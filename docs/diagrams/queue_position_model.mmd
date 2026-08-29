@@ -1,0 +1,14 @@
+flowchart TD
+    SUB["Child LIMIT order submitted<br/>arrival = decision_ts + fixed latency + seeded jitter (one draw)"] --> JOIN["Join level at price p:<br/>ahead_qty = displayed depth at p on arrival"]
+    JOIN --> OBS{"next market event at level p"}
+    OBS -->|"EXECUTE qty q ahead"| DEC1["ahead_qty -= q<br/>(leftover after ahead exhausted fills US)"]
+    OBS -->|"CANCEL qty q ahead"| DEC2["ahead_qty -= q"]
+    OBS -->|"marketable ADD consumes level"| DEC3["treated like EXECUTE volume<br/>(marketable-ADD expansion)"]
+    OBS -->|"trade-through: opposite side<br/>crosses our price"| FILL["FILL (maker) at our price<br/>+ rebate - none of the spread"]
+    DEC1 --> CHK{"ahead_qty <= 0 and<br/>incoming volume remains?"}
+    DEC2 --> OBS
+    DEC3 --> OBS
+    CHK -- yes --> FILL
+    CHK -- no --> OBS
+    FILL --> ACC["Fill record: price_ticks, qty, ts,<br/>maker/taker flag, fee/rebate, impact<br/>(golden: expected_replay_fills.json)"]
+    CROSS["crossing exemption: displayed liquidity a<br/>marketable limit already consumed is not<br/>double-counted against ahead_qty"] -.-> DEC3

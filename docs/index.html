@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>intraday-alpha-platform — polyglot research-to-production trading system</title>
+<!-- GitHub Pages landing page. If the repository is renamed, update the
+     github.com/AshJha0/intraday-alpha-platform links below to match. -->
+<style>
+:root{--teal:#16697a;--green:#16a085;--ink:#1a1a2e;--muted:#556}
+body{font-family:'Segoe UI',Arial,sans-serif;margin:0;color:var(--ink);background:#f7f8fa}
+header{background:var(--teal);color:#fff;padding:3rem 2rem}
+header h1{margin:0 0 .5rem;font-size:2.2rem}
+header p{margin:0;max-width:52rem;opacity:.92;line-height:1.5}
+.wrap{max-width:64rem;margin:0 auto;padding:0 2rem}
+nav{margin-top:1.2rem}
+nav a{display:inline-block;background:var(--green);color:#fff;text-decoration:none;
+  padding:.55rem 1.1rem;margin:.25rem .6rem .25rem 0;border-radius:4px;font-weight:600}
+nav a.secondary{background:rgba(255,255,255,.15)}
+h2{color:var(--teal);border-bottom:2px solid #e3e8ec;padding-bottom:.3rem;margin-top:2.5rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(17rem,1fr));gap:1rem;margin:1.2rem 0}
+.card{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.12);padding:1rem 1.2rem;border-radius:4px}
+.card h3{margin:.1rem 0 .5rem;font-size:1.02rem;color:var(--teal)}
+.card p{margin:0;font-size:.9rem;color:var(--muted);line-height:1.45}
+pre{background:#10222a;color:#d7e3ea;padding:1rem 1.2rem;border-radius:4px;overflow-x:auto;
+  font-size:.85rem;line-height:1.5}
+.numbers{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.12);border-radius:4px;
+  padding:1rem 1.4rem;font-family:Consolas,monospace;font-size:.88rem;line-height:1.7}
+.honest{background:#fff8ec;border-left:4px solid var(--green);padding:.8rem 1.2rem;
+  border-radius:4px;font-size:.92rem;line-height:1.55;margin:1.2rem 0}
+footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>intraday-alpha-platform</h1>
+    <p>An institutional-style, event-driven research-to-production trading platform for
+       equities and FX — deliberately polyglot: Python for research and reference
+       implementations, C++ for the latency-critical path, Rust for safety-critical
+       infrastructure, Java for the strategy/platform layer. Market data → order books →
+       205-feature factory → 24 alphas → validation → ML → portfolio → fail-closed risk →
+       execution/SOR → deterministic replay → TCA, held together by cross-language
+       golden tests.</p>
+    <nav>
+      <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/LEARN.md">Learn (guide)</a>
+      <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/COOKBOOK.md">Cookbook</a>
+      <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+      <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/DIAGRAMS.md">Diagrams</a>
+      <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/papers/INDEX.md">Research papers</a>
+      <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/SPECIFICATION.md">Specification</a>
+      <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap">
+  <h2>Measured, not claimed</h2>
+  <div class="numbers">
+    Cross-language parity&nbsp;&nbsp;&nbsp; python 443&nbsp; · cpp 175&nbsp; · rust 181&nbsp; · java 291 tests — 1,090 green, one command<br>
+    Golden suites&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; identical book states, byte-identical IAP1 SHA-256, features/alphas to 1e-9 in all four languages<br>
+    C++ hot path&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; IAP1 decode 3.5 ns/event · book update 17.4 ns · replay 37M events/s · 48-feature engine ≈450 ns/event<br>
+    Determinism&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; full dataset regeneration is byte-identical (sha256-verified); replays reproduce fills exactly<br>
+    Feature factory&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 205 registered, versioned features across 10 families; validity-bitset semantics, no NaN ever valid<br>
+    Alpha research&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 24 flagship alphas · walk-forward + purging/embargo · 1,224-experiment multiple-testing ledger<br>
+    Verdicts (honest)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0 PROMOTE · 12 ITERATE · 12 REJECT — on clean synthetic data, nothing survives costs, and we say so
+  </div>
+
+  <div class="honest">
+    <strong>Research truth over backtest cosmetics.</strong> The adversarial review of this
+    platform found — and fixed — a generator artifact that left the consolidated equity book
+    crossed 95% of the time and silently inflated ML information coefficients. After the fix
+    (a shared efficient price per instrument) the crossed fraction is 0.8%, every golden file
+    and research report was regenerated, and the alpha promotion count honestly fell from 2 to 0.
+    The full story is a worked case study in
+    <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/LEARN.md">LEARN.md §7</a>.
+  </div>
+
+  <h2>What's inside</h2>
+  <div class="grid">
+    <div class="card"><h3>Market data foundation</h3>
+      <p>Seeded synthetic equity MBO + multi-venue FX quote generator (regime-switching
+         efficient price, clustered flow, halts/auctions, injected anomalies), raw→normalized
+         pipeline with sequence-gap/duplicate/out-of-order QC, JSONL + IAP1 binary codecs
+         byte-identical across languages, Parquet research datasets.</p></div>
+    <div class="card"><h3>Order books</h3>
+      <p>L1/L2/MBO reconstruction with FIFO queues, pinned modify semantics, marketable
+         crossing ADDs, snapshot recovery (incl. broken-burst rule), per-venue + consolidated
+         views, deterministic checkpoints — identical state in Python, C++, Rust and Java
+         after every event.</p></div>
+    <div class="card"><h3>Feature factory</h3>
+      <p>205 registered features across price, microstructure, order flow (OFI L1–L10),
+         liquidity, volatility, time-of-day, cross-asset, venue, regime and execution
+         families; event-driven incremental engines in all four languages validated to 1e-9
+         against golden checkpoints.</p></div>
+    <div class="card"><h3>Alpha library</h3>
+      <p>12 equity + 12 FX flagship alphas (microprice, multi-level OFI, queue depletion,
+         momentum/reversal, VWAP deviation, lead-lag, carry-style currency factors,
+         regime-conditioned variants), each with a mandatory economic-rationale docstring
+         and declared feature dependencies.</p></div>
+    <div class="card"><h3>Validation framework</h3>
+      <p>Event-time labels at 11 horizons (10ms–15m), walk-forward with purging + embargo,
+         automatic leakage tests, IC/RankIC/Newey-West t/hit/decay/turnover/capacity,
+         a persistent multiple-testing ledger, and cost/latency/regime stress — the §20
+         promotion gates, enforced literally.</p></div>
+    <div class="card"><h3>ML &amp; meta-labeling</h3>
+      <p>Linear baselines gate the advanced models (literally — trees/MLP only run if the
+         baseline shows OOS signal), LightGBM/XGBoost, isotonic-calibrated trade/no-trade
+         meta-labels evaluated economically, and full reproducibility manifests
+         (data/feature/model versions, windows, hardware) on every fit.</p></div>
+    <div class="card"><h3>Portfolio construction</h3>
+      <p>alpha'w − λ·w'Σw − tc(Δw) under position/gross/net/participation/turnover/
+         vol-target and FX currency-exposure constraints; deterministic projected-gradient
+         production optimizer (Java) matching the Python reference to 1e-9, with a
+         constraint-audit report.</p></div>
+    <div class="card"><h3>Fail-closed risk</h3>
+      <p>Fat-finger, price-band, stale-price, position/notional/gross/net, loss limits,
+         rate throttle, duplicate-order and self-match prevention, sequence-gap gating,
+         venue-disconnect handling and four-scope kill switches — Rust reference + Java
+         port with byte-identical audit logs, replayable.</p></div>
+    <div class="card"><h3>Execution &amp; SOR</h3>
+      <p>Market/limit/IOC/FOK, VWAP/TWAP/POV/IS parent algos, deterministic queue-position
+         modeling for passive orders (pinned depletion rules), fees/rebates/impact,
+         venue latency with seeded jitter, and fee-aware smart order routing — C++ reference
+         fills reproduced exactly by Java.</p></div>
+    <div class="card"><h3>Event-driven backtester</h3>
+      <p>Replays every market event in event-time through book → features → alphas →
+         portfolio → risk → execution with modeled decision/wire/venue latency, partial
+         fills and queue position; identity-tested P&amp;L accounting; checkpoint/restart
+         bit-identical to uninterrupted runs.</p></div>
+    <div class="card"><h3>TCA &amp; attribution</h3>
+      <p>Arrival/VWAP/TWAP benchmarks, Perold implementation-shortfall decomposition
+         (delay/trading/opportunity — exact identity), spread/impact/timing split,
+         post-fill adverse-selection markouts at 100ms/1s/10s, and impact regression
+         versus participation.</p></div>
+    <div class="card"><h3>Cross-language golden parity</h3>
+      <p>The Python reference generates validated golden vectors (events, book states,
+         codec SHA-256, features, alphas, risk decisions, fills, portfolio); C++, Rust and
+         Java must reproduce every one. <code>tests/harness/run_all.sh</code> prints the
+         parity table in one command.</p></div>
+    <div class="card"><h3>Observability &amp; deployment</h3>
+      <p>Prometheus metrics (rust telemetry + 19 live Java metrics with /metrics, /health),
+         recording + alert rules, two Grafana dashboards, structured JSONL logs,
+         Dockerfiles + docker-compose + Kubernetes manifests, runbooks, governance and
+         reproducibility docs, and a paper-trading mode.</p></div>
+    <div class="card"><h3>Research papers</h3>
+      <p>Six case studies written from the platform's own measured outputs: OFI
+         predictability, microprice/queue dynamics in FX, cross-venue lead-lag, alpha decay
+         vs latency economics, queue-aware execution and adverse selection, and
+         C++ vs Rust vs Java for event-driven trading.</p></div>
+    <div class="card"><h3>Performance engineering</h3>
+      <p>Benchmark suite with published methodology (hardware, toolchain, boundaries,
+         variance caveats — no isolated numbers): codec, book, replay, feature engine,
+         alpha scoring and execution-sim stages, plus demo-scale Rust/Java replay
+         throughput.</p></div>
+  </div>
+
+  <h2>Quick start</h2>
+<pre>git clone https://github.com/AshJha0/intraday-alpha-platform && cd intraday-alpha-platform
+
+# generate the deterministic synthetic dataset, then the feature/label store
+cd python && PYTHONPATH=src python3 -m iap.marketdata && PYTHONPATH=src python3 -m iap.features && cd ..
+
+# run everything — builds and tests all four languages, prints the parity table
+bash tests/harness/run_all.sh
+
+# research pipelines (honest reports in research/)
+PYTHONPATH=python/src python3 research/alpha_reports/run_all.py
+PYTHONPATH=python/src python3 research/ml_reports/run_ml.py
+
+# paper trading with live /metrics on :8080
+cd java && ./paper.sh</pre>
+
+  <footer>intraday-alpha-platform — a polyglot, golden-tested, honestly-validated trading
+    platform built on fully synthetic data for education and demonstration.
+    See <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/SPECIFICATION.md">the
+    governing specification</a> and
+    <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/README.md">README</a>.</footer>
+</div>
+</body>
+</html>

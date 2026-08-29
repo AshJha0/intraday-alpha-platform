@@ -1,0 +1,30 @@
+flowchart LR
+    subgraph PYL["Python — research + reference"]
+        pcore["core / codec / book / replay<br/>(reference for all ports)"]
+        pfeat["205-feature factory + labels"]
+        presearch["24 alphas · validation · ML ·<br/>portfolio ref · TCA ref · backtester"]
+    end
+    subgraph CPPL["C++ — latency-critical path"]
+        ccore["codec · book · replay<br/>3.5 / 17.4 ns per event"]
+        cfeat["48-feature native engine ≈450 ns"]
+        cexec["execution simulator + algos + SOR<br/>(FILLS REFERENCE)"]
+        cbench["bench_all — published methodology"]
+    end
+    subgraph RSL["Rust — safety-critical infrastructure"]
+        rcore["codec · book · replay · SPSC eventbus"]
+        rrisk["fail-closed risk engine<br/>(RISK REFERENCE, audit JSONL)"]
+        rven["venue wire codec + simulated venue"]
+        rtel["telemetry: counters/gauges/histograms<br/>Prometheus exposition"]
+    end
+    subgraph JVL["Java — institutional platform layer"]
+        jcore["codec · book · replay · features · alphas"]
+        jplat["event-driven backtester · portfolio service ·<br/>risk orchestration · execution/SOR · TCA service"]
+        jops["monitoring /metrics /health · config service ·<br/>paper trading"]
+    end
+    pcore -->|"golden vectors + expected_*"| ccore
+    pcore -->|"golden"| rcore
+    pcore -->|"golden"| jcore
+    cexec -->|"expected_replay_fills.json"| jplat
+    rrisk -->|"expected_risk_decisions.json<br/>byte-identical audit"| jplat
+    presearch -->|"expected_portfolio / tca / alpha"| jplat
+    rtel -.->|"metric naming contract"| jops

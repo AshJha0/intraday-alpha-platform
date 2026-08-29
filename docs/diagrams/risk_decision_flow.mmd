@@ -1,0 +1,24 @@
+flowchart TD
+    OR["OrderRequest"] --> KG{"kill switches?<br/>global > strategy > instrument > venue"}
+    KG -- engaged --> REJ["REJECT + RiskEvent<br/>(rule_id, severity, audit JSONL)"]
+    KG -- clear --> MAL{"malformed / unknown instrument?"}
+    MAL -- yes --> REJ
+    MAL -- no --> DUP{"duplicate order_id?"}
+    DUP -- yes --> REJ
+    DUP -- no --> FF{"fat-finger qty / notional?"}
+    FF -- breach --> REJ
+    FF -- ok --> PB{"price band vs last mid?<br/>stale price age? sequence gap?<br/>venue disconnected?"}
+    PB -- breach --> REJ
+    PB -- ok --> SM{"self-match vs own resting orders?<br/>(conservative for unpriced MARKET)"}
+    SM -- would cross --> REJ
+    SM -- ok --> RT{"order-rate token bucket<br/>(event-time refill)"}
+    RT -- exhausted --> REJ
+    RT -- ok --> LIM{"worst-case position / instrument /<br/>gross / net notional projections"}
+    LIM -- breach --> REJ
+    LIM -- ok --> PNL{"daily / strategy loss limits<br/>(avg-cost realized PnL, latched)"}
+    PNL -- breached --> KILL["engage kill switch +<br/>REJECT"]
+    PNL -- ok --> ALLOW["ALLOW -> execution"]
+    ALLOW --> FILLS["fills feed back:<br/>positions, PnL, resting-order set"]
+    FILLS -.-> SM
+    FILLS -.-> LIM
+    FILLS -.-> PNL
