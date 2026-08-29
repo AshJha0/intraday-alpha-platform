@@ -1,0 +1,9 @@
+[package]
+name = "telemetry"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "IAP lightweight metrics registry (counters/gauges/log2 histograms), Prometheus text writer, JSONL logger"
+
+[dependencies]
+serde_json = { workspace = true }

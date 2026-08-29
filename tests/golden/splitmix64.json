@@ -1,0 +1,20 @@
+{
+  "description": "SplitMix64 known-answer test (conventions section 3). first_5_u64 are the raw outputs for the given seed; first_5_uniform are (out >> 11) * 2^-53 as exact doubles.",
+  "seed": 42,
+  "first_5_u64": [
+    13679457532755275413,
+    2949826092126892291,
+    5139283748462763858,
+    6349198060258255764,
+    701532786141963250
+  ],
+  "first_5_uniform": [
+    0.7415648787718233,
+    0.1599103928769201,
+    0.27860113025513866,
+    0.34419071652363753,
+    0.03803016854024621
+  ],
+  "golden_eq_seed": 4242424242,
+  "golden_fx_seed": 8484848484
+}

@@ -1,0 +1,30 @@
+{
+  "x-version": 2,
+  "description": "Complete pinned hard-risk limit set (spec section 16), consumed by the Rust risk engine (rust/risk). FAIL-CLOSED: a missing or invalid limit puts the engine in reject-everything mode; every decision is emitted as a RiskEvent (schemas/risk_event.schema.json) to a JSONL audit log; decisions are deterministic and replayable. duplicate_order_window_ns 0 means the entire session; order rate is a per-strategy event-time token bucket (rate max_order_rate_per_sec, capacity order_rate_burst).",
+  "global": {
+    "kill_switch_engaged": false,
+    "max_gross_notional": 5000000.0,
+    "max_net_notional": 2500000.0,
+    "max_daily_loss": 250000.0,
+    "max_order_rate_per_sec": 500,
+    "order_rate_burst": 4
+  },
+  "per_order": {
+    "max_order_qty": 50000,
+    "max_order_notional": 1000000.0,
+    "price_band_bps": 200.0,
+    "stale_book_reject": true,
+    "duplicate_order_window_ns": 0
+  },
+  "per_instrument": {
+    "max_position_qty": 100000,
+    "max_instrument_notional": 2400000.0
+  },
+  "per_strategy": {
+    "max_daily_loss": 50000.0
+  },
+  "market_data": {
+    "max_sequence_gap_before_halt": 1,
+    "stale_feed_timeout_ns": 5000000000
+  }
+}

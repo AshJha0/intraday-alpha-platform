@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iap.example/schemas/book_update.schema.json",
+  "title": "BookUpdate",
+  "description": "Per-level book state update derived from order-book reconstruction (spec section 6).",
+  "x-version": 1,
+  "type": "object",
+  "properties": {
+    "instrument_id": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "venue_id": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 65535,
+      "description": "0 = consolidated book."
+    },
+    "side": {
+      "type": "integer",
+      "enum": [
+        0,
+        1
+      ]
+    },
+    "price_ticks": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807
+    },
+    "size": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807,
+      "description": "Total resting quantity at the level; 0 = level removed."
+    },
+    "order_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295,
+      "description": "Number of resting orders at the level."
+    },
+    "level": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 255,
+      "description": "Depth level, 0 = best."
+    },
+    "stale": {
+      "type": "boolean",
+      "description": "True while the source book is gap-stale awaiting SNAPSHOT."
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "exchange_ts": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807
+    },
+    "receive_ts": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807
+    }
+  },
+  "required": [
+    "instrument_id",
+    "venue_id",
+    "side",
+    "price_ticks",
+    "size",
+    "order_count",
+    "level",
+    "stale",
+    "sequence",
+    "exchange_ts",
+    "receive_ts"
+  ],
+  "additionalProperties": false
+}

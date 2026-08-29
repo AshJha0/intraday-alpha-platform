@@ -1,0 +1,336 @@
+{
+  "x-version": 1,
+  "description": "Synthetic universe. tick_size: real price per tick; lot_size: base units per board lot (EQ shares) / 1 qty unit = 1,000 base ccy (FX). adv in base units/day.",
+  "calendar": {
+    "trading_days": [
+      "2026-08-24",
+      "2026-08-25",
+      "2026-08-26",
+      "2026-08-27",
+      "2026-08-28"
+    ],
+    "timezone": "UTC"
+  },
+  "sessions": {
+    "EQUITY": {
+      "open": "13:30:00",
+      "close": "20:00:00",
+      "open_auction": "13:30:00",
+      "close_auction": "20:00:00"
+    },
+    "ETF": {
+      "open": "13:30:00",
+      "close": "20:00:00",
+      "open_auction": "13:30:00",
+      "close_auction": "20:00:00"
+    },
+    "FX": {
+      "open": "00:00:00",
+      "close": "21:00:00"
+    }
+  },
+  "instruments": [
+    {
+      "symbol": "SYN.EQ.001",
+      "instrument_id": 1,
+      "asset_class": "EQUITY",
+      "currency": "USD",
+      "tick_size": 0.01,
+      "lot_size": 100,
+      "ref_price": 24.5,
+      "adv": 38000000,
+      "venues": [
+        "XV1",
+        "XV2"
+      ]
+    },
+    {
+      "symbol": "SYN.EQ.002",
+      "instrument_id": 2,
+      "asset_class": "EQUITY",
+      "currency": "USD",
+      "tick_size": 0.01,
+      "lot_size": 100,
+      "ref_price": 31.2,
+      "adv": 22000000,
+      "venues": [
+        "XV1",
+        "XV2"
+      ]
+    },
+    {
+      "symbol": "SYN.EQ.003",
+      "instrument_id": 3,
+      "asset_class": "EQUITY",
+      "currency": "USD",
+      "tick_size": 0.01,
+      "lot_size": 100,
+      "ref_price": 47.8,
+      "adv": 15000000,
+      "venues": [
+        "XV1",
+        "XV2"
+      ]
+    },
+    {
+      "symbol": "SYN.EQ.004",
+      "instrument_id": 4,
+      "asset_class": "EQUITY",
+      "currency": "USD",
+      "tick_size": 0.01,
+      "lot_size": 100,
+      "ref_price": 62.35,
+      "adv": 12000000,
+      "venues": [
+        "XV1",
+        "XV2"
+      ]
+    },
+    {
+      "symbol": "SYN.EQ.005",
+      "instrument_id": 5,
+      "asset_class": "EQUITY",
+      "currency": "USD",
+      "tick_size": 0.01,
+      "lot_size": 100,
+      "ref_price": 88.1,
+      "adv": 9000000,
+      "venues": [
+        "XV1",
+        "XV2"
+      ]
+    },
+    {
+      "symbol": "SYN.EQ.006",
+      "instrument_id": 6,
+      "asset_class": "EQUITY",
+      "currency": "USD",
+      "tick_size": 0.01,
+      "lot_size": 100,
+      "ref_price": 105.4,
+      "adv": 7500000,
+      "venues": [
+        "XV1",
+        "XV2"
+      ]
+    },
+    {
+      "symbol": "SYN.EQ.007",
+      "instrument_id": 7,
+      "asset_class": "EQUITY",
+      "currency": "USD",
+      "tick_size": 0.01,
+      "lot_size": 100,
+      "ref_price": 142.75,
+      "adv": 6000000,
+      "venues": [
+        "XV1",
+        "XV2"
+      ]
+    },
+    {
+      "symbol": "SYN.EQ.008",
+      "instrument_id": 8,
+      "asset_class": "EQUITY",
+      "currency": "USD",
+      "tick_size": 0.01,
+      "lot_size": 100,
+      "ref_price": 189.6,
+      "adv": 4500000,
+      "venues": [
+        "XV1",
+        "XV2"
+      ]
+    },
+    {
+      "symbol": "SYN.EQ.009",
+      "instrument_id": 9,
+      "asset_class": "EQUITY",
+      "currency": "USD",
+      "tick_size": 0.01,
+      "lot_size": 100,
+      "ref_price": 256.3,
+      "adv": 3000000,
+      "venues": [
+        "XV1",
+        "XV2"
+      ]
+    },
+    {
+      "symbol": "SYN.EQ.010",
+      "instrument_id": 10,
+      "asset_class": "EQUITY",
+      "currency": "USD",
+      "tick_size": 0.01,
+      "lot_size": 100,
+      "ref_price": 412.9,
+      "adv": 1800000,
+      "venues": [
+        "XV1",
+        "XV2"
+      ]
+    },
+    {
+      "symbol": "SYN.ETF.IDX",
+      "instrument_id": 11,
+      "asset_class": "ETF",
+      "currency": "USD",
+      "tick_size": 0.01,
+      "lot_size": 100,
+      "ref_price": 402.5,
+      "adv": 65000000,
+      "venues": [
+        "XV1",
+        "XV2"
+      ],
+      "underlying": [
+        "SYN.EQ.001",
+        "SYN.EQ.002",
+        "SYN.EQ.003",
+        "SYN.EQ.004",
+        "SYN.EQ.005",
+        "SYN.EQ.006",
+        "SYN.EQ.007",
+        "SYN.EQ.008",
+        "SYN.EQ.009",
+        "SYN.EQ.010"
+      ]
+    },
+    {
+      "symbol": "EUR/USD",
+      "instrument_id": 101,
+      "asset_class": "FX",
+      "base_currency": "EUR",
+      "quote_currency": "USD",
+      "tick_size": 1e-05,
+      "lot_size": 1000,
+      "ref_price": 1.0865,
+      "adv": 4000000000,
+      "venues": [
+        "LP1",
+        "LP2",
+        "PRI"
+      ],
+      "pip": 0.0001
+    },
+    {
+      "symbol": "GBP/USD",
+      "instrument_id": 102,
+      "asset_class": "FX",
+      "base_currency": "GBP",
+      "quote_currency": "USD",
+      "tick_size": 1e-05,
+      "lot_size": 1000,
+      "ref_price": 1.2734,
+      "adv": 4000000000,
+      "venues": [
+        "LP1",
+        "LP2",
+        "PRI"
+      ],
+      "pip": 0.0001
+    },
+    {
+      "symbol": "USD/JPY",
+      "instrument_id": 103,
+      "asset_class": "FX",
+      "base_currency": "USD",
+      "quote_currency": "JPY",
+      "tick_size": 0.001,
+      "lot_size": 1000,
+      "ref_price": 147.52,
+      "adv": 4000000000,
+      "venues": [
+        "LP1",
+        "LP2",
+        "PRI"
+      ],
+      "pip": 0.01
+    },
+    {
+      "symbol": "AUD/USD",
+      "instrument_id": 104,
+      "asset_class": "FX",
+      "base_currency": "AUD",
+      "quote_currency": "USD",
+      "tick_size": 1e-05,
+      "lot_size": 1000,
+      "ref_price": 0.6621,
+      "adv": 4000000000,
+      "venues": [
+        "LP1",
+        "LP2",
+        "PRI"
+      ],
+      "pip": 0.0001
+    },
+    {
+      "symbol": "USD/CAD",
+      "instrument_id": 105,
+      "asset_class": "FX",
+      "base_currency": "USD",
+      "quote_currency": "CAD",
+      "tick_size": 1e-05,
+      "lot_size": 1000,
+      "ref_price": 1.3548,
+      "adv": 4000000000,
+      "venues": [
+        "LP1",
+        "LP2",
+        "PRI"
+      ],
+      "pip": 0.0001
+    },
+    {
+      "symbol": "USD/CHF",
+      "instrument_id": 106,
+      "asset_class": "FX",
+      "base_currency": "USD",
+      "quote_currency": "CHF",
+      "tick_size": 1e-05,
+      "lot_size": 1000,
+      "ref_price": 0.8819,
+      "adv": 4000000000,
+      "venues": [
+        "LP1",
+        "LP2",
+        "PRI"
+      ],
+      "pip": 0.0001
+    },
+    {
+      "symbol": "NZD/USD",
+      "instrument_id": 107,
+      "asset_class": "FX",
+      "base_currency": "NZD",
+      "quote_currency": "USD",
+      "tick_size": 1e-05,
+      "lot_size": 1000,
+      "ref_price": 0.6114,
+      "adv": 4000000000,
+      "venues": [
+        "LP1",
+        "LP2",
+        "PRI"
+      ],
+      "pip": 0.0001
+    },
+    {
+      "symbol": "EUR/GBP",
+      "instrument_id": 108,
+      "asset_class": "FX",
+      "base_currency": "EUR",
+      "quote_currency": "GBP",
+      "tick_size": 1e-05,
+      "lot_size": 1000,
+      "ref_price": 0.8532,
+      "adv": 4000000000,
+      "venues": [
+        "LP1",
+        "LP2",
+        "PRI"
+      ],
+      "pip": 0.0001
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+[package]
+name = "venue"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "IAP venue adapter layer: order/execution contracts, length-prefixed wire codec, simulated venue endpoint"
+
+[dependencies]
+marketdata = { path = "../marketdata" }
+orderbook = { path = "../orderbook" }
+telemetry = { path = "../telemetry" }
+serde = { workspace = true }
+serde_json = { workspace = true }

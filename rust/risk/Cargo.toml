@@ -1,0 +1,13 @@
+[package]
+name = "risk"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "IAP fail-closed hard risk engine: pre-trade checks, kill switches, deterministic replayable RiskEvent audit log"
+
+[dependencies]
+marketdata = { path = "../marketdata" }
+venue = { path = "../venue" }
+telemetry = { path = "../telemetry" }
+serde = { workspace = true }
+serde_json = { workspace = true }

@@ -1,0 +1,1179 @@
+{
+  "description": "Feature-engine golden checkpoints: representative feature values (every family) after applying the first N events of each golden vector with emission cadence = every event. value is null when valid is false. Tolerance: abs 1e-9 / rel 1e-9. Validated against independent brute-force pandas recomputation before writing.",
+  "registry_hash": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
+  "registered_count": 205,
+  "tolerance": {
+    "abs": 1e-09,
+    "rel": 1e-09
+  },
+  "eq": {
+    "vector": "events_eq_mbo.jsonl",
+    "instrument_id": 1,
+    "checkpoints": {
+      "500": {
+        "timestamp": 1787579830566121437,
+        "features": {
+          "ret_simple_5s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_log_1m_v1": {
+            "value": 0.0008168266739652097,
+            "valid": true
+          },
+          "ret_accel_10s_v1": {
+            "value": -0.00040832993625805614,
+            "valid": true
+          },
+          "mid_change_ticks_1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_vol_adj_30s_v1": {
+            "value": 5.476106901478297,
+            "valid": true
+          },
+          "mid_price_v1": {
+            "value": 24.495,
+            "valid": true
+          },
+          "microprice_v1": {
+            "value": 24.493939393939396,
+            "valid": true
+          },
+          "micro_mid_dev_bps_v1": {
+            "value": -0.4329887979608475,
+            "valid": true
+          },
+          "spread_ticks_v1": {
+            "value": 7.0,
+            "valid": true
+          },
+          "spread_bps_v1": {
+            "value": 28.57726066544193,
+            "valid": true
+          },
+          "imbalance_l1_v1": {
+            "value": -0.030303030303030304,
+            "valid": true
+          },
+          "imbalance_l5_v1": {
+            "value": -0.10256410256410256,
+            "valid": true
+          },
+          "depth_bid_l1_v1": {
+            "value": 1600.0,
+            "valid": true
+          },
+          "depth_ask_l10_v1": {
+            "value": 4300.0,
+            "valid": true
+          },
+          "depth_bid_l5_avg_w10s_v1": {
+            "value": 3760.0,
+            "valid": true
+          },
+          "queue_depletion_rate_bid_w10s_v1": {
+            "value": 10.0,
+            "valid": true
+          },
+          "ofi_l1_w1s_v1": {
+            "value": -100.0,
+            "valid": true
+          },
+          "ofi_l5_w5s_v1": {
+            "value": 300.0,
+            "valid": true
+          },
+          "ofi_l10_w30s_v1": {
+            "value": 400.0,
+            "valid": true
+          },
+          "signed_volume_w1m_v1": {
+            "value": 200.0,
+            "valid": true
+          },
+          "trade_imbalance_w10s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "cancel_intensity_w10s_v1": {
+            "value": 0.3,
+            "valid": true
+          },
+          "add_intensity_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "quoted_depth_total_v1": {
+            "value": 7800.0,
+            "valid": true
+          },
+          "effective_spread_bps_w1m_v1": {
+            "value": 28.592828801997957,
+            "valid": true
+          },
+          "participation_w1m_v1": {
+            "value": 0.04406364749082007,
+            "valid": true
+          },
+          "resiliency_halflife_v1": {
+            "value": 1143692847923909.8,
+            "valid": true
+          },
+          "rvol_w1m_v1": {
+            "value": 7.456573403848616e-05,
+            "valid": true
+          },
+          "range_bps_w1m_v1": {
+            "value": 4.082465809348847,
+            "valid": true
+          },
+          "vol_ratio_w10s_w1m_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "minute_of_day_v1": {
+            "value": 837.17610202395,
+            "valid": true
+          },
+          "session_frac_v1": {
+            "value": 0.06968231288192299,
+            "valid": true
+          },
+          "norm_spread_m5_v1": {
+            "value": 1.2417584458619193,
+            "valid": true
+          },
+          "ref_ret_1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ref_ret_1m_v1": {
+            "value": null,
+            "valid": false
+          },
+          "corr_contemp_w5m_v1": {
+            "value": null,
+            "valid": false
+          },
+          "venue_count_active_v1": {
+            "value": 1.0,
+            "valid": true
+          },
+          "venue_depth_hhi_v1": {
+            "value": 1.0,
+            "valid": true
+          },
+          "venue_imbalance_divergence_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "venue_update_share_top_w10s_v1": {
+            "value": 1.0,
+            "valid": true
+          },
+          "trend_score_w1m_v1": {
+            "value": 1.414213530437988,
+            "valid": true
+          },
+          "meanrev_score_w1m_v1": {
+            "value": -0.9999999999989999,
+            "valid": true
+          },
+          "vol_regime_ratio_v1": {
+            "value": 1.6899878752804744,
+            "valid": true
+          },
+          "half_spread_cost_bps_v1": {
+            "value": 14.288630332720965,
+            "valid": true
+          },
+          "fill_prob_bid_h1s_v1": {
+            "value": 0.006230509376605298,
+            "valid": true
+          },
+          "alpha_decay_proxy_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "urgency_score_v1": {
+            "value": 0.0,
+            "valid": true
+          }
+        }
+      },
+      "1000": {
+        "timestamp": 1787581487493488657,
+        "features": {
+          "ret_simple_5s_v1": {
+            "value": 0.0006200909466722582,
+            "valid": true
+          },
+          "ret_log_1m_v1": {
+            "value": 0.0008266171167115033,
+            "valid": true
+          },
+          "ret_accel_10s_v1": {
+            "value": 0.0008266171167115033,
+            "valid": true
+          },
+          "mid_change_ticks_1s_v1": {
+            "value": 1.5,
+            "valid": true
+          },
+          "ret_vol_adj_30s_v1": {
+            "value": 9.798566338027264,
+            "valid": true
+          },
+          "mid_price_v1": {
+            "value": 24.205000000000002,
+            "valid": true
+          },
+          "microprice_v1": {
+            "value": 24.203636363636367,
+            "valid": true
+          },
+          "micro_mid_dev_bps_v1": {
+            "value": -0.5633697019769153,
+            "valid": true
+          },
+          "spread_ticks_v1": {
+            "value": 1.0,
+            "valid": true
+          },
+          "spread_bps_v1": {
+            "value": 4.131377814501136,
+            "valid": true
+          },
+          "imbalance_l1_v1": {
+            "value": -0.2727272727272727,
+            "valid": true
+          },
+          "imbalance_l5_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "depth_bid_l1_v1": {
+            "value": 400.0,
+            "valid": true
+          },
+          "depth_ask_l10_v1": {
+            "value": 2300.0,
+            "valid": true
+          },
+          "depth_bid_l5_avg_w10s_v1": {
+            "value": 1720.0,
+            "valid": true
+          },
+          "queue_depletion_rate_bid_w10s_v1": {
+            "value": 20.0,
+            "valid": true
+          },
+          "ofi_l1_w1s_v1": {
+            "value": -400.0,
+            "valid": true
+          },
+          "ofi_l5_w5s_v1": {
+            "value": 900.0,
+            "valid": true
+          },
+          "ofi_l10_w30s_v1": {
+            "value": 1100.0,
+            "valid": true
+          },
+          "signed_volume_w1m_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "trade_imbalance_w10s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "cancel_intensity_w10s_v1": {
+            "value": 0.2,
+            "valid": true
+          },
+          "add_intensity_w1s_v1": {
+            "value": 1.0,
+            "valid": true
+          },
+          "quoted_depth_total_v1": {
+            "value": 4600.0,
+            "valid": true
+          },
+          "effective_spread_bps_w1m_v1": {
+            "value": 12.404382881950141,
+            "valid": true
+          },
+          "participation_w1m_v1": {
+            "value": 0.08232445520581112,
+            "valid": true
+          },
+          "resiliency_halflife_v1": {
+            "value": 4.235899436755174,
+            "valid": true
+          },
+          "rvol_w1m_v1": {
+            "value": 8.436102572525514e-05,
+            "valid": true
+          },
+          "range_bps_w1m_v1": {
+            "value": 6.197066721751704,
+            "valid": true
+          },
+          "vol_ratio_w10s_w1m_v1": {
+            "value": 2.449489713747372,
+            "valid": true
+          },
+          "minute_of_day_v1": {
+            "value": 864.7915581442833,
+            "valid": true
+          },
+          "session_frac_v1": {
+            "value": 0.14049117472893147,
+            "valid": true
+          },
+          "norm_spread_m5_v1": {
+            "value": 0.17603557421199337,
+            "valid": true
+          },
+          "ref_ret_1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ref_ret_1m_v1": {
+            "value": null,
+            "valid": false
+          },
+          "corr_contemp_w5m_v1": {
+            "value": null,
+            "valid": false
+          },
+          "venue_count_active_v1": {
+            "value": 1.0,
+            "valid": true
+          },
+          "venue_depth_hhi_v1": {
+            "value": 1.0,
+            "valid": true
+          },
+          "venue_imbalance_divergence_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "venue_update_share_top_w10s_v1": {
+            "value": 1.0,
+            "valid": true
+          },
+          "trend_score_w1m_v1": {
+            "value": 1.264989487855384,
+            "valid": true
+          },
+          "meanrev_score_w1m_v1": {
+            "value": -0.9999999999993333,
+            "valid": true
+          },
+          "vol_regime_ratio_v1": {
+            "value": 0.4953500917432119,
+            "valid": true
+          },
+          "half_spread_cost_bps_v1": {
+            "value": 2.065688907250568,
+            "valid": true
+          },
+          "fill_prob_bid_h1s_v1": {
+            "value": 0.048770575499285984,
+            "valid": true
+          },
+          "alpha_decay_proxy_v1": {
+            "value": 2.449489713747372,
+            "valid": true
+          },
+          "urgency_score_v1": {
+            "value": 0.33402132460191436,
+            "valid": true
+          }
+        }
+      },
+      "1500": {
+        "timestamp": 1787583385211361810,
+        "features": {
+          "ret_simple_5s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_log_1m_v1": {
+            "value": -0.0016498250803493875,
+            "valid": true
+          },
+          "ret_accel_10s_v1": {
+            "value": 0.00041271152051081117,
+            "valid": true
+          },
+          "mid_change_ticks_1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_vol_adj_30s_v1": {
+            "value": 3.464959591506908,
+            "valid": true
+          },
+          "mid_price_v1": {
+            "value": 24.225,
+            "valid": true
+          },
+          "microprice_v1": {
+            "value": 24.221999999999998,
+            "valid": true
+          },
+          "micro_mid_dev_bps_v1": {
+            "value": -1.2383900928807703,
+            "valid": true
+          },
+          "spread_ticks_v1": {
+            "value": 3.0,
+            "valid": true
+          },
+          "spread_bps_v1": {
+            "value": 12.383900928792569,
+            "valid": true
+          },
+          "imbalance_l1_v1": {
+            "value": -0.2,
+            "valid": true
+          },
+          "imbalance_l5_v1": {
+            "value": 0.3,
+            "valid": true
+          },
+          "depth_bid_l1_v1": {
+            "value": 400.0,
+            "valid": true
+          },
+          "depth_ask_l10_v1": {
+            "value": 1400.0,
+            "valid": true
+          },
+          "depth_bid_l5_avg_w10s_v1": {
+            "value": 2600.0,
+            "valid": true
+          },
+          "queue_depletion_rate_bid_w10s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_l1_w1s_v1": {
+            "value": 300.0,
+            "valid": true
+          },
+          "ofi_l5_w5s_v1": {
+            "value": 600.0,
+            "valid": true
+          },
+          "ofi_l10_w30s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "signed_volume_w1m_v1": {
+            "value": 100.0,
+            "valid": true
+          },
+          "trade_imbalance_w10s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "cancel_intensity_w10s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "add_intensity_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "quoted_depth_total_v1": {
+            "value": 4000.0,
+            "valid": true
+          },
+          "effective_spread_bps_w1m_v1": {
+            "value": 20.61006560034144,
+            "valid": true
+          },
+          "participation_w1m_v1": {
+            "value": 0.09633027522935778,
+            "valid": true
+          },
+          "resiliency_halflife_v1": {
+            "value": 346573590279972.6,
+            "valid": true
+          },
+          "rvol_w1m_v1": {
+            "value": 0.00011915923036562396,
+            "valid": true
+          },
+          "range_bps_w1m_v1": {
+            "value": 8.25593395252838,
+            "valid": true
+          },
+          "vol_ratio_w10s_w1m_v1": {
+            "value": 4.096082772672592e-08,
+            "valid": true
+          },
+          "minute_of_day_v1": {
+            "value": 896.4201893635,
+            "valid": true
+          },
+          "session_frac_v1": {
+            "value": 0.22159022913717938,
+            "valid": true
+          },
+          "norm_spread_m5_v1": {
+            "value": 0.6286751942936577,
+            "valid": true
+          },
+          "ref_ret_1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ref_ret_1m_v1": {
+            "value": null,
+            "valid": false
+          },
+          "corr_contemp_w5m_v1": {
+            "value": null,
+            "valid": false
+          },
+          "venue_count_active_v1": {
+            "value": 1.0,
+            "valid": true
+          },
+          "venue_depth_hhi_v1": {
+            "value": 1.0,
+            "valid": true
+          },
+          "venue_imbalance_divergence_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "venue_update_share_top_w10s_v1": {
+            "value": 1.0,
+            "valid": true
+          },
+          "trend_score_w1m_v1": {
+            "value": -1.7874528152567084,
+            "valid": true
+          },
+          "meanrev_score_w1m_v1": {
+            "value": 0.3015113445775818,
+            "valid": true
+          },
+          "vol_regime_ratio_v1": {
+            "value": 1.1413208148357517,
+            "valid": true
+          },
+          "half_spread_cost_bps_v1": {
+            "value": 6.191950464396284,
+            "valid": true
+          },
+          "fill_prob_bid_h1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "alpha_decay_proxy_v1": {
+            "value": 4.096082772672592e-08,
+            "valid": true
+          },
+          "urgency_score_v1": {
+            "value": 2.048041386336296e-09,
+            "valid": true
+          }
+        }
+      },
+      "2000": {
+        "timestamp": 1787585173508725885,
+        "features": {
+          "ret_simple_5s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_log_1m_v1": {
+            "value": -0.000205994438877255,
+            "valid": true
+          },
+          "ret_accel_10s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "mid_change_ticks_1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_vol_adj_30s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "mid_price_v1": {
+            "value": 24.27,
+            "valid": true
+          },
+          "microprice_v1": {
+            "value": 24.26391304347826,
+            "valid": true
+          },
+          "micro_mid_dev_bps_v1": {
+            "value": -2.5080166962249995,
+            "valid": true
+          },
+          "spread_ticks_v1": {
+            "value": 4.0,
+            "valid": true
+          },
+          "spread_bps_v1": {
+            "value": 16.481252575195715,
+            "valid": true
+          },
+          "imbalance_l1_v1": {
+            "value": -0.30434782608695654,
+            "valid": true
+          },
+          "imbalance_l5_v1": {
+            "value": -0.07526881720430108,
+            "valid": true
+          },
+          "depth_bid_l1_v1": {
+            "value": 800.0,
+            "valid": true
+          },
+          "depth_ask_l10_v1": {
+            "value": 5000.0,
+            "valid": true
+          },
+          "depth_bid_l5_avg_w10s_v1": {
+            "value": 4650.0,
+            "valid": true
+          },
+          "queue_depletion_rate_bid_w10s_v1": {
+            "value": 70.0,
+            "valid": true
+          },
+          "ofi_l1_w1s_v1": {
+            "value": -700.0,
+            "valid": true
+          },
+          "ofi_l5_w5s_v1": {
+            "value": -700.0,
+            "valid": true
+          },
+          "ofi_l10_w30s_v1": {
+            "value": -1200.0,
+            "valid": true
+          },
+          "signed_volume_w1m_v1": {
+            "value": -100.0,
+            "valid": true
+          },
+          "trade_imbalance_w10s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "cancel_intensity_w10s_v1": {
+            "value": 0.1,
+            "valid": true
+          },
+          "add_intensity_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "quoted_depth_total_v1": {
+            "value": 10000.0,
+            "valid": true
+          },
+          "effective_spread_bps_w1m_v1": {
+            "value": 16.481252575195434,
+            "valid": true
+          },
+          "participation_w1m_v1": {
+            "value": 0.011285266457680248,
+            "valid": true
+          },
+          "resiliency_halflife_v1": {
+            "value": 797119257643937.1,
+            "valid": true
+          },
+          "rvol_w1m_v1": {
+            "value": 5.9472823667981804e-05,
+            "valid": true
+          },
+          "range_bps_w1m_v1": {
+            "value": 2.0601565718994643,
+            "valid": true
+          },
+          "vol_ratio_w10s_w1m_v1": {
+            "value": 1.5353658392370314e-07,
+            "valid": true
+          },
+          "minute_of_day_v1": {
+            "value": 926.2251454314166,
+            "valid": true
+          },
+          "session_frac_v1": {
+            "value": 0.2980131934138888,
+            "valid": true
+          },
+          "norm_spread_m5_v1": {
+            "value": 1.2778216258842021,
+            "valid": true
+          },
+          "ref_ret_1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ref_ret_1m_v1": {
+            "value": null,
+            "valid": false
+          },
+          "corr_contemp_w5m_v1": {
+            "value": null,
+            "valid": false
+          },
+          "venue_count_active_v1": {
+            "value": 1.0,
+            "valid": true
+          },
+          "venue_depth_hhi_v1": {
+            "value": 1.0,
+            "valid": true
+          },
+          "venue_imbalance_divergence_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "venue_update_share_top_w10s_v1": {
+            "value": 1.0,
+            "valid": true
+          },
+          "trend_score_w1m_v1": {
+            "value": -0.4471583154826337,
+            "valid": true
+          },
+          "meanrev_score_w1m_v1": {
+            "value": -0.999999999998,
+            "valid": true
+          },
+          "vol_regime_ratio_v1": {
+            "value": 0.3798951179153003,
+            "valid": true
+          },
+          "half_spread_cost_bps_v1": {
+            "value": 8.240626287597857,
+            "valid": true
+          },
+          "fill_prob_bid_h1s_v1": {
+            "value": 0.08378112834912232,
+            "valid": true
+          },
+          "alpha_decay_proxy_v1": {
+            "value": 1.5353658392370314e-07,
+            "valid": true
+          },
+          "urgency_score_v1": {
+            "value": 9.345705108399321e-09,
+            "valid": true
+          }
+        }
+      }
+    }
+  },
+  "fx": {
+    "vector": "events_fx_quote.jsonl",
+    "instrument_id": 101,
+    "checkpoints": {
+      "400": {
+        "timestamp": 1787544548057907396,
+        "features": {
+          "ret_simple_5s_v1": {
+            "value": 1.8406375968726962e-05,
+            "valid": true
+          },
+          "ret_log_1m_v1": {
+            "value": 2.7609436907383156e-05,
+            "valid": true
+          },
+          "ret_accel_10s_v1": {
+            "value": 1.840620657311831e-05,
+            "valid": true
+          },
+          "mid_change_ticks_1s_v1": {
+            "value": 2.0,
+            "valid": true
+          },
+          "ret_vol_adj_30s_v1": {
+            "value": 8.94423669507889,
+            "valid": true
+          },
+          "mid_price_v1": {
+            "value": 1.0866,
+            "valid": true
+          },
+          "microprice_v1": {
+            "value": 1.0866,
+            "valid": true
+          },
+          "micro_mid_dev_bps_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "spread_ticks_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "spread_bps_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "imbalance_l1_v1": {
+            "value": -0.5238095238095238,
+            "valid": true
+          },
+          "imbalance_l5_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "depth_bid_l1_v1": {
+            "value": 5.0,
+            "valid": true
+          },
+          "depth_ask_l10_v1": {
+            "value": 22.0,
+            "valid": true
+          },
+          "depth_bid_l5_avg_w10s_v1": {
+            "value": 22.0,
+            "valid": true
+          },
+          "queue_depletion_rate_bid_w10s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_l1_w1s_v1": {
+            "value": 8.0,
+            "valid": true
+          },
+          "ofi_l5_w5s_v1": {
+            "value": 5.0,
+            "valid": true
+          },
+          "ofi_l10_w30s_v1": {
+            "value": 5.0,
+            "valid": true
+          },
+          "signed_volume_w1m_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "trade_imbalance_w10s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "cancel_intensity_w10s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "add_intensity_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "quoted_depth_total_v1": {
+            "value": 44.0,
+            "valid": true
+          },
+          "effective_spread_bps_w1m_v1": {
+            "value": null,
+            "valid": false
+          },
+          "participation_w1m_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "resiliency_halflife_v1": {
+            "value": 14.55609079172974,
+            "valid": true
+          },
+          "rvol_w1m_v1": {
+            "value": 2.057883557465411e-06,
+            "valid": true
+          },
+          "range_bps_w1m_v1": {
+            "value": 0.2300754647524388,
+            "valid": true
+          },
+          "vol_ratio_w10s_w1m_v1": {
+            "value": 2.2360622606087732,
+            "valid": true
+          },
+          "minute_of_day_v1": {
+            "value": 249.1342984566,
+            "valid": true
+          },
+          "session_frac_v1": {
+            "value": 0.19772563369571428,
+            "valid": true
+          },
+          "norm_spread_m5_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ref_ret_1s_v1": {
+            "value": 1.840620657311831e-05,
+            "valid": true
+          },
+          "ref_ret_1m_v1": {
+            "value": 2.7609436907383156e-05,
+            "valid": true
+          },
+          "corr_contemp_w5m_v1": {
+            "value": 1.0,
+            "valid": true
+          },
+          "venue_count_active_v1": {
+            "value": 3.0,
+            "valid": true
+          },
+          "venue_depth_hhi_v1": {
+            "value": 0.45764462809917356,
+            "valid": true
+          },
+          "venue_imbalance_divergence_v1": {
+            "value": 0.8518518518518519,
+            "valid": true
+          },
+          "venue_update_share_top_w10s_v1": {
+            "value": 1.0,
+            "valid": true
+          },
+          "trend_score_w1m_v1": {
+            "value": 1.7320526914546677,
+            "valid": true
+          },
+          "meanrev_score_w1m_v1": {
+            "value": -1.2126781251810765,
+            "valid": true
+          },
+          "vol_regime_ratio_v1": {
+            "value": 1.9999948351120114,
+            "valid": true
+          },
+          "half_spread_cost_bps_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "fill_prob_bid_h1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "alpha_decay_proxy_v1": {
+            "value": 2.2360622606087732,
+            "valid": true
+          },
+          "urgency_score_v1": {
+            "value": 1.171270707937929,
+            "valid": true
+          }
+        }
+      },
+      "800": {
+        "timestamp": 1787561176043865152,
+        "features": {
+          "ret_simple_5s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_log_1m_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_accel_10s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "mid_change_ticks_1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_vol_adj_30s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "mid_price_v1": {
+            "value": 1.0867850000000001,
+            "valid": true
+          },
+          "microprice_v1": {
+            "value": 1.0867844000000002,
+            "valid": true
+          },
+          "micro_mid_dev_bps_v1": {
+            "value": -0.00552087119261152,
+            "valid": true
+          },
+          "spread_ticks_v1": {
+            "value": 1.0,
+            "valid": true
+          },
+          "spread_bps_v1": {
+            "value": 0.09201451989123884,
+            "valid": true
+          },
+          "imbalance_l1_v1": {
+            "value": -0.12,
+            "valid": true
+          },
+          "imbalance_l5_v1": {
+            "value": -0.18604651162790697,
+            "valid": true
+          },
+          "depth_bid_l1_v1": {
+            "value": 11.0,
+            "valid": true
+          },
+          "depth_ask_l10_v1": {
+            "value": 51.0,
+            "valid": true
+          },
+          "depth_bid_l5_avg_w10s_v1": {
+            "value": 35.0,
+            "valid": true
+          },
+          "queue_depletion_rate_bid_w10s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_l1_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_l5_w5s_v1": {
+            "value": 8.0,
+            "valid": true
+          },
+          "ofi_l10_w30s_v1": {
+            "value": 8.0,
+            "valid": true
+          },
+          "signed_volume_w1m_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "trade_imbalance_w10s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "cancel_intensity_w10s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "add_intensity_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "quoted_depth_total_v1": {
+            "value": 86.0,
+            "valid": true
+          },
+          "effective_spread_bps_w1m_v1": {
+            "value": null,
+            "valid": false
+          },
+          "participation_w1m_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "resiliency_halflife_v1": {
+            "value": 8664339756999.316,
+            "valid": true
+          },
+          "rvol_w1m_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "range_bps_w1m_v1": {
+            "value": null,
+            "valid": false
+          },
+          "vol_ratio_w10s_w1m_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "minute_of_day_v1": {
+            "value": 526.2673977525333,
+            "valid": true
+          },
+          "session_frac_v1": {
+            "value": 0.4176725378988359,
+            "valid": true
+          },
+          "norm_spread_m5_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ref_ret_1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ref_ret_1m_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "corr_contemp_w5m_v1": {
+            "value": null,
+            "valid": false
+          },
+          "venue_count_active_v1": {
+            "value": 3.0,
+            "valid": true
+          },
+          "venue_depth_hhi_v1": {
+            "value": 0.33450513791238506,
+            "valid": true
+          },
+          "venue_imbalance_divergence_v1": {
+            "value": 0.2532855436081243,
+            "valid": true
+          },
+          "venue_update_share_top_w10s_v1": {
+            "value": 1.0,
+            "valid": true
+          },
+          "trend_score_w1m_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "meanrev_score_w1m_v1": {
+            "value": null,
+            "valid": false
+          },
+          "vol_regime_ratio_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "half_spread_cost_bps_v1": {
+            "value": 0.04600725994561942,
+            "valid": true
+          },
+          "fill_prob_bid_h1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "alpha_decay_proxy_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "urgency_score_v1": {
+            "value": 0.0,
+            "valid": true
+          }
+        }
+      }
+    }
+  }
+}

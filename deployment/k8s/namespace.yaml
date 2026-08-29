@@ -1,0 +1,12 @@
+# Namespace for the whole platform. Everything in deployment/k8s/ deploys here.
+# Apply order: namespace -> pvc -> configmaps -> workloads -> networkpolicy
+# (or simply `kubectl apply -f deployment/k8s/` — resources are idempotent).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: intraday-alpha
+  labels:
+    app.kubernetes.io/part-of: intraday-alpha-platform
+    app.kubernetes.io/managed-by: manual
+    # pod-security: the platform runs entirely unprivileged (runAsNonRoot).
+    pod-security.kubernetes.io/enforce: restricted

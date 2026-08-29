@@ -1,0 +1,55 @@
+# =============================================================================
+# Dockerfile.python — IAP research / data-pipeline image
+#
+# Runs the end-to-end synthetic market-data pipeline (docs/BUILD_NOTES.md):
+#   generator -> data/raw/*.jsonl -> normalize -> data/normalized/{*.jsonl,
+#   *.iap1, events.parquet, qc_report.json}
+#
+# Build (from the REPO ROOT — the build context must contain python/, configs/,
+# schemas/, tests/golden/):
+#   docker build -f deployment/docker/Dockerfile.python -t iap/python:1.0.0 .
+#
+# Image pinning policy (docs/governance/SECURITY.md): base images are pinned by
+# tag here and MUST be pinned by digest at release time, e.g.
+#   FROM python:3.11-slim@sha256:<digest recorded in the release manifest>
+# (digest left symbolic in-repo because this environment builds offline and
+# cannot resolve registry digests deterministically).
+# =============================================================================
+FROM python:3.11-slim
+# digest-pin at release: python:3.11-slim@sha256:<record-me>
+
+# Never run as root in production images.
+RUN groupadd --gid 10001 iap && \
+    useradd --uid 10001 --gid iap --create-home --shell /usr/sbin/nologin iap
+
+WORKDIR /app
+
+# The pipeline itself needs only the stdlib + pyarrow (python/pyproject.toml).
+# The full research stack (numpy/pandas/scipy/sklearn) is only needed for
+# research/ scripts and the test suite, and is deliberately NOT installed here
+# to keep the production image small; use the dev target below for tests.
+COPY python/pyproject.toml python/pyproject.toml
+COPY python/src python/src
+RUN pip install --no-cache-dir ./python
+
+# Configuration and schemas are baked read-only; at runtime they may be
+# overridden by a mounted volume/ConfigMap (deployment/k8s/) — configs are
+# data, secrets NEVER live here (SECURITY.md).
+COPY configs configs
+COPY schemas schemas
+
+# Generated market data goes to a volume, never into the image layer.
+RUN mkdir -p /data && chown -R iap:iap /data /app
+VOLUME ["/data"]
+
+USER iap
+ENV PYTHONUNBUFFERED=1
+
+# Healthcheck: the pipeline is a batch job; "healthy" means the interpreter and
+# the installed package import cleanly (compose gates ordering on successful
+# completion, not on this healthcheck).
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD python3 -c "import iap.marketdata" || exit 1
+
+# Deterministic pipeline run: identical seed => bit-identical outputs.
+ENTRYPOINT ["python3", "-m", "iap.marketdata", "--configs-dir", "/app/configs", "--out", "/data"]

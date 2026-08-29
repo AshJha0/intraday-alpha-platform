@@ -1,0 +1,85 @@
+{
+  "x-version": 1,
+  "description": "Synthetic venues. Latency profile: receive_ts = exchange_ts + mean_ns + jitter (uniform in [0, jitter_ns], SplitMix64). Fees per share (EQ, negative rebate for makers) / per million notional (FX).",
+  "venues": [
+    {
+      "venue": "XV1",
+      "venue_id": 1,
+      "asset_class": "EQUITY",
+      "taker_fee_per_share": 0.003,
+      "maker_rebate_per_share": 0.002,
+      "latency": {
+        "mean_ns": 150000,
+        "jitter_ns": 50000
+      },
+      "supports": [
+        "MBO",
+        "AUCTION",
+        "HALT",
+        "SNAPSHOT"
+      ]
+    },
+    {
+      "venue": "XV2",
+      "venue_id": 2,
+      "asset_class": "EQUITY",
+      "taker_fee_per_share": 0.0028,
+      "maker_rebate_per_share": 0.0015,
+      "latency": {
+        "mean_ns": 220000,
+        "jitter_ns": 80000
+      },
+      "supports": [
+        "MBO",
+        "AUCTION",
+        "HALT",
+        "SNAPSHOT"
+      ]
+    },
+    {
+      "venue": "LP1",
+      "venue_id": 10,
+      "asset_class": "FX",
+      "commission_per_million": 4.0,
+      "latency": {
+        "mean_ns": 300000,
+        "jitter_ns": 100000
+      },
+      "supports": [
+        "QUOTE",
+        "TRADE",
+        "SNAPSHOT"
+      ]
+    },
+    {
+      "venue": "LP2",
+      "venue_id": 11,
+      "asset_class": "FX",
+      "commission_per_million": 6.0,
+      "latency": {
+        "mean_ns": 500000,
+        "jitter_ns": 150000
+      },
+      "supports": [
+        "QUOTE",
+        "TRADE",
+        "SNAPSHOT"
+      ]
+    },
+    {
+      "venue": "PRI",
+      "venue_id": 12,
+      "asset_class": "FX",
+      "commission_per_million": 2.5,
+      "latency": {
+        "mean_ns": 200000,
+        "jitter_ns": 60000
+      },
+      "supports": [
+        "QUOTE",
+        "TRADE",
+        "SNAPSHOT"
+      ]
+    }
+  ]
+}

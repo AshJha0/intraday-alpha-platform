@@ -1,0 +1,192 @@
+# =============================================================================
+# alerts.yml — alert rules per spec §25 (observability) and §16 (risk).
+#
+# Severity policy:
+#   page     — trading correctness / capital at risk; wake someone up.
+#   critical — feed or platform integrity degraded; act now during session.
+#   warning  — investigate the same day.
+# Each alert links its runbook (docs/runbooks/).
+# Thresholds are pinned to configs/risk.json where a config limit exists
+# (stale_feed_timeout_ns = 5s, max_sequence_gap_before_halt = 1).
+# =============================================================================
+
+groups:
+  - name: iap-market-data-health
+    rules:
+      # Sequence-gap rate: any sustained gap rate on a live feed is a data
+      # integrity incident (books are marked stale on a gap; risk.json halts
+      # after 1 gap).
+      - alert: SequenceGapRate
+        expr: job:md_sequence_gaps:rate5m > 0.1
+        for: 2m
+        labels:
+          severity: critical
+          domain: market-data
+        annotations:
+          summary: "Sequence gaps on {{ $labels.service }} ({{ $value | printf \"%.3f\" }}/s)"
+          description: >
+            Sustained sequence-gap rate above 0.1/s for 2m. Books downstream are
+            marked stale until SNAPSHOT recovery; risk is fail-closed on stale
+            books. Runbook: docs/runbooks/RUNBOOK_data_pipeline.md#sequence-gaps
+          runbook: docs/runbooks/RUNBOOK_data_pipeline.md
+
+      # Stale feed: no events for longer than the configured staleness budget
+      # (configs/risk.json market_data.stale_feed_timeout_ns = 5e9 ns).
+      - alert: StaleFeed
+        expr: rate(md_events_total[1m]) == 0 or (time() - md_last_event_unixtime) > 5
+        for: 1m
+        labels:
+          severity: page
+          domain: market-data
+        annotations:
+          summary: "Stale market-data feed on {{ $labels.service }}"
+          description: >
+            No market events within the 5s staleness budget
+            (risk.json stale_feed_timeout_ns). Risk engine rejects orders
+            against stale books (fail-closed); verify feed handlers and venue
+            connectivity. Runbook: docs/runbooks/RUNBOOK_data_pipeline.md#stale-feed
+          runbook: docs/runbooks/RUNBOOK_data_pipeline.md
+
+  - name: iap-alpha-health
+    rules:
+      # Signal-rate collapse: alpha engine emitting far below its trailing
+      # baseline while market data still flows.
+      - alert: SignalRateCollapse
+        expr: >
+          job:alpha_signals:rate5m
+            < 0.2 * (job:alpha_signals:rate5m offset 1h)
+          and job:md_events:rate5m > 0
+        for: 10m
+        labels:
+          severity: critical
+          domain: alpha
+        annotations:
+          summary: "Alpha signal rate collapsed on {{ $labels.service }}"
+          description: >
+            Signal rate under 20% of its rate 1h ago while market data is
+            flowing — feature validity flags, warmup state or a wedged engine.
+            Runbook: docs/runbooks/RUNBOOK_paper_trading.md#signal-rate
+          runbook: docs/runbooks/RUNBOOK_paper_trading.md
+
+      # Live-vs-backtest drift (PLACEHOLDER contract): no producer emits
+      # alpha_live_vs_backtest_drift yet — the Java monitoring endpoint is
+      # live but does not compute this statistic. Contract: a KS-style
+      # statistic in [0, 1] comparing the live signal distribution to the
+      # walk-forward backtest distribution for the same regime (spec §25
+      # "alpha health").
+      - alert: LiveVsBacktestDrift
+        expr: alpha_live_vs_backtest_drift > 0.25
+        for: 30m
+        labels:
+          severity: warning
+          domain: alpha
+        annotations:
+          summary: "Live signal distribution drifting from backtest ({{ $value | printf \"%.2f\" }})"
+          description: >
+            Placeholder threshold 0.25 on the drift statistic; calibrate after
+            the first paper-trading week. Persistent drift is a retirement
+            trigger per spec §20 step 13.
+            Runbook: docs/runbooks/RUNBOOK_paper_trading.md#drift
+          runbook: docs/runbooks/RUNBOOK_paper_trading.md
+
+  - name: iap-execution
+    rules:
+      # Fill-rate drop: fills per accepted order far below baseline.
+      - alert: FillRateDrop
+        expr: >
+          job:fill_rate:ratio5m < 0.5 * (job:fill_rate:ratio5m offset 1h)
+          and job:venue_orders:rate5m > 0.1
+        for: 10m
+        labels:
+          severity: critical
+          domain: execution
+        annotations:
+          summary: "Fill rate dropped on {{ $labels.service }}"
+          description: >
+            Fill rate below half its 1h-ago baseline while orders are flowing —
+            queue-position model, venue health or adverse regime shift.
+            Runbook: docs/runbooks/RUNBOOK_paper_trading.md#fill-rate
+          runbook: docs/runbooks/RUNBOOK_paper_trading.md
+
+  - name: iap-risk
+    rules:
+      # Loss-limit utilization: realized PnL approaching the global daily loss
+      # limit (configs/risk.json global.max_daily_loss = 250000).
+      # risk_realized_pnl is LIVE today from rust/risk.
+      - alert: LossLimitUtilizationHigh
+        expr: (-risk_realized_pnl) / 250000 > 0.75
+        for: 1m
+        labels:
+          severity: page
+          domain: risk
+        annotations:
+          summary: "Daily loss limit utilization {{ $value | humanizePercentage }}"
+          description: >
+            Realized loss above 75% of global.max_daily_loss; at 100% the risk
+            engine latches the global kill switch (fail-closed, audit-logged).
+            Runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+          runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+
+      - alert: KillSwitchEngaged
+        expr: risk_kill_switch_engaged > 0
+        labels:
+          severity: page
+          domain: risk
+        annotations:
+          summary: "Kill switch engaged ({{ $labels.scope | default \"global\" }})"
+          description: >
+            A kill switch latched — trading halted for the affected scope. Do
+            NOT clear without following the incident runbook and risk approval.
+            Runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+          runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+
+  - name: iap-infrastructure
+    rules:
+      # GC pause: p99 pause above 10ms breaks the order-path latency budget.
+      - alert: GcPauseHigh
+        expr: job:jvm_gc_pause_ns:p99 > 10e6
+        for: 5m
+        labels:
+          severity: warning
+          domain: infrastructure
+        annotations:
+          summary: "JVM p99 GC pause {{ $value | humanize }}ns on {{ $labels.job }}"
+          description: >
+            p99 GC pause above 10ms for 5m; check heap sizing / allocation rate
+            on hot paths (spec §23: allocation-conscious Java).
+            Runbook: docs/runbooks/RUNBOOK_backtest.md#jvm
+          runbook: docs/runbooks/RUNBOOK_backtest.md
+
+      # Queue depth (PLACEHOLDER contract, like LiveVsBacktestDrift): no
+      # producer emits eventbus_queue_depth yet — the rust eventbus crate has
+      # no exporter wired. The alert can never fire until one exists; kept as
+      # the pinned name/threshold contract (deployment/grafana/README.md).
+      - alert: QueueDepthHigh
+        expr: eventbus_queue_depth > 100000
+        for: 2m
+        labels:
+          severity: critical
+          domain: infrastructure
+        annotations:
+          summary: "Event-bus queue depth {{ $value | humanize }} on {{ $labels.service }}"
+          description: >
+            PLACEHOLDER metric — no producer exports eventbus_queue_depth yet.
+            Contract: sustained backlog above 100k events — downstream consumer
+            stalled or throughput regression; latency SLOs are already violated
+            at this depth. Runbook: docs/runbooks/RUNBOOK_data_pipeline.md#queue-depth
+          runbook: docs/runbooks/RUNBOOK_data_pipeline.md
+
+      # A scrape target disappearing is itself an incident.
+      - alert: TargetDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: critical
+          domain: infrastructure
+        annotations:
+          summary: "Scrape target {{ $labels.job }}/{{ $labels.instance }} down"
+          description: >
+            Prometheus cannot scrape {{ $labels.instance }}. If this is
+            java-platform during a trading session, treat as a platform
+            incident. Runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+          runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md

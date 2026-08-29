@@ -1,0 +1,22 @@
+{
+  "alpha_id": "EQ01",
+  "config": {
+    "conf_min": 0.2,
+    "cost_multiplier": 1.0,
+    "latency_rows": 1,
+    "max_pos_qty": 1000
+  },
+  "description": "Research-backtester golden: EQ01 (day-1-fitted params from expected_alpha.json) on the golden EQ frame. total_pnl / total_costs at 1e-9 abs/rel; counts exact.",
+  "fee_cost": 1512.0,
+  "gross_pnl": -120.00000000002586,
+  "impact_cost": 9.824021052631581,
+  "instrument_id": 1,
+  "n_rows": 2000,
+  "source": "events_eq_mbo.jsonl",
+  "spread_cost": 12900.0,
+  "total_costs": 14421.824021052631,
+  "total_pnl": -14541.824021052693,
+  "trade_count": 372,
+  "traded_qty": 504000,
+  "x-version": 1
+}

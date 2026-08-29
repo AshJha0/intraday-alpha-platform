@@ -1,0 +1,196 @@
+# =============================================================================
+# docker-compose.yml — Intraday Alpha Platform local production-shape stack
+#
+# Topology (spec §4/§25):
+#   data-generator (python, batch)
+#       -> shared volume /data (raw + normalized + qc_report.json)
+#   cpp-replay, rust-replay (deterministic replay / exec sim)
+#   java-platform (paper-trading vertical, com.iap.platform.PaperTrading;
+#                  monitoring API live on :8080 — /metrics, /health, /status)
+#   rust-telemetry-exporter (serves rust telemetry Prometheus text from /data)
+#   prometheus  -> scrapes java-platform + rust telemetry file target
+#   grafana     -> provisioned dashboards (deployment/grafana/)
+#
+# Run from the repo root:   docker compose -f deployment/docker/docker-compose.yml up --build
+#
+# Image pinning: iap/* images are built from this repo; third-party images are
+# tag-pinned here and MUST be digest-pinned at release, e.g.
+#   image: prom/prometheus:v2.53.0@sha256:<digest recorded in release manifest>
+# (kept symbolic in-repo: this environment builds offline and cannot resolve
+# digests). All images build offline-agnostic — in particular the Java image
+# uses NO Maven (Maven Central unreachable; see docs/BUILD_NOTES.md).
+# =============================================================================
+
+name: intraday-alpha-platform
+
+volumes:
+  iap-data: {}        # generated market data — never baked into images
+  prom-data: {}
+  grafana-data: {}
+
+networks:
+  iap-net:
+    driver: bridge
+
+services:
+  # ------------------------------------------------------------ data pipeline
+  data-generator:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile.python
+    image: iap/python:1.0.0
+    container_name: iap-data-generator
+    # Deterministic batch job: identical seed => bit-identical /data outputs
+    # (configs/generator.json pins seed 20260829). Runs to completion; the
+    # replay services gate on successful completion, not on liveness.
+    command: []
+    restart: "no"
+    networks: [iap-net]
+    volumes:
+      - iap-data:/data
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import iap.marketdata"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # --------------------------------------------------------- replay services
+  cpp-replay:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile.cpp
+    image: iap/cpp:1.0.0
+    container_name: iap-cpp-replay
+    # Deterministic replay + execution-sim pass over the golden vectors;
+    # writes its methodology/results table to the shared volume.
+    command: ["/data/results_cpp.md"]
+    restart: "no"
+    networks: [iap-net]
+    volumes:
+      - iap-data:/data
+    depends_on:
+      data-generator:
+        condition: service_completed_successfully
+
+  rust-replay:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile.rust
+    image: iap/rust:1.0.0
+    container_name: iap-rust-replay
+    command: ["/golden"]
+    restart: "no"
+    networks: [iap-net]
+    volumes:
+      - iap-data:/data
+    depends_on:
+      data-generator:
+        condition: service_completed_successfully
+
+  # Serves rust/telemetry Prometheus text exposition (Registry::to_prometheus)
+  # written by replay/risk components to /data/telemetry/*.prom. This is the
+  # "file-based target" scraped by prometheus (deployment/prometheus/
+  # targets/rust-telemetry.json). Reuses the already-built python image; no
+  # extra dependency.
+  rust-telemetry-exporter:
+    image: iap/python:1.0.0
+    container_name: iap-rust-telemetry-exporter
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        mkdir -p /data/telemetry &&
+        touch /data/telemetry/rust.prom &&
+        exec python3 -m http.server 9091 --directory /data/telemetry
+    restart: unless-stopped
+    networks: [iap-net]
+    volumes:
+      - iap-data:/data
+    depends_on:
+      data-generator:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9091/rust.prom', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ----------------------------------------------------------- java platform
+  java-platform:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile.java
+    image: iap/java:1.0.0
+    container_name: iap-java-platform
+    # The paper-trading vertical (com.iap.platform.PaperTrading) over the
+    # golden equity vector, paced 60x realtime, serving GET /metrics
+    # (Prometheus text), /health and /status on :8080 (see Dockerfile.java).
+    # A session is finite; restart re-runs it so the endpoint stays up for
+    # scraping (the run is deterministic — every session reports the same
+    # honest summary line).
+    restart: unless-stopped
+    networks: [iap-net]
+    ports:
+      - "8080:8080"
+    volumes:
+      - iap-data:/data
+    depends_on:
+      data-generator:
+        condition: service_completed_successfully
+    healthcheck:
+      # Real check against the live /health endpoint (no curl/wget in the
+      # JRE image — bash /dev/tcp, same as the image's own HEALTHCHECK).
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /health HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q ok <&3"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ----------------------------------------------------------- observability
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    # digest-pin at release: prom/prometheus:v2.53.0@sha256:<record-me>
+    container_name: iap-prometheus
+    restart: unless-stopped
+    networks: [iap-net]
+    ports:
+      - "9090:9090"
+    volumes:
+      - ../prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../prometheus/recording.yml:/etc/prometheus/recording.yml:ro
+      - ../prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - ../prometheus/targets:/etc/prometheus/targets:ro
+      - prom-data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9090/-/healthy >/dev/null || promtool check healthy >/dev/null 2>&1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    # digest-pin at release: grafana/grafana:11.1.0@sha256:<record-me>
+    container_name: iap-grafana
+    restart: unless-stopped
+    networks: [iap-net]
+    ports:
+      - "3000:3000"
+    environment:
+      # Secrets stay OUT of source control (SECURITY.md): the admin password
+      # comes from the host environment / an .env file that is git-ignored.
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in the environment}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ../grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 3

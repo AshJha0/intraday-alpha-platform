@@ -1,0 +1,147 @@
+{
+  "alpha_id": "EQ06",
+  "asset_class": "EQUITY",
+  "capacity_usd_by_instrument": {
+    "1": 46550000.0,
+    "10": 37161000.0,
+    "11": 1308125000.0,
+    "2": 34320000.0,
+    "3": 35850000.0,
+    "4": 37410000.0,
+    "5": 39645000.0,
+    "6": 39525000.0,
+    "7": 42825000.0,
+    "8": 42660000.0,
+    "9": 38445000.0
+  },
+  "decay_ic_by_horizon": {
+    "100ms": 0.0005480026044128442,
+    "10ms": 0.0006109518930410449,
+    "10s": 0.0665240240242231,
+    "15m": 0.003973776532372352,
+    "1m": 0.04497792001172053,
+    "1s": 0.02272722584429662,
+    "30s": 0.07150672013279187,
+    "500ms": 0.012431807279391832,
+    "50ms": -0.003666081256899828,
+    "5m": 0.01942675319804191,
+    "5s": 0.049915559477063214
+  },
+  "fold_sign_consistency": 1.0,
+  "folds": [
+    {
+      "beta_fit": 7.00699382606713e-06,
+      "fold": 1,
+      "hit_rate": null,
+      "ic": null,
+      "n_test_pairs": 0,
+      "n_train": 77432,
+      "rank_ic": null
+    },
+    {
+      "beta_fit": 7.00699382606713e-06,
+      "fold": 2,
+      "hit_rate": null,
+      "ic": null,
+      "n_test_pairs": 0,
+      "n_train": 77432,
+      "rank_ic": null
+    },
+    {
+      "beta_fit": 7.00699382606713e-06,
+      "fold": 3,
+      "hit_rate": 0.5445098039215687,
+      "ic": 0.015681646915247135,
+      "n_test_pairs": 11241,
+      "n_train": 77432,
+      "rank_ic": 0.0789634807945331
+    },
+    {
+      "beta_fit": 6.461512005878594e-06,
+      "fold": 4,
+      "hit_rate": 0.5330173775671406,
+      "ic": 0.04561971891391316,
+      "n_test_pairs": 66189,
+      "n_train": 88121,
+      "rank_ic": 0.07449472013927974
+    }
+  ],
+  "gates": {
+    "iterate_min_ic": 0.005,
+    "iterate_min_tstat": 1.5,
+    "min_fold_sign_consistency": 0.7,
+    "min_nw_tstat": 3.0,
+    "min_oos_ic": 0.01
+  },
+  "horizon": "10s",
+  "hypothesis_confirmed": true,
+  "leakage": {
+    "ic_shifted": 0.04671802003074194,
+    "ic_unshifted": 0.04561971891391316,
+    "label_guard_ok": true,
+    "passed": true,
+    "shift_ok": true
+  },
+  "n_ic_buckets": 33,
+  "name": "short_horizon_momentum",
+  "net_pnl_1x_cost": -87643.0635814476,
+  "nw_tstat": 1.8019889699617857,
+  "oos_hit_rate": 0.5347625428018461,
+  "oos_ic": 0.03734768753250236,
+  "oos_rank_ic": 0.07125272762619247,
+  "stress": {
+    "cost": {
+      "x0.5": {
+        "total_costs": 44749.03179072424,
+        "total_pnl": -42894.03179072695,
+        "trade_count": 5319
+      },
+      "x1": {
+        "total_costs": 89498.06358144848,
+        "total_pnl": -87643.0635814476,
+        "trade_count": 5319
+      },
+      "x2": {
+        "total_costs": 178996.12716289697,
+        "total_pnl": -177141.12716289714,
+        "trade_count": 5319
+      }
+    },
+    "latency": {
+      "+0ev": {
+        "ic": 0.04561971891391316,
+        "latency_rows": 1,
+        "total_pnl": -87643.0635814476
+      },
+      "+1ev": {
+        "ic": 0.04671802003074194,
+        "latency_rows": 2,
+        "total_pnl": -87318.927815763
+      },
+      "+5ev": {
+        "ic": 0.04710274703798927,
+        "latency_rows": 6,
+        "total_pnl": -86621.47823662918
+      }
+    },
+    "regime": {
+      "ic_high_vol": 0.04134011466086095,
+      "ic_low_vol": 0.05002352980388819
+    }
+  },
+  "turnover_flips_per_hour": 101.91245871740338,
+  "universe": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+  ],
+  "verdict": "ITERATE"
+}

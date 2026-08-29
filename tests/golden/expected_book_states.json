@@ -1,0 +1,344 @@
+{
+  "description": "Exact-integer book state after applying the first N events of events_eq_mbo.jsonl (N is the key; 1-based). Validated by an independent brute-force rebuild before writing. Tolerance: exact equality.",
+  "vector": "events_eq_mbo.jsonl",
+  "instrument_id": 1,
+  "venue_id": 1,
+  "states": {
+    "100": {
+      "best_bid_ticks": 2448,
+      "best_bid_size": 2000,
+      "best_ask_ticks": 2450,
+      "best_ask_size": 900,
+      "depth_bid_top5": [
+        [
+          2448,
+          2000
+        ],
+        [
+          2447,
+          1400
+        ],
+        [
+          2446,
+          200
+        ],
+        [
+          2445,
+          300
+        ],
+        [
+          2444,
+          400
+        ]
+      ],
+      "depth_ask_top5": [
+        [
+          2450,
+          900
+        ],
+        [
+          2451,
+          1000
+        ],
+        [
+          2452,
+          600
+        ],
+        [
+          2453,
+          1900
+        ],
+        [
+          2454,
+          2800
+        ]
+      ],
+      "order_count_bid_top3": [
+        [
+          2448,
+          5
+        ],
+        [
+          2447,
+          2
+        ],
+        [
+          2446,
+          1
+        ]
+      ],
+      "order_count_ask_top3": [
+        [
+          2450,
+          1
+        ],
+        [
+          2451,
+          1
+        ],
+        [
+          2452,
+          1
+        ]
+      ],
+      "trade_flow": 400,
+      "sequence": 100
+    },
+    "500": {
+      "best_bid_ticks": 2446,
+      "best_bid_size": 1600,
+      "best_ask_ticks": 2453,
+      "best_ask_size": 1700,
+      "depth_bid_top5": [
+        [
+          2446,
+          1600
+        ],
+        [
+          2444,
+          900
+        ],
+        [
+          2443,
+          1000
+        ]
+      ],
+      "depth_ask_top5": [
+        [
+          2453,
+          1700
+        ],
+        [
+          2454,
+          2000
+        ],
+        [
+          2455,
+          600
+        ]
+      ],
+      "order_count_bid_top3": [
+        [
+          2446,
+          2
+        ],
+        [
+          2444,
+          1
+        ],
+        [
+          2443,
+          2
+        ]
+      ],
+      "order_count_ask_top3": [
+        [
+          2453,
+          2
+        ],
+        [
+          2454,
+          3
+        ],
+        [
+          2455,
+          2
+        ]
+      ],
+      "trade_flow": 100,
+      "sequence": 500
+    },
+    "1000": {
+      "best_bid_ticks": 2420,
+      "best_bid_size": 400,
+      "best_ask_ticks": 2421,
+      "best_ask_size": 700,
+      "depth_bid_top5": [
+        [
+          2420,
+          400
+        ],
+        [
+          2417,
+          800
+        ],
+        [
+          2415,
+          1100
+        ]
+      ],
+      "depth_ask_top5": [
+        [
+          2421,
+          700
+        ],
+        [
+          2422,
+          1600
+        ]
+      ],
+      "order_count_bid_top3": [
+        [
+          2420,
+          1
+        ],
+        [
+          2417,
+          1
+        ],
+        [
+          2415,
+          2
+        ]
+      ],
+      "order_count_ask_top3": [
+        [
+          2421,
+          1
+        ],
+        [
+          2422,
+          2
+        ]
+      ],
+      "trade_flow": -4000,
+      "sequence": 1000
+    },
+    "1500": {
+      "best_bid_ticks": 2421,
+      "best_bid_size": 400,
+      "best_ask_ticks": 2424,
+      "best_ask_size": 600,
+      "depth_bid_top5": [
+        [
+          2421,
+          400
+        ],
+        [
+          2419,
+          1200
+        ],
+        [
+          2416,
+          1000
+        ]
+      ],
+      "depth_ask_top5": [
+        [
+          2424,
+          600
+        ],
+        [
+          2426,
+          800
+        ]
+      ],
+      "order_count_bid_top3": [
+        [
+          2421,
+          1
+        ],
+        [
+          2419,
+          2
+        ],
+        [
+          2416,
+          1
+        ]
+      ],
+      "order_count_ask_top3": [
+        [
+          2424,
+          1
+        ],
+        [
+          2426,
+          1
+        ]
+      ],
+      "trade_flow": -4600,
+      "sequence": 1500
+    },
+    "2000": {
+      "best_bid_ticks": 2425,
+      "best_bid_size": 800,
+      "best_ask_ticks": 2429,
+      "best_ask_size": 1500,
+      "depth_bid_top5": [
+        [
+          2425,
+          800
+        ],
+        [
+          2424,
+          1400
+        ],
+        [
+          2423,
+          100
+        ],
+        [
+          2422,
+          1000
+        ],
+        [
+          2421,
+          1000
+        ]
+      ],
+      "depth_ask_top5": [
+        [
+          2429,
+          1500
+        ],
+        [
+          2430,
+          800
+        ],
+        [
+          2431,
+          100
+        ],
+        [
+          2432,
+          2500
+        ],
+        [
+          2433,
+          100
+        ]
+      ],
+      "order_count_bid_top3": [
+        [
+          2425,
+          1
+        ],
+        [
+          2424,
+          2
+        ],
+        [
+          2423,
+          1
+        ]
+      ],
+      "order_count_ask_top3": [
+        [
+          2429,
+          2
+        ],
+        [
+          2430,
+          2
+        ],
+        [
+          2431,
+          1
+        ]
+      ],
+      "trade_flow": -2700,
+      "sequence": 2000
+    }
+  }
+}

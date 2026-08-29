@@ -1,0 +1,91 @@
+# =============================================================================
+# recording.yml — precomputed rates and tail-latency quantiles (spec §22/§25)
+#
+# Histogram note: rust/telemetry and the live Java monitoring endpoint
+# (com.iap.api.MetricsServer) expose fixed log2 histograms — bucket upper bounds are 0, 1, 3, 7, ...,
+# 2^i - 1 nanoseconds. histogram_quantile therefore returns a value within one
+# power of two ABOVE the true order statistic (conservative for latency);
+# benchmarks/RESULTS.md holds the exact offline numbers.
+# Naming: level:metric:operation per Prometheus recording-rule conventions.
+# =============================================================================
+
+groups:
+  - name: iap-event-rates
+    interval: 15s
+    rules:
+      # Market-data event throughput (events/sec).
+      - record: job:md_events:rate5m
+        expr: sum by (job, service) (rate(md_events_total[5m]))
+      - record: job:venue_market_events:rate5m
+        expr: sum by (job, service) (rate(venue_market_events_total[5m]))
+
+      # Sequence-gap / duplicate / out-of-order rates (per second).
+      - record: job:md_sequence_gaps:rate5m
+        expr: sum by (job, service) (rate(md_sequence_gaps_total[5m]))
+      - record: job:md_duplicates:rate5m
+        expr: sum by (job, service) (rate(md_duplicates_total[5m]))
+      # PLACEHOLDER (like LiveVsBacktestDrift): no producer emits
+      # md_out_of_order_total yet — out-of-order arrivals are counted in
+      # qc_report.json but not exported as a metric. The rule evaluates to
+      # empty until a producer exists (deployment/grafana/README.md).
+      - record: job:md_out_of_order:rate5m
+        expr: sum by (job, service) (rate(md_out_of_order_total[5m]))
+
+      # Alpha signal rate and risk decision/order flow.
+      - record: job:alpha_signals:rate5m
+        expr: sum by (job, service) (rate(alpha_signals_total[5m]))
+      - record: job:risk_decisions:rate5m
+        expr: sum by (job, service) (rate(risk_decisions_total[5m]))
+      - record: job:venue_orders:rate5m
+        expr: sum by (job, service) (rate(venue_orders_total[5m]))
+
+      # Fill rate: fills over accepted orders (rust venue sim naming).
+      - record: job:fill_rate:ratio5m
+        expr: >
+          sum by (job, service) (rate(venue_fills_total[5m]))
+          /
+          clamp_min(sum by (job, service) (rate(venue_orders_accepted_total[5m])), 1e-9)
+
+      # Risk rejection ratio.
+      - record: job:risk_rejected:ratio5m
+        expr: >
+          sum by (job, service) (rate(risk_rejected_total[5m]))
+          /
+          clamp_min(sum by (job, service) (rate(risk_decisions_total[5m])), 1e-9)
+
+  - name: iap-latency-quantiles
+    interval: 15s
+    rules:
+      # p50 / p99 / p999 for each hot-path histogram (nanoseconds).
+      # Market-data decode (LIVE from java: decode_latency_ns).
+      - record: job:decode_latency_ns:p50
+        expr: histogram_quantile(0.50, sum by (job, le) (rate(decode_latency_ns_bucket[5m])))
+      - record: job:decode_latency_ns:p99
+        expr: histogram_quantile(0.99, sum by (job, le) (rate(decode_latency_ns_bucket[5m])))
+      - record: job:decode_latency_ns:p999
+        expr: histogram_quantile(0.999, sum by (job, le) (rate(decode_latency_ns_bucket[5m])))
+
+      # Order-book update.
+      - record: job:book_update_latency_ns:p50
+        expr: histogram_quantile(0.50, sum by (job, le) (rate(book_update_latency_ns_bucket[5m])))
+      - record: job:book_update_latency_ns:p99
+        expr: histogram_quantile(0.99, sum by (job, le) (rate(book_update_latency_ns_bucket[5m])))
+      - record: job:book_update_latency_ns:p999
+        expr: histogram_quantile(0.999, sum by (job, le) (rate(book_update_latency_ns_bucket[5m])))
+
+      # Decision-to-wire order path.
+      - record: job:order_path_latency_ns:p50
+        expr: histogram_quantile(0.50, sum by (job, le) (rate(order_path_latency_ns_bucket[5m])))
+      - record: job:order_path_latency_ns:p99
+        expr: histogram_quantile(0.99, sum by (job, le) (rate(order_path_latency_ns_bucket[5m])))
+      - record: job:order_path_latency_ns:p999
+        expr: histogram_quantile(0.999, sum by (job, le) (rate(order_path_latency_ns_bucket[5m])))
+
+      # Venue ack latency (LIVE today from rust/venue: venue_ack_latency_ns).
+      - record: job:venue_ack_latency_ns:p99
+        expr: histogram_quantile(0.99, sum by (job, le) (rate(venue_ack_latency_ns_bucket[5m])))
+
+      # JVM GC pause (LIVE from java: jvm_gc_pause_ns, registered at the
+      # first observed pause).
+      - record: job:jvm_gc_pause_ns:p99
+        expr: histogram_quantile(0.99, sum by (job, le) (rate(jvm_gc_pause_ns_bucket[5m])))

@@ -1,0 +1,11 @@
+[package]
+name = "orderbook"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "IAP pinned MBO/L2/L1 order book with sequencing, snapshots, checkpoints"
+
+[dependencies]
+marketdata = { path = "../marketdata" }
+serde = { workspace = true }
+serde_json = { workspace = true }

@@ -1,0 +1,29 @@
+{
+  "data_version": "4b77389e38548bcc156f2e66c89666f44e0afe91bd927d800f80d703bfa2a7f0",
+  "experiment_id": "run_0007_metalabel_xgboost",
+  "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
+  "git_commit": "unversioned-workspace",
+  "hardware": {
+    "cpu_count": 2,
+    "cpu_model": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "machine": "x86_64",
+    "python": "3.11.15",
+    "system": "Linux"
+  },
+  "hyperparams": {
+    "learning_rate": 0.1,
+    "max_depth": 3,
+    "max_iter": 80,
+    "min_samples_leaf": 50,
+    "random_state": 7
+  },
+  "model_version": "metalabel_isotonic_v1",
+  "test_window": {
+    "end_ts": 1787691459285005656,
+    "start_ts": 1787659177607391290
+  },
+  "train_window": {
+    "end_ts": 1787626716155086754,
+    "start_ts": 1787562048390754894
+  }
+}

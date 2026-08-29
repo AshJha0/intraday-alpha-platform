@@ -1,0 +1,33 @@
+{
+  "x-version": 1,
+  "description": "Strategy registry skeleton; alpha waves extend. All disabled by default.",
+  "defaults": {
+    "enabled": false,
+    "max_position_qty": 10000,
+    "signal_threshold": 0.0,
+    "horizon_ns": 1000000000,
+    "seed": 20260829
+  },
+  "strategies": [
+    {
+      "strategy_id": "EQ01_microprice",
+      "asset_class": "EQUITY",
+      "model_version": "unset"
+    },
+    {
+      "strategy_id": "EQ02_ofi_l1",
+      "asset_class": "EQUITY",
+      "model_version": "unset"
+    },
+    {
+      "strategy_id": "FX01_quote_imbalance",
+      "asset_class": "FX",
+      "model_version": "unset"
+    },
+    {
+      "strategy_id": "FX02_trade_flow",
+      "asset_class": "FX",
+      "model_version": "unset"
+    }
+  ]
+}

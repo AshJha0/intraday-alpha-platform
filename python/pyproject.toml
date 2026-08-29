@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "iap"
+version = "1.0.0"
+description = "Intraday Alpha Platform - Python reference implementation"
+requires-python = ">=3.11"
+dependencies = ["pyarrow"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,11 @@
+[package]
+name = "marketdata"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "IAP canonical events, SplitMix64 RNG, IAP1 + JSONL codecs, validation"
+
+[dependencies]
+
+[dev-dependencies]
+serde_json = { workspace = true }

@@ -1,0 +1,60 @@
+{
+  "economics": {
+    "conservative_costs": true,
+    "hit_rate": 0.01485647137821051,
+    "mean_gross_bps_per_signal": -0.00544488148864062,
+    "mean_net_bps_per_signal": -2.1276185214904104,
+    "n_long": 93610,
+    "n_samples": 196449,
+    "n_short": 25530,
+    "n_trades": 119140,
+    "total_net_bps": -253484.47065036747
+  },
+  "economics_label_exact": {
+    "conservative_costs": false,
+    "hit_rate": 0.11249790162833641,
+    "mean_gross_bps_per_signal": -0.00544488148864062,
+    "mean_net_bps_per_signal": -1.929783582500461,
+    "n_long": 93610,
+    "n_samples": 196449,
+    "n_short": 25530,
+    "n_trades": 119140,
+    "total_net_bps": -229914.41601910495
+  },
+  "ic_tstat": 2.991225005199773,
+  "mean_ic": 0.6541616861958274,
+  "mean_rank_ic": 0.6461202524607339,
+  "model": "elasticnet",
+  "per_fold": [
+    {
+      "fold": 0,
+      "ic": 0.0,
+      "n_test": 89764,
+      "n_train": 11805,
+      "rank_ic": 0.0
+    },
+    {
+      "fold": 1,
+      "ic": 0.8373183715434773,
+      "n_test": 6495,
+      "n_train": 101590,
+      "rank_ic": 0.8064235963496665
+    },
+    {
+      "fold": 2,
+      "ic": 0.8620434356783899,
+      "n_test": 11785,
+      "n_train": 108102,
+      "rank_ic": 0.8156579015641438
+    },
+    {
+      "fold": 3,
+      "ic": 0.9172849375614421,
+      "n_test": 88405,
+      "n_train": 119907,
+      "rank_ic": 0.9623995119291254
+    }
+  ],
+  "pooled_ic": 0.6162012223844723,
+  "pooled_ic_vs_mid": -0.06609664424878779
+}

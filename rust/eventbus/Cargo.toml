@@ -1,0 +1,9 @@
+[package]
+name = "eventbus"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "IAP bounded single-producer single-consumer ring buffer"
+
+[dependencies]
+marketdata = { path = "../marketdata" }

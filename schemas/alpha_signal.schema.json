@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iap.example/schemas/alpha_signal.schema.json",
+  "title": "AlphaSignal",
+  "description": "Alpha model output (spec section 6).",
+  "x-version": 1,
+  "type": "object",
+  "properties": {
+    "timestamp": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807
+    },
+    "instrument_id": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "expected_return": {
+      "type": "number",
+      "description": "Expected forward return over `horizon_ns` (research double, 1e-9 tol)."
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "horizon_ns": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807,
+      "description": "Prediction horizon in ns."
+    },
+    "direction": {
+      "type": "integer",
+      "enum": [
+        -1,
+        0,
+        1
+      ],
+      "description": "Sign of the signal."
+    },
+    "model_version": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "timestamp",
+    "instrument_id",
+    "expected_return",
+    "confidence",
+    "horizon_ns",
+    "direction",
+    "model_version"
+  ],
+  "additionalProperties": false
+}

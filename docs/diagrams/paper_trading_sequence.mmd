@@ -1,0 +1,35 @@
+sequenceDiagram
+    autonumber
+    actor Op as Operator
+    participant PT as PaperTrading<br/>(com.iap.platform)
+    participant BK as Book + FeatureEngine<br/>(com.iap.orderbook / features)
+    participant AL as Alpha scorers<br/>(com.iap.alpha, params from configs)
+    participant PF as PortfolioOptimizer<br/>(com.iap.portfolio)
+    participant RK as RiskEngine<br/>(com.iap.risk, fail-closed)
+    participant EX as ExecutionSimulator<br/>(com.iap.execution)
+    participant MX as MetricsServer :8080<br/>(com.iap.api)
+    participant PR as Prometheus/Grafana
+
+    Op->>PT: java/paper.sh [--mode realtime --speed 60]
+    PT->>PT: load configs/ (instruments, venues,<br/>strategies, risk, execution, alpha_params)
+    PT->>MX: bind /metrics /health /status
+
+    loop every MarketEvent (event-time order)
+        PT->>BK: apply(event) — sequence check, book update
+        BK-->>BK: feature refresh (validity bitset)
+        BK-->>AL: FeatureVector
+        AL-->>PF: AlphaSignal {expected_return, confidence}
+        PF-->>RK: OrderRequest (target position delta)
+        alt risk ALLOW
+            RK-->>EX: forward child order
+            EX-->>PT: Fill(s) {price_ticks, qty, fee, impact}
+            PT->>PT: position / P&L accounting
+        else risk REJECT
+            RK-->>PT: RiskEvent {rule_id, severity, decision}
+        end
+        PT->>MX: update counters + latency histograms
+    end
+
+    PR->>MX: GET /metrics (scrape, 15s interval)
+    Op->>MX: curl /health -> {"status":"ok"}
+    PT->>Op: summary line + out/paper_session_report.json<br/>(events, orders, fills, pnl, risk allowed/rejected)

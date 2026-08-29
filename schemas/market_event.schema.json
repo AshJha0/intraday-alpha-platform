@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iap.example/schemas/market_event.schema.json",
+  "title": "MarketEvent",
+  "description": "Canonical market event. Wire formats: canonical JSONL and IAP1 binary (see schemas/FORMAT.md). All 12 fields are always present; unused fields are 0. Prices are int64 ticks (real price = price_ticks * tick_size from reference data); quantities are int64 base units; timestamps are int64 ns since Unix epoch.",
+  "x-version": 1,
+  "type": "object",
+  "properties": {
+    "event_id": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615,
+      "description": "Global monotone id per file."
+    },
+    "instrument_id": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295,
+      "description": "Instrument id from configs/instruments.json."
+    },
+    "venue_id": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 65535,
+      "description": "Venue id from configs/venues.json."
+    },
+    "exchange_ts": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807,
+      "description": "Exchange/event timestamp, ns since epoch."
+    },
+    "receive_ts": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807,
+      "description": "Receive timestamp, ns since epoch; always >= exchange_ts."
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615,
+      "description": "Per venue+instrument stream sequence, gap-checkable."
+    },
+    "event_type": {
+      "type": "integer",
+      "enum": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "description": "ADD=1 MODIFY=2 CANCEL=3 EXECUTE=4 TRADE=5 QUOTE=6 SNAPSHOT=7 STATUS=8 HEARTBEAT=9."
+    },
+    "side": {
+      "type": "integer",
+      "enum": [
+        0,
+        1
+      ],
+      "description": "BID=0 ASK=1."
+    },
+    "price_ticks": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807,
+      "description": "Price in integer ticks; 0 when unused."
+    },
+    "qty": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807,
+      "description": "Quantity in base units; for STATUS carries status code TRADING=1 HALT=2 AUCTION=3 CLOSE=4."
+    },
+    "order_id": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615,
+      "description": "Order id for ADD/MODIFY/CANCEL/EXECUTE/QUOTE/SNAPSHOT; 0 when unused."
+    },
+    "trade_id": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615,
+      "description": "Trade id for TRADE/EXECUTE; for SNAPSHOT carries the number of records remaining in the snapshot burst after this one (0 = last)."
+    }
+  },
+  "required": [
+    "event_id",
+    "instrument_id",
+    "venue_id",
+    "exchange_ts",
+    "receive_ts",
+    "sequence",
+    "event_type",
+    "side",
+    "price_ticks",
+    "qty",
+    "order_id",
+    "trade_id"
+  ],
+  "additionalProperties": false
+}

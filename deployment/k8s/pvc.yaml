@@ -1,0 +1,20 @@
+# Shared market-data volume: written by the daily data-pipeline CronJob,
+# read by replay/backtest workloads. Generated data is reproducible from the
+# pinned seed (configs/generator.json), so the PVC is cheap to rebuild —
+# raw IMMUTABILITY is a pipeline property (files are never rewritten in
+# place), not a storage-class property.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: iap-data
+  namespace: intraday-alpha
+  labels:
+    app.kubernetes.io/part-of: intraday-alpha-platform
+    app.kubernetes.io/name: iap-data
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi

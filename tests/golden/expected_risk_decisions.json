@@ -1,0 +1,829 @@
+{
+  "config": "configs/risk.json",
+  "description": "Hard-risk golden decision vector (spec section 16; rust/risk is the reference implementation, every rule validated by unit test first). The engine is built from configs/risk.json (x-version 2, complete pinned limit set) with the instrument tick sizes below, then driven through `steps` in order. Every step of type 'order' pins the expected decision (ALLOW=1 REJECT=2), the deciding rule_id (first failing rule in the engine's pinned check order) and the RiskEvent severity (INFO=1 WARN=2 BREACH=3). Non-order steps mutate engine state: market (best bid/ask ticks), fill (position/PnL), cancel (order done), gap/recover (feed gate), venue_down/venue_up (connectivity), kill/unkill (manual switches). Decisions are deterministic and replayable; the audit log for a replay is byte-identical across runs. expected_kill_events pins the non-decision KILL/notification RiskEvents the replay must emit, in order.",
+  "expected_kill_events": [
+    {
+      "decision": 3,
+      "rule_id": "VENUE_DISCONNECT",
+      "scope": "VENUE",
+      "scope_id": "2"
+    },
+    {
+      "decision": 1,
+      "rule_id": "VENUE_RECONNECT",
+      "scope": "VENUE",
+      "scope_id": "2"
+    },
+    {
+      "decision": 3,
+      "rule_id": "KILL_SWITCH_ENGAGED",
+      "scope": "INSTRUMENT",
+      "scope_id": "2"
+    },
+    {
+      "decision": 1,
+      "rule_id": "KILL_SWITCH_CLEARED",
+      "scope": "INSTRUMENT",
+      "scope_id": "2"
+    },
+    {
+      "decision": 3,
+      "rule_id": "STRATEGY_LOSS",
+      "scope": "STRATEGY",
+      "scope_id": "S1"
+    },
+    {
+      "decision": 3,
+      "rule_id": "STRATEGY_LOSS",
+      "scope": "STRATEGY",
+      "scope_id": "S2"
+    },
+    {
+      "decision": 3,
+      "rule_id": "DAILY_LOSS",
+      "scope": "GLOBAL",
+      "scope_id": ""
+    },
+    {
+      "decision": 3,
+      "rule_id": "KILL_SWITCH_ENGAGED",
+      "scope": "STRATEGY",
+      "scope_id": "S3"
+    }
+  ],
+  "instruments": {
+    "1": {
+      "tick_size": 0.01
+    },
+    "2": {
+      "tick_size": 0.01
+    }
+  },
+  "steps": [
+    {
+      "ask_ticks": 2452,
+      "bid_ticks": 2450,
+      "instrument_id": 1,
+      "ts": 1787578200000000000,
+      "type": "market"
+    },
+    {
+      "ask_ticks": 3121,
+      "bid_ticks": 3119,
+      "instrument_id": 2,
+      "ts": 1787578200000000000,
+      "type": "market"
+    },
+    {
+      "expect": {
+        "decision": 1,
+        "rule_id": "ALLOW",
+        "severity": 1
+      },
+      "order": {
+        "instrument_id": 1,
+        "order_id": 1,
+        "order_type": 2,
+        "price_ticks": 2450,
+        "qty": 100,
+        "side": 0,
+        "strategy_id": "S1",
+        "timestamp": 1787578200100000000,
+        "urgency": 0.5,
+        "venue_id": 1
+      },
+      "type": "order"
+    },
+    {
+      "expect": {
+        "decision": 2,
+        "rule_id": "DUPLICATE_ORDER_ID",
+        "severity": 2
+      },
+      "order": {
+        "instrument_id": 1,
+        "order_id": 1,
+        "order_type": 2,
+        "price_ticks": 2455,
+        "qty": 50,
+        "side": 1,
+        "strategy_id": "S1",
+        "timestamp": 1787578200200000000,
+        "urgency": 0.5,
+        "venue_id": 1
+      },
+      "type": "order"
+    },
+    {
+      "expect": {
+        "decision": 2,
+        "rule_id": "MALFORMED_ORDER",
+        "severity": 2
+      },
+      "order": {
+        "instrument_id": 1,
+        "order_id": 3,
+        "order_type": 2,
+        "price_ticks": 2450,
+        "qty": 0,
+        "side": 0,
+        "strategy_id": "S1",
+        "timestamp": 1787578200300000000,
+        "urgency": 0.5,
+        "venue_id": 1
+      },
+      "type": "order"
+    },
+    {
+      "expect": {
+        "decision": 2,
+        "rule_id": "UNKNOWN_INSTRUMENT",
+        "severity": 2
+      },
+      "order": {
+        "instrument_id": 999,
+        "order_id": 4,
+        "order_type": 2,
+        "price_ticks": 2450,
+        "qty": 100,
+        "side": 0,
+        "strategy_id": "S1",
+        "timestamp": 1787578200400000000,
+        "urgency": 0.5,
+        "venue_id": 1
+      },
+      "type": "order"
+    },
+    {
+      "expect": {
+        "decision": 2,
+        "rule_id": "FAT_FINGER_QTY",
+        "severity": 2
+      },
+      "order": {
+        "instrument_id": 1,
+        "order_id": 5,
+        "order_type": 2,
+        "price_ticks": 2450,
+        "qty": 60000,
+        "side": 0,
+        "strategy_id": "S1",
+        "timestamp": 1787578200500000000,
+        "urgency": 0.5,
+        "venue_id": 1
+      },
+      "type": "order"
+    },
+    {
+      "expect": {
+        "decision": 2,
+        "rule_id": "FAT_FINGER_NOTIONAL",
+        "severity": 2
+      },
+      "order": {
+        "instrument_id": 1,
+        "order_id": 6,
+        "order_type": 2,
+        "price_ticks": 2460,
+        "qty": 45000,
+        "side": 0,
+        "strategy_id": "S1",
+        "timestamp": 1787578200600000000,
+        "urgency": 0.5,
+        "venue_id": 1
+      },
+      "type": "order"
+    },
+    {
+      "expect": {
+        "decision": 2,
+        "rule_id": "PRICE_BAND",
+        "severity": 2
+      },
+      "order": {
+        "instrument_id": 1,
+        "order_id": 7,
+        "order_type": 2,
+        "price_ticks": 3000,
+        "qty": 30000,
+        "side": 0,
+        "strategy_id": "S1",
+        "timestamp": 1787578200700000000,
+        "urgency": 0.5,
+        "venue_id": 1
+      },
+      "type": "order"
+    },
+    {
+      "expect": {
+        "decision": 2,
+        "rule_id": "SELF_MATCH",
+        "severity": 2
+      },
+      "order": {
+        "instrument_id": 1,
+        "order_id": 8,
+        "order_type": 2,
+        "price_ticks": 2450,
+        "qty": 50,
+        "side": 1,
+        "strategy_id": "S1",
+        "timestamp": 1787578200800000000,
+        "urgency": 0.5,
+        "venue_id": 1
+      },
+      "type": "order"
+    },
+    {
+      "expect": {
+        "decision": 1,
+        "rule_id": "ALLOW",
+        "severity": 1
+      },
+      "order": {
+        "instrument_id": 1,
+        "order_id": 9,
+        "order_type": 2,
+        "price_ticks": 2455,
+        "qty": 50,
+        "side": 1,
+        "strategy_id": "S1",
+        "timestamp": 1787578200900000000,
+        "urgency": 0.5,
+        "venue_id": 1
+      },
+      "type": "order"
+    },
+    {
+      "expect": {
+        "decision": 2,
+        "rule_id": "SELF_MATCH",
+        "severity": 2
+      },
+      "order": {
+        "instrument_id": 1,
+        "order_id": 10,
+        "order_type": 2,
+        "price_ticks": 2455,
+        "qty": 50,
+        "side": 0,
+        "strategy_id": "S1",
+        "timestamp": 1787578201000000000,
+        "urgency": 0.5,
+        "venue_id": 1
+      },
+      "type": "order"
+    },
+    {
+      "expect": {
+        "decision": 2,
+        "rule_id": "SELF_MATCH",
+        "severity": 2
+      },
+      "order": {
+        "instrument_id": 1,
+        "order_id": 11,
+        "order_type": 1,
+        "price_ticks": 0,
+        "qty": 50,
+        "side": 0,
+        "strategy_id": "S1",
+        "timestamp": 1787578201100000000,
+        "urgency": 0.5,
+        "venue_id": 1
+      },
+      "type": "order"
+    },
+    {
+      "order_id": 9,
+      "ts": 1787578201150000000,
+      "type": "cancel"
+    },
+    {
+      "expect": {
+        "decision": 1,
+        "rule_id": "ALLOW",
+        "severity": 1
+      },
+      "order": {
+        "instrument_id": 1,
+        "order_id": 12,
+        "order_type": 1,
+        "price_ticks": 0,
+        "qty": 50,
+        "side": 0,
+        "strategy_id": "S1",
+        "timestamp": 1787578201200000000,
+        "urgency": 0.5,
+        "venue_id": 1
+      },
+      "type": "order"
+    },
+    {
+      "expect": {
+        "decision": 2,
+        "rule_id": "STALE_PRICE",
+        "severity": 2
+      },
+      "order": {
+        "instrument_id": 1,
+        "order_id": 13,
+        "order_type": 2,
+        "price_ticks": 2450,
+        "qty": 100,
+        "side": 0,
+        "strategy_id": "S1",
+        "timestamp": 1787578207000000000,
+        "urgency": 0.5,
+        "venue_id": 1
+      },
+      "type": "order"
+    },
+    {
+      "ask_ticks": 2452,
+      "bid_ticks": 2450,
+      "instrument_id": 1,
+      "ts": 1787578207000000000,
+      "type": "market"
+    },
+    {
+      "ask_ticks": 3121,
+      "bid_ticks": 3119,
+      "instrument_id": 2,
+      "ts": 1787578207000000000,
+      "type": "market"
+    },
+    {
+      "instrument_id": 1,
+      "ts": 1787578207100000000,
+      "type": "gap"
+    },
+    {
+      "expect": {
+        "decision": 2,
+        "rule_id": "SEQUENCE_GAP",
+        "severity": 2
+      },
+      "order": {
+        "instrument_id": 1,
+        "order_id": 14,
+        "order_type": 2,
+        "price_ticks": 2450,
+        "qty": 100,
+        "side": 0,
+        "strategy_id": "S1",
+        "timestamp": 1787578207200000000,
+        "urgency": 0.5,
+        "venue_id": 1
+      },
+      "type": "order"
+    },
+    {
+      "instrument_id": 1,
+      "ts": 1787578207300000000,
+      "type": "recover"
+    },
+    {
+      "expect": {
+        "decision": 1,
+        "rule_id": "ALLOW",
+        "severity": 1
+      },
+      "order": {
+        "instrument_id": 1,
+        "order_id": 15,
+        "order_type": 2,
+        "price_ticks": 2450,
+        "qty": 100,
+        "side": 0,
+        "strategy_id": "S1",
+        "timestamp": 1787578207400000000,
+        "urgency": 0.5,
+        "venue_id": 1
+      },
+      "type": "order"
+    },
+    {
+      "ts": 1787578207500000000,
+      "type": "venue_down",
+      "venue_id": 2
+    },
+    {
+      "expect": {
+        "decision": 2,
+        "rule_id": "VENUE_DISCONNECTED",
+        "severity": 2
+      },
+      "order": {
+        "instrument_id": 1,
+        "order_id": 16,
+        "order_type": 2,
+        "price_ticks": 2450,
+        "qty": 100,
+        "side": 0,
+        "strategy_id": "S1",
+        "timestamp": 1787578207600000000,
+        "urgency": 0.5,
+        "venue_id": 2
+      },
+      "type": "order"
+    },
+    {
+      "ts": 1787578207700000000,
+      "type": "venue_up",
+      "venue_id": 2
+    },
+    {
+      "reason": "manual instrument halt",
+      "scope": "INSTRUMENT",
+      "scope_id": "2",
+      "ts": 1787578207800000000,
+      "type": "kill"
+    },
+    {
+      "expect": {
+        "decision": 2,
+        "rule_id": "KILL_INSTRUMENT",
+        "severity": 3
+      },
+      "order": {
+        "instrument_id": 2,
+        "order_id": 17,
+        "order_type": 2,
+        "price_ticks": 3120,
+        "qty": 100,
+        "side": 0,
+        "strategy_id": "S2",
+        "timestamp": 1787578207900000000,
+        "urgency": 0.5,
+        "venue_id": 1
+      },
+      "type": "order"
+    },
+    {
+      "reason": "halt lifted",
+      "scope": "INSTRUMENT",
+      "scope_id": "2",
+      "ts": 1787578208000000000,
+      "type": "unkill"
+    },
+    {
+      "expect": {
+        "decision": 1,
+        "rule_id": "ALLOW",
+        "severity": 1
+      },
+      "order": {
+        "instrument_id": 2,
+        "order_id": 18,
+        "order_type": 1,
+        "price_ticks": 0,
+        "qty": 10,
+        "side": 0,
+        "strategy_id": "S2",
+        "timestamp": 1787578208100000000,
+        "urgency": 0.5,
+        "venue_id": 1
+      },
+      "type": "order"
+    },
+    {
+      "expect": {
+        "decision": 1,
+        "rule_id": "ALLOW",
+        "severity": 1
+      },
+      "order": {
+        "instrument_id": 2,
+        "order_id": 19,
+        "order_type": 1,
+        "price_ticks": 0,
+        "qty": 10,
+        "side": 0,
+        "strategy_id": "S2",
+        "timestamp": 1787578208100000000,
+        "urgency": 0.5,
+        "venue_id": 1
+      },
+      "type": "order"
+    },
+    {
+      "expect": {
+        "decision": 1,
+        "rule_id": "ALLOW",
+        "severity": 1
+      },
+      "order": {
+        "instrument_id": 2,
+        "order_id": 20,
+        "order_type": 1,
+        "price_ticks": 0,
+        "qty": 10,
+        "side": 0,
+        "strategy_id": "S2",
+        "timestamp": 1787578208100000000,
+        "urgency": 0.5,
+        "venue_id": 1
+      },
+      "type": "order"
+    },
+    {
+      "expect": {
+        "decision": 1,
+        "rule_id": "ALLOW",
+        "severity": 1
+      },
+      "order": {
+        "instrument_id": 2,
+        "order_id": 21,
+        "order_type": 1,
+        "price_ticks": 0,
+        "qty": 10,
+        "side": 0,
+        "strategy_id": "S2",
+        "timestamp": 1787578208100000000,
+        "urgency": 0.5,
+        "venue_id": 1
+      },
+      "type": "order"
+    },
+    {
+      "expect": {
+        "decision": 2,
+        "rule_id": "RATE_THROTTLE",
+        "severity": 2
+      },
+      "order": {
+        "instrument_id": 2,
+        "order_id": 22,
+        "order_type": 1,
+        "price_ticks": 0,
+        "qty": 10,
+        "side": 0,
+        "strategy_id": "S2",
+        "timestamp": 1787578208100000000,
+        "urgency": 0.5,
+        "venue_id": 1
+      },
+      "type": "order"
+    },
+    {
+      "expect": {
+        "decision": 2,
+        "rule_id": "RATE_THROTTLE",
+        "severity": 2
+      },
+      "order": {
+        "instrument_id": 2,
+        "order_id": 23,
+        "order_type": 1,
+        "price_ticks": 0,
+        "qty": 10,
+        "side": 0,
+        "strategy_id": "S2",
+        "timestamp": 1787578208100000000,
+        "urgency": 0.5,
+        "venue_id": 1
+      },
+      "type": "order"
+    },
+    {
+      "instrument_id": 1,
+      "order_id": 0,
+      "price_ticks": 2452,
+      "qty": 95000,
+      "side": 0,
+      "strategy_id": "S1",
+      "ts": 1787578208200000000,
+      "type": "fill"
+    },
+    {
+      "expect": {
+        "decision": 2,
+        "rule_id": "POSITION_LIMIT",
+        "severity": 2
+      },
+      "order": {
+        "instrument_id": 1,
+        "order_id": 24,
+        "order_type": 2,
+        "price_ticks": 2452,
+        "qty": 40000,
+        "side": 0,
+        "strategy_id": "S1",
+        "timestamp": 1787578208300000000,
+        "urgency": 0.5,
+        "venue_id": 1
+      },
+      "type": "order"
+    },
+    {
+      "expect": {
+        "decision": 2,
+        "rule_id": "INSTRUMENT_NOTIONAL",
+        "severity": 2
+      },
+      "order": {
+        "instrument_id": 1,
+        "order_id": 25,
+        "order_type": 2,
+        "price_ticks": 2452,
+        "qty": 3000,
+        "side": 0,
+        "strategy_id": "S1",
+        "timestamp": 1787578208400000000,
+        "urgency": 0.5,
+        "venue_id": 1
+      },
+      "type": "order"
+    },
+    {
+      "expect": {
+        "decision": 1,
+        "rule_id": "ALLOW",
+        "severity": 1
+      },
+      "order": {
+        "instrument_id": 1,
+        "order_id": 26,
+        "order_type": 2,
+        "price_ticks": 2455,
+        "qty": 40000,
+        "side": 1,
+        "strategy_id": "S1",
+        "timestamp": 1787578208500000000,
+        "urgency": 0.5,
+        "venue_id": 1
+      },
+      "type": "order"
+    },
+    {
+      "instrument_id": 2,
+      "order_id": 0,
+      "price_ticks": 3120,
+      "qty": 10000,
+      "side": 0,
+      "strategy_id": "S2",
+      "ts": 1787578208600000000,
+      "type": "fill"
+    },
+    {
+      "expect": {
+        "decision": 2,
+        "rule_id": "NET_NOTIONAL",
+        "severity": 2
+      },
+      "order": {
+        "instrument_id": 2,
+        "order_id": 27,
+        "order_type": 2,
+        "price_ticks": 3120,
+        "qty": 5000,
+        "side": 0,
+        "strategy_id": "S2",
+        "timestamp": 1787578208700000000,
+        "urgency": 0.5,
+        "venue_id": 1
+      },
+      "type": "order"
+    },
+    {
+      "instrument_id": 2,
+      "order_id": 0,
+      "price_ticks": 3120,
+      "qty": 80000,
+      "side": 1,
+      "strategy_id": "S2",
+      "ts": 1787578208800000000,
+      "type": "fill"
+    },
+    {
+      "expect": {
+        "decision": 2,
+        "rule_id": "GROSS_NOTIONAL",
+        "severity": 2
+      },
+      "order": {
+        "instrument_id": 1,
+        "order_id": 28,
+        "order_type": 2,
+        "price_ticks": 2455,
+        "qty": 20000,
+        "side": 1,
+        "strategy_id": "S1",
+        "timestamp": 1787578208900000000,
+        "urgency": 0.5,
+        "venue_id": 1
+      },
+      "type": "order"
+    },
+    {
+      "instrument_id": 1,
+      "order_id": 0,
+      "price_ticks": 2398,
+      "qty": 95000,
+      "side": 1,
+      "strategy_id": "S1",
+      "ts": 1787578209000000000,
+      "type": "fill"
+    },
+    {
+      "expect": {
+        "decision": 2,
+        "rule_id": "KILL_STRATEGY",
+        "severity": 3
+      },
+      "order": {
+        "instrument_id": 1,
+        "order_id": 29,
+        "order_type": 2,
+        "price_ticks": 2450,
+        "qty": 100,
+        "side": 0,
+        "strategy_id": "S1",
+        "timestamp": 1787578209100000000,
+        "urgency": 0.5,
+        "venue_id": 1
+      },
+      "type": "order"
+    },
+    {
+      "expect": {
+        "decision": 1,
+        "rule_id": "ALLOW",
+        "severity": 1
+      },
+      "order": {
+        "instrument_id": 2,
+        "order_id": 30,
+        "order_type": 2,
+        "price_ticks": 3120,
+        "qty": 1000,
+        "side": 0,
+        "strategy_id": "S2",
+        "timestamp": 1787578209200000000,
+        "urgency": 0.5,
+        "venue_id": 1
+      },
+      "type": "order"
+    },
+    {
+      "instrument_id": 2,
+      "order_id": 0,
+      "price_ticks": 3500,
+      "qty": 70000,
+      "side": 0,
+      "strategy_id": "S2",
+      "ts": 1787578209300000000,
+      "type": "fill"
+    },
+    {
+      "expect": {
+        "decision": 2,
+        "rule_id": "KILL_GLOBAL",
+        "severity": 3
+      },
+      "order": {
+        "instrument_id": 1,
+        "order_id": 31,
+        "order_type": 2,
+        "price_ticks": 2450,
+        "qty": 100,
+        "side": 0,
+        "strategy_id": "S3",
+        "timestamp": 1787578209400000000,
+        "urgency": 0.5,
+        "venue_id": 1
+      },
+      "type": "order"
+    },
+    {
+      "reason": "precedence demo",
+      "scope": "STRATEGY",
+      "scope_id": "S3",
+      "ts": 1787578209500000000,
+      "type": "kill"
+    },
+    {
+      "expect": {
+        "decision": 2,
+        "rule_id": "KILL_GLOBAL",
+        "severity": 3
+      },
+      "order": {
+        "instrument_id": 1,
+        "order_id": 32,
+        "order_type": 2,
+        "price_ticks": 2450,
+        "qty": 100,
+        "side": 0,
+        "strategy_id": "S3",
+        "timestamp": 1787578209600000000,
+        "urgency": 0.5,
+        "venue_id": 1
+      },
+      "type": "order"
+    }
+  ],
+  "x-version": 1
+}

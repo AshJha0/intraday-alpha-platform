@@ -1,0 +1,176 @@
+# GENERATED FILE — do not edit by hand.
+# Source of truth: deployment/prometheus/
+# Regenerate: python3 deployment/k8s/generate_configmaps.py
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: iap-prometheus-config
+  namespace: intraday-alpha
+  labels:
+    app.kubernetes.io/part-of: intraday-alpha-platform
+    app.kubernetes.io/component: config
+    app.kubernetes.io/managed-by: generate-configmaps
+data:
+  alerts.yml: "# =============================================================================\n# alerts.yml\
+    \ \u2014 alert rules per spec \xA725 (observability) and \xA716 (risk).\n#\n# Severity policy:\n#\
+    \   page     \u2014 trading correctness / capital at risk; wake someone up.\n#   critical \u2014 feed\
+    \ or platform integrity degraded; act now during session.\n#   warning  \u2014 investigate the same\
+    \ day.\n# Each alert links its runbook (docs/runbooks/).\n# Thresholds are pinned to configs/risk.json\
+    \ where a config limit exists\n# (stale_feed_timeout_ns = 5s, max_sequence_gap_before_halt = 1).\n\
+    # =============================================================================\n\ngroups:\n  - name:\
+    \ iap-market-data-health\n    rules:\n      # Sequence-gap rate: any sustained gap rate on a live\
+    \ feed is a data\n      # integrity incident (books are marked stale on a gap; risk.json halts\n \
+    \     # after 1 gap).\n      - alert: SequenceGapRate\n        expr: job:md_sequence_gaps:rate5m >\
+    \ 0.1\n        for: 2m\n        labels:\n          severity: critical\n          domain: market-data\n\
+    \        annotations:\n          summary: \"Sequence gaps on {{ $labels.service }} ({{ $value | printf\
+    \ \\\"%.3f\\\" }}/s)\"\n          description: >\n            Sustained sequence-gap rate above 0.1/s\
+    \ for 2m. Books downstream are\n            marked stale until SNAPSHOT recovery; risk is fail-closed\
+    \ on stale\n            books. Runbook: docs/runbooks/RUNBOOK_data_pipeline.md#sequence-gaps\n   \
+    \       runbook: docs/runbooks/RUNBOOK_data_pipeline.md\n\n      # Stale feed: no events for longer\
+    \ than the configured staleness budget\n      # (configs/risk.json market_data.stale_feed_timeout_ns\
+    \ = 5e9 ns).\n      - alert: StaleFeed\n        expr: rate(md_events_total[1m]) == 0 or (time() -\
+    \ md_last_event_unixtime) > 5\n        for: 1m\n        labels:\n          severity: page\n      \
+    \    domain: market-data\n        annotations:\n          summary: \"Stale market-data feed on {{\
+    \ $labels.service }}\"\n          description: >\n            No market events within the 5s staleness\
+    \ budget\n            (risk.json stale_feed_timeout_ns). Risk engine rejects orders\n            against\
+    \ stale books (fail-closed); verify feed handlers and venue\n            connectivity. Runbook: docs/runbooks/RUNBOOK_data_pipeline.md#stale-feed\n\
+    \          runbook: docs/runbooks/RUNBOOK_data_pipeline.md\n\n  - name: iap-alpha-health\n    rules:\n\
+    \      # Signal-rate collapse: alpha engine emitting far below its trailing\n      # baseline while\
+    \ market data still flows.\n      - alert: SignalRateCollapse\n        expr: >\n          job:alpha_signals:rate5m\n\
+    \            < 0.2 * (job:alpha_signals:rate5m offset 1h)\n          and job:md_events:rate5m > 0\n\
+    \        for: 10m\n        labels:\n          severity: critical\n          domain: alpha\n      \
+    \  annotations:\n          summary: \"Alpha signal rate collapsed on {{ $labels.service }}\"\n   \
+    \       description: >\n            Signal rate under 20% of its rate 1h ago while market data is\n\
+    \            flowing \u2014 feature validity flags, warmup state or a wedged engine.\n           \
+    \ Runbook: docs/runbooks/RUNBOOK_paper_trading.md#signal-rate\n          runbook: docs/runbooks/RUNBOOK_paper_trading.md\n\
+    \n      # Live-vs-backtest drift (PLACEHOLDER contract): no producer emits\n      # alpha_live_vs_backtest_drift\
+    \ yet \u2014 the Java monitoring endpoint is\n      # live but does not compute this statistic. Contract:\
+    \ a KS-style\n      # statistic in [0, 1] comparing the live signal distribution to the\n      # walk-forward\
+    \ backtest distribution for the same regime (spec \xA725\n      # \"alpha health\").\n      - alert:\
+    \ LiveVsBacktestDrift\n        expr: alpha_live_vs_backtest_drift > 0.25\n        for: 30m\n     \
+    \   labels:\n          severity: warning\n          domain: alpha\n        annotations:\n        \
+    \  summary: \"Live signal distribution drifting from backtest ({{ $value | printf \\\"%.2f\\\" }})\"\
+    \n          description: >\n            Placeholder threshold 0.25 on the drift statistic; calibrate\
+    \ after\n            the first paper-trading week. Persistent drift is a retirement\n            trigger\
+    \ per spec \xA720 step 13.\n            Runbook: docs/runbooks/RUNBOOK_paper_trading.md#drift\n  \
+    \        runbook: docs/runbooks/RUNBOOK_paper_trading.md\n\n  - name: iap-execution\n    rules:\n\
+    \      # Fill-rate drop: fills per accepted order far below baseline.\n      - alert: FillRateDrop\n\
+    \        expr: >\n          job:fill_rate:ratio5m < 0.5 * (job:fill_rate:ratio5m offset 1h)\n    \
+    \      and job:venue_orders:rate5m > 0.1\n        for: 10m\n        labels:\n          severity: critical\n\
+    \          domain: execution\n        annotations:\n          summary: \"Fill rate dropped on {{ $labels.service\
+    \ }}\"\n          description: >\n            Fill rate below half its 1h-ago baseline while orders\
+    \ are flowing \u2014\n            queue-position model, venue health or adverse regime shift.\n  \
+    \          Runbook: docs/runbooks/RUNBOOK_paper_trading.md#fill-rate\n          runbook: docs/runbooks/RUNBOOK_paper_trading.md\n\
+    \n  - name: iap-risk\n    rules:\n      # Loss-limit utilization: realized PnL approaching the global\
+    \ daily loss\n      # limit (configs/risk.json global.max_daily_loss = 250000).\n      # risk_realized_pnl\
+    \ is LIVE today from rust/risk.\n      - alert: LossLimitUtilizationHigh\n        expr: (-risk_realized_pnl)\
+    \ / 250000 > 0.75\n        for: 1m\n        labels:\n          severity: page\n          domain: risk\n\
+    \        annotations:\n          summary: \"Daily loss limit utilization {{ $value | humanizePercentage\
+    \ }}\"\n          description: >\n            Realized loss above 75% of global.max_daily_loss; at\
+    \ 100% the risk\n            engine latches the global kill switch (fail-closed, audit-logged).\n\
+    \            Runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md\n          runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md\n\
+    \n      - alert: KillSwitchEngaged\n        expr: risk_kill_switch_engaged > 0\n        labels:\n\
+    \          severity: page\n          domain: risk\n        annotations:\n          summary: \"Kill\
+    \ switch engaged ({{ $labels.scope | default \\\"global\\\" }})\"\n          description: >\n    \
+    \        A kill switch latched \u2014 trading halted for the affected scope. Do\n            NOT clear\
+    \ without following the incident runbook and risk approval.\n            Runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md\n\
+    \          runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md\n\n  - name: iap-infrastructure\n\
+    \    rules:\n      # GC pause: p99 pause above 10ms breaks the order-path latency budget.\n      -\
+    \ alert: GcPauseHigh\n        expr: job:jvm_gc_pause_ns:p99 > 10e6\n        for: 5m\n        labels:\n\
+    \          severity: warning\n          domain: infrastructure\n        annotations:\n          summary:\
+    \ \"JVM p99 GC pause {{ $value | humanize }}ns on {{ $labels.job }}\"\n          description: >\n\
+    \            p99 GC pause above 10ms for 5m; check heap sizing / allocation rate\n            on hot\
+    \ paths (spec \xA723: allocation-conscious Java).\n            Runbook: docs/runbooks/RUNBOOK_backtest.md#jvm\n\
+    \          runbook: docs/runbooks/RUNBOOK_backtest.md\n\n      # Queue depth (PLACEHOLDER contract,\
+    \ like LiveVsBacktestDrift): no\n      # producer emits eventbus_queue_depth yet \u2014 the rust eventbus\
+    \ crate has\n      # no exporter wired. The alert can never fire until one exists; kept as\n     \
+    \ # the pinned name/threshold contract (deployment/grafana/README.md).\n      - alert: QueueDepthHigh\n\
+    \        expr: eventbus_queue_depth > 100000\n        for: 2m\n        labels:\n          severity:\
+    \ critical\n          domain: infrastructure\n        annotations:\n          summary: \"Event-bus\
+    \ queue depth {{ $value | humanize }} on {{ $labels.service }}\"\n          description: >\n     \
+    \       PLACEHOLDER metric \u2014 no producer exports eventbus_queue_depth yet.\n            Contract:\
+    \ sustained backlog above 100k events \u2014 downstream consumer\n            stalled or throughput\
+    \ regression; latency SLOs are already violated\n            at this depth. Runbook: docs/runbooks/RUNBOOK_data_pipeline.md#queue-depth\n\
+    \          runbook: docs/runbooks/RUNBOOK_data_pipeline.md\n\n      # A scrape target disappearing\
+    \ is itself an incident.\n      - alert: TargetDown\n        expr: up == 0\n        for: 2m\n    \
+    \    labels:\n          severity: critical\n          domain: infrastructure\n        annotations:\n\
+    \          summary: \"Scrape target {{ $labels.job }}/{{ $labels.instance }} down\"\n          description:\
+    \ >\n            Prometheus cannot scrape {{ $labels.instance }}. If this is\n            java-platform\
+    \ during a trading session, treat as a platform\n            incident. Runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md\n\
+    \          runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md\n"
+  prometheus.yml: "# =============================================================================\n#\
+    \ prometheus.yml \u2014 Intraday Alpha Platform scrape configuration (spec \xA725)\n#\n# Two sources\
+    \ of metrics:\n#   1. java-platform  \u2014 com.iap.monitoring registry served by\n#      com.iap.api.MetricsServer\
+    \ (LIVE), port 8080, GET /metrics,\n#      Prometheus text exposition.\n#   2. rust telemetry \u2014\
+    \ rust/telemetry Registry::to_prometheus() text written\n#      by replay/risk/venue components to\
+    \ a file (/data/telemetry/rust.prom)\n#      and served by the rust-telemetry-exporter sidecar. Discovered\
+    \ via a\n#      FILE-BASED target list (targets/rust-telemetry.json) so operators can\n#      re-point\
+    \ it without reloading this config.\n#\n# Metric-name conventions (see deployment/grafana/README.md\
+    \ for the full\n# mapping): snake_case, counters end in _total, latency histograms end in _ns\n# (fixed\
+    \ log2 buckets: _bucket{le=\"2^i - 1\"}, powers of two in nanoseconds).\n# =============================================================================\n\
+    \nglobal:\n  scrape_interval: 15s\n  evaluation_interval: 15s\n  external_labels:\n    platform: intraday-alpha\n\
+    \    env: local\n\nrule_files:\n  - /etc/prometheus/recording.yml\n  - /etc/prometheus/alerts.yml\n\
+    \nscrape_configs:\n  # Java platform monitoring API (port 8080, /metrics \u2014 LIVE, served by\n\
+    \  # com.iap.api.MetricsServer).\n  - job_name: java-platform\n    metrics_path: /metrics\n    static_configs:\n\
+    \      - targets: [\"java-platform:8080\"]\n        labels:\n          service: java-platform\n  \
+    \        language: java\n\n  # Rust telemetry: file-based service discovery pointing at the sidecar\
+    \ that\n  # serves rust/telemetry text exposition from the shared data volume.\n  - job_name: rust-telemetry\n\
+    \    metrics_path: /rust.prom\n    file_sd_configs:\n      - files:\n          - /etc/prometheus/targets/rust-telemetry.json\n\
+    \        refresh_interval: 30s\n\n  # Prometheus self-scrape (rule/alert health).\n  - job_name: prometheus\n\
+    \    static_configs:\n      - targets: [\"localhost:9090\"]\n        labels:\n          service: prometheus\n"
+  recording.yml: "# =============================================================================\n# recording.yml\
+    \ \u2014 precomputed rates and tail-latency quantiles (spec \xA722/\xA725)\n#\n# Histogram note: rust/telemetry\
+    \ and the live Java monitoring endpoint\n# (com.iap.api.MetricsServer) expose fixed log2 histograms\
+    \ \u2014 bucket upper bounds are 0, 1, 3, 7, ...,\n# 2^i - 1 nanoseconds. histogram_quantile therefore\
+    \ returns a value within one\n# power of two ABOVE the true order statistic (conservative for latency);\n\
+    # benchmarks/RESULTS.md holds the exact offline numbers.\n# Naming: level:metric:operation per Prometheus\
+    \ recording-rule conventions.\n# =============================================================================\n\
+    \ngroups:\n  - name: iap-event-rates\n    interval: 15s\n    rules:\n      # Market-data event throughput\
+    \ (events/sec).\n      - record: job:md_events:rate5m\n        expr: sum by (job, service) (rate(md_events_total[5m]))\n\
+    \      - record: job:venue_market_events:rate5m\n        expr: sum by (job, service) (rate(venue_market_events_total[5m]))\n\
+    \n      # Sequence-gap / duplicate / out-of-order rates (per second).\n      - record: job:md_sequence_gaps:rate5m\n\
+    \        expr: sum by (job, service) (rate(md_sequence_gaps_total[5m]))\n      - record: job:md_duplicates:rate5m\n\
+    \        expr: sum by (job, service) (rate(md_duplicates_total[5m]))\n      # PLACEHOLDER (like LiveVsBacktestDrift):\
+    \ no producer emits\n      # md_out_of_order_total yet \u2014 out-of-order arrivals are counted in\n\
+    \      # qc_report.json but not exported as a metric. The rule evaluates to\n      # empty until a\
+    \ producer exists (deployment/grafana/README.md).\n      - record: job:md_out_of_order:rate5m\n  \
+    \      expr: sum by (job, service) (rate(md_out_of_order_total[5m]))\n\n      # Alpha signal rate\
+    \ and risk decision/order flow.\n      - record: job:alpha_signals:rate5m\n        expr: sum by (job,\
+    \ service) (rate(alpha_signals_total[5m]))\n      - record: job:risk_decisions:rate5m\n        expr:\
+    \ sum by (job, service) (rate(risk_decisions_total[5m]))\n      - record: job:venue_orders:rate5m\n\
+    \        expr: sum by (job, service) (rate(venue_orders_total[5m]))\n\n      # Fill rate: fills over\
+    \ accepted orders (rust venue sim naming).\n      - record: job:fill_rate:ratio5m\n        expr: >\n\
+    \          sum by (job, service) (rate(venue_fills_total[5m]))\n          /\n          clamp_min(sum\
+    \ by (job, service) (rate(venue_orders_accepted_total[5m])), 1e-9)\n\n      # Risk rejection ratio.\n\
+    \      - record: job:risk_rejected:ratio5m\n        expr: >\n          sum by (job, service) (rate(risk_rejected_total[5m]))\n\
+    \          /\n          clamp_min(sum by (job, service) (rate(risk_decisions_total[5m])), 1e-9)\n\n\
+    \  - name: iap-latency-quantiles\n    interval: 15s\n    rules:\n      # p50 / p99 / p999 for each\
+    \ hot-path histogram (nanoseconds).\n      # Market-data decode (LIVE from java: decode_latency_ns).\n\
+    \      - record: job:decode_latency_ns:p50\n        expr: histogram_quantile(0.50, sum by (job, le)\
+    \ (rate(decode_latency_ns_bucket[5m])))\n      - record: job:decode_latency_ns:p99\n        expr:\
+    \ histogram_quantile(0.99, sum by (job, le) (rate(decode_latency_ns_bucket[5m])))\n      - record:\
+    \ job:decode_latency_ns:p999\n        expr: histogram_quantile(0.999, sum by (job, le) (rate(decode_latency_ns_bucket[5m])))\n\
+    \n      # Order-book update.\n      - record: job:book_update_latency_ns:p50\n        expr: histogram_quantile(0.50,\
+    \ sum by (job, le) (rate(book_update_latency_ns_bucket[5m])))\n      - record: job:book_update_latency_ns:p99\n\
+    \        expr: histogram_quantile(0.99, sum by (job, le) (rate(book_update_latency_ns_bucket[5m])))\n\
+    \      - record: job:book_update_latency_ns:p999\n        expr: histogram_quantile(0.999, sum by (job,\
+    \ le) (rate(book_update_latency_ns_bucket[5m])))\n\n      # Decision-to-wire order path.\n      -\
+    \ record: job:order_path_latency_ns:p50\n        expr: histogram_quantile(0.50, sum by (job, le) (rate(order_path_latency_ns_bucket[5m])))\n\
+    \      - record: job:order_path_latency_ns:p99\n        expr: histogram_quantile(0.99, sum by (job,\
+    \ le) (rate(order_path_latency_ns_bucket[5m])))\n      - record: job:order_path_latency_ns:p999\n\
+    \        expr: histogram_quantile(0.999, sum by (job, le) (rate(order_path_latency_ns_bucket[5m])))\n\
+    \n      # Venue ack latency (LIVE today from rust/venue: venue_ack_latency_ns).\n      - record: job:venue_ack_latency_ns:p99\n\
+    \        expr: histogram_quantile(0.99, sum by (job, le) (rate(venue_ack_latency_ns_bucket[5m])))\n\
+    \n      # JVM GC pause (LIVE from java: jvm_gc_pause_ns, registered at the\n      # first observed\
+    \ pause).\n      - record: job:jvm_gc_pause_ns:p99\n        expr: histogram_quantile(0.99, sum by\
+    \ (job, le) (rate(jvm_gc_pause_ns_bucket[5m])))\n"
+  targets__rust-telemetry.json: |
+    [
+      {
+        "targets": ["rust-telemetry-exporter:9091"],
+        "labels": {
+          "service": "rust-replay",
+          "language": "rust"
+        }
+      }
+    ]

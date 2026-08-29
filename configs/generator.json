@@ -1,0 +1,67 @@
+{
+  "x-version": 1,
+  "description": "Synthetic market-data generator config (iap.marketdata.generator). All randomness is SplitMix64 seeded from `seed`; identical seed => bit-identical output files. Equities: ONE shared regime-switching efficient price per instrument (sigma per sqrt-second, 1s grid) with per-venue bounded AR(1) microstructure noise (`venue_noise`) and self-exciting MBO flow, so the consolidated multi-venue book stays uncrossed; FX streams are QUOTE+TRADE across LP1/LP2/PRI. `anomalies` are injected for QC testing and disabled for golden vectors.",
+  "seed": 20260829,
+  "sessions": 2,
+  "equities": {
+    "slots_per_stream": 3850,
+    "vol_regimes": {
+      "sigma_ticks_per_s": [
+        0.15,
+        0.4
+      ],
+      "switch_prob_per_s": 0.0007
+    },
+    "venue_noise": {
+      "rho": 0.9,
+      "sigma_ticks": 0.12,
+      "max_ticks": 0.45
+    },
+    "flow": {
+      "excitation_kick": 1.4,
+      "excitation_decay": 0.82,
+      "max_excitation": 8.0
+    },
+    "book": {
+      "max_resting_orders": 160,
+      "qty_lots_max": 10
+    },
+    "mix": {
+      "add": 0.46,
+      "cancel": 0.26,
+      "modify": 0.12,
+      "execute": 0.16
+    },
+    "halt": {
+      "instrument": "SYN.EQ.007",
+      "session_index": 0,
+      "duration_s": 300
+    },
+    "auction_prints": 3
+  },
+  "fx": {
+    "slots_per_pair": 3300,
+    "vol_regimes": {
+      "sigma_ticks": [
+        0.8,
+        3.0
+      ],
+      "switch_prob": 0.003
+    },
+    "spread_ticks": {
+      "PRI": 2,
+      "LP1": 3,
+      "LP2": 5
+    },
+    "trade_prob": 0.12,
+    "qty_units_max": 20
+  },
+  "anomalies": {
+    "gap_prob": 0.0006,
+    "gap_max_events": 3,
+    "dup_prob": 0.0015,
+    "ooo_prob": 0.001,
+    "invalid_prob": 0.0005,
+    "ts_violation_prob": 0.0005
+  }
+}

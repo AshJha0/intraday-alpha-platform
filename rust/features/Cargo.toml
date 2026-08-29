@@ -1,0 +1,13 @@
+[package]
+name = "features"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "IAP event-driven feature engine: the 40 pinned native features per API_FEATURES.md"
+
+[dependencies]
+marketdata = { path = "../marketdata" }
+orderbook = { path = "../orderbook" }
+
+[dev-dependencies]
+serde_json = { workspace = true }

@@ -1,0 +1,89 @@
+{
+  "experiment_count": 21,
+  "runs": [
+    {
+      "name": "ols",
+      "run_id": "run_0001_ols"
+    },
+    {
+      "name": "ridge",
+      "run_id": "run_0002_ridge"
+    },
+    {
+      "name": "elasticnet",
+      "run_id": "run_0003_elasticnet"
+    },
+    {
+      "name": "xgboost",
+      "run_id": "run_0004_xgboost"
+    },
+    {
+      "name": "lightgbm",
+      "run_id": "run_0005_lightgbm"
+    },
+    {
+      "name": "mlp",
+      "run_id": "run_0006_mlp"
+    },
+    {
+      "name": "metalabel_xgboost",
+      "run_id": "run_0007_metalabel_xgboost"
+    },
+    {
+      "name": "ols",
+      "run_id": "run_0008_ols"
+    },
+    {
+      "name": "ridge",
+      "run_id": "run_0009_ridge"
+    },
+    {
+      "name": "elasticnet",
+      "run_id": "run_0010_elasticnet"
+    },
+    {
+      "name": "xgboost",
+      "run_id": "run_0011_xgboost"
+    },
+    {
+      "name": "lightgbm",
+      "run_id": "run_0012_lightgbm"
+    },
+    {
+      "name": "mlp",
+      "run_id": "run_0013_mlp"
+    },
+    {
+      "name": "metalabel_lightgbm",
+      "run_id": "run_0014_metalabel_lightgbm"
+    },
+    {
+      "name": "ols",
+      "run_id": "run_0015_ols"
+    },
+    {
+      "name": "ridge",
+      "run_id": "run_0016_ridge"
+    },
+    {
+      "name": "elasticnet",
+      "run_id": "run_0017_elasticnet"
+    },
+    {
+      "name": "xgboost",
+      "run_id": "run_0018_xgboost"
+    },
+    {
+      "name": "lightgbm",
+      "run_id": "run_0019_lightgbm"
+    },
+    {
+      "name": "mlp",
+      "run_id": "run_0020_mlp"
+    },
+    {
+      "name": "metalabel_lightgbm",
+      "run_id": "run_0021_metalabel_lightgbm"
+    }
+  ]
+}

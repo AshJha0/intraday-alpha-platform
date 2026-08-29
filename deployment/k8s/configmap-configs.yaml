@@ -1,0 +1,1046 @@
+# GENERATED FILE — do not edit by hand.
+# Source of truth: configs/*.json and configs/strategies/*.json
+# Regenerate: python3 deployment/k8s/generate_configmaps.py
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: iap-configs
+  namespace: intraday-alpha
+  labels:
+    app.kubernetes.io/part-of: intraday-alpha-platform
+    app.kubernetes.io/component: config
+    app.kubernetes.io/managed-by: generate-configmaps
+data:
+  execution.json: |
+    {
+      "x-version": 1,
+      "description": "Execution/SOR defaults skeleton; execution wave extends.",
+      "defaults": {
+        "algo": "TWAP",
+        "max_child_qty": 1000,
+        "max_participation": 0.05,
+        "min_slice_interval_ns": 500000000,
+        "latency_budget_ns": 2000000,
+        "seed": 20260829
+      },
+      "algos": {
+        "TWAP": {
+          "slices": 20
+        },
+        "VWAP": {
+          "volume_curve": "time_of_day_default"
+        },
+        "POV": {
+          "target_participation": 0.05
+        },
+        "IS": {
+          "risk_aversion": 1.0
+        }
+      },
+      "cost_model": {
+        "description": "Research-backtester cost model (iap.backtest.costs): cost = half_spread + fee + impact; impact_bps = impact_coeff_bps_per_pct_adv * (|child_qty| / adv * 100). Fees mirror configs/venues.json primary venues (XV1 equities taker, PRI FX).",
+        "impact_coeff_bps_per_pct_adv": 2.0,
+        "equity_taker_fee_per_share": 0.003,
+        "fx_commission_per_million": 2.5,
+        "cost_multipliers_stress": [0.5, 1.0, 2.0],
+        "latency_shift_events_stress": [0, 1, 5]
+      },
+      "sor": {
+        "eq_venues": [
+          "XV1",
+          "XV2"
+        ],
+        "fx_venues": [
+          "PRI",
+          "LP1",
+          "LP2"
+        ],
+        "prefer_rebate": true,
+        "max_venue_latency_ns": 1000000
+      }
+    }
+  generator.json: |
+    {
+      "x-version": 1,
+      "description": "Synthetic market-data generator config (iap.marketdata.generator). All randomness is SplitMix64 seeded from `seed`; identical seed => bit-identical output files. Equities: ONE shared regime-switching efficient price per instrument (sigma per sqrt-second, 1s grid) with per-venue bounded AR(1) microstructure noise (`venue_noise`) and self-exciting MBO flow, so the consolidated multi-venue book stays uncrossed; FX streams are QUOTE+TRADE across LP1/LP2/PRI. `anomalies` are injected for QC testing and disabled for golden vectors.",
+      "seed": 20260829,
+      "sessions": 2,
+      "equities": {
+        "slots_per_stream": 3850,
+        "vol_regimes": {
+          "sigma_ticks_per_s": [
+            0.15,
+            0.4
+          ],
+          "switch_prob_per_s": 0.0007
+        },
+        "venue_noise": {
+          "rho": 0.9,
+          "sigma_ticks": 0.12,
+          "max_ticks": 0.45
+        },
+        "flow": {
+          "excitation_kick": 1.4,
+          "excitation_decay": 0.82,
+          "max_excitation": 8.0
+        },
+        "book": {
+          "max_resting_orders": 160,
+          "qty_lots_max": 10
+        },
+        "mix": {
+          "add": 0.46,
+          "cancel": 0.26,
+          "modify": 0.12,
+          "execute": 0.16
+        },
+        "halt": {
+          "instrument": "SYN.EQ.007",
+          "session_index": 0,
+          "duration_s": 300
+        },
+        "auction_prints": 3
+      },
+      "fx": {
+        "slots_per_pair": 3300,
+        "vol_regimes": {
+          "sigma_ticks": [
+            0.8,
+            3.0
+          ],
+          "switch_prob": 0.003
+        },
+        "spread_ticks": {
+          "PRI": 2,
+          "LP1": 3,
+          "LP2": 5
+        },
+        "trade_prob": 0.12,
+        "qty_units_max": 20
+      },
+      "anomalies": {
+        "gap_prob": 0.0006,
+        "gap_max_events": 3,
+        "dup_prob": 0.0015,
+        "ooo_prob": 0.001,
+        "invalid_prob": 0.0005,
+        "ts_violation_prob": 0.0005
+      }
+    }
+  instruments.json: |
+    {
+      "x-version": 1,
+      "description": "Synthetic universe. tick_size: real price per tick; lot_size: base units per board lot (EQ shares) / 1 qty unit = 1,000 base ccy (FX). adv in base units/day.",
+      "calendar": {
+        "trading_days": [
+          "2026-08-24",
+          "2026-08-25",
+          "2026-08-26",
+          "2026-08-27",
+          "2026-08-28"
+        ],
+        "timezone": "UTC"
+      },
+      "sessions": {
+        "EQUITY": {
+          "open": "13:30:00",
+          "close": "20:00:00",
+          "open_auction": "13:30:00",
+          "close_auction": "20:00:00"
+        },
+        "ETF": {
+          "open": "13:30:00",
+          "close": "20:00:00",
+          "open_auction": "13:30:00",
+          "close_auction": "20:00:00"
+        },
+        "FX": {
+          "open": "00:00:00",
+          "close": "21:00:00"
+        }
+      },
+      "instruments": [
+        {
+          "symbol": "SYN.EQ.001",
+          "instrument_id": 1,
+          "asset_class": "EQUITY",
+          "currency": "USD",
+          "tick_size": 0.01,
+          "lot_size": 100,
+          "ref_price": 24.5,
+          "adv": 38000000,
+          "venues": [
+            "XV1",
+            "XV2"
+          ]
+        },
+        {
+          "symbol": "SYN.EQ.002",
+          "instrument_id": 2,
+          "asset_class": "EQUITY",
+          "currency": "USD",
+          "tick_size": 0.01,
+          "lot_size": 100,
+          "ref_price": 31.2,
+          "adv": 22000000,
+          "venues": [
+            "XV1",
+            "XV2"
+          ]
+        },
+        {
+          "symbol": "SYN.EQ.003",
+          "instrument_id": 3,
+          "asset_class": "EQUITY",
+          "currency": "USD",
+          "tick_size": 0.01,
+          "lot_size": 100,
+          "ref_price": 47.8,
+          "adv": 15000000,
+          "venues": [
+            "XV1",
+            "XV2"
+          ]
+        },
+        {
+          "symbol": "SYN.EQ.004",
+          "instrument_id": 4,
+          "asset_class": "EQUITY",
+          "currency": "USD",
+          "tick_size": 0.01,
+          "lot_size": 100,
+          "ref_price": 62.35,
+          "adv": 12000000,
+          "venues": [
+            "XV1",
+            "XV2"
+          ]
+        },
+        {
+          "symbol": "SYN.EQ.005",
+          "instrument_id": 5,
+          "asset_class": "EQUITY",
+          "currency": "USD",
+          "tick_size": 0.01,
+          "lot_size": 100,
+          "ref_price": 88.1,
+          "adv": 9000000,
+          "venues": [
+            "XV1",
+            "XV2"
+          ]
+        },
+        {
+          "symbol": "SYN.EQ.006",
+          "instrument_id": 6,
+          "asset_class": "EQUITY",
+          "currency": "USD",
+          "tick_size": 0.01,
+          "lot_size": 100,
+          "ref_price": 105.4,
+          "adv": 7500000,
+          "venues": [
+            "XV1",
+            "XV2"
+          ]
+        },
+        {
+          "symbol": "SYN.EQ.007",
+          "instrument_id": 7,
+          "asset_class": "EQUITY",
+          "currency": "USD",
+          "tick_size": 0.01,
+          "lot_size": 100,
+          "ref_price": 142.75,
+          "adv": 6000000,
+          "venues": [
+            "XV1",
+            "XV2"
+          ]
+        },
+        {
+          "symbol": "SYN.EQ.008",
+          "instrument_id": 8,
+          "asset_class": "EQUITY",
+          "currency": "USD",
+          "tick_size": 0.01,
+          "lot_size": 100,
+          "ref_price": 189.6,
+          "adv": 4500000,
+          "venues": [
+            "XV1",
+            "XV2"
+          ]
+        },
+        {
+          "symbol": "SYN.EQ.009",
+          "instrument_id": 9,
+          "asset_class": "EQUITY",
+          "currency": "USD",
+          "tick_size": 0.01,
+          "lot_size": 100,
+          "ref_price": 256.3,
+          "adv": 3000000,
+          "venues": [
+            "XV1",
+            "XV2"
+          ]
+        },
+        {
+          "symbol": "SYN.EQ.010",
+          "instrument_id": 10,
+          "asset_class": "EQUITY",
+          "currency": "USD",
+          "tick_size": 0.01,
+          "lot_size": 100,
+          "ref_price": 412.9,
+          "adv": 1800000,
+          "venues": [
+            "XV1",
+            "XV2"
+          ]
+        },
+        {
+          "symbol": "SYN.ETF.IDX",
+          "instrument_id": 11,
+          "asset_class": "ETF",
+          "currency": "USD",
+          "tick_size": 0.01,
+          "lot_size": 100,
+          "ref_price": 402.5,
+          "adv": 65000000,
+          "venues": [
+            "XV1",
+            "XV2"
+          ],
+          "underlying": [
+            "SYN.EQ.001",
+            "SYN.EQ.002",
+            "SYN.EQ.003",
+            "SYN.EQ.004",
+            "SYN.EQ.005",
+            "SYN.EQ.006",
+            "SYN.EQ.007",
+            "SYN.EQ.008",
+            "SYN.EQ.009",
+            "SYN.EQ.010"
+          ]
+        },
+        {
+          "symbol": "EUR/USD",
+          "instrument_id": 101,
+          "asset_class": "FX",
+          "base_currency": "EUR",
+          "quote_currency": "USD",
+          "tick_size": 1e-05,
+          "lot_size": 1000,
+          "ref_price": 1.0865,
+          "adv": 4000000000,
+          "venues": [
+            "LP1",
+            "LP2",
+            "PRI"
+          ],
+          "pip": 0.0001
+        },
+        {
+          "symbol": "GBP/USD",
+          "instrument_id": 102,
+          "asset_class": "FX",
+          "base_currency": "GBP",
+          "quote_currency": "USD",
+          "tick_size": 1e-05,
+          "lot_size": 1000,
+          "ref_price": 1.2734,
+          "adv": 4000000000,
+          "venues": [
+            "LP1",
+            "LP2",
+            "PRI"
+          ],
+          "pip": 0.0001
+        },
+        {
+          "symbol": "USD/JPY",
+          "instrument_id": 103,
+          "asset_class": "FX",
+          "base_currency": "USD",
+          "quote_currency": "JPY",
+          "tick_size": 0.001,
+          "lot_size": 1000,
+          "ref_price": 147.52,
+          "adv": 4000000000,
+          "venues": [
+            "LP1",
+            "LP2",
+            "PRI"
+          ],
+          "pip": 0.01
+        },
+        {
+          "symbol": "AUD/USD",
+          "instrument_id": 104,
+          "asset_class": "FX",
+          "base_currency": "AUD",
+          "quote_currency": "USD",
+          "tick_size": 1e-05,
+          "lot_size": 1000,
+          "ref_price": 0.6621,
+          "adv": 4000000000,
+          "venues": [
+            "LP1",
+            "LP2",
+            "PRI"
+          ],
+          "pip": 0.0001
+        },
+        {
+          "symbol": "USD/CAD",
+          "instrument_id": 105,
+          "asset_class": "FX",
+          "base_currency": "USD",
+          "quote_currency": "CAD",
+          "tick_size": 1e-05,
+          "lot_size": 1000,
+          "ref_price": 1.3548,
+          "adv": 4000000000,
+          "venues": [
+            "LP1",
+            "LP2",
+            "PRI"
+          ],
+          "pip": 0.0001
+        },
+        {
+          "symbol": "USD/CHF",
+          "instrument_id": 106,
+          "asset_class": "FX",
+          "base_currency": "USD",
+          "quote_currency": "CHF",
+          "tick_size": 1e-05,
+          "lot_size": 1000,
+          "ref_price": 0.8819,
+          "adv": 4000000000,
+          "venues": [
+            "LP1",
+            "LP2",
+            "PRI"
+          ],
+          "pip": 0.0001
+        },
+        {
+          "symbol": "NZD/USD",
+          "instrument_id": 107,
+          "asset_class": "FX",
+          "base_currency": "NZD",
+          "quote_currency": "USD",
+          "tick_size": 1e-05,
+          "lot_size": 1000,
+          "ref_price": 0.6114,
+          "adv": 4000000000,
+          "venues": [
+            "LP1",
+            "LP2",
+            "PRI"
+          ],
+          "pip": 0.0001
+        },
+        {
+          "symbol": "EUR/GBP",
+          "instrument_id": 108,
+          "asset_class": "FX",
+          "base_currency": "EUR",
+          "quote_currency": "GBP",
+          "tick_size": 1e-05,
+          "lot_size": 1000,
+          "ref_price": 0.8532,
+          "adv": 4000000000,
+          "venues": [
+            "LP1",
+            "LP2",
+            "PRI"
+          ],
+          "pip": 0.0001
+        }
+      ]
+    }
+  risk.json: |
+    {
+      "x-version": 2,
+      "description": "Complete pinned hard-risk limit set (spec section 16), consumed by the Rust risk engine (rust/risk). FAIL-CLOSED: a missing or invalid limit puts the engine in reject-everything mode; every decision is emitted as a RiskEvent (schemas/risk_event.schema.json) to a JSONL audit log; decisions are deterministic and replayable. duplicate_order_window_ns 0 means the entire session; order rate is a per-strategy event-time token bucket (rate max_order_rate_per_sec, capacity order_rate_burst).",
+      "global": {
+        "kill_switch_engaged": false,
+        "max_gross_notional": 5000000.0,
+        "max_net_notional": 2500000.0,
+        "max_daily_loss": 250000.0,
+        "max_order_rate_per_sec": 500,
+        "order_rate_burst": 4
+      },
+      "per_order": {
+        "max_order_qty": 50000,
+        "max_order_notional": 1000000.0,
+        "price_band_bps": 200.0,
+        "stale_book_reject": true,
+        "duplicate_order_window_ns": 0
+      },
+      "per_instrument": {
+        "max_position_qty": 100000,
+        "max_instrument_notional": 2400000.0
+      },
+      "per_strategy": {
+        "max_daily_loss": 50000.0
+      },
+      "market_data": {
+        "max_sequence_gap_before_halt": 1,
+        "stale_feed_timeout_ns": 5000000000
+      }
+    }
+  strategies.json: |
+    {
+      "x-version": 1,
+      "description": "Strategy registry skeleton; alpha waves extend. All disabled by default.",
+      "defaults": {
+        "enabled": false,
+        "max_position_qty": 10000,
+        "signal_threshold": 0.0,
+        "horizon_ns": 1000000000,
+        "seed": 20260829
+      },
+      "strategies": [
+        {
+          "strategy_id": "EQ01_microprice",
+          "asset_class": "EQUITY",
+          "model_version": "unset"
+        },
+        {
+          "strategy_id": "EQ02_ofi_l1",
+          "asset_class": "EQUITY",
+          "model_version": "unset"
+        },
+        {
+          "strategy_id": "FX01_quote_imbalance",
+          "asset_class": "FX",
+          "model_version": "unset"
+        },
+        {
+          "strategy_id": "FX02_trade_flow",
+          "asset_class": "FX",
+          "model_version": "unset"
+        }
+      ]
+    }
+  strategies__alpha_params.json: |
+    {
+      "description": "Fitted flagship-alpha parameters (iap.alpha). model linear_z_v1: er = beta * clip((raw - mu)/(sigma + 1e-12), +-z_clip); conf = min(1, |z|/conf_scale). See /API_ALPHA.md.",
+      "params": {
+        "EQ01": {
+          "alpha_id": "EQ01",
+          "beta": 1.2569134136931961e-06,
+          "beta_fit": 1.2569134136931961e-06,
+          "conf_scale": 2.0,
+          "features": [
+            "micro_mid_dev_bps_v1"
+          ],
+          "fitted": true,
+          "horizon": "1s",
+          "hypothesis_confirmed": true,
+          "model": "linear_z_v1",
+          "mu": 0.02215393616745688,
+          "n_train": 77856,
+          "sigma": 1.2146010585779519,
+          "z_clip": 4.0
+        },
+        "EQ02": {
+          "alpha_id": "EQ02",
+          "beta": 4.209385253433178e-06,
+          "beta_fit": 4.209385253433178e-06,
+          "conf_scale": 2.0,
+          "features": [
+            "ofi_norm_l1_w1s_v1"
+          ],
+          "fitted": true,
+          "horizon": "5s",
+          "hypothesis_confirmed": true,
+          "model": "linear_z_v1",
+          "mu": -0.0014342441896034324,
+          "n_train": 77809,
+          "sigma": 0.31120419702587687,
+          "z_clip": 4.0
+        },
+        "EQ03": {
+          "alpha_id": "EQ03",
+          "beta": 4.035006162122629e-06,
+          "beta_fit": 4.035006162122629e-06,
+          "conf_scale": 2.0,
+          "features": [
+            "ofi_norm_l1_w1s_v1",
+            "ofi_norm_l5_w1s_v1",
+            "ofi_norm_l5_w5s_v1"
+          ],
+          "fitted": true,
+          "horizon": "5s",
+          "hypothesis_confirmed": true,
+          "model": "linear_z_v1",
+          "mu": -0.0008977579877723356,
+          "n_train": 77809,
+          "sigma": 0.16852613765131852,
+          "z_clip": 4.0
+        },
+        "EQ04": {
+          "alpha_id": "EQ04",
+          "beta": 1.2049976408150433e-08,
+          "beta_fit": 1.2049976408150433e-08,
+          "conf_scale": 2.0,
+          "features": [
+            "trade_imbalance_w10s_v1"
+          ],
+          "fitted": true,
+          "horizon": "5s",
+          "hypothesis_confirmed": true,
+          "model": "linear_z_v1",
+          "mu": 0.00079964547944971,
+          "n_train": 57304,
+          "sigma": 0.8095147611062078,
+          "z_clip": 4.0
+        },
+        "EQ05": {
+          "alpha_id": "EQ05",
+          "beta": 1.027850894912352e-06,
+          "beta_fit": 1.027850894912352e-06,
+          "conf_scale": 2.0,
+          "features": [
+            "queue_depletion_rate_bid_w1s_v1",
+            "queue_depletion_rate_ask_w1s_v1",
+            "queue_replenish_rate_bid_w1s_v1",
+            "queue_replenish_rate_ask_w1s_v1"
+          ],
+          "fitted": true,
+          "horizon": "1s",
+          "hypothesis_confirmed": true,
+          "model": "linear_z_v1",
+          "mu": 0.0030748393277607905,
+          "n_train": 77857,
+          "sigma": 0.6622743815170242,
+          "z_clip": 4.0
+        },
+        "EQ06": {
+          "alpha_id": "EQ06",
+          "beta": 7.00699382606713e-06,
+          "beta_fit": 7.00699382606713e-06,
+          "conf_scale": 2.0,
+          "features": [
+            "ret_vol_adj_10s_v1"
+          ],
+          "fitted": true,
+          "horizon": "10s",
+          "hypothesis_confirmed": true,
+          "model": "linear_z_v1",
+          "mu": 0.03597265482343416,
+          "n_train": 77432,
+          "sigma": 3.4160853453189435,
+          "z_clip": 4.0
+        },
+        "EQ07": {
+          "alpha_id": "EQ07",
+          "beta": -3.0741197825519736e-06,
+          "beta_fit": -3.0741197825519736e-06,
+          "conf_scale": 2.0,
+          "features": [
+            "ret_vol_adj_1s_v1"
+          ],
+          "fitted": true,
+          "horizon": "10s",
+          "hypothesis_confirmed": false,
+          "model": "linear_z_v1",
+          "mu": -0.008057363984993304,
+          "n_train": 77432,
+          "sigma": 1.40716162747592,
+          "z_clip": 4.0
+        },
+        "EQ08": {
+          "alpha_id": "EQ08",
+          "beta": -8.436324626903814e-06,
+          "beta_fit": -8.436324626903814e-06,
+          "conf_scale": 2.0,
+          "features": [
+            "mid_price_v1",
+            "traded_volume_w10s_v1"
+          ],
+          "fitted": true,
+          "horizon": "10s",
+          "hypothesis_confirmed": false,
+          "model": "linear_z_v1",
+          "mu": 0.2694343695980405,
+          "n_train": 77775,
+          "sigma": 5.071444715376117,
+          "z_clip": 4.0
+        },
+        "EQ09": {
+          "alpha_id": "EQ09",
+          "beta": -5.684469893955674e-06,
+          "beta_fit": -5.684469893955674e-06,
+          "conf_scale": 2.0,
+          "features": [
+            "ret_resid_10s_v1"
+          ],
+          "fitted": true,
+          "horizon": "10s",
+          "hypothesis_confirmed": false,
+          "model": "linear_z_v1",
+          "mu": 2.895587388247623e-06,
+          "n_train": 47235,
+          "sigma": 0.0002275550483645598,
+          "z_clip": 4.0
+        },
+        "EQ10": {
+          "alpha_id": "EQ10",
+          "beta": -3.6522207576424923e-07,
+          "beta_fit": -3.6522207576424923e-07,
+          "conf_scale": 2.0,
+          "features": [
+            "ref_ret_1s_v1"
+          ],
+          "fitted": true,
+          "horizon": "1s",
+          "hypothesis_confirmed": false,
+          "model": "linear_z_v1",
+          "mu": -3.89560847955798e-08,
+          "n_train": 70781,
+          "sigma": 5.599752775471277e-06,
+          "z_clip": 4.0
+        },
+        "EQ11": {
+          "alpha_id": "EQ11",
+          "beta": -6.460835409461466e-05,
+          "beta_fit": -6.460835409461466e-05,
+          "conf_scale": 2.0,
+          "features": [
+            "ret_log_1m_v1"
+          ],
+          "fitted": true,
+          "horizon": "15m",
+          "hypothesis_confirmed": false,
+          "model": "linear_z_v1",
+          "mu": 0.0022970398705487063,
+          "n_train": 70254,
+          "sigma": 1.001052890340401,
+          "z_clip": 4.0
+        },
+        "EQ12": {
+          "alpha_id": "EQ12",
+          "beta": 4.386985298229266e-06,
+          "beta_fit": 4.386985298229266e-06,
+          "conf_scale": 2.0,
+          "features": [
+            "ofi_norm_l1_w1s_v1",
+            "liq_regime_ratio_v1"
+          ],
+          "fitted": true,
+          "horizon": "5s",
+          "hypothesis_confirmed": true,
+          "model": "linear_z_v1",
+          "mu": -0.0016337823992369032,
+          "n_train": 77431,
+          "sigma": 0.3153737503358417,
+          "z_clip": 4.0
+        },
+        "FX01": {
+          "alpha_id": "FX01",
+          "beta": 3.662039175535756e-08,
+          "beta_fit": 3.662039175535756e-08,
+          "conf_scale": 2.0,
+          "features": [
+            "micro_mid_dev_bps_v1"
+          ],
+          "fitted": true,
+          "horizon": "500ms",
+          "hypothesis_confirmed": true,
+          "model": "linear_z_v1",
+          "mu": 0.00217860673633946,
+          "n_train": 26254,
+          "sigma": 0.09416347034818112,
+          "z_clip": 4.0
+        },
+        "FX02": {
+          "alpha_id": "FX02",
+          "beta": -3.395580363717923e-07,
+          "beta_fit": -3.395580363717923e-07,
+          "conf_scale": 2.0,
+          "features": [
+            "trade_imbalance_w1m_v1"
+          ],
+          "fitted": true,
+          "horizon": "1m",
+          "hypothesis_confirmed": false,
+          "model": "linear_z_v1",
+          "mu": -0.004450275196331971,
+          "n_train": 9524,
+          "sigma": 0.9578101950791438,
+          "z_clip": 4.0
+        },
+        "FX03": {
+          "alpha_id": "FX03",
+          "beta": -3.575897867689408e-07,
+          "beta_fit": -3.575897867689408e-07,
+          "conf_scale": 2.0,
+          "features": [
+            "ofi_norm_l1_w30s_v1",
+            "ofi_norm_l5_w30s_v1"
+          ],
+          "fitted": true,
+          "horizon": "1m",
+          "hypothesis_confirmed": false,
+          "model": "linear_z_v1",
+          "mu": -0.029458129024415237,
+          "n_train": 24126,
+          "sigma": 0.4600070103675951,
+          "z_clip": 4.0
+        },
+        "FX04": {
+          "alpha_id": "FX04",
+          "beta": 1.929510129479924e-07,
+          "beta_fit": 1.929510129479924e-07,
+          "conf_scale": 2.0,
+          "features": [
+            "imbalance_l1_v1",
+            "venue_imbalance_divergence_v1"
+          ],
+          "fitted": true,
+          "horizon": "30s",
+          "hypothesis_confirmed": true,
+          "model": "linear_z_v1",
+          "mu": 0.0193884395083761,
+          "n_train": 26244,
+          "sigma": 0.4032422934348996,
+          "z_clip": 4.0
+        },
+        "FX05": {
+          "alpha_id": "FX05",
+          "beta": 5.489378277825488e-07,
+          "beta_fit": 5.489378277825488e-07,
+          "conf_scale": 2.0,
+          "features": [
+            "ret_log_1m_v1"
+          ],
+          "fitted": true,
+          "horizon": "5m",
+          "hypothesis_confirmed": true,
+          "model": "linear_z_v1",
+          "mu": 9.725439567807008e-08,
+          "n_train": 25980,
+          "sigma": 9.724824288595495e-06,
+          "z_clip": 4.0
+        },
+        "FX06": {
+          "alpha_id": "FX06",
+          "beta": 5.321210493041251e-07,
+          "beta_fit": 5.321210493041251e-07,
+          "conf_scale": 2.0,
+          "features": [
+            "ret_log_1m_v1"
+          ],
+          "fitted": true,
+          "horizon": "30s",
+          "hypothesis_confirmed": true,
+          "model": "linear_z_v1",
+          "mu": 4.675659164042555e-07,
+          "n_train": 26141,
+          "sigma": 1.9293677609047076e-05,
+          "z_clip": 4.0
+        },
+        "FX07": {
+          "alpha_id": "FX07",
+          "beta": -3.2460001253880287e-07,
+          "beta_fit": -3.2460001253880287e-07,
+          "conf_scale": 2.0,
+          "features": [
+            "ref_ret_30s_v1"
+          ],
+          "fitted": true,
+          "horizon": "1m",
+          "hypothesis_confirmed": false,
+          "model": "linear_z_v1",
+          "mu": 5.72408254531069e-07,
+          "n_train": 22927,
+          "sigma": 1.6809115201803434e-05,
+          "z_clip": 4.0
+        },
+        "FX08": {
+          "alpha_id": "FX08",
+          "beta": 3.3669327161336038e-06,
+          "beta_fit": 3.3669327161336038e-06,
+          "conf_scale": 2.0,
+          "features": [
+            "ret_vol_adj_1m_v1",
+            "liq_regime_flag_v1"
+          ],
+          "fitted": true,
+          "horizon": "1m",
+          "hypothesis_confirmed": true,
+          "model": "linear_z_v1",
+          "mu": 0.03580654674617754,
+          "n_train": 25936,
+          "sigma": 5.752844432087656,
+          "z_clip": 4.0
+        },
+        "FX09": {
+          "alpha_id": "FX09",
+          "beta": -3.973069967541952e-06,
+          "beta_fit": -3.973069967541952e-06,
+          "conf_scale": 2.0,
+          "features": [
+            "ret_vol_adj_10s_v1",
+            "vol_regime_ratio_v1"
+          ],
+          "fitted": true,
+          "horizon": "1m",
+          "hypothesis_confirmed": false,
+          "model": "linear_z_v1",
+          "mu": -0.02007012437674839,
+          "n_train": 26107,
+          "sigma": 4.983987872773303,
+          "z_clip": 4.0
+        },
+        "FX10": {
+          "alpha_id": "FX10",
+          "beta": 1.868506866802858e-06,
+          "beta_fit": 1.868506866802858e-06,
+          "conf_scale": 2.0,
+          "features": [
+            "ret_vol_adj_1m_v1",
+            "minute_of_day_v1"
+          ],
+          "fitted": true,
+          "horizon": "1m",
+          "hypothesis_confirmed": true,
+          "model": "linear_z_v1",
+          "mu": 0.06342929075580311,
+          "n_train": 26204,
+          "sigma": 3.239116672913238,
+          "z_clip": 4.0
+        },
+        "FX11": {
+          "alpha_id": "FX11",
+          "beta": 3.6190542343429484e-06,
+          "beta_fit": 3.6190542343429484e-06,
+          "conf_scale": 2.0,
+          "features": [
+            "vol_ratio_w10s_w1m_v1",
+            "ret_vol_adj_1m_v1"
+          ],
+          "fitted": true,
+          "horizon": "5m",
+          "hypothesis_confirmed": true,
+          "model": "linear_z_v1",
+          "mu": -0.11072164147932209,
+          "n_train": 26115,
+          "sigma": 6.327313016873727,
+          "z_clip": 4.0
+        },
+        "FX12": {
+          "alpha_id": "FX12",
+          "beta": 2.5933699189874254e-07,
+          "beta_fit": 2.5933699189874254e-07,
+          "conf_scale": 2.0,
+          "features": [
+            "imbalance_l1_v1",
+            "venue_update_hhi_w10s_v1"
+          ],
+          "fitted": true,
+          "horizon": "1m",
+          "hypothesis_confirmed": true,
+          "model": "linear_z_v1",
+          "mu": 0.003670447379969561,
+          "n_train": 26227,
+          "sigma": 0.10646885230027606,
+          "z_clip": 4.0
+        }
+      },
+      "x-version": 1
+    }
+  venues.json: |
+    {
+      "x-version": 1,
+      "description": "Synthetic venues. Latency profile: receive_ts = exchange_ts + mean_ns + jitter (uniform in [0, jitter_ns], SplitMix64). Fees per share (EQ, negative rebate for makers) / per million notional (FX).",
+      "venues": [
+        {
+          "venue": "XV1",
+          "venue_id": 1,
+          "asset_class": "EQUITY",
+          "taker_fee_per_share": 0.003,
+          "maker_rebate_per_share": 0.002,
+          "latency": {
+            "mean_ns": 150000,
+            "jitter_ns": 50000
+          },
+          "supports": [
+            "MBO",
+            "AUCTION",
+            "HALT",
+            "SNAPSHOT"
+          ]
+        },
+        {
+          "venue": "XV2",
+          "venue_id": 2,
+          "asset_class": "EQUITY",
+          "taker_fee_per_share": 0.0028,
+          "maker_rebate_per_share": 0.0015,
+          "latency": {
+            "mean_ns": 220000,
+            "jitter_ns": 80000
+          },
+          "supports": [
+            "MBO",
+            "AUCTION",
+            "HALT",
+            "SNAPSHOT"
+          ]
+        },
+        {
+          "venue": "LP1",
+          "venue_id": 10,
+          "asset_class": "FX",
+          "commission_per_million": 4.0,
+          "latency": {
+            "mean_ns": 300000,
+            "jitter_ns": 100000
+          },
+          "supports": [
+            "QUOTE",
+            "TRADE",
+            "SNAPSHOT"
+          ]
+        },
+        {
+          "venue": "LP2",
+          "venue_id": 11,
+          "asset_class": "FX",
+          "commission_per_million": 6.0,
+          "latency": {
+            "mean_ns": 500000,
+            "jitter_ns": 150000
+          },
+          "supports": [
+            "QUOTE",
+            "TRADE",
+            "SNAPSHOT"
+          ]
+        },
+        {
+          "venue": "PRI",
+          "venue_id": 12,
+          "asset_class": "FX",
+          "commission_per_million": 2.5,
+          "latency": {
+            "mean_ns": 200000,
+            "jitter_ns": 60000
+          },
+          "supports": [
+            "QUOTE",
+            "TRADE",
+            "SNAPSHOT"
+          ]
+        }
+      ]
+    }

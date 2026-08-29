@@ -1,0 +1,2308 @@
+{
+  "x-version": 1,
+  "description": "Pinned feature registry (conventions \u00a76). FeatureVector.values follows this order; registry_hash is the FeatureVector feature_version.",
+  "registry_hash": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
+  "count": 205,
+  "families": {
+    "price": 30,
+    "micro": 52,
+    "flow": 47,
+    "liquidity": 13,
+    "vol": 13,
+    "tod": 11,
+    "xasset": 11,
+    "venue": 10,
+    "regime": 10,
+    "exec": 8
+  },
+  "features": [
+    {
+      "name": "ret_simple_1s_v1",
+      "family": "price",
+      "version": 1,
+      "params": {
+        "horizon": "1s"
+      },
+      "doc": "Simple mid-to-mid return over 1s: mid(t)/mid(t-1s) - 1 (mid sampled at-or-before t-1s).",
+      "depends_on": []
+    },
+    {
+      "name": "ret_simple_5s_v1",
+      "family": "price",
+      "version": 1,
+      "params": {
+        "horizon": "5s"
+      },
+      "doc": "Simple mid-to-mid return over 5s: mid(t)/mid(t-5s) - 1 (mid sampled at-or-before t-5s).",
+      "depends_on": []
+    },
+    {
+      "name": "ret_simple_10s_v1",
+      "family": "price",
+      "version": 1,
+      "params": {
+        "horizon": "10s"
+      },
+      "doc": "Simple mid-to-mid return over 10s: mid(t)/mid(t-10s) - 1 (mid sampled at-or-before t-10s).",
+      "depends_on": []
+    },
+    {
+      "name": "ret_simple_30s_v1",
+      "family": "price",
+      "version": 1,
+      "params": {
+        "horizon": "30s"
+      },
+      "doc": "Simple mid-to-mid return over 30s: mid(t)/mid(t-30s) - 1 (mid sampled at-or-before t-30s).",
+      "depends_on": []
+    },
+    {
+      "name": "ret_simple_1m_v1",
+      "family": "price",
+      "version": 1,
+      "params": {
+        "horizon": "1m"
+      },
+      "doc": "Simple mid-to-mid return over 1m: mid(t)/mid(t-1m) - 1 (mid sampled at-or-before t-1m).",
+      "depends_on": []
+    },
+    {
+      "name": "ret_log_1s_v1",
+      "family": "price",
+      "version": 1,
+      "params": {
+        "horizon": "1s"
+      },
+      "doc": "Log mid return over 1s: ln mid(t) - ln mid(t-1s).",
+      "depends_on": []
+    },
+    {
+      "name": "ret_log_5s_v1",
+      "family": "price",
+      "version": 1,
+      "params": {
+        "horizon": "5s"
+      },
+      "doc": "Log mid return over 5s: ln mid(t) - ln mid(t-5s).",
+      "depends_on": []
+    },
+    {
+      "name": "ret_log_10s_v1",
+      "family": "price",
+      "version": 1,
+      "params": {
+        "horizon": "10s"
+      },
+      "doc": "Log mid return over 10s: ln mid(t) - ln mid(t-10s).",
+      "depends_on": []
+    },
+    {
+      "name": "ret_log_30s_v1",
+      "family": "price",
+      "version": 1,
+      "params": {
+        "horizon": "30s"
+      },
+      "doc": "Log mid return over 30s: ln mid(t) - ln mid(t-30s).",
+      "depends_on": []
+    },
+    {
+      "name": "ret_log_1m_v1",
+      "family": "price",
+      "version": 1,
+      "params": {
+        "horizon": "1m"
+      },
+      "doc": "Log mid return over 1m: ln mid(t) - ln mid(t-1m).",
+      "depends_on": []
+    },
+    {
+      "name": "ret_accel_1s_v1",
+      "family": "price",
+      "version": 1,
+      "params": {
+        "horizon": "1s"
+      },
+      "doc": "Return acceleration over 1s: ret_log(t,1s) - ret_log(t-1s,1s).",
+      "depends_on": [
+        "ret_log_1s_v1"
+      ]
+    },
+    {
+      "name": "ret_accel_5s_v1",
+      "family": "price",
+      "version": 1,
+      "params": {
+        "horizon": "5s"
+      },
+      "doc": "Return acceleration over 5s: ret_log(t,5s) - ret_log(t-5s,5s).",
+      "depends_on": [
+        "ret_log_5s_v1"
+      ]
+    },
+    {
+      "name": "ret_accel_10s_v1",
+      "family": "price",
+      "version": 1,
+      "params": {
+        "horizon": "10s"
+      },
+      "doc": "Return acceleration over 10s: ret_log(t,10s) - ret_log(t-10s,10s).",
+      "depends_on": [
+        "ret_log_10s_v1"
+      ]
+    },
+    {
+      "name": "ret_accel_30s_v1",
+      "family": "price",
+      "version": 1,
+      "params": {
+        "horizon": "30s"
+      },
+      "doc": "Return acceleration over 30s: ret_log(t,30s) - ret_log(t-30s,30s).",
+      "depends_on": [
+        "ret_log_30s_v1"
+      ]
+    },
+    {
+      "name": "ret_accel_1m_v1",
+      "family": "price",
+      "version": 1,
+      "params": {
+        "horizon": "1m"
+      },
+      "doc": "Return acceleration over 1m: ret_log(t,1m) - ret_log(t-1m,1m).",
+      "depends_on": [
+        "ret_log_1m_v1"
+      ]
+    },
+    {
+      "name": "ret_resid_1s_v1",
+      "family": "price",
+      "version": 1,
+      "params": {
+        "horizon": "1s"
+      },
+      "doc": "Residual log return over 1s vs the cross-asset reference: ret_log_1s - beta_w5m * ref_ret_1s.",
+      "depends_on": [
+        "ret_log_1s_v1",
+        "beta_w5m_v1",
+        "ref_ret_1s_v1"
+      ]
+    },
+    {
+      "name": "ret_resid_5s_v1",
+      "family": "price",
+      "version": 1,
+      "params": {
+        "horizon": "5s"
+      },
+      "doc": "Residual log return over 5s vs the cross-asset reference: ret_log_5s - beta_w5m * ref_ret_5s.",
+      "depends_on": [
+        "ret_log_5s_v1",
+        "beta_w5m_v1",
+        "ref_ret_5s_v1"
+      ]
+    },
+    {
+      "name": "ret_resid_10s_v1",
+      "family": "price",
+      "version": 1,
+      "params": {
+        "horizon": "10s"
+      },
+      "doc": "Residual log return over 10s vs the cross-asset reference: ret_log_10s - beta_w5m * ref_ret_10s.",
+      "depends_on": [
+        "ret_log_10s_v1",
+        "beta_w5m_v1",
+        "ref_ret_10s_v1"
+      ]
+    },
+    {
+      "name": "ret_resid_30s_v1",
+      "family": "price",
+      "version": 1,
+      "params": {
+        "horizon": "30s"
+      },
+      "doc": "Residual log return over 30s vs the cross-asset reference: ret_log_30s - beta_w5m * ref_ret_30s.",
+      "depends_on": [
+        "ret_log_30s_v1",
+        "beta_w5m_v1",
+        "ref_ret_30s_v1"
+      ]
+    },
+    {
+      "name": "ret_resid_1m_v1",
+      "family": "price",
+      "version": 1,
+      "params": {
+        "horizon": "1m"
+      },
+      "doc": "Residual log return over 1m vs the cross-asset reference: ret_log_1m - beta_w5m * ref_ret_1m.",
+      "depends_on": [
+        "ret_log_1m_v1",
+        "beta_w5m_v1",
+        "ref_ret_1m_v1"
+      ]
+    },
+    {
+      "name": "mid_change_ticks_1s_v1",
+      "family": "price",
+      "version": 1,
+      "params": {
+        "horizon": "1s"
+      },
+      "doc": "Mid change over 1s in ticks: (mid_ticks(t) - mid_ticks(t-1s)).",
+      "depends_on": []
+    },
+    {
+      "name": "mid_change_ticks_5s_v1",
+      "family": "price",
+      "version": 1,
+      "params": {
+        "horizon": "5s"
+      },
+      "doc": "Mid change over 5s in ticks: (mid_ticks(t) - mid_ticks(t-5s)).",
+      "depends_on": []
+    },
+    {
+      "name": "mid_change_ticks_10s_v1",
+      "family": "price",
+      "version": 1,
+      "params": {
+        "horizon": "10s"
+      },
+      "doc": "Mid change over 10s in ticks: (mid_ticks(t) - mid_ticks(t-10s)).",
+      "depends_on": []
+    },
+    {
+      "name": "mid_change_ticks_30s_v1",
+      "family": "price",
+      "version": 1,
+      "params": {
+        "horizon": "30s"
+      },
+      "doc": "Mid change over 30s in ticks: (mid_ticks(t) - mid_ticks(t-30s)).",
+      "depends_on": []
+    },
+    {
+      "name": "mid_change_ticks_1m_v1",
+      "family": "price",
+      "version": 1,
+      "params": {
+        "horizon": "1m"
+      },
+      "doc": "Mid change over 1m in ticks: (mid_ticks(t) - mid_ticks(t-1m)).",
+      "depends_on": []
+    },
+    {
+      "name": "ret_vol_adj_1s_v1",
+      "family": "price",
+      "version": 1,
+      "params": {
+        "horizon": "1s"
+      },
+      "doc": "Volatility-adjusted log return over 1s: ret_log_1s / (rvol_w1m + EPS).",
+      "depends_on": [
+        "ret_log_1s_v1",
+        "rvol_w1m_v1"
+      ]
+    },
+    {
+      "name": "ret_vol_adj_5s_v1",
+      "family": "price",
+      "version": 1,
+      "params": {
+        "horizon": "5s"
+      },
+      "doc": "Volatility-adjusted log return over 5s: ret_log_5s / (rvol_w1m + EPS).",
+      "depends_on": [
+        "ret_log_5s_v1",
+        "rvol_w1m_v1"
+      ]
+    },
+    {
+      "name": "ret_vol_adj_10s_v1",
+      "family": "price",
+      "version": 1,
+      "params": {
+        "horizon": "10s"
+      },
+      "doc": "Volatility-adjusted log return over 10s: ret_log_10s / (rvol_w1m + EPS).",
+      "depends_on": [
+        "ret_log_10s_v1",
+        "rvol_w1m_v1"
+      ]
+    },
+    {
+      "name": "ret_vol_adj_30s_v1",
+      "family": "price",
+      "version": 1,
+      "params": {
+        "horizon": "30s"
+      },
+      "doc": "Volatility-adjusted log return over 30s: ret_log_30s / (rvol_w1m + EPS).",
+      "depends_on": [
+        "ret_log_30s_v1",
+        "rvol_w1m_v1"
+      ]
+    },
+    {
+      "name": "ret_vol_adj_1m_v1",
+      "family": "price",
+      "version": 1,
+      "params": {
+        "horizon": "1m"
+      },
+      "doc": "Volatility-adjusted log return over 1m: ret_log_1m / (rvol_w1m + EPS).",
+      "depends_on": [
+        "ret_log_1m_v1",
+        "rvol_w1m_v1"
+      ]
+    },
+    {
+      "name": "mid_price_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {},
+      "doc": "Consolidated mid price: (best_bid + best_ask)/2 * tick_size.",
+      "depends_on": []
+    },
+    {
+      "name": "microprice_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {},
+      "doc": "Size-weighted microprice: (Pb*Qa + Pa*Qb)/(Qb+Qa) * tick_size.",
+      "depends_on": []
+    },
+    {
+      "name": "micro_mid_dev_bps_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {},
+      "doc": "Microprice deviation from mid in bps: (microprice-mid)/mid*1e4.",
+      "depends_on": [
+        "microprice_v1",
+        "mid_price_v1"
+      ]
+    },
+    {
+      "name": "spread_ticks_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {},
+      "doc": "Consolidated quoted spread in ticks: best_ask - best_bid.",
+      "depends_on": []
+    },
+    {
+      "name": "spread_bps_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {},
+      "doc": "Quoted spread in bps of mid: spread_ticks*tick_size/mid*1e4.",
+      "depends_on": [
+        "spread_ticks_v1",
+        "mid_price_v1"
+      ]
+    },
+    {
+      "name": "depth_bid_l1_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "levels": 1,
+        "side": "bid"
+      },
+      "doc": "Summed bid size over the best 1 price level(s).",
+      "depends_on": []
+    },
+    {
+      "name": "depth_ask_l1_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "levels": 1,
+        "side": "ask"
+      },
+      "doc": "Summed ask size over the best 1 price level(s).",
+      "depends_on": []
+    },
+    {
+      "name": "depth_bid_l5_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "levels": 5,
+        "side": "bid"
+      },
+      "doc": "Summed bid size over the best 5 price level(s).",
+      "depends_on": []
+    },
+    {
+      "name": "depth_ask_l5_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "levels": 5,
+        "side": "ask"
+      },
+      "doc": "Summed ask size over the best 5 price level(s).",
+      "depends_on": []
+    },
+    {
+      "name": "depth_bid_l10_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "levels": 10,
+        "side": "bid"
+      },
+      "doc": "Summed bid size over the best 10 price level(s).",
+      "depends_on": []
+    },
+    {
+      "name": "depth_ask_l10_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "levels": 10,
+        "side": "ask"
+      },
+      "doc": "Summed ask size over the best 10 price level(s).",
+      "depends_on": []
+    },
+    {
+      "name": "depth_total_l1_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "levels": 1
+      },
+      "doc": "Two-sided depth over the best 1 level(s): bid + ask.",
+      "depends_on": [
+        "depth_bid_l1_v1",
+        "depth_ask_l1_v1"
+      ]
+    },
+    {
+      "name": "depth_total_l5_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "levels": 5
+      },
+      "doc": "Two-sided depth over the best 5 level(s): bid + ask.",
+      "depends_on": [
+        "depth_bid_l5_v1",
+        "depth_ask_l5_v1"
+      ]
+    },
+    {
+      "name": "depth_total_l10_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "levels": 10
+      },
+      "doc": "Two-sided depth over the best 10 level(s): bid + ask.",
+      "depends_on": [
+        "depth_bid_l10_v1",
+        "depth_ask_l10_v1"
+      ]
+    },
+    {
+      "name": "depth_bid_l1_avg_w1s_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "levels": 1,
+        "side": "bid",
+        "window": "1s"
+      },
+      "doc": "Mean of depth_bid_l1 sampled at book refreshes over 1s.",
+      "depends_on": [
+        "depth_bid_l1_v1"
+      ]
+    },
+    {
+      "name": "depth_ask_l1_avg_w1s_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "levels": 1,
+        "side": "ask",
+        "window": "1s"
+      },
+      "doc": "Mean of depth_ask_l1 sampled at book refreshes over 1s.",
+      "depends_on": [
+        "depth_ask_l1_v1"
+      ]
+    },
+    {
+      "name": "depth_bid_l5_avg_w1s_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "levels": 5,
+        "side": "bid",
+        "window": "1s"
+      },
+      "doc": "Mean of depth_bid_l5 sampled at book refreshes over 1s.",
+      "depends_on": [
+        "depth_bid_l5_v1"
+      ]
+    },
+    {
+      "name": "depth_ask_l5_avg_w1s_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "levels": 5,
+        "side": "ask",
+        "window": "1s"
+      },
+      "doc": "Mean of depth_ask_l5 sampled at book refreshes over 1s.",
+      "depends_on": [
+        "depth_ask_l5_v1"
+      ]
+    },
+    {
+      "name": "depth_bid_l10_avg_w1s_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "levels": 10,
+        "side": "bid",
+        "window": "1s"
+      },
+      "doc": "Mean of depth_bid_l10 sampled at book refreshes over 1s.",
+      "depends_on": [
+        "depth_bid_l10_v1"
+      ]
+    },
+    {
+      "name": "depth_ask_l10_avg_w1s_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "levels": 10,
+        "side": "ask",
+        "window": "1s"
+      },
+      "doc": "Mean of depth_ask_l10 sampled at book refreshes over 1s.",
+      "depends_on": [
+        "depth_ask_l10_v1"
+      ]
+    },
+    {
+      "name": "depth_bid_l1_avg_w10s_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "levels": 1,
+        "side": "bid",
+        "window": "10s"
+      },
+      "doc": "Mean of depth_bid_l1 sampled at book refreshes over 10s.",
+      "depends_on": [
+        "depth_bid_l1_v1"
+      ]
+    },
+    {
+      "name": "depth_ask_l1_avg_w10s_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "levels": 1,
+        "side": "ask",
+        "window": "10s"
+      },
+      "doc": "Mean of depth_ask_l1 sampled at book refreshes over 10s.",
+      "depends_on": [
+        "depth_ask_l1_v1"
+      ]
+    },
+    {
+      "name": "depth_bid_l5_avg_w10s_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "levels": 5,
+        "side": "bid",
+        "window": "10s"
+      },
+      "doc": "Mean of depth_bid_l5 sampled at book refreshes over 10s.",
+      "depends_on": [
+        "depth_bid_l5_v1"
+      ]
+    },
+    {
+      "name": "depth_ask_l5_avg_w10s_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "levels": 5,
+        "side": "ask",
+        "window": "10s"
+      },
+      "doc": "Mean of depth_ask_l5 sampled at book refreshes over 10s.",
+      "depends_on": [
+        "depth_ask_l5_v1"
+      ]
+    },
+    {
+      "name": "depth_bid_l10_avg_w10s_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "levels": 10,
+        "side": "bid",
+        "window": "10s"
+      },
+      "doc": "Mean of depth_bid_l10 sampled at book refreshes over 10s.",
+      "depends_on": [
+        "depth_bid_l10_v1"
+      ]
+    },
+    {
+      "name": "depth_ask_l10_avg_w10s_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "levels": 10,
+        "side": "ask",
+        "window": "10s"
+      },
+      "doc": "Mean of depth_ask_l10 sampled at book refreshes over 10s.",
+      "depends_on": [
+        "depth_ask_l10_v1"
+      ]
+    },
+    {
+      "name": "imbalance_l1_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "levels": 1
+      },
+      "doc": "Depth imbalance over best 1 level(s): (b-a)/(b+a).",
+      "depends_on": []
+    },
+    {
+      "name": "imbalance_l3_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "levels": 3
+      },
+      "doc": "Depth imbalance over best 3 level(s): (b-a)/(b+a).",
+      "depends_on": []
+    },
+    {
+      "name": "imbalance_l5_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "levels": 5
+      },
+      "doc": "Depth imbalance over best 5 level(s): (b-a)/(b+a).",
+      "depends_on": []
+    },
+    {
+      "name": "imbalance_l10_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "levels": 10
+      },
+      "doc": "Depth imbalance over best 10 level(s): (b-a)/(b+a).",
+      "depends_on": []
+    },
+    {
+      "name": "imbalance_l1_avg_w1s_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "levels": 1,
+        "window": "1s"
+      },
+      "doc": "Mean of imbalance_l1 sampled at book refreshes over 1s.",
+      "depends_on": [
+        "imbalance_l1_v1"
+      ]
+    },
+    {
+      "name": "imbalance_l3_avg_w1s_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "levels": 3,
+        "window": "1s"
+      },
+      "doc": "Mean of imbalance_l3 sampled at book refreshes over 1s.",
+      "depends_on": [
+        "imbalance_l3_v1"
+      ]
+    },
+    {
+      "name": "imbalance_l5_avg_w1s_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "levels": 5,
+        "window": "1s"
+      },
+      "doc": "Mean of imbalance_l5 sampled at book refreshes over 1s.",
+      "depends_on": [
+        "imbalance_l5_v1"
+      ]
+    },
+    {
+      "name": "imbalance_l10_avg_w1s_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "levels": 10,
+        "window": "1s"
+      },
+      "doc": "Mean of imbalance_l10 sampled at book refreshes over 1s.",
+      "depends_on": [
+        "imbalance_l10_v1"
+      ]
+    },
+    {
+      "name": "imbalance_l1_avg_w10s_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "levels": 1,
+        "window": "10s"
+      },
+      "doc": "Mean of imbalance_l1 sampled at book refreshes over 10s.",
+      "depends_on": [
+        "imbalance_l1_v1"
+      ]
+    },
+    {
+      "name": "imbalance_l3_avg_w10s_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "levels": 3,
+        "window": "10s"
+      },
+      "doc": "Mean of imbalance_l3 sampled at book refreshes over 10s.",
+      "depends_on": [
+        "imbalance_l3_v1"
+      ]
+    },
+    {
+      "name": "imbalance_l5_avg_w10s_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "levels": 5,
+        "window": "10s"
+      },
+      "doc": "Mean of imbalance_l5 sampled at book refreshes over 10s.",
+      "depends_on": [
+        "imbalance_l5_v1"
+      ]
+    },
+    {
+      "name": "imbalance_l10_avg_w10s_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "levels": 10,
+        "window": "10s"
+      },
+      "doc": "Mean of imbalance_l10 sampled at book refreshes over 10s.",
+      "depends_on": [
+        "imbalance_l10_v1"
+      ]
+    },
+    {
+      "name": "spread_ticks_avg_w1s_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "window": "1s"
+      },
+      "doc": "Mean quoted spread in ticks over 1s.",
+      "depends_on": [
+        "spread_ticks_v1"
+      ]
+    },
+    {
+      "name": "spread_ticks_avg_w10s_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "window": "10s"
+      },
+      "doc": "Mean quoted spread in ticks over 10s.",
+      "depends_on": [
+        "spread_ticks_v1"
+      ]
+    },
+    {
+      "name": "queue_depletion_rate_bid_w1s_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "side": "bid",
+        "window": "1s"
+      },
+      "doc": "L1 bid queue depletion rate over 1s: depleted qty per second.",
+      "depends_on": []
+    },
+    {
+      "name": "queue_depletion_rate_ask_w1s_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "side": "ask",
+        "window": "1s"
+      },
+      "doc": "L1 ask queue depletion rate over 1s: depleted qty per second.",
+      "depends_on": []
+    },
+    {
+      "name": "queue_depletion_rate_bid_w10s_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "side": "bid",
+        "window": "10s"
+      },
+      "doc": "L1 bid queue depletion rate over 10s: depleted qty per second.",
+      "depends_on": []
+    },
+    {
+      "name": "queue_depletion_rate_ask_w10s_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "side": "ask",
+        "window": "10s"
+      },
+      "doc": "L1 ask queue depletion rate over 10s: depleted qty per second.",
+      "depends_on": []
+    },
+    {
+      "name": "queue_replenish_rate_bid_w1s_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "side": "bid",
+        "window": "1s"
+      },
+      "doc": "L1 bid queue replenishment rate over 1s: added qty per second.",
+      "depends_on": []
+    },
+    {
+      "name": "queue_replenish_rate_ask_w1s_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "side": "ask",
+        "window": "1s"
+      },
+      "doc": "L1 ask queue replenishment rate over 1s: added qty per second.",
+      "depends_on": []
+    },
+    {
+      "name": "queue_replenish_rate_bid_w10s_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "side": "bid",
+        "window": "10s"
+      },
+      "doc": "L1 bid queue replenishment rate over 10s: added qty per second.",
+      "depends_on": []
+    },
+    {
+      "name": "queue_replenish_rate_ask_w10s_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "side": "ask",
+        "window": "10s"
+      },
+      "doc": "L1 ask queue replenishment rate over 10s: added qty per second.",
+      "depends_on": []
+    },
+    {
+      "name": "order_count_bid_l1_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "side": "bid"
+      },
+      "doc": "Resting order count at the best bid price (non-stale venues quoting that price).",
+      "depends_on": []
+    },
+    {
+      "name": "order_count_ask_l1_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "side": "ask"
+      },
+      "doc": "Resting order count at the best ask price (non-stale venues quoting that price).",
+      "depends_on": []
+    },
+    {
+      "name": "avg_order_size_bid_l1_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "side": "bid"
+      },
+      "doc": "Best-bid size divided by its resting order count.",
+      "depends_on": [
+        "depth_bid_l1_v1",
+        "order_count_bid_l1_v1"
+      ]
+    },
+    {
+      "name": "avg_order_size_ask_l1_v1",
+      "family": "micro",
+      "version": 1,
+      "params": {
+        "side": "ask"
+      },
+      "doc": "Best-ask size divided by its resting order count.",
+      "depends_on": [
+        "depth_ask_l1_v1",
+        "order_count_ask_l1_v1"
+      ]
+    },
+    {
+      "name": "ofi_l1_w1s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "levels": 1,
+        "window": "1s"
+      },
+      "doc": "Order-flow imbalance over the best 1 level(s), summed over 1s: sum of per-event (bid depth delta - ask depth delta) within top 1.",
+      "depends_on": []
+    },
+    {
+      "name": "ofi_l1_w5s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "levels": 1,
+        "window": "5s"
+      },
+      "doc": "Order-flow imbalance over the best 1 level(s), summed over 5s: sum of per-event (bid depth delta - ask depth delta) within top 1.",
+      "depends_on": []
+    },
+    {
+      "name": "ofi_l1_w30s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "levels": 1,
+        "window": "30s"
+      },
+      "doc": "Order-flow imbalance over the best 1 level(s), summed over 30s: sum of per-event (bid depth delta - ask depth delta) within top 1.",
+      "depends_on": []
+    },
+    {
+      "name": "ofi_l3_w1s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "levels": 3,
+        "window": "1s"
+      },
+      "doc": "Order-flow imbalance over the best 3 level(s), summed over 1s: sum of per-event (bid depth delta - ask depth delta) within top 3.",
+      "depends_on": []
+    },
+    {
+      "name": "ofi_l3_w5s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "levels": 3,
+        "window": "5s"
+      },
+      "doc": "Order-flow imbalance over the best 3 level(s), summed over 5s: sum of per-event (bid depth delta - ask depth delta) within top 3.",
+      "depends_on": []
+    },
+    {
+      "name": "ofi_l3_w30s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "levels": 3,
+        "window": "30s"
+      },
+      "doc": "Order-flow imbalance over the best 3 level(s), summed over 30s: sum of per-event (bid depth delta - ask depth delta) within top 3.",
+      "depends_on": []
+    },
+    {
+      "name": "ofi_l5_w1s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "levels": 5,
+        "window": "1s"
+      },
+      "doc": "Order-flow imbalance over the best 5 level(s), summed over 1s: sum of per-event (bid depth delta - ask depth delta) within top 5.",
+      "depends_on": []
+    },
+    {
+      "name": "ofi_l5_w5s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "levels": 5,
+        "window": "5s"
+      },
+      "doc": "Order-flow imbalance over the best 5 level(s), summed over 5s: sum of per-event (bid depth delta - ask depth delta) within top 5.",
+      "depends_on": []
+    },
+    {
+      "name": "ofi_l5_w30s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "levels": 5,
+        "window": "30s"
+      },
+      "doc": "Order-flow imbalance over the best 5 level(s), summed over 30s: sum of per-event (bid depth delta - ask depth delta) within top 5.",
+      "depends_on": []
+    },
+    {
+      "name": "ofi_l10_w1s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "levels": 10,
+        "window": "1s"
+      },
+      "doc": "Order-flow imbalance over the best 10 level(s), summed over 1s: sum of per-event (bid depth delta - ask depth delta) within top 10.",
+      "depends_on": []
+    },
+    {
+      "name": "ofi_l10_w5s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "levels": 10,
+        "window": "5s"
+      },
+      "doc": "Order-flow imbalance over the best 10 level(s), summed over 5s: sum of per-event (bid depth delta - ask depth delta) within top 10.",
+      "depends_on": []
+    },
+    {
+      "name": "ofi_l10_w30s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "levels": 10,
+        "window": "30s"
+      },
+      "doc": "Order-flow imbalance over the best 10 level(s), summed over 30s: sum of per-event (bid depth delta - ask depth delta) within top 10.",
+      "depends_on": []
+    },
+    {
+      "name": "ofi_norm_l1_w1s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "levels": 1,
+        "window": "1s"
+      },
+      "doc": "ofi_l1_w1s normalized by the 10s mean two-sided depth over the best 1 level(s): ofi / (mean depth_total_l1 + EPS).",
+      "depends_on": [
+        "ofi_l1_w1s_v1",
+        "depth_bid_l1_avg_w10s_v1",
+        "depth_ask_l1_avg_w10s_v1"
+      ]
+    },
+    {
+      "name": "ofi_norm_l1_w5s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "levels": 1,
+        "window": "5s"
+      },
+      "doc": "ofi_l1_w5s normalized by the 10s mean two-sided depth over the best 1 level(s): ofi / (mean depth_total_l1 + EPS).",
+      "depends_on": [
+        "ofi_l1_w5s_v1",
+        "depth_bid_l1_avg_w10s_v1",
+        "depth_ask_l1_avg_w10s_v1"
+      ]
+    },
+    {
+      "name": "ofi_norm_l1_w30s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "levels": 1,
+        "window": "30s"
+      },
+      "doc": "ofi_l1_w30s normalized by the 10s mean two-sided depth over the best 1 level(s): ofi / (mean depth_total_l1 + EPS).",
+      "depends_on": [
+        "ofi_l1_w30s_v1",
+        "depth_bid_l1_avg_w10s_v1",
+        "depth_ask_l1_avg_w10s_v1"
+      ]
+    },
+    {
+      "name": "ofi_norm_l5_w1s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "levels": 5,
+        "window": "1s"
+      },
+      "doc": "ofi_l5_w1s normalized by the 10s mean two-sided depth over the best 5 level(s): ofi / (mean depth_total_l5 + EPS).",
+      "depends_on": [
+        "ofi_l5_w1s_v1",
+        "depth_bid_l5_avg_w10s_v1",
+        "depth_ask_l5_avg_w10s_v1"
+      ]
+    },
+    {
+      "name": "ofi_norm_l5_w5s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "levels": 5,
+        "window": "5s"
+      },
+      "doc": "ofi_l5_w5s normalized by the 10s mean two-sided depth over the best 5 level(s): ofi / (mean depth_total_l5 + EPS).",
+      "depends_on": [
+        "ofi_l5_w5s_v1",
+        "depth_bid_l5_avg_w10s_v1",
+        "depth_ask_l5_avg_w10s_v1"
+      ]
+    },
+    {
+      "name": "ofi_norm_l5_w30s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "levels": 5,
+        "window": "30s"
+      },
+      "doc": "ofi_l5_w30s normalized by the 10s mean two-sided depth over the best 5 level(s): ofi / (mean depth_total_l5 + EPS).",
+      "depends_on": [
+        "ofi_l5_w30s_v1",
+        "depth_bid_l5_avg_w10s_v1",
+        "depth_ask_l5_avg_w10s_v1"
+      ]
+    },
+    {
+      "name": "signed_volume_w1s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "window": "1s"
+      },
+      "doc": "Signed traded volume over 1s: +qty for buy-aggressor TRADEs (side=BID), -qty for sells.",
+      "depends_on": []
+    },
+    {
+      "name": "signed_volume_w10s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "window": "10s"
+      },
+      "doc": "Signed traded volume over 10s: +qty for buy-aggressor TRADEs (side=BID), -qty for sells.",
+      "depends_on": []
+    },
+    {
+      "name": "signed_volume_w1m_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "window": "1m"
+      },
+      "doc": "Signed traded volume over 1m: +qty for buy-aggressor TRADEs (side=BID), -qty for sells.",
+      "depends_on": []
+    },
+    {
+      "name": "trade_imbalance_w1s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "window": "1s"
+      },
+      "doc": "Trade imbalance over 1s: (buy_qty - sell_qty)/(buy_qty + sell_qty).",
+      "depends_on": []
+    },
+    {
+      "name": "trade_imbalance_w10s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "window": "10s"
+      },
+      "doc": "Trade imbalance over 10s: (buy_qty - sell_qty)/(buy_qty + sell_qty).",
+      "depends_on": []
+    },
+    {
+      "name": "trade_imbalance_w1m_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "window": "1m"
+      },
+      "doc": "Trade imbalance over 1m: (buy_qty - sell_qty)/(buy_qty + sell_qty).",
+      "depends_on": []
+    },
+    {
+      "name": "trade_count_w1s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "window": "1s"
+      },
+      "doc": "Number of TRADE events in 1s.",
+      "depends_on": []
+    },
+    {
+      "name": "trade_count_w10s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "window": "10s"
+      },
+      "doc": "Number of TRADE events in 10s.",
+      "depends_on": []
+    },
+    {
+      "name": "trade_count_w1m_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "window": "1m"
+      },
+      "doc": "Number of TRADE events in 1m.",
+      "depends_on": []
+    },
+    {
+      "name": "trade_intensity_w1s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "window": "1s"
+      },
+      "doc": "TRADE events per second over 1s.",
+      "depends_on": [
+        "trade_count_w1s_v1"
+      ]
+    },
+    {
+      "name": "trade_intensity_w10s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "window": "10s"
+      },
+      "doc": "TRADE events per second over 10s.",
+      "depends_on": [
+        "trade_count_w10s_v1"
+      ]
+    },
+    {
+      "name": "trade_intensity_w1m_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "window": "1m"
+      },
+      "doc": "TRADE events per second over 1m.",
+      "depends_on": [
+        "trade_count_w1m_v1"
+      ]
+    },
+    {
+      "name": "add_intensity_w1s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "window": "1s"
+      },
+      "doc": "ADD events per second over 1s.",
+      "depends_on": []
+    },
+    {
+      "name": "add_intensity_w10s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "window": "10s"
+      },
+      "doc": "ADD events per second over 10s.",
+      "depends_on": []
+    },
+    {
+      "name": "add_intensity_w1m_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "window": "1m"
+      },
+      "doc": "ADD events per second over 1m.",
+      "depends_on": []
+    },
+    {
+      "name": "cancel_intensity_w1s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "window": "1s"
+      },
+      "doc": "CANCEL events per second over 1s.",
+      "depends_on": []
+    },
+    {
+      "name": "cancel_intensity_w10s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "window": "10s"
+      },
+      "doc": "CANCEL events per second over 10s.",
+      "depends_on": []
+    },
+    {
+      "name": "cancel_intensity_w1m_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "window": "1m"
+      },
+      "doc": "CANCEL events per second over 1m.",
+      "depends_on": []
+    },
+    {
+      "name": "modify_intensity_w1s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "window": "1s"
+      },
+      "doc": "MODIFY events per second over 1s.",
+      "depends_on": []
+    },
+    {
+      "name": "modify_intensity_w10s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "window": "10s"
+      },
+      "doc": "MODIFY events per second over 10s.",
+      "depends_on": []
+    },
+    {
+      "name": "execute_intensity_w1s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "window": "1s"
+      },
+      "doc": "EXECUTE events per second over 1s.",
+      "depends_on": []
+    },
+    {
+      "name": "execute_intensity_w10s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "window": "10s"
+      },
+      "doc": "EXECUTE events per second over 10s.",
+      "depends_on": []
+    },
+    {
+      "name": "execute_intensity_w1m_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "window": "1m"
+      },
+      "doc": "EXECUTE events per second over 1m.",
+      "depends_on": []
+    },
+    {
+      "name": "add_qty_w1s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "window": "1s"
+      },
+      "doc": "Summed qty of ADD events over 1s.",
+      "depends_on": []
+    },
+    {
+      "name": "add_qty_w10s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "window": "10s"
+      },
+      "doc": "Summed qty of ADD events over 10s.",
+      "depends_on": []
+    },
+    {
+      "name": "cancel_qty_w1s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "window": "1s"
+      },
+      "doc": "Summed qty of CANCEL events over 1s.",
+      "depends_on": []
+    },
+    {
+      "name": "cancel_qty_w10s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "window": "10s"
+      },
+      "doc": "Summed qty of CANCEL events over 10s.",
+      "depends_on": []
+    },
+    {
+      "name": "cancel_add_ratio_w1s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "window": "1s"
+      },
+      "doc": "cancel_count / add_count over 1s (valid when adds > 0).",
+      "depends_on": []
+    },
+    {
+      "name": "cancel_add_ratio_w10s_v1",
+      "family": "flow",
+      "version": 1,
+      "params": {
+        "window": "10s"
+      },
+      "doc": "cancel_count / add_count over 10s (valid when adds > 0).",
+      "depends_on": []
+    },
+    {
+      "name": "quoted_depth_total_v1",
+      "family": "liquidity",
+      "version": 1,
+      "params": {},
+      "doc": "Two-sided quoted depth over the best 10 levels.",
+      "depends_on": [
+        "depth_bid_l10_v1",
+        "depth_ask_l10_v1"
+      ]
+    },
+    {
+      "name": "quoted_depth_ratio_v1",
+      "family": "liquidity",
+      "version": 1,
+      "params": {},
+      "doc": "Bid share of two-sided top-10 depth: bid/(bid+ask).",
+      "depends_on": [
+        "quoted_depth_total_v1"
+      ]
+    },
+    {
+      "name": "quoted_depth_avg_w10s_v1",
+      "family": "liquidity",
+      "version": 1,
+      "params": {
+        "window": "10s"
+      },
+      "doc": "Mean two-sided top-10 quoted depth over 10s.",
+      "depends_on": [
+        "quoted_depth_total_v1"
+      ]
+    },
+    {
+      "name": "quoted_depth_avg_w1m_v1",
+      "family": "liquidity",
+      "version": 1,
+      "params": {
+        "window": "1m"
+      },
+      "doc": "Mean two-sided top-10 quoted depth over 1m.",
+      "depends_on": [
+        "quoted_depth_total_v1"
+      ]
+    },
+    {
+      "name": "effective_spread_bps_w10s_v1",
+      "family": "liquidity",
+      "version": 1,
+      "params": {
+        "window": "10s"
+      },
+      "doc": "Mean effective spread over TRADEs in 10s: 2*|price-mid|/mid*1e4.",
+      "depends_on": []
+    },
+    {
+      "name": "effective_spread_bps_w1m_v1",
+      "family": "liquidity",
+      "version": 1,
+      "params": {
+        "window": "1m"
+      },
+      "doc": "Mean effective spread over TRADEs in 1m: 2*|price-mid|/mid*1e4.",
+      "depends_on": []
+    },
+    {
+      "name": "traded_volume_w10s_v1",
+      "family": "liquidity",
+      "version": 1,
+      "params": {
+        "window": "10s"
+      },
+      "doc": "Total TRADE qty over 10s.",
+      "depends_on": []
+    },
+    {
+      "name": "traded_volume_w1m_v1",
+      "family": "liquidity",
+      "version": 1,
+      "params": {
+        "window": "1m"
+      },
+      "doc": "Total TRADE qty over 1m.",
+      "depends_on": []
+    },
+    {
+      "name": "participation_w10s_v1",
+      "family": "liquidity",
+      "version": 1,
+      "params": {
+        "window": "10s"
+      },
+      "doc": "Trading activity vs liquidity over 10s: volume/(volume + mean quoted depth).",
+      "depends_on": [
+        "traded_volume_w10s_v1",
+        "quoted_depth_avg_w10s_v1"
+      ]
+    },
+    {
+      "name": "participation_w1m_v1",
+      "family": "liquidity",
+      "version": 1,
+      "params": {
+        "window": "1m"
+      },
+      "doc": "Trading activity vs liquidity over 1m: volume/(volume + mean quoted depth).",
+      "depends_on": [
+        "traded_volume_w1m_v1",
+        "quoted_depth_avg_w1m_v1"
+      ]
+    },
+    {
+      "name": "depth_slope_bid_v1",
+      "family": "liquidity",
+      "version": 1,
+      "params": {
+        "levels": 5,
+        "side": "bid"
+      },
+      "doc": "Book slope of the bid side: bps distance from L1 to L<=5 divided by the cumulative depth through that level.",
+      "depends_on": []
+    },
+    {
+      "name": "depth_slope_ask_v1",
+      "family": "liquidity",
+      "version": 1,
+      "params": {
+        "levels": 5,
+        "side": "ask"
+      },
+      "doc": "Book slope of the ask side: bps distance from L1 to L<=5 divided by the cumulative depth through that level.",
+      "depends_on": []
+    },
+    {
+      "name": "resiliency_halflife_v1",
+      "family": "liquidity",
+      "version": 1,
+      "params": {
+        "window": "10s"
+      },
+      "doc": "Seconds to rebuild half the current L1 depth at the 10s replenishment rate: ln(2)*(Qb+Qa)/2 / (rep_rate_10s + EPS).",
+      "depends_on": [
+        "queue_replenish_rate_bid_w10s_v1",
+        "queue_replenish_rate_ask_w10s_v1"
+      ]
+    },
+    {
+      "name": "rvol_w10s_v1",
+      "family": "vol",
+      "version": 1,
+      "params": {
+        "window": "10s"
+      },
+      "doc": "Realized vol over 10s: sqrt(sum dlm^2 / 10s in seconds).",
+      "depends_on": []
+    },
+    {
+      "name": "rvol_w1m_v1",
+      "family": "vol",
+      "version": 1,
+      "params": {
+        "window": "1m"
+      },
+      "doc": "Realized vol over 1m: sqrt(sum dlm^2 / 1m in seconds).",
+      "depends_on": []
+    },
+    {
+      "name": "rvol_w5m_v1",
+      "family": "vol",
+      "version": 1,
+      "params": {
+        "window": "5m"
+      },
+      "doc": "Realized vol over 5m: sqrt(sum dlm^2 / 5m in seconds).",
+      "depends_on": []
+    },
+    {
+      "name": "volofvol_w5m_v1",
+      "family": "vol",
+      "version": 1,
+      "params": {
+        "window": "5m"
+      },
+      "doc": "Std of squared mid-change log returns over 5m (vol-of-vol proxy).",
+      "depends_on": []
+    },
+    {
+      "name": "mean_abs_ret_w10s_v1",
+      "family": "vol",
+      "version": 1,
+      "params": {
+        "window": "10s"
+      },
+      "doc": "Mean |dlm| per mid change over 10s.",
+      "depends_on": []
+    },
+    {
+      "name": "mean_abs_ret_w1m_v1",
+      "family": "vol",
+      "version": 1,
+      "params": {
+        "window": "1m"
+      },
+      "doc": "Mean |dlm| per mid change over 1m.",
+      "depends_on": []
+    },
+    {
+      "name": "range_bps_w10s_v1",
+      "family": "vol",
+      "version": 1,
+      "params": {
+        "window": "10s"
+      },
+      "doc": "High-low mid range over 10s in bps of current mid.",
+      "depends_on": []
+    },
+    {
+      "name": "range_bps_w1m_v1",
+      "family": "vol",
+      "version": 1,
+      "params": {
+        "window": "1m"
+      },
+      "doc": "High-low mid range over 1m in bps of current mid.",
+      "depends_on": []
+    },
+    {
+      "name": "range_bps_w5m_v1",
+      "family": "vol",
+      "version": 1,
+      "params": {
+        "window": "5m"
+      },
+      "doc": "High-low mid range over 5m in bps of current mid.",
+      "depends_on": []
+    },
+    {
+      "name": "jump_flag_w1m_v1",
+      "family": "vol",
+      "version": 1,
+      "params": {
+        "k": 4.0,
+        "min_obs": 30,
+        "window": "1m"
+      },
+      "doc": "1 if max|dlm| over 1m > 4.0x mean|dlm| over 1m (>= 30 mid changes).",
+      "depends_on": []
+    },
+    {
+      "name": "jump_count_w5m_v1",
+      "family": "vol",
+      "version": 1,
+      "params": {
+        "k": 4.0,
+        "min_obs": 30,
+        "window": "5m"
+      },
+      "doc": "Number of threshold jumps (|dlm| > 4.0x prevailing 1m mean|dlm|) detected in the last 5m.",
+      "depends_on": []
+    },
+    {
+      "name": "vol_ratio_w10s_w1m_v1",
+      "family": "vol",
+      "version": 1,
+      "params": {},
+      "doc": "rvol_w10s / (rvol_w1m + EPS): short-vs-medium vol ratio.",
+      "depends_on": [
+        "rvol_w10s_v1",
+        "rvol_w1m_v1"
+      ]
+    },
+    {
+      "name": "vol_ratio_w1m_w5m_v1",
+      "family": "vol",
+      "version": 1,
+      "params": {},
+      "doc": "rvol_w1m / (rvol_w5m + EPS): medium-vs-long vol ratio.",
+      "depends_on": [
+        "rvol_w1m_v1",
+        "rvol_w5m_v1"
+      ]
+    },
+    {
+      "name": "minute_of_day_v1",
+      "family": "tod",
+      "version": 1,
+      "params": {},
+      "doc": "Minutes since UTC midnight (fractional).",
+      "depends_on": []
+    },
+    {
+      "name": "session_frac_v1",
+      "family": "tod",
+      "version": 1,
+      "params": {},
+      "doc": "Fraction of the configured session elapsed, clipped to [0,1].",
+      "depends_on": []
+    },
+    {
+      "name": "is_open_phase_v1",
+      "family": "tod",
+      "version": 1,
+      "params": {},
+      "doc": "1 during the first 30 session minutes.",
+      "depends_on": []
+    },
+    {
+      "name": "is_close_phase_v1",
+      "family": "tod",
+      "version": 1,
+      "params": {},
+      "doc": "1 during the last 30 session minutes.",
+      "depends_on": []
+    },
+    {
+      "name": "is_trading_v1",
+      "family": "tod",
+      "version": 1,
+      "params": {},
+      "doc": "1 when no venue reports HALT or AUCTION.",
+      "depends_on": []
+    },
+    {
+      "name": "is_auction_v1",
+      "family": "tod",
+      "version": 1,
+      "params": {},
+      "doc": "1 when any venue reports AUCTION (and none HALT).",
+      "depends_on": []
+    },
+    {
+      "name": "is_halt_v1",
+      "family": "tod",
+      "version": 1,
+      "params": {},
+      "doc": "1 when any venue reports HALT.",
+      "depends_on": []
+    },
+    {
+      "name": "norm_volume_m5_v1",
+      "family": "tod",
+      "version": 1,
+      "params": {
+        "bucket_minutes": 5
+      },
+      "doc": "traded_volume_w1m normalized by its expanding 5-minute-of-day session profile mean (>= 10 prior observations).",
+      "depends_on": [
+        "traded_volume_w1m_v1"
+      ]
+    },
+    {
+      "name": "norm_spread_m5_v1",
+      "family": "tod",
+      "version": 1,
+      "params": {
+        "bucket_minutes": 5
+      },
+      "doc": "spread_bps normalized by its expanding 5-minute-of-day session profile mean.",
+      "depends_on": [
+        "spread_bps_v1"
+      ]
+    },
+    {
+      "name": "norm_vol_m5_v1",
+      "family": "tod",
+      "version": 1,
+      "params": {
+        "bucket_minutes": 5
+      },
+      "doc": "rvol_w1m normalized by its expanding 5-minute-of-day session profile mean.",
+      "depends_on": [
+        "rvol_w1m_v1"
+      ]
+    },
+    {
+      "name": "norm_depth_m5_v1",
+      "family": "tod",
+      "version": 1,
+      "params": {
+        "bucket_minutes": 5
+      },
+      "doc": "quoted_depth_total normalized by its expanding 5-minute-of-day session profile mean.",
+      "depends_on": [
+        "quoted_depth_total_v1"
+      ]
+    },
+    {
+      "name": "ref_ret_1s_v1",
+      "family": "xasset",
+      "version": 1,
+      "params": {
+        "horizon": "1s"
+      },
+      "doc": "Reference-instrument (ETF / EUR/USD) log mid return over 1s (lead-lag input).",
+      "depends_on": []
+    },
+    {
+      "name": "ref_ret_5s_v1",
+      "family": "xasset",
+      "version": 1,
+      "params": {
+        "horizon": "5s"
+      },
+      "doc": "Reference-instrument (ETF / EUR/USD) log mid return over 5s (lead-lag input).",
+      "depends_on": []
+    },
+    {
+      "name": "ref_ret_10s_v1",
+      "family": "xasset",
+      "version": 1,
+      "params": {
+        "horizon": "10s"
+      },
+      "doc": "Reference-instrument (ETF / EUR/USD) log mid return over 10s (lead-lag input).",
+      "depends_on": []
+    },
+    {
+      "name": "ref_ret_30s_v1",
+      "family": "xasset",
+      "version": 1,
+      "params": {
+        "horizon": "30s"
+      },
+      "doc": "Reference-instrument (ETF / EUR/USD) log mid return over 30s (lead-lag input).",
+      "depends_on": []
+    },
+    {
+      "name": "ref_ret_1m_v1",
+      "family": "xasset",
+      "version": 1,
+      "params": {
+        "horizon": "1m"
+      },
+      "doc": "Reference-instrument (ETF / EUR/USD) log mid return over 1m (lead-lag input).",
+      "depends_on": []
+    },
+    {
+      "name": "beta_w5m_v1",
+      "family": "xasset",
+      "version": 1,
+      "params": {
+        "min_pairs": 4,
+        "window": "5m"
+      },
+      "doc": "OLS beta of own vs reference contemporaneous 1s log returns over 5m: cov(x,y)/var(y).",
+      "depends_on": []
+    },
+    {
+      "name": "corr_contemp_w1m_v1",
+      "family": "xasset",
+      "version": 1,
+      "params": {
+        "min_pairs": 4,
+        "window": "1m"
+      },
+      "doc": "Correlation of own vs reference contemporaneous 1s log returns over 1m (FX: correlation proxy vs EUR/USD).",
+      "depends_on": []
+    },
+    {
+      "name": "corr_contemp_w5m_v1",
+      "family": "xasset",
+      "version": 1,
+      "params": {
+        "min_pairs": 4,
+        "window": "5m"
+      },
+      "doc": "Correlation of own vs reference contemporaneous 1s log returns over 5m (FX: correlation proxy vs EUR/USD).",
+      "depends_on": []
+    },
+    {
+      "name": "leadlag_corr_w1m_v1",
+      "family": "xasset",
+      "version": 1,
+      "params": {
+        "min_pairs": 4,
+        "window": "1m"
+      },
+      "doc": "Correlation of own 1s return vs reference 1s return lagged 1s over 1m (positive = reference leads).",
+      "depends_on": []
+    },
+    {
+      "name": "leadlag_corr_w5m_v1",
+      "family": "xasset",
+      "version": 1,
+      "params": {
+        "min_pairs": 4,
+        "window": "5m"
+      },
+      "doc": "Correlation of own 1s return vs reference 1s return lagged 1s over 5m (positive = reference leads).",
+      "depends_on": []
+    },
+    {
+      "name": "resid_vol_w1m_v1",
+      "family": "xasset",
+      "version": 1,
+      "params": {
+        "min_pairs": 4,
+        "window": "1m"
+      },
+      "doc": "Std of the beta-residual 1s return over 1m: sqrt(max(var(x) - cov^2/var(y), 0)).",
+      "depends_on": [
+        "beta_w5m_v1"
+      ]
+    },
+    {
+      "name": "venue_count_active_v1",
+      "family": "venue",
+      "version": 1,
+      "params": {},
+      "doc": "Number of venues with a two-sided, non-stale book.",
+      "depends_on": []
+    },
+    {
+      "name": "venue_depth_hhi_v1",
+      "family": "venue",
+      "version": 1,
+      "params": {},
+      "doc": "HHI of per-venue shares of two-sided top-10 depth.",
+      "depends_on": []
+    },
+    {
+      "name": "venue_update_hhi_w10s_v1",
+      "family": "venue",
+      "version": 1,
+      "params": {
+        "window": "10s"
+      },
+      "doc": "HHI of per-venue event-count shares over 10s.",
+      "depends_on": []
+    },
+    {
+      "name": "venue_update_share_top_w10s_v1",
+      "family": "venue",
+      "version": 1,
+      "params": {
+        "window": "10s"
+      },
+      "doc": "Largest per-venue event-count share over 10s.",
+      "depends_on": []
+    },
+    {
+      "name": "venue_staleness_max_ms_v1",
+      "family": "venue",
+      "version": 1,
+      "params": {},
+      "doc": "Max over venues of ms since that venue's last event.",
+      "depends_on": []
+    },
+    {
+      "name": "venue_staleness_min_ms_v1",
+      "family": "venue",
+      "version": 1,
+      "params": {},
+      "doc": "Min over venues of ms since that venue's last event.",
+      "depends_on": []
+    },
+    {
+      "name": "venue_staleness_spread_ms_v1",
+      "family": "venue",
+      "version": 1,
+      "params": {},
+      "doc": "Staleness spread: max - min venue staleness in ms.",
+      "depends_on": [
+        "venue_staleness_max_ms_v1",
+        "venue_staleness_min_ms_v1"
+      ]
+    },
+    {
+      "name": "venue_imbalance_divergence_v1",
+      "family": "venue",
+      "version": 1,
+      "params": {},
+      "doc": "Max - min of per-venue L1 imbalance across active venues.",
+      "depends_on": []
+    },
+    {
+      "name": "venue_best_depth_share_bid_v1",
+      "family": "venue",
+      "version": 1,
+      "params": {
+        "side": "bid"
+      },
+      "doc": "Largest single-venue share of the consolidated best-bid size.",
+      "depends_on": []
+    },
+    {
+      "name": "venue_best_depth_share_ask_v1",
+      "family": "venue",
+      "version": 1,
+      "params": {
+        "side": "ask"
+      },
+      "doc": "Largest single-venue share of the consolidated best-ask size.",
+      "depends_on": []
+    },
+    {
+      "name": "trend_score_w10s_v1",
+      "family": "regime",
+      "version": 1,
+      "params": {
+        "window": "10s"
+      },
+      "doc": "Normalized drift over 10s: ret_log / (rvol_w10s * sqrt(w_s) + EPS).",
+      "depends_on": [
+        "rvol_w10s_v1"
+      ]
+    },
+    {
+      "name": "trend_score_w1m_v1",
+      "family": "regime",
+      "version": 1,
+      "params": {
+        "window": "1m"
+      },
+      "doc": "Normalized drift over 1m: ret_log / (rvol_w1m * sqrt(w_s) + EPS).",
+      "depends_on": [
+        "rvol_w1m_v1"
+      ]
+    },
+    {
+      "name": "trend_score_w5m_v1",
+      "family": "regime",
+      "version": 1,
+      "params": {
+        "window": "5m"
+      },
+      "doc": "Normalized drift over 5m: ret_log / (rvol_w5m * sqrt(w_s) + EPS).",
+      "depends_on": [
+        "rvol_w5m_v1"
+      ]
+    },
+    {
+      "name": "meanrev_score_w10s_v1",
+      "family": "regime",
+      "version": 1,
+      "params": {
+        "window": "10s"
+      },
+      "doc": "Mean-reversion z-score over 10s: -(mid - mean)/(std + EPS).",
+      "depends_on": []
+    },
+    {
+      "name": "meanrev_score_w1m_v1",
+      "family": "regime",
+      "version": 1,
+      "params": {
+        "window": "1m"
+      },
+      "doc": "Mean-reversion z-score over 1m: -(mid - mean)/(std + EPS).",
+      "depends_on": []
+    },
+    {
+      "name": "meanrev_score_w5m_v1",
+      "family": "regime",
+      "version": 1,
+      "params": {
+        "window": "5m"
+      },
+      "doc": "Mean-reversion z-score over 5m: -(mid - mean)/(std + EPS).",
+      "depends_on": []
+    },
+    {
+      "name": "vol_regime_flag_v1",
+      "family": "regime",
+      "version": 1,
+      "params": {},
+      "doc": "1 when rvol_w1m > rvol_w5m (elevated short-term vol).",
+      "depends_on": [
+        "vol_regime_ratio_v1"
+      ]
+    },
+    {
+      "name": "vol_regime_ratio_v1",
+      "family": "regime",
+      "version": 1,
+      "params": {},
+      "doc": "rvol_w1m / (rvol_w5m + EPS).",
+      "depends_on": [
+        "rvol_w1m_v1",
+        "rvol_w5m_v1"
+      ]
+    },
+    {
+      "name": "liq_regime_flag_v1",
+      "family": "regime",
+      "version": 1,
+      "params": {},
+      "doc": "1 when current quoted depth exceeds its 1m mean.",
+      "depends_on": [
+        "liq_regime_ratio_v1"
+      ]
+    },
+    {
+      "name": "liq_regime_ratio_v1",
+      "family": "regime",
+      "version": 1,
+      "params": {},
+      "doc": "quoted_depth_total / (mean quoted depth over 1m + EPS).",
+      "depends_on": [
+        "quoted_depth_total_v1",
+        "quoted_depth_avg_w1m_v1"
+      ]
+    },
+    {
+      "name": "fill_prob_bid_h1s_v1",
+      "family": "exec",
+      "version": 1,
+      "params": {
+        "horizon": "1s",
+        "side": "bid"
+      },
+      "doc": "P(back-of-L1-bid-queue order fills within 1s): 1 - exp(-depletion_rate_bid_w10s * h_s / Q_bid_L1).",
+      "depends_on": [
+        "queue_depletion_rate_bid_w10s_v1",
+        "depth_bid_l1_v1"
+      ]
+    },
+    {
+      "name": "fill_prob_ask_h1s_v1",
+      "family": "exec",
+      "version": 1,
+      "params": {
+        "horizon": "1s",
+        "side": "ask"
+      },
+      "doc": "P(back-of-L1-ask-queue order fills within 1s): 1 - exp(-depletion_rate_ask_w10s * h_s / Q_ask_L1).",
+      "depends_on": [
+        "queue_depletion_rate_ask_w10s_v1",
+        "depth_ask_l1_v1"
+      ]
+    },
+    {
+      "name": "fill_prob_bid_h10s_v1",
+      "family": "exec",
+      "version": 1,
+      "params": {
+        "horizon": "10s",
+        "side": "bid"
+      },
+      "doc": "P(back-of-L1-bid-queue order fills within 10s): 1 - exp(-depletion_rate_bid_w10s * h_s / Q_bid_L1).",
+      "depends_on": [
+        "queue_depletion_rate_bid_w10s_v1",
+        "depth_bid_l1_v1"
+      ]
+    },
+    {
+      "name": "fill_prob_ask_h10s_v1",
+      "family": "exec",
+      "version": 1,
+      "params": {
+        "horizon": "10s",
+        "side": "ask"
+      },
+      "doc": "P(back-of-L1-ask-queue order fills within 10s): 1 - exp(-depletion_rate_ask_w10s * h_s / Q_ask_L1).",
+      "depends_on": [
+        "queue_depletion_rate_ask_w10s_v1",
+        "depth_ask_l1_v1"
+      ]
+    },
+    {
+      "name": "half_spread_cost_bps_v1",
+      "family": "exec",
+      "version": 1,
+      "params": {},
+      "doc": "Immediate crossing cost: spread_bps / 2.",
+      "depends_on": [
+        "spread_bps_v1"
+      ]
+    },
+    {
+      "name": "expected_impact_bps_v1",
+      "family": "exec",
+      "version": 1,
+      "params": {},
+      "doc": "Impact proxy: half_spread_bps * sqrt(1 + traded_volume_w10s / (quoted_depth_total + EPS)).",
+      "depends_on": [
+        "half_spread_cost_bps_v1",
+        "traded_volume_w10s_v1",
+        "quoted_depth_total_v1"
+      ]
+    },
+    {
+      "name": "alpha_decay_proxy_v1",
+      "family": "exec",
+      "version": 1,
+      "params": {},
+      "doc": "Information arrival speed: rvol_w10s / (rvol_w1m + EPS).",
+      "depends_on": [
+        "rvol_w10s_v1",
+        "rvol_w1m_v1"
+      ]
+    },
+    {
+      "name": "urgency_score_v1",
+      "family": "exec",
+      "version": 1,
+      "params": {},
+      "doc": "Urgency to act: |imbalance_l1| * alpha_decay_proxy / (1 + spread_ticks).",
+      "depends_on": [
+        "imbalance_l1_v1",
+        "alpha_decay_proxy_v1",
+        "spread_ticks_v1"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iap.example/schemas/risk_event.schema.json",
+  "title": "RiskEvent",
+  "description": "Hard-risk decision record (spec sections 6, 16). Fail-closed, auditable, replayable. severity: INFO=1 WARN=2 BREACH=3; decision: ALLOW=1 REJECT=2 KILL=3.",
+  "x-version": 1,
+  "type": "object",
+  "properties": {
+    "timestamp": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807
+    },
+    "scope": {
+      "type": "string",
+      "enum": [
+        "GLOBAL",
+        "STRATEGY",
+        "INSTRUMENT",
+        "VENUE"
+      ]
+    },
+    "scope_id": {
+      "type": "string",
+      "description": "Identifier within scope ('' for GLOBAL)."
+    },
+    "rule_id": {
+      "type": "string"
+    },
+    "severity": {
+      "type": "integer",
+      "enum": [
+        1,
+        2,
+        3
+      ]
+    },
+    "decision": {
+      "type": "integer",
+      "enum": [
+        1,
+        2,
+        3
+      ]
+    },
+    "reason": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "timestamp",
+    "scope",
+    "scope_id",
+    "rule_id",
+    "severity",
+    "decision",
+    "reason"
+  ],
+  "additionalProperties": false
+}

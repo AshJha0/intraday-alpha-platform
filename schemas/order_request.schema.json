@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iap.example/schemas/order_request.schema.json",
+  "title": "OrderRequest",
+  "description": "Strategy order request (spec section 6). order_type: MARKET=1 LIMIT=2 IOC=3 FOK=4 PEG=5 MID=6.",
+  "x-version": 1,
+  "type": "object",
+  "properties": {
+    "order_id": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "instrument_id": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "side": {
+      "type": "integer",
+      "enum": [
+        0,
+        1
+      ]
+    },
+    "qty": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807,
+      "description": "Base units, > 0."
+    },
+    "price_ticks": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807,
+      "description": "Limit price in ticks; 0 for MARKET."
+    },
+    "order_type": {
+      "type": "integer",
+      "enum": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ]
+    },
+    "venue_id": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 65535,
+      "description": "Target venue; 0 = route via SOR."
+    },
+    "strategy_id": {
+      "type": "string"
+    },
+    "urgency": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "0 = fully passive, 1 = immediate."
+    },
+    "timestamp": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807
+    }
+  },
+  "required": [
+    "order_id",
+    "instrument_id",
+    "side",
+    "qty",
+    "price_ticks",
+    "order_type",
+    "venue_id",
+    "strategy_id",
+    "urgency",
+    "timestamp"
+  ],
+  "additionalProperties": false
+}

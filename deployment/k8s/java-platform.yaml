@@ -1,0 +1,152 @@
+# =============================================================================
+# java-platform — the institutional strategy/monitoring layer (iap/java image,
+# deployment/docker/Dockerfile.java).
+#
+# The container runs the paper-trading vertical (com.iap.platform.PaperTrading
+# — see Dockerfile.java): golden-vector session paced 60x realtime, with the
+# monitoring API (com.iap.api.MetricsServer) LIVE on :8080 — /metrics
+# (Prometheus text), /health, /status. Probes are real httpGet checks against
+# those endpoints. Config note: the image entrypoint reads its baked-in
+# /app/configs; the iap-configs ConfigMap is still mounted read-only at
+# /etc/iap/configs (IAP_CONFIG_DIR) for operators overriding the command.
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: java-platform
+  namespace: intraday-alpha
+  labels:
+    app.kubernetes.io/part-of: intraday-alpha-platform
+    app.kubernetes.io/name: java-platform
+    app.kubernetes.io/component: strategy-platform
+    app.kubernetes.io/version: "1.0.0"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: java-platform
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/part-of: intraday-alpha-platform
+        app.kubernetes.io/name: java-platform
+        app.kubernetes.io/component: strategy-platform
+        app.kubernetes.io/version: "1.0.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: /metrics
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: java-platform
+          image: iap/java:1.0.0   # digest-pin at release: iap/java@sha256:<release manifest>
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: metrics
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: JAVA_OPTS
+              value: "-XX:+UseZGC -Xms256m -Xmx768m -Xlog:gc*:stdout:time,level,tags"
+            - name: IAP_CONFIG_DIR
+              value: /etc/iap/configs
+          volumeMounts:
+            - name: configs
+              mountPath: /etc/iap/configs
+              readOnly: true
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 1Gi
+          # Real probes against the live monitoring API.
+          livenessProbe:
+            httpGet: { path: /health, port: metrics }
+            initialDelaySeconds: 15
+            periodSeconds: 15
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet: { path: /metrics, port: metrics }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false   # JVM writes hsperfdata/tmp
+            capabilities:
+              drop: ["ALL"]
+      volumes:
+        - name: configs
+          configMap:
+            name: iap-configs
+            # '__' encodes '/' in generated keys — keep in sync with
+            # generate_configmaps.py when configs/ gains files.
+            items:
+              - key: execution.json
+                path: execution.json
+              - key: generator.json
+                path: generator.json
+              - key: instruments.json
+                path: instruments.json
+              - key: risk.json
+                path: risk.json
+              - key: strategies.json
+                path: strategies.json
+              - key: venues.json
+                path: venues.json
+              - key: strategies__alpha_params.json
+                path: strategies/alpha_params.json
+        - name: data
+          persistentVolumeClaim:
+            claimName: iap-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: java-platform
+  namespace: intraday-alpha
+  labels:
+    app.kubernetes.io/part-of: intraday-alpha-platform
+    app.kubernetes.io/name: java-platform
+    app.kubernetes.io/component: strategy-platform
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: java-platform
+  ports:
+    - name: metrics
+      port: 8080
+      targetPort: metrics
+      protocol: TCP
+---
+# At most one of the two replicas may be voluntarily disrupted (node drain,
+# upgrade) at a time — the strategy layer stays observable through rollouts.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: java-platform
+  namespace: intraday-alpha
+  labels:
+    app.kubernetes.io/part-of: intraday-alpha-platform
+    app.kubernetes.io/name: java-platform
+    app.kubernetes.io/component: strategy-platform
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: java-platform

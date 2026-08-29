@@ -1,0 +1,101 @@
+# =============================================================================
+# Daily data pipeline (docs/BUILD_NOTES.md: python3 -m iap.marketdata):
+# generator -> data/raw/*.jsonl -> normalize -> data/normalized/{jsonl,iap1,
+# parquet,qc_report.json} on the shared iap-data PVC.
+#
+# Schedule: 07:30 UTC daily (before EU/US overlap analysis windows; the
+# pipeline is deterministic, so a re-run after failure is safe and produces
+# bit-identical output for the pinned seed in configs/generator.json).
+# Runbook: docs/runbooks/RUNBOOK_data_pipeline.md
+# =============================================================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: data-pipeline
+  namespace: intraday-alpha
+  labels:
+    app.kubernetes.io/part-of: intraday-alpha-platform
+    app.kubernetes.io/name: data-pipeline
+    app.kubernetes.io/component: data
+    app.kubernetes.io/version: "1.0.0"
+spec:
+  schedule: "30 7 * * *"
+  timeZone: Etc/UTC
+  concurrencyPolicy: Forbid        # never two writers on the data volume
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    metadata:
+      labels:
+        app.kubernetes.io/part-of: intraday-alpha-platform
+        app.kubernetes.io/name: data-pipeline
+        app.kubernetes.io/component: data
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 1800
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/part-of: intraday-alpha-platform
+            app.kubernetes.io/name: data-pipeline
+            app.kubernetes.io/component: data
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: pipeline
+              image: iap/python:1.0.0   # digest-pin at release: @sha256:<release manifest>
+              imagePullPolicy: IfNotPresent
+              # Configs from the ConfigMap (not the baked copy) so a config
+              # change does not require an image rebuild; every config change
+              # is audit-logged per docs/governance/GOVERNANCE.md.
+              args: ["--configs-dir", "/etc/iap/configs", "--out", "/data"]
+              volumeMounts:
+                - name: configs
+                  mountPath: /etc/iap/configs
+                  readOnly: true
+                - name: data
+                  mountPath: /data
+              resources:
+                requests:
+                  cpu: 500m
+                  memory: 512Mi
+                limits:
+                  cpu: "2"
+                  memory: 2Gi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+          volumes:
+            - name: configs
+              configMap:
+                name: iap-configs
+                # '__' encodes '/' in generated keys — keep in sync with
+                # generate_configmaps.py when configs/ gains files.
+                items:
+                  - key: execution.json
+                    path: execution.json
+                  - key: generator.json
+                    path: generator.json
+                  - key: instruments.json
+                    path: instruments.json
+                  - key: risk.json
+                    path: risk.json
+                  - key: strategies.json
+                    path: strategies.json
+                  - key: venues.json
+                    path: venues.json
+                  - key: strategies__alpha_params.json
+                    path: strategies/alpha_params.json
+            - name: data
+              persistentVolumeClaim:
+                claimName: iap-data

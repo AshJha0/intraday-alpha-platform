@@ -1,0 +1,60 @@
+{
+  "economics": {
+    "conservative_costs": true,
+    "hit_rate": 0.06641990540818425,
+    "mean_gross_bps_per_signal": -0.004365956636686248,
+    "mean_net_bps_per_signal": -0.08806251339448407,
+    "n_long": 12971,
+    "n_samples": 196449,
+    "n_short": 6481,
+    "n_trades": 19452,
+    "total_net_bps": -1712.992010549504
+  },
+  "economics_label_exact": {
+    "conservative_costs": false,
+    "hit_rate": 0.6264651449722394,
+    "mean_gross_bps_per_signal": -0.004365956636686248,
+    "mean_net_bps_per_signal": 1.1102351801206987,
+    "n_long": 12971,
+    "n_samples": 196449,
+    "n_short": 6481,
+    "n_trades": 19452,
+    "total_net_bps": 21596.294723707833
+  },
+  "ic_tstat": 5.453047659380541,
+  "mean_ic": 0.6931878669949465,
+  "mean_rank_ic": 0.7671387413192927,
+  "model": "xgboost",
+  "per_fold": [
+    {
+      "fold": 0,
+      "ic": 0.3129483421018899,
+      "n_test": 89764,
+      "n_train": 11805,
+      "rank_ic": 0.46548337839449805
+    },
+    {
+      "fold": 1,
+      "ic": 0.8004322231563965,
+      "n_test": 6495,
+      "n_train": 101590,
+      "rank_ic": 0.8153450888183142
+    },
+    {
+      "fold": 2,
+      "ic": 0.8464978951241288,
+      "n_test": 11785,
+      "n_train": 108102,
+      "rank_ic": 0.8253357816044435
+    },
+    {
+      "fold": 3,
+      "ic": 0.8128730075973711,
+      "n_test": 88405,
+      "n_train": 119907,
+      "rank_ic": 0.9623907164599151
+    }
+  ],
+  "pooled_ic": 0.5573469864437108,
+  "pooled_ic_vs_mid": -0.03256933038574542
+}

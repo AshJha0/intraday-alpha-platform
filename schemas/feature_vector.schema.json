@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iap.example/schemas/feature_vector.schema.json",
+  "title": "FeatureVector",
+  "description": "Event-driven feature vector. `values` ordered by the feature registry (data/reference/feature_registry.json); `validity` is a parallel bitset \u2014 NaN never leaks into a valid=true value.",
+  "x-version": 1,
+  "type": "object",
+  "properties": {
+    "instrument_id": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "timestamp": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807,
+      "description": "Event time, ns since epoch."
+    },
+    "feature_version": {
+      "type": "string",
+      "description": "Registry content hash (sha256 hex)."
+    },
+    "values": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      }
+    },
+    "validity": {
+      "type": "array",
+      "items": {
+        "type": "boolean"
+      },
+      "description": "Parallel to values; false during warmup or stale book."
+    }
+  },
+  "required": [
+    "instrument_id",
+    "timestamp",
+    "feature_version",
+    "values",
+    "validity"
+  ],
+  "additionalProperties": false
+}

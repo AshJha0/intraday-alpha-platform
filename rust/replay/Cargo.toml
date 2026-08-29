@@ -1,0 +1,16 @@
+[package]
+name = "replay"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "IAP deterministic event-time replay with checkpoints and snapshots"
+
+[dependencies]
+marketdata = { path = "../marketdata" }
+orderbook = { path = "../orderbook" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[[bin]]
+name = "demo"
+path = "src/bin/demo.rs"

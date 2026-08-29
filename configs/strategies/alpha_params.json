@@ -1,0 +1,428 @@
+{
+  "description": "Fitted flagship-alpha parameters (iap.alpha). model linear_z_v1: er = beta * clip((raw - mu)/(sigma + 1e-12), +-z_clip); conf = min(1, |z|/conf_scale). See /API_ALPHA.md.",
+  "params": {
+    "EQ01": {
+      "alpha_id": "EQ01",
+      "beta": 1.2569134136931961e-06,
+      "beta_fit": 1.2569134136931961e-06,
+      "conf_scale": 2.0,
+      "features": [
+        "micro_mid_dev_bps_v1"
+      ],
+      "fitted": true,
+      "horizon": "1s",
+      "hypothesis_confirmed": true,
+      "model": "linear_z_v1",
+      "mu": 0.02215393616745688,
+      "n_train": 77856,
+      "sigma": 1.2146010585779519,
+      "z_clip": 4.0
+    },
+    "EQ02": {
+      "alpha_id": "EQ02",
+      "beta": 4.209385253433178e-06,
+      "beta_fit": 4.209385253433178e-06,
+      "conf_scale": 2.0,
+      "features": [
+        "ofi_norm_l1_w1s_v1"
+      ],
+      "fitted": true,
+      "horizon": "5s",
+      "hypothesis_confirmed": true,
+      "model": "linear_z_v1",
+      "mu": -0.0014342441896034324,
+      "n_train": 77809,
+      "sigma": 0.31120419702587687,
+      "z_clip": 4.0
+    },
+    "EQ03": {
+      "alpha_id": "EQ03",
+      "beta": 4.035006162122629e-06,
+      "beta_fit": 4.035006162122629e-06,
+      "conf_scale": 2.0,
+      "features": [
+        "ofi_norm_l1_w1s_v1",
+        "ofi_norm_l5_w1s_v1",
+        "ofi_norm_l5_w5s_v1"
+      ],
+      "fitted": true,
+      "horizon": "5s",
+      "hypothesis_confirmed": true,
+      "model": "linear_z_v1",
+      "mu": -0.0008977579877723356,
+      "n_train": 77809,
+      "sigma": 0.16852613765131852,
+      "z_clip": 4.0
+    },
+    "EQ04": {
+      "alpha_id": "EQ04",
+      "beta": 1.2049976408150433e-08,
+      "beta_fit": 1.2049976408150433e-08,
+      "conf_scale": 2.0,
+      "features": [
+        "trade_imbalance_w10s_v1"
+      ],
+      "fitted": true,
+      "horizon": "5s",
+      "hypothesis_confirmed": true,
+      "model": "linear_z_v1",
+      "mu": 0.00079964547944971,
+      "n_train": 57304,
+      "sigma": 0.8095147611062078,
+      "z_clip": 4.0
+    },
+    "EQ05": {
+      "alpha_id": "EQ05",
+      "beta": 1.027850894912352e-06,
+      "beta_fit": 1.027850894912352e-06,
+      "conf_scale": 2.0,
+      "features": [
+        "queue_depletion_rate_bid_w1s_v1",
+        "queue_depletion_rate_ask_w1s_v1",
+        "queue_replenish_rate_bid_w1s_v1",
+        "queue_replenish_rate_ask_w1s_v1"
+      ],
+      "fitted": true,
+      "horizon": "1s",
+      "hypothesis_confirmed": true,
+      "model": "linear_z_v1",
+      "mu": 0.0030748393277607905,
+      "n_train": 77857,
+      "sigma": 0.6622743815170242,
+      "z_clip": 4.0
+    },
+    "EQ06": {
+      "alpha_id": "EQ06",
+      "beta": 7.00699382606713e-06,
+      "beta_fit": 7.00699382606713e-06,
+      "conf_scale": 2.0,
+      "features": [
+        "ret_vol_adj_10s_v1"
+      ],
+      "fitted": true,
+      "horizon": "10s",
+      "hypothesis_confirmed": true,
+      "model": "linear_z_v1",
+      "mu": 0.03597265482343416,
+      "n_train": 77432,
+      "sigma": 3.4160853453189435,
+      "z_clip": 4.0
+    },
+    "EQ07": {
+      "alpha_id": "EQ07",
+      "beta": -3.0741197825519736e-06,
+      "beta_fit": -3.0741197825519736e-06,
+      "conf_scale": 2.0,
+      "features": [
+        "ret_vol_adj_1s_v1"
+      ],
+      "fitted": true,
+      "horizon": "10s",
+      "hypothesis_confirmed": false,
+      "model": "linear_z_v1",
+      "mu": -0.008057363984993304,
+      "n_train": 77432,
+      "sigma": 1.40716162747592,
+      "z_clip": 4.0
+    },
+    "EQ08": {
+      "alpha_id": "EQ08",
+      "beta": -8.436324626903814e-06,
+      "beta_fit": -8.436324626903814e-06,
+      "conf_scale": 2.0,
+      "features": [
+        "mid_price_v1",
+        "traded_volume_w10s_v1"
+      ],
+      "fitted": true,
+      "horizon": "10s",
+      "hypothesis_confirmed": false,
+      "model": "linear_z_v1",
+      "mu": 0.2694343695980405,
+      "n_train": 77775,
+      "sigma": 5.071444715376117,
+      "z_clip": 4.0
+    },
+    "EQ09": {
+      "alpha_id": "EQ09",
+      "beta": -5.684469893955674e-06,
+      "beta_fit": -5.684469893955674e-06,
+      "conf_scale": 2.0,
+      "features": [
+        "ret_resid_10s_v1"
+      ],
+      "fitted": true,
+      "horizon": "10s",
+      "hypothesis_confirmed": false,
+      "model": "linear_z_v1",
+      "mu": 2.895587388247623e-06,
+      "n_train": 47235,
+      "sigma": 0.0002275550483645598,
+      "z_clip": 4.0
+    },
+    "EQ10": {
+      "alpha_id": "EQ10",
+      "beta": -3.6522207576424923e-07,
+      "beta_fit": -3.6522207576424923e-07,
+      "conf_scale": 2.0,
+      "features": [
+        "ref_ret_1s_v1"
+      ],
+      "fitted": true,
+      "horizon": "1s",
+      "hypothesis_confirmed": false,
+      "model": "linear_z_v1",
+      "mu": -3.89560847955798e-08,
+      "n_train": 70781,
+      "sigma": 5.599752775471277e-06,
+      "z_clip": 4.0
+    },
+    "EQ11": {
+      "alpha_id": "EQ11",
+      "beta": -6.460835409461466e-05,
+      "beta_fit": -6.460835409461466e-05,
+      "conf_scale": 2.0,
+      "features": [
+        "ret_log_1m_v1"
+      ],
+      "fitted": true,
+      "horizon": "15m",
+      "hypothesis_confirmed": false,
+      "model": "linear_z_v1",
+      "mu": 0.0022970398705487063,
+      "n_train": 70254,
+      "sigma": 1.001052890340401,
+      "z_clip": 4.0
+    },
+    "EQ12": {
+      "alpha_id": "EQ12",
+      "beta": 4.386985298229266e-06,
+      "beta_fit": 4.386985298229266e-06,
+      "conf_scale": 2.0,
+      "features": [
+        "ofi_norm_l1_w1s_v1",
+        "liq_regime_ratio_v1"
+      ],
+      "fitted": true,
+      "horizon": "5s",
+      "hypothesis_confirmed": true,
+      "model": "linear_z_v1",
+      "mu": -0.0016337823992369032,
+      "n_train": 77431,
+      "sigma": 0.3153737503358417,
+      "z_clip": 4.0
+    },
+    "FX01": {
+      "alpha_id": "FX01",
+      "beta": 3.662039175535756e-08,
+      "beta_fit": 3.662039175535756e-08,
+      "conf_scale": 2.0,
+      "features": [
+        "micro_mid_dev_bps_v1"
+      ],
+      "fitted": true,
+      "horizon": "500ms",
+      "hypothesis_confirmed": true,
+      "model": "linear_z_v1",
+      "mu": 0.00217860673633946,
+      "n_train": 26254,
+      "sigma": 0.09416347034818112,
+      "z_clip": 4.0
+    },
+    "FX02": {
+      "alpha_id": "FX02",
+      "beta": -3.395580363717923e-07,
+      "beta_fit": -3.395580363717923e-07,
+      "conf_scale": 2.0,
+      "features": [
+        "trade_imbalance_w1m_v1"
+      ],
+      "fitted": true,
+      "horizon": "1m",
+      "hypothesis_confirmed": false,
+      "model": "linear_z_v1",
+      "mu": -0.004450275196331971,
+      "n_train": 9524,
+      "sigma": 0.9578101950791438,
+      "z_clip": 4.0
+    },
+    "FX03": {
+      "alpha_id": "FX03",
+      "beta": -3.575897867689408e-07,
+      "beta_fit": -3.575897867689408e-07,
+      "conf_scale": 2.0,
+      "features": [
+        "ofi_norm_l1_w30s_v1",
+        "ofi_norm_l5_w30s_v1"
+      ],
+      "fitted": true,
+      "horizon": "1m",
+      "hypothesis_confirmed": false,
+      "model": "linear_z_v1",
+      "mu": -0.029458129024415237,
+      "n_train": 24126,
+      "sigma": 0.4600070103675951,
+      "z_clip": 4.0
+    },
+    "FX04": {
+      "alpha_id": "FX04",
+      "beta": 1.929510129479924e-07,
+      "beta_fit": 1.929510129479924e-07,
+      "conf_scale": 2.0,
+      "features": [
+        "imbalance_l1_v1",
+        "venue_imbalance_divergence_v1"
+      ],
+      "fitted": true,
+      "horizon": "30s",
+      "hypothesis_confirmed": true,
+      "model": "linear_z_v1",
+      "mu": 0.0193884395083761,
+      "n_train": 26244,
+      "sigma": 0.4032422934348996,
+      "z_clip": 4.0
+    },
+    "FX05": {
+      "alpha_id": "FX05",
+      "beta": 5.489378277825488e-07,
+      "beta_fit": 5.489378277825488e-07,
+      "conf_scale": 2.0,
+      "features": [
+        "ret_log_1m_v1"
+      ],
+      "fitted": true,
+      "horizon": "5m",
+      "hypothesis_confirmed": true,
+      "model": "linear_z_v1",
+      "mu": 9.725439567807008e-08,
+      "n_train": 25980,
+      "sigma": 9.724824288595495e-06,
+      "z_clip": 4.0
+    },
+    "FX06": {
+      "alpha_id": "FX06",
+      "beta": 5.321210493041251e-07,
+      "beta_fit": 5.321210493041251e-07,
+      "conf_scale": 2.0,
+      "features": [
+        "ret_log_1m_v1"
+      ],
+      "fitted": true,
+      "horizon": "30s",
+      "hypothesis_confirmed": true,
+      "model": "linear_z_v1",
+      "mu": 4.675659164042555e-07,
+      "n_train": 26141,
+      "sigma": 1.9293677609047076e-05,
+      "z_clip": 4.0
+    },
+    "FX07": {
+      "alpha_id": "FX07",
+      "beta": -3.2460001253880287e-07,
+      "beta_fit": -3.2460001253880287e-07,
+      "conf_scale": 2.0,
+      "features": [
+        "ref_ret_30s_v1"
+      ],
+      "fitted": true,
+      "horizon": "1m",
+      "hypothesis_confirmed": false,
+      "model": "linear_z_v1",
+      "mu": 5.72408254531069e-07,
+      "n_train": 22927,
+      "sigma": 1.6809115201803434e-05,
+      "z_clip": 4.0
+    },
+    "FX08": {
+      "alpha_id": "FX08",
+      "beta": 3.3669327161336038e-06,
+      "beta_fit": 3.3669327161336038e-06,
+      "conf_scale": 2.0,
+      "features": [
+        "ret_vol_adj_1m_v1",
+        "liq_regime_flag_v1"
+      ],
+      "fitted": true,
+      "horizon": "1m",
+      "hypothesis_confirmed": true,
+      "model": "linear_z_v1",
+      "mu": 0.03580654674617754,
+      "n_train": 25936,
+      "sigma": 5.752844432087656,
+      "z_clip": 4.0
+    },
+    "FX09": {
+      "alpha_id": "FX09",
+      "beta": -3.973069967541952e-06,
+      "beta_fit": -3.973069967541952e-06,
+      "conf_scale": 2.0,
+      "features": [
+        "ret_vol_adj_10s_v1",
+        "vol_regime_ratio_v1"
+      ],
+      "fitted": true,
+      "horizon": "1m",
+      "hypothesis_confirmed": false,
+      "model": "linear_z_v1",
+      "mu": -0.02007012437674839,
+      "n_train": 26107,
+      "sigma": 4.983987872773303,
+      "z_clip": 4.0
+    },
+    "FX10": {
+      "alpha_id": "FX10",
+      "beta": 1.868506866802858e-06,
+      "beta_fit": 1.868506866802858e-06,
+      "conf_scale": 2.0,
+      "features": [
+        "ret_vol_adj_1m_v1",
+        "minute_of_day_v1"
+      ],
+      "fitted": true,
+      "horizon": "1m",
+      "hypothesis_confirmed": true,
+      "model": "linear_z_v1",
+      "mu": 0.06342929075580311,
+      "n_train": 26204,
+      "sigma": 3.239116672913238,
+      "z_clip": 4.0
+    },
+    "FX11": {
+      "alpha_id": "FX11",
+      "beta": 3.6190542343429484e-06,
+      "beta_fit": 3.6190542343429484e-06,
+      "conf_scale": 2.0,
+      "features": [
+        "vol_ratio_w10s_w1m_v1",
+        "ret_vol_adj_1m_v1"
+      ],
+      "fitted": true,
+      "horizon": "5m",
+      "hypothesis_confirmed": true,
+      "model": "linear_z_v1",
+      "mu": -0.11072164147932209,
+      "n_train": 26115,
+      "sigma": 6.327313016873727,
+      "z_clip": 4.0
+    },
+    "FX12": {
+      "alpha_id": "FX12",
+      "beta": 2.5933699189874254e-07,
+      "beta_fit": 2.5933699189874254e-07,
+      "conf_scale": 2.0,
+      "features": [
+        "imbalance_l1_v1",
+        "venue_update_hhi_w10s_v1"
+      ],
+      "fitted": true,
+      "horizon": "1m",
+      "hypothesis_confirmed": true,
+      "model": "linear_z_v1",
+      "mu": 0.003670447379969561,
+      "n_train": 26227,
+      "sigma": 0.10646885230027606,
+      "z_clip": 4.0
+    }
+  },
+  "x-version": 1
+}

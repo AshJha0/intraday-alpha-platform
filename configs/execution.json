@@ -1,0 +1,47 @@
+{
+  "x-version": 1,
+  "description": "Execution/SOR defaults skeleton; execution wave extends.",
+  "defaults": {
+    "algo": "TWAP",
+    "max_child_qty": 1000,
+    "max_participation": 0.05,
+    "min_slice_interval_ns": 500000000,
+    "latency_budget_ns": 2000000,
+    "seed": 20260829
+  },
+  "algos": {
+    "TWAP": {
+      "slices": 20
+    },
+    "VWAP": {
+      "volume_curve": "time_of_day_default"
+    },
+    "POV": {
+      "target_participation": 0.05
+    },
+    "IS": {
+      "risk_aversion": 1.0
+    }
+  },
+  "cost_model": {
+    "description": "Research-backtester cost model (iap.backtest.costs): cost = half_spread + fee + impact; impact_bps = impact_coeff_bps_per_pct_adv * (|child_qty| / adv * 100). Fees mirror configs/venues.json primary venues (XV1 equities taker, PRI FX).",
+    "impact_coeff_bps_per_pct_adv": 2.0,
+    "equity_taker_fee_per_share": 0.003,
+    "fx_commission_per_million": 2.5,
+    "cost_multipliers_stress": [0.5, 1.0, 2.0],
+    "latency_shift_events_stress": [0, 1, 5]
+  },
+  "sor": {
+    "eq_venues": [
+      "XV1",
+      "XV2"
+    ],
+    "fx_venues": [
+      "PRI",
+      "LP1",
+      "LP2"
+    ],
+    "prefer_rebate": true,
+    "max_venue_latency_ns": 1000000
+  }
+}

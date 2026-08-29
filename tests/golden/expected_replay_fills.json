@@ -1,0 +1,20 @@
+{
+  "x-version": 1,
+  "description": "Execution-replay golden fills: events_eq_mbo.jsonl (instrument 1, venue XV1, tick 0.01) worked by parent 1 = VWAP BUY 400 over [t0+60s, t0+660s) in 4 passive LIMIT slices joining the best bid, and parent 2 = IS SELL 600 over [t0+120s, t0+720s) in 3 front-loaded MARKET slices (risk_aversion 1.0). Pinned rules: cpp/include/iap/execution/execution.hpp and algos.hpp (C++ port is the reference). Latency decision/risk/wire 50000/50000/100000 ns + venue mean 150000 ns + SplitMix64(seed).below(jitter+1) per submission. ticks/qty/ts exact; fee/impact_cost at 1e-9.",
+  "seed": 20260829,
+  "t0": 1787578200000000000,
+  "events_processed": 2000,
+  "fills": [
+    {"fill_id": 1, "order_id": 2, "parent_id": 2, "instrument_id": 1, "venue_id": 1, "side": 1, "price_ticks": 2451, "qty": 304, "ts": 1787578329586302498, "liquidity": "TAKER", "fee": 0.91200000000000003, "impact_cost": 0.0011921664000000001},
+    {"fill_id": 2, "order_id": 1, "parent_id": 1, "instrument_id": 1, "venue_id": 1, "side": 0, "price_ticks": 2449, "qty": 129, "ts": 1787578386181246977, "liquidity": "MAKER", "fee": -0.25800000000000001, "impact_cost": 0},
+    {"fill_id": 3, "order_id": 4, "parent_id": 2, "instrument_id": 1, "venue_id": 1, "side": 1, "price_ticks": 2451, "qty": 184, "ts": 1787578525151937018, "liquidity": "TAKER", "fee": 0.55200000000000005, "impact_cost": 0.00043674240000000003},
+    {"fill_id": 4, "order_id": 5, "parent_id": 1, "instrument_id": 1, "venue_id": 1, "side": 0, "price_ticks": 2451, "qty": 71, "ts": 1787578587462039064, "liquidity": "MAKER", "fee": -0.14200000000000002, "impact_cost": 0},
+    {"fill_id": 5, "order_id": 7, "parent_id": 2, "instrument_id": 1, "venue_id": 1, "side": 1, "price_ticks": 2450, "qty": 112, "ts": 1787578721553511454, "liquidity": "TAKER", "fee": 0.33600000000000002, "impact_cost": 0.00016175157894736844},
+    {"fill_id": 6, "order_id": 6, "parent_id": 1, "instrument_id": 1, "venue_id": 1, "side": 0, "price_ticks": 2450, "qty": 129, "ts": 1787578742073893610, "liquidity": "MAKER", "fee": -0.25800000000000001, "impact_cost": 0},
+    {"fill_id": 7, "order_id": 3, "parent_id": 1, "instrument_id": 1, "venue_id": 1, "side": 0, "price_ticks": 2448, "qty": 71, "ts": 1787579149619789349, "liquidity": "MAKER", "fee": -0.14200000000000002, "impact_cost": 0}
+  ],
+  "parents": {
+    "1": {"filled_qty": 400, "unfilled_qty": 0, "children": 4, "notional": 9798, "avg_price": 24.495000000000001, "fees": 0, "rebates": 0.80000000000000004, "impact": 0, "total_cost": -0.80000000000000004},
+    "2": {"filled_qty": 600, "unfilled_qty": 0, "children": 3, "notional": 14704.880000000001, "avg_price": 24.508133333333333, "fees": 1.8, "rebates": 0, "impact": 0.0017906603789473686, "total_cost": 1.8017906603789473}
+  }
+}

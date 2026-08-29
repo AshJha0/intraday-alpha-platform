@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iap.example/schemas/execution_report.schema.json",
+  "title": "ExecutionReport",
+  "description": "Venue execution report (spec section 6). status: NEW=1 PARTIAL=2 FILLED=3 CANCELED=4 REJECTED=5 EXPIRED=6.",
+  "x-version": 1,
+  "type": "object",
+  "properties": {
+    "order_id": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "execution_id": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "status": {
+      "type": "integer",
+      "enum": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ]
+    },
+    "filled_qty": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807
+    },
+    "fill_price_ticks": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807
+    },
+    "venue_id": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 65535
+    },
+    "exchange_ts": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807
+    },
+    "receive_ts": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807
+    },
+    "fees": {
+      "type": "number",
+      "description": "Signed fees in currency (negative = rebate); research double, 1e-9 tol."
+    }
+  },
+  "required": [
+    "order_id",
+    "execution_id",
+    "status",
+    "filled_qty",
+    "fill_price_ticks",
+    "venue_id",
+    "exchange_ts",
+    "receive_ts",
+    "fees"
+  ],
+  "additionalProperties": false
+}

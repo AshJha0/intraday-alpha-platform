@@ -1,0 +1,838 @@
+{
+  "bonferroni_p_threshold": 4.084967320261438e-05,
+  "bonferroni_t_threshold": 4.102620641213317,
+  "description": "Multiple-testing ledger (spec \u00a713). Deterministic: no wall-clock; identical rerun => identical file.",
+  "entries": [
+    {
+      "alpha_id": "ALL",
+      "config": {
+        "alphas": 24,
+        "horizons_scanned": 9
+      },
+      "count": 216,
+      "kind": "design_horizon_scan",
+      "n": 216,
+      "result": {}
+    },
+    {
+      "alpha_id": "EQ01",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "1s",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 237,
+      "result": {
+        "nw_tstat": 3.8128806842235785,
+        "oos_ic": 0.01281844463919237,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "EQ02",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "5s",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 258,
+      "result": {
+        "nw_tstat": 3.0240732678491002,
+        "oos_ic": 0.015826935692860415,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "EQ03",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "5s",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 279,
+      "result": {
+        "nw_tstat": 3.668845419202838,
+        "oos_ic": 0.017962210379152806,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "EQ04",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "5s",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 300,
+      "result": {
+        "nw_tstat": -0.32307561672943724,
+        "oos_ic": 0.0006207883343421495,
+        "verdict": "REJECT"
+      }
+    },
+    {
+      "alpha_id": "EQ05",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "1s",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 321,
+      "result": {
+        "nw_tstat": 4.822842477551322,
+        "oos_ic": 0.0118893975485502,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "EQ06",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "10s",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 342,
+      "result": {
+        "nw_tstat": 9.874123873373723,
+        "oos_ic": 0.05564871862262222,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "EQ07",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "10s",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 363,
+      "result": {
+        "nw_tstat": 14.736382814071371,
+        "oos_ic": 0.05773812126291274,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "EQ08",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "10s",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 384,
+      "result": {
+        "nw_tstat": 10.816808196549763,
+        "oos_ic": 0.15759663555916875,
+        "verdict": "PROMOTE"
+      }
+    },
+    {
+      "alpha_id": "EQ09",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "10s",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 405,
+      "result": {
+        "nw_tstat": 5.530837786550274,
+        "oos_ic": 0.24533878008110369,
+        "verdict": "PROMOTE"
+      }
+    },
+    {
+      "alpha_id": "EQ10",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "1s",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 426,
+      "result": {
+        "nw_tstat": 0.25525219901133483,
+        "oos_ic": 0.0007897041170994118,
+        "verdict": "REJECT"
+      }
+    },
+    {
+      "alpha_id": "EQ11",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "15m",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 447,
+      "result": {
+        "nw_tstat": -0.01389881019833195,
+        "oos_ic": -0.038655679646502704,
+        "verdict": "REJECT"
+      }
+    },
+    {
+      "alpha_id": "EQ12",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "5s",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 468,
+      "result": {
+        "nw_tstat": 2.8668359571802404,
+        "oos_ic": 0.015498069895714863,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "FX01",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "500ms",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 489,
+      "result": {
+        "nw_tstat": -0.3042793192720331,
+        "oos_ic": -0.015003540363381146,
+        "verdict": "REJECT"
+      }
+    },
+    {
+      "alpha_id": "FX02",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "1m",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 510,
+      "result": {
+        "nw_tstat": -1.4488522102517623,
+        "oos_ic": -0.002626919362759751,
+        "verdict": "REJECT"
+      }
+    },
+    {
+      "alpha_id": "FX03",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "1m",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 531,
+      "result": {
+        "nw_tstat": 0.621758951096141,
+        "oos_ic": 0.005986392301240666,
+        "verdict": "REJECT"
+      }
+    },
+    {
+      "alpha_id": "FX04",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "30s",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 552,
+      "result": {
+        "nw_tstat": 1.7144658876666043,
+        "oos_ic": 0.007375945354878848,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "FX05",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "5m",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 573,
+      "result": {
+        "nw_tstat": -1.643586003160131,
+        "oos_ic": -0.0021381374570254613,
+        "verdict": "REJECT"
+      }
+    },
+    {
+      "alpha_id": "FX06",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "30s",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 594,
+      "result": {
+        "nw_tstat": 0.6049537021963882,
+        "oos_ic": 0.03782668448721306,
+        "verdict": "REJECT"
+      }
+    },
+    {
+      "alpha_id": "FX07",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "1m",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 615,
+      "result": {
+        "nw_tstat": 0.15962631139999853,
+        "oos_ic": -0.0003330142515930643,
+        "verdict": "REJECT"
+      }
+    },
+    {
+      "alpha_id": "FX08",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "1m",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 636,
+      "result": {
+        "nw_tstat": 10.091293488803164,
+        "oos_ic": 0.1038204418951184,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "FX09",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "1m",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 657,
+      "result": {
+        "nw_tstat": 14.327710596023197,
+        "oos_ic": 0.11314634504030202,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "FX10",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "1m",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 678,
+      "result": {
+        "nw_tstat": 3.4342082476043445,
+        "oos_ic": 0.05662635307002905,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "FX11",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "5m",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 699,
+      "result": {
+        "nw_tstat": 3.0516269168725234,
+        "oos_ic": 0.058015810203124345,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "FX12",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "1m",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 720,
+      "result": {
+        "nw_tstat": 0.08875258557148626,
+        "oos_ic": 0.00457507996594423,
+        "verdict": "REJECT"
+      }
+    },
+    {
+      "alpha_id": "EQ01",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "1s",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 741,
+      "result": {
+        "nw_tstat": 3.810495247382391,
+        "oos_ic": 0.021904892759058343,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "EQ02",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "5s",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 762,
+      "result": {
+        "nw_tstat": 5.888102509227305,
+        "oos_ic": 0.027427938201136728,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "EQ03",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "5s",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 783,
+      "result": {
+        "nw_tstat": 7.236059527203757,
+        "oos_ic": 0.025607341689565126,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "EQ04",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "5s",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 804,
+      "result": {
+        "nw_tstat": 0.6035787836787878,
+        "oos_ic": -7.980847888302226e-05,
+        "verdict": "REJECT"
+      }
+    },
+    {
+      "alpha_id": "EQ05",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "1s",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 825,
+      "result": {
+        "nw_tstat": 3.9649805557079,
+        "oos_ic": 0.011557576071576902,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "EQ06",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "10s",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 846,
+      "result": {
+        "nw_tstat": 1.8019889699617857,
+        "oos_ic": 0.03734768753250236,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "EQ07",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "10s",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 867,
+      "result": {
+        "nw_tstat": 1.266899089391123,
+        "oos_ic": 0.012227296007993946,
+        "verdict": "REJECT"
+      }
+    },
+    {
+      "alpha_id": "EQ08",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "10s",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 888,
+      "result": {
+        "nw_tstat": -0.13618642984815302,
+        "oos_ic": 0.01956840057636323,
+        "verdict": "REJECT"
+      }
+    },
+    {
+      "alpha_id": "EQ09",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "10s",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 909,
+      "result": {
+        "nw_tstat": 3.4143061157619186,
+        "oos_ic": 0.08439350233859892,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "EQ10",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "1s",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 930,
+      "result": {
+        "nw_tstat": 1.2804532344959865,
+        "oos_ic": 0.003636351105552351,
+        "verdict": "REJECT"
+      }
+    },
+    {
+      "alpha_id": "EQ11",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "15m",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 951,
+      "result": {
+        "nw_tstat": 0.059855761799482175,
+        "oos_ic": 0.016645584490125206,
+        "verdict": "REJECT"
+      }
+    },
+    {
+      "alpha_id": "EQ12",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "5s",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 972,
+      "result": {
+        "nw_tstat": 5.487118653279794,
+        "oos_ic": 0.026172634798850545,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "FX01",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "500ms",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 993,
+      "result": {
+        "nw_tstat": -0.3042793192720331,
+        "oos_ic": -0.015003540363381146,
+        "verdict": "REJECT"
+      }
+    },
+    {
+      "alpha_id": "FX02",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "1m",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 1014,
+      "result": {
+        "nw_tstat": -1.4488522102517623,
+        "oos_ic": -0.002626919362759751,
+        "verdict": "REJECT"
+      }
+    },
+    {
+      "alpha_id": "FX03",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "1m",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 1035,
+      "result": {
+        "nw_tstat": 0.621758951096141,
+        "oos_ic": 0.005986392301240666,
+        "verdict": "REJECT"
+      }
+    },
+    {
+      "alpha_id": "FX04",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "30s",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 1056,
+      "result": {
+        "nw_tstat": 1.7144658876666043,
+        "oos_ic": 0.007375945354878848,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "FX05",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "5m",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 1077,
+      "result": {
+        "nw_tstat": -1.643586003160131,
+        "oos_ic": -0.0021381374570254613,
+        "verdict": "REJECT"
+      }
+    },
+    {
+      "alpha_id": "FX06",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "30s",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 1098,
+      "result": {
+        "nw_tstat": 0.6049537021963882,
+        "oos_ic": 0.03782668448721306,
+        "verdict": "REJECT"
+      }
+    },
+    {
+      "alpha_id": "FX07",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "1m",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 1119,
+      "result": {
+        "nw_tstat": 0.15962631139999853,
+        "oos_ic": -0.0003330142515930643,
+        "verdict": "REJECT"
+      }
+    },
+    {
+      "alpha_id": "FX08",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "1m",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 1140,
+      "result": {
+        "nw_tstat": 10.091293488803183,
+        "oos_ic": 0.10382044189511845,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "FX09",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "1m",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 1161,
+      "result": {
+        "nw_tstat": 14.327710596023199,
+        "oos_ic": 0.11314634504030201,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "FX10",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "1m",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 1182,
+      "result": {
+        "nw_tstat": 3.4342082476043547,
+        "oos_ic": 0.056626353070029,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "FX11",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "5m",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 1203,
+      "result": {
+        "nw_tstat": 3.051626916872538,
+        "oos_ic": 0.05801581020312467,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "FX12",
+      "config": {
+        "embargo_s": 60,
+        "horizon": "1m",
+        "looks": 21,
+        "n_folds": 4
+      },
+      "count": 21,
+      "kind": "promotion_pipeline",
+      "n": 1224,
+      "result": {
+        "nw_tstat": 0.08875258557148626,
+        "oos_ic": 0.00457507996594423,
+        "verdict": "REJECT"
+      }
+    }
+  ],
+  "expected_max_null_t": 3.7709095621805284,
+  "pinned_alpha": 0.05,
+  "total_experiments": 1224,
+  "x-version": 1
+}

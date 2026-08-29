@@ -1,0 +1,23 @@
+flowchart LR
+    subgraph REF["Python reference (validated first)"]
+        MG["python/tools/make_golden.py<br/>make_golden_features.py<br/>make_golden_alpha.py"]
+        BF["independent brute-force checks<br/>naive book, brute-force features,<br/>SLSQP portfolio optimum"]
+        MG <--> BF
+    end
+    MG --> GV[("tests/golden/<br/>events_eq_mbo.jsonl (2,000 ev)<br/>events_fx_quote.jsonl (800 ev)<br/>+ splitmix64.json")]
+    MG --> EXP[("expected_*.json<br/>codec sha256 | book states | features<br/>alpha | backtest | risk decisions<br/>replay fills | portfolio | tca")]
+    CPPTOOL["cpp/tools/make_replay_fills_golden<br/>(C++ is the fills reference)"] --> EXP
+    GV --> PY["python: pytest -k golden<br/>45 tests"]
+    GV --> CPP["cpp: ctest -R Golden<br/>37 tests"]
+    GV --> RS["rust: 6 golden test targets<br/>36 tests"]
+    GV --> JV["java: *GoldenTest (JUnitCore)<br/>13 golden-group tests"]
+    EXP --> PY
+    EXP --> CPP
+    EXP --> RS
+    EXP --> JV
+    PY --> TAB["tests/harness/run_all.sh<br/>cross-language parity table<br/>exit 0 iff all four PASS"]
+    CPP --> TAB
+    RS --> TAB
+    JV --> TAB
+    TOL["Tolerance policy (conventions §5):<br/>IAP1 encoding — byte-identical SHA-256<br/>integer state (ticks/sizes/counts/seq) — EXACT<br/>floats (features/alpha/portfolio/tca) — abs 1e-9 + rel 1e-9"] -.-> EXP
+    MIG["regeneration: deliberate only,<br/>+ schemas/MIGRATIONS.md entry"] -.-> MG

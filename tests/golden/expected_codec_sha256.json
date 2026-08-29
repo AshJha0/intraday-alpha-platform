@@ -1,0 +1,5 @@
+{
+  "description": "SHA-256 of the IAP1 encoding (schemas/FORMAT.md) of each golden vector. Every language must encode to these exact bytes.",
+  "events_eq_mbo.iap1": "c4768ce37d70f23536046134742cb427240313c58c44b586c35472cff0bfd284",
+  "events_fx_quote.iap1": "599e4f228c3a02e6b426a9a1aaf1ee0f235da23873528c1e0d8a8cc31f334d05"
+}

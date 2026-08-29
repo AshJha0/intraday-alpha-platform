@@ -1,0 +1,138 @@
+{
+  "x-version": 1,
+  "description": "Pinned parent-order fill sets with expected Perold implementation-shortfall decompositions (iap.tca.tca.perold_decomposition). delay + trading + opportunity == total_is exactly; all values must match to 1e-9. Formulas in API_PORTFOLIO_TCA.md.",
+  "tolerance": 1e-09,
+  "cases": [
+    {
+      "inputs": {
+        "name": "buy_full_fill",
+        "side_sign": 1,
+        "qty_target": 2000,
+        "fills": [
+          [
+            100.06,
+            500
+          ],
+          [
+            100.1,
+            500
+          ],
+          [
+            100.02,
+            600
+          ],
+          [
+            100.12,
+            400
+          ]
+        ],
+        "decision_mid": 100.0,
+        "arrival_mid": 100.03,
+        "end_mid": 100.15
+      },
+      "expected": {
+        "qty_target": 2000.0,
+        "qty_filled": 2000.0,
+        "fill_rate": 1.0,
+        "delay_cost": 60.000000000002274,
+        "trading_cost": 79.99999999999545,
+        "opportunity_cost": 0.0,
+        "total_is": 139.99999999999773,
+        "delay_bps": 3.0000000000001137,
+        "trading_bps": 3.9999999999997726,
+        "opportunity_bps": 0.0,
+        "total_is_bps": 6.999999999999886
+      }
+    },
+    {
+      "inputs": {
+        "name": "sell_partial_fill",
+        "side_sign": -1,
+        "qty_target": 1500,
+        "fills": [
+          [
+            99.97,
+            400
+          ],
+          [
+            99.95,
+            400
+          ]
+        ],
+        "decision_mid": 100.02,
+        "arrival_mid": 100.0,
+        "end_mid": 99.9
+      },
+      "expected": {
+        "qty_target": 1500.0,
+        "qty_filled": 800.0,
+        "fill_rate": 0.5333333333333333,
+        "delay_cost": 15.999999999996817,
+        "trading_cost": 31.999999999999318,
+        "opportunity_cost": 83.99999999999324,
+        "total_is": 131.99999999998937,
+        "delay_bps": 1.0664533759912562,
+        "trading_bps": 2.1329067519828913,
+        "opportunity_bps": 5.598880223954758,
+        "total_is_bps": 8.798240351928905
+      }
+    },
+    {
+      "inputs": {
+        "name": "buy_unfilled",
+        "side_sign": 1,
+        "qty_target": 1000,
+        "fills": [],
+        "decision_mid": 50.0,
+        "arrival_mid": 50.01,
+        "end_mid": 50.2
+      },
+      "expected": {
+        "qty_target": 1000.0,
+        "qty_filled": 0.0,
+        "fill_rate": 0.0,
+        "delay_cost": 0.0,
+        "trading_cost": 0.0,
+        "opportunity_cost": 200.00000000000284,
+        "total_is": 200.00000000000284,
+        "delay_bps": 0.0,
+        "trading_bps": 0.0,
+        "opportunity_bps": 40.00000000000057,
+        "total_is_bps": 40.00000000000057
+      }
+    },
+    {
+      "inputs": {
+        "name": "fx_sell_full",
+        "side_sign": -1,
+        "qty_target": 5000,
+        "fills": [
+          [
+            1.08645,
+            2500
+          ],
+          [
+            1.0864,
+            2500
+          ]
+        ],
+        "decision_mid": 1.08655,
+        "arrival_mid": 1.08652,
+        "end_mid": 1.0863
+      },
+      "expected": {
+        "qty_target": 5000.0,
+        "qty_filled": 5000.0,
+        "fill_rate": 1.0,
+        "delay_cost": 0.14999999999987246,
+        "trading_cost": 0.47499999999978115,
+        "opportunity_cost": 0.0,
+        "total_is": 0.6249999999996536,
+        "delay_bps": 0.27610326261998525,
+        "trading_bps": 0.8743269982969606,
+        "opportunity_bps": 0.0,
+        "total_is_bps": 1.1504302609169457
+      }
+    }
+  ]
+}

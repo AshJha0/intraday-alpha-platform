@@ -1,0 +1,22 @@
+flowchart TD
+    subgraph GEN["Synthetic venues — seeded generator (SplitMix64, seed 20260829)"]
+        V1["Equity MBO streams<br/>11 instruments @ venue XV1<br/>regimes, self-exciting flow, halt, auctions"]
+        V2["FX QUOTE+TRADE streams<br/>8 G10 pairs @ LP1/LP2/PRI<br/>venue latency profiles"]
+    end
+    V1 --> RAW["data/raw/*.jsonl<br/>immutable raw feed files"]
+    V2 --> RAW
+    RAW --> NORM["Normalization + sequence validation<br/>python iap.marketdata.normalize<br/>gaps / dups / out-of-order / invalid counted -> qc_report.json"]
+    NORM --> CANON["Canonical event stream<br/>JSONL + IAP1 binary (72-byte LE records)<br/>+ Parquet research dataset — schemas x-version 1"]
+    CANON --> BOOK["Order-book reconstruction<br/>Python ref / C++ / Rust / Java<br/>MBO FIFO, marketable ADDs, dup-drop, gap->stale, SNAPSHOT recovery"]
+    BOOK --> FEAT["Feature engine<br/>205-feature registry (hash = feature_version)<br/>native 40 in C++/Rust/Java — validity bitset, NaN never valid"]
+    FEAT --> LBL["Event-time labels (Python-owned)<br/>11 horizons, mid-to-mid + cost-adjusted<br/>at-or-before rule, no lookahead"]
+    FEAT --> ALPHA["Alpha ensemble<br/>24 flagship alphas (EQ01-FX12)<br/>linear_z_v1 scoring; 6 golden alphas ported"]
+    ALPHA --> PORT["Portfolio construction<br/>PGD + prox, 7 constraint families, EWMA cov<br/>Python reference, Java production service"]
+    PORT --> RISK["Hard risk engine — FAIL-CLOSED<br/>Rust reference, Java orchestration<br/>limits, throttles, gap/stale gates, kill switches"]
+    RISK --> EXEC["Execution algos + event-driven simulator<br/>VWAP / TWAP / POV / IS; deterministic queue model<br/>C++ reference, Java port"]
+    EXEC --> SOR["SOR / venue adapters<br/>cpp/sor, rust venue protocol + sim"]
+    SOR --> FILLS["Executions (fills, fees, rebates, impact)"]
+    FILLS --> TCA["TCA + attribution<br/>Perold IS = delay + trading + opportunity (exact)<br/>Python reference, Java service"]
+    LBL --> RESEARCH
+    TCA --> RESEARCH["Research feedback / alpha factory<br/>REPORT.md, ML_REPORT.md, experiments ledger,<br/>model manifests, promotion gates"]
+    RESEARCH -. "promotion gates (spec §20)<br/>PROMOTE / ITERATE / REJECT" .-> ALPHA

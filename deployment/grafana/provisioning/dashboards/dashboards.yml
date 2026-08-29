@@ -1,0 +1,16 @@
+# Grafana dashboard provisioning — loads the two IAP dashboards from disk
+# (mounted from deployment/grafana/dashboards in docker-compose / the
+# iap-grafana-dashboards ConfigMap in k8s).
+apiVersion: 1
+
+providers:
+  - name: intraday-alpha-platform
+    orgId: 1
+    folder: Intraday Alpha
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

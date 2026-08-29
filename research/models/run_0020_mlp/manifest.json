@@ -1,0 +1,36 @@
+{
+  "data_version": "9ac066590d3104abff5a23d653cf15f5969d2193520c1e7892d5d680c738f2a6",
+  "experiment_id": "run_0020_mlp",
+  "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
+  "git_commit": "unversioned-workspace",
+  "hardware": {
+    "cpu_count": 2,
+    "cpu_model": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "machine": "x86_64",
+    "python": "3.11.15",
+    "system": "Linux"
+  },
+  "hyperparams": {
+    "activation": "relu",
+    "batch_size": 4096,
+    "early_stopping": false,
+    "hidden_layer_sizes": [
+      32,
+      16
+    ],
+    "learning_rate_init": 0.001,
+    "max_iter": 60,
+    "n_iter_no_change": 60,
+    "random_state": 7,
+    "solver": "adam"
+  },
+  "model_version": "mlp_v1",
+  "test_window": {
+    "end_ts": 1787691459285005656,
+    "start_ts": 1787659155580849480
+  },
+  "train_window": {
+    "end_ts": 1787659076592875059,
+    "start_ts": 1787529602028520532
+  }
+}
