@@ -1,0 +1,348 @@
+{
+  "alpha_id": "FX09",
+  "deploy_start": 1787538602028520532,
+  "horizon": "1m",
+  "ic_baseline": {
+    "alpha_id": "FX09",
+    "bucket_ns": 300000000000,
+    "horizon": "1m",
+    "ic_mean": 0.14849660500671077,
+    "ic_std": 0.10292274531367337,
+    "kind": "ic",
+    "n_buckets_baseline": 29,
+    "name": "run_fx09_ic",
+    "source": "warmup window [1787529602028520532, 1787538602028520532) of the bundled feature frames, universe [101, 102, 103, 104, 105, 106, 107, 108]",
+    "x-version": 1
+  },
+  "n_blocks": 169,
+  "policies": {
+    "drift_triggered": {
+      "deployed_ic": 0.12115098506362777,
+      "drift_event_count": 1,
+      "final_state": "ACTIVE",
+      "gross_pnl": 91525.00000014174,
+      "lifecycle_transitions": [],
+      "n_evals": 169,
+      "n_ic_evals": 159,
+      "net_pnl": -2922814.6123998626,
+      "policy": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "refit_count": 25,
+      "refit_events": [
+        {
+          "block": 0,
+          "n_train": 3100,
+          "reasons": [
+            "initial deployment fit"
+          ],
+          "ts": 1787538602028520532
+        },
+        {
+          "block": 27,
+          "n_train": 11942,
+          "reasons": [
+            "ic_z=-2.1569 < threshold -2.0"
+          ],
+          "ts": 1787562902028520532
+        },
+        {
+          "block": 31,
+          "n_train": 13236,
+          "reasons": [
+            "ic_z=-3.8062 < threshold -2.0"
+          ],
+          "ts": 1787566502028520532
+        },
+        {
+          "block": 35,
+          "n_train": 14574,
+          "reasons": [
+            "ic_z=-4.2327 < threshold -2.0"
+          ],
+          "ts": 1787570102028520532
+        },
+        {
+          "block": 39,
+          "n_train": 15848,
+          "reasons": [
+            "ic_z=-4.0668 < threshold -2.0"
+          ],
+          "ts": 1787573702028520532
+        },
+        {
+          "block": 43,
+          "n_train": 17145,
+          "reasons": [
+            "ic_z=-2.6827 < threshold -2.0"
+          ],
+          "ts": 1787577302028520532
+        },
+        {
+          "block": 47,
+          "n_train": 18533,
+          "reasons": [
+            "ic_z=-2.2967 < threshold -2.0"
+          ],
+          "ts": 1787580902028520532
+        },
+        {
+          "block": 54,
+          "n_train": 20932,
+          "reasons": [
+            "ic_z=-2.5489 < threshold -2.0"
+          ],
+          "ts": 1787587202028520532
+        },
+        {
+          "block": 58,
+          "n_train": 22269,
+          "reasons": [
+            "ic_z=-2.0592 < threshold -2.0"
+          ],
+          "ts": 1787590802028520532
+        },
+        {
+          "block": 89,
+          "n_train": 26042,
+          "reasons": [
+            "ic_z=-2.3605 < threshold -2.0"
+          ],
+          "ts": 1787618702028520532
+        },
+        {
+          "block": 93,
+          "n_train": 26156,
+          "reasons": [
+            "ic_z=-2.6018 < threshold -2.0"
+          ],
+          "ts": 1787622302028520532
+        },
+        {
+          "block": 97,
+          "n_train": 26169,
+          "reasons": [
+            "ic_z=-4.0444 < threshold -2.0"
+          ],
+          "ts": 1787625902028520532
+        },
+        {
+          "block": 101,
+          "n_train": 26122,
+          "reasons": [
+            "ic_z=-3.7007 < threshold -2.0"
+          ],
+          "ts": 1787629502028520532
+        },
+        {
+          "block": 105,
+          "n_train": 26085,
+          "reasons": [
+            "ic_z=-3.2493 < threshold -2.0"
+          ],
+          "ts": 1787633102028520532
+        },
+        {
+          "block": 109,
+          "n_train": 26091,
+          "reasons": [
+            "ic_z=-3.5989 < threshold -2.0"
+          ],
+          "ts": 1787636702028520532
+        },
+        {
+          "block": 113,
+          "n_train": 26072,
+          "reasons": [
+            "ic_z=-2.2505 < threshold -2.0"
+          ],
+          "ts": 1787640302028520532
+        },
+        {
+          "block": 117,
+          "n_train": 26085,
+          "reasons": [
+            "ic_z=-3.1019 < threshold -2.0"
+          ],
+          "ts": 1787643902028520532
+        },
+        {
+          "block": 121,
+          "n_train": 26096,
+          "reasons": [
+            "ic_z=-3.7023 < threshold -2.0"
+          ],
+          "ts": 1787647502028520532
+        },
+        {
+          "block": 125,
+          "n_train": 26159,
+          "reasons": [
+            "ic_z=-3.0036 < threshold -2.0"
+          ],
+          "ts": 1787651102028520532
+        },
+        {
+          "block": 134,
+          "n_train": 26233,
+          "reasons": [
+            "ic_z=-2.4339 < threshold -2.0"
+          ],
+          "ts": 1787659202028520532
+        },
+        {
+          "block": 138,
+          "n_train": 26237,
+          "reasons": [
+            "ic_z=-2.1268 < threshold -2.0"
+          ],
+          "ts": 1787662802028520532
+        },
+        {
+          "block": 148,
+          "n_train": 25983,
+          "reasons": [
+            "ic_z=-2.5858 < threshold -2.0"
+          ],
+          "ts": 1787671802028520532
+        },
+        {
+          "block": 152,
+          "n_train": 25937,
+          "reasons": [
+            "psi[feature:vol_regime_ratio_v1]=0.250673 > threshold 0.25",
+            "ic_z=-2.9581 < threshold -2.0"
+          ],
+          "ts": 1787675402028520532
+        },
+        {
+          "block": 156,
+          "n_train": 25899,
+          "reasons": [
+            "ic_z=-2.8108 < threshold -2.0"
+          ],
+          "ts": 1787679002028520532
+        },
+        {
+          "block": 167,
+          "n_train": 26064,
+          "reasons": [
+            "ic_z=-2.0394 < threshold -2.0"
+          ],
+          "ts": 1787688902028520532
+        }
+      ],
+      "rolling_ic_mean": 0.10170052860295549,
+      "rolling_ic_std": 0.02661441707498946,
+      "total_costs": 3014339.6124000004,
+      "trade_count": 10063
+    },
+    "scheduled_daily": {
+      "deployed_ic": 0.12147281460247583,
+      "drift_event_count": 1,
+      "final_state": "ACTIVE",
+      "gross_pnl": 89675.00000010454,
+      "lifecycle_transitions": [],
+      "n_evals": 169,
+      "n_ic_evals": 159,
+      "net_pnl": -2901270.860849862,
+      "policy": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "refit_count": 2,
+      "refit_events": [
+        {
+          "block": 0,
+          "n_train": 3100,
+          "reasons": [
+            "initial deployment fit"
+          ],
+          "ts": 1787538602028520532
+        },
+        {
+          "block": 86,
+          "n_train": 26107,
+          "reasons": [
+            "scheduled: period boundary crossed (1787538602028520532 -> 1787616002028520532, period 86400000000000)"
+          ],
+          "ts": 1787616002028520532
+        }
+      ],
+      "rolling_ic_mean": 0.1016713999663418,
+      "rolling_ic_std": 0.026622115212076407,
+      "total_costs": 2990945.8608500008,
+      "trade_count": 9957
+    },
+    "scheduled_weekly": {
+      "deployed_ic": 0.1212147998979684,
+      "drift_event_count": 1,
+      "final_state": "ACTIVE",
+      "gross_pnl": 93165.00000010621,
+      "lifecycle_transitions": [],
+      "n_evals": 169,
+      "n_ic_evals": 159,
+      "net_pnl": -2874385.7161998325,
+      "policy": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "refit_count": 1,
+      "refit_events": [
+        {
+          "block": 0,
+          "n_train": 3100,
+          "reasons": [
+            "initial deployment fit"
+          ],
+          "ts": 1787538602028520532
+        }
+      ],
+      "rolling_ic_mean": 0.10166350478764155,
+      "rolling_ic_std": 0.026624026063280348,
+      "total_costs": 2967550.7162,
+      "trade_count": 9946
+    },
+    "static": {
+      "deployed_ic": 0.1212147998979684,
+      "drift_event_count": 1,
+      "final_state": "ACTIVE",
+      "gross_pnl": 93165.00000010621,
+      "lifecycle_transitions": [],
+      "n_evals": 169,
+      "n_ic_evals": 159,
+      "net_pnl": -2874385.7161998325,
+      "policy": {
+        "policy": "static"
+      },
+      "refit_count": 1,
+      "refit_events": [
+        {
+          "block": 0,
+          "n_train": 3100,
+          "reasons": [
+            "initial deployment fit"
+          ],
+          "ts": 1787538602028520532
+        }
+      ],
+      "rolling_ic_mean": 0.10166350478764155,
+      "rolling_ic_std": 0.026624026063280348,
+      "total_costs": 2967550.7162,
+      "trade_count": 9946
+    }
+  },
+  "universe": [
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    108
+  ]
+}

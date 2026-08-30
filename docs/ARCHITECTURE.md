@@ -47,6 +47,7 @@ repository:
 | Execution algos + event-driven simulator | — | `execution` (**reference**) | — | `execution` |
 | SOR / venue adapters | — | `sor` | `venue` crate (protocol codec + sim venue) | `sor` |
 | Research backtester | `backtest` (reference) | — | — | `backtest` |
+| Adaptability (drift / refit / lifecycle) | `adaptive` + `backtest.adaptive` (reference) | — | — | `adaptive` (live monitors) |
 | TCA | `tca` (reference + report) | — | — | `tca` (service) |
 | Event bus / threading | — | — | `eventbus` crate (SPSC ring) | — |
 | Telemetry / metrics | — | — | `telemetry` crate (sets the metric-name contract) | `monitoring` + `api` (MetricsServer) |
@@ -166,9 +167,9 @@ flowchart LR
         MG <--> BF
     end
     MG --> GV[("tests/golden/<br/>events_eq_mbo.jsonl (2,000 ev)<br/>events_fx_quote.jsonl (800 ev)<br/>+ splitmix64.json")]
-    MG --> EXP[("expected_*.json<br/>codec sha256 | book states | features<br/>alpha | backtest | risk decisions<br/>replay fills | portfolio | tca")]
+    MG --> EXP[("expected_*.json<br/>codec sha256 | book states | features<br/>alpha | backtest | risk decisions<br/>replay fills | portfolio | tca | adaptive")]
     CPPTOOL["cpp/tools/make_replay_fills_golden<br/>(C++ is the fills reference)"] --> EXP
-    GV --> PY["python: pytest -k golden<br/>45 tests"]
+    GV --> PY["python: pytest -k golden<br/>49 tests"]
     GV --> CPP["cpp: ctest -R Golden<br/>37 tests"]
     GV --> RS["rust: 6 golden test targets<br/>36 tests"]
     GV --> JV["java: *GoldenTest (JUnitCore)<br/>13 golden-group tests"]
@@ -190,8 +191,8 @@ execution reference) and the **risk golden from Rust** (the risk reference) —
 each domain's owning language pins the truth, and everyone else matches it.
 The harness (`tests/harness/run_all.sh`, with `run_golden.sh` as the
 golden-only alias) runs every suite with the canonical commands and prints
-the parity table; a full harness run passes 443/175/181/291 tests
-(45/37/36/13 golden) across python/cpp/rust/java.
+the parity table; a full harness run passes 489/175/181/315 tests
+(49/37/36/13 golden) across python/cpp/rust/java.
 
 ## 7. Hot-path engineering notes per language
 
@@ -247,19 +248,57 @@ histograms end `_ns` with fixed log2 buckets, gauges are bare nouns.
   (:8080) and `rust-telemetry` (file-based target list), plus recording
   rules and alerts (`recording.yml`, `alerts.yml`: SignalRateCollapse,
   FillRateDrop, LossLimitUtilizationHigh, KillSwitchEngaged, GcPauseHigh —
-  each with a runbook anchor in `docs/runbooks/`; LiveVsBacktestDrift and
-  QueueDepthHigh are explicitly marked PLACEHOLDER, since no producer emits
-  `alpha_live_vs_backtest_drift` or `eventbus_queue_depth` yet — see
+  each with a runbook anchor in `docs/runbooks/`; LiveVsBacktestDrift is
+  LIVE against the Java adaptability gauges (`com.iap.adaptive`, PSI > 0.25),
+  while QueueDepthHigh stays explicitly marked PLACEHOLDER, since no
+  producer emits `eventbus_queue_depth` yet — see
   `deployment/grafana/README.md`).
 - **Dashboards**: two provisioned Grafana dashboards — *Market Data &
   Latency* (events/sec, gaps/dups, decode/book/order-path p50/p99/p999, GC)
   and *Trading & Risk* (signal rate, fills, slippage, exposure and limit
-  utilization, P&L, drawdown, kill-switch status).
+  utilization, P&L, drawdown, kill-switch status, live-vs-backtest drift
+  PSI, rolling realized IC, alpha lifecycle state).
 - **What is watched** maps 1:1 to spec §25: market-data health (gap/dup
   counters exist because the normalizer and books count them anyway), alpha
   health (signal rate + live-vs-backtest drift), execution (order/fill/
   slippage), risk (utilization, rejections, kill switches), infrastructure
   (latency histograms, GC pauses).
+
+### 8.1 Adaptability layer (spec §20 steps 12-13)
+
+The monitoring loop is closed by the adaptability layer, contract-pinned
+in [/API_ADAPTIVE.md](../API_ADAPTIVE.md):
+
+- **Reference** (`python/src/iap/adaptive`): `drift.py` (the pinned PSI
+  formula + diagnostic two-sample KS), `refit.py` (static / scheduled /
+  drift-triggered refit policies as pure functions of event time and
+  monitor values), `lifecycle.py` (the IC-gated ACTIVE → WATCH → RETIRED
+  state machine with consecutive-breach hysteresis).
+  `iap.backtest.adaptive` replays a deployment: warmup fit + baseline
+  capture, block-wise evaluation, refits on trailing purged/embargoed
+  windows (no-lookahead asserted at runtime and shift-tested), retirement
+  forcing positions flat while shadow scoring continues.
+- **Serialized expectations**: research baselines (decile edges, expected
+  fractions, IC statistics) are written to `research/baselines/*.json` and
+  consumed unchanged by the live side — the studied numbers and the
+  monitored numbers are the same files.
+- **Live port** (`com.iap.adaptive`): BaselineLoader/Psi/DriftMonitor/
+  RollingIc/LifecycleGauge feed the three per-alpha gauges named above
+  (`alpha_live_vs_backtest_drift`, `alpha_rolling_ic`,
+  `alpha_lifecycle_state`) from inside `PaperTrading` — observational
+  only, never feeding back into an in-session trading decision, so
+  determinism is untouched.
+- **Parity**: `tests/golden/expected_adaptive.json` pins PSI/KS at 1e-10,
+  refit decisions as exact booleans and lifecycle sequences as exact
+  states (generated by `python/tools/make_golden_adaptive.py`,
+  brute-force validated first).
+- **Evidence**: the policy-comparison study lives in
+  `research/adaptive_reports/ADAPTIVE_REPORT.md` — reported honestly:
+  on two synthetic sessions no refit policy demonstrably beats static;
+  what is established is that the machinery is deterministic, leak-free
+  and behaves exactly as pinned, with every look counted in
+  `research/experiments.json` and every lifecycle transition logged to
+  `research/lifecycle_log.jsonl`.
 
 ## 9. Deployment topology
 

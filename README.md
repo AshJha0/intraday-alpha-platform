@@ -40,7 +40,8 @@ flow, and diagrams.
 | Registered features | **205** (10 families; 40-feature native core set ported to C++/Rust/Java) | `data/reference/feature_registry.json` |
 | Flagship alphas | **24** (EQ01–EQ12, FX01–FX12), each with an enforced `Economic rationale:` docstring | `python/src/iap/alpha/`, `research/alpha_reports/` |
 | Promotion verdicts | **0 PROMOTE / 12 ITERATE / 12 REJECT** | `research/alpha_reports/REPORT.md` |
-| Experiments ledger | 1,224 recorded looks; expected max \|t\| under the global null ≈ 3.77 | `research/experiments.json` |
+| Experiments ledger | 13,306 recorded looks (12,082 from the adaptive study); expected max \|t\| under the global null ≈ 4.36 | `research/experiments.json` |
+| Adaptive deployment study | 4 refit policies × 10 alphas; 113 drift-triggered refits; FX01 retired under every policy | `research/adaptive_reports/ADAPTIVE_REPORT.md` |
 | Bundled dataset | 2 synthetic sessions, 19 instruments, 310,159 normalized events | `data/normalized/qc_report.json` |
 | Feature emission | 208,437 vectors at 100 ms cadence | `data/features/features_summary.json` |
 | C++ hot path | IAP1 decode 3.5 ns/event; book update 17.4 ns; replay 37.1M events/s | `benchmarks/results_cpp.md` |
@@ -56,6 +57,23 @@ fitted sign contradicts their stated rationale. Statistically significant
 and cost-negative is the platform's central, truthfully reported finding
 (see [research paper 1](docs/papers/01_ofi_predictability_equities.md)).
 
+**Models decay, and the platform now treats that as a first-class
+concern.** The adaptability layer (`python/src/iap/adaptive` — the
+reference; `com.iap.adaptive` — the live Java port; contract in
+[API_ADAPTIVE.md](API_ADAPTIVE.md)) measures decay with PSI/KS drift
+monitors and a rolling realized-vs-research IC, refits models when drift
+crosses the pinned triggers, and moves decaying alphas through an
+IC-gated ACTIVE → WATCH → RETIRED lifecycle that verifiably halts
+allocation (FX01 finishes RETIRED under every policy). The comparison
+study ([ADAPTIVE_REPORT.md](research/adaptive_reports/ADAPTIVE_REPORT.md))
+is reported with the same honesty as the promotion report: on the bundled
+two synthetic sessions, **no refit policy demonstrably beats static** —
+weekly scheduling cannot even fire once, and the P&L differences between
+policies are one to two orders of magnitude smaller than the cost drag.
+What the study does establish is that the machinery is deterministic,
+leak-free, and behaves exactly as pinned; ranking the policies would take
+months of sessions, and the report says so in print.
+
 **All bundled market data is synthetic** (seeded generator,
 `python/src/iap/marketdata/generator.py`). Every research result is a
 statement about this dataset and pipeline, not about real markets.
@@ -69,6 +87,7 @@ intraday-alpha-platform/
   API_FEATURES.md           contract: feature engine (native 40 + registry 205)
   API_ALPHA.md              contract: the 6 golden production alphas
   API_PORTFOLIO_TCA.md      contract: portfolio optimizer + TCA (Java services)
+  API_ADAPTIVE.md           contract: drift monitors / refit policies / lifecycle
   LEARN.md                  textbook-style walkthrough of the whole platform
   COOKBOOK.md               task-oriented recipes (runnable commands)
   docs/                     SPECIFICATION.md, ARCHITECTURE.md, BUILD_NOTES.md,
@@ -86,7 +105,9 @@ intraday-alpha-platform/
   rust/                     cargo workspace (9 crates): marketdata, orderbook,
                             eventbus, features, alpha, risk, venue, replay, telemetry
   java/                     javac build: com.iap.* — full platform layer + paper trading
-  research/                 alpha_reports/, ml_reports/, tca/, models/, experiments.json
+  research/                 alpha_reports/, ml_reports/, adaptive_reports/,
+                            baselines/, tca/, models/, experiments.json,
+                            lifecycle_log.jsonl
   deployment/               docker/, k8s/, grafana/, prometheus/
 ```
 
@@ -114,6 +135,7 @@ tests/harness/run_all.sh              # add --golden-only for the fast parity ch
 cd python && PYTHONPATH=src python3 -m iap.features && cd ..     # ~1 min
 PYTHONPATH=python/src python3 research/alpha_reports/run_all.py  # 24-alpha promotion report
 PYTHONPATH=python/src python3 research/ml_reports/run_ml.py      # gated ML + meta-labeling
+PYTHONPATH=python/src python3 research/adaptive_reports/run_adaptive.py  # adaptive policy study
 cd python && PYTHONPATH=src python3 -m iap.tca && cd ..          # TCA report
 
 # 5. Paper trading (Java platform: book → features → alphas → portfolio →
@@ -128,19 +150,20 @@ java/paper.sh --mode realtime --speed 60   # paced session you can scrape
 ===================== cross-language parity table =====================
 language | tests passed | golden passed  | time   | status
 ---------+--------------+----------------+--------+-------
-python   | 443          | 45             |   33s | PASS
+python   | 489          | 49             |   39s | PASS
 cpp      | 175          | 37             |    1s | PASS
-rust     | 181          | 36             |    6s | PASS
-java     | 291          | 13             |    7s | PASS
+rust     | 181          | 36             |    1s | PASS
+java     | 315          | 13             |    8s | PASS
 =======================================================================
 >> PARITY OK — all languages passed (full suites).
 ```
 
 (Times above are from a warm build tree; a cold C++/Rust/Java build adds
 compile time. The `golden passed` column counts each language's golden-group
-tests: byte-exact IAP1 SHA-256 codec parity, exact-integer book states, and
-1e-9-tolerance feature/alpha/portfolio/TCA/risk/fill comparisons against
-`tests/golden/`.)
+tests: byte-exact IAP1 SHA-256 codec parity, exact-integer book states,
+1e-9-tolerance feature/alpha/portfolio/TCA/risk/fill comparisons, and the
+adaptability goldens — PSI/KS at 1e-10, exact refit-decision booleans and
+lifecycle state sequences — against `tests/golden/`.)
 
 Four independent implementations of one pinned semantics, held identical by
 golden tests — the engineering discipline this repo is built around
@@ -150,18 +173,19 @@ golden tests — the engineering discipline this repo is built around
 
 | document | what it covers |
 |---|---|
-| [LEARN.md](LEARN.md) | textbook walkthrough: microstructure, generator, book, features, honest alpha research, ML/meta-labeling, portfolio, risk, execution, TCA, parity, latency economics, pitfalls, interview Q&A |
-| [COOKBOOK.md](COOKBOOK.md) | 17 task-oriented recipes with runnable commands |
+| [LEARN.md](LEARN.md) | textbook walkthrough: microstructure, generator, book, features, honest alpha research, ML/meta-labeling, portfolio, risk, execution, TCA, parity, latency economics, adaptability (drift/refit/lifecycle), pitfalls, interview Q&A |
+| [COOKBOOK.md](COOKBOOK.md) | 19 task-oriented recipes with runnable commands |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | system design, per-language responsibilities, contracts, determinism, golden topology, hot-path notes, observability, deployment |
 | [docs/DIAGRAMS.md](docs/DIAGRAMS.md) | all six architecture diagrams on one page (pipeline, golden topology, paper trading, responsibility matrix, risk decision flow, queue-position model) |
 | [docs/index.html](docs/index.html) + [docs/GITHUB_PAGES.md](docs/GITHUB_PAGES.md) | the GitHub Pages landing site and how to publish it (Settings → Pages → main branch, /docs folder) |
 | [docs/SPECIFICATION.md](docs/SPECIFICATION.md) | the governing institutional specification (verbatim) |
 | [PLATFORM_CONVENTIONS.md](PLATFORM_CONVENTIONS.md) | binding conventions: types, serialization, determinism, book semantics, golden rules |
-| [API_CORE.md](API_CORE.md) / [API_FEATURES.md](API_FEATURES.md) / [API_ALPHA.md](API_ALPHA.md) / [API_PORTFOLIO_TCA.md](API_PORTFOLIO_TCA.md) | the four port contracts |
+| [API_CORE.md](API_CORE.md) / [API_FEATURES.md](API_FEATURES.md) / [API_ALPHA.md](API_ALPHA.md) / [API_PORTFOLIO_TCA.md](API_PORTFOLIO_TCA.md) / [API_ADAPTIVE.md](API_ADAPTIVE.md) | the five port contracts |
 | [docs/BUILD_NOTES.md](docs/BUILD_NOTES.md) | per-language build/test commands; the no-Maven rationale and pom-equivalent table |
 | [docs/papers/INDEX.md](docs/papers/INDEX.md) | six flagship research papers/case studies (spec §28) |
 | [research/alpha_reports/REPORT.md](research/alpha_reports/REPORT.md) | the honest 24-alpha promotion report |
 | [research/ml_reports/ML_REPORT.md](research/ml_reports/ML_REPORT.md) | gated model comparison + meta-labeling (incl. the crossed-book artifact story) |
+| [research/adaptive_reports/ADAPTIVE_REPORT.md](research/adaptive_reports/ADAPTIVE_REPORT.md) | the honest adaptive-deployment study: static vs scheduled vs drift-triggered refits, lifecycle retirements, and what two sessions cannot prove |
 | [research/tca/TCA_REPORT.md](research/tca/TCA_REPORT.md) | simulated parent-order TCA |
 | [benchmarks/RESULTS.md](benchmarks/RESULTS.md) | benchmark index; C++ table in [results_cpp.md](benchmarks/results_cpp.md) + methodology |
 | [docs/runbooks/](docs/runbooks/) | data pipeline, backtest, paper trading, kill-switch incident runbooks |

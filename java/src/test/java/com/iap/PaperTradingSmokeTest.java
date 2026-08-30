@@ -104,6 +104,7 @@ public class PaperTradingSmokeTest {
         for (String name : new String[] {"md_events_total",
                 "md_last_event_unixtime", "decode_latency_ns",
                 "book_update_latency_ns", "alpha_signals_total",
+                "alpha_rolling_ic", "alpha_lifecycle_state",
                 "risk_decisions_total", "risk_kill_switch_engaged",
                 "portfolio_gross_notional", "portfolio_net_notional",
                 "portfolio_drawdown", "jvm_gc_pause_ns"}) {
@@ -133,5 +134,92 @@ public class PaperTradingSmokeTest {
         } finally {
             server.stop();
         }
+    }
+
+    /** Deterministic EQ01 baseline dir (API_ADAPTIVE.md raw-values form). */
+    private static Path baselineDir() throws IOException {
+        Path dir = Files.createTempDirectory("iap-baselines");
+        StringBuilder sb = new StringBuilder(
+                "{\"alpha_id\":\"EQ01\",\"values\":[");
+        com.iap.core.SplitMix64 rng = new com.iap.core.SplitMix64(7L);
+        for (int i = 0; i < 512; i++) {
+            // roughly the live signal's scale (beta ~ 1.26e-6, |z| <= 4)
+            sb.append(i == 0 ? "" : ",").append(rng.normal() * 1.26e-6);
+        }
+        sb.append("]}");
+        Files.write(dir.resolve("signal_eq01.json"),
+                sb.toString().getBytes(StandardCharsets.UTF_8));
+        return dir;
+    }
+
+    @Test
+    public void adaptiveMetricsAreLiveInMetricsAndReport() throws IOException {
+        PaperTrading.Options opts = shortSession();
+        opts.baselinesDir = baselineDir();
+        PaperTrading.Result a = PaperTrading.run(opts);
+        PaperTrading.Result b = PaperTrading.run(opts);
+
+        // the three adaptability gauges are on /metrics with the alpha label
+        String text;
+        synchronized (a.metrics) {
+            text = a.metrics.toPrometheus();
+        }
+        for (String name : new String[] {"alpha_live_vs_backtest_drift",
+                "alpha_rolling_ic", "alpha_lifecycle_state"}) {
+            assertTrue("TYPE line for " + name,
+                    text.contains("# TYPE " + name + " gauge"));
+            assertTrue("labeled series for " + name,
+                    text.contains(name + "{alpha=\"EQ01\"} "));
+        }
+
+        // final values are real, deterministic, and mirrored in Result
+        assertTrue("PSI computed", !Double.isNaN(a.driftPsi));
+        assertTrue("PSI is non-negative", a.driftPsi >= 0.0);
+        assertTrue("rolling IC computed", !Double.isNaN(a.rollingIc));
+        assertTrue("IC is a correlation",
+                a.rollingIc >= -1.0 && a.rollingIc <= 1.0);
+        assertEquals(a.driftPsi, b.driftPsi, 0.0);
+        assertEquals(a.rollingIc, b.rollingIc, 0.0);
+        assertEquals(a.lifecycle, b.lifecycle);
+        assertEquals(a.driftPsi, a.metrics.gaugeValue(
+                "alpha_live_vs_backtest_drift{alpha=\"EQ01\"}"), 0.0);
+        assertEquals(a.rollingIc, a.metrics.gaugeValue(
+                "alpha_rolling_ic{alpha=\"EQ01\"}"), 0.0);
+        assertEquals((double) a.lifecycle.code(), a.metrics.gaugeValue(
+                "alpha_lifecycle_state{alpha=\"EQ01\"}"), 0.0);
+
+        // and in the session report's adaptive section
+        Map<String, Object> doc = Json.object(Json.parse(a.reportJson));
+        Map<String, Object> adaptive = Json.object(doc.get("adaptive"));
+        assertEquals(a.driftPsi, Json.asDouble(adaptive.get("drift_psi")),
+                0.0);
+        assertEquals(a.rollingIc, Json.asDouble(adaptive.get("rolling_ic")),
+                0.0);
+        assertEquals(a.lifecycle.name(), adaptive.get("lifecycle"));
+        assertEquals(a.lifecycle.code(),
+                Json.asLong(adaptive.get("lifecycle_code")));
+    }
+
+    @Test
+    public void missingBaselineDisarmsDriftButKeepsIcAndLifecycle()
+            throws IOException {
+        PaperTrading.Options opts = shortSession();
+        opts.maxEvents = 800;
+        opts.baselinesDir = Paths.get("no", "such", "baselines");
+        PaperTrading.Result res = PaperTrading.run(opts);
+        String text;
+        synchronized (res.metrics) {
+            text = res.metrics.toPrometheus();
+        }
+        assertTrue("no drift series without a baseline",
+                !text.contains("alpha_live_vs_backtest_drift"));
+        assertTrue(text.contains("alpha_rolling_ic{alpha=\"EQ01\"} "));
+        assertTrue(text.contains("alpha_lifecycle_state{alpha=\"EQ01\"} "));
+        assertTrue(Double.isNaN(res.driftPsi));
+        // report carries null for the unarmed statistic
+        Map<String, Object> adaptive = Json.object(Json.object(
+                Json.parse(res.reportJson)).get("adaptive"));
+        assertEquals(null, adaptive.get("drift_psi"));
+        assertTrue(!Double.isNaN(Json.asDouble(adaptive.get("rolling_ic"))));
     }
 }

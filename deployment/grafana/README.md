@@ -5,7 +5,7 @@ Two provisioned dashboards (spec §25):
 | Dashboard | File | Content |
 |---|---|---|
 | Market Data & Latency | `dashboards/market_data_latency.json` | events/sec, sequence gaps/dups/out-of-order, decode + book-update + order-path p50/p99/p999, venue ack p99, queue depth, GC pause |
-| Trading & Risk | `dashboards/trading_risk.json` | signal rate, order/fill flow, fill rate, slippage, exposure & limit utilization, P&L, drawdown, kill-switch status |
+| Trading & Risk | `dashboards/trading_risk.json` | signal rate, order/fill flow, fill rate, slippage, exposure & limit utilization, P&L, drawdown, kill-switch status, live-vs-backtest drift (PSI), rolling realized IC, alpha lifecycle |
 
 Provisioning (`provisioning/`) registers the Prometheus datasource
 (uid `prometheus`, URL `http://prometheus:9090`) and a file provider loading
@@ -28,8 +28,9 @@ on every producer — today that means rust/telemetry and Java's
   `histogram_quantile` returns the bucket's inclusive upper bound — a value
   **within one power of two above** the exact order statistic, conservative
   for latency. Exact benchmark numbers live in `benchmarks/RESULTS.md`.
-- No labels are emitted by either registry today; Prometheus attaches
-  `service`/`language` via scrape-config target labels.
+- The only labels emitted by the registries are the `alpha="..."` label on
+  the three Java adaptability gauges below; everything else is bare, and
+  Prometheus attaches `service`/`language` via scrape-config target labels.
 
 ### Live rust metrics (exist in rust source today)
 
@@ -74,6 +75,9 @@ metrics (verified against a running `/metrics` scrape and the sources):
 | `risk_realized_pnl` | gauge | realized PnL (LossLimitUtilizationHigh) |
 | `risk_kill_switch_engaged` | gauge | 0/1 latched kill state |
 | `jvm_gc_pause_ns` | histogram | GC pauses (GcPauseHigh at p99 > 10 ms; registered at first observed pause) |
+| `alpha_live_vs_backtest_drift{alpha=...}` | gauge | **LIVE** — Population Stability Index of the rolling live signal window (256 values, recomputed every 32 signals) vs the research baseline (`research/baselines/*.json`, pinned formula in `/API_ADAPTIVE.md` and `com.iap.adaptive.Psi`). Registered once the window fills against a loaded baseline; absent while no baseline ships for the alpha. LiveVsBacktestDrift warns at PSI > 0.25 — the standard industry PSI rule of thumb (< 0.1 stable, 0.1–0.25 moderate shift, > 0.25 significant shift; the credit-scoring population-stability convention) |
+| `alpha_rolling_ic{alpha=...}` | gauge | rolling realized IC: mean of per-bucket Pearson ICs (300 s event-time buckets, matured signal/forward-return pairs only, lookahead-free) over the pinned 2 h `ic_window_ns` from `configs/strategies.json`; NaN below `min_ic_buckets` (`com.iap.adaptive.RollingIc`, normative semantics in `/API_ADAPTIVE.md` §4) |
+| `alpha_lifecycle_state{alpha=...}` | gauge | 0 = ACTIVE, 1 = WATCH, 2 = RETIRED — IC-gated hysteresis per `configs/strategies.json` (`adaptive.lifecycle`): WATCH on rolling IC < `watch_ic_gate` (0.0); RETIRED after `retire_breach_evals` (6) consecutive breaches; re-activation after 3 consecutive evals ≥ `reactivate_ic_gate` (0.005), RETIRED only back to WATCH (`com.iap.adaptive.LifecycleGauge`, mirroring `/API_ADAPTIVE.md` §6) |
 
 Note there is **no fill counter on the Java endpoint** — fill metrics
 (`venue_fills_total` etc.) come from the rust venue sim.
@@ -88,7 +92,6 @@ them are explicitly marked PLACEHOLDER in the JSON/YAML and render
 |---|---|---|
 | `md_out_of_order_total` | counter | receive-time regressions (counted in qc_report.json, not yet exported) |
 | `eventbus_queue_depth` | gauge | producer/consumer backlog (rust eventbus has no exporter wired) |
-| `alpha_live_vs_backtest_drift` | gauge | KS-style [0,1] drift statistic (placeholder alert at 0.25) |
 | `exec_slippage_bps` | gauge | rolling slippage vs arrival, bps |
 | `tca_arrival_cost_bps` | gauge | rolling arrival cost, bps |
 

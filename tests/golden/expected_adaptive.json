@@ -1,0 +1,247 @@
+{
+  "description": "Adaptability-layer goldens (iap.adaptive; normative contract /API_ADAPTIVE.md). PSI/KS float tolerance 1e-10; trigger booleans and lifecycle states exact. Regenerate with python/tools/make_golden_adaptive.py (brute-force validated at 1e-12 before writing).",
+  "drift_trigger": {
+    "expected": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false
+    ],
+    "initial_last_fit_ns": 0,
+    "note": "stateful: a True decision sets last_fit_ns = now_ns",
+    "policy": {
+      "ic_z_threshold": -2.0,
+      "min_refit_gap_ns": 3600000000000,
+      "policy": "drift_triggered",
+      "psi_threshold": 0.25
+    },
+    "steps": [
+      {
+        "ic_z": null,
+        "now_ns": 900000000000,
+        "psi": {
+          "signal": 0.5
+        }
+      },
+      {
+        "ic_z": -5.0,
+        "now_ns": 1800000000000,
+        "psi": {}
+      },
+      {
+        "ic_z": -2.0,
+        "now_ns": 3600000000000,
+        "psi": {
+          "signal": 0.25
+        }
+      },
+      {
+        "ic_z": null,
+        "now_ns": 4500000000000,
+        "psi": {
+          "signal": 0.2500000001
+        }
+      },
+      {
+        "ic_z": -9.0,
+        "now_ns": 5400000000000,
+        "psi": {
+          "signal": 3.0
+        }
+      },
+      {
+        "ic_z": -1.99,
+        "now_ns": 8100000000000,
+        "psi": {
+          "signal": null
+        }
+      },
+      {
+        "ic_z": -2.0000001,
+        "now_ns": 9000000000000,
+        "psi": {
+          "signal": 0.1
+        }
+      },
+      {
+        "ic_z": 0.5,
+        "now_ns": 12600000000000,
+        "psi": {
+          "feature:x": 0.26,
+          "signal": 0.1
+        }
+      },
+      {
+        "ic_z": null,
+        "now_ns": 16200000000000,
+        "psi": {
+          "signal": 0.24
+        }
+      },
+      {
+        "ic_z": null,
+        "now_ns": 17100000000000,
+        "psi": {}
+      }
+    ]
+  },
+  "lifecycle": {
+    "config": {
+      "reactivate_evals": 3,
+      "reactivate_ic_gate": 0.005,
+      "retire_breach_evals": 6,
+      "watch_ic_gate": 0.0
+    },
+    "expected_states": [
+      "ACTIVE",
+      "WATCH",
+      "WATCH",
+      "WATCH",
+      "WATCH",
+      "WATCH",
+      "WATCH",
+      "WATCH",
+      "WATCH",
+      "WATCH",
+      "RETIRED",
+      "RETIRED",
+      "RETIRED",
+      "RETIRED",
+      "RETIRED",
+      "WATCH",
+      "WATCH",
+      "WATCH",
+      "ACTIVE",
+      "WATCH"
+    ],
+    "expected_transition_count": 5,
+    "expected_transitions": [
+      {
+        "eval_index": 2,
+        "from": "ACTIVE",
+        "to": "WATCH"
+      },
+      {
+        "eval_index": 11,
+        "from": "WATCH",
+        "to": "RETIRED"
+      },
+      {
+        "eval_index": 16,
+        "from": "RETIRED",
+        "to": "WATCH"
+      },
+      {
+        "eval_index": 19,
+        "from": "WATCH",
+        "to": "ACTIVE"
+      },
+      {
+        "eval_index": 20,
+        "from": "ACTIVE",
+        "to": "WATCH"
+      }
+    ],
+    "ic_path": [
+      0.02,
+      -0.01,
+      -0.02,
+      0.002,
+      -0.01,
+      -0.01,
+      -0.01,
+      null,
+      -0.01,
+      -0.01,
+      -0.001,
+      0.01,
+      0.004,
+      0.01,
+      0.02,
+      0.005,
+      0.005,
+      0.03,
+      0.06,
+      -0.01
+    ],
+    "ts_step_ns": 900000000000
+  },
+  "psi_ks": {
+    "baseline": {
+      "alpha_id": "",
+      "edges": [
+        0.09305864271544871,
+        0.18184642401074866,
+        0.29090833515269693,
+        0.39148350410331,
+        0.4864698661953184,
+        0.5867707967992718,
+        0.6961805653662343,
+        0.8014289161233373,
+        0.8945075776411697
+      ],
+      "expected_frac": [
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1
+      ],
+      "kind": "feature",
+      "max": 0.9999280254011335,
+      "mean": 0.4920651229247885,
+      "min": 0.00010111801542078691,
+      "n": 4000,
+      "n_buckets": 10,
+      "name": "golden_synthetic_uniform",
+      "psi_eps": 1e-06,
+      "source": "SplitMix64 seed 20260830, 4000 uniforms",
+      "std": 0.2914412499124531,
+      "x-version": 1
+    },
+    "cases": {
+      "same_dist": {
+        "ks_d": 0.026500000000000024,
+        "ks_p": 0.302504004277992,
+        "n": 2000,
+        "psi": 0.006620137698390184
+      },
+      "shifted": {
+        "ks_d": 0.26575,
+        "ks_p": 9.102168826041467e-83,
+        "n": 2000,
+        "psi": 2.400375350983907
+      }
+    },
+    "recipe": {
+      "baseline": "4000 x uniform()",
+      "rng": "SplitMix64, one continuous stream",
+      "same_dist": "2000 x uniform()",
+      "seed": 20260830,
+      "shifted": "2000 x (0.25 + 0.75*uniform())"
+    }
+  },
+  "signal_eq01": {
+    "baseline_file": "research/baselines/signal_eq01.json",
+    "n": 1935,
+    "psi_self": 0.0,
+    "second_half": {
+      "ks_d": 0.04636107373950926,
+      "ks_p": 0.12149150250116869,
+      "n": 968,
+      "psi": 0.013453605879311874
+    }
+  },
+  "x-version": 1
+}

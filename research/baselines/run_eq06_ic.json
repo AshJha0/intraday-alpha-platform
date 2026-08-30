@@ -1,0 +1,12 @@
+{
+  "alpha_id": "EQ06",
+  "bucket_ns": 300000000000,
+  "horizon": "10s",
+  "ic_mean": 0.0493274640181505,
+  "ic_std": 0.03817594596629235,
+  "kind": "ic",
+  "n_buckets_baseline": 30,
+  "name": "run_eq06_ic",
+  "source": "warmup window [1787578200000000000, 1787587200000000000) of the bundled feature frames, universe [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]",
+  "x-version": 1
+}

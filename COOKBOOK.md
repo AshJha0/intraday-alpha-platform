@@ -26,6 +26,8 @@ Contents:
 15. [Generate the TCA report](#15-generate-the-tca-report)
 16. [Add a NEW alpha (full walkthrough)](#16-add-a-new-alpha-full-walkthrough)
 17. [Add a new feature to the registry](#17-add-a-new-feature-to-the-registry)
+18. [Run the adaptive policy comparison (drift → refit → retire)](#18-run-the-adaptive-policy-comparison-drift--refit--retire)
+19. [Watch live drift in paper trading](#19-watch-live-drift-in-paper-trading)
 
 ---
 
@@ -369,7 +371,9 @@ curl -s localhost:8080/metrics | grep -E '_total|latency' | head -20
 # risk_rejected_total, portfolio gauges, latency histograms, GC metrics.
 # (Gap/duplicate counters appear once a gap/dup is actually seen — the golden
 # vector has none. There is NO fill counter on the Java endpoint; fill
-# metrics — venue_fills_total etc. — come from the rust venue sim.)
+# metrics — venue_fills_total etc. — come from the rust venue sim.
+# The live adaptability gauges — drift PSI, rolling IC, lifecycle state —
+# are scraped in recipe 19.)
 ```
 
 The port comes from `configs/execution.json` `monitoring.port` (default
@@ -405,8 +409,8 @@ tests/harness/run_all.sh --golden-only   # golden groups only (fast)
 ```
 
 Exit code 0 iff every language passed; logs land in a temp dir printed on
-the first line. A full-suite run: python 443 / cpp 175 /
-rust 181 / java 291 tests passed (golden groups 45/37/36/13), all PASS.
+the first line. A full-suite run: python 489 / cpp 175 /
+rust 181 / java 315 tests passed (golden groups 49/37/36/13), all PASS.
 
 ## 15. Generate the TCA report
 
@@ -521,3 +525,66 @@ for a production port), implement it in `cpp/src/features/`,
 `tests/harness/run_all.sh` — the feature golden groups in all four languages
 must agree at 1e-9. Otherwise it remains a Python research feature until its
 family is ported (API_FEATURES.md §1).
+
+## 18. Run the adaptive policy comparison (drift → refit → retire)
+
+Replay the bundled 2-session data as a deployment of 10 alphas (the 6
+golden alphas + the 4 best remaining by walk-forward OOS IC) under four
+refit policies — static, scheduled weekly, scheduled daily,
+drift-triggered — with PSI/rolling-IC drift monitoring and the pinned
+IC-gated lifecycle (`configs/strategies.json` `adaptive`):
+
+```bash
+PYTHONPATH=python/src python3 research/adaptive_reports/run_adaptive.py
+# alpha subset: ['EQ01', 'EQ03', 'EQ06', 'FX01', 'FX05', 'FX09', 'FX08', 'EQ09', 'FX11', 'FX10']
+# EQ01: static:rf=1,pnl=-62365 ... drift_triggered:rf=1,pnl=-62365 (2.7s)
+# ...
+# Done in 30s -> research/adaptive_reports/ADAPTIVE_REPORT.md
+```
+
+Takes ~30 s and writes `research/adaptive_reports/ADAPTIVE_REPORT.md`
+(the honest comparison + the FX10 false-positive case), per-alpha
+evidence JSONs alongside it, drift baselines to `research/baselines/`
+(the same files the Java live monitor consumes), every lifecycle
+transition to `research/lifecycle_log.jsonl`, and 6,041 counted looks per run (12,082 recorded across the two committed study runs)
+to `research/experiments.json`. Deterministic: a rerun reproduces every
+number except the runtime line — but note the experiments ledger is
+**append-only by design**, so reruns grow it (that is the multiple-testing
+discipline working, not a bug). Read the report's "READ THIS FIRST"
+section before quoting any policy ranking: on two synthetic sessions
+there isn't one. Contract: `/API_ADAPTIVE.md`; concepts: LEARN.md §14.
+
+## 19. Watch live drift in paper trading
+
+The Java platform ships the live half of the adaptability layer
+(`com.iap.adaptive`): it loads the research baselines from
+`research/baselines/` (override with `--baselines <dir>`) and exports
+three per-alpha gauges alongside the usual metrics. Run a paced session
+and scrape them:
+
+```bash
+java/paper.sh --mode realtime --speed 60 &
+sleep 25                # drift PSI appears once its 256-signal window fills;
+                        # rolling IC once >= 4 matured event-time buckets exist
+curl -s localhost:8080/health               # {"status":"ok"}
+curl -s localhost:8080/metrics | grep -E 'alpha_(live_vs_backtest_drift|rolling_ic|lifecycle_state)'
+# alpha_lifecycle_state{alpha="EQ01"} 0
+# alpha_live_vs_backtest_drift{alpha="EQ01"} 0.23972904275579857
+# alpha_rolling_ic{alpha="EQ01"} 0.22802197463720542
+```
+
+`alpha_live_vs_backtest_drift` is the pinned PSI (API_ADAPTIVE.md §2) of
+a rolling 256-value window of the live EQ01 signal (recomputed every 32
+confident signals) against `research/baselines/signal_eq01.json` — the
+Java-parity baseline; `alpha_rolling_ic` is the mean of event-time bucket
+ICs over the trailing window, matured (lookahead-free) rows only;
+`alpha_lifecycle_state` encodes 0 ACTIVE / 1 WATCH / 2 RETIRED, driven by
+the pinned IC hysteresis of `configs/strategies.json` `adaptive.lifecycle`.
+Early in the session the drift and IC gauges are absent rather than zero —
+until the PSI window fills, or with fewer than `min_ic_buckets` (4)
+buckets, the monitors report no value, which is itself pinned behavior
+(no data must never read as no drift). The `LiveVsBacktestDrift` alert
+(`deployment/prometheus/alerts.yml`) fires on PSI > 0.25, and the
+Trading & Risk Grafana dashboard plots all three. Monitoring is
+observational only — it never alters a trading decision mid-session, so
+the summary line stays bit-for-bit reproducible (recipe 12).

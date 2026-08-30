@@ -1,6 +1,39 @@
 {
   "x-version": 1,
-  "description": "Strategy registry skeleton; alpha waves extend. All disabled by default.",
+  "description": "Strategy registry skeleton; alpha waves extend. All disabled by default. The 'adaptive' block pins the adaptability layer (drift thresholds, refit policies, lifecycle gates) — see /API_ADAPTIVE.md.",
+  "adaptive": {
+    "x-version": 1,
+    "description": "Pinned adaptability parameters (iap.adaptive / iap.backtest.adaptive; normative contract /API_ADAPTIVE.md). All durations are event-time nanoseconds; no wall-clock anywhere.",
+    "block_ns": 900000000000,
+    "warmup_ns": 9000000000000,
+    "train_window_ns": 86400000000000,
+    "embargo_ns": 60000000000,
+    "monitor_window_ns": 3600000000000,
+    "ic_window_ns": 7200000000000,
+    "ic_bucket_ns": 300000000000,
+    "min_psi_samples": 200,
+    "min_ic_buckets": 4,
+    "policies": {
+      "static": {},
+      "scheduled_weekly": {
+        "period_ns": 604800000000000
+      },
+      "scheduled_daily": {
+        "period_ns": 86400000000000
+      },
+      "drift_triggered": {
+        "psi_threshold": 0.25,
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000
+      }
+    },
+    "lifecycle": {
+      "watch_ic_gate": 0.0,
+      "reactivate_ic_gate": 0.005,
+      "retire_breach_evals": 6,
+      "reactivate_evals": 3
+    }
+  },
   "defaults": {
     "enabled": false,
     "max_position_qty": 10000,

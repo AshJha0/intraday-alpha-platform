@@ -1,0 +1,12 @@
+{
+  "alpha_id": "FX01",
+  "bucket_ns": 300000000000,
+  "horizon": "500ms",
+  "ic_mean": -0.0020906950281603396,
+  "ic_std": 0.1326868325929774,
+  "kind": "ic",
+  "n_buckets_baseline": 21,
+  "name": "run_fx01_ic",
+  "source": "warmup window [1787529602028520532, 1787538602028520532) of the bundled feature frames, universe [101, 102, 103, 104, 105, 106, 107, 108]",
+  "x-version": 1
+}

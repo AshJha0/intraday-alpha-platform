@@ -1,6 +1,6 @@
 {
-  "bonferroni_p_threshold": 4.084967320261438e-05,
-  "bonferroni_t_threshold": 4.102620641213317,
+  "bonferroni_p_threshold": 2.5843800072362644e-06,
+  "bonferroni_t_threshold": 4.701357179586857,
   "description": "Multiple-testing ledger (spec \u00a713). Deterministic: no wall-clock; identical rerun => identical file.",
   "entries": [
     {
@@ -829,10 +829,1960 @@
         "oos_ic": 0.00457507996594423,
         "verdict": "REJECT"
       }
+    },
+    {
+      "alpha_id": "EQ01",
+      "config": {
+        "policy": "static"
+      },
+      "count": 114,
+      "kind": "adaptive_deployment",
+      "n": 1338,
+      "result": {
+        "deployed_ic": 0.020986846344278144,
+        "final_state": "ACTIVE",
+        "net_pnl": -62365.090708341115,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "EQ01",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 114,
+      "kind": "adaptive_deployment",
+      "n": 1452,
+      "result": {
+        "deployed_ic": 0.020986846344278144,
+        "final_state": "ACTIVE",
+        "net_pnl": -62365.090708341115,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "EQ01",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 115,
+      "kind": "adaptive_deployment",
+      "n": 1567,
+      "result": {
+        "deployed_ic": 0.020797095853922504,
+        "final_state": "ACTIVE",
+        "net_pnl": -61418.14539703861,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "EQ01",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 114,
+      "kind": "adaptive_deployment",
+      "n": 1681,
+      "result": {
+        "deployed_ic": 0.020986846344278144,
+        "final_state": "ACTIVE",
+        "net_pnl": -62365.090708341115,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "EQ03",
+      "config": {
+        "policy": "static"
+      },
+      "count": 114,
+      "kind": "adaptive_deployment",
+      "n": 1795,
+      "result": {
+        "deployed_ic": 0.019898617773882136,
+        "final_state": "ACTIVE",
+        "net_pnl": -147829.80665481515,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "EQ03",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 114,
+      "kind": "adaptive_deployment",
+      "n": 1909,
+      "result": {
+        "deployed_ic": 0.019898617773882136,
+        "final_state": "ACTIVE",
+        "net_pnl": -147829.80665481515,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "EQ03",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 115,
+      "kind": "adaptive_deployment",
+      "n": 2024,
+      "result": {
+        "deployed_ic": 0.019893226879441093,
+        "final_state": "ACTIVE",
+        "net_pnl": -148048.17593259295,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "EQ03",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 119,
+      "kind": "adaptive_deployment",
+      "n": 2143,
+      "result": {
+        "deployed_ic": 0.019417303747849106,
+        "final_state": "ACTIVE",
+        "net_pnl": -146799.58204200174,
+        "refits": 6
+      }
+    },
+    {
+      "alpha_id": "EQ06",
+      "config": {
+        "policy": "static"
+      },
+      "count": 114,
+      "kind": "adaptive_deployment",
+      "n": 2257,
+      "result": {
+        "deployed_ic": 0.05340653535898924,
+        "final_state": "WATCH",
+        "net_pnl": -66921.35373559556,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "EQ06",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 114,
+      "kind": "adaptive_deployment",
+      "n": 2371,
+      "result": {
+        "deployed_ic": 0.05340653535898924,
+        "final_state": "WATCH",
+        "net_pnl": -66921.35373559556,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "EQ06",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 115,
+      "kind": "adaptive_deployment",
+      "n": 2486,
+      "result": {
+        "deployed_ic": 0.05337610182968743,
+        "final_state": "WATCH",
+        "net_pnl": -68194.87546460111,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "EQ06",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 119,
+      "kind": "adaptive_deployment",
+      "n": 2605,
+      "result": {
+        "deployed_ic": 0.052539284412901024,
+        "final_state": "WATCH",
+        "net_pnl": -68240.93175551019,
+        "refits": 6
+      }
+    },
+    {
+      "alpha_id": "FX01",
+      "config": {
+        "policy": "static"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 2776,
+      "result": {
+        "deployed_ic": 0.003453189085147243,
+        "final_state": "RETIRED",
+        "net_pnl": -244819.71927488747,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX01",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 2947,
+      "result": {
+        "deployed_ic": 0.003453189085147243,
+        "final_state": "RETIRED",
+        "net_pnl": -244819.71927488747,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX01",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 172,
+      "kind": "adaptive_deployment",
+      "n": 3119,
+      "result": {
+        "deployed_ic": 0.00461631223448981,
+        "final_state": "RETIRED",
+        "net_pnl": -177438.05009998742,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "FX01",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 172,
+      "kind": "adaptive_deployment",
+      "n": 3291,
+      "result": {
+        "deployed_ic": 0.004612919905500903,
+        "final_state": "RETIRED",
+        "net_pnl": -177167.85283748794,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "FX05",
+      "config": {
+        "policy": "static"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 3462,
+      "result": {
+        "deployed_ic": 0.009841735515834832,
+        "final_state": "WATCH",
+        "net_pnl": -35804.39244999108,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX05",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 3633,
+      "result": {
+        "deployed_ic": 0.009841735515834832,
+        "final_state": "WATCH",
+        "net_pnl": -35804.39244999108,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX05",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 172,
+      "kind": "adaptive_deployment",
+      "n": 3805,
+      "result": {
+        "deployed_ic": -0.009555205315146129,
+        "final_state": "RETIRED",
+        "net_pnl": -15873.290312494035,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "FX05",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 173,
+      "kind": "adaptive_deployment",
+      "n": 3978,
+      "result": {
+        "deployed_ic": 0.008027615260153024,
+        "final_state": "WATCH",
+        "net_pnl": -35652.47086249199,
+        "refits": 3
+      }
+    },
+    {
+      "alpha_id": "FX09",
+      "config": {
+        "policy": "static"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 4149,
+      "result": {
+        "deployed_ic": 0.1212147998979684,
+        "final_state": "ACTIVE",
+        "net_pnl": -2874385.7161998325,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX09",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 4320,
+      "result": {
+        "deployed_ic": 0.1212147998979684,
+        "final_state": "ACTIVE",
+        "net_pnl": -2874385.7161998325,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX09",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 172,
+      "kind": "adaptive_deployment",
+      "n": 4492,
+      "result": {
+        "deployed_ic": 0.12147281460247583,
+        "final_state": "ACTIVE",
+        "net_pnl": -2901270.860849862,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "FX09",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 195,
+      "kind": "adaptive_deployment",
+      "n": 4687,
+      "result": {
+        "deployed_ic": 0.12115098506362777,
+        "final_state": "ACTIVE",
+        "net_pnl": -2922814.6123998626,
+        "refits": 25
+      }
+    },
+    {
+      "alpha_id": "FX08",
+      "config": {
+        "policy": "static"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 4858,
+      "result": {
+        "deployed_ic": 0.10880961152085607,
+        "final_state": "ACTIVE",
+        "net_pnl": -3376227.959800301,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX08",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 5029,
+      "result": {
+        "deployed_ic": 0.10880961152085607,
+        "final_state": "ACTIVE",
+        "net_pnl": -3376227.959800301,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX08",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 172,
+      "kind": "adaptive_deployment",
+      "n": 5201,
+      "result": {
+        "deployed_ic": 0.10826585296882385,
+        "final_state": "ACTIVE",
+        "net_pnl": -3372023.9753253255,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "FX08",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 190,
+      "kind": "adaptive_deployment",
+      "n": 5391,
+      "result": {
+        "deployed_ic": 0.10824862628377444,
+        "final_state": "ACTIVE",
+        "net_pnl": -3364316.506112784,
+        "refits": 20
+      }
+    },
+    {
+      "alpha_id": "EQ09",
+      "config": {
+        "policy": "static"
+      },
+      "count": 114,
+      "kind": "adaptive_deployment",
+      "n": 5505,
+      "result": {
+        "deployed_ic": 0.08021225438855126,
+        "final_state": "ACTIVE",
+        "net_pnl": -31832.66500200952,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "EQ09",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 114,
+      "kind": "adaptive_deployment",
+      "n": 5619,
+      "result": {
+        "deployed_ic": 0.08021225438855126,
+        "final_state": "ACTIVE",
+        "net_pnl": -31832.66500200952,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "EQ09",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 115,
+      "kind": "adaptive_deployment",
+      "n": 5734,
+      "result": {
+        "deployed_ic": 0.08001679196399603,
+        "final_state": "ACTIVE",
+        "net_pnl": -32369.377763083416,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "EQ09",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 114,
+      "kind": "adaptive_deployment",
+      "n": 5848,
+      "result": {
+        "deployed_ic": 0.08021225438855126,
+        "final_state": "ACTIVE",
+        "net_pnl": -31832.66500200952,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX11",
+      "config": {
+        "policy": "static"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 6019,
+      "result": {
+        "deployed_ic": 0.059894480111893314,
+        "final_state": "ACTIVE",
+        "net_pnl": -1567176.5192368862,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX11",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 6190,
+      "result": {
+        "deployed_ic": 0.059894480111893314,
+        "final_state": "ACTIVE",
+        "net_pnl": -1567176.5192368862,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX11",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 172,
+      "kind": "adaptive_deployment",
+      "n": 6362,
+      "result": {
+        "deployed_ic": 0.05819633147439981,
+        "final_state": "ACTIVE",
+        "net_pnl": -1548173.0592742497,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "FX11",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 178,
+      "kind": "adaptive_deployment",
+      "n": 6540,
+      "result": {
+        "deployed_ic": 0.05795630618095114,
+        "final_state": "ACTIVE",
+        "net_pnl": -1562143.301086762,
+        "refits": 8
+      }
+    },
+    {
+      "alpha_id": "FX10",
+      "config": {
+        "policy": "static"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 6711,
+      "result": {
+        "deployed_ic": 0.05781394000225534,
+        "final_state": "ACTIVE",
+        "net_pnl": -460337.76055020664,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX10",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 6882,
+      "result": {
+        "deployed_ic": 0.05781394000225534,
+        "final_state": "ACTIVE",
+        "net_pnl": -460337.76055020664,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX10",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 172,
+      "kind": "adaptive_deployment",
+      "n": 7054,
+      "result": {
+        "deployed_ic": 0.05655940619923985,
+        "final_state": "ACTIVE",
+        "net_pnl": -474560.63385020185,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "FX10",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 211,
+      "kind": "adaptive_deployment",
+      "n": 7265,
+      "result": {
+        "deployed_ic": 0.053060282648740825,
+        "final_state": "WATCH",
+        "net_pnl": -502129.4746377395,
+        "refits": 41
+      }
+    },
+    {
+      "alpha_id": "EQ01",
+      "config": {
+        "policy": "static"
+      },
+      "count": 114,
+      "kind": "adaptive_deployment",
+      "n": 7379,
+      "result": {
+        "deployed_ic": 0.020986846344278144,
+        "final_state": "ACTIVE",
+        "net_pnl": -62365.090708341115,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "EQ01",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 114,
+      "kind": "adaptive_deployment",
+      "n": 7493,
+      "result": {
+        "deployed_ic": 0.020986846344278144,
+        "final_state": "ACTIVE",
+        "net_pnl": -62365.090708341115,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "EQ01",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 115,
+      "kind": "adaptive_deployment",
+      "n": 7608,
+      "result": {
+        "deployed_ic": 0.020797095853922504,
+        "final_state": "ACTIVE",
+        "net_pnl": -61418.14539703861,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "EQ01",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 114,
+      "kind": "adaptive_deployment",
+      "n": 7722,
+      "result": {
+        "deployed_ic": 0.020986846344278144,
+        "final_state": "ACTIVE",
+        "net_pnl": -62365.090708341115,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "EQ03",
+      "config": {
+        "policy": "static"
+      },
+      "count": 114,
+      "kind": "adaptive_deployment",
+      "n": 7836,
+      "result": {
+        "deployed_ic": 0.019898617773882136,
+        "final_state": "ACTIVE",
+        "net_pnl": -147829.80665481515,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "EQ03",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 114,
+      "kind": "adaptive_deployment",
+      "n": 7950,
+      "result": {
+        "deployed_ic": 0.019898617773882136,
+        "final_state": "ACTIVE",
+        "net_pnl": -147829.80665481515,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "EQ03",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 115,
+      "kind": "adaptive_deployment",
+      "n": 8065,
+      "result": {
+        "deployed_ic": 0.019893226879441093,
+        "final_state": "ACTIVE",
+        "net_pnl": -148048.17593259295,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "EQ03",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 119,
+      "kind": "adaptive_deployment",
+      "n": 8184,
+      "result": {
+        "deployed_ic": 0.019417303747849106,
+        "final_state": "ACTIVE",
+        "net_pnl": -146799.58204200174,
+        "refits": 6
+      }
+    },
+    {
+      "alpha_id": "EQ06",
+      "config": {
+        "policy": "static"
+      },
+      "count": 114,
+      "kind": "adaptive_deployment",
+      "n": 8298,
+      "result": {
+        "deployed_ic": 0.05340653535898924,
+        "final_state": "WATCH",
+        "net_pnl": -66921.35373559556,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "EQ06",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 114,
+      "kind": "adaptive_deployment",
+      "n": 8412,
+      "result": {
+        "deployed_ic": 0.05340653535898924,
+        "final_state": "WATCH",
+        "net_pnl": -66921.35373559556,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "EQ06",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 115,
+      "kind": "adaptive_deployment",
+      "n": 8527,
+      "result": {
+        "deployed_ic": 0.05337610182968743,
+        "final_state": "WATCH",
+        "net_pnl": -68194.87546460111,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "EQ06",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 119,
+      "kind": "adaptive_deployment",
+      "n": 8646,
+      "result": {
+        "deployed_ic": 0.052539284412901024,
+        "final_state": "WATCH",
+        "net_pnl": -68240.93175551019,
+        "refits": 6
+      }
+    },
+    {
+      "alpha_id": "FX01",
+      "config": {
+        "policy": "static"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 8817,
+      "result": {
+        "deployed_ic": 0.003453189085147243,
+        "final_state": "RETIRED",
+        "net_pnl": -244819.71927488747,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX01",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 8988,
+      "result": {
+        "deployed_ic": 0.003453189085147243,
+        "final_state": "RETIRED",
+        "net_pnl": -244819.71927488747,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX01",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 172,
+      "kind": "adaptive_deployment",
+      "n": 9160,
+      "result": {
+        "deployed_ic": 0.00461631223448981,
+        "final_state": "RETIRED",
+        "net_pnl": -177438.05009998742,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "FX01",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 172,
+      "kind": "adaptive_deployment",
+      "n": 9332,
+      "result": {
+        "deployed_ic": 0.004612919905500903,
+        "final_state": "RETIRED",
+        "net_pnl": -177167.85283748794,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "FX05",
+      "config": {
+        "policy": "static"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 9503,
+      "result": {
+        "deployed_ic": 0.009841735515834832,
+        "final_state": "WATCH",
+        "net_pnl": -35804.39244999108,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX05",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 9674,
+      "result": {
+        "deployed_ic": 0.009841735515834832,
+        "final_state": "WATCH",
+        "net_pnl": -35804.39244999108,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX05",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 172,
+      "kind": "adaptive_deployment",
+      "n": 9846,
+      "result": {
+        "deployed_ic": -0.009555205315146129,
+        "final_state": "RETIRED",
+        "net_pnl": -15873.290312494035,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "FX05",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 173,
+      "kind": "adaptive_deployment",
+      "n": 10019,
+      "result": {
+        "deployed_ic": 0.008027615260153024,
+        "final_state": "WATCH",
+        "net_pnl": -35652.47086249199,
+        "refits": 3
+      }
+    },
+    {
+      "alpha_id": "FX09",
+      "config": {
+        "policy": "static"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 10190,
+      "result": {
+        "deployed_ic": 0.1212147998979684,
+        "final_state": "ACTIVE",
+        "net_pnl": -2874385.7161998325,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX09",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 10361,
+      "result": {
+        "deployed_ic": 0.1212147998979684,
+        "final_state": "ACTIVE",
+        "net_pnl": -2874385.7161998325,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX09",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 172,
+      "kind": "adaptive_deployment",
+      "n": 10533,
+      "result": {
+        "deployed_ic": 0.12147281460247583,
+        "final_state": "ACTIVE",
+        "net_pnl": -2901270.860849862,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "FX09",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 195,
+      "kind": "adaptive_deployment",
+      "n": 10728,
+      "result": {
+        "deployed_ic": 0.12115098506362777,
+        "final_state": "ACTIVE",
+        "net_pnl": -2922814.6123998626,
+        "refits": 25
+      }
+    },
+    {
+      "alpha_id": "FX08",
+      "config": {
+        "policy": "static"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 10899,
+      "result": {
+        "deployed_ic": 0.10880961152085607,
+        "final_state": "ACTIVE",
+        "net_pnl": -3376227.959800301,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX08",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 11070,
+      "result": {
+        "deployed_ic": 0.10880961152085607,
+        "final_state": "ACTIVE",
+        "net_pnl": -3376227.959800301,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX08",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 172,
+      "kind": "adaptive_deployment",
+      "n": 11242,
+      "result": {
+        "deployed_ic": 0.10826585296882385,
+        "final_state": "ACTIVE",
+        "net_pnl": -3372023.9753253255,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "FX08",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 190,
+      "kind": "adaptive_deployment",
+      "n": 11432,
+      "result": {
+        "deployed_ic": 0.10824862628377444,
+        "final_state": "ACTIVE",
+        "net_pnl": -3364316.506112784,
+        "refits": 20
+      }
+    },
+    {
+      "alpha_id": "EQ09",
+      "config": {
+        "policy": "static"
+      },
+      "count": 114,
+      "kind": "adaptive_deployment",
+      "n": 11546,
+      "result": {
+        "deployed_ic": 0.08021225438855126,
+        "final_state": "ACTIVE",
+        "net_pnl": -31832.66500200952,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "EQ09",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 114,
+      "kind": "adaptive_deployment",
+      "n": 11660,
+      "result": {
+        "deployed_ic": 0.08021225438855126,
+        "final_state": "ACTIVE",
+        "net_pnl": -31832.66500200952,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "EQ09",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 115,
+      "kind": "adaptive_deployment",
+      "n": 11775,
+      "result": {
+        "deployed_ic": 0.08001679196399603,
+        "final_state": "ACTIVE",
+        "net_pnl": -32369.377763083416,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "EQ09",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 114,
+      "kind": "adaptive_deployment",
+      "n": 11889,
+      "result": {
+        "deployed_ic": 0.08021225438855126,
+        "final_state": "ACTIVE",
+        "net_pnl": -31832.66500200952,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX11",
+      "config": {
+        "policy": "static"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 12060,
+      "result": {
+        "deployed_ic": 0.059894480111893314,
+        "final_state": "ACTIVE",
+        "net_pnl": -1567176.5192368862,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX11",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 12231,
+      "result": {
+        "deployed_ic": 0.059894480111893314,
+        "final_state": "ACTIVE",
+        "net_pnl": -1567176.5192368862,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX11",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 172,
+      "kind": "adaptive_deployment",
+      "n": 12403,
+      "result": {
+        "deployed_ic": 0.05819633147439981,
+        "final_state": "ACTIVE",
+        "net_pnl": -1548173.0592742497,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "FX11",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 178,
+      "kind": "adaptive_deployment",
+      "n": 12581,
+      "result": {
+        "deployed_ic": 0.05795630618095114,
+        "final_state": "ACTIVE",
+        "net_pnl": -1562143.301086762,
+        "refits": 8
+      }
+    },
+    {
+      "alpha_id": "FX10",
+      "config": {
+        "policy": "static"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 12752,
+      "result": {
+        "deployed_ic": 0.05781394000225534,
+        "final_state": "ACTIVE",
+        "net_pnl": -460337.76055020664,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX10",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 12923,
+      "result": {
+        "deployed_ic": 0.05781394000225534,
+        "final_state": "ACTIVE",
+        "net_pnl": -460337.76055020664,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX10",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 172,
+      "kind": "adaptive_deployment",
+      "n": 13095,
+      "result": {
+        "deployed_ic": 0.05655940619923985,
+        "final_state": "ACTIVE",
+        "net_pnl": -474560.63385020185,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "FX10",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 211,
+      "kind": "adaptive_deployment",
+      "n": 13306,
+      "result": {
+        "deployed_ic": 0.053060282648740825,
+        "final_state": "WATCH",
+        "net_pnl": -502129.4746377395,
+        "refits": 41
+      }
+    },
+    {
+      "alpha_id": "EQ01",
+      "config": {
+        "policy": "static"
+      },
+      "count": 114,
+      "kind": "adaptive_deployment",
+      "n": 13420,
+      "result": {
+        "deployed_ic": 0.020986846344278144,
+        "final_state": "ACTIVE",
+        "net_pnl": -62365.090708341115,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "EQ01",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 114,
+      "kind": "adaptive_deployment",
+      "n": 13534,
+      "result": {
+        "deployed_ic": 0.020986846344278144,
+        "final_state": "ACTIVE",
+        "net_pnl": -62365.090708341115,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "EQ01",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 115,
+      "kind": "adaptive_deployment",
+      "n": 13649,
+      "result": {
+        "deployed_ic": 0.020797095853922504,
+        "final_state": "ACTIVE",
+        "net_pnl": -61418.14539703861,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "EQ01",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 114,
+      "kind": "adaptive_deployment",
+      "n": 13763,
+      "result": {
+        "deployed_ic": 0.020986846344278144,
+        "final_state": "ACTIVE",
+        "net_pnl": -62365.090708341115,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "EQ03",
+      "config": {
+        "policy": "static"
+      },
+      "count": 114,
+      "kind": "adaptive_deployment",
+      "n": 13877,
+      "result": {
+        "deployed_ic": 0.019898617773882136,
+        "final_state": "ACTIVE",
+        "net_pnl": -147829.80665481515,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "EQ03",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 114,
+      "kind": "adaptive_deployment",
+      "n": 13991,
+      "result": {
+        "deployed_ic": 0.019898617773882136,
+        "final_state": "ACTIVE",
+        "net_pnl": -147829.80665481515,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "EQ03",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 115,
+      "kind": "adaptive_deployment",
+      "n": 14106,
+      "result": {
+        "deployed_ic": 0.019893226879441093,
+        "final_state": "ACTIVE",
+        "net_pnl": -148048.17593259295,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "EQ03",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 119,
+      "kind": "adaptive_deployment",
+      "n": 14225,
+      "result": {
+        "deployed_ic": 0.019417303747849106,
+        "final_state": "ACTIVE",
+        "net_pnl": -146799.58204200174,
+        "refits": 6
+      }
+    },
+    {
+      "alpha_id": "EQ06",
+      "config": {
+        "policy": "static"
+      },
+      "count": 114,
+      "kind": "adaptive_deployment",
+      "n": 14339,
+      "result": {
+        "deployed_ic": 0.05340653535898924,
+        "final_state": "WATCH",
+        "net_pnl": -66921.35373559556,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "EQ06",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 114,
+      "kind": "adaptive_deployment",
+      "n": 14453,
+      "result": {
+        "deployed_ic": 0.05340653535898924,
+        "final_state": "WATCH",
+        "net_pnl": -66921.35373559556,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "EQ06",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 115,
+      "kind": "adaptive_deployment",
+      "n": 14568,
+      "result": {
+        "deployed_ic": 0.05337610182968743,
+        "final_state": "WATCH",
+        "net_pnl": -68194.87546460111,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "EQ06",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 119,
+      "kind": "adaptive_deployment",
+      "n": 14687,
+      "result": {
+        "deployed_ic": 0.052539284412901024,
+        "final_state": "WATCH",
+        "net_pnl": -68240.93175551019,
+        "refits": 6
+      }
+    },
+    {
+      "alpha_id": "FX01",
+      "config": {
+        "policy": "static"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 14858,
+      "result": {
+        "deployed_ic": 0.003453189085147243,
+        "final_state": "RETIRED",
+        "net_pnl": -244819.71927488747,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX01",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 15029,
+      "result": {
+        "deployed_ic": 0.003453189085147243,
+        "final_state": "RETIRED",
+        "net_pnl": -244819.71927488747,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX01",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 172,
+      "kind": "adaptive_deployment",
+      "n": 15201,
+      "result": {
+        "deployed_ic": 0.00461631223448981,
+        "final_state": "RETIRED",
+        "net_pnl": -177438.05009998742,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "FX01",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 172,
+      "kind": "adaptive_deployment",
+      "n": 15373,
+      "result": {
+        "deployed_ic": 0.004612919905500903,
+        "final_state": "RETIRED",
+        "net_pnl": -177167.85283748794,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "FX05",
+      "config": {
+        "policy": "static"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 15544,
+      "result": {
+        "deployed_ic": 0.009841735515834832,
+        "final_state": "WATCH",
+        "net_pnl": -35804.39244999108,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX05",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 15715,
+      "result": {
+        "deployed_ic": 0.009841735515834832,
+        "final_state": "WATCH",
+        "net_pnl": -35804.39244999108,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX05",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 172,
+      "kind": "adaptive_deployment",
+      "n": 15887,
+      "result": {
+        "deployed_ic": -0.009555205315146129,
+        "final_state": "RETIRED",
+        "net_pnl": -15873.290312494035,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "FX05",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 173,
+      "kind": "adaptive_deployment",
+      "n": 16060,
+      "result": {
+        "deployed_ic": 0.008027615260153024,
+        "final_state": "WATCH",
+        "net_pnl": -35652.47086249199,
+        "refits": 3
+      }
+    },
+    {
+      "alpha_id": "FX09",
+      "config": {
+        "policy": "static"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 16231,
+      "result": {
+        "deployed_ic": 0.1212147998979684,
+        "final_state": "ACTIVE",
+        "net_pnl": -2874385.7161998325,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX09",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 16402,
+      "result": {
+        "deployed_ic": 0.1212147998979684,
+        "final_state": "ACTIVE",
+        "net_pnl": -2874385.7161998325,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX09",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 172,
+      "kind": "adaptive_deployment",
+      "n": 16574,
+      "result": {
+        "deployed_ic": 0.12147281460247583,
+        "final_state": "ACTIVE",
+        "net_pnl": -2901270.860849862,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "FX09",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 195,
+      "kind": "adaptive_deployment",
+      "n": 16769,
+      "result": {
+        "deployed_ic": 0.12115098506362777,
+        "final_state": "ACTIVE",
+        "net_pnl": -2922814.6123998626,
+        "refits": 25
+      }
+    },
+    {
+      "alpha_id": "FX08",
+      "config": {
+        "policy": "static"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 16940,
+      "result": {
+        "deployed_ic": 0.10880961152085607,
+        "final_state": "ACTIVE",
+        "net_pnl": -3376227.959800301,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX08",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 17111,
+      "result": {
+        "deployed_ic": 0.10880961152085607,
+        "final_state": "ACTIVE",
+        "net_pnl": -3376227.959800301,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX08",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 172,
+      "kind": "adaptive_deployment",
+      "n": 17283,
+      "result": {
+        "deployed_ic": 0.10826585296882385,
+        "final_state": "ACTIVE",
+        "net_pnl": -3372023.9753253255,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "FX08",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 190,
+      "kind": "adaptive_deployment",
+      "n": 17473,
+      "result": {
+        "deployed_ic": 0.10824862628377444,
+        "final_state": "ACTIVE",
+        "net_pnl": -3364316.506112784,
+        "refits": 20
+      }
+    },
+    {
+      "alpha_id": "EQ09",
+      "config": {
+        "policy": "static"
+      },
+      "count": 114,
+      "kind": "adaptive_deployment",
+      "n": 17587,
+      "result": {
+        "deployed_ic": 0.08021225438855126,
+        "final_state": "ACTIVE",
+        "net_pnl": -31832.66500200952,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "EQ09",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 114,
+      "kind": "adaptive_deployment",
+      "n": 17701,
+      "result": {
+        "deployed_ic": 0.08021225438855126,
+        "final_state": "ACTIVE",
+        "net_pnl": -31832.66500200952,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "EQ09",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 115,
+      "kind": "adaptive_deployment",
+      "n": 17816,
+      "result": {
+        "deployed_ic": 0.08001679196399603,
+        "final_state": "ACTIVE",
+        "net_pnl": -32369.377763083416,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "EQ09",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 114,
+      "kind": "adaptive_deployment",
+      "n": 17930,
+      "result": {
+        "deployed_ic": 0.08021225438855126,
+        "final_state": "ACTIVE",
+        "net_pnl": -31832.66500200952,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX11",
+      "config": {
+        "policy": "static"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 18101,
+      "result": {
+        "deployed_ic": 0.059894480111893314,
+        "final_state": "ACTIVE",
+        "net_pnl": -1567176.5192368862,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX11",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 18272,
+      "result": {
+        "deployed_ic": 0.059894480111893314,
+        "final_state": "ACTIVE",
+        "net_pnl": -1567176.5192368862,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX11",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 172,
+      "kind": "adaptive_deployment",
+      "n": 18444,
+      "result": {
+        "deployed_ic": 0.05819633147439981,
+        "final_state": "ACTIVE",
+        "net_pnl": -1548173.0592742497,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "FX11",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 178,
+      "kind": "adaptive_deployment",
+      "n": 18622,
+      "result": {
+        "deployed_ic": 0.05795630618095114,
+        "final_state": "ACTIVE",
+        "net_pnl": -1562143.301086762,
+        "refits": 8
+      }
+    },
+    {
+      "alpha_id": "FX10",
+      "config": {
+        "policy": "static"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 18793,
+      "result": {
+        "deployed_ic": 0.05781394000225534,
+        "final_state": "ACTIVE",
+        "net_pnl": -460337.76055020664,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX10",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 171,
+      "kind": "adaptive_deployment",
+      "n": 18964,
+      "result": {
+        "deployed_ic": 0.05781394000225534,
+        "final_state": "ACTIVE",
+        "net_pnl": -460337.76055020664,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX10",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 172,
+      "kind": "adaptive_deployment",
+      "n": 19136,
+      "result": {
+        "deployed_ic": 0.05655940619923985,
+        "final_state": "ACTIVE",
+        "net_pnl": -474560.63385020185,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "FX10",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 211,
+      "kind": "adaptive_deployment",
+      "n": 19347,
+      "result": {
+        "deployed_ic": 0.053060282648740825,
+        "final_state": "WATCH",
+        "net_pnl": -502129.4746377395,
+        "refits": 41
+      }
     }
   ],
-  "expected_max_null_t": 3.7709095621805284,
+  "expected_max_null_t": 4.443037845366273,
   "pinned_alpha": 0.05,
-  "total_experiments": 1224,
+  "total_experiments": 19347,
   "x-version": 1
 }

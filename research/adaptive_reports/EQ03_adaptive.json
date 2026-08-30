@@ -1,0 +1,362 @@
+{
+  "alpha_id": "EQ03",
+  "deploy_start": 1787587200000000000,
+  "horizon": "5s",
+  "ic_baseline": {
+    "alpha_id": "EQ03",
+    "bucket_ns": 300000000000,
+    "horizon": "5s",
+    "ic_mean": 0.04052240933422649,
+    "ic_std": 0.021744229097855495,
+    "kind": "ic",
+    "n_buckets_baseline": 30,
+    "name": "run_eq03_ic",
+    "source": "warmup window [1787578200000000000, 1787587200000000000) of the bundled feature frames, universe [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]",
+    "x-version": 1
+  },
+  "n_blocks": 112,
+  "policies": {
+    "drift_triggered": {
+      "deployed_ic": 0.019417303747849106,
+      "drift_event_count": 0,
+      "final_state": "ACTIVE",
+      "gross_pnl": 1229.9999999997801,
+      "lifecycle_transitions": [
+        {
+          "alpha_id": "EQ03",
+          "eval_index": 2,
+          "event_ts": 1787589000000000000,
+          "from": "ACTIVE",
+          "policy": "drift_triggered",
+          "reason": "rolling_ic -0.041154 < watch gate 0.0",
+          "rolling_ic": -0.04115436621771814,
+          "to": "WATCH"
+        },
+        {
+          "alpha_id": "EQ03",
+          "eval_index": 7,
+          "event_ts": 1787593500000000000,
+          "from": "WATCH",
+          "policy": "drift_triggered",
+          "reason": "persistent breach: 6 consecutive evals below watch gate 0.0",
+          "rolling_ic": -0.04115436621771814,
+          "to": "RETIRED"
+        },
+        {
+          "alpha_id": "EQ03",
+          "eval_index": 90,
+          "event_ts": 1787668200000000000,
+          "from": "RETIRED",
+          "policy": "drift_triggered",
+          "reason": "recovery from retirement: 3 consecutive evals >= reactivate gate 0.005; probation before ACTIVE",
+          "rolling_ic": 0.03932706870656838,
+          "to": "WATCH"
+        },
+        {
+          "alpha_id": "EQ03",
+          "eval_index": 93,
+          "event_ts": 1787670900000000000,
+          "from": "WATCH",
+          "policy": "drift_triggered",
+          "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
+          "rolling_ic": 0.030968421691272917,
+          "to": "ACTIVE"
+        }
+      ],
+      "n_evals": 112,
+      "n_ic_evals": 23,
+      "net_pnl": -146799.58204200174,
+      "policy": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "refit_count": 6,
+      "refit_events": [
+        {
+          "block": 0,
+          "n_train": 72804,
+          "reasons": [
+            "initial deployment fit"
+          ],
+          "ts": 1787587200000000000
+        },
+        {
+          "block": 4,
+          "n_train": 77809,
+          "reasons": [
+            "ic_z=-7.5125 < threshold -2.0"
+          ],
+          "ts": 1787590800000000000
+        },
+        {
+          "block": 8,
+          "n_train": 77809,
+          "reasons": [
+            "ic_z=-7.5125 < threshold -2.0"
+          ],
+          "ts": 1787594400000000000
+        },
+        {
+          "block": 93,
+          "n_train": 77106,
+          "reasons": [
+            "ic_z=-2.0135 < threshold -2.0"
+          ],
+          "ts": 1787670900000000000
+        },
+        {
+          "block": 97,
+          "n_train": 77941,
+          "reasons": [
+            "ic_z=-3.3531 < threshold -2.0"
+          ],
+          "ts": 1787674500000000000
+        },
+        {
+          "block": 101,
+          "n_train": 77877,
+          "reasons": [
+            "ic_z=-2.3710 < threshold -2.0"
+          ],
+          "ts": 1787678100000000000
+        }
+      ],
+      "rolling_ic_mean": 0.007909390014115033,
+      "rolling_ic_std": 0.03285776238512966,
+      "total_costs": 148029.5820420014,
+      "trade_count": 8150
+    },
+    "scheduled_daily": {
+      "deployed_ic": 0.019893226879441093,
+      "drift_event_count": 0,
+      "final_state": "ACTIVE",
+      "gross_pnl": 1284.999999999819,
+      "lifecycle_transitions": [
+        {
+          "alpha_id": "EQ03",
+          "eval_index": 2,
+          "event_ts": 1787589000000000000,
+          "from": "ACTIVE",
+          "policy": "scheduled_daily",
+          "reason": "rolling_ic -0.041154 < watch gate 0.0",
+          "rolling_ic": -0.04115436621771814,
+          "to": "WATCH"
+        },
+        {
+          "alpha_id": "EQ03",
+          "eval_index": 7,
+          "event_ts": 1787593500000000000,
+          "from": "WATCH",
+          "policy": "scheduled_daily",
+          "reason": "persistent breach: 6 consecutive evals below watch gate 0.0",
+          "rolling_ic": -0.04115436621771814,
+          "to": "RETIRED"
+        },
+        {
+          "alpha_id": "EQ03",
+          "eval_index": 90,
+          "event_ts": 1787668200000000000,
+          "from": "RETIRED",
+          "policy": "scheduled_daily",
+          "reason": "recovery from retirement: 3 consecutive evals >= reactivate gate 0.005; probation before ACTIVE",
+          "rolling_ic": 0.03932706870656838,
+          "to": "WATCH"
+        },
+        {
+          "alpha_id": "EQ03",
+          "eval_index": 93,
+          "event_ts": 1787670900000000000,
+          "from": "WATCH",
+          "policy": "scheduled_daily",
+          "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
+          "rolling_ic": 0.030968421691272917,
+          "to": "ACTIVE"
+        }
+      ],
+      "n_evals": 112,
+      "n_ic_evals": 23,
+      "net_pnl": -148048.17593259295,
+      "policy": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "refit_count": 2,
+      "refit_events": [
+        {
+          "block": 0,
+          "n_train": 72804,
+          "reasons": [
+            "initial deployment fit"
+          ],
+          "ts": 1787587200000000000
+        },
+        {
+          "block": 32,
+          "n_train": 77809,
+          "reasons": [
+            "scheduled: period boundary crossed (1787587200000000000 -> 1787616000000000000, period 86400000000000)"
+          ],
+          "ts": 1787616000000000000
+        }
+      ],
+      "rolling_ic_mean": 0.007927815866784925,
+      "rolling_ic_std": 0.032868264292730445,
+      "total_costs": 149333.17593259233,
+      "trade_count": 8222
+    },
+    "scheduled_weekly": {
+      "deployed_ic": 0.019898617773882136,
+      "drift_event_count": 0,
+      "final_state": "ACTIVE",
+      "gross_pnl": 1284.999999999819,
+      "lifecycle_transitions": [
+        {
+          "alpha_id": "EQ03",
+          "eval_index": 2,
+          "event_ts": 1787589000000000000,
+          "from": "ACTIVE",
+          "policy": "scheduled_weekly",
+          "reason": "rolling_ic -0.041154 < watch gate 0.0",
+          "rolling_ic": -0.04115436621771814,
+          "to": "WATCH"
+        },
+        {
+          "alpha_id": "EQ03",
+          "eval_index": 7,
+          "event_ts": 1787593500000000000,
+          "from": "WATCH",
+          "policy": "scheduled_weekly",
+          "reason": "persistent breach: 6 consecutive evals below watch gate 0.0",
+          "rolling_ic": -0.04115436621771814,
+          "to": "RETIRED"
+        },
+        {
+          "alpha_id": "EQ03",
+          "eval_index": 90,
+          "event_ts": 1787668200000000000,
+          "from": "RETIRED",
+          "policy": "scheduled_weekly",
+          "reason": "recovery from retirement: 3 consecutive evals >= reactivate gate 0.005; probation before ACTIVE",
+          "rolling_ic": 0.03932947292519156,
+          "to": "WATCH"
+        },
+        {
+          "alpha_id": "EQ03",
+          "eval_index": 93,
+          "event_ts": 1787670900000000000,
+          "from": "WATCH",
+          "policy": "scheduled_weekly",
+          "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
+          "rolling_ic": 0.03096374557222604,
+          "to": "ACTIVE"
+        }
+      ],
+      "n_evals": 112,
+      "n_ic_evals": 23,
+      "net_pnl": -147829.80665481515,
+      "policy": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "refit_count": 1,
+      "refit_events": [
+        {
+          "block": 0,
+          "n_train": 72804,
+          "reasons": [
+            "initial deployment fit"
+          ],
+          "ts": 1787587200000000000
+        }
+      ],
+      "rolling_ic_mean": 0.007924686500557436,
+      "rolling_ic_std": 0.032866983189065654,
+      "total_costs": 149114.80665481457,
+      "trade_count": 8212
+    },
+    "static": {
+      "deployed_ic": 0.019898617773882136,
+      "drift_event_count": 0,
+      "final_state": "ACTIVE",
+      "gross_pnl": 1284.999999999819,
+      "lifecycle_transitions": [
+        {
+          "alpha_id": "EQ03",
+          "eval_index": 2,
+          "event_ts": 1787589000000000000,
+          "from": "ACTIVE",
+          "policy": "static",
+          "reason": "rolling_ic -0.041154 < watch gate 0.0",
+          "rolling_ic": -0.04115436621771814,
+          "to": "WATCH"
+        },
+        {
+          "alpha_id": "EQ03",
+          "eval_index": 7,
+          "event_ts": 1787593500000000000,
+          "from": "WATCH",
+          "policy": "static",
+          "reason": "persistent breach: 6 consecutive evals below watch gate 0.0",
+          "rolling_ic": -0.04115436621771814,
+          "to": "RETIRED"
+        },
+        {
+          "alpha_id": "EQ03",
+          "eval_index": 90,
+          "event_ts": 1787668200000000000,
+          "from": "RETIRED",
+          "policy": "static",
+          "reason": "recovery from retirement: 3 consecutive evals >= reactivate gate 0.005; probation before ACTIVE",
+          "rolling_ic": 0.03932947292519156,
+          "to": "WATCH"
+        },
+        {
+          "alpha_id": "EQ03",
+          "eval_index": 93,
+          "event_ts": 1787670900000000000,
+          "from": "WATCH",
+          "policy": "static",
+          "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
+          "rolling_ic": 0.03096374557222604,
+          "to": "ACTIVE"
+        }
+      ],
+      "n_evals": 112,
+      "n_ic_evals": 23,
+      "net_pnl": -147829.80665481515,
+      "policy": {
+        "policy": "static"
+      },
+      "refit_count": 1,
+      "refit_events": [
+        {
+          "block": 0,
+          "n_train": 72804,
+          "reasons": [
+            "initial deployment fit"
+          ],
+          "ts": 1787587200000000000
+        }
+      ],
+      "rolling_ic_mean": 0.007924686500557436,
+      "rolling_ic_std": 0.032866983189065654,
+      "total_costs": 149114.80665481457,
+      "trade_count": 8212
+    }
+  },
+  "universe": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+  ]
+}

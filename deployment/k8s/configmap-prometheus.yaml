@@ -43,24 +43,28 @@ data:
     \       description: >\n            Signal rate under 20% of its rate 1h ago while market data is\n\
     \            flowing \u2014 feature validity flags, warmup state or a wedged engine.\n           \
     \ Runbook: docs/runbooks/RUNBOOK_paper_trading.md#signal-rate\n          runbook: docs/runbooks/RUNBOOK_paper_trading.md\n\
-    \n      # Live-vs-backtest drift (PLACEHOLDER contract): no producer emits\n      # alpha_live_vs_backtest_drift\
-    \ yet \u2014 the Java monitoring endpoint is\n      # live but does not compute this statistic. Contract:\
-    \ a KS-style\n      # statistic in [0, 1] comparing the live signal distribution to the\n      # walk-forward\
-    \ backtest distribution for the same regime (spec \xA725\n      # \"alpha health\").\n      - alert:\
+    \n      # Live-vs-backtest drift (LIVE from java: com.iap.adaptive.DriftMonitor\n      # via com.iap.platform.PaperTrading,\
+    \ labeled {alpha=\"...\"}). The\n      # statistic is the pinned Population Stability Index of the\
+    \ rolling\n      # live signal window vs the research baseline (API_ADAPTIVE.md /\n      # research/baselines/*.json):\
+    \ 10 baseline-quantile buckets,\n      # sum((live-base)*ln(live/base)), fractions floored at 1e-6.\n\
+    \      # Threshold 0.25 is the standard industry PSI rule of thumb\n      # (< 0.1 stable, 0.1-0.25\
+    \ moderate, > 0.25 significant shift) \u2014\n      # see deployment/grafana/README.md.\n      - alert:\
     \ LiveVsBacktestDrift\n        expr: alpha_live_vs_backtest_drift > 0.25\n        for: 30m\n     \
     \   labels:\n          severity: warning\n          domain: alpha\n        annotations:\n        \
-    \  summary: \"Live signal distribution drifting from backtest ({{ $value | printf \\\"%.2f\\\" }})\"\
-    \n          description: >\n            Placeholder threshold 0.25 on the drift statistic; calibrate\
-    \ after\n            the first paper-trading week. Persistent drift is a retirement\n            trigger\
-    \ per spec \xA720 step 13.\n            Runbook: docs/runbooks/RUNBOOK_paper_trading.md#drift\n  \
-    \        runbook: docs/runbooks/RUNBOOK_paper_trading.md\n\n  - name: iap-execution\n    rules:\n\
-    \      # Fill-rate drop: fills per accepted order far below baseline.\n      - alert: FillRateDrop\n\
-    \        expr: >\n          job:fill_rate:ratio5m < 0.5 * (job:fill_rate:ratio5m offset 1h)\n    \
-    \      and job:venue_orders:rate5m > 0.1\n        for: 10m\n        labels:\n          severity: critical\n\
-    \          domain: execution\n        annotations:\n          summary: \"Fill rate dropped on {{ $labels.service\
-    \ }}\"\n          description: >\n            Fill rate below half its 1h-ago baseline while orders\
-    \ are flowing \u2014\n            queue-position model, venue health or adverse regime shift.\n  \
-    \          Runbook: docs/runbooks/RUNBOOK_paper_trading.md#fill-rate\n          runbook: docs/runbooks/RUNBOOK_paper_trading.md\n\
+    \  summary: \"Live signal PSI drift on {{ $labels.alpha }} ({{ $value | printf \\\"%.2f\\\" }})\"\n\
+    \          description: >\n            Live signal distribution for {{ $labels.alpha }} has PSI >\
+    \ 0.25\n            vs its backtest baseline for 30m \u2014 a significant shift under the\n      \
+    \      industry rule of thumb. The lifecycle gauge\n            (alpha_lifecycle_state) marks the\
+    \ alpha RETIRED at the same\n            edge; persistent drift is a retirement trigger per spec \xA7\
+    20\n            step 13. Runbook: docs/runbooks/RUNBOOK_paper_trading.md#drift\n          runbook:\
+    \ docs/runbooks/RUNBOOK_paper_trading.md\n\n  - name: iap-execution\n    rules:\n      # Fill-rate\
+    \ drop: fills per accepted order far below baseline.\n      - alert: FillRateDrop\n        expr: >\n\
+    \          job:fill_rate:ratio5m < 0.5 * (job:fill_rate:ratio5m offset 1h)\n          and job:venue_orders:rate5m\
+    \ > 0.1\n        for: 10m\n        labels:\n          severity: critical\n          domain: execution\n\
+    \        annotations:\n          summary: \"Fill rate dropped on {{ $labels.service }}\"\n       \
+    \   description: >\n            Fill rate below half its 1h-ago baseline while orders are flowing\
+    \ \u2014\n            queue-position model, venue health or adverse regime shift.\n            Runbook:\
+    \ docs/runbooks/RUNBOOK_paper_trading.md#fill-rate\n          runbook: docs/runbooks/RUNBOOK_paper_trading.md\n\
     \n  - name: iap-risk\n    rules:\n      # Loss-limit utilization: realized PnL approaching the global\
     \ daily loss\n      # limit (configs/risk.json global.max_daily_loss = 250000).\n      # risk_realized_pnl\
     \ is LIVE today from rust/risk.\n      - alert: LossLimitUtilizationHigh\n        expr: (-risk_realized_pnl)\
@@ -81,23 +85,22 @@ data:
     \ \"JVM p99 GC pause {{ $value | humanize }}ns on {{ $labels.job }}\"\n          description: >\n\
     \            p99 GC pause above 10ms for 5m; check heap sizing / allocation rate\n            on hot\
     \ paths (spec \xA723: allocation-conscious Java).\n            Runbook: docs/runbooks/RUNBOOK_backtest.md#jvm\n\
-    \          runbook: docs/runbooks/RUNBOOK_backtest.md\n\n      # Queue depth (PLACEHOLDER contract,\
-    \ like LiveVsBacktestDrift): no\n      # producer emits eventbus_queue_depth yet \u2014 the rust eventbus\
-    \ crate has\n      # no exporter wired. The alert can never fire until one exists; kept as\n     \
-    \ # the pinned name/threshold contract (deployment/grafana/README.md).\n      - alert: QueueDepthHigh\n\
-    \        expr: eventbus_queue_depth > 100000\n        for: 2m\n        labels:\n          severity:\
-    \ critical\n          domain: infrastructure\n        annotations:\n          summary: \"Event-bus\
-    \ queue depth {{ $value | humanize }} on {{ $labels.service }}\"\n          description: >\n     \
-    \       PLACEHOLDER metric \u2014 no producer exports eventbus_queue_depth yet.\n            Contract:\
-    \ sustained backlog above 100k events \u2014 downstream consumer\n            stalled or throughput\
-    \ regression; latency SLOs are already violated\n            at this depth. Runbook: docs/runbooks/RUNBOOK_data_pipeline.md#queue-depth\n\
-    \          runbook: docs/runbooks/RUNBOOK_data_pipeline.md\n\n      # A scrape target disappearing\
-    \ is itself an incident.\n      - alert: TargetDown\n        expr: up == 0\n        for: 2m\n    \
-    \    labels:\n          severity: critical\n          domain: infrastructure\n        annotations:\n\
-    \          summary: \"Scrape target {{ $labels.job }}/{{ $labels.instance }} down\"\n          description:\
-    \ >\n            Prometheus cannot scrape {{ $labels.instance }}. If this is\n            java-platform\
-    \ during a trading session, treat as a platform\n            incident. Runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md\n\
-    \          runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md\n"
+    \          runbook: docs/runbooks/RUNBOOK_backtest.md\n\n      # Queue depth (PLACEHOLDER contract):\
+    \ no\n      # producer emits eventbus_queue_depth yet \u2014 the rust eventbus crate has\n      #\
+    \ no exporter wired. The alert can never fire until one exists; kept as\n      # the pinned name/threshold\
+    \ contract (deployment/grafana/README.md).\n      - alert: QueueDepthHigh\n        expr: eventbus_queue_depth\
+    \ > 100000\n        for: 2m\n        labels:\n          severity: critical\n          domain: infrastructure\n\
+    \        annotations:\n          summary: \"Event-bus queue depth {{ $value | humanize }} on {{ $labels.service\
+    \ }}\"\n          description: >\n            PLACEHOLDER metric \u2014 no producer exports eventbus_queue_depth\
+    \ yet.\n            Contract: sustained backlog above 100k events \u2014 downstream consumer\n   \
+    \         stalled or throughput regression; latency SLOs are already violated\n            at this\
+    \ depth. Runbook: docs/runbooks/RUNBOOK_data_pipeline.md#queue-depth\n          runbook: docs/runbooks/RUNBOOK_data_pipeline.md\n\
+    \n      # A scrape target disappearing is itself an incident.\n      - alert: TargetDown\n       \
+    \ expr: up == 0\n        for: 2m\n        labels:\n          severity: critical\n          domain:\
+    \ infrastructure\n        annotations:\n          summary: \"Scrape target {{ $labels.job }}/{{ $labels.instance\
+    \ }} down\"\n          description: >\n            Prometheus cannot scrape {{ $labels.instance }}.\
+    \ If this is\n            java-platform during a trading session, treat as a platform\n          \
+    \  incident. Runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md\n          runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md\n"
   prometheus.yml: "# =============================================================================\n#\
     \ prometheus.yml \u2014 Intraday Alpha Platform scrape configuration (spec \xA725)\n#\n# Two sources\
     \ of metrics:\n#   1. java-platform  \u2014 com.iap.monitoring registry served by\n#      com.iap.api.MetricsServer\
@@ -130,7 +133,7 @@ data:
     \      - record: job:venue_market_events:rate5m\n        expr: sum by (job, service) (rate(venue_market_events_total[5m]))\n\
     \n      # Sequence-gap / duplicate / out-of-order rates (per second).\n      - record: job:md_sequence_gaps:rate5m\n\
     \        expr: sum by (job, service) (rate(md_sequence_gaps_total[5m]))\n      - record: job:md_duplicates:rate5m\n\
-    \        expr: sum by (job, service) (rate(md_duplicates_total[5m]))\n      # PLACEHOLDER (like LiveVsBacktestDrift):\
+    \        expr: sum by (job, service) (rate(md_duplicates_total[5m]))\n      # PLACEHOLDER (like QueueDepthHigh):\
     \ no producer emits\n      # md_out_of_order_total yet \u2014 out-of-order arrivals are counted in\n\
     \      # qc_report.json but not exported as a metric. The rule evaluates to\n      # empty until a\
     \ producer exists (deployment/grafana/README.md).\n      - record: job:md_out_of_order:rate5m\n  \

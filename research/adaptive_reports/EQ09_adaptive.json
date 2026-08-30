@@ -1,0 +1,157 @@
+{
+  "alpha_id": "EQ09",
+  "deploy_start": 1787587200000000000,
+  "horizon": "10s",
+  "ic_baseline": {
+    "alpha_id": "EQ09",
+    "bucket_ns": 300000000000,
+    "horizon": "10s",
+    "ic_mean": 0.040699157418539085,
+    "ic_std": 0.08949779228822308,
+    "kind": "ic",
+    "n_buckets_baseline": 29,
+    "name": "run_eq09_ic",
+    "source": "warmup window [1787578200000000000, 1787587200000000000) of the bundled feature frames, universe [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]",
+    "x-version": 1
+  },
+  "n_blocks": 112,
+  "policies": {
+    "drift_triggered": {
+      "deployed_ic": 0.08021225438855126,
+      "drift_event_count": 0,
+      "final_state": "ACTIVE",
+      "gross_pnl": 1390.0000000000327,
+      "lifecycle_transitions": [],
+      "n_evals": 112,
+      "n_ic_evals": 16,
+      "net_pnl": -31832.66500200952,
+      "policy": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "refit_count": 1,
+      "refit_events": [
+        {
+          "block": 0,
+          "n_train": 43819,
+          "reasons": [
+            "initial deployment fit"
+          ],
+          "ts": 1787587200000000000
+        }
+      ],
+      "rolling_ic_mean": 0.05782743834955527,
+      "rolling_ic_std": 0.01568142817439971,
+      "total_costs": 33222.66500200957,
+      "trade_count": 2010
+    },
+    "scheduled_daily": {
+      "deployed_ic": 0.08001679196399603,
+      "drift_event_count": 0,
+      "final_state": "ACTIVE",
+      "gross_pnl": 1425.0000000000184,
+      "lifecycle_transitions": [],
+      "n_evals": 112,
+      "n_ic_evals": 16,
+      "net_pnl": -32369.377763083416,
+      "policy": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "refit_count": 2,
+      "refit_events": [
+        {
+          "block": 0,
+          "n_train": 43819,
+          "reasons": [
+            "initial deployment fit"
+          ],
+          "ts": 1787587200000000000
+        },
+        {
+          "block": 32,
+          "n_train": 47235,
+          "reasons": [
+            "scheduled: period boundary crossed (1787587200000000000 -> 1787616000000000000, period 86400000000000)"
+          ],
+          "ts": 1787616000000000000
+        }
+      ],
+      "rolling_ic_mean": 0.05792402178342643,
+      "rolling_ic_std": 0.01570782477382752,
+      "total_costs": 33794.37776308347,
+      "trade_count": 2043
+    },
+    "scheduled_weekly": {
+      "deployed_ic": 0.08021225438855126,
+      "drift_event_count": 0,
+      "final_state": "ACTIVE",
+      "gross_pnl": 1390.0000000000327,
+      "lifecycle_transitions": [],
+      "n_evals": 112,
+      "n_ic_evals": 16,
+      "net_pnl": -31832.66500200952,
+      "policy": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "refit_count": 1,
+      "refit_events": [
+        {
+          "block": 0,
+          "n_train": 43819,
+          "reasons": [
+            "initial deployment fit"
+          ],
+          "ts": 1787587200000000000
+        }
+      ],
+      "rolling_ic_mean": 0.05782743834955527,
+      "rolling_ic_std": 0.01568142817439971,
+      "total_costs": 33222.66500200957,
+      "trade_count": 2010
+    },
+    "static": {
+      "deployed_ic": 0.08021225438855126,
+      "drift_event_count": 0,
+      "final_state": "ACTIVE",
+      "gross_pnl": 1390.0000000000327,
+      "lifecycle_transitions": [],
+      "n_evals": 112,
+      "n_ic_evals": 16,
+      "net_pnl": -31832.66500200952,
+      "policy": {
+        "policy": "static"
+      },
+      "refit_count": 1,
+      "refit_events": [
+        {
+          "block": 0,
+          "n_train": 43819,
+          "reasons": [
+            "initial deployment fit"
+          ],
+          "ts": 1787587200000000000
+        }
+      ],
+      "rolling_ic_mean": 0.05782743834955527,
+      "rolling_ic_std": 0.01568142817439971,
+      "total_costs": 33222.66500200957,
+      "trade_count": 2010
+    }
+  },
+  "universe": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10
+  ]
+}

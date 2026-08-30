@@ -58,11 +58,16 @@ Watch the **Trading & Risk** dashboard:
   means feature validity flags (stale books ⇒ invalid ⇒ no signals — check
   gap rate first), warmup after a restart, or a wedged engine.
 - **Live-vs-backtest drift**. {#drift}
-  `alpha_live_vs_backtest_drift` compares live signal distribution to the
-  walk-forward distribution. The 0.25 threshold is a placeholder — calibrate
-  after the first paper week and record the chosen value in the alert rule
-  with a review. Persistent drift is a no-go for gate 12 and a retirement
-  trigger for live strategies (gate 13).
+  `alpha_live_vs_backtest_drift{alpha=...}` (LIVE from java,
+  `com.iap.adaptive.DriftMonitor`) is the Population Stability Index of the
+  rolling live signal window vs the research baseline
+  (`research/baselines/*.json`; pinned formula in `/API_ADAPTIVE.md`). The
+  0.25 alert threshold is the standard industry PSI rule of thumb (< 0.1
+  stable, 0.1–0.25 moderate, > 0.25 significant shift); at the same edge
+  `alpha_lifecycle_state` marks the alpha RETIRED (WATCH from 0.10, or when
+  the rolling realized IC `alpha_rolling_ic` goes negative). Persistent
+  drift is a no-go for gate 12 and a retirement trigger for live strategies
+  (gate 13).
 - **Fill rate**. {#fill-rate}
   `FillRateDrop` below half of baseline: inspect venue sim rejects
   (`venue_orders_rejected_total`), queue-position assumptions, and whether

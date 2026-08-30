@@ -33,6 +33,12 @@ import org.junit.runners.Suite;
     MetricsTest.class,
     ApiServerTest.class,
     ConfigServiceTest.class,
+    PsiTest.class,
+    AdaptiveGoldenTest.class,
+    BaselineLoaderTest.class,
+    DriftMonitorTest.class,
+    RollingIcTest.class,
+    LifecycleGaugeTest.class,
     PaperTradingSmokeTest.class,
 })
 public class AllTests {

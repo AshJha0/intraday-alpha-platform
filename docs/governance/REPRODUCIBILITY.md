@@ -89,3 +89,12 @@ manifest; never rebuild-and-hope.
 - A manifest with `git_commit = unversioned-workspace` or
   `data_version = no-qc-report` is a research scratch run and can never pass
   promotion gate 5 (GOVERNANCE.md).
+
+### Known historical manifests
+
+`research/models/run_0001…run_0007` predate the market-data generator fix
+(the crossed-book artifact repair) and pin `data_version 4b77389e…`, a
+dataset the current generator no longer produces; they are retained
+because the ledger is append-only history, but the §3 reconstruction
+recipe cannot be executed for them from this snapshot. Every run from
+`run_0008` onward pins the live dataset hash and is fully reconstructible.

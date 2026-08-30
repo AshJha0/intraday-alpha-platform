@@ -61,17 +61,39 @@ public final class MetricsRegistry {
     }
 
     /**
+     * Metric name without any {@code {label="..."}} suffix. Registry keys
+     * may carry a label set (e.g.
+     * {@code alpha_live_vs_backtest_drift{alpha="EQ01"}}); the exposition's
+     * {@code # TYPE} line must name the bare metric, emitted once per
+     * family (labeled series of one family sort adjacently in a TreeMap).
+     */
+    private static String baseName(String key) {
+        int brace = key.indexOf('{');
+        return brace < 0 ? key : key.substring(0, brace);
+    }
+
+    /**
      * Prometheus text exposition (metrics sorted by name; histogram buckets
      * cumulative, empty buckets skipped, {@code +Inf} always present).
      */
     public String toPrometheus() {
         StringBuilder out = new StringBuilder(1024);
+        String typed = null;
         for (Map.Entry<String, Counter> e : counters.entrySet()) {
-            out.append("# TYPE ").append(e.getKey()).append(" counter\n");
+            String base = baseName(e.getKey());
+            if (!base.equals(typed)) {
+                out.append("# TYPE ").append(base).append(" counter\n");
+                typed = base;
+            }
             out.append(e.getKey()).append(' ').append(e.getValue().get()).append('\n');
         }
+        typed = null;
         for (Map.Entry<String, Gauge> e : gauges.entrySet()) {
-            out.append("# TYPE ").append(e.getKey()).append(" gauge\n");
+            String base = baseName(e.getKey());
+            if (!base.equals(typed)) {
+                out.append("# TYPE ").append(base).append(" gauge\n");
+                typed = base;
+            }
             out.append(e.getKey()).append(' ').append(num(e.getValue().get())).append('\n');
         }
         for (Map.Entry<String, Histogram> e : histograms.entrySet()) {

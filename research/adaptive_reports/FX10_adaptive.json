@@ -1,0 +1,681 @@
+{
+  "alpha_id": "FX10",
+  "deploy_start": 1787538602028520532,
+  "horizon": "1m",
+  "ic_baseline": {
+    "alpha_id": "FX10",
+    "bucket_ns": 300000000000,
+    "horizon": "1m",
+    "ic_mean": 0.1359950084982177,
+    "ic_std": 0.12337488068102348,
+    "kind": "ic",
+    "n_buckets_baseline": 12,
+    "name": "run_fx10_ic",
+    "source": "warmup window [1787529602028520532, 1787538602028520532) of the bundled feature frames, universe [101, 102, 103, 104, 105, 106, 107, 108]",
+    "x-version": 1
+  },
+  "n_blocks": 169,
+  "policies": {
+    "drift_triggered": {
+      "deployed_ic": 0.053060282648740825,
+      "drift_event_count": 156,
+      "final_state": "WATCH",
+      "gross_pnl": 36735.00000001429,
+      "lifecycle_transitions": [
+        {
+          "alpha_id": "FX10",
+          "eval_index": 71,
+          "event_ts": 1787602502028520532,
+          "from": "ACTIVE",
+          "policy": "drift_triggered",
+          "reason": "rolling_ic -0.063891 < watch gate 0.0",
+          "rolling_ic": -0.06389121052742786,
+          "to": "WATCH"
+        },
+        {
+          "alpha_id": "FX10",
+          "eval_index": 76,
+          "event_ts": 1787607002028520532,
+          "from": "WATCH",
+          "policy": "drift_triggered",
+          "reason": "persistent breach: 6 consecutive evals below watch gate 0.0",
+          "rolling_ic": -0.16703033119384397,
+          "to": "RETIRED"
+        },
+        {
+          "alpha_id": "FX10",
+          "eval_index": 90,
+          "event_ts": 1787619602028520532,
+          "from": "RETIRED",
+          "policy": "drift_triggered",
+          "reason": "recovery from retirement: 3 consecutive evals >= reactivate gate 0.005; probation before ACTIVE",
+          "rolling_ic": 0.159420230606004,
+          "to": "WATCH"
+        },
+        {
+          "alpha_id": "FX10",
+          "eval_index": 93,
+          "event_ts": 1787622302028520532,
+          "from": "WATCH",
+          "policy": "drift_triggered",
+          "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
+          "rolling_ic": 0.15173548115060478,
+          "to": "ACTIVE"
+        },
+        {
+          "alpha_id": "FX10",
+          "eval_index": 149,
+          "event_ts": 1787672702028520532,
+          "from": "ACTIVE",
+          "policy": "drift_triggered",
+          "reason": "rolling_ic -0.021153 < watch gate 0.0",
+          "rolling_ic": -0.02115270016129954,
+          "to": "WATCH"
+        }
+      ],
+      "n_evals": 169,
+      "n_ic_evals": 61,
+      "net_pnl": -502129.4746377395,
+      "policy": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "refit_count": 41,
+      "refit_events": [
+        {
+          "block": 0,
+          "n_train": 3197,
+          "reasons": [
+            "initial deployment fit"
+          ],
+          "ts": 1787538602028520532
+        },
+        {
+          "block": 4,
+          "n_train": 4502,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25",
+            "psi[signal]=2.933042 > threshold 0.25"
+          ],
+          "ts": 1787542202028520532
+        },
+        {
+          "block": 8,
+          "n_train": 5855,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25",
+            "psi[signal]=2.933042 > threshold 0.25"
+          ],
+          "ts": 1787545802028520532
+        },
+        {
+          "block": 12,
+          "n_train": 7182,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25",
+            "psi[signal]=2.933042 > threshold 0.25"
+          ],
+          "ts": 1787549402028520532
+        },
+        {
+          "block": 16,
+          "n_train": 8499,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25",
+            "psi[signal]=2.933042 > threshold 0.25"
+          ],
+          "ts": 1787553002028520532
+        },
+        {
+          "block": 20,
+          "n_train": 9847,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25"
+          ],
+          "ts": 1787556602028520532
+        },
+        {
+          "block": 24,
+          "n_train": 11119,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25"
+          ],
+          "ts": 1787560202028520532
+        },
+        {
+          "block": 28,
+          "n_train": 12380,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25",
+            "psi[signal]=2.933042 > threshold 0.25"
+          ],
+          "ts": 1787563802028520532
+        },
+        {
+          "block": 32,
+          "n_train": 13692,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25",
+            "psi[signal]=2.933042 > threshold 0.25"
+          ],
+          "ts": 1787567402028520532
+        },
+        {
+          "block": 36,
+          "n_train": 14998,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25",
+            "psi[signal]=2.933042 > threshold 0.25"
+          ],
+          "ts": 1787571002028520532
+        },
+        {
+          "block": 40,
+          "n_train": 16268,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25",
+            "psi[signal]=2.933042 > threshold 0.25"
+          ],
+          "ts": 1787574602028520532
+        },
+        {
+          "block": 44,
+          "n_train": 17577,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25",
+            "ic_z=-2.1523 < threshold -2.0"
+          ],
+          "ts": 1787578202028520532
+        },
+        {
+          "block": 48,
+          "n_train": 18978,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25"
+          ],
+          "ts": 1787581802028520532
+        },
+        {
+          "block": 52,
+          "n_train": 20352,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25",
+            "psi[signal]=2.933042 > threshold 0.25"
+          ],
+          "ts": 1787585402028520532
+        },
+        {
+          "block": 56,
+          "n_train": 21709,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25",
+            "psi[signal]=2.933042 > threshold 0.25"
+          ],
+          "ts": 1787589002028520532
+        },
+        {
+          "block": 60,
+          "n_train": 23029,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25",
+            "psi[signal]=2.933042 > threshold 0.25"
+          ],
+          "ts": 1787592602028520532
+        },
+        {
+          "block": 64,
+          "n_train": 24319,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25",
+            "psi[signal]=2.933042 > threshold 0.25"
+          ],
+          "ts": 1787596202028520532
+        },
+        {
+          "block": 68,
+          "n_train": 25636,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25",
+            "psi[signal]=2.933042 > threshold 0.25"
+          ],
+          "ts": 1787599802028520532
+        },
+        {
+          "block": 72,
+          "n_train": 26204,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25",
+            "ic_z=-5.7356 < threshold -2.0"
+          ],
+          "ts": 1787603402028520532
+        },
+        {
+          "block": 76,
+          "n_train": 26204,
+          "reasons": [
+            "ic_z=-5.4921 < threshold -2.0"
+          ],
+          "ts": 1787607002028520532
+        },
+        {
+          "block": 87,
+          "n_train": 26104,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=11.141929 > threshold 0.25",
+            "psi[signal]=0.872899 > threshold 0.25"
+          ],
+          "ts": 1787616902028520532
+        },
+        {
+          "block": 91,
+          "n_train": 26165,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=6.491102 > threshold 0.25",
+            "psi[signal]=0.257455 > threshold 0.25"
+          ],
+          "ts": 1787620502028520532
+        },
+        {
+          "block": 95,
+          "n_train": 26236,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=6.627465 > threshold 0.25",
+            "psi[signal]=2.933042 > threshold 0.25"
+          ],
+          "ts": 1787624102028520532
+        },
+        {
+          "block": 99,
+          "n_train": 26220,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25",
+            "psi[signal]=2.933042 > threshold 0.25"
+          ],
+          "ts": 1787627702028520532
+        },
+        {
+          "block": 103,
+          "n_train": 26191,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25",
+            "psi[signal]=2.933042 > threshold 0.25"
+          ],
+          "ts": 1787631302028520532
+        },
+        {
+          "block": 107,
+          "n_train": 26166,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25",
+            "psi[signal]=2.933042 > threshold 0.25"
+          ],
+          "ts": 1787634902028520532
+        },
+        {
+          "block": 111,
+          "n_train": 26193,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25",
+            "psi[signal]=2.933042 > threshold 0.25"
+          ],
+          "ts": 1787638502028520532
+        },
+        {
+          "block": 115,
+          "n_train": 26127,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25"
+          ],
+          "ts": 1787642102028520532
+        },
+        {
+          "block": 119,
+          "n_train": 26160,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25"
+          ],
+          "ts": 1787645702028520532
+        },
+        {
+          "block": 123,
+          "n_train": 26222,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25",
+            "psi[signal]=2.933042 > threshold 0.25"
+          ],
+          "ts": 1787649302028520532
+        },
+        {
+          "block": 127,
+          "n_train": 26253,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25",
+            "psi[signal]=2.933042 > threshold 0.25"
+          ],
+          "ts": 1787652902028520532
+        },
+        {
+          "block": 131,
+          "n_train": 26268,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25",
+            "psi[signal]=2.933042 > threshold 0.25"
+          ],
+          "ts": 1787656502028520532
+        },
+        {
+          "block": 135,
+          "n_train": 26298,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25",
+            "psi[signal]=2.933042 > threshold 0.25"
+          ],
+          "ts": 1787660102028520532
+        },
+        {
+          "block": 139,
+          "n_train": 26320,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25"
+          ],
+          "ts": 1787663702028520532
+        },
+        {
+          "block": 143,
+          "n_train": 26159,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25"
+          ],
+          "ts": 1787667302028520532
+        },
+        {
+          "block": 147,
+          "n_train": 26057,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25",
+            "psi[signal]=2.933042 > threshold 0.25"
+          ],
+          "ts": 1787670902028520532
+        },
+        {
+          "block": 151,
+          "n_train": 26051,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25",
+            "psi[signal]=2.933042 > threshold 0.25"
+          ],
+          "ts": 1787674502028520532
+        },
+        {
+          "block": 155,
+          "n_train": 26009,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25",
+            "psi[signal]=2.933042 > threshold 0.25"
+          ],
+          "ts": 1787678102028520532
+        },
+        {
+          "block": 159,
+          "n_train": 26032,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25",
+            "psi[signal]=2.933042 > threshold 0.25"
+          ],
+          "ts": 1787681702028520532
+        },
+        {
+          "block": 163,
+          "n_train": 26008,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25",
+            "psi[signal]=2.933042 > threshold 0.25"
+          ],
+          "ts": 1787685302028520532
+        },
+        {
+          "block": 167,
+          "n_train": 26140,
+          "reasons": [
+            "psi[feature:minute_of_day_v1]=12.431670 > threshold 0.25",
+            "psi[signal]=0.280707 > threshold 0.25"
+          ],
+          "ts": 1787688902028520532
+        }
+      ],
+      "rolling_ic_mean": 0.08972621114445802,
+      "rolling_ic_std": 0.10394033299592392,
+      "total_costs": 538864.4746375,
+      "trade_count": 1455
+    },
+    "scheduled_daily": {
+      "deployed_ic": 0.05655940619923985,
+      "drift_event_count": 156,
+      "final_state": "ACTIVE",
+      "gross_pnl": 38670.00000002441,
+      "lifecycle_transitions": [
+        {
+          "alpha_id": "FX10",
+          "eval_index": 72,
+          "event_ts": 1787603402028520532,
+          "from": "ACTIVE",
+          "policy": "scheduled_daily",
+          "reason": "rolling_ic -0.167572 < watch gate 0.0",
+          "rolling_ic": -0.16757249622593234,
+          "to": "WATCH"
+        },
+        {
+          "alpha_id": "FX10",
+          "eval_index": 77,
+          "event_ts": 1787607902028520532,
+          "from": "WATCH",
+          "policy": "scheduled_daily",
+          "reason": "persistent breach: 6 consecutive evals below watch gate 0.0",
+          "rolling_ic": -0.16757249622593234,
+          "to": "RETIRED"
+        },
+        {
+          "alpha_id": "FX10",
+          "eval_index": 90,
+          "event_ts": 1787619602028520532,
+          "from": "RETIRED",
+          "policy": "scheduled_daily",
+          "reason": "recovery from retirement: 3 consecutive evals >= reactivate gate 0.005; probation before ACTIVE",
+          "rolling_ic": 0.15940953018092255,
+          "to": "WATCH"
+        },
+        {
+          "alpha_id": "FX10",
+          "eval_index": 93,
+          "event_ts": 1787622302028520532,
+          "from": "WATCH",
+          "policy": "scheduled_daily",
+          "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
+          "rolling_ic": 0.16251976103393875,
+          "to": "ACTIVE"
+        }
+      ],
+      "n_evals": 169,
+      "n_ic_evals": 54,
+      "net_pnl": -474560.63385020185,
+      "policy": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "refit_count": 2,
+      "refit_events": [
+        {
+          "block": 0,
+          "n_train": 3197,
+          "reasons": [
+            "initial deployment fit"
+          ],
+          "ts": 1787538602028520532
+        },
+        {
+          "block": 86,
+          "n_train": 26204,
+          "reasons": [
+            "scheduled: period boundary crossed (1787538602028520532 -> 1787616002028520532, period 86400000000000)"
+          ],
+          "ts": 1787616002028520532
+        }
+      ],
+      "rolling_ic_mean": 0.09426903567053403,
+      "rolling_ic_std": 0.11176205031960486,
+      "total_costs": 513230.63385,
+      "trade_count": 1464
+    },
+    "scheduled_weekly": {
+      "deployed_ic": 0.05781394000225534,
+      "drift_event_count": 156,
+      "final_state": "ACTIVE",
+      "gross_pnl": 39330.00000006946,
+      "lifecycle_transitions": [
+        {
+          "alpha_id": "FX10",
+          "eval_index": 72,
+          "event_ts": 1787603402028520532,
+          "from": "ACTIVE",
+          "policy": "scheduled_weekly",
+          "reason": "rolling_ic -0.167572 < watch gate 0.0",
+          "rolling_ic": -0.16757249622593234,
+          "to": "WATCH"
+        },
+        {
+          "alpha_id": "FX10",
+          "eval_index": 77,
+          "event_ts": 1787607902028520532,
+          "from": "WATCH",
+          "policy": "scheduled_weekly",
+          "reason": "persistent breach: 6 consecutive evals below watch gate 0.0",
+          "rolling_ic": -0.16757249622593234,
+          "to": "RETIRED"
+        },
+        {
+          "alpha_id": "FX10",
+          "eval_index": 90,
+          "event_ts": 1787619602028520532,
+          "from": "RETIRED",
+          "policy": "scheduled_weekly",
+          "reason": "recovery from retirement: 3 consecutive evals >= reactivate gate 0.005; probation before ACTIVE",
+          "rolling_ic": 0.157079005697738,
+          "to": "WATCH"
+        },
+        {
+          "alpha_id": "FX10",
+          "eval_index": 93,
+          "event_ts": 1787622302028520532,
+          "from": "WATCH",
+          "policy": "scheduled_weekly",
+          "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
+          "rolling_ic": 0.1601875426018626,
+          "to": "ACTIVE"
+        }
+      ],
+      "n_evals": 169,
+      "n_ic_evals": 54,
+      "net_pnl": -460337.76055020664,
+      "policy": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "refit_count": 1,
+      "refit_events": [
+        {
+          "block": 0,
+          "n_train": 3197,
+          "reasons": [
+            "initial deployment fit"
+          ],
+          "ts": 1787538602028520532
+        }
+      ],
+      "rolling_ic_mean": 0.09445208842558696,
+      "rolling_ic_std": 0.11230115945327356,
+      "total_costs": 499667.76054999995,
+      "trade_count": 1460
+    },
+    "static": {
+      "deployed_ic": 0.05781394000225534,
+      "drift_event_count": 156,
+      "final_state": "ACTIVE",
+      "gross_pnl": 39330.00000006946,
+      "lifecycle_transitions": [
+        {
+          "alpha_id": "FX10",
+          "eval_index": 72,
+          "event_ts": 1787603402028520532,
+          "from": "ACTIVE",
+          "policy": "static",
+          "reason": "rolling_ic -0.167572 < watch gate 0.0",
+          "rolling_ic": -0.16757249622593234,
+          "to": "WATCH"
+        },
+        {
+          "alpha_id": "FX10",
+          "eval_index": 77,
+          "event_ts": 1787607902028520532,
+          "from": "WATCH",
+          "policy": "static",
+          "reason": "persistent breach: 6 consecutive evals below watch gate 0.0",
+          "rolling_ic": -0.16757249622593234,
+          "to": "RETIRED"
+        },
+        {
+          "alpha_id": "FX10",
+          "eval_index": 90,
+          "event_ts": 1787619602028520532,
+          "from": "RETIRED",
+          "policy": "static",
+          "reason": "recovery from retirement: 3 consecutive evals >= reactivate gate 0.005; probation before ACTIVE",
+          "rolling_ic": 0.157079005697738,
+          "to": "WATCH"
+        },
+        {
+          "alpha_id": "FX10",
+          "eval_index": 93,
+          "event_ts": 1787622302028520532,
+          "from": "WATCH",
+          "policy": "static",
+          "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
+          "rolling_ic": 0.1601875426018626,
+          "to": "ACTIVE"
+        }
+      ],
+      "n_evals": 169,
+      "n_ic_evals": 54,
+      "net_pnl": -460337.76055020664,
+      "policy": {
+        "policy": "static"
+      },
+      "refit_count": 1,
+      "refit_events": [
+        {
+          "block": 0,
+          "n_train": 3197,
+          "reasons": [
+            "initial deployment fit"
+          ],
+          "ts": 1787538602028520532
+        }
+      ],
+      "rolling_ic_mean": 0.09445208842558696,
+      "rolling_ic_std": 0.11230115945327356,
+      "total_costs": 499667.76054999995,
+      "trade_count": 1460
+    }
+  },
+  "universe": [
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    108
+  ]
+}

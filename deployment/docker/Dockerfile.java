@@ -33,6 +33,7 @@ WORKDIR /build
 COPY java java
 COPY tests/golden tests/golden
 COPY configs configs
+COPY research/baselines research/baselines
 
 # JUnit4 + Hamcrest must be LOCAL jars (no network) — note they are two
 # SEPARATE jars: junit4.jar and hamcrest-core.jar (docs/BUILD_NOTES.md).
@@ -59,6 +60,9 @@ WORKDIR /app
 COPY --from=build /build/java/out/main /app/classes
 COPY --from=build /build/tests/golden /golden
 COPY --from=build /build/configs /app/configs
+# Research signal baselines (API_ADAPTIVE.md): arm the live drift monitor
+# (alpha_live_vs_backtest_drift) with the pinned PSI baselines.
+COPY --from=build /build/research/baselines /app/baselines
 
 USER iap
 
@@ -82,6 +86,7 @@ ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -cp /app/classes \
     com.iap.platform.PaperTrading \
     --configs /app/configs \
     --events /golden/events_eq_mbo.jsonl \
+    --baselines /app/baselines \
     --mode realtime --speed 60 \
     --port 8080 \
     --report /tmp/paper_session_report.json"]

@@ -26,9 +26,10 @@ Contents:
 11. [TCA: decomposing execution cost](#11-tca-decomposing-execution-cost)
 12. [Cross-language golden parity as an engineering discipline](#12-cross-language-golden-parity-as-an-engineering-discipline)
 13. [Latency economics](#13-latency-economics)
-14. [Twelve pitfalls this platform is built to avoid](#14-twelve-pitfalls-this-platform-is-built-to-avoid)
-15. [Ten interview questions (with answers from this repo)](#15-ten-interview-questions-with-answers-from-this-repo)
-16. [Further reading](#16-further-reading)
+14. [Adaptability: evolving faster than you decay](#14-adaptability-evolving-faster-than-you-decay)
+15. [Twelve pitfalls this platform is built to avoid](#15-twelve-pitfalls-this-platform-is-built-to-avoid)
+16. [Ten interview questions (with answers from this repo)](#16-ten-interview-questions-with-answers-from-this-repo)
+17. [Further reading](#17-further-reading)
 
 ---
 
@@ -456,9 +457,12 @@ the last gate. Worked examples, straight from the master table:
 
 Every walk-forward evaluation, decay horizon, stress variant, and backtest is
 recorded in an append-only ledger (`research/experiments.json`) — 21 looks
-per alpha per run plus a one-time 216-look design scan; **1,224 experiments**
-at the committed run. The report translates that into a selection yardstick:
-Bonferroni per-test threshold |t| ≥ 4.10, and an expected **max |t| ≈ 3.77
+per alpha per run plus a one-time 216-look design scan gave **1,224
+experiments** at the committed promotion run; the adaptive-deployment study
+(§14) then added 12,082 counted looks of its own across its two committed runs — 6,041 per run (every drift evaluation,
+rolling-IC reading, refit and final backtest), bringing the ledger to
+**13,306**. The ledger translates that into a selection yardstick:
+Bonferroni per-test threshold |t| ≥ 4.62, and an expected **max |t| ≈ 4.36
 under the global null** across the ledger. Meaning: an alpha waving t = 1.7
 (FX04) is *consistent with pure selection* over this many trials, and the
 report says so in print. Most quant shops track this informally at best; here
@@ -763,8 +767,8 @@ match**.
   the portfolio golden is checked against an SLSQP optimum. Golden files are
   regenerated only deliberately, with a MIGRATIONS.md entry.
 - **One command proves parity**: `tests/harness/run_all.sh` runs all four
-  suites and prints the table (a full harness run: python 443, cpp 175,
-  rust 181, java 291 tests passed; golden groups 45/37/36/13; all PASS).
+  suites and prints the table (a full harness run: python 489, cpp 175,
+  rust 181, java 315 tests passed; golden groups 49/37/36/13; all PASS).
 
 ### 12.3 Why it changes how you write code
 
@@ -815,7 +819,174 @@ family.
 
 ---
 
-## 14. Twelve pitfalls this platform is built to avoid
+## 14. Adaptability: evolving faster than you decay
+
+### 14.1 Why static models rot
+
+Every fitted alpha is a snapshot of a joint distribution — feature values,
+their relationship to forward returns, the cost surface — taken over its
+training window. Markets do not honor snapshots: volatility regimes shift,
+liquidity migrates, competitors crowd the signal, and the microstructure
+itself changes (tick regimes, fee schedules, venue mixes). The result is
+the best-documented phenomenon in live quant trading: **realized IC decays
+relative to the research backtest**, sometimes gradually, sometimes in a
+break. A platform that only validates at promotion time is betting that
+the snapshot stays true forever. Spec §20's last two steps (12-13 —
+continuous monitoring, retirement criteria) exist precisely because it
+never does. The adaptability layer (`python/src/iap/adaptive` — reference;
+`iap.backtest.adaptive` — deployment semantics; `com.iap.adaptive` — the
+live Java port; contract in `/API_ADAPTIVE.md`) is this platform's
+implementation of those steps: *measure* decay, *refit* when the evidence
+says the input distribution moved, and *retire* alphas whose realized IC
+stops clearing the gate.
+
+### 14.2 Detecting drift: PSI and KS
+
+The primary monitor is the **Population Stability Index** of a live
+distribution (the alpha's signal, and each feature it declares) against a
+research-window baseline. The formula is pinned in API_ADAPTIVE.md §2:
+bucket the baseline into deciles (9 interior edges, linear-interpolation
+quantiles), assign each live value `v` to bucket `searchsorted(edges, v,
+side='left')` — a value exactly on an edge falls in the *lower* bucket —
+and with live fraction `a_i` and baseline fraction `E_i`, both clamped
+below at `1e-6` (no renormalization):
+
+```
+PSI = Σ_{i=0..9} (a_i − E_i) · ln(a_i / E_i)
+```
+
+The conventional reading is ~0.1 modest shift, ~0.25 significant; the
+pinned trigger is strict `PSI > 0.25`. Fewer than 200 finite live values
+reports **null**, never 0 — "no data" and "no drift" are different facts.
+A two-sample Kolmogorov–Smirnov test (D plus the Numerical Recipes
+asymptotic p, 100 terms, pinned) is computed alongside as a diagnostic
+but never triggers anything: KS p-values on thousands of correlated
+microstructure observations reject constantly, while PSI's bucketed view
+degrades gracefully. Both are golden-tested to 1e-10 from a
+SplitMix64-seeded recipe (`tests/golden/expected_adaptive.json`), so the
+Java monitor provably computes the same number as the Python reference.
+Alongside distribution drift, a **rolling realized-vs-research IC**
+z-score (`z = (mean live bucket ICs − ic_mean) / (ic_std / √n)`) watches
+the thing you actually care about — is the alpha still predicting? — with
+maturity handled correctly: a row only enters the rolling IC once its
+label horizon has fully elapsed.
+
+### 14.3 Refit policies: static, scheduled, drift-triggered
+
+`iap.adaptive.refit` pins three policy families, all pure functions of
+`(now, last_fit, PSI values, ic_z)` — no wall clock, no randomness:
+
+- **static** — fit once, never again. Zero refit cost and zero churn, and
+  the honest baseline every adaptive scheme must beat; its failure mode is
+  unbounded staleness.
+- **scheduled** — refit on an epoch-aligned calendar cadence (weekly and
+  daily instances are pinned). Predictable and audit-friendly, but it
+  refits whether or not anything changed *and* can sleep through a fast
+  break between boundaries.
+- **drift_triggered** — refit when any monitored PSI exceeds 0.25 or the
+  rolling-IC z drops below −2.0, rate-limited by a 1-hour minimum gap.
+  Reactive exactly when the evidence moves — but it inherits the quality
+  of its monitors, and a misconfigured monitor turns it into a refit
+  treadmill (see the FX10 lesson below).
+
+In the study (`research/adaptive_reports/ADAPTIVE_REPORT.md`), across 10
+alphas the policies performed 10 (static) / 20 (daily) / **113
+(drift-triggered)** total refits — and none of that activity changed the
+economics: every alpha stays net-negative after costs, and the P&L spread
+between policies is one to two orders of magnitude smaller than the cost
+drag. Refitting neither rescues nor ruins any alpha here.
+
+### 14.4 The lifecycle state machine: hysteresis against flapping
+
+Monitoring produces a noisy scalar (rolling IC) and the platform must
+turn it into a discrete allocation decision. A naive threshold would flap
+— allocate, deallocate, reallocate on every noise excursion. The pinned
+state machine (`iap.adaptive.lifecycle`, API_ADAPTIVE.md §6) is built
+around **hysteresis**:
+
+- **ACTIVE** → WATCH on a rolling IC below 0.0 (the entering breach counts
+  as breach #1). Still allocated — WATCH is probation, not punishment.
+- **WATCH** → RETIRED only after **6 consecutive** breaches; back to
+  ACTIVE only after **3 consecutive** readings at or above 0.005. A
+  reading in the neutral zone `[0.0, 0.005)` resets *both* counters —
+  ambiguous evidence restarts the clock in both directions.
+- **RETIRED** — allocation verifiably halted (the adaptive backtest forces
+  positions flat), but *shadow scoring continues*, so the pinned
+  re-activation path stays reachable: 3 consecutive recoveries earn WATCH
+  — probation again, never a straight jump back to ACTIVE.
+
+A null rolling IC (too little matured data) causes no transition at all.
+Every transition appends a JSON line to `research/lifecycle_log.jsonl`
+with the alpha, policy, timestamp, states, reason and the IC that caused
+it — 248 in the committed study — and the asymmetry of the design (fast
+to suspicion, slow to trust) is the point. Six alphas hit RETIRED under
+at least one policy; FX01 finishes RETIRED under all four, which is the
+system doing its job: a REJECT-grade alpha (promotion IC −0.015) that
+should never have been deployed gets caught and shut off by the live
+gate.
+
+### 14.5 The live monitoring loop
+
+The research layer *serializes its expectations*: decile edges, expected
+fractions and IC baselines are written to `research/baselines/*.json`
+(API_ADAPTIVE.md §1), and the Java paper-trading platform consumes those
+files unchanged — the same numbers the study monitored against are the
+numbers production is monitored against. `com.iap.adaptive`
+(BaselineLoader, Psi, DriftMonitor, RollingIc, LifecycleGauge) feeds
+three live Prometheus gauges, no longer placeholders:
+
+- `alpha_live_vs_backtest_drift{alpha=...}` — PSI of the live signal
+  against its research baseline;
+- `alpha_rolling_ic{alpha=...}` — realized IC over the trailing window,
+  matured rows only;
+- `alpha_lifecycle_state{alpha=...}` — 0 ACTIVE / 1 WATCH / 2 RETIRED.
+
+The `LiveVsBacktestDrift` alert fires on PSI > 0.25 — the same pinned
+threshold as the research trigger — and the Trading & Risk Grafana
+dashboard plots all three. Monitoring is observational by construction:
+it never feeds back into a trading decision mid-session, so determinism
+and replayability are untouched. Recipe 19 in the COOKBOOK scrapes all
+three gauges from a live paced session.
+
+### 14.6 FX10, or: how to choose monitors badly
+
+The study's deliberate teaching case. FX10 declares `minute_of_day_v1`
+among its features, and its drift baselines were captured from a
+morning warmup — so as the session simply *progresses*, the live
+minute-of-day distribution walks away from the baseline **by
+construction**. PSI dutifully exceeds 0.25 at almost every evaluation:
+FX10 logs 156 drift events where no other alpha logs more than 23, and
+under the drift-triggered policy it refits 41 times (vs 1 static) while
+ending in a *worse* deployed IC and P&L than static. Nothing
+malfunctioned — the machinery behaved exactly as pinned. The lesson is
+about **monitor selection**: deterministic calendar features do not
+belong in a drift trigger, because their "drift" carries no information
+about model validity. In a production review this is exactly the class
+of misconfiguration a drift-monitor checklist must catch, and the report
+leaves the false positive visible on purpose rather than quietly
+excluding the feature.
+
+### 14.7 The honest limits
+
+Two synthetic sessions (~2.6 dense hours each) cannot rank refit
+policies, and the report leads with that instead of burying it:
+SCHEDULED(weekly) crosses no week boundary, so it is *identical to
+static by construction*; daily fires exactly once; the generator has no
+real regime shifts, so most drift-triggered refits come from the noisy
+rolling-IC z rather than genuine distribution breaks; and every P&L
+difference between policies is within noise. What the study *does*
+establish is the part you can establish at this sample size: the
+machinery is deterministic and leak-free (refits train only on purged,
+embargoed history — asserted at runtime and shift-tested), triggers fire
+exactly when the pinned rules say, retirement verifiably halts
+allocation, and all 12,082 study looks (6,041 per run, two runs recorded) are counted in the multiple-testing
+ledger. "We built the machinery and proved it behaves; we did not prove
+it makes money" is the adaptability layer's version of the platform's
+central discipline: research truth over backtest cosmetics.
+
+---
+
+## 15. Twelve pitfalls this platform is built to avoid
 
 1. **Lookahead in labels or benchmarks.** One pinned at-or-before rule for
    labels, TCA and features; shift-by-one tests enforce it mechanically.
@@ -823,8 +994,9 @@ family.
    harness masks everything else and demands identical output.
 3. **Random splits on overlapping labels.** Walk-forward only, purge at the
    label horizon, 60 s embargo (§6.2).
-4. **Uncounted multiple testing.** An append-only ledger (1,224 experiments)
-   with a printed expected-max-|t| yardstick; t = 1.7 is called what it is.
+4. **Uncounted multiple testing.** An append-only ledger (13,306 looks,
+   12,082 of them from the adaptive study alone) with a printed
+   expected-max-|t| yardstick; t = 1.7 is called what it is.
 5. **Ignoring costs until the end.** Cost-adjusted labels, cost-stressed
    backtests, and a promotion gate requiring net P&L > 0 at 1× costs — which
    is exactly what stopped OFI (§6.5).
@@ -851,7 +1023,7 @@ family.
 
 ---
 
-## 15. Ten interview questions (with answers from this repo)
+## 16. Ten interview questions (with answers from this repo)
 
 **Q1. Why can order-flow imbalance be a real predictor and still lose
 money?**
@@ -937,7 +1109,7 @@ bottlenecked, weighted per alpha family.
 
 ---
 
-## 16. Further reading
+## 17. Further reading
 
 Inside this repository, in suggested order:
 
@@ -945,14 +1117,17 @@ Inside this repository, in suggested order:
    worth memorizing.
 2. `PLATFORM_CONVENTIONS.md` + `schemas/FORMAT.md` — how contracts get pinned.
 3. `API_CORE.md` → `API_FEATURES.md` → `API_ALPHA.md` →
-   `API_PORTFOLIO_TCA.md` — the four port contracts, increasingly rich.
+   `API_PORTFOLIO_TCA.md` → `API_ADAPTIVE.md` — the five port contracts,
+   increasingly rich.
 4. `research/alpha_reports/REPORT.md` — read the master table cold, then
    re-read §6 above.
 5. `research/ml_reports/ML_REPORT.md` — the crossed-book artifact, in the
    authors' own numbers.
-6. `docs/papers/INDEX.md` — all six papers; paper 4 (latency) and paper 6
+6. `research/adaptive_reports/ADAPTIVE_REPORT.md` — the adaptive study;
+   start with "READ THIS FIRST", then §14 above.
+7. `docs/papers/INDEX.md` — all six papers; paper 4 (latency) and paper 6
    (C++/Rust/Java case study) especially.
-7. `cpp/include/iap/execution/execution.hpp` — the header comment is the
+8. `cpp/include/iap/execution/execution.hpp` — the header comment is the
    best short document on deterministic fill modeling in the repo.
 
 Classic external literature these designs draw on (find current editions):

@@ -18,7 +18,10 @@ events/s (`benchmarks/results_cpp.md`); demo-scale replay throughput is
 ≈ 6.9M events/s for Rust and ≈ 3.5M events/s for Java (different
 measurement boundaries, disclosed below). All four suites pass in the
 same harness run: Python 443 tests (45 golden), C++ 175 (37), Rust 181
-(36), Java 291 (13). Architecturally, all three ports converge on the same
+(36), Java 291 (13) — the counts of this paper's recorded 2026-08-29 run;
+the platform has since grown (the adaptability layer landed 2026-08-30)
+and the same harness now passes 489/175/181/315 (49/37/36/13 golden).
+Architecturally, all three ports converge on the same
 low-latency discipline — pooled objects, free lists, intrusive FIFO lists,
 open-addressing indices, no steady-state allocation — but pay for it in
 different currencies: C++ in manual invariant discipline, Rust in a
@@ -167,6 +170,13 @@ Full harness run (`tests/harness/run_all.sh`, this container, 2026-08-29):
 | cpp | 175 | 37 | PASS |
 | rust | 181 | 36 | PASS |
 | java | 291 | 13 | PASS |
+
+*Note (2026-08-30): the table above is the paper's timestamped
+measurement. After the adaptability layer landed (Python `iap.adaptive` +
+Java `com.iap.adaptive`, golden-pinned in
+`tests/golden/expected_adaptive.json`), the same harness passes
+python 489 (49 golden) / cpp 175 (37) / rust 181 (36) / java 315 (13) —
+the parity claim is unchanged; the suites grew.*
 
 Hardest evidence of parity: all languages must encode the golden vectors to
 byte-identical IAP1 with pinned SHA-256 digests

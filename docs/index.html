@@ -58,12 +58,13 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
 <div class="wrap">
   <h2>Measured, not claimed</h2>
   <div class="numbers">
-    Cross-language parity&nbsp;&nbsp;&nbsp; python 443&nbsp; · cpp 175&nbsp; · rust 181&nbsp; · java 291 tests — 1,090 green, one command<br>
+    Cross-language parity&nbsp;&nbsp;&nbsp; python 489&nbsp; · cpp 175&nbsp; · rust 181&nbsp; · java 315 tests — 1,160 green, one command<br>
     Golden suites&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; identical book states, byte-identical IAP1 SHA-256, features/alphas to 1e-9 in all four languages<br>
     C++ hot path&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; IAP1 decode 3.5 ns/event · book update 17.4 ns · replay 37M events/s · 48-feature engine ≈450 ns/event<br>
     Determinism&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; full dataset regeneration is byte-identical (sha256-verified); replays reproduce fills exactly<br>
     Feature factory&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 205 registered, versioned features across 10 families; validity-bitset semantics, no NaN ever valid<br>
-    Alpha research&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 24 flagship alphas · walk-forward + purging/embargo · 1,224-experiment multiple-testing ledger<br>
+    Alpha research&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 24 flagship alphas · walk-forward + purging/embargo · 13,306-look multiple-testing ledger<br>
+    Adaptive lifecycle&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; PSI/KS drift monitors · 113 drift-triggered refits in the study · retirement verifiably halts allocation<br>
     Verdicts (honest)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0 PROMOTE · 12 ITERATE · 12 REJECT — on clean synthetic data, nothing survives costs, and we say so
   </div>
 
@@ -134,6 +135,12 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
          (delay/trading/opportunity — exact identity), spread/impact/timing split,
          post-fill adverse-selection markouts at 100ms/1s/10s, and impact regression
          versus participation.</p></div>
+    <div class="card"><h3>Adaptive lifecycle</h3>
+      <p>Models decay, so the platform measures it: pinned PSI/KS drift monitors against
+         serialized research baselines, rolling realized-vs-research IC, drift-triggered
+         refits on purged/embargoed windows, and an IC-gated ACTIVE→WATCH→RETIRED state
+         machine with hysteresis that verifiably halts allocation — with live PSI, rolling-IC
+         and lifecycle gauges monitored in paper trading.</p></div>
     <div class="card"><h3>Cross-language golden parity</h3>
       <p>The Python reference generates validated golden vectors (events, book states,
          codec SHA-256, features, alphas, risk decisions, fills, portfolio); C++, Rust and

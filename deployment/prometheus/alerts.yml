@@ -68,12 +68,15 @@ groups:
             Runbook: docs/runbooks/RUNBOOK_paper_trading.md#signal-rate
           runbook: docs/runbooks/RUNBOOK_paper_trading.md
 
-      # Live-vs-backtest drift (PLACEHOLDER contract): no producer emits
-      # alpha_live_vs_backtest_drift yet — the Java monitoring endpoint is
-      # live but does not compute this statistic. Contract: a KS-style
-      # statistic in [0, 1] comparing the live signal distribution to the
-      # walk-forward backtest distribution for the same regime (spec §25
-      # "alpha health").
+      # Live-vs-backtest drift (LIVE from java: com.iap.adaptive.DriftMonitor
+      # via com.iap.platform.PaperTrading, labeled {alpha="..."}). The
+      # statistic is the pinned Population Stability Index of the rolling
+      # live signal window vs the research baseline (API_ADAPTIVE.md /
+      # research/baselines/*.json): 10 baseline-quantile buckets,
+      # sum((live-base)*ln(live/base)), fractions floored at 1e-6.
+      # Threshold 0.25 is the standard industry PSI rule of thumb
+      # (< 0.1 stable, 0.1-0.25 moderate, > 0.25 significant shift) —
+      # see deployment/grafana/README.md.
       - alert: LiveVsBacktestDrift
         expr: alpha_live_vs_backtest_drift > 0.25
         for: 30m
@@ -81,12 +84,14 @@ groups:
           severity: warning
           domain: alpha
         annotations:
-          summary: "Live signal distribution drifting from backtest ({{ $value | printf \"%.2f\" }})"
+          summary: "Live signal PSI drift on {{ $labels.alpha }} ({{ $value | printf \"%.2f\" }})"
           description: >
-            Placeholder threshold 0.25 on the drift statistic; calibrate after
-            the first paper-trading week. Persistent drift is a retirement
-            trigger per spec §20 step 13.
-            Runbook: docs/runbooks/RUNBOOK_paper_trading.md#drift
+            Live signal distribution for {{ $labels.alpha }} has PSI > 0.25
+            vs its backtest baseline for 30m — a significant shift under the
+            industry rule of thumb. The lifecycle gauge
+            (alpha_lifecycle_state) marks the alpha RETIRED at the same
+            edge; persistent drift is a retirement trigger per spec §20
+            step 13. Runbook: docs/runbooks/RUNBOOK_paper_trading.md#drift
           runbook: docs/runbooks/RUNBOOK_paper_trading.md
 
   - name: iap-execution
@@ -157,7 +162,7 @@ groups:
             Runbook: docs/runbooks/RUNBOOK_backtest.md#jvm
           runbook: docs/runbooks/RUNBOOK_backtest.md
 
-      # Queue depth (PLACEHOLDER contract, like LiveVsBacktestDrift): no
+      # Queue depth (PLACEHOLDER contract): no
       # producer emits eventbus_queue_depth yet — the rust eventbus crate has
       # no exporter wired. The alert can never fire until one exists; kept as
       # the pinned name/threshold contract (deployment/grafana/README.md).

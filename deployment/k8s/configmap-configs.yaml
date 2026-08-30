@@ -495,40 +495,27 @@ data:
         "stale_feed_timeout_ns": 5000000000
       }
     }
-  strategies.json: |
-    {
-      "x-version": 1,
-      "description": "Strategy registry skeleton; alpha waves extend. All disabled by default.",
-      "defaults": {
-        "enabled": false,
-        "max_position_qty": 10000,
-        "signal_threshold": 0.0,
-        "horizon_ns": 1000000000,
-        "seed": 20260829
-      },
-      "strategies": [
-        {
-          "strategy_id": "EQ01_microprice",
-          "asset_class": "EQUITY",
-          "model_version": "unset"
-        },
-        {
-          "strategy_id": "EQ02_ofi_l1",
-          "asset_class": "EQUITY",
-          "model_version": "unset"
-        },
-        {
-          "strategy_id": "FX01_quote_imbalance",
-          "asset_class": "FX",
-          "model_version": "unset"
-        },
-        {
-          "strategy_id": "FX02_trade_flow",
-          "asset_class": "FX",
-          "model_version": "unset"
-        }
-      ]
-    }
+  strategies.json: "{\n  \"x-version\": 1,\n  \"description\": \"Strategy registry skeleton; alpha waves\
+    \ extend. All disabled by default. The 'adaptive' block pins the adaptability layer (drift thresholds,\
+    \ refit policies, lifecycle gates) \u2014 see /API_ADAPTIVE.md.\",\n  \"adaptive\": {\n    \"x-version\"\
+    : 1,\n    \"description\": \"Pinned adaptability parameters (iap.adaptive / iap.backtest.adaptive;\
+    \ normative contract /API_ADAPTIVE.md). All durations are event-time nanoseconds; no wall-clock anywhere.\"\
+    ,\n    \"block_ns\": 900000000000,\n    \"warmup_ns\": 9000000000000,\n    \"train_window_ns\": 86400000000000,\n\
+    \    \"embargo_ns\": 60000000000,\n    \"monitor_window_ns\": 3600000000000,\n    \"ic_window_ns\"\
+    : 7200000000000,\n    \"ic_bucket_ns\": 300000000000,\n    \"min_psi_samples\": 200,\n    \"min_ic_buckets\"\
+    : 4,\n    \"policies\": {\n      \"static\": {},\n      \"scheduled_weekly\": {\n        \"period_ns\"\
+    : 604800000000000\n      },\n      \"scheduled_daily\": {\n        \"period_ns\": 86400000000000\n\
+    \      },\n      \"drift_triggered\": {\n        \"psi_threshold\": 0.25,\n        \"ic_z_threshold\"\
+    : -2.0,\n        \"min_refit_gap_ns\": 3600000000000\n      }\n    },\n    \"lifecycle\": {\n    \
+    \  \"watch_ic_gate\": 0.0,\n      \"reactivate_ic_gate\": 0.005,\n      \"retire_breach_evals\": 6,\n\
+    \      \"reactivate_evals\": 3\n    }\n  },\n  \"defaults\": {\n    \"enabled\": false,\n    \"max_position_qty\"\
+    : 10000,\n    \"signal_threshold\": 0.0,\n    \"horizon_ns\": 1000000000,\n    \"seed\": 20260829\n\
+    \  },\n  \"strategies\": [\n    {\n      \"strategy_id\": \"EQ01_microprice\",\n      \"asset_class\"\
+    : \"EQUITY\",\n      \"model_version\": \"unset\"\n    },\n    {\n      \"strategy_id\": \"EQ02_ofi_l1\"\
+    ,\n      \"asset_class\": \"EQUITY\",\n      \"model_version\": \"unset\"\n    },\n    {\n      \"\
+    strategy_id\": \"FX01_quote_imbalance\",\n      \"asset_class\": \"FX\",\n      \"model_version\"\
+    : \"unset\"\n    },\n    {\n      \"strategy_id\": \"FX02_trade_flow\",\n      \"asset_class\": \"\
+    FX\",\n      \"model_version\": \"unset\"\n    }\n  ]\n}\n"
   strategies__alpha_params.json: |
     {
       "description": "Fitted flagship-alpha parameters (iap.alpha). model linear_z_v1: er = beta * clip((raw - mu)/(sigma + 1e-12), +-z_clip); conf = min(1, |z|/conf_scale). See /API_ALPHA.md.",

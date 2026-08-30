@@ -43,7 +43,7 @@ be structurally unobservable on an L1 quote book.
 FX03 (multi-venue OFI) is rejected (IC 0.0060, t 0.62) and FX04
 (cross-venue lead-lag) survives only the lenient ITERATE gate (IC 0.0074,
 t 1.71 — below the ~3.77 expected max |t| under the global null across the
-ledger's 1,224 experiments) while failing every deeper probe, including a
+ledger's 1,224 experiments at that report's run) while failing every deeper probe, including a
 sign flip under one event of execution lag. Venue-feature diagnostics
 computed from the committed feature frames explain the null: the median
 cross-venue staleness spread (~81 s) is nearly 3x the prediction horizon,
@@ -86,7 +86,9 @@ The Perold IS decomposition is enforced as an exact identity to 1e-9.
 
 An engineering case study of four parallel ports of one pinned semantics,
 held identical by golden tests (byte-exact IAP1 SHA-256 digests; 443/175/
-181/291 tests green in one harness run). Measured on the stated 2-CPU
+181/291 tests green in the paper's recorded 2026-08-29 harness run —
+489/175/181/315 after the adaptability layer landed). Measured on the
+stated 2-CPU
 Xeon container (g++ 13.3.0, rustc 1.95.0, OpenJDK 21.0.10): C++ decodes at
 3.5 ns/event and replays at 37.1M events/s; demo-scale replay is ≈ 6.9M
 events/s in Rust and ≈ 3.5M in Java, with measurement-boundary caveats

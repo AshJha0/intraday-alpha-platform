@@ -24,7 +24,7 @@ groups:
         expr: sum by (job, service) (rate(md_sequence_gaps_total[5m]))
       - record: job:md_duplicates:rate5m
         expr: sum by (job, service) (rate(md_duplicates_total[5m]))
-      # PLACEHOLDER (like LiveVsBacktestDrift): no producer emits
+      # PLACEHOLDER (like QueueDepthHigh): no producer emits
       # md_out_of_order_total yet — out-of-order arrivals are counted in
       # qc_report.json but not exported as a metric. The rule evaluates to
       # empty until a producer exists (deployment/grafana/README.md).

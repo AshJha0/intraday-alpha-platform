@@ -10,6 +10,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.TreeMap;
 
+import com.iap.adaptive.BaselineLoader;
+import com.iap.adaptive.DriftMonitor;
+import com.iap.adaptive.LifecycleGauge;
+import com.iap.adaptive.RollingIc;
 import com.iap.alpha.AlphaSignal;
 import com.iap.alpha.Alphas;
 import com.iap.alpha.LinearZParams;
@@ -85,6 +89,12 @@ public final class PaperTrading {
         public double confMin = 0.2;
         /** Venue for child orders (0 = SOR). */
         public int venueId = 1;
+        /**
+         * research/baselines directory (API_ADAPTIVE.md schema). Missing
+         * directory or no baseline for the alpha = drift monitoring stays
+         * disarmed (no {@code alpha_live_vs_backtest_drift} series).
+         */
+        public Path baselinesDir = Paths.get("..", "research", "baselines");
     }
 
     /** Session result (deterministic fields + the report JSON). */
@@ -110,6 +120,12 @@ public final class PaperTrading {
         public int httpPort = -1;
         public String reportJson;
         public MetricsRegistry metrics;
+        /** Final live-vs-backtest PSI (NaN = never computed / no baseline). */
+        public double driftPsi = Double.NaN;
+        /** Final rolling realized IC (NaN = too few realized pairs). */
+        public double rollingIc = Double.NaN;
+        /** Final lifecycle state per the pinned thresholds. */
+        public LifecycleGauge.State lifecycle = LifecycleGauge.State.ACTIVE;
     }
 
     private PaperTrading() {
@@ -167,9 +183,73 @@ public final class PaperTrading {
         long[] orderIdSeq = {0};
         BacktestEngine[] engineHolder = new BacktestEngine[1];
 
+        // Adaptability monitoring (spec §20 step 13 / API_ADAPTIVE.md):
+        // live-vs-backtest PSI drift, rolling realized IC, and the pinned
+        // IC-gated lifecycle state machine evaluated once per event-time
+        // adaptive block (configs/strategies.json adaptive.*). Only rows
+        // with confidence > 0 feed the monitors — the same population the
+        // research baseline was captured from. Observational only — never
+        // feeds back into a trading decision, so determinism is untouched.
+        DriftMonitor drift = new DriftMonitor(
+                BaselineLoader.loadDir(opts.baselinesDir));
+        Path strategiesJson = opts.configsDir.resolve("strategies.json");
+        var adaptiveCfg = com.iap.config.Json.object(com.iap.config.Json
+                .object(com.iap.config.Json.parseFile(strategiesJson))
+                .get("adaptive"));
+        RollingIc rollingIc = new RollingIc(
+                RollingIc.parseHorizonNs(alphaParams.horizon()),
+                com.iap.config.Json.asLong(adaptiveCfg.get("ic_window_ns")),
+                com.iap.config.Json.asLong(adaptiveCfg.get("ic_bucket_ns")),
+                (int) com.iap.config.Json.asLong(
+                        adaptiveCfg.get("min_ic_buckets")));
+        LifecycleGauge lifecycle =
+                LifecycleGauge.fromStrategiesConfig(strategiesJson);
+        long blockNs =
+                com.iap.config.Json.asLong(adaptiveCfg.get("block_ns"));
+        long[] lifecycleBlock = {Long.MIN_VALUE};
+        long[] lastSignalTs = {Long.MIN_VALUE};
+        String alphaLabel = "{alpha=\"" + opts.alphaId + "\"}";
+        String driftGauge = "alpha_live_vs_backtest_drift" + alphaLabel;
+        String icGauge = "alpha_rolling_ic" + alphaLabel;
+        String lifecycleGauge = "alpha_lifecycle_state" + alphaLabel;
+        reg.gauge(lifecycleGauge).set(lifecycle.state().code());
+
         BacktestEngine.Strategy strategy = vec -> {
             reg.counter("alpha_signals_total").inc();
             AlphaSignal sig = Alphas.scoreRow(alphaParams, vec);
+            lastSignalTs[0] = vec.timestamp;
+            if (sig.confidence() > 0.0) {
+                double psi = drift.onSignal(opts.alphaId,
+                        sig.expectedReturn());
+                if (!Double.isNaN(psi)) {
+                    reg.gauge(driftGauge).set(psi);
+                }
+                if (vec.valid[Features.MID_PRICE]) {
+                    rollingIc.onObservation(vec.timestamp,
+                            sig.expectedReturn(),
+                            vec.values[Features.MID_PRICE]);
+                }
+                double ic = rollingIc.ic(vec.timestamp);
+                if (!Double.isNaN(ic)) {
+                    reg.gauge(icGauge).set(ic);
+                }
+            }
+            // One lifecycle evaluation per event-time adaptive block.
+            // Note (documented divergence from the Python reference walk-forward):
+            // if the feed is silent across MULTIPLE block boundaries, this live
+            // loop evaluates once at the newest boundary, whereas
+            // iap.backtest.adaptive evaluates every boundary. On such gaps a
+            // live retirement can therefore lag the reference by up to the
+            // number of skipped boundaries; acceptable for a monitoring gauge.
+            long block = Math.floorDiv(vec.timestamp, blockNs);
+            if (lifecycleBlock[0] == Long.MIN_VALUE) {
+                lifecycleBlock[0] = block;
+            } else if (block != lifecycleBlock[0]) {
+                lifecycleBlock[0] = block;
+                // evaluate at the block boundary the event just crossed
+                reg.gauge(lifecycleGauge).set(lifecycle
+                        .update(rollingIc.ic(block * blockNs)).code());
+            }
             // 1-minute bar roll: last-observation mid per pinned bucket
             if (vec.valid[Features.MID_PRICE]) {
                 double mid = vec.values[Features.MID_PRICE];
@@ -307,6 +387,18 @@ public final class PaperTrading {
             res.riskRejected = reg.counterValue("risk_rejected_total");
             res.riskEvents = reg.counterValue("risk_events_total");
             res.killSwitchEngaged = risk.killSwitchEngaged();
+            res.driftPsi = drift.psi(opts.alphaId);
+            res.rollingIc = lastSignalTs[0] == Long.MIN_VALUE ? Double.NaN
+                    : rollingIc.ic(lastSignalTs[0]);
+            // session end closes the last partial adaptive block: one
+            // final lifecycle evaluation so the report reflects it
+            res.lifecycle = lifecycle.update(res.rollingIc);
+            synchronized (reg) {
+                reg.gauge(lifecycleGauge).set(res.lifecycle.code());
+                if (!Double.isNaN(res.rollingIc)) {
+                    reg.gauge(icGauge).set(res.rollingIc);
+                }
+            }
             res.metrics = reg;
             res.reportJson = reportJson(res, opts, reg);
             if (opts.reportPath != null) {
@@ -383,10 +475,20 @@ public final class PaperTrading {
                 + p[1] + ",\"p999\":" + p[2] + "}";
     }
 
+    /** Finite double as JSON number, NaN as JSON {@code null}. */
+    private static String numOrNull(double v) {
+        return Double.isNaN(v) ? "null" : Double.toString(v);
+    }
+
     private static String reportJson(Result res, Options opts,
             MetricsRegistry reg) {
         StringBuilder sb = new StringBuilder(512);
-        sb.append("{\"alpha_id\":\"").append(opts.alphaId)
+        sb.append("{\"adaptive\":{\"drift_psi\":")
+                .append(numOrNull(res.driftPsi))
+                .append(",\"lifecycle\":\"").append(res.lifecycle)
+                .append("\",\"lifecycle_code\":").append(res.lifecycle.code())
+                .append(",\"rolling_ic\":").append(numOrNull(res.rollingIc))
+                .append("},\"alpha_id\":\"").append(opts.alphaId)
                 .append("\",\"events_processed\":").append(res.eventsProcessed)
                 .append(",\"fills\":").append(res.fillCount)
                 .append(",\"instrument_id\":").append(opts.instrumentId)
@@ -436,6 +538,8 @@ public final class PaperTrading {
                     opts.port = "config".equals(v) ? -2 : Integer.parseInt(v);
                 }
                 case "--report" -> opts.reportPath = Paths.get(args[++i]);
+                case "--baselines" ->
+                        opts.baselinesDir = Paths.get(args[++i]);
                 default -> throw new IllegalArgumentException(
                         "unknown argument " + a);
             }
