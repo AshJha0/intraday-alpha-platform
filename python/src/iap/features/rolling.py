@@ -182,39 +182,67 @@ class RollingKeyCount:
 class SessionProfile:
     """Expanding minute-of-day session profile built from the data itself.
 
-    Buckets are 5 minutes of day (0..287).  For each (metric, bucket) the
+    **Bound / regime caveat (documented, round-3)**: the profile is
+    EXPANDING and never forgets.  Over weeks the normalizer converges to a
+    long-run mean and stops tracking the current regime, so
+    ``norm_*_m5_v1`` measures "vs the whole history", not "vs recent
+    comparable sessions".  Memory is bounded (288 buckets x metrics), so
+    this is a modelling choice, not a leak: a decayed variant is available
+    via ``decay`` (an exponential-forgetting factor applied to the running
+    count and sum at each update; ``decay = 1.0``, the default, is the
+    pinned expanding behaviour and the only one the goldens cover).
+
+    Buckets are 5 minutes of the SESSION-LOCAL day (0..287).  For each
+    (metric, bucket) the
     profile keeps an expanding count and sum.  ``prior(metric, bucket)``
     returns the (count, mean) accumulated *before* the current observation —
     readers must call ``prior`` before ``update`` so normalization never uses
     the value being normalized (no lookahead).
     """
 
-    BUCKETS = 288  # 5-minute buckets per UTC day
+    BUCKETS = 288  # 5-minute buckets per session-local day
     MIN_OBS = 10  # observations required before a normalization is valid
 
-    __slots__ = ("_count", "_sum")
+    __slots__ = ("_count", "_sum", "decay")
 
-    def __init__(self, metrics: Sequence[str]) -> None:
-        self._count: Dict[str, List[int]] = {
-            m: [0] * self.BUCKETS for m in metrics
+    def __init__(self, metrics: Sequence[str], decay: float = 1.0) -> None:
+        if not 0.0 < decay <= 1.0:
+            raise ValueError("decay must be in (0, 1]")
+        self.decay = float(decay)
+        self._count: Dict[str, List[float]] = {
+            m: [0.0] * self.BUCKETS for m in metrics
         }
         self._sum: Dict[str, List[float]] = {
             m: [0.0] * self.BUCKETS for m in metrics
         }
 
     @staticmethod
-    def bucket_of(ts_ns: int) -> int:
-        """5-minute-of-day bucket for an event timestamp (UTC)."""
-        sec_of_day = (ts_ns // 1_000_000_000) % 86_400
+    def bucket_of(ts_ns: int, utc_offset_s: int = 0) -> int:
+        """5-minute-of-day bucket for an event timestamp.
+
+        ``utc_offset_s`` is the venue's UTC offset at that instant
+        (``InstrumentContext.clock``): buckets are keyed in SESSION-LOCAL
+        time so a DST shift moves the whole profile with the venue
+        (API_FEATURES §3).  The default 0 keeps pure-UTC callers exact.
+        """
+        sec_of_day = (ts_ns // 1_000_000_000 + utc_offset_s) % 86_400
         return int(sec_of_day // 300)
 
-    def prior(self, metric: str, bucket: int) -> Tuple[int, float]:
+    def prior(self, metric: str, bucket: int) -> Tuple[float, float]:
         """(count, mean) accumulated so far for (metric, bucket); mean=0 if empty."""
         c = self._count[metric][bucket]
         s = self._sum[metric][bucket]
         return c, (s / c if c else 0.0)
 
     def update(self, metric: str, bucket: int, value: float) -> None:
-        """Fold one observation into the profile (call after ``prior``)."""
-        self._count[metric][bucket] += 1
+        """Fold one observation into the profile (call after ``prior``).
+
+        With ``decay < 1`` the running count and sum are scaled first, so
+        the effective memory is ``1 / (1 - decay)`` observations per bucket.
+        """
+        d = self.decay
+        if d != 1.0:
+            self._count[metric][bucket] *= d
+            self._sum[metric][bucket] *= d
+        self._count[metric][bucket] += 1.0
         self._sum[metric][bucket] += value

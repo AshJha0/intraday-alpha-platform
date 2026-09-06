@@ -26,11 +26,16 @@ import com.iap.tca.TcaService;
 public class TcaMetricsTest {
     private static final long S = 1_000_000_000L;
 
-    /** Simple two-state timeline: mid 100.00 then 100.10 at t=10s. */
+    /**
+     * Simple timeline: mid 100.00 then 100.10 at t=10s, and a closing state
+     * at 20s so that order windows ending at 15s lie inside the data
+     * (pinned: end_ts beyond the timeline is rejected).
+     */
     private static MarketTimeline timeline() {
         MarketTimeline t = new MarketTimeline();
         t.append(0, 99.99, 100.01, 500, 400);
         t.append(10 * S, 100.09, 100.11, 300, 200);
+        t.append(20 * S, 100.09, 100.11, 300, 200);
         return t;
     }
 
@@ -41,7 +46,7 @@ public class TcaMetricsTest {
         assertEquals(0, t.prevailing(0));
         assertEquals(0, t.prevailing(10 * S - 1));
         assertEquals(1, t.prevailing(10 * S));
-        assertEquals(1, t.prevailing(999 * S));
+        assertEquals(2, t.prevailing(999 * S));
         assertTrue(Double.isNaN(t.midAt(-5)));
         assertEquals(100.0, t.midAt(3 * S), 1e-12);
         assertEquals(100.1, t.midAt(11 * S), 1e-12);
@@ -105,6 +110,16 @@ public class TcaMetricsTest {
         MarketTimeline empty = new MarketTimeline();
         none.fills.add(new TcaFill(0, 100.0, 100, 100.0, 0.0, 1));
         assertNull(Tca.adverseSelection(none, empty).get("1s"));
+        // a fill 5 s before the timeline end: the 10 s markout is undefined
+        // (never the stale last mid — pinned §2.5), the others defined
+        TcaParentOrder late = new TcaParentOrder(3, 1, 0, 400, 0, 0, 20 * S);
+        late.fills.add(new TcaFill(15 * S, 100.11, 400, 100.10, 0.01, 200));
+        Map<String, Integer> n = new java.util.LinkedHashMap<>();
+        Map<String, Double> lateAs = Tca.adverseSelectionWithCounts(late, t, n);
+        assertNull(lateAs.get("10s"));
+        assertEquals(Integer.valueOf(0), n.get("10s"));
+        assertEquals(Integer.valueOf(1), n.get("1s"));
+        assertNotNull(lateAs.get("1s"));
     }
 
     @Test

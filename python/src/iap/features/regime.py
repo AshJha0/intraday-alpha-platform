@@ -14,7 +14,9 @@
 
 Validity: window warmup plus the underlying inputs (mid history spanning w
 for trend, >= 1 mid sample for meanrev, valid rvols / depth averages for the
-ratio features).
+ratio features).  EPS guard (API_FEATURES §4): every ratio above is INVALID
+when its denominator is <= 0 (rvol_w == 0, std == 0, rvol_w5m == 0, mean
+depth == 0) — an unobserved denominator is undefined, never 1e12-scaled.
 """
 
 from __future__ import annotations
@@ -66,7 +68,7 @@ def compute(st, values: List[float], valid: List[bool]) -> None:
         wn = WINDOW_NS[w]
         v = None
         rv = st.rvol(w)
-        if st.book_ok and rv is not None:
+        if st.book_ok and rv is not None and st.rv[w].count > 0:
             past = st.logmid_at(t - wn)
             if past is not None:
                 v = (st.logmid - past) / (rv * sqrt(wn / 1e9) + EPS)
@@ -79,17 +81,25 @@ def compute(st, values: List[float], valid: List[bool]) -> None:
             mean = win.sums[0] / n
             var = win.sums[1] / n - mean * mean
             std = sqrt(max(var, 0.0))
-            v = -(st.mid2 - mean) / (std + EPS)
+            # exact integer dispersion test (mid2 samples are integers):
+            # n*sum(x^2) - sum(x)^2 > 0 iff the samples are not all equal
+            if n * win.sums[1] - win.sums[0] * win.sums[0] > 0:
+                v = -(st.mid2 - mean) / (std + EPS)
         put(values, valid, v, v is not None)
     rv1m, rv5m = st.rvol("1m"), st.rvol("5m")
-    ratio = rv1m / (rv5m + EPS) if (rv1m is not None and rv5m is not None) else None
+    ratio = (
+        rv1m / (rv5m + EPS)
+        if (rv1m is not None and rv5m is not None and st.rv["5m"].count > 0)
+        else None
+    )
     put(values, valid, 1.0 if (ratio is not None and ratio > 1.0) else
         (0.0 if ratio is not None else None), ratio is not None)
     put(values, valid, ratio, ratio is not None)
     lr = None
     da = st.depthavg["1m"]
     if st.book_ok and st.warm(WINDOW_NS["1m"]) and da.count > 0:
-        lr = (st.db10 + st.da10) / (da.sums[11] / da.count + EPS)
+        if da.sums[11] > 0:  # exact integer depth sum
+            lr = (st.db10 + st.da10) / (da.sums[11] / da.count + EPS)
     put(values, valid, 1.0 if (lr is not None and lr > 1.0) else
         (0.0 if lr is not None else None), lr is not None)
     put(values, valid, lr, lr is not None)

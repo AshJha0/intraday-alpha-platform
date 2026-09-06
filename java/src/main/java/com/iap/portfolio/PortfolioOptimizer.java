@@ -271,6 +271,24 @@ public final class PortfolioOptimizer {
         if (wPrev.length != n || tcLinear.length != n) {
             throw new IllegalArgumentException("w_prev/tc_linear must have length n");
         }
+        // Every input must be finite (pinned: NaN/inf never propagate into
+        // weights; API_PORTFOLIO_TCA.md §1.3).
+        for (int i = 0; i < n; i++) {
+            if (!Double.isFinite(alpha[i]) || !Double.isFinite(wPrev[i])
+                    || !Double.isFinite(tcLinear[i])) {
+                throw new IllegalArgumentException(
+                        "alpha/w_prev/tc_linear must be finite (index " + i + ")");
+            }
+            for (int j = 0; j < n; j++) {
+                if (!Double.isFinite(sigma[i][j])) {
+                    throw new IllegalArgumentException(
+                            "Sigma must be finite (" + i + "," + j + ")");
+                }
+            }
+        }
+        if (!Double.isFinite(riskAversion)) {
+            throw new IllegalArgumentException("risk_aversion must be finite");
+        }
         if (riskAversion < 0.0) {
             throw new IllegalArgumentException("risk_aversion must be >= 0");
         }
@@ -309,7 +327,8 @@ public final class PortfolioOptimizer {
         int passes = params.projPasses();
         double[] w = project(wPrev, constraints, wPrev, sigma, passes);
         double[] bestW = w.clone();
-        double bestF = maxViolation(w, constraints, wPrev, sigma) <= params.feasTol()
+        boolean feasible = maxViolation(w, constraints, wPrev, sigma) <= params.feasTol();
+        double bestF = feasible
                 ? objective(w, alpha, sigma, wPrev, riskAversion, tcLinear)
                 : Double.NEGATIVE_INFINITY;
         int bestK = 0;
@@ -333,9 +352,18 @@ public final class PortfolioOptimizer {
                 bestF = fw;
                 bestW = w.clone();
                 bestK = k + 1;
+                feasible = true;
             }
         }
+        if (!feasible) {
+            // INFEASIBLE (pinned §1.3): hold the book, never -inf/NaN.
+            double[] hold = wPrev.clone();
+            return new PgdResult(hold,
+                    objective(hold, alpha, sigma, wPrev, riskAversion, tcLinear),
+                    params.iters(), 0, maxViolation(hold, constraints, wPrev, sigma),
+                    false);
+        }
         return new PgdResult(bestW, bestF, params.iters(), bestK,
-                maxViolation(bestW, constraints, wPrev, sigma));
+                maxViolation(bestW, constraints, wPrev, sigma), true);
     }
 }

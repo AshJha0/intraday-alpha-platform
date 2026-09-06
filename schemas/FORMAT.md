@@ -35,7 +35,12 @@ One event per line. Keys **exactly**, in **exactly this order**:
 - Canonical encoding (required for byte-identical goldens): UTF-8, ASCII digits only,
   **no whitespace** (separators `,` and `:`), no floats, no exponent notation, no `+`
   sign, one `\n` (LF, 0x0A) after every line including the last, no BOM.
-- Decoders must reject lines with missing keys, unknown keys, or non-integer values.
+- Decoders are domain-strict and identical in every language: they reject missing, extra,
+  duplicate or misordered keys; non-integer tokens (floats, exponents, leading zeros, `+`,
+  bools, strings, null); `-0` on an unsigned field; values outside the field's domain
+  (u64/u32/u16/u8/i64); trailing content. Whitespace between tokens is tolerated on input.
+  The shared fixture `tests/golden/jsonl_reject_cases.txt` (REJECT block, then an `# ACCEPT`
+  block) is consumed by all four test suites.
 
 ## 2. IAP1 binary (`*.iap1`)
 
@@ -46,7 +51,7 @@ File header, once, 16 bytes:
 | offset | type | value |
 |---|---|---|
 | 0 | `u32` | magic = `0x49415031` (`"1PAI"` on disk LE; spells IAP1) |
-| 4 | `u32` | version = `1` |
+| 4 | `u32` | version = `2` (encoders); `1` accepted on read as legacy |
 | 8 | `u64` | count = number of records |
 
 Then `count` records of exactly 72 bytes each:
@@ -66,12 +71,27 @@ Then `count` records of exactly 72 bytes each:
 | 56 | 8 | `u64` | order_id |
 | 64 | 8 | `u64` | trade_id |
 
-Python struct format: header `<IIQ`, record `<QIHBBqqQqqQQ` (72 bytes).
+Then (version 2) one 16-byte integrity trailer:
 
-- File size must equal `16 + 72*count`; decoders must reject wrong magic, wrong
-  version, truncated files, and count mismatches.
+| offset | type | value |
+|---|---|---|
+| 0 | `u32` | crc32 = CRC-32 (IEEE 802.3, polynomial 0xEDB88320 reflected, as `zlib.crc32` / `java.util.zip.CRC32`) of all bytes before the trailer (header + records); known answer `crc32("123456789") = 0xCBF43926` |
+| 4 | `u32` | reserved = 0 |
+| 8 | `u64` | count (echo of the header count) |
+
+Python struct formats: header `<IIQ`, record `<QIHBBqqQqqQQ` (72 bytes), trailer `<IIQ`.
+
+- Version 2 file size must equal `16 + 72*count + 16`; version 1 (legacy, no trailer)
+  `16 + 72*count`. Decoders reject wrong magic, unknown versions, truncated files, count
+  mismatches, a non-zero reserved field, a count echo that differs from the header, and a
+  CRC mismatch — each with the byte offset / values in the error. A version-1 file cannot be
+  verified; decoders report it as unverified (`integrity_checked = false`).
+- The 72-byte record has no spare bytes: integrity is per file (trailer), not per record. A
+  single flipped bit anywhere in a v2 file is detected; recovery is re-transfer, never
+  partial acceptance.
 - Golden test: encode the golden event vectors → byte-identical files across all 4
-  languages (compare SHA-256 against `tests/golden/expected_codec_sha256.json`).
+  languages (compare SHA-256 against `tests/golden/expected_codec_sha256.json`). The SHA
+  golden is a parity check between implementations, not a data-integrity mechanism.
 
 ## 3. Schema versioning
 
@@ -80,15 +100,32 @@ adds a `schemas/MIGRATIONS.md` entry.
 
 ## 4. Event-type payload conventions (pinned)
 
-- `ADD/MODIFY/CANCEL/EXECUTE`: MBO; `order_id` set; `price_ticks`/`qty` as per book
-  semantics (conventions §4). MODIFY is qty-change only.
-- `TRADE`: tape print; `trade_id` set; `side` = aggressor side; updates trade_flow only.
-- `QUOTE` (FX): replaces the venue's whole `side` at L1 with (`price_ticks`, `qty`).
+- `ADD/MODIFY/CANCEL/EXECUTE`: MBO; `order_id` set (non-zero, and for ADD outside the
+  reserved synthetic range `>= 0xFFFF000000000000`); ADD needs `price_ticks > 0`, `qty > 0`;
+  EXECUTE needs `qty > 0`. MODIFY is qty-change only: `price_ticks` is 0 or the resting
+  price — a price change must be encoded as CANCEL + ADD (adapters mapping ITCH Replace,
+  MDP3 price modify or T7 order modify do this; a differing price is dropped + counted).
+- `TRADE`: tape print; `trade_id` set; `side` = aggressor side; `qty > 0`, `price_ticks > 0`;
+  updates trade_flow only.
+- `QUOTE` (FX): replaces the venue's whole `side` at L1 with (`price_ticks`, `qty`), both
+  `> 0`. `order_id = 0` means id-less (LP streams, EBS/Reuters): the book keys the level
+  by a synthetic id; an explicit id must be unique per side.
 - `SNAPSHOT`: full-book recovery burst, one record per resting order, best→worst price,
   FIFO within level, bids then asks; `trade_id` = records remaining in the burst after
-  this one (0 = last record). First record of a burst clears the book side state;
-  the last clears `stale` — unless a sequence gap occurred INSIDE the burst, which
-  marks the burst broken: it still ends at its last record but leaves `stale` set;
-  only a later complete gap-free burst clears it (conventions §4).
+  this one (0 = last record), counting down by exactly one. First record of a burst
+  clears the book; the last clears `stale` — unless a sequence gap occurred INSIDE the
+  burst, which marks the burst broken: it still ends at its last record but leaves
+  `stale` set; only a later complete gap-free burst clears it (conventions §4). A record
+  whose countdown goes up restarts the burst; one that skips ahead breaks it. `order_id = 0`
+  records (L2 / price-level snapshots: CME MBP, FX LPs, crypto venues) are legal and get
+  synthetic ids; ids must be unique within a burst. Snapshot channels that are not in the
+  incremental sequence space must be merged into it by the adapter (one sequenced stream
+  per venue+instrument is assumed); a burst whose first record's sequence is below the
+  book's last sequence is a venue sequence reset.
 - `STATUS`: `qty` carries the status code (TRADING/HALT/AUCTION/CLOSE); other payload 0.
+  It never affects sequencing (a session roll is signalled by a SNAPSHOT burst restarting
+  the sequence, or by the explicit `reset_sequence()` API).
 - `HEARTBEAT`: all payload fields 0 except ids/timestamps/sequence.
+- Negative prices (spreads, 2020 WTI) are representable on the wire (`i64`) but rejected by
+  the validator and the book for ADD/QUOTE/SNAPSHOT/TRADE in this version; instruments that
+  can trade negative need a price-offset convention in reference data (documented gap).

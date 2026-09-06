@@ -19,7 +19,18 @@ package com.iap.execution;
  *   <li>IS: front-loaded exponential decay
  *       {@code w_i = exp(-risk_aversion * i / max(1, N-1))}.</li>
  *   <li>POV: no precomputed slices — event-driven (see
- *       {@link ExecutionReplay}).</li>
+ *       {@link ExecutionReplay}): after each in-window TRADE, target =
+ *       floor(participation * volume) and the deficit against the qty
+ *       COMMITTED (filled + open/in-flight children — a cancelled MARKET
+ *       remainder frees its qty and is re-sent) is covered by one child
+ *       (capped at max_child_qty and the parent remainder).</li>
+ *   <li>Child sizing: a slice larger than max_child_qty is split into
+ *       ceil(slice / max_child_qty) children of max_child_qty (the last one
+ *       the remainder), all decided at the same event, in order — no
+ *       quantity is ever silently dropped.</li>
+ *   <li>Time-in-force: every child carries expireTs = end_ts (simulator
+ *       rule 7): no child outlives its parent's window; an unfilled slice
+ *       at end_ts is reported as unfilled_qty, never filled later.</li>
  * </ul>
  */
 public final class Algos {

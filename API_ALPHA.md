@@ -44,22 +44,57 @@ conf = min(1, |z| / conf_scale)
 invalid raw  =>  er = 0.0, conf = 0.0
 ```
 
+**Dead alpha (pinned)**: when `sigma <= 0` or `beta == 0` the fit found no
+usable evidence (fewer than 32 training pairs, or a degenerate signal).
+EVERY row then scores `(er, conf) = (0.0, 0.0)`.  Without this rule
+`sigma = 0` made `z = clip(x / 1e-12) = ±z_clip` and every row reported
+**confidence 1.0** with expected return 0 — maximum conviction in nothing —
+and the ports loaded such a file happily (`fitted: true`).
+
 `mu, sigma, beta, z_clip (= 4.0), conf_scale (= 2.0)` come from
 `configs/strategies/alpha_params.json` — **ports never fit**; Python
 research owns fitting (pooled OLS of the pinned-horizon mid label on z over
 the day-1 training frames; `beta` is free-signed — `beta_fit` and
 `hypothesis_confirmed` are recorded for honesty, `beta == beta_fit`).
-Ports load the JSON and treat every number as opaque f64.
+The reference reads `z_clip`/`conf_scale` from the FILE too (it used class
+constants, so a hand-edited file changed the ports' behaviour and not
+Python's).
 
-`alpha_params.json` layout:
+`alpha_params.json` layout (**x-version 2**, provenance header pinned):
 
 ```json
-{ "params": { "EQ01": { "model": "linear_z_v1", "horizon": "1s",
+{ "x-version": 2,
+  "feature_version": "<sha256 of the feature registry>",
+  "data_version":    "<sha256 over the normalized .iap1 bytes>",
+  "git_commit": "<40 hex>", "git_dirty": bool, "git_dirty_hash": str|null,
+  "train_window": {"start_ts": i64, "end_ts": i64},
+  "params": { "EQ01": { "model": "linear_z_v1", "horizon": "1s",
               "mu": ..., "sigma": ..., "beta": ..., "beta_fit": ...,
               "z_clip": 4.0, "conf_scale": 2.0,
               "features": [...], "hypothesis_confirmed": bool,
-              "n_train": int, "fitted": true }, ... } }
+              "n_train": int, "train_window": {...}, "dead": bool,
+              "fitted": true }, ... } }
 ```
+
+### 2.1 Loader validation (pinned, every language)
+
+A loader REJECTS a parameter file when any of:
+
+- `model != "linear_z_v1"`, or `fitted != true`;
+- `z_clip != 4.0` or `conf_scale != 2.0` — the ports obey the file's values,
+  so a hand-edited constant would silently break cross-language parity;
+- `mu`, `sigma`, `beta` or `beta_fit` is not finite;
+- `sigma <= 0` while `beta != 0` — the only legal shape with a non-positive
+  sigma is the dead alpha (`beta == 0`);
+- (when the caller supplies an expected value) the document's
+  `feature_version` differs from the engine's feature-registry hash:
+  parameters fitted against a different registry read features whose
+  semantics may have changed under the same name.
+
+Python: `iap.alpha.load_params_file(path, expected_feature_version=...)`;
+Rust: `load_params_json_checked(doc, Some(hash))`; C++:
+`load_alpha_params(path, expected_feature_version)`; Java:
+`Alphas.loadParams(path, expectedFeatureVersion)`.
 
 The same params are embedded verbatim in `expected_alpha.json` under
 `"params"` so the golden suite is self-contained.
@@ -111,6 +146,15 @@ USD.  Pairs (instrument_id -> base/quote): 101 EUR/USD, 102 GBP/USD,
   the normal-equations solution; deterministic).  Fewer than 2 valid pairs
   => no signal.  `residual_i = r_i - (A_free f)_i`; `raw_i = -residual_i`
   (NaN for pairs whose own r is NaN).
+- **Identified universe (pinned, round-3)**: a pair is scored only when
+  EVERY free currency it touches appears in at least TWO observable pairs
+  (`identified_pairs`).  A currency seen in a single observable pair has its
+  factor absorb that pair's whole return, so the residual is 0 **by
+  construction** — a constant, not a signal.  On this universe AUD, CAD,
+  CHF, JPY and NZD each appear in exactly one pair, so AUD/USD, USD/CAD,
+  USD/CHF, USD/JPY and NZD/USD score NaN (confidence 0) and only the
+  EUR/USD-GBP/USD-EUR/GBP triangle trades.  Reports that describe FX05 as a
+  cross-pair RV alpha "over 8 pairs" are describing 3.
 - **Row mapping**: a native row at time t carries the signal of the latest
   grid point <= t.  Then §2 scaling applies.
 

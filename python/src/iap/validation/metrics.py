@@ -8,14 +8,21 @@ Newey-West-lite t-statistic (documented, pinned): the IC time series is
 formed by bucketing test rows into fixed event-time buckets (default 5
 minutes), computing the IC inside each bucket, and testing the mean bucket
 IC against 0 with a Newey-West long-run variance using Bartlett weights and
-a pinned small lag count L (default 2):
+a lag count L:
 
     lrv = g0 + 2 * sum_{l=1..L} (1 - l/(L+1)) * g_l
     t   = mean(ic) / sqrt(lrv / n_buckets)
 
-where g_l is the lag-l autocovariance of the bucket-IC series.  This is
-"lite" because L is fixed rather than bandwidth-selected — adequate for
-bucket counts in the hundreds and fully reproducible.
+where g_l is the lag-l autocovariance of the bucket-IC series.
+
+**L scales with the label horizon (pinned, round-3)**: overlapping labels
+induce autocorrelation for as long as the horizon spans buckets, so
+``L = ceil(horizon_ns / bucket_ns) + 1`` (:func:`nw_lags`) — a 15-minute
+label over 5-minute buckets overlaps 3 buckets and gets L = 4, where the
+old fixed L = 2 under-covered the long-run variance and inflated the
+t-stat.  The lag count actually used is reported in every alpha JSON
+(``nw_lags``).  This is still "lite" because L follows a pinned rule rather
+than a data-driven bandwidth selection — deterministic and reproducible.
 """
 
 from __future__ import annotations
@@ -123,6 +130,13 @@ def bucket_ics(
             continue
         out.append(float(np.corrcoef(xb, yb)[0, 1]))
     return np.asarray(out)
+
+
+def nw_lags(horizon_ns: int, bucket_ns: int = 300 * NS_S) -> int:
+    """Pinned Newey-West lag count for a label horizon (see docstring)."""
+    if horizon_ns <= 0 or bucket_ns <= 0:
+        raise ValueError("horizon_ns and bucket_ns must be positive")
+    return int(-(-int(horizon_ns) // int(bucket_ns))) + 1
 
 
 def newey_west_tstat(series: np.ndarray, lags: int = 2) -> float:

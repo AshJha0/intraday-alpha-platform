@@ -18,9 +18,9 @@ flowchart TD
     end
     V1 --> RAW["data/raw/*.jsonl<br/>immutable raw feed files"]
     V2 --> RAW
-    RAW --> NORM["Normalization + sequence validation<br/>python iap.marketdata.normalize<br/>gaps / dups / out-of-order / invalid counted -> qc_report.json"]
-    NORM --> CANON["Canonical event stream<br/>JSONL + IAP1 binary (72-byte LE records)<br/>+ Parquet research dataset — schemas x-version 1"]
-    CANON --> BOOK["Order-book reconstruction<br/>Python ref / C++ / Rust / Java<br/>MBO FIFO, marketable ADDs, dup-drop, gap->stale, SNAPSHOT recovery"]
+    RAW --> NORM["Normalization + sequence validation<br/>python iap.marketdata.normalize<br/>gaps / dups / late / resets / ts-regressions / invalid counted -> qc_report.json"]
+    NORM --> CANON["Canonical event stream<br/>JSONL + IAP1 v2 binary (72-byte LE records + CRC-32 trailer)<br/>+ Parquet research dataset — schemas x-version 1"]
+    CANON --> BOOK["Order-book reconstruction<br/>Python ref / C++ / Rust / Java<br/>MBO FIFO, status-gated matching, synthetic ids, dup-drop,<br/>gap->stale, reorder window, sequence resets, SNAPSHOT recovery"]
     BOOK --> FEAT["Feature engine<br/>205-feature registry (hash = feature_version)<br/>native 40 in C++/Rust/Java — validity bitset, NaN never valid"]
     FEAT --> LBL["Event-time labels (Python-owned)<br/>11 horizons, mid-to-mid + cost-adjusted<br/>at-or-before rule, no lookahead"]
     FEAT --> ALPHA["Alpha ensemble<br/>24 flagship alphas (EQ01-FX12)<br/>linear_z_v1 scoring; 6 golden alphas ported"]
@@ -38,8 +38,9 @@ flowchart TD
 ## 2. Cross-language golden-test topology
 
 How one validated Python reference pins four implementations. The parity table is
-printed by `tests/harness/run_all.sh` (python 489 · cpp 175 · rust 181 · java 315
-tests; 49/37/36/13 in the golden groups).
+printed by `tests/harness/run_all.sh` (python 626 · cpp 243 · rust 254 · java 448
+tests; 65/45/47/85 in the golden groups — the Java gate runs all ten
+`*GoldenTest` classes).
 
 ```mermaid
 flowchart LR
@@ -49,12 +50,13 @@ flowchart LR
         MG <--> BF
     end
     MG --> GV[("tests/golden/<br/>events_eq_mbo.jsonl (2,000 ev)<br/>events_fx_quote.jsonl (800 ev)<br/>+ splitmix64.json")]
-    MG --> EXP[("expected_*.json<br/>codec sha256 | book states | features<br/>alpha | backtest | risk decisions<br/>replay fills | portfolio | tca | adaptive")]
+    MG --> EXP[("expected_*.json<br/>codec sha256 | book states | features<br/>alpha | backtest | risk decisions + audit + snapshot<br/>replay fills | portfolio | tca (+ timeline cases) | adaptive")]
     CPPTOOL["cpp/tools/make_replay_fills_golden<br/>(C++ is the fills reference)"] --> EXP
-    GV --> PY["python: pytest -k golden<br/>49 tests"]
-    GV --> CPP["cpp: ctest -R Golden<br/>37 tests"]
-    GV --> RS["rust: 6 golden test targets<br/>36 tests"]
-    GV --> JV["java: *GoldenTest (JUnitCore)<br/>13 golden-group tests"]
+    RSTOOL["rust/risk/src/bin/make_risk_golden<br/>(Rust is the risk reference)"] --> EXP
+    GV --> PY["python: pytest -k golden<br/>65 tests"]
+    GV --> CPP["cpp: ctest -R Golden<br/>45 tests"]
+    GV --> RS["rust: 6 golden test targets<br/>47 tests"]
+    GV --> JV["java: all ten *GoldenTest (JUnitCore)<br/>85 golden-group tests"]
     EXP --> PY
     EXP --> CPP
     EXP --> RS
@@ -87,7 +89,7 @@ sequenceDiagram
 
     Op->>PT: java/paper.sh [--mode realtime --speed 60]
     PT->>PT: load configs/ (instruments, venues,<br/>strategies, risk, execution, alpha_params)
-    PT->>MX: bind /metrics /health /status
+    PT->>MX: bind /metrics /health /ready /status /admin/*
 
     loop every MarketEvent (event-time order)
         PT->>BK: apply(event) — sequence check, book update
@@ -96,9 +98,10 @@ sequenceDiagram
         AL-->>PF: AlphaSignal {expected_return, confidence}
         PF-->>RK: OrderRequest (target position delta)
         alt risk ALLOW
-            RK-->>EX: forward child order
+            RK-->>EX: forward child order (open-order tracked)
             EX-->>PT: Fill(s) {price_ticks, qty, fee, impact}
-            PT->>PT: position / P&L accounting
+            PT->>RK: onFill / onOrderDone (before the next decision)
+            PT->>PT: position / P&L accounting (reporting ccy)
         else risk REJECT
             RK-->>PT: RiskEvent {rule_id, severity, decision}
         end
@@ -106,7 +109,7 @@ sequenceDiagram
     end
 
     PR->>MX: GET /metrics (scrape, 15s interval)
-    Op->>MX: curl /health -> {"status":"ok"}
+    Op->>MX: curl /status -> live events_processed, kill state
     PT->>Op: summary line + out/paper_session_report.json<br/>(events, orders, fills, pnl, risk allowed/rejected)
 ```
 
@@ -123,8 +126,8 @@ flowchart LR
         presearch["24 alphas · validation · ML ·<br/>portfolio ref · TCA ref · backtester"]
     end
     subgraph CPPL["C++ — latency-critical path"]
-        ccore["codec · book · replay<br/>3.5 / 17.4 ns per event"]
-        cfeat["48-feature native engine ≈450 ns"]
+        ccore["codec · book · replay<br/>174.4 / 25.7 ns per event"]
+        cfeat["48-feature native engine ≈530 ns"]
         cexec["execution simulator + algos + SOR<br/>(FILLS REFERENCE)"]
         cbench["bench_all — published methodology"]
     end
@@ -156,29 +159,33 @@ or malformed limit configuration rejects (CONFIG_MISSING) — the engine never
 
 ```mermaid
 flowchart TD
-    OR["OrderRequest"] --> KG{"kill switches?<br/>global > strategy > instrument > venue"}
-    KG -- engaged --> REJ["REJECT + RiskEvent<br/>(rule_id, severity, audit JSONL)"]
-    KG -- clear --> MAL{"malformed / unknown instrument?"}
+    OR["OrderRequest"] --> BS{"config loaded and<br/>state bootstrapped?"}
+    BS -- no --> REJ["REJECT + RiskEvent<br/>(rule_id, severity, audit JSONL —<br/>money via fmt_fixed, byte-identical Rust/Java)"]
+    BS -- yes --> KG{"kill switches?<br/>global > strategy > instrument > venue"}
+    KG -- engaged --> REJ
+    KG -- clear --> MAL{"malformed / unknown instrument?<br/>duplicate order_id?"}
     MAL -- yes --> REJ
-    MAL -- no --> DUP{"duplicate order_id?"}
-    DUP -- yes --> REJ
-    DUP -- no --> FF{"fat-finger qty / notional?"}
-    FF -- breach --> REJ
-    FF -- ok --> PB{"price band vs last mid?<br/>stale price age? sequence gap?<br/>venue disconnected?"}
+    MAL -- no --> PB{"venue disconnected? sequence gap?<br/>stale mark (market-data time)?"}
     PB -- breach --> REJ
-    PB -- ok --> SM{"self-match vs own resting orders?<br/>(conservative for unpriced MARKET)"}
-    SM -- would cross --> REJ
-    SM -- ok --> RT{"order-rate token bucket<br/>(event-time refill)"}
+    PB -- ok --> FF{"fat-finger qty?<br/>FX rate present + fresh?<br/>fat-finger notional (qty x qty_unit x price x fx)?<br/>price band vs last mid?"}
+    FF -- breach --> REJ
+    FF -- ok --> RT{"order-rate token bucket<br/>(event-time refill, never backwards)"}
     RT -- exhausted --> REJ
-    RT -- ok --> LIM{"worst-case position / instrument /<br/>gross / net notional projections"}
+    RT -- ok --> SM{"self-match vs ALL own open orders<br/>(any strategy/venue; unpriced = crosses)"}
+    SM -- would cross --> REJ
+    SM -- ok --> LIM{"worst-case projections incl. every open order:<br/>position / instrument / gross / net notional"}
     LIM -- breach --> REJ
-    LIM -- ok --> PNL{"daily / strategy loss limits<br/>(avg-cost realized PnL, latched)"}
-    PNL -- breached --> KILL["engage kill switch +<br/>REJECT"]
-    PNL -- ok --> ALLOW["ALLOW -> execution"]
-    ALLOW --> FILLS["fills feed back:<br/>positions, PnL, resting-order set"]
+    LIM -- ok --> PNL{"daily / strategy loss limits<br/>(realized + unrealized MTM, reporting ccy)"}
+    PNL -- breached --> REJ
+    PNL -- ok --> ALLOW["ALLOW -> execution<br/>(order tracked open until on_order_done / full fill)"]
+    ALLOW --> FILLS["fills + terminal reports feed back:<br/>positions, lots, open-order set"]
+    MK["market updates (mid, ts):<br/>marks held lots"] --> LATCH{"daily P&L <= -limit?"}
+    FILLS --> LATCH
+    LATCH -- yes --> KILL["latch STRATEGY then GLOBAL kill<br/>(no fill required)"]
+    KILL --> KG
+    RE["re-arm: override_loss_limit (audited)<br/>then clear_kill; roll_session keeps kills;<br/>snapshot/restore for restarts"] -.-> KG
     FILLS -.-> SM
     FILLS -.-> LIM
-    FILLS -.-> PNL
 ```
 
 ## 6. Passive queue-position model (execution simulator)
@@ -201,6 +208,9 @@ flowchart TD
     CHK -- no --> OBS
     FILL --> ACC["Fill record: price_ticks, qty, ts,<br/>maker/taker flag, fee/rebate, impact<br/>(golden: expected_replay_fills.json)"]
     CROSS["crossing exemption: displayed liquidity a<br/>marketable limit already consumed is not<br/>double-counted against ahead_qty"] -.-> DEC3
+    GATE["venue gate (rule 8): book missing / stale / not TRADING<br/>=> no fill of any kind; MARKET/IOC/FOK cancelled VENUE_NOT_TRADING,<br/>LIMIT rests; re-open fills crossed resting orders at the touch"] -.-> OBS
+    TIF["cancel (rule 7): same latency path, effective at<br/>max(cancel arrival, order arrival); expire_ts = parent end_ts<br/>expires pending or resting before activation"] -.-> OBS
+    OVL["overlay (rule 3b): displayed liquidity our earlier child<br/>consumed is not re-used by a later child"] -.-> SUB
 ```
 
 ## 7. Where to go deeper
@@ -210,6 +220,6 @@ flowchart TD
 | Full architecture narrative, per-language engineering notes | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | Governing institutional specification (verbatim) | [SPECIFICATION.md](SPECIFICATION.md) |
 | Teaching walkthrough of every subsystem | [../LEARN.md](../LEARN.md) |
-| 17 runnable recipes | [../COOKBOOK.md](../COOKBOOK.md) |
+| 19 runnable recipes | [../COOKBOOK.md](../COOKBOOK.md) |
 | Six research papers from the platform's own numbers | [papers/INDEX.md](papers/INDEX.md) |
 | Benchmark methodology + results | [../benchmarks/RESULTS.md](../benchmarks/RESULTS.md) |

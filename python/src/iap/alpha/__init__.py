@@ -62,6 +62,7 @@ from iap.alpha.fx_exposure import (  # noqa: F401
     currency_exposures,
     exposure_matrix,
     free_exposure_matrix,
+    identified_pairs,
     solve_factor_returns,
 )
 
@@ -115,16 +116,51 @@ def fit_all(train: Mapping[int, pd.DataFrame]) -> Dict[str, AlphaModel]:
     return models
 
 
+#: alpha_params.json schema version (2 = provenance header, round-3).
+PARAMS_VERSION = 2
+
+
+def params_provenance() -> dict:
+    """Provenance header for ``alpha_params.json`` (pinned, API_ALPHA §2).
+
+    ``feature_version`` is the feature-registry hash the parameters were
+    fitted against: a port that scores with a different registry is reading
+    features whose semantics may have changed under the same name, so every
+    loader rejects a mismatch.  ``data_version`` and the git fields identify
+    the data and the code (see ``iap.experiment.tracker``).
+    """
+    from iap.experiment.tracker import data_version, git_status
+    from iap.features.registry import registry_hash
+
+    return {
+        "feature_version": registry_hash(),
+        "data_version": data_version(),
+        **git_status(),
+    }
+
+
 def save_params(models: Mapping[str, AlphaModel], path) -> dict:
     """Serialize fitted parameters (configs/strategies/alpha_params.json)."""
+    per = {aid: models[aid].params() for aid in sorted(models)}
+    windows = [p["train_window"] for p in per.values() if p.get("train_window")]
     blob = {
-        "x-version": 1,
+        "x-version": PARAMS_VERSION,
         "description": (
             "Fitted flagship-alpha parameters (iap.alpha). model "
             "linear_z_v1: er = beta * clip((raw - mu)/(sigma + 1e-12), "
-            "+-z_clip); conf = min(1, |z|/conf_scale). See /API_ALPHA.md."
+            "+-z_clip); conf = min(1, |z|/conf_scale); a dead alpha "
+            "(sigma <= 0 or beta == 0) scores (0, 0) on every row. The "
+            "provenance header identifies the feature registry, the data "
+            "and the commit these numbers were fitted with; every loader "
+            "rejects a feature_version that differs from its engine's "
+            "registry hash. See /API_ALPHA.md section 2."
         ),
-        "params": {aid: models[aid].params() for aid in sorted(models)},
+        **params_provenance(),
+        "train_window": (
+            {"start_ts": min(w["start_ts"] for w in windows),
+             "end_ts": max(w["end_ts"] for w in windows)} if windows else None
+        ),
+        "params": per,
     }
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -132,9 +168,25 @@ def save_params(models: Mapping[str, AlphaModel], path) -> dict:
     return blob
 
 
-def load_params_file(path) -> Dict[str, AlphaModel]:
-    """Build models and restore fitted parameters from save_params output."""
+def load_params_file(path, expected_feature_version: str = "") -> Dict[str, AlphaModel]:
+    """Build models and restore fitted parameters from save_params output.
+
+    ``expected_feature_version`` defaults to the running engine's registry
+    hash; pass ``None`` explicitly to skip the check (tooling that inspects a
+    historic file).  A mismatch is an error, never a warning.
+    """
     blob = json.loads(Path(path).read_text())
+    if expected_feature_version == "":
+        from iap.features.registry import registry_hash
+        expected_feature_version = registry_hash()
+    if expected_feature_version is not None:
+        got = blob.get("feature_version")
+        if got != expected_feature_version:
+            raise ValueError(
+                f"{path}: feature_version {got!r} does not match the engine's "
+                f"registry hash {expected_feature_version!r} — the parameters "
+                "were fitted against a different feature registry"
+            )
     models: Dict[str, AlphaModel] = {}
     for aid, p in blob["params"].items():
         m = build(aid)

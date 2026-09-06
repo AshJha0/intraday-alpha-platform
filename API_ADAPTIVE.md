@@ -26,15 +26,16 @@ validated before writing).
 
 One JSON file per monitored distribution, captured from a research
 window and consumed unchanged by live monitors.  Distribution baseline
-(`"kind": "signal" | "feature"`), `x-version` 1:
+(`"kind": "signal" | "feature"`), `x-version` 2:
 
 ```json
 {
-  "x-version": 1,
+  "x-version": 2,
   "kind": "signal",
   "name": "signal_eq01",
   "alpha_id": "EQ01",
   "source": "human-readable provenance",
+  "feature_version": "<64-hex feature-registry hash>",
   "n": 1935,
   "edges": [9 floats, ascending],
   "expected_frac": [10 floats, summing to 1],
@@ -51,13 +52,32 @@ window and consumed unchanged by live monitors.  Distribution baseline
 - `expected_frac[i]` is the baseline sample's own fraction in bucket i
   (NOT assumed 0.1 — ties can concentrate mass).
 - `mean/std/min/max` are diagnostics (std is population, ddof = 0).
+- `feature_version` (pinned, round 3) is the feature-registry hash the
+  baseline was captured against.  A baseline captured under a different
+  registry describes a feature whose **semantics may have changed under the
+  same name**, so a PSI or IC computed against it is meaningless rather than
+  merely stale.  Every loader MUST therefore reject a baseline whose
+  `feature_version` differs from the registry hash of the engine that will
+  produce the live values, and MUST reject a baseline that carries no
+  `feature_version` at all (fail closed: absence cannot be shown to match).
+  A loader MAY offer an explicit opt-out for offline tooling that inspects a
+  historic file — Python `expected_feature_version=None`, Java by not
+  calling `BaselineLoader.requireFeatureVersion` — but the opt-out must
+  never be the default.
 - A reader MUST reject a file whose `x-version`, `n_buckets` or
   `psi_eps` differ from the pinned values.
 
 IC baselines use `"kind": "ic"` and carry
-`{ic_mean, ic_std, n_buckets_baseline, bucket_ns, horizon}` instead of
-`edges`/`expected_frac` (`ic_std` is the population std of the research
-window's bucket ICs).
+`{ic_mean, ic_std, n_buckets_baseline, bucket_ns, horizon, baseline_kind}`
+instead of `edges`/`expected_frac` (`ic_std` is the population std of the
+research window's bucket ICs); they carry the same `x-version` and
+`feature_version` provenance.  `baseline_kind` MUST be `"oos"` — see §4.
+
+When the held-out warmup tail yields fewer than the required IC buckets, no
+IC baseline is written at all.  That is not an error, but it MUST be
+reported: the rolling-IC gauge is then unavailable for that alpha, so its
+drift events come from PSI alone and its lifecycle can never observe decay.
+Writing an in-sample baseline instead is forbidden (§4).
 
 ### The pinned Java parity file — `research/baselines/signal_eq01.json`
 
@@ -72,6 +92,17 @@ capture the baseline from those values.  Parity targets in
 - PSI of the full sample against its own baseline is **exactly 0.0**;
 - PSI and KS (D, p) of the sample's second half (elements `n//2 ..`)
   are pinned at 1e-10.
+
+### 1.1 Live monitor windows (pinned)
+
+A live PSI monitor uses the SAME window as research: `monitor_window_ns`
+(1 h) of **event time** with at least `min_psi_samples` (200) samples, from
+`configs/strategies.json`.  A fixed ring of N signals is not the pinned
+statistic — 256 signals is ~13 minutes on an equity stream and hours on a
+sparse FX one, so the live gauge and the research number were never
+comparable.  Feed the signal's `exchange_ts`
+(`DriftMonitor.onSignal(alphaId, exchangeTs, value)`); a backwards
+timestamp is dropped.
 
 ## 2. PSI — pinned formula
 
@@ -113,6 +144,17 @@ p   = clamp( 2 * sum_{j=1..100} (-1)^(j-1) * exp(-2 j^2 lam^2), 0, 1 )
 Research window pins an IC baseline: Pearson ICs per fixed event-time
 bucket (`bucket_ns` = 300 s pinned; a bucket needs >= 8 finite pairs and
 nondegenerate variance to count), `ic_mean`/`ic_std` over those buckets.
+
+**The baseline MUST be out of sample (pinned, round-3).**  Scoring the
+deployed model on its own warmup rows makes `ic_mean` optimistic, so live
+`ic_z` is biased negative and every drift-triggered refit fires on the
+IS/OOS gap instead of on drift (20-40 "drift" refits per alpha in 1.5 days
+on the bundled data; 3 with an OOS baseline).  The reference splits the
+warmup: fit on its first `BASELINE_FIT_FRAC` (2/3) and take the baseline
+bucket ICs from the purged held-out tail.  The serialized baseline carries
+`"baseline_kind": "oos"` and **a loader rejects any other value** (including
+its absence).
+
 Live, at evaluation time T:
 
 - take rows in `[T - ic_window_ns, T)` that are **matured**:
@@ -121,6 +163,22 @@ Live, at evaluation time T:
 - compute bucket ICs the same way; with fewer than `min_ic_buckets`
   (4 pinned) buckets, or `ic_std <= 1e-12`, report **null**;
 - else `z = (mean(live bucket ICs) - ic_mean) / (ic_std / sqrt(n_live))`.
+
+**The realized leg is the RESEARCH label** (API_FEATURES §6): a signal at
+`t` with prevailing mid `m0` realizes `m(t + h) / m0 - 1` where `m(x)` is
+the prevailing mid **at-or-before** `x` from the instrument's mid series —
+one sample per `book_ok` book refresh.  A live port therefore needs TWO
+feeds: every book refresh (`RollingIc.onMid`) and the confident signal rows
+(`RollingIc.onSignal`).  Realizing at "the next confident signal emission"
+— as the Java gauge used to — runs the forward leg many seconds past
+`t + h` on a sparse FX stream and skips it entirely while the alpha is
+unconfident, so the live number and `research/baselines/run_*_ic.json` are
+not comparable and the lifecycle gauge compares apples to oranges.
+
+Golden: `expected_adaptive.json` -> `"rolling_ic"` embeds the mid series,
+the signal rows and the rolling IC at 5 pinned evaluation times (EQ01 on
+the golden EQ frame); every port that implements the gauge reproduces them
+at 1e-10.
 
 ## 5. Refit policies (configs/strategies.json `adaptive.policies`)
 
@@ -147,6 +205,22 @@ edge-exact threshold inputs): `expected_adaptive.json` →
 States: `ACTIVE -> WATCH -> RETIRED`, evaluated once per adaptive block
 on the rolling OOS IC (section 4's `mean(live bucket ICs)`;
 `null` = no transition, counters unchanged):
+
+**Informative evaluations (pinned, round-3).**  An evaluation counts only
+when its MATURED set gained at least `min_new_rows` (1) new rows since the
+last counted evaluation; otherwise it is *uninformative* and is treated
+exactly like `null`: no transition, no counter moves, and it cannot trigger
+a drift refit either.  Blocks are 15 minutes and the IC window is 2 hours,
+so after a feed goes quiet the window content is frozen — six re-reads of
+one bad reading used to retire an alpha (EQ03 went WATCH -> RETIRED on six
+copies of the identical rolling IC -0.04115436621771814 and stayed retired
+through the next session's open). Silence is not evidence, and neither is
+re-reading.
+
+Ports take the flag explicitly:
+`LifecycleGauge.update(rollingIc, informative)`; the golden `ic_path`
+carries a parallel `ic_informative` array whose final six entries are
+uninformative breaches that must move nothing.
 
 - ACTIVE: `ic < watch_ic_gate` (0.0) -> WATCH (the entering breach
   counts as breach #1).

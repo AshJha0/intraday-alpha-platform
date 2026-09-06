@@ -5,21 +5,31 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 import com.iap.core.MarketEvent;
 import com.iap.orderbook.BookState;
 import com.iap.orderbook.ConsolidatedBook;
+import com.iap.orderbook.OrderBook;
 
 /**
  * Deterministic event-time replay driving order books (API_CORE.md section 5,
  * mirroring {@code iap/replay/replay.py}). Consumes normalized events in
- * event-time order, routes each to its instrument's {@link ConsolidatedBook},
- * emits book-state snapshots every {@code snapshotEvery} events, keeps rolling
- * checkpoints every {@code checkpointEvery} events, and can be restored from
- * any checkpoint to bit-identical subsequent state. No wall clock; every
- * serialized map is walked in sorted key order.
+ * event-time order, validates ids against an optional universe (instrument
+ * to venue ids; unknown ids are dropped + counted), routes each to its
+ * instrument's {@link ConsolidatedBook}, emits book-state snapshots every
+ * {@code snapshotEvery} events (retaining the latest {@code keepSnapshots}),
+ * keeps rolling checkpoints every {@code checkpointEvery} events (retaining
+ * {@code keepCheckpoints}), and can be restored from any checkpoint to
+ * bit-identical subsequent state. Checkpoints serialize to the
+ * cross-language JSON document of API_CORE section 5 through
+ * {@link CheckpointJson}. No wall clock; every serialized map is walked in
+ * sorted key order.
  */
 public final class ReplayEngine {
+    /** Engine checkpoint schema version (API_CORE section 5). */
+    public static final long VERSION = 2;
+
     /** Callback invoked when a periodic snapshot is emitted. */
     @FunctionalInterface
     public interface SnapshotCallback {
@@ -58,18 +68,36 @@ public final class ReplayEngine {
         public final long eventsProcessed;
         public final long lastExchangeTs;
         public final long timeRegressions;
+        public final long unknownInstrumentDropped;
+        public final long unknownVenueDropped;
         public final int checkpointEvery;
         public final int snapshotEvery;
+        public final int keepCheckpoints;
+        public final int keepSnapshots;
+        public final long snapshotsEmitted;
+        public final int reorderWindow;
+        /** instrument_id to allowed venue ids; null = no validation. */
+        public final TreeMap<Long, TreeSet<Integer>> universe;
         public final TreeMap<Long, ConsolidatedBook.Checkpoint> books;
 
         public Checkpoint(long eventsProcessed, long lastExchangeTs, long timeRegressions,
-                int checkpointEvery, int snapshotEvery,
+                long unknownInstrumentDropped, long unknownVenueDropped,
+                int checkpointEvery, int snapshotEvery, int keepCheckpoints,
+                int keepSnapshots, long snapshotsEmitted, int reorderWindow,
+                TreeMap<Long, TreeSet<Integer>> universe,
                 TreeMap<Long, ConsolidatedBook.Checkpoint> books) {
             this.eventsProcessed = eventsProcessed;
             this.lastExchangeTs = lastExchangeTs;
             this.timeRegressions = timeRegressions;
+            this.unknownInstrumentDropped = unknownInstrumentDropped;
+            this.unknownVenueDropped = unknownVenueDropped;
             this.checkpointEvery = checkpointEvery;
             this.snapshotEvery = snapshotEvery;
+            this.keepCheckpoints = keepCheckpoints;
+            this.keepSnapshots = keepSnapshots;
+            this.snapshotsEmitted = snapshotsEmitted;
+            this.reorderWindow = reorderWindow;
+            this.universe = universe;
             this.books = books;
         }
 
@@ -84,32 +112,47 @@ public final class ReplayEngine {
             return eventsProcessed == o.eventsProcessed
                     && lastExchangeTs == o.lastExchangeTs
                     && timeRegressions == o.timeRegressions
+                    && unknownInstrumentDropped == o.unknownInstrumentDropped
+                    && unknownVenueDropped == o.unknownVenueDropped
                     && checkpointEvery == o.checkpointEvery
                     && snapshotEvery == o.snapshotEvery
+                    && keepCheckpoints == o.keepCheckpoints
+                    && keepSnapshots == o.keepSnapshots
+                    && snapshotsEmitted == o.snapshotsEmitted
+                    && reorderWindow == o.reorderWindow
+                    && Objects.equals(universe, o.universe)
                     && books.equals(o.books);
         }
 
         @Override
         public int hashCode() {
             return Objects.hash(eventsProcessed, lastExchangeTs, timeRegressions,
-                    checkpointEvery, snapshotEvery, books);
+                    unknownInstrumentDropped, unknownVenueDropped, checkpointEvery,
+                    snapshotEvery, keepCheckpoints, keepSnapshots, snapshotsEmitted,
+                    reorderWindow, universe, books);
         }
     }
 
     /** Summary statistics returned by {@link #run}. */
     public record Summary(long eventsProcessed, int instruments, long timeRegressions,
-            int snapshots) {
+            long snapshots, long unknownInstrumentDropped, long unknownVenueDropped) {
     }
 
     public final int checkpointEvery;
     public final int snapshotEvery;
     public final int keepCheckpoints;
+    public final int keepSnapshots;
+    public final int reorderWindow;
 
+    private final TreeMap<Long, TreeSet<Integer>> universe;
     private final TreeMap<Long, ConsolidatedBook> books = new TreeMap<>();
     private final List<Checkpoint> checkpoints = new ArrayList<>();
     private final List<Snapshot> snapshots = new ArrayList<>();
     private long eventsProcessed;
+    private long snapshotsEmitted;
     private long timeRegressions;
+    private long unknownInstrumentDropped;
+    private long unknownVenueDropped;
     private long lastExchangeTs;
 
     public ReplayEngine() {
@@ -117,13 +160,38 @@ public final class ReplayEngine {
     }
 
     public ReplayEngine(int checkpointEvery, int snapshotEvery, int keepCheckpoints) {
+        this(checkpointEvery, snapshotEvery, keepCheckpoints, 4, 0, null);
+    }
+
+    /**
+     * @param universe instrument_id to allowed venue ids (null = accept all)
+     */
+    public ReplayEngine(int checkpointEvery, int snapshotEvery, int keepCheckpoints,
+            int keepSnapshots, int reorderWindow, Map<Long, ? extends java.util.Set<Integer>> universe) {
         if (checkpointEvery < 0 || snapshotEvery < 0) {
             throw new IllegalArgumentException(
                     "checkpointEvery/snapshotEvery must be >= 0");
         }
+        if (keepCheckpoints < 0 || keepSnapshots < 0) {
+            throw new IllegalArgumentException(
+                    "keepCheckpoints/keepSnapshots must be >= 0");
+        }
+        if (reorderWindow < 0 || reorderWindow > OrderBook.MAX_REORDER_WINDOW) {
+            throw new IllegalArgumentException("reorderWindow out of range: " + reorderWindow);
+        }
         this.checkpointEvery = checkpointEvery;
         this.snapshotEvery = snapshotEvery;
         this.keepCheckpoints = keepCheckpoints;
+        this.keepSnapshots = keepSnapshots;
+        this.reorderWindow = reorderWindow;
+        if (universe == null) {
+            this.universe = null;
+        } else {
+            this.universe = new TreeMap<>();
+            for (Map.Entry<Long, ? extends java.util.Set<Integer>> e : universe.entrySet()) {
+                this.universe.put(e.getKey(), new TreeSet<>(e.getValue()));
+            }
+        }
     }
 
     // -------------------------------------------------------------- applying
@@ -132,20 +200,38 @@ public final class ReplayEngine {
     public ConsolidatedBook instrumentBook(long instrumentId) {
         ConsolidatedBook book = books.get(instrumentId);
         if (book == null) {
-            book = new ConsolidatedBook(instrumentId);
+            book = new ConsolidatedBook(instrumentId, reorderWindow);
             books.put(instrumentId, book);
         }
         return book;
     }
 
-    /** Apply one event; tracks event-time monotonicity. */
+    /** Apply one event; counts it, validates the universe, tracks event-time monotonicity. */
     public void apply(MarketEvent ev) {
         if (ev.exchangeTs < lastExchangeTs) {
             timeRegressions++;
         }
         lastExchangeTs = ev.exchangeTs;
-        instrumentBook(ev.instrumentId).apply(ev);
         eventsProcessed++;
+        if (universe != null) {
+            TreeSet<Integer> venues = universe.get(ev.instrumentId);
+            if (venues == null) {
+                unknownInstrumentDropped++;
+                return;
+            }
+            if (!venues.contains(ev.venueId)) {
+                unknownVenueDropped++;
+                return;
+            }
+        }
+        instrumentBook(ev.instrumentId).apply(ev);
+    }
+
+    /** Explicit sequence reset on every book (session roll). */
+    public void resetSequences() {
+        for (ConsolidatedBook cons : books.values()) {
+            cons.resetSequences();
+        }
     }
 
     /** Replay an event stream; returns summary stats. */
@@ -154,7 +240,11 @@ public final class ReplayEngine {
             apply(ev);
             if (snapshotEvery != 0 && eventsProcessed % snapshotEvery == 0) {
                 Snapshot snap = new Snapshot(eventsProcessed, bookStates());
+                snapshotsEmitted++;
                 snapshots.add(snap);
+                if (snapshots.size() > keepSnapshots) {
+                    snapshots.remove(0);
+                }
                 if (onSnapshot != null) {
                     onSnapshot.onSnapshot(eventsProcessed, snap);
                 }
@@ -166,7 +256,8 @@ public final class ReplayEngine {
                 }
             }
         }
-        return new Summary(eventsProcessed, books.size(), timeRegressions, snapshots.size());
+        return new Summary(eventsProcessed, books.size(), timeRegressions, snapshotsEmitted,
+                unknownInstrumentDropped, unknownVenueDropped);
     }
 
     /** Replay an event stream without a snapshot callback. */
@@ -193,16 +284,29 @@ public final class ReplayEngine {
         for (Map.Entry<Long, ConsolidatedBook> e : books.entrySet()) {
             cps.put(e.getKey(), e.getValue().checkpoint());
         }
+        TreeMap<Long, TreeSet<Integer>> uni = null;
+        if (universe != null) {
+            uni = new TreeMap<>();
+            for (Map.Entry<Long, TreeSet<Integer>> e : universe.entrySet()) {
+                uni.put(e.getKey(), new TreeSet<>(e.getValue()));
+            }
+        }
         return new Checkpoint(eventsProcessed, lastExchangeTs, timeRegressions,
-                checkpointEvery, snapshotEvery, cps);
+                unknownInstrumentDropped, unknownVenueDropped, checkpointEvery,
+                snapshotEvery, keepCheckpoints, keepSnapshots, snapshotsEmitted,
+                reorderWindow, uni, cps);
     }
 
-    /** Rebuild an engine from {@link #checkpoint()} output. */
+    /** Rebuild an engine from {@link #checkpoint()} output (all configuration carried). */
     public static ReplayEngine restore(Checkpoint cp) {
-        ReplayEngine engine = new ReplayEngine(cp.checkpointEvery, cp.snapshotEvery, 4);
+        ReplayEngine engine = new ReplayEngine(cp.checkpointEvery, cp.snapshotEvery,
+                cp.keepCheckpoints, cp.keepSnapshots, cp.reorderWindow, cp.universe);
         engine.eventsProcessed = cp.eventsProcessed;
         engine.lastExchangeTs = cp.lastExchangeTs;
         engine.timeRegressions = cp.timeRegressions;
+        engine.unknownInstrumentDropped = cp.unknownInstrumentDropped;
+        engine.unknownVenueDropped = cp.unknownVenueDropped;
+        engine.snapshotsEmitted = cp.snapshotsEmitted;
         for (Map.Entry<Long, ConsolidatedBook.Checkpoint> e : cp.books.entrySet()) {
             engine.books.put(e.getKey(), ConsolidatedBook.restore(e.getValue()));
         }
@@ -219,8 +323,25 @@ public final class ReplayEngine {
         return timeRegressions;
     }
 
+    public long unknownInstrumentDropped() {
+        return unknownInstrumentDropped;
+    }
+
+    public long unknownVenueDropped() {
+        return unknownVenueDropped;
+    }
+
+    public long snapshotsEmitted() {
+        return snapshotsEmitted;
+    }
+
     public long lastExchangeTs() {
         return lastExchangeTs;
+    }
+
+    /** The universe (read-only copy), or null when ids are not validated. */
+    public TreeMap<Long, TreeSet<Integer>> universe() {
+        return universe == null ? null : new TreeMap<>(universe);
     }
 
     /** Rolling checkpoints taken by {@link #run} (latest last). */
@@ -228,7 +349,7 @@ public final class ReplayEngine {
         return java.util.Collections.unmodifiableList(checkpoints);
     }
 
-    /** Periodic snapshots taken by {@link #run}. */
+    /** Retained periodic snapshots taken by {@link #run} (latest last). */
     public List<Snapshot> snapshots() {
         return java.util.Collections.unmodifiableList(snapshots);
     }

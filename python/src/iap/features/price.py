@@ -22,7 +22,10 @@ Formulas (horizon h in {1s, 5s, 10s, 30s, 1m}):
 
 Validity: book_ok and the mid history spans t-h (t-2h for acceleration);
 residuals additionally need a valid beta_w5m and reference return;
-vol-adjusted returns need a valid rvol_w1m.
+vol-adjusted returns need a valid rvol_w1m that is strictly positive
+(EPS guard, API_FEATURES §4: ``rvol == 0`` means "no mid change was observed
+in the window" — an undefined denominator, so ``ret_vol_adj`` is INVALID, not
+``ret / 1e-12``).
 """
 
 from __future__ import annotations
@@ -118,9 +121,14 @@ def compute(st, values: List[float], valid: List[bool]) -> None:
             if past is not None:
                 chg = (st.mid2 - past) / 2.0
         put(values, valid, chg, chg is not None)
+    # EPS guard (pinned, API_FEATURES §4): the denominator is UNDEFINED when
+    # the vol window holds no mid-change sample.  The test is the exact
+    # integer SAMPLE COUNT, not `rvol > 0`: a float sum drifts by ~1e-20
+    # after eviction, and a `> 0` test on it would flip between languages.
     rv1m = st.rvol("1m")
+    rv1m_ok = rv1m is not None and st.rv["1m"].count > 0
     for h in HORIZONS:
         va = None
-        if h in logs and rv1m is not None:
+        if h in logs and rv1m_ok:
             va = logs[h] / (rv1m + EPS)
         put(values, valid, va, va is not None)

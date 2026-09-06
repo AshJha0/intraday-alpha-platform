@@ -1,0 +1,98 @@
+# CODEOWNERS — review ownership by area.
+#
+# Referenced by docs/governance/SECURITY.md ("reports about deployment go to
+# CODEOWNERS for deployment/") and GOVERNANCE.md §1/§3 (a limit or contract
+# change needs the owning reviewer). GitHub requires a review from every
+# matching owner before a PR to a protected branch can merge; the last
+# matching pattern wins.
+#
+# Roles, not individuals: replace each handle with the team that holds it in
+# your organisation. The names below mirror the ownership the governance docs
+# already assume.
+#
+#   @iap/platform  platform + deployment + observability + CI
+#   @iap/risk      hard risk engine, limits, kill switches
+#   @iap/core      market data, order book, codecs, replay
+#   @iap/execution execution simulator, SOR, algos, TCA
+#   @iap/research  features, alphas, models, adaptability, papers
+#   @iap/docs      specification, contracts, runbooks
+
+# ------------------------------------------------------------- default ------
+*                                   @iap/platform
+
+# ------------------------------------------------------------- contracts ----
+/PLATFORM_CONVENTIONS.md            @iap/platform @iap/docs
+/API_CORE.md                        @iap/core @iap/docs
+/API_FEATURES.md                    @iap/research @iap/docs
+/API_ALPHA.md                       @iap/research @iap/docs
+/API_ADAPTIVE.md                    @iap/research @iap/docs
+/API_PORTFOLIO_TCA.md               @iap/execution @iap/docs
+/docs/SPECIFICATION.md              @iap/docs
+/schemas/                           @iap/core @iap/docs
+
+# ------------------------------------------------------------- risk ---------
+# A limit change is a GOVERNANCE §3 event: risk must approve the config AND
+# every place the limit is mirrored.
+/configs/risk.json                  @iap/risk @iap/platform
+/rust/risk/                         @iap/risk
+/cpp/include/iap/risk/              @iap/risk
+/cpp/src/risk/                      @iap/risk
+/java/src/main/java/com/iap/risk/   @iap/risk
+/python/src/iap/risk/               @iap/risk
+
+# ------------------------------------------------------------- core ---------
+/python/src/iap/marketdata/         @iap/core
+/python/src/iap/orderbook/          @iap/core
+/rust/marketdata/                   @iap/core
+/rust/orderbook/                    @iap/core
+/rust/eventbus/                     @iap/core
+/rust/replay/                       @iap/core
+/cpp/include/iap/marketdata/        @iap/core
+/cpp/include/iap/orderbook/         @iap/core
+/java/src/main/java/com/iap/core/   @iap/core
+/java/src/main/java/com/iap/codec/  @iap/core
+/java/src/main/java/com/iap/orderbook/ @iap/core
+/java/src/main/java/com/iap/replay/ @iap/core
+
+# ------------------------------------------------------------- execution ----
+/cpp/include/iap/execution/         @iap/execution
+/cpp/include/iap/sor/               @iap/execution
+/java/src/main/java/com/iap/execution/ @iap/execution
+/java/src/main/java/com/iap/sor/    @iap/execution
+/java/src/main/java/com/iap/tca/    @iap/execution
+/python/src/iap/tca/                @iap/execution
+/python/src/iap/portfolio/          @iap/execution
+/configs/execution.json             @iap/execution @iap/platform
+/configs/venues.json                @iap/execution @iap/platform
+
+# ------------------------------------------------------------- research -----
+/python/src/iap/features/           @iap/research
+/python/src/iap/alpha/              @iap/research
+/python/src/iap/labels/             @iap/research
+/python/src/iap/models/             @iap/research
+/python/src/iap/validation/         @iap/research
+/research/                          @iap/research
+/docs/papers/                       @iap/research @iap/docs
+/java/src/main/java/com/iap/features/ @iap/research
+/java/src/main/java/com/iap/alpha/  @iap/research
+/java/src/main/java/com/iap/adaptive/ @iap/research
+
+# ------------------------------------------------------------- platform -----
+/java/src/main/java/com/iap/platform/   @iap/platform
+/java/src/main/java/com/iap/monitoring/ @iap/platform
+/java/src/main/java/com/iap/api/        @iap/platform
+/java/src/main/java/com/iap/config/     @iap/platform
+/deployment/                        @iap/platform
+/deployment/prometheus/             @iap/platform @iap/risk
+/deployment/k8s/                    @iap/platform
+/tests/harness/                     @iap/platform
+/benchmarks/                        @iap/platform
+/.github/                           @iap/platform
+/.dockerignore                      @iap/platform
+/CODEOWNERS                         @iap/platform
+
+# ------------------------------------------------------------- runbooks -----
+/docs/runbooks/                     @iap/platform @iap/docs
+/docs/runbooks/RUNBOOK_incident_kill_switch.md  @iap/risk @iap/platform
+/docs/governance/                   @iap/docs @iap/platform
+/docs/SCENARIOS.md                  @iap/docs

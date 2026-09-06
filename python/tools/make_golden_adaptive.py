@@ -27,7 +27,15 @@ Pins (see /API_ADAPTIVE.md for the normative formulas):
 4. **Lifecycle transition sequence** — a constructed rolling-IC path
    through the pinned lifecycle gates with exact expected states,
    covering WATCH entry, neutral-zone counter reset, retirement,
-   post-retirement recovery to WATCH, re-activation and relapse.
+   post-retirement recovery to WATCH, re-activation, relapse and a block of
+   UNINFORMATIVE evaluations (a frozen IC window re-read six times, which
+   must move nothing).
+5. **Rolling realized IC** — EQ01 on the golden EQ frame: the mid series
+   (one sample per book_ok refresh) and the confident signal rows are
+   embedded, together with the rolling IC at pinned evaluation times.
+   A live port (Java ``com.iap.adaptive.RollingIc``) must reproduce the
+   research label — prevailing mid at-or-before ``t + horizon`` — and the
+   mean bucket IC at 1e-10 from the embedded series alone.
 
 BEFORE writing, every PSI and KS value is re-derived by an independent
 brute-force implementation (explicit loops, no iap.adaptive code) and
@@ -109,6 +117,77 @@ def bf_ks(a, b):
 def check(label: str, got: float, bf: float, tol: float = 1e-12) -> None:
     if abs(got - bf) > tol:
         raise RuntimeError(f"brute-force mismatch {label}: {got!r} vs {bf!r}")
+
+
+def _rolling_ic_case(frame, model, cfg) -> dict:
+    """Rolling-IC golden: embedded mid series + signals + pinned ICs.
+
+    The mid series is exactly the one the label layer uses (one sample per
+    book_ok refresh); the signal rows are EQ01's confident emissions.  The
+    expected values come from the reference ``rolling_ic_z`` over the
+    matured rows of each window — the same code path research uses.
+    """
+    from iap.adaptive.drift import ICBaseline, rolling_ic_z  # noqa: E402
+    from iap.validation.metrics import HORIZONS_NS  # noqa: E402
+
+    horizon = model.horizon
+    h_ns = HORIZONS_NS[horizon]
+    window_ns = int(cfg["ic_window_ns"])
+    bucket_ns = int(cfg["ic_bucket_ns"])
+    min_buckets = int(cfg["min_ic_buckets"])
+
+    ts = frame["exchange_ts"].to_numpy(dtype=np.int64)
+    mid = frame["mid_price_v1"].to_numpy(dtype=float)
+    ok = np.isfinite(mid) & (mid > 0.0)
+    mid_ts, mid_v = ts[ok], mid[ok]
+
+    sc = model.score({1: frame})[1]
+    er = sc["expected_return"].to_numpy(dtype=float)
+    conf = sc["confidence"].to_numpy(dtype=float)
+    sig_ok = (conf > 0.0) & np.isfinite(er) & ok
+    sig_ts, sig_v, sig_mid = ts[sig_ok], er[sig_ok], mid[sig_ok]
+
+    # research label: prevailing mid at-or-before t + h (at_or_before sweep)
+    idx = np.searchsorted(mid_ts, sig_ts + h_ns, side="right") - 1
+    have = idx >= 0
+    fwd = np.where(have, mid_v[np.maximum(idx, 0)], np.nan)
+    observed = (sig_ts + h_ns) <= mid_ts[-1]  # stream seen through t+h
+    ret = np.where(have & observed, fwd / sig_mid - 1.0, np.nan)
+
+    # a dummy baseline: only `rolling_ic` (the mean live bucket IC) is pinned
+    base = ICBaseline(name="golden", alpha_id="EQ01", source="golden",
+                      ic_mean=0.0, ic_std=1.0, n_buckets_baseline=8,
+                      bucket_ns=bucket_ns, horizon=horizon)
+    t_lo, t_hi = int(ts[0]), int(ts[-1])
+    evals = []
+    for k in range(1, 6):
+        t_eval = t_lo + (t_hi - t_lo) * k // 5
+        m = (sig_ts >= t_eval - window_ns) & (sig_ts + h_ns <= t_eval)
+        res = rolling_ic_z(base, sig_ts[m], sig_v[m], ret[m], min_buckets)
+        evals.append({
+            "t": int(t_eval),
+            "n_matured": int(np.sum(m & np.isfinite(ret))),
+            "n_buckets": int(res.n_buckets),
+            "rolling_ic": res.rolling_ic,
+        })
+    return {
+        "description": (
+            "EQ01 on the golden EQ frame. Feed mid_series through onMid (one "
+            "sample per book_ok refresh) and signals through onSignal, then "
+            "read ic(t) at each evaluation time; tolerance 1e-10, null = NaN."
+        ),
+        "alpha_id": "EQ01",
+        "instrument_id": 1,
+        "horizon": horizon,
+        "horizon_ns": int(h_ns),
+        "window_ns": window_ns,
+        "bucket_ns": bucket_ns,
+        "min_buckets": min_buckets,
+        "mid_series": [[int(a), float(b)] for a, b in zip(mid_ts, mid_v)],
+        "signals": [[int(a), float(b), float(c)]
+                    for a, b, c in zip(sig_ts, sig_v, sig_mid)],
+        "evaluations": evals,
+    }
 
 
 def main() -> int:
@@ -208,19 +287,31 @@ def main() -> int:
     lc = LifecycleConfig.from_config(cfg["lifecycle"])
     ic_path = [0.02, -0.01, -0.02, 0.002, -0.01, -0.01, -0.01, None,
                -0.01, -0.01, -0.001, 0.01, 0.004, 0.01, 0.02, 0.005,
-               0.005, 0.03, 0.06, -0.01]
+               0.005, 0.03, 0.06, -0.01,
+               # round-3: a breach followed by SIX re-reads of the SAME
+               # frozen IC window (no new matured rows) must NOT retire the
+               # alpha — uninformative evaluations move nothing.
+               -0.02, -0.02, -0.02, -0.02, -0.02, -0.02, -0.02]
+    ic_informative = [True] * 20 + [True] + [False] * 6
     tracker = LifecycleTracker(alpha_id="GOLDEN", config=lc, policy="golden")
     states = []
-    for k, v in enumerate(ic_path):
-        states.append(tracker.update((k + 1) * NS_15M, v))
+    for k, (v, inf) in enumerate(zip(ic_path, ic_informative)):
+        states.append(tracker.update((k + 1) * NS_15M, v, informative=inf))
     expected_states = [
         "ACTIVE", "WATCH", "WATCH", "WATCH", "WATCH", "WATCH", "WATCH",
         "WATCH", "WATCH", "WATCH", "RETIRED", "RETIRED", "RETIRED",
         "RETIRED", "RETIRED", "WATCH", "WATCH", "WATCH", "ACTIVE", "WATCH",
+        "WATCH", "WATCH", "WATCH", "WATCH", "WATCH", "WATCH", "WATCH",
     ]
     if states != expected_states:
         raise RuntimeError(f"lifecycle sequence changed: {states}")
     print(f"lifecycle sequence ok ({len(tracker.transitions)} transitions)")
+
+    # -- 5. rolling realized IC on the golden EQ frame ----------------------
+    rolling = _rolling_ic_case(frame, models["EQ01"], cfg)
+    print(f"rolling ic: {len(rolling['evaluations'])} evaluations, "
+          f"{len(rolling['mid_series'])} mid samples, "
+          f"{len(rolling['signals'])} signal rows")
 
     blob = {
         "x-version": 1,
@@ -258,6 +349,7 @@ def main() -> int:
             "steps": steps,
             "expected": expected_bools,
         },
+        "rolling_ic": rolling,
         "lifecycle": {
             "config": {
                 "watch_ic_gate": lc.watch_ic_gate,
@@ -267,6 +359,7 @@ def main() -> int:
             },
             "ts_step_ns": NS_15M,
             "ic_path": ic_path,
+            "ic_informative": ic_informative,
             "expected_states": expected_states,
             "expected_transition_count": len(tracker.transitions),
             "expected_transitions": [

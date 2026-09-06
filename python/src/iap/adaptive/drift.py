@@ -91,6 +91,41 @@ def _finite(values) -> np.ndarray:
 # ---------------------------------------------------------------------------
 
 
+#: Baseline schema version. 2 (round-3) adds the ``feature_version``
+#: provenance field; see MIGRATIONS.md.
+BASELINE_VERSION = 2
+
+
+def _registry_hash() -> str:
+    """Current feature-registry hash (empty if the registry is unavailable)."""
+    try:
+        from iap.features.registry import registry_hash
+        return registry_hash()
+    except Exception:  # pragma: no cover - registry always present in-repo
+        return ""
+
+
+def _check_feature_version(blob: dict, expected, what: str) -> str:
+    """Pinned loader check (API_ADAPTIVE section 4).
+
+    A baseline captured against a different feature registry describes a
+    distribution of a feature whose SEMANTICS may have changed under the same
+    name, so PSI/IC against it is meaningless.  ``expected`` defaults to the
+    running engine's registry hash; pass ``None`` to skip (tooling that
+    inspects a historic file).  A mismatch is an error, never a warning.
+    """
+    got = str(blob.get("feature_version", ""))
+    if expected == "":
+        expected = _registry_hash()
+    if expected is not None and got != expected:
+        raise ValueError(
+            f"{what}: feature_version {got!r} does not match the engine's "
+            f"registry hash {expected!r} — the baseline was captured against "
+            "a different feature registry"
+        )
+    return got
+
+
 @dataclass(frozen=True)
 class DriftBaseline:
     """Pinned PSI baseline for one scalar distribution (schema above)."""
@@ -106,6 +141,8 @@ class DriftBaseline:
     std: float
     min: float
     max: float
+    #: feature-registry hash this baseline was captured against (provenance)
+    feature_version: str = ""
 
     def __post_init__(self) -> None:
         if self.kind not in ("signal", "feature"):
@@ -123,11 +160,12 @@ class DriftBaseline:
 
     def to_dict(self) -> dict:
         return {
-            "x-version": 1,
+            "x-version": BASELINE_VERSION,
             "kind": self.kind,
             "name": self.name,
             "alpha_id": self.alpha_id,
             "source": self.source,
+            "feature_version": self.feature_version,
             "n": self.n,
             "edges": list(self.edges),
             "expected_frac": list(self.expected_frac),
@@ -145,9 +183,15 @@ class DriftBaseline:
         path.write_text(json.dumps(self.to_dict(), indent=2, sort_keys=True) + "\n")
 
     @staticmethod
-    def from_dict(blob: dict) -> "DriftBaseline":
-        if int(blob.get("x-version", 0)) != 1:
-            raise ValueError(f"unsupported baseline x-version {blob.get('x-version')!r}")
+    def from_dict(blob: dict, expected_feature_version="") -> "DriftBaseline":
+        if int(blob.get("x-version", 0)) != BASELINE_VERSION:
+            raise ValueError(
+                f"unsupported baseline x-version {blob.get('x-version')!r} "
+                f"(pinned {BASELINE_VERSION}); see MIGRATIONS.md"
+            )
+        fv = _check_feature_version(
+            blob, expected_feature_version,
+            f"baseline {blob.get('name')!r}")
         if int(blob.get("n_buckets", 0)) != PSI_BUCKETS:
             raise ValueError("baseline n_buckets mismatch (pinned 10)")
         if float(blob.get("psi_eps", -1.0)) != PSI_EPS:
@@ -164,11 +208,13 @@ class DriftBaseline:
             std=float(blob["std"]),
             min=float(blob["min"]),
             max=float(blob["max"]),
+            feature_version=fv,
         )
 
     @staticmethod
-    def load(path) -> "DriftBaseline":
-        return DriftBaseline.from_dict(json.loads(Path(path).read_text()))
+    def load(path, expected_feature_version="") -> "DriftBaseline":
+        return DriftBaseline.from_dict(
+            json.loads(Path(path).read_text()), expected_feature_version)
 
 
 def bucket_counts(values: np.ndarray, edges) -> np.ndarray:
@@ -185,6 +231,7 @@ def capture_baseline(
     name: str,
     alpha_id: str = "",
     source: str = "",
+    feature_version: str = "",
 ) -> DriftBaseline:
     """Capture a PSI baseline from a research-window sample (pinned recipe:
     module docstring).  Raises on < MIN_BASELINE_N finite values."""
@@ -208,6 +255,7 @@ def capture_baseline(
         std=float(v.std()),
         min=float(v.min()),
         max=float(v.max()),
+        feature_version=feature_version or _registry_hash(),
     )
 
 
@@ -287,19 +335,25 @@ class ICBaseline:
     n_buckets_baseline: int
     bucket_ns: int
     horizon: str
+    #: "oos" (required) — the baseline rows were NOT used to fit the model
+    baseline_kind: str = "oos"
+    #: feature-registry hash this baseline was captured against (provenance)
+    feature_version: str = ""
 
     def to_dict(self) -> dict:
         return {
-            "x-version": 1,
+            "x-version": BASELINE_VERSION,
             "kind": "ic",
             "name": self.name,
             "alpha_id": self.alpha_id,
             "source": self.source,
+            "feature_version": self.feature_version,
             "ic_mean": self.ic_mean,
             "ic_std": self.ic_std,
             "n_buckets_baseline": self.n_buckets_baseline,
             "bucket_ns": self.bucket_ns,
             "horizon": self.horizon,
+            "baseline_kind": self.baseline_kind,
         }
 
     def save(self, path) -> None:
@@ -308,9 +362,28 @@ class ICBaseline:
         path.write_text(json.dumps(self.to_dict(), indent=2, sort_keys=True) + "\n")
 
     @staticmethod
-    def from_dict(blob: dict) -> "ICBaseline":
-        if int(blob.get("x-version", 0)) != 1 or blob.get("kind") != "ic":
-            raise ValueError("not a v1 IC baseline")
+    def from_dict(blob: dict, expected_feature_version="") -> "ICBaseline":
+        if int(blob.get("x-version", 0)) != BASELINE_VERSION \
+                or blob.get("kind") != "ic":
+            raise ValueError(
+                f"not a v{BASELINE_VERSION} IC baseline "
+                f"(x-version {blob.get('x-version')!r}, kind "
+                f"{blob.get('kind')!r}); see MIGRATIONS.md"
+            )
+        fv = _check_feature_version(
+            blob, expected_feature_version,
+            f"IC baseline {blob.get('name')!r}")
+        kind = str(blob.get("baseline_kind", "")).lower()
+        if kind != "oos":
+            # An IN-SAMPLE baseline (the warmup model scored on its own
+            # training rows) is an optimistic prior: ic_z is biased negative
+            # and drift-triggered refits fire on the IS/OOS gap, not on
+            # drift. Rejected at load (pinned, API_ADAPTIVE section 4).
+            raise ValueError(
+                f"IC baseline {blob.get('name')!r}: baseline_kind must be "
+                f"'oos' (got {blob.get('baseline_kind')!r}) — an in-sample "
+                "IC baseline is rejected"
+            )
         return ICBaseline(
             name=str(blob["name"]),
             alpha_id=str(blob.get("alpha_id", "")),
@@ -320,11 +393,14 @@ class ICBaseline:
             n_buckets_baseline=int(blob["n_buckets_baseline"]),
             bucket_ns=int(blob["bucket_ns"]),
             horizon=str(blob["horizon"]),
+            baseline_kind=kind,
+            feature_version=fv,
         )
 
     @staticmethod
-    def load(path) -> "ICBaseline":
-        return ICBaseline.from_dict(json.loads(Path(path).read_text()))
+    def load(path, expected_feature_version="") -> "ICBaseline":
+        return ICBaseline.from_dict(
+            json.loads(Path(path).read_text()), expected_feature_version)
 
 
 def capture_ic_baseline(
@@ -337,8 +413,18 @@ def capture_ic_baseline(
     bucket_ns: int = 300_000_000_000,
     source: str = "",
     min_buckets: int = 4,
+    baseline_kind: str = "oos",
+    feature_version: str = "",
 ) -> ICBaseline:
-    """IC baseline from a research window (bucket ICs, metrics semantics)."""
+    """IC baseline from a research window (bucket ICs, metrics semantics).
+
+    ``baseline_kind`` must be ``"oos"``: the rows passed in must NOT be rows
+    the scoring model was fitted on (API_ADAPTIVE section 4).  The caller is
+    responsible for the split; this constructor records the claim so a
+    loader can reject an in-sample file.
+    """
+    if baseline_kind != "oos":
+        raise ValueError("IC baselines must be out-of-sample (baseline_kind='oos')")
     bics = bucket_ics(ts, scores, labels, bucket_ns=bucket_ns)
     if bics.size < min_buckets:
         raise ValueError(
@@ -353,6 +439,8 @@ def capture_ic_baseline(
         n_buckets_baseline=int(bics.size),
         bucket_ns=int(bucket_ns),
         horizon=horizon,
+        baseline_kind=baseline_kind,
+        feature_version=feature_version or _registry_hash(),
     )
 
 

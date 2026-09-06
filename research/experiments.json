@@ -1,7 +1,8 @@
 {
-  "bonferroni_p_threshold": 2.5843800072362644e-06,
-  "bonferroni_t_threshold": 4.701357179586857,
-  "description": "Multiple-testing ledger (spec \u00a713). Deterministic: no wall-clock; identical rerun => identical file.",
+  "bonferroni_p_threshold": 6.578947368421052e-05,
+  "bonferroni_t_threshold": 3.9910209275478836,
+  "description": "Multiple-testing ledger (spec \u00a713). Deterministic: no wall-clock; identical rerun => identical file. Experiments are de-duplicated by (alpha_id, kind, canonical config): re-running the same script does not inflate the Bonferroni denominator.",
+  "distinct_experiments": 65,
   "entries": [
     {
       "alpha_id": "ALL",
@@ -10,6 +11,7 @@
         "horizons_scanned": 9
       },
       "count": 216,
+      "key": "348c137c221e41a23fe2f541523ae21988e8b599578d0f9468a0c1bed3ad139d",
       "kind": "design_horizon_scan",
       "n": 216,
       "result": {}
@@ -23,11 +25,13 @@
         "n_folds": 4
       },
       "count": 21,
+      "key": "4450b0f79766e5e5c0ac0b3415d62bcf490cd74dab6477e964e4ba1451542e2f",
       "kind": "promotion_pipeline",
       "n": 237,
+      "reruns": 2,
       "result": {
-        "nw_tstat": 3.8128806842235785,
-        "oos_ic": 0.01281844463919237,
+        "nw_tstat": 4.349182887171232,
+        "oos_ic": 0.024070918077187736,
         "verdict": "ITERATE"
       }
     },
@@ -40,11 +44,13 @@
         "n_folds": 4
       },
       "count": 21,
+      "key": "b2ebfcb89a2391180a9bf8a850323d8e9cb140efe1368a77507c41719a834850",
       "kind": "promotion_pipeline",
       "n": 258,
+      "reruns": 2,
       "result": {
-        "nw_tstat": 3.0240732678491002,
-        "oos_ic": 0.015826935692860415,
+        "nw_tstat": 3.762246869929148,
+        "oos_ic": 0.03085836769049623,
         "verdict": "ITERATE"
       }
     },
@@ -57,11 +63,13 @@
         "n_folds": 4
       },
       "count": 21,
+      "key": "f020162f03984de2994eb6f92b8a14459b28ac01a348707a1fdf35c31398135d",
       "kind": "promotion_pipeline",
       "n": 279,
+      "reruns": 2,
       "result": {
-        "nw_tstat": 3.668845419202838,
-        "oos_ic": 0.017962210379152806,
+        "nw_tstat": 4.890146800078435,
+        "oos_ic": 0.02989435566006399,
         "verdict": "ITERATE"
       }
     },
@@ -74,11 +82,13 @@
         "n_folds": 4
       },
       "count": 21,
+      "key": "7ce9d2df8501cda1c6107ad115c45d4b3a876ea8cca07c1e46b1c3d735810b23",
       "kind": "promotion_pipeline",
       "n": 300,
+      "reruns": 2,
       "result": {
-        "nw_tstat": -0.32307561672943724,
-        "oos_ic": 0.0006207883343421495,
+        "nw_tstat": -0.5396896804855014,
+        "oos_ic": -0.005143508044550327,
         "verdict": "REJECT"
       }
     },
@@ -91,11 +101,13 @@
         "n_folds": 4
       },
       "count": 21,
+      "key": "1ff754b9dcca482135e25e6fa114a2e185320ed2970fdf465355aa9cf4622259",
       "kind": "promotion_pipeline",
       "n": 321,
+      "reruns": 2,
       "result": {
-        "nw_tstat": 4.822842477551322,
-        "oos_ic": 0.0118893975485502,
+        "nw_tstat": 2.162290371340686,
+        "oos_ic": 0.01535170372688936,
         "verdict": "ITERATE"
       }
     },
@@ -108,11 +120,13 @@
         "n_folds": 4
       },
       "count": 21,
+      "key": "b30aeb42374ceaa03df443b02ab17aa5e730870ab74a79c59c5aa6904b513eba",
       "kind": "promotion_pipeline",
       "n": 342,
+      "reruns": 2,
       "result": {
-        "nw_tstat": 9.874123873373723,
-        "oos_ic": 0.05564871862262222,
+        "nw_tstat": 2.6476652234211966,
+        "oos_ic": 0.04040044552713451,
         "verdict": "ITERATE"
       }
     },
@@ -125,12 +139,14 @@
         "n_folds": 4
       },
       "count": 21,
+      "key": "c1d1de936784c13837530d591c9ff770f12ace8778de12a8aa7da73f110cf08c",
       "kind": "promotion_pipeline",
       "n": 363,
+      "reruns": 2,
       "result": {
-        "nw_tstat": 14.736382814071371,
-        "oos_ic": 0.05773812126291274,
-        "verdict": "ITERATE"
+        "nw_tstat": -0.6977543259597518,
+        "oos_ic": -0.01589460364563378,
+        "verdict": "REJECT"
       }
     },
     {
@@ -142,12 +158,14 @@
         "n_folds": 4
       },
       "count": 21,
+      "key": "6ec23833a3cba418202c640f0d68e9d7d99d023914311f5c3c57b8559dc3d487",
       "kind": "promotion_pipeline",
       "n": 384,
+      "reruns": 2,
       "result": {
-        "nw_tstat": 10.816808196549763,
-        "oos_ic": 0.15759663555916875,
-        "verdict": "PROMOTE"
+        "nw_tstat": 0.44801107016258324,
+        "oos_ic": -0.03831493323967739,
+        "verdict": "REJECT"
       }
     },
     {
@@ -159,12 +177,14 @@
         "n_folds": 4
       },
       "count": 21,
+      "key": "b103faa62e00cce0c6ec2e8d85b623c767c81cc6714435e9b6c69b6873640520",
       "kind": "promotion_pipeline",
       "n": 405,
+      "reruns": 2,
       "result": {
-        "nw_tstat": 5.530837786550274,
-        "oos_ic": 0.24533878008110369,
-        "verdict": "PROMOTE"
+        "nw_tstat": -3.7942506291154956,
+        "oos_ic": -0.06515880871540398,
+        "verdict": "REJECT"
       }
     },
     {
@@ -176,11 +196,13 @@
         "n_folds": 4
       },
       "count": 21,
+      "key": "9e82cd888e98cfb2293db07fd8b542aea2a5a888c7147ac0bd0f0a6834b040bc",
       "kind": "promotion_pipeline",
       "n": 426,
+      "reruns": 2,
       "result": {
-        "nw_tstat": 0.25525219901133483,
-        "oos_ic": 0.0007897041170994118,
+        "nw_tstat": -0.5724256949646885,
+        "oos_ic": -0.004481790201351869,
         "verdict": "REJECT"
       }
     },
@@ -193,12 +215,14 @@
         "n_folds": 4
       },
       "count": 21,
+      "key": "b08132ec9837ffadae9fae305735c03e5375fbea759e69c783fc4a7d9e4a0d9b",
       "kind": "promotion_pipeline",
       "n": 447,
+      "reruns": 2,
       "result": {
-        "nw_tstat": -0.01389881019833195,
-        "oos_ic": -0.038655679646502704,
-        "verdict": "REJECT"
+        "nw_tstat": 2.541277750960204,
+        "oos_ic": 0.04642054127928291,
+        "verdict": "ITERATE"
       }
     },
     {
@@ -210,11 +234,13 @@
         "n_folds": 4
       },
       "count": 21,
+      "key": "584b67300c3d450849cdd55ce5dd913ba76d01f97cdab92edceffc8543ac1957",
       "kind": "promotion_pipeline",
       "n": 468,
+      "reruns": 2,
       "result": {
-        "nw_tstat": 2.8668359571802404,
-        "oos_ic": 0.015498069895714863,
+        "nw_tstat": 3.6445295993008946,
+        "oos_ic": 0.029846653598665115,
         "verdict": "ITERATE"
       }
     },
@@ -227,12 +253,14 @@
         "n_folds": 4
       },
       "count": 21,
+      "key": "04185a3ebcd88699b9586f1488f10dcae29c271802af813797b154aea1fca959",
       "kind": "promotion_pipeline",
       "n": 489,
+      "reruns": 2,
       "result": {
-        "nw_tstat": -0.3042793192720331,
-        "oos_ic": -0.015003540363381146,
-        "verdict": "REJECT"
+        "nw_tstat": -0.2516426234955344,
+        "oos_ic": -0.015345115315985525,
+        "verdict": "ITERATE"
       }
     },
     {
@@ -244,11 +272,13 @@
         "n_folds": 4
       },
       "count": 21,
+      "key": "18230976edf6aa4f4a349f400578aca8106d87bc55cf42786fb9f57c289675fb",
       "kind": "promotion_pipeline",
       "n": 510,
+      "reruns": 2,
       "result": {
-        "nw_tstat": -1.4488522102517623,
-        "oos_ic": -0.002626919362759751,
+        "nw_tstat": 1.029691745013394,
+        "oos_ic": 0.004872357044527756,
         "verdict": "REJECT"
       }
     },
@@ -261,11 +291,13 @@
         "n_folds": 4
       },
       "count": 21,
+      "key": "6a628a89b41fcd359b8fc23cfad439689f8bb6feca92d6226a152265c6438422",
       "kind": "promotion_pipeline",
       "n": 531,
+      "reruns": 2,
       "result": {
-        "nw_tstat": 0.621758951096141,
-        "oos_ic": 0.005986392301240666,
+        "nw_tstat": 0.12255940832134822,
+        "oos_ic": -0.00652440775632895,
         "verdict": "REJECT"
       }
     },
@@ -278,11 +310,13 @@
         "n_folds": 4
       },
       "count": 21,
+      "key": "ddd41ca3556eae632043979945092bb946c930be3f6c337d0b28f92b5cf26f1a",
       "kind": "promotion_pipeline",
       "n": 552,
+      "reruns": 2,
       "result": {
-        "nw_tstat": 1.7144658876666043,
-        "oos_ic": 0.007375945354878848,
+        "nw_tstat": 1.940659530107021,
+        "oos_ic": 0.00999513225913094,
         "verdict": "ITERATE"
       }
     },
@@ -295,11 +329,13 @@
         "n_folds": 4
       },
       "count": 21,
+      "key": "e43fd5948fbd1cf39fecf0ab4e7d755949c5023a043eda6338737c35f2948413",
       "kind": "promotion_pipeline",
       "n": 573,
+      "reruns": 2,
       "result": {
-        "nw_tstat": -1.643586003160131,
-        "oos_ic": -0.0021381374570254613,
+        "nw_tstat": -1.0483778412087075,
+        "oos_ic": -0.03755023648127032,
         "verdict": "REJECT"
       }
     },
@@ -312,11 +348,13 @@
         "n_folds": 4
       },
       "count": 21,
+      "key": "ebebc522218d1edf57640b95e344543c45b26b1a1b06b865ca7ef3fc4821f908",
       "kind": "promotion_pipeline",
       "n": 594,
+      "reruns": 2,
       "result": {
-        "nw_tstat": 0.6049537021963882,
-        "oos_ic": 0.03782668448721306,
+        "nw_tstat": 2.1532395707159444,
+        "oos_ic": 0.05018924250994274,
         "verdict": "REJECT"
       }
     },
@@ -329,11 +367,13 @@
         "n_folds": 4
       },
       "count": 21,
+      "key": "a1b39108bbb2d1a2c1d476ccf213ac7ed23d637dc8c5989634a18021b64b1565",
       "kind": "promotion_pipeline",
       "n": 615,
+      "reruns": 2,
       "result": {
-        "nw_tstat": 0.15962631139999853,
-        "oos_ic": -0.0003330142515930643,
+        "nw_tstat": 0.2520987362206791,
+        "oos_ic": -0.005283673738419402,
         "verdict": "REJECT"
       }
     },
@@ -346,11 +386,13 @@
         "n_folds": 4
       },
       "count": 21,
+      "key": "efdc910ad489acaf7e439ee0469a2762fa5a11351f735ae4538a925999f1e379",
       "kind": "promotion_pipeline",
       "n": 636,
+      "reruns": 2,
       "result": {
-        "nw_tstat": 10.091293488803164,
-        "oos_ic": 0.1038204418951184,
+        "nw_tstat": 9.543020540452813,
+        "oos_ic": 0.11665815652301799,
         "verdict": "ITERATE"
       }
     },
@@ -363,12 +405,14 @@
         "n_folds": 4
       },
       "count": 21,
+      "key": "47cb1a397911454ea7aab925b2e4347fdbcc2577cfcf121f2b46e0a64110fc26",
       "kind": "promotion_pipeline",
       "n": 657,
+      "reruns": 2,
       "result": {
-        "nw_tstat": 14.327710596023197,
-        "oos_ic": 0.11314634504030202,
-        "verdict": "ITERATE"
+        "nw_tstat": -12.40393273683921,
+        "oos_ic": -0.12840896456478335,
+        "verdict": "REJECT"
       }
     },
     {
@@ -380,12 +424,14 @@
         "n_folds": 4
       },
       "count": 21,
+      "key": "0fad1540172bc3f22339d06a48692a1352ae792170d6cb2db2399a1dbd736e1e",
       "kind": "promotion_pipeline",
       "n": 678,
+      "reruns": 2,
       "result": {
-        "nw_tstat": 3.4342082476043445,
-        "oos_ic": 0.05662635307002905,
-        "verdict": "ITERATE"
+        "nw_tstat": 3.3340527364317496,
+        "oos_ic": 0.06735609999482002,
+        "verdict": "REJECT"
       }
     },
     {
@@ -397,12 +443,14 @@
         "n_folds": 4
       },
       "count": 21,
+      "key": "973ed02dbe2d74a7ac7b81952f5b36dc1084133f31a0308c29d3d1c8a776af36",
       "kind": "promotion_pipeline",
       "n": 699,
+      "reruns": 2,
       "result": {
-        "nw_tstat": 3.0516269168725234,
-        "oos_ic": 0.058015810203124345,
-        "verdict": "ITERATE"
+        "nw_tstat": 3.3063904200836802,
+        "oos_ic": 0.06667067849809888,
+        "verdict": "REJECT"
       }
     },
     {
@@ -414,2375 +462,829 @@
         "n_folds": 4
       },
       "count": 21,
+      "key": "081754d266379da2fe6d441c15a3bc3b1846d8aa717cbb131140ce8846925b7b",
       "kind": "promotion_pipeline",
       "n": 720,
+      "reruns": 2,
       "result": {
-        "nw_tstat": 0.08875258557148626,
-        "oos_ic": 0.00457507996594423,
+        "nw_tstat": -0.1116900784773735,
+        "oos_ic": 0.003574666550554545,
         "verdict": "REJECT"
       }
     },
     {
       "alpha_id": "EQ01",
       "config": {
-        "embargo_s": 60,
-        "horizon": "1s",
-        "looks": 21,
-        "n_folds": 4
+        "policy": "static"
       },
-      "count": 21,
-      "kind": "promotion_pipeline",
-      "n": 741,
+      "count": 1,
+      "key": "d5848408e7c2ee0d3d3e7854d7a25ce53bca5516b7b82b2aa51c6eb0e0e8173c",
+      "kind": "adaptive_deployment",
+      "n": 721,
+      "reruns": 3,
       "result": {
-        "nw_tstat": 3.810495247382391,
-        "oos_ic": 0.021904892759058343,
-        "verdict": "ITERATE"
+        "deployed_ic": 0.02150472070042302,
+        "final_state": "ACTIVE",
+        "n_evals": 112,
+        "n_informative_evals": 13,
+        "net_pnl": -55476.43455378761,
+        "refits": 1
       }
     },
     {
-      "alpha_id": "EQ02",
+      "alpha_id": "EQ01",
       "config": {
-        "embargo_s": 60,
-        "horizon": "5s",
-        "looks": 21,
-        "n_folds": 4
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
       },
-      "count": 21,
-      "kind": "promotion_pipeline",
-      "n": 762,
+      "count": 1,
+      "key": "122b26e375c07cc013635d60244e980aecc0e5b8909bce36ae98b8935e1cb24d",
+      "kind": "adaptive_deployment",
+      "n": 722,
+      "reruns": 3,
       "result": {
-        "nw_tstat": 5.888102509227305,
-        "oos_ic": 0.027427938201136728,
-        "verdict": "ITERATE"
+        "deployed_ic": 0.02150472070042302,
+        "final_state": "ACTIVE",
+        "n_evals": 112,
+        "n_informative_evals": 13,
+        "net_pnl": -55476.43455378761,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "EQ01",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 1,
+      "key": "d625176d60664250524c312d0fabb65c184dc0e4c5c7ce1ff7fd8694524eef6f",
+      "kind": "adaptive_deployment",
+      "n": 723,
+      "reruns": 3,
+      "result": {
+        "deployed_ic": 0.0213126112375627,
+        "final_state": "ACTIVE",
+        "n_evals": 112,
+        "n_informative_evals": 13,
+        "net_pnl": -54728.55683396566,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "EQ01",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 1,
+      "key": "473ce6e12ed41fba797751f7d02bbedc754371657e30274a5c482b75be3f4c0b",
+      "kind": "adaptive_deployment",
+      "n": 724,
+      "reruns": 3,
+      "result": {
+        "deployed_ic": 0.02150472070042302,
+        "final_state": "ACTIVE",
+        "n_evals": 112,
+        "n_informative_evals": 13,
+        "net_pnl": -55476.43455378761,
+        "refits": 1
       }
     },
     {
       "alpha_id": "EQ03",
       "config": {
-        "embargo_s": 60,
-        "horizon": "5s",
-        "looks": 21,
-        "n_folds": 4
+        "policy": "static"
       },
-      "count": 21,
-      "kind": "promotion_pipeline",
-      "n": 783,
+      "count": 1,
+      "key": "d2510de2c345e6ebf81fd7e5ef08a7667e94a3cb9c01e937f9ca88038917deb9",
+      "kind": "adaptive_deployment",
+      "n": 725,
+      "reruns": 3,
       "result": {
-        "nw_tstat": 7.236059527203757,
-        "oos_ic": 0.025607341689565126,
-        "verdict": "ITERATE"
+        "deployed_ic": 0.026322159998224296,
+        "final_state": "ACTIVE",
+        "n_evals": 112,
+        "n_informative_evals": 13,
+        "net_pnl": -214176.27787509048,
+        "refits": 1
       }
     },
     {
-      "alpha_id": "EQ04",
+      "alpha_id": "EQ03",
       "config": {
-        "embargo_s": 60,
-        "horizon": "5s",
-        "looks": 21,
-        "n_folds": 4
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
       },
-      "count": 21,
-      "kind": "promotion_pipeline",
-      "n": 804,
+      "count": 1,
+      "key": "d47dcc0cf619fc3df558f5182e65cf705be94936c894a5916a7dc206762b2403",
+      "kind": "adaptive_deployment",
+      "n": 726,
+      "reruns": 3,
       "result": {
-        "nw_tstat": 0.6035787836787878,
-        "oos_ic": -7.980847888302226e-05,
-        "verdict": "REJECT"
+        "deployed_ic": 0.026322159998224296,
+        "final_state": "ACTIVE",
+        "n_evals": 112,
+        "n_informative_evals": 13,
+        "net_pnl": -214176.27787509048,
+        "refits": 1
       }
     },
     {
-      "alpha_id": "EQ05",
+      "alpha_id": "EQ03",
       "config": {
-        "embargo_s": 60,
-        "horizon": "1s",
-        "looks": 21,
-        "n_folds": 4
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
       },
-      "count": 21,
-      "kind": "promotion_pipeline",
-      "n": 825,
+      "count": 1,
+      "key": "2c44c60ad9fc03514f2bb116dbd1b0d8115f57edc04aebf5654c277fc0f2c129",
+      "kind": "adaptive_deployment",
+      "n": 727,
+      "reruns": 3,
       "result": {
-        "nw_tstat": 3.9649805557079,
-        "oos_ic": 0.011557576071576902,
-        "verdict": "ITERATE"
+        "deployed_ic": 0.02628531974268434,
+        "final_state": "ACTIVE",
+        "n_evals": 112,
+        "n_informative_evals": 13,
+        "net_pnl": -214931.19845812404,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "EQ03",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 1,
+      "key": "7024647a419ff9d216ccf322b00449fb04845fde37b69679cf8bed1c296c017b",
+      "kind": "adaptive_deployment",
+      "n": 728,
+      "reruns": 3,
+      "result": {
+        "deployed_ic": 0.02618290072441929,
+        "final_state": "ACTIVE",
+        "n_evals": 112,
+        "n_informative_evals": 13,
+        "net_pnl": -213056.93647770208,
+        "refits": 3
       }
     },
     {
       "alpha_id": "EQ06",
       "config": {
-        "embargo_s": 60,
-        "horizon": "10s",
-        "looks": 21,
-        "n_folds": 4
+        "policy": "static"
       },
-      "count": 21,
-      "kind": "promotion_pipeline",
-      "n": 846,
+      "count": 1,
+      "key": "3c075c9322b69f855b4a84ccadc208c8338adacf93f6e40d6979139e14f94def",
+      "kind": "adaptive_deployment",
+      "n": 729,
+      "reruns": 3,
       "result": {
-        "nw_tstat": 1.8019889699617857,
-        "oos_ic": 0.03734768753250236,
-        "verdict": "ITERATE"
+        "deployed_ic": 0.037307450721878604,
+        "final_state": "ACTIVE",
+        "n_evals": 112,
+        "n_informative_evals": 13,
+        "net_pnl": -97366.22205764618,
+        "refits": 1
       }
     },
     {
-      "alpha_id": "EQ07",
+      "alpha_id": "EQ06",
       "config": {
-        "embargo_s": 60,
-        "horizon": "10s",
-        "looks": 21,
-        "n_folds": 4
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
       },
-      "count": 21,
-      "kind": "promotion_pipeline",
-      "n": 867,
+      "count": 1,
+      "key": "2e934faea190270faa0b10748893c330268ee4409b6f6601f0b200db543c29fb",
+      "kind": "adaptive_deployment",
+      "n": 730,
+      "reruns": 3,
       "result": {
-        "nw_tstat": 1.266899089391123,
-        "oos_ic": 0.012227296007993946,
-        "verdict": "REJECT"
+        "deployed_ic": 0.037307450721878604,
+        "final_state": "ACTIVE",
+        "n_evals": 112,
+        "n_informative_evals": 13,
+        "net_pnl": -97366.22205764618,
+        "refits": 1
       }
     },
     {
-      "alpha_id": "EQ08",
+      "alpha_id": "EQ06",
       "config": {
-        "embargo_s": 60,
-        "horizon": "10s",
-        "looks": 21,
-        "n_folds": 4
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
       },
-      "count": 21,
-      "kind": "promotion_pipeline",
-      "n": 888,
+      "count": 1,
+      "key": "4483c4e101094c4472c80fbdb287e85c89bb03ab0b883578e900989259c9e272",
+      "kind": "adaptive_deployment",
+      "n": 731,
+      "reruns": 3,
       "result": {
-        "nw_tstat": -0.13618642984815302,
-        "oos_ic": 0.01956840057636323,
-        "verdict": "REJECT"
+        "deployed_ic": 0.03730578169873323,
+        "final_state": "ACTIVE",
+        "n_evals": 112,
+        "n_informative_evals": 13,
+        "net_pnl": -97427.9677576461,
+        "refits": 2
       }
     },
     {
-      "alpha_id": "EQ09",
+      "alpha_id": "EQ06",
       "config": {
-        "embargo_s": 60,
-        "horizon": "10s",
-        "looks": 21,
-        "n_folds": 4
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
       },
-      "count": 21,
-      "kind": "promotion_pipeline",
-      "n": 909,
+      "count": 1,
+      "key": "a8356f3c3a4655ca23361a4d363b7d6ac398d4a743fe38e5b76c97e635968290",
+      "kind": "adaptive_deployment",
+      "n": 732,
+      "reruns": 3,
       "result": {
-        "nw_tstat": 3.4143061157619186,
-        "oos_ic": 0.08439350233859892,
-        "verdict": "ITERATE"
-      }
-    },
-    {
-      "alpha_id": "EQ10",
-      "config": {
-        "embargo_s": 60,
-        "horizon": "1s",
-        "looks": 21,
-        "n_folds": 4
-      },
-      "count": 21,
-      "kind": "promotion_pipeline",
-      "n": 930,
-      "result": {
-        "nw_tstat": 1.2804532344959865,
-        "oos_ic": 0.003636351105552351,
-        "verdict": "REJECT"
-      }
-    },
-    {
-      "alpha_id": "EQ11",
-      "config": {
-        "embargo_s": 60,
-        "horizon": "15m",
-        "looks": 21,
-        "n_folds": 4
-      },
-      "count": 21,
-      "kind": "promotion_pipeline",
-      "n": 951,
-      "result": {
-        "nw_tstat": 0.059855761799482175,
-        "oos_ic": 0.016645584490125206,
-        "verdict": "REJECT"
-      }
-    },
-    {
-      "alpha_id": "EQ12",
-      "config": {
-        "embargo_s": 60,
-        "horizon": "5s",
-        "looks": 21,
-        "n_folds": 4
-      },
-      "count": 21,
-      "kind": "promotion_pipeline",
-      "n": 972,
-      "result": {
-        "nw_tstat": 5.487118653279794,
-        "oos_ic": 0.026172634798850545,
-        "verdict": "ITERATE"
+        "deployed_ic": 0.033875556017102404,
+        "final_state": "ACTIVE",
+        "n_evals": 112,
+        "n_informative_evals": 13,
+        "net_pnl": -96872.98398057543,
+        "refits": 3
       }
     },
     {
       "alpha_id": "FX01",
       "config": {
-        "embargo_s": 60,
-        "horizon": "500ms",
-        "looks": 21,
-        "n_folds": 4
+        "policy": "static"
       },
-      "count": 21,
-      "kind": "promotion_pipeline",
-      "n": 993,
+      "count": 1,
+      "key": "d5e4e57b1cf6ae782f01c135c9bb21d643d63f2d4835253b1123b9c8c5ccd52f",
+      "kind": "adaptive_deployment",
+      "n": 733,
+      "reruns": 3,
       "result": {
-        "nw_tstat": -0.3042793192720331,
-        "oos_ic": -0.015003540363381146,
-        "verdict": "REJECT"
+        "deployed_ic": 0.00353528567120078,
+        "final_state": "RETIRED",
+        "n_evals": 169,
+        "n_informative_evals": 155,
+        "net_pnl": -217369.6927748646,
+        "refits": 1
       }
     },
     {
-      "alpha_id": "FX02",
+      "alpha_id": "FX01",
       "config": {
-        "embargo_s": 60,
-        "horizon": "1m",
-        "looks": 21,
-        "n_folds": 4
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
       },
-      "count": 21,
-      "kind": "promotion_pipeline",
-      "n": 1014,
+      "count": 1,
+      "key": "ffaec57d4300b349885ad97e65a768c33536a9c900225dd4e81ee556e368d8e5",
+      "kind": "adaptive_deployment",
+      "n": 734,
+      "reruns": 3,
       "result": {
-        "nw_tstat": -1.4488522102517623,
-        "oos_ic": -0.002626919362759751,
-        "verdict": "REJECT"
+        "deployed_ic": 0.00353528567120078,
+        "final_state": "RETIRED",
+        "n_evals": 169,
+        "n_informative_evals": 155,
+        "net_pnl": -217369.6927748646,
+        "refits": 1
       }
     },
     {
-      "alpha_id": "FX03",
+      "alpha_id": "FX01",
       "config": {
-        "embargo_s": 60,
-        "horizon": "1m",
-        "looks": 21,
-        "n_folds": 4
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
       },
-      "count": 21,
-      "kind": "promotion_pipeline",
-      "n": 1035,
+      "count": 1,
+      "key": "ab8e5fbcdf0b484b32e5954b8f8f18d8b8ad080738c49316e11bbc5ee67b2dc8",
+      "kind": "adaptive_deployment",
+      "n": 735,
+      "reruns": 3,
       "result": {
-        "nw_tstat": 0.621758951096141,
-        "oos_ic": 0.005986392301240666,
-        "verdict": "REJECT"
+        "deployed_ic": 0.004670962956136265,
+        "final_state": "RETIRED",
+        "n_evals": 169,
+        "n_informative_evals": 155,
+        "net_pnl": -158773.6019249634,
+        "refits": 2
       }
     },
     {
-      "alpha_id": "FX04",
+      "alpha_id": "FX01",
       "config": {
-        "embargo_s": 60,
-        "horizon": "30s",
-        "looks": 21,
-        "n_folds": 4
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
       },
-      "count": 21,
-      "kind": "promotion_pipeline",
-      "n": 1056,
+      "count": 1,
+      "key": "f1572df8623141b968dc9503dd533c77a3f846c3fc885dbda7ab0dbb96b17327",
+      "kind": "adaptive_deployment",
+      "n": 736,
+      "reruns": 3,
       "result": {
-        "nw_tstat": 1.7144658876666043,
-        "oos_ic": 0.007375945354878848,
-        "verdict": "ITERATE"
+        "deployed_ic": 0.004667047802930422,
+        "final_state": "RETIRED",
+        "n_evals": 169,
+        "n_informative_evals": 155,
+        "net_pnl": -154107.1103499945,
+        "refits": 2
       }
     },
     {
       "alpha_id": "FX05",
       "config": {
-        "embargo_s": 60,
-        "horizon": "5m",
-        "looks": 21,
-        "n_folds": 4
+        "policy": "static"
       },
-      "count": 21,
-      "kind": "promotion_pipeline",
-      "n": 1077,
+      "count": 1,
+      "key": "afc285d7b7cec9c12d9846f5a5ce0f25442b82f9d5224d3a271711f29362e743",
+      "kind": "adaptive_deployment",
+      "n": 737,
+      "reruns": 3,
       "result": {
-        "nw_tstat": -1.643586003160131,
-        "oos_ic": -0.0021381374570254613,
-        "verdict": "REJECT"
+        "deployed_ic": 0.02979099107782181,
+        "final_state": "ACTIVE",
+        "n_evals": 169,
+        "n_informative_evals": 152,
+        "net_pnl": -23583.53172500443,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX05",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 1,
+      "key": "f638bd70e26c7e4c6e9120b364b9b285085b8453ab5627618335f061cbbe9f1d",
+      "kind": "adaptive_deployment",
+      "n": 738,
+      "reruns": 3,
+      "result": {
+        "deployed_ic": 0.02979099107782181,
+        "final_state": "ACTIVE",
+        "n_evals": 169,
+        "n_informative_evals": 152,
+        "net_pnl": -23583.53172500443,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX05",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 1,
+      "key": "2213fdd7f1b94036bf33fe41cb2094c7668828973d3c59f322f2d5fb9dbea627",
+      "kind": "adaptive_deployment",
+      "n": 739,
+      "reruns": 3,
+      "result": {
+        "deployed_ic": 0.031414627008509624,
+        "final_state": "ACTIVE",
+        "n_evals": 169,
+        "n_informative_evals": 152,
+        "net_pnl": -23496.982162505505,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "FX05",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 1,
+      "key": "b2ac06e849b0d43f22f53311abe3949901cc08da2c19f4f9b1053579062d3535",
+      "kind": "adaptive_deployment",
+      "n": 740,
+      "reruns": 3,
+      "result": {
+        "deployed_ic": 0.02088242295809687,
+        "final_state": "ACTIVE",
+        "n_evals": 169,
+        "n_informative_evals": 152,
+        "net_pnl": -20010.597837504698,
+        "refits": 34
+      }
+    },
+    {
+      "alpha_id": "FX09",
+      "config": {
+        "policy": "static"
+      },
+      "count": 1,
+      "key": "13caf81f486d8976bb6986cf7afa0d4992e09972b262c57aa9b6d4e3862be42f",
+      "kind": "adaptive_deployment",
+      "n": 741,
+      "reruns": 3,
+      "result": {
+        "deployed_ic": 0.1356616729431871,
+        "final_state": "ACTIVE",
+        "n_evals": 169,
+        "n_informative_evals": 155,
+        "net_pnl": -2284497.5098247053,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX09",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 1,
+      "key": "0e2a71c9593391bd245e04725c9e36b1e1d58f4f1f5c3ef30c28fdbcc72aa1f1",
+      "kind": "adaptive_deployment",
+      "n": 742,
+      "reruns": 3,
+      "result": {
+        "deployed_ic": 0.1356616729431871,
+        "final_state": "ACTIVE",
+        "n_evals": 169,
+        "n_informative_evals": 155,
+        "net_pnl": -2284497.5098247053,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX09",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 1,
+      "key": "b738535d83eeaa2f4245b19eb6dc0f92935aae666049a5ba4552f5ca6e8382a6",
+      "kind": "adaptive_deployment",
+      "n": 743,
+      "reruns": 3,
+      "result": {
+        "deployed_ic": 0.13626833313843334,
+        "final_state": "ACTIVE",
+        "n_evals": 169,
+        "n_informative_evals": 155,
+        "net_pnl": -2357151.721262198,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "FX09",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 1,
+      "key": "960bf3e8e18fdc808ac071978b38b04a86b85ba2b370bd17998c87a03fd17f34",
+      "kind": "adaptive_deployment",
+      "n": 744,
+      "reruns": 3,
+      "result": {
+        "deployed_ic": 0.13525055842007866,
+        "final_state": "ACTIVE",
+        "n_evals": 169,
+        "n_informative_evals": 155,
+        "net_pnl": -2390752.7166871927,
+        "refits": 5
+      }
+    },
+    {
+      "alpha_id": "FX08",
+      "config": {
+        "policy": "static"
+      },
+      "count": 1,
+      "key": "438ec8140932eee6ff741c6f0806a6223d5fda68d3e41210a5f20b9672cd77a2",
+      "kind": "adaptive_deployment",
+      "n": 745,
+      "reruns": 3,
+      "result": {
+        "deployed_ic": 0.12128021640279497,
+        "final_state": "ACTIVE",
+        "n_evals": 169,
+        "n_informative_evals": 155,
+        "net_pnl": -2945367.5787626333,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX08",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 1,
+      "key": "7d7b791b2e4a74c723b4577d8f31348365d4532a2f163d8482009214427fc698",
+      "kind": "adaptive_deployment",
+      "n": 746,
+      "reruns": 3,
+      "result": {
+        "deployed_ic": 0.12128021640279497,
+        "final_state": "ACTIVE",
+        "n_evals": 169,
+        "n_informative_evals": 155,
+        "net_pnl": -2945367.5787626333,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX08",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 1,
+      "key": "c6fa55b11ae3681cd5665c298cd8b06e567706d3865c0c99408030598366784d",
+      "kind": "adaptive_deployment",
+      "n": 747,
+      "reruns": 3,
+      "result": {
+        "deployed_ic": 0.12047640811385504,
+        "final_state": "ACTIVE",
+        "n_evals": 169,
+        "n_informative_evals": 155,
+        "net_pnl": -2958352.282250163,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "FX08",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 1,
+      "key": "2ff8310394c70e42c7e0e797bb2cc3dd49e5fca4c667b2a71c48433355aee5a2",
+      "kind": "adaptive_deployment",
+      "n": 748,
+      "reruns": 3,
+      "result": {
+        "deployed_ic": 0.12037535449738983,
+        "final_state": "ACTIVE",
+        "n_evals": 169,
+        "n_informative_evals": 155,
+        "net_pnl": -2986215.8068001294,
+        "refits": 20
+      }
+    },
+    {
+      "alpha_id": "FX10",
+      "config": {
+        "policy": "static"
+      },
+      "count": 1,
+      "key": "df7b3412b90eebe23c3c2850713b46c3c0938c9fb687850f0d8f6aeb09f54b9d",
+      "kind": "adaptive_deployment",
+      "n": 749,
+      "reruns": 3,
+      "result": {
+        "deployed_ic": 0.07231847961150736,
+        "final_state": "ACTIVE",
+        "n_evals": 169,
+        "n_informative_evals": 155,
+        "net_pnl": -471653.1482252076,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX10",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 1,
+      "key": "aa489e800ba9777a441e864770e396cd106260c0a5fd5470860dbb4cb5351a08",
+      "kind": "adaptive_deployment",
+      "n": 750,
+      "reruns": 3,
+      "result": {
+        "deployed_ic": 0.07231847961150736,
+        "final_state": "ACTIVE",
+        "n_evals": 169,
+        "n_informative_evals": 155,
+        "net_pnl": -471653.1482252076,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX10",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 1,
+      "key": "1d61e496a31b6e8359f264e60e1bbf78832941f9741e75dab9a1d0a34e8e5fa9",
+      "kind": "adaptive_deployment",
+      "n": 751,
+      "reruns": 3,
+      "result": {
+        "deployed_ic": 0.07172381143384328,
+        "final_state": "ACTIVE",
+        "n_evals": 169,
+        "n_informative_evals": 155,
+        "net_pnl": -473075.3894377671,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "FX10",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 1,
+      "key": "eea44a47cc4ce3ebc0c5afc6380a66edf167103689f4b0df51e87845c6a2c29c",
+      "kind": "adaptive_deployment",
+      "n": 752,
+      "reruns": 3,
+      "result": {
+        "deployed_ic": 0.06880375808316466,
+        "final_state": "ACTIVE",
+        "n_evals": 169,
+        "n_informative_evals": 155,
+        "net_pnl": -483917.4047503149,
+        "refits": 40
+      }
+    },
+    {
+      "alpha_id": "FX11",
+      "config": {
+        "policy": "static"
+      },
+      "count": 1,
+      "key": "5bf8eada336010359b7a49f30707517e1c865451b7dc262dfa59b7f0634afbf7",
+      "kind": "adaptive_deployment",
+      "n": 753,
+      "reruns": 3,
+      "result": {
+        "deployed_ic": 0.06760307597569155,
+        "final_state": "ACTIVE",
+        "n_evals": 169,
+        "n_informative_evals": 155,
+        "net_pnl": -1500944.1802743678,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX11",
+      "config": {
+        "period_ns": 604800000000000,
+        "policy": "scheduled"
+      },
+      "count": 1,
+      "key": "f3781629b967e55cca98adbe729cd9f8378ab2bc1147b4873268bce2d3eb8d63",
+      "kind": "adaptive_deployment",
+      "n": 754,
+      "reruns": 3,
+      "result": {
+        "deployed_ic": 0.06760307597569155,
+        "final_state": "ACTIVE",
+        "n_evals": 169,
+        "n_informative_evals": 155,
+        "net_pnl": -1500944.1802743678,
+        "refits": 1
+      }
+    },
+    {
+      "alpha_id": "FX11",
+      "config": {
+        "period_ns": 86400000000000,
+        "policy": "scheduled"
+      },
+      "count": 1,
+      "key": "0bc56eb417646ab4d23a1fb4a2018a9aa9a4bb3e2dca8f283b92c560f161e715",
+      "kind": "adaptive_deployment",
+      "n": 755,
+      "reruns": 3,
+      "result": {
+        "deployed_ic": 0.06836857973574223,
+        "final_state": "ACTIVE",
+        "n_evals": 169,
+        "n_informative_evals": 155,
+        "net_pnl": -1490132.956836767,
+        "refits": 2
+      }
+    },
+    {
+      "alpha_id": "FX11",
+      "config": {
+        "ic_z_threshold": -2.0,
+        "min_refit_gap_ns": 3600000000000,
+        "policy": "drift_triggered",
+        "psi_threshold": 0.25
+      },
+      "count": 1,
+      "key": "869521c5bf1b668e357a6c05a55959b2a4519ccccfd953deb1da326bf7c5f9ac",
+      "kind": "adaptive_deployment",
+      "n": 756,
+      "reruns": 3,
+      "result": {
+        "deployed_ic": 0.06266604338102416,
+        "final_state": "ACTIVE",
+        "n_evals": 169,
+        "n_informative_evals": 155,
+        "net_pnl": -1486601.8589993094,
+        "refits": 11
       }
     },
     {
       "alpha_id": "FX06",
       "config": {
-        "embargo_s": 60,
-        "horizon": "30s",
-        "looks": 21,
-        "n_folds": 4
-      },
-      "count": 21,
-      "kind": "promotion_pipeline",
-      "n": 1098,
-      "result": {
-        "nw_tstat": 0.6049537021963882,
-        "oos_ic": 0.03782668448721306,
-        "verdict": "REJECT"
-      }
-    },
-    {
-      "alpha_id": "FX07",
-      "config": {
-        "embargo_s": 60,
-        "horizon": "1m",
-        "looks": 21,
-        "n_folds": 4
-      },
-      "count": 21,
-      "kind": "promotion_pipeline",
-      "n": 1119,
-      "result": {
-        "nw_tstat": 0.15962631139999853,
-        "oos_ic": -0.0003330142515930643,
-        "verdict": "REJECT"
-      }
-    },
-    {
-      "alpha_id": "FX08",
-      "config": {
-        "embargo_s": 60,
-        "horizon": "1m",
-        "looks": 21,
-        "n_folds": 4
-      },
-      "count": 21,
-      "kind": "promotion_pipeline",
-      "n": 1140,
-      "result": {
-        "nw_tstat": 10.091293488803183,
-        "oos_ic": 0.10382044189511845,
-        "verdict": "ITERATE"
-      }
-    },
-    {
-      "alpha_id": "FX09",
-      "config": {
-        "embargo_s": 60,
-        "horizon": "1m",
-        "looks": 21,
-        "n_folds": 4
-      },
-      "count": 21,
-      "kind": "promotion_pipeline",
-      "n": 1161,
-      "result": {
-        "nw_tstat": 14.327710596023199,
-        "oos_ic": 0.11314634504030201,
-        "verdict": "ITERATE"
-      }
-    },
-    {
-      "alpha_id": "FX10",
-      "config": {
-        "embargo_s": 60,
-        "horizon": "1m",
-        "looks": 21,
-        "n_folds": 4
-      },
-      "count": 21,
-      "kind": "promotion_pipeline",
-      "n": 1182,
-      "result": {
-        "nw_tstat": 3.4342082476043547,
-        "oos_ic": 0.056626353070029,
-        "verdict": "ITERATE"
-      }
-    },
-    {
-      "alpha_id": "FX11",
-      "config": {
-        "embargo_s": 60,
-        "horizon": "5m",
-        "looks": 21,
-        "n_folds": 4
-      },
-      "count": 21,
-      "kind": "promotion_pipeline",
-      "n": 1203,
-      "result": {
-        "nw_tstat": 3.051626916872538,
-        "oos_ic": 0.05801581020312467,
-        "verdict": "ITERATE"
-      }
-    },
-    {
-      "alpha_id": "FX12",
-      "config": {
-        "embargo_s": 60,
-        "horizon": "1m",
-        "looks": 21,
-        "n_folds": 4
-      },
-      "count": 21,
-      "kind": "promotion_pipeline",
-      "n": 1224,
-      "result": {
-        "nw_tstat": 0.08875258557148626,
-        "oos_ic": 0.00457507996594423,
-        "verdict": "REJECT"
-      }
-    },
-    {
-      "alpha_id": "EQ01",
-      "config": {
         "policy": "static"
       },
-      "count": 114,
+      "count": 1,
+      "key": "009fb2cdfce29d5163659f8933963978c237213c928e870c3850b89dd6ec1a4a",
       "kind": "adaptive_deployment",
-      "n": 1338,
+      "n": 757,
+      "reruns": 3,
       "result": {
-        "deployed_ic": 0.020986846344278144,
-        "final_state": "ACTIVE",
-        "net_pnl": -62365.090708341115,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "EQ01",
-      "config": {
-        "period_ns": 604800000000000,
-        "policy": "scheduled"
-      },
-      "count": 114,
-      "kind": "adaptive_deployment",
-      "n": 1452,
-      "result": {
-        "deployed_ic": 0.020986846344278144,
-        "final_state": "ACTIVE",
-        "net_pnl": -62365.090708341115,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "EQ01",
-      "config": {
-        "period_ns": 86400000000000,
-        "policy": "scheduled"
-      },
-      "count": 115,
-      "kind": "adaptive_deployment",
-      "n": 1567,
-      "result": {
-        "deployed_ic": 0.020797095853922504,
-        "final_state": "ACTIVE",
-        "net_pnl": -61418.14539703861,
-        "refits": 2
-      }
-    },
-    {
-      "alpha_id": "EQ01",
-      "config": {
-        "ic_z_threshold": -2.0,
-        "min_refit_gap_ns": 3600000000000,
-        "policy": "drift_triggered",
-        "psi_threshold": 0.25
-      },
-      "count": 114,
-      "kind": "adaptive_deployment",
-      "n": 1681,
-      "result": {
-        "deployed_ic": 0.020986846344278144,
-        "final_state": "ACTIVE",
-        "net_pnl": -62365.090708341115,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "EQ03",
-      "config": {
-        "policy": "static"
-      },
-      "count": 114,
-      "kind": "adaptive_deployment",
-      "n": 1795,
-      "result": {
-        "deployed_ic": 0.019898617773882136,
-        "final_state": "ACTIVE",
-        "net_pnl": -147829.80665481515,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "EQ03",
-      "config": {
-        "period_ns": 604800000000000,
-        "policy": "scheduled"
-      },
-      "count": 114,
-      "kind": "adaptive_deployment",
-      "n": 1909,
-      "result": {
-        "deployed_ic": 0.019898617773882136,
-        "final_state": "ACTIVE",
-        "net_pnl": -147829.80665481515,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "EQ03",
-      "config": {
-        "period_ns": 86400000000000,
-        "policy": "scheduled"
-      },
-      "count": 115,
-      "kind": "adaptive_deployment",
-      "n": 2024,
-      "result": {
-        "deployed_ic": 0.019893226879441093,
-        "final_state": "ACTIVE",
-        "net_pnl": -148048.17593259295,
-        "refits": 2
-      }
-    },
-    {
-      "alpha_id": "EQ03",
-      "config": {
-        "ic_z_threshold": -2.0,
-        "min_refit_gap_ns": 3600000000000,
-        "policy": "drift_triggered",
-        "psi_threshold": 0.25
-      },
-      "count": 119,
-      "kind": "adaptive_deployment",
-      "n": 2143,
-      "result": {
-        "deployed_ic": 0.019417303747849106,
-        "final_state": "ACTIVE",
-        "net_pnl": -146799.58204200174,
-        "refits": 6
-      }
-    },
-    {
-      "alpha_id": "EQ06",
-      "config": {
-        "policy": "static"
-      },
-      "count": 114,
-      "kind": "adaptive_deployment",
-      "n": 2257,
-      "result": {
-        "deployed_ic": 0.05340653535898924,
-        "final_state": "WATCH",
-        "net_pnl": -66921.35373559556,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "EQ06",
-      "config": {
-        "period_ns": 604800000000000,
-        "policy": "scheduled"
-      },
-      "count": 114,
-      "kind": "adaptive_deployment",
-      "n": 2371,
-      "result": {
-        "deployed_ic": 0.05340653535898924,
-        "final_state": "WATCH",
-        "net_pnl": -66921.35373559556,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "EQ06",
-      "config": {
-        "period_ns": 86400000000000,
-        "policy": "scheduled"
-      },
-      "count": 115,
-      "kind": "adaptive_deployment",
-      "n": 2486,
-      "result": {
-        "deployed_ic": 0.05337610182968743,
-        "final_state": "WATCH",
-        "net_pnl": -68194.87546460111,
-        "refits": 2
-      }
-    },
-    {
-      "alpha_id": "EQ06",
-      "config": {
-        "ic_z_threshold": -2.0,
-        "min_refit_gap_ns": 3600000000000,
-        "policy": "drift_triggered",
-        "psi_threshold": 0.25
-      },
-      "count": 119,
-      "kind": "adaptive_deployment",
-      "n": 2605,
-      "result": {
-        "deployed_ic": 0.052539284412901024,
-        "final_state": "WATCH",
-        "net_pnl": -68240.93175551019,
-        "refits": 6
-      }
-    },
-    {
-      "alpha_id": "FX01",
-      "config": {
-        "policy": "static"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 2776,
-      "result": {
-        "deployed_ic": 0.003453189085147243,
+        "deployed_ic": -0.013067281465816876,
         "final_state": "RETIRED",
-        "net_pnl": -244819.71927488747,
+        "n_evals": 169,
+        "n_informative_evals": 153,
+        "net_pnl": -114781.72677496681,
         "refits": 1
       }
     },
     {
-      "alpha_id": "FX01",
+      "alpha_id": "FX06",
       "config": {
         "period_ns": 604800000000000,
         "policy": "scheduled"
       },
-      "count": 171,
+      "count": 1,
+      "key": "6a3b827bf89bad5d72a2e519455f8b61127bb55375b7aff53ae7318c454f0533",
       "kind": "adaptive_deployment",
-      "n": 2947,
+      "n": 758,
+      "reruns": 3,
       "result": {
-        "deployed_ic": 0.003453189085147243,
+        "deployed_ic": -0.013067281465816876,
         "final_state": "RETIRED",
-        "net_pnl": -244819.71927488747,
+        "n_evals": 169,
+        "n_informative_evals": 153,
+        "net_pnl": -114781.72677496681,
         "refits": 1
       }
     },
     {
-      "alpha_id": "FX01",
+      "alpha_id": "FX06",
       "config": {
         "period_ns": 86400000000000,
         "policy": "scheduled"
       },
-      "count": 172,
+      "count": 1,
+      "key": "e145619e1735850e6770e3fa091c6413517573ad15099b285344314def9d58f4",
       "kind": "adaptive_deployment",
-      "n": 3119,
+      "n": 759,
+      "reruns": 3,
       "result": {
-        "deployed_ic": 0.00461631223448981,
-        "final_state": "RETIRED",
-        "net_pnl": -177438.05009998742,
+        "deployed_ic": 0.02725957821940159,
+        "final_state": "ACTIVE",
+        "n_evals": 169,
+        "n_informative_evals": 153,
+        "net_pnl": -108327.12178754143,
         "refits": 2
       }
     },
     {
-      "alpha_id": "FX01",
+      "alpha_id": "FX06",
       "config": {
         "ic_z_threshold": -2.0,
         "min_refit_gap_ns": 3600000000000,
         "policy": "drift_triggered",
         "psi_threshold": 0.25
       },
-      "count": 172,
+      "count": 1,
+      "key": "ed8c14cf51766b25a2e5c3136d0f43405477868575425b2e5c08d4096232a7d0",
       "kind": "adaptive_deployment",
-      "n": 3291,
+      "n": 760,
+      "reruns": 3,
       "result": {
-        "deployed_ic": 0.004612919905500903,
-        "final_state": "RETIRED",
-        "net_pnl": -177167.85283748794,
-        "refits": 2
-      }
-    },
-    {
-      "alpha_id": "FX05",
-      "config": {
-        "policy": "static"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 3462,
-      "result": {
-        "deployed_ic": 0.009841735515834832,
-        "final_state": "WATCH",
-        "net_pnl": -35804.39244999108,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX05",
-      "config": {
-        "period_ns": 604800000000000,
-        "policy": "scheduled"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 3633,
-      "result": {
-        "deployed_ic": 0.009841735515834832,
-        "final_state": "WATCH",
-        "net_pnl": -35804.39244999108,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX05",
-      "config": {
-        "period_ns": 86400000000000,
-        "policy": "scheduled"
-      },
-      "count": 172,
-      "kind": "adaptive_deployment",
-      "n": 3805,
-      "result": {
-        "deployed_ic": -0.009555205315146129,
-        "final_state": "RETIRED",
-        "net_pnl": -15873.290312494035,
-        "refits": 2
-      }
-    },
-    {
-      "alpha_id": "FX05",
-      "config": {
-        "ic_z_threshold": -2.0,
-        "min_refit_gap_ns": 3600000000000,
-        "policy": "drift_triggered",
-        "psi_threshold": 0.25
-      },
-      "count": 173,
-      "kind": "adaptive_deployment",
-      "n": 3978,
-      "result": {
-        "deployed_ic": 0.008027615260153024,
-        "final_state": "WATCH",
-        "net_pnl": -35652.47086249199,
-        "refits": 3
-      }
-    },
-    {
-      "alpha_id": "FX09",
-      "config": {
-        "policy": "static"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 4149,
-      "result": {
-        "deployed_ic": 0.1212147998979684,
-        "final_state": "ACTIVE",
-        "net_pnl": -2874385.7161998325,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX09",
-      "config": {
-        "period_ns": 604800000000000,
-        "policy": "scheduled"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 4320,
-      "result": {
-        "deployed_ic": 0.1212147998979684,
-        "final_state": "ACTIVE",
-        "net_pnl": -2874385.7161998325,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX09",
-      "config": {
-        "period_ns": 86400000000000,
-        "policy": "scheduled"
-      },
-      "count": 172,
-      "kind": "adaptive_deployment",
-      "n": 4492,
-      "result": {
-        "deployed_ic": 0.12147281460247583,
-        "final_state": "ACTIVE",
-        "net_pnl": -2901270.860849862,
-        "refits": 2
-      }
-    },
-    {
-      "alpha_id": "FX09",
-      "config": {
-        "ic_z_threshold": -2.0,
-        "min_refit_gap_ns": 3600000000000,
-        "policy": "drift_triggered",
-        "psi_threshold": 0.25
-      },
-      "count": 195,
-      "kind": "adaptive_deployment",
-      "n": 4687,
-      "result": {
-        "deployed_ic": 0.12115098506362777,
-        "final_state": "ACTIVE",
-        "net_pnl": -2922814.6123998626,
-        "refits": 25
-      }
-    },
-    {
-      "alpha_id": "FX08",
-      "config": {
-        "policy": "static"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 4858,
-      "result": {
-        "deployed_ic": 0.10880961152085607,
-        "final_state": "ACTIVE",
-        "net_pnl": -3376227.959800301,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX08",
-      "config": {
-        "period_ns": 604800000000000,
-        "policy": "scheduled"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 5029,
-      "result": {
-        "deployed_ic": 0.10880961152085607,
-        "final_state": "ACTIVE",
-        "net_pnl": -3376227.959800301,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX08",
-      "config": {
-        "period_ns": 86400000000000,
-        "policy": "scheduled"
-      },
-      "count": 172,
-      "kind": "adaptive_deployment",
-      "n": 5201,
-      "result": {
-        "deployed_ic": 0.10826585296882385,
-        "final_state": "ACTIVE",
-        "net_pnl": -3372023.9753253255,
-        "refits": 2
-      }
-    },
-    {
-      "alpha_id": "FX08",
-      "config": {
-        "ic_z_threshold": -2.0,
-        "min_refit_gap_ns": 3600000000000,
-        "policy": "drift_triggered",
-        "psi_threshold": 0.25
-      },
-      "count": 190,
-      "kind": "adaptive_deployment",
-      "n": 5391,
-      "result": {
-        "deployed_ic": 0.10824862628377444,
-        "final_state": "ACTIVE",
-        "net_pnl": -3364316.506112784,
-        "refits": 20
-      }
-    },
-    {
-      "alpha_id": "EQ09",
-      "config": {
-        "policy": "static"
-      },
-      "count": 114,
-      "kind": "adaptive_deployment",
-      "n": 5505,
-      "result": {
-        "deployed_ic": 0.08021225438855126,
-        "final_state": "ACTIVE",
-        "net_pnl": -31832.66500200952,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "EQ09",
-      "config": {
-        "period_ns": 604800000000000,
-        "policy": "scheduled"
-      },
-      "count": 114,
-      "kind": "adaptive_deployment",
-      "n": 5619,
-      "result": {
-        "deployed_ic": 0.08021225438855126,
-        "final_state": "ACTIVE",
-        "net_pnl": -31832.66500200952,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "EQ09",
-      "config": {
-        "period_ns": 86400000000000,
-        "policy": "scheduled"
-      },
-      "count": 115,
-      "kind": "adaptive_deployment",
-      "n": 5734,
-      "result": {
-        "deployed_ic": 0.08001679196399603,
-        "final_state": "ACTIVE",
-        "net_pnl": -32369.377763083416,
-        "refits": 2
-      }
-    },
-    {
-      "alpha_id": "EQ09",
-      "config": {
-        "ic_z_threshold": -2.0,
-        "min_refit_gap_ns": 3600000000000,
-        "policy": "drift_triggered",
-        "psi_threshold": 0.25
-      },
-      "count": 114,
-      "kind": "adaptive_deployment",
-      "n": 5848,
-      "result": {
-        "deployed_ic": 0.08021225438855126,
-        "final_state": "ACTIVE",
-        "net_pnl": -31832.66500200952,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX11",
-      "config": {
-        "policy": "static"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 6019,
-      "result": {
-        "deployed_ic": 0.059894480111893314,
-        "final_state": "ACTIVE",
-        "net_pnl": -1567176.5192368862,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX11",
-      "config": {
-        "period_ns": 604800000000000,
-        "policy": "scheduled"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 6190,
-      "result": {
-        "deployed_ic": 0.059894480111893314,
-        "final_state": "ACTIVE",
-        "net_pnl": -1567176.5192368862,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX11",
-      "config": {
-        "period_ns": 86400000000000,
-        "policy": "scheduled"
-      },
-      "count": 172,
-      "kind": "adaptive_deployment",
-      "n": 6362,
-      "result": {
-        "deployed_ic": 0.05819633147439981,
-        "final_state": "ACTIVE",
-        "net_pnl": -1548173.0592742497,
-        "refits": 2
-      }
-    },
-    {
-      "alpha_id": "FX11",
-      "config": {
-        "ic_z_threshold": -2.0,
-        "min_refit_gap_ns": 3600000000000,
-        "policy": "drift_triggered",
-        "psi_threshold": 0.25
-      },
-      "count": 178,
-      "kind": "adaptive_deployment",
-      "n": 6540,
-      "result": {
-        "deployed_ic": 0.05795630618095114,
-        "final_state": "ACTIVE",
-        "net_pnl": -1562143.301086762,
-        "refits": 8
-      }
-    },
-    {
-      "alpha_id": "FX10",
-      "config": {
-        "policy": "static"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 6711,
-      "result": {
-        "deployed_ic": 0.05781394000225534,
-        "final_state": "ACTIVE",
-        "net_pnl": -460337.76055020664,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX10",
-      "config": {
-        "period_ns": 604800000000000,
-        "policy": "scheduled"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 6882,
-      "result": {
-        "deployed_ic": 0.05781394000225534,
-        "final_state": "ACTIVE",
-        "net_pnl": -460337.76055020664,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX10",
-      "config": {
-        "period_ns": 86400000000000,
-        "policy": "scheduled"
-      },
-      "count": 172,
-      "kind": "adaptive_deployment",
-      "n": 7054,
-      "result": {
-        "deployed_ic": 0.05655940619923985,
-        "final_state": "ACTIVE",
-        "net_pnl": -474560.63385020185,
-        "refits": 2
-      }
-    },
-    {
-      "alpha_id": "FX10",
-      "config": {
-        "ic_z_threshold": -2.0,
-        "min_refit_gap_ns": 3600000000000,
-        "policy": "drift_triggered",
-        "psi_threshold": 0.25
-      },
-      "count": 211,
-      "kind": "adaptive_deployment",
-      "n": 7265,
-      "result": {
-        "deployed_ic": 0.053060282648740825,
-        "final_state": "WATCH",
-        "net_pnl": -502129.4746377395,
-        "refits": 41
-      }
-    },
-    {
-      "alpha_id": "EQ01",
-      "config": {
-        "policy": "static"
-      },
-      "count": 114,
-      "kind": "adaptive_deployment",
-      "n": 7379,
-      "result": {
-        "deployed_ic": 0.020986846344278144,
-        "final_state": "ACTIVE",
-        "net_pnl": -62365.090708341115,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "EQ01",
-      "config": {
-        "period_ns": 604800000000000,
-        "policy": "scheduled"
-      },
-      "count": 114,
-      "kind": "adaptive_deployment",
-      "n": 7493,
-      "result": {
-        "deployed_ic": 0.020986846344278144,
-        "final_state": "ACTIVE",
-        "net_pnl": -62365.090708341115,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "EQ01",
-      "config": {
-        "period_ns": 86400000000000,
-        "policy": "scheduled"
-      },
-      "count": 115,
-      "kind": "adaptive_deployment",
-      "n": 7608,
-      "result": {
-        "deployed_ic": 0.020797095853922504,
-        "final_state": "ACTIVE",
-        "net_pnl": -61418.14539703861,
-        "refits": 2
-      }
-    },
-    {
-      "alpha_id": "EQ01",
-      "config": {
-        "ic_z_threshold": -2.0,
-        "min_refit_gap_ns": 3600000000000,
-        "policy": "drift_triggered",
-        "psi_threshold": 0.25
-      },
-      "count": 114,
-      "kind": "adaptive_deployment",
-      "n": 7722,
-      "result": {
-        "deployed_ic": 0.020986846344278144,
-        "final_state": "ACTIVE",
-        "net_pnl": -62365.090708341115,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "EQ03",
-      "config": {
-        "policy": "static"
-      },
-      "count": 114,
-      "kind": "adaptive_deployment",
-      "n": 7836,
-      "result": {
-        "deployed_ic": 0.019898617773882136,
-        "final_state": "ACTIVE",
-        "net_pnl": -147829.80665481515,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "EQ03",
-      "config": {
-        "period_ns": 604800000000000,
-        "policy": "scheduled"
-      },
-      "count": 114,
-      "kind": "adaptive_deployment",
-      "n": 7950,
-      "result": {
-        "deployed_ic": 0.019898617773882136,
-        "final_state": "ACTIVE",
-        "net_pnl": -147829.80665481515,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "EQ03",
-      "config": {
-        "period_ns": 86400000000000,
-        "policy": "scheduled"
-      },
-      "count": 115,
-      "kind": "adaptive_deployment",
-      "n": 8065,
-      "result": {
-        "deployed_ic": 0.019893226879441093,
-        "final_state": "ACTIVE",
-        "net_pnl": -148048.17593259295,
-        "refits": 2
-      }
-    },
-    {
-      "alpha_id": "EQ03",
-      "config": {
-        "ic_z_threshold": -2.0,
-        "min_refit_gap_ns": 3600000000000,
-        "policy": "drift_triggered",
-        "psi_threshold": 0.25
-      },
-      "count": 119,
-      "kind": "adaptive_deployment",
-      "n": 8184,
-      "result": {
-        "deployed_ic": 0.019417303747849106,
-        "final_state": "ACTIVE",
-        "net_pnl": -146799.58204200174,
-        "refits": 6
-      }
-    },
-    {
-      "alpha_id": "EQ06",
-      "config": {
-        "policy": "static"
-      },
-      "count": 114,
-      "kind": "adaptive_deployment",
-      "n": 8298,
-      "result": {
-        "deployed_ic": 0.05340653535898924,
-        "final_state": "WATCH",
-        "net_pnl": -66921.35373559556,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "EQ06",
-      "config": {
-        "period_ns": 604800000000000,
-        "policy": "scheduled"
-      },
-      "count": 114,
-      "kind": "adaptive_deployment",
-      "n": 8412,
-      "result": {
-        "deployed_ic": 0.05340653535898924,
-        "final_state": "WATCH",
-        "net_pnl": -66921.35373559556,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "EQ06",
-      "config": {
-        "period_ns": 86400000000000,
-        "policy": "scheduled"
-      },
-      "count": 115,
-      "kind": "adaptive_deployment",
-      "n": 8527,
-      "result": {
-        "deployed_ic": 0.05337610182968743,
-        "final_state": "WATCH",
-        "net_pnl": -68194.87546460111,
-        "refits": 2
-      }
-    },
-    {
-      "alpha_id": "EQ06",
-      "config": {
-        "ic_z_threshold": -2.0,
-        "min_refit_gap_ns": 3600000000000,
-        "policy": "drift_triggered",
-        "psi_threshold": 0.25
-      },
-      "count": 119,
-      "kind": "adaptive_deployment",
-      "n": 8646,
-      "result": {
-        "deployed_ic": 0.052539284412901024,
-        "final_state": "WATCH",
-        "net_pnl": -68240.93175551019,
-        "refits": 6
-      }
-    },
-    {
-      "alpha_id": "FX01",
-      "config": {
-        "policy": "static"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 8817,
-      "result": {
-        "deployed_ic": 0.003453189085147243,
-        "final_state": "RETIRED",
-        "net_pnl": -244819.71927488747,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX01",
-      "config": {
-        "period_ns": 604800000000000,
-        "policy": "scheduled"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 8988,
-      "result": {
-        "deployed_ic": 0.003453189085147243,
-        "final_state": "RETIRED",
-        "net_pnl": -244819.71927488747,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX01",
-      "config": {
-        "period_ns": 86400000000000,
-        "policy": "scheduled"
-      },
-      "count": 172,
-      "kind": "adaptive_deployment",
-      "n": 9160,
-      "result": {
-        "deployed_ic": 0.00461631223448981,
-        "final_state": "RETIRED",
-        "net_pnl": -177438.05009998742,
-        "refits": 2
-      }
-    },
-    {
-      "alpha_id": "FX01",
-      "config": {
-        "ic_z_threshold": -2.0,
-        "min_refit_gap_ns": 3600000000000,
-        "policy": "drift_triggered",
-        "psi_threshold": 0.25
-      },
-      "count": 172,
-      "kind": "adaptive_deployment",
-      "n": 9332,
-      "result": {
-        "deployed_ic": 0.004612919905500903,
-        "final_state": "RETIRED",
-        "net_pnl": -177167.85283748794,
-        "refits": 2
-      }
-    },
-    {
-      "alpha_id": "FX05",
-      "config": {
-        "policy": "static"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 9503,
-      "result": {
-        "deployed_ic": 0.009841735515834832,
-        "final_state": "WATCH",
-        "net_pnl": -35804.39244999108,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX05",
-      "config": {
-        "period_ns": 604800000000000,
-        "policy": "scheduled"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 9674,
-      "result": {
-        "deployed_ic": 0.009841735515834832,
-        "final_state": "WATCH",
-        "net_pnl": -35804.39244999108,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX05",
-      "config": {
-        "period_ns": 86400000000000,
-        "policy": "scheduled"
-      },
-      "count": 172,
-      "kind": "adaptive_deployment",
-      "n": 9846,
-      "result": {
-        "deployed_ic": -0.009555205315146129,
-        "final_state": "RETIRED",
-        "net_pnl": -15873.290312494035,
-        "refits": 2
-      }
-    },
-    {
-      "alpha_id": "FX05",
-      "config": {
-        "ic_z_threshold": -2.0,
-        "min_refit_gap_ns": 3600000000000,
-        "policy": "drift_triggered",
-        "psi_threshold": 0.25
-      },
-      "count": 173,
-      "kind": "adaptive_deployment",
-      "n": 10019,
-      "result": {
-        "deployed_ic": 0.008027615260153024,
-        "final_state": "WATCH",
-        "net_pnl": -35652.47086249199,
-        "refits": 3
-      }
-    },
-    {
-      "alpha_id": "FX09",
-      "config": {
-        "policy": "static"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 10190,
-      "result": {
-        "deployed_ic": 0.1212147998979684,
-        "final_state": "ACTIVE",
-        "net_pnl": -2874385.7161998325,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX09",
-      "config": {
-        "period_ns": 604800000000000,
-        "policy": "scheduled"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 10361,
-      "result": {
-        "deployed_ic": 0.1212147998979684,
-        "final_state": "ACTIVE",
-        "net_pnl": -2874385.7161998325,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX09",
-      "config": {
-        "period_ns": 86400000000000,
-        "policy": "scheduled"
-      },
-      "count": 172,
-      "kind": "adaptive_deployment",
-      "n": 10533,
-      "result": {
-        "deployed_ic": 0.12147281460247583,
-        "final_state": "ACTIVE",
-        "net_pnl": -2901270.860849862,
-        "refits": 2
-      }
-    },
-    {
-      "alpha_id": "FX09",
-      "config": {
-        "ic_z_threshold": -2.0,
-        "min_refit_gap_ns": 3600000000000,
-        "policy": "drift_triggered",
-        "psi_threshold": 0.25
-      },
-      "count": 195,
-      "kind": "adaptive_deployment",
-      "n": 10728,
-      "result": {
-        "deployed_ic": 0.12115098506362777,
-        "final_state": "ACTIVE",
-        "net_pnl": -2922814.6123998626,
-        "refits": 25
-      }
-    },
-    {
-      "alpha_id": "FX08",
-      "config": {
-        "policy": "static"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 10899,
-      "result": {
-        "deployed_ic": 0.10880961152085607,
-        "final_state": "ACTIVE",
-        "net_pnl": -3376227.959800301,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX08",
-      "config": {
-        "period_ns": 604800000000000,
-        "policy": "scheduled"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 11070,
-      "result": {
-        "deployed_ic": 0.10880961152085607,
-        "final_state": "ACTIVE",
-        "net_pnl": -3376227.959800301,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX08",
-      "config": {
-        "period_ns": 86400000000000,
-        "policy": "scheduled"
-      },
-      "count": 172,
-      "kind": "adaptive_deployment",
-      "n": 11242,
-      "result": {
-        "deployed_ic": 0.10826585296882385,
-        "final_state": "ACTIVE",
-        "net_pnl": -3372023.9753253255,
-        "refits": 2
-      }
-    },
-    {
-      "alpha_id": "FX08",
-      "config": {
-        "ic_z_threshold": -2.0,
-        "min_refit_gap_ns": 3600000000000,
-        "policy": "drift_triggered",
-        "psi_threshold": 0.25
-      },
-      "count": 190,
-      "kind": "adaptive_deployment",
-      "n": 11432,
-      "result": {
-        "deployed_ic": 0.10824862628377444,
-        "final_state": "ACTIVE",
-        "net_pnl": -3364316.506112784,
-        "refits": 20
-      }
-    },
-    {
-      "alpha_id": "EQ09",
-      "config": {
-        "policy": "static"
-      },
-      "count": 114,
-      "kind": "adaptive_deployment",
-      "n": 11546,
-      "result": {
-        "deployed_ic": 0.08021225438855126,
-        "final_state": "ACTIVE",
-        "net_pnl": -31832.66500200952,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "EQ09",
-      "config": {
-        "period_ns": 604800000000000,
-        "policy": "scheduled"
-      },
-      "count": 114,
-      "kind": "adaptive_deployment",
-      "n": 11660,
-      "result": {
-        "deployed_ic": 0.08021225438855126,
-        "final_state": "ACTIVE",
-        "net_pnl": -31832.66500200952,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "EQ09",
-      "config": {
-        "period_ns": 86400000000000,
-        "policy": "scheduled"
-      },
-      "count": 115,
-      "kind": "adaptive_deployment",
-      "n": 11775,
-      "result": {
-        "deployed_ic": 0.08001679196399603,
-        "final_state": "ACTIVE",
-        "net_pnl": -32369.377763083416,
-        "refits": 2
-      }
-    },
-    {
-      "alpha_id": "EQ09",
-      "config": {
-        "ic_z_threshold": -2.0,
-        "min_refit_gap_ns": 3600000000000,
-        "policy": "drift_triggered",
-        "psi_threshold": 0.25
-      },
-      "count": 114,
-      "kind": "adaptive_deployment",
-      "n": 11889,
-      "result": {
-        "deployed_ic": 0.08021225438855126,
-        "final_state": "ACTIVE",
-        "net_pnl": -31832.66500200952,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX11",
-      "config": {
-        "policy": "static"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 12060,
-      "result": {
-        "deployed_ic": 0.059894480111893314,
-        "final_state": "ACTIVE",
-        "net_pnl": -1567176.5192368862,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX11",
-      "config": {
-        "period_ns": 604800000000000,
-        "policy": "scheduled"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 12231,
-      "result": {
-        "deployed_ic": 0.059894480111893314,
-        "final_state": "ACTIVE",
-        "net_pnl": -1567176.5192368862,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX11",
-      "config": {
-        "period_ns": 86400000000000,
-        "policy": "scheduled"
-      },
-      "count": 172,
-      "kind": "adaptive_deployment",
-      "n": 12403,
-      "result": {
-        "deployed_ic": 0.05819633147439981,
-        "final_state": "ACTIVE",
-        "net_pnl": -1548173.0592742497,
-        "refits": 2
-      }
-    },
-    {
-      "alpha_id": "FX11",
-      "config": {
-        "ic_z_threshold": -2.0,
-        "min_refit_gap_ns": 3600000000000,
-        "policy": "drift_triggered",
-        "psi_threshold": 0.25
-      },
-      "count": 178,
-      "kind": "adaptive_deployment",
-      "n": 12581,
-      "result": {
-        "deployed_ic": 0.05795630618095114,
-        "final_state": "ACTIVE",
-        "net_pnl": -1562143.301086762,
-        "refits": 8
-      }
-    },
-    {
-      "alpha_id": "FX10",
-      "config": {
-        "policy": "static"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 12752,
-      "result": {
-        "deployed_ic": 0.05781394000225534,
-        "final_state": "ACTIVE",
-        "net_pnl": -460337.76055020664,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX10",
-      "config": {
-        "period_ns": 604800000000000,
-        "policy": "scheduled"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 12923,
-      "result": {
-        "deployed_ic": 0.05781394000225534,
-        "final_state": "ACTIVE",
-        "net_pnl": -460337.76055020664,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX10",
-      "config": {
-        "period_ns": 86400000000000,
-        "policy": "scheduled"
-      },
-      "count": 172,
-      "kind": "adaptive_deployment",
-      "n": 13095,
-      "result": {
-        "deployed_ic": 0.05655940619923985,
-        "final_state": "ACTIVE",
-        "net_pnl": -474560.63385020185,
-        "refits": 2
-      }
-    },
-    {
-      "alpha_id": "FX10",
-      "config": {
-        "ic_z_threshold": -2.0,
-        "min_refit_gap_ns": 3600000000000,
-        "policy": "drift_triggered",
-        "psi_threshold": 0.25
-      },
-      "count": 211,
-      "kind": "adaptive_deployment",
-      "n": 13306,
-      "result": {
-        "deployed_ic": 0.053060282648740825,
-        "final_state": "WATCH",
-        "net_pnl": -502129.4746377395,
-        "refits": 41
-      }
-    },
-    {
-      "alpha_id": "EQ01",
-      "config": {
-        "policy": "static"
-      },
-      "count": 114,
-      "kind": "adaptive_deployment",
-      "n": 13420,
-      "result": {
-        "deployed_ic": 0.020986846344278144,
-        "final_state": "ACTIVE",
-        "net_pnl": -62365.090708341115,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "EQ01",
-      "config": {
-        "period_ns": 604800000000000,
-        "policy": "scheduled"
-      },
-      "count": 114,
-      "kind": "adaptive_deployment",
-      "n": 13534,
-      "result": {
-        "deployed_ic": 0.020986846344278144,
-        "final_state": "ACTIVE",
-        "net_pnl": -62365.090708341115,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "EQ01",
-      "config": {
-        "period_ns": 86400000000000,
-        "policy": "scheduled"
-      },
-      "count": 115,
-      "kind": "adaptive_deployment",
-      "n": 13649,
-      "result": {
-        "deployed_ic": 0.020797095853922504,
-        "final_state": "ACTIVE",
-        "net_pnl": -61418.14539703861,
-        "refits": 2
-      }
-    },
-    {
-      "alpha_id": "EQ01",
-      "config": {
-        "ic_z_threshold": -2.0,
-        "min_refit_gap_ns": 3600000000000,
-        "policy": "drift_triggered",
-        "psi_threshold": 0.25
-      },
-      "count": 114,
-      "kind": "adaptive_deployment",
-      "n": 13763,
-      "result": {
-        "deployed_ic": 0.020986846344278144,
-        "final_state": "ACTIVE",
-        "net_pnl": -62365.090708341115,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "EQ03",
-      "config": {
-        "policy": "static"
-      },
-      "count": 114,
-      "kind": "adaptive_deployment",
-      "n": 13877,
-      "result": {
-        "deployed_ic": 0.019898617773882136,
-        "final_state": "ACTIVE",
-        "net_pnl": -147829.80665481515,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "EQ03",
-      "config": {
-        "period_ns": 604800000000000,
-        "policy": "scheduled"
-      },
-      "count": 114,
-      "kind": "adaptive_deployment",
-      "n": 13991,
-      "result": {
-        "deployed_ic": 0.019898617773882136,
-        "final_state": "ACTIVE",
-        "net_pnl": -147829.80665481515,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "EQ03",
-      "config": {
-        "period_ns": 86400000000000,
-        "policy": "scheduled"
-      },
-      "count": 115,
-      "kind": "adaptive_deployment",
-      "n": 14106,
-      "result": {
-        "deployed_ic": 0.019893226879441093,
-        "final_state": "ACTIVE",
-        "net_pnl": -148048.17593259295,
-        "refits": 2
-      }
-    },
-    {
-      "alpha_id": "EQ03",
-      "config": {
-        "ic_z_threshold": -2.0,
-        "min_refit_gap_ns": 3600000000000,
-        "policy": "drift_triggered",
-        "psi_threshold": 0.25
-      },
-      "count": 119,
-      "kind": "adaptive_deployment",
-      "n": 14225,
-      "result": {
-        "deployed_ic": 0.019417303747849106,
-        "final_state": "ACTIVE",
-        "net_pnl": -146799.58204200174,
-        "refits": 6
-      }
-    },
-    {
-      "alpha_id": "EQ06",
-      "config": {
-        "policy": "static"
-      },
-      "count": 114,
-      "kind": "adaptive_deployment",
-      "n": 14339,
-      "result": {
-        "deployed_ic": 0.05340653535898924,
-        "final_state": "WATCH",
-        "net_pnl": -66921.35373559556,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "EQ06",
-      "config": {
-        "period_ns": 604800000000000,
-        "policy": "scheduled"
-      },
-      "count": 114,
-      "kind": "adaptive_deployment",
-      "n": 14453,
-      "result": {
-        "deployed_ic": 0.05340653535898924,
-        "final_state": "WATCH",
-        "net_pnl": -66921.35373559556,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "EQ06",
-      "config": {
-        "period_ns": 86400000000000,
-        "policy": "scheduled"
-      },
-      "count": 115,
-      "kind": "adaptive_deployment",
-      "n": 14568,
-      "result": {
-        "deployed_ic": 0.05337610182968743,
-        "final_state": "WATCH",
-        "net_pnl": -68194.87546460111,
-        "refits": 2
-      }
-    },
-    {
-      "alpha_id": "EQ06",
-      "config": {
-        "ic_z_threshold": -2.0,
-        "min_refit_gap_ns": 3600000000000,
-        "policy": "drift_triggered",
-        "psi_threshold": 0.25
-      },
-      "count": 119,
-      "kind": "adaptive_deployment",
-      "n": 14687,
-      "result": {
-        "deployed_ic": 0.052539284412901024,
-        "final_state": "WATCH",
-        "net_pnl": -68240.93175551019,
-        "refits": 6
-      }
-    },
-    {
-      "alpha_id": "FX01",
-      "config": {
-        "policy": "static"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 14858,
-      "result": {
-        "deployed_ic": 0.003453189085147243,
-        "final_state": "RETIRED",
-        "net_pnl": -244819.71927488747,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX01",
-      "config": {
-        "period_ns": 604800000000000,
-        "policy": "scheduled"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 15029,
-      "result": {
-        "deployed_ic": 0.003453189085147243,
-        "final_state": "RETIRED",
-        "net_pnl": -244819.71927488747,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX01",
-      "config": {
-        "period_ns": 86400000000000,
-        "policy": "scheduled"
-      },
-      "count": 172,
-      "kind": "adaptive_deployment",
-      "n": 15201,
-      "result": {
-        "deployed_ic": 0.00461631223448981,
-        "final_state": "RETIRED",
-        "net_pnl": -177438.05009998742,
-        "refits": 2
-      }
-    },
-    {
-      "alpha_id": "FX01",
-      "config": {
-        "ic_z_threshold": -2.0,
-        "min_refit_gap_ns": 3600000000000,
-        "policy": "drift_triggered",
-        "psi_threshold": 0.25
-      },
-      "count": 172,
-      "kind": "adaptive_deployment",
-      "n": 15373,
-      "result": {
-        "deployed_ic": 0.004612919905500903,
-        "final_state": "RETIRED",
-        "net_pnl": -177167.85283748794,
-        "refits": 2
-      }
-    },
-    {
-      "alpha_id": "FX05",
-      "config": {
-        "policy": "static"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 15544,
-      "result": {
-        "deployed_ic": 0.009841735515834832,
-        "final_state": "WATCH",
-        "net_pnl": -35804.39244999108,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX05",
-      "config": {
-        "period_ns": 604800000000000,
-        "policy": "scheduled"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 15715,
-      "result": {
-        "deployed_ic": 0.009841735515834832,
-        "final_state": "WATCH",
-        "net_pnl": -35804.39244999108,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX05",
-      "config": {
-        "period_ns": 86400000000000,
-        "policy": "scheduled"
-      },
-      "count": 172,
-      "kind": "adaptive_deployment",
-      "n": 15887,
-      "result": {
-        "deployed_ic": -0.009555205315146129,
-        "final_state": "RETIRED",
-        "net_pnl": -15873.290312494035,
-        "refits": 2
-      }
-    },
-    {
-      "alpha_id": "FX05",
-      "config": {
-        "ic_z_threshold": -2.0,
-        "min_refit_gap_ns": 3600000000000,
-        "policy": "drift_triggered",
-        "psi_threshold": 0.25
-      },
-      "count": 173,
-      "kind": "adaptive_deployment",
-      "n": 16060,
-      "result": {
-        "deployed_ic": 0.008027615260153024,
-        "final_state": "WATCH",
-        "net_pnl": -35652.47086249199,
-        "refits": 3
-      }
-    },
-    {
-      "alpha_id": "FX09",
-      "config": {
-        "policy": "static"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 16231,
-      "result": {
-        "deployed_ic": 0.1212147998979684,
-        "final_state": "ACTIVE",
-        "net_pnl": -2874385.7161998325,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX09",
-      "config": {
-        "period_ns": 604800000000000,
-        "policy": "scheduled"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 16402,
-      "result": {
-        "deployed_ic": 0.1212147998979684,
-        "final_state": "ACTIVE",
-        "net_pnl": -2874385.7161998325,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX09",
-      "config": {
-        "period_ns": 86400000000000,
-        "policy": "scheduled"
-      },
-      "count": 172,
-      "kind": "adaptive_deployment",
-      "n": 16574,
-      "result": {
-        "deployed_ic": 0.12147281460247583,
-        "final_state": "ACTIVE",
-        "net_pnl": -2901270.860849862,
-        "refits": 2
-      }
-    },
-    {
-      "alpha_id": "FX09",
-      "config": {
-        "ic_z_threshold": -2.0,
-        "min_refit_gap_ns": 3600000000000,
-        "policy": "drift_triggered",
-        "psi_threshold": 0.25
-      },
-      "count": 195,
-      "kind": "adaptive_deployment",
-      "n": 16769,
-      "result": {
-        "deployed_ic": 0.12115098506362777,
-        "final_state": "ACTIVE",
-        "net_pnl": -2922814.6123998626,
-        "refits": 25
-      }
-    },
-    {
-      "alpha_id": "FX08",
-      "config": {
-        "policy": "static"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 16940,
-      "result": {
-        "deployed_ic": 0.10880961152085607,
-        "final_state": "ACTIVE",
-        "net_pnl": -3376227.959800301,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX08",
-      "config": {
-        "period_ns": 604800000000000,
-        "policy": "scheduled"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 17111,
-      "result": {
-        "deployed_ic": 0.10880961152085607,
-        "final_state": "ACTIVE",
-        "net_pnl": -3376227.959800301,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX08",
-      "config": {
-        "period_ns": 86400000000000,
-        "policy": "scheduled"
-      },
-      "count": 172,
-      "kind": "adaptive_deployment",
-      "n": 17283,
-      "result": {
-        "deployed_ic": 0.10826585296882385,
-        "final_state": "ACTIVE",
-        "net_pnl": -3372023.9753253255,
-        "refits": 2
-      }
-    },
-    {
-      "alpha_id": "FX08",
-      "config": {
-        "ic_z_threshold": -2.0,
-        "min_refit_gap_ns": 3600000000000,
-        "policy": "drift_triggered",
-        "psi_threshold": 0.25
-      },
-      "count": 190,
-      "kind": "adaptive_deployment",
-      "n": 17473,
-      "result": {
-        "deployed_ic": 0.10824862628377444,
+        "deployed_ic": 0.038335741661340836,
         "final_state": "ACTIVE",
-        "net_pnl": -3364316.506112784,
-        "refits": 20
-      }
-    },
-    {
-      "alpha_id": "EQ09",
-      "config": {
-        "policy": "static"
-      },
-      "count": 114,
-      "kind": "adaptive_deployment",
-      "n": 17587,
-      "result": {
-        "deployed_ic": 0.08021225438855126,
-        "final_state": "ACTIVE",
-        "net_pnl": -31832.66500200952,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "EQ09",
-      "config": {
-        "period_ns": 604800000000000,
-        "policy": "scheduled"
-      },
-      "count": 114,
-      "kind": "adaptive_deployment",
-      "n": 17701,
-      "result": {
-        "deployed_ic": 0.08021225438855126,
-        "final_state": "ACTIVE",
-        "net_pnl": -31832.66500200952,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "EQ09",
-      "config": {
-        "period_ns": 86400000000000,
-        "policy": "scheduled"
-      },
-      "count": 115,
-      "kind": "adaptive_deployment",
-      "n": 17816,
-      "result": {
-        "deployed_ic": 0.08001679196399603,
-        "final_state": "ACTIVE",
-        "net_pnl": -32369.377763083416,
-        "refits": 2
-      }
-    },
-    {
-      "alpha_id": "EQ09",
-      "config": {
-        "ic_z_threshold": -2.0,
-        "min_refit_gap_ns": 3600000000000,
-        "policy": "drift_triggered",
-        "psi_threshold": 0.25
-      },
-      "count": 114,
-      "kind": "adaptive_deployment",
-      "n": 17930,
-      "result": {
-        "deployed_ic": 0.08021225438855126,
-        "final_state": "ACTIVE",
-        "net_pnl": -31832.66500200952,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX11",
-      "config": {
-        "policy": "static"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 18101,
-      "result": {
-        "deployed_ic": 0.059894480111893314,
-        "final_state": "ACTIVE",
-        "net_pnl": -1567176.5192368862,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX11",
-      "config": {
-        "period_ns": 604800000000000,
-        "policy": "scheduled"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 18272,
-      "result": {
-        "deployed_ic": 0.059894480111893314,
-        "final_state": "ACTIVE",
-        "net_pnl": -1567176.5192368862,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX11",
-      "config": {
-        "period_ns": 86400000000000,
-        "policy": "scheduled"
-      },
-      "count": 172,
-      "kind": "adaptive_deployment",
-      "n": 18444,
-      "result": {
-        "deployed_ic": 0.05819633147439981,
-        "final_state": "ACTIVE",
-        "net_pnl": -1548173.0592742497,
-        "refits": 2
-      }
-    },
-    {
-      "alpha_id": "FX11",
-      "config": {
-        "ic_z_threshold": -2.0,
-        "min_refit_gap_ns": 3600000000000,
-        "policy": "drift_triggered",
-        "psi_threshold": 0.25
-      },
-      "count": 178,
-      "kind": "adaptive_deployment",
-      "n": 18622,
-      "result": {
-        "deployed_ic": 0.05795630618095114,
-        "final_state": "ACTIVE",
-        "net_pnl": -1562143.301086762,
-        "refits": 8
-      }
-    },
-    {
-      "alpha_id": "FX10",
-      "config": {
-        "policy": "static"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 18793,
-      "result": {
-        "deployed_ic": 0.05781394000225534,
-        "final_state": "ACTIVE",
-        "net_pnl": -460337.76055020664,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX10",
-      "config": {
-        "period_ns": 604800000000000,
-        "policy": "scheduled"
-      },
-      "count": 171,
-      "kind": "adaptive_deployment",
-      "n": 18964,
-      "result": {
-        "deployed_ic": 0.05781394000225534,
-        "final_state": "ACTIVE",
-        "net_pnl": -460337.76055020664,
-        "refits": 1
-      }
-    },
-    {
-      "alpha_id": "FX10",
-      "config": {
-        "period_ns": 86400000000000,
-        "policy": "scheduled"
-      },
-      "count": 172,
-      "kind": "adaptive_deployment",
-      "n": 19136,
-      "result": {
-        "deployed_ic": 0.05655940619923985,
-        "final_state": "ACTIVE",
-        "net_pnl": -474560.63385020185,
-        "refits": 2
-      }
-    },
-    {
-      "alpha_id": "FX10",
-      "config": {
-        "ic_z_threshold": -2.0,
-        "min_refit_gap_ns": 3600000000000,
-        "policy": "drift_triggered",
-        "psi_threshold": 0.25
-      },
-      "count": 211,
-      "kind": "adaptive_deployment",
-      "n": 19347,
-      "result": {
-        "deployed_ic": 0.053060282648740825,
-        "final_state": "WATCH",
-        "net_pnl": -502129.4746377395,
-        "refits": 41
+        "n_evals": 169,
+        "n_informative_evals": 153,
+        "net_pnl": -131076.08286263118,
+        "refits": 7
       }
     }
   ],
-  "expected_max_null_t": 4.443037845366273,
+  "expected_max_null_t": 3.6423394771164253,
   "pinned_alpha": 0.05,
-  "total_experiments": 19347,
+  "total_experiments": 760,
   "x-version": 1
 }

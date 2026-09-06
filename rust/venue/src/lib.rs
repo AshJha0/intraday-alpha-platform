@@ -14,4 +14,4 @@ pub use codec::{
 pub use messages::{
     order_validation_error, validate_order, ExecStatus, ExecutionReport, OrderRequest, OrderType,
 };
-pub use sim::{SimVenueConfig, SimulatedVenue};
+pub use sim::{RejectReason, SimVenueConfig, SimulatedVenue};

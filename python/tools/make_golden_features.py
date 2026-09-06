@@ -1,21 +1,40 @@
 #!/usr/bin/env python3
-"""(Re)generate tests/golden/expected_features.json.
+"""(Re)generate tests/golden/expected_features{,_anomalies}.json.
 
 Run from python/ with PYTHONPATH=src:
 
     PYTHONPATH=src python3 tools/make_golden_features.py
 
-Runs the FeatureEngine (cadence = every event) over the pinned golden
-vectors and captures a representative subset of feature values (covering
-every family) at the pinned checkpoints:
+1. ``expected_features.json`` — the FeatureEngine (cadence = every event)
+   over the clean golden vectors, capturing a representative subset of
+   feature values (covering every family) at the pinned checkpoints:
 
-    events_eq_mbo.jsonl   -> after events 500 / 1000 / 1500 / 2000
-    events_fx_quote.jsonl -> after events 400 / 800
+       events_eq_mbo.jsonl   -> after events 500 / 1000 / 1500 / 2000
+       events_fx_quote.jsonl -> after events 400 / 800
 
-BEFORE writing, several features are re-derived by independent brute-force
-pandas computations straight from the event stream (reference OrderBook for
-book state, pandas rolling/asof for windows) and compared at 1e-9 abs/rel —
-the file is only written when every cross-check agrees.
+   BEFORE writing, several features are re-derived by independent
+   brute-force pandas computations straight from the event stream
+   (reference OrderBook for book state, pandas rolling/asof for windows)
+   and compared at 1e-9 abs/rel — the file is only written when every
+   cross-check agrees.
+
+2. ``expected_features_anomalies.json`` — the same engine over the ANOMALY
+   vectors (``events_eq_anomalies.jsonl`` / ``events_fx_anomalies.jsonl``,
+   arrival order: duplicates, invalid sides, payload-domain drops, sequence
+   gaps with SNAPSHOT recovery, a venue sequence reset, HALT + re-opening
+   auction, multi-venue staleness, exchange_ts regressions).  It pins the
+   API_FEATURES section 2 ingestion rules every port must reproduce:
+
+   - only APPLIED events feed rolling state (``events_dropped`` counts the
+     rest, and the flow/trade windows must not move on them);
+   - ``ts_regressions_dropped`` counts events dropped for a backwards
+     ``exchange_ts``;
+   - a stale->fresh recovery resets rolling state and re-anchors warmup
+     (``recoveries``, ``warm_ts``);
+   - EPS-guarded ratios stay INVALID when their denominator is 0.
+
+   The checkpointed feature set is the full native-45 sub-vector the ports
+   implement, so a port mismatch anywhere in the ingestion path shows up.
 
 Golden values are pinned: regenerate ONLY on a deliberate, versioned change
 (schemas/MIGRATIONS.md); every other language must match these numbers.
@@ -80,6 +99,32 @@ REPRESENTATIVE = [
 ]
 
 
+#: The native sub-vector every port implements (API_FEATURES §3 native 40 +
+#: the 5 auxiliary alpha inputs), in the ports' pinned slot order.
+NATIVE_45 = [
+    "ofi_l1_w1s_v1", "ofi_l1_w5s_v1", "ofi_l1_w30s_v1",
+    "ofi_l3_w1s_v1", "ofi_l3_w5s_v1", "ofi_l3_w30s_v1",
+    "ofi_l5_w1s_v1", "ofi_l5_w5s_v1", "ofi_l5_w30s_v1",
+    "ofi_l10_w1s_v1", "ofi_l10_w5s_v1", "ofi_l10_w30s_v1",
+    "imbalance_l1_v1", "imbalance_l3_v1", "imbalance_l5_v1", "imbalance_l10_v1",
+    "mid_price_v1", "microprice_v1", "micro_mid_dev_bps_v1",
+    "spread_ticks_v1", "spread_bps_v1",
+    "depth_bid_l1_v1", "depth_ask_l1_v1", "depth_bid_l5_v1",
+    "depth_ask_l5_v1", "depth_bid_l10_v1", "depth_ask_l10_v1",
+    "signed_volume_w1s_v1", "signed_volume_w10s_v1", "signed_volume_w1m_v1",
+    "trade_imbalance_w1s_v1", "trade_imbalance_w10s_v1", "trade_imbalance_w1m_v1",
+    "rvol_w10s_v1", "rvol_w1m_v1", "rvol_w5m_v1",
+    "ret_simple_1s_v1", "ret_log_1s_v1", "ret_log_10s_v1", "ret_log_1m_v1",
+    "ofi_norm_l1_w1s_v1", "ofi_norm_l5_w1s_v1", "ofi_norm_l5_w5s_v1",
+    "ret_vol_adj_10s_v1", "vol_regime_ratio_v1",
+]
+
+#: Anomaly-vector checkpoints (1-based event indices; the last one is the
+#: final event of each vector).
+EQ_ANOMALY_CHECKPOINTS = (100, 300, 500, 700, 900, 1100, 1300, 1403)
+FX_ANOMALY_CHECKPOINTS = (60, 120, 240, 360, 480, 561)
+
+
 def close(a: float, b: float) -> bool:
     return abs(a - b) <= TOL + TOL * abs(b)
 
@@ -99,18 +144,16 @@ def brute_force_frames(events, tick: float):
     """Independent per-event L1/trade/mid-sample frames from a reference
     OrderBook.
 
-    The mid-sample frame mirrors the PINNED sampling semantics: a sample is
-    recorded at every two-sided refresh where the mid changed (or the book
-    just became two-sided again), and the log-mid return ``dlm`` of a sample
-    is only defined when the PREVIOUS book-touching refresh was two-sided —
-    the return chain breaks across one-sided periods (no dlm bridges them).
+    The mid-sample frame mirrors the PINNED sampling semantics
+    (API_FEATURES section 2): a sample is recorded at every two-sided refresh whose
+    mid differs from the last RECORDED sample — a one-sided flicker that
+    moves the mid still yields a ``dlm``; a flicker back to the same mid
+    yields none.  ``dlm`` is undefined only for the first sample.
     """
     book = OrderBook(events[0].instrument_id, 0)
     rows, trows, srows = [], [], []
     prev = None
     hist_mid2 = None      # last recorded mid-sample value
-    last_ok_mid2 = None   # mid2 at the last two-sided refresh
-    prev_touch_ok = False  # was the previous book-touching refresh two-sided?
     for n, ev in enumerate(events, start=1):
         book.apply(ev)
         et = ev.event_type
@@ -126,17 +169,14 @@ def brute_force_frames(events, tick: float):
         row = {"ts": ev.exchange_ts, "n": n,
                "bp": bb[0] if bb else None, "bq": bb[1] if bb else None,
                "ap": ba[0] if ba else None, "aq": ba[1] if ba else None}
-        ok = bb is not None and ba is not None
-        if ok:
+        if bb is not None and ba is not None:
             mid2 = row["bp"] + row["ap"]
-            if not prev_touch_ok or mid2 != last_ok_mid2:
+            if hist_mid2 is None or mid2 != hist_mid2:
                 dlm = (math.log(mid2) - math.log(hist_mid2)
-                       if prev_touch_ok and hist_mid2 is not None else None)
+                       if hist_mid2 is not None else None)
                 srows.append({"ts": ev.exchange_ts, "n": n,
                               "mid2": mid2, "dlm": dlm})
                 hist_mid2 = mid2
-            last_ok_mid2 = mid2
-        prev_touch_ok = ok
         # L1 OFI contribution (pinned formula, level union of prev/curr best)
         e = 0
         if prev is not None:
@@ -221,6 +261,85 @@ def validate_eq(events, vecs, names_idx, tick):
     print(f"  eq brute-force cross-checks passed at {list(vecs)}")
 
 
+def _anomaly_side(vector: str, checkpoints, instrument_id: int, names_idx):
+    """Run the engine over one anomaly vector and capture the golden side."""
+    events = read_jsonl(GOLDEN_DIR / vector)
+    engine = FeatureEngine(build_contexts(REPO / "configs"), cadence_ns=0)
+    cps = {}
+    for i, ev in enumerate(events, start=1):
+        vec = engine.apply(ev)
+        if i in checkpoints:
+            if vec is None:
+                raise SystemExit(
+                    f"{vector}: event {i} produced no vector (ts regression?) — "
+                    "pick a checkpoint on an ingested event"
+                )
+            entry = {}
+            for name in NATIVE_45:
+                j = names_idx[name]
+                entry[name] = {
+                    "value": vec.values[j] if vec.validity[j] else None,
+                    "valid": vec.validity[j],
+                }
+            st = engine.states[instrument_id]
+            cps[str(i)] = {
+                "timestamp": vec.timestamp,
+                "events_processed": engine.events_processed,
+                "events_dropped": engine.events_dropped,
+                "ts_regressions_dropped": engine.ts_regressions_dropped,
+                "oversized_qty_dropped": engine.oversized_qty_dropped,
+                "oversized_depth_skipped": engine.oversized_depth_skipped,
+                "recoveries": st.recoveries,
+                "warm_ts": st.warm_ts,
+                "book_ok": st.book_ok,
+                "features": entry,
+            }
+    return {
+        "vector": vector,
+        "instrument_id": instrument_id,
+        "n_events": len(events),
+        "checkpoints": cps,
+    }
+
+
+def write_anomaly_golden(names_idx) -> None:
+    """Write tests/golden/expected_features_anomalies.json."""
+    doc = {
+        "description": (
+            "Feature-engine golden checkpoints on the ANOMALY vectors "
+            "(arrival order: duplicates, invalid sides, payload drops, "
+            "sequence gaps + SNAPSHOT recovery, venue sequence reset, HALT + "
+            "re-opening auction, multi-venue staleness, exchange_ts "
+            "regressions).  Pins API_FEATURES section 2: only APPLIED events feed "
+            "rolling state, ts regressions are dropped+counted, a stale->fresh "
+            "recovery resets rolling state and re-anchors warmup, EPS-guarded "
+            "ratios stay invalid on a zero denominator.  Feature set = the "
+            "native-45 sub-vector every port implements; value is null when "
+            "valid is false.  Tolerance: abs 1e-9 / rel 1e-9."
+        ),
+        "registry_hash": registry_hash(),
+        "tolerance": {"abs": TOL, "rel": TOL},
+        "features": list(NATIVE_45),
+        "eq": _anomaly_side("events_eq_anomalies.jsonl", set(EQ_ANOMALY_CHECKPOINTS),
+                            1, names_idx),
+        "fx": _anomaly_side("events_fx_anomalies.jsonl", set(FX_ANOMALY_CHECKPOINTS),
+                            101, names_idx),
+    }
+    out_path = GOLDEN_DIR / "expected_features_anomalies.json"
+    with open(out_path, "w") as f:
+        json.dump(doc, f, indent=2)
+        f.write("\n")
+    print(f"wrote {out_path}")
+    for side in ("eq", "fx"):
+        last = doc[side]["checkpoints"][
+            sorted(doc[side]["checkpoints"], key=int)[-1]
+        ]
+        print(f"  {side}: {doc[side]['n_events']} events, "
+              f"{last['events_dropped']} dropped "
+              f"({last['ts_regressions_dropped']} ts regressions), "
+              f"{last['recoveries']} stale recoveries")
+
+
 def main() -> int:
     registry = build_registry()
     names_idx = {s.name: i for i, s in enumerate(registry)}
@@ -268,6 +387,7 @@ def main() -> int:
     with open(out_path, "w") as f:
         json.dump(doc, f, indent=2)
         f.write("\n")
+    write_anomaly_golden(names_idx)
     n_valid = sum(
         1 for side in ("eq", "fx")
         for cp in doc[side]["checkpoints"].values()

@@ -8,6 +8,8 @@ import pytest
 from iap.tca.fills import Fill, MarketTimeline, ParentOrder
 from iap.tca.simulator import bundled_order_set
 from iap.tca.tca import (
+    adverse_selection_with_counts,
+    validate_order_window,
     adverse_selection,
     arrival_slippage_bps,
     impact_regression,
@@ -126,7 +128,14 @@ def test_adverse_selection_hand():
     adv = adverse_selection(order, tl)
     # +100ms: still state@2s (mid 100.01) -> (100.01-100.03)/100.03
     assert abs(adv["100ms"] - 1e4 * (100.01 - 100.03) / 100.03) < 1e-9
-    # +10s = 12s: state@10s mid = 100.08
+    # +10s = 12s is BEYOND the timeline end (10s): undefined, never the
+    # stale last mid (pinned §2.5)
+    assert adv["10s"] is None
+    _, n = adverse_selection_with_counts(order, tl)
+    assert n == {"100ms": 1, "1s": 1, "10s": 0}
+    # extend the timeline to 12s: the 10s markout becomes defined
+    tl.append(12_000_000_000, 100.07, 100.09, 100, 100)
+    adv = adverse_selection(order, tl)
     assert abs(adv["10s"] - 1e4 * (100.08 - 100.03) / 100.03) < 1e-9
 
 
@@ -188,3 +197,139 @@ def test_simulated_orders_are_sane():
                     assert f.price >= f.mid_at_fill
                 else:
                     assert f.price <= f.mid_at_fill
+
+
+# ------------------------------------------------------ round-3 scenarios
+
+
+def test_tca_markout_undefined_past_timeline_end():
+    """A fill at the last state: every markout undefined (n_defined 0); a
+    fill 20 s before the end: only the 10 s markout is defined (pinned §2.5)."""
+    tl = MarketTimeline()
+    t0 = 1_000_000_000_000
+    for k in range(0, 61):
+        tl.append(t0 + k * 1_000_000_000, 99.99, 100.01, 100, 100)
+    last = ParentOrder(order_id=1, instrument_id=1, side=0, qty_target=100,
+                       decision_ts=t0, arrival_ts=t0, end_ts=tl.last_ts)
+    last.fills.append(Fill(ts=tl.last_ts, price=100.01, qty=100,
+                           mid_at_fill=100.0, half_spread_at_fill=0.01,
+                           opp_depth_at_fill=100))
+    adv, n = adverse_selection_with_counts(last, tl)
+    assert adv == {"100ms": None, "1s": None, "10s": None}
+    assert n == {"100ms": 0, "1s": 0, "10s": 0}
+    rec = order_tca(last, tl)
+    assert rec["adverse_selection_bps"]["10s"] is None
+    assert rec["adverse_selection_n"] == {"100ms": 0, "1s": 0, "10s": 0}
+    # 20 s before the end: 100ms / 1s / 10s all inside -> all defined; a
+    # fill 5 s before the end: 10 s undefined, the others defined
+    early = ParentOrder(order_id=2, instrument_id=1, side=0, qty_target=100,
+                        decision_ts=t0, arrival_ts=t0, end_ts=tl.last_ts)
+    early.fills.append(Fill(ts=tl.last_ts - 5_000_000_000, price=100.01,
+                            qty=100, mid_at_fill=100.0,
+                            half_spread_at_fill=0.01, opp_depth_at_fill=100))
+    adv, n = adverse_selection_with_counts(early, tl)
+    assert n == {"100ms": 1, "1s": 1, "10s": 0}
+    assert adv["10s"] is None and adv["1s"] is not None
+    # a HALT inside (t_f, t_f + 10s] makes the 10 s markout undefined too
+    tl2 = MarketTimeline()
+    for k in range(0, 61):
+        tl2.append(t0 + k * 1_000_000_000, 99.99, 100.01, 100, 100)
+    tl2.add_halt(t0 + 3_000_000_000)
+    halted = ParentOrder(order_id=3, instrument_id=1, side=0, qty_target=100,
+                         decision_ts=t0, arrival_ts=t0, end_ts=tl2.last_ts)
+    halted.fills.append(Fill(ts=t0, price=100.01, qty=100, mid_at_fill=100.0,
+                             half_spread_at_fill=0.01, opp_depth_at_fill=100))
+    _, n = adverse_selection_with_counts(halted, tl2)
+    assert n == {"100ms": 1, "1s": 1, "10s": 0}
+
+
+def test_tca_passive_fill_uses_pre_event_mid():
+    """MAKER fill by a trade-through: reference state strictly before the
+    event -> spread cost == -q*hs (we provided liquidity), impact 0."""
+    from iap.tca.fills import MAKER, TAKER, stamp_fill
+    tl = MarketTimeline()
+    t0 = 1_000_000_000_000
+    tl.append(t0, 99.98, 100.02, 500, 400)        # hs 0.02, mid 100.00
+    # a sell sweeps through our 99.98 bid: post-event state 99.90 / 100.02
+    tl.append(t0 + 1_000, 99.90, 100.02, 500, 400)  # mid 99.96
+    f = stamp_fill(tl, t0 + 1_000, 99.98, 100, side=0, liquidity=MAKER)
+    assert abs(f.mid_at_fill - 100.00) < 1e-9
+    assert abs(f.half_spread_at_fill - 0.02) < 1e-9
+    order = ParentOrder(order_id=1, instrument_id=1, side=0, qty_target=100,
+                        decision_ts=t0, arrival_ts=t0, end_ts=t0 + 1_000)
+    order.fills.append(f)
+    split = spread_and_impact_cost(order)
+    assert abs(split["spread_cost"] - 100 * 0.02) < 1e-12
+    assert abs(split["exec_cost_vs_mid"] - (-100 * 0.02)) < 1e-12
+    assert abs(split["impact_cost"] - (-100 * 0.04)) < 1e-12  # -2 * q * hs
+    # the same fill stamped as TAKER (post-event state) would read as cost
+    g = stamp_fill(tl, t0 + 1_000, 99.98, 100, side=0, liquidity=TAKER)
+    assert abs(g.mid_at_fill - 99.96) < 1e-9
+    with pytest.raises(ValueError):
+        stamp_fill(tl, t0, 99.98, 100, side=0, liquidity=MAKER)  # no prior state
+    with pytest.raises(ValueError):
+        stamp_fill(tl, t0, 99.98, 100, side=0, liquidity="ODD")
+
+
+def test_tca_locked_and_crossed_states_pinned(tmp_path):
+    """Timeline builder: crossed consolidated states skipped + counted,
+    locked states kept with half-spread 0 (pinned §2.1)."""
+    import json
+    from iap.tca.simulator import build_timeline
+    t0 = 1_000_000_000_000
+    rows = []
+    seq = {1: 0, 2: 0}
+
+    def add(vid, side, px, qty, oid, ts, etype=1):
+        seq[vid] += 1
+        rows.append({"event_id": len(rows) + 1, "instrument_id": 1,
+                     "venue_id": vid, "exchange_ts": ts, "receive_ts": ts,
+                     "sequence": seq[vid], "event_type": etype, "side": side,
+                     "price_ticks": px, "qty": qty, "order_id": oid,
+                     "trade_id": 0})
+    add(1, 0, 100, 100, 11, t0)          # v1 bid 100
+    add(1, 1, 102, 100, 12, t0 + 1)      # v1 ask 102 -> mid 101
+    add(2, 0, 102, 50, 21, t0 + 2)       # v2 bid 102 -> LOCKED (102/102), hs 0
+    add(2, 0, 103, 50, 22, t0 + 3)       # v2 bid 103 -> CROSSED (103/102): skipped
+    add(2, 0, 104, 50, 23, t0 + 4)       # still crossed (best bid 104)
+    add(2, 0, 104, 50, 23, t0 + 5, 3)    # cancel 104: still crossed (103)
+    add(2, 0, 103, 50, 22, t0 + 6, 3)    # cancel 103: locked again
+    for k in range(60):                  # pad to a long enough timeline
+        add(1, 0, 90, 10, 100 + k, t0 + 10 + k)
+    path = tmp_path / "ev.jsonl"
+    path.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+    tl = build_timeline(path, 1, 0.01)
+    assert tl.crossed_states_skipped == 3
+    i = tl.prevailing(t0 + 2)
+    assert tl.half_spread(i) == 0.0 and abs(tl.mid(i) - 1.02) < 1e-12  # locked kept
+    assert tl.prevailing(t0 + 5) == i                        # crossed skipped
+    assert tl.prevailing(t0 + 6) == i + 1                    # locked 102/102 again
+    assert tl.half_spread(i + 1) == 0.0
+    with pytest.raises(ValueError):
+        tl.append(t0 + 100, 1.01, 1.00, 1, 1)                # crossed never appended
+
+
+def test_tca_fill_outside_window_rejected():
+    tl = _mini_timeline()
+    order = ParentOrder(order_id=1, instrument_id=1, side=0, qty_target=100,
+                        decision_ts=1_000_000_000, arrival_ts=2_000_000_000,
+                        end_ts=9_000_000_000)
+    order.fills.append(Fill(ts=9_000_000_001, price=100.03, qty=100,
+                            mid_at_fill=100.01, half_spread_at_fill=0.02,
+                            opp_depth_at_fill=200))
+    with pytest.raises(ValueError, match="outside"):
+        order_tca(order, tl)
+    with pytest.raises(ValueError, match="outside"):
+        validate_order_window(order, tl)
+    # end_ts beyond the last state: end_mid would be fabricated -> reject
+    late = ParentOrder(order_id=2, instrument_id=1, side=0, qty_target=100,
+                       decision_ts=1_000_000_000, arrival_ts=2_000_000_000,
+                       end_ts=11_000_000_000)
+    with pytest.raises(ValueError, match="beyond"):
+        order_tca(late, tl)
+    # inverted window
+    bad = ParentOrder(order_id=3, instrument_id=1, side=0, qty_target=100,
+                      decision_ts=3_000_000_000, arrival_ts=2_000_000_000,
+                      end_ts=9_000_000_000)
+    with pytest.raises(ValueError):
+        order_tca(bad, tl)

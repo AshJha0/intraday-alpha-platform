@@ -7,26 +7,47 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.zip.CRC32;
 
 import com.iap.core.MarketEvent;
 
 /**
  * IAP1 binary codec (schemas/FORMAT.md section 2). Little-endian, 16-byte
  * header (magic u32 | version u32 | count u64) followed by fixed 72-byte
- * records with no padding. Byte-identical across languages (SHA-256 golden).
+ * records with no padding, then (version 2) a 16-byte integrity trailer
+ * {@code crc32 | reserved 0 | count echo} where crc32 is CRC-32 (IEEE
+ * 802.3 / zlib, {@link java.util.zip.CRC32}) of header + records. Decoders
+ * verify the trailer and accept version-1 files (no trailer) as unverified
+ * legacy input. Byte-identical across languages (SHA-256 golden).
  */
 public final class Iap1Codec {
     public static final int MAGIC = 0x49415031;
-    public static final int VERSION = 1;
+    /** Version written by {@link #encode} (header + records + trailer). */
+    public static final int VERSION = 2;
+    /** Legacy version (no trailer) still accepted by the decoder. */
+    public static final int VERSION_LEGACY = 1;
     public static final int HEADER_SIZE = 16;
     public static final int RECORD_SIZE = 72;
+    public static final int TRAILER_SIZE = 16;
+
+    /** Result of {@link #decodeEx}: events, format version, integrity flag. */
+    public record Decoded(List<MarketEvent> events, int version, boolean integrityChecked) {
+    }
 
     private Iap1Codec() {
     }
 
-    /** Encode events to IAP1 bytes (header + fixed 72-byte LE records). */
+    /** CRC-32 (IEEE 802.3 / zlib) of {@code data[0, len)}; crc32("123456789") = 0xCBF43926. */
+    public static int crc32(byte[] data, int len) {
+        CRC32 crc = new CRC32();
+        crc.update(data, 0, len);
+        return (int) crc.getValue();
+    }
+
+    /** Encode events to IAP1 v2 bytes (header + fixed 72-byte LE records + trailer). */
     public static byte[] encode(List<MarketEvent> events) {
-        ByteBuffer buf = ByteBuffer.allocate(HEADER_SIZE + RECORD_SIZE * events.size());
+        int body = HEADER_SIZE + RECORD_SIZE * events.size();
+        ByteBuffer buf = ByteBuffer.allocate(body + TRAILER_SIZE);
         buf.order(ByteOrder.LITTLE_ENDIAN);
         buf.putInt(MAGIC);
         buf.putInt(VERSION);
@@ -45,11 +66,23 @@ public final class Iap1Codec {
             buf.putLong(ev.orderId);
             buf.putLong(ev.tradeId);
         }
+        buf.putInt(crc32(buf.array(), body));
+        buf.putInt(0);
+        buf.putLong(events.size());
         return buf.array();
     }
 
-    /** Decode IAP1 bytes. Rejects bad magic/version, truncation, count mismatch. */
+    /** Decode IAP1 bytes. Rejects bad magic/version, truncation, count/CRC mismatch. */
     public static List<MarketEvent> decode(byte[] data) {
+        return decodeEx(data).events();
+    }
+
+    /**
+     * Decode IAP1 bytes (version 2 with trailer, or legacy version 1). Rejects
+     * bad magic / unknown version / truncation / count mismatch / bad trailer
+     * (reserved != 0, count echo, CRC mismatch).
+     */
+    public static Decoded decodeEx(byte[] data) {
         if (data.length < HEADER_SIZE) {
             throw new IllegalArgumentException(
                     "IAP1 file truncated: " + data.length + " bytes < 16-byte header");
@@ -62,16 +95,38 @@ public final class Iap1Codec {
                     "bad IAP1 magic: 0x%08X (expected 0x%08X)", magic, MAGIC));
         }
         int version = buf.getInt();
-        if (version != VERSION) {
+        if (version != VERSION && version != VERSION_LEGACY) {
             throw new IllegalArgumentException("unsupported IAP1 version: " + version);
         }
+        boolean withTrailer = version == VERSION;
         long count = buf.getLong();
-        long body = (long) data.length - HEADER_SIZE;
-        if (count < 0 || count > body / RECORD_SIZE
-                || body != count * RECORD_SIZE) {
+        long payload = (long) data.length - HEADER_SIZE - (withTrailer ? TRAILER_SIZE : 0);
+        if (count < 0 || payload < 0 || count > payload / RECORD_SIZE
+                || payload != count * RECORD_SIZE) {
             throw new IllegalArgumentException("IAP1 size mismatch: " + data.length
                     + " bytes, header count=" + Long.toUnsignedString(count)
-                    + " implies 16 + 72*count");
+                    + " (version " + version + ") implies 16 + 72*count"
+                    + (withTrailer ? " + 16" : ""));
+        }
+        if (withTrailer) {
+            int body = (int) (HEADER_SIZE + count * RECORD_SIZE);
+            int crc = buf.getInt(body);
+            int reserved = buf.getInt(body + 4);
+            long echo = buf.getLong(body + 8);
+            if (reserved != 0) {
+                throw new IllegalArgumentException(
+                        "IAP1 trailer reserved field must be 0: " + reserved);
+            }
+            if (echo != count) {
+                throw new IllegalArgumentException("IAP1 trailer count echo "
+                        + Long.toUnsignedString(echo) + " != header count "
+                        + Long.toUnsignedString(count));
+            }
+            int actual = crc32(data, body);
+            if (actual != crc) {
+                throw new IllegalArgumentException(String.format(
+                        "IAP1 CRC-32 mismatch: trailer 0x%08X, computed 0x%08X", crc, actual));
+            }
         }
         List<MarketEvent> events = new ArrayList<>((int) count);
         for (long i = 0; i < count; i++) {
@@ -90,7 +145,7 @@ public final class Iap1Codec {
             events.add(new MarketEvent(eventId, instrumentId, venueId, exchangeTs,
                     receiveTs, sequence, eventType, side, priceTicks, qty, orderId, tradeId));
         }
-        return events;
+        return new Decoded(events, version, withTrailer);
     }
 
     /** Write an IAP1 file; return the number of events written. */

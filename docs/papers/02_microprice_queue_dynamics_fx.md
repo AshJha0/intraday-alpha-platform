@@ -268,3 +268,128 @@ refusing promotion unless all three hold (spec §13, §20, §32).
 | FX generator design (shared mid per pair) | `python/src/iap/marketdata/generator.py` |
 | stress axes | `python/src/iap/validation/stress.py` |
 | data volumes and QC | `data/normalized/qc_report.json` |
+
+## Erratum / Update — 2026-09-06 (round-3 trading fixes: FX P&L currency)
+
+- Every FX P&L figure quoted above (§Abstract "-670,712 currency units",
+  §4.5 item 2, §4.6 table, §5 item 2) was produced by a backtester that
+  summed quote-currency P&L across pairs as if it were USD. With USD/JPY
+  quoted in JPY the FX totals were JPY-dominated and wrong in *scale*
+  (not in sign). The Python backtester now converts each instrument's P&L
+  increment to USD at the prevailing mid of the configured conversion pair
+  before aggregating (`configs/risk.json` `currency.conversion`,
+  `PLATFORM_CONVENTIONS.md` §11.6, `API_PORTFOLIO_TCA.md` §4) and fails
+  closed when no rate prevails; capital for the day-2 backtest is likewise
+  converted (`research/alpha_reports/run_all.py`).
+- Re-derived figures (USD, `research/alpha_reports/REPORT.md`,
+  2026-09-06): FX09 net at 1x costs **-32,852** (x0.5: -14,885; x2:
+  -68,787); day-2 gross **+6,222**, costs 87,607, net **-81,385** over
+  5,483 trades. FX01: 1x -11,192 (x0.5: -5,229; x2: -23,120). EQ05's
+  -474,288 (§5 item 2) is a USD equity figure and is unchanged.
+- Nothing in the IC / Rank IC / t-statistic / hit-rate / decay tables
+  changes (they are currency-free); the verdicts (FX09 ITERATE, FX01
+  REJECT) and the conclusions of §6 are unchanged — FX09 still cannot be
+  promoted (hypothesis gate fails and it is cost-negative at every cost
+  multiplier).
+  **[Both verdicts in this bullet are wrong as of the same day, and every
+  P&L figure in the bullet above it is superseded — see "Erratum to the
+  errata" at the end of this paper.]**
+
+
+## Erratum / Update — 2026-09-06 (round-3 research fixes)
+
+1. **The FX headline statistics were a stale-LP artefact.** ~30 % of the
+   consolidated FX rows in this dataset are CROSSED: one LP's quote is stale
+   inside the aggregation window, the merged mid is not a tradable price, and
+   it reverts mechanically when that LP refreshes. A vol-scaled momentum or
+   reversion signal is paid for measuring exactly that reversion. Conditioning
+   the IC on the book state (the reports now always do):
+
+   | alpha | pooled IC | uncrossed IC | crossed IC | crossed frac |
+   |---|---|---|---|---|
+   | FX01 | -0.0153 | 0.0183 | -0.0302 | 0.287 |
+   | FX08 | 0.1167 | 0.0409 | 0.1922 | 0.318 |
+   | FX09 | -0.1284 | -0.0472 | -0.2100 | 0.317 |
+   | FX10 | 0.0674 | 0.0198 | 0.1151 | 0.318 |
+   | FX11 | 0.0667 | 0.0329 | 0.1061 | 0.316 |
+
+   The claim that FX09 carries "the strongest FX statistics in the study" is
+   **withdrawn**: its uncrossed Newey-West t is
+   -3.81 (against a selection yardstick of
+   3.64), and the PROMOTE gate — which now reads
+   the uncrossed IC — puts it at REJECT.
+2. **FX01's sub-second REJECT was mis-explained.** (FX01 is no longer a
+   REJECT at all — see "Erratum to the errata" below; the explanation
+   correction in this item stands, the verdict word in its heading does
+   not.) §5 attributed it to "few
+   valid label pairs at sub-second horizons". The label VALIDITY is high; the
+   labels are *exactly zero* in 98-99 % of rows at 500 ms-1 s because the
+   median inter-emission gap on this generator is ~15-22 s. That is a
+   sampling artefact of the data, not evidence against microprice in FX.
+   `data/features/features_summary.json` now publishes
+   `label_zero_frac_by_horizon` and REPORT.md prints it above the master
+   table; horizon choice should be gated on P(label == 0).
+3. **Labels no longer span halts, stale-venue gaps or a frozen mid**, and the
+   forward mid must be fresher than `max(5 s, 2 x median quote gap)` — on the
+   FX book that is ~33 s, so the 1 m label validity is now ~74 %, not ~100 %.
+4. **Walk-forward folds** are quantiles of the row index; degenerate folds are
+   reported and count as failures (see paper 01's erratum item 1).
+5. **Execution**: latency is 1 s of EVENT time with a 60 s decision-age bound
+   and session flattening; every P&L figure above is superseded by the current
+   REPORT.md.
+
+The multiple-testing ledger was **reset and re-derived** for this round: an
+experiment is now identified by (alpha, kind, canonical configuration) and
+re-running a script no longer increases the count, and one adaptive
+deployment counts as ONE experiment instead of its 211 monitoring
+evaluations. Every "1,224 experiments" / "19,347 experiments" figure in the
+body above is superseded by **760 experiments
+(65 distinct configurations)**: Bonferroni
+per-test |t| **3.99**, expected max |t| under
+the global null **3.64**. Reports now read the
+ledger at render time, so a report and the ledger can never disagree again.
+
+## Erratum to the errata — 2026-09-06 (verdicts and FX P&L)
+
+The two errata above disagree with each other and with the current
+`research/alpha_reports/REPORT.md` about which of FX09 and FX01 is which.
+This note supersedes both on those points. Nothing in the paper's §§1-6
+body is rewritten; the body is a dated record and its numbers were already
+withdrawn.
+
+1. **The verdicts are the other way round.** The currency erratum states
+   "the verdicts (FX09 ITERATE, FX01 REJECT) ... are unchanged". Under the
+   round-3 gates — which read the UNCROSSED IC and its Newey-West t, not
+   the pooled IC — the current report says the opposite:
+
+   | alpha | horizon | IC | IC unc | IC crs | crs% | NW t unc | hyp | verdict |
+   |---|---|---|---|---|---|---|---|---|
+   | FX09 | 1m | -0.1284 | -0.0472 | -0.2100 | 0.317 | -3.81 | no | **REJECT** |
+   | FX01 | 500ms | -0.0153 | 0.0183 | -0.0302 | 0.287 | 2.65 | yes | **ITERATE** |
+
+   FX09 is a REJECT twice over: its uncrossed t is negative, and its fitted
+   sign contradicts its stated rationale (`hyp = no`), which bars PROMOTE
+   regardless of magnitude. FX01 clears only the lenient ITERATE gate, and
+   on **0 of 4 folds** is its IC positive — ITERATE here means "not yet
+   ruled out", not "works". Item 1 of the round-3 erratum already reached
+   the FX09 half of this correction; the FX01 half was never stated, and
+   item 2's heading word "REJECT" is stale for the same reason.
+
+2. **The re-derived P&L figures in the currency erratum are themselves
+   superseded.** They were computed before the round-3 label, fold and
+   execution fixes. Current figures (USD, `research/alpha_reports/
+   REPORT.md`, this regeneration):
+
+   | alpha | x0.5 cost | x1 cost | x2 cost | day-2 net | day-2 gross | day-2 costs | day-2 trades |
+   |---|---|---|---|---|---|---|---|
+   | FX09 | -12,868 | -27,386 | -56,423 | -68,183 | +4,054 | 72,237 | 4,556 |
+   | FX01 | -4,452 | -9,867 | -20,696 | -25,234 | +2,344 | 27,578 | 1,723 |
+
+   The round-3 erratum's blanket "every P&L figure above is superseded by
+   the current REPORT.md" was already correct; this table just names the
+   replacements so no reader has to guess which erratum won.
+
+3. **What does not change.** The paper's conclusion is unaffected: neither
+   alpha is promotable, both lose money at every cost multiplier, and the
+   reason FX09 ever looked strong is the stale-LP crossed-book artefact
+   documented in item 1 of the round-3 erratum.

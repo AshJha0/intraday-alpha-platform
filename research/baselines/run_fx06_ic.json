@@ -1,0 +1,14 @@
+{
+  "alpha_id": "FX06",
+  "baseline_kind": "oos",
+  "bucket_ns": 300000000000,
+  "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
+  "horizon": "30s",
+  "ic_mean": 0.036624788868432234,
+  "ic_std": 0.2380325259440524,
+  "kind": "ic",
+  "n_buckets_baseline": 10,
+  "name": "run_fx06_ic",
+  "source": "warmup window [1787529602028520532, 1787538602028520532) of the bundled feature frames, universe [101, 102, 103, 104, 105, 106, 107, 108]; OOS tail [1787535602028520532, 1787538602028520532) of the warmup, model fitted on its first 67%",
+  "x-version": 2
+}

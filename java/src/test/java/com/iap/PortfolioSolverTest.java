@@ -269,4 +269,101 @@ public class PortfolioSolverTest {
             assertTrue(expected.getMessage().contains("pair"));
         }
     }
+
+    // ------------------------------------------------ round-3 scenarios ---
+
+    private static double[] fillv(int n, double v) {
+        double[] out = new double[n];
+        java.util.Arrays.fill(out, v);
+        return out;
+    }
+
+    /** turnover_cap 0 with w_prev outside the gross cap: INFEASIBLE, hold. */
+    @Test
+    public void portfolioInfeasibleFlagsAndHoldsWPrev() {
+        double[] wPrev = {0.5, 0.5};
+        Constraints cons = new Constraints(fillv(2, -1.0), fillv(2, 1.0));
+        cons.grossCap = 0.5;
+        cons.turnoverCap = 0.0;
+        double[][] sigma = {{1e-4, 0.0}, {0.0, 1e-4}};
+        PgdResult res = PortfolioOptimizer.solve(new double[] {0.01, 0.02}, sigma,
+                wPrev, 1.0, new double[2], cons,
+                new SolverParams(null, 0.01, 50, 8, 1e-7));
+        assertTrue(!res.feasible());
+        assertEquals("INFEASIBLE", res.status());
+        assertArrayEquals(wPrev, res.weights(), 0.0);
+        assertTrue(Double.isFinite(res.objective()));
+        assertEquals(0, res.bestIteration());
+        assertEquals(0.5, res.maxViolation(), 1e-12);
+        com.iap.portfolio.ConstraintAudit.Report audit =
+                com.iap.portfolio.ConstraintAudit.audit(res.weights(), cons, wPrev, sigma);
+        assertTrue(!audit.feasible());
+        assertEquals(0.5, audit.maxViolation(), 1e-12);
+        boolean negativeSlack = false;
+        for (com.iap.portfolio.ConstraintAudit.Row r : audit.constraints()) {
+            if (r.name().equals("gross_exposure") && r.slack() < 0) {
+                negativeSlack = true;
+            }
+        }
+        assertTrue(negativeSlack);
+        assertTrue(audit.toJson().contains("\"feasible\":false"));
+        Constraints ok = new Constraints(fillv(2, -1.0), fillv(2, 1.0));
+        ok.grossCap = 0.5;
+        PgdResult fine = PortfolioOptimizer.solve(new double[] {0.01, 0.02}, sigma,
+                new double[2], 1.0, new double[2], ok,
+                new SolverParams(null, 0.01, 50, 8, 1e-7));
+        assertTrue(fine.feasible());
+        assertEquals("OPTIMAL", fine.status());
+    }
+
+    /** NaN / inf anywhere in the inputs is rejected up front. */
+    @Test
+    public void portfolioRejectsNonFiniteInputs() {
+        Constraints cons = new Constraints(fillv(2, -1.0), fillv(2, 1.0));
+        double[][] eye = {{1.0, 0.0}, {0.0, 1.0}};
+        SolverParams p = new SolverParams(null, 0.01, 10, 4, 1e-7);
+        expectIae(() -> PortfolioOptimizer.solve(new double[] {Double.NaN, 0.0},
+                eye, new double[2], 1.0, new double[2], cons, p), "alpha");
+        expectIae(() -> PortfolioOptimizer.solve(new double[2],
+                new double[][] {{Double.POSITIVE_INFINITY, 0.0}, {0.0, 1.0}},
+                new double[2], 1.0, new double[2], cons, p), "Sigma");
+        expectIae(() -> PortfolioOptimizer.solve(new double[2], eye,
+                new double[] {Double.NaN, 0.0}, 1.0, new double[2], cons, p),
+                "w_prev");
+        expectIae(() -> PortfolioOptimizer.solve(new double[2], eye,
+                new double[2], 1.0, new double[] {Double.POSITIVE_INFINITY, 0.0},
+                cons, p), "tc_linear");
+        expectIae(() -> PortfolioOptimizer.solve(new double[2], eye,
+                new double[2], Double.NaN, new double[2], cons, p),
+                "risk_aversion");
+    }
+
+    private static void expectIae(Runnable r, String what) {
+        try {
+            r.run();
+            fail(what + " must throw");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage(), expected.getMessage().contains(what));
+        }
+    }
+
+    /** Sigma = 0, lambda = 0, tc > 0: auto eta 1e6 still yields a finite,
+     *  feasible, bang-bang solution inside the box. */
+    @Test
+    public void portfolioZeroSigmaLambdaZeroAutoEta() {
+        int n = 3;
+        Constraints cons = new Constraints(fillv(n, -1.0), fillv(n, 1.0));
+        PgdResult res = PortfolioOptimizer.solve(new double[] {0.01, -0.02, 0.0},
+                new double[n][n], new double[n], 0.0, fillv(n, 1e-4), cons,
+                new SolverParams(null, 0.01, 100, 8, 1e-7));
+        assertTrue(res.feasible());
+        for (double w : res.weights()) {
+            assertTrue(Double.isFinite(w));
+        }
+        assertTrue(Double.isFinite(res.objective()));
+        assertEquals(1.0, res.weights()[0], 1e-12);
+        assertEquals(-1.0, res.weights()[1], 1e-12);
+        assertEquals(0.0, res.weights()[2], 1e-12);
+        assertTrue(res.maxViolation() <= 1e-7);
+    }
 }

@@ -118,8 +118,8 @@
             "valid": true
           },
           "resiliency_halflife_v1": {
-            "value": 1143692847923909.8,
-            "valid": true
+            "value": null,
+            "valid": false
           },
           "rvol_w1m_v1": {
             "value": 7.456573403848616e-05,
@@ -223,7 +223,7 @@
             "valid": true
           },
           "ret_vol_adj_30s_v1": {
-            "value": 9.798566338027264,
+            "value": 9.798566338027253,
             "valid": true
           },
           "mid_price_v1": {
@@ -315,7 +315,7 @@
             "valid": true
           },
           "rvol_w1m_v1": {
-            "value": 8.436102572525514e-05,
+            "value": 8.436102572525522e-05,
             "valid": true
           },
           "range_bps_w1m_v1": {
@@ -323,7 +323,7 @@
             "valid": true
           },
           "vol_ratio_w10s_w1m_v1": {
-            "value": 2.449489713747372,
+            "value": 2.4494897137473695,
             "valid": true
           },
           "minute_of_day_v1": {
@@ -367,7 +367,7 @@
             "valid": true
           },
           "trend_score_w1m_v1": {
-            "value": 1.264989487855384,
+            "value": 1.2649894878553831,
             "valid": true
           },
           "meanrev_score_w1m_v1": {
@@ -375,7 +375,7 @@
             "valid": true
           },
           "vol_regime_ratio_v1": {
-            "value": 0.4953500917432119,
+            "value": 0.3782250441036435,
             "valid": true
           },
           "half_spread_cost_bps_v1": {
@@ -387,11 +387,11 @@
             "valid": true
           },
           "alpha_decay_proxy_v1": {
-            "value": 2.449489713747372,
+            "value": 2.4494897137473695,
             "valid": true
           },
           "urgency_score_v1": {
-            "value": 0.33402132460191436,
+            "value": 0.33402132460191397,
             "valid": true
           }
         }
@@ -416,7 +416,7 @@
             "valid": true
           },
           "ret_vol_adj_30s_v1": {
-            "value": 3.464959591506908,
+            "value": 1.4152446096390547,
             "valid": true
           },
           "mid_price_v1": {
@@ -504,11 +504,11 @@
             "valid": true
           },
           "resiliency_halflife_v1": {
-            "value": 346573590279972.6,
-            "valid": true
+            "value": null,
+            "valid": false
           },
           "rvol_w1m_v1": {
-            "value": 0.00011915923036562396,
+            "value": 0.000291738910298317,
             "valid": true
           },
           "range_bps_w1m_v1": {
@@ -516,7 +516,7 @@
             "valid": true
           },
           "vol_ratio_w10s_w1m_v1": {
-            "value": 4.096082772672592e-08,
+            "value": 0.0,
             "valid": true
           },
           "minute_of_day_v1": {
@@ -560,15 +560,15 @@
             "valid": true
           },
           "trend_score_w1m_v1": {
-            "value": -1.7874528152567084,
+            "value": -0.7300757437517333,
             "valid": true
           },
           "meanrev_score_w1m_v1": {
-            "value": 0.3015113445775818,
+            "value": -0.0,
             "valid": true
           },
           "vol_regime_ratio_v1": {
-            "value": 1.1413208148357517,
+            "value": 1.7735228045349538,
             "valid": true
           },
           "half_spread_cost_bps_v1": {
@@ -580,11 +580,11 @@
             "valid": true
           },
           "alpha_decay_proxy_v1": {
-            "value": 4.096082772672592e-08,
+            "value": 0.0,
             "valid": true
           },
           "urgency_score_v1": {
-            "value": 2.048041386336296e-09,
+            "value": 0.0,
             "valid": true
           }
         }
@@ -697,11 +697,11 @@
             "valid": true
           },
           "resiliency_halflife_v1": {
-            "value": 797119257643937.1,
-            "valid": true
+            "value": null,
+            "valid": false
           },
           "rvol_w1m_v1": {
-            "value": 5.9472823667981804e-05,
+            "value": 5.947282366798204e-05,
             "valid": true
           },
           "range_bps_w1m_v1": {
@@ -709,7 +709,7 @@
             "valid": true
           },
           "vol_ratio_w10s_w1m_v1": {
-            "value": 1.5353658392370314e-07,
+            "value": 0.0,
             "valid": true
           },
           "minute_of_day_v1": {
@@ -753,7 +753,7 @@
             "valid": true
           },
           "trend_score_w1m_v1": {
-            "value": -0.4471583154826337,
+            "value": -0.44715831548263185,
             "valid": true
           },
           "meanrev_score_w1m_v1": {
@@ -761,7 +761,7 @@
             "valid": true
           },
           "vol_regime_ratio_v1": {
-            "value": 0.3798951179153003,
+            "value": 0.3798951179153017,
             "valid": true
           },
           "half_spread_cost_bps_v1": {
@@ -773,11 +773,11 @@
             "valid": true
           },
           "alpha_decay_proxy_v1": {
-            "value": 1.5353658392370314e-07,
+            "value": 0.0,
             "valid": true
           },
           "urgency_score_v1": {
-            "value": 9.345705108399321e-09,
+            "value": 0.0,
             "valid": true
           }
         }
@@ -1001,8 +1001,8 @@
             "valid": true
           },
           "ret_vol_adj_30s_v1": {
-            "value": 0.0,
-            "valid": true
+            "value": null,
+            "valid": false
           },
           "mid_price_v1": {
             "value": 1.0867850000000001,
@@ -1089,8 +1089,8 @@
             "valid": true
           },
           "resiliency_halflife_v1": {
-            "value": 8664339756999.316,
-            "valid": true
+            "value": null,
+            "valid": false
           },
           "rvol_w1m_v1": {
             "value": 0.0,
@@ -1101,8 +1101,8 @@
             "valid": false
           },
           "vol_ratio_w10s_w1m_v1": {
-            "value": 0.0,
-            "valid": true
+            "value": null,
+            "valid": false
           },
           "minute_of_day_v1": {
             "value": 526.2673977525333,
@@ -1145,8 +1145,8 @@
             "valid": true
           },
           "trend_score_w1m_v1": {
-            "value": 0.0,
-            "valid": true
+            "value": null,
+            "valid": false
           },
           "meanrev_score_w1m_v1": {
             "value": null,
@@ -1165,12 +1165,12 @@
             "valid": true
           },
           "alpha_decay_proxy_v1": {
-            "value": 0.0,
-            "valid": true
+            "value": null,
+            "valid": false
           },
           "urgency_score_v1": {
-            "value": 0.0,
-            "valid": true
+            "value": null,
+            "valid": false
           }
         }
       }

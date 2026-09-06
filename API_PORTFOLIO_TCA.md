@@ -63,6 +63,16 @@ return best iterate, its objective, its (1-based) iteration index
 Ties keep the earliest iterate. The initial projection of `w_prev` counts as
 iteration 0.
 
+**Infeasible (pinned, round 3).** When no iterate (iteration 0 included)
+satisfies every constraint within `feas_tol`, the solve is `Infeasible`:
+the result carries `feasible = false` (`status = "INFEASIBLE"`), weights =
+`w_prev` (the last known feasible-by-construction holding), objective
+`f(w_prev)`, `best_iteration = 0`. A solver never returns NaN or a
+violating weight vector; callers hold the current position on an
+infeasible solve. Non-finite inputs (`alpha`, `Σ`, `w_prev`, `tc`,
+bounds) raise / throw before the first iteration. Feasible results carry
+`feasible = true` (`status = "OPTIMAL"`).
+
 `project(v)` = exactly `proj_passes` passes of cyclic projections **in this
 order**:
 
@@ -121,7 +131,9 @@ candidate sweep.
 Every solve response carries the audit: for each active-or-binding
 constraint `{name, value, bound, slack, binding}` with
 `binding = slack <= 1e-6`, plus `turnover`, `gross`, `net`, `realized_vol`
-(`sqrt(wᵀΣw)`), `target_vol`. Position/participation rows are emitted only
+(`sqrt(wᵀΣw)`), `target_vol`, and (round 3) `feasible` (every row's
+`slack >= -feas_tol`) with `max_violation` (the largest positive
+`-slack`, 0 when feasible). Position/participation rows are emitted only
 when binding (n can be large); aggregate rows always.
 
 ## 2. TCA (spec §19)
@@ -137,6 +149,19 @@ when execution is worse than the benchmark**. Bps figures multiply by 1e4.
 - `end_mid` `m_e`: prevailing mid at the end of the execution horizon
 - "prevailing at t" = state of the latest market event with
   `event_ts <= t` (identical to the label-alignment rule, no lookahead)
+- **Timeline builder (pinned, round 3):** a CROSSED consolidated state
+  (`ask < bid`, possible when venues disagree) is never a reference state —
+  the builder skips it and counts it (`crossed_states_skipped` /
+  `crossedStatesSkipped()`); a LOCKED state (`ask == bid`, half-spread 0)
+  is a legal state and is kept. HALT statuses are recorded on the timeline
+  (`add_halt` / `addHalt`) for §2.5. Python (`append_state_pinned`) and Java
+  (`appendStatePinned`) apply the identical rule and are held equal by the
+  `timeline_cases` of `tests/golden/expected_tca.json` (v2).
+- **Order window validation (pinned):** `decision_ts <= arrival_ts <=
+  end_ts`, `end_ts <= last_ts` of the timeline, and every fill inside
+  `[arrival_ts, end_ts]`; otherwise `validate_order_window` /
+  `Tca.validateOrderWindow` raises — a benchmark over a window the
+  timeline does not cover is never fabricated from the last state.
 
 ### 2.2 Implementation shortfall (Perold, pinned decomposition)
 
@@ -167,7 +192,15 @@ total_is_bps`.
 
 ### 2.4 Spread / impact / timing attribution
 
-Per fill, with `mid_f` and half-spread `hs_f` prevailing at the fill:
+Per fill, with `mid_f` and half-spread `hs_f` the fill's **reference
+state** (pinned, round 3): for a TAKER fill the state prevailing at `t_f`;
+for a MAKER (passive) fill the state prevailing strictly BEFORE `t_f`
+(`prevailing(t_f - 1)`) — a passive fill is caused by the event stamped
+`t_f`, and the post-event state already reflects the trade-through that
+hit us, so measuring against it would book the spread we captured as a
+cost. Fills carry `liquidity ∈ {TAKER, MAKER}`; `stamp_fill` /
+`TcaFill.stamp` build the reference state and raise when no state
+prevails.
 
 ```
 spread_cost = Σ_f q_f * hs_f
@@ -182,8 +215,15 @@ so `trading_cost = spread_cost + impact_cost + timing_cost`.
 
 Pinned deltas `{100ms, 1s, 10s}` (ns: 1e8, 1e9, 1e10). Per fill:
 `1e4 * s * (mid(t_f + delta) - p_f) / p_f`, averaged over fills with a
-defined prevailing mid at `t_f + delta`. Negative = post-fill reversion
-(we paid temporary impact); positive = continued adverse drift.
+**defined** markout. Defined (pinned, round 3) iff the timeline's
+`last_ts >= t_f + delta` (the horizon lies inside the observed data — the
+last state is never extrapolated past the end of the timeline) AND no HALT
+starts in `(t_f, t_f + delta]`. A horizon with no defined fill reports
+`null` (Python `None`, Java a `null` `Double` — never NaN) and
+`adverse_selection_n[delta]` = number of defined fills is reported next to
+every average (`adverse_selection_with_counts` /
+`Tca.adverseSelectionWithCounts`). Negative = post-fill reversion (we paid
+temporary impact); positive = continued adverse drift.
 
 ### 2.6 Impact estimate
 
@@ -194,10 +234,15 @@ r2, n`. Requires n >= 3; zero x-variance returns slope 0.
 
 ### 2.7 Golden case
 
-`tests/golden/expected_tca.json`: four pinned parent-order cases
-(`buy_full_fill`, `sell_partial_fill`, `buy_unfilled`, `fx_sell_full`) with
-inputs and the full expected §2.2 record, 1e-9. `buy_unfilled` must come out
-as pure opportunity cost.
+`tests/golden/expected_tca.json` (x-version 2): four pinned parent-order
+cases (`buy_full_fill`, `sell_partial_fill`, `buy_unfilled`, `fx_sell_full`)
+with inputs and the full expected §2.2 record, 1e-9 (`buy_unfilled` must
+come out as pure opportunity cost), plus `timeline_cases` — seven pinned
+timelines (crossed/locked states, MAKER vs TAKER stamping, halts, horizons
+past the end) with the expected `crossed_states_skipped`, per-fill
+reference mids and per-horizon markouts (`null` where undefined) and
+`adverse_selection_n`. Python generates (`python/tools/make_golden_tca.py`),
+Java consumes.
 
 ### 2.8 Bundled research simulation (context, not part of the Java contract)
 
@@ -217,3 +262,35 @@ data_version (sha256 of data/normalized/qc_report.json), feature_version
 cpu_count, machine, system, python}` — plus `metrics.json` and `model.pkl`.
 `research/models/ledger.json` holds the monotone experiment counter
 (`run_NNNN_<name>` ids) used for multiple-testing accounting.
+
+## 4. Currency and cost-model units (pinned, round 3)
+
+- **Reporting currency.** Every aggregated figure — risk-engine notionals and
+  daily P&L, Java `BacktestEngine.Summary.totalPnl`, Python
+  `BacktestResult.total_pnl` / `InstrumentResult.total_pnl`, research
+  report P&L, cost and capital columns — is in the reporting currency
+  (`configs/risk.json` `currency.reporting_ccy`, USD). Native figures are
+  kept alongside, never mixed: `InstrumentResult.total_pnl_native` (in the
+  instrument's `quote_currency`), `BacktestResult.total_pnl_native_by_ccy`,
+  Java `Summary.totalPnlNative` (per quote ccy).
+- **Conversion table.** `currency.conversion[ccy] = {instrument_id, invert}`
+  names the FX pair whose consolidated mid converts `ccy` into the reporting
+  currency (`invert = true` when the pair is quoted REPORTING/CCY, e.g.
+  USD/JPY for JPY). `configs/instruments.json` carries `base_currency` /
+  `quote_currency` per FX pair and `currency` per equity.
+- **When.** P&L is converted **per increment at the prevailing pair mid of
+  that row** (Python `Backtester.rate_series`, Java
+  `Account.pnlReporting`), then summed; a session total is never converted
+  at an end-of-day rate, and a non-USD increment on a row with no
+  prevailing rate is an error (Python raises; Java `FxConverter` throws;
+  the risk engine rejects with `FX_RATE_MISSING`). Capital for the day-2
+  backtest is converted with the pair's `ref_price`.
+- **Cost-model units** (research `iap.backtest.costs.CostModel` and the
+  simulator rule 6 are identical): commission bps × notional, half-spread
+  in price units × qty × qty_unit, and impact
+  `impact_coeff_bps_per_pct_adv × (qty × qty_unit / adv × 100)` bps of the
+  fill notional, with `adv` in base units (shares, or currency units of the
+  base for FX — `configs/instruments.json` `adv`). Both sides pass
+  `qty_unit = lot_size` for FX and `1` for EQUITY/ETF; passing lot counts
+  against a base-unit ADV understates FX impact by `lot_size` and is a
+  contract violation.

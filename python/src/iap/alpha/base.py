@@ -38,7 +38,7 @@ contradicts its rationale can at best be ITERATE, never PROMOTE.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Mapping, Sequence, Tuple
+from typing import Dict, List, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -135,11 +135,26 @@ class LinearAlpha(AlphaModel):
 
     Pinned scoring semantics (mirrored by ports, see /API_ALPHA.md):
 
-    ``z    = clip((raw - mu) / (sigma + EPS), -Z_CLIP, +Z_CLIP)``
+    ``z    = clip((raw - mu) / (sigma + EPS), -z_clip, +z_clip)``
     ``er   = beta * z``            (beta = fitted OLS slope, free-signed)
-    ``conf = min(1, |z| / CONF_SCALE)``; rows with NaN raw -> er 0, conf 0.
+    ``conf = min(1, |z| / conf_scale)``; rows with NaN raw -> er 0, conf 0.
+
+    **Dead alpha (pinned, round-3)**: when ``sigma <= 0`` or ``beta == 0``
+    the fit found no usable evidence (fewer than 32 training pairs, or a
+    degenerate signal).  EVERY row then scores ``(er, conf) = (0.0, 0.0)``.
+    Without this rule ``sigma = 0`` made ``z = clip(x / 1e-12) = ±4`` and
+    every row reported **confidence 1.0** with expected return 0 — maximum
+    conviction in nothing, and the ports loaded such a file happily
+    (``fitted: true``).
+
+    ``z_clip`` / ``conf_scale`` are read from the parameter FILE (they are
+    part of the port contract, API_ALPHA §2) and validated against the
+    pinned constants, so the reference and the ports read one source of
+    truth: a hand-edited ``z_clip`` is now rejected instead of silently
+    breaking cross-language parity.
     """
 
+    #: pinned scoring constants; a params file must carry exactly these
     Z_CLIP = 4.0
     CONF_SCALE = 2.0
 
@@ -149,7 +164,15 @@ class LinearAlpha(AlphaModel):
         self.beta: float = 0.0
         self.beta_fit: float = 0.0
         self.n_train: int = 0
+        self.z_clip: float = self.Z_CLIP
+        self.conf_scale: float = self.CONF_SCALE
+        self.train_window: Optional[Dict[str, int]] = None
         self._fitted = False
+
+    @property
+    def is_dead(self) -> bool:
+        """True when the fit found no usable evidence (pinned scoring rule)."""
+        return not (self.sigma > 0.0) or self.beta == 0.0
 
     # subclass hook ------------------------------------------------------
 
@@ -189,6 +212,14 @@ class LinearAlpha(AlphaModel):
         x = np.concatenate(xs) if xs else np.empty(0)
         y = np.concatenate(ys) if ys else np.empty(0)
         self.n_train = int(x.size)
+        spans = [
+            (int(df["exchange_ts"].iloc[0]), int(df["exchange_ts"].iloc[-1]))
+            for df in train.values() if len(df)
+        ]
+        self.train_window = (
+            {"start_ts": min(a for a, _ in spans),
+             "end_ts": max(b for _, b in spans)} if spans else None
+        )
         if x.size < 32:
             # not enough evidence: dead alpha, honestly zero
             self.mu, self.sigma, self.beta_fit, self.beta = 0.0, 0.0, 0.0, 0.0
@@ -210,16 +241,19 @@ class LinearAlpha(AlphaModel):
         if not self._fitted:
             raise RuntimeError(f"{self.alpha_id}: score() before fit()/load_params()")
         out: Dict[int, pd.DataFrame] = {}
+        dead = self.is_dead
         for iid, sig in self.signals(data).items():
             df = data[iid]
             x = sig.to_numpy(dtype=float)
-            ok = np.isfinite(x)
+            ok = np.isfinite(x) & (not dead)
             z = np.zeros(len(x))
-            z[ok] = np.clip(
-                (x[ok] - self.mu) / (self.sigma + EPS), -self.Z_CLIP, self.Z_CLIP
-            )
+            if not dead:
+                z[ok] = np.clip(
+                    (x[ok] - self.mu) / (self.sigma + EPS),
+                    -self.z_clip, self.z_clip,
+                )
             er = self.beta * z
-            conf = np.minimum(1.0, np.abs(z) / self.CONF_SCALE)
+            conf = np.minimum(1.0, np.abs(z) / self.conf_scale)
             conf[~ok] = 0.0
             er[~ok] = 0.0
             out[iid] = pd.DataFrame(
@@ -244,22 +278,64 @@ class LinearAlpha(AlphaModel):
             "beta": self.beta,
             "beta_fit": self.beta_fit,
             "hypothesis_confirmed": bool(self.beta_fit > 0.0),
-            "z_clip": self.Z_CLIP,
-            "conf_scale": self.CONF_SCALE,
+            "z_clip": self.z_clip,
+            "conf_scale": self.conf_scale,
             "n_train": self.n_train,
+            "train_window": self.train_window,
+            "dead": bool(self.is_dead),
             "fitted": self._fitted,
         }
 
     def load_params(self, blob: dict) -> None:
-        if blob.get("alpha_id") != self.alpha_id:
+        """Restore fitted parameters, validating the pinned port contract.
+
+        Rejected (API_ALPHA §2): a foreign alpha_id, an unsupported model, a
+        horizon or feature list that differs from the class, a `z_clip` /
+        `conf_scale` that is not the pinned constant, a non-finite number,
+        and `sigma <= 0` unless the file also says `beta == 0` (the only
+        legal dead-alpha shape).
+        """
+        aid = self.alpha_id
+        if blob.get("alpha_id") != aid:
             raise ValueError(
-                f"params for {blob.get('alpha_id')!r} loaded into {self.alpha_id}"
+                f"params for {blob.get('alpha_id')!r} loaded into {aid}"
             )
-        self.mu = float(blob["mu"])
-        self.sigma = float(blob["sigma"])
-        self.beta = float(blob["beta"])
-        self.beta_fit = float(blob.get("beta_fit", blob["beta"]))
+        model = blob.get("model")
+        if model != "linear_z_v1":
+            raise ValueError(f"{aid}: unsupported model {model!r}")
+        horizon = blob.get("horizon")
+        if horizon is not None and horizon != self.horizon:
+            raise ValueError(
+                f"{aid}: params horizon {horizon!r} != class horizon "
+                f"{self.horizon!r}")
+        feats = blob.get("features")
+        if feats is not None and tuple(feats) != tuple(self.features):
+            raise ValueError(
+                f"{aid}: params features {list(feats)} != class features "
+                f"{list(self.features)}")
+        z_clip = float(blob.get("z_clip", self.Z_CLIP))
+        conf_scale = float(blob.get("conf_scale", self.CONF_SCALE))
+        if z_clip != self.Z_CLIP or conf_scale != self.CONF_SCALE:
+            raise ValueError(
+                f"{aid}: z_clip/conf_scale must be the pinned "
+                f"{self.Z_CLIP}/{self.CONF_SCALE} (got {z_clip}/{conf_scale})")
+        mu = float(blob["mu"])
+        sigma = float(blob["sigma"])
+        beta = float(blob["beta"])
+        beta_fit = float(blob.get("beta_fit", beta))
+        for name, v in (("mu", mu), ("sigma", sigma), ("beta", beta),
+                        ("beta_fit", beta_fit)):
+            if not np.isfinite(v):
+                raise ValueError(f"{aid}: non-finite {name}")
+        if sigma <= 0.0 and beta != 0.0:
+            raise ValueError(
+                f"{aid}: sigma <= 0 is only legal for a dead alpha "
+                f"(beta == 0); got sigma={sigma}, beta={beta}")
+        self.mu, self.sigma, self.beta, self.beta_fit = mu, sigma, beta, beta_fit
+        self.z_clip, self.conf_scale = z_clip, conf_scale
         self.n_train = int(blob.get("n_train", 0))
+        tw = blob.get("train_window")
+        self.train_window = dict(tw) if isinstance(tw, dict) else None
         self._fitted = True
 
 

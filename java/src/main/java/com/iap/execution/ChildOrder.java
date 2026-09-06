@@ -16,6 +16,7 @@ public final class ChildOrder {
     public long limitTicks;   // ignored for MARKET
     public long qty;
     public long decisionTs;
+    public long expireTs;     // 0 = good till cancelled (rule 7)
     // ---- simulator-owned runtime state ----
     public long arrivalTs;
     public OrderState state = OrderState.PENDING;
@@ -23,6 +24,8 @@ public final class ChildOrder {
     public long aheadQty;     // displayed qty ahead of us at our level
     public boolean resting;
     public boolean crossExempt; // see the crossing-rule exemption (rule 4)
+    public CancelReason cancelReason = CancelReason.NONE;
+    public long cancelArrivalTs; // 0 = no cancel in flight (rule 7)
 
     /** Field-by-field copy (checkpoint support). */
     public ChildOrder copy() {
@@ -36,12 +39,15 @@ public final class ChildOrder {
         o.limitTicks = limitTicks;
         o.qty = qty;
         o.decisionTs = decisionTs;
+        o.expireTs = expireTs;
         o.arrivalTs = arrivalTs;
         o.state = state;
         o.remaining = remaining;
         o.aheadQty = aheadQty;
         o.resting = resting;
         o.crossExempt = crossExempt;
+        o.cancelReason = cancelReason;
+        o.cancelArrivalTs = cancelArrivalTs;
         return o;
     }
 }

@@ -60,14 +60,27 @@ struct LinearZParams {
     double z_clip = 4.0;
     double conf_scale = 2.0;
     std::vector<std::string> features;
+
+    // True when the fit found no usable evidence: every row scores (0, 0)
+    // (pinned dead-alpha rule, API_ALPHA.md section 2).
+    bool is_dead() const { return !(sigma > 0.0) || beta == 0.0; }
 };
+
+// Pinned scoring constants every params file must carry.
+constexpr double PINNED_Z_CLIP = 4.0;
+constexpr double PINNED_CONF_SCALE = 2.0;
 
 // The 6 production alpha ids, pinned order.
 extern const std::array<const char*, 6> GOLDEN_ALPHA_IDS;
 
 // Load configs/strategies/alpha_params.json (throws std::runtime_error on
-// missing file / malformed JSON, std::invalid_argument on missing alphas).
-std::map<std::string, LinearZParams> load_alpha_params(const std::string& path);
+// missing file / malformed JSON, std::invalid_argument on missing alphas,
+// an edited z_clip/conf_scale, a non-finite number, a sigma <= 0 that is not
+// a dead alpha, or — when expected_feature_version is non-empty — a
+// feature_version that differs from the engine's registry hash).
+std::map<std::string, LinearZParams> load_alpha_params(
+    const std::string& path,
+    const std::string& expected_feature_version = "");
 
 // Core scoring: raw -> (expected_return, confidence). NaN raw => (0, 0).
 void score_linear_z(double raw, const LinearZParams& p, double& er,
@@ -105,6 +118,14 @@ bool fx_solve_factors(const std::array<double, FX_NUM_PAIRS>& returns,
 
 // FX05 raw signals for one grid cross-section: raw_i = -(r_i - fitted_i)
 // for pairs with finite r_i, NaN otherwise; all-NaN when < 2 valid pairs.
+// Which observable pairs carry identifiable relative-value information
+// (pinned, API_ALPHA.md section 5): a pair is identified iff every free
+// currency it touches appears in at least two observable pairs. A currency
+// seen in a single pair has its factor absorb the whole return, so the
+// residual would be 0 by construction (a constant, not a signal).
+std::array<bool, FX_NUM_PAIRS> fx05_identified_pairs(
+    const std::array<bool, FX_NUM_PAIRS>& observable);
+
 std::array<double, FX_NUM_PAIRS> fx05_raw_signals(
     const std::array<double, FX_NUM_PAIRS>& returns);
 

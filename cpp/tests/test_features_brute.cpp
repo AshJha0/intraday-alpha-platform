@@ -158,18 +158,21 @@ protected:
                 const bool ok = !bid.empty() && !ask.empty();
                 if (ok) {
                     const std::int64_t mid2 = bid[0].first + ask[0].first;
-                    if (!prev_ok || mid2 != prev_mid2) {
+                    // Pinned: compare against the last RECORDED mid sample,
+                    // so a one-sided flicker that moves the mid still
+                    // contributes a vol sample (API_FEATURES.md section 2).
+                    if (!have_hist || mid2 != prev_mid2) {
                         const double lm =
                             std::log(static_cast<double>(mid2));
-                        if (prev_ok && have_hist) {
+                        if (have_hist) {
                             const double dlm = lm - last_logmid;
                             lg.dlm_sq.emplace_back(t, dlm * dlm);
                         }
                         lg.logmid.emplace_back(t, lm);
                         last_logmid = lm;
                         have_hist = true;
+                        prev_mid2 = mid2;
                     }
-                    prev_mid2 = mid2;
                 }
                 prev_ok = ok;
                 prev_bid = bid;

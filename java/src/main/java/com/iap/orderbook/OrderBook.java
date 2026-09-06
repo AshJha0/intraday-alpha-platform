@@ -11,6 +11,7 @@ import com.iap.core.EventType;
 import com.iap.core.MarketEvent;
 import com.iap.core.SessionStatus;
 import com.iap.core.Side;
+import com.iap.core.Validation;
 
 /**
  * MBO order book for one instrument on one venue (venueId=0: accept any venue).
@@ -18,15 +19,21 @@ import com.iap.core.Side;
  * section 4, mirroring the Python reference {@code iap/orderbook/book.py}:
  *
  * <ul>
- *   <li>ADD: FIFO tail of its (side, price) level; a crossing limit ADD
- *       executes against the opposite side from the best level's FIFO head
- *       (marketable), leftover posts; duplicate order_id dropped + counted.</li>
- *   <li>MODIFY: qty change only (event price ignored); decrease keeps queue
- *       position, increase moves to level tail, &lt;= 0 removes.</li>
+ *   <li>ADD: FIFO tail of its (side, price) level; while the status is
+ *       TRADING a crossing limit ADD executes against the opposite side from
+ *       the best level's FIFO head (marketable), leftover posts; while
+ *       HALT/AUCTION/CLOSE nothing matches (the ADD rests, the book may be
+ *       crossed); duplicate order_id dropped + counted.</li>
+ *   <li>MODIFY: qty change only; a non-zero price that differs from the
+ *       resting price is dropped + counted ({@code modify_price_mismatch});
+ *       decrease keeps queue position, increase moves to level tail, &lt;= 0
+ *       removes.</li>
  *   <li>CANCEL: remove by order_id; EXECUTE: partial fill keeps position,
  *       removed at 0, never touches trade_flow.</li>
  *   <li>TRADE: trade_flow += qty (BID aggressor) / -= qty (ASK aggressor).</li>
- *   <li>QUOTE (FX): replaces the venue's whole side at L1.</li>
+ *   <li>QUOTE (FX): replaces the venue's whole side at L1; {@code order_id
+ *       == 0} uses the synthetic id {@link #syntheticOrderId}; an explicit id
+ *       resting on the other side is dropped + counted.</li>
  *   <li>SNAPSHOT: recovery burst; first record clears both sides, the record
  *       with trade_id == 0 ends the burst and clears {@code stale} — unless a
  *       sequence gap occurred INSIDE the burst, which marks it broken: a
@@ -36,9 +43,19 @@ import com.iap.core.Side;
  *       {@code side} must be BID (0) or ASK (1); side &gt; 1 is malformed:
  *       dropped + counted ({@code invalid_side_dropped}) after its sequence
  *       number is consumed, never raised mid-stream.</li>
- *   <li>Sequencing: duplicates (sequence &lt;= last) dropped + counted; gaps
- *       mark the book stale + counted; while stale only SNAPSHOT/STATUS/TRADE/
- *       HEARTBEAT are applied, the rest dropped + counted.</li>
+ *   <li>Malformed payloads (qty/price domain, order_id 0, reserved ids,
+ *       bad STATUS code, i64 overflow) and unknown event types are dropped +
+ *       counted ({@code invalid_payload_dropped}, {@code unknown_type_dropped})
+ *       after the sequence number is consumed; SNAPSHOT countdowns are
+ *       validated ({@code snapshot_restarts}); id-less SNAPSHOT records get
+ *       synthetic ids.</li>
+ *   <li>Sequencing: the first event of an epoch is accepted whatever its
+ *       sequence; duplicates (sequence &lt;= last) dropped + counted; gaps
+ *       mark the book stale + counted unless a {@code reorderWindow} holds
+ *       the event back until the hole fills ({@code late_recovered}); a
+ *       SNAPSHOT burst starting below the last sequence is a venue sequence
+ *       reset ({@code sequence_resets}); while stale only SNAPSHOT/STATUS/
+ *       TRADE/HEARTBEAT are applied, the rest dropped + counted.</li>
  * </ul>
  *
  * <p>Allocation-conscious: order nodes are pooled (free list) and looked up in
@@ -48,6 +65,20 @@ import com.iap.core.Side;
  */
 public final class OrderBook {
     public static final int DEPTH_LEVELS = 10;
+    /** Largest accepted reorder window (hold-back buffer, events) — pinned. */
+    public static final int MAX_REORDER_WINDOW = 4096;
+    /** Reserved synthetic order-id range: every id with the top 16 bits set. */
+    public static final long SYNTHETIC_ID_BASE = Validation.SYNTHETIC_ID_BASE;
+
+    /** Deterministic synthetic order id for id-less QUOTE/SNAPSHOT records. */
+    public static long syntheticOrderId(int side, long ordinal) {
+        return SYNTHETIC_ID_BASE | ((long) side << 40) | (ordinal & ((1L << 40) - 1));
+    }
+
+    private static boolean addOverflows(long a, long b) {
+        long r = a + b;
+        return ((a ^ r) & (b ^ r)) < 0;
+    }
 
     /** One resting order: intrusive FIFO list node. */
     private static final class Order {
@@ -198,14 +229,19 @@ public final class OrderBook {
 
     public final long instrumentId;
     public final int venueId;
+    private final int reorderWindow;
 
     private final TreeMap<Long, Level> bids = new TreeMap<>(Comparator.reverseOrder());
     private final TreeMap<Long, Level> asks = new TreeMap<>();
     private final OrderMap orders = new OrderMap();
     private final ArrayDeque<Order> orderPool = new ArrayDeque<>();
     private final ArrayDeque<Level> levelPool = new ArrayDeque<>();
+    /** Hold-back buffer keyed by (unsigned) sequence. */
+    private final TreeMap<Long, MarketEvent> pending = new TreeMap<>(Long::compareUnsigned);
 
     private long lastSequence;
+    private boolean hasSequence;
+    private long sequenceEpoch;
     private long exchangeTs;
     private long receiveTs;
     private long tradeFlow;
@@ -213,78 +249,238 @@ public final class OrderBook {
     private boolean stale;
     private boolean snapshotActive;
     private boolean snapshotBroken;
+    private long snapshotCountdown;
+    private final long[] snapshotSyntheticNext = new long[2];
     private long arrivalCounter;
     private long duplicatesDropped;
     private long gapsDetected;
     private long droppedWhileStale;
     private long unknownOrderEvents;
     private long invalidSideDropped;
+    private long invalidPayloadDropped;
+    private long unknownTypeDropped;
+    private long modifyPriceMismatch;
+    private long snapshotRestarts;
+    private long sequenceResets;
+    private long lateRecovered;
     private long eventsApplied;
 
     public OrderBook(long instrumentId, int venueId) {
+        this(instrumentId, venueId, 0);
+    }
+
+    /**
+     * @param reorderWindow hold-back buffer for late retransmissions (0 = off,
+     *     at most {@link #MAX_REORDER_WINDOW})
+     */
+    public OrderBook(long instrumentId, int venueId, int reorderWindow) {
+        if (reorderWindow < 0 || reorderWindow > MAX_REORDER_WINDOW) {
+            throw new IllegalArgumentException("reorderWindow must be in [0, "
+                    + MAX_REORDER_WINDOW + "]: " + reorderWindow);
+        }
         this.instrumentId = instrumentId;
         this.venueId = venueId;
+        this.reorderWindow = reorderWindow;
     }
 
     // -------------------------------------------------------------- applying
 
-    /** Apply one event (sequence-checked). Throws on routing errors. */
-    public void apply(MarketEvent ev) {
+    /**
+     * Apply one event (sequence-checked). Throws only on routing errors;
+     * every malformed event is dropped + counted.
+     *
+     * @return the pinned per-event verdict: downstream consumers (the feature
+     *     engine, API_FEATURES.md section 2) fold ONLY APPLIED events into
+     *     rolling state.
+     */
+    public ApplyStatus apply(MarketEvent ev) {
         if (ev.instrumentId != instrumentId || (venueId != 0 && ev.venueId != venueId)) {
             throw new IllegalArgumentException("event routed to wrong book: event "
                     + ev.instrumentId + "@" + ev.venueId + ", book "
                     + instrumentId + "@" + venueId);
         }
-        // Sequence handling (duplicates dropped, gaps => stale).
-        if (Long.compareUnsigned(ev.sequence, lastSequence) <= 0) {
-            duplicatesDropped++;
-            return;
+        if (reorderWindow != 0 && hasSequence
+                && Long.compareUnsigned(ev.sequence, lastSequence) > 0
+                && Long.compareUnsigned(ev.sequence - lastSequence, 1) > 0) {
+            // Out-of-sequence event ahead of a hole: hold it back until the
+            // missing sequences arrive (bounded by reorderWindow).
+            if (pending.containsKey(ev.sequence)) {
+                duplicatesDropped++;
+                return ApplyStatus.DROPPED;
+            }
+            if (pending.size() < reorderWindow) {
+                pending.put(ev.sequence, ev);
+                return ApplyStatus.HELD;
+            }
+            // Buffer full: give up on the hole, declare the gap and apply
+            // everything held so far in sequence order.
+            pending.put(ev.sequence, ev);
+            return flushPending(ev.sequence, true);
         }
-        if (lastSequence != 0 && Long.compareUnsigned(ev.sequence, lastSequence + 1) > 0) {
-            gapsDetected++;
-            stale = true;
-            if (snapshotActive) {
-                // Gap inside an active SNAPSHOT burst: the burst is broken —
-                // its completion record must NOT clear `stale` (records are
-                // missing). Only a later complete gap-free burst recovers.
-                snapshotBroken = true;
+        ApplyStatus status = applySequenced(ev, false);
+        if (!pending.isEmpty()) {
+            drainPending();
+        }
+        return status;
+    }
+
+    private ApplyStatus flushPending() {
+        return flushPending(0L, false);
+    }
+
+    /**
+     * Apply every held-back event in sequence order (gap declared); returns
+     * the verdict of {@code target} when the caller tracks one.
+     */
+    private ApplyStatus flushPending(long target, boolean hasTarget) {
+        List<MarketEvent> held = new ArrayList<>(pending.values());
+        pending.clear();
+        ApplyStatus status = ApplyStatus.APPLIED;
+        for (MarketEvent pev : held) {
+            ApplyStatus st = applySequenced(pev, true);
+            if (hasTarget && pev.sequence == target) {
+                status = st;
             }
         }
+        return status;
+    }
+
+    private void drainPending() {
+        while (!pending.isEmpty()) {
+            MarketEvent pev = pending.remove(lastSequence + 1);
+            if (pev == null) {
+                return;
+            }
+            applySequenced(pev, true);
+        }
+    }
+
+    /**
+     * Explicit venue sequence reset (session roll known out of band): held
+     * events are flushed, then a new epoch starts (next event accepted
+     * whatever its sequence) with the book stale until a complete burst.
+     */
+    public void resetSequence() {
+        if (!pending.isEmpty()) {
+            flushPending();
+        }
+        hasSequence = false;
+        sequenceEpoch++;
+        sequenceResets++;
+        stale = true;
+        snapshotActive = false;
+        snapshotBroken = false;
+        snapshotCountdown = 0;
+    }
+
+    private static boolean payloadOk(MarketEvent ev) {
+        switch (ev.eventType) {
+            case EventType.ADD:
+                return ev.orderId != 0 && ev.qty > 0 && ev.priceTicks > 0
+                        && Long.compareUnsigned(ev.orderId, SYNTHETIC_ID_BASE) < 0;
+            case EventType.MODIFY:
+            case EventType.CANCEL:
+                return ev.orderId != 0;
+            case EventType.EXECUTE:
+                return ev.orderId != 0 && ev.qty > 0;
+            case EventType.QUOTE:
+            case EventType.SNAPSHOT:
+                return ev.qty > 0 && ev.priceTicks > 0
+                        && Long.compareUnsigned(ev.orderId, SYNTHETIC_ID_BASE) < 0;
+            case EventType.TRADE:
+                return ev.qty > 0 && ev.priceTicks > 0;
+            case EventType.STATUS:
+                return SessionStatus.isValid(ev.qty);
+            default:
+                return true; // HEARTBEAT
+        }
+    }
+
+    private ApplyStatus applySequenced(MarketEvent ev, boolean fromBuffer) {
+        int et = ev.eventType;
+        if (hasSequence) {
+            if (Long.compareUnsigned(ev.sequence, lastSequence) <= 0) {
+                if (et == EventType.SNAPSHOT && !snapshotActive
+                        && Long.compareUnsigned(ev.sequence, lastSequence) < 0) {
+                    // Venue sequence reset (daily restart / fail-over): the
+                    // SNAPSHOT burst starting the new epoch recovers the book.
+                    if (!pending.isEmpty()) {
+                        flushPending();
+                    }
+                    sequenceEpoch++;
+                    sequenceResets++;
+                    stale = true;
+                } else {
+                    duplicatesDropped++;
+                    return ApplyStatus.DROPPED;
+                }
+            } else if (Long.compareUnsigned(ev.sequence - lastSequence, 1) > 0) {
+                gapsDetected++;
+                stale = true;
+                if (snapshotActive) {
+                    // Gap inside an active SNAPSHOT burst: the burst is broken —
+                    // its completion record must NOT clear `stale`.
+                    snapshotBroken = true;
+                }
+            } else if (!pending.isEmpty() && !fromBuffer) {
+                lateRecovered++; // a gap filler arrived late
+            }
+        }
+        hasSequence = true;
         lastSequence = ev.sequence;
         exchangeTs = ev.exchangeTs;
         receiveTs = ev.receiveTs;
 
-        int et = ev.eventType;
-        // Side-domain validation for side-indexed event types: malformed
-        // side => dropped + counted (never raised mid-stream), same path as
-        // other malformed events; the sequence number above is consumed.
+        // Malformed-event classes: dropped + counted (never raised), after
+        // the sequence number above is consumed (pinned).
+        if (!EventType.isValid(et)) {
+            unknownTypeDropped++;
+            return ApplyStatus.DROPPED;
+        }
         if (ev.side > 1 && (et == EventType.ADD || et == EventType.QUOTE
                 || et == EventType.SNAPSHOT || et == EventType.TRADE)) {
             invalidSideDropped++;
-            return;
+            return ApplyStatus.DROPPED;
+        }
+        if (!payloadOk(ev)) {
+            invalidPayloadDropped++;
+            return ApplyStatus.DROPPED;
         }
         if (stale && et != EventType.SNAPSHOT && et != EventType.STATUS
                 && et != EventType.TRADE && et != EventType.HEARTBEAT) {
             droppedWhileStale++;
-            return;
+            return ApplyStatus.DROPPED;
         }
 
+        boolean applied;
         switch (et) {
-            case EventType.ADD -> applyAdd(ev);
-            case EventType.MODIFY -> applyModify(ev);
-            case EventType.CANCEL -> applyCancel(ev);
-            case EventType.EXECUTE -> applyExecute(ev);
-            case EventType.TRADE -> tradeFlow += ev.side == Side.BID ? ev.qty : -ev.qty;
-            case EventType.QUOTE -> applyQuote(ev);
-            case EventType.SNAPSHOT -> applySnapshot(ev);
-            case EventType.STATUS -> status = ev.qty;
-            case EventType.HEARTBEAT -> {
-                // timestamps/sequence only, already updated above
+            case EventType.ADD -> applied = applyAdd(ev);
+            case EventType.MODIFY -> applied = applyModify(ev);
+            case EventType.CANCEL -> applied = applyCancel(ev);
+            case EventType.EXECUTE -> applied = applyExecute(ev);
+            case EventType.TRADE -> {
+                long delta = ev.side == Side.BID ? ev.qty : -ev.qty;
+                if (addOverflows(tradeFlow, delta)) {
+                    invalidPayloadDropped++;
+                    applied = false;
+                } else {
+                    tradeFlow += delta;
+                    applied = true;
+                }
             }
-            default -> throw new IllegalArgumentException("unknown event_type " + et
-                    + " (event_id=" + Long.toUnsignedString(ev.eventId) + ")");
+            case EventType.QUOTE -> applied = applyQuote(ev);
+            case EventType.SNAPSHOT -> applied = applySnapshot(ev);
+            case EventType.STATUS -> {
+                status = ev.qty;
+                applied = true;
+            }
+            default -> applied = true; // HEARTBEAT: timestamps/sequence only
+        }
+        if (!applied) {
+            return ApplyStatus.DROPPED;
         }
         eventsApplied++;
+        return ApplyStatus.APPLIED;
     }
 
     // ------------------------------------------------------------ primitives
@@ -390,15 +586,27 @@ public final class OrderBook {
         freeOrder(o);
     }
 
-    private void applyAdd(MarketEvent ev) {
+    private long levelTotal(int side, long price) {
+        Level level = sideTree(side).get(price);
+        return level == null ? 0 : level.totalQty;
+    }
+
+    private boolean applyAdd(MarketEvent ev) {
         if (orders.get(ev.orderId) != null) {
             unknownOrderEvents++; // duplicate order id: drop, count
-            return;
+            return false;
         }
-        long remaining = matchMarketable(ev.side, ev.priceTicks, ev.qty);
+        if (addOverflows(levelTotal(ev.side, ev.priceTicks), ev.qty)) {
+            invalidPayloadDropped++;
+            return false;
+        }
+        long remaining = status == SessionStatus.TRADING
+                ? matchMarketable(ev.side, ev.priceTicks, ev.qty)
+                : ev.qty;
         if (remaining > 0) {
             insertOrder(ev.side, ev.priceTicks, ev.orderId, remaining);
         }
+        return true;
     }
 
     /** Execute a crossing limit against the opposite side; return leftover. */
@@ -428,45 +636,55 @@ public final class OrderBook {
         return qty;
     }
 
-    private void applyModify(MarketEvent ev) {
+    private boolean applyModify(MarketEvent ev) {
         Order o = orders.get(ev.orderId);
         if (o == null) {
             unknownOrderEvents++;
-            return;
+            return false;
+        }
+        Level level = o.level;
+        if (ev.priceTicks != 0 && ev.priceTicks != level.price) {
+            modifyPriceMismatch++; // price change must be CANCEL+ADD
+            return false;
         }
         long newQty = ev.qty;
         long oldQty = o.qty;
         if (newQty <= 0) {
             removeOrder(o);
-            return;
+            return true;
         }
-        Level level = o.level;
         if (newQty <= oldQty) {
             // Decrease: keep queue position.
             o.qty = newQty;
         } else {
+            if (addOverflows(level.totalQty, newQty - oldQty)) {
+                invalidPayloadDropped++;
+                return false;
+            }
             // Increase: move to tail of the level.
             unlink(level, o);
             appendTail(level, o);
             o.qty = newQty;
         }
         level.totalQty += newQty - oldQty;
+        return true;
     }
 
-    private void applyCancel(MarketEvent ev) {
+    private boolean applyCancel(MarketEvent ev) {
         Order o = orders.get(ev.orderId);
         if (o == null) {
             unknownOrderEvents++;
-            return;
+            return false;
         }
         removeOrder(o);
+        return true;
     }
 
-    private void applyExecute(MarketEvent ev) {
+    private boolean applyExecute(MarketEvent ev) {
         Order o = orders.get(ev.orderId);
         if (o == null) {
             unknownOrderEvents++;
-            return;
+            return false;
         }
         long fill = Math.min(ev.qty, o.qty);
         if (fill >= o.qty) {
@@ -475,28 +693,61 @@ public final class OrderBook {
             o.qty -= fill;
             o.level.totalQty -= fill;
         }
+        return true;
     }
 
     /** FX QUOTE: replace this venue's whole side at L1. */
-    private void applyQuote(MarketEvent ev) {
+    private boolean applyQuote(MarketEvent ev) {
+        long oid = ev.orderId != 0 ? ev.orderId : syntheticOrderId(ev.side, 0);
+        Order resting = orders.get(oid);
+        if (resting != null && resting.level.side != ev.side) {
+            unknownOrderEvents++; // id rests on the other side
+            return false;
+        }
         clearSide(sideTree(ev.side));
-        insertOrder(ev.side, ev.priceTicks, ev.orderId, ev.qty);
+        insertOrder(ev.side, ev.priceTicks, oid, ev.qty);
+        return true;
     }
 
-    private void applySnapshot(MarketEvent ev) {
+    private boolean applySnapshot(MarketEvent ev) {
+        if (snapshotActive) {
+            if (Long.compareUnsigned(ev.tradeId, snapshotCountdown) >= 0) {
+                // Countdown went up (or repeated): the previous burst was
+                // interrupted and this record starts a new burst.
+                snapshotActive = false;
+                snapshotRestarts++;
+            } else if (ev.tradeId != snapshotCountdown - 1) {
+                // Countdown skipped ahead: records missing — burst broken.
+                snapshotBroken = true;
+            }
+        }
         if (!snapshotActive) {
             // Burst start: clear the whole book state (levels + orders).
             clearSide(bids);
             clearSide(asks);
             orders.clear();
+            snapshotSyntheticNext[0] = 0;
+            snapshotSyntheticNext[1] = 0;
             snapshotActive = true;
             snapshotBroken = false;
         }
-        Order existing = orders.get(ev.orderId);
-        if (existing != null) {
-            removeOrder(existing);
+        snapshotCountdown = ev.tradeId;
+        long oid;
+        if (ev.orderId != 0) {
+            oid = ev.orderId;
+        } else {
+            oid = syntheticOrderId(ev.side, snapshotSyntheticNext[ev.side]++);
         }
-        insertOrder(ev.side, ev.priceTicks, ev.orderId, ev.qty);
+        boolean ok = true;
+        if (orders.get(oid) != null) {
+            unknownOrderEvents++; // repeated id inside a burst
+            ok = false;
+        } else if (addOverflows(levelTotal(ev.side, ev.priceTicks), ev.qty)) {
+            invalidPayloadDropped++;
+            ok = false;
+        } else {
+            insertOrder(ev.side, ev.priceTicks, oid, ev.qty);
+        }
         if (ev.tradeId == 0) { // last record of the burst
             snapshotActive = false;
             if (!snapshotBroken) {
@@ -504,6 +755,7 @@ public final class OrderBook {
             }
             snapshotBroken = false;
         }
+        return ok;
     }
 
     private void clearSide(TreeMap<Long, Level> tree) {
@@ -574,6 +826,30 @@ public final class OrderBook {
         return orders.size();
     }
 
+    /** Number of events currently held back in the reorder buffer. */
+    public int pendingCount() {
+        return pending.size();
+    }
+
+    /** True when best bid &gt; best ask (call phase / crossed feed). */
+    public boolean isCrossed() {
+        long[] bb = bestBid();
+        long[] ba = bestAsk();
+        return bb != null && ba != null && bb[0] > ba[0];
+    }
+
+    /** True when best bid == best ask. */
+    public boolean isLocked() {
+        long[] bb = bestBid();
+        long[] ba = bestAsk();
+        return bb != null && ba != null && bb[0] == ba[0];
+    }
+
+    /** Not stale and the last event was received within maxAgeNs of nowNs. */
+    public boolean isFresh(long nowNs, long maxAgeNs) {
+        return !stale && hasSequence && nowNs - receiveTs <= maxAgeNs;
+    }
+
     /** Golden-comparable exact-integer state (expected_book_states.json shape). */
     public BookState stateSummary() {
         long[] bb = bestBid();
@@ -588,6 +864,18 @@ public final class OrderBook {
 
     public long lastSequence() {
         return lastSequence;
+    }
+
+    public boolean hasSequence() {
+        return hasSequence;
+    }
+
+    public long sequenceEpoch() {
+        return sequenceEpoch;
+    }
+
+    public int reorderWindow() {
+        return reorderWindow;
     }
 
     public long exchangeTs() {
@@ -630,8 +918,40 @@ public final class OrderBook {
         return invalidSideDropped;
     }
 
+    public long invalidPayloadDropped() {
+        return invalidPayloadDropped;
+    }
+
+    public long unknownTypeDropped() {
+        return unknownTypeDropped;
+    }
+
+    public long modifyPriceMismatch() {
+        return modifyPriceMismatch;
+    }
+
+    public long snapshotRestarts() {
+        return snapshotRestarts;
+    }
+
+    public long sequenceResets() {
+        return sequenceResets;
+    }
+
+    public long lateRecovered() {
+        return lateRecovered;
+    }
+
     public long eventsApplied() {
         return eventsApplied;
+    }
+
+    /** The 12 QC counters in pinned order. */
+    public BookCheckpoint.Counters counters() {
+        return new BookCheckpoint.Counters(duplicatesDropped, gapsDetected, droppedWhileStale,
+                unknownOrderEvents, invalidSideDropped, invalidPayloadDropped,
+                unknownTypeDropped, modifyPriceMismatch, snapshotRestarts, sequenceResets,
+                lateRecovered, eventsApplied);
     }
 
     // ------------------------------------------------------------ checkpoints
@@ -647,10 +967,10 @@ public final class OrderBook {
             levels.add(levelCheckpoint(level));
         }
         return new BookCheckpoint(instrumentId, venueId, levels, arrivalOrder(),
-                lastSequence, exchangeTs, receiveTs, tradeFlow, status, stale,
-                snapshotActive, snapshotBroken, duplicatesDropped, gapsDetected,
-                droppedWhileStale, unknownOrderEvents, invalidSideDropped,
-                eventsApplied);
+                lastSequence, hasSequence, sequenceEpoch, exchangeTs, receiveTs,
+                tradeFlow, status, stale, snapshotActive, snapshotBroken,
+                snapshotCountdown, snapshotSyntheticNext, reorderWindow,
+                pending.values().toArray(new MarketEvent[0]), counters());
     }
 
     /**
@@ -700,9 +1020,16 @@ public final class OrderBook {
 
     /** Rebuild an identical book from {@link #checkpoint()} output. */
     public static OrderBook restore(BookCheckpoint cp) {
-        OrderBook book = new OrderBook(cp.instrumentId, cp.venueId);
+        OrderBook book = new OrderBook(cp.instrumentId, cp.venueId, cp.reorderWindow);
         for (BookCheckpoint.LevelCheckpoint lvl : cp.levels) {
+            if (lvl.side < 0 || lvl.side > 1) {
+                throw new IllegalArgumentException("invalid side in checkpoint level");
+            }
             for (int i = 0; i < lvl.orderIds.length; i++) {
+                if (book.orders.get(lvl.orderIds[i]) != null) {
+                    throw new IllegalArgumentException("duplicate order_id "
+                            + Long.toUnsignedString(lvl.orderIds[i]) + " in checkpoint");
+                }
                 book.insertOrder(lvl.side, lvl.priceTicks, lvl.orderIds[i], lvl.qtys[i]);
             }
         }
@@ -716,14 +1043,20 @@ public final class OrderBook {
         long stamp = 0;
         for (long orderId : cp.arrivalOrder) {
             Order o = book.orders.get(orderId);
-            if (o == null) {
+            if (o == null || o.arrival < 0) {
                 throw new IllegalArgumentException(
                         "checkpoint arrival_order inconsistent with levels");
             }
-            o.arrival = ++stamp;
+            o.arrival = -(++stamp); // mark as assigned (negative) during the pass
+        }
+        for (long orderId : cp.arrivalOrder) {
+            Order o = book.orders.get(orderId);
+            o.arrival = -o.arrival;
         }
         book.arrivalCounter = stamp;
         book.lastSequence = cp.lastSequence;
+        book.hasSequence = cp.hasSequence;
+        book.sequenceEpoch = cp.sequenceEpoch;
         book.exchangeTs = cp.exchangeTs;
         book.receiveTs = cp.receiveTs;
         book.tradeFlow = cp.tradeFlow;
@@ -731,12 +1064,32 @@ public final class OrderBook {
         book.stale = cp.stale;
         book.snapshotActive = cp.snapshotActive;
         book.snapshotBroken = cp.snapshotBroken;
-        book.duplicatesDropped = cp.duplicatesDropped;
-        book.gapsDetected = cp.gapsDetected;
-        book.droppedWhileStale = cp.droppedWhileStale;
-        book.unknownOrderEvents = cp.unknownOrderEvents;
-        book.invalidSideDropped = cp.invalidSideDropped;
-        book.eventsApplied = cp.eventsApplied;
+        book.snapshotCountdown = cp.snapshotCountdown;
+        book.snapshotSyntheticNext[0] = cp.snapshotSyntheticNext[0];
+        book.snapshotSyntheticNext[1] = cp.snapshotSyntheticNext[1];
+        if (cp.reorderPending.length > cp.reorderWindow) {
+            throw new IllegalArgumentException(
+                    "checkpoint reorder_pending exceeds reorder_window");
+        }
+        for (MarketEvent pev : cp.reorderPending) {
+            if (book.pending.put(pev.sequence, pev) != null) {
+                throw new IllegalArgumentException("duplicate pending sequence "
+                        + Long.toUnsignedString(pev.sequence) + " in checkpoint");
+            }
+        }
+        BookCheckpoint.Counters c = cp.counters;
+        book.duplicatesDropped = c.duplicatesDropped;
+        book.gapsDetected = c.gapsDetected;
+        book.droppedWhileStale = c.droppedWhileStale;
+        book.unknownOrderEvents = c.unknownOrderEvents;
+        book.invalidSideDropped = c.invalidSideDropped;
+        book.invalidPayloadDropped = c.invalidPayloadDropped;
+        book.unknownTypeDropped = c.unknownTypeDropped;
+        book.modifyPriceMismatch = c.modifyPriceMismatch;
+        book.snapshotRestarts = c.snapshotRestarts;
+        book.sequenceResets = c.sequenceResets;
+        book.lateRecovered = c.lateRecovered;
+        book.eventsApplied = c.eventsApplied;
         return book;
     }
 }

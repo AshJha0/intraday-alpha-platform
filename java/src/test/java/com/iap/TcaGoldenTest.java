@@ -130,4 +130,100 @@ public class TcaGoldenTest {
             assertTrue(expected.getMessage().contains("decision_mid"));
         }
     }
+
+    // -- v2 timeline cases ---------------------------------------------------
+
+    private static com.iap.tca.MarketTimeline build(Map<String, Object> c) {
+        com.iap.tca.MarketTimeline tl = new com.iap.tca.MarketTimeline();
+        for (Object row : Json.array(c.get("states"))) {
+            List<Object> r = Json.array(row);
+            tl.appendStatePinned(Json.asLong(r.get(0)), Json.asDouble(r.get(1)),
+                    Json.asDouble(r.get(2)), Json.asLong(r.get(3)),
+                    Json.asLong(r.get(4)));
+        }
+        for (Object h : Json.array(c.get("halts"))) {
+            tl.addHalt(Json.asLong(h));
+        }
+        return tl;
+    }
+
+    private static com.iap.tca.TcaParentOrder order(Map<String, Object> c,
+            com.iap.tca.MarketTimeline tl) {
+        Map<String, Object> o = Json.object(c.get("order"));
+        int side = (int) Json.asLong(o.get("side"));
+        com.iap.tca.TcaParentOrder order = new com.iap.tca.TcaParentOrder(1, 1,
+                side, Json.asLong(o.get("qty_target")),
+                Json.asLong(o.get("decision_ts")), Json.asLong(o.get("arrival_ts")),
+                Json.asLong(o.get("end_ts")));
+        for (Object row : Json.array(o.get("fills"))) {
+            List<Object> f = Json.array(row);
+            order.fills.add(com.iap.tca.TcaFill.stamp(tl, Json.asLong(f.get(0)),
+                    Json.asDouble(f.get(1)), Json.asLong(f.get(2)), side,
+                    com.iap.execution.Liquidity.valueOf((String) f.get(3))));
+        }
+        return order;
+    }
+
+    @Test
+    public void timelineCasesMatchThePythonReference() {
+        Map<String, Object> golden = Golden.json("expected_tca.json");
+        assertEquals(2L, Json.asLong(golden.get("x-version")));
+        double tol = Json.asDouble(golden.get("tolerance"));
+        List<Object> cases = Json.array(golden.get("timeline_cases"));
+        assertTrue(cases.size() >= 7);
+        for (Object cv : cases) {
+            Map<String, Object> c = Json.object(cv);
+            String name = (String) c.get("name");
+            Map<String, Object> exp = Json.object(c.get("expected"));
+            com.iap.tca.MarketTimeline tl = build(c);
+            assertEquals(name + " n_states", Json.asLong(exp.get("n_states")), tl.size());
+            assertEquals(name + " crossed skipped",
+                    Json.asLong(exp.get("crossed_states_skipped")),
+                    tl.crossedStatesSkipped());
+            com.iap.tca.TcaParentOrder order = order(c, tl);
+            if (c.containsKey("expect_error")) {
+                try {
+                    Tca.orderTca(order, tl);
+                    fail(name + " must throw");
+                } catch (IllegalArgumentException e) {
+                    assertTrue(name + ": " + e.getMessage(),
+                            e.getMessage().contains((String) c.get("expect_error")));
+                }
+                continue;
+            }
+            List<Object> refs = Json.array(exp.get("fill_ref"));
+            for (int i = 0; i < refs.size(); i++) {
+                List<Object> r = Json.array(refs.get(i));
+                assertEquals(name + " mid", Json.asDouble(r.get(0)),
+                        order.fills.get(i).midAtFill(), tol);
+                assertEquals(name + " hs", Json.asDouble(r.get(1)),
+                        order.fills.get(i).halfSpreadAtFill(), tol);
+            }
+            Tca.SpreadImpact split = Tca.spreadAndImpactCost(order);
+            assertEquals(name + " spread", Json.asDouble(exp.get("spread_cost")),
+                    split.spreadCost(), tol);
+            assertEquals(name + " impact", Json.asDouble(exp.get("impact_cost")),
+                    split.impactCost(), tol);
+            Map<String, Integer> n = new java.util.LinkedHashMap<>();
+            Map<String, Double> m = Tca.adverseSelectionWithCounts(order, tl, n);
+            Map<String, Object> wantM = Json.object(exp.get("adverse_selection_bps"));
+            Map<String, Object> wantN = Json.object(exp.get("adverse_selection_n"));
+            for (String d : Tca.ADVERSE_DELTAS_NS.keySet()) {
+                assertEquals(name + " n " + d, Json.asLong(wantN.get(d)),
+                        (long) n.get(d));
+                if (wantM.get(d) == null) {
+                    assertEquals(name + " " + d + " undefined", null, m.get(d));
+                } else {
+                    assertEquals(name + " " + d, Json.asDouble(wantM.get(d)),
+                            m.get(d), tol);
+                }
+            }
+            Tca.OrderTca rec = Tca.orderTca(order, tl);
+            assertEquals(name + " total_is", Json.asDouble(exp.get("total_is")),
+                    rec.perold().totalIs(), tol);
+            assertEquals(name + " end_mid", Json.asDouble(exp.get("end_mid")),
+                    rec.endMid(), tol);
+            assertEquals(name + " n map", n, rec.adverseSelectionN());
+        }
+    }
 }

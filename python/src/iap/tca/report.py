@@ -47,7 +47,10 @@ def compute_tca_records(golden_dir: Optional[Path] = None) -> Dict[int, dict]:
                                 / f.mid_at_fill)
         impact = impact_regression(part, cost_bps) if len(part) >= 3 else None
         out[iid] = {"orders": recs, "impact_regression": impact,
-                    "n_market_trades": len(tl.trades)}
+                    "n_market_trades": len(tl.trades),
+                    "n_states": len(tl),
+                    "crossed_states_skipped": tl.crossed_states_skipped,
+                    "n_halts": len(tl.halts)}
     return out
 
 
@@ -65,13 +68,19 @@ def render_report(records: Dict[int, dict]) -> str:
         "per-child unfill probability. This is a research TCA harness, not "
         "the production backtester.")
     lines.append("")
+    skipped = {iid: p["crossed_states_skipped"] for iid, p in records.items()}
+    n_states = {iid: p["n_states"] for iid, p in records.items()}
     lines.append(
-        "**Honest caveat**: the synthetic multi-venue generator can "
-        "occasionally produce *crossed* consolidated books (negative "
-        "spread; < 2% of equity event states under the shared-efficient-"
-        "price design), so isolated spread-cost lines can be negative — a "
-        "synthetic-data artifact, flagged rather than hidden "
-        "(conventions §7).")
+        "**Timeline rule (pinned, API_PORTFOLIO_TCA.md §2.1)**: crossed "
+        "consolidated states (cross-venue bid > ask, a synthetic-generator "
+        "artifact) are SKIPPED and counted, locked states (half-spread 0) "
+        "are kept; markouts past the timeline end or across a HALT are "
+        "undefined (excluded, never a stale mid); every fill must lie in "
+        "[arrival, end]. Crossed states skipped per instrument: "
+        + ", ".join(f"{iid}: {skipped[iid]} of {n_states[iid] + skipped[iid]}"
+                    for iid in sorted(skipped))
+        + ". Spread-cost lines are therefore never negative by "
+        "construction (conventions §7: honest, not hidden).")
     lines.append("")
 
     for iid, payload in sorted(records.items()):
@@ -79,7 +88,10 @@ def render_report(records: Dict[int, dict]) -> str:
         lines.append(f"## Instrument {iid}")
         lines.append("")
         lines.append(f"Parent orders: {len(recs)} | market trades on tape: "
-                     f"{payload['n_market_trades']}")
+                     f"{payload['n_market_trades']} | timeline states: "
+                     f"{payload['n_states']} | crossed skipped: "
+                     f"{payload['crossed_states_skipped']} | halts: "
+                     f"{payload['n_halts']}")
         lines.append("")
         lines.append("### Per-order implementation shortfall (Perold)")
         lines.append("")
@@ -123,18 +135,23 @@ def render_report(records: Dict[int, dict]) -> str:
 
         lines.append("### Adverse selection (post-fill markout, mean bps)")
         lines.append("")
-        lines.append("| delta | mean markout bps |")
-        lines.append("|---|---|")
+        lines.append("| delta | mean markout bps | fills defined |")
+        lines.append("|---|---|---|")
         for delta in ("100ms", "1s", "10s"):
+            n_def = sum(r["adverse_selection_n"][delta] for r in recs)
+            n_all = sum(r["n_fills"] for r in recs)
             lines.append(
                 f"| {delta} | "
-                f"{_fmt(_mean([r['adverse_selection_bps'][delta] for r in recs]))} |")
+                f"{_fmt(_mean([r['adverse_selection_bps'][delta] for r in recs]))} "
+                f"| {n_def} / {n_all} |")
         lines.append("")
         lines.append(
-            "Markout = side * (mid(t_fill + delta) - fill px) / fill px; "
-            "negative values mean the price reverted after our marketable "
-            "fills (we paid temporary impact), positive means continued "
-            "adverse drift.")
+            "Markout = side * (mid(t_fill + delta) - fill px) / fill px over "
+            "the fills whose markout is defined (timeline reaches t_fill + "
+            "delta, no HALT inside the window — pinned §2.5); negative "
+            "values mean the price reverted after our marketable fills (we "
+            "paid temporary impact), positive means continued adverse "
+            "drift.")
         lines.append("")
 
         imp = payload["impact_regression"]

@@ -1,6 +1,6 @@
 {
   "x-version": 1,
-  "description": "Execution/SOR defaults skeleton; execution wave extends.",
+  "description": "Execution/SOR controls consumed by the Java BacktestEngine/PaperTrading (ConfigService.executionLimits/sorOptions) and the research cost model. ENFORCED (PLATFORM_CONVENTIONS.md section 11.3-11.4): defaults.max_participation (share of session volume a child may take), defaults.min_slice_interval_ns (per-instrument child spacing), defaults.latency_budget_ns (decision-to-arrival budget; a venue path slower than it blocks the child), defaults.max_child_qty (algo slices above it are split), sor.prefer_rebate and sor.max_venue_latency_ns (venues with a slower latency_mean_ns are ineligible; a stale/halted venue is never eligible). Violations block the order and are counted (BacktestEngine.Counters).",
   "defaults": {
     "algo": "TWAP",
     "max_child_qty": 1000,
@@ -24,7 +24,7 @@
     }
   },
   "cost_model": {
-    "description": "Research-backtester cost model (iap.backtest.costs): cost = half_spread + fee + impact; impact_bps = impact_coeff_bps_per_pct_adv * (|child_qty| / adv * 100). Fees mirror configs/venues.json primary venues (XV1 equities taker, PRI FX).",
+    "description": "Research-backtester cost model (iap.backtest.costs): cost = half_spread + fee + impact; impact_bps = impact_coeff_bps_per_pct_adv * (|child_qty| * qty_unit / adv * 100) with qty_unit = lot_size for FX and 1 for equities (base units, identical to the C++/Java simulator rule 6). Fees mirror configs/venues.json primary venues (XV1 equities taker, PRI FX).",
     "impact_coeff_bps_per_pct_adv": 2.0,
     "equity_taker_fee_per_share": 0.003,
     "fx_commission_per_million": 2.5,

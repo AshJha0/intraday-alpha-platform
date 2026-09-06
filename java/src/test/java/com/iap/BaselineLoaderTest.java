@@ -43,8 +43,54 @@ public class BaselineLoaderTest {
             sb.append(i == 0 ? "" : ",")
                     .append(String.format(Locale.ROOT, "%s", fractions[i]));
         }
-        sb.append("],\"count\":").append(count).append(",\"x-version\":1}");
+        sb.append("],\"count\":").append(count)
+                .append(",\"feature_version\":\"").append(FEATURE_VERSION)
+                .append("\",\"x-version\":")
+                .append(BaselineLoader.SCHEMA_VERSION).append("}");
         return sb.toString();
+    }
+
+    /** Stand-in feature-registry hash for the synthetic baselines here. */
+    private static final String FEATURE_VERSION =
+            "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac";
+
+    @Test
+    public void supersededSchemaVersionIsRejected() throws IOException {
+        Path dir = Files.createTempDirectory("iap-baselines-v1");
+        Path file = dir.resolve("signal_eq01.json");
+        Files.write(file,
+                json("EQ01", EDGES, FRACTIONS, 10).replace(
+                        "\"x-version\":" + BaselineLoader.SCHEMA_VERSION,
+                        "\"x-version\":1")
+                        .getBytes(StandardCharsets.UTF_8));
+        try {
+            BaselineLoader.load(file);
+            org.junit.Assert.fail("a v1 baseline must be rejected");
+        } catch (IllegalArgumentException e) {
+            org.junit.Assert.assertTrue(e.getMessage(),
+                    e.getMessage().contains("x-version"));
+        }
+    }
+
+    @Test
+    public void baselineFromFeatureRegistryMismatchIsRejected()
+            throws IOException {
+        Path dir = Files.createTempDirectory("iap-baselines-fv");
+        Path file = dir.resolve("signal_eq01.json");
+        Files.write(file, json("EQ01", EDGES, FRACTIONS, 10)
+                .getBytes(StandardCharsets.UTF_8));
+        BaselineLoader.Baseline b = BaselineLoader.load(file);
+        org.junit.Assert.assertEquals(FEATURE_VERSION, b.featureVersion());
+        // matching registry: accepted
+        BaselineLoader.requireFeatureVersion(b, FEATURE_VERSION);
+        // a different registry means the feature semantics may have moved
+        try {
+            BaselineLoader.requireFeatureVersion(b, "0".repeat(64));
+            org.junit.Assert.fail("a foreign feature_version must be rejected");
+        } catch (IllegalArgumentException e) {
+            org.junit.Assert.assertTrue(e.getMessage(),
+                    e.getMessage().contains("feature_version"));
+        }
     }
 
     @Test

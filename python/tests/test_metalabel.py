@@ -174,3 +174,61 @@ def test_horizon_shorter_than_embargo_is_asserted():
     from iap.models.metalabel import _EMBARGO_NS
 
     assert TARGET_HORIZON_NS < _EMBARGO_NS
+
+
+def test_isotonic_falls_back_to_platt_on_a_thin_calibration_segment():
+    """Isotonic on a few dozen positives interpolates noise into a step
+    function; the platform falls back to Platt and says which it used."""
+    import numpy as np
+    from sklearn.ensemble import HistGradientBoostingClassifier
+
+    from iap.models.metalabel import (
+        MIN_ISOTONIC_POSITIVES,
+        _fit_isotonic_calibrated,
+    )
+
+    rng = np.random.default_rng(3)
+    n = 800
+    X = rng.standard_normal((n, 3))
+    y = (X[:, 0] + 0.3 * rng.standard_normal(n) > 1.6).astype(np.int8)
+    base = HistGradientBoostingClassifier(max_iter=20, random_state=7)
+    base.fit(X, y)
+    thin = _fit_isotonic_calibrated(base, X[:300], y[:300])
+    assert thin.iap_calibration_positives < MIN_ISOTONIC_POSITIVES
+    assert thin.iap_calibration_method == "sigmoid"
+
+    # with enough positives isotonic is used
+    y_rich = (X[:, 0] > -0.5).astype(np.int8)
+    base2 = HistGradientBoostingClassifier(max_iter=20, random_state=7)
+    base2.fit(X, y_rich)
+    rich = _fit_isotonic_calibrated(base2, X, y_rich)
+    assert rich.iap_calibration_positives >= MIN_ISOTONIC_POSITIVES
+    assert rich.iap_calibration_method == "isotonic"
+
+
+def test_metalabel_manifest_records_features_target_and_segments(tmp_path):
+    """The meta run's manifest must name its meta-features, its economic
+    target and its three chronological segments (spec §14/§26).
+
+    Sibling of `test_pipeline_manifest_records_features_target_and_folds`:
+    the tracker has always been able to store these, but until round 3's
+    follow-up neither producer passed them, so every committed manifest had
+    them null.
+    """
+    import json
+
+    from iap.experiment.tracker import ExperimentTracker
+
+    ds, pred = _meta_dataset()
+    tracker = ExperimentTracker(models_dir=tmp_path / "models")
+    res = run_meta_labeling(ds, pred, tracker=tracker, primary_name="unitp")
+
+    man = json.loads(
+        (tracker.run_dir(res["run_id"]) / "manifest.json").read_text())
+    assert man["features"] == list(META_FEATURE_NAMES)
+    assert man["target"] and "net P&L" in man["target"]
+    assert man["folds"] is not None
+    assert [f["segment"] for f in man["folds"]] == [
+        "train", "calibration", "test"]
+    for seg in man["folds"]:
+        assert seg["n"] > 0 and len(seg["window"]) == 2

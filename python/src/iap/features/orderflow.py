@@ -15,7 +15,8 @@ event.  Then
 and the event's contribution is  e(k) = delta_bid(k) - delta_ask(k).
 ``ofi_lk_w`` is the sum of e(k) over the window (integer, exact).
 
-- ``ofi_norm_lk_w``     = ofi_lk_w / (mean two-sided depth_total_lk over 10s + EPS)
+- ``ofi_norm_lk_w``     = ofi_lk_w / (mean two-sided depth_total_lk over 10s + EPS);
+                        INVALID when that mean depth is 0 (EPS guard, §4)
 - ``signed_volume_w``   = sum of +qty (buy aggressor, side=BID) / -qty (sell) TRADEs
 - ``trade_imbalance_w`` = (buy_qty - sell_qty) / (buy_qty + sell_qty)
 - ``trade_count_w``     = number of TRADE events in w
@@ -120,8 +121,11 @@ def compute(st, values: List[float], valid: List[bool]) -> None:
         for w in OFI_WINDOWS:
             v = None
             if st.warm(WINDOW_NS[w]) and st.warm(WINDOW_NS["10s"]) and da10.count > 0:
-                denom = (da10.sums[bi] + da10.sums[ai]) / da10.count
-                v = st.ofi[w].sums[ofi_idx[k]] / (denom + EPS)
+                # exact integer depth total: a float `> 0` test would flip
+                # between languages on accumulation drift
+                if da10.sums[bi] + da10.sums[ai] > 0:
+                    denom = (da10.sums[bi] + da10.sums[ai]) / da10.count
+                    v = st.ofi[w].sums[ofi_idx[k]] / (denom + EPS)
             put(values, valid, v, v is not None)
     # trades sums layout: [signed, qty, buy, sell, eff_bps_sum, eff_n]
     for w in TRADE_WINDOWS:

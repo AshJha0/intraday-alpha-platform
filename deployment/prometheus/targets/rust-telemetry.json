@@ -1,9 +1,0 @@
-[
-  {
-    "targets": ["rust-telemetry-exporter:9091"],
-    "labels": {
-      "service": "rust-replay",
-      "language": "rust"
-    }
-  }
-]

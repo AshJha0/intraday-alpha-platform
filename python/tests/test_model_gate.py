@@ -52,7 +52,9 @@ def _signal_dataset(flip_after_first_segment: bool) -> Dataset:
     x1 = np.array([rng.normal() for _ in range(n)])
     sign = np.ones(n)
     if flip_after_first_segment:
-        sign[ts >= span // 5] = -1.0
+        # flip after the first ROW-MASS segment (folds are row-mass
+        # quantiles since round-3), so later folds really do see -x0
+        sign[n // 5:] = -1.0
     y = sign * x0 * 1e-3
     X = np.column_stack([x0, x1])
     return _make_dataset(y, X, ts)
@@ -72,7 +74,7 @@ def test_gate_blocks_advanced_models_on_negative_ic():
     ds = _signal_dataset(flip_after_first_segment=True)
     res = run_model_comparison(ds, n_folds=4, embargo_ns=_S)
     assert res["gate"]["passed"] is False
-    assert res["gate"]["best_linear_mean_oos_ic"] < 0.0
+    assert res["gate"]["best_linear_pooled_ic_vs_mid"] < 0.0
     advanced = model_names(1) + model_names(2)
     assert sorted(res["gate"]["skipped_models"]) == sorted(advanced)
     for name in advanced:
@@ -86,7 +88,14 @@ def test_gate_decision_is_literal_threshold():
     # the rule is > 0, not >= 0 or a soft margin: verify recorded rule text
     ds = _signal_dataset(flip_after_first_segment=False)
     res = run_model_comparison(ds, n_folds=2, embargo_ns=_S)
-    assert "IC > 0" in res["gate"]["rule"]
+    assert "IC" in res["gate"]["rule"] and "> 0" in res["gate"]["rule"]
+    # the gate reads the MID-TO-MID IC, not the cost-adjusted target: the
+    # latter embeds the observable half-spread and passes trivially
+    assert "MID-TO-MID" in res["gate"]["rule"]
+    assert "best_linear_pooled_ic_vs_mid" in res["gate"]
+    best = res["gate"]["best_linear_model"]
+    assert (res["gate"]["best_linear_pooled_ic_vs_mid"]
+            == res["models"][best]["pooled_ic_vs_mid"])
 
 
 def test_model_tiers_pinned():
@@ -114,7 +123,10 @@ def test_ic_functions_hand_cases():
     a = np.array([1.0, 2.0, 3.0, 4.0])
     assert information_coefficient(a, a) == 1.0
     assert information_coefficient(a, -a) == -1.0
-    assert information_coefficient(np.ones(4), a) == 0.0  # degenerate
+    # a degenerate fold is NaN (round-3), never a fabricated 0.0 that would
+    # dilute mean_ic as if it were evidence of "no skill"
+    assert np.isnan(information_coefficient(np.ones(4), a))
+    assert np.isnan(information_coefficient(a[:2], a[:2]))
     assert rank_ic(np.array([1.0, 10.0, 100.0, 1000.0]), a) == 1.0
     assert ic_tstat([0.1, 0.1, 0.1, 0.1]) == 0.0  # zero variance
     assert ic_tstat([0.1]) == 0.0
@@ -140,3 +152,52 @@ def test_rank_ic_averages_tied_ranks_vs_scipy():
     a = np.array([1.0, 2.0, 2.0, 3.0])
     b = np.array([10.0, 20.0, 20.0, 30.0])
     assert abs(rank_ic(a, b) - 1.0) <= 1e-12
+
+
+def test_ml_folds_report_sizes_and_asset_mix():
+    """ML_REPORT must be able to state per-fold n_train/n_test and the asset
+    mix; a fold testing on asset classes absent from its train set is
+    flagged rather than silently averaged in."""
+    ds = _signal_dataset(flip_after_first_segment=False)
+    res = run_model_comparison(ds, n_folds=2, embargo_ns=_S)
+    for m in res["models"].values():
+        assert m["n_folds"] >= 1
+        assert m["n_degenerate_folds"] >= 0
+        for f in m["per_fold"]:
+            assert f["n_train"] > 0 and f["n_test"] > 0
+            assert len(f["train_window"]) == 2 and len(f["test_window"]) == 2
+            assert "degenerate" in f
+        assert isinstance(m["asset_mix_warning"], list)
+
+
+def test_pipeline_manifest_records_features_target_and_folds(tmp_path):
+    """A manifest written THROUGH the pipeline must carry the reproduction
+    fields, not just be capable of carrying them.
+
+    `test_experiment_tracker.test_manifest_records_features_target_folds_and_
+    libraries` calls the tracker directly, so it passed for the whole of
+    round 3 while every committed manifest under `research/models/` had
+    `"features": null, "target": null, "folds": null` — the two producers
+    never passed them.  This test fails if either producer stops.
+    """
+    import json
+
+    from iap.experiment.tracker import ExperimentTracker
+    from iap.models.dataset import TARGET_COLUMN
+
+    ds = _signal_dataset(flip_after_first_segment=False)
+    tracker = ExperimentTracker(models_dir=tmp_path / "models")
+    res = run_model_comparison(ds, tracker=tracker, n_folds=3, embargo_ns=_S)
+
+    run_ids = [m["run_id"] for m in res["models"].values()]
+    assert run_ids, "no run was tracked"
+    for run_id in run_ids:
+        man = json.loads(
+            (tracker.run_dir(run_id) / "manifest.json").read_text())
+        assert man["features"] == ds.feature_names, run_id
+        assert man["target"] == TARGET_COLUMN, run_id
+        assert man["folds"] is not None and len(man["folds"]) == 3, run_id
+        for fold in man["folds"]:
+            assert fold["n_train"] > 0 and fold["n_test"] > 0
+            assert len(fold["train_window"]) == 2
+            assert len(fold["test_window"]) == 2

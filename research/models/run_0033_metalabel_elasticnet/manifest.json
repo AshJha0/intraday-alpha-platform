@@ -1,0 +1,76 @@
+{
+  "data_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
+  "experiment_id": "run_0033_metalabel_elasticnet",
+  "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
+  "features": [
+    "alpha_strength",
+    "alpha_signed",
+    "spread_bps",
+    "rvol_1m",
+    "log_depth_l1",
+    "queue_imbalance_signed",
+    "half_spread_cost_bps",
+    "expected_impact_bps"
+  ],
+  "folds": [
+    {
+      "n": 17538,
+      "segment": "train",
+      "window": [
+        1787581099826998900,
+        1787636273992056393
+      ]
+    },
+    {
+      "n": 9404,
+      "segment": "calibration",
+      "window": [
+        1787636340689766118,
+        1787663864097135180
+      ]
+    },
+    {
+      "n": 11461,
+      "segment": "test",
+      "window": [
+        1787663930438842169,
+        1787691459285005656
+      ]
+    }
+  ],
+  "git_commit": "0768cbe40a6343c64512bf504be0c791a6baae12",
+  "git_dirty": true,
+  "git_dirty_hash": "10fe4cb46db2328be33058322137b4489bd68070eb96d88408175c4451a96c41",
+  "hardware": {
+    "cpu_count": 2,
+    "cpu_model": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "machine": "x86_64",
+    "python": "3.11.15",
+    "system": "Linux"
+  },
+  "hyperparams": {
+    "learning_rate": 0.1,
+    "max_depth": 3,
+    "max_iter": 80,
+    "min_samples_leaf": 50,
+    "random_state": 7
+  },
+  "library_versions": {
+    "lightgbm": "4.7.0",
+    "numpy": "2.4.4",
+    "pandas": "3.0.2",
+    "pyarrow": "25.0.1",
+    "sklearn": "1.8.0",
+    "xgboost": "3.2.0"
+  },
+  "model_version": "metalabel_isotonic_v1",
+  "target": "meta_label_net_pnl_positive (1 iff the primary signal's realized net P&L > 0 under the conservative cost model; primary = elasticnet)",
+  "test_window": {
+    "end_ts": 1787691459285005656,
+    "start_ts": 1787663930438842169
+  },
+  "train_window": {
+    "end_ts": 1787636273992056393,
+    "start_ts": 1787581099826998900
+  }
+}

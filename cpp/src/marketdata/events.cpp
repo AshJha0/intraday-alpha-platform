@@ -6,6 +6,10 @@ namespace iap {
 
 namespace {
 
+// Reserved synthetic order-id range (conventions section 1; the book's
+// SYNTHETIC_ID_BASE mirrors this constant).
+constexpr std::uint64_t SYNTHETIC_ID_BASE_EVENTS = 0xFFFF000000000000ULL;
+
 bool is_book_type(std::uint8_t et) {
     return et == static_cast<std::uint8_t>(EventType::ADD) ||
            et == static_cast<std::uint8_t>(EventType::MODIFY) ||
@@ -31,6 +35,13 @@ std::string validation_error(const MarketEvent& ev) {
     }
 
     const std::uint8_t et = ev.event_type;
+    if (ev.order_id >= SYNTHETIC_ID_BASE_EVENTS &&
+        (et == static_cast<std::uint8_t>(EventType::ADD) ||
+         et == static_cast<std::uint8_t>(EventType::QUOTE) ||
+         et == static_cast<std::uint8_t>(EventType::SNAPSHOT))) {
+        return "order_id in reserved synthetic range: " +
+               std::to_string(ev.order_id);
+    }
     if (is_book_type(et)) {
         if (ev.order_id == 0) {
             return "order_id required for event_type " + std::to_string(et);

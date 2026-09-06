@@ -24,6 +24,17 @@ PYTHONPATH=src python3 -m pytest -q tests/test_backtester.py          # engine i
 PYTHONPATH=src python3 -m pytest -q tests/test_model_economics.py     # cost-adjusted economics
 ```
 
+Currency (conventions §11.6): `Backtester(..., reporting_ccy="USD")`
+converts every instrument's P&L increment to USD at the prevailing mid of
+the conversion pair (`configs/risk.json` `currency.conversion`) before it
+is summed; `InstrumentResult.total_pnl_native` /
+`BacktestResult.total_pnl_native_by_ccy` keep the quote-currency figures.
+A non-USD P&L increment on a row with no prevailing rate raises — run the
+conversion pairs in the same frame set as the instruments you backtest
+(the alpha reports do; `research/alpha_reports/run_all.py`). Reports
+produced before 2026-09-06 summed quote-currency P&L as if USD (papers 2-4
+errata).
+
 Research runs go through the experiment tracker so every result carries a
 manifest (git commit, data/feature/model versions, hardware —
 `docs/governance/REPRODUCIBILITY.md`). Check the ledger after a run:
@@ -50,6 +61,15 @@ cd java && bash build.sh && java -cp out/main com.iap.replay.Demo ../tests/golde
 
 Containerized equivalents: `docker compose -f
 deployment/docker/docker-compose.yml up cpp-replay rust-replay java-platform`.
+
+Known optimisms of the simulators (documented, not bugs — `docs/SCENARIOS.md`
+TRADING section, paper 05 §5 + erratum): no PEG/MID order types in the
+C++/Java simulator; the SOR ranks eligible venues by price/fee only (not
+depth); full-amount cancel decrement in the queue model; simulated fills
+never mutate the replayed book (rule 3b only prevents our own children from
+re-using the same displayed liquidity). Pinned and tested: no fill through
+HALT/AUCTION_CALL or a stale book, cancels have latency, children expire at
+the parent `end_ts`, FX impact in base units.
 
 ## 4. Cross-language parity (the gate that matters)
 

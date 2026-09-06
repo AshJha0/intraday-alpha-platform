@@ -1,18 +1,26 @@
 {
   "1": {
+    "crossed_states_skipped": 0,
     "impact_regression": {
       "intercept_bps": 22.167043982913203,
       "n": 82.0,
       "r2": 0.0986731432955357,
       "slope_bps_per_participation": 1.531039152315062
     },
+    "n_halts": 0,
     "n_market_trades": 246,
+    "n_states": 1935,
     "orders": [
       {
         "adverse_selection_bps": {
           "100ms": -24.158703172343174,
           "10s": -22.099394051029876,
           "1s": -24.158703172343174
+        },
+        "adverse_selection_n": {
+          "100ms": 4,
+          "10s": 4,
+          "1s": 4
         },
         "arrival_mid": 24.215,
         "arrival_slippage_bps": 33.03737352880522,
@@ -49,6 +57,11 @@
           "10s": -21.387834672701924,
           "1s": -21.896999642151926
         },
+        "adverse_selection_n": {
+          "100ms": 4,
+          "10s": 4,
+          "1s": 4
+        },
         "arrival_mid": 24.495,
         "arrival_slippage_bps": 20.412329046744524,
         "decision_mid": 24.495,
@@ -83,6 +96,11 @@
           "100ms": -20.355823476070537,
           "10s": -20.355823476070537,
           "1s": -20.355823476070537
+        },
+        "adverse_selection_n": {
+          "100ms": 4,
+          "10s": 4,
+          "1s": 4
         },
         "arrival_mid": 24.509999999999998,
         "arrival_slippage_bps": 20.39983680130588,
@@ -119,6 +137,11 @@
           "10s": -16.420361247947106,
           "1s": -16.933497536945726
         },
+        "adverse_selection_n": {
+          "100ms": 4,
+          "10s": 4,
+          "1s": 4
+        },
         "arrival_mid": 24.41,
         "arrival_slippage_bps": 20.483408439164567,
         "decision_mid": 24.41,
@@ -153,6 +176,11 @@
           "100ms": -19.363035492067336,
           "10s": -13.15956154665816,
           "1s": -19.363035492067336
+        },
+        "adverse_selection_n": {
+          "100ms": 3,
+          "10s": 3,
+          "1s": 3
         },
         "arrival_mid": 24.21,
         "arrival_slippage_bps": 30.29051356188936,
@@ -189,6 +217,11 @@
           "10s": -41.48066814907977,
           "1s": -37.315780405197046
         },
+        "adverse_selection_n": {
+          "100ms": 4,
+          "10s": 4,
+          "1s": 4
+        },
         "arrival_mid": 24.22,
         "arrival_slippage_bps": 35.094962840626465,
         "decision_mid": 24.22,
@@ -223,6 +256,11 @@
           "100ms": -26.21242546978654,
           "10s": -28.277112923692986,
           "1s": -26.21242546978654
+        },
+        "adverse_selection_n": {
+          "100ms": 3,
+          "10s": 3,
+          "1s": 3
         },
         "arrival_mid": 24.22,
         "arrival_slippage_bps": 22.02036884117713,
@@ -259,6 +297,11 @@
           "10s": -29.460520985057315,
           "1s": -36.678064296568216
         },
+        "adverse_selection_n": {
+          "100ms": 4,
+          "10s": 4,
+          "1s": 4
+        },
         "arrival_mid": 24.22,
         "arrival_slippage_bps": 10.322047894301644,
         "decision_mid": 24.22,
@@ -293,6 +336,11 @@
           "100ms": -14.960437682415765,
           "10s": -14.960437682415765,
           "1s": -14.960437682415765
+        },
+        "adverse_selection_n": {
+          "100ms": 3,
+          "10s": 3,
+          "1s": 3
         },
         "arrival_mid": 24.47,
         "arrival_slippage_bps": 14.984334559326685,
@@ -329,6 +377,11 @@
           "10s": -6.79440141323559,
           "1s": -7.473841554559004
         },
+        "adverse_selection_n": {
+          "100ms": 3,
+          "10s": 3,
+          "1s": 3
+        },
         "arrival_mid": 24.515,
         "arrival_slippage_bps": 6.118702834999212,
         "decision_mid": 24.515,
@@ -363,6 +416,11 @@
           "100ms": -24.73144075137239,
           "10s": -23.700512916321053,
           "1s": -24.73144075137239
+        },
+        "adverse_selection_n": {
+          "100ms": 4,
+          "10s": 4,
+          "1s": 4
         },
         "arrival_mid": 24.205000000000002,
         "arrival_slippage_bps": 21.689733526130315,
@@ -399,6 +457,11 @@
           "10s": -32.0945485288115,
           "1s": -26.914489070378337
         },
+        "adverse_selection_n": {
+          "100ms": 4,
+          "10s": 4,
+          "1s": 4
+        },
         "arrival_mid": 24.22,
         "arrival_slippage_bps": 26.837324525184858,
         "decision_mid": 24.22,
@@ -433,6 +496,11 @@
           "100ms": -36.141317814918985,
           "10s": -37.49878783226964,
           "1s": -36.141317814918985
+        },
+        "adverse_selection_n": {
+          "100ms": 3,
+          "10s": 3,
+          "1s": 3
         },
         "arrival_mid": 24.345,
         "arrival_slippage_bps": 36.2839734373936,
@@ -469,6 +537,11 @@
           "10s": -22.014639020611714,
           "1s": -22.014429149623606
         },
+        "adverse_selection_n": {
+          "100ms": 4,
+          "10s": 4,
+          "1s": 4
+        },
         "arrival_mid": 24.47,
         "arrival_slippage_bps": 20.43318348998658,
         "decision_mid": 24.47,
@@ -503,6 +576,11 @@
           "100ms": -17.896805135734688,
           "10s": -18.410350194708524,
           "1s": -18.919718392690655
+        },
+        "adverse_selection_n": {
+          "100ms": 4,
+          "10s": 4,
+          "1s": 4
         },
         "arrival_mid": 24.490000000000002,
         "arrival_slippage_bps": 15.312372396897272,
@@ -539,6 +617,11 @@
           "10s": -40.728843946741534,
           "1s": -41.7471738856419
         },
+        "adverse_selection_n": {
+          "100ms": 4,
+          "10s": 4,
+          "1s": 4
+        },
         "arrival_mid": 24.445,
         "arrival_slippage_bps": 43.97627326651592,
         "decision_mid": 24.445,
@@ -573,6 +656,11 @@
           "100ms": -25.448720436495496,
           "10s": -23.411230623944242,
           "1s": -25.448720436495496
+        },
+        "adverse_selection_n": {
+          "100ms": 2,
+          "10s": 2,
+          "1s": 2
         },
         "arrival_mid": 24.490000000000002,
         "arrival_slippage_bps": 26.541445487953336,
@@ -609,6 +697,11 @@
           "10s": -13.344072317023773,
           "1s": -14.370344895021013
         },
+        "adverse_selection_n": {
+          "100ms": 2,
+          "10s": 2,
+          "1s": 2
+        },
         "arrival_mid": 24.314999999999998,
         "arrival_slippage_bps": 16.450750565495664,
         "decision_mid": 24.314999999999998,
@@ -643,6 +736,11 @@
           "100ms": -22.538202983120197,
           "10s": -23.22042429571435,
           "1s": -22.538202983120197
+        },
+        "adverse_selection_n": {
+          "100ms": 3,
+          "10s": 3,
+          "1s": 3
         },
         "arrival_mid": 24.365000000000002,
         "arrival_slippage_bps": 14.364867638003934,
@@ -679,6 +777,11 @@
           "10s": -29.971087876411215,
           "1s": -25.84013641630721
         },
+        "adverse_selection_n": {
+          "100ms": 4,
+          "10s": 4,
+          "1s": 4
+        },
         "arrival_mid": 24.14,
         "arrival_slippage_bps": 18.641259320628894,
         "decision_mid": 24.14,
@@ -713,6 +816,11 @@
           "100ms": -31.840591618734827,
           "10s": -31.840591618734827,
           "1s": -31.840591618734827
+        },
+        "adverse_selection_n": {
+          "100ms": 2,
+          "10s": 2,
+          "1s": 2
         },
         "arrival_mid": 24.455000000000002,
         "arrival_slippage_bps": 47.02514823144633,
@@ -749,6 +857,11 @@
           "10s": -15.716823834904801,
           "1s": -16.400164001639666
         },
+        "adverse_selection_n": {
+          "100ms": 3,
+          "10s": 3,
+          "1s": 3
+        },
         "arrival_mid": 24.35,
         "arrival_slippage_bps": 16.427104722792258,
         "decision_mid": 24.35,
@@ -783,6 +896,11 @@
           "100ms": -22.6430629888842,
           "10s": -22.6430629888842,
           "1s": -22.6430629888842
+        },
+        "adverse_selection_n": {
+          "100ms": 4,
+          "10s": 4,
+          "1s": 4
         },
         "arrival_mid": 24.345,
         "arrival_slippage_bps": 22.591907989320074,
@@ -819,6 +937,11 @@
           "10s": -25.43579708379957,
           "1s": -24.060659336012893
         },
+        "adverse_selection_n": {
+          "100ms": 3,
+          "10s": 3,
+          "1s": 3
+        },
         "arrival_mid": 24.3,
         "arrival_slippage_bps": 21.947873799726157,
         "decision_mid": 24.3,
@@ -851,26 +974,34 @@
     ]
   },
   "101": {
+    "crossed_states_skipped": 55,
     "impact_regression": {
-      "intercept_bps": 0.5392470980021639,
+      "intercept_bps": 0.5651838564869899,
       "n": 40.0,
-      "r2": 0.003218637199208803,
-      "slope_bps_per_participation": 1.921506217607706e-06
+      "r2": 0.2680941250229387,
+      "slope_bps_per_participation": -3.51942405982084e-05
     },
+    "n_halts": 0,
     "n_market_trades": 51,
+    "n_states": 744,
     "orders": [
       {
         "adverse_selection_bps": {
-          "100ms": -0.5981962083561728,
-          "10s": -0.5981962083561728,
-          "1s": -0.5981962083561728
+          "100ms": -0.5982017136176639,
+          "10s": -0.5982017136176639,
+          "1s": -0.5982017136176639
         },
-        "arrival_mid": 1.086665,
-        "arrival_slippage_bps": 0.5981604266262531,
-        "decision_mid": 1.086665,
-        "end_mid": 1.086665,
+        "adverse_selection_n": {
+          "100ms": 4,
+          "10s": 4,
+          "1s": 4
+        },
+        "arrival_mid": 1.086655,
+        "arrival_slippage_bps": 0.598165931229155,
+        "decision_mid": 1.086655,
+        "end_mid": 1.086655,
         "execution_alpha_vs_vwap_bps": null,
-        "fill_vwap": 1.0866,
+        "fill_vwap": 1.08659,
         "impact_cost": 1.6499999999998183,
         "instrument_id": 101,
         "n_fills": 4,
@@ -884,29 +1015,34 @@
           "qty_filled": 33000.0,
           "qty_target": 33000.0,
           "total_is": 2.1449999999993974,
-          "total_is_bps": 0.5981604266262532,
-          "trading_bps": 0.5981604266262532,
+          "total_is_bps": 0.5981659312291551,
+          "trading_bps": 0.5981659312291551,
           "trading_cost": 2.1449999999993974
         },
         "side": "SELL",
         "spread_cost": 0.4949999999995791,
         "timing_cost": 0.0,
-        "twap_slippage_bps": 0.5981604266262531,
+        "twap_slippage_bps": 0.598165931229155,
         "vwap_slippage_bps": null
       },
       {
         "adverse_selection_bps": {
-          "100ms": -0.5061473901212753,
-          "10s": -0.5061473901212753,
-          "1s": -0.5061473901212753
+          "100ms": -0.5061427322517671,
+          "10s": -0.5061427322517671,
+          "1s": -0.5061427322517671
         },
-        "arrival_mid": 1.0865850000000001,
-        "arrival_slippage_bps": 0.5061730099360682,
-        "decision_mid": 1.0865850000000001,
-        "end_mid": 1.0865850000000001,
+        "adverse_selection_n": {
+          "100ms": 3,
+          "10s": 3,
+          "1s": 3
+        },
+        "arrival_mid": 1.086595,
+        "arrival_slippage_bps": 0.5061683515950126,
+        "decision_mid": 1.086595,
+        "end_mid": 1.086595,
         "execution_alpha_vs_vwap_bps": null,
-        "fill_vwap": 1.0866400000000003,
-        "impact_cost": 1.2375000000026115,
+        "fill_vwap": 1.0866500000000001,
+        "impact_cost": 1.2375000000053593,
         "instrument_id": 101,
         "n_fills": 3,
         "order_id": 26,
@@ -919,29 +1055,34 @@
           "qty_filled": 24750.0,
           "qty_target": 33000.0,
           "total_is": 1.3612500000034222,
-          "total_is_bps": 0.37962975745205113,
-          "trading_bps": 0.37962975745205113,
+          "total_is_bps": 0.37962626369625946,
+          "trading_bps": 0.37962626369625946,
           "trading_cost": 1.3612500000034222
         },
         "side": "BUY",
-        "spread_cost": 0.12375000000081071,
+        "spread_cost": 0.12374999999806291,
         "timing_cost": 0.0,
-        "twap_slippage_bps": 0.5061730099360682,
+        "twap_slippage_bps": 0.5061683515950126,
         "vwap_slippage_bps": null
       },
       {
         "adverse_selection_bps": {
-          "100ms": -0.552216689830663,
-          "10s": -0.552216689830663,
-          "1s": -0.552216689830663
+          "100ms": -0.4831896036015747,
+          "10s": -0.4831896036015747,
+          "1s": -0.4831896036015747
+        },
+        "adverse_selection_n": {
+          "100ms": 4,
+          "10s": 4,
+          "1s": 4
         },
         "arrival_mid": 1.0865900000000002,
         "arrival_slippage_bps": 0.5521861971872649,
         "decision_mid": 1.0865900000000002,
-        "end_mid": 1.0865900000000002,
+        "end_mid": 1.08658,
         "execution_alpha_vs_vwap_bps": null,
         "fill_vwap": 1.08653,
-        "impact_cost": 2.400000000010394,
+        "impact_cost": 2.400000000006397,
         "instrument_id": 101,
         "n_fills": 4,
         "order_id": 27,
@@ -949,8 +1090,8 @@
           "delay_bps": -0.0,
           "delay_cost": -0.0,
           "fill_rate": 1.0,
-          "opportunity_bps": -0.0,
-          "opportunity_cost": -0.0,
+          "opportunity_bps": 0.0,
+          "opportunity_cost": 0.0,
           "qty_filled": 48000.0,
           "qty_target": 48000.0,
           "total_is": 2.8800000000082093,
@@ -959,24 +1100,29 @@
           "trading_cost": 2.8800000000082093
         },
         "side": "SELL",
-        "spread_cost": 0.4799999999978155,
-        "timing_cost": 0.0,
-        "twap_slippage_bps": 0.5521861971872649,
+        "spread_cost": 0.11999999999945388,
+        "timing_cost": 0.36000000000235843,
+        "twap_slippage_bps": 0.4798154644171163,
         "vwap_slippage_bps": null
       },
       {
         "adverse_selection_bps": {
-          "100ms": -0.5061799976084216,
-          "10s": -0.5061799976084216,
-          "1s": -0.5061799976084216
+          "100ms": -0.5061753391387498,
+          "10s": -0.55219127906064,
+          "1s": -0.5061753391387498
         },
-        "arrival_mid": 1.0866250000000002,
-        "arrival_slippage_bps": 0.5061543770862833,
-        "decision_mid": 1.0866250000000002,
-        "end_mid": 1.0866250000000002,
+        "adverse_selection_n": {
+          "100ms": 3,
+          "10s": 3,
+          "1s": 3
+        },
+        "arrival_mid": 1.08663,
+        "arrival_slippage_bps": 0.46013822552391814,
+        "decision_mid": 1.08663,
+        "end_mid": 1.086645,
         "execution_alpha_vs_vwap_bps": null,
-        "fill_vwap": 1.08657,
-        "impact_cost": 0.9000000000038977,
+        "fill_vwap": 1.0865799999999999,
+        "impact_cost": 0.9000000000018993,
         "instrument_id": 101,
         "n_fills": 3,
         "order_id": 28,
@@ -984,34 +1130,39 @@
           "delay_bps": -0.0,
           "delay_cost": -0.0,
           "fill_rate": 0.75,
-          "opportunity_bps": -0.0,
-          "opportunity_cost": -0.0,
+          "opportunity_bps": -0.034510366914447116,
+          "opportunity_cost": -0.09000000000058961,
           "qty_filled": 18000.0,
           "qty_target": 24000.0,
-          "total_is": 0.9900000000024889,
-          "total_is_bps": 0.37961578281471253,
-          "trading_bps": 0.37961578281471253,
-          "trading_cost": 0.9900000000024889
+          "total_is": 0.8100000000013097,
+          "total_is_bps": 0.3105933022284915,
+          "trading_bps": 0.3451036691429386,
+          "trading_cost": 0.9000000000018993
         },
         "side": "SELL",
-        "spread_cost": 0.0899999999985912,
-        "timing_cost": 0.0,
-        "twap_slippage_bps": 0.50615437708424,
+        "spread_cost": 0.09000000000058961,
+        "timing_cost": -0.09000000000058961,
+        "twap_slippage_bps": 0.5605269682628301,
         "vwap_slippage_bps": null
       },
       {
         "adverse_selection_bps": {
-          "100ms": -0.5521303027530231,
-          "10s": -0.5521303027530231,
-          "1s": -0.5521303027530231
+          "100ms": -0.5751120226340931,
+          "10s": -0.540605148865123,
+          "1s": -0.5751120226340931
         },
-        "arrival_mid": 1.08664,
-        "arrival_slippage_bps": 0.5521607892233953,
-        "decision_mid": 1.08664,
-        "end_mid": 1.08664,
+        "adverse_selection_n": {
+          "100ms": 4,
+          "10s": 4,
+          "1s": 4
+        },
+        "arrival_mid": 1.086675,
+        "arrival_slippage_bps": 0.6441668392135325,
+        "decision_mid": 1.086675,
+        "end_mid": 1.08669,
         "execution_alpha_vs_vwap_bps": null,
-        "fill_vwap": 1.0867000000000002,
-        "impact_cost": 0.2500000000005276,
+        "fill_vwap": 1.0867450000000003,
+        "impact_cost": 0.2500000000010827,
         "instrument_id": 101,
         "n_fills": 4,
         "order_id": 29,
@@ -1023,22 +1174,27 @@
           "opportunity_cost": 0.0,
           "qty_filled": 5000.0,
           "qty_target": 5000.0,
-          "total_is": 0.30000000000085514,
-          "total_is_bps": 0.5521607892233954,
-          "trading_bps": 0.5521607892233954,
-          "trading_cost": 0.30000000000085514
+          "total_is": 0.3500000000006276,
+          "total_is_bps": 0.6441668392125108,
+          "trading_bps": 0.6441668392125108,
+          "trading_cost": 0.3500000000006276
         },
         "side": "BUY",
-        "spread_cost": 0.05000000000032756,
-        "timing_cost": 0.0,
-        "twap_slippage_bps": 0.5521607892233953,
+        "spread_cost": 0.06249999999985434,
+        "timing_cost": 0.03749999999969056,
+        "twap_slippage_bps": 0.5594749411090368,
         "vwap_slippage_bps": null
       },
       {
         "adverse_selection_bps": {
-          "100ms": -0.5982182300121832,
+          "100ms": -0.5752098365490759,
           "10s": -0.5752098365490759,
-          "1s": -0.5982182300121832
+          "1s": -0.5752098365490759
+        },
+        "adverse_selection_n": {
+          "100ms": 2,
+          "10s": 2,
+          "1s": 2
         },
         "arrival_mid": 1.0866250000000002,
         "arrival_slippage_bps": 0.5981824456477973,
@@ -1046,7 +1202,7 @@
         "end_mid": 1.08662,
         "execution_alpha_vs_vwap_bps": null,
         "fill_vwap": 1.08656,
-        "impact_cost": 0.3250000000014075,
+        "impact_cost": 0.32500000000068585,
         "instrument_id": 101,
         "n_fills": 2,
         "order_id": 30,
@@ -1064,24 +1220,29 @@
           "trading_cost": 0.4225000000013246
         },
         "side": "SELL",
-        "spread_cost": 0.0974999999999171,
-        "timing_cost": 0.0,
-        "twap_slippage_bps": 0.5897005556207667,
+        "spread_cost": 0.08124999999981064,
+        "timing_cost": 0.016250000000828102,
+        "twap_slippage_bps": 0.5696381324512392,
         "vwap_slippage_bps": null
       },
       {
         "adverse_selection_bps": {
-          "100ms": -0.5521252220019234,
-          "10s": -0.5521252220019234,
-          "1s": -0.5521252220019234
+          "100ms": -0.5981246491787635,
+          "10s": -0.5981246491787635,
+          "1s": -0.5981246491787635
         },
-        "arrival_mid": 1.0866500000000001,
-        "arrival_slippage_bps": 0.5521557079112044,
-        "decision_mid": 1.0866500000000001,
-        "end_mid": 1.0866500000000001,
+        "adverse_selection_n": {
+          "100ms": 4,
+          "10s": 4,
+          "1s": 4
+        },
+        "arrival_mid": 1.086665,
+        "arrival_slippage_bps": 0.5981604266282965,
+        "decision_mid": 1.086665,
+        "end_mid": 1.086665,
         "execution_alpha_vs_vwap_bps": null,
-        "fill_vwap": 1.0867100000000003,
-        "impact_cost": 2.1000000000044317,
+        "fill_vwap": 1.0867300000000002,
+        "impact_cost": 2.1000000000090946,
         "instrument_id": 101,
         "n_fills": 4,
         "order_id": 31,
@@ -1093,15 +1254,15 @@
           "opportunity_cost": 0.0,
           "qty_filled": 42000.0,
           "qty_target": 42000.0,
-          "total_is": 2.520000000007183,
-          "total_is_bps": 0.5521557079112044,
-          "trading_bps": 0.5521557079112044,
-          "trading_cost": 2.520000000007183
+          "total_is": 2.730000000008559,
+          "total_is_bps": 0.5981604266282966,
+          "trading_bps": 0.5981604266282966,
+          "trading_cost": 2.730000000008559
         },
         "side": "BUY",
-        "spread_cost": 0.4200000000027515,
+        "spread_cost": 0.6299999999994643,
         "timing_cost": 0.0,
-        "twap_slippage_bps": 0.5521557079112044,
+        "twap_slippage_bps": 0.5981604266282965,
         "vwap_slippage_bps": null
       },
       {
@@ -1109,6 +1270,11 @@
           "100ms": -0.5061799976084216,
           "10s": -0.5061799976084216,
           "1s": -0.5061799976084216
+        },
+        "adverse_selection_n": {
+          "100ms": 4,
+          "10s": 4,
+          "1s": 4
         },
         "arrival_mid": 1.0866250000000002,
         "arrival_slippage_bps": 0.5061543770862833,
@@ -1141,14 +1307,19 @@
       },
       {
         "adverse_selection_bps": {
-          "100ms": -0.5061380744679869,
-          "10s": -0.5061380744679869,
-          "1s": -0.5061380744679869
+          "100ms": -0.46012552224343867,
+          "10s": -0.46012552224343867,
+          "1s": -0.46012552224343867
         },
-        "arrival_mid": 1.086605,
-        "arrival_slippage_bps": 0.5061636933396981,
-        "decision_mid": 1.086605,
-        "end_mid": 1.086605,
+        "adverse_selection_n": {
+          "100ms": 3,
+          "10s": 3,
+          "1s": 3
+        },
+        "arrival_mid": 1.08661,
+        "arrival_slippage_bps": 0.4601466947672625,
+        "decision_mid": 1.08661,
+        "end_mid": 1.08661,
         "execution_alpha_vs_vwap_bps": null,
         "fill_vwap": 1.0866600000000002,
         "impact_cost": 1.087500000002295,
@@ -1163,27 +1334,32 @@
           "opportunity_cost": 0.0,
           "qty_filled": 21750.0,
           "qty_target": 29000.0,
-          "total_is": 1.1962500000030074,
-          "total_is_bps": 0.37962277000477357,
-          "trading_bps": 0.37962277000477357,
-          "trading_cost": 1.1962500000030074
+          "total_is": 1.087500000002295,
+          "total_is_bps": 0.3451100210754469,
+          "trading_bps": 0.3451100210754469,
+          "trading_cost": 1.087500000002295
         },
         "side": "BUY",
-        "spread_cost": 0.10875000000071244,
+        "spread_cost": 0.0,
         "timing_cost": 0.0,
-        "twap_slippage_bps": 0.5061636933396981,
+        "twap_slippage_bps": 0.4601466947672625,
         "vwap_slippage_bps": null
       },
       {
         "adverse_selection_bps": {
-          "100ms": -0.5061147868349262,
-          "10s": -0.5061147868349262,
-          "1s": -0.5061147868349262
+          "100ms": -0.5521252220019234,
+          "10s": -0.5521252220019234,
+          "1s": -0.5521252220019234
         },
-        "arrival_mid": 1.0866550000000001,
-        "arrival_slippage_bps": 0.5061404033491611,
-        "decision_mid": 1.0866550000000001,
-        "end_mid": 1.0866550000000001,
+        "adverse_selection_n": {
+          "100ms": 2,
+          "10s": 2,
+          "1s": 2
+        },
+        "arrival_mid": 1.0866500000000001,
+        "arrival_slippage_bps": 0.5521557079112044,
+        "decision_mid": 1.0866500000000001,
+        "end_mid": 1.0866500000000001,
         "execution_alpha_vs_vwap_bps": null,
         "fill_vwap": 1.0867100000000003,
         "impact_cost": 0.5500000000011607,
@@ -1198,30 +1374,35 @@
           "opportunity_cost": 0.0,
           "qty_filled": 11000.0,
           "qty_target": 22000.0,
-          "total_is": 0.605000000001521,
-          "total_is_bps": 0.2530702016745805,
-          "trading_bps": 0.2530702016745805,
-          "trading_cost": 0.605000000001521
+          "total_is": 0.6600000000018813,
+          "total_is_bps": 0.2760778539556022,
+          "trading_bps": 0.2760778539556022,
+          "trading_cost": 0.6600000000018813
         },
         "side": "BUY",
-        "spread_cost": 0.055000000000360316,
+        "spread_cost": 0.11000000000072063,
         "timing_cost": 0.0,
-        "twap_slippage_bps": 0.5061404033491611,
+        "twap_slippage_bps": 0.5521557079112044,
         "vwap_slippage_bps": null
       },
       {
         "adverse_selection_bps": {
-          "100ms": -0.53687733733531,
-          "10s": -0.53687733733531,
-          "1s": -0.53687733733531
+          "100ms": -0.5061986323446042,
+          "10s": -0.4908592798492512,
+          "1s": -0.4908592798492512
+        },
+        "adverse_selection_n": {
+          "100ms": 3,
+          "10s": 3,
+          "1s": 3
         },
         "arrival_mid": 1.0865850000000001,
         "arrival_slippage_bps": 0.5061730099360682,
         "decision_mid": 1.0865850000000001,
-        "end_mid": 1.0865900000000002,
+        "end_mid": 1.08658,
         "execution_alpha_vs_vwap_bps": null,
         "fill_vwap": 1.08653,
-        "impact_cost": 1.275000000004578,
+        "impact_cost": 1.2750000000026906,
         "instrument_id": 101,
         "n_fills": 3,
         "order_id": 35,
@@ -1229,34 +1410,39 @@
           "delay_bps": -0.0,
           "delay_cost": -0.0,
           "fill_rate": 0.75,
-          "opportunity_bps": -0.011503932044047992,
-          "opportunity_cost": -0.042500000000278426,
+          "opportunity_bps": 0.011503932044047992,
+          "opportunity_cost": 0.042500000000278426,
           "qty_filled": 25500.0,
           "qty_target": 34000.0,
-          "total_is": 1.3600000000032475,
-          "total_is_bps": 0.3681258254080031,
+          "total_is": 1.4450000000038044,
+          "total_is_bps": 0.3911336894960991,
           "trading_bps": 0.37962975745205113,
           "trading_cost": 1.402500000003526
         },
         "side": "SELL",
-        "spread_cost": 0.21249999999950475,
-        "timing_cost": -0.08500000000055685,
-        "twap_slippage_bps": 0.5421841176569756,
+        "spread_cost": 0.12750000000083528,
+        "timing_cost": 0.0,
+        "twap_slippage_bps": 0.49526756855440796,
         "vwap_slippage_bps": null
       },
       {
         "adverse_selection_bps": {
-          "100ms": -0.5522243135512749,
-          "10s": -0.5522243135512749,
-          "1s": -0.5522243135512749
+          "100ms": -0.5982292414451538,
+          "10s": -0.5982292414451538,
+          "1s": -0.5982292414451538
         },
-        "arrival_mid": 1.08657,
-        "arrival_slippage_bps": 0.5061799976063781,
-        "decision_mid": 1.08657,
-        "end_mid": 1.0865900000000002,
+        "adverse_selection_n": {
+          "100ms": 4,
+          "10s": 4,
+          "1s": 4
+        },
+        "arrival_mid": 1.086605,
+        "arrival_slippage_bps": 0.5981934557634259,
+        "decision_mid": 1.086605,
+        "end_mid": 1.086605,
         "execution_alpha_vs_vwap_bps": null,
-        "fill_vwap": 1.0865150000000001,
-        "impact_cost": 0.9500000000009501,
+        "fill_vwap": 1.08654,
+        "impact_cost": 0.9499999999998954,
         "instrument_id": 101,
         "n_fills": 4,
         "order_id": 36,
@@ -1268,15 +1454,15 @@
           "opportunity_cost": -0.0,
           "qty_filled": 19000.0,
           "qty_target": 19000.0,
-          "total_is": 1.044999999999463,
-          "total_is_bps": 0.5061799976068889,
-          "trading_bps": 0.5061799976068889,
-          "trading_cost": 1.044999999999463
+          "total_is": 1.234999999999653,
+          "total_is_bps": 0.5981934557634259,
+          "trading_bps": 0.5981934557634259,
+          "trading_cost": 1.234999999999653
         },
         "side": "SELL",
-        "spread_cost": 0.1899999999991353,
-        "timing_cost": -0.09500000000062236,
-        "twap_slippage_bps": 0.5557681044953362,
+        "spread_cost": 0.28499999999975767,
+        "timing_cost": 0.0,
+        "twap_slippage_bps": 0.5981934557634259,
         "vwap_slippage_bps": null
       }
     ]

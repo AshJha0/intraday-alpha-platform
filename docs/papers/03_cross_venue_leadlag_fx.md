@@ -267,3 +267,58 @@ to test.
 | shared-mid generator design | `python/src/iap/marketdata/generator.py` |
 | QC volumes | `data/normalized/qc_report.json` |
 | stress axes | `python/src/iap/validation/stress.py` |
+
+## Erratum / Update — 2026-09-06 (round-3 trading fixes: FX P&L currency)
+
+- The net-P&L column of the §4.1 table and the cost-stress numbers in §4.4
+  ("FX03 nets -635,830 and FX04 -676,524 …; day-2 backtests -1,651,005 and
+  -1,814,903 with costs of 1.63M / 1.83M") came from a backtester that
+  summed quote-currency P&L across pairs as if USD (JPY-dominated). The
+  Python backtester now converts every P&L increment to USD at the
+  prevailing conversion-pair mid before aggregating
+  (`PLATFORM_CONVENTIONS.md` §11.6, `API_PORTFOLIO_TCA.md` §4).
+- Re-derived (USD, `research/alpha_reports/REPORT.md`, 2026-09-06): FX03
+  nets **-30,572** at 1x (x0.5: -16,012; x2: -59,693), FX04 **-35,488**
+  (x0.5: -18,397; x2: -69,671); day-2 backtests **-77,960** and
+  **-87,143** with costs of 76,182 / 87,125 USD. The statistical columns
+  (IC, t, hit, leakage, flips/h) are currency-free and unchanged; both
+  verdicts (FX03 REJECT, FX04 ITERATE-by-lenient-gate) and the §6
+  conclusion — there is no cost regime in which these signals trade —
+  stand.
+
+
+## Erratum / Update — 2026-09-06 (round-3 research fixes)
+
+1. **Crossed consolidated books.** ~29 % of the FX rows this paper studies
+   have a CROSSED merged book (a stale LP quote inside the aggregation
+   window). Cross-venue lead-lag measured on those rows is partly measuring
+   the aggregation artefact, not information flow between venues. Reported
+   split (current run): FX03 pooled -0.0065 /
+   uncrossed 0.0108 /
+   crossed -0.0284; FX04 pooled
+   0.0100 / uncrossed 0.0297 /
+   crossed -0.0075 (crossed fraction
+   0.287). The promotion gates read the uncrossed
+   numbers; FX04's verdict on the current run is ITERATE.
+2. **FX05 is a triangle, not an eight-pair cross-section.** With USD pinned,
+   AUD, CAD, CHF, JPY and NZD each appear in exactly ONE pair of this
+   universe, so their factor absorbs that pair's whole return and the
+   residual is 0 by construction. Those five pairs now score NaN (confidence
+   0) instead of a constant, and only EUR/USD-GBP/USD-EUR/GBP carries
+   cross-pair information (API_ALPHA §5). FX05's current IC is
+   -0.0376 pooled / -0.0065
+   uncrossed, verdict REJECT.
+3. **Labels, folds and execution** were fixed as described in paper 01's
+   erratum (items 1, 4, 6); every IC, t-statistic and P&L figure above is
+   superseded by the current `research/alpha_reports/REPORT.md`.
+
+The multiple-testing ledger was **reset and re-derived** for this round: an
+experiment is now identified by (alpha, kind, canonical configuration) and
+re-running a script no longer increases the count, and one adaptive
+deployment counts as ONE experiment instead of its 211 monitoring
+evaluations. Every "1,224 experiments" / "19,347 experiments" figure in the
+body above is superseded by **760 experiments
+(65 distinct configurations)**: Bonferroni
+per-test |t| **3.99**, expected max |t| under
+the global null **3.64**. Reports now read the
+ledger at render time, so a report and the ledger can never disagree again.

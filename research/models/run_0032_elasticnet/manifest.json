@@ -1,0 +1,145 @@
+{
+  "data_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
+  "experiment_id": "run_0032_elasticnet",
+  "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
+  "features": [
+    "ret_log_1s_v1",
+    "ret_log_5s_v1",
+    "ret_log_10s_v1",
+    "ret_log_30s_v1",
+    "ret_accel_5s_v1",
+    "ret_resid_5s_v1",
+    "ret_vol_adj_5s_v1",
+    "mid_change_ticks_1s_v1",
+    "micro_mid_dev_bps_v1",
+    "spread_bps_v1",
+    "imbalance_l1_v1",
+    "imbalance_l3_v1",
+    "imbalance_l5_v1",
+    "imbalance_l1_avg_w1s_v1",
+    "imbalance_l5_avg_w10s_v1",
+    "depth_total_l1_v1",
+    "depth_total_l5_v1",
+    "queue_depletion_rate_bid_w1s_v1",
+    "queue_depletion_rate_ask_w1s_v1",
+    "ofi_norm_l5_w5s_v1",
+    "ofi_norm_l5_w30s_v1",
+    "signed_volume_w1s_v1",
+    "signed_volume_w10s_v1",
+    "trade_imbalance_w1s_v1",
+    "trade_imbalance_w10s_v1",
+    "trade_intensity_w1s_v1",
+    "cancel_add_ratio_w1s_v1",
+    "quoted_depth_ratio_v1",
+    "effective_spread_bps_w10s_v1",
+    "participation_w10s_v1",
+    "depth_slope_bid_v1",
+    "depth_slope_ask_v1",
+    "rvol_w10s_v1",
+    "rvol_w1m_v1",
+    "vol_ratio_w10s_w1m_v1",
+    "range_bps_w10s_v1",
+    "jump_flag_w1m_v1",
+    "minute_of_day_v1",
+    "session_frac_v1",
+    "norm_spread_m5_v1",
+    "ref_ret_5s_v1",
+    "beta_w5m_v1",
+    "leadlag_corr_w1m_v1",
+    "venue_depth_hhi_v1",
+    "venue_imbalance_divergence_v1",
+    "trend_score_w1m_v1",
+    "meanrev_score_w1m_v1",
+    "vol_regime_ratio_v1",
+    "half_spread_cost_bps_v1",
+    "expected_impact_bps_v1",
+    "fill_prob_bid_h1s_v1"
+  ],
+  "folds": [
+    {
+      "fold": 0,
+      "n_test": 40673,
+      "n_train": 41189,
+      "test_window": [
+        1787581089746702797,
+        1787585836921304703
+      ],
+      "train_window": [
+        1787529602028520532,
+        1787581024495790671
+      ]
+    },
+    {
+      "fold": 1,
+      "n_test": 40738,
+      "n_train": 82433,
+      "test_window": [
+        1787585897002655290,
+        1787665002452264215
+      ],
+      "train_window": [
+        1787529602028520532,
+        1787585831931997411
+      ]
+    },
+    {
+      "fold": 2,
+      "n_test": 40742,
+      "n_train": 123677,
+      "test_window": [
+        1787665062760125271,
+        1787669862608897508
+      ],
+      "train_window": [
+        1787529602028520532,
+        1787664997320954259
+      ]
+    },
+    {
+      "fold": 3,
+      "n_test": 40700,
+      "n_train": 164911,
+      "test_window": [
+        1787669923043734877,
+        1787691459285005656
+      ],
+      "train_window": [
+        1787529602028520532,
+        1787669857938725198
+      ]
+    }
+  ],
+  "git_commit": "0768cbe40a6343c64512bf504be0c791a6baae12",
+  "git_dirty": true,
+  "git_dirty_hash": "bde32b0f34c0499dba75178d0cc4ef9b9b547d004e70ee9620fee8ea147dbaab",
+  "hardware": {
+    "cpu_count": 2,
+    "cpu_model": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "machine": "x86_64",
+    "python": "3.11.15",
+    "system": "Linux"
+  },
+  "hyperparams": {
+    "alpha": 0.0001,
+    "l1_ratio": 0.5,
+    "max_iter": 5000
+  },
+  "library_versions": {
+    "lightgbm": "4.7.0",
+    "numpy": "2.4.4",
+    "pandas": "3.0.2",
+    "pyarrow": "25.0.1",
+    "sklearn": "1.8.0",
+    "xgboost": "3.2.0"
+  },
+  "model_version": "elasticnet_v1",
+  "target": "label_cost_5s",
+  "test_window": {
+    "end_ts": 1787691459285005656,
+    "start_ts": 1787669923043734877
+  },
+  "train_window": {
+    "end_ts": 1787669857938725198,
+    "start_ts": 1787529602028520532
+  }
+}

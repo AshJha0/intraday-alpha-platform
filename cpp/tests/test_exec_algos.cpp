@@ -125,7 +125,7 @@ iap::ExecConfig algo_config() {
     iap::InstrumentSpec ins;
     ins.instrument_id = 7;
     ins.tick_size = 0.01;
-    ins.lot_size = 1.0;
+    ins.qty_unit = 1.0;
     ins.adv = 1'000'000.0;
     cfg.instruments[7] = ins;
     return cfg;
@@ -234,12 +234,13 @@ TEST(SorRouting, AggressivePrefersPriceThenFee) {
     EXPECT_EQ(sor.route_aggressive(book, 1, {1, 2}), 1);
 }
 
-TEST(SorRouting, PassivePrefersRebateAndFallsBack) {
+TEST(SorRouting, PassivePrefersRebateAndReportsNoRoute) {
     const auto cfg = algo_config();
     iap::SmartOrderRouter sor(cfg.venues);
     iap::ConsolidatedBook book(7);
-    // No venue quotes anything: fallback = lowest candidate id.
-    EXPECT_EQ(sor.route_passive(book, 0, {2, 1}), 1);
+    // No venue quotes anything: no route (0), never a blind fallback.
+    EXPECT_EQ(sor.route_passive(book, 0, {2, 1}), 0);
+    EXPECT_EQ(sor.route_aggressive(book, 0, {2, 1}), 0);
     EXPECT_THROW(sor.route_passive(book, 0, {}), std::invalid_argument);
     // Both venues quote the bid side: venue 2 pays the higher rebate.
     book.apply(MarketEvent::of(1, 7, 1, T0, T0, 1, 1, 0, 99, 100, 11, 0));
@@ -298,6 +299,176 @@ TEST(AlgoReplay, AccountingIdentityAndDeterminism) {
         EXPECT_EQ(rep.filled_qty + rep.unfilled_qty,
                   pid == 1 ? p1.qty : p2.qty);
     }
+}
+
+// Scenario: both venues gap at 09:35 (multicast storm). The SOR must never
+// route to a stale or halted venue; with no eligible venue it reports no
+// route and the replay driver submits nothing (counted), and routing
+// resumes after the SNAPSHOT recovery.
+TEST(SorRouting, NeverRoutesToStaleOrHaltedVenues) {
+    const auto cfg = algo_config();
+    iap::SmartOrderRouter sor(cfg.venues);
+    iap::ConsolidatedBook book(7);
+    std::uint64_t seq1 = 0, seq2 = 0;
+    auto push = [&](std::uint16_t vid, std::uint8_t type, std::uint8_t side,
+                    std::int64_t px, std::int64_t qty, std::uint64_t oid,
+                    bool gap) {
+        std::uint64_t& s = vid == 1 ? seq1 : seq2;
+        if (gap) ++s;
+        ++s;
+        book.apply(MarketEvent::of(s, 7, vid, T0 + static_cast<std::int64_t>(s),
+                                   T0 + static_cast<std::int64_t>(s), s, type,
+                                   side, px, qty, oid, 0));
+    };
+    push(1, 1, 1, 100, 500, 11, false);  // venue 1 ask 100 (best)
+    push(2, 1, 1, 101, 500, 21, false);  // venue 2 ask 101
+    EXPECT_EQ(sor.route_aggressive(book, 0, {1, 2}), 1);
+    push(1, 1, 1, 100, 100, 12, true);   // venue 1 gaps -> stale
+    EXPECT_TRUE(book.books().at(1).stale());
+    EXPECT_EQ(sor.route_aggressive(book, 0, {1, 2}), 2) << "skip stale";
+    push(2, 8, 0, 0, static_cast<std::int64_t>(iap::SessionStatus::HALT), 0,
+         false);
+    EXPECT_EQ(sor.route_aggressive(book, 0, {1, 2}), 0) << "all gated";
+    push(2, 8, 0, 0, static_cast<std::int64_t>(iap::SessionStatus::TRADING),
+         0, false);
+    EXPECT_EQ(sor.route_aggressive(book, 0, {1, 2}), 2);
+    // FX-style tie-break: equal price and per-share fee -> lower commission.
+    // Latency budget: a venue slower than max_venue_latency_ns is skipped.
+    iap::SorOptions opts;
+    opts.max_venue_latency_ns = 50'000;  // both venues are 100 us
+    iap::SmartOrderRouter strict(cfg.venues, opts);
+    EXPECT_EQ(strict.route_aggressive(book, 0, {1, 2}), 0);
+    opts.prefer_rebate = false;
+    opts.max_venue_latency_ns = INT64_MAX;
+    iap::SmartOrderRouter plain(cfg.venues, opts);
+    push(2, 1, 0, 99, 100, 22, false);
+    EXPECT_EQ(plain.route_passive(book, 0, {1, 2}), 2) << "only eligible";
+}
+
+TEST(SorRouting, AggressiveTieBreaksOnCommissionForFx) {
+    auto cfg = algo_config();
+    cfg.venues[1].is_fx = true;
+    cfg.venues[1].taker_fee_per_share = 0.0;
+    cfg.venues[1].commission_per_million = 4.0;
+    cfg.venues[2].is_fx = true;
+    cfg.venues[2].taker_fee_per_share = 0.0;
+    cfg.venues[2].commission_per_million = 2.5;
+    iap::SmartOrderRouter sor(cfg.venues);
+    iap::ConsolidatedBook book(7);
+    book.apply(MarketEvent::of(1, 7, 1, T0, T0, 1, 1, 1, 100, 500, 11, 0));
+    book.apply(MarketEvent::of(2, 7, 2, T0 + 1, T0 + 1, 1, 1, 1, 100, 500, 21, 0));
+    EXPECT_EQ(sor.route_aggressive(book, 0, {1, 2}), 2) << "2.5/M beats 4.0/M";
+}
+
+// A replay whose only venue is stale submits nothing and counts it.
+TEST(AlgoReplay, NoRouteChildrenAreSkippedAndCounted) {
+    auto p = parent(AlgoType::IS, 300, 3);
+    p.venue_id = 0;  // SOR-routed
+    std::vector<MarketEvent> evs;
+    std::uint64_t seq = 0;
+    auto push = [&](std::int64_t ts, std::uint8_t type, std::uint8_t side,
+                    std::int64_t px, std::int64_t qty, std::uint64_t oid,
+                    bool gap) {
+        if (gap) ++seq;
+        ++seq;
+        evs.push_back(MarketEvent::of(seq, 7, 1, ts, ts, seq, type, side, px,
+                                      qty, oid, 0));
+    };
+    push(T0 - SEC, 1, 0, 100, 100000, 1, false);
+    push(T0 - SEC + 1, 1, 1, 101, 100000, 2, false);
+    push(T0 - SEC + 2, 1, 1, 102, 100, 3, true);  // gap: venue 1 stale
+    for (int i = 0; i < 200; ++i) push(T0 + i * SEC, 9, 0, 0, 0, 0, false);
+    iap::ExecutionReplay replay(algo_config(), {p});
+    const auto res = replay.run(evs);
+    EXPECT_EQ(res.sor_no_route, 3u);
+    EXPECT_EQ(res.parents.at(1).children, 0);
+    EXPECT_EQ(res.parents.at(1).unfilled_qty, 300);
+    EXPECT_TRUE(res.fills.empty());
+}
+
+// Pinned child sizing: a slice above max_child_qty is split, never dropped.
+TEST(AlgoSliceLargerThanMaxChildIsSplit, TwentyChildrenForEightSlices) {
+    auto p = parent(AlgoType::IS, 20000, 8);
+    p.max_child_qty = 1000;
+    p.risk_aversion = 0.0;  // equal slices of 2500 -> 1000 + 1000 + 500
+    iap::ExecutionReplay replay(algo_config(), {p});
+    const auto res = replay.run(algo_stream());
+    const auto& rep = res.parents.at(1);
+    EXPECT_EQ(rep.children, 24);
+    EXPECT_EQ(rep.filled_qty, 20000) << "the 100000 displayed ask absorbs it";
+    EXPECT_EQ(rep.unfilled_qty, 0);
+    for (const auto& [oid, o] : replay.simulator().orders()) {
+        (void)oid;
+        EXPECT_LE(o.qty, 1000);
+        EXPECT_EQ(o.expire_ts, p.end_ts);
+    }
+}
+
+// Pinned: no child outlives end_ts. Passive VWAP children that never fill
+// are expired at the first event >= end_ts; a later crossing print does
+// not fill them; the report shows the unfilled qty.
+TEST(AlgoChildrenCancelledAtEndTs, LateCrossingPrintDoesNotFill) {
+    auto p = parent(AlgoType::VWAP, 400, 4);
+    auto evs = algo_stream();  // ends at T0 + 199.5 s, window ends T0+100s
+    std::uint64_t seq = evs.size();
+    // A crossing ask well after the window (limit 99 < our 100 bids).
+    ++seq;
+    evs.push_back(MarketEvent::of(seq, 7, 1, T0 + 150 * SEC, T0 + 150 * SEC,
+                                  seq, 1, 1, 99, 100000, 77, 0));
+    iap::ExecutionReplay replay(algo_config(), {p});
+    const auto res = replay.run(evs);
+    const auto& rep = res.parents.at(1);
+    EXPECT_EQ(rep.children, 4);
+    EXPECT_EQ(rep.filled_qty, 0) << "no fills after end_ts";
+    EXPECT_EQ(rep.unfilled_qty, 400);
+    for (const auto& [oid, o] : replay.simulator().orders()) {
+        (void)oid;
+        EXPECT_EQ(o.state, iap::OrderState::CANCELLED);
+        EXPECT_EQ(o.cancel_reason, iap::CancelReason::EXPIRED);
+    }
+    EXPECT_EQ(replay.simulator().counters().expired_orders, 4u);
+}
+
+// Pinned: POV deficit is measured against FILLED + in-flight qty, so a
+// cancelled MARKET remainder (thin book) is re-sent once liquidity returns.
+TEST(AlgoPovResendsAfterCancelledRemainder, ThinBookThenRefill) {
+    auto p = parent(AlgoType::POV, 500, 1);
+    p.participation = 0.10;
+    p.max_child_qty = 25;
+    std::vector<MarketEvent> evs;
+    std::uint64_t seq = 0;
+    auto push = [&](std::int64_t ts, std::uint8_t type, std::uint8_t side,
+                    std::int64_t px, std::int64_t qty, std::uint64_t oid,
+                    std::uint64_t tid) {
+        ++seq;
+        evs.push_back(MarketEvent::of(seq, 7, 1, ts, ts, seq, type, side, px,
+                                      qty, oid, tid));
+    };
+    push(T0 - SEC, 1, 0, 100, 100000, 1, 0);
+    push(T0 - SEC + 1, 1, 1, 101, 30, 2, 0);  // thin ask: 30 displayed
+    for (int i = 0; i < 200; ++i) {
+        const std::int64_t ts = T0 + i * SEC;
+        if (i == 30) push(ts - 1, 1, 1, 101, 100000, 3, 0);  // liquidity back
+        push(ts, 5, 0, 100, 40, 0, 1000 + i);
+        push(ts + SEC / 2, 9, 0, 0, 0, 0, 0);
+    }
+    iap::ExecutionReplay replay(algo_config(), {p});
+    const auto res = replay.run(evs);
+    const auto& rep = res.parents.at(1);
+    // The first children hit the 30-lot display (25 filled, then a 5-lot
+    // partial with a 20-lot cancelled remainder); the deficit is re-sent
+    // against filled qty, so the 10% target (400) is still reached.
+    EXPECT_EQ(rep.filled_qty, 400);
+    EXPECT_GT(rep.children, 16) << "re-sent remainders add children";
+    bool saw_partial = false;
+    for (const auto& [oid, o] : replay.simulator().orders()) {
+        (void)oid;
+        if (o.state == iap::OrderState::CANCELLED && o.remaining > 0 &&
+            o.remaining < o.qty) {
+            saw_partial = true;
+        }
+    }
+    EXPECT_TRUE(saw_partial);
 }
 
 }  // namespace

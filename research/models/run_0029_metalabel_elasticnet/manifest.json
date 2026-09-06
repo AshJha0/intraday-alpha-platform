@@ -1,0 +1,42 @@
+{
+  "data_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
+  "experiment_id": "run_0029_metalabel_elasticnet",
+  "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
+  "features": null,
+  "folds": null,
+  "git_commit": "a87ca00ff50ee6db9dd7d0b3f57897c916ba8189",
+  "git_dirty": true,
+  "git_dirty_hash": "a61e11c1eea1953af5664c177da2e80b3e4a2f13e04cab7ac87b5c198f212bb5",
+  "hardware": {
+    "cpu_count": 2,
+    "cpu_model": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "machine": "x86_64",
+    "python": "3.11.15",
+    "system": "Linux"
+  },
+  "hyperparams": {
+    "learning_rate": 0.1,
+    "max_depth": 3,
+    "max_iter": 80,
+    "min_samples_leaf": 50,
+    "random_state": 7
+  },
+  "library_versions": {
+    "lightgbm": "4.7.0",
+    "numpy": "2.4.4",
+    "pandas": "3.0.2",
+    "pyarrow": "25.0.1",
+    "sklearn": "1.8.0",
+    "xgboost": "3.2.0"
+  },
+  "model_version": "metalabel_isotonic_v1",
+  "target": null,
+  "test_window": {
+    "end_ts": 1787691459285005656,
+    "start_ts": 1787663930438842169
+  },
+  "train_window": {
+    "end_ts": 1787636273992056393,
+    "start_ts": 1787581099826998900
+  }
+}

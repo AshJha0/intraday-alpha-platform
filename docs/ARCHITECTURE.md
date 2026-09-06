@@ -87,9 +87,9 @@ flowchart TD
     end
     V1 --> RAW["data/raw/*.jsonl<br/>immutable raw feed files"]
     V2 --> RAW
-    RAW --> NORM["Normalization + sequence validation<br/>python iap.marketdata.normalize<br/>gaps / dups / out-of-order / invalid counted -> qc_report.json"]
-    NORM --> CANON["Canonical event stream<br/>JSONL + IAP1 binary (72-byte LE records)<br/>+ Parquet research dataset — schemas x-version 1"]
-    CANON --> BOOK["Order-book reconstruction<br/>Python ref / C++ / Rust / Java<br/>MBO FIFO, marketable ADDs, dup-drop, gap->stale, SNAPSHOT recovery"]
+    RAW --> NORM["Normalization + sequence validation<br/>python iap.marketdata.normalize<br/>gaps / dups / late / resets / ts-regressions / invalid counted -> qc_report.json"]
+    NORM --> CANON["Canonical event stream<br/>JSONL + IAP1 v2 binary (72-byte LE records + CRC-32 trailer)<br/>+ Parquet research dataset — schemas x-version 1"]
+    CANON --> BOOK["Order-book reconstruction<br/>Python ref / C++ / Rust / Java<br/>MBO FIFO, status-gated matching, synthetic ids, dup-drop,<br/>gap->stale, reorder window, sequence resets, SNAPSHOT recovery"]
     BOOK --> FEAT["Feature engine<br/>205-feature registry (hash = feature_version)<br/>native 40 in C++/Rust/Java — validity bitset, NaN never valid"]
     FEAT --> LBL["Event-time labels (Python-owned)<br/>11 horizons, mid-to-mid + cost-adjusted<br/>at-or-before rule, no lookahead"]
     FEAT --> ALPHA["Alpha ensemble<br/>24 flagship alphas (EQ01-FX12)<br/>linear_z_v1 scoring; 6 golden alphas ported"]
@@ -120,10 +120,14 @@ carrying `"x-version": 1`. The rules (`schemas/MIGRATIONS.md`):
 
 - **Any field change bumps the schema's x-version** and adds a MIGRATIONS
   entry (what changed, why, migration path).
-- **Physical formats**: canonical JSONL (exact key order, integers only) and
-  IAP1 binary (16-byte header + 72-byte little-endian records) are normative
-  in `schemas/FORMAT.md`; the golden codec test requires **byte-identical**
-  IAP1 encodings across all four languages (SHA-256 comparison).
+- **Physical formats**: canonical JSONL (exact key order, integers only,
+  domain-strict decoders pinned by a shared reject/accept fixture) and IAP1
+  binary (16-byte header + 72-byte little-endian records + a version-2
+  CRC-32 integrity trailer) are normative in `schemas/FORMAT.md`; the golden
+  codec test requires **byte-identical** IAP1 encodings across all four
+  languages (SHA-256 comparison). Book and replay checkpoints are a
+  cross-language JSON document (x-version 2) pinned by
+  `expected_checkpoint_eq_1000.json`.
 - **Version identity propagates**: the feature registry's canonical-JSON
   hash is `FeatureVector.feature_version` and appears in feature output,
   golden files and every model manifest; the data version is the hash of
@@ -147,7 +151,8 @@ aspiration:
 | No unordered iteration | sorted keys everywhere state is serialized (books, consolidated views, feature emission, venue merging in ascending venue_id) |
 | Integer arithmetic | ticks/qty/window sums stay integer end-to-end; float creep is confined to genuinely real-valued inputs |
 | Pinned algorithms | not just results: PGD projection order and passes, EWMA initialization, queue-model tie-breaks, latency draw order, fold boundaries are all specified |
-| Checkpoint/restore | book and replay checkpoints resume bit-identically (tested) |
+| Checkpoint/restore | book and replay checkpoints resume bit-identically (tested), across languages (golden) |
+| Feed anomalies | gaps, duplicates, late retransmissions (bounded reorder window), venue sequence resets, broken/interrupted SNAPSHOT bursts, id-less L2 feeds, malformed payloads and auction call phases are pinned by `expected_anomaly_states.json` in all four languages; `docs/SCENARIOS.md` maps scenario → rule → tests |
 | Seeded simulation | generator, backtester fills, execution sim, TCA parent-order set: same seed ⇒ same bytes |
 
 The payoff is compounding: because the generator is deterministic, the whole
@@ -167,12 +172,13 @@ flowchart LR
         MG <--> BF
     end
     MG --> GV[("tests/golden/<br/>events_eq_mbo.jsonl (2,000 ev)<br/>events_fx_quote.jsonl (800 ev)<br/>+ splitmix64.json")]
-    MG --> EXP[("expected_*.json<br/>codec sha256 | book states | features<br/>alpha | backtest | risk decisions<br/>replay fills | portfolio | tca | adaptive")]
+    MG --> EXP[("expected_*.json<br/>codec sha256 | book states | features<br/>alpha | backtest | risk decisions + audit + snapshot<br/>replay fills | portfolio | tca (+ timeline cases) | adaptive")]
     CPPTOOL["cpp/tools/make_replay_fills_golden<br/>(C++ is the fills reference)"] --> EXP
-    GV --> PY["python: pytest -k golden<br/>49 tests"]
-    GV --> CPP["cpp: ctest -R Golden<br/>37 tests"]
-    GV --> RS["rust: 6 golden test targets<br/>36 tests"]
-    GV --> JV["java: *GoldenTest (JUnitCore)<br/>13 golden-group tests"]
+    RSTOOL["rust/risk/src/bin/make_risk_golden<br/>(Rust is the risk reference)"] --> EXP
+    GV --> PY["python: pytest -k golden<br/>65 tests"]
+    GV --> CPP["cpp: ctest -R Golden<br/>45 tests"]
+    GV --> RS["rust: 6 golden test targets<br/>47 tests"]
+    GV --> JV["java: all ten *GoldenTest (JUnitCore)<br/>85 golden-group tests"]
     EXP --> PY
     EXP --> CPP
     EXP --> RS
@@ -191,8 +197,9 @@ execution reference) and the **risk golden from Rust** (the risk reference) —
 each domain's owning language pins the truth, and everyone else matches it.
 The harness (`tests/harness/run_all.sh`, with `run_golden.sh` as the
 golden-only alias) runs every suite with the canonical commands and prints
-the parity table; a full harness run passes 489/175/181/315 tests
-(49/37/36/13 golden) across python/cpp/rust/java.
+the parity table; a full harness run (2026-09-06) passes 626/243/254/448
+tests (65/45/47/85 golden) across python/cpp/rust/java — the same counts
+the README parity table records.
 
 ## 7. Hot-path engineering notes per language
 
@@ -200,11 +207,14 @@ All measured on the stated 2-CPU Xeon container (methodology caveats in
 `benchmarks/results_cpp.md`; never quote these numbers without them).
 
 **C++** (`cpp/`): fixed-layout structs mirroring the 72-byte IAP1 record
-(decode 3.5 ns/event); order book on pooled nodes with free lists and
-intrusive per-level FIFO lists — **no allocation in book/feature hot loops
-after warmup**, enforced by tests (conventions §8); book update 17.4 ns,
-replay 37.1M events/s, 48-feature engine ~450 ns/event, alpha scoring
-32.3 ns/row. `-Wall -Wextra -Werror`, C++17, Release `-O3`.
+(decode 174.4 ns/event, of which the great majority is the IAP1 v2 CRC-32
+integrity check over the record body — a byte-serial table CRC at
+~5 cycles/byte; the pre-round-3 unchecked decode was 3.5 ns/event); order
+book on pooled nodes with free lists and intrusive per-level FIFO lists —
+**no allocation in book/feature hot loops after warmup**, enforced by tests
+(conventions §8); book update 25.7 ns, replay 28.1M events/s, 48-feature
+engine ~530 ns/event, alpha scoring 38.5 ns/row.
+`-Wall -Wextra -Werror`, C++17, Release `-O3`.
 
 **Rust** (`rust/`): nine-crate workspace; same pooling/intrusive-structure
 discipline expressed through ownership — the entire workspace confines
@@ -239,25 +249,48 @@ contract set by the Rust telemetry crate** and binding on Java
 (`deployment/grafana/README.md`): snake_case, counters end `_total`, latency
 histograms end `_ns` with fixed log2 buckets, gauges are bare nouns.
 
-- **Producers**: `rust/telemetry` (Registry → Prometheus text exposition)
-  and Java's `com.iap.monitoring` registry (counters, gauges, histograms, GC
-  metrics) served by `com.iap.api.MetricsServer` on
-  `GET /metrics | /health | /status` (port from `configs/execution.json`
-  `monitoring.port`, default 8080).
+- **Producer**: exactly one — Java's `com.iap.monitoring` registry (lock-free
+  counters, gauges, histograms, GC metrics; `PLATFORM_CONVENTIONS.md` §12.4)
+  served by `com.iap.api.MetricsServer` on
+  `GET /metrics | /health | /ready | /status` plus
+  `POST /admin/{kill,clear,override,roll}` (port from
+  `configs/execution.json` `monitoring.port`, default 8080). `rust/telemetry`
+  remains the reference for the exposition FORMAT and is unit-tested there,
+  but no deployed Rust binary writes metrics anywhere Prometheus can read —
+  so round 3 removed the `rust-telemetry` scrape job, the exporter sidecar and
+  every rule and panel built on `venue_*` rather than leave a permanently-down
+  target and an always-firing `TargetDown` (§12.7 "no aspirational targets").
 - **Scrape**: `deployment/prometheus/prometheus.yml` — jobs `java-platform`
-  (:8080) and `rust-telemetry` (file-based target list), plus recording
-  rules and alerts (`recording.yml`, `alerts.yml`: SignalRateCollapse,
-  FillRateDrop, LossLimitUtilizationHigh, KillSwitchEngaged, GcPauseHigh —
-  each with a runbook anchor in `docs/runbooks/`; LiveVsBacktestDrift is
-  LIVE against the Java adaptability gauges (`com.iap.adaptive`, PSI > 0.25),
-  while QueueDepthHigh stays explicitly marked PLACEHOLDER, since no
-  producer emits `eventbus_queue_depth` yet — see
-  `deployment/grafana/README.md`).
+  (:8080) and Prometheus's self-scrape, plus recording rules and alerts
+  (`recording.yml`, `alerts.yml`: SequenceGapDetected, BookStale, StaleFeed,
+  FeedWallClockStall, SignalRateCollapse, LiveVsBacktestDrift,
+  AlphaLifecycleRetired, FillRateDrop, PreTradeRejectRatioHigh,
+  LossLimitUtilizationHigh, KillSwitchEngaged, GrossNotionalUtilizationHigh,
+  GcPauseHigh, PlatformSessionFailed, SessionRestartsClimbing, TargetDown —
+  each with a runbook anchor in `docs/runbooks/`). Staleness is judged on the
+  EVENT-time gap so a historical replay does not page; limit-utilization rules
+  divide by the exported `risk_limit{limit=...}` gauges, never a copied
+  constant. `eventbus_queue_depth` and `md_out_of_order_total` remain
+  PLACEHOLDER **names** in `deployment/grafana/README.md` — with no rule and
+  no panel until a producer exists. Everything is validated in CI by
+  `promtool check rules/config`, `promtool test rules` and
+  `tests/harness/check_deployment.py`.
 - **Dashboards**: two provisioned Grafana dashboards — *Market Data &
-  Latency* (events/sec, gaps/dups, decode/book/order-path p50/p99/p999, GC)
-  and *Trading & Risk* (signal rate, fills, slippage, exposure and limit
-  utilization, P&L, drawdown, kill-switch status, live-vs-backtest drift
-  PSI, rolling realized IC, alpha lifecycle state).
+  Latency* (events/sec, session state, event-time gap, gaps/dups,
+  decode/book/order-path p50/p99/p999, book-stale + restarts, GC) and
+  *Trading & Risk* (signal rate, order/fill flow, fill rate, execution
+  slippage, exposure and limit utilization, daily P&L, drawdown, kill-switch
+  status, live-vs-backtest drift PSI, rolling realized IC, alpha lifecycle
+  state). Every panel expression names a metric a producer actually exports;
+  `check_deployment.py` fails the build otherwise.
+- **State and the shape of the deployment**: the paper-trading vertical is a
+  SINGLETON with durable state (`PLATFORM_CONVENTIONS.md` §12.3) — risk
+  snapshot, session accounting and the risk/config/admin audit JSONL are
+  checkpointed to `$IAP_STATE_DIR` every 1,024 events, at session end and from
+  a shutdown hook, and `--resume` restores positions, realized P&L and every
+  latched kill switch. A session is FINITE and exits 0 (`restart: on-failure`
+  in compose, a single-replica `Recreate` Deployment in k8s), so "daily"
+  limits are daily rather than per-restart.
 - **What is watched** maps 1:1 to spec §25: market-data health (gap/dup
   counters exist because the normalizer and books count them anyway), alpha
   health (signal rate + live-vs-backtest drift), execution (order/fill/
@@ -304,15 +337,32 @@ in [/API_ADAPTIVE.md](../API_ADAPTIVE.md):
 
 `deployment/docker/docker-compose.yml` composes the full stack:
 `data-generator` (Python image; runs the seeded pipeline into a shared
-volume — data is never baked into images) → `cpp-replay` + `rust-replay`
-(+ `rust-telemetry-exporter`) and `java-platform` (the paper-trading
-vertical: `com.iap.platform.PaperTrading` paced in realtime over the golden
-vector, serving `/metrics`, `/health` and `/status` on :8080, with a real
-HTTP healthcheck against `/health`) → `prometheus` → `grafana` (:3000,
-admin password from the environment, never committed). `deployment/k8s/` carries the equivalent
-manifests (namespace, ConfigMaps generated from `configs/` by
-`generate_configmaps.py`, PVC, network policy, CronJob for the data
-pipeline, Deployments for the platform, Prometheus and Grafana).
+volume — data is never baked into images) → `cpp-replay` + `rust-replay` and
+`java-platform` (the paper-trading vertical: `com.iap.platform.PaperTrading`
+paced in realtime over the golden vector, serving `/metrics`, `/health`,
+`/ready`, `/status` and the kill-switch admin API on :8080, with a real HTTP
+healthcheck against `/health`) → `prometheus` → `grafana` (:3000, admin
+password from the environment, never committed). `deployment/k8s/` carries the
+equivalent manifests (namespace, ConfigMaps generated from `configs/` by
+`generate_configmaps.py`, PVC, network policy, CronJob for the data pipeline,
+Deployments for the platform, Prometheus and Grafana).
+
+Three properties of the shape matter more than the box diagram
+(`PLATFORM_CONVENTIONS.md` §12.3/§12.7):
+
+- **The platform reads mounted configuration, not a baked copy.** Both
+  deployments set `IAP_CONFIG_DIR` and mount `configs/` (bind mount / ConfigMap)
+  there, which is what makes the kill-switch runbook's "edit risk.json, restart
+  the service" path real.
+- **A session is finite and ends cleanly** (report, final checkpoint,
+  `platform_session_state = 2`, exit 0), so compose uses `restart: on-failure`
+  and k8s a single-replica `Recreate` Deployment. The round-2 stack re-ran a
+  two-minute session forever, which reset the "daily" loss counter every two
+  minutes and made every `offset 1h` baseline meaningless.
+- **The trading vertical is a singleton with durable state.** `replicas: 1`,
+  no rollout overlap, one writer on the ReadWriteOnce PVC, `$IAP_STATE_DIR` on
+  that PVC — so an eviction or a node drain resumes with its positions,
+  realized P&L and any latched kill switch intact.
 
 The paper-trading loop itself (source:
 [diagrams/paper_trading_sequence.mmd](diagrams/paper_trading_sequence.mmd)):
@@ -332,7 +382,7 @@ sequenceDiagram
 
     Op->>PT: java/paper.sh [--mode realtime --speed 60]
     PT->>PT: load configs/ (instruments, venues,<br/>strategies, risk, execution, alpha_params)
-    PT->>MX: bind /metrics /health /status
+    PT->>MX: bind /metrics /health /ready /status /admin/*
 
     loop every MarketEvent (event-time order)
         PT->>BK: apply(event) — sequence check, book update
@@ -341,9 +391,10 @@ sequenceDiagram
         AL-->>PF: AlphaSignal {expected_return, confidence}
         PF-->>RK: OrderRequest (target position delta)
         alt risk ALLOW
-            RK-->>EX: forward child order
+            RK-->>EX: forward child order (open-order tracked)
             EX-->>PT: Fill(s) {price_ticks, qty, fee, impact}
-            PT->>PT: position / P&L accounting
+            PT->>RK: onFill / onOrderDone (before the next decision)
+            PT->>PT: position / P&L accounting (reporting ccy)
         else risk REJECT
             RK-->>PT: RiskEvent {rule_id, severity, decision}
         end
@@ -351,15 +402,29 @@ sequenceDiagram
     end
 
     PR->>MX: GET /metrics (scrape, 15s interval)
-    Op->>MX: curl /health -> {"status":"ok"}
+    Op->>MX: curl /status -> live events_processed, kill state
     PT->>Op: summary line + out/paper_session_report.json<br/>(events, orders, fills, pnl, risk allowed/rejected)
 ```
 
 The same contracts drive replay, paper and (hypothetically) production —
 spec §1's core requirement — which is why the paper session over the golden
 vector is also a smoke test (`PaperTradingSmokeTest`) and why its honest
-summary line (`events=2000 orders=405 fills=600 pnl=-634420.053607
-risk[allowed=405 rejected=33]`) is reproducible bit-for-bit.
+summary line (`events=2000 orders=420 fills=421 pnl=-100.801250
+risk[allowed=420 rejected=5]`, re-derived 2026-09-06 after the round-3
+trading fixes; the earlier `-634420` figure came from a wiring that fed the
+risk engine decision-clock marks and lost terminal reports) is reproducible
+bit-for-bit. The report now also carries the execution-control counters
+(`execution.{participation_blocked, participation_capped,
+slice_interval_blocked, latency_budget_blocked, sor_no_route}`) and
+`risk.rejected_stale`.
+
+Round-3 wiring contract (`PLATFORM_CONVENTIONS.md` §11.4,
+`PaperTrading.RiskWiring`): step 5's mark is the consolidated touch over
+non-stale venue books stamped with the market-data event time; per-venue
+stale transitions call `onSequenceGap`/`onFeedRecovered`; every fill (step
+7) reaches the risk engine before the next decision and every terminal
+child calls `onOrderDone`; `configs/execution.json` participation / slice
+interval / latency budget are enforced between steps 5 and 6.
 
 ## 10. Known deviations from the spec blueprint (documented, not hidden)
 

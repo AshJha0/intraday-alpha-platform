@@ -86,7 +86,9 @@ fn duplicate_order_id_add_dropped_and_counted() {
     apply(&mut book, f.add(BID, 101, 20, 1)); // same order_id
     assert_eq!(book.best_bid(), Some((100, 10)));
     assert_eq!(book.counters.unknown_order_events, 1);
-    assert_eq!(book.counters.events_applied, 2); // still dispatched
+    // Dropped events are not "applied": applied + drops == events fed.
+    assert_eq!(book.counters.events_applied, 1);
+    assert_eq!(book.counters.events_applied + book.counters.drops(), 2);
 }
 
 #[test]
@@ -166,11 +168,16 @@ fn modify_increase_moves_to_tail() {
 }
 
 #[test]
-fn modify_ignores_event_price_and_nonpositive_removes() {
+fn modify_price_mismatch_dropped_and_nonpositive_removes() {
     let (mut book, mut f) = book_with_feed();
     apply(&mut book, f.add(BID, 100, 10, 1));
-    // Price field 999 ignored: order stays at level 100.
+    // Price field 999 differs from the resting price: adapter bug, dropped.
     let m = f.ev(EventType::Modify, BID, 999, 4, 1);
+    apply(&mut book, m);
+    assert_eq!(book.best_bid(), Some((100, 10)));
+    assert_eq!(book.counters.modify_price_mismatch, 1);
+    // Price 0 (unchanged) and the matching price are accepted.
+    let m = f.ev(EventType::Modify, BID, 0, 4, 1);
     apply(&mut book, m);
     assert_eq!(book.best_bid(), Some((100, 4)));
     // qty <= 0 removes the order.
@@ -509,12 +516,16 @@ fn wrong_routing_is_an_error_not_a_panic() {
 }
 
 #[test]
-fn unknown_event_type_is_an_error() {
+fn unknown_event_type_dropped_and_counted_not_an_error() {
     let (mut book, mut f) = book_with_feed();
     let mut ev = f.add(BID, 100, 10, 1);
     ev.event_type = 42;
-    assert!(book.apply(&ev).is_err());
+    assert!(book.apply(&ev).is_ok());
+    assert_eq!(book.counters.unknown_type_dropped, 1);
     assert_eq!(book.counters.events_applied, 0);
+    assert_eq!(book.last_sequence, 1); // sequence consumed
+    apply(&mut book, f.add(BID, 100, 10, 1));
+    assert_eq!(book.counters.gaps_detected, 0);
 }
 
 #[test]

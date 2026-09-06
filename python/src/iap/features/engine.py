@@ -11,18 +11,36 @@ no wall clock).
 
 Pinned state-update semantics (family modules document the formulas):
 
-- The book state is refreshed after every book-touching event: ADD, MODIFY,
-  CANCEL, EXECUTE, QUOTE, and the final record of a SNAPSHOT burst (interior
-  burst records leave derived state untouched so a half-built book never
-  contaminates rolling statistics).
+- **Timestamp regression**: an event whose ``exchange_ts`` is below the
+  instrument's last seen ``exchange_ts`` (cross-venue clock skew) is dropped
+  and counted (``ts_regressions_dropped``) BEFORE the book sees it — the
+  engine never raises mid-stream and never re-orders the stream.
+- **Applied events only** (API_FEATURES §2 step 1): every event is handed to
+  the ConsolidatedBook first; an event the book DROPS (duplicate sequence,
+  invalid side, malformed payload, dropped-while-stale, unknown type) or
+  HOLDS contributes to NO rolling state — no trade window, no event-rate
+  window, no venue-update count, no book refresh.
+- The book state is refreshed after every applied book-touching event: ADD,
+  MODIFY, CANCEL, EXECUTE, QUOTE, and the final record of a SNAPSHOT burst
+  (interior burst records leave derived state untouched so a half-built book
+  never contaminates rolling statistics).
 - The consolidated view merges only non-stale venue books; ``book_ok`` means
   both sides are quoted after the merge.
 - Rolling windows are half-open event-time intervals ``(t - w, t]``.
 - Mid-derived samples (returns, realized vol, extrema, mid stats, cross-
-  asset pairs) are recorded at mid *changes*; depth/imbalance/spread samples
-  at every two-sided refresh; OFI and L1 queue deltas at every refresh.
+  asset pairs) are recorded whenever the merged mid differs from the last
+  RECORDED mid sample (so a one-sided flicker that moves the mid still
+  yields a vol sample); depth/imbalance/spread samples at every two-sided
+  refresh; OFI and L1 queue deltas at every refresh.
+- **Stale recovery** (API_FEATURES §2.1): when the instrument's venue set
+  goes from "at least one venue stale" back to "no venue stale", every
+  rolling window and history of that instrument is CLEARED and the warmup
+  anchor moves to the recovery timestamp (``warmup_after_recovery``).  A
+  window therefore never spans an interval the platform did not observe.
 - Validity: a feature is invalid during warmup, when the book is not ok
-  (for book-derived features), or when its inputs are undefined.  NaN never
+  (for book-derived features), or when its inputs are undefined — including
+  every ``x / (y + EPS)`` ratio whose denominator ``y`` is <= 0 (an
+  unreliable denominator makes the ratio undefined, never huge).  NaN never
   appears with valid=True (enforced by the single value funnel).
 """
 
@@ -45,12 +63,18 @@ from iap.features.rolling import (
 )
 from iap.features.spec import FAMILY_ORDER, WINDOW_NS
 from iap.features.volatility import JUMP_K, JUMP_MIN_OBS
-from iap.orderbook.book import ConsolidatedBook
+from iap.orderbook.book import ApplyStatus, ConsolidatedBook
 
 _NS = 1_000_000_000
 #: History retention: 2x the longest lookback needed (accel_1m needs 2m,
 #: window stats need 5m) plus margin.
 _HIST_KEEP_NS = 660 * _NS
+
+#: Largest quantity the feature engine folds into a rolling window
+#: (pinned, API_FEATURES §2.2).  Beyond this a feed is malformed, not a
+#: market: window sums must stay exactly representable as int64 in every
+#: port, and 2^40 units leaves >= 2^23 samples of headroom per window.
+FEATURE_MAX_QTY = 1 << 40
 
 _BOOK_TOUCH = frozenset({
     EventType.ADD, EventType.MODIFY, EventType.CANCEL,
@@ -93,6 +117,24 @@ class _InstState:
         self.ref: "_InstState" = self  # rewired by the engine
         self.profile = profile
         self.first_ts: Optional[int] = None
+        #: warmup anchor: max(first event ts, last stale->fresh recovery ts)
+        self.warm_ts: Optional[int] = None
+        #: event time of the last stale->fresh recovery (None: never stale)
+        self.recovered_ts: Optional[int] = None
+        #: number of stale->fresh recoveries (rolling state resets)
+        self.recoveries = 0
+        #: sorted ids of this instrument's venues whose book is stale
+        self.stale_venues: tuple = ()
+        #: monotone counter of merged-view refreshes (label sampling hook)
+        self.refresh_seq = 0
+        #: events the book dropped/held (never folded into rolling state)
+        self.events_dropped = 0
+        #: events dropped by the engine for an exchange_ts regression
+        self.ts_regressions_dropped = 0
+        #: applied events whose qty exceeded FEATURE_MAX_QTY (not folded)
+        self.oversized_qty_dropped = 0
+        #: refreshes whose merged depth exceeded FEATURE_MAX_QTY (view unusable)
+        self.oversized_depth_skipped = 0
         self.last_ts = 0
         self.t = 0
         self.last_emit: Optional[int] = None
@@ -135,8 +177,27 @@ class _InstState:
     # ------------------------------------------------------ family accessors
 
     def warm(self, w_ns: int) -> bool:
-        """True when the window w has fully elapsed since the first event."""
-        return self.first_ts is not None and self.t - self.first_ts >= w_ns
+        """True when the window w has fully elapsed since the warmup anchor.
+
+        The anchor is the instrument's first event, or the last stale->fresh
+        recovery when one happened (``warmup_after_recovery``, API_FEATURES
+        §2.1): a window is never reported over an unobserved interval.
+        """
+        return self.warm_ts is not None and self.t - self.warm_ts >= w_ns
+
+    @property
+    def label_tradable(self) -> bool:
+        """True when this refresh is a tradable market state (API_FEATURES §6).
+
+        Two-sided merged book, no stale venue, no venue in HALT or AUCTION.
+        The label layer marks every other refresh as a blackout sample.
+        """
+        return (
+            self.book_ok
+            and not self.stale_venues
+            and not self.halt
+            and not self.auction
+        )
 
     def mid2_at(self, ts: int) -> Optional[int]:
         """Latest mid2 sample at-or-before ts (None during warmup)."""
@@ -172,6 +233,32 @@ class _InstState:
         return m[2] / m[1]
 
     # ----------------------------------------------------------- maintenance
+
+    def reset_rolling(self, t: int) -> None:
+        """Clear every rolling window / history and re-anchor warmup at t.
+
+        Called on a stale->fresh recovery (pinned, API_FEATURES §2.1): the
+        platform did not observe the market during the stale period, so no
+        window may span it and no history lookup may reach across it.
+        """
+        self.warm_ts = t
+        self.recovered_ts = t
+        self.recoveries += 1
+        self.hist2 = TimeSeries()
+        self.histlog = TimeSeries()
+        self.rv = {w: RollingSum(WINDOW_NS[w], 3) for w in ("10s", "1m", "5m")}
+        self.ext_mid = {w: RollingExtrema(WINDOW_NS[w]) for w in ("10s", "1m", "5m")}
+        self.ext_absdlm = RollingExtrema(WINDOW_NS["1m"])
+        self.jumps = RollingSum(WINDOW_NS["5m"], 1)
+        self.midstat = {w: RollingSum(WINDOW_NS[w], 2) for w in ("10s", "1m", "5m")}
+        self.ofi = {w: RollingSum(WINDOW_NS[w], 4) for w in ("1s", "5s", "30s")}
+        self.depthavg = {w: RollingSum(WINDOW_NS[w], 12) for w in ("1s", "10s", "1m")}
+        self.trades = {w: RollingSum(WINDOW_NS[w], 6) for w in ("1s", "10s", "1m")}
+        self.evstats = {w: RollingSum(WINDOW_NS[w], 7) for w in ("1s", "10s", "1m")}
+        self.queue = {w: RollingSum(WINDOW_NS[w], 4) for w in ("1s", "10s")}
+        self.xc = {w: RollingSum(WINDOW_NS[w], 5) for w in ("1m", "5m")}
+        self.xl = {w: RollingSum(WINDOW_NS[w], 5) for w in ("1m", "5m")}
+        self.venue_updates = RollingKeyCount(WINDOW_NS["10s"])
 
     def trim_all(self, t: int) -> None:
         """Evict expired samples from every rolling structure at time t."""
@@ -216,6 +303,14 @@ class FeatureEngine:
         self.states: Dict[int, _InstState] = {}
         self._profiles = profiles if profiles is not None else {}
         self.events_processed = 0
+        #: events the book dropped/held — never folded into rolling state
+        self.events_dropped = 0
+        #: events dropped for an exchange_ts regression (fail closed)
+        self.ts_regressions_dropped = 0
+        #: applied events whose qty exceeded FEATURE_MAX_QTY
+        self.oversized_qty_dropped = 0
+        #: refreshes whose merged depth exceeded FEATURE_MAX_QTY
+        self.oversized_depth_skipped = 0
         self.vectors_emitted = 0
 
     # ---------------------------------------------------------------- states
@@ -241,19 +336,65 @@ class FeatureEngine:
     # ----------------------------------------------------------------- apply
 
     def apply(self, ev: MarketEvent) -> Optional[FeatureVector]:
-        """Apply one event; returns the emitted FeatureVector, if any."""
+        """Apply one event; returns the emitted FeatureVector, if any.
+
+        Events the book DROPS or HOLDS (API_CORE §4 / API_FEATURES §2) are
+        counted and then ignored: they contribute to no rolling sample.  A
+        *staleness refresh* still runs when the drop changed the set of stale
+        venues (a gap detected on a dropped event still removes that venue
+        from the merged view) — it updates the merged view and ``book_ok``
+        but records no flow/mid samples.  An emission still happens on the
+        engine's cadence so the vector stream stays aligned with the events.
+        """
         st = self._state(ev.instrument_id)
-        st.cons.apply(ev)
         t = ev.exchange_ts
+        if st.first_ts is not None and t < st.last_ts:
+            # Cross-venue exchange_ts regression (clock skew between venue
+            # gateways).  Pinned (API_FEATURES §2): dropped + counted before
+            # the book sees it — never raised mid-stream, never re-ordered.
+            st.ts_regressions_dropped += 1
+            self.ts_regressions_dropped += 1
+            st.events_dropped += 1
+            self.events_processed += 1
+            self.events_dropped += 1
+            return None
+        status = st.cons.apply(ev)
         if st.first_ts is None:
             st.first_ts = t
+            st.warm_ts = t
         st.last_ts = t
         st.t = t
-        st.venue_last_ts[ev.venue_id] = t
-        st.venue_updates.add(t, ev.venue_id)
         self.events_processed += 1
 
+        # The merged view is a function of WHICH venues are stale, so the
+        # trigger is a change of the stale SET (a second venue going stale
+        # must remove it from the view too), not of "any venue is stale".
+        stale_now = tuple(
+            vid for vid in sorted(st.cons.books) if st.cons.books[vid].stale
+        )
+        stale_changed = stale_now != st.stale_venues
+        just_recovered = bool(st.stale_venues) and not stale_now
+        st.stale_venues = stale_now
+
+        if status != ApplyStatus.APPLIED:
+            st.events_dropped += 1
+            self.events_dropped += 1
+            if stale_changed:
+                self._refresh_book(st, ev.venue_id, t, just_recovered,
+                                   samples=False)
+            return self._maybe_emit(st, t)
+        st.venue_last_ts[ev.venue_id] = t
+        st.venue_updates.add(t, ev.venue_id)
+
         et = ev.event_type
+        oversized = ev.qty > FEATURE_MAX_QTY
+        if oversized:
+            # Oversized quantity (pinned §2.2): the book may hold it, but no
+            # rolling window folds it in — an i64 window sum must stay exact.
+            # The merged view is still refreshed (the book state changed).
+            st.oversized_qty_dropped += 1
+            self.oversized_qty_dropped += 1
+            et = None
         if et == EventType.TRADE:
             self._on_trade(st, ev)
         elif et == EventType.ADD:
@@ -265,11 +406,19 @@ class FeatureEngine:
         elif et == EventType.EXECUTE:
             self._add_evstats(st, t, (0, 0, 0, 0, 0, 1, ev.qty))
 
+        et = ev.event_type
         if et in _BOOK_TOUCH or (
             et == EventType.SNAPSHOT and ev.trade_id == 0
         ):
-            self._refresh_book(st, ev.venue_id, t)
+            self._refresh_book(st, ev.venue_id, t, just_recovered)
+        elif stale_changed:
+            self._refresh_book(st, ev.venue_id, t, just_recovered,
+                               samples=False)
 
+        return self._maybe_emit(st, t)
+
+    def _maybe_emit(self, st: _InstState, t: int) -> Optional[FeatureVector]:
+        """Cadence check (pure event time); emits at most one vector."""
         if (
             self.cadence_ns == 0
             or st.last_emit is None
@@ -286,6 +435,10 @@ class FeatureEngine:
             self.apply(ev)
         return {
             "events_processed": self.events_processed,
+            "events_dropped": self.events_dropped,
+            "ts_regressions_dropped": self.ts_regressions_dropped,
+            "oversized_qty_dropped": self.oversized_qty_dropped,
+            "oversized_depth_skipped": self.oversized_depth_skipped,
             "vectors_emitted": self.vectors_emitted,
             "instruments": len(self.states),
         }
@@ -311,12 +464,29 @@ class FeatureEngine:
         for win in st.trades.values():
             win.add(ev.exchange_ts, vals)
 
-    def _refresh_book(self, st: _InstState, venue_id: int, t: int) -> None:
-        """Recompute the merged view after a book-touching event."""
+    def _refresh_book(self, st: _InstState, venue_id: int, t: int,
+                      just_recovered: bool = False,
+                      samples: bool = True) -> None:
+        """Recompute the merged view (pinned, API_FEATURES §2).
+
+        ``samples=False`` is a *staleness refresh*: the merged view and
+        ``book_ok`` are recomputed because the set of stale venues changed,
+        but no OFI / queue / depth / mid sample is recorded — a venue
+        appearing in or disappearing from the merged view is a data
+        availability event, not order flow.
+        """
         cons = st.cons
+        st.refresh_seq += 1
         vb = cons.books.get(venue_id)
         if vb is not None:
             st.venue_cache[venue_id] = (vb.depth(0, 10), vb.depth(1, 10))
+        # stale->fresh recovery: clear all rolling state before this refresh
+        # contributes anything (pinned, API_FEATURES §2.1).
+        if just_recovered:
+            st.reset_rolling(t)
+            st.depth_bid = []
+            st.depth_ask = []
+            st.book_ok = False
         # merged non-stale depth (sorted venue iteration — deterministic)
         agg_b: Dict[int, int] = {}
         agg_a: Dict[int, int] = {}
@@ -333,30 +503,47 @@ class FeatureEngine:
                 agg_a[p] = agg_a.get(p, 0) + q
         st.venue_rows = rows
         prev_bid, prev_ask = st.depth_bid, st.depth_ask
-        prev_ok = st.book_ok
-        prev_mid2 = st.mid2
         bid = sorted(agg_b.items(), key=lambda x: -x[0])[:10]
         ask = sorted(agg_a.items())[:10]
+
+        # Oversized merged depth (pinned §2.2): a level above FEATURE_MAX_QTY
+        # makes the merged view unusable — clear it, record nothing, and let
+        # the next clean refresh re-baseline (like the first refresh).
+        oversized = any(q > FEATURE_MAX_QTY for _, q in bid) or any(
+            q > FEATURE_MAX_QTY for _, q in ask
+        )
+        if oversized:
+            st.oversized_depth_skipped += 1
+            self.oversized_depth_skipped += 1
+            st.depth_bid, st.depth_ask = [], []
+            st.book_ok = False
+            self._status_flags(st)
+            return
         st.depth_bid, st.depth_ask = bid, ask
 
-        # OFI contributions + L1 queue deltas (defined per side, book_ok or not)
-        contribs = [0, 0, 0, 0]
-        for i, k in enumerate((1, 3, 5, 10)):
-            db = self._delta(prev_bid, bid, k)
-            da = self._delta(prev_ask, ask, k)
-            contribs[i] = db - da
-        if prev_bid or prev_ask or bid or ask:
+        # OFI contributions + L1 queue deltas (defined per side, book_ok or
+        # not).  The first refresh after a recovery has no previous depth
+        # and contributes nothing (same rule as the very first refresh).
+        sample_flow = samples and (not just_recovered) and bool(
+            prev_bid or prev_ask or bid or ask
+        )
+        if sample_flow:
+            contribs = [0, 0, 0, 0]
+            for i, k in enumerate((1, 3, 5, 10)):
+                db = self._delta(prev_bid, bid, k)
+                da = self._delta(prev_ask, ask, k)
+                contribs[i] = db - da
             ct = tuple(contribs)
             for win in st.ofi.values():
                 win.add(t, ct)
-        dep_b, rep_b = self._queue_delta(prev_bid, bid, True)
-        dep_a, rep_a = self._queue_delta(prev_ask, ask, False)
-        if prev_bid or prev_ask or bid or ask:
+            dep_b, rep_b = self._queue_delta(prev_bid, bid, True)
+            dep_a, rep_a = self._queue_delta(prev_ask, ask, False)
             qt = (dep_b, rep_b, dep_a, rep_a)
             for win in st.queue.values():
                 win.add(t, qt)
 
         st.book_ok = bool(bid) and bool(ask)
+        self._status_flags(st)
         if not st.book_ok:
             return
         st.bid_p, st.bid_q = bid[0]
@@ -375,6 +562,9 @@ class FeatureEngine:
         st.spread_ticks = st.ask_p - st.bid_p
         st.spread_bps = st.spread_ticks * st.tick / st.mid * 1e4
 
+        if not samples:
+            return  # staleness refresh: view updated, nothing recorded
+
         # depth/imbalance/spread sample (every two-sided refresh)
         imb = []
         for bk, ak in ((st.db1, st.da1), (st.db3, st.da3),
@@ -386,9 +576,14 @@ class FeatureEngine:
         for win in st.depthavg.values():
             win.add(t, dvals)
 
-        # mid-change samples
-        if not prev_ok or st.mid2 != prev_mid2:
-            if prev_ok and len(st.hist2):
+        # Mid-change samples.  The comparison is against the last RECORDED
+        # mid sample (pinned): a one-sided flicker that moves the mid still
+        # produces a vol sample, and a flicker back to the same mid produces
+        # none.  History is empty right after a stale recovery, so no sample
+        # ever spans an unobserved interval.
+        last_mid2 = st.hist2.last()
+        if last_mid2 is None or st.mid2 != last_mid2:
+            if last_mid2 is not None:
                 dlm = st.logmid - st.histlog.last()
                 adlm = abs(dlm)
                 # jump detection against the *prior* 1m mean (no lookahead).
@@ -468,16 +663,20 @@ class FeatureEngine:
 
     # ------------------------------------------------------------- emissions
 
-    def _emit(self, st: _InstState, t: int) -> FeatureVector:
-        st.t = t
-        st.trim_all(t)
-        # consolidated session status flags (sorted venue order)
+    @staticmethod
+    def _status_flags(st: _InstState) -> None:
+        """Consolidated session status flags (sorted venue order)."""
         halt = auction = False
         for vid in sorted(st.cons.books):
             status = st.cons.books[vid].status
             halt = halt or status == SessionStatus.HALT
             auction = auction or status == SessionStatus.AUCTION
         st.halt, st.auction = halt, auction
+
+    def _emit(self, st: _InstState, t: int) -> FeatureVector:
+        st.t = t
+        st.trim_all(t)
+        self._status_flags(st)
         # L1 order counts across non-stale venues quoting the best price
         st.oc_bid1 = st.oc_ask1 = 0
         if st.book_ok:
@@ -514,7 +713,7 @@ class FeatureEngine:
         )
         # fold this emission's observations into the session profile
         # (after all reads — normalizations never see their own value)
-        bucket = SessionProfile.bucket_of(t)
+        bucket = SessionProfile.bucket_of(t, st.ctx.clock.offset_seconds(t))
         for m in timeofday.PROFILE_METRICS:
             cur = timeofday._metric_value(st, m)
             if cur is not None:

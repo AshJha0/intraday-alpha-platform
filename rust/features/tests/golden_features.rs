@@ -209,3 +209,124 @@ fn cadence_limits_emissions() {
         );
     }
 }
+
+// ---------------------------------------------------------------------------
+// Anomaly-vector golden (API_FEATURES.md §2 ingestion rules)
+// ---------------------------------------------------------------------------
+
+/// Replay one anomaly vector and check every pinned checkpoint: emission
+/// timestamp, engine drop counters, stale-recovery count and the full
+/// native-45 sub-vector.
+fn check_anomaly_side(golden: &serde_json::Value, side: &str, tick: f64) {
+    let doc = &golden[side];
+    let vector = doc["vector"].as_str().expect("vector name");
+    let instrument_id = doc["instrument_id"].as_u64().expect("instrument") as u32;
+    let events = read_jsonl(golden_path(vector)).expect("anomaly vector");
+    assert_eq!(
+        events.len() as u64,
+        doc["n_events"].as_u64().expect("n_events"),
+        "{side}: vector length"
+    );
+    let mut eng = engine_for(instrument_id, tick);
+    let cps = doc["checkpoints"].as_object().expect("checkpoints");
+    let mut checked = 0usize;
+    for (i, ev) in events.iter().enumerate() {
+        let vec = eng.apply(ev).expect("anomaly events never error");
+        let key = (i + 1).to_string();
+        let Some(cp) = cps.get(&key) else { continue };
+        let vec = vec.unwrap_or_else(|| panic!("{side}@{key}: cadence 0 must emit"));
+        assert_eq!(
+            vec.timestamp,
+            cp["timestamp"].as_i64().unwrap(),
+            "{side}@{key}: timestamp"
+        );
+        assert_eq!(
+            eng.events_processed,
+            cp["events_processed"].as_u64().unwrap(),
+            "{side}@{key}: events_processed"
+        );
+        assert_eq!(
+            eng.events_dropped,
+            cp["events_dropped"].as_u64().unwrap(),
+            "{side}@{key}: events_dropped (only APPLIED events feed state)"
+        );
+        assert_eq!(
+            eng.ts_regressions_dropped,
+            cp["ts_regressions_dropped"].as_u64().unwrap(),
+            "{side}@{key}: ts_regressions_dropped"
+        );
+        assert_eq!(
+            eng.oversized_qty_dropped,
+            cp["oversized_qty_dropped"].as_u64().unwrap(),
+            "{side}@{key}: oversized_qty_dropped"
+        );
+        assert_eq!(
+            eng.oversized_depth_skipped,
+            cp["oversized_depth_skipped"].as_u64().unwrap(),
+            "{side}@{key}: oversized_depth_skipped"
+        );
+        assert_eq!(
+            eng.recoveries(instrument_id),
+            cp["recoveries"].as_u64().unwrap(),
+            "{side}@{key}: stale->fresh recoveries"
+        );
+        assert_eq!(
+            eng.warm_ts(instrument_id),
+            cp["warm_ts"].as_i64(),
+            "{side}@{key}: warmup anchor"
+        );
+        assert_eq!(
+            eng.book_ok(instrument_id),
+            cp["book_ok"].as_bool().unwrap(),
+            "{side}@{key}: book_ok"
+        );
+        for (name, entry) in cp["features"].as_object().expect("features") {
+            let slot = features::feature_index(name)
+                .unwrap_or_else(|| panic!("{name} must be a native feature"));
+            let want_valid = entry["valid"].as_bool().unwrap();
+            assert_eq!(
+                vec.validity[slot], want_valid,
+                "{side}@{key} {name}: validity"
+            );
+            if want_valid {
+                let want = entry["value"].as_f64().unwrap();
+                let got = vec.values[slot];
+                assert!(
+                    (got - want).abs() <= ABS_TOL + REL_TOL * want.abs(),
+                    "{side}@{key} {name}: {got} != {want}"
+                );
+                checked += 1;
+            }
+        }
+    }
+    assert_eq!(cps.len(), events.iter().enumerate().filter(|(i, _)| cps.contains_key(&(i + 1).to_string())).count());
+    assert!(checked > 100, "{side}: too few valid features compared");
+}
+
+#[test]
+fn anomaly_golden_eq_matches() {
+    let golden = load_json("expected_features_anomalies.json");
+    check_anomaly_side(&golden, "eq", 0.01);
+}
+
+#[test]
+fn anomaly_golden_fx_matches() {
+    let golden = load_json("expected_features_anomalies.json");
+    check_anomaly_side(&golden, "fx", 1e-5);
+}
+
+#[test]
+fn anomaly_golden_exercises_the_drop_paths() {
+    let golden = load_json("expected_features_anomalies.json");
+    for side in ["eq", "fx"] {
+        let cps = golden[side]["checkpoints"].as_object().unwrap();
+        let last = cps
+            .iter()
+            .max_by_key(|(k, _)| k.parse::<u64>().unwrap())
+            .unwrap()
+            .1;
+        assert!(last["events_dropped"].as_u64().unwrap() > 0, "{side}");
+        assert!(last["ts_regressions_dropped"].as_u64().unwrap() > 0, "{side}");
+        assert!(last["recoveries"].as_u64().unwrap() > 0, "{side}");
+    }
+}

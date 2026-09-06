@@ -1,0 +1,40 @@
+{
+  "data_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
+  "experiment_id": "run_0028_elasticnet",
+  "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
+  "features": null,
+  "folds": null,
+  "git_commit": "a87ca00ff50ee6db9dd7d0b3f57897c916ba8189",
+  "git_dirty": true,
+  "git_dirty_hash": "efcc0d13b25e16309ad3b93da562dca19f9e69d8da40c7df73e8f035e309d082",
+  "hardware": {
+    "cpu_count": 2,
+    "cpu_model": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "machine": "x86_64",
+    "python": "3.11.15",
+    "system": "Linux"
+  },
+  "hyperparams": {
+    "alpha": 0.0001,
+    "l1_ratio": 0.5,
+    "max_iter": 5000
+  },
+  "library_versions": {
+    "lightgbm": "4.7.0",
+    "numpy": "2.4.4",
+    "pandas": "3.0.2",
+    "pyarrow": "25.0.1",
+    "sklearn": "1.8.0",
+    "xgboost": "3.2.0"
+  },
+  "model_version": "elasticnet_v1",
+  "target": null,
+  "test_window": {
+    "end_ts": 1787691459285005656,
+    "start_ts": 1787669923043734877
+  },
+  "train_window": {
+    "end_ts": 1787669857938725198,
+    "start_ts": 1787529602028520532
+  }
+}

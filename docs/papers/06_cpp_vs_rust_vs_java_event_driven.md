@@ -280,3 +280,69 @@ latency folklore admits.
 | Java no-Maven decision + pom-equivalent | `docs/BUILD_NOTES.md`, `java/build.sh` |
 | pinned semantics and conventions | `PLATFORM_CONVENTIONS.md` §§3-5, `docs/SPECIFICATION.md` §21-23 |
 | line counts | `wc -l` over `cpp/{src,include,tests}`, `rust/**/*.rs` (excl. target), `java/src`, `python/src` — 2026-08-29 |
+
+## Erratum / Update — 2026-09-06 (round-3 market-data boundary fixes)
+
+- The Rust order book (`rust/orderbook/src/book.rs`) is no longer the "safe
+  BTreeMap book" with `Vec`-backed FIFO and arrival lists described above:
+  it now uses order/level slabs with intrusive per-level FIFO and global
+  arrival lists plus price-keyed `BTreeMap`s, so cancels/executes/quotes
+  are O(1) per order (the earlier design was O(N) in resting orders —
+  quadratic on real books; a 50k-order cancel storm is now a regression
+  test). Still no `unsafe` outside the SPSC ring.
+- The Rust replay demo now streams events from a decoder thread through the
+  bounded SPSC event bus into the engine (blocking backpressure, never
+  drops). Re-measured in this container on 2026-09-06 with that cross-thread
+  hand-off included: ≈ 6.5M events/s equity, ≈ 5.1M events/s FX (single
+  timed pass, high variance) versus the ≈ 6.9M / ≈ 6.1M in-thread figures
+  recorded above — the measurement boundary moved, the conclusion ("orders
+  of magnitude of headroom") does not.
+- All four books gained the same pinned anomaly semantics (status-gated
+  matching, synthetic ids, reorder window, sequence resets, checked i64
+  arithmetic, CRC-32 IAP1 trailer) and are held equal by two new anomaly
+  golden vectors; see `docs/SCENARIOS.md` and `schemas/MIGRATIONS.md`
+  (2026-09-06 entry). The parity counts quoted above are those of the
+  2026-08-29 / 08-30 runs; the current table is in `README.md`.
+
+### Benchmark erratum — the codec numbers above are superseded
+
+**The paper's headline engineering claim is wrong in direction and is
+withdrawn.** Section 4.1 reads "the binary codec is ~60x faster than JSONL
+(3.5 vs 214 ns/event) — format choice dwarfs most micro-optimization". That
+comparison was measured before IAP1 carried an integrity check. Round-3
+made the CRC-32 trailer mandatory on every record (`schemas/MIGRATIONS.md`,
+2026-09-06; rationale: a silently truncated or bit-flipped record must not
+be replayed as valid state), and a byte-serial table CRC over the 144 KB
+body costs roughly 5 cycles/byte. Re-measured on an idle container
+(loadavg 0.25) with the same `bench_all` methodology:
+
+| figure | as published (2026-08-29) | current (2026-09-06) |
+|---|---|---|
+| IAP1 decode | 3.5 ns/event | **174.4 ns/event** |
+| IAP1 encode | 3.3 ns/event | **170.3 ns/event** |
+| JSONL decode (control, no CRC) | 214 ns/event | 225.7 ns/event |
+| book update (eq MBO) | 17.4 ns/event | **25.7 ns/event** |
+| book update (fx QUOTE) | 29.6 ns/event | **36.2 ns/event** |
+| feature engine (48 feats, cadence 0) | 450.5 ns/event | **530.4 ns/event** |
+| alpha scoring (3 alphas) | 32.3 ns/event | **38.5 ns/event** |
+| execution sim replay | 41.7 ns/event | **66.2 ns/event** |
+| replay engine | 37.1M events/s | **28.1M events/s** |
+
+The JSONL control moved 214 → 225.7 ns (container noise), which isolates
+the *codec* change to the CRC path. The non-codec rows moved too — the
+feature engine and alpha scoring by ~18-19 %, the execution sim by ~59 % —
+from round-3 engine changes plus the same container variance; they are
+listed here so no row of §4.1 is left looking current, but they carry no
+part of the codec argument. Binary decode is now **1.29x** JSONL, not 60x:
+with integrity checking included, format choice does *not* dwarf
+micro-optimization on this path — the integrity check dominates the decode,
+and a vectorised CRC (CLMUL) or a per-block rather than per-record check is
+now the highest-value optimisation available, which is the opposite of the
+paper's advice. The *architectural* conclusions (event-driven structure,
+port comparison, boundaries) are unaffected; the *format* conclusion is
+not, and should not be cited.
+
+Current numbers, the cold single-pass reference table and the full
+methodology are generated into `benchmarks/results_cpp.md` by
+`cpp/bench/bench_all.cpp`; the caveat text is emitted by the generator so
+it can no longer be lost on regeneration.

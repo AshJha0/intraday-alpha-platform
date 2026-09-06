@@ -13,7 +13,7 @@ auditable:
 | Python | stdlib + `pyarrow` (pipeline); numpy/pandas/scipy/sklearn preinstalled research stack | `python/pyproject.toml`; production image installs only the pipeline deps. Release images must add a `pip freeze`-generated constraints file recorded in the release manifest. |
 | C++ | g++/CMake toolchain, GoogleTest, Eigen (system packages) | Debian package versions recorded at image build; no FetchContent/network downloads in CMake (`cpp/CMakeLists.txt` resolves system packages only). |
 | Rust | `serde`, `serde_json` (+ `crossbeam` only where justified) — PLATFORM_CONVENTIONS.md §10 | `rust/Cargo.toml` workspace dependencies; **`Cargo.lock` is the pin** — commit it, and never publish a release image built without a lockfile. |
-| Java | **none at runtime**; JUnit4 + hamcrest, test scope only | Local jar at `/usr/share/java/junit4.jar` (or vendored `java/lib/`). Maven/Gradle are deliberately absent (Maven Central unreachable — `docs/BUILD_NOTES.md` is the normative pom-equivalent list). Any new Java dependency must be vendored into `java/lib/` and recorded there. |
+| Java | **none at runtime**; JUnit4 + hamcrest, test scope only | Local jar at `/usr/share/java/junit4.jar` (or vendored `java/lib/`). Maven/Gradle are deliberately absent (Maven Central unreachable — `docs/BUILD_NOTES.md` is the normative pom-equivalent list). Any new Java dependency must be vendored into `java/lib/` and recorded there. The `iap/java` image build does NOT run the JUnit suite (its base image has no JUnit jars and the build may not reach a registry): the gate is `.github/workflows/ci.yml`, and the `images` job `needs:` it. |
 | Images | base images in `deployment/docker/*`, `docker-compose.yml`, `deployment/k8s/*` | Tag-pinned in repo; **digest-pinned at release** (`image@sha256:...` recorded in the release manifest — symbolic in-repo because this environment builds offline). |
 
 Adding a dependency in any language is a reviewed change (see GOVERNANCE.md)
@@ -71,6 +71,23 @@ secrets.**
   grafana→prometheus:9090, ingress→grafana:3000) are open.
 - Raw market data is immutable (spec §1): pipeline outputs are written once
   per dated run; nothing rewrites `data/raw/` in place.
+- **Monitoring API exposure** (`com.iap.api.MetricsServer`, port 8080):
+  `/metrics`, `/health`, `/ready` and `/status` are **unauthenticated** and
+  must stay behind the NetworkPolicy (only `prometheus → java-platform:8080`
+  is open) — they expose position, P&L and limit data. The write surface is
+  authenticated: `POST /admin/{kill,clear,override,roll}` requires a bearer
+  token from `$IAP_ADMIN_TOKEN` or `$IAP_ADMIN_TOKEN_FILE` (a Kubernetes
+  Secret), compared in constant time; **with no token configured the routes
+  are not registered at all** (404) — the platform never exposes an
+  unauthenticated kill endpoint. The token is never logged: the audit records
+  its sha256 (`PLATFORM_CONVENTIONS.md` §12.5). Handlers run on a bounded pool
+  with `maxReqTime`/`maxRspTime`, so a client that connects and stalls cannot
+  occupy the server, and — because the metric registry is lock-free (§12.4) —
+  cannot stall the trading thread either.
+- **Durable state** (`$IAP_STATE_DIR`) holds positions, P&L and the audit
+  logs. It is written by the container's non-root user on a mounted
+  volume/PVC and must never be baked into an image or committed;
+  `.gitignore` excludes it.
 
 ## 5. Reporting
 

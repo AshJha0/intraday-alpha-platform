@@ -91,3 +91,77 @@ def test_engine_determinism(golden, contexts):
         assert a[cp].values == b[cp].values  # exact float equality
         assert a[cp].validity == b[cp].validity
         assert a[cp].feature_version == b[cp].feature_version
+
+
+# --------------------------------------------------------------------------
+# Anomaly-vector golden (API_FEATURES §2 ingestion rules)
+# --------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def golden_anomalies():
+    with open(GOLDEN_DIR / "expected_features_anomalies.json") as f:
+        return json.load(f)
+
+
+def _run_anomaly_side(side_doc, contexts):
+    """Replay one anomaly vector; return {checkpoint: (vector, counters)}."""
+    events = read_jsonl(GOLDEN_DIR / side_doc["vector"])
+    engine = FeatureEngine(contexts, cadence_ns=0)
+    want = {int(k) for k in side_doc["checkpoints"]}
+    out = {}
+    for i, ev in enumerate(events, start=1):
+        vec = engine.apply(ev)
+        if i in want:
+            st = engine.states[side_doc["instrument_id"]]
+            out[i] = (
+                vec,
+                {
+                    "events_processed": engine.events_processed,
+                    "events_dropped": engine.events_dropped,
+                    "ts_regressions_dropped": engine.ts_regressions_dropped,
+                    "oversized_qty_dropped": engine.oversized_qty_dropped,
+                    "oversized_depth_skipped": engine.oversized_depth_skipped,
+                    "recoveries": st.recoveries,
+                    "warm_ts": st.warm_ts,
+                    "book_ok": st.book_ok,
+                },
+            )
+    assert len(events) == side_doc["n_events"]
+    return out
+
+
+def _check_anomaly_side(side_doc, contexts):
+    idx = feature_index()
+    got = _run_anomaly_side(side_doc, contexts)
+    for key in sorted(side_doc["checkpoints"], key=int):
+        exp = side_doc["checkpoints"][key]
+        vec, counters = got[int(key)]
+        assert vec.timestamp == exp["timestamp"], key
+        for cname, want in counters.items():
+            assert want == exp[cname], (key, cname)
+        for name, e in exp["features"].items():
+            i = idx[name]
+            assert vec.validity[i] == e["valid"], (key, name)
+            if e["valid"]:
+                v, w = vec.values[i], e["value"]
+                assert abs(v - w) <= TOL + TOL * abs(w), (key, name, v, w)
+
+
+def test_golden_anomaly_eq_checkpoints(golden_anomalies, contexts):
+    _check_anomaly_side(golden_anomalies["eq"], contexts)
+
+
+def test_golden_anomaly_fx_checkpoints(golden_anomalies, contexts):
+    _check_anomaly_side(golden_anomalies["fx"], contexts)
+
+
+def test_golden_anomaly_vector_exercises_the_drop_paths(golden_anomalies):
+    """The vectors must actually contain drops, ts regressions and recoveries
+    (otherwise the golden would silently stop testing the ingestion rules)."""
+    for side in ("eq", "fx"):
+        last_key = sorted(golden_anomalies[side]["checkpoints"], key=int)[-1]
+        last = golden_anomalies[side]["checkpoints"][last_key]
+        assert last["events_dropped"] > 0, side
+        assert last["ts_regressions_dropped"] > 0, side
+        assert last["recoveries"] > 0, side

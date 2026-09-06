@@ -9,25 +9,36 @@
       "2026-08-27",
       "2026-08-28"
     ],
-    "timezone": "UTC"
+    "timezone": "UTC",
+    "description": "Explicit synthetic trading calendar (YYYY-MM-DD, sorted). Sessions below are defined in their own IANA timezone (UTC for the synthetic venues) and converted via zoneinfo; fx_week defines the weekly FX open/close window in New York time."
   },
   "sessions": {
     "EQUITY": {
+      "timezone": "UTC",
       "open": "13:30:00",
       "close": "20:00:00",
       "open_auction": "13:30:00",
       "close_auction": "20:00:00"
     },
     "ETF": {
+      "timezone": "UTC",
       "open": "13:30:00",
       "close": "20:00:00",
       "open_auction": "13:30:00",
       "close_auction": "20:00:00"
     },
     "FX": {
+      "timezone": "UTC",
       "open": "00:00:00",
       "close": "21:00:00"
     }
+  },
+  "fx_week": {
+    "timezone": "America/New_York",
+    "open_weekday": 6,
+    "open": "17:00:00",
+    "close_weekday": 4,
+    "close": "17:00:00"
   },
   "instruments": [
     {

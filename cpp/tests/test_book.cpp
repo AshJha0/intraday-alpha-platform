@@ -120,9 +120,11 @@ TEST(Book, DuplicateAddOrderIdDroppedAndCounted) {
     EXPECT_EQ(book.counters().unknown_order_events, 1u);
     EXPECT_EQ(*book.best_bid(), LE(100, 10));
     EXPECT_EQ(book.order_count_total(), 1u);
-    // The dropped ADD still advanced sequence and counted as applied.
+    // The dropped ADD still advanced the sequence; it is NOT counted as
+    // applied (accounting invariant: applied + drops == events fed).
     EXPECT_EQ(book.last_sequence(), 2u);
-    EXPECT_EQ(book.counters().events_applied, 2u);
+    EXPECT_EQ(book.counters().events_applied, 1u);
+    EXPECT_EQ(book.counters().events_applied + book.counters().drops(), 2u);
 }
 
 // ------------------------------------------------------------------- MODIFY
@@ -157,12 +159,17 @@ TEST(Book, ModifyIncreaseMovesToTail) {
     EXPECT_EQ(cp.levels[0].orders[1].second, 15);
 }
 
-TEST(Book, ModifyPriceFieldIgnored) {
+TEST(Book, ModifyPriceMismatchDroppedAndCounted) {
     OrderBook book(1, 1);
     Stream s;
     book.apply(s.ev(ADD, BID, 100, 10, 1));
-    book.apply(s.ev(MODIFY, BID, 999, 8, 1));  // qty change only
+    book.apply(s.ev(MODIFY, BID, 999, 8, 1));  // price change: adapter bug
+    EXPECT_EQ(book.counters().modify_price_mismatch, 1u);
+    EXPECT_EQ(*book.best_bid(), LE(100, 10));
+    book.apply(s.ev(MODIFY, BID, 0, 8, 1));    // price 0 = unchanged
     EXPECT_EQ(*book.best_bid(), LE(100, 8));
+    book.apply(s.ev(MODIFY, BID, 100, 6, 1));  // matching price
+    EXPECT_EQ(*book.best_bid(), LE(100, 6));
     EXPECT_TRUE(book.depth(Side::BID, 10).size() == 1);
 }
 

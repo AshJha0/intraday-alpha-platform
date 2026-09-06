@@ -1,0 +1,36 @@
+{
+  "data_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
+  "experiment_id": "run_0022_ols",
+  "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
+  "features": null,
+  "folds": null,
+  "git_commit": "3fff88d772f280f80cbc6b1355c5411eedcc41a8",
+  "git_dirty": true,
+  "git_dirty_hash": "087a2be1a0259c28055411dd9d5850148c6041990f16cb226f897b3510a1e841",
+  "hardware": {
+    "cpu_count": 2,
+    "cpu_model": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "machine": "x86_64",
+    "python": "3.11.15",
+    "system": "Linux"
+  },
+  "hyperparams": {},
+  "library_versions": {
+    "lightgbm": "4.7.0",
+    "numpy": "2.4.4",
+    "pandas": "3.0.2",
+    "pyarrow": "25.0.1",
+    "sklearn": "1.8.0",
+    "xgboost": "3.2.0"
+  },
+  "model_version": "ols_v1",
+  "target": null,
+  "test_window": {
+    "end_ts": 1787691459285005656,
+    "start_ts": 1787669923043734877
+  },
+  "train_window": {
+    "end_ts": 1787669857938725198,
+    "start_ts": 1787529602028520532
+  }
+}

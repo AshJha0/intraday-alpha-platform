@@ -2,11 +2,11 @@
 
 Deterministic simulation (SplitMix64 seed `20260829`) over the cross-language golden vectors (`tests/golden/events_eq_mbo.jsonl`, `events_fx_quote.jsonl`), replayed through the reference consolidated book. Execution model: 4 child slices 15s apart, marketable at the touch plus depth-dependent impact ticks, 15% per-child unfill probability. This is a research TCA harness, not the production backtester.
 
-**Honest caveat**: the synthetic multi-venue generator can occasionally produce *crossed* consolidated books (negative spread; < 2% of equity event states under the shared-efficient-price design), so isolated spread-cost lines can be negative — a synthetic-data artifact, flagged rather than hidden (conventions §7).
+**Timeline rule (pinned, API_PORTFOLIO_TCA.md §2.1)**: crossed consolidated states (cross-venue bid > ask, a synthetic-generator artifact) are SKIPPED and counted, locked states (half-spread 0) are kept; markouts past the timeline end or across a HALT are undefined (excluded, never a stale mid); every fill must lie in [arrival, end]. Crossed states skipped per instrument: 1: 0 of 1935, 101: 55 of 799. Spread-cost lines are therefore never negative by construction (conventions §7: honest, not hidden).
 
 ## Instrument 1
 
-Parent orders: 24 | market trades on tape: 246
+Parent orders: 24 | market trades on tape: 246 | timeline states: 1935 | crossed skipped: 0 | halts: 0
 
 ### Per-order implementation shortfall (Perold)
 
@@ -51,13 +51,13 @@ Parent orders: 24 | market trades on tape: 246
 
 ### Adverse selection (post-fill markout, mean bps)
 
-| delta | mean markout bps |
-|---|---|
-| 100ms | -24.102 |
-| 1s | -24.123 |
-| 10s | -23.934 |
+| delta | mean markout bps | fills defined |
+|---|---|---|
+| 100ms | -24.102 | 82 / 82 |
+| 1s | -24.123 | 82 / 82 |
+| 10s | -23.934 | 82 / 82 |
 
-Markout = side * (mid(t_fill + delta) - fill px) / fill px; negative values mean the price reverted after our marketable fills (we paid temporary impact), positive means continued adverse drift.
+Markout = side * (mid(t_fill + delta) - fill px) / fill px over the fills whose markout is defined (timeline reaches t_fill + delta, no HALT inside the window — pinned §2.5); negative values mean the price reverted after our marketable fills (we paid temporary impact), positive means continued adverse drift.
 
 ### Impact estimate (signed fill cost vs participation)
 
@@ -67,7 +67,7 @@ Markout = side * (mid(t_fill + delta) - fill px) / fill px; negative values mean
 
 ## Instrument 101
 
-Parent orders: 12 | market trades on tape: 51
+Parent orders: 12 | market trades on tape: 51 | timeline states: 744 | crossed skipped: 55 | halts: 0
 
 ### Per-order implementation shortfall (Perold)
 
@@ -75,44 +75,44 @@ Parent orders: 12 | market trades on tape: 51
 |---|---|---|---|---|---|---|---|---|---|
 | 25 | SELL | 1.00 | -0.000 | 0.598 | -0.000 | 0.598 | 0.598 | n/a | 0.598 |
 | 26 | BUY | 0.75 | 0.000 | 0.380 | 0.000 | 0.380 | 0.506 | n/a | 0.506 |
-| 27 | SELL | 1.00 | -0.000 | 0.552 | -0.000 | 0.552 | 0.552 | n/a | 0.552 |
-| 28 | SELL | 0.75 | -0.000 | 0.380 | -0.000 | 0.380 | 0.506 | n/a | 0.506 |
-| 29 | BUY | 1.00 | 0.000 | 0.552 | 0.000 | 0.552 | 0.552 | n/a | 0.552 |
-| 30 | SELL | 0.50 | -0.000 | 0.299 | 0.023 | 0.322 | 0.598 | n/a | 0.590 |
-| 31 | BUY | 1.00 | 0.000 | 0.552 | 0.000 | 0.552 | 0.552 | n/a | 0.552 |
+| 27 | SELL | 1.00 | -0.000 | 0.552 | 0.000 | 0.552 | 0.552 | n/a | 0.480 |
+| 28 | SELL | 0.75 | -0.000 | 0.345 | -0.035 | 0.311 | 0.460 | n/a | 0.561 |
+| 29 | BUY | 1.00 | 0.000 | 0.644 | 0.000 | 0.644 | 0.644 | n/a | 0.559 |
+| 30 | SELL | 0.50 | -0.000 | 0.299 | 0.023 | 0.322 | 0.598 | n/a | 0.570 |
+| 31 | BUY | 1.00 | 0.000 | 0.598 | 0.000 | 0.598 | 0.598 | n/a | 0.598 |
 | 32 | SELL | 1.00 | -0.000 | 0.506 | -0.000 | 0.506 | 0.506 | n/a | 0.506 |
-| 33 | BUY | 0.75 | 0.000 | 0.380 | 0.000 | 0.380 | 0.506 | n/a | 0.506 |
-| 34 | BUY | 0.50 | 0.000 | 0.253 | 0.000 | 0.253 | 0.506 | n/a | 0.506 |
-| 35 | SELL | 0.75 | -0.000 | 0.380 | -0.012 | 0.368 | 0.506 | n/a | 0.542 |
-| 36 | SELL | 1.00 | -0.000 | 0.506 | -0.000 | 0.506 | 0.506 | n/a | 0.556 |
+| 33 | BUY | 0.75 | 0.000 | 0.345 | 0.000 | 0.345 | 0.460 | n/a | 0.460 |
+| 34 | BUY | 0.50 | 0.000 | 0.276 | 0.000 | 0.276 | 0.552 | n/a | 0.552 |
+| 35 | SELL | 0.75 | -0.000 | 0.380 | 0.012 | 0.391 | 0.506 | n/a | 0.495 |
+| 36 | SELL | 1.00 | -0.000 | 0.598 | -0.000 | 0.598 | 0.598 | n/a | 0.598 |
 
 ### Aggregates
 
 | metric | value |
 |---|---|
 | mean fill rate | 0.833 |
-| mean total IS bps | 0.446 |
+| mean total IS bps | 0.460 |
 | mean delay bps | 0.000 |
-| mean trading bps | 0.445 |
-| mean opportunity bps | 0.001 |
-| mean arrival slippage bps | 0.533 |
+| mean trading bps | 0.460 |
+| mean opportunity bps | 0.000 |
+| mean arrival slippage bps | 0.548 |
 | mean exec alpha vs VWAP bps | n/a |
 
 ### Adverse selection (post-fill markout, mean bps)
 
-| delta | mean markout bps |
-|---|---|
-| 100ms | -0.539 |
-| 1s | -0.539 |
-| 10s | -0.537 |
+| delta | mean markout bps | fills defined |
+|---|---|---|
+| 100ms | -0.539 | 40 / 40 |
+| 1s | -0.537 | 40 / 40 |
+| 10s | -0.538 | 40 / 40 |
 
-Markout = side * (mid(t_fill + delta) - fill px) / fill px; negative values mean the price reverted after our marketable fills (we paid temporary impact), positive means continued adverse drift.
+Markout = side * (mid(t_fill + delta) - fill px) / fill px over the fills whose markout is defined (timeline reaches t_fill + delta, no HALT inside the window — pinned §2.5); negative values mean the price reverted after our marketable fills (we paid temporary impact), positive means continued adverse drift.
 
 ### Impact estimate (signed fill cost vs participation)
 
 | slope (bps per unit participation) | intercept bps | R^2 | n fills |
 |---|---|---|---|
-| 0.000 | 0.539 | 0.003 | 40 |
+| -0.000 | 0.565 | 0.268 | 40 |
 
 ## Execution-alpha attribution note
 

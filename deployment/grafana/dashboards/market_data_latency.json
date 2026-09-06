@@ -1,7 +1,7 @@
 {
   "uid": "iap-md-latency",
   "title": "Market Data & Latency",
-  "description": "Feed health, stream QC and hot-path tail latency (spec \u00a722/\u00a725). Metric mapping: deployment/grafana/README.md.",
+  "description": "Feed health, stream QC and hot-path tail latency (spec §22/§25). Metric mapping: deployment/grafana/README.md.",
   "tags": [
     "iap",
     "market-data",
@@ -28,7 +28,7 @@
       "id": 1,
       "type": "stat",
       "title": "Feed status (events in last 1m)",
-      "description": "0 for >5s trips the StaleFeed page (risk.json stale_feed_timeout_ns).",
+      "description": "Normalized market events/sec from the java platform. A 5s event-time gap trips the StaleFeed page (risk.json stale_feed_timeout_ns).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -77,7 +77,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(md_events_total[1m])) + sum(rate(venue_market_events_total[1m])) or vector(0)",
+          "expr": "sum(rate(md_events_total[1m])) or vector(0)",
           "legendFormat": "events/s",
           "refId": "A"
         }
@@ -149,8 +149,8 @@
     {
       "id": 3,
       "type": "stat",
-      "title": "Queue depth (event bus) \u2014 PLACEHOLDER",
-      "description": "PLACEHOLDER: no producer emits eventbus_queue_depth yet (rust eventbus has no exporter wired) \u2014 renders No data. Contract: QueueDepthHigh alert at 100k. See deployment/grafana/README.md.",
+      "title": "Session state",
+      "description": "platform_session_state: 0 STARTING, 1 RUNNING, 2 FINISHED, 3 FAILED (PLATFORM_CONVENTIONS.md §12.6). A paper session is finite: FINISHED is the normal terminal state.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -164,21 +164,47 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "mappings": [],
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "STARTING",
+                  "index": 0
+                },
+                "1": {
+                  "text": "RUNNING",
+                  "index": 1
+                },
+                "2": {
+                  "text": "FINISHED",
+                  "index": 2
+                },
+                "3": {
+                  "text": "FAILED",
+                  "index": 3
+                }
+              }
+            }
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "blue",
                 "value": null
               },
               {
-                "color": "orange",
-                "value": 10000
+                "color": "green",
+                "value": 1
+              },
+              {
+                "color": "text",
+                "value": 2
               },
               {
                 "color": "red",
-                "value": 100000
+                "value": 3
               }
             ]
           }
@@ -203,8 +229,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "max(eventbus_queue_depth)",
-          "legendFormat": "events",
+          "expr": "max(platform_session_state)",
+          "legendFormat": "state",
           "refId": "A"
         }
       ]
@@ -212,8 +238,8 @@
     {
       "id": 4,
       "type": "stat",
-      "title": "Venue ack p99 (live, rust)",
-      "description": "venue_ack_latency_ns from rust/venue sim \u2014 live today.",
+      "title": "Event-time gap (last event)",
+      "description": "md_event_time_gap_seconds — the gap between the last two consecutive processed events. This is the staleness signal StaleFeed alerts on; it is correct in replay AND live (PLATFORM_CONVENTIONS.md §12.6).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -226,7 +252,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "ns",
+          "unit": "s",
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -234,6 +260,10 @@
               {
                 "color": "green",
                 "value": null
+              },
+              {
+                "color": "red",
+                "value": 5
               }
             ]
           }
@@ -258,8 +288,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "max(job:venue_ack_latency_ns:p99)",
-          "legendFormat": "p99 ns",
+          "expr": "max(md_event_time_gap_seconds)",
+          "legendFormat": "gap s",
           "refId": "A"
         }
       ]
@@ -268,7 +298,7 @@
       "id": 10,
       "type": "timeseries",
       "title": "Market-data events/sec",
-      "description": "Normalized event throughput per service (spec \u00a725 market-data health).",
+      "description": "Normalized event throughput per service (spec §25 market-data health).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -310,25 +340,16 @@
             "uid": "prometheus"
           },
           "expr": "job:md_events:rate5m",
-          "legendFormat": "md {{service}} (java)",
+          "legendFormat": "md {{service}}",
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "job:venue_market_events:rate5m",
-          "legendFormat": "venue {{service}} (rust, live)",
-          "refId": "B"
         }
       ]
     },
     {
       "id": 11,
       "type": "timeseries",
-      "title": "Stream QC: gaps / duplicates / out-of-order (per sec)",
-      "description": "Gap/duplicate counters are LIVE from the java platform (mirroring qc_report.json fields); the out-of-order series is PLACEHOLDER \u2014 md_out_of_order_total has no producer yet and renders No data.",
+      "title": "Stream QC: sequence gaps / duplicates (per sec)",
+      "description": "Gap and duplicate counters, LIVE from the java platform and updated on EVERY event (max_sequence_gap_before_halt = 1, so a single gap must be visible on the next scrape). The SequenceGapDetected alert uses increase(...) > 0, not a rate.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -381,15 +402,6 @@
           "expr": "job:md_duplicates:rate5m",
           "legendFormat": "duplicates {{service}}",
           "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "job:md_out_of_order:rate5m",
-          "legendFormat": "out-of-order {{service}}",
-          "refId": "C"
         }
       ]
     },
@@ -603,8 +615,8 @@
     {
       "id": 15,
       "type": "timeseries",
-      "title": "Event-bus queue depth \u2014 PLACEHOLDER",
-      "description": "PLACEHOLDER: no producer emits eventbus_queue_depth yet \u2014 renders No data. Contract: producer minus consumer backlog; sustained growth = consumer stall.",
+      "title": "Book stale & session restarts",
+      "description": "book_stale{instrument} is 1 while any venue book of the instrument is stale (fail-closed trading); risk_session_restarts_total counts --resume restarts, each of which re-warms the book from the stream (PLATFORM_CONVENTIONS.md §12.3).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -645,9 +657,18 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "eventbus_queue_depth",
-          "legendFormat": "{{service}}",
+          "expr": "book_stale",
+          "legendFormat": "stale instrument {{instrument}}",
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "risk_session_restarts_total",
+          "legendFormat": "restarts {{service}}",
+          "refId": "B"
         }
       ]
     },
@@ -655,7 +676,7 @@
       "id": 16,
       "type": "timeseries",
       "title": "JVM GC pause p99",
-      "description": "GcPauseHigh alert at 10ms sustained 5m (spec \u00a723).",
+      "description": "GcPauseHigh alert at 10ms sustained 5m (spec §23).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"

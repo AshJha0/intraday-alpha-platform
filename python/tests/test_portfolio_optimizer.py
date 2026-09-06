@@ -212,3 +212,70 @@ def test_solver_input_validation():
                          vol_target=0.01)
         c2.validate(n)
         project(np.ones(n), c2, wp, None)  # vol target without Sigma
+
+
+# ------------------------------------------------------ round-3 scenarios
+
+
+def test_portfolio_infeasible_raises_or_flags():
+    """turnover_cap 0 with w_prev outside the gross cap: no iterate is
+    feasible -> feasible False, weights == w_prev (hold), finite objective,
+    audit rows with negative slack (pinned §1.3, step 4)."""
+    n = 2
+    w_prev = np.array([0.5, 0.5])
+    cons = Constraints(w_min=-np.ones(n), w_max=np.ones(n), gross_cap=0.5,
+                       turnover_cap=0.0)
+    res = solve(np.array([0.01, 0.02]), np.eye(n) * 1e-4, w_prev, 1.0,
+                np.zeros(n), cons, iters=50)
+    assert res.feasible is False
+    assert res.status == "INFEASIBLE"
+    assert np.array_equal(res.weights, w_prev)
+    assert np.isfinite(res.objective) and res.objective != -np.inf
+    assert res.best_iteration == 0
+    assert abs(res.max_violation - 0.5) < 1e-12
+    audit = constraint_audit(res.weights, cons, w_prev, np.eye(n) * 1e-4)
+    assert audit["feasible"] is False
+    gross = next(r for r in audit["constraints"] if r["name"] == "gross_exposure")
+    assert gross["slack"] < 0
+    assert abs(audit["max_violation"] - 0.5) < 1e-12
+    # a feasible problem reports feasible True / OPTIMAL
+    ok = solve(np.array([0.01, 0.02]), np.eye(n) * 1e-4, np.zeros(n), 1.0,
+               np.zeros(n), Constraints(w_min=-np.ones(n), w_max=np.ones(n),
+                                        gross_cap=0.5), iters=50)
+    assert ok.feasible is True and ok.status == "OPTIMAL"
+
+
+def test_portfolio_rejects_nonfinite_inputs():
+    n = 2
+    cons = Constraints(w_min=-np.ones(n), w_max=np.ones(n))
+    a, S, wp, tc = np.zeros(n), np.eye(n), np.zeros(n), np.zeros(n)
+    with pytest.raises(ValueError, match="alpha"):
+        solve(np.array([np.nan, 0.0]), S, wp, 1.0, tc, cons)
+    with pytest.raises(ValueError, match="Sigma"):
+        solve(a, np.array([[np.inf, 0.0], [0.0, 1.0]]), wp, 1.0, tc, cons)
+    with pytest.raises(ValueError, match="w_prev"):
+        solve(a, S, np.array([np.nan, 0.0]), 1.0, tc, cons)
+    with pytest.raises(ValueError, match="tc_linear"):
+        solve(a, S, wp, 1.0, np.array([np.inf, 0.0]), cons)
+    with pytest.raises(ValueError, match="risk_aversion"):
+        solve(a, S, wp, np.nan, tc, cons)
+    with pytest.raises(ValueError, match="finite"):
+        solve(a, S, wp, 1.0, tc, Constraints(w_min=np.array([-np.inf, 0.0]),
+                                             w_max=np.ones(n)))
+
+
+def test_portfolio_zero_sigma_lambda_zero_auto_eta():
+    """Sigma = 0, lambda = 0, tc > 0: the auto step is 1 / max(0, 1e-6) =
+    1e6; the result must still be finite, feasible and bang-bang inside the
+    box (the L1 cost soft-threshold and box projection bound the step)."""
+    n = 3
+    alpha = np.array([0.01, -0.02, 0.0])
+    cons = Constraints(w_min=-np.ones(n), w_max=np.ones(n))
+    res = solve(alpha, np.zeros((n, n)), np.zeros(n), 0.0,
+                np.full(n, 1e-4), cons, iters=100)
+    assert res.feasible
+    assert np.all(np.isfinite(res.weights))
+    assert np.isfinite(res.objective)
+    assert abs(res.weights[0] - 1.0) < 1e-12 and abs(res.weights[1] + 1.0) < 1e-12
+    assert abs(res.weights[2]) < 1e-12  # zero alpha: the L1 cost keeps it flat
+    assert res.max_violation <= 1e-7

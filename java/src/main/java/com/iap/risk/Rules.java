@@ -45,10 +45,14 @@ public final class Rules {
     public static final String GROSS_NOTIONAL = "GROSS_NOTIONAL";
     /** Projected net notional beyond the cap. */
     public static final String NET_NOTIONAL = "NET_NOTIONAL";
-    /** Firm-wide realized daily loss limit breached. */
+    /** Firm-wide daily loss limit (realized + unrealized) breached. */
     public static final String DAILY_LOSS = "DAILY_LOSS";
-    /** Per-strategy realized loss limit breached. */
+    /** Per-strategy daily loss limit (realized + unrealized) breached. */
     public static final String STRATEGY_LOSS = "STRATEGY_LOSS";
+    /** Quote-to-reporting currency conversion rate missing or stale. */
+    public static final String FX_RATE_MISSING = "FX_RATE_MISSING";
+    /** Engine awaits a position bootstrap (drop-copy) or state restore. */
+    public static final String NOT_BOOTSTRAPPED = "NOT_BOOTSTRAPPED";
     /** Order passed every check. */
     public static final String ALLOW = "ALLOW";
     /** Engine is fail-closed (missing/invalid configuration). */
@@ -61,6 +65,16 @@ public final class Rules {
     public static final String VENUE_DISCONNECT = "VENUE_DISCONNECT";
     /** Venue reconnect notification (audit record). */
     public static final String VENUE_RECONNECT = "VENUE_RECONNECT";
+    /** A fill was rejected as malformed / unpriceable (audit record). */
+    public static final String MALFORMED_FILL = "MALFORMED_FILL";
+    /** A loss limit was overridden with approval (audit record). */
+    public static final String LOSS_LIMIT_OVERRIDE = "LOSS_LIMIT_OVERRIDE";
+    /** The trading session rolled: daily P&amp;L re-based (audit record). */
+    public static final String SESSION_ROLLED = "SESSION_ROLLED";
+    /** Position bootstrap completed (audit record). */
+    public static final String BOOTSTRAP_COMPLETE = "BOOTSTRAP_COMPLETE";
+    /** Engine state restored from a snapshot (audit record). */
+    public static final String STATE_RESTORED = "STATE_RESTORED";
 
     private Rules() {
     }

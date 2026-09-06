@@ -105,7 +105,17 @@ public final class LifecycleGauge {
      * (possibly new) state. {@code NaN} = no evidence, no movement.
      */
     public State update(double rollingIc) {
-        if (Double.isNaN(rollingIc)) {
+        return update(rollingIc, true);
+    }
+
+    /**
+     * One evaluation. {@code informative} is false when the evaluation's
+     * matured set gained no new rows since the last counted evaluation
+     * (pinned, API_ADAPTIVE.md section 6): re-reading a frozen IC window is
+     * ONE reading, not N consecutive breaches, so it moves nothing.
+     */
+    public State update(double rollingIc, boolean informative) {
+        if (Double.isNaN(rollingIc) || !informative) {
             return state;
         }
         boolean breach = rollingIc < watchIcGate;

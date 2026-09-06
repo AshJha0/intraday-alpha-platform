@@ -18,7 +18,8 @@ are half-open event-time intervals (t-w, t].
                         change whose |dlm| exceeded 4x the then-prevailing
                         1m mean|dlm| (>= 30 prior samples) at the moment it
                         happened (threshold jump detector, no lookahead)
-- ``vol_ratio_a_b``   = rvol_a / (rvol_b + EPS) (volatility acceleration)
+- ``vol_ratio_a_b``   = rvol_a / (rvol_b + EPS) (volatility acceleration);
+                      INVALID when rvol_b == 0 (EPS guard, API_FEATURES §4)
 
 Validity: warmup of the window; mean/std statistics need enough samples
 (volofvol >= 2, jump_flag >= 30); ranges need at least one sample.
@@ -108,6 +109,6 @@ def compute(st, values: List[float], valid: List[bool]) -> None:
     put(values, valid, st.jumps.count if wok else None, wok)
     for a, b in (("10s", "1m"), ("1m", "5m")):
         v = None
-        if rvols[a] is not None and rvols[b] is not None:
+        if rvols[a] is not None and rvols[b] is not None and st.rv[b].count > 0:
             v = rvols[a] / (rvols[b] + EPS)
         put(values, valid, v, v is not None)

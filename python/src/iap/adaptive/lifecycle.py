@@ -19,6 +19,12 @@ the rolling OOS IC of the *deployed* scores over matured rows only):
   through probation, never jump straight back).
 - ``rolling_ic is None`` (too little matured data): no transition, all
   counters unchanged — silence is not evidence.
+- ``informative=False`` — the evaluation re-read an UNCHANGED matured set
+  (no new matured rows since the last counted evaluation): treated exactly
+  like ``rolling_ic is None``.  Re-reading the same 2-hour IC window six
+  times after a feed goes quiet is ONE reading, not six consecutive
+  breaches; without this rule an alpha was retired on one bad window plus
+  silence, and stayed retired through the next session's open.
 
 Gates (``watch_ic_gate``, ``reactivate_ic_gate``,
 ``retire_breach_evals``, ``reactivate_evals``) are pinned in
@@ -153,11 +159,17 @@ class LifecycleTracker:
         self.breach_count = 0
         self.recovery_count = 0
 
-    def update(self, ts: int, rolling_ic: Optional[float]) -> str:
-        """One evaluation at event time ts; returns the (possibly new) state."""
+    def update(self, ts: int, rolling_ic: Optional[float],
+               informative: bool = True) -> str:
+        """One evaluation at event time ts; returns the (possibly new) state.
+
+        ``informative`` is False when the evaluation's matured set gained no
+        new rows since the last counted evaluation (pinned, API_ADAPTIVE §6):
+        the reading carries no new evidence and moves nothing.
+        """
         self.eval_index += 1
         cfg = self.config
-        if rolling_ic is None:
+        if rolling_ic is None or not informative:
             return self.state  # no evidence, no movement (pinned)
         breach = rolling_ic < cfg.watch_ic_gate
         recover = rolling_ic >= cfg.reactivate_ic_gate

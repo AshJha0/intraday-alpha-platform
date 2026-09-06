@@ -138,6 +138,15 @@ TEST(Jsonl, RejectsMalformedLines) {
     EXPECT_THROW(decode_jsonl_line(line + "x"), std::invalid_argument);
 }
 
+TEST(Jsonl, RejectsNegativeZeroOnUnsignedAcceptsOnSigned) {
+    std::string line = encode_jsonl_line(sample());
+    line.replace(line.find("\"sequence\":9"), 12, "\"sequence\":-0");
+    EXPECT_THROW(decode_jsonl_line(line), std::invalid_argument);
+    std::string line2 = encode_jsonl_line(sample());
+    line2.replace(line2.find("\"qty\":300"), 9, "\"qty\":-0");
+    EXPECT_EQ(decode_jsonl_line(line2).qty, 0);
+}
+
 TEST(Jsonl, RejectsUnsignedFieldOutOfRange) {
     std::string line = encode_jsonl_line(sample());
     line.replace(line.find("\"venue_id\":1"), 12, "\"venue_id\":70000");
@@ -149,20 +158,62 @@ TEST(Jsonl, RejectsUnsignedFieldOutOfRange) {
 
 // -------------------------------------------------------------------- IAP1
 
-TEST(Iap1, HeaderAndRecordBytes) {
+TEST(Iap1, HeaderRecordAndTrailerBytes) {
     auto data = encode_iap1(sample_vec());
-    ASSERT_EQ(data.size(), 16u + 2u * 72u);
+    ASSERT_EQ(data.size(), 16u + 2u * 72u + 16u);
     // Magic 0x49415031 little-endian on disk: '1' 'P' 'A' 'I'.
     EXPECT_EQ(data[0], '1');
     EXPECT_EQ(data[1], 'P');
     EXPECT_EQ(data[2], 'A');
     EXPECT_EQ(data[3], 'I');
-    EXPECT_EQ(data[4], 1u);  // version LE
+    EXPECT_EQ(data[4], 2u);  // version 2 LE
     EXPECT_EQ(data[5], 0u);
     EXPECT_EQ(data[8], 2u);  // count LE
     // First record starts with event_id=7 LE.
     EXPECT_EQ(data[16], 7u);
     EXPECT_EQ(data[17], 0u);
+    // Trailer: crc32(header + records) | reserved 0 | count echo.
+    const std::size_t body = 16u + 2u * 72u;
+    const std::uint32_t crc = iap::crc32(data.data(), body);
+    EXPECT_EQ(data[body], static_cast<std::uint8_t>(crc));
+    EXPECT_EQ(data[body + 3], static_cast<std::uint8_t>(crc >> 24));
+    EXPECT_EQ(data[body + 4], 0u);
+    EXPECT_EQ(data[body + 8], 2u);
+}
+
+TEST(Iap1, Crc32KnownAnswer) {
+    const std::string s = "123456789";
+    EXPECT_EQ(iap::crc32(reinterpret_cast<const std::uint8_t*>(s.data()),
+                         s.size()),
+              0xCBF43926u);
+    EXPECT_EQ(iap::crc32(nullptr, 0), 0u);
+}
+
+TEST(Iap1, LegacyV1AcceptedWithoutIntegrity) {
+    auto data = encode_iap1(sample_vec());
+    data.resize(16u + 2u * 72u);  // strip the trailer
+    data[4] = 1;                  // version 1
+    auto decoded = iap::decode_iap1_ex(data.data(), data.size());
+    EXPECT_EQ(decoded.version, 1u);
+    EXPECT_FALSE(decoded.integrity_checked);
+    ASSERT_EQ(decoded.events.size(), 2u);
+    EXPECT_EQ(decoded.events[0], sample_vec()[0]);
+    auto enc = encode_iap1(sample_vec());
+    auto v2 = iap::decode_iap1_ex(enc.data(), enc.size());
+    EXPECT_EQ(v2.version, 2u);
+    EXPECT_TRUE(v2.integrity_checked);
+}
+
+TEST(Iap1, RejectsCorruptedRecordViaCrc) {
+    auto data = encode_iap1(sample_vec());
+    data[16 + 50] ^= 0x01;  // a qty byte of record 0
+    EXPECT_THROW(decode_iap1(data), std::invalid_argument);
+    auto data2 = encode_iap1(sample_vec());
+    data2[data2.size() - 8] ^= 0x01;  // count echo
+    EXPECT_THROW(decode_iap1(data2), std::invalid_argument);
+    auto data3 = encode_iap1(sample_vec());
+    data3[data3.size() - 12] = 1;  // reserved
+    EXPECT_THROW(decode_iap1(data3), std::invalid_argument);
 }
 
 TEST(Iap1, RoundTrip) {
@@ -176,7 +227,7 @@ TEST(Iap1, RoundTrip) {
 
 TEST(Iap1, EmptyVectorRoundTrip) {
     auto data = encode_iap1({});
-    EXPECT_EQ(data.size(), 16u);
+    EXPECT_EQ(data.size(), 32u);  // header + trailer
     EXPECT_TRUE(decode_iap1(data).empty());
 }
 
@@ -188,7 +239,7 @@ TEST(Iap1, RejectsBadMagic) {
 
 TEST(Iap1, RejectsBadVersion) {
     auto data = encode_iap1(sample_vec());
-    data[4] = 2;
+    data[4] = 3;
     EXPECT_THROW(decode_iap1(data), std::invalid_argument);
 }
 

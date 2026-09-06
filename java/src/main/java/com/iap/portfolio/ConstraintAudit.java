@@ -22,9 +22,14 @@ public final class ConstraintAudit {
             boolean binding) {
     }
 
-    /** The full audit report. */
+    /**
+     * The full audit report. {@code feasible} is {@code maxViolation <=
+     * bindTol}: an INFEASIBLE solve (API_PORTFOLIO_TCA.md §1.3) audits
+     * w_prev and shows negative slack on the violated rows.
+     */
     public record Report(List<Row> constraints, int nBinding, double turnover,
-            double gross, double net, Double realizedVol, Double targetVol) {
+            double gross, double net, Double realizedVol, Double targetVol,
+            boolean feasible, double maxViolation) {
         /** Compact JSON for solve responses / session reports. */
         public String toJson() {
             StringBuilder sb = new StringBuilder(256);
@@ -39,7 +44,9 @@ public final class ConstraintAudit {
                                 + "\"slack\":%s,\"value\":%s}",
                         r.binding(), r.bound(), r.name(), r.slack(), r.value()));
             }
-            sb.append("],\"gross\":").append(gross)
+            sb.append("],\"feasible\":").append(feasible)
+                    .append(",\"gross\":").append(gross)
+                    .append(",\"max_violation\":").append(maxViolation)
                     .append(",\"n_binding\":").append(nBinding)
                     .append(",\"net\":").append(net)
                     .append(",\"realized_vol\":")
@@ -119,13 +126,16 @@ public final class ConstraintAudit {
             }
         }
         int nBinding = 0;
+        double maxViolation = 0.0;
         for (Row r : rows) {
             if (r.binding()) {
                 nBinding++;
             }
+            maxViolation = Math.max(maxViolation, -r.slack());
         }
         return new Report(List.copyOf(rows), nBinding, turnover, gross, net,
-                realizedVol, cons.volTarget);
+                realizedVol, cons.volTarget, maxViolation <= bindTol,
+                maxViolation);
     }
 
     private static void addRow(List<Row> rows, String name, double value,

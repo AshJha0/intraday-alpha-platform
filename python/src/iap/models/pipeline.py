@@ -24,7 +24,12 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 
 from iap.experiment.tracker import ExperimentTracker
-from iap.models.dataset import Dataset, TrainScaler, TARGET_HORIZON_NS
+from iap.models.dataset import (
+    Dataset,
+    TARGET_COLUMN,
+    TARGET_HORIZON_NS,
+    TrainScaler,
+)
 from iap.models.economics import signal_economics
 from iap.models.splits import Fold, WalkForwardSplitter
 from iap.models.zoo import (
@@ -39,14 +44,29 @@ from iap.validation.metrics import _ranks as _avg_ranks
 _HALF_SPREAD_COL = 4
 
 
+def _asset_classes(ds, idx: np.ndarray) -> list:
+    """Sorted asset classes present in a row subset (fold composition)."""
+    inst = getattr(ds, "instrument_ids", None)
+    if inst is None or len(inst) == 0:
+        return []
+    ids = np.asarray(inst)[idx]
+    return sorted({"FX" if int(i) >= 100 else "EQUITY" for i in ids})
+
+
 def information_coefficient(pred: np.ndarray, y: np.ndarray) -> float:
-    """Pearson IC; 0.0 when degenerate (constant predictions)."""
+    """Pearson IC; **NaN** when degenerate (constant predictions).
+
+    Round-3: a degenerate fold used to return 0.0, which then entered
+    ``mean_ic`` as if it were evidence of "no skill" and diluted the mean.
+    NaN is the same convention as :func:`iap.validation.metrics.ic`, and the
+    caller reports how many folds were degenerate.
+    """
     pred = np.asarray(pred, dtype=np.float64)
     y = np.asarray(y, dtype=np.float64)
     if len(pred) != len(y):
         raise ValueError("pred/y length mismatch")
     if len(pred) < 3 or np.std(pred) == 0.0 or np.std(y) == 0.0:
-        return 0.0
+        return float("nan")
     return float(np.corrcoef(pred, y)[0, 1])
 
 
@@ -102,12 +122,18 @@ def _evaluate_model(
         pred = np.asarray(model.predict(X_te), dtype=np.float64)
         pooled_pred[fold.test_idx] = pred
         y_te = ds.y[fold.test_idx]
+        ic_f = information_coefficient(pred, y_te)
         per_fold.append({
             "fold": fold.fold,
             "n_train": int(len(fold.train_idx)),
             "n_test": int(len(fold.test_idx)),
-            "ic": information_coefficient(pred, y_te),
+            "train_window": [int(fold.train_window[0]), int(fold.train_window[1])],
+            "test_window": [int(fold.test_window[0]), int(fold.test_window[1])],
+            "train_asset_classes": _asset_classes(ds, fold.train_idx),
+            "test_asset_classes": _asset_classes(ds, fold.test_idx),
+            "ic": ic_f,
             "rank_ic": rank_ic(pred, y_te),
+            "degenerate": bool(not np.isfinite(ic_f)),
         })
         final_model = model  # last fold = largest purged train window
 
@@ -120,12 +146,19 @@ def _evaluate_model(
     econ_exact = signal_economics(
         pooled_pred[idx], ds.y_mid[idx], ds.y[idx], cost_est,
         conservative=False)
-    fold_ics = [f["ic"] for f in per_fold]
+    fold_ics = [f["ic"] for f in per_fold if np.isfinite(f["ic"])]
+    rank_ics = [f["rank_ic"] for f in per_fold if np.isfinite(f["rank_ic"])]
     return {
         "model": name,
         "per_fold": per_fold,
-        "mean_ic": float(np.mean(fold_ics)),
-        "mean_rank_ic": float(np.mean([f["rank_ic"] for f in per_fold])),
+        "n_folds": len(per_fold),
+        "n_degenerate_folds": sum(1 for f in per_fold if f["degenerate"]),
+        "asset_mix_warning": [
+            f["fold"] for f in per_fold
+            if set(f["test_asset_classes"]) - set(f["train_asset_classes"])
+        ],
+        "mean_ic": float(np.mean(fold_ics)) if fold_ics else float("nan"),
+        "mean_rank_ic": float(np.mean(rank_ics)) if rank_ics else float("nan"),
         "ic_tstat": ic_tstat(fold_ics),
         "pooled_ic": information_coefficient(pooled_pred[idx], ds.y[idx]),
         # IC against the MID-TO-MID label: the honest directional-signal
@@ -156,11 +189,13 @@ def run_model_comparison(
         label_horizon_ns=TARGET_HORIZON_NS)
     folds = splitter.split(ds.ts)
 
-    results: Dict[str, Any] = {"models": {}, "folds": [
+    fold_records = [
         {"fold": f.fold, "n_train": int(len(f.train_idx)),
          "n_test": int(len(f.test_idx)),
-         "train_window": list(f.train_window),
-         "test_window": list(f.test_window)} for f in folds]}
+         "train_window": [int(f.train_window[0]), int(f.train_window[1])],
+         "test_window": [int(f.test_window[0]), int(f.test_window[1])]}
+        for f in folds]
+    results: Dict[str, Any] = {"models": {}, "folds": fold_records}
 
     def _track(res: Dict[str, Any]) -> None:
         if tracker is None:
@@ -168,6 +203,8 @@ def run_model_comparison(
         name = res["model"]
         run_id = tracker.new_run(name)
         last = folds[-1]
+        # WHICH columns and WHICH rows: without features/target/folds a
+        # manifest names a commit but cannot reproduce the fit (spec §14/§26).
         tracker.write_manifest(
             run_id,
             model_version=f"{name}_v1",
@@ -176,6 +213,9 @@ def run_model_comparison(
                           "end_ts": int(last.train_window[1])},
             test_window={"start_ts": int(last.test_window[0]),
                          "end_ts": int(last.test_window[1])},
+            features=list(ds.feature_names),
+            target=TARGET_COLUMN,
+            folds=fold_records,
         )
         tracker.write_metrics(
             run_id, {k: v for k, v in res.items()
@@ -189,14 +229,25 @@ def run_model_comparison(
         _track(res)
         results["models"][name] = res
 
-    # ---- The gate (literal): best linear mean OOS IC must be positive
-    tier0_ics = {n: results["models"][n]["mean_ic"] for n in model_names(0)}
-    best_linear = max(tier0_ics, key=lambda n: tier0_ics[n])
-    gate_passed = tier0_ics[best_linear] > 0.0
+    # ---- The gate (literal): the best linear model must show a positive
+    # OOS IC against the MID-TO-MID label.  The cost-adjusted target embeds
+    # the observable half-spread (corr(spread, target) ~ -0.94), so gating on
+    # it passed trivially — it measured spread, not direction (round-3).
+    tier0_ics = {
+        n: results["models"][n]["pooled_ic_vs_mid"] for n in model_names(0)
+    }
+    best_linear = max(
+        tier0_ics, key=lambda n: (tier0_ics[n] if np.isfinite(tier0_ics[n])
+                                  else -np.inf))
+    gate_passed = bool(np.isfinite(tier0_ics[best_linear])
+                       and tier0_ics[best_linear] > 0.0)
     results["gate"] = {
-        "rule": "advanced models run only if best linear mean OOS IC > 0",
+        "rule": ("advanced models run only if the best linear pooled OOS IC "
+                 "vs the MID-TO-MID label is > 0 (the cost-adjusted target "
+                 "embeds the observable half-spread)"),
         "best_linear_model": best_linear,
-        "best_linear_mean_oos_ic": tier0_ics[best_linear],
+        "best_linear_pooled_ic_vs_mid": tier0_ics[best_linear],
+        "best_linear_mean_oos_ic": results["models"][best_linear]["mean_ic"],
         "passed": bool(gate_passed),
         "tree_fallback_active": TREE_FALLBACK_ACTIVE,
     }

@@ -12,15 +12,27 @@
 // sub-vector. Order below is pinned by the Feature enum.
 //
 // State-update semantics (pinned, section 2 of API_FEATURES.md):
-// - events are applied to the per-venue books of a ConsolidatedBook;
-// - the merged top-10 view is refreshed only after book-touching events
+// - an exchange_ts below the instrument's last seen exchange_ts (cross-venue
+//   clock skew) is dropped + counted before the book sees it;
+// - events are applied to the per-venue books of a ConsolidatedBook; ONLY
+//   events the book reports APPLIED feed rolling state (duplicates, invalid
+//   sides, malformed payloads and events dropped while stale contribute
+//   nothing);
+// - the merged top-10 view is refreshed after APPLIED book-touching events
 //   (ADD/MODIFY/CANCEL/EXECUTE/QUOTE and the final record of a SNAPSHOT
-//   burst, trade_id == 0), merging non-stale venues in ascending venue_id;
+//   burst, trade_id == 0) and after any event that changed the set of stale
+//   venues (staleness refresh: view only, no samples), merging non-stale
+//   venues in ascending venue_id;
+// - a stale -> fresh recovery CLEARS every rolling window and history and
+//   re-anchors warmup at the recovery timestamp (warmup_after_recovery);
 // - windows are half-open (t - w, t] on exchange_ts;
-// - mid-derived samples are recorded at mid *changes*; depth samples at every
-//   two-sided refresh; OFI deltas at every refresh;
-// - a windowed feature is invalid until t - first_event_ts >= w (warmup);
-// - NaN never appears with valid == true.
+// - mid-derived samples are recorded whenever the merged mid differs from the
+//   last RECORDED sample; depth samples at every two-sided refresh; OFI
+//   deltas at every refresh;
+// - a windowed feature is invalid until t - warm_ts >= w (warmup);
+// - every x / (y + EPS) ratio is invalid when y <= 0;
+// - quantities above FEATURE_MAX_QTY are not folded into any window;
+// - NaN never appears with valid == true (single value funnel).
 //
 // Hot path: preallocated rolling buffers and merge scratch; no per-event
 // allocation after warmup (conventions section 8).
@@ -50,6 +62,11 @@ constexpr std::int64_t W_5M = 300 * NS_PER_SEC;
 
 // Pinned EPS used in every guarded division (spec EPS = 1e-12).
 constexpr double FEATURE_EPS = 1e-12;
+
+// Largest quantity folded into a rolling window (API_FEATURES.md section 2.2):
+// beyond this a feed is malformed, not a market, and an int64 window sum could
+// no longer be exact in every port.
+constexpr std::int64_t FEATURE_MAX_QTY = std::int64_t{1} << 40;
 
 // The native feature slots, pinned order. Names (registry names, _v1) come
 // from feature_name().
@@ -139,12 +156,38 @@ public:
 
     std::uint64_t events_processed() const { return events_processed_; }
     std::uint64_t vectors_emitted() const { return vectors_emitted_; }
+    // Events the book dropped/held — never folded into rolling state.
+    std::uint64_t events_dropped() const { return events_dropped_; }
+    // Events dropped for an exchange_ts regression (fail closed).
+    std::uint64_t ts_regressions_dropped() const {
+        return ts_regressions_dropped_;
+    }
+    // Applied events whose qty exceeded FEATURE_MAX_QTY (not folded).
+    std::uint64_t oversized_qty_dropped() const {
+        return oversized_qty_dropped_;
+    }
+    // Refreshes whose merged depth exceeded FEATURE_MAX_QTY.
+    std::uint64_t oversized_depth_skipped() const {
+        return oversized_depth_skipped_;
+    }
+    // Stale->fresh recoveries of one instrument (rolling-state resets).
+    std::uint64_t recoveries(std::uint32_t instrument_id) const;
+    // Warmup anchor of one instrument (-1 when it has no events yet).
+    std::int64_t warm_ts(std::uint32_t instrument_id) const;
+    // True when the instrument's merged book is currently two-sided.
+    bool book_ok(std::uint32_t instrument_id) const;
 
 private:
     struct InstState {
         double tick = 0.0;
         ConsolidatedBook cons;
         std::int64_t first_ts = -1;
+        // warmup anchor: first event, or the last stale->fresh recovery
+        std::int64_t warm_ts = -1;
+        std::int64_t last_ts = 0;
+        std::uint64_t recoveries = 0;
+        // sorted ids of this instrument's venues whose book is stale
+        std::vector<std::uint16_t> stale_venues;
         std::int64_t last_emit = -1;
         // merged top-10 view (refreshed on book-touching events)
         bool book_ok = false;
@@ -171,12 +214,18 @@ private:
 
         explicit InstState(std::uint32_t iid, double tick_size);
         bool warm(std::int64_t t, std::int64_t w) const {
-            return first_ts >= 0 && t - first_ts >= w;
+            return warm_ts >= 0 && t - warm_ts >= w;
         }
+        // Clear every rolling window / history; re-anchor warmup at t.
+        void reset_rolling(std::int64_t t);
     };
 
     InstState& state(std::uint32_t instrument_id);
-    void refresh_book(InstState& st, std::uint16_t venue_id, std::int64_t t);
+    // Returns true when the merged depth was oversized (view unusable).
+    bool refresh_book(InstState& st, std::uint16_t venue_id, std::int64_t t,
+                      bool just_recovered, bool samples);
+    bool emit_if_due(InstState& st, std::uint32_t iid, std::int64_t t,
+                     FeatureVector& out);
     void emit(InstState& st, std::uint32_t iid, std::int64_t t,
               FeatureVector& out) const;
     static std::int64_t depth_delta(const std::vector<LevelEntry>& prev,
@@ -187,6 +236,10 @@ private:
     std::int64_t cadence_ns_;
     std::map<std::uint32_t, InstState> states_;
     std::uint64_t events_processed_ = 0;
+    std::uint64_t events_dropped_ = 0;
+    std::uint64_t ts_regressions_dropped_ = 0;
+    std::uint64_t oversized_qty_dropped_ = 0;
+    std::uint64_t oversized_depth_skipped_ = 0;
     std::uint64_t vectors_emitted_ = 0;
 };
 

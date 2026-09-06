@@ -1,6 +1,7 @@
 package com.iap;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.util.List;
@@ -17,6 +18,7 @@ import com.iap.execution.Fill;
 import com.iap.execution.InstrumentSpec;
 import com.iap.execution.LatencyConfig;
 import com.iap.execution.Liquidity;
+import com.iap.execution.CancelReason;
 import com.iap.execution.OrderState;
 import com.iap.execution.OrderType;
 import com.iap.execution.VenueSpec;
@@ -72,6 +74,23 @@ public class ExecutionSimTest {
 
         MarketEvent heartbeat(long ts) {
             return ev(ts, 9, 0, 0, 0, 0);
+        }
+
+        MarketEvent status(long ts, int st) {
+            return ev(ts, 8, 0, 0, st, 0);
+        }
+
+        /** An ADD that skips one sequence number (venue gap -> stale). */
+        MarketEvent gapAdd(long ts, int side, long px, long qty, long oid) {
+            seq++;
+            return add(ts, side, px, qty, oid);
+        }
+
+        MarketEvent snapshot(long ts, int side, long px, long qty, long oid,
+                long countdown) {
+            seq++;
+            return new MarketEvent(seq, INS, VEN, ts, ts, seq, 7, side, px, qty,
+                    oid, countdown);
         }
     }
 
@@ -501,12 +520,17 @@ public class ExecutionSimTest {
         Feeder f = new Feeder();
         seedBook(sim, f);
         long id = sim.submit(child(0, OrderType.LIMIT, 99, 10, T0 + 10));
-        sim.cancel(id);
+        // Rule 7: the cancel travels the latency path; applied at the first
+        // event at/after its arrival (never before the order's own).
+        sim.cancel(id, T0 + 10);
+        assertEquals(OrderState.PENDING, sim.orders().get(id).state);
+        sim.onEvent(f.heartbeat(T0 + 10 + LAT + 1));
         assertEquals(OrderState.CANCELLED, sim.orders().get(id).state);
-        sim.cancel(id); // idempotent on terminal states
+        assertEquals(CancelReason.USER, sim.orders().get(id).cancelReason);
+        sim.cancel(id, T0 + 20); // idempotent on terminal states
         sim.onEvent(f.exec(T0 + 2_000_000, 0, 99, 500, 12));
         assertTrue(sim.fills().isEmpty()); // cancelled orders never fill
-        expectThrow(() -> sim.cancel(9999));
+        expectThrow(() -> sim.cancel(9999, T0));
         expectThrow(() -> sim.submit(child(0, OrderType.LIMIT, 0, 10, T0)));
         expectThrow(() -> sim.submit(child(0, OrderType.MARKET, 0, 0, T0)));
         ChildOrder bad = child(0, OrderType.MARKET, 0, 10, T0);
@@ -521,5 +545,183 @@ public class ExecutionSimTest {
         } catch (IllegalArgumentException expected) {
             // pinned behavior
         }
+    }
+
+    // ------------------------------------------------ round-3 scenarios ---
+
+    /** Scenario: halt at 09:03, re-open auction; uncross fills at the touch. */
+    @Test
+    public void scenarioHaltThenReopenAuction() {
+        ExecutionSimulator sim = new ExecutionSimulator(testConfig(0));
+        Feeder f = new Feeder();
+        seedBook(sim, f);
+        sim.onEvent(f.status(T0 + 100, com.iap.core.SessionStatus.HALT));
+        assertFalse(ExecutionSimulator.venueOpen(sim.venueBook(INS, VEN)));
+        long mkt = sim.submit(child(0, OrderType.MARKET, 0, 50, T0 + 200));
+        long lim = sim.submit(child(0, OrderType.LIMIT, 103, 60, T0 + 200));
+        sim.onEvent(f.heartbeat(T0 + 200 + LAT + 1));
+        assertEquals(OrderState.CANCELLED, sim.orders().get(mkt).state);
+        assertEquals(CancelReason.VENUE_NOT_TRADING, sim.orders().get(mkt).cancelReason);
+        assertEquals(1, sim.counters().venueNotTradingCancels);
+        assertEquals(OrderState.ACTIVE, sim.orders().get(lim).state);
+        assertTrue("no fill through a halt", sim.fills().isEmpty());
+        sim.onEvent(f.exec(T0 + 300, 1, 101, 200, 21));
+        assertTrue(sim.fills().isEmpty());
+        sim.onEvent(f.status(T0 + 400, com.iap.core.SessionStatus.AUCTION));
+        sim.onEvent(f.add(T0 + 500, 1, 100, 500, 23));
+        assertTrue(sim.fills().isEmpty());
+        sim.onEvent(f.status(T0 + 600, com.iap.core.SessionStatus.TRADING));
+        assertEquals(1, sim.fills().size());
+        assertEquals("touch, not the 103 limit", 100, sim.fills().get(0).priceTicks());
+        assertEquals(60, sim.fills().get(0).qty());
+        assertEquals(T0 + 600, sim.fills().get(0).ts());
+        assertEquals(1, sim.counters().reopenTouchFills);
+        assertEquals(OrderState.FILLED, sim.orders().get(lim).state);
+    }
+
+    /** Scenario: multicast storm gaps the feed; no fill while stale. */
+    @Test
+    public void scenarioStaleBookNoFillThenSnapshotRecovery() {
+        ExecutionSimulator sim = new ExecutionSimulator(testConfig(0));
+        Feeder f = new Feeder();
+        seedBook(sim, f);
+        sim.onEvent(f.gapAdd(T0 + 100, 0, 98, 100, 13));
+        assertTrue(sim.venueBook(INS, VEN).isStale());
+        long a = sim.submit(child(1, OrderType.MARKET, 0, 50, T0 + 200));
+        sim.onEvent(f.heartbeat(T0 + 200 + LAT + 1));
+        assertEquals(OrderState.CANCELLED, sim.orders().get(a).state);
+        assertEquals(CancelReason.VENUE_NOT_TRADING, sim.orders().get(a).cancelReason);
+        assertTrue(sim.fills().isEmpty());
+        sim.onEvent(f.snapshot(T0 + 300, 0, 100, 300, 31, 2));
+        sim.onEvent(f.snapshot(T0 + 301, 1, 101, 200, 32, 1));
+        sim.onEvent(f.snapshot(T0 + 302, 1, 102, 500, 33, 0));
+        assertFalse(sim.venueBook(INS, VEN).isStale());
+        long b = sim.submit(child(1, OrderType.MARKET, 0, 50, T0 + 400));
+        sim.onEvent(f.heartbeat(T0 + 400 + LAT + 1));
+        assertEquals(1, sim.fills().size());
+        assertEquals(b, sim.fills().get(0).orderId());
+        assertEquals(100, sim.fills().get(0).priceTicks());
+    }
+
+    /** Rule 3b: two children on one display share one copy of the liquidity. */
+    @Test
+    public void scenarioLiquidityNotReusedAcrossChildren() {
+        ExecutionSimulator sim = new ExecutionSimulator(testConfig(0));
+        Feeder f = new Feeder();
+        seedBook(sim, f); // asks 101x200, 102x500 = 700 displayed
+        long c1 = sim.submit(child(0, OrderType.MARKET, 0, 1000, T0 + 10));
+        long c2 = sim.submit(child(0, OrderType.MARKET, 0, 1000, T0 + 10));
+        sim.onEvent(f.heartbeat(T0 + 10 + LAT + 1));
+        long taken = 0;
+        for (Fill fl : sim.fills()) {
+            taken += fl.qty();
+        }
+        assertEquals("total taker qty <= displayed depth", 700, taken);
+        assertEquals(300, sim.orders().get(c1).remaining);
+        assertEquals(1000, sim.orders().get(c2).remaining);
+        assertEquals(OrderState.CANCELLED, sim.orders().get(c2).state);
+        assertTrue(sim.counters().overlayThinnedFills >= 1);
+        // 150 new at 101 on top of the 200 we took: exactly 150 available
+        sim.onEvent(f.add(T0 + 20, 1, 101, 150, 24));
+        long c3 = sim.submit(child(0, OrderType.MARKET, 0, 200, T0 + 30));
+        sim.onEvent(f.heartbeat(T0 + 30 + LAT + 1));
+        assertEquals(OrderState.CANCELLED, sim.orders().get(c3).state);
+        assertEquals(50, sim.orders().get(c3).remaining);
+        Fill last = sim.fills().get(sim.fills().size() - 1);
+        assertEquals(101, last.priceTicks());
+        assertEquals(150, last.qty());
+        long fok = sim.submit(child(0, OrderType.FOK, 102, 100, T0 + 40));
+        sim.onEvent(f.heartbeat(T0 + 40 + LAT + 1));
+        assertEquals(OrderState.CANCELLED, sim.orders().get(fok).state);
+        assertEquals(100, sim.orders().get(fok).remaining);
+        sim.onEvent(f.exec(T0 + 50, 1, 101, 300, 21));
+        long c4 = sim.submit(child(0, OrderType.IOC, 101, 10, T0 + 60));
+        sim.onEvent(f.heartbeat(T0 + 60 + LAT + 1));
+        assertEquals(10, sim.orders().get(c4).remaining);
+        sim.onEvent(f.cancel(T0 + 70, 1, 101, 50, 21));
+        sim.onEvent(f.add(T0 + 80, 1, 101, 40, 25));
+        long c5 = sim.submit(child(0, OrderType.IOC, 101, 10, T0 + 90));
+        sim.onEvent(f.heartbeat(T0 + 90 + LAT + 1));
+        assertEquals(OrderState.FILLED, sim.orders().get(c5).state);
+    }
+
+    /** Rule 6: FX impact in base units equals the research CostModel value. */
+    @Test
+    public void scenarioFxImpactScalesWithLotSize() {
+        TreeMap<Integer, VenueSpec> venues = new TreeMap<>();
+        venues.put(VEN, new VenueSpec(VEN, "PRI", true, 0.0, 0.0, 2.5, 150_000, 0));
+        TreeMap<Long, InstrumentSpec> instruments = new TreeMap<>();
+        instruments.put(INS, new InstrumentSpec(INS, 1e-05, 1000.0, 4e9));
+        ExecutionSimulator sim = new ExecutionSimulator(
+                new ExecConfig(LatencyConfig.DEFAULT, 42, 2.0, instruments, venues));
+        Feeder f = new Feeder();
+        sim.onEvent(f.add(T0, 0, 108650, 5000, 11));
+        sim.onEvent(f.add(T0 + 1, 1, 108660, 5000, 21));
+        sim.submit(child(0, OrderType.MARKET, 0, 1000, T0 + 10));
+        sim.onEvent(f.heartbeat(T0 + 10 + LAT + 1));
+        assertEquals(1, sim.fills().size());
+        Fill fl = sim.fills().get(0);
+        double price = 108660 * 1e-05;
+        double[] research = new com.iap.backtest.CostModel(2.0, 0.003, 2.5, 1.0)
+                .costComponents(1000, price, 0.0, "FX", 4e9, 1000.0);
+        assertEquals(research[2], fl.impactCost(), 1e-12);
+        assertEquals(research[1], fl.fee(), 1e-12);
+        assertEquals(0.05e-4 * 1000.0 * 1000.0 * price, fl.impactCost(), 1e-12);
+    }
+
+    /** Rule 7: a cancel cannot undo a fill made before it arrives. */
+    @Test
+    public void scenarioCancelHasLatency() {
+        ExecutionSimulator sim = new ExecutionSimulator(testConfig(0));
+        Feeder f = new Feeder();
+        seedBook(sim, f);
+        long id = sim.submit(child(0, OrderType.LIMIT, 100, 50, T0 + 10));
+        sim.onEvent(f.heartbeat(T0 + 10 + LAT + 1));
+        sim.cancel(id, T0 + 1_000_000);
+        assertEquals(T0 + 1_000_000 + LAT, sim.orders().get(id).cancelArrivalTs);
+        sim.onEvent(f.exec(T0 + 1_100_000, 0, 99, 400, 12)); // trade-through
+        assertEquals(1, sim.fills().size());
+        assertEquals(OrderState.FILLED, sim.orders().get(id).state);
+        sim.onEvent(f.heartbeat(T0 + 2_000_000));
+        assertEquals(OrderState.FILLED, sim.orders().get(id).state);
+        assertEquals(0, sim.counters().userCancels);
+        long id2 = sim.submit(child(0, OrderType.LIMIT, 100, 50, T0 + 3_000_000));
+        sim.onEvent(f.heartbeat(T0 + 3_000_000 + LAT + 1));
+        sim.cancel(id2, T0 + 3_100_000);
+        sim.onEvent(f.heartbeat(T0 + 3_100_000 + LAT + 1));
+        assertEquals(OrderState.CANCELLED, sim.orders().get(id2).state);
+        sim.onEvent(f.exec(T0 + 4_000_000, 0, 99, 400, 12));
+        assertEquals("cancelled order never fills", 1, sim.fills().size());
+        assertEquals(1, sim.counters().userCancels);
+        // a cancel never overtakes its own order
+        ExecutionSimulator jit = new ExecutionSimulator(testConfig(50_000));
+        Feeder g = new Feeder();
+        seedBook(jit, g);
+        long m = jit.submit(child(0, OrderType.MARKET, 0, 50, T0 + 10));
+        jit.cancel(m, T0 + 10);
+        assertTrue(jit.orders().get(m).cancelArrivalTs >= jit.orders().get(m).arrivalTs);
+        jit.onEvent(g.heartbeat(T0 + 10 + LAT + 100_000));
+        assertEquals(OrderState.FILLED, jit.orders().get(m).state);
+    }
+
+    /** Time-in-force expires pending and resting orders with no latency. */
+    @Test
+    public void scenarioExpiryBeforeActivation() {
+        ExecutionSimulator sim = new ExecutionSimulator(testConfig(0));
+        Feeder f = new Feeder();
+        seedBook(sim, f);
+        ChildOrder rest = child(0, OrderType.LIMIT, 100, 50, T0 + 10);
+        rest.expireTs = T0 + 5_000_000;
+        long r = sim.submit(rest);
+        sim.onEvent(f.heartbeat(T0 + 10 + LAT + 1));
+        assertEquals(OrderState.ACTIVE, sim.orders().get(r).state);
+        ChildOrder late = child(0, OrderType.MARKET, 0, 50, T0 + 4_900_000);
+        late.expireTs = T0 + 5_000_000;
+        long l = sim.submit(late);
+        sim.onEvent(f.exec(T0 + 5_000_000, 0, 99, 400, 12));
+        assertEquals(CancelReason.EXPIRED, sim.orders().get(r).cancelReason);
+        assertEquals(CancelReason.EXPIRED, sim.orders().get(l).cancelReason);
+        assertTrue(sim.fills().isEmpty());
+        assertEquals(2, sim.counters().expiredOrders);
     }
 }

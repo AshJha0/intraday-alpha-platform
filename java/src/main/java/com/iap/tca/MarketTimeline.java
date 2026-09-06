@@ -18,6 +18,64 @@ public final class MarketTimeline {
     private final List<Long> askSz = new ArrayList<>();
     private final List<long[]> tradeTsQty = new ArrayList<>();
     private final List<Double> tradePx = new ArrayList<>();
+    /** HALT start timestamps (markout windows containing one are undefined). */
+    private final List<Long> halts = new ArrayList<>();
+    private long crossedStatesSkipped;
+
+    /**
+     * Builder rule (pinned §2.1): a CROSSED state ({@code ask < bid}) is
+     * skipped and counted (false); a LOCKED state (half-spread 0) is
+     * appended like any other (true).
+     */
+    public boolean appendStatePinned(long t, double bidPx, double askPx,
+            long bidSize, long askSize) {
+        if (askPx < bidPx) {
+            crossedStatesSkipped++;
+            return false;
+        }
+        append(t, bidPx, askPx, bidSize, askSize);
+        return true;
+    }
+
+    /** Crossed consolidated states skipped by the builder rule. */
+    public long crossedStatesSkipped() {
+        return crossedStatesSkipped;
+    }
+
+    /** Record a HALT status at {@code t}. */
+    public void addHalt(long t) {
+        halts.add(t);
+    }
+
+    /** Timestamp of the last state (throws when empty). */
+    public long lastTs() {
+        if (ts.isEmpty()) {
+            throw new IllegalStateException("empty timeline");
+        }
+        return ts.get(ts.size() - 1);
+    }
+
+    /** True when a HALT started inside {@code (startTs, endTs]}. */
+    public boolean haltIn(long startTs, long endTs) {
+        for (long h : halts) {
+            if (startTs < h && h <= endTs) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Pinned §2.5 "defined" rule: a prevailing mid exists at {@code t}
+     * ({@code lastTs >= t}) and no HALT started inside
+     * {@code (afterTs, t]}.
+     */
+    public boolean midDefinedAt(long t, long afterTs) {
+        if (ts.isEmpty() || prevailing(t) < 0 || lastTs() < t) {
+            return false;
+        }
+        return !haltIn(afterTs, t);
+    }
 
     /** Append one BBO state (non-decreasing ts, uncrossed). */
     public void append(long t, double bidPx, double askPx, long bidSize,

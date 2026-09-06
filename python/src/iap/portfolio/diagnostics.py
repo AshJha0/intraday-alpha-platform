@@ -27,8 +27,11 @@ def constraint_audit(
     """Audit a weight vector against the constraint set.
 
     Returns ``{"constraints": [...], "turnover": .., "gross": .., "net": ..,
-    "realized_vol": .., "target_vol": .., "n_binding": ..}``; each constraint
-    row carries name / value / bound / slack / binding.
+    "realized_vol": .., "target_vol": .., "n_binding": .., "feasible": ..,
+    "max_violation": ..}``; each constraint row carries name / value / bound
+    / slack / binding. ``feasible`` is ``max_violation <= bind_tol`` — an
+    INFEASIBLE solve (API_PORTFOLIO_TCA.md §1.3) audits ``w_prev`` and shows
+    negative slack on the violated rows.
     """
     w = np.asarray(w, dtype=np.float64)
     w_prev = np.asarray(w_prev, dtype=np.float64)
@@ -75,9 +78,12 @@ def constraint_audit(
         if cons.vol_target is not None:
             row("volatility", realized_vol, float(cons.vol_target))
 
+    max_violation = max([0.0] + [-r["slack"] for r in rows])
     return {
         "constraints": rows,
         "n_binding": int(sum(r["binding"] for r in rows)),
+        "feasible": bool(max_violation <= bind_tol),
+        "max_violation": float(max_violation),
         "turnover": float(np.abs(w - w_prev).sum()),
         "gross": float(np.abs(w).sum()),
         "net": float(w.sum()),

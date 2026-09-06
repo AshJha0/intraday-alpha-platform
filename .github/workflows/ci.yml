@@ -1,0 +1,196 @@
+# =============================================================================
+# CI — the gate every governance document already referred to.
+#
+# GOVERNANCE.md §1 requires "tests/harness/run_all.sh green (all four
+# languages)" and "YAML must pass the structural validation used in CI";
+# RUNBOOK_backtest.md says "CI treats budget breaks as failures";
+# SECURITY.md routes deployment reports to CODEOWNERS; Dockerfile.java defers
+# its JUnit gate to "the CI harness". Until round 3 none of that existed.
+# This workflow is it (PLATFORM_CONVENTIONS.md §9, §12.7).
+#
+# Jobs:
+#   python | cpp | rust | java   one per language, the canonical commands from
+#                                docs/BUILD_NOTES.md, run in parallel
+#   golden                       tests/harness/run_golden.sh — the promotion
+#                                gate 10 artefact (every language's golden
+#                                group, including ALL Java *GoldenTest classes)
+#   deployment                   tests/harness/check_deployment.py: promtool
+#                                check rules/config, promtool test rules, the
+#                                Dockerfile/compose/k8s/ConfigMap/dashboard
+#                                checks and the docker build-context proof
+#   images                       builds the four images; needs every other job
+#
+# Local equivalent of the whole thing:  bash tests/harness/run_all.sh
+# =============================================================================
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install the research stack
+        run: |
+          python -m pip install --upgrade pip
+          pip install numpy pandas scipy scikit-learn pyarrow pytest pyyaml
+      - name: pytest
+        working-directory: python
+        env:
+          PYTHONPATH: src
+        run: python -m pytest -q
+
+  cpp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            g++ cmake make libgtest-dev libeigen3-dev
+      - name: build
+        working-directory: cpp
+        run: bash build.sh
+      - name: ctest
+        working-directory: cpp
+        run: ctest --test-dir build --output-on-failure
+
+  rust:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      - name: cargo test (workspace)
+        working-directory: rust
+        run: cargo test --workspace
+
+  java:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: JUnit4 + Hamcrest (local jars — no Maven, see BUILD_NOTES.md)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends junit4
+          # java/test.sh pins both jars at /usr/share/java.
+          test -f /usr/share/java/junit4.jar
+          test -f /usr/share/java/hamcrest-core.jar
+      - name: build + test (javac -Xlint:all -Werror, JUnit4 suite)
+        working-directory: java
+        run: bash test.sh
+
+  golden:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      - name: Toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            g++ cmake make libgtest-dev libeigen3-dev junit4
+          python -m pip install --upgrade pip
+          pip install numpy pandas scipy scikit-learn pyarrow pytest pyyaml
+      - name: cross-language golden suite (promotion gate 10)
+        run: bash tests/harness/run_golden.sh
+
+  deployment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # check_docker_build.py clones the working tree
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Tooling
+        run: |
+          pip install pyyaml
+          curl -fsSL -o /tmp/prometheus.tar.gz \
+            https://github.com/prometheus/prometheus/releases/download/v2.53.0/prometheus-2.53.0.linux-amd64.tar.gz
+          tar -xzf /tmp/prometheus.tar.gz -C /tmp
+          sudo install -m 0755 /tmp/prometheus-2.53.0.linux-amd64/promtool /usr/local/bin/promtool
+          curl -fsSL -o /tmp/kubeconform.tar.gz \
+            https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
+          tar -xzf /tmp/kubeconform.tar.gz -C /tmp
+          sudo install -m 0755 /tmp/kubeconform /usr/local/bin/kubeconform
+      - name: structural validation of deployment/
+        run: python3 tests/harness/check_deployment.py --verbose
+      - name: headline numbers vs artefacts
+        # exit 2 = only the research-ledger rows are stale (they move on every
+        # research rerun); exit 1 = a platform number is wrong.
+        run: |
+          set +e
+          python3 tests/harness/check_headline_numbers.py
+          rc=$?
+          set -e
+          if [ "$rc" = "1" ]; then exit 1; fi
+          if [ "$rc" = "2" ]; then
+            echo "::warning::research-ledger numbers are stale — regenerate the research reports and the doc rows together"
+          fi
+
+  images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: [python, cpp, rust, java, golden, deployment]
+    steps:
+      - uses: actions/checkout@v4
+      # GOVERNANCE promotion gate 10: an image is only ever built from a tree
+      # whose full suite and golden gate are green — hence `needs:` above.
+      - name: build all four images
+        run: |
+          for df in python java cpp rust; do
+            docker build -f "deployment/docker/Dockerfile.$df" \
+              -t "iap/$df:ci-${GITHUB_SHA::12}" .
+          done
+      - name: the C++ replay container runs bench_all to completion
+        run: docker run --rm "iap/cpp:ci-${GITHUB_SHA::12}"
+      - name: the Rust replay container exits 0
+        run: docker run --rm "iap/rust:ci-${GITHUB_SHA::12}" /golden
+      - name: compose config is valid
+        env:
+          GRAFANA_ADMIN_PASSWORD: ci-placeholder
+        run: docker compose -f deployment/docker/docker-compose.yml config -q

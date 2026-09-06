@@ -12,7 +12,7 @@ sequenceDiagram
 
     Op->>PT: java/paper.sh [--mode realtime --speed 60]
     PT->>PT: load configs/ (instruments, venues,<br/>strategies, risk, execution, alpha_params)
-    PT->>MX: bind /metrics /health /status
+    PT->>MX: bind /metrics /health /ready /status /admin/*
 
     loop every MarketEvent (event-time order)
         PT->>BK: apply(event) — sequence check, book update
@@ -21,9 +21,10 @@ sequenceDiagram
         AL-->>PF: AlphaSignal {expected_return, confidence}
         PF-->>RK: OrderRequest (target position delta)
         alt risk ALLOW
-            RK-->>EX: forward child order
+            RK-->>EX: forward child order (open-order tracked)
             EX-->>PT: Fill(s) {price_ticks, qty, fee, impact}
-            PT->>PT: position / P&L accounting
+            PT->>RK: onFill / onOrderDone (before the next decision)
+            PT->>PT: position / P&L accounting (reporting ccy)
         else risk REJECT
             RK-->>PT: RiskEvent {rule_id, severity, decision}
         end
@@ -31,5 +32,5 @@ sequenceDiagram
     end
 
     PR->>MX: GET /metrics (scrape, 15s interval)
-    Op->>MX: curl /health -> {"status":"ok"}
+    Op->>MX: curl /status -> live events_processed, kill state
     PT->>Op: summary line + out/paper_session_report.json<br/>(events, orders, fills, pnl, risk allowed/rejected)

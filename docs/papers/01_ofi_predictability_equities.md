@@ -295,3 +295,68 @@ this dataset.
 | stress axes | `python/src/iap/validation/stress.py` |
 | data volumes and QC | `data/normalized/qc_report.json` |
 | generator design | `python/src/iap/marketdata/generator.py` |
+
+
+## Erratum / Update — 2026-09-06 (round-3 research fixes)
+
+The research layer was re-audited and several defects that affect the
+numbers above were fixed; this section records the revised figures. The
+body is left as the dated record of what was computed at the time.
+
+1. **"Four expanding walk-forward folds" were two.** Fold boundaries were
+   equal segments of the WALL SPAN, and the equity frames occupy 13:30-16:05
+   UTC of each day plus a lone 20:00 close print — so two of the four folds
+   contained ZERO test rows and were silently dropped, while the report still
+   claimed four folds and a fold sign consistency of 1.00. Boundaries are now
+   quantiles of the ROW INDEX; a fold with fewer than 32 usable pairs is
+   reported, counts as a FAILED fold, and PROMOTE requires at least three
+   non-degenerate folds. On the current data every alpha runs **four
+   non-degenerate folds** (`n_degenerate_folds = 0`).
+2. **Crossed-book conditioning.** Every IC is now reported split by whether
+   the consolidated book was crossed (a stale venue quote). On the equity
+   book this changes little — the crossed fraction is ~1 % — but it is now
+   visible: EQ02 IC 0.0309 pooled /
+   0.0312 uncrossed, EQ03
+   0.0299 / 0.0298, EQ12
+   0.0298 / 0.0315. The
+   promotion gates now read the UNCROSSED IC and its Newey-West t.
+3. **Newey-West lag count** scales with the horizon
+   (`L = ceil(h / bucket) + 1`) instead of a fixed L = 2, and is reported as
+   `nw_lags`. The 5 s OFI alphas keep L = 2; the 15 m alphas move to L = 4.
+   Re-derived t-statistics (uncrossed): EQ02 **8.47**,
+   EQ03 **10.61**, EQ12
+   **8.07**.
+4. **Labels no longer span halts, stale-venue gaps or the dead zone before
+   the close print** (API_FEATURES §6): a label is valid only with a
+   tradable anchor, a tradable AND fresh forward mid, and no non-tradable
+   sample inside (t, t+h]. 15-minute equity labels near the close no longer
+   exist rather than being computed against a frozen mid, so every long-horizon
+   number above rests on fewer, better rows.
+5. **Feature ingestion.** The engine now consumes only events the order book
+   APPLIED, so a gateway replay can no longer double-count trade flow, and a
+   stale-venue recovery resets the rolling windows instead of producing a
+   max-conviction signal from the gap move. OFI features on the bundled data
+   are affected only marginally, but the mechanism the paper relies on is now
+   measured on the post-validation stream.
+6. **Execution model.** The research backtester now executes at
+   `t + 1 s` of EVENT time (not "the next row", which is 3.3 s on equities
+   and 15 s on FX), drops decisions older than 60 s and flattens at session
+   boundaries, so no P&L figure credits an overnight gap to a 5-second alpha.
+   Latency stress is reported on a time grid (100 ms / 500 ms / 1 s / 5 s).
+   Every P&L number in §4.3-§4.5 above is superseded by the current
+   `research/alpha_reports/REPORT.md`.
+7. **Verdicts (current run)**: EQ02 ITERATE, EQ03
+   ITERATE, EQ12 ITERATE. The paper's
+   conclusion — statistically real OFI predictability that does not survive
+   costs at 5-second turnover — is unchanged.
+
+The multiple-testing ledger was **reset and re-derived** for this round: an
+experiment is now identified by (alpha, kind, canonical configuration) and
+re-running a script no longer increases the count, and one adaptive
+deployment counts as ONE experiment instead of its 211 monitoring
+evaluations. Every "1,224 experiments" / "19,347 experiments" figure in the
+body above is superseded by **760 experiments
+(65 distinct configurations)**: Bonferroni
+per-test |t| **3.99**, expected max |t| under
+the global null **3.64**. Reports now read the
+ledger at render time, so a report and the ledger can never disagree again.

@@ -276,3 +276,90 @@ committed artifacts.
 | Rust / Java replay throughput | `rust/replay/src/bin/demo.rs`, `java/src/main/java/com/iap/replay/Demo.java` (run in this container) |
 | inter-emission gaps | computed from `data/features/features_1.parquet`, `features_101.parquet` |
 | feed volumes | `data/normalized/qc_report.json` |
+
+## Erratum / Update — 2026-09-06 (round-3 trading fixes)
+
+- The §3 decay table (OOS IC by lag, FX rows included) is currency-free and
+  unchanged. Any FX P&L figure cross-referenced from `REPORT.md` before
+  2026-09-06 (papers 2 and 3) was summed in quote currency as if USD; the
+  re-derived USD figures are in those papers' errata and in
+  `research/alpha_reports/REPORT.md`.
+- The execution-side latency controls this paper argued for are now
+  enforced rather than merely declared: `configs/execution.json`
+  `latency_budget_ns`, `max_participation` and `min_slice_interval_ns` are
+  read by the Java `BacktestEngine`/`PaperTrading` and violations are
+  counted (`PLATFORM_CONVENTIONS.md` §11.4; test
+  `ExecutionScenarioTest.backtestEnforcesParticipationSliceIntervalAndLatencyBudget`).
+
+
+## Erratum / Update — 2026-09-06 (round-3 research fixes: latency in time)
+
+1. **The latency axis was measured in ROWS, not time.** The "+0ev / +1ev /
+   +5ev" grid shifts execution by emission events, and one emission row is
+   ~3.3 s on the equity book and ~15-22 s on the FX book in this dataset — so
+   the same column meant two very different latencies, and neither was a
+   latency budget anyone could act on. The backtester now supports TIME
+   latency (`latency_ns`: the decision at t executes at the first row with
+   `exchange_ts >= t + latency_ns`) and every report carries a pinned time
+   grid of **100 ms / 500 ms / 1 s / 5 s**. The event grid is retained only
+   for continuity with this paper's tables.
+2. **Decision age and session flattening.** A decision used to fill at
+   whatever row came next, however old: a 16:05 decision "filled" at the
+   20:00 close print and a 20:00 decision at the next day's open, which
+   credited the overnight gap to a 1-second alpha. The research backtester
+   now drops decisions older than `max_decision_age_ns` (60 s) and flattens
+   before every session boundary. The decay-vs-latency curves above are
+   therefore optimistic in the tail: the P&L at large lags included fills
+   that could not have happened.
+3. **Labels** no longer span halts, stale-venue gaps or a frozen mid, so the
+   long-horizon points of the decay curves rest on fewer, better rows
+   (15 m equity label validity is 47 %, not ~100 %).
+4. **Crossed-book conditioning** applies to every FX curve in this paper: see
+   paper 02's erratum table.
+
+The multiple-testing ledger was **reset and re-derived** for this round: an
+experiment is now identified by (alpha, kind, canonical configuration) and
+re-running a script no longer increases the count, and one adaptive
+deployment counts as ONE experiment instead of its 211 monitoring
+evaluations. Every "1,224 experiments" / "19,347 experiments" figure in the
+body above is superseded by **760 experiments
+(65 distinct configurations)**: Bonferroni
+per-test |t| **3.99**, expected max |t| under
+the global null **3.64**. Reports now read the
+ledger at render time, so a report and the ledger can never disagree again.
+
+### Benchmark erratum — compute-cost figures superseded (2026-09-06)
+
+**Every row of the §4.1 hot-path table is superseded, not just the codec
+rows.** The per-event compute figures quoted in §1, in the §4.1 table and
+in §4.3 (3.5 + 17.4 + 450.5 + 32.3 ns/event ≈ 0.5 µs; C++ 37.1M replay
+events/s) predate the mandatory CRC-32 IAP1 trailer added in round 3 and
+the round-3 feature-engine changes. Re-measured on the same methodology
+(`benchmarks/results_cpp.md`; codec explanation in paper 06's benchmark
+erratum):
+
+| stage (§4.1 row) | as published | current |
+|---|---:|---:|
+| IAP1 binary decode (eq) | 3.5 ns | **174.4 ns** |
+| book update (eq MBO) | 17.4 ns | **25.7 ns** |
+| book update (FX QUOTE) | 29.6 ns | **36.2 ns** |
+| feature engine (48 features, every event) | 450.5 ns | **530.4 ns** |
+| alpha scoring (EQ01+EQ03+EQ06) | 32.3 ns | **38.5 ns** |
+| replay engine (eq) | 27.0 ns / 37.1M ev/s | **35.5 ns / 28.1M ev/s** |
+| execution sim replay | 41.7 ns | **66.2 ns** |
+| JSONL decode (contrast) | 214.0 ns | **225.7 ns** |
+
+The **feature engine row is the one an earlier version of this erratum left
+unflagged**, and it matters: it is ~69 % of the end-to-end path, so a
+correction that re-derives only the decode and book terms understates the
+total. End to end, decode + book + features + alpha is now
+174.4 + 25.7 + 530.4 + 38.5 = **769 ns ≈ 0.77 µs/event**, not the ≈ 0.68 µs
+this erratum previously stated (that figure summed the two re-measured
+terms with the two stale ones) and not §4.1's ≈ 504 ns.
+
+**The paper's argument is unchanged**: 0.77 µs is still five to six orders
+of magnitude below the ~0.9 s median inter-event gap on the synthetic
+equity feed, so the measured decay penalty remains information staleness
+rather than compute time. Only the absolute compute numbers move — and
+they moved *against* the platform, which is the direction that could have
+threatened the argument had the gap been narrower.

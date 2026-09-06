@@ -82,6 +82,11 @@ impl SessionStatus {
     }
 }
 
+/// Reserved order-id range (top 16 bits set): synthetic ids the book assigns
+/// to id-less QUOTE/SNAPSHOT records (conventions §1). Feeds must not carry
+/// explicit ids in this range on ADD/QUOTE/SNAPSHOT.
+pub const SYNTHETIC_ID_BASE: u64 = 0xFFFF_0000_0000_0000;
+
 /// Canonical JSONL key order / IAP1 field order (normative).
 pub const FIELDS: [&str; 12] = [
     "event_id",
@@ -133,6 +138,14 @@ pub fn validation_error(ev: &MarketEvent) -> Option<String> {
     };
     if ev.side > 1 {
         return Some(format!("side must be 0 (BID) or 1 (ASK): {}", ev.side));
+    }
+    if ev.order_id >= SYNTHETIC_ID_BASE
+        && matches!(et, EventType::Add | EventType::Quote | EventType::Snapshot)
+    {
+        return Some(format!(
+            "order_id in reserved synthetic range: {}",
+            ev.order_id
+        ));
     }
     match et {
         EventType::Add | EventType::Modify | EventType::Cancel | EventType::Execute => {

@@ -57,6 +57,8 @@ def test_qc_exact_counts_on_handcrafted_stream(tmp_path):
         "gap_missing_events": 2,
         "duplicates": 1,
         "out_of_order": 1,
+        "sequence_resets": 0,
+        "ts_regression_dropped": 0,
         "invalid": 1,
         "ts_clamped": 1,
     }
@@ -140,7 +142,8 @@ def test_qc_report_written_with_per_stream_counts(pipeline):
     for counters in on_disk["per_stream"].values():
         assert set(counters) == {
             "events_in", "events_out", "gaps", "gap_missing_events",
-            "duplicates", "out_of_order", "invalid", "ts_clamped",
+            "duplicates", "out_of_order", "sequence_resets",
+            "ts_regression_dropped", "invalid", "ts_clamped",
         }
 
 

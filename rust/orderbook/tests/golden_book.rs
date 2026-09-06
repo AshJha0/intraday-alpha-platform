@@ -85,3 +85,105 @@ fn golden_checkpoint_midstream_restores_to_identical_final_state() {
     assert_eq!(restored.checkpoint(), full.checkpoint());
     assert_eq!(restored.state_summary(), full.state_summary());
 }
+
+// ------------------------------------------------------- anomaly goldens (round 3)
+
+fn venue_state(book: &OrderBook) -> serde_json::Value {
+    serde_json::json!({
+        "summary": book.state_summary(),
+        "counters": book.counters,
+        "stale": book.stale,
+        "status": book.status,
+        "has_sequence": book.has_sequence,
+        "sequence_epoch": book.sequence_epoch,
+        "pending_count": book.pending_count(),
+    })
+}
+
+fn check_anomaly_vector(name: &str) {
+    let expected: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(golden_path("expected_anomaly_states.json"))
+            .expect("read expected_anomaly_states.json"),
+    )
+    .expect("parse expected_anomaly_states.json");
+    let spec = &expected["vectors"][name];
+    let events = read_jsonl(golden_path(name)).expect("anomaly vector must decode");
+    assert_eq!(events.len() as u64, spec["events"].as_u64().unwrap());
+    let instrument_id = spec["instrument_id"].as_u64().unwrap() as u32;
+    for run in spec["runs"].as_array().unwrap() {
+        let window = run["reorder_window"].as_u64().unwrap() as usize;
+        let mut cons =
+            orderbook::ConsolidatedBook::with_reorder_window(instrument_id, window).unwrap();
+        let states = run["states"].as_object().unwrap();
+        for (i, ev) in events.iter().enumerate() {
+            cons.apply(ev).unwrap_or_else(|e| panic!("{name} event {}: {e}", i + 1));
+            let key = (i + 1).to_string();
+            let Some(exp) = states.get(&key) else { continue };
+            let mut venues = serde_json::Map::new();
+            for (vid, book) in &cons.books {
+                venues.insert(vid.to_string(), venue_state(book));
+            }
+            let got = serde_json::json!({
+                "venues": venues,
+                "consolidated": cons.consolidated_summary(),
+            });
+            assert_eq!(&got, exp, "{name} window={window} index {key}");
+        }
+        // Accounting invariant: applied + drops + pending == events fed.
+        let mut fed = std::collections::BTreeMap::new();
+        for ev in &events {
+            *fed.entry(ev.venue_id).or_insert(0u64) += 1;
+        }
+        for (vid, book) in &cons.books {
+            assert_eq!(
+                book.counters.events_applied + book.counters.drops() + book.pending_count() as u64,
+                fed[vid],
+                "{name} venue {vid}"
+            );
+        }
+    }
+}
+
+#[test]
+fn anomaly_eq_vector_states_and_counters_match_golden() {
+    check_anomaly_vector("events_eq_anomalies.jsonl");
+}
+
+#[test]
+fn anomaly_fx_vector_states_and_counters_match_golden() {
+    check_anomaly_vector("events_fx_anomalies.jsonl");
+}
+
+#[test]
+fn anomaly_vectors_byte_stable_and_checkpoint_round_trip() {
+    for name in ["events_eq_anomalies.jsonl", "events_fx_anomalies.jsonl"] {
+        let events = read_jsonl(golden_path(name)).expect("decode");
+        let text = std::fs::read(golden_path(name)).expect("read");
+        assert_eq!(marketdata::encode_jsonl(&events), text);
+        for window in [0usize, 4] {
+            let mut full =
+                orderbook::ConsolidatedBook::with_reorder_window(events[0].instrument_id, window)
+                    .unwrap();
+            for ev in &events {
+                full.apply(ev).unwrap();
+            }
+            for split in [137usize, 500, events.len() - 20] {
+                let mut part = orderbook::ConsolidatedBook::with_reorder_window(
+                    events[0].instrument_id,
+                    window,
+                )
+                .unwrap();
+                for ev in &events[..split] {
+                    part.apply(ev).unwrap();
+                }
+                let json = serde_json::to_string(&part.checkpoint()).unwrap();
+                let back: orderbook::ConsolidatedCheckpoint = serde_json::from_str(&json).unwrap();
+                let mut resumed = orderbook::ConsolidatedBook::restore(&back).unwrap();
+                for ev in &events[split..] {
+                    resumed.apply(ev).unwrap();
+                }
+                assert_eq!(resumed.checkpoint(), full.checkpoint(), "{name} w={window} split={split}");
+            }
+        }
+    }
+}

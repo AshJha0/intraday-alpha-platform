@@ -88,10 +88,6 @@ spec:
                 path: recording.yml
               - key: alerts.yml
                 path: alerts.yml
-              # '__' encodes '/' (ConfigMap keys cannot contain slashes):
-              # lands at /etc/prometheus/targets/rust-telemetry.json.
-              - key: targets__rust-telemetry.json
-                path: targets/rust-telemetry.json
         - name: tsdb
           emptyDir: {}   # metrics are rebuildable; swap for a PVC to retain across restarts
 ---

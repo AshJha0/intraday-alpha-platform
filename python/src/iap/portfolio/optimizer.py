@@ -25,7 +25,15 @@ see API_PORTFOLIO_TCA.md):
       ``d = v - w_prev`` by ``eta_k * tc`` elementwise; ``v = w_prev + d``;
    d. ``w = project(v)``.
 3. Keep the best FEASIBLE iterate by objective (ties keep the earliest);
-   return it with its objective.
+   return it with its objective and ``feasible=True``.
+4. INFEASIBLE (pinned): when no iterate — the initial projection included
+   — satisfies ``feas_tol``, the result is ``feasible=False`` with
+   ``weights = w_prev`` (hold the book: the safe action), ``objective =
+   f(w_prev)``, ``best_iteration = 0`` and ``max_violation`` = the
+   violation of ``w_prev``. Weights are never NaN/inf and the objective is
+   never ``-inf``; callers MUST check ``feasible`` before acting.
+5. Every input must be finite (alpha, Sigma, w_prev, tc, risk_aversion,
+   bounds); a NaN/inf anywhere raises ValueError — it never propagates.
 
 ``project`` is ``proj_passes`` fixed passes of cyclic projections in the
 pinned order box -> participation -> net -> currency -> gross -> turnover ->
@@ -65,6 +73,8 @@ class Constraints:
         self.w_max = np.asarray(self.w_max, dtype=np.float64)
         if self.w_min.shape != (n,) or self.w_max.shape != (n,):
             raise ValueError("w_min/w_max must have shape (n,)")
+        if not (np.all(np.isfinite(self.w_min)) and np.all(np.isfinite(self.w_max))):
+            raise ValueError("w_min/w_max must be finite")
         if np.any(self.w_min > self.w_max):
             raise ValueError("w_min > w_max for some asset")
         if self.gross_cap is not None and self.gross_cap <= 0:
@@ -98,7 +108,8 @@ class Constraints:
 
 @dataclass
 class PGDResult:
-    """Solver output: best feasible iterate + audit trail."""
+    """Solver output: best feasible iterate + audit trail (see module
+    docstring, step 4, for the pinned INFEASIBLE result)."""
 
     weights: np.ndarray
     objective: float
@@ -106,6 +117,12 @@ class PGDResult:
     best_iteration: int
     max_violation: float
     trajectory: List[float] = field(default_factory=list)
+    feasible: bool = True
+
+    @property
+    def status(self) -> str:
+        """``"OPTIMAL"`` or ``"INFEASIBLE"`` (audit wording, pinned)."""
+        return "OPTIMAL" if self.feasible else "INFEASIBLE"
 
 
 def objective(w: np.ndarray, alpha: np.ndarray, Sigma: np.ndarray,
@@ -238,10 +255,15 @@ def solve(
         raise ValueError("Sigma must be (n, n)")
     if w_prev.shape != (n,) or tc_linear.shape != (n,):
         raise ValueError("w_prev/tc_linear must be (n,)")
-    if risk_aversion < 0:
-        raise ValueError("risk_aversion must be >= 0")
+    if not np.isfinite(risk_aversion) or risk_aversion < 0:
+        raise ValueError("risk_aversion must be finite and >= 0")
     if np.any(tc_linear < 0):
         raise ValueError("tc_linear must be >= 0")
+    # pinned: NaN/inf never propagate into weights
+    for name, arr in (("alpha", alpha), ("Sigma", Sigma), ("w_prev", w_prev),
+                      ("tc_linear", tc_linear)):
+        if not np.all(np.isfinite(arr)):
+            raise ValueError(f"{name} must be finite")
     if eta0 is None:
         L = max(2.0 * risk_aversion * float(np.abs(Sigma).sum(axis=1).max()),
                 1e-6)
@@ -257,8 +279,8 @@ def solve(
 
     w = project(w_prev, constraints, w_prev, Sigma, proj_passes)
     best_w = w.copy()
-    best_f = f(w) if max_violation(w, constraints, w_prev, Sigma) <= feas_tol \
-        else -np.inf
+    feasible = max_violation(w, constraints, w_prev, Sigma) <= feas_tol
+    best_f = f(w) if feasible else -np.inf
     best_k = 0
     trajectory: List[float] = []
     for k in range(iters):
@@ -276,6 +298,19 @@ def solve(
             best_f = fw
             best_w = w.copy()
             best_k = k + 1
+            feasible = True
+    if not feasible:
+        # INFEASIBLE (pinned step 4): hold the book, never -inf / NaN.
+        hold = w_prev.copy()
+        return PGDResult(
+            weights=hold,
+            objective=f(hold),
+            iterations=iters,
+            best_iteration=0,
+            max_violation=max_violation(hold, constraints, w_prev, Sigma),
+            trajectory=trajectory,
+            feasible=False,
+        )
     return PGDResult(
         weights=best_w,
         objective=float(best_f),
@@ -283,4 +318,5 @@ def solve(
         best_iteration=best_k,
         max_violation=max_violation(best_w, constraints, w_prev, Sigma),
         trajectory=trajectory,
+        feasible=True,
     )

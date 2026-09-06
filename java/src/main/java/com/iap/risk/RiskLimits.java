@@ -1,12 +1,14 @@
 package com.iap.risk;
 
 import java.util.Map;
+import java.util.TreeMap;
 
 import com.iap.config.Json;
 
 /**
- * Hard-risk limits ({@code configs/risk.json}, x-version 2 — the complete
- * pinned limit set; Rust reference {@code rust/risk/src/limits.rs}).
+ * Hard-risk limits ({@code configs/risk.json}, x-version 3 — the complete
+ * pinned limit set plus the currency block; Rust reference
+ * {@code rust/risk/src/limits.rs}).
  * Parsing is STRICT: any missing or invalid limit is an
  * {@link IllegalArgumentException}, and the engine built from a failed
  * parse is fail-closed (rejects every order with {@code CONFIG_MISSING}).
@@ -27,7 +29,50 @@ public record RiskLimits(
         double maxInstrumentNotional,
         double strategyMaxDailyLoss,
         long maxSequenceGapBeforeHalt,
-        long staleFeedTimeoutNs) {
+        long staleFeedTimeoutNs,
+        String reportingCcy,
+        TreeMap<String, FxConversion> fxConversion) {
+
+    /**
+     * How one quote currency converts into the reporting currency: the
+     * last consolidated mid of {@code instrumentId} (an FX pair), inverted
+     * when the pair is quoted REPORTING/CCY (e.g. USD/JPY for JPY).
+     */
+    public record FxConversion(long instrumentId, boolean invert) {
+    }
+
+    private static TreeMap<String, FxConversion> parseConversion(
+            Map<String, Object> doc) {
+        Object table = section(doc, "currency").get("conversion");
+        if (!(table instanceof Map)) {
+            throw new IllegalArgumentException(
+                    "risk.json: missing currency.conversion object");
+        }
+        TreeMap<String, FxConversion> out = new TreeMap<>();
+        for (Map.Entry<String, Object> e : Json.object(table).entrySet()) {
+            if (!(e.getValue() instanceof Map)) {
+                throw new IllegalArgumentException(
+                        "risk.json: currency.conversion." + e.getKey()
+                                + " must be an object");
+            }
+            Map<String, Object> spec = Json.object(e.getValue());
+            Object iid = spec.get("instrument_id");
+            if (!(iid instanceof Long) || (Long) iid <= 0
+                    || (Long) iid > 0xFFFFFFFFL) {
+                throw new IllegalArgumentException(
+                        "risk.json: currency.conversion." + e.getKey()
+                                + ".instrument_id missing/invalid");
+            }
+            Object inv = spec.get("invert");
+            if (!(inv instanceof Boolean)) {
+                throw new IllegalArgumentException(
+                        "risk.json: currency.conversion." + e.getKey()
+                                + ".invert missing/non-bool");
+            }
+            out.put(e.getKey(), new FxConversion((Long) iid, (Boolean) inv));
+        }
+        return out;
+    }
 
     private static Map<String, Object> section(Map<String, Object> doc, String name) {
         Object s = doc.get(name);
@@ -116,6 +161,17 @@ public record RiskLimits(
                 needPosF64(doc, "per_instrument", "max_instrument_notional"),
                 needPosF64(doc, "per_strategy", "max_daily_loss"),
                 (Long) gapRaw,
-                needPosI64(doc, "market_data", "stale_feed_timeout_ns"));
+                needPosI64(doc, "market_data", "stale_feed_timeout_ns"),
+                reportingCcy(doc),
+                parseConversion(doc));
+    }
+
+    private static String reportingCcy(Map<String, Object> doc) {
+        Object v = section(doc, "currency").get("reporting_ccy");
+        if (!(v instanceof String) || ((String) v).isEmpty()) {
+            throw new IllegalArgumentException(
+                    "risk.json: missing/empty currency.reporting_ccy");
+        }
+        return (String) v;
     }
 }

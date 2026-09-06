@@ -1,0 +1,2771 @@
+{
+  "description": "Feature-engine golden checkpoints on the ANOMALY vectors (arrival order: duplicates, invalid sides, payload drops, sequence gaps + SNAPSHOT recovery, venue sequence reset, HALT + re-opening auction, multi-venue staleness, exchange_ts regressions).  Pins API_FEATURES section 2: only APPLIED events feed rolling state, ts regressions are dropped+counted, a stale->fresh recovery resets rolling state and re-anchors warmup, EPS-guarded ratios stay invalid on a zero denominator.  Feature set = the native-45 sub-vector every port implements; value is null when valid is false.  Tolerance: abs 1e-9 / rel 1e-9.",
+  "registry_hash": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
+  "tolerance": {
+    "abs": 1e-09,
+    "rel": 1e-09
+  },
+  "features": [
+    "ofi_l1_w1s_v1",
+    "ofi_l1_w5s_v1",
+    "ofi_l1_w30s_v1",
+    "ofi_l3_w1s_v1",
+    "ofi_l3_w5s_v1",
+    "ofi_l3_w30s_v1",
+    "ofi_l5_w1s_v1",
+    "ofi_l5_w5s_v1",
+    "ofi_l5_w30s_v1",
+    "ofi_l10_w1s_v1",
+    "ofi_l10_w5s_v1",
+    "ofi_l10_w30s_v1",
+    "imbalance_l1_v1",
+    "imbalance_l3_v1",
+    "imbalance_l5_v1",
+    "imbalance_l10_v1",
+    "mid_price_v1",
+    "microprice_v1",
+    "micro_mid_dev_bps_v1",
+    "spread_ticks_v1",
+    "spread_bps_v1",
+    "depth_bid_l1_v1",
+    "depth_ask_l1_v1",
+    "depth_bid_l5_v1",
+    "depth_ask_l5_v1",
+    "depth_bid_l10_v1",
+    "depth_ask_l10_v1",
+    "signed_volume_w1s_v1",
+    "signed_volume_w10s_v1",
+    "signed_volume_w1m_v1",
+    "trade_imbalance_w1s_v1",
+    "trade_imbalance_w10s_v1",
+    "trade_imbalance_w1m_v1",
+    "rvol_w10s_v1",
+    "rvol_w1m_v1",
+    "rvol_w5m_v1",
+    "ret_simple_1s_v1",
+    "ret_log_1s_v1",
+    "ret_log_10s_v1",
+    "ret_log_1m_v1",
+    "ofi_norm_l1_w1s_v1",
+    "ofi_norm_l5_w1s_v1",
+    "ofi_norm_l5_w5s_v1",
+    "ret_vol_adj_10s_v1",
+    "vol_regime_ratio_v1"
+  ],
+  "eq": {
+    "vector": "events_eq_anomalies.jsonl",
+    "instrument_id": 1,
+    "n_events": 1403,
+    "checkpoints": {
+      "100": {
+        "timestamp": 1787578403943201375,
+        "events_processed": 100,
+        "events_dropped": 34,
+        "ts_regressions_dropped": 23,
+        "oversized_qty_dropped": 0,
+        "oversized_depth_skipped": 0,
+        "recoveries": 0,
+        "warm_ts": 1787578200000000000,
+        "book_ok": true,
+        "features": {
+          "ofi_l1_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_l1_w5s_v1": {
+            "value": -1100.0,
+            "valid": true
+          },
+          "ofi_l1_w30s_v1": {
+            "value": -900.0,
+            "valid": true
+          },
+          "ofi_l3_w1s_v1": {
+            "value": 800.0,
+            "valid": true
+          },
+          "ofi_l3_w5s_v1": {
+            "value": 900.0,
+            "valid": true
+          },
+          "ofi_l3_w30s_v1": {
+            "value": 1300.0,
+            "valid": true
+          },
+          "ofi_l5_w1s_v1": {
+            "value": 800.0,
+            "valid": true
+          },
+          "ofi_l5_w5s_v1": {
+            "value": 100.0,
+            "valid": true
+          },
+          "ofi_l5_w30s_v1": {
+            "value": -100.0,
+            "valid": true
+          },
+          "ofi_l10_w1s_v1": {
+            "value": 800.0,
+            "valid": true
+          },
+          "ofi_l10_w5s_v1": {
+            "value": -1300.0,
+            "valid": true
+          },
+          "ofi_l10_w30s_v1": {
+            "value": -1500.0,
+            "valid": true
+          },
+          "imbalance_l1_v1": {
+            "value": 0.45454545454545453,
+            "valid": true
+          },
+          "imbalance_l3_v1": {
+            "value": 0.6,
+            "valid": true
+          },
+          "imbalance_l5_v1": {
+            "value": 0.07865168539325842,
+            "valid": true
+          },
+          "imbalance_l10_v1": {
+            "value": -0.11926605504587157,
+            "valid": true
+          },
+          "mid_price_v1": {
+            "value": 24.490000000000002,
+            "valid": true
+          },
+          "microprice_v1": {
+            "value": 24.494545454545456,
+            "valid": true
+          },
+          "micro_mid_dev_bps_v1": {
+            "value": 1.8560451390175434,
+            "valid": true
+          },
+          "spread_ticks_v1": {
+            "value": 2.0,
+            "valid": true
+          },
+          "spread_bps_v1": {
+            "value": 8.166598611678236,
+            "valid": true
+          },
+          "depth_bid_l1_v1": {
+            "value": 800.0,
+            "valid": true
+          },
+          "depth_ask_l1_v1": {
+            "value": 300.0,
+            "valid": true
+          },
+          "depth_bid_l5_v1": {
+            "value": 4800.0,
+            "valid": true
+          },
+          "depth_ask_l5_v1": {
+            "value": 4100.0,
+            "valid": true
+          },
+          "depth_bid_l10_v1": {
+            "value": 4800.0,
+            "valid": true
+          },
+          "depth_ask_l10_v1": {
+            "value": 6100.0,
+            "valid": true
+          },
+          "signed_volume_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "signed_volume_w10s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "signed_volume_w1m_v1": {
+            "value": 200.0,
+            "valid": true
+          },
+          "trade_imbalance_w1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "trade_imbalance_w10s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "trade_imbalance_w1m_v1": {
+            "value": 1.0,
+            "valid": true
+          },
+          "rvol_w10s_v1": {
+            "value": 9.128671239867252e-05,
+            "valid": true
+          },
+          "rvol_w1m_v1": {
+            "value": 3.7267644278824384e-05,
+            "valid": true
+          },
+          "rvol_w5m_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ret_simple_1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_log_1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_log_10s_v1": {
+            "value": -0.0004082465866055429,
+            "valid": true
+          },
+          "ret_log_1m_v1": {
+            "value": -0.0004082465866055429,
+            "valid": true
+          },
+          "ofi_norm_l1_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_norm_l5_w1s_v1": {
+            "value": 0.09108159392789371,
+            "valid": true
+          },
+          "ofi_norm_l5_w5s_v1": {
+            "value": 0.011385199240986714,
+            "valid": true
+          },
+          "ret_vol_adj_10s_v1": {
+            "value": -10.954450799109386,
+            "valid": true
+          },
+          "vol_regime_ratio_v1": {
+            "value": null,
+            "valid": false
+          }
+        }
+      },
+      "300": {
+        "timestamp": 1787579213382168627,
+        "events_processed": 300,
+        "events_dropped": 36,
+        "ts_regressions_dropped": 23,
+        "oversized_qty_dropped": 0,
+        "oversized_depth_skipped": 0,
+        "recoveries": 1,
+        "warm_ts": 1787578430826852461,
+        "book_ok": true,
+        "features": {
+          "ofi_l1_w1s_v1": {
+            "value": 300.0,
+            "valid": true
+          },
+          "ofi_l1_w5s_v1": {
+            "value": 300.0,
+            "valid": true
+          },
+          "ofi_l1_w30s_v1": {
+            "value": 300.0,
+            "valid": true
+          },
+          "ofi_l3_w1s_v1": {
+            "value": 300.0,
+            "valid": true
+          },
+          "ofi_l3_w5s_v1": {
+            "value": 300.0,
+            "valid": true
+          },
+          "ofi_l3_w30s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_l5_w1s_v1": {
+            "value": 300.0,
+            "valid": true
+          },
+          "ofi_l5_w5s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_l5_w30s_v1": {
+            "value": 300.0,
+            "valid": true
+          },
+          "ofi_l10_w1s_v1": {
+            "value": 300.0,
+            "valid": true
+          },
+          "ofi_l10_w5s_v1": {
+            "value": -500.0,
+            "valid": true
+          },
+          "ofi_l10_w30s_v1": {
+            "value": -1200.0,
+            "valid": true
+          },
+          "imbalance_l1_v1": {
+            "value": -0.3076923076923077,
+            "valid": true
+          },
+          "imbalance_l3_v1": {
+            "value": -0.5,
+            "valid": true
+          },
+          "imbalance_l5_v1": {
+            "value": 0.01935483870967742,
+            "valid": true
+          },
+          "imbalance_l10_v1": {
+            "value": 0.13368983957219252,
+            "valid": true
+          },
+          "mid_price_v1": {
+            "value": 24.525000000000002,
+            "valid": true
+          },
+          "microprice_v1": {
+            "value": 24.52346153846154,
+            "valid": true
+          },
+          "micro_mid_dev_bps_v1": {
+            "value": -0.6273033795973899,
+            "valid": true
+          },
+          "spread_ticks_v1": {
+            "value": 1.0,
+            "valid": true
+          },
+          "spread_bps_v1": {
+            "value": 4.077471967380224,
+            "valid": true
+          },
+          "depth_bid_l1_v1": {
+            "value": 900.0,
+            "valid": true
+          },
+          "depth_ask_l1_v1": {
+            "value": 1700.0,
+            "valid": true
+          },
+          "depth_bid_l5_v1": {
+            "value": 7900.0,
+            "valid": true
+          },
+          "depth_ask_l5_v1": {
+            "value": 7600.0,
+            "valid": true
+          },
+          "depth_bid_l10_v1": {
+            "value": 10600.0,
+            "valid": true
+          },
+          "depth_ask_l10_v1": {
+            "value": 8100.0,
+            "valid": true
+          },
+          "signed_volume_w1s_v1": {
+            "value": 300.0,
+            "valid": true
+          },
+          "signed_volume_w10s_v1": {
+            "value": 300.0,
+            "valid": true
+          },
+          "signed_volume_w1m_v1": {
+            "value": 200.0,
+            "valid": true
+          },
+          "trade_imbalance_w1s_v1": {
+            "value": 1.0,
+            "valid": true
+          },
+          "trade_imbalance_w10s_v1": {
+            "value": 1.0,
+            "valid": true
+          },
+          "trade_imbalance_w1m_v1": {
+            "value": 0.5,
+            "valid": true
+          },
+          "rvol_w10s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "rvol_w1m_v1": {
+            "value": 8.323783883558288e-05,
+            "valid": true
+          },
+          "rvol_w5m_v1": {
+            "value": 4.7099405766098406e-05,
+            "valid": true
+          },
+          "ret_simple_1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_log_1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_log_10s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_log_1m_v1": {
+            "value": 0.00040783034823022035,
+            "valid": true
+          },
+          "ofi_norm_l1_w1s_v1": {
+            "value": 0.10714285714285711,
+            "valid": true
+          },
+          "ofi_norm_l5_w1s_v1": {
+            "value": 0.01923076923076923,
+            "valid": true
+          },
+          "ofi_norm_l5_w5s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_vol_adj_10s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "vol_regime_ratio_v1": {
+            "value": 1.7672799839911462,
+            "valid": true
+          }
+        }
+      },
+      "500": {
+        "timestamp": 1787579805291495747,
+        "events_processed": 500,
+        "events_dropped": 74,
+        "ts_regressions_dropped": 24,
+        "oversized_qty_dropped": 0,
+        "oversized_depth_skipped": 0,
+        "recoveries": 2,
+        "warm_ts": 1787579311105911680,
+        "book_ok": true,
+        "features": {
+          "ofi_l1_w1s_v1": {
+            "value": -100.0,
+            "valid": true
+          },
+          "ofi_l1_w5s_v1": {
+            "value": -100.0,
+            "valid": true
+          },
+          "ofi_l1_w30s_v1": {
+            "value": -100.0,
+            "valid": true
+          },
+          "ofi_l3_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_l3_w5s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_l3_w30s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_l5_w1s_v1": {
+            "value": -300.0,
+            "valid": true
+          },
+          "ofi_l5_w5s_v1": {
+            "value": -300.0,
+            "valid": true
+          },
+          "ofi_l5_w30s_v1": {
+            "value": -300.0,
+            "valid": true
+          },
+          "ofi_l10_w1s_v1": {
+            "value": -300.0,
+            "valid": true
+          },
+          "ofi_l10_w5s_v1": {
+            "value": -300.0,
+            "valid": true
+          },
+          "ofi_l10_w30s_v1": {
+            "value": -300.0,
+            "valid": true
+          },
+          "imbalance_l1_v1": {
+            "value": -0.4,
+            "valid": true
+          },
+          "imbalance_l3_v1": {
+            "value": -0.3333333333333333,
+            "valid": true
+          },
+          "imbalance_l5_v1": {
+            "value": -0.3333333333333333,
+            "valid": true
+          },
+          "imbalance_l10_v1": {
+            "value": -0.3333333333333333,
+            "valid": true
+          },
+          "mid_price_v1": {
+            "value": 24.465,
+            "valid": true
+          },
+          "microprice_v1": {
+            "value": 24.459000000000003,
+            "valid": true
+          },
+          "micro_mid_dev_bps_v1": {
+            "value": -2.452483139177059,
+            "valid": true
+          },
+          "spread_ticks_v1": {
+            "value": 3.0,
+            "valid": true
+          },
+          "spread_bps_v1": {
+            "value": 12.26241569589209,
+            "valid": true
+          },
+          "depth_bid_l1_v1": {
+            "value": 300.0,
+            "valid": true
+          },
+          "depth_ask_l1_v1": {
+            "value": 700.0,
+            "valid": true
+          },
+          "depth_bid_l5_v1": {
+            "value": 800.0,
+            "valid": true
+          },
+          "depth_ask_l5_v1": {
+            "value": 1600.0,
+            "valid": true
+          },
+          "depth_bid_l10_v1": {
+            "value": 800.0,
+            "valid": true
+          },
+          "depth_ask_l10_v1": {
+            "value": 1600.0,
+            "valid": true
+          },
+          "signed_volume_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "signed_volume_w10s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "signed_volume_w1m_v1": {
+            "value": 100.0,
+            "valid": true
+          },
+          "trade_imbalance_w1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "trade_imbalance_w10s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "trade_imbalance_w1m_v1": {
+            "value": 1.0,
+            "valid": true
+          },
+          "rvol_w10s_v1": {
+            "value": 6.462200206770593e-05,
+            "valid": true
+          },
+          "rvol_w1m_v1": {
+            "value": 2.63818218704933e-05,
+            "valid": true
+          },
+          "rvol_w5m_v1": {
+            "value": 0.00014900316197854268,
+            "valid": true
+          },
+          "ret_simple_1s_v1": {
+            "value": -0.0002043318348998735,
+            "valid": true
+          },
+          "ret_log_1s_v1": {
+            "value": -0.00020435271349406037,
+            "valid": true
+          },
+          "ret_log_10s_v1": {
+            "value": -0.00020435271349406037,
+            "valid": true
+          },
+          "ret_log_1m_v1": {
+            "value": -0.00020435271349406037,
+            "valid": true
+          },
+          "ofi_norm_l1_w1s_v1": {
+            "value": -0.10526315789473673,
+            "valid": true
+          },
+          "ofi_norm_l5_w1s_v1": {
+            "value": -0.12765957446808507,
+            "valid": true
+          },
+          "ofi_norm_l5_w5s_v1": {
+            "value": -0.12765957446808507,
+            "valid": true
+          },
+          "ret_vol_adj_10s_v1": {
+            "value": -7.7459663988047724,
+            "valid": true
+          },
+          "vol_regime_ratio_v1": {
+            "value": 0.1770554486436804,
+            "valid": true
+          }
+        }
+      },
+      "700": {
+        "timestamp": 1787580600807904121,
+        "events_processed": 700,
+        "events_dropped": 138,
+        "ts_regressions_dropped": 24,
+        "oversized_qty_dropped": 0,
+        "oversized_depth_skipped": 0,
+        "recoveries": 2,
+        "warm_ts": 1787579311105911680,
+        "book_ok": true,
+        "features": {
+          "ofi_l1_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_l1_w5s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_l1_w30s_v1": {
+            "value": 200.0,
+            "valid": true
+          },
+          "ofi_l3_w1s_v1": {
+            "value": 500.0,
+            "valid": true
+          },
+          "ofi_l3_w5s_v1": {
+            "value": 500.0,
+            "valid": true
+          },
+          "ofi_l3_w30s_v1": {
+            "value": -1400.0,
+            "valid": true
+          },
+          "ofi_l5_w1s_v1": {
+            "value": 500.0,
+            "valid": true
+          },
+          "ofi_l5_w5s_v1": {
+            "value": 500.0,
+            "valid": true
+          },
+          "ofi_l5_w30s_v1": {
+            "value": -700.0,
+            "valid": true
+          },
+          "ofi_l10_w1s_v1": {
+            "value": 500.0,
+            "valid": true
+          },
+          "ofi_l10_w5s_v1": {
+            "value": 500.0,
+            "valid": true
+          },
+          "ofi_l10_w30s_v1": {
+            "value": 100.0,
+            "valid": true
+          },
+          "imbalance_l1_v1": {
+            "value": -0.3333333333333333,
+            "valid": true
+          },
+          "imbalance_l3_v1": {
+            "value": -0.5172413793103449,
+            "valid": true
+          },
+          "imbalance_l5_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "imbalance_l10_v1": {
+            "value": 0.15384615384615385,
+            "valid": true
+          },
+          "mid_price_v1": {
+            "value": 24.5,
+            "valid": true
+          },
+          "microprice_v1": {
+            "value": 24.493333333333336,
+            "valid": true
+          },
+          "micro_mid_dev_bps_v1": {
+            "value": -2.721088435373125,
+            "valid": true
+          },
+          "spread_ticks_v1": {
+            "value": 4.0,
+            "valid": true
+          },
+          "spread_bps_v1": {
+            "value": 16.3265306122449,
+            "valid": true
+          },
+          "depth_bid_l1_v1": {
+            "value": 500.0,
+            "valid": true
+          },
+          "depth_ask_l1_v1": {
+            "value": 1000.0,
+            "valid": true
+          },
+          "depth_bid_l5_v1": {
+            "value": 2200.0,
+            "valid": true
+          },
+          "depth_ask_l5_v1": {
+            "value": 2200.0,
+            "valid": true
+          },
+          "depth_bid_l10_v1": {
+            "value": 3000.0,
+            "valid": true
+          },
+          "depth_ask_l10_v1": {
+            "value": 2200.0,
+            "valid": true
+          },
+          "signed_volume_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "signed_volume_w10s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "signed_volume_w1m_v1": {
+            "value": 200.0,
+            "valid": true
+          },
+          "trade_imbalance_w1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "trade_imbalance_w10s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "trade_imbalance_w1m_v1": {
+            "value": 1.0,
+            "valid": true
+          },
+          "rvol_w10s_v1": {
+            "value": 7.631088724666563e-12,
+            "valid": true
+          },
+          "rvol_w1m_v1": {
+            "value": 7.902703858340439e-05,
+            "valid": true
+          },
+          "rvol_w5m_v1": {
+            "value": 7.452882782816342e-05,
+            "valid": true
+          },
+          "ret_simple_1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_log_1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_log_10s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_log_1m_v1": {
+            "value": 0.0002041024601435737,
+            "valid": true
+          },
+          "ofi_norm_l1_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_norm_l5_w1s_v1": {
+            "value": 0.11363636363636362,
+            "valid": true
+          },
+          "ofi_norm_l5_w5s_v1": {
+            "value": 0.11363636363636362,
+            "valid": true
+          },
+          "ret_vol_adj_10s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "vol_regime_ratio_v1": {
+            "value": 1.0603552990965714,
+            "valid": true
+          }
+        }
+      },
+      "900": {
+        "timestamp": 1787581692327717716,
+        "events_processed": 900,
+        "events_dropped": 234,
+        "ts_regressions_dropped": 24,
+        "oversized_qty_dropped": 0,
+        "oversized_depth_skipped": 0,
+        "recoveries": 2,
+        "warm_ts": 1787579311105911680,
+        "book_ok": true,
+        "features": {
+          "ofi_l1_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_l1_w5s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_l1_w30s_v1": {
+            "value": -700.0,
+            "valid": true
+          },
+          "ofi_l3_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_l3_w5s_v1": {
+            "value": -1000.0,
+            "valid": true
+          },
+          "ofi_l3_w30s_v1": {
+            "value": -900.0,
+            "valid": true
+          },
+          "ofi_l5_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_l5_w5s_v1": {
+            "value": -1000.0,
+            "valid": true
+          },
+          "ofi_l5_w30s_v1": {
+            "value": -900.0,
+            "valid": true
+          },
+          "ofi_l10_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_l10_w5s_v1": {
+            "value": -1000.0,
+            "valid": true
+          },
+          "ofi_l10_w30s_v1": {
+            "value": -900.0,
+            "valid": true
+          },
+          "imbalance_l1_v1": {
+            "value": -0.14285714285714285,
+            "valid": true
+          },
+          "imbalance_l3_v1": {
+            "value": 0.058823529411764705,
+            "valid": true
+          },
+          "imbalance_l5_v1": {
+            "value": 0.058823529411764705,
+            "valid": true
+          },
+          "imbalance_l10_v1": {
+            "value": 0.058823529411764705,
+            "valid": true
+          },
+          "mid_price_v1": {
+            "value": 24.455000000000002,
+            "valid": true
+          },
+          "microprice_v1": {
+            "value": 24.45,
+            "valid": true
+          },
+          "micro_mid_dev_bps_v1": {
+            "value": -2.044571662237807,
+            "valid": true
+          },
+          "spread_ticks_v1": {
+            "value": 7.0,
+            "valid": true
+          },
+          "spread_bps_v1": {
+            "value": 28.624003271314663,
+            "valid": true
+          },
+          "depth_bid_l1_v1": {
+            "value": 600.0,
+            "valid": true
+          },
+          "depth_ask_l1_v1": {
+            "value": 800.0,
+            "valid": true
+          },
+          "depth_bid_l5_v1": {
+            "value": 900.0,
+            "valid": true
+          },
+          "depth_ask_l5_v1": {
+            "value": 800.0,
+            "valid": true
+          },
+          "depth_bid_l10_v1": {
+            "value": 900.0,
+            "valid": true
+          },
+          "depth_ask_l10_v1": {
+            "value": 800.0,
+            "valid": true
+          },
+          "signed_volume_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "signed_volume_w10s_v1": {
+            "value": -100.0,
+            "valid": true
+          },
+          "signed_volume_w1m_v1": {
+            "value": -300.0,
+            "valid": true
+          },
+          "trade_imbalance_w1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "trade_imbalance_w10s_v1": {
+            "value": -1.0,
+            "valid": true
+          },
+          "trade_imbalance_w1m_v1": {
+            "value": -1.0,
+            "valid": true
+          },
+          "rvol_w10s_v1": {
+            "value": 7.970412225479465e-12,
+            "valid": true
+          },
+          "rvol_w1m_v1": {
+            "value": 2.6398005382653e-05,
+            "valid": true
+          },
+          "rvol_w5m_v1": {
+            "value": 7.928736751718987e-05,
+            "valid": true
+          },
+          "ret_simple_1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_log_1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_log_10s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_log_1m_v1": {
+            "value": 0.00020447807044021715,
+            "valid": true
+          },
+          "ofi_norm_l1_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_norm_l5_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_norm_l5_w5s_v1": {
+            "value": -0.5882352941176467,
+            "valid": true
+          },
+          "ret_vol_adj_10s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "vol_regime_ratio_v1": {
+            "value": 0.3329408690985852,
+            "valid": true
+          }
+        }
+      },
+      "1100": {
+        "timestamp": 1787582818791949591,
+        "events_processed": 1100,
+        "events_dropped": 322,
+        "ts_regressions_dropped": 24,
+        "oversized_qty_dropped": 0,
+        "oversized_depth_skipped": 0,
+        "recoveries": 2,
+        "warm_ts": 1787579311105911680,
+        "book_ok": true,
+        "features": {
+          "ofi_l1_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_l1_w5s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_l1_w30s_v1": {
+            "value": 500.0,
+            "valid": true
+          },
+          "ofi_l3_w1s_v1": {
+            "value": 100.0,
+            "valid": true
+          },
+          "ofi_l3_w5s_v1": {
+            "value": 100.0,
+            "valid": true
+          },
+          "ofi_l3_w30s_v1": {
+            "value": 1600.0,
+            "valid": true
+          },
+          "ofi_l5_w1s_v1": {
+            "value": 100.0,
+            "valid": true
+          },
+          "ofi_l5_w5s_v1": {
+            "value": 100.0,
+            "valid": true
+          },
+          "ofi_l5_w30s_v1": {
+            "value": 1600.0,
+            "valid": true
+          },
+          "ofi_l10_w1s_v1": {
+            "value": 100.0,
+            "valid": true
+          },
+          "ofi_l10_w5s_v1": {
+            "value": 100.0,
+            "valid": true
+          },
+          "ofi_l10_w30s_v1": {
+            "value": 1600.0,
+            "valid": true
+          },
+          "imbalance_l1_v1": {
+            "value": 0.1111111111111111,
+            "valid": true
+          },
+          "imbalance_l3_v1": {
+            "value": 0.6,
+            "valid": true
+          },
+          "imbalance_l5_v1": {
+            "value": 0.6,
+            "valid": true
+          },
+          "imbalance_l10_v1": {
+            "value": 0.6,
+            "valid": true
+          },
+          "mid_price_v1": {
+            "value": 24.41,
+            "valid": true
+          },
+          "microprice_v1": {
+            "value": 24.413333333333334,
+            "valid": true
+          },
+          "micro_mid_dev_bps_v1": {
+            "value": 1.3655605626111653,
+            "valid": true
+          },
+          "spread_ticks_v1": {
+            "value": 6.0,
+            "valid": true
+          },
+          "spread_bps_v1": {
+            "value": 24.58009012699713,
+            "valid": true
+          },
+          "depth_bid_l1_v1": {
+            "value": 500.0,
+            "valid": true
+          },
+          "depth_ask_l1_v1": {
+            "value": 400.0,
+            "valid": true
+          },
+          "depth_bid_l5_v1": {
+            "value": 1600.0,
+            "valid": true
+          },
+          "depth_ask_l5_v1": {
+            "value": 400.0,
+            "valid": true
+          },
+          "depth_bid_l10_v1": {
+            "value": 1600.0,
+            "valid": true
+          },
+          "depth_ask_l10_v1": {
+            "value": 400.0,
+            "valid": true
+          },
+          "signed_volume_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "signed_volume_w10s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "signed_volume_w1m_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "trade_imbalance_w1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "trade_imbalance_w10s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "trade_imbalance_w1m_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "rvol_w10s_v1": {
+            "value": 6.478085980211784e-05,
+            "valid": true
+          },
+          "rvol_w1m_v1": {
+            "value": 2.6446675268993605e-05,
+            "valid": true
+          },
+          "rvol_w5m_v1": {
+            "value": 7.935196927599755e-05,
+            "valid": true
+          },
+          "ret_simple_1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_log_1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_log_10s_v1": {
+            "value": 0.00020485506575873558,
+            "valid": true
+          },
+          "ret_log_1m_v1": {
+            "value": 0.00020485506575873558,
+            "valid": true
+          },
+          "ofi_norm_l1_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_norm_l5_w1s_v1": {
+            "value": 0.05128205128205126,
+            "valid": true
+          },
+          "ofi_norm_l5_w5s_v1": {
+            "value": 0.05128205128205126,
+            "valid": true
+          },
+          "ret_vol_adj_10s_v1": {
+            "value": 7.745966399524846,
+            "valid": true
+          },
+          "vol_regime_ratio_v1": {
+            "value": 0.3332831582758219,
+            "valid": true
+          }
+        }
+      },
+      "1300": {
+        "timestamp": 1787601601042394735,
+        "events_processed": 1300,
+        "events_dropped": 425,
+        "ts_regressions_dropped": 24,
+        "oversized_qty_dropped": 6,
+        "oversized_depth_skipped": 2,
+        "recoveries": 3,
+        "warm_ts": 1787601601009294735,
+        "book_ok": true,
+        "features": {
+          "ofi_l1_w1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ofi_l1_w5s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ofi_l1_w30s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ofi_l3_w1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ofi_l3_w5s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ofi_l3_w30s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ofi_l5_w1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ofi_l5_w5s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ofi_l5_w30s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ofi_l10_w1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ofi_l10_w5s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ofi_l10_w30s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "imbalance_l1_v1": {
+            "value": 0.125,
+            "valid": true
+          },
+          "imbalance_l3_v1": {
+            "value": 0.3939393939393939,
+            "valid": true
+          },
+          "imbalance_l5_v1": {
+            "value": 0.5319148936170213,
+            "valid": true
+          },
+          "imbalance_l10_v1": {
+            "value": 0.5319148936170213,
+            "valid": true
+          },
+          "mid_price_v1": {
+            "value": 24.385,
+            "valid": true
+          },
+          "microprice_v1": {
+            "value": 24.381875,
+            "valid": true
+          },
+          "micro_mid_dev_bps_v1": {
+            "value": -1.281525527988809,
+            "valid": true
+          },
+          "spread_ticks_v1": {
+            "value": -5.0,
+            "valid": true
+          },
+          "spread_bps_v1": {
+            "value": -20.50440844781628,
+            "valid": true
+          },
+          "depth_bid_l1_v1": {
+            "value": 900.0,
+            "valid": true
+          },
+          "depth_ask_l1_v1": {
+            "value": 700.0,
+            "valid": true
+          },
+          "depth_bid_l5_v1": {
+            "value": 3600.0,
+            "valid": true
+          },
+          "depth_ask_l5_v1": {
+            "value": 1100.0,
+            "valid": true
+          },
+          "depth_bid_l10_v1": {
+            "value": 3600.0,
+            "valid": true
+          },
+          "depth_ask_l10_v1": {
+            "value": 1100.0,
+            "valid": true
+          },
+          "signed_volume_w1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "signed_volume_w10s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "signed_volume_w1m_v1": {
+            "value": null,
+            "valid": false
+          },
+          "trade_imbalance_w1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "trade_imbalance_w10s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "trade_imbalance_w1m_v1": {
+            "value": null,
+            "valid": false
+          },
+          "rvol_w10s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "rvol_w1m_v1": {
+            "value": null,
+            "valid": false
+          },
+          "rvol_w5m_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ret_simple_1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ret_log_1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ret_log_10s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ret_log_1m_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ofi_norm_l1_w1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ofi_norm_l5_w1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ofi_norm_l5_w5s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ret_vol_adj_10s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "vol_regime_ratio_v1": {
+            "value": null,
+            "valid": false
+          }
+        }
+      },
+      "1403": {
+        "timestamp": 1787601601093294735,
+        "events_processed": 1403,
+        "events_dropped": 441,
+        "ts_regressions_dropped": 24,
+        "oversized_qty_dropped": 6,
+        "oversized_depth_skipped": 2,
+        "recoveries": 6,
+        "warm_ts": 1787601601082294735,
+        "book_ok": false,
+        "features": {
+          "ofi_l1_w1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ofi_l1_w5s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ofi_l1_w30s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ofi_l3_w1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ofi_l3_w5s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ofi_l3_w30s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ofi_l5_w1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ofi_l5_w5s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ofi_l5_w30s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ofi_l10_w1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ofi_l10_w5s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ofi_l10_w30s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "imbalance_l1_v1": {
+            "value": null,
+            "valid": false
+          },
+          "imbalance_l3_v1": {
+            "value": null,
+            "valid": false
+          },
+          "imbalance_l5_v1": {
+            "value": null,
+            "valid": false
+          },
+          "imbalance_l10_v1": {
+            "value": null,
+            "valid": false
+          },
+          "mid_price_v1": {
+            "value": null,
+            "valid": false
+          },
+          "microprice_v1": {
+            "value": null,
+            "valid": false
+          },
+          "micro_mid_dev_bps_v1": {
+            "value": null,
+            "valid": false
+          },
+          "spread_ticks_v1": {
+            "value": null,
+            "valid": false
+          },
+          "spread_bps_v1": {
+            "value": null,
+            "valid": false
+          },
+          "depth_bid_l1_v1": {
+            "value": null,
+            "valid": false
+          },
+          "depth_ask_l1_v1": {
+            "value": null,
+            "valid": false
+          },
+          "depth_bid_l5_v1": {
+            "value": null,
+            "valid": false
+          },
+          "depth_ask_l5_v1": {
+            "value": null,
+            "valid": false
+          },
+          "depth_bid_l10_v1": {
+            "value": null,
+            "valid": false
+          },
+          "depth_ask_l10_v1": {
+            "value": null,
+            "valid": false
+          },
+          "signed_volume_w1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "signed_volume_w10s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "signed_volume_w1m_v1": {
+            "value": null,
+            "valid": false
+          },
+          "trade_imbalance_w1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "trade_imbalance_w10s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "trade_imbalance_w1m_v1": {
+            "value": null,
+            "valid": false
+          },
+          "rvol_w10s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "rvol_w1m_v1": {
+            "value": null,
+            "valid": false
+          },
+          "rvol_w5m_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ret_simple_1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ret_log_1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ret_log_10s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ret_log_1m_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ofi_norm_l1_w1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ofi_norm_l5_w1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ofi_norm_l5_w5s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ret_vol_adj_10s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "vol_regime_ratio_v1": {
+            "value": null,
+            "valid": false
+          }
+        }
+      }
+    }
+  },
+  "fx": {
+    "vector": "events_fx_anomalies.jsonl",
+    "instrument_id": 101,
+    "n_events": 561,
+    "checkpoints": {
+      "60": {
+        "timestamp": 1787532404523414764,
+        "events_processed": 60,
+        "events_dropped": 0,
+        "ts_regressions_dropped": 0,
+        "oversized_qty_dropped": 0,
+        "oversized_depth_skipped": 0,
+        "recoveries": 0,
+        "warm_ts": 1787529669896521732,
+        "book_ok": true,
+        "features": {
+          "ofi_l1_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_l1_w5s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_l1_w30s_v1": {
+            "value": 8.0,
+            "valid": true
+          },
+          "ofi_l3_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_l3_w5s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_l3_w30s_v1": {
+            "value": -5.0,
+            "valid": true
+          },
+          "ofi_l5_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_l5_w5s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_l5_w30s_v1": {
+            "value": -5.0,
+            "valid": true
+          },
+          "ofi_l10_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_l10_w5s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_l10_w30s_v1": {
+            "value": -5.0,
+            "valid": true
+          },
+          "imbalance_l1_v1": {
+            "value": 0.38461538461538464,
+            "valid": true
+          },
+          "imbalance_l3_v1": {
+            "value": -0.047619047619047616,
+            "valid": true
+          },
+          "imbalance_l5_v1": {
+            "value": -0.047619047619047616,
+            "valid": true
+          },
+          "imbalance_l10_v1": {
+            "value": -0.047619047619047616,
+            "valid": true
+          },
+          "mid_price_v1": {
+            "value": 1.0865500000000001,
+            "valid": true
+          },
+          "microprice_v1": {
+            "value": 1.0865538461538462,
+            "valid": true
+          },
+          "micro_mid_dev_bps_v1": {
+            "value": 0.03539785418136819,
+            "valid": true
+          },
+          "spread_ticks_v1": {
+            "value": 2.0,
+            "valid": true
+          },
+          "spread_bps_v1": {
+            "value": 0.1840688417468133,
+            "valid": true
+          },
+          "depth_bid_l1_v1": {
+            "value": 18.0,
+            "valid": true
+          },
+          "depth_ask_l1_v1": {
+            "value": 8.0,
+            "valid": true
+          },
+          "depth_bid_l5_v1": {
+            "value": 30.0,
+            "valid": true
+          },
+          "depth_ask_l5_v1": {
+            "value": 33.0,
+            "valid": true
+          },
+          "depth_bid_l10_v1": {
+            "value": 30.0,
+            "valid": true
+          },
+          "depth_ask_l10_v1": {
+            "value": 33.0,
+            "valid": true
+          },
+          "signed_volume_w1s_v1": {
+            "value": 9.0,
+            "valid": true
+          },
+          "signed_volume_w10s_v1": {
+            "value": 9.0,
+            "valid": true
+          },
+          "signed_volume_w1m_v1": {
+            "value": 9.0,
+            "valid": true
+          },
+          "trade_imbalance_w1s_v1": {
+            "value": 1.0,
+            "valid": true
+          },
+          "trade_imbalance_w10s_v1": {
+            "value": 1.0,
+            "valid": true
+          },
+          "trade_imbalance_w1m_v1": {
+            "value": 1.0,
+            "valid": true
+          },
+          "rvol_w10s_v1": {
+            "value": 4.365545763031561e-06,
+            "valid": true
+          },
+          "rvol_w1m_v1": {
+            "value": 2.5204316241742796e-06,
+            "valid": true
+          },
+          "rvol_w5m_v1": {
+            "value": 1.1271712888587781e-06,
+            "valid": true
+          },
+          "ret_simple_1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_log_1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_log_10s_v1": {
+            "value": -1.3805067840877427e-05,
+            "valid": true
+          },
+          "ret_log_1m_v1": {
+            "value": -2.7609945103534983e-05,
+            "valid": true
+          },
+          "ofi_norm_l1_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_norm_l5_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ofi_norm_l5_w5s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_vol_adj_10s_v1": {
+            "value": -5.477261208440402,
+            "valid": true
+          },
+          "vol_regime_ratio_v1": {
+            "value": 2.2360659937143477,
+            "valid": true
+          }
+        }
+      },
+      "120": {
+        "timestamp": 1787535062733216913,
+        "events_processed": 120,
+        "events_dropped": 1,
+        "ts_regressions_dropped": 0,
+        "oversized_qty_dropped": 0,
+        "oversized_depth_skipped": 0,
+        "recoveries": 0,
+        "warm_ts": 1787529669896521732,
+        "book_ok": true,
+        "features": {
+          "ofi_l1_w1s_v1": {
+            "value": -17.0,
+            "valid": true
+          },
+          "ofi_l1_w5s_v1": {
+            "value": -17.0,
+            "valid": true
+          },
+          "ofi_l1_w30s_v1": {
+            "value": -17.0,
+            "valid": true
+          },
+          "ofi_l3_w1s_v1": {
+            "value": -6.0,
+            "valid": true
+          },
+          "ofi_l3_w5s_v1": {
+            "value": -6.0,
+            "valid": true
+          },
+          "ofi_l3_w30s_v1": {
+            "value": -6.0,
+            "valid": true
+          },
+          "ofi_l5_w1s_v1": {
+            "value": -6.0,
+            "valid": true
+          },
+          "ofi_l5_w5s_v1": {
+            "value": -6.0,
+            "valid": true
+          },
+          "ofi_l5_w30s_v1": {
+            "value": -6.0,
+            "valid": true
+          },
+          "ofi_l10_w1s_v1": {
+            "value": -6.0,
+            "valid": true
+          },
+          "ofi_l10_w5s_v1": {
+            "value": -6.0,
+            "valid": true
+          },
+          "ofi_l10_w30s_v1": {
+            "value": -6.0,
+            "valid": true
+          },
+          "imbalance_l1_v1": {
+            "value": 0.16666666666666666,
+            "valid": true
+          },
+          "imbalance_l3_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "imbalance_l5_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "imbalance_l10_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "mid_price_v1": {
+            "value": 1.0865900000000002,
+            "valid": true
+          },
+          "microprice_v1": {
+            "value": 1.0865916666666668,
+            "valid": true
+          },
+          "micro_mid_dev_bps_v1": {
+            "value": 0.015338505477480788,
+            "valid": true
+          },
+          "spread_ticks_v1": {
+            "value": 2.0,
+            "valid": true
+          },
+          "spread_bps_v1": {
+            "value": 0.18406206572856365,
+            "valid": true
+          },
+          "depth_bid_l1_v1": {
+            "value": 7.0,
+            "valid": true
+          },
+          "depth_ask_l1_v1": {
+            "value": 5.0,
+            "valid": true
+          },
+          "depth_bid_l5_v1": {
+            "value": 32.0,
+            "valid": true
+          },
+          "depth_ask_l5_v1": {
+            "value": 32.0,
+            "valid": true
+          },
+          "depth_bid_l10_v1": {
+            "value": 32.0,
+            "valid": true
+          },
+          "depth_ask_l10_v1": {
+            "value": 32.0,
+            "valid": true
+          },
+          "signed_volume_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "signed_volume_w10s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "signed_volume_w1m_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "trade_imbalance_w1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "trade_imbalance_w10s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "trade_imbalance_w1m_v1": {
+            "value": null,
+            "valid": false
+          },
+          "rvol_w10s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "rvol_w1m_v1": {
+            "value": 1.1881209926717708e-06,
+            "valid": true
+          },
+          "rvol_w5m_v1": {
+            "value": 7.514371523491364e-07,
+            "valid": true
+          },
+          "ret_simple_1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_log_1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_log_10s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_log_1m_v1": {
+            "value": 9.203145635794385e-06,
+            "valid": true
+          },
+          "ofi_norm_l1_w1s_v1": {
+            "value": -1.4166666666665486,
+            "valid": true
+          },
+          "ofi_norm_l5_w1s_v1": {
+            "value": -0.0923076923076909,
+            "valid": true
+          },
+          "ofi_norm_l5_w5s_v1": {
+            "value": -0.0923076923076909,
+            "valid": true
+          },
+          "ret_vol_adj_10s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "vol_regime_ratio_v1": {
+            "value": 1.5811294501849316,
+            "valid": true
+          }
+        }
+      },
+      "240": {
+        "timestamp": 1787541127992316107,
+        "events_processed": 240,
+        "events_dropped": 1,
+        "ts_regressions_dropped": 0,
+        "oversized_qty_dropped": 0,
+        "oversized_depth_skipped": 0,
+        "recoveries": 0,
+        "warm_ts": 1787529669896521732,
+        "book_ok": true,
+        "features": {
+          "ofi_l1_w1s_v1": {
+            "value": -2.0,
+            "valid": true
+          },
+          "ofi_l1_w5s_v1": {
+            "value": -2.0,
+            "valid": true
+          },
+          "ofi_l1_w30s_v1": {
+            "value": -2.0,
+            "valid": true
+          },
+          "ofi_l3_w1s_v1": {
+            "value": 13.0,
+            "valid": true
+          },
+          "ofi_l3_w5s_v1": {
+            "value": 13.0,
+            "valid": true
+          },
+          "ofi_l3_w30s_v1": {
+            "value": 13.0,
+            "valid": true
+          },
+          "ofi_l5_w1s_v1": {
+            "value": 13.0,
+            "valid": true
+          },
+          "ofi_l5_w5s_v1": {
+            "value": 13.0,
+            "valid": true
+          },
+          "ofi_l5_w30s_v1": {
+            "value": 13.0,
+            "valid": true
+          },
+          "ofi_l10_w1s_v1": {
+            "value": 13.0,
+            "valid": true
+          },
+          "ofi_l10_w5s_v1": {
+            "value": 13.0,
+            "valid": true
+          },
+          "ofi_l10_w30s_v1": {
+            "value": 13.0,
+            "valid": true
+          },
+          "imbalance_l1_v1": {
+            "value": -0.2631578947368421,
+            "valid": true
+          },
+          "imbalance_l3_v1": {
+            "value": 0.3142857142857143,
+            "valid": true
+          },
+          "imbalance_l5_v1": {
+            "value": 0.3142857142857143,
+            "valid": true
+          },
+          "imbalance_l10_v1": {
+            "value": 0.3142857142857143,
+            "valid": true
+          },
+          "mid_price_v1": {
+            "value": 1.086645,
+            "valid": true
+          },
+          "microprice_v1": {
+            "value": 1.0866436842105263,
+            "valid": true
+          },
+          "micro_mid_dev_bps_v1": {
+            "value": -0.012108733522184178,
+            "valid": true
+          },
+          "spread_ticks_v1": {
+            "value": 1.0,
+            "valid": true
+          },
+          "spread_bps_v1": {
+            "value": 0.09202637475900592,
+            "valid": true
+          },
+          "depth_bid_l1_v1": {
+            "value": 14.0,
+            "valid": true
+          },
+          "depth_ask_l1_v1": {
+            "value": 24.0,
+            "valid": true
+          },
+          "depth_bid_l5_v1": {
+            "value": 46.0,
+            "valid": true
+          },
+          "depth_ask_l5_v1": {
+            "value": 24.0,
+            "valid": true
+          },
+          "depth_bid_l10_v1": {
+            "value": 46.0,
+            "valid": true
+          },
+          "depth_ask_l10_v1": {
+            "value": 24.0,
+            "valid": true
+          },
+          "signed_volume_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "signed_volume_w10s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "signed_volume_w1m_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "trade_imbalance_w1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "trade_imbalance_w10s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "trade_imbalance_w1m_v1": {
+            "value": null,
+            "valid": false
+          },
+          "rvol_w10s_v1": {
+            "value": 1.4550680930486684e-06,
+            "valid": true
+          },
+          "rvol_w1m_v1": {
+            "value": 1.0288932498496833e-06,
+            "valid": true
+          },
+          "rvol_w5m_v1": {
+            "value": 1.2460706303151035e-06,
+            "valid": true
+          },
+          "ret_simple_1s_v1": {
+            "value": 4.601339910204061e-06,
+            "valid": true
+          },
+          "ret_log_1s_v1": {
+            "value": 4.60132932467161e-06,
+            "valid": true
+          },
+          "ret_log_10s_v1": {
+            "value": 4.60132932467161e-06,
+            "valid": true
+          },
+          "ret_log_1m_v1": {
+            "value": 1.380405148942998e-05,
+            "valid": true
+          },
+          "ofi_norm_l1_w1s_v1": {
+            "value": -0.05263157894736703,
+            "valid": true
+          },
+          "ofi_norm_l5_w1s_v1": {
+            "value": 0.18571428571428308,
+            "valid": true
+          },
+          "ofi_norm_l5_w5s_v1": {
+            "value": 0.18571428571428308,
+            "valid": true
+          },
+          "ret_vol_adj_10s_v1": {
+            "value": 4.472111031181138,
+            "valid": true
+          },
+          "vol_regime_ratio_v1": {
+            "value": 0.8257095537834365,
+            "valid": true
+          }
+        }
+      },
+      "360": {
+        "timestamp": 1787546349835158175,
+        "events_processed": 360,
+        "events_dropped": 2,
+        "ts_regressions_dropped": 0,
+        "oversized_qty_dropped": 0,
+        "oversized_depth_skipped": 0,
+        "recoveries": 1,
+        "warm_ts": 1787545277972173696,
+        "book_ok": true,
+        "features": {
+          "ofi_l1_w1s_v1": {
+            "value": -5.0,
+            "valid": true
+          },
+          "ofi_l1_w5s_v1": {
+            "value": -5.0,
+            "valid": true
+          },
+          "ofi_l1_w30s_v1": {
+            "value": -2.0,
+            "valid": true
+          },
+          "ofi_l3_w1s_v1": {
+            "value": -8.0,
+            "valid": true
+          },
+          "ofi_l3_w5s_v1": {
+            "value": -8.0,
+            "valid": true
+          },
+          "ofi_l3_w30s_v1": {
+            "value": -8.0,
+            "valid": true
+          },
+          "ofi_l5_w1s_v1": {
+            "value": -8.0,
+            "valid": true
+          },
+          "ofi_l5_w5s_v1": {
+            "value": -8.0,
+            "valid": true
+          },
+          "ofi_l5_w30s_v1": {
+            "value": -8.0,
+            "valid": true
+          },
+          "ofi_l10_w1s_v1": {
+            "value": -8.0,
+            "valid": true
+          },
+          "ofi_l10_w5s_v1": {
+            "value": -8.0,
+            "valid": true
+          },
+          "ofi_l10_w30s_v1": {
+            "value": -8.0,
+            "valid": true
+          },
+          "imbalance_l1_v1": {
+            "value": -0.28,
+            "valid": true
+          },
+          "imbalance_l3_v1": {
+            "value": 0.047619047619047616,
+            "valid": true
+          },
+          "imbalance_l5_v1": {
+            "value": 0.047619047619047616,
+            "valid": true
+          },
+          "imbalance_l10_v1": {
+            "value": 0.047619047619047616,
+            "valid": true
+          },
+          "mid_price_v1": {
+            "value": 1.086615,
+            "valid": true
+          },
+          "microprice_v1": {
+            "value": 1.0866164,
+            "valid": true
+          },
+          "micro_mid_dev_bps_v1": {
+            "value": 0.012884048167283127,
+            "valid": true
+          },
+          "spread_ticks_v1": {
+            "value": -1.0,
+            "valid": true
+          },
+          "spread_bps_v1": {
+            "value": -0.09202891548524547,
+            "valid": true
+          },
+          "depth_bid_l1_v1": {
+            "value": 9.0,
+            "valid": true
+          },
+          "depth_ask_l1_v1": {
+            "value": 16.0,
+            "valid": true
+          },
+          "depth_bid_l5_v1": {
+            "value": 33.0,
+            "valid": true
+          },
+          "depth_ask_l5_v1": {
+            "value": 30.0,
+            "valid": true
+          },
+          "depth_bid_l10_v1": {
+            "value": 33.0,
+            "valid": true
+          },
+          "depth_ask_l10_v1": {
+            "value": 30.0,
+            "valid": true
+          },
+          "signed_volume_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "signed_volume_w10s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "signed_volume_w1m_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "trade_imbalance_w1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "trade_imbalance_w10s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "trade_imbalance_w1m_v1": {
+            "value": null,
+            "valid": false
+          },
+          "rvol_w10s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "rvol_w1m_v1": {
+            "value": 5.940454617932853e-07,
+            "valid": true
+          },
+          "rvol_w5m_v1": {
+            "value": 8.811025966751293e-07,
+            "valid": true
+          },
+          "ret_simple_1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_log_1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_log_10s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_log_1m_v1": {
+            "value": 4.60145636083098e-06,
+            "valid": true
+          },
+          "ofi_norm_l1_w1s_v1": {
+            "value": -0.19999999999999202,
+            "valid": true
+          },
+          "ofi_norm_l5_w1s_v1": {
+            "value": -0.130081300813006,
+            "valid": true
+          },
+          "ofi_norm_l5_w5s_v1": {
+            "value": -0.130081300813006,
+            "valid": true
+          },
+          "ret_vol_adj_10s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "vol_regime_ratio_v1": {
+            "value": 0.6742061478751574,
+            "valid": true
+          }
+        }
+      },
+      "480": {
+        "timestamp": 1787552332481411389,
+        "events_processed": 480,
+        "events_dropped": 2,
+        "ts_regressions_dropped": 0,
+        "oversized_qty_dropped": 0,
+        "oversized_depth_skipped": 0,
+        "recoveries": 1,
+        "warm_ts": 1787545277972173696,
+        "book_ok": true,
+        "features": {
+          "ofi_l1_w1s_v1": {
+            "value": -11.0,
+            "valid": true
+          },
+          "ofi_l1_w5s_v1": {
+            "value": -11.0,
+            "valid": true
+          },
+          "ofi_l1_w30s_v1": {
+            "value": -15.0,
+            "valid": true
+          },
+          "ofi_l3_w1s_v1": {
+            "value": 6.0,
+            "valid": true
+          },
+          "ofi_l3_w5s_v1": {
+            "value": 6.0,
+            "valid": true
+          },
+          "ofi_l3_w30s_v1": {
+            "value": -8.0,
+            "valid": true
+          },
+          "ofi_l5_w1s_v1": {
+            "value": 6.0,
+            "valid": true
+          },
+          "ofi_l5_w5s_v1": {
+            "value": 6.0,
+            "valid": true
+          },
+          "ofi_l5_w30s_v1": {
+            "value": -8.0,
+            "valid": true
+          },
+          "ofi_l10_w1s_v1": {
+            "value": 6.0,
+            "valid": true
+          },
+          "ofi_l10_w5s_v1": {
+            "value": 6.0,
+            "valid": true
+          },
+          "ofi_l10_w30s_v1": {
+            "value": -8.0,
+            "valid": true
+          },
+          "imbalance_l1_v1": {
+            "value": -0.7142857142857143,
+            "valid": true
+          },
+          "imbalance_l3_v1": {
+            "value": 0.07142857142857142,
+            "valid": true
+          },
+          "imbalance_l5_v1": {
+            "value": 0.07142857142857142,
+            "valid": true
+          },
+          "imbalance_l10_v1": {
+            "value": 0.07142857142857142,
+            "valid": true
+          },
+          "mid_price_v1": {
+            "value": 1.08668,
+            "valid": true
+          },
+          "microprice_v1": {
+            "value": 1.086687142857143,
+            "valid": true
+          },
+          "micro_mid_dev_bps_v1": {
+            "value": 0.06573100768277888,
+            "valid": true
+          },
+          "spread_ticks_v1": {
+            "value": -2.0,
+            "valid": true
+          },
+          "spread_bps_v1": {
+            "value": -0.1840468215113925,
+            "valid": true
+          },
+          "depth_bid_l1_v1": {
+            "value": 4.0,
+            "valid": true
+          },
+          "depth_ask_l1_v1": {
+            "value": 24.0,
+            "valid": true
+          },
+          "depth_bid_l5_v1": {
+            "value": 30.0,
+            "valid": true
+          },
+          "depth_ask_l5_v1": {
+            "value": 26.0,
+            "valid": true
+          },
+          "depth_bid_l10_v1": {
+            "value": 30.0,
+            "valid": true
+          },
+          "depth_ask_l10_v1": {
+            "value": 26.0,
+            "valid": true
+          },
+          "signed_volume_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "signed_volume_w10s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "signed_volume_w1m_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "trade_imbalance_w1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "trade_imbalance_w10s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "trade_imbalance_w1m_v1": {
+            "value": null,
+            "valid": false
+          },
+          "rvol_w10s_v1": {
+            "value": 1.4550145328967318e-06,
+            "valid": true
+          },
+          "rvol_w1m_v1": {
+            "value": 1.3282331348958616e-06,
+            "valid": true
+          },
+          "rvol_w5m_v1": {
+            "value": 1.2459992236041158e-06,
+            "valid": true
+          },
+          "ret_simple_1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_log_1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "ret_log_10s_v1": {
+            "value": -4.601159952599687e-06,
+            "valid": true
+          },
+          "ret_log_1m_v1": {
+            "value": -1.3803416345936625e-05,
+            "valid": true
+          },
+          "ofi_norm_l1_w1s_v1": {
+            "value": -0.5866666666666355,
+            "valid": true
+          },
+          "ofi_norm_l5_w1s_v1": {
+            "value": 0.12244897959183423,
+            "valid": true
+          },
+          "ofi_norm_l5_w5s_v1": {
+            "value": 0.12244897959183423,
+            "valid": true
+          },
+          "ret_vol_adj_10s_v1": {
+            "value": -3.4641181337810103,
+            "valid": true
+          },
+          "vol_regime_ratio_v1": {
+            "value": 1.0659975092571679,
+            "valid": true
+          }
+        }
+      },
+      "561": {
+        "timestamp": 1787553126231320622,
+        "events_processed": 561,
+        "events_dropped": 22,
+        "ts_regressions_dropped": 17,
+        "oversized_qty_dropped": 0,
+        "oversized_depth_skipped": 0,
+        "recoveries": 2,
+        "warm_ts": 1787553055882587332,
+        "book_ok": true,
+        "features": {
+          "ofi_l1_w1s_v1": {
+            "value": -3.0,
+            "valid": true
+          },
+          "ofi_l1_w5s_v1": {
+            "value": -3.0,
+            "valid": true
+          },
+          "ofi_l1_w30s_v1": {
+            "value": -3.0,
+            "valid": true
+          },
+          "ofi_l3_w1s_v1": {
+            "value": -11.0,
+            "valid": true
+          },
+          "ofi_l3_w5s_v1": {
+            "value": -11.0,
+            "valid": true
+          },
+          "ofi_l3_w30s_v1": {
+            "value": -11.0,
+            "valid": true
+          },
+          "ofi_l5_w1s_v1": {
+            "value": 9.0,
+            "valid": true
+          },
+          "ofi_l5_w5s_v1": {
+            "value": 9.0,
+            "valid": true
+          },
+          "ofi_l5_w30s_v1": {
+            "value": 9.0,
+            "valid": true
+          },
+          "ofi_l10_w1s_v1": {
+            "value": 9.0,
+            "valid": true
+          },
+          "ofi_l10_w5s_v1": {
+            "value": 9.0,
+            "valid": true
+          },
+          "ofi_l10_w30s_v1": {
+            "value": 9.0,
+            "valid": true
+          },
+          "imbalance_l1_v1": {
+            "value": -0.06666666666666667,
+            "valid": true
+          },
+          "imbalance_l3_v1": {
+            "value": 0.022222222222222223,
+            "valid": true
+          },
+          "imbalance_l5_v1": {
+            "value": 0.3230769230769231,
+            "valid": true
+          },
+          "imbalance_l10_v1": {
+            "value": 0.3230769230769231,
+            "valid": true
+          },
+          "mid_price_v1": {
+            "value": 1.086535,
+            "valid": true
+          },
+          "microprice_v1": {
+            "value": 1.086534,
+            "valid": true
+          },
+          "micro_mid_dev_bps_v1": {
+            "value": -0.009203569143356941,
+            "valid": true
+          },
+          "spread_ticks_v1": {
+            "value": 3.0,
+            "valid": true
+          },
+          "spread_bps_v1": {
+            "value": 0.27610707432342263,
+            "valid": true
+          },
+          "depth_bid_l1_v1": {
+            "value": 7.0,
+            "valid": true
+          },
+          "depth_ask_l1_v1": {
+            "value": 8.0,
+            "valid": true
+          },
+          "depth_bid_l5_v1": {
+            "value": 43.0,
+            "valid": true
+          },
+          "depth_ask_l5_v1": {
+            "value": 22.0,
+            "valid": true
+          },
+          "depth_bid_l10_v1": {
+            "value": 43.0,
+            "valid": true
+          },
+          "depth_ask_l10_v1": {
+            "value": 22.0,
+            "valid": true
+          },
+          "signed_volume_w1s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "signed_volume_w10s_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "signed_volume_w1m_v1": {
+            "value": 0.0,
+            "valid": true
+          },
+          "trade_imbalance_w1s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "trade_imbalance_w10s_v1": {
+            "value": null,
+            "valid": false
+          },
+          "trade_imbalance_w1m_v1": {
+            "value": null,
+            "valid": false
+          },
+          "rvol_w10s_v1": {
+            "value": 2.1534503728370875e-05,
+            "valid": true
+          },
+          "rvol_w1m_v1": {
+            "value": 8.791424333095094e-06,
+            "valid": true
+          },
+          "rvol_w5m_v1": {
+            "value": null,
+            "valid": false
+          },
+          "ret_simple_1s_v1": {
+            "value": -8.742626284941046e-05,
+            "valid": true
+          },
+          "ret_log_1s_v1": {
+            "value": -8.743008474709768e-05,
+            "valid": true
+          },
+          "ret_log_10s_v1": {
+            "value": -8.743008474709768e-05,
+            "valid": true
+          },
+          "ret_log_1m_v1": {
+            "value": -8.743008474709768e-05,
+            "valid": true
+          },
+          "ofi_norm_l1_w1s_v1": {
+            "value": -0.16869300911853158,
+            "valid": true
+          },
+          "ofi_norm_l5_w1s_v1": {
+            "value": 0.19182027649769176,
+            "valid": true
+          },
+          "ofi_norm_l5_w5s_v1": {
+            "value": 0.19182027649769176,
+            "valid": true
+          },
+          "ret_vol_adj_10s_v1": {
+            "value": -9.944927180120542,
+            "valid": true
+          },
+          "vol_regime_ratio_v1": {
+            "value": null,
+            "valid": false
+          }
+        }
+      }
+    }
+  }
+}

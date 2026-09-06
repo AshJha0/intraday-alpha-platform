@@ -1,6 +1,7 @@
 #include "iap/orderbook/book.hpp"
 
 #include <algorithm>
+#include <limits>
 #include <string>
 
 namespace iap {
@@ -9,8 +10,16 @@ namespace {
 constexpr int kBid = 0;
 }
 
-OrderBook::OrderBook(std::uint32_t instrument_id, std::uint16_t venue_id)
-    : instrument_id_(instrument_id), venue_id_(venue_id) {
+OrderBook::OrderBook(std::uint32_t instrument_id, std::uint16_t venue_id,
+                     std::size_t reorder_window)
+    : instrument_id_(instrument_id),
+      venue_id_(venue_id),
+      reorder_window_(reorder_window) {
+    if (reorder_window > MAX_REORDER_WINDOW) {
+        throw std::invalid_argument(
+            "reorder_window must be <= " + std::to_string(MAX_REORDER_WINDOW) +
+            ": " + std::to_string(reorder_window));
+    }
     reserve(1024, 256);
 }
 
@@ -26,7 +35,7 @@ void OrderBook::reserve(std::size_t orders, std::size_t levels) {
 
 // ---------------------------------------------------------------- application
 
-void OrderBook::apply(const MarketEvent& ev) {
+ApplyStatus OrderBook::apply(const MarketEvent& ev) {
     if (ev.instrument_id != instrument_id_ ||
         (venue_id_ != 0 && ev.venue_id != venue_id_)) {
         throw std::invalid_argument(
@@ -35,76 +44,182 @@ void OrderBook::apply(const MarketEvent& ev) {
             std::to_string(ev.venue_id) + ", book " +
             std::to_string(instrument_id_) + "@" + std::to_string(venue_id_));
     }
-    // Sequence handling (duplicates dropped, gaps => stale).
-    if (ev.sequence <= last_sequence_) {
-        ++counters_.duplicates_dropped;
-        return;
+    if (reorder_window_ != 0 && has_sequence_ && ev.sequence > last_sequence_ &&
+        ev.sequence - last_sequence_ > 1) {
+        // Out-of-sequence event ahead of a hole: hold it back until the
+        // missing sequences arrive (bounded by reorder_window).
+        if (pending_.count(ev.sequence) != 0) {
+            ++counters_.duplicates_dropped;
+            return ApplyStatus::DROPPED;
+        }
+        if (pending_.size() < reorder_window_) {
+            pending_.emplace(ev.sequence, ev);
+            return ApplyStatus::HELD;
+        }
+        // Buffer full: give up on the hole, declare the gap and apply
+        // everything held so far in sequence order.
+        pending_.emplace(ev.sequence, ev);
+        return flush_pending(ev.sequence, true);
     }
-    if (ev.sequence > last_sequence_ + 1 && last_sequence_ != 0) {
-        ++counters_.gaps_detected;
-        stale_ = true;
-        if (snapshot_active_) {
-            // Gap inside an active SNAPSHOT burst: the burst is broken —
-            // its completion record must NOT clear `stale` (records are
-            // missing). Only a later complete gap-free burst recovers.
-            snapshot_broken_ = true;
+    const ApplyStatus status = apply_sequenced(ev, false);
+    if (!pending_.empty()) drain_pending();
+    return status;
+}
+
+ApplyStatus OrderBook::flush_pending(std::uint64_t target, bool has_target) {
+    std::map<std::uint64_t, MarketEvent> pending;
+    pending.swap(pending_);
+    ApplyStatus status = ApplyStatus::APPLIED;
+    for (const auto& [seq, pev] : pending) {
+        const ApplyStatus st = apply_sequenced(pev, true);
+        if (has_target && seq == target) status = st;
+    }
+    return status;
+}
+
+void OrderBook::drain_pending() {
+    while (!pending_.empty()) {
+        auto it = pending_.find(last_sequence_ + 1);
+        if (it == pending_.end()) return;
+        MarketEvent pev = it->second;
+        pending_.erase(it);
+        apply_sequenced(pev, true);
+    }
+}
+
+void OrderBook::reset_sequence() {
+    if (!pending_.empty()) flush_pending();
+    has_sequence_ = false;
+    ++sequence_epoch_;
+    ++counters_.sequence_resets;
+    stale_ = true;
+    snapshot_active_ = false;
+    snapshot_broken_ = false;
+    snapshot_countdown_ = 0;
+}
+
+bool OrderBook::payload_ok(const MarketEvent& ev) {
+    const auto et = static_cast<EventType>(ev.event_type);
+    switch (et) {
+        case EventType::ADD:
+            return ev.order_id != 0 && ev.qty > 0 && ev.price_ticks > 0 &&
+                   ev.order_id < SYNTHETIC_ID_BASE;
+        case EventType::MODIFY:
+        case EventType::CANCEL:
+            return ev.order_id != 0;
+        case EventType::EXECUTE:
+            return ev.order_id != 0 && ev.qty > 0;
+        case EventType::QUOTE:
+        case EventType::SNAPSHOT:
+            return ev.qty > 0 && ev.price_ticks > 0 &&
+                   ev.order_id < SYNTHETIC_ID_BASE;
+        case EventType::TRADE:
+            return ev.qty > 0 && ev.price_ticks > 0;
+        case EventType::STATUS:
+            return ev.qty >= 1 && ev.qty <= 4;
+        case EventType::HEARTBEAT:
+            return true;
+    }
+    return true;
+}
+
+ApplyStatus OrderBook::apply_sequenced(const MarketEvent& ev, bool from_buffer) {
+    const auto et = static_cast<EventType>(ev.event_type);
+    if (has_sequence_) {
+        if (ev.sequence <= last_sequence_) {
+            if (et == EventType::SNAPSHOT && !snapshot_active_ &&
+                ev.sequence < last_sequence_) {
+                // Venue sequence reset (daily restart / fail-over): the
+                // SNAPSHOT burst starting the new epoch recovers the book.
+                if (!pending_.empty()) flush_pending();
+                ++sequence_epoch_;
+                ++counters_.sequence_resets;
+                stale_ = true;
+            } else {
+                ++counters_.duplicates_dropped;
+                return ApplyStatus::DROPPED;
+            }
+        } else if (ev.sequence - last_sequence_ > 1) {
+            ++counters_.gaps_detected;
+            stale_ = true;
+            if (snapshot_active_) {
+                // Gap inside an active SNAPSHOT burst: the burst is broken —
+                // its completion record must NOT clear `stale`.
+                snapshot_broken_ = true;
+            }
+        } else if (!pending_.empty() && !from_buffer) {
+            ++counters_.late_recovered;  // a gap filler arrived late
         }
     }
+    has_sequence_ = true;
     last_sequence_ = ev.sequence;
     exchange_ts_ = ev.exchange_ts;
     receive_ts_ = ev.receive_ts;
 
-    const auto et = static_cast<EventType>(ev.event_type);
-    // Side-domain validation for side-indexed event types: malformed side
-    // => dropped + counted (never raised mid-stream), same path as other
-    // malformed events; the sequence number above is consumed (pinned).
+    // Malformed-event classes: dropped + counted (never thrown), after the
+    // sequence number above is consumed (pinned).
+    if (ev.event_type < 1 || ev.event_type > 9) {
+        ++counters_.unknown_type_dropped;
+        return ApplyStatus::DROPPED;
+    }
     if (ev.side > 1 &&
         (et == EventType::ADD || et == EventType::QUOTE ||
          et == EventType::SNAPSHOT || et == EventType::TRADE)) {
         ++counters_.invalid_side_dropped;
-        return;
+        return ApplyStatus::DROPPED;
+    }
+    if (!payload_ok(ev)) {
+        ++counters_.invalid_payload_dropped;
+        return ApplyStatus::DROPPED;
     }
     if (stale_ && et != EventType::SNAPSHOT && et != EventType::STATUS &&
         et != EventType::TRADE && et != EventType::HEARTBEAT) {
         ++counters_.dropped_while_stale;
-        return;
+        return ApplyStatus::DROPPED;
     }
 
+    bool applied = true;
     switch (et) {
         case EventType::ADD:
-            apply_add(ev);
+            applied = apply_add(ev);
             break;
         case EventType::MODIFY:
-            apply_modify(ev);
+            applied = apply_modify(ev);
             break;
         case EventType::CANCEL:
-            apply_cancel(ev);
+            applied = apply_cancel(ev);
             break;
         case EventType::EXECUTE:
-            apply_execute(ev);
+            applied = apply_execute(ev);
             break;
-        case EventType::TRADE:
-            trade_flow_ += (ev.side == static_cast<std::uint8_t>(Side::BID))
-                               ? ev.qty
-                               : -ev.qty;
+        case EventType::TRADE: {
+            std::int64_t flow = 0;
+            const bool overflow =
+                ev.side == static_cast<std::uint8_t>(Side::BID)
+                    ? __builtin_add_overflow(trade_flow_, ev.qty, &flow)
+                    : __builtin_sub_overflow(trade_flow_, ev.qty, &flow);
+            if (overflow) {
+                ++counters_.invalid_payload_dropped;
+                return ApplyStatus::DROPPED;
+            }
+            trade_flow_ = flow;
             break;
+        }
         case EventType::QUOTE:
-            apply_quote(ev);
+            applied = apply_quote(ev);
             break;
         case EventType::SNAPSHOT:
-            apply_snapshot(ev);
+            applied = apply_snapshot(ev);
             break;
         case EventType::STATUS:
             status_ = ev.qty;
             break;
         case EventType::HEARTBEAT:
             break;
-        default:
-            throw std::invalid_argument(
-                "unknown event_type " + std::to_string(ev.event_type) +
-                " (event_id=" + std::to_string(ev.event_id) + ")");
     }
+    if (!applied) return ApplyStatus::DROPPED;
     ++counters_.events_applied;
+    return ApplyStatus::APPLIED;
 }
 
 // ----------------------------------------------------------------- primitives
@@ -178,6 +293,26 @@ std::uint32_t OrderBook::find_level(int side, std::int64_t price) const {
     std::size_t pos = level_pos(side, price);
     if (pos < v.size() && levels_[v[pos]].price == price) return v[pos];
     return NIL;
+}
+
+std::int64_t OrderBook::level_total(int side, std::int64_t price) const {
+    const std::uint32_t li = find_level(side, price);
+    return li == NIL ? 0 : levels_[li].total_qty;
+}
+
+void OrderBook::clear_side(int side) {
+    for (std::uint32_t li : side_levels_[side]) {
+        std::uint32_t oi = levels_[li].head;
+        while (oi != NIL) {
+            const std::uint32_t next = orders_[oi].next;
+            arrival_unlink(oi);
+            index_.erase(orders_[oi].id);
+            free_orders_.push_back(oi);
+            oi = next;
+        }
+        free_levels_.push_back(li);
+    }
+    side_levels_[side].clear();
 }
 
 void OrderBook::insert_order(int side, std::int64_t price,
@@ -268,39 +403,59 @@ void OrderBook::clear_book() {
     index_.clear();
     arrival_head_ = NIL;
     arrival_tail_ = NIL;
+    snapshot_synthetic_next_ = {0, 0};
 }
 
 // ------------------------------------------------------------- event handlers
 
-void OrderBook::apply_add(const MarketEvent& ev) {
+bool OrderBook::apply_add(const MarketEvent& ev) {
     if (index_.contains(ev.order_id)) {
         ++counters_.unknown_order_events;  // duplicate order id: drop + count
-        return;
+        return false;
     }
-    std::int64_t remaining = match_marketable(ev.side, ev.price_ticks, ev.qty);
+    std::int64_t total = 0;
+    if (__builtin_add_overflow(level_total(ev.side, ev.price_ticks), ev.qty,
+                               &total)) {
+        ++counters_.invalid_payload_dropped;
+        return false;
+    }
+    std::int64_t remaining = ev.qty;
+    if (status_ == static_cast<std::int64_t>(SessionStatus::TRADING)) {
+        remaining = match_marketable(ev.side, ev.price_ticks, ev.qty);
+    }
     if (remaining > 0) {
         insert_order(ev.side, ev.price_ticks, ev.order_id, remaining);
     }
+    return true;
 }
 
-void OrderBook::apply_modify(const MarketEvent& ev) {
+bool OrderBook::apply_modify(const MarketEvent& ev) {
     const std::uint32_t oi = index_.find(ev.order_id);
     if (oi == OrderIndex::NPOS) {
         ++counters_.unknown_order_events;
-        return;
+        return false;
     }
     OrderNode& o = orders_[oi];
     LevelNode& lvl = levels_[o.level];
+    if (ev.price_ticks != 0 && ev.price_ticks != lvl.price) {
+        ++counters_.modify_price_mismatch;  // price change must be CANCEL+ADD
+        return false;
+    }
     const std::int64_t old_qty = o.qty;
     const std::int64_t new_qty = ev.qty;
     if (new_qty <= 0) {
         remove_order(oi);
-        return;
+        return true;
     }
     if (new_qty <= old_qty) {
         // Decrease: keep queue position.
         o.qty = new_qty;
     } else {
+        std::int64_t total = 0;
+        if (__builtin_add_overflow(lvl.total_qty, new_qty - old_qty, &total)) {
+            ++counters_.invalid_payload_dropped;
+            return false;
+        }
         // Increase: move to the tail of the level.
         if (lvl.tail != oi) {
             if (o.prev != NIL) {
@@ -317,22 +472,24 @@ void OrderBook::apply_modify(const MarketEvent& ev) {
         o.qty = new_qty;
     }
     lvl.total_qty += new_qty - old_qty;
+    return true;
 }
 
-void OrderBook::apply_cancel(const MarketEvent& ev) {
+bool OrderBook::apply_cancel(const MarketEvent& ev) {
     const std::uint32_t oi = index_.find(ev.order_id);
     if (oi == OrderIndex::NPOS) {
         ++counters_.unknown_order_events;
-        return;
+        return false;
     }
     remove_order(oi);
+    return true;
 }
 
-void OrderBook::apply_execute(const MarketEvent& ev) {
+bool OrderBook::apply_execute(const MarketEvent& ev) {
     const std::uint32_t oi = index_.find(ev.order_id);
     if (oi == OrderIndex::NPOS) {
         ++counters_.unknown_order_events;
-        return;
+        return false;
     }
     OrderNode& o = orders_[oi];
     const std::int64_t old_qty = o.qty;
@@ -343,41 +500,67 @@ void OrderBook::apply_execute(const MarketEvent& ev) {
         o.qty = old_qty - fill;
         levels_[o.level].total_qty -= fill;
     }
+    return true;
 }
 
-void OrderBook::apply_quote(const MarketEvent& ev) {
+bool OrderBook::apply_quote(const MarketEvent& ev) {
     // FX QUOTE: replace this venue's whole side at L1.
     const int side = ev.side;
-    for (std::uint32_t li : side_levels_[side]) {
-        std::uint32_t oi = levels_[li].head;
-        while (oi != NIL) {
-            const std::uint32_t next = orders_[oi].next;
-            arrival_unlink(oi);
-            index_.erase(orders_[oi].id);
-            free_orders_.push_back(oi);
-            oi = next;
-        }
-        free_levels_.push_back(li);
+    const std::uint64_t oid =
+        ev.order_id != 0 ? ev.order_id : synthetic_order_id(ev.side, 0);
+    const std::uint32_t resting = index_.find(oid);
+    if (resting != OrderIndex::NPOS &&
+        levels_[orders_[resting].level].side != side) {
+        ++counters_.unknown_order_events;  // id rests on the other side
+        return false;
     }
-    side_levels_[side].clear();
-    insert_order(side, ev.price_ticks, ev.order_id, ev.qty);
+    clear_side(side);
+    insert_order(side, ev.price_ticks, oid, ev.qty);
+    return true;
 }
 
-void OrderBook::apply_snapshot(const MarketEvent& ev) {
+bool OrderBook::apply_snapshot(const MarketEvent& ev) {
+    if (snapshot_active_) {
+        if (ev.trade_id >= snapshot_countdown_) {
+            // Countdown went up (or repeated): the previous burst was
+            // interrupted and this record starts a new burst.
+            snapshot_active_ = false;
+            ++counters_.snapshot_restarts;
+        } else if (ev.trade_id != snapshot_countdown_ - 1) {
+            // Countdown skipped ahead: records missing — burst broken.
+            snapshot_broken_ = true;
+        }
+    }
     if (!snapshot_active_) {
         // Burst start: clear the whole book state (levels + orders).
         clear_book();
         snapshot_active_ = true;
         snapshot_broken_ = false;
     }
-    const std::uint32_t oi = index_.find(ev.order_id);
-    if (oi != OrderIndex::NPOS) remove_order(oi);
-    insert_order(ev.side, ev.price_ticks, ev.order_id, ev.qty);
+    snapshot_countdown_ = ev.trade_id;
+    std::uint64_t oid = ev.order_id;
+    if (oid == 0) {
+        const std::uint64_t ordinal = snapshot_synthetic_next_[ev.side]++;
+        oid = synthetic_order_id(ev.side, ordinal);
+    }
+    bool ok = true;
+    std::int64_t total = 0;
+    if (index_.contains(oid)) {
+        ++counters_.unknown_order_events;  // repeated id inside a burst
+        ok = false;
+    } else if (__builtin_add_overflow(level_total(ev.side, ev.price_ticks),
+                                      ev.qty, &total)) {
+        ++counters_.invalid_payload_dropped;
+        ok = false;
+    } else {
+        insert_order(ev.side, ev.price_ticks, oid, ev.qty);
+    }
     if (ev.trade_id == 0) {  // last record of the burst
         snapshot_active_ = false;
         if (!snapshot_broken_) stale_ = false;
         snapshot_broken_ = false;
     }
+    return ok;
 }
 
 // -------------------------------------------------------------- derived state
@@ -394,6 +577,22 @@ std::optional<LevelEntry> OrderBook::best_ask() const {
     if (v.empty()) return std::nullopt;
     const LevelNode& lvl = levels_[v.front()];
     return LevelEntry{lvl.price, lvl.total_qty};
+}
+
+bool OrderBook::is_crossed() const {
+    const auto bb = best_bid();
+    const auto ba = best_ask();
+    return bb && ba && bb->first > ba->first;
+}
+
+bool OrderBook::is_locked() const {
+    const auto bb = best_bid();
+    const auto ba = best_ask();
+    return bb && ba && bb->first == ba->first;
+}
+
+bool OrderBook::is_fresh(std::int64_t now_ns, std::int64_t max_age_ns) const {
+    return !stale_ && has_sequence_ && now_ns - receive_ts_ <= max_age_ns;
 }
 
 std::vector<LevelEntry> OrderBook::depth(Side side, int levels) const {
@@ -498,6 +697,8 @@ BookCheckpoint OrderBook::checkpoint() const {
         cp.arrival_order.push_back(orders_[oi].id);
     }
     cp.last_sequence = last_sequence_;
+    cp.has_sequence = has_sequence_;
+    cp.sequence_epoch = sequence_epoch_;
     cp.exchange_ts = exchange_ts_;
     cp.receive_ts = receive_ts_;
     cp.trade_flow = trade_flow_;
@@ -505,14 +706,34 @@ BookCheckpoint OrderBook::checkpoint() const {
     cp.stale = stale_;
     cp.snapshot_active = snapshot_active_;
     cp.snapshot_broken = snapshot_broken_;
+    cp.snapshot_countdown = snapshot_countdown_;
+    cp.snapshot_synthetic_next = snapshot_synthetic_next_;
+    cp.reorder_window = reorder_window_;
+    cp.reorder_pending.reserve(pending_.size());
+    for (const auto& [seq, pev] : pending_) {
+        (void)seq;
+        cp.reorder_pending.push_back(pev);
+    }
     cp.counters = counters_;
     return cp;
 }
 
 OrderBook OrderBook::restore(const BookCheckpoint& cp) {
-    OrderBook book(cp.instrument_id, cp.venue_id);
+    if (cp.reorder_window > MAX_REORDER_WINDOW) {
+        throw std::invalid_argument("checkpoint reorder_window out of range");
+    }
+    OrderBook book(cp.instrument_id, cp.venue_id,
+                   static_cast<std::size_t>(cp.reorder_window));
     for (const auto& lvl : cp.levels) {
+        if (lvl.side > 1) {
+            throw std::invalid_argument("invalid side in checkpoint level");
+        }
         for (const auto& [oid, qty] : lvl.orders) {
+            if (book.index_.contains(oid)) {
+                throw std::invalid_argument(
+                    "duplicate order_id " + std::to_string(oid) +
+                    " in checkpoint");
+            }
             book.insert_order(lvl.side, lvl.price_ticks, oid, qty);
         }
     }
@@ -536,6 +757,8 @@ OrderBook OrderBook::restore(const BookCheckpoint& cp) {
         book.arrival_append(oi);
     }
     book.last_sequence_ = cp.last_sequence;
+    book.has_sequence_ = cp.has_sequence;
+    book.sequence_epoch_ = cp.sequence_epoch;
     book.exchange_ts_ = cp.exchange_ts;
     book.receive_ts_ = cp.receive_ts;
     book.trade_flow_ = cp.trade_flow;
@@ -543,26 +766,87 @@ OrderBook OrderBook::restore(const BookCheckpoint& cp) {
     book.stale_ = cp.stale;
     book.snapshot_active_ = cp.snapshot_active;
     book.snapshot_broken_ = cp.snapshot_broken;
+    book.snapshot_countdown_ = cp.snapshot_countdown;
+    book.snapshot_synthetic_next_ = cp.snapshot_synthetic_next;
+    if (cp.reorder_pending.size() > book.reorder_window_) {
+        throw std::invalid_argument(
+            "checkpoint reorder_pending exceeds reorder_window");
+    }
+    for (const auto& pev : cp.reorder_pending) {
+        if (!book.pending_.emplace(pev.sequence, pev).second) {
+            throw std::invalid_argument(
+                "duplicate pending sequence in checkpoint");
+        }
+    }
     book.counters_ = cp.counters;
     return book;
 }
 
 // ----------------------------------------------------------- ConsolidatedBook
 
-ConsolidatedBook::ConsolidatedBook(std::uint32_t instrument_id)
-    : instrument_id_(instrument_id) {}
+ConsolidatedBook::ConsolidatedBook(std::uint32_t instrument_id,
+                                   std::size_t reorder_window)
+    : instrument_id_(instrument_id), reorder_window_(reorder_window) {
+    if (reorder_window > MAX_REORDER_WINDOW) {
+        throw std::invalid_argument("reorder_window out of range");
+    }
+}
 
 OrderBook& ConsolidatedBook::venue_book(std::uint16_t venue_id) {
     auto it = books_.find(venue_id);
     if (it == books_.end()) {
-        it = books_.emplace(venue_id, OrderBook(instrument_id_, venue_id))
+        it = books_
+                 .emplace(venue_id,
+                          OrderBook(instrument_id_, venue_id, reorder_window_))
                  .first;
     }
     return it->second;
 }
 
-void ConsolidatedBook::apply(const MarketEvent& ev) {
-    venue_book(ev.venue_id).apply(ev);
+ApplyStatus ConsolidatedBook::apply(const MarketEvent& ev) {
+    return venue_book(ev.venue_id).apply(ev);
+}
+
+void ConsolidatedBook::reset_sequences() {
+    for (auto& [vid, book] : books_) {
+        (void)vid;
+        book.reset_sequence();
+    }
+}
+
+bool ConsolidatedBook::is_crossed() const {
+    const auto bb = best_bid();
+    const auto ba = best_ask();
+    return bb && ba && bb->first > ba->first;
+}
+
+bool ConsolidatedBook::is_locked() const {
+    const auto bb = best_bid();
+    const auto ba = best_ask();
+    return bb && ba && bb->first == ba->first;
+}
+
+std::vector<std::uint16_t> ConsolidatedBook::active_venues() const {
+    std::vector<std::uint16_t> out;
+    for (const auto& [vid, book] : books_) {
+        if (!book.stale()) out.push_back(vid);
+    }
+    return out;
+}
+
+std::vector<std::uint16_t> ConsolidatedBook::stale_venues() const {
+    std::vector<std::uint16_t> out;
+    for (const auto& [vid, book] : books_) {
+        if (book.stale()) out.push_back(vid);
+    }
+    return out;
+}
+
+std::optional<std::int64_t> ConsolidatedBook::venue_status(
+    std::uint16_t venue_id) const {
+    auto it = books_.find(venue_id);
+    if (it == books_.end()) return std::nullopt;
+    return it->second.status();
 }
 
 std::vector<std::array<std::int64_t, 3>> ConsolidatedBook::merged(
@@ -572,6 +856,7 @@ std::vector<std::array<std::int64_t, 3>> ConsolidatedBook::merged(
     std::map<std::int64_t, std::pair<std::int64_t, std::int64_t>> agg;
     for (const auto& [vid, book] : books_) {
         (void)vid;
+        if (book.stale()) continue;  // non-stale venues only (pinned)
         const auto& v = book.side_levels_[static_cast<int>(side)];
         for (std::uint32_t li : v) {
             auto& slot = agg[book.levels_[li].price];
@@ -627,17 +912,23 @@ std::vector<LevelEntry> ConsolidatedBook::order_count(Side side,
 }
 
 std::int64_t ConsolidatedBook::trade_flow() const {
-    std::int64_t total = 0;
+    // Saturating sum (pinned): per-venue flows are i64, the aggregate may not be.
+    __int128 total = 0;
     for (const auto& [vid, book] : books_) {
         (void)vid;
         total += book.trade_flow();
     }
-    return total;
+    const __int128 lo = std::numeric_limits<std::int64_t>::min();
+    const __int128 hi = std::numeric_limits<std::int64_t>::max();
+    if (total < lo) return std::numeric_limits<std::int64_t>::min();
+    if (total > hi) return std::numeric_limits<std::int64_t>::max();
+    return static_cast<std::int64_t>(total);
 }
 
 ConsolidatedCheckpoint ConsolidatedBook::checkpoint() const {
     ConsolidatedCheckpoint cp;
     cp.instrument_id = instrument_id_;
+    cp.reorder_window = reorder_window_;
     for (const auto& [vid, book] : books_) {
         cp.venues.emplace(vid, book.checkpoint());
     }
@@ -645,7 +936,11 @@ ConsolidatedCheckpoint ConsolidatedBook::checkpoint() const {
 }
 
 ConsolidatedBook ConsolidatedBook::restore(const ConsolidatedCheckpoint& cp) {
-    ConsolidatedBook cons(cp.instrument_id);
+    if (cp.reorder_window > MAX_REORDER_WINDOW) {
+        throw std::invalid_argument("checkpoint reorder_window out of range");
+    }
+    ConsolidatedBook cons(cp.instrument_id,
+                          static_cast<std::size_t>(cp.reorder_window));
     for (const auto& [vid, bcp] : cp.venues) {
         cons.books_.emplace(vid, OrderBook::restore(bcp));
     }

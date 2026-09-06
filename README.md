@@ -39,23 +39,36 @@ flow, and diagrams.
 |---|---|---|
 | Registered features | **205** (10 families; 40-feature native core set ported to C++/Rust/Java) | `data/reference/feature_registry.json` |
 | Flagship alphas | **24** (EQ01–EQ12, FX01–FX12), each with an enforced `Economic rationale:` docstring | `python/src/iap/alpha/`, `research/alpha_reports/` |
-| Promotion verdicts | **0 PROMOTE / 12 ITERATE / 12 REJECT** | `research/alpha_reports/REPORT.md` |
-| Experiments ledger | 13,306 recorded looks (12,082 from the adaptive study); expected max \|t\| under the global null ≈ 4.36 | `research/experiments.json` |
-| Adaptive deployment study | 4 refit policies × 10 alphas; 113 drift-triggered refits; FX01 retired under every policy | `research/adaptive_reports/ADAPTIVE_REPORT.md` |
+| Promotion verdicts | **0 PROMOTE / 10 ITERATE / 14 REJECT** (gated on *uncrossed* IC) | `research/alpha_reports/REPORT.md` |
+| Experiments ledger | 760 recorded looks over **65 distinct configurations** (de-duplicated by alpha × kind × config); expected max \|t\| under the global null ≈ 3.64 | `research/experiments.json` |
+| Adaptive deployment study | 4 refit policies × 10 alphas; 126 drift-triggered refits; FX01 retired under every policy | `research/adaptive_reports/ADAPTIVE_REPORT.md` |
 | Bundled dataset | 2 synthetic sessions, 19 instruments, 310,159 normalized events | `data/normalized/qc_report.json` |
 | Feature emission | 208,437 vectors at 100 ms cadence | `data/features/features_summary.json` |
-| C++ hot path | IAP1 decode 3.5 ns/event; book update 17.4 ns; replay 37.1M events/s | `benchmarks/results_cpp.md` |
+| C++ hot path | IAP1 decode 174.4 ns/event (CRC-32 verified); book update 25.7 ns; replay 28.1M events/s | `benchmarks/results_cpp.md` |
 
 The honesty is the point (spec §32): of 24 alphas on the bundled synthetic
 data, **none** survives every promotion gate — leakage tests, OOS IC ≥ 0.01,
 Newey–West t ≥ 3.0, fold consistency, *hypothesis sign confirmed*, and
-positive net P&L at 1× modeled costs. Twelve are statistically real enough
-for ITERATE (EQ03: IC 0.0256, t 7.24, leakage-clean), yet every one of the
-24 loses money net of modeled costs at 1×; alphas with the strongest
-statistics (FX09: IC 0.113, t 14.3) are additionally held back because their
-fitted sign contradicts their stated rationale. Statistically significant
-and cost-negative is the platform's central, truthfully reported finding
-(see [research paper 1](docs/papers/01_ofi_predictability_equities.md)).
+positive net P&L at 1× modeled costs. Ten are statistically real enough for
+ITERATE (EQ03: uncrossed IC 0.0298, t 10.6, leakage-clean), yet every one of
+the 24 loses money net of modeled costs at 1×.
+
+Two conditioning rules do most of the culling, and both were added after a
+round-3 audit found the earlier numbers were measuring the wrong thing. IC is
+now computed **only on uncrossed cross-sections** (`spread_ticks_v1 >= 0`)
+with no stale venue in the instrument, because a crossed merged book is an
+artifact of two venues disagreeing, not a price anyone could trade: on FX,
+where ~29-33 % of cross-sections are crossed, this is the difference between
+FX08 at IC 0.117 (all rows) and **0.041** (uncrossed), and it withdraws
+FX09's former "strongest statistics in the study" standing (−0.128 → −0.047).
+And walk-forward folds are cut at quantiles of **row mass** rather than wall
+span, so the equity calendar can no longer hand two of four folds ~0 rows and
+call the empty ones a pass. Every report prints the crossed/uncrossed split
+and the degenerate-fold count (currently 0 of 96 folds). Statistically
+significant and cost-negative is still the platform's central, truthfully
+reported finding (see
+[research paper 1](docs/papers/01_ofi_predictability_equities.md), and the
+dated errata appended to all four papers).
 
 **Models decay, and the platform now treats that as a first-class
 concern.** The adaptability layer (`python/src/iap/adaptive` — the
@@ -63,8 +76,13 @@ reference; `com.iap.adaptive` — the live Java port; contract in
 [API_ADAPTIVE.md](API_ADAPTIVE.md)) measures decay with PSI/KS drift
 monitors and a rolling realized-vs-research IC, refits models when drift
 crosses the pinned triggers, and moves decaying alphas through an
-IC-gated ACTIVE → WATCH → RETIRED lifecycle that verifiably halts
-allocation (FX01 finishes RETIRED under every policy). The comparison
+IC-gated ACTIVE → WATCH → RETIRED lifecycle (FX01 finishes RETIRED under
+every policy). RETIRED verifiably halts allocation in the *backtest*
+(`iap.backtest.adaptive`); in the live Java loop the gauge is
+**observational** — a RETIRED alpha keeps trading at full size and
+`AlphaLifecycleRetired` pages a human, who reduces the allocation by
+decision. That divergence is deliberate and pinned
+([API_ADAPTIVE.md](API_ADAPTIVE.md) §6). The comparison
 study ([ADAPTIVE_REPORT.md](research/adaptive_reports/ADAPTIVE_REPORT.md))
 is reported with the same honesty as the promotion report: on the bundled
 two synthetic sessions, **no refit policy demonstrably beats static** —
@@ -139,9 +157,17 @@ PYTHONPATH=python/src python3 research/adaptive_reports/run_adaptive.py  # adapt
 cd python && PYTHONPATH=src python3 -m iap.tca && cd ..          # TCA report
 
 # 5. Paper trading (Java platform: book → features → alphas → portfolio →
-#    risk → execution, with /metrics, /health, /status on :8080)
+#    risk → execution, with /metrics, /health, /ready, /status on :8080)
 bash java/paper.sh                          # asap replay of the golden vector
 bash java/paper.sh --mode realtime --speed 60   # paced session you can scrape
+bash java/paper.sh --resume                 # continue from java/out/state
+#   (positions, realized P&L and any latched kill switch survive a restart —
+#    PLATFORM_CONVENTIONS.md §12.3)
+
+# 6. Validate the deployment the way CI does (promtool rules + unit tests,
+#    compose, Dockerfile COPY sources, k8s manifests, ConfigMap sync,
+#    dashboard metric provenance, Java golden-gate completeness)
+python3 tests/harness/check_deployment.py
 ```
 
 ## Cross-language parity (captured from `tests/harness/run_all.sh`)
@@ -150,11 +176,15 @@ bash java/paper.sh --mode realtime --speed 60   # paced session you can scrape
 ===================== cross-language parity table =====================
 language | tests passed | golden passed  | time   | status
 ---------+--------------+----------------+--------+-------
-python   | 489          | 49             |   39s | PASS
-cpp      | 175          | 37             |    1s | PASS
-rust     | 181          | 36             |    1s | PASS
-java     | 315          | 13             |    8s | PASS
+python   | 626          | 65             |   75s | PASS
+cpp      | 243          | 45             |    1s | PASS
+rust     | 254          | 47             |    1s | PASS
+java     | 448          | 85             |   19s | PASS
+deployment | -            | -              |    5s | PASS
+numbers  | -            | -              |    -s | PASS
 =======================================================================
+deployment checks: 17 passed, 0 failed, 0 skipped
+headline numbers: all headline numbers match their artefacts
 >> PARITY OK — all languages passed (full suites).
 ```
 
@@ -163,7 +193,17 @@ compile time. The `golden passed` column counts each language's golden-group
 tests: byte-exact IAP1 SHA-256 codec parity, exact-integer book states,
 1e-9-tolerance feature/alpha/portfolio/TCA/risk/fill comparisons, and the
 adaptability goldens — PSI/KS at 1e-10, exact refit-decision booleans and
-lifecycle state sequences — against `tests/golden/`.)
+lifecycle state sequences — against `tests/golden/`. The Java golden column
+runs **all ten** `com.iap.*GoldenTest` classes; until round 3 it ran two of
+them while this paragraph claimed otherwise, and a harness case now fails if
+the gate list ever drifts from the files on disk.)
+
+The last two rows are not test counts: `deployment` is
+`tests/harness/check_deployment.py` (promtool rules/config/unit tests,
+`docker compose config`, Dockerfile COPY sources against a clean clone, k8s
+manifests + singleton shape, ConfigMap sync, dashboard metric provenance),
+and `numbers` is `tests/harness/check_headline_numbers.py`, which re-derives
+every headline figure in this README from the artefact that produces it.
 
 Four independent implementations of one pinned semantics, held identical by
 golden tests — the engineering discipline this repo is built around
@@ -179,7 +219,8 @@ golden tests — the engineering discipline this repo is built around
 | [docs/DIAGRAMS.md](docs/DIAGRAMS.md) | all six architecture diagrams on one page (pipeline, golden topology, paper trading, responsibility matrix, risk decision flow, queue-position model) |
 | [docs/index.html](docs/index.html) + [docs/GITHUB_PAGES.md](docs/GITHUB_PAGES.md) | the GitHub Pages landing site and how to publish it (Settings → Pages → main branch, /docs folder) |
 | [docs/SPECIFICATION.md](docs/SPECIFICATION.md) | the governing institutional specification (verbatim) |
-| [PLATFORM_CONVENTIONS.md](PLATFORM_CONVENTIONS.md) | binding conventions: types, serialization, determinism, book semantics, golden rules |
+| [PLATFORM_CONVENTIONS.md](PLATFORM_CONVENTIONS.md) | binding conventions: types, serialization, determinism, book semantics, golden rules, trading contracts (§11: risk engine, execution simulator, SOR/algos, paper wiring, currency) |
+| [docs/SCENARIOS.md](docs/SCENARIOS.md) | real-life scenarios (feed gaps, halts, clock regressions, loss latches, re-arms, FX notionals, …) → pinned behaviour → contract clause → the tests in each language |
 | [API_CORE.md](API_CORE.md) / [API_FEATURES.md](API_FEATURES.md) / [API_ALPHA.md](API_ALPHA.md) / [API_PORTFOLIO_TCA.md](API_PORTFOLIO_TCA.md) / [API_ADAPTIVE.md](API_ADAPTIVE.md) | the five port contracts |
 | [docs/BUILD_NOTES.md](docs/BUILD_NOTES.md) | per-language build/test commands; the no-Maven rationale and pom-equivalent table |
 | [docs/papers/INDEX.md](docs/papers/INDEX.md) | six flagship research papers/case studies (spec §28) |
@@ -217,6 +258,7 @@ generator and this pipeline, not about any market.
 | timestamps | `int64` nanoseconds since the Unix epoch, `exchange_ts` (event time — all windows, labels, splits) and `receive_ts` (arrival; `receive_ts ≥ exchange_ts`) |
 | costs, slippage, IC-scale returns | basis points of mid / notional; fees per share (equities, negative = maker rebate) or per million notional (FX), `configs/venues.json` |
 | P&L, research metrics | `double`, compared across languages at 1e-9 absolute/relative tolerance |
+| currency | every aggregated P&L / notional / cost figure is in the reporting currency (USD, `configs/risk.json` `currency`); FX quote-currency figures are converted per increment at the prevailing conversion-pair mid, never summed as dollars (`PLATFORM_CONVENTIONS.md` §11.6) |
 | randomness | one pinned RNG (SplitMix64, `PLATFORM_CONVENTIONS.md` §3); same seed ⇒ bit-identical files |
 | calendar | a five-day synthetic calendar in UTC (`configs/instruments.json`); no exchange holidays, DST, or session-time rules |
 
@@ -246,10 +288,12 @@ figures from a two-CPU container without pinning (`benchmarks/RESULTS.md`).
   linear impact in %ADV (`configs/execution.json`), and the queue-position
   fill model is a documented simplification
   ([paper 5](docs/papers/05_queue_aware_execution_adverse_selection.md));
-- production hardening: authentication on the `/metrics` `/health`
-  `/status` endpoints, secrets management, HA/failover, and kernel-bypass
-  networking. The C++ latency figures are single-threaded in-memory
-  measurements, not tick-to-trade on a real network.
+- production hardening: the read endpoints (`/metrics` `/health` `/ready`
+  `/status`) are unauthenticated and rely on the NetworkPolicy — only the
+  write surface (`POST /admin/*`, the kill switch) is token-authenticated and
+  audited; and there is no HA/failover (the trading vertical is a deliberate
+  singleton) or kernel-bypass networking. The C++ latency figures are
+  single-threaded in-memory measurements, not tick-to-trade on a real network.
 
 ## References
 
@@ -425,7 +469,12 @@ deliberate simplification of the cited method the note says so.
 
 ## License
 
-MIT License, Copyright (c) 2026 Ashish Jha — see [LICENSE](LICENSE).
+MIT License, Copyright (c) 2026 Ashish Jha — see [LICENSE](LICENSE). That
+covers this repository's own code. The toolchain, the test libraries and the
+container images pull in third-party software under its own terms (JUnit EPL-1.0,
+Eigen MPL-2.0, GoogleTest BSD-3, OpenJDK GPL-2.0-with-classpath-exception,
+Prometheus Apache-2.0, Grafana AGPL-3.0) — [NOTICE](NOTICE) records what,
+where, and under which licence.
 
 ## Disclaimer
 

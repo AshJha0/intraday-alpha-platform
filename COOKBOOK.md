@@ -50,8 +50,11 @@ python3 -m json.tool ../data/normalized/qc_report.json | head -30
 ```
 
 Expect (seed 20260829): 310,782 events in, 310,159 out; 322 gaps, 450
-duplicates, 182 out-of-order, 173 invalid events counted per stream.
-Generated data is never committed (BUILD_NOTES.md).
+duplicates, 182 out-of-order, 0 sequence resets, 0 in-stream timestamp
+regressions, 173 invalid events counted per stream (`qc_report.json`
+x-version 2). Generated data is never committed (BUILD_NOTES.md). The
+normalized `.iap1` files carry the IAP1 v2 CRC-32 trailer; older v1 files
+still load (unverified).
 
 ## 2. Replay and inspect an order book (all four languages)
 
@@ -76,10 +79,38 @@ print("trade_flow:", book["trade_flow"], "sequence:", book["sequence"])
 EOF
 ```
 
-**Rust** — the replay demo binary (book summary + throughput):
+**Rust** — the replay demo binary (decoder thread → bounded SPSC event bus
+→ engine; book summary + throughput):
 
 ```bash
 cd rust && cargo run --release --bin demo          # defaults to tests/golden/
+```
+
+**Feed anomalies, reorder windows, resets, checkpoints across languages** —
+the anomaly goldens are the executable guide (see `docs/SCENARIOS.md`):
+
+```bash
+cd python && PYTHONPATH=src python3 - <<'PY'
+import json
+from iap.core.codec import read_jsonl
+from iap.orderbook.book import ConsolidatedBook
+from iap.replay.replay import ReplayEngine
+
+events = read_jsonl("../tests/golden/events_eq_anomalies.jsonl")
+for window in (0, 4):                      # hold-back buffer for late retransmissions
+    cons = ConsolidatedBook(1, reorder_window=window)
+    for ev in events:
+        cons.apply(ev)
+    for vid, b in sorted(cons.books.items()):
+        print(window, vid, "stale" if b.stale else "ok", b.counters())
+    print(window, cons.consolidated_summary())   # non-stale venues only
+    cons.reset_sequences()                       # explicit venue sequence reset (session roll)
+
+eng = ReplayEngine(reorder_window=4, keep_snapshots=2)
+eng.run(events)
+cp = eng.checkpoint()                            # x-version 2 JSON, loadable by C++/Rust/Java
+print(json.dumps(cp)[:200])
+PY
 ```
 
 **Java** — the replay demo (golden vectors, codec SHA-256s, throughput):
@@ -259,7 +290,10 @@ cd java && bash build.sh && bash test.sh          # includes PortfolioGoldenTest
 
 The Rust engine is the reference; Java ports it. The golden replays a full
 step sequence (orders, fills, market moves, gaps, venue outages, kill
-switches) and pins every decision, deciding rule and severity:
+switches, loss-limit overrides, session rolls, a mid-stream snapshot) and
+pins every decision, deciding rule and severity, the notification events,
+the audit log byte-for-byte (`expected_risk_audit.jsonl`) and the state
+snapshot (`expected_risk_snapshot.json`, restored by Java):
 
 ```bash
 cd rust && cargo test -p risk --test golden_risk     # reference
@@ -274,16 +308,29 @@ cd java && bash build.sh && rm -rf out/test && mkdir -p out/test && \
 
 To understand a decision, read the step in
 `tests/golden/expected_risk_decisions.json` — the deciding `rule_id` is the
-first failing rule in the engine's pinned check order, and limits come from
-`configs/risk.json` (x-version 2). Kill-switch operations in production
-follow `docs/runbooks/RUNBOOK_incident_kill_switch.md`.
+first failing rule in the engine's pinned check order
+(`PLATFORM_CONVENTIONS.md` §11.1), limits come from `configs/risk.json`
+(x-version 3, incl. the `currency` conversion table) and per-instrument
+reference data (`tick_size`, `qty_unit`, `quote_ccy`) from
+`configs/instruments.json`. Regenerate deliberately only:
+
+```bash
+cd rust && cargo run -p risk --bin make_risk_golden -- ../tests/golden --force
+```
+
+Kill-switch operations in production — including the re-arm order
+(`override_loss_limit` → `clear_kill`, `roll_session` keeps kills) — follow
+`docs/runbooks/RUNBOOK_incident_kill_switch.md`; the scenario tests
+(`rust/risk/tests/rules.rs`, `RiskScenarioTest`) are listed per scenario in
+`docs/SCENARIOS.md`.
 
 ## 10. Run the execution simulator and the fills golden
 
 C++ owns the pinned fill semantics (`cpp/include/iap/execution/execution.hpp`
-— latency, aggressive depth walk, deterministic queue position, fees/impact);
-the golden pins a passive VWAP parent and an aggressive IS parent on the
-golden equity vector:
+— latency, aggressive depth walk, liquidity-consumption overlay,
+deterministic queue position, cancel latency and expiry, venue trading-state
+gate, fees/impact); the golden (v2) pins a passive VWAP parent and an
+aggressive IS parent on the golden equity vector:
 
 ```bash
 cd cpp && bash build.sh
@@ -297,7 +344,8 @@ cd java && bash build.sh && bash test.sh    # includes ReplayFillsGoldenTest, Ex
 ```
 
 Read the expected economics (patience vs urgency — the passive parent earns
-−$0.80 in rebates; the aggressive one pays $1.80 + impact):
+−$0.658 in rebates on 329 of 400 shares and leaves 71 unfilled at `end_ts`;
+the aggressive one completes 600 paying $1.80 + impact):
 
 ```bash
 python3 -m json.tool tests/golden/expected_replay_fills.json | head -30
@@ -340,8 +388,13 @@ print({k: round(v, 2) if isinstance(v, float) else v
 EOF
 ```
 
-The identity `total_pnl = gross_pnl − total_costs` holds exactly. Note this
-demo scores the *full 2-day* frame — including the day the parameters were
+The identity `total_pnl = gross_pnl − total_costs` holds exactly, in USD:
+for FX instruments add `base_currency` / `quote_currency` to the meta (as
+`research/alpha_reports/run_all.py` does) and include the conversion pairs
+in `frames` — every P&L increment is converted at the prevailing pair mid
+(`InstrumentResult.total_pnl_native` keeps the quote-currency figure) and a
+non-USD increment with no prevailing rate raises rather than being summed
+as dollars (conventions §11.6). Note this demo scores the *full 2-day* frame — including the day the parameters were
 fitted on — so it will not match the REPORT.md day-2 OOS table (net −60,061
 for EQ01), which splits by day with `iap.alpha.data.split_by_day` first. The
 pinned EQ01 backtest on the golden frame is golden-tested cross-language
@@ -356,7 +409,22 @@ portfolio → risk → execution with the monitoring endpoints live:
 ```bash
 bash java/paper.sh                              # asap replay of the golden EQ vector
 # prints e.g.:
-# paper session: events=2000 orders=405 fills=600 pnl=-634420.053607 risk[allowed=405 rejected=33] port=8080 ...
+# paper session: events=2000 orders=420 fills=421 pnl=-100.801250 \
+#   risk[allowed=420 rejected=5] status=FINISHED port=8080 \
+#   state=out/state report=out/paper_session_report.json
+```
+
+A session is FINITE: it ends with `status=FINISHED` and exit 0 after the last
+event (PLATFORM_CONVENTIONS.md §12.3). It leaves its durable state behind in
+`out/state/` — `risk_snapshot.json`, `session_state.json`, `risk_audit.jsonl`
+(every RiskEvent, byte-identical to `RiskEngine.auditJsonl()` and hashed in the
+report), `config_audit.jsonl`, `admin_audit.jsonl`:
+
+```bash
+sha256sum java/out/state/risk_audit.jsonl
+python3 -c "import json;print(json.load(open('java/out/paper_session_report.json'))['risk']['audit_sha256'])"
+bash java/paper.sh --resume     # continue from the checkpoint (positions,
+                                # realized P&L and any latched kill switch)
 ```
 
 For a session you can scrape while it runs, pace it in real time (60×):
@@ -370,10 +438,28 @@ curl -s localhost:8080/metrics | grep -E '_total|latency' | head -20
 # e.g. md_events_total, alpha_signals_total, risk_decisions_total /
 # risk_rejected_total, portfolio gauges, latency histograms, GC metrics.
 # (Gap/duplicate counters appear once a gap/dup is actually seen — the golden
-# vector has none. There is NO fill counter on the Java endpoint; fill
-# metrics — venue_fills_total etc. — come from the rust venue sim.
-# The live adaptability gauges — drift PSI, rolling IC, lifecycle state —
-# are scraped in recipe 19.)
+# vector has none, and they are exported on EVERY event so a single gap is
+# visible on the next scrape. Execution flow comes from the PLATFORM's own
+# counters: exec_orders_submitted_total, exec_fills_total,
+# exec_child_orders_rejected_total, exec_slippage_bps — the rust venue
+# counters were never written by any deployed service and their rules and
+# panels were removed in round 3. The live adaptability gauges — drift PSI,
+# rolling IC, lifecycle state — are scraped in recipe 19.)
+
+curl -s localhost:8080/ready                # 503 when the feed is stale
+curl -s localhost:8080/metrics | grep -E '^(platform_|md_event_time_gap|risk_limit|book_stale)'
+```
+
+Halt it the way the runbook does (needs a token, else the routes are 404):
+
+```bash
+IAP_ADMIN_TOKEN=dev-token bash java/paper.sh --mode realtime --speed 60 &
+sleep 5
+curl -sS -X POST localhost:8080/admin/kill \
+  -H "Authorization: Bearer dev-token" \
+  -d 'scope=global' --data-urlencode 'reason=COOKBOOK demo'
+curl -s localhost:8080/metrics | grep '^risk_kill_switch_engaged'   # 1
+tail -1 java/out/state/admin_audit.jsonl                            # audited
 ```
 
 The port comes from `configs/execution.json` `monitoring.port` (default
@@ -397,9 +483,19 @@ Methodology matters more than the numbers (spec §22): the committed
 `benchmarks/results_cpp.md` states hardware (2-CPU Xeon container, no
 pinning), compiler, flags, workload and the mean-only caveat next to every
 figure (`benchmarks/RESULTS.md` is the cross-language index). Reference
-points from the committed run: IAP1 decode 3.5 ns/event, book update
-17.4 ns, replay 37.1M events/s, feature engine ~450 ns/event, alpha scoring
-32.3 ns/row.
+points from the committed run: IAP1 decode 174.4 ns/event, book update
+25.7 ns, replay 28.1M events/s, feature engine ~530 ns/event, alpha scoring
+38.5 ns/row. The table now also carries a **cold** reference — one single
+pass over a full generated session — next to the hot rows, because every
+hot figure is cache-resident by construction (see the caveat in
+`results_cpp.md`, which `bench_all` emits itself so a regeneration cannot
+drop it).
+
+The decode figure moved from 3.5 to 174.4 ns/event in round 3 and that is
+not a regression to fix: IAP1 v2 added a mandatory CRC-32 integrity
+trailer, and a byte-at-a-time table CRC over the 144 KB body costs
+~5 cycles/byte. Paying ~170 ns/event to detect a corrupted capture is the
+right trade; quoting the pre-CRC number afterwards was not.
 
 ## 14. Verify cross-language parity in one command
 
@@ -409,8 +505,10 @@ bash tests/harness/run_all.sh --golden-only   # golden groups only (fast)
 ```
 
 Exit code 0 iff every language passed; logs land in a temp dir printed on
-the first line. A full-suite run: python 489 / cpp 175 /
-rust 181 / java 315 tests passed (golden groups 49/37/36/13), all PASS.
+the first line. A full-suite run: python 626 / cpp 243 /
+rust 254 / java 448 tests passed (golden groups 65/45/47/85), plus a
+`deployment` row (17 structural checks) and a `numbers` row (every headline
+figure re-derived from its artefact), all PASS.
 
 ## 15. Generate the TCA report
 
@@ -420,9 +518,13 @@ cd python && PYTHONPATH=src python3 -m iap.tca      # writes research/tca/TCA_RE
 
 The report simulates a pinned 36-parent order set (SplitMix64 seed 20260829)
 over the golden vectors and reports the full Perold decomposition, VWAP/TWAP
-slippage, spread/impact/timing attribution and post-fill markouts. The exact
-§2.2 records are separately golden-tested (`tests/golden/expected_tca.json`,
-including the all-opportunity-cost unfilled case) in Python and Java.
+slippage, spread/impact/timing attribution and post-fill markouts (with the
+number of fills whose markout is *defined* — a horizon past the end of the
+timeline or across a halt is `null`, never the last mid). The exact §2.2
+records and the timeline cases (crossed states skipped, MAKER fills against
+the pre-event state, undefined markouts) are golden-tested
+(`tests/golden/expected_tca.json` v2, regenerate with
+`python/tools/make_golden_tca.py --force`) in Python and Java.
 
 ## 16. Add a NEW alpha (full walkthrough)
 
@@ -537,7 +639,7 @@ IC-gated lifecycle (`configs/strategies.json` `adaptive`):
 ```bash
 PYTHONPATH=python/src python3 research/adaptive_reports/run_adaptive.py
 # alpha subset: ['EQ01', 'EQ03', 'EQ06', 'FX01', 'FX05', 'FX09', 'FX08', 'EQ09', 'FX11', 'FX10']
-# EQ01: static:rf=1,pnl=-62365 ... drift_triggered:rf=1,pnl=-62365 (2.7s)
+# EQ01: static:rf=1,pnl=-55476 ... drift_triggered:rf=1,pnl=-55476 (2.7s)
 # ...
 # Done in 30s -> research/adaptive_reports/ADAPTIVE_REPORT.md
 ```
@@ -546,11 +648,14 @@ Takes ~30 s and writes `research/adaptive_reports/ADAPTIVE_REPORT.md`
 (the honest comparison + the FX10 false-positive case), per-alpha
 evidence JSONs alongside it, drift baselines to `research/baselines/`
 (the same files the Java live monitor consumes), every lifecycle
-transition to `research/lifecycle_log.jsonl`, and 6,041 counted looks per run (12,082 recorded across the two committed study runs)
-to `research/experiments.json`. Deterministic: a rerun reproduces every
-number except the runtime line — but note the experiments ledger is
-**append-only by design**, so reruns grow it (that is the multiple-testing
-discipline working, not a bug). Read the report's "READ THIS FIRST"
+transition to `research/lifecycle_log.jsonl`, and one ledger entry per
+deployment (10 alphas x 4 policies = 40) to `research/experiments.json`.
+Deterministic: a rerun reproduces every number except the runtime line.
+Since round 3 the ledger is **de-duplicated by (alpha, kind, canonical
+config)**, so rerunning this script bumps a `reruns` counter but does NOT
+inflate the Bonferroni denominator — and one deployment counts as one
+experiment rather than as its 211 monitoring evaluations. Read the report's
+"READ THIS FIRST"
 section before quoting any policy ranking: on two synthetic sessions
 there isn't one. Contract: `/API_ADAPTIVE.md`; concepts: LEARN.md §14.
 

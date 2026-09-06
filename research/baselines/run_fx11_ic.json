@@ -1,12 +1,14 @@
 {
   "alpha_id": "FX11",
+  "baseline_kind": "oos",
   "bucket_ns": 300000000000,
+  "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
   "horizon": "5m",
-  "ic_mean": -0.010388289589473692,
-  "ic_std": 0.24760224374393927,
+  "ic_mean": -0.06721571165635352,
+  "ic_std": 0.3162528013226001,
   "kind": "ic",
-  "n_buckets_baseline": 29,
+  "n_buckets_baseline": 9,
   "name": "run_fx11_ic",
-  "source": "warmup window [1787529602028520532, 1787538602028520532) of the bundled feature frames, universe [101, 102, 103, 104, 105, 106, 107, 108]",
-  "x-version": 1
+  "source": "warmup window [1787529602028520532, 1787538602028520532) of the bundled feature frames, universe [101, 102, 103, 104, 105, 106, 107, 108]; OOS tail [1787535602028520532, 1787538602028520532) of the warmup, model fitted on its first 67%",
+  "x-version": 2
 }

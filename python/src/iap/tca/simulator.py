@@ -7,8 +7,10 @@ reproducible parent-order/fill set so the TCA layer has realistic input:
 - The golden streams (``tests/golden/events_eq_mbo.jsonl`` for instrument 1,
   ``events_fx_quote.jsonl`` for instrument 101) are replayed through the
   reference ``ConsolidatedBook``; every event with a two-sided book appends
-  a state to a :class:`MarketTimeline`, and TRADE events feed the market
-  VWAP tape.
+  a state to a :class:`MarketTimeline` — CROSSED consolidated states
+  (bid > ask across venues) are skipped and counted, LOCKED states (bid ==
+  ask, half-spread 0) are kept (pinned §2.1) — TRADE events feed the market
+  VWAP tape and HALT statuses are recorded for the markout rule.
 - Parent orders are generated from a :class:`SplitMix64` stream with pinned
   draw order (decision point, side, size, decision->arrival delay, then one
   skip-draw per child slice).  Identical seed => identical orders and fills,
@@ -25,10 +27,10 @@ from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
 from iap.core.codec import read_jsonl
-from iap.core.events import EventType
+from iap.core.events import EventType, SessionStatus
 from iap.core.rng import SplitMix64
 from iap.orderbook.book import ConsolidatedBook
-from iap.tca.fills import Fill, MarketTimeline, ParentOrder
+from iap.tca.fills import TAKER, Fill, MarketTimeline, ParentOrder
 
 _REPO = Path(__file__).resolve().parents[4]
 
@@ -65,11 +67,14 @@ def build_timeline(events_path: Path, instrument_id: int,
         book.apply(ev)
         if ev.event_type == EventType.TRADE:
             tl.add_trade(ev.exchange_ts, ev.price_ticks * tick_size, ev.qty)
+        if ev.event_type == EventType.STATUS and ev.qty == SessionStatus.HALT:
+            tl.add_halt(ev.exchange_ts)
         bb, ba = book.best_bid(), book.best_ask()
-        if bb is None or ba is None or bb[0] >= ba[0]:
+        if bb is None or ba is None:
             continue
-        tl.append(ev.exchange_ts, bb[0] * tick_size, ba[0] * tick_size,
-                  bb[1], ba[1])
+        # pinned: crossed states skipped + counted, locked states kept
+        tl.append_state_pinned(ev.exchange_ts, bb[0] * tick_size,
+                               ba[0] * tick_size, bb[1], ba[1])
     if len(tl) < 50:
         raise ValueError(f"timeline too short from {events_path}")
     return tl
@@ -143,6 +148,7 @@ def simulate_parent_orders(
                 mid_at_fill=timeline.mid(i),
                 half_spread_at_fill=timeline.half_spread(i),
                 opp_depth_at_fill=contra_depth,
+                liquidity=TAKER,
             ))
         orders.append(order)
     return orders

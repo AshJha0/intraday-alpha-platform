@@ -17,6 +17,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from iap.adaptive.drift import BASELINE_VERSION
+from iap.features.registry import registry_hash
+
 from iap.adaptive import (
     ACTIVE,
     PSI_EPS,
@@ -307,7 +310,10 @@ def test_baseline_roundtrip(tmp_path, synth_baseline, synth_samples):
 
 def test_baseline_schema_fields(synth_baseline):
     d = synth_baseline.to_dict()
-    assert d["x-version"] == 1
+    assert d["x-version"] == BASELINE_VERSION == 2
+    # round-3 provenance: a baseline records the registry it was captured
+    # against, so a loader can refuse one whose feature semantics moved.
+    assert d["feature_version"] == registry_hash()
     assert d["kind"] in ("signal", "feature")
     assert d["psi_eps"] == PSI_EPS and d["n_buckets"] == 10
     assert len(d["edges"]) == 9 and len(d["expected_frac"]) == 10
@@ -330,14 +336,96 @@ def test_signal_eq01_baseline_matches_golden(golden):
     assert all(e2 >= e1 for e1, e2 in zip(b.edges, b.edges[1:]))
 
 
+def test_rolling_ic_matches_golden(golden):
+    """The `rolling_ic` block of expected_adaptive.json, re-derived here.
+
+    Java asserts this section (`AdaptiveGoldenTest.
+    rollingIcMatchesThePythonResearchLabel`), but the vector was PRODUCED by
+    the Python reference (`python/tools/make_golden_adaptive.py`) — so
+    without this test a regression in `rolling_ic_z` / `bucket_ics` would
+    leave the committed golden stale and Java would happily keep passing
+    against the stale file.  Everything below is rebuilt from the golden's
+    own embedded `mid_series` / `signals`; nothing is read from the frame.
+    """
+    g = golden["rolling_ic"]
+    h_ns = int(g["horizon_ns"])
+    window_ns = int(g["window_ns"])
+    bucket_ns = int(g["bucket_ns"])
+    min_buckets = int(g["min_buckets"])
+
+    mids = np.asarray(g["mid_series"], dtype=np.float64)
+    mid_ts = mids[:, 0].astype(np.int64)
+    mid_v = mids[:, 1]
+    sigs = np.asarray(g["signals"], dtype=np.float64)
+    sig_ts = sigs[:, 0].astype(np.int64)
+    sig_v, sig_mid = sigs[:, 1], sigs[:, 2]
+    assert np.all(np.diff(mid_ts) >= 0), "mid stream must be event-time sorted"
+
+    # research label: the mid prevailing AT OR BEFORE t + h, and only once
+    # the mid stream has actually been seen through t + h (no lookahead).
+    idx = np.searchsorted(mid_ts, sig_ts + h_ns, side="right") - 1
+    have = idx >= 0
+    fwd = np.where(have, mid_v[np.maximum(idx, 0)], np.nan)
+    observed = (sig_ts + h_ns) <= mid_ts[-1]
+    ret = np.where(have & observed, fwd / sig_mid - 1.0, np.nan)
+
+    base = ICBaseline(name="golden", alpha_id=g["alpha_id"], source="golden",
+                      ic_mean=0.0, ic_std=1.0, n_buckets_baseline=8,
+                      bucket_ns=bucket_ns, horizon=g["horizon"])
+    evals = g["evaluations"]
+    assert len(evals) >= 5, "the golden must pin several evaluation times"
+    for i, ev in enumerate(evals):
+        t_eval = int(ev["t"])
+        m = (sig_ts >= t_eval - window_ns) & (sig_ts + h_ns <= t_eval)
+        res = rolling_ic_z(base, sig_ts[m], sig_v[m], ret[m], min_buckets)
+        assert int(np.sum(m & np.isfinite(ret))) == ev["n_matured"], \
+            f"eval {i}: matured-row count drifted from the golden"
+        assert res.n_buckets == ev["n_buckets"], f"eval {i}: bucket count"
+        if ev["rolling_ic"] is None:
+            assert res.rolling_ic is None, f"eval {i}: expected a null IC"
+        else:
+            assert res.rolling_ic == pytest.approx(
+                ev["rolling_ic"], abs=1e-10), f"eval {i}: rolling_ic"
+
+
 def test_ic_baseline_roundtrip(tmp_path):
     b = ICBaseline("run_test_ic", "ZZ99", "unit test", 0.05, 0.02, 30,
-                   300 * NS_S, "1s")
+                   300 * NS_S, "1s", feature_version=registry_hash())
     p = tmp_path / "ic.json"
     b.save(p)
     assert ICBaseline.load(p) == b
     with pytest.raises(ValueError):
-        ICBaseline.from_dict({"x-version": 1, "kind": "feature"})
+        ICBaseline.from_dict({"x-version": BASELINE_VERSION, "kind": "feature"})
+    with pytest.raises(ValueError):  # superseded schema
+        ICBaseline.from_dict({**b.to_dict(), "x-version": 1})
+
+
+def test_baseline_loader_rejects_a_foreign_feature_registry(tmp_path):
+    """Pinned (API_ADAPTIVE section 4): a baseline captured against another
+    feature registry describes a feature whose semantics may have changed
+    under the same name, so PSI/IC against it is meaningless."""
+    b = ICBaseline("run_test_ic", "ZZ99", "unit test", 0.05, 0.02, 30,
+                   300 * NS_S, "1s", feature_version=registry_hash())
+    p = tmp_path / "ic.json"
+    b.save(p)
+    blob = json.loads(p.read_text())
+    blob["feature_version"] = "0" * 64
+    p.write_text(json.dumps(blob))
+    with pytest.raises(ValueError, match="feature_version"):
+        ICBaseline.load(p)
+    # explicit opt-out for tooling that inspects a historic file
+    assert ICBaseline.load(p, expected_feature_version=None).ic_mean == 0.05
+
+
+def test_drift_baseline_carries_the_registry_hash(synth_baseline, tmp_path):
+    p = tmp_path / "b.json"
+    synth_baseline.save(p)
+    assert DriftBaseline.load(p).feature_version == registry_hash()
+    blob = json.loads(p.read_text())
+    del blob["feature_version"]
+    p.write_text(json.dumps(blob))
+    with pytest.raises(ValueError, match="feature_version"):
+        DriftBaseline.load(p)
 
 
 # ---------------------------------------------------------------------------
@@ -518,9 +606,15 @@ def test_golden_lifecycle_sequence(golden):
         "reactivate_evals")})
     t = LifecycleTracker(alpha_id="GOLDEN", config=cfg, policy="golden")
     states = []
+    informative = g["ic_informative"]
+    assert len(informative) == len(g["ic_path"])
     for k, v in enumerate(g["ic_path"]):
-        states.append(t.update((k + 1) * int(g["ts_step_ns"]), v))
+        states.append(t.update((k + 1) * int(g["ts_step_ns"]), v,
+                               informative=bool(informative[k])))
     assert states == g["expected_states"]
+    # the golden path ends with six UNINFORMATIVE breaches that move nothing
+    assert not any(informative[-6:])
+    assert states[-1] == states[-7] == "WATCH"
     assert len(t.transitions) == g["expected_transition_count"]
     got = [{"from": tr.from_state, "to": tr.to_state,
             "eval_index": tr.eval_index} for tr in t.transitions]
@@ -698,3 +792,68 @@ def test_rolling_ic_z_hand_computed():
     # below min_buckets: silent
     r2 = rolling_ic_z(base, ts, x, y, min_buckets=3)
     assert r2.rolling_ic is None and r2.z is None
+
+
+# -- round-3: informative evaluations, OOS IC baseline ---------------------
+
+
+def test_lifecycle_ignores_uninformative_evaluations():
+    """Six re-reads of the SAME matured window are one reading, not six
+    consecutive breaches (API_ADAPTIVE section 6)."""
+    from iap.adaptive.lifecycle import ACTIVE, RETIRED, WATCH
+
+    cfg = LifecycleConfig(watch_ic_gate=0.0, reactivate_ic_gate=0.005,
+                          retire_breach_evals=6, reactivate_evals=3)
+    tr = LifecycleTracker(alpha_id="EQ03", config=cfg)
+    # one genuine breach enters WATCH, then the feed goes quiet
+    assert tr.update(1, -0.04) == WATCH
+    for k in range(2, 9):
+        assert tr.update(k, -0.04, informative=False) == WATCH
+    assert tr.state == WATCH
+    assert tr.breach_count == 1
+
+    # the same readings WITH new evidence retire the alpha
+    tr2 = LifecycleTracker(alpha_id="EQ03", config=cfg)
+    states = [tr2.update(k, -0.04) for k in range(1, 8)]
+    assert states[-1] == RETIRED
+    assert tr2.state == RETIRED
+    assert ACTIVE not in states[1:]
+
+
+def test_drift_refit_requires_new_evidence():
+    """drift_triggered must not fire twice on the same ic_z recomputed from
+    an unchanged matured set."""
+    pol = DriftTriggeredPolicy(psi_threshold=0.25, ic_z_threshold=-2.0,
+                               min_refit_gap_ns=3600 * NS_S)
+    hour = 3600 * NS_S
+    ctx = RefitContext(now_ns=10 * hour, last_fit_ns=1 * hour,
+                       psi_by_series={"signal": 0.01}, ic_z=-7.5)
+    assert pol.should_refit(ctx).refit is True
+    # the deployment passes ic_z=None for an uninformative evaluation
+    stale = RefitContext(now_ns=11 * hour, last_fit_ns=10 * hour,
+                         psi_by_series={"signal": 0.01}, ic_z=None)
+    assert pol.should_refit(stale).refit is False
+
+
+def test_ic_baseline_must_be_out_of_sample():
+    from iap.adaptive.drift import ICBaseline, capture_ic_baseline
+
+    ts = np.arange(400, dtype=np.int64) * 10 * NS_S
+    rng = np.random.default_rng(4)
+    x = rng.standard_normal(400)
+    y = 0.1 * x + rng.standard_normal(400)
+    base = capture_ic_baseline(ts, x, y, name="t", alpha_id="EQ01",
+                               horizon="1m", source="unit")
+    assert base.baseline_kind == "oos"
+    assert base.to_dict()["baseline_kind"] == "oos"
+    # a file claiming an in-sample baseline is rejected at load
+    blob = base.to_dict()
+    blob["baseline_kind"] = "is"
+    with pytest.raises(ValueError, match="must be 'oos'"):
+        ICBaseline.from_dict(blob)
+    blob.pop("baseline_kind")
+    with pytest.raises(ValueError, match="must be 'oos'"):
+        ICBaseline.from_dict(blob)
+    with pytest.raises(ValueError, match="out-of-sample"):
+        capture_ic_baseline(ts, x, y, name="t", alpha_id="EQ01",
+                            horizon="1m", baseline_kind="is")

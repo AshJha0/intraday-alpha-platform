@@ -12,6 +12,7 @@ import pytest
 
 from iap.alpha.base import LinearAlpha
 from iap.validation import (
+    MIN_TEST_PAIRS,
     ExperimentLedger,
     LeakageTester,
     WalkForwardSplitter,
@@ -19,9 +20,11 @@ from iap.validation import (
     hit_rate,
     ic,
     newey_west_tstat,
+    nw_lags,
     rank_ic,
     signal_turnover,
 )
+from iap.validation.metrics import HORIZONS_NS as _H
 
 NS_S = 1_000_000_000
 
@@ -163,16 +166,28 @@ def test_splitter_validates_args():
 # -- leakage detection --------------------------------------------------
 
 
-def _label_frames(n=3000, seed=7):
-    """Frames with a genuine (weak) signal plus labels, deterministic."""
+def _label_frames(n=3000, seed=7, rho=0.9):
+    """Frames with a genuine (weak, PERSISTENT) signal plus labels.
+
+    The signal is an AR(1) process, like every real book-derived feature
+    sampled at 100 ms: it predicts the next second and survives a one-row
+    shift with ~rho of its IC.  A white-noise "signal" would be destroyed by
+    any one-row shift and is indistinguishable from lookahead — which is
+    exactly what the round-3 shift-test calibration pins.
+    """
     rng = np.random.default_rng(seed)  # test-only fixture data, not a shared path
     ts = np.arange(n, dtype=np.int64) * 100_000_000 + NS_S
-    future = rng.standard_normal(n) * 1e-4
-    sig = 0.05 * future / 1e-4 + rng.standard_normal(n)  # weak look-ahead-free proxy
+    innov = rng.standard_normal(n)
+    z = np.empty(n)
+    z[0] = innov[0]
+    for i in range(1, n):
+        z[i] = rho * z[i - 1] + innov[i]
+    z /= z.std()
+    future = (0.06 * z + rng.standard_normal(n)) * 1e-4
     df = pd.DataFrame(
         {
             "exchange_ts": ts,
-            "sig_feature": sig,
+            "sig_feature": z,
             "ret_feature": np.concatenate(([0.0], future[:-1])),
             "label_mid_1s": future,
             "label_valid_1s": np.ones(n, dtype=bool),
@@ -255,8 +270,69 @@ def test_leakage_honest_alpha_passes():
     m.fit(frames)
     res = LeakageTester().run(m, frames)
     assert res.label_guard_ok is True
+    assert res.truncation_ok is True
     assert res.passed is True
     assert abs(res.ic_unshifted) < 0.15
+    # a persistent signal keeps most of its IC under a one-row shift
+    assert abs(res.ic_shifted) >= res.required_shift_ratio * abs(res.ic_unshifted)
+
+
+def test_leakage_detector_catches_sub_threshold_leak():
+    """A shifted-label leak worth IC 0.12 — 12x the PROMOTE gate — must fail.
+
+    The old detector only fired above |IC| > 0.15 and let this through.
+    """
+    n = 20000
+    rng = np.random.default_rng(11)
+    ts = np.arange(n, dtype=np.int64) * 100_000_000 + NS_S
+    future = rng.standard_normal(n) * 1e-4
+    leak = 0.12 * (future / 1e-4) + np.sqrt(1 - 0.12 ** 2) * rng.standard_normal(n)
+    df = pd.DataFrame({
+        "exchange_ts": ts,
+        "sig_feature": leak,
+        "ret_feature": np.concatenate(([0.0], future[:-1])),
+        "label_mid_1s": future,
+        "label_valid_1s": np.ones(n, dtype=bool),
+    })
+    m = _HonestAlpha()
+    frames = {1: df}
+    m.fit(frames)
+    res = LeakageTester().run(m, frames)
+    assert 0.10 < abs(res.ic_unshifted) < 0.15
+    assert abs(res.ic_shifted) < 0.03
+    assert res.shift_ok is False, "a 12x-gate leak must be flagged"
+    assert res.passed is False
+
+
+def test_leakage_shift_test_is_disabled_when_rows_span_the_horizon():
+    """On a 15 s-spaced FX stream a 1 s alpha MUST collapse under a one-row
+    shift: that is row spacing, not lookahead, so the test cannot fire."""
+    frames = _label_frames()
+    df = frames[1].copy()
+    df["exchange_ts"] = np.arange(len(df), dtype=np.int64) * 15 * NS_S + NS_S
+    m = _HonestAlpha()
+    m.fit({1: df})
+    res = LeakageTester().run(m, {1: df})
+    assert res.required_shift_ratio == 0.0
+    assert res.shift_ok is True
+    assert res.median_row_gap_ns == 15 * NS_S
+
+
+def test_leakage_truncation_probe_catches_future_row_reader():
+    """A score() that reads the NEXT row fails the engine-level probe even
+    where the shift heuristic is inconclusive."""
+    frames = _label_frames()
+    m = _PeekAheadAlpha()
+    m.fit(frames)
+    tester = LeakageTester()
+    assert tester.truncation_probe(m, frames) is False
+    assert tester.truncation_probe(_fitted_honest(frames), frames) is True
+
+
+def _fitted_honest(frames):
+    m = _HonestAlpha()
+    m.fit(frames)
+    return m
 
 
 # -- experiments ledger --------------------------------------------------
@@ -298,3 +374,138 @@ def test_ledger_file_is_deterministic(tmp_path):
     assert p1.read_bytes() == p2.read_bytes()
     blob = json.loads(p1.read_text())
     assert blob["total_experiments"] == 1
+
+
+# -- round-3: row-mass folds, degenerate folds, NW lag, crossed rows -------
+
+
+def _two_day_frames(rows_per_day=4000, seed=3):
+    """Frames shaped like the bundled equity data: 2.6 h of rows per day
+    inside a 24 h calendar, plus a lone close print 4 h later."""
+    rng = np.random.default_rng(seed)
+    day = 86_400 * NS_S
+    ts = []
+    for d in (0, 1):
+        base = d * day + 13 * 3600 * NS_S + 1800 * NS_S
+        ts.extend(base + np.arange(rows_per_day, dtype=np.int64)
+                  * (9360 * NS_S // rows_per_day))
+        ts.append(d * day + 20 * 3600 * NS_S)  # 20:00 close print
+    ts = np.array(sorted(ts), dtype=np.int64)
+    n = ts.size
+    z = rng.standard_normal(n)
+    future = (0.05 * z + rng.standard_normal(n)) * 1e-4
+    return {1: pd.DataFrame({
+        "exchange_ts": ts,
+        "sig_feature": z,
+        "spread_ticks_v1": np.ones(n),
+        "label_mid_1s": future,
+        "label_valid_1s": np.ones(n, dtype=bool),
+    })}
+
+
+def test_walk_forward_splits_on_row_mass_not_wall_span():
+    frames = _two_day_frames()
+    rows = len(frames[1])
+    sp = WalkForwardSplitter(n_folds=4, embargo_ns=NS_S)
+    sizes = [len(test[1]) for _, _, test in sp.split_frames(frames, _H["1s"])]
+    assert len(sizes) == 4
+    assert all(s > MIN_TEST_PAIRS for s in sizes), sizes
+    # every fold carries roughly a fifth of the rows
+    for s in sizes:
+        assert abs(s - rows / 5) < rows * 0.05, sizes
+
+    # the old wall-span mode is exactly the failure mode we fixed
+    wall = WalkForwardSplitter(n_folds=4, embargo_ns=NS_S, mode="wall_span")
+    wall_sizes = [len(test[1]) for _, _, test in wall.split_frames(frames, _H["1s"])]
+    assert min(wall_sizes) == 0, "wall-span folds should still show the defect"
+
+
+def test_walk_forward_degenerate_fold_is_reported_and_fails_the_gate():
+    """A fold with < MIN_TEST_PAIRS rows counts as a FAILED fold."""
+    from iap.validation.splits import MIN_NONDEGENERATE_FOLDS
+
+    fold_rows = [
+        {"fold": 1, "ic": 0.02, "degenerate": False},
+        {"fold": 2, "ic": None, "degenerate": True},
+        {"fold": 3, "ic": None, "degenerate": True},
+        {"fold": 4, "ic": 0.03, "degenerate": False},
+    ]
+    n_run = len(fold_rows)
+    n_nondeg = sum(1 for r in fold_rows if not r["degenerate"])
+    positive = sum(1 for r in fold_rows
+                   if not r["degenerate"] and r["ic"] is not None and r["ic"] > 0)
+    assert n_nondeg == 2
+    assert positive / n_run == 0.5  # NOT 1.00
+    assert n_nondeg < MIN_NONDEGENERATE_FOLDS  # blocks PROMOTE
+
+
+def test_row_mass_split_rejects_a_sample_it_cannot_divide():
+    ts = np.full(500, 1_000_000_000, dtype=np.int64)
+    sp = WalkForwardSplitter(n_folds=4)
+    with pytest.raises(ValueError, match="strictly increasing"):
+        sp.folds_by_row_mass(ts)
+    with pytest.raises(ValueError, match="too few rows"):
+        sp.folds_by_row_mass(np.arange(10, dtype=np.int64))
+
+
+def test_nw_lag_scales_with_horizon():
+    assert nw_lags(_H["1s"]) == 2
+    assert nw_lags(_H["5m"]) == 2
+    assert nw_lags(_H["15m"]) >= 3
+    # a longer horizon over the same buckets needs more lags
+    assert nw_lags(_H["15m"]) > nw_lags(_H["1m"])
+    with pytest.raises(ValueError):
+        nw_lags(0)
+
+
+def test_crossed_rows_are_split_out_of_the_reported_ic():
+    """A signal whose IC lives entirely on crossed (stale-LP) rows must show
+    a near-zero uncrossed IC — the number the PROMOTE gate reads."""
+    from iap.validation.validate import _pooled_arrays
+
+    n = 4000
+    rng = np.random.default_rng(5)
+    crossed = np.zeros(n, dtype=bool)
+    crossed[: int(0.3 * n)] = True
+    rng.shuffle(crossed)
+    z = rng.standard_normal(n)
+    lab = np.where(crossed, 0.5 * z, 0.0) * 1e-4 + rng.standard_normal(n) * 1e-6
+    df = pd.DataFrame({
+        "exchange_ts": np.arange(n, dtype=np.int64) * NS_S,
+        "spread_ticks_v1": np.where(crossed, -1.0, 1.0),
+        "label_mid_1s": lab,
+        "label_valid_1s": np.ones(n, dtype=bool),
+    })
+    scores = {1: pd.DataFrame({
+        "exchange_ts": df["exchange_ts"],
+        "expected_return": z,
+        "confidence": np.ones(n),
+    })}
+    ts, er, y, cr = _pooled_arrays(scores, {1: df}, "1s")
+    assert abs(np.mean(cr) - 0.3) < 0.02
+    pooled = ic(er, y)
+    unc = ~cr
+    ic_unc = ic(np.where(unc, er, np.nan), np.where(unc, y, np.nan))
+    ic_cr = ic(np.where(cr, er, np.nan), np.where(cr, y, np.nan))
+    assert ic_cr > 0.5
+    assert abs(ic_unc) < 0.1
+    assert ic_unc < pooled, "the pooled IC hides the crossed-row artefact"
+
+
+def test_ledger_reruns_do_not_inflate_the_denominator(tmp_path):
+    """Re-running the same script must not change the multiple-testing
+    denominator every report and paper quotes."""
+    path = tmp_path / "experiments.json"
+    for _ in range(5):
+        led = ExperimentLedger(path)
+        for aid in ("EQ01", "EQ02"):
+            led.record(aid, "alpha_validation", config={"folds": 4},
+                       result={"ic": 0.02})
+        led.save()
+    led = ExperimentLedger(path)
+    assert led.total_experiments == 2
+    assert led.distinct_experiments == 2
+    assert led.entries[0]["reruns"] >= 4
+    # a genuinely different configuration IS a new experiment
+    led.record("EQ01", "alpha_validation", config={"folds": 8})
+    assert led.total_experiments == 3

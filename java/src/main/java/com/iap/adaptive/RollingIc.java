@@ -17,11 +17,22 @@ import java.util.List;
  * (a monitor with no data must not report health).
  *
  * <p>Strictly event-time and lookahead-free: a signal observed at
- * {@code ts} with mid {@code m0} stays pending until the first later
- * observation at {@code ts' >= ts + horizon_ns}, whose mid {@code m1}
- * realizes the forward return {@code m1/m0 - 1}; the pair enters the
- * matured set only at {@code ts'}. Rows with {@code confidence <= 0} are
- * excluded by the caller (invalid signal rows, pinned).
+ * {@code ts} with mid {@code m0} stays pending until the mid series has
+ * been observed through {@code ts + horizon_ns}; the realized return is
+ * {@code m(ts + h) / m0 - 1} where {@code m(x)} is the PREVAILING mid
+ * at-or-before {@code x} — exactly the research label of API_FEATURES.md
+ * section 6. Rows with {@code confidence <= 0} are excluded by the caller
+ * (invalid signal rows, pinned).
+ *
+ * <p><b>Round-3 fix.</b> The gauge used to realize a pending signal at the
+ * first later SIGNAL observation, and signals were only fed for rows with
+ * {@code confidence > 0}: on a sparse FX stream the forward leg then ran
+ * many seconds past {@code t + h}, and it was skipped entirely while the
+ * alpha was unconfident — so the live gauge measured a different label than
+ * {@code research/baselines/run_*_ic.json}, which the lifecycle gauge then
+ * compares it against. The mid series is now fed SEPARATELY through
+ * {@link #onMid}: call it on every {@code book_ok} book refresh (a MidSeries
+ * mirror), and {@link #onSignal} only for confident signal rows.
  */
 public final class RollingIc {
     /** Pinned per-bucket minimum pair count (metrics.bucket_ics min_obs). */
@@ -48,6 +59,8 @@ public final class RollingIc {
     private final int minBuckets;
     private final ArrayDeque<Row> pending = new ArrayDeque<>();
     private final ArrayDeque<Row> matured = new ArrayDeque<>();
+    private long lastMidTs = Long.MIN_VALUE;
+    private double lastMid = Double.NaN;
 
     /**
      * @param horizonNs alpha horizon (label maturity)
@@ -96,22 +109,65 @@ public final class RollingIc {
     }
 
     /**
-     * One observation: first realizes every pending signal whose horizon
-     * has elapsed by {@code ts} (forward return measured to the current
-     * mid), then enqueues this signal. Timestamps must be non-decreasing
-     * (event time). Rows that can no longer enter any future evaluation
-     * window are evicted.
+     * One mid observation (every {@code book_ok} book refresh, event time,
+     * non-decreasing {@code ts}).
+     *
+     * <p>Realizes every pending signal whose target {@code ts0 + horizonNs}
+     * is at-or-before this sample, using the PREVAILING mid at that target:
+     * this sample when the target lands exactly on it, otherwise the
+     * previous sample (no mid arrived in between, so it is the latest
+     * at-or-before the target). Rows that can no longer enter any future
+     * evaluation window are evicted, so both deques stay bounded by the
+     * event rate over {@code windowNs + horizonNs}.
      */
-    public void onObservation(long ts, double signal, double mid) {
-        while (!pending.isEmpty()
-                && ts - pending.peekFirst().ts >= horizonNs) {
-            Row p = pending.pollFirst();
-            matured.addLast(new Row(p.ts, p.signal, mid / p.value - 1.0));
+    public void onMid(long ts, double mid) {
+        while (!pending.isEmpty()) {
+            Row p = pending.peekFirst();
+            long target = p.ts + horizonNs;
+            if (target > ts) {
+                break;
+            }
+            double m1 = target == ts ? mid : lastMid;
+            pending.pollFirst();
+            if (!Double.isNaN(m1) && p.value > 0.0) {
+                matured.addLast(new Row(p.ts, p.signal, m1 / p.value - 1.0));
+            }
         }
         while (!matured.isEmpty() && matured.peekFirst().ts < ts - windowNs) {
             matured.pollFirst();
         }
+        // a pending signal older than the window can never enter one again
+        while (!pending.isEmpty() && pending.peekFirst().ts < ts - windowNs) {
+            pending.pollFirst();
+        }
+        lastMidTs = ts;
+        lastMid = mid;
+    }
+
+    /** One signal row (confidence &gt; 0) with the mid prevailing at it. */
+    public void onSignal(long ts, double signal, double mid) {
         pending.addLast(new Row(ts, signal, mid));
+    }
+
+    /**
+     * Convenience for callers that only see confident signal rows: feeds the
+     * mid series AND the signal. Prefer {@link #onMid} on every book refresh
+     * plus {@link #onSignal} on confident rows — feeding mids only at signal
+     * rows makes the realized leg coarser than the research label.
+     */
+    public void onObservation(long ts, double signal, double mid) {
+        onMid(ts, mid);
+        onSignal(ts, signal, mid);
+    }
+
+    /** Event time of the last mid sample ({@code Long.MIN_VALUE}: none). */
+    public long lastMidTs() {
+        return lastMidTs;
+    }
+
+    /** Signals waiting for their horizon to elapse (diagnostics/tests). */
+    public int pendingCount() {
+        return pending.size();
     }
 
     /** Matured pairs currently retained (diagnostics/tests). */

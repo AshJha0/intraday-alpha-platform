@@ -4,16 +4,26 @@
 //! native features (+5 auxiliary alpha inputs, see [`crate::names`]). The
 //! pinned state-update semantics are mirrored exactly:
 //!
-//! - Events are routed to a per-instrument [`ConsolidatedBook`]; the merged
-//!   top-10 view is refreshed only after book-touching events (ADD, MODIFY,
-//!   CANCEL, EXECUTE, QUOTE, and the FINAL record of a SNAPSHOT burst —
-//!   `trade_id == 0`), merging non-stale venue books only (same price =>
-//!   sizes summed; venues iterated in ascending venue_id).
+//! - An `exchange_ts` below the instrument's last seen `exchange_ts`
+//!   (cross-venue clock skew) is dropped + counted before the book sees it.
+//! - Events are routed to a per-instrument [`ConsolidatedBook`]; only events
+//!   the book reports `Applied` feed rolling state (a duplicate, an invalid
+//!   side, a malformed payload or an event dropped while stale contributes
+//!   nothing).  The merged top-10 view is refreshed after applied
+//!   book-touching events (ADD, MODIFY, CANCEL, EXECUTE, QUOTE, and the
+//!   FINAL record of a SNAPSHOT burst — `trade_id == 0`) and after any event
+//!   that changed the set of stale venues (*staleness refresh*: view only,
+//!   no samples), merging non-stale venue books only (same price => sizes
+//!   summed; venues iterated in ascending venue_id).
+//! - A stale -> fresh recovery CLEARS every rolling window and history and
+//!   re-anchors warmup at the recovery timestamp (`warmup_after_recovery`).
+//! - Every `x / (y + EPS)` ratio is invalid when `y <= 0`.
 //! - `book_ok` means both sides quoted after the merge.
 //! - Windows are half-open event-time intervals `(t - w, t]`.
-//! - Mid-derived samples (returns, realized vol) are recorded at mid
-//!   *changes*; depth samples at every two-sided refresh; OFI at every
-//!   refresh. History lookups `x(t - h)` are at-or-before, no interpolation.
+//! - Mid-derived samples (returns, realized vol) are recorded whenever the
+//!   merged mid differs from the last RECORDED mid sample; depth samples at
+//!   every two-sided refresh; OFI at every refresh. History lookups
+//!   `x(t - h)` are at-or-before, no interpolation.
 //! - Warmup: a windowed feature is invalid until `t - first_event_ts >= w`.
 //! - Cadence 0 emits one vector after every event of the instrument;
 //!   otherwise at most one vector per cadence interval (pure event time).
@@ -24,7 +34,7 @@
 use std::collections::BTreeMap;
 
 use marketdata::{EventType, IapError, MarketEvent};
-use orderbook::ConsolidatedBook;
+use orderbook::{ApplyStatus, ConsolidatedBook};
 
 use crate::names::{feature_index, FEATURE_COUNT, FEATURE_NAMES};
 use crate::rolling::{RollingFSum, RollingISum, TimeSeries};
@@ -35,6 +45,10 @@ const NS: i64 = 1_000_000_000;
 const HIST_KEEP_NS: i64 = 660 * NS;
 /// Pinned epsilon for guarded divisions (conventions / API_FEATURES §3).
 pub const EPS: f64 = 1e-12;
+/// Largest quantity folded into a rolling window (API_FEATURES.md §2.2):
+/// beyond this a feed is malformed, not a market, and an i64 window sum
+/// could no longer be exact in every port.
+pub const FEATURE_MAX_QTY: i64 = 1 << 40;
 
 const W1S: i64 = NS;
 const W5S: i64 = 5 * NS;
@@ -94,6 +108,16 @@ struct InstState {
     tick: f64,
     cons: ConsolidatedBook,
     first_ts: Option<i64>,
+    /// warmup anchor: first event, or the last stale->fresh recovery
+    warm_ts: Option<i64>,
+    /// stale->fresh recoveries so far (rolling-state resets)
+    recoveries: u64,
+    /// sorted ids of this instrument's venues whose book is stale
+    stale_venues: Vec<u16>,
+    /// monotone count of merged-view refreshes (label sampling hook)
+    refresh_seq: u64,
+    /// last seen exchange_ts (timestamp-regression guard)
+    last_ts: i64,
     t: i64,
     last_emit: Option<i64>,
     // current merged book view
@@ -131,6 +155,11 @@ impl InstState {
             tick,
             cons: ConsolidatedBook::new(instrument_id),
             first_ts: None,
+            warm_ts: None,
+            recoveries: 0,
+            stale_venues: Vec::new(),
+            refresh_seq: 0,
+            last_ts: 0,
             t: 0,
             last_emit: None,
             book_ok: false,
@@ -171,8 +200,38 @@ impl InstState {
         }
     }
 
+    /// True when the window has fully elapsed since the warmup anchor (the
+    /// first event, or the last stale->fresh recovery).
     fn warm(&self, w_ns: i64) -> bool {
-        matches!(self.first_ts, Some(f) if self.t - f >= w_ns)
+        matches!(self.warm_ts, Some(f) if self.t - f >= w_ns)
+    }
+
+    /// Clear every rolling window and history; re-anchor warmup at `t`
+    /// (stale->fresh recovery, API_FEATURES.md §2.1).
+    fn reset_rolling(&mut self, t: i64) {
+        self.warm_ts = Some(t);
+        self.recoveries += 1;
+        self.hist2 = TimeSeries::new();
+        self.histlog = TimeSeries::new();
+        self.rv = [
+            RollingFSum::new(W10S),
+            RollingFSum::new(W1M),
+            RollingFSum::new(W5M),
+        ];
+        self.ofi = [
+            RollingISum::new(W1S),
+            RollingISum::new(W5S),
+            RollingISum::new(W30S),
+        ];
+        self.trades = [
+            RollingISum::new(W1S),
+            RollingISum::new(W10S),
+            RollingISum::new(W1M),
+        ];
+        self.depthavg = RollingISum::new(W10S);
+        self.depth_bid.clear();
+        self.depth_ask.clear();
+        self.book_ok = false;
     }
 
     /// Realized vol over window index (0 = 10s, 1 = 1m, 2 = 5m); `None`
@@ -229,6 +288,14 @@ pub struct FeatureEngine {
     states: BTreeMap<u32, InstState>,
     /// Events consumed so far.
     pub events_processed: u64,
+    /// Events the book dropped/held — never folded into rolling state.
+    pub events_dropped: u64,
+    /// Events dropped for an exchange_ts regression (fail closed).
+    pub ts_regressions_dropped: u64,
+    /// Applied events whose qty exceeded [`FEATURE_MAX_QTY`] (not folded).
+    pub oversized_qty_dropped: u64,
+    /// Refreshes whose merged depth exceeded [`FEATURE_MAX_QTY`].
+    pub oversized_depth_skipped: u64,
     /// Vectors emitted so far.
     pub vectors_emitted: u64,
 }
@@ -254,6 +321,10 @@ impl FeatureEngine {
             cadence_ns,
             states: BTreeMap::new(),
             events_processed: 0,
+            events_dropped: 0,
+            ts_regressions_dropped: 0,
+            oversized_qty_dropped: 0,
+            oversized_depth_skipped: 0,
             vectors_emitted: 0,
         })
     }
@@ -270,16 +341,55 @@ impl FeatureEngine {
             .states
             .entry(ev.instrument_id)
             .or_insert_with(|| InstState::new(ev.instrument_id, tick));
-        st.cons.apply(ev)?;
         let t = ev.exchange_ts;
+        if st.first_ts.is_some() && t < st.last_ts {
+            // Cross-venue exchange_ts regression: dropped + counted before
+            // the book sees it (pinned, API_FEATURES.md §2). Never an error.
+            self.ts_regressions_dropped += 1;
+            self.events_dropped += 1;
+            self.events_processed += 1;
+            return Ok(None);
+        }
+        let status = st.cons.apply(ev)?;
         if st.first_ts.is_none() {
             st.first_ts = Some(t);
+            st.warm_ts = Some(t);
         }
+        st.last_ts = t;
         st.t = t;
         self.events_processed += 1;
 
+        // The merged view is a function of WHICH venues are stale, so the
+        // trigger is a change of the stale SET (a second venue going stale
+        // must leave the view too), not of "any venue is stale".
+        let stale_now: Vec<u16> = st
+            .cons
+            .books
+            .iter()
+            .filter(|(_, b)| b.stale)
+            .map(|(&v, _)| v)
+            .collect();
+        let stale_changed = stale_now != st.stale_venues;
+        let just_recovered = !st.stale_venues.is_empty() && stale_now.is_empty();
+        st.stale_venues = stale_now;
+
+        if status != ApplyStatus::Applied {
+            self.events_dropped += 1;
+            if stale_changed {
+                if Self::refresh_book(st, ev.venue_id, t, just_recovered, false) {
+                    self.oversized_depth_skipped += 1;
+                }
+            }
+            return Ok(self.emit_if_due(ev.instrument_id, t));
+        }
+
         let et = EventType::from_u8(ev.event_type);
-        if et == Some(EventType::Trade) {
+        if ev.qty > FEATURE_MAX_QTY {
+            // Oversized quantity (pinned §2.2): the book may hold it, but no
+            // rolling window folds it in — an i64 window sum stays exact.
+            // The merged view is still refreshed (book state changed).
+            self.oversized_qty_dropped += 1;
+        } else if et == Some(EventType::Trade) {
             let buy = if ev.side == 0 { ev.qty } else { 0 };
             let sell = ev.qty - buy;
             let vals = [buy - sell, buy, sell];
@@ -295,28 +405,54 @@ impl FeatureEngine {
                 | Some(EventType::Execute)
                 | Some(EventType::Quote)
         ) || (et == Some(EventType::Snapshot) && ev.trade_id == 0);
-        if touches {
-            Self::refresh_book(st, ev.venue_id, t);
+        let oversized_depth = if touches {
+            Self::refresh_book(st, ev.venue_id, t, just_recovered, true)
+        } else if stale_changed {
+            Self::refresh_book(st, ev.venue_id, t, just_recovered, false)
+        } else {
+            false
+        };
+        if oversized_depth {
+            self.oversized_depth_skipped += 1;
         }
 
+        Ok(self.emit_if_due(ev.instrument_id, t))
+    }
+
+    /// Cadence check (pure event time); emits at most one vector.
+    fn emit_if_due(&mut self, instrument_id: u32, t: i64) -> Option<FeatureVector> {
+        let st = self.states.get_mut(&instrument_id)?;
         let emit = self.cadence_ns == 0
             || match st.last_emit {
                 None => true,
                 Some(le) => t - le >= self.cadence_ns,
             };
         if emit {
-            let vec = Self::emit(st, ev.instrument_id, t);
+            let vec = Self::emit(st, instrument_id, t);
             st.last_emit = Some(t);
             self.vectors_emitted += 1;
-            Ok(Some(vec))
+            Some(vec)
         } else {
-            Ok(None)
+            None
         }
     }
 
     /// Recompute the merged non-stale top-10 view after a book-touching
     /// event; record OFI / depth / mid-change samples (pinned semantics).
-    fn refresh_book(st: &mut InstState, venue_id: u16, t: i64) {
+    /// `samples == false` is a *staleness refresh*: the merged view and
+    /// `book_ok` are recomputed because the stale-venue set changed, but no
+    /// OFI / depth / mid sample is recorded.
+    fn refresh_book(
+        st: &mut InstState,
+        venue_id: u16,
+        t: i64,
+        just_recovered: bool,
+        samples: bool,
+    ) -> bool {
+        st.refresh_seq += 1;
+        if just_recovered {
+            st.reset_rolling(t);
+        }
         if let Some(vb) = st.cons.books.get(&venue_id) {
             st.venue_cache
                 .insert(venue_id, (vb.depth(0, 10), vb.depth(1, 10)));
@@ -334,18 +470,34 @@ impl FeatureEngine {
                 *st.agg_a.entry(p).or_insert(0) += q;
             }
         }
-        let prev_ok = st.book_ok;
-        let prev_mid2 = st.mid2;
         let bid: Vec<(i64, i64)> = st.agg_b.iter().rev().take(10).map(|(&p, &q)| (p, q)).collect();
         let ask: Vec<(i64, i64)> = st.agg_a.iter().take(10).map(|(&p, &q)| (p, q)).collect();
 
-        // OFI contributions (defined per side, book_ok or not)
-        let mut contribs = [0i64; 4];
-        for (i, k) in [1usize, 3, 5, 10].into_iter().enumerate() {
-            contribs[i] = depth_delta(&st.depth_bid, &bid, k) - depth_delta(&st.depth_ask, &ask, k);
+        // Oversized merged depth (pinned §2.2): a level above
+        // FEATURE_MAX_QTY makes the merged view unusable — clear it, record
+        // nothing, and let the next clean refresh re-baseline.
+        if bid.iter().chain(ask.iter()).any(|&(_, q)| q > FEATURE_MAX_QTY) {
+            st.depth_bid.clear();
+            st.depth_ask.clear();
+            st.book_ok = false;
+            return true;
         }
-        if !(st.depth_bid.is_empty() && st.depth_ask.is_empty() && bid.is_empty() && ask.is_empty())
-        {
+
+        // OFI contributions (defined per side, book_ok or not).  The first
+        // refresh after a recovery has no previous depth: it contributes
+        // nothing, exactly like the very first refresh.
+        let sample_flow = samples
+            && !just_recovered
+            && !(st.depth_bid.is_empty()
+                && st.depth_ask.is_empty()
+                && bid.is_empty()
+                && ask.is_empty());
+        if sample_flow {
+            let mut contribs = [0i64; 4];
+            for (i, k) in [1usize, 3, 5, 10].into_iter().enumerate() {
+                contribs[i] =
+                    depth_delta(&st.depth_bid, &bid, k) - depth_delta(&st.depth_ask, &ask, k);
+            }
             for w in &mut st.ofi {
                 w.add(t, contribs);
             }
@@ -354,8 +506,8 @@ impl FeatureEngine {
         st.depth_ask = ask;
 
         st.book_ok = !st.depth_bid.is_empty() && !st.depth_ask.is_empty();
-        if !st.book_ok {
-            return;
+        if !st.book_ok || !samples {
+            return false;
         }
         (st.bid_p, st.bid_q) = st.depth_bid[0];
         (st.ask_p, st.ask_q) = st.depth_ask[0];
@@ -372,9 +524,12 @@ impl FeatureEngine {
         // depth sample at every two-sided refresh
         st.depthavg.add(t, [st.db[0], st.da[0], st.db[2], st.da[2]]);
 
-        // mid-change samples
-        if !prev_ok || st.mid2 != prev_mid2 {
-            if prev_ok && !st.hist2.is_empty() {
+        // Mid-change samples, compared against the last RECORDED sample
+        // (pinned): a one-sided flicker that moves the mid still yields a
+        // vol sample; a flicker back to the same mid yields none.
+        let last_mid2 = st.hist2.last();
+        if last_mid2 != Some(st.mid2) {
+            if last_mid2.is_some() {
                 let dlm = st.logmid - st.histlog.last().unwrap_or(st.logmid);
                 let sq = dlm * dlm;
                 for w in &mut st.rv {
@@ -384,6 +539,7 @@ impl FeatureEngine {
             st.hist2.append(t, st.mid2);
             st.histlog.append(t, st.logmid);
         }
+        false
     }
 
     fn emit(st: &mut InstState, instrument_id: u32, t: i64) -> FeatureVector {
@@ -506,7 +662,13 @@ impl FeatureEngine {
             if warm(w_ns) && warm(W10S) && st.depthavg.count > 0 {
                 let denom = (st.depthavg.sums[bi] + st.depthavg.sums[ai]) as f64
                     / st.depthavg.count as f64;
-                Some(st.ofi[wi].sums[ki] as f64 / (denom + EPS))
+                // Exact INTEGER guard (API_FEATURES.md §4): a float `> 0`
+                // test would flip between languages on accumulation drift.
+                if st.depthavg.sums[bi] + st.depthavg.sums[ai] > 0 {
+                    Some(st.ofi[wi].sums[ki] as f64 / (denom + EPS))
+                } else {
+                    None
+                }
             } else {
                 None
             }
@@ -515,14 +677,16 @@ impl FeatureEngine {
         put(&mut slot, &mut values, &mut validity, ofi_norm(2, 0, 2, 3));
         put(&mut slot, &mut values, &mut validity, ofi_norm(2, 1, 2, 3));
         // ret_vol_adj_10s = ret_log_10s / (rvol_w1m + EPS)
+        // EPS guard: the denominator is undefined when the vol window holds
+        // no mid-change SAMPLE (exact integer count, not `rvol > 0`).
         let rva = match (log_10s, rvols[1]) {
-            (Some(r), Some(v)) => Some(r / (v + EPS)),
+            (Some(r), Some(v)) if st.rv[1].count > 0 => Some(r / (v + EPS)),
             _ => None,
         };
         put(&mut slot, &mut values, &mut validity, rva);
         // vol_regime_ratio = rvol_w1m / (rvol_w5m + EPS)
         let vrr = match (rvols[1], rvols[2]) {
-            (Some(a), Some(b)) => Some(a / (b + EPS)),
+            (Some(a), Some(b)) if st.rv[2].count > 0 => Some(a / (b + EPS)),
             _ => None,
         };
         put(&mut slot, &mut values, &mut validity, vrr);
@@ -548,6 +712,39 @@ impl FeatureEngine {
         } else {
             None
         }
+    }
+
+    /// Monotone count of merged-view refreshes for an instrument: the label
+    /// layer samples the mid series once per refresh (API_FEATURES.md §6).
+    pub fn refresh_seq(&self, instrument_id: u32) -> u64 {
+        self.states
+            .get(&instrument_id)
+            .map_or(0, |st| st.refresh_seq)
+    }
+
+    /// True when this refresh is a TRADABLE market state (API_FEATURES.md
+    /// §6): two-sided merged book, no stale venue.  (Session status is not
+    /// tracked by this port; a caller that observes STATUS events must add
+    /// the HALT / AUCTION condition itself.)
+    pub fn label_tradable(&self, instrument_id: u32) -> bool {
+        self.states
+            .get(&instrument_id)
+            .is_some_and(|st| st.book_ok && st.stale_venues.is_empty())
+    }
+
+    /// Stale->fresh recoveries seen for an instrument (rolling-state resets).
+    pub fn recoveries(&self, instrument_id: u32) -> u64 {
+        self.states.get(&instrument_id).map_or(0, |st| st.recoveries)
+    }
+
+    /// Warmup anchor of an instrument (first event, or last recovery).
+    pub fn warm_ts(&self, instrument_id: u32) -> Option<i64> {
+        self.states.get(&instrument_id).and_then(|st| st.warm_ts)
+    }
+
+    /// True when the instrument's merged book is currently two-sided.
+    pub fn book_ok(&self, instrument_id: u32) -> bool {
+        self.states.get(&instrument_id).is_some_and(|st| st.book_ok)
     }
 
     /// Brute-force recomputation hooks: live OFI window samples for a

@@ -33,18 +33,56 @@ public class Iap1CodecTest {
         assertEquals('P', data[1]);
         assertEquals('A', data[2]);
         assertEquals('I', data[3]);
-        // version 1 LE
-        assertEquals(1, data[4]);
+        // version 2 LE
+        assertEquals(2, data[4]);
         assertEquals(0, data[5]);
         // count = 2 as u64 LE
         assertEquals(2, data[8]);
         assertEquals(0, data[15]);
+        // trailer: crc32(header + records) | reserved 0 | count echo
+        int body = 16 + 72 * 2;
+        int crc = Iap1Codec.crc32(data, body);
+        assertEquals((byte) crc, data[body]);
+        assertEquals((byte) (crc >>> 24), data[body + 3]);
+        assertEquals(0, data[body + 4]);
+        assertEquals(2, data[body + 8]);
     }
 
     @Test
-    public void fileSizeIsHeaderPlus72PerRecord() {
-        assertEquals(16, Iap1Codec.encode(List.of()).length);
-        assertEquals(16 + 72 * 2, Iap1Codec.encode(sample()).length);
+    public void crc32KnownAnswerAndCorruptionDetected() {
+        byte[] s = "123456789".getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+        assertEquals(0xCBF43926, Iap1Codec.crc32(s, s.length));
+        assertEquals(0, Iap1Codec.crc32(new byte[0], 0));
+        byte[] data = Iap1Codec.encode(sample());
+        data[16 + 50] ^= 0x01; // a qty byte of record 0
+        assertRejected(data, "CRC-32");
+        byte[] echo = Iap1Codec.encode(sample());
+        echo[echo.length - 8] ^= 0x01;
+        assertRejected(echo, "count echo");
+        byte[] reserved = Iap1Codec.encode(sample());
+        reserved[reserved.length - 12] = 1;
+        assertRejected(reserved, "reserved");
+    }
+
+    @Test
+    public void legacyV1AcceptedWithoutIntegrity() {
+        byte[] data = Iap1Codec.encode(sample());
+        byte[] legacy = Arrays.copyOf(data, data.length - Iap1Codec.TRAILER_SIZE);
+        legacy[4] = 1;
+        Iap1Codec.Decoded d = Iap1Codec.decodeEx(legacy);
+        assertEquals(1, d.version());
+        assertEquals(false, d.integrityChecked());
+        assertEquals(sample(), d.events());
+        Iap1Codec.Decoded v2 = Iap1Codec.decodeEx(data);
+        assertEquals(2, v2.version());
+        assertEquals(true, v2.integrityChecked());
+    }
+
+    @Test
+    public void fileSizeIsHeaderPlus72PerRecordPlusTrailer() {
+        assertEquals(32, Iap1Codec.encode(List.of()).length);
+        assertEquals(16 + 72 * 2 + 16, Iap1Codec.encode(sample()).length);
+        assertEquals(List.of(), Iap1Codec.decode(Iap1Codec.encode(List.of())));
     }
 
     @Test
@@ -103,7 +141,7 @@ public class Iap1CodecTest {
     @Test
     public void badVersionRejected() {
         byte[] data = Iap1Codec.encode(sample());
-        data[4] = 2;
+        data[4] = 3;
         assertRejected(data, "unsupported IAP1 version");
     }
 

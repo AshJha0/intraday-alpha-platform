@@ -10,10 +10,13 @@ pub mod events;
 pub mod rng;
 
 pub use codec::{
-    decode_iap1, decode_jsonl_line, encode_iap1, encode_jsonl, encode_jsonl_line, read_iap1,
-    read_jsonl, write_iap1, write_jsonl, IAP1_HEADER_SIZE, IAP1_MAGIC, IAP1_RECORD_SIZE,
-    IAP1_VERSION,
+    crc32, decode_iap1, decode_iap1_ex, decode_jsonl_line, encode_iap1, encode_jsonl,
+    encode_jsonl_line, read_iap1, read_jsonl, write_iap1, write_jsonl, Iap1Decoded,
+    IAP1_HEADER_SIZE, IAP1_MAGIC, IAP1_RECORD_SIZE, IAP1_TRAILER_SIZE, IAP1_VERSION,
+    IAP1_VERSION_LEGACY,
 };
 pub use error::IapError;
-pub use events::{validate, validation_error, EventType, MarketEvent, SessionStatus, Side};
+pub use events::{
+    validate, validation_error, EventType, MarketEvent, SessionStatus, Side, SYNTHETIC_ID_BASE,
+};
 pub use rng::SplitMix64;

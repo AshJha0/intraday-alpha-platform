@@ -1,5 +1,5 @@
 {
-  "experiment_count": 21,
+  "experiment_count": 33,
   "runs": [
     {
       "name": "ols",
@@ -84,6 +84,54 @@
     {
       "name": "metalabel_lightgbm",
       "run_id": "run_0021_metalabel_lightgbm"
+    },
+    {
+      "name": "ols",
+      "run_id": "run_0022_ols"
+    },
+    {
+      "name": "ridge",
+      "run_id": "run_0023_ridge"
+    },
+    {
+      "name": "elasticnet",
+      "run_id": "run_0024_elasticnet"
+    },
+    {
+      "name": "metalabel_elasticnet",
+      "run_id": "run_0025_metalabel_elasticnet"
+    },
+    {
+      "name": "ols",
+      "run_id": "run_0026_ols"
+    },
+    {
+      "name": "ridge",
+      "run_id": "run_0027_ridge"
+    },
+    {
+      "name": "elasticnet",
+      "run_id": "run_0028_elasticnet"
+    },
+    {
+      "name": "metalabel_elasticnet",
+      "run_id": "run_0029_metalabel_elasticnet"
+    },
+    {
+      "name": "ols",
+      "run_id": "run_0030_ols"
+    },
+    {
+      "name": "ridge",
+      "run_id": "run_0031_ridge"
+    },
+    {
+      "name": "elasticnet",
+      "run_id": "run_0032_elasticnet"
+    },
+    {
+      "name": "metalabel_elasticnet",
+      "run_id": "run_0033_metalabel_elasticnet"
     }
   ]
 }

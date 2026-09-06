@@ -90,9 +90,11 @@ def test_restore_round_trips_resting_order_arrival_order(eq_events):
 def test_snapshot_emission(eq_events):
     seen = []
     engine = ReplayEngine(snapshot_every=250)
-    engine.run(eq_events, on_snapshot=lambda i, snap: seen.append(i))
+    stats = engine.run(eq_events, on_snapshot=lambda i, snap: seen.append(i))
     assert seen == list(range(250, 2001, 250))
-    assert len(engine.snapshots) == 8
+    assert stats["snapshots"] == 8
+    # retention is bounded by keep_snapshots (default 4): latest ones kept
+    assert [s["index"] for s in engine.snapshots] == [1250, 1500, 1750, 2000]
     snap = engine.snapshots[-1]
     assert snap["index"] == 2000
     state = snap["instruments"]["1"]["1"]
@@ -118,7 +120,7 @@ def test_replay_multi_venue_fx(fx_events):
 def test_replay_golden_states_match_expected(eq_events, golden_dir):
     with open(golden_dir / "expected_book_states.json") as f:
         expected = json.load(f)
-    engine = ReplayEngine(snapshot_every=100)
+    engine = ReplayEngine(snapshot_every=100, keep_snapshots=20)
     engine.run(eq_events)
     for idx, exp_state in expected["states"].items():
         snap = next(s for s in engine.snapshots if s["index"] == int(idx))

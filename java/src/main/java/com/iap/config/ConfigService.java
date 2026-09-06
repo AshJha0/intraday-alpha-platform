@@ -48,6 +48,34 @@ public final class ConfigService {
         }
     }
 
+    /** Environment variable naming the configuration directory. */
+    public static final String CONFIG_DIR_ENV = "IAP_CONFIG_DIR";
+
+    /**
+     * The pinned config-directory resolution order
+     * (PLATFORM_CONVENTIONS.md §12.2): an explicit {@code --configs} value,
+     * else {@code $IAP_CONFIG_DIR}, else the caller's default. A blank
+     * environment value is treated as unset; a value that is not a readable
+     * directory is a configuration error (fail fast — never silently fall
+     * back to the baked-in configs an operator meant to override).
+     */
+    public static Path resolveDir(Path explicit, Map<String, String> env,
+            Path fallback) {
+        if (explicit != null) {
+            return explicit;
+        }
+        String v = env.get(CONFIG_DIR_ENV);
+        if (v == null || v.isBlank()) {
+            return fallback;
+        }
+        Path p = Path.of(v.trim());
+        if (!Files.isDirectory(p)) {
+            throw new IllegalArgumentException(CONFIG_DIR_ENV + "=" + v
+                    + " is not a readable directory");
+        }
+        return p;
+    }
+
     private final Path configsDir;
     private final Map<String, Map<String, Object>> docs = new LinkedHashMap<>();
     private final Map<String, String> hashes = new LinkedHashMap<>();
@@ -106,6 +134,62 @@ public final class ConfigService {
         if (!(doc("risk.json").get("global") instanceof Map)) {
             throw new IllegalArgumentException("risk.json: missing global section");
         }
+        executionLimits();
+        sorOptions();
+        com.iap.risk.RiskLimits.fromJson(riskDoc());
+        adaptive();
+    }
+
+    /**
+     * The {@code strategies.json} {@code adaptive} block, validated
+     * (PLATFORM_CONVENTIONS.md §12.2). Every key must be present and
+     * positive; a missing block or key is an {@link IllegalArgumentException}
+     * naming file and key, never an NPE/ClassCastException at first use.
+     */
+    public Map<String, Object> adaptive() {
+        Object block = doc("strategies.json").get("adaptive");
+        if (!(block instanceof Map)) {
+            throw new IllegalArgumentException(
+                    "strategies.json: missing/non-object adaptive block");
+        }
+        Map<String, Object> a = Json.object(block);
+        for (String key : new String[] {"block_ns", "ic_window_ns",
+                "ic_bucket_ns", "min_ic_buckets"}) {
+            Object v = a.get(key);
+            if (!(v instanceof Long)) {
+                throw new IllegalArgumentException(
+                        "strategies.json: missing/non-integer adaptive." + key);
+            }
+            if ((Long) v <= 0) {
+                throw new IllegalArgumentException(
+                        "strategies.json: adaptive." + key + " must be > 0, got "
+                                + v);
+            }
+        }
+        if (!(a.get("lifecycle") instanceof Map)) {
+            throw new IllegalArgumentException(
+                    "strategies.json: missing/non-object adaptive.lifecycle");
+        }
+        return a;
+    }
+
+    /** Parsed, validated hard-risk limits (`configs/risk.json`). */
+    public com.iap.risk.RiskLimits riskLimits() {
+        return com.iap.risk.RiskLimits.fromJson(riskDoc());
+    }
+
+    /**
+     * SHA-256 over the loaded config hashes: the hex digest of
+     * {@code "<file>=<sha256>\n"} lines sorted by file name. One value that
+     * identifies the whole configuration a session ran with (the session
+     * report's {@code config_sha256}, PLATFORM_CONVENTIONS.md §12.2).
+     */
+    public String configSha256() {
+        StringBuilder sb = new StringBuilder(512);
+        for (String name : new TreeMap<>(hashes).keySet()) {
+            sb.append(name).append('=').append(hashes.get(name)).append('\n');
+        }
+        return Sha256.hex(sb.toString().getBytes(StandardCharsets.UTF_8));
     }
 
     /**
@@ -160,7 +244,13 @@ public final class ConfigService {
         return doc("risk.json");
     }
 
-    /** Instrument reference data keyed by instrument_id. */
+    /**
+     * Instrument reference data keyed by instrument_id. {@code qtyUnit} is
+     * the FX {@code lot_size} (1 qty unit = 1,000 base ccy) and 1 for
+     * EQUITY/ETF (qty already in shares); {@code quoteCcy} is the FX
+     * {@code quote_currency} or the equity {@code currency}. Missing or
+     * invalid fields fail closed (throw).
+     */
     public TreeMap<Long, InstrumentSpec> instruments() {
         Object arr = doc("instruments.json").get("instruments");
         if (!(arr instanceof List)) {
@@ -170,7 +260,7 @@ public final class ConfigService {
         for (Object o : Json.array(arr)) {
             Map<String, Object> ins = Json.object(o);
             for (String key : new String[] {"instrument_id", "tick_size",
-                    "lot_size", "adv"}) {
+                    "lot_size", "adv", "asset_class"}) {
                 if (!ins.containsKey(key)) {
                     throw new IllegalArgumentException(
                             "instruments.json: instrument missing " + key);
@@ -178,16 +268,58 @@ public final class ConfigService {
             }
             long iid = Json.asLong(ins.get("instrument_id"));
             double tick = Json.asDouble(ins.get("tick_size"));
-            if (iid <= 0 || tick <= 0.0) {
+            if (iid <= 0 || !(tick > 0.0)) {
                 throw new IllegalArgumentException(
                         "instruments.json: bad instrument_id/tick_size for " + iid);
             }
-            out.put(iid, new InstrumentSpec(iid, tick,
-                    Json.asDouble(ins.get("lot_size")),
-                    Json.asDouble(ins.get("adv"))));
+            String assetClass = String.valueOf(ins.get("asset_class"));
+            double lot = Json.asDouble(ins.get("lot_size"));
+            double adv = Json.asDouble(ins.get("adv"));
+            // The money unit (PLATFORM_CONVENTIONS.md §12.1) is derived from
+            // lot_size; a non-positive lot_size or adv is a reference-data
+            // error, not a value to normalise away.
+            if (!(lot > 0.0)) {
+                throw new IllegalArgumentException(
+                        "instruments.json: lot_size must be > 0 for instrument "
+                                + iid + ", got " + lot);
+            }
+            if (!(adv > 0.0)) {
+                throw new IllegalArgumentException(
+                        "instruments.json: adv must be > 0 for instrument "
+                                + iid + ", got " + adv);
+            }
+            double unit;
+            Object ccy;
+            switch (assetClass) {
+                case "FX" -> {
+                    unit = lot;
+                    ccy = ins.get("quote_currency");
+                }
+                case "EQUITY", "ETF" -> {
+                    unit = 1.0;
+                    ccy = ins.get("currency");
+                }
+                default -> throw new IllegalArgumentException(
+                        "instruments.json: unknown asset_class " + assetClass
+                                + " for " + iid);
+            }
+            if (!(ccy instanceof String) || ((String) ccy).isEmpty()) {
+                throw new IllegalArgumentException(
+                        "instruments.json: missing currency for " + iid);
+            }
+            out.put(iid, new InstrumentSpec(iid, tick, unit, adv, (String) ccy));
         }
         if (out.isEmpty()) {
             throw new IllegalArgumentException("instruments.json: empty universe");
+        }
+        return out;
+    }
+
+    /** Risk-engine reference data (tick, qty unit, quote ccy) per instrument. */
+    public TreeMap<Long, com.iap.risk.InstrumentRef> riskInstruments() {
+        TreeMap<Long, com.iap.risk.InstrumentRef> out = new TreeMap<>();
+        for (Map.Entry<Long, InstrumentSpec> e : instruments().entrySet()) {
+            out.put(e.getKey(), e.getValue().riskRef());
         }
         return out;
     }
@@ -215,6 +347,52 @@ public final class ConfigService {
     public long maxChildQty() {
         return Json.asLong(Json.object(doc("execution.json").get("defaults"))
                 .get("max_child_qty"));
+    }
+
+    private Map<String, Object> executionDefaults() {
+        return Json.object(doc("execution.json").get("defaults"));
+    }
+
+    private static double needNum(Map<String, Object> m, String key, String where) {
+        Object v = m.get(key);
+        if (!(v instanceof Long) && !(v instanceof Double)) {
+            throw new IllegalArgumentException(
+                    "execution.json: missing/non-numeric " + where + "." + key);
+        }
+        return Json.asDouble(v);
+    }
+
+    /**
+     * execution.json defaults.{max_participation, min_slice_interval_ns,
+     * latency_budget_ns} — the enforced execution controls (strict).
+     */
+    public com.iap.backtest.BacktestEngine.ExecutionLimits executionLimits() {
+        Map<String, Object> d = executionDefaults();
+        return new com.iap.backtest.BacktestEngine.ExecutionLimits(
+                needNum(d, "max_participation", "defaults"),
+                (long) needNum(d, "min_slice_interval_ns", "defaults"),
+                (long) needNum(d, "latency_budget_ns", "defaults"));
+    }
+
+    /** execution.json sor.{prefer_rebate, max_venue_latency_ns} (strict). */
+    public com.iap.sor.SorOptions sorOptions() {
+        Object sor = doc("execution.json").get("sor");
+        if (!(sor instanceof Map)) {
+            throw new IllegalArgumentException("execution.json: missing sor block");
+        }
+        Map<String, Object> s = Json.object(sor);
+        Object pr = s.get("prefer_rebate");
+        if (!(pr instanceof Boolean)) {
+            throw new IllegalArgumentException(
+                    "execution.json: missing/non-bool sor.prefer_rebate");
+        }
+        return new com.iap.sor.SorOptions((Boolean) pr,
+                (long) needNum(s, "max_venue_latency_ns", "sor"));
+    }
+
+    /** Risk-engine FX conversion table from configs/risk.json. */
+    public TreeMap<String, com.iap.risk.RiskLimits.FxConversion> fxConversion() {
+        return com.iap.risk.RiskLimits.fromJson(riskDoc()).fxConversion();
     }
 
     /** execution.json cost_model.impact_coeff_bps_per_pct_adv. */

@@ -1,0 +1,73 @@
+# JSONL lines every decoder must REJECT (tests/golden, pinned; consumed by all four suites)
+# blank lines and '#' comments are ignored; the ACCEPT block lists lines every decoder must accept
+# out-of-range unsigned
+{"event_id":18446744073709551616,"instrument_id":2,"venue_id":3,"exchange_ts":4,"receive_ts":5,"sequence":6,"event_type":1,"side":0,"price_ticks":2450,"qty":100,"order_id":10,"trade_id":0}
+# u32 overflow
+{"event_id":1,"instrument_id":4294967296,"venue_id":3,"exchange_ts":4,"receive_ts":5,"sequence":6,"event_type":1,"side":0,"price_ticks":2450,"qty":100,"order_id":10,"trade_id":0}
+# u16 overflow
+{"event_id":1,"instrument_id":2,"venue_id":70000,"exchange_ts":4,"receive_ts":5,"sequence":6,"event_type":1,"side":0,"price_ticks":2450,"qty":100,"order_id":10,"trade_id":0}
+# u8 overflow
+{"event_id":1,"instrument_id":2,"venue_id":3,"exchange_ts":4,"receive_ts":5,"sequence":6,"event_type":256,"side":0,"price_ticks":2450,"qty":100,"order_id":10,"trade_id":0}
+# u8 overflow (side)
+{"event_id":1,"instrument_id":2,"venue_id":3,"exchange_ts":4,"receive_ts":5,"sequence":6,"event_type":1,"side":300,"price_ticks":2450,"qty":100,"order_id":10,"trade_id":0}
+# i64 overflow
+{"event_id":1,"instrument_id":2,"venue_id":3,"exchange_ts":4,"receive_ts":5,"sequence":6,"event_type":1,"side":0,"price_ticks":2450,"qty":9223372036854775808,"order_id":10,"trade_id":0}
+# i64 underflow
+{"event_id":1,"instrument_id":2,"venue_id":3,"exchange_ts":4,"receive_ts":5,"sequence":6,"event_type":1,"side":0,"price_ticks":-9223372036854775809,"qty":100,"order_id":10,"trade_id":0}
+# negative unsigned
+{"event_id":1,"instrument_id":2,"venue_id":3,"exchange_ts":4,"receive_ts":5,"sequence":6,"event_type":1,"side":0,"price_ticks":2450,"qty":100,"order_id":-1,"trade_id":0}
+# negative zero on unsigned
+{"event_id":1,"instrument_id":2,"venue_id":3,"exchange_ts":4,"receive_ts":5,"sequence":-0,"event_type":1,"side":0,"price_ticks":2450,"qty":100,"order_id":10,"trade_id":0}
+# float
+{"event_id":1,"instrument_id":2,"venue_id":3,"exchange_ts":4,"receive_ts":5,"sequence":6,"event_type":1,"side":0,"price_ticks":2450,"qty":100.0,"order_id":10,"trade_id":0}
+# exponent
+{"event_id":1,"instrument_id":2,"venue_id":3,"exchange_ts":4,"receive_ts":5,"sequence":6,"event_type":1,"side":0,"price_ticks":2450,"qty":1e2,"order_id":10,"trade_id":0}
+# leading plus
+{"event_id":1,"instrument_id":2,"venue_id":3,"exchange_ts":4,"receive_ts":5,"sequence":6,"event_type":1,"side":0,"price_ticks":2450,"qty":+100,"order_id":10,"trade_id":0}
+# leading zero
+{"event_id":1,"instrument_id":2,"venue_id":3,"exchange_ts":4,"receive_ts":5,"sequence":6,"event_type":1,"side":0,"price_ticks":2450,"qty":0100,"order_id":10,"trade_id":0}
+# bool
+{"event_id":1,"instrument_id":2,"venue_id":3,"exchange_ts":4,"receive_ts":5,"sequence":6,"event_type":1,"side":0,"price_ticks":2450,"qty":true,"order_id":10,"trade_id":0}
+# string
+{"event_id":1,"instrument_id":2,"venue_id":3,"exchange_ts":4,"receive_ts":5,"sequence":6,"event_type":1,"side":0,"price_ticks":2450,"qty":"100","order_id":10,"trade_id":0}
+# null
+{"event_id":1,"instrument_id":2,"venue_id":3,"exchange_ts":4,"receive_ts":5,"sequence":6,"event_type":1,"side":0,"price_ticks":2450,"qty":null,"order_id":10,"trade_id":0}
+# duplicate key
+{"event_id":1,"instrument_id":2,"venue_id":3,"exchange_ts":4,"receive_ts":5,"sequence":6,"event_type":1,"side":0,"price_ticks":2450,"qty":100,"order_id":10,"trade_id":0,"trade_id":77}
+# missing key
+{"event_id":1,"instrument_id":2,"venue_id":3,"exchange_ts":4,"receive_ts":5,"sequence":6,"event_type":1,"side":0,"price_ticks":2450,"qty":100,"order_id":10}
+# extra key
+{"event_id":1,"instrument_id":2,"venue_id":3,"exchange_ts":4,"receive_ts":5,"sequence":6,"event_type":1,"side":0,"price_ticks":2450,"qty":100,"order_id":10,"trade_id":0,"extra":1}
+# misordered keys
+{"instrument_id":2,"event_id":1,"venue_id":3,"exchange_ts":4,"receive_ts":5,"sequence":6,"event_type":1,"side":0,"price_ticks":2450,"qty":100,"order_id":10,"trade_id":0}
+# renamed key
+{"event_id":1,"instrument_id":2,"venue_id":3,"exchange_ts":4,"receive_ts":5,"sequence":6,"event_type":1,"side":0,"price_ticks":2450,"quantity":100,"order_id":10,"trade_id":0}
+# trailing content
+{"event_id":1,"instrument_id":2,"venue_id":3,"exchange_ts":4,"receive_ts":5,"sequence":6,"event_type":1,"side":0,"price_ticks":2450,"qty":100,"order_id":10,"trade_id":0} x
+# trailing comma
+{"event_id":1,"instrument_id":2,"venue_id":3,"exchange_ts":4,"receive_ts":5,"sequence":6,"event_type":1,"side":0,"price_ticks":2450,"qty":100,"order_id":10,"trade_id":0,}
+# not an object
+[1,2,3]
+# empty object
+{}
+# garbage
+not json at all {
+# hex
+{"event_id":1,"instrument_id":2,"venue_id":3,"exchange_ts":4,"receive_ts":5,"sequence":6,"event_type":1,"side":0,"price_ticks":2450,"qty":0x64,"order_id":10,"trade_id":0}
+# empty value
+{"event_id":1,"instrument_id":2,"venue_id":3,"exchange_ts":4,"receive_ts":5,"sequence":6,"event_type":1,"side":0,"price_ticks":2450,"qty":,"order_id":10,"trade_id":0}
+# unquoted key
+{"event_id":1,"instrument_id":2,"venue_id":3,"exchange_ts":4,"receive_ts":5,"sequence":6,"event_type":1,"side":0,"price_ticks":2450,qty:100,"order_id":10,"trade_id":0}
+# ACCEPT
+# canonical
+{"event_id":1,"instrument_id":2,"venue_id":3,"exchange_ts":4,"receive_ts":5,"sequence":6,"event_type":1,"side":0,"price_ticks":2450,"qty":100,"order_id":10,"trade_id":0}
+# whitespace between tokens is tolerated
+{"event_id": 1, "instrument_id": 2, "venue_id": 3, "exchange_ts": 4, "receive_ts": 5, "sequence": 6, "event_type": 1, "side": 0, "price_ticks": 2450, "qty": 100, "order_id": 10, "trade_id": 0}
+# negative zero on signed
+{"event_id":1,"instrument_id":2,"venue_id":3,"exchange_ts":4,"receive_ts":5,"sequence":6,"event_type":1,"side":0,"price_ticks":-0,"qty":100,"order_id":10,"trade_id":0}
+# u64 max
+{"event_id":1,"instrument_id":2,"venue_id":3,"exchange_ts":4,"receive_ts":5,"sequence":6,"event_type":1,"side":0,"price_ticks":2450,"qty":100,"order_id":18446744073709551615,"trade_id":0}
+# i64 extremes
+{"event_id":1,"instrument_id":2,"venue_id":3,"exchange_ts":4,"receive_ts":5,"sequence":6,"event_type":1,"side":0,"price_ticks":9223372036854775807,"qty":-9223372036854775808,"order_id":10,"trade_id":0}
+# u8 max event_type/side (domain, not semantics)
+{"event_id":1,"instrument_id":2,"venue_id":3,"exchange_ts":4,"receive_ts":5,"sequence":6,"event_type":255,"side":255,"price_ticks":2450,"qty":100,"order_id":10,"trade_id":0}

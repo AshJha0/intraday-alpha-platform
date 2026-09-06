@@ -319,4 +319,350 @@ public class FeatureGoldenTest {
             long qty, long oid, long iid) {
         return new MarketEvent(seq, iid, 1, ts, ts, seq, 1, side, px, qty, oid, 0);
     }
+
+    // ---------------------------------------------------------------------
+    // Anomaly-vector golden (API_FEATURES.md section 2 ingestion rules)
+    // ---------------------------------------------------------------------
+
+    private void checkAnomalySide(String side, double tick) {
+        Map<String, Object> golden =
+                Golden.json("expected_features_anomalies.json");
+        Map<String, Object> doc = Json.object(golden.get(side));
+        String vector = (String) doc.get("vector");
+        long iid = Json.asLong(doc.get("instrument_id"));
+        List<MarketEvent> events = Golden.events(vector);
+        assertEquals("vector length", Json.asLong(doc.get("n_events")),
+                events.size());
+        Map<Long, Double> ticks = new TreeMap<>();
+        ticks.put(iid, tick);
+        FeatureEngine engine = new FeatureEngine(ticks, 0);
+        Map<String, Object> cps = Json.object(doc.get("checkpoints"));
+        FeatureVector vec = new FeatureVector();
+        int compared = 0;
+        for (int i = 0; i < events.size(); i++) {
+            boolean emitted = engine.apply(events.get(i), vec);
+            String key = Integer.toString(i + 1);
+            Object raw = cps.get(key);
+            if (raw == null) {
+                continue;
+            }
+            Map<String, Object> cp = Json.object(raw);
+            String at = side + "@" + key;
+            assertTrue(at + ": cadence 0 must emit", emitted);
+            assertEquals(at + ": timestamp", Json.asLong(cp.get("timestamp")),
+                    vec.timestamp);
+            assertEquals(at + ": events_processed",
+                    Json.asLong(cp.get("events_processed")),
+                    engine.eventsProcessed());
+            assertEquals(at + ": events_dropped (only APPLIED events count)",
+                    Json.asLong(cp.get("events_dropped")),
+                    engine.eventsDropped());
+            assertEquals(at + ": ts_regressions_dropped",
+                    Json.asLong(cp.get("ts_regressions_dropped")),
+                    engine.tsRegressionsDropped());
+            assertEquals(at + ": oversized_qty_dropped",
+                    Json.asLong(cp.get("oversized_qty_dropped")),
+                    engine.oversizedQtyDropped());
+            assertEquals(at + ": oversized_depth_skipped",
+                    Json.asLong(cp.get("oversized_depth_skipped")),
+                    engine.oversizedDepthSkipped());
+            assertEquals(at + ": stale recoveries",
+                    Json.asLong(cp.get("recoveries")), engine.recoveries(iid));
+            assertEquals(at + ": warmup anchor", Json.asLong(cp.get("warm_ts")),
+                    engine.warmTs(iid));
+            assertEquals(at + ": book_ok", cp.get("book_ok"),
+                    Boolean.valueOf(engine.bookOk(iid)));
+            for (Map.Entry<String, Object> e
+                    : Json.object(cp.get("features")).entrySet()) {
+                int slot = Features.index(e.getKey());
+                if (slot < 0) {
+                    continue;
+                }
+                Map<String, Object> entry = Json.object(e.getValue());
+                boolean wantValid = (Boolean) entry.get("valid");
+                assertEquals(at + " " + e.getKey() + " validity", wantValid,
+                        vec.valid[slot]);
+                if (!wantValid) {
+                    continue;
+                }
+                compared++;
+                double want = Json.asDouble(entry.get("value"));
+                double got = vec.values[slot];
+                assertTrue(at + " " + e.getKey() + ": got " + got + " want "
+                        + want,
+                        Math.abs(got - want) <= 1e-9 + 1e-9 * Math.abs(want));
+            }
+        }
+        assertTrue(side + ": too few valid features compared", compared > 50);
+    }
+
+    @Test
+    public void anomalyGoldenEqCheckpoints() {
+        checkAnomalySide("eq", 0.01);
+    }
+
+    @Test
+    public void anomalyGoldenFxCheckpoints() {
+        checkAnomalySide("fx", 1e-05);
+    }
+
+    @Test
+    public void anomalyGoldenExercisesTheDropPaths() {
+        Map<String, Object> golden =
+                Golden.json("expected_features_anomalies.json");
+        for (String side : new String[] {"eq", "fx"}) {
+            Map<String, Object> cps = Json.object(
+                    Json.object(golden.get(side)).get("checkpoints"));
+            long best = -1;
+            Map<String, Object> last = null;
+            for (Map.Entry<String, Object> e : cps.entrySet()) {
+                long k = Long.parseLong(e.getKey());
+                if (k > best) {
+                    best = k;
+                    last = Json.object(e.getValue());
+                }
+            }
+            assertTrue(side, last != null);
+            assertTrue(side, Json.asLong(last.get("events_dropped")) > 0);
+            assertTrue(side,
+                    Json.asLong(last.get("ts_regressions_dropped")) > 0);
+            assertTrue(side, Json.asLong(last.get("recoveries")) > 0);
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // Ingestion scenarios (mirror of python/tests/test_feature_ingestion.py)
+    // ---------------------------------------------------------------------
+
+    private static final long NS = 1_000_000_000L;
+    private static final long T0 = 1_787_578_200L * NS;
+
+    /** Single-instrument feed with explicit per-venue sequence numbers. */
+    private static final class Feed {
+        final FeatureEngine engine;
+        final long iid;
+        final Map<Integer, Long> seq = new TreeMap<>();
+        long id;
+        FeatureVector vec = new FeatureVector();
+
+        Feed(long iid, double tick) {
+            Map<Long, Double> ticks = new TreeMap<>();
+            ticks.put(iid, tick);
+            this.engine = new FeatureEngine(ticks, 0);
+            this.iid = iid;
+        }
+
+        boolean send(int et, long ts, int venue, long sequence, int side,
+                long price, long qty, long orderId, long tradeId) {
+            long sq = sequence == 0
+                    ? seq.getOrDefault(venue, 0L) + 1 : sequence;
+            seq.put(venue, Math.max(seq.getOrDefault(venue, 0L), sq));
+            MarketEvent ev = new MarketEvent(++id, iid, venue, ts, ts + 150_000,
+                    sq, et, side, price, qty, orderId, tradeId);
+            return engine.apply(ev, vec);
+        }
+
+        void add(long ts, int side, long price, long qty, long oid) {
+            send(com.iap.core.EventType.ADD, ts, 1, 0, side, price, qty, oid, 0);
+        }
+
+        long seqOf(int venue) {
+            return seq.getOrDefault(venue, 0L);
+        }
+
+        boolean valid(String name) {
+            return vec.valid[Features.index(name)];
+        }
+
+        double value(String name) {
+            return vec.values[Features.index(name)];
+        }
+
+        void assertNoValidNan() {
+            for (int i = 0; i < vec.values.length; i++) {
+                if (vec.valid[i]) {
+                    assertTrue("slot " + i, !Double.isNaN(vec.values[i])
+                            && !Double.isInfinite(vec.values[i]));
+                }
+            }
+        }
+    }
+
+    @Test
+    public void scenarioGatewayReplayAfterReconnect() {
+        Feed f = new Feed(1L, 0.01);
+        long t = T0;
+        f.add(t, com.iap.core.Side.BID, 1000, 100, 1);
+        f.add(t, com.iap.core.Side.ASK, 1002, 100, 2);
+        t += 2 * NS;
+        f.send(com.iap.core.EventType.TRADE, t, 1, 0, com.iap.core.Side.BID,
+                1001, 50, 0, 1);
+        assertEquals(50.0, f.value("signed_volume_w1s_v1"), 0.0);
+
+        // the gateway replays the same message (duplicate sequence)
+        f.send(com.iap.core.EventType.TRADE, t, 1, f.seqOf(1),
+                com.iap.core.Side.BID, 1001, 50, 0, 1);
+        assertEquals("a duplicate trade must not double-count signed volume",
+                50.0, f.value("signed_volume_w1s_v1"), 0.0);
+        assertEquals(1L, f.engine.eventsDropped());
+
+        // side > 1 on an ADD: dropped by the book, no depth change
+        double depthBefore = f.value("depth_bid_l1_v1");
+        f.send(com.iap.core.EventType.ADD, t, 1, 0, 2, 1000, 70, 900, 0);
+        assertEquals(2L, f.engine.eventsDropped());
+        assertEquals(depthBefore, f.value("depth_bid_l1_v1"), 0.0);
+
+        // gap -> stale venue; a CANCEL arriving while stale is dropped
+        f.send(com.iap.core.EventType.ADD, t, 1, f.seqOf(1) + 10,
+                com.iap.core.Side.BID, 999, 10, 901, 0);
+        f.send(com.iap.core.EventType.CANCEL, t, 1, 0, com.iap.core.Side.BID,
+                1000, 0, 1, 0);
+        assertTrue(f.engine.eventsDropped() >= 3);
+        assertTrue("stale venue leaves the merged view",
+                !f.valid("mid_price_v1"));
+    }
+
+    @Test
+    public void scenarioVenueDisconnectThenSnapshotRecovery() {
+        Feed f = new Feed(1L, 0.01);
+        long t = T0;
+        f.add(t, com.iap.core.Side.BID, 1000, 100, 1);
+        f.add(t, com.iap.core.Side.ASK, 1002, 100, 2);
+        long bid = 1000;
+        long oid = 10;
+        for (int k = 0; k < 200; k++) {
+            t += 2 * NS;
+            long step = (k % 2 == 0) ? 1 : -1;
+            f.add(t, com.iap.core.Side.BID, bid + step, 100, oid);
+            f.send(com.iap.core.EventType.CANCEL, t, 1, 0,
+                    com.iap.core.Side.BID, bid, 0, k == 0 ? 1 : oid - 1, 0);
+            bid += step;
+            oid++;
+        }
+        assertTrue(f.valid("rvol_w1m_v1"));
+        assertTrue(f.value("rvol_w1m_v1") > 0.0);
+        assertTrue(f.valid("ret_vol_adj_10s_v1"));
+
+        // gap then 120 s of silence
+        t += NS;
+        f.send(com.iap.core.EventType.ADD, t, 1, f.seqOf(1) + 50,
+                com.iap.core.Side.BID, 1000, 10, oid + 50, 0);
+        assertTrue(!f.valid("mid_price_v1"));
+
+        // recovery: a complete SNAPSHOT burst 1 % higher
+        t += 120 * NS;
+        long sq = f.seqOf(1) + 1;
+        f.send(com.iap.core.EventType.SNAPSHOT, t, 1, sq,
+                com.iap.core.Side.BID, 1010, 100, 0, 3);
+        f.send(com.iap.core.EventType.SNAPSHOT, t, 1, sq + 1,
+                com.iap.core.Side.ASK, 1012, 100, 0, 2);
+        f.send(com.iap.core.EventType.SNAPSHOT, t, 1, sq + 2,
+                com.iap.core.Side.BID, 1009, 90, 0, 1);
+        f.send(com.iap.core.EventType.SNAPSHOT, t, 1, sq + 3,
+                com.iap.core.Side.ASK, 1013, 90, 0, 0);
+
+        assertEquals(1L, f.engine.recoveries(1L));
+        assertEquals(t, f.engine.warmTs(1L));
+        assertTrue(f.engine.bookOk(1L));
+        for (String name : new String[] {"rvol_w10s_v1", "rvol_w1m_v1",
+            "rvol_w5m_v1", "ret_log_10s_v1", "ret_log_1m_v1",
+            "ret_vol_adj_10s_v1", "vol_regime_ratio_v1", "ofi_l1_w1s_v1",
+            "signed_volume_w1m_v1"}) {
+            assertTrue(name + " valid right after a stale recovery",
+                    !f.valid(name));
+        }
+        assertTrue(f.valid("mid_price_v1"));
+        f.assertNoValidNan();
+    }
+
+    @Test
+    public void scenarioZeroRvolMakesRatiosInvalidNotHuge() {
+        Feed f = new Feed(1L, 0.01);
+        long t = T0;
+        f.add(t, com.iap.core.Side.BID, 1000, 100, 1);
+        f.add(t, com.iap.core.Side.ASK, 1002, 100, 2);
+        for (long k = 0; k < 70; k++) {
+            t += NS;
+            f.add(t, com.iap.core.Side.BID, 990, 5, 500 + k);
+        }
+        assertTrue(f.valid("rvol_w1m_v1"));
+        assertEquals(0.0, f.value("rvol_w1m_v1"), 0.0);
+        assertTrue(!f.valid("ret_vol_adj_10s_v1"));
+        assertTrue(!f.valid("vol_regime_ratio_v1"));
+    }
+
+    @Test
+    public void scenarioOneSidedFlickerKeepsRvolSamples() {
+        Feed f = new Feed(1L, 0.01);
+        long t = T0;
+        f.add(t, com.iap.core.Side.BID, 1000, 100, 1);
+        f.add(t, com.iap.core.Side.ASK, 1002, 100, 2);
+        t += 11 * NS;
+        f.send(com.iap.core.EventType.CANCEL, t, 1, 0, com.iap.core.Side.BID,
+                1000, 0, 1, 0);
+        assertTrue(!f.valid("mid_price_v1"));
+        t += 1000;
+        f.add(t, com.iap.core.Side.BID, 999, 100, 3);
+        assertTrue(f.valid("rvol_w10s_v1"));
+        assertTrue("the flicker mid change must enter the vol window",
+                f.value("rvol_w10s_v1") > 0.0);
+    }
+
+    @Test
+    public void scenarioZeroPriceQuoteIsDroppedNotApplied() {
+        for (long price : new long[] {0L, -5L}) {
+            Feed f = new Feed(101L, 1e-05);
+            long t = T0;
+            f.send(com.iap.core.EventType.QUOTE, t, 10, 0,
+                    com.iap.core.Side.BID, 110000, 1000, 0, 0);
+            f.send(com.iap.core.EventType.QUOTE, t, 10, 0,
+                    com.iap.core.Side.ASK, 110002, 1000, 0, 0);
+            assertTrue(f.valid("mid_price_v1"));
+            f.send(com.iap.core.EventType.QUOTE, t + NS, 10, 0,
+                    com.iap.core.Side.BID, price, 1000, 0, 0);
+            assertEquals("price " + price, 1L, f.engine.eventsDropped());
+            assertTrue("previous quote prevails", f.valid("mid_price_v1"));
+            f.assertNoValidNan();
+        }
+    }
+
+    @Test
+    public void scenarioCrossVenueTimestampRegression() {
+        Feed f = new Feed(1L, 0.01);
+        long t = T0;
+        f.send(com.iap.core.EventType.ADD, t, 1, 0, com.iap.core.Side.BID,
+                1000, 100, 1, 0);
+        f.send(com.iap.core.EventType.ADD, t, 1, 0, com.iap.core.Side.ASK,
+                1002, 100, 2, 0);
+        double midBefore = f.value("mid_price_v1");
+
+        // venue 2's gateway clock runs 5 ms behind venue 1's
+        boolean emitted = f.send(com.iap.core.EventType.ADD, t - 5_000_000, 2,
+                0, com.iap.core.Side.BID, 1001, 100, 3, 0);
+        assertTrue("a ts regression emits no vector", !emitted);
+        assertEquals(1L, f.engine.tsRegressionsDropped());
+        assertEquals(1L, f.engine.eventsDropped());
+
+        f.send(com.iap.core.EventType.ADD, t + NS, 2, 0,
+                com.iap.core.Side.BID, 1001, 100, 4, 0);
+        assertTrue(f.value("mid_price_v1") > midBefore);
+    }
+
+    @Test
+    public void scenarioOversizedQuantitiesNeverOverflowWindowSums() {
+        Feed f = new Feed(1L, 0.01);
+        long t = T0;
+        f.add(t, com.iap.core.Side.BID, 1000, 100, 1);
+        f.add(t, com.iap.core.Side.ASK, 1002, 100, 2);
+        f.send(com.iap.core.EventType.TRADE, t + NS, 1, 0,
+                com.iap.core.Side.BID, 1001, Long.MAX_VALUE, 0, 1);
+        assertEquals(1L, f.engine.oversizedQtyDropped());
+        f.send(com.iap.core.EventType.ADD, t + 2 * NS, 1, 0,
+                com.iap.core.Side.BID, 998, Long.MAX_VALUE, 7, 0);
+        assertEquals(2L, f.engine.oversizedQtyDropped());
+        assertTrue(f.engine.oversizedDepthSkipped() >= 1);
+        assertTrue("an oversized merged depth is unusable",
+                !f.engine.bookOk(1L));
+        f.assertNoValidNan();
+    }
 }

@@ -1,20 +1,26 @@
 {
-  "auc_test": 0.5517600095593042,
-  "base_rate_test": 0.07348426707597851,
-  "brier_test": 0.06825883786694012,
+  "auc_test": 0.7532760840604338,
+  "base_rate_test": 0.0368205217694791,
+  "brier_test": 0.03439320361744996,
   "curve": [
     {
       "bin": 0,
-      "count": 4726,
-      "empirical": 0.07109606432501057,
-      "p_mean": 0.054392890421880925
+      "count": 10881,
+      "empirical": 0.03198235456299973,
+      "p_mean": 0.03183940359297518
     },
     {
       "bin": 1,
-      "count": 486,
-      "empirical": 0.09670781893004116,
-      "p_mean": 0.10910515700495745
+      "count": 568,
+      "empirical": 0.13028169014084506,
+      "p_mean": 0.13108749024610014
+    },
+    {
+      "bin": 2,
+      "count": 12,
+      "empirical": 0.0,
+      "p_mean": 0.22316351209148355
     }
   ],
-  "primary_model": "lightgbm"
+  "primary_model": "elasticnet"
 }

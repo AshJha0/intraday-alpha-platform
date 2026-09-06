@@ -90,7 +90,7 @@ IntTok parse_int(Cursor& c, const char* key) {
 
 std::uint64_t as_unsigned(const IntTok& t, Cursor& c, const char* key,
                           std::uint64_t max) {
-    if (t.neg && t.mag != 0) {
+    if (t.neg) {  // "-0" included: a leading '-' is malformed on unsigned fields
         c.fail(std::string("field '") + key + "' must be non-negative");
     }
     if (t.mag > max) {
@@ -124,6 +124,24 @@ void store_le64(std::uint8_t* p, std::uint64_t v) {
     for (int i = 0; i < 8; ++i) p[i] = static_cast<std::uint8_t>(v >> (8 * i));
 }
 
+struct Crc32Table {
+    std::uint32_t t[256];
+    Crc32Table() {
+        for (std::uint32_t i = 0; i < 256; ++i) {
+            std::uint32_t c = i;
+            for (int k = 0; k < 8; ++k) {
+                c = (c & 1u) ? (0xEDB88320u ^ (c >> 1)) : (c >> 1);
+            }
+            t[i] = c;
+        }
+    }
+};
+
+const Crc32Table& crc_table() {
+    static const Crc32Table table;
+    return table;
+}
+
 std::uint32_t load_le32(const std::uint8_t* p) {
     return static_cast<std::uint32_t>(p[0]) |
            static_cast<std::uint32_t>(p[1]) << 8 |
@@ -138,6 +156,15 @@ std::uint64_t load_le64(const std::uint8_t* p) {
 }
 
 }  // namespace
+
+std::uint32_t crc32(const std::uint8_t* data, std::size_t len) {
+    const auto& t = crc_table().t;
+    std::uint32_t c = 0xFFFFFFFFu;
+    for (std::size_t i = 0; i < len; ++i) {
+        c = t[(c ^ data[i]) & 0xFFu] ^ (c >> 8);
+    }
+    return c ^ 0xFFFFFFFFu;
+}
 
 // --------------------------------------------------------------------- JSONL
 
@@ -275,8 +302,9 @@ std::vector<MarketEvent> read_jsonl(const std::string& path) {
 // ---------------------------------------------------------------------- IAP1
 
 std::vector<std::uint8_t> encode_iap1(const std::vector<MarketEvent>& events) {
-    std::vector<std::uint8_t> out(IAP1_HEADER_SIZE +
-                                  IAP1_RECORD_SIZE * events.size());
+    const std::size_t body_size =
+        IAP1_HEADER_SIZE + IAP1_RECORD_SIZE * events.size();
+    std::vector<std::uint8_t> out(body_size + IAP1_TRAILER_SIZE);
     store_le32(out.data(), IAP1_MAGIC);
     store_le32(out.data() + 4, IAP1_VERSION);
     store_le64(out.data() + 8, events.size());
@@ -287,11 +315,14 @@ std::vector<std::uint8_t> encode_iap1(const std::vector<MarketEvent>& events) {
         std::memcpy(out.data() + off, &ev, IAP1_RECORD_SIZE);
         off += IAP1_RECORD_SIZE;
     }
+    // Integrity trailer: crc32 | reserved 0 | count echo (FORMAT.md section 2).
+    store_le32(out.data() + body_size, crc32(out.data(), body_size));
+    store_le32(out.data() + body_size + 4, 0);
+    store_le64(out.data() + body_size + 8, events.size());
     return out;
 }
 
-std::vector<MarketEvent> decode_iap1(const std::uint8_t* data,
-                                     std::size_t len) {
+Iap1Decoded decode_iap1_ex(const std::uint8_t* data, std::size_t len) {
     if (len < IAP1_HEADER_SIZE) {
         throw std::invalid_argument("IAP1 file truncated: " +
                                     std::to_string(len) +
@@ -305,30 +336,63 @@ std::vector<MarketEvent> decode_iap1(const std::uint8_t* data,
                                     " (expected " + std::to_string(IAP1_MAGIC) +
                                     ")");
     }
-    if (version != IAP1_VERSION) {
+    if (version != IAP1_VERSION && version != IAP1_VERSION_LEGACY) {
         throw std::invalid_argument("unsupported IAP1 version: " +
                                     std::to_string(version));
     }
+    const bool with_trailer = version == IAP1_VERSION;
     if (count > (len / IAP1_RECORD_SIZE) + 1) {
         throw std::invalid_argument("IAP1 size mismatch: header count=" +
                                     std::to_string(count) +
                                     " impossible for " + std::to_string(len) +
                                     " bytes");
     }
-    std::size_t expected = IAP1_HEADER_SIZE + IAP1_RECORD_SIZE * count;
+    const std::size_t body_size = IAP1_HEADER_SIZE + IAP1_RECORD_SIZE * count;
+    const std::size_t expected =
+        body_size + (with_trailer ? IAP1_TRAILER_SIZE : 0);
     if (len != expected) {
         throw std::invalid_argument(
             "IAP1 size mismatch: " + std::to_string(len) +
-            " bytes, header count=" + std::to_string(count) + " implies " +
-            std::to_string(expected));
+            " bytes, header count=" + std::to_string(count) + " (version " +
+            std::to_string(version) + ") implies " + std::to_string(expected));
     }
-    std::vector<MarketEvent> events(count);
+    if (with_trailer) {
+        const std::uint32_t crc = load_le32(data + body_size);
+        const std::uint32_t reserved = load_le32(data + body_size + 4);
+        const std::uint64_t echo = load_le64(data + body_size + 8);
+        if (reserved != 0) {
+            throw std::invalid_argument(
+                "IAP1 trailer reserved field must be 0: " +
+                std::to_string(reserved));
+        }
+        if (echo != count) {
+            throw std::invalid_argument("IAP1 trailer count echo " +
+                                        std::to_string(echo) +
+                                        " != header count " +
+                                        std::to_string(count));
+        }
+        const std::uint32_t actual = crc32(data, body_size);
+        if (actual != crc) {
+            throw std::invalid_argument(
+                "IAP1 CRC-32 mismatch: trailer " + std::to_string(crc) +
+                ", computed " + std::to_string(actual));
+        }
+    }
+    Iap1Decoded out;
+    out.version = version;
+    out.integrity_checked = with_trailer;
+    out.events.resize(count);
     std::size_t off = IAP1_HEADER_SIZE;
     for (std::uint64_t i = 0; i < count; ++i) {
-        std::memcpy(&events[i], data + off, IAP1_RECORD_SIZE);
+        std::memcpy(&out.events[i], data + off, IAP1_RECORD_SIZE);
         off += IAP1_RECORD_SIZE;
     }
-    return events;
+    return out;
+}
+
+std::vector<MarketEvent> decode_iap1(const std::uint8_t* data,
+                                     std::size_t len) {
+    return decode_iap1_ex(data, len).events;
 }
 
 std::vector<MarketEvent> decode_iap1(const std::vector<std::uint8_t>& data) {

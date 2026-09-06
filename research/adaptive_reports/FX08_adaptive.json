@@ -4,48 +4,32 @@
   "horizon": "1m",
   "ic_baseline": {
     "alpha_id": "FX08",
+    "baseline_kind": "oos",
     "bucket_ns": 300000000000,
+    "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
     "horizon": "1m",
-    "ic_mean": 0.12783655735014907,
-    "ic_std": 0.11493251188731891,
+    "ic_mean": 0.16438365226975765,
+    "ic_std": 0.17372797642583246,
     "kind": "ic",
-    "n_buckets_baseline": 30,
+    "n_buckets_baseline": 10,
     "name": "run_fx08_ic",
-    "source": "warmup window [1787529602028520532, 1787538602028520532) of the bundled feature frames, universe [101, 102, 103, 104, 105, 106, 107, 108]",
-    "x-version": 1
+    "source": "warmup window [1787529602028520532, 1787538602028520532) of the bundled feature frames, universe [101, 102, 103, 104, 105, 106, 107, 108]; OOS tail [1787535602028520532, 1787538602028520532) of the warmup, model fitted on its first 67%",
+    "x-version": 2
   },
   "n_blocks": 169,
   "policies": {
     "drift_triggered": {
-      "deployed_ic": 0.10824862628377444,
+      "deployed_ic": 0.12037535449738983,
       "drift_event_count": 0,
       "final_state": "ACTIVE",
-      "gross_pnl": 56839.999999283566,
-      "lifecycle_transitions": [
-        {
-          "alpha_id": "FX08",
-          "eval_index": 75,
-          "event_ts": 1787606102028520532,
-          "from": "ACTIVE",
-          "policy": "drift_triggered",
-          "reason": "rolling_ic -0.023397 < watch gate 0.0",
-          "rolling_ic": -0.02339741753226973,
-          "to": "WATCH"
-        },
-        {
-          "alpha_id": "FX08",
-          "eval_index": 90,
-          "event_ts": 1787619602028520532,
-          "from": "WATCH",
-          "policy": "drift_triggered",
-          "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
-          "rolling_ic": 0.1287456589071877,
-          "to": "ACTIVE"
-        }
-      ],
+      "gross_pnl": 94514.99999936172,
+      "ic_baseline_kind": "oos",
+      "ic_baseline_rows": 658,
+      "lifecycle_transitions": [],
       "n_evals": 169,
       "n_ic_evals": 159,
-      "net_pnl": -3364316.506112784,
+      "n_informative_evals": 155,
+      "net_pnl": -2986215.8068001294,
       "policy": {
         "ic_z_threshold": -2.0,
         "min_refit_gap_ns": 3600000000000,
@@ -56,7 +40,7 @@
       "refit_events": [
         {
           "block": 0,
-          "n_train": 3157,
+          "n_train": 1963,
           "reasons": [
             "initial deployment fit"
           ],
@@ -64,192 +48,174 @@
         },
         {
           "block": 15,
-          "n_train": 8063,
+          "n_train": 5068,
           "reasons": [
-            "ic_z=-2.6778 < threshold -2.0"
+            "ic_z=-2.8740 < threshold -2.0"
           ],
           "ts": 1787552102028520532
         },
         {
           "block": 28,
-          "n_train": 12246,
+          "n_train": 7597,
           "reasons": [
-            "ic_z=-2.3384 < threshold -2.0"
+            "ic_z=-2.2957 < threshold -2.0"
           ],
           "ts": 1787563802028520532
         },
         {
           "block": 32,
-          "n_train": 13548,
+          "n_train": 8353,
           "reasons": [
-            "ic_z=-3.3071 < threshold -2.0"
+            "ic_z=-3.4375 < threshold -2.0"
           ],
           "ts": 1787567402028520532
         },
         {
           "block": 36,
-          "n_train": 14843,
+          "n_train": 9127,
           "reasons": [
-            "ic_z=-2.0279 < threshold -2.0"
+            "ic_z=-2.4577 < threshold -2.0"
           ],
           "ts": 1787571002028520532
         },
         {
           "block": 40,
-          "n_train": 16098,
+          "n_train": 9886,
           "reasons": [
-            "ic_z=-2.6310 < threshold -2.0"
+            "ic_z=-2.8333 < threshold -2.0"
           ],
           "ts": 1787574602028520532
         },
         {
           "block": 44,
-          "n_train": 17398,
+          "n_train": 10671,
           "reasons": [
-            "ic_z=-3.9096 < threshold -2.0"
+            "ic_z=-3.8208 < threshold -2.0"
           ],
           "ts": 1787578202028520532
         },
         {
           "block": 48,
-          "n_train": 18782,
+          "n_train": 11534,
           "reasons": [
-            "ic_z=-3.1125 < threshold -2.0"
+            "ic_z=-3.2559 < threshold -2.0"
           ],
           "ts": 1787581802028520532
         },
         {
-          "block": 56,
-          "n_train": 21485,
+          "block": 53,
+          "n_train": 12591,
           "reasons": [
-            "ic_z=-2.1189 < threshold -2.0"
+            "ic_z=-2.3562 < threshold -2.0"
           ],
-          "ts": 1787589002028520532
+          "ts": 1787586302028520532
+        },
+        {
+          "block": 57,
+          "n_train": 13399,
+          "reasons": [
+            "ic_z=-3.4788 < threshold -2.0"
+          ],
+          "ts": 1787589902028520532
         },
         {
           "block": 71,
-          "n_train": 25903,
+          "n_train": 16009,
           "reasons": [
-            "ic_z=-3.2546 < threshold -2.0"
+            "ic_z=-3.5834 < threshold -2.0"
           ],
           "ts": 1787602502028520532
         },
         {
-          "block": 75,
-          "n_train": 25936,
-          "reasons": [
-            "ic_z=-4.9235 < threshold -2.0"
-          ],
-          "ts": 1787606102028520532
-        },
-        {
           "block": 97,
-          "n_train": 25987,
+          "n_train": 16148,
           "reasons": [
-            "ic_z=-2.2372 < threshold -2.0"
+            "ic_z=-2.2528 < threshold -2.0"
           ],
           "ts": 1787625902028520532
         },
         {
           "block": 101,
-          "n_train": 25942,
+          "n_train": 16101,
           "reasons": [
-            "ic_z=-3.2608 < threshold -2.0"
+            "ic_z=-2.9026 < threshold -2.0"
           ],
           "ts": 1787629502028520532
         },
         {
           "block": 105,
-          "n_train": 25910,
+          "n_train": 16053,
           "reasons": [
-            "ic_z=-2.8737 < threshold -2.0"
+            "ic_z=-2.7016 < threshold -2.0"
           ],
           "ts": 1787633102028520532
         },
         {
           "block": 115,
-          "n_train": 25856,
+          "n_train": 16029,
           "reasons": [
-            "ic_z=-2.7196 < threshold -2.0"
+            "ic_z=-2.7916 < threshold -2.0"
           ],
           "ts": 1787642102028520532
         },
         {
           "block": 119,
-          "n_train": 25883,
+          "n_train": 16016,
           "reasons": [
-            "ic_z=-3.4473 < threshold -2.0"
+            "ic_z=-3.8186 < threshold -2.0"
           ],
           "ts": 1787645702028520532
         },
         {
           "block": 123,
-          "n_train": 25951,
+          "n_train": 16150,
           "reasons": [
-            "ic_z=-3.4756 < threshold -2.0"
+            "ic_z=-3.3206 < threshold -2.0"
           ],
           "ts": 1787649302028520532
         },
         {
           "block": 144,
-          "n_train": 25808,
+          "n_train": 16124,
           "reasons": [
-            "ic_z=-2.5528 < threshold -2.0"
+            "ic_z=-2.3065 < threshold -2.0"
           ],
           "ts": 1787668202028520532
         },
         {
           "block": 148,
-          "n_train": 25786,
+          "n_train": 16098,
           "reasons": [
-            "ic_z=-3.5923 < threshold -2.0"
+            "ic_z=-2.9256 < threshold -2.0"
           ],
           "ts": 1787671802028520532
         },
         {
-          "block": 152,
-          "n_train": 25738,
+          "block": 153,
+          "n_train": 16031,
           "reasons": [
-            "ic_z=-2.7829 < threshold -2.0"
+            "ic_z=-2.2305 < threshold -2.0"
           ],
-          "ts": 1787675402028520532
+          "ts": 1787676302028520532
         }
       ],
-      "rolling_ic_mean": 0.08341866628831304,
-      "rolling_ic_std": 0.05011675565248614,
-      "total_costs": 3421156.5061125006,
-      "trade_count": 11771
+      "rolling_ic_mean": 0.09304610842581888,
+      "rolling_ic_std": 0.06052191495873666,
+      "total_costs": 3080730.806800001,
+      "trade_count": 10536
     },
     "scheduled_daily": {
-      "deployed_ic": 0.10826585296882385,
+      "deployed_ic": 0.12047640811385504,
       "drift_event_count": 0,
       "final_state": "ACTIVE",
-      "gross_pnl": 57174.99999927165,
-      "lifecycle_transitions": [
-        {
-          "alpha_id": "FX08",
-          "eval_index": 75,
-          "event_ts": 1787606102028520532,
-          "from": "ACTIVE",
-          "policy": "scheduled_daily",
-          "reason": "rolling_ic -0.023397 < watch gate 0.0",
-          "rolling_ic": -0.023397417532269708,
-          "to": "WATCH"
-        },
-        {
-          "alpha_id": "FX08",
-          "eval_index": 90,
-          "event_ts": 1787619602028520532,
-          "from": "WATCH",
-          "policy": "scheduled_daily",
-          "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
-          "rolling_ic": 0.1287456589071877,
-          "to": "ACTIVE"
-        }
-      ],
+      "gross_pnl": 94054.99999934483,
+      "ic_baseline_kind": "oos",
+      "ic_baseline_rows": 658,
+      "lifecycle_transitions": [],
       "n_evals": 169,
       "n_ic_evals": 159,
-      "net_pnl": -3372023.9753253255,
+      "n_informative_evals": 155,
+      "net_pnl": -2958352.282250163,
       "policy": {
         "period_ns": 86400000000000,
         "policy": "scheduled"
@@ -258,7 +224,7 @@
       "refit_events": [
         {
           "block": 0,
-          "n_train": 3157,
+          "n_train": 1963,
           "reasons": [
             "initial deployment fit"
           ],
@@ -266,48 +232,30 @@
         },
         {
           "block": 86,
-          "n_train": 25936,
+          "n_train": 16030,
           "reasons": [
             "scheduled: period boundary crossed (1787538602028520532 -> 1787616002028520532, period 86400000000000)"
           ],
           "ts": 1787616002028520532
         }
       ],
-      "rolling_ic_mean": 0.0834258193334625,
-      "rolling_ic_std": 0.05011160778966668,
-      "total_costs": 3429198.9753250005,
-      "trade_count": 11774
+      "rolling_ic_mean": 0.09306356833761346,
+      "rolling_ic_std": 0.06051445459806934,
+      "total_costs": 3052407.28225,
+      "trade_count": 10465
     },
     "scheduled_weekly": {
-      "deployed_ic": 0.10880961152085607,
+      "deployed_ic": 0.12128021640279497,
       "drift_event_count": 0,
       "final_state": "ACTIVE",
-      "gross_pnl": 57324.99999927186,
-      "lifecycle_transitions": [
-        {
-          "alpha_id": "FX08",
-          "eval_index": 75,
-          "event_ts": 1787606102028520532,
-          "from": "ACTIVE",
-          "policy": "scheduled_weekly",
-          "reason": "rolling_ic -0.023397 < watch gate 0.0",
-          "rolling_ic": -0.023397417532269708,
-          "to": "WATCH"
-        },
-        {
-          "alpha_id": "FX08",
-          "eval_index": 90,
-          "event_ts": 1787619602028520532,
-          "from": "WATCH",
-          "policy": "scheduled_weekly",
-          "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
-          "rolling_ic": 0.12874565890718764,
-          "to": "ACTIVE"
-        }
-      ],
+      "gross_pnl": 96909.99999935954,
+      "ic_baseline_kind": "oos",
+      "ic_baseline_rows": 658,
+      "lifecycle_transitions": [],
       "n_evals": 169,
       "n_ic_evals": 159,
-      "net_pnl": -3376227.959800301,
+      "n_informative_evals": 155,
+      "net_pnl": -2945367.5787626333,
       "policy": {
         "period_ns": 604800000000000,
         "policy": "scheduled"
@@ -316,48 +264,30 @@
       "refit_events": [
         {
           "block": 0,
-          "n_train": 3157,
+          "n_train": 1963,
           "reasons": [
             "initial deployment fit"
           ],
           "ts": 1787538602028520532
         }
       ],
-      "rolling_ic_mean": 0.0834258193334625,
-      "rolling_ic_std": 0.05011160778966668,
-      "total_costs": 3433552.959800001,
-      "trade_count": 11786
+      "rolling_ic_mean": 0.09306356833761346,
+      "rolling_ic_std": 0.06051445459806934,
+      "total_costs": 3042277.5787625005,
+      "trade_count": 10459
     },
     "static": {
-      "deployed_ic": 0.10880961152085607,
+      "deployed_ic": 0.12128021640279497,
       "drift_event_count": 0,
       "final_state": "ACTIVE",
-      "gross_pnl": 57324.99999927186,
-      "lifecycle_transitions": [
-        {
-          "alpha_id": "FX08",
-          "eval_index": 75,
-          "event_ts": 1787606102028520532,
-          "from": "ACTIVE",
-          "policy": "static",
-          "reason": "rolling_ic -0.023397 < watch gate 0.0",
-          "rolling_ic": -0.023397417532269708,
-          "to": "WATCH"
-        },
-        {
-          "alpha_id": "FX08",
-          "eval_index": 90,
-          "event_ts": 1787619602028520532,
-          "from": "WATCH",
-          "policy": "static",
-          "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
-          "rolling_ic": 0.12874565890718764,
-          "to": "ACTIVE"
-        }
-      ],
+      "gross_pnl": 96909.99999935954,
+      "ic_baseline_kind": "oos",
+      "ic_baseline_rows": 658,
+      "lifecycle_transitions": [],
       "n_evals": 169,
       "n_ic_evals": 159,
-      "net_pnl": -3376227.959800301,
+      "n_informative_evals": 155,
+      "net_pnl": -2945367.5787626333,
       "policy": {
         "policy": "static"
       },
@@ -365,17 +295,17 @@
       "refit_events": [
         {
           "block": 0,
-          "n_train": 3157,
+          "n_train": 1963,
           "reasons": [
             "initial deployment fit"
           ],
           "ts": 1787538602028520532
         }
       ],
-      "rolling_ic_mean": 0.0834258193334625,
-      "rolling_ic_std": 0.05011160778966668,
-      "total_costs": 3433552.959800001,
-      "trade_count": 11786
+      "rolling_ic_mean": 0.09306356833761346,
+      "rolling_ic_std": 0.06051445459806934,
+      "total_costs": 3042277.5787625005,
+      "trade_count": 10459
     }
   },
   "universe": [

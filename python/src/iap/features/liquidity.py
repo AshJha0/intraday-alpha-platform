@@ -22,7 +22,10 @@ Formulas (windows are half-open event-time intervals (t-w, t]):
                              less resilient).
 
 Validity: instantaneous features need book_ok; windowed features need warmup;
-effective spread needs at least one mid-valid TRADE in the window.
+effective spread needs at least one mid-valid TRADE in the window;
+``resiliency_halflife`` is INVALID when no L1 replenishment was observed in
+the 10s window (EPS guard, API_FEATURES §4 — an unobserved rebuild rate is
+undefined, not "3e13 seconds").
 """
 
 from __future__ import annotations
@@ -121,8 +124,12 @@ def compute(st, values: List[float], valid: List[bool]) -> None:
             dist_bps = abs(p1 - pk) * st.tick / st.mid * 1e4
             slope = dist_bps / cum if cum > 0 else None
         put(values, valid, slope, slope is not None)
+    # EPS guard (pinned): with no observed L1 replenishment in the window
+    # the half-life is UNDEFINED (invalid), not 1e13 seconds.
     hl = None
     if ok and st.warm(WINDOW_NS["10s"]):
-        rep = (st.queue["10s"].sums[1] + st.queue["10s"].sums[3]) / 10.0
-        hl = LN2 * (st.bid_q + st.ask_q) / 2.0 / (rep + EPS)
+        rep_int = st.queue["10s"].sums[1] + st.queue["10s"].sums[3]
+        if rep_int > 0:  # exact integer replenishment total
+            rep = rep_int / 10.0
+            hl = LN2 * (st.bid_q + st.ask_q) / 2.0 / (rep + EPS)
     put(values, valid, hl, hl is not None)

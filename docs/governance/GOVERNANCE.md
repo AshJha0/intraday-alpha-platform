@@ -14,12 +14,20 @@ Review depth scales with blast radius:
 | **Risk engine / limits** | `rust/risk/`, `configs/risk.json`, risk contracts in `schemas/` | 2 reviewers, one of whom is the risk owner. Fail-closed semantics may never be weakened in the same PR that adds a feature. Limit changes (`configs/risk.json`) additionally require the audit-log entry of §3 *before* deploy. |
 | **Execution / SOR** | `cpp/src/execution/`, `cpp/src/sor/`, `rust/execution/`, `rust/venue/`, `configs/execution.json` | 1 execution owner + 1 second reviewer; determinism proof: `tests/harness/run_golden.sh` parity table attached to the PR. |
 | **Contracts & schemas** | `schemas/`, `PLATFORM_CONVENTIONS.md` §1–§2 | 2 reviewers + version bump + `MIGRATIONS.md` entry; all four languages updated in the same PR or the PR is blocked. |
-| **Deployment / observability** | `deployment/`, `docs/runbooks/` | 1 platform reviewer; YAML must pass the structural validation used in CI (pyyaml load + `docker compose config -q`). |
+| **Deployment / observability** | `deployment/`, `docs/runbooks/`, `tests/harness/`, `.github/` | 1 platform reviewer (`CODEOWNERS`); the deployment validation used in CI must pass — `python3 tests/harness/check_deployment.py`, i.e. `promtool check rules` + `check config` + `promtool test rules`, `docker compose config -q`, every Dockerfile `COPY` source resolving in a clean build context, k8s manifests parsing and dry-running, the generated ConfigMaps matching `configs/`, every rule and dashboard expression naming a metric a producer exports, and the Java golden gate covering every `*GoldenTest` class. |
 | Everything else | docs, research scripts, benchmarks | 1 reviewer. |
 
 Mandatory for every PR class: `tests/harness/run_all.sh` green (all four
-languages, < 120 s each), zero compiler warnings (conventions §8), no new
-dependencies without a SECURITY.md §1 entry.
+languages, < 120 s each, plus the deployment column), zero compiler warnings
+(conventions §8), no new dependencies without a SECURITY.md §1 entry.
+
+**Where CI is.** `.github/workflows/ci.yml` runs exactly this on every push and
+pull request: one job per language, `tests/harness/run_golden.sh` (gate 10),
+`tests/harness/check_deployment.py`, and an `images` job — building the four
+container images — that `needs:` all of them, so promotion gate 10's "never
+publish an image from a tree whose golden suite fails" is enforced by the
+dependency graph rather than by a promise in a Dockerfile header.
+`CODEOWNERS` names the reviewers this table and SECURITY.md refer to.
 
 ## 2. Promotion gates (spec §20, verbatim order)
 
@@ -41,6 +49,10 @@ order; each gate's evidence is linked from the experiment's manifest
     hard gate between research code and production code.
 11. Paper/shadow deployment — monitored against the live-vs-backtest drift
     metric (`alpha_live_vs_backtest_drift`, deployment/grafana/README.md).
+    Note the lifecycle gauge (`alpha_lifecycle_state`) is IC-gated and
+    **observational** in the live loop: RETIRED pages a human
+    (`AlphaLifecycleRetired`), it does not halt the allocation by itself
+    (API_ADAPTIVE.md §6, PLATFORM_CONVENTIONS.md §12.6).
 12. Limited-capital promotion subject to **written risk approval** (risk owner
     sign-off recorded in the audit log).
 13. Continuous monitoring and pre-agreed retirement criteria (drift, decay,
@@ -57,17 +69,35 @@ denominator public.
 Auditable events and where they are recorded:
 
 - **Risk decisions and kill events (runtime)**: every pre-trade decision and
-  breach is a `RiskEvent` (schemas/risk_event.schema.json) appended to the
-  JSONL audit log by the rust risk engine (`RiskEngine::audit_jsonl`,
-  byte-deterministic and replayable — `rust/risk/tests/golden_risk.rs`
-  proves the log replays identically). Retention: immutable, per session,
-  shipped off-host daily.
+  breach is a `RiskEvent` (schemas/risk_event.schema.json), byte-deterministic
+  and replayable (`rust/risk/tests/golden_risk.rs` proves the log replays
+  identically). **Where the deployed platform writes it**: the Java vertical
+  streams it to `<state-dir>/risk_audit.jsonl` — appended and fsynced at every
+  checkpoint (1,024 events), at session end and from a shutdown hook — and the
+  session report carries the file's path and its sha256
+  (`report.risk.audit_jsonl` / `audit_sha256`), so a postmortem can prove which
+  bytes it read (`PLATFORM_CONVENTIONS.md` §12.3, tested by
+  `PaperStateRecoveryTest.auditLogIsPersistedAndMatchesTheEngine`). In the
+  deployments `<state-dir>` is `$IAP_STATE_DIR` on the shared volume/PVC
+  (`/data/state`). Retention: immutable, per session, shipped off-host daily.
+- **Kill-switch operations (runtime)**: every call to the operator API
+  (`POST /admin/{kill,clear,override,roll}`) — accepted, refused or rejected —
+  appends a line to `<state-dir>/admin_audit.jsonl` with the action, the scope,
+  the approval `reason` verbatim, the HTTP status and the **sha256 of the
+  actor's token** (never the token). The corresponding `RiskEvent` is written
+  by the trading thread at the current event time, so the two logs line up
+  (`PLATFORM_CONVENTIONS.md` §12.5).
 - **Strategy/risk configuration changes**: any change to `configs/risk.json`,
   `configs/strategies*`, `configs/execution.json` requires a ledger entry
   (PR link, before/after diff, approver, effective time) *before* the config
   reaches production. The deployed ConfigMap is regenerated only from a
-  reviewed commit (`deployment/k8s/generate_configmaps.py`), so `git log` of
-  `configs/` plus the PR record is the authoritative change trail.
+  reviewed commit (`deployment/k8s/generate_configmaps.py`) and CI fails if the
+  committed ConfigMaps drift from `configs/`, so `git log` of `configs/` plus
+  the PR record is the authoritative change trail. At runtime the platform
+  writes `<state-dir>/config_audit.jsonl` (one `config_loaded` record with the
+  sha256 of every pinned file) at startup and reports a single `config_sha256`
+  over all of them on `/status` and in the session report — so a session can
+  always be tied to the exact configuration it ran with.
 - **Golden vector changes**: regeneration commits must carry the "golden
   change" note (§1) — the goldens define cross-language truth, so their
   history is part of the audit trail.

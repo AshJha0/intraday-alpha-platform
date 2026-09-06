@@ -20,7 +20,12 @@ from iap.core.codec import read_jsonl
 from iap.features.context import build_contexts
 from iap.features.engine import FeatureEngine
 from iap.features.registry import build_registry
-from iap.labels.labels import HORIZON_ORDER, MidSeries, compute_labels
+from iap.labels.labels import (
+    HORIZON_ORDER,
+    MidSeries,
+    compute_labels,
+    max_sample_age,
+)
 
 
 def build_golden_frame(events_path, configs_dir, instrument_id: int) -> pd.DataFrame:
@@ -38,14 +43,23 @@ def build_golden_frame(events_path, configs_dir, instrument_id: int) -> pd.DataF
     rows = []
     series = MidSeries()
     last_event_ts = 0
+    last_refresh_seq = 0
     for ev in events:
         vec = engine.apply(ev)
         if ev.instrument_id != instrument_id:
             continue
         last_event_ts = ev.exchange_ts
         st = engine.states[instrument_id]
-        if st.book_ok:
-            series.append(ev.exchange_ts, st.mid, st.spread_ticks * st.tick / 2.0)
+        # one mid sample per book refresh; non-tradable refreshes are
+        # recorded as blackout samples (API_FEATURES §6)
+        if st.refresh_seq != last_refresh_seq:
+            last_refresh_seq = st.refresh_seq
+            if st.label_tradable:
+                series.append(ev.exchange_ts, st.mid,
+                              st.spread_ticks * st.tick / 2.0, True)
+            else:
+                series.append(ev.exchange_ts, float("nan"), float("nan"),
+                              False)
         if vec is None:
             raise RuntimeError("cadence 0 must emit after every event")
         vals = np.asarray(vec.values, dtype=float).copy()
@@ -56,10 +70,12 @@ def build_golden_frame(events_path, configs_dir, instrument_id: int) -> pd.DataF
     frame = pd.DataFrame(np.vstack(rows), columns=names)
     frame.insert(0, "exchange_ts", np.asarray(ts_list, dtype=np.int64))
     frame.insert(0, "instrument_id", np.uint32(instrument_id))
-    labels = compute_labels(ts_list, series, last_event_ts)
+    labels = compute_labels(ts_list, series, last_event_ts,
+                            max_age_ns=max_sample_age(series))
     for h in HORIZON_ORDER:
         lab = labels[h]
         frame[f"label_mid_{h}"] = np.asarray(lab.mid, dtype=float)
         frame[f"label_cost_{h}"] = np.asarray(lab.cost, dtype=float)
         frame[f"label_valid_{h}"] = np.asarray(lab.valid, dtype=bool)
+        frame[f"label_reason_{h}"] = np.asarray(lab.reason, dtype=np.uint8)
     return frame

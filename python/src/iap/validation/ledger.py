@@ -6,6 +6,16 @@ Every evaluated alpha/configuration is one recorded experiment in
 persisted as sorted JSON, and deliberately wall-clock-free (conventions §3:
 reruns of the same code on the same data produce byte-identical ledgers).
 
+**De-duplication (pinned, round-3).**  An experiment is identified by
+``(alpha_id, kind, sha256 of the canonical config JSON)``.  Recording the
+same identity again updates its result and does NOT increase the count:
+re-running ``run_all.py`` five times is still one set of experiments, not
+five.  Before this rule the Bonferroni denominator — and therefore the
+"selection-adjusted" threshold every report and paper quotes — was a
+function of how often a script had been run, which made the correction
+meaningless.  A genuinely new configuration (a different threshold, a
+different window) has a different config hash and is counted.
+
 Multiple-testing math reported with every batch:
 
 - Bonferroni: a per-test significance threshold ``alpha / n_experiments``
@@ -18,10 +28,11 @@ Multiple-testing math reported with every batch:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 PINNED_ALPHA = 0.05
 
@@ -61,12 +72,28 @@ class ExperimentLedger:
         self.path = Path(path)
         self.entries: List[dict] = []
         self.total_experiments = 0
+        self._index: Dict[str, int] = {}
         if self.path.exists():
             blob = json.loads(self.path.read_text())
             self.entries = list(blob.get("entries", []))
             self.total_experiments = int(
                 blob.get("total_experiments", len(self.entries))
             )
+            for i, e in enumerate(self.entries):
+                key = e.get("key") or self.experiment_key(
+                    e.get("alpha_id", ""), e.get("kind", ""), e.get("config")
+                )
+                self._index.setdefault(key, i)
+
+    @staticmethod
+    def experiment_key(alpha_id: str, kind: str,
+                       config: Optional[dict]) -> str:
+        """Pinned experiment identity: alpha, kind and canonical config."""
+        payload = json.dumps(
+            {"alpha_id": alpha_id, "kind": kind, "config": config or {}},
+            sort_keys=True, separators=(",", ":"),
+        )
+        return hashlib.sha256(payload.encode()).hexdigest()
 
     def record(
         self,
@@ -80,10 +107,20 @@ class ExperimentLedger:
         horizon scan) and return the running total."""
         if count < 1:
             raise ValueError("count must be >= 1")
+        key = self.experiment_key(alpha_id, kind, config)
+        prev = self._index.get(key)
+        if prev is not None:
+            # Same identity: a rerun, not a new experiment (pinned).
+            entry = self.entries[prev]
+            entry["result"] = result or {}
+            entry["reruns"] = int(entry.get("reruns", 0)) + 1
+            return self.total_experiments
         self.total_experiments += count
+        self._index[key] = len(self.entries)
         self.entries.append(
             {
                 "n": self.total_experiments,
+                "key": key,
                 "alpha_id": alpha_id,
                 "kind": kind,
                 "count": count,
@@ -110,6 +147,11 @@ class ExperimentLedger:
         n = max(self.total_experiments, 2)
         return math.sqrt(2.0 * math.log(n))
 
+    @property
+    def distinct_experiments(self) -> int:
+        """Distinct (alpha, kind, config) identities recorded."""
+        return len(self._index)
+
     def note(self) -> str:
         return (
             f"Multiple testing: {self.total_experiments} experiments recorded. "
@@ -125,8 +167,12 @@ class ExperimentLedger:
             "x-version": 1,
             "description": (
                 "Multiple-testing ledger (spec §13). Deterministic: no "
-                "wall-clock; identical rerun => identical file."
+                "wall-clock; identical rerun => identical file. Experiments "
+                "are de-duplicated by (alpha_id, kind, canonical config): "
+                "re-running the same script does not inflate the Bonferroni "
+                "denominator."
             ),
+            "distinct_experiments": self.distinct_experiments,
             "total_experiments": self.total_experiments,
             "pinned_alpha": PINNED_ALPHA,
             "bonferroni_p_threshold": self.bonferroni_threshold(),

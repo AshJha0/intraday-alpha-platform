@@ -21,10 +21,16 @@ import com.iap.config.Json;
  *       bucket edges, {@link Psi#edges});</li>
  *   <li>{@code bucket_fractions} — the 10 baseline per-bucket fractions
  *       (sum 1 up to rounding);</li>
- *   <li>{@code count} — baseline sample size (provenance).</li>
+ *   <li>{@code count} — baseline sample size (provenance);</li>
+ *   <li>{@code feature_version} — the feature-registry hash the baseline was
+ *       captured against. A baseline captured under a different registry
+ *       describes a feature whose semantics may have changed under the same
+ *       name, so PSI against it is meaningless; callers that know their
+ *       engine's registry hash must compare it (see
+ *       {@link #requireFeatureVersion}).</li>
  * </ul>
  *
- * <p>The normative v1 schema ({@code iap.adaptive.drift.DriftBaseline})
+ * <p>The normative v2 schema ({@code iap.adaptive.drift.DriftBaseline})
  * uses {@code edges} / {@code expected_frac} / {@code n} and echoes the
  * pinned constants {@code psi_eps} / {@code n_buckets}, which are verified
  * when present. For cross-schema tolerance the loader also accepts the key
@@ -34,6 +40,12 @@ import com.iap.config.Json;
  * derived via the pinned {@link Psi} formulas. Unknown keys are ignored.
  */
 public final class BaselineLoader {
+    /**
+     * Pinned baseline schema version. v2 (round 3) adds the
+     * {@code feature_version} provenance field; see MIGRATIONS.md.
+     */
+    public static final long SCHEMA_VERSION = 2;
+
     /** One loaded distribution baseline (immutable). */
     public static final class Baseline {
         private final String alphaId;
@@ -41,14 +53,21 @@ public final class BaselineLoader {
         private final double[] edges;
         private final double[] fractions;
         private final long count;
+        private final String featureVersion;
 
         Baseline(String alphaId, String name, double[] edges,
                 double[] fractions, long count) {
+            this(alphaId, name, edges, fractions, count, "");
+        }
+
+        Baseline(String alphaId, String name, double[] edges,
+                double[] fractions, long count, String featureVersion) {
             this.alphaId = alphaId;
             this.name = name;
             this.edges = edges;
             this.fractions = fractions;
             this.count = count;
+            this.featureVersion = featureVersion;
         }
 
         public String alphaId() {
@@ -73,6 +92,16 @@ public final class BaselineLoader {
         /** Baseline sample size ({@code 0} when the file omitted it). */
         public long count() {
             return count;
+        }
+
+        /**
+         * Feature-registry hash this baseline was captured against
+         * (schema v2 provenance; {@code ""} when the file omitted it).
+         *
+         * @return the registry hash, or {@code ""}
+         */
+        public String featureVersion() {
+            return featureVersion;
         }
     }
 
@@ -119,10 +148,13 @@ public final class BaselineLoader {
             throw new IllegalArgumentException("baseline missing alpha_id");
         }
         Object xv = doc.get("x-version");
-        if (xv != null && Json.asLong(xv) != 1) {
+        if (xv != null && Json.asLong(xv) != SCHEMA_VERSION) {
             throw new IllegalArgumentException(
-                    "unsupported baseline x-version " + xv);
+                    "unsupported baseline x-version " + xv
+                    + " (pinned " + SCHEMA_VERSION + "); see MIGRATIONS.md");
         }
+        String featureVersion = doc.get("feature_version") instanceof String fv
+                ? fv : "";
         long count = 0;
         Object n = firstOf(doc, "n", "count");
         if (n != null) {
@@ -151,7 +183,8 @@ public final class BaselineLoader {
                 }
             }
             return new Baseline(alphaId, name, edges,
-                    doubles(fracRaw, "fractions", Psi.BUCKETS), count);
+                    doubles(fracRaw, "fractions", Psi.BUCKETS), count,
+                    featureVersion);
         }
         Object valuesRaw = doc.get("values");
         if (valuesRaw == null) {
@@ -166,12 +199,42 @@ public final class BaselineLoader {
         double[] edges = Psi.edges(values);
         return new Baseline(alphaId, name, edges,
                 Psi.fractions(values, edges),
-                count == 0 ? values.length : count);
+                count == 0 ? values.length : count,
+                featureVersion);
     }
 
     /** Load one baseline file. */
     public static Baseline load(Path file) {
         return parse(Json.object(Json.parseFile(file)));
+    }
+
+    /**
+     * Reject a baseline captured against a different feature registry
+     * (pinned, API_ADAPTIVE section 4). A baseline whose
+     * {@code feature_version} differs from the engine's registry hash
+     * describes a feature whose semantics may have changed under the same
+     * name, so PSI or IC measured against it is meaningless. Fails closed:
+     * a baseline that carries no {@code feature_version} at all is also
+     * rejected, because it cannot be shown to match.
+     *
+     * @param b the loaded baseline
+     * @param engineRegistryHash the running feature engine's registry hash
+     * @throws IllegalArgumentException on any mismatch
+     */
+    public static void requireFeatureVersion(Baseline b,
+            String engineRegistryHash) {
+        if (engineRegistryHash == null || engineRegistryHash.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "engine registry hash must be supplied to verify baseline "
+                    + b.name());
+        }
+        if (!engineRegistryHash.equals(b.featureVersion())) {
+            throw new IllegalArgumentException("baseline " + b.name()
+                    + ": feature_version '" + b.featureVersion()
+                    + "' does not match the engine's registry hash '"
+                    + engineRegistryHash
+                    + "' - captured against a different feature registry");
+        }
     }
 
     /**

@@ -45,11 +45,32 @@ def main(argv=None) -> int:
     )
     parser.add_argument("--seed", type=int, default=None,
                         help="override the config seed")
+    parser.add_argument(
+        "--allow-default-config", action="store_true",
+        help="run with the built-in generator defaults when the config file "
+             "is absent (default: fail fast — a silently defaulted config "
+             "changes the dataset version without a trace)",
+    )
     args = parser.parse_args(argv)
 
     configs_dir = Path(args.configs_dir)
     config_path = Path(args.config) if args.config else configs_dir / "generator.json"
-    cfg = load_generator_config(config_path if config_path.exists() else None)
+    # Fail fast (PLATFORM_CONVENTIONS.md §8/§12.2, SPEC §26): a missing or
+    # typo'd generator.json used to fall back to the built-in defaults
+    # silently. That is identical to the committed file TODAY, so a ConfigMap
+    # that omits the key produces a dataset nobody notices is different the
+    # moment the two diverge (anomaly rates, sessions, seed) — and the
+    # dataset version is part of the reproducibility chain.
+    if not config_path.exists():
+        if not args.allow_default_config:
+            raise FileNotFoundError(
+                f"generator config not found: {config_path}. Pass --config with "
+                "a real path, or --allow-default-config to run with the "
+                "built-in defaults on purpose."
+            )
+        cfg = load_generator_config(None)
+    else:
+        cfg = load_generator_config(config_path)
     if args.seed is not None:
         cfg["seed"] = args.seed
 

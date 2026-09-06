@@ -134,9 +134,12 @@ public class FeatureBruteTest {
                 boolean ok = bid.length != 0 && ask.length != 0;
                 if (ok) {
                     long mid2 = bid[0][0] + ask[0][0];
-                    if (!prevOk || mid2 != prevMid2) {
+                    // Pinned: compare against the last RECORDED mid sample,
+                    // so a one-sided flicker that moves the mid still
+                    // contributes a vol sample (API_FEATURES.md section 2).
+                    if (!haveHist || mid2 != prevMid2) {
                         double lm = Math.log((double) mid2);
-                        if (prevOk && haveHist) {
+                        if (haveHist) {
                             double dlm = lm - lastLogmid;
                             lg.dlmSqTs.add(t);
                             lg.dlmSq.add(dlm * dlm);
@@ -145,8 +148,8 @@ public class FeatureBruteTest {
                         lg.logmid.add(lm);
                         lastLogmid = lm;
                         haveHist = true;
+                        prevMid2 = mid2;
                     }
-                    prevMid2 = mid2;
                 }
                 prevOk = ok;
                 prevBid = bid;

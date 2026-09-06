@@ -37,7 +37,7 @@ public class RiskRuleTest {
         TreeMap<Long, Double> ticks = new TreeMap<>();
         ticks.put(1L, 0.01);
         ticks.put(2L, 0.01);
-        RiskEngine eng = RiskEngine.fromConfig(configDoc(), ticks);
+        RiskEngine eng = RiskEngine.fromConfigTicks(configDoc(), ticks);
         eng.onMarket(1, 2450, 2452, TS);
         eng.onMarket(2, 3119, 3121, TS);
         return eng;
@@ -108,7 +108,7 @@ public class RiskRuleTest {
         // no reference price at all
         TreeMap<Long, Double> ticks = new TreeMap<>();
         ticks.put(1L, 0.01);
-        RiskEngine fresh = RiskEngine.fromConfig(configDoc(), ticks);
+        RiskEngine fresh = RiskEngine.fromConfigTicks(configDoc(), ticks);
         RiskDecision d = fresh.checkOrder(limitBuy(1, 10, 2450, TS));
         assertEquals(Rules.STALE_PRICE, d.ruleId());
         assertTrue(d.reason().contains("no reference price"));
@@ -159,9 +159,13 @@ public class RiskRuleTest {
         // unpriced marketable buy vs own resting ask (order 3) crosses
         expect(eng, new OrderRequest(4, 1, 0, 50, 0, OrderRequest.MARKET, 1,
                 "S1", 0.5, TS + 4 * step), Rules.SELF_MATCH);
-        // PEG orders are passive by construction and skip the check
+        // PEG orders are checked at their pegged touch (bid 2450 for a
+        // buy) — below the own ask at 2455, so no cross
         expect(eng, new OrderRequest(5, 1, 0, 50, 0, OrderRequest.PEG, 1,
                 "S1", 0.5, TS + 5 * step), Rules.ALLOW);
+        // ... but a sell at/below the pegged bid would cross it
+        expect(eng, new OrderRequest(7, 1, 1, 50, 2450, OrderRequest.LIMIT, 1,
+                "S1", 0.5, TS + 5 * step + 1), Rules.SELF_MATCH);
         // once the resting ask is done, the unpriced buy is fine (an
         // unpriced BUY only conflicts with opposite-side resting orders;
         // the own resting bid 1 does not block it)
@@ -210,7 +214,7 @@ public class RiskRuleTest {
         TreeMap<Long, Double> ticks = new TreeMap<>();
         ticks.put(1L, 0.01);
         ticks.put(2L, 0.01);
-        RiskEngine eng = RiskEngine.fromConfig(configDoc(), ticks);
+        RiskEngine eng = RiskEngine.fromConfigTicks(configDoc(), ticks);
         eng.onMarket(1, 2450, 2452, TS);
         // instrument 2 position exists but never had a mark
         eng.onFill(new RiskFill(TS + 1, "S1", 2, 0, 0, 100, 3120));
@@ -228,11 +232,16 @@ public class RiskRuleTest {
         assertEquals(-51_300.0, eng.strategyPnl("S1"), 1e-6);
         expect(eng, limitBuy(1, 100, 2450, TS + 3), Rules.KILL_STRATEGY);
         assertFalse("global not yet killed", eng.killSwitchEngaged());
-        // another strategy loses enough to breach the 250k daily loss
+        // another strategy loses enough to breach the 250k daily loss:
+        // the buy at 35.00 marked at 31.20 is -380k UNREALIZED and latches
+        // the global switch at the fill, before the closing sell
         eng.onMarket(2, 3119, 3121, TS + 3);
         eng.onFill(new RiskFill(TS + 4, "S2", 2, 0, 0, 100_000, 3500));
+        assertTrue("mark-to-market latch", eng.killSwitchEngaged());
+        assertEquals(-380_000.0, eng.unrealizedPnl(), 1e-6);
         eng.onFill(new RiskFill(TS + 5, "S2", 2, 0, 1, 100_000, 3120));
         assertTrue(eng.killSwitchEngaged());
+        assertEquals(-431_300.0, eng.globalDailyPnl(), 1e-6);
         assertEquals(1.0, eng.metrics.gaugeValue("risk_kill_switch_engaged"), 0.0);
         expect(eng, new OrderRequest(2, 2, 0, 10, 3120, OrderRequest.LIMIT, 1,
                 "S3", 0.5, TS + 6), Rules.KILL_GLOBAL);
@@ -279,7 +288,7 @@ public class RiskRuleTest {
         // missing limit
         Map<String, Object> doc = configDoc();
         Json.object(doc.get("per_order")).remove("max_order_qty");
-        RiskEngine eng = RiskEngine.fromConfig(doc, ticks);
+        RiskEngine eng = RiskEngine.fromConfigTicks(doc, ticks);
         eng.onMarket(1, 2450, 2452, TS);
         RiskDecision d = eng.checkOrder(limitBuy(1, 10, 2450, TS + 1));
         assertEquals(Rules.CONFIG_MISSING, d.ruleId());
@@ -289,17 +298,17 @@ public class RiskRuleTest {
         // negative limit
         Map<String, Object> doc2 = configDoc();
         Json.object(doc2.get("global")).put("max_daily_loss", -5.0);
-        RiskEngine eng2 = RiskEngine.fromConfig(doc2, ticks);
+        RiskEngine eng2 = RiskEngine.fromConfigTicks(doc2, ticks);
         assertEquals(Rules.CONFIG_MISSING,
                 eng2.checkOrder(limitBuy(1, 10, 2450, TS)).ruleId());
         // wrong type
         Map<String, Object> doc3 = configDoc();
         Json.object(doc3.get("per_order")).put("max_order_qty", "many");
-        assertEquals(Rules.CONFIG_MISSING, RiskEngine.fromConfig(doc3, ticks)
+        assertEquals(Rules.CONFIG_MISSING, RiskEngine.fromConfigTicks(doc3, ticks)
                 .checkOrder(limitBuy(1, 10, 2450, TS)).ruleId());
         // an entirely empty document
         assertEquals(Rules.CONFIG_MISSING,
-                RiskEngine.fromConfig(new HashMap<>(), ticks)
+                RiskEngine.fromConfigTicks(new HashMap<>(), ticks)
                         .checkOrder(limitBuy(1, 10, 2450, TS)).ruleId());
     }
 
@@ -319,7 +328,7 @@ public class RiskRuleTest {
         // Audit parity with the Rust reference: order ids are u64 and are
         // printed as unsigned decimals. 2^63 is Long.MIN_VALUE in Java —
         // the reason text must still be byte-identical to Rust's
-        // "would cross own resting order {oid} at {price_ticks}".
+        // "would cross own open order {oid} at {price_ticks}".
         RiskEngine eng = engine();
         long bigId = Long.MIN_VALUE; // 2^63 = 9223372036854775808 as u64
         // Resting LIMIT sell with the huge id...
@@ -329,11 +338,11 @@ public class RiskRuleTest {
         RiskDecision d = eng.checkOrder(new OrderRequest(7, 1, 0, 10, 2451,
                 OrderRequest.LIMIT, 1, "S1", 0.5, TS + 2 * SEC));
         assertEquals(Rules.SELF_MATCH, d.ruleId());
-        assertEquals("would cross own resting order 9223372036854775808 at 2451",
+        assertEquals("would cross own open order 9223372036854775808 at 2451",
                 d.reason());
         // The audit line carries the exact same text.
         assertTrue(eng.auditJsonl().contains(
-                "\"reason\":\"would cross own resting order "
+                "\"reason\":\"would cross own open order "
                         + "9223372036854775808 at 2451\""));
     }
 
@@ -350,7 +359,7 @@ public class RiskRuleTest {
         RiskDecision d = eng.checkOrder(new OrderRequest(9, 1, 0, 10, 2451,
                 OrderRequest.LIMIT, 1, "S1", 0.5, TS + 3 * SEC));
         assertEquals(Rules.SELF_MATCH, d.ruleId());
-        assertEquals("would cross own resting order 5 at 2451", d.reason());
+        assertEquals("would cross own open order 5 at 2451", d.reason());
     }
 
     @Test

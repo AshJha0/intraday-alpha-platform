@@ -49,7 +49,30 @@ public final class Alphas {
      * IllegalArgumentException on missing alphas / unsupported models.
      */
     public static TreeMap<String, LinearZParams> loadParams(Path path) {
+        return loadParams(path, "");
+    }
+
+    /**
+     * Load configs/strategies/alpha_params.json, additionally rejecting a
+     * {@code feature_version} that differs from {@code expectedFeatureVersion}
+     * (pass "" to skip the check): parameters fitted against a different
+     * feature registry read features whose semantics may have changed under
+     * the same name (API_ALPHA.md section 2).
+     */
+    public static TreeMap<String, LinearZParams> loadParams(Path path,
+            String expectedFeatureVersion) {
         Map<String, Object> root = Json.object(Json.parseFile(path));
+        if (expectedFeatureVersion != null && !expectedFeatureVersion.isEmpty()) {
+            Object got = root.get("feature_version");
+            if (!expectedFeatureVersion.equals(got)) {
+                throw new IllegalArgumentException(
+                        "alpha_params.json: feature_version " + got
+                        + " does not match the engine registry hash "
+                        + expectedFeatureVersion
+                        + " - the parameters were fitted against a different"
+                        + " feature registry");
+            }
+        }
         Map<String, Object> params = Json.object(root.get("params"));
         TreeMap<String, LinearZParams> out = new TreeMap<>();
         for (String aid : GOLDEN_ALPHA_IDS) {
@@ -66,14 +89,31 @@ public final class Alphas {
             for (Object f : Json.array(p.get("features"))) {
                 feats.add((String) f);
             }
+            double mu = Json.asDouble(p.get("mu"));
+            double sigma = Json.asDouble(p.get("sigma"));
+            double beta = Json.asDouble(p.get("beta"));
+            double zClip = Json.asDouble(p.get("z_clip"));
+            double confScale = Json.asDouble(p.get("conf_scale"));
+            // Pinned loader validation (API_ALPHA.md section 2).
+            if (zClip != LinearZParams.PINNED_Z_CLIP
+                    || confScale != LinearZParams.PINNED_CONF_SCALE) {
+                throw new IllegalArgumentException(aid
+                        + ": z_clip/conf_scale must be the pinned 4.0/2.0");
+            }
+            if (!Double.isFinite(mu) || !Double.isFinite(sigma)
+                    || !Double.isFinite(beta)) {
+                throw new IllegalArgumentException(
+                        aid + ": non-finite mu/sigma/beta");
+            }
+            if (sigma <= 0.0 && beta != 0.0) {
+                throw new IllegalArgumentException(aid
+                        + ": sigma <= 0 is only legal for a dead alpha"
+                        + " (beta == 0)");
+            }
             out.put(aid, new LinearZParams(
                     (String) p.get("alpha_id"),
                     (String) p.get("horizon"),
-                    Json.asDouble(p.get("mu")),
-                    Json.asDouble(p.get("sigma")),
-                    Json.asDouble(p.get("beta")),
-                    Json.asDouble(p.get("z_clip")),
-                    Json.asDouble(p.get("conf_scale")),
+                    mu, sigma, beta, zClip, confScale,
                     List.copyOf(feats)));
         }
         return out;
@@ -84,7 +124,9 @@ public final class Alphas {
      * (0, 0) exactly. Returns {er, conf}.
      */
     public static double[] scoreLinearZ(double raw, LinearZParams p) {
-        if (!Double.isFinite(raw)) {
+        // Dead alpha (pinned): sigma == 0 would collapse the z denominator
+        // to EPS and report confidence 1.0 on every row.
+        if (p.isDead() || !Double.isFinite(raw)) {
             return new double[] {0.0, 0.0};
         }
         double z = (raw - p.mu()) / (p.sigma() + EPS);

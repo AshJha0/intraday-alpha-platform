@@ -20,8 +20,11 @@ public final class TcaService {
     /**
      * Build a per-instrument {@link MarketTimeline} by replaying events
      * through a consolidated book: after every event of the instrument with
-     * a two-sided book, the BBO state is appended at {@code exchange_ts};
-     * TRADE events are recorded as market prints.
+     * a two-sided book, the BBO state is appended at {@code exchange_ts}
+     * through the pinned builder rule (crossed consolidated states skipped
+     * and counted, locked states kept — identical to the Python reference);
+     * TRADE events are recorded as market prints and HALT statuses for the
+     * markout rule.
      */
     public static MarketTimeline timelineFromEvents(List<MarketEvent> events,
             long instrumentId, double tickSize) {
@@ -39,10 +42,14 @@ public final class TcaService {
                 timeline.addTrade(ev.exchangeTs,
                         (double) ev.priceTicks * tickSize, ev.qty);
             }
+            if (ev.eventType == EventType.STATUS
+                    && ev.qty == com.iap.core.SessionStatus.HALT) {
+                timeline.addHalt(ev.exchangeTs);
+            }
             long[] bb = book.bestBid();
             long[] ba = book.bestAsk();
             if (bb != null && ba != null) {
-                timeline.append(ev.exchangeTs, (double) bb[0] * tickSize,
+                timeline.appendStatePinned(ev.exchangeTs, (double) bb[0] * tickSize,
                         (double) ba[0] * tickSize, bb[1], ba[1]);
             }
         }
@@ -51,9 +58,11 @@ public final class TcaService {
 
     /**
      * Assemble a {@link TcaParentOrder} from execution-simulator fills:
-     * each fill is stamped with the prevailing mid / half-spread at its
-     * timestamp and the displayed contra depth (fail if a fill precedes the
-     * first market state — TCA never guesses reference prices).
+     * each fill is stamped with its reference state (pinned §2.4: TAKER
+     * fills the state prevailing at the fill time, MAKER fills the state
+     * strictly before the triggering event) and the displayed contra depth
+     * (fail if a fill precedes the first market state — TCA never guesses
+     * reference prices).
      */
     public static TcaParentOrder parentFromFills(long orderId,
             long instrumentId, int side, long qtyTarget, long decisionTs,
@@ -62,16 +71,9 @@ public final class TcaService {
         TcaParentOrder parent = new TcaParentOrder(orderId, instrumentId, side,
                 qtyTarget, decisionTs, arrivalTs, endTs);
         for (com.iap.execution.Fill f : fills) {
-            int i = timeline.prevailing(f.ts());
-            if (i < 0) {
-                throw new IllegalArgumentException(
-                        "fill at " + f.ts() + " precedes the first market state");
-            }
-            long oppDepth = f.side() == Side.BID
-                    ? timeline.askSize(i) : timeline.bidSize(i);
-            parent.fills.add(new TcaFill(f.ts(),
+            parent.fills.add(TcaFill.stamp(timeline, f.ts(),
                     (double) f.priceTicks() * tickSize, f.qty(),
-                    timeline.mid(i), timeline.halfSpread(i), oppDepth));
+                    f.side() == Side.BID ? 0 : 1, f.liquidity()));
         }
         return parent;
     }

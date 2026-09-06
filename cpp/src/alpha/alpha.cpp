@@ -32,8 +32,20 @@ const std::array<std::uint32_t, 8> FX_PAIR_IDS = {101, 102, 103, 104,
                                                   105, 106, 107, 108};
 
 std::map<std::string, LinearZParams> load_alpha_params(
-    const std::string& path) {
+    const std::string& path, const std::string& expected_feature_version) {
     const Json root = read_json_file(path);
+    if (!expected_feature_version.empty()) {
+        const std::string got =
+            root.has("feature_version") ? root["feature_version"].s() : "";
+        if (got != expected_feature_version) {
+            throw std::invalid_argument(
+                "alpha_params.json: feature_version '" + got +
+                "' does not match the engine registry hash '" +
+                expected_feature_version +
+                "' - the parameters were fitted against a different feature "
+                "registry");
+        }
+    }
     const Json& params = root["params"];
     std::map<std::string, LinearZParams> out;
     for (const char* aid : GOLDEN_ALPHA_IDS) {
@@ -54,6 +66,22 @@ std::map<std::string, LinearZParams> load_alpha_params(
         lp.beta = p["beta"].num();
         lp.z_clip = p["z_clip"].num();
         lp.conf_scale = p["conf_scale"].num();
+        // Pinned loader validation (API_ALPHA.md section 2).
+        if (lp.z_clip != PINNED_Z_CLIP || lp.conf_scale != PINNED_CONF_SCALE) {
+            throw std::invalid_argument(
+                std::string(aid) + ": z_clip/conf_scale must be the pinned "
+                "4.0/2.0");
+        }
+        if (!std::isfinite(lp.mu) || !std::isfinite(lp.sigma) ||
+            !std::isfinite(lp.beta)) {
+            throw std::invalid_argument(std::string(aid) +
+                                        ": non-finite mu/sigma/beta");
+        }
+        if (lp.sigma <= 0.0 && lp.beta != 0.0) {
+            throw std::invalid_argument(
+                std::string(aid) + ": sigma <= 0 is only legal for a dead "
+                "alpha (beta == 0)");
+        }
         for (const auto& f : p["features"].a()) lp.features.push_back(f.s());
         out[aid] = lp;
     }
@@ -62,7 +90,9 @@ std::map<std::string, LinearZParams> load_alpha_params(
 
 void score_linear_z(double raw, const LinearZParams& p, double& er,
                     double& conf) {
-    if (!std::isfinite(raw)) {
+    // Dead alpha (pinned): sigma == 0 would collapse the z denominator to
+    // EPS and report confidence 1.0 on every row.
+    if (p.is_dead() || !std::isfinite(raw)) {
         er = 0.0;
         conf = 0.0;
         return;
@@ -178,20 +208,48 @@ bool fx_solve_factors(const std::array<double, FX_NUM_PAIRS>& returns,
     return true;
 }
 
+std::array<bool, FX_NUM_PAIRS> fx05_identified_pairs(
+    const std::array<bool, FX_NUM_PAIRS>& observable) {
+    const auto a = fx_free_exposure_matrix();
+    std::array<int, FX_NUM_FREE_CCY> counts{};
+    for (std::size_t i = 0; i < FX_NUM_PAIRS; ++i) {
+        if (!observable[i]) continue;
+        for (std::size_t j = 0; j < FX_NUM_FREE_CCY; ++j) {
+            if (a[i][j] != 0.0) ++counts[j];
+        }
+    }
+    std::array<bool, FX_NUM_PAIRS> out{};
+    for (std::size_t i = 0; i < FX_NUM_PAIRS; ++i) {
+        if (!observable[i]) continue;
+        bool ok = true;
+        for (std::size_t j = 0; j < FX_NUM_FREE_CCY; ++j) {
+            if (a[i][j] != 0.0 && counts[j] < 2) {
+                ok = false;
+                break;
+            }
+        }
+        out[i] = ok;
+    }
+    return out;
+}
+
 std::array<double, FX_NUM_PAIRS> fx05_raw_signals(
     const std::array<double, FX_NUM_PAIRS>& returns) {
     std::array<double, FX_NUM_PAIRS> raw;
     raw.fill(kNaN);
+    std::array<bool, FX_NUM_PAIRS> observable{};
     int nvalid = 0;
-    for (double r : returns) {
-        if (std::isfinite(r)) ++nvalid;
+    for (std::size_t i = 0; i < FX_NUM_PAIRS; ++i) {
+        observable[i] = std::isfinite(returns[i]);
+        if (observable[i]) ++nvalid;
     }
     if (nvalid < 2) return raw;  // no cross-pair information
+    const auto identified = fx05_identified_pairs(observable);
     std::array<double, FX_NUM_FREE_CCY> factors;
     std::array<double, FX_NUM_PAIRS> fitted;
     fx_solve_factors(returns, factors, fitted);
     for (std::size_t i = 0; i < FX_NUM_PAIRS; ++i) {
-        if (std::isfinite(returns[i])) {
+        if (identified[i]) {
             raw[i] = -(returns[i] - fitted[i]);
         }
     }

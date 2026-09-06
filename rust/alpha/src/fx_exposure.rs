@@ -202,19 +202,54 @@ pub fn solve_factor_returns(
     Ok((f, fitted))
 }
 
+/// Which observable pairs carry IDENTIFIABLE relative-value information
+/// (pinned, API_ALPHA.md §5): a pair is identified iff every FREE currency
+/// it touches appears in at least two observable pairs.  A currency seen in
+/// a single observable pair has its factor absorb that pair's whole return,
+/// so the residual is 0 by construction — a constant, not a signal.
+pub fn identified_pairs(pair_ids: &[u32], observable: &[bool]) -> Result<Vec<bool>, IapError> {
+    let rows = free_exposure_matrix(pair_ids)?;
+    let mut counts = [0usize; N_FREE];
+    for (i, row) in rows.iter().enumerate() {
+        if !observable[i] {
+            continue;
+        }
+        for (j, &a) in row.iter().enumerate() {
+            if a != 0.0 {
+                counts[j] += 1;
+            }
+        }
+    }
+    Ok(rows
+        .iter()
+        .enumerate()
+        .map(|(i, row)| {
+            observable[i]
+                && row
+                    .iter()
+                    .enumerate()
+                    .all(|(j, &a)| a == 0.0 || counts[j] >= 2)
+        })
+        .collect())
+}
+
 /// FX05 raw signals for one grid cross-section: `-(r_i - fitted_i)` per
-/// pair, NaN where the pair's own return is NaN or fewer than 2 pairs are
-/// valid (API_ALPHA.md §5).
+/// IDENTIFIED pair, NaN where the pair's own return is NaN, fewer than 2
+/// pairs are valid, or the pair carries no identifiable relative value
+/// (API_ALPHA.md §5).
 pub fn fx05_raw_signals(pair_ids: &[u32], returns: &[f64]) -> Result<Vec<f64>, IapError> {
-    let n_valid = returns.iter().filter(|v| v.is_finite()).count();
+    let observable: Vec<bool> = returns.iter().map(|v| v.is_finite()).collect();
+    let n_valid = observable.iter().filter(|&&v| v).count();
     if n_valid < 2 {
         return Ok(vec![f64::NAN; returns.len()]);
     }
+    let ident = identified_pairs(pair_ids, &observable)?;
     let (_, fitted) = solve_factor_returns(pair_ids, returns)?;
     Ok(returns
         .iter()
         .zip(fitted.iter())
-        .map(|(&r, &fit)| if r.is_finite() { -(r - fit) } else { f64::NAN })
+        .zip(ident.iter())
+        .map(|((&r, &fit), &id)| if id { -(r - fit) } else { f64::NAN })
         .collect())
 }
 
@@ -286,6 +321,37 @@ mod tests {
         returns[4] = f64::NAN;
         let sig = fx05_raw_signals(&ALL_PAIRS, &returns).unwrap();
         assert!(sig[4].is_nan());
-        assert!(sig.iter().enumerate().all(|(i, v)| i == 4 || v.is_finite()));
+        // only the identified triangle (EUR/USD, GBP/USD, EUR/GBP) scores
+        for (i, v) in sig.iter().enumerate() {
+            let identified = i == 0 || i == 1 || i == 7;
+            assert_eq!(v.is_finite(), identified, "pair index {i}");
+        }
+    }
+
+    #[test]
+    fn only_pairs_with_a_shared_currency_are_identified() {
+        // AUD, CAD, CHF, JPY and NZD each appear in ONE pair: their factor
+        // absorbs the whole return, so the residual is 0 by construction.
+        let obs = [true; 8];
+        let ident = identified_pairs(&ALL_PAIRS, &obs).unwrap();
+        assert_eq!(
+            ident,
+            vec![true, true, false, false, false, false, false, true]
+        );
+        // the EUR/USD-GBP/USD-EUR/GBP triangle alone is identified
+        let tri = [101u32, 102, 108];
+        assert_eq!(
+            identified_pairs(&tri, &[true; 3]).unwrap(),
+            vec![true, true, true]
+        );
+        // two unrelated pairs carry no cross-pair information
+        assert_eq!(
+            identified_pairs(&[101u32, 103], &[true; 2]).unwrap(),
+            vec![false, false]
+        );
+        // a degenerate signal is NaN, never a constant
+        let returns = vec![0.001; 8];
+        let sig = fx05_raw_signals(&ALL_PAIRS, &returns).unwrap();
+        assert!(sig[2].is_nan() && sig[3].is_nan());
     }
 }

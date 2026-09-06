@@ -45,6 +45,33 @@ NUMERAIRE = "USD"
 FREE_CURRENCIES: Tuple[str, ...] = tuple(c for c in CURRENCIES if c != NUMERAIRE)
 
 
+def identified_pairs(pair_ids: Sequence[int], observable: Sequence[bool]) -> np.ndarray:
+    """Which observable pairs carry IDENTIFIABLE relative-value information.
+
+    Pinned (API_ALPHA §5, round-3).  The factor solve pins USD and fits one
+    free factor per remaining currency.  A currency that appears in exactly
+    ONE observable pair has its factor absorb that pair's whole return, so
+    the pair's residual is 0 **by construction** — a constant, not a signal.
+    On this universe AUD, CAD, CHF, JPY and NZD each appear in a single
+    pair, so five of the eight pairs had a constant FX05 signal (raw = -0,
+    z = -mu/sigma, a small non-zero expected return on every row) and their
+    "IC" was pooled into the headline number.
+
+    A pair is identified iff every FREE currency it touches appears in at
+    least two observable pairs.  Everything else scores NaN (confidence 0).
+    """
+    a = exposure_matrix(pair_ids)
+    free = [j for j, c in enumerate(CURRENCIES) if c != NUMERAIRE]
+    obs = np.asarray(observable, dtype=bool)
+    counts = {j: int(np.sum(obs & (a[:, j] != 0.0))) for j in free}
+    out = np.zeros(len(pair_ids), dtype=bool)
+    for i in range(len(pair_ids)):
+        if not obs[i]:
+            continue
+        out[i] = all(counts[j] >= 2 for j in free if a[i, j] != 0.0)
+    return out
+
+
 def exposure_matrix(pair_ids: Sequence[int]) -> np.ndarray:
     """A[i, j] = exposure of pair i to currency j (all currencies, sorted)."""
     a = np.zeros((len(pair_ids), len(CURRENCIES)))
@@ -114,6 +141,15 @@ class FX05CrossPairRelativeValue(CrossSectionalLinearAlpha):
     minimum-norm solution attributes shared moves to factors first, so a
     lone pair has residual 0 (no relative-value information — honest
     degradation).
+
+    **Universe (pinned, round-3)**: only pairs whose every free currency
+    appears in at least two observable pairs are scored
+    (:func:`identified_pairs`).  A currency seen in a single pair has its
+    factor absorb that pair's whole return, so the residual is 0 by
+    construction — on this universe that is AUD/USD, USD/CAD, USD/CHF,
+    USD/JPY and NZD/USD; only the EUR/USD-GBP/USD-EUR/GBP triangle carries
+    cross-pair information.  Those five pairs score NaN (confidence 0)
+    instead of a constant.
     """
 
     alpha_id = "FX05"
@@ -139,9 +175,12 @@ class FX05CrossPairRelativeValue(CrossSectionalLinearAlpha):
             ok = np.isfinite(r)
             if ok.sum() < 2:
                 continue
+            ident = identified_pairs(self._pair_ids, ok)
+            if not ident.any():
+                continue
             _, fitted = solve_factor_returns(self._pair_ids, r)
             resid = r - fitted
-            sig[ok, t] = -resid[ok]
+            sig[ident, t] = -resid[ident]
         return sig
 
 

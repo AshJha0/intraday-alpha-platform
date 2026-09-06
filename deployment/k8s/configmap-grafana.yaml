@@ -33,1617 +33,460 @@ metadata:
     app.kubernetes.io/component: config
     app.kubernetes.io/managed-by: generate-configmaps
 data:
-  market_data_latency.json: |
-    {
-      "uid": "iap-md-latency",
-      "title": "Market Data & Latency",
-      "description": "Feed health, stream QC and hot-path tail latency (spec \u00a722/\u00a725). Metric mapping: deployment/grafana/README.md.",
-      "tags": [
-        "iap",
-        "market-data",
-        "latency"
-      ],
-      "schemaVersion": 39,
-      "version": 1,
-      "editable": false,
-      "graphTooltip": 1,
-      "timezone": "utc",
-      "time": {
-        "from": "now-6h",
-        "to": "now"
-      },
-      "refresh": "30s",
-      "annotations": {
-        "list": []
-      },
-      "templating": {
-        "list": []
-      },
-      "panels": [
-        {
-          "id": 1,
-          "type": "stat",
-          "title": "Feed status (events in last 1m)",
-          "description": "0 for >5s trips the StaleFeed page (risk.json stale_feed_timeout_ns).",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "gridPos": {
-            "h": 4,
-            "w": 6,
-            "x": 0,
-            "y": 0
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "ops",
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "red",
-                    "value": null
-                  },
-                  {
-                    "color": "green",
-                    "value": 0.001
-                  }
-                ]
-              }
-            },
-            "overrides": []
-          },
-          "options": {
-            "colorMode": "background",
-            "graphMode": "area",
-            "reduceOptions": {
-              "calcs": [
-                "lastNotNull"
-              ],
-              "fields": "",
-              "values": false
-            },
-            "textMode": "auto"
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "expr": "sum(rate(md_events_total[1m])) + sum(rate(venue_market_events_total[1m])) or vector(0)",
-              "legendFormat": "events/s",
-              "refId": "A"
-            }
-          ]
-        },
-        {
-          "id": 2,
-          "type": "stat",
-          "title": "Sequence gap rate (5m)",
-          "description": "Any sustained gaps => books stale; SequenceGapRate alert at 0.1/s.",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "gridPos": {
-            "h": 4,
-            "w": 6,
-            "x": 6,
-            "y": 0
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "ops",
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "orange",
-                    "value": 0.01
-                  },
-                  {
-                    "color": "red",
-                    "value": 0.1
-                  }
-                ]
-              }
-            },
-            "overrides": []
-          },
-          "options": {
-            "colorMode": "background",
-            "graphMode": "area",
-            "reduceOptions": {
-              "calcs": [
-                "lastNotNull"
-              ],
-              "fields": "",
-              "values": false
-            },
-            "textMode": "auto"
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "expr": "sum(job:md_sequence_gaps:rate5m)",
-              "legendFormat": "gaps/s",
-              "refId": "A"
-            }
-          ]
-        },
-        {
-          "id": 3,
-          "type": "stat",
-          "title": "Queue depth (event bus) \u2014 PLACEHOLDER",
-          "description": "PLACEHOLDER: no producer emits eventbus_queue_depth yet (rust eventbus has no exporter wired) \u2014 renders No data. Contract: QueueDepthHigh alert at 100k. See deployment/grafana/README.md.",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "gridPos": {
-            "h": 4,
-            "w": 6,
-            "x": 12,
-            "y": 0
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "short",
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "orange",
-                    "value": 10000
-                  },
-                  {
-                    "color": "red",
-                    "value": 100000
-                  }
-                ]
-              }
-            },
-            "overrides": []
-          },
-          "options": {
-            "colorMode": "background",
-            "graphMode": "area",
-            "reduceOptions": {
-              "calcs": [
-                "lastNotNull"
-              ],
-              "fields": "",
-              "values": false
-            },
-            "textMode": "auto"
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "expr": "max(eventbus_queue_depth)",
-              "legendFormat": "events",
-              "refId": "A"
-            }
-          ]
-        },
-        {
-          "id": 4,
-          "type": "stat",
-          "title": "Venue ack p99 (live, rust)",
-          "description": "venue_ack_latency_ns from rust/venue sim \u2014 live today.",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "gridPos": {
-            "h": 4,
-            "w": 6,
-            "x": 18,
-            "y": 0
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "ns",
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  }
-                ]
-              }
-            },
-            "overrides": []
-          },
-          "options": {
-            "colorMode": "background",
-            "graphMode": "area",
-            "reduceOptions": {
-              "calcs": [
-                "lastNotNull"
-              ],
-              "fields": "",
-              "values": false
-            },
-            "textMode": "auto"
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "expr": "max(job:venue_ack_latency_ns:p99)",
-              "legendFormat": "p99 ns",
-              "refId": "A"
-            }
-          ]
-        },
-        {
-          "id": 10,
-          "type": "timeseries",
-          "title": "Market-data events/sec",
-          "description": "Normalized event throughput per service (spec \u00a725 market-data health).",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 0,
-            "y": 4
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "ops",
-              "custom": {
-                "drawStyle": "line",
-                "lineWidth": 1,
-                "fillOpacity": 8,
-                "showPoints": "never",
-                "spanNulls": true
-              }
-            },
-            "overrides": []
-          },
-          "options": {
-            "legend": {
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "tooltip": {
-              "mode": "multi",
-              "sort": "desc"
-            }
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "expr": "job:md_events:rate5m",
-              "legendFormat": "md {{service}} (java)",
-              "refId": "A"
-            },
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "expr": "job:venue_market_events:rate5m",
-              "legendFormat": "venue {{service}} (rust, live)",
-              "refId": "B"
-            }
-          ]
-        },
-        {
-          "id": 11,
-          "type": "timeseries",
-          "title": "Stream QC: gaps / duplicates / out-of-order (per sec)",
-          "description": "Gap/duplicate counters are LIVE from the java platform (mirroring qc_report.json fields); the out-of-order series is PLACEHOLDER \u2014 md_out_of_order_total has no producer yet and renders No data.",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 12,
-            "y": 4
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "ops",
-              "custom": {
-                "drawStyle": "line",
-                "lineWidth": 1,
-                "fillOpacity": 8,
-                "showPoints": "never",
-                "spanNulls": true
-              }
-            },
-            "overrides": []
-          },
-          "options": {
-            "legend": {
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "tooltip": {
-              "mode": "multi",
-              "sort": "desc"
-            }
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "expr": "job:md_sequence_gaps:rate5m",
-              "legendFormat": "sequence gaps {{service}}",
-              "refId": "A"
-            },
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "expr": "job:md_duplicates:rate5m",
-              "legendFormat": "duplicates {{service}}",
-              "refId": "B"
-            },
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "expr": "job:md_out_of_order:rate5m",
-              "legendFormat": "out-of-order {{service}}",
-              "refId": "C"
-            }
-          ]
-        },
-        {
-          "id": 12,
-          "type": "timeseries",
-          "title": "Decode latency (p50/p99/p999)",
-          "description": "Log2 buckets: quantiles are upper bounds within one power of two (telemetry crate doc).",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 8,
-            "x": 0,
-            "y": 12
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "ns",
-              "custom": {
-                "drawStyle": "line",
-                "lineWidth": 1,
-                "fillOpacity": 8,
-                "showPoints": "never",
-                "spanNulls": true
-              }
-            },
-            "overrides": []
-          },
-          "options": {
-            "legend": {
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "tooltip": {
-              "mode": "multi",
-              "sort": "desc"
-            }
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "expr": "job:decode_latency_ns:p50",
-              "legendFormat": "p50",
-              "refId": "A"
-            },
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "expr": "job:decode_latency_ns:p99",
-              "legendFormat": "p99",
-              "refId": "B"
-            },
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "expr": "job:decode_latency_ns:p999",
-              "legendFormat": "p999",
-              "refId": "C"
-            }
-          ]
-        },
-        {
-          "id": 13,
-          "type": "timeseries",
-          "title": "Book update latency (p50/p99/p999)",
-          "description": "",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 8,
-            "x": 8,
-            "y": 12
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "ns",
-              "custom": {
-                "drawStyle": "line",
-                "lineWidth": 1,
-                "fillOpacity": 8,
-                "showPoints": "never",
-                "spanNulls": true
-              }
-            },
-            "overrides": []
-          },
-          "options": {
-            "legend": {
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "tooltip": {
-              "mode": "multi",
-              "sort": "desc"
-            }
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "expr": "job:book_update_latency_ns:p50",
-              "legendFormat": "p50",
-              "refId": "A"
-            },
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "expr": "job:book_update_latency_ns:p99",
-              "legendFormat": "p99",
-              "refId": "B"
-            },
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "expr": "job:book_update_latency_ns:p999",
-              "legendFormat": "p999",
-              "refId": "C"
-            }
-          ]
-        },
-        {
-          "id": 14,
-          "type": "timeseries",
-          "title": "Order path latency decision-to-wire (p50/p99/p999)",
-          "description": "",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 8,
-            "x": 16,
-            "y": 12
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "ns",
-              "custom": {
-                "drawStyle": "line",
-                "lineWidth": 1,
-                "fillOpacity": 8,
-                "showPoints": "never",
-                "spanNulls": true
-              }
-            },
-            "overrides": []
-          },
-          "options": {
-            "legend": {
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "tooltip": {
-              "mode": "multi",
-              "sort": "desc"
-            }
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "expr": "job:order_path_latency_ns:p50",
-              "legendFormat": "p50",
-              "refId": "A"
-            },
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "expr": "job:order_path_latency_ns:p99",
-              "legendFormat": "p99",
-              "refId": "B"
-            },
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "expr": "job:order_path_latency_ns:p999",
-              "legendFormat": "p999",
-              "refId": "C"
-            }
-          ]
-        },
-        {
-          "id": 15,
-          "type": "timeseries",
-          "title": "Event-bus queue depth \u2014 PLACEHOLDER",
-          "description": "PLACEHOLDER: no producer emits eventbus_queue_depth yet \u2014 renders No data. Contract: producer minus consumer backlog; sustained growth = consumer stall.",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 0,
-            "y": 20
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "short",
-              "custom": {
-                "drawStyle": "line",
-                "lineWidth": 1,
-                "fillOpacity": 8,
-                "showPoints": "never",
-                "spanNulls": true
-              }
-            },
-            "overrides": []
-          },
-          "options": {
-            "legend": {
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "tooltip": {
-              "mode": "multi",
-              "sort": "desc"
-            }
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "expr": "eventbus_queue_depth",
-              "legendFormat": "{{service}}",
-              "refId": "A"
-            }
-          ]
-        },
-        {
-          "id": 16,
-          "type": "timeseries",
-          "title": "JVM GC pause p99",
-          "description": "GcPauseHigh alert at 10ms sustained 5m (spec \u00a723).",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 12,
-            "y": 20
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "ns",
-              "custom": {
-                "drawStyle": "line",
-                "lineWidth": 1,
-                "fillOpacity": 8,
-                "showPoints": "never",
-                "spanNulls": true
-              }
-            },
-            "overrides": []
-          },
-          "options": {
-            "legend": {
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "tooltip": {
-              "mode": "multi",
-              "sort": "desc"
-            }
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "expr": "job:jvm_gc_pause_ns:p99",
-              "legendFormat": "gc p99 {{job}}",
-              "refId": "A"
-            }
-          ]
-        }
-      ]
-    }
-  trading_risk.json: |
-    {
-     "uid": "iap-trading-risk",
-     "title": "Trading & Risk",
-     "description": "Alpha health, execution quality and hard-risk state (spec \u00a725). Metric mapping: deployment/grafana/README.md.",
-     "tags": [
-      "iap",
-      "trading",
-      "risk"
-     ],
-     "schemaVersion": 39,
-     "version": 1,
-     "editable": false,
-     "graphTooltip": 1,
-     "timezone": "utc",
-     "time": {
-      "from": "now-6h",
-      "to": "now"
-     },
-     "refresh": "30s",
-     "annotations": {
-      "list": []
-     },
-     "templating": {
-      "list": []
-     },
-     "panels": [
-      {
-       "id": 101,
-       "type": "stat",
-       "title": "Kill switch",
-       "description": "Latched by rust/risk on loss-limit breach (fail-closed). risk_kill_switch_engaged is LIVE from both the rust engine and the java platform.",
-       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-       },
-       "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 0,
-        "y": 0
-       },
-       "fieldConfig": {
-        "defaults": {
-         "unit": "short",
-         "mappings": [
-          {
-           "type": "value",
-           "options": {
-            "0": {
-             "text": "ARMED / TRADING",
-             "color": "green"
-            },
-            "1": {
-             "text": "ENGAGED \u2014 HALTED",
-             "color": "red"
-            }
-           }
-          }
-         ],
-         "thresholds": {
-          "mode": "absolute",
-          "steps": [
-           {
-            "color": "green",
-            "value": null
-           },
-           {
-            "color": "red",
-            "value": 1
-           }
-          ]
-         }
-        },
-        "overrides": []
-       },
-       "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "reduceOptions": {
-         "calcs": [
-          "lastNotNull"
-         ],
-         "fields": "",
-         "values": false
-        },
-        "textMode": "auto"
-       },
-       "targets": [
-        {
-         "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-         },
-         "expr": "max(risk_kill_switch_engaged) or vector(0)",
-         "legendFormat": "engaged",
-         "refId": "A"
-        }
-       ]
-      },
-      {
-       "id": 102,
-       "type": "stat",
-       "title": "Realized P&L (live, rust)",
-       "description": "risk_realized_pnl gauge from rust/risk \u2014 live today.",
-       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-       },
-       "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 6,
-        "y": 0
-       },
-       "fieldConfig": {
-        "defaults": {
-         "unit": "currencyUSD",
-         "mappings": [],
-         "thresholds": {
-          "mode": "absolute",
-          "steps": [
-           {
-            "color": "red",
-            "value": null
-           },
-           {
-            "color": "green",
-            "value": 0
-           }
-          ]
-         }
-        },
-        "overrides": []
-       },
-       "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "reduceOptions": {
-         "calcs": [
-          "lastNotNull"
-         ],
-         "fields": "",
-         "values": false
-        },
-        "textMode": "auto"
-       },
-       "targets": [
-        {
-         "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-         },
-         "expr": "sum(risk_realized_pnl)",
-         "legendFormat": "PnL",
-         "refId": "A"
-        }
-       ]
-      },
-      {
-       "id": 103,
-       "type": "stat",
-       "title": "Daily loss-limit utilization",
-       "description": "Against configs/risk.json global.max_daily_loss=250k; page at 75%.",
-       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-       },
-       "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 12,
-        "y": 0
-       },
-       "fieldConfig": {
-        "defaults": {
-         "unit": "percentunit",
-         "mappings": [],
-         "thresholds": {
-          "mode": "absolute",
-          "steps": [
-           {
-            "color": "green",
-            "value": null
-           },
-           {
-            "color": "orange",
-            "value": 0.5
-           },
-           {
-            "color": "red",
-            "value": 0.75
-           }
-          ]
-         }
-        },
-        "overrides": []
-       },
-       "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "reduceOptions": {
-         "calcs": [
-          "lastNotNull"
-         ],
-         "fields": "",
-         "values": false
-        },
-        "textMode": "auto"
-       },
-       "targets": [
-        {
-         "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-         },
-         "expr": "clamp_min(-sum(risk_realized_pnl), 0) / 250000",
-         "legendFormat": "of max_daily_loss",
-         "refId": "A"
-        }
-       ]
-      },
-      {
-       "id": 104,
-       "type": "stat",
-       "title": "Fill rate (5m)",
-       "description": "venue_fills_total / venue_orders_accepted_total (rust venue sim \u2014 live).",
-       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-       },
-       "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 18,
-        "y": 0
-       },
-       "fieldConfig": {
-        "defaults": {
-         "unit": "percentunit",
-         "mappings": [],
-         "thresholds": {
-          "mode": "absolute",
-          "steps": [
-           {
-            "color": "green",
-            "value": null
-           }
-          ]
-         }
-        },
-        "overrides": []
-       },
-       "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "reduceOptions": {
-         "calcs": [
-          "lastNotNull"
-         ],
-         "fields": "",
-         "values": false
-        },
-        "textMode": "auto"
-       },
-       "targets": [
-        {
-         "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-         },
-         "expr": "avg(job:fill_rate:ratio5m)",
-         "legendFormat": "fills/accepted",
-         "refId": "A"
-        }
-       ]
-      },
-      {
-       "id": 110,
-       "type": "timeseries",
-       "title": "Alpha signal rate",
-       "description": "SignalRateCollapse alert fires below 20% of the 1h-ago baseline.",
-       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-       },
-       "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 4
-       },
-       "fieldConfig": {
-        "defaults": {
-         "unit": "ops",
-         "custom": {
-          "drawStyle": "line",
-          "lineWidth": 1,
-          "fillOpacity": 8,
-          "showPoints": "never",
-          "spanNulls": true
-         }
-        },
-        "overrides": []
-       },
-       "options": {
-        "legend": {
-         "displayMode": "list",
-         "placement": "bottom",
-         "showLegend": true
-        },
-        "tooltip": {
-         "mode": "multi",
-         "sort": "desc"
-        }
-       },
-       "targets": [
-        {
-         "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-         },
-         "expr": "job:alpha_signals:rate5m",
-         "legendFormat": "signals/s {{service}}",
-         "refId": "A"
-        }
-       ]
-      },
-      {
-       "id": 111,
-       "type": "timeseries",
-       "title": "Order flow & fills",
-       "description": "",
-       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-       },
-       "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 4
-       },
-       "fieldConfig": {
-        "defaults": {
-         "unit": "ops",
-         "custom": {
-          "drawStyle": "line",
-          "lineWidth": 1,
-          "fillOpacity": 8,
-          "showPoints": "never",
-          "spanNulls": true
-         }
-        },
-        "overrides": []
-       },
-       "options": {
-        "legend": {
-         "displayMode": "list",
-         "placement": "bottom",
-         "showLegend": true
-        },
-        "tooltip": {
-         "mode": "multi",
-         "sort": "desc"
-        }
-       },
-       "targets": [
-        {
-         "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-         },
-         "expr": "job:venue_orders:rate5m",
-         "legendFormat": "orders/s {{service}}",
-         "refId": "A"
-        },
-        {
-         "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-         },
-         "expr": "sum by (service) (rate(venue_fills_total[5m]))",
-         "legendFormat": "fills/s {{service}}",
-         "refId": "B"
-        },
-        {
-         "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-         },
-         "expr": "sum by (service) (rate(venue_orders_rejected_total[5m]))",
-         "legendFormat": "venue rejects/s {{service}}",
-         "refId": "C"
-        }
-       ]
-      },
-      {
-       "id": 112,
-       "type": "timeseries",
-       "title": "Fill rate",
-       "description": "FillRateDrop alert below half of the 1h-ago baseline.",
-       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-       },
-       "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 12
-       },
-       "fieldConfig": {
-        "defaults": {
-         "unit": "percentunit",
-         "custom": {
-          "drawStyle": "line",
-          "lineWidth": 1,
-          "fillOpacity": 8,
-          "showPoints": "never",
-          "spanNulls": true
-         }
-        },
-        "overrides": []
-       },
-       "options": {
-        "legend": {
-         "displayMode": "list",
-         "placement": "bottom",
-         "showLegend": true
-        },
-        "tooltip": {
-         "mode": "multi",
-         "sort": "desc"
-        }
-       },
-       "targets": [
-        {
-         "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-         },
-         "expr": "job:fill_rate:ratio5m",
-         "legendFormat": "{{service}}",
-         "refId": "A"
-        }
-       ]
-      },
-      {
-       "id": 113,
-       "type": "timeseries",
-       "title": "Slippage vs arrival \u2014 PLACEHOLDER",
-       "description": "PLACEHOLDER: exec_slippage_bps / tca_arrival_cost_bps have no producer yet (the live java endpoint does not export them) \u2014 renders No data. TCA definitions per spec \u00a719.",
-       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-       },
-       "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 12
-       },
-       "fieldConfig": {
-        "defaults": {
-         "unit": "none",
-         "custom": {
-          "drawStyle": "line",
-          "lineWidth": 1,
-          "fillOpacity": 8,
-          "showPoints": "never",
-          "spanNulls": true
-         }
-        },
-        "overrides": []
-       },
-       "options": {
-        "legend": {
-         "displayMode": "list",
-         "placement": "bottom",
-         "showLegend": true
-        },
-        "tooltip": {
-         "mode": "multi",
-         "sort": "desc"
-        }
-       },
-       "targets": [
-        {
-         "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-         },
-         "expr": "exec_slippage_bps",
-         "legendFormat": "slippage bps {{service}}",
-         "refId": "A"
-        },
-        {
-         "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-         },
-         "expr": "tca_arrival_cost_bps",
-         "legendFormat": "arrival cost bps {{service}}",
-         "refId": "B"
-        }
-       ]
-      },
-      {
-       "id": 114,
-       "type": "timeseries",
-       "title": "Risk decisions",
-       "description": "risk_decisions_total / risk_rejected_total from rust/risk \u2014 live.",
-       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-       },
-       "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 12
-       },
-       "fieldConfig": {
-        "defaults": {
-         "unit": "short",
-         "custom": {
-          "drawStyle": "line",
-          "lineWidth": 1,
-          "fillOpacity": 8,
-          "showPoints": "never",
-          "spanNulls": true
-         }
-        },
-        "overrides": []
-       },
-       "options": {
-        "legend": {
-         "displayMode": "list",
-         "placement": "bottom",
-         "showLegend": true
-        },
-        "tooltip": {
-         "mode": "multi",
-         "sort": "desc"
-        }
-       },
-       "targets": [
-        {
-         "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-         },
-         "expr": "job:risk_decisions:rate5m",
-         "legendFormat": "decisions/s {{service}}",
-         "refId": "A"
-        },
-        {
-         "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-         },
-         "expr": "job:risk_rejected:ratio5m",
-         "legendFormat": "rejected ratio {{service}}",
-         "refId": "B"
-        }
-       ]
-      },
-      {
-       "id": 115,
-       "type": "timeseries",
-       "title": "Exposure & limit utilization",
-       "description": "LIVE java gauges (portfolio_gross_notional / portfolio_net_notional); limits pinned from configs/risk.json global.*.",
-       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-       },
-       "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 20
-       },
-       "fieldConfig": {
-        "defaults": {
-         "unit": "short",
-         "custom": {
-          "drawStyle": "line",
-          "lineWidth": 1,
-          "fillOpacity": 8,
-          "showPoints": "never",
-          "spanNulls": true
-         }
-        },
-        "overrides": []
-       },
-       "options": {
-        "legend": {
-         "displayMode": "list",
-         "placement": "bottom",
-         "showLegend": true
-        },
-        "tooltip": {
-         "mode": "multi",
-         "sort": "desc"
-        }
-       },
-       "targets": [
-        {
-         "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-         },
-         "expr": "portfolio_gross_notional",
-         "legendFormat": "gross notional {{service}}",
-         "refId": "A"
-        },
-        {
-         "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-         },
-         "expr": "portfolio_net_notional",
-         "legendFormat": "net notional {{service}}",
-         "refId": "B"
-        },
-        {
-         "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-         },
-         "expr": "portfolio_gross_notional / 5000000",
-         "legendFormat": "gross limit util (5.0M)",
-         "refId": "C"
-        },
-        {
-         "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-         },
-         "expr": "portfolio_net_notional / 2500000",
-         "legendFormat": "net limit util (2.5M)",
-         "refId": "D"
-        }
-       ]
-      },
-      {
-       "id": 116,
-       "type": "timeseries",
-       "title": "P&L and drawdown",
-       "description": "Drawdown = peak-to-trough of cumulative PnL. risk_realized_pnl and portfolio_drawdown are LIVE from the java platform (and risk_realized_pnl from rust/risk).",
-       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-       },
-       "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 20
-       },
-       "fieldConfig": {
-        "defaults": {
-         "unit": "currencyUSD",
-         "custom": {
-          "drawStyle": "line",
-          "lineWidth": 1,
-          "fillOpacity": 8,
-          "showPoints": "never",
-          "spanNulls": true
-         }
-        },
-        "overrides": []
-       },
-       "options": {
-        "legend": {
-         "displayMode": "list",
-         "placement": "bottom",
-         "showLegend": true
-        },
-        "tooltip": {
-         "mode": "multi",
-         "sort": "desc"
-        }
-       },
-       "targets": [
-        {
-         "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-         },
-         "expr": "sum(risk_realized_pnl)",
-         "legendFormat": "realized PnL (live)",
-         "refId": "A"
-        },
-        {
-         "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-         },
-         "expr": "portfolio_drawdown",
-         "legendFormat": "drawdown {{service}}",
-         "refId": "B"
-        }
-       ]
-      },
-      {
-       "id": 117,
-       "type": "timeseries",
-       "title": "Live vs backtest drift (PSI)",
-       "description": "LIVE from java (com.iap.adaptive.DriftMonitor): Population Stability Index of the rolling live signal window vs the research baseline (research/baselines/*.json, API_ADAPTIVE.md), labeled {alpha=...}. Industry rule of thumb: < 0.1 stable, 0.1-0.25 moderate, > 0.25 significant shift - the LiveVsBacktestDrift warning threshold (deployment/prometheus/alerts.yml).",
-       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-       },
-       "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 28
-       },
-       "fieldConfig": {
-        "defaults": {
-         "unit": "none",
-         "min": 0,
-         "custom": {
-          "drawStyle": "line",
-          "lineWidth": 1,
-          "fillOpacity": 8,
-          "showPoints": "never",
-          "spanNulls": true,
-          "thresholdsStyle": {
-           "mode": "line"
-          }
-         },
-         "thresholds": {
-          "mode": "absolute",
-          "steps": [
-           {
-            "color": "green",
-            "value": null
-           },
-           {
-            "color": "yellow",
-            "value": 0.1
-           },
-           {
-            "color": "red",
-            "value": 0.25
-           }
-          ]
-         }
-        },
-        "overrides": []
-       },
-       "options": {
-        "legend": {
-         "displayMode": "list",
-         "placement": "bottom",
-         "showLegend": true
-        },
-        "tooltip": {
-         "mode": "multi",
-         "sort": "desc"
-        }
-       },
-       "targets": [
-        {
-         "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-         },
-         "expr": "alpha_live_vs_backtest_drift",
-         "legendFormat": "PSI {{alpha}}",
-         "refId": "A"
-        }
-       ]
-      },
-      {
-       "id": 118,
-       "type": "timeseries",
-       "title": "Rolling realized IC",
-       "description": "LIVE from java (com.iap.adaptive.RollingIc): Pearson correlation of the live signal vs the subsequent mid return over the alpha's pinned horizon, rolling 256-pair window, event-time and lookahead-free. IC < 0 puts the alpha on WATCH, IC < -0.05 retires it (alpha_lifecycle_state).",
-       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-       },
-       "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 28
-       },
-       "fieldConfig": {
-        "defaults": {
-         "unit": "none",
-         "min": -1,
-         "max": 1,
-         "custom": {
-          "drawStyle": "line",
-          "lineWidth": 1,
-          "fillOpacity": 8,
-          "showPoints": "never",
-          "spanNulls": true
-         }
-        },
-        "overrides": []
-       },
-       "options": {
-        "legend": {
-         "displayMode": "list",
-         "placement": "bottom",
-         "showLegend": true
-        },
-        "tooltip": {
-         "mode": "multi",
-         "sort": "desc"
-        }
-       },
-       "targets": [
-        {
-         "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-         },
-         "expr": "alpha_rolling_ic",
-         "legendFormat": "IC {{alpha}}",
-         "refId": "A"
-        }
-       ]
-      },
-      {
-       "id": 119,
-       "type": "stat",
-       "title": "Alpha lifecycle",
-       "description": "LIVE from java (com.iap.adaptive.LifecycleGauge): 0=ACTIVE, 1=WATCH, 2=RETIRED per the pinned PSI (0.10/0.25) and rolling-IC (0.0/-0.05) thresholds (API_ADAPTIVE.md lifecycle rules).",
-       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-       },
-       "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 28
-       },
-       "fieldConfig": {
-        "defaults": {
-         "unit": "none",
-         "mappings": [
-          {
-           "type": "value",
-           "options": {
-            "0": {
-             "text": "ACTIVE",
-             "color": "green",
-             "index": 0
-            },
-            "1": {
-             "text": "WATCH",
-             "color": "yellow",
-             "index": 1
-            },
-            "2": {
-             "text": "RETIRED",
-             "color": "red",
-             "index": 2
-            }
-           }
-          }
-         ],
-         "thresholds": {
-          "mode": "absolute",
-          "steps": [
-           {
-            "color": "green",
-            "value": null
-           }
-          ]
-         }
-        },
-        "overrides": []
-       },
-       "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "textMode": "value_and_name",
-        "reduceOptions": {
-         "calcs": [
-          "lastNotNull"
-         ]
-        }
-       },
-       "targets": [
-        {
-         "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-         },
-         "expr": "alpha_lifecycle_state",
-         "legendFormat": "{{alpha}}",
-         "refId": "A"
-        }
-       ]
-      }
-     ]
-    }
+  market_data_latency.json: "{\n  \"uid\": \"iap-md-latency\",\n  \"title\": \"Market Data & Latency\"\
+    ,\n  \"description\": \"Feed health, stream QC and hot-path tail latency (spec \xA722/\xA725). Metric\
+    \ mapping: deployment/grafana/README.md.\",\n  \"tags\": [\n    \"iap\",\n    \"market-data\",\n \
+    \   \"latency\"\n  ],\n  \"schemaVersion\": 39,\n  \"version\": 1,\n  \"editable\": false,\n  \"graphTooltip\"\
+    : 1,\n  \"timezone\": \"utc\",\n  \"time\": {\n    \"from\": \"now-6h\",\n    \"to\": \"now\"\n  },\n\
+    \  \"refresh\": \"30s\",\n  \"annotations\": {\n    \"list\": []\n  },\n  \"templating\": {\n    \"\
+    list\": []\n  },\n  \"panels\": [\n    {\n      \"id\": 1,\n      \"type\": \"stat\",\n      \"title\"\
+    : \"Feed status (events in last 1m)\",\n      \"description\": \"Normalized market events/sec from\
+    \ the java platform. A 5s event-time gap trips the StaleFeed page (risk.json stale_feed_timeout_ns).\"\
+    ,\n      \"datasource\": {\n        \"type\": \"prometheus\",\n        \"uid\": \"prometheus\"\n \
+    \     },\n      \"gridPos\": {\n        \"h\": 4,\n        \"w\": 6,\n        \"x\": 0,\n        \"\
+    y\": 0\n      },\n      \"fieldConfig\": {\n        \"defaults\": {\n          \"unit\": \"ops\",\n\
+    \          \"mappings\": [],\n          \"thresholds\": {\n            \"mode\": \"absolute\",\n \
+    \           \"steps\": [\n              {\n                \"color\": \"red\",\n                \"\
+    value\": null\n              },\n              {\n                \"color\": \"green\",\n        \
+    \        \"value\": 0.001\n              }\n            ]\n          }\n        },\n        \"overrides\"\
+    : []\n      },\n      \"options\": {\n        \"colorMode\": \"background\",\n        \"graphMode\"\
+    : \"area\",\n        \"reduceOptions\": {\n          \"calcs\": [\n            \"lastNotNull\"\n \
+    \         ],\n          \"fields\": \"\",\n          \"values\": false\n        },\n        \"textMode\"\
+    : \"auto\"\n      },\n      \"targets\": [\n        {\n          \"datasource\": {\n            \"\
+    type\": \"prometheus\",\n            \"uid\": \"prometheus\"\n          },\n          \"expr\": \"\
+    sum(rate(md_events_total[1m])) or vector(0)\",\n          \"legendFormat\": \"events/s\",\n      \
+    \    \"refId\": \"A\"\n        }\n      ]\n    },\n    {\n      \"id\": 2,\n      \"type\": \"stat\"\
+    ,\n      \"title\": \"Sequence gap rate (5m)\",\n      \"description\": \"Any sustained gaps => books\
+    \ stale; SequenceGapRate alert at 0.1/s.\",\n      \"datasource\": {\n        \"type\": \"prometheus\"\
+    ,\n        \"uid\": \"prometheus\"\n      },\n      \"gridPos\": {\n        \"h\": 4,\n        \"\
+    w\": 6,\n        \"x\": 6,\n        \"y\": 0\n      },\n      \"fieldConfig\": {\n        \"defaults\"\
+    : {\n          \"unit\": \"ops\",\n          \"mappings\": [],\n          \"thresholds\": {\n    \
+    \        \"mode\": \"absolute\",\n            \"steps\": [\n              {\n                \"color\"\
+    : \"green\",\n                \"value\": null\n              },\n              {\n               \
+    \ \"color\": \"orange\",\n                \"value\": 0.01\n              },\n              {\n   \
+    \             \"color\": \"red\",\n                \"value\": 0.1\n              }\n            ]\n\
+    \          }\n        },\n        \"overrides\": []\n      },\n      \"options\": {\n        \"colorMode\"\
+    : \"background\",\n        \"graphMode\": \"area\",\n        \"reduceOptions\": {\n          \"calcs\"\
+    : [\n            \"lastNotNull\"\n          ],\n          \"fields\": \"\",\n          \"values\"\
+    : false\n        },\n        \"textMode\": \"auto\"\n      },\n      \"targets\": [\n        {\n \
+    \         \"datasource\": {\n            \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\
+    \n          },\n          \"expr\": \"sum(job:md_sequence_gaps:rate5m)\",\n          \"legendFormat\"\
+    : \"gaps/s\",\n          \"refId\": \"A\"\n        }\n      ]\n    },\n    {\n      \"id\": 3,\n \
+    \     \"type\": \"stat\",\n      \"title\": \"Session state\",\n      \"description\": \"platform_session_state:\
+    \ 0 STARTING, 1 RUNNING, 2 FINISHED, 3 FAILED (PLATFORM_CONVENTIONS.md \xA712.6). A paper session\
+    \ is finite: FINISHED is the normal terminal state.\",\n      \"datasource\": {\n        \"type\"\
+    : \"prometheus\",\n        \"uid\": \"prometheus\"\n      },\n      \"gridPos\": {\n        \"h\"\
+    : 4,\n        \"w\": 6,\n        \"x\": 12,\n        \"y\": 0\n      },\n      \"fieldConfig\": {\n\
+    \        \"defaults\": {\n          \"unit\": \"short\",\n          \"mappings\": [\n            {\n\
+    \              \"type\": \"value\",\n              \"options\": {\n                \"0\": {\n    \
+    \              \"text\": \"STARTING\",\n                  \"index\": 0\n                },\n     \
+    \           \"1\": {\n                  \"text\": \"RUNNING\",\n                  \"index\": 1\n \
+    \               },\n                \"2\": {\n                  \"text\": \"FINISHED\",\n        \
+    \          \"index\": 2\n                },\n                \"3\": {\n                  \"text\"\
+    : \"FAILED\",\n                  \"index\": 3\n                }\n              }\n            }\n\
+    \          ],\n          \"thresholds\": {\n            \"mode\": \"absolute\",\n            \"steps\"\
+    : [\n              {\n                \"color\": \"blue\",\n                \"value\": null\n    \
+    \          },\n              {\n                \"color\": \"green\",\n                \"value\":\
+    \ 1\n              },\n              {\n                \"color\": \"text\",\n                \"value\"\
+    : 2\n              },\n              {\n                \"color\": \"red\",\n                \"value\"\
+    : 3\n              }\n            ]\n          }\n        },\n        \"overrides\": []\n      },\n\
+    \      \"options\": {\n        \"colorMode\": \"background\",\n        \"graphMode\": \"area\",\n\
+    \        \"reduceOptions\": {\n          \"calcs\": [\n            \"lastNotNull\"\n          ],\n\
+    \          \"fields\": \"\",\n          \"values\": false\n        },\n        \"textMode\": \"auto\"\
+    \n      },\n      \"targets\": [\n        {\n          \"datasource\": {\n            \"type\": \"\
+    prometheus\",\n            \"uid\": \"prometheus\"\n          },\n          \"expr\": \"max(platform_session_state)\"\
+    ,\n          \"legendFormat\": \"state\",\n          \"refId\": \"A\"\n        }\n      ]\n    },\n\
+    \    {\n      \"id\": 4,\n      \"type\": \"stat\",\n      \"title\": \"Event-time gap (last event)\"\
+    ,\n      \"description\": \"md_event_time_gap_seconds \u2014 the gap between the last two consecutive\
+    \ processed events. This is the staleness signal StaleFeed alerts on; it is correct in replay AND\
+    \ live (PLATFORM_CONVENTIONS.md \xA712.6).\",\n      \"datasource\": {\n        \"type\": \"prometheus\"\
+    ,\n        \"uid\": \"prometheus\"\n      },\n      \"gridPos\": {\n        \"h\": 4,\n        \"\
+    w\": 6,\n        \"x\": 18,\n        \"y\": 0\n      },\n      \"fieldConfig\": {\n        \"defaults\"\
+    : {\n          \"unit\": \"s\",\n          \"mappings\": [],\n          \"thresholds\": {\n      \
+    \      \"mode\": \"absolute\",\n            \"steps\": [\n              {\n                \"color\"\
+    : \"green\",\n                \"value\": null\n              },\n              {\n               \
+    \ \"color\": \"red\",\n                \"value\": 5\n              }\n            ]\n          }\n\
+    \        },\n        \"overrides\": []\n      },\n      \"options\": {\n        \"colorMode\": \"\
+    background\",\n        \"graphMode\": \"area\",\n        \"reduceOptions\": {\n          \"calcs\"\
+    : [\n            \"lastNotNull\"\n          ],\n          \"fields\": \"\",\n          \"values\"\
+    : false\n        },\n        \"textMode\": \"auto\"\n      },\n      \"targets\": [\n        {\n \
+    \         \"datasource\": {\n            \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\
+    \n          },\n          \"expr\": \"max(md_event_time_gap_seconds)\",\n          \"legendFormat\"\
+    : \"gap s\",\n          \"refId\": \"A\"\n        }\n      ]\n    },\n    {\n      \"id\": 10,\n \
+    \     \"type\": \"timeseries\",\n      \"title\": \"Market-data events/sec\",\n      \"description\"\
+    : \"Normalized event throughput per service (spec \xA725 market-data health).\",\n      \"datasource\"\
+    : {\n        \"type\": \"prometheus\",\n        \"uid\": \"prometheus\"\n      },\n      \"gridPos\"\
+    : {\n        \"h\": 8,\n        \"w\": 12,\n        \"x\": 0,\n        \"y\": 4\n      },\n      \"\
+    fieldConfig\": {\n        \"defaults\": {\n          \"unit\": \"ops\",\n          \"custom\": {\n\
+    \            \"drawStyle\": \"line\",\n            \"lineWidth\": 1,\n            \"fillOpacity\"\
+    : 8,\n            \"showPoints\": \"never\",\n            \"spanNulls\": true\n          }\n     \
+    \   },\n        \"overrides\": []\n      },\n      \"options\": {\n        \"legend\": {\n       \
+    \   \"displayMode\": \"list\",\n          \"placement\": \"bottom\",\n          \"showLegend\": true\n\
+    \        },\n        \"tooltip\": {\n          \"mode\": \"multi\",\n          \"sort\": \"desc\"\n\
+    \        }\n      },\n      \"targets\": [\n        {\n          \"datasource\": {\n            \"\
+    type\": \"prometheus\",\n            \"uid\": \"prometheus\"\n          },\n          \"expr\": \"\
+    job:md_events:rate5m\",\n          \"legendFormat\": \"md {{service}}\",\n          \"refId\": \"\
+    A\"\n        }\n      ]\n    },\n    {\n      \"id\": 11,\n      \"type\": \"timeseries\",\n     \
+    \ \"title\": \"Stream QC: sequence gaps / duplicates (per sec)\",\n      \"description\": \"Gap and\
+    \ duplicate counters, LIVE from the java platform and updated on EVERY event (max_sequence_gap_before_halt\
+    \ = 1, so a single gap must be visible on the next scrape). The SequenceGapDetected alert uses increase(...)\
+    \ > 0, not a rate.\",\n      \"datasource\": {\n        \"type\": \"prometheus\",\n        \"uid\"\
+    : \"prometheus\"\n      },\n      \"gridPos\": {\n        \"h\": 8,\n        \"w\": 12,\n        \"\
+    x\": 12,\n        \"y\": 4\n      },\n      \"fieldConfig\": {\n        \"defaults\": {\n        \
+    \  \"unit\": \"ops\",\n          \"custom\": {\n            \"drawStyle\": \"line\",\n           \
+    \ \"lineWidth\": 1,\n            \"fillOpacity\": 8,\n            \"showPoints\": \"never\",\n   \
+    \         \"spanNulls\": true\n          }\n        },\n        \"overrides\": []\n      },\n    \
+    \  \"options\": {\n        \"legend\": {\n          \"displayMode\": \"list\",\n          \"placement\"\
+    : \"bottom\",\n          \"showLegend\": true\n        },\n        \"tooltip\": {\n          \"mode\"\
+    : \"multi\",\n          \"sort\": \"desc\"\n        }\n      },\n      \"targets\": [\n        {\n\
+    \          \"datasource\": {\n            \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\
+    \n          },\n          \"expr\": \"job:md_sequence_gaps:rate5m\",\n          \"legendFormat\":\
+    \ \"sequence gaps {{service}}\",\n          \"refId\": \"A\"\n        },\n        {\n          \"\
+    datasource\": {\n            \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\n    \
+    \      },\n          \"expr\": \"job:md_duplicates:rate5m\",\n          \"legendFormat\": \"duplicates\
+    \ {{service}}\",\n          \"refId\": \"B\"\n        }\n      ]\n    },\n    {\n      \"id\": 12,\n\
+    \      \"type\": \"timeseries\",\n      \"title\": \"Decode latency (p50/p99/p999)\",\n      \"description\"\
+    : \"Log2 buckets: quantiles are upper bounds within one power of two (telemetry crate doc).\",\n \
+    \     \"datasource\": {\n        \"type\": \"prometheus\",\n        \"uid\": \"prometheus\"\n    \
+    \  },\n      \"gridPos\": {\n        \"h\": 8,\n        \"w\": 8,\n        \"x\": 0,\n        \"y\"\
+    : 12\n      },\n      \"fieldConfig\": {\n        \"defaults\": {\n          \"unit\": \"ns\",\n \
+    \         \"custom\": {\n            \"drawStyle\": \"line\",\n            \"lineWidth\": 1,\n   \
+    \         \"fillOpacity\": 8,\n            \"showPoints\": \"never\",\n            \"spanNulls\":\
+    \ true\n          }\n        },\n        \"overrides\": []\n      },\n      \"options\": {\n     \
+    \   \"legend\": {\n          \"displayMode\": \"list\",\n          \"placement\": \"bottom\",\n  \
+    \        \"showLegend\": true\n        },\n        \"tooltip\": {\n          \"mode\": \"multi\",\n\
+    \          \"sort\": \"desc\"\n        }\n      },\n      \"targets\": [\n        {\n          \"\
+    datasource\": {\n            \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\n    \
+    \      },\n          \"expr\": \"job:decode_latency_ns:p50\",\n          \"legendFormat\": \"p50\"\
+    ,\n          \"refId\": \"A\"\n        },\n        {\n          \"datasource\": {\n            \"\
+    type\": \"prometheus\",\n            \"uid\": \"prometheus\"\n          },\n          \"expr\": \"\
+    job:decode_latency_ns:p99\",\n          \"legendFormat\": \"p99\",\n          \"refId\": \"B\"\n \
+    \       },\n        {\n          \"datasource\": {\n            \"type\": \"prometheus\",\n      \
+    \      \"uid\": \"prometheus\"\n          },\n          \"expr\": \"job:decode_latency_ns:p999\",\n\
+    \          \"legendFormat\": \"p999\",\n          \"refId\": \"C\"\n        }\n      ]\n    },\n \
+    \   {\n      \"id\": 13,\n      \"type\": \"timeseries\",\n      \"title\": \"Book update latency\
+    \ (p50/p99/p999)\",\n      \"description\": \"\",\n      \"datasource\": {\n        \"type\": \"prometheus\"\
+    ,\n        \"uid\": \"prometheus\"\n      },\n      \"gridPos\": {\n        \"h\": 8,\n        \"\
+    w\": 8,\n        \"x\": 8,\n        \"y\": 12\n      },\n      \"fieldConfig\": {\n        \"defaults\"\
+    : {\n          \"unit\": \"ns\",\n          \"custom\": {\n            \"drawStyle\": \"line\",\n\
+    \            \"lineWidth\": 1,\n            \"fillOpacity\": 8,\n            \"showPoints\": \"never\"\
+    ,\n            \"spanNulls\": true\n          }\n        },\n        \"overrides\": []\n      },\n\
+    \      \"options\": {\n        \"legend\": {\n          \"displayMode\": \"list\",\n          \"placement\"\
+    : \"bottom\",\n          \"showLegend\": true\n        },\n        \"tooltip\": {\n          \"mode\"\
+    : \"multi\",\n          \"sort\": \"desc\"\n        }\n      },\n      \"targets\": [\n        {\n\
+    \          \"datasource\": {\n            \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\
+    \n          },\n          \"expr\": \"job:book_update_latency_ns:p50\",\n          \"legendFormat\"\
+    : \"p50\",\n          \"refId\": \"A\"\n        },\n        {\n          \"datasource\": {\n     \
+    \       \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\n          },\n          \"\
+    expr\": \"job:book_update_latency_ns:p99\",\n          \"legendFormat\": \"p99\",\n          \"refId\"\
+    : \"B\"\n        },\n        {\n          \"datasource\": {\n            \"type\": \"prometheus\"\
+    ,\n            \"uid\": \"prometheus\"\n          },\n          \"expr\": \"job:book_update_latency_ns:p999\"\
+    ,\n          \"legendFormat\": \"p999\",\n          \"refId\": \"C\"\n        }\n      ]\n    },\n\
+    \    {\n      \"id\": 14,\n      \"type\": \"timeseries\",\n      \"title\": \"Order path latency\
+    \ decision-to-wire (p50/p99/p999)\",\n      \"description\": \"\",\n      \"datasource\": {\n    \
+    \    \"type\": \"prometheus\",\n        \"uid\": \"prometheus\"\n      },\n      \"gridPos\": {\n\
+    \        \"h\": 8,\n        \"w\": 8,\n        \"x\": 16,\n        \"y\": 12\n      },\n      \"fieldConfig\"\
+    : {\n        \"defaults\": {\n          \"unit\": \"ns\",\n          \"custom\": {\n            \"\
+    drawStyle\": \"line\",\n            \"lineWidth\": 1,\n            \"fillOpacity\": 8,\n         \
+    \   \"showPoints\": \"never\",\n            \"spanNulls\": true\n          }\n        },\n       \
+    \ \"overrides\": []\n      },\n      \"options\": {\n        \"legend\": {\n          \"displayMode\"\
+    : \"list\",\n          \"placement\": \"bottom\",\n          \"showLegend\": true\n        },\n  \
+    \      \"tooltip\": {\n          \"mode\": \"multi\",\n          \"sort\": \"desc\"\n        }\n \
+    \     },\n      \"targets\": [\n        {\n          \"datasource\": {\n            \"type\": \"prometheus\"\
+    ,\n            \"uid\": \"prometheus\"\n          },\n          \"expr\": \"job:order_path_latency_ns:p50\"\
+    ,\n          \"legendFormat\": \"p50\",\n          \"refId\": \"A\"\n        },\n        {\n     \
+    \     \"datasource\": {\n            \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\
+    \n          },\n          \"expr\": \"job:order_path_latency_ns:p99\",\n          \"legendFormat\"\
+    : \"p99\",\n          \"refId\": \"B\"\n        },\n        {\n          \"datasource\": {\n     \
+    \       \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\n          },\n          \"\
+    expr\": \"job:order_path_latency_ns:p999\",\n          \"legendFormat\": \"p999\",\n          \"refId\"\
+    : \"C\"\n        }\n      ]\n    },\n    {\n      \"id\": 15,\n      \"type\": \"timeseries\",\n \
+    \     \"title\": \"Book stale & session restarts\",\n      \"description\": \"book_stale{instrument}\
+    \ is 1 while any venue book of the instrument is stale (fail-closed trading); risk_session_restarts_total\
+    \ counts --resume restarts, each of which re-warms the book from the stream (PLATFORM_CONVENTIONS.md\
+    \ \xA712.3).\",\n      \"datasource\": {\n        \"type\": \"prometheus\",\n        \"uid\": \"prometheus\"\
+    \n      },\n      \"gridPos\": {\n        \"h\": 8,\n        \"w\": 12,\n        \"x\": 0,\n     \
+    \   \"y\": 20\n      },\n      \"fieldConfig\": {\n        \"defaults\": {\n          \"unit\": \"\
+    short\",\n          \"custom\": {\n            \"drawStyle\": \"line\",\n            \"lineWidth\"\
+    : 1,\n            \"fillOpacity\": 8,\n            \"showPoints\": \"never\",\n            \"spanNulls\"\
+    : true\n          }\n        },\n        \"overrides\": []\n      },\n      \"options\": {\n     \
+    \   \"legend\": {\n          \"displayMode\": \"list\",\n          \"placement\": \"bottom\",\n  \
+    \        \"showLegend\": true\n        },\n        \"tooltip\": {\n          \"mode\": \"multi\",\n\
+    \          \"sort\": \"desc\"\n        }\n      },\n      \"targets\": [\n        {\n          \"\
+    datasource\": {\n            \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\n    \
+    \      },\n          \"expr\": \"book_stale\",\n          \"legendFormat\": \"stale instrument {{instrument}}\"\
+    ,\n          \"refId\": \"A\"\n        },\n        {\n          \"datasource\": {\n            \"\
+    type\": \"prometheus\",\n            \"uid\": \"prometheus\"\n          },\n          \"expr\": \"\
+    risk_session_restarts_total\",\n          \"legendFormat\": \"restarts {{service}}\",\n          \"\
+    refId\": \"B\"\n        }\n      ]\n    },\n    {\n      \"id\": 16,\n      \"type\": \"timeseries\"\
+    ,\n      \"title\": \"JVM GC pause p99\",\n      \"description\": \"GcPauseHigh alert at 10ms sustained\
+    \ 5m (spec \xA723).\",\n      \"datasource\": {\n        \"type\": \"prometheus\",\n        \"uid\"\
+    : \"prometheus\"\n      },\n      \"gridPos\": {\n        \"h\": 8,\n        \"w\": 12,\n        \"\
+    x\": 12,\n        \"y\": 20\n      },\n      \"fieldConfig\": {\n        \"defaults\": {\n       \
+    \   \"unit\": \"ns\",\n          \"custom\": {\n            \"drawStyle\": \"line\",\n           \
+    \ \"lineWidth\": 1,\n            \"fillOpacity\": 8,\n            \"showPoints\": \"never\",\n   \
+    \         \"spanNulls\": true\n          }\n        },\n        \"overrides\": []\n      },\n    \
+    \  \"options\": {\n        \"legend\": {\n          \"displayMode\": \"list\",\n          \"placement\"\
+    : \"bottom\",\n          \"showLegend\": true\n        },\n        \"tooltip\": {\n          \"mode\"\
+    : \"multi\",\n          \"sort\": \"desc\"\n        }\n      },\n      \"targets\": [\n        {\n\
+    \          \"datasource\": {\n            \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\
+    \n          },\n          \"expr\": \"job:jvm_gc_pause_ns:p99\",\n          \"legendFormat\": \"gc\
+    \ p99 {{job}}\",\n          \"refId\": \"A\"\n        }\n      ]\n    }\n  ]\n}\n"
+  trading_risk.json: "{\n  \"uid\": \"iap-trading-risk\",\n  \"title\": \"Trading & Risk\",\n  \"description\"\
+    : \"Alpha health, execution quality and hard-risk state (spec \xA725). Metric mapping: deployment/grafana/README.md.\"\
+    ,\n  \"tags\": [\n    \"iap\",\n    \"trading\",\n    \"risk\"\n  ],\n  \"schemaVersion\": 39,\n \
+    \ \"version\": 1,\n  \"editable\": false,\n  \"graphTooltip\": 1,\n  \"timezone\": \"utc\",\n  \"\
+    time\": {\n    \"from\": \"now-6h\",\n    \"to\": \"now\"\n  },\n  \"refresh\": \"30s\",\n  \"annotations\"\
+    : {\n    \"list\": []\n  },\n  \"templating\": {\n    \"list\": []\n  },\n  \"panels\": [\n    {\n\
+    \      \"id\": 101,\n      \"type\": \"stat\",\n      \"title\": \"Kill switch\",\n      \"description\"\
+    : \"Latched by rust/risk on loss-limit breach (fail-closed). risk_kill_switch_engaged is LIVE from\
+    \ both the rust engine and the java platform.\",\n      \"datasource\": {\n        \"type\": \"prometheus\"\
+    ,\n        \"uid\": \"prometheus\"\n      },\n      \"gridPos\": {\n        \"h\": 4,\n        \"\
+    w\": 6,\n        \"x\": 0,\n        \"y\": 0\n      },\n      \"fieldConfig\": {\n        \"defaults\"\
+    : {\n          \"unit\": \"short\",\n          \"mappings\": [\n            {\n              \"type\"\
+    : \"value\",\n              \"options\": {\n                \"0\": {\n                  \"text\":\
+    \ \"ARMED / TRADING\",\n                  \"color\": \"green\"\n                },\n             \
+    \   \"1\": {\n                  \"text\": \"ENGAGED \u2014 HALTED\",\n                  \"color\"\
+    : \"red\"\n                }\n              }\n            }\n          ],\n          \"thresholds\"\
+    : {\n            \"mode\": \"absolute\",\n            \"steps\": [\n              {\n            \
+    \    \"color\": \"green\",\n                \"value\": null\n              },\n              {\n \
+    \               \"color\": \"red\",\n                \"value\": 1\n              }\n            ]\n\
+    \          }\n        },\n        \"overrides\": []\n      },\n      \"options\": {\n        \"colorMode\"\
+    : \"background\",\n        \"graphMode\": \"area\",\n        \"reduceOptions\": {\n          \"calcs\"\
+    : [\n            \"lastNotNull\"\n          ],\n          \"fields\": \"\",\n          \"values\"\
+    : false\n        },\n        \"textMode\": \"auto\"\n      },\n      \"targets\": [\n        {\n \
+    \         \"datasource\": {\n            \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\
+    \n          },\n          \"expr\": \"max(risk_kill_switch_engaged) or vector(0)\",\n          \"\
+    legendFormat\": \"engaged\",\n          \"refId\": \"A\"\n        }\n      ]\n    },\n    {\n    \
+    \  \"id\": 102,\n      \"type\": \"stat\",\n      \"title\": \"Daily P&L (realized + unrealized)\"\
+    ,\n      \"description\": \"risk_daily_pnl \u2014 the risk engine's daily P&L in the reporting currency\
+    \ (USD), the same unit as global.max_daily_loss (PLATFORM_CONVENTIONS.md \xA712.1).\",\n      \"datasource\"\
+    : {\n        \"type\": \"prometheus\",\n        \"uid\": \"prometheus\"\n      },\n      \"gridPos\"\
+    : {\n        \"h\": 4,\n        \"w\": 6,\n        \"x\": 6,\n        \"y\": 0\n      },\n      \"\
+    fieldConfig\": {\n        \"defaults\": {\n          \"unit\": \"currencyUSD\",\n          \"mappings\"\
+    : [],\n          \"thresholds\": {\n            \"mode\": \"absolute\",\n            \"steps\": [\n\
+    \              {\n                \"color\": \"red\",\n                \"value\": null\n         \
+    \     },\n              {\n                \"color\": \"green\",\n                \"value\": 0\n \
+    \             }\n            ]\n          }\n        },\n        \"overrides\": []\n      },\n   \
+    \   \"options\": {\n        \"colorMode\": \"background\",\n        \"graphMode\": \"area\",\n   \
+    \     \"reduceOptions\": {\n          \"calcs\": [\n            \"lastNotNull\"\n          ],\n  \
+    \        \"fields\": \"\",\n          \"values\": false\n        },\n        \"textMode\": \"auto\"\
+    \n      },\n      \"targets\": [\n        {\n          \"datasource\": {\n            \"type\": \"\
+    prometheus\",\n            \"uid\": \"prometheus\"\n          },\n          \"expr\": \"sum(risk_daily_pnl)\"\
+    ,\n          \"legendFormat\": \"PnL\",\n          \"refId\": \"A\"\n        }\n      ]\n    },\n\
+    \    {\n      \"id\": 103,\n      \"type\": \"stat\",\n      \"title\": \"Daily loss-limit utilization\"\
+    ,\n      \"description\": \"Daily loss against the LIVE limit gauge risk_limit{limit=\\\"max_daily_loss\\\
+    \"} \u2014 never a hand-copied constant, so a GOVERNANCE \xA73 limit change moves this stat and the\
+    \ LossLimitUtilizationHigh page together.\",\n      \"datasource\": {\n        \"type\": \"prometheus\"\
+    ,\n        \"uid\": \"prometheus\"\n      },\n      \"gridPos\": {\n        \"h\": 4,\n        \"\
+    w\": 6,\n        \"x\": 12,\n        \"y\": 0\n      },\n      \"fieldConfig\": {\n        \"defaults\"\
+    : {\n          \"unit\": \"percentunit\",\n          \"mappings\": [],\n          \"thresholds\":\
+    \ {\n            \"mode\": \"absolute\",\n            \"steps\": [\n              {\n            \
+    \    \"color\": \"green\",\n                \"value\": null\n              },\n              {\n \
+    \               \"color\": \"orange\",\n                \"value\": 0.5\n              },\n       \
+    \       {\n                \"color\": \"red\",\n                \"value\": 0.75\n              }\n\
+    \            ]\n          }\n        },\n        \"overrides\": []\n      },\n      \"options\": {\n\
+    \        \"colorMode\": \"background\",\n        \"graphMode\": \"area\",\n        \"reduceOptions\"\
+    : {\n          \"calcs\": [\n            \"lastNotNull\"\n          ],\n          \"fields\": \"\"\
+    ,\n          \"values\": false\n        },\n        \"textMode\": \"auto\"\n      },\n      \"targets\"\
+    : [\n        {\n          \"datasource\": {\n            \"type\": \"prometheus\",\n            \"\
+    uid\": \"prometheus\"\n          },\n          \"expr\": \"clamp_min(-sum(risk_daily_pnl), 0) / sum(risk_limit{limit=\\\
+    \"max_daily_loss\\\"})\",\n          \"legendFormat\": \"of max_daily_loss\",\n          \"refId\"\
+    : \"A\"\n        }\n      ]\n    },\n    {\n      \"id\": 104,\n      \"type\": \"stat\",\n      \"\
+    title\": \"Fill rate (5m)\",\n      \"description\": \"exec_fills_total / exec_orders_submitted_total\
+    \ over 5m \u2014 the platform's OWN execution counters (\xA712.6).\",\n      \"datasource\": {\n \
+    \       \"type\": \"prometheus\",\n        \"uid\": \"prometheus\"\n      },\n      \"gridPos\": {\n\
+    \        \"h\": 4,\n        \"w\": 6,\n        \"x\": 18,\n        \"y\": 0\n      },\n      \"fieldConfig\"\
+    : {\n        \"defaults\": {\n          \"unit\": \"percentunit\",\n          \"mappings\": [],\n\
+    \          \"thresholds\": {\n            \"mode\": \"absolute\",\n            \"steps\": [\n    \
+    \          {\n                \"color\": \"green\",\n                \"value\": null\n           \
+    \   }\n            ]\n          }\n        },\n        \"overrides\": []\n      },\n      \"options\"\
+    : {\n        \"colorMode\": \"background\",\n        \"graphMode\": \"area\",\n        \"reduceOptions\"\
+    : {\n          \"calcs\": [\n            \"lastNotNull\"\n          ],\n          \"fields\": \"\"\
+    ,\n          \"values\": false\n        },\n        \"textMode\": \"auto\"\n      },\n      \"targets\"\
+    : [\n        {\n          \"datasource\": {\n            \"type\": \"prometheus\",\n            \"\
+    uid\": \"prometheus\"\n          },\n          \"expr\": \"avg(job:exec_fill_rate:ratio5m)\",\n  \
+    \        \"legendFormat\": \"fills/accepted\",\n          \"refId\": \"A\"\n        }\n      ]\n \
+    \   },\n    {\n      \"id\": 110,\n      \"type\": \"timeseries\",\n      \"title\": \"Alpha signal\
+    \ rate\",\n      \"description\": \"SignalRateCollapse alert fires below 20% of the 1h-ago baseline.\"\
+    ,\n      \"datasource\": {\n        \"type\": \"prometheus\",\n        \"uid\": \"prometheus\"\n \
+    \     },\n      \"gridPos\": {\n        \"h\": 8,\n        \"w\": 12,\n        \"x\": 0,\n       \
+    \ \"y\": 4\n      },\n      \"fieldConfig\": {\n        \"defaults\": {\n          \"unit\": \"ops\"\
+    ,\n          \"custom\": {\n            \"drawStyle\": \"line\",\n            \"lineWidth\": 1,\n\
+    \            \"fillOpacity\": 8,\n            \"showPoints\": \"never\",\n            \"spanNulls\"\
+    : true\n          }\n        },\n        \"overrides\": []\n      },\n      \"options\": {\n     \
+    \   \"legend\": {\n          \"displayMode\": \"list\",\n          \"placement\": \"bottom\",\n  \
+    \        \"showLegend\": true\n        },\n        \"tooltip\": {\n          \"mode\": \"multi\",\n\
+    \          \"sort\": \"desc\"\n        }\n      },\n      \"targets\": [\n        {\n          \"\
+    datasource\": {\n            \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\n    \
+    \      },\n          \"expr\": \"job:alpha_signals:rate5m\",\n          \"legendFormat\": \"signals/s\
+    \ {{service}}\",\n          \"refId\": \"A\"\n        }\n      ]\n    },\n    {\n      \"id\": 111,\n\
+    \      \"type\": \"timeseries\",\n      \"title\": \"Order flow & fills\",\n      \"description\"\
+    : \"Child orders submitted, fills booked and pre-trade rejects per second, from com.iap.platform.PaperTrading's\
+    \ exec_* counters.\",\n      \"datasource\": {\n        \"type\": \"prometheus\",\n        \"uid\"\
+    : \"prometheus\"\n      },\n      \"gridPos\": {\n        \"h\": 8,\n        \"w\": 12,\n        \"\
+    x\": 12,\n        \"y\": 4\n      },\n      \"fieldConfig\": {\n        \"defaults\": {\n        \
+    \  \"unit\": \"ops\",\n          \"custom\": {\n            \"drawStyle\": \"line\",\n           \
+    \ \"lineWidth\": 1,\n            \"fillOpacity\": 8,\n            \"showPoints\": \"never\",\n   \
+    \         \"spanNulls\": true\n          }\n        },\n        \"overrides\": []\n      },\n    \
+    \  \"options\": {\n        \"legend\": {\n          \"displayMode\": \"list\",\n          \"placement\"\
+    : \"bottom\",\n          \"showLegend\": true\n        },\n        \"tooltip\": {\n          \"mode\"\
+    : \"multi\",\n          \"sort\": \"desc\"\n        }\n      },\n      \"targets\": [\n        {\n\
+    \          \"datasource\": {\n            \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\
+    \n          },\n          \"expr\": \"job:exec_orders:rate5m\",\n          \"legendFormat\": \"orders\
+    \ {{service}}\",\n          \"refId\": \"A\"\n        },\n        {\n          \"datasource\": {\n\
+    \            \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\n          },\n      \
+    \    \"expr\": \"job:exec_fills:rate5m\",\n          \"legendFormat\": \"fills {{service}}\",\n  \
+    \        \"refId\": \"B\"\n        },\n        {\n          \"datasource\": {\n            \"type\"\
+    : \"prometheus\",\n            \"uid\": \"prometheus\"\n          },\n          \"expr\": \"job:exec_rejects:rate5m\"\
+    ,\n          \"legendFormat\": \"pre-trade rejects {{service}}\",\n          \"refId\": \"C\"\n  \
+    \      }\n      ]\n    },\n    {\n      \"id\": 112,\n      \"type\": \"timeseries\",\n      \"title\"\
+    : \"Fill rate\",\n      \"description\": \"FillRateDrop alert below half of the 1h-ago baseline.\"\
+    ,\n      \"datasource\": {\n        \"type\": \"prometheus\",\n        \"uid\": \"prometheus\"\n \
+    \     },\n      \"gridPos\": {\n        \"h\": 8,\n        \"w\": 8,\n        \"x\": 0,\n        \"\
+    y\": 12\n      },\n      \"fieldConfig\": {\n        \"defaults\": {\n          \"unit\": \"percentunit\"\
+    ,\n          \"custom\": {\n            \"drawStyle\": \"line\",\n            \"lineWidth\": 1,\n\
+    \            \"fillOpacity\": 8,\n            \"showPoints\": \"never\",\n            \"spanNulls\"\
+    : true\n          }\n        },\n        \"overrides\": []\n      },\n      \"options\": {\n     \
+    \   \"legend\": {\n          \"displayMode\": \"list\",\n          \"placement\": \"bottom\",\n  \
+    \        \"showLegend\": true\n        },\n        \"tooltip\": {\n          \"mode\": \"multi\",\n\
+    \          \"sort\": \"desc\"\n        }\n      },\n      \"targets\": [\n        {\n          \"\
+    datasource\": {\n            \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\n    \
+    \      },\n          \"expr\": \"job:exec_fill_rate:ratio5m\",\n          \"legendFormat\": \"{{service}}\"\
+    ,\n          \"refId\": \"A\"\n        }\n      ]\n    },\n    {\n      \"id\": 113,\n      \"type\"\
+    : \"timeseries\",\n      \"title\": \"Execution slippage |fill - mark| (bps)\",\n      \"description\"\
+    : \"exec_slippage_bps, a log2 histogram of |fill price - mark| in basis points x100 (integer-scaled);\
+    \ divided by 100 here. LIVE from the java platform \u2014 this panel used to reference two metrics\
+    \ with no producer.\",\n      \"datasource\": {\n        \"type\": \"prometheus\",\n        \"uid\"\
+    : \"prometheus\"\n      },\n      \"gridPos\": {\n        \"h\": 8,\n        \"w\": 8,\n        \"\
+    x\": 8,\n        \"y\": 12\n      },\n      \"fieldConfig\": {\n        \"defaults\": {\n        \
+    \  \"unit\": \"none\",\n          \"custom\": {\n            \"drawStyle\": \"line\",\n          \
+    \  \"lineWidth\": 1,\n            \"fillOpacity\": 8,\n            \"showPoints\": \"never\",\n  \
+    \          \"spanNulls\": true\n          }\n        },\n        \"overrides\": []\n      },\n   \
+    \   \"options\": {\n        \"legend\": {\n          \"displayMode\": \"list\",\n          \"placement\"\
+    : \"bottom\",\n          \"showLegend\": true\n        },\n        \"tooltip\": {\n          \"mode\"\
+    : \"multi\",\n          \"sort\": \"desc\"\n        }\n      },\n      \"targets\": [\n        {\n\
+    \          \"datasource\": {\n            \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\
+    \n          },\n          \"expr\": \"job:exec_slippage_bps_x100:p50 / 100\",\n          \"legendFormat\"\
+    : \"p50 bps\",\n          \"refId\": \"A\"\n        },\n        {\n          \"datasource\": {\n \
+    \           \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\n          },\n       \
+    \   \"expr\": \"job:exec_slippage_bps_x100:p99 / 100\",\n          \"legendFormat\": \"p99 bps\",\n\
+    \          \"refId\": \"B\"\n        }\n      ]\n    },\n    {\n      \"id\": 114,\n      \"type\"\
+    : \"timeseries\",\n      \"title\": \"Risk decisions\",\n      \"description\": \"risk_decisions_total\
+    \ / risk_rejected_total from rust/risk \u2014 live.\",\n      \"datasource\": {\n        \"type\"\
+    : \"prometheus\",\n        \"uid\": \"prometheus\"\n      },\n      \"gridPos\": {\n        \"h\"\
+    : 8,\n        \"w\": 8,\n        \"x\": 16,\n        \"y\": 12\n      },\n      \"fieldConfig\": {\n\
+    \        \"defaults\": {\n          \"unit\": \"short\",\n          \"custom\": {\n            \"\
+    drawStyle\": \"line\",\n            \"lineWidth\": 1,\n            \"fillOpacity\": 8,\n         \
+    \   \"showPoints\": \"never\",\n            \"spanNulls\": true\n          }\n        },\n       \
+    \ \"overrides\": []\n      },\n      \"options\": {\n        \"legend\": {\n          \"displayMode\"\
+    : \"list\",\n          \"placement\": \"bottom\",\n          \"showLegend\": true\n        },\n  \
+    \      \"tooltip\": {\n          \"mode\": \"multi\",\n          \"sort\": \"desc\"\n        }\n \
+    \     },\n      \"targets\": [\n        {\n          \"datasource\": {\n            \"type\": \"prometheus\"\
+    ,\n            \"uid\": \"prometheus\"\n          },\n          \"expr\": \"job:risk_decisions:rate5m\"\
+    ,\n          \"legendFormat\": \"decisions/s {{service}}\",\n          \"refId\": \"A\"\n        },\n\
+    \        {\n          \"datasource\": {\n            \"type\": \"prometheus\",\n            \"uid\"\
+    : \"prometheus\"\n          },\n          \"expr\": \"job:risk_rejected:ratio5m\",\n          \"legendFormat\"\
+    : \"rejected ratio {{service}}\",\n          \"refId\": \"B\"\n        }\n      ]\n    },\n    {\n\
+    \      \"id\": 115,\n      \"type\": \"timeseries\",\n      \"title\": \"Exposure & limit utilization\"\
+    ,\n      \"description\": \"Gross/net notional and their utilization against the LIVE risk_limit gauges\
+    \ (\xA712.6). One money unit throughout: qty x qty_unit x price_ticks x tick_size, converted to USD\
+    \ (\xA712.1).\",\n      \"datasource\": {\n        \"type\": \"prometheus\",\n        \"uid\": \"\
+    prometheus\"\n      },\n      \"gridPos\": {\n        \"h\": 8,\n        \"w\": 12,\n        \"x\"\
+    : 0,\n        \"y\": 20\n      },\n      \"fieldConfig\": {\n        \"defaults\": {\n          \"\
+    unit\": \"short\",\n          \"custom\": {\n            \"drawStyle\": \"line\",\n            \"\
+    lineWidth\": 1,\n            \"fillOpacity\": 8,\n            \"showPoints\": \"never\",\n       \
+    \     \"spanNulls\": true\n          }\n        },\n        \"overrides\": []\n      },\n      \"\
+    options\": {\n        \"legend\": {\n          \"displayMode\": \"list\",\n          \"placement\"\
+    : \"bottom\",\n          \"showLegend\": true\n        },\n        \"tooltip\": {\n          \"mode\"\
+    : \"multi\",\n          \"sort\": \"desc\"\n        }\n      },\n      \"targets\": [\n        {\n\
+    \          \"datasource\": {\n            \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\
+    \n          },\n          \"expr\": \"portfolio_gross_notional\",\n          \"legendFormat\": \"\
+    gross notional {{service}}\",\n          \"refId\": \"A\"\n        },\n        {\n          \"datasource\"\
+    : {\n            \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\n          },\n  \
+    \        \"expr\": \"portfolio_net_notional\",\n          \"legendFormat\": \"net notional {{service}}\"\
+    ,\n          \"refId\": \"B\"\n        },\n        {\n          \"datasource\": {\n            \"\
+    type\": \"prometheus\",\n            \"uid\": \"prometheus\"\n          },\n          \"expr\": \"\
+    portfolio_gross_notional / ignoring (limit) group_left risk_limit{limit=\\\"max_gross_notional\\\"\
+    }\",\n          \"legendFormat\": \"gross limit util (5.0M)\",\n          \"refId\": \"C\"\n     \
+    \   },\n        {\n          \"datasource\": {\n            \"type\": \"prometheus\",\n          \
+    \  \"uid\": \"prometheus\"\n          },\n          \"expr\": \"portfolio_net_notional / ignoring\
+    \ (limit) group_left risk_limit{limit=\\\"max_net_notional\\\"}\",\n          \"legendFormat\": \"\
+    net limit util (2.5M)\",\n          \"refId\": \"D\"\n        }\n      ]\n    },\n    {\n      \"\
+    id\": 116,\n      \"type\": \"timeseries\",\n      \"title\": \"Daily P&L and drawdown\",\n      \"\
+    description\": \"risk_daily_pnl (realized + unrealized, USD) and portfolio_drawdown (peak-to-trough\
+    \ equity), both LIVE from the java platform in the pinned money unit (PLATFORM_CONVENTIONS.md \\u00a712.1).\"\
+    ,\n      \"datasource\": {\n        \"type\": \"prometheus\",\n        \"uid\": \"prometheus\"\n \
+    \     },\n      \"gridPos\": {\n        \"h\": 8,\n        \"w\": 12,\n        \"x\": 12,\n      \
+    \  \"y\": 20\n      },\n      \"fieldConfig\": {\n        \"defaults\": {\n          \"unit\": \"\
+    currencyUSD\",\n          \"custom\": {\n            \"drawStyle\": \"line\",\n            \"lineWidth\"\
+    : 1,\n            \"fillOpacity\": 8,\n            \"showPoints\": \"never\",\n            \"spanNulls\"\
+    : true\n          }\n        },\n        \"overrides\": []\n      },\n      \"options\": {\n     \
+    \   \"legend\": {\n          \"displayMode\": \"list\",\n          \"placement\": \"bottom\",\n  \
+    \        \"showLegend\": true\n        },\n        \"tooltip\": {\n          \"mode\": \"multi\",\n\
+    \          \"sort\": \"desc\"\n        }\n      },\n      \"targets\": [\n        {\n          \"\
+    datasource\": {\n            \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\n    \
+    \      },\n          \"expr\": \"sum(risk_daily_pnl)\",\n          \"legendFormat\": \"daily P&L (USD)\"\
+    ,\n          \"refId\": \"A\"\n        },\n        {\n          \"datasource\": {\n            \"\
+    type\": \"prometheus\",\n            \"uid\": \"prometheus\"\n          },\n          \"expr\": \"\
+    portfolio_drawdown\",\n          \"legendFormat\": \"drawdown {{service}}\",\n          \"refId\"\
+    : \"B\"\n        }\n      ]\n    },\n    {\n      \"id\": 117,\n      \"type\": \"timeseries\",\n\
+    \      \"title\": \"Live vs backtest drift (PSI)\",\n      \"description\": \"LIVE from java (com.iap.adaptive.DriftMonitor):\
+    \ Population Stability Index of the rolling live signal window vs the research baseline (research/baselines/*.json,\
+    \ API_ADAPTIVE.md), labeled {alpha=...}. Industry rule of thumb: < 0.1 stable, 0.1-0.25 moderate,\
+    \ > 0.25 significant shift - the LiveVsBacktestDrift warning threshold (deployment/prometheus/alerts.yml).\"\
+    ,\n      \"datasource\": {\n        \"type\": \"prometheus\",\n        \"uid\": \"prometheus\"\n \
+    \     },\n      \"gridPos\": {\n        \"h\": 8,\n        \"w\": 8,\n        \"x\": 0,\n        \"\
+    y\": 28\n      },\n      \"fieldConfig\": {\n        \"defaults\": {\n          \"unit\": \"none\"\
+    ,\n          \"min\": 0,\n          \"custom\": {\n            \"drawStyle\": \"line\",\n        \
+    \    \"lineWidth\": 1,\n            \"fillOpacity\": 8,\n            \"showPoints\": \"never\",\n\
+    \            \"spanNulls\": true,\n            \"thresholdsStyle\": {\n              \"mode\": \"\
+    line\"\n            }\n          },\n          \"thresholds\": {\n            \"mode\": \"absolute\"\
+    ,\n            \"steps\": [\n              {\n                \"color\": \"green\",\n            \
+    \    \"value\": null\n              },\n              {\n                \"color\": \"yellow\",\n\
+    \                \"value\": 0.1\n              },\n              {\n                \"color\": \"\
+    red\",\n                \"value\": 0.25\n              }\n            ]\n          }\n        },\n\
+    \        \"overrides\": []\n      },\n      \"options\": {\n        \"legend\": {\n          \"displayMode\"\
+    : \"list\",\n          \"placement\": \"bottom\",\n          \"showLegend\": true\n        },\n  \
+    \      \"tooltip\": {\n          \"mode\": \"multi\",\n          \"sort\": \"desc\"\n        }\n \
+    \     },\n      \"targets\": [\n        {\n          \"datasource\": {\n            \"type\": \"prometheus\"\
+    ,\n            \"uid\": \"prometheus\"\n          },\n          \"expr\": \"alpha_live_vs_backtest_drift\"\
+    ,\n          \"legendFormat\": \"PSI {{alpha}}\",\n          \"refId\": \"A\"\n        }\n      ]\n\
+    \    },\n    {\n      \"id\": 118,\n      \"type\": \"timeseries\",\n      \"title\": \"Rolling realized\
+    \ IC\",\n      \"description\": \"LIVE from java (com.iap.adaptive.RollingIc): Pearson correlation\
+    \ of the live signal vs the subsequent mid return over the alpha's pinned horizon, rolling 256-pair\
+    \ window, event-time and lookahead-free. IC < 0 puts the alpha on WATCH, IC < -0.05 retires it (alpha_lifecycle_state).\"\
+    ,\n      \"datasource\": {\n        \"type\": \"prometheus\",\n        \"uid\": \"prometheus\"\n \
+    \     },\n      \"gridPos\": {\n        \"h\": 8,\n        \"w\": 8,\n        \"x\": 8,\n        \"\
+    y\": 28\n      },\n      \"fieldConfig\": {\n        \"defaults\": {\n          \"unit\": \"none\"\
+    ,\n          \"min\": -1,\n          \"max\": 1,\n          \"custom\": {\n            \"drawStyle\"\
+    : \"line\",\n            \"lineWidth\": 1,\n            \"fillOpacity\": 8,\n            \"showPoints\"\
+    : \"never\",\n            \"spanNulls\": true\n          }\n        },\n        \"overrides\": []\n\
+    \      },\n      \"options\": {\n        \"legend\": {\n          \"displayMode\": \"list\",\n   \
+    \       \"placement\": \"bottom\",\n          \"showLegend\": true\n        },\n        \"tooltip\"\
+    : {\n          \"mode\": \"multi\",\n          \"sort\": \"desc\"\n        }\n      },\n      \"targets\"\
+    : [\n        {\n          \"datasource\": {\n            \"type\": \"prometheus\",\n            \"\
+    uid\": \"prometheus\"\n          },\n          \"expr\": \"alpha_rolling_ic\",\n          \"legendFormat\"\
+    : \"IC {{alpha}}\",\n          \"refId\": \"A\"\n        }\n      ]\n    },\n    {\n      \"id\":\
+    \ 119,\n      \"type\": \"stat\",\n      \"title\": \"Alpha lifecycle\",\n      \"description\": \"\
+    0 ACTIVE / 1 WATCH / 2 RETIRED \u2014 IC-gated (NOT PSI-gated) and OBSERVATIONAL: the live loop does\
+    \ not halt allocation on this signal, the AlphaLifecycleRetired alert asks a human to (API_ADAPTIVE.md\
+    \ \xA76, PLATFORM_CONVENTIONS.md \xA712.6).\",\n      \"datasource\": {\n        \"type\": \"prometheus\"\
+    ,\n        \"uid\": \"prometheus\"\n      },\n      \"gridPos\": {\n        \"h\": 8,\n        \"\
+    w\": 8,\n        \"x\": 16,\n        \"y\": 28\n      },\n      \"fieldConfig\": {\n        \"defaults\"\
+    : {\n          \"unit\": \"none\",\n          \"mappings\": [\n            {\n              \"type\"\
+    : \"value\",\n              \"options\": {\n                \"0\": {\n                  \"text\":\
+    \ \"ACTIVE\",\n                  \"color\": \"green\",\n                  \"index\": 0\n         \
+    \       },\n                \"1\": {\n                  \"text\": \"WATCH\",\n                  \"\
+    color\": \"yellow\",\n                  \"index\": 1\n                },\n                \"2\": {\n\
+    \                  \"text\": \"RETIRED\",\n                  \"color\": \"red\",\n               \
+    \   \"index\": 2\n                }\n              }\n            }\n          ],\n          \"thresholds\"\
+    : {\n            \"mode\": \"absolute\",\n            \"steps\": [\n              {\n            \
+    \    \"color\": \"green\",\n                \"value\": null\n              }\n            ]\n    \
+    \      }\n        },\n        \"overrides\": []\n      },\n      \"options\": {\n        \"colorMode\"\
+    : \"background\",\n        \"graphMode\": \"none\",\n        \"textMode\": \"value_and_name\",\n \
+    \       \"reduceOptions\": {\n          \"calcs\": [\n            \"lastNotNull\"\n          ]\n \
+    \       }\n      },\n      \"targets\": [\n        {\n          \"datasource\": {\n            \"\
+    type\": \"prometheus\",\n            \"uid\": \"prometheus\"\n          },\n          \"expr\": \"\
+    alpha_lifecycle_state\",\n          \"legendFormat\": \"{{alpha}}\",\n          \"refId\": \"A\"\n\
+    \        }\n      ]\n    }\n  ]\n}\n"

@@ -40,7 +40,7 @@
       "type": "integer",
       "minimum": 0,
       "maximum": 18446744073709551615,
-      "description": "Per venue+instrument stream sequence, gap-checkable."
+      "description": "Per venue+instrument stream sequence, gap-checkable; 0 is a legal first sequence; a SNAPSHOT burst restarting below the last sequence signals a venue sequence reset."
     },
     "event_type": {
       "type": "integer",
@@ -69,19 +69,19 @@
       "type": "integer",
       "minimum": -9223372036854775808,
       "maximum": 9223372036854775807,
-      "description": "Price in integer ticks; 0 when unused."
+      "description": "Price in integer ticks; 0 when unused. Must be > 0 on ADD/QUOTE/SNAPSHOT/TRADE (validator + book); negative prices are not supported in this version."
     },
     "qty": {
       "type": "integer",
       "minimum": -9223372036854775808,
       "maximum": 9223372036854775807,
-      "description": "Quantity in base units; for STATUS carries status code TRADING=1 HALT=2 AUCTION=3 CLOSE=4."
+      "description": "Quantity in base units; > 0 on ADD/EXECUTE/TRADE/QUOTE/SNAPSHOT (MODIFY: <= 0 removes the order); for STATUS carries status code TRADING=1 HALT=2 AUCTION=3 CLOSE=4."
     },
     "order_id": {
       "type": "integer",
       "minimum": 0,
       "maximum": 18446744073709551615,
-      "description": "Order id for ADD/MODIFY/CANCEL/EXECUTE/QUOTE/SNAPSHOT; 0 when unused."
+      "description": "Order id for ADD/MODIFY/CANCEL/EXECUTE (required, non-zero) and QUOTE/SNAPSHOT (0 = id-less record, the book assigns a synthetic id); explicit ids >= 0xFFFF000000000000 are reserved for synthetic ids and rejected on ADD/QUOTE/SNAPSHOT; 0 when unused."
     },
     "trade_id": {
       "type": "integer",

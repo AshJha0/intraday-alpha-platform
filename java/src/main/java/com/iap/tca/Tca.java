@@ -50,6 +50,7 @@ public final class Tca {
             Double twapSlippageBps, Perold perold, double spreadCost,
             double impactCost, double timingCost,
             Map<String, Double> adverseSelectionBps,
+            Map<String, Integer> adverseSelectionN,
             Double executionAlphaVsVwapBps, int nFills) {
     }
 
@@ -124,26 +125,62 @@ public final class Tca {
 
     /**
      * Mean post-fill markout {@code s*(mid(t+delta) - p_f)/p_f} bps per
-     * pinned delta (null when no fill has a defined prevailing mid there).
-     * Negative = post-fill reversion; positive = continued adverse drift.
+     * pinned delta over the fills whose markout is DEFINED (pinned §2.5:
+     * the timeline reaches {@code t_f + delta} and no HALT started inside
+     * {@code (t_f, t_f + delta]}); null when no fill qualifies — a stale
+     * last mid is never carried past the end of the data. Negative =
+     * post-fill reversion; positive = continued adverse drift.
      */
     public static Map<String, Double> adverseSelection(TcaParentOrder order,
             MarketTimeline timeline) {
+        return adverseSelectionWithCounts(order, timeline, new LinkedHashMap<>());
+    }
+
+    /** {@link #adverseSelection} filling {@code counts} with n_defined per delta. */
+    public static Map<String, Double> adverseSelectionWithCounts(
+            TcaParentOrder order, MarketTimeline timeline,
+            Map<String, Integer> counts) {
         Map<String, Double> out = new LinkedHashMap<>();
         double s = order.sign();
         for (Map.Entry<String, Long> e : ADVERSE_DELTAS_NS.entrySet()) {
             double sum = 0.0;
             int n = 0;
             for (TcaFill f : order.fills) {
-                double m = timeline.midAt(f.ts() + e.getValue());
-                if (!Double.isNaN(m) && f.price() > 0.0) {
-                    sum += 1e4 * s * (m - f.price()) / f.price();
+                long t = f.ts() + e.getValue();
+                if (f.price() > 0.0 && timeline.midDefinedAt(t, f.ts())) {
+                    sum += 1e4 * s * (timeline.midAt(t) - f.price()) / f.price();
                     n++;
                 }
             }
             out.put(e.getKey(), n > 0 ? sum / n : null);
+            counts.put(e.getKey(), n);
         }
         return out;
+    }
+
+    /**
+     * Pinned window rules: {@code decision <= arrival <= end}, end inside
+     * the timeline (no fabricated end_mid), every fill inside
+     * {@code [arrival_ts, end_ts]}. Throws otherwise.
+     */
+    public static void validateOrderWindow(TcaParentOrder order,
+            MarketTimeline timeline) {
+        if (!(order.decisionTs <= order.arrivalTs && order.arrivalTs <= order.endTs)) {
+            throw new IllegalArgumentException(
+                    "order needs decision_ts <= arrival_ts <= end_ts");
+        }
+        if (timeline.size() == 0 || order.endTs > timeline.lastTs()) {
+            throw new IllegalArgumentException("order " + order.orderId
+                    + ": end_ts " + order.endTs + " is beyond the timeline end"
+                    + " (end_mid would be fabricated)");
+        }
+        for (TcaFill f : order.fills) {
+            if (f.ts() < order.arrivalTs || f.ts() > order.endTs) {
+                throw new IllegalArgumentException("order " + order.orderId
+                        + ": fill at " + f.ts() + " outside [" + order.arrivalTs
+                        + ", " + order.endTs + "]");
+            }
+        }
     }
 
     /**
@@ -189,6 +226,7 @@ public final class Tca {
 
     /** Full per-order TCA record against a market timeline. */
     public static OrderTca orderTca(TcaParentOrder order, MarketTimeline timeline) {
+        validateOrderWindow(order, timeline);
         double md = timeline.midAt(order.decisionTs);
         double ma = timeline.midAt(order.arrivalTs);
         double me = timeline.midAt(order.endTs);
@@ -211,13 +249,16 @@ public final class Tca {
                 ? 1e4 * s * (fv - vwapMkt) / vwapMkt : null;
         Double twapSlip = filled && twapMkt != null && twapMkt != 0.0
                 ? 1e4 * s * (fv - twapMkt) / twapMkt : null;
+        Map<String, Integer> nDefined = new LinkedHashMap<>();
+        Map<String, Double> markouts = adverseSelectionWithCounts(order, timeline,
+                nDefined);
         return new OrderTca(order.orderId, order.instrumentId,
                 order.side == 0 ? "BUY" : "SELL", md, ma, me,
                 filled ? fv : null, arrivalSlippageBps(order, ma),
                 vwapSlip, twapSlip, perold, split.spreadCost(),
                 split.impactCost(),
                 perold.tradingCost() - split.execCostVsMid(),
-                adverseSelection(order, timeline),
+                markouts, nDefined,
                 vwapSlip == null ? null : -vwapSlip,
                 order.fills.size());
     }

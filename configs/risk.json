@@ -1,6 +1,6 @@
 {
-  "x-version": 2,
-  "description": "Complete pinned hard-risk limit set (spec section 16), consumed by the Rust risk engine (rust/risk). FAIL-CLOSED: a missing or invalid limit puts the engine in reject-everything mode; every decision is emitted as a RiskEvent (schemas/risk_event.schema.json) to a JSONL audit log; decisions are deterministic and replayable. duplicate_order_window_ns 0 means the entire session; order rate is a per-strategy event-time token bucket (rate max_order_rate_per_sec, capacity order_rate_burst).",
+  "x-version": 3,
+  "description": "Complete pinned hard-risk limit set (spec section 16), consumed by the Rust risk engine (rust/risk, normative) and its Java port. FAIL-CLOSED: a missing or invalid limit puts the engine in reject-everything mode; every decision is emitted as a RiskEvent (schemas/risk_event.schema.json) to a JSONL audit log; decisions are deterministic and replayable. Money semantics (PLATFORM_CONVENTIONS.md section 11): every notional and loss figure is in currency.reporting_ccy; notional = qty x qty_unit x price_ticks x tick_size x fx_rate (qty_unit = lot_size for FX, 1 for EQUITY/ETF); quote currencies convert through currency.conversion (last consolidated mid of the named pair, inverted when the pair is REPORTING/CCY) and an order whose conversion is missing or stale is rejected with FX_RATE_MISSING. Loss limits act on daily P&L = realized (average cost) + unrealized (mark-to-market at the last consolidated mid) and latch the strategy/global kill switch on fills AND on mark updates. duplicate_order_window_ns 0 means the entire session; order rate is a per-strategy event-time token bucket (rate max_order_rate_per_sec, capacity order_rate_burst).",
   "global": {
     "kill_switch_engaged": false,
     "max_gross_notional": 5000000.0,
@@ -26,5 +26,17 @@
   "market_data": {
     "max_sequence_gap_before_halt": 1,
     "stale_feed_timeout_ns": 5000000000
+  },
+  "currency": {
+    "reporting_ccy": "USD",
+    "conversion": {
+      "EUR": {"instrument_id": 101, "invert": false},
+      "GBP": {"instrument_id": 102, "invert": false},
+      "JPY": {"instrument_id": 103, "invert": true},
+      "AUD": {"instrument_id": 104, "invert": false},
+      "CAD": {"instrument_id": 105, "invert": true},
+      "CHF": {"instrument_id": 106, "invert": true},
+      "NZD": {"instrument_id": 107, "invert": false}
+    }
   }
 }

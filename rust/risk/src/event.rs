@@ -141,10 +141,15 @@ pub mod rules {
     pub const GROSS_NOTIONAL: &str = "GROSS_NOTIONAL";
     /// Projected net notional beyond the cap.
     pub const NET_NOTIONAL: &str = "NET_NOTIONAL";
-    /// Firm-wide realized daily loss limit breached.
+    /// Firm-wide daily loss limit (realized + unrealized) breached.
     pub const DAILY_LOSS: &str = "DAILY_LOSS";
-    /// Per-strategy realized loss limit breached.
+    /// Per-strategy daily loss limit (realized + unrealized) breached.
     pub const STRATEGY_LOSS: &str = "STRATEGY_LOSS";
+    /// Quote->reporting currency conversion rate missing or stale
+    /// (fail-closed: notionals cannot be expressed in the reporting ccy).
+    pub const FX_RATE_MISSING: &str = "FX_RATE_MISSING";
+    /// Engine awaits a position bootstrap (drop-copy) or state restore.
+    pub const NOT_BOOTSTRAPPED: &str = "NOT_BOOTSTRAPPED";
     /// Order passed every check.
     pub const ALLOW: &str = "ALLOW";
     /// Engine is fail-closed (missing/invalid configuration).
@@ -157,6 +162,42 @@ pub mod rules {
     pub const VENUE_DISCONNECT: &str = "VENUE_DISCONNECT";
     /// Venue reconnect notification (audit record).
     pub const VENUE_RECONNECT: &str = "VENUE_RECONNECT";
+    /// A fill was rejected as malformed / unpriceable (audit record; the
+    /// fill is NOT applied and `risk_malformed_fills_total` increments).
+    pub const MALFORMED_FILL: &str = "MALFORMED_FILL";
+    /// A loss limit was overridden with approval (audit record).
+    pub const LOSS_LIMIT_OVERRIDE: &str = "LOSS_LIMIT_OVERRIDE";
+    /// The trading session rolled: daily P&L re-based (audit record).
+    pub const SESSION_ROLLED: &str = "SESSION_ROLLED";
+    /// Position bootstrap completed (audit record).
+    pub const BOOTSTRAP_COMPLETE: &str = "BOOTSTRAP_COMPLETE";
+    /// Engine state restored from a snapshot (audit record).
+    pub const STATE_RESTORED: &str = "STATE_RESTORED";
+}
+
+/// Fixed-decimal formatting for audit reasons, PINNED for cross-language
+/// byte parity (no floating-point formatting anywhere in a reason): the
+/// value is scaled by `10^decimals`, rounded half away from zero to an
+/// integer, and printed as `[-]int.frac` with exactly `decimals` fraction
+/// digits. A value that rounds to zero prints without a sign. The Java
+/// port (`RiskEngine.fmtFixed`) computes the identical integer from the
+/// identical IEEE-754 product, so both engines emit identical text at
+/// decimal ties (e.g. 2.675 -> "2.67" in BOTH, because 2.675*100 is
+/// 267.49999999999997 in binary).
+pub fn fmt_fixed(v: f64, decimals: u32) -> String {
+    let scale_i: i64 = 10i64.pow(decimals);
+    let scale = scale_i as f64;
+    let units = (v.abs() * scale).round() as i64;
+    let sign = if v < 0.0 && units > 0 { "-" } else { "" };
+    if decimals == 0 {
+        return format!("{sign}{units}");
+    }
+    format!(
+        "{sign}{}.{:0width$}",
+        units / scale_i,
+        units % scale_i,
+        width = decimals as usize
+    )
 }
 
 #[cfg(test)]
@@ -185,6 +226,18 @@ mod tests {
         );
         let back = RiskEvent::from_json_line(&line).unwrap();
         assert_eq!(back, ev);
+    }
+
+    #[test]
+    fn fixed_formatting_is_integer_scaled() {
+        assert_eq!(fmt_fixed(2.675, 2), "2.68"); // 2.675*100 rounds to 267.5 in binary
+        assert_eq!(fmt_fixed(32.4375, 2), "32.44"); // exact tie: half away
+        assert_eq!(fmt_fixed(-50012.345, 2), "-50012.35");
+        assert_eq!(fmt_fixed(-0.001, 2), "0.00");
+        assert_eq!(fmt_fixed(1000000.125, 2), "1000000.13");
+        assert_eq!(fmt_fixed(0.05, 1), "0.1");
+        assert_eq!(fmt_fixed(500.0, 0), "500");
+        assert_eq!(fmt_fixed(-7.0, 2), "-7.00");
     }
 
     #[test]

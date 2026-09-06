@@ -29,7 +29,18 @@ the platform's pinned conventions:
 - Adverse selection at delta: ``s * (mid(t_f + delta) - p_f)`` per filled
   unit — positive means the price kept moving against the parent after the
   fill (it was "picked off" in the passive case / momentum in the taker
-  case); measured at pinned deltas {100ms, 1s, 10s}.
+  case); measured at pinned deltas {100ms, 1s, 10s}. A markout is DEFINED
+  (pinned §2.5) only when the timeline extends to ``t_f + delta``
+  (``last_ts >= t_f + delta``) and no HALT started in ``(t_f, t_f + delta]``;
+  undefined fills are excluded and ``n_defined`` is reported per delta —
+  a stale last mid is never carried past the end of the data.
+- Reference state of a fill (pinned §2.4): TAKER fills use the state
+  prevailing at the fill time; MAKER fills use the state strictly before the
+  triggering event (``prevailing(t_f - 1)``), so a passive fill by a
+  trade-through is attributed as provided liquidity (spread cost = -q*hs).
+- Windows (pinned §2.3): every fill must lie in ``[arrival_ts, end_ts]`` and
+  ``end_ts`` must be inside the timeline — otherwise the order is rejected
+  (ValueError), never analysed against fabricated reference prices.
 - Impact regression: OLS of per-fill signed cost bps on per-fill
   participation (q_f / displayed contra depth) — slope is the impact
   estimate in bps per unit participation.
@@ -143,17 +154,27 @@ def spread_and_impact_cost(order: ParentOrder) -> Dict[str, float]:
 
 def adverse_selection(order: ParentOrder,
                       timeline: MarketTimeline) -> Dict[str, Optional[float]]:
-    """Mean post-fill markout s*(mid(t+delta) - p_f)/p_f bps per pinned delta."""
+    """Mean post-fill markout s*(mid(t+delta) - p_f)/p_f bps per pinned delta
+    over the fills whose markout is DEFINED (see module docstring)."""
+    return adverse_selection_with_counts(order, timeline)[0]
+
+
+def adverse_selection_with_counts(
+    order: ParentOrder, timeline: MarketTimeline,
+) -> Tuple[Dict[str, Optional[float]], Dict[str, int]]:
+    """(markout bps per delta or None, number of defined fills per delta)."""
     out: Dict[str, Optional[float]] = {}
+    counts: Dict[str, int] = {}
     s = order.sign
     for name, delta in ADVERSE_DELTAS_NS.items():
         vals: List[float] = []
         for f in order.fills:
-            m = timeline.mid_at(f.ts + delta)
-            if m == m and f.price > 0:  # not NaN
-                vals.append(1e4 * s * (m - f.price) / f.price)
+            t = f.ts + delta
+            if f.price > 0 and timeline.mid_defined_at(t, after_ts=f.ts):
+                vals.append(1e4 * s * (timeline.mid_at(t) - f.price) / f.price)
         out[name] = sum(vals) / len(vals) if vals else None
-    return out
+        counts[name] = len(vals)
+    return out, counts
 
 
 def impact_regression(
@@ -181,8 +202,26 @@ def impact_regression(
             "intercept_bps": my - slope * mx, "r2": r2, "n": float(n)}
 
 
+def validate_order_window(order: ParentOrder, timeline: MarketTimeline) -> None:
+    """Pinned window rules: decision <= arrival <= end, end inside the
+    timeline, every fill inside [arrival_ts, end_ts]."""
+    if not order.decision_ts <= order.arrival_ts <= order.end_ts:
+        raise ValueError("order needs decision_ts <= arrival_ts <= end_ts")
+    last = timeline.last_ts
+    if last is None or order.end_ts > last:
+        raise ValueError(
+            f"order {order.order_id}: end_ts {order.end_ts} is beyond the "
+            f"timeline end {last} (end_mid would be fabricated)")
+    for f in order.fills:
+        if not order.arrival_ts <= f.ts <= order.end_ts:
+            raise ValueError(
+                f"order {order.order_id}: fill at {f.ts} outside "
+                f"[{order.arrival_ts}, {order.end_ts}]")
+
+
 def order_tca(order: ParentOrder, timeline: MarketTimeline) -> Dict[str, object]:
     """Full per-order TCA record (spec §19 metric table)."""
+    validate_order_window(order, timeline)
     m_d = timeline.mid_at(order.decision_ts)
     m_a = timeline.mid_at(order.arrival_ts)
     m_e = timeline.mid_at(order.end_ts)
@@ -196,6 +235,7 @@ def order_tca(order: ParentOrder, timeline: MarketTimeline) -> Dict[str, object]
     twap_mkt = interval_twap(timeline, order.arrival_ts, order.end_ts)
     fv = order.fill_vwap
     s = order.sign
+    markouts, n_defined = adverse_selection_with_counts(order, timeline)
     rec: Dict[str, object] = {
         "order_id": order.order_id,
         "instrument_id": order.instrument_id,
@@ -214,7 +254,8 @@ def order_tca(order: ParentOrder, timeline: MarketTimeline) -> Dict[str, object]
         "perold": perold,
         "spread_cost": split["spread_cost"],
         "impact_cost": split["impact_cost"],
-        "adverse_selection_bps": adverse_selection(order, timeline),
+        "adverse_selection_bps": markouts,
+        "adverse_selection_n": n_defined,
         "n_fills": len(order.fills),
     }
     # execution-alpha attribution: trading cost = spread + impact + timing

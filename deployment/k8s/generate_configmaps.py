@@ -8,7 +8,6 @@ deployment/grafana/ change, then commit the results:
 Outputs (do not hand-edit):
   configmap-configs.yaml     <- configs/*.json + configs/strategies/*.json
   configmap-prometheus.yaml  <- deployment/prometheus/{prometheus,recording,alerts}.yml
-                                + targets/rust-telemetry.json
   configmap-grafana.yaml     <- deployment/grafana/provisioning + dashboards
 
 Equivalent to `kubectl create configmap ... --from-file=... --dry-run=client
@@ -17,6 +16,7 @@ kubectl. Requires PyYAML.
 """
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -74,16 +74,30 @@ def write(out: Path, src_desc: str, *manifests: dict) -> None:
         for m in manifests
     )
     out.write_text(HEADER.format(src=src_desc) + body)
-    print(f"wrote {out.relative_to(REPO)} ({len(body)} bytes)")
+    try:
+        shown = out.relative_to(REPO)
+    except ValueError:
+        shown = out
+    print(f"wrote {shown} ({len(body)} bytes)")
 
 
 def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument(
+        "--out-dir", type=Path, default=K8S,
+        help="write the manifests here instead of deployment/k8s (used by "
+             "tests/harness/check_deployment.py to diff against the committed "
+             "files without touching the working tree)")
+    args = ap.parse_args()
+    out_dir = args.out_dir
+    out_dir.mkdir(parents=True, exist_ok=True)
+
     # 1. Platform configs (mounted at /etc/iap/configs).
     cfg_files = {p.name: p for p in sorted((REPO / "configs").glob("*.json"))}
     for p in sorted((REPO / "configs" / "strategies").glob("*.json")):
         cfg_files[f"strategies__{p.name}"] = p  # '/' not allowed in keys
     write(
-        K8S / "configmap-configs.yaml",
+        out_dir / "configmap-configs.yaml",
         "configs/*.json and configs/strategies/*.json",
         configmap("iap-configs", cfg_files),
     )
@@ -91,7 +105,7 @@ def main() -> int:
     # 2. Prometheus config + rules + file-SD targets (mounted at /etc/prometheus).
     prom = REPO / "deployment" / "prometheus"
     write(
-        K8S / "configmap-prometheus.yaml",
+        out_dir / "configmap-prometheus.yaml",
         "deployment/prometheus/",
         configmap(
             "iap-prometheus-config",
@@ -99,15 +113,11 @@ def main() -> int:
                 "prometheus.yml": prom / "prometheus.yml",
                 "recording.yml": prom / "recording.yml",
                 "alerts.yml": prom / "alerts.yml",
-                # NOTE: file-SD target list. In k8s the rust exporter is not
-                # deployed yet (compose-only today); Prometheus reports the
-                # target down until that wave, which is intended (TargetDown
-                # alert documents the gap). Mounted flat at targets/ via k8s
-                # subPath-free mount: prometheus.yml references
-                # /etc/prometheus/targets/rust-telemetry.json, so the
-                # deployment mounts the whole ConfigMap at /etc/prometheus and
-                # this key must keep the 'targets__' prefix mapping below.
-                "targets__rust-telemetry.json": prom / "targets" / "rust-telemetry.json",
+                # NOTE: the rust-telemetry file-SD target list was removed in
+                # round 3 — no component ever wrote /data/telemetry/rust.prom,
+                # so the target was permanently down and TargetDown (critical)
+                # fired continuously. A scrape target is only added here
+                # together with a producer (PLATFORM_CONVENTIONS.md §12.7).
             },
         ),
     )
@@ -115,7 +125,7 @@ def main() -> int:
     # 3. Grafana provisioning + dashboards.
     graf = REPO / "deployment" / "grafana"
     write(
-        K8S / "configmap-grafana.yaml",
+        out_dir / "configmap-grafana.yaml",
         "deployment/grafana/ (provisioning + dashboards)",
         configmap(
             "iap-grafana-provisioning",

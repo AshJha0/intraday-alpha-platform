@@ -1,5 +1,9 @@
 package com.iap.monitoring;
 
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicLongArray;
+import java.util.concurrent.atomic.DoubleAdder;
+
 /**
  * Fixed-bucket log2 histogram of non-negative long samples (latency in ns,
  * sizes, ...), mirroring rust/telemetry semantics exactly: 65 buckets,
@@ -9,15 +13,22 @@ package com.iap.monitoring;
  * containing the rank-{@code ceil(q*count)} sample (1-based) — conservative
  * for latency: the reported value is always &gt;= the exact order statistic
  * and within one power of two of it.
+ *
+ * <p>Lock-free (PLATFORM_CONVENTIONS.md §12.4): every field is an atomic so
+ * the exposition thread reads while the trading thread records. A reader
+ * observes each field atomically but the set of fields is not a single
+ * snapshot; the exposition writer therefore derives {@code +Inf} and
+ * {@code _count} from one read of the bucket array so the cumulative series
+ * is always internally consistent.
  */
 public final class Histogram {
     /** Number of buckets: value 0 plus one bucket per power of two. */
     public static final int BUCKETS = 65;
 
-    private final long[] counts = new long[BUCKETS];
-    private long total;
-    private double sum;
-    private long max;
+    private final AtomicLongArray counts = new AtomicLongArray(BUCKETS);
+    private final AtomicLong total = new AtomicLong();
+    private final DoubleAdder sum = new DoubleAdder();
+    private final AtomicLong max = new AtomicLong();
 
     /** Bucket index for a value: 0 for 0, else {@code 64 - nlz(value)}. */
     public static int bucketOf(long value) {
@@ -43,32 +54,34 @@ public final class Histogram {
 
     /** Record one sample (&gt;= 0). */
     public void record(long value) {
-        counts[bucketOf(value)]++;
-        total++;
-        sum += (double) value;
-        if (value > max) {
-            max = value;
-        }
+        counts.incrementAndGet(bucketOf(value));
+        total.incrementAndGet();
+        sum.add((double) value);
+        max.accumulateAndGet(value, Math::max);
     }
 
     /** Number of recorded samples. */
     public long count() {
-        return total;
+        return total.get();
     }
 
     /** Sum of recorded samples (double; exact for realistic ns totals). */
     public double sum() {
-        return sum;
+        return sum.sum();
     }
 
     /** Largest recorded sample (0 when empty). */
     public long max() {
-        return max;
+        return max.get();
     }
 
-    /** Raw bucket counts (live view; do not mutate). */
+    /** Copy of the bucket counts (a consistent-enough snapshot for rendering). */
     public long[] buckets() {
-        return counts;
+        long[] out = new long[BUCKETS];
+        for (int i = 0; i < BUCKETS; i++) {
+            out[i] = counts.get(i);
+        }
+        return out;
     }
 
     /**
@@ -82,13 +95,18 @@ public final class Histogram {
         if (!(Double.isFinite(q) && q >= 0.0 && q <= 1.0)) {
             throw new IllegalArgumentException("quantile must be in [0, 1]: " + q);
         }
-        if (total == 0) {
+        long[] c = buckets();
+        long n = 0;
+        for (long v : c) {
+            n += v;
+        }
+        if (n == 0) {
             throw new IllegalStateException("empty histogram has no quantiles");
         }
-        long rank = Math.max((long) Math.ceil(q * (double) total), 1L);
+        long rank = Math.max((long) Math.ceil(q * (double) n), 1L);
         long cum = 0;
         for (int i = 0; i < BUCKETS; i++) {
-            cum += counts[i];
+            cum += c[i];
             if (cum >= rank) {
                 return bucketUpper(i);
             }

@@ -11,6 +11,10 @@
 //   parent 2: IS   SELL 600 over [t0+120s, t0+720s), 3 slices,
 //             risk_aversion 1.0, aggressive MARKET children.
 //
+// Golden v2 (round 3): children expire at end_ts (execution.hpp rule 7), so
+// the VWAP slice-2 child that v1 filled 290 s after the window now expires
+// unfilled (parent 1: 329 filled / 71 unfilled).
+//
 // Config: seed 20260829 (configs/execution.json), latency decision/risk/wire
 // 50/50/100 us + XV1 venue latency (mean 150 us, jitter uniform [0, 50 us],
 // SplitMix64), impact_coeff_bps_per_pct_adv 2.0, instrument 1 adv 38,000,000
@@ -37,7 +41,7 @@ iap::ExecConfig golden_exec_config(const std::string& configs_dir) {
     iap::InstrumentSpec ins;
     ins.instrument_id = 1;
     ins.tick_size = 0.01;
-    ins.lot_size = 1.0;
+    ins.qty_unit = 1.0;
     ins.adv = 38000000.0;
     cfg.instruments[1] = ins;
     return cfg;
@@ -100,7 +104,7 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "cannot write %s\n", out_path.c_str());
         return 1;
     }
-    std::fprintf(f, "{\n  \"x-version\": 1,\n");
+    std::fprintf(f, "{\n  \"x-version\": 2,\n");
     std::fprintf(
         f,
         "  \"description\": \"Execution-replay golden fills: "
@@ -109,7 +113,9 @@ int main(int argc, char** argv) {
         "slices joining the best bid, and parent 2 = IS SELL 600 over "
         "[t0+120s, t0+720s) in 3 front-loaded MARKET slices "
         "(risk_aversion 1.0). Pinned rules: cpp/include/iap/execution/"
-        "execution.hpp and algos.hpp (C++ port is the reference). Latency "
+        "execution.hpp and algos.hpp (C++ port is the reference; v2: children "
+        "expire at the parent end_ts, no fill outlives the window, displayed "
+        "liquidity consumed by an earlier child is not re-used). Latency "
         "decision/risk/wire 50000/50000/100000 ns + venue mean 150000 ns + "
         "SplitMix64(seed).below(jitter+1) per submission. ticks/qty/ts "
         "exact; fee/impact_cost at 1e-9.\",\n");

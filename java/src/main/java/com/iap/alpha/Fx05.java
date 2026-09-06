@@ -134,27 +134,70 @@ public final class Fx05 {
     }
 
     /**
+     * Which observable pairs carry IDENTIFIABLE relative-value information
+     * (pinned, API_ALPHA.md section 5): a pair is identified iff every FREE
+     * currency it touches appears in at least two observable pairs. A
+     * currency seen in a single observable pair has its factor absorb that
+     * pair's whole return, so the residual is 0 by construction — a
+     * constant, not a signal. On this universe AUD, CAD, CHF, JPY and NZD
+     * each appear in one pair, leaving the EUR/USD-GBP/USD-EUR/GBP triangle.
+     */
+    public static boolean[] identifiedPairs(boolean[] observable) {
+        double[][] a = freeExposureMatrix();
+        int[] counts = new int[NUM_FREE_CCY];
+        for (int i = 0; i < NUM_PAIRS; i++) {
+            if (!observable[i]) {
+                continue;
+            }
+            for (int j = 0; j < NUM_FREE_CCY; j++) {
+                if (a[i][j] != 0.0) {
+                    counts[j]++;
+                }
+            }
+        }
+        boolean[] out = new boolean[NUM_PAIRS];
+        for (int i = 0; i < NUM_PAIRS; i++) {
+            if (!observable[i]) {
+                continue;
+            }
+            boolean ok = true;
+            for (int j = 0; j < NUM_FREE_CCY; j++) {
+                if (a[i][j] != 0.0 && counts[j] < 2) {
+                    ok = false;
+                    break;
+                }
+            }
+            out[i] = ok;
+        }
+        return out;
+    }
+
+    /**
      * FX05 raw signals for one grid cross-section:
-     * {@code raw_i = -(r_i - fitted_i)} for pairs with finite r_i, NaN
-     * otherwise; all-NaN when fewer than 2 valid pairs.
+     * {@code raw_i = -(r_i - fitted_i)} for IDENTIFIED pairs, NaN otherwise
+     * (missing return, fewer than 2 valid pairs, or no identifiable
+     * relative value).
      */
     public static double[] rawSignals(double[] returns) {
         double[] raw = new double[NUM_PAIRS];
         java.util.Arrays.fill(raw, Double.NaN);
+        boolean[] observable = new boolean[NUM_PAIRS];
         int nValid = 0;
-        for (double r : returns) {
-            if (Double.isFinite(r)) {
+        for (int i = 0; i < NUM_PAIRS; i++) {
+            observable[i] = Double.isFinite(returns[i]);
+            if (observable[i]) {
                 nValid++;
             }
         }
         if (nValid < 2) {
             return raw; // no cross-pair information
         }
+        boolean[] identified = identifiedPairs(observable);
         double[] factors = new double[NUM_FREE_CCY];
         double[] fitted = new double[NUM_PAIRS];
         solveFactors(returns, factors, fitted);
         for (int i = 0; i < NUM_PAIRS; i++) {
-            if (Double.isFinite(returns[i])) {
+            if (identified[i]) {
                 raw[i] = -(returns[i] - fitted[i]);
             }
         }

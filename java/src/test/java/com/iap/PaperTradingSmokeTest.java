@@ -97,10 +97,7 @@ public class PaperTradingSmokeTest {
         opts.port = 0; // ephemeral
         PaperTrading.Result res = PaperTrading.run(opts);
         // server stops at session end; scrape the final registry directly
-        String text;
-        synchronized (res.metrics) {
-            text = res.metrics.toPrometheus();
-        }
+        String text = res.metrics.toPrometheus();
         for (String name : new String[] {"md_events_total",
                 "md_last_event_unixtime", "decode_latency_ns",
                 "book_update_latency_ns", "alpha_signals_total",
@@ -160,10 +157,7 @@ public class PaperTradingSmokeTest {
         PaperTrading.Result b = PaperTrading.run(opts);
 
         // the three adaptability gauges are on /metrics with the alpha label
-        String text;
-        synchronized (a.metrics) {
-            text = a.metrics.toPrometheus();
-        }
+        String text = a.metrics.toPrometheus();
         for (String name : new String[] {"alpha_live_vs_backtest_drift",
                 "alpha_rolling_ic", "alpha_lifecycle_state"}) {
             assertTrue("TYPE line for " + name,
@@ -207,10 +201,7 @@ public class PaperTradingSmokeTest {
         opts.maxEvents = 800;
         opts.baselinesDir = Paths.get("no", "such", "baselines");
         PaperTrading.Result res = PaperTrading.run(opts);
-        String text;
-        synchronized (res.metrics) {
-            text = res.metrics.toPrometheus();
-        }
+        String text = res.metrics.toPrometheus();
         assertTrue("no drift series without a baseline",
                 !text.contains("alpha_live_vs_backtest_drift"));
         assertTrue(text.contains("alpha_rolling_ic{alpha=\"EQ01\"} "));

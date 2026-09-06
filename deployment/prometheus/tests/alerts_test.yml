@@ -1,0 +1,254 @@
+# =============================================================================
+# promtool test rules — unit tests for the alerting rules (proposed tests 14
+# and 15 of the round-3 PLATFORM review, plus the sequence-gap and kill-switch
+# regressions).
+#
+# Run:  promtool test rules deployment/prometheus/tests/alerts_test.yml
+# (also run by tests/harness/check_deployment.py and CI)
+# =============================================================================
+
+rule_files:
+  - ../alerts.yml
+  - ../recording.yml
+
+evaluation_interval: 15s
+
+tests:
+  # ---------------------------------------------------------------------------
+  # Test 14 — StaleFeed on a replayed (historical) session must NOT fire.
+  # Regression: the old rule compared wall clock to the REPLAYED event time
+  # (`time() - md_last_event_unixtime > 5`), so every historical replay paged
+  # after one minute. The rule now reads the event-time gap between
+  # consecutive events, which is small on a healthy replay.
+  # ---------------------------------------------------------------------------
+  - interval: 15s
+    name: StaleFeed does not fire on a replayed session with 10-day-old data
+    input_series:
+      # event time ~ 2026-08-22, i.e. ~10 days behind wall clock
+      - series: 'md_last_event_unixtime{job="java-platform",service="java-platform"}'
+        values: '1787583604+15x40'
+      - series: 'md_event_time_gap_seconds{job="java-platform",service="java-platform"}'
+        values: '0.3+0x40'
+      - series: 'platform_mode{job="java-platform",service="java-platform",mode="asap"}'
+        values: '1+0x40'
+      - series: 'platform_session_state{job="java-platform",service="java-platform"}'
+        values: '1+0x40'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: StaleFeed
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: FeedWallClockStall
+        exp_alerts: []
+
+  # ---------------------------------------------------------------------------
+  # Test 14 (positive) — a real 6-second event-time gap fires StaleFeed.
+  # ---------------------------------------------------------------------------
+  - interval: 15s
+    name: StaleFeed fires on a 6s event-time gap
+    input_series:
+      - series: 'md_event_time_gap_seconds{job="java-platform",service="java-platform"}'
+        values: '6+0x20'
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: StaleFeed
+        exp_alerts: []          # `for: 1m` not yet satisfied
+      - eval_time: 5m
+        alertname: StaleFeed
+        exp_alerts:
+          - exp_labels:
+              alertname: StaleFeed
+              severity: page
+              domain: market-data
+              job: java-platform
+              service: java-platform
+            exp_annotations:
+              summary: "Stale market-data feed on java-platform (6.0s event-time gap)"
+              runbook: docs/runbooks/RUNBOOK_data_pipeline.md
+              description: >-
+                The gap between consecutive market events exceeded the 5s
+                staleness budget (risk.json stale_feed_timeout_ns). The risk
+                engine rejects orders against stale books (fail-closed); verify
+                feed handlers and venue connectivity. Runbook:
+                docs/runbooks/RUNBOOK_data_pipeline.md#stale-feed
+
+  # ---------------------------------------------------------------------------
+  # A wedged realtime session (no event processed for minutes of wall clock)
+  # fires FeedWallClockStall; the same series in `asap` mode does not.
+  # ---------------------------------------------------------------------------
+  - interval: 15s
+    name: FeedWallClockStall is scoped to realtime sessions
+    input_series:
+      - series: 'md_last_event_wallclock_unixtime{job="java-platform",service="java-platform"}'
+        values: '0+0x40'        # frozen: never advances
+      - series: 'platform_mode{job="java-platform",service="java-platform",mode="realtime"}'
+        values: '1+0x40'
+      - series: 'platform_session_state{job="java-platform",service="java-platform"}'
+        values: '1+0x40'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: FeedWallClockStall
+        exp_alerts:
+          - exp_labels:
+              alertname: FeedWallClockStall
+              severity: page
+              domain: market-data
+              job: java-platform
+              service: java-platform
+            exp_annotations:
+              summary: "No market event processed for 5m 0s on java-platform"
+              runbook: docs/runbooks/RUNBOOK_paper_trading.md
+              description: >-
+                A running realtime session has not processed an event in over a
+                minute of wall clock — a wedged decode/trading thread or a dead
+                upstream. /health returns 503 after 30s of no progress. Runbook:
+                docs/runbooks/RUNBOOK_paper_trading.md#feed-stall
+
+  # ---------------------------------------------------------------------------
+  # Test 15 — loss-limit utilization is computed against the EXPORTED limit
+  # gauge, not a hand-copied constant: -190,000 against a 250,000 limit is 76%
+  # and pages; the same P&L against a 500,000 limit does not.
+  # ---------------------------------------------------------------------------
+  - interval: 15s
+    name: LossLimitUtilizationHigh fires at 76 percent of the live limit
+    input_series:
+      - series: 'risk_daily_pnl{job="java-platform",service="java-platform"}'
+        values: '-190000+0x20'
+      - series: 'risk_limit{job="java-platform",service="java-platform",limit="max_daily_loss"}'
+        values: '250000+0x20'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: LossLimitUtilizationHigh
+        exp_alerts:
+          - exp_labels:
+              alertname: LossLimitUtilizationHigh
+              severity: page
+              domain: risk
+              job: java-platform
+              service: java-platform
+            exp_annotations:
+              summary: "Daily loss limit utilization 76%"
+              runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+              description: >-
+                Daily P&L (realized + unrealized, reporting currency) is below
+                -75% of global.max_daily_loss; at 100% the risk engine latches the
+                global kill switch (fail-closed, audit-logged). Runbook:
+                docs/runbooks/RUNBOOK_incident_kill_switch.md
+
+  - interval: 15s
+    name: LossLimitUtilizationHigh follows an approved limit override
+    input_series:
+      - series: 'risk_daily_pnl{job="java-platform",service="java-platform"}'
+        values: '-190000+0x20'
+      - series: 'risk_limit{job="java-platform",service="java-platform",limit="max_daily_loss"}'
+        values: '500000+0x20'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: LossLimitUtilizationHigh
+        exp_alerts: []
+
+  # ---------------------------------------------------------------------------
+  # A SINGLE sequence gap is an incident (max_sequence_gap_before_halt = 1).
+  # The old `rate > 0.1 for 2m` rule needed ~12 gaps/minute to notice.
+  # ---------------------------------------------------------------------------
+  - interval: 15s
+    name: One sequence gap fires SequenceGapDetected
+    input_series:
+      - series: 'md_sequence_gaps_total{job="java-platform",service="java-platform"}'
+        values: '0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1'
+      - series: 'book_stale{job="java-platform",service="java-platform",instrument="1"}'
+        values: '0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: SequenceGapDetected
+        exp_alerts:
+          - exp_labels:
+              alertname: SequenceGapDetected
+              severity: critical
+              domain: market-data
+              job: java-platform
+              service: java-platform
+            exp_annotations:
+              summary: "Sequence gap on java-platform (1 in 5m)"
+              runbook: docs/runbooks/RUNBOOK_data_pipeline.md
+              description: >-
+                At least one sequence gap. max_sequence_gap_before_halt = 1: the
+                affected book is marked stale and the risk engine rejects orders
+                against it until a SNAPSHOT recovers the stream. Check book_stale
+                for the instrument. Runbook:
+                docs/runbooks/RUNBOOK_data_pipeline.md#sequence-gaps
+      - eval_time: 3m
+        alertname: BookStale
+        exp_alerts:
+          - exp_labels:
+              alertname: BookStale
+              severity: critical
+              domain: market-data
+              job: java-platform
+              service: java-platform
+              instrument: "1"
+            exp_annotations:
+              summary: "Book stale for instrument 1 on java-platform"
+              runbook: docs/runbooks/RUNBOOK_data_pipeline.md
+              description: >-
+                A venue book has been stale for 2m — no SNAPSHOT recovery after a
+                sequence gap or a venue disconnect. Trading in that instrument is
+                fail-closed (STALE_PRICE / SEQUENCE_GAP rejects). Runbook:
+                docs/runbooks/RUNBOOK_data_pipeline.md#stale-feed
+
+  # ---------------------------------------------------------------------------
+  # The kill-switch page renders (this is the rule whose `default` template
+  # function made Prometheus refuse the ENTIRE alerts.yml at load time).
+  # ---------------------------------------------------------------------------
+  - interval: 15s
+    name: KillSwitchEngaged renders its annotations
+    input_series:
+      - series: 'risk_kill_switch_engaged{job="java-platform",service="java-platform"}'
+        values: '0 0 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: KillSwitchEngaged
+        exp_alerts:
+          - exp_labels:
+              alertname: KillSwitchEngaged
+              severity: page
+              domain: risk
+              job: java-platform
+              service: java-platform
+            exp_annotations:
+              summary: "Global kill switch engaged on java-platform"
+              runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+              description: >-
+                The global kill switch latched — trading is halted and every order
+                in scope is rejected pre-trade. The latch SURVIVES a restart
+                (PLATFORM_CONVENTIONS.md §12.3): a redeploy is not a re-arm path.
+                Do NOT clear without following the incident runbook and risk
+                approval. Scope and reason are in <state-dir>/risk_audit.jsonl.
+                Runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+
+  # ---------------------------------------------------------------------------
+  # A failed session pages immediately.
+  # ---------------------------------------------------------------------------
+  - interval: 15s
+    name: PlatformSessionFailed pages on state 3
+    input_series:
+      - series: 'platform_session_state{job="java-platform",service="java-platform"}'
+        values: '1 1 3 3 3 3'
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: PlatformSessionFailed
+        exp_alerts:
+          - exp_labels:
+              alertname: PlatformSessionFailed
+              severity: page
+              domain: infrastructure
+              job: java-platform
+              service: java-platform
+            exp_annotations:
+              summary: "Paper-trading session FAILED on java-platform"
+              runbook: docs/runbooks/RUNBOOK_paper_trading.md
+              description: >-
+                platform_session_state = 3 (FAILED). /health is 503 with the
+                reason; the container exits non-zero. Check the pod logs and
+                <state-dir>/config_audit.jsonl. Runbook:
+                docs/runbooks/RUNBOOK_paper_trading.md#failed-session

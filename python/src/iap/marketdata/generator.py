@@ -24,9 +24,13 @@ bit-identical output files):
     aggressive ADDs cross the book (marketable), far orders are pruned with
     real CANCELs.
   * Session structure: open auction (STATUS AUCTION + auction TRADE prints +
-    STATUS TRADING), one intraday HALT for a configured instrument/session,
-    close auction (STATUS AUCTION + prints + STATUS CLOSE). Multi-day capable;
-    books and sequences persist across sessions.
+    STATUS TRADING), one intraday HALT for a configured instrument/session
+    (optionally followed by a re-opening auction: STATUS AUCTION, crossing
+    ADDs that rest during the call, EXECUTEs that uncross them, auction
+    TRADE prints, STATUS TRADING — ``halt.reopen_auction``, off by default so
+    the pinned dataset is unchanged), close auction (STATUS AUCTION + prints
+    + STATUS CLOSE). Multi-day capable; books and sequences persist across
+    sessions.
 - FX (8 G10 pairs, venues LP1/LP2/PRI): QUOTE (full L1 side replace) + TRADE
   streams; one shared regime-switching mid per pair, venue-specific spreads
   and venue-specific latency in receive_ts.
@@ -47,7 +51,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from iap.core.codec import write_jsonl
-from iap.core.events import EventType, MarketEvent, SessionStatus, Side
+from iap.core.events import SYNTHETIC_ID_BASE, EventType, MarketEvent, SessionStatus, Side
 from iap.core.rng import SplitMix64
 from iap.orderbook.book import OrderBook
 from iap.reference.refdata import Instrument, ReferenceData, Venue
@@ -68,7 +72,8 @@ _DEFAULT_CONFIG = {
         "flow": {"excitation_kick": 1.4, "excitation_decay": 0.82, "max_excitation": 8.0},
         "book": {"max_resting_orders": 160, "qty_lots_max": 10},
         "mix": {"add": 0.46, "cancel": 0.26, "modify": 0.12, "execute": 0.16},
-        "halt": {"instrument": "SYN.EQ.007", "session_index": 0, "duration_s": 300},
+        "halt": {"instrument": "SYN.EQ.007", "session_index": 0, "duration_s": 300,
+                 "reopen_auction": False, "reopen_call_s": 60},
         "auction_prints": 3,
     },
     "fx": {
@@ -288,7 +293,9 @@ class MarketDataGenerator:
         for side in (int(Side.BID), int(Side.ASK)):
             for level in stream.book._sorted_levels(side):
                 for oid, q in level.orders.items():
-                    records.append((side, level.price, q, oid))
+                    # Synthetic (id-less) resting orders are re-emitted id-less.
+                    records.append((side, level.price, q,
+                                    oid if oid < SYNTHETIC_ID_BASE else 0))
         if not records:  # nothing to recover; emit a heartbeat to advance
             self._emit(stream, out, rng, ts, EventType.HEARTBEAT)
             return
@@ -420,6 +427,53 @@ class MarketDataGenerator:
             self._emit(stream, out, rng, ts, EventType.CANCEL, side=far[1],
                        price=far[2], qty=far[3], order_id=far[0])
 
+    def _reopen_auction(self, stream: _Stream, out: List[MarketEvent],
+                        rng: SplitMix64, t_end: int, price: _EffPrice) -> None:
+        """Re-opening auction after a halt (pinned synthetic model).
+
+        STATUS AUCTION opens the call ``reopen_call_s`` before ``t_end``;
+        during the call two crossing ADDs (a bid at the best ask, an ask at
+        the best bid) REST — the book is crossed, nothing matches while the
+        status is AUCTION — then the venue uncrosses them with two EXECUTEs,
+        prints the auction TRADEs at the mid, and STATUS TRADING resumes
+        continuous matching exactly at ``t_end``.
+        """
+        cfg = self.cfg["equities"]
+        book = stream.book
+        lot = stream.inst.lot_size
+        call_ns = int(cfg["halt"]["reopen_call_s"]) * NS
+        if call_ns < (cfg["auction_prints"] + 5) * 1_000_000:
+            raise ValueError("halt.reopen_call_s too short for the auction messages")
+        t = t_end - call_ns
+        self._emit(stream, out, rng, t, EventType.STATUS,
+                   qty=int(SessionStatus.AUCTION))
+        bb, ba = book.best_bid(), book.best_ask()
+        if bb is not None and ba is not None:
+            qty = lot * rng.randint(1, 3)
+            t += 1_000_000
+            bid_id = stream.new_order_id()
+            self._emit(stream, out, rng, t, EventType.ADD, side=int(Side.BID),
+                       price=ba[0], qty=qty, order_id=bid_id)
+            t += 1_000_000
+            ask_id = stream.new_order_id()
+            self._emit(stream, out, rng, t, EventType.ADD, side=int(Side.ASK),
+                       price=bb[0], qty=qty, order_id=ask_id)
+            # Uncross: the venue matches the two auction orders together.
+            t += 1_000_000
+            self._emit(stream, out, rng, t, EventType.EXECUTE, side=int(Side.BID),
+                       price=ba[0], qty=qty, order_id=bid_id)
+            t += 1_000_000
+            self._emit(stream, out, rng, t, EventType.EXECUTE, side=int(Side.ASK),
+                       price=bb[0], qty=qty, order_id=ask_id)
+            mid = max(1, int(round(price.mid_at(t))))
+            for i in range(cfg["auction_prints"]):
+                t += 1_000_000
+                self._emit(stream, out, rng, t, EventType.TRADE, side=i % 2,
+                           price=mid, qty=lot * rng.randint(1, 20),
+                           trade_id=stream.new_trade_id())
+        self._emit(stream, out, rng, t_end, EventType.STATUS,
+                   qty=int(SessionStatus.TRADING))
+
     def _eq_session_stream(
         self,
         stream: _Stream,
@@ -479,8 +533,11 @@ class MarketDataGenerator:
                 self._emit(stream, out, rng, halt_window[0], EventType.STATUS,
                            qty=int(SessionStatus.HALT))
                 t = halt_window[1]
-                self._emit(stream, out, rng, t, EventType.STATUS,
-                           qty=int(SessionStatus.TRADING))
+                if cfg["halt"].get("reopen_auction"):
+                    self._reopen_auction(stream, out, rng, t, price)
+                else:
+                    self._emit(stream, out, rng, t, EventType.STATUS,
+                               qty=int(SessionStatus.TRADING))
                 halted = True
             if t >= close_ns - 2_000_000:
                 break

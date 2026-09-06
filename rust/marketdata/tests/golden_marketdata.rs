@@ -9,6 +9,7 @@ use marketdata::{
 };
 use support::{golden_path, sha256_hex};
 
+
 fn load_json(name: &str) -> serde_json::Value {
     let text = std::fs::read_to_string(golden_path(name))
         .unwrap_or_else(|e| panic!("reading golden {name}: {e}"));
@@ -112,4 +113,52 @@ fn vendored_sha256_known_answers() {
         sha256_hex(b"abc"),
         "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
     );
+}
+
+#[test]
+fn jsonl_reject_cases_fixture_parity() {
+    // Shared fixture (tests/golden/jsonl_reject_cases.txt): every line before
+    // "# ACCEPT" must be rejected, every line after it accepted (round trip).
+    let text = std::fs::read_to_string(support::golden_path("jsonl_reject_cases.txt"))
+        .expect("read jsonl_reject_cases.txt");
+    let (mut rejected, mut accepted, mut accept_block) = (0usize, 0usize, false);
+    for line in text.lines() {
+        if line == "# ACCEPT" {
+            accept_block = true;
+            continue;
+        }
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        if accept_block {
+            let ev = marketdata::decode_jsonl_line(line)
+                .unwrap_or_else(|e| panic!("must accept {line:?}: {e}"));
+            assert_eq!(
+                marketdata::decode_jsonl_line(&marketdata::encode_jsonl_line(&ev)).unwrap(),
+                ev
+            );
+            accepted += 1;
+        } else {
+            assert!(marketdata::decode_jsonl_line(line).is_err(), "must reject {line:?}");
+            rejected += 1;
+        }
+    }
+    assert!(rejected >= 25 && accepted >= 5);
+}
+
+#[test]
+fn iap1_v2_trailer_detects_bit_flip_in_golden_vector() {
+    let events = marketdata::read_jsonl(support::golden_path("events_eq_mbo.jsonl")).unwrap();
+    let mut data = marketdata::encode_iap1(&events);
+    assert_eq!(data.len(), 16 + 72 * events.len() + 16);
+    data[16 + 72 * 499 + 14] = 0; // event_type of record 500
+    assert!(marketdata::decode_iap1(&data).is_err());
+    // Legacy v1 form (no trailer) still loads; the book then drops the record.
+    let n = data.len();
+    data.truncate(n - 16);
+    data[4] = 1;
+    let legacy = marketdata::decode_iap1_ex(&data).unwrap();
+    assert!(!legacy.integrity_checked);
+    assert_eq!(legacy.events.len(), 2000);
+    assert_eq!(legacy.events[499].event_type, 0);
 }

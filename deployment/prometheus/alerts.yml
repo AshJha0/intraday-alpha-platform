@@ -6,46 +6,109 @@
 #   critical — feed or platform integrity degraded; act now during session.
 #   warning  — investigate the same day.
 # Each alert links its runbook (docs/runbooks/).
-# Thresholds are pinned to configs/risk.json where a config limit exists
-# (stale_feed_timeout_ns = 5s, max_sequence_gap_before_halt = 1).
+#
+# Rules (PLATFORM_CONVENTIONS.md §12.7):
+#   - every expression references a metric a component in THIS deployment
+#     actually exports (§12.6 lists them); no aspirational targets.
+#   - annotations use Go text/template + Prometheus's own functions only
+#     (humanize, humanizePercentage, printf). Sprig/Helm helpers such as
+#     `default` are NOT defined and make Prometheus refuse the whole file.
+#   - thresholds that mirror a config limit divide by the exported
+#     `risk_limit{limit="..."}` gauge instead of a hand-copied constant, so a
+#     GOVERNANCE §3 limit change cannot leave the alert behind.
+#   - staleness is judged on EVENT time (md_event_time_gap_seconds), which is
+#     correct in replay and live alike; wall-clock budgets are scoped to
+#     `platform_mode{mode="realtime"}`.
+#
+# Validated by `promtool check rules` and unit-tested by
+# `promtool test rules deployment/prometheus/tests/*.yml`, both run by
+# tests/harness/check_deployment.py (and CI).
 # =============================================================================
 
 groups:
   - name: iap-market-data-health
     rules:
-      # Sequence-gap rate: any sustained gap rate on a live feed is a data
-      # integrity incident (books are marked stale on a gap; risk.json halts
-      # after 1 gap).
-      - alert: SequenceGapRate
-        expr: job:md_sequence_gaps:rate5m > 0.1
+      # A single sequence gap marks the book stale and fail-closes the risk
+      # engine (configs/risk.json market_data.max_sequence_gap_before_halt = 1),
+      # so ANY gap is the incident — a rate threshold would miss the one gap
+      # that silently stops trading. The counter is exported on every event
+      # (PLATFORM_CONVENTIONS.md §12.6), so this fires on the next scrape.
+      - alert: SequenceGapDetected
+        expr: increase(md_sequence_gaps_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          domain: market-data
+        annotations:
+          summary: "Sequence gap on {{ $labels.service }} ({{ $value | printf \"%.0f\" }} in 5m)"
+          description: >-
+            At least one sequence gap. max_sequence_gap_before_halt = 1: the
+            affected book is marked stale and the risk engine rejects orders
+            against it until a SNAPSHOT recovers the stream. Check book_stale
+            for the instrument. Runbook:
+            docs/runbooks/RUNBOOK_data_pipeline.md#sequence-gaps
+          runbook: docs/runbooks/RUNBOOK_data_pipeline.md
+
+      # Book stale (the consequence of a gap or a venue drop) is its own
+      # signal: it can persist for a whole session with no further gaps.
+      - alert: BookStale
+        expr: book_stale > 0
         for: 2m
         labels:
           severity: critical
           domain: market-data
         annotations:
-          summary: "Sequence gaps on {{ $labels.service }} ({{ $value | printf \"%.3f\" }}/s)"
-          description: >
-            Sustained sequence-gap rate above 0.1/s for 2m. Books downstream are
-            marked stale until SNAPSHOT recovery; risk is fail-closed on stale
-            books. Runbook: docs/runbooks/RUNBOOK_data_pipeline.md#sequence-gaps
+          summary: "Book stale for instrument {{ $labels.instrument }} on {{ $labels.service }}"
+          description: >-
+            A venue book has been stale for 2m — no SNAPSHOT recovery after a
+            sequence gap or a venue disconnect. Trading in that instrument is
+            fail-closed (STALE_PRICE / SEQUENCE_GAP rejects). Runbook:
+            docs/runbooks/RUNBOOK_data_pipeline.md#stale-feed
           runbook: docs/runbooks/RUNBOOK_data_pipeline.md
 
-      # Stale feed: no events for longer than the configured staleness budget
-      # (configs/risk.json market_data.stale_feed_timeout_ns = 5e9 ns).
+      # Stale feed, judged on EVENT time: the gap between the last two
+      # consecutive processed events exceeded the configured staleness budget
+      # (configs/risk.json market_data.stale_feed_timeout_ns = 5e9 ns). This
+      # is the same quantity the risk engine uses, so the alert and the
+      # engine agree — and it does NOT page on every historical replay the way
+      # `time() - md_last_event_unixtime` did.
       - alert: StaleFeed
-        expr: rate(md_events_total[1m]) == 0 or (time() - md_last_event_unixtime) > 5
+        expr: md_event_time_gap_seconds > 5
         for: 1m
         labels:
           severity: page
           domain: market-data
         annotations:
-          summary: "Stale market-data feed on {{ $labels.service }}"
-          description: >
-            No market events within the 5s staleness budget
-            (risk.json stale_feed_timeout_ns). Risk engine rejects orders
-            against stale books (fail-closed); verify feed handlers and venue
-            connectivity. Runbook: docs/runbooks/RUNBOOK_data_pipeline.md#stale-feed
+          summary: "Stale market-data feed on {{ $labels.service }} ({{ $value | printf \"%.1f\" }}s event-time gap)"
+          description: >-
+            The gap between consecutive market events exceeded the 5s
+            staleness budget (risk.json stale_feed_timeout_ns). The risk
+            engine rejects orders against stale books (fail-closed); verify
+            feed handlers and venue connectivity. Runbook:
+            docs/runbooks/RUNBOOK_data_pipeline.md#stale-feed
           runbook: docs/runbooks/RUNBOOK_data_pipeline.md
+
+      # Wall-clock liveness of the feed, scoped to a PACED (realtime) session:
+      # a wedged decoder thread stops advancing md_last_event_wallclock_unixtime
+      # even though event time never moves either. Inhibited for replay
+      # (`asap`) sessions, whose wall-clock pacing is meaningless.
+      - alert: FeedWallClockStall
+        expr: >
+          (time() - md_last_event_wallclock_unixtime) > 60
+          and on (job, instance) platform_mode{mode="realtime"} == 1
+          and on (job, instance) platform_session_state == 1
+        for: 1m
+        labels:
+          severity: page
+          domain: market-data
+        annotations:
+          summary: "No market event processed for {{ $value | humanizeDuration }} on {{ $labels.service }}"
+          description: >-
+            A running realtime session has not processed an event in over a
+            minute of wall clock — a wedged decode/trading thread or a dead
+            upstream. /health returns 503 after 30s of no progress. Runbook:
+            docs/runbooks/RUNBOOK_paper_trading.md#feed-stall
+          runbook: docs/runbooks/RUNBOOK_paper_trading.md
 
   - name: iap-alpha-health
     rules:
@@ -62,10 +125,13 @@ groups:
           domain: alpha
         annotations:
           summary: "Alpha signal rate collapsed on {{ $labels.service }}"
-          description: >
+          description: >-
             Signal rate under 20% of its rate 1h ago while market data is
             flowing — feature validity flags, warmup state or a wedged engine.
-            Runbook: docs/runbooks/RUNBOOK_paper_trading.md#signal-rate
+            NOTE: the demo deployment runs a FINITE session, so `offset 1h`
+            baselines are only meaningful for a continuously running feed
+            (RUNBOOK_paper_trading.md §1). Runbook:
+            docs/runbooks/RUNBOOK_paper_trading.md#signal-rate
           runbook: docs/runbooks/RUNBOOK_paper_trading.md
 
       # Live-vs-backtest drift (LIVE from java: com.iap.adaptive.DriftMonitor
@@ -85,69 +151,140 @@ groups:
           domain: alpha
         annotations:
           summary: "Live signal PSI drift on {{ $labels.alpha }} ({{ $value | printf \"%.2f\" }})"
-          description: >
+          description: >-
             Live signal distribution for {{ $labels.alpha }} has PSI > 0.25
             vs its backtest baseline for 30m — a significant shift under the
-            industry rule of thumb. The lifecycle gauge
-            (alpha_lifecycle_state) marks the alpha RETIRED at the same
-            edge; persistent drift is a retirement trigger per spec §20
-            step 13. Runbook: docs/runbooks/RUNBOOK_paper_trading.md#drift
+            industry rule of thumb. NOTE the lifecycle gauge
+            (alpha_lifecycle_state) is IC-gated, NOT PSI-gated, and is
+            OBSERVATIONAL in the live loop: a RETIRED alpha keeps trading at
+            full size until a human acts (API_ADAPTIVE.md §6,
+            PLATFORM_CONVENTIONS.md §12.6). Persistent drift is a retirement
+            trigger per spec §20 step 13 — raise it with research.
+            Runbook: docs/runbooks/RUNBOOK_paper_trading.md#drift
+          runbook: docs/runbooks/RUNBOOK_paper_trading.md
+
+      # The lifecycle gauge is observational, so RETIRED must page a human:
+      # nothing in the platform stops the allocation on its own.
+      - alert: AlphaLifecycleRetired
+        expr: alpha_lifecycle_state >= 2
+        for: 15m
+        labels:
+          severity: warning
+          domain: alpha
+        annotations:
+          summary: "Alpha {{ $labels.alpha }} is RETIRED by the lifecycle gauge"
+          description: >-
+            The IC-gated lifecycle state machine has marked {{ $labels.alpha }}
+            RETIRED (rolling IC below watch_ic_gate for retire_breach_evals
+            consecutive evaluations). The live loop does NOT halt allocation
+            on this signal — it is observational — so the position must be
+            reduced by a human decision. Runbook:
+            docs/runbooks/RUNBOOK_paper_trading.md#lifecycle
           runbook: docs/runbooks/RUNBOOK_paper_trading.md
 
   - name: iap-execution
     rules:
-      # Fill-rate drop: fills per accepted order far below baseline.
+      # Fill rate over the PLATFORM's own execution counters (exec_*, exported
+      # by com.iap.platform.PaperTrading — PLATFORM_CONVENTIONS.md §12.6).
+      # The previous version divided venue-simulator counters that no deployed
+      # component ever wrote, so it could never fire.
       - alert: FillRateDrop
         expr: >
-          job:fill_rate:ratio5m < 0.5 * (job:fill_rate:ratio5m offset 1h)
-          and job:venue_orders:rate5m > 0.1
+          job:exec_fill_rate:ratio5m < 0.5 * (job:exec_fill_rate:ratio5m offset 1h)
+          and job:exec_orders:rate5m > 0.1
         for: 10m
         labels:
           severity: critical
           domain: execution
         annotations:
-          summary: "Fill rate dropped on {{ $labels.service }}"
-          description: >
-            Fill rate below half its 1h-ago baseline while orders are flowing —
-            queue-position model, venue health or adverse regime shift.
-            Runbook: docs/runbooks/RUNBOOK_paper_trading.md#fill-rate
+          summary: "Fill rate dropped on {{ $labels.service }} ({{ $value | humanizePercentage }})"
+          description: >-
+            Fills per submitted child order below half their 1h-ago baseline
+            while orders are flowing — queue-position model, venue health or
+            adverse regime shift. Runbook:
+            docs/runbooks/RUNBOOK_paper_trading.md#fill-rate
+          runbook: docs/runbooks/RUNBOOK_paper_trading.md
+
+      # Pre-trade rejects are normal in small numbers; a sustained majority
+      # means the strategy is fighting a limit (or a stale book).
+      - alert: PreTradeRejectRatioHigh
+        expr: job:risk_rejected:ratio5m > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          domain: execution
+        annotations:
+          summary: "{{ $value | humanizePercentage }} of pre-trade checks rejected on {{ $labels.service }}"
+          description: >-
+            More than half of all risk decisions are rejects for 10m. Read the
+            rule_id distribution in the session's risk_audit.jsonl
+            (<state-dir>/risk_audit.jsonl) before changing any limit.
+            Runbook: docs/runbooks/RUNBOOK_paper_trading.md#rejects
           runbook: docs/runbooks/RUNBOOK_paper_trading.md
 
   - name: iap-risk
     rules:
-      # Loss-limit utilization: realized PnL approaching the global daily loss
-      # limit (configs/risk.json global.max_daily_loss = 250000).
-      # risk_realized_pnl is LIVE today from rust/risk.
+      # Loss-limit utilization against the LIVE limit gauge (§12.6), so a
+      # GOVERNANCE §3 limit change cannot leave this alert reading the old
+      # number. risk_daily_pnl is realized + unrealized in the reporting
+      # currency, the same unit the limit is expressed in (§12.1).
       - alert: LossLimitUtilizationHigh
-        expr: (-risk_realized_pnl) / 250000 > 0.75
+        expr: >-
+          (- risk_daily_pnl) / ignoring (limit)
+            risk_limit{limit="max_daily_loss"} > 0.75
         for: 1m
         labels:
           severity: page
           domain: risk
         annotations:
           summary: "Daily loss limit utilization {{ $value | humanizePercentage }}"
-          description: >
-            Realized loss above 75% of global.max_daily_loss; at 100% the risk
-            engine latches the global kill switch (fail-closed, audit-logged).
-            Runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+          description: >-
+            Daily P&L (realized + unrealized, reporting currency) is below
+            -75% of global.max_daily_loss; at 100% the risk engine latches the
+            global kill switch (fail-closed, audit-logged). Runbook:
+            docs/runbooks/RUNBOOK_incident_kill_switch.md
           runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
 
+      # risk_kill_switch_engaged carries no scope label (the gauge is the
+      # GLOBAL latch); scope detail lives in the audit JSONL.
       - alert: KillSwitchEngaged
         expr: risk_kill_switch_engaged > 0
         labels:
           severity: page
           domain: risk
         annotations:
-          summary: "Kill switch engaged ({{ $labels.scope | default \"global\" }})"
-          description: >
-            A kill switch latched — trading halted for the affected scope. Do
-            NOT clear without following the incident runbook and risk approval.
+          summary: "Global kill switch engaged on {{ $labels.service }}"
+          description: >-
+            The global kill switch latched — trading is halted and every order
+            in scope is rejected pre-trade. The latch SURVIVES a restart
+            (PLATFORM_CONVENTIONS.md §12.3): a redeploy is not a re-arm path.
+            Do NOT clear without following the incident runbook and risk
+            approval. Scope and reason are in <state-dir>/risk_audit.jsonl.
             Runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
           runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+
+      # Gross exposure against the live limit gauge (§12.6).
+      - alert: GrossNotionalUtilizationHigh
+        expr: >-
+          portfolio_gross_notional / ignoring (limit) group_left
+            risk_limit{limit="max_gross_notional"} > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          domain: risk
+        annotations:
+          summary: "Gross notional at {{ $value | humanizePercentage }} of the limit"
+          description: >-
+            Gross exposure has been above 90% of global.max_gross_notional for
+            5m; the next sizing decision will be rejected by the pre-trade
+            check. Runbook: docs/runbooks/RUNBOOK_paper_trading.md#exposure
+          runbook: docs/runbooks/RUNBOOK_paper_trading.md
 
   - name: iap-infrastructure
     rules:
       # GC pause: p99 pause above 10ms breaks the order-path latency budget.
+      # NOTE under ZGC the MX bean reports concurrent-cycle time rather than
+      # stop-the-world pause time (deployment/grafana/README.md).
       - alert: GcPauseHigh
         expr: job:jvm_gc_pause_ns:p99 > 10e6
         for: 5m
@@ -156,32 +293,49 @@ groups:
           domain: infrastructure
         annotations:
           summary: "JVM p99 GC pause {{ $value | humanize }}ns on {{ $labels.job }}"
-          description: >
+          description: >-
             p99 GC pause above 10ms for 5m; check heap sizing / allocation rate
             on hot paths (spec §23: allocation-conscious Java).
             Runbook: docs/runbooks/RUNBOOK_backtest.md#jvm
           runbook: docs/runbooks/RUNBOOK_backtest.md
 
-      # Queue depth (PLACEHOLDER contract): no
-      # producer emits eventbus_queue_depth yet — the rust eventbus crate has
-      # no exporter wired. The alert can never fire until one exists; kept as
-      # the pinned name/threshold contract (deployment/grafana/README.md).
-      - alert: QueueDepthHigh
-        expr: eventbus_queue_depth > 100000
-        for: 2m
+      # The session aborted (config load, decode or accounting failure). The
+      # process exits non-zero and `restart: on-failure` retries it.
+      - alert: PlatformSessionFailed
+        expr: platform_session_state == 3
+        for: 0m
         labels:
-          severity: critical
+          severity: page
           domain: infrastructure
         annotations:
-          summary: "Event-bus queue depth {{ $value | humanize }} on {{ $labels.service }}"
-          description: >
-            PLACEHOLDER metric — no producer exports eventbus_queue_depth yet.
-            Contract: sustained backlog above 100k events — downstream consumer
-            stalled or throughput regression; latency SLOs are already violated
-            at this depth. Runbook: docs/runbooks/RUNBOOK_data_pipeline.md#queue-depth
-          runbook: docs/runbooks/RUNBOOK_data_pipeline.md
+          summary: "Paper-trading session FAILED on {{ $labels.service }}"
+          description: >-
+            platform_session_state = 3 (FAILED). /health is 503 with the
+            reason; the container exits non-zero. Check the pod logs and
+            <state-dir>/config_audit.jsonl. Runbook:
+            docs/runbooks/RUNBOOK_paper_trading.md#failed-session
+          runbook: docs/runbooks/RUNBOOK_paper_trading.md
 
-      # A scrape target disappearing is itself an incident.
+      # An unexpected restart re-reads the checkpoint; a burst of restarts is
+      # a crash loop (and each one re-warms the book from the stream).
+      - alert: SessionRestartsClimbing
+        expr: increase(risk_session_restarts_total[15m]) > 2
+        for: 0m
+        labels:
+          severity: warning
+          domain: infrastructure
+        annotations:
+          summary: "{{ $value | printf \"%.0f\" }} session restarts in 15m on {{ $labels.service }}"
+          description: >-
+            The platform resumed from its checkpoint more than twice in 15m.
+            Risk state survives (positions, realized P&L, latches), but the
+            book and feature warm-up restart from the stream each time.
+            Runbook: docs/runbooks/RUNBOOK_paper_trading.md#restart-recovery
+          runbook: docs/runbooks/RUNBOOK_paper_trading.md
+
+      # A scrape target disappearing is itself an incident. Every job in
+      # prometheus.yml is a target that really exists (§12.7), so this can
+      # only fire on a real outage.
       - alert: TargetDown
         expr: up == 0
         for: 2m
@@ -190,7 +344,7 @@ groups:
           domain: infrastructure
         annotations:
           summary: "Scrape target {{ $labels.job }}/{{ $labels.instance }} down"
-          description: >
+          description: >-
             Prometheus cannot scrape {{ $labels.instance }}. If this is
             java-platform during a trading session, treat as a platform
             incident. Runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md

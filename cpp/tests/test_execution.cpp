@@ -42,7 +42,7 @@ ExecConfig test_config(std::int64_t jitter_ns = 0) {
     iap::InstrumentSpec ins;
     ins.instrument_id = INS;
     ins.tick_size = 0.01;
-    ins.lot_size = 1.0;
+    ins.qty_unit = 1.0;
     ins.adv = 1'000'000.0;
     cfg.instruments[INS] = ins;
     return cfg;
@@ -76,6 +76,22 @@ struct EventFeeder {
         return ev(ts, 2, side, px, qty, oid);
     }
     MarketEvent heartbeat(std::int64_t ts) { return ev(ts, 9, 0, 0, 0, 0); }
+    MarketEvent status(std::int64_t ts, iap::SessionStatus st) {
+        return ev(ts, 8, 0, 0, static_cast<std::int64_t>(st), 0);
+    }
+    // A sequence gap on the venue stream (skips one sequence number).
+    MarketEvent gap_add(std::int64_t ts, std::uint8_t side, std::int64_t px,
+                        std::int64_t qty, std::uint64_t oid) {
+        ++seq;
+        return add(ts, side, px, qty, oid);
+    }
+    MarketEvent snapshot(std::int64_t ts, std::uint8_t side, std::int64_t px,
+                         std::int64_t qty, std::uint64_t oid,
+                         std::uint64_t countdown) {
+        ++seq;
+        return MarketEvent::of(seq, INS, VEN, ts, ts, seq, 7, side, px, qty,
+                               oid, countdown);
+    }
 };
 
 // Seed a two-sided book: bids 100x300 (order 11), 99x400 (12); asks
@@ -380,7 +396,7 @@ TEST(ExecFees, FxCommissionPerMillionNotional) {
     cfg.venues[VEN].is_fx = true;
     cfg.venues[VEN].commission_per_million = 2.5;
     cfg.instruments[INS].tick_size = 1e-05;
-    cfg.instruments[INS].lot_size = 1000.0;
+    cfg.instruments[INS].qty_unit = 1000.0;
     ExecutionSimulator sim(cfg);
     EventFeeder f;
     sim.on_event(f.add(T0, 0, 108650, 500, 11));
@@ -466,12 +482,17 @@ TEST(ExecLifecycle, CancelAndValidation) {
     EventFeeder f;
     seed_book(sim, f);
     const auto id = sim.submit(child(0, OrderType::LIMIT, 99, 10, T0 + 10));
-    sim.cancel(id);
+    // Rule 7: the cancel travels the same latency path; it is applied at
+    // the first event at/after its arrival (never before the order's own).
+    sim.cancel(id, T0 + 10);
+    EXPECT_EQ(sim.orders().at(id).state, OrderState::PENDING);
+    sim.on_event(f.heartbeat(T0 + 10 + LAT + 1));
     EXPECT_EQ(sim.orders().at(id).state, OrderState::CANCELLED);
-    sim.cancel(id);  // idempotent on terminal states
+    EXPECT_EQ(sim.orders().at(id).cancel_reason, iap::CancelReason::USER);
+    sim.cancel(id, T0 + 20);  // idempotent on terminal states
     sim.on_event(f.exec(T0 + 2'000'000, 0, 99, 500, 12));
     EXPECT_TRUE(sim.fills().empty());  // cancelled orders never fill
-    EXPECT_THROW(sim.cancel(9999), std::invalid_argument);
+    EXPECT_THROW(sim.cancel(9999, T0), std::invalid_argument);
     ChildOrder bad = child(0, OrderType::LIMIT, 0, 10, T0);
     EXPECT_THROW(sim.submit(bad), std::invalid_argument);  // limit needs px
     bad = child(0, OrderType::MARKET, 0, 0, T0);
@@ -479,6 +500,214 @@ TEST(ExecLifecycle, CancelAndValidation) {
     bad = child(0, OrderType::MARKET, 0, 10, T0);
     bad.venue_id = 999;
     EXPECT_THROW(sim.submit(bad), std::invalid_argument);  // unknown venue
+}
+
+// ------------------------------------------------ round-3 scenario tests ---
+
+// Scenario: LSE-style halt at 09:03 followed by a re-open auction. A MARKET
+// child arriving during the halt is cancelled (VENUE_NOT_TRADING), a LIMIT
+// child rests without executing, and at the uncross (first TRADING event)
+// the crossed resting order fills at the TOUCH, not at its limit (rule 8).
+TEST(ScenarioHaltThenReopenAuction, NoFillDuringHaltUncrossAtTouch) {
+    ExecutionSimulator sim(test_config());
+    EventFeeder f;
+    seed_book(sim, f);
+    sim.on_event(f.status(T0 + 100, iap::SessionStatus::HALT));
+    EXPECT_FALSE(ExecutionSimulator::venue_open(sim.venue_book(INS, VEN)));
+    const auto mkt = sim.submit(child(0, OrderType::MARKET, 0, 50, T0 + 200));
+    const auto lim = sim.submit(child(0, OrderType::LIMIT, 103, 60, T0 + 200));
+    sim.on_event(f.heartbeat(T0 + 200 + LAT + 1));  // both arrive: halted
+    EXPECT_EQ(sim.orders().at(mkt).state, OrderState::CANCELLED);
+    EXPECT_EQ(sim.orders().at(mkt).cancel_reason,
+              iap::CancelReason::VENUE_NOT_TRADING);
+    EXPECT_EQ(sim.counters().venue_not_trading_cancels, 1u);
+    EXPECT_EQ(sim.orders().at(lim).state, OrderState::ACTIVE);
+    EXPECT_TRUE(sim.fills().empty()) << "no fill through a halt";
+    // Observed executions at our level during the halt do not touch us.
+    sim.on_event(f.exec(T0 + 300, 1, 101, 200, 21));
+    EXPECT_TRUE(sim.fills().empty());
+    // Auction call: a new ask posts at 100 (the uncross price), still no fill.
+    sim.on_event(f.status(T0 + 400, iap::SessionStatus::AUCTION));
+    sim.on_event(f.add(T0 + 500, 1, 100, 500, 23));
+    EXPECT_TRUE(sim.fills().empty());
+    // Uncross: TRADING again -> the crossed resting buy fills at the touch.
+    sim.on_event(f.status(T0 + 600, iap::SessionStatus::TRADING));
+    ASSERT_EQ(sim.fills().size(), 1u);
+    EXPECT_EQ(sim.fills()[0].price_ticks, 100) << "touch, not the 103 limit";
+    EXPECT_EQ(sim.fills()[0].qty, 60);
+    EXPECT_EQ(sim.fills()[0].ts, T0 + 600);
+    EXPECT_EQ(sim.counters().reopen_touch_fills, 1u);
+    EXPECT_EQ(sim.orders().at(lim).state, OrderState::FILLED);
+}
+
+// Scenario: multicast storm gaps the venue feed. While the book is stale no
+// child fills (aggressive arrivals cancel), and after the SNAPSHOT recovery
+// execution resumes against the fresh display.
+TEST(ScenarioStaleBookNoFill, GapThenSnapshotRecovery) {
+    ExecutionSimulator sim(test_config());
+    EventFeeder f;
+    seed_book(sim, f);
+    sim.on_event(f.gap_add(T0 + 100, 0, 98, 100, 13));  // gap -> stale
+    ASSERT_TRUE(sim.venue_book(INS, VEN)->stale());
+    const auto a = sim.submit(child(1, OrderType::MARKET, 0, 50, T0 + 200));
+    sim.on_event(f.heartbeat(T0 + 200 + LAT + 1));
+    EXPECT_EQ(sim.orders().at(a).state, OrderState::CANCELLED);
+    EXPECT_EQ(sim.orders().at(a).cancel_reason,
+              iap::CancelReason::VENUE_NOT_TRADING);
+    EXPECT_TRUE(sim.fills().empty());
+    // Snapshot burst (countdown 2, 1, 0) rebuilds the book and clears stale.
+    sim.on_event(f.snapshot(T0 + 300, 0, 100, 300, 31, 2));
+    sim.on_event(f.snapshot(T0 + 301, 1, 101, 200, 32, 1));
+    sim.on_event(f.snapshot(T0 + 302, 1, 102, 500, 33, 0));
+    ASSERT_FALSE(sim.venue_book(INS, VEN)->stale());
+    const auto b = sim.submit(child(1, OrderType::MARKET, 0, 50, T0 + 400));
+    sim.on_event(f.heartbeat(T0 + 400 + LAT + 1));
+    ASSERT_EQ(sim.fills().size(), 1u);
+    EXPECT_EQ(sim.fills()[0].order_id, b);
+    EXPECT_EQ(sim.fills()[0].price_ticks, 100);
+}
+
+// Rule 3b: two MARKET children activating on the same displayed state
+// share one copy of the liquidity; the display refresh restores it.
+TEST(ScenarioLiquidityNotReused, SecondChildSeesTheThinRemainder) {
+    ExecutionSimulator sim(test_config());
+    EventFeeder f;
+    seed_book(sim, f);  // asks 101x200, 102x500 = 700 displayed
+    const auto c1 = sim.submit(child(0, OrderType::MARKET, 0, 1000, T0 + 10));
+    const auto c2 = sim.submit(child(0, OrderType::MARKET, 0, 1000, T0 + 10));
+    sim.on_event(f.heartbeat(T0 + 10 + LAT + 1));  // both activate here
+    std::int64_t taken = 0;
+    for (const auto& fl : sim.fills()) taken += fl.qty;
+    EXPECT_EQ(taken, 700) << "total taker qty <= displayed depth";
+    EXPECT_EQ(sim.orders().at(c1).remaining, 300);
+    EXPECT_EQ(sim.orders().at(c2).remaining, 1000);
+    EXPECT_EQ(sim.orders().at(c2).state, OrderState::CANCELLED);
+    EXPECT_GE(sim.counters().overlay_thinned_fills, 1u);
+    // The display refreshes (a new ask of 150 at 101 on top of the 200 we
+    // took): exactly the NEW 150 is available (overlay = min(200, 350)).
+    sim.on_event(f.add(T0 + 20, 1, 101, 150, 24));
+    const auto c3 = sim.submit(child(0, OrderType::MARKET, 0, 200, T0 + 30));
+    sim.on_event(f.heartbeat(T0 + 30 + LAT + 1));
+    EXPECT_EQ(sim.orders().at(c3).state, OrderState::CANCELLED);
+    EXPECT_EQ(sim.orders().at(c3).remaining, 50);
+    EXPECT_EQ(sim.fills().back().price_ticks, 101);
+    EXPECT_EQ(sim.fills().back().qty, 150);
+    // FOK availability also nets the overlay: 101/102 still display 350/500
+    // but everything was consumed -> a 100-lot FOK at 102 misses.
+    const auto fok = sim.submit(child(0, OrderType::FOK, 102, 100, T0 + 40));
+    sim.on_event(f.heartbeat(T0 + 40 + LAT + 1));
+    EXPECT_EQ(sim.orders().at(fok).state, OrderState::CANCELLED);
+    EXPECT_EQ(sim.orders().at(fok).remaining, 100);
+    // An observed EXECUTE of 300 at 101 (display 350 -> 50) caps the
+    // overlay at 50: still nothing available for us.
+    sim.on_event(f.exec(T0 + 50, 1, 101, 300, 21));
+    const auto c4 = sim.submit(child(0, OrderType::IOC, 101, 10, T0 + 60));
+    sim.on_event(f.heartbeat(T0 + 60 + LAT + 1));
+    EXPECT_EQ(sim.orders().at(c4).remaining, 10);
+    // ... until the level empties and is re-posted.
+    sim.on_event(f.cancel(T0 + 70, 1, 101, 50, 21));
+    sim.on_event(f.add(T0 + 80, 1, 101, 40, 25));
+    const auto c5 = sim.submit(child(0, OrderType::IOC, 101, 10, T0 + 90));
+    sim.on_event(f.heartbeat(T0 + 90 + LAT + 1));
+    EXPECT_EQ(sim.orders().at(c5).state, OrderState::FILLED);
+}
+
+// Rule 6: FX impact uses base units (qty * qty_unit / adv), identical to
+// the research cost model (iap.backtest.costs / CostModel.java).
+TEST(ScenarioFxImpact, ScalesWithLotSizeLikeTheResearchModel) {
+    ExecConfig cfg = test_config();
+    cfg.venues[VEN].is_fx = true;
+    cfg.venues[VEN].commission_per_million = 2.5;
+    cfg.instruments[INS].tick_size = 1e-05;
+    cfg.instruments[INS].qty_unit = 1000.0;
+    cfg.instruments[INS].adv = 4e9;
+    ExecutionSimulator sim(cfg);
+    EventFeeder f;
+    sim.on_event(f.add(T0, 0, 108650, 5000, 11));
+    sim.on_event(f.add(T0 + 1, 1, 108660, 5000, 21));
+    sim.submit(child(0, OrderType::MARKET, 0, 1000, T0 + 10));
+    sim.on_event(f.heartbeat(T0 + 10 + LAT + 1));
+    ASSERT_EQ(sim.fills().size(), 1u);
+    const auto& fl = sim.fills()[0];
+    // research: impact_bps = coeff * (|q| * unit / adv * 100),
+    //           impact = impact_bps * 1e-4 * |q| * unit * mid
+    const double unit = 1000.0;
+    const double price = 108660 * 1e-05;
+    const double impact_bps = 2.0 * (1000.0 * unit / 4e9 * 100.0);
+    const double expected = impact_bps * 1e-4 * 1000.0 * unit * price;
+    EXPECT_NEAR(fl.impact_cost, expected, 1e-12);
+    EXPECT_NEAR(impact_bps, 0.05, 1e-15);
+    // commission per million of notional (rule 5)
+    EXPECT_NEAR(fl.fee, 2.5 * (1000.0 * unit * price) / 1e6, 1e-12);
+}
+
+// Rule 7: a cancel issued between arrival and the next event cannot
+// prevent a fill the venue would have made before the cancel arrives.
+TEST(ScenarioCancelLatency, CancelCannotUndoAnEarlierFill) {
+    ExecutionSimulator sim(test_config());
+    EventFeeder f;
+    seed_book(sim, f);
+    const auto id = sim.submit(child(0, OrderType::LIMIT, 100, 50, T0 + 10));
+    sim.on_event(f.heartbeat(T0 + 10 + LAT + 1));  // resting, 300 ahead
+    // Strategy decides to cancel at T0+1ms; the cancel arrives at +LAT.
+    sim.cancel(id, T0 + 1'000'000);
+    EXPECT_EQ(sim.orders().at(id).cancel_arrival_ts, T0 + 1'000'000 + LAT);
+    // The market trades through our level BEFORE the cancel arrives.
+    sim.on_event(f.exec(T0 + 1'100'000, 0, 99, 400, 12));
+    ASSERT_EQ(sim.fills().size(), 1u);
+    EXPECT_EQ(sim.orders().at(id).state, OrderState::FILLED);
+    // The cancel's arrival is then a no-op (order already terminal).
+    sim.on_event(f.heartbeat(T0 + 2'000'000));
+    EXPECT_EQ(sim.orders().at(id).state, OrderState::FILLED);
+    EXPECT_EQ(sim.counters().user_cancels, 0u);
+    // Control: a cancel that arrives first prevents the later fill.
+    const auto id2 = sim.submit(child(0, OrderType::LIMIT, 100, 50, T0 + 3'000'000));
+    sim.on_event(f.heartbeat(T0 + 3'000'000 + LAT + 1));
+    sim.cancel(id2, T0 + 3'100'000);
+    sim.on_event(f.heartbeat(T0 + 3'100'000 + LAT + 1));  // cancel lands
+    EXPECT_EQ(sim.orders().at(id2).state, OrderState::CANCELLED);
+    sim.on_event(f.exec(T0 + 4'000'000, 0, 99, 400, 12));
+    EXPECT_EQ(sim.fills().size(), 1u) << "cancelled order never fills";
+    EXPECT_EQ(sim.counters().user_cancels, 1u);
+}
+
+// Rule 7: a cancel never overtakes its own order — issued before the order
+// arrives, it takes effect at the order's arrival (after activation).
+TEST(ScenarioCancelLatency, CancelNeverOvertakesItsOrder) {
+    ExecutionSimulator sim(test_config(50'000));  // jittered venue
+    EventFeeder f;
+    seed_book(sim, f);
+    const auto id = sim.submit(child(0, OrderType::MARKET, 0, 50, T0 + 10));
+    sim.cancel(id, T0 + 10);  // same decision time, different jitter draw
+    const auto& o = sim.orders().at(id);
+    EXPECT_GE(o.cancel_arrival_ts, o.arrival_ts);
+    sim.on_event(f.heartbeat(T0 + 10 + LAT + 100'000));
+    // The MARKET order activated (and filled) before the cancel applied.
+    EXPECT_EQ(o.state, OrderState::FILLED);
+    ASSERT_EQ(sim.fills().size(), 1u);
+}
+
+// Time-in-force: expire_ts expires pending AND resting orders at the first
+// event at/after it, before activation, with no latency.
+TEST(ScenarioExpiry, ExpiresPendingAndRestingOrders) {
+    ExecutionSimulator sim(test_config());
+    EventFeeder f;
+    seed_book(sim, f);
+    auto rest = child(0, OrderType::LIMIT, 100, 50, T0 + 10);
+    rest.expire_ts = T0 + 5'000'000;
+    const auto r = sim.submit(rest);
+    sim.on_event(f.heartbeat(T0 + 10 + LAT + 1));
+    EXPECT_EQ(sim.orders().at(r).state, OrderState::ACTIVE);
+    auto late = child(0, OrderType::MARKET, 0, 50, T0 + 4'900'000);
+    late.expire_ts = T0 + 5'000'000;  // expires before it can arrive
+    const auto l = sim.submit(late);
+    sim.on_event(f.exec(T0 + 5'000'000, 0, 99, 400, 12));  // trade-through!
+    EXPECT_EQ(sim.orders().at(r).state, OrderState::CANCELLED);
+    EXPECT_EQ(sim.orders().at(r).cancel_reason, iap::CancelReason::EXPIRED);
+    EXPECT_EQ(sim.orders().at(l).state, OrderState::CANCELLED);
+    EXPECT_EQ(sim.orders().at(l).cancel_reason, iap::CancelReason::EXPIRED);
+    EXPECT_TRUE(sim.fills().empty()) << "expired before the trade-through";
+    EXPECT_EQ(sim.counters().expired_orders, 2u);
 }
 
 }  // namespace

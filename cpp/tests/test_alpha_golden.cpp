@@ -12,6 +12,8 @@
 
 #include <gtest/gtest.h>
 
+#include <fstream>
+
 #include <cmath>
 #include <limits>
 #include <string>
@@ -197,18 +199,22 @@ TEST(AlphaScoring, Fx05DegenerateCrossSections) {
     r[0] = 1e-4;
     auto raws = iap::fx05_raw_signals(r);
     for (double v : raws) EXPECT_TRUE(std::isnan(v));
-    // Two valid pairs: signals defined for exactly those two.
+    // Two valid pairs that share no currency: EUR/USD and GBP/USD load
+    // disjoint factors, so each return is attributed entirely to its own
+    // currency and the residual is 0 BY CONSTRUCTION. Round-3 rule: such
+    // pairs are not identified and score NaN, never a constant.
     r[1] = -5e-5;
+    raws = iap::fx05_raw_signals(r);
+    for (double v : raws) EXPECT_TRUE(std::isnan(v));
+    // adding EUR/GBP identifies the triangle
+    r[7] = 2e-5;
     raws = iap::fx05_raw_signals(r);
     EXPECT_TRUE(std::isfinite(raws[0]));
     EXPECT_TRUE(std::isfinite(raws[1]));
-    for (std::size_t i = 2; i < iap::FX_NUM_PAIRS; ++i) {
+    EXPECT_TRUE(std::isfinite(raws[7]));
+    for (std::size_t i = 2; i < 7; ++i) {
         EXPECT_TRUE(std::isnan(raws[i]));
     }
-    // EUR/USD and GBP/USD load disjoint factors: minimum-norm attributes
-    // each return fully to its own currency => residuals (and raws) are 0.
-    EXPECT_NEAR(raws[0], 0.0, 1e-15);
-    EXPECT_NEAR(raws[1], 0.0, 1e-15);
 }
 
 TEST(AlphaScoring, Fx05ResidualOrthogonalToExposures) {
@@ -255,3 +261,78 @@ TEST(AlphaScoring, RawSignalFormulaPinned) {
 }
 
 }  // namespace
+
+// ---------------------------------------------------------------------------
+// Round-3: parameter-file validation and the dead-alpha rule
+// ---------------------------------------------------------------------------
+
+TEST(AlphaParams, DeadAlphaScoresConfidenceZero) {
+    iap::LinearZParams p;
+    p.alpha_id = "EQ01";
+    p.mu = 0.0;
+    p.sigma = 0.0;   // no evidence: the fit found nothing
+    p.beta = 0.0;
+    p.z_clip = 4.0;
+    p.conf_scale = 2.0;
+    EXPECT_TRUE(p.is_dead());
+    double er = 1.0;
+    double conf = 1.0;
+    iap::score_linear_z(3.0, p, er, conf);
+    EXPECT_EQ(er, 0.0);
+    EXPECT_EQ(conf, 0.0) << "a dead alpha must never report conviction";
+}
+
+TEST(AlphaParams, LoaderRejectsEditedOrImpossibleFiles) {
+    const std::string dir = ::testing::TempDir();
+    auto write = [&](const std::string& name, const std::string& body) {
+        const std::string path = dir + "/" + name;
+        std::ofstream f(path);
+        f << body;
+        f.close();
+        return path;
+    };
+    const std::string head =
+        R"({"feature_version":"aaaa","params":{"EQ01":{"model":"linear_z_v1",)"
+        R"("alpha_id":"EQ01","horizon":"1s","mu":0.0,"beta_fit":1.0,)"
+        R"("features":["f"],)";
+    const std::string tail = R"(}}})";
+
+    // an edited z_clip is rejected (the ports obey the file's value)
+    EXPECT_THROW(iap::load_alpha_params(write("z.json",
+        head + R"("sigma":1.0,"beta":1.0,"z_clip":3.0,"conf_scale":2.0)" + tail)),
+        std::invalid_argument);
+    // sigma <= 0 with a live beta is impossible
+    EXPECT_THROW(iap::load_alpha_params(write("s.json",
+        head + R"("sigma":0.0,"beta":1.0,"z_clip":4.0,"conf_scale":2.0)" + tail)),
+        std::invalid_argument);
+    // a foreign feature_version is rejected when the caller pins one
+    const std::string ok = write("ok.json",
+        head + R"("sigma":1.0,"beta":1.0,"z_clip":4.0,"conf_scale":2.0)" + tail);
+    EXPECT_THROW(iap::load_alpha_params(ok, "bbbb"), std::invalid_argument);
+    // the header check fires BEFORE the per-alpha checks: with the matching
+    // version the loader gets as far as the (here absent) other alphas
+    try {
+        iap::load_alpha_params(ok, "aaaa");
+    } catch (const std::invalid_argument& e) {
+        EXPECT_NE(std::string(e.what()).find("lacks"), std::string::npos)
+            << e.what();
+    }
+}
+
+TEST(AlphaParams, Fx05OnlyScoresIdentifiedPairs) {
+    // AUD, CAD, CHF, JPY and NZD each appear in ONE pair: their factor
+    // absorbs the whole return, so the residual is 0 by construction.
+    std::array<bool, iap::FX_NUM_PAIRS> all_obs;
+    all_obs.fill(true);
+    const auto ident = iap::fx05_identified_pairs(all_obs);
+    const bool want[8] = {true, true, false, false, false, false, false, true};
+    for (std::size_t i = 0; i < 8; ++i) {
+        EXPECT_EQ(ident[i], want[i]) << "pair index " << i;
+    }
+    std::array<double, iap::FX_NUM_PAIRS> returns;
+    returns.fill(0.001);
+    const auto raw = iap::fx05_raw_signals(returns);
+    for (std::size_t i = 0; i < 8; ++i) {
+        EXPECT_EQ(std::isfinite(raw[i]), want[i]) << "signal " << i;
+    }
+}

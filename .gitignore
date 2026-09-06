@@ -2,6 +2,7 @@
 # `python -m iap.features`; docs/BUILD_NOTES.md: "do not commit generated data")
 data/raw/
 data/normalized/
+data/orderbooks/
 data/features/
 # data/reference/feature_registry.json is tracked (the feature_version source)
 
@@ -9,13 +10,11 @@ data/features/
 research/models/*/model.pkl
 *.parquet
 
-# --- build trees
-cpp/build/
-rust/target/
-java/out/
-build/
-target/
-out/
+# --- build trees (ANCHORED: a bare `build/`/`out/`/`target/` pattern would
+# swallow any directory of that name anywhere, e.g. a future research/out/)
+/cpp/build/
+/rust/target/
+/java/out/
 
 # --- python
 __pycache__/
@@ -26,8 +25,17 @@ python/build/
 python/dist/
 
 # --- editor / OS / logs
-*.log
+# NOTE: only the JVM's own stdout redirects; audit logs are *.jsonl under the
+# platform state directory and are deliberately NOT ignored (a committed
+# incident record must be possible).
+/logs/
+*.tmp
 *.swp
 .DS_Store
 .idea/
 .vscode/
+
+# --- platform state (PLATFORM_CONVENTIONS.md §12.3): risk snapshots, session
+# accounting and audit JSONL are runtime artefacts of a session, not sources.
+/java/out/state/
+/data/state/

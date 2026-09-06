@@ -11,12 +11,16 @@ from iap.experiment.tracker import (
     data_version,
     feature_version,
     git_commit,
+    git_status,
     hardware_summary,
+    library_versions,
 )
 
 REQUIRED_MANIFEST_KEYS = {
-    "experiment_id", "git_commit", "data_version", "feature_version",
-    "model_version", "hyperparams", "train_window", "test_window", "hardware",
+    "experiment_id", "git_commit", "git_dirty", "git_dirty_hash",
+    "data_version", "feature_version", "model_version", "hyperparams",
+    "features", "target", "train_window", "test_window", "folds",
+    "library_versions", "hardware",
 }
 
 
@@ -63,7 +67,7 @@ def test_manifest_versions_are_real(tracker, tmp_path):
         len(commit) == 40 and all(c in "0123456789abcdef" for c in commit))
     # an empty directory is never a checkout -> pinned fallback string
     assert git_commit(tmp_path) == "unversioned-workspace"
-    # qc_report + feature registry exist in this repo -> sha256 hex digests
+    # normalized data + feature registry exist in this repo -> sha256 digests
     assert len(data_version()) == 64
     assert len(feature_version()) == 64
     hw = hardware_summary()
@@ -98,3 +102,62 @@ def test_ledger_persists_across_instances(tmp_path):
     assert ledger["experiment_count"] == 2
     assert [r["run_id"] for r in ledger["runs"]] == ["run_0001_a",
                                                      "run_0002_b"]
+
+
+# -- round-3: real provenance ---------------------------------------------
+
+
+def test_manifest_records_real_commit_and_dirty_flag():
+    """In a git checkout the manifest carries the 40-hex HEAD plus an
+    explicit dirty flag — never the string 'unversioned-workspace'."""
+    st = git_status()
+    if st["git_commit"] == "unversioned-workspace":
+        pytest.skip("not a git checkout")
+    assert len(st["git_commit"]) == 40
+    assert all(c in "0123456789abcdef" for c in st["git_commit"])
+    assert st["git_dirty"] in (True, False)
+    if st["git_dirty"]:
+        assert len(st["git_dirty_hash"]) == 64
+    else:
+        assert st["git_dirty_hash"] is None
+
+
+def test_data_version_hashes_content_not_paths(tmp_path):
+    """The fingerprint is invariant under moving the checkout and changes
+    when one byte of a normalized file changes."""
+    import shutil
+
+    src = data_version()
+    a = tmp_path / "a" / "data" / "normalized"
+    b = tmp_path / "bbbbbbbbbbbb" / "data" / "normalized"
+    a.mkdir(parents=True)
+    b.mkdir(parents=True)
+    for name, payload in (("eq_1.normalized.iap1", b"one"),
+                          ("fx_1.normalized.iap1", b"two")):
+        (a / name).write_bytes(payload)
+        (b / name).write_bytes(payload)
+    va = data_version(tmp_path / "a")
+    vb = data_version(tmp_path / "bbbbbbbbbbbb")
+    assert va == vb, "moving the checkout must not change data_version"
+    assert va != src and len(va) == 64
+    # one changed byte changes the fingerprint
+    (b / "eq_1.normalized.iap1").write_bytes(b"onE")
+    assert data_version(tmp_path / "bbbbbbbbbbbb") != vb
+    # an absent dataset is named, never silently hashed to something
+    shutil.rmtree(a)
+    assert data_version(tmp_path / "a") == "no-normalized-data"
+
+
+def test_manifest_records_features_target_folds_and_libraries(tracker):
+    run_id = tracker.new_run("m")
+    m = tracker.write_manifest(
+        run_id, model_version="m_v1", hyperparams={},
+        train_window={"start_ts": 1, "end_ts": 2}, test_window={},
+        features=["ofi_l1_w1s_v1"], target="label_mid_1s",
+        folds=[{"fold": 1, "test_start": 1, "test_end": 2}])
+    assert m["features"] == ["ofi_l1_w1s_v1"]
+    assert m["target"] == "label_mid_1s"
+    assert m["folds"][0]["fold"] == 1
+    libs = m["library_versions"]
+    assert set(libs) >= {"numpy", "sklearn", "lightgbm", "xgboost"}
+    assert libs == library_versions()

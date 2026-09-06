@@ -6,7 +6,13 @@
 //! er   = beta * z
 //! conf = min(1, |z| / conf_scale)
 //! invalid raw (NaN / missing input)  =>  er = 0.0, conf = 0.0
+//! dead alpha (sigma <= 0 or beta == 0)  =>  er = 0.0, conf = 0.0
 //! ```
+//!
+//! The dead-alpha rule is pinned (round-3): with `sigma == 0` the z
+//! denominator collapses to EPS, so every row clipped to +-z_clip and
+//! reported **confidence 1.0** with expected return 0 — maximum conviction
+//! in nothing.
 
 use crate::params::AlphaParams;
 
@@ -34,6 +40,9 @@ pub struct AlphaSignal {
 /// Returns `(expected_return, confidence)` — finite always, `(0.0, 0.0)`
 /// exactly for invalid rows.
 pub fn score_linear_z(params: &AlphaParams, raw: Option<f64>) -> (f64, f64) {
+    if params.is_dead() {
+        return (0.0, 0.0);
+    }
     match raw {
         Some(x) if x.is_finite() => {
             let z = ((x - params.mu) / (params.sigma + EPS))

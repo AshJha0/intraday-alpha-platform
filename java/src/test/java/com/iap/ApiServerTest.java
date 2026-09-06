@@ -37,11 +37,9 @@ public class ApiServerTest {
     @Test
     public void servesMetricsHealthAndStatus() throws IOException {
         MetricsRegistry reg = new MetricsRegistry();
-        synchronized (reg) {
-            reg.counter("md_events_total").add(7);
-            reg.gauge("risk_kill_switch_engaged").set(0.0);
-            reg.histogram("book_update_latency_ns").record(123);
-        }
+        reg.counter("md_events_total").add(7);
+        reg.gauge("risk_kill_switch_engaged").set(0.0);
+        reg.histogram("book_update_latency_ns").record(123);
         MetricsServer server = new MetricsServer(reg, 0,
                 () -> "{\"component\":\"test\",\"status\":\"ok\"}");
         server.start();
@@ -61,9 +59,8 @@ public class ApiServerTest {
                         || line.split(" ").length == 2);
             }
             // live registry: an update is visible on the next scrape
-            synchronized (reg) {
-                reg.counter("md_events_total").add(3);
-            }
+            // (lock-free: no monitor is taken anywhere, §12.4)
+            reg.counter("md_events_total").add(3);
             assertTrue(get(port, "/metrics").contains("md_events_total 10"));
             Map<String, Object> health = Json.object(Json.parse(
                     get(port, "/health")));

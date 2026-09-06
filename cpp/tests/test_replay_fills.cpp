@@ -13,7 +13,8 @@
 // HAND TRACE of the first two fills (verified against the raw event vector;
 // t0 = 1787578200000000000, latency = 50+50+100 us internal + 150 us venue
 // mean + SplitMix64(20260829) jitter draws, in submission order:
-// {21675, 14614, 24600, 13721, 18924, 15550, 8663} ns; order 1 = VWAP
+// {21675, 14614, 24600, 13721, 18924, 15550, 8663} ns (v2: 6 fills, the
+// VWAP slice-2 child expires at end_ts instead of filling late); order 1 = VWAP
 // slice 0 is submitted first, so it takes jitter draw #1 even though the
 // IS market order fills earlier):
 //
@@ -74,7 +75,7 @@ iap::ExecConfig golden_config() {
     iap::InstrumentSpec ins;
     ins.instrument_id = 1;
     ins.tick_size = 0.01;
-    ins.lot_size = 1.0;
+    ins.qty_unit = 1.0;
     ins.adv = 38000000.0;
     cfg.instruments[1] = ins;
     return cfg;
@@ -217,8 +218,11 @@ TEST(ReplayFillsGolden, DeterministicRerun) {
 
 TEST(ReplayFillsGolden, BothParentsCompleteWithMixedLiquidity) {
     const auto res = run_golden_scenario();
-    // Scenario shape: parent 1 fills entirely passively (maker), parent 2
-    // entirely aggressively (taker), both in full.
+    // Scenario shape: parent 1 fills passively (maker) except its slice-2
+    // child (71 @ 2448) which the market never reaches inside the window —
+    // it EXPIRES at end_ts (golden v2, execution.hpp rule 7; in v1 it filled
+    // 290 s after the window closed); parent 2 fills entirely aggressively
+    // (taker) in full.
     std::int64_t maker_qty = 0, taker_qty = 0;
     for (const auto& f : res.fills) {
         if (f.liquidity == iap::Liquidity::MAKER) {
@@ -231,8 +235,18 @@ TEST(ReplayFillsGolden, BothParentsCompleteWithMixedLiquidity) {
             taker_qty += f.qty;
         }
     }
-    EXPECT_EQ(maker_qty, 400);
+    EXPECT_EQ(maker_qty, 329);
     EXPECT_EQ(taker_qty, 600);
+    EXPECT_EQ(res.parents.at(1).unfilled_qty, 71);
+    // every attributed fill lies inside its parent's window (pinned)
+    const std::int64_t t0 =
+        iap::read_jsonl(iap_test::golden_path("events_eq_mbo.jsonl"))
+            .front()
+            .exchange_ts;
+    for (const auto& f : res.fills) {
+        const std::int64_t end = t0 + (f.parent_id == 1 ? 660 : 720) * SEC;
+        EXPECT_LE(f.ts, end);
+    }
 }
 
 }  // namespace

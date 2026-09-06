@@ -1,9 +1,22 @@
-//! Hard-risk limits (`configs/risk.json`, x-version 2 — the complete
-//! pinned limit set). Parsing is STRICT: any missing or invalid limit is
-//! an error, and the engine built from a failed parse is fail-closed
-//! (rejects every order with `CONFIG_MISSING`).
+//! Hard-risk limits (`configs/risk.json`, x-version 3 — the complete
+//! pinned limit set plus the currency block). Parsing is STRICT: any
+//! missing or invalid limit is an error, and the engine built from a
+//! failed parse is fail-closed (rejects every order with `CONFIG_MISSING`).
+
+use std::collections::BTreeMap;
 
 use marketdata::IapError;
+
+/// How one quote currency converts into the reporting currency: the last
+/// consolidated mid of `instrument_id` (an FX pair), inverted when the
+/// pair is quoted as `REPORTING/CCY` (e.g. USD/JPY for JPY -> USD).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FxConversion {
+    /// The FX pair whose mid is the conversion rate.
+    pub instrument_id: u32,
+    /// `true`: rate = 1 / mid (pair quoted REPORTING/CCY); `false`: rate = mid.
+    pub invert: bool,
+}
 
 /// The complete pinned limit set.
 #[derive(Debug, Clone, PartialEq)]
@@ -40,6 +53,12 @@ pub struct RiskLimits {
     pub max_sequence_gap_before_halt: u64,
     /// Reference-price staleness timeout (ns).
     pub stale_feed_timeout_ns: i64,
+    /// Currency every limit and P&L figure is expressed in (pinned "USD"
+    /// in the repo config).
+    pub reporting_ccy: String,
+    /// Quote-currency -> conversion source (`currency.conversion`).
+    /// A quote currency equal to `reporting_ccy` needs no entry.
+    pub fx_conversion: BTreeMap<String, FxConversion>,
 }
 
 fn need_f64(doc: &serde_json::Value, section: &str, key: &str) -> Result<f64, IapError> {
@@ -74,6 +93,40 @@ fn need_pos_i64(doc: &serde_json::Value, section: &str, key: &str) -> Result<i64
         )));
     }
     Ok(v)
+}
+
+fn parse_conversion(
+    doc: &serde_json::Value,
+) -> Result<BTreeMap<String, FxConversion>, IapError> {
+    let table = doc["currency"]["conversion"].as_object().ok_or_else(|| {
+        IapError::InvalidArgument("risk.json: missing currency.conversion object".to_string())
+    })?;
+    let mut out = BTreeMap::new();
+    for (ccy, spec) in table {
+        let iid = spec["instrument_id"].as_u64().ok_or_else(|| {
+            IapError::InvalidArgument(format!(
+                "risk.json: currency.conversion.{ccy}.instrument_id missing/invalid"
+            ))
+        })?;
+        if iid == 0 || iid > u64::from(u32::MAX) {
+            return Err(IapError::InvalidArgument(format!(
+                "risk.json: currency.conversion.{ccy}.instrument_id out of u32 range"
+            )));
+        }
+        let invert = spec["invert"].as_bool().ok_or_else(|| {
+            IapError::InvalidArgument(format!(
+                "risk.json: currency.conversion.{ccy}.invert missing/non-bool"
+            ))
+        })?;
+        out.insert(
+            ccy.clone(),
+            FxConversion {
+                instrument_id: iid as u32,
+                invert,
+            },
+        );
+    }
+    Ok(out)
 }
 
 fn need_bool(doc: &serde_json::Value, section: &str, key: &str) -> Result<bool, IapError> {
@@ -120,6 +173,16 @@ impl RiskLimits {
                     )
                 })?,
             stale_feed_timeout_ns: need_pos_i64(doc, "market_data", "stale_feed_timeout_ns")?,
+            reporting_ccy: doc["currency"]["reporting_ccy"]
+                .as_str()
+                .filter(|s| !s.is_empty())
+                .ok_or_else(|| {
+                    IapError::InvalidArgument(
+                        "risk.json: missing/empty currency.reporting_ccy".to_string(),
+                    )
+                })?
+                .to_string(),
+            fx_conversion: parse_conversion(doc)?,
         })
     }
 
@@ -149,6 +212,20 @@ mod tests {
         assert!(limits.max_order_notional > 0.0);
         assert!(!limits.kill_switch_engaged);
         assert_eq!(limits.duplicate_order_window_ns, 0); // whole session
+        assert_eq!(limits.reporting_ccy, "USD");
+        assert_eq!(limits.fx_conversion["JPY"].instrument_id, 103);
+        assert!(limits.fx_conversion["JPY"].invert);
+        assert!(!limits.fx_conversion["EUR"].invert);
+    }
+
+    #[test]
+    fn missing_currency_block_is_a_config_error() {
+        let mut doc = repo_risk_json();
+        doc.as_object_mut().unwrap().remove("currency");
+        assert!(RiskLimits::from_json(&doc).is_err());
+        let mut doc = repo_risk_json();
+        doc["currency"]["conversion"]["JPY"]["invert"] = serde_json::json!("yes");
+        assert!(RiskLimits::from_json(&doc).is_err());
     }
 
     #[test]

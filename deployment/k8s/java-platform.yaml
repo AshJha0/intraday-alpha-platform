@@ -5,10 +5,22 @@
 # The container runs the paper-trading vertical (com.iap.platform.PaperTrading
 # — see Dockerfile.java): golden-vector session paced 60x realtime, with the
 # monitoring API (com.iap.api.MetricsServer) LIVE on :8080 — /metrics
-# (Prometheus text), /health, /status. Probes are real httpGet checks against
-# those endpoints. Config note: the image entrypoint reads its baked-in
-# /app/configs; the iap-configs ConfigMap is still mounted read-only at
-# /etc/iap/configs (IAP_CONFIG_DIR) for operators overriding the command.
+# (Prometheus text), /health (liveness), /ready (readiness), /status, and
+# POST /admin/{kill,clear,override,roll} when an admin token is provided.
+#
+# SINGLETON (PLATFORM_CONVENTIONS.md §12.7): replicas 1 + strategy Recreate.
+# Two copies of a strategy/risk loop with no leader election duplicate orders
+# the moment a real venue adapter is wired, and the iap-data PVC is
+# ReadWriteOnce — a second replica (or a RollingUpdate surge pod) hits
+# Multi-Attach. There is deliberately no PodDisruptionBudget: minAvailable 1
+# on a single replica blocks every node drain.
+#
+# CONFIG (§12.2): the entrypoint reads $IAP_CONFIG_DIR, so the iap-configs
+# ConfigMap mounted at /etc/iap/configs is what the process actually loads —
+# the kill-switch runbook's "regenerate the ConfigMap, rollout restart" path
+# is real. STATE (§12.3): /data/state on the PVC holds the risk snapshot,
+# session accounting and the audit JSONL, so a restart resumes instead of
+# starting flat and un-latched.
 # =============================================================================
 apiVersion: apps/v1
 kind: Deployment
@@ -21,15 +33,15 @@ metadata:
     app.kubernetes.io/component: strategy-platform
     app.kubernetes.io/version: "1.0.0"
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: java-platform
   strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 0
-      maxSurge: 1
+    # A trading singleton: never two loops at once, not even for a rollout
+    # second. Recreate stops the old pod before the new one starts, which also
+    # keeps the ReadWriteOnce PVC single-attach.
+    type: Recreate
   template:
     metadata:
       labels:
@@ -62,6 +74,19 @@ spec:
               value: "-XX:+UseZGC -Xms256m -Xmx768m -Xlog:gc*:stdout:time,level,tags"
             - name: IAP_CONFIG_DIR
               value: /etc/iap/configs
+            - name: IAP_STATE_DIR
+              value: /data/state
+            # Kill-switch admin API (PLATFORM_CONVENTIONS.md §12.5). The token
+            # lives in the iap-admin-token Secret, created out of band:
+            #   kubectl -n intraday-alpha create secret generic iap-admin-token \
+            #     --from-literal=token="$(openssl rand -hex 32)"
+            # optional: with no Secret the /admin/* routes are not registered.
+            - name: IAP_ADMIN_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: iap-admin-token
+                  key: token
+                  optional: true
           volumeMounts:
             - name: configs
               mountPath: /etc/iap/configs
@@ -75,16 +100,31 @@ spec:
             limits:
               cpu: "2"
               memory: 1Gi
-          # Real probes against the live monitoring API.
+          # Real probes that can actually fail (PLATFORM_CONVENTIONS.md §12.5).
+          # startupProbe covers config load + JSONL decode of the vector, so a
+          # slow start is not mistaken for a wedged process.
+          startupProbe:
+            httpGet: { path: /health, port: metrics }
+            periodSeconds: 5
+            failureThreshold: 24        # up to 2 minutes to decode and start
+            timeoutSeconds: 5
+          # liveness: 503 when the session FAILED or the trading loop has not
+          # advanced for 30s with events pending. A latched kill switch is NOT
+          # unhealthy — halted is a deliberate state.
           livenessProbe:
             httpGet: { path: /health, port: metrics }
-            initialDelaySeconds: 15
             periodSeconds: 15
             timeoutSeconds: 5
+            failureThreshold: 3
+          # readiness: 503 before the first event, after the session FINISHES,
+          # and (realtime mode) when no event has been processed within
+          # stale_feed_timeout_ns of wall clock — a stalled feed takes the pod
+          # out of the Service without killing it.
           readinessProbe:
-            httpGet: { path: /metrics, port: metrics }
-            initialDelaySeconds: 5
+            httpGet: { path: /ready, port: metrics }
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 2
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: false   # JVM writes hsperfdata/tmp
@@ -134,19 +174,8 @@ spec:
       targetPort: metrics
       protocol: TCP
 ---
-# At most one of the two replicas may be voluntarily disrupted (node drain,
-# upgrade) at a time — the strategy layer stays observable through rollouts.
-apiVersion: policy/v1
-kind: PodDisruptionBudget
-metadata:
-  name: java-platform
-  namespace: intraday-alpha
-  labels:
-    app.kubernetes.io/part-of: intraday-alpha-platform
-    app.kubernetes.io/name: java-platform
-    app.kubernetes.io/component: strategy-platform
-spec:
-  minAvailable: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: java-platform
+# NOTE: no PodDisruptionBudget. This is a single-replica singleton; a PDB with
+# minAvailable 1 would block every voluntary disruption (node drain, upgrade)
+# and, because a paper session is finite, would block them while the pod is
+# not even Ready. Draining this workload is safe: state is checkpointed to the
+# PVC and the next pod resumes from it (PLATFORM_CONVENTIONS.md §12.3).

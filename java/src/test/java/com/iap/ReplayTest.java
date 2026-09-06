@@ -44,13 +44,14 @@ public class ReplayTest {
     @Test
     public void snapshotCadenceAndIndices() {
         ReplayEngine engine = new ReplayEngine(0, 250, 4);
-        engine.run(Golden.eq());
-        assertEquals(8, engine.snapshots().size());
-        for (int i = 0; i < 8; i++) {
-            assertEquals(250L * (i + 1), engine.snapshots().get(i).index);
+        ReplayEngine.Summary summary = engine.run(Golden.eq());
+        assertEquals(8, summary.snapshots());
+        assertEquals(4, engine.snapshots().size()); // keep_snapshots = 4 retained
+        for (int i = 0; i < 4; i++) {
+            assertEquals(250L * (i + 5), engine.snapshots().get(i).index);
         }
         // Snapshot content equals the golden shape source: instrument 1, venue 1.
-        ReplayEngine.Snapshot last = engine.snapshots().get(7);
+        ReplayEngine.Snapshot last = engine.snapshots().get(3);
         assertEquals(engine.instruments().get(1L).venues().get(1).stateSummary(),
                 last.instruments.get(1L).get(1));
     }

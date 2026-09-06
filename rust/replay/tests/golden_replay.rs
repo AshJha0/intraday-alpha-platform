@@ -91,14 +91,15 @@ fn snapshot_and_checkpoint_cadence() {
     let summary = engine.run(&events).expect("run");
     assert_eq!(summary.events_processed, 2000);
     assert_eq!(summary.instruments, 1);
-    assert_eq!(engine.snapshots.len(), 5); // 400/800/1200/1600/2000
-    assert_eq!(engine.snapshots[0]["index"], 400);
-    assert_eq!(engine.snapshots[4]["index"], 2000);
+    assert_eq!(summary.snapshots, 5); // 400/800/1200/1600/2000 emitted
+    assert_eq!(engine.snapshots.len(), 4); // keep_snapshots = 4 retained
+    assert_eq!(engine.snapshots[0]["index"], 800);
+    assert_eq!(engine.snapshots[3]["index"], 2000);
     assert_eq!(engine.checkpoints.len(), 4); // 500..2000, keep_checkpoints=4
     assert_eq!(engine.checkpoints[3].events_processed, 2000);
     // Final snapshot state equals final book state.
     assert_eq!(
-        engine.snapshots[4]["instruments"],
+        engine.snapshots[3]["instruments"],
         engine.book_states()["instruments"]
     );
 }
@@ -143,4 +144,45 @@ fn time_regressions_are_counted() {
     let events = vec![mk(1, 100), mk(2, 90), mk(3, 95), mk(4, 94)];
     let summary = engine.run(&events).expect("run");
     assert_eq!(summary.time_regressions, 2);
+}
+
+// ------------------------------------------------ cross-language checkpoint golden
+
+#[test]
+fn checkpoint_eq_1000_interchange_with_python() {
+    let events = eq_events();
+    let text = std::fs::read_to_string(golden_path("expected_checkpoint_eq_1000.json"))
+        .expect("read expected_checkpoint_eq_1000.json");
+    let cp: replay::EngineCheckpoint = serde_json::from_str(&text).expect("parse checkpoint");
+    let expected: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(golden_path("expected_book_states.json")).expect("read"),
+    )
+    .expect("parse");
+    // Restore Python's checkpoint, replay the rest, reach the golden state.
+    let mut restored = ReplayEngine::restore(&cp).expect("restore");
+    assert_eq!(restored.keep_checkpoints, 4);
+    restored.run(&events[1000..]).expect("rest run");
+    assert_eq!(
+        restored.book_states()["instruments"]["1"]["1"],
+        expected["states"]["2000"]
+    );
+    let mut full = ReplayEngine::new(0, 0);
+    full.run(&events).expect("full run");
+    assert_eq!(restored.checkpoint(), full.checkpoint());
+    // Our own checkpoint at 1000 is structurally identical to Python's.
+    let mut own = ReplayEngine::new(0, 0);
+    own.run(&events[..1000]).expect("prefix run");
+    assert_eq!(own.checkpoint(), cp);
+    let own_json: serde_json::Value =
+        serde_json::to_value(own.checkpoint()).expect("serialize");
+    let py_json: serde_json::Value = serde_json::from_str(&text).expect("parse");
+    assert_eq!(own_json, py_json);
+    // Unknown fields and wrong versions are rejected (fail closed).
+    let mut bad: serde_json::Value = py_json.clone();
+    bad["x-version"] = serde_json::json!(1);
+    let bad_cp: replay::EngineCheckpoint = serde_json::from_value(bad).expect("parse");
+    assert!(ReplayEngine::restore(&bad_cp).is_err());
+    let mut extra: serde_json::Value = py_json;
+    extra["unexpected"] = serde_json::json!(1);
+    assert!(serde_json::from_value::<replay::EngineCheckpoint>(extra).is_err());
 }

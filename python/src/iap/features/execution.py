@@ -13,7 +13,8 @@ feature quantity, combined by pinned formulas:
                               (quoted_depth_total + EPS)) — square-root-law
                               flavored impact proxy scaling with recent
                               activity vs standing depth.
-- ``alpha_decay_proxy``     = rvol_w10s / (rvol_w1m + EPS) — how front-loaded
+- ``alpha_decay_proxy``     = rvol_w10s / (rvol_w1m + EPS), INVALID when
+                              rvol_w1m == 0 (EPS guard) — how front-loaded
                               recent price movement is; > 1 means information
                               is arriving faster than the 1m norm, so alpha
                               decays quickly.
@@ -87,13 +88,13 @@ def compute(st, values: List[float], valid: List[bool]) -> None:
     half = st.spread_bps / 2.0 if ok else None
     put(values, valid, half, ok)
     v = None
-    if ok and warm10:
+    if ok and warm10 and (st.db10 + st.da10) > 0:
         vol10 = st.trades["10s"].sums[1]
         v = half * (1.0 + vol10 / (st.db10 + st.da10 + EPS)) ** 0.5
     put(values, valid, v, v is not None)
     decay = None
     rv10, rv1m = st.rvol("10s"), st.rvol("1m")
-    if rv10 is not None and rv1m is not None:
+    if rv10 is not None and rv1m is not None and st.rv["1m"].count > 0:
         decay = rv10 / (rv1m + EPS)
     put(values, valid, decay, decay is not None)
     v = None

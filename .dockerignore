@@ -1,0 +1,49 @@
+# =============================================================================
+# .dockerignore — build-context hygiene (PLATFORM_CONVENTIONS.md §12.7).
+#
+# Two reasons this file is mandatory, not cosmetic:
+#  1. CORRECTNESS. `COPY cpp cpp` from a tree where the README quick start was
+#     followed carries cpp/build/CMakeCache.txt, whose CMAKE_HOME_DIRECTORY
+#     points at the HOST path; `cmake -S . -B build` inside the image then
+#     aborts with "source directory ... does not match the source used to
+#     generate cache". Likewise rust/target and java/out poison incremental
+#     state with host paths.
+#  2. SIZE. Without this file the context is ~950 MB (rust/target 668 MB,
+#     data/ 259 MB, java/out, .git) for images that need a few MB of source.
+#
+# Everything a build stage needs must be COPYed explicitly; anything listed
+# here can never be. tests/harness/check_deployment.py asserts that every
+# `COPY <src>` in every Dockerfile exists AND is not excluded here.
+# =============================================================================
+
+# --- build trees (host-absolute paths baked into caches)
+cpp/build/
+rust/target/
+java/out/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+python/build/
+python/dist/
+*.egg-info/
+
+# --- generated data (regenerated inside the pipeline image; never baked in)
+data/raw/
+data/normalized/
+data/features/
+data/orderbooks/
+# data/reference/ IS required by the C++/Rust golden tests — do NOT exclude it.
+
+# --- VCS, editor, OS
+.git/
+.github/
+.gitignore
+.idea/
+.vscode/
+*.swp
+.DS_Store
+*.log
+
+# --- research artefacts and pickles (not needed by any image)
+research/models/*/model.pkl
+*.parquet

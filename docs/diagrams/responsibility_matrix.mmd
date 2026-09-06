@@ -5,8 +5,8 @@ flowchart LR
         presearch["24 alphas · validation · ML ·<br/>portfolio ref · TCA ref · backtester"]
     end
     subgraph CPPL["C++ — latency-critical path"]
-        ccore["codec · book · replay<br/>3.5 / 17.4 ns per event"]
-        cfeat["48-feature native engine ≈450 ns"]
+        ccore["codec · book · replay<br/>174.4 / 25.7 ns per event"]
+        cfeat["48-feature native engine ≈530 ns"]
         cexec["execution simulator + algos + SOR<br/>(FILLS REFERENCE)"]
         cbench["bench_all — published methodology"]
     end

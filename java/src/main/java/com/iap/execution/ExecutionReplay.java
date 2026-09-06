@@ -9,9 +9,11 @@ import com.iap.core.MarketEvent;
 import com.iap.orderbook.ConsolidatedBook;
 import com.iap.orderbook.OrderBook;
 import com.iap.sor.SmartOrderRouter;
+import com.iap.sor.SorOptions;
 
 /**
- * Execution replay — the event-driven parent-order driver (spec section 18).
+ * Execution replay — the event-driven parent-order driver (spec section 18),
+ * mirroring the C++ reference ({@code cpp/src/replay/exec_replay.cpp}).
  * Consumes the normalized event stream in file order (event time), drives
  * the {@link ExecutionSimulator}'s books and order lifecycle, and works a
  * set of parent orders through their VWAP/TWAP/POV/IS schedules
@@ -19,18 +21,24 @@ import com.iap.sor.SmartOrderRouter;
  * bit.
  *
  * <p>Per event, in pinned order: (1) the simulator processes the event
- * (child activation, passive queue tracking, book application, crossing
- * checks); (2) the scheduler evaluates every parent against the post-event
- * state — due TWAP/VWAP/IS slices are issued (decision_ts = the event's
- * exchange_ts, limit prices read from the just-updated book) and POV
- * targets are re-evaluated after TRADE events of the parent's instrument
- * inside its window. After the last event every unfinished child is
- * cancelled (unfilled residual = opportunity cost, reported per parent).
+ * (expiries, child activation, passive queue tracking, book application,
+ * crossing checks); (2) new fills are booked per parent; (3) the scheduler
+ * evaluates every parent against the post-event state — due TWAP/VWAP/IS
+ * slices are issued (decision_ts = the event's exchange_ts, limit prices
+ * read from the just-updated book, split into children of at most
+ * max_child_qty) and POV targets are re-evaluated after TRADE events of the
+ * parent's instrument inside its window against filled + in-flight qty.
+ * Children expire at their parent's end_ts; after the last event every
+ * still-unfinished child is cancelled (unfilled residual = opportunity
+ * cost, reported per parent). Every fill attributed to a parent lies inside
+ * its window by construction (verified — a violation throws).
  *
  * <p>Child order styles (pinned): TWAP and VWAP children are passive LIMIT
  * orders joining the same-side best price at decision time (falling back to
  * MARKET when that side is empty); POV and IS children are MARKET orders.
- * Venue: parent.venue_id, or SOR-routed when venue_id == 0.
+ * Venue: parent.venue_id, or SOR-routed when venue_id == 0; with no
+ * eligible venue the child is NOT submitted and counted in
+ * {@link Result#sorNoRoute}.
  *
  * <p>Parent accounting identity (tested):
  * {@code total_cost = fees - rebates + impact} with fees/rebates/impact
@@ -43,8 +51,8 @@ public final class ExecutionReplay {
         public long filledQty;
         public long unfilledQty;
         public long children;
-        public double notional;  // sum of fill qty * price * tick * lot
-        public double avgPrice;  // notional / (filled qty * lot); 0 if unfilled
+        public double notional;  // sum of fill qty * price * tick * qty_unit
+        public double avgPrice;  // notional / (filled qty * qty_unit); 0 if unfilled
         public double fees;      // taker fees (>= 0)
         public double rebates;   // maker rebates (>= 0)
         public double impact;    // linear impact charges (>= 0)
@@ -56,12 +64,15 @@ public final class ExecutionReplay {
         public final List<Fill> fills;
         public final TreeMap<Long, ParentReport> parents;
         public final long eventsProcessed;
+        /** Children not submitted because the SOR found no eligible venue. */
+        public final long sorNoRoute;
 
         Result(List<Fill> fills, TreeMap<Long, ParentReport> parents,
-                long eventsProcessed) {
+                long eventsProcessed, long sorNoRoute) {
             this.fills = fills;
             this.parents = parents;
             this.eventsProcessed = eventsProcessed;
+            this.sorNoRoute = sorNoRoute;
         }
     }
 
@@ -70,7 +81,7 @@ public final class ExecutionReplay {
         long[] sliceQty = new long[0];  // TWAP/VWAP/IS
         long[] sliceDue = new long[0];  // TWAP/VWAP/IS
         int nextSlice;
-        long sentQty;                   // qty submitted so far
+        long filledQty;                 // fills booked so far
         long povVolume;                 // window TRADE volume (POV)
         final List<Long> childIds = new ArrayList<>();
     }
@@ -80,18 +91,32 @@ public final class ExecutionReplay {
     private final SmartOrderRouter sor;
     private final List<Integer> sorCandidates = new ArrayList<>();
     private final List<ParentState> parents = new ArrayList<>();
+    private int fillsBooked;
+    private long sorNoRoute;
     private boolean ran;
 
     public ExecutionReplay(ExecConfig config, List<ParentOrder> parentOrders) {
+        this(config, parentOrders, SorOptions.DEFAULT);
+    }
+
+    public ExecutionReplay(ExecConfig config, List<ParentOrder> parentOrders,
+            SorOptions sorOptions) {
         this.config = config;
         this.sim = new ExecutionSimulator(config);
-        this.sor = new SmartOrderRouter(config.venues);
+        this.sor = new SmartOrderRouter(config.venues, sorOptions);
         for (Integer vid : config.venues.keySet()) {
             sorCandidates.add(vid);
         }
         for (ParentOrder p : parentOrders) {
             if (p.qty <= 0) {
                 throw new IllegalArgumentException("parent qty must be > 0");
+            }
+            if (p.maxChildQty <= 0) {
+                throw new IllegalArgumentException("max_child_qty must be > 0");
+            }
+            if (p.endTs <= p.startTs) {
+                throw new IllegalArgumentException(
+                        "parent window must have end_ts > start_ts");
             }
             ParentState ps = new ParentState();
             ps.order = p;
@@ -107,10 +132,11 @@ public final class ExecutionReplay {
         return sim;
     }
 
-    private void issueChild(ParentState ps, long childQty, long decisionTs,
+    /** Issue one child of at most max_child_qty; false when unroutable. */
+    private boolean issueChild(ParentState ps, long childQty, long decisionTs,
             boolean passive) {
         if (childQty <= 0) {
-            return;
+            return true;
         }
         ParentOrder p = ps.order;
         ChildOrder c = new ChildOrder();
@@ -119,6 +145,7 @@ public final class ExecutionReplay {
         c.side = p.side;
         c.qty = childQty;
         c.decisionTs = decisionTs;
+        c.expireTs = p.endTs; // pinned: no child outlives the window
         ConsolidatedBook book = sim.instrumentBook(p.instrumentId);
         if (p.venueId != 0) {
             c.venueId = p.venueId;
@@ -126,6 +153,10 @@ public final class ExecutionReplay {
             c.venueId = sor.routePassive(book, p.side, sorCandidates);
         } else {
             c.venueId = sor.routeAggressive(book, p.side, sorCandidates);
+        }
+        if (c.venueId == SmartOrderRouter.NO_ROUTE) {
+            sorNoRoute++; // no eligible venue: do not submit (pinned)
+            return false;
         }
         if (passive) {
             // Join the same-side best on the routed venue; MARKET fallback.
@@ -144,7 +175,43 @@ public final class ExecutionReplay {
             c.type = OrderType.MARKET;
         }
         ps.childIds.add(sim.submit(c));
-        ps.sentQty += childQty;
+        return true;
+    }
+
+    /** Split a slice into children of at most max_child_qty (pinned). */
+    private void issueSlice(ParentState ps, long sliceQty, long decisionTs,
+            boolean passive) {
+        long cap = ps.order.maxChildQty;
+        long left = sliceQty;
+        while (left > 0) {
+            long q = Math.min(left, cap);
+            issueChild(ps, q, decisionTs, passive);
+            left -= q;
+        }
+    }
+
+    /** Filled + still open/in-flight qty of the parent's children. */
+    private long committedQty(ParentState ps) {
+        long open = 0;
+        for (long id : ps.childIds) {
+            ChildOrder o = sim.orders().get(id);
+            if (o.state == OrderState.PENDING || o.state == OrderState.ACTIVE) {
+                open += o.remaining;
+            }
+        }
+        return ps.filledQty + open;
+    }
+
+    private void bookNewFills() {
+        List<Fill> fills = sim.fills();
+        while (fillsBooked < fills.size()) {
+            Fill f = fills.get(fillsBooked++);
+            for (ParentState ps : parents) {
+                if (ps.order.parentId == f.parentId()) {
+                    ps.filledQty += f.qty();
+                }
+            }
+        }
     }
 
     private void schedule(ParentState ps, MarketEvent ev) {
@@ -158,18 +225,23 @@ public final class ExecutionReplay {
             }
             ps.povVolume += ev.qty;
             long target = (long) Math.floor(p.participation * (double) ps.povVolume);
-            long deficit = Math.min(target, p.qty) - ps.sentQty; // cap at parent
+            // Deficit against FILLED + in-flight qty, never sent qty (pinned).
+            long deficit = Math.min(target, p.qty) - committedQty(ps);
             if (deficit > 0) {
                 issueChild(ps, Math.min(deficit, p.maxChildQty), t, false);
             }
             return;
         }
-        // TWAP / VWAP / IS: issue every slice that has come due.
+        // TWAP / VWAP / IS: issue every slice that has come due (inside the
+        // window only — a slice due at/after end_ts would expire on arrival).
         while (ps.nextSlice < ps.sliceDue.length && t >= ps.sliceDue[ps.nextSlice]) {
             long q = ps.sliceQty[ps.nextSlice];
             ps.nextSlice++;
+            if (t >= p.endTs) {
+                continue;
+            }
             boolean passive = p.algo == AlgoType.TWAP || p.algo == AlgoType.VWAP;
-            issueChild(ps, Math.min(q, p.maxChildQty), t, passive);
+            issueSlice(ps, q, t, passive);
         }
     }
 
@@ -182,12 +254,14 @@ public final class ExecutionReplay {
         long processed = 0;
         for (MarketEvent ev : events) {
             sim.onEvent(ev);
+            bookNewFills();
             for (ParentState ps : parents) {
                 schedule(ps, ev);
             }
             processed++;
         }
         sim.cancelAll();
+        bookNewFills();
 
         List<Fill> fills = new ArrayList<>(sim.fills());
         TreeMap<Long, ParentReport> reports = new TreeMap<>();
@@ -196,11 +270,15 @@ public final class ExecutionReplay {
             r.parentId = ps.order.parentId;
             r.children = ps.childIds.size();
             InstrumentSpec ins = config.instruments.get(ps.order.instrumentId);
-            double lot = ins == null ? 1.0 : ins.lotSize();
+            double lot = ins == null ? 1.0 : ins.qtyUnit();
             double tick = ins == null ? 1.0 : ins.tickSize();
             for (Fill f : fills) {
                 if (f.parentId() != ps.order.parentId) {
                     continue;
+                }
+                if (f.ts() < ps.order.startTs || f.ts() > ps.order.endTs) {
+                    throw new IllegalStateException(
+                            "fill outside the parent window (time-in-force broken)");
                 }
                 r.filledQty += f.qty();
                 r.notional += (double) f.qty() * lot * (double) f.priceTicks() * tick;
@@ -218,6 +296,6 @@ public final class ExecutionReplay {
             r.totalCost = r.fees - r.rebates + r.impact;
             reports.put(r.parentId, r);
         }
-        return new Result(fills, reports, processed);
+        return new Result(fills, reports, processed, sorNoRoute);
     }
 }

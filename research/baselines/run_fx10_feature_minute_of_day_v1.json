@@ -23,6 +23,7 @@
     0.10009182736455463,
     0.10009182736455463
   ],
+  "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
   "kind": "feature",
   "max": 149.94238315926668,
   "mean": 74.79491683219926,
@@ -33,5 +34,5 @@
   "psi_eps": 1e-06,
   "source": "warmup window [1787529602028520532, 1787538602028520532) of the bundled feature frames, universe [101, 102, 103, 104, 105, 106, 107, 108]",
   "std": 43.75050514163626,
-  "x-version": 1
+  "x-version": 2
 }

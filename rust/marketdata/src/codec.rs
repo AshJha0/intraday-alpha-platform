@@ -244,13 +244,54 @@ pub fn write_jsonl<P: AsRef<Path>>(path: P, events: &[MarketEvent]) -> Result<us
 // -------------------------------------------------------------------- IAP1
 
 pub const IAP1_MAGIC: u32 = 0x4941_5031;
-pub const IAP1_VERSION: u32 = 1;
+/// Version written by `encode_iap1` (header + records + integrity trailer).
+pub const IAP1_VERSION: u32 = 2;
+/// Legacy version (no trailer) still accepted by the decoder.
+pub const IAP1_VERSION_LEGACY: u32 = 1;
 pub const IAP1_HEADER_SIZE: usize = 16;
 pub const IAP1_RECORD_SIZE: usize = 72;
+pub const IAP1_TRAILER_SIZE: usize = 16;
 
-/// Encode events to IAP1 bytes (16-byte header + fixed 72-byte LE records).
+const CRC32_TABLE: [u32; 256] = {
+    let mut table = [0u32; 256];
+    let mut i = 0;
+    while i < 256 {
+        let mut c = i as u32;
+        let mut k = 0;
+        while k < 8 {
+            c = if c & 1 != 0 { 0xEDB8_8320 ^ (c >> 1) } else { c >> 1 };
+            k += 1;
+        }
+        table[i] = c;
+        i += 1;
+    }
+    table
+};
+
+/// CRC-32 (IEEE 802.3 / zlib) — the IAP1 trailer checksum.
+/// Known answer: `crc32(b"123456789") == 0xCBF43926`.
+pub fn crc32(data: &[u8]) -> u32 {
+    let mut c = 0xFFFF_FFFFu32;
+    for &b in data {
+        c = CRC32_TABLE[((c ^ b as u32) & 0xFF) as usize] ^ (c >> 8);
+    }
+    c ^ 0xFFFF_FFFF
+}
+
+/// Result of [`decode_iap1_ex`]: events plus the file's format version and
+/// whether the CRC-32 integrity trailer was present and verified.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Iap1Decoded {
+    pub events: Vec<MarketEvent>,
+    pub version: u32,
+    pub integrity_checked: bool,
+}
+
+/// Encode events to IAP1 v2 bytes (16-byte header + fixed 72-byte LE records
+/// + 16-byte integrity trailer `crc32 | reserved 0 | count`).
 pub fn encode_iap1(events: &[MarketEvent]) -> Vec<u8> {
-    let mut out = Vec::with_capacity(IAP1_HEADER_SIZE + IAP1_RECORD_SIZE * events.len());
+    let mut out =
+        Vec::with_capacity(IAP1_HEADER_SIZE + IAP1_RECORD_SIZE * events.len() + IAP1_TRAILER_SIZE);
     out.extend_from_slice(&IAP1_MAGIC.to_le_bytes());
     out.extend_from_slice(&IAP1_VERSION.to_le_bytes());
     out.extend_from_slice(&(events.len() as u64).to_le_bytes());
@@ -268,6 +309,10 @@ pub fn encode_iap1(events: &[MarketEvent]) -> Vec<u8> {
         out.extend_from_slice(&ev.order_id.to_le_bytes());
         out.extend_from_slice(&ev.trade_id.to_le_bytes());
     }
+    let crc = crc32(&out);
+    out.extend_from_slice(&crc.to_le_bytes());
+    out.extend_from_slice(&0u32.to_le_bytes());
+    out.extend_from_slice(&(events.len() as u64).to_le_bytes());
     out
 }
 
@@ -287,8 +332,10 @@ fn le_i64(b: &[u8]) -> i64 {
     le_u64(b) as i64
 }
 
-/// Decode IAP1 bytes. Rejects bad magic/version, truncation, count mismatch.
-pub fn decode_iap1(data: &[u8]) -> Result<Vec<MarketEvent>, IapError> {
+/// Decode IAP1 bytes (version 2 with trailer, or legacy version 1). Rejects
+/// bad magic / unknown version / truncation / count mismatch / bad trailer
+/// (reserved != 0, count echo, CRC mismatch).
+pub fn decode_iap1_ex(data: &[u8]) -> Result<Iap1Decoded, IapError> {
     if data.len() < IAP1_HEADER_SIZE {
         return Err(IapError::Codec(format!(
             "IAP1 file truncated: {} bytes < 16-byte header",
@@ -302,18 +349,43 @@ pub fn decode_iap1(data: &[u8]) -> Result<Vec<MarketEvent>, IapError> {
         )));
     }
     let version = le_u32(&data[4..8]);
-    if version != IAP1_VERSION {
+    if version != IAP1_VERSION && version != IAP1_VERSION_LEGACY {
         return Err(IapError::Codec(format!("unsupported IAP1 version: {version}")));
     }
+    let with_trailer = version == IAP1_VERSION;
     let count = le_u64(&data[8..16]);
-    let expected = (count as u128) * (IAP1_RECORD_SIZE as u128) + IAP1_HEADER_SIZE as u128;
+    let body = (count as u128) * (IAP1_RECORD_SIZE as u128) + IAP1_HEADER_SIZE as u128;
+    let expected = body + if with_trailer { IAP1_TRAILER_SIZE as u128 } else { 0 };
     if data.len() as u128 != expected {
         return Err(IapError::Codec(format!(
-            "IAP1 size mismatch: {} bytes, header count={} implies {}",
+            "IAP1 size mismatch: {} bytes, header count={} (version {}) implies {}",
             data.len(),
             count,
+            version,
             expected
         )));
+    }
+    let body = body as usize;
+    if with_trailer {
+        let crc = le_u32(&data[body..body + 4]);
+        let reserved = le_u32(&data[body + 4..body + 8]);
+        let echo = le_u64(&data[body + 8..body + 16]);
+        if reserved != 0 {
+            return Err(IapError::Codec(format!(
+                "IAP1 trailer reserved field must be 0: {reserved}"
+            )));
+        }
+        if echo != count {
+            return Err(IapError::Codec(format!(
+                "IAP1 trailer count echo {echo} != header count {count}"
+            )));
+        }
+        let actual = crc32(&data[..body]);
+        if actual != crc {
+            return Err(IapError::Codec(format!(
+                "IAP1 CRC-32 mismatch: trailer 0x{crc:08X}, computed 0x{actual:08X}"
+            )));
+        }
     }
     let count = count as usize;
     let mut events = Vec::with_capacity(count);
@@ -336,7 +408,16 @@ pub fn decode_iap1(data: &[u8]) -> Result<Vec<MarketEvent>, IapError> {
         });
         off += IAP1_RECORD_SIZE;
     }
-    Ok(events)
+    Ok(Iap1Decoded {
+        events,
+        version,
+        integrity_checked: with_trailer,
+    })
+}
+
+/// Decode IAP1 bytes. Rejects bad magic/version, truncation, count/CRC mismatch.
+pub fn decode_iap1(data: &[u8]) -> Result<Vec<MarketEvent>, IapError> {
+    decode_iap1_ex(data).map(|d| d.events)
 }
 
 /// Write an IAP1 file; return the number of events written.
@@ -426,9 +507,41 @@ mod tests {
     fn iap1_roundtrip_and_layout() {
         let events = vec![sample(), MarketEvent::default()];
         let bytes = encode_iap1(&events);
-        assert_eq!(bytes.len(), IAP1_HEADER_SIZE + 2 * IAP1_RECORD_SIZE);
+        assert_eq!(
+            bytes.len(),
+            IAP1_HEADER_SIZE + 2 * IAP1_RECORD_SIZE + IAP1_TRAILER_SIZE
+        );
         assert_eq!(&bytes[0..4], &[0x31, 0x50, 0x41, 0x49]); // "1PAI" LE
+        assert_eq!(bytes[4], 2); // version 2
         assert_eq!(decode_iap1(&bytes).expect("roundtrip"), events);
+        let decoded = decode_iap1_ex(&bytes).expect("roundtrip");
+        assert_eq!(decoded.version, 2);
+        assert!(decoded.integrity_checked);
+        assert_eq!(decode_iap1(&encode_iap1(&[])).expect("empty"), Vec::new());
+    }
+
+    #[test]
+    fn crc32_known_answer_and_trailer_checks() {
+        assert_eq!(crc32(b"123456789"), 0xCBF4_3926);
+        assert_eq!(crc32(b""), 0);
+        let good = encode_iap1(&[sample()]);
+        let mut flipped = good.clone();
+        flipped[16 + 50] ^= 0x01; // a qty byte
+        assert!(decode_iap1(&flipped).is_err());
+        let mut echo = good.clone();
+        let n = echo.len();
+        echo[n - 8] ^= 0x01;
+        assert!(decode_iap1(&echo).is_err());
+        let mut reserved = good.clone();
+        reserved[n - 12] = 1;
+        assert!(decode_iap1(&reserved).is_err());
+        // Legacy v1 (no trailer) is accepted but unverified.
+        let mut legacy = good[..n - IAP1_TRAILER_SIZE].to_vec();
+        legacy[4] = 1;
+        let d = decode_iap1_ex(&legacy).expect("legacy");
+        assert_eq!(d.version, 1);
+        assert!(!d.integrity_checked);
+        assert_eq!(d.events, vec![sample()]);
     }
 
     #[test]
@@ -440,7 +553,7 @@ mod tests {
         assert!(decode_iap1(&bad_magic).is_err());
 
         let mut bad_version = good.clone();
-        bad_version[4] = 9;
+        bad_version[4] = 3;
         assert!(decode_iap1(&bad_version).is_err());
 
         assert!(decode_iap1(&good[..10]).is_err()); // truncated header

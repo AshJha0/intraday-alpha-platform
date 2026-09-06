@@ -44,6 +44,11 @@ final class Golden {
         }
     }
 
+    /** Load any golden jsonl event vector by name (uncached). */
+    static List<MarketEvent> events(String name) {
+        return load(name);
+    }
+
     static byte[] bytes(String name) {
         try {
             return Files.readAllBytes(DIR.resolve(name));

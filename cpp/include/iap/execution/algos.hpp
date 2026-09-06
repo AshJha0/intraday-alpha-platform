@@ -24,14 +24,26 @@
 // - POV: no precomputed slices. Tracks cumulative TRADE volume V(t) of the
 //   parent's instrument inside the window; after each TRADE event, target =
 //   floor(participation * V(t)); whenever target exceeds the quantity
-//   already sent, a child covers the deficit (capped at max_child_qty and
-//   the parent's remainder).
+//   COMMITTED (filled + still open/in-flight of the parent's children — a
+//   cancelled MARKET remainder frees its qty and is re-sent), a child covers
+//   the deficit (capped at max_child_qty and the parent's remainder).
+//
+// Child sizing (pinned): a slice larger than max_child_qty is split into
+// ceil(slice / max_child_qty) children of max_child_qty (the last one the
+// remainder), all decided at the same event, in order — no quantity is ever
+// silently dropped. Every child carries expire_ts = end_ts (venue-side
+// time-in-force, execution.hpp rule 7): no child outlives its parent's
+// window, and an unfilled slice at end_ts is reported as unfilled_qty
+// (opportunity cost), never filled later.
 //
 // Child order styles (pinned): TWAP and VWAP children are passive LIMIT
 // orders joining the same-side best price at decision time (falling back to
 // MARKET when that side is empty); POV and IS children are MARKET orders.
 // Venue: parent.venue_id, or SOR-routed when venue_id == 0 (aggressive
-// children via route_aggressive, passive via route_passive).
+// children via route_aggressive, passive via route_passive); when the SOR
+// finds no eligible venue (0) the child is NOT submitted and counted in
+// ExecReplayResult::sor_no_route (a TWAP/VWAP/IS slice is then lost to
+// opportunity cost; POV re-evaluates on the next trade).
 
 #pragma once
 

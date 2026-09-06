@@ -17,10 +17,19 @@ pipeline replays events through the FeatureEngine and writes, per instrument:
 
 with columns: instrument_id, exchange_ts, one float64 column per registered
 feature (NaN where invalid), a packed validity bitset, and per-horizon label
-columns label_mid_<h> / label_cost_<h> / label_valid_<h> (event-time forward
-returns, mid-to-mid and cost-adjusted; two-pointer sweep, no lookahead).
-A summary JSON (rows, valid fraction per family, registry hash) is written
-to data/features/features_summary.json.
+columns label_mid_<h> / label_cost_<h> / label_valid_<h> / label_reason_<h>
+(event-time forward returns, mid-to-mid and cost-adjusted; two-pointer
+sweep, no lookahead; the reason bitmask explains every invalid label —
+iap.labels.LabelReason).
+
+A summary JSON is written to data/features/features_summary.json: rows,
+valid fraction per family, registry hash, and the data-quality facts a
+researcher needs BEFORE trusting a row — ``crossed_frac`` (share of
+emissions whose merged book is crossed, i.e. a stale LP quote),
+``mean_row_gap_ns`` / ``median_sample_gap_ns``, the pinned
+``label_max_age_ns`` freshness bound, ``label_valid_frac_by_horizon``,
+``label_zero_frac_by_horizon`` (a 500 ms FX label that is 0 in 99 % of rows
+is a sampling artefact, not evidence) and the invalid-label reason counts.
 
 Everything is deterministic: sorted file order, sorted instrument iteration,
 event-time only.
@@ -45,7 +54,13 @@ from iap.features.context import build_contexts
 from iap.features.engine import FeatureEngine
 from iap.features.registry import build_registry, registry_hash, write_registry
 from iap.features.spec import FAMILY_ORDER
-from iap.labels.labels import HORIZON_ORDER, MidSeries, compute_labels
+from iap.labels.labels import (
+    HORIZON_ORDER,
+    LabelReason,
+    MidSeries,
+    compute_labels,
+    max_sample_age,
+)
 
 _REPO = Path(__file__).resolve().parents[4]
 
@@ -53,7 +68,8 @@ _REPO = Path(__file__).resolve().parents[4]
 class _InstrumentBuffer:
     """Accumulates emitted rows for one instrument within one input file."""
 
-    __slots__ = ("ts", "values", "bits", "series", "last_event_ts")
+    __slots__ = ("ts", "values", "bits", "series", "last_event_ts",
+                 "last_refresh_seq")
 
     def __init__(self) -> None:
         self.ts: List[int] = []
@@ -61,6 +77,7 @@ class _InstrumentBuffer:
         self.bits = bytearray()
         self.series = MidSeries()
         self.last_event_ts = 0
+        self.last_refresh_seq = 0
 
 
 def _load_events(path: Path):
@@ -77,6 +94,7 @@ def _flush_file(
     names: List[str],
     fam_valid: Dict[int, np.ndarray],
     row_counts: Dict[int, int],
+    label_stats: Dict[int, dict],
 ) -> None:
     """Write one row group per instrument for the just-processed file."""
     nfeat = len(names)
@@ -93,7 +111,46 @@ def _flush_file(
         fam_valid[iid] += validity.sum(axis=0, dtype=np.int64)
         row_counts[iid] = row_counts.get(iid, 0) + rows
 
-        labels = compute_labels(buf.ts, buf.series, buf.last_event_ts)
+        max_age = max_sample_age(buf.series)
+        labels = compute_labels(buf.ts, buf.series, buf.last_event_ts,
+                                max_age_ns=max_age)
+        # Data-quality facts a researcher must see before trusting a row
+        # (RESEARCH round-3): how many emissions came from a CROSSED merged
+        # book (a stale LP quote makes spread_ticks < 0), how far apart the
+        # rows are, and how many labels are exact zeros / why they are
+        # invalid.
+        ts_arr = np.asarray(buf.ts, dtype=np.int64)
+        gaps = np.diff(ts_arr)
+        spread = vals[:, names.index("spread_ticks_v1")]
+        spread_ok = validity[:, names.index("spread_ticks_v1")].astype(bool)
+        stats = label_stats.setdefault(iid, {
+            "rows": 0, "crossed_rows": 0, "spread_valid_rows": 0,
+            "gap_sum_ns": 0, "gap_count": 0, "median_sample_gap_ns": 0,
+            "label_max_age_ns": 0, "series_samples": 0,
+            "tradable_samples": 0,
+            "by_horizon": {h: {"valid": 0, "zero": 0, "reason": {}}
+                           for h in HORIZON_ORDER},
+        })
+        stats["rows"] += rows
+        stats["spread_valid_rows"] += int(spread_ok.sum())
+        stats["crossed_rows"] += int(((spread < 0) & spread_ok).sum())
+        stats["gap_sum_ns"] += int(gaps.sum()) if gaps.size else 0
+        stats["gap_count"] += int(gaps.size)
+        stats["median_sample_gap_ns"] = buf.series.median_gap_ns()
+        stats["label_max_age_ns"] = max_age
+        stats["series_samples"] += len(buf.series)
+        stats["tradable_samples"] += int(sum(buf.series.tradable))
+        for h in HORIZON_ORDER:
+            lab = labels[h]
+            hv = stats["by_horizon"][h]
+            valid_mask = np.asarray(lab.valid, dtype=bool)
+            hv["valid"] += int(valid_mask.sum())
+            lm = np.asarray(lab.mid, dtype=float)
+            hv["zero"] += int(((lm == 0.0) & valid_mask).sum())
+            for r in lab.reason:
+                if r:
+                    for nm in LabelReason.describe(r):
+                        hv["reason"][nm] = hv["reason"].get(nm, 0) + 1
 
         cols: Dict[str, pa.Array] = {
             "instrument_id": pa.array([iid] * rows, type=pa.uint32()),
@@ -110,6 +167,7 @@ def _flush_file(
             cols[f"label_mid_{h}"] = pa.array(lab.mid, type=pa.float64())
             cols[f"label_cost_{h}"] = pa.array(lab.cost, type=pa.float64())
             cols[f"label_valid_{h}"] = pa.array(lab.valid, type=pa.bool_())
+            cols[f"label_reason_{h}"] = pa.array(lab.reason, type=pa.uint8())
         table = pa.table(cols, schema=schema)
         writer = writers.get(iid)
         if writer is None:
@@ -132,6 +190,7 @@ def _build_schema(names: List[str]) -> pa.Schema:
         fields.append(pa.field(f"label_mid_{h}", pa.float64()))
         fields.append(pa.field(f"label_cost_{h}", pa.float64()))
         fields.append(pa.field(f"label_valid_{h}", pa.bool_()))
+        fields.append(pa.field(f"label_reason_{h}", pa.uint8()))
     return pa.schema(fields)
 
 
@@ -173,6 +232,7 @@ def main(argv: List[str] | None = None) -> int:
     profiles: Dict[int, object] = {}
     fam_valid: Dict[int, np.ndarray] = {}
     row_counts: Dict[int, int] = {}
+    label_stats: Dict[int, dict] = {}
     total_events = 0
     total_vectors = 0
 
@@ -190,17 +250,28 @@ def main(argv: List[str] | None = None) -> int:
                 buf = buffers[iid] = _InstrumentBuffer()
             buf.last_event_ts = ev.exchange_ts
             st = engine.states[iid]
-            if st.book_ok:
-                buf.series.append(
-                    ev.exchange_ts, st.mid, st.spread_ticks * st.tick / 2.0
-                )
+            # One mid sample per BOOK REFRESH (API_FEATURES §6): a refresh
+            # that left the merged view one-sided / stale / halted is
+            # recorded as a NON-TRADABLE sample so labels cannot span it.
+            if st.refresh_seq != buf.last_refresh_seq:
+                buf.last_refresh_seq = st.refresh_seq
+                if st.label_tradable:
+                    buf.series.append(
+                        ev.exchange_ts, st.mid,
+                        st.spread_ticks * st.tick / 2.0, True
+                    )
+                else:
+                    buf.series.append(
+                        ev.exchange_ts, float("nan"), float("nan"), False
+                    )
             if vec is not None:
                 buf.ts.append(vec.timestamp)
                 buf.values.extend(vec.values)
                 buf.bits.extend(vec.validity_bits())
         total_events += engine.events_processed
         total_vectors += engine.vectors_emitted
-        _flush_file(writers, out_dir, schema, buffers, names, fam_valid, row_counts)
+        _flush_file(writers, out_dir, schema, buffers, names, fam_valid,
+                    row_counts, label_stats)
         print(f"{path.name}: {len(events)} events -> "
               f"{engine.vectors_emitted} vectors", file=sys.stderr)
 
@@ -214,12 +285,40 @@ def main(argv: List[str] | None = None) -> int:
     for iid in sorted(row_counts):
         rows = row_counts[iid]
         counts = fam_valid[iid]
+        st = label_stats.get(iid, {})
+        by_h = st.get("by_horizon", {})
+        gap_n = st.get("gap_count", 0)
         per_instrument[str(iid)] = {
             "symbol": contexts[iid].symbol,
             "rows": rows,
             "valid_fraction_by_family": {
                 fam: round(float(counts[idx].sum()) / (rows * len(idx)), 6)
                 for fam, idx in fam_slices.items()
+            },
+            # data-quality facts (see the module docstring)
+            "crossed_frac": (
+                round(st["crossed_rows"] / st["spread_valid_rows"], 6)
+                if st.get("spread_valid_rows") else None
+            ),
+            "mean_row_gap_ns": (
+                int(st["gap_sum_ns"] / gap_n) if gap_n else None
+            ),
+            "median_sample_gap_ns": st.get("median_sample_gap_ns"),
+            "label_max_age_ns": st.get("label_max_age_ns"),
+            "tradable_sample_frac": (
+                round(st["tradable_samples"] / st["series_samples"], 6)
+                if st.get("series_samples") else None
+            ),
+            "label_valid_frac_by_horizon": {
+                h: round(by_h[h]["valid"] / rows, 6) for h in by_h
+            },
+            "label_zero_frac_by_horizon": {
+                h: (round(by_h[h]["zero"] / by_h[h]["valid"], 6)
+                    if by_h[h]["valid"] else None)
+                for h in by_h
+            },
+            "label_invalid_reasons_by_horizon": {
+                h: dict(sorted(by_h[h]["reason"].items())) for h in by_h
             },
         }
     summary = {

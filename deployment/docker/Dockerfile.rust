@@ -12,9 +12,11 @@
 #   docker build -f deployment/docker/Dockerfile.rust -t iap/rust:1.0.0 .
 #
 # Telemetry: rust/telemetry renders Prometheus text exposition
-# (Registry::to_prometheus). Services that write it should emit to
-# /data/telemetry/rust.prom on the shared volume; docker-compose serves that
-# directory via the rust-telemetry-exporter sidecar for Prometheus to scrape.
+# (Registry::to_prometheus), but NO binary in this image writes it — the
+# `demo` replay binary does not touch telemetry. The compose exporter sidecar
+# and the Prometheus file-SD target that pretended otherwise were removed in
+# round 3 (see deployment/prometheus/prometheus.yml). Re-introduce them
+# together with a producer, never before.
 # Digest pinning policy: see Dockerfile.python header / SECURITY.md.
 # =============================================================================
 
@@ -23,9 +25,17 @@ FROM rust:1-slim-bookworm AS build
 # digest-pin at release: rust:1-slim-bookworm@sha256:<record-me>
 # (toolchain baseline: Rust 1.95 in CI; workspace rust-version = 1.75)
 
+# configs/ and data/reference/ are NOT optional: the workspace's golden and
+# rule tests resolve ../../configs/{risk.json,strategies/alpha_params.json} and
+# ../../data/reference/feature_registry.json relative to CARGO_MANIFEST_DIR
+# (rust/risk/tests/rules.rs, rust/alpha/tests/golden_alpha.rs,
+# rust/features/tests/golden_features.rs). Without them `RUN cargo test` fails.
+# .dockerignore keeps rust/target (668 MB of host-path build state) out.
 WORKDIR /build
 COPY rust rust
 COPY tests/golden tests/golden
+COPY configs configs
+COPY data/reference data/reference
 
 # -j2: 2-CPU baseline environment (BUILD_NOTES.md).
 RUN cd rust && cargo build --release -j2 --workspace

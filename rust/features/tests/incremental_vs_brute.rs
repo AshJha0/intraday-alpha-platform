@@ -133,19 +133,19 @@ impl BruteState {
             let e5 = delta_union(&self.bid, &bid, 5) - delta_union(&self.ask, &ask, 5);
             self.ofi_log.push((t, e1, e5));
         }
-        let prev_ok = self.book_ok;
-        let prev_mid2 = self.mid2;
         self.bid = bid;
         self.ask = ask;
         self.book_ok = !self.bid.is_empty() && !self.ask.is_empty();
         if self.book_ok {
             self.mid2 = self.bid[0].0 + self.ask[0].0;
-            if !prev_ok || self.mid2 != prev_mid2 {
-                if prev_ok {
-                    if let Some(&(_, m0)) = self.mid_log.last() {
-                        let dlm = (self.mid2 as f64).ln() - (m0 as f64).ln();
-                        self.rv_log.push((t, dlm * dlm));
-                    }
+            // Pinned sampling: compare against the last RECORDED mid sample
+            // (API_FEATURES.md §2), so a one-sided flicker that moves the
+            // mid still contributes a vol sample.
+            let last = self.mid_log.last().map(|&(_, m)| m);
+            if last != Some(self.mid2) {
+                if let Some(m0) = last {
+                    let dlm = (self.mid2 as f64).ln() - (m0 as f64).ln();
+                    self.rv_log.push((t, dlm * dlm));
                 }
                 self.mid_log.push((t, self.mid2));
             }

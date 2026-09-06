@@ -9,6 +9,7 @@ import java.util.TreeMap;
 import com.iap.core.EventType;
 import com.iap.core.MarketEvent;
 import com.iap.core.Side;
+import com.iap.orderbook.ApplyStatus;
 import com.iap.orderbook.ConsolidatedBook;
 import com.iap.orderbook.OrderBook;
 
@@ -21,24 +22,44 @@ import com.iap.orderbook.OrderBook;
  *
  * <p>State-update semantics (pinned, API_FEATURES.md section 2):
  * <ul>
+ *   <li>an exchange_ts below the instrument's last seen exchange_ts
+ *       (cross-venue clock skew) is dropped + counted before the book sees
+ *       it — never thrown, never re-ordered;</li>
  *   <li>events are applied to the per-venue books of a
- *       {@link ConsolidatedBook};</li>
- *   <li>the merged top-10 view is refreshed only after book-touching events
- *       (ADD/MODIFY/CANCEL/EXECUTE/QUOTE and the final record of a SNAPSHOT
- *       burst, trade_id == 0), merging non-stale venues in ascending
- *       venue_id (same price: sizes summed);</li>
+ *       {@link ConsolidatedBook}; ONLY events the book reports
+ *       {@link com.iap.orderbook.ApplyStatus#APPLIED} feed rolling state
+ *       (duplicates, invalid sides, malformed payloads and events dropped
+ *       while stale contribute nothing);</li>
+ *   <li>the merged top-10 view is refreshed after APPLIED book-touching
+ *       events (ADD/MODIFY/CANCEL/EXECUTE/QUOTE and the final record of a
+ *       SNAPSHOT burst, trade_id == 0) and after any event that changed the
+ *       set of stale venues (staleness refresh: view only, no samples),
+ *       merging non-stale venues in ascending venue_id;</li>
+ *   <li>a stale to fresh recovery CLEARS every rolling window and history and
+ *       re-anchors warmup at the recovery timestamp
+ *       (warmup_after_recovery);</li>
  *   <li>windows are half-open {@code (t - w, t]} on exchange_ts;</li>
- *   <li>mid-derived samples are recorded at mid CHANGES; depth samples at
- *       every two-sided refresh; OFI deltas at every refresh;</li>
- *   <li>a windowed feature is invalid until
- *       {@code t - first_event_ts >= w} (warmup);</li>
- *   <li>NaN never appears with valid == true.</li>
+ *   <li>mid-derived samples are recorded whenever the merged mid differs from
+ *       the last RECORDED sample; depth samples at every two-sided refresh;
+ *       OFI deltas at every refresh;</li>
+ *   <li>a windowed feature is invalid until {@code t - warmTs >= w};</li>
+ *   <li>every {@code x / (y + EPS)} ratio is invalid when {@code y <= 0};</li>
+ *   <li>quantities above {@link #FEATURE_MAX_QTY} are not folded into any
+ *       window;</li>
+ *   <li>NaN never appears with valid == true (single value funnel).</li>
  * </ul>
  *
  * <p>Hot path: primitive ring buffers and preallocated merge scratch; no
  * steady-state allocation in the rolling machinery (conventions section 8).
  */
 public final class FeatureEngine {
+    /**
+     * Largest quantity folded into a rolling window (API_FEATURES.md section
+     * 2.2): beyond this a feed is malformed, not a market, and an int64
+     * window sum could no longer be exact in every port.
+     */
+    public static final long FEATURE_MAX_QTY = 1L << 40;
+
     /** History retention (2x the longest lookback + margin, as the reference). */
     private static final long HIST_KEEP_NS = 660 * Features.NS_PER_SEC;
     private static final int DEPTH = OrderBook.DEPTH_LEVELS;
@@ -47,6 +68,12 @@ public final class FeatureEngine {
         final double tick;
         ConsolidatedBook cons;
         long firstTs = -1;
+        /** warmup anchor: first event, or the last stale to fresh recovery. */
+        long warmTs = -1;
+        long lastTs;
+        long recoveries;
+        /** sorted ids of this instrument's venues whose book is stale. */
+        List<Integer> staleVenues = new ArrayList<>();
         long lastEmit = -1;
         // merged top-10 view (refreshed on book-touching events)
         boolean bookOk;
@@ -64,6 +91,12 @@ public final class FeatureEngine {
         int nPrevAsk;
         long[] scratchP = new long[8 * DEPTH];
         long[] scratchQ = new long[8 * DEPTH];
+        /**
+         * Per-venue cached top-10 depth, refreshed only for the venue whose
+         * event triggered the refresh (pinned: interior SNAPSHOT records
+         * must not leak a half-built book into the merged view).
+         */
+        TreeMap<Integer, long[][][]> venueCache = new TreeMap<>();
         long bestBidP;
         long bestBidQ;
         long bestAskP;
@@ -105,13 +138,46 @@ public final class FeatureEngine {
         }
 
         boolean warm(long t, long w) {
-            return firstTs >= 0 && t - firstTs >= w;
+            return warmTs >= 0 && t - warmTs >= w;
+        }
+
+        private static long[][] copyLevels(long[][] src) {
+            long[][] out = new long[src.length][];
+            for (int i = 0; i < src.length; i++) {
+                out[i] = src[i].clone();
+            }
+            return out;
+        }
+
+        /** Clear every rolling window / history; re-anchor warmup at t. */
+        void resetRolling(long t) {
+            warmTs = t;
+            recoveries++;
+            hist2 = new TimeSeries();
+            histlog = new TimeSeries();
+            rv10s = new DoubleRollingSum(Features.W_10S);
+            rv1m = new DoubleRollingSum(Features.W_1M);
+            rv5m = new DoubleRollingSum(Features.W_5M);
+            ofi1s = new LongRollingSum(4, Features.W_1S);
+            ofi5s = new LongRollingSum(4, Features.W_5S);
+            ofi30s = new LongRollingSum(4, Features.W_30S);
+            depthAvg10s = new LongRollingSum(4, Features.W_10S);
+            tr1s = new LongRollingSum(3, Features.W_1S);
+            tr10s = new LongRollingSum(3, Features.W_10S);
+            tr1m = new LongRollingSum(3, Features.W_1M);
+            nBid = 0;
+            nAsk = 0;
+            bookOk = false;
         }
 
         InstState copy(long instrumentId) {
             InstState o = new InstState(instrumentId, tick);
             o.cons = ConsolidatedBook.restore(cons.checkpoint());
             o.firstTs = firstTs;
+            o.warmTs = warmTs;
+            o.lastTs = lastTs;
+            o.recoveries = recoveries;
+            o.staleVenues = new ArrayList<>(staleVenues);
             o.lastEmit = lastEmit;
             o.bookOk = bookOk;
             System.arraycopy(bidP, 0, o.bidP, 0, DEPTH);
@@ -143,6 +209,12 @@ public final class FeatureEngine {
             o.logmid = logmid;
             o.spreadTicks = spreadTicks;
             o.spreadBps = spreadBps;
+            o.venueCache = new TreeMap<>();
+            for (Map.Entry<Integer, long[][][]> e : venueCache.entrySet()) {
+                long[][][] v = e.getValue();
+                o.venueCache.put(e.getKey(), new long[][][] {
+                    copyLevels(v[0]), copyLevels(v[1])});
+            }
             o.hist2 = hist2.copy();
             o.histlog = histlog.copy();
             o.rv10s = rv10s.copy();
@@ -163,6 +235,10 @@ public final class FeatureEngine {
     private final long cadenceNs;
     private final TreeMap<Long, InstState> states = new TreeMap<>();
     private long eventsProcessed;
+    private long eventsDropped;
+    private long tsRegressionsDropped;
+    private long oversizedQtyDropped;
+    private long oversizedDepthSkipped;
     private long vectorsEmitted;
 
     /**
@@ -183,6 +259,10 @@ public final class FeatureEngine {
         this.tickSizes = new TreeMap<>(o.tickSizes);
         this.cadenceNs = o.cadenceNs;
         this.eventsProcessed = o.eventsProcessed;
+        this.eventsDropped = o.eventsDropped;
+        this.tsRegressionsDropped = o.tsRegressionsDropped;
+        this.oversizedQtyDropped = o.oversizedQtyDropped;
+        this.oversizedDepthSkipped = o.oversizedDepthSkipped;
         this.vectorsEmitted = o.vectorsEmitted;
         for (Map.Entry<Long, InstState> e : o.states.entrySet()) {
             this.states.put(e.getKey(), e.getValue().copy(e.getKey()));
@@ -200,6 +280,44 @@ public final class FeatureEngine {
 
     public long vectorsEmitted() {
         return vectorsEmitted;
+    }
+
+    /** Events the book dropped/held — never folded into rolling state. */
+    public long eventsDropped() {
+        return eventsDropped;
+    }
+
+    /** Events dropped for an exchange_ts regression (fail closed). */
+    public long tsRegressionsDropped() {
+        return tsRegressionsDropped;
+    }
+
+    /** Applied events whose qty exceeded {@link #FEATURE_MAX_QTY}. */
+    public long oversizedQtyDropped() {
+        return oversizedQtyDropped;
+    }
+
+    /** Refreshes whose merged depth exceeded {@link #FEATURE_MAX_QTY}. */
+    public long oversizedDepthSkipped() {
+        return oversizedDepthSkipped;
+    }
+
+    /** Stale to fresh recoveries of one instrument (rolling-state resets). */
+    public long recoveries(long instrumentId) {
+        InstState st = states.get(instrumentId);
+        return st == null ? 0L : st.recoveries;
+    }
+
+    /** Warmup anchor of one instrument (-1 when it has no events yet). */
+    public long warmTs(long instrumentId) {
+        InstState st = states.get(instrumentId);
+        return st == null ? -1L : st.warmTs;
+    }
+
+    /** True when the instrument's merged book is currently two-sided. */
+    public boolean bookOk(long instrumentId) {
+        InstState st = states.get(instrumentId);
+        return st != null && st.bookOk;
     }
 
     private InstState state(long instrumentId) {
@@ -223,15 +341,51 @@ public final class FeatureEngine {
      */
     public boolean apply(MarketEvent ev, FeatureVector out) {
         InstState st = state(ev.instrumentId);
-        st.cons.apply(ev);
         long t = ev.exchangeTs;
+        if (st.firstTs >= 0 && t < st.lastTs) {
+            // Cross-venue exchange_ts regression: dropped + counted before
+            // the book sees it (pinned). Never thrown, never re-ordered.
+            tsRegressionsDropped++;
+            eventsDropped++;
+            eventsProcessed++;
+            return false;
+        }
+        ApplyStatus status = st.cons.apply(ev);
         if (st.firstTs < 0) {
             st.firstTs = t;
+            st.warmTs = t;
         }
+        st.lastTs = t;
         eventsProcessed++;
 
+        // The merged view is a function of WHICH venues are stale, so the
+        // trigger is a change of the stale SET, not of "any venue is stale".
+        List<Integer> staleNow = new ArrayList<>();
+        for (Map.Entry<Integer, OrderBook> e : st.cons.venues().entrySet()) {
+            if (e.getValue().isStale()) {
+                staleNow.add(e.getKey());
+            }
+        }
+        boolean staleChanged = !staleNow.equals(st.staleVenues);
+        boolean justRecovered = !st.staleVenues.isEmpty() && staleNow.isEmpty();
+        st.staleVenues = staleNow;
+
+        if (status != ApplyStatus.APPLIED) {
+            eventsDropped++;
+            if (staleChanged
+                    && refreshBook(st, ev.venueId, t, justRecovered, false)) {
+                oversizedDepthSkipped++;
+            }
+            return emitIfDue(st, ev.instrumentId, t, out);
+        }
+
         int et = ev.eventType;
-        if (et == EventType.TRADE) {
+        if (ev.qty > FEATURE_MAX_QTY) {
+            // Oversized quantity (pinned section 2.2): the book may hold it,
+            // but no rolling window folds it in — an int64 window sum stays
+            // exact. The merged view is still refreshed.
+            oversizedQtyDropped++;
+        } else if (et == EventType.TRADE) {
             // signed / buy / sell traded quantity (side BID = buy aggressor)
             long buy = ev.side == Side.BID ? ev.qty : 0;
             long sell = ev.qty - buy;
@@ -248,9 +402,20 @@ public final class FeatureEngine {
                 || et == EventType.QUOTE
                 || (et == EventType.SNAPSHOT && ev.tradeId == 0);
         if (bookTouch) {
-            refreshBook(st, t);
+            if (refreshBook(st, ev.venueId, t, justRecovered, true)) {
+                oversizedDepthSkipped++;
+            }
+        } else if (staleChanged) {
+            if (refreshBook(st, ev.venueId, t, justRecovered, false)) {
+                oversizedDepthSkipped++;
+            }
         }
 
+        return emitIfDue(st, ev.instrumentId, t, out);
+    }
+
+    private boolean emitIfDue(InstState st, long instrumentId, long t,
+            FeatureVector out) {
         if (cadenceNs == 0 || st.lastEmit < 0 || t - st.lastEmit >= cadenceNs) {
             // Evict expired samples from every window at emission time.
             st.rv10s.trim(t);
@@ -265,7 +430,7 @@ public final class FeatureEngine {
             st.tr1m.trim(t);
             st.hist2.trim(t - HIST_KEEP_NS);
             st.histlog.trim(t - HIST_KEEP_NS);
-            emit(st, ev.instrumentId, t, out);
+            emit(st, instrumentId, t, out);
             st.lastEmit = t;
             vectorsEmitted++;
             return true;
@@ -320,16 +485,20 @@ public final class FeatureEngine {
         return d;
     }
 
-    /** Merge one side over non-stale venues into (outP, outQ); returns count. */
+    /**
+     * Merge one side over non-stale venues into (outP, outQ) from the per
+     * venue CACHE (pinned: a venue's contribution changes only when one of
+     * its own book-touching events refreshes it); returns the level count.
+     */
     private int mergeSide(InstState st, int side, long[] outP, long[] outQ) {
         int n = 0;
         SortedMap<Integer, OrderBook> venues = st.cons.venues();
-        for (Map.Entry<Integer, OrderBook> e : venues.entrySet()) { // asc vid
-            OrderBook book = e.getValue();
-            if (book.isStale()) {
+        for (Map.Entry<Integer, long[][][]> ce : st.venueCache.entrySet()) {
+            OrderBook book = venues.get(ce.getKey());
+            if (book == null || book.isStale()) {
                 continue;
             }
-            long[][] levels = book.depth(side, DEPTH);
+            long[][] levels = ce.getValue()[side == Side.BID ? 0 : 1];
             for (long[] lvl : levels) {
                 long p = lvl[0];
                 long q = lvl[1];
@@ -376,7 +545,23 @@ public final class FeatureEngine {
         return take;
     }
 
-    private void refreshBook(InstState st, long t) {
+    /**
+     * Recompute the merged view. {@code samples == false} is a staleness
+     * refresh: the view and bookOk are recomputed because the stale-venue set
+     * changed, but no OFI / depth / mid sample is recorded.
+     *
+     * @return true when the merged depth was oversized (view unusable)
+     */
+    private boolean refreshBook(InstState st, int venueId, long t,
+            boolean justRecovered, boolean samples) {
+        if (justRecovered) {
+            st.resetRolling(t);
+        }
+        OrderBook vb = st.cons.venues().get(venueId);
+        if (vb != null) {
+            st.venueCache.put(venueId, new long[][][] {
+                vb.depth(Side.BID, DEPTH), vb.depth(Side.ASK, DEPTH)});
+        }
         // Save the previous merged view (copy into the prev arrays).
         System.arraycopy(st.bidP, 0, st.prevBidP, 0, DEPTH);
         System.arraycopy(st.bidQ, 0, st.prevBidQ, 0, DEPTH);
@@ -384,16 +569,32 @@ public final class FeatureEngine {
         System.arraycopy(st.askP, 0, st.prevAskP, 0, DEPTH);
         System.arraycopy(st.askQ, 0, st.prevAskQ, 0, DEPTH);
         st.nPrevAsk = st.nAsk;
-        boolean prevOk = st.bookOk;
-        long prevMid2 = st.mid2;
-
         st.nBid = mergeSide(st, Side.BID, st.bidP, st.bidQ);
         st.nAsk = mergeSide(st, Side.ASK, st.askP, st.askQ);
 
+        // Oversized merged depth (pinned section 2.2): a level above
+        // FEATURE_MAX_QTY makes the merged view unusable — clear it, record
+        // nothing, and let the next clean refresh re-baseline.
+        boolean oversized = false;
+        for (int i = 0; i < st.nBid; i++) {
+            oversized |= st.bidQ[i] > FEATURE_MAX_QTY;
+        }
+        for (int i = 0; i < st.nAsk; i++) {
+            oversized |= st.askQ[i] > FEATURE_MAX_QTY;
+        }
+        if (oversized) {
+            st.nBid = 0;
+            st.nAsk = 0;
+            st.bookOk = false;
+            return true;
+        }
+
         // OFI contributions per level count (defined book_ok or not); the
-        // sample is skipped only when previous and current views are all
-        // empty.
-        if (st.nPrevBid != 0 || st.nPrevAsk != 0 || st.nBid != 0 || st.nAsk != 0) {
+        // sample is skipped when previous and current views are all empty, or
+        // on the first refresh after a recovery (no previous depth).
+        if (samples && !justRecovered
+                && (st.nPrevBid != 0 || st.nPrevAsk != 0 || st.nBid != 0
+                        || st.nAsk != 0)) {
             final int[] ks = {1, 3, 5, 10};
             for (int i = 0; i < 4; i++) {
                 st.ofiContribs[i] = depthDelta(st.prevBidP, st.prevBidQ,
@@ -407,8 +608,8 @@ public final class FeatureEngine {
         }
 
         st.bookOk = st.nBid > 0 && st.nAsk > 0;
-        if (!st.bookOk) {
-            return;
+        if (!st.bookOk || !samples) {
+            return false;
         }
 
         st.bestBidP = st.bidP[0];
@@ -456,9 +657,13 @@ public final class FeatureEngine {
         st.depthSample[3] = st.da5;
         st.depthAvg10s.add(t, st.depthSample);
 
-        // Mid-change samples (returns / realized-vol inputs).
-        if (!prevOk || st.mid2 != prevMid2) {
-            if (prevOk && !st.hist2.isEmpty()) {
+        // Mid-change samples (returns / realized-vol inputs), compared with
+        // the last RECORDED sample (pinned): a one-sided flicker that moves
+        // the mid still yields a vol sample; a flicker back to the same mid
+        // yields none.
+        boolean hasLast = !st.hist2.isEmpty();
+        if (!hasLast || st.hist2.last() != (double) st.mid2) {
+            if (hasLast) {
                 double dlm = st.logmid - st.histlog.last();
                 double sq = dlm * dlm;
                 st.rv10s.add(t, sq);
@@ -468,6 +673,7 @@ public final class FeatureEngine {
             st.hist2.append(t, (double) st.mid2);
             st.histlog.append(t, st.logmid);
         }
+        return false;
     }
 
     private void emit(InstState st, long iid, long t, FeatureVector out) {
@@ -510,10 +716,13 @@ public final class FeatureEngine {
         put(out, Features.RVOL_W1M, rv1m, hasRv1m);
         put(out, Features.RVOL_W5M, rv5m, hasRv5m);
 
-        boolean hasRva = hasLog10s && hasRv1m;
+        // EPS guard (section 4): the denominator is undefined when the vol
+        // window holds no mid-change SAMPLE (exact integer count, not
+        // `rvol > 0`: a float sum drifts and the test would flip per port).
+        boolean hasRva = hasLog10s && hasRv1m && st.rv1m.count() > 0;
         put(out, Features.RET_VOL_ADJ_10S,
                 hasRva ? retLog10s / (rv1m + Features.EPS) : 0.0, hasRva);
-        boolean hasVrr = hasRv1m && hasRv5m;
+        boolean hasVrr = hasRv1m && hasRv5m && st.rv5m.count() > 0;
         put(out, Features.VOL_REGIME_RATIO,
                 hasVrr ? rv1m / (rv5m + Features.EPS) : 0.0, hasVrr);
 
@@ -571,16 +780,21 @@ public final class FeatureEngine {
         final int[] normOfiIdx = {0, 2, 2};      // l1 -> tuple 0, l5 -> tuple 2
         final int[] normWi = {0, 0, 1};          // w1s, w1s, w5s
         for (int i = 0; i < 3; i++) {
-            boolean has = st.warm(t, ofiW[normWi[i]]) && davgOk;
-            double v = 0.0;
-            if (has) {
+            double denom = 0.0;
+            if (davgOk) {
                 double denomSum = normOfiIdx[i] == 0
                         ? (double) (st.depthAvg10s.sum(0) + st.depthAvg10s.sum(1))
                         : (double) (st.depthAvg10s.sum(2) + st.depthAvg10s.sum(3));
-                double denom = denomSum / (double) st.depthAvg10s.count();
-                v = (double) ofis[normWi[i]].sum(normOfiIdx[i])
-                        / (denom + Features.EPS);
+                denom = denomSum / (double) st.depthAvg10s.count();
             }
+            // Exact INTEGER guard: a float `> 0` test would flip between
+            // ports on accumulation drift.
+            long depthSum = normOfiIdx[i] == 0
+                    ? st.depthAvg10s.sum(0) + st.depthAvg10s.sum(1)
+                    : st.depthAvg10s.sum(2) + st.depthAvg10s.sum(3);
+            boolean has = st.warm(t, ofiW[normWi[i]]) && davgOk && depthSum > 0;
+            double v = has ? (double) ofis[normWi[i]].sum(normOfiIdx[i])
+                    / (denom + Features.EPS) : 0.0;
             put(out, normSlots[i], v, has);
         }
 
@@ -603,8 +817,13 @@ public final class FeatureEngine {
         return Math.sqrt(Math.max(win.sum(), 0.0) / ((double) w / 1e9));
     }
 
+    /**
+     * Single value funnel (API_FEATURES.md section 1): a non-finite value can
+     * never be emitted with valid == true.
+     */
     private static void put(FeatureVector out, int slot, double v, boolean ok) {
-        out.values[slot] = ok ? v : Double.NaN;
-        out.valid[slot] = ok;
+        boolean good = ok && !Double.isNaN(v) && !Double.isInfinite(v);
+        out.values[slot] = good ? v : Double.NaN;
+        out.valid[slot] = good;
     }
 }

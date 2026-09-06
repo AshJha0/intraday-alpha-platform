@@ -58,11 +58,21 @@ fn engine_vectors(vector: &str, instrument_id: u32, tick: f64) -> (Vec<FeatureVe
     let mut series = MidSeries::new();
     let mut vectors = Vec::with_capacity(events.len());
     let mut last_ts = 0i64;
+    let mut last_refresh = 0u64;
     for ev in &events {
         let vec = eng.apply(ev).unwrap().expect("cadence 0 emits");
         last_ts = ev.exchange_ts;
-        if let Some((mid, _hs)) = eng.mid_state(instrument_id) {
-            series.append(ev.exchange_ts, mid);
+        // one mid sample per book REFRESH; a non-tradable refresh is a
+        // blackout sample (API_FEATURES.md §6)
+        let seq = eng.refresh_seq(instrument_id);
+        if seq != last_refresh {
+            last_refresh = seq;
+            match eng.mid_state(instrument_id) {
+                Some((mid, _hs)) if eng.label_tradable(instrument_id) => {
+                    series.append_sample(ev.exchange_ts, mid, true)
+                }
+                _ => series.append_sample(ev.exchange_ts, f64::NAN, false),
+            }
         }
         vectors.push(vec);
     }

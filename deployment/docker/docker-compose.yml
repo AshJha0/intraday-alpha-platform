@@ -6,10 +6,15 @@
 #       -> shared volume /data (raw + normalized + qc_report.json)
 #   cpp-replay, rust-replay (deterministic replay / exec sim)
 #   java-platform (paper-trading vertical, com.iap.platform.PaperTrading;
-#                  monitoring API live on :8080 — /metrics, /health, /status)
-#   rust-telemetry-exporter (serves rust telemetry Prometheus text from /data)
-#   prometheus  -> scrapes java-platform + rust telemetry file target
+#                  monitoring API live on :8080 — /metrics, /health, /ready,
+#                  /status, POST /admin/* when GRAFANA-style secrets provide
+#                  IAP_ADMIN_TOKEN)
+#   prometheus  -> scrapes java-platform (the only metrics producer)
 #   grafana     -> provisioned dashboards (deployment/grafana/)
+#
+# The rust-telemetry-exporter sidecar was REMOVED in round 3: no Rust binary
+# ever wrote /data/telemetry/rust.prom, so it served an empty file and kept a
+# permanently-down scrape target (see deployment/prometheus/prometheus.yml).
 #
 # Run from the repo root:   docker compose -f deployment/docker/docker-compose.yml up --build
 #
@@ -87,33 +92,6 @@ services:
       data-generator:
         condition: service_completed_successfully
 
-  # Serves rust/telemetry Prometheus text exposition (Registry::to_prometheus)
-  # written by replay/risk components to /data/telemetry/*.prom. This is the
-  # "file-based target" scraped by prometheus (deployment/prometheus/
-  # targets/rust-telemetry.json). Reuses the already-built python image; no
-  # extra dependency.
-  rust-telemetry-exporter:
-    image: iap/python:1.0.0
-    container_name: iap-rust-telemetry-exporter
-    entrypoint: ["sh", "-c"]
-    command:
-      - >-
-        mkdir -p /data/telemetry &&
-        touch /data/telemetry/rust.prom &&
-        exec python3 -m http.server 9091 --directory /data/telemetry
-    restart: unless-stopped
-    networks: [iap-net]
-    volumes:
-      - iap-data:/data
-    depends_on:
-      data-generator:
-        condition: service_completed_successfully
-    healthcheck:
-      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9091/rust.prom', timeout=3)"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-
   # ----------------------------------------------------------- java platform
   java-platform:
     build:
@@ -123,19 +101,44 @@ services:
     container_name: iap-java-platform
     # The paper-trading vertical (com.iap.platform.PaperTrading) over the
     # golden equity vector, paced 60x realtime, serving GET /metrics
-    # (Prometheus text), /health and /status on :8080 (see Dockerfile.java).
-    # A session is finite; restart re-runs it so the endpoint stays up for
-    # scraping (the run is deterministic — every session reports the same
-    # honest summary line).
-    restart: unless-stopped
+    # (Prometheus text), /health, /ready and /status on :8080, plus the
+    # kill-switch admin API when IAP_ADMIN_TOKEN is set (see Dockerfile.java).
+    #
+    # A session is FINITE and ends cleanly (exit 0, status FINISHED,
+    # PLATFORM_CONVENTIONS.md §12.3) — hence `restart: on-failure`, NOT
+    # `unless-stopped`: the container must not re-run the 2-minute session
+    # forever, which used to reset the "daily" counters every two minutes and
+    # make `offset 1h` baselines meaningless. To watch a longer window, lower
+    # --speed or point --events at a longer vector.
+    restart: on-failure
     networks: [iap-net]
     ports:
       - "8080:8080"
+    environment:
+      # PLATFORM_CONVENTIONS.md §12.2: the entrypoint reads IAP_CONFIG_DIR, so
+      # the bind mount below is what the process actually loads. This makes the
+      # kill-switch runbook's config path real:
+      #   edit configs/risk.json  ->  docker compose restart java-platform
+      IAP_CONFIG_DIR: /app/configs
+      IAP_STATE_DIR: /data/state
+      # Kill-switch admin API (§12.5). Optional: with no token the /admin/*
+      # routes are not registered. Set IAP_ADMIN_TOKEN in the environment or an
+      # .env file (git-ignored, SECURITY.md) to enable the manual halt path.
+      IAP_ADMIN_TOKEN: ${IAP_ADMIN_TOKEN:-}
     volumes:
+      # configs mounted READ-ONLY over the baked-in copy: an operator edit plus
+      # a restart is a real config change (round-3 SEV-1).
+      - ../../configs:/app/configs:ro
       - iap-data:/data
     depends_on:
       data-generator:
         condition: service_completed_successfully
+    logging:
+      # -Xlog:gc*:stdout grows without bound otherwise (round-3 SEV-3).
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     healthcheck:
       # Real check against the live /health endpoint (no curl/wget in the
       # JRE image — bash /dev/tcp, same as the image's own HEALTHCHECK).
@@ -157,12 +160,16 @@ services:
       - ../prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ../prometheus/recording.yml:/etc/prometheus/recording.yml:ro
       - ../prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
-      - ../prometheus/targets:/etc/prometheus/targets:ro
       - prom-data:/prometheus
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
       - --storage.tsdb.retention.time=15d
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:9090/-/healthy >/dev/null || promtool check healthy >/dev/null 2>&1"]
       interval: 15s
@@ -189,6 +196,11 @@ services:
       - grafana-data:/var/lib/grafana
     depends_on:
       - prometheus
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health >/dev/null"]
       interval: 15s

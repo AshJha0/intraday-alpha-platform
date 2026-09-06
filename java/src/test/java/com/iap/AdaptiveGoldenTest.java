@@ -13,6 +13,7 @@ import org.junit.Test;
 import com.iap.adaptive.BaselineLoader;
 import com.iap.adaptive.LifecycleGauge;
 import com.iap.adaptive.Psi;
+import com.iap.adaptive.RollingIc;
 import com.iap.core.SplitMix64;
 
 /**
@@ -88,14 +89,18 @@ public class AdaptiveGoldenTest {
                 (int) Json.asLong(cfg.get("reactivate_evals")));
         List<Object> icPath = Json.array(golden.get("ic_path"));
         List<Object> wantStates = Json.array(golden.get("expected_states"));
+        List<Object> informative = Json.array(golden.get("ic_informative"));
         assertEquals(wantStates.size(), icPath.size());
+        assertEquals(informative.size(), icPath.size());
         int transitions = 0;
         LifecycleGauge.State prev = g.state();
         for (int i = 0; i < icPath.size(); i++) {
             Object ic = icPath.get(i);
-            // null rolling IC = no evidence (NaN on the Java side)
+            // null rolling IC = no evidence (NaN on the Java side); an
+            // uninformative evaluation re-read a frozen IC window
             LifecycleGauge.State got = g.update(
-                    ic == null ? Double.NaN : Json.asDouble(ic));
+                    ic == null ? Double.NaN : Json.asDouble(ic),
+                    (Boolean) informative.get(i));
             assertEquals("eval " + (i + 1), wantStates.get(i), got.name());
             if (got != prev) {
                 transitions++;
@@ -135,5 +140,64 @@ public class AdaptiveGoldenTest {
         Map<String, BaselineLoader.Baseline> all = BaselineLoader.loadDir(
                 Paths.get("..", "research", "baselines"));
         assertEquals("signal_eq01", all.get("EQ01").name());
+    }
+
+    @Test
+    public void rollingIcMatchesThePythonResearchLabel() {
+        Map<String, Object> g = Json.object(
+                Golden.json("expected_adaptive.json").get("rolling_ic"));
+        long horizonNs = Json.asLong(g.get("horizon_ns"));
+        assertEquals(horizonNs,
+                RollingIc.parseHorizonNs((String) g.get("horizon")));
+        RollingIc ric = new RollingIc(horizonNs,
+                Json.asLong(g.get("window_ns")),
+                Json.asLong(g.get("bucket_ns")),
+                (int) Json.asLong(g.get("min_buckets")));
+
+        List<Object> mids = Json.array(g.get("mid_series"));
+        List<Object> signals = Json.array(g.get("signals"));
+        List<Object> evals = Json.array(g.get("evaluations"));
+
+        // merge the two event-time streams (mids first at equal ts, so a
+        // signal always sees the mid prevailing at its own timestamp)
+        int mi = 0;
+        int si = 0;
+        int ei = 0;
+        while (mi < mids.size() || si < signals.size()) {
+            long mts = mi < mids.size()
+                    ? Json.asLong(Json.array(mids.get(mi)).get(0))
+                    : Long.MAX_VALUE;
+            long sts = si < signals.size()
+                    ? Json.asLong(Json.array(signals.get(si)).get(0))
+                    : Long.MAX_VALUE;
+            long now;
+            if (mts <= sts) {
+                List<Object> row = Json.array(mids.get(mi++));
+                now = mts;
+                ric.onMid(now, Json.asDouble(row.get(1)));
+            } else {
+                List<Object> row = Json.array(signals.get(si++));
+                now = sts;
+                ric.onSignal(now, Json.asDouble(row.get(1)),
+                        Json.asDouble(row.get(2)));
+            }
+            while (ei < evals.size()) {
+                Map<String, Object> ev = Json.object(evals.get(ei));
+                long t = Json.asLong(ev.get("t"));
+                if (now < t) {
+                    break;
+                }
+                Object want = ev.get("rolling_ic");
+                double got = ric.ic(t);
+                if (want == null) {
+                    assertTrue("eval " + ei + ": expected NaN, got " + got,
+                            Double.isNaN(got));
+                } else {
+                    assertEquals("eval " + ei, Json.asDouble(want), got, 1e-10);
+                }
+                ei++;
+            }
+        }
+        assertEquals("every pinned evaluation was checked", evals.size(), ei);
     }
 }

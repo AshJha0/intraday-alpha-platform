@@ -107,30 +107,25 @@ def _queue_delta(prev, curr, is_bid: bool):
 def mid_change_frame(book_df: pd.DataFrame) -> pd.DataFrame:
     """Mid samples (ts, n, mid2, logmid, dlm) from a book frame.
 
-    Mirrors the PINNED sampling semantics: a sample is recorded at every
-    two-sided refresh where the mid changed — or where the book just became
-    two-sided again (re-baseline, possibly with an unchanged mid2) — and
-    ``dlm`` is only defined when the PREVIOUS refresh was two-sided: the
-    return chain breaks across one-sided periods (dlm = NaN there, so no
-    return ever bridges a one-sided gap).
+    Mirrors the PINNED sampling semantics (API_FEATURES §2): a sample is
+    recorded at every two-sided refresh whose ``mid2`` differs from the last
+    RECORDED sample — a one-sided flicker that moves the mid therefore still
+    produces a ``dlm`` sample, and a flicker back to the same mid produces
+    none.  ``dlm`` is undefined only for the first sample of the series (or
+    the first after a stale-recovery reset, which clears the series).
     """
     rows = []
     hist_mid2 = None      # last recorded sample value
-    last_ok_mid2 = None   # mid2 at the last two-sided refresh
-    prev_ok = False
     for r in book_df.itertuples():
-        ok = pd.notna(r.bp) and pd.notna(r.ap)
-        if ok:
+        if pd.notna(r.bp) and pd.notna(r.ap):
             mid2 = r.bp + r.ap
-            if not prev_ok or mid2 != last_ok_mid2:
+            if hist_mid2 is None or mid2 != hist_mid2:
                 dlm = (math.log(mid2) - math.log(hist_mid2)
-                       if prev_ok and hist_mid2 is not None
+                       if hist_mid2 is not None
                        else float("nan"))
                 rows.append({"ts": r.ts, "n": r.n, "mid2": mid2,
                              "logmid": math.log(mid2), "dlm": dlm})
                 hist_mid2 = mid2
-            last_ok_mid2 = mid2
-        prev_ok = ok
     return pd.DataFrame(rows)
 
 

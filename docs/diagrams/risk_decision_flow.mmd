@@ -1,24 +1,28 @@
 flowchart TD
-    OR["OrderRequest"] --> KG{"kill switches?<br/>global > strategy > instrument > venue"}
-    KG -- engaged --> REJ["REJECT + RiskEvent<br/>(rule_id, severity, audit JSONL)"]
-    KG -- clear --> MAL{"malformed / unknown instrument?"}
+    OR["OrderRequest"] --> BS{"config loaded and<br/>state bootstrapped?"}
+    BS -- no --> REJ["REJECT + RiskEvent<br/>(rule_id, severity, audit JSONL —<br/>money via fmt_fixed, byte-identical Rust/Java)"]
+    BS -- yes --> KG{"kill switches?<br/>global > strategy > instrument > venue"}
+    KG -- engaged --> REJ
+    KG -- clear --> MAL{"malformed / unknown instrument?<br/>duplicate order_id?"}
     MAL -- yes --> REJ
-    MAL -- no --> DUP{"duplicate order_id?"}
-    DUP -- yes --> REJ
-    DUP -- no --> FF{"fat-finger qty / notional?"}
-    FF -- breach --> REJ
-    FF -- ok --> PB{"price band vs last mid?<br/>stale price age? sequence gap?<br/>venue disconnected?"}
+    MAL -- no --> PB{"venue disconnected? sequence gap?<br/>stale mark (market-data time)?"}
     PB -- breach --> REJ
-    PB -- ok --> SM{"self-match vs own resting orders?<br/>(conservative for unpriced MARKET)"}
-    SM -- would cross --> REJ
-    SM -- ok --> RT{"order-rate token bucket<br/>(event-time refill)"}
+    PB -- ok --> FF{"fat-finger qty?<br/>FX rate present + fresh?<br/>fat-finger notional (qty x qty_unit x price x fx)?<br/>price band vs last mid?"}
+    FF -- breach --> REJ
+    FF -- ok --> RT{"order-rate token bucket<br/>(event-time refill, never backwards)"}
     RT -- exhausted --> REJ
-    RT -- ok --> LIM{"worst-case position / instrument /<br/>gross / net notional projections"}
+    RT -- ok --> SM{"self-match vs ALL own open orders<br/>(any strategy/venue; unpriced = crosses)"}
+    SM -- would cross --> REJ
+    SM -- ok --> LIM{"worst-case projections incl. every open order:<br/>position / instrument / gross / net notional"}
     LIM -- breach --> REJ
-    LIM -- ok --> PNL{"daily / strategy loss limits<br/>(avg-cost realized PnL, latched)"}
-    PNL -- breached --> KILL["engage kill switch +<br/>REJECT"]
-    PNL -- ok --> ALLOW["ALLOW -> execution"]
-    ALLOW --> FILLS["fills feed back:<br/>positions, PnL, resting-order set"]
+    LIM -- ok --> PNL{"daily / strategy loss limits<br/>(realized + unrealized MTM, reporting ccy)"}
+    PNL -- breached --> REJ
+    PNL -- ok --> ALLOW["ALLOW -> execution<br/>(order tracked open until on_order_done / full fill)"]
+    ALLOW --> FILLS["fills + terminal reports feed back:<br/>positions, lots, open-order set"]
+    MK["market updates (mid, ts):<br/>marks held lots"] --> LATCH{"daily P&L <= -limit?"}
+    FILLS --> LATCH
+    LATCH -- yes --> KILL["latch STRATEGY then GLOBAL kill<br/>(no fill required)"]
+    KILL --> KG
+    RE["re-arm: override_loss_limit (audited)<br/>then clear_kill; roll_session keeps kills;<br/>snapshot/restore for restarts"] -.-> KG
     FILLS -.-> SM
     FILLS -.-> LIM
-    FILLS -.-> PNL

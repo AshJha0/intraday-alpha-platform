@@ -94,16 +94,35 @@ def build_meta_features(pred: np.ndarray, direction: np.ndarray,
     return np.where(np.isfinite(X), X, 0.0)
 
 
+#: Minimum POSITIVE calibration samples before isotonic regression is used
+#: (pinned, round-3).  Isotonic is non-parametric: with a 7 % base rate and a
+#: few dozen positives it interpolates noise into a step function whose steps
+#: sit above every achievable probability, so the gate declines 100 % of test
+#: signals for every tau and the "economically correct" reading is an
+#: artefact of the calibrator, not of the signal.  Below the threshold the
+#: platform falls back to Platt scaling (sigmoid, 2 parameters).
+MIN_ISOTONIC_POSITIVES = 500
+
+
 def _fit_isotonic_calibrated(base: Any, X_cal: np.ndarray,
                              y_cal: np.ndarray) -> Any:
-    """Isotonic-calibrate a prefit classifier on held-out calibration data."""
+    """Calibrate a prefit classifier on held-out calibration data.
+
+    Isotonic when the calibration segment carries at least
+    :data:`MIN_ISOTONIC_POSITIVES` positives, otherwise Platt (sigmoid).
+    The method actually used is recorded on the returned object as
+    ``iap_calibration_method``.
+    """
+    n_pos = int(np.sum(np.asarray(y_cal) > 0))
+    method = "isotonic" if n_pos >= MIN_ISOTONIC_POSITIVES else "sigmoid"
     try:  # sklearn >= 1.6
         from sklearn.frozen import FrozenEstimator
-        calib = CalibratedClassifierCV(FrozenEstimator(base),
-                                       method="isotonic")
+        calib = CalibratedClassifierCV(FrozenEstimator(base), method=method)
     except ImportError:  # pragma: no cover - older sklearn
-        calib = CalibratedClassifierCV(base, method="isotonic", cv="prefit")
+        calib = CalibratedClassifierCV(base, method=method, cv="prefit")
     calib.fit(X_cal, y_cal)
+    calib.iap_calibration_method = method
+    calib.iap_calibration_positives = n_pos
     return calib
 
 
@@ -229,6 +248,16 @@ def run_meta_labeling(
         "tau": tau,
         "best_tau_from_calibration": best_tau,
         "tau_sweep_calibration": sweep,
+        "calibration_method": getattr(calib, "iap_calibration_method", ""),
+        "calibration_positives": int(
+            getattr(calib, "iap_calibration_positives", 0)),
+        # A gate that declines EVERY test signal is degenerate: say so
+        # explicitly instead of reporting it as an economic decision.
+        "gate_degenerate": bool(
+            int(np.sum(p_test >= tau)) == 0
+            and int(np.sum(p_test >= best_tau)) == 0),
+        "n_taken_at_tau": int(np.sum(p_test >= tau)),
+        "n_taken_at_best_tau": int(np.sum(p_test >= best_tau)),
         "economics_gate_off": econ_off,
         "economics_gate_tau": econ_tau,
         "economics_gate_best_tau": econ_best,
@@ -237,6 +266,14 @@ def run_meta_labeling(
 
     if tracker is not None:
         run_id = tracker.new_run(f"metalabel_{primary_name}")
+        # The meta run's "folds" are its three chronological segments: the
+        # manifest has to say which rows trained, calibrated and scored, or
+        # the fit cannot be replayed (spec §14/§26).
+        segment_records = [
+            {"segment": label, "n": int(mask.sum()),
+             "window": [int(ts[mask].min()), int(ts[mask].max())]}
+            for label, mask in (("train", tr), ("calibration", ca),
+                                ("test", te))]
         tracker.write_manifest(
             run_id,
             model_version="metalabel_isotonic_v1",
@@ -245,6 +282,11 @@ def run_meta_labeling(
                           "end_ts": int(ts[tr].max())},
             test_window={"start_ts": int(ts[te].min()),
                          "end_ts": int(ts[te].max())},
+            features=list(META_FEATURE_NAMES),
+            target=("meta_label_net_pnl_positive (1 iff the primary signal's "
+                    "realized net P&L > 0 under the conservative cost model; "
+                    f"primary = {primary_name})"),
+            folds=segment_records,
         )
         tracker.write_metrics(run_id, result)
         tracker.save_model(run_id, calib)

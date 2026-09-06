@@ -1,15 +1,17 @@
 # =============================================================================
 # prometheus.yml — Intraday Alpha Platform scrape configuration (spec §25)
 #
-# Two sources of metrics:
-#   1. java-platform  — com.iap.monitoring registry served by
-#      com.iap.api.MetricsServer (LIVE), port 8080, GET /metrics,
-#      Prometheus text exposition.
-#   2. rust telemetry — rust/telemetry Registry::to_prometheus() text written
-#      by replay/risk/venue components to a file (/data/telemetry/rust.prom)
-#      and served by the rust-telemetry-exporter sidecar. Discovered via a
-#      FILE-BASED target list (targets/rust-telemetry.json) so operators can
-#      re-point it without reloading this config.
+# ONE source of metrics today: the Java platform (com.iap.monitoring registry
+# served by com.iap.api.MetricsServer) on port 8080, GET /metrics, Prometheus
+# text exposition — plus Prometheus's own self-scrape.
+#
+# The `rust-telemetry` file-SD job was REMOVED (round-3 PLATFORM finding
+# SEV-2): no Rust component ever wrote /data/telemetry/rust.prom, so the
+# target was permanently down, `TargetDown` (critical) fired continuously, and
+# every rule/panel built on venue_* was empty. Execution monitoring now comes
+# from the platform's own exec_* counters (PLATFORM_CONVENTIONS.md §12.6);
+# deployment/grafana/README.md records what is scraped today. Re-add a job
+# here only together with a producer that actually writes the metrics.
 #
 # Metric-name conventions (see deployment/grafana/README.md for the full
 # mapping): snake_case, counters end in _total, latency histograms end in _ns
@@ -37,15 +39,6 @@ scrape_configs:
         labels:
           service: java-platform
           language: java
-
-  # Rust telemetry: file-based service discovery pointing at the sidecar that
-  # serves rust/telemetry text exposition from the shared data volume.
-  - job_name: rust-telemetry
-    metrics_path: /rust.prom
-    file_sd_configs:
-      - files:
-          - /etc/prometheus/targets/rust-telemetry.json
-        refresh_interval: 30s
 
   # Prometheus self-scrape (rule/alert health).
   - job_name: prometheus

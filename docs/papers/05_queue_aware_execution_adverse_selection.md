@@ -274,3 +274,44 @@ data where the answer is not known in advance.
 | Perold identity to 1e-9 | `tests/golden/expected_tca.json`, `python/src/iap/tca/tca.py` |
 | venue fees/rebates and latency profiles | `configs/venues.json` |
 | golden event vectors | `tests/golden/events_eq_mbo.jsonl`, `events_fx_quote.jsonl` |
+
+## Erratum / Update — 2026-09-06 (round-3 trading fixes)
+
+- **Golden fills v2 supersede the numbers in the Abstract, §4.1 and §6.**
+  Three simulator rules changed (`cpp/include/iap/execution/execution.hpp`,
+  `PLATFORM_CONVENTIONS.md` §11.2): (3b) displayed liquidity consumed by an
+  earlier child inside the same decision is *consumed* — a later child
+  cannot fill against it again (previously each child saw the full
+  displayed size); (7) cancels arrive after the same latency path as
+  submissions and children carry an `expire_ts` = parent `end_ts`, so **no
+  child outlives its parent's window**; (8) no fill is generated while the
+  venue book is stale or its status is HALT/AUCTION_CALL. On the pinned
+  vector rule (7) is the one that bites: parent 1's second VWAP slice used
+  to fill 290 s *after* the horizon. `tests/golden/expected_replay_fills.json`
+  x-version 2 now records **6 fills**: parent 1 (VWAP buy) fills
+  **329 of 400** in 3 maker fills (avg 24.4982, rebates **-0.658**, 71
+  unfilled at `end_ts`); parent 2 (IS sell) is unchanged (3 taker fills,
+  600, avg 24.5081, fees +1.800, impact +0.0018). Fills 1-6 are
+  byte-identical to v1; only v1's seventh (out-of-window) fill is gone. The
+  passive/aggressive explicit-cost swing is therefore still ≈ 0.5 cents per
+  filled share, and the timing-uncertainty caveat of §4.1 is now visible in
+  the golden itself (18% of the passive parent left unfilled).
+- **Crossed consolidated states (§5 item 1).** The TCA timeline builder now
+  pins the rule instead of tolerating it: crossed states are skipped and
+  counted (`crossed_states_skipped`), locked states are kept, so a negative
+  spread-cost line can no longer come from a crossed reference state
+  (`API_PORTFOLIO_TCA.md` §2.1; `tests/golden/expected_tca.json` v2).
+  Passive (MAKER) fills are attributed against the state *before* the event
+  that filled them (§2.4), and a markout whose horizon runs past the end of
+  the timeline or across a HALT is reported as undefined rather than
+  fabricated from the last state (§2.5) — `TCA_REPORT.md` now prints
+  "fills defined" per horizon.
+- **Additional known optimism** (adds to §5): the C++/Java simulator has
+  no PEG/MID order types; the SOR is not depth-aware (it ranks eligible
+  venues by cost only); and the post-apply "crossed display fills us in
+  full" rule (rule 4) fills the whole resting remainder when an opposite
+  quote crosses our price even if the crossing quote is smaller — on FX
+  L1 QUOTE feeds this overstates passive fill size (the Rust venue
+  simulator caps at the crossing level's size; the two are not yet
+  pinned equal). All three are documented in `docs/SCENARIOS.md` (TRADING)
+  as declined for this round.

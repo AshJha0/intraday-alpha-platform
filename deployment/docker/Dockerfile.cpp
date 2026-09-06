@@ -35,9 +35,16 @@ RUN if [ ! -e /usr/lib/x86_64-linux-gnu/libgtest.a ] && [ -d /usr/src/googletest
 
 # Layout matters: cpp/CMakeLists.txt compiles IAP_GOLDEN_DIR as
 # <source-dir>/../tests/golden, so keep the repo shape: /build/cpp + /build/tests.
+# configs/ and data/reference/ are NOT optional: the golden tests resolve
+# <golden>/../../configs (test_alpha_golden.cpp:32, test_replay_fills.cpp:74)
+# and bench_all reads the same path AT RUNTIME (bench_all.cpp:133). Without
+# them `RUN ctest` fails and the runtime container exits at startup.
+# .dockerignore keeps cpp/build (host CMakeCache) out of the context.
 WORKDIR /build
 COPY cpp cpp
 COPY tests/golden tests/golden
+COPY configs configs
+COPY data/reference data/reference
 
 # Exactly cpp/build.sh (Release, -j2 — 2-CPU baseline, BUILD_NOTES.md).
 RUN cd cpp && bash build.sh
@@ -57,6 +64,9 @@ RUN groupadd --gid 10001 iap && \
 # golden); keep the same absolute layout in the runtime image.
 COPY --from=build /build/cpp/build/bench_all /usr/local/bin/iap-replay-sim
 COPY --from=build /build/tests/golden /build/tests/golden
+# bench_all reads IAP_GOLDEN_DIR/../../configs at runtime — keep the shape.
+COPY --from=build /build/configs /build/configs
+COPY --from=build /build/data/reference /build/data/reference
 
 USER iap
 WORKDIR /home/iap

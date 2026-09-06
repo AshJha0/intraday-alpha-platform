@@ -8,6 +8,7 @@ description = "IAP deterministic event-time replay with checkpoints and snapshot
 [dependencies]
 marketdata = { path = "../marketdata" }
 orderbook = { path = "../orderbook" }
+eventbus = { path = "../eventbus" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 

@@ -236,3 +236,189 @@ def test_ensemble_scores_cancels_opposite_members():
     )
     with pytest.raises(ValueError):
         ensemble_scores({"A": a}, {"A": 0.0})
+
+
+# ------------------------------------------------------ round-3 scenarios
+
+
+def test_backtest_multi_currency_pnl_converted():
+    """EUR/USD (USD-quoted) gains 1,000 USD, USD/JPY (JPY-quoted) loses
+    150,000 JPY at a 150 USD/JPY rate: converted total ~ 0 USD (pinned:
+    per-row conversion at the prevailing pair mid, never summed natively)."""
+    meta = {
+        101: {"tick_size": 1e-05, "lot_size": 1000, "adv": 4e9,
+              "asset_class": "FX", "ref_price": 1.0,
+              "base_currency": "EUR", "quote_currency": "USD"},
+        103: {"tick_size": 0.001, "lot_size": 1000, "adv": 4e9,
+              "asset_class": "FX", "ref_price": 150.0,
+              "base_currency": "USD", "quote_currency": "JPY"},
+    }
+    cm = CostModel(0.0, 0.003, 0.0, 1.0)  # zero impact/commission: exact numbers
+    bt = Backtester(cm, meta, BacktestConfig(max_pos_qty=1000, conf_min=0.5))
+    assert bt.fx_conversion == {"EUR": (101, False), "JPY": (103, True)}
+    # EUR/USD: buy 1000 lots at row 1 (1.00000), mid rises by 0.001 -> +1,000 USD
+    eur_mids = [1.0, 1.0, 1.001, 1.001]
+    # USD/JPY: buy 1000 lots at row 1 (150.000), mid falls by 0.15 -> -150,000 JPY
+    jpy_mids = [150.0, 150.0, 149.85, 149.85]
+    frames = {101: _frame(eur_mids, spreads_ticks=0.0, iid=101),
+              103: _frame(jpy_mids, spreads_ticks=0.0, iid=103)}
+    scores = {101: _scores([1e-4, 1e-4, 1e-4, 1e-4]),
+              103: _scores([1e-4, 1e-4, 1e-4, 1e-4])}
+    res = bt.run(frames, scores, "FX")
+    native = res.total_pnl_native_by_ccy
+    assert abs(native["USD"] - 1000.0) < 1e-6
+    assert abs(native["JPY"] + 150_000.0) < 1e-6
+    # the JPY loss converts at the prevailing USD/JPY mid of the loss row
+    # (149.85): -150,000 / 149.85 = -1,001.00 USD; total ~ -1 USD, not -149k
+    jpy = res.per_instrument[103]
+    assert jpy.quote_currency == "JPY"
+    assert abs(jpy.total_pnl - (-150_000.0 / 149.85)) < 1e-6
+    assert abs(res.total_pnl - (1000.0 - 150_000.0 / 149.85)) < 1e-6
+    assert abs(res.total_pnl) < 2.0
+    # bar P&L pooled in USD as well
+    assert abs(sum(sum(r.bar_pnl) for r in res.per_instrument.values())
+               - res.total_pnl) < 1e-6
+    # reference rate for capital arithmetic
+    assert abs(bt.reference_rate("JPY") - 1 / 150.0) < 1e-15
+    assert bt.reference_rate("USD") == 1.0
+    with pytest.raises(ValueError):
+        bt.reference_rate("CHF")
+    # fail closed: a GBP-quoted instrument (EUR/GBP) whose conversion pair
+    # (GBP/USD) is not in the frame set
+    meta2 = dict(meta)
+    meta2[102] = {"tick_size": 1e-05, "lot_size": 1000, "adv": 4e9,
+                  "asset_class": "FX", "ref_price": 1.27,
+                  "base_currency": "GBP", "quote_currency": "USD"}
+    meta2[108] = {"tick_size": 1e-05, "lot_size": 1000, "adv": 4e9,
+                  "asset_class": "FX", "ref_price": 0.85,
+                  "base_currency": "EUR", "quote_currency": "GBP"}
+    bt2 = Backtester(cm, meta2, BacktestConfig(max_pos_qty=1000, conf_min=0.5))
+    with pytest.raises(ValueError, match="conversion pair"):
+        bt2.run({108: _frame([0.85, 0.85, 0.851, 0.851], 0.0, 108)},
+                {108: _scores([1e-4] * 4)}, "FX")
+    # a bad rate series is rejected
+    with pytest.raises(ValueError):
+        bt.run_instrument(103, frames[103], scores[103], rate=np.array([1.0, 0.0, 1.0, 1.0]))
+
+
+# -- round-3: time latency, decision age, session flattening, bar filling --
+
+
+def _frame_at(ts_ns, mids, spreads_ticks=2.0):
+    return pd.DataFrame({
+        "exchange_ts": np.asarray(ts_ns, dtype=np.int64),
+        "mid_price_v1": np.asarray(mids, dtype=float),
+        "spread_ticks_v1": np.full(len(mids), spreads_ticks, dtype=float),
+    })
+
+
+def _scores_at(frame, er, conf=1.0):
+    return pd.DataFrame({
+        "exchange_ts": frame["exchange_ts"].to_numpy(),
+        "expected_return": np.asarray(er, dtype=float),
+        "confidence": np.full(len(frame), conf, dtype=float),
+    })
+
+
+def test_backtester_time_latency_mode_executes_at_the_first_aged_row():
+    """latency_ns = 500 ms on 3 s-spaced rows executes at the NEXT row; on
+    100 ms-spaced rows it executes 500 ms later, not one row later."""
+    # 3 s spacing: the first row at-or-after t+500ms is t+3s (the next row)
+    ts = np.arange(6, dtype=np.int64) * 3 * NS_S + NS_S
+    frame = _frame_at(ts, [20.0, 20.1, 20.2, 20.3, 20.4, 20.5])
+    scores = _scores_at(frame, [1e-4, 0, 0, 0, 0, 0])
+    cfg = BacktestConfig(max_pos_qty=100, conf_min=0.5,
+                         latency_ns=500_000_000)
+    bt = Backtester(_cost_model(), META, cfg)
+    res = bt.run_instrument(1, frame, scores)
+    assert res.positions[0] == 0.0
+    assert res.positions[1] == 100.0
+
+    # 100 ms spacing: 500 ms == five rows later
+    ts2 = np.arange(20, dtype=np.int64) * 100_000_000 + NS_S
+    frame2 = _frame_at(ts2, 20.0 + np.arange(20) * 0.01)
+    er = np.zeros(20)
+    er[0] = 1e-4
+    res2 = bt.run_instrument(1, frame2, _scores_at(frame2, er))
+    assert res2.positions[4] == 0.0
+    assert res2.positions[5] == 100.0
+
+
+def test_time_latency_matches_rows_mode_when_spacing_equals_latency():
+    ts = np.arange(12, dtype=np.int64) * NS_S + NS_S
+    frame = _frame_at(ts, 20.0 + np.arange(12) * 0.01)
+    er = np.where(np.arange(12) % 3 == 0, 1e-4, -1e-4)
+    scores = _scores_at(frame, er)
+    rows = Backtester(_cost_model(), META,
+                      BacktestConfig(max_pos_qty=100, latency_rows=1))
+    timed = Backtester(_cost_model(), META,
+                       BacktestConfig(max_pos_qty=100, latency_ns=NS_S))
+    a = rows.run_instrument(1, frame, scores)
+    b = timed.run_instrument(1, frame, scores)
+    assert np.array_equal(a.positions, b.positions)
+    assert a.total_pnl == pytest.approx(b.total_pnl, rel=1e-12)
+
+
+def test_backtester_drops_stale_decisions_and_flattens_at_session_end():
+    """2-day frames with a 4-hour quote gap before the close print.
+
+    A 4-hour-old decision must NOT fill at the print, the position must be
+    flat at the day boundary, and the accounting identity must still hold.
+    """
+    day = 86_400 * NS_S
+    ts = []
+    for d in (0, 1):
+        base = d * day + 13 * 3600 * NS_S + 1800 * NS_S
+        ts.extend(base + np.arange(60, dtype=np.int64) * 60 * NS_S)
+        ts.append(d * day + 20 * 3600 * NS_S)  # lone close print, 4 h later
+    ts = np.array(ts, dtype=np.int64)
+    mids = 20.0 + np.arange(len(ts)) * 0.01
+    frame = _frame_at(ts, mids)
+    er = np.full(len(ts), 1e-4)
+    scores = _scores_at(frame, er)
+    cfg = BacktestConfig(
+        max_pos_qty=100, latency_ns=NS_S,
+        max_decision_age_ns=5 * NS_S, flatten_at_session_end=True,
+    )
+    bt = Backtester(_cost_model(), META, cfg)
+    res = bt.run_instrument(1, frame, scores)
+    pos = res.positions
+    # the 4-hour-old decision cannot fill at the close print
+    print_idx = [i for i, t in enumerate(ts) if t % day == 20 * 3600 * NS_S]
+    for i in print_idx:
+        assert pos[i] == 0.0, "no fill at the close print, and flat into the gap"
+    # flat before every session boundary
+    assert pos[59] == 0.0 and pos[-1] == 0.0
+    # accounting identity still exact
+    mark = frame["mid_price_v1"].to_numpy()
+    gross = float(np.sum(pos[:-1] * np.diff(mark)))
+    assert res.total_pnl == pytest.approx(gross - res.total_costs, abs=1e-9)
+
+
+def test_unbounded_decision_age_still_fills_at_the_print():
+    """Regression: without max_decision_age_ns the old behaviour is intact
+    (the golden backtest depends on it)."""
+    day = 86_400 * NS_S
+    ts = np.array([
+        13 * 3600 * NS_S, 13 * 3600 * NS_S + 60 * NS_S, 20 * 3600 * NS_S,
+        day + 13 * 3600 * NS_S,
+    ], dtype=np.int64)
+    frame = _frame_at(ts, [20.0, 20.1, 21.0, 21.5])
+    scores = _scores_at(frame, [1e-4, 1e-4, 1e-4, 1e-4])
+    bt = Backtester(_cost_model(), META,
+                    BacktestConfig(max_pos_qty=100, latency_rows=1))
+    res = bt.run_instrument(1, frame, scores)
+    assert res.positions[2] == 100.0  # fills at the 20:00 print (legacy)
+
+
+def test_sharpe_bars_are_zero_filled_inside_a_session():
+    """Quiet minutes are real bars: dropping them inflates the Sharpe."""
+    ts = np.array([0, 60, 600, 660], dtype=np.int64) * NS_S + NS_S
+    frame = _frame_at(ts, [20.0, 20.5, 20.5, 21.0])
+    scores = _scores_at(frame, [1e-4, 1e-4, 1e-4, 1e-4])
+    bt = Backtester(_cost_model(), META,
+                    BacktestConfig(max_pos_qty=100, latency_rows=1))
+    res = bt.run(frames={1: frame}, scores={1: scores}, asset_class="EQUITY")
+    m = res.metrics(capital=1000.0)
+    assert m["n_bars_with_rows"] == 4
+    assert m["n_bars"] == 12, "the quiet minutes between 1m and 10m are bars"

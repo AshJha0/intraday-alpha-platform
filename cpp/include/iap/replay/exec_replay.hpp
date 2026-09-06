@@ -14,8 +14,10 @@
 //      exchange_ts, limit prices read from the just-updated book), and POV
 //      targets are re-evaluated after TRADE events of the parent's
 //      instrument inside its window.
-// After the last event every unfinished child is cancelled (unfilled
-// residual = opportunity cost, reported per parent).
+// Children expire at their parent's end_ts (execution.hpp rule 7); after
+// the last event every still-unfinished child is cancelled (unfilled
+// residual = opportunity cost, reported per parent). Every fill attributed
+// to a parent lies inside [start_ts, end_ts] by construction.
 //
 // Parent accounting identity (tested): with buy notional > 0,
 //   total_cost = fees - rebates + impact
@@ -50,12 +52,14 @@ struct ExecReplayResult {
     std::vector<Fill> fills;
     std::map<std::uint64_t, ParentReport> parents;
     std::uint64_t events_processed = 0;
+    std::uint64_t sor_no_route = 0;  // children not submitted: no eligible venue
 };
 
 class ExecutionReplay {
 public:
     ExecutionReplay(const ExecConfig& config,
-                    const std::vector<ParentOrder>& parents);
+                    const std::vector<ParentOrder>& parents,
+                    SorOptions sor_options = SorOptions{});
 
     // Replay the stream, working every parent. Callable once.
     ExecReplayResult run(const std::vector<MarketEvent>& events);
@@ -68,20 +72,29 @@ private:
         std::vector<std::int64_t> slice_qty;   // TWAP/VWAP/IS
         std::vector<std::int64_t> slice_due;   // TWAP/VWAP/IS
         std::size_t next_slice = 0;
-        std::int64_t sent_qty = 0;             // qty submitted so far
+        std::int64_t filled_qty = 0;           // fills booked so far
         std::int64_t pov_volume = 0;           // window TRADE volume (POV)
         std::vector<std::uint64_t> child_ids;
     };
 
     void schedule(ParentState& ps, const MarketEvent& ev);
-    void issue_child(ParentState& ps, std::int64_t child_qty,
+    // Issue one child of at most max_child_qty; returns false when unroutable.
+    bool issue_child(ParentState& ps, std::int64_t child_qty,
                      std::int64_t decision_ts, bool passive);
+    // Split a slice into children of at most max_child_qty (pinned).
+    void issue_slice(ParentState& ps, std::int64_t slice_qty,
+                     std::int64_t decision_ts, bool passive);
+    // Filled + still open/in-flight qty of the parent's children.
+    std::int64_t committed_qty(const ParentState& ps) const;
+    void book_new_fills();
 
     ExecConfig config_;
     ExecutionSimulator sim_;
     SmartOrderRouter sor_;
     std::vector<std::uint16_t> sor_candidates_;
     std::vector<ParentState> parents_;
+    std::size_t fills_booked_ = 0;
+    std::uint64_t sor_no_route_ = 0;
     bool ran_ = false;
 };
 

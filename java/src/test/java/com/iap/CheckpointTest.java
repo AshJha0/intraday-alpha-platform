@@ -121,11 +121,11 @@ public class CheckpointTest {
         BookCheckpoint good = b.checkpoint();
         BookCheckpoint bad = new BookCheckpoint(good.instrumentId,
                 good.venueId, good.levels, new long[] {1, 3},
-                good.lastSequence, good.exchangeTs, good.receiveTs,
-                good.tradeFlow, good.status, good.stale, good.snapshotActive,
-                good.snapshotBroken, good.duplicatesDropped, good.gapsDetected,
-                good.droppedWhileStale, good.unknownOrderEvents,
-                good.invalidSideDropped, good.eventsApplied);
+                good.lastSequence, good.hasSequence, good.sequenceEpoch,
+                good.exchangeTs, good.receiveTs, good.tradeFlow, good.status,
+                good.stale, good.snapshotActive, good.snapshotBroken,
+                good.snapshotCountdown, good.snapshotSyntheticNext,
+                good.reorderWindow, good.reorderPending, good.counters);
         try {
             OrderBook.restore(bad);
             throw new AssertionError("inconsistent arrival_order must throw");
@@ -163,7 +163,7 @@ public class CheckpointTest {
         b.apply(ev.add(Side.BID, 100, 10, 1));
         b.apply(ev.raw(com.iap.core.EventType.ADD, 9, 101, 5, 2, 0));
         BookCheckpoint cp = b.checkpoint();
-        assertEquals(1, cp.invalidSideDropped);
+        assertEquals(1, cp.counters.invalidSideDropped);
         OrderBook restored = OrderBook.restore(cp);
         assertEquals(1, restored.invalidSideDropped());
         assertEquals(cp, restored.checkpoint());

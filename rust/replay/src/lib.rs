@@ -3,4 +3,4 @@
 
 pub mod engine;
 
-pub use engine::{EngineCheckpoint, ReplayEngine, ReplaySummary};
+pub use engine::{EngineCheckpoint, ReplayEngine, ReplaySummary, Universe, ENGINE_CHECKPOINT_VERSION};

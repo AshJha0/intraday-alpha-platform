@@ -9,6 +9,18 @@ deployed score series is run through the standard research backtester, so
 the exact accounting identity of :mod:`iap.backtest.engine` is preserved
 untouched.
 
+Round-3 pinned rules:
+
+- the rolling-IC baseline is **out of sample**: the warmup is split, the
+  model is fitted on its first ``BASELINE_FIT_FRAC`` and the baseline bucket
+  ICs come from the purged held-out tail.  An in-sample baseline made
+  ``ic_z`` biased negative and produced 20-40 "drift" refits per alpha in
+  1.5 days that were really the IS/OOS gap;
+- an evaluation whose MATURED set gained no new rows since the last counted
+  evaluation is **uninformative**: it moves no lifecycle counter and cannot
+  trigger a drift refit.  Six re-reads of a frozen 2-hour IC window after
+  the feed goes quiet are one reading, not six consecutive breaches.
+
 No-lookahead guarantees (enforced, not assumed):
 
 - every (re)fit at event time T trains only on rows with
@@ -60,6 +72,13 @@ from iap.adaptive.refit import RefitContext, RefitPolicy
 from iap.backtest.engine import Backtester, BacktestResult
 from iap.validation.metrics import HORIZONS_NS, ic
 
+#: Fraction of the warmup used to FIT the model whose out-of-sample tail
+#: pins the IC baseline (pinned, API_ADAPTIVE section 4).
+BASELINE_FIT_FRAC = 2.0 / 3.0
+#: Minimum number of NEW matured rows for an evaluation to count as new
+#: evidence (pinned, API_ADAPTIVE section 6).
+MIN_NEW_MATURED_ROWS = 1
+
 
 @dataclass
 class AdaptiveResult:
@@ -70,6 +89,7 @@ class AdaptiveResult:
     deploy_start: int
     n_blocks: int
     n_evals: int
+    n_informative_evals: int          # evaluations with new matured evidence
     refit_events: List[dict]          # {"ts", "block", "reasons", "n_train"}
     eval_rows: List[dict]             # per-eval monitor readouts
     transitions: List[dict]           # lifecycle transitions (dicts)
@@ -199,29 +219,49 @@ class AdaptiveDeployment:
                     alpha_id=self.alpha_id, source=src,
                 )
 
-        # research IC baseline: warmup-fitted model on matured warmup rows
+        # Research IC baseline — OUT OF SAMPLE (pinned, API_ADAPTIVE section
+        # 4).  The deployed model is fitted on the whole warmup, so scoring
+        # it on its own warmup rows produces an in-sample baseline: ic_mean
+        # is optimistic, live ic_z is biased negative and drift-triggered
+        # refits fire on the IS/OOS gap instead of on drift.  Split the
+        # warmup: fit on its first BASELINE_FIT_FRAC, take the baseline from
+        # the held-out tail (purged the same way a fold is).
         model = self._fit_at(self.deploy_start)
         self.initial_model_params = model.params()
-        scores = model.score(self.uframes)
+
+        split_ts = self.t0 + int(
+            (self.deploy_start - self.t0) * BASELINE_FIT_FRAC
+        )
+        baseline_model = self._fit_at(split_ts)
+        self.baseline_split_ts = split_ts
+        self.baseline_model_params = baseline_model.params()
+        bscores = baseline_model.score(self.uframes)
         ts_l, x_l, y_l = [], [], []
         for i in self.universe:
             t = self._ts[i]
-            m = (t >= self.t0) & (t + self.horizon_ns + self.embargo_ns < self.deploy_start)
-            er = scores[i]["expected_return"].to_numpy(dtype=float).copy()
-            er[scores[i]["confidence"].to_numpy(dtype=float) <= 0.0] = np.nan
+            # held-out tail of the warmup, purged against the fit window
+            m = (t >= split_ts) & (
+                t + self.horizon_ns + self.embargo_ns < self.deploy_start)
+            er = bscores[i]["expected_return"].to_numpy(dtype=float).copy()
+            er[bscores[i]["confidence"].to_numpy(dtype=float) <= 0.0] = np.nan
             ts_l.append(t[m])
             x_l.append(er[m])
             y_l.append(self._labels[i][m])
         ts_a = np.concatenate(ts_l) if ts_l else np.empty(0, np.int64)
         x_a = np.concatenate(x_l) if x_l else np.empty(0)
         y_a = np.concatenate(y_l) if y_l else np.empty(0)
+        self.ic_baseline_rows = int(np.sum(np.isfinite(x_a) & np.isfinite(y_a)))
         try:
             self.ic_baseline: Optional[ICBaseline] = capture_ic_baseline(
                 ts_a, x_a, y_a,
                 name=f"run_{self.alpha_id.lower()}_ic",
                 alpha_id=self.alpha_id, horizon=self.horizon,
-                bucket_ns=int(self.cfg["ic_bucket_ns"]), source=src,
+                bucket_ns=int(self.cfg["ic_bucket_ns"]),
+                source=(f"{src}; OOS tail [{split_ts}, {self.deploy_start}) of "
+                        f"the warmup, model fitted on its first "
+                        f"{BASELINE_FIT_FRAC:.0%}"),
                 min_buckets=int(self.cfg["min_ic_buckets"]),
+                baseline_kind="oos",
             )
         except ValueError:
             self.ic_baseline = None  # honest: warmup too thin for an IC baseline
@@ -329,6 +369,7 @@ class AdaptiveDeployment:
 
         eval_rows: List[dict] = []
         drift_event_count = 0
+        last_matured = (-1, -1)   # (n matured pairs, last matured ts)
         for block_idx, tb in enumerate(self.block_bounds[1:], start=1):
             # rolling realized IC over matured rows of the trailing window
             ts_l, x_l, y_l = [], [], []
@@ -349,7 +390,21 @@ class AdaptiveDeployment:
             else:
                 rolling_ic, ic_z, n_ic_buckets = None, None, 0
 
-            state = tracker.update(tb, rolling_ic)
+            # Informative evaluation (pinned, API_ADAPTIVE section 6): the
+            # matured set must have gained new rows since the last COUNTED
+            # evaluation.  After a feed goes quiet the IC window content is
+            # frozen; re-reading it is one reading, not six breaches.
+            usable = np.isfinite(x_a) & np.isfinite(y_a)
+            matured = (int(usable.sum()),
+                       int(ts_a[usable].max()) if usable.any() else -1)
+            informative = (
+                matured[0] - last_matured[0] >= MIN_NEW_MATURED_ROWS
+                or matured[1] > last_matured[1]
+            )
+            if informative:
+                last_matured = matured
+
+            state = tracker.update(tb, rolling_ic, informative=informative)
             if state == RETIRED:
                 # halt allocation for the coming block (through end-of-data
                 # after the final evaluation — no eval can lift it)
@@ -364,9 +419,13 @@ class AdaptiveDeployment:
             if psi_max is not None and psi_max > self.psi_threshold:
                 drift_event_count += 1
 
+            # An uninformative evaluation carries no new IC evidence, so it
+            # cannot trigger a drift refit either (the same ic_z recomputed
+            # from an unchanged matured set is not a second observation).
             ctx = RefitContext(
                 now_ns=tb, last_fit_ns=last_fit_ns,
-                psi_by_series=drift["psi"], ic_z=ic_z,
+                psi_by_series=drift["psi"],
+                ic_z=ic_z if informative else None,
             )
             decision = policy.should_refit(ctx)
             if decision.refit:
@@ -388,6 +447,8 @@ class AdaptiveDeployment:
                 "rolling_ic": rolling_ic,
                 "ic_z": ic_z,
                 "n_ic_buckets": n_ic_buckets,
+                "n_matured_pairs": matured[0],
+                "informative": bool(informative),
                 "state": state,
                 "refit": bool(decision.refit),
             })
@@ -425,6 +486,7 @@ class AdaptiveDeployment:
             deploy_start=self.deploy_start,
             n_blocks=len(self.block_bounds) - 1,
             n_evals=len(eval_rows),
+            n_informative_evals=sum(1 for r in eval_rows if r["informative"]),
             refit_events=refit_events,
             eval_rows=eval_rows,
             transitions=[tr.to_dict() for tr in tracker.transitions],

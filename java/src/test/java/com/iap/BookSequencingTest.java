@@ -187,12 +187,14 @@ public class BookSequencingTest {
     }
 
     @Test
-    public void snapshotDuplicateOrderIdWithinBurstReplaces() {
+    public void snapshotDuplicateOrderIdWithinBurstIsDroppedAndCounted() {
         OrderBook b = book();
         b.apply(ev.snapshot(Side.BID, 100, 5, 11, 1));
-        b.apply(ev.snapshot(Side.BID, 101, 9, 11, 0)); // same id, new price/qty
-        assertArrayEquals(new long[] {101, 9}, b.bestBid());
+        b.apply(ev.snapshot(Side.BID, 101, 9, 11, 0)); // same id inside the burst
+        assertArrayEquals(new long[] {100, 5}, b.bestBid());
         assertEquals(1, b.orderCountTotal());
+        assertEquals(1, b.unknownOrderEvents());
+        assertFalse(b.isStale()); // the burst still completed
     }
 
     @Test
@@ -206,6 +208,7 @@ public class BookSequencingTest {
         assertEquals(1, b.unknownOrderEvents());
         assertEquals(1, b.gapsDetected());
         assertEquals(1, b.droppedWhileStale());
-        assertEquals(2, b.eventsApplied()); // add + cancel(unknown) applied
+        assertEquals(1, b.eventsApplied()); // the unknown-order cancel is a drop
+        assertEquals(4, b.eventsApplied() + b.counters().drops()); // accounting invariant
     }
 }

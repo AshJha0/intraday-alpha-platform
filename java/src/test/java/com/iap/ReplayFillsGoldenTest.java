@@ -184,8 +184,10 @@ public class ReplayFillsGoldenTest {
     @Test
     public void bothParentsCompleteWithMixedLiquidity() {
         ExecutionReplay.Result res = runGoldenScenario();
-        // Scenario shape: parent 1 fills entirely passively (maker), parent
-        // 2 entirely aggressively (taker), both in full.
+        // Scenario shape (golden v2): parent 1 fills passively (maker) except
+        // its slice-2 child (71 @ 2448), which EXPIRES at end_ts (rule 7 —
+        // in v1 it filled 290 s after the window); parent 2 fills entirely
+        // aggressively (taker) in full.
         long makerQty = 0;
         long takerQty = 0;
         for (Fill f : res.fills) {
@@ -199,8 +201,22 @@ public class ReplayFillsGoldenTest {
                 takerQty += f.qty();
             }
         }
-        assertEquals(400, makerQty);
+        assertEquals(329, makerQty);
         assertEquals(600, takerQty);
+        assertEquals(71, res.parents.get(1L).unfilledQty);
+        // every attributed fill lies inside its parent's window (pinned)
+        long t0 = Golden.eq().get(0).exchangeTs;
+        for (Fill f : res.fills) {
+            long end = t0 + (f.parentId() == 1 ? 660 : 720) * 1_000_000_000L;
+            assertTrue(f.ts() <= end);
+        }
+        assertEquals(4, res.parents.get(1L).children);
+        assertTrue(replayExpiredCount(res) >= 1);
+    }
+
+    private static long replayExpiredCount(ExecutionReplay.Result res) {
+        // the expired child is reported unfilled: 400 - 329
+        return res.parents.get(1L).unfilledQty > 0 ? 1 : 0;
     }
 
     @Test

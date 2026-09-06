@@ -1,0 +1,128 @@
+{
+  "x-version": 2,
+  "events_processed": 1000,
+  "last_exchange_ts": 1787581487493488657,
+  "time_regressions": 0,
+  "unknown_instrument_dropped": 0,
+  "unknown_venue_dropped": 0,
+  "checkpoint_every": 0,
+  "snapshot_every": 0,
+  "keep_checkpoints": 4,
+  "keep_snapshots": 4,
+  "snapshots_emitted": 0,
+  "reorder_window": 0,
+  "universe": null,
+  "books": {
+    "1": {
+      "instrument_id": 1,
+      "reorder_window": 0,
+      "venues": {
+        "1": {
+          "x-version": 2,
+          "instrument_id": 1,
+          "venue_id": 1,
+          "levels": [
+            {
+              "side": 0,
+              "price_ticks": 2415,
+              "orders": [
+                [
+                  72058693549556085,
+                  900
+                ],
+                [
+                  72058693549556089,
+                  200
+                ]
+              ]
+            },
+            {
+              "side": 0,
+              "price_ticks": 2417,
+              "orders": [
+                [
+                  72058693549556086,
+                  800
+                ]
+              ]
+            },
+            {
+              "side": 0,
+              "price_ticks": 2420,
+              "orders": [
+                [
+                  72058693549556092,
+                  400
+                ]
+              ]
+            },
+            {
+              "side": 1,
+              "price_ticks": 2421,
+              "orders": [
+                [
+                  72058693549556081,
+                  700
+                ]
+              ]
+            },
+            {
+              "side": 1,
+              "price_ticks": 2422,
+              "orders": [
+                [
+                  72058693549556084,
+                  900
+                ],
+                [
+                  72058693549556088,
+                  700
+                ]
+              ]
+            }
+          ],
+          "arrival_order": [
+            72058693549556081,
+            72058693549556084,
+            72058693549556085,
+            72058693549556086,
+            72058693549556088,
+            72058693549556089,
+            72058693549556092
+          ],
+          "last_sequence": 1000,
+          "has_sequence": true,
+          "sequence_epoch": 0,
+          "exchange_ts": 1787581487493488657,
+          "receive_ts": 1787581487493639597,
+          "trade_flow": -4000,
+          "status": 1,
+          "stale": false,
+          "snapshot_active": false,
+          "snapshot_broken": false,
+          "snapshot_countdown": 0,
+          "snapshot_synthetic_next": [
+            0,
+            0
+          ],
+          "reorder_window": 0,
+          "reorder_pending": [],
+          "counters": {
+            "duplicates_dropped": 0,
+            "gaps_detected": 0,
+            "dropped_while_stale": 0,
+            "unknown_order_events": 0,
+            "invalid_side_dropped": 0,
+            "invalid_payload_dropped": 0,
+            "unknown_type_dropped": 0,
+            "modify_price_mismatch": 0,
+            "snapshot_restarts": 0,
+            "sequence_resets": 0,
+            "late_recovered": 0,
+            "events_applied": 1000
+          }
+        }
+      }
+    }
+  }
+}

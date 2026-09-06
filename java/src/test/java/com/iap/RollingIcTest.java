@@ -18,27 +18,25 @@ import com.iap.adaptive.RollingIc;
 public class RollingIcTest {
     @Test
     public void noLookaheadHandCase() {
-        // horizon 10ns: a signal's return is realized only by the first
-        // observation at or after ts + 10. One 1000ns bucket, min 1.
+        // horizon 10ns: a signal's return is realized against the mid
+        // PREVAILING at ts + 10 (the research label), not against the next
+        // signal observation. One 1000ns bucket, min 1.
         RollingIc ic = new RollingIc(10, 1000, 1000, 1);
-        // returns engineered exactly linear in the signal:
-        // mid_i = 100/(1 + 0.001 i) and final mid 100
-        // => fwd return_i = 0.001 * i  (perfect positive correlation)
+        // mid_i = 100/(1 + 0.001 i); the last mid before every target is
+        // mid_8, so return_i = (1 + 0.001 i)/1.008 - 1: linear in i.
         for (int i = 0; i <= 8; i++) {
             ic.onObservation(i, i, 100.0 / (1.0 + 0.001 * i));
             assertEquals("nothing matured yet", 0, ic.pairs());
             assertTrue("no pair may exist before the horizon elapsed",
                     Double.isNaN(ic.ic(i)));
         }
-        // ts=17 realizes signals 0..7 (7+10 <= 17); signal 8 stays pending
-        ic.onObservation(17, 99.0, 100.0);
-        assertEquals(8, ic.pairs());
-        assertEquals("8-pair bucket, perfectly correlated", 1.0, ic.ic(18),
-                1e-12);
-        // ts=18 realizes signal 8 as well
-        ic.onObservation(18, 99.0, 100.0);
+        // a mid far in the future realizes every pending signal against the
+        // PREVAILING mid at its own target (mid_8), never against this one
+        ic.onMid(100, 100.0);
         assertEquals(9, ic.pairs());
-        assertEquals(1.0, ic.ic(19), 1e-12);
+        assertEquals(0, ic.pendingCount());
+        assertEquals("9-pair bucket, perfectly correlated", 1.0, ic.ic(101),
+                1e-12);
     }
 
     @Test
@@ -50,10 +48,11 @@ public class RollingIcTest {
         for (int i = 0; i < 8; i++) { // bucket 0: ts 0..7
             ic.onObservation(i, i, 100.0 / (1.0 + 0.001 * i));
         }
+        // the prevailing mid at every bucket-0 target (10..57) is mid_7
         for (int i = 0; i < 8; i++) { // bucket 1: ts 100..107, inverted
             ic.onObservation(100 + i, -i, 100.0 / (1.0 + 0.001 * i));
         }
-        ic.onObservation(300, 0.0, 100.0); // realizes everything
+        ic.onMid(300, 100.0); // realizes everything still pending
         assertEquals(16, ic.pairs());
         assertTrue("both buckets count (min_ic_buckets=2 met)",
                 !Double.isNaN(ic.ic(301)));
@@ -90,11 +89,11 @@ public class RollingIcTest {
         for (int i = 0; i < 8; i++) {
             w.onObservation(i, i, 100.0 / (1.0 + 0.001 * i));
         }
-        w.onObservation(30, 0.0, 100.0);
+        w.onMid(30, 100.0);
         assertEquals(1.0, w.ic(50), 1e-12);
         assertTrue("bucket left the [T-100, T) window",
                 Double.isNaN(w.ic(150)));
-        w.onObservation(200, 0.0, 100.0); // triggers eviction
+        w.onMid(200, 100.0); // triggers eviction
         assertEquals(0, w.pairs());
     }
 

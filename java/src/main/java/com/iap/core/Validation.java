@@ -12,6 +12,8 @@ package com.iap.core;
 public final class Validation {
     public static final long U32_MAX = 0xFFFFFFFFL;
     public static final int U16_MAX = 0xFFFF;
+    /** Reserved synthetic order-id range (top 16 bits set; conventions section 1). */
+    public static final long SYNTHETIC_ID_BASE = 0xFFFF000000000000L;
 
     private Validation() {
     }
@@ -35,6 +37,10 @@ public final class Validation {
         }
 
         int et = ev.eventType;
+        if (Long.compareUnsigned(ev.orderId, SYNTHETIC_ID_BASE) >= 0
+                && (et == EventType.ADD || et == EventType.QUOTE || et == EventType.SNAPSHOT)) {
+            return "order_id in reserved synthetic range: " + Long.toUnsignedString(ev.orderId);
+        }
         boolean bookType = et == EventType.ADD || et == EventType.MODIFY
                 || et == EventType.CANCEL || et == EventType.EXECUTE;
         if (bookType) {

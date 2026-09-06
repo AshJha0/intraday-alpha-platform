@@ -15,8 +15,14 @@ pub mod params;
 pub mod scoring;
 
 pub use fx_exposure::{
+    identified_pairs,
     currency_exposures, fx05_raw_signals, solve_factor_returns, GRID_STEP_NS, MAX_AGE_NS,
 };
-pub use labels::{mid_labels, pearson_ic, MidSeries};
-pub use params::{load_params_file, load_params_json, AlphaParams, GOLDEN_ALPHA_IDS};
+pub use labels::{
+    mid_labels, mid_labels_with_age, pearson_ic, MidSeries, LABEL_MAX_AGE_FLOOR_NS,
+};
+pub use params::{
+    document_feature_version, load_params_file, load_params_json, load_params_json_checked,
+    AlphaParams, GOLDEN_ALPHA_IDS, PINNED_CONF_SCALE, PINNED_Z_CLIP,
+};
 pub use scoring::{raw_signal, score_linear_z, score_row, AlphaSignal, EPS};

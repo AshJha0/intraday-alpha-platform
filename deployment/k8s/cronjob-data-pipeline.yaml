@@ -56,6 +56,13 @@ spec:
               # Configs from the ConfigMap (not the baked copy) so a config
               # change does not require an image rebuild; every config change
               # is audit-logged per docs/governance/GOVERNANCE.md.
+              #
+              # `command` REPLACES the image ENTRYPOINT rather than appending
+              # to it: the entrypoint already carries --configs-dir/--out, and
+              # appending relied on argparse keeping the last occurrence of a
+              # repeated option — which stops working the moment the CLI grows
+              # a positional argument (round-3 PLATFORM SEV-3).
+              command: ["python3", "-m", "iap.marketdata"]
               args: ["--configs-dir", "/etc/iap/configs", "--out", "/data"]
               volumeMounts:
                 - name: configs

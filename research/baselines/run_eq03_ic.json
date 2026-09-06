@@ -1,12 +1,14 @@
 {
   "alpha_id": "EQ03",
+  "baseline_kind": "oos",
   "bucket_ns": 300000000000,
+  "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
   "horizon": "5s",
-  "ic_mean": 0.04052240933422649,
-  "ic_std": 0.021744229097855495,
+  "ic_mean": 0.037994096690746514,
+  "ic_std": 0.013907779606984394,
   "kind": "ic",
-  "n_buckets_baseline": 30,
+  "n_buckets_baseline": 10,
   "name": "run_eq03_ic",
-  "source": "warmup window [1787578200000000000, 1787587200000000000) of the bundled feature frames, universe [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]",
-  "x-version": 1
+  "source": "warmup window [1787578200000000000, 1787587200000000000) of the bundled feature frames, universe [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]; OOS tail [1787584200000000000, 1787587200000000000) of the warmup, model fitted on its first 67%",
+  "x-version": 2
 }

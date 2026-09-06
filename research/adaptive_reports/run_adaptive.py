@@ -150,11 +150,20 @@ def run_alpha(aid: str, frames, cfg, backtester, lc_cfg, log, ledger) -> dict:
             "rolling_ic_mean": stab["mean"],
             "rolling_ic_std": stab["std"],
             "n_ic_evals": stab["n"],
+            "n_evals": res.n_evals,
+            "n_informative_evals": res.n_informative_evals,
+            "ic_baseline_kind": (
+                dep.ic_baseline.baseline_kind if dep.ic_baseline else None),
+            "ic_baseline_rows": getattr(dep, "ic_baseline_rows", 0),
             "lifecycle_transitions": res.transitions,
             "final_state": res.final_state,
         }
-        # every evaluation inspects the data (drift + rolling IC), every
-        # refit re-estimates parameters, plus one final backtest: counted.
+        # One deployment = ONE experiment (pinned, round-3).  Counting the
+        # 211 monitoring evaluations of a single policy as 211 separate
+        # "experiments" made the Bonferroni denominator a function of the
+        # block cadence: a monitor that looks twice as often does not test
+        # twice as many hypotheses.  The evaluation counts stay in the JSON
+        # as diagnostics.
         ledger.record(
             aid, "adaptive_deployment",
             config={"policy": pname, **res.policy},
@@ -162,8 +171,10 @@ def run_alpha(aid: str, frames, cfg, backtester, lc_cfg, log, ledger) -> dict:
                 "net_pnl": m.total_pnl, "refits": res.refit_count,
                 "deployed_ic": res.deployed_ic,
                 "final_state": res.final_state,
+                "n_evals": res.n_evals,
+                "n_informative_evals": res.n_informative_evals,
             },
-            count=res.n_evals + res.refit_count + 1,
+            count=1,
         )
     return out
 
@@ -313,9 +324,25 @@ def _write_report(results: Dict[str, dict], cfg, ledger, log,
     a("only. Counts of evaluations with any PSI above the pinned trigger")
     a(f"threshold ({dt['psi_threshold']}) appear in the master table")
     a("(`drift ev`). Baselines are serialized to `research/baselines/` in")
-    a("the /API_ADAPTIVE.md schema — the same files the Java live monitor")
-    a("consumes.")
+    a("the /API_ADAPTIVE.md schema (x-version 2: each file records the")
+    a("`feature_version` it was captured against, and a loader rejects a")
+    a("baseline from a different feature registry) — the same files the")
+    a("Java live monitor consumes.")
     a("")
+    no_ic = sorted(aid for aid, r in results.items()
+                   if r.get("ic_baseline") is None)
+    if no_ic:
+        a(f"**No OOS IC baseline: {', '.join(no_ic)}.** The IC baseline is")
+        a("captured from the purged held-out tail of the warmup; when that")
+        a("tail yields too few 5-minute IC buckets, no baseline is written")
+        a("and the rolling-IC gauge is UNAVAILABLE for that alpha. Read the")
+        a("consequence: for these alphas every drift event and refit below")
+        a("comes from PSI alone, and the lifecycle gauge never sees an IC")
+        a("reading, so they cannot be retired on decay. This is reported")
+        a("rather than papered over with an in-sample baseline — round 2")
+        a("used the warmup model's own training rows, which biased `ic_z`")
+        a("negative and fired refits on the IS/OOS gap instead of on drift.")
+        a("")
     a("**Known false-positive pattern (reported, not hidden):** FX10")
     a("monitors `minute_of_day_v1`, and a time-of-day feature 'drifts' by")
     a("construction as the session progresses — its PSI against a")
@@ -331,9 +358,16 @@ def _write_report(results: Dict[str, dict], cfg, ledger, log,
     a("")
     a(ledger.note())
     a("")
-    a("Every adaptive evaluation (drift + rolling-IC look), every refit and")
-    a("every final backtest in this study is recorded in")
-    a("`research/experiments.json` (kind `adaptive_deployment`).")
+    a("One deployment (alpha x refit policy) is ONE experiment in")
+    a("`research/experiments.json` (kind `adaptive_deployment`), and the")
+    a("ledger de-duplicates reruns of the same configuration. Counting each")
+    a("monitoring evaluation as an experiment — as earlier versions did —")
+    a("made the selection-adjusted threshold a function of the block cadence")
+    a("rather than of the research design.")
+    a("")
+    a(f"`ledger_n_at_report` = **{ledger.total_experiments}** "
+      f"({ledger.distinct_experiments} distinct configurations), read at")
+    a("render time.")
     a("")
     (REPORTS_DIR / "ADAPTIVE_REPORT.md").write_text("\n".join(lines) + "\n")
 
@@ -346,9 +380,15 @@ def main() -> int:
     lc_cfg = LifecycleConfig.from_config(cfg["lifecycle"])
     meta = _load_meta()
     frames = load_features(REPO / "data" / "features")
+    # Same pinned research execution model as run_all.py (round-3): latency
+    # in EVENT TIME, a bounded decision age and no overnight carry.
     backtester = Backtester(
         CostModel.load(REPO / "configs" / "execution.json"), meta,
-        BacktestConfig(),
+        BacktestConfig(
+            latency_ns=1_000_000_000,
+            max_decision_age_ns=60_000_000_000,
+            flatten_at_session_end=True,
+        ),
     )
     log = LifecycleLog(LIFECYCLE_LOG, truncate=True)
     ledger = ExperimentLedger(LEDGER_PATH)

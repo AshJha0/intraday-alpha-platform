@@ -236,3 +236,120 @@ def test_factor_solve_single_pair_degrades_to_zero_residual():
     r[0] = 0.004  # only EUR/USD observed
     f, fitted = solve_factor_returns(list(FX_IDS), r)
     assert np.isclose(fitted[0], r[0], atol=1e-12)  # residual exactly 0
+
+
+# -- round-3: dead alphas and parameter provenance ------------------------
+
+
+def test_dead_alpha_scores_confidence_zero():
+    """sigma == 0 (or beta == 0) means the fit found no evidence: every row
+    scores (0, 0), never confidence 1.0."""
+    import numpy as np
+    import pandas as pd
+
+    from iap.alpha import build
+
+    m = build("EQ01")
+    m.load_params({
+        "alpha_id": "EQ01", "model": "linear_z_v1", "horizon": m.horizon,
+        "features": list(m.features), "mu": 0.0, "sigma": 0.0, "beta": 0.0,
+        "beta_fit": 0.0, "z_clip": 4.0, "conf_scale": 2.0, "n_train": 3,
+        "fitted": True,
+    })
+    assert m.is_dead
+    n = 16
+    df = pd.DataFrame({
+        "exchange_ts": np.arange(n, dtype=np.int64) * 1_000_000_000,
+        **{f: np.linspace(-3.0, 3.0, n) for f in m.features},
+    })
+    sc = m.score({1: df})[1]
+    assert np.all(sc["expected_return"].to_numpy() == 0.0)
+    assert np.all(sc["confidence"].to_numpy() == 0.0)
+
+
+def test_load_params_rejects_edited_or_impossible_files():
+    from iap.alpha import build
+
+    m = build("EQ01")
+    good = {
+        "alpha_id": "EQ01", "model": "linear_z_v1", "horizon": m.horizon,
+        "features": list(m.features), "mu": 0.0, "sigma": 1.0, "beta": 1e-4,
+        "beta_fit": 1e-4, "z_clip": 4.0, "conf_scale": 2.0, "n_train": 100,
+        "fitted": True,
+    }
+    m.load_params(dict(good))  # baseline: loads
+
+    for key, val, msg in (
+        ("z_clip", 3.0, "pinned"),
+        ("conf_scale", 1.0, "pinned"),
+        ("model", "other_v1", "unsupported model"),
+        ("horizon", "15m", "horizon"),
+        ("sigma", 0.0, "dead alpha"),
+        ("sigma", float("nan"), "non-finite"),
+    ):
+        blob = dict(good)
+        blob[key] = val
+        with pytest.raises(ValueError, match=msg):
+            build("EQ01").load_params(blob)
+
+    blob = dict(good)
+    blob["features"] = ["not_a_feature_v1"]
+    with pytest.raises(ValueError, match="features"):
+        build("EQ01").load_params(blob)
+
+
+def test_params_file_carries_provenance_and_rejects_a_foreign_registry(tmp_path):
+    from iap.alpha import build, load_params_file, save_params
+    from iap.features.registry import registry_hash
+
+    m = build("EQ01")
+    m.load_params({
+        "alpha_id": "EQ01", "model": "linear_z_v1", "horizon": m.horizon,
+        "features": list(m.features), "mu": 0.0, "sigma": 1.0, "beta": 1e-4,
+        "beta_fit": 1e-4, "z_clip": 4.0, "conf_scale": 2.0, "n_train": 100,
+        "fitted": True,
+    })
+    path = tmp_path / "alpha_params.json"
+    blob = save_params({"EQ01": m}, path)
+    assert blob["x-version"] == 2
+    assert blob["feature_version"] == registry_hash()
+    assert len(blob["data_version"]) >= 16
+    assert "git_commit" in blob and "git_dirty" in blob
+    # loads against the running registry
+    assert "EQ01" in load_params_file(path)
+    # and is rejected against a different one
+    with pytest.raises(ValueError, match="feature_version"):
+        load_params_file(path, expected_feature_version="0" * 64)
+
+
+def test_fx05_universe_excludes_singleton_currencies():
+    """A currency seen in ONE pair has its factor absorb that pair's whole
+    return: the residual is 0 by construction, so the pair must score NaN
+    rather than a constant."""
+    import numpy as np
+
+    from iap.alpha.fx_exposure import (
+        FX05CrossPairRelativeValue,
+        identified_pairs,
+        solve_factor_returns,
+    )
+
+    ids = [101, 102, 103, 104, 105, 106, 107, 108]
+    ident = identified_pairs(ids, [True] * 8)
+    # only the EUR/USD - GBP/USD - EUR/GBP triangle is identified
+    assert list(ident) == [True, True, False, False, False, False, False, True]
+    assert list(identified_pairs([101, 102, 108], [True] * 3)) == [True] * 3
+    assert list(identified_pairs([101, 103], [True] * 2)) == [False, False]
+
+    # the singleton pairs really do have a zero residual
+    r = np.array([0.001, 0.0005, 0.002, -0.001, 0.0, 0.0007, -0.0003, 0.0004])
+    _, fitted = solve_factor_returns(ids, r)
+    for i in (2, 3, 4, 5, 6):
+        assert abs(r[i] - fitted[i]) < 1e-12
+
+    m = FX05CrossPairRelativeValue()
+    m._pair_ids = ids
+    mat = np.tile(r.reshape(-1, 1), (1, 4))
+    sig = m.grid_signals(mat)
+    assert np.all(np.isnan(sig[2:7, :])), "singleton pairs must score NaN"
+    assert np.all(np.isfinite(sig[[0, 1, 7], :]))

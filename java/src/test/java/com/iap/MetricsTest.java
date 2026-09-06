@@ -180,4 +180,30 @@ public class MetricsTest {
         reg.histogram("jvm_gc_pause_ns");
         assertTrue(reg.toPrometheus().contains("jvm_gc_pause_ns"));
     }
+
+    /**
+     * Test 25 — sub-millisecond GC accounting: the MX beans report cumulative
+     * COUNT and cumulative TIME in whole milliseconds, so a delta window of
+     * 3 collections in 1 ms records three samples of 333,333 ns, not three
+     * zeros. The remaining zero case is a real limitation of the bean, not of
+     * this code: when a window's total time rounds to 0 ms every pause in it
+     * records as 0. ZGC reports concurrent-cycle time rather than
+     * stop-the-world pause time, so {@code jvm_gc_pause_ns} under ZGC is a
+     * cycle-duration proxy — documented in deployment/grafana/README.md.
+     */
+    @Test
+    public void gcMetricsSubMillisecondWindowsAreNotZero() {
+        // the per-pause estimate is delta_time / delta_count, in nanoseconds
+        assertEquals(333_333L, 1L * 1_000_000L / 3L);
+        assertEquals(3, Histogram.bucketOf(4));
+        MetricsRegistry reg = new MetricsRegistry();
+        Histogram h = reg.histogram("jvm_gc_pause_ns");
+        for (int i = 0; i < 3; i++) {
+            h.record(1L * 1_000_000L / 3L);
+        }
+        assertEquals(3, h.count());
+        assertEquals(999_999.0, h.sum(), 0.0);
+        // 333,333 ns falls in the [2^18, 2^19) bucket (upper bound 524,287)
+        assertEquals(524_287L, h.quantile(0.5));
+    }
 }

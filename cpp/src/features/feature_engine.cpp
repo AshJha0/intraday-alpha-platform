@@ -146,8 +146,48 @@ std::int64_t FeatureEngine::depth_delta(const std::vector<LevelEntry>& prev,
     return d;
 }
 
-void FeatureEngine::refresh_book(InstState& st, std::uint16_t venue_id,
-                                 std::int64_t t) {
+void FeatureEngine::InstState::reset_rolling(std::int64_t t) {
+    warm_ts = t;
+    ++recoveries;
+    hist2 = TimeSeries<std::int64_t>();
+    histlog = TimeSeries<double>();
+    rv_10s = RollingSum<double, 1>(W_10S);
+    rv_1m = RollingSum<double, 1>(W_1M);
+    rv_5m = RollingSum<double, 1>(W_5M);
+    ofi_1s = RollingSum<std::int64_t, 4>(W_1S);
+    ofi_5s = RollingSum<std::int64_t, 4>(W_5S);
+    ofi_30s = RollingSum<std::int64_t, 4>(W_30S);
+    depthavg_10s = RollingSum<std::int64_t, 4>(W_10S);
+    tr_1s = RollingSum<std::int64_t, 3>(W_1S);
+    tr_10s = RollingSum<std::int64_t, 3>(W_10S);
+    tr_1m = RollingSum<std::int64_t, 3>(W_1M);
+    depth_bid.clear();
+    depth_ask.clear();
+    book_ok = false;
+}
+
+std::uint64_t FeatureEngine::recoveries(std::uint32_t instrument_id) const {
+    auto it = states_.find(instrument_id);
+    return it == states_.end() ? 0 : it->second.recoveries;
+}
+
+std::int64_t FeatureEngine::warm_ts(std::uint32_t instrument_id) const {
+    auto it = states_.find(instrument_id);
+    return it == states_.end() ? -1 : it->second.warm_ts;
+}
+
+bool FeatureEngine::book_ok(std::uint32_t instrument_id) const {
+    auto it = states_.find(instrument_id);
+    return it != states_.end() && it->second.book_ok;
+}
+
+// `samples == false` is a *staleness refresh*: the merged view and book_ok
+// are recomputed because the stale-venue set changed, but no OFI / depth /
+// mid sample is recorded.  Returns true when the merged depth was oversized.
+bool FeatureEngine::refresh_book(InstState& st, std::uint16_t venue_id,
+                                 std::int64_t t, bool just_recovered,
+                                 bool samples) {
+    if (just_recovered) st.reset_rolling(t);
     // Refresh this venue's cached top-10 depth.
     const auto& books = st.cons.books();
     auto vb = books.find(venue_id);
@@ -162,8 +202,6 @@ void FeatureEngine::refresh_book(InstState& st, std::uint16_t venue_id,
     // Save the previous merged view (swap: no allocation).
     st.prev_bid.swap(st.depth_bid);
     st.prev_ask.swap(st.depth_ask);
-    const bool prev_ok = st.book_ok;
-    const std::int64_t prev_mid2 = st.mid2;
 
     // Merge non-stale venues (ascending venue_id; equal prices summed).
     auto merge_side = [&](bool is_bid, std::vector<LevelEntry>& out) {
@@ -204,10 +242,25 @@ void FeatureEngine::refresh_book(InstState& st, std::uint16_t venue_id,
     merge_side(true, st.depth_bid);
     merge_side(false, st.depth_ask);
 
+    // Oversized merged depth (pinned section 2.2): a level above
+    // FEATURE_MAX_QTY makes the merged view unusable — clear it, record
+    // nothing, and let the next clean refresh re-baseline.
+    bool oversized = false;
+    for (const auto& e : st.depth_bid) oversized |= e.second > FEATURE_MAX_QTY;
+    for (const auto& e : st.depth_ask) oversized |= e.second > FEATURE_MAX_QTY;
+    if (oversized) {
+        st.depth_bid.clear();
+        st.depth_ask.clear();
+        st.book_ok = false;
+        return true;
+    }
+
     // OFI contributions per level count (defined book_ok or not); the sample
-    // is skipped only when previous and current views are all empty.
-    if (!st.prev_bid.empty() || !st.prev_ask.empty() || !st.depth_bid.empty() ||
-        !st.depth_ask.empty()) {
+    // is skipped only when previous and current views are all empty, or on
+    // the first refresh after a recovery (no previous depth).
+    if (samples && !just_recovered &&
+        (!st.prev_bid.empty() || !st.prev_ask.empty() ||
+         !st.depth_bid.empty() || !st.depth_ask.empty())) {
         std::array<std::int64_t, 4> contribs{};
         const int ks[4] = {1, 3, 5, 10};
         for (int i = 0; i < 4; ++i) {
@@ -221,7 +274,7 @@ void FeatureEngine::refresh_book(InstState& st, std::uint16_t venue_id,
     }
 
     st.book_ok = !st.depth_bid.empty() && !st.depth_ask.empty();
-    if (!st.book_ok) return;
+    if (!st.book_ok || !samples) return false;
 
     st.bid_p = st.depth_bid[0].first;
     st.bid_q = st.depth_bid[0].second;
@@ -250,9 +303,12 @@ void FeatureEngine::refresh_book(InstState& st, std::uint16_t venue_id,
     // Depth sample at every two-sided refresh (ofi_norm denominator inputs).
     st.depthavg_10s.add(t, {st.db1, st.da1, st.db5, st.da5});
 
-    // Mid-change samples (returns / realized-vol inputs).
-    if (!prev_ok || st.mid2 != prev_mid2) {
-        if (prev_ok && !st.hist2.empty()) {
+    // Mid-change samples (returns / realized-vol inputs), compared against
+    // the last RECORDED sample (pinned): a one-sided flicker that moves the
+    // mid still yields a vol sample; a flicker back to the same mid does not.
+    const bool has_last = !st.hist2.empty();
+    if (!has_last || st.hist2.last() != st.mid2) {
+        if (has_last) {
             const double dlm = st.logmid - st.histlog.last();
             const std::array<double, 1> sq{dlm * dlm};
             st.rv_10s.add(t, sq);
@@ -262,17 +318,53 @@ void FeatureEngine::refresh_book(InstState& st, std::uint16_t venue_id,
         st.hist2.append(t, st.mid2);
         st.histlog.append(t, st.logmid);
     }
+    return false;
 }
 
 bool FeatureEngine::apply(const MarketEvent& ev, FeatureVector& out) {
     InstState& st = state(ev.instrument_id);
-    st.cons.apply(ev);
     const std::int64_t t = ev.exchange_ts;
-    if (st.first_ts < 0) st.first_ts = t;
+    if (st.first_ts >= 0 && t < st.last_ts) {
+        // Cross-venue exchange_ts regression: dropped + counted before the
+        // book sees it (pinned). Never thrown, never re-ordered.
+        ++ts_regressions_dropped_;
+        ++events_dropped_;
+        ++events_processed_;
+        return false;
+    }
+    const ApplyStatus status = st.cons.apply(ev);
+    if (st.first_ts < 0) {
+        st.first_ts = t;
+        st.warm_ts = t;
+    }
+    st.last_ts = t;
     ++events_processed_;
 
+    // The merged view is a function of WHICH venues are stale, so the trigger
+    // is a change of the stale SET, not of "any venue is stale".
+    std::vector<std::uint16_t> stale_now;
+    for (const auto& [vid, book] : st.cons.books()) {
+        if (book.stale()) stale_now.push_back(vid);
+    }
+    const bool stale_changed = stale_now != st.stale_venues;
+    const bool just_recovered = !st.stale_venues.empty() && stale_now.empty();
+    st.stale_venues.swap(stale_now);
+
+    if (status != ApplyStatus::APPLIED) {
+        ++events_dropped_;
+        if (stale_changed &&
+            refresh_book(st, ev.venue_id, t, just_recovered, false)) {
+            ++oversized_depth_skipped_;
+        }
+        return emit_if_due(st, ev.instrument_id, t, out);
+    }
+
     const auto et = static_cast<EventType>(ev.event_type);
-    if (et == EventType::TRADE) {
+    if (ev.qty > FEATURE_MAX_QTY) {
+        // Oversized quantity (pinned section 2.2): the book may hold it, but
+        // no rolling window folds it in — an int64 window sum stays exact.
+        ++oversized_qty_dropped_;
+    } else if (et == EventType::TRADE) {
         // signed / buy / sell traded quantity (side BID = buy aggressor).
         const std::int64_t buy = ev.side == 0 ? ev.qty : 0;
         const std::int64_t sell = ev.qty - buy;
@@ -287,8 +379,21 @@ bool FeatureEngine::apply(const MarketEvent& ev, FeatureVector& out) {
         et == EventType::CANCEL || et == EventType::EXECUTE ||
         et == EventType::QUOTE ||
         (et == EventType::SNAPSHOT && ev.trade_id == 0);
-    if (book_touch) refresh_book(st, ev.venue_id, t);
+    if (book_touch) {
+        if (refresh_book(st, ev.venue_id, t, just_recovered, true)) {
+            ++oversized_depth_skipped_;
+        }
+    } else if (stale_changed) {
+        if (refresh_book(st, ev.venue_id, t, just_recovered, false)) {
+            ++oversized_depth_skipped_;
+        }
+    }
 
+    return emit_if_due(st, ev.instrument_id, t, out);
+}
+
+bool FeatureEngine::emit_if_due(InstState& st, std::uint32_t iid,
+                                std::int64_t t, FeatureVector& out) {
     if (cadence_ns_ == 0 || st.last_emit < 0 ||
         t - st.last_emit >= cadence_ns_) {
         // Evict expired samples from every window at emission time.
@@ -304,7 +409,7 @@ bool FeatureEngine::apply(const MarketEvent& ev, FeatureVector& out) {
         st.tr_1m.trim(t);
         st.hist2.trim(t - kHistKeepNs);
         st.histlog.trim(t - kHistKeepNs);
-        emit(st, ev.instrument_id, t, out);
+        emit(st, iid, t, out);
         st.last_emit = t;
         ++vectors_emitted_;
         return true;
@@ -327,9 +432,12 @@ void FeatureEngine::emit(InstState& st, std::uint32_t iid, std::int64_t t,
     out.values.fill(kNaN);
     out.valid.fill(false);
 
+    // Single value funnel (API_FEATURES.md section 1): a non-finite value can
+    // never be emitted with valid == true.
     auto put = [&](int slot, double v, bool ok) {
-        out.values[static_cast<std::size_t>(slot)] = ok ? v : kNaN;
-        out.valid[static_cast<std::size_t>(slot)] = ok;
+        const bool good = ok && std::isfinite(v);
+        out.values[static_cast<std::size_t>(slot)] = good ? v : kNaN;
+        out.valid[static_cast<std::size_t>(slot)] = good;
     };
 
     const bool ok = st.book_ok;
@@ -378,10 +486,13 @@ void FeatureEngine::emit(InstState& st, std::uint32_t iid, std::int64_t t,
     put(F_RVOL_W1M, rv1m, has_rv1m);
     put(F_RVOL_W5M, rv5m, has_rv5m);
 
-    const bool has_rva = has_log_10s && has_rv1m;
+    // EPS guard (section 4): the denominator is undefined when the vol
+    // window holds no mid-change SAMPLE (exact integer count, not
+    // `rvol > 0`: a float sum drifts and the test would flip per language).
+    const bool has_rva = has_log_10s && has_rv1m && st.rv_1m.count() > 0;
     put(F_RET_VOL_ADJ_10S, has_rva ? ret_log_10s / (rv1m + FEATURE_EPS) : 0.0,
         has_rva);
-    const bool has_vrr = has_rv1m && has_rv5m;
+    const bool has_vrr = has_rv1m && has_rv5m && st.rv_5m.count() > 0;
     put(F_VOL_REGIME_RATIO, has_vrr ? rv1m / (rv5m + FEATURE_EPS) : 0.0,
         has_vrr);
 
@@ -448,16 +559,20 @@ void FeatureEngine::emit(InstState& st, std::uint32_t iid, std::int64_t t,
                                           st.depthavg_10s.sum(1))
                     : static_cast<double>(st.depthavg_10s.sum(2) +
                                           st.depthavg_10s.sum(3));
+        const double denom =
+            davg_ok ? denom_sum / static_cast<double>(st.depthavg_10s.count())
+                    : 0.0;
+        const bool depth_ok =
+            davg_ok && (ni == 0 ? st.depthavg_10s.sum(0) + st.depthavg_10s.sum(1)
+                                : st.depthavg_10s.sum(2) + st.depthavg_10s.sum(3)) > 0;
         for (int wi = 0; wi < 3; ++wi) {
-            const bool has = st.warm(t, ofi_w[wi]) && davg_ok;
-            double v = 0.0;
-            if (has) {
-                const double denom =
-                    denom_sum /
-                    static_cast<double>(st.depthavg_10s.count());
-                v = static_cast<double>(ofis[wi]->sum(ofi_idx)) /
-                    (denom + FEATURE_EPS);
-            }
+            // Exact INTEGER guard: a float `> 0` test would flip between
+            // languages on accumulation drift.
+            const bool has = st.warm(t, ofi_w[wi]) && depth_ok;
+            const double v =
+                has ? static_cast<double>(ofis[wi]->sum(ofi_idx)) /
+                          (denom + FEATURE_EPS)
+                    : 0.0;
             put(F_OFI_NORM_L1_W1S + ni * 3 + wi, v, has);
         }
     }

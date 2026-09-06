@@ -1,13 +1,16 @@
 """Time-of-day family (spec §10, "Time of day").
 
-Clock features are pure functions of the event timestamp (UTC) and the
-instrument's configured session; normalized features divide the current
+Clock features are pure functions of the event timestamp converted into the
+venue's session time zone (``InstrumentContext.clock``) and the instrument's
+configured session; normalized features divide the current
 value of a metric by the expanding mean of that metric in the same 5-minute
 bucket of the day, built online from the data itself (the profile is updated
 *after* each emission reads it, so a value is never normalized by a profile
 that already contains it — no lookahead).
 
-- ``minute_of_day``   = minutes since UTC midnight (float, fractional)
+- ``minute_of_day``   = minutes since SESSION-LOCAL midnight (float,
+                        fractional; the venue's IANA zone from
+                        configs/instruments.json, DST-correct)
 - ``session_frac``    = (minute_of_day - open) / (close - open), clipped to [0,1]
 - ``is_open_phase``   = 1 during the first 30 minutes of the session
 - ``is_close_phase``  = 1 during the last 30 minutes of the session
@@ -76,7 +79,9 @@ def specs() -> List[FeatureSpec]:
 def compute(st, values: List[float], valid: List[bool]) -> None:
     """Append the 11 time-of-day values for the current emission."""
     t = st.t
-    minute = ((t // 1_000_000_000) % 86_400) / 60.0 + ((t % 1_000_000_000) / 6e10)
+    off = st.ctx.clock.offset_seconds(t)
+    minute = (((t // 1_000_000_000 + off) % 86_400) / 60.0
+              + ((t % 1_000_000_000) / 6e10))
     put(values, valid, minute, True)
     o, c = st.ctx.session_open_min, st.ctx.session_close_min
     frac = (minute - o) / (c - o) if c > o else 0.0
@@ -86,7 +91,7 @@ def compute(st, values: List[float], valid: List[bool]) -> None:
     put(values, valid, 1.0 if (not st.halt and not st.auction) else 0.0, True)
     put(values, valid, 1.0 if (st.auction and not st.halt) else 0.0, True)
     put(values, valid, 1.0 if st.halt else 0.0, True)
-    bucket = SessionProfile.bucket_of(t)
+    bucket = SessionProfile.bucket_of(t, off)
     for m in PROFILE_METRICS:
         cur = _metric_value(st, m)
         v = None

@@ -4,6 +4,17 @@
 //! data stream it is fed. Pinned simulation semantics (documented, venue
 //! crate normative):
 //!
+//! - Market-data gating (spec §16 "sequence-gap and stale-market-data
+//!   protection", conventions §4): the venue keys its books by
+//!   (instrument, `cfg.venue_id`) and IGNORES events of other venues
+//!   (`venue_market_events_ignored_total`) so a multi-venue feed never
+//!   corrupts its sequence counters. `submit()` REJECTS (reason in
+//!   [`RejectReason`], counted per reason) when the instrument has no book,
+//!   the book is `stale` (sequence gap not yet recovered), the session
+//!   status is not TRADING (HALT / AUCTION / CLOSE), or the book is empty
+//!   on both sides. Resting orders never fill while the book is stale or
+//!   the status is not TRADING (they are held; fills resume after a
+//!   complete SNAPSHOT burst / STATUS TRADING).
 //! - Marketable fills are computed against the current merged depth
 //!   *without consuming it* (impact-free simulation, like the research
 //!   backtester): the market-data stream remains the sole owner of book
@@ -29,11 +40,45 @@
 
 use std::collections::BTreeMap;
 
-use marketdata::{IapError, MarketEvent};
+use marketdata::{IapError, MarketEvent, SessionStatus};
 use orderbook::OrderBook;
 use telemetry::Registry;
 
 use crate::messages::{validate_order, ExecStatus, ExecutionReport, OrderRequest, OrderType};
+
+/// Why the simulated venue rejected the last order (pinned gating rules).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RejectReason {
+    /// Order routed to another venue id.
+    WrongVenue,
+    /// Contract-level validation failed or the order id is already resting.
+    InvalidOrder,
+    /// No market data has been seen for the instrument.
+    UnknownInstrument,
+    /// The book is stale (sequence gap not recovered by a SNAPSHOT burst).
+    StaleBook,
+    /// Session status is HALT / AUCTION / CLOSE.
+    NotTrading,
+    /// The book is empty on both sides.
+    EmptyBook,
+    /// PEG/MID reference price missing (one-sided book).
+    NoReferencePrice,
+}
+
+impl RejectReason {
+    /// Metric counter name for this reason.
+    pub const fn counter(self) -> &'static str {
+        match self {
+            RejectReason::WrongVenue => "venue_orders_rejected_wrong_venue_total",
+            RejectReason::InvalidOrder => "venue_orders_rejected_invalid_total",
+            RejectReason::UnknownInstrument => "venue_orders_rejected_unknown_instrument_total",
+            RejectReason::StaleBook => "venue_orders_rejected_stale_total",
+            RejectReason::NotTrading => "venue_orders_rejected_not_trading_total",
+            RejectReason::EmptyBook => "venue_orders_rejected_empty_book_total",
+            RejectReason::NoReferencePrice => "venue_orders_rejected_no_reference_total",
+        }
+    }
+}
 
 /// Simulated venue configuration.
 #[derive(Debug, Clone, Copy)]
@@ -62,6 +107,7 @@ pub struct SimulatedVenue {
     books: BTreeMap<u32, OrderBook>,
     resting: BTreeMap<u64, RestingOrder>,
     next_exec_id: u64,
+    last_reject: Option<RejectReason>,
     /// Venue metrics (orders/fills/latency histogram).
     pub metrics: Registry,
 }
@@ -79,8 +125,32 @@ impl SimulatedVenue {
             books: BTreeMap::new(),
             resting: BTreeMap::new(),
             next_exec_id: 0,
+            last_reject: None,
             metrics: Registry::new(),
         })
+    }
+
+    /// Reason of the most recent rejection (`None` after an accepted order).
+    pub fn last_reject_reason(&self) -> Option<RejectReason> {
+        self.last_reject
+    }
+
+    /// The venue's book for an instrument (read-only), if any.
+    pub fn book(&self, instrument_id: u32) -> Option<&OrderBook> {
+        self.books.get(&instrument_id)
+    }
+
+    fn reject(&mut self, order: &OrderRequest, reason: RejectReason) -> Vec<ExecutionReport> {
+        self.last_reject = Some(reason);
+        self.metrics.counter("venue_orders_rejected_total").inc();
+        self.metrics.counter(reason.counter()).inc();
+        vec![self.report(order.order_id, ExecStatus::Rejected, 0, 0, order.timestamp, 0.0)]
+    }
+
+    /// True iff the instrument's book may be traded against: not stale and
+    /// in continuous trading.
+    fn tradable(book: &OrderBook) -> bool {
+        !book.stale && book.status == SessionStatus::Trading as i64
     }
 
     fn report(
@@ -108,14 +178,24 @@ impl SimulatedVenue {
     }
 
     /// Feed one market event; returns fills of resting orders the update
-    /// crossed.
+    /// crossed. Events of other venues are ignored (counted); no resting
+    /// order fills while the book is stale or the status is not TRADING.
     pub fn on_market_event(&mut self, ev: &MarketEvent) -> Result<Vec<ExecutionReport>, IapError> {
+        if self.cfg.venue_id != 0 && ev.venue_id != self.cfg.venue_id {
+            self.metrics.counter("venue_market_events_ignored_total").inc();
+            return Ok(Vec::new());
+        }
+        let venue_id = self.cfg.venue_id;
         let book = self
             .books
             .entry(ev.instrument_id)
-            .or_insert_with(|| OrderBook::new(ev.instrument_id, 0));
+            .or_insert_with(|| OrderBook::new(ev.instrument_id, venue_id));
         book.apply(ev)?;
         self.metrics.counter("venue_market_events_total").inc();
+        if !Self::tradable(book) {
+            self.metrics.counter("venue_market_events_untradable_total").inc();
+            return Ok(Vec::new());
+        }
         // resting orders crossed by the new touch fill at their limit price
         let best_bid = self.books[&ev.instrument_id].best_bid();
         let best_ask = self.books[&ev.instrument_id].best_ask();
@@ -195,20 +275,27 @@ impl SimulatedVenue {
     /// fills / cancels (rejects come back as a single REJECTED report).
     pub fn submit(&mut self, order: &OrderRequest) -> Result<Vec<ExecutionReport>, IapError> {
         self.metrics.counter("venue_orders_total").inc();
+        self.last_reject = None;
         let ts = order.timestamp;
         if self.cfg.venue_id != 0 && order.venue_id != self.cfg.venue_id {
-            self.metrics.counter("venue_orders_rejected_total").inc();
-            return Ok(vec![self.report(order.order_id, ExecStatus::Rejected, 0, 0, ts, 0.0)]);
+            return Ok(self.reject(order, RejectReason::WrongVenue));
         }
-        if validate_order(order).is_err()
-            || !self.books.contains_key(&order.instrument_id)
-            || self.resting.contains_key(&order.order_id)
-        {
-            self.metrics.counter("venue_orders_rejected_total").inc();
-            return Ok(vec![self.report(order.order_id, ExecStatus::Rejected, 0, 0, ts, 0.0)]);
+        if validate_order(order).is_err() || self.resting.contains_key(&order.order_id) {
+            return Ok(self.reject(order, RejectReason::InvalidOrder));
+        }
+        let Some(book) = self.books.get(&order.instrument_id) else {
+            return Ok(self.reject(order, RejectReason::UnknownInstrument));
+        };
+        if book.stale {
+            return Ok(self.reject(order, RejectReason::StaleBook));
+        }
+        if book.status != SessionStatus::Trading as i64 {
+            return Ok(self.reject(order, RejectReason::NotTrading));
+        }
+        if book.best_bid().is_none() && book.best_ask().is_none() {
+            return Ok(self.reject(order, RejectReason::EmptyBook));
         }
         let ot = OrderType::from_u8(order.order_type).expect("validated");
-        let book = &self.books[&order.instrument_id];
         let (same_touch, opp_touch) = if order.side == 0 {
             (book.best_bid(), book.best_ask())
         } else {
@@ -218,8 +305,7 @@ impl SimulatedVenue {
         if (ot == OrderType::Peg && same_touch.is_none())
             || (ot == OrderType::Mid && (book.best_bid().is_none() || book.best_ask().is_none()))
         {
-            self.metrics.counter("venue_orders_rejected_total").inc();
-            return Ok(vec![self.report(order.order_id, ExecStatus::Rejected, 0, 0, ts, 0.0)]);
+            return Ok(self.reject(order, RejectReason::NoReferencePrice));
         }
         let mut out = vec![self.report(order.order_id, ExecStatus::New, 0, 0, ts, 0.0)];
         self.metrics.counter("venue_orders_accepted_total").inc();

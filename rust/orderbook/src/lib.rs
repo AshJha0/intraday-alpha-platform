@@ -7,6 +7,7 @@
 pub mod book;
 
 pub use book::{
-    BookCheckpoint, ConsolidatedBook, ConsolidatedCheckpoint, Counters, LevelCheckpoint,
-    OrderBook, DEPTH_LEVELS,
+    synthetic_order_id, ApplyStatus, BookCheckpoint, ConsolidatedBook, ConsolidatedCheckpoint, Counters,
+    LevelCheckpoint, OrderBook, PendingRow, CHECKPOINT_VERSION, DEPTH_LEVELS,
+    MAX_REORDER_WINDOW, SYNTHETIC_ID_BASE,
 };

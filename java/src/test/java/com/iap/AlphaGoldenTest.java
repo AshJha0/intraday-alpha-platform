@@ -2,7 +2,10 @@ package com.iap;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
@@ -241,18 +244,24 @@ public class AlphaGoldenTest {
         for (double v : raws) {
             assertTrue(Double.isNaN(v));
         }
-        // Two valid pairs: signals defined for exactly those two; EUR/USD
-        // and GBP/USD load disjoint factors, so minimum-norm attributes each
-        // return fully to its own currency => residuals (and raws) are 0.
+        // Two valid pairs that share no currency: EUR/USD and GBP/USD load
+        // disjoint factors, so each return is attributed entirely to its own
+        // currency and the residual is 0 BY CONSTRUCTION. Round-3 rule: such
+        // pairs are not identified and score NaN, never a constant.
         r[1] = -5e-5;
+        raws = Fx05.rawSignals(r);
+        for (double v : raws) {
+            assertTrue("unidentified pairs must score NaN", Double.isNaN(v));
+        }
+        // add EUR/GBP and the triangle becomes identified
+        r[7] = 2e-5;
         raws = Fx05.rawSignals(r);
         assertTrue(Double.isFinite(raws[0]));
         assertTrue(Double.isFinite(raws[1]));
-        for (int i = 2; i < Fx05.NUM_PAIRS; i++) {
+        assertTrue(Double.isFinite(raws[7]));
+        for (int i = 2; i < 7; i++) {
             assertTrue(Double.isNaN(raws[i]));
         }
-        assertEquals(0.0, raws[0], 1e-15);
-        assertEquals(0.0, raws[1], 1e-15);
     }
 
     @Test
@@ -331,5 +340,74 @@ public class AlphaGoldenTest {
     private static void set(FeatureVector vec, int slot, double v) {
         vec.values[slot] = v;
         vec.valid[slot] = true;
+    }
+
+    // -----------------------------------------------------------------
+    // Round-3: parameter-file validation and the dead-alpha rule
+    // -----------------------------------------------------------------
+
+    @Test
+    public void deadAlphaScoresConfidenceZero() {
+        LinearZParams dead = new LinearZParams("EQ01", "1s", 0.0, 0.0, 0.0,
+                4.0, 2.0, List.of("f"));
+        assertTrue(dead.isDead());
+        double[] s = Alphas.scoreLinearZ(3.0, dead);
+        assertEquals(0.0, s[0], 0.0);
+        assertEquals("a dead alpha must never report conviction", 0.0, s[1],
+                0.0);
+    }
+
+    @Test
+    public void paramsLoaderRejectsEditedOrImpossibleFiles() throws IOException {
+        Path dir = Files.createTempDirectory("iap-params");
+        String head = "{\"feature_version\":\"aaaa\",\"params\":{\"EQ01\":{"
+                + "\"model\":\"linear_z_v1\",\"alpha_id\":\"EQ01\","
+                + "\"horizon\":\"1s\",\"mu\":0.0,\"beta_fit\":1.0,"
+                + "\"features\":[\"f\"],";
+        String tail = "}}}";
+        Path zbad = Files.writeString(dir.resolve("z.json"), head
+                + "\"sigma\":1.0,\"beta\":1.0,\"z_clip\":3.0,\"conf_scale\":2.0"
+                + tail);
+        try {
+            Alphas.loadParams(zbad);
+            fail("an edited z_clip must be rejected");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("pinned"));
+        }
+        Path sbad = Files.writeString(dir.resolve("s.json"), head
+                + "\"sigma\":0.0,\"beta\":1.0,\"z_clip\":4.0,\"conf_scale\":2.0"
+                + tail);
+        try {
+            Alphas.loadParams(sbad);
+            fail("sigma <= 0 with a live beta must be rejected");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("dead alpha"));
+        }
+        Path ok = Files.writeString(dir.resolve("ok.json"), head
+                + "\"sigma\":1.0,\"beta\":1.0,\"z_clip\":4.0,\"conf_scale\":2.0"
+                + tail);
+        try {
+            Alphas.loadParams(ok, "bbbb");
+            fail("a foreign feature_version must be rejected");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("feature_version"));
+        }
+    }
+
+    @Test
+    public void fx05OnlyScoresIdentifiedPairs() {
+        boolean[] obs = new boolean[Fx05.NUM_PAIRS];
+        java.util.Arrays.fill(obs, true);
+        boolean[] ident = Fx05.identifiedPairs(obs);
+        boolean[] want = {true, true, false, false, false, false, false, true};
+        for (int i = 0; i < want.length; i++) {
+            assertEquals("pair index " + i, want[i], ident[i]);
+        }
+        double[] returns = new double[Fx05.NUM_PAIRS];
+        java.util.Arrays.fill(returns, 0.001);
+        double[] raw = Fx05.rawSignals(returns);
+        for (int i = 0; i < want.length; i++) {
+            assertEquals("signal " + i, want[i], Double.isFinite(raw[i]));
+        }
     }
 }

@@ -34,7 +34,13 @@ class Fold:
 
 
 class WalkForwardSplitter:
-    """Expanding-train / embargoed-test walk-forward splitter."""
+    """Expanding-train / embargoed-test walk-forward splitter.
+
+    Segments are quantiles of the ROW INDEX (pinned, round-3), so every fold
+    carries about the same number of rows whatever the calendar does; folds
+    that still come out empty are recorded in :attr:`degenerate_folds`
+    instead of being silently skipped.
+    """
 
     def __init__(
         self,
@@ -66,11 +72,19 @@ class WalkForwardSplitter:
         if span <= 0:
             raise ValueError("timestamp span must be positive")
         n_seg = self.n_folds + 1
-        # segment boundaries: t0 + i*span/n_seg, last boundary inclusive of t1
-        bounds = [t0 + (span * i) // n_seg for i in range(n_seg + 1)]
-        bounds[-1] = t1 + 1
+        # Segment boundaries at quantiles of the ROW INDEX, not of the wall
+        # span (pinned, round-3 — mirrors iap.validation.splits): this data
+        # occupies 2.6 h of each 24 h day, so equal wall segments put ~100 %
+        # of the rows in two folds and left the others empty.
+        order = np.sort(ts)
+        n = order.size
+        bounds = [t0]
+        for i in range(1, n_seg):
+            bounds.append(int(order[min(int(round(i * n / n_seg)), n - 1)]))
+        bounds.append(t1 + 1)
 
         folds: List[Fold] = []
+        self.degenerate_folds: List[int] = []
         for k in range(self.n_folds):
             train_end = bounds[k + 1]         # exclusive train boundary
             test_start = train_end + self.embargo_ns
@@ -81,6 +95,9 @@ class WalkForwardSplitter:
             train_idx = np.flatnonzero(train_mask)
             test_idx = np.flatnonzero(test_mask)
             if train_idx.size == 0 or test_idx.size == 0:
+                # Reported, never silently dropped: a fold with no usable
+                # rows is a failure of the split, not a missing datum.
+                self.degenerate_folds.append(k)
                 continue
             folds.append(
                 Fold(
@@ -95,3 +112,8 @@ class WalkForwardSplitter:
         if not folds:
             raise ValueError("walk-forward produced no usable folds")
         return folds
+
+    @property
+    def n_degenerate(self) -> int:
+        """Folds the last :meth:`split` could not populate (reported)."""
+        return len(getattr(self, "degenerate_folds", []))

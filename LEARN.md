@@ -106,10 +106,14 @@ ofi_lK_wW = Σ e(K) over the window (t−W, t]
 The repo computes this exactly, in integers, for K ∈ {1,3,5,10} and
 W ∈ {1s,5s,30s} (API_FEATURES.md §3). OFI drives alphas EQ02 (L1) and EQ03
 (multi-level). Paper 1's finding is the honest headline: OFI *is*
-statistically predictive here (pooled OOS IC 0.0274/0.0256 with t of
-5.89/7.24, every non-degenerate walk-forward fold positive) and *still not
-tradable* — at 246–277 signal flips per hour the strategies pay the spread
-so often that costs exceed gross alpha by roughly two orders of magnitude.
+statistically predictive here (uncrossed OOS IC 0.0312/0.0298 with
+Newey-West t of 8.47/10.61, every non-degenerate walk-forward fold
+positive — the gates read the UNCROSSED column, and on equities the
+consolidated book is crossed on only ~1 % of rows, so pooled and uncrossed
+barely differ: 0.0309/0.0299) and *still not tradable* — at 133/147 signal
+flips per hour the strategies pay the spread so often that costs exceed
+gross alpha by roughly two orders of magnitude (EQ02 day 2: gross +1,360
+against 195,402 of costs).
 
 ### 1.5 Queues, and what you can and cannot observe
 
@@ -177,8 +181,12 @@ process. Consequences you will see all over the research reports:
 1. **Reversion alphas look great, momentum-family hypotheses often fail.**
    Several alphas ship with `hypothesis_confirmed = false` — the fitted sign
    contradicts the stated economic rationale — and are therefore barred from
-   PROMOTE no matter how large the IC (e.g. FX09, IC 0.113, t 14.3, still
-   capped at ITERATE).
+   PROMOTE no matter how large the IC (e.g. EQ09, statistically strong at
+   NW t −5.11 on 1.00 fold sign consistency, but with the sign pointing the
+   wrong way: **REJECT**). FX09 used to be the example here at "IC 0.113,
+   t 14.3, capped at ITERATE"; since the gates started reading the
+   crossed-book-conditioned IC it fails on the number as well as the sign
+   (uncrossed IC −0.0472, NW t −3.81, **REJECT**) — see §6.5.
 2. **The consolidated multi-venue book can still cross occasionally**
    (negative spread). Under the shared-efficient-price design the merged
    *equity* book is crossed at only 0.79% of ML decision rows — but the FX
@@ -207,16 +215,22 @@ Book reconstruction sounds trivial until you pin every edge case. This repo
 pins them all in conventions §4 / API_CORE.md §4, because four languages must
 agree *exactly*:
 
-- **ADD** — join the FIFO tail of the (side, price) level. If the price
-  crosses the opposite best, it is *marketable*: it executes against the
-  opposite FIFO from the head of the best level (partial fills reduce the
-  head; emptied orders are removed), and any remainder posts. Note the subtle
-  consequence: an internal match generates **no EXECUTE events** on the wire
-  — the execution simulator has to reverse-engineer those consumptions for
-  queue accounting (§10).
+- **ADD** — join the FIFO tail of the (side, price) level. While the venue
+  status is TRADING, a price that crosses the opposite best is *marketable*:
+  it executes against the opposite FIFO from the head of the best level
+  (partial fills reduce the head; emptied orders are removed), and any
+  remainder posts. Note the subtle consequence: an internal match generates
+  **no EXECUTE events** on the wire — the execution simulator has to
+  reverse-engineer those consumptions for queue accounting (§10). During a
+  HALT / AUCTION call phase / after CLOSE **nothing matches**: crossing ADDs
+  rest, the book is legitimately crossed (`is_crossed()`), and the venue's
+  own EXECUTE messages perform the uncross — exactly what LSE SETS, Xetra or
+  a NYSE re-opening auction looks like on the wire.
 - **MODIFY** — quantity change only. Decrease keeps queue position; increase
   moves the order to the level tail (you lose priority when you upsize —
-  matching real exchange semantics). The event's price field is ignored.
+  matching real exchange semantics). A non-zero price that differs from the
+  resting price is an adapter bug (ITCH Replace / MDP3 price-modify must be
+  CANCEL+ADD): dropped and counted (`modify_price_mismatch`).
 - **CANCEL** — remove by order_id; unknown ids are dropped and counted, never
   fatal.
 - **EXECUTE** — fills the **referenced** order, by `order_id` (valid feeds
@@ -224,39 +238,63 @@ agree *exactly*:
   order the event references); partial fills keep position, an order is
   removed at qty 0. Does *not* touch `trade_flow`.
 - **TRADE** — updates cumulative signed `trade_flow` only (+qty for buy
-  aggressor, −qty for sell). Trade prints and book mutations are separate
-  event types with separate meanings.
+  aggressor, −qty for sell), with checked arithmetic. Trade prints and book
+  mutations are separate event types with separate meanings.
 - **QUOTE** (FX) — replaces the venue's entire side at L1: the quote-driven
-  world in one rule.
+  world in one rule. Real LP streams carry no order ids, so `order_id = 0`
+  is first-class: the book keys the level by a deterministic *synthetic id*
+  in a reserved range (`0xFFFF…`), and an explicit id may not rest on the
+  other side.
 - **SNAPSHOT** — a burst of records (one per resting order, bids then asks,
   best→worst, FIFO within level, with a countdown in `trade_id`); the first
   record clears both sides, the last clears the `stale` flag. **Broken-burst
   rule** (conventions §4): a sequence gap arriving *inside* an active burst
   marks that burst BROKEN — it still ends at its `trade_id == 0` record but
   does **not** clear `stale`; only a later complete, gap-free burst does.
-- **Side domain** — for side-indexed event types (ADD/QUOTE/SNAPSHOT/TRADE),
-  `side` must be BID=0 or ASK=1. An event with side > 1 is malformed:
-  dropped and counted (`invalid_side_dropped`) through the normal drop path
-  — never an exception mid-stream — *after* its sequence number is consumed.
+  The countdown itself is validated: a restart (countdown goes up) clears
+  and starts over, a skip breaks the burst; id-less (L2) records get
+  synthetic ids; a repeated id is malformed.
+- **Malformed events** — one policy, one table (API_CORE §4): unknown event
+  type, bad side, `qty <= 0` / `price <= 0` where a positive value is
+  required, `order_id 0` on MBO events, reserved ids, bad STATUS codes, and
+  any i64 overflow are **dropped and counted** in a named counter *after*
+  the sequence number is consumed — never an exception mid-stream. Only
+  routing an event to the wrong book raises. The accounting invariant
+  `applied + drops + held == events fed` is asserted in every port.
 
-**Sequencing** is checked before dispatch: a duplicate (sequence ≤ last) is
-dropped and counted; a gap marks the book `stale = true`, and while stale
-only SNAPSHOT/STATUS/TRADE/HEARTBEAT apply. Stale books poison nothing
-downstream because the feature engine excludes stale venues from its merged
-view and marks affected features invalid (§4.3) — the fail-closed idea (§9)
-appearing already at the data layer.
+**Sequencing** is checked before dispatch: the first event of an epoch is
+accepted whatever its sequence (0 included); a duplicate (sequence ≤ last)
+is dropped and counted; a gap marks the book `stale = true`, and while stale
+only SNAPSHOT/STATUS/TRADE/HEARTBEAT apply. Two things real feeds do that a
+naive book cannot survive are pinned too: a **venue sequence reset** (LSE,
+Xetra, Euronext and Nasdaq restart channel sequences daily; T7 on fail-over)
+is recognised when a SNAPSHOT burst starts below the last sequence — new
+epoch, `sequence_resets`, stale until the burst completes — and a
+**retransmission** (MoldUDP64 re-request, A/B arbitration) is reordered by
+an optional bounded hold-back buffer (`reorder_window`, ≤ 4096 events,
+`late_recovered`). Stale books poison nothing downstream because the
+consolidated view and the feature engine exclude stale venues and mark
+affected features invalid (§4.3) — the fail-closed idea (§9) appearing
+already at the data layer. Silent disconnects (no gap, the line just goes
+quiet) are a *time* question, answered by `is_fresh(now, max_age)`.
 
 **Checkpoints** serialize the full book (levels in sorted order, FIFO lists,
-counters — including `arrival_order`, the `snapshot_broken` flag and the
-`invalid_side_dropped` counter, so the global resting-order arrival order
-round-trips exactly) such that restore-and-continue is bit-identical to
-never having stopped — verified in tests, and the foundation of replayable
-backtests.
+`arrival_order`, burst state, the reorder buffer and all twelve counters) as
+a cross-language JSON document (x-version 2) such that restore-and-continue
+is bit-identical to never having stopped — verified in tests, verified
+*across languages* by `expected_checkpoint_eq_1000.json`, and the
+foundation of replayable backtests.
 
 Derived state after *every* event: best bid/ask with sizes, top-10 depth and
 order counts per side, signed trade flow, last sequence, timestamps. The
 golden file `expected_book_states.json` pins this state after events
-100/500/1000/1500/2000 of the equity vector — exact integers, no epsilons.
+100/500/1000/1500/2000 of the equity vector — exact integers, no epsilons —
+and `expected_anomaly_states.json` pins per-venue state, all twelve counters
+and the consolidated view of two *anomaly* vectors (gaps, duplicates, late
+arrivals, resets, id-less quotes, malformed payloads, a halt with a
+re-opening auction) in every language, with and without a reorder window.
+`docs/SCENARIOS.md` maps each real-world scenario to its pinned rule and
+tests.
 
 ---
 
@@ -331,7 +369,8 @@ research data.
 
 On the bundled dataset the pipeline emits 208,437 vectors (100 ms cadence,
 310,159 events, ~56 s in the Python reference; the C++ port does the same
-state updates at ~450 ns/event).
+state updates at 530.4 ns/event on the equity vector — `benchmarks/
+results_cpp.md`, hot and cache-resident).
 
 ---
 
@@ -434,39 +473,60 @@ Result on the bundled data: **0 PROMOTE / 12 ITERATE / 12 REJECT** — every
 one of the 24 alphas is net-negative at 1× modeled costs, so nothing clears
 the last gate. Worked examples, straight from the master table:
 
+Since round 3 the gates read the **uncrossed** IC and its Newey–West t —
+the same IC restricted to rows whose consolidated book was not crossed by
+a stale venue quote (`IC unc` in the master table). On the equity book the
+two are the same number to three decimals (≈1 % of rows are crossed); on
+FX, where 29–33 % of cross-sections are crossed, they are different alphas
+entirely. Worked examples:
+
 - **EQ03 (multi-level OFI) — ITERATE, the platform's signature finding.**
-  IC 0.0256, t 7.24, every non-degenerate fold positive, leakage-clean… and
-  net **−199,913** at 1× costs, because 277 flips/hour means paying the
-  spread constantly. Statistically real, economically dead on this data
-  (paper 1).
-- **EQ08 (VWAP/mid deviation) — REJECT, instructively.** Only 11 signal
-  flips/hour, so it loses the least money of any equity alpha (−7,543 at
-  1×) — but its pooled NW t is −0.14 and its fitted sign contradicts the
+  Uncrossed IC 0.0298, NW t 10.61, all four folds non-degenerate and
+  sign-consistent, leakage-clean… and net **−70,638** at 1× costs, because
+  147 flips/hour means paying the spread constantly. Statistically real,
+  economically dead on this data (paper 1).
+- **EQ08 (VWAP/mid deviation) — REJECT, instructively.** Only 6 signal
+  flips/hour, so it loses the least money of any equity alpha (−3,714 at
+  1×) — but its uncrossed IC is −0.0468 and its fitted sign contradicts the
   stated rationale (`hyp = no`). Cheap to trade is not the same as real.
-- **FX09 (vol-regime reversion) — ITERATE despite the best FX statistics
-  in the study.** IC 0.113, t 14.3, regime-split IC 0.176 in high-vol —
-  but `hyp = no` (the fitted sign contradicts the stated rationale) and it
-  loses 670k at 1× costs. The gate that blocks it (`hypothesis_confirmed`)
-  is the codified version of "a fit you can't explain is a fit you can't
-  trust."
-- **FX01 (microprice on the FX quote book) — REJECT.** IC −0.015, 1/4
-  positive folds. Compare EQ01, the same formula on the MBO book: ITERATE,
-  sign-stable and hypothesis-confirmed. Market structure decides (paper 2).
+- **FX09 (vol-regime reversion) — REJECT, and the clearest lesson in the
+  report.** Round 2 called it "the best FX statistics in the study" at
+  IC 0.113, t 14.3. Conditioning on book state dissolves most of that: its
+  IC is **−0.2100 on crossed rows and −0.0472 on uncrossed ones**, i.e. the
+  signal was largely measuring the mechanical reversion of a stale LP's
+  quote, not a vol regime. With `hyp = no` on top, it is a REJECT twice
+  over. A number that only exists on untradeable rows is not a number.
+- **FX01 (microprice on the FX quote book) — ITERATE, but on 0/4 folds.**
+  Pooled IC −0.015 flips to +0.018 uncrossed (t 2.65), which clears the
+  lenient ITERATE gate, yet **no individual fold** is positive
+  (`folds+ = 0.00`) — so it can never reach PROMOTE. Compare EQ01, the same
+  formula on the MBO book: uncrossed IC 0.0273, t 4.95, all four folds
+  positive. Market structure decides (paper 2).
 
 ### 6.6 Multiple testing: counting your looks
 
 Every walk-forward evaluation, decay horizon, stress variant, and backtest is
-recorded in an append-only ledger (`research/experiments.json`) — 21 looks
-per alpha per run plus a one-time 216-look design scan gave **1,224
-experiments** at the committed promotion run; the adaptive-deployment study
-(§14) then added 12,082 counted looks of its own across its two committed runs — 6,041 per run (every drift evaluation,
-rolling-IC reading, refit and final backtest), bringing the ledger to
-**13,306**. The ledger translates that into a selection yardstick:
-Bonferroni per-test threshold |t| ≥ 4.62, and an expected **max |t| ≈ 4.36
-under the global null** across the ledger. Meaning: an alpha waving t = 1.7
-(FX04) is *consistent with pure selection* over this many trials, and the
-report says so in print. Most quant shops track this informally at best; here
-it is a serialized artifact that only ever grows.
+recorded in a ledger (`research/experiments.json`). The round-3 audit found
+the count was measuring the wrong thing: it grew every time somebody *reran*
+a script, and it counted each of the adaptive study's 211 monitoring
+evaluations as a separate "experiment", so the Bonferroni denominator was a
+function of how often the same code had been executed. An experiment is now
+identified by **(alpha, kind, canonical config)** and de-duplicated on that
+key — rerunning `run_all.py` changes nothing, and one adaptive deployment is
+one experiment.
+
+The current ledger holds **65 distinct configurations / 760 looks**: a
+one-time 216-look design scan over 24 alphas × 9 horizons, 24 promotion
+pipelines at 21 looks each (504), and 40 adaptive deployments
+(10 alphas × 4 refit policies). That translates into a selection yardstick:
+Bonferroni per-test threshold |t| ≥ **3.99**, and an expected
+**max |t| ≈ 3.64 under the global null**. Meaning: FX08's uncrossed
+t = 2.02 — or FX11's 1.40 — is *consistent with pure selection* over this
+many trials, and the report says so in print. EQ03 (t 10.61) and EQ02
+(8.47) clear it; EQ06 (3.25) and EQ11 (3.16) pass the fixed t ≥ 3.0 gate but
+sit *below* the selection-adjusted yardstick, which the master table flags.
+Most quant shops track this informally at best; here it is a serialized,
+deterministic artifact.
 
 ### 6.7 Cost reality
 
@@ -610,6 +670,13 @@ Design choices worth studying:
 - **Constraint audit in every response**: each active constraint reports
   value, bound, slack, and a binding flag. "Constraint-auditable" (spec §15)
   means the optimizer explains itself.
+- **Infeasible is an answer, not a NaN**: when no iterate satisfies the
+  constraints (a gross cap cut below the minimum positions, say), the
+  result says so — `feasible = false`, weights = the previous holding,
+  `max_violation` in the audit — and the platform holds its position.
+  Non-finite inputs are rejected before the first iteration. A solver that
+  returns NaN weights to a risk engine is a production incident waiting
+  for its first bad covariance (round 3, API_PORTFOLIO_TCA.md §1.3).
 
 The golden problem (`tests/golden/expected_portfolio.json`) exercises all
 seven families on the 8-pair FX book: expected weights, objective and
@@ -648,9 +715,43 @@ Engineering properties to note:
   byte-identical audit log. Risk events (including kill-switch engage/clear
   notifications) are part of the pinned output, in order.
 - **State mutation is explicit**: the golden's step language (market, fill,
-  cancel, gap/recover, venue_down/venue_up, kill/unkill) is a tiny
-  domain-specific test format — a pattern worth copying for any stateful
-  engine.
+  cancel, gap/recover, venue_down/venue_up, kill/unkill, override_loss,
+  roll_session, snapshot) is a tiny domain-specific test format — a pattern
+  worth copying for any stateful engine.
+
+Round 3 (2026-09-06) hardened the semantics that a first implementation
+tends to get subtly wrong — each one is now a pinned rule in
+`PLATFORM_CONVENTIONS.md` §11.1 with a scenario test in Rust and Java:
+
+- **Loss limits are mark-to-market.** A realized-only daily loss lets a
+  position sail through the limit as long as nothing trades. The engine
+  now evaluates realized + unrealized on every fill *and* on every market
+  update of a held instrument, converted to the reporting currency, and
+  latches with zero fills (`risk_mtm_loss_latches_without_fill`).
+- **Notional means money.** `qty × qty_unit × price × tick × fx_rate`: a
+  lot of USD/JPY is 100,000 units quoted in yen, and a JPY notional summed
+  as dollars is off by two orders of magnitude. Conversion pairs live in
+  `configs/risk.json`; a missing or stale rate fails closed
+  (`FX_RATE_MISSING`) instead of guessing 1.0.
+- **Every in-flight order counts.** Tracking only resting LIMITs means
+  three MARKET orders in the wire are invisible to the position projection.
+  Now every allowed order is open until its terminal report, and the OMS
+  callback (`on_order_done`) is part of the contract.
+- **Marks carry market-data time.** Stamping the reference price with the
+  decision clock makes the stale gate a no-op during a feed stall; the
+  Java paper wiring now hands the engine the book event time
+  (`paperStaleFeedRejectsOrders`).
+- **Re-arming has a precedence.** `clear_kill` clears only the switch —
+  the loss checks still reject and the next mark re-latches; the audited
+  `override_loss_limit` (or a `roll_session`) has to come first. The
+  runbook procedure is the test.
+- **Byte-identical audit means integer formatting.** `format!("{:.2}")`
+  and `String.format("%.2f")` disagree on ties; money in reasons goes
+  through one integer-scaled formatter in both languages, with a
+  decimal-tie golden.
+- **Restart is a state problem.** `snapshot()` / `restore()` and a
+  `NOT_BOOTSTRAPPED` mode make a redeploy resume bit-identically rather
+  than start flat with a latched loss forgotten.
 
 The kill-switch incident runbook
 (`docs/runbooks/RUNBOOK_incident_kill_switch.md`) closes the loop from
@@ -676,7 +777,13 @@ everything else and simulates child-order lifecycles with pinned rules
 
 - **Latency**: arrival = decision + decision_ns + risk_ns + wire_ns + venue
   mean + a SplitMix64 jitter draw per submission — deterministic given the
-  seed.
+  seed. Cancels travel the same path (rule 7): a cancel never overtakes its
+  order and never undoes a fill that landed first; a child carries an
+  `expire_ts` (the parent's `end_ts`) so no child outlives its window.
+- **Venue state gate** (rule 8): a halted, auction-call or gap-stale venue
+  book produces no fill of any kind; on re-open, crossed resting orders
+  fill at the uncross touch. The SOR applies the same eligibility and
+  returns "no route" rather than falling back to a stale venue.
 - **Aggressive fills** walk the *displayed* top-10 depth, best-first, one
   fill per level; simulated orders never mutate the replayed book (the
   market stream stays authoritative); impact is charged economically
@@ -692,17 +799,25 @@ everything else and simulates child-order lifecycles with pinned rules
   liquidity you already took. MODIFYs deliberately do nothing (a modified
   order's queue position is unknowable from public data — pinned as ignored
   rather than guessed).
+- **Liquidity is consumed, not copied** (rule 3b): two children hitting
+  the same displayed level inside one decision share one copy of it — the
+  second sees the thin remainder. Simulated fills still never mutate the
+  replayed book (the tape stays authoritative); the overlay only stops us
+  from taking the same shares twice.
 
 ### 10.3 What the golden shows
 
-`expected_replay_fills.json` runs two parents against the golden equity
-vector: a passive VWAP BUY 400 (4 LIMIT slices joining the bid) and an
-aggressive IS SELL 600 (3 front-loaded MARKET slices). The economics are the
-lesson: the passive parent completes 400 shares with **negative explicit
-cost** (−$0.80 — maker rebates), while the aggressive parent pays $1.80 in
+`expected_replay_fills.json` (v2) runs two parents against the golden
+equity vector: a passive VWAP BUY 400 (4 LIMIT slices joining the bid) and
+an aggressive IS SELL 600 (3 front-loaded MARKET slices). The economics are
+the lesson: the passive parent fills 329 of 400 shares with **negative
+explicit cost** (−$0.658 — maker rebates) and leaves 71 unfilled when its
+window closes, while the aggressive parent completes 600 paying $1.80 in
 taker fees plus impact — a ~2 bps explicit swing between patience and
-urgency on the same tape (paper 5). Every fill's price/qty/timestamp is
-exact; fees and impact match to 1e-9, in C++ and Java alike.
+urgency on the same tape, and the timing risk of patience made visible
+(paper 5 + erratum: v1 let the second slice fill 290 s after the window).
+Every fill's price/qty/timestamp is exact; fees and impact match to 1e-9,
+in C++ and Java alike.
 
 ---
 
@@ -730,6 +845,16 @@ The identity is enforced to 1e-9 — decompositions that don't sum are
 narratives, not accounting. The golden cases include the edge everyone gets
 wrong: a fully unfilled buy must come out as *pure opportunity cost*.
 
+Three more edges are pinned since round 3 (API_PORTFOLIO_TCA.md §2.1,
+§2.4, §2.5; Python and Java held equal by the v2 golden's timeline cases):
+a markout whose horizon runs past the end of the data (or across a halt) is
+**undefined**, reported as `null` with the count of defined fills, never
+fabricated from the last state; a passive fill is measured against the
+state *before* the event that hit it (measuring against the post-print
+book books the spread you captured as a cost); and a crossed consolidated
+state is skipped and counted, while a locked one is a legitimate
+zero-spread state.
+
 On the bundled 36-parent simulation (`research/tca/TCA_REPORT.md`): mean IS
 20.6 bps (equity) / 0.45 bps (FX), and equity markouts ≈ **−24 bps, flat
 from 100 ms to 10 s** — aggressive fills paid purely temporary impact and
@@ -752,11 +877,13 @@ match**.
 
 ### 12.2 How this repo does it
 
-- `tests/golden/` holds two pinned event vectors (2,000-event equity MBO,
-  800-event FX quote, both byte-exact JSONL) and expected outputs for codec
-  (SHA-256 of the IAP1 binary encoding — *byte* parity, the strongest
-  possible claim), book states, features, alphas, backtest, risk decisions,
-  replay fills, portfolio, and TCA.
+- `tests/golden/` holds four pinned event vectors (2,000-event equity MBO,
+  800-event FX quote, and two anomaly vectors of 1,403 / 561 events, all
+  byte-exact JSONL) and expected outputs for codec (SHA-256 of the IAP1
+  binary encoding — *byte* parity, the strongest possible claim), book
+  states, anomaly states + counters, a cross-language checkpoint, a JSONL
+  reject/accept fixture, features, alphas, backtest, risk decisions, replay
+  fills, portfolio, and TCA.
 - **Tolerance policy is explicit**: integer state (ticks, sizes, counts,
   sequences) matches *exactly* — no epsilons; float outputs match at
   abs 1e-9 + rel 1e-9. Deciding which quantities are integers (§1.2) is what
@@ -767,8 +894,12 @@ match**.
   the portfolio golden is checked against an SLSQP optimum. Golden files are
   regenerated only deliberately, with a MIGRATIONS.md entry.
 - **One command proves parity**: `tests/harness/run_all.sh` runs all four
-  suites and prints the table (a full harness run: python 489, cpp 175,
-  rust 181, java 315 tests passed; golden groups 49/37/36/13; all PASS).
+  suites and prints the table (a full harness run on 2026-09-06: python 626,
+  cpp 243, rust 254, java 448 tests passed; golden groups 65/45/47/85; all
+  PASS, plus a `deployment` row — 17 structural checks — and a `numbers` row
+  that re-derives every headline figure in the docs from its artefact). The
+  Java golden group is 85 because the gate now runs all ten `*GoldenTest`
+  classes; it used to run two of them and report 18.
 
 ### 12.3 Why it changes how you write code
 
@@ -793,19 +924,22 @@ repo can actually make.
 
 **Measurement 1 — the cost of staleness.** The validation framework's latency
 stress rescores every alpha with signals delayed by +1 and +5 events. The
-fast equity flow alphas (EQ02/EQ03/EQ12) shed ~20-25% of IC after one event
-and ~70-77% after five (EQ03: 0.0267 → 0.0214 → 0.0085); EQ01's microprice
-signal flips sign entirely by +5 events (0.0213 → −0.0131). The slow equity
-alphas barely notice even five events (EQ09: 0.0862 → 0.0870 → 0.0833), and
-the FX regime family retains ~80% at one event (~15 s of FX tape) but only
-~25-30% at five (FX09: 0.1414 → 0.1138 → 0.0345). Alpha decay against
-*events* is the economically meaningful axis.
+fast equity flow alphas (EQ02/EQ03/EQ12) shed ~15-21% of IC after one event
+and ~66-82% after five (EQ03: 0.0254 → 0.0215 → 0.0086); EQ01's microprice
+signal flips sign entirely by +5 events (0.0050 → 0.0083 → −0.0335). The
+slow equity alphas do not notice even five events (EQ09: 0.1006 → 0.1055 →
+0.1153, which drifts *up*; EQ11 keeps 95%), and the FX regime family
+retains ~78-83% at one event (~15-22 s of FX tape) but only ~7-41% at five
+(FX09: 0.1617 → 0.1342 → 0.0481). Alpha decay against *events* is the
+economically meaningful axis.
 
 **Measurement 2 — the speed of the stack.** The measured C++ hot path
-(decode + book + features + alpha) sums to ≈ 0.5 µs/event, versus a median
-inter-event gap of ≈ 0.9 s on this dataset — six orders of magnitude of
-headroom. Rust and Java demo-scale replays (≈ 6.9M and ≈ 3.5M events/s) are
-equally overprovisioned.
+(decode + book + features + alpha = 174.4 + 25.7 + 530.4 + 38.5 ns) sums to
+≈ 0.77 µs/event, versus a median inter-event gap of ≈ 0.9 s on this dataset
+— six orders of magnitude of headroom. (The ≈ 0.5 µs this section used to
+quote predates the mandatory CRC-32 IAP1 trailer; paper 04's benchmark
+erratum carries the re-derivation.) Rust and Java demo-scale replays (≈ 6.5M events/s through the
+SPSC bus and ≈ 3.5M events/s) are equally overprovisioned.
 
 **The synthesis**: on this platform, latency economics are entirely about
 *reacting to the next event* rather than compute speed. Latency investment
@@ -890,8 +1024,8 @@ label horizon has fully elapsed.
   treadmill (see the FX10 lesson below).
 
 In the study (`research/adaptive_reports/ADAPTIVE_REPORT.md`), across 10
-alphas the policies performed 10 (static) / 20 (daily) / **113
-(drift-triggered)** total refits — and none of that activity changed the
+alphas the policies performed 10 (static) / 10 (weekly) / 20 (daily) /
+**126 (drift-triggered)** total refits — and none of that activity changed the
 economics: every alpha stays net-negative after costs, and the P&L spread
 between policies is one to two orders of magnitude smaller than the cost
 drag. Refitting neither rescues nor ruins any alpha here.
@@ -956,7 +1090,7 @@ morning warmup — so as the session simply *progresses*, the live
 minute-of-day distribution walks away from the baseline **by
 construction**. PSI dutifully exceeds 0.25 at almost every evaluation:
 FX10 logs 156 drift events where no other alpha logs more than 23, and
-under the drift-triggered policy it refits 41 times (vs 1 static) while
+under the drift-triggered policy it refits 40 times (vs 1 static) while
 ending in a *worse* deployed IC and P&L than static. Nothing
 malfunctioned — the machinery behaved exactly as pinned. The lesson is
 about **monitor selection**: deterministic calendar features do not
@@ -979,8 +1113,10 @@ establish is the part you can establish at this sample size: the
 machinery is deterministic and leak-free (refits train only on purged,
 embargoed history — asserted at runtime and shift-tested), triggers fire
 exactly when the pinned rules say, retirement verifiably halts
-allocation, and all 12,082 study looks (6,041 per run, two runs recorded) are counted in the multiple-testing
-ledger. "We built the machinery and proved it behaves; we did not prove
+allocation, and each of the 40 deployments (10 alphas × 4 refit policies) is
+counted once in the multiple-testing ledger — round 3 stopped charging the
+denominator for all 211 monitoring evaluations inside a single deployment.
+"We built the machinery and proved it behaves; we did not prove
 it makes money" is the adaptability layer's version of the platform's
 central discipline: research truth over backtest cosmetics.
 
@@ -994,9 +1130,12 @@ central discipline: research truth over backtest cosmetics.
    harness masks everything else and demands identical output.
 3. **Random splits on overlapping labels.** Walk-forward only, purge at the
    label horizon, 60 s embargo (§6.2).
-4. **Uncounted multiple testing.** An append-only ledger (13,306 looks,
-   12,082 of them from the adaptive study alone) with a printed
-   expected-max-|t| yardstick; t = 1.7 is called what it is.
+4. **Uncounted multiple testing.** A ledger de-duplicated by (alpha, kind,
+   config) — 65 distinct configurations, 760 looks — with a printed
+   expected-max-|t| yardstick of 3.64; FX08's t = 2.02 is called what it is.
+   Round 3 also fixed the denominator itself: it used to grow every time a
+   script was rerun, which made the correction a function of how busy the
+   researcher had been.
 5. **Ignoring costs until the end.** Cost-adjusted labels, cost-stressed
    backtests, and a promotion gate requiring net P&L > 0 at 1× costs — which
    is exactly what stopped OFI (§6.5).
@@ -1099,10 +1238,12 @@ and an unfilled order must be pure opportunity cost.
 
 **Q10. How would you decide whether to invest in lower latency?**
 Measure alpha decay in *events*, not seconds, per strategy: here the fast
-flow alphas shed ~20-25% of IC per event of staleness and ~75% by five
-events (EQ01's microprice signal flips sign outright), while the slow
-equity and FX regime alphas barely notice — and the compute path is six
-orders of magnitude faster than the feed. So the marginal microsecond of
+flow alphas shed ~15-21% of IC after one event of staleness and ~66-82% by
+five (EQ01's microprice signal flips sign outright), the slow equity alphas
+do not notice at all (EQ09 drifts up, EQ11 keeps 95%), and the FX regime
+family holds ~78-83% at one event but loses most of its IC by five
+(~7-41%) — and the compute path is six orders of magnitude faster than the
+feed. So the marginal microsecond of
 compute is worthless, but being events late is existential for flow alphas.
 The budget goes wherever your reaction-to-next-event chain is actually
 bottlenecked, weighted per alpha family.

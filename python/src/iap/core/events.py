@@ -17,6 +17,11 @@ U16_MAX = (1 << 16) - 1
 I64_MIN = -(1 << 63)
 I64_MAX = (1 << 63) - 1
 
+#: Reserved order-id range (top 16 bits set): synthetic ids assigned by the
+#: book to id-less QUOTE/SNAPSHOT records. Feeds must never use explicit ids
+#: in this range (pinned; conventions section 4).
+SYNTHETIC_ID_BASE = 0xFFFF_0000_0000_0000
+
 
 class Side(IntEnum):
     """Order/quote/aggressor side."""
@@ -127,6 +132,10 @@ def validation_error(ev: MarketEvent) -> Optional[str]:
         return f"trade_id out of u64 range: {ev.trade_id}"
 
     et = ev.event_type
+    if ev.order_id >= SYNTHETIC_ID_BASE and et in (
+        EventType.ADD, EventType.QUOTE, EventType.SNAPSHOT
+    ):
+        return f"order_id in reserved synthetic range: {ev.order_id}"
     if et in _BOOK_TYPES:
         if ev.order_id == 0:
             return f"order_id required for event_type {et}"
