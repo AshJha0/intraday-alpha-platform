@@ -40,7 +40,7 @@ COPY cpp cpp
 COPY tests/golden tests/golden
 
 # Exactly cpp/build.sh (Release, -j2 — 2-CPU baseline, BUILD_NOTES.md).
-RUN cd cpp && ./build.sh
+RUN cd cpp && bash build.sh
 
 # Tests run at image-build time: a production image is never published from a
 # tree whose golden/parity suite fails (GOVERNANCE.md promotion gate 10).

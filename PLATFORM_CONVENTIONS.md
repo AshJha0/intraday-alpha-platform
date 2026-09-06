@@ -128,9 +128,9 @@ hot paths allocation-conscious (primitive arrays, no boxing). All: no dead code,
 ## 9. Build & test commands (CI = tests/harness/run_all.sh)
 
 - python: `cd python && PYTHONPATH=src python3 -m pytest -q`
-- cpp: `cd cpp && ./build.sh && ctest --test-dir build --output-on-failure`
+- cpp: `cd cpp && bash build.sh && ctest --test-dir build --output-on-failure`
 - rust: `cd rust && cargo test` (workspace)
-- java: `cd java && ./build.sh && ./test.sh`  (javac + JUnit4 jar at /usr/share/java/junit4.jar; NO Maven — Maven Central unreachable here; document in README that pom.xml equivalents are listed in docs/BUILD_NOTES.md)
+- java: `cd java && bash build.sh && bash test.sh`  (javac + JUnit4 jar at /usr/share/java/junit4.jar; NO Maven — Maven Central unreachable here; document in README that pom.xml equivalents are listed in docs/BUILD_NOTES.md)
 - Keep each language's full test run < 120s.
 
 ## 10. Environment facts

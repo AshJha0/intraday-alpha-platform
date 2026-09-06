@@ -85,13 +85,13 @@ cd rust && cargo run --release --bin demo          # defaults to tests/golden/
 **Java** — the replay demo (golden vectors, codec SHA-256s, throughput):
 
 ```bash
-java/demo.sh
+bash java/demo.sh
 ```
 
 **C++** — book/replay correctness runs as tests; throughput via the bench:
 
 ```bash
-cd cpp && ./build.sh
+cd cpp && bash build.sh
 ctest --test-dir build --output-on-failure -R 'Book|Replay'
 ./build/bench_all           # includes book-update and replay-engine passes
 ```
@@ -252,7 +252,7 @@ Cross-language versions of the same check:
 
 ```bash
 cd python && PYTHONPATH=src python3 -m pytest -q tests/test_portfolio_golden.py
-cd java && ./build.sh && ./test.sh          # includes PortfolioGoldenTest
+cd java && bash build.sh && bash test.sh          # includes PortfolioGoldenTest
 ```
 
 ## 9. Run risk checks against the golden decisions
@@ -264,7 +264,7 @@ switches) and pins every decision, deciding rule and severity:
 ```bash
 cd rust && cargo test -p risk --test golden_risk     # reference
 cd rust && cargo test -p risk --test rules           # per-rule unit tests
-cd java && ./build.sh && rm -rf out/test && mkdir -p out/test && \
+cd java && bash build.sh && rm -rf out/test && mkdir -p out/test && \
   find src/test/java -name '*.java' | sort > out/test-sources.txt && \
   javac -cp "out/main:/usr/share/java/junit4.jar:/usr/share/java/hamcrest-core.jar" \
         -d out/test @out/test-sources.txt && \
@@ -286,14 +286,14 @@ the golden pins a passive VWAP parent and an aggressive IS parent on the
 golden equity vector:
 
 ```bash
-cd cpp && ./build.sh
+cd cpp && bash build.sh
 ctest --test-dir build --output-on-failure -R 'ReplayFillsGolden|Exec'
 ```
 
 Java must reproduce the same fills to the tick:
 
 ```bash
-cd java && ./build.sh && ./test.sh    # includes ReplayFillsGoldenTest, ExecutionSimTest, AlgosTest
+cd java && bash build.sh && bash test.sh    # includes ReplayFillsGoldenTest, ExecutionSimTest, AlgosTest
 ```
 
 Read the expected economics (patience vs urgency — the passive parent earns
@@ -354,7 +354,7 @@ The Java platform streams events through book → features → alphas →
 portfolio → risk → execution with the monitoring endpoints live:
 
 ```bash
-java/paper.sh                              # asap replay of the golden EQ vector
+bash java/paper.sh                              # asap replay of the golden EQ vector
 # prints e.g.:
 # paper session: events=2000 orders=405 fills=600 pnl=-634420.053607 risk[allowed=405 rejected=33] port=8080 ...
 ```
@@ -362,7 +362,7 @@ java/paper.sh                              # asap replay of the golden EQ vector
 For a session you can scrape while it runs, pace it in real time (60×):
 
 ```bash
-java/paper.sh --mode realtime --speed 60 &
+bash java/paper.sh --mode realtime --speed 60 &
 sleep 5
 curl -s localhost:8080/health              # {"status":"ok"}
 curl -s localhost:8080/status | python3 -m json.tool
@@ -387,10 +387,10 @@ report, not an embarrassment to be tuned away.
 ## 13. Run the benchmarks
 
 ```bash
-cd cpp && ./build.sh && ./build/bench_all                       # full C++ pass
+cd cpp && bash build.sh && ./build/bench_all                       # full C++ pass
 ./build/bench_all ../benchmarks/results_cpp.md                  # persist the table
 cd rust && cargo run --release --bin demo                       # replay throughput
-java/demo.sh                                                    # Java replay throughput
+bash java/demo.sh                                                    # Java replay throughput
 ```
 
 Methodology matters more than the numbers (spec §22): the committed
@@ -404,8 +404,8 @@ points from the committed run: IAP1 decode 3.5 ns/event, book update
 ## 14. Verify cross-language parity in one command
 
 ```bash
-tests/harness/run_all.sh                 # full suites + parity table
-tests/harness/run_all.sh --golden-only   # golden groups only (fast)
+bash tests/harness/run_all.sh                 # full suites + parity table
+bash tests/harness/run_all.sh --golden-only   # golden groups only (fast)
 ```
 
 Exit code 0 iff every language passed; logs land in a temp dir printed on
@@ -563,7 +563,7 @@ three per-alpha gauges alongside the usual metrics. Run a paced session
 and scrape them:
 
 ```bash
-java/paper.sh --mode realtime --speed 60 &
+bash java/paper.sh --mode realtime --speed 60 &
 sleep 25                # drift PSI appears once its 256-signal window fills;
                         # rolling IC once >= 4 matured event-time buckets exist
 curl -s localhost:8080/health               # {"status":"ok"}

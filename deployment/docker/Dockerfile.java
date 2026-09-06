@@ -42,9 +42,9 @@ COPY research/baselines research/baselines
 # exactly as CI does (build.sh); the JUnit test pass runs when both jars are
 # present, and is otherwise executed by tests/harness/run_all.sh on the CI
 # host (which has /usr/share/java/{junit4,hamcrest-core}.jar).
-RUN cd java && ./build.sh
+RUN cd java && bash build.sh
 RUN if [ -f /usr/share/java/junit4.jar ] && [ -f /usr/share/java/hamcrest-core.jar ]; then \
-        cd java && ./test.sh; \
+        cd java && bash test.sh; \
     else \
         echo "junit4/hamcrest jars not present in build context; test pass deferred to CI harness"; \
     fi

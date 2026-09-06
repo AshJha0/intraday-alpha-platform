@@ -4,12 +4,12 @@
 # serve /metrics|/health|/status on the config port (execution.json
 # monitoring.port, default 8080) and write out/paper_session_report.json.
 #
-# Usage: ./paper.sh [extra PaperTrading flags...]
-#   e.g. ./paper.sh --mode realtime --speed 60
+# Usage: bash paper.sh [extra PaperTrading flags...]
+#   e.g. bash paper.sh --mode realtime --speed 60
 set -euo pipefail
 cd "$(dirname "$0")"
 
-./build.sh
+bash build.sh
 java -cp out/main com.iap.platform.PaperTrading \
     --configs ../configs \
     --events ../tests/golden/events_eq_mbo.jsonl \

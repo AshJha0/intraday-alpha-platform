@@ -73,8 +73,8 @@ run_python() {
 # -------------------------------------------------------------------- cpp ---
 run_cpp() {
     local t0=$SECONDS ok=1 full=0 gold=0
-    note "cpp: ./build.sh"
-    if ! run_logged "$LOG_DIR/cpp_build.log" env -C "$ROOT/cpp" ./build.sh; then
+    note "cpp: bash build.sh"
+    if ! run_logged "$LOG_DIR/cpp_build.log" env -C "$ROOT/cpp" bash build.sh; then
         TESTS[cpp]=0; GOLDEN[cpp]=0; STATUS[cpp]="BUILD FAIL"
         SECS[cpp]=$((SECONDS - t0)); OVERALL=1; return
     fi
@@ -128,13 +128,13 @@ run_java() {
     local t0=$SECONDS ok=1 full=0 gold=0
     local JUNIT=/usr/share/java/junit4.jar HAMCREST=/usr/share/java/hamcrest-core.jar
     if [ "$GOLDEN_ONLY" -eq 0 ]; then
-        note "java: ./build.sh && ./test.sh"
-        if run_logged "$LOG_DIR/java_full.log" env -C "$ROOT/java" ./test.sh; then
+        note "java: bash build.sh && bash test.sh"
+        if run_logged "$LOG_DIR/java_full.log" env -C "$ROOT/java" bash test.sh; then
             full=$(grep -Eo 'OK \([0-9]+ tests?\)' "$LOG_DIR/java_full.log" | grep -Eo '[0-9]+')
         else ok=0; fi
     else
-        note "java: ./build.sh + compile tests"
-        if ! run_logged "$LOG_DIR/java_build.log" env -C "$ROOT/java" ./build.sh; then
+        note "java: bash build.sh + compile tests"
+        if ! run_logged "$LOG_DIR/java_build.log" env -C "$ROOT/java" bash build.sh; then
             TESTS[java]=0; GOLDEN[java]=0; STATUS[java]="BUILD FAIL"
             SECS[java]=$((SECONDS - t0)); OVERALL=1; return
         fi

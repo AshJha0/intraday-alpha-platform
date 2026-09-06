@@ -37,7 +37,7 @@ python3 -m json.tool research/models/<run_id>/manifest.json
 
 ```bash
 # C++ — replay + execution sim + fills golden
-cd cpp && ./build.sh && ctest --test-dir build --output-on-failure -R 'Replay|Exec|Golden'
+cd cpp && bash build.sh && ctest --test-dir build --output-on-failure -R 'Replay|Exec|Golden'
 ./build/bench_all                       # full decode/book/replay/exec throughput+latency pass
 ./build/bench_all ../benchmarks/results_cpp.md   # ... persisting the methodology table
 
@@ -45,7 +45,7 @@ cd cpp && ./build.sh && ctest --test-dir build --output-on-failure -R 'Replay|Ex
 cd rust && cargo run --release --bin demo
 
 # Java — replay demo (golden vectors, codec SHA-256s, throughput)
-cd java && ./build.sh && java -cp out/main com.iap.replay.Demo ../tests/golden
+cd java && bash build.sh && java -cp out/main com.iap.replay.Demo ../tests/golden
 ```
 
 Containerized equivalents: `docker compose -f
@@ -54,8 +54,8 @@ deployment/docker/docker-compose.yml up cpp-replay rust-replay java-platform`.
 ## 4. Cross-language parity (the gate that matters)
 
 ```bash
-tests/harness/run_all.sh        # full builds + tests, parity table
-tests/harness/run_golden.sh     # golden groups only, parity table
+bash tests/harness/run_all.sh        # full builds + tests, parity table
+bash tests/harness/run_golden.sh     # golden groups only, parity table
 ```
 
 Both must show every language passing. Promotion gate 10 (GOVERNANCE.md)

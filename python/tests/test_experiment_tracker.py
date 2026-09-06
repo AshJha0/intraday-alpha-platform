@@ -55,9 +55,14 @@ def test_manifest_completeness(tracker):
     assert hw["cpu_count"] >= 1 and hw["python"]
 
 
-def test_manifest_versions_are_real(tracker):
-    # workspace is not a git checkout -> pinned fallback string
-    assert git_commit() == "unversioned-workspace"
+def test_manifest_versions_are_real(tracker, tmp_path):
+    # inside a git checkout -> the 40-hex HEAD sha; outside one -> the
+    # pinned fallback string (the workspace may be either)
+    commit = git_commit()
+    assert commit == "unversioned-workspace" or (
+        len(commit) == 40 and all(c in "0123456789abcdef" for c in commit))
+    # an empty directory is never a checkout -> pinned fallback string
+    assert git_commit(tmp_path) == "unversioned-workspace"
     # qc_report + feature registry exist in this repo -> sha256 hex digests
     assert len(data_version()) == 64
     assert len(feature_version()) == 64

@@ -23,7 +23,7 @@ cd python && PYTHONPATH=src python3 tools/make_golden.py   # regen goldens (deli
 ## C++
 
 ```bash
-cd cpp && ./build.sh && ctest --test-dir build --output-on-failure
+cd cpp && bash build.sh && ctest --test-dir build --output-on-failure
 ```
 
 C++17, g++13/CMake/GoogleTest/Eigen available; `-Wall -Wextra` clean; build with
@@ -41,7 +41,7 @@ where justified); zero warnings.
 ## Java — why there is NO Maven build
 
 ```bash
-cd java && ./build.sh && ./test.sh
+cd java && bash build.sh && bash test.sh
 ```
 
 **Maven/Gradle are deliberately not used: Maven Central is unreachable from

@@ -3,5 +3,5 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-./build.sh
+bash build.sh
 java -cp out/main com.iap.replay.Demo ../tests/golden

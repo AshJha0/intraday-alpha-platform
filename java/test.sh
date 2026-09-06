@@ -7,7 +7,7 @@ JUNIT=/usr/share/java/junit4.jar
 HAMCREST=/usr/share/java/hamcrest-core.jar
 CP="out/main:$JUNIT:$HAMCREST"
 
-./build.sh
+bash build.sh
 
 rm -rf out/test
 mkdir -p out/test

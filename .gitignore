@@ -1,0 +1,33 @@
+# --- generated data (seeded; regenerate with `python -m iap.marketdata` /
+# `python -m iap.features`; docs/BUILD_NOTES.md: "do not commit generated data")
+data/raw/
+data/normalized/
+data/features/
+# data/reference/feature_registry.json is tracked (the feature_version source)
+
+# --- pickled estimators (manifest.json / metrics.json per run ARE tracked)
+research/models/*/model.pkl
+*.parquet
+
+# --- build trees
+cpp/build/
+rust/target/
+java/out/
+build/
+target/
+out/
+
+# --- python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+python/build/
+python/dist/
+
+# --- editor / OS / logs
+*.log
+*.swp
+.DS_Store
+.idea/
+.vscode/

@@ -124,12 +124,12 @@ cd python && PYTHONPATH=src python3 -m iap.marketdata && cd ..
 
 # 2. Run each language's test suite
 cd python && PYTHONPATH=src python3 -m pytest -q && cd ..
-cd cpp    && ./build.sh && ctest --test-dir build --output-on-failure && cd ..
+cd cpp    && bash build.sh && ctest --test-dir build --output-on-failure && cd ..
 cd rust   && cargo test && cd ..
-cd java   && ./build.sh && ./test.sh && cd ..
+cd java   && bash build.sh && bash test.sh && cd ..
 
 # 3. Or all four + the cross-language parity table in one command
-tests/harness/run_all.sh              # add --golden-only for the fast parity check
+bash tests/harness/run_all.sh              # add --golden-only for the fast parity check
 
 # 4. Run the research pipelines (features → alphas → ML → TCA)
 cd python && PYTHONPATH=src python3 -m iap.features && cd ..     # ~1 min
@@ -140,8 +140,8 @@ cd python && PYTHONPATH=src python3 -m iap.tca && cd ..          # TCA report
 
 # 5. Paper trading (Java platform: book → features → alphas → portfolio →
 #    risk → execution, with /metrics, /health, /status on :8080)
-java/paper.sh                          # asap replay of the golden vector
-java/paper.sh --mode realtime --speed 60   # paced session you can scrape
+bash java/paper.sh                          # asap replay of the golden vector
+bash java/paper.sh --mode realtime --speed 60   # paced session you can scrape
 ```
 
 ## Cross-language parity (captured from `tests/harness/run_all.sh`)
@@ -192,6 +192,240 @@ golden tests — the engineering discipline this repo is built around
 | [docs/governance/](docs/governance/) | governance, reproducibility, security |
 | [schemas/FORMAT.md](schemas/FORMAT.md) | normative wire layout (JSONL + IAP1 binary) |
 | [deployment/grafana/README.md](deployment/grafana/README.md) | dashboards and observability stack |
+| [Real-world usage notes](#real-world-usage-notes) / [References](#references) | scope, units and out-of-scope items for a live deployment; the literature and standards the platform implements |
+
+## Real-world usage notes
+
+What this repository is, and is not, if you are evaluating it against a
+live deployment.
+
+**Data.** Every event in `data/` is produced by the seeded synthetic
+generator (`python/src/iap/marketdata/generator.py`: regime-switching
+efficient price, AR(1) venue noise, Hawkes-style clustered order flow, real
+FIFO queue dynamics, auctions/halt, injected QC anomalies). No real venue
+data, symbols, or fee schedules are included — instruments are `SYN.EQ.*` /
+`SYN.ETF.IDX` / eight synthetic G10 pairs on venues `XV1`, `XV2`, `LP1`,
+`LP2`, `PRI`. Every number in the reports is a statement about this
+generator and this pipeline, not about any market.
+
+**Units and conventions (binding, `PLATFORM_CONVENTIONS.md` §1).**
+
+| quantity | representation |
+|---|---|
+| prices | `int64 price_ticks`; real price = ticks × `tick_size` (per instrument, `configs/instruments.json`); never a float on a contract or hot path |
+| quantities | `int64 qty` in base units (equity shares; FX 1 unit = 1,000 base currency, `lot_size`) |
+| timestamps | `int64` nanoseconds since the Unix epoch, `exchange_ts` (event time — all windows, labels, splits) and `receive_ts` (arrival; `receive_ts ≥ exchange_ts`) |
+| costs, slippage, IC-scale returns | basis points of mid / notional; fees per share (equities, negative = maker rebate) or per million notional (FX), `configs/venues.json` |
+| P&L, research metrics | `double`, compared across languages at 1e-9 absolute/relative tolerance |
+| randomness | one pinned RNG (SplitMix64, `PLATFORM_CONVENTIONS.md` §3); same seed ⇒ bit-identical files |
+| calendar | a five-day synthetic calendar in UTC (`configs/instruments.json`); no exchange holidays, DST, or session-time rules |
+
+**What is validated.** Cross-language parity of the pinned semantics
+(codec bytes, book states, features, alphas, portfolio, TCA, risk
+decisions, fills, drift/refit/lifecycle) via `tests/golden/`; leakage
+tests (label-column guard, shift-by-one) on every alpha; purged
+and embargoed walk-forward statistics with a recorded multiple-testing
+denominator; deterministic replay; fail-closed risk gating; and the
+build/test commands in `docs/BUILD_NOTES.md`. Benchmarks are mean-only
+figures from a two-CPU container without pinning (`benchmarks/RESULTS.md`).
+
+**Out of scope for a live deployment** (each would be a project of its own):
+
+- real feed handlers and venue protocols (ITCH/OUCH/FIX and vendor APIs) —
+  the "venue protocol" here is a simulator (`rust/venue`) speaking the
+  platform's own length-prefixed `IAPV1` order/report framing;
+- exchange certification, order-entry conformance testing, drop copy,
+  and clearing/settlement integration;
+- regulatory compliance controls (pre-trade risk checks in the sense of
+  SEC 15c3-5 / MiFID II RTS 6, best-execution reporting, surveillance,
+  audit retention) — the risk engine implements the platform's own pinned
+  limits, not a regulatory rulebook;
+- real trading calendars, corporate actions, symbology and reference-data
+  feeds, and fee schedules;
+- real cost and impact models — the cost model is half-spread + fee +
+  linear impact in %ADV (`configs/execution.json`), and the queue-position
+  fill model is a documented simplification
+  ([paper 5](docs/papers/05_queue_aware_execution_adverse_selection.md));
+- production hardening: authentication on the `/metrics` `/health`
+  `/status` endpoints, secrets management, HA/failover, and kernel-bypass
+  networking. The C++ latency figures are single-threaded in-memory
+  measurements, not tick-to-trade on a real network.
+
+## References
+
+Works the platform implements, follows, or documents. Only items actually
+used in the code or the write-ups are listed; where the implementation is a
+deliberate simplification of the cited method the note says so.
+
+### Market microstructure and alpha
+
+1. Cont, R., Kukanov, A., & Stoikov, S. (2014). The Price Impact of Order
+   Book Events. *Journal of Financial Econometrics*, 12(1), 47–88.
+   <https://doi.org/10.1093/jjfinec/nbt003> (preprint:
+   <https://arxiv.org/abs/1011.6402>). — Order-flow imbalance (OFI); the
+   `ofi_*` feature family (`python/src/iap/features/orderflow.py`) and
+   alphas EQ02/EQ03; paper 1.
+2. Stoikov, S. (2018). The Micro-Price: A High-Frequency Estimator of
+   Future Prices. *Quantitative Finance*, 18(12), 1959–1966.
+   <https://doi.org/10.1080/14697688.2018.1489139> (preprint:
+   <https://ssrn.com/abstract=2970694>). — The size-weighted microprice
+   `microprice_v1` (`python/src/iap/features/microstructure.py`), alphas
+   EQ01/FX01; paper 2. Note: the platform uses the one-level size-weighted
+   estimator, not Stoikov's Markov-chain refinement.
+3. Hawkes, A. G. (1971). Spectra of Some Self-Exciting and Mutually
+   Exciting Point Processes. *Biometrika*, 58(1), 83–90.
+   <https://doi.org/10.1093/biomet/58.1.83>. — The generator's self-exciting
+   ("Hawkes-style") order-flow intensity with exponential decay
+   (`python/src/iap/marketdata/generator.py`); a discretized simplification.
+4. Almgren, R., Thum, C., Hauptmann, E., & Li, H. (2005). Direct Estimation
+   of Equity Market Impact. *Risk*, 18(7), 58–62. — The square-root shape
+   behind the `expected_impact_bps_v1` proxy
+   (`python/src/iap/features/execution.py`); a proxy only, not the fitted
+   model.
+
+### Execution and transaction-cost analysis
+
+5. Perold, A. F. (1988). The Implementation Shortfall: Paper versus
+   Reality. *Journal of Portfolio Management*, 14(3), 4–9.
+   <https://doi.org/10.3905/jpm.1988.409150>. — The pinned IS decomposition
+   (delay + trading + opportunity) in `python/src/iap/tca/tca.py`, the Java
+   TCA service, and `API_PORTFOLIO_TCA.md` §2.2.
+6. Almgren, R., & Chriss, N. (2000). Optimal Execution of Portfolio
+   Transactions. *Journal of Risk*, 3(2), 5–39.
+   <https://doi.org/10.21314/JOR.2001.041>. — The impact/urgency trade-off
+   that motivates the IS algorithm's `risk_aversion` parameter
+   (`cpp/include/iap/execution/algos.hpp`). The pinned schedule is a
+   front-loaded exponential decay, not the closed-form Almgren–Chriss
+   trajectory.
+
+### Portfolio construction and risk
+
+7. Markowitz, H. (1952). Portfolio Selection. *Journal of Finance*, 7(1),
+   77–91. <https://doi.org/10.1111/j.1540-6261.1952.tb01525.x>. — The
+   mean–variance objective `alpha'w − λ w'Σw − Σ tc·|w − w_prev|` solved by
+   the pinned projected-gradient optimizer
+   (`python/src/iap/portfolio/optimizer.py`, `API_PORTFOLIO_TCA.md` §1).
+8. J.P. Morgan/Reuters (1996). *RiskMetrics — Technical Document*, 4th ed.
+   New York. — The EWMA covariance recursion with λ = 0.94
+   (`python/src/iap/portfolio/covariance.py`).
+
+### Validation, multiple testing, and machine learning
+
+9. López de Prado, M. (2018). *Advances in Financial Machine Learning*.
+   Wiley. ISBN 978-1-119-48208-6. — Purging and embargo in walk-forward
+   splits (`python/src/iap/validation/splits.py`, `python/src/iap/models/splits.py`;
+   ch. 7), meta-labeling (`python/src/iap/models/metalabel.py`; ch. 3), and
+   the multiple-testing / deflated-Sharpe discipline of the experiments
+   ledger (ch. 14).
+10. Bailey, D. H., & López de Prado, M. (2014). The Deflated Sharpe Ratio:
+    Correcting for Selection Bias, Backtest Overfitting, and Non-Normality.
+    *Journal of Portfolio Management*, 40(5), 94–107.
+    <https://doi.org/10.3905/jpm.2014.40.5.094> (preprint:
+    <https://ssrn.com/abstract=2460551>). — The "expected max |t| under the
+    global null ≈ √(2 ln n)" selection yardstick printed in every report
+    (`python/src/iap/validation/ledger.py`); a deflated-Sharpe-*style* note,
+    not the full DSR with skew/kurtosis terms.
+11. Newey, W. K., & West, K. D. (1987). A Simple, Positive Semi-Definite,
+    Heteroskedasticity and Autocorrelation Consistent Covariance Matrix.
+    *Econometrica*, 55(3), 703–708. <https://doi.org/10.2307/1913610>. — The
+    Bartlett-weighted long-run variance in the pinned "Newey–West-lite"
+    t-statistic (`python/src/iap/validation/metrics.py`; fixed lag L = 2
+    rather than a bandwidth rule).
+12. Bonferroni, C. E. (1936). Teoria statistica delle classi e calcolo delle
+    probabilità. *Pubblicazioni del R. Istituto Superiore di Scienze
+    Economiche e Commerciali di Firenze*, 8, 3–62. — The per-test threshold
+    `alpha / n_experiments` in the experiments ledger.
+13. Harvey, C. R., Liu, Y., & Zhu, H. (2016). … and the Cross-Section of
+    Expected Returns. *Review of Financial Studies*, 29(1), 5–68.
+    <https://doi.org/10.1093/rfs/hhv059>. — Context for the spec's
+    t ≥ 3.0 promotion hurdle and for reporting the number of trials; the
+    repository does not implement their Bayesianized p-values.
+14. Zadrozny, B., & Elkan, C. (2002). Transforming Classifier Scores into
+    Accurate Multiclass Probability Estimates. *Proceedings of KDD '02*,
+    694–699. <https://doi.org/10.1145/775047.775151>. — Isotonic probability
+    calibration of the meta-label gate (via scikit-learn's
+    `CalibratedClassifierCV(method="isotonic")`).
+15. Brier, G. W. (1950). Verification of Forecasts Expressed in Terms of
+    Probability. *Monthly Weather Review*, 78(1), 1–3.
+    <https://doi.org/10.1175/1520-0493(1950)078%3C0001:VOFEIT%3E2.0.CO;2>.
+    — The Brier score reported alongside AUC in `ML_REPORT.md`.
+16. Chen, T., & Guestrin, C. (2016). XGBoost: A Scalable Tree Boosting
+    System. *Proceedings of KDD '16*, 785–794.
+    <https://doi.org/10.1145/2939672.2939785>. — Tier-1 model in the gated
+    zoo (`python/src/iap/models/zoo.py`).
+17. Ke, G., Meng, Q., Finley, T., Wang, T., Chen, W., Ma, W., Ye, Q., &
+    Liu, T.-Y. (2017). LightGBM: A Highly Efficient Gradient Boosting
+    Decision Tree. *Advances in Neural Information Processing Systems*, 30,
+    3146–3154.
+    <https://papers.nips.cc/paper/6907-lightgbm-a-highly-efficient-gradient-boosting-decision-tree>.
+    — Tier-1 model in the gated zoo and the meta-label classifier.
+
+### Drift monitoring
+
+18. Kolmogorov, A. N. (1933). Sulla determinazione empirica di una legge di
+    distribuzione. *Giornale dell'Istituto Italiano degli Attuari*, 4,
+    83–91; and Smirnov, N. V. (1948). Table for Estimating the Goodness of
+    Fit of Empirical Distributions. *Annals of Mathematical Statistics*,
+    19(2), 279–281. <https://doi.org/10.1214/aoms/1177730256>. — The
+    two-sample Kolmogorov–Smirnov statistic in
+    `python/src/iap/adaptive/drift.py` (diagnostic only — KS never
+    triggers a refit; the Java port implements PSI, rolling IC and
+    lifecycle, `API_ADAPTIVE.md`).
+19. Press, W. H., Teukolsky, S. A., Vetterling, W. T., & Flannery, B. P.
+    (2007). *Numerical Recipes: The Art of Scientific Computing*, 3rd ed.
+    Cambridge University Press, §14.3 (Kolmogorov–Smirnov test). — The
+    asymptotic two-sample KS p-value form
+    `λ = (√Nₑ + 0.12 + 0.11/√Nₑ)·D`, pinned at 100 series terms
+    (`API_ADAPTIVE.md` §3).
+20. Siddiqi, N. (2006). *Credit Risk Scorecards: Developing and
+    Implementing Intelligent Credit Scoring*. Wiley. ISBN
+    978-0-471-75451-0; and Yurdakul, B. (2018). *Statistical Properties of
+    Population Stability Index*. PhD dissertation, Western Michigan
+    University. <https://scholarworks.wmich.edu/dissertations/3208>. — The
+    Population Stability Index (10 quantile buckets, ε = 1e-6) used by the
+    drift monitors and the `alpha_live_vs_backtest_drift` gauge.
+
+### Determinism and infrastructure
+
+21. Steele, G. L., Lea, D., & Flood, C. H. (2014). Fast Splittable
+    Pseudorandom Number Generators. *Proceedings of OOPSLA '14* (ACM SIGPLAN
+    Notices 49(10)), 453–472. <https://doi.org/10.1145/2660193.2660195>. —
+    SplitMix64, the single pinned RNG in all four languages
+    (`python/src/iap/core/rng.py`, `cpp/include/iap/marketdata/rng.hpp`,
+    `java/src/main/java/com/iap/core/SplitMix64.java`, `rust/marketdata`;
+    `tests/golden/splitmix64.json`).
+22. NIST (2015). *Secure Hash Standard (SHS)*, FIPS PUB 180-4.
+    <https://doi.org/10.6028/NIST.FIPS.180-4>. — SHA-256 for the IAP1 codec
+    parity digests, `feature_version`, and `data_version`.
+23. Wright, A., Andrews, H., Hutton, B., & Dennis, G. (2022). *JSON Schema:
+    A Media Type for Describing JSON Documents*, draft 2020-12.
+    <https://json-schema.org/draft/2020-12/json-schema-core>. — The
+    versioned contracts in `schemas/*.schema.json`.
+24. Apache Software Foundation. *Apache Parquet Format Specification*.
+    <https://parquet.apache.org/docs/file-format/>. — The research dataset
+    and feature store (`data/normalized/*.parquet`, `data/features/`).
+25. Prometheus Authors. *Exposition Formats* (text-based format).
+    <https://prometheus.io/docs/instrumenting/exposition_formats/>. — The
+    `/metrics` endpoint of the Java platform and the Rust telemetry crate.
+
+### Background texts cited in LEARN.md (context, not implemented)
+
+- Harris, L. (2003). *Trading and Exchanges: Market Microstructure for
+  Practitioners*. Oxford University Press.
+- O'Hara, M. (1995). *Market Microstructure Theory*. Blackwell.
+- Hasbrouck, J. (2007). *Empirical Market Microstructure*. Oxford
+  University Press.
+- Avellaneda, M., & Stoikov, S. (2008). High-Frequency Trading in a Limit
+  Order Book. *Quantitative Finance*, 8(3), 217–224.
+  <https://doi.org/10.1080/14697680701381228>. — Inventory-aware quoting;
+  background only, no market-making quoter is implemented.
+- Grinold, R. C., & Kahn, R. N. (2000). *Active Portfolio Management*, 2nd
+  ed. McGraw-Hill. — IC and the fundamental law, context for the
+  portfolio chapter.
+
+## License
+
+MIT License, Copyright (c) 2026 Ashish Jha — see [LICENSE](LICENSE).
 
 ## Disclaimer
 
