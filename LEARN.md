@@ -150,7 +150,7 @@ regenerated at all.
 
 ### 2.2 What it generates
 
-From `configs/generator.json` (seed 20260829, 2 sessions):
+From `configs/marketdata/generator.json` (seed 20260829, 2 sessions):
 
 - **Equities** (11 instruments: 10 index constituents + 1 ETF): MBO streams
   with regime-switching volatility (two sigma states, switch probability
@@ -530,7 +530,7 @@ deterministic artifact.
 
 ### 6.7 Cost reality
 
-The cost model (`configs/execution.json`) charges half-spread + fees
+The cost model (`configs/execution/execution.json`) charges half-spread + fees
 (mirroring venue configs) + linear impact per trade, and the day-2
 out-of-sample backtest uses day-1-fitted parameters — the exact parameters
 serialized for the production ports. The equal-weight ensembles finish
@@ -731,7 +731,7 @@ tends to get subtly wrong — each one is now a pinned rule in
 - **Notional means money.** `qty × qty_unit × price × tick × fx_rate`: a
   lot of USD/JPY is 100,000 units quoted in yen, and a JPY notional summed
   as dollars is off by two orders of magnitude. Conversion pairs live in
-  `configs/risk.json`; a missing or stale rate fails closed
+  `configs/risk/risk.json`; a missing or stale rate fails closed
   (`FX_RATE_MISSING`) instead of guessing 1.0.
 - **Every in-flight order counts.** Tracking only resting LIMITs means
   three MARKET orders in the wire are invisible to the position projection.
@@ -894,9 +894,10 @@ match**.
   the portfolio golden is checked against an SLSQP optimum. Golden files are
   regenerated only deliberately, with a MIGRATIONS.md entry.
 - **One command proves parity**: `tests/harness/run_all.sh` runs all four
-  suites and prints the table (a full harness run on 2026-09-06: python 626,
-  cpp 243, rust 254, java 448 tests passed; golden groups 65/45/47/85; all
-  PASS, plus a `deployment` row — 17 structural checks — and a `numbers` row
+  suites and prints the table (a full harness run on 2026-09-19: python 626,
+  cpp 243, rust 254, java 449 tests passed; golden groups 65/45/47/85; all
+  PASS, plus `integration` (1) and `replay` (2) rows for the repo-level
+  pytest suites, a `deployment` row — 18 structural checks — and a `numbers` row
   that re-derives every headline figure in the docs from its artefact). The
   Java golden group is 85 because the gate now runs all ten `*GoldenTest`
   classes; it used to run two of them and report 18.

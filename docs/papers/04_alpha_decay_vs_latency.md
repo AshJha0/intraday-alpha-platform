@@ -46,7 +46,7 @@ market data is synthetic.
 The platform measures both natively. The stress module
 (`python/src/iap/validation/stress.py`) re-runs every alpha's backtest and
 IC with the executed signal lagged by 0, 1 and 5 emission events
-(`LATENCY_SHIFTS = (0, 1, 5)`; grid pinned in `configs/execution.json` as
+(`LATENCY_SHIFTS = (0, 1, 5)`; grid pinned in `configs/execution/execution.json` as
 `latency_shift_events_stress`), on top of a backtester that already never
 executes on the decision row (`latency_rows = 1` default,
 `python/src/iap/backtest/engine.py`). The benchmark suite
@@ -270,7 +270,7 @@ committed artifacts.
 |---|---|
 | latency stress grid (all 24 alphas) | `research/alpha_reports/REPORT.md` (cost/latency stress table) |
 | per-alpha stressed P&L | `research/alpha_reports/EQ06.json`, `EQ08.json`, `EQ09.json` (+ peers), `stress.latency` |
-| stress semantics, shift grid | `python/src/iap/validation/stress.py`, `configs/execution.json` |
+| stress semantics, shift grid | `python/src/iap/validation/stress.py`, `configs/execution/execution.json` |
 | backtester base latency | `python/src/iap/backtest/engine.py` (`latency_rows`) |
 | C++ stage benchmarks + methodology | `benchmarks/results_cpp.md`, `cpp/bench/bench_all.cpp` |
 | Rust / Java replay throughput | `rust/replay/src/bin/demo.rs`, `java/src/main/java/com/iap/replay/Demo.java` (run in this container) |
@@ -285,7 +285,7 @@ committed artifacts.
   re-derived USD figures are in those papers' errata and in
   `research/alpha_reports/REPORT.md`.
 - The execution-side latency controls this paper argued for are now
-  enforced rather than merely declared: `configs/execution.json`
+  enforced rather than merely declared: `configs/execution/execution.json`
   `latency_budget_ns`, `max_participation` and `min_slice_interval_ns` are
   read by the Java `BacktestEngine`/`PaperTrading` and violations are
   counted (`PLATFORM_CONVENTIONS.md` §11.4; test

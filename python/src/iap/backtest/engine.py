@@ -248,7 +248,7 @@ class Backtester:
     ) -> None:
         """``instrument_meta[iid]``: dict with tick_size, lot_size, adv,
         asset_class and, for FX, base_currency / quote_currency (built from
-        ReferenceData or configs/instruments.json; equities default to the
+        ReferenceData or configs/instruments/instruments.json; equities default to the
         reporting currency). The quote->reporting conversion table is derived
         from the FX pairs in the meta (a pair quoted ``X/REPORTING`` converts
         X with its mid, ``REPORTING/X`` converts X with 1 / mid)."""

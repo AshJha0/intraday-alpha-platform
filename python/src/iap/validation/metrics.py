@@ -202,8 +202,8 @@ def capacity_proxy_usd(
 
     capacity = max_participation * ADV * ref_price * multiplier
 
-    ADV is in base units/day (configs/instruments.json), max_participation
-    from configs/execution.json defaults.  This is an upper-bound style
+    ADV is in base units/day (configs/instruments/instruments.json), max_participation
+    from configs/execution/execution.json defaults.  This is an upper-bound style
     proxy — it ignores alpha decay vs execution time and assumes the full
     participation cap is achievable at model horizons; reports must treat
     it as an order-of-magnitude number only.

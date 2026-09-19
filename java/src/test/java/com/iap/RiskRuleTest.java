@@ -30,7 +30,7 @@ public class RiskRuleTest {
 
     private static Map<String, Object> configDoc() {
         return Json.object(com.iap.config.Json.parseFile(
-                java.nio.file.Paths.get("..", "configs", "risk.json")));
+                java.nio.file.Paths.get("..", "configs", "risk", "risk.json")));
     }
 
     private static RiskEngine engine() {

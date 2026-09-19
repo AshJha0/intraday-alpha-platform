@@ -50,7 +50,7 @@ VALID_HORIZONS = (
     "10ms", "50ms", "100ms", "500ms", "1s", "5s", "10s", "30s", "1m", "5m", "15m",
 )
 
-#: pinned universes (configs/instruments.json)
+#: pinned universes (configs/instruments/instruments.json)
 EQ_IDS: Tuple[int, ...] = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
 EQ_CONSTITUENT_IDS: Tuple[int, ...] = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
 ETF_ID = 11

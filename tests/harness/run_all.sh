@@ -3,8 +3,10 @@
 # tests/harness/run_all.sh — CI entry point (PLATFORM_CONVENTIONS.md §9).
 #
 # Runs every language's build + test suite with the canonical commands
-# (docs/BUILD_NOTES.md) and prints a cross-language parity table:
-# language, tests passed, golden-group tests passed.
+# (docs/BUILD_NOTES.md), then the repo-level integration and replay suites
+# (tests/integration, tests/replay — tests/README.md), and prints a
+# cross-language parity table: language, tests passed, golden-group tests
+# passed.
 #
 # Usage:
 #   tests/harness/run_all.sh                 # full suites (CI mode)
@@ -23,6 +25,13 @@
 #   java    JUnitCore on the *GoldenTest classes (CodecGoldenTest, BookGoldenTest,
 #           AnomalyGoldenTest, RiskGoldenTest, ReplayFillsGoldenTest,
 #           TcaGoldenTest, PortfolioGoldenTest)
+#
+# Repo-level rows (full mode only; skipped by --golden-only, which stays the
+# four-language golden parity check):
+#   integration  python3 -m pytest -q tests/integration   (cross-component runs)
+#   replay       python3 -m pytest -q tests/replay        (same seed => same bytes)
+#   Both are counted like the python row (pytest "N passed") and are part of
+#   the PASS/FAIL verdict.
 #
 # Exit code: 0 iff every selected suite passed.
 # =============================================================================
@@ -177,6 +186,26 @@ run_java() {
     SECS[java]=$((SECONDS - t0)); [ $ok -eq 1 ] || OVERALL=1
 }
 
+# ------------------------------------------------- integration / replay ---
+# Repo-level pytest suites, run from the repo root; tests/conftest.py puts
+# python/src on sys.path, so no PYTHONPATH is needed. They have no golden
+# group ("-" in that column, by design).
+run_pytest_dir() { # run_pytest_dir <row> <dir>
+    local row="$1" dir="$2" t0=$SECONDS ok=1 full="-"
+    note "$row: python3 -m pytest -q $dir"
+    if run_logged "$LOG_DIR/${row}.log" \
+        env -C "$ROOT" python3 -m pytest -q "$dir"; then
+        full=$(grep -Eo '[0-9]+ passed' "$LOG_DIR/${row}.log" | tail -1 | grep -Eo '[0-9]+')
+        [ -n "$full" ] || { full="?"; ok=0; }
+    else ok=0; full="FAIL"; fi
+    TESTS[$row]=$full; GOLDEN[$row]="-"
+    STATUS[$row]=$([ $ok -eq 1 ] && echo PASS || echo FAIL)
+    SECS[$row]=$((SECONDS - t0)); [ $ok -eq 1 ] || OVERALL=1
+}
+
+run_integration() { run_pytest_dir integration tests/integration; }
+run_replay() { run_pytest_dir replay tests/replay; }
+
 # ------------------------------------------------------------- deployment ---
 # Structural validation of deployment/ (GOVERNANCE.md §1 "the structural
 # validation used in CI", PLATFORM_CONVENTIONS.md §12.7): promtool rules +
@@ -218,6 +247,10 @@ run_python
 run_cpp
 run_rust
 run_java
+if [ "$GOLDEN_ONLY" -eq 0 ]; then
+    run_integration
+    run_replay
+fi
 if [ "$GOLDEN_ONLY" -eq 0 ] && [ "${IAP_SKIP_DEPLOYMENT:-0}" != "1" ]; then
     run_deployment
 fi
@@ -234,7 +267,7 @@ if [ "$GOLDEN_ONLY" -eq 1 ]; then
 else
     printf '%-8s | %-12s | %-14s | %-6s | %s\n' language "tests passed" "golden passed" time status
     printf '%s\n' "---------+--------------+----------------+--------+-------"
-    for lang in python cpp rust java; do
+    for lang in python cpp rust java integration replay; do
         printf '%-8s | %-12s | %-14s | %4ss | %s\n' \
             "$lang" "${TESTS[$lang]}" "${GOLDEN[$lang]}" "${SECS[$lang]}" "${STATUS[$lang]}"
     done
@@ -252,8 +285,9 @@ fi
 if [ -n "$NUMBERS_DETAIL" ]; then
     echo "headline numbers: $NUMBERS_DETAIL"
 fi
-echo "(a '-' count means the suite did not run in this mode; '?' means it ran"
-echo " but its count could not be parsed — both are treated as a failure.)"
+echo "(a '-' count means the suite did not run in this mode, or has no golden"
+echo " group (integration/replay); '?' means it ran but its count could not be"
+echo " parsed — a '?' or FAIL anywhere fails the run.)"
 
 if [ "$OVERALL" -eq 0 ]; then
     note "PARITY OK — all languages passed ($MODE)."

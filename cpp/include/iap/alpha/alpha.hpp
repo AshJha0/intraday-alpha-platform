@@ -40,7 +40,7 @@ namespace iap {
 
 constexpr double ALPHA_EPS = 1e-12;
 
-// AlphaSignal contract (schemas/alpha_signal.schema.json).
+// AlphaSignal contract (schemas/alpha/alpha_signal.schema.json).
 struct AlphaSignal {
     std::string alpha_id;
     std::uint32_t instrument_id = 0;

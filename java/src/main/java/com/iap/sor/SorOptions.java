@@ -1,7 +1,7 @@
 package com.iap.sor;
 
 /**
- * configs/execution.json {@code sor} block: rebate preference for passive
+ * configs/execution/execution.json {@code sor} block: rebate preference for passive
  * routing and the venue latency budget (mean latency above it makes a venue
  * ineligible).
  */

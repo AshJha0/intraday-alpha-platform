@@ -39,8 +39,8 @@ iap/
                    books; periodic book-state snapshots; checkpoint()/restore()
                    with bit-identical continuation.
   reference/
-    refdata.py     ReferenceData service over configs/instruments.json +
-                   configs/venues.json: tick/lot sizes, price<->ticks, venues,
+    refdata.py     ReferenceData service over configs/instruments/instruments.json +
+                   configs/venues/venues.json: tick/lot sizes, price<->ticks, venues,
                    fees, latency profiles, sessions, trading calendar;
                    corporate-action stub API (out of scope for synthetic data).
 ```

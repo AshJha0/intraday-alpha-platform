@@ -1,7 +1,7 @@
 package com.iap.risk;
 
 /**
- * Strategy order request (schemas/order_request.schema.json), mirroring the
+ * Strategy order request (schemas/order/order_request.schema.json), mirroring the
  * Rust {@code venue::OrderRequest} field-for-field. Order type codes:
  * MARKET=1 LIMIT=2 IOC=3 FOK=4 PEG=5 MID=6.
  */

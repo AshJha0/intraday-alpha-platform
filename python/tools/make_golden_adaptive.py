@@ -21,7 +21,7 @@ Pins (see /API_ADAPTIVE.md for the normative formulas):
    agent consumes).  Self-PSI (exactly 0) and second-half PSI/KS pinned
    as cross-language parity targets.
 3. **Drift-trigger decision sequence** — a pinned stateful input sequence
-   through DriftTriggeredPolicy (thresholds from configs/strategies.json)
+   through DriftTriggeredPolicy (thresholds from configs/strategies/strategies.json)
    with exact expected booleans, covering both threshold edges, the
    min-refit-gap and None (silent monitor) inputs.
 4. **Lifecycle transition sequence** — a constructed rolling-IC path
@@ -191,7 +191,7 @@ def _rolling_ic_case(frame, model, cfg) -> dict:
 
 
 def main() -> int:
-    cfg = load_adaptive_config(REPO / "configs" / "strategies.json")
+    cfg = load_adaptive_config(REPO / "configs" / "strategies" / "strategies.json")
     dt_cfg = cfg["policies"]["drift_triggered"]
 
     # -- 1. synthetic PSI/KS ------------------------------------------------

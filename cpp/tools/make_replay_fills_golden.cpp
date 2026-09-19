@@ -15,7 +15,7 @@
 // the VWAP slice-2 child that v1 filled 290 s after the window now expires
 // unfilled (parent 1: 329 filled / 71 unfilled).
 //
-// Config: seed 20260829 (configs/execution.json), latency decision/risk/wire
+// Config: seed 20260829 (configs/execution/execution.json), latency decision/risk/wire
 // 50/50/100 us + XV1 venue latency (mean 150 us, jitter uniform [0, 50 us],
 // SplitMix64), impact_coeff_bps_per_pct_adv 2.0, instrument 1 adv 38,000,000
 // lot 1.0 (fees per share). Fill list is exact (ticks/qty/ts); fee and
@@ -37,7 +37,7 @@ iap::ExecConfig golden_exec_config(const std::string& configs_dir) {
     iap::ExecConfig cfg;
     cfg.seed = 20260829;
     cfg.impact_coeff_bps_per_pct_adv = 2.0;
-    cfg.venues = iap::load_venues(configs_dir + "/venues.json");
+    cfg.venues = iap::load_venues(configs_dir + "/venues/venues.json");
     iap::InstrumentSpec ins;
     ins.instrument_id = 1;
     ins.tick_size = 0.01;

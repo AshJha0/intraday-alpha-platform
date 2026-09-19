@@ -95,7 +95,7 @@ Python struct formats: header `<IIQ`, record `<QIHBBqqQqqQQ` (72 bytes), trailer
 
 ## 3. Schema versioning
 
-`schemas/*.schema.json` carry `"x-version": 1`. Any field change bumps the version and
+`schemas/<domain>/*.schema.json` carry `"x-version": 1`. Any field change bumps the version and
 adds a `schemas/MIGRATIONS.md` entry.
 
 ## 4. Event-type payload conventions (pinned)

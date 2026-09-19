@@ -170,8 +170,8 @@ public class PaperStateRecoveryTest {
         // A session whose config latches the switch at boot leaves a latched
         // snapshot behind.
         Path configs = PaperFixtures.copyConfigs();
-        PaperFixtures.writeConfig(configs, "risk.json",
-                PaperFixtures.readConfig(configs, "risk.json")
+        PaperFixtures.writeConfig(configs, ConfigService.RISK,
+                PaperFixtures.readConfig(configs, ConfigService.RISK)
                         .replace("\"kill_switch_engaged\": false",
                                 "\"kill_switch_engaged\": true"));
         PaperTrading.Options leg1 = PaperFixtures.session(600);

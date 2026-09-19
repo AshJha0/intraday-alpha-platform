@@ -34,7 +34,7 @@
 
 namespace iap {
 
-// configs/execution.json `sor` block.
+// configs/execution/execution.json `sor` block.
 struct SorOptions {
     bool prefer_rebate = true;
     std::int64_t max_venue_latency_ns = INT64_MAX;

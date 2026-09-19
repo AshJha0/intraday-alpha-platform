@@ -10,7 +10,7 @@ For a representative alpha subset — the 6 golden alphas (EQ01, EQ03,
 EQ06, FX01, FX05, FX09) plus the 4 best remaining by walk-forward OOS IC
 from research/alpha_reports/ — replays the bundled 2-session data as a
 deployment under four refit policies (static, scheduled weekly, scheduled
-daily, drift-triggered; pinned in configs/strategies.json `adaptive`) with
+daily, drift-triggered; pinned in configs/strategies/strategies.json `adaptive`) with
 drift monitoring and lifecycle gating, and reports the comparison
 honestly.
 
@@ -82,7 +82,7 @@ def select_alphas() -> List[str]:
 
 
 def _load_meta() -> Dict[int, dict]:
-    cfg = json.loads((REPO / "configs" / "instruments.json").read_text())
+    cfg = json.loads((REPO / "configs" / "instruments" / "instruments.json").read_text())
     out: Dict[int, dict] = {}
     for row in cfg["instruments"]:
         out[int(row["instrument_id"])] = {
@@ -216,7 +216,7 @@ def _write_report(results: Dict[str, dict], cfg, ledger, log,
     a("allocation, every transition is logged with a reason, and every look")
     a("at the data is counted in the experiments ledger.")
     a("")
-    a("## Pinned configuration (configs/strategies.json `adaptive`)")
+    a("## Pinned configuration (configs/strategies/strategies.json `adaptive`)")
     a("")
     a(f"- blocks {cfg['block_ns'] / NS_H:.2f}h, warmup {cfg['warmup_ns'] / NS_H:.1f}h,"
       f" trailing train window {cfg['train_window_ns'] / NS_H:.0f}h,"
@@ -376,14 +376,14 @@ def main() -> int:
     t_start = time.time()
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     BASELINES_DIR.mkdir(parents=True, exist_ok=True)
-    cfg = load_adaptive_config(REPO / "configs" / "strategies.json")
+    cfg = load_adaptive_config(REPO / "configs" / "strategies" / "strategies.json")
     lc_cfg = LifecycleConfig.from_config(cfg["lifecycle"])
     meta = _load_meta()
     frames = load_features(REPO / "data" / "features")
     # Same pinned research execution model as run_all.py (round-3): latency
     # in EVENT TIME, a bounded decision age and no overnight carry.
     backtester = Backtester(
-        CostModel.load(REPO / "configs" / "execution.json"), meta,
+        CostModel.load(REPO / "configs" / "execution" / "execution.json"), meta,
         BacktestConfig(
             latency_ns=1_000_000_000,
             max_decision_age_ns=60_000_000_000,

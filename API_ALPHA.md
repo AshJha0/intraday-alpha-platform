@@ -10,7 +10,7 @@ semantics below and must reproduce `tests/golden/expected_alpha.json` and
 Normative companions: `PLATFORM_CONVENTIONS.md` §7, `/API_FEATURES.md`
 (feature semantics — alpha inputs are registry features),
 `configs/strategies/alpha_params.json` (fitted coefficients),
-`schemas/alpha_signal.schema.json`.
+`schemas/alpha/alpha_signal.schema.json`.
 
 ## 1. AlphaSignal contract
 
@@ -185,7 +185,7 @@ USD.  Pairs (instrument_id -> base/quote): 101 EUR/USD, 102 GBP/USD,
 on the golden EQ frame: config {max_pos_qty 1000, conf_min 0.2,
 latency_rows 1, cost multiplier 1}; semantics of `iap/backtest/engine.py`
 (decision at row i executes at row i+1 at that row's mid, spread/fee/impact
-charged as explicit costs per `configs/execution.json cost_model`;
+charged as explicit costs per `configs/execution/execution.json cost_model`;
 accounting identity `total_pnl = gross_pnl - total_costs`).  `total_pnl`,
 `gross_pnl`, `total_costs` (and components) at 1e-9; `trade_count`,
 `traded_qty`, `n_rows` exact.

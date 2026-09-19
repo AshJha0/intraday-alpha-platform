@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://iap.example/schemas/market_event.schema.json",
+  "$id": "https://iap.example/schemas/market/market_event.schema.json",
   "title": "MarketEvent",
   "description": "Canonical market event. Wire formats: canonical JSONL and IAP1 binary (see schemas/FORMAT.md). All 12 fields are always present; unused fields are 0. Prices are int64 ticks (real price = price_ticks * tick_size from reference data); quantities are int64 base units; timestamps are int64 ns since Unix epoch.",
   "x-version": 1,
@@ -16,13 +16,13 @@
       "type": "integer",
       "minimum": 0,
       "maximum": 4294967295,
-      "description": "Instrument id from configs/instruments.json."
+      "description": "Instrument id from configs/instruments/instruments.json."
     },
     "venue_id": {
       "type": "integer",
       "minimum": 0,
       "maximum": 65535,
-      "description": "Venue id from configs/venues.json."
+      "description": "Venue id from configs/venues/venues.json."
     },
     "exchange_ts": {
       "type": "integer",

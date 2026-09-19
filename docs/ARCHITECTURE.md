@@ -197,9 +197,10 @@ execution reference) and the **risk golden from Rust** (the risk reference) —
 each domain's owning language pins the truth, and everyone else matches it.
 The harness (`tests/harness/run_all.sh`, with `run_golden.sh` as the
 golden-only alias) runs every suite with the canonical commands and prints
-the parity table; a full harness run (2026-09-06) passes 626/243/254/448
-tests (65/45/47/85 golden) across python/cpp/rust/java — the same counts
-the README parity table records.
+the parity table; a full harness run (2026-09-19) passes 626/243/254/449
+tests (65/45/47/85 golden) across python/cpp/rust/java, plus the repo-level
+`integration` (1) and `replay` (2) rows — the same counts the README parity
+table records.
 
 ## 7. Hot-path engineering notes per language
 
@@ -254,7 +255,7 @@ histograms end `_ns` with fixed log2 buckets, gauges are bare nouns.
   served by `com.iap.api.MetricsServer` on
   `GET /metrics | /health | /ready | /status` plus
   `POST /admin/{kill,clear,override,roll}` (port from
-  `configs/execution.json` `monitoring.port`, default 8080). `rust/telemetry`
+  `configs/execution/execution.json` `monitoring.port`, default 8080). `rust/telemetry`
   remains the reference for the exposition FORMAT and is unit-tested there,
   but no deployed Rust binary writes metrics anywhere Prometheus can read —
   so round 3 removed the `rust-telemetry` scrape job, the exporter sidecar and
@@ -423,7 +424,7 @@ Round-3 wiring contract (`PLATFORM_CONVENTIONS.md` §11.4,
 non-stale venue books stamped with the market-data event time; per-venue
 stale transitions call `onSequenceGap`/`onFeedRecovered`; every fill (step
 7) reaches the risk engine before the next decision and every terminal
-child calls `onOrderDone`; `configs/execution.json` participation / slice
+child calls `onOrderDone`; `configs/execution/execution.json` participation / slice
 interval / latency budget are enforced between steps 5 and 6.
 
 ## 10. Known deviations from the spec blueprint (documented, not hidden)

@@ -3,7 +3,7 @@
 Three pinned stress axes for every alpha:
 
 - **Costs**: full backtest at cost multipliers {0.5, 1.0, 2.0} (grid pinned
-  in configs/execution.json ``cost_model.cost_multipliers_stress``).
+  in configs/execution/execution.json ``cost_model.cost_multipliers_stress``).
 - **Latency**: two pinned grids.  The ROW grid shifts the decision by
   {0, 1, 5} emission events (kept for continuity with earlier reports); the
   TIME grid delays execution by {100 ms, 500 ms, 1 s, 5 s} of event time

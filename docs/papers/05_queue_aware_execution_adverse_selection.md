@@ -100,7 +100,7 @@ price first (one fill per level), never mutate the replayed book, and are
 charged linear impact economically instead. Order arrival is
 latency-delayed: decision + risk + wire legs (50/50/100 µs) plus per-venue
 mean latency and a seeded jitter draw per submission
-(`expected_replay_fills.json` description; `configs/venues.json`).
+(`expected_replay_fills.json` description; `configs/venues/venues.json`).
 
 ## 4. Results
 
@@ -117,7 +117,7 @@ the best bid; parent 2, an IS SELL of 600 in 3 front-loaded MARKET slices.
 | 2 (IS sell) | 100% TAKER | 3 | 600 | 24.5081 | +1.800 | +0.0018 | **+1.802** |
 
 Per share, the passive parent *earns* 0.2 cents (maker rebate,
-`maker_rebate_per_share`, `configs/venues.json`) while the aggressive
+`maker_rebate_per_share`, `configs/venues/venues.json`) while the aggressive
 parent pays 0.3 cents (taker fee) plus impact — a 0.5 cents/share explicit
 swing, ≈ 2.0 bps at the ~$24.50 price level, before counting the half-spread
 each style pays or captures. The passive parent nonetheless completed all
@@ -272,7 +272,7 @@ data where the answer is not known in advance.
 | TCA population, IS/markout/impact tables | `research/tca/TCA_REPORT.md`, `research/tca/tca_orders.json` |
 | research harness rules (slices, skip prob, impact ticks) | `python/src/iap/tca/simulator.py` |
 | Perold identity to 1e-9 | `tests/golden/expected_tca.json`, `python/src/iap/tca/tca.py` |
-| venue fees/rebates and latency profiles | `configs/venues.json` |
+| venue fees/rebates and latency profiles | `configs/venues/venues.json` |
 | golden event vectors | `tests/golden/events_eq_mbo.jsonl`, `events_fx_quote.jsonl` |
 
 ## Erratum / Update — 2026-09-06 (round-3 trading fixes)

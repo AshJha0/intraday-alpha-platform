@@ -88,18 +88,18 @@ metrics (verified against a running `/metrics` scrape and the sources):
 | `order_path_latency_ns` | histogram | decision-to-wire latency |
 | `alpha_signals_total` | counter | alpha signals emitted |
 | `portfolio_solves_total` | counter | portfolio optimizations run |
-| `portfolio_gross_notional` / `portfolio_net_notional` | gauge | exposure (limits pinned in configs/risk.json) |
+| `portfolio_gross_notional` / `portfolio_net_notional` | gauge | exposure (limits pinned in configs/risk/risk.json) |
 | `portfolio_drawdown` | gauge | peak-to-trough of cumulative PnL (USD) |
 | `risk_events_total` / `risk_decisions_total` / `risk_allowed_total` / `risk_rejected_total` | counter | risk engine decision flow |
 | `exec_orders_submitted_total` / `exec_fills_total` / `exec_child_orders_rejected_total` | counter | the platform's OWN execution flow (fill rate, order flow panels, `FillRateDrop`) |
 | `exec_slippage_bps` | histogram | \|fill price − mark\| in basis points **x100** (integer-scaled into the log2 buckets; divide by 100 for bps) |
 | `risk_realized_pnl` / `risk_unrealized_pnl` / `risk_daily_pnl` | gauge | P&L in the reporting currency (USD). `risk_daily_pnl` = realized + unrealized is the number `max_daily_loss` is expressed in (PLATFORM_CONVENTIONS.md §12.1) and what `LossLimitUtilizationHigh` divides |
-| `risk_limit{limit="max_daily_loss"\|"max_strategy_daily_loss"\|"max_gross_notional"\|"max_net_notional"}` | gauge | the LIVE limits from `configs/risk.json`. Alerts and dashboards divide by these instead of hard-coding a constant, so a GOVERNANCE §3 limit change moves them together |
+| `risk_limit{limit="max_daily_loss"\|"max_strategy_daily_loss"\|"max_gross_notional"\|"max_net_notional"}` | gauge | the LIVE limits from `configs/risk/risk.json`. Alerts and dashboards divide by these instead of hard-coding a constant, so a GOVERNANCE §3 limit change moves them together |
 | `risk_kill_switch_engaged` | gauge | 0/1 latched global kill state. The latch survives a restart (§12.3) |
 | `jvm_gc_pause_ns` | histogram | GC pauses (GcPauseHigh at p99 > 10 ms; registered at first observed pause) |
 | `alpha_live_vs_backtest_drift{alpha=...}` | gauge | **LIVE** — Population Stability Index of the rolling live signal window (256 values, recomputed every 32 signals) vs the research baseline (`research/baselines/*.json`, pinned formula in `/API_ADAPTIVE.md` and `com.iap.adaptive.Psi`). Registered once the window fills against a loaded baseline; absent while no baseline ships for the alpha. LiveVsBacktestDrift warns at PSI > 0.25 — the standard industry PSI rule of thumb (< 0.1 stable, 0.1–0.25 moderate shift, > 0.25 significant shift; the credit-scoring population-stability convention) |
-| `alpha_rolling_ic{alpha=...}` | gauge | rolling realized IC: mean of per-bucket Pearson ICs (300 s event-time buckets, matured signal/forward-return pairs only, lookahead-free) over the pinned 2 h `ic_window_ns` from `configs/strategies.json`; NaN below `min_ic_buckets` (`com.iap.adaptive.RollingIc`, normative semantics in `/API_ADAPTIVE.md` §4) |
-| `alpha_lifecycle_state{alpha=...}` | gauge | 0 = ACTIVE, 1 = WATCH, 2 = RETIRED — IC-gated hysteresis per `configs/strategies.json` (`adaptive.lifecycle`): WATCH on rolling IC < `watch_ic_gate` (0.0); RETIRED after `retire_breach_evals` (6) consecutive breaches; re-activation after 3 consecutive evals ≥ `reactivate_ic_gate` (0.005), RETIRED only back to WATCH (`com.iap.adaptive.LifecycleGauge`, mirroring `/API_ADAPTIVE.md` §6) |
+| `alpha_rolling_ic{alpha=...}` | gauge | rolling realized IC: mean of per-bucket Pearson ICs (300 s event-time buckets, matured signal/forward-return pairs only, lookahead-free) over the pinned 2 h `ic_window_ns` from `configs/strategies/strategies.json`; NaN below `min_ic_buckets` (`com.iap.adaptive.RollingIc`, normative semantics in `/API_ADAPTIVE.md` §4) |
+| `alpha_lifecycle_state{alpha=...}` | gauge | 0 = ACTIVE, 1 = WATCH, 2 = RETIRED — IC-gated hysteresis per `configs/strategies/strategies.json` (`adaptive.lifecycle`): WATCH on rolling IC < `watch_ic_gate` (0.0); RETIRED after `retire_breach_evals` (6) consecutive breaches; re-activation after 3 consecutive evals ≥ `reactivate_ic_gate` (0.005), RETIRED only back to WATCH (`com.iap.adaptive.LifecycleGauge`, mirroring `/API_ADAPTIVE.md` §6) |
 
 Note on GC: `jvm_gc_pause_ns` is derived from the `GarbageCollectorMXBean`
 delta window (`delta_time / delta_count`, recorded `delta_count` times). The

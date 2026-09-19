@@ -24,7 +24,7 @@
     }
   },
   "cost_model": {
-    "description": "Research-backtester cost model (iap.backtest.costs): cost = half_spread + fee + impact; impact_bps = impact_coeff_bps_per_pct_adv * (|child_qty| * qty_unit / adv * 100) with qty_unit = lot_size for FX and 1 for equities (base units, identical to the C++/Java simulator rule 6). Fees mirror configs/venues.json primary venues (XV1 equities taker, PRI FX).",
+    "description": "Research-backtester cost model (iap.backtest.costs): cost = half_spread + fee + impact; impact_bps = impact_coeff_bps_per_pct_adv * (|child_qty| * qty_unit / adv * 100) with qty_unit = lot_size for FX and 1 for equities (base units, identical to the C++/Java simulator rule 6). Fees mirror configs/venues/venues.json primary venues (XV1 equities taker, PRI FX).",
     "impact_coeff_bps_per_pct_adv": 2.0,
     "equity_taker_fee_per_share": 0.003,
     "fx_commission_per_million": 2.5,

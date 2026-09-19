@@ -11,11 +11,21 @@ intraday-alpha-platform/
   PLATFORM_CONVENTIONS.md   this file
   README.md                 (Wave 6)
   docs/                     SPECIFICATION.md, ARCHITECTURE.md, runbooks/, papers/, governance/
-  schemas/                  canonical contracts, versioned JSON Schema + FORMAT.md (binary layout)
-  configs/                  instruments/ venues/ strategies/ risk/ execution/  (JSON)
+  schemas/                  canonical contracts, versioned JSON Schema by domain
+                            (market/ features/ alpha/ order/ execution/ risk/ — README.md is the
+                            index) + FORMAT.md (binary layout) + MIGRATIONS.md at the root
+  configs/                  instruments/ venues/ marketdata/ strategies/ risk/ execution/  (JSON;
+                            one domain folder per file: configs/<domain>/<file>.json, e.g.
+                            configs/risk/risk.json, configs/marketdata/generator.json,
+                            configs/strategies/{strategies,alpha_params}.json)
   data/                     raw/ normalized/ orderbooks/ features/ reference/  (generated, seeded)
+  tests/README.md           the six-level testing strategy (unit, golden, replay, integration,
+                            research validation, deployment) with the exact commands
   tests/golden/             cross-language golden vectors + expected outputs (JSON)
-  tests/harness/            run_golden.sh — runs every language's golden suite, one command
+  tests/integration/        cross-component end-to-end runs (pytest from the repo root)
+  tests/replay/             determinism: same seed => identical bytes (pytest from the repo root)
+  tests/harness/            run_all.sh (CI entry: every suite + parity table), run_golden.sh
+                            (every language's golden suite, one command), check_deployment.py
   benchmarks/               per-language benchmark code + RESULTS.md with methodology
   python/   src/iap/...     research + reference implementations (packages below)
   cpp/                      CMake project: marketdata/ orderbook/ features/ alpha/ execution/ sor/ replay/
@@ -26,6 +36,7 @@ intraday-alpha-platform/
   java/                     javac build (build.sh/test.sh): com.iap.* — marketdata, orderbook, features,
                             alpha, portfolio, risk, execution, sor, tca, backtest, replay, config, monitoring, api
   research/                 runnable research scripts ("notebooks") + generated reports/ and models/
+                            + experiments/<experiment_id>/{spec.json,result.json} (ExperimentRunner)
   deployment/               docker/ (Dockerfiles, docker-compose.yml), k8s/ (manifests), grafana/, prometheus/
 ```
 
@@ -71,8 +82,11 @@ Two physical formats, identical semantics:
    Golden test: encode the golden event vector → byte-identical files across all 4 languages
    (compare SHA-256).
 
-Schema versioning: `schemas/market_event.schema.json` etc. carry `"x-version": 1`. Any field
-change bumps version and adds a MIGRATIONS.md entry. Book / engine checkpoints carry
+Schema versioning: `schemas/<domain>/*.schema.json` (`schemas/market/market_event.schema.json`
+etc.; `schemas/README.md` is the index, each `$id` is
+`https://iap.example/schemas/<domain>/<file>`) carry `"x-version": 1`. Any field change bumps
+version and adds a MIGRATIONS.md entry. A move of a schema or config file within the tree is a
+MIGRATIONS.md entry too (old → new path table) but bumps nothing. Book / engine checkpoints carry
 `"x-version": 2` and are cross-language JSON (API_CORE §4-§5).
 
 ## 3. Determinism rules
@@ -173,8 +187,11 @@ hot paths allocation-conscious (primitive arrays, no boxing). All: no dead code,
 - cpp: `cd cpp && bash build.sh && ctest --test-dir build --output-on-failure`
 - rust: `cd rust && cargo test` (workspace)
 - java: `cd java && bash build.sh && bash test.sh`  (javac + JUnit4 jar at /usr/share/java/junit4.jar; NO Maven — Maven Central unreachable here; document in README that pom.xml equivalents are listed in docs/BUILD_NOTES.md)
+- integration / replay (repo root, no PYTHONPATH — `tests/conftest.py`):
+  `python3 -m pytest -q tests/integration` and `python3 -m pytest -q tests/replay`; two extra
+  rows of the `run_all.sh` parity table, counted like the python row (`tests/README.md`)
 - deployment: `python3 tests/harness/check_deployment.py` (structural validation of
-  `deployment/`; run by `run_all.sh` as a fifth column — see §12.7)
+  `deployment/`; run by `run_all.sh` as a further row — see §12.7)
 - Keep each language's full test run < 120s. CI is `.github/workflows/ci.yml`, which runs exactly
   these commands plus `tests/harness/run_golden.sh` and the deployment validation.
 
@@ -207,11 +224,11 @@ implements it (`docs/SCENARIOS.md`, TRADING section).
   16 `SELF_MATCH`; 17 `POSITION_LIMIT`; 18 `INSTRUMENT_NOTIONAL`; 19 `GROSS_NOTIONAL`;
   20 `NET_NOTIONAL`; 21 `DAILY_LOSS`; 22 `STRATEGY_LOSS`; else `ALLOW`.
 - **Reference data**: `InstrumentRef{tick_size, qty_unit, quote_ccy}` per instrument, from
-  `configs/instruments.json` (`qty_unit` = `lot_size` for FX, 1 for EQUITY/ETF — §1). An
+  `configs/instruments/instruments.json` (`qty_unit` = `lot_size` for FX, 1 for EQUITY/ETF — §1). An
   instrument without reference data is `UNKNOWN_INSTRUMENT`; an engine built from a missing or
-  invalid `configs/risk.json` rejects everything with `CONFIG_MISSING`.
+  invalid `configs/risk/risk.json` rejects everything with `CONFIG_MISSING`.
 - **Money** (spec §16 "notional"): `notional = qty × qty_unit × price_ticks × tick_size ×
-  fx_rate(quote_ccy → reporting_ccy)`. `configs/risk.json` `currency.reporting_ccy` names the
+  fx_rate(quote_ccy → reporting_ccy)`. `configs/risk/risk.json` `currency.reporting_ccy` names the
   base; `currency.conversion[ccy] = {instrument_id, invert}` names the pair whose last
   consolidated mid converts `ccy` (inverted when the pair is REPORTING/CCY). Pre-trade the rate
   must exist and be no older than `stale_feed_timeout_ns` (else `FX_RATE_MISSING`); loss-limit
@@ -282,7 +299,7 @@ check. The simulator has no PEG/MID order types (documented optimism).
 
 - SOR eligibility: a venue is eligible only when its book for the instrument is open (exists,
   not stale, status TRADING) and `latency_mean_ns ≤ max_venue_latency_ns`
-  (`configs/execution.json` `sor.max_venue_latency_ns`). Aggressive routing picks the most
+  (`configs/execution/execution.json` `sor.max_venue_latency_ns`). Aggressive routing picks the most
   favourable displayed opposite best; passive routing the highest maker rebate when
   `sor.prefer_rebate` (else the lowest venue id quoting our side); ties break taker fee →
   commission → venue id. No eligible venue ⇒ `NO_ROUTE` (0): the
@@ -364,7 +381,11 @@ may apply `lot_size` a second time and none may omit it. Consequences that are t
 
 - Config directory resolution, in order: `--configs <dir>` → `$IAP_CONFIG_DIR` → the built-in
   default (`../configs` in a source tree, `/app/configs` in the image). Every image entrypoint and
-  every manifest that sets `IAP_CONFIG_DIR` therefore reaches the same files.
+  every manifest that sets `IAP_CONFIG_DIR` therefore reaches the same files. The directory has
+  the domain layout of §0 (`<dir>/risk/risk.json`, `<dir>/instruments/instruments.json`, …);
+  `ConfigService` names each file by that relative path (`ConfigService.RISK` =
+  `"risk/risk.json"`, …) in `doc()/sha256()/reload()`, in the audit `file` field and in the
+  `config_sha256` digest.
 - Startup is **fail-fast and fails before binding any socket or reading any event**:
   every CLI argument is validated (`--speed` finite and `> 0`, `--port` in `[-1, 65535]`,
   `--max-events > 0`, `--instrument > 0`, a non-empty `--alpha`), and `ConfigService` validates
@@ -511,6 +532,13 @@ Admin endpoints (`RUNBOOK_incident_kill_switch.md` §2 — the manual ENGAGE pat
   `configs/` and `data/reference/` for the C++ and Rust images, whose golden tests resolve
   `<golden>/../../configs` and `../../data/reference`. `tests/harness/check_deployment.py`
   verifies that every `COPY <src>` in every Dockerfile exists in the repository.
+- **k8s ConfigMap for configs**: `deployment/k8s/configmap-configs.yaml` is generated by
+  `generate_configmaps.py` from every `configs/**/*.json`; a key is the configs-relative path
+  with `/` encoded as `__` (`risk__risk.json`, `strategies__alpha_params.json`) because a
+  ConfigMap key may not contain `/`. Every volume that mounts `iap-configs` MUST list the
+  generator's `items[]` (`key` → `path`) so the pod sees the nested tree at `IAP_CONFIG_DIR`;
+  `check_deployment.py` (`configmap_items_in_sync`) fails when a manifest drifts from
+  `generate_configmaps.configmap_items()`.
 - **Prometheus**: `alerts.yml` and `recording.yml` must pass `promtool check rules`,
   `prometheus.yml` `promtool check config`, and the rule unit tests in
   `deployment/prometheus/tests/` must pass `promtool test rules`. Only Go `text/template`
@@ -528,7 +556,7 @@ Admin endpoints (`RUNBOOK_incident_kill_switch.md` §2 — the manual ENGAGE pat
   `logging.options.{max-size,max-file}`; `configs/` is bind-mounted read-only into `java-platform`
   at the path `IAP_CONFIG_DIR` names, so the runbook's "edit risk.json, restart the service" path
   is real.
-- **CI** (`.github/workflows/ci.yml`) runs `tests/harness/run_all.sh` (all four languages),
-  `tests/harness/run_golden.sh`, and `tests/harness/check_deployment.py` (YAML/compose/promtool/
-  Dockerfile/configmap checks). `CODEOWNERS` names the reviewers `SECURITY.md` and `GOVERNANCE.md`
+- **CI** (`.github/workflows/ci.yml`) runs `tests/harness/run_all.sh` (all four languages plus
+  the `integration` and `replay` rows), `tests/harness/run_golden.sh`, and
+  `tests/harness/check_deployment.py` (YAML/compose/promtool/Dockerfile/configmap checks). `CODEOWNERS` names the reviewers `SECURITY.md` and `GOVERNANCE.md`
   refer to.

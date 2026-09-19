@@ -10,7 +10,7 @@ that already contains it — no lookahead).
 
 - ``minute_of_day``   = minutes since SESSION-LOCAL midnight (float,
                         fractional; the venue's IANA zone from
-                        configs/instruments.json, DST-correct)
+                        configs/instruments/instruments.json, DST-correct)
 - ``session_frac``    = (minute_of_day - open) / (close - open), clipped to [0,1]
 - ``is_open_phase``   = 1 during the first 30 minutes of the session
 - ``is_close_phase``  = 1 during the last 30 minutes of the session

@@ -105,7 +105,7 @@ def _merge_config(base: dict, override: dict) -> dict:
 
 
 def load_generator_config(path=None) -> dict:
-    """Load configs/generator.json merged over built-in defaults."""
+    """Load configs/marketdata/generator.json merged over built-in defaults."""
     cfg = dict(_DEFAULT_CONFIG)
     if path is not None:
         with open(path) as f:

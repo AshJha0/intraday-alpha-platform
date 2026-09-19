@@ -15,8 +15,16 @@ import com.iap.execution.InstrumentSpec;
 import com.iap.execution.VenueSpec;
 
 /**
- * Typed configuration service for {@code configs/*.json} (spec §26:
- * configuration is versioned, validated and audited).
+ * Typed configuration service for the pinned {@code configs/} tree (spec
+ * §26: configuration is versioned, validated and audited). The tree is laid
+ * out by domain (PLATFORM_CONVENTIONS.md §0): {@code risk/risk.json},
+ * {@code instruments/instruments.json}, {@code venues/venues.json},
+ * {@code execution/execution.json}, {@code strategies/strategies.json},
+ * {@code marketdata/generator.json} (+ {@code strategies/alpha_params.json},
+ * loaded by the alpha layer). A config file is named by its path relative
+ * to the config directory, with '/' separators on every platform — that is
+ * the key of {@link #doc}, {@link #sha256}, {@link #reload} and the
+ * {@code file} field of every audit record.
  *
  * <p>Every load computes the file's SHA-256 and appends a structured audit
  * record; {@link #reload} re-reads a file and, when the hash changed,
@@ -51,6 +59,37 @@ public final class ConfigService {
     /** Environment variable naming the configuration directory. */
     public static final String CONFIG_DIR_ENV = "IAP_CONFIG_DIR";
 
+    /** {@code risk/risk.json} — hard-risk limits (x-version 3). */
+    public static final String RISK = "risk/risk.json";
+    /** {@code instruments/instruments.json} — instrument reference data. */
+    public static final String INSTRUMENTS = "instruments/instruments.json";
+    /** {@code venues/venues.json} — venue execution profiles. */
+    public static final String VENUES = "venues/venues.json";
+    /** {@code execution/execution.json} — execution defaults, SOR, cost model. */
+    public static final String EXECUTION = "execution/execution.json";
+    /** {@code strategies/strategies.json} — strategy registry + adaptive block. */
+    public static final String STRATEGIES = "strategies/strategies.json";
+    /** {@code marketdata/generator.json} — synthetic generator parameters. */
+    public static final String GENERATOR = "marketdata/generator.json";
+    /** {@code strategies/alpha_params.json} — fitted alpha parameters. */
+    public static final String ALPHA_PARAMS = "strategies/alpha_params.json";
+
+    /**
+     * The pinned platform config files, in load order (relative paths under
+     * the config directory). Every one must exist and validate at startup.
+     */
+    public static final String[] PINNED_FILES = {RISK, INSTRUMENTS, VENUES,
+        EXECUTION, STRATEGIES, GENERATOR};
+
+    /** Resolve a relative config name ('/'-separated) under a directory. */
+    public static Path resolve(Path configsDir, String name) {
+        Path p = configsDir;
+        for (String part : name.split("/")) {
+            p = p.resolve(part);
+        }
+        return p;
+    }
+
     /**
      * The pinned config-directory resolution order
      * (PLATFORM_CONVENTIONS.md §12.2): an explicit {@code --configs} value,
@@ -84,16 +123,14 @@ public final class ConfigService {
     /** Load and validate the pinned platform config files from a dir. */
     public ConfigService(Path configsDir) {
         this.configsDir = configsDir;
-        for (String name : new String[] {"risk.json", "instruments.json",
-                "venues.json", "execution.json", "strategies.json",
-                "generator.json"}) {
+        for (String name : PINNED_FILES) {
             load(name);
         }
         validate();
     }
 
     private Map<String, Object> load(String name) {
-        Path path = configsDir.resolve(name);
+        Path path = resolve(configsDir, name);
         byte[] bytes;
         try {
             bytes = Files.readAllBytes(path);
@@ -128,10 +165,10 @@ public final class ConfigService {
         // shape checks for the typed accessors (fail early, not on use)
         instruments();
         venues();
-        if (!(doc("execution.json").get("defaults") instanceof Map)) {
+        if (!(doc(EXECUTION).get("defaults") instanceof Map)) {
             throw new IllegalArgumentException("execution.json: missing defaults");
         }
-        if (!(doc("risk.json").get("global") instanceof Map)) {
+        if (!(doc(RISK).get("global") instanceof Map)) {
             throw new IllegalArgumentException("risk.json: missing global section");
         }
         executionLimits();
@@ -147,7 +184,7 @@ public final class ConfigService {
      * naming file and key, never an NPE/ClassCastException at first use.
      */
     public Map<String, Object> adaptive() {
-        Object block = doc("strategies.json").get("adaptive");
+        Object block = doc(STRATEGIES).get("adaptive");
         if (!(block instanceof Map)) {
             throw new IllegalArgumentException(
                     "strategies.json: missing/non-object adaptive block");
@@ -173,7 +210,7 @@ public final class ConfigService {
         return a;
     }
 
-    /** Parsed, validated hard-risk limits (`configs/risk.json`). */
+    /** Parsed, validated hard-risk limits (`configs/risk/risk.json`). */
     public com.iap.risk.RiskLimits riskLimits() {
         return com.iap.risk.RiskLimits.fromJson(riskDoc());
     }
@@ -205,7 +242,7 @@ public final class ConfigService {
         return !hashes.get(name).equals(before);
     }
 
-    /** Parsed document of one config file. */
+    /** Parsed document of one config file (relative name, e.g. {@link #RISK}). */
     public Map<String, Object> doc(String name) {
         Map<String, Object> d = docs.get(name);
         if (d == null) {
@@ -241,7 +278,7 @@ public final class ConfigService {
 
     /** The risk.json document (RiskLimits parses it strictly). */
     public Map<String, Object> riskDoc() {
-        return doc("risk.json");
+        return doc(RISK);
     }
 
     /**
@@ -252,7 +289,7 @@ public final class ConfigService {
      * invalid fields fail closed (throw).
      */
     public TreeMap<Long, InstrumentSpec> instruments() {
-        Object arr = doc("instruments.json").get("instruments");
+        Object arr = doc(INSTRUMENTS).get("instruments");
         if (!(arr instanceof List)) {
             throw new IllegalArgumentException("instruments.json: missing instruments[]");
         }
@@ -335,22 +372,22 @@ public final class ConfigService {
 
     /** Venue execution profiles keyed by venue_id. */
     public TreeMap<Integer, VenueSpec> venues() {
-        return VenueSpec.loadVenues(configsDir.resolve("venues.json"));
+        return VenueSpec.loadVenues(resolve(configsDir, VENUES));
     }
 
     /** execution.json defaults.seed (the pinned platform seed). */
     public long executionSeed() {
-        return Json.asLong(Json.object(doc("execution.json").get("defaults")).get("seed"));
+        return Json.asLong(Json.object(doc(EXECUTION).get("defaults")).get("seed"));
     }
 
     /** execution.json defaults.max_child_qty. */
     public long maxChildQty() {
-        return Json.asLong(Json.object(doc("execution.json").get("defaults"))
+        return Json.asLong(Json.object(doc(EXECUTION).get("defaults"))
                 .get("max_child_qty"));
     }
 
     private Map<String, Object> executionDefaults() {
-        return Json.object(doc("execution.json").get("defaults"));
+        return Json.object(doc(EXECUTION).get("defaults"));
     }
 
     private static double needNum(Map<String, Object> m, String key, String where) {
@@ -376,7 +413,7 @@ public final class ConfigService {
 
     /** execution.json sor.{prefer_rebate, max_venue_latency_ns} (strict). */
     public com.iap.sor.SorOptions sorOptions() {
-        Object sor = doc("execution.json").get("sor");
+        Object sor = doc(EXECUTION).get("sor");
         if (!(sor instanceof Map)) {
             throw new IllegalArgumentException("execution.json: missing sor block");
         }
@@ -390,14 +427,14 @@ public final class ConfigService {
                 (long) needNum(s, "max_venue_latency_ns", "sor"));
     }
 
-    /** Risk-engine FX conversion table from configs/risk.json. */
+    /** Risk-engine FX conversion table from configs/risk/risk.json. */
     public TreeMap<String, com.iap.risk.RiskLimits.FxConversion> fxConversion() {
         return com.iap.risk.RiskLimits.fromJson(riskDoc()).fxConversion();
     }
 
     /** execution.json cost_model.impact_coeff_bps_per_pct_adv. */
     public double impactCoeffBpsPerPctAdv() {
-        return Json.asDouble(Json.object(doc("execution.json").get("cost_model"))
+        return Json.asDouble(Json.object(doc(EXECUTION).get("cost_model"))
                 .get("impact_coeff_bps_per_pct_adv"));
     }
 
@@ -406,7 +443,7 @@ public final class ConfigService {
      * {@code monitoring.port}, default 8080 (grafana contract).
      */
     public int monitoringPort() {
-        Object mon = doc("execution.json").get("monitoring");
+        Object mon = doc(EXECUTION).get("monitoring");
         if (mon instanceof Map) {
             Object p = Json.object(mon).get("port");
             if (p instanceof Long) {

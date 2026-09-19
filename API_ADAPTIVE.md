@@ -18,7 +18,7 @@ files and reproduce the applicable parts of
 
 Normative companions: `PLATFORM_CONVENTIONS.md` §3/§7, `/API_ALPHA.md`
 (the scoring semantics that produce the monitored signal),
-`configs/strategies.json` `adaptive` block (every pinned threshold),
+`configs/strategies/strategies.json` `adaptive` block (every pinned threshold),
 `python/tools/make_golden_adaptive.py` (golden generation, brute-force
 validated before writing).
 
@@ -97,7 +97,7 @@ capture the baseline from those values.  Parity targets in
 
 A live PSI monitor uses the SAME window as research: `monitor_window_ns`
 (1 h) of **event time** with at least `min_psi_samples` (200) samples, from
-`configs/strategies.json`.  A fixed ring of N signals is not the pinned
+`configs/strategies/strategies.json`.  A fixed ring of N signals is not the pinned
 statistic — 256 signals is ~13 minutes on an equity stream and hours on a
 sparse FX one, so the live gauge and the research number were never
 comparable.  Feed the signal's `exchange_ts`
@@ -180,7 +180,7 @@ the signal rows and the rolling IC at 5 pinned evaluation times (EQ01 on
 the golden EQ frame); every port that implements the gauge reproduces them
 at 1e-10.
 
-## 5. Refit policies (configs/strategies.json `adaptive.policies`)
+## 5. Refit policies (configs/strategies/strategies.json `adaptive.policies`)
 
 All decisions are pure functions of `(now_ns, last_fit_ns, PSI values,
 ic_z)` — no wall-clock, no RNG.  `null` monitor values never trigger.
@@ -200,7 +200,7 @@ A refit sets `last_fit_ns = now_ns`.  Golden decision sequence (with
 edge-exact threshold inputs): `expected_adaptive.json` →
 `"drift_trigger"` — exact booleans.
 
-## 6. Lifecycle (configs/strategies.json `adaptive.lifecycle`)
+## 6. Lifecycle (configs/strategies/strategies.json `adaptive.lifecycle`)
 
 States: `ACTIVE -> WATCH -> RETIRED`, evaluated once per adaptive block
 on the rolling OOS IC (section 4's `mean(live bucket ICs)`;

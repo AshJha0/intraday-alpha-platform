@@ -17,7 +17,7 @@
 //    jitter = SplitMix64(seed).below(venue.latency_jitter_ns + 1) — one draw
 //    per submitted order OR cancel, in submission order (uniform on
 //    [0, jitter_ns], mirroring the venue latency profile in
-//    configs/venues.json).
+//    configs/venues/venues.json).
 // 2. Activation: a pending order becomes active while processing the first
 //    market event with exchange_ts >= arrival_ts, BEFORE that event is
 //    applied to the books; orders activate in (arrival_ts, order_id) order.
@@ -74,13 +74,13 @@
 //      - MODIFY events do not change ahead_qty (a modified order's queue
 //        position is unknowable from the public stream — pinned: ignored).
 //    Passive fills are stamped with the triggering event's exchange_ts.
-// 5. Fees (configs/venues.json): equity venues charge
+// 5. Fees (configs/venues/venues.json): equity venues charge
 //    taker_fee_per_share * qty on aggressive fills and rebate
 //    maker_rebate_per_share * qty on passive fills (fee < 0 = rebate).
 //    FX venues charge commission_per_million * notional / 1e6 on every fill,
 //    notional = qty * qty_unit * price_ticks * tick_size (qty_unit =
 //    lot_size for FX, 1 for EQUITY/ETF; conventions section 1).
-// 6. Linear impact (aggressive fills only, configs/execution.json
+// 6. Linear impact (aggressive fills only, configs/execution/execution.json
 //    cost_model, IDENTICAL to the research cost model iap.backtest.costs):
 //    impact_bps = impact_coeff_bps_per_pct_adv *
 //    (child_order_qty * qty_unit / adv * 100); each taker fill is charged
@@ -145,7 +145,7 @@ enum class CancelReason : std::uint8_t {
     END_OF_STREAM = 5,       // cancel_all()
 };
 
-// One venue's execution profile (configs/venues.json).
+// One venue's execution profile (configs/venues/venues.json).
 struct VenueSpec {
     std::uint16_t venue_id = 0;
     std::string name;
@@ -157,7 +157,7 @@ struct VenueSpec {
     std::int64_t latency_jitter_ns = 0;
 };
 
-// Load every venue from configs/venues.json.
+// Load every venue from configs/venues/venues.json.
 std::map<std::uint16_t, VenueSpec> load_venues(const std::string& path);
 
 // Instrument reference data the simulator needs. qty_unit = real base

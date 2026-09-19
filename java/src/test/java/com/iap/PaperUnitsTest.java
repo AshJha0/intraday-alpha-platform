@@ -82,10 +82,10 @@ public class PaperUnitsTest {
     @Test
     public void scenarioDailyLossLimitLatchesTheKillSwitch() throws IOException {
         Path configs = PaperFixtures.copyConfigs();
-        String risk = PaperFixtures.readConfig(configs, "risk.json");
+        String risk = PaperFixtures.readConfig(configs, ConfigService.RISK);
         assertTrue(risk.contains("\"max_daily_loss\": 250000"));
         // 20 USD: the golden EQ session loses more than that in its own unit
-        PaperFixtures.writeConfig(configs, "risk.json",
+        PaperFixtures.writeConfig(configs, ConfigService.RISK,
                 risk.replace("\"max_daily_loss\": 250000",
                         "\"max_daily_loss\": 20"));
         PaperTrading.Options opts = PaperFixtures.session(1500);
@@ -113,8 +113,8 @@ public class PaperUnitsTest {
     public void scenarioConfigMasterKillSwitchHaltsTheSession()
             throws IOException {
         Path configs = PaperFixtures.copyConfigs();
-        PaperFixtures.writeConfig(configs, "risk.json",
-                PaperFixtures.readConfig(configs, "risk.json")
+        PaperFixtures.writeConfig(configs, ConfigService.RISK,
+                PaperFixtures.readConfig(configs, ConfigService.RISK)
                         .replace("\"kill_switch_engaged\": false",
                                 "\"kill_switch_engaged\": true"));
         PaperTrading.Options opts = PaperFixtures.session(800);

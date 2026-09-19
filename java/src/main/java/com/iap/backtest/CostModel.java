@@ -6,7 +6,7 @@ import java.util.Map;
 import com.iap.config.Json;
 
 /**
- * Research-backtester cost model (spec section 18; configs/execution.json
+ * Research-backtester cost model (spec section 18; configs/execution/execution.json
  * {@code cost_model}), mirroring {@code iap.backtest.costs} exactly.
  *
  * <p>Pinned per-execution cost of trading {@code q} units at a row with mid
@@ -29,7 +29,7 @@ public record CostModel(
         double fxCommissionPerMillion,
         double multiplier) {
 
-    /** Load the cost_model block of configs/execution.json. */
+    /** Load the cost_model block of configs/execution/execution.json. */
     public static CostModel load(Path executionConfigPath, double multiplier) {
         Map<String, Object> root = Json.object(Json.parseFile(executionConfigPath));
         Object cm = root.get("cost_model");

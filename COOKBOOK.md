@@ -39,7 +39,7 @@ report:
 
 ```bash
 cd python
-PYTHONPATH=src python3 -m iap.marketdata            # configs/generator.json, seed 20260829
+PYTHONPATH=src python3 -m iap.marketdata            # configs/marketdata/generator.json, seed 20260829
 PYTHONPATH=src python3 -m iap.marketdata --seed 42  # explicit seed override
 ```
 
@@ -174,10 +174,10 @@ meta = {int(r["instrument_id"]): {"symbol": r["symbol"],
         "asset_class": r["asset_class"], "tick_size": float(r["tick_size"]),
         "lot_size": int(r["lot_size"]), "adv": float(r["adv"]),
         "ref_price": float(r.get("ref_price", 1.0))}
-        for r in json.load(open("configs/instruments.json"))["instruments"]}
+        for r in json.load(open("configs/instruments/instruments.json"))["instruments"]}
 frames = load_features("data/features")
-exec_cfg = json.load(open("configs/execution.json"))
-bt = Backtester(CostModel.load("configs/execution.json"), meta, BacktestConfig())
+exec_cfg = json.load(open("configs/execution/execution.json"))
+bt = Backtester(CostModel.load("configs/execution/execution.json"), meta, BacktestConfig())
 
 rep = validate_alpha(lambda: build("EQ03"), frames, bt, meta,
                      float(exec_cfg["defaults"]["max_participation"]))
@@ -309,10 +309,10 @@ cd java && bash build.sh && rm -rf out/test && mkdir -p out/test && \
 To understand a decision, read the step in
 `tests/golden/expected_risk_decisions.json` — the deciding `rule_id` is the
 first failing rule in the engine's pinned check order
-(`PLATFORM_CONVENTIONS.md` §11.1), limits come from `configs/risk.json`
+(`PLATFORM_CONVENTIONS.md` §11.1), limits come from `configs/risk/risk.json`
 (x-version 3, incl. the `currency` conversion table) and per-instrument
 reference data (`tick_size`, `qty_unit`, `quote_ccy`) from
-`configs/instruments.json`. Regenerate deliberately only:
+`configs/instruments/instruments.json`. Regenerate deliberately only:
 
 ```bash
 cd rust && cargo run -p risk --bin make_risk_golden -- ../tests/golden --force
@@ -372,11 +372,11 @@ meta = {int(r["instrument_id"]): {"symbol": r["symbol"],
         "asset_class": r["asset_class"], "tick_size": float(r["tick_size"]),
         "lot_size": int(r["lot_size"]), "adv": float(r["adv"]),
         "ref_price": float(r.get("ref_price", 1.0))}
-        for r in json.load(open("configs/instruments.json"))["instruments"]}
+        for r in json.load(open("configs/instruments/instruments.json"))["instruments"]}
 frames = load_features("data/features")
 models = load_params_file("configs/strategies/alpha_params.json")
 
-bt = Backtester(CostModel.load("configs/execution.json"), meta, BacktestConfig())
+bt = Backtester(CostModel.load("configs/execution/execution.json"), meta, BacktestConfig())
 m = models["EQ01"]
 scores = m.score({i: frames[i] for i in m.universe(list(frames))})
 res = bt.run(frames=frames, scores=scores, asset_class="EQUITY")
@@ -462,7 +462,7 @@ curl -s localhost:8080/metrics | grep '^risk_kill_switch_engaged'   # 1
 tail -1 java/out/state/admin_audit.jsonl                            # audited
 ```
 
-The port comes from `configs/execution.json` `monitoring.port` (default
+The port comes from `configs/execution/execution.json` `monitoring.port` (default
 8080 — the Grafana/Prometheus contract; `deployment/prometheus/` scrapes it
 in the docker-compose stack). The session report lands in
 `java/out/paper_session_report.json`. Full ops procedure:
@@ -506,8 +506,9 @@ bash tests/harness/run_all.sh --golden-only   # golden groups only (fast)
 
 Exit code 0 iff every language passed; logs land in a temp dir printed on
 the first line. A full-suite run: python 626 / cpp 243 /
-rust 254 / java 448 tests passed (golden groups 65/45/47/85), plus a
-`deployment` row (17 structural checks) and a `numbers` row (every headline
+rust 254 / java 449 tests passed (golden groups 65/45/47/85), plus
+`integration` (1) and `replay` (2) rows for the repo-level pytest suites, a
+`deployment` row (18 structural checks) and a `numbers` row (every headline
 figure re-derived from its artefact), all PASS.
 
 ## 15. Generate the TCA report
@@ -634,7 +635,7 @@ Replay the bundled 2-session data as a deployment of 10 alphas (the 6
 golden alphas + the 4 best remaining by walk-forward OOS IC) under four
 refit policies — static, scheduled weekly, scheduled daily,
 drift-triggered — with PSI/rolling-IC drift monitoring and the pinned
-IC-gated lifecycle (`configs/strategies.json` `adaptive`):
+IC-gated lifecycle (`configs/strategies/strategies.json` `adaptive`):
 
 ```bash
 PYTHONPATH=python/src python3 research/adaptive_reports/run_adaptive.py
@@ -684,7 +685,7 @@ confident signals) against `research/baselines/signal_eq01.json` — the
 Java-parity baseline; `alpha_rolling_ic` is the mean of event-time bucket
 ICs over the trailing window, matured (lookahead-free) rows only;
 `alpha_lifecycle_state` encodes 0 ACTIVE / 1 WATCH / 2 RETIRED, driven by
-the pinned IC hysteresis of `configs/strategies.json` `adaptive.lifecycle`.
+the pinned IC hysteresis of `configs/strategies/strategies.json` `adaptive.lifecycle`.
 Early in the session the drift and IC gauges are absent rather than zero —
 until the PSI window fills, or with fewer than `min_ic_buckets` (4)
 buckets, the monitors report no value, which is itself pinned behavior

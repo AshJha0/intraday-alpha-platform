@@ -236,7 +236,7 @@ capacity.
    lead-lag has limited resolution when the median venue refresh gap is
    tens of seconds.
 4. **Synthetic cost model** as in papers 1-2; conclusions about tradability
-   are relative to `configs/execution.json`.
+   are relative to `configs/execution/execution.json`.
 
 ## 6. Conclusions
 

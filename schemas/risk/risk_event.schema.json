@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://iap.example/schemas/risk_event.schema.json",
+  "$id": "https://iap.example/schemas/risk/risk_event.schema.json",
   "title": "RiskEvent",
   "description": "Hard-risk decision record (spec sections 6, 16). Fail-closed, auditable, replayable. severity: INFO=1 WARN=2 BREACH=3; decision: ALLOW=1 REJECT=2 KILL=3.",
   "x-version": 1,

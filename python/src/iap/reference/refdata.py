@@ -1,6 +1,7 @@
 """Reference-data service: instruments, venues, sessions, calendars.
 
-Reads the JSON configs under ``configs/`` (instruments.json, venues.json).
+Reads the JSON configs under ``configs/`` (instruments/instruments.json,
+venues/venues.json).
 Prices on contracts are integer ticks; this service owns the tick_size /
 lot_size mapping used to convert to/from real prices.
 
@@ -207,7 +208,8 @@ class _FxWeek:
 
 
 class ReferenceData:
-    """Loads, validates and indexes configs/instruments.json + configs/venues.json."""
+    """Loads, validates and indexes configs/instruments/instruments.json +
+    configs/venues/venues.json."""
 
     def __init__(self, instruments_cfg: dict, venues_cfg: dict) -> None:
         self._venue_by_name: Dict[str, Venue] = {}
@@ -258,11 +260,12 @@ class ReferenceData:
 
     @classmethod
     def load(cls, config_dir) -> "ReferenceData":
-        """Load from a configs/ directory (expects instruments.json, venues.json)."""
+        """Load from a configs/ directory (expects instruments/instruments.json,
+        venues/venues.json — the domain layout of PLATFORM_CONVENTIONS.md §0)."""
         config_dir = Path(config_dir)
-        with open(config_dir / "instruments.json") as f:
+        with open(config_dir / "instruments" / "instruments.json") as f:
             instruments_cfg = json.load(f)
-        with open(config_dir / "venues.json") as f:
+        with open(config_dir / "venues" / "venues.json") as f:
             venues_cfg = json.load(f)
         return cls(instruments_cfg, venues_cfg)
 

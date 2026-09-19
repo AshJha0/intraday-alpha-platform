@@ -71,7 +71,7 @@ iap::ExecConfig golden_config() {
     cfg.seed = 20260829;
     cfg.impact_coeff_bps_per_pct_adv = 2.0;
     cfg.venues =
-        iap::load_venues(iap_test::golden_dir() + "/../../configs/venues.json");
+        iap::load_venues(iap_test::golden_dir() + "/../../configs/venues/venues.json");
     iap::InstrumentSpec ins;
     ins.instrument_id = 1;
     ins.tick_size = 0.01;

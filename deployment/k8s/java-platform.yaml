@@ -134,23 +134,26 @@ spec:
         - name: configs
           configMap:
             name: iap-configs
-            # '__' encodes '/' in generated keys — keep in sync with
-            # generate_configmaps.py when configs/ gains files.
+            # Every key is a configs/-relative path with '/' encoded as '__'
+            # (ConfigMap keys may not contain '/'); items[].path projects the
+            # nested domain tree (PLATFORM_CONVENTIONS.md §0) back under
+            # IAP_CONFIG_DIR. Generated from generate_configmaps.py
+            # configmap_items() — check_deployment.py fails if this drifts.
             items:
-              - key: execution.json
-                path: execution.json
-              - key: generator.json
-                path: generator.json
-              - key: instruments.json
-                path: instruments.json
-              - key: risk.json
-                path: risk.json
-              - key: strategies.json
-                path: strategies.json
-              - key: venues.json
-                path: venues.json
+              - key: execution__execution.json
+                path: execution/execution.json
+              - key: instruments__instruments.json
+                path: instruments/instruments.json
+              - key: marketdata__generator.json
+                path: marketdata/generator.json
+              - key: risk__risk.json
+                path: risk/risk.json
               - key: strategies__alpha_params.json
                 path: strategies/alpha_params.json
+              - key: strategies__strategies.json
+                path: strategies/strategies.json
+              - key: venues__venues.json
+                path: venues/venues.json
         - name: data
           persistentVolumeClaim:
             claimName: iap-data

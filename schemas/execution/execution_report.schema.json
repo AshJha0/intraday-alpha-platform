@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://iap.example/schemas/execution_report.schema.json",
+  "$id": "https://iap.example/schemas/execution/execution_report.schema.json",
   "title": "ExecutionReport",
   "description": "Venue execution report (spec section 6). status: NEW=1 PARTIAL=2 FILLED=3 CANCELED=4 REJECTED=5 EXPIRED=6.",
   "x-version": 1,

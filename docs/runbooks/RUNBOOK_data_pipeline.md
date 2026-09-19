@@ -13,7 +13,7 @@ Local / on-demand run (deterministic — same seed ⇒ bit-identical files):
 
 ```bash
 cd python
-PYTHONPATH=src python3 -m iap.marketdata            # uses configs/generator.json (seed 20260829)
+PYTHONPATH=src python3 -m iap.marketdata            # uses configs/marketdata/generator.json (seed 20260829)
 PYTHONPATH=src python3 -m iap.marketdata --seed 42  # explicit seed override
 # custom locations:
 PYTHONPATH=src python3 -m iap.marketdata --configs-dir ../configs --out ../data
@@ -39,7 +39,7 @@ python3 -m json.tool data/normalized/qc_report.json | head -40
 ```
 
 Expect in `qc_report.json`: per-stream event counts, and gap/duplicate/
-out-of-order/invalid counters consistent with `configs/generator.json`
+out-of-order/invalid counters consistent with `configs/marketdata/generator.json`
 `anomalies` rates (goldens run with anomalies disabled). The report's sha256
 is the **dataset version** used by every experiment manifest
 (`docs/governance/REPRODUCIBILITY.md`):
@@ -58,7 +58,7 @@ cd python && PYTHONPATH=src python3 -m pytest -q tests/test_generator.py tests/t
 
 ### Sequence gaps (`SequenceGapDetected`, `BookStale`) {#sequence-gaps}
 
-0. **One gap is the incident.** `configs/risk.json`
+0. **One gap is the incident.** `configs/risk/risk.json`
    `market_data.max_sequence_gap_before_halt = 1`: a single gap marks the book
    stale and fail-closes trading in that instrument until a SNAPSHOT recovers
    it. `SequenceGapDetected` therefore fires on `increase(md_sequence_gaps_total[5m]) > 0`
@@ -99,7 +99,7 @@ cd python && PYTHONPATH=src python3 -m pytest -q tests/test_generator.py tests/t
    to MODIFY instead of CANCEL+ADD. IAP1 v2 files are CRC-32 checked on
    load: a CRC error is corruption in transit/at rest — re-transfer, never
    partially accept.
-6. Batch pipeline: a gap rate far above `configs/generator.json`
+6. Batch pipeline: a gap rate far above `configs/marketdata/generator.json`
    `anomalies.gap_prob` means a generator/normalizer regression — bisect with
    the determinism tests above; identical seed must reproduce identical
    counters.
@@ -124,7 +124,7 @@ cd python && PYTHONPATH=src python3 -m pytest -q tests/test_generator.py tests/t
    already taken the pod out of the Service; `/health` stays 200 unless the
    loop itself is wedged for 30 s.
 2. Check the last event age vs the 5 s budget
-   (`configs/risk.json` `market_data.stale_feed_timeout_ns`). A silent
+   (`configs/risk/risk.json` `market_data.stale_feed_timeout_ns`). A silent
    venue (no gap, the line just stops) is invisible to sequence-based
    `stale`; consumers use `OrderBook.is_fresh(now_ns, max_age_ns)` and the
    consolidated view excludes only gap-stale venues (`stale_venues()`).

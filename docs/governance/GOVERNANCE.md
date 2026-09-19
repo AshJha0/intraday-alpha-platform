@@ -11,8 +11,8 @@ Review depth scales with blast radius:
 | Change class | Paths (indicative) | Review requirement |
 |---|---|---|
 | **Alpha / signal logic** | `python/src/iap/alpha/`, `cpp/src/alpha/`, `rust/alpha/`, `java/.../alpha/`, `configs/strategies/` | 1 quant reviewer **+ 1 owner of each production language touched**; golden vectors regenerated only with an explicit "golden change" note explaining why (`python/tools/make_golden.py` runs are deliberate acts, never side effects). |
-| **Risk engine / limits** | `rust/risk/`, `configs/risk.json`, risk contracts in `schemas/` | 2 reviewers, one of whom is the risk owner. Fail-closed semantics may never be weakened in the same PR that adds a feature. Limit changes (`configs/risk.json`) additionally require the audit-log entry of §3 *before* deploy. |
-| **Execution / SOR** | `cpp/src/execution/`, `cpp/src/sor/`, `rust/execution/`, `rust/venue/`, `configs/execution.json` | 1 execution owner + 1 second reviewer; determinism proof: `tests/harness/run_golden.sh` parity table attached to the PR. |
+| **Risk engine / limits** | `rust/risk/`, `configs/risk/risk.json`, risk contracts in `schemas/` | 2 reviewers, one of whom is the risk owner. Fail-closed semantics may never be weakened in the same PR that adds a feature. Limit changes (`configs/risk/risk.json`) additionally require the audit-log entry of §3 *before* deploy. |
+| **Execution / SOR** | `cpp/src/execution/`, `cpp/src/sor/`, `rust/execution/`, `rust/venue/`, `configs/execution/execution.json` | 1 execution owner + 1 second reviewer; determinism proof: `tests/harness/run_golden.sh` parity table attached to the PR. |
 | **Contracts & schemas** | `schemas/`, `PLATFORM_CONVENTIONS.md` §1–§2 | 2 reviewers + version bump + `MIGRATIONS.md` entry; all four languages updated in the same PR or the PR is blocked. |
 | **Deployment / observability** | `deployment/`, `docs/runbooks/`, `tests/harness/`, `.github/` | 1 platform reviewer (`CODEOWNERS`); the deployment validation used in CI must pass — `python3 tests/harness/check_deployment.py`, i.e. `promtool check rules` + `check config` + `promtool test rules`, `docker compose config -q`, every Dockerfile `COPY` source resolving in a clean build context, k8s manifests parsing and dry-running, the generated ConfigMaps matching `configs/`, every rule and dashboard expression naming a metric a producer exports, and the Java golden gate covering every `*GoldenTest` class. |
 | Everything else | docs, research scripts, benchmarks | 1 reviewer. |
@@ -69,7 +69,7 @@ denominator public.
 Auditable events and where they are recorded:
 
 - **Risk decisions and kill events (runtime)**: every pre-trade decision and
-  breach is a `RiskEvent` (schemas/risk_event.schema.json), byte-deterministic
+  breach is a `RiskEvent` (schemas/risk/risk_event.schema.json), byte-deterministic
   and replayable (`rust/risk/tests/golden_risk.rs` proves the log replays
   identically). **Where the deployed platform writes it**: the Java vertical
   streams it to `<state-dir>/risk_audit.jsonl` — appended and fsynced at every
@@ -87,8 +87,8 @@ Auditable events and where they are recorded:
   actor's token** (never the token). The corresponding `RiskEvent` is written
   by the trading thread at the current event time, so the two logs line up
   (`PLATFORM_CONVENTIONS.md` §12.5).
-- **Strategy/risk configuration changes**: any change to `configs/risk.json`,
-  `configs/strategies*`, `configs/execution.json` requires a ledger entry
+- **Strategy/risk configuration changes**: any change to `configs/risk/risk.json`,
+  `configs/strategies*`, `configs/execution/execution.json` requires a ledger entry
   (PR link, before/after diff, approver, effective time) *before* the config
   reaches production. The deployed ConfigMap is regenerated only from a
   reviewed commit (`deployment/k8s/generate_configmaps.py`) and CI fails if the

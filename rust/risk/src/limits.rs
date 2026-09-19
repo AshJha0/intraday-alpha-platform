@@ -1,4 +1,4 @@
-//! Hard-risk limits (`configs/risk.json`, x-version 3 — the complete
+//! Hard-risk limits (`configs/risk/risk.json`, x-version 3 — the complete
 //! pinned limit set plus the currency block). Parsing is STRICT: any
 //! missing or invalid limit is an error, and the engine built from a
 //! failed parse is fail-closed (rejects every order with `CONFIG_MISSING`).
@@ -136,7 +136,7 @@ fn need_bool(doc: &serde_json::Value, section: &str, key: &str) -> Result<bool, 
 }
 
 impl RiskLimits {
-    /// Strict parse of a `configs/risk.json` document.
+    /// Strict parse of a `configs/risk/risk.json` document.
     pub fn from_json(doc: &serde_json::Value) -> Result<RiskLimits, IapError> {
         let dup = doc["per_order"]["duplicate_order_window_ns"]
             .as_i64()
@@ -201,7 +201,7 @@ mod tests {
 
     fn repo_risk_json() -> serde_json::Value {
         let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../configs/risk.json");
+            .join("../../configs/risk/risk.json");
         serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
     }
 

@@ -26,7 +26,7 @@ FROM rust:1-slim-bookworm AS build
 # (toolchain baseline: Rust 1.95 in CI; workspace rust-version = 1.75)
 
 # configs/ and data/reference/ are NOT optional: the workspace's golden and
-# rule tests resolve ../../configs/{risk.json,strategies/alpha_params.json} and
+# rule tests resolve ../../configs/{risk/risk.json,strategies/alpha_params.json} and
 # ../../data/reference/feature_registry.json relative to CARGO_MANIFEST_DIR
 # (rust/risk/tests/rules.rs, rust/alpha/tests/golden_alpha.rs,
 # rust/features/tests/golden_features.rs). Without them `RUN cargo test` fails.

@@ -26,6 +26,37 @@ import com.iap.execution.InstrumentSpec;
 public class ConfigServiceTest {
     private static final Path CONFIGS = Paths.get("..", "configs");
 
+    /**
+     * Copy exactly the six pinned files (nested layout, PLATFORM_CONVENTIONS
+     * §0) into a fresh temp dir — no alpha_params.json, so the test also
+     * proves ConfigService needs nothing else.
+     */
+    private static Path copyPinnedConfigs(String prefix) throws IOException {
+        Path dir = Files.createTempDirectory(prefix);
+        for (String name : ConfigService.PINNED_FILES) {
+            Path dst = ConfigService.resolve(dir, name);
+            Files.createDirectories(dst.getParent());
+            Files.copy(ConfigService.resolve(CONFIGS, name), dst);
+        }
+        return dir;
+    }
+
+    /** The pinned names are the domain-folder layout of the repo tree. */
+    @Test
+    public void pinnedFilesUseTheDomainLayout() {
+        assertEquals(List.of("risk/risk.json", "instruments/instruments.json",
+                "venues/venues.json", "execution/execution.json",
+                "strategies/strategies.json", "marketdata/generator.json"),
+                List.of(ConfigService.PINNED_FILES));
+        assertEquals("strategies/alpha_params.json", ConfigService.ALPHA_PARAMS);
+        for (String name : ConfigService.PINNED_FILES) {
+            assertTrue(name, Files.isRegularFile(
+                    ConfigService.resolve(CONFIGS, name)));
+        }
+        assertTrue(Files.isRegularFile(
+                ConfigService.resolve(CONFIGS, ConfigService.ALPHA_PARAMS)));
+    }
+
     @Test
     public void loadsAndTypesTheRepoConfigs() {
         ConfigService cfg = new ConfigService(CONFIGS);
@@ -55,8 +86,9 @@ public class ConfigServiceTest {
             assertEquals(null, a.previousSha256());
             assertTrue(a.bytes() > 0);
         }
-        assertEquals(cfg.sha256("risk.json"), audit.stream()
-                .filter(a -> a.file().equals("risk.json"))
+        // the audit names every file by its relative path in the tree
+        assertEquals(cfg.sha256(ConfigService.RISK), audit.stream()
+                .filter(a -> a.file().equals("risk/risk.json"))
                 .findFirst().orElseThrow().sha256());
         // JSONL renders one parseable sorted-key object per line
         String jsonl = cfg.auditJsonl();
@@ -71,24 +103,19 @@ public class ConfigServiceTest {
     @Test
     public void reloadDetectsChangesAndAuditsBothHashes() throws IOException {
         // copy the configs into a scratch dir so nothing outside java/ moves
-        Path dir = Files.createTempDirectory("iap-configs");
-        for (String name : new String[] {"risk.json", "instruments.json",
-                "venues.json", "execution.json", "strategies.json",
-                "generator.json"}) {
-            Files.copy(CONFIGS.resolve(name), dir.resolve(name));
-        }
+        Path dir = copyPinnedConfigs("iap-configs");
         ConfigService cfg = new ConfigService(dir);
-        String before = cfg.sha256("risk.json");
-        assertFalse("no change yet", cfg.reload("risk.json"));
+        String before = cfg.sha256(ConfigService.RISK);
+        assertFalse("no change yet", cfg.reload(ConfigService.RISK));
         assertEquals(6, cfg.auditTrail().size());
         // mutate the file -> reload reports the change and audits it
-        String text = new String(Files.readAllBytes(dir.resolve("risk.json")),
+        Path risk = ConfigService.resolve(dir, ConfigService.RISK);
+        String text = new String(Files.readAllBytes(risk),
                 StandardCharsets.UTF_8)
                 .replace("\"max_daily_loss\": 250000.0",
                         "\"max_daily_loss\": 300000.0");
-        Files.write(dir.resolve("risk.json"),
-                text.getBytes(StandardCharsets.UTF_8));
-        assertTrue(cfg.reload("risk.json"));
+        Files.write(risk, text.getBytes(StandardCharsets.UTF_8));
+        assertTrue(cfg.reload(ConfigService.RISK));
         List<ConfigService.Audit> audit = cfg.auditTrail();
         ConfigService.Audit change = audit.get(audit.size() - 1);
         assertEquals("config_changed", change.action());
@@ -100,14 +127,10 @@ public class ConfigServiceTest {
 
     @Test
     public void malformedConfigsAreRejected() throws IOException {
-        Path dir = Files.createTempDirectory("iap-bad-configs");
-        for (String name : new String[] {"risk.json", "instruments.json",
-                "venues.json", "execution.json", "strategies.json",
-                "generator.json"}) {
-            Files.copy(CONFIGS.resolve(name), dir.resolve(name));
-        }
+        Path dir = copyPinnedConfigs("iap-bad-configs");
+        Path generator = ConfigService.resolve(dir, ConfigService.GENERATOR);
         // missing file
-        Files.delete(dir.resolve("generator.json"));
+        Files.delete(generator);
         try {
             new ConfigService(dir);
             fail("missing file must fail");
@@ -115,8 +138,7 @@ public class ConfigServiceTest {
             assertTrue(expected.getMessage().contains("generator.json"));
         }
         // malformed JSON
-        Files.write(dir.resolve("generator.json"),
-                "{not json".getBytes(StandardCharsets.UTF_8));
+        Files.write(generator, "{not json".getBytes(StandardCharsets.UTF_8));
         try {
             new ConfigService(dir);
             fail("bad json must fail");
@@ -124,8 +146,7 @@ public class ConfigServiceTest {
             assertTrue(true);
         }
         // structurally wrong document (no x-version)
-        Files.write(dir.resolve("generator.json"),
-                "{\"seed\": 1}".getBytes(StandardCharsets.UTF_8));
+        Files.write(generator, "{\"seed\": 1}".getBytes(StandardCharsets.UTF_8));
         try {
             new ConfigService(dir);
             fail("missing x-version must fail");
@@ -133,9 +154,8 @@ public class ConfigServiceTest {
             assertTrue(expected.getMessage().contains("x-version"));
         }
         // unknown file access is rejected
-        Files.copy(CONFIGS.resolve("generator.json"),
-                dir.resolve("generator.json"),
-                java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        Files.copy(ConfigService.resolve(CONFIGS, ConfigService.GENERATOR),
+                generator, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         ConfigService ok = new ConfigService(dir);
         try {
             ok.doc("nope.json");

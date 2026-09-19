@@ -33,7 +33,7 @@
 # ------------------------------------------------------------- risk ---------
 # A limit change is a GOVERNANCE §3 event: risk must approve the config AND
 # every place the limit is mirrored.
-/configs/risk.json                  @iap/risk @iap/platform
+/configs/risk/                      @iap/risk @iap/platform
 /rust/risk/                         @iap/risk
 /cpp/include/iap/risk/              @iap/risk
 /cpp/src/risk/                      @iap/risk
@@ -62,8 +62,8 @@
 /java/src/main/java/com/iap/tca/    @iap/execution
 /python/src/iap/tca/                @iap/execution
 /python/src/iap/portfolio/          @iap/execution
-/configs/execution.json             @iap/execution @iap/platform
-/configs/venues.json                @iap/execution @iap/platform
+/configs/execution/                 @iap/execution @iap/platform
+/configs/venues/                    @iap/execution @iap/platform
 
 # ------------------------------------------------------------- research -----
 /python/src/iap/features/           @iap/research

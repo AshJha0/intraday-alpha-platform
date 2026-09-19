@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://iap.example/schemas/feature_vector.schema.json",
+  "$id": "https://iap.example/schemas/features/feature_vector.schema.json",
   "title": "FeatureVector",
   "description": "Event-driven feature vector. `values` ordered by the feature registry (data/reference/feature_registry.json); `validity` is a parallel bitset \u2014 NaN never leaks into a valid=true value.",
   "x-version": 1,

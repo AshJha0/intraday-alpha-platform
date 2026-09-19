@@ -307,7 +307,7 @@ impl RiskEngine {
         eng
     }
 
-    /// Build from a `configs/risk.json` document: a parse failure lands
+    /// Build from a `configs/risk/risk.json` document: a parse failure lands
     /// fail-closed instead of erroring (hard risk never runs open).
     pub fn from_config(doc: &Value, instruments: BTreeMap<u32, InstrumentRef>) -> RiskEngine {
         match RiskLimits::from_json(doc) {

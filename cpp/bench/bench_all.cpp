@@ -135,7 +135,7 @@ std::string compiler_version() {
 iap::ExecConfig bench_exec_config(const std::string& configs_dir) {
     iap::ExecConfig cfg;
     cfg.seed = 20260829;
-    cfg.venues = iap::load_venues(configs_dir + "/venues.json");
+    cfg.venues = iap::load_venues(configs_dir + "/venues/venues.json");
     iap::InstrumentSpec ins;
     ins.instrument_id = 1;
     ins.tick_size = 0.01;

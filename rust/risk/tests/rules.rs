@@ -14,7 +14,7 @@ const T0: i64 = 1_700_000_000_000_000_000;
 const NS: i64 = 1_000_000_000;
 
 fn config() -> serde_json::Value {
-    let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../configs/risk.json");
+    let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../configs/risk/risk.json");
     serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
 }
 

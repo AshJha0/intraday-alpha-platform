@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://iap.example/schemas/book_update.schema.json",
+  "$id": "https://iap.example/schemas/market/book_update.schema.json",
   "title": "BookUpdate",
   "description": "Per-level book state update derived from order-book reconstruction (spec section 6).",
   "x-version": 1,

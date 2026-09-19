@@ -110,11 +110,16 @@ intraday-alpha-platform/
   COOKBOOK.md               task-oriented recipes (runnable commands)
   docs/                     SPECIFICATION.md, ARCHITECTURE.md, BUILD_NOTES.md,
                             runbooks/, governance/, papers/, diagrams/
-  schemas/                  versioned JSON Schema contracts + FORMAT.md (wire layout)
-  configs/                  instruments, venues, generator, risk, execution,
-                            strategies (incl. fitted alpha_params.json)
+  schemas/                  versioned JSON Schema contracts by domain (market/
+                            features/ alpha/ order/ execution/ risk/) + README.md
+                            index, FORMAT.md (wire layout), MIGRATIONS.md
+  configs/                  by domain: instruments/ venues/ marketdata/ risk/
+                            execution/ strategies/ (incl. fitted alpha_params.json)
   data/                     raw/ normalized/ features/ reference/ (generated, seeded)
+  tests/README.md           the six-level testing strategy + exact commands
   tests/golden/             cross-language golden vectors + expected outputs
+  tests/integration/        cross-component end-to-end runs (pytest, repo root)
+  tests/replay/             determinism: same seed => identical bytes (pytest)
   tests/harness/            run_all.sh / run_golden.sh — one-command CI
   benchmarks/               per-language benchmarks + methodology
   python/  src/iap/...      reference implementation + research stack
@@ -124,8 +129,8 @@ intraday-alpha-platform/
                             eventbus, features, alpha, risk, venue, replay, telemetry
   java/                     javac build: com.iap.* — full platform layer + paper trading
   research/                 alpha_reports/, ml_reports/, adaptive_reports/,
-                            baselines/, tca/, models/, experiments.json,
-                            lifecycle_log.jsonl
+                            baselines/, tca/, models/, experiments/ (spec +
+                            result documents), experiments.json, lifecycle_log.jsonl
   deployment/               docker/, k8s/, grafana/, prometheus/
 ```
 
@@ -146,8 +151,9 @@ cd cpp    && bash build.sh && ctest --test-dir build --output-on-failure && cd .
 cd rust   && cargo test && cd ..
 cd java   && bash build.sh && bash test.sh && cd ..
 
-# 3. Or all four + the cross-language parity table in one command
+# 3. Or all four + the repo-level integration/replay suites + the parity table
 bash tests/harness/run_all.sh              # add --golden-only for the fast parity check
+python3 -m pytest -q tests/integration tests/replay   # the two repo-level suites alone
 
 # 4. Run the research pipelines (features → alphas → ML → TCA)
 cd python && PYTHONPATH=src python3 -m iap.features && cd ..     # ~1 min
@@ -179,11 +185,13 @@ language | tests passed | golden passed  | time   | status
 python   | 626          | 65             |   75s | PASS
 cpp      | 243          | 45             |    1s | PASS
 rust     | 254          | 47             |    1s | PASS
-java     | 448          | 85             |   19s | PASS
+java     | 449          | 85             |   19s | PASS
+integration | 1            | -              |    1s | PASS
+replay   | 2            | -              |    2s | PASS
 deployment | -            | -              |    5s | PASS
 numbers  | -            | -              |    -s | PASS
 =======================================================================
-deployment checks: 17 passed, 0 failed, 0 skipped
+deployment checks: 18 passed, 0 failed, 0 skipped
 headline numbers: all headline numbers match their artefacts
 >> PARITY OK — all languages passed (full suites).
 ```
@@ -198,12 +206,22 @@ runs **all ten** `com.iap.*GoldenTest` classes; until round 3 it ran two of
 them while this paragraph claimed otherwise, and a harness case now fails if
 the gate list ever drifts from the files on disk.)
 
+The `integration` and `replay` rows are the repo-level pytest suites
+`tests/integration` (cross-component end-to-end runs) and `tests/replay`
+(same seed ⇒ identical bytes), run from the repository root with no
+`PYTHONPATH` (`tests/conftest.py`); they have no golden group and count
+toward the verdict like the language rows. The six-level testing strategy —
+unit, golden, replay, integration, research validation, deployment — is laid
+out with the exact commands in [tests/README.md](tests/README.md).
+
 The last two rows are not test counts: `deployment` is
 `tests/harness/check_deployment.py` (promtool rules/config/unit tests,
-`docker compose config`, Dockerfile COPY sources against a clean clone, k8s
-manifests + singleton shape, ConfigMap sync, dashboard metric provenance),
-and `numbers` is `tests/harness/check_headline_numbers.py`, which re-derives
-every headline figure in this README from the artefact that produces it.
+`docker compose config`, Dockerfile COPY sources against a clean checkout,
+k8s manifests + singleton shape, ConfigMap sync and the ConfigMap `items[]`
+that project the nested `configs/<domain>/` tree, dashboard metric
+provenance), and `numbers` is `tests/harness/check_headline_numbers.py`,
+which re-derives every headline figure in this README from the artefact
+that produces it.
 
 Four independent implementations of one pinned semantics, held identical by
 golden tests — the engineering discipline this repo is built around
@@ -253,14 +271,14 @@ generator and this pipeline, not about any market.
 
 | quantity | representation |
 |---|---|
-| prices | `int64 price_ticks`; real price = ticks × `tick_size` (per instrument, `configs/instruments.json`); never a float on a contract or hot path |
+| prices | `int64 price_ticks`; real price = ticks × `tick_size` (per instrument, `configs/instruments/instruments.json`); never a float on a contract or hot path |
 | quantities | `int64 qty` in base units (equity shares; FX 1 unit = 1,000 base currency, `lot_size`) |
 | timestamps | `int64` nanoseconds since the Unix epoch, `exchange_ts` (event time — all windows, labels, splits) and `receive_ts` (arrival; `receive_ts ≥ exchange_ts`) |
-| costs, slippage, IC-scale returns | basis points of mid / notional; fees per share (equities, negative = maker rebate) or per million notional (FX), `configs/venues.json` |
+| costs, slippage, IC-scale returns | basis points of mid / notional; fees per share (equities, negative = maker rebate) or per million notional (FX), `configs/venues/venues.json` |
 | P&L, research metrics | `double`, compared across languages at 1e-9 absolute/relative tolerance |
-| currency | every aggregated P&L / notional / cost figure is in the reporting currency (USD, `configs/risk.json` `currency`); FX quote-currency figures are converted per increment at the prevailing conversion-pair mid, never summed as dollars (`PLATFORM_CONVENTIONS.md` §11.6) |
+| currency | every aggregated P&L / notional / cost figure is in the reporting currency (USD, `configs/risk/risk.json` `currency`); FX quote-currency figures are converted per increment at the prevailing conversion-pair mid, never summed as dollars (`PLATFORM_CONVENTIONS.md` §11.6) |
 | randomness | one pinned RNG (SplitMix64, `PLATFORM_CONVENTIONS.md` §3); same seed ⇒ bit-identical files |
-| calendar | a five-day synthetic calendar in UTC (`configs/instruments.json`); no exchange holidays, DST, or session-time rules |
+| calendar | a five-day synthetic calendar in UTC (`configs/instruments/instruments.json`); no exchange holidays, DST, or session-time rules |
 
 **What is validated.** Cross-language parity of the pinned semantics
 (codec bytes, book states, features, alphas, portfolio, TCA, risk
@@ -285,7 +303,7 @@ figures from a two-CPU container without pinning (`benchmarks/RESULTS.md`).
 - real trading calendars, corporate actions, symbology and reference-data
   feeds, and fee schedules;
 - real cost and impact models — the cost model is half-spread + fee +
-  linear impact in %ADV (`configs/execution.json`), and the queue-position
+  linear impact in %ADV (`configs/execution/execution.json`), and the queue-position
   fill model is a documented simplification
   ([paper 5](docs/papers/05_queue_aware_execution_adverse_selection.md));
 - production hardening: the read endpoints (`/metrics` `/health` `/ready`
@@ -444,7 +462,7 @@ deliberate simplification of the cited method the note says so.
 23. Wright, A., Andrews, H., Hutton, B., & Dennis, G. (2022). *JSON Schema:
     A Media Type for Describing JSON Documents*, draft 2020-12.
     <https://json-schema.org/draft/2020-12/json-schema-core>. — The
-    versioned contracts in `schemas/*.schema.json`.
+    versioned contracts in `schemas/<domain>/*.schema.json` (index: `schemas/README.md`).
 24. Apache Software Foundation. *Apache Parquet Format Specification*.
     <https://parquet.apache.org/docs/file-format/>. — The research dataset
     and feature store (`data/normalized/*.parquet`, `data/features/`).

@@ -27,7 +27,7 @@ data:
     # Validated by `promtool check rules` and unit-tested by\n# `promtool test rules deployment/prometheus/tests/*.yml`,\
     \ both run by\n# tests/harness/check_deployment.py (and CI).\n# =============================================================================\n\
     \ngroups:\n  - name: iap-market-data-health\n    rules:\n      # A single sequence gap marks the book\
-    \ stale and fail-closes the risk\n      # engine (configs/risk.json market_data.max_sequence_gap_before_halt\
+    \ stale and fail-closes the risk\n      # engine (configs/risk/risk.json market_data.max_sequence_gap_before_halt\
     \ = 1),\n      # so ANY gap is the incident \u2014 a rate threshold would miss the one gap\n     \
     \ # that silently stops trading. The counter is exported on every event\n      # (PLATFORM_CONVENTIONS.md\
     \ \xA712.6), so this fires on the next scrape.\n      - alert: SequenceGapDetected\n        expr:\
@@ -47,7 +47,7 @@ data:
     \     fail-closed (STALE_PRICE / SEQUENCE_GAP rejects). Runbook:\n            docs/runbooks/RUNBOOK_data_pipeline.md#stale-feed\n\
     \          runbook: docs/runbooks/RUNBOOK_data_pipeline.md\n\n      # Stale feed, judged on EVENT\
     \ time: the gap between the last two\n      # consecutive processed events exceeded the configured\
-    \ staleness budget\n      # (configs/risk.json market_data.stale_feed_timeout_ns = 5e9 ns). This\n\
+    \ staleness budget\n      # (configs/risk/risk.json market_data.stale_feed_timeout_ns = 5e9 ns). This\n\
     \      # is the same quantity the risk engine uses, so the alert and the\n      # engine agree \u2014\
     \ and it does NOT page on every historical replay the way\n      # `time() - md_last_event_unixtime`\
     \ did.\n      - alert: StaleFeed\n        expr: md_event_time_gap_seconds > 5\n        for: 1m\n \

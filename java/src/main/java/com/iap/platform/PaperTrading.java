@@ -318,7 +318,7 @@ public final class PaperTrading {
                 cfg.executionSeed(), cfg.impactCoeffBpsPerPctAdv(),
                 cfg.instruments(), cfg.venues());
         LinearZParams alphaParams = Alphas.loadParams(
-                opts.configsDir.resolve("strategies").resolve("alpha_params.json"))
+                ConfigService.resolve(opts.configsDir, ConfigService.ALPHA_PARAMS))
                 .get(opts.alphaId);
         if (alphaParams == null) {
             throw new IllegalArgumentException("unknown alpha id " + opts.alphaId);
@@ -434,14 +434,15 @@ public final class PaperTrading {
         // Adaptability monitoring (spec §20 step 13 / API_ADAPTIVE.md):
         // live-vs-backtest PSI drift, rolling realized IC, and the pinned
         // IC-gated lifecycle state machine evaluated once per event-time
-        // adaptive block (configs/strategies.json adaptive.*). Only rows
+        // adaptive block (configs/strategies/strategies.json adaptive.*). Only rows
         // with confidence > 0 feed the monitors — the same population the
         // research baseline was captured from. Observational only — never
         // feeds back into a trading decision, so determinism is untouched
         // (PLATFORM_CONVENTIONS.md §12.6: the alert text says so too).
         DriftMonitor drift = new DriftMonitor(
                 BaselineLoader.loadDir(opts.baselinesDir));
-        Path strategiesJson = opts.configsDir.resolve("strategies.json");
+        Path strategiesJson = ConfigService.resolve(opts.configsDir,
+                ConfigService.STRATEGIES);
         Map<String, Object> adaptiveCfg = cfg.adaptive();
         RollingIc rollingIc = new RollingIc(
                 RollingIc.parseHorizonNs(alphaParams.horizon()),
@@ -1085,7 +1086,7 @@ public final class PaperTrading {
     /**
      * FX converter for the backtest accounts: the rate of a quote currency
      * is the consolidated mid of the conversion pair named in
-     * configs/risk.json {@code currency.conversion}, read from the
+     * configs/risk/risk.json {@code currency.conversion}, read from the
      * engine's own books (same source and inversion rule as the risk
      * engine); a missing pair or mark fails closed.
      */

@@ -60,9 +60,9 @@ kubectl -n intraday-alpha get pods -w
 ## 2. Session checklist (start of paper session)
 
 1. Dashboards green: feed status non-zero, gap rate ~0, kill switch ARMED.
-2. `configs/risk.json` limits are the intended paper limits — any change went
+2. `configs/risk/risk.json` limits are the intended paper limits — any change went
    through review + audit log (GOVERNANCE.md §3).
-3. Strategy allow-list in `configs/strategies.json` matches the promotion
+3. Strategy allow-list in `configs/strategies/strategies.json` matches the promotion
    decision; alpha params (`configs/strategies/alpha_params.json`) match the
    promoted `model_version`'s manifest.
 4. Record the session header in the ops log: git commit, image tags/digests,
@@ -76,7 +76,7 @@ kubectl -n intraday-alpha get pods -w
    curl -s localhost:8080/status | python3 -m json.tool   # config_sha256
    head -2 <state-dir>/config_audit.jsonl                 # per-file sha256
    ```
-6. `configs/execution.json` controls are live, not decorative:
+6. `configs/execution/execution.json` controls are live, not decorative:
    `max_participation`, `min_slice_interval_ns`, `latency_budget_ns` and
    `sor.{prefer_rebate, max_venue_latency_ns}` are read by
    `PaperTrading`/`BacktestEngine` and enforced per decision
@@ -110,7 +110,7 @@ Watch the **Trading & Risk** dashboard:
   `alpha_lifecycle_state{alpha=...}` is **IC-gated, not PSI-gated**: WATCH when
   the rolling realized IC (`alpha_rolling_ic`) drops below `watch_ic_gate`,
   RETIRED after `retire_breach_evals` consecutive breaches, re-activation only
-  back to WATCH (`configs/strategies.json` `adaptive.lifecycle`,
+  back to WATCH (`configs/strategies/strategies.json` `adaptive.lifecycle`,
   API_ADAPTIVE.md §6). PSI never moves it.
   **And in the live loop it is OBSERVATIONAL** — a RETIRED alpha keeps trading
   at full size; nothing in `PaperTrading` reduces the target on this signal
@@ -129,7 +129,7 @@ Watch the **Trading & Risk** dashboard:
   (`exec_child_orders_rejected_total`), queue-position assumptions, and whether
   slippage moved with it — `exec_slippage_bps` is |fill − mark| in bps ×100
   (spread regime change is expected in high-vol regimes; see
-  `configs/generator.json` vol_regimes).
+  `configs/marketdata/generator.json` vol_regimes).
 - **Pre-trade rejects**. {#rejects}
   `PreTradeRejectRatioHigh` (> 50% of decisions rejected for 10 m) means the
   strategy is fighting a limit or a stale book. Read the rule distribution

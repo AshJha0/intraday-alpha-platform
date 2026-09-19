@@ -243,7 +243,7 @@ def test_golden_params_match_serialized_params(golden, models):
 
 def test_golden_backtest_eq01(golden_bt, models, eq_frame):
     cfg = golden_bt["config"]
-    inst = json.loads((CONFIGS_DIR / "instruments.json").read_text())["instruments"]
+    inst = json.loads((CONFIGS_DIR / "instruments" / "instruments.json").read_text())["instruments"]
     meta = {
         int(r["instrument_id"]): {
             "tick_size": float(r["tick_size"]),
@@ -255,7 +255,7 @@ def test_golden_backtest_eq01(golden_bt, models, eq_frame):
         for r in inst
     }
     cm = CostModel.load(
-        CONFIGS_DIR / "execution.json", multiplier=cfg["cost_multiplier"]
+        CONFIGS_DIR / "execution" / "execution.json", multiplier=cfg["cost_multiplier"]
     )
     bt = Backtester(
         cm,

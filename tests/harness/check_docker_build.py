@@ -10,9 +10,11 @@ With a Docker daemon this script builds all four images for real. Without one
 (the usual case in this environment — `docker info` reports no server) it does
 the next best thing, which is what actually catches the bug class:
 
-  1. materialise a CLEAN `git clone` of the working tree into a temp dir —
-     no cpp/build, no rust/target, no java/out, exactly what a fresh checkout
-     plus `.dockerignore` gives Docker as a build context;
+  1. materialise a CLEAN checkout of the working tree into a temp dir: every
+     file `git ls-files` tracks (so staged moves — `git mv` — are honoured
+     before they are committed), at its working-tree content, and nothing
+     else — no cpp/build, no rust/target, no java/out, exactly what a fresh
+     checkout plus `.dockerignore` gives Docker as a build context;
   2. apply the repository's `.dockerignore` to that clone, so the context is
      byte-for-byte what `docker build` would send;
   3. assert every `COPY <src> <dst>` of every stage resolves inside it;
@@ -88,11 +90,28 @@ def ignored(rel: str, rules: list[str]) -> bool:
 
 
 def build_context(dest: Path) -> tuple[int, int]:
-    """Clone HEAD into dest, then delete everything .dockerignore excludes."""
-    proc = run(["git", "clone", "--quiet", "--no-hardlinks", str(ROOT),
-                str(dest)], timeout=900)
+    """Materialise the tracked tree (index paths, working-tree content) into
+    dest, then delete everything .dockerignore excludes.
+
+    `git ls-files` rather than `git clone`: a clone reproduces HEAD, which
+    would silently test the PREVIOUS layout while a restructure (git mv +
+    edits) is staged but not yet committed. On a committed tree the two are
+    identical. A tracked file deleted from the working tree is skipped, so
+    the result is what the next commit would contain."""
+    proc = run(["git", "ls-files", "-z", "--cached", "--full-name"],
+               cwd=ROOT, timeout=300)
     if proc.returncode != 0:
-        raise RuntimeError(f"git clone failed: {proc.stderr.strip()}")
+        raise RuntimeError(f"git ls-files failed: {proc.stderr.strip()}")
+    dest.mkdir(parents=True, exist_ok=True)
+    for rel in proc.stdout.split("\0"):
+        if not rel:
+            continue
+        src = ROOT / rel
+        if not src.is_file():
+            continue  # staged deletion / rename source
+        target = dest / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, target)
     rules = dockerignore_rules()
     removed = 0
     kept = 0
@@ -151,21 +170,21 @@ def check_build_inputs(ctx: Path) -> None:
     # <golden>/../../configs; bench_all reads the same path AT RUNTIME.
     for rel in ["tests/golden/events_eq_mbo.jsonl",
                 "configs/strategies/alpha_params.json",
-                "configs/venues.json"]:
+                "configs/venues/venues.json"]:
         if not (ctx / rel).exists():
             problems.append(f"cpp: {rel} absent (ctest / bench_all read it)")
 
-    # Rust: rules.rs -> ../../configs/risk.json;
+    # Rust: rules.rs -> ../../configs/risk/risk.json;
     # golden_alpha.rs -> configs/strategies/alpha_params.json;
     # golden_features.rs -> ../../data/reference/feature_registry.json.
-    for rel in ["configs/risk.json",
+    for rel in ["configs/risk/risk.json",
                 "data/reference/feature_registry.json"]:
         if not (ctx / rel).exists():
             problems.append(f"rust: {rel} absent (cargo test reads it)")
 
     # Java: the entrypoint reads $IAP_CONFIG_DIR (default /app/configs) and
     # /golden/events_eq_mbo.jsonl and /app/baselines.
-    for rel in ["configs/risk.json", "configs/strategies/alpha_params.json",
+    for rel in ["configs/risk/risk.json", "configs/strategies/alpha_params.json",
                 "tests/golden/events_eq_mbo.jsonl", "research/baselines"]:
         if not (ctx / rel).exists():
             problems.append(f"java: {rel} absent (the entrypoint reads it)")
@@ -180,7 +199,7 @@ def check_build_inputs(ctx: Path) -> None:
 
 
 def check_java_build_stage(ctx: Path) -> None:
-    """Actually run the Java image's build-stage command in the clean clone."""
+    """Actually run the Java image's build-stage command in the clean checkout."""
     if not shutil.which("javac"):
         record("java_build_stage_runs", True, "javac absent — skipped")
         return

@@ -6,7 +6,7 @@ import java.util.TreeMap;
 import com.iap.config.Json;
 
 /**
- * Hard-risk limits ({@code configs/risk.json}, x-version 3 — the complete
+ * Hard-risk limits ({@code configs/risk/risk.json}, x-version 3 — the complete
  * pinned limit set plus the currency block; Rust reference
  * {@code rust/risk/src/limits.rs}).
  * Parsing is STRICT: any missing or invalid limit is an
@@ -128,7 +128,7 @@ public record RiskLimits(
         return (Boolean) v;
     }
 
-    /** Strict parse of a {@code configs/risk.json} document. */
+    /** Strict parse of a {@code configs/risk/risk.json} document. */
     public static RiskLimits fromJson(Map<String, Object> doc) {
         Object dupRaw = section(doc, "per_order").get("duplicate_order_window_ns");
         if (!(dupRaw instanceof Long)) {

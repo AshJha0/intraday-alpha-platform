@@ -5,7 +5,7 @@ package `iap` (`python/src/iap/`) is the reference; C++ (`cpp/`), Rust
 (`rust/`) and Java (`java/`, `com.iap.*`) must reproduce the semantics below
 **exactly** and pass the golden suite. Normative companions:
 `PLATFORM_CONVENTIONS.md` (binding), `schemas/FORMAT.md` (wire layout),
-`schemas/*.schema.json` (contracts, all `"x-version": 1`), `docs/SCENARIOS.md`
+`schemas/<domain>/*.schema.json` (contracts, all `"x-version": 1`; index in `schemas/README.md`), `docs/SCENARIOS.md`
 (real-world scenario → pinned behaviour → tests).
 
 ## 1. Types (exact layouts)
@@ -218,9 +218,9 @@ MIGRATIONS.md entry.
 
 ## 7. Reference data & configs the ports read
 
-`configs/instruments.json` (universe, tick_size, lot_size, sessions,
-calendar, fx_week), `configs/venues.json` (ids, fees, latency profiles),
-`configs/generator.json` (seeds — conventions §3). Prices convert via
+`configs/instruments/instruments.json` (universe, tick_size, lot_size, sessions,
+calendar, fx_week), `configs/venues/venues.json` (ids, fees, latency profiles),
+`configs/marketdata/generator.json` (seeds — conventions §3). Prices convert via
 `price_ticks * tick_size`; never floats on contracts.
 
 `ReferenceData` (Python reference) validates fail-fast at load: `tick_size >

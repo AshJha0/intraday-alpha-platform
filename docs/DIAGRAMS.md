@@ -38,7 +38,7 @@ flowchart TD
 ## 2. Cross-language golden-test topology
 
 How one validated Python reference pins four implementations. The parity table is
-printed by `tests/harness/run_all.sh` (python 626 · cpp 243 · rust 254 · java 448
+printed by `tests/harness/run_all.sh` (python 626 · cpp 243 · rust 254 · java 449
 tests; 65/45/47/85 in the golden groups — the Java gate runs all ten
 `*GoldenTest` classes).
 

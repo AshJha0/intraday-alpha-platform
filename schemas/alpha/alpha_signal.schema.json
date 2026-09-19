@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://iap.example/schemas/alpha_signal.schema.json",
+  "$id": "https://iap.example/schemas/alpha/alpha_signal.schema.json",
   "title": "AlphaSignal",
   "description": "Alpha model output (spec section 6).",
   "x-version": 1,

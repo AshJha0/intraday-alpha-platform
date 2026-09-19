@@ -83,7 +83,7 @@ shift-by-one leakage test, cost stress {0.5, 1, 2}x, latency stress
 {+0, +1, +5} events, and a volatility-regime IC split
 (`python/src/iap/validation/stress.py`). The FX cost model charges spread +
 2.5-per-million commission + linear impact
-(`configs/execution.json`). Signal definitions
+(`configs/execution/execution.json`). Signal definitions
 (`python/src/iap/alpha/fx.py`):
 
 - **FX01** (`fx_quote_imbalance`): `micro_mid_dev_bps_v1` on the
@@ -277,7 +277,7 @@ refusing promotion unless all three hold (spec §13, §20, §32).
   quoted in JPY the FX totals were JPY-dominated and wrong in *scale*
   (not in sign). The Python backtester now converts each instrument's P&L
   increment to USD at the prevailing mid of the configured conversion pair
-  before aggregating (`configs/risk.json` `currency.conversion`,
+  before aggregating (`configs/risk/risk.json` `currency.conversion`,
   `PLATFORM_CONVENTIONS.md` §11.6, `API_PORTFOLIO_TCA.md` §4) and fails
   closed when no rate prevails; capital for the day-2 backtest is likewise
   converted (`research/alpha_reports/run_all.py`).

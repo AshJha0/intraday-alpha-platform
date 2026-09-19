@@ -36,7 +36,7 @@ public class ReplayFillsGoldenTest {
 
     private static ExecConfig goldenConfig() {
         TreeMap<Integer, VenueSpec> venues = VenueSpec.loadVenues(
-                Paths.get("..", "configs", "venues.json"));
+                Paths.get("..", "configs", "venues", "venues.json"));
         TreeMap<Long, InstrumentSpec> instruments = new TreeMap<>();
         instruments.put(1L, new InstrumentSpec(1, 0.01, 1.0, 38_000_000.0));
         return new ExecConfig(LatencyConfig.DEFAULT, 20260829L, 2.0,

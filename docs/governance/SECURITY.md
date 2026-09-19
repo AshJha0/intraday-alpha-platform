@@ -41,7 +41,7 @@ it is a stopgap.
 Hard rule: **this repository contains no secrets, and configs are not
 secrets.**
 
-- `configs/*.json` (instruments, venues, generator, risk limits, execution,
+- `configs/<domain>/*.json` (instruments, venues, generator, risk limits, execution,
   strategies) are *behavioral configuration*: reviewed, versioned, deployed
   via the `iap-configs` ConfigMap / baked read-only into images. They are
   world-readable by design; nothing in them may be secret.

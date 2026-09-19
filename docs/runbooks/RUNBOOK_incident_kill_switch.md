@@ -40,7 +40,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST localhost:8080/admin/kill
   **realized + unrealized** (mark-to-market at the last consolidated mid,
   converted to the reporting currency USD) ≤ −`per_strategy.max_daily_loss`
   (50k) latches that strategy; global daily P&L ≤ −`global.max_daily_loss`
-  (250k) latches globally (`configs/risk.json`). The check runs after
+  (250k) latches globally (`configs/risk/risk.json`). The check runs after
   every fill AND after every market update of a held instrument — a
   position that is marked through the limit latches **with no fill at
   all**. Every latch and every rejected order is a `RiskEvent` in the
@@ -52,7 +52,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST localhost:8080/admin/kill
 - While engaged, every order in scope is rejected pre-trade
   (`risk_rejected_total` climbs); working orders must be cancelled by the
   execution layer (verify in §3).
-- Config-level master switch: `configs/risk.json`
+- Config-level master switch: `configs/risk/risk.json`
   `global.kill_switch_engaged: true` boots the engine already halted — the
   deploy-time hard stop.
 - Programmatic API (paper/live wiring, identical in `rust/risk` and
@@ -117,11 +117,11 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST localhost:8080/admin/kill
    Use when the process is not running, is not reachable, or when the halt
    must survive an image redeploy.
    ```bash
-   # configs/risk.json: "kill_switch_engaged": true
+   # configs/risk/risk.json: "kill_switch_engaged": true
    python3 deployment/k8s/generate_configmaps.py
    kubectl apply -f deployment/k8s/configmap-configs.yaml
    kubectl -n intraday-alpha rollout restart deployment/java-platform
-   # compose: edit configs/risk.json, then
+   # compose: edit configs/risk/risk.json, then
    docker compose -f deployment/docker/docker-compose.yml restart java-platform
    ```
    This path is real because the process reads `$IAP_CONFIG_DIR` — the mounted
@@ -131,7 +131,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST localhost:8080/admin/kill
    ```bash
    curl -s http://java-platform:8080/status | python3 -m json.tool  # config_sha256
    ```
-   Incident edits to `configs/risk.json` are the ONE allowed
+   Incident edits to `configs/risk/risk.json` are the ONE allowed
    review-after-the-fact change: commit within the hour with an
    `INCIDENT:` message; the audit-log entry still gets written
    (GOVERNANCE.md §3).
@@ -217,7 +217,7 @@ curl -sS -X POST $A/clear -H "Authorization: Bearer $TOKEN" \
 ```
 
 ```bash
-# 1. Revert configs/risk.json master switch if it was set (reviewed commit).
+# 1. Revert configs/risk/risk.json master switch if it was set (reviewed commit).
 # 2. Decide what the approval covers, then act in this order:
 #    a) Loss-limit latch, SAME session, trading resumes at a larger limit:
 #         override_loss_limit(scope, id, new_limit, ts, "approver <name> <ref>")

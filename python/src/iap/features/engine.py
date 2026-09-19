@@ -84,7 +84,7 @@ _BOOK_TOUCH = frozenset({
 
 @dataclass
 class FeatureVector:
-    """FeatureVector contract (schemas/feature_vector.schema.json)."""
+    """FeatureVector contract (schemas/features/feature_vector.schema.json)."""
 
     instrument_id: int
     timestamp: int

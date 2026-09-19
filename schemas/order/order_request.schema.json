@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://iap.example/schemas/order_request.schema.json",
+  "$id": "https://iap.example/schemas/order/order_request.schema.json",
   "title": "OrderRequest",
   "description": "Strategy order request (spec section 6). order_type: MARKET=1 LIMIT=2 IOC=3 FOK=4 PEG=5 MID=6.",
   "x-version": 1,

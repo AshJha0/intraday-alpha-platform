@@ -26,7 +26,7 @@ PYTHONPATH=src python3 -m pytest -q tests/test_model_economics.py     # cost-adj
 
 Currency (conventions §11.6): `Backtester(..., reporting_ccy="USD")`
 converts every instrument's P&L increment to USD at the prevailing mid of
-the conversion pair (`configs/risk.json` `currency.conversion`) before it
+the conversion pair (`configs/risk/risk.json` `currency.conversion`) before it
 is summed; `InstrumentResult.total_pnl_native` /
 `BacktestResult.total_pnl_native_by_ccy` keep the quote-currency figures.
 A non-USD P&L increment on a row with no prevailing rate raises — run the

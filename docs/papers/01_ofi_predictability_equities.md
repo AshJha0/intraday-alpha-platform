@@ -122,7 +122,7 @@ at-or-before the row's `exchange_ts`.
   sign, *and* positive net P&L at 1x costs; ITERATE requires IC ≥ 0.005 and
   t ≥ 1.5.
 - **Costs:** the research cost model (`python/src/iap/backtest/costs.py`,
-  `configs/execution.json`) charges half-spread + $0.003/share taker fee +
+  `configs/execution/execution.json`) charges half-spread + $0.003/share taker fee +
   linear impact (2.0 bps per pct-of-ADV), with a stress grid at {0.5, 1, 2}x.
 - **Execution lag:** the backtester never executes on the decision row
   (`latency_rows = 1` default in `python/src/iap/backtest/engine.py`).
@@ -291,7 +291,7 @@ this dataset.
 | EQ02/EQ03/EQ12 per-alpha metrics, folds, leakage, capacity | `research/alpha_reports/EQ02.json`, `EQ03.json`, `EQ12.json` |
 | alpha definitions and rationales | `python/src/iap/alpha/equity.py` |
 | OFI feature formulas | `python/src/iap/features/orderflow.py` |
-| cost model | `python/src/iap/backtest/costs.py`, `configs/execution.json` |
+| cost model | `python/src/iap/backtest/costs.py`, `configs/execution/execution.json` |
 | stress axes | `python/src/iap/validation/stress.py` |
 | data volumes and QC | `data/normalized/qc_report.json` |
 | generator design | `python/src/iap/marketdata/generator.py` |

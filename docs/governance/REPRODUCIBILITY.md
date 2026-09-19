@@ -61,7 +61,7 @@ Given `research/models/<run_id>/manifest.json`:
 # 1. Exact code + configs
 git checkout <manifest.git_commit>
 
-# 2. Regenerate the dataset (deterministic; seed pinned in configs/generator.json)
+# 2. Regenerate the dataset (deterministic; seed pinned in configs/marketdata/generator.json)
 cd python && PYTHONPATH=src python3 -m iap.marketdata
 
 # 3. Verify the dataset version matches (content hash of the .iap1 files)

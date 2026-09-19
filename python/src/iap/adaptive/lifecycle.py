@@ -28,7 +28,7 @@ the rolling OOS IC of the *deployed* scores over matured rows only):
 
 Gates (``watch_ic_gate``, ``reactivate_ic_gate``,
 ``retire_breach_evals``, ``reactivate_evals``) are pinned in
-``configs/strategies.json`` ``adaptive.lifecycle`` with
+``configs/strategies/strategies.json`` ``adaptive.lifecycle`` with
 ``reactivate_ic_gate >= watch_ic_gate`` enforced.  Comparisons are strict
 ``<`` for breach and inclusive ``>=`` for recovery (pinned).
 

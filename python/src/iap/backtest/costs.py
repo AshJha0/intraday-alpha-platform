@@ -1,4 +1,4 @@
-"""Research-backtester cost model (spec §18; configs/execution.json).
+"""Research-backtester cost model (spec §18; configs/execution/execution.json).
 
 Pinned per-execution cost of trading ``q`` units at a row with mid ``m``
 and half-spread ``hs`` (all in price units of the instrument):

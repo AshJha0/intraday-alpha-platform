@@ -29,9 +29,9 @@ path for stored data.
 - Native-port contract for the 40-feature core set: `API_FEATURES.md`.
 - No existing schema or golden changed (additive only).
 
-## 2026-08-29 — configs/risk.json v1 -> v2 + expected_risk_decisions.json (new golden)
+## 2026-08-29 — configs/risk/risk.json v1 -> v2 + expected_risk_decisions.json (new golden)
 
-- `configs/risk.json` extended from the skeleton to the complete pinned hard-risk
+- `configs/risk/risk.json` extended from the skeleton to the complete pinned hard-risk
   limit set (spec §16), now owned by the Rust risk engine (`rust/risk`, the
   reference implementation): added `global.order_rate_burst` and
   `per_instrument.max_instrument_notional`; removed the never-enforced
@@ -46,7 +46,7 @@ path for stored data.
   order, plus the pinned KILL/notification events. Every rule was validated by a
   dedicated unit test in `rust/risk/tests/rules.rs` before the vector was pinned;
   replays are deterministic and the audit log is byte-identical across runs.
-- `schemas/risk_event.schema.json` itself is unchanged (still v1).
+- `schemas/risk/risk_event.schema.json` itself is unchanged (still v1).
 
 ## 2026-08-29 — generator redesign (shared efficient price) + book semantics fixes; golden vectors regenerated
 
@@ -61,7 +61,7 @@ changed is pinned SEMANTICS plus the pinned synthetic vectors themselves:
   stream) with per-venue bounded AR(1) microstructure noise, venue latency on
   receive_ts, and per-slot repricing cancels of quotes the efficient price moved
   through. Measured consolidated crossed-book fraction on equities: **0.80%** of
-  event states (target < 2%). `configs/generator.json` equities keys changed:
+  event states (target < 2%). `configs/marketdata/generator.json` equities keys changed:
   `vol_regimes` is now `{sigma_ticks_per_s, switch_prob_per_s}` and `venue_noise`
   `{rho, sigma_ticks, max_ticks}` was added. Determinism unchanged (same seed =>
   byte-identical files; verified).
@@ -130,24 +130,24 @@ No `market_event` field changed (`market_event.schema.json` stays v1; the schema
   sequence resets are kept as new epochs instead of being discarded as duplicates. The pinned
   dataset (`data/`) is unchanged in content (verified: identical normalized JSONL; IAP1 files
   gain the v2 trailer on regeneration).
-- **Reference data** (`configs/instruments.json`): sessions gained `timezone` (IANA; `UTC` for
+- **Reference data** (`configs/instruments/instruments.json`): sessions gained `timezone` (IANA; `UTC` for
   the synthetic venues — UTC bounds unchanged) and the file gained `fx_week`; loading validates
   fail-fast. Generator config gained `equities.halt.reopen_auction` (default false — dataset
   unchanged) and `reopen_call_s`.
 - Migration path: every port re-runs its golden suite; adapters writing IAP1 get the trailer
   for free; any code that read the book counters must add the six new ones.
 
-## 2026-09-06 — configs/risk.json v2 -> v3 (currency), risk goldens v3 + audit/snapshot goldens, replay fills v1 -> v2, TCA golden v1 -> v2 (round-3 trading fixes)
+## 2026-09-06 — configs/risk/risk.json v2 -> v3 (currency), risk goldens v3 + audit/snapshot goldens, replay fills v1 -> v2, TCA golden v1 -> v2 (round-3 trading fixes)
 
-- **`configs/risk.json` x-version 3**: new `currency` block — `reporting_ccy` (USD) and
+- **`configs/risk/risk.json` x-version 3**: new `currency` block — `reporting_ccy` (USD) and
   `conversion[ccy] = {instrument_id, invert}` naming the FX pair whose last consolidated mid
   converts each quote currency into the reporting currency (`invert` for REPORTING/CCY pairs
   such as USD/JPY). Parsed strictly by both engines; a missing block fails closed
   (`CONFIG_MISSING`). Engines now take per-instrument reference data
-  (`InstrumentRef{tick_size, qty_unit, quote_ccy}` from `configs/instruments.json`) instead
+  (`InstrumentRef{tick_size, qty_unit, quote_ccy}` from `configs/instruments/instruments.json`) instead
   of a tick-size map; `notional = qty × qty_unit × price × tick × fx_rate`
   (PLATFORM_CONVENTIONS §11.1).
-- **`schemas/risk_event.schema.json` unchanged (v1)**; new `rule_id` values emitted:
+- **`schemas/risk/risk_event.schema.json` unchanged (v1)**; new `rule_id` values emitted:
   `FX_RATE_MISSING` (check 12, shifting `FAT_FINGER_NOTIONAL`..`STRATEGY_LOSS` to 13..22),
   `NOT_BOOTSTRAPPED`, `MALFORMED_FILL`, `LOSS_LIMIT_OVERRIDE`, `SESSION_ROLLED`,
   `BOOTSTRAP_COMPLETE`, `STATE_RESTORED`. Money in `reason` strings is now integer-scaled
@@ -173,7 +173,7 @@ No `market_event` field changed (`market_event.schema.json` stays v1; the schema
   pre-event reference, undefined markouts past the timeline end / across halts and
   `adverse_selection_n`. TCA records gain `adverse_selection_n`; undefined markouts are
   `null` instead of a fabricated last-state value.
-- **`configs/execution.json`** (still x-version 1): descriptions only — the controls it
+- **`configs/execution/execution.json`** (still x-version 1): descriptions only — the controls it
   declares (`max_participation`, `min_slice_interval_ns`, `latency_budget_ns`,
   `sor.prefer_rebate`, `sor.max_venue_latency_ns`) are now read and enforced by the Java
   `BacktestEngine` / `PaperTrading`.
@@ -203,7 +203,7 @@ stored feature parquet or an `alpha_params.json` written before this entry.
   above `FEATURE_MAX_QTY = 2^40` are not folded into any window and an
   oversized merged depth makes the view unusable. Java additionally builds the
   merged view from a per-venue depth cache like the other ports.
-- **Session time zones**: `configs/instruments.json` sessions MUST declare an
+- **Session time zones**: `configs/instruments/instruments.json` sessions MUST declare an
   IANA `timezone`; time-of-day features and 5-minute profile buckets are
   session-local. A missing timezone or a non-positive `tick_size` fails at
   start-up.
@@ -259,3 +259,76 @@ stored feature parquet or an `alpha_params.json` written before this entry.
 - Migration path: regenerate `data/features` (`python3 -m iap.features`), then
   `research/alpha_reports/run_all.py` (rewrites `alpha_params.json`), then the
   goldens under `python/tools/`, then `run_adaptive.py` / `run_ml.py`.
+
+## 2026-09-19 — Repository tree restructure (2026-09-19)
+
+Layout-only change: `configs/` and `schemas/` moved into the domain-folder
+blueprint of `PLATFORM_CONVENTIONS.md` §0. **No field of any schema or config
+changed, so every `x-version` is unchanged** (all seven schemas stay at 1;
+`risk.json` stays at 3, `alpha_params.json` at 2, the rest at 1). Every move
+was a `git mv` (history preserved). Golden vectors, expected outputs and the
+codec SHA-256 goldens are byte-identical before and after; the only golden
+edit is the descriptive `"config"` string in
+`tests/golden/expected_risk_decisions.json` (not hashed by any test).
+
+### configs/ — old → new
+
+| Old path | New path |
+|---|---|
+| `configs/instruments.json` | `configs/instruments/instruments.json` |
+| `configs/venues.json` | `configs/venues/venues.json` |
+| `configs/generator.json` | `configs/marketdata/generator.json` |
+| `configs/risk.json` | `configs/risk/risk.json` |
+| `configs/execution.json` | `configs/execution/execution.json` |
+| `configs/strategies.json` | `configs/strategies/strategies.json` |
+| `configs/strategies/alpha_params.json` | unchanged |
+
+Code consequences (semantics untouched):
+
+- Every loader resolves the nested name under the config directory it is
+  given (`--configs <dir>` / `$IAP_CONFIG_DIR` / built-in default, §12.2):
+  `iap.reference.refdata.ReferenceData.load`, `iap.features.context.build_contexts`,
+  `python3 -m iap.marketdata` (`<configs-dir>/marketdata/generator.json`),
+  `com.iap.config.ConfigService` (pinned names `ConfigService.{RISK, INSTRUMENTS,
+  VENUES, EXECUTION, STRATEGIES, GENERATOR, ALPHA_PARAMS}`), the Rust
+  `rust/risk` and `rust/alpha` tests, the C++ golden tests and `bench_all`.
+- `ConfigService` names a file by its relative path (`risk/risk.json`) in
+  `doc()/sha256()/reload()`, in the `file` field of `config_audit.jsonl` and in
+  the `config_sha256` digest (`<file>=<sha256>` lines sorted by name). The
+  digest value therefore differs from a pre-restructure session for the same
+  content — it is a per-session attribution value, not a golden.
+- The k8s ConfigMap `iap-configs` (generated by
+  `deployment/k8s/generate_configmaps.py`) keys every file by its relative
+  path with `/` encoded as `__` (`risk__risk.json`,
+  `strategies__alpha_params.json`, …); the `java-platform` Deployment and the
+  `data-pipeline` CronJob mount it with `items[].path` so the container sees
+  the nested tree at `IAP_CONFIG_DIR`. Compose bind-mounts the whole
+  `configs/` directory, so the tree is nested there by construction.
+
+### schemas/ — old → new
+
+| Old path | New path | `$id` (new) |
+|---|---|---|
+| `schemas/market_event.schema.json` | `schemas/market/market_event.schema.json` | `https://iap.example/schemas/market/market_event.schema.json` |
+| `schemas/book_update.schema.json` | `schemas/market/book_update.schema.json` | `https://iap.example/schemas/market/book_update.schema.json` |
+| `schemas/feature_vector.schema.json` | `schemas/features/feature_vector.schema.json` | `https://iap.example/schemas/features/feature_vector.schema.json` |
+| `schemas/alpha_signal.schema.json` | `schemas/alpha/alpha_signal.schema.json` | `https://iap.example/schemas/alpha/alpha_signal.schema.json` |
+| `schemas/order_request.schema.json` | `schemas/order/order_request.schema.json` | `https://iap.example/schemas/order/order_request.schema.json` |
+| `schemas/execution_report.schema.json` | `schemas/execution/execution_report.schema.json` | `https://iap.example/schemas/execution/execution_report.schema.json` |
+| `schemas/risk_event.schema.json` | `schemas/risk/risk_event.schema.json` | `https://iap.example/schemas/risk/risk_event.schema.json` |
+| `schemas/FORMAT.md`, `schemas/MIGRATIONS.md` | unchanged (root) | — |
+
+Each schema's `$id` now carries its folder; the `$id` is documentation (no
+`$ref` between schemas exists), so no validator behaviour changes. A new
+`schemas/README.md` indexes folder → file → x-version → contract → implementing
+types. Earlier entries in this file were rewritten to the new paths so their
+links resolve; the tables above are the record of what they used to say.
+
+### tests/ and research/ (same change set)
+
+- New `tests/integration/` (cross-component end-to-end runs) and
+  `tests/replay/` (determinism: same seed ⇒ identical bytes), run by
+  `tests/harness/run_all.sh` as two extra parity rows; `tests/README.md`
+  describes the six-level testing strategy.
+- New `research/experiments/` (README only) reserved for
+  `ExperimentSpec`/`ExperimentResult` documents.

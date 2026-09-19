@@ -158,7 +158,7 @@ public final class RiskEngine {
     }
 
     /**
-     * Build from a parsed {@code configs/risk.json} document: a parse
+     * Build from a parsed {@code configs/risk/risk.json} document: a parse
      * failure lands fail-closed instead of throwing (hard risk never runs
      * open).
      */
