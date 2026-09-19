@@ -389,3 +389,55 @@ no golden moved. Rules for the DDL (the portable type/keyword subset, the
 mapping of each contract to its table, the alpha-report → ExperimentResult
 mapping) are in `docs/DATA_MODEL.md`; a change to the DDL is a new
 `iap_vN.sql` + `iap.store.ddl.DDL_X_VERSION` bump + an entry here.
+
+## 2026-09-19 — Java ports of the cross-language contracts: `session_state.json` v1 -> v2, paper session report v2 -> v3
+
+Additive; no wire schema under `schemas/` changed. The Java platform gained
+byte-identical ports of the Phase 0 components (`com.iap.contracts.CanonicalJson`,
+`com.iap.trace`, `com.iap.lifecycle`; golden gates `CanonicalJsonGoldenTest`,
+`TraceGoldenTest`, `LifecycleGoldenTest`) and the paper-trading vertical now
+emits one `DecisionTrace` per decision cycle:
+
+- **`<state-dir>/session_state.json` x-version 1 -> 2** (`SessionStore.STATE_VERSION`):
+  new key `trace_lines` — the append cursor of `<state-dir>/decision_traces.jsonl`
+  (one canonical `trace/decision_trace.schema.json` line per decision cycle,
+  flushed at every checkpoint like `risk_audit.jsonl`). `--resume` compares the
+  file's line count with `trace_lines` (refusing on a mismatch, like
+  `audit_lines`) and rebuilds the running `TraceDigest` from exactly those lines.
+  Migration: a v1 state directory cannot be resumed by the v2 platform (the
+  version check fails closed); finish or archive the session first.
+- **Paper session report x-version 2 -> 3**: new block
+  `trace: {count, digest, jsonl}` — the number of traces, the running sha256
+  stream digest (`TraceDigest`, equal to `TraceDigest.ofJsonl(<jsonl>)`) and
+  the file path. `/status` gains `trace_count` / `trace_digest`; new metrics
+  `trace_records_total`, `trace_tca_skipped_total`.
+- **`configs/strategies/lifecycle.json`** is now a pinned platform config file
+  (`ConfigService.LIFECYCLE`, seventh `config_loaded` audit line; it enters
+  `config_sha256`).
+
+## 2026-09-19 — MVP loop (`iap.mvp`): new config documents + golden, no wire schema changed
+
+Additive; nothing under `schemas/` changed and no existing golden moved.
+`python -m iap.mvp` (docs/MVP.md) runs the whole loop on one synthetic
+equity and is pinned by a new golden:
+
+- **`configs/mvp/mvp.json` x-version 1** (`iap.mvp.config.MvpConfig`,
+  fail-fast validated): seed, instrument, venues, alphas, horizon, decision
+  cadence, session window, portfolio / execution / sor blocks and the
+  `reference` map naming every other document in force (their content hash
+  is the run's `config_version`). `configs/mvp/{instruments,venues,generator}.json`
+  are the MVP's own reference data (instrument `SYN.EQ.AAPL` id 12, venue
+  `XV3` id 3 — ids unused by the bundled universe) and generator config;
+  `mvp_tiny.json` / `generator_tiny.json` are the fast test variants.
+  `configs/venues/venues.json`, `configs/instruments/instruments.json` and the
+  bundled dataset are untouched.
+- **`tests/golden/expected_mvp.json` x-version 1** (`iap.mvp.golden`,
+  generator `python/tools/make_golden_mvp.py`, refuses overwrite without
+  `--force`): run / session id, config_version, event-stream sha256 +
+  data_version, n_events, trace digest, first / last trace ids, counts by
+  rule / venue / algo and the full report. Consumers:
+  `python/tests/test_mvp_golden.py`.
+- Run artefacts (`data/mvp/<run_id>/`, git-ignored): `feed.json` x-version 1,
+  `config.json` x-version 1, `report.json` x-version 1
+  (`iap.mvp.report.REPORT_VERSION`), `paper_evidence.json` x-version 1.
+  A change to any of these layouts bumps its version and adds an entry here.

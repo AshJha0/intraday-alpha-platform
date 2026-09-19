@@ -10,6 +10,8 @@ members = [
     "alpha",
     "risk",
     "venue",
+    "contracts",
+    "lifecycle",
 ]
 
 [workspace.package]
@@ -19,7 +21,10 @@ rust-version = "1.75"
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+# float_roundtrip: serde_json's default float parser is best-effort (up to
+# 1 ulp off on 17-digit inputs); the canonical-JSON / golden parity of the
+# contracts + lifecycle crates needs correctly rounded parsing.
+serde_json = { version = "1", features = ["float_roundtrip"] }
 
 # Keep `cargo test` fast (< 90s budget): golden replay + threading tests are
 # integer-heavy, so optimize even in the dev profile.

@@ -6,7 +6,7 @@ test run < 120 s.
 **CI** is `.github/workflows/ci.yml`, and it is the local
 `tests/harness/run_all.sh` split into parallel jobs: one per language, plus
 `tests/harness/run_golden.sh` (the GOVERNANCE promotion-gate-10 artefact: every
-language's golden group, including ALL ten Java `*GoldenTest` classes),
+language's golden group, including ALL thirteen Java `*GoldenTest` classes),
 `tests/harness/check_deployment.py` (promtool rules/config/unit tests, compose
 and Dockerfile checks, k8s manifests, ConfigMap sync, dashboard metric
 provenance) and an `images` job that builds the four container images and is
@@ -45,18 +45,39 @@ cd cpp && bash build.sh && ctest --test-dir build --output-on-failure
 ```
 
 C++17, g++13/CMake/GoogleTest/Eigen available; `-Wall -Wextra` clean; build with
-`-j2` (2-CPU environment).
+`-j2` (2-CPU environment). Layout: `include/iap/{marketdata,orderbook,features,
+alpha,execution,sor,replay,contracts,util}` + `src/` mirrors; `contracts/` is the
+canonical-JSON / decision-trace contract (`canonical_json.hpp`, `trace.hpp`),
+`util/sha256.hpp` the SHA-256 the codec goldens and the trace digest share. The
+golden group is `ctest --test-dir build -R Golden` (suites `*Golden`, including
+`CanonicalJsonGolden`, `TraceGolden`, `ReplayTraceGolden`).
 
 ## Rust
 
 ```bash
-cd rust && cargo test        # workspace
+cd rust && cargo test        # workspace (eleven crates)
 ```
+
+Crates: `marketdata`, `orderbook`, `replay`, `eventbus`, `telemetry`, `features`,
+`alpha`, `risk`, `venue`, `contracts` (canonical JSON with Python
+`json.dumps` byte parity, SHA-256, trace ids, `DecisionTrace` records, JSONL
+trace sink + digest, `explain()`) and `lifecycle` (alpha promotion state
+machine: gate table, 17-edge transition table, live rolling-IC rules,
+byte-identical `research/alpha_registry.json`). Golden targets run by
+`tests/harness/run_all.sh`: `golden_marketdata`, `golden_book`, `golden_features`,
+`golden_alpha`, `golden_risk`, `golden_replay`, `golden_canonical_json`,
+`golden_trace`, `golden_lifecycle`. The lifecycle golden reads
+`configs/strategies/{lifecycle,strategies}.json` and
+`research/alpha_registry.json` relative to the crate (the Docker image copies
+them).
 
 Rust 1.95, crates.io reachable; keep deps to serde/serde_json only (`rand` was
 permitted historically but is NOT used — the pinned RNG is SplitMix64,
 conventions §3 — and SECURITY.md §1 allows serde/serde_json alone) (+ crossbeam
-where justified); zero warnings.
+where justified); zero warnings. `serde_json` is built with its
+`float_roundtrip` feature (workspace `Cargo.toml`): the default parser is
+best-effort on 17-digit decimals (up to 1 ulp off), which would break the
+canonical-JSON byte parity the contracts / lifecycle goldens pin.
 
 ## Java — why there is NO Maven build
 
@@ -80,6 +101,15 @@ otherwise declare is exactly:
 No other third-party Java dependencies are permitted; if a future wave needs
 one, it must be vendored into `java/lib/` and recorded here (this file is the
 normative pom-equivalent list, referenced from the top-level README).
+
+The cross-language contract ports added on 2026-09-19 — `com.iap.contracts`
+(canonical JSON, Python-`repr` float layout, sha256 helpers),
+`com.iap.trace` (decision-trace records, JSONL sink, stream digest,
+`explain()`), `com.iap.lifecycle` (alpha promotion lifecycle + registry) —
+use only the JDK (`java.security.MessageDigest`, `java.math`); the golden
+gates `CanonicalJsonGoldenTest`, `TraceGoldenTest`, `LifecycleGoldenTest`
+are listed in `tests/harness/run_all.sh` `JAVA_GOLDEN_CLASSES`, which
+`check_deployment.py` keeps equal to the `*GoldenTest.java` set on disk.
 
 ## Benchmarks
 

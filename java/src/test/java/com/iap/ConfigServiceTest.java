@@ -46,7 +46,8 @@ public class ConfigServiceTest {
     public void pinnedFilesUseTheDomainLayout() {
         assertEquals(List.of("risk/risk.json", "instruments/instruments.json",
                 "venues/venues.json", "execution/execution.json",
-                "strategies/strategies.json", "marketdata/generator.json"),
+                "strategies/strategies.json", "marketdata/generator.json",
+                "strategies/lifecycle.json"),
                 List.of(ConfigService.PINNED_FILES));
         assertEquals("strategies/alpha_params.json", ConfigService.ALPHA_PARAMS);
         for (String name : ConfigService.PINNED_FILES) {
@@ -79,7 +80,7 @@ public class ConfigServiceTest {
     public void auditTrailCarriesSha256PerFile() {
         ConfigService cfg = new ConfigService(CONFIGS);
         List<ConfigService.Audit> audit = cfg.auditTrail();
-        assertEquals(6, audit.size());
+        assertEquals(7, audit.size());
         for (ConfigService.Audit a : audit) {
             assertEquals("config_loaded", a.action());
             assertEquals(64, a.sha256().length());
@@ -92,7 +93,7 @@ public class ConfigServiceTest {
                 .findFirst().orElseThrow().sha256());
         // JSONL renders one parseable sorted-key object per line
         String jsonl = cfg.auditJsonl();
-        assertEquals(6, jsonl.lines().count());
+        assertEquals(7, jsonl.lines().count());
         jsonl.lines().forEach(line -> {
             Map<String, Object> obj = Json.object(Json.parse(line));
             assertEquals(List.of("action", "bytes", "file", "previous_sha256",
@@ -107,7 +108,7 @@ public class ConfigServiceTest {
         ConfigService cfg = new ConfigService(dir);
         String before = cfg.sha256(ConfigService.RISK);
         assertFalse("no change yet", cfg.reload(ConfigService.RISK));
-        assertEquals(6, cfg.auditTrail().size());
+        assertEquals(7, cfg.auditTrail().size());
         // mutate the file -> reload reports the change and audits it
         Path risk = ConfigService.resolve(dir, ConfigService.RISK);
         String text = new String(Files.readAllBytes(risk),

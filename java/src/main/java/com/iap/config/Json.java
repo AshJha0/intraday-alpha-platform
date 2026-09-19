@@ -19,15 +19,29 @@ import java.util.Map;
  */
 public final class Json {
     private final String s;
+    private final boolean wideIntegers;
     private int pos;
 
-    private Json(String s) {
+    private Json(String s, boolean wideIntegers) {
         this.s = s;
+        this.wideIntegers = wideIntegers;
     }
 
     /** Parse a complete JSON document; rejects trailing content. */
     public static Object parse(String text) {
-        Json p = new Json(text);
+        return parse(text, false);
+    }
+
+    /**
+     * Parse a complete JSON document. With {@code wideIntegers} an integer
+     * token outside the i64 domain becomes a {@link java.math.BigInteger}
+     * (the u64 upper half keeps its decimal value) instead of the bit
+     * pattern {@code Long} the platform's id-carrying documents use; this
+     * is the representation the canonical-JSON tree
+     * ({@code com.iap.contracts.CanonicalJson}) serialises exactly.
+     */
+    public static Object parse(String text, boolean wideIntegers) {
+        Json p = new Json(text, wideIntegers);
         p.ws();
         Object v = p.value();
         p.ws();
@@ -223,6 +237,9 @@ public final class Json {
         try {
             return Long.parseLong(token);
         } catch (NumberFormatException e) {
+            if (wideIntegers) {
+                return new java.math.BigInteger(token);
+            }
             return Long.parseUnsignedLong(token);
         }
     }

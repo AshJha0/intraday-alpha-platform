@@ -177,7 +177,7 @@ public class PlatformConfigTest {
                 com.iap.platform.SessionStore.CONFIG_AUDIT);
         assertTrue("config_audit.jsonl written", Files.exists(audit));
         var lines = PaperFixtures.lines(audit);
-        assertEquals("one config_loaded line per pinned file", 6, lines.size());
+        assertEquals("one config_loaded line per pinned file", 7, lines.size());
         for (String line : lines) {
             Map<String, Object> doc = PaperFixtures.json(line);
             assertEquals("config_loaded", doc.get("action"));

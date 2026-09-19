@@ -245,6 +245,21 @@ Golden state sequence (breach, neutral-zone reset, retirement, recovery,
 re-activation, relapse): `expected_adaptive.json` → `"lifecycle"` —
 exact states and transitions.
 
+**Promotion lifecycle (pointer).** The ACTIVE/WATCH/RETIRED rules above are
+the live sub-machine of the full seven-state promotion lifecycle
+(RESEARCH → CANDIDATE → VALIDATING → PAPER → ACTIVE ⇄ WATCH → RETIRED;
+Python `iap.lifecycle`, Java `com.iap.lifecycle`; policy
+`configs/strategies/lifecycle.json` + this file's `adaptive.lifecycle`
+block; golden `tests/golden/expected_lifecycle.json`, Java
+`LifecycleGoldenTest`). The lifecycle service delegates the live edges to
+`LifecycleTracker` / `LifecycleGauge` unchanged and wraps each transition
+into a `LifecycleTransition` (`gates = {"rolling_ic": …}`, `policy =
+lifecycle_v1`, `actor = SYSTEM`); `LiveEvidence.informative = false` or
+`rolling_ic = null` evaluates nothing. One difference of scope: on the
+platform RETIRED is terminal for the system (re-entry is a HUMAN reset to
+RESEARCH); the RETIRED → WATCH recovery above models shadow scoring inside
+one adaptive backtest.
+
 ## 7. Adaptive walk-forward backtest (reference semantics)
 
 `iap.backtest.adaptive.AdaptiveDeployment`: warmup `warmup_ns` (fit +

@@ -32,6 +32,8 @@ add_library(iap_core STATIC
   src/execution/execution.cpp
   src/execution/algos.cpp
   src/sor/sor.cpp
+  src/contracts/canonical_json.cpp
+  src/contracts/trace.cpp
 )
 target_include_directories(iap_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 if(TARGET Eigen3::Eigen)
@@ -67,6 +69,9 @@ iap_add_test(test_alpha_golden)
 iap_add_test(test_execution)
 iap_add_test(test_exec_algos)
 iap_add_test(test_replay_fills)
+iap_add_test(test_canonical_json_golden)
+iap_add_test(test_trace_golden)
+iap_add_test(test_replay_trace)
 
 # -------------------------------------------------------------------- tools
 # One-shot golden generator (expected_replay_fills.json; refuses overwrite).

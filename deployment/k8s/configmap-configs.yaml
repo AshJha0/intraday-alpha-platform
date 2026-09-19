@@ -1076,6 +1076,17 @@ data:
       },
       "x-version": 2
     }
+  strategies__lifecycle.json: "{\n  \"x-version\": 1,\n  \"description\": \"Pinned alpha promotion lifecycle\
+    \ policy (iap.lifecycle; RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE -> WATCH -> RETIRED).\
+    \ The promotion gate thresholds equal the spec section 20 gates pinned in iap.validation.validate.GATES;\
+    \ the ACTIVE/WATCH/RETIRED rules are NOT duplicated here \u2014 they stay in strategies.json adaptive.lifecycle\
+    \ and are reused unchanged. Every number is a threshold a port must reproduce exactly; tests/golden/expected_lifecycle.json\
+    \ embeds the merged config.\",\n  \"policy\": \"lifecycle_v1\",\n  \"gates\": {\n    \"min_experiments_in_ledger\"\
+    : 1,\n    \"min_oos_ic\": 0.01,\n    \"min_nw_tstat\": 3.0,\n    \"min_fold_sign_consistency\": 0.7,\n\
+    \    \"min_folds\": 3,\n    \"min_net_return_bps\": 0.0,\n    \"min_capacity_usd\": 1000000.0,\n \
+    \   \"max_ic_rank_gap\": 1.0,\n    \"ic_rank_gap_eps\": 1e-12,\n    \"max_holdout_ic_gap\": 0.01,\n\
+    \    \"min_paper_sessions\": 5,\n    \"max_paper_ic_gap\": 0.01,\n    \"min_paper_net_pnl\": 0.0,\n\
+    \    \"max_kill_events\": 0\n  },\n  \"demotion\": {\n    \"max_consecutive_failures\": 3\n  }\n}\n"
   strategies__strategies.json: "{\n  \"x-version\": 1,\n  \"description\": \"Strategy registry skeleton;\
     \ alpha waves extend. All disabled by default. The 'adaptive' block pins the adaptability layer (drift\
     \ thresholds, refit policies, lifecycle gates) \u2014 see /API_ADAPTIVE.md.\",\n  \"adaptive\": {\n\

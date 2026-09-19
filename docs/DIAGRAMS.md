@@ -491,7 +491,7 @@ erDiagram
 | Full architecture narrative, per-language engineering notes | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | Governing institutional specification (verbatim) | [SPECIFICATION.md](SPECIFICATION.md) |
 | Teaching walkthrough of every subsystem | [../LEARN.md](../LEARN.md) |
-| 21 runnable recipes | [../COOKBOOK.md](../COOKBOOK.md) |
+| 24 runnable recipes | [../COOKBOOK.md](../COOKBOOK.md) |
 | Data model, views, SQLite/PostgreSQL portability, query cookbook | [DATA_MODEL.md](DATA_MODEL.md) |
 | Six research papers from the platform's own numbers | [papers/INDEX.md](papers/INDEX.md) |
 | Benchmark methodology + results | [../benchmarks/RESULTS.md](../benchmarks/RESULTS.md) |

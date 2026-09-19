@@ -73,13 +73,19 @@ public final class ConfigService {
     public static final String GENERATOR = "marketdata/generator.json";
     /** {@code strategies/alpha_params.json} — fitted alpha parameters. */
     public static final String ALPHA_PARAMS = "strategies/alpha_params.json";
+    /**
+     * {@code strategies/lifecycle.json} — alpha promotion lifecycle policy
+     * (x-version 1): promotion gates + demotion counter; the live gates stay
+     * in {@link #STRATEGIES} {@code adaptive.lifecycle}.
+     */
+    public static final String LIFECYCLE = "strategies/lifecycle.json";
 
     /**
      * The pinned platform config files, in load order (relative paths under
      * the config directory). Every one must exist and validate at startup.
      */
     public static final String[] PINNED_FILES = {RISK, INSTRUMENTS, VENUES,
-        EXECUTION, STRATEGIES, GENERATOR};
+        EXECUTION, STRATEGIES, GENERATOR, LIFECYCLE};
 
     /** Resolve a relative config name ('/'-separated) under a directory. */
     public static Path resolve(Path configsDir, String name) {
@@ -175,6 +181,18 @@ public final class ConfigService {
         sorOptions();
         com.iap.risk.RiskLimits.fromJson(riskDoc());
         adaptive();
+        lifecyclePolicy();
+    }
+
+    /**
+     * The merged alpha-lifecycle policy: {@code strategies/lifecycle.json}
+     * (gates + demotion) and {@code strategies.json adaptive.lifecycle}
+     * (live gates), validated fail-fast with file and key named
+     * (PLATFORM_CONVENTIONS.md §12.2).
+     */
+    public com.iap.lifecycle.PolicyConfig lifecyclePolicy() {
+        return com.iap.lifecycle.PolicyConfig.fromDocs(doc(LIFECYCLE), LIFECYCLE,
+                doc(STRATEGIES), STRATEGIES);
     }
 
     /**

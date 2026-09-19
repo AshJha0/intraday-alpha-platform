@@ -102,6 +102,8 @@ spec:
                     path: risk/risk.json
                   - key: strategies__alpha_params.json
                     path: strategies/alpha_params.json
+                  - key: strategies__lifecycle.json
+                    path: strategies/lifecycle.json
                   - key: strategies__strategies.json
                     path: strategies/strategies.json
                   - key: venues__venues.json

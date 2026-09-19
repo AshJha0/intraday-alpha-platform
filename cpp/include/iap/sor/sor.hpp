@@ -22,6 +22,17 @@
 //
 // All iteration is in ascending venue_id order — same candidates + same
 // books => same route.
+//
+// Explainability: score_aggressive / score_passive return the candidate
+// table the router evaluated for the same inputs — one SorCandidate per
+// candidate venue (sorted by venue id) carrying the displayed best on the
+// side the router looked at, the fee profile, the eligibility verdict and
+// the 1-based preference rank among eligible venues (rank 1 == the venue
+// route_* returns; ineligible venues, including open venues showing
+// nothing on the needed side, carry eligible=false / rank 0). This is the
+// VenueDecision.candidates table of the decision trace
+// (schemas/execution/venue_decision.schema.json); it is computed only when
+// a trace sink is attached, never on the routing call itself.
 
 #pragma once
 
@@ -40,6 +51,19 @@ struct SorOptions {
     std::int64_t max_venue_latency_ns = INT64_MAX;
 };
 
+// One row of the router's candidate table (see header).
+struct SorCandidate {
+    std::uint16_t venue_id = 0;
+    bool eligible = false;
+    std::int64_t displayed_price_ticks = 0;  // 0 = none on the needed side
+    std::int64_t displayed_qty = 0;
+    double taker_fee = 0.0;
+    double maker_rebate = 0.0;
+    double commission_per_million = 0.0;
+    std::int64_t latency_mean_ns = 0;
+    std::uint16_t rank = 0;  // 1-based among eligible; 0 when ineligible
+};
+
 class SmartOrderRouter {
 public:
     explicit SmartOrderRouter(const std::map<std::uint16_t, VenueSpec>& venues,
@@ -56,12 +80,26 @@ public:
         const ConsolidatedBook& book, std::uint8_t side,
         const std::vector<std::uint16_t>& candidates) const;
 
+    // Candidate table of the corresponding route_* call (rank 1 == its
+    // result). `out` is cleared first; throws on an empty candidate list.
+    void score_aggressive(const ConsolidatedBook& book, std::uint8_t side,
+                          const std::vector<std::uint16_t>& candidates,
+                          std::vector<SorCandidate>& out) const;
+    void score_passive(const ConsolidatedBook& book, std::uint8_t side,
+                       const std::vector<std::uint16_t>& candidates,
+                       std::vector<SorCandidate>& out) const;
+
     const SorOptions& options() const { return options_; }
 
 private:
     // The venue book when the venue is eligible, else nullptr.
     const OrderBook* eligible(const ConsolidatedBook& book,
                               std::uint16_t vid) const;
+    // Shared body of score_*: fills the rows, then ranks the eligible ones
+    // with the comparator of the corresponding route_* rule.
+    void score(const ConsolidatedBook& book, std::uint8_t side,
+               const std::vector<std::uint16_t>& candidates, bool passive,
+               std::vector<SorCandidate>& out) const;
 
     std::map<std::uint16_t, VenueSpec> venues_;
     SorOptions options_;

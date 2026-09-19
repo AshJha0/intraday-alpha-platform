@@ -44,6 +44,9 @@ import com.iap.risk.RiskEngine;
 import com.iap.risk.RiskEvent;
 import com.iap.risk.RiskFill;
 import com.iap.risk.RiskLimits;
+import com.iap.trace.JsonlTraceSink;
+import com.iap.trace.PortfolioTargetRec;
+import com.iap.trace.TraceDigest;
 
 /**
  * Paper-trading mode (spec §20 step 11 / §31): streams the normalized
@@ -66,6 +69,16 @@ import com.iap.risk.RiskLimits;
  * shutdown hook. {@code --resume} restores them, so a restart mid-session
  * keeps positions, realized P&amp;L and any latched kill switch: the daily
  * loss limit is a daily limit, not a per-restart limit.
+ *
+ * <p><b>Decision traces.</b> Every pre-trade decision cycle is recorded as
+ * one {@code DecisionTrace} ({@link PaperTraces}: signal → sizing target →
+ * risk decision → parent/child order → routing → fills → TCA at the parent's
+ * end → attribution) and written to {@code <state-dir>/decision_traces.jsonl}
+ * as canonical JSON, drained at every checkpoint like the risk audit. The
+ * running {@code TraceDigest} (sha256 over every line) is carried in the
+ * session report ({@code trace.digest} / {@code trace.count}) and on
+ * {@code /status}; {@code --resume} rebuilds it from the persisted lines and
+ * continues it.
  *
  * <p>Portfolio sizing: on every completed 1-minute bar (once
  * {@code >= 22} bars exist) the production optimizer solves the pinned
@@ -209,6 +222,10 @@ public final class PaperTrading {
         public double rollingIc = Double.NaN;
         /** Final lifecycle state per the pinned thresholds. */
         public LifecycleGauge.State lifecycle = LifecycleGauge.State.ACTIVE;
+        /** Running decision-trace digest (sha256 hex; live during the session). */
+        public volatile String traceDigest = TraceDigest.EMPTY;
+        /** Decision traces emitted so far (live during the session). */
+        public volatile long traceCount;
 
         // ---- live/observability state (§12.5) ----
         /** Current session lifecycle (drives probes and the state gauge). */
@@ -406,6 +423,31 @@ public final class PaperTrading {
             }
         }
 
+        // The trace stream is guarded the same way: its line count must equal
+        // the checkpoint's trace_lines, and the running digest is rebuilt from
+        // exactly those lines (every line re-parsed and re-canonicalised).
+        Path traceFile = store.file(SessionStore.DECISION_TRACES);
+        JsonlTraceSink traceSink;
+        if (opts.resume) {
+            TraceDigest digest = Files.exists(traceFile)
+                    ? TraceDigest.ofJsonl(traceFile) : new TraceDigest();
+            if (digest.count() != st.traceLines) {
+                throw new IllegalStateException("--resume: " + traceFile + " has "
+                        + digest.count() + " lines but " + SessionStore.SESSION_STATE
+                        + " records trace_lines=" + st.traceLines
+                        + " (torn append, truncated file, or traces from a"
+                        + " different session): refusing to resume");
+            }
+            traceSink = new JsonlTraceSink(traceFile, true, digest);
+        } else {
+            traceSink = new JsonlTraceSink(traceFile);
+        }
+        res.traceDigest = traceSink.digest().hexDigest();
+        res.traceCount = traceSink.count();
+        String dataVersion = com.iap.codec.Sha256.hex(Files.readAllBytes(opts.eventsFile));
+        String modelVersion = com.iap.codec.Sha256.hex(Files.readAllBytes(
+                ConfigService.resolve(opts.configsDir, ConfigService.ALPHA_PARAMS)));
+
         // ------------------------------------------------------ risk engine
         RiskEngine risk;
         if (opts.resume) {
@@ -427,9 +469,13 @@ public final class PaperTrading {
             double barMid = Double.NaN;
             double weightScale = 1.0;
             double positionWeight; // current position / maxPos
+            PgdResult lastSolve;   // null until the first solve
         }
         Sizing sizing = new Sizing();
         BacktestEngine[] engineHolder = new BacktestEngine[1];
+        PaperTraces[] tracesHolder = new PaperTraces[1];
+        final String portfolioVersion = sizingProblemVersion(opts.maxPos);
+        final String featureVersion = PaperTraces.engineFeatureVersion();
 
         // Adaptability monitoring (spec §20 step 13 / API_ADAPTIVE.md):
         // live-vs-backtest PSI drift, rolling realized IC, and the pinned
@@ -512,8 +558,11 @@ public final class PaperTrading {
                         }
                         sizing.lastMid = sizing.barMid;
                         if (sizing.barReturns.size() >= 22) {
-                            sizing.weightScale = solveWeight(sizing.barReturns,
+                            sizing.lastSolve = solveWeight(sizing.barReturns,
                                     sig.expectedReturn(), sizing.positionWeight);
+                            sizing.weightScale = sizing.lastSolve.feasible()
+                                    ? Math.min(Math.abs(sizing.lastSolve.weights()[0]), 1.0)
+                                    : Math.min(Math.abs(sizing.positionWeight), 1.0);
                             reg.counter("portfolio_solves_total").inc();
                         }
                     }
@@ -521,11 +570,31 @@ public final class PaperTrading {
                 }
                 sizing.barMid = mid;
             }
-            if (sig.confidence() < opts.confMin || sig.expectedReturn() == 0.0) {
+            long target = 0;
+            if (sig.confidence() >= opts.confMin && sig.expectedReturn() != 0.0) {
+                target = Math.round(Math.signum(sig.expectedReturn())
+                        * sizing.weightScale * opts.maxPos);
+            }
+            // Trace stage 1+2: the signal and the sizing target this event
+            // produced (the portfolio stage exists once a solve has run).
+            BacktestEngine.Account acct = engineHolder[0] == null ? null
+                    : engineHolder[0].accounts().get(opts.instrumentId);
+            long prevQty = acct == null ? 0 : acct.position;
+            PortfolioTargetRec portfolio = null;
+            if (sizing.lastSolve != null) {
+                double weight = (double) target / opts.maxPos;
+                portfolio = new PortfolioTargetRec(PaperTraces.STRATEGY_ID,
+                        vec.timestamp, portfolioVersion, featureVersion, modelVersion,
+                        sizing.lastSolve.status(), sizing.lastSolve.objective(),
+                        Math.abs(weight - sizing.positionWeight),
+                        List.of(new PortfolioTargetRec.Leg(opts.instrumentId, target,
+                                weight, sig.expectedReturn() * 1e4, prevQty)));
+            }
+            tracesHolder[0].onSignal(vec.timestamp, sig.expectedReturn(),
+                    sig.confidence(), target, prevQty, portfolio);
+            if (target == 0) {
                 return 0;
             }
-            long target = Math.round(Math.signum(sig.expectedReturn())
-                    * sizing.weightScale * opts.maxPos);
             sizing.positionWeight = (double) target / opts.maxPos;
             return target;
         };
@@ -536,11 +605,18 @@ public final class PaperTrading {
         double unit = exec.instrument(opts.instrumentId).qtyUnit();
         ExecMetrics execMetrics = new ExecMetrics(wiring, reg, engineHolder,
                 exec);
+        PaperTraces traces = new PaperTraces(traceSink, execMetrics, exec,
+                cfg.sorOptions(), opts.instrumentId, opts.alphaId, dataVersion,
+                modelVersion, res.configSha256,
+                RollingIc.parseHorizonNs(alphaParams.horizon()), opts.venueId,
+                engineHolder, reg);
+        tracesHolder[0] = traces;
+        wiring.traces = traces;
         BacktestEngine.RiskHook hook = wiring.hook();
 
         BacktestEngine.FxConverter fx = marketFxConverter(cfg, engineHolder);
         BacktestEngine engine = new BacktestEngine(exec, strategy, hook,
-                execMetrics, fx, opts.maxPos, opts.venueId, cfg.executionLimits(),
+                traces, fx, opts.maxPos, opts.venueId, cfg.executionLimits(),
                 cfg.sorOptions());
         engineHolder[0] = engine;
 
@@ -613,7 +689,7 @@ public final class PaperTrading {
                         stf.fillCount = execMetrics.fills();
                         stf.ordersSubmitted = execMetrics.submitted();
                         auditCursor[0] = checkpoint(store, risk, stf,
-                                auditBase, auditCursor[0], equityPeak[0]);
+                                auditBase, auditCursor[0], equityPeak[0], traceSink);
                     } catch (RuntimeException ignored) {
                         // a shutdown hook must never throw
                     }
@@ -635,6 +711,7 @@ public final class PaperTrading {
                 // on THIS thread at an event boundary, so the resulting
                 // RiskEvent carries the current event time (§12.5).
                 admin.drain();
+                traces.beginEvent(ev);
                 long t0 = System.nanoTime();
                 engine.onEvent(ev);
                 hBook.record(System.nanoTime() - t0);
@@ -651,6 +728,10 @@ public final class PaperTrading {
                 res.eventsProcessed = progress[0];
                 res.eventsPending = events.size() - (i + 1);
                 res.halted = risk.killSwitchEngaged();
+                if (traceSink.count() != res.traceCount) {
+                    res.traceCount = traceSink.count();
+                    res.traceDigest = traceSink.digest().hexDigest();
+                }
                 // exposure / drawdown gauges (same money unit as risk, §12.1)
                 BacktestEngine.Account a =
                         engine.accounts().get(opts.instrumentId);
@@ -676,13 +757,14 @@ public final class PaperTrading {
                         st.fillCount = execMetrics.fills();
                         st.ordersSubmitted = execMetrics.submitted();
                         auditCursor[0] = checkpoint(store, risk, st,
-                                auditBase, auditCursor[0], equityPeak[0]);
+                                auditBase, auditCursor[0], equityPeak[0], traceSink);
                     }
                 }
             }
             BacktestEngine.Summary summary;
             synchronized (checkpointLock) {
                 summary = engine.finish();
+                traces.finish();
                 sampleBookHealth(cGaps, cDups, gStale, engine, opts.instrumentId,
                         bookHealth);
                 gc.sample();
@@ -733,7 +815,9 @@ public final class PaperTrading {
                 st.ordersSubmitted = res.ordersSubmitted;
                 st.configSha256 = res.configSha256;
                 checkpoint(store, risk, st, auditBase, auditCursor[0],
-                        equityPeak[0]);
+                        equityPeak[0], traceSink);
+                res.traceDigest = traceSink.digest().hexDigest();
+                res.traceCount = traceSink.count();
                 res.state = SessionState.FINISHED;
                 gSessionState.set(SessionState.FINISHED.code());
             }
@@ -775,7 +859,7 @@ public final class PaperTrading {
      */
     private static long checkpoint(SessionStore store, RiskEngine risk,
             SessionStore.State st, long auditBase, long auditCursor,
-            double equityPeak) {
+            double equityPeak, JsonlTraceSink traces) {
         List<RiskEvent> audit = risk.audit();
         StringBuilder sb = new StringBuilder(256);
         for (int i = (int) auditCursor; i < audit.size(); i++) {
@@ -783,6 +867,8 @@ public final class PaperTrading {
         }
         store.appendJsonl(SessionStore.RISK_AUDIT, sb.toString());
         st.auditLines = auditBase + audit.size();
+        traces.flush();
+        st.traceLines = traces.count();
         st.equityPeak = equityPeak;
         store.writeAtomic(SessionStore.RISK_SNAPSHOT, risk.snapshot());
         store.writeAtomic(SessionStore.SESSION_STATE, st.toJson());
@@ -900,6 +986,8 @@ public final class PaperTrading {
          */
         long riskOrderSeq;
         private long pendingRiskId;
+        /** Trace recorder notified of every pre-trade decision (nullable). */
+        PaperTraces traces;
 
         public RiskWiring(RiskEngine risk, String strategyId, int venueId,
                 MetricsRegistry reg) {
@@ -999,6 +1087,10 @@ public final class PaperTrading {
                         .record(System.nanoTime() - t0);
                 if (!d.allowed()) {
                     reg.counter("exec_child_orders_rejected_total").inc();
+                }
+                if (traces != null) {
+                    traces.onRiskDecision(orderId, delta > 0 ? 0 : 1, Math.abs(delta),
+                            ts, d);
                 }
                 return d.allowed() ? delta : 0;
             };
@@ -1123,7 +1215,7 @@ public final class PaperTrading {
      * weight scale: the optimizer returns w_prev with {@code feasible ==
      * false} and the caller must not act on it.
      */
-    private static double solveWeight(List<Double> barReturns,
+    private static PgdResult solveWeight(List<Double> barReturns,
             double expectedReturn, double positionWeight) {
         double[][] rets = new double[barReturns.size()][1];
         for (int i = 0; i < barReturns.size(); i++) {
@@ -1132,16 +1224,42 @@ public final class PaperTrading {
         double[][] sigma = EwmaCovariance.estimate(rets);
         Constraints cons = new Constraints(new double[] {-1.0},
                 new double[] {1.0});
-        cons.participation = new double[] {0.5};
-        cons.volTarget = 5e-4; // per-bar vol target (pinned sizing choice)
-        PgdResult sol = PortfolioOptimizer.solve(
+        cons.participation = new double[] {SIZING_PARTICIPATION};
+        cons.volTarget = SIZING_VOL_TARGET;
+        return PortfolioOptimizer.solve(
                 new double[] {expectedReturn}, sigma,
-                new double[] {positionWeight}, 6.0, new double[] {1e-4}, cons,
-                new SolverParams(null, 0.01, 100, 4, 1e-7));
-        if (!sol.feasible()) {
-            return Math.min(Math.abs(positionWeight), 1.0); // hold
-        }
-        return Math.min(Math.abs(sol.weights()[0]), 1.0);
+                new double[] {positionWeight}, SIZING_RISK_AVERSION,
+                new double[] {SIZING_COST_BPS}, cons,
+                new SolverParams(null, SIZING_STEP, SIZING_MAX_ITER, SIZING_PATIENCE,
+                        SIZING_FEAS_TOL));
+    }
+
+    // The pinned single-asset sizing problem (PLATFORM_CONVENTIONS.md §12,
+    // "Portfolio sizing"); its content hash is the traces' portfolio_version.
+    private static final double SIZING_PARTICIPATION = 0.5;
+    private static final double SIZING_VOL_TARGET = 5e-4; // per-bar vol target
+    private static final double SIZING_RISK_AVERSION = 6.0;
+    private static final double SIZING_COST_BPS = 1e-4;
+    private static final double SIZING_STEP = 0.01;
+    private static final int SIZING_MAX_ITER = 100;
+    private static final int SIZING_PATIENCE = 4;
+    private static final double SIZING_FEAS_TOL = 1e-7;
+
+    /** {@code portfolio_version}: content hash of the sizing problem (constraints + solver). */
+    static String sizingProblemVersion(long maxPos) {
+        Map<String, Object> problem = new TreeMap<>();
+        problem.put("box", List.of(-1.0, 1.0));
+        problem.put("participation", SIZING_PARTICIPATION);
+        problem.put("vol_target", SIZING_VOL_TARGET);
+        problem.put("risk_aversion", SIZING_RISK_AVERSION);
+        problem.put("cost_bps", SIZING_COST_BPS);
+        problem.put("step", SIZING_STEP);
+        problem.put("max_iter", (long) SIZING_MAX_ITER);
+        problem.put("patience", (long) SIZING_PATIENCE);
+        problem.put("feas_tol", SIZING_FEAS_TOL);
+        problem.put("covariance", "ewma_1min_bars");
+        problem.put("max_pos", maxPos);
+        return com.iap.contracts.CanonicalJson.contentHash(problem);
     }
 
     /**
@@ -1205,7 +1323,9 @@ public final class PaperTrading {
                 + ",\"lifecycle\":\"" + res.lifecycle
                 + "\",\"mode\":\"" + (opts.realtime ? "realtime" : "asap")
                 + "\",\"restarts\":" + res.restarts
-                + ",\"status\":\"" + res.state.label() + "\"}";
+                + ",\"status\":\"" + res.state.label()
+                + "\",\"trace_count\":" + res.traceCount
+                + ",\"trace_digest\":\"" + res.traceDigest + "\"}";
     }
 
     private static String pct(MetricsRegistry reg, String name) {
@@ -1274,7 +1394,11 @@ public final class PaperTrading {
                 .append("},\"state_dir\":\"")
                 .append(esc(store.dir().toString()))
                 .append("\",\"status\":\"").append(res.state.label())
-                .append("\",\"x-version\":2}");
+                .append("\",\"trace\":{\"count\":").append(res.traceCount)
+                .append(",\"digest\":\"").append(res.traceDigest)
+                .append("\",\"jsonl\":\"")
+                .append(esc(store.file(SessionStore.DECISION_TRACES).toString()))
+                .append("\"},\"x-version\":3}");
         return sb.toString();
     }
 
