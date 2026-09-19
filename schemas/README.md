@@ -38,6 +38,17 @@ canonical instance per type.
 | `alpha/` | `lifecycle_transition.schema.json` | 1 | An alpha moving between lifecycle states RESEARCH → CANDIDATE → VALIDATING → PAPER → ACTIVE → WATCH → RETIRED (names on the wire), with the gate results, policy and actor (SYSTEM/HUMAN). | `iap.contracts.types.LifecycleTransition` (`iap.adaptive.lifecycle` is the ACTIVE/WATCH/RETIRED sub-machine) / — / — / `com.iap.monitoring` |
 | `trace/` | `decision_trace.schema.json` | 1 | The auditable chain for one decision: `trace_id` (first 128 bits of sha256 over `session|instrument|event_ts|sequence`), the four version hashes, and every stage output by `$ref` to the schemas above; `$defs` carry `MarketEventRef`, `BookSnapshotRef`, `FeatureVectorRef`, `Attribution`. Rendered by `iap.contracts.explain`. | `iap.contracts.types.DecisionTrace` / — / — / — |
 
+## Relational data model — `sql/iap_v1.sql`
+
+`schemas/sql/iap_v1.sql` (x-version 1) is the portable DDL (SQLite 3 and
+PostgreSQL ≥ 13, unchanged) that every contract above maps into: one table
+per contract (nested `$defs` records are embedded), the research artefacts
+(`research/experiments.json`, alpha reports, model manifests, baselines) and
+three views over the decision chain. It is applied and populated by
+`python -m iap.store build` and documented in
+[`docs/DATA_MODEL.md`](../docs/DATA_MODEL.md). The store is a derived index
+of the flat files, never their replacement.
+
 Where a language column says "research reference", the Python code produces
 the same fields in pandas frames and JSON reports but is not a wire-level
 port; where it says "no … subsystem", that is by design (see

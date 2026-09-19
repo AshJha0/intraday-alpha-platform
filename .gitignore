@@ -39,3 +39,6 @@ python/dist/
 # accounting and audit JSONL are runtime artefacts of a session, not sources.
 /java/out/state/
 /data/state/
+
+# --- derived store (rebuild with `python -m iap.store build`; docs/DATA_MODEL.md)
+/data/store/

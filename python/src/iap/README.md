@@ -120,6 +120,109 @@ iap/
                    metrics; checked i64 arithmetic (OverflowError = Rust panic).
     serialize.py   serde_json-identical canonical JSON (ryu float layout, sorted
                    keys, escaping) for the audit lines and the snapshot.
+  research/        Contract-driven research: ExperimentSpec in, ExperimentResult
+                   out (iap.contracts.protocols.ExperimentRunner), persisted under
+                   research/experiments/<experiment_id>/{spec,result}.json and
+                   counted in the multiple-testing ledger research/experiments.json.
+    specs.py       build_spec(alpha_id, horizon, configuration, ...): versions
+                   from iap.experiment.tracker, pinned configuration keys
+                   (n_folds, embargo_ns, cost_multiplier, latency_ns,
+                   max_decision_age_ns, flatten_at_session_end — run_all.py's
+                   defaults), periods derived from the session calendar
+                   (train = earlier sessions, validation = purge+embargo tail,
+                   test = last session), model_definition_hash,
+                   experiment_id = content_hash(spec without id)[:16].
+    runner.py      ExperimentRunner(feature_store_dir, ledger_path, out_dir,
+                   configs_dir, dry_run=, frames=): validate_alpha over the
+                   experiment window (purged + embargoed walk-forward, leakage,
+                   NW t, fold consistency, hypothesis sign, stress, §20 verdict)
+                   + a holdout backtest (fit on train, test period at
+                   cost_multiplier) for the bps economics; 21 looks per run in
+                   the ledger; build_result maps the report onto the contract
+                   (a NaN metric raises ResearchError, never a value);
+                   created_ts = test_period.end_ts; canonical JSON persistence,
+                   refuses a rerun that reproduces different numbers.
+    registry.py    ExperimentRegistry(root): experiment_ids / load / records /
+                   find(alpha_id=, horizon=, verdict=) with strict validation.
+    golden.py      The pinned golden experiment (EQ03 @ 5s on the golden equity
+                   vector) shared by tools/make_golden_research.py and
+                   tests/test_research_golden.py.
+    __main__.py    `python -m iap.research run --alpha EQ03 [--horizon 1s]
+                   [--config k=v] [--seed N] [--dry-run] | list | show <id>` —
+                   result table, verdict and the ledger's expected-max-|t| note.
+  lifecycle/       Alpha promotion lifecycle RESEARCH -> CANDIDATE -> VALIDATING
+                   -> PAPER -> ACTIVE -> WATCH -> RETIRED (LifecycleState 0..6)
+                   with a gate at every edge; extends (never alters) the
+                   ACTIVE/WATCH/RETIRED tracker of iap.adaptive.lifecycle.
+    config.py      PolicyConfig = configs/strategies/lifecycle.json (x-version 1:
+                   promotion-gate thresholds equal to validate.GATES, demotion
+                   max_consecutive_failures) + strategies.json adaptive.lifecycle
+                   (the live gates, not duplicated); fail-fast loader.
+    evidence.py    Evidence(research: ExperimentResult, capacity_usd,
+                   validation: ValidationEvidence, paper: PaperEvidence,
+                   live: LiveEvidence) — finite scalars only, strict to/from_dict.
+    gates.py       GATE_SPECS: the gate table (name, block, metric, min/max/gt/
+                   bool comparison, config key) -> Gate objects satisfying
+                   LifecycleGate; stability = |ic - rank_ic| / max(|ic|, eps).
+    machine.py     ALLOWED_TRANSITIONS (table-driven edges: PROMOTION / DEMOTION /
+                   LIVE / MANUAL) and AlphaLifecycle (advance / retire /
+                   reset_to_research); live edges wrap LifecycleTracker's
+                   Transition into a LifecycleTransition; RETIRED is terminal for
+                   SYSTEM; every advance records a GateEvaluation.
+    registry.py    AlphaRecord / AlphaRegistry (research/alpha_registry.json,
+                   x-version 1, byte-deterministic) and LifecycleTransitionLog
+                   (research/lifecycle_transitions.jsonl, canonical JSON lines,
+                   schema-validated).
+    bootstrap.py   Report -> ExperimentResult mapping (gate_ic / uncrossed t),
+                   run_bootstrap over the 24 flagship alphas at the pinned event
+                   time (latest fold test_end), render_status.
+    golden.py      The LC01/LC02/LC03 scripted scenarios behind
+                   tests/golden/expected_lifecycle.json
+                   (python/tools/make_golden_lifecycle.py).
+    __main__.py    `python -m iap.lifecycle bootstrap [--dry-run] | status |
+                   retire <ID> --reason ... | reset <ID> --reason ...`.
+  store/           The platform data model (schemas/sql/iap_v1.sql, x-version 1:
+                   portable DDL for SQLite 3 + PostgreSQL >= 13) over sqlite3 —
+                   a derived, rebuildable INDEX of the flat-file artefacts,
+                   never their replacement (docs/DATA_MODEL.md).
+    ddl.py         load_ddl / split_statements (strip `--` comments, split on
+                   `;` outside quotes) / apply(conn); DDL_X_VERSION.
+    db.py          Store: open(path|":memory:"), init(); insert_<type>() for
+                   every contract type (validate_typed first, INSERT OR REPLACE
+                   by PK, one transaction per call); insert_trace decomposes a
+                   DecisionTrace into alpha_signals / portfolio_targets(+legs) /
+                   risk_decisions / parent_orders / child_orders /
+                   venue_decisions / executions / tca_results / attribution
+                   linked by trace_id; get_trace, explain(parent_order_id) with
+                   venue names from the venues table, fetch(T, **where), query,
+                   export_jsonl (canonical lines, PK order), counts.
+    importers.py   import_reference / import_experiments_ledger /
+                   import_alpha_reports (pinned report -> ExperimentSpec+Result
+                   mapping; NaN -> skipped + warning, never a crash) /
+                   import_experiment_documents / import_lifecycle_log /
+                   import_lifecycle_transitions / import_alpha_registry /
+                   import_tca_orders / import_model_runs / import_baselines /
+                   import_all — each returns ImportReport(inserted, warnings).
+    __main__.py    `python -m iap.store build [--db data/store/iap.sqlite] |
+                   explain <parent_order_id> | sql "<query>"`.
+  trace/           Building, persisting, digesting and explaining DecisionTraces.
+    builder.py     TraceBuilder(session_id, instrument_id, event_ts, sequence,
+                   data/feature/model/config_version).add_signal/set_portfolio/
+                   add_risk/add_parent_order/add_child_order/add_routing/
+                   add_fill/add_tca/set_attribution -> build() (validated;
+                   trace_id = make_trace_id).
+    sinks.py       MemoryTraceSink, JsonlTraceSink(path) (one canonical_json
+                   line per trace, flushed), StoreTraceSink(store), MultiSink —
+                   all satisfy iap.contracts.protocols.TraceSink.
+    digest.py      TraceDigest: streaming sha256 over `canonical_json(trace) +
+                   "\n"` per trace — the replay-determinism digest (same seed
+                   => same hexdigest); of_jsonl(path) re-canonicalises a file.
+    explain.py     explain (re-export), explain_jsonl(path, parent_order_id).
+    attribution.py attribute(parent, signal, tca, realized_bps) -> Attribution
+                   with the pinned decomposition (alpha = side-signed expected
+                   return in bps; spread/impact/fees/timing = -TCA costs; total
+                   = sum); the residual vs realized P&L is reported separately
+                   (attribution_report / residual_bps), never hidden.
 ```
 
 Tests live in `python/tests/` (run: `cd python && PYTHONPATH=src python3 -m
@@ -130,4 +233,5 @@ used to validate golden states; `python/tools/make_golden.py` (re)generates
 Dependencies are declared in `python/pyproject.toml` (1.1.0): numpy, pandas,
 scipy, scikit-learn, pyarrow, jsonschema, referencing; extras `ml`
 (xgboost, lightgbm) and `dev` (pytest, pyyaml). Console entry points:
-`iap-marketdata`, `iap-features`, `iap-tca`.
+`iap-marketdata`, `iap-features`, `iap-tca`, `iap-research`, `iap-lifecycle`,
+`iap-store`.

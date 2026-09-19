@@ -1,0 +1,29 @@
+{
+  "alpha_id": "EQ06",
+  "configuration": {
+    "cost_multiplier": 1.0,
+    "embargo_ns": 60000000000,
+    "flatten_at_session_end": true,
+    "latency_ns": 1000000000,
+    "max_decision_age_ns": 60000000000,
+    "n_folds": 4
+  },
+  "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
+  "experiment_id": "4a2900e4a6705542",
+  "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
+  "horizon": "1s",
+  "model_version": "50ec14851692f0e04fbdd7ac46d92f7a0104f6989f548b525a8eea923d33acf4",
+  "seed": 20260919,
+  "test_period": {
+    "end_ts": 1787691480577291027,
+    "start_ts": 1787616005708237294
+  },
+  "train_period": {
+    "end_ts": 1787615944708237294,
+    "start_ts": 1787529602028520532
+  },
+  "validation_period": {
+    "end_ts": 1787616005708237294,
+    "start_ts": 1787615944708237294
+  }
+}

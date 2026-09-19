@@ -111,7 +111,8 @@ intraday-alpha-platform/
   docs/                     SPECIFICATION.md, ARCHITECTURE.md, BUILD_NOTES.md,
                             runbooks/, governance/, papers/, diagrams/
   schemas/                  versioned JSON Schema contracts by domain (market/
-                            features/ alpha/ order/ execution/ risk/) + README.md
+                            features/ alpha/ order/ execution/ risk/ portfolio/
+                            tca/ research/ trace/) + sql/ (portable DDL) + README.md
                             index, FORMAT.md (wire layout), MIGRATIONS.md
   configs/                  by domain: instruments/ venues/ marketdata/ risk/
                             execution/ strategies/ (incl. fitted alpha_params.json)
@@ -234,9 +235,10 @@ golden tests — the engineering discipline this repo is built around
 | document | what it covers |
 |---|---|
 | [LEARN.md](LEARN.md) | textbook walkthrough: microstructure, generator, book, features, honest alpha research, ML/meta-labeling, portfolio, risk, execution, TCA, parity, latency economics, adaptability (drift/refit/lifecycle), pitfalls, interview Q&A |
-| [COOKBOOK.md](COOKBOOK.md) | 19 task-oriented recipes with runnable commands |
+| [COOKBOOK.md](COOKBOOK.md) | 21 task-oriented recipes with runnable commands |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | system design, per-language responsibilities, contracts, determinism, golden topology, hot-path notes, observability, deployment |
-| [docs/DIAGRAMS.md](docs/DIAGRAMS.md) | all six architecture diagrams on one page (pipeline, golden topology, paper trading, responsibility matrix, risk decision flow, queue-position model) |
+| [docs/DIAGRAMS.md](docs/DIAGRAMS.md) | all seven architecture diagrams on one page (pipeline, golden topology, paper trading, responsibility matrix, risk decision flow, queue-position model, data model) |
+| [docs/DATA_MODEL.md](docs/DATA_MODEL.md) | the relational data model (`schemas/sql/iap_v1.sql`, SQLite + PostgreSQL): every table, the views, portability rules, how the store indexes the flat-file artefacts, query cookbook |
 | [docs/index.html](docs/index.html) + [docs/GITHUB_PAGES.md](docs/GITHUB_PAGES.md) | the GitHub Pages landing site and how to publish it (Settings → Pages → main branch, /docs folder) |
 | [docs/SPECIFICATION.md](docs/SPECIFICATION.md) | the governing institutional specification (verbatim) |
 | [PLATFORM_CONVENTIONS.md](PLATFORM_CONVENTIONS.md) | binding conventions: types, serialization, determinism, book semantics, golden rules, trading contracts (§11: risk engine, execution simulator, SOR/algos, paper wiring, currency) |

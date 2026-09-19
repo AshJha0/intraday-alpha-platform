@@ -1,8 +1,8 @@
 {
-  "bonferroni_p_threshold": 6.578947368421052e-05,
-  "bonferroni_t_threshold": 3.9910209275478836,
+  "bonferroni_p_threshold": 5.780346820809249e-05,
+  "bonferroni_t_threshold": 4.021602810506129,
   "description": "Multiple-testing ledger (spec \u00a713). Deterministic: no wall-clock; identical rerun => identical file. Experiments are de-duplicated by (alpha_id, kind, canonical config): re-running the same script does not inflate the Bonferroni denominator.",
-  "distinct_experiments": 65,
+  "distinct_experiments": 70,
   "entries": [
     {
       "alpha_id": "ALL",
@@ -1281,10 +1281,225 @@
         "net_pnl": -131076.08286263118,
         "refits": 7
       }
+    },
+    {
+      "alpha_id": "EQ03",
+      "config": {
+        "alpha_id": "EQ03",
+        "configuration": {
+          "cost_multiplier": 1.0,
+          "embargo_ns": 60000000000,
+          "flatten_at_session_end": true,
+          "latency_ns": 1000000000,
+          "max_decision_age_ns": 60000000000,
+          "n_folds": 4
+        },
+        "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
+        "experiment_id": "d7b554d0a3fa3b26",
+        "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
+        "horizon": "1s",
+        "model_version": "b63867f3c6ac0d050bf6f5d54d0cc610d899139f46242395a91144885765d2b9",
+        "seed": 20260919,
+        "test_period": {
+          "end_ts": 1787691480577291027,
+          "start_ts": 1787616005708237294
+        },
+        "train_period": {
+          "end_ts": 1787615944708237294,
+          "start_ts": 1787529602028520532
+        },
+        "validation_period": {
+          "end_ts": 1787616005708237294,
+          "start_ts": 1787615944708237294
+        }
+      },
+      "count": 21,
+      "key": "57e02cff51d30f4a61885d32f90d9e08d40935d9e4bf5f0e4c240fbf78bf1359",
+      "kind": "experiment_runner",
+      "n": 781,
+      "reruns": 3,
+      "result": {
+        "experiment_id": "d7b554d0a3fa3b26",
+        "nw_tstat": 3.925832741366989,
+        "oos_ic": 0.018457199630622693,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "EQ01",
+      "config": {
+        "alpha_id": "EQ01",
+        "configuration": {
+          "cost_multiplier": 1.0,
+          "embargo_ns": 60000000000,
+          "flatten_at_session_end": true,
+          "latency_ns": 1000000000,
+          "max_decision_age_ns": 60000000000,
+          "n_folds": 4
+        },
+        "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
+        "experiment_id": "c73bb6294d226163",
+        "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
+        "horizon": "1s",
+        "model_version": "995362d0c53e541bd1f9db90c65ef1cb32e34e98dbb7e9afb121925d2db6625d",
+        "seed": 20260919,
+        "test_period": {
+          "end_ts": 1787691480577291027,
+          "start_ts": 1787616005708237294
+        },
+        "train_period": {
+          "end_ts": 1787615944708237294,
+          "start_ts": 1787529602028520532
+        },
+        "validation_period": {
+          "end_ts": 1787616005708237294,
+          "start_ts": 1787615944708237294
+        }
+      },
+      "count": 21,
+      "key": "ae5a04b5ce25d6921f32232c37f9d7863affead394efb81d064f324a2df0ff78",
+      "kind": "experiment_runner",
+      "n": 802,
+      "reruns": 2,
+      "result": {
+        "experiment_id": "c73bb6294d226163",
+        "nw_tstat": 4.349182887171232,
+        "oos_ic": 0.024070918077187736,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "EQ06",
+      "config": {
+        "alpha_id": "EQ06",
+        "configuration": {
+          "cost_multiplier": 1.0,
+          "embargo_ns": 60000000000,
+          "flatten_at_session_end": true,
+          "latency_ns": 1000000000,
+          "max_decision_age_ns": 60000000000,
+          "n_folds": 4
+        },
+        "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
+        "experiment_id": "4a2900e4a6705542",
+        "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
+        "horizon": "1s",
+        "model_version": "50ec14851692f0e04fbdd7ac46d92f7a0104f6989f548b525a8eea923d33acf4",
+        "seed": 20260919,
+        "test_period": {
+          "end_ts": 1787691480577291027,
+          "start_ts": 1787616005708237294
+        },
+        "train_period": {
+          "end_ts": 1787615944708237294,
+          "start_ts": 1787529602028520532
+        },
+        "validation_period": {
+          "end_ts": 1787616005708237294,
+          "start_ts": 1787615944708237294
+        }
+      },
+      "count": 21,
+      "key": "a2b5f20fb025b1d1b903c6c4e511788cdb1eeba65ac790d2656c4d0cf46cbb0d",
+      "kind": "experiment_runner",
+      "n": 823,
+      "reruns": 2,
+      "result": {
+        "experiment_id": "4a2900e4a6705542",
+        "nw_tstat": 1.5832557028077545,
+        "oos_ic": 0.01611467292714124,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "EQ03",
+      "config": {
+        "alpha_id": "EQ03",
+        "configuration": {
+          "cost_multiplier": 1.0,
+          "embargo_ns": 60000000000,
+          "flatten_at_session_end": true,
+          "latency_ns": 1000000000,
+          "max_decision_age_ns": 60000000000,
+          "n_folds": 4
+        },
+        "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
+        "experiment_id": "217fa0cb1d89a9c8",
+        "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
+        "horizon": "5s",
+        "model_version": "f02f49dd0daef381be157888951293578edf1f07b56d5c8cff32a36002e06a2c",
+        "seed": 20260919,
+        "test_period": {
+          "end_ts": 1787691480577291027,
+          "start_ts": 1787616005708237294
+        },
+        "train_period": {
+          "end_ts": 1787615940708237294,
+          "start_ts": 1787529602028520532
+        },
+        "validation_period": {
+          "end_ts": 1787616005708237294,
+          "start_ts": 1787615940708237294
+        }
+      },
+      "count": 21,
+      "key": "68bf37a44ff18f72adcc65cfd40c0927d9e2e1a9936f6b6a9d528c597cc492d7",
+      "kind": "experiment_runner",
+      "n": 844,
+      "reruns": 3,
+      "result": {
+        "experiment_id": "217fa0cb1d89a9c8",
+        "nw_tstat": 4.890146800078435,
+        "oos_ic": 0.02989435566006399,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "EQ06",
+      "config": {
+        "alpha_id": "EQ06",
+        "configuration": {
+          "cost_multiplier": 1.0,
+          "embargo_ns": 60000000000,
+          "flatten_at_session_end": true,
+          "latency_ns": 1000000000,
+          "max_decision_age_ns": 60000000000,
+          "n_folds": 4
+        },
+        "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
+        "experiment_id": "d0dd1ab0711d33a1",
+        "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
+        "horizon": "10s",
+        "model_version": "fad2af862625cbd16569ae8d4092cf85705dc9ba8983f1e8d0a804059fc177ff",
+        "seed": 20260919,
+        "test_period": {
+          "end_ts": 1787691480577291027,
+          "start_ts": 1787616005708237294
+        },
+        "train_period": {
+          "end_ts": 1787615935708237294,
+          "start_ts": 1787529602028520532
+        },
+        "validation_period": {
+          "end_ts": 1787616005708237294,
+          "start_ts": 1787615935708237294
+        }
+      },
+      "count": 21,
+      "key": "8d1335e8be108f781a2098ff137754f27d0596f84e7b8a61cf482828183add23",
+      "kind": "experiment_runner",
+      "n": 865,
+      "reruns": 2,
+      "result": {
+        "experiment_id": "d0dd1ab0711d33a1",
+        "nw_tstat": 2.6476652234211966,
+        "oos_ic": 0.04040044552713451,
+        "verdict": "ITERATE"
+      }
     }
   ],
-  "expected_max_null_t": 3.6423394771164253,
+  "expected_max_null_t": 3.6776975152755234,
   "pinned_alpha": 0.05,
-  "total_experiments": 760,
+  "total_experiments": 865,
   "x-version": 1
 }

@@ -25,6 +25,9 @@ dev = ["pytest", "pyyaml"]
 iap-marketdata = "iap.marketdata.__main__:main"
 iap-features = "iap.features.__main__:main"
 iap-tca = "iap.tca.__main__:main"
+iap-research = "iap.research.__main__:main"
+iap-lifecycle = "iap.lifecycle.__main__:main"
+iap-store = "iap.store.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

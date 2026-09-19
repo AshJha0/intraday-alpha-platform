@@ -377,3 +377,15 @@ pinned, enums documented in each description):
 - Migration path: none for stored data (additive). Producers of portfolio,
   risk, execution, SOR, TCA and research outputs adopt the typed contracts
   and validate before persisting.
+
+## 2026-09-19 — Phase 0 store: `schemas/sql/iap_v1.sql` (relational data model, v1)
+
+Additive: a new folder `schemas/sql/` holding the portable DDL (SQLite 3 /
+PostgreSQL ≥ 13, one file, `schema_version.x_version = 1`) that indexes
+every contract above plus the research artefacts, and the Python package
+`iap.store` (`Store`, importers, `python -m iap.store build|explain|sql`)
+that builds it under the git-ignored `data/store/`. No JSON schema changed;
+no golden moved. Rules for the DDL (the portable type/keyword subset, the
+mapping of each contract to its table, the alpha-report → ExperimentResult
+mapping) are in `docs/DATA_MODEL.md`; a change to the DDL is a new
+`iap_vN.sql` + `iap.store.ddl.DDL_X_VERSION` bump + an entry here.

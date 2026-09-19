@@ -28,6 +28,8 @@ Contents:
 17. [Add a new feature to the registry](#17-add-a-new-feature-to-the-registry)
 18. [Run the adaptive policy comparison (drift → refit → retire)](#18-run-the-adaptive-policy-comparison-drift--refit--retire)
 19. [Watch live drift in paper trading](#19-watch-live-drift-in-paper-trading)
+20. [Build the platform store and query it](#20-build-the-platform-store-and-query-it)
+21. [Explain an order (the decision trace)](#21-explain-an-order-the-decision-trace)
 
 ---
 
@@ -694,3 +696,93 @@ buckets, the monitors report no value, which is itself pinned behavior
 Trading & Risk Grafana dashboard plots all three. Monitoring is
 observational only — it never alters a trading decision mid-session, so
 the summary line stays bit-for-bit reproducible (recipe 12).
+
+## 20. Build the platform store and query it
+
+The store (`schemas/sql/iap_v1.sql`, [docs/DATA_MODEL.md](docs/DATA_MODEL.md))
+is a derived, rebuildable SQLite index over the research artefacts and the
+decision traces; the JSON / JSONL / Parquet files stay the source of truth.
+Building it takes about a second and prints one row per table:
+
+```bash
+cd python
+PYTHONPATH=src python3 -m iap.store build            # -> data/store/iap.sqlite (git-ignored)
+# table                  rows
+# alpha_signals             0
+# alphas                   24
+# drift_baselines          36
+# experiment_results       29
+# experiments              29
+# instruments              19
+# ledger_entries           70
+# lifecycle_transitions   284
+# model_runs               33
+# tca_orders               36
+# venues                    5
+# ...
+```
+
+Every importer is idempotent — run `build` again and the counts do not
+move — and total over its input: a record it cannot map (a NaN metric, a
+malformed line, an absent optional artefact) is a warning on stderr, never
+a crash. Query with `sql` (one canonical JSON line per row; add `ORDER BY`
+for deterministic output) or with the views:
+
+```bash
+PYTHONPATH=src python3 -m iap.store sql "SELECT alpha_id, current_state, verdict, ROUND(ic,4) AS ic, ledger_count FROM v_alpha_scorecard ORDER BY alpha_id"
+# {"alpha_id":"EQ01","current_state":"CANDIDATE","ic":0.0241,"ledger_count":46,"verdict":"ITERATE"}
+PYTHONPATH=src python3 -m iap.store sql "SELECT COUNT(*) AS distinct_experiments, SUM(count) AS total_experiments FROM ledger_entries"
+# {"distinct_experiments":70,"total_experiments":865}      -- the Bonferroni denominator
+```
+
+From Python the same store is `iap.store.Store` (`open`, `init`,
+`insert_<type>` for every contract, `fetch(T, **where)`, `query`,
+`export_jsonl`); `Store.export_jsonl(table, path)` writes canonical lines in
+primary-key order, so two builds from the same files are byte-identical.
+The DDL runs unchanged on PostgreSQL ≥ 13 (`psql -f schemas/sql/iap_v1.sql`).
+
+## 21. Explain an order (the decision trace)
+
+Every decision the loop makes is a `DecisionTrace` (signal → portfolio →
+risk → parent order → child orders → routing → fills → TCA → attribution),
+built with `iap.trace.TraceBuilder` and emitted to sinks. Write one to a
+JSONL file and to the store, then ask why the order happened:
+
+```bash
+cd python && mkdir -p ../data/store
+PYTHONPATH=src python3 - <<'PY'
+from iap.contracts.examples import example_trace          # the pinned golden decision
+from iap.store import Store
+from iap.trace import JsonlTraceSink, MultiSink, StoreTraceSink, explain_jsonl
+store = Store.open("../data/store/iap.sqlite"); store.init()
+with MultiSink(JsonlTraceSink("../data/store/traces.jsonl"), StoreTraceSink(store)) as sink:
+    sink.emit(example_trace())
+    print("digest", sink.sinks[0].digest.hexdigest())       # replay-determinism digest
+print(explain_jsonl("../data/store/traces.jsonl", 12345, {1: "XV1", 2: "XV2", 3: "XV3"}))
+PY
+PYTHONPATH=src python3 -m iap.store explain 12345         # venue names from the venues table
+# Order 12345
+# Alpha:      EQ03  expected return = +4.2 bps  confidence = 0.81
+# Portfolio:  target = +20,000 shares
+# Risk:       ALLOW
+# Execution:  POV 15%
+# SOR:        XV1 = 45%  XV2 = 35%  3 = 20%
+# Fills:      18,000 / 20,000 (90.0%)
+# TCA:        IS = 2.1 bps
+# Attribution: alpha = +6.2 bps  spread = -0.8 bps  impact = -2.1 bps  fees = -0.4 bps
+```
+
+(The store names venues from `configs/venues/venues.json`, which has XV1 and
+XV2; the golden example's third venue renders as its id.) A rejected order
+renders its rule: `Risk: REJECT  rule = FAT_FINGER_NOTIONAL  reason = …`,
+and the same chain is one row of `v_order_chain`:
+
+```bash
+PYTHONPATH=src python3 -m iap.store sql "SELECT parent_order_id, alpha_id, risk_decision, risk_rule_id, n_child_orders, filled_qty, implementation_shortfall_bps, attribution_total_bps FROM v_order_chain ORDER BY parent_order_id"
+# {"alpha_id":"EQ03","attribution_total_bps":2.7,"filled_qty":18000,"implementation_shortfall_bps":2.1,"n_child_orders":3,"parent_order_id":12345,"risk_decision":1,"risk_rule_id":""}
+```
+
+The digest printed above is `sha256` over `canonical_json(trace) + "\n"`
+per emitted trace: replaying the same session with the same seed reproduces
+it, and `TraceDigest.of_jsonl(path)` recomputes it from the file
+(`bf60a300d151c9…` for the one-trace stream of the golden example).
