@@ -86,6 +86,9 @@ class Instrument:
         "adv",
         "venues",
         "pip",
+        "currency",
+        "base_currency",
+        "quote_currency",
     )
 
     def __init__(self, row: dict) -> None:
@@ -98,6 +101,14 @@ class Instrument:
         self.adv: int = row["adv"]
         self.venues: List[str] = list(row["venues"])
         self.pip: Optional[float] = row.get("pip")
+        #: Settlement / P&L currency of an EQUITY/ETF (``currency``) and the
+        #: FX pair legs (``base_currency`` / ``quote_currency``); optional in
+        #: the schema, consumed by the risk engine's reference data
+        #: (``iap.risk.refdata``) which fails closed when the one it needs
+        #: is absent.
+        self.currency: Optional[str] = row.get("currency")
+        self.base_currency: Optional[str] = row.get("base_currency")
+        self.quote_currency: Optional[str] = row.get("quote_currency")
         what = f"instrument {self.symbol!r}"
         if not isinstance(self.symbol, str) or not self.symbol:
             raise ValueError(f"{what}: symbol must be a non-empty string")
@@ -118,6 +129,10 @@ class Instrument:
             raise ValueError(f"{what}: needs at least one venue")
         if self.pip is not None and not (math.isfinite(self.pip) and self.pip > 0):
             raise ValueError(f"{what}: pip must be > 0 when present")
+        for name in ("currency", "base_currency", "quote_currency"):
+            value = getattr(self, name)
+            if value is not None and (not isinstance(value, str) or not value):
+                raise ValueError(f"{what}: {name} must be a non-empty string when present")
 
     def price_to_ticks(self, price: float) -> int:
         """Convert a real price to integer ticks (round half away from zero)."""

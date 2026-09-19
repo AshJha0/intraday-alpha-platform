@@ -1,0 +1,310 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iap.example/schemas/trace/decision_trace.schema.json",
+  "title": "DecisionTrace",
+  "description": "The auditable chain for one decision: identity (trace_id = first 128 bits of sha256 over '<session_id>|<instrument_id>|<event_ts>|<sequence>'), the four version hashes in force, and every stage output ($ref to the sibling schemas). $defs carry the thin references (MarketEventRef, BookSnapshotRef, FeatureVectorRef) trace sinks use to point at inputs.",
+  "x-version": 1,
+  "type": "object",
+  "properties": {
+    "trace_id": {
+      "type": "string",
+      "description": "32 lowercase hex chars.",
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "session_id": {
+      "type": "string",
+      "description": "Replay / paper / live session.",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "instrument_id": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "event_ts": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807,
+      "description": "Event time of the triggering event, ns."
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615,
+      "description": "Stream sequence of the triggering event."
+    },
+    "data_version": {
+      "type": "string",
+      "description": "Dataset hash.",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "feature_version": {
+      "type": "string",
+      "description": "Feature-registry hash.",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "model_version": {
+      "type": "string",
+      "description": "Model / parameter-set hash.",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "config_version": {
+      "type": "string",
+      "description": "Hash of the canonical JSON of the configuration in force.",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "stages": {
+      "$ref": "#/$defs/TraceStages"
+    }
+  },
+  "required": [
+    "trace_id",
+    "session_id",
+    "instrument_id",
+    "event_ts",
+    "sequence",
+    "data_version",
+    "feature_version",
+    "model_version",
+    "config_version",
+    "stages"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "MarketEventRef": {
+      "description": "Reference to one MarketEvent (market_event.schema.json) by stream key.",
+      "type": "object",
+      "properties": {
+        "event_id": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 18446744073709551615
+        },
+        "instrument_id": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "venue_id": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "exchange_ts": {
+          "type": "integer",
+          "minimum": -9223372036854775808,
+          "maximum": 9223372036854775807
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 18446744073709551615
+        }
+      },
+      "required": [
+        "event_id",
+        "instrument_id",
+        "venue_id",
+        "exchange_ts",
+        "sequence"
+      ],
+      "additionalProperties": false
+    },
+    "BookSnapshotRef": {
+      "description": "Content-addressed reference to a book state.",
+      "type": "object",
+      "properties": {
+        "instrument_id": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "venue_id": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535,
+          "description": "0 = consolidated book."
+        },
+        "exchange_ts": {
+          "type": "integer",
+          "minimum": -9223372036854775808,
+          "maximum": 9223372036854775807
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 18446744073709551615,
+          "description": "Last sequence applied before the state was taken."
+        },
+        "state_hash": {
+          "type": "string",
+          "description": "content hash of the book's state_summary().",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "instrument_id",
+        "venue_id",
+        "exchange_ts",
+        "sequence",
+        "state_hash"
+      ],
+      "additionalProperties": false
+    },
+    "FeatureVectorRef": {
+      "description": "Reference to a FeatureVector emission (feature_vector.schema.json).",
+      "type": "object",
+      "properties": {
+        "instrument_id": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "timestamp_ns": {
+          "type": "integer",
+          "minimum": -9223372036854775808,
+          "maximum": 9223372036854775807
+        },
+        "feature_version": {
+          "type": "string",
+          "description": "Feature-registry hash.",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "n_values": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295,
+          "description": "Length of the values array."
+        },
+        "n_valid": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295,
+          "description": "Count of validity == true; <= n_values."
+        }
+      },
+      "required": [
+        "instrument_id",
+        "timestamp_ns",
+        "feature_version",
+        "n_values",
+        "n_valid"
+      ],
+      "additionalProperties": false
+    },
+    "Attribution": {
+      "description": "P&L attribution of the decision, bps of traded notional (negative = cost).",
+      "type": "object",
+      "properties": {
+        "alpha_bps": {
+          "type": "number"
+        },
+        "spread_bps": {
+          "type": "number"
+        },
+        "impact_bps": {
+          "type": "number"
+        },
+        "fees_bps": {
+          "type": "number"
+        },
+        "timing_bps": {
+          "type": "number"
+        },
+        "total_bps": {
+          "type": "number",
+          "description": "Sum of the five components."
+        }
+      },
+      "required": [
+        "alpha_bps",
+        "spread_bps",
+        "impact_bps",
+        "fees_bps",
+        "timing_bps",
+        "total_bps"
+      ],
+      "additionalProperties": false
+    },
+    "TraceStages": {
+      "description": "Stage outputs; empty lists / null mean the stage did not run.",
+      "type": "object",
+      "properties": {
+        "signal": {
+          "type": "array",
+          "items": {
+            "$ref": "../alpha/alpha_signal.schema.json"
+          }
+        },
+        "portfolio": {
+          "oneOf": [
+            {
+              "$ref": "../portfolio/portfolio_target.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "risk": {
+          "type": "array",
+          "items": {
+            "$ref": "../risk/risk_decision.schema.json"
+          }
+        },
+        "parent_orders": {
+          "type": "array",
+          "items": {
+            "$ref": "../order/parent_order.schema.json"
+          }
+        },
+        "child_orders": {
+          "type": "array",
+          "items": {
+            "$ref": "../order/child_order.schema.json"
+          }
+        },
+        "routing": {
+          "type": "array",
+          "items": {
+            "$ref": "../execution/venue_decision.schema.json"
+          }
+        },
+        "fills": {
+          "type": "array",
+          "items": {
+            "$ref": "../execution/execution_report.schema.json"
+          }
+        },
+        "tca": {
+          "type": "array",
+          "items": {
+            "$ref": "../tca/tca_result.schema.json"
+          }
+        },
+        "attribution": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Attribution"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "signal",
+        "portfolio",
+        "risk",
+        "parent_orders",
+        "child_orders",
+        "routing",
+        "fills",
+        "tca",
+        "attribution"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,91 @@
+name: Research experiment
+description: A ledgered experiment with a hypothesis, an expected sign and a verdict (spec §13, §20, §32).
+title: "Research: <alpha_id> — <hypothesis in one line>"
+labels: ["type:research", "area:research"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Every experiment is a look at the data and is counted in `research/experiments.json`
+        before its result is read. File the issue, get the ledger entry id from the
+        ExperimentRunner, then run. Results are reported with costs and the multiple-testing
+        denominator, never without (PLATFORM_CONVENTIONS.md §7).
+  - type: input
+    id: alpha_id
+    attributes:
+      label: alpha_id
+      description: EQ01..EQ12, FX01..FX12, a model name from the zoo, or `ALL` for a design scan.
+      placeholder: EQ03
+    validations:
+      required: true
+  - type: textarea
+    id: hypothesis
+    attributes:
+      label: Hypothesis and expected sign
+      description: |
+        The economic rationale and the sign the fitted coefficient must have for the hypothesis to hold
+        (an alpha whose measured sign contradicts its rationale can at best be ITERATE, never PROMOTE).
+      placeholder: |
+        Multi-level OFI predicts the 5 s mid-to-mid return; expected sign: positive beta on ofi_norm_l5_w1s_v1.
+    validations:
+      required: true
+  - type: input
+    id: dataset_version
+    attributes:
+      label: dataset_version
+      description: The data_version (hash of data/normalized/qc_report.json) the experiment runs on.
+      placeholder: "sha256:…"
+    validations:
+      required: true
+  - type: input
+    id: feature_version
+    attributes:
+      label: feature_version
+      description: The feature-registry hash (data/reference/feature_registry.json).
+      placeholder: "585dd7b9…"
+    validations:
+      required: true
+  - type: dropdown
+    id: horizon
+    attributes:
+      label: Horizon
+      options: [10ms, 50ms, 100ms, 500ms, 1s, 5s, 10s, 30s, 1m, 5m, 15m, "several (list below)"]
+    validations:
+      required: true
+  - type: textarea
+    id: protocol
+    attributes:
+      label: Validation protocol
+      description: Walk-forward folds, purge, embargo, label (mid-to-mid and cost-adjusted), cost multiplier, seed.
+      value: |
+        - folds: expanding walk-forward, boundaries at row-mass quantiles
+        - purge: label horizon; embargo: 60 s
+        - labels: mid-to-mid and cost-adjusted (half-spread)
+        - cost multipliers: 1x, 2x
+        - seed:
+    validations:
+      required: true
+  - type: input
+    id: ledger_id
+    attributes:
+      label: Ledger entry id
+      description: The `key` in research/experiments.json (SHA-256 of the canonical config) assigned by the ExperimentRunner. Required before any result is posted.
+      placeholder: "assigned by python -m iap.research …"
+  - type: checkboxes
+    id: gates
+    attributes:
+      label: Gates this experiment addresses
+      description: The pinned promotion gates (python/src/iap/validation/validate.py GATES; docs/governance/GOVERNANCE.md §2).
+      options:
+        - label: leakage passed (label-column guard, shift-by-one destroys IC)
+        - label: uncrossed OOS IC >= 0.010
+        - label: Newey–West t >= 3.0
+        - label: fold sign consistency >= 0.70 with >= 3 non-degenerate folds
+        - label: hypothesis sign confirmed
+        - label: cost survival — net P&L > 0 at 1x modeled costs
+        - label: capacity and stress (cost / latency / regime)
+  - type: textarea
+    id: result
+    attributes:
+      label: Result (filled in after the run)
+      description: Verdict (PROMOTE / ITERATE / REJECT), the numbers, and the link to research/experiments/<id>/result.json. Negative results are results.

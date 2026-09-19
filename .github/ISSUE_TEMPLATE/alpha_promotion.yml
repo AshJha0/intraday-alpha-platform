@@ -1,0 +1,79 @@
+name: Alpha promotion request
+description: Move one alpha one step along RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE -> WATCH -> RETIRED, with evidence per gate.
+title: "Promotion: <alpha_id> <current state> -> <target state>"
+labels: ["area:lifecycle", "type:feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        One transition per request. The lifecycle machine (`iap.lifecycle`, docs/LIFECYCLE.md)
+        refuses a transition without its gate evidence; this form is the human-readable copy of
+        the `lifecycle_transition` document. A PR that changes a verdict or a lifecycle state
+        without the ledger entry id is not mergeable (CONTRIBUTING.md).
+  - type: input
+    id: alpha_id
+    attributes:
+      label: alpha_id
+      placeholder: EQ03
+    validations:
+      required: true
+  - type: dropdown
+    id: from_state
+    attributes:
+      label: Current state
+      options: [RESEARCH, CANDIDATE, VALIDATING, PAPER, ACTIVE, WATCH, RETIRED]
+    validations:
+      required: true
+  - type: dropdown
+    id: to_state
+    attributes:
+      label: Target state
+      options: [CANDIDATE, VALIDATING, PAPER, ACTIVE, WATCH, RETIRED, RESEARCH]
+    validations:
+      required: true
+  - type: input
+    id: ledger_id
+    attributes:
+      label: Ledger entry id
+      description: The research/experiments.json key of the experiment whose verdict supports this transition.
+    validations:
+      required: true
+  - type: textarea
+    id: gate_research
+    attributes:
+      label: "Gate: research verdict (RESEARCH -> CANDIDATE)"
+      description: Link to research/alpha_reports/<alpha_id>.json and research/experiments/<id>/result.json; verdict must be ITERATE or PROMOTE with hypothesis sign confirmed.
+      placeholder: "research/alpha_reports/EQ03.json — verdict ITERATE, uncrossed IC 0.0298, NW t 10.6, hyp=yes"
+  - type: textarea
+    id: gate_validation
+    attributes:
+      label: "Gate: full validation (CANDIDATE -> VALIDATING -> PAPER)"
+      description: Leakage, uncrossed OOS IC, NW t, fold consistency, cost survival at 1x, capacity, stress — all seven PROMOTE gates with values; cross-language golden parity for the port (tests/harness/run_golden.sh table).
+      placeholder: |
+        leakage: pass · uncrossed IC: · NW t: · folds: · net P&L @1x: · capacity USD: · stress:
+        parity table: python/cpp/rust/java golden PASS (paste)
+  - type: textarea
+    id: gate_paper
+    attributes:
+      label: "Gate: paper evidence (PAPER -> ACTIVE)"
+      description: Session count, alpha_live_vs_backtest_drift (PSI) and alpha_rolling_ic over the paper period, fill quality vs research TCA, links to session reports.
+  - type: textarea
+    id: gate_risk
+    attributes:
+      label: "Gate: written risk approval (-> ACTIVE)"
+      description: The approver, the audit-log line (admin_audit.jsonl / config_audit.jsonl) and the pre-agreed retirement criteria (drift, decay, fill-quality thresholds).
+  - type: textarea
+    id: gate_watch
+    attributes:
+      label: "Gate: lifecycle IC evidence (ACTIVE <-> WATCH -> RETIRED)"
+      description: The rolling-IC breach counts against configs/strategies/strategies.json `adaptive.lifecycle`, and the research/lifecycle_log.jsonl line.
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirmations
+      options:
+        - label: The evidence above is regenerable from a seed and a commit (docs/governance/REPRODUCIBILITY.md)
+          required: true
+        - label: No gate is skipped; backtest Sharpe alone is not cited as evidence (spec §1)
+          required: true
+        - label: If the target is ACTIVE, I understand RETIRED is observational in the live Java loop until the allocation gate lands (API_ADAPTIVE.md §6)

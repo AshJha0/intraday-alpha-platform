@@ -132,6 +132,8 @@ intraday-alpha-platform/
                             baselines/, tca/, models/, experiments/ (spec +
                             result documents), experiments.json, lifecycle_log.jsonl
   deployment/               docker/, k8s/, grafana/, prometheus/
+  tools/github/             issues.yaml (epics/issues source of truth) + create_issues.py
+  CONTRIBUTING.md           branching, parity harness, golden regeneration, promotion-gate rule
 ```
 
 ## Quick start
@@ -186,7 +188,7 @@ python   | 626          | 65             |   75s | PASS
 cpp      | 243          | 45             |    1s | PASS
 rust     | 254          | 47             |    1s | PASS
 java     | 449          | 85             |   19s | PASS
-integration | 1            | -              |    1s | PASS
+integration | 11           | -              |    2s | PASS
 replay   | 2            | -              |    2s | PASS
 deployment | -            | -              |    5s | PASS
 numbers  | -            | -              |    -s | PASS
@@ -249,6 +251,7 @@ golden tests — the engineering discipline this repo is built around
 | [benchmarks/RESULTS.md](benchmarks/RESULTS.md) | benchmark index; C++ table in [results_cpp.md](benchmarks/results_cpp.md) + methodology |
 | [docs/runbooks/](docs/runbooks/) | data pipeline, backtest, paper trading, kill-switch incident runbooks |
 | [docs/governance/](docs/governance/) | governance, reproducibility, security |
+| [docs/EPICS.md](docs/EPICS.md) + [CONTRIBUTING.md](CONTRIBUTING.md) | the build plan as epics/issues with honest done / in-progress / backlog status (generated from `tools/github/issues.yaml`); how to contribute |
 | [schemas/FORMAT.md](schemas/FORMAT.md) | normative wire layout (JSONL + IAP1 binary) |
 | [deployment/grafana/README.md](deployment/grafana/README.md) | dashboards and observability stack |
 | [Real-world usage notes](#real-world-usage-notes) / [References](#references) | scope, units and out-of-scope items for a live deployment; the literature and standards the platform implements |

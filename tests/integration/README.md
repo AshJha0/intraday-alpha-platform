@@ -10,6 +10,9 @@ What belongs here:
 - decode → order book → feature engine over a golden vector, asserting a
   `FeatureVector` is emitted with the registry hash as `feature_version`
   (`test_pipeline_smoke.py`);
+- the GitHub issue plan wired end to end — the script's validator over
+  `tools/github/issues.yaml`, `--dry-run` as a subprocess, and `docs/EPICS.md`
+  compared with the rendering (`test_github_issue_plan.py`);
 - longer verticals as they become cheap enough to run in CI: features →
   alpha → risk → execution simulator, or the Python pipeline entry points
   (`python3 -m iap.marketdata`, `python3 -m iap.features`) against a temp

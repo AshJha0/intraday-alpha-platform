@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iap.example/schemas/execution/venue_decision.schema.json",
+  "title": "VenueDecision",
+  "description": "Smart-order-router decision for one child order. venue_id 0 = NO_ROUTE (no eligible venue). candidates sorted by venue_id; the routed venue is an eligible candidate.",
+  "x-version": 1,
+  "type": "object",
+  "properties": {
+    "child_order_id": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "venue_id": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 65535,
+      "description": "Chosen venue; 0 = NO_ROUTE."
+    },
+    "reason": {
+      "type": "string",
+      "description": "Why this venue (or why none)."
+    },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/VenueScore"
+      },
+      "description": "Every venue considered, sorted by venue_id."
+    }
+  },
+  "required": [
+    "child_order_id",
+    "venue_id",
+    "reason",
+    "candidates"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "VenueScore": {
+      "description": "One candidate venue as the router scored it.",
+      "type": "object",
+      "properties": {
+        "venue_id": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "eligible": {
+          "type": "boolean",
+          "description": "False when the venue was excluded (stale, halted, latency budget, ...)."
+        },
+        "displayed_price_ticks": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807,
+          "description": "Best displayed contra price in ticks; 0 = none."
+        },
+        "displayed_qty": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807,
+          "description": "Displayed contra quantity at that price."
+        },
+        "taker_fee": {
+          "type": "number",
+          "description": "Taker fee per unit (currency)."
+        },
+        "maker_rebate": {
+          "type": "number",
+          "description": "Maker rebate per unit (currency, positive = rebate)."
+        },
+        "commission_per_million": {
+          "type": "number",
+          "description": "Commission per million notional (FX venues; 0 otherwise)."
+        },
+        "latency_mean_ns": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807,
+          "description": "Mean venue latency, ns."
+        },
+        "rank": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535,
+          "description": "1-based rank among eligible venues; 0 when ineligible."
+        }
+      },
+      "required": [
+        "venue_id",
+        "eligible",
+        "displayed_price_ticks",
+        "displayed_qty",
+        "taker_fee",
+        "maker_rebate",
+        "commission_per_million",
+        "latency_mean_ns",
+        "rank"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

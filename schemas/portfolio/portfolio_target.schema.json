@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iap.example/schemas/portfolio/portfolio_target.schema.json",
+  "title": "PortfolioTarget",
+  "description": "Output of one portfolio solve (API_PORTFOLIO_TCA.md section 1). solver_status: OPTIMAL (feasible best iterate), INFEASIBLE (no feasible iterate; targets hold prev_qty), MAX_ITER (iteration budget exhausted without a declared best). Legs sorted by instrument_id.",
+  "x-version": 1,
+  "type": "object",
+  "properties": {
+    "strategy_id": {
+      "type": "string",
+      "description": "Strategy that owns the book.",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "timestamp_ns": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807,
+      "description": "Event time of the solve, ns since epoch."
+    },
+    "portfolio_version": {
+      "type": "string",
+      "description": "sha256 of the canonical JSON of the problem (constraints + solver parameters).",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "feature_version": {
+      "type": "string",
+      "description": "Feature-registry hash the alphas were scored on.",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "model_version": {
+      "type": "string",
+      "description": "Model / parameter-set hash that produced the expected returns.",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "solver_status": {
+      "type": "string",
+      "description": "Solve outcome.",
+      "enum": [
+        "OPTIMAL",
+        "INFEASIBLE",
+        "MAX_ITER"
+      ]
+    },
+    "objective_value": {
+      "type": "number",
+      "description": "f(w) at the returned iterate."
+    },
+    "turnover": {
+      "type": "number",
+      "description": "sum |w - w_prev|.",
+      "minimum": 0
+    },
+    "targets": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/PortfolioLeg"
+      },
+      "description": "Per-instrument targets, sorted by instrument_id."
+    }
+  },
+  "required": [
+    "strategy_id",
+    "timestamp_ns",
+    "portfolio_version",
+    "feature_version",
+    "model_version",
+    "solver_status",
+    "objective_value",
+    "turnover",
+    "targets"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "PortfolioLeg": {
+      "description": "One instrument's target.",
+      "type": "object",
+      "properties": {
+        "instrument_id": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "target_qty": {
+          "type": "integer",
+          "minimum": -9223372036854775808,
+          "maximum": 9223372036854775807,
+          "description": "Target position in base units (signed)."
+        },
+        "target_weight": {
+          "type": "number",
+          "description": "Target weight as a signed fraction of NAV."
+        },
+        "expected_return_bps": {
+          "type": "number",
+          "description": "Expected return of the leg in bps."
+        },
+        "prev_qty": {
+          "type": "integer",
+          "minimum": -9223372036854775808,
+          "maximum": 9223372036854775807,
+          "description": "Position before the solve, base units (signed)."
+        }
+      },
+      "required": [
+        "instrument_id",
+        "target_qty",
+        "target_weight",
+        "expected_return_bps",
+        "prev_qty"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,75 @@
+name: Epic
+description: A body of work with child issues, a task list and acceptance criteria (mirrors tools/github/issues.yaml `epics:`).
+title: "Epic: <name>"
+labels: ["type:epic"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Epics are normally created from `tools/github/issues.yaml` by
+        `python3 tools/github/create_issues.py --apply`; file one by hand only for
+        work that is not yet in the plan, then add it to the YAML in the same PR
+        (see CONTRIBUTING.md, "Epics and issues").
+  - type: input
+    id: key
+    attributes:
+      label: Plan key
+      description: The `key:` this epic will carry in tools/github/issues.yaml (E01..E99).
+      placeholder: E25
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [contracts, marketdata, replay, orderbook, features, alpha, research, portfolio, risk, execution, tca, parity, lifecycle, observability, store, mvp, testing, ml, adaptive, performance, deployment, repo, agentic]
+    validations:
+      required: true
+  - type: dropdown
+    id: milestone
+    attributes:
+      label: Milestone
+      options: ["Phase 0", "Week 1", "Week 2", "Week 3", "Week 4", "Week 5", "Week 6", "Phase 2", "Phase 3", "Backlog"]
+    validations:
+      required: true
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: One paragraph. What exists when this epic is done, in the repo's terms (contracts, goldens, ports).
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Module paths and documents in scope, one per line.
+      placeholder: |
+        python/src/iap/<pkg>
+        schemas/<domain>/<file>.schema.json
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Checklist. Each item must be provable by a file, a test or a golden.
+      value: |
+        - [ ]
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of scope
+      description: What this epic deliberately does not do (and where that work lives, if anywhere).
+    validations:
+      required: true
+  - type: textarea
+    id: issues
+    attributes:
+      label: Child issues
+      description: Task list of `#N` or plan keys; the script rewrites this section on every `--apply`.
+      value: |
+        - [ ]

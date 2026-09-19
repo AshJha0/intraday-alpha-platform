@@ -199,7 +199,7 @@ The harness (`tests/harness/run_all.sh`, with `run_golden.sh` as the
 golden-only alias) runs every suite with the canonical commands and prints
 the parity table; a full harness run (2026-09-19) passes 626/243/254/449
 tests (65/45/47/85 golden) across python/cpp/rust/java, plus the repo-level
-`integration` (1) and `replay` (2) rows — the same counts the README parity
+`integration` (11) and `replay` (2) rows — the same counts the README parity
 table records.
 
 ## 7. Hot-path engineering notes per language

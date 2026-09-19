@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iap.example/schemas/alpha/lifecycle_transition.schema.json",
+  "title": "LifecycleTransition",
+  "description": "An alpha moving between lifecycle states RESEARCH=0 CANDIDATE=1 VALIDATING=2 PAPER=3 ACTIVE=4 WATCH=5 RETIRED=6 (serialised by name). actor: SYSTEM (automatic policy) or HUMAN (override). gates keyed by gate name.",
+  "x-version": 1,
+  "type": "object",
+  "properties": {
+    "alpha_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "from_state": {
+      "type": "string",
+      "description": "State before.",
+      "enum": [
+        "RESEARCH",
+        "CANDIDATE",
+        "VALIDATING",
+        "PAPER",
+        "ACTIVE",
+        "WATCH",
+        "RETIRED"
+      ]
+    },
+    "to_state": {
+      "type": "string",
+      "description": "State after (differs from from_state).",
+      "enum": [
+        "RESEARCH",
+        "CANDIDATE",
+        "VALIDATING",
+        "PAPER",
+        "ACTIVE",
+        "WATCH",
+        "RETIRED"
+      ]
+    },
+    "event_ts": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807,
+      "description": "Event time of the transition, ns."
+    },
+    "reason": {
+      "type": "string"
+    },
+    "gates": {
+      "type": "object",
+      "description": "Gate results by gate name.",
+      "propertyNames": {
+        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/GateResult"
+      }
+    },
+    "policy": {
+      "type": "string",
+      "description": "Lifecycle policy name.",
+      "minLength": 1
+    },
+    "actor": {
+      "type": "string",
+      "description": "SYSTEM or HUMAN.",
+      "enum": [
+        "SYSTEM",
+        "HUMAN"
+      ]
+    }
+  },
+  "required": [
+    "alpha_id",
+    "from_state",
+    "to_state",
+    "event_ts",
+    "reason",
+    "gates",
+    "policy",
+    "actor"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "GateResult": {
+      "description": "One gate evaluated for the transition.",
+      "type": "object",
+      "properties": {
+        "passed": {
+          "type": "boolean"
+        },
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Observed value; null for a boolean gate."
+        },
+        "threshold": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Threshold compared against; null for a boolean gate."
+        }
+      },
+      "required": [
+        "passed",
+        "value",
+        "threshold"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

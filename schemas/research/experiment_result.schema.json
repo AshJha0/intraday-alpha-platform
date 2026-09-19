@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iap.example/schemas/research/experiment_result.schema.json",
+  "title": "ExperimentResult",
+  "description": "What an experiment produced (research/experiments/<experiment_id>/result.json; metrics per iap.validation). verdict: PROMOTE ITERATE REJECT (always REJECT when leakage_passed is false). created_ts is event / ledger time, never wall clock (0 allowed). net_return_bps = gross_return_bps - transaction_cost_bps.",
+  "x-version": 1,
+  "type": "object",
+  "properties": {
+    "experiment_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "alpha_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "dataset_version": {
+      "type": "string",
+      "description": "sha256 of the normalised dataset.",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "feature_version": {
+      "type": "string",
+      "description": "Feature-registry hash.",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "model_version": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Model hash, or null when the alpha is not fitted."
+    },
+    "ic": {
+      "type": "number",
+      "description": "Pooled OOS Pearson IC."
+    },
+    "rank_ic": {
+      "type": "number",
+      "description": "Pooled OOS Spearman IC."
+    },
+    "t_stat": {
+      "type": "number",
+      "description": "Newey-West t-statistic of the bucketed IC."
+    },
+    "nw_lags": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295,
+      "description": "Newey-West lag count used."
+    },
+    "hit_rate": {
+      "type": "number",
+      "description": "Directional hit rate.",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "turnover": {
+      "type": "number",
+      "description": "Signal turnover (flips per hour).",
+      "minimum": 0
+    },
+    "gross_return_bps": {
+      "type": "number"
+    },
+    "transaction_cost_bps": {
+      "type": "number",
+      "minimum": 0
+    },
+    "net_return_bps": {
+      "type": "number"
+    },
+    "max_drawdown_bps": {
+      "type": "number",
+      "minimum": 0
+    },
+    "sharpe": {
+      "type": "number",
+      "description": "Annualised net Sharpe."
+    },
+    "fold_consistency": {
+      "type": "number",
+      "description": "Fraction of non-degenerate folds with positive IC.",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "n_folds": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295,
+      "description": "Folds run."
+    },
+    "leakage_passed": {
+      "type": "boolean",
+      "description": "Shift-by-one and label-guard tests passed."
+    },
+    "leakage_detail": {
+      "type": "object",
+      "description": "Free-form leakage test detail."
+    },
+    "hypothesis_sign_confirmed": {
+      "type": [
+        "boolean",
+        "null"
+      ],
+      "description": "Whether the fitted sign matched the stated hypothesis; null when not applicable."
+    },
+    "verdict": {
+      "type": "string",
+      "description": "Promotion verdict.",
+      "enum": [
+        "PROMOTE",
+        "ITERATE",
+        "REJECT"
+      ]
+    },
+    "n_experiments_in_ledger": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615,
+      "description": "Multiple-testing count at run time."
+    },
+    "git_commit": {
+      "type": "string",
+      "description": "Commit of the code that ran (or 'unversioned-workspace').",
+      "minLength": 1
+    },
+    "created_ts": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9223372036854775807,
+      "description": "Event / ledger time, ns; 0 allowed. Never wall clock."
+    }
+  },
+  "required": [
+    "experiment_id",
+    "alpha_id",
+    "dataset_version",
+    "feature_version",
+    "model_version",
+    "ic",
+    "rank_ic",
+    "t_stat",
+    "nw_lags",
+    "hit_rate",
+    "turnover",
+    "gross_return_bps",
+    "transaction_cost_bps",
+    "net_return_bps",
+    "max_drawdown_bps",
+    "sharpe",
+    "fold_consistency",
+    "n_folds",
+    "leakage_passed",
+    "leakage_detail",
+    "hypothesis_sign_confirmed",
+    "verdict",
+    "n_experiments_in_ledger",
+    "git_commit",
+    "created_ts"
+  ],
+  "additionalProperties": false
+}
