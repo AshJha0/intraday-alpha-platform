@@ -10,13 +10,14 @@
 //             risk_aversion 1.0    -> quantities {304, 184, 112}
 //             (weights {1, e^-0.5, e^-1}).
 //
-// HAND TRACE of the first two fills (verified against the raw event vector;
-// t0 = 1787578200000000000, latency = 50+50+100 us internal + 150 us venue
-// mean + SplitMix64(20260829) jitter draws, in submission order:
-// {21675, 14614, 24600, 13721, 18924, 15550, 8663} ns (v2: 6 fills, the
-// VWAP slice-2 child expires at end_ts instead of filling late); order 1 = VWAP
-// slice 0 is submitted first, so it takes jitter draw #1 even though the
-// IS market order fills earlier):
+// HAND TRACE of the first three fills (verified against the raw event
+// vector; t0 = 1787578200000000000, latency = 50+50+100 us internal + 150 us
+// venue mean + SplitMix64(20260829) jitter draws, in submission order:
+// {21675, 14614, 24600, 13721, 18924, 15550, 8663} ns (v2: the VWAP slice-2
+// child expires at end_ts instead of filling late; v3: passive fills are
+// bounded by the observed traded volume, so the VWAP slice-0 child fills in
+// two prints instead of one); order 1 = VWAP slice 0 is submitted first, so
+// it takes jitter draw #1 even though the IS market order fills earlier):
 //
 // Fill 1 — IS slice 0 (order 2, SELL 304):
 //   * due t0+120s; the first event at/after that is event 74
@@ -47,9 +48,16 @@
 //   * event 98 (ts 1787578386181246977) is a marketable ASK ADD (limit
 //     2448, qty 100): its expansion consumes 100 @ 2448 — strictly BELOW
 //     our 2449 level, so the market traded THROUGH us and the pinned
-//     trade-through rule fills the full 129 at OUR price 2449, stamped
-//     with event 98's exchange_ts. Maker rebate 0.002/share => fee
-//     -0.258.  == golden fill 2.
+//     trade-through rule fills us at OUR price 2449. It traded 100, and
+//     the budget is the traded volume (rule 4), so we get 100 of our 129,
+//     stamped with event 98's exchange_ts. Maker rebate 0.002/share =>
+//     fee -0.2.  == golden fill 2.
+//
+// Fill 3 — VWAP slice 0 again (order 1, the remaining 29):
+//   * event 103 (ts 1787578395624588691) is a BID-side EXECUTE of 100 at
+//     2448, again strictly below our 2449: a second trade-through. The
+//     queue ahead of us is already 0, so the 100-share budget fills our
+//     whole remaining 29 at 2449, fee -0.058.  == golden fill 3.
 
 #include <gtest/gtest.h>
 
@@ -162,7 +170,7 @@ TEST(ReplayFillsGolden, ExactFillListMatches) {
 
 TEST(ReplayFillsGolden, HandTracedFirstFills) {
     const auto res = run_golden_scenario();
-    ASSERT_GE(res.fills.size(), 2u);
+    ASSERT_GE(res.fills.size(), 3u);
 
     // The jitter draws come from SplitMix64(20260829) in submission order
     // (order 1 = VWAP slice 0 was submitted first: draw #1).
@@ -188,19 +196,30 @@ TEST(ReplayFillsGolden, HandTracedFirstFills) {
     EXPECT_NEAR(f1.impact_cost, impact_bps * 1e-4 * (304.0 * 2451 * 0.01),
                 1e-15);
 
-    // Fill 2: VWAP slice 0 — passive trade-through fill at our own level.
+    // Fill 2: VWAP slice 0 — passive trade-through fill at our own level,
+    // capped at the 100 shares event 98 actually traded (slice qty 129).
     const auto& f2 = res.fills[1];
     EXPECT_EQ(f2.order_id, 1u);
     EXPECT_EQ(f2.parent_id, 1u);
-    EXPECT_EQ(f2.qty, 129);          // VWAP slice quantities {129,71,71,129}
+    EXPECT_EQ(f2.qty, 100);          // bounded by the observed volume
     EXPECT_EQ(f2.price_ticks, 2449); // best bid at the slice-0 decision
     EXPECT_EQ(f2.liquidity, iap::Liquidity::MAKER);
     EXPECT_EQ(f2.ts, 1787578386181246977);  // event 98 (trade-through)
-    EXPECT_DOUBLE_EQ(f2.fee, -0.002 * 129);
+    EXPECT_DOUBLE_EQ(f2.fee, -0.002 * 100);
     // Decision at event 48 => arrival = decision + 350000 + j1.
     const std::int64_t decision1 = 1787578263509538609;
     EXPECT_EQ(decision1 + 350'000 + j1, 1787578263509910284);
     EXPECT_GT(f2.ts, decision1 + 350'000 + j1);  // fill after arrival
+
+    // Fill 3: the slice-0 residual, taken by the next trade-through
+    // (event 103, a 100-share bid EXECUTE at 2448).
+    const auto& f3 = res.fills[2];
+    EXPECT_EQ(f3.order_id, 1u);
+    EXPECT_EQ(f3.qty, 29);           // 100 + 29 = the 129-share slice
+    EXPECT_EQ(f3.price_ticks, 2449);
+    EXPECT_EQ(f3.liquidity, iap::Liquidity::MAKER);
+    EXPECT_EQ(f3.ts, 1787578395624588691);  // event 103
+    EXPECT_DOUBLE_EQ(f3.fee, -0.002 * 29);
 }
 
 TEST(ReplayFillsGolden, DeterministicRerun) {

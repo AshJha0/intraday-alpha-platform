@@ -49,6 +49,7 @@ from iap.alpha import ALPHA_IDS, build, fit_all, save_params  # noqa: E402
 from iap.alpha.data import load_features, session_days, split_by_day  # noqa: E402
 from iap.backtest import Backtester, BacktestConfig, CostModel  # noqa: E402
 from iap.backtest.engine import ensemble_scores  # noqa: E402
+from iap.research import LOOKS_PER_EXPERIMENT  # noqa: E402
 from iap.validation import ExperimentLedger, validate_alpha  # noqa: E402
 from iap.validation.validate import GATES  # noqa: E402
 
@@ -61,9 +62,17 @@ RESEARCH_LATENCY_NS = 1_000_000_000
 RESEARCH_MAX_DECISION_AGE_NS = 60_000_000_000
 PARAMS_PATH = REPO / "configs" / "strategies" / "alpha_params.json"
 
-#: looks-at-the-data counted per alpha in one pipeline run: 1 walk-forward
-#: eval + 11 decay horizons + 3 cost + 3 latency + 2 regime + 1 backtest
-LOOKS_PER_ALPHA = 21
+#: Looks-at-the-data counted per alpha in one pipeline run. This is the
+#: denominator of every multiple-testing correction in the research, so it
+#: counts what the chain ACTUALLY evaluates. It must stay equal to
+#: ``iap.research.LOOKS_PER_EXPERIMENT``, which carries the itemised
+#: breakdown (1 walk-forward + 11 decay + 3 cost + 3 latency-row +
+#: 4 latency-time + 2 regime + 2 crossed/uncrossed + 1 leakage shift +
+#: 1 backtest). The previous value, 21, omitted the time-latency grid, the
+#: crossed-book split and the leakage shift IC — looks that were added to
+#: the chain without being added to its denominator, which made every
+#: corrected t-stat in these reports look better than it is.
+LOOKS_PER_ALPHA = LOOKS_PER_EXPERIMENT
 #: pinned-horizon selection during alpha design scanned 9 horizons x 24
 #: alphas once; recorded the first time the ledger is created
 DESIGN_SCAN_COUNT = 216
@@ -398,9 +407,14 @@ def main() -> int:
         reports[aid] = rep
         ledger.record(
             aid, "promotion_pipeline",
+            # The config is the experiment's IDENTITY — what was looked at.
+            # How many looks that costs is the recording's size and travels
+            # in `count`, not here: carrying `looks` in the identity meant
+            # that correcting the look accounting (21 -> 28) forked every
+            # alpha into a second "configuration", double-counting the
+            # multiple-testing denominator the ledger exists to keep honest.
             config={
                 "n_folds": 4, "embargo_s": 60, "horizon": rep["horizon"],
-                "looks": LOOKS_PER_ALPHA,
             },
             result={
                 "oos_ic": rep["oos_ic"], "nw_tstat": rep["nw_tstat"],

@@ -165,6 +165,12 @@ pub mod rules {
     /// A fill was rejected as malformed / unpriceable (audit record; the
     /// fill is NOT applied and `risk_malformed_fills_total` increments).
     pub const MALFORMED_FILL: &str = "MALFORMED_FILL";
+    /// A kill-switch command named a scope id the engine cannot resolve
+    /// (audit record; `engage_kill`/`clear_kill` return an error and
+    /// `risk_malformed_kills_total` increments). NEVER accompanied by a
+    /// KILL_SWITCH_ENGAGED / KILL_SWITCH_CLEARED record — that pairing is
+    /// exactly the phantom-halt defect this record exists to make visible.
+    pub const MALFORMED_KILL: &str = "MALFORMED_KILL";
     /// A loss limit was overridden with approval (audit record).
     pub const LOSS_LIMIT_OVERRIDE: &str = "LOSS_LIMIT_OVERRIDE";
     /// The trading session rolled: daily P&L re-based (audit record).

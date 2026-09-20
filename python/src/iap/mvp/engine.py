@@ -520,8 +520,15 @@ class MvpEngine:
         self.counters.events += 1
         # 1. simulator + reports (fills -> account + risk, terminals -> risk)
         self._process_reports(self.sim.on_market_event(ev))
-        # 2. session volume
-        if ev.event_type in (EventType.EXECUTE, EventType.TRADE):
+        # 2. session volume — the TAPE, counted once.
+        # The equity generator emits an EXECUTE *and* a matching TRADE print
+        # for the same trade, so summing both counted every equity trade
+        # twice and the participation cap enforced against this total was
+        # ~2x looser than configured (on the golden vector: 93,800 counted
+        # against a real tape of 48,900, so a 5% cap admitted 9.6%). The POV
+        # algo already measures participation against TRADE only, so the two
+        # disagreed; TRADE is the tape and is what both now use.
+        if ev.event_type == EventType.TRADE:
             self.account.session_volume += ev.qty
         # 3. risk wiring: stale transitions + reference price + account mark
         self._on_market(ev)

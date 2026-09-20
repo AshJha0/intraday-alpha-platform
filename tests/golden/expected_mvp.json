@@ -8,12 +8,12 @@
     "ALLOW": 105
   },
   "by_venue": {
-    "XV1": 429,
+    "XV1": 379,
     "XV2": 373,
     "XV3": 2374
   },
   "config_path": "configs/mvp/mvp.json",
-  "config_version": "1f7c50addf61a06e1599ceed15ef2bb64670fb73e150227e6ad5c44506ad20e5",
+  "config_version": "f40c3289c64616e3ed2b35a8d0a6bc37f42328b01c28b6395f944b4440f35b39",
   "data_version": "25cf9b7f79f0becadfeeff9c10a5db19706238cba4b93e8f59fde281d0a40234",
   "description": "MVP golden (python -m iap.mvp run on configs/mvp/mvp.json): the seeded feed, the full loop (book -> features -> EQ01/EQ03/EQ06 ensemble -> portfolio -> hard risk -> TWAP/POV/IS -> SOR -> simulator -> TCA -> attribution -> trace) and its report. Ports reproduce every value: integers and hashes exactly, floats at abs/rel 1e-9. Regenerate only on a deliberate, versioned change: PYTHONPATH=src python3 tools/make_golden_mvp.py --force.",
   "events_iap1_sha256": "25cf9b7f79f0becadfeeff9c10a5db19706238cba4b93e8f59fde281d0a40234",
@@ -38,8 +38,8 @@
   "n_traces": 355,
   "report": {
     "alpha": {
-      "contribution_bps_notional_weighted": 0.0388396848591721,
-      "cost_bps_notional_weighted": -0.40336196546531805,
+      "contribution_bps_notional_weighted": 0.03894669841679795,
+      "cost_bps_notional_weighted": -0.41078212543848697,
       "cost_negative": true,
       "ensemble": {
         "alpha_id": "EQ01-EQ03-EQ06",
@@ -52,7 +52,7 @@
         "realized_ic_shifted": -0.014939456528553436
       },
       "ic_definition": "Pearson(expected_return, label) over confidence > 0 decisions; label = iap.labels.compute_labels at the decision timestamps on the feature-engine book-refresh mid series (mid-to-mid and cost-adjusted half-spread at both ends; valid only when observed through t+h, tradable anchor, fresh tradable forward sample, no stale/halt/auction/one-sided refresh inside (t, t+h]); ic_shifted = signal lagged one confidence > 0 decision; ic_gap = |at_research_horizon.ic - research_ic| (the registry IC is measured at the alpha's fitted horizon)",
-      "net_bps_notional_weighted": -0.36452228060614594,
+      "net_bps_notional_weighted": -0.37183542702168904,
       "per_alpha": {
         "EQ01": {
           "at_research_horizon": {
@@ -162,7 +162,7 @@
         "ts_regressions_dropped": 0,
         "vectors_emitted": 355
       },
-      "fill_rate": 0.2045864467920639,
+      "fill_rate": 0.201690431640751,
       "n_child_orders_generated": 212,
       "n_child_orders_submitted": 105,
       "n_decisions": 355,
@@ -183,7 +183,7 @@
         "ts_regression_dropped": 0
       },
       "simulator": {
-        "expired_orders": 50,
+        "expired_orders": 51,
         "overlay_thinned_fills": 29,
         "reopen_touch_fills": 0,
         "user_cancels": 0,
@@ -191,14 +191,14 @@
       }
     },
     "execution": {
-      "attribution_residual_bps_mean": -0.1596434145981439,
+      "attribution_residual_bps_mean": -0.1582869640625264,
       "delay_cost_bps_qty_weighted": 0.0,
-      "fees_bps_qty_weighted": 0.023789783049066062,
-      "fill_rate": 0.2045864467920639,
-      "impact_bps_qty_weighted": -0.01271454144525734,
+      "fees_bps_qty_weighted": 0.023743252085086108,
+      "fill_rate": 0.201690431640751,
+      "impact_bps_qty_weighted": -0.0033958941883453233,
       "implementation_shortfall_bps": {
-        "mean": 0.11217736337127526,
-        "qty_weighted": 0.10553167758029298
+        "mean": 0.11337356709912573,
+        "qty_weighted": 0.10612636537659899
       },
       "latency_decision_to_arrival_ns": {
         "count": 105,
@@ -210,16 +210,16 @@
       },
       "n_orders_with_tca": 66,
       "n_parent_orders": 66,
-      "opportunity_cost_bps_qty_weighted": 0.02632758973942746,
-      "participation_rate_mean": 0.047750761417201436,
+      "opportunity_cost_bps_qty_weighted": 0.026370056333626164,
+      "participation_rate_mean": 0.046967933134373155,
       "per_algo": {
         "IS": {
-          "fill_rate": 0.6912896275777162,
-          "filled_qty": 2246,
-          "implementation_shortfall_bps_qty_weighted": 0.3539802913811429,
+          "fill_rate": 0.6888957816377171,
+          "filled_qty": 2221,
+          "implementation_shortfall_bps_qty_weighted": 0.3526437281027418,
           "n_orders": 15,
-          "qty": 3249,
-          "slippage_bps_filled_weighted": 0.5017457596089232
+          "qty": 3224,
+          "slippage_bps_filled_weighted": 0.5014688828399134
         },
         "POV": {
           "fill_rate": 0.13934426229508196,
@@ -230,47 +230,48 @@
           "slippage_bps_filled_weighted": 0.34445464231541667
         },
         "TWAP": {
-          "fill_rate": 0.03380662609871535,
-          "filled_qty": 250,
-          "implementation_shortfall_bps_qty_weighted": 0.02135338425039831,
+          "fill_rate": 0.030425963488843813,
+          "filled_qty": 225,
+          "implementation_shortfall_bps_qty_weighted": 0.024022398653310125,
           "n_orders": 31,
           "qty": 7395,
-          "slippage_bps_filled_weighted": -0.5263434928566777
+          "slippage_bps_filled_weighted": -0.4971044964650514
         }
       },
-      "qty_filled": 3176,
-      "qty_target": 15524,
-      "realized_bps_filled_weighted": -0.4375467737682487,
-      "slippage_bps_filled_weighted": 0.3871423991315981,
-      "spread_cost_bps_qty_weighted": 0.08791783674088892,
-      "timing_cost_bps_qty_weighted": 0.004000792545233949,
-      "trading_cost_bps_qty_weighted": 0.07920408784086552
+      "qty_filled": 3126,
+      "qty_target": 15499,
+      "realized_bps_filled_weighted": -0.4483323539854789,
+      "slippage_bps_filled_weighted": 0.3954392302806444,
+      "spread_cost_bps_qty_weighted": 0.07926381680309415,
+      "timing_cost_bps_qty_weighted": 0.0038883864282240116,
+      "trading_cost_bps_qty_weighted": 0.07975630904297282
     },
     "pnl": {
-      "equity": -22.6762870486491,
-      "execution_cost": 29.216287048690017,
-      "fees": 7.516400000000003,
-      "fees_net": 7.016400000000003,
+      "equity": -22.6511830029267,
+      "execution_cost": 29.351183002976537,
+      "fees": 7.441400000000003,
+      "fees_net": 6.991400000000003,
       "final_mark": 189.98,
       "final_position": -270,
-      "gross": 6.5400000000157945,
-      "identity_abs_diff": 5.7696070143720135e-12,
-      "identity_lhs_risk_daily": -15.64000000002332,
+      "gross": 6.700000000015649,
+      "identity_abs_diff": 3.3452351999585517e-11,
+      "identity_lhs_risk_daily": -15.639999999984099,
       "identity_rhs_gross_minus_spread": -15.640000000017551,
-      "impact": 0.01988704865666667,
-      "max_drawdown": 23.763728468416957,
-      "realized": -14.337335915070156,
-      "rebates": 0.5,
+      "impact": 0.019783002943333336,
+      "max_drawdown": 23.738624422694556,
+      "realized": -14.335859688491524,
+      "rebates": 0.45,
       "reporting_ccy": "USD",
-      "risk_daily": -15.64000000002332,
-      "session_volume": 806400,
-      "spread_cost": 22.180000000033345,
-      "total": -22.676287048679992,
-      "traded_qty": 3176,
-      "unrealized": -1.3026640849531645
+      "risk_daily": -15.639999999984099,
+      "session_volume": 414800,
+      "spread_cost": 22.3400000000332,
+      "total": -22.651183002927436,
+      "traded_qty": 3126,
+      "unrealized": -1.3041403114925743
     },
     "portfolio": {
       "bars": 6,
+      "infeasible_risk_solves": 0,
       "infeasible_solves": 0,
       "portfolio_version": "0008b2f0cce4501f2be40479db03de7ae446f2b5e6915aec708a4d73f26f3264",
       "solves": 180
@@ -293,14 +294,14 @@
     "routing": {
       "no_route": 0,
       "venue_fill_qty": {
-        "XV1": 429,
+        "XV1": 379,
         "XV2": 373,
         "XV3": 2374
       },
       "venue_shares": {
-        "XV1": 0.13507556675062973,
-        "XV2": 0.11744332493702771,
-        "XV3": 0.7474811083123426
+        "XV1": 0.12124120281509917,
+        "XV2": 0.11932181701855406,
+        "XV3": 0.7594369801663468
       }
     },
     "run": {
@@ -309,7 +310,7 @@
         "EQ03",
         "EQ06"
       ],
-      "config_version": "1f7c50addf61a06e1599ceed15ef2bb64670fb73e150227e6ad5c44506ad20e5",
+      "config_version": "f40c3289c64616e3ed2b35a8d0a6bc37f42328b01c28b6395f944b4440f35b39",
       "data_version": "25cf9b7f79f0becadfeeff9c10a5db19706238cba4b93e8f59fde281d0a40234",
       "decision_cadence_ns": 1000000000,
       "events_sha256": "2337a031c0b7ed87752d1de5d0630017608f6af2ac0b75e89c08dfbc16a43ed7",
@@ -325,7 +326,7 @@
       "seed": 12345,
       "session_id": "mvp-58a10f2194a3c81c",
       "strategy_id": "MVP",
-      "trace_digest": "059c30df7213d00e0d3f6de7ab9011b3d1ee9651cd3df5ec6609d2e66e965c2b",
+      "trace_digest": "d938eeae68c85a6c2acaf7fb3f7d1333f29c3ad8e036fb5af7a4d1b48c9ea2cc",
       "venues": [
         "XV1",
         "XV2",
@@ -333,7 +334,7 @@
       ]
     },
     "trace": {
-      "digest": "059c30df7213d00e0d3f6de7ab9011b3d1ee9651cd3df5ec6609d2e66e965c2b",
+      "digest": "d938eeae68c85a6c2acaf7fb3f7d1333f29c3ad8e036fb5af7a4d1b48c9ea2cc",
       "first_trace_ids": [
         "403020d9da592210fad79613f87ffa19",
         "2f060d00f430d94731a37a5bfff17fdd",
@@ -351,6 +352,6 @@
   "run_id": "58a10f2194a3c81c",
   "seed": 12345,
   "session_id": "mvp-58a10f2194a3c81c",
-  "trace_digest": "059c30df7213d00e0d3f6de7ab9011b3d1ee9651cd3df5ec6609d2e66e965c2b",
+  "trace_digest": "d938eeae68c85a6c2acaf7fb3f7d1333f29c3ad8e036fb5af7a4d1b48c9ea2cc",
   "x-version": 1
 }

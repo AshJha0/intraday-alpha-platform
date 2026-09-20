@@ -79,8 +79,10 @@ def render_report(records: Dict[int, dict]) -> str:
         "[arrival, end]. Crossed states skipped per instrument: "
         + ", ".join(f"{iid}: {skipped[iid]} of {n_states[iid] + skipped[iid]}"
                     for iid in sorted(skipped))
-        + ". Spread-cost lines are therefore never negative by "
-        "construction (conventions §7: honest, not hidden).")
+        + ". Spread-cost lines in THIS report are never negative because "
+        "every fill in the bundled research set is a TAKER fill; a MAKER "
+        "fill earns the half-spread and reports a negative spread cost "
+        "(conventions §7: honest, not hidden).")
     lines.append("")
 
     for iid, payload in sorted(records.items()):

@@ -45,22 +45,34 @@ import com.iap.orderbook.OrderBook;
  *       an applied event changes a level's displayed size the entry becomes
  *       {@code min(consumed, new displayed)} (0 removes it). Two children
  *       on the same display share one copy of the liquidity.</li>
- *   <li><b>Passive queue position</b> (pinned deterministic rule): when a
+ *   <li><b>Passive queue position</b> (pinned deterministic rule). GOVERNING
+ *       PRINCIPLE: the simulator never fills more than the market actually
+ *       traded, and our own resting orders queue behind each other. When a
  *       LIMIT remainder rests at price P, ahead_qty := displayed qty at
- *       (side, P) on that venue at rest time. Then, on that venue: an
- *       observed EXECUTE at (side, P) reduces ahead_qty by its full qty and
- *       any leftover fills our order at P (partials supported); an observed
+ *       (side, P) on that venue at rest time PLUS the sum of {@code
+ *       remaining} over our own still-ACTIVE orders already resting at that
+ *       exact (venue, side, P). Then, on that venue: ONE observed trade of
+ *       qty at (side, price) is ONE pool of liquidity, budgeted once across
+ *       the resting orders it reaches, visited in queue order (the {@code
+ *       resting} order = pinned activation order: ascending arrivalTs, then
+ *       ascending orderId) — each order pays down its queue
+ *       ({@code dec = min(aheadQty, budget)}) and then, while budget
+ *       remains, fills {@code min(budget, remaining)} at ITS OWN limit. A
+ *       trade reaches an order when it prints AT its limit or STRICTLY
+ *       WORSE (below our bid / above our ask — the market traded THROUGH
+ *       us); a trade-through fills at OUR limit but is bounded by the
+ *       observed volume, not a free fill of the whole residual. An observed
  *       CANCEL at (side, P) reduces ahead_qty by its full qty, floored at
- *       0; an EXECUTE on our side at a price WORSE than P fills us in full
- *       at P (trade-through); a MARKETABLE incoming ADD is expanded into
+ *       0, and never fills us; a MARKETABLE incoming ADD is expanded into
  *       the per-level volumes it consumes over the pre-event displayed
- *       depth and the two EXECUTE rules apply level by level; after the
- *       event is applied, a crossed displayed opposite best fills us in
- *       full at P — EXEMPTION: a remainder that rests while the display
- *       already crosses its price (the aggressive leg just consumed that
- *       display) is crossing-exempt until the display first shows an
- *       uncrossed opposite best; MODIFY events never change ahead_qty.
- *       Passive fills are stamped with the triggering event's
+ *       depth, each level's volume being its own pool; after the event is
+ *       applied, a crossed displayed opposite best fills us at P, bounded
+ *       by the DISPLAYED size of that crossing level (one pool per side,
+ *       ahead_qty consumed first) — EXEMPTION: a remainder that rests while
+ *       the display already crosses its price (the aggressive leg just
+ *       consumed that display) is crossing-exempt until the display first
+ *       shows an uncrossed opposite best; MODIFY events never change
+ *       ahead_qty. Passive fills are stamped with the triggering event's
  *       exchange_ts.</li>
  *   <li><b>Fees</b>: equity venues charge taker_fee_per_share * qty on
  *       aggressive fills and rebate maker_rebate_per_share * qty on passive
@@ -85,8 +97,9 @@ import com.iap.orderbook.OrderBook;
  *       arrivals do not execute (MARKET/IOC/FOK cancelled
  *       VENUE_NOT_TRADING, LIMIT rests), resting orders ignore observed
  *       consumption and the crossing check is skipped. On the first event
- *       after which the venue is open again, crossed resting orders fill in
- *       full at the TOUCH (uncross) price.</li>
+ *       after which the venue is open again, crossed resting orders fill at
+ *       the TOUCH (uncross) price — bounded by the same displayed-size pool
+ *       and ahead_qty consumption as the rule-4 crossing check.</li>
  *   <li><b>Event order</b>: expiries; activations + cancel arrivals; passive
  *       queue tracking; book update; overlay cap; crossing check.</li>
  * </ol>
@@ -418,6 +431,20 @@ public final class ExecutionSimulator {
                 o.resting = true;
                 int side = o.side == 0 ? Side.BID : Side.ASK;
                 o.aheadQty = book != null ? levelQty(book, side, o.limitTicks) : 0;
+                // Rule 4: our own children already resting at this exact
+                // (venue, side, price) are ahead of us in the FIFO queue.
+                // Without this a later sibling would be handed the very
+                // liquidity its earlier sibling is still queued for.
+                for (long id : resting) {
+                    ChildOrder ahead = orders.get(id);
+                    if (ahead.state == OrderState.ACTIVE
+                            && ahead.instrumentId == o.instrumentId
+                            && ahead.venueId == o.venueId
+                            && ahead.side == o.side
+                            && ahead.limitTicks == o.limitTicks) {
+                        o.aheadQty += ahead.remaining;
+                    }
+                }
                 // Crossing exemption: the display may still show the
                 // liquidity our aggressive leg just consumed (rule 4). While
                 // gated (rule 8) nothing was consumed: no exemption.
@@ -493,30 +520,39 @@ public final class ExecutionSimulator {
     }
 
     /**
-     * Queue tracking for observed consumption of displayed liquidity at one
-     * price level (EXECUTE events and marketable-ADD expansion).
+     * Queue tracking for ONE observed trade of {@code qty} at one price level
+     * (an EXECUTE, or one level of the marketable-ADD expansion).
+     *
+     * <p>The traded quantity is a single budget shared by every resting order
+     * it reaches: handing each order the full {@code qty} would manufacture
+     * liquidity that never traded — n children at one level would each fill
+     * from the same print. Queue order is the {@code resting} order, which is
+     * the pinned activation order (ascending arrivalTs, then ascending
+     * orderId): the earlier child is served first, as on a FIFO book.
      */
     private void trackConsumption(long instrumentId, int venueId, int side,
             long priceTicks, long qty, long ts) {
+        long budget = qty;
         for (int i = 0; i < resting.size();) {
             ChildOrder o = orders.get(resting.get(i));
-            if (o.instrumentId == instrumentId && o.venueId == venueId
-                    && o.side == side && o.state == OrderState.ACTIVE) {
-                if (priceTicks == o.limitTicks) {
-                    long dec = Math.min(o.aheadQty, qty);
+            if (budget > 0 && o.instrumentId == instrumentId
+                    && o.venueId == venueId && o.side == side
+                    && o.state == OrderState.ACTIVE) {
+                // A trade reaches us when it prints AT our limit, or STRICTLY
+                // WORSE than it (below our bid / above our ask) — the market
+                // traded through our level, so we must have been hit first.
+                // Both fill at OUR limit (we never get price improvement) and
+                // both are capped by the observed volume.
+                boolean through = o.side == 0 ? priceTicks < o.limitTicks
+                                              : priceTicks > o.limitTicks;
+                if (priceTicks == o.limitTicks || through) {
+                    long dec = Math.min(o.aheadQty, budget);
                     o.aheadQty -= dec;
-                    long leftover = qty - dec;
-                    if (leftover > 0) {
-                        emitFill(o, o.limitTicks, Math.min(leftover, o.remaining),
-                                ts, Liquidity.MAKER);
-                    }
-                } else {
-                    // Consumption strictly worse than our price: the market
-                    // traded through our level — full fill at our limit.
-                    boolean through = o.side == 0 ? priceTicks < o.limitTicks
-                                                  : priceTicks > o.limitTicks;
-                    if (through) {
-                        emitFill(o, o.limitTicks, o.remaining, ts, Liquidity.MAKER);
+                    budget -= dec;
+                    if (budget > 0) {
+                        long fill = Math.min(budget, o.remaining);
+                        emitFill(o, o.limitTicks, fill, ts, Liquidity.MAKER);
+                        budget -= fill;
                     }
                 }
             }
@@ -528,30 +564,52 @@ public final class ExecutionSimulator {
         }
     }
 
+    /**
+     * Rule 4 (last bullet) / rule 8 reopen against the post-event book. No
+     * trade was observed here, only a crossed display, so the pool is the
+     * DISPLAYED size of the crossing opposite best (the most an incoming
+     * aggressor could have brought): one pool per side, shared by every order
+     * of ours resting against it, in {@link #trackConsumption} queue order.
+     */
     private void crossingCheck(MarketEvent ev, OrderBook book, boolean reopened) {
         long t = ev.exchangeTs;
+        long[] bestAsk = book.bestAsk();
+        long[] bestBid = book.bestBid();
+        // Indexed by OUR side: a buy crosses against the ask, a sell the bid.
+        long[] budget = {
+            bestAsk == null ? 0L : bestAsk[1],
+            bestBid == null ? 0L : bestBid[1],
+        };
         for (int i = 0; i < resting.size();) {
             ChildOrder o = orders.get(resting.get(i));
-            boolean filled = false;
             if (o.instrumentId == ev.instrumentId && o.venueId == ev.venueId
                     && o.state == OrderState.ACTIVE) {
-                long[] opp = o.side == 0 ? book.bestAsk() : book.bestBid();
+                long[] opp = o.side == 0 ? bestAsk : bestBid;
                 boolean crossed = opp != null
                         && (o.side == 0 ? opp[0] <= o.limitTicks
                                         : opp[0] >= o.limitTicks);
                 if (!crossed) {
                     o.crossExempt = false; // display uncrossed: exemption ends
-                } else if (reopened) {
-                    // Rule 8: uncross at the touch, not at the limit.
-                    counters.reopenTouchFills++;
-                    emitFill(o, opp[0], o.remaining, t, Liquidity.MAKER);
-                    filled = true;
-                } else if (!o.crossExempt) {
-                    emitFill(o, o.limitTicks, o.remaining, t, Liquidity.MAKER);
-                    filled = true;
+                } else if (reopened || !o.crossExempt) {
+                    // The queue ahead of us would have been served by that
+                    // same aggressor first.
+                    long dec = Math.min(o.aheadQty, budget[o.side]);
+                    o.aheadQty -= dec;
+                    budget[o.side] -= dec;
+                    if (budget[o.side] > 0) {
+                        long fill = Math.min(budget[o.side], o.remaining);
+                        // Rule 8 uncrosses AT THE TOUCH; the rule-4 crossing
+                        // fills at our own limit (no price improvement).
+                        emitFill(o, reopened ? opp[0] : o.limitTicks, fill, t,
+                                Liquidity.MAKER);
+                        budget[o.side] -= fill;
+                        if (reopened) {
+                            counters.reopenTouchFills++;
+                        }
+                    }
                 }
             }
-            if (filled) {
+            if (o.state == OrderState.FILLED) {
                 resting.remove(i);
             } else {
                 i++;

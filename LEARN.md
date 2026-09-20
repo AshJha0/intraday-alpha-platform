@@ -475,7 +475,7 @@ Pinned promotion gates (spec §20):
 - **ITERATE**: leakage pass ∧ IC ≥ 0.005 ∧ t ≥ 1.5.
 - **REJECT**: otherwise (always, on leakage failure).
 
-Result on the bundled data: **0 PROMOTE / 12 ITERATE / 12 REJECT** — every
+Result on the bundled data: **0 PROMOTE / 11 ITERATE / 13 REJECT** — every
 one of the 24 alphas is net-negative at 1× modeled costs, so nothing clears
 the last gate. Worked examples, straight from the master table:
 
@@ -521,12 +521,12 @@ identified by **(alpha, kind, canonical config)** and de-duplicated on that
 key — rerunning `run_all.py` changes nothing, and one adaptive deployment is
 one experiment.
 
-The current ledger holds **70 distinct configurations / 865 looks**: a
+The current ledger holds **70 distinct configurations / 1068 looks**: a
 one-time design scan (216 experiments: 24 alphas × 9 horizons), 24 promotion
 pipelines at 21 experiments each (504), 40 adaptive deployments (10 alphas ×
 4 refit policies), and — since 2026-09-19 — five `ExperimentRunner` runs at
 21 each (105; §6.8). That translates into a selection yardstick: Bonferroni
-per-test threshold |t| ≥ **4.02**, and an expected **max |t| ≈ 3.68 under
+per-test threshold |t| ≥ **4.071**, and an expected **max |t| ≈ 3.735 under
 the global null**. Meaning: FX08's uncrossed t = 2.02 — or FX11's 1.40 — is
 *consistent with pure selection* over this many trials, and the report says
 so in print. EQ03 (t 10.61) and EQ02 (8.47) clear it; EQ06 (3.25) and EQ11
@@ -941,8 +941,8 @@ match**.
   the portfolio golden is checked against an SLSQP optimum. Golden files are
   regenerated only deliberately, with a MIGRATIONS.md entry.
 - **One command proves parity**: `tests/harness/run_all.sh` runs all four
-  suites and prints the table (a full harness run on 2026-09-20: python 1362,
-  cpp 267, rust 298, java 475 tests passed; golden groups 164/68/62/102; all
+  suites and prints the table (a full harness run on 2026-09-20: python 1388,
+  cpp 285, rust 313, java 482 tests passed; golden groups 164/68/62/102; all
   PASS, plus `integration` (15) and `replay` (4) rows for the repo-level
   pytest suites, a `deployment` row — 16 structural checks passed, 2 skipped
   for tools absent here — and a `numbers` row that re-derives every headline
@@ -1430,7 +1430,7 @@ reproduces them with string concatenation and one hash (pinned:
 digest is sha256 over every canonical line + newline in emission order;
 same seed ⇒ same digest; one changed field or one swapped line changes it.
 Known answers are pinned for one trace, the same trace twice, and the empty
-stream; the MVP golden pins a whole session's digest (`059c30df…`, 355
+stream; the MVP golden pins a whole session's digest (`d938eeae…`, 355
 traces).
 
 ### 18.3 Four languages, one line
@@ -1513,7 +1513,7 @@ index that lied about what its sources contain would be worse than none.
 
 ```bash
 cd python && PYTHONPATH=src python3 -m iap.mvp run
-# mvp run 58a10f2194a3c81c: events=16578 decisions=355 parents=66 children=105 fills=55 pnl=-22.676287 USD digest=059c30df7213d00e...
+# mvp run 58a10f2194a3c81c: events=16578 decisions=355 parents=66 children=105 fills=55 pnl=-22.676287 USD digest=d938eeae68c85a6c...
 ```
 
 Seven seconds later `data/mvp/58a10f2194a3c81c/` holds the captured stream,
@@ -1541,7 +1541,7 @@ XV1 13.5 %, XV2 11.7 % of filled quantity (aggressive routing picks the
 cheapest taker fee on price ties; passive routing prefers XV1's rebate).
 TCA: implementation shortfall +0.106 bps quantity-weighted; TWAP fills
 3.4 % (passive limits at a 1 s horizon mostly expire), POV 13.9 %, IS
-69.1 %. **P&L −22.68 USD** on 3,176 shares: +0.039 bps of alpha
+69.1 %. **P&L −22.65 USD** on 3,176 shares: +0.039 bps of alpha
 contribution against −0.40 bps of execution cost. The report field is
 `alpha.cost_negative: true`. This is the research finding of §6 — real
 signal, no money after costs — reproduced by a full loop on a different
@@ -1584,7 +1584,7 @@ with a number like that, and docs/MVP.md §7.1 records doing it:
    measure precisely that lean. A real feed would not be this kind.
 5. **Check that it still does not pay.** The cost-adjusted IC — buy the ask
    now, sell the bid at t + h — is +0.017 / +0.065 at 1 s. The predicted
-   move is smaller than the spread; that is the −22.68 USD.
+   move is smaller than the spread; that is the −22.65 USD.
 6. **Let the lifecycle see it.** `paper_evidence.json` carries the realized
    IC at the fitted horizon, so the `paper_ic_tracking` gate (max gap 0.01)
    fails EQ01 and EQ03 on this data — correctly: paper behaviour that
@@ -1616,8 +1616,8 @@ there rather than left for a reader to discover.
 3. **Random splits on overlapping labels.** Walk-forward only, purge at the
    label horizon, 60 s embargo (§6.2).
 4. **Uncounted multiple testing.** A ledger de-duplicated by (alpha, kind,
-   config) — 70 distinct configurations, 865 looks — with a printed
-   expected-max-|t| yardstick of 3.68; FX08's t = 2.02 is called what it is.
+   config) — 70 distinct configurations, 1068 looks — with a printed
+   expected-max-|t| yardstick of 3.735; FX08's t = 2.02 is called what it is.
    Round 3 also fixed the denominator itself: it used to grow every time a
    script was rerun, which made the correction a function of how busy the
    researcher had been.
@@ -1745,7 +1745,7 @@ same number; then read the shift-by-one test with its known blind spot (at
 a cadence equal to the horizon it cannot discriminate); then look at the
 data — a synthetic generator whose venues lean towards a shared efficient
 price makes microprice and OFI look clairvoyant at 1 s; and finally check
-the cost-adjusted IC (0.017) and the P&L (−22.68 USD): still no money. A
+the cost-adjusted IC (0.017) and the P&L (−22.65 USD): still no money. A
 number that survives all of that is a property of the data, stated as such,
 and the lifecycle's `paper_ic_tracking` gate still fails the alpha for
 diverging from research — correctly.

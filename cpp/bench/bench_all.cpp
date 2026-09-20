@@ -47,6 +47,7 @@
 #include "iap/orderbook/book.hpp"
 #include "iap/replay/exec_replay.hpp"
 #include "iap/replay/replay.hpp"
+#include "iap/util/data_paths.hpp"
 #include "iap/util/sha256.hpp"
 
 namespace {
@@ -206,11 +207,15 @@ std::vector<iap::ParentOrder> bench_parents(std::int64_t t0) {
 }  // namespace
 
 int main(int argc, char** argv) {
-    const std::string dir = IAP_GOLDEN_DIR;
-    const std::string configs = dir + "/../../configs";
+    // iap/util/data_paths.hpp: $IAP_GOLDEN_DIR overrides the compiled-in
+    // path, and every derived path is collapsed lexically so it stays
+    // walkable in an image that carries the data without the build tree.
+    const std::string dir = iap::golden_dir();
+    const std::string configs = iap::configs_dir();
     const std::string cold_path =
         argc > 2 ? std::string(argv[2])
-                 : dir + "/../../data/normalized/eq_20260824.normalized.jsonl";
+                 : iap::normalize_path(
+                       iap::data_dir() + "/normalized/eq_20260824.normalized.jsonl");
     const auto eq = iap::read_jsonl(dir + "/events_eq_mbo.jsonl");
     const auto fx = iap::read_jsonl(dir + "/events_fx_quote.jsonl");
     const auto eq_bin = iap::encode_iap1(eq);

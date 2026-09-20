@@ -31,16 +31,36 @@ public final class Constraints {
         this.wMax = wMax;
     }
 
-    /** Validate shapes and signs against dimension n (mirrors the reference). */
+    /**
+     * Validate shapes, finiteness and signs against dimension n (mirrors
+     * the reference {@code iap.portfolio.optimizer.Constraints.validate}).
+     *
+     * <p>CROSS-LANGUAGE DIVERGENCE this closes: the sign tests below are all
+     * false for NaN ({@code NaN > x}, {@code NaN < 0} and {@code NaN <= 0}
+     * are each false), so a NaN bound or cap used to pass validation here
+     * while the reference rejected it, then surfaced as a NaN
+     * {@code PgdResult.maxViolation()} — a book frozen mid-session instead
+     * of a loud failure at config load. Finiteness is therefore checked
+     * FIRST for every array and scalar.
+     */
     public void validate(int n) {
         if (wMin == null || wMax == null || wMin.length != n || wMax.length != n) {
             throw new IllegalArgumentException("w_min/w_max must have length n");
+        }
+        for (int i = 0; i < n; i++) {
+            if (!Double.isFinite(wMin[i]) || !Double.isFinite(wMax[i])) {
+                throw new IllegalArgumentException("w_min/w_max must be finite");
+            }
         }
         for (int i = 0; i < n; i++) {
             if (wMin[i] > wMax[i]) {
                 throw new IllegalArgumentException("w_min > w_max for asset " + i);
             }
         }
+        requireFinite(grossCap, "gross_cap");
+        requireFinite(netCap, "net_cap");
+        requireFinite(turnoverCap, "turnover_cap");
+        requireFinite(volTarget, "vol_target");
         if (grossCap != null && grossCap <= 0.0) {
             throw new IllegalArgumentException("gross_cap must be > 0");
         }
@@ -48,6 +68,11 @@ public final class Constraints {
             throw new IllegalArgumentException("net_cap must be >= 0");
         }
         if (participation != null) {
+            for (double p : participation) {
+                if (!Double.isFinite(p)) {
+                    throw new IllegalArgumentException("participation must be finite");
+                }
+            }
             if (participation.length != n) {
                 throw new IllegalArgumentException("participation must have length n");
             }
@@ -77,11 +102,31 @@ public final class Constraints {
             if (currencyBounds.length != currencyMatrix.length) {
                 throw new IllegalArgumentException("currency_bounds shape mismatch");
             }
+            for (double[] row : currencyMatrix) {
+                for (double x : row) {
+                    if (!Double.isFinite(x)) {
+                        throw new IllegalArgumentException(
+                                "currency_matrix/currency_bounds must be finite");
+                    }
+                }
+            }
+            for (double b : currencyBounds) {
+                if (!Double.isFinite(b)) {
+                    throw new IllegalArgumentException(
+                            "currency_matrix/currency_bounds must be finite");
+                }
+            }
             for (double b : currencyBounds) {
                 if (b < 0.0) {
                     throw new IllegalArgumentException("currency_bounds must be >= 0");
                 }
             }
+        }
+    }
+
+    private static void requireFinite(Double value, String name) {
+        if (value != null && !Double.isFinite(value)) {
+            throw new IllegalArgumentException(name + " must be finite");
         }
     }
 }

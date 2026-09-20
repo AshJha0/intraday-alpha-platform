@@ -26,10 +26,14 @@ Pinned semantics (mirrored by the accounting-identity tests):
   alpha.  ``None`` keeps the unbounded legacy behaviour (goldens only).
 
 - **Session flattening** (pinned): with ``flatten_at_session_end=True`` the
-  target is forced to 0 on the last row before any gap larger than
-  ``session_gap_ns`` and on the final row of the frame, so no position is
-  carried across a session boundary.  A gap in the row stream IS the session
-  boundary here: it needs no calendar and works for FX and equities alike.
+  target is forced to 0 on the last EXECUTABLE row at or before any gap
+  larger than ``session_gap_ns``, and likewise at the end of the frame, so no
+  position is carried across a session boundary.  The "executable" qualifier
+  is load-bearing: a boundary row whose mid or half-spread is invalid cannot
+  trade, so the flatten has to retreat to the last row that can, or the
+  forward fill carries the position across the gap anyway.  A gap in the row
+  stream IS the session boundary here: it needs no calendar and works for FX
+  and equities alike.
 - **Position rule** (pinned, deliberately simple): target =
   ``sign(expected_return) * max_pos_qty`` when ``confidence >= conf_min``,
   else flat.  No pyramiding, no hysteresis — a research backtester
@@ -364,13 +368,27 @@ class Backtester:
                     ts[cfg.latency_rows:] - ts[: n - cfg.latency_rows])
                 exec_target[age > cfg.max_decision_age_ns] = np.nan
 
-        if cfg.flatten_at_session_end and n:
-            # Flat before every session boundary (a row gap) and at the end.
-            gaps = np.diff(ts, append=ts[-1] + cfg.session_gap_ns + 1)
-            exec_target[gaps > cfg.session_gap_ns] = 0.0
-
         executable = np.isfinite(mid) & np.isfinite(hs) & (hs >= 0.0)
         exec_target[~executable] = np.nan  # cannot trade here; carry position
+
+        if cfg.flatten_at_session_end and n:
+            # Flat before every session boundary (a row gap) and at the end.
+            #
+            # The flatten is applied AFTER the executability mask, and lands on
+            # the last EXECUTABLE row at or before the boundary.  Writing the 0
+            # onto the boundary row first let the mask overwrite it with NaN
+            # whenever that row's book was one-sided (a crossed or single-sided
+            # quote at the close is routine), and ``_ffill`` then carried the
+            # position straight across the session gap — handing an intraday
+            # alpha the whole overnight move, which is precisely the leak this
+            # flag exists to close.
+            gaps = np.diff(ts, append=ts[-1] + cfg.session_gap_ns + 1)
+            boundary = np.flatnonzero(gaps > cfg.session_gap_ns)
+            if boundary.size:
+                last_exec = np.where(executable, np.arange(n), -1)
+                np.maximum.accumulate(last_exec, out=last_exec)
+                flat_rows = last_exec[boundary]
+                exec_target[flat_rows[flat_rows >= 0]] = 0.0
         pos = _ffill(exec_target, 0.0)
         trades = np.diff(pos, prepend=0.0)
         trade_rows = trades != 0.0

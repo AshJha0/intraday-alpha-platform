@@ -23,9 +23,9 @@ are statements about this dataset and pipeline, not about real markets).
 >
 > **Errata — 2026-09-20.** The ledger moved again on 2026-09-19 when the
 > contract-driven `ExperimentRunner` registered five experiments
-> (`research/experiments/<id>/`): the denominator is now **865 looks over 70
-> distinct configurations** (Bonferroni per-test |t| ≥ 4.02, expected max
-> |t| under the global null ≈ 3.68). Papers 1-4 carry a second dated note;
+> (`research/experiments/<id>/`): the denominator is now **1068 looks over 70
+> distinct configurations** (Bonferroni per-test |t| ≥ 4.071, expected max
+> |t| under the global null ≈ 3.735). Papers 1-4 carry a second dated note;
 > no verdict or statistic in any paper changes. Papers 4 and 6 additionally
 > note the 2026-09-19 regeneration of `benchmarks/results_cpp.md` (IAP1
 > decode 184.1 ns/event, book update 26.4 ns, replay 27.2M events/s, feature
@@ -41,7 +41,7 @@ are statements about this dataset and pipeline, not about real markets).
 L1 and multi-level order-flow imbalance (EQ02/EQ03) are statistically real
 predictors on the synthetic equity dataset — uncrossed OOS IC 0.0312/0.0298
 with Newey-West t of 8.47/10.61 (clearing even the ledger's
-selection-adjusted threshold of |t| 4.02), **all four** walk-forward folds
+selection-adjusted threshold of |t| 4.071), **all four** walk-forward folds
 non-degenerate and sign-consistent under the row-mass split, passed leakage
 tests, and a decay curve rising from ~0 (in fact slightly negative) below
 100 ms to a peak of IC ≈ 0.041-0.044 at 10 s — and still not worth trading:
@@ -78,7 +78,7 @@ fitted sign that contradicts its rationale — while FX04 (cross-venue
 lead-lag) reads very differently once crossed rows are excluded: uncrossed
 IC 0.0297 at t 4.26, all four folds sign-consistent, hypothesis confirmed.
 That clears every *statistical* promotion gate and clears the ledger's
-selection yardstick (expected max |t| 3.68 over 70 distinct configurations);
+selection yardstick (expected max |t| 3.735 over 70 distinct configurations);
 FX04 is held at ITERATE purely because it is cost-negative
 (−32,566 USD at 1x). Its pooled IC of 0.0100 had understated it: 28.7 % of
 these rows carry a crossed merged book on which the lead-lag "signal" is an
@@ -141,7 +141,7 @@ The Perold IS decomposition is enforced as an exact identity to 1e-9.
 An engineering case study of four parallel ports of one pinned semantics,
 held identical by golden tests (byte-exact IAP1 SHA-256 digests; 443/175/
 181/291 tests green in the paper's recorded 2026-08-29 harness run; the
-2026-09-20 harness records 1362/267/298/475 py/cpp/rs/java tests and
+2026-09-20 harness records 1388/285/313/482 py/cpp/rs/java tests and
 164/68/62/102 golden after the contracts / lifecycle / trace / MVP release). Measured on the
 stated 2-CPU
 Xeon container (g++ 13.3.0, rustc 1.95.0, OpenJDK 21.0.10): C++ decodes at

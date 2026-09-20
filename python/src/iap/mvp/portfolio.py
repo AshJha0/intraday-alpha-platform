@@ -87,6 +87,12 @@ class SingleStockPortfolio:
         self._model_version = model_version
         self.solves = 0
         self.infeasible_solves = 0
+        #: Infeasible solves whose residual breach was a RISK constraint
+        #: (vol/box/gross/net/currency) rather than a purely trading one
+        #: (participation/turnover). A trading-only breach means "we are
+        #: moving toward compliance but had to slice"; a risk breach means
+        #: the book is still outside its mandate and a human should know.
+        self.infeasible_risk_solves = 0
 
     @property
     def acting_alpha_id(self) -> str:
@@ -139,7 +145,18 @@ class SingleStockPortfolio:
         w = float(result.weights[0])
         if not result.feasible:
             self.infeasible_solves += 1
-            w = w_prev
+            # Do NOT fall back to w_prev. The usual cause of infeasibility is
+            # that w_prev itself breaches a RISK constraint (vol/box/gross)
+            # while a trading constraint stops us reaching the feasible set in
+            # one step — precisely when holding the book is the worst action
+            # available. In a vol spike that fallback pinned the book at 10.6x
+            # the vol target indefinitely, though the solver had already
+            # computed a strictly less-violating step. solve() now returns the
+            # least-violating candidate, so the target it hands back is the
+            # best reachable move toward compliance; we take it and count the
+            # residual breach by kind so an operator can alarm on RISK.
+            if result.risk_violation > 0.0:
+                self.infeasible_risk_solves += 1
         target_qty = round_half_away(w * float(spec.max_position_qty))
         return PortfolioTarget(
             strategy_id=self._strategy_id, timestamp_ns=state.timestamp_ns,

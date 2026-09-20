@@ -584,3 +584,59 @@ review of the release, findings 1–10 and notes 12/13):
   `ExecutionReport.from_dict`, the DDL and every port require `>= 0` (safe
   direction).  Tighten to `minimum: 0` at the next revision of that schema
   (x-version bump + golden regeneration across the four ports).
+
+## 2026-09-20 — correctness review: execution fills, research statistics, risk fail-closed
+
+No schema `x-version` changed. Four goldens were regenerated deliberately
+because pinned SEMANTICS were corrected; each is listed with the defect it
+encoded. Verdicts moved (10 ITERATE / 14 REJECT -> 11 / 13) and the MVP's
+P&L moved (−22.68 -> −22.65 USD); nothing was promoted, before or after.
+
+- **`tests/golden/expected_replay_fills.json` regenerated (6 -> 7 fills)**,
+  owner `cpp/tools/make_replay_fills_golden`. The simulator credited EVERY
+  resting order at a price with the FULL observed trade quantity, so N
+  children at one level filled N times the liquidity that traded (4 × 1000
+  at bid 100 against a single 400-share print filled 400, not 100), and our
+  own children never queued behind each other. A trade-through filled the
+  entire residual regardless of the printed size — one share through a
+  level filled a 1,000,000-share order. Both are now bounded by observed
+  volume under one rule: *the simulator never fills more than the market
+  actually traded, and our own orders queue behind each other*. The golden's
+  single 129-share fill is now the 100 the tape showed plus a later 29.
+  C++/Python/Java verified bit-identical (raw IEEE-754 comparison).
+- **`tests/golden/expected_mvp.json` regenerated**, digest
+  `059c30df...` -> `d938eeae...`. Consequence of the fills rule
+  above plus two MVP fixes: session volume counted each equity trade twice
+  (an EXECUTE *and* its TRADE print), making the participation cap ~2×
+  looser than configured; and the TCA spread/impact split ignored the
+  liquidity flag, booking passive fills as PAYING the spread. Fill rate
+  0.2046 -> 0.2017, filled qty 3176 -> 3126, P&L −22.676 -> −22.651 — every
+  move in the conservative direction.
+- **`tests/golden/expected_tca.json` regenerated**: the case literally named
+  `passive_fill_pre_event_mid` pinned `spread = +1.999…` for a MAKER fill.
+  A liquidity provider EARNS the half-spread; the sign is now applied, so it
+  is `−1.999…` and impact is exactly 0, as that case's own docstring said.
+- **`tests/golden/expected_experiment_golden_frame.json` regenerated**:
+  `fold_consistency` was measured on the β-SIGNED signal, so an alpha
+  backwards in every fold reported 1.00; the walk-forward also ran over the
+  union of all three declared periods, training later folds inside the
+  declared holdout (fold 4 on 59.3% of it). Both fixed — the walk-forward
+  now ends where the holdout begins, guarded by an assertion.
+- **`tests/golden/expected_lifecycle.json` regenerated** from the corrected
+  reports; still 24 CANDIDATE / 0 beyond. FX09 and EQ07 now fail
+  `fold_consistency` and `hypothesis_sign`, gates they previously passed
+  falsely.
+- **`research/experiments.json` migrated** by
+  `research/migrate_ledger_looks_identity.py` (idempotent, `--check` for
+  CI): `looks` left the experiment IDENTITY — it is the size of a recording
+  (`count`), not what was looked at, and carrying it in the key forked every
+  alpha into a second "configuration" the moment the look count was
+  corrected. The count itself went 21 -> 28 (it omitted the time-latency
+  grid, the crossed/uncrossed split and the leakage shift IC), so the ledger
+  reads 1068 looks over the same 70 distinct configurations, up from 865.
+  A higher denominator makes every corrected t-statistic HARDER to clear.
+- **`schemas/FORMAT.md` §1**: the tolerated JSONL whitespace set is now
+  pinned to ASCII space/tab/CR/LF. It was unpinned, and the four ports
+  disagreed — C++ rejected LF while Rust and Python accepted VT, FF and
+  NBSP, so one port refused files the others ingested.
+- No stored data needs migrating: every regenerated artefact is derived.

@@ -509,3 +509,207 @@ def test_ledger_reruns_do_not_inflate_the_denominator(tmp_path):
     # a genuinely different configuration IS a new experiment
     led.record("EQ01", "alpha_validation", config={"folds": 8})
     assert led.total_experiments == 3
+
+
+# -- round-4: z-scored folds/stress, turnover denominator, NW weighting ---
+
+
+def _backwards_frames(n=3000, seed=17):
+    """Frames whose signal is ANTI-correlated with every horizon's label.
+
+    A free-signed OLS fit lands on beta < 0 here, so ``expected_return``
+    carries the opposite sign to the standardized signal ``z`` the gate is
+    computed on — the exact configuration that made EQ09 report
+    ``fold_sign_consistency = 1.00`` beside a negative gate IC.
+    """
+    rng = np.random.default_rng(seed)
+    ts = np.arange(n, dtype=np.int64) * NS_S + NS_S
+    z = rng.standard_normal(n)
+    noise = rng.standard_normal(n)
+    future = (-0.25 * z + noise) * 1e-4
+    cols = {
+        "exchange_ts": ts,
+        "sig_feature": z,
+        "mid_price_v1": 25.0 + np.cumsum(future) * 25.0,
+        "spread_ticks_v1": np.ones(n),
+        "vol_regime_flag_v1": np.tile([0.0, 1.0], n // 2),
+    }
+    for h in _H:
+        cols[f"label_mid_{h}"] = future
+        cols[f"label_valid_{h}"] = np.ones(n, dtype=bool)
+    return {1: pd.DataFrame(cols)}
+
+
+class _BackwardsAlpha(LinearAlpha):
+    """Fixture whose stated direction the data contradicts.
+
+    Economic rationale: fixture — the raw signal is oriented positively but
+    the planted relationship is negative, so the free-signed fit returns
+    beta < 0.  Exists only inside the test suite.
+    """
+
+    alpha_id = "TST4"
+    name = "backwards_fixture"
+    asset_class = "EQUITY"
+    horizon = "1s"
+    features = ("sig_feature",)
+
+    def universe(self, ids):
+        return [i for i in sorted(ids) if i == 1]
+
+    def raw_signal(self, df):
+        return df["sig_feature"]
+
+
+def _validate_backwards():
+    from iap.backtest import Backtester, BacktestConfig, CostModel
+    from iap.validation.validate import validate_alpha
+
+    frames = _backwards_frames()
+    meta = {1: {"tick_size": 0.01, "lot_size": 1, "adv": 1_000_000.0,
+                "asset_class": "EQUITY", "ref_price": 25.0}}
+    bt = Backtester(
+        CostModel(impact_coeff_bps_per_pct_adv=2.0,
+                  equity_taker_fee_per_share=0.003,
+                  fx_commission_per_million=2.5),
+        meta, BacktestConfig(max_pos_qty=100, latency_rows=1))
+    return validate_alpha(_BackwardsAlpha, frames, bt,
+                          {1: {"adv": 1_000_000.0, "ref_price": 25.0}},
+                          0.1, n_folds=4, embargo_ns=NS_S)
+
+
+@pytest.fixture(scope="module")
+def backwards_report():
+    return _validate_backwards()
+
+
+def test_fold_sign_consistency_is_scored_on_z_not_expected_return(backwards_report):
+    """An alpha that is backwards in every fold must score 0.00, not 1.00.
+
+    ``beta_k`` is refit free-signed per fold, so ``ic(er, y)`` is
+    ``sign(beta_k) * ic(z, y)``.  Counting folds by ``ic(er, y) > 0`` made a
+    uniformly-backwards alpha look perfectly consistent while the gate IC
+    (computed on ``z``) was negative in the same report.
+    """
+    rep = backwards_report
+    folds = [f for f in rep["folds"] if not f["degenerate"]]
+    assert len(folds) == 4
+    assert rep["gate_ic"] < 0.0
+    for f in folds:
+        assert f["ic"] < 0.0, "the fold IC must agree in sign with the gate"
+        assert f["ic_er"] > 0.0, "the er diagnostic is the sign-flipped one"
+        assert f["hit_rate"] < 0.5
+    assert rep["fold_sign_consistency"] == 0.0
+    # what the defect reported: every fold counted as a success
+    er_positive = sum(1 for f in folds if f["ic_er"] > 0)
+    assert er_positive / len(rep["folds"]) == 1.0
+    assert rep["verdict"] == "REJECT"
+
+
+def test_stress_and_decay_agree_in_sign_with_the_gate(backwards_report):
+    """Regime and decay ICs are scored on z too: a backwards alpha must not
+    publish a positive high-vol IC beside a negative gate IC."""
+    rep = backwards_report
+    assert rep["gate_ic"] < 0.0
+    assert rep["stress"]["regime"]["ic_high_vol"] < 0.0
+    assert rep["stress"]["regime"]["ic_low_vol"] < 0.0
+    assert rep["stress"]["latency"]["+0ev"]["ic"] < 0.0
+    assert rep["decay_ic_by_horizon"]["1s"] < 0.0
+
+
+def test_decay_curve_applies_the_confidence_mask():
+    """Rows whose signal was NaN must DROP OUT of the decay IC.
+
+    Without the mask ``_pooled_arrays`` applies everywhere else, an invalid
+    signal enters the correlation as an exact 0.0 — not a prediction of "no
+    move" but the absence of a prediction — and shrinks the IC toward 0.
+    """
+    from iap.validation.metrics import decay_curve
+
+    n = 4000
+    rng = np.random.default_rng(23)
+    z = rng.standard_normal(n)
+    future = (0.3 * z + rng.standard_normal(n)) * 1e-4
+    dead = np.zeros(n, dtype=bool)
+    dead[: int(0.6 * n)] = True          # 60 % invalid, as in FX02's last fold
+    rng.shuffle(dead)
+    er = np.where(dead, 0.0, z)          # what score() emits at confidence 0
+    frame = pd.DataFrame({
+        "exchange_ts": np.arange(n, dtype=np.int64) * NS_S,
+        "label_mid_1s": future,
+        "label_valid_1s": np.ones(n, dtype=bool),
+    })
+    unmasked = decay_curve(er, frame, horizons=("1s",))["1s"]
+    masked = decay_curve(np.where(dead, np.nan, er), frame,
+                         horizons=("1s",))["1s"]
+    honest = ic(np.where(dead, np.nan, z), np.where(dead, np.nan, future))
+    assert abs(masked - honest) < 1e-12
+    assert abs(unmasked) < abs(masked), "the zeros diluted the reported IC"
+
+
+def test_newey_west_tstat_weights_buckets_by_pair_count():
+    """One thin bucket must not move the headline t the way it used to.
+
+    Bucket ICs are means over very different pair counts (81..2 592 here);
+    weighting them equally let a single small bucket swing EQ03's reported t
+    from 4.89 to 11.46.
+    """
+    from iap.validation.metrics import bucket_ics_with_counts
+
+    ics = np.array([0.02] * 11 + [-0.40])       # 11 fat buckets + 1 thin one
+    counts = np.array([2000] * 11 + [20])
+    equal = newey_west_tstat(ics, lags=2)
+    weighted = newey_west_tstat(ics, lags=2, weights=counts)
+    assert equal < 0.0, "the thin bucket flips the equal-weighted mean"
+    assert weighted > 0.0, "20 pairs cannot outvote 22 000"
+    # equal weights must reduce EXACTLY to the pinned unweighted formula
+    same = newey_west_tstat(ics, lags=2, weights=np.ones(len(ics)))
+    assert abs(same - equal) < 1e-12
+
+    # counts come out of the bucketer alongside the ICs, aligned
+    ts = np.concatenate([np.zeros(40, np.int64),
+                         np.full(10, 400, np.int64)]) * NS_S
+    x = np.concatenate([np.arange(40.0), np.arange(10.0)])
+    y = np.concatenate([np.arange(40.0), -np.arange(10.0)])
+    b, c = bucket_ics_with_counts(ts, x, y, bucket_ns=300 * NS_S, min_obs=4)
+    assert list(c) == [40, 10]
+    assert abs(b[0] - 1.0) < 1e-12 and abs(b[1] + 1.0) < 1e-12
+
+
+def test_bucket_size_distribution_is_reported(backwards_report):
+    """``n_ic_buckets`` alone hides how uneven the evidence is."""
+    dist = backwards_report["ic_bucket_pairs"]
+    assert dist["n_buckets"] == backwards_report["n_ic_buckets"]
+    assert dist["min"] <= dist["median"] <= dist["max"]
+    assert dist["total_pairs"] > 0
+
+
+def test_signal_turnover_denominator_excludes_session_gaps():
+    """Turnover is a COST statistic: the dead hours must not dilute it.
+
+    Dividing flips by the wall span bills the strategy for hours in which it
+    cannot flip and understated equity turnover ~4.6x (EQ01: 29.42 flips/h
+    reported against 134.7 of open market).
+    """
+    from iap.validation.metrics import signal_turnover_detail
+
+    # two 30-minute sessions of 1-minute rows, 4 hours apart
+    minute = 60 * NS_S
+    s1 = np.arange(31, dtype=np.int64) * minute
+    ts = np.concatenate([s1, s1 + s1[-1] + 4 * 3600 * NS_S])
+    er = np.where(np.arange(len(ts)) % 2 == 0, 1.0, -1.0)
+    conf = np.ones(len(ts))
+    det = signal_turnover_detail(ts, er, conf)
+    assert det["flips"] == len(ts) - 1
+    assert abs(det["active_hours"] - 1.0) < 1e-12, "two half-hour sessions"
+    assert abs(det["span_hours"] - 5.0) < 1e-12
+    assert abs(det["flips_per_hour"] - det["flips"]) < 1e-9
+    # the old wall-span denominator understated it fivefold
+    assert abs(det["flips"] / det["span_hours"] - det["flips_per_hour"] / 5.0) < 1e-9
+    assert signal_turnover(ts, er, conf) == det["flips_per_hour"]
+
+
+def test_turnover_denominator_is_reported(backwards_report):
+    rep = backwards_report
+    assert rep["turnover_active_hours"] > 0.0
+    assert rep["turnover_span_hours"] >= rep["turnover_active_hours"]

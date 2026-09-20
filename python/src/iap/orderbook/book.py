@@ -741,7 +741,22 @@ class OrderBook:
         for lvl in cp["levels"]:
             if lvl["side"] not in (0, 1):
                 raise ValueError(f"invalid side {lvl['side']} in checkpoint level")
+            # A checkpoint is a trust boundary like the wire: restore must
+            # reject what apply() would reject (``_payload_ok`` requires
+            # qty > 0 and price_ticks > 0).  Without this a hand-written
+            # checkpoint seeds a book state unreachable through apply() —
+            # best_bid() == (-5, -1000000) — which then feeds negative sizes
+            # into the feature engine's merged depth and rolling windows.
+            if lvl["price_ticks"] <= 0:
+                raise ValueError(
+                    f"non-positive price_ticks {lvl['price_ticks']} "
+                    "in checkpoint level"
+                )
             for oid, qty in lvl["orders"]:
+                if qty <= 0:
+                    raise ValueError(
+                        f"non-positive qty {qty} for order_id {oid} in checkpoint"
+                    )
                 if oid in book._orders:
                     raise ValueError(f"duplicate order_id {oid} in checkpoint")
                 book._insert_order(lvl["side"], lvl["price_ticks"], oid, qty)

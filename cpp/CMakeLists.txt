@@ -67,6 +67,7 @@ function(iap_add_test name)
   gtest_discover_tests(${name})
 endfunction()
 
+iap_add_test(test_data_paths)
 iap_add_test(test_rng)
 iap_add_test(test_events)
 iap_add_test(test_codec)
@@ -83,6 +84,7 @@ iap_add_test(test_replay_fills)
 iap_add_test(test_canonical_json_golden)
 iap_add_test(test_trace_golden)
 iap_add_test(test_replay_trace)
+iap_add_test(test_hardening)
 
 # -------------------------------------------------------------------- tools
 # One-shot golden generator (expected_replay_fills.json; refuses overwrite).

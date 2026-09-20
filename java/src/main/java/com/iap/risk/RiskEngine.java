@@ -321,16 +321,53 @@ public final class RiskEngine {
                 Decision.ALLOW.code(), "venue " + venueId + " reconnected"));
     }
 
-    /** Manually engage a kill switch. */
+    /**
+     * Manually engage a kill switch. Throws {@link IllegalArgumentException}
+     * (changing nothing in the requested scope, emitting
+     * {@code MALFORMED_KILL} instead of {@code KILL_SWITCH_ENGAGED}) when
+     * {@code scopeId} does not parse.
+     *
+     * <p>SILENT NO-OP defect: an unparseable scope id used to leave the
+     * engine untouched while the audit log recorded a convincing
+     * KILL_SWITCH_ENGAGED, so an operator halting an instrument by ticker
+     * ("AAPL") believed the halt was in force and the next order was
+     * ALLOWed. Fail-closed: the operator's intent is to STOP trading and the
+     * narrow scope is undeterminable, so the engine takes the wider safe
+     * interpretation and latches the GLOBAL kill, then reports the failure
+     * loudly. Over-halting is recoverable; a phantom halt is not.
+     */
     public void engageKill(Scope scope, String scopeId, long ts, String reason) {
-        setKill(scope, scopeId, true);
+        if (!setKill(scope, scopeId, true)) {
+            metrics.counter("risk_malformed_kills_total").inc();
+            setKill(Scope.GLOBAL, "", true);
+            String why = "kill scope id \"" + scopeId + "\" is not a valid "
+                    + scopeName(scope) + " id: escalated to GLOBAL (fail-closed)";
+            emit(new RiskEvent(ts, scope, scopeId, Rules.MALFORMED_KILL,
+                    Severity.BREACH.code(), Decision.KILL.code(),
+                    why + ": " + reason));
+            throw new IllegalArgumentException(why);
+        }
         emit(new RiskEvent(ts, scope, scopeId, Rules.KILL_SWITCH_ENGAGED,
                 Severity.BREACH.code(), Decision.KILL.code(), reason));
     }
 
-    /** Clear a kill switch (the switch only — see the re-arm precedence). */
+    /**
+     * Clear a kill switch (the switch only — see the re-arm precedence).
+     * Throws {@link IllegalArgumentException} (clearing NOTHING and emitting
+     * {@code MALFORMED_KILL} instead of {@code KILL_SWITCH_CLEARED}) when
+     * {@code scopeId} does not parse: clearing is the permissive direction,
+     * so an unresolvable scope leaves every switch exactly as it was.
+     */
     public void clearKill(Scope scope, String scopeId, long ts, String reason) {
-        setKill(scope, scopeId, false);
+        if (!setKill(scope, scopeId, false)) {
+            metrics.counter("risk_malformed_kills_total").inc();
+            String why = "kill scope id \"" + scopeId + "\" is not a valid "
+                    + scopeName(scope) + " id: nothing cleared (fail-closed)";
+            emit(new RiskEvent(ts, scope, scopeId, Rules.MALFORMED_KILL,
+                    Severity.BREACH.code(), Decision.REJECT.code(),
+                    why + ": " + reason));
+            throw new IllegalArgumentException(why);
+        }
         emit(new RiskEvent(ts, scope, scopeId, Rules.KILL_SWITCH_CLEARED,
                 Severity.INFO.code(), Decision.ALLOW.code(), reason));
     }
@@ -393,34 +430,53 @@ public final class RiskEngine {
                 Severity.INFO.code(), Decision.ALLOW.code(), reason));
     }
 
-    private void setKill(Scope scope, String scopeId, boolean engaged) {
+    /**
+     * Apply a kill-switch change. Returns {@code false} (changing NOTHING)
+     * when {@code scopeId} does not name a scope this engine can address —
+     * an INSTRUMENT id that is not a u32 or a VENUE id that is not a u16.
+     * Callers MUST act on {@code false}: a silently dropped kill is the
+     * defect this return value exists to prevent.
+     */
+    private boolean setKill(Scope scope, String scopeId, boolean engaged) {
         switch (scope) {
             case GLOBAL -> setKillGlobal(engaged);
             case STRATEGY -> killStrategies.put(scopeId, engaged);
             case INSTRUMENT -> {
                 try {
                     // Instrument ids are u32 (the Rust reference parses the
-                    // scope id with parse::<u32>()): out-of-range or
-                    // unparseable ids are a no-op.
+                    // scope id with parse::<u32>()).
                     killInstruments.put(
                             Integer.toUnsignedLong(
                                     Integer.parseUnsignedInt(scopeId)),
                             engaged);
-                } catch (NumberFormatException ignored) {
-                    // unparseable id: no-op, mirrors the reference
+                } catch (NumberFormatException e) {
+                    return false;
                 }
             }
             case VENUE -> {
+                int vid;
                 try {
-                    int vid = Integer.parseInt(scopeId);
-                    if (vid >= 0 && vid <= 0xFFFF) {
-                        killVenues.put(vid, engaged);
-                    }
-                } catch (NumberFormatException ignored) {
-                    // unparseable id: no-op, mirrors the reference
+                    vid = Integer.parseInt(scopeId);
+                } catch (NumberFormatException e) {
+                    return false;
                 }
+                if (vid < 0 || vid > 0xFFFF) {
+                    return false;
+                }
+                killVenues.put(vid, engaged);
             }
         }
+        return true;
+    }
+
+    /** {@code "INSTRUMENT"} / {@code "VENUE"} / ... for malformed-kill reasons. */
+    private static String scopeName(Scope scope) {
+        return switch (scope) {
+            case GLOBAL -> "GLOBAL";
+            case STRATEGY -> "STRATEGY";
+            case INSTRUMENT -> "INSTRUMENT";
+            case VENUE -> "VENUE";
+        };
     }
 
     private void setKillGlobal(boolean engaged) {
@@ -597,7 +653,13 @@ public final class RiskEngine {
                 }
                 Double mark = markPrice(l.getKey());
                 if (mark == null) {
-                    continue; // unmarked: undeterminable, contributes nothing
+                    // FAIL-OPEN defect: skipping an unmarked held lot let its
+                    // unrealized P&L count as zero, so a loss limit could fail
+                    // to trip on a book that is only partly valuable. An
+                    // unmarked lot makes the daily total undeterminable,
+                    // exactly like the missing FX rate below — null rejects,
+                    // it does not guess.
+                    return null;
                 }
                 InstrumentRef ins = instruments.get(l.getKey());
                 double[] rate = fxRate(ins.quoteCcy());
@@ -1055,7 +1117,8 @@ public final class RiskEngine {
             gross += Math.abs(v);
             net += v;
         }
-        for (OpenOrder r : open.values()) {
+        for (Map.Entry<Long, OpenOrder> oe : open.entrySet()) {
+            OpenOrder r = oe.getValue();
             InstrumentRef oins = instruments.get(r.instrumentId);
             if (oins == null) {
                 continue;
@@ -1066,7 +1129,17 @@ public final class RiskEngine {
             } else {
                 Double m = markPrice(r.instrumentId);
                 if (m == null) {
-                    continue; // unpriced and unmarked: cannot value
+                    // FAIL-OPEN defect: skipping an unvaluable OPEN ORDER
+                    // (MARKET / MID / unpriced IOC-FOK on an instrument whose
+                    // book went one-sided) dropped its whole notional from
+                    // gross AND net, so live working exposure vanished from
+                    // the aggregate and a correct GROSS_NOTIONAL reject became
+                    // an ALLOW. An unvaluable open order is exactly as
+                    // undeterminable as an unvaluable position: reject.
+                    return reject(Rules.GROSS_NOTIONAL, Severity.WARN,
+                            "open order " + Long.toUnsignedString(oe.getKey())
+                                    + " in instrument " + r.instrumentId
+                                    + " has no mark price (fail-closed)");
                 }
                 price = m;
             }

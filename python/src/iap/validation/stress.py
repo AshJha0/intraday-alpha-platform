@@ -41,12 +41,25 @@ def _pooled(
     horizon: str,
     lag_events: int = 0,
     row_mask=None,
+    beta: float = 0.0,
 ):
+    """Pooled (score, label) arrays.
+
+    ``beta`` is the fitted coefficient of the model that produced ``scores``.
+    When it is nonzero the score is divided by it, i.e. the STANDARDIZED
+    signal ``z`` is scored — exactly what the gate IC in
+    :mod:`iap.validation.validate` uses.  Correlation is scale-invariant but
+    not sign-invariant, so scoring the raw ``expected_return`` of a
+    free-signed fit reports ``+IC`` for a model the gate measures at ``-IC``:
+    EQ09 published ``ic_high_vol = +0.1441`` next to ``gate_ic = -0.0650``.
+    """
     xs, ys = [], []
     for iid, sc in scores.items():
         df = frames[iid]
         er = sc["expected_return"].to_numpy(dtype=float).copy()
         er[sc["confidence"].to_numpy(dtype=float) <= 0.0] = np.nan
+        if beta != 0.0:
+            er = er / beta
         lab = df[f"label_mid_{horizon}"].to_numpy(dtype=float).copy()
         lab[~df[f"label_valid_{horizon}"].to_numpy(dtype=bool)] = np.nan
         if row_mask is not None:
@@ -95,12 +108,15 @@ def latency_stress(
     asset_class: str,
     horizon: str,
     shifts: Sequence[int] = LATENCY_SHIFTS,
+    beta: float = 0.0,
 ) -> Dict[str, dict]:
-    """IC and net P&L when execution lags the decision by extra events."""
+    """IC and net P&L when execution lags the decision by extra events.
+
+    ``beta`` standardizes the score before scoring it (see :func:`_pooled`)."""
     out: Dict[str, dict] = {}
     base_latency = backtester_base.config.latency_rows
     for k in shifts:
-        x, y = _pooled(scores, frames, horizon, lag_events=k)
+        x, y = _pooled(scores, frames, horizon, lag_events=k, beta=beta)
         cfg = BacktestConfig(
             max_pos_qty=backtester_base.config.max_pos_qty,
             conf_min=backtester_base.config.conf_min,
@@ -161,8 +177,15 @@ def regime_split(
     scores: Mapping[int, pd.DataFrame],
     frames: Mapping[int, pd.DataFrame],
     horizon: str,
+    beta: float = 0.0,
 ) -> Dict[str, float]:
-    """IC in high-vol vs low-vol regimes (vol_regime_flag_v1)."""
+    """IC in high-vol vs low-vol regimes (vol_regime_flag_v1).
+
+    ``beta`` standardizes the score before scoring it (see :func:`_pooled`):
+    a regime IC computed on the raw ``expected_return`` of a free-signed fit
+    carries the opposite sign to the gate IC and reads as a regime the alpha
+    "works in" when it is the regime it is most wrong in.
+    """
     def high(df: pd.DataFrame) -> np.ndarray:
         f = df["vol_regime_flag_v1"].to_numpy(dtype=float)
         return np.where(np.isfinite(f), f, 0.0) > 0.5
@@ -171,6 +194,6 @@ def regime_split(
         f = df["vol_regime_flag_v1"].to_numpy(dtype=float)
         return np.isfinite(f) & (f < 0.5)
 
-    xh, yh = _pooled(scores, frames, horizon, row_mask=high)
-    xl, yl = _pooled(scores, frames, horizon, row_mask=low)
+    xh, yh = _pooled(scores, frames, horizon, row_mask=high, beta=beta)
+    xl, yl = _pooled(scores, frames, horizon, row_mask=low, beta=beta)
     return {"ic_high_vol": ic(xh, yh), "ic_low_vol": ic(xl, yl)}

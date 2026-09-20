@@ -800,3 +800,95 @@ flip a verdict, move a lifecycle state, override a risk decision or send an orde
 HUMAN or gated-SYSTEM acts with a ledger entry id (CONTRIBUTING.md §6). A policy test that
 enforces the import rule is backlog issue AG03; until it exists the rule is enforced in review
 (CODEOWNERS: risk, execution, core).
+
+## 14. Pinned semantics corrected on 2026-09-20 (correctness review)
+
+An adversarial review across research, risk, execution and the low-latency
+ports produced verified reproductions of 28 defects. The rules below replace
+earlier pinned behaviour; `schemas/MIGRATIONS.md` lists the goldens that were
+regenerated as a result, and each rule is enforced by a regression test that
+failed before the change.
+
+### 14.1 The execution simulator never fabricates liquidity
+
+**The simulator never fills more than the market actually traded, and our own
+orders queue behind each other.** Concretely:
+
+- `ahead_qty` at rest = displayed size at `(venue, side, price_ticks)` **plus**
+  the `remaining` of our own still-active orders already resting at that exact
+  level. A later child queues behind its earlier siblings.
+- One observed trade of `qty` at a price is ONE pool. It is consumed once,
+  in queue order (ascending `arrival_ts`, then ascending `order_id`): each
+  order pays down `ahead_qty` from the budget first, then fills from what is
+  left, and consumption stops when the budget is exhausted.
+- A trade **through** our limit is bounded by the same observed volume. It
+  still fills at our limit (no price improvement), but the old "fills in
+  full" rule is retired: it was optimistic in exactly the direction that
+  flatters a backtest, and let a one-share print fill a million-share order.
+- A **crossing / reopen** has no traded volume, so its pool is the displayed
+  size of the crossing opposite best, again shared in queue order. Rule-4
+  crossing fills at our limit; rule-8 reopen fills at the touch.
+
+Before this, every resting order at a level was credited with the *full*
+observed trade quantity, so N children at one price filled N times the
+liquidity that existed. All four languages implemented it identically, so
+the cross-language goldens **locked the defect in** rather than catching it —
+a reminder that parity proves agreement, not correctness.
+
+### 14.2 Research statistics measure the signal, not the fitted signal
+
+- Per-fold IC, `fold_sign_consistency`, regime splits, latency stress and the
+  decay curve are all computed on the **raw oriented signal `z`**, the same
+  quantity the promotion gate reads — never on `beta_k * z` with `beta_k`
+  refit free-signed per fold. Scoring the signed product made an alpha that
+  was backwards in *every* fold report 1.00 consistency.
+- The walk-forward window ends where the declared holdout begins. The
+  runner asserts this (`_assert_holdout_is_held_out`) on every experiment.
+  `research/alpha_reports/run_all.py` still evaluates the whole window and
+  declares no holdout; that is a weaker protocol and is disclosed as such
+  rather than silently equated with the runner's.
+- Turnover is flips per **active** hour: inter-row time is summed excluding
+  gaps beyond the pinned session gap, and the denominator is reported.
+  Dividing by wall span understated a *cost* statistic ~4.6x on equities.
+- The Newey-West bucket mean is weighted by pair count, and the bucket-size
+  distribution is reported, so one 81-pair bucket can no longer swing the
+  gate statistic by a factor of 2.5 against 2,592-pair neighbours.
+- Every look is ledgered: 28 per experiment, itemised at
+  `iap.research.LOOKS_PER_EXPERIMENT`. `looks` is **not** part of an
+  experiment's identity — it is the size of a recording (`count`), not what
+  was looked at.
+
+### 14.3 Fail closed means fail closed, including when data is degraded
+
+- An open order that cannot be valued (no mark price) **rejects** on the
+  gross/net check exactly as an unvaluable position does. It used to be
+  skipped, so working exposure vanished from the aggregate and a correct
+  reject became an allow precisely when the book degraded.
+- A held lot with no mark makes daily P&L **undeterminable** (`None`), not
+  zero, so a loss limit cannot fail to trip on unmarked inventory.
+- A kill switch whose scope id does not parse is **not** a no-op: it
+  escalates to a GLOBAL kill, emits `MALFORMED_KILL` and raises. It
+  previously changed nothing while writing `KILL_SWITCH_ENGAGED` to the
+  audit log — the worst possible combination.
+- On an infeasible solve the optimizer returns the **least-violating**
+  candidate, ranked by (risk violation, total violation, order), never
+  `w_prev` when a strictly better iterate was computed and discarded.
+  `PGDResult` carries `violations` and `risk_violation` so a caller can
+  distinguish "still outside the mandate" from "moving, had to slice".
+
+### 14.4 Arithmetic and paths
+
+- Cross-venue depth, doubled mid, OFI deltas and rolling window sums are
+  accumulated in a **wider type** (`__int128` / `i128`) and range-checked
+  before narrowing, so the size guards actually fire. They previously
+  wrapped, emitting negative depths and prices as *valid* features, and the
+  three ports disagreed (C++ emitted garbage, Rust panicked, Python was
+  correct).
+- `OrderBook::restore` rejects non-positive `qty` and `price_ticks` in all
+  three ports, matching the live path's `payload_ok`.
+- JSONL whitespace is pinned to ASCII space, tab, CR and LF (`FORMAT.md` §1).
+- A path derived from a compiled-in root is normalised **lexically**, and
+  the root is overridable by `$IAP_GOLDEN_DIR`
+  (`cpp/include/iap/util/data_paths.hpp`). A build-tree path used at runtime
+  inside a container that carries the data but not the build tree is how the
+  `images` CI job crashed on startup.

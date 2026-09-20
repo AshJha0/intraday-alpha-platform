@@ -128,7 +128,7 @@ public class ReplayFillsGoldenTest {
     @Test
     public void handTracedFirstFills() {
         ExecutionReplay.Result res = runGoldenScenario();
-        assertTrue(res.fills.size() >= 2);
+        assertTrue(res.fills.size() >= 3);
 
         // The jitter draws come from SplitMix64(20260829), submission order:
         // order 1 = VWAP slice 0 (starts t0+60s), order 2 = IS slice 0.
@@ -157,18 +157,30 @@ public class ReplayFillsGoldenTest {
 
         // Fill 2: VWAP slice 0 — passive join at the 2449 bid (decision at
         // event index 47, the first event at or after t0+60s), filled by
-        // the ask ADD at 2448 trading through it (event index 97).
+        // the ask ADD at 2448 trading through it (event index 97). That ADD
+        // traded 100, and a trade-through is bounded by the observed volume
+        // (rule 4), so 100 of the 129-share slice fills here.
         Fill f2 = res.fills.get(1);
         assertEquals(1, f2.orderId());
         assertEquals(1, f2.parentId());
-        assertEquals(129, f2.qty()); // VWAP slice quantities {129,71,71,129}
+        assertEquals(100, f2.qty()); // bounded by the observed volume
         assertEquals(2449, f2.priceTicks());
         assertEquals(Liquidity.MAKER, f2.liquidity());
         assertEquals(1787578386181246977L, f2.ts());
-        assertEquals(-0.002 * 129, f2.fee(), 0.0);
+        assertEquals(-0.002 * 100, f2.fee(), 0.0);
         long decision1 = 1787578263509538609L; // event index 47
         assertEquals(1787578263509910284L, decision1 + 350_000 + j1);
         assertTrue(f2.ts() > decision1 + 350_000 + j1); // fill after arrival
+
+        // Fill 3: the slice-0 residual, taken by the next trade-through
+        // (event index 102, a 100-share bid EXECUTE at 2448).
+        Fill f3 = res.fills.get(2);
+        assertEquals(1, f3.orderId());
+        assertEquals(29, f3.qty()); // 100 + 29 = the 129-share slice
+        assertEquals(2449, f3.priceTicks());
+        assertEquals(Liquidity.MAKER, f3.liquidity());
+        assertEquals(1787578395624588691L, f3.ts());
+        assertEquals(-0.002 * 29, f3.fee(), 0.0);
     }
 
     @Test

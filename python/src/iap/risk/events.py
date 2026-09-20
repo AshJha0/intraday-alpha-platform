@@ -120,6 +120,12 @@ class Rules:
     VENUE_RECONNECT = "VENUE_RECONNECT"
     #: A fill was rejected as malformed / unpriceable (not applied).
     MALFORMED_FILL = "MALFORMED_FILL"
+    #: A kill-switch command named a scope id the engine cannot resolve
+    #: (``engage_kill``/``clear_kill`` raise and
+    #: ``risk_malformed_kills_total`` increments). NEVER accompanied by a
+    #: KILL_SWITCH_ENGAGED / KILL_SWITCH_CLEARED record — that pairing is
+    #: exactly the phantom-halt defect this record exists to make visible.
+    MALFORMED_KILL = "MALFORMED_KILL"
     #: A loss limit was overridden with approval.
     LOSS_LIMIT_OVERRIDE = "LOSS_LIMIT_OVERRIDE"
     #: The trading session rolled: daily P&L re-based.

@@ -32,6 +32,7 @@ from iap.contracts.types import (
     VenueDecision,
 )
 from iap.contracts.versions import content_hash
+from iap.research import LOOKS_PER_EXPERIMENT
 from iap.store import (
     DDL_X_VERSION,
     STAGE_TABLES,
@@ -608,8 +609,14 @@ def test_import_experiments_ledger(store: Store) -> None:
     assert rep.inserted["ledger_entries"] == _n_ledger_entries() >= 65
     row = store.query("SELECT * FROM ledger_entries WHERE alpha_id='EQ03' "
                       "AND kind='promotion_pipeline'")[0]
-    assert row["count"] == 21 and row["verdict"] == "ITERATE"
-    assert json.loads(row["config_json"])["horizon"] == "5s"
+    # 28, not 21: the look count now includes the time-latency grid, the
+    # crossed/uncrossed split and the leakage shift IC. Asserted against the
+    # constant rather than a literal so the two cannot drift apart again.
+    assert row["count"] == LOOKS_PER_EXPERIMENT and row["verdict"] == "ITERATE"
+    # `looks` is no longer part of the experiment identity — it is the size
+    # of the recording (`count`), not what was looked at.
+    config = json.loads(row["config_json"])
+    assert config["horizon"] == "5s" and "looks" not in config
 
 
 def test_import_lifecycle_log_gate_mapping(store: Store) -> None:

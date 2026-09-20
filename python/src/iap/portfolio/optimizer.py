@@ -27,11 +27,21 @@ see API_PORTFOLIO_TCA.md):
 3. Keep the best FEASIBLE iterate by objective (ties keep the earliest);
    return it with its objective and ``feasible=True``.
 4. INFEASIBLE (pinned): when no iterate — the initial projection included
-   — satisfies ``feas_tol``, the result is ``feasible=False`` with
-   ``weights = w_prev`` (hold the book: the safe action), ``objective =
-   f(w_prev)``, ``best_iteration = 0`` and ``max_violation`` = the
-   violation of ``w_prev``. Weights are never NaN/inf and the objective is
-   never ``-inf``; callers MUST check ``feasible`` before acting.
+   — satisfies ``feas_tol``, the result is ``feasible=False`` carrying the
+   LEAST-VIOLATING candidate. Candidates are ``w_prev`` (holding the book,
+   ``best_iteration = -1``), the initial projection (0) and every iterate
+   (``k + 1``), ranked lexicographically by ``(risk violation, total
+   violation, candidate order)`` — so ties keep the earliest and holding
+   wins only a genuine tie. Constraints split into RISK (box, net,
+   currency, gross, vol — they bound the BOOK) and TRADING (participation,
+   turnover — they bound the TRADE), and ranking on the risk violation
+   first is what forces an over-risked book to move: a breached risk
+   constraint is live exposure that holding perpetuates, while a breached
+   trading constraint only means the step is larger than one bar's cap and
+   the execution layer slices it. ``violations`` names the residual
+   breaches (pinned order) and ``risk_violation`` is the number to alarm
+   on. Weights are never NaN/inf and the objective is never ``-inf``;
+   callers MUST check ``feasible`` before acting.
 5. Every input must be finite (alpha, Sigma, w_prev, tc, risk_aversion,
    bounds); a NaN/inf anywhere raises ValueError — it never propagates.
 
@@ -46,12 +56,21 @@ iteration counts, no RNG, no unordered iteration.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
 _TOL = 1e-8
+
+#: Constraints that bound the BOOK's exposure. A residual breach here is
+#: live over-exposure, so holding ``w_prev`` perpetuates it — this is why
+#: the INFEASIBLE result ranks on the risk violation before the total.
+RISK_CONSTRAINTS = ("BOX", "NET", "CURRENCY", "GROSS", "VOL")
+#: Constraints that bound the TRADE. A residual breach here only means the
+#: step exceeds one bar's cap; the execution layer slices it over bars.
+TRADING_CONSTRAINTS = ("PARTICIPATION", "TURNOVER")
 
 
 @dataclass
@@ -77,6 +96,14 @@ class Constraints:
             raise ValueError("w_min/w_max must be finite")
         if np.any(self.w_min > self.w_max):
             raise ValueError("w_min > w_max for some asset")
+        # Every scalar cap must be finite BEFORE the sign tests below: a NaN
+        # compares false against every one of them, so it would flow through
+        # validation untouched and surface as a NaN max_violation — a frozen
+        # book instead of a loud failure at config load.
+        for name in ("gross_cap", "net_cap", "turnover_cap", "vol_target"):
+            value = getattr(self, name)
+            if value is not None and not math.isfinite(float(value)):
+                raise ValueError(f"{name} must be finite")
         if self.gross_cap is not None and self.gross_cap <= 0:
             raise ValueError("gross_cap must be > 0")
         if self.net_cap is not None and self.net_cap < 0:
@@ -84,6 +111,8 @@ class Constraints:
         if self.participation is not None:
             self.participation = np.asarray(self.participation,
                                             dtype=np.float64)
+            if not np.all(np.isfinite(self.participation)):
+                raise ValueError("participation must be finite")
             if self.participation.shape != (n,) or \
                     np.any(self.participation < 0):
                 raise ValueError("participation must be (n,) and >= 0")
@@ -102,6 +131,9 @@ class Constraints:
                 raise ValueError("currency_matrix must have n columns")
             if self.currency_bounds.shape != (self.currency_matrix.shape[0],):
                 raise ValueError("currency_bounds shape mismatch")
+            if not (np.all(np.isfinite(self.currency_matrix))
+                    and np.all(np.isfinite(self.currency_bounds))):
+                raise ValueError("currency_matrix/currency_bounds must be finite")
             if np.any(self.currency_bounds < 0):
                 raise ValueError("currency_bounds must be >= 0")
 
@@ -114,15 +146,39 @@ class PGDResult:
     weights: np.ndarray
     objective: float
     iterations: int
+    #: 1-based iterate index; 0 = the initial projection of ``w_prev``,
+    #: -1 = ``w_prev`` itself was held (INFEASIBLE only).
     best_iteration: int
     max_violation: float
     trajectory: List[float] = field(default_factory=list)
     feasible: bool = True
+    #: Names of the constraints ``weights`` still violates, pinned order
+    #: (empty when feasible) — what a caller names in its alarm.
+    violations: Tuple[str, ...] = ()
+    #: Largest RISK-constraint violation of ``weights`` (0 when none): live
+    #: book exposure, as opposed to a trade over one bar's trading cap.
+    risk_violation: float = 0.0
 
     @property
     def status(self) -> str:
         """``"OPTIMAL"`` or ``"INFEASIBLE"`` (audit wording, pinned)."""
         return "OPTIMAL" if self.feasible else "INFEASIBLE"
+
+    @property
+    def violation_kind(self) -> str:
+        """``"NONE"`` / ``"RISK"`` / ``"TRADING"`` / ``"RISK_AND_TRADING"``
+        — the alarm class of an INFEASIBLE result. RISK means the book is
+        over-exposed right now; TRADING means only that the step exceeds a
+        participation/turnover cap and the execution layer must slice it."""
+        risk = any(name in RISK_CONSTRAINTS for name in self.violations)
+        trading = any(name in TRADING_CONSTRAINTS for name in self.violations)
+        if risk and trading:
+            return "RISK_AND_TRADING"
+        if risk:
+            return "RISK"
+        if trading:
+            return "TRADING"
+        return "NONE"
 
 
 def objective(w: np.ndarray, alpha: np.ndarray, Sigma: np.ndarray,
@@ -201,27 +257,61 @@ def project(v: np.ndarray, cons: Constraints, w_prev: np.ndarray,
     return w
 
 
+def violation_breakdown(w: np.ndarray, cons: Constraints, w_prev: np.ndarray,
+                        Sigma: Optional[np.ndarray]) -> Dict[str, float]:
+    """Per-constraint violation of w, keyed by the names in
+    :data:`RISK_CONSTRAINTS` / :data:`TRADING_CONSTRAINTS`, in the pinned
+    projection order. An inactive constraint is absent; an active one that
+    holds maps to a value <= 0. ``max_violation`` is the maximum of these
+    (floored at 0), so the two can never disagree."""
+    out: Dict[str, float] = {}
+    out["BOX"] = max(float(np.max(cons.w_min - w, initial=0.0)),
+                     float(np.max(w - cons.w_max, initial=0.0)))
+    if cons.participation is not None:
+        out["PARTICIPATION"] = float(
+            np.max(np.abs(w - w_prev) - cons.participation, initial=0.0))
+    if cons.net_cap is not None:
+        out["NET"] = abs(float(w.sum())) - cons.net_cap
+    if cons.currency_matrix is not None:
+        exc = np.abs(cons.currency_matrix @ w) - cons.currency_bounds
+        out["CURRENCY"] = float(np.max(exc, initial=0.0))
+    if cons.gross_cap is not None:
+        out["GROSS"] = float(np.abs(w).sum()) - cons.gross_cap
+    if cons.turnover_cap is not None:
+        out["TURNOVER"] = float(np.abs(w - w_prev).sum()) - cons.turnover_cap
+    if cons.vol_target is not None and Sigma is not None:
+        out["VOL"] = float(np.sqrt(max(w @ Sigma @ w, 0.0))) - cons.vol_target
+    return out
+
+
 def max_violation(w: np.ndarray, cons: Constraints, w_prev: np.ndarray,
                   Sigma: Optional[np.ndarray]) -> float:
     """Largest constraint violation of w (0 when feasible)."""
     v = 0.0
-    v = max(v, float(np.max(cons.w_min - w, initial=0.0)))
-    v = max(v, float(np.max(w - cons.w_max, initial=0.0)))
-    if cons.participation is not None:
-        v = max(v, float(np.max(np.abs(w - w_prev) - cons.participation,
-                                initial=0.0)))
-    if cons.net_cap is not None:
-        v = max(v, abs(float(w.sum())) - cons.net_cap)
-    if cons.currency_matrix is not None:
-        exc = np.abs(cons.currency_matrix @ w) - cons.currency_bounds
-        v = max(v, float(np.max(exc, initial=0.0)))
-    if cons.gross_cap is not None:
-        v = max(v, float(np.abs(w).sum()) - cons.gross_cap)
-    if cons.turnover_cap is not None:
-        v = max(v, float(np.abs(w - w_prev).sum()) - cons.turnover_cap)
-    if cons.vol_target is not None and Sigma is not None:
-        v = max(v, float(np.sqrt(max(w @ Sigma @ w, 0.0))) - cons.vol_target)
+    for value in violation_breakdown(w, cons, w_prev, Sigma).values():
+        v = max(v, value)
     return max(v, 0.0)
+
+
+def _risk_violation(breakdown: Dict[str, float]) -> float:
+    """Largest violation among the RISK constraints only (0 when none).
+    This is the figure a caller alarms on: it is live book exposure, not a
+    trade that merely exceeds one bar's participation/turnover cap."""
+    v = 0.0
+    for name in RISK_CONSTRAINTS:
+        value = breakdown.get(name)
+        if value is not None:
+            v = max(v, value)
+    return max(v, 0.0)
+
+
+def _violated(breakdown: Dict[str, float], tol: float) -> Tuple[str, ...]:
+    """Names of the constraints violated by more than ``tol``, in the
+    pinned projection order (deterministic, never unordered)."""
+    order = ("BOX", "PARTICIPATION", "NET", "CURRENCY", "GROSS", "TURNOVER",
+             "VOL")
+    return tuple(name for name in order
+                 if breakdown.get(name) is not None and breakdown[name] > tol)
 
 
 def solve(
@@ -277,11 +367,38 @@ def solve(
     def f(w: np.ndarray) -> float:
         return objective(w, alpha, Sigma, w_prev, risk_aversion, tc_linear)
 
+    def rank(cand: np.ndarray) -> Tuple[float, float]:
+        b = violation_breakdown(cand, constraints, w_prev, Sigma)
+        total = 0.0
+        for value in b.values():
+            total = max(total, value)
+        return _risk_violation(b), max(total, 0.0)
+
+    # Least-violating fallback for the INFEASIBLE result. Candidates are
+    # considered in order — holding w_prev first, then the initial
+    # projection, then each iterate — and ranked by (risk violation, total
+    # violation); a strict `<` keeps the EARLIEST on a tie, so holding wins
+    # only when nothing computed later is any better.
+    #
+    # DEFECT this replaces: the solver used to discard every iterate and
+    # return w_prev unconditionally. But w_prev cannot violate
+    # participation or turnover (its own trade is identically zero), so an
+    # infeasible solve means w_prev is breaching a RISK constraint — the
+    # one situation in which holding is the WORST available action. A vol
+    # spike then parked the book at many times the vol target indefinitely,
+    # and the returned answer could be strictly worse than an iterate the
+    # solver had already computed and thrown away.
+    least_w = w_prev.copy()
+    least_rank = rank(least_w)
+    least_k = -1
+
     w = project(w_prev, constraints, w_prev, Sigma, proj_passes)
     best_w = w.copy()
     feasible = max_violation(w, constraints, w_prev, Sigma) <= feas_tol
     best_f = f(w) if feasible else -np.inf
     best_k = 0
+    if rank(w) < least_rank:
+        least_w, least_rank, least_k = w.copy(), rank(w), 0
     trajectory: List[float] = []
     for k in range(iters):
         eta = eta0 / (1.0 + step_decay * k)
@@ -299,17 +416,23 @@ def solve(
             best_w = w.copy()
             best_k = k + 1
             feasible = True
+        cand_rank = rank(w)
+        if cand_rank < least_rank:
+            least_w, least_rank, least_k = w.copy(), cand_rank, k + 1
     if not feasible:
-        # INFEASIBLE (pinned step 4): hold the book, never -inf / NaN.
-        hold = w_prev.copy()
+        # INFEASIBLE (pinned step 4): the least-violating candidate, never
+        # -inf / NaN, with the residual breach named so a caller can alarm.
+        breakdown = violation_breakdown(least_w, constraints, w_prev, Sigma)
         return PGDResult(
-            weights=hold,
-            objective=f(hold),
+            weights=least_w,
+            objective=f(least_w),
             iterations=iters,
-            best_iteration=0,
-            max_violation=max_violation(hold, constraints, w_prev, Sigma),
+            best_iteration=least_k,
+            max_violation=least_rank[1],
             trajectory=trajectory,
             feasible=False,
+            violations=_violated(breakdown, feas_tol),
+            risk_violation=least_rank[0],
         )
     return PGDResult(
         weights=best_w,

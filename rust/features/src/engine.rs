@@ -130,7 +130,11 @@ struct InstState {
     ask_q: i64,
     db: [i64; 4], // depth sums at k = 1, 3, 5, 10
     da: [i64; 4],
-    mid2: i64,
+    /// Doubled mid (`bid_p + ask_p`). Widened: both prices are positive
+    /// `i64` tick counts, so their sum overflows `i64` for legal large
+    /// prices — it panicked here under overflow checks and emitted a
+    /// NEGATIVE `mid_price_v1` with `valid == true` without them.
+    mid2: i128,
     mid: f64,
     logmid: f64,
     spread_ticks: i64,
@@ -138,15 +142,20 @@ struct InstState {
     // per-venue cached top-10 depth (ascending venue id)
     venue_cache: BTreeMap<u16, (Depth, Depth)>,
     // rolling structures
-    hist2: TimeSeries<i64>,
+    hist2: TimeSeries<i128>,
     histlog: TimeSeries<f64>,
     rv: [RollingFSum; 3],       // dlm^2 over 10s / 1m / 5m
     ofi: [RollingISum<4>; 3],   // e(1|3|5|10) over 1s / 5s / 30s
     trades: [RollingISum<3>; 3], // (signed, buy, sell) over 1s / 10s / 1m
     depthavg: RollingISum<4>,   // (db1, da1, db5, da5) over 10s
-    // scratch buffers reused across refreshes (no steady-state allocation)
-    agg_b: BTreeMap<i64, i64>,
-    agg_a: BTreeMap<i64, i64>,
+    // Scratch buffers reused across refreshes (no steady-state allocation).
+    // Cross-venue sizes are summed in `i128`: each venue level is only
+    // checked against `i64` by the book, so two venues resting 2^62 at the
+    // same price wrapped the merged total (panic with overflow checks,
+    // negative depth emitted as a valid feature without them) before the
+    // FEATURE_MAX_QTY guard could reject it.
+    agg_b: BTreeMap<i64, i128>,
+    agg_a: BTreeMap<i64, i128>,
 }
 
 impl InstState {
@@ -202,8 +211,12 @@ impl InstState {
 
     /// True when the window has fully elapsed since the warmup anchor (the
     /// first event, or the last stale->fresh recovery).
+    /// Widened subtraction: `exchange_ts` is a signed 64-bit wire field the
+    /// codec accepts down to `i64::MIN`, so `t - warm_ts` overflowed `i64`
+    /// for extreme (but decodable) timestamps.
     fn warm(&self, w_ns: i64) -> bool {
-        matches!(self.warm_ts, Some(f) if self.t - f >= w_ns)
+        matches!(self.warm_ts, Some(f)
+                 if i128::from(self.t) - i128::from(f) >= i128::from(w_ns))
     }
 
     /// Clear every rolling window and history; re-anchor warmup at `t`
@@ -255,13 +268,21 @@ impl InstState {
             w.trim(t);
         }
         self.depthavg.trim(t);
-        self.hist2.trim(t - HIST_KEEP_NS);
-        self.histlog.trim(t - HIST_KEEP_NS);
+        let keep = i128::from(t) - i128::from(HIST_KEEP_NS);
+        self.hist2.trim(keep);
+        self.histlog.trim(keep);
     }
 }
 
 /// Signed depth change within the best-k levels (the OFI building block,
 /// pinned): sum over the union of prev/curr prices of `curr[p] - prev[p]`.
+///
+/// `i64` is sufficient here, no widening needed: every entry of `prev` and
+/// `curr` comes from a merged view that passed the [`FEATURE_MAX_QTY`]
+/// guard in `refresh_book`, so `0 < size <= 2^40` with `k <= 10`; at most
+/// 20 such terms are combined, bounding `|d|` by `20 * 2^40 < 2^45`. The
+/// unbounded accumulation this used to perform was reachable only because a
+/// wrapped-negative merged level slipped past the old guard.
 fn depth_delta(prev: &[(i64, i64)], curr: &[(i64, i64)], k: usize) -> i64 {
     let prev_k = &prev[..prev.len().min(k)];
     let curr_k = &curr[..curr.len().min(k)];
@@ -425,7 +446,11 @@ impl FeatureEngine {
         let emit = self.cadence_ns == 0
             || match st.last_emit {
                 None => true,
-                Some(le) => t - le >= self.cadence_ns,
+                // Widened: `t - last_emit` overflowed i64 when the two
+                // timestamps straddled the i64 range.
+                Some(le) => {
+                    i128::from(t) - i128::from(le) >= i128::from(self.cadence_ns)
+                }
             };
         if emit {
             let vec = Self::emit(st, instrument_id, t);
@@ -464,19 +489,39 @@ impl FeatureEngine {
                 continue;
             }
             for &(p, q) in b10 {
-                *st.agg_b.entry(p).or_insert(0) += q;
+                *st.agg_b.entry(p).or_insert(0) += i128::from(q);
             }
             for &(p, q) in a10 {
-                *st.agg_a.entry(p).or_insert(0) += q;
+                *st.agg_a.entry(p).or_insert(0) += i128::from(q);
             }
         }
-        let bid: Vec<(i64, i64)> = st.agg_b.iter().rev().take(10).map(|(&p, &q)| (p, q)).collect();
-        let ask: Vec<(i64, i64)> = st.agg_a.iter().take(10).map(|(&p, &q)| (p, q)).collect();
-
         // Oversized merged depth (pinned §2.2): a level above
         // FEATURE_MAX_QTY makes the merged view unusable — clear it, record
-        // nothing, and let the next clean refresh re-baseline.
-        if bid.iter().chain(ask.iter()).any(|&(_, q)| q > FEATURE_MAX_QTY) {
+        // nothing, and let the next clean refresh re-baseline. The test runs
+        // on the WIDENED sum, so a cross-venue total that no longer fits in
+        // i64 is oversized (what the arbitrary-precision reference decides)
+        // instead of wrapping past the guard. Every level that passes is in
+        // [1, 2^40], so narrowing back to i64 is exact.
+        let max_qty = i128::from(FEATURE_MAX_QTY);
+        let mut oversized = false;
+        let mut narrow = |q: i128| -> i64 {
+            oversized |= q > max_qty;
+            q as i64
+        };
+        let bid: Vec<(i64, i64)> = st
+            .agg_b
+            .iter()
+            .rev()
+            .take(10)
+            .map(|(&p, &q)| (p, narrow(q)))
+            .collect();
+        let ask: Vec<(i64, i64)> = st
+            .agg_a
+            .iter()
+            .take(10)
+            .map(|(&p, &q)| (p, narrow(q)))
+            .collect();
+        if oversized {
             st.depth_bid.clear();
             st.depth_ask.clear();
             st.book_ok = false;
@@ -515,7 +560,7 @@ impl FeatureEngine {
             st.db[i] = st.depth_bid.iter().take(k).map(|&(_, q)| q).sum();
             st.da[i] = st.depth_ask.iter().take(k).map(|&(_, q)| q).sum();
         }
-        st.mid2 = st.bid_p + st.ask_p;
+        st.mid2 = i128::from(st.bid_p) + i128::from(st.ask_p);
         st.mid = st.mid2 as f64 * st.tick / 2.0;
         st.logmid = (st.mid2 as f64).ln();
         st.spread_ticks = st.ask_p - st.bid_p;
@@ -587,8 +632,12 @@ impl FeatureEngine {
         // microprice family (5)
         put(&mut slot, &mut values, &mut validity, ok.then_some(st.mid));
         let micro = if ok && st.bid_q + st.ask_q > 0 {
+            // i128 numerator: price (up to 2^63) x size (up to 2^40)
+            // overflows i64. The reference multiplies in arbitrary
+            // precision; i128 holds every product exactly.
             Some(
-                (st.bid_p * st.ask_q + st.ask_p * st.bid_q) as f64
+                (i128::from(st.bid_p) * i128::from(st.ask_q)
+                    + i128::from(st.ask_p) * i128::from(st.bid_q)) as f64
                     / (st.bid_q + st.ask_q) as f64
                     * st.tick,
             )
@@ -640,11 +689,13 @@ impl FeatureEngine {
             if !ok {
                 return None;
             }
-            st.histlog.at_or_before(t - h_ns).map(|p| st.logmid - p)
+            st.histlog
+                .at_or_before(i128::from(t) - i128::from(h_ns))
+                .map(|p| st.logmid - p)
         };
         let simple_1s = if ok {
             st.hist2
-                .at_or_before(t - W1S)
+                .at_or_before(i128::from(t) - i128::from(W1S))
                 .map(|p| st.mid2 as f64 / p as f64 - 1.0)
         } else {
             None

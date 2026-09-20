@@ -728,7 +728,22 @@ OrderBook OrderBook::restore(const BookCheckpoint& cp) {
         if (lvl.side > 1) {
             throw std::invalid_argument("invalid side in checkpoint level");
         }
+        // A checkpoint is a trust boundary like the wire: restore must reject
+        // what apply() would reject (payload_ok requires qty > 0 and
+        // price_ticks > 0). Without this a hand-written checkpoint could
+        // seed a book state unreachable through apply() — best_bid() of
+        // (-5, -1000000) — which then feeds negative sizes straight into the
+        // feature engine's merged depth and rolling windows.
+        if (lvl.price_ticks <= 0) {
+            throw std::invalid_argument(
+                "non-positive price_ticks in checkpoint level");
+        }
         for (const auto& [oid, qty] : lvl.orders) {
+            if (qty <= 0) {
+                throw std::invalid_argument(
+                    "non-positive qty for order_id " + std::to_string(oid) +
+                    " in checkpoint");
+            }
             if (book.index_.contains(oid)) {
                 throw std::invalid_argument(
                     "duplicate order_id " + std::to_string(oid) +

@@ -235,12 +235,12 @@ possible.
 
 Run id `58a10f2194a3c81c`, 16,578 events, 355 decisions, 66 parent orders,
 212 children generated / 105 submitted, 55 fills, fill rate 20.5 %.
-Trace digest `059c30df7213d00e0d3f6de7ab9011b3d1ee9651cd3df5ec6609d2e66e965c2b`.
+Trace digest `d938eeae68c85a6c2acaf7fb3f7d1333f29c3ad8e036fb5af7a4d1b48c9ea2cc`.
 Wall time ≈ 7 s (1 s feed generation + normalisation, 6 s loop) on the CI box.
 
 | P&L (USD) | value |
 |---|---:|
-| total (`risk daily − fees_net − impact`) | **−22.68** |
+| total (`risk daily − fees_net − impact`) | **−22.65** |
 | risk daily (realized −14.34 + unrealized −1.30) | −15.64 |
 | gross (mark-to-market) | +6.54 |
 | spread cost | 22.18 |
@@ -324,7 +324,7 @@ audited on 2026-09-20; the outcome, in order of evidence:
    an order of magnitude lower. A real feed would not be this kind.
 5. **It still does not pay.** The cost-adjusted IC (buy at the ask now,
    sell at the bid at t+h) is +0.017 (EQ01) / +0.065 (EQ03) at 1 s: the
-   predicted move is smaller than the spread, which is the −22.68 USD
+   predicted move is smaller than the spread, which is the −22.65 USD
    above and the research verdicts.
 6. **The gap the lifecycle sees.** `ic_gap` is now measured at the alpha's
    FITTED horizon (like for like with the registry's `oos_ic`): 0.256 /

@@ -181,20 +181,89 @@ TEST(ExecQueue, CancelAheadReducesPositionDeterministically) {
     EXPECT_EQ(sim.fills()[0].qty, 10);
 }
 
-TEST(ExecQueue, TradeThroughFillsInFullAtOurPrice) {
+TEST(ExecQueue, TradeThroughFillsAtOurPriceBoundedByTradedVolume) {
     ExecutionSimulator sim(test_config());
     EventFeeder f;
     seed_book(sim, f);
     const auto id = sim.submit(child(0, OrderType::LIMIT, 100, 50, T0 + 10));
     sim.on_event(f.heartbeat(T0 + 10 + LAT + 1));
+    ASSERT_EQ(sim.orders().at(id).ahead_qty, 300);
     // EXECUTE on the bid side BELOW our price: the aggressor traded through
-    // our level, so we must have filled first — full fill at OUR limit.
+    // our level, so we must have been hit first — but only for as much as
+    // it actually traded, and only after the 300 ahead of us (rule 4).
     sim.on_event(f.exec(T0 + 2'000'000, 0, 99, 100, 12));
+    EXPECT_TRUE(sim.fills().empty());
+    EXPECT_EQ(sim.orders().at(id).ahead_qty, 200);
+    // A 240-share print through our level: 200 clears the queue, 40 reaches
+    // us — at OUR limit, never at the (better) 99 print price.
+    sim.on_event(f.exec(T0 + 3'000'000, 0, 99, 240, 12));
     ASSERT_EQ(sim.fills().size(), 1u);
-    EXPECT_EQ(sim.fills()[0].qty, 50);
+    EXPECT_EQ(sim.fills()[0].qty, 40);
     EXPECT_EQ(sim.fills()[0].price_ticks, 100);
     EXPECT_EQ(sim.fills()[0].liquidity, Liquidity::MAKER);
-    EXPECT_EQ(sim.orders().at(id).state, OrderState::FILLED);
+    EXPECT_EQ(sim.orders().at(id).state, OrderState::ACTIVE);
+    EXPECT_EQ(sim.orders().at(id).remaining, 10);
+}
+
+// DEFECT B repro (pinned): one share printing through a huge resting order
+// must not hand it the whole residual.
+TEST(ExecQueue, SingleShareTradeThroughCannotFillAMillion) {
+    ExecutionSimulator sim(test_config());
+    EventFeeder f;
+    // Bid 100 x 500 only, so ahead_qty is exactly the 500 displayed.
+    sim.on_event(f.add(T0, 0, 100, 500, 11));
+    sim.on_event(f.add(T0 + 1, 1, 101, 200, 21));
+    const auto id =
+        sim.submit(child(0, OrderType::LIMIT, 100, 1'000'000, T0 + 10));
+    sim.on_event(f.heartbeat(T0 + 10 + LAT + 1));
+    ASSERT_EQ(sim.orders().at(id).ahead_qty, 500);
+    // ONE share executes at 99 — below our bid. Old rule: 1,000,000 filled.
+    sim.on_event(f.exec(T0 + 2'000'000, 0, 99, 1, 12));
+    EXPECT_TRUE(sim.fills().empty());
+    EXPECT_EQ(sim.orders().at(id).ahead_qty, 499);
+    EXPECT_EQ(sim.orders().at(id).remaining, 1'000'000);
+    // Even with the queue cleared, a 1-share print gives at most 1 share.
+    sim.on_event(f.exec(T0 + 3'000'000, 0, 99, 499, 12));
+    ASSERT_TRUE(sim.fills().empty());
+    sim.on_event(f.exec(T0 + 4'000'000, 0, 99, 1, 12));
+    ASSERT_EQ(sim.fills().size(), 1u);
+    EXPECT_EQ(sim.fills()[0].qty, 1);
+    EXPECT_EQ(sim.fills()[0].price_ticks, 100);
+    EXPECT_EQ(sim.orders().at(id).remaining, 999'999);
+}
+
+// DEFECT A repro (pinned): four same-price children share ONE print, and
+// each child queues behind its earlier siblings.
+TEST(ExecQueue, SamePriceChildrenShareOnePrintAndQueueBehindEachOther) {
+    ExecutionSimulator sim(test_config());
+    EventFeeder f;
+    seed_book(sim, f);  // bid 100 displayed 300
+    std::vector<std::uint64_t> ids;
+    for (int k = 0; k < 4; ++k) {
+        ids.push_back(
+            sim.submit(child(0, OrderType::LIMIT, 100, 1000, T0 + 10 + k)));
+    }
+    sim.on_event(f.heartbeat(T0 + 20 + LAT + 1));  // all four rest
+    // Queue position: 300 displayed, then each earlier sibling's 1000.
+    EXPECT_EQ(sim.orders().at(ids[0]).ahead_qty, 300);
+    EXPECT_EQ(sim.orders().at(ids[1]).ahead_qty, 1300);
+    EXPECT_EQ(sim.orders().at(ids[2]).ahead_qty, 2300);
+    EXPECT_EQ(sim.orders().at(ids[3]).ahead_qty, 3300);
+    // ONE print of 400 at 100: 300 clears the display, 100 reaches the
+    // FIRST child and nobody else. Old rule: 4 x 100 = 400 filled.
+    sim.on_event(f.exec(T0 + 2'000'000, 0, 100, 400, 11));
+    ASSERT_EQ(sim.fills().size(), 1u);
+    EXPECT_EQ(sim.fills()[0].order_id, ids[0]);
+    EXPECT_EQ(sim.fills()[0].qty, 100);
+    EXPECT_EQ(sim.fills()[0].price_ticks, 100);
+    std::int64_t total = 0;
+    for (const auto& fl : sim.fills()) total += fl.qty;
+    EXPECT_EQ(total, 100);
+    // The budget was spent, so the siblings' queue positions are untouched:
+    // the print was never cloned for them.
+    EXPECT_EQ(sim.orders().at(ids[1]).ahead_qty, 1300);
+    EXPECT_EQ(sim.orders().at(ids[2]).ahead_qty, 2300);
+    EXPECT_EQ(sim.orders().at(ids[3]).ahead_qty, 3300);
 }
 
 TEST(ExecQueue, MarketableAddConsumesQueueAhead) {
@@ -242,17 +311,26 @@ TEST(ExecQueue, MarketableAddTradingThroughFillsInFull) {
     EXPECT_EQ(sim.orders().at(id).state, OrderState::FILLED);
 }
 
-TEST(ExecQueue, CrossingQuoteAfterL1ReplaceFills) {
+TEST(ExecQueue, CrossingQuoteFillsBoundedByTheCrossingDisplay) {
     // FX-style: a QUOTE replaces the venue's L1; if the new opposite best
-    // crosses our resting price, we fill at our limit (post-apply check).
+    // crosses our resting price we fill at our limit (post-apply check) —
+    // but only for what that opposite level displays, and only behind the
+    // queue ahead of us (rule 4, last bullet).
     ExecutionSimulator sim(test_config());
     EventFeeder f;
     seed_book(sim, f);
     const auto id = sim.submit(child(0, OrderType::LIMIT, 100, 50, T0 + 10));
     sim.on_event(f.heartbeat(T0 + 10 + LAT + 1));
     ASSERT_EQ(sim.orders().at(id).state, OrderState::ACTIVE);
-    // QUOTE: ask side replaced at 100 <= our bid 100 -> crossed.
+    ASSERT_EQ(sim.orders().at(id).ahead_qty, 300);
+    // QUOTE: ask replaced at 100 <= our bid 100 -> crossed, but the 250 it
+    // displays cannot even clear the 300 queued ahead of us.
     sim.on_event(f.ev(T0 + 2'000'000, 6, 1, 100, 250, 0));
+    EXPECT_TRUE(sim.fills().empty());
+    EXPECT_EQ(sim.orders().at(id).ahead_qty, 50);
+    // A bigger crossing display: 50 clears the queue, 50 fills us at our
+    // own limit (the crossing rule never gives price improvement).
+    sim.on_event(f.ev(T0 + 3'000'000, 6, 1, 100, 400, 0));
     ASSERT_EQ(sim.fills().size(), 1u);
     EXPECT_EQ(sim.fills()[0].price_ticks, 100);
     EXPECT_EQ(sim.fills()[0].qty, 50);
@@ -380,10 +458,11 @@ TEST(ExecFees, TakerMakerAndImpactArithmetic) {
     // impact_bps = 2.0 * (100 / 1e6 * 100) = 0.02 bps over notional
     // 100 * 100 ticks * 0.01 = 100.0 => 0.02e-4 * 100 = 2e-4.
     EXPECT_NEAR(taker.impact_cost, 2e-4, 1e-15);
-    // Maker: passive buy at 100, filled by trade-through.
+    // Maker: passive buy at 100 joining 300 displayed, filled by a
+    // trade-through print big enough to clear the queue (300) and reach us.
     sim.submit(child(0, OrderType::LIMIT, 100, 40, T0 + 5'000'000));
     sim.on_event(f.heartbeat(T0 + 5'000'000 + LAT + 1));
-    sim.on_event(f.exec(T0 + 8'000'000, 0, 99, 10, 12));
+    sim.on_event(f.exec(T0 + 8'000'000, 0, 99, 340, 12));
     ASSERT_EQ(sim.fills().size(), 2u);
     const auto& maker = sim.fills()[1];
     EXPECT_EQ(maker.liquidity, Liquidity::MAKER);

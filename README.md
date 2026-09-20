@@ -53,12 +53,12 @@ the full design, data flow, and diagrams.
 |---|---|---|
 | Registered features | **205** (10 families; 40-feature native core set ported to C++/Rust/Java) | `data/reference/feature_registry.json` |
 | Flagship alphas | **24** (EQ01–EQ12, FX01–FX12), each with an enforced `Economic rationale:` docstring | `python/src/iap/alpha/`, `research/alpha_reports/` |
-| Promotion verdicts | **0 PROMOTE / 10 ITERATE / 14 REJECT** (gated on *uncrossed* IC) | `research/alpha_reports/REPORT.md` |
+| Promotion verdicts | **0 PROMOTE / 11 ITERATE / 13 REJECT** (gated on *uncrossed* IC) | `research/alpha_reports/REPORT.md` |
 | Lifecycle registry | **24 alphas at CANDIDATE, 0 beyond** — every one fails `net_pnl_after_costs` at 1× costs (7 states, 17 pinned edges, 18 gates) | `research/alpha_registry.json`, `research/lifecycle_transitions.jsonl`, `tests/golden/expected_lifecycle.json` |
-| Experiments ledger | 865 recorded looks over **70 distinct configurations** (de-duplicated by alpha × kind × config); expected max \|t\| under the global null ≈ 3.68, Bonferroni per-test \|t\| ≥ 4.02 | `research/experiments.json` |
+| Experiments ledger | 1068 recorded looks over **70 distinct configurations** (de-duplicated by alpha × kind × config); expected max \|t\| under the global null ≈ 3.735, Bonferroni per-test \|t\| ≥ 4.071 | `research/experiments.json` |
 | Contracts | **17** JSON Schemas (all `x-version` 1) mirrored by **22** typed Python contracts and **18** runtime-checkable Protocols; one pinned instance each | `schemas/`, `python/src/iap/contracts/`, `tests/golden/expected_contracts_examples.json` |
 | Python reference ports proven by the ports' own goldens | risk: `expected_risk_decisions.json` exact, audit JSONL + snapshot **byte-identical**; execution: `expected_replay_fills.json` **bit-identical** | `python/tests/test_risk_golden.py`, `python/tests/test_execution_golden.py` |
-| MVP golden run (`python -m iap.mvp run`, seed 12345) | **16,578** events · **355** decisions · **66** parent orders · **55** fills · P&L **−22.68 USD** (cost-negative: +0.039 bps alpha vs −0.40 bps execution cost) · trace digest `059c30df…` reproduced by run-twice and replay-from-capture | `tests/golden/expected_mvp.json` |
+| MVP golden run (`python -m iap.mvp run`, seed 12345) | **16,578** events · **355** decisions · **66** parent orders · **55** fills · P&L **−22.65 USD** (cost-negative: +0.039 bps alpha vs −0.40 bps execution cost) · trace digest `d938eeae…` reproduced by run-twice and replay-from-capture | `tests/golden/expected_mvp.json` |
 | Adaptive deployment study | 4 refit policies × 10 alphas; 126 drift-triggered refits; FX01 retired under every policy | `research/adaptive_reports/ADAPTIVE_REPORT.md` |
 | Bundled dataset | 2 synthetic sessions, 19 instruments, 310,159 normalized events | `data/normalized/qc_report.json` |
 | Feature emission | 208,437 vectors at 100 ms cadence | `data/features/features_summary.json` |
@@ -67,9 +67,20 @@ the full design, data flow, and diagrams.
 The honesty is the point (spec §32): of 24 alphas on the bundled synthetic
 data, **none** survives every promotion gate — leakage tests, OOS IC ≥ 0.01,
 Newey–West t ≥ 3.0, fold consistency, *hypothesis sign confirmed*, and
-positive net P&L at 1× modeled costs. Ten are statistically real enough for
-ITERATE (EQ03: uncrossed IC 0.0298, t 10.6, leakage-clean), yet every one of
-the 24 loses money net of modeled costs at 1×.
+positive net P&L at 1× modeled costs. Eleven are statistically real enough
+for ITERATE (EQ03: uncrossed IC 0.0298, t 10.6,
+leakage-clean), yet every one of the 24 loses money net of modeled costs at 1×.
+
+A correctness review on 2026-09-20 moved several of these numbers, always
+toward a harsher reading: `fold_sign_consistency` was measuring the
+*beta-signed* signal, so an alpha backwards in every fold reported perfect
+consistency; the walk-forward was training inside its own declared holdout;
+turnover — a cost statistic — was divided by wall-clock span including dead
+hours; and the execution simulator credited every resting child with the
+full observed trade volume, fabricating liquidity that was never there.
+`PLATFORM_CONVENTIONS.md` §14 pins the corrected semantics and
+`schemas/MIGRATIONS.md` lists the goldens regenerated because of them.
+Nothing was promoted before the review and nothing is promoted after it.
 
 Two conditioning rules do most of the culling, and both were added after a
 round-3 audit found the earlier numbers were measuring the wrong thing. IC is
@@ -246,10 +257,10 @@ python3 tools/github/create_issues.py --dry-run   # the epics/issues plan (docs/
 ===================== cross-language parity table =====================
 language | tests passed | golden passed  | time   | status
 ---------+--------------+----------------+--------+-------
-python   | 1362         | 164            |   83s | PASS
-cpp      | 267          | 68             |    1s | PASS
-rust     | 298          | 62             |    2s | PASS
-java     | 475          | 102            |   20s | PASS
+python   | 1388         | 164            |   83s | PASS
+cpp      | 285          | 68             |    1s | PASS
+rust     | 313          | 62             |    2s | PASS
+java     | 482          | 102            |   20s | PASS
 integration | 15           | -              |   15s | PASS
 replay   | 4            | -              |   15s | PASS
 deployment | -            | -              |    4s | PASS
@@ -406,7 +417,7 @@ microprice and OFI measure. The research code path on the captured stream
 gives the same numbers at the 1 s and 100 ms cadences; the truncation probe
 reproduces every earlier signal bit for bit; the shift-by-one probe
 collapses the IC but cannot discriminate at a cadence equal to the horizon
-(stated as such). The cost-adjusted IC (0.017 / 0.065) and the −22.68 USD
+(stated as such). The cost-adjusted IC (0.017 / 0.065) and the −22.65 USD
 session say the same thing the research reports say: a real feed would not
 be this kind, and even this one does not pay the spread.
 

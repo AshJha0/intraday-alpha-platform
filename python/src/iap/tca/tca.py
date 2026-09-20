@@ -21,11 +21,15 @@ the platform's pinned conventions:
   fill instant is spread cost; the remainder of the fill's cost relative to
   the fill-time mid is impact:
 
-      spread_cost = sum_f q_f * hs_f
+      spread_cost = sum_f sigma_f * q_f * hs_f,  sigma_f = +1 TAKER, -1 MAKER
       impact_cost = s * sum_f q_f * (p_f - mid_f) - spread_cost
 
   (for a marketable buy at the ask, ``p_f - mid_f = hs_f + extra`` so the
-  extra ticks are impact.)
+  extra ticks are impact.)  ``sigma_f`` is what makes the split an
+  attribution rather than an accounting identity: a liquidity PROVIDER earns
+  the half-spread and its spread cost is negative.  A parent filled entirely
+  passively therefore reports a negative spread cost, which is correct and
+  is the whole reason the flag is carried on the fill.
 - Adverse selection at delta: ``s * (mid(t_f + delta) - p_f)`` per filled
   unit — positive means the price kept moving against the parent after the
   fill (it was "picked off" in the passive case / momentum in the taker
@@ -50,7 +54,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional, Sequence, Tuple
 
-from iap.tca.fills import MarketTimeline, ParentOrder
+from iap.tca.fills import MAKER, MarketTimeline, ParentOrder
 
 ADVERSE_DELTAS_NS: Dict[str, int] = {
     "100ms": 100_000_000,
@@ -142,7 +146,17 @@ def interval_twap(timeline: MarketTimeline, start_ts: int,
 def spread_and_impact_cost(order: ParentOrder) -> Dict[str, float]:
     """Split executed cost vs fill-time mid into spread + impact (currency)."""
     s = order.sign
-    spread = sum(f.qty * f.half_spread_at_fill for f in order.fills)
+    # Sign by liquidity flag (pinned §2.4, stated in the module docstring
+    # above): a TAKER fill PAYS the half-spread, a MAKER fill EARNS it. This
+    # was unconditionally positive, so every passive fill was reported as
+    # paying the spread and the impact term silently absorbed the error of
+    # 2*q*hs to keep the Perold identity closed. The total was therefore
+    # right while the attribution — the entire point of the decomposition —
+    # was wrong, and wrong in the direction that makes passive execution look
+    # more expensive than it was. The bundled research set is TAKER-only, so
+    # no committed figure moved; the MVP, which fills passively, did.
+    spread = sum((-1.0 if f.liquidity == MAKER else 1.0)
+                 * f.qty * f.half_spread_at_fill for f in order.fills)
     exec_vs_mid = sum(s * f.qty * (f.price - f.mid_at_fill)
                       for f in order.fills)
     return {

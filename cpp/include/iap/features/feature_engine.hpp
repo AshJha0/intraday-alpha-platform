@@ -43,6 +43,7 @@
 #include <cstdint>
 #include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "iap/features/rolling.hpp"
@@ -137,6 +138,11 @@ struct FeatureVector {
     std::array<bool, NUM_FEATURES> valid{};
 };
 
+// One merged price level during the cross-venue merge: the size is widened
+// so summing two venues that each rest a near-int64 quantity at the same
+// price cannot wrap before the FEATURE_MAX_QTY guard runs.
+using WideLevel = std::pair<std::int64_t, __int128>;
+
 class FeatureEngine {
 public:
     // instrument_id -> tick_size (real price per tick, reference data).
@@ -181,14 +187,21 @@ private:
     struct InstState {
         double tick = 0.0;
         ConsolidatedBook cons;
-        std::int64_t first_ts = -1;
+        // `seen` / `has_emit` are explicit presence flags, not a negative
+        // sentinel: exchange_ts is a signed wire field, so a legal negative
+        // timestamp made `first_ts < 0` and `last_emit < 0` stay true and
+        // the warmup anchor kept re-arming on every event. The reference
+        // uses Optional[int] for exactly this reason.
+        bool seen = false;
+        std::int64_t first_ts = 0;
         // warmup anchor: first event, or the last stale->fresh recovery
-        std::int64_t warm_ts = -1;
+        std::int64_t warm_ts = 0;
         std::int64_t last_ts = 0;
         std::uint64_t recoveries = 0;
         // sorted ids of this instrument's venues whose book is stale
         std::vector<std::uint16_t> stale_venues;
-        std::int64_t last_emit = -1;
+        bool has_emit = false;
+        std::int64_t last_emit = 0;
         // merged top-10 view (refreshed on book-touching events)
         bool book_ok = false;
         std::vector<LevelEntry> depth_bid, depth_ask;       // current
@@ -196,16 +209,19 @@ private:
         std::map<std::uint16_t,
                  std::pair<std::vector<LevelEntry>, std::vector<LevelEntry>>>
             venue_cache;
-        std::vector<LevelEntry> merge_scratch;              // preallocated
+        std::vector<WideLevel> merge_scratch;               // preallocated
         std::int64_t bid_p = 0, bid_q = 0, ask_p = 0, ask_q = 0;
         std::int64_t db1 = 0, db3 = 0, db5 = 0, db10 = 0;
         std::int64_t da1 = 0, da3 = 0, da5 = 0, da10 = 0;
-        std::int64_t mid2 = 0;
+        // Doubled mid (bid_p + ask_p). Widened: both prices are positive
+        // int64 ticks, so their sum overflows int64 for legal large prices
+        // and produced a NEGATIVE mid_price_v1 with valid == 1.
+        __int128 mid2 = 0;
         double mid = 0.0, logmid = 0.0;
         std::int64_t spread_ticks = 0;
         double spread_bps = 0.0;
         // rolling state
-        TimeSeries<std::int64_t> hist2;    // mid2 at mid changes
+        TimeSeries<__int128> hist2;        // mid2 at mid changes
         TimeSeries<double> histlog;        // ln(mid2) at mid changes
         RollingSum<double, 1> rv_10s{W_10S}, rv_1m{W_1M}, rv_5m{W_5M};
         RollingSum<std::int64_t, 4> ofi_1s{W_1S}, ofi_5s{W_5S}, ofi_30s{W_30S};
@@ -213,8 +229,11 @@ private:
         RollingSum<std::int64_t, 3> tr_1s{W_1S}, tr_10s{W_10S}, tr_1m{W_1M};
 
         explicit InstState(std::uint32_t iid, double tick_size);
+        // Widened subtraction: exchange_ts is a signed 64-bit wire field the
+        // codec accepts down to INT64_MIN, so `t - warm_ts` overflowed int64
+        // for extreme (but decodable) timestamps.
         bool warm(std::int64_t t, std::int64_t w) const {
-            return warm_ts >= 0 && t - warm_ts >= w;
+            return seen && static_cast<__int128>(t) - warm_ts >= w;
         }
         // Clear every rolling window / history; re-anchor warmup at t.
         void reset_rolling(std::int64_t t);

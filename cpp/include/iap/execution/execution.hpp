@@ -42,35 +42,54 @@
 //    resurrected by a partial refresh, and an entry reaching 0 is removed.
 //    Two children arriving on the same display therefore share one copy of
 //    the liquidity (the second gets the thin remainder), never fresh copies.
-// 4. Passive queue position (pinned deterministic rule): when a LIMIT
-//    remainder rests at price P, ahead_qty := displayed qty at (side, P) on
-//    that venue at rest time. Subsequently, on that venue:
-//      - an observed EXECUTE at (side, P) reduces ahead_qty by its full qty;
-//        any leftover EXECUTE volume after ahead_qty reaches 0 fills our
-//        order (partial fills supported) at P;
+// 4. Passive queue position (pinned deterministic rule). GOVERNING
+//    PRINCIPLE: the simulator never fills more than the market actually
+//    traded, and our own resting orders queue behind each other.
+//    When a LIMIT remainder rests at price P, ahead_qty := displayed qty at
+//    (side, P) on that venue at rest time PLUS the sum of `remaining` over
+//    our own still-ACTIVE orders already resting at that exact (venue,
+//    side, P) — a later child queues behind its earlier siblings, as it
+//    would on a real FIFO book. Subsequently, on that venue:
+//      - ONE observed trade of `qty` at (side, price) is ONE pool of
+//        liquidity and is budgeted ONCE across the resting orders it
+//        reaches, visited in queue order (the `resting_` order, i.e. the
+//        pinned activation order: ascending arrival_ts, then ascending
+//        order_id). Starting from budget = qty, each visited order first
+//        pays down its queue (dec = min(ahead_qty, budget); ahead_qty -=
+//        dec; budget -= dec) and then, while budget remains, fills
+//        min(budget, remaining) at ITS OWN limit price, debiting the
+//        budget. The budget is never replenished, so n children at one
+//        level share one print instead of each cloning it.
+//      - a trade reaches an order when it prints AT that order's limit, or
+//        at a price STRICTLY WORSE than it (below our bid / above our ask)
+//        — the market traded THROUGH our level and must have hit us first.
+//        A trade-through fills at OUR limit (no price improvement) but is
+//        bounded by the observed volume and by ahead_qty exactly like a
+//        trade at our own level; it is NOT a free fill of the whole
+//        residual.
 //      - an observed CANCEL at (side, P) reduces ahead_qty by its full qty
-//        (deterministic full amount — no probabilistic split), floored at 0;
-//      - an observed EXECUTE on our side at a price WORSE than P (below our
-//        bid / above our ask) means the market traded through our level: the
-//        order fills in full at P;
+//        (deterministic full amount — no probabilistic split), floored at
+//        0; a CANCEL never fills us;
 //      - a MARKETABLE incoming ADD (its limit crosses the pre-event opposite
 //        best; the replayed book matches it internally with NO EXECUTE
 //        events, per conventions section 4) is expanded into the per-level
 //        volumes it consumes: the walk over the pre-event displayed depth,
-//        best first up to the ADD's limit, applies the two EXECUTE rules
-//        above level by level (consumption at P depletes-then-fills;
-//        consumption strictly worse than P fills in full);
+//        best first up to the ADD's limit, applies the trade rule above
+//        level by level, each level's volume being its own pool;
 //      - after the event is applied, if the venue's opposite best crosses P
 //        (ask <= our bid / bid >= our ask, e.g. after an FX QUOTE replaced
-//        L1), the order fills in full at P (an incoming marketable order
-//        would have hit us first). EXEMPTION (pinned): a LIMIT remainder
-//        that rests while the displayed opposite best already crosses its
-//        price (possible only because the aggressive part just consumed
-//        that very display — simulated fills never mutate the book) is
-//        crossing-exempt until the display first shows an uncrossed
-//        opposite best; without this the same displayed liquidity would be
-//        double-counted (taken aggressively AND again via the crossing
-//        rule);
+//        L1), the order fills at P — but no trade was observed here, so the
+//        pool is the DISPLAYED size of that crossing opposite best (the
+//        most an incoming aggressor could have brought), one pool per side
+//        shared by every order of ours resting against it, in the same
+//        queue order, each paying down its ahead_qty from the pool first.
+//        EXEMPTION (pinned): a LIMIT remainder that rests while the
+//        displayed opposite best already crosses its price (possible only
+//        because the aggressive part just consumed that very display —
+//        simulated fills never mutate the book) is crossing-exempt until
+//        the display first shows an uncrossed opposite best; without this
+//        the same displayed liquidity would be double-counted (taken
+//        aggressively AND again via the crossing rule);
 //      - MODIFY events do not change ahead_qty (a modified order's queue
 //        position is unknowable from the public stream — pinned: ignored).
 //    Passive fills are stamped with the triggering event's exchange_ts.
@@ -108,7 +127,10 @@
 //    crossing check is skipped. On the first event after which the venue is
 //    open again (TRADING and not stale — the auction uncross / snapshot
 //    recovery), every resting order crossed by the post-event opposite best
-//    fills in full at the TOUCH (uncross) price, not at its limit.
+//    fills at the TOUCH (uncross) price, not at its limit — bounded by the
+//    same displayed-size pool and the same ahead_qty consumption as the
+//    rule-4 crossing check, so an uncross cannot print more than the
+//    displayed size that uncrossed it.
 // 9. Event processing order (pinned): expiries, then activations and
 //    cancel arrivals merged by time, then passive queue tracking on the raw
 //    event, then the book update, then the overlay reset, then the
@@ -216,7 +238,9 @@ struct ChildOrder {
     std::int64_t arrival_ts = 0;
     OrderState state = OrderState::PENDING;
     std::int64_t remaining = 0;
-    std::int64_t ahead_qty = 0;  // displayed qty ahead of us at our level
+    // Qty ahead of us in the FIFO queue at our level: the displayed size at
+    // rest time plus our own earlier children resting there (rule 4).
+    std::int64_t ahead_qty = 0;
     bool resting = false;
     bool cross_exempt = false;   // see the crossing-rule exemption above
     CancelReason cancel_reason = CancelReason::NONE;
@@ -267,8 +291,9 @@ public:
 private:
     const VenueSpec& venue(std::uint16_t venue_id) const;
     const InstrumentSpec& instrument(std::uint32_t instrument_id) const;
-    // Queue tracking for observed consumption of displayed liquidity at one
-    // price level (EXECUTE events and marketable-ADD expansion).
+    // Queue tracking for one observed trade of `qty` at one price level
+    // (an EXECUTE, or one level of the marketable-ADD expansion). `qty` is
+    // a single shared budget across the resting orders it reaches (rule 4).
     void track_consumption(std::uint32_t instrument_id,
                            std::uint16_t venue_id, std::uint8_t side,
                            std::int64_t price_ticks, std::int64_t qty,

@@ -325,7 +325,7 @@ TEST(ReplayTraceGolden, OptionsAreValidatedAndSinkIsOptional) {
     EXPECT_THROW(replay.set_trace_sink(nullptr, iap::TraceOptions{}), std::invalid_argument);
     // Without a sink the replay is exactly the untraced golden run.
     const auto res = replay.run(events);
-    EXPECT_EQ(res.fills.size(), 6u);
+    EXPECT_EQ(res.fills.size(), 7u);
     EXPECT_TRUE(mem.traces().empty());
     EXPECT_THROW(replay.set_trace_sink(&mem, iap::TraceOptions{}), std::runtime_error);
 }

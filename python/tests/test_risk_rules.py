@@ -310,14 +310,18 @@ def test_strategy_kill_only_hits_that_strategy(config_doc):
 
 def test_instrument_kill_scope_id_bound_to_u32(config_doc):
     """The Rust reference parses the INSTRUMENT scope id with
-    ``parse::<u32>()``: out-of-range or unparseable ids are a no-op."""
+    ``parse::<u32>()``; an id outside that domain does not address an
+    instrument and raises instead of silently doing nothing."""
     eng = engine(config_doc)
     eng.engage_kill(Scope.INSTRUMENT, "4294967295", T0, "ops")
     d = eng.check_order(order(1, 0, 10, 2450, instrument_id=4294967295, timestamp=T0 + SEC))
     assert d.rule_id == Rules.KILL_INSTRUMENT
     for bad_id in ("4294967296", "-1", "", " 1", "1 ", "1.0", "0x1", "1_0"):
-        eng.engage_kill(Scope.INSTRUMENT, bad_id, T0, "ops")
+        with pytest.raises(ValueError, match="escalated to GLOBAL"):
+            eng.engage_kill(Scope.INSTRUMENT, bad_id, T0, "ops")
     assert eng.snapshot()["kill_instruments"] == {"4294967295": True}
+    assert eng.snapshot()["kill_global"] is True  # fail-closed escalation
+    eng.clear_kill(Scope.GLOBAL, "", T0, "escalation reviewed")
     # a leading '+' is accepted by Rust's integer parser
     eng.engage_kill(Scope.INSTRUMENT, "+7", T0, "ops")
     assert eng.snapshot()["kill_instruments"] == {"4294967295": True, "7": True}
@@ -325,11 +329,14 @@ def test_instrument_kill_scope_id_bound_to_u32(config_doc):
     d = eng.check_order(order(4, 0, 10, 2450, instrument_id=4294967295, timestamp=T0 + 5 * SEC))
     assert d.rule_id == Rules.UNKNOWN_INSTRUMENT  # kill lifted
     # venue scope ids are bound to u16 the same way
-    eng.engage_kill(Scope.VENUE, "65536", T0, "ops")
+    with pytest.raises(ValueError, match="escalated to GLOBAL"):
+        eng.engage_kill(Scope.VENUE, "65536", T0, "ops")
+    # the audit record carries whatever id text was given
+    assert eng.audit()[-1].scope_id == "65536"
+    assert eng.audit()[-1].rule_id == Rules.MALFORMED_KILL
+    eng.clear_kill(Scope.GLOBAL, "", T0, "escalation reviewed")
     eng.engage_kill(Scope.VENUE, "65535", T0, "ops")
     assert eng.snapshot()["kill_venues"] == {"65535": True}
-    # the audit record carries whatever id text was given
-    assert eng.audit()[-2].scope_id == "65536"
 
 
 # ------------------------------------------------- malformed / reference
@@ -784,14 +791,16 @@ def test_unmarked_position_fails_closed_on_gross_check(config_doc):
     d = eng.check_order(order(1, 0, 100, 2450))
     assert d.rule_id == Rules.GROSS_NOTIONAL
     assert d.reason == "position in instrument 3 has no mark price (fail-closed)"
-    # an unpriced open order in an unmarked instrument cannot be valued and
-    # is skipped in gross/net (it still counts in the position projection)
+    # an unpriced open order in an unmarked instrument cannot be valued
+    # either, and rejects exactly like the unmarked position above
     eng2 = RiskEngine.from_config_ticks(config_doc, {**ticks(), 3: 0.01})
     eng2.on_market(1, 2450, 2452, T0)
     eng2.on_market(3, 4999, 5001, T0)
     assert eng2.check_order(order(1, 0, 100, 0, instrument_id=3)).allowed()
     eng2.on_market(3, 0, 0, T0 + 1)  # mark withdrawn
-    assert eng2.check_order(order(2, 0, 100, 2450, timestamp=T0 + 2)).allowed()
+    d = eng2.check_order(order(2, 0, 100, 2450, timestamp=T0 + 2))
+    assert d.rule_id == Rules.GROSS_NOTIONAL
+    assert d.reason == "open order 1 in instrument 3 has no mark price (fail-closed)"
 
 
 # -------------------------------------------------------------- loss limits
@@ -1880,3 +1889,103 @@ def test_reference_builders_reject_malformed_tables():
             instrument_refs_from_config({"instruments": [row]})
     with pytest.raises(ValueError, match="must be an object"):
         instrument_refs_from_config({"instruments": [1]})
+
+
+# ----------------------------------------------- fail-closed regressions
+
+
+def test_unvaluable_open_order_rejects_instead_of_vanishing_from_gross(config_doc):
+    """Regression — FAIL-OPEN defect: an unvaluable OPEN ORDER used to be
+    skipped in the gross/net loop, so live working exposure vanished from
+    the aggregate and a correct GROSS_NOTIONAL reject became an ALLOW.
+    Five working MARKET children (9,000 @ mid 100.01 = 900,090 each,
+    4,500,450 gross) then instrument 1's book goes one-sided (halt/open):
+    the two children on instrument 1 are 1,800,180 of real exposure."""
+    def build():
+        eng = RiskEngine.from_config_ticks(config(config_doc), {1: 0.01, 2: 0.01, 3: 0.01})
+        for iid in (1, 2, 3):
+            eng.on_market(iid, 10_000, 10_002, T0)  # mid 100.01
+        ts = T0 + 100_000_000
+        # buys on 1, sells on 2, buy on 3 keeps |net| under the net cap
+        for oid, iid, side in ((1, 1, 0), (2, 1, 0), (3, 2, 1), (4, 2, 1), (5, 3, 0)):
+            o = typed(oid, iid, side, 9_000, 0, OrderType.MARKET, ts)
+            assert eng.check_order(o).allowed(), f"child {oid} must rest"
+            ts += 100_000_000
+        return eng, ts
+
+    healthy, ts = build()
+    d = healthy.check_order(typed(6, 3, 0, 9_000, 0, OrderType.MARKET, ts + 100_000_000))
+    assert d.rule_id == Rules.GROSS_NOTIONAL
+    assert d.reason == ("projected gross notional 5400540.00 exceeds "
+                        "max_gross_notional 5000000.00")
+
+    degraded, ts = build()
+    degraded.on_market(1, 10_000, 0, ts)  # one-sided: instrument 1 has no mid
+    d = degraded.check_order(typed(6, 3, 0, 9_000, 0, OrderType.MARKET, ts + 100_000_000))
+    assert d.rule_id == Rules.GROSS_NOTIONAL, d.reason
+    assert d.severity == Severity.WARN
+    assert d.reason == "open order 1 in instrument 1 has no mark price (fail-closed)"
+
+
+def test_unparseable_kill_scope_id_escalates_and_never_looks_successful(config_doc):
+    """Regression — SILENT NO-OP defect: an INSTRUMENT kill sent as a ticker
+    used to emit KILL_SWITCH_ENGAGED and halt nothing. It must now fail
+    loudly, emit MALFORMED_KILL (never a success record) and escalate to
+    the GLOBAL kill."""
+    eng = engine(config_doc)
+    with pytest.raises(ValueError, match="escalated to GLOBAL"):
+        eng.engage_kill(Scope.INSTRUMENT, "AAPL", T0, "ops halt")
+    # the very next order is stopped, not allowed
+    assert eng.check_order(order(1, 0, 100, 2450)).rule_id == Rules.KILL_GLOBAL
+    assert eng.metrics.counter_value("risk_malformed_kills_total") == 1
+    malformed = [e for e in eng.audit() if e.rule_id == Rules.MALFORMED_KILL]
+    assert len(malformed) == 1
+    assert malformed[0].decision == Decision.KILL
+    assert malformed[0].severity == Severity.BREACH
+    assert malformed[0].reason == (
+        'kill scope id "AAPL" is not a valid INSTRUMENT id: '
+        "escalated to GLOBAL (fail-closed): ops halt"
+    )
+    assert not [e for e in eng.audit() if e.rule_id == Rules.KILL_SWITCH_ENGAGED], \
+        "a phantom halt must never leave a success record"
+
+    # a VENUE id above u16 is the same defect
+    eng = engine(config_doc)
+    with pytest.raises(ValueError):
+        eng.engage_kill(Scope.VENUE, "65536", T0, "ops")
+    assert eng.check_order(order(1, 0, 100, 2450)).rule_id == Rules.KILL_GLOBAL
+
+    # clearing is the permissive direction: it clears NOTHING and reports
+    eng = engine(config_doc)
+    eng.engage_kill(Scope.INSTRUMENT, "1", T0, "halt")
+    with pytest.raises(ValueError, match="nothing cleared"):
+        eng.clear_kill(Scope.INSTRUMENT, "AAPL", T0 + NS, "ops clear")
+    assert eng.check_order(order(2, 0, 100, 2450)).rule_id == Rules.KILL_INSTRUMENT, \
+        "the real halt must still be in force"
+    assert not [e for e in eng.audit() if e.rule_id == Rules.KILL_SWITCH_CLEARED], \
+        "nothing was cleared, so nothing may claim it was"
+
+
+def test_unmarked_held_lot_makes_daily_pnl_undeterminable(config_doc):
+    """Regression — FAIL-OPEN defect: an unmarked held lot used to
+    contribute zero unrealized P&L instead of making the daily total
+    undeterminable, so a loss limit could fail to trip. It must behave
+    exactly like the missing-FX-rate branch: ``None``, and orders reject
+    FX_RATE_MISSING."""
+    eng = engine(config_doc)
+    # S1 long 1,000 and S2 short 1,000 of instrument 2: two HELD lots, but
+    # a flat firm position, so check 19 cannot mask the P&L path below.
+    assert eng.on_fill(fill("S1", 2, 0, 1_000, 3_120))
+    assert eng.on_fill(fill("S2", 2, 1, 1_000, 3_120))
+    assert eng.position(2) == 0
+    assert eng.global_daily_pnl() is not None
+    assert eng.strategy_daily_pnl("S1") is not None
+
+    eng.on_market(2, 3_119, 0, T0 + NS)  # instrument 2 goes one-sided
+    assert eng.global_daily_pnl() is None
+    assert eng.strategy_daily_pnl("S1") is None
+
+    # fail-closed pre-trade, exactly like a missing conversion rate
+    d = eng.check_order(order(9, 0, 100, 2450))
+    assert d.rule_id == Rules.FX_RATE_MISSING, d.reason
+    assert d.reason == "global daily pnl undeterminable: conversion rate missing"

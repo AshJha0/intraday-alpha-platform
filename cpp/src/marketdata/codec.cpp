@@ -43,8 +43,17 @@ struct Cursor {
     [[noreturn]] void fail(const std::string& msg) const {
         throw std::invalid_argument("malformed JSONL line: " + msg);
     }
+    // Pinned JSONL whitespace set: ASCII space, tab, CR, LF — exactly the
+    // `[ \t\r\n]*` of the reference decoder's line regex. LF was missing
+    // here, so a line the Python and Rust ports accepted was rejected by
+    // this port ("expected '{' at start of object") in a codec whose whole
+    // contract is byte-identical cross-language behaviour. Non-ASCII
+    // whitespace (VT, FF, NBSP, ...) is NOT whitespace and stays rejected.
     void skip_ws() {
-        while (p != end && (*p == ' ' || *p == '\t' || *p == '\r')) ++p;
+        while (p != end &&
+               (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n')) {
+            ++p;
+        }
     }
     void expect(char c, const char* what) {
         skip_ws();
@@ -270,12 +279,13 @@ std::vector<MarketEvent> decode_jsonl(std::string_view data) {
                                     ? data.substr(start)
                                     : data.substr(start, nl - start);
         // Strip surrounding whitespace; skip blank lines (as the reference).
+        // Same pinned set as skip_ws(): ASCII space, tab, CR, LF only.
+        auto is_ws = [](char c) {
+            return c == ' ' || c == '\t' || c == '\r' || c == '\n';
+        };
         std::size_t b = 0, e = line.size();
-        while (b < e && (line[b] == ' ' || line[b] == '\t' || line[b] == '\r'))
-            ++b;
-        while (e > b &&
-               (line[e - 1] == ' ' || line[e - 1] == '\t' || line[e - 1] == '\r'))
-            --e;
+        while (b < e && is_ws(line[b])) ++b;
+        while (e > b && is_ws(line[e - 1])) --e;
         if (e > b) events.push_back(decode_jsonl_line(line.substr(b, e - b)));
         if (nl == std::string_view::npos) break;
         start = nl + 1;

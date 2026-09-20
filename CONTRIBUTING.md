@@ -58,7 +58,7 @@ abs and rel 1e-9; adaptive PSI/KS at 1e-10 with exact refit booleans and
 lifecycle state sequences; canonical-JSON lines, trace digests, the risk
 audit / snapshot and the lifecycle registry are byte-identical; the 7-state
 lifecycle golden is compared exactly, field by field. The 2026-09-20 table
-reads python 1362 / cpp 267 / rust 298 / java 475 (golden 164/68/62/102),
+reads python 1388 / cpp 285 / rust 313 / java 482 (golden 164/68/62/102),
 `integration` 13, `replay` 4.
 
 ## 4. Golden regeneration protocol
@@ -127,7 +127,7 @@ Research truth is the product (spec §32). Two rules are mechanical:
    the SHA-256 of the canonical spec and writes
    `research/experiments/<id>/{spec,result}.json`) *before* its result is
    read, and every report prints the denominator and the expected max |t|
-   under the global null (865 looks / 70 configurations, max |t| ≈ 3.68 as
+   under the global null (1068 looks / 70 configurations, max |t| ≈ 3.735 as
    of 2026-09-20). Runner entries are never de-duplicated against the
    report pipeline's entries even when the computation coincides: the
    denominator only grows.

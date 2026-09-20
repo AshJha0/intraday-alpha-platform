@@ -62,7 +62,7 @@ is refused by the runner rather than silently overwritten.
 ## The five committed experiments (2026-09-19)
 
 All with the default configuration, seed 20260919, dataset `203c8f54…`,
-features `585dd7b9…`, `n_experiments_in_ledger = 865`, commit `f3a01377…`;
+features `585dd7b9…`, `n_experiments_in_ledger = 1068`, commit `fc41ac6f…`;
 periods derived from the two-session calendar (train = session 1, validation
 = the purged + embargoed tail, which holds zero rows on this data, test =
 session 2):
@@ -83,8 +83,8 @@ reproduce `research/alpha_reports/{EQ01,EQ03,EQ06}.json` at 1e-9
 EQ03 @ 1 s is a new configuration compared to nothing. EQ06 @ 1 s and @ 10 s
 share identical holdout economics because the linear alpha's trades depend
 only on z and sign(β), not on the horizon's β magnitude. These five runs
-(5 × 21 = 105 entries) moved the ledger from 760 / 65 to **865 looks over 70 distinct
-configurations** (Bonferroni |t| ≥ 4.02, expected max |t| ≈ 3.68); they were not de-duplicated against
+(5 × 21 = 105 entries) moved the ledger from 760 / 65 to **1068 looks over 70 distinct
+configurations** (Bonferroni |t| ≥ 4.071, expected max |t| ≈ 3.735); they were not de-duplicated against
 the `promotion_pipeline` entries — the denominator only grows.
 
 `seed` is recorded and hashed but consumed by nothing: the whole chain

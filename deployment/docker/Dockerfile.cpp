@@ -63,13 +63,23 @@ FROM debian:bookworm-slim
 RUN groupadd --gid 10001 iap && \
     useradd --uid 10001 --gid iap --create-home --shell /usr/sbin/nologin iap
 
-# bench_all resolves the golden dir from its compiled-in path (/build/tests/
-# golden); keep the same absolute layout in the runtime image.
+# bench_all resolves the golden dir from $IAP_GOLDEN_DIR, falling back to the
+# path compiled in at build time (iap/util/data_paths.hpp). Setting it below
+# states the image's layout explicitly instead of inheriting the build tree's,
+# and every path derived from it (configs/, data/) is collapsed lexically, so
+# the binary never needs an intermediate build directory that this stage does
+# not copy. Keeping the same absolute layout as the build stage is therefore
+# belt-and-braces rather than load-bearing.
 COPY --from=build /build/cpp/build/bench_all /usr/local/bin/iap-replay-sim
 COPY --from=build /build/tests/golden /build/tests/golden
 # bench_all reads IAP_GOLDEN_DIR/../../configs at runtime — keep the shape.
 COPY --from=build /build/configs /build/configs
 COPY --from=build /build/data/reference /build/data/reference
+
+# The image's data root, read by iap::golden_dir() (iap/util/data_paths.hpp).
+# check_docker_build.py asserts this is set and that the directory it names is
+# one this stage actually copies.
+ENV IAP_GOLDEN_DIR=/build/tests/golden
 
 USER iap
 WORKDIR /home/iap

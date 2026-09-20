@@ -63,7 +63,9 @@
 //! - **Projections** (worst case): buys check `pos + open_buy_qty + qty`,
 //!   sells `pos - open_sell_qty - qty` (all order types); gross/net include
 //!   every open order at its limit price (unpriced: the mid): gross adds
-//!   |notional|, net adds it signed.
+//!   |notional|, net adds it signed. An open order that cannot be valued
+//!   (unpriced AND unmarked) rejects with `GROSS_NOTIONAL`, exactly like an
+//!   unmarked position — never skipped (fail-closed).
 //! - **Loss limits** act on daily P&L = realized (average-cost accounting
 //!   per (strategy, instrument) lot, pinned in `on_fill`) + unrealized
 //!   (`pos * (mark - avg_price) * qty_unit`, mark = last consolidated
@@ -71,9 +73,9 @@
 //!   evaluated after every fill AND after every market update touching a
 //!   held instrument: a breach engages the STRATEGY / GLOBAL kill switch
 //!   (strategy first, each at most once per latch) with no fill required,
-//!   and every later order is rejected by the kill checks. Unmarked lots
-//!   contribute nothing to a latch (undeterminable) but fail the gross
-//!   check pre-trade.
+//!   and every later order is rejected by the kill checks. An unmarked
+//!   held lot makes daily P&L UNDETERMINABLE (`None`), exactly like a
+//!   missing FX rate: no latch, and orders reject with `FX_RATE_MISSING`.
 //! - **Re-arm precedence** (pinned): `clear_kill` clears only the switch;
 //!   while daily P&L is still at/below the effective limit, checks 21/22
 //!   reject and the next fill/mark re-latches. `override_loss_limit`
@@ -83,6 +85,12 @@
 //! - **Malformed fills** (qty <= 0, side > 1, price_ticks <= 0, unknown
 //!   instrument) are NOT applied: `MALFORMED_FILL` audit record +
 //!   `risk_malformed_fills_total`, `on_fill` returns `false`.
+//! - **Malformed kills**: a kill command whose `scope_id` does not name an
+//!   addressable scope (INSTRUMENT id not a u32, VENUE id not a u16) is
+//!   NEVER recorded as a success. `engage_kill` latches the GLOBAL kill
+//!   (the safe wider reading of "stop trading"), `clear_kill` clears
+//!   nothing, and both emit `MALFORMED_KILL` + `risk_malformed_kills_total`
+//!   and return `Err`.
 //! - **Snapshot / restore**: [`RiskEngine::snapshot`] serializes the full
 //!   mutable state (schema x-version 1); [`RiskEngine::restore`] resumes it
 //!   with bit-identical subsequent decisions and audit lines. An engine
@@ -452,9 +460,44 @@ impl RiskEngine {
         });
     }
 
-    /// Manually engage a kill switch.
-    pub fn engage_kill(&mut self, scope: Scope, scope_id: &str, ts: i64, reason: &str) {
-        self.set_kill(scope, scope_id, true);
+    /// Manually engage a kill switch. Errors (changing nothing in the
+    /// requested scope, emitting `MALFORMED_KILL` instead of
+    /// `KILL_SWITCH_ENGAGED`) when `scope_id` does not parse.
+    ///
+    /// SILENT NO-OP defect: an unparseable scope id used to leave the
+    /// engine untouched while the audit log recorded a convincing
+    /// KILL_SWITCH_ENGAGED, so an operator halting an instrument by ticker
+    /// ("AAPL") believed the halt was in force and the next order was
+    /// ALLOWed. Fail-closed: the operator's intent is to STOP trading and
+    /// the narrow scope is undeterminable, so the engine takes the wider
+    /// safe interpretation and latches the GLOBAL kill, then reports the
+    /// failure loudly. Over-halting is recoverable; a phantom halt is not.
+    pub fn engage_kill(
+        &mut self,
+        scope: Scope,
+        scope_id: &str,
+        ts: i64,
+        reason: &str,
+    ) -> Result<(), IapError> {
+        if !self.set_kill(scope, scope_id, true) {
+            self.metrics.counter("risk_malformed_kills_total").inc();
+            let _ = self.set_kill(Scope::Global, "", true);
+            let why = format!(
+                "kill scope id \"{}\" is not a valid {} id: escalated to GLOBAL (fail-closed)",
+                scope_id,
+                Self::scope_name(scope)
+            );
+            self.emit(RiskEvent {
+                timestamp: ts,
+                scope,
+                scope_id: scope_id.to_string(),
+                rule_id: rules::MALFORMED_KILL.to_string(),
+                severity: Severity::Breach as u8,
+                decision: Decision::Kill as u8,
+                reason: format!("{why}: {reason}"),
+            });
+            return Err(IapError::InvalidArgument(why));
+        }
         self.emit(RiskEvent {
             timestamp: ts,
             scope,
@@ -464,11 +507,39 @@ impl RiskEngine {
             decision: Decision::Kill as u8,
             reason: reason.to_string(),
         });
+        Ok(())
     }
 
     /// Clear a kill switch (the switch only — see the re-arm precedence).
-    pub fn clear_kill(&mut self, scope: Scope, scope_id: &str, ts: i64, reason: &str) {
-        self.set_kill(scope, scope_id, false);
+    /// Errors (clearing NOTHING and emitting `MALFORMED_KILL` instead of
+    /// `KILL_SWITCH_CLEARED`) when `scope_id` does not parse: clearing is
+    /// the permissive direction, so an unresolvable scope leaves every
+    /// switch exactly as it was.
+    pub fn clear_kill(
+        &mut self,
+        scope: Scope,
+        scope_id: &str,
+        ts: i64,
+        reason: &str,
+    ) -> Result<(), IapError> {
+        if !self.set_kill(scope, scope_id, false) {
+            self.metrics.counter("risk_malformed_kills_total").inc();
+            let why = format!(
+                "kill scope id \"{}\" is not a valid {} id: nothing cleared (fail-closed)",
+                scope_id,
+                Self::scope_name(scope)
+            );
+            self.emit(RiskEvent {
+                timestamp: ts,
+                scope,
+                scope_id: scope_id.to_string(),
+                rule_id: rules::MALFORMED_KILL.to_string(),
+                severity: Severity::Breach as u8,
+                decision: Decision::Reject as u8,
+                reason: format!("{why}: {reason}"),
+            });
+            return Err(IapError::InvalidArgument(why));
+        }
         self.emit(RiskEvent {
             timestamp: ts,
             scope,
@@ -478,6 +549,7 @@ impl RiskEngine {
             decision: Decision::Allow as u8,
             reason: reason.to_string(),
         });
+        Ok(())
     }
 
     /// Raise (or lower) the effective daily loss limit of the GLOBAL or a
@@ -571,27 +643,49 @@ impl RiskEngine {
         });
     }
 
-    fn set_kill(&mut self, scope: Scope, scope_id: &str, engaged: bool) {
+    /// Apply a kill-switch change. Returns `false` (changing NOTHING) when
+    /// `scope_id` does not name a scope this engine can address — an
+    /// INSTRUMENT id that is not a u32 or a VENUE id that is not a u16.
+    /// Callers MUST act on `false`: a silently dropped kill is the defect
+    /// this return value exists to prevent.
+    #[must_use]
+    fn set_kill(&mut self, scope: Scope, scope_id: &str, engaged: bool) -> bool {
         match scope {
             Scope::Global => {
                 self.kill_global = engaged;
                 self.metrics
                     .gauge("risk_kill_switch_engaged")
                     .set(if engaged { 1.0 } else { 0.0 });
+                true
             }
             Scope::Strategy => {
                 self.kill_strategies.insert(scope_id.to_string(), engaged);
+                true
             }
-            Scope::Instrument => {
-                if let Ok(iid) = scope_id.parse::<u32>() {
+            Scope::Instrument => match scope_id.parse::<u32>() {
+                Ok(iid) => {
                     self.kill_instruments.insert(iid, engaged);
+                    true
                 }
-            }
-            Scope::Venue => {
-                if let Ok(vid) = scope_id.parse::<u16>() {
+                Err(_) => false,
+            },
+            Scope::Venue => match scope_id.parse::<u16>() {
+                Ok(vid) => {
                     self.kill_venues.insert(vid, engaged);
+                    true
                 }
-            }
+                Err(_) => false,
+            },
+        }
+    }
+
+    /// `"INSTRUMENT"` / `"VENUE"` / ... for the malformed-kill reason.
+    fn scope_name(scope: Scope) -> &'static str {
+        match scope {
+            Scope::Global => "GLOBAL",
+            Scope::Strategy => "STRATEGY",
+            Scope::Instrument => "INSTRUMENT",
+            Scope::Venue => "VENUE",
         }
     }
 
@@ -731,8 +825,8 @@ impl RiskEngine {
     }
 
     /// Daily P&L of one strategy in the reporting currency: realized +
-    /// unrealized of every marked lot. `None` when a needed conversion
-    /// rate is missing (undeterminable).
+    /// unrealized of every held lot. `None` when a needed conversion rate
+    /// is missing OR a held lot has no mark (undeterminable).
     pub fn strategy_daily_pnl(&self, sid: &str) -> Option<f64> {
         let mut total = 0.0;
         for ((s, ccy), pnl) in &self.realized {
@@ -745,9 +839,12 @@ impl RiskEngine {
             if s != sid || lot.pos == 0 {
                 continue;
             }
-            let Some(mark) = self.mark_price(*iid) else {
-                continue; // unmarked: undeterminable, contributes nothing
-            };
+            // FAIL-OPEN defect: skipping an unmarked held lot let its
+            // unrealized P&L count as zero, so a loss limit could fail to
+            // trip on a book that is only partly valuable. An unmarked lot
+            // makes the daily total undeterminable, exactly like the missing
+            // FX rate above — `None` rejects, it does not guess.
+            let mark = self.mark_price(*iid)?;
             let ins = &self.instruments[iid];
             total += lot.pos as f64 * (mark - lot.avg_price) * ins.qty_unit
                 * self.fx_rate(&ins.quote_ccy)?.0;
@@ -756,7 +853,7 @@ impl RiskEngine {
     }
 
     /// Firm-wide daily P&L in the reporting currency (`None` when a
-    /// conversion rate is missing).
+    /// conversion rate is missing or a held lot has no mark).
     pub fn global_daily_pnl(&self) -> Option<f64> {
         let mut total = 0.0;
         for ((_, ccy), pnl) in &self.realized {
@@ -766,9 +863,9 @@ impl RiskEngine {
             if lot.pos == 0 {
                 continue;
             }
-            let Some(mark) = self.mark_price(*iid) else {
-                continue;
-            };
+            // FAIL-OPEN defect: see `strategy_daily_pnl` — an unmarked held
+            // lot makes the daily total undeterminable, never zero.
+            let mark = self.mark_price(*iid)?;
             let ins = &self.instruments[iid];
             total += lot.pos as f64 * (mark - lot.avg_price) * ins.qty_unit
                 * self.fx_rate(&ins.quote_ccy)?.0;
@@ -855,7 +952,7 @@ impl RiskEngine {
             if let Some(pnl) = self.global_daily_pnl() {
                 let limit = self.effective_global_loss(&limits);
                 if pnl <= -limit {
-                    self.set_kill(Scope::Global, "", true);
+                    let _ = self.set_kill(Scope::Global, "", true);
                     self.emit(RiskEvent {
                         timestamp: ts,
                         scope: Scope::Global,
@@ -1315,7 +1412,7 @@ impl RiskEngine {
             gross += v.abs();
             net += v;
         }
-        for r in self.open.values() {
+        for (oid, r) in &self.open {
             let Some(oins) = self.instruments.get(&r.instrument_id) else {
                 continue;
             };
@@ -1324,7 +1421,23 @@ impl RiskEngine {
             } else {
                 match self.mark_price(r.instrument_id) {
                     Some(m) => m,
-                    None => continue, // unpriced and unmarked: cannot value
+                    // FAIL-OPEN defect: skipping an unvaluable OPEN ORDER
+                    // (MARKET / MID / unpriced IOC-FOK on an instrument whose
+                    // book went one-sided) dropped its whole notional from
+                    // gross AND net, so live working exposure vanished from
+                    // the aggregate and a correct GROSS_NOTIONAL reject became
+                    // an ALLOW. An unvaluable open order is exactly as
+                    // undeterminable as an unvaluable position: reject.
+                    None => {
+                        return Self::reject(
+                            rules::GROSS_NOTIONAL,
+                            Warn,
+                            format!(
+                                "open order {oid} in instrument {} has no mark price (fail-closed)",
+                                r.instrument_id
+                            ),
+                        )
+                    }
                 }
             };
             let Some((rate, _)) = self.fx_rate(&oins.quote_ccy) else {

@@ -10,14 +10,18 @@
 #include <vector>
 
 #include "iap/orderbook/book.hpp"
+#include "iap/util/data_paths.hpp"
 #include "json_min.hpp"
 
 namespace iap_test {
 
-inline std::string golden_dir() { return IAP_GOLDEN_DIR; }
+// iap/util/data_paths.hpp owns the resolution rules ($IAP_GOLDEN_DIR
+// overrides the compiled-in path; every derived path is collapsed
+// lexically). These stay as the suite's spelling of them.
+inline std::string golden_dir() { return iap::golden_dir(); }
 
 inline std::string golden_path(const std::string& name) {
-    return golden_dir() + "/" + name;
+    return iap::golden_file(name);
 }
 
 inline std::string read_text_file(const std::string& path) {

@@ -186,20 +186,87 @@ public class ExecutionSimTest {
     }
 
     @Test
-    public void tradeThroughFillsInFullAtOurPrice() {
+    public void tradeThroughFillsAtOurPriceBoundedByTradedVolume() {
         ExecutionSimulator sim = new ExecutionSimulator(testConfig(0));
         Feeder f = new Feeder();
         seedBook(sim, f);
         long id = sim.submit(child(0, OrderType.LIMIT, 100, 50, T0 + 10));
         sim.onEvent(f.heartbeat(T0 + 10 + LAT + 1));
+        assertEquals(300, sim.orders().get(id).aheadQty);
         // EXECUTE on the bid side BELOW our price: the market traded through
-        // our level — full fill at OUR limit.
+        // us, but only for what it traded and only behind the 300 ahead.
         sim.onEvent(f.exec(T0 + 2_000_000, 0, 99, 100, 12));
+        assertTrue(sim.fills().isEmpty());
+        assertEquals(200, sim.orders().get(id).aheadQty);
+        // 240 through our level: 200 clears the queue, 40 reaches us — at
+        // OUR limit, never at the (better) 99 print price.
+        sim.onEvent(f.exec(T0 + 3_000_000, 0, 99, 240, 12));
         assertEquals(1, sim.fills().size());
-        assertEquals(50, sim.fills().get(0).qty());
+        assertEquals(40, sim.fills().get(0).qty());
         assertEquals(100, sim.fills().get(0).priceTicks());
         assertEquals(Liquidity.MAKER, sim.fills().get(0).liquidity());
-        assertEquals(OrderState.FILLED, sim.orders().get(id).state);
+        assertEquals(OrderState.ACTIVE, sim.orders().get(id).state);
+        assertEquals(10, sim.orders().get(id).remaining);
+    }
+
+    /** DEFECT B repro: one share through a huge order fills at most one. */
+    @Test
+    public void singleShareTradeThroughCannotFillAMillion() {
+        ExecutionSimulator sim = new ExecutionSimulator(testConfig(0));
+        Feeder f = new Feeder();
+        sim.onEvent(f.add(T0, 0, 100, 500, 11));
+        sim.onEvent(f.add(T0 + 1, 1, 101, 200, 21));
+        long id = sim.submit(child(0, OrderType.LIMIT, 100, 1_000_000, T0 + 10));
+        sim.onEvent(f.heartbeat(T0 + 10 + LAT + 1));
+        assertEquals(500, sim.orders().get(id).aheadQty);
+        // ONE share executes at 99. Old rule: the whole 1,000,000 filled.
+        sim.onEvent(f.exec(T0 + 2_000_000, 0, 99, 1, 12));
+        assertTrue(sim.fills().isEmpty());
+        assertEquals(499, sim.orders().get(id).aheadQty);
+        assertEquals(1_000_000, sim.orders().get(id).remaining);
+        // Even with the queue cleared, a 1-share print gives at most 1 share.
+        sim.onEvent(f.exec(T0 + 3_000_000, 0, 99, 499, 12));
+        assertTrue(sim.fills().isEmpty());
+        sim.onEvent(f.exec(T0 + 4_000_000, 0, 99, 1, 12));
+        assertEquals(1, sim.fills().size());
+        assertEquals(1, sim.fills().get(0).qty());
+        assertEquals(100, sim.fills().get(0).priceTicks());
+        assertEquals(999_999, sim.orders().get(id).remaining);
+    }
+
+    /** DEFECT A repro: four same-price children share ONE 400-share print. */
+    @Test
+    public void samePriceChildrenShareOnePrintAndQueueBehindEachOther() {
+        ExecutionSimulator sim = new ExecutionSimulator(testConfig(0));
+        Feeder f = new Feeder();
+        seedBook(sim, f); // bid 100 displayed 300
+        long[] ids = new long[4];
+        for (int k = 0; k < 4; k++) {
+            ids[k] = sim.submit(child(0, OrderType.LIMIT, 100, 1000, T0 + 10 + k));
+        }
+        sim.onEvent(f.heartbeat(T0 + 20 + LAT + 1)); // all four rest
+        // Queue position: 300 displayed, then each earlier sibling's 1000.
+        assertEquals(300, sim.orders().get(ids[0]).aheadQty);
+        assertEquals(1300, sim.orders().get(ids[1]).aheadQty);
+        assertEquals(2300, sim.orders().get(ids[2]).aheadQty);
+        assertEquals(3300, sim.orders().get(ids[3]).aheadQty);
+        // ONE print of 400 at 100: 300 clears the display, 100 reaches the
+        // FIRST child and nobody else. Old rule: 4 x 100 = 400 filled.
+        sim.onEvent(f.exec(T0 + 2_000_000, 0, 100, 400, 11));
+        assertEquals(1, sim.fills().size());
+        assertEquals(ids[0], sim.fills().get(0).orderId());
+        assertEquals(100, sim.fills().get(0).qty());
+        assertEquals(100, sim.fills().get(0).priceTicks());
+        long total = 0;
+        for (Fill fl : sim.fills()) {
+            total += fl.qty();
+        }
+        assertEquals(100, total);
+        // The budget was spent, so the siblings' queue positions are
+        // untouched: the print was never cloned for them.
+        assertEquals(1300, sim.orders().get(ids[1]).aheadQty);
+        assertEquals(2300, sim.orders().get(ids[2]).aheadQty);
+        assertEquals(3300, sim.orders().get(ids[3]).aheadQty);
     }
 
     @Test
@@ -248,17 +315,25 @@ public class ExecutionSimTest {
     }
 
     @Test
-    public void crossingQuoteAfterL1ReplaceFills() {
+    public void crossingQuoteFillsBoundedByTheCrossingDisplay() {
         // FX-style: a QUOTE replaces the venue's L1; if the new opposite
-        // best crosses our resting price, we fill (post-apply check).
+        // best crosses our resting price we fill (post-apply check) — but
+        // only for what that level displays, behind the queue ahead of us.
         ExecutionSimulator sim = new ExecutionSimulator(testConfig(0));
         Feeder f = new Feeder();
         seedBook(sim, f);
         long id = sim.submit(child(0, OrderType.LIMIT, 100, 50, T0 + 10));
         sim.onEvent(f.heartbeat(T0 + 10 + LAT + 1));
         assertEquals(OrderState.ACTIVE, sim.orders().get(id).state);
-        // QUOTE: ask side replaced at 100 <= our bid 100 -> crossed.
+        assertEquals(300, sim.orders().get(id).aheadQty);
+        // QUOTE: ask replaced at 100 <= our bid 100 -> crossed, but the 250
+        // it displays cannot even clear the 300 queued ahead of us.
         sim.onEvent(f.ev(T0 + 2_000_000, 6, 1, 100, 250, 0));
+        assertTrue(sim.fills().isEmpty());
+        assertEquals(50, sim.orders().get(id).aheadQty);
+        // A bigger crossing display: 50 clears the queue, 50 fills us at our
+        // own limit (the crossing rule never gives price improvement).
+        sim.onEvent(f.ev(T0 + 3_000_000, 6, 1, 100, 400, 0));
         assertEquals(1, sim.fills().size());
         assertEquals(100, sim.fills().get(0).priceTicks());
         assertEquals(50, sim.fills().get(0).qty());
@@ -387,10 +462,11 @@ public class ExecutionSimTest {
         // impact_bps = 2.0 * (100 / 1e6 * 100) = 0.02 bps over notional
         // 100 * 100 ticks * 0.01 = 100.0 => 0.02e-4 * 100 = 2e-4.
         assertEquals(2e-4, taker.impactCost(), 1e-15);
-        // Maker: passive buy at 100, filled by trade-through.
+        // Maker: passive buy at 100 joining 300 displayed, filled by a
+        // trade-through print big enough to clear the queue and reach us.
         sim.submit(child(0, OrderType.LIMIT, 100, 40, T0 + 5_000_000));
         sim.onEvent(f.heartbeat(T0 + 5_000_000 + LAT + 1));
-        sim.onEvent(f.exec(T0 + 8_000_000, 0, 99, 10, 12));
+        sim.onEvent(f.exec(T0 + 8_000_000, 0, 99, 340, 12));
         assertEquals(2, sim.fills().size());
         Fill maker = sim.fills().get(1);
         assertEquals(Liquidity.MAKER, maker.liquidity());

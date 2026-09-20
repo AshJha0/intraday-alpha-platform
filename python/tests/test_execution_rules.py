@@ -198,18 +198,73 @@ def test_queue_cancel_decrement_floors_at_zero():
     assert sim.fills == []  # cancels never fill us
 
 
-def test_queue_trade_through_fills_in_full_at_our_price():
+def test_queue_trade_through_fills_at_our_price_bounded_by_traded_volume():
     sim = ExecutionSimulator(make_config())
     f = Feeder()
     seed_book(sim, f)
     oid = sim.submit(child(0, OrderType.LIMIT, 100, 50, T0 + 10))
     sim.on_event(f.heartbeat(T0 + 10 + LAT + 1))
-    # EXECUTE on the bid side BELOW our price: full fill at OUR limit.
+    assert sim.orders[oid].ahead_qty == 300
+    # EXECUTE on the bid side BELOW our price: the market traded through us,
+    # but only for what it actually traded and only behind the 300 ahead.
     sim.on_event(f.exec(T0 + 2_000_000, 0, 99, 100, 12))
+    assert sim.fills == []
+    assert sim.orders[oid].ahead_qty == 200
+    # 240 through our level: 200 clears the queue, 40 reaches us — at OUR
+    # limit, never at the (better) 99 print price.
+    sim.on_event(f.exec(T0 + 3_000_000, 0, 99, 240, 12))
     assert len(sim.fills) == 1
-    assert (sim.fills[0].qty, sim.fills[0].price_ticks) == (50, 100)
+    assert (sim.fills[0].qty, sim.fills[0].price_ticks) == (40, 100)
     assert sim.fills[0].liquidity == Liquidity.MAKER
-    assert sim.orders[oid].state == OrderState.FILLED
+    assert sim.orders[oid].state == OrderState.ACTIVE
+    assert sim.orders[oid].remaining == 10
+
+
+def test_queue_single_share_trade_through_cannot_fill_a_million():
+    """DEFECT B repro: one share through a huge order fills at most one."""
+    sim = ExecutionSimulator(make_config())
+    f = Feeder()
+    sim.on_event(f.add(T0, 0, 100, 500, 11))
+    sim.on_event(f.add(T0 + 1, 1, 101, 200, 21))
+    oid = sim.submit(child(0, OrderType.LIMIT, 100, 1_000_000, T0 + 10))
+    sim.on_event(f.heartbeat(T0 + 10 + LAT + 1))
+    assert sim.orders[oid].ahead_qty == 500
+    # ONE share executes at 99. Old rule: the whole 1,000,000 filled.
+    sim.on_event(f.exec(T0 + 2_000_000, 0, 99, 1, 12))
+    assert sim.fills == []
+    assert sim.orders[oid].ahead_qty == 499
+    assert sim.orders[oid].remaining == 1_000_000
+    # Even with the queue cleared, a 1-share print gives at most 1 share.
+    sim.on_event(f.exec(T0 + 3_000_000, 0, 99, 499, 12))
+    assert sim.fills == []
+    sim.on_event(f.exec(T0 + 4_000_000, 0, 99, 1, 12))
+    assert len(sim.fills) == 1
+    assert (sim.fills[0].qty, sim.fills[0].price_ticks) == (1, 100)
+    assert sim.orders[oid].remaining == 999_999
+
+
+def test_queue_same_price_children_share_one_print_and_queue_behind_each_other():
+    """DEFECT A repro: four same-price children share ONE 400-share print."""
+    sim = ExecutionSimulator(make_config())
+    f = Feeder()
+    seed_book(sim, f)  # bid 100 displayed 300
+    ids = [
+        sim.submit(child(0, OrderType.LIMIT, 100, 1000, T0 + 10 + k))
+        for k in range(4)
+    ]
+    sim.on_event(f.heartbeat(T0 + 20 + LAT + 1))  # all four rest
+    # Queue position: 300 displayed, then each earlier sibling's 1000.
+    assert [sim.orders[i].ahead_qty for i in ids] == [300, 1300, 2300, 3300]
+    # ONE print of 400 at 100: 300 clears the display, 100 reaches the FIRST
+    # child and nobody else. Old rule: 4 x 100 = 400 filled.
+    sim.on_event(f.exec(T0 + 2_000_000, 0, 100, 400, 11))
+    assert len(sim.fills) == 1
+    assert sim.fills[0].order_id == ids[0]
+    assert (sim.fills[0].qty, sim.fills[0].price_ticks) == (100, 100)
+    assert sum(x.qty for x in sim.fills) == 100
+    # The budget was spent, so the siblings' queue positions are untouched:
+    # the print was never cloned for them.
+    assert [sim.orders[i].ahead_qty for i in ids[1:]] == [1300, 2300, 3300]
 
 
 def test_queue_marketable_add_consumes_queue_ahead():
@@ -252,15 +307,22 @@ def test_queue_marketable_add_trading_through_fills_in_full():
     assert sim.orders[oid].state == OrderState.FILLED
 
 
-def test_queue_crossing_quote_after_l1_replace_fills():
+def test_queue_crossing_quote_fills_bounded_by_the_crossing_display():
     sim = ExecutionSimulator(make_config())
     f = Feeder()
     seed_book(sim, f)
     oid = sim.submit(child(0, OrderType.LIMIT, 100, 50, T0 + 10))
     sim.on_event(f.heartbeat(T0 + 10 + LAT + 1))
     assert sim.orders[oid].state == OrderState.ACTIVE
-    # QUOTE: ask side replaced at 100 <= our bid 100 -> crossed.
+    assert sim.orders[oid].ahead_qty == 300
+    # QUOTE: ask replaced at 100 <= our bid 100 -> crossed, but the 250 it
+    # displays cannot even clear the 300 queued ahead of us.
     sim.on_event(f.quote(T0 + 2_000_000, 1, 100, 250))
+    assert sim.fills == []
+    assert sim.orders[oid].ahead_qty == 50
+    # A bigger crossing display: 50 clears the queue, 50 fills us at our own
+    # limit (the crossing rule never gives price improvement).
+    sim.on_event(f.quote(T0 + 3_000_000, 1, 100, 400))
     assert len(sim.fills) == 1
     assert (sim.fills[0].price_ticks, sim.fills[0].qty) == (100, 50)
     assert sim.orders[oid].state == OrderState.FILLED
@@ -389,10 +451,11 @@ def test_fees_taker_maker_and_impact_arithmetic():
     # impact_bps = 2.0 * (100 / 1e6 * 100) = 0.02 bps over notional
     # 100 * 100 ticks * 0.01 = 100.0 => 0.02e-4 * 100 = 2e-4.
     assert math.isclose(taker.impact_cost, 2e-4, abs_tol=1e-15)
-    # Maker: passive buy at 100, filled by trade-through.
+    # Maker: passive buy at 100 joining 300 displayed, filled by a
+    # trade-through print big enough to clear the queue (300) and reach us.
     sim.submit(child(0, OrderType.LIMIT, 100, 40, T0 + 5_000_000))
     sim.on_event(f.heartbeat(T0 + 5_000_000 + LAT + 1))
-    sim.on_event(f.exec(T0 + 8_000_000, 0, 99, 10, 12))
+    sim.on_event(f.exec(T0 + 8_000_000, 0, 99, 340, 12))
     assert len(sim.fills) == 2
     maker = sim.fills[1]
     assert maker.liquidity == Liquidity.MAKER

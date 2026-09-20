@@ -2,9 +2,9 @@
   "data_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
   "description": "Fitted flagship-alpha parameters (iap.alpha). model linear_z_v1: er = beta * clip((raw - mu)/(sigma + 1e-12), +-z_clip); conf = min(1, |z|/conf_scale); a dead alpha (sigma <= 0 or beta == 0) scores (0, 0) on every row. The provenance header identifies the feature registry, the data and the commit these numbers were fitted with; every loader rejects a feature_version that differs from its engine's registry hash. See /API_ALPHA.md section 2.",
   "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
-  "git_commit": "0768cbe40a6343c64512bf504be0c791a6baae12",
+  "git_commit": "fc41ac6f1381cc88d235fa206ba94f7bd104d469",
   "git_dirty": true,
-  "git_dirty_hash": "2ba583d01de19c549e6d30c5dd37cdb4c0463307dbe4eec02520bf6767d3934f",
+  "git_dirty_hash": "63cf5f68b6a83680d1d578488fbf0e72f20b8ceec8f7974a3aaaf70ca74863fc",
   "params": {
     "EQ01": {
       "alpha_id": "EQ01",

@@ -205,7 +205,7 @@ PYTHONPATH=python/src python3 research/alpha_reports/run_all.py    # ~20 s
 ```
 
 Outputs: `research/alpha_reports/REPORT.md` (the honest master table —
-0 PROMOTE / 12 ITERATE / 12 REJECT on the bundled data), one JSON of full
+0 PROMOTE / 11 ITERATE / 13 REJECT on the bundled data), one JSON of full
 evidence per alpha, the appending multiple-testing ledger
 `research/experiments.json`, and refreshed day-1-fitted
 `configs/strategies/alpha_params.json` (the port contract input —
@@ -520,8 +520,8 @@ bash tests/harness/run_all.sh --golden-only   # golden groups only (fast)
 ```
 
 Exit code 0 iff every language passed; logs land in a temp dir printed on
-the first line. A full-suite run (2026-09-20): python 1362 / cpp 267 /
-rust 298 / java 475 tests passed (golden groups 164/68/62/102), plus
+the first line. A full-suite run (2026-09-20): python 1388 / cpp 285 /
+rust 313 / java 482 tests passed (golden groups 164/68/62/102), plus
 `integration` (15) and `replay` (4) rows for the repo-level pytest suites, a
 `deployment` row (16 structural checks passed, 2 skipped for absent tools)
 and a `numbers` row (every headline figure re-derived from its artefact),
@@ -744,9 +744,9 @@ for deterministic output) or with the views:
 
 ```bash
 PYTHONPATH=src python3 -m iap.store sql "SELECT alpha_id, current_state, verdict, ROUND(ic,4) AS ic, ledger_count FROM v_alpha_scorecard ORDER BY alpha_id"
-# {"alpha_id":"EQ01","current_state":"CANDIDATE","ic":0.0241,"ledger_count":46,"verdict":"ITERATE"}
+# {"alpha_id":"EQ01","current_state":"CANDIDATE","ic":0.0276,"ledger_count":46,"verdict":"ITERATE"}
 PYTHONPATH=src python3 -m iap.store sql "SELECT COUNT(*) AS distinct_experiments, SUM(count) AS total_experiments FROM ledger_entries"
-# {"distinct_experiments":70,"total_experiments":865}      -- the Bonferroni denominator
+# {"distinct_experiments":70,"total_experiments":1068}      -- the Bonferroni denominator
 ```
 
 From Python the same store is `iap.store.Store` (`open`, `init`,
@@ -813,7 +813,7 @@ synthetic equity `SYN.EQ.AAPL` and writes every artefact under
 ```bash
 cd python
 PYTHONPATH=src python3 -m iap.mvp run                       # configs/mvp/mvp.json, seed 12345
-# mvp run 58a10f2194a3c81c: events=16578 decisions=355 parents=66 children=105 fills=55 pnl=-22.676287 USD digest=059c30df7213d00e... out=.../data/mvp/58a10f2194a3c81c
+# mvp run 58a10f2194a3c81c: events=16578 decisions=355 parents=66 children=105 fills=55 pnl=-22.676287 USD digest=d938eeae68c85a6c... out=.../data/mvp/58a10f2194a3c81c
 PYTHONPATH=src python3 -m iap.mvp run --seed 7 --out /tmp/mvp7          # another seed, explicit directory
 PYTHONPATH=src python3 -m iap.mvp verify                                  # run twice from scratch, compare digest/report/stream
 cat ../data/mvp/58a10f2194a3c81c/report.md                                # the honest numbers (cost-negative)

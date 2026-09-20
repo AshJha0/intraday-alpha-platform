@@ -24,19 +24,32 @@ this module is self-contained:
    consumed; walks see ``displayed - consumed`` and debit it. When an
    applied event changes a level's displayed size, its overlay entry
    becomes ``min(consumed, new displayed)`` (0 removes it).
-4. **Passive queue position.** A resting LIMIT remainder at ``P`` starts
-   with ``ahead_qty`` = displayed qty at ``(side, P)``. On that venue an
-   EXECUTE at ``(side, P)`` depletes ``ahead_qty`` by its full qty and any
-   leftover fills us; a CANCEL at ``(side, P)`` depletes by its full qty
-   (floored at 0); an EXECUTE on our side strictly worse than ``P`` fills
-   us in full at ``P`` (trade-through); a marketable ADD is expanded into
-   the per-level volumes it consumes over the pre-event displayed depth
-   and the two EXECUTE rules are applied level by level; after the event
-   is applied, an opposite best crossing ``P`` fills us in full at ``P`` —
-   EXEMPT while the display still shows the liquidity our own aggressive
-   leg consumed, until the display first shows an uncrossed opposite best;
-   MODIFY never changes ``ahead_qty``. Passive fills are stamped with the
-   triggering event's ``exchange_ts``.
+4. **Passive queue position.** Governing principle: the simulator never
+   fills more than the market actually traded, and our own resting orders
+   queue behind each other. A resting LIMIT remainder at ``P`` starts with
+   ``ahead_qty`` = displayed qty at ``(side, P)`` PLUS the sum of
+   ``remaining`` over our own still-ACTIVE orders already resting at that
+   exact ``(venue, side, P)``. On that venue, ONE observed trade of
+   ``qty`` at ``(side, price)`` is ONE pool of liquidity, budgeted once
+   across the resting orders it reaches, visited in queue order (the
+   ``_resting`` order = pinned activation order: ascending arrival_ts,
+   then ascending order_id): each order pays down its queue
+   (``dec = min(ahead_qty, budget)``) and then, while budget remains,
+   fills ``min(budget, remaining)`` at ITS OWN limit. A trade reaches an
+   order when it prints AT its limit or STRICTLY WORSE (below our bid /
+   above our ask — the market traded THROUGH us); a trade-through fills at
+   OUR limit but is bounded by the observed volume, not a free fill of the
+   whole residual. A CANCEL at ``(side, P)`` depletes ``ahead_qty`` by its
+   full qty (floored at 0) and never fills us; a marketable ADD is
+   expanded into the per-level volumes it consumes over the pre-event
+   displayed depth, each level's volume being its own pool; after the
+   event is applied, an opposite best crossing ``P`` fills us at ``P``,
+   bounded by the DISPLAYED size of that crossing level (one pool per
+   side, ``ahead_qty`` consumed first) — EXEMPT while the display still
+   shows the liquidity our own aggressive leg consumed, until the display
+   first shows an uncrossed opposite best; MODIFY never changes
+   ``ahead_qty``. Passive fills are stamped with the triggering event's
+   ``exchange_ts``.
 5. **Fees.** Equity: ``taker_fee_per_share * qty`` (taker), ``-
    maker_rebate_per_share * qty`` (maker). FX: ``commission_per_million *
    notional / 1e6`` on every fill, ``notional = qty * qty_unit *
@@ -56,7 +69,8 @@ this module is self-contained:
    without executing, resting orders are not consumed and the crossing
    check is skipped. On the first event after which the venue is open
    again, every resting order crossed by the post-event opposite best
-   fills in full at the TOUCH price.
+   fills at the TOUCH price — bounded by the same displayed-size pool and
+   ``ahead_qty`` consumption as the rule-4 crossing check.
 9. **Processing order.** Expiries, then activations and cancel arrivals
    merged by time, then passive queue tracking on the raw event, then the
    book update, then the overlay reset, then the post-apply crossing check.
@@ -345,6 +359,20 @@ class ExecutionSimulator:
             o.state = OrderState.ACTIVE
             o.resting = True
             o.ahead_qty = book.level_qty(o.side, o.limit_ticks) if book is not None else 0
+            # Rule 4: our own children already resting at this exact
+            # (venue, side, price) are ahead of us in the FIFO queue.
+            # Without this a later sibling would be handed the very
+            # liquidity its earlier sibling is still queued for.
+            for oid in self._resting:
+                ahead = self._orders[oid]
+                if (
+                    ahead.state == OrderState.ACTIVE
+                    and ahead.instrument_id == o.instrument_id
+                    and ahead.venue_id == o.venue_id
+                    and ahead.side == o.side
+                    and ahead.limit_ticks == o.limit_ticks
+                ):
+                    o.ahead_qty += ahead.remaining
             # Crossing exemption: the display may still show the liquidity
             # our aggressive leg just consumed (rule 4). While the venue is
             # gated (rule 8) nothing was consumed: no exemption.
@@ -410,66 +438,97 @@ class ExecutionSimulator:
         qty: int,
         ts: int,
     ) -> None:
-        """Rule 4: observed consumption of displayed liquidity at one level."""
+        """Rule 4: one observed trade of ``qty`` at one level, budgeted once.
+
+        Handing each resting order the full ``qty`` would manufacture
+        liquidity that never traded — n children at one level would each
+        fill from the same print. Queue order is ``self._resting`` order,
+        which is the pinned activation order (ascending arrival_ts, then
+        ascending order_id): the earlier child is served first, as on a
+        FIFO book.
+        """
+        budget = qty
         i = 0
         while i < len(self._resting):
             o = self._orders[self._resting[i]]
             if (
-                o.instrument_id == instrument_id
+                budget > 0
+                and o.instrument_id == instrument_id
                 and o.venue_id == venue_id
                 and o.side == side
                 and o.state == OrderState.ACTIVE
             ):
-                if price_ticks == o.limit_ticks:
-                    dec = min(o.ahead_qty, qty)
+                # A trade reaches us when it prints AT our limit, or STRICTLY
+                # WORSE than it (below our bid / above our ask) — the market
+                # traded through our level, so we must have been hit first.
+                # Both fill at OUR limit (we never get price improvement) and
+                # both are capped by the observed volume.
+                through = (
+                    price_ticks < o.limit_ticks if o.side == 0
+                    else price_ticks > o.limit_ticks
+                )
+                if price_ticks == o.limit_ticks or through:
+                    dec = min(o.ahead_qty, budget)
                     o.ahead_qty -= dec
-                    leftover = qty - dec
-                    if leftover > 0:
-                        self._emit_fill(
-                            o, o.limit_ticks, min(leftover, o.remaining), ts,
-                            Liquidity.MAKER,
-                        )
-                else:
-                    # Consumption strictly worse than our price: the market
-                    # traded through our level — full fill at our limit.
-                    through = (
-                        price_ticks < o.limit_ticks if o.side == 0
-                        else price_ticks > o.limit_ticks
-                    )
-                    if through:
-                        self._emit_fill(o, o.limit_ticks, o.remaining, ts, Liquidity.MAKER)
+                    budget -= dec
+                    if budget > 0:
+                        fill = min(budget, o.remaining)
+                        self._emit_fill(o, o.limit_ticks, fill, ts, Liquidity.MAKER)
+                        budget -= fill
             if o.state == OrderState.FILLED:
                 del self._resting[i]
             else:
                 i += 1
 
     def _crossing_check(self, ev: MarketEvent, book: OrderBook, reopened: bool) -> None:
-        """Rule 4 last bullet / rule 8 reopen, against the post-event book."""
+        """Rule 4 last bullet / rule 8 reopen, against the post-event book.
+
+        No trade was observed here, only a crossed display, so the pool is
+        the DISPLAYED size of the crossing opposite best (the most an
+        incoming aggressor could have brought): one pool per side, shared by
+        every order of ours resting against it, in ``_track_consumption``
+        queue order.
+        """
         t = ev.exchange_ts
+        best_ask = book.best_ask()
+        best_bid = book.best_bid()
+        # Indexed by OUR side: a buy crosses against the ask, a sell the bid.
+        budget = [
+            0 if best_ask is None else best_ask[1],
+            0 if best_bid is None else best_bid[1],
+        ]
         i = 0
         while i < len(self._resting):
             o = self._orders[self._resting[i]]
-            filled = False
             if (
                 o.instrument_id == ev.instrument_id
                 and o.venue_id == ev.venue_id
                 and o.state == OrderState.ACTIVE
             ):
-                opp = book.best_ask() if o.side == 0 else book.best_bid()
+                opp = best_ask if o.side == 0 else best_bid
                 crossed = opp is not None and (
                     opp[0] <= o.limit_ticks if o.side == 0 else opp[0] >= o.limit_ticks
                 )
                 if not crossed:
                     o.cross_exempt = False  # display uncrossed: exemption ends
-                elif reopened:
-                    # Rule 8: uncross at the touch, not at the limit.
-                    self._counters.reopen_touch_fills += 1
-                    self._emit_fill(o, opp[0], o.remaining, t, Liquidity.MAKER)
-                    filled = True
-                elif not o.cross_exempt:
-                    self._emit_fill(o, o.limit_ticks, o.remaining, t, Liquidity.MAKER)
-                    filled = True
-            if filled:
+                elif reopened or not o.cross_exempt:
+                    # The queue ahead of us would have been served by that
+                    # same aggressor first.
+                    dec = min(o.ahead_qty, budget[o.side])
+                    o.ahead_qty -= dec
+                    budget[o.side] -= dec
+                    if budget[o.side] > 0:
+                        fill = min(budget[o.side], o.remaining)
+                        # Rule 8 uncrosses AT THE TOUCH; the rule-4 crossing
+                        # fills at our own limit (no price improvement).
+                        self._emit_fill(
+                            o, opp[0] if reopened else o.limit_ticks, fill, t,
+                            Liquidity.MAKER,
+                        )
+                        budget[o.side] -= fill
+                        if reopened:
+                            self._counters.reopen_touch_fills += 1
+            if o.state == OrderState.FILLED:
                 del self._resting[i]
             else:
                 i += 1

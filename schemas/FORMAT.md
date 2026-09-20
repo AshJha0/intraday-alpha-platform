@@ -38,7 +38,12 @@ One event per line. Keys **exactly**, in **exactly this order**:
 - Decoders are domain-strict and identical in every language: they reject missing, extra,
   duplicate or misordered keys; non-integer tokens (floats, exponents, leading zeros, `+`,
   bools, strings, null); `-0` on an unsigned field; values outside the field's domain
-  (u64/u32/u16/u8/i64); trailing content. Whitespace between tokens is tolerated on input.
+  (u64/u32/u16/u8/i64); trailing content. Whitespace between tokens is tolerated on input,
+  and the tolerated set is pinned to ASCII space (`0x20`), tab (`0x09`), CR (`0x0D`) and
+  LF (`0x0A`). Every other byte — including VT (`0x0B`), FF (`0x0C`) and NBSP (`U+00A0`) —
+  is content and is rejected. The set is pinned because it was not: C++ omitted LF while
+  Rust used `str::trim` and Python `str.strip`, whose Unicode set accepted VT/FF/NBSP, so
+  one port rejected files the other two ingested (fixed 2026-09-20).
   The shared fixture `tests/golden/jsonl_reject_cases.txt` (REJECT block, then an `# ACCEPT`
   block) is consumed by all four test suites.
 

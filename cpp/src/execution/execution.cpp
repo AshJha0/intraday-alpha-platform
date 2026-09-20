@@ -292,6 +292,19 @@ void ExecutionSimulator::activate(ChildOrder& o) {
             const Side side = o.side == 0 ? Side::BID : Side::ASK;
             o.ahead_qty =
                 book != nullptr ? book->level_qty(side, o.limit_ticks) : 0;
+            // Pinned rule 4: our own children already resting at this exact
+            // (venue, side, price) are ahead of us in the FIFO queue. Without
+            // this a later sibling would be handed the very liquidity its
+            // earlier sibling is still queued for.
+            for (std::uint64_t id : resting_) {
+                const ChildOrder& ahead = orders_.at(id);
+                if (ahead.state == OrderState::ACTIVE &&
+                    ahead.instrument_id == o.instrument_id &&
+                    ahead.venue_id == o.venue_id && ahead.side == o.side &&
+                    ahead.limit_ticks == o.limit_ticks) {
+                    o.ahead_qty += ahead.remaining;
+                }
+            }
             // Crossing exemption: the display may still show the liquidity
             // our aggressive leg just consumed (pinned rule 4). While the
             // venue is gated (rule 8) nothing was consumed: no exemption.
@@ -381,27 +394,35 @@ void ExecutionSimulator::track_consumption(std::uint32_t instrument_id,
                                            std::uint8_t side,
                                            std::int64_t price_ticks,
                                            std::int64_t qty, std::int64_t ts) {
+    // Pinned rule 4: one observed trade is ONE pool of liquidity, budgeted
+    // once across every resting order of ours it can reach. Handing each
+    // order the full `qty` would manufacture liquidity that never traded —
+    // n children at one level would each fill from the same print.
+    //
+    // Queue order is resting_ order, which is the pinned activation order
+    // (ascending arrival_ts, then ascending order_id): the earlier child is
+    // served first, exactly as on a FIFO book.
+    std::int64_t budget = qty;
     for (std::size_t i = 0; i < resting_.size();) {
         ChildOrder& o = orders_.at(resting_[i]);
-        if (o.instrument_id == instrument_id && o.venue_id == venue_id &&
-            o.side == side && o.state == OrderState::ACTIVE) {
-            if (price_ticks == o.limit_ticks) {
-                const std::int64_t dec = std::min(o.ahead_qty, qty);
+        if (budget > 0 && o.instrument_id == instrument_id &&
+            o.venue_id == venue_id && o.side == side &&
+            o.state == OrderState::ACTIVE) {
+            // A trade reaches us when it prints AT our limit, or STRICTLY
+            // WORSE than it (below our bid / above our ask) — the market
+            // traded through our level, so we must have been hit first. Both
+            // fill at OUR limit (we never get price improvement) and both
+            // are capped by the observed volume.
+            const bool through = o.side == 0 ? price_ticks < o.limit_ticks
+                                             : price_ticks > o.limit_ticks;
+            if (price_ticks == o.limit_ticks || through) {
+                const std::int64_t dec = std::min(o.ahead_qty, budget);
                 o.ahead_qty -= dec;
-                const std::int64_t leftover = qty - dec;
-                if (leftover > 0) {
-                    emit_fill(o, o.limit_ticks, std::min(leftover, o.remaining),
-                              ts, Liquidity::MAKER);
-                }
-            } else {
-                // Consumption strictly worse than our price: the market
-                // traded through our level — full fill at our limit.
-                const bool through = o.side == 0
-                                         ? price_ticks < o.limit_ticks
-                                         : price_ticks > o.limit_ticks;
-                if (through) {
-                    emit_fill(o, o.limit_ticks, o.remaining, ts,
-                              Liquidity::MAKER);
+                budget -= dec;
+                if (budget > 0) {
+                    const std::int64_t fill = std::min(budget, o.remaining);
+                    emit_fill(o, o.limit_ticks, fill, ts, Liquidity::MAKER);
+                    budget -= fill;
                 }
             }
         }
@@ -416,28 +437,47 @@ void ExecutionSimulator::track_consumption(std::uint32_t instrument_id,
 void ExecutionSimulator::crossing_check(const MarketEvent& ev,
                                         const OrderBook& book, bool reopened) {
     const std::int64_t t = ev.exchange_ts;
+    // Pinned rule 4 (last bullet) / rule 8: there is no observed trade here,
+    // only a crossed display, so the DISPLAYED size of the crossing opposite
+    // best is the pool an incoming aggressor could have brought. It is one
+    // pool per side, shared by every order of ours resting against it, in
+    // the same queue order as track_consumption.
+    const auto best_ask = book.best_ask();
+    const auto best_bid = book.best_bid();
+    // Indexed by OUR side: a buy crosses against the ask, a sell the bid.
+    std::int64_t budget[2] = {
+        best_ask.has_value() ? best_ask->second : 0,
+        best_bid.has_value() ? best_bid->second : 0,
+    };
     for (std::size_t i = 0; i < resting_.size();) {
         ChildOrder& o = orders_.at(resting_[i]);
-        bool filled = false;
         if (o.instrument_id == ev.instrument_id &&
             o.venue_id == ev.venue_id && o.state == OrderState::ACTIVE) {
-            const auto opp = o.side == 0 ? book.best_ask() : book.best_bid();
+            const auto& opp = o.side == 0 ? best_ask : best_bid;
             const bool crossed =
                 opp.has_value() && (o.side == 0 ? opp->first <= o.limit_ticks
                                                 : opp->first >= o.limit_ticks);
             if (!crossed) {
                 o.cross_exempt = false;  // display uncrossed: exemption ends
-            } else if (reopened) {
-                // Rule 8: uncross at the touch, not at the limit.
-                ++counters_.reopen_touch_fills;
-                emit_fill(o, opp->first, o.remaining, t, Liquidity::MAKER);
-                filled = true;
-            } else if (!o.cross_exempt) {
-                emit_fill(o, o.limit_ticks, o.remaining, t, Liquidity::MAKER);
-                filled = true;
+            } else if (reopened || !o.cross_exempt) {
+                std::int64_t& pool = budget[o.side];
+                // The queue ahead of us would have been served by that same
+                // aggressor first.
+                const std::int64_t dec = std::min(o.ahead_qty, pool);
+                o.ahead_qty -= dec;
+                pool -= dec;
+                if (pool > 0) {
+                    const std::int64_t fill = std::min(pool, o.remaining);
+                    // Rule 8 uncrosses AT THE TOUCH; the rule-4 crossing
+                    // fills at our own limit (no price improvement).
+                    emit_fill(o, reopened ? opp->first : o.limit_ticks, fill,
+                              t, Liquidity::MAKER);
+                    pool -= fill;
+                    if (reopened) ++counters_.reopen_touch_fills;
+                }
             }
         }
-        if (filled) {
+        if (o.state == OrderState::FILLED) {
             resting_.erase(resting_.begin() + static_cast<std::ptrdiff_t>(i));
         } else {
             ++i;

@@ -378,28 +378,166 @@ public class RiskRuleTest {
     @Test
     public void instrumentKillScopeIdBoundToU32() {
         // The Rust reference parses the INSTRUMENT scope id with
-        // parse::<u32>(): out-of-range or unparseable ids are a no-op.
+        // parse::<u32>(); an id outside that domain does not address an
+        // instrument and throws instead of silently doing nothing.
         RiskEngine eng = engine();
         // u32::MAX engages (kill checks precede reference-data checks).
         eng.engageKill(Scope.INSTRUMENT, "4294967295", TS, "ops");
         RiskDecision d = eng.checkOrder(new OrderRequest(1, 4294967295L, 0,
                 10, 2450, OrderRequest.LIMIT, 1, "S1", 0.5, TS + SEC));
         assertEquals(Rules.KILL_INSTRUMENT, d.ruleId());
-        // u32::MAX + 1 parses as a long but is out of u32 range: no-op.
-        eng.engageKill(Scope.INSTRUMENT, "4294967296", TS, "ops");
+        // u32::MAX + 1 parses as a long but is out of u32 range, and a
+        // negative id does not parse at all: both fail closed.
+        for (String bad : new String[] {"4294967296", "-1", "", "1.0"}) {
+            expectIae(() -> eng.engageKill(Scope.INSTRUMENT, bad, TS, "ops"),
+                    "escalated to GLOBAL");
+            eng.clearKill(Scope.GLOBAL, "", TS, "escalation reviewed");
+        }
         RiskDecision d2 = eng.checkOrder(new OrderRequest(2, 4294967296L, 0,
                 10, 2450, OrderRequest.LIMIT, 1, "S1", 0.5, TS + 2 * SEC));
         assertEquals(Rules.UNKNOWN_INSTRUMENT, d2.ruleId()); // not killed
-        // Negative ids are a no-op too.
-        eng.engageKill(Scope.INSTRUMENT, "-1", TS, "ops");
-        RiskDecision d3 = eng.checkOrder(new OrderRequest(3, -1L, 0, 10,
-                2450, OrderRequest.LIMIT, 1, "S1", 0.5, TS + 3 * SEC));
-        assertEquals(Rules.UNKNOWN_INSTRUMENT, d3.ruleId()); // not killed
         // In-range clears still work.
         eng.clearKill(Scope.INSTRUMENT, "4294967295", TS + 4 * SEC, "clear");
         RiskDecision d4 = eng.checkOrder(new OrderRequest(4, 4294967295L, 0,
                 10, 2450, OrderRequest.LIMIT, 1, "S1", 0.5, TS + 5 * SEC));
         assertEquals(Rules.UNKNOWN_INSTRUMENT, d4.ruleId()); // kill lifted
+    }
+
+    /** Assert the runnable throws IllegalArgumentException mentioning {@code needle}. */
+    private static void expectIae(Runnable r, String needle) {
+        try {
+            r.run();
+            org.junit.Assert.fail("expected IllegalArgumentException: " + needle);
+        } catch (IllegalArgumentException e) {
+            assertTrue(String.valueOf(e.getMessage()),
+                    String.valueOf(e.getMessage()).contains(needle));
+        }
+    }
+
+    /**
+     * Regression — FAIL-OPEN defect: an unvaluable OPEN ORDER used to be
+     * skipped in the gross/net loop, so live working exposure vanished from
+     * the aggregate and a correct GROSS_NOTIONAL reject became an ALLOW.
+     * Five working MARKET children (9,000 @ mid 100.01 = 900,090 each,
+     * 4,500,450 gross) then instrument 1's book goes one-sided (halt/open):
+     * the two children on instrument 1 are 1,800,180 of real exposure.
+     */
+    @Test
+    public void unvaluableOpenOrderRejectsInsteadOfVanishingFromGross() {
+        long[][] plan = {{1, 1, 0}, {2, 1, 0}, {3, 2, 1}, {4, 2, 1}, {5, 3, 0}};
+        RiskEngine[] built = new RiskEngine[2];
+        long ts = 0;
+        for (int b = 0; b < 2; b++) {
+            TreeMap<Long, Double> ticks = new TreeMap<>();
+            ticks.put(1L, 0.01);
+            ticks.put(2L, 0.01);
+            ticks.put(3L, 0.01);
+            RiskEngine eng = RiskEngine.fromConfigTicks(configDoc(), ticks);
+            for (long iid : new long[] {1, 2, 3}) {
+                eng.onMarket(iid, 10_000, 10_002, TS); // mid 100.01
+            }
+            ts = TS + 100_000_000L;
+            // buys on 1, sells on 2, buy on 3 keeps |net| under the net cap
+            for (long[] p : plan) {
+                RiskDecision c = eng.checkOrder(new OrderRequest(p[0], p[1],
+                        (int) p[2], 9_000, 0, OrderRequest.MARKET, 1, "S1", 0.5, ts));
+                assertEquals("child " + p[0] + " must rest (" + c.reason() + ")",
+                        Rules.ALLOW, c.ruleId());
+                ts += 100_000_000L;
+            }
+            built[b] = eng;
+        }
+        OrderRequest sixth = new OrderRequest(6, 3, 0, 9_000, 0,
+                OrderRequest.MARKET, 1, "S1", 0.5, ts + 100_000_000L);
+        RiskDecision healthy = built[0].checkOrder(sixth);
+        assertEquals(Rules.GROSS_NOTIONAL, healthy.ruleId());
+        assertEquals("projected gross notional 5400540.00 exceeds "
+                + "max_gross_notional 5000000.00", healthy.reason());
+
+        built[1].onMarket(1, 10_000, 0, ts); // one-sided: instrument 1 has no mid
+        RiskDecision degraded = built[1].checkOrder(sixth);
+        assertEquals(degraded.reason(), Rules.GROSS_NOTIONAL, degraded.ruleId());
+        assertEquals(Severity.WARN, degraded.severity());
+        assertEquals("open order 1 in instrument 1 has no mark price (fail-closed)",
+                degraded.reason());
+    }
+
+    /**
+     * Regression — SILENT NO-OP defect: an INSTRUMENT kill sent as a ticker
+     * used to emit KILL_SWITCH_ENGAGED and halt nothing. It must now fail
+     * loudly, emit MALFORMED_KILL (never a success record) and escalate to
+     * the GLOBAL kill.
+     */
+    @Test
+    public void unparseableKillScopeIdEscalatesAndNeverLooksSuccessful() {
+        RiskEngine eng = engine();
+        expectIae(() -> eng.engageKill(Scope.INSTRUMENT, "AAPL", TS, "ops halt"),
+                "escalated to GLOBAL");
+        // the very next order is stopped, not allowed
+        assertEquals(Rules.KILL_GLOBAL,
+                eng.checkOrder(limitBuy(1, 100, 2450, TS + SEC)).ruleId());
+        assertEquals(1, eng.metrics.counterValue("risk_malformed_kills_total"));
+        int malformed = 0;
+        for (com.iap.risk.RiskEvent e : eng.audit()) {
+            assertFalse("a phantom halt must never leave a success record",
+                    Rules.KILL_SWITCH_ENGAGED.equals(e.ruleId()));
+            if (Rules.MALFORMED_KILL.equals(e.ruleId())) {
+                malformed++;
+                assertEquals(Decision.KILL.code(), e.decision());
+                assertEquals(Severity.BREACH.code(), e.severity());
+                assertEquals("kill scope id \"AAPL\" is not a valid INSTRUMENT id: "
+                        + "escalated to GLOBAL (fail-closed): ops halt", e.reason());
+            }
+        }
+        assertEquals(1, malformed);
+
+        // a VENUE id above u16 is the same defect
+        RiskEngine venue = engine();
+        expectIae(() -> venue.engageKill(Scope.VENUE, "65536", TS, "ops"),
+                "escalated to GLOBAL");
+        assertEquals(Rules.KILL_GLOBAL,
+                venue.checkOrder(limitBuy(1, 100, 2450, TS + SEC)).ruleId());
+
+        // clearing is the permissive direction: it clears NOTHING and reports
+        RiskEngine held = engine();
+        held.engageKill(Scope.INSTRUMENT, "1", TS, "halt");
+        expectIae(() -> held.clearKill(Scope.INSTRUMENT, "AAPL", TS + SEC, "ops clear"),
+                "nothing cleared");
+        assertEquals("the real halt must still be in force", Rules.KILL_INSTRUMENT,
+                held.checkOrder(limitBuy(2, 100, 2450, TS + 2 * SEC)).ruleId());
+        for (com.iap.risk.RiskEvent e : held.audit()) {
+            assertFalse("nothing was cleared, so nothing may claim it was",
+                    Rules.KILL_SWITCH_CLEARED.equals(e.ruleId()));
+        }
+    }
+
+    /**
+     * Regression — FAIL-OPEN defect: an unmarked held lot used to contribute
+     * zero unrealized P&amp;L instead of making the daily total
+     * undeterminable, so a loss limit could fail to trip. It must behave
+     * exactly like the missing-FX-rate branch: null, and orders reject
+     * FX_RATE_MISSING.
+     */
+    @Test
+    public void unmarkedHeldLotMakesDailyPnlUndeterminable() {
+        RiskEngine eng = engine();
+        // S1 long 1,000 and S2 short 1,000 of instrument 2: two HELD lots,
+        // but a flat firm position, so check 19 cannot mask the P&L path.
+        assertTrue(eng.onFill(new RiskFill(TS + SEC, "S1", 2, 0, 0, 1_000, 3_120)));
+        assertTrue(eng.onFill(new RiskFill(TS + SEC, "S2", 2, 0, 1, 1_000, 3_120)));
+        assertEquals(0L, eng.position(2));
+        org.junit.Assert.assertNotNull(eng.globalDailyPnl());
+        org.junit.Assert.assertNotNull(eng.strategyDailyPnl("S1"));
+
+        eng.onMarket(2, 3_119, 0, TS + 2 * SEC); // instrument 2 goes one-sided
+        org.junit.Assert.assertNull(eng.globalDailyPnl());
+        org.junit.Assert.assertNull(eng.strategyDailyPnl("S1"));
+
+        // fail-closed pre-trade, exactly like a missing conversion rate
+        RiskDecision d = eng.checkOrder(limitBuy(9, 100, 2450, TS + 3 * SEC));
+        assertEquals(d.reason(), Rules.FX_RATE_MISSING, d.ruleId());
+        assertEquals("global daily pnl undeterminable: conversion rate missing",
+                d.reason());
     }
 
     @Test

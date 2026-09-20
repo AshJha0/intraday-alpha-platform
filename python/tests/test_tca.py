@@ -259,9 +259,15 @@ def test_tca_passive_fill_uses_pre_event_mid():
                         decision_ts=t0, arrival_ts=t0, end_ts=t0 + 1_000)
     order.fills.append(f)
     split = spread_and_impact_cost(order)
-    assert abs(split["spread_cost"] - 100 * 0.02) < 1e-12
+    # We PROVIDED liquidity, so the half-spread is earned, not paid, and the
+    # whole of exec-vs-mid is explained by it — impact is exactly zero. These
+    # three assertions previously read +2.0 / -2.0 / -4.0: the sign was not
+    # applied, so a passive fill was booked as paying the spread and the
+    # impact term absorbed a fabricated -2*q*hs to keep the identity closed,
+    # contradicting this test's own docstring.
+    assert abs(split["spread_cost"] - (-100 * 0.02)) < 1e-12
     assert abs(split["exec_cost_vs_mid"] - (-100 * 0.02)) < 1e-12
-    assert abs(split["impact_cost"] - (-100 * 0.04)) < 1e-12  # -2 * q * hs
+    assert abs(split["impact_cost"]) < 1e-12
     # the same fill stamped as TAKER (post-event state) would read as cost
     g = stamp_fill(tl, t0 + 1_000, 99.98, 100, side=0, liquidity=TAKER)
     assert abs(g.mid_at_fill - 99.96) < 1e-9

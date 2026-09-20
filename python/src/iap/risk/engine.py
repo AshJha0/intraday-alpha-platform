@@ -56,12 +56,16 @@ Pinned semantics (the Rust module docs, verbatim in substance):
   on either side crosses unconditionally.
 - **Projections** (worst case): buys check ``pos + open_buy_qty + qty``,
   sells ``pos - open_sell_qty - qty``; gross/net include every open order
-  at its limit price (unpriced: the mid).
+  at its limit price (unpriced: the mid). An open order that cannot be
+  valued (unpriced AND unmarked) rejects with ``GROSS_NOTIONAL``, exactly
+  like an unmarked position — never skipped (fail-closed).
 - **Loss limits** act on daily P&L = realized (average-cost lots per
   (strategy, instrument), kept natively per (strategy, quote ccy)) +
   unrealized (``pos * (mark - avg_price) * qty_unit``), converted at the
   last rate. Evaluated after every fill AND after every mark of a held
   instrument; a breach latches STRATEGY then GLOBAL (each once per latch).
+  An unmarked held lot makes daily P&L UNDETERMINABLE (``None``), exactly
+  like a missing FX rate: no latch, and orders reject ``FX_RATE_MISSING``.
 - **Re-arm precedence**: ``clear_kill`` clears only the switch (checks
   21/22 keep rejecting, the next fill/mark re-latches);
   ``override_loss_limit`` replaces the effective limit (audited) and never
@@ -70,6 +74,11 @@ Pinned semantics (the Rust module docs, verbatim in substance):
 - **Malformed fills** (qty <= 0, side > 1, price_ticks <= 0, unknown
   instrument) are NOT applied: ``MALFORMED_FILL`` audit record +
   ``risk_malformed_fills_total``; ``on_fill`` returns ``False``.
+- **Malformed kills**: a kill command whose ``scope_id`` does not name an
+  addressable scope (INSTRUMENT id not a u32, VENUE id not a u16) is NEVER
+  recorded as a success. ``engage_kill`` latches the GLOBAL kill (the safe
+  wider reading of "stop trading"), ``clear_kill`` clears nothing, and both
+  emit ``MALFORMED_KILL`` + ``risk_malformed_kills_total`` and raise.
 - **Snapshot / restore**: :meth:`RiskEngine.snapshot` serialises the full
   mutable state (x-version 1); :meth:`RiskEngine.restore` resumes it with
   bit-identical subsequent decisions and audit lines; an engine that
@@ -447,9 +456,34 @@ class RiskEngine:
         ))
 
     def engage_kill(self, scope: Scope, scope_id: str, ts: int, reason: str) -> None:
-        """Manually engage a kill switch."""
+        """Manually engage a kill switch. Raises ``ValueError`` (changing
+        nothing in the requested scope, emitting ``MALFORMED_KILL`` instead
+        of ``KILL_SWITCH_ENGAGED``) when ``scope_id`` does not parse.
+
+        SILENT NO-OP defect: an unparseable scope id used to leave the engine
+        untouched while the audit log recorded a convincing
+        KILL_SWITCH_ENGAGED, so an operator halting an instrument by ticker
+        ("AAPL") believed the halt was in force and the next order was
+        ALLOWed. Fail-closed: the operator's intent is to STOP trading and
+        the narrow scope is undeterminable, so the engine takes the wider
+        safe interpretation and latches the GLOBAL kill, then reports the
+        failure loudly. Over-halting is recoverable; a phantom halt is not."""
         _require("ts", ts, _I64_MIN, _I64_MAX)
-        self._set_kill(scope, scope_id, True)
+        if not self._set_kill(scope, scope_id, True):
+            self.metrics.inc("risk_malformed_kills_total")
+            self._set_kill(Scope.GLOBAL, "", True)
+            why = (f'kill scope id "{scope_id}" is not a valid {scope.name} id: '
+                   f"escalated to GLOBAL (fail-closed)")
+            self._emit(RiskEvent(
+                timestamp=ts,
+                scope=scope,
+                scope_id=scope_id,
+                rule_id=Rules.MALFORMED_KILL,
+                severity=Severity.BREACH,
+                decision=Decision.KILL,
+                reason=f"{why}: {reason}",
+            ))
+            raise ValueError(why)
         self._emit(RiskEvent(
             timestamp=ts,
             scope=scope,
@@ -461,9 +495,26 @@ class RiskEngine:
         ))
 
     def clear_kill(self, scope: Scope, scope_id: str, ts: int, reason: str) -> None:
-        """Clear a kill switch (the switch only — see the re-arm precedence)."""
+        """Clear a kill switch (the switch only — see the re-arm precedence).
+        Raises ``ValueError`` (clearing NOTHING and emitting
+        ``MALFORMED_KILL`` instead of ``KILL_SWITCH_CLEARED``) when
+        ``scope_id`` does not parse: clearing is the permissive direction, so
+        an unresolvable scope leaves every switch exactly as it was."""
         _require("ts", ts, _I64_MIN, _I64_MAX)
-        self._set_kill(scope, scope_id, False)
+        if not self._set_kill(scope, scope_id, False):
+            self.metrics.inc("risk_malformed_kills_total")
+            why = (f'kill scope id "{scope_id}" is not a valid {scope.name} id: '
+                   f"nothing cleared (fail-closed)")
+            self._emit(RiskEvent(
+                timestamp=ts,
+                scope=scope,
+                scope_id=scope_id,
+                rule_id=Rules.MALFORMED_KILL,
+                severity=Severity.BREACH,
+                decision=Decision.REJECT,
+                reason=f"{why}: {reason}",
+            ))
+            raise ValueError(why)
         self._emit(RiskEvent(
             timestamp=ts,
             scope=scope,
@@ -536,7 +587,12 @@ class RiskEngine:
             reason=reason,
         ))
 
-    def _set_kill(self, scope: Scope, scope_id: str, engaged: bool) -> None:
+    def _set_kill(self, scope: Scope, scope_id: str, engaged: bool) -> bool:
+        """Apply a kill-switch change. Returns ``False`` (changing NOTHING)
+        when ``scope_id`` does not name a scope this engine can address — an
+        INSTRUMENT id that is not a u32 or a VENUE id that is not a u16.
+        Callers MUST act on ``False``: a silently dropped kill is the defect
+        this return value exists to prevent."""
         if not isinstance(scope, Scope):
             raise ValueError(f"scope must be a Scope, got {scope!r}")
         if not isinstance(scope_id, str):
@@ -548,12 +604,15 @@ class RiskEngine:
             self._kill_strategies[scope_id] = engaged
         elif scope == Scope.INSTRUMENT:
             iid = _parse_uint(scope_id, _U32_MAX)
-            if iid is not None:
-                self._kill_instruments[iid] = engaged
+            if iid is None:
+                return False
+            self._kill_instruments[iid] = engaged
         else:
             vid = _parse_uint(scope_id, _U16_MAX)
-            if vid is not None:
-                self._kill_venues[vid] = engaged
+            if vid is None:
+                return False
+            self._kill_venues[vid] = engaged
+        return True
 
     def on_order_done(self, order_id: int) -> None:
         """A terminal order state (cancel / full fill / reject / expiry
@@ -685,9 +744,10 @@ class RiskEngine:
         return float(_i64(md.bid_ticks + md.ask_ticks)) * ins.tick_size / 2.0
 
     def _daily_pnl(self, sid: Optional[str]) -> Optional[float]:
-        """Realized + unrealized of every marked lot in the reporting
+        """Realized + unrealized of every held lot in the reporting
         currency, for one strategy (``sid``) or the whole firm (``None``);
-        ``None`` when a needed conversion rate is missing."""
+        ``None`` when a needed conversion rate is missing or a held lot has
+        no mark (undeterminable)."""
         total = 0.0
         for (s, ccy), pnl in sorted(self._realized.items()):
             if sid is not None and s != sid:
@@ -701,7 +761,12 @@ class RiskEngine:
                 continue
             mark = self._mark_price(iid)
             if mark is None:
-                continue  # unmarked: undeterminable, contributes nothing
+                # FAIL-OPEN defect: skipping an unmarked held lot let its
+                # unrealized P&L count as zero, so a loss limit could fail to
+                # trip on a book that is only partly valuable. An unmarked lot
+                # makes the daily total undeterminable, exactly like the
+                # missing FX rate below — None rejects, it does not guess.
+                return None
             ins = self._instruments[iid]
             rate = self._fx_rate(ins.quote_ccy)
             if rate is None:
@@ -1091,7 +1156,17 @@ class RiskEngine:
             else:
                 marked = self._mark_price(r.instrument_id)
                 if marked is None:
-                    continue  # unpriced and unmarked: cannot value
+                    # FAIL-OPEN defect: skipping an unvaluable OPEN ORDER
+                    # (MARKET / MID / unpriced IOC-FOK on an instrument whose
+                    # book went one-sided) dropped its whole notional from
+                    # gross AND net, so live working exposure vanished from
+                    # the aggregate and a correct GROSS_NOTIONAL reject became
+                    # an ALLOW. An unvaluable open order is exactly as
+                    # undeterminable as an unvaluable position: reject.
+                    return reject(Rules.GROSS_NOTIONAL, warn,
+                                  f"open order {oid} in instrument "
+                                  f"{r.instrument_id} has no mark price "
+                                  f"(fail-closed)")
                 price = marked
             rate = self._fx_rate(oins.quote_ccy)
             if rate is None:

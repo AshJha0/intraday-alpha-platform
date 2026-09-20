@@ -22,13 +22,31 @@
 
 namespace iap {
 
+// Accumulator type of a rolling sum. Integer windows accumulate in __int128
+// so the running sum is EXACT for any number of samples, like the Python
+// reference's arbitrary-precision int: an int64 accumulator wraps once a
+// window has folded in enough samples, and because trim() then subtracts
+// from the wrapped total the window sum stays corrupted for the rest of the
+// session (permanently poisoned ofi_* / signed_volume_*). Float windows keep
+// their double accumulator (same add/evict order as the reference).
+template <typename T>
+struct RollingAccum {
+    using type = T;
+};
+template <>
+struct RollingAccum<std::int64_t> {
+    using type = __int128;
+};
+
 // Rolling sums of an N-tuple over an event-time window. add() appends a
 // sample and evicts expired ones; trim() evicts samples with ts <= now - w.
 template <typename T, std::size_t N>
 class RollingSum {
 public:
+    using Acc = typename RollingAccum<T>::type;
+
     explicit RollingSum(std::int64_t window_ns) : window_(window_ns) {
-        sums_.fill(T{});
+        sums_.fill(Acc{});
         ts_.resize(16);
         vals_.resize(16);
     }
@@ -43,16 +61,20 @@ public:
         trim(ts);
     }
 
+    // `now` is widened before the subtraction: exchange_ts is a signed 64-bit
+    // wire field the codec accepts down to INT64_MIN, and `now - window_`
+    // overflowed int64 for a timestamp within one window of the bottom of
+    // the range.
     void trim(std::int64_t now) {
-        const std::int64_t cutoff = now - window_;
-        while (count_ > 0 && ts_[head_] <= cutoff) {
+        const __int128 cutoff = static_cast<__int128>(now) - window_;
+        while (count_ > 0 && static_cast<__int128>(ts_[head_]) <= cutoff) {
             for (std::size_t i = 0; i < N; ++i) sums_[i] -= vals_[head_][i];
             head_ = (head_ + 1) & (ts_.size() - 1);
             --count_;
         }
     }
 
-    T sum(std::size_t i) const { return sums_[i]; }
+    Acc sum(std::size_t i) const { return sums_[i]; }
     std::size_t count() const { return count_; }
 
 private:
@@ -77,7 +99,7 @@ private:
     std::vector<std::array<T, N>> vals_;
     std::size_t head_ = 0;
     std::size_t count_ = 0;
-    std::array<T, N> sums_;
+    std::array<Acc, N> sums_;
 };
 
 // Append-only (ts, value) series with at-or-before lookup and trimming —
@@ -100,10 +122,15 @@ public:
     }
 
     // Latest value with ts <= t; found=false when no sample is that early.
-    bool at_or_before(std::int64_t t, T& out) const {
-        auto it = std::upper_bound(ts_.begin() + static_cast<std::ptrdiff_t>(start_),
-                                   ts_.end(), t);
-        if (it == ts_.begin() + static_cast<std::ptrdiff_t>(start_)) return false;
+    // `t` is __int128 because every caller passes `now - lookback`, which
+    // overflows int64 for an exchange_ts near INT64_MIN (the codec accepts
+    // the whole i64 range on the wire).
+    bool at_or_before(__int128 t, T& out) const {
+        const auto lo = ts_.begin() + static_cast<std::ptrdiff_t>(start_);
+        auto it = std::upper_bound(
+            lo, ts_.end(), t,
+            [](__int128 v, std::int64_t x) { return v < static_cast<__int128>(x); });
+        if (it == lo) return false;
         out = vals_[static_cast<std::size_t>(it - ts_.begin()) - 1];
         return true;
     }
@@ -113,8 +140,10 @@ public:
 
     // Forget samples with ts < min_ts, keeping the newest at-or-before one
     // (so at_or_before stays correct at the trim boundary).
-    void trim(std::int64_t min_ts) {
-        auto it = std::upper_bound(ts_.begin(), ts_.end(), min_ts);
+    void trim(__int128 min_ts) {
+        auto it = std::upper_bound(
+            ts_.begin(), ts_.end(), min_ts,
+            [](__int128 v, std::int64_t x) { return v < static_cast<__int128>(x); });
         const std::size_t i = static_cast<std::size_t>(it - ts_.begin());
         if (i > 0) start_ = std::max(start_, i - 1);
         if (start_ >= kCompactAt) {

@@ -129,37 +129,37 @@ fn kill_switch_scopes_and_precedence() {
     let mut eng = engine();
     assert!(eng.check_order(&order(1, 0, 100, 2450)).allowed());
 
-    eng.engage_kill(Scope::Venue, "1", T0, "test");
+    eng.engage_kill(Scope::Venue, "1", T0, "test").expect("kill scope id parses");
     let d = eng.check_order(&order(2, 0, 100, 2450));
     assert_eq!(d.rule_id, rules::KILL_VENUE);
 
-    eng.engage_kill(Scope::Instrument, "1", T0, "test");
+    eng.engage_kill(Scope::Instrument, "1", T0, "test").expect("kill scope id parses");
     let d = eng.check_order(&order(3, 0, 100, 2450));
     assert_eq!(d.rule_id, rules::KILL_INSTRUMENT); // instrument > venue
 
-    eng.engage_kill(Scope::Strategy, "S1", T0, "test");
+    eng.engage_kill(Scope::Strategy, "S1", T0, "test").expect("kill scope id parses");
     let d = eng.check_order(&order(4, 0, 100, 2450));
     assert_eq!(d.rule_id, rules::KILL_STRATEGY); // strategy > instrument
 
-    eng.engage_kill(Scope::Global, "", T0, "test");
+    eng.engage_kill(Scope::Global, "", T0, "test").expect("kill scope id parses");
     let d = eng.check_order(&order(5, 0, 100, 2450));
     assert_eq!(d.rule_id, rules::KILL_GLOBAL); // global beats everything
     assert_eq!(d.severity, Severity::Breach);
 
     // clearing restores, innermost first
-    eng.clear_kill(Scope::Global, "", T0, "clear");
+    eng.clear_kill(Scope::Global, "", T0, "clear").expect("kill scope id parses");
     let d = eng.check_order(&order(6, 0, 100, 2450));
     assert_eq!(d.rule_id, rules::KILL_STRATEGY);
-    eng.clear_kill(Scope::Strategy, "S1", T0, "clear");
-    eng.clear_kill(Scope::Instrument, "1", T0, "clear");
-    eng.clear_kill(Scope::Venue, "1", T0, "clear");
+    eng.clear_kill(Scope::Strategy, "S1", T0, "clear").expect("kill scope id parses");
+    eng.clear_kill(Scope::Instrument, "1", T0, "clear").expect("kill scope id parses");
+    eng.clear_kill(Scope::Venue, "1", T0, "clear").expect("kill scope id parses");
     assert!(eng.check_order(&order(7, 0, 100, 2450)).allowed());
 }
 
 #[test]
 fn strategy_kill_only_hits_that_strategy() {
     let mut eng = engine();
-    eng.engage_kill(Scope::Strategy, "S1", T0, "test");
+    eng.engage_kill(Scope::Strategy, "S1", T0, "test").expect("kill scope id parses");
     let d = eng.check_order(&order(1, 0, 100, 2450));
     assert_eq!(d.rule_id, rules::KILL_STRATEGY);
     let mut o = order(2, 0, 100, 2450);
@@ -769,7 +769,7 @@ fn risk_clear_kill_after_loss_latch_resumes_with_override() {
     eng.on_fill(&fill("S1", 1, 0, 95_000, 2452));
     eng.on_fill(&fill("S1", 1, 1, 94_900, 2398)); // realized -51,246 -> S1 latched; 100 left
     assert_eq!(eng.check_order(&order(1, 0, 100, 2450)).rule_id, rules::KILL_STRATEGY);
-    eng.clear_kill(Scope::Strategy, "S1", T0 + 2 * NS, "ops clear");
+    eng.clear_kill(Scope::Strategy, "S1", T0 + 2 * NS, "ops clear").expect("kill scope id parses");
     let d = eng.check_order(&order(2, 0, 100, 2450));
     assert_eq!(d.rule_id, rules::STRATEGY_LOSS, "belt-and-braces: {}", d.reason);
     assert_eq!(d.decision, Decision::Reject);
@@ -780,18 +780,18 @@ fn risk_clear_kill_after_loss_latch_resumes_with_override() {
     assert_eq!(n_latches, 2);
     // override below the loss is legal but ineffective
     eng.override_loss_limit(Scope::Strategy, "S1", 51_000.0, T0 + 4 * NS, "cro").unwrap();
-    eng.clear_kill(Scope::Strategy, "S1", T0 + 4 * NS, "ops clear #2");
+    eng.clear_kill(Scope::Strategy, "S1", T0 + 4 * NS, "ops clear #2").expect("kill scope id parses");
     assert_eq!(eng.check_order(&order(4, 0, 100, 2450)).rule_id, rules::STRATEGY_LOSS);
     // a flat strategy's realized loss cannot re-latch on a mark (no lot to
     // mark) but stays rejected pre-trade: the latch basis is the same P&L
     eng.on_fill(&fill("S1", 1, 1, 100, 2450)); // flat; realized -51,448 -> re-latch on the fill
     assert_eq!(eng.check_order(&order(6, 0, 100, 2450)).rule_id, rules::KILL_STRATEGY);
-    eng.clear_kill(Scope::Strategy, "S1", T0 + 4 * NS + 1, "ops clear #3");
+    eng.clear_kill(Scope::Strategy, "S1", T0 + 4 * NS + 1, "ops clear #3").expect("kill scope id parses");
     eng.on_market(1, 2450, 2452, T0 + 4 * NS + 2);
     assert_eq!(eng.check_order(&order(7, 0, 100, 2450)).rule_id, rules::STRATEGY_LOSS);
     // override above the loss + clear -> ALLOW, and marks no longer latch
     eng.override_loss_limit(Scope::Strategy, "S1", 75_000.0, T0 + 5 * NS, "cro").unwrap();
-    eng.clear_kill(Scope::Strategy, "S1", T0 + 5 * NS, "ops clear INC-1");
+    eng.clear_kill(Scope::Strategy, "S1", T0 + 5 * NS, "ops clear INC-1").expect("kill scope id parses");
     eng.on_market(1, 2450, 2452, T0 + 5 * NS);
     assert!(eng.check_order(&order(5, 0, 100, 2450)).allowed());
     let ids: Vec<&str> = eng.audit().iter().map(|e| e.rule_id.as_str()).collect();
@@ -814,7 +814,7 @@ fn scenario_session_roll_rebases_daily_pnl_and_keeps_latches() {
     eng.on_fill(&fill("S2", 2, 0, 1_000, 3120));
     eng.on_fill(&fill("S2", 2, 1, 1_000, 3110)); // realized -100
     eng.override_loss_limit(Scope::Global, "", 400_000.0, T0, "cro").unwrap();
-    eng.engage_kill(Scope::Strategy, "S2", T0, "manual");
+    eng.engage_kill(Scope::Strategy, "S2", T0, "manual").expect("kill scope id parses");
     assert!((eng.global_daily_pnl().unwrap() + 1_050.0).abs() < 1e-6);
     eng.roll_session(T0 + NS, "roll");
     assert_eq!(eng.global_daily_pnl().unwrap(), 0.0);
@@ -950,4 +950,142 @@ fn self_match_is_firm_wide_across_strategies_and_venues() {
     o.venue_id = 2;
     o.timestamp += 10_000_000;
     assert_eq!(eng.check_order(&o).rule_id, rules::SELF_MATCH);
+}
+
+// ----------------------------------------------- fail-closed regressions
+
+/// Regression — FAIL-OPEN defect: an unvaluable OPEN ORDER used to be
+/// skipped in the gross/net loop, so live working exposure vanished from
+/// the aggregate and a correct GROSS_NOTIONAL reject became an ALLOW.
+/// Five working MARKET children (9,000 @ mid 100.01 = 900,090 each,
+/// 4,500,450 gross) then instrument 1's book goes one-sided (halt/open):
+/// the two children on instrument 1 are 1,800,180 of real exposure.
+#[test]
+fn unvaluable_open_order_rejects_instead_of_vanishing_from_gross() {
+    let build = || {
+        let mut t = BTreeMap::new();
+        t.insert(1u32, 0.01);
+        t.insert(2u32, 0.01);
+        t.insert(3u32, 0.01);
+        let mut eng = RiskEngine::from_config_ticks(&config(), t);
+        for iid in [1u32, 2, 3] {
+            eng.on_market(iid, 10_000, 10_002, T0); // mid 100.01
+        }
+        let mut ts = T0 + 100_000_000;
+        // buys on 1, sells on 2, buy on 3 keeps |net| under the net cap
+        for (oid, iid, side) in [(1u64, 1u32, 0u8), (2, 1, 0), (3, 2, 1), (4, 2, 1), (5, 3, 0)] {
+            let o = typed(oid, iid, side, 9_000, 0, OrderType::Market, ts);
+            assert!(eng.check_order(&o).allowed(), "child {oid} must rest");
+            ts += 100_000_000;
+        }
+        (eng, ts)
+    };
+
+    let (mut healthy, ts) = build();
+    let sixth = typed(6, 3, 0, 9_000, 0, OrderType::Market, ts + 100_000_000);
+    let d = healthy.check_order(&sixth);
+    assert_eq!(d.rule_id, rules::GROSS_NOTIONAL);
+    assert!(d.reason.contains("5400540.00"), "{}", d.reason);
+
+    let (mut degraded, ts) = build();
+    degraded.on_market(1, 10_000, 0, ts); // one-sided: instrument 1 has no mid
+    let d = degraded.check_order(&typed(6, 3, 0, 9_000, 0, OrderType::Market, ts + 100_000_000));
+    assert_eq!(d.rule_id, rules::GROSS_NOTIONAL, "{}", d.reason);
+    assert_eq!(d.severity, Severity::Warn);
+    assert_eq!(
+        d.reason,
+        "open order 1 in instrument 1 has no mark price (fail-closed)"
+    );
+}
+
+/// Regression — SILENT NO-OP defect: an INSTRUMENT kill sent as a ticker
+/// used to emit KILL_SWITCH_ENGAGED and halt nothing. It must now fail
+/// loudly, emit MALFORMED_KILL (never a success record) and escalate to
+/// the GLOBAL kill.
+#[test]
+fn unparseable_kill_scope_id_escalates_and_never_looks_successful() {
+    let mut eng = engine();
+    let err = eng
+        .engage_kill(Scope::Instrument, "AAPL", T0, "ops halt")
+        .expect_err("an unparseable instrument kill must fail");
+    assert!(
+        err.to_string().contains("escalated to GLOBAL (fail-closed)"),
+        "{err}"
+    );
+    // the very next order is stopped, not allowed
+    assert_eq!(
+        eng.check_order(&order(1, 0, 100, 2450)).rule_id,
+        rules::KILL_GLOBAL
+    );
+    assert_eq!(eng.metrics.counter_value("risk_malformed_kills_total"), 1);
+    let malformed: Vec<_> = eng
+        .audit()
+        .iter()
+        .filter(|e| e.rule_id == rules::MALFORMED_KILL)
+        .collect();
+    assert_eq!(malformed.len(), 1);
+    assert_eq!(malformed[0].decision, Decision::Kill as u8);
+    assert_eq!(malformed[0].severity, Severity::Breach as u8);
+    assert_eq!(
+        malformed[0].reason,
+        "kill scope id \"AAPL\" is not a valid INSTRUMENT id: escalated to GLOBAL (fail-closed): ops halt"
+    );
+    assert!(
+        !eng.audit().iter().any(|e| e.rule_id == rules::KILL_SWITCH_ENGAGED),
+        "a phantom halt must never leave a success record"
+    );
+
+    // a VENUE id above u16 is the same defect
+    let mut eng = engine();
+    assert!(eng.engage_kill(Scope::Venue, "65536", T0, "ops").is_err());
+    assert_eq!(
+        eng.check_order(&order(1, 0, 100, 2450)).rule_id,
+        rules::KILL_GLOBAL
+    );
+
+    // clearing is the permissive direction: it clears NOTHING and reports
+    let mut eng = engine();
+    eng.engage_kill(Scope::Instrument, "1", T0, "halt")
+        .expect("kill scope id parses");
+    let err = eng
+        .clear_kill(Scope::Instrument, "AAPL", T0 + NS, "ops clear")
+        .expect_err("an unparseable clear must fail");
+    assert!(err.to_string().contains("nothing cleared (fail-closed)"), "{err}");
+    assert_eq!(
+        eng.check_order(&order(2, 0, 100, 2450)).rule_id,
+        rules::KILL_INSTRUMENT,
+        "the real halt must still be in force"
+    );
+    assert!(
+        !eng.audit().iter().any(|e| e.rule_id == rules::KILL_SWITCH_CLEARED),
+        "nothing was cleared, so nothing may claim it was"
+    );
+}
+
+/// Regression — FAIL-OPEN defect: an unmarked held lot used to contribute
+/// zero unrealized P&L instead of making the daily total undeterminable,
+/// so a loss limit could fail to trip. It must behave exactly like the
+/// missing-FX-rate branch: `None`, and orders reject FX_RATE_MISSING.
+#[test]
+fn unmarked_held_lot_makes_daily_pnl_undeterminable() {
+    let mut eng = engine();
+    // S1 long 1,000 and S2 short 1,000 of instrument 2: two HELD lots, but
+    // a flat firm position, so check 19 cannot mask the P&L path below.
+    assert!(eng.on_fill(&fill("S1", 2, 0, 1_000, 3_120)));
+    assert!(eng.on_fill(&fill("S2", 2, 1, 1_000, 3_120)));
+    assert_eq!(eng.position(2), 0);
+    assert!(eng.global_daily_pnl().is_some());
+    assert!(eng.strategy_daily_pnl("S1").is_some());
+
+    eng.on_market(2, 3_119, 0, T0 + NS); // instrument 2 goes one-sided
+    assert_eq!(eng.global_daily_pnl(), None);
+    assert_eq!(eng.strategy_daily_pnl("S1"), None);
+
+    // fail-closed pre-trade, exactly like a missing conversion rate
+    let d = eng.check_order(&order(9, 0, 100, 2450));
+    assert_eq!(d.rule_id, rules::FX_RATE_MISSING, "{}", d.reason);
+    assert_eq!(
+        d.reason,
+        "global daily pnl undeterminable: conversion rate missing"
+    );
 }

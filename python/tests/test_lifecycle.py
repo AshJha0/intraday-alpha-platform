@@ -707,14 +707,20 @@ def test_bootstrap_failed_gates_agree_with_report_verdicts(bootstrap):
         assert ev.gates["ledger_entry_exists"].value == float(ledger[row.alpha_id]["n"]) \
             if "ledger_entry_exists" in ev.gates else True
     by_id = {r.alpha_id: r.failed_gates for r in bootstrap.rows}
-    # hand cross-checks against REPORT.md
+    # Hand cross-checks against REPORT.md. Updated 2026-09-20: several gates
+    # moved when fold_sign_consistency stopped scoring the beta-SIGNED signal
+    # (an alpha backwards in every fold used to report 1.00 consistency and
+    # pass this gate) and when the walk-forward stopped training inside its
+    # own declared holdout. EQ05 and FX01 now clear statistical_significance
+    # on the pair-count-weighted Newey-West t; EQ07, FX01 and FX03 now fail
+    # fold_consistency, which they previously passed falsely.
     assert by_id["EQ01"] == ("net_pnl_after_costs",)
-    assert by_id["EQ05"] == ("statistical_significance", "net_pnl_after_costs")
-    assert by_id["FX01"] == ("statistical_significance", "fold_consistency",
-                             "net_pnl_after_costs")
-    assert by_id["EQ07"] == ("oos_ic", "statistical_significance", "hypothesis_sign",
-                             "net_pnl_after_costs")
-    assert set(by_id["FX03"]) >= {"statistical_significance", "hypothesis_sign"}
+    assert by_id["EQ05"] == ("net_pnl_after_costs",)
+    assert by_id["FX01"] == ("fold_consistency", "net_pnl_after_costs")
+    assert by_id["EQ07"] == ("oos_ic", "statistical_significance", "fold_consistency",
+                             "hypothesis_sign", "net_pnl_after_costs")
+    assert set(by_id["FX03"]) >= {"statistical_significance", "hypothesis_sign",
+                                  "fold_consistency"}
 
 
 def test_bootstrap_research_mapping(bootstrap):

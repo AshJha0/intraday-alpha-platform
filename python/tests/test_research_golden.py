@@ -34,7 +34,7 @@ from iap.research.golden import (
     golden_spec,
     render_golden,
 )
-from iap.research.runner import document_drift, load_instrument_meta
+from iap.research.runner import document_drift, load_instrument_meta, restrict_frames
 from iap.validation import validate_alpha
 
 from conftest import CONFIGS_DIR, GOLDEN_DIR
@@ -134,7 +134,14 @@ def test_golden_document_round_trips(golden, spec, result):
 
 def test_golden_walk_forward_metrics_match_validate_alpha(golden, spec, frames):
     """The pinned IC / t / hit / turnover / folds are validate_alpha's own
-    numbers for the same window and protocol — nothing is re-derived."""
+    numbers for the same window and protocol — nothing is re-derived.
+
+    "The same window" now means ``[train_period.start, test_period.start)``:
+    the runner stopped handing the walk-forward the union of all three
+    declared periods on 2026-09-20, because doing so trained the later folds
+    inside the very holdout the result reports separately. Passing the full
+    frames here would test the runner against a protocol it no longer uses.
+    """
     meta = load_instrument_meta(CONFIGS_DIR)
     cfg = spec.configuration
     backtester = Backtester(
@@ -149,7 +156,9 @@ def test_golden_walk_forward_metrics_match_validate_alpha(golden, spec, frames):
         model.horizon = GOLDEN_HORIZON
         return model
 
-    report = validate_alpha(factory, frames, backtester, meta,
+    window = restrict_frames(frames, spec.train_period.start_ts,
+                             spec.test_period.start_ts)
+    report = validate_alpha(factory, window, backtester, meta,
                             float(exec_cfg["defaults"]["max_participation"]),
                             n_folds=cfg["n_folds"], embargo_ns=cfg["embargo_ns"])
     want = golden["result"]

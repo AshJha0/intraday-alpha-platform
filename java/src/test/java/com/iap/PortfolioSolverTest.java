@@ -278,7 +278,12 @@ public class PortfolioSolverTest {
         return out;
     }
 
-    /** turnover_cap 0 with w_prev outside the gross cap: INFEASIBLE, hold. */
+    /**
+     * turnover_cap 0 with w_prev outside the gross cap: no iterate can move
+     * at all, so holding IS the least-violating candidate and wins the tie
+     * as the earliest one -> INFEASIBLE, weights == w_prev,
+     * bestIteration -1, and the residual breach named as RISK.
+     */
     @Test
     public void portfolioInfeasibleFlagsAndHoldsWPrev() {
         double[] wPrev = {0.5, 0.5};
@@ -293,8 +298,11 @@ public class PortfolioSolverTest {
         assertEquals("INFEASIBLE", res.status());
         assertArrayEquals(wPrev, res.weights(), 0.0);
         assertTrue(Double.isFinite(res.objective()));
-        assertEquals(0, res.bestIteration());
+        assertEquals(-1, res.bestIteration()); // -1 = w_prev itself was held
         assertEquals(0.5, res.maxViolation(), 1e-12);
+        assertEquals(List.of("GROSS"), res.violations());
+        assertEquals("RISK", res.violationKind());
+        assertEquals(0.5, res.riskViolation(), 1e-12);
         com.iap.portfolio.ConstraintAudit.Report audit =
                 com.iap.portfolio.ConstraintAudit.audit(res.weights(), cons, wPrev, sigma);
         assertTrue(!audit.feasible());
@@ -314,6 +322,99 @@ public class PortfolioSolverTest {
                 new SolverParams(null, 0.01, 50, 8, 1e-7));
         assertTrue(fine.feasible());
         assertEquals("OPTIMAL", fine.status());
+        assertEquals(List.of(), fine.violations());
+        assertEquals("NONE", fine.violationKind());
+        assertEquals(0.0, fine.riskViolation(), 0.0);
+    }
+
+    /**
+     * Regression — the INFEASIBLE branch used to discard every iterate and
+     * return w_prev. w_prev cannot violate participation or turnover (its
+     * own trade is zero), so an infeasible solve means w_prev breaches a
+     * RISK constraint — precisely when holding is the worst available
+     * action. Position 500/500 (w_prev 1.0), participation/turnover cap
+     * 0.5, per-bar vol target 0.0005 against an EWMA per-bar sigma of
+     * 0.0053: the vol cap allows |w| &lt;= 0.0943 while participation allows
+     * only [0.5, 1.5], so the feasible set is empty. Holding leaves the book
+     * at 10.6x the vol target indefinitely.
+     */
+    @Test
+    public void infeasibleVolSpikeMovesInsteadOfFreezingTheBook() {
+        double sigmaBar = 0.0053;
+        double[][] sigma = {{sigmaBar * sigmaBar}};
+        double[] wPrev = {1.0};
+        Constraints cons = new Constraints(new double[] {-1.5}, new double[] {1.5});
+        cons.participation = new double[] {0.5};
+        cons.turnoverCap = 0.5;
+        cons.volTarget = 0.0005;
+        PgdResult res = PortfolioOptimizer.solve(new double[] {0.02}, sigma,
+                wPrev, 1.0, new double[1], cons,
+                new SolverParams(null, 0.01, 500, 8, 1e-7));
+
+        assertTrue(!res.feasible());
+        assertEquals("INFEASIBLE", res.status());
+        // it moves: the returned book is vol-compliant, not parked at 10.6x
+        assertTrue(res.weights()[0] != wPrev[0]);
+        assertEquals(0.0005 / sigmaBar, res.weights()[0], 1e-12);
+        assertEquals(0.0, res.riskViolation(), 0.0);
+        assertEquals(List.of("PARTICIPATION", "TURNOVER"), res.violations());
+        assertEquals("TRADING", res.violationKind()); // slice it, do not unwind
+        // and never strictly worse on risk than a candidate it discarded
+        assertTrue(res.riskViolation()
+                <= PortfolioOptimizer.maxViolation(wPrev, cons, wPrev, sigma));
+        assertTrue(Double.isFinite(res.weights()[0]));
+        assertTrue(Double.isFinite(res.objective()));
+    }
+
+    /**
+     * Regression — CROSS-LANGUAGE DIVERGENCE: validate()'s sign tests are
+     * all false for NaN, so a NaN bound or cap used to flow through and
+     * surface as a NaN maxViolation (a frozen book) instead of failing at
+     * config load. The reference rejects each of these.
+     */
+    @Test
+    public void constraintsRejectNonFiniteBoundsLikeTheReference() {
+        double[][] eye = {{1.0, 0.0}, {0.0, 1.0}};
+        SolverParams p = new SolverParams(null, 0.01, 10, 4, 1e-7);
+        Constraints nanMin = new Constraints(new double[] {Double.NaN, -1.0},
+                fillv(2, 1.0));
+        expectIae(() -> PortfolioOptimizer.solve(new double[2], eye,
+                new double[2], 1.0, new double[2], nanMin, p),
+                "w_min/w_max must be finite");
+        Constraints nanMax = new Constraints(fillv(2, -1.0),
+                new double[] {1.0, Double.POSITIVE_INFINITY});
+        expectIae(() -> PortfolioOptimizer.solve(new double[2], eye,
+                new double[2], 1.0, new double[2], nanMax, p),
+                "w_min/w_max must be finite");
+        for (String which : new String[] {"gross_cap", "net_cap",
+                "turnover_cap", "vol_target"}) {
+            Constraints c = new Constraints(fillv(2, -1.0), fillv(2, 1.0));
+            switch (which) {
+                case "gross_cap" -> c.grossCap = Double.NaN;
+                case "net_cap" -> c.netCap = Double.NaN;
+                case "turnover_cap" -> c.turnoverCap = Double.NaN;
+                default -> c.volTarget = Double.NaN;
+            }
+            expectIae(() -> PortfolioOptimizer.solve(new double[2], eye,
+                    new double[2], 1.0, new double[2], c, p),
+                    which + " must be finite");
+        }
+        Constraints part = new Constraints(fillv(2, -1.0), fillv(2, 1.0));
+        part.participation = new double[] {0.1, Double.NaN};
+        expectIae(() -> PortfolioOptimizer.solve(new double[2], eye,
+                new double[2], 1.0, new double[2], part, p),
+                "participation must be finite");
+        Constraints ccy = new Constraints(fillv(2, -1.0), fillv(2, 1.0));
+        ccy.currencyMatrix = new double[][] {{1.0, 1.0}};
+        ccy.currencyBounds = new double[] {Double.NaN};
+        expectIae(() -> PortfolioOptimizer.solve(new double[2], eye,
+                new double[2], 1.0, new double[2], ccy, p),
+                "currency_matrix/currency_bounds must be finite");
+        // and the result of a valid solve is never NaN
+        Constraints good = new Constraints(fillv(2, -1.0), fillv(2, 1.0));
+        PgdResult ok = PortfolioOptimizer.solve(new double[] {0.01, 0.02}, eye,
+                new double[2], 1.0, new double[2], good, p);
+        assertTrue(!Double.isNaN(ok.maxViolation()));
     }
 
     /** NaN / inf anywhere in the inputs is rejected up front. */

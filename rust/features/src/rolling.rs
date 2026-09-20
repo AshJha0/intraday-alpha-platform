@@ -19,12 +19,19 @@ const INIT_CAPACITY: usize = 4096;
 ///
 /// Integer sums are exact — incremental state is bit-identical to a
 /// brute-force recomputation over the retained samples.
+///
+/// The running sums accumulate in `i128`, not `i64`: a window folds in an
+/// unbounded number of samples, and an `i64` accumulator both wraps (a
+/// release build) or panics (overflow checks on) and — because `trim` then
+/// subtracts from the wrapped total — leaves the window sum permanently
+/// corrupted for the rest of the session. The Python reference accumulates
+/// in arbitrary precision; `i128` is exact for every reachable sample count.
 #[derive(Debug, Clone)]
 pub struct RollingISum<const N: usize> {
     window: i64,
     buf: VecDeque<(i64, [i64; N])>,
     /// Running sums of each component over the live window.
-    pub sums: [i64; N],
+    pub sums: [i128; N],
     /// Number of live samples.
     pub count: usize,
 }
@@ -35,7 +42,7 @@ impl<const N: usize> RollingISum<N> {
         RollingISum {
             window: window_ns,
             buf: VecDeque::with_capacity(INIT_CAPACITY),
-            sums: [0; N],
+            sums: [0i128; N],
             count: 0,
         }
     }
@@ -44,21 +51,25 @@ impl<const N: usize> RollingISum<N> {
     pub fn add(&mut self, ts: i64, vals: [i64; N]) {
         self.buf.push_back((ts, vals));
         for (sum, v) in self.sums.iter_mut().zip(vals.iter()) {
-            *sum += v;
+            *sum += i128::from(*v);
         }
         self.count += 1;
         self.trim(ts);
     }
 
     /// Evict samples with `ts <= now - window`.
+    ///
+    /// The cutoff is computed in `i128`: `exchange_ts` is a signed 64-bit
+    /// wire field the codec accepts down to `i64::MIN`, and `now - window`
+    /// overflowed for a timestamp within one window of the bottom.
     pub fn trim(&mut self, now: i64) {
-        let cutoff = now - self.window;
+        let cutoff = i128::from(now) - i128::from(self.window);
         while let Some(&(ts, vals)) = self.buf.front() {
-            if ts > cutoff {
+            if i128::from(ts) > cutoff {
                 break;
             }
             for (sum, v) in self.sums.iter_mut().zip(vals.iter()) {
-                *sum -= v;
+                *sum -= i128::from(*v);
             }
             self.count -= 1;
             self.buf.pop_front();
@@ -106,10 +117,14 @@ impl RollingFSum {
     }
 
     /// Evict samples with `ts <= now - window`.
+    ///
+    /// The cutoff is computed in `i128` for the same reason as
+    /// [`RollingISum::trim`]: `now - window` overflowed `i64` for an
+    /// `exchange_ts` near `i64::MIN`.
     pub fn trim(&mut self, now: i64) {
-        let cutoff = now - self.window;
+        let cutoff = i128::from(now) - i128::from(self.window);
         while let Some(&(ts, val)) = self.buf.front() {
-            if ts > cutoff {
+            if i128::from(ts) > cutoff {
                 break;
             }
             self.sum -= val;
@@ -160,8 +175,11 @@ impl<T: Copy> TimeSeries<T> {
     }
 
     /// Latest value with sample ts <= `t`, or `None`.
-    pub fn at_or_before(&self, t: i64) -> Option<T> {
-        let i = self.ts[self.start..].partition_point(|&x| x <= t) + self.start;
+    ///
+    /// `t` is `i128` because every caller passes `now - lookback`, which
+    /// overflows `i64` for an `exchange_ts` near `i64::MIN`.
+    pub fn at_or_before(&self, t: i128) -> Option<T> {
+        let i = self.ts[self.start..].partition_point(|&x| i128::from(x) <= t) + self.start;
         if i > self.start {
             Some(self.vals[i - 1])
         } else {
@@ -185,8 +203,8 @@ impl<T: Copy> TimeSeries<T> {
     }
 
     /// Forget samples with ts < `min_ts`, keeping the newest at-or-before.
-    pub fn trim(&mut self, min_ts: i64) {
-        let i = self.ts.partition_point(|&x| x <= min_ts);
+    pub fn trim(&mut self, min_ts: i128) {
+        let i = self.ts.partition_point(|&x| i128::from(x) <= min_ts);
         if i > 0 {
             self.start = self.start.max(i - 1);
         }
@@ -222,9 +240,9 @@ mod tests {
         let mut w: RollingISum<2> = RollingISum::new(500);
         for i in 0..200i64 {
             w.add(i * 7, [i, -2 * i]);
-            let brute: (i64, i64) = w
-                .samples()
-                .fold((0, 0), |acc, &(_, v)| (acc.0 + v[0], acc.1 + v[1]));
+            let brute: (i128, i128) = w.samples().fold((0, 0), |acc, &(_, v)| {
+                (acc.0 + i128::from(v[0]), acc.1 + i128::from(v[1]))
+            });
             assert_eq!((w.sums[0], w.sums[1]), brute);
         }
     }

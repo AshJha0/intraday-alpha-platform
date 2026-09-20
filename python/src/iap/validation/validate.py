@@ -31,6 +31,13 @@ Round-3 honesty rules baked into the report (all pinned):
   (``degenerate: true``) and counted as a *failed* fold in
   ``fold_sign_consistency`` instead of silently vanishing from the mean.
   ``n_nondegenerate_folds`` is reported and gates PROMOTE.
+- **Every per-fold and every stress statistic is scored on z** (round-4).
+  ``beta_k`` is refit free-signed per fold, so ``ic(er, y)`` equals
+  ``sign(beta_k) * ic(z, y)``: an alpha that is backwards in every fold used
+  to report ``fold_sign_consistency = 1.00`` and a positive high-vol regime
+  IC beside a NEGATIVE gate IC.  Fold IC / RankIC / hit rate, the regime
+  split and the decay curve all read ``z`` now; ``ic_er`` is kept per fold as
+  a clearly-named diagnostic.
 - **The pooled IC is computed on z, not on expected_return.**  Folds fit
   different betas, so concatenating ``expected_return`` weights each fold by
   |beta_k| and a sign flip between folds can cancel the IC.  The gate uses
@@ -58,7 +65,8 @@ from iap.backtest.engine import Backtester
 from iap.validation.leakage import LeakageTester
 from iap.validation.metrics import (
     HORIZONS_NS,
-    bucket_ics,
+    bucket_ics_with_counts,
+    bucket_size_summary,
     capacity_proxy_usd,
     decay_curve,
     hit_rate,
@@ -66,7 +74,7 @@ from iap.validation.metrics import (
     newey_west_tstat,
     nw_lags,
     rank_ic,
-    signal_turnover,
+    signal_turnover_detail,
 )
 from iap.validation.splits import (
     MIN_NONDEGENERATE_FOLDS,
@@ -161,6 +169,12 @@ def validate_alpha(
         z = er / beta if beta != 0.0 else er
         n_pairs = int(np.sum(np.isfinite(er) & np.isfinite(y)))
         degenerate = n_pairs < MIN_TEST_PAIRS
+        # Fold statistics are computed on z, NEVER on expected_return.
+        # beta_k is refit free-signed per fold, so ic(er, y) is
+        # sign(beta_k) * ic(z, y): an alpha that is backwards in every fold
+        # (EQ09: beta < 0 in all 4) scored ic(er, y) > 0 four times over and
+        # published fold_sign_consistency = 1.00 beside a NEGATIVE gate IC.
+        # The gate reads z (see the pooled block below), so the folds must too.
         fold_rows.append(
             {
                 "fold": fold.index,
@@ -170,9 +184,10 @@ def validate_alpha(
                 "degenerate": degenerate,
                 "test_start": int(fold.test_start),
                 "test_end": int(fold.test_end),
-                "ic": _fnum(ic(er, y)),
-                "rank_ic": _fnum(rank_ic(er, y)),
-                "hit_rate": _fnum(hit_rate(er, y)),
+                "ic": _fnum(ic(z, y)),
+                "ic_er": _fnum(ic(er, y)),   # diagnostic: sign-flipped by beta
+                "rank_ic": _fnum(rank_ic(z, y)),
+                "hit_rate": _fnum(hit_rate(z, y)),
                 "beta_fit": model.params().get("beta_fit"),
             }
         )
@@ -193,8 +208,11 @@ def validate_alpha(
     oos_rank_ic = rank_ic(x, y)
     oos_hit = hit_rate(x, y)
     lags = nw_lags(horizon_ns)
-    bics = bucket_ics(ts, x, y)
-    nw_t = newey_west_tstat(bics, lags=lags)
+    # Bucket ICs are weighted by their pair count: fixed time buckets range
+    # from ~81 to ~2 592 pairs here, and equal weighting let one thin bucket
+    # swing EQ03's headline t between 4.89 and 11.46 (metrics module docs).
+    bics, bcounts = bucket_ics_with_counts(ts, x, y)
+    nw_t = newey_west_tstat(bics, lags=lags, weights=bcounts)
 
     # Crossed-book conditioning (pinned): a crossed consolidated book means a
     # stale venue quote; its mid reverts when that venue refreshes.
@@ -207,8 +225,8 @@ def validate_alpha(
     oos_ic_uncrossed = ic(np.where(unc, x, np.nan), np.where(unc, y, np.nan))
     oos_ic_crossed = ic(np.where(crossed, x, np.nan),
                         np.where(crossed, y, np.nan))
-    bics_unc = bucket_ics(ts[unc], x[unc], y[unc])
-    nw_t_uncrossed = newey_west_tstat(bics_unc, lags=lags)
+    bics_unc, bcounts_unc = bucket_ics_with_counts(ts[unc], x[unc], y[unc])
+    nw_t_uncrossed = newey_west_tstat(bics_unc, lags=lags, weights=bcounts_unc)
 
     # Degenerate folds count as FAILED folds, never as missing data.
     n_folds_run = len(fold_rows)
@@ -224,21 +242,34 @@ def validate_alpha(
     # leakage + decay + turnover on the last (largest-train) fold
     leak = LeakageTester().run(last_model, last_test).to_dict()
     scores_last = last_model.score(last_test)
+    beta_last = float(last_model.params().get("beta", 0.0) or 0.0)
     decay: Dict[str, Optional[float]] = {}
     turnover_vals = []
+    turnover_active_hours = 0.0
+    turnover_span_hours = 0.0
     for iid, sc in scores_last.items():
-        d = decay_curve(sc["expected_return"].to_numpy(), last_test[iid])
+        er_last = sc["expected_return"].to_numpy(dtype=float).copy()
+        # Same confidence mask _pooled_arrays applies everywhere else: the
+        # decay IC used to see rows whose signal was NaN as an exact 0.0
+        # (62.4 % of FX02's last fold, 66.8 % of FX05's), which is not a
+        # prediction of "no move" — it is the absence of a prediction, and a
+        # column of zeros shrinks the IC toward 0 rather than dropping out.
+        er_last[sc["confidence"].to_numpy(dtype=float) <= 0.0] = np.nan
+        z_last = er_last / beta_last if beta_last != 0.0 else er_last
+        d = decay_curve(z_last, last_test[iid])
         for h, v in d.items():
             decay.setdefault(h, [])
             if np.isfinite(v):
                 decay[h].append(v)
-        tv = signal_turnover(
+        tdet = signal_turnover_detail(
             last_test[iid]["exchange_ts"].to_numpy(),
             sc["expected_return"].to_numpy(),
             sc["confidence"].to_numpy(),
         )
-        if np.isfinite(tv):
-            turnover_vals.append(tv)
+        if np.isfinite(tdet["flips_per_hour"]):
+            turnover_vals.append(tdet["flips_per_hour"])
+            turnover_active_hours += tdet["active_hours"]
+            turnover_span_hours += tdet["span_hours"]
     decay_out = {
         h: (_fnum(float(np.mean(v))) if v else None) for h, v in decay.items()
     }
@@ -259,14 +290,16 @@ def validate_alpha(
     stress = {
         "cost": cost_stress(backtester, last_test, scores_last, asset_class),
         "latency": latency_stress(
-            backtester, last_test, scores_last, asset_class, horizon
+            backtester, last_test, scores_last, asset_class, horizon,
+            beta=beta_last,
         ),
         "latency_time": latency_stress_time(
             backtester, last_test, scores_last, asset_class, horizon
         ),
         "regime": {
             k: _fnum(v)
-            for k, v in regime_split(scores_last, last_test, horizon).items()
+            for k, v in regime_split(scores_last, last_test, horizon,
+                                     beta=beta_last).items()
         },
     }
     net_pnl_1x = stress["cost"]["x1"]["total_pnl"]
@@ -322,11 +355,18 @@ def validate_alpha(
         "nw_lags": int(lags),
         "n_ic_buckets": int(bics.size),
         "n_ic_buckets_uncrossed": int(bics_unc.size),
+        "ic_bucket_pairs": bucket_size_summary(bcounts),
+        "ic_bucket_pairs_uncrossed": bucket_size_summary(bcounts_unc),
         "fold_sign_consistency": _fnum(sign_consistency),
         "hypothesis_confirmed": hypothesis_confirmed,
         "leakage": leak,
         "decay_ic_by_horizon": decay_out,
         "turnover_flips_per_hour": _fnum(turnover),
+        # The denominator is reported so the cost statistic can be audited:
+        # flips/h over ACTIVE hours, not over the wall span that includes the
+        # hours the market was shut (see metrics.signal_turnover_detail).
+        "turnover_active_hours": _fnum(turnover_active_hours),
+        "turnover_span_hours": _fnum(turnover_span_hours),
         "capacity_usd_by_instrument": capacity,
         "stress": stress,
         "net_pnl_1x_cost": _fnum(net_pnl_1x),

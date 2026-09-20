@@ -6,11 +6,12 @@
   "events_processed": 2000,
   "fills": [
     {"fill_id": 1, "order_id": 2, "parent_id": 2, "instrument_id": 1, "venue_id": 1, "side": 1, "price_ticks": 2451, "qty": 304, "ts": 1787578329586302498, "liquidity": "TAKER", "fee": 0.91200000000000003, "impact_cost": 0.0011921664000000001},
-    {"fill_id": 2, "order_id": 1, "parent_id": 1, "instrument_id": 1, "venue_id": 1, "side": 0, "price_ticks": 2449, "qty": 129, "ts": 1787578386181246977, "liquidity": "MAKER", "fee": -0.25800000000000001, "impact_cost": 0},
-    {"fill_id": 3, "order_id": 4, "parent_id": 2, "instrument_id": 1, "venue_id": 1, "side": 1, "price_ticks": 2451, "qty": 184, "ts": 1787578525151937018, "liquidity": "TAKER", "fee": 0.55200000000000005, "impact_cost": 0.00043674240000000003},
-    {"fill_id": 4, "order_id": 5, "parent_id": 1, "instrument_id": 1, "venue_id": 1, "side": 0, "price_ticks": 2451, "qty": 71, "ts": 1787578587462039064, "liquidity": "MAKER", "fee": -0.14200000000000002, "impact_cost": 0},
-    {"fill_id": 5, "order_id": 7, "parent_id": 2, "instrument_id": 1, "venue_id": 1, "side": 1, "price_ticks": 2450, "qty": 112, "ts": 1787578721553511454, "liquidity": "TAKER", "fee": 0.33600000000000002, "impact_cost": 0.00016175157894736844},
-    {"fill_id": 6, "order_id": 6, "parent_id": 1, "instrument_id": 1, "venue_id": 1, "side": 0, "price_ticks": 2450, "qty": 129, "ts": 1787578742073893610, "liquidity": "MAKER", "fee": -0.25800000000000001, "impact_cost": 0}
+    {"fill_id": 2, "order_id": 1, "parent_id": 1, "instrument_id": 1, "venue_id": 1, "side": 0, "price_ticks": 2449, "qty": 100, "ts": 1787578386181246977, "liquidity": "MAKER", "fee": -0.20000000000000001, "impact_cost": 0},
+    {"fill_id": 3, "order_id": 1, "parent_id": 1, "instrument_id": 1, "venue_id": 1, "side": 0, "price_ticks": 2449, "qty": 29, "ts": 1787578395624588691, "liquidity": "MAKER", "fee": -0.058000000000000003, "impact_cost": 0},
+    {"fill_id": 4, "order_id": 4, "parent_id": 2, "instrument_id": 1, "venue_id": 1, "side": 1, "price_ticks": 2451, "qty": 184, "ts": 1787578525151937018, "liquidity": "TAKER", "fee": 0.55200000000000005, "impact_cost": 0.00043674240000000003},
+    {"fill_id": 5, "order_id": 5, "parent_id": 1, "instrument_id": 1, "venue_id": 1, "side": 0, "price_ticks": 2451, "qty": 71, "ts": 1787578587462039064, "liquidity": "MAKER", "fee": -0.14200000000000002, "impact_cost": 0},
+    {"fill_id": 6, "order_id": 7, "parent_id": 2, "instrument_id": 1, "venue_id": 1, "side": 1, "price_ticks": 2450, "qty": 112, "ts": 1787578721553511454, "liquidity": "TAKER", "fee": 0.33600000000000002, "impact_cost": 0.00016175157894736844},
+    {"fill_id": 7, "order_id": 6, "parent_id": 1, "instrument_id": 1, "venue_id": 1, "side": 0, "price_ticks": 2450, "qty": 129, "ts": 1787578742073893610, "liquidity": "MAKER", "fee": -0.25800000000000001, "impact_cost": 0}
   ],
   "parents": {
     "1": {"filled_qty": 329, "unfilled_qty": 71, "children": 4, "notional": 8059.9200000000001, "avg_price": 24.498237082066868, "fees": 0, "rebates": 0.65800000000000003, "impact": 0, "total_cost": -0.65800000000000003},

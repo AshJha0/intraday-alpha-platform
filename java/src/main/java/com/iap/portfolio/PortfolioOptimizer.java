@@ -1,6 +1,11 @@
 package com.iap.portfolio;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Deterministic projected-gradient portfolio optimizer — the production
@@ -17,10 +22,28 @@ import java.util.Arrays;
  * the vol cap uses radial scaling (pinned retraction, NOT the exact
  * ellipsoidal projection). The best FEASIBLE iterate by objective wins
  * (ties keep the earliest; the initial projection of w_prev is iteration 0).
- * No RNG, no unordered iteration — bit-deterministic for given inputs, and
- * must match tests/golden/expected_portfolio.json to 1e-9.
+ * When NO iterate is feasible the result carries the LEAST-VIOLATING
+ * candidate — w_prev (bestIteration -1), the initial projection (0) or an
+ * iterate (k + 1) — ranked by (risk violation, total violation, candidate
+ * order); see {@link PgdResult}. No RNG, no unordered iteration —
+ * bit-deterministic for given inputs, and must match
+ * tests/golden/expected_portfolio.json to 1e-9.
  */
 public final class PortfolioOptimizer {
+    /**
+     * Constraints that bound the BOOK's exposure. A residual breach here is
+     * live over-exposure, so holding w_prev perpetuates it — this is why the
+     * INFEASIBLE result ranks on the risk violation before the total.
+     */
+    public static final Set<String> RISK_CONSTRAINTS =
+            Set.of("BOX", "NET", "CURRENCY", "GROSS", "VOL");
+    /**
+     * Constraints that bound the TRADE. A residual breach here only means
+     * the step exceeds one bar's cap; the execution layer slices it.
+     */
+    public static final Set<String> TRADING_CONSTRAINTS =
+            Set.of("PARTICIPATION", "TURNOVER");
+
     private PortfolioOptimizer() {
     }
 
@@ -199,55 +222,107 @@ public final class PortfolioOptimizer {
         return w;
     }
 
-    /** Largest constraint violation of w (0 when feasible). */
-    public static double maxViolation(double[] w, Constraints cons,
-            double[] wPrev, double[][] sigma) {
+    /**
+     * Per-constraint violation of w, keyed by the names in
+     * {@link #RISK_CONSTRAINTS} / {@link #TRADING_CONSTRAINTS}, in the
+     * pinned projection order. An inactive constraint is absent; an active
+     * one that holds maps to a value &lt;= 0. {@link #maxViolation} is the
+     * maximum of these (floored at 0), so the two can never disagree.
+     */
+    public static LinkedHashMap<String, Double> violationBreakdown(double[] w,
+            Constraints cons, double[] wPrev, double[][] sigma) {
         int n = w.length;
-        double v = 0.0;
+        LinkedHashMap<String, Double> out = new LinkedHashMap<>();
+        double box = 0.0;
         for (int i = 0; i < n; i++) {
-            v = Math.max(v, cons.wMin[i] - w[i]);
-            v = Math.max(v, w[i] - cons.wMax[i]);
+            box = Math.max(box, cons.wMin[i] - w[i]);
+            box = Math.max(box, w[i] - cons.wMax[i]);
         }
+        out.put("BOX", box);
         if (cons.participation != null) {
+            double p = 0.0;
             for (int i = 0; i < n; i++) {
-                v = Math.max(v, Math.abs(w[i] - wPrev[i]) - cons.participation[i]);
+                p = Math.max(p, Math.abs(w[i] - wPrev[i]) - cons.participation[i]);
             }
+            out.put("PARTICIPATION", p);
         }
         if (cons.netCap != null) {
             double s = 0.0;
             for (double x : w) {
                 s += x;
             }
-            v = Math.max(v, Math.abs(s) - cons.netCap);
+            out.put("NET", Math.abs(s) - cons.netCap);
         }
         if (cons.currencyMatrix != null) {
+            double c1 = 0.0;
             for (int c = 0; c < cons.currencyMatrix.length; c++) {
                 double val = 0.0;
                 for (int i = 0; i < n; i++) {
                     val += cons.currencyMatrix[c][i] * w[i];
                 }
-                v = Math.max(v, Math.abs(val) - cons.currencyBounds[c]);
+                c1 = Math.max(c1, Math.abs(val) - cons.currencyBounds[c]);
             }
+            out.put("CURRENCY", c1);
         }
         if (cons.grossCap != null) {
             double g = 0.0;
             for (double x : w) {
                 g += Math.abs(x);
             }
-            v = Math.max(v, g - cons.grossCap);
+            out.put("GROSS", g - cons.grossCap);
         }
         if (cons.turnoverCap != null) {
             double t = 0.0;
             for (int i = 0; i < n; i++) {
                 t += Math.abs(w[i] - wPrev[i]);
             }
-            v = Math.max(v, t - cons.turnoverCap);
+            out.put("TURNOVER", t - cons.turnoverCap);
         }
         if (cons.volTarget != null && sigma != null) {
             double q = Math.max(quadraticForm(w, sigma), 0.0);
-            v = Math.max(v, Math.sqrt(q) - cons.volTarget);
+            out.put("VOL", Math.sqrt(q) - cons.volTarget);
+        }
+        return out;
+    }
+
+    /** Largest constraint violation of w (0 when feasible). */
+    public static double maxViolation(double[] w, Constraints cons,
+            double[] wPrev, double[][] sigma) {
+        double v = 0.0;
+        for (double value : violationBreakdown(w, cons, wPrev, sigma).values()) {
+            v = Math.max(v, value);
         }
         return Math.max(v, 0.0);
+    }
+
+    /**
+     * Largest violation among the RISK constraints only (0 when none). This
+     * is the figure a caller alarms on: it is live book exposure, not a
+     * trade that merely exceeds one bar's participation/turnover cap.
+     */
+    static double riskViolation(LinkedHashMap<String, Double> breakdown) {
+        double v = 0.0;
+        for (String name : RISK_CONSTRAINTS) {
+            Double value = breakdown.get(name);
+            if (value != null) {
+                v = Math.max(v, value);
+            }
+        }
+        return Math.max(v, 0.0);
+    }
+
+    /**
+     * Names of the constraints violated by more than {@code tol}, in the
+     * pinned projection order (deterministic, never unordered).
+     */
+    static List<String> violated(LinkedHashMap<String, Double> breakdown, double tol) {
+        List<String> names = new ArrayList<>();
+        for (Map.Entry<String, Double> e : breakdown.entrySet()) {
+            if (e.getValue() > tol) {
+                names.add(e.getKey());
+            }
+        }
+        return List.copyOf(names);
     }
 
     /**
@@ -325,13 +400,41 @@ public final class PortfolioOptimizer {
         constraints.validate(n);
 
         int passes = params.projPasses();
+        // Least-violating fallback for the INFEASIBLE result. Candidates are
+        // considered in order — holding w_prev first, then the initial
+        // projection, then each iterate — and ranked by (risk violation,
+        // total violation); a strict "better" keeps the EARLIEST on a tie,
+        // so holding wins only when nothing computed later is any better.
+        //
+        // DEFECT this replaces: the solver used to discard every iterate and
+        // return w_prev unconditionally. But w_prev cannot violate
+        // participation or turnover (its own trade is identically zero), so
+        // an infeasible solve means w_prev is breaching a RISK constraint —
+        // the one situation in which holding is the WORST available action.
+        // A vol spike then parked the book at many times the vol target
+        // indefinitely, and the returned answer could be strictly worse than
+        // an iterate the solver had already computed and thrown away.
+        double[] leastW = wPrev.clone();
+        LinkedHashMap<String, Double> leastB =
+                violationBreakdown(leastW, constraints, wPrev, sigma);
+        double leastRisk = riskViolation(leastB);
+        double leastTotal = maxOf(leastB);
+        int leastK = -1;
+
         double[] w = project(wPrev, constraints, wPrev, sigma, passes);
         double[] bestW = w.clone();
-        boolean feasible = maxViolation(w, constraints, wPrev, sigma) <= params.feasTol();
+        LinkedHashMap<String, Double> b0 = violationBreakdown(w, constraints, wPrev, sigma);
+        boolean feasible = maxOf(b0) <= params.feasTol();
         double bestF = feasible
                 ? objective(w, alpha, sigma, wPrev, riskAversion, tcLinear)
                 : Double.NEGATIVE_INFINITY;
         int bestK = 0;
+        if (betterCandidate(riskViolation(b0), maxOf(b0), leastRisk, leastTotal)) {
+            leastW = w.clone();
+            leastRisk = riskViolation(b0);
+            leastTotal = maxOf(b0);
+            leastK = 0;
+        }
         for (int k = 0; k < params.iters(); k++) {
             double eta = eta0 / (1.0 + params.stepDecay() * k);
             double[] sw = matVec(sigma, w);
@@ -347,23 +450,57 @@ public final class PortfolioOptimizer {
             }
             w = project(v, constraints, wPrev, sigma, passes);
             double fw = objective(w, alpha, sigma, wPrev, riskAversion, tcLinear);
-            if (maxViolation(w, constraints, wPrev, sigma) <= params.feasTol()
-                    && fw > bestF) {
+            LinkedHashMap<String, Double> bk =
+                    violationBreakdown(w, constraints, wPrev, sigma);
+            double totalK = maxOf(bk);
+            if (totalK <= params.feasTol() && fw > bestF) {
                 bestF = fw;
                 bestW = w.clone();
                 bestK = k + 1;
                 feasible = true;
             }
+            double riskK = riskViolation(bk);
+            if (betterCandidate(riskK, totalK, leastRisk, leastTotal)) {
+                leastW = w.clone();
+                leastRisk = riskK;
+                leastTotal = totalK;
+                leastK = k + 1;
+            }
         }
         if (!feasible) {
-            // INFEASIBLE (pinned §1.3): hold the book, never -inf/NaN.
-            double[] hold = wPrev.clone();
-            return new PgdResult(hold,
-                    objective(hold, alpha, sigma, wPrev, riskAversion, tcLinear),
-                    params.iters(), 0, maxViolation(hold, constraints, wPrev, sigma),
-                    false);
+            // INFEASIBLE (pinned §1.3): the least-violating candidate, never
+            // -inf/NaN, with the residual breach named so a caller can alarm.
+            LinkedHashMap<String, Double> b =
+                    violationBreakdown(leastW, constraints, wPrev, sigma);
+            return new PgdResult(leastW,
+                    objective(leastW, alpha, sigma, wPrev, riskAversion, tcLinear),
+                    params.iters(), leastK, leastTotal, false,
+                    violated(b, params.feasTol()), leastRisk);
         }
         return new PgdResult(bestW, bestF, params.iters(), bestK,
-                maxViolation(bestW, constraints, wPrev, sigma), true);
+                maxViolation(bestW, constraints, wPrev, sigma), true,
+                List.of(), 0.0);
+    }
+
+    /** Maximum of a breakdown's values, floored at 0 (= {@link #maxViolation}). */
+    private static double maxOf(LinkedHashMap<String, Double> breakdown) {
+        double v = 0.0;
+        for (double value : breakdown.values()) {
+            v = Math.max(v, value);
+        }
+        return Math.max(v, 0.0);
+    }
+
+    /**
+     * Lexicographic candidate ranking for the INFEASIBLE result: smaller
+     * RISK violation wins, then smaller total violation; equal ranks keep
+     * the incumbent, which is the earlier candidate.
+     */
+    private static boolean betterCandidate(double risk, double total,
+            double bestRisk, double bestTotal) {
+        if (risk != bestRisk) {
+            return risk < bestRisk;
+        }
+        return total < bestTotal;
     }
 }

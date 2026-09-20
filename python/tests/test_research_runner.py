@@ -20,6 +20,7 @@ import pandas as pd
 import pytest
 
 from iap.alpha.equity import EQ03OfiMultiLevel
+from iap.backtest import Backtester, BacktestConfig, CostModel
 from iap.contracts import protocols
 from iap.contracts.types import ExperimentSpec, Period, Verdict
 from iap.contracts.validate import validate
@@ -40,7 +41,13 @@ from iap.research import (
 )
 from iap.research.__main__ import main as cli_main
 from iap.research.golden import GOLDEN_INSTRUMENT, golden_frames, golden_spec
-from iap.research.runner import document_drift, render_document
+from iap.research.runner import (
+    document_drift,
+    load_instrument_meta,
+    render_document,
+    restrict_frames,
+)
+from iap.validation import validate_alpha
 from iap.validation.ledger import ExperimentLedger
 from iap.validation.metrics import HORIZONS_NS
 from iap.validation.splits import Fold
@@ -566,13 +573,25 @@ def test_cli_list_and_show(frames, tmp_path, spec, capsys):
 def test_eq03_report_reproduces_through_the_runner(tmp_path):
     """EQ03 at its pinned 5 s horizon with the default (= run_all.py)
     configuration on the bundled dataset: the derived periods are the
-    day-1 / day-2 split, the walk-forward runs over the full two-session
-    window exactly as run_all.py's validate_alpha call, so IC / rank IC /
-    NW t / hit rate / fold consistency / leakage / verdict must equal
-    research/alpha_reports/EQ03.json at 1e-9.  (The report has no 1 s
-    EQ03 row: the flagship pipeline evaluates each alpha at its pinned
-    horizon only, so a 1 s EQ03 experiment is a different configuration
-    and is not compared here.)"""
+    day-1 / day-2 split.
+
+    This used to assert that the runner reproduced
+    ``research/alpha_reports/EQ03.json`` field for field, because both ran
+    the walk-forward over the whole two-session window. Since 2026-09-20
+    they run DIFFERENT protocols on purpose, and the test pins both:
+
+    * the runner evaluates ``[train_start, test_start)`` and reports the
+      declared holdout separately, so its statistics are genuinely out of
+      sample;
+    * ``run_all.py`` still evaluates the whole window and declares no
+      holdout at all, which is a weaker protocol — legitimate only because
+      it is disclosed, and disclosed in REPORT.md.
+
+    So the invariant worth pinning is not "the two agree" (they must not)
+    but "the runner adds no statistics of its own": it equals
+    ``validate_alpha`` called directly on the runner's own window. The
+    divergence from the committed report is asserted explicitly, so it can
+    only ever change deliberately."""
     if not FEATURES_DIR.is_dir() or not list(FEATURES_DIR.glob("features_1*.parquet")):
         pytest.skip("data/features missing — regenerate via python3 -m iap.features")
     report_path = REPORTS_DIR / "EQ03.json"
@@ -591,22 +610,57 @@ def test_eq03_report_reproduces_through_the_runner(tmp_path):
     assert spec.test_period.start_ts // NS_DAY == days[1]
     assert spec.train_period.start_ts // NS_DAY == days[0]
     result = runner.run(spec)
+
+    # 1. The runner adds no statistics of its own: on ITS window, every
+    #    reported field is validate_alpha's own number.
+    meta = load_instrument_meta(CONFIGS_DIR)
+    exec_cfg = json.loads((CONFIGS_DIR / "execution" / "execution.json").read_text())
+    cfg = spec.configuration
+    backtester = Backtester(
+        CostModel.load(CONFIGS_DIR / "execution" / "execution.json"), meta,
+        BacktestConfig(latency_ns=cfg["latency_ns"],
+                       max_decision_age_ns=cfg["max_decision_age_ns"],
+                       flatten_at_session_end=cfg["flatten_at_session_end"]))
+
+    def factory():
+        model = EQ03OfiMultiLevel()
+        model.horizon = spec.horizon
+        return model
+
+    window = restrict_frames(frames, spec.train_period.start_ts,
+                             spec.test_period.start_ts)
+    direct = validate_alpha(factory, window, backtester, meta,
+                            float(exec_cfg["defaults"]["max_participation"]),
+                            n_folds=int(cfg["n_folds"]),
+                            embargo_ns=int(cfg["embargo_ns"]))
     for field, key in (("ic", "oos_ic"), ("rank_ic", "oos_rank_ic"),
                        ("t_stat", "nw_tstat"), ("hit_rate", "oos_hit_rate"),
                        ("turnover", "turnover_flips_per_hour"),
                        ("fold_consistency", "fold_sign_consistency")):
-        got, want = getattr(result, field), report[key]
+        got, want = getattr(result, field), direct[key]
         assert math.isfinite(got) and abs(got - want) <= TOL + TOL * abs(want), (field, got, want)
-    assert result.nw_lags == report["nw_lags"]
-    assert result.n_folds == report["n_folds_run"]
-    assert result.leakage_passed == report["leakage"]["passed"]
+    assert result.nw_lags == direct["nw_lags"]
+    assert result.n_folds == direct["n_folds_run"]
+    assert result.leakage_passed == direct["leakage"]["passed"]
     # ic_shifted / ic_unshifted are BLAS reductions: last-ulp CPU dependence,
     # so 1e-9 like every other research double (CI runners differ here).
-    assert document_drift(report["leakage"], result.leakage_detail, tol=TOL) == []
-    assert result.hypothesis_sign_confirmed == report["hypothesis_confirmed"]
-    assert result.verdict.value == report["verdict"]
+    assert document_drift(direct["leakage"], result.leakage_detail, tol=TOL) == []
+    assert result.hypothesis_sign_confirmed == direct["hypothesis_confirmed"]
+    assert result.verdict.value == direct["verdict"]
     assert result.created_ts == spec.test_period.end_ts
     assert result.n_experiments_in_ledger == LOOKS_PER_EXPERIMENT
+
+    # 2. The holdout really is held out: no walk-forward row reaches it.
+    for iid, df in window.items():
+        ts = df["exchange_ts"].to_numpy(dtype=np.int64)
+        assert not ts.size or int(ts.max()) < spec.test_period.start_ts, iid
+
+    # 3. The committed report is the WEAKER whole-window protocol, so it
+    #    must differ. Pinned explicitly so the two can never silently
+    #    converge (which would mean the holdout leaked back in).
+    assert abs(result.ic - report["oos_ic"]) > TOL, (
+        "the runner's holdout-honouring IC equals run_all.py's whole-window "
+        "IC — the walk-forward window has leaked back into the holdout")
 
 
 def test_document_drift_tolerates_last_ulp_but_not_semantics():
@@ -648,3 +702,43 @@ def test_persist_keeps_committed_bytes_when_numbers_agree(tmp_path, spec):
     assert path.read_bytes() == first
     with pytest.raises(ResearchError, match="reproduced different values"):
         runner._persist(spec, build_result(spec, _report(oos_ic=0.5), _holdout(), 21, "deadbeef"))
+
+
+def test_looks_per_experiment_counts_every_look_the_chain_takes():
+    """The multiple-testing denominator must track the evidence chain.
+
+    ``LOOKS_PER_EXPERIMENT`` was 21 while the chain evaluated the time-latency
+    grid (4 backtests), the crossed/uncrossed IC split (2) and the leakage
+    shift IC — looks that were added without being added to the denominator,
+    which makes every Bonferroni-corrected t in the reports look better than
+    it is.  This test recomputes the total from the grids themselves, so a
+    new stress axis cannot be added silently again.
+    """
+    from iap.validation.metrics import HORIZON_ORDER
+    from iap.validation.stress import (
+        COST_MULTIPLIERS,
+        LATENCY_SHIFTS,
+        LATENCY_TIMES_NS,
+    )
+
+    expected = (
+        1                          # pooled walk-forward OOS IC / NW t
+        + len(HORIZON_ORDER)       # decay curve, one IC per pinned horizon
+        + len(COST_MULTIPLIERS)    # cost stress grid
+        + len(LATENCY_SHIFTS)      # latency stress, ROW grid
+        + len(LATENCY_TIMES_NS)    # latency stress, TIME grid
+        + 2                        # regime split: high vol, low vol
+        + 2                        # crossed / uncrossed conditional IC
+        + 1                        # leakage shift-by-one IC
+        + 1                        # holdout backtest
+    )
+    assert expected == 28
+    assert LOOKS_PER_EXPERIMENT == expected
+
+
+def test_ledger_records_the_full_look_count(frames, tmp_path):
+    """The ledger entry carries the honest count, not a round number."""
+    runner = _runner(frames, tmp_path, dry_run=True)
+    spec = _spec(frames)
+    result = runner.run(spec)
+    assert result.n_experiments_in_ledger == LOOKS_PER_EXPERIMENT == 28

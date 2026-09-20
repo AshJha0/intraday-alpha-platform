@@ -213,11 +213,20 @@ pub fn decode_jsonl_line(line: &str) -> Result<MarketEvent, IapError> {
     })
 }
 
+/// The pinned JSONL whitespace set: ASCII space, tab, CR, LF — exactly the
+/// `[ \t\r\n]*` of the reference decoder's line regex and of this module's
+/// [`Scanner::skip_ws`]. `str::trim` is NOT that set: it strips every
+/// Unicode `White_Space` char, so a line prefixed with VT (`\x0b`), FF
+/// (`\x0c`) or NBSP (`\u{a0}`) was ingested here and rejected by the C++
+/// port — one port reading a file another refuses, in a codec whose whole
+/// contract is byte-identical cross-language behaviour.
+const JSONL_WS: [char; 4] = [' ', '\t', '\r', '\n'];
+
 /// Decode canonical JSONL text (skipping blank lines, like the reference).
 pub fn decode_jsonl(text: &str) -> Result<Vec<MarketEvent>, IapError> {
     let mut events = Vec::new();
     for line in text.lines() {
-        let line = line.trim();
+        let line = line.trim_matches(|c| JSONL_WS.contains(&c));
         if !line.is_empty() {
             events.push(decode_jsonl_line(line)?);
         }

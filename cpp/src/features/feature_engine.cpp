@@ -115,6 +115,14 @@ FeatureEngine::InstState& FeatureEngine::state(std::uint32_t instrument_id) {
 // Signed depth change within the best-k levels of one side (OFI building
 // block): sum over the union of prev/curr top-k prices of (curr - prev)
 // sizes, missing price => size 0. Mirrors engine._delta.
+//
+// Exactness (int64 is sufficient here, no widening needed): every entry of
+// `prev` and `curr` comes from a merged view that passed the
+// FEATURE_MAX_QTY guard in refresh_book, so 0 < size <= 2^40 and k <= 10;
+// at most 20 such terms are combined, bounding |d| by 20 * 2^40 < 2^45.
+// That bound is exactly what the guard's widened sum now guarantees — the
+// unbounded accumulation this function used to perform was reachable only
+// because a wrapped-negative merged level passed the old guard.
 std::int64_t FeatureEngine::depth_delta(const std::vector<LevelEntry>& prev,
                                         const std::vector<LevelEntry>& curr,
                                         int k) {
@@ -149,7 +157,7 @@ std::int64_t FeatureEngine::depth_delta(const std::vector<LevelEntry>& prev,
 void FeatureEngine::InstState::reset_rolling(std::int64_t t) {
     warm_ts = t;
     ++recoveries;
-    hist2 = TimeSeries<std::int64_t>();
+    hist2 = TimeSeries<__int128>();
     histlog = TimeSeries<double>();
     rv_10s = RollingSum<double, 1>(W_10S);
     rv_1m = RollingSum<double, 1>(W_1M);
@@ -173,7 +181,7 @@ std::uint64_t FeatureEngine::recoveries(std::uint32_t instrument_id) const {
 
 std::int64_t FeatureEngine::warm_ts(std::uint32_t instrument_id) const {
     auto it = states_.find(instrument_id);
-    return it == states_.end() ? -1 : it->second.warm_ts;
+    return (it == states_.end() || !it->second.seen) ? -1 : it->second.warm_ts;
 }
 
 bool FeatureEngine::book_ok(std::uint32_t instrument_id) const {
@@ -204,6 +212,13 @@ bool FeatureEngine::refresh_book(InstState& st, std::uint16_t venue_id,
     st.prev_ask.swap(st.depth_ask);
 
     // Merge non-stale venues (ascending venue_id; equal prices summed).
+    // Cross-venue sizes are summed in __int128: each venue level is only
+    // checked against int64 by the book, so two venues resting 2^62 at the
+    // same price wrapped the merged total NEGATIVE and slipped past the
+    // FEATURE_MAX_QTY guard below, emitting a negative depth as a valid
+    // feature. The widened sum is what the guard now tests (the Python
+    // reference sums in arbitrary precision and reaches the same verdict).
+    bool oversized = false;
     auto merge_side = [&](bool is_bid, std::vector<LevelEntry>& out) {
         auto& scratch = st.merge_scratch;
         scratch.clear();
@@ -215,29 +230,36 @@ bool FeatureEngine::refresh_book(InstState& st, std::uint16_t venue_id,
                 bool found = false;
                 for (auto& e : scratch) {
                     if (e.first == p) {
-                        e.second += q;
+                        e.second += static_cast<__int128>(q);
                         found = true;
                         break;
                     }
                 }
-                if (!found) scratch.emplace_back(p, q);
+                if (!found) scratch.emplace_back(p, static_cast<__int128>(q));
             }
         }
         if (is_bid) {
             std::sort(scratch.begin(), scratch.end(),
-                      [](const LevelEntry& a, const LevelEntry& b) {
+                      [](const WideLevel& a, const WideLevel& b) {
                           return a.first > b.first;
                       });
         } else {
             std::sort(scratch.begin(), scratch.end(),
-                      [](const LevelEntry& a, const LevelEntry& b) {
+                      [](const WideLevel& a, const WideLevel& b) {
                           return a.first < b.first;
                       });
         }
         out.clear();
         const std::size_t n =
             std::min<std::size_t>(scratch.size(), DEPTH_LEVELS);
-        for (std::size_t i = 0; i < n; ++i) out.push_back(scratch[i]);
+        for (std::size_t i = 0; i < n; ++i) {
+            if (scratch[i].second > FEATURE_MAX_QTY) {
+                oversized = true;
+                return;  // view is unusable; nothing below may read it
+            }
+            out.emplace_back(scratch[i].first,
+                             static_cast<std::int64_t>(scratch[i].second));
+        }
     };
     merge_side(true, st.depth_bid);
     merge_side(false, st.depth_ask);
@@ -245,9 +267,6 @@ bool FeatureEngine::refresh_book(InstState& st, std::uint16_t venue_id,
     // Oversized merged depth (pinned section 2.2): a level above
     // FEATURE_MAX_QTY makes the merged view unusable — clear it, record
     // nothing, and let the next clean refresh re-baseline.
-    bool oversized = false;
-    for (const auto& e : st.depth_bid) oversized |= e.second > FEATURE_MAX_QTY;
-    for (const auto& e : st.depth_ask) oversized |= e.second > FEATURE_MAX_QTY;
     if (oversized) {
         st.depth_bid.clear();
         st.depth_ask.clear();
@@ -293,7 +312,11 @@ bool FeatureEngine::refresh_book(InstState& st, std::uint16_t venue_id,
     };
     side_sums(st.depth_bid, st.db1, st.db3, st.db5, st.db10);
     side_sums(st.depth_ask, st.da1, st.da3, st.da5, st.da10);
-    st.mid2 = st.bid_p + st.ask_p;
+    // Widened: both prices are positive int64 tick counts, so their sum
+    // overflows int64 for legal large prices (verified repro: bid 2^62,
+    // ask 2^62+1 emitted mid_price_v1 = -4.6e16 with valid == 1 while
+    // microprice_v1 was +4.6e16). The reference sums in arbitrary precision.
+    st.mid2 = static_cast<__int128>(st.bid_p) + static_cast<__int128>(st.ask_p);
     st.mid = static_cast<double>(st.mid2) * st.tick / 2.0;
     st.logmid = std::log(static_cast<double>(st.mid2));
     st.spread_ticks = st.ask_p - st.bid_p;
@@ -324,7 +347,7 @@ bool FeatureEngine::refresh_book(InstState& st, std::uint16_t venue_id,
 bool FeatureEngine::apply(const MarketEvent& ev, FeatureVector& out) {
     InstState& st = state(ev.instrument_id);
     const std::int64_t t = ev.exchange_ts;
-    if (st.first_ts >= 0 && t < st.last_ts) {
+    if (st.seen && t < st.last_ts) {
         // Cross-venue exchange_ts regression: dropped + counted before the
         // book sees it (pinned). Never thrown, never re-ordered.
         ++ts_regressions_dropped_;
@@ -333,7 +356,8 @@ bool FeatureEngine::apply(const MarketEvent& ev, FeatureVector& out) {
         return false;
     }
     const ApplyStatus status = st.cons.apply(ev);
-    if (st.first_ts < 0) {
+    if (!st.seen) {
+        st.seen = true;
         st.first_ts = t;
         st.warm_ts = t;
     }
@@ -394,8 +418,10 @@ bool FeatureEngine::apply(const MarketEvent& ev, FeatureVector& out) {
 
 bool FeatureEngine::emit_if_due(InstState& st, std::uint32_t iid,
                                 std::int64_t t, FeatureVector& out) {
-    if (cadence_ns_ == 0 || st.last_emit < 0 ||
-        t - st.last_emit >= cadence_ns_) {
+    // Widened cadence test: `t - last_emit` overflowed int64 when the two
+    // timestamps straddled the i64 range (exchange_ts is a wire field).
+    if (cadence_ns_ == 0 || !st.has_emit ||
+        static_cast<__int128>(t) - st.last_emit >= cadence_ns_) {
         // Evict expired samples from every window at emission time.
         st.rv_10s.trim(t);
         st.rv_1m.trim(t);
@@ -407,9 +433,10 @@ bool FeatureEngine::emit_if_due(InstState& st, std::uint32_t iid,
         st.tr_1s.trim(t);
         st.tr_10s.trim(t);
         st.tr_1m.trim(t);
-        st.hist2.trim(t - kHistKeepNs);
-        st.histlog.trim(t - kHistKeepNs);
+        st.hist2.trim(static_cast<__int128>(t) - kHistKeepNs);
+        st.histlog.trim(static_cast<__int128>(t) - kHistKeepNs);
         emit(st, iid, t, out);
+        st.has_emit = true;
         st.last_emit = t;
         ++vectors_emitted_;
         return true;
@@ -443,9 +470,12 @@ void FeatureEngine::emit(InstState& st, std::uint32_t iid, std::int64_t t,
     const bool ok = st.book_ok;
 
     // ---- price family: returns from at-or-before mid-change samples -----
-    std::int64_t past2 = 0;
+    // Lookback offsets are widened: `t - W` overflowed int64 for an
+    // exchange_ts near INT64_MIN (the codec accepts the whole i64 range).
+    __int128 past2 = 0;
     double pastlog = 0.0;
-    const bool has_1s = ok && st.hist2.at_or_before(t - W_1S, past2);
+    const bool has_1s =
+        ok && st.hist2.at_or_before(static_cast<__int128>(t) - W_1S, past2);
     put(F_RET_SIMPLE_1S,
         has_1s ? static_cast<double>(st.mid2) / static_cast<double>(past2) - 1.0
                : 0.0,
@@ -460,7 +490,9 @@ void FeatureEngine::emit(InstState& st, std::uint32_t iid, std::int64_t t,
                          {F_RET_LOG_10S, W_10S},
                          {F_RET_LOG_1M, W_1M}};
         for (const auto& hz : horizons) {
-            const bool has = ok && st.histlog.at_or_before(t - hz.h, pastlog);
+            const bool has =
+                ok && st.histlog.at_or_before(
+                          static_cast<__int128>(t) - hz.h, pastlog);
             const double v = has ? st.logmid - pastlog : 0.0;
             put(hz.slot, v, has);
             if (hz.slot == F_RET_LOG_10S) {
@@ -584,7 +616,7 @@ void FeatureEngine::emit(InstState& st, std::uint32_t iid, std::int64_t t,
         const bool warm = st.warm(t, tr_w[wi]);
         put(F_SIGNED_VOLUME_W1S + wi,
             warm ? static_cast<double>(trs[wi]->sum(0)) : 0.0, warm);
-        const std::int64_t tot = trs[wi]->sum(1) + trs[wi]->sum(2);
+        const __int128 tot = trs[wi]->sum(1) + trs[wi]->sum(2);
         const bool has = warm && tot > 0;
         put(F_TRADE_IMBALANCE_W1S + wi,
             has ? static_cast<double>(trs[wi]->sum(1) - trs[wi]->sum(2)) /

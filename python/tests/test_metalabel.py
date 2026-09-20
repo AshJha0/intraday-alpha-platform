@@ -152,10 +152,12 @@ def test_split_purges_label_horizon_at_both_boundaries():
     direction = signal_directions(np.nan_to_num(pred, nan=0.0), cost_est)
     usable = np.isfinite(pred) & (direction != 0)
     ts = ds.ts[np.flatnonzero(usable)]
-    t_lo, t_hi = int(ts[0]), int(ts[-1])
-    span = t_hi - t_lo
-    b1 = t_lo + span // 2
-    b2 = t_lo + (3 * span) // 4
+    # Boundaries are quantiles of the ROW INDEX, matching run_meta_labeling
+    # (they were wall-clock fractions of the span until the 50/25/25 split
+    # was found to be an actual 50.0/6.0/43.9 on the bundled dataset).
+    n_rows = ts.size
+    b1 = int(ts[min(int(round(0.50 * n_rows)), n_rows - 1)])
+    b2 = int(ts[min(int(round(0.75 * n_rows)), n_rows - 1)])
 
     exp_train = int((ts + TARGET_HORIZON_NS <= b1).sum())
     exp_cal = int(((ts > b1 + _EMBARGO_NS)
@@ -232,3 +234,77 @@ def test_metalabel_manifest_records_features_target_and_segments(tmp_path):
         "train", "calibration", "test"]
     for seg in man["folds"]:
         assert seg["n"] > 0 and len(seg["window"]) == 2
+
+
+def _clustered_meta_dataset(n: int = 8000, seed: int = 11):
+    """The planted dataset on a realistic, NON-uniform time axis.
+
+    Rows sit in 2.6-hour sessions inside 24-hour calendar days, exactly like
+    the bundled equity frames.  On such an axis wall-clock split boundaries
+    and row-mass split boundaries are wildly different things.
+    """
+    ds, pred = _meta_dataset(n=n, seed=seed)
+    day = 86_400 * _S
+    days = 6
+    per_day = n // days
+    ts = []
+    for k in range(n):
+        d, j = divmod(k, per_day)
+        ts.append(min(d, days - 1) * day + 13 * 3600 * _S
+                  + j * (9360 * _S // per_day))
+    ds.ts[:] = np.asarray(sorted(ts), dtype=np.int64)
+    return ds, pred
+
+
+def test_meta_split_uses_row_mass_not_wall_clock():
+    """Regression: the documented 50/25/25 must be 50/25/25 of the SAMPLES.
+
+    Wall-clock boundaries (``t_lo + span // 2``, ``t_lo + 3 * span // 4``)
+    put the calibration window in the dormant overnight stretch: on the real
+    206 190-row dataset the actual split was 50.0 / 6.0 / 43.9, leaving 324
+    calibration positives against the 500 isotonic regression needs, so the
+    calibrator silently fell back to Platt.
+    """
+    ds, pred = _clustered_meta_dataset()
+    res = run_meta_labeling(ds, pred)
+    seg = res["segments"]
+    total = seg["train"] + seg["calibration"] + seg["test"]
+    fractions = [seg[k] / total for k in ("train", "calibration", "test")]
+    for got, want in zip(fractions, (0.50, 0.25, 0.25)):
+        assert abs(got - want) < 0.02, fractions
+
+    # the wall-clock rule the defect used, evaluated on the same timestamps
+    ts = ds.ts[np.flatnonzero(np.isfinite(pred))]
+    span = int(ts[-1]) - int(ts[0])
+    b1_wall = int(ts[0]) + span // 2
+    b2_wall = int(ts[0]) + (3 * span) // 4
+    cal_wall = np.sum((ts > b1_wall) & (ts <= b2_wall)) / ts.size
+    assert cal_wall < 0.20, "wall-clock boundaries should still show the defect"
+
+
+def test_meta_split_keeps_calibration_positives_for_isotonic():
+    """The calibration segment must carry its share of the POSITIVES.
+
+    Falling back to Platt is legitimate when the evidence is genuinely thin;
+    it is not legitimate when a split bug moved most of the calibration
+    samples into the test segment.  On the bundled 206 190-row dataset the
+    shortfall was 324 positives against MIN_ISOTONIC_POSITIVES = 500.
+    """
+    from iap.models.economics import realized_net, signal_directions
+
+    ds, pred = _clustered_meta_dataset()
+    res = run_meta_labeling(ds, pred)
+
+    half_bps = ds.meta_context[:, 4]
+    cost_est = np.maximum(
+        2.0 * np.where(np.isfinite(half_bps), half_bps, 0.0) / 1e4, 0.0)
+    direction = signal_directions(np.nan_to_num(pred, nan=0.0), cost_est)
+    idx = np.flatnonzero(np.isfinite(pred) & (direction != 0))
+    net = realized_net(direction[idx], ds.y_mid[idx], ds.y[idx])
+    total_positives = int((net > 0.0).sum())
+
+    # a quarter of the samples must bring (very nearly) a quarter of the
+    # positives; the purge and embargo account for the small shortfall
+    expected = 0.25 * total_positives
+    assert res["calibration_positives"] >= 0.9 * expected, (
+        res["calibration_positives"], expected)

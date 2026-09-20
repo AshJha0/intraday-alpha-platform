@@ -111,8 +111,11 @@ changed. `git_commit = unversioned-workspace` marks a scratch run exactly as
 for manifests. The five committed experiments (`c73bb6294d226163`,
 `d7b554d0a3fa3b26`, `217fa0cb1d89a9c8`, `4a2900e4a6705542`,
 `d0dd1ab0711d33a1`) pin dataset `203c8f54…`, features `585dd7b9…`, commit
-`f3a01377…` and `n_experiments_in_ledger = 865`; the pinned-horizon runs
-reproduce `research/alpha_reports/{EQ01,EQ03,EQ06}.json` at 1e-9.
+`fc41ac6f…` and `n_experiments_in_ledger = 1068`; the pinned-horizon runs
+are the contract-driven runner's own numbers: since 2026-09-20 the
+walk-forward stops where the declared holdout starts, so they no longer
+equal `research/alpha_reports/{EQ01,EQ03,EQ06}.json`, whose walk-forward
+still spans the whole window (a weaker, disclosed protocol).
 
 ## 3.2 Sessions, traces and the store
 
@@ -128,7 +131,7 @@ reproduce `research/alpha_reports/{EQ01,EQ03,EQ06}.json` at 1e-9.
   §13.2), `report.json` and the stream sha256, refusing first if a
   reference document changed (`config_version`). The golden run is
   `tests/golden/expected_mvp.json`: seed 12345, run `58a10f2194a3c81c`,
-  digest `059c30df7213d00e0d3f6de7ab9011b3d1ee9651cd3df5ec6609d2e66e965c2b`.
+  digest `d938eeae68c85a6c2acaf7fb3f7d1333f29c3ad8e036fb5af7a4d1b48c9ea2cc`.
 - **A Java paper session** is reproduced by re-running `java/paper.sh` on
   the same vector and configuration: `decision_traces.jsonl` and the
   report's `trace.digest` are a pure function of the event stream

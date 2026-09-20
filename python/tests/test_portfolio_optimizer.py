@@ -14,6 +14,7 @@ from iap.portfolio.optimizer import (
     project,
     project_l1_ball,
     solve,
+    violation_breakdown,
 )
 
 
@@ -218,9 +219,11 @@ def test_solver_input_validation():
 
 
 def test_portfolio_infeasible_raises_or_flags():
-    """turnover_cap 0 with w_prev outside the gross cap: no iterate is
-    feasible -> feasible False, weights == w_prev (hold), finite objective,
-    audit rows with negative slack (pinned §1.3, step 4)."""
+    """turnover_cap 0 with w_prev outside the gross cap: no iterate can
+    move at all, so holding IS the least-violating candidate and wins the
+    tie as the earliest one -> feasible False, weights == w_prev,
+    best_iteration -1, finite objective, audit rows with negative slack,
+    and the residual breach named as RISK so a caller can alarm."""
     n = 2
     w_prev = np.array([0.5, 0.5])
     cons = Constraints(w_min=-np.ones(n), w_max=np.ones(n), gross_cap=0.5,
@@ -231,8 +234,11 @@ def test_portfolio_infeasible_raises_or_flags():
     assert res.status == "INFEASIBLE"
     assert np.array_equal(res.weights, w_prev)
     assert np.isfinite(res.objective) and res.objective != -np.inf
-    assert res.best_iteration == 0
+    assert res.best_iteration == -1  # -1 = w_prev itself was held
     assert abs(res.max_violation - 0.5) < 1e-12
+    assert res.violations == ("GROSS",)
+    assert res.violation_kind == "RISK"
+    assert abs(res.risk_violation - 0.5) < 1e-12
     audit = constraint_audit(res.weights, cons, w_prev, np.eye(n) * 1e-4)
     assert audit["feasible"] is False
     gross = next(r for r in audit["constraints"] if r["name"] == "gross_exposure")
@@ -243,6 +249,8 @@ def test_portfolio_infeasible_raises_or_flags():
                np.zeros(n), Constraints(w_min=-np.ones(n), w_max=np.ones(n),
                                         gross_cap=0.5), iters=50)
     assert ok.feasible is True and ok.status == "OPTIMAL"
+    assert ok.violations == () and ok.violation_kind == "NONE"
+    assert ok.risk_violation == 0.0
 
 
 def test_portfolio_rejects_nonfinite_inputs():
@@ -279,3 +287,96 @@ def test_portfolio_zero_sigma_lambda_zero_auto_eta():
     assert abs(res.weights[0] - 1.0) < 1e-12 and abs(res.weights[1] + 1.0) < 1e-12
     assert abs(res.weights[2]) < 1e-12  # zero alpha: the L1 cost keeps it flat
     assert res.max_violation <= 1e-7
+
+
+def test_infeasible_vol_spike_moves_instead_of_freezing_the_book():
+    """Regression — the INFEASIBLE branch used to discard every iterate and
+    return ``w_prev``. w_prev cannot violate participation or turnover (its
+    own trade is zero), so an infeasible solve means w_prev breaches a RISK
+    constraint — precisely when holding is the worst available action.
+
+    Position 500/500 (w_prev 1.0), participation/turnover cap 0.5, per-bar
+    vol target 0.0005 against an EWMA per-bar sigma of 0.0053: the vol cap
+    allows |w| <= 0.0943 while participation allows only [0.5, 1.5], so the
+    feasible set is empty. Holding leaves the book at 10.6x the vol target
+    indefinitely; the solver had a vol-compliant iterate in hand."""
+    sigma_bar = 0.0053
+    Sigma = np.array([[sigma_bar ** 2]])
+    w_prev = np.array([1.0])
+    cons = Constraints(w_min=np.array([-1.5]), w_max=np.array([1.5]),
+                       participation=np.array([0.5]), turnover_cap=0.5,
+                       vol_target=0.0005)
+    res = solve(np.array([0.02]), Sigma, w_prev, 1.0, np.zeros(1), cons)
+
+    assert res.feasible is False and res.status == "INFEASIBLE"
+    # it moves: the returned book is vol-compliant, not parked at 10.6x
+    assert not np.array_equal(res.weights, w_prev)
+    assert abs(float(res.weights[0]) - 0.0005 / sigma_bar) < 1e-12
+    assert res.risk_violation == 0.0
+    assert res.violations == ("PARTICIPATION", "TURNOVER")
+    assert res.violation_kind == "TRADING"  # slice it, do not alarm on risk
+    # and it is never strictly worse on risk than a candidate it discarded
+    assert res.risk_violation <= max_violation(w_prev, cons, w_prev, Sigma)
+    assert np.all(np.isfinite(res.weights)) and np.isfinite(res.objective)
+
+
+def test_infeasible_returns_the_least_violating_candidate():
+    """Regression — the returned answer must never be strictly worse than
+    an iterate the solver computed and threw away. Ranking is (risk
+    violation, total violation, earliest candidate), so every iterate is
+    compared against holding rather than discarded."""
+    sigma_bar = 0.0053
+    Sigma = np.array([[sigma_bar ** 2]])
+    w_prev = np.array([1.0])
+    cons = Constraints(w_min=np.array([-1.5]), w_max=np.array([1.5]),
+                       participation=np.array([0.5]), turnover_cap=0.5,
+                       vol_target=0.0005)
+    res = solve(np.array([0.02]), Sigma, w_prev, 1.0, np.zeros(1), cons,
+                iters=25)
+    chosen = (res.risk_violation, res.max_violation)
+
+    # replay every candidate the solver saw and check none beats the answer
+    seen = [w_prev, project(w_prev, cons, w_prev, Sigma, 8)]
+    w = seen[-1]
+    eta0 = 1.0 / max(2.0 * 1.0 * float(np.abs(Sigma).sum(axis=1).max()), 1e-6)
+    for k in range(25):
+        eta = eta0 / (1.0 + 0.01 * k)
+        w = project(w + eta * (np.array([0.02]) - 2.0 * (Sigma @ w)),
+                    cons, w_prev, Sigma, 8)
+        seen.append(w.copy())
+    for cand in seen:
+        b = violation_breakdown(cand, cons, w_prev, Sigma)
+        rank = (max(0.0, max((b[n] for n in ("BOX", "VOL") if n in b),
+                             default=0.0)),
+                max(0.0, max(b.values(), default=0.0)))
+        assert chosen <= rank, f"discarded candidate {cand} was better"
+
+
+def test_constraints_reject_nonfinite_bounds_and_caps():
+    """Regression — CROSS-LANGUAGE DIVERGENCE: every sign test in
+    ``Constraints.validate`` is false for NaN, so a NaN bound or cap flows
+    through validation and surfaces as a NaN ``max_violation`` — a frozen
+    book instead of a loud failure at config load. Both ports must reject
+    the same set."""
+    n = 2
+    ones = np.ones(n)
+    with pytest.raises(ValueError, match="w_min/w_max must be finite"):
+        Constraints(w_min=np.array([np.nan, -1.0]), w_max=ones).validate(n)
+    with pytest.raises(ValueError, match="w_min/w_max must be finite"):
+        Constraints(w_min=-ones, w_max=np.array([1.0, np.inf])).validate(n)
+    for cap in ("gross_cap", "net_cap", "turnover_cap", "vol_target"):
+        cons = Constraints(w_min=-ones, w_max=ones, **{cap: float("nan")})
+        with pytest.raises(ValueError, match=f"{cap} must be finite"):
+            cons.validate(n)
+    with pytest.raises(ValueError, match="participation must be finite"):
+        Constraints(w_min=-ones, w_max=ones,
+                    participation=np.array([0.1, np.nan])).validate(n)
+    with pytest.raises(ValueError,
+                       match="currency_matrix/currency_bounds must be finite"):
+        Constraints(w_min=-ones, w_max=ones,
+                    currency_matrix=np.array([[1.0, 1.0]]),
+                    currency_bounds=np.array([np.nan])).validate(n)
+    # and the result of a valid solve is never NaN
+    res = solve(np.array([0.01, 0.02]), np.eye(n) * 1e-4, np.zeros(n), 1.0,
+                np.zeros(n), Constraints(w_min=-ones, w_max=ones), iters=10)
+    assert not np.isnan(res.max_violation)

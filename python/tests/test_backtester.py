@@ -422,3 +422,48 @@ def test_sharpe_bars_are_zero_filled_inside_a_session():
     m = res.metrics(capital=1000.0)
     assert m["n_bars_with_rows"] == 4
     assert m["n_bars"] == 12, "the quiet minutes between 1m and 10m are bars"
+
+
+def _session_gap_frame(boundary_mid_valid: bool):
+    """Two sessions of four rows, flat within each, 100 -> 200 across a
+    2-hour gap.  ``boundary_mid_valid`` controls whether the last row of the
+    first session has a usable mid (a one-sided book at the close does not)."""
+    gap = 2 * 3600 * NS_S
+    first = np.arange(4, dtype=np.int64) * NS_S
+    ts = np.concatenate([first, first[-1] + gap + first + NS_S])
+    mids = np.array([100.0] * 4 + [200.0] * 4)
+    frame = _frame_at(ts, mids)
+    if not boundary_mid_valid:
+        frame.loc[3, "mid_price_v1"] = np.nan
+    return frame, _scores_at(frame, np.full(8, 1e-4))
+
+
+def test_flatten_at_session_end_retreats_to_the_last_executable_row():
+    """Regression: the flatten must survive an unexecutable boundary row.
+
+    ``exec_target[~executable] = np.nan`` used to run AFTER the flatten, so
+    the forced 0 on a boundary row with no usable mid was overwritten and the
+    forward fill carried the position straight across the session gap — the
+    whole overnight move booked as intraday alpha, which is the leak the flag
+    exists to close.  The flatten now lands on the last EXECUTABLE row at or
+    before the boundary.
+    """
+    cfg = BacktestConfig(max_pos_qty=100, latency_rows=1,
+                         flatten_at_session_end=True)
+    bt = Backtester(_cost_model(), META, cfg)
+
+    frame, scores = _session_gap_frame(boundary_mid_valid=True)
+    ok = bt.run_instrument(1, frame, scores)
+    assert list(ok.positions) == [0.0, 100.0, 100.0, 0.0, 100.0, 100.0, 100.0, 0.0]
+
+    frame, scores = _session_gap_frame(boundary_mid_valid=False)
+    nan_row = bt.run_instrument(1, frame, scores)
+    # row 3 cannot trade, so the flatten retreats to row 2 and the position
+    # is already flat when the gap arrives
+    assert list(nan_row.positions) == [0.0, 100.0, 0.0, 0.0, 100.0, 100.0, 100.0, 0.0]
+    assert nan_row.positions[3] == 0.0, "no position may cross the session gap"
+    # nothing of the 100 -> 200 overnight move reaches P&L in either case
+    assert ok.gross_pnl == 0.0
+    assert nan_row.gross_pnl == 0.0
+    assert nan_row.total_pnl == pytest.approx(-nan_row.total_costs, abs=1e-9)
+    assert nan_row.total_pnl < 0.0

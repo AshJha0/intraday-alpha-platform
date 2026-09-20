@@ -90,7 +90,10 @@ def test_golden_exact_fill_list_matches(golden, events, configs_dir):
     res, _ = run_golden_scenario(events, configs_dir)
     assert res.events_processed == golden["events_processed"]
     want_fills = golden["fills"]
-    assert len(res.fills) == len(want_fills) == 6
+    # 7 since 2026-09-20: passive fills are bounded by the observed trade
+    # volume and share one liquidity pool, so the old single 129-share fill
+    # is now the 100 the tape actually showed plus a later 29.
+    assert len(res.fills) == len(want_fills) == 7
     for i, (got, want) in enumerate(zip(res.fills, want_fills)):
         what = f"fill {i + 1}"
         assert got.fill_id == want["fill_id"], what
@@ -134,7 +137,7 @@ def test_golden_rows_are_bit_identical_to_the_cpp_reference(golden, events, conf
 
 def test_golden_hand_traced_first_fills(events, configs_dir):
     res, _ = run_golden_scenario(events, configs_dir)
-    assert len(res.fills) >= 2
+    assert len(res.fills) >= 3
     # Jitter draws from SplitMix64(20260829) in submission order (order 1 =
     # VWAP slice 0 was submitted first: draw #1).
     rng = SplitMix64(20260829)
@@ -153,17 +156,27 @@ def test_golden_hand_traced_first_fills(events, configs_dir):
     assert f1.fee == 0.003 * 304
     impact_bps = 2.0 * (304.0 / 38_000_000.0 * 100.0)
     assert math.isclose(f1.impact_cost, impact_bps * 1e-4 * (304.0 * 2451 * 0.01), abs_tol=1e-15)
-    # Fill 2: VWAP slice 0 — passive trade-through fill at our own level.
+    # Fill 2: VWAP slice 0 — passive trade-through fill at our own level,
+    # capped at the 100 shares event 98 actually traded (slice qty 129).
     f2 = res.fills[1]
     assert f2.order_id == 1 and f2.parent_id == 1
-    assert f2.qty == 129
+    assert f2.qty == 100  # bounded by the observed volume
     assert f2.price_ticks == 2449  # best bid at the slice-0 decision
     assert f2.liquidity == Liquidity.MAKER
     assert f2.ts == 1787578386181246977  # event 98 (trade-through)
-    assert f2.fee == -0.002 * 129
+    assert f2.fee == -0.002 * 100
     decision1 = 1787578263509538609  # event 48
     assert decision1 + 350_000 + j1 == 1787578263509910284
     assert f2.ts > decision1 + 350_000 + j1
+    # Fill 3: the slice-0 residual, taken by the next trade-through
+    # (event 103, a 100-share bid EXECUTE at 2448).
+    f3 = res.fills[2]
+    assert f3.order_id == 1
+    assert f3.qty == 29  # 100 + 29 = the 129-share slice
+    assert f3.price_ticks == 2449
+    assert f3.liquidity == Liquidity.MAKER
+    assert f3.ts == 1787578395624588691  # event 103
+    assert f3.fee == -0.002 * 29
 
 
 def test_golden_deterministic_rerun(events, configs_dir):

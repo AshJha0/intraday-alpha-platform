@@ -142,7 +142,12 @@ def iter_jsonl(path: Union[str, Path]) -> Iterator[MarketEvent]:
     """Iterate events from a canonical JSONL file (blank lines skipped)."""
     with open(path, "r", encoding="utf-8") as f:
         for lineno, line in enumerate(f, start=1):
-            line = line.strip()
+            # Only the pinned ASCII whitespace set (schemas/FORMAT.md §1), not
+            # str.strip()'s Unicode set: a bare strip() also removed VT, FF and
+            # NBSP, so this reader ingested files that the C++ and Rust
+            # decoders reject as malformed — a silent parity break in a codec
+            # whose whole contract is identical cross-language behaviour.
+            line = line.strip(" \t\r\n")
             if line:
                 try:
                     yield decode_jsonl_line(line)

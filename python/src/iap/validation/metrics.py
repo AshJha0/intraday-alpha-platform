@@ -23,13 +23,30 @@ old fixed L = 2 under-covered the long-run variance and inflated the
 t-stat.  The lag count actually used is reported in every alpha JSON
 (``nw_lags``).  This is still "lite" because L follows a pinned rule rather
 than a data-driven bandwidth selection — deterministic and reproducible.
+
+**Bucket ICs are weighted by their pair count (pinned, round-4).**  Buckets
+are fixed *time* windows, so they carry wildly different amounts of evidence
+— 81 to 2 592 pairs in this dataset.  An equal-weighted mean treats an
+81-pair IC as evidence equal to a 2 592-pair one, and the headline t then
+swings with whichever thin bucket happens to be included: dropping a single
+81-pair bucket moved EQ03's reported t from 4.89 to 11.46.  The mean, the
+Bartlett autocovariances and the effective sample size are therefore all
+computed with pair-count weights (:func:`newey_west_tstat`).  Pair counts
+were chosen over Fisher-z ``n-3`` weights because they keep the reported
+statistic a weighted mean IC — the same quantity the gates read — instead of
+silently changing it to a mean of transformed ICs; the two weightings are
+nearly identical anyway at these bucket sizes.  Every report carries the
+bucket-size distribution (``ic_bucket_pairs``) so the weighting is
+auditable.
 """
 
 from __future__ import annotations
 
-from typing import Dict, List, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
+
+from iap.backtest.engine import SESSION_GAP_NS
 
 EPS = 1e-12
 NS_S = 1_000_000_000
@@ -104,23 +121,30 @@ def hit_rate(scores: np.ndarray, labels: np.ndarray, min_obs: int = 32) -> float
     return float(np.mean(np.sign(x[nz]) == np.sign(y[nz])))
 
 
-def bucket_ics(
+def bucket_ics_with_counts(
     ts: np.ndarray,
     scores: np.ndarray,
     labels: np.ndarray,
     bucket_ns: int = 300 * NS_S,
     min_obs: int = 8,
-) -> np.ndarray:
-    """IC per fixed event-time bucket (buckets with < min_obs pairs skipped)."""
+) -> Tuple[np.ndarray, np.ndarray]:
+    """IC per fixed event-time bucket **and** each bucket's pair count.
+
+    The counts are the weights :func:`newey_west_tstat` uses: fixed time
+    buckets carry very different amounts of evidence, and an equal-weighted
+    mean lets a thin bucket move the headline t-stat by more than the data
+    in it justifies (see the module docstring).
+    """
     ts = np.asarray(ts, dtype=np.int64)
     x = np.asarray(scores, dtype=float)
     y = np.asarray(labels, dtype=float)
     ok = np.isfinite(x) & np.isfinite(y)
     ts, x, y = ts[ok], x[ok], y[ok]
     if ts.size == 0:
-        return np.empty(0)
+        return np.empty(0), np.empty(0, dtype=np.int64)
     buckets = ts // bucket_ns
     out: List[float] = []
+    counts: List[int] = []
     for b in np.unique(buckets):
         m = buckets == b
         if m.sum() < min_obs:
@@ -129,7 +153,45 @@ def bucket_ics(
         if xb.std() <= EPS or yb.std() <= EPS:
             continue
         out.append(float(np.corrcoef(xb, yb)[0, 1]))
-    return np.asarray(out)
+        counts.append(int(m.sum()))
+    return np.asarray(out), np.asarray(counts, dtype=np.int64)
+
+
+def bucket_ics(
+    ts: np.ndarray,
+    scores: np.ndarray,
+    labels: np.ndarray,
+    bucket_ns: int = 300 * NS_S,
+    min_obs: int = 8,
+) -> np.ndarray:
+    """IC per fixed event-time bucket (buckets with < min_obs pairs skipped)."""
+    return bucket_ics_with_counts(ts, scores, labels, bucket_ns, min_obs)[0]
+
+
+def bucket_size_summary(counts: np.ndarray) -> Dict[str, float]:
+    """Distribution of bucket pair counts, for auditing the NW weighting.
+
+    A t-stat built from 30 buckets of 2 000 pairs is a very different
+    estimator from one built from 30 buckets ranging 81..2 592, and the
+    report has to make that visible rather than quoting only ``n_buckets``.
+    """
+    c = np.asarray(counts, dtype=float)
+    c = c[np.isfinite(c)]
+    if c.size == 0:
+        return {"n_buckets": 0, "total_pairs": 0, "min": float("nan"),
+                "p25": float("nan"), "median": float("nan"),
+                "p75": float("nan"), "max": float("nan"),
+                "mean": float("nan")}
+    return {
+        "n_buckets": int(c.size),
+        "total_pairs": int(c.sum()),
+        "min": float(c.min()),
+        "p25": float(np.quantile(c, 0.25)),
+        "median": float(np.median(c)),
+        "p75": float(np.quantile(c, 0.75)),
+        "max": float(c.max()),
+        "mean": float(c.mean()),
+    }
 
 
 def nw_lags(horizon_ns: int, bucket_ns: int = 300 * NS_S) -> int:
@@ -139,23 +201,58 @@ def nw_lags(horizon_ns: int, bucket_ns: int = 300 * NS_S) -> int:
     return int(-(-int(horizon_ns) // int(bucket_ns))) + 1
 
 
-def newey_west_tstat(series: np.ndarray, lags: int = 2) -> float:
-    """t-stat of mean(series) vs 0 with Bartlett-weighted long-run variance
-    (see module docstring — 'Newey-West-lite')."""
+def newey_west_tstat(
+    series: np.ndarray,
+    lags: int = 2,
+    weights: Optional[np.ndarray] = None,
+) -> float:
+    """t-stat of the (weighted) mean of ``series`` vs 0, with a
+    Bartlett-weighted long-run variance (see module docstring).
+
+    ``weights`` is the evidence behind each entry — the bucket pair counts
+    from :func:`bucket_ics_with_counts`.  The weighted estimator is the
+    ordinary one with the sample moments taken under pair weights
+    ``w_i w_{i+l}``: the point estimate is ``sum(w*s)/sum(w)``, each
+    autocovariance is ``sum(w_i w_{i+l} d_i d_{i+l}) / sum(w_i w_{i+l})``,
+    and the denominator uses Kish's effective sample size
+    ``(sum w)^2 / sum(w^2)`` in place of ``n``.  With equal weights every one
+    of those reduces exactly to the unweighted formula, so the pinned
+    hand-calculation still holds bit-for-bit.
+    """
     s = np.asarray(series, dtype=float)
-    s = s[np.isfinite(s)]
+    if weights is None:
+        w = np.ones(s.shape, dtype=float)
+    else:
+        w = np.asarray(weights, dtype=float)
+        if w.shape != s.shape:
+            raise ValueError("weights/series length mismatch")
+    ok = np.isfinite(s) & np.isfinite(w) & (w > 0.0)
+    s, w = s[ok], w[ok]
     n = s.size
     if n < 8:
         return float("nan")
-    d = s - s.mean()
-    lrv = float(np.mean(d * d))
+    sw = float(w.sum())
+    m = float(np.sum(w * s) / sw)
+    d = s - m
+
+    def gamma(lag: int) -> float:
+        if lag == 0:
+            pw = w * w
+            num = float(np.sum(pw * d * d))
+        else:
+            pw = w[lag:] * w[:-lag]
+            num = float(np.sum(pw * d[lag:] * d[:-lag]))
+        den = float(pw.sum())
+        return num / den if den > 0.0 else 0.0
+
+    lrv = gamma(0)
     for lag in range(1, min(lags, n - 1) + 1):
-        gamma = float(np.mean(d[lag:] * d[:-lag]))
-        lrv += 2.0 * (1.0 - lag / (lags + 1.0)) * gamma
+        lrv += 2.0 * (1.0 - lag / (lags + 1.0)) * gamma(lag)
     lrv = max(lrv, 0.0)
     if lrv <= EPS:
         return float("nan")
-    return float(s.mean() / np.sqrt(lrv / n))
+    n_eff = sw * sw / float(np.sum(w * w))
+    return float(m / np.sqrt(lrv / n_eff))
 
 
 def decay_curve(
@@ -172,24 +269,58 @@ def decay_curve(
     return out
 
 
-def signal_turnover(
-    ts: np.ndarray, scores: np.ndarray, conf: np.ndarray, conf_min: float = 0.25
-) -> float:
-    """Position flips per hour of a sign-following unit strategy.
+def signal_turnover_detail(
+    ts: np.ndarray,
+    scores: np.ndarray,
+    conf: np.ndarray,
+    conf_min: float = 0.25,
+    session_gap_ns: int = SESSION_GAP_NS,
+) -> Dict[str, float]:
+    """Flips, ACTIVE hours and wall span of a sign-following unit strategy.
 
     Position proxy: sign(score) where confidence >= conf_min else flat.
-    Turnover = number of position changes / elapsed event-time hours.
+
+    The denominator is summed inter-row event time with every gap larger
+    than ``session_gap_ns`` excluded (the same pinned session-gap constant
+    the backtester's ``BacktestConfig`` carries), NOT the wall span.
+    Turnover is a *cost* statistic: dividing flips by ``ts[-1] - ts[0]``
+    bills the strategy for the overnight and weekend hours in which it
+    cannot flip, and understates the rate it actually pays spread at by the
+    ratio of closed to open time — ~4.6x on this platform's equity frames,
+    where 29.4 flips/h wall-span is 134.7 flips/h of open market.  Both
+    denominators are returned so a report can show its work.
     """
     ts = np.asarray(ts, dtype=np.int64)
     pos = np.sign(np.where(np.asarray(conf, float) >= conf_min, scores, 0.0))
     pos[~np.isfinite(pos)] = 0.0
-    if len(pos) < 2:
-        return float("nan")
-    changes = int(np.sum(pos[1:] != pos[:-1]))
-    hours = (ts[-1] - ts[0]) / (3600.0 * NS_S)
-    if hours <= 0:
-        return float("nan")
-    return changes / hours
+    nan = float("nan")
+    if len(pos) < 2 or len(ts) != len(pos):
+        return {"flips": nan, "active_hours": nan, "span_hours": nan,
+                "flips_per_hour": nan}
+    changes = float(np.sum(pos[1:] != pos[:-1]))
+    gaps = np.diff(ts)
+    intra = gaps[(gaps > 0) & (gaps <= int(session_gap_ns))]
+    active_hours = float(intra.sum()) / (3600.0 * NS_S)
+    span_hours = float(ts[-1] - ts[0]) / (3600.0 * NS_S)
+    return {
+        "flips": changes,
+        "active_hours": active_hours,
+        "span_hours": span_hours,
+        "flips_per_hour": changes / active_hours if active_hours > 0 else nan,
+    }
+
+
+def signal_turnover(
+    ts: np.ndarray,
+    scores: np.ndarray,
+    conf: np.ndarray,
+    conf_min: float = 0.25,
+    session_gap_ns: int = SESSION_GAP_NS,
+) -> float:
+    """Position flips per hour of OPEN market time (see
+    :func:`signal_turnover_detail` for the denominator and why)."""
+    return signal_turnover_detail(
+        ts, scores, conf, conf_min, session_gap_ns)["flips_per_hour"]
 
 
 def capacity_proxy_usd(

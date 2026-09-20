@@ -216,7 +216,9 @@ class ChildOrder:
     arrival_ts: int = 0
     state: OrderState = OrderState.PENDING
     remaining: int = 0
-    ahead_qty: int = 0  #: displayed qty ahead of us at our level
+    #: qty ahead of us in the FIFO queue at our level: the displayed size at
+    #: rest time plus our own earlier children resting there (rule 4).
+    ahead_qty: int = 0
     resting: bool = False
     cross_exempt: bool = False  #: crossing-rule exemption (rule 4)
     cancel_reason: CancelReason = CancelReason.NONE

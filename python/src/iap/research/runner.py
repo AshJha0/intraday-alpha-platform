@@ -93,10 +93,24 @@ __all__ = [
     "restrict_frames",
 ]
 
-#: Looks at the data one experiment makes (= ``run_all.py``'s
-#: ``LOOKS_PER_ALPHA``): 1 walk-forward evaluation + 11 decay horizons +
-#: 3 cost multipliers + 3 latency shifts + 2 regimes + 1 holdout backtest.
-LOOKS_PER_EXPERIMENT = 21
+#: Looks at the data one experiment makes.  The ledger is the denominator of
+#: every multiple-testing correction in the research, so it counts what the
+#: chain ACTUALLY evaluates, not a round number:
+#:
+#:   1  pooled walk-forward OOS IC / Newey-West t (the headline evaluation)
+#:  11  decay curve, one IC per pinned label horizon (metrics.HORIZON_ORDER)
+#:   3  cost stress, one backtest per stress.COST_MULTIPLIERS entry
+#:   3  latency stress, ROW grid (stress.LATENCY_SHIFTS)
+#:   4  latency stress, TIME grid (stress.LATENCY_TIMES_NS)
+#:   2  regime split, IC in high vol and in low vol (stress.regime_split)
+#:   2  crossed / uncrossed conditional IC (the gate reads the uncrossed one)
+#:   1  leakage shift-by-one IC (LeakageTester.shift_test)
+#:   1  holdout backtest on the declared test period
+#: = 28.  The previous value, 21, omitted the time-latency grid, the
+#: crossed-book split and the leakage shift IC — three families of looks that
+#: were added to the chain without being added to its denominator, which
+#: makes every corrected t-stat in the reports look better than it is.
+LOOKS_PER_EXPERIMENT = 28
 
 #: Ledger ``kind`` of every runner entry.
 LEDGER_KIND = "experiment_runner"
@@ -236,6 +250,25 @@ def restrict_frames(frames: Mapping[int, pd.DataFrame], start_ts: int,
         ts = frames[iid]["exchange_ts"].to_numpy(dtype=np.int64)
         out[iid] = frames[iid][(ts >= start_ts) & (ts < end_ts)].reset_index(drop=True)
     return out
+
+
+def _assert_holdout_is_held_out(window: Mapping[int, pd.DataFrame],
+                                test_start_ts: int) -> None:
+    """Fail loudly if any walk-forward row reaches into the declared holdout.
+
+    The walk-forward window and the holdout backtest are separate pieces of
+    evidence in the same result document, and a reader is entitled to assume
+    the second was not used to produce the first. That assumption was false
+    for a year of this repository's history (see ``run``), silently, because
+    nothing checked it. This is cheap and runs on every experiment.
+    """
+    for iid in sorted(window):
+        ts = window[iid]["exchange_ts"].to_numpy(dtype=np.int64)
+        if ts.size and int(ts.max()) >= test_start_ts:
+            raise ResearchError(
+                f"instrument {iid}: walk-forward window reaches ts {int(ts.max())}, "
+                f"at or past the declared holdout start {test_start_ts} — the "
+                "reported OOS statistics would not be out of sample")
 
 
 def render_document(doc: Mapping[str, Any]) -> str:
@@ -474,23 +507,47 @@ class ExperimentRunner:
         self._check_spec(spec)
         factory = self._model_factory(spec)
         probe = factory()
-        window = restrict_frames(self.frames(), spec.train_period.start_ts,
-                                 spec.test_period.end_ts)
-        universe = probe.universe(sorted(window))
-        window = {iid: window[iid] for iid in universe}
-        if not any(len(df) for df in window.values()):
+        # Two windows, because they answer two different questions.
+        #
+        # ``full_window`` spans train..test end and belongs to the holdout
+        # backtest, which masks train and test out of it itself.
+        #
+        # ``wf_window`` stops where the declared holdout begins and is the
+        # only thing the walk-forward ever sees. It used to be the full
+        # window, so every headline statistic (ic, rank_ic, t_stat,
+        # hit_rate, turnover, fold_consistency, verdict) was a whole-dataset
+        # number and the later folds trained on rows inside the holdout they
+        # were supposed to be held out from: on the committed EQ03 spec,
+        # fold 3 trained on 19.4% of the declared test period and fold 4 on
+        # 59.3%, while ``validation_period`` was constructed,
+        # contract-validated, printed, and then read by nothing. Splitting
+        # the two makes the holdout genuinely held out and makes
+        # ``validation_period`` the boundary it claims to be;
+        # ``_assert_holdout_is_held_out`` stops it regressing.
+        full_window = restrict_frames(self.frames(), spec.train_period.start_ts,
+                                      spec.test_period.end_ts)
+        universe = probe.universe(sorted(full_window))
+        full_window = {iid: full_window[iid] for iid in universe}
+        if not any(len(df) for df in full_window.values()):
             raise ResearchError(
                 f"no rows for {spec.alpha_id}'s universe inside the experiment window")
+        wf_window = restrict_frames(full_window, spec.train_period.start_ts,
+                                    spec.test_period.start_ts)
+        if not any(len(df) for df in wf_window.values()):
+            raise ResearchError(
+                f"no rows for {spec.alpha_id}'s universe before the declared "
+                "holdout — the walk-forward would have nothing to evaluate")
+        _assert_holdout_is_held_out(wf_window, spec.test_period.start_ts)
         cfg = spec.configuration
         try:
             report = validate_alpha(
-                factory, window, self._backtester(spec, 1.0), self.meta,
+                factory, wf_window, self._backtester(spec, 1.0), self.meta,
                 self.max_participation, n_folds=int(cfg["n_folds"]),
                 embargo_ns=int(cfg["embargo_ns"]),
             )
         except ValueError as exc:  # splitter: too few rows / degenerate boundaries
             raise ResearchError(f"walk-forward validation impossible: {exc}") from exc
-        holdout = self._holdout(spec, window, factory)
+        holdout = self._holdout(spec, full_window, factory)
         total = self._ledger_total_after(spec, report)
         result = build_result(spec, report, holdout, total,
                               tracker.git_commit(self.repo_root))

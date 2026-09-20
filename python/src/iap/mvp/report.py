@@ -294,6 +294,7 @@ def build_report(engine: MvpEngine, feed: FeedResult, trace_digest: str,
         "portfolio": {
             "solves": engine.portfolio.solves,
             "infeasible_solves": engine.portfolio.infeasible_solves,
+            "infeasible_risk_solves": engine.portfolio.infeasible_risk_solves,
             "bars": len(engine.bar_returns),
             "portfolio_version": engine.portfolio.portfolio_version(engine.constraints),
         },

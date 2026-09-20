@@ -1,5 +1,6 @@
 package com.iap.tca;
 
+import com.iap.execution.Liquidity;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -117,7 +118,15 @@ public final class Tca {
         double spread = 0.0;
         double execVsMid = 0.0;
         for (TcaFill f : order.fills) {
-            spread += (double) f.qty() * f.halfSpreadAtFill();
+            // Sign by liquidity flag (pinned §2.4): a TAKER fill PAYS the
+            // half-spread, a MAKER fill EARNS it. This was unconditionally
+            // positive, so every passive fill was reported as paying the
+            // spread while the impact term silently absorbed the 2*q*hs
+            // error to keep the Perold identity closed — the total stayed
+            // right and the attribution, which is the entire point of the
+            // split, was wrong in the flattering direction.
+            double sigma = f.liquidity() == Liquidity.MAKER ? -1.0 : 1.0;
+            spread += sigma * (double) f.qty() * f.halfSpreadAtFill();
             execVsMid += s * (double) f.qty() * (f.price() - f.midAtFill());
         }
         return new SpreadImpact(spread, execVsMid - spread, execVsMid);

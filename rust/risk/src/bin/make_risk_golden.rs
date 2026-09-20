@@ -109,18 +109,22 @@ pub fn apply_step(eng: &mut RiskEngine, step: &Value) {
         "recover" => eng.on_feed_recovered(step["instrument_id"].as_u64().unwrap() as u32, ts()),
         "venue_down" => eng.on_venue_disconnect(step["venue_id"].as_u64().unwrap() as u16, ts()),
         "venue_up" => eng.on_venue_reconnect(step["venue_id"].as_u64().unwrap() as u16, ts()),
-        "kill" => eng.engage_kill(
-            parse_scope(step["scope"].as_str().unwrap()),
-            step["scope_id"].as_str().unwrap(),
-            ts(),
-            step["reason"].as_str().unwrap_or(""),
-        ),
-        "unkill" => eng.clear_kill(
-            parse_scope(step["scope"].as_str().unwrap()),
-            step["scope_id"].as_str().unwrap(),
-            ts(),
-            step["reason"].as_str().unwrap_or(""),
-        ),
+        "kill" => eng
+            .engage_kill(
+                parse_scope(step["scope"].as_str().unwrap()),
+                step["scope_id"].as_str().unwrap(),
+                ts(),
+                step["reason"].as_str().unwrap_or(""),
+            )
+            .expect("valid kill step"),
+        "unkill" => eng
+            .clear_kill(
+                parse_scope(step["scope"].as_str().unwrap()),
+                step["scope_id"].as_str().unwrap(),
+                ts(),
+                step["reason"].as_str().unwrap_or(""),
+            )
+            .expect("valid unkill step"),
         "override_loss" => eng
             .override_loss_limit(
                 parse_scope(step["scope"].as_str().unwrap()),

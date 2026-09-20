@@ -14,6 +14,10 @@ Pinned methodology:
   signal (through the platform cost model, ``iap.models.economics``) is > 0.
 - Time-aware three-way split of the OOS region, chronological with a 60s
   embargo between segments: 50% meta-train / 25% calibration / 25% test.
+  The percentages are of ROW MASS (quantiles of the row index), never of the
+  wall-clock span — this data occupies a fraction of each calendar day, and
+  wall-span boundaries put the calibration segment in the dormant overnight
+  stretch instead of in a quarter of the samples.
   Both boundaries are PURGED: earlier-side rows survive only when
   ``ts + TARGET_HORIZON_NS <= boundary`` so no train/calibration label
   window overlaps the following segment; the label horizon is asserted to
@@ -181,10 +185,21 @@ def run_meta_labeling(
     # label window closes at or before the boundary
     # (ts + TARGET_HORIZON_NS <= boundary) — a row whose label overlaps the
     # boundary would leak the later segment's outcomes into training.
-    t_lo, t_hi = int(ts[0]), int(ts[-1])
-    span = t_hi - t_lo
-    b1 = t_lo + span // 2
-    b2 = t_lo + (3 * span) // 4
+    # Boundaries at quantiles of the ROW INDEX, not of the wall span (pinned,
+    # round-4 — the same correction both walk-forward splitters already carry,
+    # iap.validation.splits.folds_by_row_mass and iap.models.splits.split).
+    # These frames occupy ~2.6 h of each 24 h day, so wall-span boundaries put
+    # the documented 50/25/25 at an actual 50.0 / 6.0 / 43.9 on the 206 190-row
+    # dataset: the calibration window landed almost entirely in the dormant
+    # overnight stretch and carried 324 positives against the 500 isotonic
+    # regression needs, so the calibrator silently fell back to Platt.
+    n_rows = ts.size
+    b1 = int(ts[min(int(round(0.50 * n_rows)), n_rows - 1)])
+    b2 = int(ts[min(int(round(0.75 * n_rows)), n_rows - 1)])
+    if not (int(ts[0]) < b1 < b2):
+        raise ValueError(
+            "meta split boundaries are not strictly increasing "
+            "(too many identical timestamps)")
     tr = ts + TARGET_HORIZON_NS <= b1
     ca = (ts > b1 + _EMBARGO_NS) & (ts + TARGET_HORIZON_NS <= b2)
     te = ts > b2 + _EMBARGO_NS

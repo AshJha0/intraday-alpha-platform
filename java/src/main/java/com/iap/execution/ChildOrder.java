@@ -21,7 +21,9 @@ public final class ChildOrder {
     public long arrivalTs;
     public OrderState state = OrderState.PENDING;
     public long remaining;
-    public long aheadQty;     // displayed qty ahead of us at our level
+    // Qty ahead of us in the FIFO queue at our level: the displayed size at
+    // rest time plus our own earlier children resting there (rule 4).
+    public long aheadQty;
     public boolean resting;
     public boolean crossExempt; // see the crossing-rule exemption (rule 4)
     public CancelReason cancelReason = CancelReason.NONE;

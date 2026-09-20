@@ -1091,7 +1091,24 @@ impl OrderBook {
                     lvl.side
                 )));
             }
+            // A checkpoint is a trust boundary like the wire: restore must
+            // reject what apply() would reject (`payload_ok` requires
+            // qty > 0 and price_ticks > 0). Without this a hand-written
+            // checkpoint seeds a book state unreachable through apply() —
+            // best_bid() of (-5, -1000000) — which then feeds negative sizes
+            // into the feature engine's merged depth and rolling windows.
+            if lvl.price_ticks <= 0 {
+                return Err(IapError::Checkpoint(format!(
+                    "non-positive price_ticks {} in checkpoint level",
+                    lvl.price_ticks
+                )));
+            }
             for &(oid, qty) in &lvl.orders {
+                if qty <= 0 {
+                    return Err(IapError::Checkpoint(format!(
+                        "non-positive qty {qty} for order_id {oid} in checkpoint"
+                    )));
+                }
                 if book.index.contains_key(&oid) {
                     return Err(IapError::Checkpoint(format!(
                         "duplicate order_id {oid} in checkpoint"
