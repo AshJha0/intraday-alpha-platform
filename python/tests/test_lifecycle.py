@@ -783,6 +783,61 @@ def test_bootstrap_nan_metric_is_reported_not_crashed(tmp_path):
     assert "EQ03 | RESEARCH" in table and "EQ01 | CANDIDATE" in table
 
 
+def test_bootstrap_refuses_to_truncate_the_transition_log_without_force(tmp_path, capsys):
+    """``research/lifecycle_transitions.jsonl`` is an append-only audit: a
+    HUMAN retire/reset line must survive a routine bootstrap.  A write over a
+    non-empty log raises ``TransitionLogExists`` (CLI exit 3) unless forced;
+    ``--dry-run`` never touches it; a forced rerun rewrites identical bytes."""
+    from iap.lifecycle.__main__ import main as lifecycle_main
+    from iap.lifecycle.bootstrap import TransitionLogExists
+
+    root = tmp_path / "repo"
+    for rel in ("configs/strategies", "research/alpha_reports"):
+        (root / rel).mkdir(parents=True)
+    for name in ("lifecycle.json", "strategies.json", "alpha_params.json"):
+        (root / "configs" / "strategies" / name).write_bytes(
+            (ROOT / "configs" / "strategies" / name).read_bytes())
+    (root / "research" / "experiments.json").write_bytes(
+        (ROOT / "research" / "experiments.json").read_bytes())
+    for path in sorted((ROOT / "research" / "alpha_reports").glob("*.json")):
+        (root / "research" / "alpha_reports" / path.name).write_bytes(path.read_bytes())
+    log_path = root / "research" / "lifecycle_transitions.jsonl"
+    registry_path = root / "research" / "alpha_registry.json"
+
+    # First bootstrap: no log yet, nothing to protect.
+    run_bootstrap(root, write=True)
+    first_log = log_path.read_bytes()
+    first_registry = registry_path.read_bytes()
+    assert len(first_log.splitlines()) == 24
+
+    # A HUMAN action appends to the audit.
+    _, registry, machine = __import__("iap.lifecycle.__main__", fromlist=["_load"])._load(root)
+    machine.retire("EQ03", 1_800_000_000_000_000_000, "review 2026-09-20", actor=Actor.HUMAN)
+    registry.save(registry_path)
+    audited = log_path.read_bytes()
+    assert len(audited.splitlines()) == 25 and audited.startswith(first_log)
+
+    # A routine bootstrap must not destroy it.
+    with pytest.raises(TransitionLogExists, match="25 transition"):
+        run_bootstrap(root, write=True)
+    assert log_path.read_bytes() == audited
+    assert registry_path.read_bytes() != first_registry     # the retire is still there
+    rc = lifecycle_main(["--root", str(root), "bootstrap"])
+    assert rc == 3 and "append-only" in capsys.readouterr().err
+    assert log_path.read_bytes() == audited
+    assert lifecycle_main(["--root", str(root), "bootstrap", "--dry-run"]) == 0
+    assert log_path.read_bytes() == audited
+
+    # Forced: rebuilt from research/, byte-identical to the first bootstrap.
+    run_bootstrap(root, write=True, force=True)
+    assert log_path.read_bytes() == first_log
+    assert registry_path.read_bytes() == first_registry
+    # An empty log is not an audit: no force needed.
+    log_path.write_text("")
+    run_bootstrap(root, write=True)
+    assert log_path.read_bytes() == first_log
+
+
 # --------------------------------------------------------------------------
 # Property tests (SplitMix64-driven, pinned seed)
 # --------------------------------------------------------------------------

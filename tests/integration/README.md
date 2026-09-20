@@ -18,6 +18,12 @@ What belongs here:
   subprocess — every artefact present, `report.json` sections, `explain` of a
   parent order, `replay` of the captured stream — and a bad configuration
   refused with exit code 2 naming the key; docs/MVP.md);
+- the *installed* package outside the checkout (`test_installed_package.py`:
+  a fresh venv, `pip install` of `python/` non-editable — what the Docker
+  images do — then `python -m iap.mvp run` on `mvp_tiny.json` from an
+  unrelated directory, once on the wheel's packaged `iap/_schemas` (asserted
+  byte-identical to `schemas/`) and once with `$IAP_SCHEMA_DIR` as the image
+  sets it; a dangling override must fail closed);
 - longer verticals as they become cheap enough to run in CI: features →
   alpha → risk → execution simulator, or the Python pipeline entry points
   (`python3 -m iap.marketdata`, `python3 -m iap.features`) against a temp

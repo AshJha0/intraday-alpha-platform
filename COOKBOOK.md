@@ -520,9 +520,9 @@ bash tests/harness/run_all.sh --golden-only   # golden groups only (fast)
 ```
 
 Exit code 0 iff every language passed; logs land in a temp dir printed on
-the first line. A full-suite run (2026-09-20): python 1352 / cpp 266 /
-rust 298 / java 475 tests passed (golden groups 162/67/62/102), plus
-`integration` (13) and `replay` (4) rows for the repo-level pytest suites, a
+the first line. A full-suite run (2026-09-20): python 1360 / cpp 266 /
+rust 298 / java 475 tests passed (golden groups 164/67/62/102), plus
+`integration` (15) and `replay` (4) rows for the repo-level pytest suites, a
 `deployment` row (16 structural checks passed, 2 skipped for absent tools)
 and a `numbers` row (every headline figure re-derived from its artefact),
 all PASS.
@@ -813,7 +813,7 @@ synthetic equity `SYN.EQ.AAPL` and writes every artefact under
 ```bash
 cd python
 PYTHONPATH=src python3 -m iap.mvp run                       # configs/mvp/mvp.json, seed 12345
-# mvp run 58a10f2194a3c81c: events=16578 decisions=355 parents=66 children=105 fills=55 pnl=-22.676287 USD digest=16cd29aa4c28ffb2... out=.../data/mvp/58a10f2194a3c81c
+# mvp run 58a10f2194a3c81c: events=16578 decisions=355 parents=66 children=105 fills=55 pnl=-22.676287 USD digest=059c30df7213d00e... out=.../data/mvp/58a10f2194a3c81c
 PYTHONPATH=src python3 -m iap.mvp run --seed 7 --out /tmp/mvp7          # another seed, explicit directory
 PYTHONPATH=src python3 -m iap.mvp verify                                  # run twice from scratch, compare digest/report/stream
 cat ../data/mvp/58a10f2194a3c81c/report.md                                # the honest numbers (cost-negative)
@@ -903,7 +903,8 @@ step: every alpha reaches CANDIDATE and holds there on
 ```bash
 cd python
 PYTHONPATH=src python3 -m iap.lifecycle bootstrap --dry-run      # compute, print, touch nothing
-PYTHONPATH=src python3 -m iap.lifecycle bootstrap                # rewrite research/alpha_registry.json + lifecycle_transitions.jsonl (identical bytes on an identical rerun)
+PYTHONPATH=src python3 -m iap.lifecycle bootstrap --force        # rewrite research/alpha_registry.json + lifecycle_transitions.jsonl (identical bytes on an identical rerun);
+                                                                  # without --force a non-empty transition log (an append-only audit with any HUMAN retire/reset lines) is refused, exit 3
 PYTHONPATH=src python3 -m iap.lifecycle status
 # alpha | state | since_ts | failed gates
 # ----- | ----- | -------- | ------------

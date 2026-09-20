@@ -240,7 +240,7 @@ flowchart LR
     MG --> EXP[("expected_*.json<br/>codec sha256 | book states | features<br/>alpha | backtest | risk decisions + audit + snapshot<br/>replay fills | portfolio | tca (+ timeline cases) | adaptive<br/>contracts examples | canonical json + trace digest<br/>lifecycle | experiment golden frame | mvp")]
     CPPTOOL["cpp/tools/make_replay_fills_golden<br/>(C++ is the fills reference;<br/>Python iap.execution consumes it too)"] --> EXP
     RSTOOL["rust/risk/src/bin/make_risk_golden<br/>(Rust is the risk reference;<br/>Python iap.risk consumes it too)"] --> EXP
-    GV --> PY["python: pytest -k golden<br/>162 tests"]
+    GV --> PY["python: pytest -k golden<br/>164 tests"]
     GV --> CPP["cpp: ctest -R Golden<br/>67 tests"]
     GV --> RS["rust: 9 golden test targets<br/>62 tests"]
     GV --> JV["java: all thirteen *GoldenTest (JUnitCore)<br/>102 golden-group tests"]
@@ -268,8 +268,8 @@ and are matched by Java, Rust and C++ (the trace and canonical-JSON ports)
 and by Java and Rust (the lifecycle ports). The harness
 (`tests/harness/run_all.sh`, with `run_golden.sh` as the golden-only alias)
 runs every suite with the canonical commands and prints the parity table; a
-full harness run (2026-09-20) passes 1352/266/298/475 tests (162/67/62/102
-golden) across python/cpp/rust/java, plus the repo-level `integration` (13)
+full harness run (2026-09-20) passes 1360/266/298/475 tests (164/67/62/102
+golden) across python/cpp/rust/java, plus the repo-level `integration` (15)
 and `replay` (4) rows — the same counts the README parity table records.
 
 ## 7. Hot-path engineering notes per language
@@ -553,7 +553,7 @@ book → `FeatureEngine` → three fitted `linear_z_v1` alphas ensembled →
 and compares bytes; `replay` re-runs it from the captured stream and must
 reproduce the trace digest; `tests/golden/expected_mvp.json` pins the golden
 run (seed 12345: 16,578 events, 355 decisions, 66 parents, 55 fills,
-−22.68 USD, digest `16cd29aa…`) as the cross-language pin for any port of
+−22.68 USD, digest `059c30df…`) as the cross-language pin for any port of
 the loop (docs/MVP.md §9 lists what a port must reproduce). The result is
 cost-negative and the realized-IC audit (docs/MVP.md §7.1) is part of the
 document: an order-of-magnitude gap between the MVP's mid-to-mid IC and the

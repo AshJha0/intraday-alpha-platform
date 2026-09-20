@@ -46,7 +46,7 @@ REPORT_JSON = "report.json"
 REPORT_MD = "report.md"
 RISK_AUDIT_FILE = "risk_audit.jsonl"
 PAPER_EVIDENCE_FILE = "paper_evidence.json"
-_PAPER_EVIDENCE_VERSION = 2
+_PAPER_EVIDENCE_VERSION = 3
 
 
 @dataclass(frozen=True)
@@ -113,11 +113,16 @@ def _paper_evidence(engine: MvpEngine, report: Dict[str, Any],
     ``realized_ic`` is the alpha's own realized IC at ITS FITTED HORIZON
     (the horizon the registry's ``research_ic`` was measured at — the
     ``paper_ic_tracking`` gate compares like with like; the IC at the MVP
-    holding horizon sits next to it as ``realized_ic_at_mvp_horizon``) when
-    defined, else 0.0 with ``ic_defined`` false alongside;
-    ``tracking_error`` is 0.0 (a single session has no dispersion) — both
-    facts are stated next to the numbers so a lifecycle gate never mistakes
-    an undefined statistic for evidence.
+    holding horizon sits next to it as ``realized_ic_at_mvp_horizon``);
+    ``tracking_error`` is 0.0 (a single session has no dispersion).
+
+    **An undefined statistic is never written as a number into the block a
+    gate reads**: when the realized IC is undefined (fewer than three valid
+    label pairs — a short or halted session) or the registry carries no
+    research IC, ``paper`` is ``null`` and the lifecycle machine records
+    ``NO_EVIDENCE`` for the PAPER -> ACTIVE edge (silence is not evidence;
+    conventions section 13.4).  ``ic_defined`` / ``research_ic_defined`` /
+    ``n_ic_samples`` next to the block say why.
     """
     alphas: Dict[str, Any] = {}
     kills = engine.n_kill_events()
@@ -126,13 +131,14 @@ def _paper_evidence(engine: MvpEngine, report: Dict[str, Any],
         at_mvp = engine.realized_ic(alpha.alpha_id)
         research = research_ic_of(registry, alpha.alpha_id)
         record = registry.get(alpha.alpha_id) if alpha.alpha_id in registry else None
-        evidence = PaperEvidence(
-            n_sessions=1, realized_ic=at_fit.ic if at_fit.ic is not None else 0.0,
-            research_ic=research if research is not None else 0.0,
-            net_pnl=report["pnl"]["total"], n_kill_events=kills, tracking_error=0.0)
+        evidence = None
+        if at_fit.ic is not None and research is not None:
+            evidence = PaperEvidence(
+                n_sessions=1, realized_ic=at_fit.ic, research_ic=research,
+                net_pnl=report["pnl"]["total"], n_kill_events=kills, tracking_error=0.0)
         alphas[alpha.alpha_id] = {
             "state_at_run": record.state.name if record is not None else None,
-            "paper": evidence.to_dict(),
+            "paper": None if evidence is None else evidence.to_dict(),
             "ic_defined": at_fit.ic is not None, "n_ic_samples": at_fit.n,
             "ic_horizon": at_fit.horizon,
             "realized_ic_at_mvp_horizon": at_mvp.ic, "mvp_horizon": at_mvp.horizon,
@@ -150,7 +156,8 @@ def _paper_evidence(engine: MvpEngine, report: Dict[str, Any],
         "alphas": alphas,
         "note": "PaperEvidence for iap.lifecycle (PAPER -> ACTIVE gates: paper_min_sessions, "
                 "paper_ic_tracking, paper_net_pnl, no_kill_events); the registry is not "
-                "mutated by the MVP.",
+                "mutated by the MVP. paper is null when the realized or research IC is "
+                "undefined (ic_defined / research_ic_defined) and evaluates as NO_EVIDENCE.",
     }
 
 

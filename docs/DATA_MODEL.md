@@ -65,7 +65,8 @@ erDiagram
     child_orders ||..o| venue_decisions : "child_order_id"
     child_orders ||..o{ executions : "order_id"
     parent_orders ||..o| tca_results : "parent_order_id"
-    parent_orders ||..o{ risk_decisions : "order_id"
+    child_orders ||..o{ risk_decisions : "order_id (per routed child)"
+    parent_orders ||..o{ risk_decisions : "order_id (parent-level loop)"
     sessions ||..o{ decision_traces : "session_id"
     instruments ||..o{ decision_traces : "instrument_id"
     venues ||..o{ child_orders : "venue_id"
@@ -147,11 +148,12 @@ columns or JSON) in their parent's row.
 
 | view | one row per | joins |
 |---|---|---|
-| `v_order_chain` | parent order | `parent_orders` → `decision_traces` header → the trace's first `alpha_signals` row for the order's instrument (`signal_expected_return`, `signal_confidence`, `signal_model_version`) → `portfolio_targets`/`portfolio_legs` (`portfolio_solver_status`, `portfolio_target_qty`) → the last `risk_decisions` row for the order (`risk_decision`, `risk_rule_id`, `risk_reason`) → counts over `child_orders` / `venue_decisions` (`n_child_orders`, `n_venues_routed`) → `executions` (`n_fills`, `filled_qty`, `fees`) → `tca_results` (`tca_fill_rate`, `implementation_shortfall_bps`, the cost split) → `attribution` (`attribution_*_bps`). This is the spec's observability chain *signal → portfolio → risk → order → children → fills → TCA → attribution* as one row; `Store.explain(order_id)` renders the same chain as text |
+| `v_order_chain` | parent order | `parent_orders` → `decision_traces` header → the trace's first `alpha_signals` row for the order's instrument (`signal_expected_return`, `signal_confidence`, `signal_model_version`) → `portfolio_targets`/`portfolio_legs` (`portfolio_solver_status`, `portfolio_target_qty`) → the `risk_decisions` rows of the order's **children** (risk is decided per routed child, conventions §11.4; the parent id itself also matches, for a loop without a child stage such as the Java paper loop) aggregated as `risk_decision` = `MAX(decision)` (REJECT/KILL if any child was rejected/killed, else ALLOW; NULL when nothing was checked), `risk_rule_id` / `risk_reason` = the first rejecting row (lowest `risk_index`), else the first row (`rule_id` is `''` on ALLOW), `n_children_allowed`, `n_children_rejected` → counts over `child_orders` / `venue_decisions` (`n_child_orders` — submitted children only, a control-blocked child never enters the trace; `n_venues_routed`) → `executions` (`n_fills` = PARTIAL/FILLED reports only, `filled_qty`, `fees`) → `tca_results` (`tca_fill_rate`, `implementation_shortfall_bps`, the cost split) → `attribution` (`attribution_*_bps`). This is the spec's observability chain *signal → portfolio → risk → order → children → fills → TCA → attribution* as one row; `Store.explain(order_id)` renders the same chain as text |
 | `v_alpha_scorecard` | alpha | `alphas` → its latest `experiment_results` row (max `created_ts`, ties broken by the greatest `experiment_id`) → ledger share (`ledger_entries`, `ledger_count` = Σ `count`) → `n_results`, `n_transitions` |
 | `v_experiment_ledger_summary` | ledger `kind` | `n_entries`, `n_alphas`, `total_count`, `total_reruns`, `n_promote` / `n_iterate` / `n_reject`, `max_nw_tstat`, `max_oos_ic`. `SUM(total_count)` over the view is the Bonferroni denominator |
 
-Views use only correlated scalar subqueries, `COALESCE`, `CASE` and standard
+Views use only correlated scalar subqueries (`IN (SELECT …)` / `EXISTS`
+subqueries included), `COALESCE`, `CASE`, `COUNT`/`SUM`/`MIN`/`MAX` and standard
 joins, so they read identically on both engines.
 
 ## 5. SQLite ↔ PostgreSQL portability rules
@@ -199,22 +201,35 @@ The files are the truth; the store is an index of them. Concretely:
 state writers run). Each importer returns an `ImportReport(inserted={table:
 n}, warnings=(…))`.
 
-**Alpha report → `ExperimentSpec` / `ExperimentResult` (pinned).** The report
-format predates the contracts and records neither the dataset hash, the
-feature hash, a seed nor a git commit, so the mapping is explicit about
-what it derives and what it cannot know:
+**Alpha report → `ExperimentSpec` / `ExperimentResult` (pinned, shared with
+the registry).** The report format predates the contracts and records neither
+the dataset hash, the feature hash, a seed nor a git commit, so the mapping is
+explicit about what it derives and what it cannot know. There is **one**
+mapping: `iap.lifecycle.bootstrap.research_evidence` (the result) +
+`alpha_report_spec` (the spec), which `python -m iap.lifecycle bootstrap`
+builds the registry from and `import_alpha_reports` calls — so the registry's
+`experiment_id` / gate values and the store's `experiment_results` row of an
+alpha are the same numbers (`test_store_rows_equal_the_registry_evidence_for_every_alpha`
+asserts it for all 24; docs/LIFECYCLE.md §6):
 
 | result field | from the report |
 |---|---|
-| `ic`, `rank_ic`, `t_stat`, `nw_lags`, `hit_rate`, `turnover` | `oos_ic`, `oos_rank_ic`, `nw_tstat`, `nw_lags`, `oos_hit_rate`, `turnover_flips_per_hour` |
+| `ic` | `gate_ic` — the uncrossed IC the PROMOTE gate reads (`oos_ic_uncrossed` when finite, else `oos_ic`) |
+| `t_stat` | `nw_tstat_uncrossed` when finite, else `nw_tstat` |
+| `rank_ic`, `nw_lags`, `hit_rate`, `turnover` | `oos_rank_ic`, `nw_lags`, `oos_hit_rate`, `turnover_flips_per_hour` |
 | `fold_consistency`, `n_folds`, `leakage_passed`, `leakage_detail`, `hypothesis_sign_confirmed`, `verdict` | `fold_sign_consistency`, `n_folds_run`, `leakage.passed`, `leakage`, `hypothesis_confirmed`, `verdict` |
-| `net_return_bps`, `transaction_cost_bps`, `gross_return_bps` | `stress.cost.x1.total_pnl` and `total_costs` in USD, expressed in **bps of the report's total `capacity_usd_by_instrument`** (`gross = net + cost`; the basis is recorded as `configuration.pnl_basis`) |
+| `net_return_bps`, `transaction_cost_bps`, `gross_return_bps` | `stress.cost.x1.total_pnl` and `total_costs` in USD, expressed in **bps of the 1e6 USD reference notional** (`REFERENCE_NOTIONAL_USD`; `gross = net + cost`; only the sign is gated; the basis is recorded as `configuration.pnl_basis`) |
 | `max_drawdown_bps`, `sharpe` | **not recorded** by the report: stored as `0.0` and listed in `configuration.unrecorded` |
-| `n_experiments_in_ledger` | the ledger position `n` of the alpha's `promotion_pipeline` entry (0 without a ledger) |
-| `git_commit`, `created_ts` | `unversioned-workspace` (the platform's pinned sentinel); the last fold's `test_end` |
-| spec `dataset_version`, `feature_version` | explicit arguments, else the working tree (`iap.experiment.tracker`), else — for the dataset — the newest model manifest; the source used is recorded in `configuration.version_sources`; if none is available the experiment rows are skipped with a warning |
-| spec `model_version`, `seed`, periods | `None`, `0` and empty train/validation periods (the per-fold windows live in `configuration.folds`; `test_period` spans the first fold's `test_start` to the last fold's `test_end`) |
-| `experiment_id` | `content_hash(spec without id)[:16]` — the research/experiments/README.md convention |
+| `experiment_id`, `n_experiments_in_ledger` | the alpha's `promotion_pipeline` ledger entry: `key[:16]` and `n` (`<ID>-unledgered` / `0` without one) |
+| `dataset_version`, `feature_version`, `git_commit`, `model_version` | `configs/strategies/alpha_params.json`: `data_version`, `feature_version`, `git_commit`, `content_hash(params[ID])` (explicit `dataset_version` / `feature_version` arguments to `import_alpha_reports` override the document, for a tree without it) |
+| `created_ts` | the last fold's `test_end` |
+| spec `configuration` | `source`, `protocol`, `gates`, `n_folds`, `folds` (the per-fold windows), `universe`, `capacity_usd` (Σ `capacity_usd_by_instrument`), `pnl_basis`, `ic_source`, `t_stat_source`, `experiment_id_source`, `version_sources`, `unrecorded` |
+| spec `seed`, periods | `0` and empty train/validation periods; `test_period` spans the first fold's `test_start` to the last fold's `test_end` |
+
+An `ExperimentRunner` document (`research/experiments/<id>/`) keeps its own
+`experiment_id = content_hash(spec without id)[:16]` (research/experiments/README.md);
+a report-mapped row is identified by its ledger key so the two artefacts of an
+alpha can be joined.
 
 **Lifecycle log → `LifecycleTransition` (pinned).** A move to a lower state
 (WATCH → ACTIVE, RETIRED → WATCH) *passed* the `reactivate_ic` gate
@@ -242,18 +257,26 @@ ORDER BY alpha_id;
 -- {"alpha_id":"EQ03","current_state":"CANDIDATE","ic":0.0185,"ledger_count":67,...,"verdict":"ITERATE"}
 ```
 
-**2. Why was order X rejected?** — the risk decision(s) taken on a parent
-order, with the order's context; `Store.explain(12346)` renders the same
-chain as text (`Risk: REJECT  rule = FAT_FINGER_NOTIONAL  reason = …`):
+**2. Why was order X rejected?** — the risk verdict of a parent order
+aggregated over its routed children (risk is decided per child, §11.4), then
+the per-child rows; `Store.explain(12345)` renders the same chain as text
+(`Risk: ALLOW …` / `Risk: REJECT  rule = RATE_THROTTLE  reason = …`):
 
 ```sql
-SELECT r.order_id, r.decision, r.rule_id, r.rule_index, r.reason,
-       po.alpha_id, po.qty, po.algo
+SELECT parent_order_id, alpha_id, qty, algo, risk_decision, risk_rule_id,
+       risk_reason, n_children_allowed, n_children_rejected, n_child_orders, n_fills
+FROM v_order_chain
+WHERE parent_order_id = 12345;
+-- {"algo":"POV","alpha_id":"EQ03","n_child_orders":3,"n_children_allowed":1,"n_children_rejected":0,"n_fills":3,"parent_order_id":12345,"qty":20000,"risk_decision":1,"risk_reason":"all checks passed","risk_rule_id":""}
+
+SELECT r.order_id, r.decision, r.rule_id, r.rule_index, r.reason
 FROM risk_decisions r
-JOIN parent_orders po ON po.parent_order_id = r.order_id AND po.trace_id = r.trace_id
-WHERE r.order_id = 12346
-ORDER BY r.timestamp_ns, r.risk_index;
--- {"alpha_id":"EQ03","decision":2,"order_id":12346,"qty":20000,"reason":"notional 2,000,000 > limit 1,000,000","rule_id":"FAT_FINGER_NOTIONAL","rule_index":13,...}
+JOIN parent_orders po ON po.trace_id = r.trace_id
+WHERE po.parent_order_id = 12345
+ORDER BY r.risk_index;
+-- one row per risk decision of the order's trace — per routed child in the MVP, on the parent id in a loop
+-- without a child stage (the example trace: {"decision":1,"order_id":12345,"reason":"all checks passed","rule_id":"","rule_index":-1});
+-- every child of the bundled MVP run is ALLOWed (risk_rejected = 0); a REJECTed one reads decision 2 with its rule_id / rule_index
 ```
 
 **3. Implementation shortfall by algo** — the TCA cost split per execution
@@ -319,8 +342,12 @@ store.counts()                                # {table: rows}, sorted
 ```
 python -m iap.store build   [--db data/store/iap.sqlite] [--repo-root .]   # count table on stdout, warnings on stderr
 python -m iap.store explain [--db ...] <parent_order_id>
-python -m iap.store sql     [--db ...] "<query>"                           # one canonical JSON line per row
+python -m iap.store sql     [--db ...] "<query>"                           # one canonical JSON line per row; the file is opened READ-ONLY (mode=ro)
 ```
+
+`explain` and `sql` open the database read-only (`file:…?mode=ro`,
+`Store.open(path, read_only=True)`): a statement that writes fails with exit
+code 1 and the index changes only through `build`.
 
 `data/store/` is git-ignored: the database is never committed, only rebuilt.
 The MVP writes its own store per run (`data/mvp/<run_id>/iap.sqlite`, every

@@ -21,7 +21,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
-from iap.contracts.ids import is_sha256_hex
 from iap.contracts.types import (
     Actor,
     ContractError,
@@ -64,11 +63,6 @@ UNVERSIONED = "unversioned-workspace"
 #: lifecycle log was produced under.
 WATCH_IC_GATE = 0.0
 REACTIVATE_IC_GATE = 0.005
-
-_ALPHA_REPORT_METRICS: Tuple[str, ...] = (
-    "oos_ic", "oos_rank_ic", "nw_tstat", "oos_hit_rate",
-    "turnover_flips_per_hour", "fold_sign_consistency")
-
 
 @dataclass(frozen=True)
 class ImportReport:
@@ -243,56 +237,14 @@ def import_experiments_ledger(store: Store, path: PathLike) -> ImportReport:
 # Alpha reports -> alphas + experiments + experiment_results
 # --------------------------------------------------------------------------
 
-def _resolve_versions(repo_root: Path, dataset_version: Optional[str],
-                      feature_version: Optional[str], col: _Collector
-                      ) -> Tuple[Optional[str], Optional[str], Dict[str, str]]:
-    """The (dataset, feature) hashes the alpha reports were produced under.
-
-    The report format records neither, so: an explicit argument wins; else
-    the working tree (``iap.experiment.tracker``); else, for the dataset,
-    the newest model manifest; else ``None`` (the caller skips the rows).
-    The chosen source is recorded in the spec's configuration.
-    """
-    from iap.experiment.tracker import data_version as tree_data_version
-    from iap.experiment.tracker import feature_version as tree_feature_version
-
-    sources: Dict[str, str] = {}
-    if dataset_version is None:
-        candidate = tree_data_version(repo_root)
-        if is_sha256_hex(candidate):
-            dataset_version, sources["dataset_version"] = candidate, "data/normalized"
-        else:
-            manifests = sorted((repo_root / "research" / "models").glob("run_*/manifest.json"))
-            for manifest in reversed(manifests):
-                candidate = _load_json(manifest).get("data_version")
-                if is_sha256_hex(candidate):
-                    dataset_version = candidate
-                    sources["dataset_version"] = manifest.relative_to(repo_root).as_posix()
-                    break
-    else:
-        sources["dataset_version"] = "argument"
-    if feature_version is None:
-        candidate = tree_feature_version(repo_root)
-        if is_sha256_hex(candidate):
-            feature_version, sources["feature_version"] = candidate, "data/reference/feature_registry.json"
-    else:
-        sources["feature_version"] = "argument"
-    if dataset_version is None:
-        col.warn("alpha reports: no dataset_version available (no data/normalized, "
-                 "no model manifest); experiment rows skipped")
-    if feature_version is None:
-        col.warn("alpha reports: no feature_version available; experiment rows skipped")
-    return dataset_version, feature_version, sources
-
-
-def _ledger_positions(ledger_path: Optional[PathLike]) -> Dict[str, int]:
-    """``{alpha_id: ledger position n}`` of the promotion-pipeline entries."""
+def _ledger_entries(ledger_path: Optional[PathLike]) -> Dict[str, Dict[str, Any]]:
+    """``{alpha_id: promotion_pipeline ledger entry}`` (empty without a ledger)."""
     if ledger_path is None or not Path(ledger_path).is_file():
         return {}
-    out: Dict[str, int] = {}
+    out: Dict[str, Dict[str, Any]] = {}
     for entry in _load_json(Path(ledger_path))["entries"]:
         if entry["kind"] == "promotion_pipeline":
-            out[entry["alpha_id"]] = max(out.get(entry["alpha_id"], 0), int(entry["n"]))
+            out[entry["alpha_id"]] = entry
     return out
 
 
@@ -302,76 +254,58 @@ def _rationales() -> Dict[str, str]:
     return {aid: cls.economic_rationale() for aid, cls in ALPHA_CLASSES.items()}
 
 
-def _report_to_contracts(report: Mapping[str, Any], source: str, dataset_version: str,
-                         feature_version: str, sources: Mapping[str, str],
-                         n_in_ledger: int) -> Tuple[ExperimentSpec, ExperimentResult]:
-    """The pinned alpha-report -> (ExperimentSpec, ExperimentResult) mapping
-    (docs/DATA_MODEL.md section 6).  Raises ``ValueError`` on a report that
-    cannot be mapped honestly."""
-    folds = sorted(report["folds"], key=lambda f: int(f["fold"]))
-    if not folds:
-        raise ValueError("no folds")
-    capacity = float(sum(report["capacity_usd_by_instrument"].values()))
-    if not capacity > 0:
-        raise ValueError("capacity_usd_by_instrument sums to zero")
-    x1 = report["stress"]["cost"]["x1"]
-    for name in ("total_costs", "total_pnl"):
-        if not _finite(x1[name]):
-            raise ValueError(f"stress.cost.x1.{name} non-finite")
-    for name in _ALPHA_REPORT_METRICS:
-        if not _finite(report[name]):
-            raise ValueError(f"{name} non-finite")
+def _params_document(repo_root: Path, dataset_version: Optional[str],
+                     feature_version: Optional[str], col: _Collector) -> Optional[Dict[str, Any]]:
+    """``configs/strategies/alpha_params.json`` — the provenance document
+    the registry's mapping reads (``data_version``, ``feature_version``,
+    ``git_commit`` and the per-alpha parameter blocks whose hash is the
+    ``model_version``).  Explicit ``dataset_version`` / ``feature_version``
+    arguments override the document's (for a tree that has none: the
+    arguments must then both be given, and the model hash / commit are the
+    ``unversioned`` sentinels)."""
+    from iap.lifecycle.bootstrap import PARAMS_RELPATH, load_params_document
 
-    test_start = int(folds[0]["test_start"])
-    test_end = max(int(f["test_end"]) for f in folds)
-    body: Dict[str, Any] = {
-        "alpha_id": report["alpha_id"],
-        "dataset_version": dataset_version,
-        "feature_version": feature_version,
-        "model_version": None,
-        "configuration": {
-            "source": source,
-            "protocol": "purged walk-forward CV (research/alpha_reports/run_all.py)",
-            "gates": report["gates"],
-            "n_folds": int(report["n_folds_run"]),
-            "folds": [{"fold": int(f["fold"]), "test_start": int(f["test_start"]),
-                       "test_end": int(f["test_end"]), "n_train": int(f["n_train"]),
-                       "n_test_rows": int(f["n_test_rows"])} for f in folds],
-            "universe": [int(i) for i in report["universe"]],
-            "capacity_usd": capacity,
-            "pnl_basis": "bps of total capacity_usd at 1x cost (stress.cost.x1)",
-            "version_sources": dict(sources),
-            "unrecorded": ["seed", "git_commit", "max_drawdown_bps", "sharpe",
-                           "train_period", "validation_period"],
-        },
-        "train_period": {"start_ts": test_start, "end_ts": test_start},
-        "validation_period": {"start_ts": test_start, "end_ts": test_start},
-        "test_period": {"start_ts": test_start, "end_ts": test_end},
-        "seed": 0,
-        "horizon": report["horizon"],
-    }
-    spec = ExperimentSpec(experiment_id=content_hash(body)[:16], **body)
+    path = repo_root / PARAMS_RELPATH
+    doc: Optional[Dict[str, Any]] = None
+    if path.is_file():
+        doc = load_params_document(repo_root)
+    elif dataset_version is None or feature_version is None:
+        col.warn(f"alpha reports: {PARAMS_RELPATH.as_posix()} not found and no explicit "
+                 "dataset_version / feature_version; experiment rows skipped")
+        return None
+    else:
+        doc = {"data_version": dataset_version, "feature_version": feature_version,
+               "git_commit": UNVERSIONED, "params": {}}
+    if dataset_version is not None:
+        doc = dict(doc, data_version=dataset_version)
+    if feature_version is not None:
+        doc = dict(doc, feature_version=feature_version)
+    return doc
 
-    cost_bps = float(x1["total_costs"]) / capacity * 1e4
-    net_bps = float(x1["total_pnl"]) / capacity * 1e4
-    leakage = dict(report["leakage"])
-    result = ExperimentResult(
-        experiment_id=spec.experiment_id, alpha_id=report["alpha_id"],
-        dataset_version=dataset_version, feature_version=feature_version,
-        model_version=None,
-        ic=float(report["oos_ic"]), rank_ic=float(report["oos_rank_ic"]),
-        t_stat=float(report["nw_tstat"]), nw_lags=int(report["nw_lags"]),
-        hit_rate=float(report["oos_hit_rate"]),
-        turnover=float(report["turnover_flips_per_hour"]),
-        gross_return_bps=net_bps + cost_bps, transaction_cost_bps=cost_bps,
-        net_return_bps=net_bps, max_drawdown_bps=0.0, sharpe=0.0,
-        fold_consistency=float(report["fold_sign_consistency"]),
-        n_folds=int(report["n_folds_run"]),
-        leakage_passed=bool(leakage["passed"]), leakage_detail=leakage,
-        hypothesis_sign_confirmed=report.get("hypothesis_confirmed"),
-        verdict=Verdict(report["verdict"]),
-        n_experiments_in_ledger=n_in_ledger, git_commit=UNVERSIONED,
-        created_ts=test_end)
+
+def _report_to_contracts(report: Mapping[str, Any], source: str,
+                         ledger_entry: Optional[Mapping[str, Any]],
+                         params_doc: Mapping[str, Any]) -> Tuple[ExperimentSpec, ExperimentResult]:
+    """The pinned alpha-report -> (ExperimentSpec, ExperimentResult) mapping —
+    ``iap.lifecycle.bootstrap.research_evidence`` / ``alpha_report_spec``,
+    the one mapping the registry is built from, so the store row and the
+    registry evidence of an alpha carry the same ``experiment_id`` and
+    numbers (docs/DATA_MODEL.md section 6).  Raises ``ValueError`` on a
+    report that cannot be mapped honestly (a non-finite metric)."""
+    from iap.lifecycle.bootstrap import alpha_report_spec, research_evidence
+
+    alpha_id = str(report["alpha_id"])
+    params = dict(params_doc)
+    if alpha_id not in params.get("params", {}):
+        # No fitted block for this alpha (a tree without alpha_params.json):
+        # the model hash is the unversioned sentinel, never a fake hash.
+        params["params"] = dict(params.get("params", {}), **{alpha_id: None})
+    result, missing = research_evidence(alpha_id, report, ledger_entry, params)
+    if result is None:
+        raise ValueError(f"non-finite report metric(s): {', '.join(missing)}")
+    if params["params"][alpha_id] is None:
+        result = ExperimentResult.from_dict(dict(result.to_dict(), model_version=None))
+    spec = alpha_report_spec(alpha_id, report, result, source)
     return spec, result
 
 
@@ -383,16 +317,20 @@ def import_alpha_reports(store: Store, reports_dir: PathLike, *,
     """``research/alpha_reports/<ID>.json`` -> alphas (id, asset class,
     family = the report's ``name``, horizon, economic rationale from
     ``iap.alpha``) and, per report, one ExperimentSpec + ExperimentResult
-    under the pinned mapping.  A report with a non-finite metric still
-    registers its alpha but contributes no experiment rows (warning).
-    ``ledger_path`` supplies ``n_experiments_in_ledger`` (0 without it).
-    An existing alpha row keeps its ``current_state``."""
+    under the pinned mapping shared with the lifecycle registry
+    (``iap.lifecycle.bootstrap.research_evidence`` + ``alpha_report_spec``:
+    ``experiment_id`` = the ledger entry's ``key[:16]``, versions and the
+    model hash from ``configs/strategies/alpha_params.json``, P&L in bps of
+    the 1e6 USD reference notional).  A report with a non-finite metric
+    still registers its alpha but contributes no experiment rows (warning).
+    ``ledger_path`` supplies the ledger entry (``<ID>-unledgered`` and
+    ``n_experiments_in_ledger = 0`` without it).  An existing alpha row
+    keeps its ``current_state``."""
     reports = Path(reports_dir)
     root = Path(repo_root) if repo_root is not None else default_repo_root()
     col = _Collector()
-    dataset_version, feature_version, sources = _resolve_versions(
-        root, dataset_version, feature_version, col)
-    positions = _ledger_positions(ledger_path)
+    params_doc = _params_document(root, dataset_version, feature_version, col)
+    ledger = _ledger_entries(ledger_path)
     rationales = _rationales()
     states = {r["alpha_id"]: r["current_state"]
               for r in store.query("SELECT alpha_id, current_state FROM alphas")}
@@ -408,12 +346,11 @@ def import_alpha_reports(store: Store, reports_dir: PathLike, *,
             horizon=report["horizon"], economic_rationale=rationales.get(alpha_id, ""),
             current_state=states.get(alpha_id, "RESEARCH"))
         col.wrote("alphas")
-        if dataset_version is None or feature_version is None:
+        if params_doc is None:
             continue
         try:
             spec, result = _report_to_contracts(
-                report, f"research/alpha_reports/{path.name}", dataset_version,
-                feature_version, sources, positions.get(alpha_id, 0))
+                report, f"research/alpha_reports/{path.name}", ledger.get(alpha_id), params_doc)
         except (ValueError, KeyError, TypeError) as exc:
             col.warn(f"{path.name}: experiment rows skipped ({exc})")
             continue

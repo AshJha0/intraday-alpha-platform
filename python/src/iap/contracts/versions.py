@@ -100,18 +100,36 @@ def _default_schema_dir() -> Path:
     return Path(__file__).resolve().parents[4] / "schemas"
 
 
-def schema_dir() -> Path:
-    """Resolve the repository ``schemas/`` directory.
+def _packaged_schema_dir() -> Path:
+    # A non-editable install carries schemas/ as iap/_schemas (python/setup.py
+    # copies the repository tree into the wheel at build time).
+    return Path(__file__).resolve().parents[1] / "_schemas"
 
-    ``$IAP_SCHEMA_DIR`` overrides the checkout-relative default (for an
-    installed wheel running outside the repository).  Raises when the
-    directory does not exist: contracts are never validated against nothing.
+
+def schema_dir() -> Path:
+    """Resolve the ``schemas/`` directory.
+
+    Resolution order: ``$IAP_SCHEMA_DIR`` (an explicit override must exist —
+    it never falls through), then the repository checkout (``<repo>/schemas``
+    relative to this file: the editable / in-tree case), then the copy the
+    wheel ships as ``iap/_schemas`` (``python/setup.py``; an installed package
+    running outside the repository, e.g. the Docker images).  Raises naming
+    every candidate when none exists: contracts are never validated against
+    nothing.
     """
     override = os.environ.get("IAP_SCHEMA_DIR")
-    path = Path(override).resolve() if override else _default_schema_dir()
-    if not path.is_dir():
-        raise RuntimeError(f"schema directory not found: {path}")
-    return path
+    if override:
+        path = Path(override).resolve()
+        if not path.is_dir():
+            raise RuntimeError(f"schema directory not found: {path} ($IAP_SCHEMA_DIR)")
+        return path
+    candidates = (_default_schema_dir(), _packaged_schema_dir())
+    for path in candidates:
+        if path.is_dir():
+            return path
+    raise RuntimeError("schema directory not found: tried "
+                       + ", ".join(str(p) for p in candidates)
+                       + " (set $IAP_SCHEMA_DIR)")
 
 
 #: Checkout-relative ``schemas/`` path (may not exist for an installed wheel;

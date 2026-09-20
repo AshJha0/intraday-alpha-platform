@@ -174,8 +174,13 @@ files on disk and each type's `x_version`. A field change = bump the schema
 file, the constant and the type, regenerate the golden with `--force`, add a
 `schemas/MIGRATIONS.md` entry, re-match every port in the same PR
 (CONTRIBUTING.md §4; GOVERNANCE.md §1 "Contracts & schemas"). A file move is
-a MIGRATIONS entry and bumps nothing. `schema_dir()` resolves
-`<repo>/schemas` (override with `$IAP_SCHEMA_DIR`).
+a MIGRATIONS entry and bumps nothing. `schema_dir()` resolves, in order,
+`$IAP_SCHEMA_DIR` (an explicit override must exist — it never falls through),
+`<repo>/schemas` (the checkout) and the copy a non-editable install carries as
+`iap/_schemas` (`python/setup.py` packages `schemas/` into the wheel at build
+time; `tests/integration/test_installed_package.py` proves the packaged copy
+equals the repository copy byte for byte and runs the MVP from a venv outside
+the checkout). `Dockerfile.python` sets `IAP_SCHEMA_DIR=/app/schemas`.
 
 ## 6. Schema index (17 files)
 

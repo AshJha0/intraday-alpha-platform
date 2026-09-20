@@ -139,7 +139,7 @@
         "decisions": 355,
         "decisions_flat": 114,
         "decisions_parent_live": 0,
-        "decisions_window_beyond_stream": 0,
+        "decisions_window_beyond_session": 0,
         "decisions_without_covariance": 175,
         "events": 16578,
         "feed_recoveries": 9,
@@ -325,7 +325,7 @@
       "seed": 12345,
       "session_id": "mvp-58a10f2194a3c81c",
       "strategy_id": "MVP",
-      "trace_digest": "16cd29aa4c28ffb221b84b8f97b30c70eee09394a5160b5608233a07b536a187",
+      "trace_digest": "059c30df7213d00e0d3f6de7ab9011b3d1ee9651cd3df5ec6609d2e66e965c2b",
       "venues": [
         "XV1",
         "XV2",
@@ -333,7 +333,7 @@
       ]
     },
     "trace": {
-      "digest": "16cd29aa4c28ffb221b84b8f97b30c70eee09394a5160b5608233a07b536a187",
+      "digest": "059c30df7213d00e0d3f6de7ab9011b3d1ee9651cd3df5ec6609d2e66e965c2b",
       "first_trace_ids": [
         "403020d9da592210fad79613f87ffa19",
         "2f060d00f430d94731a37a5bfff17fdd",
@@ -351,6 +351,6 @@
   "run_id": "58a10f2194a3c81c",
   "seed": 12345,
   "session_id": "mvp-58a10f2194a3c81c",
-  "trace_digest": "16cd29aa4c28ffb221b84b8f97b30c70eee09394a5160b5608233a07b536a187",
+  "trace_digest": "059c30df7213d00e0d3f6de7ab9011b3d1ee9651cd3df5ec6609d2e66e965c2b",
   "x-version": 1
 }

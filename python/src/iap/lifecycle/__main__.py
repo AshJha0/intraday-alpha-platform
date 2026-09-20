@@ -1,12 +1,14 @@
 """``python -m iap.lifecycle`` — bootstrap / status / retire / reset.
 
-    python -m iap.lifecycle bootstrap [--dry-run]
+    python -m iap.lifecycle bootstrap [--dry-run] [--force]
     python -m iap.lifecycle status
     python -m iap.lifecycle retire <ID> --reason "..." [--event-ts NS]
     python -m iap.lifecycle reset  <ID> --reason "..." [--event-ts NS]
 
 ``retire`` / ``reset`` are HUMAN actions on ``research/alpha_registry.json``
-and append to ``research/lifecycle_transitions.jsonl``.  ``--event-ts`` is
+and append to ``research/lifecycle_transitions.jsonl``.  That log is an
+append-only audit: ``bootstrap`` refuses to truncate it while it holds
+transitions unless ``--force`` is given (exit code 3).  ``--event-ts`` is
 the event time of the action; when omitted it defaults to the registry's
 latest known event time (the maximum ``since_ts``) — never the wall clock.
 """
@@ -22,6 +24,7 @@ from iap.contracts.types import Actor
 from iap.lifecycle.bootstrap import (
     REGISTRY_RELPATH,
     TRANSITIONS_RELPATH,
+    TransitionLogExists,
     render_status,
     run_bootstrap,
 )
@@ -45,8 +48,12 @@ def _default_event_ts(registry: AlphaRegistry) -> int:
     return max(rec.since_ts for rec in registry.records())
 
 
-def cmd_bootstrap(root: Path, dry_run: bool) -> int:
-    result = run_bootstrap(root, write=not dry_run)
+def cmd_bootstrap(root: Path, dry_run: bool, force: bool) -> int:
+    try:
+        result = run_bootstrap(root, write=not dry_run, force=force)
+    except TransitionLogExists as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 3
     print(f"bootstrap event_ts = {result.event_ts}")
     print(render_status(result.registry))
     print(f"states: {result.count_by_state()}")
@@ -88,6 +95,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     p_boot = sub.add_parser("bootstrap", help="build the registry from research/")
     p_boot.add_argument("--dry-run", action="store_true",
                         help="compute and print, write nothing")
+    p_boot.add_argument("--force", action="store_true",
+                        help="rebuild research/lifecycle_transitions.jsonl even though it "
+                             "already holds transitions (the log is append-only; without "
+                             "--force a non-empty log is refused with exit code 3)")
     sub.add_parser("status", help="print the registry table")
     for name in ("retire", "reset"):
         p = sub.add_parser(name, help=f"{name} an alpha (HUMAN action)")
@@ -98,7 +109,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     root = args.root if args.root is not None else repo_root()
     try:
         if args.command == "bootstrap":
-            return cmd_bootstrap(root, args.dry_run)
+            return cmd_bootstrap(root, args.dry_run, args.force)
         if args.command == "status":
             return cmd_status(root)
         return cmd_manual(root, args.alpha_id, args.reason, args.event_ts, args.command)

@@ -87,10 +87,19 @@ order (the Java `BacktestEngine.onEvent` + `PaperTrading.RiskWiring` chain):
 8. **Children** — `adapters.AlgoScheduler.generate_child_orders` (TWAP / IS
    slices from `iap.execution.algos`, POV deficit vs filled + open); EACH
    child: `adapters.SorAdapter.route` (`iap.execution.sor.SmartOrderRouter`,
-   every candidate scored, NO_ROUTE rejects + counts) → the declared
-   controls → `adapters.RiskEngineAdapter.evaluate` (`RiskEngine.check_order`
-   → `RiskDecision` with the pinned `rule_index`) → `SimulatorAdapter.submit`.
-   A REJECT is never submitted.
+   every candidate scored, NO_ROUTE rejects + counts; a NO_ROUTE child is
+   traced with its venue-0 routing verdict) → the declared controls → 
+   `adapters.RiskEngineAdapter.evaluate` (`RiskEngine.check_order` →
+   `RiskDecision` with the pinned `rule_index`) → `SimulatorAdapter.submit`.
+   A REJECT is never submitted. A **control-blocked** child never leaves the
+   strategy — no routing, no risk decision, no report — so it is **not**
+   written into the trace's `child_orders` / `routing` stages (2026-09-20):
+   `explain`'s SOR shares and `v_order_chain.n_child_orders` describe real
+   submissions (plus risk-rejected and NO_ROUTE children, which carry their
+   own terminal verdict), and the blocks are preserved per parent in
+   `ParentOrder.params` `children_blocked_slice_interval` /
+   `children_blocked_latency_budget` / `children_blocked_participation`
+   (`Counters` and `report.controls` carry the session totals).
 9. **Trace emission** — `iap.trace.TraceBuilder` per decision cycle →
    `JsonlTraceSink` + `StoreTraceSink` (SQLite via `iap.store.Store`) +
    `TraceDigest`; traces are emitted in decision order once ready.
@@ -137,6 +146,16 @@ decided), exactly as in `BacktestEngine.decide`.
 | `portfolio_version` | `content_hash` of the constraint set + solver parameters |
 | `trace_id` | `make_trace_id(session_id, instrument_id, event_ts, sequence)` per decision |
 | `trace_digest` | sha256 over `canonical_json(trace) + "\n"` per emitted trace (`iap.trace.TraceDigest`); computed by the JSONL sink and the store sink and required to agree |
+
+**Single pass, past only.** The loop never reads the end of the captured
+stream: the one place a decision needs "how long is left" — a parent window
+that would end after the session — uses the session close from the
+configured calendar (`ReferenceData.session_bounds_ns` on
+`session.trading_day`, known ex ante; counter
+`decisions_window_beyond_session`), never `feed.last_ts` (2026-09-20). The
+truncation probe (`test_shift_by_one_and_truncation_leakage_probes`) feeds a
+genuinely truncated `FeedResult` and requires every signal, and every parent
+and child order whose window closed before the cut, to reproduce bit for bit.
 
 Audit (2026-09-20): `grep` of `python/src/iap/mvp/` for `time.`,
 `datetime`, `random`, `urandom`, `uuid`, `os.environ` finds nothing on the
@@ -216,7 +235,7 @@ possible.
 
 Run id `58a10f2194a3c81c`, 16,578 events, 355 decisions, 66 parent orders,
 212 children generated / 105 submitted, 55 fills, fill rate 20.5 %.
-Trace digest `16cd29aa4c28ffb221b84b8f97b30c70eee09394a5160b5608233a07b536a187`.
+Trace digest `059c30df7213d00e0d3f6de7ab9011b3d1ee9651cd3df5ec6609d2e66e965c2b`.
 Wall time ≈ 7 s (1 s feed generation + normalisation, 6 s loop) on the CI box.
 
 | P&L (USD) | value |
@@ -312,7 +331,11 @@ audited on 2026-09-20; the outcome, in order of evidence:
    0.193 / 0.021. `paper_evidence.json` carries that IC, so the
    `paper_ic_tracking` gate (max gap 0.01) fails EQ01 and EQ03 on this
    data — correctly: paper behaviour that differs this much from research
-   is a finding, not a promotion.
+   is a finding, not a promotion. When an alpha's realized IC is undefined
+   (fewer than three valid label pairs — a short or halted session) or the
+   registry has no research IC, its `paper` block is `null` (x-version 3,
+   2026-09-20) and the lifecycle records `NO_EVIDENCE`: an undefined
+   statistic is never written as `0.0` into an artefact a gate reads.
 
 Execution: IS qty-weighted +0.106 bps (delay 0, trading +0.079, opportunity
 +0.026); spread +0.088, impact −0.013 (passive fills captured spread), fees
@@ -354,8 +377,8 @@ were flat (target == position + in-flight).
 | Determinism: run twice ⇒ identical bytes; replay from capture ⇒ same digest | done | `python -m iap.mvp verify` / `replay`; `tests/replay/test_mvp_replay_determinism.py`; `test_mvp_golden.py` |
 | Lifecycle: paper evidence for the CANDIDATE alphas, registry untouched | done | `paper_evidence.json`; `test_mvp.py::test_paper_evidence_and_report_are_consistent` |
 | Golden pinned for ports | done | `tests/golden/expected_mvp.json`; `python/tools/make_golden_mvp.py` |
-| Deployment consistency | done | `configs/mvp/*` in `deployment/k8s/configmap-configs.yaml` and the `items[]` of `java-platform.yaml` / `cronjob-data-pipeline.yaml`; `tests/harness/check_deployment.py` 16 passed / 0 failed / 2 skipped (promtool, kubeconform absent); `Dockerfile.python` documents `python3 -m iap.mvp ... --repo-root /app` and bakes `research/alpha_registry.json`; `data/mvp/` git-ignored |
-| Testing: unit / golden / replay / integration levels | done | `python/tests/test_mvp.py` (36), `python/tests/test_mvp_golden.py` (5), `tests/replay/test_mvp_replay_determinism.py` (2), `tests/integration/test_mvp_end_to_end.py` (2); full Python suite 1,352 passed in 71 s |
+| Deployment consistency | done | `configs/mvp/*` in `deployment/k8s/configmap-configs.yaml` and the `items[]` of `java-platform.yaml` / `cronjob-data-pipeline.yaml`; `tests/harness/check_deployment.py` 16 passed / 0 failed / 2 skipped (promtool, kubeconform absent); `Dockerfile.python` documents `python3 -m iap.mvp ... --repo-root /app`, sets `IAP_SCHEMA_DIR=/app/schemas` and bakes `research/alpha_registry.json` (the wheel also carries `schemas/` as `iap/_schemas`; `tests/integration/test_installed_package.py` runs the tiny MVP from a non-editable install outside the checkout); `data/mvp/` git-ignored |
+| Testing: unit / golden / replay / integration levels | done | `python/tests/test_mvp.py` (38), `python/tests/test_mvp_golden.py` (5), `tests/replay/test_mvp_replay_determinism.py` (2), `tests/integration/test_mvp_end_to_end.py` (2); full Python suite 1,360 passed in 71 s |
 | Documentation | done | this file; COOKBOOK recipes 22–24; `python/src/iap/README.md`; `schemas/MIGRATIONS.md` 2026-09-20 |
 | Honest reporting: cost-negative result stated, IC audited and stated with its definition | done | `report.md` (`alpha.ic_definition`), §7 above |
 

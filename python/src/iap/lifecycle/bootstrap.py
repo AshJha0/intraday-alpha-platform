@@ -18,7 +18,12 @@ CANDIDATE -> VALIDATING evaluation holds), and writes
 ``research/alpha_registry.json`` + ``research/lifecycle_transitions.jsonl``.
 
 **Report -> ExperimentResult mapping** (``iap.contracts`` §2 mapping,
-refined for the crossed-book split of round 3):
+refined for the crossed-book split of round 3).  This is THE pinned mapping
+of an alpha report: :func:`research_evidence` builds the result for the
+registry and :func:`alpha_report_spec` the matching ``ExperimentSpec``;
+``iap.store.importers.import_alpha_reports`` calls both, so the registry
+evidence and the store's ``experiment_results`` row of one alpha carry the
+same ``experiment_id`` and the same numbers (review 2026-09-20, finding 10).
 
 ==========================  ==================================================
 ExperimentResult field      report key
@@ -77,7 +82,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 from iap.alpha import ALPHA_IDS
-from iap.contracts.types import ExperimentResult, LifecycleState, Verdict
+from iap.contracts.types import ExperimentResult, ExperimentSpec, LifecycleState, Period, Verdict
 from iap.contracts.versions import content_hash
 from iap.lifecycle.config import PolicyConfig, load_policy_config, repo_root
 from iap.lifecycle.evidence import Evidence
@@ -90,12 +95,14 @@ __all__ = [
     "REFERENCE_NOTIONAL_USD",
     "REGISTRY_RELPATH",
     "TRANSITIONS_RELPATH",
+    "TransitionLogExists",
     "bootstrap_event_ts",
     "capacity_from_report",
     "latest_event_ts",
     "load_ledger_entries",
     "load_params_document",
     "load_report",
+    "alpha_report_spec",
     "render_status",
     "research_evidence",
     "run_bootstrap",
@@ -258,6 +265,62 @@ def research_evidence(
     return result, missing
 
 
+#: What the alpha-report format does not record and the mapping cannot know.
+UNRECORDED_BY_REPORT = ("seed", "max_drawdown_bps", "sharpe", "train_period",
+                        "validation_period")
+
+
+def alpha_report_spec(alpha_id: str, report: Mapping[str, Any], result: ExperimentResult,
+                      source: str) -> ExperimentSpec:
+    """The ``ExperimentSpec`` that goes with :func:`research_evidence`'s
+    result — the same ``experiment_id``, versions and model hash — with the
+    report's protocol recorded in ``configuration`` (gates, folds, universe,
+    capacity, the P&L basis and the id/IC sources) so a reader of the store
+    can see exactly what the numbers are.  ``source`` names the report file
+    (repo-relative)."""
+    folds = sorted(report["folds"], key=lambda f: int(f["fold"]))
+    if not folds:
+        raise ValueError(f"{alpha_id}: report has no folds")
+    test_start = int(folds[0]["test_start"])
+    test_end = max(int(f["test_end"]) for f in folds)
+    capacity = capacity_from_report(report)
+    configuration: Dict[str, Any] = {
+        "source": source,
+        "protocol": "purged walk-forward CV (research/alpha_reports/run_all.py)",
+        "gates": report["gates"],
+        "n_folds": int(report["n_folds_run"]),
+        "folds": [{"fold": int(f["fold"]), "test_start": int(f["test_start"]),
+                   "test_end": int(f["test_end"]), "n_train": int(f["n_train"]),
+                   "n_test_rows": int(f["n_test_rows"])} for f in folds],
+        "universe": [int(i) for i in report["universe"]],
+        "capacity_usd": capacity,
+        "pnl_basis": (f"stress.cost.x1 total_pnl / total_costs (USD) in bps of the "
+                      f"{REFERENCE_NOTIONAL_USD:.0f} USD reference notional "
+                      "(iap.lifecycle.bootstrap.REFERENCE_NOTIONAL_USD); only the sign "
+                      "is gated"),
+        "ic_source": "gate_ic (the uncrossed IC the PROMOTE gate reads)",
+        "t_stat_source": "nw_tstat_uncrossed when finite, else nw_tstat",
+        "experiment_id_source": (
+            "<alpha_id>-unledgered (no promotion_pipeline ledger entry)"
+            if result.experiment_id == f"{alpha_id}-unledgered"
+            else f"{LEDGER_RELPATH.as_posix()} promotion_pipeline key[:16]"),
+        "version_sources": {"dataset_version": PARAMS_RELPATH.as_posix(),
+                            "feature_version": PARAMS_RELPATH.as_posix(),
+                            "model_version": f"content_hash({PARAMS_RELPATH.as_posix()} "
+                                             "params[alpha_id])",
+                            "git_commit": PARAMS_RELPATH.as_posix()},
+        "unrecorded": list(UNRECORDED_BY_REPORT),
+    }
+    return ExperimentSpec(
+        experiment_id=result.experiment_id, alpha_id=alpha_id,
+        dataset_version=result.dataset_version, feature_version=result.feature_version,
+        model_version=result.model_version, configuration=configuration,
+        train_period=Period(start_ts=test_start, end_ts=test_start),
+        validation_period=Period(start_ts=test_start, end_ts=test_start),
+        test_period=Period(start_ts=test_start, end_ts=test_end),
+        seed=0, horizon=str(report["horizon"]))
+
+
 @dataclass(frozen=True)
 class BootstrapRow:
     """Per-alpha bootstrap outcome (the summary table)."""
@@ -283,12 +346,31 @@ class BootstrapResult:
         return dict(sorted(out.items()))
 
 
+class TransitionLogExists(FileExistsError):
+    """``research/lifecycle_transitions.jsonl`` already holds transitions
+    and ``force`` was not given (the log is an append-only audit)."""
+
+
 def run_bootstrap(root: Optional[Path] = None, *, config: Optional[PolicyConfig] = None,
-                  write: bool = True,
+                  write: bool = True, force: bool = False,
                   alpha_ids: Optional[List[str]] = None) -> BootstrapResult:
     """Bootstrap (see module docstring).  ``write=False`` computes without
-    touching ``research/``; ``alpha_ids`` defaults to ``iap.alpha.ALPHA_IDS``."""
+    touching ``research/``; ``alpha_ids`` defaults to ``iap.alpha.ALPHA_IDS``.
+
+    The transition log is an **append-only audit** (HUMAN ``retire`` /
+    ``reset`` lines live there): a write refuses to truncate a non-empty
+    ``research/lifecycle_transitions.jsonl`` unless ``force`` is given
+    (:class:`TransitionLogExists`).  A forced rerun on identical inputs
+    rewrites identical bytes.
+    """
     root = Path(root) if root is not None else repo_root()
+    log_path = root / TRANSITIONS_RELPATH
+    if write and not force and log_path.is_file() and log_path.stat().st_size > 0:
+        n_lines = len(log_path.read_text(encoding="utf-8").splitlines())
+        raise TransitionLogExists(
+            f"{log_path}: {n_lines} transition(s) already logged; bootstrap would truncate "
+            "this append-only audit — rerun with --force (run_bootstrap(force=True)) "
+            "to rebuild it from research/, or --dry-run to compute without writing")
     cfg = config if config is not None else load_policy_config(
         root / "configs" / "strategies" / "lifecycle.json",
         root / "configs" / "strategies" / "strategies.json")
@@ -299,8 +381,7 @@ def run_bootstrap(root: Optional[Path] = None, *, config: Optional[PolicyConfig]
     event_ts = bootstrap_event_ts(reports)
 
     registry = AlphaRegistry(cfg.policy)
-    log = (LifecycleTransitionLog(root / TRANSITIONS_RELPATH, truncate=True)
-           if write else None)
+    log = LifecycleTransitionLog(log_path, truncate=True) if write else None
     machine = AlphaLifecycle(cfg, registry, log)
     rows: List[BootstrapRow] = []
     for aid in ids:

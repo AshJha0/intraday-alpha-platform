@@ -12,7 +12,7 @@ indexes the lines; `explain()` renders one order's chain as text.
 | Contract | `schemas/trace/decision_trace.schema.json` (x-version 1; `$ref`s the stage schemas; `$defs` `MarketEventRef`, `BookSnapshotRef`, `FeatureVectorRef`, `Attribution`, `TraceStages`); Python `iap.contracts.types.DecisionTrace` |
 | Reference | `python/src/iap/trace/{builder,sinks,digest,explain,attribution}.py`; ids in `iap.contracts.ids`, canonical JSON in `iap.contracts.versions` |
 | Ports | Java `java/src/main/java/com/iap/trace/` + `com/iap/contracts/` (`CanonicalJson`, `Trees`, `PyFormat`); Rust `rust/contracts/src/{canonical,sha256,trace}.rs` (+ `rust/telemetry/src/trace.rs`); C++ `cpp/include/iap/contracts/{canonical_json,trace}.hpp`, `cpp/src/contracts/`, `cpp/include/iap/util/sha256.hpp` |
-| Goldens | `tests/golden/expected_canonical_json.json` (rules, 2051 float reprs, 24 string escapes, 9 documents, 5 rejects, the trace id, the trace digests; generator `python/tools/make_golden_canonical_json.py`), `tests/golden/expected_contracts_examples.json` (one instance per contract + the pinned `explain` block; `make_golden_contracts.py`), `tests/golden/expected_mvp.json` (a whole session's digest) |
+| Goldens | `tests/golden/expected_canonical_json.json` (rules, 2663 float reprs incl. 612 rounding-tie and 17-digit cases, 24 string escapes, 9 documents, 5 rejects, the trace id, the trace digests; generator `python/tools/make_golden_canonical_json.py`), `tests/golden/expected_contracts_examples.json` (one instance per contract + the pinned `explain` block; `make_golden_contracts.py`), `tests/golden/expected_mvp.json` (a whole session's digest) |
 | Tests | `python/tests/test_trace.py`, `test_canonical_json_golden.py`, `test_contracts*.py`; Java `TraceGoldenTest`, `CanonicalJsonGoldenTest`, `PaperTraceTest`; Rust `golden_canonical_json.rs`, `golden_trace.rs`; C++ `test_canonical_json_golden.cpp`, `test_trace_golden.cpp`, `test_replay_trace.cpp` |
 
 ## 1. The record
@@ -88,13 +88,17 @@ Java: `CanonicalJson.serialize` with `floatRepr` (Java's `Double.toString`
 prints two significant digits where Python prints one — `4.9E-324` vs
 `5e-324` — so the port tries the one-digit roundings and keeps the one that
 parses back). Rust: an own writer over `serde_json::Value`, `format_float`
-re-laying `{:e}` out under Python's rule; **serde_json is built with the
+re-laying serde_json's (ryu) shortest digits out under Python's rule — not
+`core::fmt`'s `{:e}`, which rounds exact decimal midpoints half-up
+(`1059438285926254.25` → `…254.3` where Python, `std::to_chars`, JDK 19+ and
+ryu all give `…254.2`; found by differential fuzz on 2026-09-20 and pinned by
+the golden's 612 tie cases); **serde_json is built with the
 `float_roundtrip` feature** because its default parser can be 1 ulp off on
 17-digit decimals, which broke the registry byte parity until it was
 enabled — a port in any language must use a correctly rounded parser. C++:
 `std::to_chars` shortest scientific + the same layout rule; `std::map`
-keys compared bytewise on UTF-8, which is code-point order. All 2051 float
-bit patterns, 24 escapes and 9 documents of the golden reproduce byte for
+keys compared bytewise on UTF-8, which is code-point order. All 2663 float
+bit patterns (612 of them rounding-tie and 17-digit cases), 24 escapes and 9 documents of the golden reproduce byte for
 byte in the four languages.
 
 `content_hash(obj)` = sha256 hex of that text. It is what `config_version`,
@@ -113,7 +117,7 @@ lowercase SHA-256 over everything hashed so far. Known answers
 | the golden `DecisionTrace` example, one line (5627 bytes, line sha256 `8ecadebd…`) | `bf60a300d151c9cea462e339b0dac407c595fdc5e3c59efd588d5aada8455162` |
 | the same trace twice | `e6f6ea54e5d5ff314dc11d235efc4caa4065e3604756101dbdce215502e053ca` |
 | empty stream | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
-| the MVP golden session (355 traces, seed 12345) | `16cd29aa4c28ffb221b84b8f97b30c70eee09394a5160b5608233a07b536a187` (`expected_mvp.json`) |
+| the MVP golden session (355 traces, seed 12345) | `059c30df7213d00e0d3f6de7ab9011b3d1ee9651cd3df5ec6609d2e66e965c2b` (`expected_mvp.json`) |
 
 `TraceDigest.of_jsonl(path)` re-canonicalises a file line by line and must
 equal the digest the emitting sink reported; same seed ⇒ same digest; any

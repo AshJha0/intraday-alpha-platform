@@ -941,9 +941,9 @@ match**.
   the portfolio golden is checked against an SLSQP optimum. Golden files are
   regenerated only deliberately, with a MIGRATIONS.md entry.
 - **One command proves parity**: `tests/harness/run_all.sh` runs all four
-  suites and prints the table (a full harness run on 2026-09-20: python 1352,
-  cpp 266, rust 298, java 475 tests passed; golden groups 162/67/62/102; all
-  PASS, plus `integration` (13) and `replay` (4) rows for the repo-level
+  suites and prints the table (a full harness run on 2026-09-20: python 1360,
+  cpp 266, rust 298, java 475 tests passed; golden groups 164/67/62/102; all
+  PASS, plus `integration` (15) and `replay` (4) rows for the repo-level
   pytest suites, a `deployment` row — 16 structural checks passed, 2 skipped
   for tools absent here — and a `numbers` row that re-derives every headline
   figure in the docs from its artefact). The Java golden group runs all
@@ -1241,8 +1241,9 @@ Java's `Double.toString` prints two significant digits where Python prints
 one (`4.9E-324` vs `5e-324`); Rust's serde_json *parser* was 1 ulp off on
 17-digit decimals until the `float_roundtrip` feature was enabled; C++ lays
 `std::to_chars` output back out under Python's rule. The golden
-`expected_canonical_json.json` pins 2051 float bit patterns, 24 escapes and
-9 documents, and all four languages reproduce every byte (§18.3).
+`expected_canonical_json.json` pins 2663 float bit patterns (612 of them exact
+decimal midpoints and 17-digit values, where round-half-even at the last digit
+is what distinguishes a faithful port), 24 escapes and 9 documents, and all four languages reproduce every byte (§18.3).
 
 ---
 
@@ -1429,7 +1430,7 @@ reproduces them with string concatenation and one hash (pinned:
 digest is sha256 over every canonical line + newline in emission order;
 same seed ⇒ same digest; one changed field or one swapped line changes it.
 Known answers are pinned for one trace, the same trace twice, and the empty
-stream; the MVP golden pins a whole session's digest (`16cd29aa…`, 355
+stream; the MVP golden pins a whole session's digest (`059c30df…`, 355
 traces).
 
 ### 18.3 Four languages, one line
@@ -1512,7 +1513,7 @@ index that lied about what its sources contain would be worse than none.
 
 ```bash
 cd python && PYTHONPATH=src python3 -m iap.mvp run
-# mvp run 58a10f2194a3c81c: events=16578 decisions=355 parents=66 children=105 fills=55 pnl=-22.676287 USD digest=16cd29aa4c28ffb2...
+# mvp run 58a10f2194a3c81c: events=16578 decisions=355 parents=66 children=105 fills=55 pnl=-22.676287 USD digest=059c30df7213d00e...
 ```
 
 Seven seconds later `data/mvp/58a10f2194a3c81c/` holds the captured stream,

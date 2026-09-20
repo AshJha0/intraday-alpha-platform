@@ -128,7 +128,7 @@ reproduce `research/alpha_reports/{EQ01,EQ03,EQ06}.json` at 1e-9.
   §13.2), `report.json` and the stream sha256, refusing first if a
   reference document changed (`config_version`). The golden run is
   `tests/golden/expected_mvp.json`: seed 12345, run `58a10f2194a3c81c`,
-  digest `16cd29aa4c28ffb221b84b8f97b30c70eee09394a5160b5608233a07b536a187`.
+  digest `059c30df7213d00e0d3f6de7ab9011b3d1ee9651cd3df5ec6609d2e66e965c2b`.
 - **A Java paper session** is reproduced by re-running `java/paper.sh` on
   the same vector and configuration: `decision_traces.jsonl` and the
   report's `trace.digest` are a pure function of the event stream

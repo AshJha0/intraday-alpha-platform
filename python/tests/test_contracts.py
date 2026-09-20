@@ -166,6 +166,34 @@ def test_schema_inventory_matches_disk():
         "https://iap.example/schemas/alpha/alpha_signal.schema.json"
 
 
+def test_schema_dir_resolution_order(monkeypatch, tmp_path):
+    """$IAP_SCHEMA_DIR wins and must exist (never falls through); without it
+    the checkout is used, then the wheel's packaged copy (iap/_schemas,
+    python/setup.py); nothing found is an error naming every candidate."""
+    from iap.contracts import versions
+
+    monkeypatch.delenv("IAP_SCHEMA_DIR", raising=False)
+    assert schema_dir() == versions._default_schema_dir()
+    assert schema_dir().is_dir()
+
+    override = tmp_path / "override"
+    override.mkdir()
+    monkeypatch.setenv("IAP_SCHEMA_DIR", str(override))
+    assert schema_dir() == override.resolve()
+    monkeypatch.setenv("IAP_SCHEMA_DIR", str(tmp_path / "nowhere"))
+    with pytest.raises(RuntimeError, match=r"\$IAP_SCHEMA_DIR"):
+        schema_dir()
+
+    monkeypatch.delenv("IAP_SCHEMA_DIR", raising=False)
+    packaged = tmp_path / "_schemas"
+    monkeypatch.setattr(versions, "_default_schema_dir", lambda: tmp_path / "no-checkout")
+    monkeypatch.setattr(versions, "_packaged_schema_dir", lambda: packaged)
+    with pytest.raises(RuntimeError, match="no-checkout.*_schemas"):
+        schema_dir()
+    packaged.mkdir()
+    assert schema_dir() == packaged
+
+
 # --------------------------------------------------------------------------
 # typed contracts
 # --------------------------------------------------------------------------

@@ -41,6 +41,44 @@ def test_golden_float_repr(golden: dict) -> None:
         assert struct.pack("<d", back) == struct.pack("<d", value), case
 
 
+def test_golden_pins_rounding_ties(golden: dict) -> None:
+    """The float table must carry exact decimal midpoints (17 significant
+    digits ending in 5 with two equidistant 16-digit neighbours that both
+    round-trip) so a port that rounds half-up instead of half-even fails the
+    golden — Rust's ``{:e}`` did until 2026-09-20 (review finding 1)."""
+    from decimal import Decimal
+
+    values = [struct.unpack("<d", struct.pack("<Q", int(c["bits_hex"], 16)))[0]
+              for c in golden["float_repr"]]
+    reprs = {v: c["repr"] for v, c in zip(values, golden["float_repr"])}
+    for value, want in ((1059438285926254.25, "1059438285926254.2"),
+                        (26363981746409.3125, "26363981746409.312"),
+                        (1000000000000000.25, "1000000000000000.2")):
+        assert reprs[value] == want
+
+    def exact_digits(v: float) -> tuple[int, ...]:
+        digits = Decimal(v).as_tuple().digits
+        while len(digits) > 1 and digits[-1] == 0:
+            digits = digits[:-1]
+        return digits
+
+    def is_midpoint_tie(v: float) -> bool:
+        # The exact expansion is one digit longer than the shortest repr and
+        # ends in 5: both shortest neighbours round-trip, the rule decides.
+        digits = exact_digits(v)
+        sig = repr(v).replace("-", "").replace(".", "").split("e")[0].strip("0")
+        return digits[-1] == 5 and len(digits) == len(sig) + 1
+
+    ties = [v for v in values if is_midpoint_tie(v)]
+    assert len(ties) >= 300, len(ties)
+    # Half-even and half-up differ exactly when the kept digit is even; at least
+    # a third of the ties must be of that kind for the golden to discriminate.
+    even_kept = [v for v in ties if exact_digits(v)[-2] % 2 == 0]
+    assert len(even_kept) >= len(ties) // 3, (len(even_kept), len(ties))
+    for v in even_kept:
+        assert reprs[v][-1] in "02468", (v, reprs[v])
+
+
 def test_golden_string_escape(golden: dict) -> None:
     for case in golden["string_escape"]:
         text = "".join(chr(c) for c in case["input_codepoints"])

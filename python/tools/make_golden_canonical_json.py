@@ -9,7 +9,14 @@ produce the same bytes, so this golden pins:
 * ``float_repr`` — Python ``float.__repr__`` layout for a table of edge cases
   plus 2,000 SplitMix64-seeded doubles (shortest round-trip digits; exponent
   form when ``exp < -4`` or ``exp >= 16``; ``e-05`` / ``e+16`` two-digit
-  signed exponents; ``.0`` on integral values);
+  signed exponents; ``.0`` on integral values), plus ``TIE_FLOATS`` and a
+  seeded set of *rounding ties*: doubles of the form ``k + j/2^b`` in the
+  binades 2^40..2^52 — 400 exact decimal midpoints (the exact expansion is
+  one digit longer than the shortest repr and ends in 5, so both neighbours
+  round-trip and the rounding rule decides the last digit) and 200 values
+  whose shortest repr needs all 17 significant digits.  These pin **round-half-even** at the last digit
+  (``1059438285926254.25`` → ``1059438285926254.2``); a port that rounds
+  half-up (Rust ``{:e}`` before 2026-09-20) fails them;
 * ``string_escape`` — ``ensure_ascii`` escaping: ``\\" \\\\ \\n \\r \\t \\b \\f``,
   other control characters as ``\\u00XX``, non-ASCII as ``\\uXXXX`` (UTF-16
   surrogate pairs for astral code points), ``/`` NOT escaped;
@@ -32,6 +39,7 @@ import json
 import math
 import struct
 import sys
+from decimal import Decimal
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -56,6 +64,67 @@ EDGE_FLOATS = [
     -4.2e-5, 12345.6789, 1e-4, 9.999e-5, 1234567890123456.0,
     12345678901234567.0, 0.000999, 1e16 - 2, 255.0, 65535.0, 4294967295.0,
 ]
+
+# Exact decimal midpoints found by the 2026-09-20 review's differential fuzz
+# (Rust rounded them half-up; Python / C++ / Java / ryu round half-even).
+TIE_FLOATS = [
+    1059438285926254.25, 26363981746409.3125, 1000000000000000.25,
+    2251799813685248.5, 1125899906842624.25, 1125899906842624.75,
+    562949953421312.125, 1099511627776.03125, 4503599627370495.5,
+    9007199254740991.0, 1152921504606846976.0, 3602879701896397.5,
+]
+TIE_SEED = SEED ^ 0x7E5
+TIE_BINADES = range(40, 53)          # 2^40 .. 2^52
+TIE_MAX_FRACTION_BITS = 6            # j / 2^b, 1 <= b <= 6
+
+
+def _exact_digits(value: float) -> tuple[int, ...]:
+    digits = Decimal(value).as_tuple().digits
+    while len(digits) > 1 and digits[-1] == 0:
+        digits = digits[:-1]
+    return digits
+
+
+def _shortest_len(value: float) -> int:
+    return len(repr(value).replace("-", "").replace(".", "").split("e")[0].strip("0"))
+
+
+def is_midpoint_tie(value: float) -> bool:
+    """True when the exact decimal expansion of ``value`` is one digit longer
+    than its shortest round-trip repr and ends in 5: both shortest-length
+    neighbours round-trip, so the last digit is decided by the rounding rule
+    (half-even on every port)."""
+    digits = _exact_digits(value)
+    return digits[-1] == 5 and len(digits) == _shortest_len(value) + 1
+
+
+def tie_floats(n_ties: int, n_long: int) -> list[float]:
+    """Deterministic doubles ``k + j / 2**b`` (``k`` in a binade of
+    ``TIE_BINADES``, ``b <= TIE_MAX_FRACTION_BITS``, only representable
+    fractions kept): ``n_ties`` exact midpoints (:func:`is_midpoint_tie`) and
+    ``n_long`` values whose shortest repr needs all 17 significant digits, in
+    stream order."""
+    rng = SplitMix64(TIE_SEED)
+    out: list[float] = []
+    ties = longs = 0
+    while ties < n_ties or longs < n_long:
+        e = TIE_BINADES.start + int(rng.next_u64() % len(TIE_BINADES))
+        b = 1 + int(rng.next_u64() % TIE_MAX_FRACTION_BITS)
+        k = (1 << e) + int(rng.next_u64() % (1 << e))
+        j = 1 + int(rng.next_u64() % ((1 << b) - 1))
+        if e - 52 + b > 0:
+            continue                                # fraction not representable
+        value = float(k) + j / (1 << b)
+        if value - float(k) != j / (1 << b):
+            continue
+        if is_midpoint_tie(value):
+            if ties < n_ties:
+                out.append(value)
+                ties += 1
+        elif _shortest_len(value) == 17 and longs < n_long:
+            out.append(value)
+            longs += 1
+    return out
 
 
 def seeded_floats(n: int) -> list[float]:
@@ -106,7 +175,7 @@ def main() -> int:
         print(f"refusing to overwrite {OUT} (use --force)", file=sys.stderr)
         return 2
 
-    floats = EDGE_FLOATS + seeded_floats(2000)
+    floats = EDGE_FLOATS + seeded_floats(2000) + TIE_FLOATS + tie_floats(400, 200)
     float_cases = []
     for value in floats:
         bits = struct.unpack("<Q", struct.pack("<d", value))[0]

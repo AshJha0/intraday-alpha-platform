@@ -23,8 +23,9 @@
 --     EXISTS, since INSERT OR REPLACE is SQLite-only and ON CONFLICT differs.
 --     (The Python Store's own upserts are SQLite INSERT OR REPLACE; a
 --     PostgreSQL writer uses INSERT ... ON CONFLICT (pk) DO UPDATE.)
---   * Only correlated scalar subqueries, COALESCE, CASE, COUNT/SUM/MAX/MIN
---     and standard joins in views (no LATERAL, no DISTINCT ON, no ::casts).
+--   * Only correlated scalar subqueries (IN (SELECT ...) / EXISTS included),
+--     COALESCE, CASE, COUNT/SUM/MAX/MIN and standard joins in views (no
+--     LATERAL, no DISTINCT ON, no ::casts, no GROUP_CONCAT / IIF).
 --   * Statements are terminated by ';' and never contain a ';' inside a
 --     string literal, so a trivial splitter (iap.store.ddl) works.
 --
@@ -520,7 +521,22 @@ CREATE INDEX IF NOT EXISTS ix_drift_baselines_alpha ON drift_baselines (alpha_id
 -- The signal is the first signal of the trace for the order's instrument — by
 -- convention the ACTING signal (an ensemble trace lists the ensemble first and
 -- its member signals after it, each labelled by its alpha id in model_version;
--- see iap.mvp.engine) — the risk decision the last one recorded for the order.
+-- see iap.mvp.engine).
+-- Risk is decided per ROUTED CHILD (conventions section 11.4; the MVP checks
+-- every child it submits), or per parent where a loop has no child stage (the
+-- Java paper loop).  The risk rows of a parent are therefore the trace's rows
+-- whose order_id is one of the parent's child_order_ids or the parent id
+-- itself, aggregated:
+--   risk_decision        = MAX over those rows (KILL=3 > REJECT=2 > ALLOW=1):
+--                          REJECT/KILL if any child was rejected/killed, else
+--                          ALLOW; NULL when no risk decision was recorded;
+--   risk_rule_id/reason  = the FIRST rejecting row (lowest risk_index), else
+--                          the first row (rule_id '' on ALLOW), NULL when none;
+--   n_children_allowed / n_children_rejected = counts over those rows.
+-- n_child_orders counts the children in the trace (only submitted children
+-- are traced — a control-blocked child never leaves the strategy and is
+-- recorded in ParentOrder.params children_blocked_* instead); n_fills counts
+-- only PARTIAL (2) and FILLED (3) reports, never NEW / CANCELED / EXPIRED.
 DROP VIEW IF EXISTS v_order_chain;
 CREATE VIEW v_order_chain AS
 SELECT
@@ -541,9 +557,59 @@ SELECT
     sg.model_version            AS signal_model_version,
     pt.solver_status            AS portfolio_solver_status,
     pl.target_qty               AS portfolio_target_qty,
-    rd.decision                 AS risk_decision,
-    rd.rule_id                  AS risk_rule_id,
-    rd.reason                   AS risk_reason,
+    (SELECT MAX(r.decision) FROM risk_decisions r
+       WHERE r.trace_id = po.trace_id
+         AND (r.order_id = po.parent_order_id
+              OR r.order_id IN (SELECT c.child_order_id FROM child_orders c
+                                 WHERE c.trace_id = po.trace_id
+                                   AND c.parent_order_id = po.parent_order_id)))
+                                AS risk_decision,
+    (SELECT r.rule_id FROM risk_decisions r
+       WHERE r.trace_id = po.trace_id
+         AND r.risk_index = COALESCE(
+               (SELECT MIN(r2.risk_index) FROM risk_decisions r2
+                  WHERE r2.trace_id = po.trace_id AND r2.decision <> 1
+                    AND (r2.order_id = po.parent_order_id
+                         OR r2.order_id IN (SELECT c.child_order_id FROM child_orders c
+                                             WHERE c.trace_id = po.trace_id
+                                               AND c.parent_order_id = po.parent_order_id))),
+               (SELECT MIN(r3.risk_index) FROM risk_decisions r3
+                  WHERE r3.trace_id = po.trace_id
+                    AND (r3.order_id = po.parent_order_id
+                         OR r3.order_id IN (SELECT c.child_order_id FROM child_orders c
+                                             WHERE c.trace_id = po.trace_id
+                                               AND c.parent_order_id = po.parent_order_id)))))
+                                AS risk_rule_id,
+    (SELECT r.reason FROM risk_decisions r
+       WHERE r.trace_id = po.trace_id
+         AND r.risk_index = COALESCE(
+               (SELECT MIN(r2.risk_index) FROM risk_decisions r2
+                  WHERE r2.trace_id = po.trace_id AND r2.decision <> 1
+                    AND (r2.order_id = po.parent_order_id
+                         OR r2.order_id IN (SELECT c.child_order_id FROM child_orders c
+                                             WHERE c.trace_id = po.trace_id
+                                               AND c.parent_order_id = po.parent_order_id))),
+               (SELECT MIN(r3.risk_index) FROM risk_decisions r3
+                  WHERE r3.trace_id = po.trace_id
+                    AND (r3.order_id = po.parent_order_id
+                         OR r3.order_id IN (SELECT c.child_order_id FROM child_orders c
+                                             WHERE c.trace_id = po.trace_id
+                                               AND c.parent_order_id = po.parent_order_id)))))
+                                AS risk_reason,
+    (SELECT COUNT(*) FROM risk_decisions r
+       WHERE r.trace_id = po.trace_id AND r.decision = 1
+         AND (r.order_id = po.parent_order_id
+              OR r.order_id IN (SELECT c.child_order_id FROM child_orders c
+                                 WHERE c.trace_id = po.trace_id
+                                   AND c.parent_order_id = po.parent_order_id)))
+                                AS n_children_allowed,
+    (SELECT COUNT(*) FROM risk_decisions r
+       WHERE r.trace_id = po.trace_id AND r.decision <> 1
+         AND (r.order_id = po.parent_order_id
+              OR r.order_id IN (SELECT c.child_order_id FROM child_orders c
+                                 WHERE c.trace_id = po.trace_id
+                                   AND c.parent_order_id = po.parent_order_id)))
+                                AS n_children_rejected,
     (SELECT COUNT(*) FROM child_orders c
        WHERE c.trace_id = po.trace_id AND c.parent_order_id = po.parent_order_id)
                                 AS n_child_orders,
@@ -552,7 +618,8 @@ SELECT
        WHERE v.trace_id = po.trace_id AND c2.parent_order_id = po.parent_order_id AND v.venue_id <> 0)
                                 AS n_venues_routed,
     (SELECT COUNT(*) FROM executions e
-       WHERE e.trace_id = po.trace_id AND e.parent_order_id = po.parent_order_id)
+       WHERE e.trace_id = po.trace_id AND e.parent_order_id = po.parent_order_id
+         AND e.status IN (2, 3))
                                 AS n_fills,
     (SELECT COALESCE(SUM(e2.filled_qty), 0) FROM executions e2
        WHERE e2.trace_id = po.trace_id AND e2.parent_order_id = po.parent_order_id)
@@ -583,10 +650,6 @@ LEFT JOIN alpha_signals sg
                               WHERE s2.trace_id = po.trace_id AND s2.instrument_id = po.instrument_id)
 LEFT JOIN portfolio_targets pt ON pt.trace_id = po.trace_id
 LEFT JOIN portfolio_legs pl ON pl.trace_id = po.trace_id AND pl.instrument_id = po.instrument_id
-LEFT JOIN risk_decisions rd
-       ON rd.trace_id = po.trace_id
-      AND rd.risk_index = (SELECT MAX(r2.risk_index) FROM risk_decisions r2
-                            WHERE r2.trace_id = po.trace_id AND r2.order_id = po.parent_order_id)
 LEFT JOIN tca_results t ON t.parent_order_id = po.parent_order_id AND t.trace_id = po.trace_id
 LEFT JOIN attribution a ON a.trace_id = po.trace_id;
 

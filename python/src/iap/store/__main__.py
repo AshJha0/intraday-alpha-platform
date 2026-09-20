@@ -7,12 +7,16 @@
 ``build`` applies the DDL and imports every research artefact that exists,
 then prints a deterministic count table (one row per table, sorted) and
 the importers' warnings on stderr.  ``sql`` prints one canonical JSON
-line per row.  Output never contains a wall-clock value.
+line per row; ``sql`` and ``explain`` open the file **read-only**
+(``file:...?mode=ro``), so a statement that writes fails with exit code 1
+and the index can only change through ``build``.  Output never contains a
+wall-clock value.
 """
 
 from __future__ import annotations
 
 import argparse
+import sqlite3
 import sys
 from pathlib import Path
 from typing import List, Optional, Sequence
@@ -83,7 +87,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"error: no store at {db} (run `python -m iap.store build` first)",
               file=sys.stderr)
         return 2
-    with Store.open(db) as store:
+    # explain / sql never write: the file is opened read-only (mode=ro), so
+    # an arbitrary statement cannot alter the index (rebuild it with `build`).
+    with Store.open(db, read_only=True) as store:
         if args.command == "explain":
             try:
                 print(store.explain(args.parent_order_id))
@@ -94,6 +100,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         try:
             for row in store.query(args.query):
                 print(canonical_json(row))
+        except sqlite3.OperationalError as exc:
+            print(f"error: {exc} (the store is opened read-only; use `build` to rebuild it)",
+                  file=sys.stderr)
+            return 1
         except BrokenPipeError:
             return 0
     return 0

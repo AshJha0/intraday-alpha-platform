@@ -10,7 +10,10 @@
 #
 # Jobs:
 #   python | cpp | rust | java   one per language, the canonical commands from
-#                                docs/BUILD_NOTES.md, run in parallel
+#                                docs/BUILD_NOTES.md, run in parallel; python
+#                                (and golden) first restore or regenerate the
+#                                seeded dataset so the data-dependent tests
+#                                run instead of skipping
 #   integration                  tests/integration + tests/replay (tests/README.md
 #                                levels 3-4: cross-component runs and same-seed
 #                                byte determinism) — the `integration` and
@@ -54,6 +57,43 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install numpy pandas scipy scikit-learn pyarrow jsonschema referencing pytest pyyaml
+      # The seeded dataset (data/normalized + data/features, git-ignored) is
+      # what test_research_runner::test_eq03_report_reproduces_through_the_runner,
+      # test_alpha_golden::test_golden_fx05_via_class_on_bundled_data and the
+      # test_alpha_interface frames run on; without it they skip and the
+      # "runner reproduces the flagship report" claim is not CI-proven.  The
+      # cache key is the generator inputs + the generator / normaliser /
+      # feature-engine sources, so a change to any of them regenerates
+      # (~10 s market data + ~60 s features; identical seed => identical bytes).
+      - name: Restore the seeded dataset
+        id: dataset-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            data/raw
+            data/normalized
+            data/features
+          key: dataset-${{ runner.os }}-${{ hashFiles('configs/marketdata/generator.json', 'configs/instruments/instruments.json', 'configs/venues/venues.json', 'data/reference/feature_registry.json', 'python/src/iap/marketdata/**', 'python/src/iap/features/**', 'python/src/iap/core/**', 'python/src/iap/orderbook/**') }}
+      - name: Generate the seeded dataset (cache miss)
+        if: steps.dataset-cache.outputs.cache-hit != 'true'
+        working-directory: python
+        env:
+          PYTHONPATH: src
+        run: |
+          python3 -m iap.marketdata
+          python3 -m iap.features
+      - name: The data-dependent tests must run, not skip
+        working-directory: python
+        env:
+          PYTHONPATH: src
+        run: |
+          test -f ../data/features/features_1.parquet
+          python -m pytest -q -rs tests/test_research_runner.py -k eq03_report_reproduces \
+            | tee /tmp/eq03.txt
+          if grep -q "skipped" /tmp/eq03.txt; then
+            echo "::error::test_eq03_report_reproduces_through_the_runner skipped — the dataset is missing"
+            exit 1
+          fi
       - name: pytest
         working-directory: python
         env:
@@ -151,6 +191,25 @@ jobs:
             g++ cmake make libgtest-dev libeigen3-dev junit4
           python -m pip install --upgrade pip
           pip install numpy pandas scipy scikit-learn pyarrow jsonschema referencing pytest pyyaml
+      # Same seeded dataset as the python job (same cache key): the Python
+      # golden group includes test_golden_fx05_via_class_on_bundled_data.
+      - name: Restore the seeded dataset
+        id: dataset-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            data/raw
+            data/normalized
+            data/features
+          key: dataset-${{ runner.os }}-${{ hashFiles('configs/marketdata/generator.json', 'configs/instruments/instruments.json', 'configs/venues/venues.json', 'data/reference/feature_registry.json', 'python/src/iap/marketdata/**', 'python/src/iap/features/**', 'python/src/iap/core/**', 'python/src/iap/orderbook/**') }}
+      - name: Generate the seeded dataset (cache miss)
+        if: steps.dataset-cache.outputs.cache-hit != 'true'
+        working-directory: python
+        env:
+          PYTHONPATH: src
+        run: |
+          python3 -m iap.marketdata
+          python3 -m iap.features
       - name: cross-language golden suite (promotion gate 10)
         run: bash tests/harness/run_golden.sh
 

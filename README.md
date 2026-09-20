@@ -58,7 +58,7 @@ the full design, data flow, and diagrams.
 | Experiments ledger | 865 recorded looks over **70 distinct configurations** (de-duplicated by alpha × kind × config); expected max \|t\| under the global null ≈ 3.68, Bonferroni per-test \|t\| ≥ 4.02 | `research/experiments.json` |
 | Contracts | **17** JSON Schemas (all `x-version` 1) mirrored by **22** typed Python contracts and **18** runtime-checkable Protocols; one pinned instance each | `schemas/`, `python/src/iap/contracts/`, `tests/golden/expected_contracts_examples.json` |
 | Python reference ports proven by the ports' own goldens | risk: `expected_risk_decisions.json` exact, audit JSONL + snapshot **byte-identical**; execution: `expected_replay_fills.json` **bit-identical** | `python/tests/test_risk_golden.py`, `python/tests/test_execution_golden.py` |
-| MVP golden run (`python -m iap.mvp run`, seed 12345) | **16,578** events · **355** decisions · **66** parent orders · **55** fills · P&L **−22.68 USD** (cost-negative: +0.039 bps alpha vs −0.40 bps execution cost) · trace digest `16cd29aa…` reproduced by run-twice and replay-from-capture | `tests/golden/expected_mvp.json` |
+| MVP golden run (`python -m iap.mvp run`, seed 12345) | **16,578** events · **355** decisions · **66** parent orders · **55** fills · P&L **−22.68 USD** (cost-negative: +0.039 bps alpha vs −0.40 bps execution cost) · trace digest `059c30df…` reproduced by run-twice and replay-from-capture | `tests/golden/expected_mvp.json` |
 | Adaptive deployment study | 4 refit policies × 10 alphas; 126 drift-triggered refits; FX01 retired under every policy | `research/adaptive_reports/ADAPTIVE_REPORT.md` |
 | Bundled dataset | 2 synthetic sessions, 19 instruments, 310,159 normalized events | `data/normalized/qc_report.json` |
 | Feature emission | 208,437 vectors at 100 ms cadence | `data/features/features_summary.json` |
@@ -246,11 +246,11 @@ python3 tools/github/create_issues.py --dry-run   # the epics/issues plan (docs/
 ===================== cross-language parity table =====================
 language | tests passed | golden passed  | time   | status
 ---------+--------------+----------------+--------+-------
-python   | 1352         | 162            |   83s | PASS
+python   | 1360         | 164            |   83s | PASS
 cpp      | 266          | 67             |    1s | PASS
 rust     | 298          | 62             |    2s | PASS
 java     | 475          | 102            |   20s | PASS
-integration | 13           | -              |   15s | PASS
+integration | 15           | -              |   15s | PASS
 replay   | 4            | -              |   15s | PASS
 deployment | -            | -              |    4s | PASS
 numbers  | -            | -              |    -s | PASS
@@ -272,8 +272,8 @@ codec parity, exact-integer book states, 1e-9-tolerance
 feature/alpha/portfolio/TCA/fill comparisons, exact risk decisions with
 byte-identical audit and snapshot, the adaptability goldens — PSI/KS at
 1e-10, exact refit-decision booleans and lifecycle state sequences — and,
-since 2026-09-19, the cross-language contract goldens: canonical JSON (2051
-float reprs, 24 escapes, 9 documents), the trace id and trace digests, one
+since 2026-09-19, the cross-language contract goldens: canonical JSON (2663
+float reprs incl. 612 rounding-tie and 17-digit cases, 24 escapes, 9 documents), the trace id and trace digests, one
 pinned instance per contract with the `explain()` block, the 7-state
 lifecycle scenarios and the registry bytes, the experiment golden frame and
 the MVP session — all against `tests/golden/`. The Java golden column runs

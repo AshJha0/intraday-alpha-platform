@@ -271,7 +271,7 @@ class Counters:
     decisions_without_covariance: int = 0
     decisions_flat: int = 0
     decisions_parent_live: int = 0
-    decisions_window_beyond_stream: int = 0
+    decisions_window_beyond_session: int = 0   #: parent window would end after the session close
     parent_orders: int = 0
     child_orders_generated: int = 0
     child_orders_submitted: int = 0
@@ -329,6 +329,14 @@ class OrderOutcome:
     latencies_ns: Tuple[int, ...]
 
 
+#: The declared controls a generated child can be blocked by, in check order
+#: (Java BacktestEngine.decide).  A blocked child never leaves the strategy:
+#: it gets no routing, no risk decision and no report, so it is NOT written
+#: into the trace's child_orders / routing stages — only counted here and in
+#: ``ParentOrder.params["children_blocked_<control>"]`` at finalisation.
+BLOCK_CONTROLS = ("slice_interval", "latency_budget", "participation")
+
+
 @dataclass
 class _LiveParent:
     parent: ParentOrder
@@ -336,7 +344,10 @@ class _LiveParent:
     decision: "_Decision"
     children: Dict[int, ChildOrder] = field(default_factory=dict)  #: submitted, by id
     reports: List[ExecutionReport] = field(default_factory=list)
-    rejected: int = 0
+    rejected: int = 0          #: generated but not submitted (any reason)
+    #: control-blocked children by control (never routed to risk or a venue;
+    #: written into ParentOrder.params as children_blocked_<control>)
+    blocked: Dict[str, int] = field(default_factory=lambda: dict.fromkeys(BLOCK_CONTROLS, 0))
     fill_impact: float = 0.0
     fill_fees: float = 0.0
 
@@ -375,7 +386,11 @@ class MvpEngine:
         self.strategy_id = cfg.strategy_id
         self.session_id = cfg.session_id
         self.controls = load_controls(cfg)
-        self.stream_end_ts = feed.last_ts
+        # The end of the session is known EX ANTE from the configured calendar
+        # (open/close in the session's zone -> UTC ns); the loop never reads
+        # the end of the captured stream, which a live loop cannot know.
+        self.session_open_ts, self.session_close_ts = self.ref.session_bounds_ns(
+            inst.asset_class, cfg.session.trading_day)
         self.counters = Counters()
         self.account = Account()
 
@@ -741,8 +756,8 @@ class MvpEngine:
             decision.ready = True
             return
         end_ts = t + self.cfg.execution.parent_window_ns
-        if end_ts > self.stream_end_ts:
-            self.counters.decisions_window_beyond_stream += 1
+        if end_ts > self.session_close_ts:
+            self.counters.decisions_window_beyond_session += 1
             decision.ready = True
             return
         urgency = signal.confidence
@@ -781,9 +796,10 @@ class MvpEngine:
             self.counters.child_orders_generated += 1
             passive = child.order_type is OrderType.LIMIT
             vd: VenueDecision = self.sor.route(child, SorMarket(self.book, passive))
-            builder.add_routing(vd)
             if vd.venue_id == NO_ROUTE:
+                # A routing verdict: traced (routing + child) with venue 0.
                 self.counters.sor_no_route += 1
+                builder.add_routing(vd)
                 builder.add_child_order(child)
                 live.rejected += 1
                 continue
@@ -803,17 +819,19 @@ class MvpEngine:
             # Declared controls (Java BacktestEngine.decide, pinned order).
             ctl = self.controls
             acct = self.account
+            # A control-blocked child never leaves the strategy (BLOCK_CONTROLS):
+            # counted, not traced.
             if (ctl.min_slice_interval_ns > 0 and acct.last_child_decision_ts is not None
                     and t - acct.last_child_decision_ts < ctl.min_slice_interval_ns):
                 self.counters.slice_interval_blocked += 1
-                builder.add_child_order(routed)
+                live.blocked["slice_interval"] += 1
                 live.rejected += 1
                 continue
             venue_latency = self.exec_config.latency.internal_ns + \
                 self.venues[vd.venue_id].latency_mean_ns
             if venue_latency > ctl.latency_budget_ns:
                 self.counters.latency_budget_blocked += 1
-                builder.add_child_order(routed)
+                live.blocked["latency_budget"] += 1
                 live.rejected += 1
                 continue
             if ctl.max_participation < 1.0:
@@ -824,12 +842,13 @@ class MvpEngine:
                 cap = max(min(cap_depth, cap_volume), 0)
                 if cap == 0:
                     self.counters.participation_blocked += 1
-                    builder.add_child_order(routed)
+                    live.blocked["participation"] += 1
                     live.rejected += 1
                     continue
                 if routed.qty > cap:
                     self.counters.participation_capped += 1
                     routed = replace(routed, qty=cap)
+            builder.add_routing(vd)
             builder.add_child_order(routed)
             rd: RiskDecision = self.risk.evaluate(
                 routed, RiskContext(self.strategy_id, parent.urgency, t))
@@ -862,8 +881,15 @@ class MvpEngine:
                 self._closing.remove(live)
 
     def _finalise(self, live: _LiveParent, *, force: bool) -> None:
-        parent = live.parent
         builder = live.decision.builder
+        # Preserve the control blocks in the trace: the parent's params gain
+        # one children_blocked_<control> counter per declared control.
+        params = dict(live.parent.params)
+        for control in BLOCK_CONTROLS:
+            params[f"children_blocked_{control}"] = float(live.blocked[control])
+        parent = replace(live.parent, params=params)
+        builder.replace_parent_order(parent)
+        live.parent = parent
         self.scheduler.close(parent.parent_order_id)
         tl = self.timeline
         can_tca = live.all_terminal(self.sim) and tl.last_ts is not None \

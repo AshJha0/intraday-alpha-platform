@@ -12,6 +12,7 @@ determinism.  The golden session itself is ``test_mvp_golden.py``.
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -30,7 +31,7 @@ from iap.contracts.protocols import (
     TCAEngine,
     TraceSink,
 )
-from iap.contracts.types import Decision, DecisionTrace, ExecStatus, Side
+from iap.contracts.types import Decision, DecisionTrace, ExecStatus, LifecycleState, Side
 from iap.contracts.validate import validate_typed
 from iap.features.engine import FeatureEngine, FeatureVector
 from iap.features.registry import build_registry, registry_hash
@@ -363,18 +364,84 @@ def test_engaged_kill_switch_rejects_every_child_and_nothing_fills(
 
 def test_paper_evidence_and_report_are_consistent(tiny_run: RunResult) -> None:
     ev = json.loads((tiny_run.out_dir / PAPER_EVIDENCE_FILE).read_text())
-    assert ev["x-version"] == 2 and set(ev["alphas"]) == {"EQ01", "EQ03", "EQ06"}
+    assert ev["x-version"] == 3 and set(ev["alphas"]) == {"EQ01", "EQ03", "EQ06"}
+    per_alpha = tiny_run.report["alpha"]["per_alpha"]
     for aid, row in ev["alphas"].items():
         assert row["state_at_run"] == "CANDIDATE"
         paper = row["paper"]
+        assert row["research_ic_defined"]
+        assert row["ic_defined"] == (per_alpha[aid]["at_research_horizon"]["realized_ic"] is not None)
+        if not row["ic_defined"]:
+            assert paper is None
+            continue
         assert paper["n_sessions"] == 1 and paper["net_pnl"] == tiny_run.report["pnl"]["total"]
         assert paper["n_kill_events"] == tiny_run.report["risk"]["kill_events"]
-        assert row["research_ic_defined"] and paper["research_ic"] == \
-            tiny_run.report["alpha"]["per_alpha"][aid]["research_ic"]
+        assert paper["research_ic"] == per_alpha[aid]["research_ic"]
+        assert paper["realized_ic"] == per_alpha[aid]["at_research_horizon"]["realized_ic"]
+    assert any(row["ic_defined"] for row in ev["alphas"].values())
     report = json.loads((tiny_run.out_dir / REPORT_JSON).read_text())
     assert compare_runs(report, tiny_run.report) == []
     assert report["run"]["run_id"] == tiny_run.config.run_id
     assert (tiny_run.out_dir / "report.md").read_text().startswith("# MVP run")
+
+
+def test_undefined_ic_writes_paper_null_and_lifecycle_reads_no_evidence(tmp_path: Path) -> None:
+    """A 12-second session leaves EQ03 (5 s) and EQ06 (10 s) with no valid
+    label pair: the evidence block a gate reads is ``null`` — never
+    ``realized_ic: 0.0`` — and ``AlphaLifecycle.advance`` records
+    ``NO_EVIDENCE`` for the PAPER -> ACTIVE edge instead of passing
+    ``paper_ic_tracking`` on |0 - 0| <= 0.01 (review finding 3)."""
+    from iap.lifecycle.config import load_policy_config
+    from iap.lifecycle.evidence import Evidence, PaperEvidence
+    from iap.lifecycle.machine import AlphaLifecycle, Outcome
+    from iap.lifecycle.registry import AlphaRegistry
+
+    doc = _doc()
+    doc["session"]["close"] = "13:30:12"
+    cfg_path = tmp_path / "short.json"
+    cfg_path.write_text(json.dumps(doc))
+    cfg = load_config(cfg_path)
+    out = tmp_path / "run"
+    run = run_session(cfg, generate_feed(cfg, out), out)
+    ev = json.loads((out / PAPER_EVIDENCE_FILE).read_text())
+    assert ev["x-version"] == 3
+    undefined = {aid for aid, row in ev["alphas"].items() if not row["ic_defined"]}
+    assert {"EQ03", "EQ06"} <= undefined
+    for aid, row in ev["alphas"].items():
+        assert row["research_ic_defined"]
+        if aid in undefined:
+            assert row["paper"] is None and row["n_ic_samples"] < 3
+            assert run.report["alpha"]["per_alpha"][aid]["at_research_horizon"]["realized_ic"] is None
+        else:
+            assert row["paper"]["realized_ic"] == \
+                run.report["alpha"]["per_alpha"][aid]["at_research_horizon"]["realized_ic"]
+    text = (out / PAPER_EVIDENCE_FILE).read_text()
+    assert '"realized_ic": 0.0' not in text
+
+    # The lifecycle reads the block as written: an absent block moves nothing.
+    policy = load_policy_config(REPO_ROOT / "configs" / "strategies" / "lifecycle.json",
+                                REPO_ROOT / "configs" / "strategies" / "strategies.json")
+    registry = AlphaRegistry.load(REPO_ROOT / "research" / "alpha_registry.json")
+    machine = AlphaLifecycle(policy, registry, None)
+    aid = sorted(undefined)[0]
+    rec = registry.get(aid)
+    rec.state = LifecycleState.PAPER          # in memory only; the file is untouched
+    block = ev["alphas"][aid]["paper"]
+    evidence = Evidence(research=None, capacity_usd=None, validation=None,
+                        paper=None if block is None else PaperEvidence.from_dict(block),
+                        live=None)
+    ts = ev["event_ts"] + 1
+    assert machine.advance(aid, ts, evidence) is None
+    assert rec.last_evaluation.outcome is Outcome.NO_EVIDENCE
+    assert rec.last_evaluation.gates == {} and rec.consecutive_failures == 0
+    assert registry.get(aid).state is LifecycleState.PAPER
+    # What the old artefact would have produced: a fabricated 0.0 passes the
+    # tracking gate on silence — the exact failure the null block prevents.
+    fabricated = Evidence(research=None, capacity_usd=None, validation=None, live=None,
+                          paper=PaperEvidence(n_sessions=1, realized_ic=0.0, research_ic=0.0,
+                                              net_pnl=0.0, n_kill_events=0, tracking_error=0.0))
+    machine.advance(aid, ts + 1, fabricated)
+    assert rec.last_evaluation.gates["paper_ic_tracking"].passed
 
 
 def test_run_twice_is_bit_identical(tiny_cfg: MvpConfig, tiny_run: RunResult,
@@ -529,9 +596,12 @@ def test_shift_by_one_and_truncation_leakage_probes(tiny_cfg: MvpConfig,
       label) for every alpha and the ensemble, and it is computed from the
       same pairs;
     * truncation — the engine is a single-pass stream: re-running it on the
-      stream cut at several points reproduces every signal decided before
-      the cut bit for bit (a scoring path that peeked at later events
-      could not)."""
+      stream cut at several points (a genuinely truncated ``FeedResult``:
+      the engine must not learn the end of the stream from the feed object —
+      the end of the session comes from the calendar, ex ante) reproduces
+      every signal decided before the cut bit for bit, and every parent and
+      child order whose window closed before the cut (a scoring or
+      scheduling path that peeked at later events could not)."""
     engine = tiny_run.engine
     for aid in list(tiny_cfg.alphas) + [engine.ensemble.alpha_id]:
         res = engine.realized_ic(aid)
@@ -547,12 +617,16 @@ def test_shift_by_one_and_truncation_leakage_probes(tiny_cfg: MvpConfig,
 
     full = _traces(tiny_run)
     events = tiny_run.feed.events
+    assert engine.session_close_ts == engine.session_open_ts + tiny_cfg.session.length_ns
+    assert not hasattr(engine, "stream_end_ts")
+    checked_orders = 0
     for frac in (0.35, 0.7):
         cut = int(len(events) * frac)
         cut_ts = events[cut - 1].exchange_ts
         sink = MemoryTraceSink()
-        part = MvpEngine(tiny_cfg, tiny_run.feed, sink)
-        for ev in events[:cut]:
+        truncated = replace(tiny_run.feed, events=events[:cut])
+        part = MvpEngine(tiny_cfg, truncated, sink)
+        for ev in truncated.events:
             part.on_event(ev)
         part.finish()
         before = [t for t in full if t.event_ts <= cut_ts]
@@ -561,6 +635,48 @@ def test_shift_by_one_and_truncation_leakage_probes(tiny_cfg: MvpConfig,
             assert got.trace_id == want.trace_id
             assert got.stages.signal == want.stages.signal
             assert got.stages.portfolio == want.stages.portfolio
+            if want.stages.parent_orders and want.stages.parent_orders[0].end_ts <= cut_ts:
+                assert got.stages.parent_orders == want.stages.parent_orders
+                assert got.stages.child_orders == want.stages.child_orders
+                assert got.stages.risk == want.stages.risk
+                checked_orders += 1
+    assert checked_orders > 0
+
+
+def test_control_blocked_children_are_counted_not_traced(tiny_run: RunResult) -> None:
+    """A child blocked by a declared control (min_slice_interval,
+    latency_budget, max_participation) never leaves the strategy: it is not
+    in the trace's ``child_orders`` / ``routing`` stages (so ``explain`` SOR
+    shares and ``v_order_chain.n_child_orders`` describe real submissions),
+    and its count is preserved in ``ParentOrder.params``
+    ``children_blocked_<control>`` (review finding 5)."""
+    engine = tiny_run.engine
+    c = engine.counters
+    traced_children = 0
+    blocked = {"slice_interval": 0, "latency_budget": 0, "participation": 0}
+    for trace in _traces(tiny_run):
+        st = trace.stages
+        child_ids = {ch.child_order_id for ch in st.child_orders}
+        assert {vd.child_order_id for vd in st.routing} == child_ids   # routed <=> traced
+        assert {rd.order_id for rd in st.risk} <= child_ids            # risk-checked <=> traced
+        traced_children += len(st.child_orders)
+        for po in st.parent_orders:
+            for control in blocked:
+                key = f"children_blocked_{control}"
+                assert key in po.params and po.params[key] == int(po.params[key]) >= 0
+                blocked[control] += int(po.params[key])
+    assert blocked["slice_interval"] == c.slice_interval_blocked
+    assert blocked["latency_budget"] == c.latency_budget_blocked
+    assert blocked["participation"] == c.participation_blocked
+    assert c.slice_interval_blocked > 0                # the control fires in the tiny run
+    assert traced_children == c.child_orders_submitted + c.risk_rejected + c.sor_no_route
+    assert traced_children == c.child_orders_generated - sum(blocked.values())
+    with Store.open(tiny_run.out_dir / STORE_FILE) as store:
+        rows = store.query("SELECT parent_order_id, n_child_orders, n_children_allowed, "
+                           "n_children_rejected FROM v_order_chain ORDER BY parent_order_id")
+        assert sum(r["n_child_orders"] for r in rows) == traced_children
+        assert sum(r["n_children_allowed"] for r in rows) == c.risk_allowed
+        assert sum(r["n_children_rejected"] for r in rows) == c.risk_rejected
 
 
 def test_signal_stage_is_ensemble_first_then_components(tiny_run: RunResult) -> None:

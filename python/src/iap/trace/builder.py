@@ -97,6 +97,17 @@ class TraceBuilder:
         self._parent_orders.append(order)
         return self
 
+    def replace_parent_order(self, order: ParentOrder) -> "TraceBuilder":
+        """Replace the recorded parent with the same ``parent_order_id``
+        (e.g. to fill in ``params`` counters known only at the end of the
+        order's window).  Raises ``KeyError`` when no such parent was added."""
+        _expect(order, ParentOrder, "replace_parent_order")
+        for i, existing in enumerate(self._parent_orders):
+            if existing.parent_order_id == order.parent_order_id:
+                self._parent_orders[i] = order
+                return self
+        raise KeyError(f"replace_parent_order: no parent {order.parent_order_id} in the trace")
+
     def add_child_order(self, order: ChildOrder) -> "TraceBuilder":
         _expect(order, ChildOrder, "add_child_order")
         self._child_orders.append(order)

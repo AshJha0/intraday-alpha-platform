@@ -43,8 +43,8 @@ flowchart TD
 ## 2. Cross-language golden-test topology
 
 How one validated Python reference pins four implementations. The parity table is
-printed by `tests/harness/run_all.sh` (python 1352 · cpp 266 · rust 298 · java 475
-tests; 162/67/62/102 in the golden groups — the Java gate runs all thirteen
+printed by `tests/harness/run_all.sh` (python 1360 · cpp 266 · rust 298 · java 475
+tests; 164/67/62/102 in the golden groups — the Java gate runs all thirteen
 `*GoldenTest` classes, the Rust gate nine golden targets). Two goldens are
 owned by a port language and consumed by Python as well: the fills golden
 (C++) by `iap.execution`, the risk goldens (Rust) by `iap.risk`.
@@ -60,7 +60,7 @@ flowchart LR
     MG --> EXP[("expected_*.json<br/>codec sha256 | book states | features<br/>alpha | backtest | risk decisions + audit + snapshot<br/>replay fills | portfolio | tca (+ timeline cases) | adaptive<br/>contracts examples | canonical json + trace digest<br/>lifecycle | experiment golden frame | mvp")]
     CPPTOOL["cpp/tools/make_replay_fills_golden<br/>(C++ is the fills reference;<br/>Python iap.execution consumes it too)"] --> EXP
     RSTOOL["rust/risk/src/bin/make_risk_golden<br/>(Rust is the risk reference;<br/>Python iap.risk consumes it too)"] --> EXP
-    GV --> PY["python: pytest -k golden<br/>162 tests"]
+    GV --> PY["python: pytest -k golden<br/>164 tests"]
     GV --> CPP["cpp: ctest -R Golden<br/>67 tests"]
     GV --> RS["rust: 9 golden test targets<br/>62 tests"]
     GV --> JV["java: all thirteen *GoldenTest (JUnitCore)<br/>102 golden-group tests"]
@@ -488,7 +488,8 @@ erDiagram
     child_orders ||..o| venue_decisions : "child_order_id"
     child_orders ||..o{ executions : "order_id"
     parent_orders ||..o| tca_results : "parent_order_id"
-    parent_orders ||..o{ risk_decisions : "order_id"
+    child_orders ||..o{ risk_decisions : "order_id (per routed child)"
+    parent_orders ||..o{ risk_decisions : "order_id (parent-level loop)"
     sessions ||..o{ decision_traces : "session_id"
     instruments ||..o{ decision_traces : "instrument_id"
     venues ||..o{ child_orders : "venue_id"
@@ -600,7 +601,7 @@ flowchart TD
     FEAT --> CHILD["8. per child: AlgoScheduler → SorAdapter.route (3 venues)<br/>→ controls (slice interval, latency budget, participation)<br/>→ RiskEngineAdapter.evaluate (RiskDecision) → submit<br/>a REJECT is never submitted"]
     CHILD --> TRACE["9. TraceBuilder per decision → JsonlTraceSink + StoreTraceSink + TraceDigest"]
     TRACE --> OUT["data/mvp/RUN_ID/: traces.jsonl · iap.sqlite · risk_audit.jsonl<br/>report.json / report.md · paper_evidence.json · config.json"]
-    OUT --> VERIFY["python -m iap.mvp verify — run twice, identical bytes<br/>python -m iap.mvp replay --run … — same digest from the captured stream<br/>golden: tests/golden/expected_mvp.json (16,578 events, 355 decisions,<br/>66 parents, 55 fills, P&L −22.68 USD, digest 16cd29aa…)"]
+    OUT --> VERIFY["python -m iap.mvp verify — run twice, identical bytes<br/>python -m iap.mvp replay --run … — same digest from the captured stream<br/>golden: tests/golden/expected_mvp.json (16,578 events, 355 decisions,<br/>66 parents, 55 fills, P&L −22.68 USD, digest 059c30df…)"]
     SIM -. "next event" .-> SIM
 ```
 

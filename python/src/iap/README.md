@@ -236,8 +236,10 @@ iap/
     golden.py      The LC01/LC02/LC03 scripted scenarios behind
                    tests/golden/expected_lifecycle.json
                    (python/tools/make_golden_lifecycle.py).
-    __main__.py    `python -m iap.lifecycle bootstrap [--dry-run] | status |
-                   retire <ID> --reason ... | reset <ID> --reason ...`.
+    __main__.py    `python -m iap.lifecycle bootstrap [--dry-run] [--force] | status |
+                   retire <ID> --reason ... | reset <ID> --reason ...` (bootstrap
+                   refuses to truncate a non-empty lifecycle_transitions.jsonl —
+                   an append-only audit — without --force; exit code 3).
   store/           The platform data model (schemas/sql/iap_v1.sql, x-version 1:
                    portable DDL for SQLite 3 + PostgreSQL >= 13) over sqlite3 —
                    a derived, rebuildable INDEX of the flat-file artefacts,

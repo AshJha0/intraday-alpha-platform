@@ -495,3 +495,92 @@ MVP's own artefacts (docs/MVP.md §7 has the audit):
   loop runs inside the Python image (`deployment/docker/Dockerfile.python`
   now bakes `research/alpha_registry.json`); `configs/mvp/*` are projected
   by the k8s ConfigMap (`deployment/k8s/*.yaml` items[]).
+
+## 2026-09-20 — Review fixes: Rust float ties, `v_order_chain`, `paper_evidence.json` v2 -> v3, packaged schemas, blocked children out of the trace, `expected_mvp.json` + `expected_canonical_json.json` regenerated; no wire schema changed
+
+Nothing under `schemas/*.schema.json` changed.  What changed (the independent
+review of the release, findings 1–10 and notes 12/13):
+
+- **`tests/golden/expected_canonical_json.json` regenerated (`--force`,
+  x-version 1 kept — additive)**: 612 float cases appended to the 2051
+  (2663 in all): the review's exact decimal midpoints
+  (`1059438285926254.25` -> `1059438285926254.2`, `26363981746409.3125`,
+  `1000000000000000.25`, …) and a SplitMix64 set of 400 midpoint ties + 200
+  values whose shortest repr needs 17 digits (`k + j/2^b` in the binades
+  2^40..2^52).  Every other section (documents, escapes, trace id, trace
+  digests) is byte-identical.  Rust `contracts::canonical::format_float`
+  now takes its digits from serde_json / ryu (round-half-even) instead of
+  `core::fmt`'s `{:e}` (half-up on ties); C++ / Java / Python needed no
+  change and all four ports match the new cases.
+- **`schemas/sql/iap_v1.sql` view `v_order_chain` (DDL x-version 1 kept —
+  tables unchanged; `python -m iap.store build` / `Store.init()` recreates
+  the view)**: risk is joined through the parent's `child_orders` (risk is
+  decided per routed child, §11.4; the parent id itself also matches for a
+  loop without a child stage), aggregated as `risk_decision = MAX(decision)`
+  (REJECT/KILL if any child, else ALLOW, NULL when none), `risk_rule_id` /
+  `risk_reason` = the first rejecting row (else the first row); new columns
+  `n_children_allowed`, `n_children_rejected`; `n_fills` counts PARTIAL /
+  FILLED reports only.  The old view matched `risk_decisions.order_id =
+  parent_order_id` (NULL for 65 of the 66 golden parents) and counted NEW /
+  CANCELED reports as fills.
+- **`paper_evidence.json` x-version 3** (`iap.mvp.session`): `paper` is
+  `null` when the alpha's realized IC (at its fitted horizon) or the
+  registry's research IC is undefined — the lifecycle then records
+  `NO_EVIDENCE` — instead of `realized_ic: 0.0` / `research_ic: 0.0`, which
+  passed `paper_ic_tracking` on silence.  `ic_defined`, `research_ic_defined`
+  and `n_ic_samples` stay next to the block.
+- **Packaged schemas**: `python/setup.py` (build hook) copies `schemas/`
+  into the wheel as `iap/_schemas`; `iap.contracts.versions.schema_dir()`
+  resolves `$IAP_SCHEMA_DIR` (must exist) -> the checkout -> the packaged
+  copy; `Dockerfile.python` sets `IAP_SCHEMA_DIR=/app/schemas` and copies
+  `schemas/` before the install.  `tests/integration/test_installed_package.py`
+  runs the tiny MVP from a non-editable venv install outside the checkout
+  and asserts the packaged copy equals `schemas/` byte for byte.
+- **Control-blocked children are no longer written into the trace**
+  (`iap.mvp.engine`): a child blocked by `min_slice_interval_ns`,
+  `latency_budget_ns` or `max_participation` never left the strategy (no
+  routing, no risk decision, no report), so it no longer appears in
+  `stages.child_orders` / `stages.routing`; its count is preserved per parent
+  in `ParentOrder.params` `children_blocked_slice_interval` /
+  `children_blocked_latency_budget` / `children_blocked_participation`
+  (session totals unchanged in `Counters` / `report.controls`).  NO_ROUTE
+  and risk-REJECTed children stay traced with their terminal verdicts.
+  `TraceBuilder.replace_parent_order` was added for the finalisation-time
+  params.
+- **The decision loop no longer reads the end of the captured stream**: the
+  "parent window beyond the session" guard uses the calendar's session
+  close (`ReferenceData.session_bounds_ns`, ex ante); the counter is renamed
+  `decisions_window_beyond_stream` -> `decisions_window_beyond_session`
+  (0 in the golden run before and after).
+- **`tests/golden/expected_mvp.json` regenerated (`--force`, x-version 1
+  kept)**: the trace digest changed because blocked children left the
+  trace and every parent's params gained the three counters
+  (`16cd29aa...` -> `059c30df...`); every count, fill, P&L figure, TCA
+  number and per-alpha IC is unchanged (the loop's decisions do not depend
+  on the trace layout), only the counter rename above differs in
+  `report.counts.counters`.
+- **`python -m iap.lifecycle bootstrap` refuses to truncate a non-empty
+  `research/lifecycle_transitions.jsonl`** (an append-only audit) without
+  `--force` (exit code 3; `run_bootstrap(force=True)`); `--dry-run` never
+  writes.  The committed registry / log bytes are unchanged.
+- **One alpha-report mapping** (`iap.lifecycle.bootstrap.research_evidence`
+  + new `alpha_report_spec`): `iap.store.import_alpha_reports` now writes the
+  registry's mapping (`ic = gate_ic`, `t_stat = nw_tstat_uncrossed`, P&L in
+  bps of the 1e6 USD reference notional, `experiment_id` = ledger key[:16],
+  versions / commit / model hash from `alpha_params.json`) instead of its own
+  (`oos_ic`, bps of Σ capacity, `content_hash(spec)[:16]`,
+  `unversioned-workspace`); the store is derived, no research artefact
+  changed.  `docs/DATA_MODEL.md` §6 documents the shared mapping.
+- `python -m iap.store sql` / `explain` open the database read-only
+  (`file:…?mode=ro`; `Store.open(path, read_only=True)`).
+- CI: the `python` and `golden` jobs restore (actions/cache keyed on the
+  generator inputs and sources) or regenerate the seeded dataset so the
+  data-dependent tests (`test_eq03_report_reproduces_through_the_runner`,
+  `test_golden_fx05_via_class_on_bundled_data`, the alpha-interface frames)
+  run instead of skipping; the python job fails if the EQ03 reproduction
+  test skips.
+- Known, deliberately NOT bumped: `execution_report.schema.json` (v1) allows
+  the full i64 range for `filled_qty` / `fill_price_ticks` while
+  `ExecutionReport.from_dict`, the DDL and every port require `>= 0` (safe
+  direction).  Tighten to `minimum: 0` at the next revision of that schema
+  (x-version bump + golden regeneration across the four ports).

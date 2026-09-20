@@ -30,29 +30,62 @@ use crate::sha256::sha256_hex;
 
 /// Lay a finite `f64` out exactly like Python's `repr(float)`.
 ///
-/// Algorithm: Rust's `{:e}` yields the shortest round-trip digit string in
-/// exponent form (`d.ddde[-]x`); the digits and the decimal exponent are
-/// re-laid out under Python's rule (exponent form iff `exp < -4 || exp >= 16`,
-/// written with a sign and at least two digits; positional otherwise with a
-/// mandatory fraction part).
+/// Algorithm: the shortest round-trip digit string comes from serde_json's
+/// own `f64` serializer (ryu's `format_finite`, which rounds exact decimal
+/// midpoints half-to-even like Python `repr`, `std::to_chars` and JDK-19+
+/// `Double.toString`). `core::fmt`'s `{:e}` was used before 2026-09-20 and
+/// rounds those ties half-up (`1059438285926254.25` → `…254.3` instead of
+/// `…254.2`), which broke content hashes and trace digests on that class of
+/// doubles. The digits and the decimal exponent are then re-laid out under
+/// Python's rule (exponent form iff `exp < -4 || exp >= 16`, written with a
+/// sign and at least two digits; positional otherwise with a mandatory
+/// fraction part).
 pub fn format_float(x: f64) -> Result<String, IapError> {
     if !x.is_finite() {
         return Err(IapError::InvalidArgument(format!(
             "canonical JSON: non-finite float {x}"
         )));
     }
-    let sci = format!("{x:e}");
-    let (mantissa, exp_str) = sci.split_once('e').ok_or_else(|| {
-        IapError::InvalidArgument(format!("canonical JSON: unexpected float layout {sci}"))
+    let (negative, digits, exp) = shortest_digits(x)?;
+    Ok(layout_python_repr(negative, &digits, exp))
+}
+
+/// `(negative, significant digits without leading/trailing zeros, decimal
+/// exponent of the first digit)` from serde_json's (ryu) shortest
+/// round-trip text of `x`. Zero yields `("0", 0)`.
+fn shortest_digits(x: f64) -> Result<(bool, String, i32), IapError> {
+    let text = serde_json::to_string(&x).map_err(|e| {
+        IapError::InvalidArgument(format!("canonical JSON: cannot serialise float {x}: {e}"))
     })?;
-    let exp: i32 = exp_str.parse().map_err(|_| {
-        IapError::InvalidArgument(format!("canonical JSON: unexpected float exponent {sci}"))
+    let (mantissa, exp_part) = match text.split_once(['e', 'E']) {
+        Some((m, e)) => (m, e),
+        None => (text.as_str(), "0"),
+    };
+    let sci_exp: i32 = exp_part.parse().map_err(|_| {
+        IapError::InvalidArgument(format!("canonical JSON: unexpected float layout {text}"))
     })?;
     let (negative, mantissa) = match mantissa.strip_prefix('-') {
         Some(rest) => (true, rest),
         None => (false, mantissa),
     };
-    let digits: String = mantissa.chars().filter(|c| *c != '.').collect();
+    let (int_part, frac_part) = mantissa.split_once('.').unwrap_or((mantissa, ""));
+    if !int_part.bytes().all(|b| b.is_ascii_digit()) || !frac_part.bytes().all(|b| b.is_ascii_digit()) {
+        return Err(IapError::InvalidArgument(format!(
+            "canonical JSON: unexpected float layout {text}"
+        )));
+    }
+    let all: String = format!("{int_part}{frac_part}");
+    let leading = all.bytes().take_while(|b| *b == b'0').count();
+    if leading == all.len() {
+        return Ok((negative, "0".to_string(), 0));
+    }
+    let trimmed = all[leading..].trim_end_matches('0');
+    let exp = int_part.len() as i32 - 1 - leading as i32 + sci_exp;
+    Ok((negative, trimmed.to_string(), exp))
+}
+
+/// Python `float.__repr__` layout of a digit string and its decimal exponent.
+fn layout_python_repr(negative: bool, digits: &str, exp: i32) -> String {
     let mut out = String::with_capacity(32);
     if negative {
         out.push('-');
@@ -75,11 +108,11 @@ pub fn format_float(x: f64) -> Result<String, IapError> {
         for _ in 0..(-exp - 1) {
             out.push('0');
         }
-        out.push_str(&digits);
+        out.push_str(digits);
     } else {
         let int_len = exp as usize + 1;
         if digits.len() <= int_len {
-            out.push_str(&digits);
+            out.push_str(digits);
             for _ in digits.len()..int_len {
                 out.push('0');
             }
@@ -90,7 +123,7 @@ pub fn format_float(x: f64) -> Result<String, IapError> {
             out.push_str(&digits[int_len..]);
         }
     }
-    Ok(out)
+    out
 }
 
 /// Append `s` as a JSON string literal (quotes included) under the
@@ -294,7 +327,7 @@ mod tests {
 
     #[test]
     fn float_layout_matches_python_repr() {
-        let cases: [(f64, &str); 14] = [
+        let cases: [(f64, &str); 18] = [
             (0.0, "0.0"),
             (-0.0, "-0.0"),
             (1.0, "1.0"),
@@ -309,6 +342,11 @@ mod tests {
             (12345.6789, "12345.6789"),
             (4200.0, "4200.0"),
             (-4.2e-5, "-4.2e-05"),
+            // exact decimal midpoints: half-to-even, like Python / C++ / Java
+            (1059438285926254.25, "1059438285926254.2"),
+            (26363981746409.3125, "26363981746409.312"),
+            (1000000000000000.25, "1000000000000000.2"),
+            (2251799813685248.5, "2251799813685248.5"),
         ];
         for (x, want) in cases {
             assert_eq!(format_float(x).expect("finite"), want);

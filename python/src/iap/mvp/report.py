@@ -374,7 +374,7 @@ def render_markdown(report: Mapping[str, Any]) -> str:
     out += ["", "Decision outcomes: " + ", ".join(
         f"{key} = {c['counters'][key]}" for key in (
             "decisions_without_covariance", "decisions_flat", "decisions_parent_live",
-            "decisions_window_beyond_stream")), ""]
+            "decisions_window_beyond_session")), ""]
     out += ["## Risk", ""]
     out += _table(["rule", "decisions"],
                   [[rule, str(n)] for rule, n in k["decisions_by_rule"].items()])

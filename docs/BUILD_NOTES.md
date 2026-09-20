@@ -17,8 +17,8 @@ gated on all of them. Run the whole thing locally with
 ## Python (reference implementation)
 
 ```bash
-cd python && PYTHONPATH=src python3 -m pytest -q          # full suite (1352 tests, ~83s on the 2-CPU baseline)
-cd python && PYTHONPATH=src python3 -m pytest -q -k golden # the golden group (162)
+cd python && PYTHONPATH=src python3 -m pytest -q          # full suite (1360 tests, ~83s on the 2-CPU baseline)
+cd python && PYTHONPATH=src python3 -m pytest -q -k golden # the golden group (164)
 cd python && PYTHONPATH=src python3 -m iap.marketdata      # end-to-end pipeline
 cd python && PYTHONPATH=src python3 -m iap.mvp run         # the traced MVP loop (~7 s)
 cd python && PYTHONPATH=src python3 tools/make_golden.py   # regen goldens (deliberate only; every
@@ -27,9 +27,9 @@ cd python && PYTHONPATH=src python3 tools/make_golden.py   # regen goldens (deli
 
 - **Timing.** ~83 s is what the harness measures: the `python` row of the README
   parity table (captured from `tests/harness/run_all.sh`, 2026-09-20) reads 83 s,
-  and that row is this full suite (1352 tests, 71 s of it the suite itself) plus the
-  `-k golden` re-run (162 tests, ~18 s), so the pytest command above is most of it.
-  The suite grew from 626 to 1352 tests with the 2026-09-19/20 release (contracts,
+  and that row is this full suite (1360 tests, 71 s of it the suite itself) plus the
+  `-k golden` re-run (164 tests, ~18 s), so the pytest command above is most of it.
+  The suite grew from 626 to 1360 tests with the 2026-09-19/20 release (contracts,
   risk and execution ports, lifecycle, trace, store, research runner, MVP) and stays
   inside the 120 s budget without shrinking any fixture. As everywhere else here,
   the number is for the 2-CPU container baseline and will move with the machine.

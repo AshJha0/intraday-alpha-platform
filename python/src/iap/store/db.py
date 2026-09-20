@@ -286,8 +286,21 @@ class Store:
     # -- lifecycle ----------------------------------------------------------
 
     @classmethod
-    def open(cls, path: Union[str, Path] = ":memory:") -> "Store":
-        """Open (creating if needed) the database at ``path``."""
+    def open(cls, path: Union[str, Path] = ":memory:", *, read_only: bool = False) -> "Store":
+        """Open (creating if needed) the database at ``path``.
+
+        ``read_only=True`` opens an existing file through the
+        ``file:<path>?mode=ro`` URI: every write (``INSERT``, ``DROP``,
+        ``PRAGMA`` changes) fails with ``sqlite3.OperationalError`` and a
+        missing file is an error instead of a new database — what the
+        ``sql`` / ``explain`` commands of ``python -m iap.store`` use.
+        """
+        if read_only:
+            if str(path) == ":memory:":
+                raise ValueError("Store.open: a read-only store needs a file path")
+            uri = "file:" + Path(path).resolve().as_posix() + "?mode=ro"
+            conn = sqlite3.connect(uri, uri=True, isolation_level=None)
+            return cls(conn)
         conn = sqlite3.connect(str(path), isolation_level=None)
         conn.execute("PRAGMA foreign_keys = ON")
         return cls(conn)

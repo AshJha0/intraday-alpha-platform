@@ -16,7 +16,7 @@ modelled costs.**
 | Transition log | `research/lifecycle_transitions.jsonl` — one canonical-JSON `LifecycleTransition` per line, schema-validated on write (24 lines on the bundled tree: the 24 RESEARCH → CANDIDATE bootstrap transitions). `research/lifecycle_log.jsonl` is the adaptive study's own policy-comparison log and never sets a state |
 | Golden | `tests/golden/expected_lifecycle.json` (x-version 1; generator `python/tools/make_golden_lifecycle.py --force`) |
 | Tests | `python/tests/test_lifecycle.py` (49), `python/tests/test_lifecycle_golden.py` (7); Java `LifecycleGoldenTest`, `LifecycleMachineTest`; Rust `golden_lifecycle.rs` (5), `machine_rules.rs` (6, incl. a SplitMix64 property test) |
-| CLI | `python -m iap.lifecycle bootstrap [--dry-run] \| status \| retire <ID> --reason "…" [--event-ts NS] \| reset <ID> --reason "…" [--event-ts NS]` (`--root` = repository root); console script `iap-lifecycle` |
+| CLI | `python -m iap.lifecycle bootstrap [--dry-run] [--force] \| status \| retire <ID> --reason "…" [--event-ts NS] \| reset <ID> --reason "…" [--event-ts NS]` (`--root` = repository root); console script `iap-lifecycle` |
 
 Design rule: **the lifecycle never sits on the trading path and never
 consults a model.** It reads typed evidence documents and writes a state; the
@@ -155,8 +155,9 @@ LiveEvidence(rolling_ic: float | None, n_buckets >= 0, eval_index >= 0, informat
 All scalars finite (NaN / ±inf raise); `Evidence.empty()` is the all-absent
 document. Producers today: `research` from `iap.research.ExperimentRunner`
 results or the report mapping in `bootstrap.py`; `paper` from
-`python -m iap.mvp run` (`paper_evidence.json`, x-version 2 — the MVP writes
-the evidence, it never touches the registry); `live` maps 1:1 onto
+`python -m iap.mvp run` (`paper_evidence.json`, x-version 3 — the MVP writes
+the evidence, it never touches the registry; the block is `null`, i.e.
+`NO_EVIDENCE`, when the realized or research IC is undefined — never `0.0`); `live` maps 1:1 onto
 `RollingIc` + the adaptive block index. `validation` has no automated
 producer yet (the held-out replay hash and the parity flag are filled in by
 hand from `python -m iap.mvp replay` and `tests/harness/run_golden.sh`).
@@ -195,10 +196,19 @@ alpha (`ic ← gate_ic`, the uncrossed IC the PROMOTE gate reads; `t_stat ←
 nw_tstat_uncrossed`; `n_experiments_in_ledger ← the ledger entry's n`;
 `gross/cost/net_return_bps ← stress.cost.x1` in bps of a 1e6 USD reference
 notional — only the sign is gated; `max_drawdown_bps = sharpe = 0.0`
-placeholders, which no gate reads) and advances every alpha at the bootstrap
+placeholders, which no gate reads; `experiment_id` = the alpha's ledger key[:16]
+— the same mapping `iap.store.import_alpha_reports` writes into
+`experiment_results`, so registry evidence and store row agree field for field,
+docs/DATA_MODEL.md §6) and advances every alpha at the bootstrap
 event time `1787691480577291027` (the latest fold `test_end` across the 24
 reports — the last event the research consumed) until it stops moving.
 Identical rerun ⇒ identical bytes (tested against the committed files).
+The transition log is an **append-only audit** — HUMAN `retire` / `reset`
+lines are appended to it — so `bootstrap` refuses to truncate a non-empty
+`research/lifecycle_transitions.jsonl` unless `--force` is given (exit code 3;
+`run_bootstrap(force=True)` / `TransitionLogExists`); `--dry-run` never
+writes. Rebuilding with `--force` is a deliberate, reviewed act (CONTRIBUTING.md
+§4) that discards the manual lines, so archive the old log first.
 
 Result — **24 CANDIDATE, 0 VALIDATING, 0 PROMOTE**; every alpha fails
 `net_pnl_after_costs`:
