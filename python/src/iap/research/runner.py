@@ -81,10 +81,12 @@ from iap.validation.splits import Fold
 from iap.validation.validate import validate_alpha
 
 __all__ = [
+    "DOCUMENT_TOL",
     "LEDGER_KIND",
     "LOOKS_PER_EXPERIMENT",
     "ExperimentRunner",
     "build_result",
+    "document_drift",
     "holdout_capital_usd",
     "load_instrument_meta",
     "render_document",
@@ -115,7 +117,48 @@ _PROVENANCE_FIELDS = ("git_commit", "n_experiments_in_ledger")
 #: Relative tolerance of the backtester's accounting identity.
 _IDENTITY_TOL = 1e-9
 
+#: Tolerance at which two research documents are "the same numbers"
+#: (PLATFORM_CONVENTIONS §1: research doubles are compared at 1e-9).  IC
+#: and t-statistics come out of numpy / BLAS reductions whose last ulp is
+#: CPU-dependent, so a document is reproduced when every float agrees to
+#: ``DOCUMENT_TOL`` (absolute + relative) and everything else is identical.
+DOCUMENT_TOL = 1e-9
+
 BPS = 1e4
+
+
+def document_drift(previous: Any, current: Any, *, tol: float = DOCUMENT_TOL,
+                   path: str = "$") -> List[str]:
+    """Paths where ``current`` differs from ``previous`` beyond ``tol``.
+
+    Floats agree when ``|a - b| <= tol + tol * |b|``; ints, bools, strings,
+    ``None`` must be identical; mappings must have the same keys; sequences
+    the same length.  Type changes (``1`` vs ``1.0``, ``True`` vs ``1``) are
+    drift.  An empty list means the documents carry the same numbers.
+    """
+    if isinstance(previous, bool) or isinstance(current, bool):
+        return [] if (type(previous) is type(current) and previous == current) else [path]
+    if isinstance(previous, float) and isinstance(current, float):
+        if math.isfinite(previous) and math.isfinite(current) and \
+                abs(previous - current) <= tol + tol * abs(current):
+            return []
+        return [path]
+    if isinstance(previous, Mapping) and isinstance(current, Mapping):
+        if set(previous) != set(current):
+            return [path]
+        drift: List[str] = []
+        for key in sorted(previous):
+            drift.extend(document_drift(previous[key], current[key], tol=tol,
+                                        path=f"{path}.{key}"))
+        return drift
+    if isinstance(previous, (list, tuple)) and isinstance(current, (list, tuple)):
+        if len(previous) != len(current):
+            return [path]
+        drift = []
+        for i, (a, b) in enumerate(zip(previous, current)):
+            drift.extend(document_drift(a, b, tol=tol, path=f"{path}[{i}]"))
+        return drift
+    return [] if (type(previous) is type(current) and previous == current) else [path]
 
 
 def _finite(value: Any, name: str) -> float:
@@ -403,20 +446,25 @@ class ExperimentRunner:
         result_doc = validate_typed(result)
         target = self.experiment_dir(spec.experiment_id)
         existing = target / "result.json"
+        reproduced = False
         if existing.is_file():
             previous = json.loads(existing.read_text())
-            drift = sorted(
-                k for k in result_doc
-                if k not in _PROVENANCE_FIELDS and previous.get(k) != result_doc[k])
+            evidence_prev = {k: v for k, v in previous.items() if k not in _PROVENANCE_FIELDS}
+            evidence_now = {k: v for k, v in result_doc.items() if k not in _PROVENANCE_FIELDS}
+            drift = document_drift(evidence_prev, evidence_now)
             if drift:
                 raise ResearchError(
                     f"{existing}: rerun of {spec.experiment_id} reproduced different "
-                    f"values for {drift}; the same spec on the same data must give "
-                    "the same result — remove the directory deliberately if the "
-                    "evidence chain changed")
+                    f"values at {drift}; the same spec on the same data must give "
+                    f"the same result (floats compared at {DOCUMENT_TOL:g}) — remove "
+                    "the directory deliberately if the evidence chain changed")
+            # Same numbers: keep the committed bytes (the last ulp of a BLAS
+            # reduction is CPU-dependent; the artefact must not churn).
+            reproduced = all(previous.get(k) == result_doc[k] for k in _PROVENANCE_FIELDS)
         target.mkdir(parents=True, exist_ok=True)
         (target / "spec.json").write_text(render_document(spec_doc), encoding="ascii")
-        (target / "result.json").write_text(render_document(result_doc), encoding="ascii")
+        if not (existing.is_file() and reproduced):
+            (target / "result.json").write_text(render_document(result_doc), encoding="ascii")
         self.ledger.save()
 
     # -- protocol -------------------------------------------------------
