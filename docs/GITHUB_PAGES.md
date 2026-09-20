@@ -22,7 +22,7 @@ GitHub, so nothing else needs generating.
 | URL | content |
 |---|---|
 | `/` | `docs/index.html` — the landing page (numbers block, subsystem cards, quick start) |
-| everything else | linked back to rendered Markdown on github.com (`LEARN.md`, `COOKBOOK.md`, `docs/ARCHITECTURE.md`, `docs/DIAGRAMS.md`, `docs/papers/…`, `docs/SPECIFICATION.md`) |
+| everything else | linked back to rendered Markdown on github.com (`LEARN.md`, `COOKBOOK.md`, `docs/ARCHITECTURE.md`, `docs/DIAGRAMS.md`, `docs/MVP.md`, `docs/LIFECYCLE.md`, `docs/DECISION_TRACE.md`, `docs/ROADMAP.md`, `docs/papers/…`, `docs/SPECIFICATION.md`) |
 
 Mermaid diagrams in `docs/DIAGRAMS.md` and `docs/ARCHITECTURE.md` render natively
 on github.com — no plugin needed. If you later want them rendered on the Pages
@@ -38,6 +38,9 @@ re-check the numbers block against:
 - `tests/harness/run_all.sh` output (test counts / parity),
 - `research/alpha_reports/REPORT.md` (verdict counts),
 - `benchmarks/RESULTS.md` (hot-path figures),
+- `research/experiments.json` (the ledger denominator), `research/alpha_registry.json`
+  (lifecycle states), `tests/golden/expected_mvp.json` (the MVP golden run),
+  `schemas/` and `python/src/iap/contracts/` (schema / contract / Protocol counts),
 - `data/normalized/qc_report.json` and `data/reference/feature_registry.json`.
 
 A wrong number on the landing page is a documentation bug — treat it like one.

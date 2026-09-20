@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import com.iap.config.ConfigService;
 import com.iap.platform.PaperTrading;
 
 /** Shared fixtures for the platform tests (sessions, config copies, HTTP). */
@@ -65,16 +66,20 @@ public final class PaperFixtures {
         return dst;
     }
 
-    /** Read a config file as text. */
+    /**
+     * Read a config file as text; {@code name} is the '/'-separated relative
+     * name ({@link ConfigService#RISK} etc.).
+     */
     public static String readConfig(Path dir, String name) throws IOException {
-        return new String(Files.readAllBytes(dir.resolve(name)),
+        return new String(Files.readAllBytes(ConfigService.resolve(dir, name)),
                 StandardCharsets.UTF_8);
     }
 
-    /** Overwrite a config file. */
+    /** Overwrite a config file ({@code name} as in {@link #readConfig}). */
     public static void writeConfig(Path dir, String name, String text)
             throws IOException {
-        Files.write(dir.resolve(name), text.getBytes(StandardCharsets.UTF_8));
+        Files.write(ConfigService.resolve(dir, name),
+                text.getBytes(StandardCharsets.UTF_8));
     }
 
     /** One HTTP GET; returns {status, body}. */

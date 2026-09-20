@@ -33,11 +33,12 @@ def main(argv=None) -> int:
     )
     parser.add_argument(
         "--configs-dir", default=str(_REPO_ROOT / "configs"),
-        help="configs/ directory (instruments.json, venues.json, generator.json)",
+        help="configs/ directory (instruments/instruments.json, "
+             "venues/venues.json, marketdata/generator.json)",
     )
     parser.add_argument(
         "--config", default=None,
-        help="generator config JSON (default: <configs-dir>/generator.json)",
+        help="generator config JSON (default: <configs-dir>/marketdata/generator.json)",
     )
     parser.add_argument(
         "--out", default=str(_REPO_ROOT / "data"),
@@ -54,7 +55,8 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
 
     configs_dir = Path(args.configs_dir)
-    config_path = Path(args.config) if args.config else configs_dir / "generator.json"
+    config_path = (Path(args.config) if args.config
+                   else configs_dir / "marketdata" / "generator.json")
     # Fail fast (PLATFORM_CONVENTIONS.md §8/§12.2, SPEC §26): a missing or
     # typo'd generator.json used to fall back to the built-in defaults
     # silently. That is identical to the committed file TODAY, so a ConfigMap

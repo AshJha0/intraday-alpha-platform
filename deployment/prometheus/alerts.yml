@@ -29,7 +29,7 @@ groups:
   - name: iap-market-data-health
     rules:
       # A single sequence gap marks the book stale and fail-closes the risk
-      # engine (configs/risk.json market_data.max_sequence_gap_before_halt = 1),
+      # engine (configs/risk/risk.json market_data.max_sequence_gap_before_halt = 1),
       # so ANY gap is the incident — a rate threshold would miss the one gap
       # that silently stops trading. The counter is exported on every event
       # (PLATFORM_CONVENTIONS.md §12.6), so this fires on the next scrape.
@@ -68,7 +68,7 @@ groups:
 
       # Stale feed, judged on EVENT time: the gap between the last two
       # consecutive processed events exceeded the configured staleness budget
-      # (configs/risk.json market_data.stale_feed_timeout_ns = 5e9 ns). This
+      # (configs/risk/risk.json market_data.stale_feed_timeout_ns = 5e9 ns). This
       # is the same quantity the risk engine uses, so the alert and the
       # engine agree — and it does NOT page on every historical replay the way
       # `time() - md_last_event_unixtime` did.

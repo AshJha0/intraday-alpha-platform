@@ -39,3 +39,16 @@ python/dist/
 # accounting and audit JSONL are runtime artefacts of a session, not sources.
 /java/out/state/
 /data/state/
+
+# --- derived store (rebuild with `python -m iap.store build`; docs/DATA_MODEL.md)
+/data/store/
+
+# --- MVP runs (python -m iap.mvp run; docs/MVP.md): captured stream, traces,
+# store and report of a seeded session - regenerate, never commit
+/data/mvp/
+python/.coverage
+.coverage
+.coverage.*
+# schemas/ is the source of truth; python/setup.py copies it into the wheel
+# at build time (iap/_schemas) — never into the source tree
+python/src/iap/_schemas/

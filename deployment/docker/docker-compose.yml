@@ -46,7 +46,7 @@ services:
     image: iap/python:1.0.0
     container_name: iap-data-generator
     # Deterministic batch job: identical seed => bit-identical /data outputs
-    # (configs/generator.json pins seed 20260829). Runs to completion; the
+    # (configs/marketdata/generator.json pins seed 20260829). Runs to completion; the
     # replay services gate on successful completion, not on liveness.
     command: []
     restart: "no"
@@ -118,7 +118,7 @@ services:
       # PLATFORM_CONVENTIONS.md §12.2: the entrypoint reads IAP_CONFIG_DIR, so
       # the bind mount below is what the process actually loads. This makes the
       # kill-switch runbook's config path real:
-      #   edit configs/risk.json  ->  docker compose restart java-platform
+      #   edit configs/risk/risk.json  ->  docker compose restart java-platform
       IAP_CONFIG_DIR: /app/configs
       IAP_STATE_DIR: /data/state
       # Kill-switch admin API (§12.5). Optional: with no token the /admin/*

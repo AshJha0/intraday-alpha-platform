@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iap.example/schemas/risk/risk_decision.schema.json",
+  "title": "RiskDecision",
+  "description": "Per-order hard-risk decision, derivable from a RiskEvent (risk_event.schema.json) plus the order context. decision: ALLOW=1 REJECT=2 KILL=3. rule_index is the pinned check index of the deciding rule (configs/risk/risk.json order) and -1 for ALLOW.",
+  "x-version": 1,
+  "type": "object",
+  "properties": {
+    "order_id": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "strategy_id": {
+      "type": "string",
+      "description": "Strategy that submitted the order.",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "instrument_id": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "timestamp_ns": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807,
+      "description": "Event time of the decision, ns since epoch (RiskEvent.timestamp)."
+    },
+    "decision": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3,
+      "description": "ALLOW=1 REJECT=2 KILL=3.",
+      "enum": [
+        1,
+        2,
+        3
+      ]
+    },
+    "rule_id": {
+      "type": "string",
+      "description": "Deciding rule id (RiskEvent.rule_id); '' for ALLOW."
+    },
+    "rule_index": {
+      "type": "integer",
+      "minimum": -1,
+      "maximum": 65535,
+      "description": "Pinned check index of the deciding rule; -1 for ALLOW."
+    },
+    "reason": {
+      "type": "string",
+      "description": "Human-readable reason (RiskEvent.reason)."
+    }
+  },
+  "required": [
+    "order_id",
+    "strategy_id",
+    "instrument_id",
+    "timestamp_ns",
+    "decision",
+    "rule_id",
+    "rule_index",
+    "reason"
+  ],
+  "additionalProperties": false
+}

@@ -486,9 +486,9 @@ def test_book_with_order_ids_above_2_63():
 
 
 def _cfgs():
-    with open(CONFIGS_DIR / "instruments.json") as f:
+    with open(CONFIGS_DIR / "instruments" / "instruments.json") as f:
         inst = json.load(f)
-    with open(CONFIGS_DIR / "venues.json") as f:
+    with open(CONFIGS_DIR / "venues" / "venues.json") as f:
         ven = json.load(f)
     return inst, ven
 

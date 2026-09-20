@@ -6,8 +6,8 @@ import java.util.TreeMap;
 /**
  * Execution-simulator configuration: latency legs, deterministic seed
  * (SplitMix64 jitter stream), linear-impact coefficient
- * (configs/execution.json cost_model), instrument reference data and venue
- * profiles (configs/venues.json). Treated as immutable once handed to a
+ * (configs/execution/execution.json cost_model), instrument reference data and venue
+ * profiles (configs/venues/venues.json). Treated as immutable once handed to a
  * simulator.
  */
 public final class ExecConfig {

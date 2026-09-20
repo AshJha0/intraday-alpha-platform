@@ -7,10 +7,10 @@
 //! gates), kill switches at global/strategy/instrument/venue scope with a
 //! pinned re-arm precedence, session roll, snapshot/restore, and a
 //! deterministic, replayable RiskEvent audit log
-//! (`schemas/risk_event.schema.json`, JSONL) that is byte-identical across
+//! (`schemas/risk/risk_event.schema.json`, JSONL) that is byte-identical across
 //! languages.
 //!
-//! Limits come from `configs/risk.json` (the complete pinned set, strict
+//! Limits come from `configs/risk/risk.json` (the complete pinned set, strict
 //! parse). Golden vectors: `tests/golden/expected_risk_decisions.json`
 //! (decisions), `expected_risk_audit.jsonl` (byte-exact audit log) and
 //! `expected_risk_snapshot.json` (state snapshot mid-script).

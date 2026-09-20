@@ -17,6 +17,13 @@
 // working set far larger than L2) is appended whenever such a vector is
 // available, so the hot figures are always printed next to their opposite.
 //
+// Trace-path rows (added with the decision-trace contract): the cost of
+// serialising one DecisionTrace to its canonical line (and of hashing it
+// into the stream digest) is reported per TRACE, in a table of its own,
+// because a trace is emitted once per decision — after it, outside the
+// event loop — not once per event. The traced execution-replay row next to
+// the untraced one shows the same cost amortised per event.
+//
 // Usage: bench_all [output.md [cold_events.jsonl]]
 //   cold_events.jsonl defaults to data/normalized/eq_20260824.normalized.jsonl
 //   relative to the golden dir's repo root; the cold rows are omitted (with a
@@ -28,15 +35,19 @@
 #include <cstdio>
 #include <fstream>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
 #include "iap/alpha/alpha.hpp"
+#include "iap/contracts/canonical_json.hpp"
+#include "iap/contracts/trace.hpp"
 #include "iap/features/feature_engine.hpp"
 #include "iap/marketdata/codec.hpp"
 #include "iap/orderbook/book.hpp"
 #include "iap/replay/exec_replay.hpp"
 #include "iap/replay/replay.hpp"
+#include "iap/util/sha256.hpp"
 
 namespace {
 
@@ -104,6 +115,28 @@ std::string repo_relative(const std::string& path) {
     return path;
 }
 
+std::string read_file(const std::string& path) {
+    std::ifstream f(path, std::ios::binary);
+    if (!f) throw std::runtime_error("cannot open: " + path);
+    std::ostringstream ss;
+    ss << f.rdbuf();
+    return ss.str();
+}
+
+// A sink that only counts: measures the replay's tracing overhead without
+// any I/O in the loop.
+struct CountingSink : iap::contracts::TraceSink {
+    std::uint64_t n = 0;
+    std::size_t bytes = 0;
+    std::string buf;
+    void emit(const iap::contracts::DecisionTrace& t) override {
+        buf.clear();
+        iap::contracts::write_trace_line(t, buf);
+        bytes += buf.size();
+        ++n;
+    }
+};
+
 std::string cpu_model() {
     std::ifstream f("/proc/cpuinfo");
     std::string line;
@@ -135,7 +168,7 @@ std::string compiler_version() {
 iap::ExecConfig bench_exec_config(const std::string& configs_dir) {
     iap::ExecConfig cfg;
     cfg.seed = 20260829;
-    cfg.venues = iap::load_venues(configs_dir + "/venues.json");
+    cfg.venues = iap::load_venues(configs_dir + "/venues/venues.json");
     iap::InstrumentSpec ins;
     ins.instrument_id = 1;
     ins.tick_size = 0.01;
@@ -186,6 +219,15 @@ int main(int argc, char** argv) {
     const auto params =
         iap::load_alpha_params(configs + "/strategies/alpha_params.json");
     const auto exec_cfg = bench_exec_config(configs);
+    // The golden DecisionTrace example (every stage populated, 5.6 KB line).
+    const iap::contracts::DecisionTrace golden_trace =
+        iap::contracts::DecisionTrace::from_value(
+            iap::contracts::parse(read_file(dir + "/expected_contracts_examples.json"))
+                .at("examples").at("DecisionTrace").at("value"));
+    std::string trace_buf;
+    trace_buf.reserve(16384);
+    iap::TraceOptions trace_opts;
+    trace_opts.session_id = "bench";
 
     // Pre-computed feature rows for the alpha-scoring benchmark.
     std::vector<iap::FeatureVector> eq_rows;
@@ -258,6 +300,49 @@ int main(int argc, char** argv) {
                                         bench_parents(eq.front().exchange_ts));
             const auto res = replay.run(eq);
             g_sink += res.fills.size();
+        }));
+
+    // Traced replay, twice: with data_version computed per run (sha256 of
+    // the IAP1 encoding of the 2,000 events — a one-off per session that
+    // dominates this small workload) and with it supplied by the caller, so
+    // the per-trace cost is visible on its own.
+    results.push_back(
+        bench("execution sim replay, traced (eq, 2 parents, 2 traces, "
+              "data_version hashed per run)", eq.size(), [&] {
+            iap::ExecutionReplay replay(exec_cfg,
+                                        bench_parents(eq.front().exchange_ts));
+            CountingSink sink;
+            replay.set_trace_sink(&sink, trace_opts);
+            const auto res = replay.run(eq);
+            g_sink += res.fills.size() + sink.bytes;
+        }));
+    iap::TraceOptions trace_opts_pre = trace_opts;
+    trace_opts_pre.data_version = iap::Sha256::hash(eq_bin);
+    results.push_back(
+        bench("execution sim replay, traced (eq, 2 parents, 2 traces, "
+              "data_version supplied)", eq.size(), [&] {
+            iap::ExecutionReplay replay(exec_cfg,
+                                        bench_parents(eq.front().exchange_ts));
+            CountingSink sink;
+            replay.set_trace_sink(&sink, trace_opts_pre);
+            const auto res = replay.run(eq);
+            g_sink += res.fills.size() + sink.bytes;
+        }));
+
+    // ---- trace path: per-trace cost, off the event loop ----
+    std::vector<Result> trace_rows;
+    trace_rows.push_back(
+        bench("canonical serialisation, golden DecisionTrace (all stages, 5627-byte line)",
+              1, [&] {
+                  trace_buf.clear();
+                  iap::contracts::write_trace_line(golden_trace, trace_buf);
+                  g_sink += trace_buf.size();
+              }));
+    trace_rows.push_back(
+        bench("serialise + sha256 digest update, golden DecisionTrace", 1, [&] {
+            iap::contracts::TraceDigest d;
+            d.update(golden_trace);
+            g_sink += static_cast<std::uint64_t>(d.count());
         }));
 
     // ---- cold reference: one single pass over a full generated session ----
@@ -353,6 +438,27 @@ int main(int argc, char** argv) {
     md << "|---|---:|---:|---:|\n";
     char buf[256];
     for (const auto& r : results) {
+        std::snprintf(buf, sizeof(buf), "| %s | %.1f | %.0f | %llu |\n",
+                      r.name.c_str(), r.ns_per_event, r.events_per_sec,
+                      static_cast<unsigned long long>(r.events));
+        md << buf;
+    }
+    md << "\nTrace path — cost per DecisionTrace of the canonical-JSON "
+          "contract (`iap::contracts`), single-threaded, in memory (no file "
+          "I/O), same 2-CPU container. A trace is serialised once per "
+          "decision, after it and outside the book / feature / execution "
+          "event loop, so this is NOT a per-event figure; the two traced "
+          "replay rows above show the same cost amortised per event (2 "
+          "traces per 2,000-event replay) — the `data_version hashed per "
+          "run` row includes the one-off sha256 of the IAP1 encoding of the "
+          "whole stream (a per-session cost that dominates a 2,000-event "
+          "workload), the `data_version supplied` row isolates the tracing "
+          "itself. The tree build (to_value) is included in the per-trace "
+          "rows, the JSONL write is not.\n\n";
+    md << "| benchmark (trace path, in-memory) | ns/trace | traces/sec | "
+          "traces |\n";
+    md << "|---|---:|---:|---:|\n";
+    for (const auto& r : trace_rows) {
         std::snprintf(buf, sizeof(buf), "| %s | %.1f | %.0f | %llu |\n",
                       r.name.c_str(), r.ns_per_event, r.events_per_sec,
                       static_cast<unsigned long long>(r.events));

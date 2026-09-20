@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iap.example/schemas/research/experiment_spec.schema.json",
+  "title": "ExperimentSpec",
+  "description": "What an ExperimentRunner was asked to run (research/experiments/<experiment_id>/spec.json). Periods are ordered train <= validation <= test without overlap (walk-forward). model_version null = unfitted / rule-based alpha.",
+  "x-version": 1,
+  "type": "object",
+  "properties": {
+    "experiment_id": {
+      "type": "string",
+      "description": "Deterministic id: first 16 hex of the content hash of the spec without this field, or a generic id.",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "alpha_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "dataset_version": {
+      "type": "string",
+      "description": "sha256 of the normalised dataset (iap.experiment.tracker.data_version).",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "feature_version": {
+      "type": "string",
+      "description": "Feature-registry hash.",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "model_version": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Model hash, or null when the alpha is not fitted."
+    },
+    "configuration": {
+      "type": "object",
+      "description": "Free-form validation protocol (folds, embargo, cost multiplier, ...); canonical JSON is hashed into experiment_id."
+    },
+    "train_period": {
+      "$ref": "#/$defs/Period"
+    },
+    "validation_period": {
+      "$ref": "#/$defs/Period"
+    },
+    "test_period": {
+      "$ref": "#/$defs/Period"
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615,
+      "description": "SplitMix64 seed for anything random in the run."
+    },
+    "horizon": {
+      "type": "string",
+      "description": "Pinned label horizon (10ms .. 15m).",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "experiment_id",
+    "alpha_id",
+    "dataset_version",
+    "feature_version",
+    "model_version",
+    "configuration",
+    "train_period",
+    "validation_period",
+    "test_period",
+    "seed",
+    "horizon"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "Period": {
+      "description": "Half-open event-time window.",
+      "type": "object",
+      "properties": {
+        "start_ts": {
+          "type": "integer",
+          "minimum": -9223372036854775808,
+          "maximum": 9223372036854775807,
+          "description": "Inclusive start, ns."
+        },
+        "end_ts": {
+          "type": "integer",
+          "minimum": -9223372036854775808,
+          "maximum": 9223372036854775807,
+          "description": "Exclusive end, ns; >= start_ts."
+        }
+      },
+      "required": [
+        "start_ts",
+        "end_ts"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

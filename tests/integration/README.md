@@ -1,0 +1,43 @@
+# tests/integration — cross-component end-to-end runs
+
+The integration level of the testing strategy (`tests/README.md`): several
+components wired together the way the platform wires them, driven by a real
+input (a golden vector or the generated dataset), asserting the observable
+contract at the end of the chain — not the internals of any one stage.
+
+What belongs here:
+
+- decode → order book → feature engine over a golden vector, asserting a
+  `FeatureVector` is emitted with the registry hash as `feature_version`
+  (`test_pipeline_smoke.py`);
+- the GitHub issue plan wired end to end — the script's validator over
+  `tools/github/issues.yaml`, `--dry-run` as a subprocess, and `docs/EPICS.md`
+  compared with the rendering (`test_github_issue_plan.py`);
+- the MVP command line end to end (`test_mvp_end_to_end.py`: `python -m
+  iap.mvp run` on the golden configuration into a temporary directory as a
+  subprocess — every artefact present, `report.json` sections, `explain` of a
+  parent order, `replay` of the captured stream — and a bad configuration
+  refused with exit code 2 naming the key; docs/MVP.md);
+- the *installed* package outside the checkout (`test_installed_package.py`:
+  a fresh venv, `pip install` of `python/` non-editable — what the Docker
+  images do — then `python -m iap.mvp run` on `mvp_tiny.json` from an
+  unrelated directory, once on the wheel's packaged `iap/_schemas` (asserted
+  byte-identical to `schemas/`) and once with `$IAP_SCHEMA_DIR` as the image
+  sets it; a dangling override must fail closed);
+- longer verticals as they become cheap enough to run in CI: features →
+  alpha → risk → execution simulator, or the Python pipeline entry points
+  (`python3 -m iap.marketdata`, `python3 -m iap.features`) against a temp
+  directory.
+
+What does not: per-component unit tests (the per-language suites),
+exact-value golden comparisons (`tests/golden/`), and byte-determinism
+(`tests/replay/`).
+
+Run from the repository root (no `PYTHONPATH` needed — `tests/conftest.py`
+adds `python/src`):
+
+    python3 -m pytest -q tests/integration
+
+`tests/harness/run_all.sh` runs this directory as the `integration` row of
+the parity table. Keep every test here well under a minute: this level runs
+on every CI push.

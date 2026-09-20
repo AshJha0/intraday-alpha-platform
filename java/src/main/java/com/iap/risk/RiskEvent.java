@@ -1,7 +1,7 @@
 package com.iap.risk;
 
 /**
- * One audit-log record (schemas/risk_event.schema.json — exact field set
+ * One audit-log record (schemas/risk/risk_event.schema.json — exact field set
  * and enum codes). Serialized as one JSONL line with sorted keys
  * (decision, reason, rule_id, scope, scope_id, severity, timestamp) —
  * identical input sequences produce byte-identical audit logs.

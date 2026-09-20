@@ -29,7 +29,7 @@ exactly when the pinned rules say, retirement verifiably halts
 allocation, every transition is logged with a reason, and every look
 at the data is counted in the experiments ledger.
 
-## Pinned configuration (configs/strategies.json `adaptive`)
+## Pinned configuration (configs/strategies/strategies.json `adaptive`)
 
 - blocks 0.25h, warmup 2.5h, trailing train window 24h, embargo 60s
 - drift trigger: PSI > 0.25 (10-quantile-bucket, eps 1e-6) OR rolling-IC z < -2.0; min refit gap 1h

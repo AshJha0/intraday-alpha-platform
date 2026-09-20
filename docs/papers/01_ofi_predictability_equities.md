@@ -122,7 +122,7 @@ at-or-before the row's `exchange_ts`.
   sign, *and* positive net P&L at 1x costs; ITERATE requires IC ≥ 0.005 and
   t ≥ 1.5.
 - **Costs:** the research cost model (`python/src/iap/backtest/costs.py`,
-  `configs/execution.json`) charges half-spread + $0.003/share taker fee +
+  `configs/execution/execution.json`) charges half-spread + $0.003/share taker fee +
   linear impact (2.0 bps per pct-of-ADV), with a stress grid at {0.5, 1, 2}x.
 - **Execution lag:** the backtester never executes on the decision row
   (`latency_rows = 1` default in `python/src/iap/backtest/engine.py`).
@@ -291,7 +291,7 @@ this dataset.
 | EQ02/EQ03/EQ12 per-alpha metrics, folds, leakage, capacity | `research/alpha_reports/EQ02.json`, `EQ03.json`, `EQ12.json` |
 | alpha definitions and rationales | `python/src/iap/alpha/equity.py` |
 | OFI feature formulas | `python/src/iap/features/orderflow.py` |
-| cost model | `python/src/iap/backtest/costs.py`, `configs/execution.json` |
+| cost model | `python/src/iap/backtest/costs.py`, `configs/execution/execution.json` |
 | stress axes | `python/src/iap/validation/stress.py` |
 | data volumes and QC | `data/normalized/qc_report.json` |
 | generator design | `python/src/iap/marketdata/generator.py` |
@@ -360,3 +360,20 @@ body above is superseded by **760 experiments
 per-test |t| **3.99**, expected max |t| under
 the global null **3.64**. Reports now read the
 ledger at render time, so a report and the ledger can never disagree again.
+
+## Erratum / Update — 2026-09-20 (ledger denominator)
+
+The multiple-testing ledger `research/experiments.json` moved on 2026-09-19
+when the contract-driven `ExperimentRunner` (`python -m iap.research run`,
+`research/experiments/<id>/`) registered five new experiments — EQ01 @ 1 s,
+EQ03 @ 1 s and @ 5 s, EQ06 @ 1 s and @ 10 s, 21 looks each, kind
+`experiment_runner`, deliberately **not** de-duplicated against the
+`promotion_pipeline` entries even where the computation coincides, so the
+denominator only grows. The 2026-09-06 erratum's **760 looks over 65 distinct
+configurations (Bonferroni per-test |t| 3.99, expected max |t| under the global
+null 3.64)** are superseded by **865 looks over 70 distinct configurations:
+Bonferroni per-test |t| ≥ 4.02 (p ≤ 5.78e-05), expected max |t| ≈ 3.68**.
+No verdict, IC, t-statistic or P&L figure in this paper changes; the five
+new experiments are all ITERATE and net-negative at 1× costs, like every
+alpha before them. The analysis above is left as written and the research
+reports quote the ledger at their own render time (`ledger_n_at_report`).

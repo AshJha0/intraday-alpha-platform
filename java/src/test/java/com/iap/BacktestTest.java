@@ -82,7 +82,7 @@ public class BacktestTest {
             conf[i] = sig.confidence();
         }
         CostModel cm = CostModel.load(
-                Paths.get("..", "configs", "execution.json"), 1.0);
+                Paths.get("..", "configs", "execution", "execution.json"), 1.0);
         // Pinned golden config: max_pos 1000, conf_min 0.2, latency 1 row.
         ResearchBacktester bt = new ResearchBacktester(cm, 1000, 0.2, 1);
         return bt.run(1, ts, mid, hs, er, conf, "EQUITY", ADV, 100.0);
@@ -189,7 +189,7 @@ public class BacktestTest {
 
     private static ExecConfig prodConfig() {
         TreeMap<Integer, VenueSpec> venues = VenueSpec.loadVenues(
-                Paths.get("..", "configs", "venues.json"));
+                Paths.get("..", "configs", "venues", "venues.json"));
         TreeMap<Long, InstrumentSpec> instruments = new TreeMap<>();
         instruments.put(1L, new InstrumentSpec(1, TICK, 1.0, ADV));
         return new ExecConfig(LatencyConfig.DEFAULT, 20260829L, 2.0,

@@ -36,9 +36,12 @@ RUN if [ ! -e /usr/lib/x86_64-linux-gnu/libgtest.a ] && [ -d /usr/src/googletest
 # Layout matters: cpp/CMakeLists.txt compiles IAP_GOLDEN_DIR as
 # <source-dir>/../tests/golden, so keep the repo shape: /build/cpp + /build/tests.
 # configs/ and data/reference/ are NOT optional: the golden tests resolve
-# <golden>/../../configs (test_alpha_golden.cpp:32, test_replay_fills.cpp:74)
-# and bench_all reads the same path AT RUNTIME (bench_all.cpp:133). Without
-# them `RUN ctest` fails and the runtime container exits at startup.
+# <golden>/../../configs (test_alpha_golden.cpp, test_replay_fills.cpp,
+# test_replay_trace.cpp) and bench_all reads the same path AT RUNTIME
+# (bench_exec_config in bench_all.cpp). Without them `RUN ctest` fails and
+# the runtime container exits at startup. The canonical-JSON / decision-trace
+# goldens (test_canonical_json_golden.cpp, test_trace_golden.cpp) read only
+# tests/golden.
 # .dockerignore keeps cpp/build (host CMakeCache) out of the context.
 WORKDIR /build
 COPY cpp cpp

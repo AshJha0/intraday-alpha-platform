@@ -1,0 +1,260 @@
+erDiagram
+    %% schemas/sql/iap_v1.sql — x-version 1. Solid lines are declared foreign
+    %% keys (every stage row of a decision trace); dotted lines are logical
+    %% references between independently imported artefacts.
+
+    instruments {
+        BIGINT instrument_id PK
+        TEXT symbol
+        TEXT asset_class
+        TEXT currency
+        DOUBLE_PRECISION tick_size
+        BIGINT lot_size
+        DOUBLE_PRECISION adv
+        TEXT venues_json
+    }
+    venues {
+        BIGINT venue_id PK
+        TEXT venue
+        TEXT asset_class
+        DOUBLE_PRECISION taker_fee_per_share
+        DOUBLE_PRECISION maker_rebate_per_share
+        DOUBLE_PRECISION commission_per_million
+        BIGINT latency_mean_ns
+        TEXT supports_json
+    }
+    sessions {
+        TEXT session_id PK
+        TEXT data_version
+        TEXT config_version
+        BIGINT seed
+        BIGINT start_ts
+        BIGINT end_ts
+        BIGINT n_events
+    }
+    feature_versions {
+        TEXT feature_version PK
+        TEXT registry_hash
+        BIGINT x_version
+        BIGINT n_features
+        TEXT registry_json
+    }
+    alphas {
+        TEXT alpha_id PK
+        TEXT asset_class
+        TEXT family
+        TEXT horizon
+        TEXT economic_rationale
+        TEXT current_state
+    }
+    experiments {
+        TEXT experiment_id PK
+        TEXT alpha_id
+        TEXT dataset_version
+        TEXT feature_version
+        TEXT model_version
+        TEXT configuration_json
+        BIGINT test_start_ts
+        BIGINT test_end_ts
+        BIGINT seed
+        TEXT horizon
+    }
+    experiment_results {
+        TEXT experiment_id PK
+        TEXT alpha_id
+        DOUBLE_PRECISION ic
+        DOUBLE_PRECISION t_stat
+        DOUBLE_PRECISION net_return_bps
+        BIGINT leakage_passed
+        TEXT verdict
+        BIGINT n_experiments_in_ledger
+        BIGINT created_ts
+    }
+    ledger_entries {
+        TEXT ledger_key PK
+        TEXT alpha_id
+        TEXT kind
+        TEXT config_json
+        BIGINT count
+        BIGINT n
+        DOUBLE_PRECISION oos_ic
+        DOUBLE_PRECISION nw_tstat
+        TEXT verdict
+    }
+    lifecycle_transitions {
+        TEXT alpha_id PK
+        TEXT policy PK
+        BIGINT event_ts PK
+        TEXT from_state PK
+        TEXT to_state PK
+        TEXT source PK
+        TEXT reason
+        TEXT gates_json
+        TEXT actor
+    }
+    decision_traces {
+        TEXT trace_id PK
+        TEXT session_id
+        BIGINT instrument_id
+        BIGINT event_ts
+        BIGINT sequence
+        TEXT data_version
+        TEXT feature_version
+        TEXT model_version
+        TEXT config_version
+        TEXT stages_json
+    }
+    alpha_signals {
+        TEXT trace_id PK, FK
+        BIGINT signal_index PK
+        BIGINT timestamp
+        BIGINT instrument_id
+        DOUBLE_PRECISION expected_return
+        DOUBLE_PRECISION confidence
+        TEXT model_version
+    }
+    portfolio_targets {
+        TEXT trace_id PK, FK
+        TEXT strategy_id
+        TEXT portfolio_version
+        TEXT solver_status
+        DOUBLE_PRECISION turnover
+        TEXT targets_json
+    }
+    portfolio_legs {
+        TEXT trace_id PK, FK
+        BIGINT instrument_id PK
+        BIGINT target_qty
+        DOUBLE_PRECISION target_weight
+    }
+    risk_decisions {
+        TEXT trace_id PK, FK
+        BIGINT risk_index PK
+        BIGINT order_id
+        BIGINT decision
+        TEXT rule_id
+        BIGINT rule_index
+        TEXT reason
+    }
+    parent_orders {
+        BIGINT parent_order_id PK
+        TEXT trace_id FK
+        TEXT strategy_id
+        TEXT alpha_id
+        BIGINT instrument_id
+        BIGINT side
+        BIGINT qty
+        TEXT algo
+        DOUBLE_PRECISION urgency
+        TEXT params_json
+    }
+    child_orders {
+        BIGINT child_order_id PK
+        TEXT trace_id FK
+        BIGINT parent_order_id
+        BIGINT venue_id
+        BIGINT qty
+        BIGINT price_ticks
+        BIGINT order_type
+        BIGINT slice_index
+    }
+    venue_decisions {
+        BIGINT child_order_id PK
+        TEXT trace_id FK
+        BIGINT venue_id
+        TEXT reason
+        TEXT candidates_json
+    }
+    executions {
+        BIGINT execution_id PK
+        TEXT trace_id FK
+        BIGINT order_id
+        BIGINT parent_order_id
+        BIGINT status
+        BIGINT filled_qty
+        BIGINT fill_price_ticks
+        BIGINT venue_id
+        DOUBLE_PRECISION fees
+    }
+    tca_results {
+        BIGINT parent_order_id PK
+        TEXT trace_id FK
+        DOUBLE_PRECISION implementation_shortfall_bps
+        DOUBLE_PRECISION spread_cost_bps
+        DOUBLE_PRECISION impact_bps
+        DOUBLE_PRECISION fees_bps
+        DOUBLE_PRECISION timing_cost_bps
+        TEXT venue_contribution_json
+        TEXT algo
+        BIGINT latency_p99_ns
+    }
+    attribution {
+        TEXT trace_id PK, FK
+        BIGINT parent_order_id
+        DOUBLE_PRECISION alpha_bps
+        DOUBLE_PRECISION spread_bps
+        DOUBLE_PRECISION impact_bps
+        DOUBLE_PRECISION fees_bps
+        DOUBLE_PRECISION timing_bps
+        DOUBLE_PRECISION total_bps
+    }
+    tca_orders {
+        BIGINT order_id PK
+        BIGINT instrument_id
+        TEXT side
+        DOUBLE_PRECISION total_is_bps
+        DOUBLE_PRECISION delay_bps
+        DOUBLE_PRECISION trading_bps
+        DOUBLE_PRECISION opportunity_bps
+    }
+    model_runs {
+        TEXT run_id PK
+        TEXT name
+        TEXT model_version
+        TEXT data_version
+        TEXT feature_version
+        TEXT git_commit
+        TEXT manifest_json
+        TEXT metrics_json
+        DOUBLE_PRECISION mean_ic
+    }
+    drift_baselines {
+        TEXT name PK
+        TEXT alpha_id
+        TEXT kind
+        TEXT feature_version
+        TEXT edges_json
+        TEXT expected_frac_json
+        DOUBLE_PRECISION ic_mean
+    }
+
+    decision_traces ||--o{ alpha_signals : "trace_id"
+    decision_traces ||--o| portfolio_targets : "trace_id"
+    decision_traces ||--o{ portfolio_legs : "trace_id"
+    decision_traces ||--o{ risk_decisions : "trace_id"
+    decision_traces ||--o{ parent_orders : "trace_id"
+    decision_traces ||--o{ child_orders : "trace_id"
+    decision_traces ||--o{ venue_decisions : "trace_id"
+    decision_traces ||--o{ executions : "trace_id"
+    decision_traces ||--o{ tca_results : "trace_id"
+    decision_traces ||--o| attribution : "trace_id"
+
+    parent_orders ||..o{ child_orders : "parent_order_id"
+    child_orders ||..o| venue_decisions : "child_order_id"
+    child_orders ||..o{ executions : "order_id"
+    parent_orders ||..o| tca_results : "parent_order_id"
+    child_orders ||..o{ risk_decisions : "order_id (per routed child)"
+    parent_orders ||..o{ risk_decisions : "order_id (parent-level loop)"
+    sessions ||..o{ decision_traces : "session_id"
+    instruments ||..o{ decision_traces : "instrument_id"
+    venues ||..o{ child_orders : "venue_id"
+    venues ||..o{ executions : "venue_id"
+    alphas ||..o{ parent_orders : "alpha_id"
+    alphas ||..o{ experiments : "alpha_id"
+    alphas ||..o{ ledger_entries : "alpha_id"
+    alphas ||..o{ lifecycle_transitions : "alpha_id"
+    experiments ||..o| experiment_results : "experiment_id"
+    feature_versions ||..o{ experiments : "feature_version"
+    feature_versions ||..o{ model_runs : "feature_version"
+    feature_versions ||..o{ drift_baselines : "feature_version"
+    instruments ||..o{ tca_orders : "instrument_id"

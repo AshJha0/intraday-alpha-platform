@@ -12,6 +12,9 @@
 //!   a Prometheus text exposition writer.
 //! - [`JsonlLogger`] — structured JSONL log writer (sorted keys, one event
 //!   per line), used for audit-style component logs.
+//! - [`trace`] — the decision-trace exposition owned by telemetry: the
+//!   canonical JSONL sink and stream digest (re-exported from the
+//!   `contracts` crate) plus the `trace_records_total` counter convention.
 //!
 //! Everything is single-threaded by design (the control plane wraps a
 //! registry in its own synchronization if it needs sharing); no wall clock
@@ -20,6 +23,8 @@
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::io::Write;
+
+pub mod trace;
 
 /// Number of histogram buckets: value 0 plus one bucket per power of two.
 pub const HISTOGRAM_BUCKETS: usize = 65;

@@ -129,7 +129,7 @@ public final class BacktestEngine {
     };
 
     /**
-     * Execution controls from configs/execution.json defaults: a child is
+     * Execution controls from configs/execution/execution.json defaults: a child is
      * capped at {@code maxParticipation} of the displayed contra depth
      * (top-10 levels of the routed venue) AND of the instrument's session
      * volume (EXECUTE + TRADE qty seen so far) — a cap of 0 blocks the
@@ -592,7 +592,7 @@ public final class BacktestEngine {
             counters.sorNoRoute++;
             return;
         }
-        // Execution controls (configs/execution.json defaults).
+        // Execution controls (configs/execution/execution.json defaults).
         if (limits.minSliceIntervalNs() > 0 && a.lastChildDecisionTs != Long.MIN_VALUE
                 && ev.exchangeTs - a.lastChildDecisionTs < limits.minSliceIntervalNs()) {
             counters.sliceIntervalBlocked++;

@@ -3,7 +3,8 @@ name = "telemetry"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-description = "IAP lightweight metrics registry (counters/gauges/log2 histograms), Prometheus text writer, JSONL logger"
+description = "IAP lightweight metrics registry (counters/gauges/log2 histograms), Prometheus text writer, JSONL logger, decision-trace sink + digest conventions"
 
 [dependencies]
+contracts = { path = "../contracts" }
 serde_json = { workspace = true }

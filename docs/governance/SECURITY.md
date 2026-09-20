@@ -10,7 +10,7 @@ auditable:
 
 | Layer | Dependency set | Pin mechanism |
 |---|---|---|
-| Python | stdlib + `pyarrow` (pipeline); numpy/pandas/scipy/sklearn preinstalled research stack | `python/pyproject.toml`; production image installs only the pipeline deps. Release images must add a `pip freeze`-generated constraints file recorded in the release manifest. |
+| Python | `python/pyproject.toml` 1.1.0: numpy, pandas, scipy, scikit-learn, `pyarrow` (Parquet), `jsonschema >= 4.18` + `referencing` (offline contract validation); extras `ml` (xgboost, lightgbm), `dev` (pytest, pyyaml) | `python/pyproject.toml`; `Dockerfile.python` installs the package with its declared dependencies and not the `dev` extra. Release images must add a `pip freeze`-generated constraints file recorded in the release manifest. No network or LLM client anywhere on the trading path (`PLATFORM_CONVENTIONS.md` §13.7). |
 | C++ | g++/CMake toolchain, GoogleTest, Eigen (system packages) | Debian package versions recorded at image build; no FetchContent/network downloads in CMake (`cpp/CMakeLists.txt` resolves system packages only). |
 | Rust | `serde`, `serde_json` (+ `crossbeam` only where justified) — PLATFORM_CONVENTIONS.md §10 | `rust/Cargo.toml` workspace dependencies; **`Cargo.lock` is the pin** — commit it, and never publish a release image built without a lockfile. |
 | Java | **none at runtime**; JUnit4 + hamcrest, test scope only | Local jar at `/usr/share/java/junit4.jar` (or vendored `java/lib/`). Maven/Gradle are deliberately absent (Maven Central unreachable — `docs/BUILD_NOTES.md` is the normative pom-equivalent list). Any new Java dependency must be vendored into `java/lib/` and recorded there. The `iap/java` image build does NOT run the JUnit suite (its base image has no JUnit jars and the build may not reach a registry): the gate is `.github/workflows/ci.yml`, and the `images` job `needs:` it. |
@@ -41,7 +41,7 @@ it is a stopgap.
 Hard rule: **this repository contains no secrets, and configs are not
 secrets.**
 
-- `configs/*.json` (instruments, venues, generator, risk limits, execution,
+- `configs/<domain>/*.json` (instruments, venues, generator, risk limits, execution,
   strategies) are *behavioral configuration*: reviewed, versioned, deployed
   via the `iap-configs` ConfigMap / baked read-only into images. They are
   world-readable by design; nothing in them may be secret.

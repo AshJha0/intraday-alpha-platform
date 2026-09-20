@@ -46,7 +46,7 @@ market data is synthetic.
 The platform measures both natively. The stress module
 (`python/src/iap/validation/stress.py`) re-runs every alpha's backtest and
 IC with the executed signal lagged by 0, 1 and 5 emission events
-(`LATENCY_SHIFTS = (0, 1, 5)`; grid pinned in `configs/execution.json` as
+(`LATENCY_SHIFTS = (0, 1, 5)`; grid pinned in `configs/execution/execution.json` as
 `latency_shift_events_stress`), on top of a backtester that already never
 executes on the decision row (`latency_rows = 1` default,
 `python/src/iap/backtest/engine.py`). The benchmark suite
@@ -270,7 +270,7 @@ committed artifacts.
 |---|---|
 | latency stress grid (all 24 alphas) | `research/alpha_reports/REPORT.md` (cost/latency stress table) |
 | per-alpha stressed P&L | `research/alpha_reports/EQ06.json`, `EQ08.json`, `EQ09.json` (+ peers), `stress.latency` |
-| stress semantics, shift grid | `python/src/iap/validation/stress.py`, `configs/execution.json` |
+| stress semantics, shift grid | `python/src/iap/validation/stress.py`, `configs/execution/execution.json` |
 | backtester base latency | `python/src/iap/backtest/engine.py` (`latency_rows`) |
 | C++ stage benchmarks + methodology | `benchmarks/results_cpp.md`, `cpp/bench/bench_all.cpp` |
 | Rust / Java replay throughput | `rust/replay/src/bin/demo.rs`, `java/src/main/java/com/iap/replay/Demo.java` (run in this container) |
@@ -285,7 +285,7 @@ committed artifacts.
   re-derived USD figures are in those papers' errata and in
   `research/alpha_reports/REPORT.md`.
 - The execution-side latency controls this paper argued for are now
-  enforced rather than merely declared: `configs/execution.json`
+  enforced rather than merely declared: `configs/execution/execution.json`
   `latency_budget_ns`, `max_participation` and `min_slice_interval_ns` are
   read by the Java `BacktestEngine`/`PaperTrading` and violations are
   counted (`PLATFORM_CONVENTIONS.md` §11.4; test
@@ -363,3 +363,36 @@ equity feed, so the measured decay penalty remains information staleness
 rather than compute time. Only the absolute compute numbers move — and
 they moved *against* the platform, which is the direction that could have
 threatened the argument had the gap been narrower.
+
+## Erratum / Update — 2026-09-20 (ledger denominator)
+
+The multiple-testing ledger `research/experiments.json` moved on 2026-09-19
+when the contract-driven `ExperimentRunner` (`python -m iap.research run`,
+`research/experiments/<id>/`) registered five new experiments — EQ01 @ 1 s,
+EQ03 @ 1 s and @ 5 s, EQ06 @ 1 s and @ 10 s, 21 looks each, kind
+`experiment_runner`, deliberately **not** de-duplicated against the
+`promotion_pipeline` entries even where the computation coincides, so the
+denominator only grows. The 2026-09-06 erratum's **760 looks over 65 distinct
+configurations (Bonferroni per-test |t| 3.99, expected max |t| under the global
+null 3.64)** are superseded by **865 looks over 70 distinct configurations:
+Bonferroni per-test |t| ≥ 4.02 (p ≤ 5.78e-05), expected max |t| ≈ 3.68**.
+No verdict, IC, t-statistic or P&L figure in this paper changes; the five
+new experiments are all ITERATE and net-negative at 1× costs, like every
+alpha before them. The analysis above is left as written and the research
+reports quote the ledger at their own render time (`ledger_n_at_report`).
+
+## Erratum / Update — 2026-09-20 (benchmark table regenerated)
+
+`benchmarks/results_cpp.md` was regenerated on 2026-09-19 (the C++ trace
+contract added two traced-replay rows and a trace-path table). The hot rows
+moved within the stated few-percent cross-run variance: IAP1 decode 174.4 →
+**184.1 ns/event**, book update 25.7 → **26.4 ns**, replay engine 28.1M →
+**27.2M events/s**, feature engine 530.4 → **514.1 ns/event**, alpha scoring
+38.5 → **33.6 ns/row**; the measured hot path is now 184.1 + 26.4 + 514.1 +
+33.6 = **758 ns ≈ 0.76 µs/event** (was 0.77). Nothing in the argument moves
+— the gap to the ~0.9 s median inter-event gap is unchanged at six orders of
+magnitude — and the platform's documents now quote the table rather than
+this paper (`tests/harness/check_headline_numbers.py`, `cpp_benchmark_numbers`).
+The new rows: serialising one 5.6 KB `DecisionTrace` costs 31.7 µs (+ 30.3 µs
+to hash), paid once per decision off the event loop; ≈ 37 ns/event amortised
+on the 2,000-event golden replay.

@@ -1,6 +1,6 @@
 //! Order/execution contract structs, mirroring
-//! `schemas/order_request.schema.json` and
-//! `schemas/execution_report.schema.json` field-for-field.
+//! `schemas/order/order_request.schema.json` and
+//! `schemas/execution/execution_report.schema.json` field-for-field.
 
 use marketdata::IapError;
 use serde::{Deserialize, Serialize};
@@ -83,7 +83,7 @@ impl ExecStatus {
     }
 }
 
-/// Strategy order request (`schemas/order_request.schema.json`).
+/// Strategy order request (`schemas/order/order_request.schema.json`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OrderRequest {
     /// Client order id (unique per session).
@@ -108,7 +108,7 @@ pub struct OrderRequest {
     pub timestamp: i64,
 }
 
-/// Venue execution report (`schemas/execution_report.schema.json`).
+/// Venue execution report (`schemas/execution/execution_report.schema.json`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ExecutionReport {
     /// The order this report refers to.

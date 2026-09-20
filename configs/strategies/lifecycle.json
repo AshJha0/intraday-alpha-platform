@@ -1,0 +1,24 @@
+{
+  "x-version": 1,
+  "description": "Pinned alpha promotion lifecycle policy (iap.lifecycle; RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE -> WATCH -> RETIRED). The promotion gate thresholds equal the spec section 20 gates pinned in iap.validation.validate.GATES; the ACTIVE/WATCH/RETIRED rules are NOT duplicated here — they stay in strategies.json adaptive.lifecycle and are reused unchanged. Every number is a threshold a port must reproduce exactly; tests/golden/expected_lifecycle.json embeds the merged config.",
+  "policy": "lifecycle_v1",
+  "gates": {
+    "min_experiments_in_ledger": 1,
+    "min_oos_ic": 0.01,
+    "min_nw_tstat": 3.0,
+    "min_fold_sign_consistency": 0.7,
+    "min_folds": 3,
+    "min_net_return_bps": 0.0,
+    "min_capacity_usd": 1000000.0,
+    "max_ic_rank_gap": 1.0,
+    "ic_rank_gap_eps": 1e-12,
+    "max_holdout_ic_gap": 0.01,
+    "min_paper_sessions": 5,
+    "max_paper_ic_gap": 0.01,
+    "min_paper_net_pnl": 0.0,
+    "max_kill_events": 0
+  },
+  "demotion": {
+    "max_consecutive_failures": 3
+  }
+}

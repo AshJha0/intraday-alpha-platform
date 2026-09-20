@@ -121,7 +121,7 @@ def synth_baseline(synth_samples):
 
 @pytest.fixture(scope="module")
 def adaptive_cfg():
-    return load_adaptive_config(CONFIGS_DIR / "strategies.json")
+    return load_adaptive_config(CONFIGS_DIR / "strategies" / "strategies.json")
 
 
 class _ToyAlpha(LinearAlpha):
@@ -185,7 +185,7 @@ def toy_frames():
 
 @pytest.fixture(scope="module")
 def toy_deployment(toy_frames, adaptive_cfg):
-    bt = Backtester(CostModel.load(CONFIGS_DIR / "execution.json"), _META,
+    bt = Backtester(CostModel.load(CONFIGS_DIR / "execution" / "execution.json"), _META,
                     BacktestConfig())
     return AdaptiveDeployment(
         _ToyAlpha, toy_frames, adaptive_cfg, bt,
@@ -664,7 +664,7 @@ def test_adaptive_determinism(toy_deployment, adaptive_cfg):
 def test_adaptive_no_lookahead_shift(toy_frames, adaptive_cfg):
     """Mutating every row at or after a cutoff leaves all deployed scores
     strictly before the cutoff bit-identical (row-level no-lookahead)."""
-    bt = Backtester(CostModel.load(CONFIGS_DIR / "execution.json"), _META,
+    bt = Backtester(CostModel.load(CONFIGS_DIR / "execution" / "execution.json"), _META,
                     BacktestConfig())
     dep = AdaptiveDeployment(_ToyAlpha, toy_frames, adaptive_cfg, bt, 0.25)
     cutoff = dep.block_bounds[len(dep.block_bounds) // 2]
@@ -736,7 +736,7 @@ def test_adaptive_static_matches_manual_deployment(toy_deployment,
     model = _ToyAlpha()
     model.fit(toy_deployment._train_window(toy_deployment.deploy_start))
     scores = model.score(toy_frames)
-    bt = Backtester(CostModel.load(CONFIGS_DIR / "execution.json"), _META,
+    bt = Backtester(CostModel.load(CONFIGS_DIR / "execution" / "execution.json"), _META,
                     BacktestConfig())
     manual = {}
     for iid, sc in scores.items():
@@ -756,7 +756,7 @@ def test_adaptive_scheduled_fires_on_day_boundary(adaptive_cfg):
     day = 86_400_000_000_000
     t0 = (1_700_000_000_000_000_000 // day) * day + day - 4 * 3600 * NS_S
     frames = _make_frames(n_rows=6 * 3600, t0=t0, seed=11)
-    bt = Backtester(CostModel.load(CONFIGS_DIR / "execution.json"), _META,
+    bt = Backtester(CostModel.load(CONFIGS_DIR / "execution" / "execution.json"), _META,
                     BacktestConfig())
     dep = AdaptiveDeployment(_ToyAlpha, frames, adaptive_cfg, bt, 0.25)
     res = dep.run(build_policy("scheduled_daily", adaptive_cfg))

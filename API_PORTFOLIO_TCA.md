@@ -269,14 +269,14 @@ cpu_count, machine, system, python}` — plus `metrics.json` and `model.pkl`.
   daily P&L, Java `BacktestEngine.Summary.totalPnl`, Python
   `BacktestResult.total_pnl` / `InstrumentResult.total_pnl`, research
   report P&L, cost and capital columns — is in the reporting currency
-  (`configs/risk.json` `currency.reporting_ccy`, USD). Native figures are
+  (`configs/risk/risk.json` `currency.reporting_ccy`, USD). Native figures are
   kept alongside, never mixed: `InstrumentResult.total_pnl_native` (in the
   instrument's `quote_currency`), `BacktestResult.total_pnl_native_by_ccy`,
   Java `Summary.totalPnlNative` (per quote ccy).
 - **Conversion table.** `currency.conversion[ccy] = {instrument_id, invert}`
   names the FX pair whose consolidated mid converts `ccy` into the reporting
   currency (`invert = true` when the pair is quoted REPORTING/CCY, e.g.
-  USD/JPY for JPY). `configs/instruments.json` carries `base_currency` /
+  USD/JPY for JPY). `configs/instruments/instruments.json` carries `base_currency` /
   `quote_currency` per FX pair and `currency` per equity.
 - **When.** P&L is converted **per increment at the prevailing pair mid of
   that row** (Python `Backtester.rate_series`, Java
@@ -290,7 +290,7 @@ cpu_count, machine, system, python}` — plus `metrics.json` and `model.pkl`.
   in price units × qty × qty_unit, and impact
   `impact_coeff_bps_per_pct_adv × (qty × qty_unit / adv × 100)` bps of the
   fill notional, with `adv` in base units (shares, or currency units of the
-  base for FX — `configs/instruments.json` `adv`). Both sides pass
+  base for FX — `configs/instruments/instruments.json` `adv`). Both sides pass
   `qty_unit = lot_size` for FX and `1` for EQUITY/ETF; passing lot counts
   against a base-unit ADV understates FX impact by `lot_size` and is a
   contract violation.

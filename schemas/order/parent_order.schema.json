@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iap.example/schemas/order/parent_order.schema.json",
+  "title": "ParentOrder",
+  "description": "Strategy-level order handed to an execution algorithm. decision_ts <= arrival_ts <= end_ts. algo: TWAP VWAP POV IS. limit_price_ticks 0 = unpriced. params: numeric algorithm parameters by name (participation for POV, slices for TWAP/VWAP/IS).",
+  "x-version": 1,
+  "type": "object",
+  "properties": {
+    "parent_order_id": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "strategy_id": {
+      "type": "string",
+      "description": "Owning strategy.",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "alpha_id": {
+      "type": "string",
+      "description": "Alpha that generated the order (EQnn / FXnn for flagship alphas).",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "instrument_id": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "side": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "BID=0 (buy) ASK=1 (sell).",
+      "enum": [
+        0,
+        1
+      ]
+    },
+    "qty": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9223372036854775807,
+      "description": "Base units, > 0."
+    },
+    "algo": {
+      "type": "string",
+      "description": "Execution algorithm.",
+      "enum": [
+        "TWAP",
+        "VWAP",
+        "POV",
+        "IS"
+      ]
+    },
+    "decision_ts": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807,
+      "description": "When the signal fired, ns."
+    },
+    "arrival_ts": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807,
+      "description": "When the first child could act, ns."
+    },
+    "end_ts": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807,
+      "description": "End of the execution horizon, ns."
+    },
+    "urgency": {
+      "type": "number",
+      "description": "0 = fully passive, 1 = immediate.",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "limit_price_ticks": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9223372036854775807,
+      "description": "Limit price in ticks; 0 = unpriced."
+    },
+    "params": {
+      "type": "object",
+      "description": "Algorithm parameters by name.",
+      "propertyNames": {
+        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+      },
+      "additionalProperties": {
+        "type": "number"
+      }
+    }
+  },
+  "required": [
+    "parent_order_id",
+    "strategy_id",
+    "alpha_id",
+    "instrument_id",
+    "side",
+    "qty",
+    "algo",
+    "decision_ts",
+    "arrival_ts",
+    "end_ts",
+    "urgency",
+    "limit_price_ticks",
+    "params"
+  ],
+  "additionalProperties": false
+}

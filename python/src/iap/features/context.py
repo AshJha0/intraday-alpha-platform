@@ -1,6 +1,6 @@
 """Per-instrument static context for the feature engine.
 
-Built from ``configs/instruments.json`` (tick size, asset class, session
+Built from ``configs/instruments/instruments.json`` (tick size, asset class, session
 bounds) — independent of any live data.  The cross-asset reference instrument
 is pinned per asset class:
 
@@ -12,7 +12,7 @@ For the reference instrument itself, cross-asset features degenerate
 naturally (beta = 1, residual = 0, correlation = 1).
 
 **Session time zones (pinned, API_FEATURES §3 "Time of day")**: every session
-block in ``configs/instruments.json`` MUST carry an IANA ``timezone``; its
+block in ``configs/instruments/instruments.json`` MUST carry an IANA ``timezone``; its
 ``open``/``close`` are wall-clock times *in that zone*, converted per event
 with :mod:`zoneinfo`.  Every time-of-day feature (``minute_of_day``,
 ``session_frac``, ``is_open_phase``, ``is_close_phase``) and every
@@ -100,9 +100,10 @@ def _minute_of_day(hhmmss: str) -> int:
 
 
 def build_contexts(config_dir: Union[str, Path]) -> Dict[int, InstrumentContext]:
-    """Build {instrument_id: InstrumentContext} from configs/instruments.json."""
+    """Build {instrument_id: InstrumentContext} from
+    configs/instruments/instruments.json."""
     config_dir = Path(config_dir)
-    with open(config_dir / "instruments.json") as f:
+    with open(config_dir / "instruments" / "instruments.json") as f:
         cfg = json.load(f)
 
     sessions = cfg["sessions"]

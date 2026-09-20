@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Epics and issues (rendered plan)
+    url: https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/EPICS.md
+    about: Every epic and issue with its status and evidence, generated from tools/github/issues.yaml.
+  - name: Contributing guide
+    url: https://github.com/AshJha0/intraday-alpha-platform/blob/main/CONTRIBUTING.md
+    about: Branching, the parity harness, golden regeneration, the promotion-gate rule and code style.
+  - name: Platform conventions (binding)
+    url: https://github.com/AshJha0/intraday-alpha-platform/blob/main/PLATFORM_CONVENTIONS.md
+    about: Canonical types, serialization, determinism, book semantics, golden rules, trading contracts.
+  - name: Security policy
+    url: https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/governance/SECURITY.md
+    about: Report risk-engine, kill-switch or deployment defects privately, not as a public issue.

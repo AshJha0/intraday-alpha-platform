@@ -7,7 +7,7 @@ import java.util.TreeMap;
 import com.iap.config.Json;
 
 /**
- * One venue's execution profile (configs/venues.json): fees per share (EQ,
+ * One venue's execution profile (configs/venues/venues.json): fees per share (EQ,
  * negative fee = maker rebate) / commission per million notional (FX) plus
  * the venue latency leg (mean + jitter bound for the pinned SplitMix64
  * uniform draw).
@@ -22,7 +22,7 @@ public record VenueSpec(
         long latencyMeanNs,
         long latencyJitterNs) {
 
-    /** Load every venue from configs/venues.json, keyed by venue_id. */
+    /** Load every venue from configs/venues/venues.json, keyed by venue_id. */
     public static TreeMap<Integer, VenueSpec> loadVenues(Path path) {
         Map<String, Object> root = Json.object(Json.parseFile(path));
         TreeMap<Integer, VenueSpec> out = new TreeMap<>();

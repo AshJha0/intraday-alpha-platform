@@ -415,7 +415,8 @@ def test_scenario_halt_then_reopen_auction_flags(contexts, idx):
 
 def _tz_config(tmp_path, tzname="America/New_York", open_="09:30:00",
                close="16:00:00"):
-    """A minimal instruments.json with one equity session in ``tzname``."""
+    """A minimal configs dir (instruments/instruments.json) with one equity
+    session in ``tzname``."""
     cfg = {
         "sessions": {
             "EQUITY": {"timezone": tzname, "open": open_, "close": close},
@@ -425,8 +426,8 @@ def _tz_config(tmp_path, tzname="America/New_York", open_="09:30:00",
              "asset_class": "EQUITY", "tick_size": 0.01},
         ],
     }
-    tmp_path.mkdir(parents=True, exist_ok=True)
-    (tmp_path / "instruments.json").write_text(json.dumps(cfg))
+    (tmp_path / "instruments").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "instruments" / "instruments.json").write_text(json.dumps(cfg))
     return tmp_path
 
 
@@ -489,7 +490,7 @@ def test_session_timezone_features_are_session_local(tmp_path, idx):
 def test_missing_or_unknown_session_timezone_fails_fast(tmp_path):
     """A session without an IANA zone is a start-up error, never UTC."""
     d = _tz_config(tmp_path / "a")
-    (tmp_path / "a" / "instruments.json").write_text(json.dumps({
+    (tmp_path / "a" / "instruments" / "instruments.json").write_text(json.dumps({
         "sessions": {"EQUITY": {"open": "09:30:00", "close": "16:00:00"}},
         "instruments": [{"instrument_id": 1, "symbol": "S", "asset_class":
                          "EQUITY", "tick_size": 0.01}],

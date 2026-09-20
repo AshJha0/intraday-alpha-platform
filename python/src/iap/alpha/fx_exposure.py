@@ -27,7 +27,7 @@ import pandas as pd
 
 from iap.alpha.cross_sectional import CrossSectionalLinearAlpha
 
-#: pinned pair -> (base, quote) map (configs/instruments.json)
+#: pinned pair -> (base, quote) map (configs/instruments/instruments.json)
 PAIR_CURRENCIES: Dict[int, Tuple[str, str]] = {
     101: ("EUR", "USD"),
     102: ("GBP", "USD"),

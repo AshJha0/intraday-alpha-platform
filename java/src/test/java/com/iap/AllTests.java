@@ -53,6 +53,11 @@ import org.junit.runners.Suite;
     PaperUnitsTest.class,
     PaperObservabilityTest.class,
     PaperStateRecoveryTest.class,
+    CanonicalJsonGoldenTest.class,
+    TraceGoldenTest.class,
+    LifecycleGoldenTest.class,
+    LifecycleMachineTest.class,
+    PaperTraceTest.class,
 })
 public class AllTests {
 }

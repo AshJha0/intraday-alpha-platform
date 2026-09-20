@@ -1,7 +1,7 @@
 """Fast vectorized research backtester (spec §18, research engine).
 
 - ``costs``  — pinned cost model (half-spread + fees + linear impact) from
-  configs/execution.json ``cost_model``.
+  configs/execution/execution.json ``cost_model``.
 - ``engine`` — decision-at-t / execute-at-t+latency vectorized backtester
   with exact accounting identity, per-alpha and ensemble runs.
 - ``adaptive`` — walk-forward deployment backtest with refit policies,

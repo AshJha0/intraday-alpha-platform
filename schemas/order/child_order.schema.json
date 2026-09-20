@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iap.example/schemas/order/child_order.schema.json",
+  "title": "ChildOrder",
+  "description": "One slice of a parent order addressed to a venue (0 = route via SOR). order_type: MARKET=1 LIMIT=2 IOC=3 FOK=4 PEG=5 MID=6 (order_request.schema.json). price_ticks 0 for MARKET; expire_ts 0 = good till the parent's end_ts.",
+  "x-version": 1,
+  "type": "object",
+  "properties": {
+    "child_order_id": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "parent_order_id": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "instrument_id": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "venue_id": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 65535,
+      "description": "Target venue; 0 = route via SOR."
+    },
+    "side": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "BID=0 (buy) ASK=1 (sell).",
+      "enum": [
+        0,
+        1
+      ]
+    },
+    "qty": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9223372036854775807,
+      "description": "Base units, > 0."
+    },
+    "price_ticks": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9223372036854775807,
+      "description": "Limit price in ticks; 0 for MARKET."
+    },
+    "order_type": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 6,
+      "description": "MARKET=1 LIMIT=2 IOC=3 FOK=4 PEG=5 MID=6.",
+      "enum": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ]
+    },
+    "submit_ts": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807,
+      "description": "Submission time, ns."
+    },
+    "expire_ts": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807,
+      "description": "Expiry time, ns; 0 = parent end_ts."
+    },
+    "slice_index": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295,
+      "description": "0-based slice ordinal within the parent."
+    }
+  },
+  "required": [
+    "child_order_id",
+    "parent_order_id",
+    "instrument_id",
+    "venue_id",
+    "side",
+    "qty",
+    "price_ticks",
+    "order_type",
+    "submit_ts",
+    "expire_ts",
+    "slice_index"
+  ],
+  "additionalProperties": false
+}

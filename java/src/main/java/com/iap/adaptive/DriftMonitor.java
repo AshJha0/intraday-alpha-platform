@@ -14,7 +14,7 @@ import java.util.TreeMap;
  * <p><b>The window is EVENT TIME</b> (round-3 fix): research computes PSI
  * over {@code adaptive.monitor_window_ns} (1 h) with at least
  * {@code adaptive.min_psi_samples} (200) samples — see API_ADAPTIVE.md
- * section 2 and {@code configs/strategies.json}. The gauge used a fixed ring
+ * section 2 and {@code configs/strategies/strategies.json}. The gauge used a fixed ring
  * of 256 signals, which is ~13 minutes on equities and hours on a sparse FX
  * stream: it was simply not the pinned statistic, so the live number and the
  * research number were never comparable. Feed
@@ -26,7 +26,7 @@ import java.util.TreeMap;
  * loaded baseline are recorded but never produce a PSI ({@code NaN}).
  */
 public final class DriftMonitor {
-    /** Pinned rolling window in event time (configs/strategies.json). */
+    /** Pinned rolling window in event time (configs/strategies/strategies.json). */
     public static final long DEFAULT_WINDOW_NS = 3_600_000_000_000L;
 
     /** Pinned minimum sample count before a PSI is reported. */
@@ -95,7 +95,7 @@ public final class DriftMonitor {
     /**
      * @param baselines per-alpha PSI baselines (may be empty)
      * @param windowNs rolling window in event time
-     *     (configs/strategies.json {@code adaptive.monitor_window_ns})
+     *     (configs/strategies/strategies.json {@code adaptive.monitor_window_ns})
      * @param minSamples minimum samples in the window before a PSI is
      *     reported ({@code adaptive.min_psi_samples})
      * @param everyN observations between PSI recomputations

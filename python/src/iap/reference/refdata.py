@@ -1,6 +1,7 @@
 """Reference-data service: instruments, venues, sessions, calendars.
 
-Reads the JSON configs under ``configs/`` (instruments.json, venues.json).
+Reads the JSON configs under ``configs/`` (instruments/instruments.json,
+venues/venues.json).
 Prices on contracts are integer ticks; this service owns the tick_size /
 lot_size mapping used to convert to/from real prices.
 
@@ -85,6 +86,9 @@ class Instrument:
         "adv",
         "venues",
         "pip",
+        "currency",
+        "base_currency",
+        "quote_currency",
     )
 
     def __init__(self, row: dict) -> None:
@@ -97,6 +101,14 @@ class Instrument:
         self.adv: int = row["adv"]
         self.venues: List[str] = list(row["venues"])
         self.pip: Optional[float] = row.get("pip")
+        #: Settlement / P&L currency of an EQUITY/ETF (``currency``) and the
+        #: FX pair legs (``base_currency`` / ``quote_currency``); optional in
+        #: the schema, consumed by the risk engine's reference data
+        #: (``iap.risk.refdata``) which fails closed when the one it needs
+        #: is absent.
+        self.currency: Optional[str] = row.get("currency")
+        self.base_currency: Optional[str] = row.get("base_currency")
+        self.quote_currency: Optional[str] = row.get("quote_currency")
         what = f"instrument {self.symbol!r}"
         if not isinstance(self.symbol, str) or not self.symbol:
             raise ValueError(f"{what}: symbol must be a non-empty string")
@@ -117,6 +129,10 @@ class Instrument:
             raise ValueError(f"{what}: needs at least one venue")
         if self.pip is not None and not (math.isfinite(self.pip) and self.pip > 0):
             raise ValueError(f"{what}: pip must be > 0 when present")
+        for name in ("currency", "base_currency", "quote_currency"):
+            value = getattr(self, name)
+            if value is not None and (not isinstance(value, str) or not value):
+                raise ValueError(f"{what}: {name} must be a non-empty string when present")
 
     def price_to_ticks(self, price: float) -> int:
         """Convert a real price to integer ticks (round half away from zero)."""
@@ -207,7 +223,8 @@ class _FxWeek:
 
 
 class ReferenceData:
-    """Loads, validates and indexes configs/instruments.json + configs/venues.json."""
+    """Loads, validates and indexes configs/instruments/instruments.json +
+    configs/venues/venues.json."""
 
     def __init__(self, instruments_cfg: dict, venues_cfg: dict) -> None:
         self._venue_by_name: Dict[str, Venue] = {}
@@ -258,11 +275,12 @@ class ReferenceData:
 
     @classmethod
     def load(cls, config_dir) -> "ReferenceData":
-        """Load from a configs/ directory (expects instruments.json, venues.json)."""
+        """Load from a configs/ directory (expects instruments/instruments.json,
+        venues/venues.json — the domain layout of PLATFORM_CONVENTIONS.md §0)."""
         config_dir = Path(config_dir)
-        with open(config_dir / "instruments.json") as f:
+        with open(config_dir / "instruments" / "instruments.json") as f:
             instruments_cfg = json.load(f)
-        with open(config_dir / "venues.json") as f:
+        with open(config_dir / "venues" / "venues.json") as f:
             venues_cfg = json.load(f)
         return cls(instruments_cfg, venues_cfg)
 

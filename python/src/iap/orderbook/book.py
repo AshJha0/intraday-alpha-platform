@@ -442,6 +442,10 @@ class OrderBook:
         level = self._levels.get((side, price))
         return level.total_qty if level is not None else 0
 
+    def level_qty(self, side: int, price_ticks: int) -> int:
+        """Displayed total quantity at (side, price_ticks); 0 when no level rests there."""
+        return self._level_total(side, price_ticks)
+
     def _remove_order(self, order_id: int) -> None:
         key = self._orders.pop(order_id)
         level = self._levels[key]

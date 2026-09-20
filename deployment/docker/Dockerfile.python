@@ -5,6 +5,17 @@
 #   generator -> data/raw/*.jsonl -> normalize -> data/normalized/{*.jsonl,
 #   *.iap1, events.parquet, qc_report.json}
 #
+# Runnable modules in this image (all deterministic, no wall clock):
+#   python3 -m iap.marketdata ...                       (the ENTRYPOINT below)
+#   python3 -m iap.mvp run    --repo-root /app --out /data/mvp/<run_id>
+#   python3 -m iap.mvp replay --repo-root /app --run /data/mvp/<run_id>
+#   python3 -m iap.mvp verify --repo-root /app
+#   python3 -m iap.mvp explain --run /data/mvp/<run_id> <parent_order_id>
+#   (docs/MVP.md; --repo-root names the directory configs/ and research/ are
+#   baked under — the MVP resolves its reference documents against it;
+#   schemas come from $IAP_SCHEMA_DIR, set below; proven outside Docker by
+#   tests/integration/test_installed_package.py).
+#
 # Build (from the REPO ROOT — the build context must contain python/, configs/,
 # schemas/, tests/golden/):
 #   docker build -f deployment/docker/Dockerfile.python -t iap/python:1.0.0 .
@@ -24,19 +35,25 @@ RUN groupadd --gid 10001 iap && \
 
 WORKDIR /app
 
-# The pipeline itself needs only the stdlib + pyarrow (python/pyproject.toml).
-# The full research stack (numpy/pandas/scipy/sklearn) is only needed for
-# research/ scripts and the test suite, and is deliberately NOT installed here
-# to keep the production image small; use the dev target below for tests.
-COPY python/pyproject.toml python/pyproject.toml
-COPY python/src python/src
-RUN pip install --no-cache-dir ./python
-
 # Configuration and schemas are baked read-only; at runtime they may be
 # overridden by a mounted volume/ConfigMap (deployment/k8s/) — configs are
-# data, secrets NEVER live here (SECURITY.md).
+# data, secrets NEVER live here (SECURITY.md).  schemas/ is copied BEFORE the
+# install: python/setup.py packages it into the wheel as iap/_schemas, so the
+# installed package validates contracts even without the checkout.
 COPY configs configs
 COPY schemas schemas
+
+# `pip install ./python` installs the package with its declared dependencies
+# (python/pyproject.toml: numpy, pandas, scipy, scikit-learn, pyarrow,
+# jsonschema): the market-data pipeline needs only the stdlib + pyarrow, the
+# MVP loop (iap.mvp) needs numpy + pandas for alpha scoring and the portfolio
+# optimizer.  The test suite (pytest, pyyaml: the `dev` extra) is NOT installed.
+COPY python/pyproject.toml python/pyproject.toml
+COPY python/setup.py python/setup.py
+COPY python/src python/src
+RUN pip install --no-cache-dir ./python
+# The MVP's alpha lifecycle registry (configs/mvp/mvp.json reference.alpha_registry).
+COPY research/alpha_registry.json research/alpha_registry.json
 
 # Generated market data goes to a volume, never into the image layer.
 RUN mkdir -p /data && chown -R iap:iap /data /app
@@ -44,6 +61,12 @@ VOLUME ["/data"]
 
 USER iap
 ENV PYTHONUNBUFFERED=1
+# Contracts are validated against /app/schemas (the same files the wheel
+# carries; an explicit override beats the packaged copy —
+# iap.contracts.versions.schema_dir).  Every runnable module above (iap.mvp,
+# iap.store, iap.lifecycle, iap.research) validates typed documents, so this
+# is what makes the documented commands executable as written.
+ENV IAP_SCHEMA_DIR=/app/schemas
 
 # Healthcheck: the pipeline is a batch job; "healthy" means the interpreter and
 # the installed package import cleanly (compose gates ordering on successful

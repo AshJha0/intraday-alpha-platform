@@ -1,5 +1,5 @@
 # GENERATED FILE — do not edit by hand.
-# Source of truth: configs/*.json and configs/strategies/*.json
+# Source of truth: configs/**/*.json (key = relative path, '/' encoded as '__')
 # Regenerate: python3 deployment/k8s/generate_configmaps.py
 apiVersion: v1
 kind: ConfigMap
@@ -11,7 +11,7 @@ metadata:
     app.kubernetes.io/component: config
     app.kubernetes.io/managed-by: generate-configmaps
 data:
-  execution.json: |
+  execution__execution.json: |
     {
       "x-version": 1,
       "description": "Execution/SOR controls consumed by the Java BacktestEngine/PaperTrading (ConfigService.executionLimits/sorOptions) and the research cost model. ENFORCED (PLATFORM_CONVENTIONS.md section 11.3-11.4): defaults.max_participation (share of session volume a child may take), defaults.min_slice_interval_ns (per-instrument child spacing), defaults.latency_budget_ns (decision-to-arrival budget; a venue path slower than it blocks the child), defaults.max_child_qty (algo slices above it are split), sor.prefer_rebate and sor.max_venue_latency_ns (venues with a slower latency_mean_ns are ineligible; a stale/halted venue is never eligible). Violations block the order and are counted (BacktestEngine.Counters).",
@@ -38,7 +38,7 @@ data:
         }
       },
       "cost_model": {
-        "description": "Research-backtester cost model (iap.backtest.costs): cost = half_spread + fee + impact; impact_bps = impact_coeff_bps_per_pct_adv * (|child_qty| * qty_unit / adv * 100) with qty_unit = lot_size for FX and 1 for equities (base units, identical to the C++/Java simulator rule 6). Fees mirror configs/venues.json primary venues (XV1 equities taker, PRI FX).",
+        "description": "Research-backtester cost model (iap.backtest.costs): cost = half_spread + fee + impact; impact_bps = impact_coeff_bps_per_pct_adv * (|child_qty| * qty_unit / adv * 100) with qty_unit = lot_size for FX and 1 for equities (base units, identical to the C++/Java simulator rule 6). Fees mirror configs/venues/venues.json primary venues (XV1 equities taker, PRI FX).",
         "impact_coeff_bps_per_pct_adv": 2.0,
         "equity_taker_fee_per_share": 0.003,
         "fx_commission_per_million": 2.5,
@@ -59,75 +59,7 @@ data:
         "max_venue_latency_ns": 1000000
       }
     }
-  generator.json: |
-    {
-      "x-version": 1,
-      "description": "Synthetic market-data generator config (iap.marketdata.generator). All randomness is SplitMix64 seeded from `seed`; identical seed => bit-identical output files. Equities: ONE shared regime-switching efficient price per instrument (sigma per sqrt-second, 1s grid) with per-venue bounded AR(1) microstructure noise (`venue_noise`) and self-exciting MBO flow, so the consolidated multi-venue book stays uncrossed; FX streams are QUOTE+TRADE across LP1/LP2/PRI. `anomalies` are injected for QC testing and disabled for golden vectors.",
-      "seed": 20260829,
-      "sessions": 2,
-      "equities": {
-        "slots_per_stream": 3850,
-        "vol_regimes": {
-          "sigma_ticks_per_s": [
-            0.15,
-            0.4
-          ],
-          "switch_prob_per_s": 0.0007
-        },
-        "venue_noise": {
-          "rho": 0.9,
-          "sigma_ticks": 0.12,
-          "max_ticks": 0.45
-        },
-        "flow": {
-          "excitation_kick": 1.4,
-          "excitation_decay": 0.82,
-          "max_excitation": 8.0
-        },
-        "book": {
-          "max_resting_orders": 160,
-          "qty_lots_max": 10
-        },
-        "mix": {
-          "add": 0.46,
-          "cancel": 0.26,
-          "modify": 0.12,
-          "execute": 0.16
-        },
-        "halt": {
-          "instrument": "SYN.EQ.007",
-          "session_index": 0,
-          "duration_s": 300
-        },
-        "auction_prints": 3
-      },
-      "fx": {
-        "slots_per_pair": 3300,
-        "vol_regimes": {
-          "sigma_ticks": [
-            0.8,
-            3.0
-          ],
-          "switch_prob": 0.003
-        },
-        "spread_ticks": {
-          "PRI": 2,
-          "LP1": 3,
-          "LP2": 5
-        },
-        "trade_prob": 0.12,
-        "qty_units_max": 20
-      },
-      "anomalies": {
-        "gap_prob": 0.0006,
-        "gap_max_events": 3,
-        "dup_prob": 0.0015,
-        "ooo_prob": 0.001,
-        "invalid_prob": 0.0005,
-        "ts_violation_prob": 0.0005
-      }
-    }
-  instruments.json: |
+  instruments__instruments.json: |
     {
       "x-version": 1,
       "description": "Synthetic universe. tick_size: real price per tick; lot_size: base units per board lot (EQ shares) / 1 qty unit = 1,000 base ccy (FX). adv in base units/day.",
@@ -475,10 +407,344 @@ data:
         }
       ]
     }
-  risk.json: |
+  marketdata__generator.json: |
+    {
+      "x-version": 1,
+      "description": "Synthetic market-data generator config (iap.marketdata.generator). All randomness is SplitMix64 seeded from `seed`; identical seed => bit-identical output files. Equities: ONE shared regime-switching efficient price per instrument (sigma per sqrt-second, 1s grid) with per-venue bounded AR(1) microstructure noise (`venue_noise`) and self-exciting MBO flow, so the consolidated multi-venue book stays uncrossed; FX streams are QUOTE+TRADE across LP1/LP2/PRI. `anomalies` are injected for QC testing and disabled for golden vectors.",
+      "seed": 20260829,
+      "sessions": 2,
+      "equities": {
+        "slots_per_stream": 3850,
+        "vol_regimes": {
+          "sigma_ticks_per_s": [
+            0.15,
+            0.4
+          ],
+          "switch_prob_per_s": 0.0007
+        },
+        "venue_noise": {
+          "rho": 0.9,
+          "sigma_ticks": 0.12,
+          "max_ticks": 0.45
+        },
+        "flow": {
+          "excitation_kick": 1.4,
+          "excitation_decay": 0.82,
+          "max_excitation": 8.0
+        },
+        "book": {
+          "max_resting_orders": 160,
+          "qty_lots_max": 10
+        },
+        "mix": {
+          "add": 0.46,
+          "cancel": 0.26,
+          "modify": 0.12,
+          "execute": 0.16
+        },
+        "halt": {
+          "instrument": "SYN.EQ.007",
+          "session_index": 0,
+          "duration_s": 300
+        },
+        "auction_prints": 3
+      },
+      "fx": {
+        "slots_per_pair": 3300,
+        "vol_regimes": {
+          "sigma_ticks": [
+            0.8,
+            3.0
+          ],
+          "switch_prob": 0.003
+        },
+        "spread_ticks": {
+          "PRI": 2,
+          "LP1": 3,
+          "LP2": 5
+        },
+        "trade_prob": 0.12,
+        "qty_units_max": 20
+      },
+      "anomalies": {
+        "gap_prob": 0.0006,
+        "gap_max_events": 3,
+        "dup_prob": 0.0015,
+        "ooo_prob": 0.001,
+        "invalid_prob": 0.0005,
+        "ts_violation_prob": 0.0005
+      }
+    }
+  mvp__generator.json: |
+    {
+      "x-version": 1,
+      "description": "MVP market-data generator config (iap.mvp.feed over iap.marketdata.generator, unmodified): seed 12345 (overridden by mvp.json seed / --seed so that one seed drives the whole run), ONE session, equities only (the MVP reference data lists no FX instrument, so the generator's FX branch emits nothing). The MVP instrument SYN.EQ.AAPL trades on XV1/XV2/XV3; each venue stream gets slots_per_stream flow slots spread over the mvp.json session window (the generator's own rate rule: lambda0 = slots / duration * 1.3, so roughly 77% of the slots are consumed before the close). The QC anomaly injection stays at the bundled rates so the loop exercises sequence-gap gating (SNAPSHOT recovery -> risk on_sequence_gap / on_feed_recovered), duplicates and out-of-order arrivals; the intraday halt targets the MVP instrument itself so the venue trading-state gate (simulator rule 8, SOR eligibility, NO_ROUTE) is exercised too.",
+      "seed": 12345,
+      "sessions": 1,
+      "equities": {
+        "slots_per_stream": 4500,
+        "halt": {
+          "instrument": "SYN.EQ.AAPL",
+          "session_index": 0,
+          "duration_s": 45
+        }
+      }
+    }
+  mvp__generator_tiny.json: |
+    {
+      "x-version": 1,
+      "description": "Generator config of the tiny test session (configs/mvp/mvp_tiny.json): the MVP generator config with fewer flow slots per venue stream and a weaker self-excitation kick, so the 8-minute test session holds a few thousand events whose flow reaches past the 3-minute portfolio warm-up.",
+      "seed": 12345,
+      "sessions": 1,
+      "equities": {
+        "slots_per_stream": 1600,
+        "halt": {
+          "instrument": "SYN.EQ.AAPL",
+          "session_index": 0,
+          "duration_s": 45
+        },
+        "flow": {
+          "excitation_kick": 0.5
+        }
+      }
+    }
+  mvp__instruments.json: |
+    {
+      "x-version": 1,
+      "description": "MVP instrument universe (iap.mvp): one synthetic large-cap equity, SYN.EQ.AAPL, listed on XV1/XV2/XV3. instrument_id 12 is the next free equity id (the bundled universe uses 1..11 for equities/ETF and 101..108 for FX) so the MVP never shadows a bundled instrument. Same schema as configs/instruments/instruments.json: tick_size real price per tick, lot_size shares per board lot, adv in shares/day, ref_price the generator's starting efficient price. The trading session (open/close, timezone) is NOT here: it is the mvp.json session block, which iap.mvp.feed composes into the reference-data document so the session length has exactly one source of truth.",
+      "calendar": {
+        "trading_days": ["2026-08-24"],
+        "timezone": "UTC",
+        "description": "Single synthetic trading day of the MVP session."
+      },
+      "instruments": [
+        {
+          "symbol": "SYN.EQ.AAPL",
+          "instrument_id": 12,
+          "asset_class": "EQUITY",
+          "currency": "USD",
+          "tick_size": 0.01,
+          "lot_size": 100,
+          "ref_price": 190.0,
+          "adv": 60000000,
+          "venues": ["XV1", "XV2", "XV3"]
+        }
+      ]
+    }
+  mvp__mvp.json: |
+    {
+      "x-version": 1,
+      "description": "The executable MVP (python -m iap.mvp): one complete, deterministic, fully traced institutional trading loop on a single synthetic equity - seeded market data -> per-venue books + consolidated book -> feature engine -> three fitted linear_z_v1 alphas ensembled -> single-stock mean-variance portfolio target -> hard risk per child -> TWAP / POV / IS child scheduling -> SOR over three venues -> execution simulator -> TCA -> attribution -> DecisionTrace (JSONL + SQLite) -> report. Every value here is validated fail-fast by iap.mvp.config (file and key named in the error). Money is in the reporting currency of configs/risk/risk.json (USD); prices are integer ticks; every duration is event-time nanoseconds; no wall clock anywhere on the path.",
+      "seed": 12345,
+      "instrument": "SYN.EQ.AAPL",
+      "strategy_id": "MVP",
+      "venues": [
+        "XV1",
+        "XV2",
+        "XV3"
+      ],
+      "alphas": [
+        "EQ01",
+        "EQ03",
+        "EQ06"
+      ],
+      "horizon_ns": 1000000000,
+      "decision_cadence_ns": 1000000000,
+      "session": {
+        "trading_day": "2026-08-24",
+        "timezone": "UTC",
+        "open": "13:30:00",
+        "close": "13:45:00"
+      },
+      "portfolio": {
+        "risk_aversion": 6.0,
+        "tc_bps": 0.001,
+        "max_position_qty": 500,
+        "max_notional": 1000000.0,
+        "turnover_cap": 0.5,
+        "vol_target_per_bar": 0.0005,
+        "ewma_lambda": 0.94,
+        "min_bars": 2,
+        "conf_min": 0.1,
+        "solver": {
+          "iters": 100,
+          "proj_passes": 4,
+          "step_decay": 0.01,
+          "feas_tol": 1e-07
+        }
+      },
+      "execution": {
+        "parent_window_ns": 1000000000,
+        "urgency_bands": [
+          {
+            "max_urgency": 0.2,
+            "algo": "TWAP"
+          },
+          {
+            "max_urgency": 0.35,
+            "algo": "POV"
+          },
+          {
+            "max_urgency": 1.0,
+            "algo": "IS"
+          }
+        ],
+        "twap_slices": 2,
+        "is_slices": 2,
+        "is_risk_aversion": 1.0,
+        "pov_participation": 0.05,
+        "latency": {
+          "decision_ns": 50000,
+          "risk_ns": 50000,
+          "wire_ns": 100000
+        }
+      },
+      "sor": {
+        "prefer_rebate": true,
+        "max_venue_latency_ns": 1000000
+      },
+      "reference": {
+        "instruments": "configs/mvp/instruments.json",
+        "venues": "configs/mvp/venues.json",
+        "generator": "configs/mvp/generator.json",
+        "risk": "configs/risk/risk.json",
+        "execution": "configs/execution/execution.json",
+        "alpha_params": "configs/strategies/alpha_params.json",
+        "alpha_registry": "research/alpha_registry.json"
+      },
+      "notes": [
+        "alphas: EQ01 (microprice), EQ03 (multi-level OFI) and EQ06 (short-horizon momentum) are three of the six golden production alphas of API_ALPHA.md; all three carry fitted, non-dead linear_z_v1 parameters in configs/strategies/alpha_params.json (feature_version-checked on load), so no substitution was needed.",
+        "horizon: the alphas read their pinned features but the MVP acts on a 1 s holding horizon; EQ03 (pinned 5 s) and EQ06 (pinned 10 s) enter the ensemble as z-scores (iap.backtest.engine.ensemble_scores: equal-weight z average rescaled by the mean |beta|), so the mixture is scale-free; the research runner measured EQ03@1s IC +0.018 and EQ06@1s IC +0.016 (research/experiments).",
+        "portfolio.tc_bps (0.001 bp): the optimizer's linear transaction-cost penalty is deliberately orders of magnitude BELOW the modelled round-trip cost (half-spread + fee + impact, about 1 bp on a USD 190 stock) - the fitted expected returns are 0.001-0.05 bp per decision, so with the honest cost the mean-variance solve would never trade and the execution / TCA / trace path would stay unexercised. It acts as a dead-band on negligible expected returns. The report measures the real cost through TCA and states the net result; it never assumes the optimizer's number.",
+        "portfolio.conf_min (0.1): below it the optimizer sees a zero expected return and flattens (the Java paper vertical's rule); urgency = ensemble confidence selects the algo: TWAP (passive limit at the same-side best) up to 0.2, POV up to 0.35, IS above.",
+        "portfolio.min_bars: the EWMA variance needs completed 1-minute bars; until min_bars bar returns exist a decision produces no target (counted as decisions_without_covariance) instead of a fabricated prior - the first three minutes of the session are warm-up.",
+        "execution controls (max_child_qty, max_participation, min_slice_interval_ns, latency_budget_ns) are read from configs/execution/execution.json defaults; the sor block must equal its sor block (checked) and every document is hashed into config_version.",
+        "session: 15 minutes of event time (about 16k events on three venues) keeps the golden run under the 20 s budget; the generator's self-exciting flow consumes its slots in roughly the first 60% of the window (its pinned rate rule), the close auction prints at 13:45; the halt lands at 30% of the session (13:34:30 for 45 s)."
+      ]
+    }
+  mvp__mvp_tiny.json: |
+    {
+      "x-version": 1,
+      "description": "Tiny MVP configuration for the unit / replay / integration tests (python -m iap.mvp --config configs/mvp/mvp_tiny.json): identical to mvp.json except an 8-minute session and configs/mvp/generator_tiny.json (fewer flow slots), so a full run takes about two seconds. Not a golden; the golden session is mvp.json.",
+      "seed": 12345,
+      "instrument": "SYN.EQ.AAPL",
+      "strategy_id": "MVP",
+      "venues": [
+        "XV1",
+        "XV2",
+        "XV3"
+      ],
+      "alphas": [
+        "EQ01",
+        "EQ03",
+        "EQ06"
+      ],
+      "horizon_ns": 1000000000,
+      "decision_cadence_ns": 1000000000,
+      "session": {
+        "trading_day": "2026-08-24",
+        "timezone": "UTC",
+        "open": "13:30:00",
+        "close": "13:38:00"
+      },
+      "portfolio": {
+        "risk_aversion": 6.0,
+        "tc_bps": 0.001,
+        "max_position_qty": 500,
+        "max_notional": 1000000.0,
+        "turnover_cap": 0.5,
+        "vol_target_per_bar": 0.0005,
+        "ewma_lambda": 0.94,
+        "min_bars": 2,
+        "conf_min": 0.1,
+        "solver": {
+          "iters": 100,
+          "proj_passes": 4,
+          "step_decay": 0.01,
+          "feas_tol": 1e-07
+        }
+      },
+      "execution": {
+        "parent_window_ns": 1000000000,
+        "urgency_bands": [
+          {
+            "max_urgency": 0.2,
+            "algo": "TWAP"
+          },
+          {
+            "max_urgency": 0.35,
+            "algo": "POV"
+          },
+          {
+            "max_urgency": 1.0,
+            "algo": "IS"
+          }
+        ],
+        "twap_slices": 2,
+        "is_slices": 2,
+        "is_risk_aversion": 1.0,
+        "pov_participation": 0.05,
+        "latency": {
+          "decision_ns": 50000,
+          "risk_ns": 50000,
+          "wire_ns": 100000
+        }
+      },
+      "sor": {
+        "prefer_rebate": true,
+        "max_venue_latency_ns": 1000000
+      },
+      "reference": {
+        "instruments": "configs/mvp/instruments.json",
+        "venues": "configs/mvp/venues.json",
+        "generator": "configs/mvp/generator_tiny.json",
+        "risk": "configs/risk/risk.json",
+        "execution": "configs/execution/execution.json",
+        "alpha_params": "configs/strategies/alpha_params.json",
+        "alpha_registry": "research/alpha_registry.json"
+      },
+      "notes": [
+        "tiny test configuration: see configs/mvp/mvp.json for the documented choices; only session.close and reference.generator differ."
+      ]
+    }
+  mvp__venues.json: |
+    {
+      "x-version": 1,
+      "description": "MVP venue universe (iap.mvp): the two bundled equity venues XV1 and XV2 copied verbatim from configs/venues/venues.json plus a third synthetic equity venue XV3. venue_id 3 is free in the platform id space (venues.json uses 1, 2, 10, 11, 12; the contracts golden example already renders venue 3 as XV3). XV3 profile (documented, plausible): slightly cheaper taker fee than XV1/XV2 (0.0025/share), the lowest maker rebate (0.001/share) and the slowest latency (300 us mean, 100 us jitter) - within sor.max_venue_latency_ns (1 ms) and the 2 ms latency budget, so it is eligible but only wins aggressive routes on price or on a fee tie. Same latency model as venues.json: receive_ts = exchange_ts + mean_ns + jitter (uniform in [0, jitter_ns], SplitMix64).",
+      "venues": [
+        {
+          "venue": "XV1",
+          "venue_id": 1,
+          "asset_class": "EQUITY",
+          "taker_fee_per_share": 0.003,
+          "maker_rebate_per_share": 0.002,
+          "latency": {"mean_ns": 150000, "jitter_ns": 50000},
+          "supports": ["MBO", "AUCTION", "HALT", "SNAPSHOT"]
+        },
+        {
+          "venue": "XV2",
+          "venue_id": 2,
+          "asset_class": "EQUITY",
+          "taker_fee_per_share": 0.0028,
+          "maker_rebate_per_share": 0.0015,
+          "latency": {"mean_ns": 220000, "jitter_ns": 80000},
+          "supports": ["MBO", "AUCTION", "HALT", "SNAPSHOT"]
+        },
+        {
+          "venue": "XV3",
+          "venue_id": 3,
+          "asset_class": "EQUITY",
+          "taker_fee_per_share": 0.0025,
+          "maker_rebate_per_share": 0.001,
+          "latency": {"mean_ns": 300000, "jitter_ns": 100000},
+          "supports": ["MBO", "AUCTION", "HALT", "SNAPSHOT"]
+        }
+      ]
+    }
+  risk__risk.json: |
     {
       "x-version": 3,
-      "description": "Complete pinned hard-risk limit set (spec section 16), consumed by the Rust risk engine (rust/risk, normative) and its Java port. FAIL-CLOSED: a missing or invalid limit puts the engine in reject-everything mode; every decision is emitted as a RiskEvent (schemas/risk_event.schema.json) to a JSONL audit log; decisions are deterministic and replayable. Money semantics (PLATFORM_CONVENTIONS.md section 11): every notional and loss figure is in currency.reporting_ccy; notional = qty x qty_unit x price_ticks x tick_size x fx_rate (qty_unit = lot_size for FX, 1 for EQUITY/ETF); quote currencies convert through currency.conversion (last consolidated mid of the named pair, inverted when the pair is REPORTING/CCY) and an order whose conversion is missing or stale is rejected with FX_RATE_MISSING. Loss limits act on daily P&L = realized (average cost) + unrealized (mark-to-market at the last consolidated mid) and latch the strategy/global kill switch on fills AND on mark updates. duplicate_order_window_ns 0 means the entire session; order rate is a per-strategy event-time token bucket (rate max_order_rate_per_sec, capacity order_rate_burst).",
+      "description": "Complete pinned hard-risk limit set (spec section 16), consumed by the Rust risk engine (rust/risk, normative) and its Java port. FAIL-CLOSED: a missing or invalid limit puts the engine in reject-everything mode; every decision is emitted as a RiskEvent (schemas/risk/risk_event.schema.json) to a JSONL audit log; decisions are deterministic and replayable. Money semantics (PLATFORM_CONVENTIONS.md section 11): every notional and loss figure is in currency.reporting_ccy; notional = qty x qty_unit x price_ticks x tick_size x fx_rate (qty_unit = lot_size for FX, 1 for EQUITY/ETF); quote currencies convert through currency.conversion (last consolidated mid of the named pair, inverted when the pair is REPORTING/CCY) and an order whose conversion is missing or stale is rejected with FX_RATE_MISSING. Loss limits act on daily P&L = realized (average cost) + unrealized (mark-to-market at the last consolidated mid) and latch the strategy/global kill switch on fills AND on mark updates. duplicate_order_window_ns 0 means the entire session; order rate is a per-strategy event-time token bucket (rate max_order_rate_per_sec, capacity order_rate_burst).",
       "global": {
         "kill_switch_engaged": false,
         "max_gross_notional": 5000000.0,
@@ -518,27 +784,6 @@ data:
         }
       }
     }
-  strategies.json: "{\n  \"x-version\": 1,\n  \"description\": \"Strategy registry skeleton; alpha waves\
-    \ extend. All disabled by default. The 'adaptive' block pins the adaptability layer (drift thresholds,\
-    \ refit policies, lifecycle gates) \u2014 see /API_ADAPTIVE.md.\",\n  \"adaptive\": {\n    \"x-version\"\
-    : 1,\n    \"description\": \"Pinned adaptability parameters (iap.adaptive / iap.backtest.adaptive;\
-    \ normative contract /API_ADAPTIVE.md). All durations are event-time nanoseconds; no wall-clock anywhere.\"\
-    ,\n    \"block_ns\": 900000000000,\n    \"warmup_ns\": 9000000000000,\n    \"train_window_ns\": 86400000000000,\n\
-    \    \"embargo_ns\": 60000000000,\n    \"monitor_window_ns\": 3600000000000,\n    \"ic_window_ns\"\
-    : 7200000000000,\n    \"ic_bucket_ns\": 300000000000,\n    \"min_psi_samples\": 200,\n    \"min_ic_buckets\"\
-    : 4,\n    \"policies\": {\n      \"static\": {},\n      \"scheduled_weekly\": {\n        \"period_ns\"\
-    : 604800000000000\n      },\n      \"scheduled_daily\": {\n        \"period_ns\": 86400000000000\n\
-    \      },\n      \"drift_triggered\": {\n        \"psi_threshold\": 0.25,\n        \"ic_z_threshold\"\
-    : -2.0,\n        \"min_refit_gap_ns\": 3600000000000\n      }\n    },\n    \"lifecycle\": {\n    \
-    \  \"watch_ic_gate\": 0.0,\n      \"reactivate_ic_gate\": 0.005,\n      \"retire_breach_evals\": 6,\n\
-    \      \"reactivate_evals\": 3\n    }\n  },\n  \"defaults\": {\n    \"enabled\": false,\n    \"max_position_qty\"\
-    : 10000,\n    \"signal_threshold\": 0.0,\n    \"horizon_ns\": 1000000000,\n    \"seed\": 20260829\n\
-    \  },\n  \"strategies\": [\n    {\n      \"strategy_id\": \"EQ01_microprice\",\n      \"asset_class\"\
-    : \"EQUITY\",\n      \"model_version\": \"unset\"\n    },\n    {\n      \"strategy_id\": \"EQ02_ofi_l1\"\
-    ,\n      \"asset_class\": \"EQUITY\",\n      \"model_version\": \"unset\"\n    },\n    {\n      \"\
-    strategy_id\": \"FX01_quote_imbalance\",\n      \"asset_class\": \"FX\",\n      \"model_version\"\
-    : \"unset\"\n    },\n    {\n      \"strategy_id\": \"FX02_trade_flow\",\n      \"asset_class\": \"\
-    FX\",\n      \"model_version\": \"unset\"\n    }\n  ]\n}\n"
   strategies__alpha_params.json: |
     {
       "data_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
@@ -1097,7 +1342,39 @@ data:
       },
       "x-version": 2
     }
-  venues.json: |
+  strategies__lifecycle.json: "{\n  \"x-version\": 1,\n  \"description\": \"Pinned alpha promotion lifecycle\
+    \ policy (iap.lifecycle; RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE -> WATCH -> RETIRED).\
+    \ The promotion gate thresholds equal the spec section 20 gates pinned in iap.validation.validate.GATES;\
+    \ the ACTIVE/WATCH/RETIRED rules are NOT duplicated here \u2014 they stay in strategies.json adaptive.lifecycle\
+    \ and are reused unchanged. Every number is a threshold a port must reproduce exactly; tests/golden/expected_lifecycle.json\
+    \ embeds the merged config.\",\n  \"policy\": \"lifecycle_v1\",\n  \"gates\": {\n    \"min_experiments_in_ledger\"\
+    : 1,\n    \"min_oos_ic\": 0.01,\n    \"min_nw_tstat\": 3.0,\n    \"min_fold_sign_consistency\": 0.7,\n\
+    \    \"min_folds\": 3,\n    \"min_net_return_bps\": 0.0,\n    \"min_capacity_usd\": 1000000.0,\n \
+    \   \"max_ic_rank_gap\": 1.0,\n    \"ic_rank_gap_eps\": 1e-12,\n    \"max_holdout_ic_gap\": 0.01,\n\
+    \    \"min_paper_sessions\": 5,\n    \"max_paper_ic_gap\": 0.01,\n    \"min_paper_net_pnl\": 0.0,\n\
+    \    \"max_kill_events\": 0\n  },\n  \"demotion\": {\n    \"max_consecutive_failures\": 3\n  }\n}\n"
+  strategies__strategies.json: "{\n  \"x-version\": 1,\n  \"description\": \"Strategy registry skeleton;\
+    \ alpha waves extend. All disabled by default. The 'adaptive' block pins the adaptability layer (drift\
+    \ thresholds, refit policies, lifecycle gates) \u2014 see /API_ADAPTIVE.md.\",\n  \"adaptive\": {\n\
+    \    \"x-version\": 1,\n    \"description\": \"Pinned adaptability parameters (iap.adaptive / iap.backtest.adaptive;\
+    \ normative contract /API_ADAPTIVE.md). All durations are event-time nanoseconds; no wall-clock anywhere.\"\
+    ,\n    \"block_ns\": 900000000000,\n    \"warmup_ns\": 9000000000000,\n    \"train_window_ns\": 86400000000000,\n\
+    \    \"embargo_ns\": 60000000000,\n    \"monitor_window_ns\": 3600000000000,\n    \"ic_window_ns\"\
+    : 7200000000000,\n    \"ic_bucket_ns\": 300000000000,\n    \"min_psi_samples\": 200,\n    \"min_ic_buckets\"\
+    : 4,\n    \"policies\": {\n      \"static\": {},\n      \"scheduled_weekly\": {\n        \"period_ns\"\
+    : 604800000000000\n      },\n      \"scheduled_daily\": {\n        \"period_ns\": 86400000000000\n\
+    \      },\n      \"drift_triggered\": {\n        \"psi_threshold\": 0.25,\n        \"ic_z_threshold\"\
+    : -2.0,\n        \"min_refit_gap_ns\": 3600000000000\n      }\n    },\n    \"lifecycle\": {\n    \
+    \  \"watch_ic_gate\": 0.0,\n      \"reactivate_ic_gate\": 0.005,\n      \"retire_breach_evals\": 6,\n\
+    \      \"reactivate_evals\": 3\n    }\n  },\n  \"defaults\": {\n    \"enabled\": false,\n    \"max_position_qty\"\
+    : 10000,\n    \"signal_threshold\": 0.0,\n    \"horizon_ns\": 1000000000,\n    \"seed\": 20260829\n\
+    \  },\n  \"strategies\": [\n    {\n      \"strategy_id\": \"EQ01_microprice\",\n      \"asset_class\"\
+    : \"EQUITY\",\n      \"model_version\": \"unset\"\n    },\n    {\n      \"strategy_id\": \"EQ02_ofi_l1\"\
+    ,\n      \"asset_class\": \"EQUITY\",\n      \"model_version\": \"unset\"\n    },\n    {\n      \"\
+    strategy_id\": \"FX01_quote_imbalance\",\n      \"asset_class\": \"FX\",\n      \"model_version\"\
+    : \"unset\"\n    },\n    {\n      \"strategy_id\": \"FX02_trade_flow\",\n      \"asset_class\": \"\
+    FX\",\n      \"model_version\": \"unset\"\n    }\n  ]\n}\n"
+  venues__venues.json: |
     {
       "x-version": 1,
       "description": "Synthetic venues. Latency profile: receive_ts = exchange_ts + mean_ns + jitter (uniform in [0, jitter_ns], SplitMix64). Fees per share (EQ, negative rebate for makers) / per million notional (FX).",

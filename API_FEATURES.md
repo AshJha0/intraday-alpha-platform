@@ -8,7 +8,7 @@ features** below with identical semantics and must reproduce the golden
 checkpoints in `tests/golden/expected_features.json` at abs 1e-9 / rel 1e-9.
 
 Normative companions: `PLATFORM_CONVENTIONS.md` §6,
-`schemas/feature_vector.schema.json`,
+`schemas/features/feature_vector.schema.json`,
 `data/reference/feature_registry.json` (full 205-feature registry; its
 `registry_hash` is the `FeatureVector.feature_version`).
 
@@ -261,7 +261,7 @@ sample at-or-before `t - h` exists.
 
 ### Session time zones (pinned)
 
-Every session block in `configs/instruments.json` MUST declare an IANA
+Every session block in `configs/instruments/instruments.json` MUST declare an IANA
 `timezone`; its `open`/`close` are wall-clock times **in that zone**,
 converted per event with `zoneinfo`. Consequently:
 

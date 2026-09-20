@@ -253,6 +253,91 @@ TEST(SorRouting, PassivePrefersRebateAndReportsNoRoute) {
     EXPECT_EQ(sor.route_passive(book, 1, {1, 2}), 1);
 }
 
+// The candidate table the trace records must rank the router's actual
+// choice first, at every step of the two scenarios above, on both sides,
+// with and without prefer_rebate; ineligible / silent venues carry rank 0.
+TEST(SorRouting, ScoreTableRanksTheRoutedVenueFirst) {
+    const auto cfg = algo_config();
+    iap::SorOptions no_rebate;
+    no_rebate.prefer_rebate = false;
+    const iap::SmartOrderRouter sor(cfg.venues);
+    const iap::SmartOrderRouter sor_id(cfg.venues, no_rebate);
+    iap::ConsolidatedBook book(7);
+    std::uint64_t seq1 = 0, seq2 = 0;
+    auto add = [&](std::uint16_t vid, std::uint8_t side, std::int64_t px,
+                   std::int64_t qty, std::uint64_t oid) {
+        std::uint64_t& s = vid == 1 ? seq1 : seq2;
+        ++s;
+        book.apply(MarketEvent::of(s, 7, vid, T0 + static_cast<std::int64_t>(s),
+                                   T0 + static_cast<std::int64_t>(s), s, 1,
+                                   side, px, qty, oid, 0));
+    };
+    std::vector<iap::SorCandidate> table;
+    auto rank1 = [&](const std::vector<iap::SorCandidate>& t) -> std::uint16_t {
+        std::uint16_t chosen = 0;
+        for (std::size_t i = 0; i < t.size(); ++i) {
+            if (i > 0) {
+                EXPECT_LT(t[i - 1].venue_id, t[i].venue_id);  // sorted
+            }
+            EXPECT_EQ(t[i].eligible, t[i].rank > 0);
+        }
+        // Eligible ranks are a permutation of 1..k; rank 1 is the route.
+        std::vector<std::uint16_t> ranks;
+        for (const auto& c : t) {
+            if (c.eligible) ranks.push_back(c.rank);
+            if (c.rank == 1) chosen = c.venue_id;
+        }
+        std::sort(ranks.begin(), ranks.end());
+        for (std::size_t i = 0; i < ranks.size(); ++i) {
+            EXPECT_EQ(ranks[i], static_cast<std::uint16_t>(i + 1));
+        }
+        return chosen;
+    };
+    auto check_all = [&]() {
+        for (std::uint8_t side : {0, 1}) {
+            for (const iap::SmartOrderRouter* r : {&sor, &sor_id}) {
+                r->score_aggressive(book, side, {2, 1}, table);
+                EXPECT_EQ(table.size(), 2u);
+                EXPECT_EQ(rank1(table), r->route_aggressive(book, side, {2, 1}));
+                r->score_passive(book, side, {2, 1}, table);
+                EXPECT_EQ(rank1(table), r->route_passive(book, side, {2, 1}));
+            }
+        }
+    };
+    check_all();  // empty books: no venue eligible, route 0
+    sor.score_aggressive(book, 0, {1, 2}, table);
+    for (const auto& c : table) {
+        EXPECT_FALSE(c.eligible);
+        EXPECT_EQ(c.rank, 0);
+        EXPECT_EQ(c.displayed_qty, 0);
+    }
+    add(1, 1, 101, 500, 11);
+    check_all();
+    add(2, 1, 100, 500, 21);
+    check_all();
+    sor.score_aggressive(book, 0, {1, 2}, table);  // buy: venue 2 (ask 100) first
+    EXPECT_EQ(table[1].venue_id, 2);
+    EXPECT_EQ(table[1].rank, 1);
+    EXPECT_EQ(table[1].displayed_price_ticks, 100);
+    EXPECT_EQ(table[1].displayed_qty, 500);
+    EXPECT_EQ(table[0].rank, 2);
+    EXPECT_EQ(table[0].taker_fee, 0.003);
+    EXPECT_EQ(table[0].latency_mean_ns, 100'000);
+    add(2, 1, 101, 100, 22);
+    add(1, 1, 100, 100, 12);
+    check_all();  // equal asks: fee tie-break
+    add(1, 0, 99, 500, 13);
+    add(2, 0, 98, 500, 23);
+    check_all();  // sell side + passive on both sides
+    sor.score_passive(book, 0, {1, 2}, table);  // bid side: venue 2 rebate
+    EXPECT_EQ(table[1].rank, 1);
+    EXPECT_EQ(table[1].maker_rebate, 0.0025);
+    sor_id.score_passive(book, 0, {1, 2}, table);  // no rebate pref: venue 1
+    EXPECT_EQ(table[0].rank, 1);
+    EXPECT_EQ(table[1].rank, 2);
+    EXPECT_THROW(sor.score_passive(book, 0, {}, table), std::invalid_argument);
+}
+
 TEST(AlgoReplay, AccountingIdentityAndDeterminism) {
     auto p1 = parent(AlgoType::VWAP, 300, 3);
     auto p2 = parent(AlgoType::IS, 200, 2);

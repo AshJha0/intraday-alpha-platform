@@ -70,7 +70,7 @@ DESIGN_SCAN_COUNT = 216
 
 
 def _load_meta() -> Dict[int, dict]:
-    cfg = json.loads((REPO / "configs" / "instruments.json").read_text())
+    cfg = json.loads((REPO / "configs" / "instruments" / "instruments.json").read_text())
     meta: Dict[int, dict] = {}
     for row in cfg["instruments"]:
         meta[int(row["instrument_id"])] = {
@@ -368,9 +368,9 @@ def main() -> int:
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     meta = _load_meta()
     frames = load_features(REPO / "data" / "features")
-    exec_cfg = json.loads((REPO / "configs" / "execution.json").read_text())
+    exec_cfg = json.loads((REPO / "configs" / "execution" / "execution.json").read_text())
     max_participation = float(exec_cfg["defaults"]["max_participation"])
-    cost_model = CostModel.load(REPO / "configs" / "execution.json")
+    cost_model = CostModel.load(REPO / "configs" / "execution" / "execution.json")
     # Round-3 pinned research execution model: latency in EVENT TIME, a
     # bounded decision age (a 4-hour-old decision no longer "fills" at the
     # 20:00 close print) and no overnight carry.

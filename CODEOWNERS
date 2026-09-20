@@ -27,18 +27,33 @@
 /API_ALPHA.md                       @iap/research @iap/docs
 /API_ADAPTIVE.md                    @iap/research @iap/docs
 /API_PORTFOLIO_TCA.md               @iap/execution @iap/docs
+/API_CONTRACTS.md                   @iap/core @iap/docs
+/API_TRADING.md                     @iap/risk @iap/execution @iap/docs
 /docs/SPECIFICATION.md              @iap/docs
+/docs/LIFECYCLE.md                  @iap/research @iap/risk @iap/docs
+/docs/DECISION_TRACE.md             @iap/platform @iap/docs
+/docs/DATA_MODEL.md                 @iap/core @iap/docs
+/docs/MVP.md                        @iap/platform @iap/research @iap/docs
+/docs/ROADMAP.md                    @iap/docs @iap/platform
+/docs/EPICS.md                      @iap/platform
 /schemas/                           @iap/core @iap/docs
+/schemas/sql/                       @iap/core @iap/platform
+/python/src/iap/contracts/          @iap/core @iap/docs
 
 # ------------------------------------------------------------- risk ---------
 # A limit change is a GOVERNANCE §3 event: risk must approve the config AND
 # every place the limit is mirrored.
-/configs/risk.json                  @iap/risk @iap/platform
+/configs/risk/                      @iap/risk @iap/platform
 /rust/risk/                         @iap/risk
 /cpp/include/iap/risk/              @iap/risk
 /cpp/src/risk/                      @iap/risk
+# (the two C++ risk paths are reserved: there is no C++ risk module by design,
+#  docs/ARCHITECTURE.md §10 — the Python port lives in python/src/iap/risk/)
 /java/src/main/java/com/iap/risk/   @iap/risk
 /python/src/iap/risk/               @iap/risk
+/configs/strategies/lifecycle.json  @iap/research @iap/risk
+/research/alpha_registry.json       @iap/research @iap/risk
+/research/lifecycle_transitions.jsonl @iap/research @iap/risk
 
 # ------------------------------------------------------------- core ---------
 /python/src/iap/marketdata/         @iap/core
@@ -57,13 +72,16 @@
 # ------------------------------------------------------------- execution ----
 /cpp/include/iap/execution/         @iap/execution
 /cpp/include/iap/sor/               @iap/execution
+/cpp/src/execution/                 @iap/execution
+/cpp/src/sor/                       @iap/execution
+/python/src/iap/execution/          @iap/execution
 /java/src/main/java/com/iap/execution/ @iap/execution
 /java/src/main/java/com/iap/sor/    @iap/execution
 /java/src/main/java/com/iap/tca/    @iap/execution
 /python/src/iap/tca/                @iap/execution
 /python/src/iap/portfolio/          @iap/execution
-/configs/execution.json             @iap/execution @iap/platform
-/configs/venues.json                @iap/execution @iap/platform
+/configs/execution/                 @iap/execution @iap/platform
+/configs/venues/                    @iap/execution @iap/platform
 
 # ------------------------------------------------------------- research -----
 /python/src/iap/features/           @iap/research
@@ -71,7 +89,14 @@
 /python/src/iap/labels/             @iap/research
 /python/src/iap/models/             @iap/research
 /python/src/iap/validation/         @iap/research
+/python/src/iap/research/           @iap/research
+/python/src/iap/lifecycle/          @iap/research @iap/risk
+/python/src/iap/adaptive/           @iap/research
+/rust/lifecycle/                    @iap/research @iap/risk
+/java/src/main/java/com/iap/lifecycle/ @iap/research @iap/risk
 /research/                          @iap/research
+/research/experiments/              @iap/research
+/tools/github/                      @iap/platform
 /docs/papers/                       @iap/research @iap/docs
 /java/src/main/java/com/iap/features/ @iap/research
 /java/src/main/java/com/iap/alpha/  @iap/research
@@ -82,6 +107,16 @@
 /java/src/main/java/com/iap/monitoring/ @iap/platform
 /java/src/main/java/com/iap/api/        @iap/platform
 /java/src/main/java/com/iap/config/     @iap/platform
+/java/src/main/java/com/iap/trace/      @iap/platform @iap/core
+/java/src/main/java/com/iap/contracts/  @iap/core
+/rust/contracts/                    @iap/core
+/rust/telemetry/                    @iap/platform
+/cpp/include/iap/contracts/         @iap/core
+/cpp/src/contracts/                 @iap/core
+/python/src/iap/trace/              @iap/platform @iap/core
+/python/src/iap/store/              @iap/core @iap/platform
+/python/src/iap/mvp/                @iap/platform @iap/research
+/configs/mvp/                       @iap/platform @iap/research
 /deployment/                        @iap/platform
 /deployment/prometheus/             @iap/platform @iap/risk
 /deployment/k8s/                    @iap/platform
@@ -94,5 +129,6 @@
 # ------------------------------------------------------------- runbooks -----
 /docs/runbooks/                     @iap/platform @iap/docs
 /docs/runbooks/RUNBOOK_incident_kill_switch.md  @iap/risk @iap/platform
+/docs/runbooks/RUNBOOK_incident_replay.md       @iap/platform @iap/risk
 /docs/governance/                   @iap/docs @iap/platform
 /docs/SCENARIOS.md                  @iap/docs

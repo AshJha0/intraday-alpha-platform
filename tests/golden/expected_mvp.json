@@ -1,0 +1,356 @@
+{
+  "by_algo": {
+    "IS": 15,
+    "POV": 20,
+    "TWAP": 31
+  },
+  "by_rule": {
+    "ALLOW": 105
+  },
+  "by_venue": {
+    "XV1": 429,
+    "XV2": 373,
+    "XV3": 2374
+  },
+  "config_path": "configs/mvp/mvp.json",
+  "config_version": "1f7c50addf61a06e1599ceed15ef2bb64670fb73e150227e6ad5c44506ad20e5",
+  "data_version": "25cf9b7f79f0becadfeeff9c10a5db19706238cba4b93e8f59fde281d0a40234",
+  "description": "MVP golden (python -m iap.mvp run on configs/mvp/mvp.json): the seeded feed, the full loop (book -> features -> EQ01/EQ03/EQ06 ensemble -> portfolio -> hard risk -> TWAP/POV/IS -> SOR -> simulator -> TCA -> attribution -> trace) and its report. Ports reproduce every value: integers and hashes exactly, floats at abs/rel 1e-9. Regenerate only on a deliberate, versioned change: PYTHONPATH=src python3 tools/make_golden_mvp.py --force.",
+  "events_iap1_sha256": "25cf9b7f79f0becadfeeff9c10a5db19706238cba4b93e8f59fde281d0a40234",
+  "events_sha256": "2337a031c0b7ed87752d1de5d0630017608f6af2ac0b75e89c08dfbc16a43ed7",
+  "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
+  "first_trace_ids": [
+    "403020d9da592210fad79613f87ffa19",
+    "2f060d00f430d94731a37a5bfff17fdd",
+    "2cd3015a1567b0ff5ac81e697695ad3b"
+  ],
+  "first_ts": 1787578200000000000,
+  "instrument": "SYN.EQ.AAPL",
+  "instrument_id": 12,
+  "last_trace_ids": [
+    "c85d8e8cdc2aa98dad4a37aed127fcbd",
+    "bd3863782f597e66264c9b4817d83546",
+    "758bd963cbe0aaa7b86ecf523a99395f"
+  ],
+  "last_ts": 1787579100004000000,
+  "model_version": "c2f07d7ff017c44c25b36a2f1a8e308f13bb6389684a38af2af58aeafddd750a",
+  "n_events": 16578,
+  "n_traces": 355,
+  "report": {
+    "alpha": {
+      "contribution_bps_notional_weighted": 0.0388396848591721,
+      "cost_bps_notional_weighted": -0.40336196546531805,
+      "cost_negative": true,
+      "ensemble": {
+        "alpha_id": "EQ01-EQ03-EQ06",
+        "horizon": "1s",
+        "model_version": "c2f07d7ff017c44c25b36a2f1a8e308f13bb6389684a38af2af58aeafddd750a",
+        "n_ic_samples": 345,
+        "n_signals": 354,
+        "realized_ic": 0.2912431357340558,
+        "realized_ic_cost": 0.04542434646100159,
+        "realized_ic_shifted": -0.014939456528553436
+      },
+      "ic_definition": "Pearson(expected_return, label) over confidence > 0 decisions; label = iap.labels.compute_labels at the decision timestamps on the feature-engine book-refresh mid series (mid-to-mid and cost-adjusted half-spread at both ends; valid only when observed through t+h, tradable anchor, fresh tradable forward sample, no stale/halt/auction/one-sided refresh inside (t, t+h]); ic_shifted = signal lagged one confidence > 0 decision; ic_gap = |at_research_horizon.ic - research_ic| (the registry IC is measured at the alpha's fitted horizon)",
+      "net_bps_notional_weighted": -0.36452228060614594,
+      "per_alpha": {
+        "EQ01": {
+          "at_research_horizon": {
+            "horizon": "1s",
+            "n_ic_samples": 345,
+            "n_signals": 354,
+            "realized_ic": 0.2833519832854967,
+            "realized_ic_cost": 0.017308289382725838,
+            "realized_ic_shifted": 0.030871982830424454
+          },
+          "beta": 1.2584700120868522e-06,
+          "horizon": "1s",
+          "ic_gap": 0.25609602147311483,
+          "lifecycle_state": "CANDIDATE",
+          "n_ic_samples": 345,
+          "n_signals": 354,
+          "params_version": "5509f278cdb5c74832745f8200dd9660103084478992157955a873fa1e16f67b",
+          "realized_ic": 0.2833519832854967,
+          "realized_ic_cost": 0.017308289382725838,
+          "realized_ic_shifted": 0.030871982830424454,
+          "research_horizon": "1s",
+          "research_ic": 0.027255961812381897
+        },
+        "EQ03": {
+          "at_research_horizon": {
+            "horizon": "5s",
+            "n_ic_samples": 242,
+            "n_signals": 277,
+            "realized_ic": 0.2231925992620615,
+            "realized_ic_cost": 0.09944870709278537,
+            "realized_ic_shifted": 0.016798916353432444
+          },
+          "beta": 4.0593310230811845e-06,
+          "horizon": "1s",
+          "ic_gap": 0.19340733947075806,
+          "lifecycle_state": "CANDIDATE",
+          "n_ic_samples": 270,
+          "n_signals": 277,
+          "params_version": "b6c196fdbe423619abd4cb9e9e8beb2b33ac886146982b00927363f5e07b939b",
+          "realized_ic": 0.33553138761120194,
+          "realized_ic_cost": 0.06494081501542576,
+          "realized_ic_shifted": -0.03433591891672234,
+          "research_horizon": "5s",
+          "research_ic": 0.029785259791303448
+        },
+        "EQ06": {
+          "at_research_horizon": {
+            "horizon": "10s",
+            "n_ic_samples": 37,
+            "n_signals": 52,
+            "realized_ic": 0.06477064711260591,
+            "realized_ic_cost": 0.11438053543170025,
+            "realized_ic_shifted": -0.014309972756805808
+          },
+          "beta": 7.474776644816464e-06,
+          "horizon": "1s",
+          "ic_gap": 0.021300813828840512,
+          "lifecycle_state": "CANDIDATE",
+          "n_ic_samples": 50,
+          "n_signals": 52,
+          "params_version": "b78f77813c8c88ae683bf46c11cec168a116acc133b32a22720c67a18ef881a9",
+          "realized_ic": -0.1062032207627265,
+          "realized_ic_cost": 0.3295612073752221,
+          "realized_ic_shifted": 0.021228840346860067,
+          "research_horizon": "10s",
+          "research_ic": 0.0434698332837654
+        }
+      }
+    },
+    "controls": {
+      "latency_budget_blocked": 0,
+      "latency_budget_ns": 2000000,
+      "max_child_qty": 1000,
+      "max_participation": 0.05,
+      "min_slice_interval_ns": 500000000,
+      "participation_blocked": 0,
+      "participation_capped": 0,
+      "slice_interval_blocked": 107
+    },
+    "counts": {
+      "counters": {
+        "child_orders_generated": 212,
+        "child_orders_submitted": 105,
+        "decisions": 355,
+        "decisions_flat": 114,
+        "decisions_parent_live": 0,
+        "decisions_window_beyond_session": 0,
+        "decisions_without_covariance": 175,
+        "events": 16578,
+        "feed_recoveries": 9,
+        "fills": 55,
+        "latency_budget_blocked": 0,
+        "parent_orders": 66,
+        "parents_finalised": 66,
+        "parents_without_tca": 0,
+        "participation_blocked": 0,
+        "participation_capped": 0,
+        "risk_allowed": 105,
+        "risk_rejected": 0,
+        "sequence_gaps": 9,
+        "slice_interval_blocked": 107,
+        "sor_no_route": 0,
+        "timeline_crossed_skipped": 0
+      },
+      "features": {
+        "events_dropped": 0,
+        "ts_regressions_dropped": 0,
+        "vectors_emitted": 355
+      },
+      "fill_rate": 0.2045864467920639,
+      "n_child_orders_generated": 212,
+      "n_child_orders_submitted": 105,
+      "n_decisions": 355,
+      "n_events": 16578,
+      "n_events_generated": 16578,
+      "n_fills": 55,
+      "n_parent_orders": 66,
+      "qc_totals": {
+        "duplicates": 33,
+        "events_in": 16621,
+        "events_out": 16578,
+        "gap_missing_events": 29,
+        "gaps": 19,
+        "invalid": 10,
+        "out_of_order": 10,
+        "sequence_resets": 0,
+        "ts_clamped": 8,
+        "ts_regression_dropped": 0
+      },
+      "simulator": {
+        "expired_orders": 50,
+        "overlay_thinned_fills": 29,
+        "reopen_touch_fills": 0,
+        "user_cancels": 0,
+        "venue_not_trading_cancels": 0
+      }
+    },
+    "execution": {
+      "attribution_residual_bps_mean": -0.1596434145981439,
+      "delay_cost_bps_qty_weighted": 0.0,
+      "fees_bps_qty_weighted": 0.023789783049066062,
+      "fill_rate": 0.2045864467920639,
+      "impact_bps_qty_weighted": -0.01271454144525734,
+      "implementation_shortfall_bps": {
+        "mean": 0.11217736337127526,
+        "qty_weighted": 0.10553167758029298
+      },
+      "latency_decision_to_arrival_ns": {
+        "count": 105,
+        "max": 596571,
+        "mean": 441847.3142857143,
+        "min": 350350,
+        "p50": 393887,
+        "p99": 582104
+      },
+      "n_orders_with_tca": 66,
+      "n_parent_orders": 66,
+      "opportunity_cost_bps_qty_weighted": 0.02632758973942746,
+      "participation_rate_mean": 0.047750761417201436,
+      "per_algo": {
+        "IS": {
+          "fill_rate": 0.6912896275777162,
+          "filled_qty": 2246,
+          "implementation_shortfall_bps_qty_weighted": 0.3539802913811429,
+          "n_orders": 15,
+          "qty": 3249,
+          "slippage_bps_filled_weighted": 0.5017457596089232
+        },
+        "POV": {
+          "fill_rate": 0.13934426229508196,
+          "filled_qty": 680,
+          "implementation_shortfall_bps_qty_weighted": 0.06768104908349173,
+          "n_orders": 20,
+          "qty": 4880,
+          "slippage_bps_filled_weighted": 0.34445464231541667
+        },
+        "TWAP": {
+          "fill_rate": 0.03380662609871535,
+          "filled_qty": 250,
+          "implementation_shortfall_bps_qty_weighted": 0.02135338425039831,
+          "n_orders": 31,
+          "qty": 7395,
+          "slippage_bps_filled_weighted": -0.5263434928566777
+        }
+      },
+      "qty_filled": 3176,
+      "qty_target": 15524,
+      "realized_bps_filled_weighted": -0.4375467737682487,
+      "slippage_bps_filled_weighted": 0.3871423991315981,
+      "spread_cost_bps_qty_weighted": 0.08791783674088892,
+      "timing_cost_bps_qty_weighted": 0.004000792545233949,
+      "trading_cost_bps_qty_weighted": 0.07920408784086552
+    },
+    "pnl": {
+      "equity": -22.6762870486491,
+      "execution_cost": 29.216287048690017,
+      "fees": 7.516400000000003,
+      "fees_net": 7.016400000000003,
+      "final_mark": 189.98,
+      "final_position": -270,
+      "gross": 6.5400000000157945,
+      "identity_abs_diff": 5.7696070143720135e-12,
+      "identity_lhs_risk_daily": -15.64000000002332,
+      "identity_rhs_gross_minus_spread": -15.640000000017551,
+      "impact": 0.01988704865666667,
+      "max_drawdown": 23.763728468416957,
+      "realized": -14.337335915070156,
+      "rebates": 0.5,
+      "reporting_ccy": "USD",
+      "risk_daily": -15.64000000002332,
+      "session_volume": 806400,
+      "spread_cost": 22.180000000033345,
+      "total": -22.676287048679992,
+      "traded_qty": 3176,
+      "unrealized": -1.3026640849531645
+    },
+    "portfolio": {
+      "bars": 6,
+      "infeasible_solves": 0,
+      "portfolio_version": "0008b2f0cce4501f2be40479db03de7ae446f2b5e6915aec708a4d73f26f3264",
+      "solves": 180
+    },
+    "risk": {
+      "allowed": 105,
+      "audit_events": 105,
+      "decisions_by_rule": {
+        "ALLOW": 105
+      },
+      "feed_recoveries": 9,
+      "final_position": -270,
+      "kill_events": 0,
+      "kill_switch_engaged": false,
+      "market_regressions_dropped": 72,
+      "open_orders": 0,
+      "rejected": 0,
+      "sequence_gaps": 9
+    },
+    "routing": {
+      "no_route": 0,
+      "venue_fill_qty": {
+        "XV1": 429,
+        "XV2": 373,
+        "XV3": 2374
+      },
+      "venue_shares": {
+        "XV1": 0.13507556675062973,
+        "XV2": 0.11744332493702771,
+        "XV3": 0.7474811083123426
+      }
+    },
+    "run": {
+      "alphas": [
+        "EQ01",
+        "EQ03",
+        "EQ06"
+      ],
+      "config_version": "1f7c50addf61a06e1599ceed15ef2bb64670fb73e150227e6ad5c44506ad20e5",
+      "data_version": "25cf9b7f79f0becadfeeff9c10a5db19706238cba4b93e8f59fde281d0a40234",
+      "decision_cadence_ns": 1000000000,
+      "events_sha256": "2337a031c0b7ed87752d1de5d0630017608f6af2ac0b75e89c08dfbc16a43ed7",
+      "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
+      "first_ts": 1787578200000000000,
+      "horizon_ns": 1000000000,
+      "instrument": "SYN.EQ.AAPL",
+      "instrument_id": 12,
+      "last_ts": 1787579100004000000,
+      "model_version": "c2f07d7ff017c44c25b36a2f1a8e308f13bb6389684a38af2af58aeafddd750a",
+      "n_traces": 355,
+      "run_id": "58a10f2194a3c81c",
+      "seed": 12345,
+      "session_id": "mvp-58a10f2194a3c81c",
+      "strategy_id": "MVP",
+      "trace_digest": "059c30df7213d00e0d3f6de7ab9011b3d1ee9651cd3df5ec6609d2e66e965c2b",
+      "venues": [
+        "XV1",
+        "XV2",
+        "XV3"
+      ]
+    },
+    "trace": {
+      "digest": "059c30df7213d00e0d3f6de7ab9011b3d1ee9651cd3df5ec6609d2e66e965c2b",
+      "first_trace_ids": [
+        "403020d9da592210fad79613f87ffa19",
+        "2f060d00f430d94731a37a5bfff17fdd",
+        "2cd3015a1567b0ff5ac81e697695ad3b"
+      ],
+      "last_trace_ids": [
+        "c85d8e8cdc2aa98dad4a37aed127fcbd",
+        "bd3863782f597e66264c9b4817d83546",
+        "758bd963cbe0aaa7b86ecf523a99395f"
+      ],
+      "n_traces": 355
+    },
+    "x-version": 2
+  },
+  "run_id": "58a10f2194a3c81c",
+  "seed": 12345,
+  "session_id": "mvp-58a10f2194a3c81c",
+  "trace_digest": "059c30df7213d00e0d3f6de7ab9011b3d1ee9651cd3df5ec6609d2e66e965c2b",
+  "x-version": 1
+}

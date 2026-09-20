@@ -26,8 +26,9 @@ Checks (each one is a named case; exit code 0 iff no case FAILED):
   dockerfile_copy_sources     every COPY source exists and is not excluded by
                               .dockerignore
   docker_build_context        tests/harness/check_docker_build.py — a clean
-                              `git clone` + .dockerignore reproduces the real
-                              build context, every stage's COPY and every
+                              checkout of the tracked tree (git ls-files, so
+                              staged moves count) + .dockerignore reproduces
+                              the real build context, every stage's COPY and every
                               build/runtime input resolves in it, and the Java
                               build stage actually runs (a real `docker build`
                               when a daemon is reachable)
@@ -36,6 +37,10 @@ Checks (each one is a named case; exit code 0 iff no case FAILED):
   k8s_dry_run                 kubectl apply --dry-run=client (or kubeconform)
   k8s_trading_singleton       replicas 1 + Recreate + probes that can fail
   configmaps_in_sync          generate_configmaps.py output == committed files
+  configmap_items_in_sync     every volume that projects the iap-configs
+                              ConfigMap lists exactly the generator's
+                              key -> path items, so the pod sees the nested
+                              configs/<domain>/ tree at IAP_CONFIG_DIR
   dashboards_valid            dashboard JSON parses, datasource uid stable, and
                               every panel expression names a real metric
   java_golden_gate_complete   JAVA_GOLDEN_CLASSES == the *GoldenTest.java set
@@ -84,8 +89,8 @@ def have(tool: str) -> bool:
 
 # --------------------------------------------------------------- metrics ---
 # The metrics the deployment actually exports (PLATFORM_CONVENTIONS.md §12.6).
-# Sourced from com.iap.platform.PaperTrading + com.iap.risk.RiskEngine +
-# com.iap.monitoring.GcMetrics; `up` is Prometheus's own.
+# Sourced from com.iap.platform.PaperTrading + com.iap.platform.PaperTraces +
+# com.iap.risk.RiskEngine + com.iap.monitoring.GcMetrics; `up` is Prometheus's own.
 EXPORTED_METRICS = {
     # market data
     "md_events_total", "md_sequence_gaps_total", "md_duplicates_total",
@@ -108,6 +113,9 @@ EXPORTED_METRICS = {
     "risk_events_total", "risk_decisions_total", "risk_allowed_total",
     "risk_rejected_total", "risk_realized_pnl", "risk_unrealized_pnl",
     "risk_daily_pnl", "risk_kill_switch_engaged", "risk_limit",
+    # decision trace (com.iap.platform.PaperTraces, 2026-09-19; the names
+    # rust/telemetry::trace pins) — exported, not yet on a panel (EPICS O06)
+    "trace_records_total", "trace_tca_skipped_total",
     # prometheus itself
     "up",
 }
@@ -521,6 +529,56 @@ def check_configmaps_in_sync() -> None:
            "; ".join(drift) or f"{len(committed)} ConfigMaps")
 
 
+def check_configmap_items_in_sync() -> None:
+    """The nested configs/ tree reaches the pod only through items[].path
+    (a ConfigMap key cannot contain '/'): every consumer of iap-configs must
+    list exactly the generator's key -> path pairs, or a moved/added config
+    file silently vanishes from IAP_CONFIG_DIR."""
+    sys.path.insert(0, str(K8S))
+    try:
+        import generate_configmaps  # noqa: WPS433 (local tool module)
+    finally:
+        sys.path.pop(0)
+    want = [(i["key"], i["path"]) for i in generate_configmaps.configmap_items()]
+    problems = []
+    consumers = 0
+    for f, doc in k8s_docs():
+        for vol in iter_volumes(doc):
+            cm = vol.get("configMap") or {}
+            if cm.get("name") != "iap-configs":
+                continue
+            consumers += 1
+            got = [(i.get("key"), i.get("path")) for i in cm.get("items") or []]
+            if got != want:
+                problems.append(
+                    f"{f.name} volume {vol.get('name')!r}: items differ from "
+                    f"generate_configmaps.configmap_items() "
+                    f"(missing {sorted(set(want) - set(got))}, "
+                    f"extra {sorted(set(got) - set(want))})")
+    if consumers == 0:
+        problems.append("no manifest mounts the iap-configs ConfigMap")
+    for key, path in want:
+        if "/" in key or key.replace("__", "/") != path:
+            problems.append(f"key {key!r} does not encode path {path!r}")
+    record("configmap_items_in_sync", "PASS" if not problems else "FAIL",
+           "; ".join(problems[:5]) or
+           f"{consumers} consumer(s) x {len(want)} files")
+
+
+def iter_volumes(doc: dict):
+    """Pod-spec volumes of a Deployment / CronJob / Job / Pod document."""
+    kind = doc.get("kind")
+    spec = doc.get("spec") or {}
+    if kind == "CronJob":
+        spec = ((spec.get("jobTemplate") or {}).get("spec") or {})
+        kind = "Job"
+    if kind in ("Deployment", "Job", "StatefulSet", "DaemonSet"):
+        spec = (spec.get("template") or {}).get("spec") or {}
+    elif kind != "Pod":
+        return []
+    return spec.get("volumes") or []
+
+
 # -------------------------------------------------------------- grafana ----
 def check_dashboards() -> None:
     problems = []
@@ -603,6 +661,7 @@ def main() -> int:
     check_k8s_dry_run()
     check_k8s_singleton()
     check_configmaps_in_sync()
+    check_configmap_items_in_sync()
     print("grafana / harness:")
     check_dashboards()
     check_java_golden_gate()

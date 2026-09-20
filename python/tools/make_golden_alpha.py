@@ -286,13 +286,13 @@ def main() -> int:
     )
 
     # -- expected_backtest.json: EQ01 on the golden EQ frame --------------
-    inst = json.loads((CONFIGS / "instruments.json").read_text())["instruments"]
+    inst = json.loads((CONFIGS / "instruments" / "instruments.json").read_text())["instruments"]
     meta = {int(r["instrument_id"]): {
         "tick_size": float(r["tick_size"]), "lot_size": int(r["lot_size"]),
         "adv": float(r["adv"]), "asset_class": r["asset_class"],
         "ref_price": float(r["ref_price"]),
     } for r in inst}
-    cm = CostModel.load(CONFIGS / "execution.json",
+    cm = CostModel.load(CONFIGS / "execution" / "execution.json",
                         multiplier=BT_CONFIG["cost_multiplier"])
     bt = Backtester(cm, meta, BacktestConfig(
         max_pos_qty=BT_CONFIG["max_pos_qty"],

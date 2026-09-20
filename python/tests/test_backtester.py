@@ -53,7 +53,7 @@ def _scores(er, conf=None):
 
 
 def test_cost_model_loads_from_execution_config():
-    cm = CostModel.load(CONFIGS_DIR / "execution.json")
+    cm = CostModel.load(CONFIGS_DIR / "execution" / "execution.json")
     assert cm.impact_coeff_bps_per_pct_adv == 2.0
     assert cm.equity_taker_fee_per_share == 0.003
     assert cm.fx_commission_per_million == 2.5

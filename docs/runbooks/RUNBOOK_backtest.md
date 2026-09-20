@@ -26,7 +26,7 @@ PYTHONPATH=src python3 -m pytest -q tests/test_model_economics.py     # cost-adj
 
 Currency (conventions §11.6): `Backtester(..., reporting_ccy="USD")`
 converts every instrument's P&L increment to USD at the prevailing mid of
-the conversion pair (`configs/risk.json` `currency.conversion`) before it
+the conversion pair (`configs/risk/risk.json` `currency.conversion`) before it
 is summed; `InstrumentResult.total_pnl_native` /
 `BacktestResult.total_pnl_native_by_ccy` keep the quote-currency figures.
 A non-USD P&L increment on a row with no prevailing rate raises — run the
@@ -62,9 +62,15 @@ cd java && bash build.sh && java -cp out/main com.iap.replay.Demo ../tests/golde
 Containerized equivalents: `docker compose -f
 deployment/docker/docker-compose.yml up cpp-replay rust-replay java-platform`.
 
+The Python reference ports of the same simulator and of the risk engine run
+their goldens in the Python suite (`cd python && PYTHONPATH=src python3 -m
+pytest -q tests/test_execution_golden.py tests/test_risk_golden.py`;
+`API_TRADING.md`), and the whole loop — including both — is one command:
+`PYTHONPATH=src python3 -m iap.mvp run` (docs/MVP.md).
+
 Known optimisms of the simulators (documented, not bugs — `docs/SCENARIOS.md`
 TRADING section, paper 05 §5 + erratum): no PEG/MID order types in the
-C++/Java simulator; the SOR ranks eligible venues by price/fee only (not
+C++/Java/Python simulator; the SOR ranks eligible venues by price/fee only (not
 depth); full-amount cancel decrement in the queue model; simulated fills
 never mutate the replayed book (rule 3b only prevents our own children from
 re-using the same displayed liquidity). Pinned and tested: no fill through

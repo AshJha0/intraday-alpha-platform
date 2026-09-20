@@ -28,6 +28,13 @@ Contents:
 17. [Add a new feature to the registry](#17-add-a-new-feature-to-the-registry)
 18. [Run the adaptive policy comparison (drift → refit → retire)](#18-run-the-adaptive-policy-comparison-drift--refit--retire)
 19. [Watch live drift in paper trading](#19-watch-live-drift-in-paper-trading)
+20. [Build the platform store and query it](#20-build-the-platform-store-and-query-it)
+21. [Explain an order (the decision trace)](#21-explain-an-order-the-decision-trace)
+22. [Run the MVP loop (one command, one instrument, fully traced)](#22-run-the-mvp-loop-one-command-one-instrument-fully-traced)
+23. [Replay an incident from the captured stream](#23-replay-an-incident-from-the-captured-stream)
+24. [Explain an MVP order](#24-explain-an-mvp-order)
+25. [Bootstrap and inspect the alpha promotion lifecycle](#25-bootstrap-and-inspect-the-alpha-promotion-lifecycle)
+26. [Run one alpha as a contract-driven experiment](#26-run-one-alpha-as-a-contract-driven-experiment)
 
 ---
 
@@ -39,7 +46,7 @@ report:
 
 ```bash
 cd python
-PYTHONPATH=src python3 -m iap.marketdata            # configs/generator.json, seed 20260829
+PYTHONPATH=src python3 -m iap.marketdata            # configs/marketdata/generator.json, seed 20260829
 PYTHONPATH=src python3 -m iap.marketdata --seed 42  # explicit seed override
 ```
 
@@ -174,10 +181,10 @@ meta = {int(r["instrument_id"]): {"symbol": r["symbol"],
         "asset_class": r["asset_class"], "tick_size": float(r["tick_size"]),
         "lot_size": int(r["lot_size"]), "adv": float(r["adv"]),
         "ref_price": float(r.get("ref_price", 1.0))}
-        for r in json.load(open("configs/instruments.json"))["instruments"]}
+        for r in json.load(open("configs/instruments/instruments.json"))["instruments"]}
 frames = load_features("data/features")
-exec_cfg = json.load(open("configs/execution.json"))
-bt = Backtester(CostModel.load("configs/execution.json"), meta, BacktestConfig())
+exec_cfg = json.load(open("configs/execution/execution.json"))
+bt = Backtester(CostModel.load("configs/execution/execution.json"), meta, BacktestConfig())
 
 rep = validate_alpha(lambda: build("EQ03"), frames, bt, meta,
                      float(exec_cfg["defaults"]["max_participation"]))
@@ -288,7 +295,8 @@ cd java && bash build.sh && bash test.sh          # includes PortfolioGoldenTest
 
 ## 9. Run risk checks against the golden decisions
 
-The Rust engine is the reference; Java ports it. The golden replays a full
+The Rust engine is the reference; Java and Python (`iap.risk`,
+[API_TRADING.md](API_TRADING.md) §1) port it. The golden replays a full
 step sequence (orders, fills, market moves, gaps, venue outages, kill
 switches, loss-limit overrides, session rolls, a mid-stream snapshot) and
 pins every decision, deciding rule and severity, the notification events,
@@ -304,15 +312,16 @@ cd java && bash build.sh && rm -rf out/test && mkdir -p out/test && \
         -d out/test @out/test-sources.txt && \
   java -cp "out/test:out/main:/usr/share/java/junit4.jar:/usr/share/java/hamcrest-core.jar" \
        org.junit.runner.JUnitCore com.iap.RiskGoldenTest
+cd python && PYTHONPATH=src python3 -m pytest -q tests/test_risk_golden.py tests/test_risk_rules.py   # Python port: 7 golden + 79 rule tests
 ```
 
 To understand a decision, read the step in
 `tests/golden/expected_risk_decisions.json` — the deciding `rule_id` is the
 first failing rule in the engine's pinned check order
-(`PLATFORM_CONVENTIONS.md` §11.1), limits come from `configs/risk.json`
+(`PLATFORM_CONVENTIONS.md` §11.1), limits come from `configs/risk/risk.json`
 (x-version 3, incl. the `currency` conversion table) and per-instrument
 reference data (`tick_size`, `qty_unit`, `quote_ccy`) from
-`configs/instruments.json`. Regenerate deliberately only:
+`configs/instruments/instruments.json`. Regenerate deliberately only:
 
 ```bash
 cd rust && cargo run -p risk --bin make_risk_golden -- ../tests/golden --force
@@ -337,10 +346,13 @@ cd cpp && bash build.sh
 ctest --test-dir build --output-on-failure -R 'ReplayFillsGolden|Exec'
 ```
 
-Java must reproduce the same fills to the tick:
+Java and Python must reproduce the same fills to the tick (Python's golden
+test additionally asserts every money field bit-identical —
+[API_TRADING.md](API_TRADING.md) §2):
 
 ```bash
 cd java && bash build.sh && bash test.sh    # includes ReplayFillsGoldenTest, ExecutionSimTest, AlgosTest
+cd python && PYTHONPATH=src python3 -m pytest -q tests/test_execution_golden.py tests/test_execution_rules.py tests/test_exec_algos.py tests/test_sor.py
 ```
 
 Read the expected economics (patience vs urgency — the passive parent earns
@@ -372,11 +384,11 @@ meta = {int(r["instrument_id"]): {"symbol": r["symbol"],
         "asset_class": r["asset_class"], "tick_size": float(r["tick_size"]),
         "lot_size": int(r["lot_size"]), "adv": float(r["adv"]),
         "ref_price": float(r.get("ref_price", 1.0))}
-        for r in json.load(open("configs/instruments.json"))["instruments"]}
+        for r in json.load(open("configs/instruments/instruments.json"))["instruments"]}
 frames = load_features("data/features")
 models = load_params_file("configs/strategies/alpha_params.json")
 
-bt = Backtester(CostModel.load("configs/execution.json"), meta, BacktestConfig())
+bt = Backtester(CostModel.load("configs/execution/execution.json"), meta, BacktestConfig())
 m = models["EQ01"]
 scores = m.score({i: frames[i] for i in m.universe(list(frames))})
 res = bt.run(frames=frames, scores=scores, asset_class="EQUITY")
@@ -462,7 +474,7 @@ curl -s localhost:8080/metrics | grep '^risk_kill_switch_engaged'   # 1
 tail -1 java/out/state/admin_audit.jsonl                            # audited
 ```
 
-The port comes from `configs/execution.json` `monitoring.port` (default
+The port comes from `configs/execution/execution.json` `monitoring.port` (default
 8080 — the Grafana/Prometheus contract; `deployment/prometheus/` scrapes it
 in the docker-compose stack). The session report lands in
 `java/out/paper_session_report.json`. Full ops procedure:
@@ -483,19 +495,22 @@ Methodology matters more than the numbers (spec §22): the committed
 `benchmarks/results_cpp.md` states hardware (2-CPU Xeon container, no
 pinning), compiler, flags, workload and the mean-only caveat next to every
 figure (`benchmarks/RESULTS.md` is the cross-language index). Reference
-points from the committed run: IAP1 decode 174.4 ns/event, book update
-25.7 ns, replay 28.1M events/s, feature engine ~530 ns/event, alpha scoring
-38.5 ns/row. The table now also carries a **cold** reference — one single
-pass over a full generated session — next to the hot rows, because every
-hot figure is cache-resident by construction (see the caveat in
-`results_cpp.md`, which `bench_all` emits itself so a regeneration cannot
-drop it).
+points from the committed run (regenerated 2026-09-19): IAP1 decode
+184.1 ns/event, book update 26.4 ns, replay 27.2M events/s, feature engine
+514.1 ns/event, alpha scoring 33.6 ns/row; serialising one 5.6 KB decision
+trace 31.7 µs/trace (+ 30.3 µs to hash), off the event loop. The table also
+carries a **cold** reference — one single pass over a full generated session
+— next to the hot rows, because every hot figure is cache-resident by
+construction (see the caveat in `results_cpp.md`, which `bench_all` emits
+itself so a regeneration cannot drop it), and a trace-path table.
 
-The decode figure moved from 3.5 to 174.4 ns/event in round 3 and that is
+The decode figure moved from 3.5 to ~180 ns/event in round 3 and that is
 not a regression to fix: IAP1 v2 added a mandatory CRC-32 integrity
 trailer, and a byte-at-a-time table CRC over the 144 KB body costs
-~5 cycles/byte. Paying ~170 ns/event to detect a corrupted capture is the
-right trade; quoting the pre-CRC number afterwards was not.
+~5 cycles/byte. Paying ~180 ns/event to detect a corrupted capture is the
+right trade; quoting the pre-CRC number afterwards was not. Every document
+that quotes the table is checked against it by
+`tests/harness/check_headline_numbers.py`.
 
 ## 14. Verify cross-language parity in one command
 
@@ -505,10 +520,12 @@ bash tests/harness/run_all.sh --golden-only   # golden groups only (fast)
 ```
 
 Exit code 0 iff every language passed; logs land in a temp dir printed on
-the first line. A full-suite run: python 626 / cpp 243 /
-rust 254 / java 448 tests passed (golden groups 65/45/47/85), plus a
-`deployment` row (17 structural checks) and a `numbers` row (every headline
-figure re-derived from its artefact), all PASS.
+the first line. A full-suite run (2026-09-20): python 1360 / cpp 266 /
+rust 298 / java 475 tests passed (golden groups 164/67/62/102), plus
+`integration` (15) and `replay` (4) rows for the repo-level pytest suites, a
+`deployment` row (16 structural checks passed, 2 skipped for absent tools)
+and a `numbers` row (every headline figure re-derived from its artefact),
+all PASS.
 
 ## 15. Generate the TCA report
 
@@ -634,7 +651,7 @@ Replay the bundled 2-session data as a deployment of 10 alphas (the 6
 golden alphas + the 4 best remaining by walk-forward OOS IC) under four
 refit policies — static, scheduled weekly, scheduled daily,
 drift-triggered — with PSI/rolling-IC drift monitoring and the pinned
-IC-gated lifecycle (`configs/strategies.json` `adaptive`):
+IC-gated lifecycle (`configs/strategies/strategies.json` `adaptive`):
 
 ```bash
 PYTHONPATH=python/src python3 research/adaptive_reports/run_adaptive.py
@@ -684,7 +701,7 @@ confident signals) against `research/baselines/signal_eq01.json` — the
 Java-parity baseline; `alpha_rolling_ic` is the mean of event-time bucket
 ICs over the trailing window, matured (lookahead-free) rows only;
 `alpha_lifecycle_state` encodes 0 ACTIVE / 1 WATCH / 2 RETIRED, driven by
-the pinned IC hysteresis of `configs/strategies.json` `adaptive.lifecycle`.
+the pinned IC hysteresis of `configs/strategies/strategies.json` `adaptive.lifecycle`.
 Early in the session the drift and IC gauges are absent rather than zero —
 until the PSI window fills, or with fewer than `min_ic_buckets` (4)
 buckets, the monitors report no value, which is itself pinned behavior
@@ -693,3 +710,256 @@ buckets, the monitors report no value, which is itself pinned behavior
 Trading & Risk Grafana dashboard plots all three. Monitoring is
 observational only — it never alters a trading decision mid-session, so
 the summary line stays bit-for-bit reproducible (recipe 12).
+
+## 20. Build the platform store and query it
+
+The store (`schemas/sql/iap_v1.sql`, [docs/DATA_MODEL.md](docs/DATA_MODEL.md))
+is a derived, rebuildable SQLite index over the research artefacts and the
+decision traces; the JSON / JSONL / Parquet files stay the source of truth.
+Building it takes about a second and prints one row per table:
+
+```bash
+cd python
+PYTHONPATH=src python3 -m iap.store build            # -> data/store/iap.sqlite (git-ignored)
+# table                  rows
+# alpha_signals             0
+# alphas                   24
+# drift_baselines          36
+# experiment_results       29
+# experiments              29
+# instruments              19
+# ledger_entries           70
+# lifecycle_transitions   284
+# model_runs               33
+# tca_orders               36
+# venues                    5
+# ...
+```
+
+Every importer is idempotent — run `build` again and the counts do not
+move — and total over its input: a record it cannot map (a NaN metric, a
+malformed line, an absent optional artefact) is a warning on stderr, never
+a crash. Query with `sql` (one canonical JSON line per row; add `ORDER BY`
+for deterministic output) or with the views:
+
+```bash
+PYTHONPATH=src python3 -m iap.store sql "SELECT alpha_id, current_state, verdict, ROUND(ic,4) AS ic, ledger_count FROM v_alpha_scorecard ORDER BY alpha_id"
+# {"alpha_id":"EQ01","current_state":"CANDIDATE","ic":0.0241,"ledger_count":46,"verdict":"ITERATE"}
+PYTHONPATH=src python3 -m iap.store sql "SELECT COUNT(*) AS distinct_experiments, SUM(count) AS total_experiments FROM ledger_entries"
+# {"distinct_experiments":70,"total_experiments":865}      -- the Bonferroni denominator
+```
+
+From Python the same store is `iap.store.Store` (`open`, `init`,
+`insert_<type>` for every contract, `fetch(T, **where)`, `query`,
+`export_jsonl`); `Store.export_jsonl(table, path)` writes canonical lines in
+primary-key order, so two builds from the same files are byte-identical.
+The DDL runs unchanged on PostgreSQL ≥ 13 (`psql -f schemas/sql/iap_v1.sql`).
+
+## 21. Explain an order (the decision trace)
+
+Every decision the loop makes is a `DecisionTrace` (signal → portfolio →
+risk → parent order → child orders → routing → fills → TCA → attribution),
+built with `iap.trace.TraceBuilder` and emitted to sinks. Write one to a
+JSONL file and to the store, then ask why the order happened:
+
+```bash
+cd python && mkdir -p ../data/store
+PYTHONPATH=src python3 - <<'PY'
+from iap.contracts.examples import example_trace          # the pinned golden decision
+from iap.store import Store
+from iap.trace import JsonlTraceSink, MultiSink, StoreTraceSink, explain_jsonl
+store = Store.open("../data/store/iap.sqlite"); store.init()
+with MultiSink(JsonlTraceSink("../data/store/traces.jsonl"), StoreTraceSink(store)) as sink:
+    sink.emit(example_trace())
+    print("digest", sink.sinks[0].digest.hexdigest())       # replay-determinism digest
+print(explain_jsonl("../data/store/traces.jsonl", 12345, {1: "XV1", 2: "XV2", 3: "XV3"}))
+PY
+PYTHONPATH=src python3 -m iap.store explain 12345         # venue names from the venues table
+# Order 12345
+# Alpha:      EQ03  expected return = +4.2 bps  confidence = 0.81
+# Portfolio:  target = +20,000 shares
+# Risk:       ALLOW
+# Execution:  POV 15%
+# SOR:        XV1 = 45%  XV2 = 35%  3 = 20%
+# Fills:      18,000 / 20,000 (90.0%)
+# TCA:        IS = 2.1 bps
+# Attribution: alpha = +6.2 bps  spread = -0.8 bps  impact = -2.1 bps  fees = -0.4 bps
+```
+
+(The store names venues from `configs/venues/venues.json`, which has XV1 and
+XV2; the golden example's third venue renders as its id.) A rejected order
+renders its rule: `Risk: REJECT  rule = FAT_FINGER_NOTIONAL  reason = …`,
+and the same chain is one row of `v_order_chain`:
+
+```bash
+PYTHONPATH=src python3 -m iap.store sql "SELECT parent_order_id, alpha_id, risk_decision, risk_rule_id, n_child_orders, filled_qty, implementation_shortfall_bps, attribution_total_bps FROM v_order_chain ORDER BY parent_order_id"
+# {"alpha_id":"EQ03","attribution_total_bps":2.7,"filled_qty":18000,"implementation_shortfall_bps":2.1,"n_child_orders":3,"parent_order_id":12345,"risk_decision":1,"risk_rule_id":""}
+```
+
+The digest printed above is `sha256` over `canonical_json(trace) + "\n"`
+per emitted trace: replaying the same session with the same seed reproduces
+it, and `TraceDigest.of_jsonl(path)` recomputes it from the file
+(`bf60a300d151c9…` for the one-trace stream of the golden example).
+
+## 22. Run the MVP loop (one command, one instrument, fully traced)
+
+The MVP (`python -m iap.mvp`, [docs/MVP.md](docs/MVP.md)) runs the whole
+loop — seeded market data → books → features → EQ01/EQ03/EQ06 ensemble →
+portfolio → hard risk → TWAP/POV/IS → SOR over XV1/XV2/XV3 → execution
+simulator → TCA → attribution → decision trace → SQLite → report — on the
+synthetic equity `SYN.EQ.AAPL` and writes every artefact under
+`data/mvp/<run_id>/` (git-ignored). About 7 seconds:
+
+```bash
+cd python
+PYTHONPATH=src python3 -m iap.mvp run                       # configs/mvp/mvp.json, seed 12345
+# mvp run 58a10f2194a3c81c: events=16578 decisions=355 parents=66 children=105 fills=55 pnl=-22.676287 USD digest=059c30df7213d00e... out=.../data/mvp/58a10f2194a3c81c
+PYTHONPATH=src python3 -m iap.mvp run --seed 7 --out /tmp/mvp7          # another seed, explicit directory
+PYTHONPATH=src python3 -m iap.mvp verify                                  # run twice from scratch, compare digest/report/stream
+cat ../data/mvp/58a10f2194a3c81c/report.md                                # the honest numbers (cost-negative)
+```
+
+`report.json` (canonical, sorted keys) carries the versions
+(`config_version` over every config document in force, `data_version` =
+sha256 of the captured stream, `feature_version`, `model_version`), counts,
+risk decisions by rule, routing shares, control counters, the §12.1 P&L
+identity, per-alpha realized IC (the research label definition —
+`iap.labels.compute_labels` on the same stream — mid-to-mid and
+cost-adjusted, with the shift-by-one IC, at the 1 s holding horizon and at
+the alpha's fitted horizon next to the registry's research IC), TCA
+aggregates and the trace digest; `paper_evidence.json` is the
+`PaperEvidence` the lifecycle's PAPER → ACTIVE gates read (the registry
+itself is not touched). The golden `tests/golden/expected_mvp.json` pins
+the run above. Outside the checkout (the Python image bakes `configs/` and
+`research/alpha_registry.json` under `/app`) add `--repo-root /app` to
+`run` / `replay` / `verify`.
+
+## 23. Replay an incident from the captured stream
+
+Every run captures its input (`events.jsonl` + IAP1 twin + `feed.json`) and
+its configuration (`config.json`). `replay` re-runs the loop from that
+capture — never from the generator — and asserts that the trace digest, the
+report and the stream sha256 reproduce (exit 1 with a line-per-difference
+diff otherwise; a reference document that changed since the run is
+reported as a `config_version` mismatch before anything runs):
+
+```bash
+cd python
+PYTHONPATH=src python3 -m iap.mvp replay --run ../data/mvp/58a10f2194a3c81c      # -> <run>/replay/
+# replay OK: ../data/mvp/58a10f2194a3c81c reproduces its trace digest and report
+```
+
+Capture → replay → reproduce (`explain`, recipe 24; `risk_audit.jsonl`;
+`traces.jsonl`) → debug (drive `iap.mvp.engine.MvpEngine` over
+`iap.mvp.feed.load_feed(run_dir)` event by event) → fix → regression test
+(a captured stream + its expected digest, the pattern of
+`python/tests/test_mvp_golden.py`) is the incident flow of docs/MVP.md §6.
+
+## 24. Explain an MVP order
+
+The run's SQLite store holds every decision trace decomposed
+(`decision_traces`, `alpha_signals`, `portfolio_targets`, `risk_decisions`,
+`parent_orders`, `child_orders`, `venue_decisions`, `executions`,
+`tca_results`, `attribution`) plus the MVP reference data, so `explain`
+renders the chain with venue names:
+
+```bash
+cd python
+PYTHONPATH=src python3 -m iap.mvp explain --run ../data/mvp/58a10f2194a3c81c 5
+# Order 5
+# Alpha:      EQ01-EQ03-EQ06  expected return = +0.0 bps  confidence = 0.20
+# Alpha:      EQ01  expected return = +0.0 bps  confidence = 0.03
+# Alpha:      EQ03  expected return = +0.0 bps  confidence = 0.57
+# Alpha:      EQ06  expected return = +0.0 bps  confidence = 0.00
+# Portfolio:  target = +340 shares
+# Risk:       ALLOW
+# Execution:  POV 5%
+# SOR:        XV2 = 25%  XV3 = 75%
+# Fills:      10 / 250 (4.0%)
+# TCA:        IS = 0.0 bps
+# Attribution: alpha = +0.0 bps  spread = -0.0 bps  impact = +0.0 bps  fees = -0.0 bps
+PYTHONPATH=src python3 -m iap.store sql --db ../data/mvp/58a10f2194a3c81c/iap.sqlite \
+  "SELECT parent_order_id, alpha_id, signal_model_version, risk_rule_id, n_child_orders, filled_qty, implementation_shortfall_bps FROM v_order_chain ORDER BY parent_order_id LIMIT 3"
+```
+
+The first `Alpha:` line is the ACTING signal — the ensemble the portfolio
+sized on, `signal[0]` of the trace, the row `v_order_chain` joins
+(`signal_model_version = EQ01-EQ03-EQ06`) — labelled with the order's
+`alpha_id`; the next three are its components (EQ01, EQ03, EQ06 in
+ensemble order), each labelled by its own `model_version`. Expected
+returns of a fitted alpha are hundredths of a basis point, which the
+pinned one-decimal renderer shows as `+0.0 bps` — read `traces.jsonl` /
+`alpha_signals` for the exact values.
+
+## 25. Bootstrap and inspect the alpha promotion lifecycle
+
+The seven-state machine ([docs/LIFECYCLE.md](docs/LIFECYCLE.md)) reads the
+24 alpha reports, the ledger and `alpha_params.json`, registers every alpha
+at RESEARCH at the pinned bootstrap event time (the latest fold `test_end`)
+and advances it until it stops moving. On the bundled data that is one
+step: every alpha reaches CANDIDATE and holds there on
+`net_pnl_after_costs`.
+
+```bash
+cd python
+PYTHONPATH=src python3 -m iap.lifecycle bootstrap --dry-run      # compute, print, touch nothing
+PYTHONPATH=src python3 -m iap.lifecycle bootstrap --force        # rewrite research/alpha_registry.json + lifecycle_transitions.jsonl (identical bytes on an identical rerun);
+                                                                  # without --force a non-empty transition log (an append-only audit with any HUMAN retire/reset lines) is refused, exit 3
+PYTHONPATH=src python3 -m iap.lifecycle status
+# alpha | state | since_ts | failed gates
+# ----- | ----- | -------- | ------------
+# EQ01 | CANDIDATE | 1787691480577291027 | net_pnl_after_costs
+# EQ04 | CANDIDATE | 1787691480577291027 | oos_ic, statistical_significance, fold_consistency, net_pnl_after_costs
+# FX09 | CANDIDATE | 1787691480577291027 | oos_ic, statistical_significance, hypothesis_sign, net_pnl_after_costs, stability
+# ...  (24 rows, all CANDIDATE)
+PYTHONPATH=src python3 -m iap.lifecycle retire FX09 --reason "desk decision: rationale contradicted by the fitted sign"   # HUMAN edge -> RETIRED
+PYTHONPATH=src python3 -m iap.lifecycle reset FX09 --reason "re-run the evidence chain after the refit"                # HUMAN edge RETIRED -> RESEARCH
+git checkout -- ../research/alpha_registry.json ../research/lifecycle_transitions.jsonl                                 # the committed state is the bundled result
+```
+
+Every transition is one canonical-JSON `LifecycleTransition` line in
+`research/lifecycle_transitions.jsonl` (gates, policy `lifecycle_v1`,
+actor, reason); the registry records each alpha's last evaluation with its
+`failed_gates`. A manual `retire` / `reset` needs a non-empty reason and is
+HUMAN-only; a SYSTEM `advance` on a RETIRED alpha records `TERMINAL` and
+moves nothing. Thresholds live in `configs/strategies/lifecycle.json`
+(promotion) and `configs/strategies/strategies.json` `adaptive.lifecycle`
+(live); the golden `tests/golden/expected_lifecycle.json` scripts three
+whole lives that Python, Java and Rust reproduce step by step
+(`PYTHONPATH=src python3 -m pytest -q tests/test_lifecycle_golden.py`).
+Changing a threshold is a `lifecycle.json` x-version bump + `python3
+tools/make_golden_lifecycle.py --force` + a MIGRATIONS entry, never an edit
+of the registry by hand (GOVERNANCE.md §1). The MVP's `paper_evidence.json`
+(recipe 22) is the `PaperEvidence` document the PAPER → ACTIVE gates read.
+
+## 26. Run one alpha as a contract-driven experiment
+
+`iap.research` ([research/experiments/README.md](research/experiments/README.md),
+LEARN.md §6.8) turns "run EQ03 at 1 s" into a typed `ExperimentSpec` whose
+id is the hash of the request, runs the same purged / embargoed walk-forward
+the promotion report runs plus a holdout backtest, writes a typed
+`ExperimentResult`, and enters the run in the multiple-testing ledger:
+
+```bash
+cd python
+PYTHONPATH=src python3 -m iap.research run --alpha EQ03 --horizon 1s               # spec block, result table, VERDICT, the ledger note
+PYTHONPATH=src python3 -m iap.research run --alpha EQ03 --horizon 1s --dry-run     # compute without touching the ledger or disk
+PYTHONPATH=src python3 -m iap.research run --alpha EQ06 --config n_folds=3 --config cost_multiplier=2.0   # a different configuration = a different id
+PYTHONPATH=src python3 -m iap.research list                                        # every research/experiments/<id>/ with alpha, horizon, verdict
+PYTHONPATH=src python3 -m iap.research show d7b554d0a3fa3b26                       # the spec and result documents
+```
+
+Where the files land: `research/experiments/<id>/{spec.json,result.json}`,
+sorted keys, 2-space indent, no wall clock — an identical rerun is
+byte-identical (only `git_commit` and `n_experiments_in_ledger` are
+provenance and may legitimately move), and a rerun that reproduces
+*different* evidence under the same id is refused, not overwritten. An empty
+configuration reproduces the flagship report's protocol: the pinned-horizon
+result (EQ03 @ 5 s, `217fa0cb1d89a9c8`) equals
+`research/alpha_reports/EQ03.json` at 1e-9. Every run adds 21 looks to
+`research/experiments.json`, which is why the five committed experiments
+moved the denominator from 760 to 865 (`check_headline_numbers.py` reports
+the docs stale until they follow). The golden
+`tests/golden/expected_experiment_golden_frame.json` pins one spec / result
+pair over the golden equity vector.
+

@@ -23,7 +23,7 @@ Pinned decision rules (mirrored in /API_ADAPTIVE.md):
   A PSI of None (window too thin) or an ic_z of None (too few matured
   buckets) can never trigger — monitors without data are silent.
 
-Thresholds are pinned in ``configs/strategies.json`` under the
+Thresholds are pinned in ``configs/strategies/strategies.json`` under the
 ``adaptive`` block; :func:`load_adaptive_config` validates it.
 """
 
@@ -158,7 +158,7 @@ class DriftTriggeredPolicy(RefitPolicy):
 
 
 # ---------------------------------------------------------------------------
-# adaptive config (configs/strategies.json "adaptive" block)
+# adaptive config (configs/strategies/strategies.json "adaptive" block)
 # ---------------------------------------------------------------------------
 
 _REQ_INT_FIELDS = (
@@ -226,7 +226,7 @@ def validate_adaptive_config(block: dict) -> dict:
 
 
 def load_adaptive_config(strategies_json_path) -> dict:
-    """Load + validate the ``adaptive`` block of configs/strategies.json."""
+    """Load + validate the ``adaptive`` block of configs/strategies/strategies.json."""
     blob = json.loads(Path(strategies_json_path).read_text())
     if "adaptive" not in blob:
         raise ValueError(f"{strategies_json_path}: no 'adaptive' block")

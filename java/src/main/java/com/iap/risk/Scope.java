@@ -1,6 +1,6 @@
 package com.iap.risk;
 
-/** Decision scope (schemas/risk_event.schema.json enum). */
+/** Decision scope (schemas/risk/risk_event.schema.json enum). */
 public enum Scope {
     /** Whole-firm scope ({@code scope_id} is ""). */
     GLOBAL,

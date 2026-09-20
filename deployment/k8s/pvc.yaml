@@ -1,6 +1,6 @@
 # Shared market-data volume: written by the daily data-pipeline CronJob,
 # read by replay/backtest workloads. Generated data is reproducible from the
-# pinned seed (configs/generator.json), so the PVC is cheap to rebuild —
+# pinned seed (configs/marketdata/generator.json), so the PVC is cheap to rebuild —
 # raw IMMUTABILITY is a pipeline property (files are never rewritten in
 # place), not a storage-class property.
 apiVersion: v1

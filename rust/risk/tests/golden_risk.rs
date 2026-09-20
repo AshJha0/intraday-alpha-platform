@@ -2,7 +2,7 @@
 //! byte-exact audit golden (`expected_risk_audit.jsonl`) and the snapshot
 //! golden (`expected_risk_snapshot.json`).
 //!
-//! The engine is built from `configs/risk.json` and driven through the
+//! The engine is built from `configs/risk/risk.json` and driven through the
 //! pinned step script; every order step's decision, deciding rule and
 //! severity must match exactly, the pinned notification events must appear
 //! in order, the audit log must be byte-identical to the golden file, and

@@ -10,7 +10,7 @@ Markets shift; models decay.  This package makes evolution a first-class,
   /API_ADAPTIVE.md — the cross-language contract).
 - ``refit``     — refit policies as objects: StaticPolicy,
   ScheduledPolicy, DriftTriggeredPolicy (pinned thresholds from
-  configs/strategies.json ``adaptive`` block).
+  configs/strategies/strategies.json ``adaptive`` block).
 - ``lifecycle`` — ACTIVE -> WATCH -> RETIRED state machine with a pinned
   re-activation rule; every transition logged to
   research/lifecycle_log.jsonl.

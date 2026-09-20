@@ -1,5 +1,5 @@
 //! RiskEvent — the auditable decision record
-//! (`schemas/risk_event.schema.json`, exact field set and enum codes).
+//! (`schemas/risk/risk_event.schema.json`, exact field set and enum codes).
 
 use marketdata::IapError;
 use serde::{Deserialize, Serialize};

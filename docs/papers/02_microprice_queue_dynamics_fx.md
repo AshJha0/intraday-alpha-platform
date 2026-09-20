@@ -83,7 +83,7 @@ shift-by-one leakage test, cost stress {0.5, 1, 2}x, latency stress
 {+0, +1, +5} events, and a volatility-regime IC split
 (`python/src/iap/validation/stress.py`). The FX cost model charges spread +
 2.5-per-million commission + linear impact
-(`configs/execution.json`). Signal definitions
+(`configs/execution/execution.json`). Signal definitions
 (`python/src/iap/alpha/fx.py`):
 
 - **FX01** (`fx_quote_imbalance`): `micro_mid_dev_bps_v1` on the
@@ -277,7 +277,7 @@ refusing promotion unless all three hold (spec §13, §20, §32).
   quoted in JPY the FX totals were JPY-dominated and wrong in *scale*
   (not in sign). The Python backtester now converts each instrument's P&L
   increment to USD at the prevailing mid of the configured conversion pair
-  before aggregating (`configs/risk.json` `currency.conversion`,
+  before aggregating (`configs/risk/risk.json` `currency.conversion`,
   `PLATFORM_CONVENTIONS.md` §11.6, `API_PORTFOLIO_TCA.md` §4) and fails
   closed when no rate prevails; capital for the day-2 backtest is likewise
   converted (`research/alpha_reports/run_all.py`).
@@ -393,3 +393,20 @@ withdrawn.
    alpha is promotable, both lose money at every cost multiplier, and the
    reason FX09 ever looked strong is the stale-LP crossed-book artefact
    documented in item 1 of the round-3 erratum.
+
+## Erratum / Update — 2026-09-20 (ledger denominator)
+
+The multiple-testing ledger `research/experiments.json` moved on 2026-09-19
+when the contract-driven `ExperimentRunner` (`python -m iap.research run`,
+`research/experiments/<id>/`) registered five new experiments — EQ01 @ 1 s,
+EQ03 @ 1 s and @ 5 s, EQ06 @ 1 s and @ 10 s, 21 looks each, kind
+`experiment_runner`, deliberately **not** de-duplicated against the
+`promotion_pipeline` entries even where the computation coincides, so the
+denominator only grows. The 2026-09-06 erratum's **760 looks over 65 distinct
+configurations (Bonferroni per-test |t| 3.99, expected max |t| under the global
+null 3.64)** are superseded by **865 looks over 70 distinct configurations:
+Bonferroni per-test |t| ≥ 4.02 (p ≤ 5.78e-05), expected max |t| ≈ 3.68**.
+No verdict, IC, t-statistic or P&L figure in this paper changes; the five
+new experiments are all ITERATE and net-negative at 1× costs, like every
+alpha before them. The analysis above is left as written and the research
+reports quote the ledger at their own render time (`ledger_n_at_report`).

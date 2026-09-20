@@ -1,4 +1,4 @@
-"""Reference-data service tests (configs/instruments.json, venues.json)."""
+"""Reference-data service tests (configs/instruments/instruments.json, venues.json)."""
 
 import pytest
 

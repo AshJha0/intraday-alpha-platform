@@ -14,13 +14,13 @@ import com.iap.adaptive.LifecycleGauge.State;
 
 /**
  * Lifecycle state machine — the Java mirror of the pinned Python tracker
- * (iap.adaptive.lifecycle, configs/strategies.json adaptive.lifecycle):
+ * (iap.adaptive.lifecycle, configs/strategies/strategies.json adaptive.lifecycle):
  * strict {@code <} breach at watch_ic_gate, inclusive {@code >=} recovery
  * at reactivate_ic_gate, consecutive-eval retirement/reactivation with
  * hysteresis, NaN = no evidence = no movement.
  */
 public class LifecycleGaugeTest {
-    /** The pinned production gates (configs/strategies.json). */
+    /** The pinned production gates (configs/strategies/strategies.json). */
     private static LifecycleGauge pinned() {
         return new LifecycleGauge(0.0, 0.005, 6, 3);
     }
@@ -104,8 +104,8 @@ public class LifecycleGaugeTest {
     @Test
     public void gatesLoadFromThePinnedStrategiesConfig() {
         LifecycleGauge g = LifecycleGauge.fromStrategiesConfig(
-                Paths.get("..", "configs", "strategies.json"));
-        // configs/strategies.json adaptive.lifecycle: watch 0.0,
+                Paths.get("..", "configs", "strategies", "strategies.json"));
+        // configs/strategies/strategies.json adaptive.lifecycle: watch 0.0,
         // reactivate 0.005, retire after 6, reactivate after 3
         assertEquals(State.ACTIVE, g.update(0.0));
         assertEquals(State.WATCH, g.update(-1e-9));

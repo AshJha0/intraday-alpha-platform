@@ -19,7 +19,7 @@ use crate::params::AlphaParams;
 /// Pinned epsilon in the z denominator.
 pub const EPS: f64 = 1e-12;
 
-/// One scored row (schemas/alpha_signal.schema.json).
+/// One scored row (schemas/alpha/alpha_signal.schema.json).
 #[derive(Debug, Clone, PartialEq)]
 pub struct AlphaSignal {
     /// "EQ01" .. "FX12".

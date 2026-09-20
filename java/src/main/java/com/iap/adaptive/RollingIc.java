@@ -65,7 +65,7 @@ public final class RollingIc {
     /**
      * @param horizonNs alpha horizon (label maturity)
      * @param windowNs rolling evaluation window
-     *     (configs/strategies.json adaptive.ic_window_ns)
+     *     (configs/strategies/strategies.json adaptive.ic_window_ns)
      * @param bucketNs event-time IC bucket (adaptive.ic_bucket_ns)
      * @param minBuckets minimum live buckets (adaptive.min_ic_buckets)
      */

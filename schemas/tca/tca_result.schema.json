@@ -1,0 +1,205 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iap.example/schemas/tca/tca_result.schema.json",
+  "title": "TCAResult",
+  "description": "Per-parent-order TCA record (API_PORTFOLIO_TCA.md section 2). Prices in ticks; costs positive when execution was worse than the benchmark. Identities: implementation_shortfall_bps = delay + trading + opportunity; trading = spread + impact + timing. venue_contribution_bps keyed by decimal venue id.",
+  "x-version": 1,
+  "type": "object",
+  "properties": {
+    "parent_order_id": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "instrument_id": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "side": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "BID=0 (buy) ASK=1 (sell).",
+      "enum": [
+        0,
+        1
+      ]
+    },
+    "qty": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9223372036854775807,
+      "description": "Target quantity, base units."
+    },
+    "filled_qty": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9223372036854775807,
+      "description": "Filled quantity, <= qty."
+    },
+    "fill_rate": {
+      "type": "number",
+      "description": "filled_qty / qty.",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "arrival_price_ticks": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9223372036854775807,
+      "description": "Arrival mid in ticks."
+    },
+    "avg_fill_price": {
+      "type": "number",
+      "description": "Fill VWAP in ticks (0 when unfilled).",
+      "minimum": 0
+    },
+    "interval_vwap": {
+      "type": "number",
+      "description": "Market VWAP over [arrival_ts, end_ts] in ticks (0 when undefined).",
+      "minimum": 0
+    },
+    "interval_twap": {
+      "type": "number",
+      "description": "Time-weighted mid over [arrival_ts, end_ts) in ticks.",
+      "minimum": 0
+    },
+    "implementation_shortfall_bps": {
+      "type": "number",
+      "description": "Perold total IS in bps of decision notional."
+    },
+    "delay_cost_bps": {
+      "type": "number"
+    },
+    "trading_cost_bps": {
+      "type": "number"
+    },
+    "opportunity_cost_bps": {
+      "type": "number"
+    },
+    "spread_cost_bps": {
+      "type": "number"
+    },
+    "impact_bps": {
+      "type": "number"
+    },
+    "fees_bps": {
+      "type": "number",
+      "description": "Signed fees in bps of filled notional (negative = net rebate)."
+    },
+    "timing_cost_bps": {
+      "type": "number"
+    },
+    "slippage_bps": {
+      "type": "number",
+      "description": "Arrival slippage of the fill VWAP in bps."
+    },
+    "participation_rate": {
+      "type": "number",
+      "description": "filled_qty / market volume over the window.",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "n_fills": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "venue_contribution_bps": {
+      "type": "object",
+      "description": "Per-venue contribution to trading cost, bps, keyed by decimal venue id.",
+      "propertyNames": {
+        "pattern": "^(0|[1-9][0-9]*)$"
+      },
+      "additionalProperties": {
+        "type": "number"
+      }
+    },
+    "algo": {
+      "type": "string",
+      "description": "Execution algorithm.",
+      "enum": [
+        "TWAP",
+        "VWAP",
+        "POV",
+        "IS"
+      ]
+    },
+    "latency_ns": {
+      "$ref": "#/$defs/LatencyStats"
+    }
+  },
+  "required": [
+    "parent_order_id",
+    "instrument_id",
+    "side",
+    "qty",
+    "filled_qty",
+    "fill_rate",
+    "arrival_price_ticks",
+    "avg_fill_price",
+    "interval_vwap",
+    "interval_twap",
+    "implementation_shortfall_bps",
+    "delay_cost_bps",
+    "trading_cost_bps",
+    "opportunity_cost_bps",
+    "spread_cost_bps",
+    "impact_bps",
+    "fees_bps",
+    "timing_cost_bps",
+    "slippage_bps",
+    "participation_rate",
+    "n_fills",
+    "venue_contribution_bps",
+    "algo",
+    "latency_ns"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "LatencyStats": {
+      "description": "Submit-to-acknowledge latency statistics over the children.",
+      "type": "object",
+      "properties": {
+        "min": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807,
+          "description": "ns"
+        },
+        "mean": {
+          "type": "number",
+          "description": "ns",
+          "minimum": 0
+        },
+        "max": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807,
+          "description": "ns"
+        },
+        "p50": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807,
+          "description": "ns, nearest-rank."
+        },
+        "p99": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807,
+          "description": "ns, nearest-rank."
+        }
+      },
+      "required": [
+        "min",
+        "mean",
+        "max",
+        "p50",
+        "p99"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

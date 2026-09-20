@@ -1,0 +1,84 @@
+{
+  "x-version": 1,
+  "description": "Tiny MVP configuration for the unit / replay / integration tests (python -m iap.mvp --config configs/mvp/mvp_tiny.json): identical to mvp.json except an 8-minute session and configs/mvp/generator_tiny.json (fewer flow slots), so a full run takes about two seconds. Not a golden; the golden session is mvp.json.",
+  "seed": 12345,
+  "instrument": "SYN.EQ.AAPL",
+  "strategy_id": "MVP",
+  "venues": [
+    "XV1",
+    "XV2",
+    "XV3"
+  ],
+  "alphas": [
+    "EQ01",
+    "EQ03",
+    "EQ06"
+  ],
+  "horizon_ns": 1000000000,
+  "decision_cadence_ns": 1000000000,
+  "session": {
+    "trading_day": "2026-08-24",
+    "timezone": "UTC",
+    "open": "13:30:00",
+    "close": "13:38:00"
+  },
+  "portfolio": {
+    "risk_aversion": 6.0,
+    "tc_bps": 0.001,
+    "max_position_qty": 500,
+    "max_notional": 1000000.0,
+    "turnover_cap": 0.5,
+    "vol_target_per_bar": 0.0005,
+    "ewma_lambda": 0.94,
+    "min_bars": 2,
+    "conf_min": 0.1,
+    "solver": {
+      "iters": 100,
+      "proj_passes": 4,
+      "step_decay": 0.01,
+      "feas_tol": 1e-07
+    }
+  },
+  "execution": {
+    "parent_window_ns": 1000000000,
+    "urgency_bands": [
+      {
+        "max_urgency": 0.2,
+        "algo": "TWAP"
+      },
+      {
+        "max_urgency": 0.35,
+        "algo": "POV"
+      },
+      {
+        "max_urgency": 1.0,
+        "algo": "IS"
+      }
+    ],
+    "twap_slices": 2,
+    "is_slices": 2,
+    "is_risk_aversion": 1.0,
+    "pov_participation": 0.05,
+    "latency": {
+      "decision_ns": 50000,
+      "risk_ns": 50000,
+      "wire_ns": 100000
+    }
+  },
+  "sor": {
+    "prefer_rebate": true,
+    "max_venue_latency_ns": 1000000
+  },
+  "reference": {
+    "instruments": "configs/mvp/instruments.json",
+    "venues": "configs/mvp/venues.json",
+    "generator": "configs/mvp/generator_tiny.json",
+    "risk": "configs/risk/risk.json",
+    "execution": "configs/execution/execution.json",
+    "alpha_params": "configs/strategies/alpha_params.json",
+    "alpha_registry": "research/alpha_registry.json"
+  },
+  "notes": [
+    "tiny test configuration: see configs/mvp/mvp.json for the documented choices; only session.close and reference.generator differ."
+  ]
+}

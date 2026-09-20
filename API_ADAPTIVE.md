@@ -18,7 +18,7 @@ files and reproduce the applicable parts of
 
 Normative companions: `PLATFORM_CONVENTIONS.md` §3/§7, `/API_ALPHA.md`
 (the scoring semantics that produce the monitored signal),
-`configs/strategies.json` `adaptive` block (every pinned threshold),
+`configs/strategies/strategies.json` `adaptive` block (every pinned threshold),
 `python/tools/make_golden_adaptive.py` (golden generation, brute-force
 validated before writing).
 
@@ -97,7 +97,7 @@ capture the baseline from those values.  Parity targets in
 
 A live PSI monitor uses the SAME window as research: `monitor_window_ns`
 (1 h) of **event time** with at least `min_psi_samples` (200) samples, from
-`configs/strategies.json`.  A fixed ring of N signals is not the pinned
+`configs/strategies/strategies.json`.  A fixed ring of N signals is not the pinned
 statistic — 256 signals is ~13 minutes on an equity stream and hours on a
 sparse FX one, so the live gauge and the research number were never
 comparable.  Feed the signal's `exchange_ts`
@@ -180,7 +180,7 @@ the signal rows and the rolling IC at 5 pinned evaluation times (EQ01 on
 the golden EQ frame); every port that implements the gauge reproduces them
 at 1e-10.
 
-## 5. Refit policies (configs/strategies.json `adaptive.policies`)
+## 5. Refit policies (configs/strategies/strategies.json `adaptive.policies`)
 
 All decisions are pure functions of `(now_ns, last_fit_ns, PSI values,
 ic_z)` — no wall-clock, no RNG.  `null` monitor values never trigger.
@@ -200,7 +200,7 @@ A refit sets `last_fit_ns = now_ns`.  Golden decision sequence (with
 edge-exact threshold inputs): `expected_adaptive.json` →
 `"drift_trigger"` — exact booleans.
 
-## 6. Lifecycle (configs/strategies.json `adaptive.lifecycle`)
+## 6. Lifecycle (configs/strategies/strategies.json `adaptive.lifecycle`)
 
 States: `ACTIVE -> WATCH -> RETIRED`, evaluated once per adaptive block
 on the rolling OOS IC (section 4's `mean(live bucket ICs)`;
@@ -244,6 +244,35 @@ Every transition appends one sorted-key JSON line to
 Golden state sequence (breach, neutral-zone reset, retirement, recovery,
 re-activation, relapse): `expected_adaptive.json` → `"lifecycle"` —
 exact states and transitions.
+
+**Promotion lifecycle (pointer).** The ACTIVE/WATCH/RETIRED rules above are
+the live sub-machine of the full seven-state promotion lifecycle
+(RESEARCH → CANDIDATE → VALIDATING → PAPER → ACTIVE ⇄ WATCH → RETIRED —
+seven states, seventeen pinned edges, eighteen gates; `docs/LIFECYCLE.md`;
+Python `iap.lifecycle` (reference), Java `com.iap.lifecycle`, Rust
+`rust/lifecycle` (`LiveTracker` is an exact port of `LifecycleTracker`,
+reason strings byte-identical); policy `configs/strategies/lifecycle.json`
++ this file's `adaptive.lifecycle` block, never duplicated; golden
+`tests/golden/expected_lifecycle.json`, matched by `LifecycleGoldenTest`
+and `rust/lifecycle/tests/golden_lifecycle.rs`). The lifecycle service
+delegates the live edges to `LifecycleTracker` / `LifecycleGauge` /
+`LiveTracker` unchanged and wraps each transition into a
+`LifecycleTransition` (`gates = {"rolling_ic": GateResult(passed, value =
+rolling_ic, threshold = watch_ic_gate or reactivate_ic_gate)}`, `policy =
+lifecycle_v1`, `actor = SYSTEM`, the tracker's reason verbatim) appended to
+`research/lifecycle_transitions.jsonl`; `research/lifecycle_log.jsonl`
+remains this study's own log and never sets a state.
+`LiveEvidence.informative = false` or `rolling_ic = null` evaluates nothing
+(the flag above, taken explicitly). One difference of scope: on the
+platform RETIRED is terminal for the system (re-entry is a HUMAN reset to
+RESEARCH, which re-runs the whole evidence chain); the RETIRED → WATCH
+recovery above models shadow scoring inside one adaptive backtest and is
+never reached on the platform because the machine never constructs a
+tracker for a RETIRED alpha. Unchanged and still pinned: in the live Java
+loop the gauge is **observational** — a RETIRED alpha keeps trading at full
+size and `AlphaLifecycleRetired` pages a human (README, GOVERNANCE gate
+11; making it an allocation gate is backlog issue L04). The lifecycle
+decides state, not size.
 
 ## 7. Adaptive walk-forward backtest (reference semantics)
 

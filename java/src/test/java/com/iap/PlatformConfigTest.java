@@ -84,11 +84,11 @@ public class PlatformConfigTest {
     @Test
     public void missingAdaptiveBlockIsAnIaeNotAnNpe() throws IOException {
         Path dir = PaperFixtures.copyConfigs();
-        String doc = PaperFixtures.readConfig(dir, "strategies.json");
+        String doc = PaperFixtures.readConfig(dir, ConfigService.STRATEGIES);
         int at = doc.indexOf("\"adaptive\"");
         assertTrue("fixture has an adaptive block", at > 0);
         // drop the whole adaptive block by renaming it
-        PaperFixtures.writeConfig(dir, "strategies.json",
+        PaperFixtures.writeConfig(dir, ConfigService.STRATEGIES,
                 doc.replace("\"adaptive\"", "\"adaptive_disabled\""));
         try {
             new ConfigService(dir);
@@ -105,9 +105,9 @@ public class PlatformConfigTest {
     @Test
     public void badAdaptiveKeyNamesTheKey() throws IOException {
         Path dir = PaperFixtures.copyConfigs();
-        String doc = PaperFixtures.readConfig(dir, "strategies.json");
+        String doc = PaperFixtures.readConfig(dir, ConfigService.STRATEGIES);
         assertTrue(doc.contains("\"ic_window_ns\""));
-        PaperFixtures.writeConfig(dir, "strategies.json",
+        PaperFixtures.writeConfig(dir, ConfigService.STRATEGIES,
                 doc.replace("\"ic_window_ns\"", "\"ic_window_nanos\""));
         try {
             new ConfigService(dir);
@@ -122,9 +122,9 @@ public class PlatformConfigTest {
     @Test
     public void instrumentReferenceDataIsValidated() throws IOException {
         Path dir = PaperFixtures.copyConfigs();
-        String doc = PaperFixtures.readConfig(dir, "instruments.json");
+        String doc = PaperFixtures.readConfig(dir, ConfigService.INSTRUMENTS);
         assertTrue(doc.contains("\"lot_size\""));
-        PaperFixtures.writeConfig(dir, "instruments.json",
+        PaperFixtures.writeConfig(dir, ConfigService.INSTRUMENTS,
                 doc.replaceFirst("\"lot_size\"\\s*:\\s*[0-9.]+",
                         "\"lot_size\": 0"));
         try {
@@ -138,8 +138,8 @@ public class PlatformConfigTest {
         }
 
         Path dir2 = PaperFixtures.copyConfigs();
-        String doc2 = PaperFixtures.readConfig(dir2, "instruments.json");
-        PaperFixtures.writeConfig(dir2, "instruments.json",
+        String doc2 = PaperFixtures.readConfig(dir2, ConfigService.INSTRUMENTS);
+        PaperFixtures.writeConfig(dir2, ConfigService.INSTRUMENTS,
                 doc2.replaceFirst("\"adv\"\\s*:\\s*[0-9.eE+-]+", "\"adv\": -1"));
         try {
             new ConfigService(dir2);
@@ -160,8 +160,8 @@ public class PlatformConfigTest {
         Path dir = PaperFixtures.copyConfigs();
         ConfigService c = new ConfigService(dir);
         assertEquals(a.configSha256(), c.configSha256());
-        PaperFixtures.writeConfig(dir, "risk.json",
-                PaperFixtures.readConfig(dir, "risk.json")
+        PaperFixtures.writeConfig(dir, ConfigService.RISK,
+                PaperFixtures.readConfig(dir, ConfigService.RISK)
                         .replace("\"max_daily_loss\": 250000",
                                 "\"max_daily_loss\": 249999"));
         assertTrue(new ConfigService(dir).configSha256()
@@ -177,7 +177,7 @@ public class PlatformConfigTest {
                 com.iap.platform.SessionStore.CONFIG_AUDIT);
         assertTrue("config_audit.jsonl written", Files.exists(audit));
         var lines = PaperFixtures.lines(audit);
-        assertEquals("one config_loaded line per pinned file", 6, lines.size());
+        assertEquals("one config_loaded line per pinned file", 7, lines.size());
         for (String line : lines) {
             Map<String, Object> doc = PaperFixtures.json(line);
             assertEquals("config_loaded", doc.get("action"));

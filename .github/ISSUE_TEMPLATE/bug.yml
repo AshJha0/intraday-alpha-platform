@@ -1,0 +1,67 @@
+name: Bug
+description: A defect against a pinned contract, a golden vector or a documented behaviour.
+title: "<component>: <symptom>"
+labels: ["type:bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Safety-relevant defects (risk engine, kill switch, admin API, audit logs) follow
+        docs/governance/SECURITY.md instead of a public issue.
+  - type: dropdown
+    id: languages
+    attributes:
+      label: Language(s) affected
+      multiple: true
+      options: [python, cpp, rust, java, docs/configs]
+    validations:
+      required: true
+  - type: input
+    id: contract
+    attributes:
+      label: Contract clause violated
+      description: The pinned rule the behaviour contradicts.
+      placeholder: "PLATFORM_CONVENTIONS.md §11.2 rule 7 / API_CORE.md §4 / execution.hpp rule 3b"
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Deterministic reproduction
+      description: |
+        Seed, config, input vector (golden file + event index, or the generator seed) and the exact command.
+        A bug that cannot be reproduced from a seed is a bug in determinism first — say so.
+      placeholder: |
+        python3 -m pytest -q python/tests/test_book.py -k reorder
+        input: tests/golden/events_eq_anomalies.jsonl, reorder_window=4, event index 1203
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs observed
+      description: Exact values (ticks, qty, counters, rule_id, bytes / SHA-256), per language if they differ.
+    validations:
+      required: true
+  - type: dropdown
+    id: parity
+    attributes:
+      label: Cross-language parity
+      description: Does the golden suite (tests/harness/run_golden.sh) still pass?
+      options:
+        - "golden suite passes — the golden itself may be wrong"
+        - "one language fails the golden — port defect"
+        - "several languages fail — reference or golden defect"
+        - "not run"
+    validations:
+      required: true
+  - type: textarea
+    id: golden_impact
+    attributes:
+      label: Golden / schema impact
+      description: Will the fix regenerate a golden (which tool?) or bump an x-version (MIGRATIONS.md entry)?
+  - type: input
+    id: epic
+    attributes:
+      label: Epic
+      placeholder: "Part of #12"

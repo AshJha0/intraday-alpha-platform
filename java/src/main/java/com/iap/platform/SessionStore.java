@@ -26,6 +26,9 @@ import com.iap.config.Json;
  *       restart count;</li>
  *   <li>{@code risk_audit.jsonl} — every {@code RiskEvent} of the session,
  *       appended and flushed at every checkpoint and at shutdown;</li>
+ *   <li>{@code decision_traces.jsonl} — one canonical {@code DecisionTrace}
+ *       line per decision cycle ({@link PaperTraces}), appended and flushed
+ *       at the same points;</li>
  *   <li>{@code config_audit.jsonl} — {@code ConfigService.auditJsonl()}, written
  *       once at startup.</li>
  * </ul>
@@ -41,10 +44,14 @@ import com.iap.config.Json;
  * platform must never silently start flat and un-latched.
  */
 public final class SessionStore {
-    /** Schema version of {@code session_state.json}. */
-    public static final long STATE_VERSION = 1;
+    /**
+     * Schema version of {@code session_state.json}: 2 adds
+     * {@code trace_lines} (the decision-trace append cursor; MIGRATIONS.md
+     * 2026-09-19 "Java decision traces").
+     */
+    public static final long STATE_VERSION = 2;
 
-    /** The platform's own recoverable accounting (schema {@code x-version 1}). */
+    /** The platform's own recoverable accounting (schema {@code x-version 2}). */
     public static final class State {
         /** Number of events of the configured stream already processed. */
         public long eventCursor;
@@ -70,6 +77,12 @@ public final class SessionStore {
         public long restarts;
         /** Number of audit lines already persisted (append cursor). */
         public long auditLines;
+        /**
+         * Number of decision-trace lines already persisted
+         * ({@code decision_traces.jsonl} append cursor); a resume rebuilds the
+         * running trace digest from exactly that many lines.
+         */
+        public long traceLines;
 
         /** Sorted-key JSON document (round-trips exactly). */
         public String toJson() {
@@ -86,6 +99,7 @@ public final class SessionStore {
                     .append(",\"restarts\":").append(restarts)
                     .append(",\"risk_order_seq\":").append(riskOrderSeq)
                     .append(",\"total_pnl\":").append(num(totalPnl))
+                    .append(",\"trace_lines\":").append(traceLines)
                     .append(",\"x-version\":").append(STATE_VERSION)
                     .append('}');
             return sb.toString();
@@ -121,8 +135,9 @@ public final class SessionStore {
             s.ordersSubmitted = asLong(doc, "orders_submitted", where);
             s.restarts = asLong(doc, "restarts", where);
             s.auditLines = asLong(doc, "audit_lines", where);
+            s.traceLines = asLong(doc, "trace_lines", where);
             if (s.eventCursor < 0 || s.riskOrderSeq < 0 || s.restarts < 0
-                    || s.auditLines < 0) {
+                    || s.auditLines < 0 || s.traceLines < 0) {
                 throw bad(where, "negative counter");
             }
             return s;
@@ -172,6 +187,8 @@ public final class SessionStore {
     public static final String CONFIG_AUDIT = "config_audit.jsonl";
     /** Admin (kill-switch API) audit log. */
     public static final String ADMIN_AUDIT = "admin_audit.jsonl";
+    /** Decision-trace stream (one canonical JSON line per decision cycle). */
+    public static final String DECISION_TRACES = PaperTraces.DECISION_TRACES;
 
     private final Path dir;
 

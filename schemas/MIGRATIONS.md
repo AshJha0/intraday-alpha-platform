@@ -29,9 +29,9 @@ path for stored data.
 - Native-port contract for the 40-feature core set: `API_FEATURES.md`.
 - No existing schema or golden changed (additive only).
 
-## 2026-08-29 — configs/risk.json v1 -> v2 + expected_risk_decisions.json (new golden)
+## 2026-08-29 — configs/risk/risk.json v1 -> v2 + expected_risk_decisions.json (new golden)
 
-- `configs/risk.json` extended from the skeleton to the complete pinned hard-risk
+- `configs/risk/risk.json` extended from the skeleton to the complete pinned hard-risk
   limit set (spec §16), now owned by the Rust risk engine (`rust/risk`, the
   reference implementation): added `global.order_rate_burst` and
   `per_instrument.max_instrument_notional`; removed the never-enforced
@@ -46,7 +46,7 @@ path for stored data.
   order, plus the pinned KILL/notification events. Every rule was validated by a
   dedicated unit test in `rust/risk/tests/rules.rs` before the vector was pinned;
   replays are deterministic and the audit log is byte-identical across runs.
-- `schemas/risk_event.schema.json` itself is unchanged (still v1).
+- `schemas/risk/risk_event.schema.json` itself is unchanged (still v1).
 
 ## 2026-08-29 — generator redesign (shared efficient price) + book semantics fixes; golden vectors regenerated
 
@@ -61,7 +61,7 @@ changed is pinned SEMANTICS plus the pinned synthetic vectors themselves:
   stream) with per-venue bounded AR(1) microstructure noise, venue latency on
   receive_ts, and per-slot repricing cancels of quotes the efficient price moved
   through. Measured consolidated crossed-book fraction on equities: **0.80%** of
-  event states (target < 2%). `configs/generator.json` equities keys changed:
+  event states (target < 2%). `configs/marketdata/generator.json` equities keys changed:
   `vol_regimes` is now `{sigma_ticks_per_s, switch_prob_per_s}` and `venue_noise`
   `{rho, sigma_ticks, max_ticks}` was added. Determinism unchanged (same seed =>
   byte-identical files; verified).
@@ -130,24 +130,24 @@ No `market_event` field changed (`market_event.schema.json` stays v1; the schema
   sequence resets are kept as new epochs instead of being discarded as duplicates. The pinned
   dataset (`data/`) is unchanged in content (verified: identical normalized JSONL; IAP1 files
   gain the v2 trailer on regeneration).
-- **Reference data** (`configs/instruments.json`): sessions gained `timezone` (IANA; `UTC` for
+- **Reference data** (`configs/instruments/instruments.json`): sessions gained `timezone` (IANA; `UTC` for
   the synthetic venues — UTC bounds unchanged) and the file gained `fx_week`; loading validates
   fail-fast. Generator config gained `equities.halt.reopen_auction` (default false — dataset
   unchanged) and `reopen_call_s`.
 - Migration path: every port re-runs its golden suite; adapters writing IAP1 get the trailer
   for free; any code that read the book counters must add the six new ones.
 
-## 2026-09-06 — configs/risk.json v2 -> v3 (currency), risk goldens v3 + audit/snapshot goldens, replay fills v1 -> v2, TCA golden v1 -> v2 (round-3 trading fixes)
+## 2026-09-06 — configs/risk/risk.json v2 -> v3 (currency), risk goldens v3 + audit/snapshot goldens, replay fills v1 -> v2, TCA golden v1 -> v2 (round-3 trading fixes)
 
-- **`configs/risk.json` x-version 3**: new `currency` block — `reporting_ccy` (USD) and
+- **`configs/risk/risk.json` x-version 3**: new `currency` block — `reporting_ccy` (USD) and
   `conversion[ccy] = {instrument_id, invert}` naming the FX pair whose last consolidated mid
   converts each quote currency into the reporting currency (`invert` for REPORTING/CCY pairs
   such as USD/JPY). Parsed strictly by both engines; a missing block fails closed
   (`CONFIG_MISSING`). Engines now take per-instrument reference data
-  (`InstrumentRef{tick_size, qty_unit, quote_ccy}` from `configs/instruments.json`) instead
+  (`InstrumentRef{tick_size, qty_unit, quote_ccy}` from `configs/instruments/instruments.json`) instead
   of a tick-size map; `notional = qty × qty_unit × price × tick × fx_rate`
   (PLATFORM_CONVENTIONS §11.1).
-- **`schemas/risk_event.schema.json` unchanged (v1)**; new `rule_id` values emitted:
+- **`schemas/risk/risk_event.schema.json` unchanged (v1)**; new `rule_id` values emitted:
   `FX_RATE_MISSING` (check 12, shifting `FAT_FINGER_NOTIONAL`..`STRATEGY_LOSS` to 13..22),
   `NOT_BOOTSTRAPPED`, `MALFORMED_FILL`, `LOSS_LIMIT_OVERRIDE`, `SESSION_ROLLED`,
   `BOOTSTRAP_COMPLETE`, `STATE_RESTORED`. Money in `reason` strings is now integer-scaled
@@ -173,7 +173,7 @@ No `market_event` field changed (`market_event.schema.json` stays v1; the schema
   pre-event reference, undefined markouts past the timeline end / across halts and
   `adverse_selection_n`. TCA records gain `adverse_selection_n`; undefined markouts are
   `null` instead of a fabricated last-state value.
-- **`configs/execution.json`** (still x-version 1): descriptions only — the controls it
+- **`configs/execution/execution.json`** (still x-version 1): descriptions only — the controls it
   declares (`max_participation`, `min_slice_interval_ns`, `latency_budget_ns`,
   `sor.prefer_rebate`, `sor.max_venue_latency_ns`) are now read and enforced by the Java
   `BacktestEngine` / `PaperTrading`.
@@ -203,7 +203,7 @@ stored feature parquet or an `alpha_params.json` written before this entry.
   above `FEATURE_MAX_QTY = 2^40` are not folded into any window and an
   oversized merged depth makes the view unusable. Java additionally builds the
   merged view from a per-venue depth cache like the other ports.
-- **Session time zones**: `configs/instruments.json` sessions MUST declare an
+- **Session time zones**: `configs/instruments/instruments.json` sessions MUST declare an
   IANA `timezone`; time-of-day features and 5-minute profile buckets are
   session-local. A missing timezone or a non-positive `tick_size` fails at
   start-up.
@@ -259,3 +259,328 @@ stored feature parquet or an `alpha_params.json` written before this entry.
 - Migration path: regenerate `data/features` (`python3 -m iap.features`), then
   `research/alpha_reports/run_all.py` (rewrites `alpha_params.json`), then the
   goldens under `python/tools/`, then `run_adaptive.py` / `run_ml.py`.
+
+## 2026-09-19 — Repository tree restructure (2026-09-19)
+
+Layout-only change: `configs/` and `schemas/` moved into the domain-folder
+blueprint of `PLATFORM_CONVENTIONS.md` §0. **No field of any schema or config
+changed, so every `x-version` is unchanged** (all seven schemas stay at 1;
+`risk.json` stays at 3, `alpha_params.json` at 2, the rest at 1). Every move
+was a `git mv` (history preserved). Golden vectors, expected outputs and the
+codec SHA-256 goldens are byte-identical before and after; the only golden
+edit is the descriptive `"config"` string in
+`tests/golden/expected_risk_decisions.json` (not hashed by any test).
+
+### configs/ — old → new
+
+| Old path | New path |
+|---|---|
+| `configs/instruments.json` | `configs/instruments/instruments.json` |
+| `configs/venues.json` | `configs/venues/venues.json` |
+| `configs/generator.json` | `configs/marketdata/generator.json` |
+| `configs/risk.json` | `configs/risk/risk.json` |
+| `configs/execution.json` | `configs/execution/execution.json` |
+| `configs/strategies.json` | `configs/strategies/strategies.json` |
+| `configs/strategies/alpha_params.json` | unchanged |
+
+Code consequences (semantics untouched):
+
+- Every loader resolves the nested name under the config directory it is
+  given (`--configs <dir>` / `$IAP_CONFIG_DIR` / built-in default, §12.2):
+  `iap.reference.refdata.ReferenceData.load`, `iap.features.context.build_contexts`,
+  `python3 -m iap.marketdata` (`<configs-dir>/marketdata/generator.json`),
+  `com.iap.config.ConfigService` (pinned names `ConfigService.{RISK, INSTRUMENTS,
+  VENUES, EXECUTION, STRATEGIES, GENERATOR, ALPHA_PARAMS}`), the Rust
+  `rust/risk` and `rust/alpha` tests, the C++ golden tests and `bench_all`.
+- `ConfigService` names a file by its relative path (`risk/risk.json`) in
+  `doc()/sha256()/reload()`, in the `file` field of `config_audit.jsonl` and in
+  the `config_sha256` digest (`<file>=<sha256>` lines sorted by name). The
+  digest value therefore differs from a pre-restructure session for the same
+  content — it is a per-session attribution value, not a golden.
+- The k8s ConfigMap `iap-configs` (generated by
+  `deployment/k8s/generate_configmaps.py`) keys every file by its relative
+  path with `/` encoded as `__` (`risk__risk.json`,
+  `strategies__alpha_params.json`, …); the `java-platform` Deployment and the
+  `data-pipeline` CronJob mount it with `items[].path` so the container sees
+  the nested tree at `IAP_CONFIG_DIR`. Compose bind-mounts the whole
+  `configs/` directory, so the tree is nested there by construction.
+
+### schemas/ — old → new
+
+| Old path | New path | `$id` (new) |
+|---|---|---|
+| `schemas/market_event.schema.json` | `schemas/market/market_event.schema.json` | `https://iap.example/schemas/market/market_event.schema.json` |
+| `schemas/book_update.schema.json` | `schemas/market/book_update.schema.json` | `https://iap.example/schemas/market/book_update.schema.json` |
+| `schemas/feature_vector.schema.json` | `schemas/features/feature_vector.schema.json` | `https://iap.example/schemas/features/feature_vector.schema.json` |
+| `schemas/alpha_signal.schema.json` | `schemas/alpha/alpha_signal.schema.json` | `https://iap.example/schemas/alpha/alpha_signal.schema.json` |
+| `schemas/order_request.schema.json` | `schemas/order/order_request.schema.json` | `https://iap.example/schemas/order/order_request.schema.json` |
+| `schemas/execution_report.schema.json` | `schemas/execution/execution_report.schema.json` | `https://iap.example/schemas/execution/execution_report.schema.json` |
+| `schemas/risk_event.schema.json` | `schemas/risk/risk_event.schema.json` | `https://iap.example/schemas/risk/risk_event.schema.json` |
+| `schemas/FORMAT.md`, `schemas/MIGRATIONS.md` | unchanged (root) | — |
+
+Each schema's `$id` now carries its folder; the `$id` is documentation (no
+`$ref` between schemas exists), so no validator behaviour changes. A new
+`schemas/README.md` indexes folder → file → x-version → contract → implementing
+types. Earlier entries in this file were rewritten to the new paths so their
+links resolve; the tables above are the record of what they used to say.
+
+### tests/ and research/ (same change set)
+
+- New `tests/integration/` (cross-component end-to-end runs) and
+  `tests/replay/` (determinism: same seed ⇒ identical bytes), run by
+  `tests/harness/run_all.sh` as two extra parity rows; `tests/README.md`
+  describes the six-level testing strategy.
+- New `research/experiments/` (README only) reserved for
+  `ExperimentSpec`/`ExperimentResult` documents.
+
+## 2026-09-19 — Phase 0 contracts (2026-09-19): ten new schemas, all v1
+
+Additive only: no existing schema changed (all seven stay at `x-version` 1)
+and no golden vector moved. Every stage of the loop Market Data → Book →
+Features → Alpha → Portfolio → Risk → Execution → SOR → TCA → Research now
+has a versioned JSON Schema and a typed Python definition
+(`python/src/iap/contracts/`, see `python/src/iap/README.md`).
+
+New schemas (draft 2020-12, `additionalProperties: false`, i64/u64 ranges
+pinned, enums documented in each description):
+
+| Path | `$id` | Python type |
+|---|---|---|
+| `schemas/portfolio/portfolio_target.schema.json` | `https://iap.example/schemas/portfolio/portfolio_target.schema.json` | `PortfolioTarget` (+ `$defs/PortfolioLeg`) |
+| `schemas/risk/risk_decision.schema.json` | `https://iap.example/schemas/risk/risk_decision.schema.json` | `RiskDecision` |
+| `schemas/order/parent_order.schema.json` | `https://iap.example/schemas/order/parent_order.schema.json` | `ParentOrder` |
+| `schemas/order/child_order.schema.json` | `https://iap.example/schemas/order/child_order.schema.json` | `ChildOrder` |
+| `schemas/execution/venue_decision.schema.json` | `https://iap.example/schemas/execution/venue_decision.schema.json` | `VenueDecision` (+ `$defs/VenueScore`) |
+| `schemas/tca/tca_result.schema.json` | `https://iap.example/schemas/tca/tca_result.schema.json` | `TCAResult` (+ `$defs/LatencyStats`) |
+| `schemas/research/experiment_spec.schema.json` | `https://iap.example/schemas/research/experiment_spec.schema.json` | `ExperimentSpec` (+ `$defs/Period`) |
+| `schemas/research/experiment_result.schema.json` | `https://iap.example/schemas/research/experiment_result.schema.json` | `ExperimentResult` |
+| `schemas/alpha/lifecycle_transition.schema.json` | `https://iap.example/schemas/alpha/lifecycle_transition.schema.json` | `LifecycleTransition` (+ `$defs/GateResult`) |
+| `schemas/trace/decision_trace.schema.json` | `https://iap.example/schemas/trace/decision_trace.schema.json` | `DecisionTrace` (+ `$defs/TraceStages`, `Attribution`, `MarketEventRef`, `BookSnapshotRef`, `FeatureVectorRef`) |
+
+- `decision_trace.schema.json` is the first schema with cross-file `$ref`s
+  (relative, resolved against its `$id`). Validators must resolve them from
+  disk: the Python reference builds a `referencing.Registry` over every
+  `schemas/**/*.schema.json` (`iap.contracts.validate`); no network fetch.
+- `alpha_signal.schema.json` and `execution_report.schema.json` are
+  unchanged and now also have typed Python mirrors (`AlphaSignal`,
+  `ExecutionReport`).
+- New golden: `tests/golden/expected_contracts_examples.json` (x-version 1,
+  generated by `python/tools/make_golden_contracts.py`) — one canonical
+  instance per contract type, the pinned `explain()` rendering of the
+  example `DecisionTrace`, the pinned trace id
+  (`sha256("<session_id>|<instrument_id>|<event_ts>|<sequence>")[:32]`) and
+  a `canonical_json` known answer (sorted keys, `,`/`:` separators, ASCII,
+  NaN rejected). Ports load it as the reference instance of every schema.
+- Python packaging: `python/pyproject.toml` 1.0.0 → 1.1.0 declares the real
+  dependencies (`jsonschema` + `referencing` are new requirements; CI
+  installs them).
+- Migration path: none for stored data (additive). Producers of portfolio,
+  risk, execution, SOR, TCA and research outputs adopt the typed contracts
+  and validate before persisting.
+
+## 2026-09-19 — Phase 0 store: `schemas/sql/iap_v1.sql` (relational data model, v1)
+
+Additive: a new folder `schemas/sql/` holding the portable DDL (SQLite 3 /
+PostgreSQL ≥ 13, one file, `schema_version.x_version = 1`) that indexes
+every contract above plus the research artefacts, and the Python package
+`iap.store` (`Store`, importers, `python -m iap.store build|explain|sql`)
+that builds it under the git-ignored `data/store/`. No JSON schema changed;
+no golden moved. Rules for the DDL (the portable type/keyword subset, the
+mapping of each contract to its table, the alpha-report → ExperimentResult
+mapping) are in `docs/DATA_MODEL.md`; a change to the DDL is a new
+`iap_vN.sql` + `iap.store.ddl.DDL_X_VERSION` bump + an entry here.
+
+## 2026-09-19 — Java ports of the cross-language contracts: `session_state.json` v1 -> v2, paper session report v2 -> v3
+
+Additive; no wire schema under `schemas/` changed. The Java platform gained
+byte-identical ports of the Phase 0 components (`com.iap.contracts.CanonicalJson`,
+`com.iap.trace`, `com.iap.lifecycle`; golden gates `CanonicalJsonGoldenTest`,
+`TraceGoldenTest`, `LifecycleGoldenTest`) and the paper-trading vertical now
+emits one `DecisionTrace` per decision cycle:
+
+- **`<state-dir>/session_state.json` x-version 1 -> 2** (`SessionStore.STATE_VERSION`):
+  new key `trace_lines` — the append cursor of `<state-dir>/decision_traces.jsonl`
+  (one canonical `trace/decision_trace.schema.json` line per decision cycle,
+  flushed at every checkpoint like `risk_audit.jsonl`). `--resume` compares the
+  file's line count with `trace_lines` (refusing on a mismatch, like
+  `audit_lines`) and rebuilds the running `TraceDigest` from exactly those lines.
+  Migration: a v1 state directory cannot be resumed by the v2 platform (the
+  version check fails closed); finish or archive the session first.
+- **Paper session report x-version 2 -> 3**: new block
+  `trace: {count, digest, jsonl}` — the number of traces, the running sha256
+  stream digest (`TraceDigest`, equal to `TraceDigest.ofJsonl(<jsonl>)`) and
+  the file path. `/status` gains `trace_count` / `trace_digest`; new metrics
+  `trace_records_total`, `trace_tca_skipped_total`.
+- **`configs/strategies/lifecycle.json`** is now a pinned platform config file
+  (`ConfigService.LIFECYCLE`, seventh `config_loaded` audit line; it enters
+  `config_sha256`).
+
+## 2026-09-19 — MVP loop (`iap.mvp`): new config documents + golden, no wire schema changed
+
+Additive; nothing under `schemas/` changed and no existing golden moved.
+`python -m iap.mvp` (docs/MVP.md) runs the whole loop on one synthetic
+equity and is pinned by a new golden:
+
+- **`configs/mvp/mvp.json` x-version 1** (`iap.mvp.config.MvpConfig`,
+  fail-fast validated): seed, instrument, venues, alphas, horizon, decision
+  cadence, session window, portfolio / execution / sor blocks and the
+  `reference` map naming every other document in force (their content hash
+  is the run's `config_version`). `configs/mvp/{instruments,venues,generator}.json`
+  are the MVP's own reference data (instrument `SYN.EQ.AAPL` id 12, venue
+  `XV3` id 3 — ids unused by the bundled universe) and generator config;
+  `mvp_tiny.json` / `generator_tiny.json` are the fast test variants.
+  `configs/venues/venues.json`, `configs/instruments/instruments.json` and the
+  bundled dataset are untouched.
+- **`tests/golden/expected_mvp.json` x-version 1** (`iap.mvp.golden`,
+  generator `python/tools/make_golden_mvp.py`, refuses overwrite without
+  `--force`): run / session id, config_version, event-stream sha256 +
+  data_version, n_events, trace digest, first / last trace ids, counts by
+  rule / venue / algo and the full report. Consumers:
+  `python/tests/test_mvp_golden.py`.
+- Run artefacts (`data/mvp/<run_id>/`, git-ignored): `feed.json` x-version 1,
+  `config.json` x-version 1, `report.json` x-version 1
+  (`iap.mvp.report.REPORT_VERSION`), `paper_evidence.json` x-version 1.
+  A change to any of these layouts bumps its version and adds an entry here.
+
+## 2026-09-20 — MVP IC audit + `explain()` multi-signal rule: `report.json` v1 -> v2, `paper_evidence.json` v1 -> v2, `expected_mvp.json` regenerated; no wire schema changed
+
+Nothing under `schemas/*.schema.json` changed (`alpha_signal` and
+`decision_trace` stay v1; the pinned contracts examples, canonical-JSON and
+digest goldens are untouched).  What changed is pinned SEMANTICS plus the
+MVP's own artefacts (docs/MVP.md §7 has the audit):
+
+- **Trace `stages.signal` ordering convention (all languages, documented,
+  not a schema change)**: `signal[0]` is the ACTING signal — the one the
+  portfolio sized on and the one `v_order_chain` / `explain()` attribute to
+  the order (the SQL view already selected the first signal); every further
+  entry is a component of it (an ensemble member), labelled by its alpha id
+  in `model_version` (the documented meaning of that field for
+  `linear_z_v1` alphas; the Java `PaperTraces.onSignal` writes the alpha id
+  there too).  The MVP previously listed the members first and the ensemble
+  last, so the view and `explain` attributed a member's signal to the order.
+- **`explain()` rendering rule (Python `iap.contracts.types.explain`, Java
+  `Explain.render`, Rust `contracts::explain`, C++ `iap::contracts::explain`)**:
+  the first signal line is labelled with the parent order's `alpha_id` when
+  an order exists (unchanged: the pinned single-signal example renders byte
+  for byte as before), every further signal line with its own
+  `model_version` (previously every line repeated the order's `alpha_id`,
+  so an ensemble trace printed four indistinguishable `Alpha:` lines).  A
+  multi-signal test was added to all four suites.
+- **`report.json` x-version 2** (`iap.mvp.report.REPORT_VERSION`): the
+  realized IC is now the research label definition
+  (`iap.labels.compute_labels` on the feature-engine book-refresh mid
+  series — stale-venue / halt / auction / one-sided refreshes inside the
+  horizon invalidate the label; the old timeline-based definition only
+  excluded halts).  `alpha.per_alpha.<id>` gained `horizon`,
+  `realized_ic_cost` (cost-adjusted label), `realized_ic_shifted`
+  (shift-by-one), `n_signals`, `research_horizon` and `at_research_horizon`
+  (the same block at the alpha's fitted horizon); `ic_gap` is now measured
+  at the fitted horizon (like for like with the registry's `oos_ic`);
+  `alpha.ensemble` gained the same keys; `alpha.ic_definition` states the
+  definition.  `n_ic_samples` shrank where a blackout sample sat inside the
+  window (EQ01 352 -> 345, EQ03 277 -> 270, EQ06 52 -> 50).
+- **`paper_evidence.json` x-version 2**: `paper.realized_ic` is now the IC
+  at the alpha's FITTED horizon (what `paper_ic_tracking` compares with
+  `research_ic`); `ic_horizon`, `realized_ic_at_mvp_horizon` and
+  `mvp_horizon` were added.
+- **`tests/golden/expected_mvp.json` regenerated (`--force`)**: the trace
+  digest changed because of the signal ordering (`400de073...` ->
+  `16cd29aa...`); every count, fill, P&L figure and TCA number is
+  unchanged (the loop's decisions do not depend on the trace layout).
+- MVP engine hardening (no artefact change): the §12.1 identity is
+  asserted after every fill (not only at session end) and a fill the risk
+  engine refuses as malformed raises instead of silently diverging the two
+  positions.
+- `python -m iap.mvp` gained `--repo-root` (run / replay / verify) so the
+  loop runs inside the Python image (`deployment/docker/Dockerfile.python`
+  now bakes `research/alpha_registry.json`); `configs/mvp/*` are projected
+  by the k8s ConfigMap (`deployment/k8s/*.yaml` items[]).
+
+## 2026-09-20 — Review fixes: Rust float ties, `v_order_chain`, `paper_evidence.json` v2 -> v3, packaged schemas, blocked children out of the trace, `expected_mvp.json` + `expected_canonical_json.json` regenerated; no wire schema changed
+
+Nothing under `schemas/*.schema.json` changed.  What changed (the independent
+review of the release, findings 1–10 and notes 12/13):
+
+- **`tests/golden/expected_canonical_json.json` regenerated (`--force`,
+  x-version 1 kept — additive)**: 612 float cases appended to the 2051
+  (2663 in all): the review's exact decimal midpoints
+  (`1059438285926254.25` -> `1059438285926254.2`, `26363981746409.3125`,
+  `1000000000000000.25`, …) and a SplitMix64 set of 400 midpoint ties + 200
+  values whose shortest repr needs 17 digits (`k + j/2^b` in the binades
+  2^40..2^52).  Every other section (documents, escapes, trace id, trace
+  digests) is byte-identical.  Rust `contracts::canonical::format_float`
+  now takes its digits from serde_json / ryu (round-half-even) instead of
+  `core::fmt`'s `{:e}` (half-up on ties); C++ / Java / Python needed no
+  change and all four ports match the new cases.
+- **`schemas/sql/iap_v1.sql` view `v_order_chain` (DDL x-version 1 kept —
+  tables unchanged; `python -m iap.store build` / `Store.init()` recreates
+  the view)**: risk is joined through the parent's `child_orders` (risk is
+  decided per routed child, §11.4; the parent id itself also matches for a
+  loop without a child stage), aggregated as `risk_decision = MAX(decision)`
+  (REJECT/KILL if any child, else ALLOW, NULL when none), `risk_rule_id` /
+  `risk_reason` = the first rejecting row (else the first row); new columns
+  `n_children_allowed`, `n_children_rejected`; `n_fills` counts PARTIAL /
+  FILLED reports only.  The old view matched `risk_decisions.order_id =
+  parent_order_id` (NULL for 65 of the 66 golden parents) and counted NEW /
+  CANCELED reports as fills.
+- **`paper_evidence.json` x-version 3** (`iap.mvp.session`): `paper` is
+  `null` when the alpha's realized IC (at its fitted horizon) or the
+  registry's research IC is undefined — the lifecycle then records
+  `NO_EVIDENCE` — instead of `realized_ic: 0.0` / `research_ic: 0.0`, which
+  passed `paper_ic_tracking` on silence.  `ic_defined`, `research_ic_defined`
+  and `n_ic_samples` stay next to the block.
+- **Packaged schemas**: `python/setup.py` (build hook) copies `schemas/`
+  into the wheel as `iap/_schemas`; `iap.contracts.versions.schema_dir()`
+  resolves `$IAP_SCHEMA_DIR` (must exist) -> the checkout -> the packaged
+  copy; `Dockerfile.python` sets `IAP_SCHEMA_DIR=/app/schemas` and copies
+  `schemas/` before the install.  `tests/integration/test_installed_package.py`
+  runs the tiny MVP from a non-editable venv install outside the checkout
+  and asserts the packaged copy equals `schemas/` byte for byte.
+- **Control-blocked children are no longer written into the trace**
+  (`iap.mvp.engine`): a child blocked by `min_slice_interval_ns`,
+  `latency_budget_ns` or `max_participation` never left the strategy (no
+  routing, no risk decision, no report), so it no longer appears in
+  `stages.child_orders` / `stages.routing`; its count is preserved per parent
+  in `ParentOrder.params` `children_blocked_slice_interval` /
+  `children_blocked_latency_budget` / `children_blocked_participation`
+  (session totals unchanged in `Counters` / `report.controls`).  NO_ROUTE
+  and risk-REJECTed children stay traced with their terminal verdicts.
+  `TraceBuilder.replace_parent_order` was added for the finalisation-time
+  params.
+- **The decision loop no longer reads the end of the captured stream**: the
+  "parent window beyond the session" guard uses the calendar's session
+  close (`ReferenceData.session_bounds_ns`, ex ante); the counter is renamed
+  `decisions_window_beyond_stream` -> `decisions_window_beyond_session`
+  (0 in the golden run before and after).
+- **`tests/golden/expected_mvp.json` regenerated (`--force`, x-version 1
+  kept)**: the trace digest changed because blocked children left the
+  trace and every parent's params gained the three counters
+  (`16cd29aa...` -> `059c30df...`); every count, fill, P&L figure, TCA
+  number and per-alpha IC is unchanged (the loop's decisions do not depend
+  on the trace layout), only the counter rename above differs in
+  `report.counts.counters`.
+- **`python -m iap.lifecycle bootstrap` refuses to truncate a non-empty
+  `research/lifecycle_transitions.jsonl`** (an append-only audit) without
+  `--force` (exit code 3; `run_bootstrap(force=True)`); `--dry-run` never
+  writes.  The committed registry / log bytes are unchanged.
+- **One alpha-report mapping** (`iap.lifecycle.bootstrap.research_evidence`
+  + new `alpha_report_spec`): `iap.store.import_alpha_reports` now writes the
+  registry's mapping (`ic = gate_ic`, `t_stat = nw_tstat_uncrossed`, P&L in
+  bps of the 1e6 USD reference notional, `experiment_id` = ledger key[:16],
+  versions / commit / model hash from `alpha_params.json`) instead of its own
+  (`oos_ic`, bps of Σ capacity, `content_hash(spec)[:16]`,
+  `unversioned-workspace`); the store is derived, no research artefact
+  changed.  `docs/DATA_MODEL.md` §6 documents the shared mapping.
+- `python -m iap.store sql` / `explain` open the database read-only
+  (`file:…?mode=ro`; `Store.open(path, read_only=True)`).
+- CI: the `python` and `golden` jobs restore (actions/cache keyed on the
+  generator inputs and sources) or regenerate the seeded dataset so the
+  data-dependent tests (`test_eq03_report_reproduces_through_the_runner`,
+  `test_golden_fx05_via_class_on_bundled_data`, the alpha-interface frames)
+  run instead of skipping; the python job fails if the EQ03 reproduction
+  test skips.
+- Known, deliberately NOT bumped: `execution_report.schema.json` (v1) allows
+  the full i64 range for `filled_qty` / `fill_price_ticks` while
+  `ExecutionReport.from_dict`, the DDL and every port require `>= 0` (safe
+  direction).  Tighten to `minimum: 0` at the next revision of that schema
+  (x-version bump + golden regeneration across the four ports).

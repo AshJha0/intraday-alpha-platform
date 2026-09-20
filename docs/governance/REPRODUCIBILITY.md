@@ -61,7 +61,7 @@ Given `research/models/<run_id>/manifest.json`:
 # 1. Exact code + configs
 git checkout <manifest.git_commit>
 
-# 2. Regenerate the dataset (deterministic; seed pinned in configs/generator.json)
+# 2. Regenerate the dataset (deterministic; seed pinned in configs/marketdata/generator.json)
 cd python && PYTHONPATH=src python3 -m iap.marketdata
 
 # 3. Verify the dataset version matches (content hash of the .iap1 files)
@@ -81,8 +81,72 @@ python3 -c "import json;print(json.load(open('../data/features/features_summary.
 Cross-language replay reproduction works the same way: replay engines take
 explicit seeds and checkpoint cadences from configs, and
 `tests/harness/run_golden.sh` proves all four languages produce identical
-book states, fills and risk decisions from the same event files (exact
-integer equality; float tolerance 1e-9 abs/rel — conventions §5).
+book states, fills, risk decisions, canonical-JSON lines, trace digests and
+lifecycle state sequences from the same event files and documents (exact
+integer / byte equality; float tolerance 1e-9 abs/rel — conventions §5).
+
+## 3.1 Research experiments (`research/experiments/<id>/`)
+
+Next to the model manifests, every `ExperimentRunner` run is its own
+reproducibility record (`research/experiments/README.md`,
+`schemas/research/experiment_{spec,result}.schema.json`):
+
+| field | pins |
+|---|---|
+| `experiment_id` | `content_hash(spec without experiment_id)[:16]` — the id IS the request; `iap.research.verify_experiment_id` re-derives it on every load and a hand-edited spec is rejected |
+| `dataset_version` | `iap.experiment.tracker.data_version()` — the sha256 over the normalized IAP1 bytes (§1) |
+| `feature_version` | the registry hash (§1) |
+| `model_version` | `content_hash` of the model *definition* (alpha id, class, `linear_z_v1`, horizon, features, `z_clip`, `conf_scale`) — fits happen inside the experiment |
+| `configuration` | the pinned protocol keys (`n_folds`, `embargo_ns`, `cost_multiplier`, `latency_ns`, `max_decision_age_ns`, `flatten_at_session_end`); an unknown key is an error, because an ignored key would change the id without changing the computation |
+| periods | train / validation (the purged + embargoed tail) / test, derived from the session calendar or given explicitly |
+| `seed` | recorded and hashed; consumed by nothing — the whole chain (row-mass walk-forward, closed-form IC / NW t, vectorised backtester) has no random element, and the document says so rather than implying otherwise |
+| result `git_commit`, `n_experiments_in_ledger`, `created_ts` | provenance: the commit, the ledger denominator at run time, the test period's end (event time, never wall clock) |
+
+Recipe: `cd python && PYTHONPATH=src python3 -m iap.research run --alpha EQ03
+--horizon 5s` reproduces `result.json` byte for byte except `git_commit` and
+`n_experiments_in_ledger` (which legitimately move); the runner itself
+**refuses** a rerun that reproduces different evidence under the same id
+(`ResearchError`) — remove the directory deliberately if the evidence chain
+changed. `git_commit = unversioned-workspace` marks a scratch run exactly as
+for manifests. The five committed experiments (`c73bb6294d226163`,
+`d7b554d0a3fa3b26`, `217fa0cb1d89a9c8`, `4a2900e4a6705542`,
+`d0dd1ab0711d33a1`) pin dataset `203c8f54…`, features `585dd7b9…`, commit
+`f3a01377…` and `n_experiments_in_ledger = 865`; the pinned-horizon runs
+reproduce `research/alpha_reports/{EQ01,EQ03,EQ06}.json` at 1e-9.
+
+## 3.2 Sessions, traces and the store
+
+- **An MVP run** (`python -m iap.mvp run`) is reproduced from its own
+  directory: `data/mvp/<run_id>/` keeps the captured stream (`events.jsonl`
+  + `events.iap1`; `data_version` = sha256 of the IAP1 bytes) and
+  `config.json` (the document in force + the sha256 of every reference
+  document = `config_version`); `run_id = content_hash({config, seed})[:16]`.
+  `python -m iap.mvp verify` runs it twice from scratch and compares bytes;
+  `python -m iap.mvp replay --run <dir>` re-runs it from the capture and
+  must reproduce the **trace digest** (sha256 over every canonical
+  `DecisionTrace` line + LF, in decision order — `PLATFORM_CONVENTIONS.md`
+  §13.2), `report.json` and the stream sha256, refusing first if a
+  reference document changed (`config_version`). The golden run is
+  `tests/golden/expected_mvp.json`: seed 12345, run `58a10f2194a3c81c`,
+  digest `059c30df7213d00e0d3f6de7ab9011b3d1ee9651cd3df5ec6609d2e66e965c2b`.
+- **A Java paper session** is reproduced by re-running `java/paper.sh` on
+  the same vector and configuration: `decision_traces.jsonl` and the
+  report's `trace.digest` are a pure function of the event stream
+  (`PaperTraceTest`); `TraceDigest.ofJsonl` (Java) or
+  `iap.trace.TraceDigest.of_jsonl` (Python, reading Java's lines unchanged)
+  re-derives the digest of an archived file. `docs/runbooks/RUNBOOK_incident_replay.md`
+  is the operator flow.
+- **The store is rebuilt, never restored.** `python -m iap.store build`
+  recreates `data/store/iap.sqlite` from the flat files in about a second,
+  and a rebuild from unchanged files is byte-identical
+  (`Store.export_jsonl`, PK order, canonical lines). The database is never
+  committed and never the source of truth (`docs/DATA_MODEL.md` §1).
+- **The lifecycle registry** (`research/alpha_registry.json`) is
+  reproduced by `python -m iap.lifecycle bootstrap` from the alpha reports,
+  the ledger and `alpha_params.json` at the pinned bootstrap event time
+  (the latest fold `test_end`, `1787691480577291027`); an identical rerun
+  gives identical bytes, and the Rust / Java loaders re-render the file
+  byte-identically.
 
 ## 4. Release manifests
 

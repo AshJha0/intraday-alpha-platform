@@ -29,7 +29,7 @@ import com.iap.config.Json;
  *       no counter movement — silence is not evidence.</li>
  * </ul>
  *
- * <p>The gates are pinned in {@code configs/strategies.json}
+ * <p>The gates are pinned in {@code configs/strategies/strategies.json}
  * {@code adaptive.lifecycle} ({@code reactivate_ic_gate >= watch_ic_gate}
  * enforced). Deterministic and wall-clock-free: evaluations happen at
  * event-time block boundaries.
@@ -76,7 +76,7 @@ public final class LifecycleGauge {
     }
 
     /**
-     * Gates from {@code configs/strategies.json} {@code adaptive.lifecycle}
+     * Gates from {@code configs/strategies/strategies.json} {@code adaptive.lifecycle}
      * (the pinned source of truth shared with the Python tracker).
      */
     public static LifecycleGauge fromStrategiesConfig(Path strategiesJson) {
@@ -89,9 +89,40 @@ public final class LifecycleGauge {
                 (int) Json.asLong(lc.get("reactivate_evals")));
     }
 
+    /**
+     * A gauge resumed at a persisted point of the SAME rules: state plus
+     * the consecutive breach / recovery counters (the platform lifecycle
+     * registry mirrors them after every live evaluation so a reload
+     * continues exactly; see {@code com.iap.lifecycle.AlphaLifecycle}).
+     */
+    public static LifecycleGauge restore(double watchIcGate, double reactivateIcGate,
+            int retireBreachEvals, int reactivateEvals, State state,
+            int breachCount, int recoveryCount) {
+        if (state == null || breachCount < 0 || recoveryCount < 0) {
+            throw new IllegalArgumentException(
+                    "lifecycle restore needs a state and counters >= 0");
+        }
+        LifecycleGauge g = new LifecycleGauge(watchIcGate, reactivateIcGate,
+                retireBreachEvals, reactivateEvals);
+        g.state = state;
+        g.breachCount = breachCount;
+        g.recoveryCount = recoveryCount;
+        return g;
+    }
+
     /** Current state (never null; starts ACTIVE). */
     public State state() {
         return state;
+    }
+
+    /** Consecutive breaches counted so far (WATCH; the entering breach is 1). */
+    public int breachCount() {
+        return breachCount;
+    }
+
+    /** Consecutive recoveries counted so far (WATCH / RETIRED). */
+    public int recoveryCount() {
+        return recoveryCount;
     }
 
     private void transition(State to) {

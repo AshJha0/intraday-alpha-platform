@@ -4,10 +4,31 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "iap"
-version = "1.0.0"
+version = "1.1.0"
 description = "Intraday Alpha Platform - Python reference implementation"
 requires-python = ">=3.11"
-dependencies = ["pyarrow"]
+dependencies = [
+  "numpy",
+  "pandas",
+  "scipy",
+  "scikit-learn",
+  "pyarrow",
+  "jsonschema>=4.18",
+  "referencing",
+]
+
+[project.optional-dependencies]
+ml = ["xgboost", "lightgbm"]
+dev = ["pytest", "pyyaml"]
+
+[project.scripts]
+iap-marketdata = "iap.marketdata.__main__:main"
+iap-features = "iap.features.__main__:main"
+iap-tca = "iap.tca.__main__:main"
+iap-research = "iap.research.__main__:main"
+iap-lifecycle = "iap.lifecycle.__main__:main"
+iap-store = "iap.store.__main__:main"
+iap-mvp = "iap.mvp.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

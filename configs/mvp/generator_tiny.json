@@ -1,0 +1,17 @@
+{
+  "x-version": 1,
+  "description": "Generator config of the tiny test session (configs/mvp/mvp_tiny.json): the MVP generator config with fewer flow slots per venue stream and a weaker self-excitation kick, so the 8-minute test session holds a few thousand events whose flow reaches past the 3-minute portfolio warm-up.",
+  "seed": 12345,
+  "sessions": 1,
+  "equities": {
+    "slots_per_stream": 1600,
+    "halt": {
+      "instrument": "SYN.EQ.AAPL",
+      "session_index": 0,
+      "duration_s": 45
+    },
+    "flow": {
+      "excitation_kick": 0.5
+    }
+  }
+}

@@ -8,20 +8,29 @@
 
 | benchmark (hot, cache-resident) | ns/event | events/sec | events |
 |---|---:|---:|---:|
-| IAP1 decode (eq, 2000 ev) | 174.4 | 5734892 | 2868000 |
-| IAP1 encode (eq, 2000 ev) | 170.3 | 5871054 | 2936000 |
-| JSONL decode (eq, 2000 ev) | 225.7 | 4429873 | 2216000 |
-| book update (eq MBO, 2000 ev) | 25.7 | 38887761 | 19444000 |
-| book update (fx QUOTE, 800 ev) | 36.2 | 27598521 | 13800000 |
-| replay engine (eq, 2000 ev) | 35.5 | 28139908 | 14072000 |
-| feature engine (eq, 48 feats, cadence 0) | 530.4 | 1885422 | 944000 |
-| feature engine (fx, 48 feats, cadence 0) | 404.7 | 2470907 | 1236000 |
-| alpha scoring (EQ01+EQ03+EQ06, 2000 rows x 3) | 38.5 | 25950590 | 12978000 |
-| execution sim replay (eq, 2 parents) | 66.2 | 15109408 | 7556000 |
+| IAP1 decode (eq, 2000 ev) | 184.1 | 5430856 | 2716000 |
+| IAP1 encode (eq, 2000 ev) | 183.1 | 5461135 | 2732000 |
+| JSONL decode (eq, 2000 ev) | 183.2 | 5457336 | 2730000 |
+| book update (eq MBO, 2000 ev) | 26.4 | 37868665 | 18936000 |
+| book update (fx QUOTE, 800 ev) | 35.8 | 27950555 | 13976000 |
+| replay engine (eq, 2000 ev) | 36.8 | 27207999 | 13604000 |
+| feature engine (eq, 48 feats, cadence 0) | 514.1 | 1945142 | 974000 |
+| feature engine (fx, 48 feats, cadence 0) | 404.4 | 2472534 | 1236800 |
+| alpha scoring (EQ01+EQ03+EQ06, 2000 rows x 3) | 33.6 | 29802581 | 14904000 |
+| execution sim replay (eq, 2 parents) | 63.7 | 15687932 | 7844000 |
+| execution sim replay, traced (eq, 2 parents, 2 traces, data_version hashed per run) | 579.9 | 1724410 | 864000 |
+| execution sim replay, traced (eq, 2 parents, 2 traces, data_version supplied) | 100.3 | 9968653 | 4986000 |
+
+Trace path — cost per DecisionTrace of the canonical-JSON contract (`iap::contracts`), single-threaded, in memory (no file I/O), same 2-CPU container. A trace is serialised once per decision, after it and outside the book / feature / execution event loop, so this is NOT a per-event figure; the two traced replay rows above show the same cost amortised per event (2 traces per 2,000-event replay) — the `data_version hashed per run` row includes the one-off sha256 of the IAP1 encoding of the whole stream (a per-session cost that dominates a 2,000-event workload), the `data_version supplied` row isolates the tracing itself. The tree build (to_value) is included in the per-trace rows, the JSONL write is not.
+
+| benchmark (trace path, in-memory) | ns/trace | traces/sec | traces |
+|---|---:|---:|---:|
+| canonical serialisation, golden DecisionTrace (all stages, 5627-byte line) | 31708.1 | 31538 | 15769 |
+| serialise + sha256 digest update, golden DecisionTrace | 61966.1 | 16138 | 8069 |
 
 Cold reference — ONE single pass over a full generated session (`data/normalized/eq_20260824.normalized.jsonl`), no warmup, no repeat, working set far larger than L2. Single-pass means higher run-to-run variance than the hot table; this is a reference point, not a target.
 
 | benchmark (cold, single pass) | ns/event | events/sec | events |
 |---|---:|---:|---:|
-| IAP1 decode (cold, 105640 ev, single pass) | 195.8 | 5106233 | 105640 |
-| book update (cold, 4822 ev, single pass) | 42.1 | 23780755 | 4822 |
+| IAP1 decode (cold, 105640 ev, single pass) | 212.3 | 4709491 | 105640 |
+| book update (cold, 4822 ev, single pass) | 45.3 | 22076733 | 4822 |
