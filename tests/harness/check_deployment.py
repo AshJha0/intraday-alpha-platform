@@ -89,8 +89,8 @@ def have(tool: str) -> bool:
 
 # --------------------------------------------------------------- metrics ---
 # The metrics the deployment actually exports (PLATFORM_CONVENTIONS.md §12.6).
-# Sourced from com.iap.platform.PaperTrading + com.iap.risk.RiskEngine +
-# com.iap.monitoring.GcMetrics; `up` is Prometheus's own.
+# Sourced from com.iap.platform.PaperTrading + com.iap.platform.PaperTraces +
+# com.iap.risk.RiskEngine + com.iap.monitoring.GcMetrics; `up` is Prometheus's own.
 EXPORTED_METRICS = {
     # market data
     "md_events_total", "md_sequence_gaps_total", "md_duplicates_total",
@@ -113,6 +113,9 @@ EXPORTED_METRICS = {
     "risk_events_total", "risk_decisions_total", "risk_allowed_total",
     "risk_rejected_total", "risk_realized_pnl", "risk_unrealized_pnl",
     "risk_daily_pnl", "risk_kill_switch_engaged", "risk_limit",
+    # decision trace (com.iap.platform.PaperTraces, 2026-09-19; the names
+    # rust/telemetry::trace pins) — exported, not yet on a panel (EPICS O06)
+    "trace_records_total", "trace_tca_skipped_total",
     # prometheus itself
     "up",
 }

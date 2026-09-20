@@ -8,14 +8,20 @@ cross-run variance of a few percent.
 
 | artifact | what it holds |
 |---|---|
-| [results_cpp.md](results_cpp.md) | the full C++ `bench_all` stage table (codec, book, replay, features, alpha, execution sim) + methodology header. Regenerate: `cpp/build/bench_all benchmarks/results_cpp.md` |
+| [results_cpp.md](results_cpp.md) | the full C++ `bench_all` stage table (codec, book, replay, features, alpha, execution sim, traced execution sim) + the decision-trace path table + methodology header. Regenerate: `cpp/build/bench_all benchmarks/results_cpp.md` |
 | Rust replay demo | `cd rust && cargo run --release --bin demo` — demo-scale replay throughput over the golden vectors, streamed from a decoder thread through the bounded SPSC event bus into the engine (round-3 slab/intrusive-list book, O(1) cancels; a recent container run: ≈ 6.5M events/s equity, ≈ 5.1M events/s FX including the cross-thread hand-off; single timed pass, high variance) |
 | Java replay demo | `java/demo.sh` — 25 timed full replays after 5 warmups (a recent container run: ≈ 3.5M events/s), plus the golden IAP1 SHA-256 digests |
 
-Reference points from the committed C++ run (see `results_cpp.md` for the
-exact table and caveats): IAP1 decode 174.4 ns/event, book update 25.7 ns,
-replay engine 28.1M events/s, feature engine ~530 ns/event (48 features,
-cadence 0), alpha scoring 38.5 ns/row.
+Reference points from the committed C++ run (regenerated 2026-09-19; see
+`results_cpp.md` for the exact table and caveats): IAP1 decode
+184.1 ns/event, book update 26.4 ns, replay engine 27.2M events/s, feature
+engine 514.1 ns/event (48 features, cadence 0), alpha scoring 33.6 ns/row;
+serialising one 5.6 KB `DecisionTrace` 31.7 µs/trace (+ 30.3 µs to hash),
+paid once per decision off the event loop — ≈ 37 ns/event amortised on the
+2,000-event replay. The previous table (2026-09-06) read 174.4 / 25.7 /
+28.1M / 530.4 / 38.5: within the stated few-percent cross-run variance.
+Every document that quotes these figures is checked against the table by
+`tests/harness/check_headline_numbers.py`.
 
 **Why the codec numbers moved 50× in round 3.** The pre-round-3 table read
 3.5 ns/event decode and 3.3 ns encode. IAP1 v2 then added a mandatory
@@ -57,7 +63,7 @@ pinned **log2** buckets, so each figure is the bucket's inclusive upper bound �
 within one power of two ABOVE the true order statistic (conservative). (2) The
 `book_update` row times the whole `onEvent` — book apply *plus* the feature
 engine, the alpha, the portfolio solve and the pre-trade risk check — so it is
-not comparable to the C++ table's isolated 25.7 ns book update; it is the
+not comparable to the C++ table's isolated 26.4 ns book update; it is the
 end-to-end per-event cost an operator actually sees.
 
 `bench_all` now measures the C++ cold case directly rather than leaving it
@@ -69,12 +75,12 @@ against hot **within the same process**:
 
 | stage | hot (cache-resident) | cold (single pass, full day) | ratio |
 |---|---:|---:|---:|
-| IAP1 decode | 174.4 ns/ev | 195.8 ns/ev | 1.12× |
-| book update | 25.7 ns/ev | 42.1 ns/ev | 1.64× |
+| IAP1 decode | 184.1 ns/ev | 212.3 ns/ev | 1.15× |
+| book update | 26.4 ns/ev | 45.3 ns/ev | 1.72× |
 
 Decode barely moves because it streams linearly and the prefetcher hides the
 misses (and because the CRC, not memory, is its bottleneck). The book update
-is 1.6× slower cold: a real day's depth pushes the level map and its free
+is 1.7× slower cold: a real day's depth pushes the level map and its free
 lists out of L2 and costs TLB misses that the 2,000-event loop never pays.
 The **ratio** is the transferable number; the absolutes carry single-pass
 variance and should not be quoted on their own.

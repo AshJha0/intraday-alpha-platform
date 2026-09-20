@@ -70,8 +70,14 @@ no epic without issues. An epic's status is derived from its issues
 carried as a `status:*` label on the epic.
 
 Status is a statement about the repository: `done` cites the files and
-tests that prove it, `in-progress` lists the planned paths of the current
-release, `backlog` says what would prove it done.
+tests that prove it (the integration test checks that at least one cited
+path exists on disk, and that each of the eight modules of the 2026-09-19/20
+release — contracts, risk, execution, lifecycle, trace, store, research, mvp
+— is named by a done issue), `in-progress` lists the planned paths of the
+current release (0 issues as of 2026-09-20: the release closed all 15),
+`backlog` says what would prove it done. Current counts: 24 epics, 123
+issues — 96 done, 0 in progress, 27 backlog (`docs/EPICS.md` summary;
+`docs/ROADMAP.md` maps them to the phases).
 
 ## Keeping it in sync
 

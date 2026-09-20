@@ -10,34 +10,66 @@ component agent; report conflicts instead of silently deviating.
 intraday-alpha-platform/
   PLATFORM_CONVENTIONS.md   this file
   README.md                 (Wave 6)
-  docs/                     SPECIFICATION.md, ARCHITECTURE.md, runbooks/, papers/, governance/
+  API_*.md                  the seven port contracts: CORE, FEATURES, ALPHA, PORTFOLIO_TCA, ADAPTIVE,
+                            CONTRACTS (typed contracts / Protocols / validation), TRADING (the Python
+                            risk + execution reference ports and their goldens)
+  docs/                     SPECIFICATION.md, ARCHITECTURE.md, DIAGRAMS.md, SCENARIOS.md, BUILD_NOTES.md,
+                            MVP.md, LIFECYCLE.md, DECISION_TRACE.md, DATA_MODEL.md, ROADMAP.md,
+                            EPICS.md (generated from tools/github/issues.yaml), runbooks/, papers/,
+                            governance/, diagrams/ (*.mmd, embedded byte-identically in the docs)
   schemas/                  canonical contracts, versioned JSON Schema by domain
-                            (market/ features/ alpha/ order/ execution/ risk/ — README.md is the
-                            index) + FORMAT.md (binary layout) + MIGRATIONS.md at the root
-  configs/                  instruments/ venues/ marketdata/ strategies/ risk/ execution/  (JSON;
+                            (market/ features/ alpha/ order/ execution/ risk/ portfolio/ tca/
+                            research/ trace/ — 17 files, README.md is the index) + sql/iap_v1.sql
+                            (the portable relational DDL, x-version 1) + FORMAT.md (binary layout)
+                            + MIGRATIONS.md at the root
+  configs/                  instruments/ venues/ marketdata/ strategies/ risk/ execution/ mvp/  (JSON;
                             one domain folder per file: configs/<domain>/<file>.json, e.g.
                             configs/risk/risk.json, configs/marketdata/generator.json,
-                            configs/strategies/{strategies,alpha_params}.json)
-  data/                     raw/ normalized/ orderbooks/ features/ reference/  (generated, seeded)
+                            configs/strategies/{strategies,alpha_params,lifecycle}.json;
+                            configs/mvp/{mvp,mvp_tiny,instruments,venues,generator,generator_tiny}.json
+                            is the MVP's own session + its synthetic 3-venue universe)
+  data/                     raw/ normalized/ orderbooks/ features/ reference/  (generated, seeded);
+                            mvp/<run_id>/ (MVP run outputs) and store/ (the SQLite index) are
+                            run outputs, git-ignored, rebuilt from seeds and files
   tests/README.md           the six-level testing strategy (unit, golden, replay, integration,
                             research validation, deployment) with the exact commands
-  tests/golden/             cross-language golden vectors + expected outputs (JSON)
+  tests/golden/             cross-language golden vectors + expected outputs (JSON / JSONL)
   tests/integration/        cross-component end-to-end runs (pytest from the repo root)
   tests/replay/             determinism: same seed => identical bytes (pytest from the repo root)
   tests/harness/            run_all.sh (CI entry: every suite + parity table), run_golden.sh
-                            (every language's golden suite, one command), check_deployment.py
+                            (every language's golden suite, one command), check_deployment.py,
+                            check_headline_numbers.py (every documented number vs its artefact)
   benchmarks/               per-language benchmark code + RESULTS.md with methodology
-  python/   src/iap/...     research + reference implementations (packages below)
+  python/   src/iap/...     research + reference implementations: core marketdata orderbook replay
+                            features labels alpha validation experiment models portfolio tca backtest
+                            adaptive reference — plus, since 2026-09-19: contracts (typed contracts,
+                            Protocols, canonical JSON, validation), risk (reference-equivalent port of
+                            rust/risk), execution (reference-equivalent port of cpp/{execution,sor,replay}),
+                            lifecycle (7-state promotion machine + registry), trace (DecisionTrace
+                            builder / sinks / digest / explain / attribution), store (SQLite index over
+                            schemas/sql), research (ExperimentRunner), mvp (the traced end-to-end loop)
   cpp/                      CMake project: marketdata/ orderbook/ features/ alpha/ execution/ sor/ replay/
-                            (+ header-only include/iap/util/; no C++ risk subsystem — Rust is the risk
-                            reference and Java the port, see docs/ARCHITECTURE.md §2)
-  rust/                     cargo workspace: crates marketdata, orderbook, eventbus, features, alpha, risk, venue, replay, telemetry
-                            (no Rust execution crate: the C++ simulator is the execution reference, Java the port)
+                            contracts/ (canonical JSON + DecisionTrace + trace digest; ExecutionReplay
+                            emits traces) (+ header-only include/iap/util/ incl. sha256; no C++ risk
+                            subsystem — Rust is the risk reference, Java and Python the ports, see
+                            docs/ARCHITECTURE.md §2)
+  rust/                     cargo workspace (11 crates): marketdata, orderbook, eventbus, features, alpha,
+                            risk, venue, replay, telemetry, contracts (canonical JSON, SHA-256,
+                            DecisionTrace, JSONL sink + digest, explain), lifecycle (the 7-state machine,
+                            gates, registry) — no Rust execution crate: the C++ simulator is the
+                            execution reference, Java and Python the ports
   java/                     javac build (build.sh/test.sh): com.iap.* — marketdata, orderbook, features,
-                            alpha, portfolio, risk, execution, sor, tca, backtest, replay, config, monitoring, api
+                            alpha, portfolio, risk, execution, sor, tca, backtest, replay, config,
+                            monitoring, api, platform, adaptive + contracts, trace, lifecycle
+                            (PaperTrading emits decision_traces.jsonl)
   research/                 runnable research scripts ("notebooks") + generated reports/ and models/
                             + experiments/<experiment_id>/{spec.json,result.json} (ExperimentRunner)
-  deployment/               docker/ (Dockerfiles, docker-compose.yml), k8s/ (manifests), grafana/, prometheus/
+                            + experiments.json (the multiple-testing ledger) + alpha_registry.json
+                            + lifecycle_transitions.jsonl (the lifecycle service) + lifecycle_log.jsonl
+                            (the adaptive study's policy comparison) + baselines/ tca/
+  deployment/               docker/ (Dockerfiles, docker-compose.yml), k8s/ (manifests; ConfigMaps
+                            generated from every configs/**/*.json), grafana/, prometheus/
+  tools/github/             issues.yaml (epics / issues source of truth) + create_issues.py
 ```
 
 ## 1. Canonical types (all languages, exact)
@@ -82,12 +114,22 @@ Two physical formats, identical semantics:
    Golden test: encode the golden event vector → byte-identical files across all 4 languages
    (compare SHA-256).
 
-Schema versioning: `schemas/<domain>/*.schema.json` (`schemas/market/market_event.schema.json`
-etc.; `schemas/README.md` is the index, each `$id` is
-`https://iap.example/schemas/<domain>/<file>`) carry `"x-version": 1`. Any field change bumps
-version and adds a MIGRATIONS.md entry. A move of a schema or config file within the tree is a
-MIGRATIONS.md entry too (old → new path table) but bumps nothing. Book / engine checkpoints carry
-`"x-version": 2` and are cross-language JSON (API_CORE §4-§5).
+Schema versioning: `schemas/<domain>/*.schema.json` (`schemas/README.md` is the index, each `$id`
+is `https://iap.example/schemas/<domain>/<file>`) carry `"x-version": 1`. The 17 schemas are the
+seven original contracts — `market/market_event`, `market/book_update`, `features/feature_vector`,
+`alpha/alpha_signal`, `order/order_request`, `execution/execution_report`, `risk/risk_event` — and
+the ten loop contracts added 2026-09-19 — `portfolio/portfolio_target`, `risk/risk_decision`,
+`order/parent_order`, `order/child_order`, `execution/venue_decision`, `tca/tca_result`,
+`research/experiment_spec`, `research/experiment_result`, `alpha/lifecycle_transition`,
+`trace/decision_trace` (which `$ref`s the others). Every schema is mirrored by one frozen,
+validated Python type in `iap.contracts.types` (`SCHEMA`, `x_version`); `SCHEMA_VERSIONS` in
+`iap.contracts.versions` is the inventory and a golden test keeps it equal to the files on disk
+(API_CONTRACTS.md §5). Any field change bumps the version, the constant and the type, regenerates
+`tests/golden/expected_contracts_examples.json` and adds a MIGRATIONS.md entry. A move of a schema
+or config file within the tree is a MIGRATIONS.md entry too (old → new path table) but bumps
+nothing. Book / engine checkpoints carry `"x-version": 2` and are cross-language JSON (API_CORE
+§4-§5). `schemas/sql/iap_v1.sql` is the relational projection of every contract (x-version 1;
+docs/DATA_MODEL.md §9: a column change is a new `iap_vN.sql`, never an in-place edit).
 
 ## 3. Determinism rules
 
@@ -147,18 +189,41 @@ MIGRATIONS.md entry too (old → new path table) but bumps nothing. Book / engin
 `expected_book_states.json` (after pinned event indices: exact integers),
 `expected_anomaly_states.json` (per-venue state + all counters + consolidated view at pinned
 indices, for reorder_window 0 and 4), `expected_checkpoint_eq_1000.json` (cross-language
-checkpoint), `jsonl_reject_cases.txt`, `expected_features.json` (float, abs tol 1e-9 / rel 1e-9),
-`expected_codec_sha256.json`, `expected_alpha.json`, `expected_risk_decisions.json` (exact),
-`expected_replay_fills.json` (exact ticks/qty), `expected_portfolio.json` (1e-9). Python reference
-GENERATES these (validated first against an independent brute-force book); every other language
-must load and match. Each language's test suite has a `golden` test group;
-`tests/harness/run_golden.sh` runs all four and prints a parity table.
+checkpoint), `jsonl_reject_cases.txt`, `expected_features.json` and
+`expected_features_anomalies.json` (float, abs tol 1e-9 / rel 1e-9), `expected_codec_sha256.json`,
+`expected_alpha.json`, `expected_backtest.json`, `expected_portfolio.json`, `expected_tca.json`
+(1e-9), `expected_adaptive.json` (PSI/KS 1e-10, exact refit booleans and lifecycle sequences),
+`splitmix64.json`; the trading goldens `expected_risk_decisions.json` (exact decisions, rule ids,
+severities, notification events, `fixed_format_cases`), `expected_risk_audit.jsonl` (byte parity)
+and `expected_risk_snapshot.json` (byte parity + restore round trip), generated by Rust
+(`rust/risk/src/bin/make_risk_golden.rs`) and consumed by Rust, Java **and Python** (`iap.risk`);
+`expected_replay_fills.json` (exact ticks/qty/timestamps; money fields 1e-9 in C++/Java and
+bit-identical in Python), generated by C++ (`cpp/tools/make_replay_fills_golden.cpp`) and consumed
+by C++, Java **and Python** (`iap.execution`); and the contract goldens added 2026-09-19/20, all
+compared **exactly** (no tolerance) unless stated: `expected_contracts_examples.json` (one
+instance per contract, the pinned `explain()` block, the trace id; `make_golden_contracts.py`),
+`expected_canonical_json.json` (the canonical-JSON rules, 2051 float reprs, 24 string escapes,
+9 documents, 5 rejects, the trace id, the trace-digest known answers;
+`make_golden_canonical_json.py`), `expected_lifecycle.json` (the 7-state machine: config,
+17-edge transition table, three scripted scenarios step by step; `make_golden_lifecycle.py`),
+`expected_experiment_golden_frame.json` (one `ExperimentSpec` + `ExperimentResult` over the golden
+equity vector, floats 1e-9; `make_golden_research.py`) and `expected_mvp.json` (a whole MVP session:
+stream hashes, counts, P&L, per-alpha realized IC, trace digest; integers/hashes exact, floats 1e-9;
+`make_golden_mvp.py`). Python reference GENERATES the goldens it owns (validated first against an
+independent brute-force book / feature recomputation / SLSQP optimum); every other language must
+load and match; the contract goldens are matched by Java, Rust and C++ (`CanonicalJsonGoldenTest`,
+`TraceGoldenTest`, `LifecycleGoldenTest`; `golden_canonical_json.rs`, `golden_trace.rs`,
+`golden_lifecycle.rs`; `CanonicalJsonGolden`, `TraceGolden`, `ReplayTraceGolden`). Each language's
+test suite has a `golden` test group (python `-k golden`, cpp `-R Golden`, rust the nine
+`golden_*` targets, java the thirteen `*GoldenTest` classes); `tests/harness/run_golden.sh` runs
+all four and prints a parity table. Regeneration is a deliberate, versioned act
+(CONTRIBUTING.md §4): every generator refuses to overwrite without `--force`.
 
 ## 6. Feature factory rules
 
 - Registry `data/reference/feature_registry.json`: every feature has `name`, `family`, `version`,
-  `params`, `doc`, `depends_on`. Names like `ofi_l5_w1s_v1`. Target 200+ registered features via
-  pinned parameter grids (returns/OFI/imbalance/vol/liquidity/time-of-day/cross-asset/venue/
+  `params`, `doc`, `depends_on`. Names like `ofi_l5_w1s_v1`. The registry holds 205 registered
+  features (the spec's 200+ target) via pinned parameter grids (returns/OFI/imbalance/vol/liquidity/time-of-day/cross-asset/venue/
   regime/execution families per spec §10).
 - Features computed event-driven with explicit validity flags (warmup, stale book ⇒ invalid).
   NaN never leaks into a valid=true value.
@@ -188,12 +253,20 @@ hot paths allocation-conscious (primitive arrays, no boxing). All: no dead code,
 - rust: `cd rust && cargo test` (workspace)
 - java: `cd java && bash build.sh && bash test.sh`  (javac + JUnit4 jar at /usr/share/java/junit4.jar; NO Maven — Maven Central unreachable here; document in README that pom.xml equivalents are listed in docs/BUILD_NOTES.md)
 - integration / replay (repo root, no PYTHONPATH — `tests/conftest.py`):
-  `python3 -m pytest -q tests/integration` and `python3 -m pytest -q tests/replay`; two extra
-  rows of the `run_all.sh` parity table, counted like the python row (`tests/README.md`)
+  `python3 -m pytest -q tests/integration` (pipeline smoke chain, the GitHub issue plan,
+  `python -m iap.mvp` end to end as a subprocess) and `python3 -m pytest -q tests/replay`
+  (generator determinism; the MVP run twice and replayed from its capture); two extra rows of the
+  `run_all.sh` parity table, counted like the python row (`tests/README.md`)
 - deployment: `python3 tests/harness/check_deployment.py` (structural validation of
-  `deployment/`; run by `run_all.sh` as a further row — see §12.7)
-- Keep each language's full test run < 120s. CI is `.github/workflows/ci.yml`, which runs exactly
-  these commands plus `tests/harness/run_golden.sh` and the deployment validation.
+  `deployment/`; run by `run_all.sh` as a further row — see §12.7); docs:
+  `python3 tests/harness/check_headline_numbers.py` (the `numbers` row: every documented count,
+  benchmark figure, ledger denominator, lifecycle / contract / MVP number vs its artefact)
+- Python dependencies: `python/pyproject.toml` (1.1.0) declares numpy, pandas, scipy, scikit-learn,
+  pyarrow, **jsonschema >= 4.18 and referencing** (offline schema validation in
+  `iap.contracts.validate`) with `ml` and `dev` extras; CI installs the same set in every Python job.
+- Keep each language's full test run < 120s (python 83 s, cpp 1 s, rust 2 s, java 20 s on the
+  2-CPU baseline, 2026-09-20). CI is `.github/workflows/ci.yml`, which runs exactly these commands
+  plus `tests/harness/run_golden.sh` and the deployment validation.
 
 ## 10. Environment facts
 
@@ -206,12 +279,22 @@ SECURITY.md §1 allows serde/serde_json alone; crossbeam optional). Java 21 + JU
 
 ## 11. Trading contracts (risk, execution simulator, SOR, algos, paper wiring, currency)
 
-Normative implementations: **risk** = `rust/risk` (Java `com.iap.risk` is a byte-identical port);
-**execution simulator / SOR / algos** = `cpp/{execution,sor}` (Java `com.iap.{execution,sor}`
-mirrors it; the pinned rule text lives in `cpp/include/iap/execution/execution.hpp`);
+Normative implementations: **risk** = `rust/risk` (the pinned rule text and the golden generator
+`rust/risk/src/bin/make_risk_golden.rs`; Java `com.iap.risk` and Python `iap.risk` —
+`python/src/iap/risk/` — are byte-identical ports proven by the same goldens
+`tests/golden/expected_risk_{decisions,snapshot}.json` + `expected_risk_audit.jsonl`);
+**execution simulator / SOR / algos** = `cpp/{execution,sor,replay}` (the pinned rule text lives in
+`cpp/include/iap/execution/execution.hpp`, the golden generator is
+`cpp/tools/make_replay_fills_golden.cpp`; Java `com.iap.{execution,sor}` and Python `iap.execution`
+— `python/src/iap/execution/` — mirror it and reproduce `tests/golden/expected_replay_fills.json`);
 **portfolio / TCA / research backtest** = Python `iap.{portfolio,tca,backtest}`
-(`API_PORTFOLIO_TCA.md`; Java `com.iap.{portfolio,tca}` mirrors). Goldens are produced by the
-reference and consumed by the ports (§5). Every rule below is tested in every language that
+(`API_PORTFOLIO_TCA.md`; Java `com.iap.{portfolio,tca}` mirrors). Stated exactly: **Rust remains
+normative for the risk rule text and C++ for the execution rule text; Python is now the
+reference-equivalent implementation of both, proven by the same goldens** (`API_TRADING.md`), so
+the platform principle "Python defines the semantics, C++/Rust/Java implement them, golden tests
+prove equivalence" holds for the whole loop the MVP runs, with the ownership of those two rule
+texts and their generators as the one stated qualification. Goldens are produced by the owning
+reference and consumed by every port (§5). Every rule below is tested in every language that
 implements it (`docs/SCENARIOS.md`, TRADING section).
 
 ### 11.1 Hard risk engine (fail-closed)
@@ -273,10 +356,10 @@ implements it (`docs/SCENARIOS.md`, TRADING section).
   `restore` (audited `BOOTSTRAP_COMPLETE` / `STATE_RESTORED`).
 - **Audit parity**: every decision and state transition appends one `RiskEvent`; money in
   reasons is formatted by `fmt_fixed(v, d)` = `round_half_away(|v|·10^d)` integer-scaled with a
-  sign only for a nonzero magnitude, never a float formatter, so Rust and Java logs are
+  sign only for a nonzero magnitude, never a float formatter, so Rust, Java and Python logs are
   byte-identical (`tests/golden/expected_risk_audit.jsonl`, `fixed_format_cases`).
 
-### 11.2 Execution simulator (C++ reference, Java port)
+### 11.2 Execution simulator (C++ reference; Java and Python ports)
 
 The nine pinned rules in `cpp/include/iap/execution/execution.hpp` are the contract. Summary:
 (1) latency = decision + risk + wire + venue mean + one SplitMix64 jitter draw per submission
@@ -293,7 +376,8 @@ arrival)`, `expire_ts` (time-in-force) expires pending or resting orders before 
 while the venue book is missing, stale or not TRADING (MARKET/IOC/FOK → `VENUE_NOT_TRADING`,
 LIMIT rests), reopen fills crossed resting orders at the touch; (9) processing order: expiries,
 activations+cancel arrivals by time, passive tracking, book update, overlay reset, crossing
-check. The simulator has no PEG/MID order types (documented optimism).
+check. The simulator has no PEG/MID order types (documented optimism) in any of the three
+languages; the risk engine tracks them, simulator callers must not submit them.
 
 ### 11.3 SOR and algos
 
@@ -403,15 +487,18 @@ may apply `lot_size` a second time and none may omit it. Consequences that are t
   dir>/state`), written with `fsync` via an atomic temp-file rename:
   `risk_snapshot.json` (`RiskEngine.snapshot()`, schema `x-version 1`), `session_state.json`
   (event cursor, positions, realized/gross P&L, equity peak, order-id sequence, restart count,
-  `x-version 1`), `risk_audit.jsonl` (every `RiskEvent`, appended and flushed at each checkpoint
-  and at shutdown), `config_audit.jsonl`.
+  `audit_lines`, `trace_lines` — `x-version 2` since 2026-09-19), `risk_audit.jsonl` (every
+  `RiskEvent`, appended and flushed at each checkpoint and at shutdown),
+  `decision_traces.jsonl` (one canonical-JSON `DecisionTrace` per pre-trade risk decision, same
+  cadence; §13.3, docs/DECISION_TRACE.md §7), `config_audit.jsonl`.
 - **Checkpoints are event-driven, never wall-clock**: after every `checkpoint_every_events`
   (pinned 1024) processed events and once more at session end and from a JVM shutdown hook, so a
   SIGTERM/OOM-kill loses at most one checkpoint interval, deterministically.
 - `--resume` restores the **risk and accounting** state: `RiskEngine.restore(...)` (positions,
   lots, open orders, kill latches, loss overrides, throttles — a latched kill switch survives the
   restart and a restart is NOT a re-arm path, per §11.1), the platform's realized/gross P&L,
-  equity peak and order-id sequence, and it resumes the event stream at the persisted cursor.
+  equity peak and order-id sequence, the decision-trace digest (rebuilt with `TraceDigest.ofJsonl`),
+  and it resumes the event stream at the persisted cursor.
   `risk_session_restarts_total` counts resumes. The market-data book, feature warm-up and the
   execution simulator are deliberately NOT snapshotted: they rebuild from the stream after the
   cursor (documented in `RUNBOOK_paper_trading.md` §6). Round trip is golden-tested
@@ -428,7 +515,7 @@ may apply `lot_size` a second time and none may omit it. Consequences that are t
   its in-memory copy is the component that grows with decisions and is the first thing to bound
   (a ring buffer) when this vertical is pointed at a full trading day at production order rates.
 - **Retention of the on-disk state** (the deployed answer to "how long is the audit kept?").
-  The four JSONL/JSON files are **per state directory, never rotated by the process** — rotating
+  The JSONL/JSON files are **per state directory, never rotated by the process** — rotating
   an audit log mid-session would break the "replays byte-identically" property the postmortem
   depends on. Instead:
   - one state directory per session (`$IAP_STATE_DIR`, `/data/state` in both deployments), so a
@@ -436,6 +523,10 @@ may apply `lot_size` a second time and none may omit it. Consequences that are t
   - `risk_audit.jsonl` grows at ~180 bytes per risk decision — a full equity day at 500 orders/s
     is ≈ 3 GB, against a 10Gi PVC (`deployment/k8s/pvc.yaml`), so **one day per volume is the
     designed capacity** and a longer run must archive and truncate between sessions;
+    `decision_traces.jsonl` is heavier still (~3 KB per decision cycle: an equity day at 500
+    decisions/s is ≈ 130 GB/h), so a full-rate day needs its own archival step like the audit —
+    archive it with the report's `trace.digest` (= `TraceDigest.ofJsonl(file)`); `--resume`
+    refuses a torn trace file (line count ≠ `session_state.json` `trace_lines`);
   - archival is an operator step, not a process step: `RUNBOOK_paper_trading.md` §7 step 1
     exports the file with its sha256 (recorded in the report as `risk.audit_sha256`) before the
     directory is reused. GOVERNANCE §3 sets the retention period for the archive; the platform's
@@ -516,6 +607,10 @@ Admin endpoints (`RUNBOOK_incident_kill_switch.md` §2 — the manual ENGAGE pat
 - Execution counters come from the platform's own fills, not from a venue simulator:
   `exec_orders_submitted_total`, `exec_fills_total`, `exec_child_orders_rejected_total`,
   `exec_slippage_bps` (histogram of |fill − mark| in bps × 100, integer-scaled).
+- Decision-trace counters: `trace_records_total` (one per canonical JSONL line written,
+  incremented only after a successful emit — the same name `rust/telemetry::trace` pins) and
+  `trace_tca_skipped_total` (a parent the TCA timeline never covered; the trace carries no TCA
+  rather than a guessed one).
 - Risk limits are exported as `risk_limit{limit="max_daily_loss"|"max_strategy_daily_loss"|
   "max_gross_notional"|"max_net_notional"}` so alerts and dashboards divide by the **live** limit
   instead of a hand-copied constant.
@@ -560,3 +655,146 @@ Admin endpoints (`RUNBOOK_incident_kill_switch.md` §2 — the manual ENGAGE pat
   the `integration` and `replay` rows), `tests/harness/run_golden.sh`, and
   `tests/harness/check_deployment.py` (YAML/compose/promtool/Dockerfile/configmap checks). `CODEOWNERS` names the reviewers `SECURITY.md` and `GOVERNANCE.md`
   refer to.
+
+## 13. Contracts, lifecycle, trace and data model (Python `iap.{contracts,lifecycle,trace,store}`; ports `com.iap.{contracts,trace,lifecycle}`, `rust/{contracts,lifecycle}`, `cpp/include/iap/contracts/`)
+
+Normative implementation: Python (`API_CONTRACTS.md`, `docs/LIFECYCLE.md`, `docs/DECISION_TRACE.md`,
+`docs/DATA_MODEL.md`); the ports are proven by `tests/golden/expected_canonical_json.json`,
+`expected_contracts_examples.json` and `expected_lifecycle.json` (§5). Everything below is pinned.
+
+### 13.1 Canonical JSON (the `rules` block of `expected_canonical_json.json`)
+
+- **keys**: sorted by Unicode code point of the raw key, recursively.
+- **separators**: `,` and `:` — no whitespace.
+- **ascii**: non-ASCII escaped as `\uXXXX` (UTF-16 surrogate pairs above U+FFFF); `/` not escaped.
+- **floats**: shortest round-trip digits; exponent form iff the decimal exponent is `< -4` or
+  `>= 16`; exponent written `e-05` / `e+16` (sign, at least two digits); integral values keep
+  `.0` — Python `float.__repr__`, reproduced by `Double.toString` + one-digit rounding (Java),
+  `{:e}` re-laid out (Rust), `std::to_chars` re-laid out (C++).
+- **ints**: exact decimal in the i64/u64 domain (`18446744073709551615` round-trips).
+- **literals**: `null`, `true`, `false`; NaN / ±Inf and non-string keys are rejected, never
+  serialised (every port validates before `to_value`, because a serde-style `to_value` would turn
+  NaN into `null` silently).
+- **parsing** must be correctly rounded (Rust builds `serde_json` with `float_roundtrip`; the
+  default parser was 1 ulp off on 17-digit decimals and broke the registry byte parity).
+- Python: `json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+  allow_nan=False)` = `iap.contracts.versions.canonical_json`; `content_hash(obj)` = its sha256 hex,
+  used for `config_version` (the configuration documents in force, keyed by repo-relative path),
+  `portfolio_version`, `experiment_id` (first 16 hex of the spec without its id) and
+  `BookSnapshotRef.state_hash`. Research artefacts that are meant to be read
+  (`research/alpha_registry.json`, `research/experiments/<id>/*.json`) use the same key order with
+  2-space indentation and a trailing newline — byte-deterministic either way.
+
+### 13.2 Ids and the trace digest
+
+- **Trace id** = first 32 hex characters of `sha256("<session_id>|<instrument_id>|<event_ts>|<sequence>")`
+  (ASCII, decimal integers); pinned `8b9fed6896d01463e64c4de915b0614b` for
+  `("golden-session-2026-09-19", 1, 1787578700000000000, 500)`. Never a wall clock, never a
+  counter that depends on thread timing.
+- **Generic ids** (`strategy_id`, `alpha_id`, `experiment_id`, `session_id`):
+  `^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$` — no `|`, no whitespace, so the trace-id preimage is
+  unambiguous. Flagship alpha ids are `^(EQ|FX)\d{2}$`. Version fields are 64-hex sha256; the
+  C++ replay writes 64 zeros (`kVersionNotApplicable`) for a version its path does not have,
+  never a fake hash.
+- **Trace digest**: for each emitted trace in emission order, sha256 over the ASCII bytes of its
+  canonical line followed by one `0x0A`; `hexdigest()` is the running SHA-256. Known answers: the
+  golden example once `bf60a300d151c9cea462e339b0dac407c595fdc5e3c59efd588d5aada8455162`, twice
+  `e6f6ea54e5d5ff314dc11d235efc4caa4065e3604756101dbdce215502e053ca`, empty
+  `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`. `of_jsonl(path)` must equal
+  the emitting sink's digest; same seed ⇒ same digest.
+
+### 13.3 The decision trace
+
+One `DecisionTrace` (`schemas/trace/decision_trace.schema.json`) per decision cycle: header
+(`trace_id`, `session_id`, `instrument_id`, `event_ts`, `sequence`, `data_version`,
+`feature_version`, `model_version`, `config_version`) + `stages` in loop order (`signal[]`,
+`portfolio`, `risk[]`, `parent_orders[]`, `child_orders[]`, `routing[]`, `fills[]`, `tca[]`,
+`attribution`). An empty list / `null` means the stage did not run; nothing is fabricated to fill
+a stage. `signal[0]` is the acting signal (the one the portfolio sized on); further entries are its
+components labelled by their own `model_version` (= alpha id). ALLOW ⇔ `rule_index == -1`.
+`Attribution.total == alpha + spread + impact + fees + timing` (1e-9); the residual against
+realized P&L is reported next to it, never absorbed. Every sink validates (`validate_typed`)
+before persisting; nothing is written for an invalid trace. Emission: Python `iap.mvp` one per
+decision (JSONL + store + digest, both sinks' digests must agree); Java `PaperTrading` one per
+pre-trade risk decision into `<state-dir>/decision_traces.jsonl` (fsynced at checkpoints;
+`trace_records_total`); C++ `ExecutionReplay` one per parent order after the run, never inside the
+event loop; Rust `contracts::trace` sink + digest (re-exported by `telemetry::trace`). The pinned
+`explain()` block is in `expected_contracts_examples.json` and reproduced byte for byte in all four
+languages. The JSONL file (with its digest) is the durable record; store rows are its index.
+
+### 13.4 The alpha promotion lifecycle (seven states, seventeen edges)
+
+States `LifecycleState`: RESEARCH=0, CANDIDATE=1, VALIDATING=2, PAPER=3, ACTIVE=4, WATCH=5,
+RETIRED=6 (names on the wire). The transition table is data, pinned as `transition_table` in
+`expected_lifecycle.json` and asserted equal in Python, Rust and Java:
+
+| # | from → to | kind | actor | gates (evaluated in this order) / trigger |
+|---|---|---|---|---|
+| 0 | RESEARCH → CANDIDATE | PROMOTION | SYSTEM | `ledger_entry_exists`, `leakage_clean` |
+| 1 | CANDIDATE → VALIDATING | PROMOTION | SYSTEM | `leakage_clean`, `oos_ic`, `statistical_significance`, `fold_consistency`, `fold_count`, `hypothesis_sign`, `net_pnl_after_costs`, `capacity`, `stability` |
+| 2 | CANDIDATE → RESEARCH | DEMOTION | SYSTEM | taken at once when edge 1's `leakage_clean` fails (carries all nine results) |
+| 3 | VALIDATING → PAPER | PROMOTION | SYSTEM | `holdout_ic_tracks_research`, `replay_reproducible`, `cross_language_parity` |
+| 4 | VALIDATING → CANDIDATE | DEMOTION | SYSTEM | the `max_consecutive_failures`-th (3) consecutive failed evaluation of edge 3 |
+| 5 | PAPER → ACTIVE | PROMOTION | SYSTEM | `paper_min_sessions`, `paper_ic_tracking`, `paper_net_pnl`, `no_kill_events` |
+| 6 | PAPER → CANDIDATE | DEMOTION | SYSTEM | the 3rd consecutive failed evaluation of edge 5 |
+| 7 | ACTIVE → WATCH | LIVE | SYSTEM | `rolling_ic` — `LifecycleTracker` unchanged (§ API_ADAPTIVE §6): `ic < watch_ic_gate` |
+| 8 | WATCH → ACTIVE | LIVE | SYSTEM | `rolling_ic` — `reactivate_evals` (3) consecutive `ic >= reactivate_ic_gate` |
+| 9 | WATCH → RETIRED | LIVE | SYSTEM | `rolling_ic` — `retire_breach_evals` (6) consecutive breaches (entering breach counts) |
+| 10–15 | {RESEARCH, CANDIDATE, VALIDATING, PAPER, ACTIVE, WATCH} → RETIRED | MANUAL | HUMAN | `retire(alpha, ts, reason)`; non-empty reason; a SYSTEM actor raises |
+| 16 | RETIRED → RESEARCH | MANUAL | HUMAN | `reset_to_research(alpha, ts, reason)` |
+
+Pinned semantics: **silence is not evidence** (an absent evidence block evaluates nothing and moves
+nothing, not even a counter — outcome `NO_EVIDENCE`; RESEARCH's presence gate is the one exception
+by construction); a promotion needs every gate of the edge; CANDIDATE has no failure counter;
+VALIDATING / PAPER demote on the 3rd consecutive failed evaluation; **RETIRED is terminal for
+SYSTEM** (outcome `TERMINAL`; re-entry is the HUMAN reset to RESEARCH — the adaptive tracker's
+RETIRED → WATCH recovery models shadow scoring inside one backtest and is never reached on the
+platform); manual transitions carry `gates = {}`; policy `lifecycle_v1`; no wall clock, no RNG,
+sorted registry iteration. Gate thresholds live in `configs/strategies/lifecycle.json`
+(x-version 1; the promotion defaults equal `iap.validation.validate.GATES`) and the live gates in
+`configs/strategies/strategies.json` `adaptive.lifecycle` — never duplicated. Artefacts:
+`research/alpha_registry.json` (x-version 1, byte-deterministic, re-rendered byte-identically by
+the Rust and Java ports) and `research/lifecycle_transitions.jsonl` (canonical `LifecycleTransition`
+lines, schema-validated on write); `research/lifecycle_log.jsonl` is the adaptive study's policy
+comparison and never sets a state. The bundled result: 24 CANDIDATE / 0 beyond
+(`net_pnl_after_costs` fails for all 24). In the live Java loop the state is **observational**
+(API_ADAPTIVE.md §6; GOVERNANCE gate 11): the machine decides state, not size.
+
+### 13.5 The store is a derived, rebuildable index
+
+`schemas/sql/iap_v1.sql` (x-version 1; 24 tables, 3 views; `BIGINT` / `DOUBLE PRECISION` / `TEXT`
+only; JSON columns hold `canonical_json` text; enums as wire values) runs unchanged on SQLite 3 and
+PostgreSQL ≥ 13, enforced in CI by a portability whitelist (docs/DATA_MODEL.md §5), not by a
+PostgreSQL run. The flat files — Parquet feature store, goldens, research JSON, the JSONL audits
+and trace files — remain the source of truth; `python -m iap.store build` recreates the database
+from them in about a second and a rebuild from unchanged files is byte-identical
+(`Store.export_jsonl`). Every typed write is `validate_typed` first; every typed read is
+`T.from_dict`; inserts are upserts by primary key in one transaction; a trace is rewritten as a
+unit. No wall clock anywhere in the DDL or the Store. A column change is a new `iap_vN.sql` +
+`DDL_X_VERSION` bump + MIGRATIONS entry, never an in-place edit.
+
+### 13.6 x-version discipline for the new artefacts
+
+Wire schemas: §2 (all 17 at 1). Non-wire documents carry their own `x-version` and the same rule
+(bump + MIGRATIONS entry on any field change): `configs/strategies/lifecycle.json` 1,
+`configs/mvp/mvp.json` 1, `research/alpha_registry.json` 1, `schemas/sql/iap_v1.sql` 1,
+`tests/golden/expected_{contracts_examples,canonical_json,lifecycle,experiment_golden_frame,mvp}.json`
+1, the MVP `report.json` 2 and `paper_evidence.json` 2 (2026-09-20), the Java `session_state.json`
+2 and paper session report 3 (2026-09-19). A golden regenerated for a deliberate semantic change is
+a `golden:` commit with the generator named (CONTRIBUTING.md §4).
+
+### 13.7 No LLM or agent on the trading path; risk never depends on a model
+
+Nothing under `python/src/iap/{risk,execution,portfolio,orderbook,features,core,marketdata,replay}`
+— nor `rust/risk`, `cpp/execution`, `com.iap.{risk,execution,portfolio}` — may import a network
+client, an LLM client or any model-inference dependency, and `RiskEngineLike.evaluate` is pinned
+as a pure function of the order and the engine's own state: no wall clock, no I/O, no model
+(`iap.contracts.protocols`). The risk engine's inputs are reference data, limits, market data and
+fills; it never reads an alpha's confidence, a lifecycle state or a model output, and no component
+may weaken a risk decision on the strength of one. Agentic / MCP tooling (docs/ARCHITECTURE.md
+§11; EPICS E24, backlog) is **read-only and off the critical path** by design: it may query the
+store, the ledger, TCA, drift and the registry and draft hypotheses or explain incidents; it cannot
+flip a verdict, move a lifecycle state, override a risk decision or send an order — those are
+HUMAN or gated-SYSTEM acts with a ledger entry id (CONTRIBUTING.md §6). A policy test that
+enforces the import rule is backlog issue AG03; until it exists the rule is enforced in review
+(CODEOWNERS: risk, execution, core).

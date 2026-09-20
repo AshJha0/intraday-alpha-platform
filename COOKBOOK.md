@@ -30,6 +30,11 @@ Contents:
 19. [Watch live drift in paper trading](#19-watch-live-drift-in-paper-trading)
 20. [Build the platform store and query it](#20-build-the-platform-store-and-query-it)
 21. [Explain an order (the decision trace)](#21-explain-an-order-the-decision-trace)
+22. [Run the MVP loop (one command, one instrument, fully traced)](#22-run-the-mvp-loop-one-command-one-instrument-fully-traced)
+23. [Replay an incident from the captured stream](#23-replay-an-incident-from-the-captured-stream)
+24. [Explain an MVP order](#24-explain-an-mvp-order)
+25. [Bootstrap and inspect the alpha promotion lifecycle](#25-bootstrap-and-inspect-the-alpha-promotion-lifecycle)
+26. [Run one alpha as a contract-driven experiment](#26-run-one-alpha-as-a-contract-driven-experiment)
 
 ---
 
@@ -290,7 +295,8 @@ cd java && bash build.sh && bash test.sh          # includes PortfolioGoldenTest
 
 ## 9. Run risk checks against the golden decisions
 
-The Rust engine is the reference; Java ports it. The golden replays a full
+The Rust engine is the reference; Java and Python (`iap.risk`,
+[API_TRADING.md](API_TRADING.md) §1) port it. The golden replays a full
 step sequence (orders, fills, market moves, gaps, venue outages, kill
 switches, loss-limit overrides, session rolls, a mid-stream snapshot) and
 pins every decision, deciding rule and severity, the notification events,
@@ -306,6 +312,7 @@ cd java && bash build.sh && rm -rf out/test && mkdir -p out/test && \
         -d out/test @out/test-sources.txt && \
   java -cp "out/test:out/main:/usr/share/java/junit4.jar:/usr/share/java/hamcrest-core.jar" \
        org.junit.runner.JUnitCore com.iap.RiskGoldenTest
+cd python && PYTHONPATH=src python3 -m pytest -q tests/test_risk_golden.py tests/test_risk_rules.py   # Python port: 7 golden + 79 rule tests
 ```
 
 To understand a decision, read the step in
@@ -339,10 +346,13 @@ cd cpp && bash build.sh
 ctest --test-dir build --output-on-failure -R 'ReplayFillsGolden|Exec'
 ```
 
-Java must reproduce the same fills to the tick:
+Java and Python must reproduce the same fills to the tick (Python's golden
+test additionally asserts every money field bit-identical —
+[API_TRADING.md](API_TRADING.md) §2):
 
 ```bash
 cd java && bash build.sh && bash test.sh    # includes ReplayFillsGoldenTest, ExecutionSimTest, AlgosTest
+cd python && PYTHONPATH=src python3 -m pytest -q tests/test_execution_golden.py tests/test_execution_rules.py tests/test_exec_algos.py tests/test_sor.py
 ```
 
 Read the expected economics (patience vs urgency — the passive parent earns
@@ -485,19 +495,22 @@ Methodology matters more than the numbers (spec §22): the committed
 `benchmarks/results_cpp.md` states hardware (2-CPU Xeon container, no
 pinning), compiler, flags, workload and the mean-only caveat next to every
 figure (`benchmarks/RESULTS.md` is the cross-language index). Reference
-points from the committed run: IAP1 decode 174.4 ns/event, book update
-25.7 ns, replay 28.1M events/s, feature engine ~530 ns/event, alpha scoring
-38.5 ns/row. The table now also carries a **cold** reference — one single
-pass over a full generated session — next to the hot rows, because every
-hot figure is cache-resident by construction (see the caveat in
-`results_cpp.md`, which `bench_all` emits itself so a regeneration cannot
-drop it).
+points from the committed run (regenerated 2026-09-19): IAP1 decode
+184.1 ns/event, book update 26.4 ns, replay 27.2M events/s, feature engine
+514.1 ns/event, alpha scoring 33.6 ns/row; serialising one 5.6 KB decision
+trace 31.7 µs/trace (+ 30.3 µs to hash), off the event loop. The table also
+carries a **cold** reference — one single pass over a full generated session
+— next to the hot rows, because every hot figure is cache-resident by
+construction (see the caveat in `results_cpp.md`, which `bench_all` emits
+itself so a regeneration cannot drop it), and a trace-path table.
 
-The decode figure moved from 3.5 to 174.4 ns/event in round 3 and that is
+The decode figure moved from 3.5 to ~180 ns/event in round 3 and that is
 not a regression to fix: IAP1 v2 added a mandatory CRC-32 integrity
 trailer, and a byte-at-a-time table CRC over the 144 KB body costs
-~5 cycles/byte. Paying ~170 ns/event to detect a corrupted capture is the
-right trade; quoting the pre-CRC number afterwards was not.
+~5 cycles/byte. Paying ~180 ns/event to detect a corrupted capture is the
+right trade; quoting the pre-CRC number afterwards was not. Every document
+that quotes the table is checked against it by
+`tests/harness/check_headline_numbers.py`.
 
 ## 14. Verify cross-language parity in one command
 
@@ -507,11 +520,12 @@ bash tests/harness/run_all.sh --golden-only   # golden groups only (fast)
 ```
 
 Exit code 0 iff every language passed; logs land in a temp dir printed on
-the first line. A full-suite run: python 626 / cpp 243 /
-rust 254 / java 449 tests passed (golden groups 65/45/47/85), plus
-`integration` (1) and `replay` (2) rows for the repo-level pytest suites, a
-`deployment` row (18 structural checks) and a `numbers` row (every headline
-figure re-derived from its artefact), all PASS.
+the first line. A full-suite run (2026-09-20): python 1352 / cpp 266 /
+rust 298 / java 475 tests passed (golden groups 162/67/62/102), plus
+`integration` (13) and `replay` (4) rows for the repo-level pytest suites, a
+`deployment` row (16 structural checks passed, 2 skipped for absent tools)
+and a `numbers` row (every headline figure re-derived from its artefact),
+all PASS.
 
 ## 15. Generate the TCA report
 
@@ -876,3 +890,75 @@ ensemble order), each labelled by its own `model_version`. Expected
 returns of a fitted alpha are hundredths of a basis point, which the
 pinned one-decimal renderer shows as `+0.0 bps` — read `traces.jsonl` /
 `alpha_signals` for the exact values.
+
+## 25. Bootstrap and inspect the alpha promotion lifecycle
+
+The seven-state machine ([docs/LIFECYCLE.md](docs/LIFECYCLE.md)) reads the
+24 alpha reports, the ledger and `alpha_params.json`, registers every alpha
+at RESEARCH at the pinned bootstrap event time (the latest fold `test_end`)
+and advances it until it stops moving. On the bundled data that is one
+step: every alpha reaches CANDIDATE and holds there on
+`net_pnl_after_costs`.
+
+```bash
+cd python
+PYTHONPATH=src python3 -m iap.lifecycle bootstrap --dry-run      # compute, print, touch nothing
+PYTHONPATH=src python3 -m iap.lifecycle bootstrap                # rewrite research/alpha_registry.json + lifecycle_transitions.jsonl (identical bytes on an identical rerun)
+PYTHONPATH=src python3 -m iap.lifecycle status
+# alpha | state | since_ts | failed gates
+# ----- | ----- | -------- | ------------
+# EQ01 | CANDIDATE | 1787691480577291027 | net_pnl_after_costs
+# EQ04 | CANDIDATE | 1787691480577291027 | oos_ic, statistical_significance, fold_consistency, net_pnl_after_costs
+# FX09 | CANDIDATE | 1787691480577291027 | oos_ic, statistical_significance, hypothesis_sign, net_pnl_after_costs, stability
+# ...  (24 rows, all CANDIDATE)
+PYTHONPATH=src python3 -m iap.lifecycle retire FX09 --reason "desk decision: rationale contradicted by the fitted sign"   # HUMAN edge -> RETIRED
+PYTHONPATH=src python3 -m iap.lifecycle reset FX09 --reason "re-run the evidence chain after the refit"                # HUMAN edge RETIRED -> RESEARCH
+git checkout -- ../research/alpha_registry.json ../research/lifecycle_transitions.jsonl                                 # the committed state is the bundled result
+```
+
+Every transition is one canonical-JSON `LifecycleTransition` line in
+`research/lifecycle_transitions.jsonl` (gates, policy `lifecycle_v1`,
+actor, reason); the registry records each alpha's last evaluation with its
+`failed_gates`. A manual `retire` / `reset` needs a non-empty reason and is
+HUMAN-only; a SYSTEM `advance` on a RETIRED alpha records `TERMINAL` and
+moves nothing. Thresholds live in `configs/strategies/lifecycle.json`
+(promotion) and `configs/strategies/strategies.json` `adaptive.lifecycle`
+(live); the golden `tests/golden/expected_lifecycle.json` scripts three
+whole lives that Python, Java and Rust reproduce step by step
+(`PYTHONPATH=src python3 -m pytest -q tests/test_lifecycle_golden.py`).
+Changing a threshold is a `lifecycle.json` x-version bump + `python3
+tools/make_golden_lifecycle.py --force` + a MIGRATIONS entry, never an edit
+of the registry by hand (GOVERNANCE.md §1). The MVP's `paper_evidence.json`
+(recipe 22) is the `PaperEvidence` document the PAPER → ACTIVE gates read.
+
+## 26. Run one alpha as a contract-driven experiment
+
+`iap.research` ([research/experiments/README.md](research/experiments/README.md),
+LEARN.md §6.8) turns "run EQ03 at 1 s" into a typed `ExperimentSpec` whose
+id is the hash of the request, runs the same purged / embargoed walk-forward
+the promotion report runs plus a holdout backtest, writes a typed
+`ExperimentResult`, and enters the run in the multiple-testing ledger:
+
+```bash
+cd python
+PYTHONPATH=src python3 -m iap.research run --alpha EQ03 --horizon 1s               # spec block, result table, VERDICT, the ledger note
+PYTHONPATH=src python3 -m iap.research run --alpha EQ03 --horizon 1s --dry-run     # compute without touching the ledger or disk
+PYTHONPATH=src python3 -m iap.research run --alpha EQ06 --config n_folds=3 --config cost_multiplier=2.0   # a different configuration = a different id
+PYTHONPATH=src python3 -m iap.research list                                        # every research/experiments/<id>/ with alpha, horizon, verdict
+PYTHONPATH=src python3 -m iap.research show d7b554d0a3fa3b26                       # the spec and result documents
+```
+
+Where the files land: `research/experiments/<id>/{spec.json,result.json}`,
+sorted keys, 2-space indent, no wall clock — an identical rerun is
+byte-identical (only `git_commit` and `n_experiments_in_ledger` are
+provenance and may legitimately move), and a rerun that reproduces
+*different* evidence under the same id is refused, not overwritten. An empty
+configuration reproduces the flagship report's protocol: the pinned-horizon
+result (EQ03 @ 5 s, `217fa0cb1d89a9c8`) equals
+`research/alpha_reports/EQ03.json` at 1e-9. Every run adds 21 looks to
+`research/experiments.json`, which is why the five committed experiments
+moved the denominator from 760 to 865 (`check_headline_numbers.py` reports
+the docs stale until they follow). The golden
+`tests/golden/expected_experiment_golden_frame.json` pins one spec / result
+pair over the golden equity vector.
+

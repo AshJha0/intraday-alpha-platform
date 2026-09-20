@@ -323,6 +323,12 @@ python -m iap.store sql     [--db ...] "<query>"                           # one
 ```
 
 `data/store/` is git-ignored: the database is never committed, only rebuilt.
+The MVP writes its own store per run (`data/mvp/<run_id>/iap.sqlite`, every
+trace of the session plus the MVP reference data — `python -m iap.mvp
+explain` reads it; docs/MVP.md §6, COOKBOOK recipe 24). The pinned rules
+for the store are `PLATFORM_CONVENTIONS.md` §13.5; the trace record it
+indexes is `docs/DECISION_TRACE.md`; the lifecycle artefacts it imports are
+`docs/LIFECYCLE.md` §5.
 
 ## 9. Versioning
 

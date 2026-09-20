@@ -209,15 +209,28 @@ exit 0.
    from §2. It is written for you, continuously:
    ```bash
    ls -l <state-dir>/            # risk_audit.jsonl, risk_snapshot.json,
-                                 # session_state.json, config_audit.jsonl,
-                                 # admin_audit.jsonl
-   python3 -c "import json;d=json.load(open('<report>.json'));print(d['risk'])"
-   #   -> audit_jsonl (path) and audit_sha256 (the archive's checksum)
+                                 # session_state.json (x-version 2), config_audit.jsonl,
+                                 # admin_audit.jsonl, decision_traces.jsonl
+   python3 -c "import json;d=json.load(open('<report>.json'));print(d['risk']);print(d['trace'])"
+   #   -> audit_jsonl (path) and audit_sha256 (the archive's checksum);
+   #      trace: {count, digest, jsonl} (the decision-trace stream digest)
    sha256sum <state-dir>/risk_audit.jsonl   # must equal report.risk.audit_sha256
+   cd python && PYTHONPATH=src python3 -c "from iap.trace import TraceDigest; print(TraceDigest.of_jsonl('<state-dir>/decision_traces.jsonl').hexdigest())"
+   #   -> must equal report.trace.digest (and /status trace_digest at session end)
    ```
-   The file is byte-identical to `RiskEngine.auditJsonl()` and two identical
-   sessions produce identical bytes (`PaperStateRecoveryTest`); `cd rust &&
-   cargo test -p risk` includes the cross-language replay proof.
+   The audit file is byte-identical to `RiskEngine.auditJsonl()` and two
+   identical sessions produce identical bytes (`PaperStateRecoveryTest`);
+   `cd rust && cargo test -p risk` includes the cross-language replay proof.
+   `decision_traces.jsonl` holds one `DecisionTrace` per pre-trade risk
+   decision (`docs/DECISION_TRACE.md` §7), appended and fsynced with the
+   audit at every checkpoint; it is ~3 KB per decision cycle (an equity day
+   at 500 decisions/s is ≈ 130 GB/h), so archive it with its digest before
+   the directory is reused, exactly like the audit. "Explain an order": load
+   the line whose `stages.parent_orders[0].parent_order_id` is the risk
+   order id and render it with `com.iap.trace.Explain.render(trace,
+   venueNames)` (Python: `iap.trace.explain_jsonl(path, parent_order_id)`,
+   COOKBOOK recipe 21); the incident flow is
+   `RUNBOOK_incident_replay.md`.
 2. Compare realized paper P&L/fill quality against the backtest for the same
    events; file the comparison in `research/tca/`. Honest reporting rule
    applies: degradation is reported, not explained away (conventions §7).
@@ -229,9 +242,11 @@ exit 0.
 
 **What survives a restart** (`PLATFORM_CONVENTIONS.md` §12.3): positions,
 lots, open orders, realized P&L, the strategy-side order-id sequence, every
-loss-limit override and **every latched kill switch** — restored from
-`<state-dir>/risk_snapshot.json` + `session_state.json`, with `STATE_RESTORED`
-appended to the audit log and `risk_session_restarts_total` incremented.
+loss-limit override, **every latched kill switch** and the decision-trace
+digest (rebuilt from `decision_traces.jsonl` with `TraceDigest.ofJsonl`) —
+restored from `<state-dir>/risk_snapshot.json` + `session_state.json`, with
+`STATE_RESTORED` appended to the audit log and `risk_session_restarts_total`
+incremented.
 A restart is **not** a re-arm path; clearing a latch still needs §5 of
 `RUNBOOK_incident_kill_switch.md`.
 
@@ -257,9 +272,10 @@ curl -s localhost:8080/status | python3 -m json.tool     # restarts >= 1
 
 Failure is closed, not silent: a missing checkpoint, malformed JSON, an
 unknown snapshot version, a checkpoint for a different instrument/alpha, a
-cursor at/past the end of the stream, or a `risk_audit.jsonl` whose line
-count disagrees with `session_state.json`'s `audit_lines` all abort the
-process with the offending file named. `SessionRestartsClimbing` (> 2
+cursor at/past the end of the stream, a `risk_audit.jsonl` whose line
+count disagrees with `session_state.json`'s `audit_lines`, or a
+`decision_traces.jsonl` whose line count disagrees with `trace_lines`, all
+abort the process with the offending file named. `SessionRestartsClimbing` (> 2
 resumes in 15 m) is a crash loop — read the logs before restarting again.
 
 **"risk_audit.jsonl has N lines but session_state.json records
@@ -273,7 +289,8 @@ tail -n $((N - M)) <state-dir>/risk_audit.jsonl   # the k decisions past the che
 ```
 
 Those decisions happened and are recorded; the checkpoint simply predates
-them. Archive the whole state directory (audit included, per §7 step 1),
+them. Archive the whole state directory (audit and traces included, per §4
+step 1),
 then resume from the archived copy with the audit truncated to M lines *by
 the recovery operator, with the discrepancy noted in the incident record* —
 or, preferably, restart the session from the last clean checkpoint and let

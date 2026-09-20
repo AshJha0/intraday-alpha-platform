@@ -1,0 +1,25 @@
+flowchart TD
+    %% iap.lifecycle (reference), com.iap.lifecycle, rust/lifecycle — pinned by
+    %% tests/golden/expected_lifecycle.json (transition_table: 17 edges, states 0..6).
+    %% Solid arrows: SYSTEM edges (PROMOTION / DEMOTION / LIVE) with the gates
+    %% evaluated in order; dashed arrows: MANUAL edges (HUMAN actor, non-empty reason).
+    RESEARCH["RESEARCH (0)"] -->|"PROMOTION: ledger_entry_exists, leakage_clean"| CANDIDATE["CANDIDATE (1)"]
+    CANDIDATE -->|"PROMOTION: leakage_clean, oos_ic, statistical_significance,<br/>fold_consistency, fold_count, hypothesis_sign,<br/>net_pnl_after_costs, capacity, stability"| VALIDATING["VALIDATING (2)"]
+    CANDIDATE -->|"DEMOTION: leakage_clean fails (at once)"| RESEARCH
+    VALIDATING -->|"PROMOTION: holdout_ic_tracks_research,<br/>replay_reproducible, cross_language_parity"| PAPER["PAPER (3)"]
+    VALIDATING -->|"DEMOTION: 3rd consecutive failed evaluation"| CANDIDATE
+    PAPER -->|"PROMOTION: paper_min_sessions, paper_ic_tracking,<br/>paper_net_pnl, no_kill_events"| ACTIVE["ACTIVE (4)"]
+    PAPER -->|"DEMOTION: 3rd consecutive failed evaluation"| CANDIDATE
+    ACTIVE -->|"LIVE: rolling_ic < watch_ic_gate (0.0)"| WATCH["WATCH (5)"]
+    WATCH -->|"LIVE: 3 consecutive rolling_ic >= reactivate_ic_gate (0.005)"| ACTIVE
+    WATCH -->|"LIVE: 6 consecutive breaches (entering breach counts)"| RETIRED["RETIRED (6) — terminal for SYSTEM"]
+    RESEARCH -. "MANUAL retire (HUMAN)" .-> RETIRED
+    CANDIDATE -. "MANUAL retire (HUMAN)" .-> RETIRED
+    VALIDATING -. "MANUAL retire (HUMAN)" .-> RETIRED
+    PAPER -. "MANUAL retire (HUMAN)" .-> RETIRED
+    ACTIVE -. "MANUAL retire (HUMAN)" .-> RETIRED
+    WATCH -. "MANUAL retire (HUMAN)" .-> RETIRED
+    RETIRED -. "MANUAL reset_to_research (HUMAN):<br/>the whole evidence chain again" .-> RESEARCH
+    SILENCE["Silence is not evidence: an absent evidence block<br/>(or rolling_ic null / uninformative) evaluates nothing<br/>and moves nothing — outcome NO_EVIDENCE"] -.-> CANDIDATE
+    RESULT["Bundled data (bootstrap 2026-09-19):<br/>24 alphas CANDIDATE, 0 VALIDATING —<br/>every alpha fails net_pnl_after_costs at 1x costs"] -.-> CANDIDATE
+    OBS["Live Java loop: the state is OBSERVATIONAL —<br/>RETIRED pages a human, does not cut size (API_ADAPTIVE §6)"] -.-> RETIRED

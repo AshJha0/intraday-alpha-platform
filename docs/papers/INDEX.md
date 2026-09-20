@@ -13,12 +13,26 @@ are statements about this dataset and pipeline, not about real markets).
 > folds are cut by row mass rather than wall span (the earlier equity folds
 > could be empty and still counted as passes); latency stress is applied in
 > **time**, not in rows; and the multiple-testing ledger is de-duplicated by
-> configuration, which resets the experiment count from 13,306 recorded
-> looks to **760 looks over 65 distinct configurations** (Bonferroni per-test
-> |t| 3.99, expected max |t| under the global null 3.64). Papers 1-4 carry a
+> configuration, which reset the experiment count from 13,306 (every rerun
+> counted) to a de-duplicated **760 over 65 configurations** at that
+> date (Bonferroni per-test threshold 3.99, selection yardstick 3.64 — both
+> superseded by the 2026-09-20 note below). Papers 1-4 carry a
 > dated `Erratum / Update` section stating the corrected figures; their
 > original dated bodies are preserved as published. The summaries below are
 > the corrected ones. Papers 5 and 6 are unaffected by these changes.
+>
+> **Errata — 2026-09-20.** The ledger moved again on 2026-09-19 when the
+> contract-driven `ExperimentRunner` registered five experiments
+> (`research/experiments/<id>/`): the denominator is now **865 looks over 70
+> distinct configurations** (Bonferroni per-test |t| ≥ 4.02, expected max
+> |t| under the global null ≈ 3.68). Papers 1-4 carry a second dated note;
+> no verdict or statistic in any paper changes. Papers 4 and 6 additionally
+> note the 2026-09-19 regeneration of `benchmarks/results_cpp.md` (IAP1
+> decode 184.1 ns/event, book update 26.4 ns, replay 27.2M events/s, feature
+> engine 514.1 ns, alpha scoring 33.6 ns — within the stated cross-run
+> variance; hot path ≈ 0.76 µs/event). The 760 / 65 / 3.99 / 3.64 figures in
+> the papers' own errata are the 2026-09-06 snapshot each paper quotes; the
+> summaries below use the current ledger.
 
 ---
 
@@ -27,7 +41,7 @@ are statements about this dataset and pipeline, not about real markets).
 L1 and multi-level order-flow imbalance (EQ02/EQ03) are statistically real
 predictors on the synthetic equity dataset — uncrossed OOS IC 0.0312/0.0298
 with Newey-West t of 8.47/10.61 (clearing even the ledger's
-selection-adjusted threshold of |t| 3.99), **all four** walk-forward folds
+selection-adjusted threshold of |t| 4.02), **all four** walk-forward folds
 non-degenerate and sign-consistent under the row-mass split, passed leakage
 tests, and a decay curve rising from ~0 (in fact slightly negative) below
 100 ms to a peak of IC ≈ 0.041-0.044 at 10 s — and still not worth trading:
@@ -64,7 +78,7 @@ fitted sign that contradicts its rationale — while FX04 (cross-venue
 lead-lag) reads very differently once crossed rows are excluded: uncrossed
 IC 0.0297 at t 4.26, all four folds sign-consistent, hypothesis confirmed.
 That clears every *statistical* promotion gate and clears the ledger's
-selection yardstick (expected max |t| 3.64 over 65 distinct configurations);
+selection yardstick (expected max |t| 3.68 over 70 distinct configurations);
 FX04 is held at ITERATE purely because it is cost-negative
 (−32,566 USD at 1x). Its pooled IC of 0.0100 had understated it: 28.7 % of
 these rows carry a crossed merged book on which the lead-lag "signal" is an
@@ -92,11 +106,13 @@ round-3 erratum the same stress is also reported on a **time** grid
 (100 ms / 500 ms / 1 s / 5 s), because one emission row is 3.3 s on the
 equity book and 15-22 s on FX — the event grid meant two different
 latencies in the same column. Meanwhile the measured C++ hot path
-(decode + book + features + alpha ≈ 0.77 µs/event — 174.4 + 25.7 + 530.4 +
-38.5 ns from `benchmarks/results_cpp.md`; the paper's own ≈ 0.5 µs and the
-≈ 0.68 µs of its first benchmark erratum are both superseded) sits six
+(decode + book + features + alpha ≈ 0.76 µs/event — 184.1 + 26.4 + 514.1 +
+33.6 ns from the 2026-09-19 `benchmarks/results_cpp.md`; the paper's own
+≈ 0.5 µs, the ≈ 0.68 µs of its first benchmark erratum and the 0.77 µs of
+its second are all superseded) sits six
 orders of magnitude below the ~0.9 s median inter-event gap — and because every alpha
-is cost-negative at 1x, the latency effect never reaches net P&L at all.
+is cost-negative at 1x, the latency effect never reaches net P&L at all
+
 Conclusion: on this platform, latency economics are entirely about reacting
 to the next event rather than compute speed, and until the cost problem is
 solved the latency budget is not where the P&L is for any alpha family.
@@ -124,15 +140,16 @@ The Perold IS decomposition is enforced as an exact identity to 1e-9.
 
 An engineering case study of four parallel ports of one pinned semantics,
 held identical by golden tests (byte-exact IAP1 SHA-256 digests; 443/175/
-181/291 tests green in the paper's recorded 2026-08-29 harness run —
-626/243/254/448 py/cpp/rs/java after the round-3 fixes). Measured on the
+181/291 tests green in the paper's recorded 2026-08-29 harness run; the
+2026-09-20 harness records 1352/266/298/475 py/cpp/rs/java tests and
+162/67/62/102 golden after the contracts / lifecycle / trace / MVP release). Measured on the
 stated 2-CPU
 Xeon container (g++ 13.3.0, rustc 1.95.0, OpenJDK 21.0.10): C++ decodes at
 3.5 ns/event and replays at 37.1M events/s; demo-scale replay is ≈ 6.9M
 events/s in Rust and ≈ 3.5M in Java, with measurement-boundary caveats
 disclosed. **Superseded (2026-09-06):** the mandatory CRC-32 IAP1 trailer
-added in round 3 moves decode to 174.4 ns/event and replay to 28.1M
-events/s, which withdraws the paper's "binary is ~60x JSONL" conclusion —
+added in round 3 moves decode to ~180 ns/event (184.1 in the 2026-09-19
+table) and replay to ~27M events/s, which withdraws the paper's "binary is ~60x JSONL" conclusion —
 see paper 06's benchmark erratum and `benchmarks/results_cpp.md`. All three ports converge on the same allocation discipline —
 pools, free lists, intrusive FIFO lists, open addressing — enforced by
 tests in C++, by the type system in Rust (all `unsafe` confined to the

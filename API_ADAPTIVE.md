@@ -247,18 +247,32 @@ exact states and transitions.
 
 **Promotion lifecycle (pointer).** The ACTIVE/WATCH/RETIRED rules above are
 the live sub-machine of the full seven-state promotion lifecycle
-(RESEARCH → CANDIDATE → VALIDATING → PAPER → ACTIVE ⇄ WATCH → RETIRED;
-Python `iap.lifecycle`, Java `com.iap.lifecycle`; policy
-`configs/strategies/lifecycle.json` + this file's `adaptive.lifecycle`
-block; golden `tests/golden/expected_lifecycle.json`, Java
-`LifecycleGoldenTest`). The lifecycle service delegates the live edges to
-`LifecycleTracker` / `LifecycleGauge` unchanged and wraps each transition
-into a `LifecycleTransition` (`gates = {"rolling_ic": …}`, `policy =
-lifecycle_v1`, `actor = SYSTEM`); `LiveEvidence.informative = false` or
-`rolling_ic = null` evaluates nothing. One difference of scope: on the
+(RESEARCH → CANDIDATE → VALIDATING → PAPER → ACTIVE ⇄ WATCH → RETIRED —
+seven states, seventeen pinned edges, eighteen gates; `docs/LIFECYCLE.md`;
+Python `iap.lifecycle` (reference), Java `com.iap.lifecycle`, Rust
+`rust/lifecycle` (`LiveTracker` is an exact port of `LifecycleTracker`,
+reason strings byte-identical); policy `configs/strategies/lifecycle.json`
++ this file's `adaptive.lifecycle` block, never duplicated; golden
+`tests/golden/expected_lifecycle.json`, matched by `LifecycleGoldenTest`
+and `rust/lifecycle/tests/golden_lifecycle.rs`). The lifecycle service
+delegates the live edges to `LifecycleTracker` / `LifecycleGauge` /
+`LiveTracker` unchanged and wraps each transition into a
+`LifecycleTransition` (`gates = {"rolling_ic": GateResult(passed, value =
+rolling_ic, threshold = watch_ic_gate or reactivate_ic_gate)}`, `policy =
+lifecycle_v1`, `actor = SYSTEM`, the tracker's reason verbatim) appended to
+`research/lifecycle_transitions.jsonl`; `research/lifecycle_log.jsonl`
+remains this study's own log and never sets a state.
+`LiveEvidence.informative = false` or `rolling_ic = null` evaluates nothing
+(the flag above, taken explicitly). One difference of scope: on the
 platform RETIRED is terminal for the system (re-entry is a HUMAN reset to
-RESEARCH); the RETIRED → WATCH recovery above models shadow scoring inside
-one adaptive backtest.
+RESEARCH, which re-runs the whole evidence chain); the RETIRED → WATCH
+recovery above models shadow scoring inside one adaptive backtest and is
+never reached on the platform because the machine never constructs a
+tracker for a RETIRED alpha. Unchanged and still pinned: in the live Java
+loop the gauge is **observational** — a RETIRED alpha keeps trading at full
+size and `AlphaLifecycleRetired` pages a human (README, GOVERNANCE gate
+11; making it an allocation gate is backlog issue L04). The lifecycle
+decides state, not size.
 
 ## 7. Adaptive walk-forward backtest (reference semantics)
 

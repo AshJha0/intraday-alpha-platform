@@ -6,9 +6,10 @@ and (with ``gh``) applies it. This test wires the three together the way a
 contributor does — the script's own validator over the checked-in YAML, the
 default ``--dry-run`` as a subprocess, ``--check-md`` against the committed
 rendering — and asserts the contract at the end of the chain: the plan parses,
-every issue hangs off an epic, the honesty rules hold (done cites evidence,
-in-progress cites planned paths), and ``docs/EPICS.md`` is exactly what the
-YAML renders to.
+every issue hangs off an epic, the honesty rules hold (done cites evidence
+that exists on disk, in-progress cites planned paths), the eight modules of
+the 2026-09-19/20 release are done with their evidence present, and
+``docs/EPICS.md`` is exactly what the YAML renders to.
 """
 from __future__ import annotations
 
@@ -23,7 +24,10 @@ TOOL = "tools/github/create_issues.py"
 PLAN = "tools/github/issues.yaml"
 RENDERED = "docs/EPICS.md"
 
-IN_PROGRESS_PATHS = (
+# The eight modules of the build/platform-mvp release. They were the plan's
+# in-progress set while the release was being built; every one of them is now
+# a `done` issue whose evidence names the module on disk.
+RELEASE_MODULE_PATHS = (
     "python/src/iap/contracts", "python/src/iap/risk", "python/src/iap/execution",
     "python/src/iap/lifecycle", "python/src/iap/trace", "python/src/iap/store",
     "python/src/iap/research", "python/src/iap/mvp",
@@ -60,9 +64,11 @@ def test_plan_shape_and_coverage(tool, plan):
     # every epic has at least one issue and every milestone is used
     used_ms = {e["milestone"] for e in epics} | {i["milestone"] for i in issues}
     assert used_ms == {m["title"] for m in plan["milestones"]}
-    # the three statuses are all represented — the plan is honest, not aspirational
+    # done and backlog are both represented — the plan is honest, not
+    # aspirational (in-progress is legitimately 0 between releases)
     counts = tool.status_counts(issues)
-    assert counts["done"] > 0 and counts["in-progress"] > 0 and counts["backlog"] > 0
+    assert counts["done"] > 0 and counts["backlog"] > 0
+    assert counts["done"] + counts["in-progress"] + counts["backlog"] == len(issues)
 
 
 def test_done_evidence_points_at_real_paths(plan, repo_root):
@@ -83,11 +89,16 @@ def test_done_evidence_points_at_real_paths(plan, repo_root):
     assert not missing, f"done issues with no existing evidence path: {missing}"
 
 
-def test_in_progress_issues_cover_the_release_modules(plan):
-    text = "\n".join("\n".join(i["evidence"]) for i in plan["issues"] if i["status"] == "in-progress")
-    for path in IN_PROGRESS_PATHS:
-        assert path in text, f"no in-progress issue plans {path}"
-    # in-progress evidence is either marked as planned or already on disk (work landing now)
+def test_release_modules_are_done_with_evidence_on_disk(plan):
+    """Each release module is named by a `done` issue and exists on disk."""
+    done_text = "\n".join("\n".join(i["evidence"]) for i in plan["issues"]
+                          if i["status"] == "done")
+    root = Path(__file__).resolve().parents[2]
+    for path in RELEASE_MODULE_PATHS:
+        assert path in done_text, f"no done issue cites {path}"
+        assert (root / path).is_dir(), f"{path} is cited as done but is not on disk"
+    # in-progress evidence (none at the moment) is either marked as planned or
+    # already on disk (work landing now)
     for it in plan["issues"]:
         if it["status"] == "in-progress":
             marked = any("planned" in ev or "generated" in ev for ev in it["evidence"])

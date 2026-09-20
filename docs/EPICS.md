@@ -17,21 +17,21 @@ planned paths of the current release, **backlog** says what would prove it done.
 |---|---:|---:|
 | epics | 24 | |
 | issues | 123 | 340 |
-| issues `done` | 81 | 184 |
-| issues `in-progress` | 15 | 45 |
+| issues `done` | 96 | 229 |
+| issues `in-progress` | 0 | 0 |
 | issues `backlog` | 27 | 111 |
 
 ### By milestone
 
 | milestone | epics | issues | done | in-progress | backlog |
 |---|---:|---:|---:|---:|---:|
-| Phase 0 | 2 | 9 | 6 | 3 | 0 |
+| Phase 0 | 2 | 9 | 9 | 0 | 0 |
 | Week 1 | 2 | 11 | 11 | 0 | 0 |
 | Week 2 | 2 | 10 | 10 | 0 | 0 |
-| Week 3 | 2 | 14 | 13 | 1 | 0 |
-| Week 4 | 2 | 10 | 9 | 1 | 0 |
-| Week 5 | 2 | 10 | 9 | 1 | 0 |
-| Week 6 | 7 | 24 | 15 | 9 | 0 |
+| Week 3 | 2 | 14 | 14 | 0 | 0 |
+| Week 4 | 2 | 10 | 10 | 0 | 0 |
+| Week 5 | 2 | 10 | 10 | 0 | 0 |
+| Week 6 | 7 | 24 | 24 | 0 | 0 |
 | Phase 2 | 3 | 9 | 7 | 0 | 2 |
 | Phase 3 | 1 | 5 | 1 | 0 | 4 |
 | Backlog | 1 | 21 | 0 | 0 | 21 |
@@ -41,24 +41,24 @@ the epic's (a backlog item under a finished epic sits in **Backlog**).
 
 ## Epics
 
-- [E01 — Architecture and contracts](#e01-architecture-and-contracts) · Phase 0 · in-progress · 7 issues
-- [E02 — Repository engineering, CI and governance](#e02-repository-engineering-ci-and-governance) · Phase 0 · in-progress · 4 issues
+- [E01 — Architecture and contracts](#e01-architecture-and-contracts) · Phase 0 · partial · 7 issues
+- [E02 — Repository engineering, CI and governance](#e02-repository-engineering-ci-and-governance) · Phase 0 · partial · 4 issues
 - [E03 — Synthetic market data generator and normalization](#e03-synthetic-market-data-generator-and-normalization) · Week 1 · done · 7 issues
 - [E04 — Deterministic replay as a flagship feature](#e04-deterministic-replay-as-a-flagship-feature) · Week 1 · partial · 5 issues
 - [E05 — Order book with integer ticks (L1/L2/MBO)](#e05-order-book-with-integer-ticks-l1l2mbo) · Week 2 · done · 5 issues
 - [E06 — Feature engine (native 40, registry 205)](#e06-feature-engine-native-40-registry-205) · Week 2 · partial · 6 issues
 - [E07 — Alpha engine — 24 flagship alphas](#e07-alpha-engine-24-flagship-alphas) · Week 3 · partial · 8 issues
-- [E08 — Research framework — validation, ledger, ExperimentRunner](#e08-research-framework-validation-ledger-experimentrunner) · Week 3 · in-progress · 9 issues
+- [E08 — Research framework — validation, ledger, ExperimentRunner](#e08-research-framework-validation-ledger-experimentrunner) · Week 3 · partial · 9 issues
 - [E09 — Portfolio construction](#e09-portfolio-construction) · Week 4 · done · 4 issues
-- [E10 — Hard risk engine (fail-closed)](#e10-hard-risk-engine-fail-closed) · Week 4 · in-progress · 6 issues
-- [E11 — Execution algorithms, SOR and execution simulator](#e11-execution-algorithms-sor-and-execution-simulator) · Week 5 · in-progress · 9 issues
+- [E10 — Hard risk engine (fail-closed)](#e10-hard-risk-engine-fail-closed) · Week 4 · done · 6 issues
+- [E11 — Execution algorithms, SOR and execution simulator](#e11-execution-algorithms-sor-and-execution-simulator) · Week 5 · partial · 9 issues
 - [E12 — Performance architecture](#e12-performance-architecture) · Week 5 · partial · 4 issues
 - [E13 — Transaction-cost analysis](#e13-transaction-cost-analysis) · Week 6 · partial · 5 issues
-- [E14 — Cross-language parity (golden tests Python == C++ == Rust == Java)](#e14-cross-language-parity-golden-tests-python-c-rust-java) · Week 6 · in-progress · 4 issues
-- [E15 — Alpha promotion lifecycle](#e15-alpha-promotion-lifecycle) · Week 6 · in-progress · 5 issues
-- [E16 — Observability and the decision trace](#e16-observability-and-the-decision-trace) · Week 6 · in-progress · 6 issues
-- [E17 — Data model and store](#e17-data-model-and-store) · Week 6 · in-progress · 3 issues
-- [E18 — End-to-end MVP loop](#e18-end-to-end-mvp-loop) · Week 6 · in-progress · 3 issues
+- [E14 — Cross-language parity (golden tests Python == C++ == Rust == Java)](#e14-cross-language-parity-golden-tests-python-c-rust-java) · Week 6 · done · 4 issues
+- [E15 — Alpha promotion lifecycle](#e15-alpha-promotion-lifecycle) · Week 6 · partial · 5 issues
+- [E16 — Observability and the decision trace](#e16-observability-and-the-decision-trace) · Week 6 · partial · 6 issues
+- [E17 — Data model and store](#e17-data-model-and-store) · Week 6 · partial · 3 issues
+- [E18 — End-to-end MVP loop](#e18-end-to-end-mvp-loop) · Week 6 · done · 3 issues
 - [E19 — Six-level testing strategy](#e19-six-level-testing-strategy) · Week 6 · partial · 4 issues
 - [E20 — ML layer — gated model zoo and meta-labeling](#e20-ml-layer-gated-model-zoo-and-meta-labeling) · Phase 2 · partial · 4 issues
 - [E21 — Adaptive layer — drift, refit policies](#e21-adaptive-layer-drift-refit-policies) · Phase 2 · partial · 4 issues
@@ -72,7 +72,7 @@ Architecture and contracts: canonical types, the schema set with x-version, wire
 
 ### E01 — Architecture and contracts
 
-**Status:** in-progress · **Milestone:** Phase 0 · **Issues:** 7 (done 4, in-progress 2, backlog 1) · **Estimate:** 15 days · **Labels:** `type:epic`, `area:contracts`, `phase:0`, `priority:p0`, `status:in-progress`
+**Status:** partial · **Milestone:** Phase 0 · **Issues:** 7 (done 6, in-progress 0, backlog 1) · **Estimate:** 15 days · **Labels:** `type:epic`, `area:contracts`, `phase:0`, `priority:p0`, `status:partial`
 
 Pin every cross-language decision before any port is written: canonical integer types, the versioned JSON Schema contract set, two wire formats with byte-exact parity, version identity that propagates end to end, and the determinism rules every deterministic path must obey.
 
@@ -93,13 +93,13 @@ Pin every cross-language decision before any port is written: canonical integer 
 | C02 | Seven JSON Schema contracts with x-version, domain folders and MIGRATIONS.md | done | 2 | Phase 0 | `schemas/market/market_event.schema.json; schemas/market/book_update.schema.json; schemas/features/feature_vector.schema.json`<br>`schemas/alpha/alpha_signal.schema.json; schemas/order/order_request.schema.json; schemas/execution/execution_report.schema.json; schemas/risk/risk_event.schema.json`<br>`schemas/README.md; schemas/MIGRATIONS.md`<br>`python/src/iap/experiment/tracker.py (data_version, feature_version)` |
 | C03 | JSONL and IAP1 binary wire formats with CRC-32 trailer and shared reject fixture | done | 3 | Phase 0 | `schemas/FORMAT.md; tests/golden/expected_codec_sha256.json; tests/golden/jsonl_reject_cases.txt`<br>`python/src/iap/core/codec.py; cpp/src/marketdata/codec.cpp; rust/marketdata/src/codec.rs; java/src/main/java/com/iap/codec/Iap1Codec.java`<br>`python/tests/test_codec.py; cpp/tests/test_codec.cpp; rust/marketdata/tests/golden_marketdata.rs; java CodecGoldenTest` |
 | C04 | Determinism contract: SplitMix64, no wall clock, no unordered iteration, seeded configs | done | 1 | Phase 0 | `tests/golden/splitmix64.json; python/src/iap/core/rng.py; cpp/include/iap/marketdata/rng.hpp; rust/marketdata/src/rng.rs; java/src/main/java/com/iap/core/SplitMix64.java`<br>`python/tests/test_rng.py; cpp/tests/test_rng.cpp; java SplitMix64Test`<br>`configs/marketdata/generator.json (seed 20260829); configs/execution/execution.json (defaults.seed)` |
-| C05 | Typed Python contracts and protocols package (iap.contracts) | in-progress | 3 | Phase 0 | `python/src/iap/contracts/__init__.py (planned)`<br>`python/src/iap/contracts/{types,protocols,validate}.py (planned)`<br>`python/tests/test_contracts.py (planned)` |
-| C06 | New MVP schemas: portfolio_target, parent/child order, venue_decision, tca_result, experiment spec/result, lifecycle_transition, decision_trace, risk_decision | in-progress | 2 | Phase 0 | `schemas/portfolio/portfolio_target.schema.json (planned)`<br>`schemas/order/parent_order.schema.json; schemas/order/child_order.schema.json; schemas/execution/venue_decision.schema.json (planned)`<br>`schemas/tca/tca_result.schema.json; schemas/research/experiment_spec.schema.json; schemas/research/experiment_result.schema.json (planned)`<br>`schemas/lifecycle/lifecycle_transition.schema.json; schemas/trace/decision_trace.schema.json; schemas/risk/risk_decision.schema.json (planned)` |
+| C05 | Typed Python contracts and protocols package (iap.contracts) | done | 3 | Phase 0 | `python/src/iap/contracts/{__init__,ids,versions,types,protocols,validate,examples}.py (22 typed contracts, 18 runtime_checkable Protocols)`<br>`python/tests/test_contracts.py; python/tests/test_contracts_schema_golden.py; tests/golden/expected_contracts_examples.json (python/tools/make_golden_contracts.py)`<br>`python/src/iap/mvp/adapters.py (the MVP consumes the Protocols, not concrete classes); API_CONTRACTS.md` |
+| C06 | New MVP schemas: portfolio_target, parent/child order, venue_decision, tca_result, experiment spec/result, lifecycle_transition, decision_trace, risk_decision | done | 2 | Phase 0 | `schemas/portfolio/portfolio_target.schema.json; schemas/risk/risk_decision.schema.json`<br>`schemas/order/parent_order.schema.json; schemas/order/child_order.schema.json; schemas/execution/venue_decision.schema.json`<br>`schemas/tca/tca_result.schema.json; schemas/research/experiment_spec.schema.json; schemas/research/experiment_result.schema.json`<br>`schemas/alpha/lifecycle_transition.schema.json; schemas/trace/decision_trace.schema.json; schemas/README.md; schemas/MIGRATIONS.md (Phase 0 contracts, 2026-09-19)` |
 | C07 | Validate goldens, configs and research documents against their JSON Schemas in CI | backlog | 2 | Backlog | `tests/integration/test_schema_conformance.py (proposed)` |
 
 ### E02 — Repository engineering, CI and governance
 
-**Status:** in-progress · **Milestone:** Phase 0 · **Issues:** 4 (done 2, in-progress 1, backlog 1) · **Estimate:** 6.5 days · **Labels:** `type:epic`, `area:repo`, `phase:0`, `priority:p1`, `status:in-progress`
+**Status:** partial · **Milestone:** Phase 0 · **Issues:** 4 (done 3, in-progress 0, backlog 1) · **Estimate:** 6.5 days · **Labels:** `type:epic`, `area:repo`, `phase:0`, `priority:p1`, `status:partial`
 
 Make the engineering discipline enforceable: one CI workflow that runs the canonical commands, a harness that prints the parity table, governance documents that name the promotion gates and audit policy, and contributor tooling (templates, CONTRIBUTING.md, this issue plan).
 
@@ -117,7 +117,7 @@ Make the engineering discipline enforceable: one CI workflow that runs the canon
 |---|---|---|---:|---|---|
 | R01 | CI workflow: per-language jobs, integration/replay, golden gate, deployment checks, images | done | 2 | Phase 0 | `.github/workflows/ci.yml`<br>`tests/harness/run_all.sh; tests/harness/run_golden.sh; tests/harness/check_headline_numbers.py` |
 | R02 | Governance: promotion gates, audit-log policy, reproducibility manifests, CODEOWNERS | done | 2 | Phase 0 | `docs/governance/GOVERNANCE.md; docs/governance/REPRODUCIBILITY.md; docs/governance/SECURITY.md`<br>`CODEOWNERS` |
-| R03 | Issue and PR templates, CONTRIBUTING.md and the GitHub issue plan tooling | in-progress | 2 | Phase 0 | `.github/ISSUE_TEMPLATE/{epic,feature,bug,research_experiment,alpha_promotion,config}.yml`<br>`.github/PULL_REQUEST_TEMPLATE.md; CONTRIBUTING.md`<br>`tools/github/issues.yaml; tools/github/create_issues.py; tools/github/README.md; docs/EPICS.md`<br>`tests/integration/test_github_issue_plan.py` |
+| R03 | Issue and PR templates, CONTRIBUTING.md and the GitHub issue plan tooling | done | 2 | Phase 0 | `.github/ISSUE_TEMPLATE/{epic,feature,bug,research_experiment,alpha_promotion,config}.yml`<br>`.github/PULL_REQUEST_TEMPLATE.md; CONTRIBUTING.md`<br>`tools/github/issues.yaml; tools/github/create_issues.py; tools/github/README.md; docs/EPICS.md (generated)`<br>`tests/integration/test_github_issue_plan.py` |
 | R04 | Declare the full Python dependency set in pyproject.toml | backlog | 0.5 | Backlog | `python/pyproject.toml; .github/workflows/ci.yml (python job)` |
 
 ## Week 1
@@ -260,7 +260,7 @@ EQ01..EQ12 and FX01..FX12 as an alpha library with an enforced economic rational
 
 ### E08 — Research framework — validation, ledger, ExperimentRunner
 
-**Status:** in-progress · **Milestone:** Week 3 · **Issues:** 9 (done 7, in-progress 1, backlog 1) · **Estimate:** 17 days · **Labels:** `type:epic`, `area:research`, `phase:w3`, `priority:p0`, `lang:python`, `status:in-progress`
+**Status:** partial · **Milestone:** Week 3 · **Issues:** 9 (done 8, in-progress 0, backlog 1) · **Estimate:** 17 days · **Labels:** `type:epic`, `area:research`, `phase:w3`, `priority:p0`, `lang:python`, `status:partial`
 
 Honest research machinery: walk-forward with purging and embargo, automatic leakage tests, IC/RankIC/t-stat/hit/decay/turnover/capacity, a multiple-testing ledger with Bonferroni and expected-max-|t|, the hypothesis-sign gate, cost and stress survival, and an ExperimentRunner that turns a spec into a reproducible result document.
 
@@ -284,7 +284,7 @@ Honest research machinery: walk-forward with purging and embargo, automatic leak
 | V05 | Promotion gates PROMOTE / ITERATE / REJECT with the hypothesis-sign rule and cost survival | done | 1 | Week 3 | `python/src/iap/validation/validate.py; research/alpha_reports/REPORT.md (Pinned promotion gates); docs/governance/GOVERNANCE.md §2` |
 | V06 | Cost, latency and regime stress tests | done | 1 | Week 3 | `python/src/iap/validation/stress.py; research/alpha_reports/*.json (stress)` |
 | V07 | Research backtester with the pinned cost model and ensemble scoring | done | 3 | Week 3 | `python/src/iap/backtest/{engine,costs}.py; python/tests/test_backtester.py; tests/golden/expected_backtest.json`<br>`java/src/main/java/com/iap/backtest/{BacktestEngine,ResearchBacktester,CostModel}.java; java BacktestTest` |
-| V08 | ExperimentRunner: spec -> deterministic id -> result document -> ledger entry | in-progress | 3 | Week 3 | `python/src/iap/research/{runner,spec,result}.py (planned)`<br>`research/experiments/README.md (layout pinned); research/experiments/<id>/{spec,result}.json (planned)`<br>`schemas/research/experiment_spec.schema.json; schemas/research/experiment_result.schema.json (planned)` |
+| V08 | ExperimentRunner: spec -> deterministic id -> result document -> ledger entry | done | 3 | Week 3 | `python/src/iap/research/{specs,runner,registry,golden,__main__}.py (ExperimentRunner satisfies iap.contracts.protocols.ExperimentRunner)`<br>`research/experiments/README.md; research/experiments/{217fa0cb1d89a9c8,4a2900e4a6705542,c73bb6294d226163,d0dd1ab0711d33a1,d7b554d0a3fa3b26}/{spec,result}.json`<br>`python/tests/test_research_runner.py; python/tests/test_research_golden.py; tests/golden/expected_experiment_golden_frame.json (python/tools/make_golden_research.py)` |
 | V09 | Full deflated Sharpe ratio (skew/kurtosis) and Harvey-Liu-Zhu adjusted p-values | backlog | 2 | Backlog | `python/src/iap/validation/ledger.py; README.md References [10], [13]` |
 
 ## Week 4
@@ -315,7 +315,7 @@ Deterministic mean-variance construction with transaction costs solved by pinned
 
 ### E10 — Hard risk engine (fail-closed)
 
-**Status:** in-progress · **Milestone:** Week 4 · **Issues:** 6 (done 5, in-progress 1, backlog 0) · **Estimate:** 20 days · **Labels:** `type:epic`, `area:risk`, `phase:w4`, `priority:p0`, `status:in-progress`
+**Status:** done · **Milestone:** Week 4 · **Issues:** 6 (done 6, in-progress 0, backlog 0) · **Estimate:** 20 days · **Labels:** `type:epic`, `area:risk`, `phase:w4`, `priority:p0`, `status:done`
 
 A deterministic pre-trade and post-fill risk engine with a pinned check order, kill switches at four scopes, latching loss limits with a pinned re-arm precedence, currency-aware notional, snapshot/restore, and a byte-identical audit log. The engine depends on nothing but its config and the event stream — never on a network call, a wall clock or an LLM.
 
@@ -323,9 +323,9 @@ A deterministic pre-trade and post-fill risk engine with a pinned check order, k
 
 **Acceptance criteria:**
 
-- [ ] Missing or invalid config rejects everything with CONFIG_MISSING; unbootstrapped engines reject with NOT_BOOTSTRAPPED
-- [ ] expected_risk_decisions.json / expected_risk_snapshot.json / expected_risk_audit.jsonl match exactly in every port
-- [ ] rust/risk depends on serde/serde_json only; no wall clock on any decision path
+- [x] Missing or invalid config rejects everything with CONFIG_MISSING; unbootstrapped engines reject with NOT_BOOTSTRAPPED
+- [x] expected_risk_decisions.json / expected_risk_snapshot.json / expected_risk_audit.jsonl match exactly in every port
+- [x] rust/risk depends on serde/serde_json only; no wall clock on any decision path
 
 **Out of scope:** Regulatory rulebooks (SEC 15c3-5 / MiFID II RTS 6) — Phase 3; A C++ risk port (deliberately not built: Rust is the reference, Java the port).
 
@@ -336,7 +336,7 @@ A deterministic pre-trade and post-fill risk engine with a pinned check order, k
 | K03 | Snapshot / restore / bootstrap and the byte-identical risk audit log | done | 2 | Week 4 | `tests/golden/expected_risk_snapshot.json; tests/golden/expected_risk_audit.jsonl; rust/risk/tests/golden_risk.rs; java RiskGoldenTest` |
 | K04 | Java risk engine: byte-identical port with the Rust-generated goldens | done | 4 | Week 4 | `java/src/main/java/com/iap/risk/{RiskEngine,RiskLimits,Rules,RiskDecision,RiskEvent}.java; java RiskGoldenTest, RiskRuleTest`<br>`rust/risk/src/bin/make_risk_golden.rs; tests/golden/expected_risk_decisions.json` |
 | K05 | Paper-loop risk wiring: marks, sequence gaps, fills before the next decision, onOrderDone | done | 2 | Week 4 | `java/src/main/java/com/iap/platform/PaperTrading.java; java PaperRiskWiringTest; PLATFORM_CONVENTIONS.md §11.4` |
-| K06 | Python risk engine port (iap.risk) against the same goldens | in-progress | 4 | Week 4 | `python/src/iap/risk/{engine,limits,event,fmt}.py (planned)`<br>`python/tests/test_risk_golden.py; python/tests/test_risk_rules.py (planned)` |
+| K06 | Python risk engine port (iap.risk) against the same goldens | done | 4 | Week 4 | `python/src/iap/risk/{limits,refdata,orders,events,engine,serialize}.py`<br>`python/tests/test_risk_golden.py (expected_risk_decisions.json exact, expected_risk_audit.jsonl and expected_risk_snapshot.json byte-identical, restore continuation); python/tests/test_risk_rules.py`<br>`python/src/iap/mvp/adapters.py (RiskEngineAdapter emits iap.contracts.types.RiskDecision); API_TRADING.md` |
 
 ## Week 5
 
@@ -344,7 +344,7 @@ Execution algorithms (TWAP/VWAP/POV/IS), smart order routing with venue scoring,
 
 ### E11 — Execution algorithms, SOR and execution simulator
 
-**Status:** in-progress · **Milestone:** Week 5 · **Issues:** 9 (done 6, in-progress 1, backlog 2) · **Estimate:** 28 days · **Labels:** `type:epic`, `area:execution`, `phase:w5`, `priority:p0`, `status:in-progress`
+**Status:** partial · **Milestone:** Week 5 · **Issues:** 9 (done 7, in-progress 0, backlog 2) · **Estimate:** 28 days · **Labels:** `type:epic`, `area:execution`, `phase:w5`, `priority:p0`, `status:partial`
 
 Parent-order algorithms (TWAP/VWAP/POV/IS) sliced into children with time-in-force, a deterministic smart order router with a pinned venue scoring ladder, and an event-driven execution simulator with seeded latency, queue position, partial fills, cancels and a venue trading-state gate — C++ is the reference, Java the port, Python the port in progress.
 
@@ -366,7 +366,7 @@ Parent-order algorithms (TWAP/VWAP/POV/IS) sliced into children with time-in-for
 | X04 | Cancels, expiry, end-of-stream sweep, venue trading-state gate and the pinned processing order | done | 2 | Week 5 | `cpp/include/iap/execution/execution.hpp; cpp/tests/test_execution.cpp; java ExecutionScenarioTest, ExecutionSimTest`<br>`docs/SCENARIOS.md (TRADING section)` |
 | X05 | Java execution simulator and SOR port with the C++-generated fills golden, plus enforced execution controls | done | 4 | Week 5 | `java/src/main/java/com/iap/execution/ExecutionSimulator.java; java ReplayFillsGoldenTest; tests/golden/expected_replay_fills.json`<br>`java/src/main/java/com/iap/platform/PaperTrading.java (controls); java PaperTradingSmokeTest; PLATFORM_CONVENTIONS.md §11.4` |
 | X06 | Rust venue layer: IAPV1 order/report framing and the simulated venue endpoint | done | 2 | Week 5 | `rust/venue/src/{codec,messages,sim}.rs; rust/venue/tests/{codec_roundtrip,sim_venue,scenario_venue_gating}.rs` |
-| X07 | Python execution port (iap.execution): simulator, algos and SOR against the same goldens | in-progress | 5 | Week 5 | `python/src/iap/execution/{simulator,algos,sor}.py (planned)`<br>`python/tests/test_execution_golden.py; python/tests/test_exec_algos.py; python/tests/test_sor.py (planned)` |
+| X07 | Python execution port (iap.execution): simulator, algos and SOR against the same goldens | done | 5 | Week 5 | `python/src/iap/execution/{types,config,simulator,algos,sor,replay}.py`<br>`python/tests/test_execution_golden.py (expected_replay_fills.json bit-identical); python/tests/test_execution_rules.py; python/tests/test_exec_algos.py; python/tests/test_sor.py`<br>`API_TRADING.md` |
 | X08 | PEG and MID order types in the execution simulator | backlog | 3 | Backlog | `schemas/order/order_request.schema.json (order_type enum); cpp/include/iap/execution/execution.hpp (rule 9 note)` |
 | X09 | Closed-form Almgren-Chriss IS trajectory as an alternative to the front-loaded exponential | backlog | 2 | Backlog | `cpp/include/iap/execution/algos.hpp; README.md References [6]` |
 
@@ -422,7 +422,7 @@ Parent-order TCA against arrival, interval VWAP and TWAP; Perold implementation 
 
 ### E14 — Cross-language parity (golden tests Python == C++ == Rust == Java)
 
-**Status:** in-progress · **Milestone:** Week 6 · **Issues:** 4 (done 3, in-progress 1, backlog 0) · **Estimate:** 7.5 days · **Labels:** `type:epic`, `area:parity`, `phase:w6`, `priority:p0`, `status:in-progress`
+**Status:** done · **Milestone:** Week 6 · **Issues:** 4 (done 4, in-progress 0, backlog 0) · **Estimate:** 7.5 days · **Labels:** `type:epic`, `area:parity`, `phase:w6`, `priority:p0`, `status:done`
 
 Four independent implementations of one pinned semantics, held identical by golden vectors: each domain's reference generates the goldens, every other language must load and match, and one harness prints the parity table that gates promotion.
 
@@ -430,9 +430,9 @@ Four independent implementations of one pinned semantics, held identical by gold
 
 **Acceptance criteria:**
 
-- [ ] Every language has a golden test group and the harness exits 0 iff all rows PASS
-- [ ] Tolerances are pinned: SHA-256 byte-exact (codec), exact integers (book/risk/fills), 1e-9 (features/alpha/portfolio/TCA), 1e-10 (PSI/KS)
-- [ ] Goldens are regenerated only by the owning reference tool with a MIGRATIONS.md entry
+- [x] Every language has a golden test group and the harness exits 0 iff all rows PASS
+- [x] Tolerances are pinned: SHA-256 byte-exact (codec), exact integers (book/risk/fills), 1e-9 (features/alpha/portfolio/TCA), 1e-10 (PSI/KS)
+- [x] Goldens are regenerated only by the owning reference tool with a MIGRATIONS.md entry
 
 **Out of scope:** Parity for components a language deliberately does not implement (see docs/ARCHITECTURE.md §10).
 
@@ -441,11 +441,11 @@ Four independent implementations of one pinned semantics, held identical by gold
 | G01 | Golden topology: reference generates, ports consume (Python most, C++ fills, Rust risk) | done | 2 | Week 6 | `python/tools/make_golden{,_adaptive,_alpha,_anomalies,_features,_tca}.py; cpp/tools/make_replay_fills_golden.cpp; rust/risk/src/bin/make_risk_golden.rs`<br>`docs/diagrams/golden_topology.mmd; docs/ARCHITECTURE.md §6; schemas/MIGRATIONS.md` |
 | G02 | Golden test groups in all four languages and the parity table (626/243/254/449 tests, 65/45/47/85 golden) | done | 2 | Week 6 | `tests/harness/run_all.sh; tests/harness/run_golden.sh; tests/harness/check_deployment.py (Java golden-gate completeness)`<br>`README.md (Cross-language parity)` |
 | G03 | Pinned tolerance policy: SHA-256 byte-exact, exact integers, 1e-9 floats, 1e-10 PSI/KS | done | 0.5 | Week 6 | `PLATFORM_CONVENTIONS.md §5; tests/README.md; cpp/tests/golden_util.hpp; java/src/test/java/com/iap/Golden.java` |
-| G04 | Lifecycle and decision-trace goldens across Python, Java, Rust and C++ | in-progress | 3 | Week 6 | `tests/golden/expected_lifecycle.json; tests/golden/expected_decision_trace.json (planned)`<br>`python/tools/make_golden_lifecycle.py; python/tools/make_golden_trace.py (planned)`<br>`java LifecycleGoldenTest, TraceGoldenTest; rust/lifecycle/tests/golden_lifecycle.rs; cpp/tests/test_lifecycle_golden.cpp (planned)` |
+| G04 | Lifecycle and decision-trace goldens across Python, Java, Rust and C++ | done | 3 | Week 6 | `tests/golden/expected_lifecycle.json (python/tools/make_golden_lifecycle.py); tests/golden/expected_canonical_json.json (python/tools/make_golden_canonical_json.py); tests/golden/expected_contracts_examples.json (python/tools/make_golden_contracts.py)`<br>`python/tests/test_lifecycle_golden.py; python/tests/test_canonical_json_golden.py; python/tests/test_contracts_schema_golden.py`<br>`java/src/test/java/com/iap/{LifecycleGoldenTest,TraceGoldenTest,CanonicalJsonGoldenTest}.java (in run_all.sh JAVA_GOLDEN_CLASSES); rust/lifecycle/tests/golden_lifecycle.rs; rust/contracts/tests/{golden_canonical_json,golden_trace}.rs; cpp/tests/{test_canonical_json_golden,test_trace_golden,test_replay_trace}.cpp`<br>`schemas/MIGRATIONS.md (2026-09-19 entries); tests/harness/check_deployment.py java_golden_gate_complete` |
 
 ### E15 — Alpha promotion lifecycle
 
-**Status:** in-progress · **Milestone:** Week 6 · **Issues:** 5 (done 1, in-progress 2, backlog 2) · **Estimate:** 12 days · **Labels:** `type:epic`, `area:lifecycle`, `phase:w6`, `priority:p0`, `status:in-progress`
+**Status:** partial · **Milestone:** Week 6 · **Issues:** 5 (done 3, in-progress 0, backlog 2) · **Estimate:** 12 days · **Labels:** `type:epic`, `area:lifecycle`, `phase:w6`, `priority:p0`, `status:partial`
 
 A seven-state alpha lifecycle RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE -> WATCH -> RETIRED with a pinned gate per transition, an alpha registry, a golden state-sequence test and ports in Java/Rust/C++ — extending the existing IC-gated ACTIVE/WATCH/RETIRED machinery.
 
@@ -462,14 +462,14 @@ A seven-state alpha lifecycle RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> AC
 | key | title | status | est. (d) | milestone | evidence |
 |---|---|---|---:|---|---|
 | L01 | IC-gated ACTIVE -> WATCH -> RETIRED machine with hysteresis (reference + Java gauge + golden) | done | 2 | Week 6 | `python/src/iap/adaptive/lifecycle.py; java/src/main/java/com/iap/adaptive/LifecycleGauge.java; java LifecycleGaugeTest, AdaptiveGoldenTest`<br>`configs/strategies/strategies.json (adaptive.lifecycle); research/lifecycle_log.jsonl; API_ADAPTIVE.md` |
-| L02 | Seven-state promotion lifecycle RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE -> WATCH -> RETIRED with gates and alpha registry | in-progress | 4 | Week 6 | `python/src/iap/lifecycle/{states,machine,registry,gates}.py (planned)`<br>`schemas/lifecycle/lifecycle_transition.schema.json; tests/golden/expected_lifecycle.json (planned)`<br>`docs/LIFECYCLE.md (planned)` |
-| L03 | Lifecycle ports in Java, Rust and C++ | in-progress | 3 | Week 6 | `java/src/main/java/com/iap/lifecycle/ (planned); rust/lifecycle/ (planned); cpp/include/iap/lifecycle/ (planned)` |
+| L02 | Seven-state promotion lifecycle RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE -> WATCH -> RETIRED with gates and alpha registry | done | 4 | Week 6 | `python/src/iap/lifecycle/{config,evidence,gates,machine,registry,bootstrap,golden,__main__}.py; configs/strategies/lifecycle.json`<br>`schemas/alpha/lifecycle_transition.schema.json; research/alpha_registry.json (24 CANDIDATE / 0 beyond); research/lifecycle_transitions.jsonl`<br>`tests/golden/expected_lifecycle.json; python/tests/test_lifecycle.py; python/tests/test_lifecycle_golden.py; docs/LIFECYCLE.md` |
+| L03 | Lifecycle ports in Java, Rust and C++ | done | 3 | Week 6 | `java/src/main/java/com/iap/lifecycle/ (java LifecycleGoldenTest, LifecycleMachineTest); rust/lifecycle/ (rust/lifecycle/tests/{golden_lifecycle,machine_rules}.rs)`<br>`C++ deliberately not ported: the lifecycle is a research/platform concern (docs/ARCHITECTURE.md §2, §10); the C++ trace port (O05) carries the contract records the hot path needs` |
 | L04 | Make RETIRED an allocation gate in the live Java loop (today observational) | backlog | 2 | Backlog | `API_ADAPTIVE.md §6; java/src/main/java/com/iap/adaptive/LifecycleGauge.java; python/src/iap/backtest/adaptive.py` |
 | L05 | CI check: a lifecycle transition or verdict change cannot merge without its ledger entry id | backlog | 1 | Backlog | `CONTRIBUTING.md (promotion-gate rule); .github/workflows/ci.yml (proposed job)` |
 
 ### E16 — Observability and the decision trace
 
-**Status:** in-progress · **Milestone:** Week 6 · **Issues:** 6 (done 3, in-progress 2, backlog 1) · **Estimate:** 13 days · **Labels:** `type:epic`, `area:observability`, `phase:w6`, `priority:p1`, `status:in-progress`
+**Status:** partial · **Milestone:** Week 6 · **Issues:** 6 (done 5, in-progress 0, backlog 1) · **Estimate:** 13 days · **Labels:** `type:epic`, `area:observability`, `phase:w6`, `priority:p1`, `status:partial`
 
 See what the platform did and why: Prometheus metrics with a pinned name contract, alerts with unit tests, dashboards, byte-identical audit logs — and a decision trace that links signal -> decision -> order -> execution -> P&L with an explain() that answers "why did this order happen".
 
@@ -487,13 +487,13 @@ See what the platform did and why: Prometheus metrics with a pinned name contrac
 | O01 | Prometheus /metrics, /health, /ready, /status with the telemetry metric-name contract | done | 2 | Week 6 | `java/src/main/java/com/iap/{monitoring,api}/; java MetricsExpositionTest, MetricsConcurrencyTest, ApiEndpointTest`<br>`rust/telemetry/src/; rust/telemetry/tests/metrics.rs; PLATFORM_CONVENTIONS.md §12.4-12.6` |
 | O02 | 16 alerts with promtool unit tests, recording rules and two Grafana dashboards | done | 2 | Week 6 | `deployment/prometheus/{alerts,recording,prometheus}.yml; deployment/prometheus/tests/alerts_test.yml`<br>`deployment/grafana/dashboards/{market_data_latency,trading_risk}.json; deployment/grafana/README.md` |
 | O03 | Audit logs (risk decisions, admin actions, config changes) and the session report | done | 1 | Week 6 | `java/src/main/java/com/iap/platform/{PaperTrading,SessionStore,AdminService}.java; java PaperObservabilityTest, PaperStateRecoveryTest`<br>`docs/governance/GOVERNANCE.md §3` |
-| O04 | Decision trace: signal -> decision -> order -> execution -> P&L with explain() | in-progress | 3 | Week 6 | `python/src/iap/trace/{trace,explain,sink}.py (planned); schemas/trace/decision_trace.schema.json (planned)`<br>`docs/DECISION_TRACE.md; tests/golden/expected_decision_trace.json (planned)` |
-| O05 | Decision trace ports in Java, Rust and C++ | in-progress | 3 | Week 6 | `java/src/main/java/com/iap/trace/ (planned); rust/trace/ (planned); cpp/include/iap/trace/ (planned)` |
+| O04 | Decision trace: signal -> decision -> order -> execution -> P&L with explain() | done | 3 | Week 6 | `python/src/iap/trace/{builder,sinks,digest,explain,attribution}.py; python/src/iap/contracts/ids.py (make_trace_id); schemas/trace/decision_trace.schema.json`<br>`python/tests/test_trace.py; python/tests/test_contracts.py (explain byte-stable); tests/golden/expected_contracts_examples.json (pinned explain block); tests/golden/expected_canonical_json.json (trace_id, trace_digest)`<br>`docs/DECISION_TRACE.md` |
+| O05 | Decision trace ports in Java, Rust and C++ | done | 3 | Week 6 | `java/src/main/java/com/iap/trace/ + java/src/main/java/com/iap/contracts/ (java TraceGoldenTest, CanonicalJsonGoldenTest, PaperTraceTest)`<br>`rust/contracts/src/{canonical,sha256,trace}.rs; rust/telemetry/src/trace.rs (rust/contracts/tests/{golden_canonical_json,golden_trace}.rs)`<br>`cpp/include/iap/contracts/{canonical_json,trace}.hpp; cpp/src/contracts/; cpp/src/replay/exec_replay.cpp (cpp/tests/{test_canonical_json_golden,test_trace_golden,test_replay_trace}.cpp)` |
 | O06 | Wire the decision trace into the Java paper loop and surface it on the dashboards | backlog | 2 | Backlog | `java/src/main/java/com/iap/platform/PaperTrading.java; deployment/grafana/dashboards/trading_risk.json` |
 
 ### E17 — Data model and store
 
-**Status:** in-progress · **Milestone:** Week 6 · **Issues:** 3 (done 1, in-progress 1, backlog 1) · **Estimate:** 7 days · **Labels:** `type:epic`, `area:store`, `phase:w6`, `priority:p1`, `status:in-progress`
+**Status:** partial · **Milestone:** Week 6 · **Issues:** 3 (done 2, in-progress 0, backlog 1) · **Estimate:** 7 days · **Labels:** `type:epic`, `area:store`, `phase:w6`, `priority:p1`, `status:partial`
 
 The platform's persistent records — experiments, lifecycle transitions, orders, executions, TCA results, decision traces — get a SQLite/Postgres-portable DDL and a Python store, alongside the existing Parquet/JSON file tiers.
 
@@ -509,12 +509,12 @@ The platform's persistent records — experiments, lifecycle transitions, orders
 | key | title | status | est. (d) | milestone | evidence |
 |---|---|---|---:|---|---|
 | D01 | File tiers: immutable raw JSONL -> normalized JSONL/IAP1/Parquet -> feature Parquet -> research JSON | done | 1 | Week 6 | `python/src/iap/marketdata/normalize.py; python/src/iap/features/__main__.py; python/src/iap/models/dataset.py; docs/ARCHITECTURE.md §3` |
-| D02 | SQLite/Postgres-portable DDL and the iap.store module (experiments, lifecycle, orders, executions, TCA, traces) | in-progress | 3 | Week 6 | `schemas/sql/{experiments,lifecycle,orders,executions,tca,traces}.sql (planned)`<br>`python/src/iap/store/{db,ddl,repo}.py (planned); python/tests/test_store.py (planned); docs/DATA_MODEL.md (planned)` |
+| D02 | SQLite/Postgres-portable DDL and the iap.store module (experiments, lifecycle, orders, executions, TCA, traces) | done | 3 | Week 6 | `schemas/sql/iap_v1.sql (24 tables, 3 views, x-version 1); python/src/iap/store/{ddl,db,importers,__main__}.py`<br>`python/tests/test_store.py (round trips per table, DDL portability whitelist); docs/DATA_MODEL.md`<br>`python/src/iap/mvp/session.py (StoreTraceSink writes every MVP trace + reference data into <run>/iap.sqlite)` |
 | D03 | Postgres backend and schema-migration tooling for the store | backlog | 3 | Backlog | `schemas/sql/ (planned by D02)` |
 
 ### E18 — End-to-end MVP loop
 
-**Status:** in-progress · **Milestone:** Week 6 · **Issues:** 3 (done 0, in-progress 3, backlog 0) · **Estimate:** 7 days · **Labels:** `type:epic`, `area:mvp`, `phase:w6`, `priority:p0`, `lang:python`, `status:in-progress`
+**Status:** done · **Milestone:** Week 6 · **Issues:** 3 (done 3, in-progress 0, backlog 0) · **Estimate:** 7 days · **Labels:** `type:epic`, `area:mvp`, `phase:w6`, `priority:p0`, `lang:python`, `status:done`
 
 One command runs the whole loop on one instrument — generate -> book -> features -> alpha -> portfolio target -> risk -> execution -> TCA -> trace — and running it twice produces identical bytes.
 
@@ -522,16 +522,16 @@ One command runs the whole loop on one instrument — generate -> book -> featur
 
 **Acceptance criteria:**
 
-- [ ] The MVP run writes a report and a trace; a second run with the same seed is byte-identical (golden)
-- [ ] Every stage consumes a typed contract from python/src/iap/contracts
+- [x] The MVP run writes a report and a trace; a second run with the same seed is byte-identical (golden)
+- [x] Every stage consumes a typed contract from python/src/iap/contracts
 
 **Out of scope:** Multi-instrument portfolios in the MVP command (the Java paper loop covers the full universe).
 
 | key | title | status | est. (d) | milestone | evidence |
 |---|---|---|---:|---|---|
-| MV01 | python -m iap.mvp --seed 12345 --instrument SYN.EQ.AAPL: one-command end-to-end loop | in-progress | 4 | Week 6 | `python/src/iap/mvp/{__main__,loop,report}.py (planned); docs/MVP.md (planned)` |
-| MV02 | MVP run-twice determinism golden | in-progress | 1 | Week 6 | `tests/replay/test_mvp_determinism.py; tests/golden/expected_mvp_sha256.json (planned)` |
-| MV03 | Documentation set: MVP.md, DATA_MODEL.md, LIFECYCLE.md, DECISION_TRACE.md, ROADMAP.md, EPICS.md | in-progress | 2 | Week 6 | `docs/MVP.md; docs/DATA_MODEL.md; docs/LIFECYCLE.md; docs/DECISION_TRACE.md; docs/ROADMAP.md (planned); docs/EPICS.md (generated)` |
+| MV01 | python -m iap.mvp --seed 12345 --instrument SYN.EQ.AAPL: one-command end-to-end loop | done | 4 | Week 6 | `python/src/iap/mvp/{__main__,config,feed,alpha,portfolio,adapters,engine,report,session,golden}.py; configs/mvp/{mvp,mvp_tiny,instruments,venues,generator,generator_tiny}.json`<br>`python/tests/test_mvp.py; tests/integration/test_mvp_end_to_end.py; docs/MVP.md` |
+| MV02 | MVP run-twice determinism golden | done | 1 | Week 6 | `tests/replay/test_mvp_replay_determinism.py; python/tests/test_mvp_golden.py; tests/golden/expected_mvp.json (python/tools/make_golden_mvp.py)` |
+| MV03 | Documentation set: MVP.md, DATA_MODEL.md, LIFECYCLE.md, DECISION_TRACE.md, ROADMAP.md, EPICS.md | done | 2 | Week 6 | `docs/MVP.md; docs/DATA_MODEL.md; docs/LIFECYCLE.md; docs/DECISION_TRACE.md; docs/ROADMAP.md; docs/EPICS.md (generated)`<br>`README.md documentation index; API_CONTRACTS.md; API_TRADING.md; docs/runbooks/RUNBOOK_incident_replay.md` |
 
 ### E19 — Six-level testing strategy
 

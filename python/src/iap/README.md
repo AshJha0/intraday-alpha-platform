@@ -1,8 +1,12 @@
 # `iap` — Python reference implementation (module map)
 
 Reference implementations per spec §3: research-grade, correctness-first; the
-C++/Rust/Java ports must match these semantics exactly (see `/API_CORE.md` and
-`tests/golden/`). Everything deterministic is seeded via SplitMix64 only.
+C++/Rust/Java ports must match these semantics exactly (see the `/API_*.md`
+contracts and `tests/golden/`). Two packages run the other way — `risk/` and
+`execution/` are Python ports of the Rust and C++ references, proven by the
+same goldens (`/API_TRADING.md`). Everything deterministic is seeded via
+SplitMix64 only; no wall clock and no network or LLM client on any trading
+path (`PLATFORM_CONVENTIONS.md` §13.7). All 23 packages are listed below.
 
 ```
 iap/
@@ -95,6 +99,59 @@ iap/
                    parents through their schedules (child split at
                    max_child_qty, expire_ts = end_ts, POV deficit vs filled +
                    in-flight); ParentReport / ExecReplayResult.
+  features/        The 205-feature factory (API_FEATURES.md): registry.py (the
+                   pinned registry + its hash = feature_version), engine.py
+                   (event-driven FeatureEngine, validity bitset, cadence),
+                   context.py / rolling.py / spec.py (windows, book context),
+                   the families price / microstructure / orderflow / liquidity /
+                   volatility / timeofday / crossasset / venue / regime /
+                   execution; __main__.py builds data/features/ (`python -m
+                   iap.features`, console script iap-features).
+  labels/          Event-time labels at the 11 pinned horizons (labels.py:
+                   compute_labels — mid-to-mid and cost-adjusted, at-or-before
+                   rule, invalid across halts / stale venues / one-sided books);
+                   the definition the MVP's realized IC is pinned to.
+  alpha/           The 24 flagship alphas (API_ALPHA.md): base.py (AlphaModel,
+                   linear_z_v1 fit / score, the enforced `Economic rationale:`
+                   docstring), equity.py (EQ01..EQ12), fx.py (FX01..FX12),
+                   fx_exposure.py, cross_sectional.py, data.py (session_days,
+                   frames), goldenframes.py (the golden alpha cases).
+  validation/      The research framework (spec §13, §20): splits.py (purged +
+                   embargoed row-mass walk-forward), metrics.py (IC, rank IC,
+                   Newey-West-lite t), leakage.py (label-column guard,
+                   shift-by-one, truncation probe), stress.py (cost / latency /
+                   regime grids), ledger.py (the multiple-testing ledger,
+                   research/experiments.json, de-duplicated by alpha x kind x
+                   config), validate.py (validate_alpha, the pinned GATES and
+                   the PROMOTE / ITERATE / REJECT verdict).
+  experiment/      tracker.py — data_version() (sha256 over the normalized IAP1
+                   bytes), feature_version() (registry hash), git_commit(),
+                   hardware_summary(), ExperimentTracker.write_manifest()
+                   (docs/governance/REPRODUCIBILITY.md).
+  models/          The gated ML layer (research/ml_reports): dataset.py,
+                   splits.py, zoo.py (linear baselines gate the tree models),
+                   metalabel.py (isotonic / Platt-calibrated trade / no-trade
+                   gate), economics.py, pipeline.py.
+  portfolio/       The reference optimizer (API_PORTFOLIO_TCA.md §1):
+                   optimizer.py (projected-gradient mean-variance with
+                   transaction costs under 7 constraint families, INFEASIBLE
+                   holds w_prev), covariance.py (EWMA), fx.py (currency
+                   exposure), diagnostics.py (the constraint audit).
+  tca/             The TCA reference (API_PORTFOLIO_TCA.md §2): fills.py
+                   (MarketTimeline, ParentOrder, fill records), tca.py
+                   (order_tca: Perold IS = delay + trading + opportunity, spread /
+                   impact / timing, markouts), simulator.py (the pinned 36-parent
+                   harness), report.py; `python -m iap.tca` writes
+                   research/tca/TCA_REPORT.md.
+  backtest/        engine.py (the event-driven research backtester: Backtester,
+                   ensemble_scores, the P&L identity), costs.py (half-spread +
+                   fees + linear impact, per-currency natives), adaptive.py
+                   (the adaptive walk-forward deployment replay).
+  adaptive/        The adaptability reference (API_ADAPTIVE.md): drift.py (PSI,
+                   two-sample KS), refit.py (static / scheduled /
+                   drift-triggered policies), lifecycle.py (LifecycleTracker:
+                   the ACTIVE -> WATCH -> RETIRED live sub-machine that
+                   iap.lifecycle wraps unchanged).
   reference/
     refdata.py     ReferenceData service over configs/instruments/instruments.json +
                    configs/venues/venues.json: tick/lot sizes, price<->ticks, venues,

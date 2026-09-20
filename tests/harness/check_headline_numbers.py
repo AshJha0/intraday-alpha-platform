@@ -12,7 +12,9 @@ failure modes:
 
   PLATFORM   numbers derived from artefacts this repository builds
              (feature registry, QC report, benchmark table, cookbook recipe
-             count, parity table). A mismatch here is a bug and exits 1.
+             count, parity table, the schema / contract / Protocol counts,
+             the lifecycle registry and transition table, the MVP golden
+             run). A mismatch here is a bug and exits 1.
 
   RESEARCH   numbers derived from the experiment ledger
              (`research/experiments.json`): the multiple-testing denominator,
@@ -52,6 +54,25 @@ DOCS = {
     # DATE with the previous round's numbers).
     "docs/ARCHITECTURE.md": ROOT / "docs" / "ARCHITECTURE.md",
     "docs/SCENARIOS.md": ROOT / "docs" / "SCENARIOS.md",
+    # added 2026-09-20 with the contracts / lifecycle / trace / MVP release:
+    # every one of these quotes counts the release moved.
+    "docs/MVP.md": ROOT / "docs" / "MVP.md",
+    "docs/LIFECYCLE.md": ROOT / "docs" / "LIFECYCLE.md",
+    "docs/DECISION_TRACE.md": ROOT / "docs" / "DECISION_TRACE.md",
+    "docs/ROADMAP.md": ROOT / "docs" / "ROADMAP.md",
+    "docs/DATA_MODEL.md": ROOT / "docs" / "DATA_MODEL.md",
+    "API_CONTRACTS.md": ROOT / "API_CONTRACTS.md",
+    "API_TRADING.md": ROOT / "API_TRADING.md",
+    "PLATFORM_CONVENTIONS.md": ROOT / "PLATFORM_CONVENTIONS.md",
+    "CONTRIBUTING.md": ROOT / "CONTRIBUTING.md",
+    "tests/README.md": ROOT / "tests" / "README.md",
+    "schemas/README.md": ROOT / "schemas" / "README.md",
+    "docs/papers/INDEX.md": ROOT / "docs" / "papers" / "INDEX.md",
+    "docs/governance/REPRODUCIBILITY.md": ROOT / "docs" / "governance" / "REPRODUCIBILITY.md",
+    "docs/runbooks/RUNBOOK_incident_replay.md":
+        ROOT / "docs" / "runbooks" / "RUNBOOK_incident_replay.md",
+    "python/src/iap/README.md": ROOT / "python" / "src" / "iap" / "README.md",
+    "research/experiments/README.md": ROOT / "research" / "experiments" / "README.md",
 }
 
 # Documents that are not in DOCS (they are not prose) but do embed the parity
@@ -140,6 +161,19 @@ def check_platform(docs: dict[str, str]) -> None:
             rows[m.group(1)] = float(m.group(2))
     decode = next((v for k, v in rows.items() if k.startswith("IAP1 decode")), None)
     book = next((v for k, v in rows.items() if k.startswith("book update (eq")), None)
+    # events/sec of the replay engine row, quoted in the docs as "27.2M events/s"
+    replay_m = None
+    feats = next((v for k, v in rows.items() if k.startswith("feature engine (eq")), None)
+    alpha = next((v for k, v in rows.items() if k.startswith("alpha scoring")), None)
+    trace_us = None
+    for line in bench.read_text().splitlines():
+        m = re.match(r"\|\s*replay engine[^|]*\|\s*([\d.]+)\s*\|\s*(\d+)\s*\|", line)
+        if m:
+            replay_m = round(int(m.group(2)) / 1e6, 1)
+        m = re.match(r"\|\s*canonical serialisation, golden DecisionTrace[^|]*\|\s*([\d.]+)\s*\|",
+                     line)
+        if m:
+            trace_us = round(float(m.group(1)) / 1e3, 1)
     problems = []
     for name, text in docs.items():
         if decode is not None and "IAP1 decode" in text:
@@ -152,8 +186,33 @@ def check_platform(docs: dict[str, str]) -> None:
                 if abs(float(m.group(1)) - book) > 1e-9:
                     problems.append(f"{name}: book update {m.group(1)} ns, "
                                     f"benchmark says {book}")
+        if replay_m is not None:
+            # "replay 27.2M events/s" / "replay engine 27.2M events/s" — the C++
+            # figure; the Rust/Java demo replays ("replay ≈ 6.9M") and the
+            # papers' superseded history ("replays at 37.1M") are not it.
+            for m in re.finditer(r"\breplay(?: engine)? ([\d.]+)M events/s", text):
+                if abs(float(m.group(1)) - replay_m) > 0.051:
+                    problems.append(f"{name}: replay {m.group(1)}M events/s, "
+                                    f"benchmark says {replay_m}M")
+        if feats is not None:
+            for m in re.finditer(r"feature engine[^\n]{0,20}?[~≈]?\s?([\d.]+)\s*ns", text):
+                if abs(float(m.group(1)) - feats) > 1.0:
+                    problems.append(f"{name}: feature engine {m.group(1)} ns, "
+                                    f"benchmark says {feats}")
+        if alpha is not None:
+            for m in re.finditer(r"alpha scoring[^\n]{0,20}?([\d.]+)\s*ns", text):
+                if abs(float(m.group(1)) - alpha) > 1e-9:
+                    problems.append(f"{name}: alpha scoring {m.group(1)} ns, "
+                                    f"benchmark says {alpha}")
+        if trace_us is not None:
+            for m in re.finditer(r"([\d.]+)\s*µs(?:/trace| per (?:5\.6 KB )?(?:decision )?trace)", text):
+                if abs(float(m.group(1)) - trace_us) > 0.6:
+                    problems.append(f"{name}: trace serialisation {m.group(1)} µs, "
+                                    f"benchmark says {trace_us}")
     report("cpp_benchmark_numbers", not problems,
-           "; ".join(problems) or f"decode {decode} ns, book {book} ns",
+           "; ".join(problems) or
+           f"decode {decode} ns, book {book} ns, replay {replay_m}M ev/s, "
+           f"features {feats} ns, alpha {alpha} ns, trace {trace_us} µs",
            PLATFORM_FAILURES)
 
     # --- QC report totals -------------------------------------------------
@@ -196,6 +255,193 @@ def check_platform(docs: dict[str, str]) -> None:
     # updated embedded block whose .mmd was never touched. Whichever half a
     # future edit forgets, this fails.
     check_mermaid_sync()
+    check_contract_counts(docs)
+    check_lifecycle_numbers(docs)
+    check_mvp_golden_numbers(docs)
+
+
+# ---------------------------------------------------------------------------
+# Contracts / lifecycle / MVP (added 2026-09-20). Each number the README and
+# the new documents print is re-derived from the artefact that produces it:
+# schema files on disk, the contract package itself (imported from
+# python/src), the lifecycle registry + golden, and the MVP golden.
+# ---------------------------------------------------------------------------
+
+def _import_contracts():
+    """Import iap.contracts / iap.lifecycle from python/src (no install needed)."""
+    import importlib
+    src = str(ROOT / "python" / "src")
+    if src not in sys.path:
+        sys.path.insert(0, src)
+    try:
+        types = importlib.import_module("iap.contracts.types")
+        protocols = importlib.import_module("iap.contracts.protocols")
+        gates = importlib.import_module("iap.lifecycle.gates")
+    except Exception as exc:  # jsonschema/referencing missing, etc.
+        return None, None, None, f"{type(exc).__name__}: {exc}"
+    return types, protocols, gates, None
+
+
+def _claims(text: str, pattern: str) -> list[tuple[int, str]]:
+    """Every integer claim matching `pattern` (group 1 = the number)."""
+    out = []
+    for m in re.finditer(pattern, text):
+        out.append((int(m.group(1).replace(",", "")), m.group(0)))
+    return out
+
+
+def check_contract_counts(docs: dict[str, str]) -> None:
+    """17 schemas on disk == SCHEMA_VERSIONS; 22 typed contracts; 18 Protocols."""
+    import dataclasses
+    import typing
+    schemas = sorted(p.relative_to(ROOT / "schemas").as_posix()
+                     for p in (ROOT / "schemas").rglob("*.schema.json"))
+    types, protocols, _gates, err = _import_contracts()
+    if err:
+        report("contract_counts", False,
+               f"could not import iap.contracts from python/src ({err})",
+               PLATFORM_FAILURES)
+        return
+    versions = sys.modules["iap.contracts.versions"]
+    n_types = sum(1 for o in vars(types).values()
+                  if isinstance(o, type) and dataclasses.is_dataclass(o)
+                  and hasattr(o, "SCHEMA"))
+    n_protocols = sum(1 for o in vars(protocols).values()
+                      if isinstance(o, type) and typing.get_origin(o) is None
+                      and getattr(o, "_is_protocol", False)
+                      and o.__module__ == protocols.__name__)
+    problems = []
+    if sorted(versions.SCHEMA_VERSIONS) != schemas:
+        problems.append("SCHEMA_VERSIONS differs from schemas/**/*.schema.json")
+    n_schemas = len(schemas)
+    for name, text in docs.items():
+        for n, claim in _claims(text, r"\b(\d+)\b(?: JSON)? [Ss]chemas?\b(?! ?\(| of )"):
+            # "17 JSON Schemas", "17 schemas", "17-schema index" is checked below
+            if n != n_schemas:
+                problems.append(f"{name}: '{claim}' — {n_schemas} schema files on disk")
+        for n, claim in _claims(text, r"\b(\d+)-schema\b"):
+            if n != n_schemas:
+                problems.append(f"{name}: '{claim}' — {n_schemas} schema files on disk")
+        for n, claim in _claims(text, r"(?<![\d.])\b(\d+) typed (?:Python )?contracts\b"):
+            if n != n_types:
+                problems.append(f"{name}: '{claim}' — {n_types} contract dataclasses "
+                                f"in iap.contracts.types")
+        for n, claim in _claims(text, r"(?<![\d.])\b(\d+) (?:runtime[-_]checkable )?Protocols\b"):
+            if n != n_protocols:
+                problems.append(f"{name}: '{claim}' — {n_protocols} Protocols in "
+                                f"iap.contracts.protocols")
+    report("contract_counts", not problems,
+           "; ".join(problems) or
+           f"{n_schemas} schema files == SCHEMA_VERSIONS; {n_types} typed contracts; "
+           f"{n_protocols} Protocols; every claim in the docs matches",
+           PLATFORM_FAILURES)
+
+
+def check_lifecycle_numbers(docs: dict[str, str]) -> None:
+    """24 alphas / 24 CANDIDATE (registry), 7 states / 17 edges (golden), 18 gates."""
+    reg_path = ROOT / "research" / "alpha_registry.json"
+    gold_path = ROOT / "tests" / "golden" / "expected_lifecycle.json"
+    if not reg_path.exists() or not gold_path.exists():
+        report("lifecycle_numbers", True, "registry or golden absent — skipped",
+               PLATFORM_FAILURES)
+        return
+    reg = json.loads(reg_path.read_text())
+    gold = json.loads(gold_path.read_text())
+    alphas = reg["alphas"]
+    n_alphas = len(alphas)
+    by_state: dict[str, int] = {}
+    for rec in alphas.values():
+        by_state[rec["state"]] = by_state.get(rec["state"], 0) + 1
+    n_candidate = by_state.get("CANDIDATE", 0)
+    n_beyond = sum(n for st, n in by_state.items()
+                   if gold["states"][st] > gold["states"]["CANDIDATE"])
+    n_states = len(gold["states"])
+    n_edges = len(gold["transition_table"])
+    _t, _p, gates, err = _import_contracts()
+    n_gates = len(gates.GATE_SPECS) if gates is not None else None
+    problems = []
+    for name, text in docs.items():
+        for n, claim in _claims(text, r"\b(\d+) flagship alphas\b"):
+            if n != n_alphas:
+                problems.append(f"{name}: '{claim}' — registry holds {n_alphas}")
+        for n, claim in _claims(text, r"\b(\d+) (?:alphas (?:at|to) )?CANDIDATE\b"):
+            if n != n_candidate:
+                problems.append(f"{name}: '{claim}' — registry says {n_candidate} CANDIDATE")
+        for n, claim in _claims(text, r"CANDIDATE(?:,| /|;) (\d+) (?:beyond|VALIDATING)\b"):
+            if n != n_beyond:
+                problems.append(f"{name}: '{claim}' — registry says {n_beyond} beyond CANDIDATE")
+        for n, claim in _claims(text, r"\b(\d+)[- ](?:state|states)\b(?= (?:machine|promotion|lifecycle|alpha|/))"):
+            if n != n_states:
+                problems.append(f"{name}: '{claim}' — golden has {n_states} states")
+        for n, claim in _claims(text, r"\b(\d+)[- ](?:pinned )?edges?\b"):
+            if n != n_edges:
+                problems.append(f"{name}: '{claim}' — golden transition_table has {n_edges}")
+        if n_gates is not None:
+            for n, claim in _claims(text, r"\b(\d+) (?:pinned )?gates\b(?! of| pass| fail)"):
+                if n != n_gates:
+                    problems.append(f"{name}: '{claim}' — GATE_SPECS has {n_gates}")
+    report("lifecycle_numbers", not problems,
+           "; ".join(problems) or
+           f"{n_alphas} alphas, {n_candidate} CANDIDATE, {n_beyond} beyond; "
+           f"{n_states} states / {n_edges} edges / {n_gates} gates; docs agree",
+           PLATFORM_FAILURES)
+
+
+def check_mvp_golden_numbers(docs: dict[str, str]) -> None:
+    """events / decisions / parents / fills / P&L / digest of expected_mvp.json."""
+    path = ROOT / "tests" / "golden" / "expected_mvp.json"
+    if not path.exists():
+        report("mvp_golden_numbers", True, "expected_mvp.json absent — skipped",
+               PLATFORM_FAILURES)
+        return
+    g = json.loads(path.read_text())
+    rep = g["report"]
+    n_events, n_dec = g["n_events"], g["n_traces"]
+    n_parents = rep["counts"]["n_parent_orders"]
+    n_fills = rep["counts"]["n_fills"]
+    pnl = rep["pnl"]["total"]
+    digest = g["trace_digest"]
+    run_id = g["run_id"]
+    problems = []
+    for name, text in docs.items():
+        # "16,578 events ... 355 decisions" quoted together
+        for m in re.finditer(r"(\d{1,3}(?:,\d{3})+|\d{4,6}) events[^\n]{0,80}?(\d{2,4}) decisions",
+                             text):
+            ev, dec = int(m.group(1).replace(",", "")), int(m.group(2))
+            if (ev, dec) != (n_events, n_dec):
+                problems.append(f"{name}: '{m.group(0)[:60]}' — golden says "
+                                f"{n_events:,} events / {n_dec} decisions")
+        for m in re.finditer(r"(?<![\d=,])(\d{2,4}) decisions[^\n]{0,80}?(?<![\d=,])(\d{2,4}) parent",
+                             text):
+            if (int(m.group(1)), int(m.group(2))) != (n_dec, n_parents):
+                problems.append(f"{name}: '{m.group(0)[:60]}' — golden says "
+                                f"{n_dec} decisions / {n_parents} parents")
+        for m in re.finditer(r"parent(?: orders?)?[^\n]{0,60}?(?<![\d=,])(\d{2,4}) fills", text):
+            if int(m.group(1)) != n_fills:
+                problems.append(f"{name}: '{m.group(0)[:60]}' — golden says {n_fills} fills")
+        for m in re.finditer(r"[−-]\s?(\d+\.\d{2}) USD", text):
+            window = text[max(0, m.start() - 200):m.end() + 200].lower()
+            if "mvp" in window or "golden run" in window or "session" in window:
+                if abs(float(m.group(1)) + pnl) > 0.005:
+                    problems.append(f"{name}: '{m.group(0)}' — golden P&L total is "
+                                    f"{pnl:.2f} USD")
+        for m in re.finditer(r"digest[^\n`0-9a-f]{0,24}?`?(?<![0-9a-f])([0-9a-f]{8,64})", text):
+            window = text[max(0, m.start() - 300):m.end() + 100].lower()
+            if "mvp" in window and not digest.startswith(m.group(1)):
+                problems.append(f"{name}: MVP digest '{m.group(1)[:16]}…' is not a prefix "
+                                f"of the golden digest {digest[:16]}…")
+        for m in re.finditer(r"\b([0-9a-f]{16})\b", text):
+            window = text[max(0, m.start() - 40):m.end() + 40].lower()
+            if "run_id" in window or "run id" in window or "mvp run" in window \
+                    and "run" in window:
+                if m.group(1) != run_id and "data/mvp/" + m.group(1) in text:
+                    problems.append(f"{name}: MVP run id {m.group(1)} is not the golden "
+                                    f"run id {run_id}")
+    report("mvp_golden_numbers", not problems,
+           "; ".join(problems) or
+           f"{n_events:,} events / {n_dec} decisions / {n_parents} parents / "
+           f"{n_fills} fills / {pnl:.2f} USD / digest {digest[:16]}…; docs agree",
+           PLATFORM_FAILURES)
 
 
 def check_mermaid_sync() -> None:
@@ -305,10 +551,39 @@ def check_test_counts(docs: dict[str, str]) -> None:
            PLATFORM_FAILURES)
 
     sources = count_sources(docs)
+    check_repo_level_rows(sources)
     check_parity_quadruples(sources, t_tuple, g_tuple)
     check_golden_topology_diagram(sources, golden)
     check_per_language_count_prose(sources, tests)
     check_parity_table_vs_tree(tests, golden)
+
+
+def check_repo_level_rows(sources: dict[str, str]) -> None:
+    """`integration | 13` / `replay | 4` in README's table vs every prose quote
+    of the form "integration (13)" / "`replay` (4)"."""
+    readme = DOCS["README.md"].read_text()
+    rows: dict[str, int] = {}
+    for line in readme.splitlines():
+        m = re.match(r"\s*(integration|replay)\s*\|\s*(\d+)\s*\|", line)
+        if m:
+            rows[m.group(1)] = int(m.group(2))
+    if sorted(rows) != ["integration", "replay"]:
+        report("repo_level_rows", False,
+               "README parity table has no integration/replay rows",
+               PLATFORM_FAILURES)
+        return
+    problems = []
+    seen = 0
+    for name, text in sources.items():
+        for m in re.finditer(r"`?(integration|replay)`? \((\d+)\)", text):
+            seen += 1
+            if int(m.group(2)) != rows[m.group(1)]:
+                problems.append(f"{name}: '{m.group(0)}' — README table says "
+                                f"{rows[m.group(1)]}")
+    report("repo_level_rows", not problems,
+           "; ".join(problems) or
+           f"integration {rows['integration']} / replay {rows['replay']}; "
+           f"{seen} prose quotes agree", PLATFORM_FAILURES)
 
 
 def check_parity_quadruples(sources: dict[str, str],
@@ -352,10 +627,13 @@ def check_golden_topology_diagram(sources: dict[str, str],
     node = {
         "python": r"python: pytest -k golden<br/>(\d+) tests",
         "cpp": r"cpp: ctest -R Golden<br/>(\d+) tests",
-        "rust": r"rust: 6 golden test targets<br/>(\d+) tests",
+        "rust": r"rust: \d+ golden test targets<br/>(\d+) tests",
         "java": r"java: [^\"]*GoldenTest \(JUnitCore\)<br/>(\d+) "
                 r"golden-group tests",
     }
+    run_all = (ROOT / "tests" / "harness" / "run_all.sh").read_text()
+    m_targets = re.search(r'RUST_GOLDEN_TARGETS="([^"]*)"', run_all)
+    n_targets = len(m_targets.group(1).split()) if m_targets else None
     problems = []
     found = 0
     for name, text in sources.items():
@@ -366,6 +644,11 @@ def check_golden_topology_diagram(sources: dict[str, str],
                     problems.append(
                         f"{name}: golden-topology {lang} node says "
                         f"{m.group(1)}, harness says {golden[lang]}")
+        if n_targets is not None:
+            for m in re.finditer(r"rust: (\d+) golden test targets", text):
+                if int(m.group(1)) != n_targets:
+                    problems.append(f"{name}: rust golden targets {m.group(1)}, "
+                                    f"run_all.sh names {n_targets}")
     if not found:
         report("golden_topology_diagram_counts", True,
                "golden-topology diagram not found — skipped",
@@ -468,24 +751,34 @@ def check_research(docs: dict[str, str]) -> None:
         return
     doc = json.loads(ledger.read_text())
     total = doc["total_experiments"]
+    distinct = doc["distinct_experiments"]
     max_t = doc["expected_max_null_t"]
     bonf = doc["bonferroni_t_threshold"]
 
     stale = []
     for name, text in docs.items():
-        for m in re.finditer(r"(?<![\d,])([\d]{1,3}(?:,[\d]{3})+|\d{4,6})"
-                             r"[- ]?look", text):
+        # "865 recorded looks", "865-look", "865 looks over": three digits and
+        # up (the pre-2026-09-20 regex started at four and let "760 recorded
+        # looks" through unflagged), but never a bare number inside a longer
+        # token, and never the "21 looks per experiment" decomposition.
+        for m in re.finditer(r"(?<![\d,.])([\d]{1,3}(?:,[\d]{3})+|\d{3,6})"
+                             r"(?: recorded)?[- ]?looks?\b(?! per)", text):
             claimed = int(m.group(1).replace(",", ""))
             if claimed != total:
                 stale.append(f"{name}: {m.group(1)}-look ledger, "
                              f"experiments.json says {total:,}")
-        for m in re.finditer(r"expected max \|?t\|?[^\n\d]{0,20}([\d.]+)", text):
+        for m in re.finditer(r"(?<![\d,.])(\d{2,4}) distinct configurations", text):
+            if int(m.group(1)) != distinct:
+                stale.append(f"{name}: {m.group(1)} distinct configurations, "
+                             f"experiments.json says {distinct}")
+        # the pipes around |t| may be markdown-escaped (\|t\|) inside a table
+        for m in re.finditer(r"expected max \\?\|?t\\?\|?[^\n\d]{0,20}([\d.]+)", text):
             if abs(float(m.group(1)) - max_t) > 0.005:
                 stale.append(f"{name}: expected max |t| {m.group(1)}, "
                              f"ledger says {max_t:.3f}")
         # only a Bonferroni *t threshold* (a small number next to |t|), never
         # a citation year or a p-value in the same sentence
-        for m in re.finditer(r"Bonferroni[^\n\d]{0,40}\|t\|[^\n\d]{0,10}([\d.]+)",
+        for m in re.finditer(r"Bonferroni[^\n\d]{0,40}\\?\|t\\?\|[^\n\d]{0,10}([\d.]+)",
                              text):
             if abs(float(m.group(1)) - bonf) > 0.005:
                 stale.append(f"{name}: Bonferroni {m.group(1)}, "
@@ -493,8 +786,8 @@ def check_research(docs: dict[str, str]) -> None:
     report("experiment_ledger",
            not stale,
            "; ".join(stale) or
-           f"total_experiments {total:,}, expected max |t| {max_t:.3f}, "
-           f"Bonferroni |t| >= {bonf:.3f}",
+           f"total_experiments {total:,} over {distinct} distinct configurations, "
+           f"expected max |t| {max_t:.3f}, Bonferroni |t| >= {bonf:.3f}",
            RESEARCH_STALE)
     if stale:
         print("     ^ regenerate the research reports "

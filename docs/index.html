@@ -40,13 +40,18 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
        implementations, C++ for the latency-critical path, Rust for safety-critical
        infrastructure, Java for the strategy/platform layer. Market data → order books →
        205-feature factory → 24 alphas → validation → ML → portfolio → fail-closed risk →
-       execution/SOR → deterministic replay → TCA, held together by cross-language
-       golden tests.</p>
+       execution/SOR → deterministic replay → TCA → decision trace → 7-state promotion
+       lifecycle, held together by cross-language golden tests, and run end to end by one
+       command (<code>python -m iap.mvp run</code>) whose golden result is honestly cost-negative.</p>
     <nav>
       <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/LEARN.md">Learn (guide)</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/COOKBOOK.md">Cookbook</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/ARCHITECTURE.md">Architecture</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/DIAGRAMS.md">Diagrams</a>
+      <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/MVP.md">MVP</a>
+      <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/LIFECYCLE.md">Lifecycle</a>
+      <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/DECISION_TRACE.md">Decision trace</a>
+      <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/ROADMAP.md">Roadmap</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/papers/INDEX.md">Research papers</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/SPECIFICATION.md">Specification</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/README.md#references">References</a>
@@ -59,12 +64,15 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
 <div class="wrap">
   <h2>Measured, not claimed</h2>
   <div class="numbers">
-    Cross-language parity&nbsp;&nbsp;&nbsp; python 626&nbsp; · cpp 243&nbsp; · rust 254&nbsp; · java 449 tests — 1,572 green, one command<br>
-    Golden suites&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; identical book states, byte-identical IAP1 SHA-256, features/alphas to 1e-9 in all four languages<br>
-    C++ hot path&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; IAP1 decode 174.4 ns/event (CRC-32 verified) · book update 25.7 ns · replay 28M events/s · 48-feature engine ≈530 ns/event<br>
-    Determinism&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; full dataset regeneration is byte-identical (sha256-verified); replays reproduce fills exactly<br>
+    Cross-language parity&nbsp;&nbsp;&nbsp; python 1352&nbsp; · cpp 266&nbsp; · rust 298&nbsp; · java 475 tests — 2,391 green, one command; golden groups 162/67/62/102<br>
+    Golden suites&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; identical book states, byte-identical IAP1 SHA-256, features/alphas to 1e-9, byte-identical canonical JSON, trace digests, risk audit and lifecycle registry in all four languages<br>
+    C++ hot path&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; IAP1 decode 184.1 ns/event (CRC-32 verified) · book update 26.4 ns · replay 27.2M events/s · 48-feature engine 514.1 ns/event · one decision trace 31.7 µs/trace off the event loop<br>
+    Determinism&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; full dataset regeneration is byte-identical (sha256-verified); replays reproduce fills exactly; the MVP run twice and replayed from its capture reproduces its trace digest<br>
+    Contracts&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 17 JSON Schemas · 22 typed contracts · 18 Protocols; Python risk and execution ports proven by the Rust and C++ goldens (audit + snapshot byte-identical, fills bit-identical)<br>
     Feature factory&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 205 registered, versioned features across 10 families; validity-bitset semantics, no NaN ever valid<br>
-    Alpha research&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 24 flagship alphas · walk-forward + purging/embargo · 760-look multiple-testing ledger over 65 distinct configurations (expected max |t| 3.64)<br>
+    Alpha research&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 24 flagship alphas · walk-forward + purging/embargo · 865-look multiple-testing ledger over 70 distinct configurations (expected max |t| 3.68, Bonferroni |t| ≥ 4.02)<br>
+    Promotion lifecycle&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 7 states · 17 pinned edges · 18 gates; bundled data: 24 alphas at CANDIDATE, 0 beyond — every one fails net P&amp;L after costs<br>
+    MVP golden run&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 16,578 events · 355 decisions · 66 parent orders · 55 fills · P&amp;L −22.68 USD (cost-negative, stated) · digest 16cd29aa…<br>
     Adaptive lifecycle&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; PSI/KS drift monitors · 126 drift-triggered refits in the study · RETIRED halts allocation in the backtest, pages a human live<br>
     Verdicts (honest)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0 PROMOTE · 10 ITERATE · 14 REJECT — on clean synthetic data, nothing survives costs, and we say so
   </div>
@@ -150,6 +158,26 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
          codec SHA-256, features, alphas, risk decisions, fills, portfolio); C++, Rust and
          Java must reproduce every one. <code>tests/harness/run_all.sh</code> prints the
          parity table in one command.</p></div>
+    <div class="card"><h3>Contracts &amp; the Python reference ports</h3>
+      <p>17 JSON Schemas mirrored by 22 frozen, validated Python contracts and 18 runtime-checkable
+         Protocols; canonical JSON reproduced byte for byte in four languages. Python ports of the
+         hard risk engine and the execution stack proven by the same goldens the Java ports use
+         (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/API_CONTRACTS.md">API_CONTRACTS</a>,
+         <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/API_TRADING.md">API_TRADING</a>).</p></div>
+    <div class="card"><h3>Promotion lifecycle</h3>
+      <p>RESEARCH → CANDIDATE → VALIDATING → PAPER → ACTIVE ⇄ WATCH → RETIRED: 17 pinned edges, 18 gates
+         reading typed evidence, a byte-deterministic registry and transition log, ports in Java and
+         Rust from one golden. Bootstrapped on the bundled research: 24 CANDIDATE, 0 beyond.</p></div>
+    <div class="card"><h3>Decision trace &amp; data model</h3>
+      <p>One validated record per decision — signal, portfolio, risk, orders, routing, fills, TCA,
+         attribution — as canonical JSONL with a stream digest that an incident replay must
+         reproduce, indexed by a SQLite/PostgreSQL-portable store (24 tables, 3 views) and rendered
+         by <code>explain()</code> identically in Python, Java, Rust and C++.</p></div>
+    <div class="card"><h3>The executable MVP</h3>
+      <p><code>python -m iap.mvp run</code>: seeded feed → books → features → EQ01/EQ03/EQ06 →
+         portfolio → hard risk → TWAP/POV/IS → SOR over three venues → simulator → TCA → trace →
+         SQLite → report, deterministic twice over. The golden run loses 22.68 USD, the realized-IC
+         gap is audited to the data rather than a leak, and the document says so.</p></div>
     <div class="card"><h3>Observability &amp; deployment</h3>
       <p>Prometheus metrics (rust telemetry + 19 live Java metrics with /metrics, /health),
          recording + alert rules, two Grafana dashboards, structured JSONL logs,
@@ -190,6 +218,9 @@ cd python && PYTHONPATH=src python3 -m iap.marketdata && PYTHONPATH=src python3 
 
 # run everything — builds and tests all four languages, prints the parity table
 bash tests/harness/run_all.sh
+
+# the whole trading loop on one instrument, fully traced; then replay it from its capture
+cd python && PYTHONPATH=src python3 -m iap.mvp run && PYTHONPATH=src python3 -m iap.mvp replay --run ../data/mvp/58a10f2194a3c81c && cd ..
 
 # research pipelines (honest reports in research/)
 PYTHONPATH=python/src python3 research/alpha_reports/run_all.py

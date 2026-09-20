@@ -58,3 +58,42 @@ timestamps (identical rerun ⇒ identical file; only `git_commit` and the
 ledger count are provenance), like every other research artefact in this
 repository. A rerun that reproduces different evidence under the same id
 is refused by the runner rather than silently overwritten.
+
+## The five committed experiments (2026-09-19)
+
+All with the default configuration, seed 20260919, dataset `203c8f54…`,
+features `585dd7b9…`, `n_experiments_in_ledger = 865`, commit `f3a01377…`;
+periods derived from the two-session calendar (train = session 1, validation
+= the purged + embargoed tail, which holds zero rows on this data, test =
+session 2):
+
+| id | alpha | horizon | verdict | IC | NW t | hit | net bps (holdout) | Sharpe |
+|---|---|---|---|---:|---:|---:|---:|---:|
+| `c73bb6294d226163` | EQ01 | 1s (pinned) | ITERATE | +0.024071 | +4.3492 | 0.5764 | −301.4984 | −637.51 |
+| `d7b554d0a3fa3b26` | EQ03 | 1s | ITERATE | +0.018457 | +3.9258 | 0.5312 | −1173.0161 | −886.10 |
+| `217fa0cb1d89a9c8` | EQ03 | 5s (pinned) | ITERATE | +0.029894 | +4.8901 | 0.5289 | −1172.8685 | −885.94 |
+| `4a2900e4a6705542` | EQ06 | 1s (the MVP horizon) | ITERATE | +0.016115 | +1.5833 | 0.5472 | −531.1169 | −896.54 |
+| `d0dd1ab0711d33a1` | EQ06 | 10s (pinned) | ITERATE | +0.040400 | +2.6477 | 0.5384 | −531.1169 | −896.54 |
+
+All leakage-clean, hypothesis-confirmed, four non-degenerate folds, fold
+consistency 1.0; every holdout is net-negative at 1× costs — the same
+picture `research/alpha_reports/REPORT.md` gives. The pinned-horizon runs
+reproduce `research/alpha_reports/{EQ01,EQ03,EQ06}.json` at 1e-9
+(`python/tests/test_research_runner.py::test_eq03_report_reproduces_through_the_runner`);
+EQ03 @ 1 s is a new configuration compared to nothing. EQ06 @ 1 s and @ 10 s
+share identical holdout economics because the linear alpha's trades depend
+only on z and sign(β), not on the horizon's β magnitude. These five runs
+(5 × 21 = 105 entries) moved the ledger from 760 / 65 to **865 looks over 70 distinct
+configurations** (Bonferroni |t| ≥ 4.02, expected max |t| ≈ 3.68); they were not de-duplicated against
+the `promotion_pipeline` entries — the denominator only grows.
+
+`seed` is recorded and hashed but consumed by nothing: the whole chain
+(row-mass purged / embargoed walk-forward, closed-form IC / NW t, the
+vectorised backtester) has no random element. `cost_multiplier` scales only
+the holdout economics; the walk-forward gates and the stress grid inside
+`validate_alpha` are always at the pinned {0.5, 1, 2}×. The golden
+`tests/golden/expected_experiment_golden_frame.json` (EQ03 @ 5 s on the
+golden equity vector, `experiment_id 8c79974a13446a4e`, verdict REJECT with
+IC +0.0344 and NW t +0.078 on 2,000 rows) pins the runner for regression;
+regenerate only on a deliberate change with `python/tools/make_golden_research.py --force`.
+

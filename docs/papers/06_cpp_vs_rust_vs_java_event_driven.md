@@ -346,3 +346,19 @@ Current numbers, the cold single-pass reference table and the full
 methodology are generated into `benchmarks/results_cpp.md` by
 `cpp/bench/bench_all.cpp`; the caveat text is emitted by the generator so
 it can no longer be lost on regeneration.
+
+## Erratum / Update — 2026-09-20 (benchmark table regenerated)
+
+`benchmarks/results_cpp.md` was regenerated on 2026-09-19 (the C++ trace
+contract added two traced-replay rows and a trace-path table). The hot rows
+moved within the stated few-percent cross-run variance: IAP1 decode 174.4 →
+**184.1 ns/event**, book update 25.7 → **26.4 ns**, replay engine 28.1M →
+**27.2M events/s**, feature engine 530.4 → **514.1 ns/event**, alpha scoring
+38.5 → **33.6 ns/row**; the measured hot path is now 184.1 + 26.4 + 514.1 +
+33.6 = **758 ns ≈ 0.76 µs/event** (was 0.77). Nothing in the argument moves
+— the gap to the ~0.9 s median inter-event gap is unchanged at six orders of
+magnitude — and the platform's documents now quote the table rather than
+this paper (`tests/harness/check_headline_numbers.py`, `cpp_benchmark_numbers`).
+The new rows: serialising one 5.6 KB `DecisionTrace` costs 31.7 µs (+ 30.3 µs
+to hash), paid once per decision off the event loop; ≈ 37 ns/event amortised
+on the 2,000-event golden replay.

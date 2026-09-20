@@ -46,3 +46,4 @@ python/dist/
 # --- MVP runs (python -m iap.mvp run; docs/MVP.md): captured stream, traces,
 # store and report of a seeded session - regenerate, never commit
 /data/mvp/
+python/.coverage

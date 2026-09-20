@@ -55,7 +55,11 @@ Tolerances are pinned once (`PLATFORM_CONVENTIONS.md` §5): IAP1 codec
 parity is byte-exact (SHA-256); book states, checkpoints, risk decisions and
 fills are exact integers; features, alphas, portfolio and TCA compare at
 abs and rel 1e-9; adaptive PSI/KS at 1e-10 with exact refit booleans and
-lifecycle state sequences.
+lifecycle state sequences; canonical-JSON lines, trace digests, the risk
+audit / snapshot and the lifecycle registry are byte-identical; the 7-state
+lifecycle golden is compared exactly, field by field. The 2026-09-20 table
+reads python 1352 / cpp 266 / rust 298 / java 475 (golden 162/67/62/102),
+`integration` 13, `replay` 4.
 
 ## 4. Golden regeneration protocol
 
@@ -63,11 +67,16 @@ A golden file changes only as a deliberate act, never as a side effect of a
 refactor. The owning reference generates it; every other language matches
 it (`docs/ARCHITECTURE.md` §6):
 
-| golden | owner / tool |
-|---|---|
-| codec SHA-256, book states, anomaly states, checkpoint, features, alpha, portfolio, TCA, backtest, adaptive | Python — `python/tools/make_golden.py`, `make_golden_features.py`, `make_golden_alpha.py`, `make_golden_anomalies.py`, `make_golden_tca.py`, `make_golden_adaptive.py` |
-| replay fills (`expected_replay_fills.json`) | C++ — `cpp/tools/make_replay_fills_golden.cpp` (refuses to overwrite) |
-| risk decisions, snapshot, audit (`expected_risk_*.json`, `expected_risk_audit.jsonl`) | Rust — `rust/risk/src/bin/make_risk_golden.rs` |
+| golden | owner / tool | consumed by |
+|---|---|---|
+| codec SHA-256, book states, anomaly states, checkpoint, features, alpha, portfolio, TCA, backtest, adaptive | Python — `python/tools/make_golden.py`, `make_golden_features.py`, `make_golden_alpha.py`, `make_golden_anomalies.py`, `make_golden_tca.py`, `make_golden_adaptive.py` | C++, Rust, Java (each its own subset) |
+| replay fills (`expected_replay_fills.json`) | C++ — `cpp/tools/make_replay_fills_golden.cpp` (refuses to overwrite) | Java `ReplayFillsGoldenTest`, Python `test_execution_golden.py` (`iap.execution`) |
+| risk decisions, snapshot, audit (`expected_risk_*.json`, `expected_risk_audit.jsonl`) | Rust — `rust/risk/src/bin/make_risk_golden.rs` | Java `RiskGoldenTest`, Python `test_risk_golden.py` (`iap.risk`) |
+| contract examples + pinned `explain` block (`expected_contracts_examples.json`) | Python — `python/tools/make_golden_contracts.py` (`--force`) | Java `TraceGoldenTest`, Rust `golden_trace.rs`, C++ `TraceGolden` |
+| canonical JSON rules, float reprs, escapes, documents, trace id, trace digests (`expected_canonical_json.json`) | Python — `python/tools/make_golden_canonical_json.py` (`--force`) | Java `CanonicalJsonGoldenTest`, Rust `golden_canonical_json.rs`, C++ `CanonicalJsonGolden` |
+| 7-state lifecycle scenarios + transition table (`expected_lifecycle.json`) | Python — `python/tools/make_golden_lifecycle.py` (`--force`) | Java `LifecycleGoldenTest`, Rust `golden_lifecycle.rs` |
+| experiment golden frame (`expected_experiment_golden_frame.json`) | Python — `python/tools/make_golden_research.py` (`--force`) | Python only (research documents; no port) |
+| MVP session (`expected_mvp.json`) | Python — `python/tools/make_golden_mvp.py` (`--force`) | Python (`test_mvp_golden.py`, from scratch and from the capture); the pin for a future port of the loop |
 
 Steps, in order:
 
@@ -84,7 +93,15 @@ Steps, in order:
    leaves one language failing its golden group is blocked, not merged with
    a follow-up.
 6. If a headline number in `README.md` moves, update it and re-run
-   `python3 tests/harness/check_headline_numbers.py`.
+   `python3 tests/harness/check_headline_numbers.py` — it re-derives the
+   parity counts, the ledger denominator, the schema / contract / Protocol
+   counts, the lifecycle registry and transition table, the MVP golden
+   numbers and the benchmark table from their artefacts and fails the
+   harness's `numbers` row otherwise.
+7. Byte-parity goldens (canonical JSON, trace digests, the lifecycle
+   registry, the risk audit and snapshot) are compared **exactly**: a port
+   that is 1 ulp off in float parsing or prints `4.9E-324` for `5e-324` is
+   wrong, not "within tolerance" (`PLATFORM_CONVENTIONS.md` §13.1).
 
 ## 5. Determinism rules for any change
 
@@ -105,17 +122,25 @@ Steps, in order:
 Research truth is the product (spec §32). Two rules are mechanical:
 
 1. **Every look is ledgered.** An experiment is registered in
-   `research/experiments.json` (via the ExperimentRunner, which assigns the
-   entry id as the SHA-256 of the canonical spec) *before* its result is
+   `research/experiments.json` (via the ExperimentRunner — `python -m
+   iap.research run`, which assigns `experiment_id` as the first 16 hex of
+   the SHA-256 of the canonical spec and writes
+   `research/experiments/<id>/{spec,result}.json`) *before* its result is
    read, and every report prints the denominator and the expected max |t|
-   under the global null.
+   under the global null (865 looks / 70 configurations, max |t| ≈ 3.68 as
+   of 2026-09-20). Runner entries are never de-duplicated against the
+   report pipeline's entries even when the computation coincides: the
+   denominator only grows.
 2. **A PR cannot flip a verdict without the ledger entry.** A change to a
    verdict in `research/alpha_reports/*.json` (PROMOTE / ITERATE / REJECT),
-   to a lifecycle state in `research/lifecycle_log.jsonl`, or to an alpha's
-   position in the RESEARCH → CANDIDATE → VALIDATING → PAPER → ACTIVE →
-   WATCH → RETIRED machine must cite the ledger entry id of the experiment
-   that supports it, in the PR and in the `lifecycle_transition` document.
-   Reports are regenerated by their `run_*.py`, never edited by hand.
+   to a lifecycle state in `research/alpha_registry.json` /
+   `research/lifecycle_transitions.jsonl`, or to an alpha's position in the
+   RESEARCH → CANDIDATE → VALIDATING → PAPER → ACTIVE → WATCH → RETIRED
+   machine (`docs/LIFECYCLE.md`) must cite the ledger entry id of the
+   experiment that supports it, in the PR and in the `LifecycleTransition`
+   document's reason. Reports are regenerated by their `run_*.py`, the
+   registry by `python -m iap.lifecycle bootstrap`, never edited by hand;
+   a manual `retire` / `reset` is a HUMAN edge with a non-empty reason.
    Reviewers reject a verdict change with no id; a CI check for it is
    tracked in the plan (issue `L05`).
 
@@ -135,9 +160,10 @@ milestones, epics and issues; `docs/EPICS.md` is generated from it and
   commit both. Validate with `python3 tools/github/create_issues.py`
   (dry run, default).
 - Status is a statement about the repository, not the plan: `done` cites
-  the files and tests that prove it; `in-progress` lists planned paths;
-  `backlog` says what would prove it done. Do not mark something done
-  because its epic is.
+  the files and tests that prove it (the integration test checks the paths
+  exist); `in-progress` lists planned paths (legitimately none between
+  releases — 0 as of 2026-09-20); `backlog` says what would prove it done.
+  Do not mark something done because its epic is.
 - Push to GitHub with `python3 tools/github/create_issues.py --apply`
   (idempotent by exact title; `tools/github/README.md`).
 - Filing by hand (the **Epic** / **Feature** / **Bug** / **Research
@@ -160,6 +186,10 @@ milestones, epics and issues; `docs/EPICS.md` is generated from it and
 
 A behaviour change updates its contract in the same PR: `API_CORE.md`,
 `API_FEATURES.md`, `API_ALPHA.md`, `API_PORTFOLIO_TCA.md`, `API_ADAPTIVE.md`,
-`PLATFORM_CONVENTIONS.md` §11–§12, `docs/SCENARIOS.md` for a new pinned
-behaviour, the runbooks for anything an operator sees, and `README.md` for
-any headline number.
+`API_CONTRACTS.md`, `API_TRADING.md`, `PLATFORM_CONVENTIONS.md` §11–§13,
+`docs/LIFECYCLE.md` / `docs/DECISION_TRACE.md` / `docs/DATA_MODEL.md` /
+`docs/MVP.md` for their subsystems, `docs/SCENARIOS.md` for a new pinned
+behaviour, the runbooks for anything an operator sees, `docs/EPICS.md`
+(via the YAML) for the plan, and `README.md` for any headline number. A
+diagram change edits the `.mmd` source and its embedded copy together
+(`check_headline_numbers.py` `mermaid_sources_in_sync`).

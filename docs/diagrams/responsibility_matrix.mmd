@@ -2,29 +2,40 @@ flowchart LR
     subgraph PYL["Python — research + reference"]
         pcore["core / codec / book / replay<br/>(reference for all ports)"]
         pfeat["205-feature factory + labels"]
-        presearch["24 alphas · validation · ML ·<br/>portfolio ref · TCA ref · backtester"]
+        presearch["24 alphas · validation · ML · ExperimentRunner ·<br/>portfolio ref · TCA ref · backtester"]
+        pcontracts["contracts · trace · lifecycle · store<br/>(reference: canonical JSON, DecisionTrace,<br/>7-state lifecycle, SQLite index)"]
+        pports["risk · execution<br/>(reference-equivalent ports, same goldens)"]
+        pmvp["mvp — the traced end-to-end loop"]
     end
     subgraph CPPL["C++ — latency-critical path"]
-        ccore["codec · book · replay<br/>174.4 / 25.7 ns per event"]
-        cfeat["48-feature native engine ≈530 ns"]
+        ccore["codec · book · replay<br/>184.1 / 26.4 ns per event"]
+        cfeat["48-feature native engine ≈514 ns"]
         cexec["execution simulator + algos + SOR<br/>(FILLS REFERENCE)"]
+        ccontracts["contracts: canonical JSON + DecisionTrace<br/>(ExecutionReplay trace sink)"]
         cbench["bench_all — published methodology"]
     end
     subgraph RSL["Rust — safety-critical infrastructure"]
         rcore["codec · book · replay · SPSC eventbus"]
         rrisk["fail-closed risk engine<br/>(RISK REFERENCE, audit JSONL)"]
         rven["venue wire codec + simulated venue"]
-        rtel["telemetry: counters/gauges/histograms<br/>Prometheus exposition"]
+        rcontracts["contracts crate: canonical JSON, DecisionTrace,<br/>JSONL sink + digest · lifecycle crate"]
+        rtel["telemetry: counters/gauges/histograms<br/>Prometheus exposition (+ trace_records_total)"]
     end
     subgraph JVL["Java — institutional platform layer"]
         jcore["codec · book · replay · features · alphas"]
         jplat["event-driven backtester · portfolio service ·<br/>risk orchestration · execution/SOR · TCA service"]
+        jcontracts["contracts · trace · lifecycle<br/>(PaperTrading emits decision_traces.jsonl)"]
         jops["monitoring /metrics /health · config service ·<br/>paper trading"]
     end
     pcore -->|"golden vectors + expected_*"| ccore
     pcore -->|"golden"| rcore
     pcore -->|"golden"| jcore
     cexec -->|"expected_replay_fills.json"| jplat
+    cexec -->|"expected_replay_fills.json"| pports
     rrisk -->|"expected_risk_decisions.json<br/>byte-identical audit"| jplat
+    rrisk -->|"expected_risk_*<br/>byte-identical audit + snapshot"| pports
     presearch -->|"expected_portfolio / tca / alpha"| jplat
+    pcontracts -->|"expected_canonical_json / contracts_examples / lifecycle"| ccontracts
+    pcontracts -->|"same goldens"| rcontracts
+    pcontracts -->|"same goldens"| jcontracts
     rtel -.->|"metric naming contract"| jops

@@ -643,7 +643,7 @@ issues:
     title: "Typed Python contracts and protocols package (iap.contracts)"
     labels: [type:feature, area:contracts, phase:0, priority:p0, lang:python]
     milestone: "Phase 0"
-    status: in-progress
+    status: done
     estimate_days: 3
     context: >
       A single typed module set that every Python stage of the MVP loop
@@ -655,16 +655,16 @@ issues:
       - "Validation raises ValueError with the field name; no float on any price/qty field"
       - "Protocols are used by iap.mvp rather than concrete classes"
     evidence:
-      - "python/src/iap/contracts/__init__.py (planned)"
-      - "python/src/iap/contracts/{types,protocols,validate}.py (planned)"
-      - "python/tests/test_contracts.py (planned)"
+      - "python/src/iap/contracts/{__init__,ids,versions,types,protocols,validate,examples}.py (22 typed contracts, 18 runtime_checkable Protocols)"
+      - "python/tests/test_contracts.py; python/tests/test_contracts_schema_golden.py; tests/golden/expected_contracts_examples.json (python/tools/make_golden_contracts.py)"
+      - "python/src/iap/mvp/adapters.py (the MVP consumes the Protocols, not concrete classes); API_CONTRACTS.md"
 
   - key: C06
     epic: E01
     title: "New MVP schemas: portfolio_target, parent/child order, venue_decision, tca_result, experiment spec/result, lifecycle_transition, decision_trace, risk_decision"
     labels: [type:feature, area:contracts, phase:0, priority:p0, type:docs]
     milestone: "Phase 0"
-    status: in-progress
+    status: done
     estimate_days: 2
     context: >
       Nine additional contracts under their domain folders, each at
@@ -674,10 +674,10 @@ issues:
       - "Each schema has $id, x-version, required fields and integer types for price/qty"
       - "schemas/README.md index and MIGRATIONS.md updated in the same change"
     evidence:
-      - "schemas/portfolio/portfolio_target.schema.json (planned)"
-      - "schemas/order/parent_order.schema.json; schemas/order/child_order.schema.json; schemas/execution/venue_decision.schema.json (planned)"
-      - "schemas/tca/tca_result.schema.json; schemas/research/experiment_spec.schema.json; schemas/research/experiment_result.schema.json (planned)"
-      - "schemas/lifecycle/lifecycle_transition.schema.json; schemas/trace/decision_trace.schema.json; schemas/risk/risk_decision.schema.json (planned)"
+      - "schemas/portfolio/portfolio_target.schema.json; schemas/risk/risk_decision.schema.json"
+      - "schemas/order/parent_order.schema.json; schemas/order/child_order.schema.json; schemas/execution/venue_decision.schema.json"
+      - "schemas/tca/tca_result.schema.json; schemas/research/experiment_spec.schema.json; schemas/research/experiment_result.schema.json"
+      - "schemas/alpha/lifecycle_transition.schema.json; schemas/trace/decision_trace.schema.json; schemas/README.md; schemas/MIGRATIONS.md (Phase 0 contracts, 2026-09-19)"
 
   - key: C07
     epic: E01
@@ -739,7 +739,7 @@ issues:
     title: "Issue and PR templates, CONTRIBUTING.md and the GitHub issue plan tooling"
     labels: [type:docs, area:repo, phase:0, priority:p1, lang:python]
     milestone: "Phase 0"
-    status: in-progress
+    status: done
     estimate_days: 2
     context: >
       Templates that ask for the platform's own evidence — golden regeneration
@@ -753,7 +753,7 @@ issues:
     evidence:
       - ".github/ISSUE_TEMPLATE/{epic,feature,bug,research_experiment,alpha_promotion,config}.yml"
       - ".github/PULL_REQUEST_TEMPLATE.md; CONTRIBUTING.md"
-      - "tools/github/issues.yaml; tools/github/create_issues.py; tools/github/README.md; docs/EPICS.md"
+      - "tools/github/issues.yaml; tools/github/create_issues.py; tools/github/README.md; docs/EPICS.md (generated)"
       - "tests/integration/test_github_issue_plan.py"
 
   - key: R04
@@ -764,12 +764,14 @@ issues:
     status: backlog
     estimate_days: 0.5
     context: >
-      python/pyproject.toml declares only pyarrow; numpy, pandas, scipy,
-      scikit-learn, pytest and PyYAML are used but undeclared (CI installs them
-      by hand), so `pip install ./python` does not produce a working install.
+      Half done on 2026-09-19: python/pyproject.toml 1.1.0 now declares
+      numpy, pandas, scipy, scikit-learn, pyarrow, jsonschema and referencing
+      with `ml` (xgboost, lightgbm) and `dev` (pytest, pyyaml) extras, and
+      Dockerfile.python installs from it. CI still installs the same set by
+      an ad-hoc pip line, which is the remaining half.
     acceptance:
-      - "dependencies and an optional [test]/[ml] extra list everything imported under python/src and python/tests"
-      - "CI installs from pyproject instead of an ad-hoc pip line"
+      - "dependencies and the [dev]/[ml] extras list everything imported under python/src and python/tests (done: python/pyproject.toml 1.1.0)"
+      - "CI installs from pyproject instead of an ad-hoc pip line (open: .github/workflows/ci.yml)"
     evidence:
       - "python/pyproject.toml; .github/workflows/ci.yml (python job)"
 
@@ -1461,7 +1463,7 @@ issues:
     title: "ExperimentRunner: spec -> deterministic id -> result document -> ledger entry"
     labels: [type:feature, area:research, phase:w3, priority:p0, lang:python]
     milestone: "Week 3"
-    status: in-progress
+    status: done
     estimate_days: 3
     context: >
       The orchestrator the inventory found missing by name: ExperimentSpec
@@ -1475,9 +1477,9 @@ issues:
       - "A result cannot be written without a ledger entry; the entry id is in the result"
       - "A golden spec/result pair is checked in and compared in tests"
     evidence:
-      - "python/src/iap/research/{runner,spec,result}.py (planned)"
-      - "research/experiments/README.md (layout pinned); research/experiments/<id>/{spec,result}.json (planned)"
-      - "schemas/research/experiment_spec.schema.json; schemas/research/experiment_result.schema.json (planned)"
+      - "python/src/iap/research/{specs,runner,registry,golden,__main__}.py (ExperimentRunner satisfies iap.contracts.protocols.ExperimentRunner)"
+      - "research/experiments/README.md; research/experiments/{217fa0cb1d89a9c8,4a2900e4a6705542,c73bb6294d226163,d0dd1ab0711d33a1,d7b554d0a3fa3b26}/{spec,result}.json"
+      - "python/tests/test_research_runner.py; python/tests/test_research_golden.py; tests/golden/expected_experiment_golden_frame.json (python/tools/make_golden_research.py)"
 
   - key: V09
     epic: E08
@@ -1653,7 +1655,7 @@ issues:
     title: "Python risk engine port (iap.risk) against the same goldens"
     labels: [type:feature, area:risk, area:parity, phase:w4, priority:p0, lang:python]
     milestone: "Week 4"
-    status: in-progress
+    status: done
     estimate_days: 4
     context: >
       A rule-for-rule port so the MVP loop gates orders with the real engine
@@ -1663,8 +1665,9 @@ issues:
       - "expected_risk_decisions.json, expected_risk_snapshot.json and expected_risk_audit.jsonl pass in pytest -k golden"
       - "Emits risk_decision contract documents consumed by iap.trace"
     evidence:
-      - "python/src/iap/risk/{engine,limits,event,fmt}.py (planned)"
-      - "python/tests/test_risk_golden.py; python/tests/test_risk_rules.py (planned)"
+      - "python/src/iap/risk/{limits,refdata,orders,events,engine,serialize}.py"
+      - "python/tests/test_risk_golden.py (expected_risk_decisions.json exact, expected_risk_audit.jsonl and expected_risk_snapshot.json byte-identical, restore continuation); python/tests/test_risk_rules.py"
+      - "python/src/iap/mvp/adapters.py (RiskEngineAdapter emits iap.contracts.types.RiskDecision); API_TRADING.md"
 
   # ---------------------------------------------------------------- E11 ----
   - key: X01
@@ -1787,7 +1790,7 @@ issues:
     title: "Python execution port (iap.execution): simulator, algos and SOR against the same goldens"
     labels: [type:feature, area:execution, area:parity, phase:w5, priority:p0, lang:python]
     milestone: "Week 5"
-    status: in-progress
+    status: done
     estimate_days: 5
     context: >
       A port of the nine rules, the four algos and the SOR ladder so the MVP
@@ -1798,8 +1801,9 @@ issues:
       - "expected_replay_fills.json passes in pytest -k golden with exact ticks/qty/timestamps"
       - "Algo slicing and SOR routing are unit-tested against the C++ expectations"
     evidence:
-      - "python/src/iap/execution/{simulator,algos,sor}.py (planned)"
-      - "python/tests/test_execution_golden.py; python/tests/test_exec_algos.py; python/tests/test_sor.py (planned)"
+      - "python/src/iap/execution/{types,config,simulator,algos,sor,replay}.py"
+      - "python/tests/test_execution_golden.py (expected_replay_fills.json bit-identical); python/tests/test_execution_rules.py; python/tests/test_exec_algos.py; python/tests/test_sor.py"
+      - "API_TRADING.md"
 
   - key: X08
     epic: E11
@@ -2048,7 +2052,7 @@ issues:
     title: "Lifecycle and decision-trace goldens across Python, Java, Rust and C++"
     labels: [type:feature, area:parity, area:lifecycle, area:observability, phase:w6, priority:p0, lang:python, lang:cpp, lang:rust, lang:java]
     milestone: "Week 6"
-    status: in-progress
+    status: done
     estimate_days: 3
     context: >
       New golden files for the 7-state lifecycle sequences and the decision
@@ -2059,9 +2063,10 @@ issues:
       - "tests/golden/expected_lifecycle.json and expected_decision_trace.json exist with x-version and a MIGRATIONS entry"
       - "Each port's golden group includes the new files; check_deployment's Java gate list includes the new *GoldenTest classes"
     evidence:
-      - "tests/golden/expected_lifecycle.json; tests/golden/expected_decision_trace.json (planned)"
-      - "python/tools/make_golden_lifecycle.py; python/tools/make_golden_trace.py (planned)"
-      - "java LifecycleGoldenTest, TraceGoldenTest; rust/lifecycle/tests/golden_lifecycle.rs; cpp/tests/test_lifecycle_golden.cpp (planned)"
+      - "tests/golden/expected_lifecycle.json (python/tools/make_golden_lifecycle.py); tests/golden/expected_canonical_json.json (python/tools/make_golden_canonical_json.py); tests/golden/expected_contracts_examples.json (python/tools/make_golden_contracts.py)"
+      - "python/tests/test_lifecycle_golden.py; python/tests/test_canonical_json_golden.py; python/tests/test_contracts_schema_golden.py"
+      - "java/src/test/java/com/iap/{LifecycleGoldenTest,TraceGoldenTest,CanonicalJsonGoldenTest}.java (in run_all.sh JAVA_GOLDEN_CLASSES); rust/lifecycle/tests/golden_lifecycle.rs; rust/contracts/tests/{golden_canonical_json,golden_trace}.rs; cpp/tests/{test_canonical_json_golden,test_trace_golden,test_replay_trace}.cpp"
+      - "schemas/MIGRATIONS.md (2026-09-19 entries); tests/harness/check_deployment.py java_golden_gate_complete"
 
   # ---------------------------------------------------------------- E15 ----
   - key: L01
@@ -2088,7 +2093,7 @@ issues:
     title: "Seven-state promotion lifecycle RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE -> WATCH -> RETIRED with gates and alpha registry"
     labels: [type:feature, area:lifecycle, phase:w6, priority:p0, lang:python]
     milestone: "Week 6"
-    status: in-progress
+    status: done
     estimate_days: 4
     context: >
       The pre-deployment half of the machine does not exist today (the
@@ -2102,16 +2107,16 @@ issues:
       - "The registry seeds all 24 alphas at RESEARCH (ten ITERATE alphas may be CANDIDATE only via a ledgered verdict)"
       - "A golden state-sequence file pins the machine"
     evidence:
-      - "python/src/iap/lifecycle/{states,machine,registry,gates}.py (planned)"
-      - "schemas/lifecycle/lifecycle_transition.schema.json; tests/golden/expected_lifecycle.json (planned)"
-      - "docs/LIFECYCLE.md (planned)"
+      - "python/src/iap/lifecycle/{config,evidence,gates,machine,registry,bootstrap,golden,__main__}.py; configs/strategies/lifecycle.json"
+      - "schemas/alpha/lifecycle_transition.schema.json; research/alpha_registry.json (24 CANDIDATE / 0 beyond); research/lifecycle_transitions.jsonl"
+      - "tests/golden/expected_lifecycle.json; python/tests/test_lifecycle.py; python/tests/test_lifecycle_golden.py; docs/LIFECYCLE.md"
 
   - key: L03
     epic: E15
     title: "Lifecycle ports in Java, Rust and C++"
     labels: [type:feature, area:lifecycle, area:parity, phase:w6, priority:p1, lang:java, lang:rust, lang:cpp]
     milestone: "Week 6"
-    status: in-progress
+    status: done
     estimate_days: 3
     context: >
       The same machine in the three production languages so the Java paper
@@ -2120,7 +2125,8 @@ issues:
     acceptance:
       - "State sequences match the Python golden exactly in each port"
     evidence:
-      - "java/src/main/java/com/iap/lifecycle/ (planned); rust/lifecycle/ (planned); cpp/include/iap/lifecycle/ (planned)"
+      - "java/src/main/java/com/iap/lifecycle/ (java LifecycleGoldenTest, LifecycleMachineTest); rust/lifecycle/ (rust/lifecycle/tests/{golden_lifecycle,machine_rules}.rs)"
+      - "C++ deliberately not ported: the lifecycle is a research/platform concern (docs/ARCHITECTURE.md §2, §10); the C++ trace port (O05) carries the contract records the hot path needs"
 
   - key: L04
     epic: E15
@@ -2218,7 +2224,7 @@ issues:
     title: "Decision trace: signal -> decision -> order -> execution -> P&L with explain()"
     labels: [type:feature, area:observability, phase:w6, priority:p0, lang:python]
     milestone: "Week 6"
-    status: in-progress
+    status: done
     estimate_days: 3
     context: >
       The inventory found no correlation id linking a market event to a
@@ -2230,15 +2236,16 @@ issues:
       - "Trace ids are derived from (instrument_id, decision exchange_ts, sequence) — never from a wall clock or a counter that depends on thread timing"
       - "explain() output for the golden trace is byte-stable and asserted in a test"
     evidence:
-      - "python/src/iap/trace/{trace,explain,sink}.py (planned); schemas/trace/decision_trace.schema.json (planned)"
-      - "docs/DECISION_TRACE.md; tests/golden/expected_decision_trace.json (planned)"
+      - "python/src/iap/trace/{builder,sinks,digest,explain,attribution}.py; python/src/iap/contracts/ids.py (make_trace_id); schemas/trace/decision_trace.schema.json"
+      - "python/tests/test_trace.py; python/tests/test_contracts.py (explain byte-stable); tests/golden/expected_contracts_examples.json (pinned explain block); tests/golden/expected_canonical_json.json (trace_id, trace_digest)"
+      - "docs/DECISION_TRACE.md"
 
   - key: O05
     epic: E16
     title: "Decision trace ports in Java, Rust and C++"
     labels: [type:feature, area:observability, area:parity, phase:w6, priority:p1, lang:java, lang:rust, lang:cpp]
     milestone: "Week 6"
-    status: in-progress
+    status: done
     estimate_days: 3
     context: >
       The trace record and id derivation in the three production languages
@@ -2246,7 +2253,9 @@ issues:
     acceptance:
       - "Trace documents for the golden decision match byte-for-byte across the ports"
     evidence:
-      - "java/src/main/java/com/iap/trace/ (planned); rust/trace/ (planned); cpp/include/iap/trace/ (planned)"
+      - "java/src/main/java/com/iap/trace/ + java/src/main/java/com/iap/contracts/ (java TraceGoldenTest, CanonicalJsonGoldenTest, PaperTraceTest)"
+      - "rust/contracts/src/{canonical,sha256,trace}.rs; rust/telemetry/src/trace.rs (rust/contracts/tests/{golden_canonical_json,golden_trace}.rs)"
+      - "cpp/include/iap/contracts/{canonical_json,trace}.hpp; cpp/src/contracts/; cpp/src/replay/exec_replay.cpp (cpp/tests/{test_canonical_json_golden,test_trace_golden,test_replay_trace}.cpp)"
 
   - key: O06
     epic: E16
@@ -2288,7 +2297,7 @@ issues:
     title: "SQLite/Postgres-portable DDL and the iap.store module (experiments, lifecycle, orders, executions, TCA, traces)"
     labels: [type:feature, area:store, phase:w6, priority:p0, lang:python]
     milestone: "Week 6"
-    status: in-progress
+    status: done
     estimate_days: 3
     context: >
       The inventory found no SQL, SQLite or ORM anywhere. schemas/sql/ gains
@@ -2301,8 +2310,9 @@ issues:
       - "Round-trip tests: contract document -> row -> document for every table"
       - "The MVP loop writes its experiment, orders, executions, TCA result and trace into the store"
     evidence:
-      - "schemas/sql/{experiments,lifecycle,orders,executions,tca,traces}.sql (planned)"
-      - "python/src/iap/store/{db,ddl,repo}.py (planned); python/tests/test_store.py (planned); docs/DATA_MODEL.md (planned)"
+      - "schemas/sql/iap_v1.sql (24 tables, 3 views, x-version 1); python/src/iap/store/{ddl,db,importers,__main__}.py"
+      - "python/tests/test_store.py (round trips per table, DDL portability whitelist); docs/DATA_MODEL.md"
+      - "python/src/iap/mvp/session.py (StoreTraceSink writes every MVP trace + reference data into <run>/iap.sqlite)"
 
   - key: D03
     epic: E17
@@ -2327,7 +2337,7 @@ issues:
     title: "python -m iap.mvp --seed 12345 --instrument SYN.EQ.AAPL: one-command end-to-end loop"
     labels: [type:feature, area:mvp, phase:w6, priority:p0, lang:python]
     milestone: "Week 6"
-    status: in-progress
+    status: done
     estimate_days: 4
     context: >
       Generate -> normalize -> book -> features -> alpha (linear_z_v1) ->
@@ -2338,14 +2348,15 @@ issues:
       - "Exit 0 with a report (events, decisions, orders, fills, IS bps, risk allowed/rejected) and a traces file"
       - "Every stage consumes iap.contracts types; no wall clock on the path"
     evidence:
-      - "python/src/iap/mvp/{__main__,loop,report}.py (planned); docs/MVP.md (planned)"
+      - "python/src/iap/mvp/{__main__,config,feed,alpha,portfolio,adapters,engine,report,session,golden}.py; configs/mvp/{mvp,mvp_tiny,instruments,venues,generator,generator_tiny}.json"
+      - "python/tests/test_mvp.py; tests/integration/test_mvp_end_to_end.py; docs/MVP.md"
 
   - key: MV02
     epic: E18
     title: "MVP run-twice determinism golden"
     labels: [type:feature, area:mvp, area:testing, phase:w6, priority:p0, lang:python]
     milestone: "Week 6"
-    status: in-progress
+    status: done
     estimate_days: 1
     context: >
       Running the MVP twice with the same seed must produce byte-identical
@@ -2354,14 +2365,14 @@ issues:
     acceptance:
       - "tests/replay/test_mvp_determinism.py compares SHA-256 of both runs and against tests/golden/expected_mvp_sha256.json"
     evidence:
-      - "tests/replay/test_mvp_determinism.py; tests/golden/expected_mvp_sha256.json (planned)"
+      - "tests/replay/test_mvp_replay_determinism.py; python/tests/test_mvp_golden.py; tests/golden/expected_mvp.json (python/tools/make_golden_mvp.py)"
 
   - key: MV03
     epic: E18
     title: "Documentation set: MVP.md, DATA_MODEL.md, LIFECYCLE.md, DECISION_TRACE.md, ROADMAP.md, EPICS.md"
     labels: [type:docs, area:mvp, phase:w6, priority:p1]
     milestone: "Week 6"
-    status: in-progress
+    status: done
     estimate_days: 2
     context: >
       One document per new subsystem in the same register as the existing
@@ -2370,7 +2381,8 @@ issues:
       - "Each document names its schemas, modules, goldens and the tests that pin it"
       - "README's documentation index links all six"
     evidence:
-      - "docs/MVP.md; docs/DATA_MODEL.md; docs/LIFECYCLE.md; docs/DECISION_TRACE.md; docs/ROADMAP.md (planned); docs/EPICS.md (generated)"
+      - "docs/MVP.md; docs/DATA_MODEL.md; docs/LIFECYCLE.md; docs/DECISION_TRACE.md; docs/ROADMAP.md; docs/EPICS.md (generated)"
+      - "README.md documentation index; API_CONTRACTS.md; API_TRADING.md; docs/runbooks/RUNBOOK_incident_replay.md"
 
   # ---------------------------------------------------------------- E19 ----
   - key: Q01

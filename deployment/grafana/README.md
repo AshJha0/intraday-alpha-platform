@@ -9,7 +9,11 @@ Two provisioned dashboards (spec §25):
 
 **Every panel expression names a metric a component in this deployment
 actually exports** — enforced by `tests/harness/check_deployment.py`
-(`dashboards_valid`). See "What is scraped today" below.
+(`dashboards_valid`, against its `EXPORTED_METRICS` list). See "What is
+scraped today" below. The decision trace (`docs/DECISION_TRACE.md`) joins
+this story as a third artefact next to the metrics and the risk audit: the
+two `trace_*` counters below are exported today; surfacing the trace itself
+on a panel is backlog (EPICS O06).
 
 Provisioning (`provisioning/`) registers the Prometheus datasource
 (uid `prometheus`, URL `http://prometheus:9090`) and a file provider loading
@@ -99,6 +103,8 @@ metrics (verified against a running `/metrics` scrape and the sources):
 | `jvm_gc_pause_ns` | histogram | GC pauses (GcPauseHigh at p99 > 10 ms; registered at first observed pause) |
 | `alpha_live_vs_backtest_drift{alpha=...}` | gauge | **LIVE** — Population Stability Index of the rolling live signal window (256 values, recomputed every 32 signals) vs the research baseline (`research/baselines/*.json`, pinned formula in `/API_ADAPTIVE.md` and `com.iap.adaptive.Psi`). Registered once the window fills against a loaded baseline; absent while no baseline ships for the alpha. LiveVsBacktestDrift warns at PSI > 0.25 — the standard industry PSI rule of thumb (< 0.1 stable, 0.1–0.25 moderate shift, > 0.25 significant shift; the credit-scoring population-stability convention) |
 | `alpha_rolling_ic{alpha=...}` | gauge | rolling realized IC: mean of per-bucket Pearson ICs (300 s event-time buckets, matured signal/forward-return pairs only, lookahead-free) over the pinned 2 h `ic_window_ns` from `configs/strategies/strategies.json`; NaN below `min_ic_buckets` (`com.iap.adaptive.RollingIc`, normative semantics in `/API_ADAPTIVE.md` §4) |
+| `trace_records_total` | counter | decision traces written to `<state-dir>/decision_traces.jsonl` — one per pre-trade risk decision, incremented only after a successful emit (`com.iap.platform.PaperTraces`; the same name `rust/telemetry::trace` pins). `/status` carries the live `trace_count` and `trace_digest`; the session report `trace: {count, digest, jsonl}` (`docs/DECISION_TRACE.md` §7). Exported since 2026-09-19; no panel or rule uses it yet (backlog O06) |
+| `trace_tca_skipped_total` | counter | traces emitted without a TCA stage because the paper `MarketTimeline` never covered the parent (the stream ended before the child arrived) — the trace carries no TCA rather than a guessed one (1 in the golden session) |
 | `alpha_lifecycle_state{alpha=...}` | gauge | 0 = ACTIVE, 1 = WATCH, 2 = RETIRED — IC-gated hysteresis per `configs/strategies/strategies.json` (`adaptive.lifecycle`): WATCH on rolling IC < `watch_ic_gate` (0.0); RETIRED after `retire_breach_evals` (6) consecutive breaches; re-activation after 3 consecutive evals ≥ `reactivate_ic_gate` (0.005), RETIRED only back to WATCH (`com.iap.adaptive.LifecycleGauge`, mirroring `/API_ADAPTIVE.md` §6) |
 
 Note on GC: `jvm_gc_pause_ns` is derived from the `GarbageCollectorMXBean`
