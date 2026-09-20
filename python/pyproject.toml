@@ -28,6 +28,7 @@ iap-tca = "iap.tca.__main__:main"
 iap-research = "iap.research.__main__:main"
 iap-lifecycle = "iap.lifecycle.__main__:main"
 iap-store = "iap.store.__main__:main"
+iap-mvp = "iap.mvp.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

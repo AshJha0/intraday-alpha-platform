@@ -475,6 +475,272 @@ data:
         "ts_violation_prob": 0.0005
       }
     }
+  mvp__generator.json: |
+    {
+      "x-version": 1,
+      "description": "MVP market-data generator config (iap.mvp.feed over iap.marketdata.generator, unmodified): seed 12345 (overridden by mvp.json seed / --seed so that one seed drives the whole run), ONE session, equities only (the MVP reference data lists no FX instrument, so the generator's FX branch emits nothing). The MVP instrument SYN.EQ.AAPL trades on XV1/XV2/XV3; each venue stream gets slots_per_stream flow slots spread over the mvp.json session window (the generator's own rate rule: lambda0 = slots / duration * 1.3, so roughly 77% of the slots are consumed before the close). The QC anomaly injection stays at the bundled rates so the loop exercises sequence-gap gating (SNAPSHOT recovery -> risk on_sequence_gap / on_feed_recovered), duplicates and out-of-order arrivals; the intraday halt targets the MVP instrument itself so the venue trading-state gate (simulator rule 8, SOR eligibility, NO_ROUTE) is exercised too.",
+      "seed": 12345,
+      "sessions": 1,
+      "equities": {
+        "slots_per_stream": 4500,
+        "halt": {
+          "instrument": "SYN.EQ.AAPL",
+          "session_index": 0,
+          "duration_s": 45
+        }
+      }
+    }
+  mvp__generator_tiny.json: |
+    {
+      "x-version": 1,
+      "description": "Generator config of the tiny test session (configs/mvp/mvp_tiny.json): the MVP generator config with fewer flow slots per venue stream and a weaker self-excitation kick, so the 8-minute test session holds a few thousand events whose flow reaches past the 3-minute portfolio warm-up.",
+      "seed": 12345,
+      "sessions": 1,
+      "equities": {
+        "slots_per_stream": 1600,
+        "halt": {
+          "instrument": "SYN.EQ.AAPL",
+          "session_index": 0,
+          "duration_s": 45
+        },
+        "flow": {
+          "excitation_kick": 0.5
+        }
+      }
+    }
+  mvp__instruments.json: |
+    {
+      "x-version": 1,
+      "description": "MVP instrument universe (iap.mvp): one synthetic large-cap equity, SYN.EQ.AAPL, listed on XV1/XV2/XV3. instrument_id 12 is the next free equity id (the bundled universe uses 1..11 for equities/ETF and 101..108 for FX) so the MVP never shadows a bundled instrument. Same schema as configs/instruments/instruments.json: tick_size real price per tick, lot_size shares per board lot, adv in shares/day, ref_price the generator's starting efficient price. The trading session (open/close, timezone) is NOT here: it is the mvp.json session block, which iap.mvp.feed composes into the reference-data document so the session length has exactly one source of truth.",
+      "calendar": {
+        "trading_days": ["2026-08-24"],
+        "timezone": "UTC",
+        "description": "Single synthetic trading day of the MVP session."
+      },
+      "instruments": [
+        {
+          "symbol": "SYN.EQ.AAPL",
+          "instrument_id": 12,
+          "asset_class": "EQUITY",
+          "currency": "USD",
+          "tick_size": 0.01,
+          "lot_size": 100,
+          "ref_price": 190.0,
+          "adv": 60000000,
+          "venues": ["XV1", "XV2", "XV3"]
+        }
+      ]
+    }
+  mvp__mvp.json: |
+    {
+      "x-version": 1,
+      "description": "The executable MVP (python -m iap.mvp): one complete, deterministic, fully traced institutional trading loop on a single synthetic equity - seeded market data -> per-venue books + consolidated book -> feature engine -> three fitted linear_z_v1 alphas ensembled -> single-stock mean-variance portfolio target -> hard risk per child -> TWAP / POV / IS child scheduling -> SOR over three venues -> execution simulator -> TCA -> attribution -> DecisionTrace (JSONL + SQLite) -> report. Every value here is validated fail-fast by iap.mvp.config (file and key named in the error). Money is in the reporting currency of configs/risk/risk.json (USD); prices are integer ticks; every duration is event-time nanoseconds; no wall clock anywhere on the path.",
+      "seed": 12345,
+      "instrument": "SYN.EQ.AAPL",
+      "strategy_id": "MVP",
+      "venues": [
+        "XV1",
+        "XV2",
+        "XV3"
+      ],
+      "alphas": [
+        "EQ01",
+        "EQ03",
+        "EQ06"
+      ],
+      "horizon_ns": 1000000000,
+      "decision_cadence_ns": 1000000000,
+      "session": {
+        "trading_day": "2026-08-24",
+        "timezone": "UTC",
+        "open": "13:30:00",
+        "close": "13:45:00"
+      },
+      "portfolio": {
+        "risk_aversion": 6.0,
+        "tc_bps": 0.001,
+        "max_position_qty": 500,
+        "max_notional": 1000000.0,
+        "turnover_cap": 0.5,
+        "vol_target_per_bar": 0.0005,
+        "ewma_lambda": 0.94,
+        "min_bars": 2,
+        "conf_min": 0.1,
+        "solver": {
+          "iters": 100,
+          "proj_passes": 4,
+          "step_decay": 0.01,
+          "feas_tol": 1e-07
+        }
+      },
+      "execution": {
+        "parent_window_ns": 1000000000,
+        "urgency_bands": [
+          {
+            "max_urgency": 0.2,
+            "algo": "TWAP"
+          },
+          {
+            "max_urgency": 0.35,
+            "algo": "POV"
+          },
+          {
+            "max_urgency": 1.0,
+            "algo": "IS"
+          }
+        ],
+        "twap_slices": 2,
+        "is_slices": 2,
+        "is_risk_aversion": 1.0,
+        "pov_participation": 0.05,
+        "latency": {
+          "decision_ns": 50000,
+          "risk_ns": 50000,
+          "wire_ns": 100000
+        }
+      },
+      "sor": {
+        "prefer_rebate": true,
+        "max_venue_latency_ns": 1000000
+      },
+      "reference": {
+        "instruments": "configs/mvp/instruments.json",
+        "venues": "configs/mvp/venues.json",
+        "generator": "configs/mvp/generator.json",
+        "risk": "configs/risk/risk.json",
+        "execution": "configs/execution/execution.json",
+        "alpha_params": "configs/strategies/alpha_params.json",
+        "alpha_registry": "research/alpha_registry.json"
+      },
+      "notes": [
+        "alphas: EQ01 (microprice), EQ03 (multi-level OFI) and EQ06 (short-horizon momentum) are three of the six golden production alphas of API_ALPHA.md; all three carry fitted, non-dead linear_z_v1 parameters in configs/strategies/alpha_params.json (feature_version-checked on load), so no substitution was needed.",
+        "horizon: the alphas read their pinned features but the MVP acts on a 1 s holding horizon; EQ03 (pinned 5 s) and EQ06 (pinned 10 s) enter the ensemble as z-scores (iap.backtest.engine.ensemble_scores: equal-weight z average rescaled by the mean |beta|), so the mixture is scale-free; the research runner measured EQ03@1s IC +0.018 and EQ06@1s IC +0.016 (research/experiments).",
+        "portfolio.tc_bps (0.001 bp): the optimizer's linear transaction-cost penalty is deliberately orders of magnitude BELOW the modelled round-trip cost (half-spread + fee + impact, about 1 bp on a USD 190 stock) - the fitted expected returns are 0.001-0.05 bp per decision, so with the honest cost the mean-variance solve would never trade and the execution / TCA / trace path would stay unexercised. It acts as a dead-band on negligible expected returns. The report measures the real cost through TCA and states the net result; it never assumes the optimizer's number.",
+        "portfolio.conf_min (0.1): below it the optimizer sees a zero expected return and flattens (the Java paper vertical's rule); urgency = ensemble confidence selects the algo: TWAP (passive limit at the same-side best) up to 0.2, POV up to 0.35, IS above.",
+        "portfolio.min_bars: the EWMA variance needs completed 1-minute bars; until min_bars bar returns exist a decision produces no target (counted as decisions_without_covariance) instead of a fabricated prior - the first three minutes of the session are warm-up.",
+        "execution controls (max_child_qty, max_participation, min_slice_interval_ns, latency_budget_ns) are read from configs/execution/execution.json defaults; the sor block must equal its sor block (checked) and every document is hashed into config_version.",
+        "session: 15 minutes of event time (about 16k events on three venues) keeps the golden run under the 20 s budget; the generator's self-exciting flow consumes its slots in roughly the first 60% of the window (its pinned rate rule), the close auction prints at 13:45; the halt lands at 30% of the session (13:34:30 for 45 s)."
+      ]
+    }
+  mvp__mvp_tiny.json: |
+    {
+      "x-version": 1,
+      "description": "Tiny MVP configuration for the unit / replay / integration tests (python -m iap.mvp --config configs/mvp/mvp_tiny.json): identical to mvp.json except an 8-minute session and configs/mvp/generator_tiny.json (fewer flow slots), so a full run takes about two seconds. Not a golden; the golden session is mvp.json.",
+      "seed": 12345,
+      "instrument": "SYN.EQ.AAPL",
+      "strategy_id": "MVP",
+      "venues": [
+        "XV1",
+        "XV2",
+        "XV3"
+      ],
+      "alphas": [
+        "EQ01",
+        "EQ03",
+        "EQ06"
+      ],
+      "horizon_ns": 1000000000,
+      "decision_cadence_ns": 1000000000,
+      "session": {
+        "trading_day": "2026-08-24",
+        "timezone": "UTC",
+        "open": "13:30:00",
+        "close": "13:38:00"
+      },
+      "portfolio": {
+        "risk_aversion": 6.0,
+        "tc_bps": 0.001,
+        "max_position_qty": 500,
+        "max_notional": 1000000.0,
+        "turnover_cap": 0.5,
+        "vol_target_per_bar": 0.0005,
+        "ewma_lambda": 0.94,
+        "min_bars": 2,
+        "conf_min": 0.1,
+        "solver": {
+          "iters": 100,
+          "proj_passes": 4,
+          "step_decay": 0.01,
+          "feas_tol": 1e-07
+        }
+      },
+      "execution": {
+        "parent_window_ns": 1000000000,
+        "urgency_bands": [
+          {
+            "max_urgency": 0.2,
+            "algo": "TWAP"
+          },
+          {
+            "max_urgency": 0.35,
+            "algo": "POV"
+          },
+          {
+            "max_urgency": 1.0,
+            "algo": "IS"
+          }
+        ],
+        "twap_slices": 2,
+        "is_slices": 2,
+        "is_risk_aversion": 1.0,
+        "pov_participation": 0.05,
+        "latency": {
+          "decision_ns": 50000,
+          "risk_ns": 50000,
+          "wire_ns": 100000
+        }
+      },
+      "sor": {
+        "prefer_rebate": true,
+        "max_venue_latency_ns": 1000000
+      },
+      "reference": {
+        "instruments": "configs/mvp/instruments.json",
+        "venues": "configs/mvp/venues.json",
+        "generator": "configs/mvp/generator_tiny.json",
+        "risk": "configs/risk/risk.json",
+        "execution": "configs/execution/execution.json",
+        "alpha_params": "configs/strategies/alpha_params.json",
+        "alpha_registry": "research/alpha_registry.json"
+      },
+      "notes": [
+        "tiny test configuration: see configs/mvp/mvp.json for the documented choices; only session.close and reference.generator differ."
+      ]
+    }
+  mvp__venues.json: |
+    {
+      "x-version": 1,
+      "description": "MVP venue universe (iap.mvp): the two bundled equity venues XV1 and XV2 copied verbatim from configs/venues/venues.json plus a third synthetic equity venue XV3. venue_id 3 is free in the platform id space (venues.json uses 1, 2, 10, 11, 12; the contracts golden example already renders venue 3 as XV3). XV3 profile (documented, plausible): slightly cheaper taker fee than XV1/XV2 (0.0025/share), the lowest maker rebate (0.001/share) and the slowest latency (300 us mean, 100 us jitter) - within sor.max_venue_latency_ns (1 ms) and the 2 ms latency budget, so it is eligible but only wins aggressive routes on price or on a fee tie. Same latency model as venues.json: receive_ts = exchange_ts + mean_ns + jitter (uniform in [0, jitter_ns], SplitMix64).",
+      "venues": [
+        {
+          "venue": "XV1",
+          "venue_id": 1,
+          "asset_class": "EQUITY",
+          "taker_fee_per_share": 0.003,
+          "maker_rebate_per_share": 0.002,
+          "latency": {"mean_ns": 150000, "jitter_ns": 50000},
+          "supports": ["MBO", "AUCTION", "HALT", "SNAPSHOT"]
+        },
+        {
+          "venue": "XV2",
+          "venue_id": 2,
+          "asset_class": "EQUITY",
+          "taker_fee_per_share": 0.0028,
+          "maker_rebate_per_share": 0.0015,
+          "latency": {"mean_ns": 220000, "jitter_ns": 80000},
+          "supports": ["MBO", "AUCTION", "HALT", "SNAPSHOT"]
+        },
+        {
+          "venue": "XV3",
+          "venue_id": 3,
+          "asset_class": "EQUITY",
+          "taker_fee_per_share": 0.0025,
+          "maker_rebate_per_share": 0.001,
+          "latency": {"mean_ns": 300000, "jitter_ns": 100000},
+          "supports": ["MBO", "AUCTION", "HALT", "SNAPSHOT"]
+        }
+      ]
+    }
   risk__risk.json: |
     {
       "x-version": 3,

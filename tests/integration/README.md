@@ -13,6 +13,11 @@ What belongs here:
 - the GitHub issue plan wired end to end — the script's validator over
   `tools/github/issues.yaml`, `--dry-run` as a subprocess, and `docs/EPICS.md`
   compared with the rendering (`test_github_issue_plan.py`);
+- the MVP command line end to end (`test_mvp_end_to_end.py`: `python -m
+  iap.mvp run` on the golden configuration into a temporary directory as a
+  subprocess — every artefact present, `report.json` sections, `explain` of a
+  parent order, `replay` of the captured stream — and a bad configuration
+  refused with exit code 2 naming the key; docs/MVP.md);
 - longer verticals as they become cheap enough to run in CI: features →
   alpha → risk → execution simulator, or the Python pipeline entry points
   (`python3 -m iap.marketdata`, `python3 -m iap.features`) against a temp

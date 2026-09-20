@@ -7,6 +7,9 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -111,6 +114,29 @@ public class TraceGoldenTest {
         // unnamed venues render as decimal ids; nothing else changes
         String unnamed = Explain.render(trace, Map.of());
         assertTrue(unnamed, unnamed.contains("SOR:        1 = 45%  2 = 35%  3 = 20%"));
+    }
+
+    @Test
+    public void explainLabelsTheActingSignalAndItsComponents() {
+        // signal[0] is the acting signal (the order's alpha id); every further
+        // signal is a component labelled by its own model_version.
+        Map<String, Object> value = example();
+        Map<String, Object> stages = Json.object(value.get("stages"));
+        List<Object> signals = new ArrayList<>(Json.array(stages.get("signal")));
+        Map<String, Object> member = new LinkedHashMap<>(Json.object(signals.get(0)));
+        member.put("model_version", "EQ01");
+        member.put("expected_return", 0.0001);
+        member.put("confidence", 0.5);
+        signals.add(member);
+        stages.put("signal", signals);
+        DecisionTrace multi = DecisionTrace.fromTree(value);
+        List<String> lines = List.of(Explain.render(multi, Map.of()).split("\n"));
+        List<String> pinned = List.of(
+                Explain.render(DecisionTrace.fromTree(example()), Map.of()).split("\n"));
+        assertEquals(pinned.get(1), lines.get(1));
+        assertEquals("Alpha:      EQ01  expected return = +1.0 bps  confidence = 0.50",
+                lines.get(2));
+        assertEquals(pinned.subList(2, pinned.size()), lines.subList(3, lines.size()));
     }
 
     @Test

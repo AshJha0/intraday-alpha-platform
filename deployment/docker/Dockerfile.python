@@ -5,6 +5,15 @@
 #   generator -> data/raw/*.jsonl -> normalize -> data/normalized/{*.jsonl,
 #   *.iap1, events.parquet, qc_report.json}
 #
+# Runnable modules in this image (all deterministic, no wall clock):
+#   python3 -m iap.marketdata ...                       (the ENTRYPOINT below)
+#   python3 -m iap.mvp run    --repo-root /app --out /data/mvp/<run_id>
+#   python3 -m iap.mvp replay --repo-root /app --run /data/mvp/<run_id>
+#   python3 -m iap.mvp verify --repo-root /app
+#   python3 -m iap.mvp explain --run /data/mvp/<run_id> <parent_order_id>
+#   (docs/MVP.md; --repo-root names the directory configs/ and research/ are
+#   baked under — the MVP resolves its reference documents against it).
+#
 # Build (from the REPO ROOT — the build context must contain python/, configs/,
 # schemas/, tests/golden/):
 #   docker build -f deployment/docker/Dockerfile.python -t iap/python:1.0.0 .
@@ -24,10 +33,11 @@ RUN groupadd --gid 10001 iap && \
 
 WORKDIR /app
 
-# The pipeline itself needs only the stdlib + pyarrow (python/pyproject.toml).
-# The full research stack (numpy/pandas/scipy/sklearn) is only needed for
-# research/ scripts and the test suite, and is deliberately NOT installed here
-# to keep the production image small; use the dev target below for tests.
+# `pip install ./python` installs the package with its declared dependencies
+# (python/pyproject.toml: numpy, pandas, scipy, scikit-learn, pyarrow,
+# jsonschema): the market-data pipeline needs only the stdlib + pyarrow, the
+# MVP loop (iap.mvp) needs numpy + pandas for alpha scoring and the portfolio
+# optimizer.  The test suite (pytest, pyyaml: the `dev` extra) is NOT installed.
 COPY python/pyproject.toml python/pyproject.toml
 COPY python/src python/src
 RUN pip install --no-cache-dir ./python
@@ -37,6 +47,8 @@ RUN pip install --no-cache-dir ./python
 # data, secrets NEVER live here (SECURITY.md).
 COPY configs configs
 COPY schemas schemas
+# The MVP's alpha lifecycle registry (configs/mvp/mvp.json reference.alpha_registry).
+COPY research/alpha_registry.json research/alpha_registry.json
 
 # Generated market data goes to a volume, never into the image layer.
 RUN mkdir -p /data && chown -R iap:iap /data /app

@@ -103,6 +103,33 @@ fn explain_text_is_pinned() {
 }
 
 #[test]
+fn explain_labels_the_acting_signal_and_its_components() {
+    // signal[0] is the acting signal (the order's alpha id); every further
+    // signal is a component labelled by its own model_version.
+    let examples = load("expected_contracts_examples.json");
+    let (doc, trace) = example_trace(&examples);
+    let mut multi = doc.clone();
+    let mut member = doc["stages"]["signal"][0].clone();
+    member["model_version"] = Value::from("EQ01");
+    member["expected_return"] = Value::from(0.0001);
+    member["confidence"] = Value::from(0.5);
+    multi["stages"]["signal"]
+        .as_array_mut()
+        .expect("signal array")
+        .push(member);
+    let multi = DecisionTrace::from_value(&multi).expect("two signals parse");
+    let names = BTreeMap::new();
+    let pinned: Vec<String> = explain(&trace, &names).lines().map(String::from).collect();
+    let lines: Vec<String> = explain(&multi, &names).lines().map(String::from).collect();
+    assert_eq!(lines[1], pinned[1]);
+    assert_eq!(
+        lines[2],
+        "Alpha:      EQ01  expected return = +1.0 bps  confidence = 0.50"
+    );
+    assert_eq!(&lines[3..], &pinned[2..]);
+}
+
+#[test]
 fn round_trip_equality_and_strictness() {
     let examples = load("expected_contracts_examples.json");
     let (doc, trace) = example_trace(&examples);

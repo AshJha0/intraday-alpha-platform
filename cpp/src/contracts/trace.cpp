@@ -964,8 +964,12 @@ std::string explain(const DecisionTrace& t,
                                     : "Order " + std::to_string(parents[0].parent_order_id));
 
     if (!st.signal.empty()) {
-        for (const auto& sig : st.signal) {
-            const std::string label = parents.empty() ? sig.model_version : parents[0].alpha_id;
+        // signal[0] is the acting signal (labelled by the order's alpha id);
+        // every further signal is one of its components (its own model_version).
+        for (std::size_t i = 0; i < st.signal.size(); ++i) {
+            const auto& sig = st.signal[i];
+            const std::string label =
+                (i == 0 && !parents.empty()) ? parents[0].alpha_id : sig.model_version;
             lines.push_back(line("Alpha", label + "  expected return = " +
                                               bps(sig.expected_return * 1e4) +
                                               "  confidence = " + fixed(sig.confidence, 2, false)));

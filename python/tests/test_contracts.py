@@ -323,6 +323,29 @@ def test_explain_renders_none_stages():
     assert "XV1 = 45%" in explain(trace, VENUE_NAMES)
 
 
+def test_explain_labels_the_acting_signal_and_its_components():
+    """signal[0] is the acting signal (the order's alpha_id); every further
+    signal is a component labelled by its own model_version (an ensemble
+    trace: ensemble first, members after)."""
+    trace = example_trace()
+    acting = trace.stages.signal[0]
+    member = dataclasses.replace(acting, model_version="EQ01", expected_return=0.0001,
+                                 confidence=0.5)
+    multi = dataclasses.replace(trace, stages=dataclasses.replace(
+        trace.stages, signal=(acting, member)))
+    lines = explain(multi, VENUE_NAMES).splitlines()
+    pinned = explain(trace, VENUE_NAMES).splitlines()
+    assert lines[1] == pinned[1]                       # unchanged for the acting signal
+    assert lines[2] == "Alpha:      EQ01  expected return = +1.0 bps  confidence = 0.50"
+    assert lines[3:] == pinned[2:]
+    # without a parent order every signal is labelled by its model_version
+    orderless = dataclasses.replace(multi, stages=dataclasses.replace(
+        multi.stages, parent_orders=()))
+    lines = explain(orderless, VENUE_NAMES).splitlines()
+    assert lines[1].startswith(f"Alpha:      {acting.model_version}  ")
+    assert lines[2].startswith("Alpha:      EQ01  ")
+
+
 # --------------------------------------------------------------------------
 # validation
 # --------------------------------------------------------------------------

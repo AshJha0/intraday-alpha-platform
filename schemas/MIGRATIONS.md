@@ -441,3 +441,57 @@ equity and is pinned by a new golden:
   `config.json` x-version 1, `report.json` x-version 1
   (`iap.mvp.report.REPORT_VERSION`), `paper_evidence.json` x-version 1.
   A change to any of these layouts bumps its version and adds an entry here.
+
+## 2026-09-20 — MVP IC audit + `explain()` multi-signal rule: `report.json` v1 -> v2, `paper_evidence.json` v1 -> v2, `expected_mvp.json` regenerated; no wire schema changed
+
+Nothing under `schemas/*.schema.json` changed (`alpha_signal` and
+`decision_trace` stay v1; the pinned contracts examples, canonical-JSON and
+digest goldens are untouched).  What changed is pinned SEMANTICS plus the
+MVP's own artefacts (docs/MVP.md §7 has the audit):
+
+- **Trace `stages.signal` ordering convention (all languages, documented,
+  not a schema change)**: `signal[0]` is the ACTING signal — the one the
+  portfolio sized on and the one `v_order_chain` / `explain()` attribute to
+  the order (the SQL view already selected the first signal); every further
+  entry is a component of it (an ensemble member), labelled by its alpha id
+  in `model_version` (the documented meaning of that field for
+  `linear_z_v1` alphas; the Java `PaperTraces.onSignal` writes the alpha id
+  there too).  The MVP previously listed the members first and the ensemble
+  last, so the view and `explain` attributed a member's signal to the order.
+- **`explain()` rendering rule (Python `iap.contracts.types.explain`, Java
+  `Explain.render`, Rust `contracts::explain`, C++ `iap::contracts::explain`)**:
+  the first signal line is labelled with the parent order's `alpha_id` when
+  an order exists (unchanged: the pinned single-signal example renders byte
+  for byte as before), every further signal line with its own
+  `model_version` (previously every line repeated the order's `alpha_id`,
+  so an ensemble trace printed four indistinguishable `Alpha:` lines).  A
+  multi-signal test was added to all four suites.
+- **`report.json` x-version 2** (`iap.mvp.report.REPORT_VERSION`): the
+  realized IC is now the research label definition
+  (`iap.labels.compute_labels` on the feature-engine book-refresh mid
+  series — stale-venue / halt / auction / one-sided refreshes inside the
+  horizon invalidate the label; the old timeline-based definition only
+  excluded halts).  `alpha.per_alpha.<id>` gained `horizon`,
+  `realized_ic_cost` (cost-adjusted label), `realized_ic_shifted`
+  (shift-by-one), `n_signals`, `research_horizon` and `at_research_horizon`
+  (the same block at the alpha's fitted horizon); `ic_gap` is now measured
+  at the fitted horizon (like for like with the registry's `oos_ic`);
+  `alpha.ensemble` gained the same keys; `alpha.ic_definition` states the
+  definition.  `n_ic_samples` shrank where a blackout sample sat inside the
+  window (EQ01 352 -> 345, EQ03 277 -> 270, EQ06 52 -> 50).
+- **`paper_evidence.json` x-version 2**: `paper.realized_ic` is now the IC
+  at the alpha's FITTED horizon (what `paper_ic_tracking` compares with
+  `research_ic`); `ic_horizon`, `realized_ic_at_mvp_horizon` and
+  `mvp_horizon` were added.
+- **`tests/golden/expected_mvp.json` regenerated (`--force`)**: the trace
+  digest changed because of the signal ordering (`400de073...` ->
+  `16cd29aa...`); every count, fill, P&L figure and TCA number is
+  unchanged (the loop's decisions do not depend on the trace layout).
+- MVP engine hardening (no artefact change): the §12.1 identity is
+  asserted after every fill (not only at session end) and a fill the risk
+  engine refuses as malformed raises instead of silently diverging the two
+  positions.
+- `python -m iap.mvp` gained `--repo-root` (run / replay / verify) so the
+  loop runs inside the Python image (`deployment/docker/Dockerfile.python`
+  now bakes `research/alpha_registry.json`); `configs/mvp/*` are projected
+  by the k8s ConfigMap (`deployment/k8s/*.yaml` items[]).

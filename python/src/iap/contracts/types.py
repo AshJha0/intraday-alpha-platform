@@ -1049,9 +1049,12 @@ def explain(trace: DecisionTrace,
 
     Stages that did not run render ``(none)``.  ``venue_names`` maps venue
     ids to display names (``configs/venues/venues.json``); unnamed venues
-    render as their decimal id.  The alpha label is the parent order's
-    ``alpha_id`` when an order exists, else the signal's ``model_version``.
-    Pure function of its inputs; the golden test pins the example above.
+    render as their decimal id.  ``signal[0]`` is the ACTING signal (the one
+    the portfolio sized on — the ``v_order_chain`` convention): its label is
+    the parent order's ``alpha_id`` when an order exists, else its
+    ``model_version``; every further signal is a component of it (an
+    ensemble member) and is labelled by its own ``model_version``.  Pure
+    function of its inputs; the golden test pins the example above.
     """
     st = trace.stages
     parents = st.parent_orders
@@ -1061,10 +1064,11 @@ def explain(trace: DecisionTrace,
 
     alpha_label = parents[0].alpha_id if parents else None
     if st.signal:
-        for sig in st.signal:
+        for i, sig in enumerate(st.signal):
+            label = alpha_label if i == 0 and alpha_label else sig.model_version
             lines.append(_line(
                 "Alpha",
-                f"{alpha_label or sig.model_version}  expected return = "
+                f"{label}  expected return = "
                 f"{_bps(sig.expected_return * 1e4)}  "
                 f"confidence = {sig.confidence:.2f}"))
     else:

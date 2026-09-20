@@ -68,8 +68,13 @@ public final class Explain {
         if (st.signal().isEmpty()) {
             lines.add(line("Alpha", "(none)"));
         } else {
-            for (AlphaSignalRec sig : st.signal()) {
-                lines.add(line("Alpha", (alphaLabel != null ? alphaLabel : sig.modelVersion())
+            // signal[0] is the acting signal (labelled by the order's alpha id);
+            // every further signal is one of its components (its own model_version).
+            List<AlphaSignalRec> signals = st.signal();
+            for (int i = 0; i < signals.size(); i++) {
+                AlphaSignalRec sig = signals.get(i);
+                String label = (i == 0 && alphaLabel != null) ? alphaLabel : sig.modelVersion();
+                lines.add(line("Alpha", label
                         + "  expected return = " + bps(sig.expectedReturn() * 1e4)
                         + "  confidence = " + PyFormat.fixed(sig.confidence(), 2)));
             }

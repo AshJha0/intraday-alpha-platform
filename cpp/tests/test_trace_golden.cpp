@@ -9,6 +9,7 @@
 
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include "golden_util.hpp"
 #include "iap/contracts/canonical_json.hpp"
@@ -106,6 +107,34 @@ TEST(TraceGolden, ExplainPinned) {
     names.erase(3);
     const std::string unnamed = cj::explain(t, names);
     EXPECT_NE(unnamed.find("XV2 = 35%  3 = 20%"), std::string::npos);
+}
+
+TEST(TraceGolden, ExplainLabelsTheActingSignalAndItsComponents) {
+    // signal[0] is the acting signal (the order's alpha id); every further
+    // signal is a component labelled by its own model_version.
+    const cj::DecisionTrace t = example_trace();
+    cj::DecisionTrace multi = t;
+    cj::AlphaSignal member = t.stages.signal.at(0);
+    member.model_version = "EQ01";
+    member.expected_return = 0.0001;
+    member.confidence = 0.5;
+    multi.stages.signal.push_back(member);
+    const std::map<std::uint16_t, std::string> names;
+    const auto split = [](const std::string& text) {
+        std::vector<std::string> out;
+        std::string cur;
+        for (char c : text) {
+            if (c == '\n') { out.push_back(cur); cur.clear(); } else { cur.push_back(c); }
+        }
+        out.push_back(cur);
+        return out;
+    };
+    const auto pinned = split(cj::explain(t, names));
+    const auto lines = split(cj::explain(multi, names));
+    ASSERT_EQ(lines.size(), pinned.size() + 1);
+    EXPECT_EQ(lines[1], pinned[1]);
+    EXPECT_EQ(lines[2], "Alpha:      EQ01  expected return = +1.0 bps  confidence = 0.50");
+    for (std::size_t i = 2; i < pinned.size(); ++i) EXPECT_EQ(lines[i + 1], pinned[i]);
 }
 
 TEST(TraceGolden, RoundTripEquality) {

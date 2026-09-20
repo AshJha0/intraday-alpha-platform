@@ -786,3 +786,93 @@ The digest printed above is `sha256` over `canonical_json(trace) + "\n"`
 per emitted trace: replaying the same session with the same seed reproduces
 it, and `TraceDigest.of_jsonl(path)` recomputes it from the file
 (`bf60a300d151c9…` for the one-trace stream of the golden example).
+
+## 22. Run the MVP loop (one command, one instrument, fully traced)
+
+The MVP (`python -m iap.mvp`, [docs/MVP.md](docs/MVP.md)) runs the whole
+loop — seeded market data → books → features → EQ01/EQ03/EQ06 ensemble →
+portfolio → hard risk → TWAP/POV/IS → SOR over XV1/XV2/XV3 → execution
+simulator → TCA → attribution → decision trace → SQLite → report — on the
+synthetic equity `SYN.EQ.AAPL` and writes every artefact under
+`data/mvp/<run_id>/` (git-ignored). About 7 seconds:
+
+```bash
+cd python
+PYTHONPATH=src python3 -m iap.mvp run                       # configs/mvp/mvp.json, seed 12345
+# mvp run 58a10f2194a3c81c: events=16578 decisions=355 parents=66 children=105 fills=55 pnl=-22.676287 USD digest=16cd29aa4c28ffb2... out=.../data/mvp/58a10f2194a3c81c
+PYTHONPATH=src python3 -m iap.mvp run --seed 7 --out /tmp/mvp7          # another seed, explicit directory
+PYTHONPATH=src python3 -m iap.mvp verify                                  # run twice from scratch, compare digest/report/stream
+cat ../data/mvp/58a10f2194a3c81c/report.md                                # the honest numbers (cost-negative)
+```
+
+`report.json` (canonical, sorted keys) carries the versions
+(`config_version` over every config document in force, `data_version` =
+sha256 of the captured stream, `feature_version`, `model_version`), counts,
+risk decisions by rule, routing shares, control counters, the §12.1 P&L
+identity, per-alpha realized IC (the research label definition —
+`iap.labels.compute_labels` on the same stream — mid-to-mid and
+cost-adjusted, with the shift-by-one IC, at the 1 s holding horizon and at
+the alpha's fitted horizon next to the registry's research IC), TCA
+aggregates and the trace digest; `paper_evidence.json` is the
+`PaperEvidence` the lifecycle's PAPER → ACTIVE gates read (the registry
+itself is not touched). The golden `tests/golden/expected_mvp.json` pins
+the run above. Outside the checkout (the Python image bakes `configs/` and
+`research/alpha_registry.json` under `/app`) add `--repo-root /app` to
+`run` / `replay` / `verify`.
+
+## 23. Replay an incident from the captured stream
+
+Every run captures its input (`events.jsonl` + IAP1 twin + `feed.json`) and
+its configuration (`config.json`). `replay` re-runs the loop from that
+capture — never from the generator — and asserts that the trace digest, the
+report and the stream sha256 reproduce (exit 1 with a line-per-difference
+diff otherwise; a reference document that changed since the run is
+reported as a `config_version` mismatch before anything runs):
+
+```bash
+cd python
+PYTHONPATH=src python3 -m iap.mvp replay --run ../data/mvp/58a10f2194a3c81c      # -> <run>/replay/
+# replay OK: ../data/mvp/58a10f2194a3c81c reproduces its trace digest and report
+```
+
+Capture → replay → reproduce (`explain`, recipe 24; `risk_audit.jsonl`;
+`traces.jsonl`) → debug (drive `iap.mvp.engine.MvpEngine` over
+`iap.mvp.feed.load_feed(run_dir)` event by event) → fix → regression test
+(a captured stream + its expected digest, the pattern of
+`python/tests/test_mvp_golden.py`) is the incident flow of docs/MVP.md §6.
+
+## 24. Explain an MVP order
+
+The run's SQLite store holds every decision trace decomposed
+(`decision_traces`, `alpha_signals`, `portfolio_targets`, `risk_decisions`,
+`parent_orders`, `child_orders`, `venue_decisions`, `executions`,
+`tca_results`, `attribution`) plus the MVP reference data, so `explain`
+renders the chain with venue names:
+
+```bash
+cd python
+PYTHONPATH=src python3 -m iap.mvp explain --run ../data/mvp/58a10f2194a3c81c 5
+# Order 5
+# Alpha:      EQ01-EQ03-EQ06  expected return = +0.0 bps  confidence = 0.20
+# Alpha:      EQ01  expected return = +0.0 bps  confidence = 0.03
+# Alpha:      EQ03  expected return = +0.0 bps  confidence = 0.57
+# Alpha:      EQ06  expected return = +0.0 bps  confidence = 0.00
+# Portfolio:  target = +340 shares
+# Risk:       ALLOW
+# Execution:  POV 5%
+# SOR:        XV2 = 25%  XV3 = 75%
+# Fills:      10 / 250 (4.0%)
+# TCA:        IS = 0.0 bps
+# Attribution: alpha = +0.0 bps  spread = -0.0 bps  impact = +0.0 bps  fees = -0.0 bps
+PYTHONPATH=src python3 -m iap.store sql --db ../data/mvp/58a10f2194a3c81c/iap.sqlite \
+  "SELECT parent_order_id, alpha_id, signal_model_version, risk_rule_id, n_child_orders, filled_qty, implementation_shortfall_bps FROM v_order_chain ORDER BY parent_order_id LIMIT 3"
+```
+
+The first `Alpha:` line is the ACTING signal — the ensemble the portfolio
+sized on, `signal[0]` of the trace, the row `v_order_chain` joins
+(`signal_model_version = EQ01-EQ03-EQ06`) — labelled with the order's
+`alpha_id`; the next three are its components (EQ01, EQ03, EQ06 in
+ensemble order), each labelled by its own `model_version`. Expected
+returns of a fitted alpha are hundredths of a basis point, which the
+pinned one-decimal renderer shows as `+0.0 bps` — read `traces.jsonl` /
+`alpha_signals` for the exact values.

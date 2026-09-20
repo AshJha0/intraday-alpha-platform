@@ -13,6 +13,10 @@ What belongs here:
   against the pinned `tests/golden/expected_codec_sha256.json`);
 - replay determinism — a pipeline stage re-run over the same input emits the
   same output bytes (books, feature vectors, fills, risk audit JSONL);
+- the MVP loop run twice from scratch and replayed from its captured stream
+  (`test_mvp_replay_determinism.py`: `python -m iap.mvp verify` / `replay` on
+  `configs/mvp/mvp_tiny.json` — identical event-stream sha256, trace digest,
+  `traces.jsonl`, `report.json` and `risk_audit.jsonl` bytes; docs/MVP.md §5);
 - cross-run comparisons of any artefact `docs/governance/REPRODUCIBILITY.md`
   says is byte-stable.
 

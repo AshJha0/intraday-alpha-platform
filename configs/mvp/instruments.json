@@ -1,0 +1,22 @@
+{
+  "x-version": 1,
+  "description": "MVP instrument universe (iap.mvp): one synthetic large-cap equity, SYN.EQ.AAPL, listed on XV1/XV2/XV3. instrument_id 12 is the next free equity id (the bundled universe uses 1..11 for equities/ETF and 101..108 for FX) so the MVP never shadows a bundled instrument. Same schema as configs/instruments/instruments.json: tick_size real price per tick, lot_size shares per board lot, adv in shares/day, ref_price the generator's starting efficient price. The trading session (open/close, timezone) is NOT here: it is the mvp.json session block, which iap.mvp.feed composes into the reference-data document so the session length has exactly one source of truth.",
+  "calendar": {
+    "trading_days": ["2026-08-24"],
+    "timezone": "UTC",
+    "description": "Single synthetic trading day of the MVP session."
+  },
+  "instruments": [
+    {
+      "symbol": "SYN.EQ.AAPL",
+      "instrument_id": 12,
+      "asset_class": "EQUITY",
+      "currency": "USD",
+      "tick_size": 0.01,
+      "lot_size": 100,
+      "ref_price": 190.0,
+      "adv": 60000000,
+      "venues": ["XV1", "XV2", "XV3"]
+    }
+  ]
+}

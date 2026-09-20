@@ -235,7 +235,8 @@ golden tests — the engineering discipline this repo is built around
 | document | what it covers |
 |---|---|
 | [LEARN.md](LEARN.md) | textbook walkthrough: microstructure, generator, book, features, honest alpha research, ML/meta-labeling, portfolio, risk, execution, TCA, parity, latency economics, adaptability (drift/refit/lifecycle), pitfalls, interview Q&A |
-| [COOKBOOK.md](COOKBOOK.md) | 21 task-oriented recipes with runnable commands |
+| [COOKBOOK.md](COOKBOOK.md) | 24 task-oriented recipes with runnable commands |
+| [docs/MVP.md](docs/MVP.md) | the executable MVP (`python -m iap.mvp run / replay / verify / explain`): one deterministic, fully traced trading loop on a synthetic equity — the loop module by module, the §11.4 wiring rules with code references, the determinism contract, the incident replay flow, the honest golden-run results (cost-negative) with the realized-IC audit, and the success-criteria table |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | system design, per-language responsibilities, contracts, determinism, golden topology, hot-path notes, observability, deployment |
 | [docs/DIAGRAMS.md](docs/DIAGRAMS.md) | all seven architecture diagrams on one page (pipeline, golden topology, paper trading, responsibility matrix, risk decision flow, queue-position model, data model) |
 | [docs/DATA_MODEL.md](docs/DATA_MODEL.md) | the relational data model (`schemas/sql/iap_v1.sql`, SQLite + PostgreSQL): every table, the views, portability rules, how the store indexes the flat-file artefacts, query cookbook |

@@ -205,6 +205,60 @@ iap/
                    import_all — each returns ImportReport(inserted, warnings).
     __main__.py    `python -m iap.store build [--db data/store/iap.sqlite] |
                    explain <parent_order_id> | sql "<query>"`.
+  mvp/             The executable MVP (`python -m iap.mvp`, docs/MVP.md): one
+                   complete, deterministic, fully traced trading loop on one
+                   synthetic equity - seeded feed -> books -> features -> EQ01/
+                   EQ03/EQ06 ensemble -> portfolio -> hard risk per child ->
+                   TWAP/POV/IS -> SOR over XV1/XV2/XV3 -> execution simulator
+                   -> TCA -> attribution -> DecisionTrace (JSONL + SQLite) ->
+                   report; golden tests/golden/expected_mvp.json.
+    config.py      MvpConfig: configs/mvp/mvp.json (x-version 1) validated
+                   fail-fast (file + key named), --seed/--instrument overrides,
+                   run_id = content_hash(config + seed)[:16], config_version =
+                   content_hash of every document in force.
+    feed.py        generate_feed: the unmodified generator + normaliser over the
+                   MVP reference data (configs/mvp/{instruments,venues}.json +
+                   the mvp.json session) -> <run>/events.jsonl + .iap1 +
+                   feed.json (data_version = sha256 of the IAP1 stream);
+                   load_feed (the replay input); JsonlMarketDataSource
+                   (contracts MarketDataSource).
+    alpha.py       LinearZAlpha: one fitted linear_z_v1 alpha as a streaming
+                   contracts.Alpha (raw signal reused from iap.alpha, pinned
+                   scaling); AlphaEnsemble over iap.backtest.engine.ensemble_scores.
+    portfolio.py   SingleStockPortfolio (contracts PortfolioConstructor):
+                   iap.portfolio.optimizer.solve + EWMA variance of 1-minute
+                   bars -> PortfolioTarget (INFEASIBLE holds the book).
+    adapters.py    Protocol adapters over the reference components:
+                   RiskEngineAdapter (RiskEngineLike over iap.risk),
+                   AlgoScheduler (ExecutionAlgorithm over iap.execution.algos),
+                   SorAdapter (SmartOrderRouterLike, VenueDecision with every
+                   candidate scored), SimulatorAdapter (ExecutionSimulatorLike,
+                   ExecutionReports), TcaAdapter (TCAEngine over iap.tca).
+    engine.py      MvpEngine: the pinned per-event order (simulator -> fills to
+                   account + risk -> §11.4 risk wiring -> TCA timeline ->
+                   parent finalisation -> features (+ label mid series) ->
+                   decision (trace signal[0] = ensemble, then members) ->
+                   children: SOR -> controls -> risk -> submit -> traces);
+                   Account (Java BacktestEngine.Account semantics), Counters;
+                   the §12.1 identity is asserted after every fill and at
+                   session end; realized_ic = iap.labels.compute_labels on the
+                   feature-engine book-refresh series (mid + cost labels,
+                   shift-by-one, any pinned horizon) -> IcResult.
+    report.py      report.json (x-version 2, canonical, finite-checked) +
+                   report.md: versions, counts, risk by rule, routing, controls,
+                   P&L identity, alpha contribution, realized IC at the MVP
+                   horizon and at each alpha's fitted horizon next to the
+                   research IC (ic_gap), TCA aggregates, trace digest - the
+                   cost-negative result stated as such.
+    session.py     run_session: feed -> engine -> JsonlTraceSink + StoreTraceSink
+                   -> store (MVP reference data + session) -> report + risk audit
+                   + paper_evidence.json (PaperEvidence for iap.lifecycle);
+                   compare_runs (the replay/verify diff).
+    golden.py      golden_document / render behind tests/golden/expected_mvp.json
+                   (python/tools/make_golden_mvp.py, tests/test_mvp_golden.py).
+    __main__.py    `python -m iap.mvp run [--config] [--seed] [--instrument]
+                   [--out] [--repo-root] | replay --run <dir> [--repo-root] |
+                   verify | explain --run <dir> ID`.
   trace/           Building, persisting, digesting and explaining DecisionTraces.
     builder.py     TraceBuilder(session_id, instrument_id, event_ts, sequence,
                    data/feature/model/config_version).add_signal/set_portfolio/
@@ -228,10 +282,11 @@ iap/
 Tests live in `python/tests/` (run: `cd python && PYTHONPATH=src python3 -m
 pytest -q`); `python/tests/bruteforce_book.py` is an independent naive book
 used to validate golden states; `python/tools/make_golden.py` (re)generates
-`tests/golden/` — only on deliberate, versioned changes.
+`tests/golden/` — only on deliberate, versioned changes (the MVP golden:
+`python/tools/make_golden_mvp.py`).
 
 Dependencies are declared in `python/pyproject.toml` (1.1.0): numpy, pandas,
 scipy, scikit-learn, pyarrow, jsonschema, referencing; extras `ml`
 (xgboost, lightgbm) and `dev` (pytest, pyyaml). Console entry points:
 `iap-marketdata`, `iap-features`, `iap-tca`, `iap-research`, `iap-lifecycle`,
-`iap-store`.
+`iap-store`, `iap-mvp`.

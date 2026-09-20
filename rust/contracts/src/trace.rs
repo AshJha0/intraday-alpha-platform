@@ -887,8 +887,13 @@ pub fn explain(trace: &DecisionTrace, venue_names: &BTreeMap<u16, String>) -> St
     if st.signal.is_empty() {
         lines.push(line("Alpha", "(none)"));
     } else {
-        for sig in &st.signal {
-            let label = alpha_label.unwrap_or(sig.model_version.as_str());
+        // signal[0] is the acting signal (labelled by the order's alpha id);
+        // every further signal is one of its components (its own model_version).
+        for (i, sig) in st.signal.iter().enumerate() {
+            let label = match alpha_label {
+                Some(a) if i == 0 => a,
+                _ => sig.model_version.as_str(),
+            };
             lines.push(line(
                 "Alpha",
                 &format!(

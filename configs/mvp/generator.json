@@ -1,0 +1,14 @@
+{
+  "x-version": 1,
+  "description": "MVP market-data generator config (iap.mvp.feed over iap.marketdata.generator, unmodified): seed 12345 (overridden by mvp.json seed / --seed so that one seed drives the whole run), ONE session, equities only (the MVP reference data lists no FX instrument, so the generator's FX branch emits nothing). The MVP instrument SYN.EQ.AAPL trades on XV1/XV2/XV3; each venue stream gets slots_per_stream flow slots spread over the mvp.json session window (the generator's own rate rule: lambda0 = slots / duration * 1.3, so roughly 77% of the slots are consumed before the close). The QC anomaly injection stays at the bundled rates so the loop exercises sequence-gap gating (SNAPSHOT recovery -> risk on_sequence_gap / on_feed_recovered), duplicates and out-of-order arrivals; the intraday halt targets the MVP instrument itself so the venue trading-state gate (simulator rule 8, SOR eligibility, NO_ROUTE) is exercised too.",
+  "seed": 12345,
+  "sessions": 1,
+  "equities": {
+    "slots_per_stream": 4500,
+    "halt": {
+      "instrument": "SYN.EQ.AAPL",
+      "session_index": 0,
+      "duration_s": 45
+    }
+  }
+}

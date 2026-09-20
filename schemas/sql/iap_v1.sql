@@ -517,8 +517,10 @@ CREATE INDEX IF NOT EXISTS ix_drift_baselines_alpha ON drift_baselines (alpha_id
 
 -- v_order_chain: one row per parent order — the observability chain
 -- signal -> portfolio -> risk -> parent -> children -> fills -> TCA -> attribution.
--- The signal is the first signal of the trace for the order's instrument, the
--- risk decision the last one recorded for the order.
+-- The signal is the first signal of the trace for the order's instrument — by
+-- convention the ACTING signal (an ensemble trace lists the ensemble first and
+-- its member signals after it, each labelled by its alpha id in model_version;
+-- see iap.mvp.engine) — the risk decision the last one recorded for the order.
 DROP VIEW IF EXISTS v_order_chain;
 CREATE VIEW v_order_chain AS
 SELECT

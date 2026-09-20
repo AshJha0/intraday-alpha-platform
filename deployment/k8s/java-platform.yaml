@@ -146,6 +146,18 @@ spec:
                 path: instruments/instruments.json
               - key: marketdata__generator.json
                 path: marketdata/generator.json
+              - key: mvp__generator.json
+                path: mvp/generator.json
+              - key: mvp__generator_tiny.json
+                path: mvp/generator_tiny.json
+              - key: mvp__instruments.json
+                path: mvp/instruments.json
+              - key: mvp__mvp.json
+                path: mvp/mvp.json
+              - key: mvp__mvp_tiny.json
+                path: mvp/mvp_tiny.json
+              - key: mvp__venues.json
+                path: mvp/venues.json
               - key: risk__risk.json
                 path: risk/risk.json
               - key: strategies__alpha_params.json

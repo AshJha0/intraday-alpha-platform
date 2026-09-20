@@ -1,0 +1,33 @@
+{
+  "x-version": 1,
+  "description": "MVP venue universe (iap.mvp): the two bundled equity venues XV1 and XV2 copied verbatim from configs/venues/venues.json plus a third synthetic equity venue XV3. venue_id 3 is free in the platform id space (venues.json uses 1, 2, 10, 11, 12; the contracts golden example already renders venue 3 as XV3). XV3 profile (documented, plausible): slightly cheaper taker fee than XV1/XV2 (0.0025/share), the lowest maker rebate (0.001/share) and the slowest latency (300 us mean, 100 us jitter) - within sor.max_venue_latency_ns (1 ms) and the 2 ms latency budget, so it is eligible but only wins aggressive routes on price or on a fee tie. Same latency model as venues.json: receive_ts = exchange_ts + mean_ns + jitter (uniform in [0, jitter_ns], SplitMix64).",
+  "venues": [
+    {
+      "venue": "XV1",
+      "venue_id": 1,
+      "asset_class": "EQUITY",
+      "taker_fee_per_share": 0.003,
+      "maker_rebate_per_share": 0.002,
+      "latency": {"mean_ns": 150000, "jitter_ns": 50000},
+      "supports": ["MBO", "AUCTION", "HALT", "SNAPSHOT"]
+    },
+    {
+      "venue": "XV2",
+      "venue_id": 2,
+      "asset_class": "EQUITY",
+      "taker_fee_per_share": 0.0028,
+      "maker_rebate_per_share": 0.0015,
+      "latency": {"mean_ns": 220000, "jitter_ns": 80000},
+      "supports": ["MBO", "AUCTION", "HALT", "SNAPSHOT"]
+    },
+    {
+      "venue": "XV3",
+      "venue_id": 3,
+      "asset_class": "EQUITY",
+      "taker_fee_per_share": 0.0025,
+      "maker_rebate_per_share": 0.001,
+      "latency": {"mean_ns": 300000, "jitter_ns": 100000},
+      "supports": ["MBO", "AUCTION", "HALT", "SNAPSHOT"]
+    }
+  ]
+}
