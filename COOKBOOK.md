@@ -520,8 +520,8 @@ bash tests/harness/run_all.sh --golden-only   # golden groups only (fast)
 ```
 
 Exit code 0 iff every language passed; logs land in a temp dir printed on
-the first line. A full-suite run (2026-09-20): python 1362 / cpp 266 /
-rust 298 / java 475 tests passed (golden groups 164/67/62/102), plus
+the first line. A full-suite run (2026-09-20): python 1362 / cpp 267 /
+rust 298 / java 475 tests passed (golden groups 164/68/62/102), plus
 `integration` (15) and `replay` (4) rows for the repo-level pytest suites, a
 `deployment` row (16 structural checks passed, 2 skipped for absent tools)
 and a `numbers` row (every headline figure re-derived from its artefact),

@@ -404,3 +404,22 @@ TEST(Golden, JsonlRejectCasesFixture) {
     EXPECT_GE(rejected, 25u);
     EXPECT_GE(accepted, 5u);
 }
+
+// Regression (CI images job, 2026-09-20): IAP_GOLDEN_DIR is compiled in and
+// read back by bench_all and the test golden helpers to find tests/golden,
+// ../../configs and ../../data/reference AT RUNTIME. Dockerfile.cpp's
+// runtime stage copies bench_all as a single file and never recreates this
+// source directory (deployment/docker/Dockerfile.cpp), so a literal
+// unresolved "cpp/.." segment needs a directory that is not there in the
+// runtime image to be traversed, even though the path it resolves to *is*
+// present — "cannot open for read: .../cpp/../tests/golden/..." on
+// container start, reported by Docker as a crash (exit 139). CMakeLists.txt
+// must produce a lexically normalised IAP_GOLDEN_DIR (get_filename_component
+// ABSOLUTE, not a bare string concatenation) so the compiled-in path never
+// contains a ".." component in the first place.
+TEST(Golden, GoldenDirHasNoDotDotComponent) {
+    const std::string dir = iap_test::golden_dir();
+    EXPECT_EQ(dir.find(".."), std::string::npos) << dir;
+    ASSERT_FALSE(dir.empty());
+    EXPECT_EQ(dir.front(), '/') << "must be absolute: " << dir;
+}

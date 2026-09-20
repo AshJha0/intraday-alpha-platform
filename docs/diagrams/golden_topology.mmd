@@ -9,7 +9,7 @@ flowchart LR
     CPPTOOL["cpp/tools/make_replay_fills_golden<br/>(C++ is the fills reference;<br/>Python iap.execution consumes it too)"] --> EXP
     RSTOOL["rust/risk/src/bin/make_risk_golden<br/>(Rust is the risk reference;<br/>Python iap.risk consumes it too)"] --> EXP
     GV --> PY["python: pytest -k golden<br/>164 tests"]
-    GV --> CPP["cpp: ctest -R Golden<br/>67 tests"]
+    GV --> CPP["cpp: ctest -R Golden<br/>68 tests"]
     GV --> RS["rust: 9 golden test targets<br/>62 tests"]
     GV --> JV["java: all thirteen *GoldenTest (JUnitCore)<br/>102 golden-group tests"]
     EXP --> PY

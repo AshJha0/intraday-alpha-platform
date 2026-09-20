@@ -55,7 +55,7 @@ cd cpp && bash build.sh && ctest --test-dir build --output-on-failure
 ```
 
 C++17, g++13/CMake/GoogleTest/Eigen available; `-Wall -Wextra -Werror` clean; build
-with `-j2` (2-CPU environment); 266 tests, 67 in the golden group. Layout: `include/iap/{marketdata,orderbook,features,
+with `-j2` (2-CPU environment); 267 tests, 68 in the golden group. Layout: `include/iap/{marketdata,orderbook,features,
 alpha,execution,sor,replay,contracts,util}` + `src/` mirrors; `contracts/` is the
 canonical-JSON / decision-trace contract (`canonical_json.hpp`, `trace.hpp`),
 `util/sha256.hpp` the SHA-256 the codec goldens and the trace digest share. The

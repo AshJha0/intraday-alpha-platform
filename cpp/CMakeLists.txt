@@ -47,7 +47,18 @@ enable_testing()
 find_package(GTest REQUIRED)
 include(GoogleTest)
 
-set(IAP_GOLDEN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../tests/golden")
+# Lexically normalised (ABSOLUTE, not REALPATH: no filesystem access, so this
+# works identically whether or not the path exists yet). Compiled in as a
+# literal string (see IAP_GOLDEN_DIR usage below) and read back at *runtime*
+# by bench_all/tests to locate golden vectors, configs and reference data —
+# it must resolve without an intermediate ".." hop through this source
+# directory, because the Dockerfile.cpp runtime stage copies bench_all as a
+# single file and never recreates /build/cpp: a literal ".../cpp/../tests"
+# path needs /build/cpp to exist to be traversed, which it does at build
+# time (this source tree) but not in the slim runtime image, so the
+# unnormalised form threw "cannot open for read" for every golden/config
+# file bench_all touched and crashed on startup (CI images job, 2026-09-20).
+get_filename_component(IAP_GOLDEN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../tests/golden" ABSOLUTE)
 
 function(iap_add_test name)
   add_executable(${name} tests/${name}.cpp)
