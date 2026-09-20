@@ -229,7 +229,10 @@ jobs:
           java-version: "21"
       - name: Tooling
         run: |
-          pip install pyyaml
+          # check_headline_numbers.py imports iap.contracts / iap.lifecycle from
+          # python/src to re-derive the contract counts: it needs the same
+          # research stack as the python job (jsonschema/referencing/numpy).
+          pip install numpy pandas scipy scikit-learn pyarrow jsonschema referencing pyyaml
           curl -fsSL -o /tmp/prometheus.tar.gz \
             https://github.com/prometheus/prometheus/releases/download/v2.53.0/prometheus-2.53.0.linux-amd64.tar.gz
           tar -xzf /tmp/prometheus.tar.gz -C /tmp
