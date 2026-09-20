@@ -34,7 +34,7 @@ from iap.research.golden import (
     golden_spec,
     render_golden,
 )
-from iap.research.runner import load_instrument_meta
+from iap.research.runner import document_drift, load_instrument_meta
 from iap.validation import validate_alpha
 
 from conftest import CONFIGS_DIR, GOLDEN_DIR
@@ -109,8 +109,27 @@ def test_golden_result_reproduces(golden, spec, result):
 
 
 def test_golden_document_round_trips(golden, spec, result):
+    """The regenerated document carries the golden's numbers: every float
+    within 1e-9 (the last ulp of a BLAS reduction is CPU-dependent — the
+    GitHub runner and a laptop differ there), everything else byte-equal.
+    The file's own byte-canonical form is pinned separately by
+    ``test_golden_file_is_canonical_and_validates``."""
     doc = golden_document(spec, result)
-    assert render_golden(doc) == GOLDEN.read_text(encoding="ascii")
+    assert document_drift(golden, doc) == []
+    assert set(doc) == set(golden)
+    # Structure and every non-float leaf are identical text after rendering
+    # with floats masked.
+    def _mask(node):
+        if isinstance(node, bool):
+            return node
+        if isinstance(node, float):
+            return "<float>"
+        if isinstance(node, dict):
+            return {k: _mask(v) for k, v in node.items()}
+        if isinstance(node, list):
+            return [_mask(v) for v in node]
+        return node
+    assert render_golden(_mask(doc)) == render_golden(_mask(golden))
 
 
 def test_golden_walk_forward_metrics_match_validate_alpha(golden, spec, frames):

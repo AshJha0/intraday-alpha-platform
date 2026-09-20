@@ -40,7 +40,7 @@ from iap.research import (
 )
 from iap.research.__main__ import main as cli_main
 from iap.research.golden import GOLDEN_INSTRUMENT, golden_frames, golden_spec
-from iap.research.runner import render_document
+from iap.research.runner import document_drift, render_document
 from iap.validation.ledger import ExperimentLedger
 from iap.validation.metrics import HORIZONS_NS
 from iap.validation.splits import Fold
@@ -445,7 +445,7 @@ def test_rerun_with_a_different_result_is_refused(frames, tmp_path, spec):
     doc = json.loads(path.read_text())
     doc["ic"] += 1e-3
     path.write_text(render_document(doc))
-    with pytest.raises(ResearchError, match="reproduced different values for \\['ic'\\]"):
+    with pytest.raises(ResearchError, match="reproduced different values at \\['\\$\\.ic'\\]"):
         runner.run(spec)
     doc["ic"] -= 1e-3
     doc["git_commit"] = "somewhere-else"          # provenance may differ
@@ -600,8 +600,51 @@ def test_eq03_report_reproduces_through_the_runner(tmp_path):
     assert result.nw_lags == report["nw_lags"]
     assert result.n_folds == report["n_folds_run"]
     assert result.leakage_passed == report["leakage"]["passed"]
-    assert result.leakage_detail == report["leakage"]
+    # ic_shifted / ic_unshifted are BLAS reductions: last-ulp CPU dependence,
+    # so 1e-9 like every other research double (CI runners differ here).
+    assert document_drift(report["leakage"], result.leakage_detail, tol=TOL) == []
     assert result.hypothesis_sign_confirmed == report["hypothesis_confirmed"]
     assert result.verdict.value == report["verdict"]
     assert result.created_ts == spec.test_period.end_ts
     assert result.n_experiments_in_ledger == LOOKS_PER_EXPERIMENT
+
+
+def test_document_drift_tolerates_last_ulp_but_not_semantics():
+    """The rerun guard and the goldens compare research documents at 1e-9
+    on floats and exactly on everything else (CI runners' BLAS reductions
+    differ from a laptop's in the last ulp)."""
+    base = {"ic": 0.021453492319862478, "n": 4, "ok": True, "tag": "x",
+            "leak": {"ic_shifted": -0.0680157774176, "passed": True}, "seq": [1.0, 2.0]}
+    same = json.loads(json.dumps(base))
+    same["ic"] = 0.021453492319862492                 # last-ulp difference
+    same["leak"]["ic_shifted"] = -0.0680157774176 * (1 + 1e-12)
+    assert document_drift(base, same) == []
+    for path, mutate in (
+        ("$.ic", lambda d: d.__setitem__("ic", 0.0215)),                # > 1e-9
+        ("$.n", lambda d: d.__setitem__("n", 5)),
+        ("$.ok", lambda d: d.__setitem__("ok", 1)),                    # bool vs int
+        ("$.tag", lambda d: d.__setitem__("tag", "y")),
+        ("$.leak.passed", lambda d: d["leak"].__setitem__("passed", False)),
+        ("$.seq", lambda d: d.__setitem__("seq", [1.0])),
+        ("$", lambda d: d.__setitem__("extra", 1)),
+    ):
+        doc = json.loads(json.dumps(base))
+        mutate(doc)
+        assert document_drift(base, doc) == [path], path
+
+
+def test_persist_keeps_committed_bytes_when_numbers_agree(tmp_path, spec):
+    """A rerun whose floats differ only in the last ulp is a reproduction:
+    result.json keeps its committed bytes; a real change is refused."""
+    runner = ExperimentRunner(None, tmp_path / "ledger.json", tmp_path / "exp",
+                              CONFIGS_DIR, frames={}, dry_run=False)
+    result = build_result(spec, _report(), _holdout(), 21, "deadbeef")
+    runner._persist(spec, result)
+    path = runner.experiment_dir(spec.experiment_id) / "result.json"
+    first = path.read_bytes()
+    nudged = build_result(spec, _report(oos_ic=_report()["oos_ic"] * (1 + 1e-13)),
+                          _holdout(), 21, "deadbeef")
+    runner._persist(spec, nudged)
+    assert path.read_bytes() == first
+    with pytest.raises(ResearchError, match="reproduced different values"):
+        runner._persist(spec, build_result(spec, _report(oos_ic=0.5), _holdout(), 21, "deadbeef"))
