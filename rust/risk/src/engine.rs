@@ -106,15 +106,14 @@
 
 use std::collections::BTreeMap;
 
-use marketdata::IapError;
-use serde_json::{json, Value};
+use serde_json::Value;
 use telemetry::Registry;
-use venue::{order_validation_error, OrderRequest, OrderType};
+use venue::{OrderRequest, OrderType};
 
 use crate::event::{fmt_fixed, rules, Decision, RiskEvent, Scope, Severity};
 use crate::limits::RiskLimits;
 
-const NS_PER_SEC: f64 = 1e9;
+pub(crate) const NS_PER_SEC: f64 = 1e9;
 /// Snapshot schema version.
 pub const SNAPSHOT_VERSION: u64 = 1;
 
@@ -185,60 +184,60 @@ impl RiskDecision {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct MarketState {
-    bid_ticks: i64,
-    ask_ticks: i64,
-    ts: i64,
-    gaps: u64,
-    gated: bool,
+pub(crate) struct MarketState {
+    pub(crate) bid_ticks: i64,
+    pub(crate) ask_ticks: i64,
+    pub(crate) ts: i64,
+    pub(crate) gaps: u64,
+    pub(crate) gated: bool,
 }
 
 #[derive(Debug, Clone)]
-struct OpenOrder {
-    instrument_id: u32,
-    side: u8,
+pub(crate) struct OpenOrder {
+    pub(crate) instrument_id: u32,
+    pub(crate) side: u8,
     /// Limit / pegged price in ticks; 0 = unpriced (MARKET, IOC/FOK
     /// without a price, MID).
-    price_ticks: i64,
-    qty: i64,
+    pub(crate) price_ticks: i64,
+    pub(crate) qty: i64,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
-struct Bucket {
-    tokens: f64,
-    last_ts: i64,
-    primed: bool,
+pub(crate) struct Bucket {
+    pub(crate) tokens: f64,
+    pub(crate) last_ts: i64,
+    pub(crate) primed: bool,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
-struct Lot {
-    pos: i64,
+pub(crate) struct Lot {
+    pub(crate) pos: i64,
     /// Real price per base unit (quote ccy).
-    avg_price: f64,
+    pub(crate) avg_price: f64,
 }
 
 /// Fail-closed hard risk engine.
 pub struct RiskEngine {
-    limits: Option<RiskLimits>,
-    config_error: String,
-    instruments: BTreeMap<u32, InstrumentRef>,
-    bootstrapped: bool,
-    kill_global: bool,
-    kill_strategies: BTreeMap<String, bool>,
-    kill_instruments: BTreeMap<u32, bool>,
-    kill_venues: BTreeMap<u16, bool>,
-    venues_down: BTreeMap<u16, bool>,
-    market: BTreeMap<u32, MarketState>,
-    seen_orders: BTreeMap<u64, i64>,
-    buckets: BTreeMap<String, Bucket>,
-    open: BTreeMap<u64, OpenOrder>,
-    positions: BTreeMap<u32, i64>,
-    lots: BTreeMap<(String, u32), Lot>,
+    pub(crate) limits: Option<RiskLimits>,
+    pub(crate) config_error: String,
+    pub(crate) instruments: BTreeMap<u32, InstrumentRef>,
+    pub(crate) bootstrapped: bool,
+    pub(crate) kill_global: bool,
+    pub(crate) kill_strategies: BTreeMap<String, bool>,
+    pub(crate) kill_instruments: BTreeMap<u32, bool>,
+    pub(crate) kill_venues: BTreeMap<u16, bool>,
+    pub(crate) venues_down: BTreeMap<u16, bool>,
+    pub(crate) market: BTreeMap<u32, MarketState>,
+    pub(crate) seen_orders: BTreeMap<u64, i64>,
+    pub(crate) buckets: BTreeMap<String, Bucket>,
+    pub(crate) open: BTreeMap<u64, OpenOrder>,
+    pub(crate) positions: BTreeMap<u32, i64>,
+    pub(crate) lots: BTreeMap<(String, u32), Lot>,
     /// Realized P&L in the instrument's quote currency per (strategy, ccy).
-    realized: BTreeMap<(String, String), f64>,
-    loss_override_global: Option<f64>,
-    loss_override_strategy: BTreeMap<String, f64>,
-    audit: Vec<RiskEvent>,
+    pub(crate) realized: BTreeMap<(String, String), f64>,
+    pub(crate) loss_override_global: Option<f64>,
+    pub(crate) loss_override_strategy: BTreeMap<String, f64>,
+    pub(crate) audit: Vec<RiskEvent>,
     /// Engine metrics (decision counters, PnL gauges).
     pub metrics: Registry,
 }
@@ -432,262 +431,9 @@ impl RiskEngine {
         }
     }
 
-    /// Venue disconnect: orders to the venue reject until reconnect.
-    pub fn on_venue_disconnect(&mut self, venue_id: u16, ts: i64) {
-        self.venues_down.insert(venue_id, true);
-        self.emit(RiskEvent {
-            timestamp: ts,
-            scope: Scope::Venue,
-            scope_id: venue_id.to_string(),
-            rule_id: rules::VENUE_DISCONNECT.to_string(),
-            severity: Severity::Warn as u8,
-            decision: Decision::Kill as u8,
-            reason: format!("venue {venue_id} disconnected"),
-        });
-    }
-
-    /// Venue reconnect.
-    pub fn on_venue_reconnect(&mut self, venue_id: u16, ts: i64) {
-        self.venues_down.insert(venue_id, false);
-        self.emit(RiskEvent {
-            timestamp: ts,
-            scope: Scope::Venue,
-            scope_id: venue_id.to_string(),
-            rule_id: rules::VENUE_RECONNECT.to_string(),
-            severity: Severity::Info as u8,
-            decision: Decision::Allow as u8,
-            reason: format!("venue {venue_id} reconnected"),
-        });
-    }
-
-    /// Manually engage a kill switch. Errors (changing nothing in the
-    /// requested scope, emitting `MALFORMED_KILL` instead of
-    /// `KILL_SWITCH_ENGAGED`) when `scope_id` does not parse.
-    ///
-    /// SILENT NO-OP defect: an unparseable scope id used to leave the
-    /// engine untouched while the audit log recorded a convincing
-    /// KILL_SWITCH_ENGAGED, so an operator halting an instrument by ticker
-    /// ("AAPL") believed the halt was in force and the next order was
-    /// ALLOWed. Fail-closed: the operator's intent is to STOP trading and
-    /// the narrow scope is undeterminable, so the engine takes the wider
-    /// safe interpretation and latches the GLOBAL kill, then reports the
-    /// failure loudly. Over-halting is recoverable; a phantom halt is not.
-    pub fn engage_kill(
-        &mut self,
-        scope: Scope,
-        scope_id: &str,
-        ts: i64,
-        reason: &str,
-    ) -> Result<(), IapError> {
-        if !self.set_kill(scope, scope_id, true) {
-            self.metrics.counter("risk_malformed_kills_total").inc();
-            let _ = self.set_kill(Scope::Global, "", true);
-            let why = format!(
-                "kill scope id \"{}\" is not a valid {} id: escalated to GLOBAL (fail-closed)",
-                scope_id,
-                Self::scope_name(scope)
-            );
-            self.emit(RiskEvent {
-                timestamp: ts,
-                scope,
-                scope_id: scope_id.to_string(),
-                rule_id: rules::MALFORMED_KILL.to_string(),
-                severity: Severity::Breach as u8,
-                decision: Decision::Kill as u8,
-                reason: format!("{why}: {reason}"),
-            });
-            return Err(IapError::InvalidArgument(why));
-        }
-        self.emit(RiskEvent {
-            timestamp: ts,
-            scope,
-            scope_id: scope_id.to_string(),
-            rule_id: rules::KILL_SWITCH_ENGAGED.to_string(),
-            severity: Severity::Breach as u8,
-            decision: Decision::Kill as u8,
-            reason: reason.to_string(),
-        });
-        Ok(())
-    }
-
-    /// Clear a kill switch (the switch only — see the re-arm precedence).
-    /// Errors (clearing NOTHING and emitting `MALFORMED_KILL` instead of
-    /// `KILL_SWITCH_CLEARED`) when `scope_id` does not parse: clearing is
-    /// the permissive direction, so an unresolvable scope leaves every
-    /// switch exactly as it was.
-    pub fn clear_kill(
-        &mut self,
-        scope: Scope,
-        scope_id: &str,
-        ts: i64,
-        reason: &str,
-    ) -> Result<(), IapError> {
-        if !self.set_kill(scope, scope_id, false) {
-            self.metrics.counter("risk_malformed_kills_total").inc();
-            let why = format!(
-                "kill scope id \"{}\" is not a valid {} id: nothing cleared (fail-closed)",
-                scope_id,
-                Self::scope_name(scope)
-            );
-            self.emit(RiskEvent {
-                timestamp: ts,
-                scope,
-                scope_id: scope_id.to_string(),
-                rule_id: rules::MALFORMED_KILL.to_string(),
-                severity: Severity::Breach as u8,
-                decision: Decision::Reject as u8,
-                reason: format!("{why}: {reason}"),
-            });
-            return Err(IapError::InvalidArgument(why));
-        }
-        self.emit(RiskEvent {
-            timestamp: ts,
-            scope,
-            scope_id: scope_id.to_string(),
-            rule_id: rules::KILL_SWITCH_CLEARED.to_string(),
-            severity: Severity::Info as u8,
-            decision: Decision::Allow as u8,
-            reason: reason.to_string(),
-        });
-        Ok(())
-    }
-
-    /// Raise (or lower) the effective daily loss limit of the GLOBAL or a
-    /// STRATEGY scope with written approval. Audited; never clears a
-    /// latched kill switch. Errors on a non-positive/non-finite limit or an
-    /// unsupported scope (nothing changes).
-    pub fn override_loss_limit(
-        &mut self,
-        scope: Scope,
-        scope_id: &str,
-        new_limit: f64,
-        ts: i64,
-        approver: &str,
-    ) -> Result<(), IapError> {
-        if !(new_limit.is_finite() && new_limit > 0.0) {
-            return Err(IapError::InvalidArgument(format!(
-                "loss limit override must be finite and > 0, got {new_limit}"
-            )));
-        }
-        let Some(limits) = self.limits.as_ref() else {
-            return Err(IapError::InvalidArgument(
-                "engine is fail-closed (no limits)".to_string(),
-            ));
-        };
-        let old = match scope {
-            Scope::Global => {
-                let old = self.loss_override_global.unwrap_or(limits.max_daily_loss);
-                self.loss_override_global = Some(new_limit);
-                old
-            }
-            Scope::Strategy => {
-                let old = self
-                    .loss_override_strategy
-                    .get(scope_id)
-                    .copied()
-                    .unwrap_or(limits.strategy_max_daily_loss);
-                self.loss_override_strategy
-                    .insert(scope_id.to_string(), new_limit);
-                old
-            }
-            _ => {
-                return Err(IapError::InvalidArgument(
-                    "loss limits exist at GLOBAL and STRATEGY scope only".to_string(),
-                ))
-            }
-        };
-        self.emit(RiskEvent {
-            timestamp: ts,
-            scope,
-            scope_id: scope_id.to_string(),
-            rule_id: rules::LOSS_LIMIT_OVERRIDE.to_string(),
-            severity: Severity::Warn as u8,
-            decision: Decision::Allow as u8,
-            reason: format!(
-                "daily loss limit {} -> {} approved by {approver}",
-                fmt_fixed(old, 2),
-                fmt_fixed(new_limit, 2)
-            ),
-        });
-        Ok(())
-    }
-
-    /// Session roll: realized P&L zeroed, every marked lot re-based to its
-    /// mark (unrealized restarts at 0; unmarked lots keep their cost),
-    /// loss-limit overrides cleared. Kill switches, positions, open orders
-    /// and seen order ids are untouched. Audited.
-    pub fn roll_session(&mut self, ts: i64, reason: &str) {
-        self.realized.clear();
-        let marks: Vec<(u32, f64)> = self
-            .lots
-            .keys()
-            .map(|(_, iid)| *iid)
-            .filter_map(|iid| self.mark_price(iid).map(|m| (iid, m)))
-            .collect();
-        for ((_, iid), lot) in self.lots.iter_mut() {
-            if let Some((_, m)) = marks.iter().find(|(i, _)| i == iid) {
-                lot.avg_price = *m;
-            }
-        }
-        self.loss_override_global = None;
-        self.loss_override_strategy.clear();
-        self.refresh_pnl_gauges();
-        self.emit(RiskEvent {
-            timestamp: ts,
-            scope: Scope::Global,
-            scope_id: String::new(),
-            rule_id: rules::SESSION_ROLLED.to_string(),
-            severity: Severity::Info as u8,
-            decision: Decision::Allow as u8,
-            reason: reason.to_string(),
-        });
-    }
-
-    /// Apply a kill-switch change. Returns `false` (changing NOTHING) when
-    /// `scope_id` does not name a scope this engine can address — an
-    /// INSTRUMENT id that is not a u32 or a VENUE id that is not a u16.
-    /// Callers MUST act on `false`: a silently dropped kill is the defect
-    /// this return value exists to prevent.
-    #[must_use]
-    fn set_kill(&mut self, scope: Scope, scope_id: &str, engaged: bool) -> bool {
-        match scope {
-            Scope::Global => {
-                self.kill_global = engaged;
-                self.metrics
-                    .gauge("risk_kill_switch_engaged")
-                    .set(if engaged { 1.0 } else { 0.0 });
-                true
-            }
-            Scope::Strategy => {
-                self.kill_strategies.insert(scope_id.to_string(), engaged);
-                true
-            }
-            Scope::Instrument => match scope_id.parse::<u32>() {
-                Ok(iid) => {
-                    self.kill_instruments.insert(iid, engaged);
-                    true
-                }
-                Err(_) => false,
-            },
-            Scope::Venue => match scope_id.parse::<u16>() {
-                Ok(vid) => {
-                    self.kill_venues.insert(vid, engaged);
-                    true
-                }
-                Err(_) => false,
-            },
-        }
-    }
-
-    /// `"INSTRUMENT"` / `"VENUE"` / ... for the malformed-kill reason.
-    fn scope_name(scope: Scope) -> &'static str {
-        match scope {
-            Scope::Global => "GLOBAL",
-            Scope::Strategy => "STRATEGY",
-            Scope::Instrument => "INSTRUMENT",
-            Scope::Venue => "VENUE",
-        }
-    }
+    // Venue connect/disconnect, kill-switch engage/clear/override, session
+    // roll and the scope-id parsing they share live in `killswitch.rs`
+    // (`impl RiskEngine` continued there).
 
     /// A terminal order state (cancel / full fill / reject / expiry
     /// downstream): stop tracking it as open. The OMS MUST call this for
@@ -796,7 +542,7 @@ impl RiskEngine {
     // ------------------------------------------------------------- money
 
     /// Quote-currency -> reporting-currency rate and its mark time.
-    fn fx_rate(&self, ccy: &str) -> Option<(f64, i64)> {
+    pub(crate) fn fx_rate(&self, ccy: &str) -> Option<(f64, i64)> {
         let limits = self.limits.as_ref()?;
         if ccy == limits.reporting_ccy {
             return Some((1.0, i64::MAX));
@@ -815,7 +561,7 @@ impl RiskEngine {
     }
 
     /// Last consolidated mid as a real price (quote ccy), if two-sided.
-    fn mark_price(&self, instrument_id: u32) -> Option<f64> {
+    pub(crate) fn mark_price(&self, instrument_id: u32) -> Option<f64> {
         let md = self.market.get(&instrument_id)?;
         if md.bid_ticks <= 0 || md.ask_ticks <= 0 {
             return None;
@@ -897,18 +643,18 @@ impl RiskEngine {
         self.global_daily_pnl().unwrap_or(0.0) - self.realized_pnl()
     }
 
-    fn effective_strategy_loss(&self, limits: &RiskLimits, sid: &str) -> f64 {
+    pub(crate) fn effective_strategy_loss(&self, limits: &RiskLimits, sid: &str) -> f64 {
         self.loss_override_strategy
             .get(sid)
             .copied()
             .unwrap_or(limits.strategy_max_daily_loss)
     }
 
-    fn effective_global_loss(&self, limits: &RiskLimits) -> f64 {
+    pub(crate) fn effective_global_loss(&self, limits: &RiskLimits) -> f64 {
         self.loss_override_global.unwrap_or(limits.max_daily_loss)
     }
 
-    fn refresh_pnl_gauges(&mut self) {
+    pub(crate) fn refresh_pnl_gauges(&mut self) {
         let realized = self.realized_pnl();
         let daily = self.global_daily_pnl().unwrap_or(realized);
         self.metrics.gauge("risk_realized_pnl").set(realized);
@@ -973,7 +719,7 @@ impl RiskEngine {
 
     // --------------------------------------------------------- state reads
 
-    fn strategy_killed(&self, sid: &str) -> bool {
+    pub(crate) fn strategy_killed(&self, sid: &str) -> bool {
         self.kill_strategies.get(sid).copied().unwrap_or(false)
     }
 
@@ -997,20 +743,8 @@ impl RiskEngine {
         &self.audit
     }
 
-    /// Full audit log as JSONL (one RiskEvent per line, trailing newline).
-    pub fn audit_jsonl(&self) -> String {
-        let mut out = String::new();
-        for ev in &self.audit {
-            out.push_str(&ev.to_json_line());
-            out.push('\n');
-        }
-        out
-    }
-
-    fn emit(&mut self, ev: RiskEvent) {
-        self.metrics.counter("risk_events_total").inc();
-        self.audit.push(ev);
-    }
+    // `audit_jsonl`, `emit`, `snapshot` and `restore` live in `audit.rs`
+    // (`impl RiskEngine` continued there).
 
     // ------------------------------------------------------ pre-trade path
 
@@ -1052,7 +786,7 @@ impl RiskEngine {
 
     /// Price an open order is tracked at: its limit price, the pegged
     /// same-side touch for PEG, 0 (unpriced) otherwise.
-    fn tracked_price(&self, order: &OrderRequest) -> i64 {
+    pub(crate) fn tracked_price(&self, order: &OrderRequest) -> i64 {
         if order.price_ticks > 0 {
             return order.price_ticks;
         }
@@ -1068,660 +802,13 @@ impl RiskEngine {
         0
     }
 
-    fn decision_scope(&self, order: &OrderRequest, rule_id: &str) -> (Scope, String) {
-        match rule_id {
-            rules::KILL_GLOBAL
-            | rules::GROSS_NOTIONAL
-            | rules::NET_NOTIONAL
-            | rules::DAILY_LOSS
-            | rules::CONFIG_MISSING
-            | rules::NOT_BOOTSTRAPPED => (Scope::Global, String::new()),
-            rules::KILL_STRATEGY
-            | rules::MALFORMED_ORDER
-            | rules::DUPLICATE_ORDER_ID
-            | rules::RATE_THROTTLE
-            | rules::STRATEGY_LOSS
-            | rules::ALLOW => (Scope::Strategy, order.strategy_id.clone()),
-            rules::KILL_VENUE | rules::VENUE_DISCONNECTED => {
-                (Scope::Venue, order.venue_id.to_string())
-            }
-            _ => (Scope::Instrument, order.instrument_id.to_string()),
-        }
-    }
+    // `decision_scope`, `reject`, `pretrade_rate` and the pinned check-order
+    // sequence `evaluate` (rules 0-22) live in `limits_eval.rs` (`impl
+    // RiskEngine` continued there).
 
-    fn reject(rule_id: &str, severity: Severity, reason: String) -> RiskDecision {
-        RiskDecision {
-            decision: Decision::Reject,
-            rule_id: rule_id.to_string(),
-            severity,
-            reason,
-        }
-    }
-
-    /// Pre-trade conversion rate: present and fresh (age within the stale
-    /// timeout), else the FX_RATE_MISSING reason.
-    fn pretrade_rate(&self, limits: &RiskLimits, ccy: &str, ts: i64) -> Result<f64, String> {
-        match self.fx_rate(ccy) {
-            None => Err(format!("no conversion rate for {ccy} -> {}", limits.reporting_ccy)),
-            Some((rate, mark_ts)) => {
-                if mark_ts != i64::MAX && limits.stale_book_reject {
-                    let age = ts - mark_ts;
-                    if age > limits.stale_feed_timeout_ns {
-                        return Err(format!(
-                            "conversion rate {ccy} -> {} age {age}ns exceeds {}ns",
-                            limits.reporting_ccy, limits.stale_feed_timeout_ns
-                        ));
-                    }
-                }
-                Ok(rate)
-            }
-        }
-    }
-
-    fn evaluate(&mut self, order: &OrderRequest) -> RiskDecision {
-        use Severity::{Breach, Warn};
-        // 0. fail-closed configuration / bootstrap
-        let Some(limits) = self.limits.clone() else {
-            return Self::reject(
-                rules::CONFIG_MISSING,
-                Breach,
-                format!("fail-closed: {}", self.config_error),
-            );
-        };
-        if !self.bootstrapped {
-            return Self::reject(
-                rules::NOT_BOOTSTRAPPED,
-                Breach,
-                "positions not bootstrapped (fail-closed)".into(),
-            );
-        }
-        // 1-4. kill switches, global > strategy > instrument > venue
-        if self.kill_global {
-            return Self::reject(rules::KILL_GLOBAL, Breach, "global kill switch engaged".into());
-        }
-        if self.strategy_killed(&order.strategy_id) {
-            return Self::reject(
-                rules::KILL_STRATEGY,
-                Breach,
-                format!("strategy {} kill switch engaged", order.strategy_id),
-            );
-        }
-        if self
-            .kill_instruments
-            .get(&order.instrument_id)
-            .copied()
-            .unwrap_or(false)
-        {
-            return Self::reject(
-                rules::KILL_INSTRUMENT,
-                Breach,
-                format!("instrument {} kill switch engaged", order.instrument_id),
-            );
-        }
-        if order.venue_id != 0
-            && self.kill_venues.get(&order.venue_id).copied().unwrap_or(false)
-        {
-            return Self::reject(
-                rules::KILL_VENUE,
-                Breach,
-                format!("venue {} kill switch engaged", order.venue_id),
-            );
-        }
-        // 5. schema-level validation
-        if let Some(reason) = order_validation_error(order) {
-            return Self::reject(rules::MALFORMED_ORDER, Warn, reason);
-        }
-        // 6. reference data
-        let Some(ins) = self.instruments.get(&order.instrument_id).cloned() else {
-            return Self::reject(
-                rules::UNKNOWN_INSTRUMENT,
-                Warn,
-                format!("no reference data for instrument {}", order.instrument_id),
-            );
-        };
-        let tick = ins.tick_size;
-        // 7. duplicate order id
-        if let Some(&prev_ts) = self.seen_orders.get(&order.order_id) {
-            let window = limits.duplicate_order_window_ns;
-            if window == 0 || order.timestamp - prev_ts <= window {
-                return Self::reject(
-                    rules::DUPLICATE_ORDER_ID,
-                    Warn,
-                    format!("order_id {} already used at ts {prev_ts}", order.order_id),
-                );
-            }
-        }
-        if limits.duplicate_order_window_ns > 0 {
-            // prune ids that fell out of the window (bounded growth)
-            let cutoff = order.timestamp - limits.duplicate_order_window_ns;
-            self.seen_orders.retain(|_, &mut ts| ts >= cutoff);
-        }
-        self.seen_orders.insert(order.order_id, order.timestamp);
-        // 8. venue connectivity
-        if order.venue_id != 0
-            && self.venues_down.get(&order.venue_id).copied().unwrap_or(false)
-        {
-            return Self::reject(
-                rules::VENUE_DISCONNECTED,
-                Warn,
-                format!("venue {} is disconnected", order.venue_id),
-            );
-        }
-        // 9-10. market-data gate
-        let md = self.market.get(&order.instrument_id).copied();
-        if let Some(md) = md {
-            if md.gated {
-                return Self::reject(
-                    rules::SEQUENCE_GAP,
-                    Warn,
-                    format!("instrument {} feed has an unrecovered gap", order.instrument_id),
-                );
-            }
-        }
-        let mid = match md {
-            Some(md) if md.bid_ticks > 0 && md.ask_ticks > 0 => {
-                let age = order.timestamp - md.ts;
-                if limits.stale_book_reject && age > limits.stale_feed_timeout_ns {
-                    return Self::reject(
-                        rules::STALE_PRICE,
-                        Warn,
-                        format!(
-                            "reference price age {age}ns exceeds {}ns",
-                            limits.stale_feed_timeout_ns
-                        ),
-                    );
-                }
-                (md.bid_ticks + md.ask_ticks) as f64 * tick / 2.0
-            }
-            _ => {
-                return Self::reject(
-                    rules::STALE_PRICE,
-                    Warn,
-                    format!("no reference price for instrument {}", order.instrument_id),
-                );
-            }
-        };
-        // 11. fat-finger quantity
-        if order.qty > limits.max_order_qty {
-            return Self::reject(
-                rules::FAT_FINGER_QTY,
-                Warn,
-                format!("qty {} exceeds max_order_qty {}", order.qty, limits.max_order_qty),
-            );
-        }
-        // 12. conversion rate to the reporting currency
-        let fx = match self.pretrade_rate(&limits, &ins.quote_ccy, order.timestamp) {
-            Ok(r) => r,
-            Err(why) => return Self::reject(rules::FX_RATE_MISSING, Warn, why),
-        };
-        // 13. fat-finger notional (priced orders use the limit price,
-        // unpriced the mid); notional in the reporting currency
-        let ref_price = if order.price_ticks > 0 {
-            order.price_ticks as f64 * tick
-        } else {
-            mid
-        };
-        let order_notional = order.qty as f64 * ins.qty_unit * ref_price * fx;
-        if order_notional > limits.max_order_notional {
-            return Self::reject(
-                rules::FAT_FINGER_NOTIONAL,
-                Warn,
-                format!(
-                    "notional {} {} exceeds max_order_notional {}",
-                    fmt_fixed(order_notional, 2),
-                    limits.reporting_ccy,
-                    fmt_fixed(limits.max_order_notional, 2)
-                ),
-            );
-        }
-        // 14. price band (priced orders only)
-        if order.price_ticks > 0 {
-            let dev_bps = ((order.price_ticks as f64 * tick) - mid).abs() / mid * 1e4;
-            if dev_bps > limits.price_band_bps {
-                return Self::reject(
-                    rules::PRICE_BAND,
-                    Warn,
-                    format!(
-                        "price deviates {}bps from mid, band {}bps",
-                        fmt_fixed(dev_bps, 1),
-                        fmt_fixed(limits.price_band_bps, 1)
-                    ),
-                );
-            }
-        }
-        // 15. order-rate throttle (event-time token bucket per strategy)
-        {
-            let bucket = self
-                .buckets
-                .entry(order.strategy_id.clone())
-                .or_insert(Bucket {
-                    tokens: limits.order_rate_burst,
-                    last_ts: order.timestamp,
-                    primed: true,
-                });
-            if !bucket.primed {
-                bucket.tokens = limits.order_rate_burst;
-                bucket.primed = true;
-                bucket.last_ts = order.timestamp;
-            }
-            let elapsed = (order.timestamp - bucket.last_ts).max(0);
-            bucket.tokens = (bucket.tokens
-                + elapsed as f64 * limits.max_order_rate_per_sec / NS_PER_SEC)
-                .min(limits.order_rate_burst);
-            bucket.last_ts = bucket.last_ts.max(order.timestamp);
-            if bucket.tokens < 1.0 {
-                return Self::reject(
-                    rules::RATE_THROTTLE,
-                    Warn,
-                    format!(
-                        "strategy {} exceeded {} orders/s (burst {})",
-                        order.strategy_id,
-                        fmt_fixed(limits.max_order_rate_per_sec, 2),
-                        fmt_fixed(limits.order_rate_burst, 2)
-                    ),
-                );
-            }
-            bucket.tokens -= 1.0;
-        }
-        // 16. self-match prevention (any venue; PEG at its pegged touch)
-        let my_price = self.tracked_price(order);
-        for (oid, r) in &self.open {
-            if r.instrument_id != order.instrument_id || r.side == order.side {
-                continue;
-            }
-            let crosses = if my_price > 0 && r.price_ticks > 0 {
-                if order.side == 0 {
-                    my_price >= r.price_ticks
-                } else {
-                    my_price <= r.price_ticks
-                }
-            } else {
-                true // unpriced on either side: conservative
-            };
-            if crosses {
-                return Self::reject(
-                    rules::SELF_MATCH,
-                    Warn,
-                    format!("would cross own open order {oid} at {}", r.price_ticks),
-                );
-            }
-        }
-        // 17. position limit (worst-case projection incl. open orders)
-        let pos = self.position(order.instrument_id);
-        let open_same: i64 = self
-            .open
-            .values()
-            .filter(|r| r.instrument_id == order.instrument_id && r.side == order.side)
-            .map(|r| r.qty)
-            .sum();
-        let projected = if order.side == 0 {
-            pos + open_same + order.qty
-        } else {
-            pos - open_same - order.qty
-        };
-        if projected.abs() > limits.max_position_qty {
-            return Self::reject(
-                rules::POSITION_LIMIT,
-                Warn,
-                format!(
-                    "projected position {projected} exceeds max_position_qty {}",
-                    limits.max_position_qty
-                ),
-            );
-        }
-        // 18. per-instrument notional (projection marked at the mid)
-        let projected_notional = projected.abs() as f64 * ins.qty_unit * mid * fx;
-        if projected_notional > limits.max_instrument_notional {
-            return Self::reject(
-                rules::INSTRUMENT_NOTIONAL,
-                Warn,
-                format!(
-                    "projected notional {} exceeds max_instrument_notional {}",
-                    fmt_fixed(projected_notional, 2),
-                    fmt_fixed(limits.max_instrument_notional, 2)
-                ),
-            );
-        }
-        // 19-20. gross / net notional (filled positions + every open order
-        // + this order; fail-closed on unmarked or unconvertible positions)
-        let mut gross = 0.0f64;
-        let mut net = 0.0f64;
-        for (&iid, &p) in &self.positions {
-            if p == 0 {
-                continue;
-            }
-            let Some(mark) = self.mark_price(iid) else {
-                return Self::reject(
-                    rules::GROSS_NOTIONAL,
-                    Warn,
-                    format!("position in instrument {iid} has no mark price (fail-closed)"),
-                );
-            };
-            let pins = &self.instruments[&iid];
-            let Some((rate, _)) = self.fx_rate(&pins.quote_ccy) else {
-                return Self::reject(
-                    rules::GROSS_NOTIONAL,
-                    Warn,
-                    format!(
-                        "position in instrument {iid} has no {} conversion rate (fail-closed)",
-                        pins.quote_ccy
-                    ),
-                );
-            };
-            let v = p as f64 * pins.qty_unit * mark * rate;
-            gross += v.abs();
-            net += v;
-        }
-        for (oid, r) in &self.open {
-            let Some(oins) = self.instruments.get(&r.instrument_id) else {
-                continue;
-            };
-            let price = if r.price_ticks > 0 {
-                r.price_ticks as f64 * oins.tick_size
-            } else {
-                match self.mark_price(r.instrument_id) {
-                    Some(m) => m,
-                    // FAIL-OPEN defect: skipping an unvaluable OPEN ORDER
-                    // (MARKET / MID / unpriced IOC-FOK on an instrument whose
-                    // book went one-sided) dropped its whole notional from
-                    // gross AND net, so live working exposure vanished from
-                    // the aggregate and a correct GROSS_NOTIONAL reject became
-                    // an ALLOW. An unvaluable open order is exactly as
-                    // undeterminable as an unvaluable position: reject.
-                    None => {
-                        return Self::reject(
-                            rules::GROSS_NOTIONAL,
-                            Warn,
-                            format!(
-                                "open order {oid} in instrument {} has no mark price (fail-closed)",
-                                r.instrument_id
-                            ),
-                        )
-                    }
-                }
-            };
-            let Some((rate, _)) = self.fx_rate(&oins.quote_ccy) else {
-                return Self::reject(
-                    rules::GROSS_NOTIONAL,
-                    Warn,
-                    format!(
-                        "open order in instrument {} has no {} conversion rate (fail-closed)",
-                        r.instrument_id, oins.quote_ccy
-                    ),
-                );
-            };
-            let v = r.qty as f64 * oins.qty_unit * price * rate;
-            gross += v;
-            net += if r.side == 0 { v } else { -v };
-        }
-        gross += order_notional;
-        if gross > limits.max_gross_notional {
-            return Self::reject(
-                rules::GROSS_NOTIONAL,
-                Warn,
-                format!(
-                    "projected gross notional {} exceeds max_gross_notional {}",
-                    fmt_fixed(gross, 2),
-                    fmt_fixed(limits.max_gross_notional, 2)
-                ),
-            );
-        }
-        net += if order.side == 0 {
-            order_notional
-        } else {
-            -order_notional
-        };
-        if net.abs() > limits.max_net_notional {
-            return Self::reject(
-                rules::NET_NOTIONAL,
-                Warn,
-                format!(
-                    "projected net notional {} exceeds max_net_notional {}",
-                    fmt_fixed(net, 2),
-                    fmt_fixed(limits.max_net_notional, 2)
-                ),
-            );
-        }
-        // 21-22. loss limits on daily P&L (belt-and-braces after a cleared
-        // latch; undeterminable P&L rejects fail-closed)
-        let Some(global_pnl) = self.global_daily_pnl() else {
-            return Self::reject(
-                rules::FX_RATE_MISSING,
-                Warn,
-                "global daily pnl undeterminable: conversion rate missing".into(),
-            );
-        };
-        let global_limit = self.effective_global_loss(&limits);
-        if global_pnl <= -global_limit {
-            return Self::reject(
-                rules::DAILY_LOSS,
-                Breach,
-                format!(
-                    "global daily pnl {} at daily loss limit {}",
-                    fmt_fixed(global_pnl, 2),
-                    fmt_fixed(global_limit, 2)
-                ),
-            );
-        }
-        let Some(strat_pnl) = self.strategy_daily_pnl(&order.strategy_id) else {
-            return Self::reject(
-                rules::FX_RATE_MISSING,
-                Warn,
-                "strategy daily pnl undeterminable: conversion rate missing".into(),
-            );
-        };
-        let strat_limit = self.effective_strategy_loss(&limits, &order.strategy_id);
-        if strat_pnl <= -strat_limit {
-            return Self::reject(
-                rules::STRATEGY_LOSS,
-                Breach,
-                format!(
-                    "strategy daily pnl {} at loss limit {}",
-                    fmt_fixed(strat_pnl, 2),
-                    fmt_fixed(strat_limit, 2)
-                ),
-            );
-        }
-        RiskDecision {
-            decision: Decision::Allow,
-            rule_id: rules::ALLOW.to_string(),
-            severity: Severity::Info,
-            reason: String::new(),
-        }
-    }
-
-    // ---------------------------------------------------- snapshot/restore
-
-    /// Serialize the full mutable state (positions, lots, realized P&L,
-    /// kill/latch state, marks, open orders, throttle buckets, seen order
-    /// ids, overrides, bootstrap flag) as a schema-versioned JSON document.
-    /// The audit log and metrics are NOT part of the snapshot (the audit
-    /// log is the external JSONL file; metrics restart).
-    pub fn snapshot(&self) -> Value {
-        let bool_map = |m: &BTreeMap<String, bool>| -> Value {
-            Value::Object(m.iter().map(|(k, v)| (k.clone(), json!(v))).collect())
-        };
-        json!({
-            "x-version": SNAPSHOT_VERSION,
-            "bootstrapped": self.bootstrapped,
-            "kill_global": self.kill_global,
-            "kill_strategies": bool_map(&self.kill_strategies),
-            "kill_instruments": Value::Object(self.kill_instruments.iter()
-                .map(|(k, v)| (k.to_string(), json!(v))).collect()),
-            "kill_venues": Value::Object(self.kill_venues.iter()
-                .map(|(k, v)| (k.to_string(), json!(v))).collect()),
-            "venues_down": Value::Object(self.venues_down.iter()
-                .map(|(k, v)| (k.to_string(), json!(v))).collect()),
-            "market": Value::Object(self.market.iter().map(|(k, m)| (k.to_string(), json!({
-                "bid_ticks": m.bid_ticks, "ask_ticks": m.ask_ticks, "ts": m.ts,
-                "gaps": m.gaps, "gated": m.gated }))).collect()),
-            "seen_orders": self.seen_orders.iter()
-                .map(|(id, ts)| json!([id, ts])).collect::<Vec<_>>(),
-            "buckets": Value::Object(self.buckets.iter().map(|(k, b)| (k.clone(), json!({
-                "tokens": b.tokens, "last_ts": b.last_ts, "primed": b.primed }))).collect()),
-            "open": Value::Object(self.open.iter().map(|(k, o)| (k.to_string(), json!({
-                "instrument_id": o.instrument_id, "side": o.side,
-                "price_ticks": o.price_ticks, "qty": o.qty }))).collect()),
-            "positions": Value::Object(self.positions.iter()
-                .map(|(k, v)| (k.to_string(), json!(v))).collect()),
-            "lots": self.lots.iter().map(|((sid, iid), lot)| json!({
-                "strategy_id": sid, "instrument_id": iid,
-                "pos": lot.pos, "avg_price": lot.avg_price })).collect::<Vec<_>>(),
-            "realized": self.realized.iter().map(|((sid, ccy), pnl)| json!({
-                "strategy_id": sid, "ccy": ccy, "pnl": pnl })).collect::<Vec<_>>(),
-            "loss_override_global": self.loss_override_global,
-            "loss_override_strategy": Value::Object(self.loss_override_strategy.iter()
-                .map(|(k, v)| (k.clone(), json!(v))).collect()),
-        })
-    }
-
-    /// Rebuild an engine from `limits`, `instruments` and a
-    /// [`RiskEngine::snapshot`] document (strict: unknown version or a
-    /// malformed field is an error, nothing is restored). Emits a
-    /// `STATE_RESTORED` audit record stamped `ts`.
-    pub fn restore(
-        limits: RiskLimits,
-        instruments: BTreeMap<u32, InstrumentRef>,
-        snap: &Value,
-        ts: i64,
-    ) -> Result<RiskEngine, IapError> {
-        let bad = |what: &str| IapError::InvalidArgument(format!("risk snapshot: bad {what}"));
-        if snap["x-version"].as_u64() != Some(SNAPSHOT_VERSION) {
-            return Err(bad("x-version"));
-        }
-        let mut eng = RiskEngine::new(limits, instruments);
-        eng.bootstrapped = snap["bootstrapped"].as_bool().ok_or_else(|| bad("bootstrapped"))?;
-        eng.kill_global = snap["kill_global"].as_bool().ok_or_else(|| bad("kill_global"))?;
-        eng.metrics
-            .gauge("risk_kill_switch_engaged")
-            .set(if eng.kill_global { 1.0 } else { 0.0 });
-        for (k, v) in snap["kill_strategies"].as_object().ok_or_else(|| bad("kill_strategies"))? {
-            eng.kill_strategies
-                .insert(k.clone(), v.as_bool().ok_or_else(|| bad("kill_strategies"))?);
-        }
-        for (k, v) in snap["kill_instruments"].as_object().ok_or_else(|| bad("kill_instruments"))? {
-            eng.kill_instruments.insert(
-                k.parse::<u32>().map_err(|_| bad("kill_instruments"))?,
-                v.as_bool().ok_or_else(|| bad("kill_instruments"))?,
-            );
-        }
-        for (k, v) in snap["kill_venues"].as_object().ok_or_else(|| bad("kill_venues"))? {
-            eng.kill_venues.insert(
-                k.parse::<u16>().map_err(|_| bad("kill_venues"))?,
-                v.as_bool().ok_or_else(|| bad("kill_venues"))?,
-            );
-        }
-        for (k, v) in snap["venues_down"].as_object().ok_or_else(|| bad("venues_down"))? {
-            eng.venues_down.insert(
-                k.parse::<u16>().map_err(|_| bad("venues_down"))?,
-                v.as_bool().ok_or_else(|| bad("venues_down"))?,
-            );
-        }
-        for (k, m) in snap["market"].as_object().ok_or_else(|| bad("market"))? {
-            eng.market.insert(
-                k.parse::<u32>().map_err(|_| bad("market"))?,
-                MarketState {
-                    bid_ticks: m["bid_ticks"].as_i64().ok_or_else(|| bad("market.bid_ticks"))?,
-                    ask_ticks: m["ask_ticks"].as_i64().ok_or_else(|| bad("market.ask_ticks"))?,
-                    ts: m["ts"].as_i64().ok_or_else(|| bad("market.ts"))?,
-                    gaps: m["gaps"].as_u64().ok_or_else(|| bad("market.gaps"))?,
-                    gated: m["gated"].as_bool().ok_or_else(|| bad("market.gated"))?,
-                },
-            );
-        }
-        for pair in snap["seen_orders"].as_array().ok_or_else(|| bad("seen_orders"))? {
-            let id = pair[0].as_u64().ok_or_else(|| bad("seen_orders"))?;
-            let t = pair[1].as_i64().ok_or_else(|| bad("seen_orders"))?;
-            eng.seen_orders.insert(id, t);
-        }
-        for (k, b) in snap["buckets"].as_object().ok_or_else(|| bad("buckets"))? {
-            eng.buckets.insert(
-                k.clone(),
-                Bucket {
-                    tokens: b["tokens"].as_f64().ok_or_else(|| bad("buckets.tokens"))?,
-                    last_ts: b["last_ts"].as_i64().ok_or_else(|| bad("buckets.last_ts"))?,
-                    primed: b["primed"].as_bool().ok_or_else(|| bad("buckets.primed"))?,
-                },
-            );
-        }
-        for (k, o) in snap["open"].as_object().ok_or_else(|| bad("open"))? {
-            let side = o["side"].as_u64().ok_or_else(|| bad("open.side"))?;
-            if side > 1 {
-                return Err(bad("open.side"));
-            }
-            eng.open.insert(
-                k.parse::<u64>().map_err(|_| bad("open"))?,
-                OpenOrder {
-                    instrument_id: o["instrument_id"]
-                        .as_u64()
-                        .and_then(|v| u32::try_from(v).ok())
-                        .ok_or_else(|| bad("open.instrument_id"))?,
-                    side: side as u8,
-                    price_ticks: o["price_ticks"].as_i64().ok_or_else(|| bad("open.price_ticks"))?,
-                    qty: o["qty"].as_i64().ok_or_else(|| bad("open.qty"))?,
-                },
-            );
-        }
-        for (k, v) in snap["positions"].as_object().ok_or_else(|| bad("positions"))? {
-            eng.positions.insert(
-                k.parse::<u32>().map_err(|_| bad("positions"))?,
-                v.as_i64().ok_or_else(|| bad("positions"))?,
-            );
-        }
-        for l in snap["lots"].as_array().ok_or_else(|| bad("lots"))? {
-            let sid = l["strategy_id"].as_str().ok_or_else(|| bad("lots.strategy_id"))?;
-            let iid = l["instrument_id"]
-                .as_u64()
-                .and_then(|v| u32::try_from(v).ok())
-                .ok_or_else(|| bad("lots.instrument_id"))?;
-            let avg = l["avg_price"].as_f64().ok_or_else(|| bad("lots.avg_price"))?;
-            if !avg.is_finite() {
-                return Err(bad("lots.avg_price"));
-            }
-            eng.lots.insert(
-                (sid.to_string(), iid),
-                Lot {
-                    pos: l["pos"].as_i64().ok_or_else(|| bad("lots.pos"))?,
-                    avg_price: avg,
-                },
-            );
-        }
-        for r in snap["realized"].as_array().ok_or_else(|| bad("realized"))? {
-            let sid = r["strategy_id"].as_str().ok_or_else(|| bad("realized.strategy_id"))?;
-            let ccy = r["ccy"].as_str().ok_or_else(|| bad("realized.ccy"))?;
-            let pnl = r["pnl"].as_f64().ok_or_else(|| bad("realized.pnl"))?;
-            if !pnl.is_finite() {
-                return Err(bad("realized.pnl"));
-            }
-            eng.realized.insert((sid.to_string(), ccy.to_string()), pnl);
-        }
-        eng.loss_override_global = match &snap["loss_override_global"] {
-            Value::Null => None,
-            v => Some(v.as_f64().ok_or_else(|| bad("loss_override_global"))?),
-        };
-        for (k, v) in snap["loss_override_strategy"]
-            .as_object()
-            .ok_or_else(|| bad("loss_override_strategy"))?
-        {
-            eng.loss_override_strategy
-                .insert(k.clone(), v.as_f64().ok_or_else(|| bad("loss_override_strategy"))?);
-        }
-        eng.refresh_pnl_gauges();
-        eng.emit(RiskEvent {
-            timestamp: ts,
-            scope: Scope::Global,
-            scope_id: String::new(),
-            rule_id: rules::STATE_RESTORED.to_string(),
-            severity: Severity::Info as u8,
-            decision: Decision::Allow as u8,
-            reason: format!(
-                "restored snapshot v{SNAPSHOT_VERSION}: {} positions, {} open orders",
-                eng.positions.values().filter(|p| **p != 0).count(),
-                eng.open.len()
-            ),
-        });
-        Ok(eng)
-    }
+    // `snapshot` and `restore` (schema x-version 1, and the audit-log
+    // helpers `audit_jsonl` / `emit`) live in `audit.rs` (`impl RiskEngine`
+    // continued there).
 }
 
 fn equity_refs(ticks: BTreeMap<u32, f64>) -> BTreeMap<u32, InstrumentRef> {

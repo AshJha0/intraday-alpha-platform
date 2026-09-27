@@ -15,9 +15,12 @@
 //! (decisions), `expected_risk_audit.jsonl` (byte-exact audit log) and
 //! `expected_risk_snapshot.json` (state snapshot mid-script).
 
+mod audit;
 pub mod engine;
 pub mod event;
+mod killswitch;
 pub mod limits;
+mod limits_eval;
 
 pub use engine::{Fill, InstrumentRef, RiskDecision, RiskEngine, SNAPSHOT_VERSION};
 pub use event::{fmt_fixed, rules, Decision, RiskEvent, Scope, Severity};
