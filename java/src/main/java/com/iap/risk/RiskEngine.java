@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-import com.iap.config.Json;
 import com.iap.monitoring.MetricsRegistry;
 
 /**
@@ -56,11 +55,15 @@ import com.iap.monitoring.MetricsRegistry;
  * the Rust engine.
  */
 public final class RiskEngine {
-    private static final double NS_PER_SEC = 1e9;
+    static final double NS_PER_SEC = 1e9;
     /** Snapshot schema version. */
     public static final long SNAPSHOT_VERSION = 1;
 
-    private static final class MarketState {
+    // Package-private (not private): LimitsEvaluator, KillSwitch and
+    // RiskAudit in this same package continue RiskEngine's implementation
+    // and read/write this state directly — the Java analogue of the Rust
+    // port's `pub(crate)` split (rust/risk/src/{limits_eval,killswitch,audit}.rs).
+    static final class MarketState {
         long bidTicks;
         long askTicks;
         long ts;
@@ -68,49 +71,49 @@ public final class RiskEngine {
         boolean gated;
     }
 
-    private static final class OpenOrder {
+    static final class OpenOrder {
         long instrumentId;
         int side;
         long priceTicks; // 0 = unpriced
         long qty;
     }
 
-    private static final class Bucket {
+    static final class Bucket {
         double tokens;
         long lastTs;
         boolean primed;
     }
 
-    private static final class Lot {
+    static final class Lot {
         long pos;
         double avgPrice; // real price per base unit (quote ccy)
     }
 
-    private RiskLimits limits; // null = fail-closed
-    private String configError = "";
-    private final TreeMap<Long, InstrumentRef> instruments;
-    private boolean bootstrapped = true;
-    private boolean killGlobal;
-    private final TreeMap<String, Boolean> killStrategies = new TreeMap<>();
-    private final TreeMap<Long, Boolean> killInstruments = new TreeMap<>();
-    private final TreeMap<Integer, Boolean> killVenues = new TreeMap<>();
-    private final TreeMap<Integer, Boolean> venuesDown = new TreeMap<>();
-    private final TreeMap<Long, MarketState> market = new TreeMap<>();
+    RiskLimits limits; // null = fail-closed
+    String configError = "";
+    final TreeMap<Long, InstrumentRef> instruments;
+    boolean bootstrapped = true;
+    boolean killGlobal;
+    final TreeMap<String, Boolean> killStrategies = new TreeMap<>();
+    final TreeMap<Long, Boolean> killInstruments = new TreeMap<>();
+    final TreeMap<Integer, Boolean> killVenues = new TreeMap<>();
+    final TreeMap<Integer, Boolean> venuesDown = new TreeMap<>();
+    final TreeMap<Long, MarketState> market = new TreeMap<>();
     // Order ids are u64: unsigned ordering so iteration (and therefore the
     // named order in SELF_MATCH reasons) matches the Rust BTreeMap<u64>.
-    private final TreeMap<Long, Long> seenOrders =
+    final TreeMap<Long, Long> seenOrders =
             new TreeMap<>(Long::compareUnsigned);
-    private final TreeMap<String, Bucket> buckets = new TreeMap<>();
-    private final TreeMap<Long, OpenOrder> open =
+    final TreeMap<String, Bucket> buckets = new TreeMap<>();
+    final TreeMap<Long, OpenOrder> open =
             new TreeMap<>(Long::compareUnsigned);
-    private final TreeMap<Long, Long> positions = new TreeMap<>();
+    final TreeMap<Long, Long> positions = new TreeMap<>();
     /** (strategy, instrument) lots — key order = Rust (String, u32) tuple order. */
-    private final TreeMap<String, TreeMap<Long, Lot>> lots = new TreeMap<>();
+    final TreeMap<String, TreeMap<Long, Lot>> lots = new TreeMap<>();
     /** Realized P&amp;L per (strategy, quote ccy) in the quote currency. */
-    private final TreeMap<String, TreeMap<String, Double>> realized = new TreeMap<>();
-    private Double lossOverrideGlobal;
-    private final TreeMap<String, Double> lossOverrideStrategy = new TreeMap<>();
-    private final List<RiskEvent> audit = new ArrayList<>();
+    final TreeMap<String, TreeMap<String, Double>> realized = new TreeMap<>();
+    Double lossOverrideGlobal;
+    final TreeMap<String, Double> lossOverrideStrategy = new TreeMap<>();
+    final List<RiskEvent> audit = new ArrayList<>();
     /** Engine metrics (decision counters, PnL + kill-switch gauges). */
     public final MetricsRegistry metrics;
 
@@ -307,18 +310,12 @@ public final class RiskEngine {
 
     /** Venue disconnect: orders to the venue reject until reconnect. */
     public void onVenueDisconnect(int venueId, long ts) {
-        venuesDown.put(venueId, true);
-        emit(new RiskEvent(ts, Scope.VENUE, Integer.toString(venueId),
-                Rules.VENUE_DISCONNECT, Severity.WARN.code(),
-                Decision.KILL.code(), "venue " + venueId + " disconnected"));
+        KillSwitch.onVenueDisconnect(this, venueId, ts);
     }
 
     /** Venue reconnect. */
     public void onVenueReconnect(int venueId, long ts) {
-        venuesDown.put(venueId, false);
-        emit(new RiskEvent(ts, Scope.VENUE, Integer.toString(venueId),
-                Rules.VENUE_RECONNECT, Severity.INFO.code(),
-                Decision.ALLOW.code(), "venue " + venueId + " reconnected"));
+        KillSwitch.onVenueReconnect(this, venueId, ts);
     }
 
     /**
@@ -337,18 +334,7 @@ public final class RiskEngine {
      * loudly. Over-halting is recoverable; a phantom halt is not.
      */
     public void engageKill(Scope scope, String scopeId, long ts, String reason) {
-        if (!setKill(scope, scopeId, true)) {
-            metrics.counter("risk_malformed_kills_total").inc();
-            setKill(Scope.GLOBAL, "", true);
-            String why = "kill scope id \"" + scopeId + "\" is not a valid "
-                    + scopeName(scope) + " id: escalated to GLOBAL (fail-closed)";
-            emit(new RiskEvent(ts, scope, scopeId, Rules.MALFORMED_KILL,
-                    Severity.BREACH.code(), Decision.KILL.code(),
-                    why + ": " + reason));
-            throw new IllegalArgumentException(why);
-        }
-        emit(new RiskEvent(ts, scope, scopeId, Rules.KILL_SWITCH_ENGAGED,
-                Severity.BREACH.code(), Decision.KILL.code(), reason));
+        KillSwitch.engageKill(this, scope, scopeId, ts, reason);
     }
 
     /**
@@ -359,17 +345,7 @@ public final class RiskEngine {
      * so an unresolvable scope leaves every switch exactly as it was.
      */
     public void clearKill(Scope scope, String scopeId, long ts, String reason) {
-        if (!setKill(scope, scopeId, false)) {
-            metrics.counter("risk_malformed_kills_total").inc();
-            String why = "kill scope id \"" + scopeId + "\" is not a valid "
-                    + scopeName(scope) + " id: nothing cleared (fail-closed)";
-            emit(new RiskEvent(ts, scope, scopeId, Rules.MALFORMED_KILL,
-                    Severity.BREACH.code(), Decision.REJECT.code(),
-                    why + ": " + reason));
-            throw new IllegalArgumentException(why);
-        }
-        emit(new RiskEvent(ts, scope, scopeId, Rules.KILL_SWITCH_CLEARED,
-                Severity.INFO.code(), Decision.ALLOW.code(), reason));
+        KillSwitch.clearKill(this, scope, scopeId, ts, reason);
     }
 
     /**
@@ -380,32 +356,7 @@ public final class RiskEngine {
      */
     public void overrideLossLimit(Scope scope, String scopeId, double newLimit,
             long ts, String approver) {
-        if (!(Double.isFinite(newLimit) && newLimit > 0.0)) {
-            throw new IllegalArgumentException(
-                    "loss limit override must be finite and > 0, got " + newLimit);
-        }
-        if (limits == null) {
-            throw new IllegalStateException("engine is fail-closed (no limits)");
-        }
-        double old;
-        switch (scope) {
-            case GLOBAL -> {
-                old = lossOverrideGlobal == null
-                        ? limits.maxDailyLoss() : lossOverrideGlobal;
-                lossOverrideGlobal = newLimit;
-            }
-            case STRATEGY -> {
-                Double prev = lossOverrideStrategy.get(scopeId);
-                old = prev == null ? limits.strategyMaxDailyLoss() : prev;
-                lossOverrideStrategy.put(scopeId, newLimit);
-            }
-            default -> throw new IllegalArgumentException(
-                    "loss limits exist at GLOBAL and STRATEGY scope only");
-        }
-        emit(new RiskEvent(ts, scope, scopeId, Rules.LOSS_LIMIT_OVERRIDE,
-                Severity.WARN.code(), Decision.ALLOW.code(),
-                "daily loss limit " + fmtFixed(old, 2) + " -> "
-                        + fmtFixed(newLimit, 2) + " approved by " + approver));
+        KillSwitch.overrideLossLimit(this, scope, scopeId, newLimit, ts, approver);
     }
 
     /**
@@ -414,20 +365,7 @@ public final class RiskEngine {
      * open orders and seen order ids are untouched. Audited.
      */
     public void rollSession(long ts, String reason) {
-        realized.clear();
-        for (TreeMap<Long, Lot> byIns : lots.values()) {
-            for (Map.Entry<Long, Lot> e : byIns.entrySet()) {
-                Double mark = markPrice(e.getKey());
-                if (mark != null) {
-                    e.getValue().avgPrice = mark;
-                }
-            }
-        }
-        lossOverrideGlobal = null;
-        lossOverrideStrategy.clear();
-        refreshPnlGauges();
-        emit(new RiskEvent(ts, Scope.GLOBAL, "", Rules.SESSION_ROLLED,
-                Severity.INFO.code(), Decision.ALLOW.code(), reason));
+        KillSwitch.rollSession(this, ts, reason);
     }
 
     /**
@@ -435,51 +373,15 @@ public final class RiskEngine {
      * when {@code scopeId} does not name a scope this engine can address —
      * an INSTRUMENT id that is not a u32 or a VENUE id that is not a u16.
      * Callers MUST act on {@code false}: a silently dropped kill is the
-     * defect this return value exists to prevent.
+     * defect this return value exists to prevent. Package-private: shared
+     * with {@link KillSwitch} and the loss-limit latch in
+     * {@link #evaluateLossLimits}.
      */
-    private boolean setKill(Scope scope, String scopeId, boolean engaged) {
-        switch (scope) {
-            case GLOBAL -> setKillGlobal(engaged);
-            case STRATEGY -> killStrategies.put(scopeId, engaged);
-            case INSTRUMENT -> {
-                try {
-                    // Instrument ids are u32 (the Rust reference parses the
-                    // scope id with parse::<u32>()).
-                    killInstruments.put(
-                            Integer.toUnsignedLong(
-                                    Integer.parseUnsignedInt(scopeId)),
-                            engaged);
-                } catch (NumberFormatException e) {
-                    return false;
-                }
-            }
-            case VENUE -> {
-                int vid;
-                try {
-                    vid = Integer.parseInt(scopeId);
-                } catch (NumberFormatException e) {
-                    return false;
-                }
-                if (vid < 0 || vid > 0xFFFF) {
-                    return false;
-                }
-                killVenues.put(vid, engaged);
-            }
-        }
-        return true;
+    boolean setKill(Scope scope, String scopeId, boolean engaged) {
+        return KillSwitch.setKill(this, scope, scopeId, engaged);
     }
 
-    /** {@code "INSTRUMENT"} / {@code "VENUE"} / ... for malformed-kill reasons. */
-    private static String scopeName(Scope scope) {
-        return switch (scope) {
-            case GLOBAL -> "GLOBAL";
-            case STRATEGY -> "STRATEGY";
-            case INSTRUMENT -> "INSTRUMENT";
-            case VENUE -> "VENUE";
-        };
-    }
-
-    private void setKillGlobal(boolean engaged) {
+    void setKillGlobal(boolean engaged) {
         killGlobal = engaged;
         metrics.gauge("risk_kill_switch_engaged").set(engaged ? 1.0 : 0.0);
     }
@@ -576,7 +478,7 @@ public final class RiskEngine {
     // ------------------------------------------------------------- money
 
     /** {rate, markTs}: quote ccy to reporting ccy; null when missing. */
-    private double[] fxRate(String ccy) {
+    double[] fxRate(String ccy) {
         if (limits == null) {
             return null;
         }
@@ -603,18 +505,18 @@ public final class RiskEngine {
     }
 
     /** Whether a rate carries a mark time (non-reporting currency). */
-    private static boolean hasMarkTs(double[] rate) {
+    static boolean hasMarkTs(double[] rate) {
         return !Double.isNaN(rate[1]);
     }
 
-    private long fxMarkTs(String ccy) {
+    long fxMarkTs(String ccy) {
         // exact mark timestamp (the double slot only signals presence)
         RiskLimits.FxConversion conv = limits.fxConversion().get(ccy);
         return market.get(conv.instrumentId()).ts;
     }
 
     /** Last consolidated mid as a real price (quote ccy), if two-sided. */
-    private Double markPrice(long instrumentId) {
+    Double markPrice(long instrumentId) {
         MarketState md = market.get(instrumentId);
         if (md == null || md.bidTicks <= 0 || md.askTicks <= 0) {
             return null;
@@ -715,16 +617,16 @@ public final class RiskEngine {
         return (daily == null ? 0.0 : daily) - realizedPnl();
     }
 
-    private double effectiveStrategyLoss(String sid) {
+    double effectiveStrategyLoss(String sid) {
         Double o = lossOverrideStrategy.get(sid);
         return o == null ? limits.strategyMaxDailyLoss() : o;
     }
 
-    private double effectiveGlobalLoss() {
+    double effectiveGlobalLoss() {
         return lossOverrideGlobal == null ? limits.maxDailyLoss() : lossOverrideGlobal;
     }
 
-    private void refreshPnlGauges() {
+    void refreshPnlGauges() {
         double realizedNow = realizedPnl();
         Double dailyBox = globalDailyPnl();
         double daily = dailyBox == null ? realizedNow : dailyBox;
@@ -773,7 +675,7 @@ public final class RiskEngine {
 
     // ------------------------------------------------------------ state reads
 
-    private boolean strategyKilled(String sid) {
+    boolean strategyKilled(String sid) {
         return killStrategies.getOrDefault(sid, false);
     }
 
@@ -799,16 +701,11 @@ public final class RiskEngine {
 
     /** Full audit log as JSONL (one RiskEvent per line, trailing newline). */
     public String auditJsonl() {
-        StringBuilder sb = new StringBuilder(audit.size() * 96);
-        for (RiskEvent ev : audit) {
-            sb.append(ev.toJsonLine()).append('\n');
-        }
-        return sb.toString();
+        return RiskAudit.auditJsonl(this);
     }
 
-    private void emit(RiskEvent ev) {
-        metrics.counter("risk_events_total").inc();
-        audit.add(ev);
+    void emit(RiskEvent ev) {
+        RiskAudit.emit(this, ev);
     }
 
     // ------------------------------------------------------- pre-trade path
@@ -818,9 +715,9 @@ public final class RiskEngine {
      * decision as a RiskEvent and returns it.
      */
     public RiskDecision checkOrder(OrderRequest order) {
-        RiskDecision outcome = evaluate(order);
-        Scope scope = decisionScope(outcome.ruleId());
-        String scopeId = decisionScopeId(order, scope);
+        RiskDecision outcome = LimitsEvaluator.evaluate(this, order);
+        Scope scope = LimitsEvaluator.decisionScope(outcome.ruleId());
+        String scopeId = LimitsEvaluator.decisionScopeId(order, scope);
         metrics.counter("risk_decisions_total").inc();
         if (outcome.allowed()) {
             metrics.counter("risk_allowed_total").inc();
@@ -843,7 +740,7 @@ public final class RiskEngine {
     }
 
     /** Limit price, the pegged same-side touch for PEG, else 0 (unpriced). */
-    private long trackedPrice(OrderRequest order) {
+    long trackedPrice(OrderRequest order) {
         if (order.priceTicks() > 0) {
             return order.priceTicks();
         }
@@ -856,357 +753,13 @@ public final class RiskEngine {
         return 0;
     }
 
-    private static Scope decisionScope(String ruleId) {
-        return switch (ruleId) {
-            case Rules.KILL_GLOBAL, Rules.GROSS_NOTIONAL, Rules.NET_NOTIONAL,
-                    Rules.DAILY_LOSS, Rules.CONFIG_MISSING,
-                    Rules.NOT_BOOTSTRAPPED -> Scope.GLOBAL;
-            case Rules.KILL_STRATEGY, Rules.MALFORMED_ORDER,
-                    Rules.DUPLICATE_ORDER_ID, Rules.RATE_THROTTLE,
-                    Rules.STRATEGY_LOSS, Rules.ALLOW -> Scope.STRATEGY;
-            case Rules.KILL_VENUE, Rules.VENUE_DISCONNECTED -> Scope.VENUE;
-            default -> Scope.INSTRUMENT;
-        };
-    }
-
-    private static String decisionScopeId(OrderRequest order, Scope scope) {
-        return switch (scope) {
-            case GLOBAL -> "";
-            case STRATEGY -> order.strategyId();
-            case VENUE -> Integer.toString(order.venueId());
-            case INSTRUMENT -> Long.toString(order.instrumentId());
-        };
-    }
-
-    private static RiskDecision reject(String ruleId, Severity severity,
-            String reason) {
-        return new RiskDecision(Decision.REJECT, ruleId, severity, reason);
-    }
-
-    /** Pre-trade conversion rate (fresh) or the FX_RATE_MISSING reason. */
-    private Object pretradeRate(String ccy, long ts) {
-        double[] rate = fxRate(ccy);
-        if (rate == null) {
-            return "no conversion rate for " + ccy + " -> " + limits.reportingCcy();
-        }
-        if (hasMarkTs(rate) && limits.staleBookReject()) {
-            long age = ts - fxMarkTs(ccy);
-            if (age > limits.staleFeedTimeoutNs()) {
-                return "conversion rate " + ccy + " -> " + limits.reportingCcy()
-                        + " age " + age + "ns exceeds "
-                        + limits.staleFeedTimeoutNs() + "ns";
-            }
-        }
-        return rate[0];
-    }
-
-    private RiskDecision evaluate(OrderRequest order) {
-        // 0. fail-closed configuration / bootstrap
-        if (limits == null) {
-            return reject(Rules.CONFIG_MISSING, Severity.BREACH,
-                    "fail-closed: " + configError);
-        }
-        if (!bootstrapped) {
-            return reject(Rules.NOT_BOOTSTRAPPED, Severity.BREACH,
-                    "positions not bootstrapped (fail-closed)");
-        }
-        // 1-4. kill switches, global > strategy > instrument > venue
-        if (killGlobal) {
-            return reject(Rules.KILL_GLOBAL, Severity.BREACH,
-                    "global kill switch engaged");
-        }
-        if (strategyKilled(order.strategyId())) {
-            return reject(Rules.KILL_STRATEGY, Severity.BREACH,
-                    "strategy " + order.strategyId() + " kill switch engaged");
-        }
-        if (killInstruments.getOrDefault(order.instrumentId(), false)) {
-            return reject(Rules.KILL_INSTRUMENT, Severity.BREACH,
-                    "instrument " + order.instrumentId() + " kill switch engaged");
-        }
-        if (order.venueId() != 0
-                && killVenues.getOrDefault(order.venueId(), false)) {
-            return reject(Rules.KILL_VENUE, Severity.BREACH,
-                    "venue " + order.venueId() + " kill switch engaged");
-        }
-        // 5. schema-level validation
-        String invalid = order.validationError();
-        if (invalid != null) {
-            return reject(Rules.MALFORMED_ORDER, Severity.WARN, invalid);
-        }
-        // 6. reference data
-        InstrumentRef ins = instruments.get(order.instrumentId());
-        if (ins == null) {
-            return reject(Rules.UNKNOWN_INSTRUMENT, Severity.WARN,
-                    "no reference data for instrument " + order.instrumentId());
-        }
-        double tick = ins.tickSize();
-        // 7. duplicate order id
-        Long prevTs = seenOrders.get(order.orderId());
-        if (prevTs != null) {
-            long window = limits.duplicateOrderWindowNs();
-            if (window == 0 || order.timestamp() - prevTs <= window) {
-                return reject(Rules.DUPLICATE_ORDER_ID, Severity.WARN,
-                        "order_id " + Long.toUnsignedString(order.orderId())
-                                + " already used at ts " + prevTs);
-            }
-        }
-        if (limits.duplicateOrderWindowNs() > 0) {
-            long cutoff = order.timestamp() - limits.duplicateOrderWindowNs();
-            seenOrders.values().removeIf(ts -> ts < cutoff);
-        }
-        seenOrders.put(order.orderId(), order.timestamp());
-        // 8. venue connectivity
-        if (order.venueId() != 0
-                && venuesDown.getOrDefault(order.venueId(), false)) {
-            return reject(Rules.VENUE_DISCONNECTED, Severity.WARN,
-                    "venue " + order.venueId() + " is disconnected");
-        }
-        // 9-10. market-data gate
-        MarketState md = market.get(order.instrumentId());
-        if (md != null && md.gated) {
-            return reject(Rules.SEQUENCE_GAP, Severity.WARN,
-                    "instrument " + order.instrumentId()
-                            + " feed has an unrecovered gap");
-        }
-        double mid;
-        if (md != null && md.bidTicks > 0 && md.askTicks > 0) {
-            long age = order.timestamp() - md.ts;
-            if (limits.staleBookReject() && age > limits.staleFeedTimeoutNs()) {
-                return reject(Rules.STALE_PRICE, Severity.WARN,
-                        "reference price age " + age + "ns exceeds "
-                                + limits.staleFeedTimeoutNs() + "ns");
-            }
-            mid = (double) (md.bidTicks + md.askTicks) * tick / 2.0;
-        } else {
-            return reject(Rules.STALE_PRICE, Severity.WARN,
-                    "no reference price for instrument " + order.instrumentId());
-        }
-        // 11. fat-finger quantity
-        if (order.qty() > limits.maxOrderQty()) {
-            return reject(Rules.FAT_FINGER_QTY, Severity.WARN,
-                    "qty " + order.qty() + " exceeds max_order_qty "
-                            + limits.maxOrderQty());
-        }
-        // 12. conversion rate to the reporting currency
-        Object rateOrReason = pretradeRate(ins.quoteCcy(), order.timestamp());
-        if (rateOrReason instanceof String why) {
-            return reject(Rules.FX_RATE_MISSING, Severity.WARN, why);
-        }
-        double fx = (Double) rateOrReason;
-        // 13. fat-finger notional (priced orders use the limit price,
-        // unpriced the mid); notional in the reporting currency
-        double refPrice = order.priceTicks() > 0
-                ? (double) order.priceTicks() * tick : mid;
-        double orderNotional = (double) order.qty() * ins.qtyUnit() * refPrice * fx;
-        if (orderNotional > limits.maxOrderNotional()) {
-            return reject(Rules.FAT_FINGER_NOTIONAL, Severity.WARN,
-                    "notional " + fmtFixed(orderNotional, 2) + " "
-                            + limits.reportingCcy() + " exceeds max_order_notional "
-                            + fmtFixed(limits.maxOrderNotional(), 2));
-        }
-        // 14. price band (priced orders only)
-        if (order.priceTicks() > 0) {
-            double devBps = Math.abs((double) order.priceTicks() * tick - mid)
-                    / mid * 1e4;
-            if (devBps > limits.priceBandBps()) {
-                return reject(Rules.PRICE_BAND, Severity.WARN,
-                        "price deviates " + fmtFixed(devBps, 1)
-                                + "bps from mid, band "
-                                + fmtFixed(limits.priceBandBps(), 1) + "bps");
-            }
-        }
-        // 15. order-rate throttle (event-time token bucket per strategy)
-        {
-            Bucket bucket = buckets.computeIfAbsent(order.strategyId(), k -> {
-                Bucket b = new Bucket();
-                b.tokens = limits.orderRateBurst();
-                b.lastTs = order.timestamp();
-                b.primed = true;
-                return b;
-            });
-            if (!bucket.primed) {
-                bucket.tokens = limits.orderRateBurst();
-                bucket.primed = true;
-                bucket.lastTs = order.timestamp();
-            }
-            long elapsed = Math.max(order.timestamp() - bucket.lastTs, 0);
-            bucket.tokens = Math.min(bucket.tokens
-                    + (double) elapsed * limits.maxOrderRatePerSec() / NS_PER_SEC,
-                    limits.orderRateBurst());
-            bucket.lastTs = Math.max(bucket.lastTs, order.timestamp());
-            if (bucket.tokens < 1.0) {
-                return reject(Rules.RATE_THROTTLE, Severity.WARN,
-                        "strategy " + order.strategyId() + " exceeded "
-                                + fmtFixed(limits.maxOrderRatePerSec(), 2)
-                                + " orders/s (burst "
-                                + fmtFixed(limits.orderRateBurst(), 2) + ")");
-            }
-            bucket.tokens -= 1.0;
-        }
-        // 16. self-match prevention (any venue; PEG at its pegged touch)
-        long myPrice = trackedPrice(order);
-        for (Map.Entry<Long, OpenOrder> e : open.entrySet()) {
-            OpenOrder r = e.getValue();
-            if (r.instrumentId != order.instrumentId() || r.side == order.side()) {
-                continue;
-            }
-            boolean crosses;
-            if (myPrice > 0 && r.priceTicks > 0) {
-                crosses = order.side() == 0
-                        ? myPrice >= r.priceTicks : myPrice <= r.priceTicks;
-            } else {
-                crosses = true; // unpriced on either side: conservative
-            }
-            if (crosses) {
-                return reject(Rules.SELF_MATCH, Severity.WARN,
-                        "would cross own open order "
-                                + Long.toUnsignedString(e.getKey())
-                                + " at " + r.priceTicks);
-            }
-        }
-        // 17. position limit (worst-case projection incl. open orders)
-        long pos = position(order.instrumentId());
-        long openSame = 0;
-        for (OpenOrder r : open.values()) {
-            if (r.instrumentId == order.instrumentId() && r.side == order.side()) {
-                openSame += r.qty;
-            }
-        }
-        long projected = order.side() == 0
-                ? pos + openSame + order.qty()
-                : pos - openSame - order.qty();
-        if (Math.abs(projected) > limits.maxPositionQty()) {
-            return reject(Rules.POSITION_LIMIT, Severity.WARN,
-                    "projected position " + projected
-                            + " exceeds max_position_qty "
-                            + limits.maxPositionQty());
-        }
-        // 18. per-instrument notional (projection marked at the mid)
-        double projectedNotional = (double) Math.abs(projected) * ins.qtyUnit()
-                * mid * fx;
-        if (projectedNotional > limits.maxInstrumentNotional()) {
-            return reject(Rules.INSTRUMENT_NOTIONAL, Severity.WARN,
-                    "projected notional " + fmtFixed(projectedNotional, 2)
-                            + " exceeds max_instrument_notional "
-                            + fmtFixed(limits.maxInstrumentNotional(), 2));
-        }
-        // 19-20. gross / net notional (filled positions + every open order
-        // + this order; fail-closed on unmarked or unconvertible positions)
-        double gross = 0.0;
-        double net = 0.0;
-        for (Map.Entry<Long, Long> e : positions.entrySet()) {
-            long p = e.getValue();
-            if (p == 0) {
-                continue;
-            }
-            Double mark = markPrice(e.getKey());
-            if (mark == null) {
-                return reject(Rules.GROSS_NOTIONAL, Severity.WARN,
-                        "position in instrument " + e.getKey()
-                                + " has no mark price (fail-closed)");
-            }
-            InstrumentRef pins = instruments.get(e.getKey());
-            double[] rate = fxRate(pins.quoteCcy());
-            if (rate == null) {
-                return reject(Rules.GROSS_NOTIONAL, Severity.WARN,
-                        "position in instrument " + e.getKey() + " has no "
-                                + pins.quoteCcy()
-                                + " conversion rate (fail-closed)");
-            }
-            double v = (double) p * pins.qtyUnit() * mark * rate[0];
-            gross += Math.abs(v);
-            net += v;
-        }
-        for (Map.Entry<Long, OpenOrder> oe : open.entrySet()) {
-            OpenOrder r = oe.getValue();
-            InstrumentRef oins = instruments.get(r.instrumentId);
-            if (oins == null) {
-                continue;
-            }
-            double price;
-            if (r.priceTicks > 0) {
-                price = (double) r.priceTicks * oins.tickSize();
-            } else {
-                Double m = markPrice(r.instrumentId);
-                if (m == null) {
-                    // FAIL-OPEN defect: skipping an unvaluable OPEN ORDER
-                    // (MARKET / MID / unpriced IOC-FOK on an instrument whose
-                    // book went one-sided) dropped its whole notional from
-                    // gross AND net, so live working exposure vanished from
-                    // the aggregate and a correct GROSS_NOTIONAL reject became
-                    // an ALLOW. An unvaluable open order is exactly as
-                    // undeterminable as an unvaluable position: reject.
-                    return reject(Rules.GROSS_NOTIONAL, Severity.WARN,
-                            "open order " + Long.toUnsignedString(oe.getKey())
-                                    + " in instrument " + r.instrumentId
-                                    + " has no mark price (fail-closed)");
-                }
-                price = m;
-            }
-            double[] rate = fxRate(oins.quoteCcy());
-            if (rate == null) {
-                return reject(Rules.GROSS_NOTIONAL, Severity.WARN,
-                        "open order in instrument " + r.instrumentId + " has no "
-                                + oins.quoteCcy()
-                                + " conversion rate (fail-closed)");
-            }
-            double v = (double) r.qty * oins.qtyUnit() * price * rate[0];
-            gross += v;
-            net += r.side == 0 ? v : -v;
-        }
-        gross += orderNotional;
-        if (gross > limits.maxGrossNotional()) {
-            return reject(Rules.GROSS_NOTIONAL, Severity.WARN,
-                    "projected gross notional " + fmtFixed(gross, 2)
-                            + " exceeds max_gross_notional "
-                            + fmtFixed(limits.maxGrossNotional(), 2));
-        }
-        net += order.side() == 0 ? orderNotional : -orderNotional;
-        if (Math.abs(net) > limits.maxNetNotional()) {
-            return reject(Rules.NET_NOTIONAL, Severity.WARN,
-                    "projected net notional " + fmtFixed(net, 2)
-                            + " exceeds max_net_notional "
-                            + fmtFixed(limits.maxNetNotional(), 2));
-        }
-        // 21-22. loss limits on daily P&L (belt-and-braces after a cleared
-        // latch; undeterminable P&L rejects fail-closed)
-        Double globalPnl = globalDailyPnl();
-        if (globalPnl == null) {
-            return reject(Rules.FX_RATE_MISSING, Severity.WARN,
-                    "global daily pnl undeterminable: conversion rate missing");
-        }
-        double globalLimit = effectiveGlobalLoss();
-        if (globalPnl <= -globalLimit) {
-            return reject(Rules.DAILY_LOSS, Severity.BREACH,
-                    "global daily pnl " + fmtFixed(globalPnl, 2)
-                            + " at daily loss limit " + fmtFixed(globalLimit, 2));
-        }
-        Double stratPnl = strategyDailyPnl(order.strategyId());
-        if (stratPnl == null) {
-            return reject(Rules.FX_RATE_MISSING, Severity.WARN,
-                    "strategy daily pnl undeterminable: conversion rate missing");
-        }
-        double stratLimit = effectiveStrategyLoss(order.strategyId());
-        if (stratPnl <= -stratLimit) {
-            return reject(Rules.STRATEGY_LOSS, Severity.BREACH,
-                    "strategy daily pnl " + fmtFixed(stratPnl, 2)
-                            + " at loss limit " + fmtFixed(stratLimit, 2));
-        }
-        return new RiskDecision(Decision.ALLOW, Rules.ALLOW, Severity.INFO, "");
-    }
+    // `decisionScope`, `decisionScopeId`, `reject`, `pretradeRate` and the
+    // pinned check-order sequence `evaluate` (rules 0-22) live in
+    // LimitsEvaluator.java.
 
     // ---------------------------------------------------- snapshot/restore
-
-    private static void jsonStr(StringBuilder sb, String s) {
-        sb.append('"').append(RiskEvent.esc(s)).append('"');
-    }
-
-    private static void jsonDouble(StringBuilder sb, double v) {
-        if (!Double.isFinite(v)) {
-            throw new IllegalStateException("non-finite value in snapshot");
-        }
-        sb.append(Double.toString(v));
-    }
+    // JSON serialization helpers, `snapshot()` and `restore(...)` live in
+    // RiskAudit.java.
 
     /**
      * Serialize the full mutable state as a schema-versioned JSON document
@@ -1215,186 +768,7 @@ public final class RiskEngine {
      * The audit log and metrics are not part of the snapshot.
      */
     public String snapshot() {
-        StringBuilder sb = new StringBuilder(1024);
-        sb.append("{\"bootstrapped\":").append(bootstrapped);
-        sb.append(",\"buckets\":{");
-        boolean first = true;
-        for (Map.Entry<String, Bucket> e : buckets.entrySet()) {
-            sb.append(first ? "" : ",");
-            first = false;
-            jsonStr(sb, e.getKey());
-            sb.append(":{\"last_ts\":").append(e.getValue().lastTs)
-                    .append(",\"primed\":").append(e.getValue().primed)
-                    .append(",\"tokens\":");
-            jsonDouble(sb, e.getValue().tokens);
-            sb.append('}');
-        }
-        sb.append("},\"kill_global\":").append(killGlobal);
-        sb.append(",\"kill_instruments\":{");
-        first = true;
-        for (Map.Entry<Long, Boolean> e : killInstruments.entrySet()) {
-            sb.append(first ? "" : ",").append('"').append(e.getKey())
-                    .append("\":").append(e.getValue());
-            first = false;
-        }
-        sb.append("},\"kill_strategies\":{");
-        first = true;
-        for (Map.Entry<String, Boolean> e : killStrategies.entrySet()) {
-            sb.append(first ? "" : ",");
-            first = false;
-            jsonStr(sb, e.getKey());
-            sb.append(':').append(e.getValue());
-        }
-        sb.append("},\"kill_venues\":{");
-        first = true;
-        for (Map.Entry<Integer, Boolean> e : killVenues.entrySet()) {
-            sb.append(first ? "" : ",").append('"').append(e.getKey())
-                    .append("\":").append(e.getValue());
-            first = false;
-        }
-        sb.append("},\"loss_override_global\":");
-        if (lossOverrideGlobal == null) {
-            sb.append("null");
-        } else {
-            jsonDouble(sb, lossOverrideGlobal);
-        }
-        sb.append(",\"loss_override_strategy\":{");
-        first = true;
-        for (Map.Entry<String, Double> e : lossOverrideStrategy.entrySet()) {
-            sb.append(first ? "" : ",");
-            first = false;
-            jsonStr(sb, e.getKey());
-            sb.append(':');
-            jsonDouble(sb, e.getValue());
-        }
-        sb.append("},\"lots\":[");
-        first = true;
-        for (Map.Entry<String, TreeMap<Long, Lot>> s : lots.entrySet()) {
-            for (Map.Entry<Long, Lot> l : s.getValue().entrySet()) {
-                sb.append(first ? "" : ",");
-                first = false;
-                sb.append("{\"avg_price\":");
-                jsonDouble(sb, l.getValue().avgPrice);
-                sb.append(",\"instrument_id\":").append(l.getKey())
-                        .append(",\"pos\":").append(l.getValue().pos)
-                        .append(",\"strategy_id\":");
-                jsonStr(sb, s.getKey());
-                sb.append('}');
-            }
-        }
-        sb.append("],\"market\":{");
-        first = true;
-        for (Map.Entry<Long, MarketState> e : market.entrySet()) {
-            MarketState m = e.getValue();
-            sb.append(first ? "" : ",").append('"').append(e.getKey())
-                    .append("\":{\"ask_ticks\":").append(m.askTicks)
-                    .append(",\"bid_ticks\":").append(m.bidTicks)
-                    .append(",\"gaps\":").append(m.gaps)
-                    .append(",\"gated\":").append(m.gated)
-                    .append(",\"ts\":").append(m.ts).append('}');
-            first = false;
-        }
-        sb.append("},\"open\":{");
-        first = true;
-        for (Map.Entry<Long, OpenOrder> e : open.entrySet()) {
-            OpenOrder o = e.getValue();
-            sb.append(first ? "" : ",").append('"')
-                    .append(Long.toUnsignedString(e.getKey()))
-                    .append("\":{\"instrument_id\":").append(o.instrumentId)
-                    .append(",\"price_ticks\":").append(o.priceTicks)
-                    .append(",\"qty\":").append(o.qty)
-                    .append(",\"side\":").append(o.side).append('}');
-            first = false;
-        }
-        sb.append("},\"positions\":{");
-        first = true;
-        for (Map.Entry<Long, Long> e : positions.entrySet()) {
-            sb.append(first ? "" : ",").append('"').append(e.getKey())
-                    .append("\":").append(e.getValue());
-            first = false;
-        }
-        sb.append("},\"realized\":[");
-        first = true;
-        for (Map.Entry<String, TreeMap<String, Double>> s : realized.entrySet()) {
-            for (Map.Entry<String, Double> c : s.getValue().entrySet()) {
-                sb.append(first ? "" : ",");
-                first = false;
-                sb.append("{\"ccy\":");
-                jsonStr(sb, c.getKey());
-                sb.append(",\"pnl\":");
-                jsonDouble(sb, c.getValue());
-                sb.append(",\"strategy_id\":");
-                jsonStr(sb, s.getKey());
-                sb.append('}');
-            }
-        }
-        sb.append("],\"seen_orders\":[");
-        first = true;
-        for (Map.Entry<Long, Long> e : seenOrders.entrySet()) {
-            sb.append(first ? "" : ",").append('[')
-                    .append(Long.toUnsignedString(e.getKey())).append(',')
-                    .append(e.getValue()).append(']');
-            first = false;
-        }
-        sb.append("],\"venues_down\":{");
-        first = true;
-        for (Map.Entry<Integer, Boolean> e : venuesDown.entrySet()) {
-            sb.append(first ? "" : ",").append('"').append(e.getKey())
-                    .append("\":").append(e.getValue());
-            first = false;
-        }
-        sb.append("},\"x-version\":").append(SNAPSHOT_VERSION).append('}');
-        return sb.toString();
-    }
-
-    private static IllegalArgumentException bad(String what) {
-        return new IllegalArgumentException("risk snapshot: bad " + what);
-    }
-
-    private static long snapLong(Object v, String what) {
-        if (!(v instanceof Long)) {
-            throw bad(what);
-        }
-        return (Long) v;
-    }
-
-    private static boolean snapBool(Object v, String what) {
-        if (!(v instanceof Boolean)) {
-            throw bad(what);
-        }
-        return (Boolean) v;
-    }
-
-    private static double snapDouble(Object v, String what) {
-        if (!(v instanceof Long) && !(v instanceof Double)) {
-            throw bad(what);
-        }
-        double d = Json.asDouble(v);
-        if (!Double.isFinite(d)) {
-            throw bad(what);
-        }
-        return d;
-    }
-
-    private static String snapStr(Object v, String what) {
-        if (!(v instanceof String)) {
-            throw bad(what);
-        }
-        return (String) v;
-    }
-
-    private static Map<String, Object> snapObj(Object v, String what) {
-        if (!(v instanceof Map)) {
-            throw bad(what);
-        }
-        return Json.object(v);
-    }
-
-    private static List<Object> snapArr(Object v, String what) {
-        if (!(v instanceof List)) {
-            throw bad(what);
-        }
-        return Json.array(v);
+        return RiskAudit.snapshot(this);
     }
 
     /**
@@ -1405,152 +779,12 @@ public final class RiskEngine {
     public static RiskEngine restore(RiskLimits limits,
             Map<Long, InstrumentRef> instruments, Map<String, Object> snap,
             long ts, MetricsRegistry metrics) {
-        if (snapLong(snap.get("x-version"), "x-version") != SNAPSHOT_VERSION) {
-            throw bad("x-version");
-        }
-        RiskEngine eng = new RiskEngine(limits, instruments, metrics);
-        eng.bootstrapped = snapBool(snap.get("bootstrapped"), "bootstrapped");
-        eng.setKillGlobal(snapBool(snap.get("kill_global"), "kill_global"));
-        for (Map.Entry<String, Object> e
-                : snapObj(snap.get("kill_strategies"), "kill_strategies").entrySet()) {
-            eng.killStrategies.put(e.getKey(), snapBool(e.getValue(), "kill_strategies"));
-        }
-        for (Map.Entry<String, Object> e
-                : snapObj(snap.get("kill_instruments"), "kill_instruments").entrySet()) {
-            eng.killInstruments.put(parseU32(e.getKey(), "kill_instruments"),
-                    snapBool(e.getValue(), "kill_instruments"));
-        }
-        for (Map.Entry<String, Object> e
-                : snapObj(snap.get("kill_venues"), "kill_venues").entrySet()) {
-            eng.killVenues.put(parseU16(e.getKey(), "kill_venues"),
-                    snapBool(e.getValue(), "kill_venues"));
-        }
-        for (Map.Entry<String, Object> e
-                : snapObj(snap.get("venues_down"), "venues_down").entrySet()) {
-            eng.venuesDown.put(parseU16(e.getKey(), "venues_down"),
-                    snapBool(e.getValue(), "venues_down"));
-        }
-        for (Map.Entry<String, Object> e
-                : snapObj(snap.get("market"), "market").entrySet()) {
-            Map<String, Object> m = snapObj(e.getValue(), "market");
-            MarketState st = new MarketState();
-            st.bidTicks = snapLong(m.get("bid_ticks"), "market.bid_ticks");
-            st.askTicks = snapLong(m.get("ask_ticks"), "market.ask_ticks");
-            st.ts = snapLong(m.get("ts"), "market.ts");
-            st.gaps = snapLong(m.get("gaps"), "market.gaps");
-            st.gated = snapBool(m.get("gated"), "market.gated");
-            eng.market.put(parseU32(e.getKey(), "market"), st);
-        }
-        for (Object pair : snapArr(snap.get("seen_orders"), "seen_orders")) {
-            List<Object> p = snapArr(pair, "seen_orders");
-            if (p.size() != 2) {
-                throw bad("seen_orders");
-            }
-            eng.seenOrders.put(snapLong(p.get(0), "seen_orders"),
-                    snapLong(p.get(1), "seen_orders"));
-        }
-        for (Map.Entry<String, Object> e
-                : snapObj(snap.get("buckets"), "buckets").entrySet()) {
-            Map<String, Object> b = snapObj(e.getValue(), "buckets");
-            Bucket bk = new Bucket();
-            bk.tokens = snapDouble(b.get("tokens"), "buckets.tokens");
-            bk.lastTs = snapLong(b.get("last_ts"), "buckets.last_ts");
-            bk.primed = snapBool(b.get("primed"), "buckets.primed");
-            eng.buckets.put(e.getKey(), bk);
-        }
-        for (Map.Entry<String, Object> e : snapObj(snap.get("open"), "open").entrySet()) {
-            Map<String, Object> o = snapObj(e.getValue(), "open");
-            OpenOrder r = new OpenOrder();
-            r.instrumentId = parseU32Value(o.get("instrument_id"), "open.instrument_id");
-            long side = snapLong(o.get("side"), "open.side");
-            if (side < 0 || side > 1) {
-                throw bad("open.side");
-            }
-            r.side = (int) side;
-            r.priceTicks = snapLong(o.get("price_ticks"), "open.price_ticks");
-            r.qty = snapLong(o.get("qty"), "open.qty");
-            long id;
-            try {
-                id = Long.parseUnsignedLong(e.getKey());
-            } catch (NumberFormatException ex) {
-                throw bad("open");
-            }
-            eng.open.put(id, r);
-        }
-        for (Map.Entry<String, Object> e
-                : snapObj(snap.get("positions"), "positions").entrySet()) {
-            eng.positions.put(parseU32(e.getKey(), "positions"),
-                    snapLong(e.getValue(), "positions"));
-        }
-        for (Object lv : snapArr(snap.get("lots"), "lots")) {
-            Map<String, Object> l = snapObj(lv, "lots");
-            Lot lot = new Lot();
-            lot.pos = snapLong(l.get("pos"), "lots.pos");
-            lot.avgPrice = snapDouble(l.get("avg_price"), "lots.avg_price");
-            eng.lots.computeIfAbsent(snapStr(l.get("strategy_id"), "lots.strategy_id"),
-                    k -> new TreeMap<>())
-                    .put(parseU32Value(l.get("instrument_id"), "lots.instrument_id"), lot);
-        }
-        for (Object rv : snapArr(snap.get("realized"), "realized")) {
-            Map<String, Object> r = snapObj(rv, "realized");
-            eng.realized.computeIfAbsent(snapStr(r.get("strategy_id"),
-                    "realized.strategy_id"), k -> new TreeMap<>())
-                    .put(snapStr(r.get("ccy"), "realized.ccy"),
-                            snapDouble(r.get("pnl"), "realized.pnl"));
-        }
-        Object og = snap.get("loss_override_global");
-        eng.lossOverrideGlobal = og == null ? null
-                : snapDouble(og, "loss_override_global");
-        for (Map.Entry<String, Object> e : snapObj(snap.get("loss_override_strategy"),
-                "loss_override_strategy").entrySet()) {
-            eng.lossOverrideStrategy.put(e.getKey(),
-                    snapDouble(e.getValue(), "loss_override_strategy"));
-        }
-        eng.refreshPnlGauges();
-        int nPos = 0;
-        for (long p : eng.positions.values()) {
-            if (p != 0) {
-                nPos++;
-            }
-        }
-        eng.emit(new RiskEvent(ts, Scope.GLOBAL, "", Rules.STATE_RESTORED,
-                Severity.INFO.code(), Decision.ALLOW.code(),
-                "restored snapshot v" + SNAPSHOT_VERSION + ": " + nPos
-                        + " positions, " + eng.open.size() + " open orders"));
-        return eng;
+        return RiskAudit.restore(limits, instruments, snap, ts, metrics);
     }
 
     /** {@link #restore(RiskLimits, Map, Map, long, MetricsRegistry)} with a fresh registry. */
     public static RiskEngine restore(RiskLimits limits,
             Map<Long, InstrumentRef> instruments, Map<String, Object> snap, long ts) {
         return restore(limits, instruments, snap, ts, new MetricsRegistry());
-    }
-
-    private static long parseU32(String s, String what) {
-        try {
-            return Integer.toUnsignedLong(Integer.parseUnsignedInt(s));
-        } catch (NumberFormatException e) {
-            throw bad(what);
-        }
-    }
-
-    private static long parseU32Value(Object v, String what) {
-        long x = snapLong(v, what);
-        if (x < 0 || x > 0xFFFFFFFFL) {
-            throw bad(what);
-        }
-        return x;
-    }
-
-    private static int parseU16(String s, String what) {
-        try {
-            int v = Integer.parseInt(s);
-            if (v < 0 || v > 0xFFFF) {
-                throw bad(what);
-            }
-            return v;
-        } catch (NumberFormatException e) {
-            throw bad(what);
-        }
     }
 }
