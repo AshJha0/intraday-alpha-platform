@@ -50,15 +50,25 @@ pub fn exposure_row(pair_id: u32) -> Result<[f64; 8], IapError> {
             IapError::InvalidArgument(format!("unknown FX pair instrument_id {pair_id}"))
         })?;
     let mut row = [0.0f64; 8];
-    row[currency_index(base).expect("pinned currency")] += 1.0;
-    row[currency_index(quote).expect("pinned currency")] -= 1.0;
+    let base_idx = currency_index(base).ok_or_else(|| {
+        IapError::InvalidArgument(format!("pair {pair_id} base currency {base} not in CURRENCIES"))
+    })?;
+    let quote_idx = currency_index(quote).ok_or_else(|| {
+        IapError::InvalidArgument(format!(
+            "pair {pair_id} quote currency {quote} not in CURRENCIES"
+        ))
+    })?;
+    row[base_idx] += 1.0;
+    row[quote_idx] -= 1.0;
     Ok(row)
 }
 
 /// Exposure matrix restricted to the non-numeraire currencies
 /// (pairs x 7, pair order = input order).
 pub fn free_exposure_matrix(pair_ids: &[u32]) -> Result<Vec<[f64; N_FREE]>, IapError> {
-    let usd = currency_index(NUMERAIRE).expect("pinned");
+    let usd = currency_index(NUMERAIRE).ok_or_else(|| {
+        IapError::InvalidArgument(format!("numeraire currency {NUMERAIRE} not in CURRENCIES"))
+    })?;
     pair_ids
         .iter()
         .map(|&pid| {
