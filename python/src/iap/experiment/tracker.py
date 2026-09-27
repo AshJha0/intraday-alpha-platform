@@ -42,11 +42,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import pickle
 import platform
 import subprocess
 from pathlib import Path
 from typing import Any, Dict, Optional
+
+logger = logging.getLogger(__name__)
 
 _REPO = Path(__file__).resolve().parents[4]
 
@@ -66,8 +69,8 @@ def _git(root: Path, *args: str) -> Optional[str]:
         )
         if out.returncode == 0:
             return out.stdout
-    except (OSError, subprocess.SubprocessError):
-        pass
+    except (OSError, subprocess.SubprocessError) as exc:
+        logger.debug("git %s failed in %s: %s", " ".join(args), root, exc)
     return None
 
 
@@ -279,12 +282,31 @@ class ExperimentTracker:
             f.write("\n")
 
     def save_model(self, run_id: str, model: Any) -> Path:
+        """Persist the fitted estimator as ``model.pkl``.
+
+        TRUST BOUNDARY: ``pickle`` deserialization can execute arbitrary
+        code (it is a well-known RCE vector), so ``model.pkl`` must only
+        ever be *loaded* (see :meth:`load_model`) from an artifact this
+        platform produced itself, locally, under this experiment tracker's
+        own run directory. Never load a model.pkl that was downloaded,
+        received from another party, or copied from a shared/untrusted
+        location — treat it exactly like executable code from that source.
+        """
         path = self.run_dir(run_id) / "model.pkl"
         with open(path, "wb") as f:
             pickle.dump(model, f)
         return path
 
     def load_model(self, run_id: str) -> Any:
+        """Load a model.pkl previously written by :meth:`save_model`.
+
+        TRUST BOUNDARY: this deserializes with ``pickle.load``, which can
+        execute arbitrary code embedded in the file. Only call this on a
+        ``run_id`` whose ``model.pkl`` was produced locally by this same
+        platform (``save_model`` above) — never on a pickle file obtained
+        from an untrusted or shared source (e.g. downloaded, emailed, or
+        copied from another user's machine).
+        """
         path = self.run_dir(run_id) / "model.pkl"
         if not path.is_file():
             raise ValueError(f"no model.pkl for run {run_id}")
