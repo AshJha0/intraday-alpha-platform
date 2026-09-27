@@ -227,7 +227,8 @@ jobs:
       # in a future wave, wire `java -javaagent:jacocoagent.jar=...` into
       # test.sh here and drop this note.
       - name: java coverage (skipped — no JaCoCo vendored)
-        run: echo "::notice::Java coverage skipped: no Maven/Gradle and no JaCoCo jar vendored in java/lib/ (see docs/BUILD_NOTES.md)"
+        run: |
+          echo "::notice::Java coverage skipped: no Maven/Gradle and no JaCoCo jar vendored in java/lib/ (see docs/BUILD_NOTES.md)"
 
   golden:
     runs-on: ubuntu-latest
