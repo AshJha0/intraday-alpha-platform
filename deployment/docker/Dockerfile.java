@@ -37,7 +37,7 @@
 # =============================================================================
 
 # ---------------------------------------------------------------- build stage
-FROM eclipse-temurin:21@sha256:3e3c176ffed168beb42c607be9bc1639b466cf00261a0fb04425562c9d0c5c2b AS build
+FROM eclipse-temurin:24@sha256:7493205ffe6caa8074fa8a06a276bb1c5ac41d3dd0fd43a0db66d7f776e80b3e AS build
 
 WORKDIR /build
 COPY java java
@@ -49,7 +49,7 @@ COPY research/baselines research/baselines
 RUN cd java && bash build.sh
 
 # -------------------------------------------------------------- runtime stage
-FROM eclipse-temurin:21-jre@sha256:cff19e6215689161eb6162c11b86b0c60ddf802164f2eaf48d570f8fb79a36c5
+FROM eclipse-temurin:24-jre@sha256:8cb2387a28af84cf0db0948d9c67d4480192f4e567027a3963f145d218e8b4f2
 
 RUN groupadd --gid 10001 iap && \
     useradd --uid 10001 --gid iap --create-home --shell /usr/sbin/nologin iap
