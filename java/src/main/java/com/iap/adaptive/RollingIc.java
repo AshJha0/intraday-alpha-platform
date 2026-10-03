@@ -12,9 +12,19 @@ import java.util.List;
  * {@code ts} in {@code [T - ic_window_ns, T)}, compute one Pearson IC of
  * signal vs realized forward mid return per fixed event-time bucket
  * ({@code ts / bucket_ns}; a bucket needs {@code >= 8} pairs and
- * nondegenerate variance to count), and report the MEAN of the bucket
- * ICs — or {@code NaN} with fewer than {@code min_ic_buckets} buckets
- * (a monitor with no data must not report health).
+ * nondegenerate variance to count), and report the PAIR-COUNT-WEIGHTED
+ * mean of the bucket ICs — or {@code NaN} with fewer than
+ * {@code min_ic_buckets} buckets (a monitor with no data must not report
+ * health).
+ *
+ * <p><b>Weighting (v1.5.0).</b> Fixed time buckets carry very different
+ * numbers of pairs, and an equal-weighted mean lets a thin bucket move the
+ * reading as much as a thick one. Since v1.5.0 the reading is
+ * {@code sum(n_b * ic_b) / sum(n_b)} over the counted buckets — the rolling
+ * IC of the default drift z of the Python reference
+ * ({@code iap.adaptive.drift.rolling_ic_z_hac}), pinned by the
+ * {@code rolling_ic} vector of {@code tests/golden/expected_adaptive.json}.
+ * The unweighted mean of the legacy z is not computed here.
  *
  * <p>Strictly event-time and lookahead-free: a signal observed at
  * {@code ts} with mid {@code m0} stays pending until the mid series has
@@ -176,15 +186,16 @@ public final class RollingIc {
     }
 
     /**
-     * Rolling realized IC at evaluation time {@code nowTs}: mean Pearson
-     * bucket IC over matured rows with {@code ts} in
-     * {@code [nowTs - windowNs, nowTs)}; {@code NaN} with fewer than
-     * {@code minBuckets} valid buckets.
+     * Rolling realized IC at evaluation time {@code nowTs}: the
+     * pair-count-weighted mean Pearson bucket IC over matured rows with
+     * {@code ts} in {@code [nowTs - windowNs, nowTs)}; {@code NaN} with
+     * fewer than {@code minBuckets} valid buckets.
      */
     public double ic(long nowTs) {
         // group the in-window rows by event-time bucket (rows are in
         // non-decreasing ts order, so buckets are contiguous runs)
-        double icSum = 0.0;
+        double weightedSum = 0.0;
+        double weightSum = 0.0;
         int icCount = 0;
         long bucket = Long.MIN_VALUE;
         List<Row> run = new ArrayList<>();
@@ -196,7 +207,8 @@ public final class RollingIc {
             if (b != bucket && !run.isEmpty()) {
                 double v = bucketIc(run);
                 if (!Double.isNaN(v)) {
-                    icSum += v;
+                    weightedSum += run.size() * v;
+                    weightSum += run.size();
                     icCount++;
                 }
                 run.clear();
@@ -207,14 +219,15 @@ public final class RollingIc {
         if (!run.isEmpty()) {
             double v = bucketIc(run);
             if (!Double.isNaN(v)) {
-                icSum += v;
+                weightedSum += run.size() * v;
+                weightSum += run.size();
                 icCount++;
             }
         }
         if (icCount < minBuckets) {
             return Double.NaN;
         }
-        return icSum / icCount;
+        return weightedSum / weightSum;
     }
 
     /**

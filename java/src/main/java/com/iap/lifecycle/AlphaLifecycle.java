@@ -38,9 +38,13 @@ import com.iap.lifecycle.LifecycleTransition.Actor;
  *       ({@code NO_EVIDENCE}). RESEARCH is the exception by construction:
  *       its {@code ledger_entry_exists} gate IS the presence check;</li>
  *   <li><b>live</b> (ACTIVE / WATCH): delegated unchanged to the pinned
- *       {@link LifecycleGauge} rules (hysteresis, entering breach counts);
- *       its transition is wrapped into a {@link LifecycleTransition} with
- *       {@code gates = {"rolling_ic": ...}} and the policy name;</li>
+ *       {@link LifecycleGauge} rules — hysteresis and the retirement rule the
+ *       config names (the CUSUM rule by default since v1.5.0, each reading
+ *       weighted by {@code live.new_fraction}; the legacy consecutive-breach
+ *       rule when the config says so); its transition is wrapped into a
+ *       {@link LifecycleTransition} with {@code gates = {"rolling_ic": ...}}
+ *       and the policy name. The gauge's counters and its CUSUM statistic are
+ *       mirrored on the record after every live evaluation;</li>
  *   <li><b>RETIRED is terminal for SYSTEM</b>: a SYSTEM {@code advance} on a
  *       RETIRED alpha records {@code TERMINAL} and returns {@code null};
  *       re-entry is the HUMAN {@link #resetToResearch}, which re-runs the
@@ -229,6 +233,7 @@ public final class AlphaLifecycle {
         rec.consecutiveFailures = 0;
         rec.breachCount = 0;
         rec.recoveryCount = 0;
+        rec.cusum = 0.0;
         gauges.remove(rec.alphaId());
         return transition;
     }
@@ -355,9 +360,11 @@ public final class AlphaLifecycle {
         LifecycleGauge g = gauges.get(rec.alphaId());
         if (g == null) {
             PolicyConfig.Live live = config.live();
-            g = LifecycleGauge.restore(live.watchIcGate(), live.reactivateIcGate(),
-                    live.retireBreachEvals(), live.reactivateEvals(),
-                    gaugeState(rec.state()), rec.breachCount, rec.recoveryCount);
+            g = LifecycleGauge.restore(live.breachRule(), live.watchIcGate(),
+                    live.reactivateIcGate(), live.retireBreachEvals(),
+                    live.reactivateEvals(), live.cusumK(), live.cusumH(),
+                    gaugeState(rec.state()), rec.breachCount, rec.recoveryCount,
+                    rec.cusum);
             gauges.put(rec.alphaId(), g);
         }
         return g;
@@ -365,16 +372,24 @@ public final class AlphaLifecycle {
 
     /**
      * The tracker's transition reason, verbatim
-     * ({@code iap.adaptive.lifecycle.LifecycleTracker}).
+     * ({@code iap.adaptive.lifecycle.LifecycleTracker}). {@code cusum} is the
+     * statistic as the deciding reading left it (quoted by a CUSUM
+     * retirement).
      */
-    private String liveReason(LifecycleState to, double rollingIc) {
+    private String liveReason(LifecycleState to, double rollingIc, double cusum) {
         PolicyConfig.Live live = config.live();
         return switch (to) {
             case WATCH -> "rolling_ic " + PyFormat.fixed(rollingIc, 6) + " < watch gate "
                     + CanonicalJson.floatRepr(live.watchIcGate());
-            case RETIRED -> "persistent breach: " + live.retireBreachEvals()
-                    + " consecutive evals below watch gate "
-                    + CanonicalJson.floatRepr(live.watchIcGate());
+            case RETIRED -> live.breachRule() == LifecycleGauge.BreachRule.CUSUM
+                    ? "persistent breach: CUSUM " + PyFormat.fixed(cusum, 6) + " >= "
+                            + CanonicalJson.floatRepr(live.cusumH()) + " (slack "
+                            + CanonicalJson.floatRepr(live.cusumK())
+                            + ") below watch gate "
+                            + CanonicalJson.floatRepr(live.watchIcGate())
+                    : "persistent breach: " + live.retireBreachEvals()
+                            + " consecutive evals below watch gate "
+                            + CanonicalJson.floatRepr(live.watchIcGate());
             case ACTIVE -> "re-activation: " + live.reactivateEvals()
                     + " consecutive evals >= reactivate gate "
                     + CanonicalJson.floatRepr(live.reactivateIcGate());
@@ -406,12 +421,14 @@ public final class AlphaLifecycle {
         LifecycleGauge gauge = gauge(rec);
         double rollingIc = live.rollingIc();
         LifecycleGauge.State before = gauge.state();
-        LifecycleGauge.State after = gauge.update(rollingIc, live.informative());
+        LifecycleGauge.State after = gauge.update(rollingIc, live.informative(),
+                live.newFraction());
         Map<String, GateResult> gate = new LinkedHashMap<>();
         gate.put(Gates.ROLLING_IC.gateName(), Gates.ROLLING_IC.evaluate(evidence, config));
         if (after == before) {
             rec.breachCount = gauge.breachCount();
             rec.recoveryCount = gauge.recoveryCount();
+            rec.cusum = gauge.cusum();
             recordEvaluation(rec, new GateEvaluation(rec.alphaId(), eventTs, state,
                     Outcome.HOLD, gate, rec.consecutiveFailures, null));
             return null;
@@ -420,8 +437,9 @@ public final class AlphaLifecycle {
         Edge edge = edgeFor(state, to, EdgeKind.LIVE);
         Map<String, GateResult> decided = new LinkedHashMap<>();
         decided.put(Gates.ROLLING_IC.gateName(), liveGateResult(to, rollingIc));
-        LifecycleTransition t = transition(rec, edge, eventTs, liveReason(to, rollingIc),
-                decided, Actor.SYSTEM);
+        LifecycleTransition t = transition(rec, edge, eventTs,
+                liveReason(to, rollingIc, gauge.cusumAtLastUpdate()), decided,
+                Actor.SYSTEM);
         apply(rec, t);
         // The gauge keeps counting across its own transition (the breach that
         // enters WATCH counts as breach #1 — pinned): keep it, and mirror its
@@ -429,6 +447,7 @@ public final class AlphaLifecycle {
         gauges.put(rec.alphaId(), gauge);
         rec.breachCount = gauge.breachCount();
         rec.recoveryCount = gauge.recoveryCount();
+        rec.cusum = gauge.cusum();
         recordEvaluation(rec, new GateEvaluation(rec.alphaId(), eventTs, state,
                 Outcome.TRANSITION, gate, 0, t));
         return t;

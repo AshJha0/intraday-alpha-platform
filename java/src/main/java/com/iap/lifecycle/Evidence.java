@@ -14,11 +14,19 @@ import com.iap.contracts.Trees;
  * is rejected on construction: a metric a runner could not compute is
  * absent, never a number). A missing block means "no evidence for that
  * stage" — silence is not evidence.
+ *
+ * <p>{@code significanceThreshold} (v1.5.0) is the PROMOTE t threshold the
+ * research result was judged at — the multiple-testing ledger's threshold
+ * under the default research methods. It sits beside {@code research}
+ * because an experiment result has no field for it, and it is what the
+ * {@code statistical_significance} gate compares {@code research.t_stat}
+ * with under the default policy ({@link Gates}); {@code null} means the
+ * evidence carries none. The key is always present on the wire.
  */
 public record Evidence(ExperimentResultRec research, Double capacityUsd,
-        Validation validation, Paper paper, Live live) {
+        Double significanceThreshold, Validation validation, Paper paper, Live live) {
     private static final String[] KEYS = {"research", "capacity_usd",
-        "validation", "paper", "live"};
+        "significance_threshold", "validation", "paper", "live"};
 
     /** VALIDATING-stage evidence: the held-out replay through the production path. */
     public record Validation(double holdoutIc, double researchIc,
@@ -99,12 +107,15 @@ public record Evidence(ExperimentResultRec research, Double capacityUsd,
      * One live rolling-IC evaluation (API_ADAPTIVE.md §4/§6):
      * {@code rollingIc} null when too few buckets exist; {@code informative}
      * false when the matured set gained no new rows since the last counted
-     * evaluation (a re-read of a frozen window moves nothing).
+     * evaluation (a re-read of a frozen window moves nothing);
+     * {@code newFraction} in (0, 1] the share of the reading's window that is
+     * new since the last counted one (v1.5.0: what the CUSUM retirement rule
+     * weights the reading by; required under either rule).
      */
     public record Live(Double rollingIc, long nBuckets, long evalIndex,
-            boolean informative) {
+            boolean informative, double newFraction) {
         private static final String[] L_KEYS = {"rolling_ic", "n_buckets",
-            "eval_index", "informative"};
+            "eval_index", "informative", "new_fraction"};
 
         public Live {
             if (rollingIc != null) {
@@ -113,6 +124,10 @@ public record Evidence(ExperimentResultRec research, Double capacityUsd,
             if (nBuckets < 0 || evalIndex < 0) {
                 throw new IllegalArgumentException(
                         "live: n_buckets/eval_index must be >= 0");
+            }
+            Trees.finite(newFraction, "live.new_fraction");
+            if (!(newFraction > 0.0 && newFraction <= 1.0)) {
+                throw new IllegalArgumentException("live.new_fraction must be in (0, 1]");
             }
         }
 
@@ -123,6 +138,7 @@ public record Evidence(ExperimentResultRec research, Double capacityUsd,
             t.put("n_buckets", nBuckets);
             t.put("eval_index", evalIndex);
             t.put("informative", informative);
+            t.put("new_fraction", newFraction);
             return t;
         }
 
@@ -133,7 +149,7 @@ public record Evidence(ExperimentResultRec research, Double capacityUsd,
             return new Live(Trees.optNum(t, "rolling_ic", p),
                     Trees.ranged(t, "n_buckets", p, 0, Long.MAX_VALUE),
                     Trees.ranged(t, "eval_index", p, 0, Long.MAX_VALUE),
-                    Trees.bool(t, "informative", p));
+                    Trees.bool(t, "informative", p), Trees.num(t, "new_fraction", p));
         }
     }
 
@@ -144,11 +160,18 @@ public record Evidence(ExperimentResultRec research, Double capacityUsd,
                 throw new IllegalArgumentException("evidence.capacity_usd must be >= 0");
             }
         }
+        if (significanceThreshold != null) {
+            Trees.finite(significanceThreshold, "evidence.significance_threshold");
+            if (significanceThreshold <= 0.0) {
+                throw new IllegalArgumentException(
+                        "evidence.significance_threshold must be > 0");
+            }
+        }
     }
 
     /** No evidence at all (every block absent). */
     public static Evidence empty() {
-        return new Evidence(null, null, null, null, null);
+        return new Evidence(null, null, null, null, null, null);
     }
 
     /** JSON form; absent blocks are {@code null}. */
@@ -156,6 +179,7 @@ public record Evidence(ExperimentResultRec research, Double capacityUsd,
         Map<String, Object> t = Trees.ordered();
         t.put("research", research == null ? null : research.toTree());
         t.put("capacity_usd", capacityUsd);
+        t.put("significance_threshold", significanceThreshold);
         t.put("validation", validation == null ? null : validation.toTree());
         t.put("paper", paper == null ? null : paper.toTree());
         t.put("live", live == null ? null : live.toTree());
@@ -173,6 +197,7 @@ public record Evidence(ExperimentResultRec research, Double capacityUsd,
         return new Evidence(
                 r == null ? null : ExperimentResultRec.fromTree(Trees.obj(r, p + ".research")),
                 Trees.optNum(t, "capacity_usd", p),
+                Trees.optNum(t, "significance_threshold", p),
                 v == null ? null : Validation.fromTree(Trees.obj(v, p + ".validation")),
                 pa == null ? null : Paper.fromTree(Trees.obj(pa, p + ".paper")),
                 l == null ? null : Live.fromTree(Trees.obj(l, p + ".live")));

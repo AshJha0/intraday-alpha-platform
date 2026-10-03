@@ -79,18 +79,38 @@ public class AdaptiveGoldenTest {
 
     @Test
     public void lifecycleStateSequenceMatchesTheGoldenExactly() {
+        // the default retirement rule (CUSUM, v1.5.0) ...
+        assertEquals(LifecycleGauge.BreachRule.CUSUM, replayLifecycle("lifecycle"));
+    }
+
+    @Test
+    public void legacyConsecutiveLifecycleSequenceMatchesTheGoldenExactly() {
+        // ... and the rule up to v1.4.0, on the same rolling-IC path
+        assertEquals(LifecycleGauge.BreachRule.CONSECUTIVE,
+                replayLifecycle("lifecycle_legacy_consecutive"));
+    }
+
+    /** Replay one lifecycle section of the golden; returns the rule it names. */
+    private static LifecycleGauge.BreachRule replayLifecycle(String section) {
         Map<String, Object> golden = Json.object(
-                Golden.json("expected_adaptive.json").get("lifecycle"));
+                Golden.json("expected_adaptive.json").get(section));
         Map<String, Object> cfg = Json.object(golden.get("config"));
-        LifecycleGauge g = new LifecycleGauge(
+        LifecycleGauge.BreachRule rule = LifecycleGauge.BreachRule.parse(
+                (String) cfg.get("breach_rule"), section);
+        LifecycleGauge g = LifecycleGauge.of(rule,
                 Json.asDouble(cfg.get("watch_ic_gate")),
                 Json.asDouble(cfg.get("reactivate_ic_gate")),
                 (int) Json.asLong(cfg.get("retire_breach_evals")),
-                (int) Json.asLong(cfg.get("reactivate_evals")));
+                (int) Json.asLong(cfg.get("reactivate_evals")),
+                Json.asDouble(cfg.get("cusum_k")),
+                Json.asDouble(cfg.get("cusum_h")));
+        double newFraction = Json.asDouble(golden.get("new_fraction"));
         List<Object> icPath = Json.array(golden.get("ic_path"));
         List<Object> wantStates = Json.array(golden.get("expected_states"));
+        List<Object> wantCusum = Json.array(golden.get("expected_cusum"));
         List<Object> informative = Json.array(golden.get("ic_informative"));
         assertEquals(wantStates.size(), icPath.size());
+        assertEquals(wantCusum.size(), icPath.size());
         assertEquals(informative.size(), icPath.size());
         int transitions = 0;
         LifecycleGauge.State prev = g.state();
@@ -100,8 +120,10 @@ public class AdaptiveGoldenTest {
             // uninformative evaluation re-read a frozen IC window
             LifecycleGauge.State got = g.update(
                     ic == null ? Double.NaN : Json.asDouble(ic),
-                    (Boolean) informative.get(i));
-            assertEquals("eval " + (i + 1), wantStates.get(i), got.name());
+                    (Boolean) informative.get(i), newFraction);
+            assertEquals(section + " eval " + (i + 1), wantStates.get(i), got.name());
+            assertEquals(section + " cusum after eval " + (i + 1),
+                    Json.asDouble(wantCusum.get(i)), g.cusum(), 1e-12);
             if (got != prev) {
                 transitions++;
                 prev = got;
@@ -109,6 +131,7 @@ public class AdaptiveGoldenTest {
         }
         assertEquals(Json.asLong(golden.get("expected_transition_count")),
                 transitions);
+        return rule;
     }
 
     @Test

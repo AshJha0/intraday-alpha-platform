@@ -1,9 +1,19 @@
 package com.iap.backtest;
 
 /**
- * Row-driven research backtester (spec section 18, research engine),
- * mirroring {@code iap.backtest.engine.Backtester} exactly — the golden
- * {@code tests/golden/expected_backtest.json} pins its EQ01 run.
+ * Row-driven research backtester (spec section 18, research engine): the
+ * LEGACY rules of {@code iap.backtest.engine.Backtester} — the golden
+ * {@code tests/golden/expected_backtest.json} pins its EQ01 run under them.
+ *
+ * <p><b>Legacy (v1.5.0).</b> Since v1.5.0 the Python research backtester
+ * defaults to the cost-aware position policy, fills capped at the displayed
+ * L1 size and trading only the rows the IC scores. This class implements
+ * none of the three: it is the {@code position_policy = "sign"} rule with
+ * uncapped fills on every row, in rows-mode latency, priced by the linear
+ * {@link CostModel} — exactly what the golden's {@code config} names
+ * ({@link #POSITION_POLICY}, {@link #CAP_FILLS_AT_L1},
+ * {@link #BLOCKS_ROWS}). It is a research-only parity vector; nothing on
+ * the paper path uses it.
  *
  * <p>Pinned semantics:
  * <ul>
@@ -37,6 +47,15 @@ public final class ResearchBacktester {
         public double[] equity;
         public double[] positions;
     }
+
+    /** The one position policy this class implements. */
+    public static final String POSITION_POLICY = "sign";
+
+    /** Fills are not capped at the displayed size. */
+    public static final boolean CAP_FILLS_AT_L1 = false;
+
+    /** No row is blocked: every row may decide. */
+    public static final boolean BLOCKS_ROWS = false;
 
     private final CostModel costModel;
     private final long maxPosQty;
