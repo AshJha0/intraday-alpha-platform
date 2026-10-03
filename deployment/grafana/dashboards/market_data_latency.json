@@ -150,7 +150,7 @@
       "id": 3,
       "type": "stat",
       "title": "Session state",
-      "description": "platform_session_state: 0 STARTING, 1 RUNNING, 2 FINISHED, 3 FAILED (PLATFORM_CONVENTIONS.md §12.6). A paper session is finite: FINISHED is the normal terminal state.",
+      "description": "platform_session_state: 0 STARTING, 1 RUNNING, 2 FINISHED, 3 FAILED, 4 STOPPED (PLATFORM_CONVENTIONS.md §12.6). A paper session is finite: FINISHED is the normal terminal state; STOPPED is an operator or signal stop that checkpointed and can be resumed.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -183,6 +183,10 @@
                 "3": {
                   "text": "FAILED",
                   "index": 3
+                },
+                "4": {
+                  "text": "STOPPED",
+                  "index": 4
                 }
               }
             }
@@ -205,6 +209,10 @@
               {
                 "color": "red",
                 "value": 3
+              },
+              {
+                "color": "orange",
+                "value": 4
               }
             ]
           }

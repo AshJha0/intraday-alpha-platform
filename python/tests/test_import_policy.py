@@ -25,7 +25,7 @@ IAP_DIR = REPO_ROOT / "python" / "src" / "iap"
 #: Packages on the trading / data path (§13.7 plus the MVP and alpha layers).
 GUARDED_PACKAGES = (
     "risk", "execution", "orderbook", "portfolio", "mvp", "core",
-    "marketdata", "features", "alpha",
+    "marketdata", "features", "alpha", "replay", "trace",
 )
 
 #: Top-level module names that are network clients / servers or transports.
