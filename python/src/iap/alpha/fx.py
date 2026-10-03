@@ -231,9 +231,9 @@ class FX11MacroSurpriseResponse(LinearAlpha):
     asset_class = "FX"
     horizon = "5m"
     features = ("vol_ratio_w10s_w1m_v1", "ret_vol_adj_1m_v1")
-    EVENT_THRESHOLD = 2.2    # vol-acceleration ratio marking a proxy event
-    TAU_NS = 300 * NS_S      # decay time constant (5m)
-    EXPIRE_NS = 900 * NS_S   # signal expires 15m after the event
+    EVENT_THRESHOLD = 2.2  # vol-acceleration ratio marking a proxy event
+    TAU_NS = 300 * NS_S  # decay time constant (5m)
+    EXPIRE_NS = 900 * NS_S  # signal expires 15m after the event
 
     def raw_signal(self, df: pd.DataFrame) -> pd.Series:
         ts = df["exchange_ts"].to_numpy()

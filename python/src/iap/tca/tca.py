@@ -52,11 +52,11 @@ the platform's pinned conventions:
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Sequence, Tuple
+from collections.abc import Sequence
 
 from iap.tca.fills import MAKER, MarketTimeline, ParentOrder
 
-ADVERSE_DELTAS_NS: Dict[str, int] = {
+ADVERSE_DELTAS_NS: dict[str, int] = {
     "100ms": 100_000_000,
     "1s": 1_000_000_000,
     "10s": 10_000_000_000,
@@ -66,11 +66,11 @@ ADVERSE_DELTAS_NS: Dict[str, int] = {
 def perold_decomposition(
     side_sign: int,
     qty_target: int,
-    fills: Sequence[Tuple[float, int]],
+    fills: Sequence[tuple[float, int]],
     decision_mid: float,
     arrival_mid: float,
     end_mid: float,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Perold IS decomposition (currency units + bps of Q*decision_mid)."""
     if side_sign not in (1, -1):
         raise ValueError("side_sign must be +1 or -1")
@@ -102,8 +102,7 @@ def perold_decomposition(
     }
 
 
-def arrival_slippage_bps(order: ParentOrder,
-                         arrival_mid: float) -> Optional[float]:
+def arrival_slippage_bps(order: ParentOrder, arrival_mid: float) -> float | None:
     """Signed fill-VWAP slippage vs the arrival mid, in bps (None if unfilled)."""
     if order.qty_filled == 0:
         return None
@@ -112,8 +111,7 @@ def arrival_slippage_bps(order: ParentOrder,
     return 1e4 * order.sign * (order.fill_vwap - arrival_mid) / arrival_mid
 
 
-def interval_vwap(timeline: MarketTimeline, start_ts: int,
-                  end_ts: int) -> Optional[float]:
+def interval_vwap(timeline: MarketTimeline, start_ts: int, end_ts: int) -> float | None:
     """Market VWAP of trades in [start_ts, end_ts] (None if no trades)."""
     num = 0.0
     den = 0
@@ -124,8 +122,7 @@ def interval_vwap(timeline: MarketTimeline, start_ts: int,
     return num / den if den > 0 else None
 
 
-def interval_twap(timeline: MarketTimeline, start_ts: int,
-                  end_ts: int) -> Optional[float]:
+def interval_twap(timeline: MarketTimeline, start_ts: int, end_ts: int) -> float | None:
     """Time-weighted prevailing mid over [start_ts, end_ts]."""
     if end_ts <= start_ts:
         raise ValueError("end_ts must exceed start_ts")
@@ -143,7 +140,7 @@ def interval_twap(timeline: MarketTimeline, start_ts: int,
     return total / (end_ts - start_ts)
 
 
-def spread_and_impact_cost(order: ParentOrder) -> Dict[str, float]:
+def spread_and_impact_cost(order: ParentOrder) -> dict[str, float]:
     """Split executed cost vs fill-time mid into spread + impact (currency)."""
     s = order.sign
     # Sign by liquidity flag (pinned §2.4, stated in the module docstring
@@ -155,10 +152,10 @@ def spread_and_impact_cost(order: ParentOrder) -> Dict[str, float]:
     # was wrong, and wrong in the direction that makes passive execution look
     # more expensive than it was. The bundled research set is TAKER-only, so
     # no committed figure moved; the MVP, which fills passively, did.
-    spread = sum((-1.0 if f.liquidity == MAKER else 1.0)
-                 * f.qty * f.half_spread_at_fill for f in order.fills)
-    exec_vs_mid = sum(s * f.qty * (f.price - f.mid_at_fill)
-                      for f in order.fills)
+    spread = sum(
+        (-1.0 if f.liquidity == MAKER else 1.0) * f.qty * f.half_spread_at_fill for f in order.fills
+    )
+    exec_vs_mid = sum(s * f.qty * (f.price - f.mid_at_fill) for f in order.fills)
     return {
         "spread_cost": spread,
         "impact_cost": exec_vs_mid - spread,
@@ -166,22 +163,22 @@ def spread_and_impact_cost(order: ParentOrder) -> Dict[str, float]:
     }
 
 
-def adverse_selection(order: ParentOrder,
-                      timeline: MarketTimeline) -> Dict[str, Optional[float]]:
+def adverse_selection(order: ParentOrder, timeline: MarketTimeline) -> dict[str, float | None]:
     """Mean post-fill markout s*(mid(t+delta) - p_f)/p_f bps per pinned delta
     over the fills whose markout is DEFINED (see module docstring)."""
     return adverse_selection_with_counts(order, timeline)[0]
 
 
 def adverse_selection_with_counts(
-    order: ParentOrder, timeline: MarketTimeline,
-) -> Tuple[Dict[str, Optional[float]], Dict[str, int]]:
+    order: ParentOrder,
+    timeline: MarketTimeline,
+) -> tuple[dict[str, float | None], dict[str, int]]:
     """(markout bps per delta or None, number of defined fills per delta)."""
-    out: Dict[str, Optional[float]] = {}
-    counts: Dict[str, int] = {}
+    out: dict[str, float | None] = {}
+    counts: dict[str, int] = {}
     s = order.sign
     for name, delta in ADVERSE_DELTAS_NS.items():
-        vals: List[float] = []
+        vals: list[float] = []
         for f in order.fills:
             t = f.ts + delta
             if f.price > 0 and timeline.mid_defined_at(t, after_ts=f.ts):
@@ -194,7 +191,7 @@ def adverse_selection_with_counts(
 def impact_regression(
     participation: Sequence[float],
     signed_cost_bps: Sequence[float],
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """OLS of signed cost bps on participation; slope = impact coefficient."""
     n = len(participation)
     if n != len(signed_cost_bps):
@@ -205,15 +202,17 @@ def impact_regression(
     my = sum(signed_cost_bps) / n
     sxx = sum((x - mx) ** 2 for x in participation)
     if sxx == 0.0:
-        return {"slope_bps_per_participation": 0.0, "intercept_bps": my,
-                "r2": 0.0, "n": float(n)}
-    sxy = sum((x - mx) * (y - my)
-              for x, y in zip(participation, signed_cost_bps))
+        return {"slope_bps_per_participation": 0.0, "intercept_bps": my, "r2": 0.0, "n": float(n)}
+    sxy = sum((x - mx) * (y - my) for x, y in zip(participation, signed_cost_bps, strict=False))
     slope = sxy / sxx
     syy = sum((y - my) ** 2 for y in signed_cost_bps)
     r2 = (sxy * sxy) / (sxx * syy) if syy > 0 else 0.0
-    return {"slope_bps_per_participation": slope,
-            "intercept_bps": my - slope * mx, "r2": r2, "n": float(n)}
+    return {
+        "slope_bps_per_participation": slope,
+        "intercept_bps": my - slope * mx,
+        "r2": r2,
+        "n": float(n),
+    }
 
 
 def validate_order_window(order: ParentOrder, timeline: MarketTimeline) -> None:
@@ -225,15 +224,17 @@ def validate_order_window(order: ParentOrder, timeline: MarketTimeline) -> None:
     if last is None or order.end_ts > last:
         raise ValueError(
             f"order {order.order_id}: end_ts {order.end_ts} is beyond the "
-            f"timeline end {last} (end_mid would be fabricated)")
+            f"timeline end {last} (end_mid would be fabricated)"
+        )
     for f in order.fills:
         if not order.arrival_ts <= f.ts <= order.end_ts:
             raise ValueError(
                 f"order {order.order_id}: fill at {f.ts} outside "
-                f"[{order.arrival_ts}, {order.end_ts}]")
+                f"[{order.arrival_ts}, {order.end_ts}]"
+            )
 
 
-def order_tca(order: ParentOrder, timeline: MarketTimeline) -> Dict[str, object]:
+def order_tca(order: ParentOrder, timeline: MarketTimeline) -> dict[str, object]:
     """Full per-order TCA record (spec §19 metric table)."""
     validate_order_window(order, timeline)
     m_d = timeline.mid_at(order.decision_ts)
@@ -242,15 +243,15 @@ def order_tca(order: ParentOrder, timeline: MarketTimeline) -> Dict[str, object]
     if m_d != m_d or m_a != m_a or m_e != m_e:
         raise ValueError("order references time before the first market state")
     perold = perold_decomposition(
-        order.sign, order.qty_target,
-        [(f.price, f.qty) for f in order.fills], m_d, m_a, m_e)
+        order.sign, order.qty_target, [(f.price, f.qty) for f in order.fills], m_d, m_a, m_e
+    )
     split = spread_and_impact_cost(order)
     vwap_mkt = interval_vwap(timeline, order.arrival_ts, order.end_ts)
     twap_mkt = interval_twap(timeline, order.arrival_ts, order.end_ts)
     fv = order.fill_vwap
     s = order.sign
     markouts, n_defined = adverse_selection_with_counts(order, timeline)
-    rec: Dict[str, object] = {
+    rec: dict[str, object] = {
         "order_id": order.order_id,
         "instrument_id": order.instrument_id,
         "side": "BUY" if order.side == 0 else "SELL",
@@ -260,11 +261,11 @@ def order_tca(order: ParentOrder, timeline: MarketTimeline) -> Dict[str, object]
         "fill_vwap": fv if order.qty_filled else None,
         "arrival_slippage_bps": arrival_slippage_bps(order, m_a),
         "vwap_slippage_bps": (
-            1e4 * s * (fv - vwap_mkt) / vwap_mkt
-            if order.qty_filled and vwap_mkt else None),
+            1e4 * s * (fv - vwap_mkt) / vwap_mkt if order.qty_filled and vwap_mkt else None
+        ),
         "twap_slippage_bps": (
-            1e4 * s * (fv - twap_mkt) / twap_mkt
-            if order.qty_filled and twap_mkt else None),
+            1e4 * s * (fv - twap_mkt) / twap_mkt if order.qty_filled and twap_mkt else None
+        ),
         "perold": perold,
         "spread_cost": split["spread_cost"],
         "impact_cost": split["impact_cost"],
@@ -275,6 +276,6 @@ def order_tca(order: ParentOrder, timeline: MarketTimeline) -> Dict[str, object]
     # execution-alpha attribution: trading cost = spread + impact + timing
     rec["timing_cost"] = perold["trading_cost"] - split["exec_cost_vs_mid"]
     rec["execution_alpha_vs_vwap_bps"] = (
-        -rec["vwap_slippage_bps"] if rec["vwap_slippage_bps"] is not None
-        else None)
+        -rec["vwap_slippage_bps"] if rec["vwap_slippage_bps"] is not None else None
+    )
     return rec

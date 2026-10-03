@@ -28,7 +28,7 @@ sorted key order when serializing. Checkpoint JSON is cross-language
 
 from __future__ import annotations
 
-from typing import Callable, Dict, Iterable, List, Optional, Set
+from collections.abc import Callable, Iterable
 
 from iap.core.events import MarketEvent
 from iap.orderbook.book import ConsolidatedBook
@@ -50,7 +50,7 @@ class ReplayEngine:
         keep_snapshots: int = 4,
         reorder_window: int = 0,
         refdata=None,
-        universe: Optional[Dict[int, Set[int]]] = None,
+        universe: dict[int, set[int]] | None = None,
     ) -> None:
         if checkpoint_every < 0 or snapshot_every < 0:
             raise ValueError("checkpoint_every/snapshot_every must be >= 0")
@@ -58,22 +58,22 @@ class ReplayEngine:
             raise ValueError("keep_checkpoints/keep_snapshots must be >= 0")
         if refdata is not None and universe is not None:
             raise ValueError("pass either refdata or universe, not both")
-        self.books: Dict[int, ConsolidatedBook] = {}
+        self.books: dict[int, ConsolidatedBook] = {}
         self.events_processed = 0
         self.checkpoint_every = checkpoint_every
         self.snapshot_every = snapshot_every
         self.keep_checkpoints = keep_checkpoints
         self.keep_snapshots = keep_snapshots
         self.reorder_window = reorder_window
-        self.checkpoints: List[dict] = []
-        self.snapshots: List[dict] = []
+        self.checkpoints: list[dict] = []
+        self.snapshots: list[dict] = []
         self.snapshots_emitted = 0
         self.time_regressions = 0
         self.unknown_instrument_dropped = 0
         self.unknown_venue_dropped = 0
         self._last_exchange_ts = 0
         # instrument_id -> allowed venue ids (None: accept everything).
-        self.universe: Optional[Dict[int, Set[int]]] = None
+        self.universe: dict[int, set[int]] | None = None
         if refdata is not None:
             self.universe = {
                 inst.instrument_id: {refdata.venue(v).venue_id for v in inst.venues}
@@ -115,15 +115,12 @@ class ReplayEngine:
     def run(
         self,
         events: Iterable[MarketEvent],
-        on_snapshot: Optional[SnapshotCallback] = None,
+        on_snapshot: SnapshotCallback | None = None,
     ) -> dict:
         """Replay an event stream; returns summary stats."""
         for ev in events:
             self.apply(ev)
-            if (
-                self.snapshot_every
-                and self.events_processed % self.snapshot_every == 0
-            ):
+            if self.snapshot_every and self.events_processed % self.snapshot_every == 0:
                 snap = self.book_states()
                 snap["index"] = self.events_processed
                 self.snapshots_emitted += 1
@@ -132,10 +129,7 @@ class ReplayEngine:
                     self.snapshots.pop(0)
                 if on_snapshot is not None:
                     on_snapshot(self.events_processed, snap)
-            if (
-                self.checkpoint_every
-                and self.events_processed % self.checkpoint_every == 0
-            ):
+            if self.checkpoint_every and self.events_processed % self.checkpoint_every == 0:
                 self.checkpoints.append(self.checkpoint())
                 if len(self.checkpoints) > self.keep_checkpoints:
                     self.checkpoints.pop(0)
@@ -156,8 +150,7 @@ class ReplayEngine:
         for iid in sorted(self.books):
             cons = self.books[iid]
             out["instruments"][str(iid)] = {
-                str(vid): cons.books[vid].state_summary()
-                for vid in sorted(cons.books)
+                str(vid): cons.books[vid].state_summary() for vid in sorted(cons.books)
             }
         return out
 
@@ -181,18 +174,14 @@ class ReplayEngine:
                 if self.universe is None
                 else {str(k): sorted(v) for k, v in sorted(self.universe.items())}
             ),
-            "books": {
-                str(iid): self.books[iid].checkpoint() for iid in sorted(self.books)
-            },
+            "books": {str(iid): self.books[iid].checkpoint() for iid in sorted(self.books)},
         }
 
     @classmethod
-    def restore(cls, cp: dict) -> "ReplayEngine":
+    def restore(cls, cp: dict) -> ReplayEngine:
         """Rebuild an engine from ``checkpoint()`` output."""
         if cp.get("x-version") != ENGINE_CHECKPOINT_VERSION:
-            raise ValueError(
-                f"unsupported engine checkpoint x-version: {cp.get('x-version')!r}"
-            )
+            raise ValueError(f"unsupported engine checkpoint x-version: {cp.get('x-version')!r}")
         universe = cp["universe"]
         engine = cls(
             checkpoint_every=cp["checkpoint_every"],

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, fields
 from enum import IntEnum
-from typing import Optional
 
 U64_MAX = (1 << 64) - 1
 U32_MAX = (1 << 32) - 1
@@ -54,9 +53,7 @@ class SessionStatus(IntEnum):
 
 
 #: Event types whose payload carries a live price/qty/order_id.
-_BOOK_TYPES = frozenset(
-    {EventType.ADD, EventType.MODIFY, EventType.CANCEL, EventType.EXECUTE}
-)
+_BOOK_TYPES = frozenset({EventType.ADD, EventType.MODIFY, EventType.CANCEL, EventType.EXECUTE})
 
 
 @dataclass(slots=True)
@@ -98,7 +95,7 @@ class MarketEvent:
 FIELDS = tuple(f.name for f in fields(MarketEvent))
 
 
-def validation_error(ev: MarketEvent) -> Optional[str]:
+def validation_error(ev: MarketEvent) -> str | None:
     """Return a reason string if ``ev`` violates the contract, else None.
 
     Checked: integer domains (u64/u32/u16/u8 enums), receive_ts >= exchange_ts,
@@ -133,7 +130,9 @@ def validation_error(ev: MarketEvent) -> Optional[str]:
 
     et = ev.event_type
     if ev.order_id >= SYNTHETIC_ID_BASE and et in (
-        EventType.ADD, EventType.QUOTE, EventType.SNAPSHOT
+        EventType.ADD,
+        EventType.QUOTE,
+        EventType.SNAPSHOT,
     ):
         return f"order_id in reserved synthetic range: {ev.order_id}"
     if et in _BOOK_TYPES:

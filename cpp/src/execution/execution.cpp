@@ -128,6 +128,7 @@ void ExecutionSimulator::terminate(ChildOrder& o, CancelReason reason) {
     o.state = OrderState::CANCELLED;
     o.cancel_reason = reason;
     o.resting = false;
+    behind_.erase(o.order_id);
     auto drop = [&](std::vector<std::uint64_t>& v) {
         v.erase(std::remove(v.begin(), v.end(), o.order_id), v.end());
     };
@@ -230,6 +231,7 @@ void ExecutionSimulator::emit_fill(ChildOrder& o, std::int64_t price_ticks,
     if (o.remaining == 0) {
         o.state = OrderState::FILLED;
         o.resting = false;
+        behind_.erase(o.order_id);
         cancels_.erase(std::remove(cancels_.begin(), cancels_.end(), o.order_id),
                        cancels_.end());
     }
@@ -445,10 +447,23 @@ void ExecutionSimulator::crossing_check(const MarketEvent& ev,
     const auto best_ask = book.best_ask();
     const auto best_bid = book.best_bid();
     // Indexed by OUR side: a buy crosses against the ask, a sell the bid.
-    std::int64_t budget[2] = {
-        best_ask.has_value() ? best_ask->second : 0,
-        best_bid.has_value() ? best_bid->second : 0,
+    // Rule 3b: the pool is the displayed size net of what was already
+    // consumed since the level's display last changed.
+    const std::int64_t pool_start[2] = {
+        best_ask.has_value()
+            ? std::max<std::int64_t>(
+                  best_ask->second - consumed_at(ev.instrument_id, ev.venue_id,
+                                                 1, best_ask->first),
+                  0)
+            : 0,
+        best_bid.has_value()
+            ? std::max<std::int64_t>(
+                  best_bid->second - consumed_at(ev.instrument_id, ev.venue_id,
+                                                 0, best_bid->first),
+                  0)
+            : 0,
     };
+    std::int64_t budget[2] = {pool_start[0], pool_start[1]};
     for (std::size_t i = 0; i < resting_.size();) {
         ChildOrder& o = orders_.at(resting_[i]);
         if (o.instrument_id == ev.instrument_id &&
@@ -483,6 +498,16 @@ void ExecutionSimulator::crossing_check(const MarketEvent& ev,
             ++i;
         }
     }
+    // Debit the overlay so the same display is not consumed again.
+    for (int s = 0; s < 2; ++s) {
+        const std::int64_t used = pool_start[s] - budget[s];
+        if (used > 0) {
+            const auto& opp = s == 0 ? best_ask : best_bid;
+            const std::uint8_t opp_side = s == 0 ? 1 : 0;
+            consumed_[{ev.instrument_id, ev.venue_id, opp_side, opp->first}] +=
+                used;
+        }
+    }
 }
 
 void ExecutionSimulator::on_event(const MarketEvent& ev) {
@@ -493,49 +518,45 @@ void ExecutionSimulator::on_event(const MarketEvent& ev) {
     expire_due(t);
     activate_and_cancel_due(t);
 
-    // 2. Passive queue tracking on the raw event (rule 4), before the book
-    //    is mutated — only while the venue is open (rule 8).
+    // 2. Capture the pre-event state queue tracking needs, snapshot the
+    //    displayed sizes behind this venue's overlay entries, then apply
+    //    the event.
     const auto et = static_cast<EventType>(ev.event_type);
     const OrderBook* pre = venue_book(ev.instrument_id, ev.venue_id);
     const bool pre_open = venue_open(pre);
-    if (!resting_.empty() && pre_open) {
-        if (et == EventType::EXECUTE) {
-            track_consumption(ev.instrument_id, ev.venue_id, ev.side,
-                              ev.price_ticks, ev.qty, t);
-        } else if (et == EventType::CANCEL) {
-            for (std::uint64_t id : resting_) {
-                ChildOrder& o = orders_.at(id);
-                if (o.instrument_id == ev.instrument_id &&
-                    o.venue_id == ev.venue_id && o.side == ev.side &&
-                    ev.price_ticks == o.limit_ticks &&
-                    o.state == OrderState::ACTIVE) {
-                    o.ahead_qty -= std::min(o.ahead_qty, ev.qty);
-                }
-            }
-        } else if (et == EventType::ADD) {
-            // Marketable-ADD expansion (rule 4): the replayed book matches a
-            // crossing ADD internally without EXECUTE events; walk the
-            // pre-event displayed opposite depth and track the consumption.
-            const std::uint8_t consumed_side = ev.side == 0 ? 1 : 0;
-            const auto depth = pre->depth(
-                consumed_side == 0 ? Side::BID : Side::ASK, DEPTH_LEVELS);
-            std::int64_t incoming = ev.qty;
-            for (const auto& [p, q] : depth) {
-                if (incoming <= 0) break;
-                const bool crosses = ev.side == 0 ? p <= ev.price_ticks
-                                                  : p >= ev.price_ticks;
-                if (!crosses) break;
-                const std::int64_t consumed = std::min(incoming, q);
-                track_consumption(ev.instrument_id, ev.venue_id,
-                                  consumed_side, p, consumed, t);
-                incoming -= consumed;
+    std::vector<LevelEntry> add_depth;
+    if (!resting_.empty() && pre_open && et == EventType::ADD) {
+        add_depth =
+            pre->depth(ev.side == 0 ? Side::ASK : Side::BID, DEPTH_LEVELS);
+    }
+    // The book's own record of the order an EXECUTE names.
+    bool have_exec_order = false;
+    RestingOrder exec_order;
+    if (!resting_.empty() && pre_open && et == EventType::EXECUTE) {
+        for (const RestingOrder& r : pre->resting_orders()) {
+            if (r.order_id == ev.order_id) {
+                exec_order = r;
+                have_exec_order = true;
+                break;
             }
         }
     }
-
-    // 3. Snapshot the displayed sizes behind this venue's overlay entries,
-    //    apply the event, then cap the entries whose display changed at the
-    //    new displayed size (rule 3b).
+    // (our order id, displayed qty at its level before the event).
+    std::vector<std::pair<std::uint64_t, std::int64_t>> level_before;
+    if (et == EventType::CANCEL || et == EventType::MODIFY) {
+        for (std::uint64_t id : resting_) {
+            const ChildOrder& o = orders_.at(id);
+            if (o.instrument_id == ev.instrument_id &&
+                o.venue_id == ev.venue_id && o.state == OrderState::ACTIVE) {
+                const std::int64_t before =
+                    pre == nullptr
+                        ? 0
+                        : pre->level_qty(o.side == 0 ? Side::BID : Side::ASK,
+                                         o.limit_ticks);
+                level_before.emplace_back(id, before);
+            }
+        }
+    }
     std::vector<std::pair<std::tuple<std::uint32_t, std::uint16_t,
                                      std::uint8_t, std::int64_t>,
                           std::int64_t>>
@@ -553,8 +574,77 @@ void ExecutionSimulator::on_event(const MarketEvent& ev) {
             watched.emplace_back(key, before);
         }
     }
-    instrument_book(ev.instrument_id).apply(ev);
+    const bool applied =
+        instrument_book(ev.instrument_id).apply(ev) == ApplyStatus::APPLIED;
     const OrderBook* book = venue_book(ev.instrument_id, ev.venue_id);
+
+    // 3. Passive queue tracking (rule 4) — only for an event the book
+    //    APPLIED; fills only while the venue was open (rule 8).
+    if (applied && book != nullptr && !resting_.empty()) {
+        const bool real_id = ev.order_id < SYNTHETIC_ID_BASE;
+        if (et == EventType::EXECUTE) {
+            if (have_exec_order) {
+                track_consumption(ev.instrument_id, ev.venue_id,
+                                  exec_order.side, exec_order.price_ticks,
+                                  std::min(ev.qty, exec_order.qty), t);
+            }
+        } else if (et == EventType::CANCEL) {
+            for (const auto& [id, before] : level_before) {
+                ChildOrder& o = orders_.at(id);
+                const std::int64_t removed =
+                    before - book->level_qty(o.side == 0 ? Side::BID : Side::ASK,
+                                             o.limit_ticks);
+                auto bit = behind_.find(id);
+                if (bit != behind_.end() &&
+                    bit->second.count(ev.order_id) != 0) {
+                    bit->second.erase(ev.order_id);
+                } else if (removed > 0 && real_id && pre_open) {
+                    // Synthetic (non-MBO) ids are assumed behind us.
+                    o.ahead_qty -= std::min(o.ahead_qty, removed);
+                }
+            }
+        } else if (et == EventType::MODIFY) {
+            for (const auto& [id, before] : level_before) {
+                const ChildOrder& o = orders_.at(id);
+                if (real_id &&
+                    book->level_qty(o.side == 0 ? Side::BID : Side::ASK,
+                                    o.limit_ticks) > before) {
+                    // A size increase moves the order to the level's tail.
+                    behind_[id].insert(ev.order_id);
+                }
+            }
+        } else if (et == EventType::ADD) {
+            if (real_id) {
+                for (std::uint64_t id : resting_) {
+                    const ChildOrder& o = orders_.at(id);
+                    if (o.instrument_id == ev.instrument_id &&
+                        o.venue_id == ev.venue_id && o.side == ev.side &&
+                        o.limit_ticks == ev.price_ticks &&
+                        o.state == OrderState::ACTIVE) {
+                        behind_[id].insert(ev.order_id);
+                    }
+                }
+            }
+            // Marketable-ADD expansion (rule 4): the replayed book matches a
+            // crossing ADD internally without EXECUTE events; walk the
+            // pre-event displayed opposite depth and track the consumption.
+            const std::uint8_t consumed_side = ev.side == 0 ? 1 : 0;
+            std::int64_t incoming = ev.qty;
+            for (const auto& [p, q] : add_depth) {
+                if (incoming <= 0) break;
+                const bool crosses = ev.side == 0 ? p <= ev.price_ticks
+                                                  : p >= ev.price_ticks;
+                if (!crosses) break;
+                const std::int64_t consumed = std::min(incoming, q);
+                track_consumption(ev.instrument_id, ev.venue_id,
+                                  consumed_side, p, consumed, t);
+                incoming -= consumed;
+            }
+        }
+    }
+
+    //    Cap the overlay entries whose display changed at the new displayed
+    //    size (rule 3b).
     for (const auto& [key, before] : watched) {
         const std::int64_t after =
             book == nullptr

@@ -1,7 +1,6 @@
 """Reference-data service tests (configs/instruments/instruments.json, venues.json)."""
 
 import pytest
-
 from conftest import CONFIGS_DIR
 from iap.reference.refdata import ReferenceData
 
@@ -14,8 +13,14 @@ def test_universe_composition(refdata):
     assert eqs[-1].symbol == "SYN.ETF.IDX"
     assert len(fxs) == 8
     assert {i.symbol for i in fxs} == {
-        "EUR/USD", "GBP/USD", "USD/JPY", "AUD/USD",
-        "USD/CAD", "USD/CHF", "NZD/USD", "EUR/GBP",
+        "EUR/USD",
+        "GBP/USD",
+        "USD/JPY",
+        "AUD/USD",
+        "USD/CAD",
+        "USD/CHF",
+        "NZD/USD",
+        "EUR/GBP",
     }
 
 

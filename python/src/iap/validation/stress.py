@@ -14,16 +14,42 @@ Three pinned stress axes for every alpha:
 - **Regimes**: IC split by the volatility-regime flag
   (``vol_regime_flag_v1``: 1 = short-horizon vol elevated) — a promotable
   alpha should not owe its entire IC to one regime.
+
+**Stress version (pinned).**  Every stressed backtest must differ from the
+base backtest in the stressed parameter ONLY.  The cost and time-latency
+grids do (``dataclasses.replace`` on the base config, the base reporting
+currency carried).  The ROW latency grid historically did not: it rebuilt
+the config from four fields and silently dropped ``max_decision_age_ns``,
+``flatten_at_session_end`` and ``session_gap_ns``, so its P&L column
+described a strategy that carries positions overnight and fills stale
+decisions even when the base strategy does neither.
+
+- ``version=1`` (:data:`STRESS_VERSION_LEGACY`, the default) reproduces that
+  historic row grid exactly.  It is the default only because the committed
+  reports under ``research/alpha_reports`` were produced with it and are
+  pinned; it is a known defect, kept reproducible.
+- ``version=2`` (:data:`STRESS_VERSION_CARRY`) derives the row-grid config
+  with ``dataclasses.replace(base, latency_rows=base.latency_rows + k,
+  latency_ns=None)`` — every other field (decision age, session flattening,
+  session gap, position policy, ...) is the base strategy's.  ``latency_ns``
+  is cleared on purpose: the grid is DEFINED in rows, and a set
+  ``latency_ns`` overrides ``latency_rows`` in the engine, which would make
+  every row of the grid the same backtest.  New work (the power study,
+  any regenerated report) should pass ``version=2``.
+
+A non-finite row-grid IC is reported as ``None`` (JSON ``null``), never as a
+raw NaN, like every other statistic in a validation report.
 """
 
 from __future__ import annotations
 
-from typing import Dict, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from dataclasses import replace
 
 import numpy as np
 import pandas as pd
 
-from iap.backtest.engine import Backtester, BacktestConfig
+from iap.backtest.engine import BacktestConfig, Backtester
 from iap.validation.metrics import ic
 
 COST_MULTIPLIERS = (0.5, 1.0, 2.0)
@@ -33,6 +59,17 @@ LATENCY_SHIFTS = (0, 1, 5)
 #: budget, and it would charge the first row of a frame before any
 #: conversion rate prevails (the currency layer fails closed there).
 LATENCY_TIMES_NS = (100_000_000, 500_000_000, 1_000_000_000, 5_000_000_000)
+
+#: Row-latency grid as historically computed (drops decision age / session
+#: flattening / session gap from the stressed config) — see module docs.
+STRESS_VERSION_LEGACY = 1
+#: Row-latency grid that carries every base-config field.
+STRESS_VERSION_CARRY = 2
+STRESS_VERSIONS = (STRESS_VERSION_LEGACY, STRESS_VERSION_CARRY)
+
+
+def _fnum(v: float) -> float | None:
+    return float(v) if np.isfinite(v) else None
 
 
 def _pooled(
@@ -83,14 +120,15 @@ def cost_stress(
     scores: Mapping[int, pd.DataFrame],
     asset_class: str,
     multipliers: Sequence[float] = COST_MULTIPLIERS,
-) -> Dict[str, dict]:
+) -> dict[str, dict]:
     """Net backtest results across the pinned cost-multiplier grid."""
-    out: Dict[str, dict] = {}
+    out: dict[str, dict] = {}
     for m in multipliers:
         bt = Backtester(
             backtester_base.cost_model.with_multiplier(m),
             backtester_base.meta,
             backtester_base.config,
+            reporting_ccy=backtester_base.reporting_ccy,
         )
         res = bt.run(frames, scores, asset_class)
         out[f"x{m:g}"] = {
@@ -109,24 +147,39 @@ def latency_stress(
     horizon: str,
     shifts: Sequence[int] = LATENCY_SHIFTS,
     beta: float = 0.0,
-) -> Dict[str, dict]:
+    version: int = STRESS_VERSION_LEGACY,
+) -> dict[str, dict]:
     """IC and net P&L when execution lags the decision by extra events.
 
-    ``beta`` standardizes the score before scoring it (see :func:`_pooled`)."""
-    out: Dict[str, dict] = {}
-    base_latency = backtester_base.config.latency_rows
+    ``beta`` standardizes the score before scoring it (see :func:`_pooled`).
+    ``version`` selects how the stressed config is derived from the base
+    one (module docs): 1 = the historic four-field rebuild, 2 = the base
+    config with only the row latency changed."""
+    if version not in STRESS_VERSIONS:
+        raise ValueError(f"unknown stress version {version!r}; known: {STRESS_VERSIONS}")
+    out: dict[str, dict] = {}
+    base = backtester_base.config
+    base_latency = base.latency_rows
     for k in shifts:
         x, y = _pooled(scores, frames, horizon, lag_events=k, beta=beta)
-        cfg = BacktestConfig(
-            max_pos_qty=backtester_base.config.max_pos_qty,
-            conf_min=backtester_base.config.conf_min,
-            latency_rows=base_latency + k,
-            bar_ns=backtester_base.config.bar_ns,
+        if version == STRESS_VERSION_LEGACY:
+            cfg = BacktestConfig(
+                max_pos_qty=base.max_pos_qty,
+                conf_min=base.conf_min,
+                latency_rows=base_latency + k,
+                bar_ns=base.bar_ns,
+            )
+        else:
+            cfg = replace(base, latency_rows=base_latency + k, latency_ns=None)
+        bt = Backtester(
+            backtester_base.cost_model,
+            backtester_base.meta,
+            cfg,
+            reporting_ccy=backtester_base.reporting_ccy,
         )
-        bt = Backtester(backtester_base.cost_model, backtester_base.meta, cfg)
         res = bt.run(frames, scores, asset_class)
         out[f"+{k}ev"] = {
-            "ic": ic(x, y),
+            "ic": _fnum(ic(x, y)),
             "total_pnl": res.total_pnl,
             "latency_rows": cfg.latency_rows,
         }
@@ -140,31 +193,29 @@ def latency_stress_time(
     asset_class: str,
     horizon: str,
     latencies_ns: Sequence[int] = LATENCY_TIMES_NS,
-) -> Dict[str, dict]:
+) -> dict[str, dict]:
     """Net P&L when execution is delayed by a real amount of EVENT TIME.
 
     Unlike the row grid this is comparable across instruments and datasets:
     a decision at t executes at the first row with
     ``exchange_ts >= t + latency_ns`` (API_ALPHA / backtester §latency).
     """
-    out: Dict[str, dict] = {}
+    out: dict[str, dict] = {}
     base = backtester_base.config
     for ns in latencies_ns:
-        cfg = BacktestConfig(
-            max_pos_qty=base.max_pos_qty,
-            conf_min=base.conf_min,
-            bar_ns=base.bar_ns,
-            latency_ns=int(ns),
-            max_decision_age_ns=base.max_decision_age_ns,
-            flatten_at_session_end=base.flatten_at_session_end,
-            session_gap_ns=base.session_gap_ns,
+        cfg = replace(base, latency_ns=int(ns))
+        bt = Backtester(
+            backtester_base.cost_model,
+            backtester_base.meta,
+            cfg,
+            reporting_ccy=backtester_base.reporting_ccy,
         )
-        bt = Backtester(backtester_base.cost_model, backtester_base.meta, cfg,
-                        reporting_ccy=backtester_base.reporting_ccy)
         res = bt.run(frames, scores, asset_class)
-        label = "0ms" if ns == 0 else (
-            f"{ns // 1_000_000}ms" if ns < 1_000_000_000
-            else f"{ns // 1_000_000_000}s")
+        label = (
+            "0ms"
+            if ns == 0
+            else (f"{ns // 1_000_000}ms" if ns < 1_000_000_000 else f"{ns // 1_000_000_000}s")
+        )
         out[label] = {
             "latency_ns": int(ns),
             "total_pnl": res.total_pnl,
@@ -178,7 +229,7 @@ def regime_split(
     frames: Mapping[int, pd.DataFrame],
     horizon: str,
     beta: float = 0.0,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """IC in high-vol vs low-vol regimes (vol_regime_flag_v1).
 
     ``beta`` standardizes the score before scoring it (see :func:`_pooled`):
@@ -186,6 +237,7 @@ def regime_split(
     carries the opposite sign to the gate IC and reads as a regime the alpha
     "works in" when it is the regime it is most wrong in.
     """
+
     def high(df: pd.DataFrame) -> np.ndarray:
         f = df["vol_regime_flag_v1"].to_numpy(dtype=float)
         return np.where(np.isfinite(f), f, 0.0) > 0.5

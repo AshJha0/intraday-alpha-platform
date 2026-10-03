@@ -9,7 +9,6 @@ independent brute-force rebuild.
 import json
 
 import pytest
-
 from bruteforce_book import BruteForceBook
 from iap.core.codec import (
     encode_iap1,

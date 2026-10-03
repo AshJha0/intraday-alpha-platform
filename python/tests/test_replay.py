@@ -3,7 +3,6 @@
 import json
 
 import pytest
-
 from iap.core.codec import read_jsonl
 from iap.replay.replay import ReplayEngine
 
@@ -108,7 +107,7 @@ def test_replay_multi_venue_fx(fx_events):
     assert stats["events_processed"] == 800
     cons = engine.instrument_book(101)
     assert sorted(cons.books) == [10, 11, 12]
-    for vid, book in cons.books.items():
+    for _vid, book in cons.books.items():
         assert not book.stale
         assert book.duplicates_dropped == 0 and book.gaps_detected == 0
     # Consolidated best must be at least as good as any single venue's.

@@ -3,10 +3,34 @@
 Implements spec §20 (research-to-production promotion) and §26 (governance).
 Binding for every change to this repository.
 
+## 0. What is enforced, and what is only required
+
+Controls in this document are of two kinds. Be clear which is which before
+relying on one.
+
+| Control | Status (2026-10-03) | Enforced by |
+|---|---|---|
+| CI green on every push and pull request (all four languages, golden gate, deployment validation) | **Enforced as a check, not as a merge gate** | `.github/workflows/ci.yml` runs it; nothing stops a merge when it is red, because no branch protection exists |
+| Pull requests only, no direct push to `main` | **Required setting, not yet configured** | Needs a branch ruleset ([REPO_SETTINGS.md](REPO_SETTINGS.md) section 1). Today `main` is unprotected |
+| Required status checks before merge | **Required setting, not yet configured** | Same ruleset |
+| "1 to 2 reviewers" by change class (section 1) | **Required setting, not yet configured, and not satisfiable by one maintainer** | Needs the ruleset and a second maintainer; GitHub does not let an author approve their own pull request |
+| Reviewer ownership by path | Enforced as a file, applied only once the ruleset requires code-owner review | `CODEOWNERS` (every path owned by `@AshJha0`) |
+| Force-push and branch-deletion protection | **Required setting, not yet configured** | Ruleset |
+| Signed release tags | **A practice, not enforced** | Nothing verifies tag signatures ([REPO_SETTINGS.md](REPO_SETTINGS.md) section 2) |
+| Dependabot alerts and security updates | **Required setting, not yet configured** (version-update PRs are configured by `.github/dependabot.yml`) | [REPO_SETTINGS.md](REPO_SETTINGS.md) section 3 |
+| Audit logs shipped off-host daily (section 3) | **Not implemented** | Nothing ships them; they exist only on the state volume |
+| Release manifest with image digests (section 3) | Implemented by `.github/workflows/release.yml`, **not yet exercised** (needs a tag) | The workflow |
+| Deployment structural checks (rule metrics, manifests, pinning, hardening) | Enforced in CI | `tests/harness/check_deployment.py` |
+
+The rest of this document states the policy. Where a sentence says "required"
+and the table above says "not yet configured", read it as a to-do for the
+repository owner, not as a description of the current state.
+
 ## 1. Code-review requirements
 
-All changes land by pull request; no direct pushes to the default branch.
-Review depth scales with blast radius:
+All changes are meant to land by pull request, with no direct pushes to the
+default branch (not yet enforced: see section 0). Review depth scales with
+blast radius:
 
 | Change class | Paths (indicative) | Review requirement |
 |---|---|---|
@@ -27,8 +51,18 @@ pull request: one job per language, `tests/harness/run_golden.sh` (gate 10),
 `tests/harness/check_deployment.py`, and an `images` job — building the four
 container images — that `needs:` all of them, so promotion gate 10's "never
 publish an image from a tree whose golden suite fails" is enforced by the
-dependency graph rather than by a promise in a Dockerfile header.
-`CODEOWNERS` names the reviewers this table and SECURITY.md refer to.
+dependency graph rather than by a promise in a Dockerfile header. The `images`
+job runs on pushes to `main` and on pull requests that change image inputs
+(`deployment/docker/**`, any Dockerfile, the pinned Python and Rust inputs); it
+is skipped on other pull requests, so it is not a required status check. The
+workflow also runs a blocking C++ ASan+UBSan job over the full ctest suite,
+blocking lint (`cargo clippy -D warnings` in the `rust` job, `ruff check` in
+the `advisory` job) and two non-blocking audits (`pip-audit`, `cargo audit`)
+that report findings without failing the
+run, and `.github/workflows/codeql.yml` scans for vulnerabilities. A red `ci`
+run does not by itself prevent a merge until the branch ruleset exists.
+`CODEOWNERS` names the reviewers this table and SECURITY.md refer to (all
+`@AshJha0` today).
 
 ## 2. Promotion gates (spec §20, verbatim order)
 
@@ -108,7 +142,10 @@ Auditable events and where they are recorded:
   bytes it read (`PLATFORM_CONVENTIONS.md` §12.3, tested by
   `PaperStateRecoveryTest.auditLogIsPersistedAndMatchesTheEngine`). In the
   deployments `<state-dir>` is `$IAP_STATE_DIR` on the shared volume/PVC
-  (`/data/state`). Retention: immutable, per session, shipped off-host daily.
+  (`/data/state`, its own `iap-java-state` PVC in Kubernetes). Intended
+  retention: immutable, per session, shipped off-host daily. **The shipping is
+  not implemented** (section 0): today the files exist only on the state
+  volume, so a lost volume loses the audit trail.
 - **Kill-switch operations (runtime)**: every call to the operator API
   (`POST /admin/{kill,clear,override,roll}`) — accepted, refused or rejected —
   appends a line to `<state-dir>/admin_audit.jsonl` with the action, the scope,
@@ -144,9 +181,11 @@ Auditable events and where they are recorded:
 - **Lifecycle transitions**: one `LifecycleTransition` line per state change
   in `research/lifecycle_transitions.jsonl` (gates, policy, actor, reason);
   HUMAN transitions carry the approval reference as the reason.
-- **Deploys**: each release records image digests, git commit and config hash
-  in the release manifest; rollbacks reference the prior manifest rather than
-  rebuilding.
+- **Deploys**: each release records image digests and the git commit in
+  `release-manifest.json`, produced by `.github/workflows/release.yml` and
+  attached to the GitHub release (not yet exercised: it runs on a tag; the
+  config hash is reported by the running platform on `/status`, not in the
+  manifest); rollbacks reference the prior manifest rather than rebuilding.
 
 Audit logs are never edited in place. Corrections are new entries referencing
 the entry they correct.

@@ -88,9 +88,9 @@ def main() -> int:
 
     book_states = {
         "description": "Exact-integer book state after applying the first N events "
-                       "of events_eq_mbo.jsonl (N is the key; 1-based). Validated by "
-                       "an independent brute-force rebuild before writing. "
-                       "Tolerance: exact equality.",
+        "of events_eq_mbo.jsonl (N is the key; 1-based). Validated by "
+        "an independent brute-force rebuild before writing. "
+        "Tolerance: exact equality.",
         "vector": "events_eq_mbo.jsonl",
         "instrument_id": eq[0].instrument_id,
         "venue_id": eq[0].venue_id,
@@ -102,7 +102,7 @@ def main() -> int:
 
     shas = {
         "description": "SHA-256 of the IAP1 encoding (schemas/FORMAT.md) of each "
-                       "golden vector. Every language must encode to these exact bytes.",
+        "golden vector. Every language must encode to these exact bytes.",
         "events_eq_mbo.iap1": sha256_events_iap1(eq),
         "events_fx_quote.iap1": sha256_events_iap1(fx),
     }
@@ -122,8 +122,8 @@ def main() -> int:
     uniforms = [rng2.uniform() for _ in range(5)]
     sm = {
         "description": "SplitMix64 known-answer test (conventions section 3). "
-                       "first_5_u64 are the raw outputs for the given seed; "
-                       "first_5_uniform are (out >> 11) * 2^-53 as exact doubles.",
+        "first_5_u64 are the raw outputs for the given seed; "
+        "first_5_uniform are (out >> 11) * 2^-53 as exact doubles.",
         "seed": seed,
         "first_5_u64": outs,
         "first_5_uniform": uniforms,

@@ -13,14 +13,13 @@ import dataclasses
 import json
 import math
 from pathlib import Path
-from typing import Dict
 
 import numpy as np
 import pandas as pd
 import pytest
-
+from conftest import CONFIGS_DIR, GOLDEN_DIR, REPO_ROOT
 from iap.alpha.equity import EQ03OfiMultiLevel
-from iap.backtest import Backtester, BacktestConfig, CostModel
+from iap.backtest import BacktestConfig, Backtester, CostModel
 from iap.contracts import protocols
 from iap.contracts.types import ExperimentSpec, Period, Verdict
 from iap.contracts.validate import validate
@@ -52,8 +51,6 @@ from iap.validation.ledger import ExperimentLedger
 from iap.validation.metrics import HORIZONS_NS
 from iap.validation.splits import Fold
 
-from conftest import CONFIGS_DIR, GOLDEN_DIR, REPO_ROOT
-
 TOL = 1e-9
 FEATURES_DIR = REPO_ROOT / "data" / "features"
 REPORTS_DIR = REPO_ROOT / "research" / "alpha_reports"
@@ -69,7 +66,7 @@ NS_S = 1_000_000_000
 
 
 @pytest.fixture(scope="module")
-def frames() -> Dict[int, pd.DataFrame]:
+def frames() -> dict[int, pd.DataFrame]:
     return golden_frames(GOLDEN_DIR, CONFIGS_DIR)
 
 
@@ -89,23 +86,40 @@ def _periods(frames, horizon: str, test_row: int = 1200):
     )
 
 
-def _spec(frames, horizon: str = "5s", configuration=None, seed: int = 1,
-          alpha_id: str = "EQ03", **overrides) -> ExperimentSpec:
-    kwargs = dict(dataset_version=DATA_VERSION, feature_version=FEATURE_VERSION,
-                  seed=seed, **_periods(frames, horizon))
+def _spec(
+    frames,
+    horizon: str = "5s",
+    configuration=None,
+    seed: int = 1,
+    alpha_id: str = "EQ03",
+    **overrides,
+) -> ExperimentSpec:
+    kwargs = dict(
+        dataset_version=DATA_VERSION,
+        feature_version=FEATURE_VERSION,
+        seed=seed,
+        **_periods(frames, horizon),
+    )
     kwargs.update(overrides)
     return build_spec(alpha_id, horizon, configuration, **kwargs)
 
 
 def _runner(frames, tmp_path: Path, **kwargs) -> ExperimentRunner:
-    return ExperimentRunner(None, tmp_path / "experiments.json", tmp_path / "experiments",
-                            CONFIGS_DIR, frames=frames, **kwargs)
+    return ExperimentRunner(
+        None,
+        tmp_path / "experiments.json",
+        tmp_path / "experiments",
+        CONFIGS_DIR,
+        frames=frames,
+        **kwargs,
+    )
 
 
-def _two_day_frames(rows_per_day: int = 200, step_ns: int = 30 * NS_S,
-                    day0: int = 20_000) -> Dict[int, pd.DataFrame]:
+def _two_day_frames(
+    rows_per_day: int = 200, step_ns: int = 30 * NS_S, day0: int = 20_000
+) -> dict[int, pd.DataFrame]:
     """Timestamp-only frames covering two UTC sessions (derivation input)."""
-    out: Dict[int, pd.DataFrame] = {}
+    out: dict[int, pd.DataFrame] = {}
     for iid, offset in ((1, 0), (2, 7 * NS_S)):
         ts = []
         for day in (day0, day0 + 1):
@@ -130,17 +144,20 @@ def test_spec_is_deterministic_and_pinned_id(frames):
     verify_experiment_id(a)
 
 
-@pytest.mark.parametrize("change", [
-    dict(configuration={"n_folds": 3}),
-    dict(configuration={"embargo_ns": 0}),
-    dict(configuration={"cost_multiplier": 2.0}),
-    dict(configuration={"flatten_at_session_end": False}),
-    dict(horizon="1s"),
-    dict(seed=2),
-    dict(alpha_id="EQ01"),
-    dict(dataset_version=content_hash("other-dataset")),
-    dict(feature_version=content_hash("other-features")),
-])
+@pytest.mark.parametrize(
+    "change",
+    [
+        dict(configuration={"n_folds": 3}),
+        dict(configuration={"embargo_ns": 0}),
+        dict(configuration={"cost_multiplier": 2.0}),
+        dict(configuration={"flatten_at_session_end": False}),
+        dict(horizon="1s"),
+        dict(seed=2),
+        dict(alpha_id="EQ01"),
+        dict(dataset_version=content_hash("other-dataset")),
+        dict(feature_version=content_hash("other-features")),
+    ],
+)
 def test_any_change_gives_a_different_experiment_id(frames, change):
     base = _spec(frames)
     assert _spec(frames, **change).experiment_id != base.experiment_id
@@ -149,25 +166,30 @@ def test_any_change_gives_a_different_experiment_id(frames, change):
 def test_equivalent_configurations_hash_identically(frames):
     """1 and 1.0 are the same cost multiplier; an empty configuration is
     the pinned default protocol."""
-    assert (_spec(frames, configuration={"cost_multiplier": 1}).experiment_id
-            == _spec(frames, configuration={"cost_multiplier": 1.0}).experiment_id
-            == _spec(frames, configuration=None).experiment_id
-            == _spec(frames, configuration=dict(DEFAULT_CONFIGURATION)).experiment_id)
+    assert (
+        _spec(frames, configuration={"cost_multiplier": 1}).experiment_id
+        == _spec(frames, configuration={"cost_multiplier": 1.0}).experiment_id
+        == _spec(frames, configuration=None).experiment_id
+        == _spec(frames, configuration=dict(DEFAULT_CONFIGURATION)).experiment_id
+    )
     assert normalise_configuration({}) == DEFAULT_CONFIGURATION
     assert list(normalise_configuration({"n_folds": 4})) == list(DEFAULT_CONFIGURATION)
 
 
-@pytest.mark.parametrize("bad", [
-    {"purge": True},                    # unknown knob would change the id for nothing
-    {"n_folds": 0},
-    {"n_folds": True},                  # a boolean is not a fold count
-    {"n_folds": 2.5},
-    {"embargo_ns": -1},
-    {"cost_multiplier": 0.0},
-    {"cost_multiplier": float("nan")},
-    {"max_decision_age_ns": 0},
-    {"flatten_at_session_end": 1},
-])
+@pytest.mark.parametrize(
+    "bad",
+    [
+        {"purge": True},  # unknown knob would change the id for nothing
+        {"n_folds": 0},
+        {"n_folds": True},  # a boolean is not a fold count
+        {"n_folds": 2.5},
+        {"embargo_ns": -1},
+        {"cost_multiplier": 0.0},
+        {"cost_multiplier": float("nan")},
+        {"max_decision_age_ns": 0},
+        {"flatten_at_session_end": 1},
+    ],
+)
 def test_configuration_is_strictly_validated(bad):
     with pytest.raises(ResearchError):
         normalise_configuration(bad)
@@ -175,20 +197,38 @@ def test_configuration_is_strictly_validated(bad):
 
 def test_spec_defaults_to_the_alpha_pinned_horizon_and_model_hash(frames):
     s = build_spec(
-        "EQ03", None, {}, dataset_version=DATA_VERSION, feature_version=FEATURE_VERSION,
-        seed=1, **_periods(frames, "5s"))
+        "EQ03",
+        None,
+        {},
+        dataset_version=DATA_VERSION,
+        feature_version=FEATURE_VERSION,
+        seed=1,
+        **_periods(frames, "5s"),
+    )
     assert s.horizon == "5s"
     assert s.model_version is not None and len(s.model_version) == 64
-    assert s.model_version != build_spec(
-        "EQ03", "1s", {}, dataset_version=DATA_VERSION, feature_version=FEATURE_VERSION,
-        seed=1, **_periods(frames, "1s")).model_version
+    assert (
+        s.model_version
+        != build_spec(
+            "EQ03",
+            "1s",
+            {},
+            dataset_version=DATA_VERSION,
+            feature_version=FEATURE_VERSION,
+            seed=1,
+            **_periods(frames, "1s"),
+        ).model_version
+    )
 
 
-@pytest.mark.parametrize("kwargs, message", [
-    (dict(alpha_id="ZZ99"), "unknown alpha_id"),
-    (dict(dataset_version="no-normalized-data"), "dataset_version"),
-    (dict(feature_version="abc"), "feature_version"),
-])
+@pytest.mark.parametrize(
+    "kwargs, message",
+    [
+        (dict(alpha_id="ZZ99"), "unknown alpha_id"),
+        (dict(dataset_version="no-normalized-data"), "dataset_version"),
+        (dict(feature_version="abc"), "feature_version"),
+    ],
+)
 def test_spec_rejects_bad_identity(frames, kwargs, message):
     with pytest.raises(ResearchError, match=message):
         _spec(frames, **kwargs)
@@ -196,18 +236,32 @@ def test_spec_rejects_bad_identity(frames, kwargs, message):
 
 def test_spec_rejects_an_unknown_horizon(frames):
     with pytest.raises(ResearchError, match="unknown horizon"):
-        build_spec("EQ03", "2s", {}, dataset_version=DATA_VERSION,
-                   feature_version=FEATURE_VERSION, seed=1, **_periods(frames, "5s"))
+        build_spec(
+            "EQ03",
+            "2s",
+            {},
+            dataset_version=DATA_VERSION,
+            feature_version=FEATURE_VERSION,
+            seed=1,
+            **_periods(frames, "5s"),
+        )
 
 
 def test_periods_must_come_together_or_be_derivable(frames):
     with pytest.raises(ResearchError, match="together"):
-        build_spec("EQ03", "5s", {}, dataset_version=DATA_VERSION,
-                   feature_version=FEATURE_VERSION, seed=1,
-                   train_period=Period(0, 1))
+        build_spec(
+            "EQ03",
+            "5s",
+            {},
+            dataset_version=DATA_VERSION,
+            feature_version=FEATURE_VERSION,
+            seed=1,
+            train_period=Period(0, 1),
+        )
     with pytest.raises(ResearchError, match="no frames"):
-        build_spec("EQ03", "5s", {}, dataset_version=DATA_VERSION,
-                   feature_version=FEATURE_VERSION, seed=1)
+        build_spec(
+            "EQ03", "5s", {}, dataset_version=DATA_VERSION, feature_version=FEATURE_VERSION, seed=1
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -237,17 +291,33 @@ def test_derive_periods_rule():
         # the last session is the holdout, everything earlier trains
         assert np.array_equal(in_test, ts // NS_DAY == 20_001)
     # the derived set is accepted by the contract as-is
-    s = build_spec("EQ03", "5s", {}, dataset_version=DATA_VERSION,
-                   feature_version=FEATURE_VERSION, seed=1, frames=f)
+    s = build_spec(
+        "EQ03",
+        "5s",
+        {},
+        dataset_version=DATA_VERSION,
+        feature_version=FEATURE_VERSION,
+        seed=1,
+        frames=f,
+    )
     assert (s.train_period, s.validation_period, s.test_period) == (train, validation, test)
 
 
 def test_derive_periods_validation_is_the_purge_and_embargo_tail():
     """On contiguous data the validation period holds exactly the rows the
     pinned splitter refuses to train on."""
-    f = {1: pd.DataFrame({"exchange_ts": np.arange(
-        20_000 * NS_DAY + 86_000 * NS_S, 20_000 * NS_DAY + 87_000 * NS_S, NS_S,
-        dtype=np.int64)})}
+    f = {
+        1: pd.DataFrame(
+            {
+                "exchange_ts": np.arange(
+                    20_000 * NS_DAY + 86_000 * NS_S,
+                    20_000 * NS_DAY + 87_000 * NS_S,
+                    NS_S,
+                    dtype=np.int64,
+                )
+            }
+        )
+    }
     train, validation, test = derive_periods(f, "10s", 30 * NS_S)
     ts = f[1]["exchange_ts"].to_numpy()
     fold = Fold(0, test.start_ts, test.start_ts, test.end_ts)
@@ -270,8 +340,12 @@ def test_derive_periods_needs_two_sessions_and_trainable_rows(frames):
 
 def test_non_overlapping_periods_are_enforced(frames):
     good = _periods(frames, "5s")
-    bad = dict(good, validation_period=Period(good["validation_period"].start_ts - 1,
-                                              good["validation_period"].end_ts))
+    bad = dict(
+        good,
+        validation_period=Period(
+            good["validation_period"].start_ts - 1, good["validation_period"].end_ts
+        ),
+    )
     with pytest.raises(ResearchError, match="overlap"):
         _spec(frames, **bad)
     reversed_ = dict(good, train_period=good["test_period"], test_period=good["train_period"])
@@ -288,30 +362,55 @@ def test_non_overlapping_periods_are_enforced(frames):
 
 def _report(**overrides) -> dict:
     report = {
-        "oos_ic": 0.02, "oos_rank_ic": 0.03, "nw_tstat": 3.5, "nw_lags": 2,
-        "oos_hit_rate": 0.52, "turnover_flips_per_hour": 40.0,
-        "fold_sign_consistency": 1.0, "n_folds_run": 4,
-        "leakage": {"passed": True, "ic_unshifted": 0.02, "ic_shifted": 0.001,
-                    "label_guard_ok": True, "shift_ok": True, "truncation_ok": True,
-                    "suspicious_ic": 0.03, "required_shift_ratio": 0.2,
-                    "median_row_gap_ns": 3_000_000_000},
-        "hypothesis_confirmed": True, "verdict": "PROMOTE",
+        "oos_ic": 0.02,
+        "oos_rank_ic": 0.03,
+        "nw_tstat": 3.5,
+        "nw_lags": 2,
+        "oos_hit_rate": 0.52,
+        "turnover_flips_per_hour": 40.0,
+        "fold_sign_consistency": 1.0,
+        "n_folds_run": 4,
+        "leakage": {
+            "passed": True,
+            "ic_unshifted": 0.02,
+            "ic_shifted": 0.001,
+            "label_guard_ok": True,
+            "shift_ok": True,
+            "truncation_ok": True,
+            "suspicious_ic": 0.03,
+            "required_shift_ratio": 0.2,
+            "median_row_gap_ns": 3_000_000_000,
+        },
+        "hypothesis_confirmed": True,
+        "verdict": "PROMOTE",
     }
     report.update(overrides)
     return report
 
 
 def _holdout(**overrides) -> dict:
-    h = {"gross_return_bps": 12.0, "transaction_cost_bps": 4.5,
-         "max_drawdown_bps": 8.0, "sharpe": 1.2}
+    h = {
+        "gross_return_bps": 12.0,
+        "transaction_cost_bps": 4.5,
+        "max_drawdown_bps": 8.0,
+        "sharpe": 1.2,
+    }
     h.update(overrides)
     return h
 
 
 def test_build_result_mapping(spec):
     r = build_result(spec, _report(), _holdout(), 21, "deadbeef")
-    assert (r.ic, r.rank_ic, r.t_stat, r.nw_lags, r.hit_rate, r.turnover,
-            r.fold_consistency, r.n_folds) == (0.02, 0.03, 3.5, 2, 0.52, 40.0, 1.0, 4)
+    assert (
+        r.ic,
+        r.rank_ic,
+        r.t_stat,
+        r.nw_lags,
+        r.hit_rate,
+        r.turnover,
+        r.fold_consistency,
+        r.n_folds,
+    ) == (0.02, 0.03, 3.5, 2, 0.52, 40.0, 1.0, 4)
     assert r.net_return_bps == 12.0 - 4.5
     assert r.leakage_passed and r.hypothesis_sign_confirmed
     assert r.verdict is Verdict.PROMOTE
@@ -320,22 +419,27 @@ def test_build_result_mapping(spec):
     assert r.leakage_detail == _report()["leakage"]
 
 
-@pytest.mark.parametrize("report_overrides, holdout_overrides, name", [
-    ({"oos_ic": None}, {}, "oos_ic"),
-    ({"oos_ic": float("nan")}, {}, "oos_ic"),
-    ({"nw_tstat": float("inf")}, {}, "nw_tstat"),
-    ({"oos_hit_rate": None}, {}, "oos_hit_rate"),
-    ({"turnover_flips_per_hour": None}, {}, "turnover_flips_per_hour"),
-    ({"fold_sign_consistency": None}, {}, "fold_sign_consistency"),
-    ({}, {"sharpe": float("nan")}, "sharpe"),
-    ({}, {"max_drawdown_bps": None}, "max_drawdown_bps"),
-    ({}, {"gross_return_bps": float("-inf")}, "gross_return_bps"),
-])
+@pytest.mark.parametrize(
+    "report_overrides, holdout_overrides, name",
+    [
+        ({"oos_ic": None}, {}, "oos_ic"),
+        ({"oos_ic": float("nan")}, {}, "oos_ic"),
+        ({"nw_tstat": float("inf")}, {}, "nw_tstat"),
+        ({"oos_hit_rate": None}, {}, "oos_hit_rate"),
+        ({"turnover_flips_per_hour": None}, {}, "turnover_flips_per_hour"),
+        ({"fold_sign_consistency": None}, {}, "fold_sign_consistency"),
+        ({}, {"sharpe": float("nan")}, "sharpe"),
+        ({}, {"max_drawdown_bps": None}, "max_drawdown_bps"),
+        ({}, {"gross_return_bps": float("-inf")}, "gross_return_bps"),
+    ],
+)
 def test_nan_metric_is_a_runner_error_naming_the_metric(
-        spec, report_overrides, holdout_overrides, name):
+    spec, report_overrides, holdout_overrides, name
+):
     with pytest.raises(ResearchError, match=name):
-        build_result(spec, _report(**report_overrides), _holdout(**holdout_overrides),
-                     21, "deadbeef")
+        build_result(
+            spec, _report(**report_overrides), _holdout(**holdout_overrides), 21, "deadbeef"
+        )
 
 
 def test_nan_inside_leakage_detail_is_an_error_too(spec):
@@ -371,7 +475,7 @@ def test_runner_rejects_a_spec_whose_id_is_not_its_hash(frames, tmp_path, spec):
 def test_runner_rejects_an_unnormalised_configuration(frames, tmp_path, spec):
     body = spec.to_dict()
     del body["experiment_id"]
-    body["configuration"] = {"n_folds": 4}          # missing the other pinned keys
+    body["configuration"] = {"n_folds": 4}  # missing the other pinned keys
     partial = ExperimentSpec.from_dict({"experiment_id": experiment_id_of(body), **body})
     with pytest.raises(ResearchError, match="not normalised"):
         _runner(frames, tmp_path, dry_run=True).run(partial)
@@ -382,14 +486,29 @@ def test_runner_needs_an_input_source(tmp_path):
         ExperimentRunner(None, tmp_path / "l.json", tmp_path / "e", CONFIGS_DIR)
 
 
-def test_dry_run_computes_without_persisting(frames, tmp_path, spec):
+def test_dry_run_writes_no_experiment_but_debits_the_looks(frames, tmp_path, spec):
+    """A dry run is a look: no experiment directory, but the ledger is
+    saved — otherwise configurations could be scanned for free and only the
+    winner persisted.  The real run of the same spec then de-duplicates."""
     runner = _runner(frames, tmp_path, dry_run=True)
     result = runner.run(spec)
     assert result.experiment_id == spec.experiment_id
     assert result.n_experiments_in_ledger == LOOKS_PER_EXPERIMENT
     assert result.created_ts == spec.test_period.end_ts
-    assert not (tmp_path / "experiments.json").exists()
     assert not (tmp_path / "experiments").exists()
+    ledger = ExperimentLedger(tmp_path / "experiments.json")
+    assert ledger.total_experiments == LOOKS_PER_EXPERIMENT
+    assert ledger.distinct_experiments == 1
+    # a second dry run of ANOTHER spec costs its own looks ...
+    _runner(frames, tmp_path, dry_run=True).run(_spec(frames, "1s"))
+    assert (
+        ExperimentLedger(tmp_path / "experiments.json").total_experiments
+        == 2 * LOOKS_PER_EXPERIMENT
+    )
+    # ... and the real run of the first spec is a rerun, not a new look
+    real = _runner(frames, tmp_path).run(spec)
+    assert real.n_experiments_in_ledger == 2 * LOOKS_PER_EXPERIMENT
+    assert (tmp_path / "experiments" / spec.experiment_id / "result.json").is_file()
 
 
 def test_ledger_increments_by_exactly_the_looks_and_deduplicates(frames, tmp_path):
@@ -407,7 +526,11 @@ def test_ledger_increments_by_exactly_the_looks_and_deduplicates(frames, tmp_pat
     assert ledger.total_experiments == LOOKS_PER_EXPERIMENT == ra2.n_experiments_in_ledger
     entry = ledger.entries[0]
     assert (entry["alpha_id"], entry["kind"], entry["count"], entry["reruns"]) == (
-        "EQ03", LEDGER_KIND, LOOKS_PER_EXPERIMENT, 1)
+        "EQ03",
+        LEDGER_KIND,
+        LOOKS_PER_EXPERIMENT,
+        1,
+    )
     assert entry["config"] == a.to_dict()
     assert entry["result"]["experiment_id"] == a.experiment_id
     # a different spec is one more batch of looks
@@ -424,7 +547,7 @@ def test_persisted_documents_are_canonical_and_byte_identical_on_rerun(frames, t
     target = tmp_path / "experiments" / spec.experiment_id
     first = {n: (target / n).read_bytes() for n in ("spec.json", "result.json")}
     ledger_first = (tmp_path / "experiments.json").read_bytes()
-    _runner(frames, tmp_path).run(spec)          # a fresh runner, same store
+    _runner(frames, tmp_path).run(spec)  # a fresh runner, same store
     second = {n: (target / n).read_bytes() for n in ("spec.json", "result.json")}
     assert first == second
     # the ledger moves only in its rerun counter (its own pinned semantics)
@@ -433,13 +556,15 @@ def test_persisted_documents_are_canonical_and_byte_identical_on_rerun(frames, t
     assert after["total_experiments"] == before["total_experiments"]
     assert after["entries"][0].pop("reruns") == 1 and "reruns" not in before["entries"][0]
     assert after == before
-    for name, schema in (("spec.json", "research/experiment_spec.schema.json"),
-                         ("result.json", "research/experiment_result.schema.json")):
+    for name, schema in (
+        ("spec.json", "research/experiment_spec.schema.json"),
+        ("result.json", "research/experiment_result.schema.json"),
+    ):
         text = first[name].decode("ascii")
         doc = json.loads(text)
         validate(doc, schema)
-        assert text == render_document(doc)          # sorted keys, 2-space, trailing \n
-        assert text.endswith("}\n") and "  \"" in text
+        assert text == render_document(doc)  # sorted keys, 2-space, trailing \n
+        assert text.endswith("}\n") and '  "' in text
         assert "NaN" not in text and "Infinity" not in text
     assert json.loads(first["spec.json"])["experiment_id"] == spec.experiment_id
     assert json.loads(first["result.json"])["experiment_id"] == spec.experiment_id
@@ -455,7 +580,7 @@ def test_rerun_with_a_different_result_is_refused(frames, tmp_path, spec):
     with pytest.raises(ResearchError, match="reproduced different values at \\['\\$\\.ic'\\]"):
         runner.run(spec)
     doc["ic"] -= 1e-3
-    doc["git_commit"] = "somewhere-else"          # provenance may differ
+    doc["git_commit"] = "somewhere-else"  # provenance may differ
     path.write_text(render_document(doc))
     runner.run(spec)
 
@@ -467,14 +592,13 @@ def test_holdout_never_fits_on_validation_or_test_rows(frames, tmp_path, monkeyp
 
     class Recording(EQ03OfiMultiLevel):
         def fit(self, train):
-            fits.append({iid: df["exchange_ts"].to_numpy().copy()
-                         for iid, df in train.items()})
+            fits.append({iid: df["exchange_ts"].to_numpy().copy() for iid, df in train.items()})
             super().fit(train)
 
     monkeypatch.setattr("iap.research.runner.build", lambda alpha_id: Recording())
     s = _spec(frames, "5s", configuration={"embargo_ns": 90 * NS_S})
     _runner(frames, tmp_path, dry_run=True).run(s)
-    holdout_train = fits[-1][GOLDEN_INSTRUMENT]      # the last fit is the holdout
+    holdout_train = fits[-1][GOLDEN_INSTRUMENT]  # the last fit is the holdout
     limit = s.test_period.start_ts - HORIZONS_NS["5s"] - 90 * NS_S
     assert holdout_train.size > 0
     assert np.all(holdout_train + HORIZONS_NS["5s"] + 90 * NS_S < s.test_period.start_ts)
@@ -494,17 +618,23 @@ def test_horizon_override_drives_fit_and_labels(frames, tmp_path):
 def test_runner_reports_an_unsplittable_window_honestly(frames, tmp_path):
     ts = frames[GOLDEN_INSTRUMENT]["exchange_ts"].to_numpy()
     small = {GOLDEN_INSTRUMENT: frames[GOLDEN_INSTRUMENT].iloc[:120].reset_index(drop=True)}
-    s = build_spec("EQ03", "5s", {}, dataset_version=DATA_VERSION,
-                   feature_version=FEATURE_VERSION, seed=1,
-                   train_period=Period(int(ts[0]), int(ts[60])),
-                   validation_period=Period(int(ts[60]), int(ts[80])),
-                   test_period=Period(int(ts[80]), int(ts[119]) + 1))
+    s = build_spec(
+        "EQ03",
+        "5s",
+        {},
+        dataset_version=DATA_VERSION,
+        feature_version=FEATURE_VERSION,
+        seed=1,
+        train_period=Period(int(ts[0]), int(ts[60])),
+        validation_period=Period(int(ts[60]), int(ts[80])),
+        test_period=Period(int(ts[80]), int(ts[119]) + 1),
+    )
     with pytest.raises(ResearchError, match="walk-forward validation impossible"):
         _runner(small, tmp_path, dry_run=True).run(s)
 
 
 def test_universe_mismatch_is_an_error(frames, tmp_path):
-    s = _spec(frames, "1m", alpha_id="FX01")   # FX alpha, equity frame
+    s = _spec(frames, "1m", alpha_id="FX01")  # FX alpha, equity frame
     with pytest.raises(ResearchError, match="no rows"):
         _runner(frames, tmp_path, dry_run=True).run(s)
 
@@ -539,12 +669,17 @@ def test_registry_rejects_corrupt_documents(frames, tmp_path, spec):
     reg = ExperimentRegistry(tmp_path / "experiments")
     spec_path = tmp_path / "experiments" / spec.experiment_id / "spec.json"
     doc = json.loads(spec_path.read_text())
-    doc["seed"] = doc["seed"] + 1                  # body edited, id stale
+    doc["seed"] = doc["seed"] + 1  # body edited, id stale
     spec_path.write_text(render_document(doc))
     with pytest.raises(ResearchError, match="does not match the spec body"):
         reg.load_spec(spec.experiment_id)
     with pytest.raises(ResearchError):
-        list(reg.records())
+        reg.load(spec.experiment_id)
+    # a listing skips the corrupt directory and REPORTS it (never raises,
+    # never quietly shorter)
+    assert list(reg.records()) == []
+    assert [name for name, _ in reg.skipped] == [spec.experiment_id]
+    assert "does not match the spec body" in reg.skipped[0][1]
     (tmp_path / "experiments" / spec.experiment_id / "result.json").unlink()
     with pytest.raises(ResearchError, match="missing"):
         reg.load_result(spec.experiment_id)
@@ -599,13 +734,23 @@ def test_eq03_report_reproduces_through_the_runner(tmp_path):
         pytest.skip("research/alpha_reports/EQ03.json missing — run run_all.py")
     report = json.loads(report_path.read_text())
     assert report["horizon"] == "5s"
-    runner = ExperimentRunner(FEATURES_DIR, tmp_path / "experiments.json",
-                              tmp_path / "experiments", CONFIGS_DIR, dry_run=True)
+    runner = ExperimentRunner(
+        FEATURES_DIR,
+        tmp_path / "experiments.json",
+        tmp_path / "experiments",
+        CONFIGS_DIR,
+        dry_run=True,
+    )
     frames = runner.frames()
     spec = build_spec("EQ03", None, {}, frames=frames)
     assert spec.horizon == "5s" and spec.configuration == DEFAULT_CONFIGURATION
-    days = sorted({int(d) for df in frames.values()
-                   for d in np.unique(df["exchange_ts"].to_numpy() // NS_DAY)})
+    days = sorted(
+        {
+            int(d)
+            for df in frames.values()
+            for d in np.unique(df["exchange_ts"].to_numpy() // NS_DAY)
+        }
+    )
     assert len(days) == 2
     assert spec.test_period.start_ts // NS_DAY == days[1]
     assert spec.train_period.start_ts // NS_DAY == days[0]
@@ -617,26 +762,38 @@ def test_eq03_report_reproduces_through_the_runner(tmp_path):
     exec_cfg = json.loads((CONFIGS_DIR / "execution" / "execution.json").read_text())
     cfg = spec.configuration
     backtester = Backtester(
-        CostModel.load(CONFIGS_DIR / "execution" / "execution.json"), meta,
-        BacktestConfig(latency_ns=cfg["latency_ns"],
-                       max_decision_age_ns=cfg["max_decision_age_ns"],
-                       flatten_at_session_end=cfg["flatten_at_session_end"]))
+        CostModel.load(CONFIGS_DIR / "execution" / "execution.json"),
+        meta,
+        BacktestConfig(
+            latency_ns=cfg["latency_ns"],
+            max_decision_age_ns=cfg["max_decision_age_ns"],
+            flatten_at_session_end=cfg["flatten_at_session_end"],
+        ),
+    )
 
     def factory():
         model = EQ03OfiMultiLevel()
         model.horizon = spec.horizon
         return model
 
-    window = restrict_frames(frames, spec.train_period.start_ts,
-                             spec.test_period.start_ts)
-    direct = validate_alpha(factory, window, backtester, meta,
-                            float(exec_cfg["defaults"]["max_participation"]),
-                            n_folds=int(cfg["n_folds"]),
-                            embargo_ns=int(cfg["embargo_ns"]))
-    for field, key in (("ic", "oos_ic"), ("rank_ic", "oos_rank_ic"),
-                       ("t_stat", "nw_tstat"), ("hit_rate", "oos_hit_rate"),
-                       ("turnover", "turnover_flips_per_hour"),
-                       ("fold_consistency", "fold_sign_consistency")):
+    window = restrict_frames(frames, spec.train_period.start_ts, spec.test_period.start_ts)
+    direct = validate_alpha(
+        factory,
+        window,
+        backtester,
+        meta,
+        float(exec_cfg["defaults"]["max_participation"]),
+        n_folds=int(cfg["n_folds"]),
+        embargo_ns=int(cfg["embargo_ns"]),
+    )
+    for field, key in (
+        ("ic", "oos_ic"),
+        ("rank_ic", "oos_rank_ic"),
+        ("t_stat", "nw_tstat"),
+        ("hit_rate", "oos_hit_rate"),
+        ("turnover", "turnover_flips_per_hour"),
+        ("fold_consistency", "fold_sign_consistency"),
+    ):
         got, want = getattr(result, field), direct[key]
         assert math.isfinite(got) and abs(got - want) <= TOL + TOL * abs(want), (field, got, want)
     assert result.nw_lags == direct["nw_lags"]
@@ -660,23 +817,30 @@ def test_eq03_report_reproduces_through_the_runner(tmp_path):
     #    converge (which would mean the holdout leaked back in).
     assert abs(result.ic - report["oos_ic"]) > TOL, (
         "the runner's holdout-honouring IC equals run_all.py's whole-window "
-        "IC — the walk-forward window has leaked back into the holdout")
+        "IC — the walk-forward window has leaked back into the holdout"
+    )
 
 
 def test_document_drift_tolerates_last_ulp_but_not_semantics():
     """The rerun guard and the goldens compare research documents at 1e-9
     on floats and exactly on everything else (CI runners' BLAS reductions
     differ from a laptop's in the last ulp)."""
-    base = {"ic": 0.021453492319862478, "n": 4, "ok": True, "tag": "x",
-            "leak": {"ic_shifted": -0.0680157774176, "passed": True}, "seq": [1.0, 2.0]}
+    base = {
+        "ic": 0.021453492319862478,
+        "n": 4,
+        "ok": True,
+        "tag": "x",
+        "leak": {"ic_shifted": -0.0680157774176, "passed": True},
+        "seq": [1.0, 2.0],
+    }
     same = json.loads(json.dumps(base))
-    same["ic"] = 0.021453492319862492                 # last-ulp difference
+    same["ic"] = 0.021453492319862492  # last-ulp difference
     same["leak"]["ic_shifted"] = -0.0680157774176 * (1 + 1e-12)
     assert document_drift(base, same) == []
     for path, mutate in (
-        ("$.ic", lambda d: d.__setitem__("ic", 0.0215)),                # > 1e-9
+        ("$.ic", lambda d: d.__setitem__("ic", 0.0215)),  # > 1e-9
         ("$.n", lambda d: d.__setitem__("n", 5)),
-        ("$.ok", lambda d: d.__setitem__("ok", 1)),                    # bool vs int
+        ("$.ok", lambda d: d.__setitem__("ok", 1)),  # bool vs int
         ("$.tag", lambda d: d.__setitem__("tag", "y")),
         ("$.leak.passed", lambda d: d["leak"].__setitem__("passed", False)),
         ("$.seq", lambda d: d.__setitem__("seq", [1.0])),
@@ -690,14 +854,16 @@ def test_document_drift_tolerates_last_ulp_but_not_semantics():
 def test_persist_keeps_committed_bytes_when_numbers_agree(tmp_path, spec):
     """A rerun whose floats differ only in the last ulp is a reproduction:
     result.json keeps its committed bytes; a real change is refused."""
-    runner = ExperimentRunner(None, tmp_path / "ledger.json", tmp_path / "exp",
-                              CONFIGS_DIR, frames={}, dry_run=False)
+    runner = ExperimentRunner(
+        None, tmp_path / "ledger.json", tmp_path / "exp", CONFIGS_DIR, frames={}, dry_run=False
+    )
     result = build_result(spec, _report(), _holdout(), 21, "deadbeef")
     runner._persist(spec, result)
     path = runner.experiment_dir(spec.experiment_id) / "result.json"
     first = path.read_bytes()
-    nudged = build_result(spec, _report(oos_ic=_report()["oos_ic"] * (1 + 1e-13)),
-                          _holdout(), 21, "deadbeef")
+    nudged = build_result(
+        spec, _report(oos_ic=_report()["oos_ic"] * (1 + 1e-13)), _holdout(), 21, "deadbeef"
+    )
     runner._persist(spec, nudged)
     assert path.read_bytes() == first
     with pytest.raises(ResearchError, match="reproduced different values"):
@@ -722,15 +888,15 @@ def test_looks_per_experiment_counts_every_look_the_chain_takes():
     )
 
     expected = (
-        1                          # pooled walk-forward OOS IC / NW t
-        + len(HORIZON_ORDER)       # decay curve, one IC per pinned horizon
-        + len(COST_MULTIPLIERS)    # cost stress grid
-        + len(LATENCY_SHIFTS)      # latency stress, ROW grid
-        + len(LATENCY_TIMES_NS)    # latency stress, TIME grid
-        + 2                        # regime split: high vol, low vol
-        + 2                        # crossed / uncrossed conditional IC
-        + 1                        # leakage shift-by-one IC
-        + 1                        # holdout backtest
+        1  # pooled walk-forward OOS IC / NW t
+        + len(HORIZON_ORDER)  # decay curve, one IC per pinned horizon
+        + len(COST_MULTIPLIERS)  # cost stress grid
+        + len(LATENCY_SHIFTS)  # latency stress, ROW grid
+        + len(LATENCY_TIMES_NS)  # latency stress, TIME grid
+        + 2  # regime split: high vol, low vol
+        + 2  # crossed / uncrossed conditional IC
+        + 1  # leakage shift-by-one IC
+        + 1  # holdout backtest
     )
     assert expected == 28
     assert LOOKS_PER_EXPERIMENT == expected

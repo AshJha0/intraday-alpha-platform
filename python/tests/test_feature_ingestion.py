@@ -28,7 +28,6 @@ import json
 import math
 
 import pytest
-
 from conftest import REPO_ROOT, mkev
 from iap.core.events import EventType, SessionStatus
 from iap.features.context import build_contexts
@@ -66,8 +65,7 @@ class _Feed:
             seq = self.seq.get(vid, 0) + 1
         self.seq[vid] = max(self.seq.get(vid, 0), seq)
         self.vec = self.engine.apply(
-            mkev(seq, event_type, instrument_id=self.iid, venue_id=vid, ts=ts,
-                 **kw)
+            mkev(seq, event_type, instrument_id=self.iid, venue_id=vid, ts=ts, **kw)
         )
         return self.vec
 
@@ -80,10 +78,8 @@ def _val(vec, idx, name):
 def _warm_book(feed, t, oid=1):
     """A deep two-sided book so window features can warm up."""
     for k in range(5):
-        feed.send(EventType.ADD, t, side=0, price=1000 - k, qty=100 + k,
-                  order_id=oid + k)
-        feed.send(EventType.ADD, t, side=1, price=1002 + k, qty=100 + k,
-                  order_id=oid + 100 + k)
+        feed.send(EventType.ADD, t, side=0, price=1000 - k, qty=100 + k, order_id=oid + k)
+        feed.send(EventType.ADD, t, side=1, price=1002 + k, qty=100 + k, order_id=oid + 100 + k)
     return oid + 200
 
 
@@ -111,12 +107,12 @@ def test_scenario_gateway_replay_after_reconnect(contexts, idx):
 
     # gateway replays the same message (duplicate sequence)
     dup_seq = feed.seq[1]
-    feed.send(EventType.TRADE, t, seq=dup_seq, side=0, price=1001, qty=50,
-              trade_id=1)
+    feed.send(EventType.TRADE, t, seq=dup_seq, side=0, price=1001, qty=50, trade_id=1)
     vec = feed.vec
     assert engine.states[1].cons.books[1].duplicates_dropped == 1
     assert _val(vec, idx, "signed_volume_w1s_v1") == (50.0, True), (
-        "a duplicate trade must not double-count signed volume")
+        "a duplicate trade must not double-count signed volume"
+    )
     assert _val(vec, idx, "trade_count_w1s_v1") == (1.0, True)
 
     # malformed side on an ADD: book drops it, add_qty must not move
@@ -128,8 +124,7 @@ def test_scenario_gateway_replay_after_reconnect(contexts, idx):
 
     # sequence gap -> venue stale; a CANCEL arriving while stale is dropped
     cancel_qty_before = _val(vec, idx, "cancel_qty_w1s_v1")[0]
-    feed.send(EventType.ADD, t, seq=feed.seq[1] + 10, side=0, price=999,
-              qty=10, order_id=901)
+    feed.send(EventType.ADD, t, seq=feed.seq[1] + 10, side=0, price=999, qty=10, order_id=901)
     feed.send(EventType.CANCEL, t, side=0, price=1000, qty=100, order_id=1)
     vec = feed.vec
     assert engine.states[1].cons.books[1].stale
@@ -159,14 +154,12 @@ def test_scenario_venue_disconnect_then_snapshot_recovery(contexts, idx):
     feed.send(EventType.ADD, t, side=1, price=1002, qty=100, order_id=2)
     # 400 s of mid changes so every window is warm and rvol > 0
     oid = 10
-    bid, ask = 1000, 1002
+    bid = 1000
     for k in range(200):
         t += 2 * NS
         step = 1 if k % 2 == 0 else -1
-        feed.send(EventType.ADD, t, side=0, price=bid + step, qty=100,
-                  order_id=oid)
-        feed.send(EventType.CANCEL, t, side=0, price=bid, qty=0,
-                  order_id=oid - 1 if k else 1)
+        feed.send(EventType.ADD, t, side=0, price=bid + step, qty=100, order_id=oid)
+        feed.send(EventType.CANCEL, t, side=0, price=bid, qty=0, order_id=oid - 1 if k else 1)
         bid += step
         oid += 1
     vec = feed.vec
@@ -175,8 +168,7 @@ def test_scenario_venue_disconnect_then_snapshot_recovery(contexts, idx):
 
     # gap: 50 sequence numbers lost, then 120 s of silence
     t += 1 * NS
-    feed.send(EventType.ADD, t, seq=feed.seq[1] + 50, side=0, price=1000,
-              qty=10, order_id=oid + 50)
+    feed.send(EventType.ADD, t, seq=feed.seq[1] + 50, side=0, price=1000, qty=10, order_id=oid + 50)
     assert engine.states[1].cons.books[1].stale
     assert not feed.vec.validity[idx["mid_price_v1"]]
 
@@ -184,40 +176,64 @@ def test_scenario_venue_disconnect_then_snapshot_recovery(contexts, idx):
     t += 120 * NS
     seq = feed.seq[1] + 1
     new_bid, new_ask = 1010, 1012
-    feed.send(EventType.SNAPSHOT, t, seq=seq, side=0, price=new_bid, qty=100,
-              order_id=0, trade_id=3)
-    feed.send(EventType.SNAPSHOT, t, seq=seq + 1, side=1, price=new_ask,
-              qty=100, order_id=0, trade_id=2)
-    feed.send(EventType.SNAPSHOT, t, seq=seq + 2, side=0, price=new_bid - 1,
-              qty=90, order_id=0, trade_id=1)
-    feed.send(EventType.SNAPSHOT, t, seq=seq + 3, side=1, price=new_ask + 1,
-              qty=90, order_id=0, trade_id=0)
+    feed.send(
+        EventType.SNAPSHOT, t, seq=seq, side=0, price=new_bid, qty=100, order_id=0, trade_id=3
+    )
+    feed.send(
+        EventType.SNAPSHOT, t, seq=seq + 1, side=1, price=new_ask, qty=100, order_id=0, trade_id=2
+    )
+    feed.send(
+        EventType.SNAPSHOT,
+        t,
+        seq=seq + 2,
+        side=0,
+        price=new_bid - 1,
+        qty=90,
+        order_id=0,
+        trade_id=1,
+    )
+    feed.send(
+        EventType.SNAPSHOT,
+        t,
+        seq=seq + 3,
+        side=1,
+        price=new_ask + 1,
+        qty=90,
+        order_id=0,
+        trade_id=0,
+    )
     vec = feed.vec
     st = engine.states[1]
     assert not st.cons.books[1].stale
     assert st.recoveries == 1 and st.recovered_ts == t and st.warm_ts == t
     assert st.book_ok
     # every window restarts its warmup: no rvol, no returns, no ratios
-    for name in ("rvol_w10s_v1", "rvol_w1m_v1", "rvol_w5m_v1",
-                 "ret_log_10s_v1", "ret_log_1m_v1", "ret_vol_adj_10s_v1",
-                 "trend_score_w1m_v1", "vol_regime_ratio_v1",
-                 "ofi_l1_w1s_v1", "signed_volume_w1m_v1"):
+    for name in (
+        "rvol_w10s_v1",
+        "rvol_w1m_v1",
+        "rvol_w5m_v1",
+        "ret_log_10s_v1",
+        "ret_log_1m_v1",
+        "ret_vol_adj_10s_v1",
+        "trend_score_w1m_v1",
+        "vol_regime_ratio_v1",
+        "ofi_l1_w1s_v1",
+        "signed_volume_w1m_v1",
+    ):
         assert not vec.validity[idx[name]], f"{name} valid right after recovery"
     # instantaneous book features are valid again immediately
     assert vec.validity[idx["mid_price_v1"]]
-    assert vec.values[idx["mid_price_v1"]] == pytest.approx(
-        (new_bid + new_ask) * 0.01 / 2.0)
+    assert vec.values[idx["mid_price_v1"]] == pytest.approx((new_bid + new_ask) * 0.01 / 2.0)
 
     # 10 s later with one mid change: the 10s window is warm again and the
     # ratio is finite and small (it cannot see across the outage)
     t += 11 * NS
-    feed.send(EventType.ADD, t, side=0, price=new_bid + 1, qty=50,
-              order_id=oid + 999)
+    feed.send(EventType.ADD, t, side=0, price=new_bid + 1, qty=50, order_id=oid + 999)
     vec = feed.vec
     assert vec.validity[idx["rvol_w10s_v1"]]
     rva = _val(vec, idx, "ret_vol_adj_10s_v1")
     assert (not rva[1]) or abs(rva[0]) < 1e3
-    for x, ok in zip(vec.values, vec.validity):
+    for x, ok in zip(vec.values, vec.validity, strict=False):
         assert (not ok) or math.isfinite(x)
 
 
@@ -233,9 +249,14 @@ def test_stale_recovery_ratio_features_are_invalid_not_huge(contexts, idx):
         feed.send(EventType.ADD, t, side=0, price=990, qty=5, order_id=500 + k)
     vec = feed.vec
     assert _val(vec, idx, "rvol_w1m_v1") == (0.0, True)
-    for name in ("ret_vol_adj_10s_v1", "ret_vol_adj_1m_v1",
-                 "trend_score_w1m_v1", "vol_regime_ratio_v1",
-                 "vol_ratio_w10s_w1m_v1", "alpha_decay_proxy_v1"):
+    for name in (
+        "ret_vol_adj_10s_v1",
+        "ret_vol_adj_1m_v1",
+        "trend_score_w1m_v1",
+        "vol_regime_ratio_v1",
+        "vol_ratio_w10s_w1m_v1",
+        "alpha_decay_proxy_v1",
+    ):
         assert not vec.validity[idx[name]], f"{name} valid with rvol == 0"
 
 
@@ -245,7 +266,7 @@ def test_resiliency_halflife_invalid_without_replenishment(contexts, idx):
     feed = _Feed(engine)
     t = T0
     _warm_book(feed, t)
-    for k in range(12):
+    for _k in range(12):
         t += 1 * NS
         feed.send(EventType.MODIFY, t, side=0, price=0, qty=100, order_id=5)
     vec = feed.vec
@@ -318,7 +339,7 @@ def test_scenario_lp_withdraws_with_zero_price_quote(contexts, idx, price):
     assert engine.events_dropped == 1
     # the withdrawal was rejected: the previous quote still prevails
     assert vec.validity[idx["mid_price_v1"]]
-    for x, ok in zip(vec.values, vec.validity):
+    for x, ok in zip(vec.values, vec.validity, strict=False):
         assert (not ok) or math.isfinite(x)
 
 
@@ -348,15 +369,14 @@ def test_scenario_cross_venue_timestamp_regression(contexts, idx):
     engine = FeatureEngine(contexts, cadence_ns=0)
     feed = _Feed(engine)
     t = T0
-    feed.send(EventType.ADD, t, venue_id=1, side=0, price=1000, qty=100,
-              order_id=1)
-    feed.send(EventType.ADD, t, venue_id=1, side=1, price=1002, qty=100,
-              order_id=2)
+    feed.send(EventType.ADD, t, venue_id=1, side=0, price=1000, qty=100, order_id=1)
+    feed.send(EventType.ADD, t, venue_id=1, side=1, price=1002, qty=100, order_id=2)
     hist_before = len(engine.states[1].hist2)
     mid_before = feed.vec.values[idx["mid_price_v1"]]
 
-    vec = feed.send(EventType.ADD, t - 5_000_000, venue_id=2, side=0,
-                    price=1001, qty=100, order_id=3)
+    vec = feed.send(
+        EventType.ADD, t - 5_000_000, venue_id=2, side=0, price=1001, qty=100, order_id=3
+    )
     assert vec is None, "a ts regression emits no vector"
     st = engine.states[1]
     assert st.ts_regressions_dropped == 1 and engine.ts_regressions_dropped == 1
@@ -365,8 +385,7 @@ def test_scenario_cross_venue_timestamp_regression(contexts, idx):
 
     # the stream continues normally afterwards
     t += NS
-    feed.send(EventType.ADD, t, venue_id=2, side=0, price=1001, qty=100,
-              order_id=4)
+    feed.send(EventType.ADD, t, venue_id=2, side=0, price=1001, qty=100, order_id=4)
     vec = feed.vec
     assert vec.validity[idx["mid_price_v1"]]
     assert vec.values[idx["mid_price_v1"]] > mid_before
@@ -375,10 +394,8 @@ def test_scenario_cross_venue_timestamp_regression(contexts, idx):
 def test_ts_regression_counter_is_reported_in_run_summary(contexts):
     engine = FeatureEngine(contexts, cadence_ns=0)
     events = [
-        mkev(1, EventType.ADD, side=0, price=1000, qty=100, order_id=1,
-             ts=T0 + NS),
-        mkev(2, EventType.ADD, side=1, price=1002, qty=100, order_id=2,
-             ts=T0 + NS),
+        mkev(1, EventType.ADD, side=0, price=1000, qty=100, order_id=1, ts=T0 + NS),
+        mkev(2, EventType.ADD, side=1, price=1002, qty=100, order_id=2, ts=T0 + NS),
         mkev(3, EventType.ADD, side=0, price=1001, qty=10, order_id=3, ts=T0),
     ]
     summary = engine.run(events)
@@ -413,8 +430,7 @@ def test_scenario_halt_then_reopen_auction_flags(contexts, idx):
 # ---------------------------------------------------------------------------
 
 
-def _tz_config(tmp_path, tzname="America/New_York", open_="09:30:00",
-               close="16:00:00"):
+def _tz_config(tmp_path, tzname="America/New_York", open_="09:30:00", close="16:00:00"):
     """A minimal configs dir (instruments/instruments.json) with one equity
     session in ``tzname``."""
     cfg = {
@@ -422,8 +438,12 @@ def _tz_config(tmp_path, tzname="America/New_York", open_="09:30:00",
             "EQUITY": {"timezone": tzname, "open": open_, "close": close},
         },
         "instruments": [
-            {"instrument_id": 1, "symbol": "SYN.EQ.001",
-             "asset_class": "EQUITY", "tick_size": 0.01},
+            {
+                "instrument_id": 1,
+                "symbol": "SYN.EQ.001",
+                "asset_class": "EQUITY",
+                "tick_size": 0.01,
+            },
         ],
     }
     (tmp_path / "instruments").mkdir(parents=True, exist_ok=True)
@@ -432,8 +452,7 @@ def _tz_config(tmp_path, tzname="America/New_York", open_="09:30:00",
 
 
 def _utc_ns(y, mo, d, h, mi):
-    return int(dt.datetime(y, mo, d, h, mi, tzinfo=dt.timezone.utc)
-               .timestamp()) * NS
+    return int(dt.datetime(y, mo, d, h, mi, tzinfo=dt.UTC).timestamp()) * NS
 
 
 def test_scenario_session_timezone_and_dst(tmp_path):
@@ -490,11 +509,16 @@ def test_session_timezone_features_are_session_local(tmp_path, idx):
 def test_missing_or_unknown_session_timezone_fails_fast(tmp_path):
     """A session without an IANA zone is a start-up error, never UTC."""
     d = _tz_config(tmp_path / "a")
-    (tmp_path / "a" / "instruments" / "instruments.json").write_text(json.dumps({
-        "sessions": {"EQUITY": {"open": "09:30:00", "close": "16:00:00"}},
-        "instruments": [{"instrument_id": 1, "symbol": "S", "asset_class":
-                         "EQUITY", "tick_size": 0.01}],
-    }))
+    (tmp_path / "a" / "instruments" / "instruments.json").write_text(
+        json.dumps(
+            {
+                "sessions": {"EQUITY": {"open": "09:30:00", "close": "16:00:00"}},
+                "instruments": [
+                    {"instrument_id": 1, "symbol": "S", "asset_class": "EQUITY", "tick_size": 0.01}
+                ],
+            }
+        )
+    )
     with pytest.raises(ValueError, match="timezone"):
         build_contexts(d)
 

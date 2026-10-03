@@ -55,27 +55,78 @@ OUT = ROOT / "tests" / "golden" / "expected_canonical_json.json"
 SEED = 0x5EED_CA7A_1
 
 EDGE_FLOATS = [
-    0.0, -0.0, 1.0, -1.0, 0.5, 0.1, 0.2, 0.30000000000000004, 1.5, 2.5,
-    100.0, 1e15, 1e16, 1e17, 123456789012345680.0, 9007199254740992.0,
-    9007199254740993.0, 0.0001, 0.00001, 0.000123, 1e-05, 1e-7, 1.5e-10,
-    1e-300, 5e-324, 2.2250738585072014e-308, 1.7976931348623157e308,
-    3.141592653589793, 2.718281828459045, 1e21, 1e22, 1.0000000000000002,
-    0.9999999999999999, 42.0, 4.2, 0.042, 4200.0, 4.2e-5, 4.2e16, 4.2e15,
-    -4.2e-5, 12345.6789, 1e-4, 9.999e-5, 1234567890123456.0,
-    12345678901234567.0, 0.000999, 1e16 - 2, 255.0, 65535.0, 4294967295.0,
+    0.0,
+    -0.0,
+    1.0,
+    -1.0,
+    0.5,
+    0.1,
+    0.2,
+    0.30000000000000004,
+    1.5,
+    2.5,
+    100.0,
+    1e15,
+    1e16,
+    1e17,
+    123456789012345680.0,
+    9007199254740992.0,
+    9007199254740993.0,
+    0.0001,
+    0.00001,
+    0.000123,
+    1e-05,
+    1e-7,
+    1.5e-10,
+    1e-300,
+    5e-324,
+    2.2250738585072014e-308,
+    1.7976931348623157e308,
+    3.141592653589793,
+    2.718281828459045,
+    1e21,
+    1e22,
+    1.0000000000000002,
+    0.9999999999999999,
+    42.0,
+    4.2,
+    0.042,
+    4200.0,
+    4.2e-5,
+    4.2e16,
+    4.2e15,
+    -4.2e-5,
+    12345.6789,
+    1e-4,
+    9.999e-5,
+    1234567890123456.0,
+    12345678901234567.0,
+    0.000999,
+    1e16 - 2,
+    255.0,
+    65535.0,
+    4294967295.0,
 ]
 
 # Exact decimal midpoints found by the 2026-09-20 review's differential fuzz
 # (Rust rounded them half-up; Python / C++ / Java / ryu round half-even).
 TIE_FLOATS = [
-    1059438285926254.25, 26363981746409.3125, 1000000000000000.25,
-    2251799813685248.5, 1125899906842624.25, 1125899906842624.75,
-    562949953421312.125, 1099511627776.03125, 4503599627370495.5,
-    9007199254740991.0, 1152921504606846976.0, 3602879701896397.5,
+    1059438285926254.25,
+    26363981746409.3125,
+    1000000000000000.25,
+    2251799813685248.5,
+    1125899906842624.25,
+    1125899906842624.75,
+    562949953421312.125,
+    1099511627776.03125,
+    4503599627370495.5,
+    9007199254740991.0,
+    1152921504606846976.0,
+    3602879701896397.5,
 ]
 TIE_SEED = SEED ^ 0x7E5
-TIE_BINADES = range(40, 53)          # 2^40 .. 2^52
-TIE_MAX_FRACTION_BITS = 6            # j / 2^b, 1 <= b <= 6
+TIE_BINADES = range(40, 53)  # 2^40 .. 2^52
+TIE_MAX_FRACTION_BITS = 6  # j / 2^b, 1 <= b <= 6
 
 
 def _exact_digits(value: float) -> tuple[int, ...]:
@@ -113,7 +164,7 @@ def tie_floats(n_ties: int, n_long: int) -> list[float]:
         k = (1 << e) + int(rng.next_u64() % (1 << e))
         j = 1 + int(rng.next_u64() % ((1 << b) - 1))
         if e - 52 + b > 0:
-            continue                                # fraction not representable
+            continue  # fraction not representable
         value = float(k) + j / (1 << b)
         if value - float(k) != j / (1 << b):
             continue
@@ -145,11 +196,30 @@ def seeded_floats(n: int) -> list[float]:
 
 
 STRING_CASES = [
-    "", "plain", "with space", "quote\"inside", "back\\slash", "slash/kept",
-    "line\nfeed", "car\rreturn", "tab\tchar", "bell\x07", "back\bspace",
-    "form\ffeed", "nul\x00byte", "del\x7f", "é", "naïve café", "€100",
-    "日本語", "emoji 😀", "𝔘𝔫𝔦𝔠𝔬𝔡𝔢", "mixed é😀\n\"\\", "  ",
-    "unicode key ordering: Z z a A", "퟿",
+    "",
+    "plain",
+    "with space",
+    'quote"inside',
+    "back\\slash",
+    "slash/kept",
+    "line\nfeed",
+    "car\rreturn",
+    "tab\tchar",
+    "bell\x07",
+    "back\bspace",
+    "form\ffeed",
+    "nul\x00byte",
+    "del\x7f",
+    "é",
+    "naïve café",
+    "€100",
+    "日本語",
+    "emoji 😀",
+    "𝔘𝔫𝔦𝔠𝔬𝔡𝔢",
+    'mixed é😀\n"\\',
+    "  ",
+    "unicode key ordering: Z z a A",
+    "퟿",
 ]
 
 DOCUMENTS = [
@@ -157,13 +227,23 @@ DOCUMENTS = [
     [],
     {"b": 1, "a": 2, "A": 3, "Z": 4, "z": 5, "_": 6, "0": 7, "é": 8, "aa": 9, "a0": 10},
     {"nested": {"y": [1, 2, {"q": None, "p": True, "o": False}], "x": {"k": "v"}}},
-    {"ids": {"u64_max": 18446744073709551615, "i64_min": -9223372036854775808,
-             "i64_max": 9223372036854775807, "two53_plus_one": 9007199254740993}},
+    {
+        "ids": {
+            "u64_max": 18446744073709551615,
+            "i64_min": -9223372036854775808,
+            "i64_max": 9223372036854775807,
+            "two53_plus_one": 9007199254740993,
+        }
+    },
     {"floats": [0.0, -0.0, 1e16, 1e-05, 0.1, 100.0, 2.5, 1e22]},
     {"arr": [[], {}, [[]], [{}]], "s": "é😀", "n": None},
-    {"key with spaces": 1, "key\twith\ttabs": 2, "key\"quoted\"": 3},
-    {"trace_id": "8b9fed6896d01463e64c4de915b0614b", "sequence": 500,
-     "event_ts": 1787578700000000000, "instrument_id": 1},
+    {"key with spaces": 1, "key\twith\ttabs": 2, 'key"quoted"': 3},
+    {
+        "trace_id": "8b9fed6896d01463e64c4de915b0614b",
+        "sequence": 500,
+        "event_ts": 1787578700000000000,
+        "instrument_id": 1,
+    },
 ]
 
 
@@ -181,8 +261,9 @@ def main() -> int:
         bits = struct.unpack("<Q", struct.pack("<d", value))[0]
         float_cases.append({"bits_hex": f"{bits:016x}", "repr": canonical_json(value)})
 
-    string_cases = [{"input_codepoints": [ord(c) for c in s], "json": canonical_json(s)}
-                    for s in STRING_CASES]
+    string_cases = [
+        {"input_codepoints": [ord(c) for c in s], "json": canonical_json(s)} for s in STRING_CASES
+    ]
 
     documents = [{"canonical": canonical_json(d), "sha256": content_hash(d)} for d in DOCUMENTS]
 
@@ -193,7 +274,13 @@ def main() -> int:
         {"case": "nested nan", "reason": "non-finite float anywhere in the document"},
         {"case": "integer key", "reason": "dict keys must be strings"},
     ]
-    for probe in (float("nan"), float("inf"), float("-inf"), {"a": [1, {"b": float("nan")}]}, {1: "x"}):
+    for probe in (
+        float("nan"),
+        float("inf"),
+        float("-inf"),
+        {"a": [1, {"b": float("nan")}]},
+        {1: "x"},
+    ):
         try:
             canonical_json(probe)
         except ValueError:
@@ -221,7 +308,7 @@ def main() -> int:
             "separators": [",", ":"],
             "ascii": "non-ASCII escaped as \\uXXXX (UTF-16 surrogate pairs above U+FFFF); '/' not escaped",
             "floats": "shortest round-trip digits; exponent form iff decimal exponent < -4 or >= 16; "
-                      "exponent written as e-05 / e+16 (sign, at least two digits); integral values keep '.0'",
+            "exponent written as e-05 / e+16 (sign, at least two digits); integral values keep '.0'",
             "ints": "exact decimal, i64/u64 domain",
             "literals": ["null", "true", "false"],
             "line_hash": "sha256 over ascii(line) + '\\n' per trace, concatenated",
@@ -231,8 +318,12 @@ def main() -> int:
         "documents": documents,
         "rejects": rejects,
         "trace_id": {
-            "inputs": {"session_id": "golden-session-2026-09-19", "instrument_id": 1,
-                       "event_ts": 1787578700000000000, "sequence": 500},
+            "inputs": {
+                "session_id": "golden-session-2026-09-19",
+                "instrument_id": 1,
+                "event_ts": 1787578700000000000,
+                "sequence": 500,
+            },
             "preimage": "golden-session-2026-09-19|1|1787578700000000000|500",
             "expected": make_trace_id("golden-session-2026-09-19", 1, 1787578700000000000, 500),
         },
@@ -246,8 +337,10 @@ def main() -> int:
         },
     }
     OUT.write_text(json.dumps(golden, indent=2, sort_keys=False) + "\n", encoding="ascii")
-    print(f"wrote {OUT} ({len(float_cases)} float cases, {len(string_cases)} string cases, "
-          f"{len(documents)} documents)")
+    print(
+        f"wrote {OUT} ({len(float_cases)} float cases, {len(string_cases)} string cases, "
+        f"{len(documents)} documents)"
+    )
     return 0
 
 

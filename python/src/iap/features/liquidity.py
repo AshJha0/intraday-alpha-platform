@@ -31,7 +31,6 @@ undefined, not "3e13 seconds").
 from __future__ import annotations
 
 from math import log
-from typing import List
 
 from iap.features._famutil import put
 from iap.features.spec import EPS, WINDOW_NS, FeatureSpec, mkspec
@@ -42,51 +41,81 @@ WINDOWS = ("10s", "1m")
 LN2 = log(2.0)
 
 
-def specs() -> List[FeatureSpec]:
+def specs() -> list[FeatureSpec]:
     """Registry entries for the liquidity family (pinned order)."""
-    out: List[FeatureSpec] = []
-    out.append(mkspec("quoted_depth_total_v1", FAMILY,
-                      "Two-sided quoted depth over the best 10 levels.",
-                      depends_on=("depth_bid_l10_v1", "depth_ask_l10_v1")))
-    out.append(mkspec("quoted_depth_ratio_v1", FAMILY,
-                      "Bid share of two-sided top-10 depth: bid/(bid+ask).",
-                      depends_on=("quoted_depth_total_v1",)))
+    out: list[FeatureSpec] = []
+    out.append(
+        mkspec(
+            "quoted_depth_total_v1",
+            FAMILY,
+            "Two-sided quoted depth over the best 10 levels.",
+            depends_on=("depth_bid_l10_v1", "depth_ask_l10_v1"),
+        )
+    )
+    out.append(
+        mkspec(
+            "quoted_depth_ratio_v1",
+            FAMILY,
+            "Bid share of two-sided top-10 depth: bid/(bid+ask).",
+            depends_on=("quoted_depth_total_v1",),
+        )
+    )
     for w in WINDOWS:
-        out.append(mkspec(f"quoted_depth_avg_w{w}_v1", FAMILY,
-                          f"Mean two-sided top-10 quoted depth over {w}.",
-                          depends_on=("quoted_depth_total_v1",), window=w))
+        out.append(
+            mkspec(
+                f"quoted_depth_avg_w{w}_v1",
+                FAMILY,
+                f"Mean two-sided top-10 quoted depth over {w}.",
+                depends_on=("quoted_depth_total_v1",),
+                window=w,
+            )
+        )
     for w in WINDOWS:
-        out.append(mkspec(
-            f"effective_spread_bps_w{w}_v1", FAMILY,
-            f"Mean effective spread over TRADEs in {w}: 2*|price-mid|/mid*1e4.",
-            window=w))
+        out.append(
+            mkspec(
+                f"effective_spread_bps_w{w}_v1",
+                FAMILY,
+                f"Mean effective spread over TRADEs in {w}: 2*|price-mid|/mid*1e4.",
+                window=w,
+            )
+        )
     for w in WINDOWS:
-        out.append(mkspec(f"traded_volume_w{w}_v1", FAMILY,
-                          f"Total TRADE qty over {w}.", window=w))
+        out.append(mkspec(f"traded_volume_w{w}_v1", FAMILY, f"Total TRADE qty over {w}.", window=w))
     for w in WINDOWS:
-        out.append(mkspec(
-            f"participation_w{w}_v1", FAMILY,
-            f"Trading activity vs liquidity over {w}: "
-            f"volume/(volume + mean quoted depth).",
-            depends_on=(f"traded_volume_w{w}_v1", f"quoted_depth_avg_w{w}_v1"),
-            window=w))
+        out.append(
+            mkspec(
+                f"participation_w{w}_v1",
+                FAMILY,
+                f"Trading activity vs liquidity over {w}: volume/(volume + mean quoted depth).",
+                depends_on=(f"traded_volume_w{w}_v1", f"quoted_depth_avg_w{w}_v1"),
+                window=w,
+            )
+        )
     for side in ("bid", "ask"):
-        out.append(mkspec(
-            f"depth_slope_{side}_v1", FAMILY,
-            f"Book slope of the {side} side: bps distance from L1 to L<=5 "
-            f"divided by the cumulative depth through that level.",
-            side=side, levels=5))
-    out.append(mkspec(
-        "resiliency_halflife_v1", FAMILY,
-        "Seconds to rebuild half the current L1 depth at the 10s "
-        "replenishment rate: ln(2)*(Qb+Qa)/2 / (rep_rate_10s + EPS).",
-        depends_on=("queue_replenish_rate_bid_w10s_v1",
-                    "queue_replenish_rate_ask_w10s_v1"),
-        window="10s"))
+        out.append(
+            mkspec(
+                f"depth_slope_{side}_v1",
+                FAMILY,
+                f"Book slope of the {side} side: bps distance from L1 to L<=5 "
+                f"divided by the cumulative depth through that level.",
+                side=side,
+                levels=5,
+            )
+        )
+    out.append(
+        mkspec(
+            "resiliency_halflife_v1",
+            FAMILY,
+            "Seconds to rebuild half the current L1 depth at the 10s "
+            "replenishment rate: ln(2)*(Qb+Qa)/2 / (rep_rate_10s + EPS).",
+            depends_on=("queue_replenish_rate_bid_w10s_v1", "queue_replenish_rate_ask_w10s_v1"),
+            window="10s",
+        )
+    )
     return out
 
 
-def compute(st, values: List[float], valid: List[bool]) -> None:
+def compute(st, values: list[float], valid: list[bool]) -> None:
     """Append the 13 liquidity values for the current emission."""
     ok = st.book_ok
     qd = (st.db10 + st.da10) if ok else None
@@ -114,7 +143,7 @@ def compute(st, values: List[float], valid: List[bool]) -> None:
         if w in vols and w in depth_means:
             v = vols[w] / (vols[w] + depth_means[w] + EPS)
         put(values, valid, v, v is not None)
-    for side, levels in (("bid", st.depth_bid), ("ask", st.depth_ask)):
+    for _side, levels in (("bid", st.depth_bid), ("ask", st.depth_ask)):
         slope = None
         if ok and len(levels) >= 2:
             k = min(5, len(levels))

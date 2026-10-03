@@ -25,7 +25,7 @@ import json
 import math
 from dataclasses import dataclass
 from enum import Enum, IntEnum
-from typing import Any, Dict
+from typing import Any
 
 from iap.risk.serialize import json_escape
 
@@ -48,7 +48,7 @@ class Scope(Enum):
     VENUE = "VENUE"
 
     @classmethod
-    def parse(cls, text: str) -> "Scope":
+    def parse(cls, text: str) -> Scope:
         """Wire string -> Scope; ``ValueError`` for anything else."""
         for member in cls:
             if member.value == text:
@@ -188,8 +188,7 @@ class RiskEvent:
             raise ValueError(f"scope must be a Scope, got {self.scope!r}")
         if not (1 <= int(self.severity) <= 3 and 1 <= int(self.decision) <= 3):
             raise ValueError(
-                f"RiskEvent enum out of domain: severity {self.severity} "
-                f"decision {self.decision}"
+                f"RiskEvent enum out of domain: severity {self.severity} decision {self.decision}"
             )
         if not (_I64_MIN <= self.timestamp <= _I64_MAX):
             raise ValueError(f"timestamp out of i64 range: {self.timestamp}")
@@ -197,17 +196,25 @@ class RiskEvent:
     def to_json_line(self) -> str:
         """Serialise as one JSONL line (sorted schema keys, no newline)."""
         return (
-            '{"decision":' + str(int(self.decision))
-            + ',"reason":"' + json_escape(self.reason)
-            + '","rule_id":"' + json_escape(self.rule_id)
-            + '","scope":"' + self.scope.value
-            + '","scope_id":"' + json_escape(self.scope_id)
-            + '","severity":' + str(int(self.severity))
-            + ',"timestamp":' + str(self.timestamp) + "}"
+            '{"decision":'
+            + str(int(self.decision))
+            + ',"reason":"'
+            + json_escape(self.reason)
+            + '","rule_id":"'
+            + json_escape(self.rule_id)
+            + '","scope":"'
+            + self.scope.value
+            + '","scope_id":"'
+            + json_escape(self.scope_id)
+            + '","severity":'
+            + str(int(self.severity))
+            + ',"timestamp":'
+            + str(self.timestamp)
+            + "}"
         )
 
     @classmethod
-    def from_json_line(cls, line: str) -> "RiskEvent":
+    def from_json_line(cls, line: str) -> RiskEvent:
         """Parse one JSONL audit line back (strict: exact field set, enum
         codes in domain); ``ValueError`` otherwise."""
         try:
@@ -217,16 +224,18 @@ class RiskEvent:
         return cls.from_dict(doc)
 
     @classmethod
-    def from_dict(cls, doc: Any) -> "RiskEvent":
+    def from_dict(cls, doc: Any) -> RiskEvent:
         """Strict deserialisation of a parsed schema-shaped object (every
         schema field required and typed; unknown fields are ignored, as
         serde's derived deserializer does in the Rust reference)."""
-        expected = {"timestamp", "scope", "scope_id", "rule_id", "severity",
-                    "decision", "reason"}
+        expected = {"timestamp", "scope", "scope_id", "rule_id", "severity", "decision", "reason"}
         if not isinstance(doc, dict) or not expected <= set(doc):
             raise ValueError("bad RiskEvent line: missing schema field")
-        if not _is_int(doc["timestamp"]) or not _is_int(doc["severity"]) \
-                or not _is_int(doc["decision"]):
+        if (
+            not _is_int(doc["timestamp"])
+            or not _is_int(doc["severity"])
+            or not _is_int(doc["decision"])
+        ):
             raise ValueError("bad RiskEvent line: non-integer field")
         for key in ("scope", "scope_id", "rule_id", "reason"):
             if not isinstance(doc[key], str):
@@ -250,7 +259,7 @@ class RiskEvent:
             reason=doc["reason"],
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Schema-shaped plain dict (scope as its wire string)."""
         return {
             "timestamp": self.timestamp,
@@ -282,7 +291,7 @@ def fmt_fixed(v: float, decimals: int) -> str:
     digits; a value that rounds to zero prints without a sign."""
     if decimals < 0:
         raise ValueError("decimals must be >= 0")
-    scale_i = 10 ** decimals
+    scale_i = 10**decimals
     scaled = abs(v) * float(scale_i)
     if math.isnan(scaled):
         units = 0

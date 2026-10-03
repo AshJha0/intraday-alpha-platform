@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 
 import pytest
-
 from iap.experiment.tracker import (
     ExperimentTracker,
     data_version,
@@ -17,10 +16,21 @@ from iap.experiment.tracker import (
 )
 
 REQUIRED_MANIFEST_KEYS = {
-    "experiment_id", "git_commit", "git_dirty", "git_dirty_hash",
-    "data_version", "feature_version", "model_version", "hyperparams",
-    "features", "target", "train_window", "test_window", "folds",
-    "library_versions", "hardware",
+    "experiment_id",
+    "git_commit",
+    "git_dirty",
+    "git_dirty_hash",
+    "data_version",
+    "feature_version",
+    "model_version",
+    "hyperparams",
+    "features",
+    "target",
+    "train_window",
+    "test_window",
+    "folds",
+    "library_versions",
+    "hardware",
 }
 
 
@@ -47,12 +57,14 @@ def test_new_run_rejects_bad_names(tracker):
 def test_manifest_completeness(tracker):
     run_id = tracker.new_run("m")
     manifest = tracker.write_manifest(
-        run_id, model_version="m_v1", hyperparams={"alpha": 1.0},
+        run_id,
+        model_version="m_v1",
+        hyperparams={"alpha": 1.0},
         train_window={"start_ts": 1, "end_ts": 2},
-        test_window={"start_ts": 3, "end_ts": 4})
+        test_window={"start_ts": 3, "end_ts": 4},
+    )
     assert set(manifest) == REQUIRED_MANIFEST_KEYS
-    on_disk = json.loads(
-        (tracker.run_dir(run_id) / "manifest.json").read_text())
+    on_disk = json.loads((tracker.run_dir(run_id) / "manifest.json").read_text())
     assert on_disk == manifest
     assert manifest["experiment_id"] == run_id
     hw = manifest["hardware"]
@@ -64,15 +76,15 @@ def test_manifest_versions_are_real(tracker, tmp_path):
     # pinned fallback string (the workspace may be either)
     commit = git_commit()
     assert commit == "unversioned-workspace" or (
-        len(commit) == 40 and all(c in "0123456789abcdef" for c in commit))
+        len(commit) == 40 and all(c in "0123456789abcdef" for c in commit)
+    )
     # an empty directory is never a checkout -> pinned fallback string
     assert git_commit(tmp_path) == "unversioned-workspace"
     # normalized data + feature registry exist in this repo -> sha256 digests
     assert len(data_version()) == 64
     assert len(feature_version()) == 64
     hw = hardware_summary()
-    assert set(hw) == {"cpu_model", "cpu_count", "machine", "system",
-                       "python"}
+    assert set(hw) == {"cpu_model", "cpu_count", "machine", "system", "python"}
 
 
 def test_manifest_rejects_incomplete_window(tracker):
@@ -84,9 +96,7 @@ def test_manifest_rejects_incomplete_window(tracker):
 def test_metrics_and_model_roundtrip(tracker):
     run_id = tracker.new_run("m")
     tracker.write_metrics(run_id, {"ic": 0.02})
-    assert json.loads(
-        (tracker.run_dir(run_id) / "metrics.json").read_text()) == {
-            "ic": 0.02}
+    assert json.loads((tracker.run_dir(run_id) / "metrics.json").read_text()) == {"ic": 0.02}
     tracker.save_model(run_id, {"weights": [1, 2, 3]})
     assert tracker.load_model(run_id) == {"weights": [1, 2, 3]}
     with pytest.raises(ValueError):
@@ -100,8 +110,7 @@ def test_ledger_persists_across_instances(tmp_path):
     assert t2.new_run("b") == "run_0002_b"
     ledger = t2.read_ledger()
     assert ledger["experiment_count"] == 2
-    assert [r["run_id"] for r in ledger["runs"]] == ["run_0001_a",
-                                                     "run_0002_b"]
+    assert [r["run_id"] for r in ledger["runs"]] == ["run_0001_a", "run_0002_b"]
 
 
 # -- round-3: real provenance ---------------------------------------------
@@ -132,8 +141,7 @@ def test_data_version_hashes_content_not_paths(tmp_path):
     b = tmp_path / "bbbbbbbbbbbb" / "data" / "normalized"
     a.mkdir(parents=True)
     b.mkdir(parents=True)
-    for name, payload in (("eq_1.normalized.iap1", b"one"),
-                          ("fx_1.normalized.iap1", b"two")):
+    for name, payload in (("eq_1.normalized.iap1", b"one"), ("fx_1.normalized.iap1", b"two")):
         (a / name).write_bytes(payload)
         (b / name).write_bytes(payload)
     va = data_version(tmp_path / "a")
@@ -151,10 +159,15 @@ def test_data_version_hashes_content_not_paths(tmp_path):
 def test_manifest_records_features_target_folds_and_libraries(tracker):
     run_id = tracker.new_run("m")
     m = tracker.write_manifest(
-        run_id, model_version="m_v1", hyperparams={},
-        train_window={"start_ts": 1, "end_ts": 2}, test_window={},
-        features=["ofi_l1_w1s_v1"], target="label_mid_1s",
-        folds=[{"fold": 1, "test_start": 1, "test_end": 2}])
+        run_id,
+        model_version="m_v1",
+        hyperparams={},
+        train_window={"start_ts": 1, "end_ts": 2},
+        test_window={},
+        features=["ofi_l1_w1s_v1"],
+        target="label_mid_1s",
+        folds=[{"fold": 1, "test_start": 1, "test_end": 2}],
+    )
     assert m["features"] == ["ofi_l1_w1s_v1"]
     assert m["target"] == "label_mid_1s"
     assert m["folds"][0]["fold"] == 1

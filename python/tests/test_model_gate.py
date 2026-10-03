@@ -10,7 +10,6 @@ Also hosts the automatic shift-by-one leakage test required by conventions §7.
 from __future__ import annotations
 
 import numpy as np
-
 from iap.core.rng import SplitMix64
 from iap.models.dataset import Dataset
 from iap.models.pipeline import (
@@ -24,15 +23,19 @@ from iap.models.zoo import model_names, model_tier
 _S = 1_000_000_000
 
 
-def _make_dataset(y: np.ndarray, X: np.ndarray,
-                  ts: np.ndarray) -> Dataset:
+def _make_dataset(y: np.ndarray, X: np.ndarray, ts: np.ndarray) -> Dataset:
     n = len(y)
     meta = np.zeros((n, 6))
     meta[:, 4] = 1.0  # half_spread_cost_bps = 1bp
-    return Dataset(X=X, y=y, y_mid=y.copy(), ts=ts,
-                   instrument_id=np.ones(n, dtype=np.int32),
-                   feature_names=[f"f{i}" for i in range(X.shape[1])],
-                   meta_context=meta)
+    return Dataset(
+        X=X,
+        y=y,
+        y_mid=y.copy(),
+        ts=ts,
+        instrument_id=np.ones(n, dtype=np.int32),
+        feature_names=[f"f{i}" for i in range(X.shape[1])],
+        meta_context=meta,
+    )
 
 
 def _signal_dataset(flip_after_first_segment: bool) -> Dataset:
@@ -40,7 +43,7 @@ def _signal_dataset(flip_after_first_segment: bool) -> Dataset:
     rng = SplitMix64(42)
     span = 5000 * _S
     # 1500 samples in the first fifth, 60 in each later fifth
-    ts_list, x_list, y_list = [], [], []
+    ts_list, _x_list, _y_list = [], [], []
     for i in range(1500):
         ts_list.append(int(i * (span / 5) / 1500))
     for seg in range(1, 5):
@@ -54,7 +57,7 @@ def _signal_dataset(flip_after_first_segment: bool) -> Dataset:
     if flip_after_first_segment:
         # flip after the first ROW-MASS segment (folds are row-mass
         # quantiles since round-3), so later folds really do see -x0
-        sign[n // 5:] = -1.0
+        sign[n // 5 :] = -1.0
     y = sign * x0 * 1e-3
     X = np.column_stack([x0, x1])
     return _make_dataset(y, X, ts)
@@ -78,8 +81,7 @@ def test_gate_blocks_advanced_models_on_negative_ic():
     advanced = model_names(1) + model_names(2)
     assert sorted(res["gate"]["skipped_models"]) == sorted(advanced)
     for name in advanced:
-        assert name not in res["models"], \
-            f"gate failed but advanced model {name} was trained"
+        assert name not in res["models"], f"gate failed but advanced model {name} was trained"
     for name in model_names(0):  # baselines always run
         assert name in res["models"]
 
@@ -94,8 +96,7 @@ def test_gate_decision_is_literal_threshold():
     assert "MID-TO-MID" in res["gate"]["rule"]
     assert "best_linear_pooled_ic_vs_mid" in res["gate"]
     best = res["gate"]["best_linear_model"]
-    assert (res["gate"]["best_linear_pooled_ic_vs_mid"]
-            == res["models"][best]["pooled_ic_vs_mid"])
+    assert res["gate"]["best_linear_pooled_ic_vs_mid"] == res["models"][best]["pooled_ic_vs_mid"]
 
 
 def test_model_tiers_pinned():
@@ -143,8 +144,7 @@ def test_rank_ic_averages_tied_ranks_vs_scipy():
     rng = SplitMix64(2024)
     # coarsely quantized draws => many ties in both vectors
     x = np.array([float(rng.below(5)) for _ in range(400)])
-    y = np.array([float(rng.below(4)) + (0.5 if rng.uniform() < 0.3 else 0.0)
-                  for _ in range(400)])
+    y = np.array([float(rng.below(4)) + (0.5 if rng.uniform() < 0.3 else 0.0) for _ in range(400)])
     got = rank_ic(x, y)
     want = float(spearmanr(x, y).statistic)
     assert abs(got - want) <= 1e-12
@@ -192,8 +192,7 @@ def test_pipeline_manifest_records_features_target_and_folds(tmp_path):
     run_ids = [m["run_id"] for m in res["models"].values()]
     assert run_ids, "no run was tracked"
     for run_id in run_ids:
-        man = json.loads(
-            (tracker.run_dir(run_id) / "manifest.json").read_text())
+        man = json.loads((tracker.run_dir(run_id) / "manifest.json").read_text())
         assert man["features"] == ds.feature_names, run_id
         assert man["target"] == TARGET_COLUMN, run_id
         assert man["folds"] is not None and len(man["folds"]) == 3, run_id

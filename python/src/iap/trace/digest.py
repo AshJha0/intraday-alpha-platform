@@ -25,7 +25,6 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from typing import Union
 
 from iap.contracts.types import DecisionTrace
 from iap.contracts.versions import canonical_json
@@ -50,12 +49,12 @@ class TraceDigest:
         """Number of traces folded in so far."""
         return self._count
 
-    def update(self, trace: DecisionTrace) -> "TraceDigest":
+    def update(self, trace: DecisionTrace) -> TraceDigest:
         """Fold one trace in."""
         self.update_line(trace_line(trace))
         return self
 
-    def update_line(self, line: str) -> "TraceDigest":
+    def update_line(self, line: str) -> TraceDigest:
         """Fold one canonical line in (the line must already be canonical:
         this is what a port that reads a JSONL file does)."""
         self._hash.update(line.encode("ascii"))
@@ -68,13 +67,13 @@ class TraceDigest:
         return self._hash.hexdigest()
 
     @classmethod
-    def of_jsonl(cls, path: Union[str, Path]) -> "TraceDigest":
+    def of_jsonl(cls, path: str | Path) -> TraceDigest:
         """The digest of a trace JSONL file.  Each line is re-canonicalised
         (parsed and re-serialised) so a pretty-printed file digests to the
         same value as the stream that produced it; a line that is not a
         valid trace document raises ``ValueError``."""
         digest = cls()
-        with open(path, "r", encoding="ascii") as fh:
+        with open(path, encoding="ascii") as fh:
             for lineno, raw in enumerate(fh, 1):
                 text = raw.strip()
                 if not text:

@@ -9,6 +9,7 @@ The per-language unit suites are NOT collected from here: ``python/tests``
 has its own ``conftest.py`` and is run with ``cd python && PYTHONPATH=src
 python3 -m pytest -q`` (PLATFORM_CONVENTIONS.md §9).
 """
+
 from __future__ import annotations
 
 import sys
@@ -38,6 +39,7 @@ def golden_dir() -> Path:
 
 @pytest.fixture(scope="session")
 def configs_dir() -> Path:
-    assert (CONFIGS_DIR / "instruments" / "instruments.json").is_file(), \
+    assert (CONFIGS_DIR / "instruments" / "instruments.json").is_file(), (
         f"missing nested configs tree under {CONFIGS_DIR}"
+    )
     return CONFIGS_DIR

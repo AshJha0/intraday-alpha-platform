@@ -52,11 +52,31 @@ Round-3 honesty rules baked into the report (all pinned):
   ``crossed_frac``.  **The PROMOTE gate uses the UNCROSSED IC.**
 - **Newey-West lag count** follows the horizon (``metrics.nw_lags``) and is
   reported as ``nw_lags``.
+
+Opt-in policies (defaults reproduce every committed report bit-for-bit):
+
+- **``tstat_threshold``** — ``"fixed"`` (default) gates PROMOTE at the pinned
+  ``min_nw_tstat`` of 3.0 regardless of how many things were tried.
+  ``"ledger"`` gates at ``max(3.0, ledger_t_threshold)`` where
+  ``ledger_t_threshold`` is the multiple-testing ledger's Bonferroni |t|
+  (``ExperimentLedger.bonferroni_t_threshold``) — the threshold the ledger
+  has always computed and no gate ever read.  It can only tighten the gate.
+  The report then carries ``tstat_threshold_policy`` and the effective
+  threshold in ``gates["min_nw_tstat"]``.
+- **``stress_version``** — which row-latency stress grid to compute
+  (:mod:`iap.validation.stress`; 1 = historic, 2 = base config carried).
+  Reported as ``stress_version`` when it is not 1.
+
+Additive statistics (no gate reads them): ``nw_tstat_pooled`` /
+``nw_tstat_pooled_uncrossed`` — the HAC t of the POOLED slope
+(:func:`iap.validation.metrics.pooled_slope_hac_tstat`), reported beside the
+within-bucket ``nw_tstat`` because the gate IC is pooled and the
+within-bucket t discards between-bucket signal.
 """
 
 from __future__ import annotations
 
-from typing import Dict, List, Mapping, Optional
+from collections.abc import Mapping
 
 import numpy as np
 import pandas as pd
@@ -71,8 +91,10 @@ from iap.validation.metrics import (
     decay_curve,
     hit_rate,
     ic,
+    instrument_ics,
     newey_west_tstat,
     nw_lags,
+    pooled_slope_hac_tstat,
     rank_ic,
     signal_turnover_detail,
 )
@@ -82,6 +104,7 @@ from iap.validation.splits import (
     WalkForwardSplitter,
 )
 from iap.validation.stress import (
+    STRESS_VERSION_LEGACY,
     cost_stress,
     latency_stress,
     latency_stress_time,
@@ -97,6 +120,40 @@ GATES = {
     "iterate_min_ic": 0.005,
     "iterate_min_tstat": 1.5,
 }
+
+#: PROMOTE t-stat threshold policies (module docs).
+TSTAT_THRESHOLD_POLICIES = ("fixed", "ledger")
+
+
+def effective_gates(
+    tstat_threshold: str = "fixed", ledger_t_threshold: float | None = None
+) -> dict:
+    """The gate thresholds under a t-stat policy.
+
+    ``"fixed"`` returns :data:`GATES` itself.  ``"ledger"`` returns a copy
+    whose ``min_nw_tstat`` is ``max(GATES["min_nw_tstat"],
+    ledger_t_threshold)`` — the ledger-derived Bonferroni |t|, never looser
+    than the fixed gate — and requires a finite positive
+    ``ledger_t_threshold``.
+    """
+    if tstat_threshold not in TSTAT_THRESHOLD_POLICIES:
+        raise ValueError(
+            f"unknown tstat_threshold {tstat_threshold!r}; known: {TSTAT_THRESHOLD_POLICIES}"
+        )
+    if tstat_threshold == "fixed":
+        return GATES
+    if (
+        ledger_t_threshold is None
+        or not np.isfinite(ledger_t_threshold)
+        or ledger_t_threshold <= 0.0
+    ):
+        raise ValueError(
+            "tstat_threshold='ledger' needs a finite positive "
+            "ledger_t_threshold (ExperimentLedger.bonferroni_t_threshold())"
+        )
+    gates = dict(GATES)
+    gates["min_nw_tstat"] = max(float(GATES["min_nw_tstat"]), float(ledger_t_threshold))
+    return gates
 
 
 def _pooled_arrays(scores, frames, horizon):
@@ -122,13 +179,17 @@ def _pooled_arrays(scores, frames, horizon):
         ys.append(lab)
         cs.append(crossed)
     if not xs:
-        return (np.empty(0, np.int64), np.empty(0), np.empty(0),
-                np.empty(0, bool))
-    return (np.concatenate(ts), np.concatenate(xs), np.concatenate(ys),
-            np.concatenate(cs))
+        return (np.empty(0, np.int64), np.empty(0), np.empty(0), np.empty(0, bool))
+    return (np.concatenate(ts), np.concatenate(xs), np.concatenate(ys), np.concatenate(cs))
 
 
-def _fnum(v: float) -> Optional[float]:
+def _pooled_instrument_ids(scores, frames) -> np.ndarray:
+    """Instrument id of every row of :func:`_pooled_arrays` (same order)."""
+    ids = [np.full(len(frames[iid]), int(iid), dtype=np.int64) for iid in scores]
+    return np.concatenate(ids) if ids else np.empty(0, np.int64)
+
+
+def _fnum(v: float) -> float | None:
     return float(v) if np.isfinite(v) else None
 
 
@@ -140,9 +201,17 @@ def validate_alpha(
     max_participation: float,
     n_folds: int = 4,
     embargo_ns: int = 60_000_000_000,
+    tstat_threshold: str = "fixed",
+    ledger_t_threshold: float | None = None,
+    stress_version: int = STRESS_VERSION_LEGACY,
 ) -> dict:
     """Full validation of one alpha.  ``model_factory()`` returns a fresh
-    unfitted model (a fresh instance per fold — no state bleeds across)."""
+    unfitted model (a fresh instance per fold — no state bleeds across).
+
+    ``tstat_threshold`` / ``ledger_t_threshold`` / ``stress_version`` are the
+    opt-in policies of the module docs; the defaults are the pinned
+    behaviour."""
+    gates = effective_gates(tstat_threshold, ledger_t_threshold)
     probe = model_factory()
     horizon = probe.horizon
     horizon_ns = HORIZONS_NS[horizon]
@@ -150,12 +219,13 @@ def validate_alpha(
     uframes = {i: frames[i] for i in universe}
     splitter = WalkForwardSplitter(n_folds=n_folds, embargo_ns=embargo_ns)
 
-    fold_rows: List[dict] = []
-    pooled_ts: List[np.ndarray] = []
-    pooled_x: List[np.ndarray] = []      # standardized signal (z), gate input
-    pooled_er: List[np.ndarray] = []     # expected_return (diagnostic)
-    pooled_y: List[np.ndarray] = []
-    pooled_c: List[np.ndarray] = []
+    fold_rows: list[dict] = []
+    pooled_ts: list[np.ndarray] = []
+    pooled_x: list[np.ndarray] = []  # standardized signal (z), gate input
+    pooled_er: list[np.ndarray] = []  # expected_return (diagnostic)
+    pooled_y: list[np.ndarray] = []
+    pooled_c: list[np.ndarray] = []
+    pooled_i: list[np.ndarray] = []
     last_model = None
     last_test = None
     for fold, train, test in splitter.split_frames(uframes, horizon_ns):
@@ -163,6 +233,7 @@ def validate_alpha(
         model.fit(train)
         scores = model.score(test)
         ts, er, y, crossed = _pooled_arrays(scores, test, horizon)
+        iids = _pooled_instrument_ids(scores, test)
         # Pool the standardized signal: folds fit different betas, so pooling
         # expected_return weights each fold by |beta_k| (pinned, round-3).
         beta = float(model.params().get("beta", 0.0) or 0.0)
@@ -185,7 +256,7 @@ def validate_alpha(
                 "test_start": int(fold.test_start),
                 "test_end": int(fold.test_end),
                 "ic": _fnum(ic(z, y)),
-                "ic_er": _fnum(ic(er, y)),   # diagnostic: sign-flipped by beta
+                "ic_er": _fnum(ic(er, y)),  # diagnostic: sign-flipped by beta
                 "rank_ic": _fnum(rank_ic(z, y)),
                 "hit_rate": _fnum(hit_rate(z, y)),
                 "beta_fit": model.params().get("beta_fit"),
@@ -196,6 +267,7 @@ def validate_alpha(
         pooled_er.append(er)
         pooled_y.append(y)
         pooled_c.append(crossed)
+        pooled_i.append(iids)
         last_model, last_test = model, test
 
     ts = np.concatenate(pooled_ts)
@@ -213,37 +285,38 @@ def validate_alpha(
     # swing EQ03's headline t between 4.89 and 11.46 (metrics module docs).
     bics, bcounts = bucket_ics_with_counts(ts, x, y)
     nw_t = newey_west_tstat(bics, lags=lags, weights=bcounts)
+    # Additive: the HAC t of the POOLED slope (keeps between-bucket signal,
+    # which the within-bucket Pearson above removes).  No gate reads it.
+    nw_t_pooled = pooled_slope_hac_tstat(ts, x, y, lags=lags)
+    # Additive: scale-free ICs (the pooled IC lets the most volatile
+    # instrument dominate; metrics.instrument_ics).  No gate reads them.
+    by_instrument = instrument_ics(np.concatenate(pooled_i), x, y)
 
     # Crossed-book conditioning (pinned): a crossed consolidated book means a
     # stale venue quote; its mid reverts when that venue refreshes.
     pairs_ok = np.isfinite(x) & np.isfinite(y)
     n_pairs_all = int(pairs_ok.sum())
-    crossed_frac = (
-        float(np.mean(crossed[pairs_ok])) if n_pairs_all else float("nan")
-    )
+    crossed_frac = float(np.mean(crossed[pairs_ok])) if n_pairs_all else float("nan")
     unc = ~crossed
     oos_ic_uncrossed = ic(np.where(unc, x, np.nan), np.where(unc, y, np.nan))
-    oos_ic_crossed = ic(np.where(crossed, x, np.nan),
-                        np.where(crossed, y, np.nan))
+    oos_ic_crossed = ic(np.where(crossed, x, np.nan), np.where(crossed, y, np.nan))
     bics_unc, bcounts_unc = bucket_ics_with_counts(ts[unc], x[unc], y[unc])
     nw_t_uncrossed = newey_west_tstat(bics_unc, lags=lags, weights=bcounts_unc)
+    nw_t_pooled_uncrossed = pooled_slope_hac_tstat(ts[unc], x[unc], y[unc], lags=lags)
 
     # Degenerate folds count as FAILED folds, never as missing data.
     n_folds_run = len(fold_rows)
     n_nondegenerate = sum(1 for r in fold_rows if not r["degenerate"])
     positive = sum(
-        1 for r in fold_rows
-        if (not r["degenerate"]) and r["ic"] is not None and r["ic"] > 0
+        1 for r in fold_rows if (not r["degenerate"]) and r["ic"] is not None and r["ic"] > 0
     )
-    sign_consistency = (
-        float(positive / n_folds_run) if n_folds_run else float("nan")
-    )
+    sign_consistency = float(positive / n_folds_run) if n_folds_run else float("nan")
 
     # leakage + decay + turnover on the last (largest-train) fold
     leak = LeakageTester().run(last_model, last_test).to_dict()
     scores_last = last_model.score(last_test)
     beta_last = float(last_model.params().get("beta", 0.0) or 0.0)
-    decay: Dict[str, Optional[float]] = {}
+    decay: dict[str, float | None] = {}
     turnover_vals = []
     turnover_active_hours = 0.0
     turnover_span_hours = 0.0
@@ -270,9 +343,7 @@ def validate_alpha(
             turnover_vals.append(tdet["flips_per_hour"])
             turnover_active_hours += tdet["active_hours"]
             turnover_span_hours += tdet["span_hours"]
-    decay_out = {
-        h: (_fnum(float(np.mean(v))) if v else None) for h, v in decay.items()
-    }
+    decay_out = {h: (_fnum(float(np.mean(v))) if v else None) for h, v in decay.items()}
     turnover = float(np.mean(turnover_vals)) if turnover_vals else float("nan")
 
     capacity = {
@@ -290,16 +361,20 @@ def validate_alpha(
     stress = {
         "cost": cost_stress(backtester, last_test, scores_last, asset_class),
         "latency": latency_stress(
-            backtester, last_test, scores_last, asset_class, horizon,
+            backtester,
+            last_test,
+            scores_last,
+            asset_class,
+            horizon,
             beta=beta_last,
+            version=stress_version,
         ),
         "latency_time": latency_stress_time(
             backtester, last_test, scores_last, asset_class, horizon
         ),
         "regime": {
             k: _fnum(v)
-            for k, v in regime_split(scores_last, last_test, horizon,
-                                     beta=beta_last).items()
+            for k, v in regime_split(scores_last, last_test, horizon, beta=beta_last).items()
         },
     }
     net_pnl_1x = stress["cost"]["x1"]["total_pnl"]
@@ -312,12 +387,12 @@ def validate_alpha(
     promote = (
         leak["passed"]
         and np.isfinite(gate_ic)
-        and gate_ic >= GATES["min_oos_ic"]
+        and gate_ic >= gates["min_oos_ic"]
         and np.isfinite(gate_t)
-        and gate_t >= GATES["min_nw_tstat"]
+        and gate_t >= gates["min_nw_tstat"]
         and np.isfinite(sign_consistency)
-        and sign_consistency >= GATES["min_fold_sign_consistency"]
-        and n_nondegenerate >= GATES["min_nondegenerate_folds"]
+        and sign_consistency >= gates["min_fold_sign_consistency"]
+        and n_nondegenerate >= gates["min_nondegenerate_folds"]
         and hypothesis_confirmed
         and net_pnl_1x > 0.0
     )
@@ -325,25 +400,36 @@ def validate_alpha(
         not promote
         and leak["passed"]
         and np.isfinite(gate_ic)
-        and gate_ic >= GATES["iterate_min_ic"]
+        and gate_ic >= gates["iterate_min_ic"]
         and np.isfinite(gate_t)
-        and gate_t >= GATES["iterate_min_tstat"]
+        and gate_t >= gates["iterate_min_tstat"]
     )
     verdict = "PROMOTE" if promote else ("ITERATE" if iterate else "REJECT")
 
+    extras: dict[str, object] = {}
+    if tstat_threshold != "fixed":
+        extras["tstat_threshold_policy"] = tstat_threshold
+        extras["ledger_t_threshold"] = float(ledger_t_threshold)
+    if stress_version != STRESS_VERSION_LEGACY:
+        extras["stress_version"] = int(stress_version)
+
     return {
+        **extras,
         "alpha_id": probe.alpha_id,
         "name": probe.name,
         "asset_class": probe.asset_class,
         "horizon": horizon,
         "universe": universe,
-        "gates": GATES,
+        "gates": gates,
         "folds": fold_rows,
         "n_folds_run": n_folds_run,
         "n_nondegenerate_folds": n_nondegenerate,
         "n_degenerate_folds": n_folds_run - n_nondegenerate,
         "oos_ic": _fnum(oos_ic),
         "oos_ic_pooled_er": _fnum(oos_ic_er),
+        "oos_ic_instrument_mean": _fnum(by_instrument["instrument_mean"]),
+        "oos_ic_vol_scaled": _fnum(by_instrument["vol_scaled"]),
+        "oos_ic_by_instrument": by_instrument["by_instrument"],
         "oos_ic_uncrossed": _fnum(oos_ic_uncrossed),
         "oos_ic_crossed": _fnum(oos_ic_crossed),
         "crossed_frac": _fnum(crossed_frac),
@@ -352,6 +438,8 @@ def validate_alpha(
         "oos_hit_rate": _fnum(oos_hit),
         "nw_tstat": _fnum(nw_t),
         "nw_tstat_uncrossed": _fnum(nw_t_uncrossed),
+        "nw_tstat_pooled": _fnum(nw_t_pooled),
+        "nw_tstat_pooled_uncrossed": _fnum(nw_t_pooled_uncrossed),
         "nw_lags": int(lags),
         "n_ic_buckets": int(bics.size),
         "n_ic_buckets_uncrossed": int(bics_unc.size),

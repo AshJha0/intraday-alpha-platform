@@ -20,13 +20,13 @@ Every validation failure is a ``ValueError`` naming the file and the key.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Mapping, Union
 
 from iap.execution.types import InstrumentSpec, LatencyConfig, VenueSpec
 
-PathLike = Union[str, Path]
+PathLike = str | Path
 
 #: Config file paths relative to the config directory (conventions section 0).
 VENUES_FILE = "venues/venues.json"
@@ -56,9 +56,7 @@ class ExecConfig:
         if not isinstance(self.seed, int) or self.seed < 0:
             raise ValueError(f"seed must be a non-negative int, got {self.seed!r}")
         # Freeze the maps in ascending key order (deterministic iteration).
-        object.__setattr__(
-            self, "instruments", dict(sorted(self.instruments.items()))
-        )
+        object.__setattr__(self, "instruments", dict(sorted(self.instruments.items())))
         object.__setattr__(self, "venues", dict(sorted(self.venues.items())))
 
     def venue(self, venue_id: int) -> VenueSpec:
@@ -101,13 +99,13 @@ def _integer(row: dict, key: str, where: str) -> int:
     return v
 
 
-def load_venues(path: PathLike) -> Dict[int, VenueSpec]:
+def load_venues(path: PathLike) -> dict[int, VenueSpec]:
     """Load every venue from ``configs/venues/venues.json`` keyed by venue_id."""
     root = _read_json(path)
     rows = root.get("venues")
     if not isinstance(rows, list):
         raise ValueError(f"{path}: missing 'venues' array")
-    out: Dict[int, VenueSpec] = {}
+    out: dict[int, VenueSpec] = {}
     for row in rows:
         if not isinstance(row, dict):
             raise ValueError(f"{path}: venue entry must be an object")
@@ -124,16 +122,17 @@ def load_venues(path: PathLike) -> Dict[int, VenueSpec]:
             name=name,
             is_fx=row.get("asset_class") == "FX",
             taker_fee_per_share=(
-                _number(row, "taker_fee_per_share", where)
-                if "taker_fee_per_share" in row else 0.0
+                _number(row, "taker_fee_per_share", where) if "taker_fee_per_share" in row else 0.0
             ),
             maker_rebate_per_share=(
                 _number(row, "maker_rebate_per_share", where)
-                if "maker_rebate_per_share" in row else 0.0
+                if "maker_rebate_per_share" in row
+                else 0.0
             ),
             commission_per_million=(
                 _number(row, "commission_per_million", where)
-                if "commission_per_million" in row else 0.0
+                if "commission_per_million" in row
+                else 0.0
             ),
             latency_mean_ns=_integer(lat, "mean_ns", f"{where} latency"),
             latency_jitter_ns=_integer(lat, "jitter_ns", f"{where} latency"),
@@ -146,13 +145,13 @@ def load_venues(path: PathLike) -> Dict[int, VenueSpec]:
     return dict(sorted(out.items()))
 
 
-def load_instruments(path: PathLike) -> Dict[int, InstrumentSpec]:
+def load_instruments(path: PathLike) -> dict[int, InstrumentSpec]:
     """Load instrument reference data from ``configs/instruments/instruments.json``."""
     root = _read_json(path)
     rows = root.get("instruments")
     if not isinstance(rows, list):
         raise ValueError(f"{path}: missing 'instruments' array")
-    out: Dict[int, InstrumentSpec] = {}
+    out: dict[int, InstrumentSpec] = {}
     for row in rows:
         if not isinstance(row, dict):
             raise ValueError(f"{path}: instrument entry must be an object")
@@ -201,9 +200,7 @@ def load_sor_options(path: PathLike) -> SorOptions:
     return SorOptions(pr, int(_number(sor, "max_venue_latency_ns", f"{path} sor")))
 
 
-def load_exec_config(
-    config_dir: PathLike, latency: LatencyConfig = LatencyConfig()
-) -> ExecConfig:
+def load_exec_config(config_dir: PathLike, latency: LatencyConfig = LatencyConfig()) -> ExecConfig:  # noqa: B008 (frozen dataclass default, one shared immutable instance is intended)
     """Build the ``ExecConfig`` the platform runs with from a config directory.
 
     Mirrors the Java ``PaperTrading`` wiring: ``LatencyConfig`` defaults (or

@@ -33,6 +33,11 @@ import com.iap.config.Json;
  *       once at startup.</li>
  * </ul>
  *
+ * <p>A checkpoint has ONE commit point, {@code session_state.json}, which
+ * records the sha256 of the risk snapshot it belongs to
+ * ({@link #commitCheckpoint}); {@code --resume} verifies it
+ * ({@link #readCommittedRiskSnapshot}).
+ *
  * <p>Both JSON documents are written atomically: content to
  * {@code <name>.tmp}, {@code force(true)} (fsync), then an
  * {@code ATOMIC_MOVE} rename onto the target, so a crash mid-write leaves the
@@ -83,6 +88,14 @@ public final class SessionStore {
          * running trace digest from exactly that many lines.
          */
         public long traceLines;
+        /**
+         * SHA-256 (hex) of the exact {@code risk_snapshot.json} bytes this
+         * state document commits to. {@code session_state.json} is the single
+         * commit point of a checkpoint: {@code --resume} only accepts a risk
+         * snapshot whose content hash equals this value. Empty for a
+         * checkpoint written before the field existed (verification skipped).
+         */
+        public String riskSnapshotSha256 = "";
 
         /** Sorted-key JSON document (round-trips exactly). */
         public String toJson() {
@@ -98,7 +111,9 @@ public final class SessionStore {
                     .append(",\"orders_submitted\":").append(ordersSubmitted)
                     .append(",\"restarts\":").append(restarts)
                     .append(",\"risk_order_seq\":").append(riskOrderSeq)
-                    .append(",\"total_pnl\":").append(num(totalPnl))
+                    .append(",\"risk_snapshot_sha256\":\"")
+                    .append(esc(riskSnapshotSha256))
+                    .append("\",\"total_pnl\":").append(num(totalPnl))
                     .append(",\"trace_lines\":").append(traceLines)
                     .append(",\"x-version\":").append(STATE_VERSION)
                     .append('}');
@@ -136,6 +151,9 @@ public final class SessionStore {
             s.restarts = asLong(doc, "restarts", where);
             s.auditLines = asLong(doc, "audit_lines", where);
             s.traceLines = asLong(doc, "trace_lines", where);
+            if (doc.containsKey("risk_snapshot_sha256")) {
+                s.riskSnapshotSha256 = asStr(doc, "risk_snapshot_sha256", where);
+            }
             if (s.eventCursor < 0 || s.riskOrderSeq < 0 || s.restarts < 0
                     || s.auditLines < 0 || s.traceLines < 0) {
                 throw bad(where, "negative counter");
@@ -179,6 +197,12 @@ public final class SessionStore {
 
     /** File names, relative to the state directory. */
     public static final String RISK_SNAPSHOT = "risk_snapshot.json";
+    /**
+     * The fully written, fsynced risk snapshot of a checkpoint in flight: it
+     * becomes {@link #RISK_SNAPSHOT} right after the state document that
+     * commits to its hash is in place.
+     */
+    public static final String RISK_SNAPSHOT_NEXT = "risk_snapshot.json.next";
     /** Platform accounting document. */
     public static final String SESSION_STATE = "session_state.json";
     /** Per-session risk audit log. */
@@ -215,7 +239,86 @@ public final class SessionStore {
     /** True when a previous session left a resumable checkpoint here. */
     public boolean hasCheckpoint() {
         return Files.isReadable(file(SESSION_STATE))
-                && Files.isReadable(file(RISK_SNAPSHOT));
+                && (Files.isReadable(file(RISK_SNAPSHOT))
+                        || Files.isReadable(file(RISK_SNAPSHOT_NEXT)));
+    }
+
+    /**
+     * Commit one checkpoint. {@code session_state.json} is the SINGLE commit
+     * point and names the risk snapshot it belongs to by content hash:
+     * <ol>
+     *   <li>the new snapshot is written and fsynced as
+     *       {@link #RISK_SNAPSHOT_NEXT} (the previous checkpoint is intact);</li>
+     *   <li>{@code session_state.json}, carrying the snapshot's sha256, is
+     *       replaced atomically — the commit;</li>
+     *   <li>the snapshot is moved onto {@link #RISK_SNAPSHOT}.</li>
+     * </ol>
+     * A crash before step 2 leaves the previous state + previous snapshot; a
+     * crash between 2 and 3 leaves the new state and the new snapshot under
+     * its {@code .next} name, which {@link #readCommittedRiskSnapshot} rolls
+     * forward. No interleaving pairs a cursor with a foreign risk state.
+     */
+    public void commitCheckpoint(State st, String riskSnapshot) {
+        st.riskSnapshotSha256 = com.iap.codec.Sha256.hex(
+                riskSnapshot.getBytes(StandardCharsets.UTF_8));
+        writeAtomic(RISK_SNAPSHOT_NEXT, riskSnapshot);
+        writeAtomic(SESSION_STATE, st.toJson());
+        promote(RISK_SNAPSHOT_NEXT, RISK_SNAPSHOT);
+    }
+
+    private void promote(String from, String to) {
+        try {
+            try {
+                Files.move(file(from), file(to), StandardCopyOption.ATOMIC_MOVE,
+                        StandardCopyOption.REPLACE_EXISTING);
+            } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                Files.move(file(from), file(to),
+                        StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException("cannot write state " + file(to), e);
+        }
+    }
+
+    private String sha256OrNull(String name) {
+        Path p = file(name);
+        if (!Files.isReadable(p)) {
+            return null;
+        }
+        try {
+            return com.iap.codec.Sha256.hex(Files.readAllBytes(p));
+        } catch (IOException e) {
+            throw new IllegalStateException("cannot read platform state " + p, e);
+        }
+    }
+
+    /**
+     * The risk snapshot {@code st} commits to (strict, fails closed): the
+     * snapshot file whose sha256 equals {@code st.riskSnapshotSha256}. A
+     * checkpoint interrupted between the state commit and the snapshot
+     * rename is rolled forward from {@link #RISK_SNAPSHOT_NEXT}; any other
+     * mismatch (edited, truncated or foreign snapshot) is refused with both
+     * hashes named. A state document without the hash (written before the
+     * field existed) falls back to the unverified {@link #readRiskSnapshot}.
+     */
+    public Map<String, Object> readCommittedRiskSnapshot(State st) {
+        if (st.riskSnapshotSha256.isEmpty()) {
+            return readRiskSnapshot();
+        }
+        String current = sha256OrNull(RISK_SNAPSHOT);
+        if (!st.riskSnapshotSha256.equals(current)) {
+            String next = sha256OrNull(RISK_SNAPSHOT_NEXT);
+            if (!st.riskSnapshotSha256.equals(next)) {
+                throw new IllegalStateException("--resume: "
+                        + file(RISK_SNAPSHOT) + " has sha256 " + current
+                        + " but " + SESSION_STATE
+                        + " commits to risk_snapshot_sha256="
+                        + st.riskSnapshotSha256 + " (edited, truncated or"
+                        + " foreign risk snapshot): refusing to resume");
+            }
+            promote(RISK_SNAPSHOT_NEXT, RISK_SNAPSHOT);
+        }
+        return readRiskSnapshot();
     }
 
     /** Write {@code text} to {@code name} atomically (temp + fsync + rename). */

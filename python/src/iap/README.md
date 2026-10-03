@@ -87,9 +87,13 @@ iap/
     simulator.py   ExecutionSimulator: seeded latency (one SplitMix64 jitter
                    draw per submit or cancel), activation, aggressive walk of
                    displayed top-10 depth (book never mutated), consumed-
-                   liquidity overlay, deterministic queue position, fees,
-                   linear impact, cancels/expiry/cancel_all, venue trading-
-                   state gate with reopen-at-touch, pinned processing order.
+                   liquidity overlay (debited by aggressive fills and, since
+                   v1.3.0, by the crossing / reopen check), deterministic
+                   queue position (only book-APPLIED events tracked; a cancel
+                   advances us only when the cancelled order is known to be
+                   ahead), fees, linear impact, cancels/expiry/cancel_all,
+                   venue trading-state gate with reopen-at-touch, pinned
+                   processing order.
     algos.py       AlgoType, ParentOrder, slice_weights/slice_quantities/
                    slice_times (TWAP equal, VWAP U-curve, IS exponential,
                    largest-remainder apportionment; POV is event-driven).
@@ -118,16 +122,28 @@ iap/
                    frames), goldenframes.py (the golden alpha cases).
   validation/      The research framework (spec §13, §20): splits.py (purged +
                    embargoed row-mass walk-forward), metrics.py (IC, rank IC,
-                   Newey-West-lite t), leakage.py (label-column guard,
-                   shift-by-one, truncation probe), stress.py (cost / latency /
-                   regime grids), ledger.py (the multiple-testing ledger,
+                   Newey-West-lite t; and, additive since v1.3.0, the
+                   pooled-slope HAC t, per-instrument / vol-scaled IC,
+                   breakeven capacity, the blackout-reopen IC), leakage.py
+                   (label-column guard, shift-by-one, truncation probe; the
+                   opt-in recompute probe that rebuilds features from
+                   truncated raw events), stress.py (cost / latency / regime
+                   grids; opt-in stress_version=2), diagnostics.py (per-fold
+                   cost survival / decay / regime and a seeded
+                   stationary-bootstrap interval for net P&L; read by no
+                   gate), ledger.py (the multiple-testing ledger,
                    research/experiments.json, de-duplicated by alpha x kind x
-                   config), validate.py (validate_alpha, the pinned GATES and
-                   the PROMOTE / ITERATE / REJECT verdict).
+                   config; locked read-modify-write), validate.py
+                   (validate_alpha, the pinned GATES, the opt-in ledger-derived
+                   t threshold and the PROMOTE / ITERATE / REJECT verdict).
   experiment/      tracker.py — data_version() (sha256 over the normalized IAP1
                    bytes), feature_version() (registry hash), git_commit(),
                    hardware_summary(), ExperimentTracker.write_manifest()
-                   (docs/governance/REPRODUCIBILITY.md).
+                   (docs/governance/REPRODUCIBILITY.md); new_run claims a run
+                   id by creating its directory. locking.py — FileLock
+                   (O_CREAT | O_EXCL lock file, bounded retry, never broken
+                   automatically) and atomic_write_text (temp file +
+                   os.replace), used by both ledgers.
   models/          The gated ML layer (research/ml_reports): dataset.py,
                    splits.py, zoo.py (linear baselines gate the tree models),
                    metalabel.py (isotonic / Platt-calibrated trade / no-trade
@@ -179,8 +195,9 @@ iap/
                    keys, escaping) for the audit lines and the snapshot.
   research/        Contract-driven research: ExperimentSpec in, ExperimentResult
                    out (iap.contracts.protocols.ExperimentRunner), persisted under
-                   research/experiments/<experiment_id>/{spec,result}.json and
-                   counted in the multiple-testing ledger research/experiments.json.
+                   research/experiments/<experiment_id>/{spec,result,eligibility}.json
+                   (staged, then one rename) and counted in the multiple-testing
+                   ledger research/experiments.json (locked read-modify-write).
     specs.py       build_spec(alpha_id, horizon, configuration, ...): versions
                    from iap.experiment.tracker, pinned configuration keys
                    (n_folds, embargo_ns, cost_multiplier, latency_ns,
@@ -188,25 +205,42 @@ iap/
                    defaults), periods derived from the session calendar
                    (train = earlier sessions, validation = purge+embargo tail,
                    test = last session), model_definition_hash,
-                   experiment_id = content_hash(spec without id)[:16].
+                   experiment_id = content_hash(spec without id)[:16];
+                   gate_eligibility(spec, frames) -> GateEligibility: is the
+                   result admissible as promotion evidence (configuration at
+                   least as conservative as the pinned protocol, periods
+                   derived from the dataset)?
     runner.py      ExperimentRunner(feature_store_dir, ledger_path, out_dir,
                    configs_dir, dry_run=, frames=): validate_alpha over the
                    experiment window (purged + embargoed walk-forward, leakage,
                    NW t, fold consistency, hypothesis sign, stress, §20 verdict)
                    + a holdout backtest (fit on train, test period at
-                   cost_multiplier) for the bps economics; 21 looks per run in
-                   the ledger; build_result maps the report onto the contract
+                   cost_multiplier) for the bps economics; 28 looks per run in
+                   the ledger (LOOKS_PER_EXPERIMENT; a --dry-run debits them
+                   too, a rerun of the same spec adds none); opt-in
+                   tstat_threshold="ledger"; build_result maps the report onto the contract
                    (a NaN metric raises ResearchError, never a value);
                    created_ts = test_period.end_ts; canonical JSON persistence,
                    refuses a rerun that reproduces different numbers.
     registry.py    ExperimentRegistry(root): experiment_ids / load / records /
-                   find(alpha_id=, horizon=, verdict=) with strict validation.
+                   find(alpha_id=, horizon=, verdict=) with strict validation;
+                   gate_eligibility(id); unreadable or incomplete directories
+                   are skipped and reported in .skipped, not raised.
+    errors.py      ResearchError with a stable machine-readable `code`
+                   (the --json-errors contract).
+    power.py       The planted-signal power study: generate data with effects
+                   of known size (generator `planted` block), run the real
+                   feature pipeline and validate_alpha on it, tabulate
+                   detection rates per effect / scenario / level
+                   (`python -m iap.research power`; research/power/).
     golden.py      The pinned golden experiment (EQ03 @ 5s on the golden equity
                    vector) shared by tools/make_golden_research.py and
                    tests/test_research_golden.py.
-    __main__.py    `python -m iap.research run --alpha EQ03 [--horizon 1s]
-                   [--config k=v] [--seed N] [--dry-run] | list | show <id>` —
-                   result table, verdict and the ledger's expected-max-|t| note.
+    __main__.py    `python -m iap.research [--json-errors] run --alpha EQ03
+                   [--horizon 1s] [--config k=v] [--seed N] [--dry-run]
+                   [--tstat-threshold fixed|ledger] | list [--json] |
+                   show <id> [--json] | power` — result table, verdict, gate
+                   eligibility and the ledger's expected-max-|t| note.
   lifecycle/       Alpha promotion lifecycle RESEARCH -> CANDIDATE -> VALIDATING
                    -> PAPER -> ACTIVE -> WATCH -> RETIRED (LifecycleState 0..6)
                    with a gate at every edge; extends (never alters) the

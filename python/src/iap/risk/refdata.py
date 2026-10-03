@@ -30,9 +30,10 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Mapping
+from typing import Any
 
 from iap.reference.refdata import ReferenceData
 
@@ -71,12 +72,12 @@ class InstrumentRef:
             raise ValueError("quote_ccy must be non-empty")
 
     @classmethod
-    def equity(cls, tick_size: float) -> "InstrumentRef":
+    def equity(cls, tick_size: float) -> InstrumentRef:
         """A USD equity: qty in shares, prices in USD."""
         return cls(tick_size, 1.0, "USD")
 
 
-def equity_refs(ticks: Mapping[int, float]) -> Dict[int, InstrumentRef]:
+def equity_refs(ticks: Mapping[int, float]) -> dict[int, InstrumentRef]:
     """``{instrument_id: tick_size}`` -> USD-equity references
     (``RiskEngine::with_ticks`` / ``from_config_ticks`` convenience)."""
     return {int(iid): InstrumentRef.equity(t) for iid, t in sorted(ticks.items())}
@@ -92,18 +93,16 @@ def _check_iid(iid: Any) -> int:
     return iid
 
 
-def instrument_refs_from_golden(table: Mapping[Any, Any]) -> Dict[int, InstrumentRef]:
+def instrument_refs_from_golden(table: Mapping[Any, Any]) -> dict[int, InstrumentRef]:
     """Build from the golden vector's explicit ``instruments`` table
     (keys are decimal instrument ids, values carry ``tick_size``,
     ``qty_unit`` and ``quote_ccy``)."""
-    out: Dict[int, InstrumentRef] = {}
+    out: dict[int, InstrumentRef] = {}
     for key in sorted(table, key=lambda k: _check_iid(k)):
         spec = table[key]
         if not isinstance(spec, dict):
             raise ValueError(f"instrument {key!r}: reference must be an object")
-        out[_check_iid(key)] = InstrumentRef(
-            spec["tick_size"], spec["qty_unit"], spec["quote_ccy"]
-        )
+        out[_check_iid(key)] = InstrumentRef(spec["tick_size"], spec["qty_unit"], spec["quote_ccy"])
     return out
 
 
@@ -132,21 +131,19 @@ def _ref_from_row(row: Mapping[str, Any]) -> tuple[int, InstrumentRef]:
         unit = 1.0
         ccy = row.get("currency")
     else:
-        raise ValueError(
-            f"instruments.json: unknown asset_class {asset_class} for {iid}"
-        )
+        raise ValueError(f"instruments.json: unknown asset_class {asset_class} for {iid}")
     if not isinstance(ccy, str) or not ccy:
         raise ValueError(f"instruments.json: missing currency for {iid}")
     return iid, InstrumentRef(float(tick), unit, ccy)
 
 
-def instrument_refs_from_config(doc: Any) -> Dict[int, InstrumentRef]:
+def instrument_refs_from_config(doc: Any) -> dict[int, InstrumentRef]:
     """Build from a parsed ``configs/instruments/instruments.json`` document
     (fail closed: ``ValueError`` on a missing/invalid field or an empty or
     duplicated universe)."""
     if not isinstance(doc, dict) or not isinstance(doc.get("instruments"), list):
         raise ValueError("instruments.json: missing instruments[]")
-    out: Dict[int, InstrumentRef] = {}
+    out: dict[int, InstrumentRef] = {}
     for row in doc["instruments"]:
         if not isinstance(row, dict):
             raise ValueError("instruments.json: instrument must be an object")
@@ -159,7 +156,7 @@ def instrument_refs_from_config(doc: Any) -> Dict[int, InstrumentRef]:
     return {iid: out[iid] for iid in sorted(out)}
 
 
-def load_instrument_refs(config_dir: "str | Path") -> Dict[int, InstrumentRef]:
+def load_instrument_refs(config_dir: str | Path) -> dict[int, InstrumentRef]:
     """Load ``<config_dir>/instruments/instruments.json`` (conventions §0
     layout) into the engine's reference map."""
     path = Path(config_dir) / "instruments" / "instruments.json"
@@ -167,11 +164,11 @@ def load_instrument_refs(config_dir: "str | Path") -> Dict[int, InstrumentRef]:
         return instrument_refs_from_config(json.load(f))
 
 
-def instrument_refs_from_reference_data(refdata: ReferenceData) -> Dict[int, InstrumentRef]:
+def instrument_refs_from_reference_data(refdata: ReferenceData) -> dict[int, InstrumentRef]:
     """Build from a loaded :class:`ReferenceData` (same derivation as the
     config builder; an instrument without the currency the engine needs
     fails closed)."""
-    out: Dict[int, InstrumentRef] = {}
+    out: dict[int, InstrumentRef] = {}
     for inst in refdata.instruments():
         row = {
             "instrument_id": inst.instrument_id,

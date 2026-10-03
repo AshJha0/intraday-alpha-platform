@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 from math import isfinite
-from typing import List, Optional
 
 NAN = float("nan")
 
 
-def put(values: List[float], valid: List[bool], x, ok: bool) -> None:
+def put(values: list[float], valid: list[bool], x, ok: bool) -> None:
     """Append one feature value.
 
     Appends ``float(x)`` with valid=True when ``ok`` and x is a finite number;

@@ -37,13 +37,11 @@ import json
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "python" / "src"))
 
 import numpy as np  # noqa: E402
-
 from iap.adaptive import (  # noqa: E402
     LifecycleConfig,
     LifecycleLog,
@@ -52,7 +50,7 @@ from iap.adaptive import (  # noqa: E402
 )
 from iap.alpha import build  # noqa: E402
 from iap.alpha.data import load_features  # noqa: E402
-from iap.backtest import Backtester, BacktestConfig, CostModel  # noqa: E402
+from iap.backtest import BacktestConfig, Backtester, CostModel  # noqa: E402
 from iap.backtest.adaptive import AdaptiveDeployment  # noqa: E402
 from iap.validation import ExperimentLedger  # noqa: E402
 
@@ -63,12 +61,11 @@ LIFECYCLE_LOG = REPO / "research" / "lifecycle_log.jsonl"
 LEDGER_PATH = REPO / "research" / "experiments.json"
 
 GOLDEN_ALPHAS = ("EQ01", "EQ03", "EQ06", "FX01", "FX05", "FX09")
-POLICY_NAMES = ("static", "scheduled_weekly", "scheduled_daily",
-                "drift_triggered")
+POLICY_NAMES = ("static", "scheduled_weekly", "scheduled_daily", "drift_triggered")
 NS_H = 3_600_000_000_000
 
 
-def select_alphas() -> List[str]:
+def select_alphas() -> list[str]:
     """Golden 6 + the 4 best remaining by walk-forward OOS IC (from the
     promotion reports — a *recorded* prior look, not a new one)."""
     scored = []
@@ -81,9 +78,9 @@ def select_alphas() -> List[str]:
     return list(GOLDEN_ALPHAS) + best
 
 
-def _load_meta() -> Dict[int, dict]:
+def _load_meta() -> dict[int, dict]:
     cfg = json.loads((REPO / "configs" / "instruments" / "instruments.json").read_text())
-    out: Dict[int, dict] = {}
+    out: dict[int, dict] = {}
     for row in cfg["instruments"]:
         out[int(row["instrument_id"])] = {
             "symbol": row["symbol"],
@@ -102,7 +99,7 @@ def _fmt(v, spec=".4f", none="   -  "):
     return format(v, spec)
 
 
-def _ic_stability(eval_rows: List[dict]) -> dict:
+def _ic_stability(eval_rows: list[dict]) -> dict:
     ics = [r["rolling_ic"] for r in eval_rows if r["rolling_ic"] is not None]
     if len(ics) < 2:
         return {"mean": None, "std": None, "n": len(ics)}
@@ -112,8 +109,7 @@ def _ic_stability(eval_rows: List[dict]) -> dict:
 
 def run_alpha(aid: str, frames, cfg, backtester, lc_cfg, log, ledger) -> dict:
     psi_thr = float(cfg["policies"]["drift_triggered"]["psi_threshold"])
-    dep = AdaptiveDeployment(lambda: build(aid), frames, cfg, backtester,
-                             psi_thr)
+    dep = AdaptiveDeployment(lambda: build(aid), frames, cfg, backtester, psi_thr)
     # persist the captured baselines (the deployment's research-window view)
     if dep.signal_baseline is not None:
         dep.signal_baseline.save(BASELINES_DIR / f"{dep.signal_baseline.name}.json")
@@ -128,8 +124,7 @@ def run_alpha(aid: str, frames, cfg, backtester, lc_cfg, log, ledger) -> dict:
         "universe": dep.universe,
         "deploy_start": dep.deploy_start,
         "n_blocks": len(dep.block_bounds) - 1,
-        "ic_baseline": (None if dep.ic_baseline is None
-                        else dep.ic_baseline.to_dict()),
+        "ic_baseline": (None if dep.ic_baseline is None else dep.ic_baseline.to_dict()),
         "policies": {},
     }
     for pname in POLICY_NAMES:
@@ -150,10 +145,8 @@ def run_alpha(aid: str, frames, cfg, backtester, lc_cfg, log, ledger) -> dict:
             "rolling_ic_mean": stab["mean"],
             "rolling_ic_std": stab["std"],
             "n_ic_evals": stab["n"],
-            "n_evals": res.n_evals,
             "n_informative_evals": res.n_informative_evals,
-            "ic_baseline_kind": (
-                dep.ic_baseline.baseline_kind if dep.ic_baseline else None),
+            "ic_baseline_kind": (dep.ic_baseline.baseline_kind if dep.ic_baseline else None),
             "ic_baseline_rows": getattr(dep, "ic_baseline_rows", 0),
             "lifecycle_transitions": res.transitions,
             "final_state": res.final_state,
@@ -165,10 +158,12 @@ def run_alpha(aid: str, frames, cfg, backtester, lc_cfg, log, ledger) -> dict:
         # twice as many hypotheses.  The evaluation counts stay in the JSON
         # as diagnostics.
         ledger.record(
-            aid, "adaptive_deployment",
+            aid,
+            "adaptive_deployment",
             config={"policy": pname, **res.policy},
             result={
-                "net_pnl": m.total_pnl, "refits": res.refit_count,
+                "net_pnl": m.total_pnl,
+                "refits": res.refit_count,
                 "deployed_ic": res.deployed_ic,
                 "final_state": res.final_state,
                 "n_evals": res.n_evals,
@@ -179,11 +174,10 @@ def run_alpha(aid: str, frames, cfg, backtester, lc_cfg, log, ledger) -> dict:
     return out
 
 
-def _write_report(results: Dict[str, dict], cfg, ledger, log,
-                  runtime_s: float) -> None:
+def _write_report(results: dict[str, dict], cfg, ledger, log, runtime_s: float) -> None:
     lc = cfg["lifecycle"]
     dt = cfg["policies"]["drift_triggered"]
-    lines: List[str] = []
+    lines: list[str] = []
     a = lines.append
     a("# Adaptive deployment report — STATIC vs SCHEDULED vs DRIFT-TRIGGERED")
     a("")
@@ -218,15 +212,21 @@ def _write_report(results: Dict[str, dict], cfg, ledger, log,
     a("")
     a("## Pinned configuration (configs/strategies/strategies.json `adaptive`)")
     a("")
-    a(f"- blocks {cfg['block_ns'] / NS_H:.2f}h, warmup {cfg['warmup_ns'] / NS_H:.1f}h,"
-      f" trailing train window {cfg['train_window_ns'] / NS_H:.0f}h,"
-      f" embargo {cfg['embargo_ns'] / 1e9:.0f}s")
-    a(f"- drift trigger: PSI > {dt['psi_threshold']} (10-quantile-bucket, eps 1e-6)"
-      f" OR rolling-IC z < {dt['ic_z_threshold']}; min refit gap "
-      f"{dt['min_refit_gap_ns'] / NS_H:.0f}h")
-    a(f"- lifecycle: WATCH below IC {lc['watch_ic_gate']}, RETIRE after "
-      f"{lc['retire_breach_evals']} consecutive breaches, re-activate at IC >= "
-      f"{lc['reactivate_ic_gate']} for {lc['reactivate_evals']} consecutive evals")
+    a(
+        f"- blocks {cfg['block_ns'] / NS_H:.2f}h, warmup {cfg['warmup_ns'] / NS_H:.1f}h,"
+        f" trailing train window {cfg['train_window_ns'] / NS_H:.0f}h,"
+        f" embargo {cfg['embargo_ns'] / 1e9:.0f}s"
+    )
+    a(
+        f"- drift trigger: PSI > {dt['psi_threshold']} (10-quantile-bucket, eps 1e-6)"
+        f" OR rolling-IC z < {dt['ic_z_threshold']}; min refit gap "
+        f"{dt['min_refit_gap_ns'] / NS_H:.0f}h"
+    )
+    a(
+        f"- lifecycle: WATCH below IC {lc['watch_ic_gate']}, RETIRE after "
+        f"{lc['retire_breach_evals']} consecutive breaches, re-activate at IC >= "
+        f"{lc['reactivate_ic_gate']} for {lc['reactivate_evals']} consecutive evals"
+    )
     a("")
     a("## Master table (per alpha x policy)")
     a("")
@@ -235,10 +235,14 @@ def _write_report(results: Dict[str, dict], cfg, ledger, log,
     a("= steadier); `state` = final lifecycle state; refits include the")
     a("initial deployment fit.")
     a("")
-    a("| alpha | policy | refits | drift ev | net P&L | costs | trades | "
-      "IC dep | rIC mean | rIC std | transitions | state |")
-    a("|-------|--------|--------|----------|---------|-------|--------|"
-      "--------|----------|---------|-------------|-------|")
+    a(
+        "| alpha | policy | refits | drift ev | net P&L | costs | trades | "
+        "IC dep | rIC mean | rIC std | transitions | state |"
+    )
+    a(
+        "|-------|--------|--------|----------|---------|-------|--------|"
+        "--------|----------|---------|-------------|-------|"
+    )
     for aid in results:
         for pname in POLICY_NAMES:
             p = results[aid]["policies"][pname]
@@ -253,10 +257,8 @@ def _write_report(results: Dict[str, dict], cfg, ledger, log,
     a("")
     a("## Policy aggregates (sum / mean over the 10 alphas)")
     a("")
-    a("| policy | total refits | total drift ev | total net P&L | "
-      "mean IC dep | retired alphas |")
-    a("|--------|--------------|----------------|---------------|"
-      "-------------|----------------|")
+    a("| policy | total refits | total drift ev | total net P&L | mean IC dep | retired alphas |")
+    a("|--------|--------------|----------------|---------------|-------------|----------------|")
     for pname in POLICY_NAMES:
         rows = [results[aid]["policies"][pname] for aid in results]
         ics = [r["deployed_ic"] for r in rows if r["deployed_ic"] is not None]
@@ -270,16 +272,15 @@ def _write_report(results: Dict[str, dict], cfg, ledger, log,
     a("")
     a("### Which policy 'wins' where — and why that is not a conclusion")
     a("")
-    win_pnl: Dict[str, int] = {p: 0 for p in POLICY_NAMES}
-    win_ic: Dict[str, int] = {p: 0 for p in POLICY_NAMES}
+    win_pnl: dict[str, int] = {p: 0 for p in POLICY_NAMES}
+    win_ic: dict[str, int] = {p: 0 for p in POLICY_NAMES}
     for aid in results:
         ps = results[aid]["policies"]
         best_pnl = max(POLICY_NAMES, key=lambda p: ps[p]["net_pnl"])
         win_pnl[best_pnl] += 1
         best_ic = max(
             POLICY_NAMES,
-            key=lambda p: (ps[p]["deployed_ic"]
-                           if ps[p]["deployed_ic"] is not None else -9.0),
+            key=lambda p: ps[p]["deployed_ic"] if ps[p]["deployed_ic"] is not None else -9.0,
         )
         win_ic[best_ic] += 1
     a("| policy | best net P&L (of 10) | best deployed IC (of 10) |")
@@ -299,23 +300,29 @@ def _write_report(results: Dict[str, dict], cfg, ledger, log,
     a("## Lifecycle activity")
     a("")
     rows = log.read_all()
-    a(f"{len(rows)} transitions logged to `research/lifecycle_log.jsonl` "
-      "(every one carries alpha, policy, event_ts, from/to, reason, the "
-      "rolling IC that caused it and the evaluation index).")
+    a(
+        f"{len(rows)} transitions logged to `research/lifecycle_log.jsonl` "
+        "(every one carries alpha, policy, event_ts, from/to, reason, the "
+        "rolling IC that caused it and the evaluation index)."
+    )
     a("")
     if rows:
         a("| alpha | policy | eval | from | to | rolling IC |")
         a("|-------|--------|------|------|----|-----------|")
         for r in rows:
-            a(f"| {r['alpha_id']} | {r['policy']} | {r['eval_index']} | "
-              f"{r['from']} | {r['to']} | {_fmt(r['rolling_ic'])} |")
+            a(
+                f"| {r['alpha_id']} | {r['policy']} | {r['eval_index']} | "
+                f"{r['from']} | {r['to']} | {_fmt(r['rolling_ic'])} |"
+            )
         a("")
         retired = sorted({r["alpha_id"] for r in rows if r["to"] == "RETIRED"})
         if retired:
-            a(f"Alphas that hit RETIRED under at least one policy: "
-              f"{', '.join(retired)} — allocation was verifiably halted for "
-              "the retired spans (positions forced flat; shadow scoring "
-              "continued so the pinned re-activation rule stayed reachable).")
+            a(
+                f"Alphas that hit RETIRED under at least one policy: "
+                f"{', '.join(retired)} — allocation was verifiably halted for "
+                "the retired spans (positions forced flat; shadow scoring "
+                "continued so the pinned re-activation rule stayed reachable)."
+            )
             a("")
     a("## Drift monitor readout")
     a("")
@@ -329,8 +336,7 @@ def _write_report(results: Dict[str, dict], cfg, ledger, log,
     a("baseline from a different feature registry) — the same files the")
     a("Java live monitor consumes.")
     a("")
-    no_ic = sorted(aid for aid, r in results.items()
-                   if r.get("ic_baseline") is None)
+    no_ic = sorted(aid for aid, r in results.items() if r.get("ic_baseline") is None)
     if no_ic:
         a(f"**No OOS IC baseline: {', '.join(no_ic)}.** The IC baseline is")
         a("captured from the purged held-out tail of the warmup; when that")
@@ -365,8 +371,10 @@ def _write_report(results: Dict[str, dict], cfg, ledger, log,
     a("made the selection-adjusted threshold a function of the block cadence")
     a("rather than of the research design.")
     a("")
-    a(f"`ledger_n_at_report` = **{ledger.total_experiments}** "
-      f"({ledger.distinct_experiments} distinct configurations), read at")
+    a(
+        f"`ledger_n_at_report` = **{ledger.total_experiments}** "
+        f"({ledger.distinct_experiments} distinct configurations), read at"
+    )
     a("render time.")
     a("")
     (REPORTS_DIR / "ADAPTIVE_REPORT.md").write_text("\n".join(lines) + "\n")
@@ -383,7 +391,8 @@ def main() -> int:
     # Same pinned research execution model as run_all.py (round-3): latency
     # in EVENT TIME, a bounded decision age and no overnight carry.
     backtester = Backtester(
-        CostModel.load(REPO / "configs" / "execution" / "execution.json"), meta,
+        CostModel.load(REPO / "configs" / "execution" / "execution.json"),
+        meta,
         BacktestConfig(
             latency_ns=1_000_000_000,
             max_decision_age_ns=60_000_000_000,
@@ -395,7 +404,7 @@ def main() -> int:
 
     alphas = select_alphas()
     print(f"alpha subset: {alphas}")
-    results: Dict[str, dict] = {}
+    results: dict[str, dict] = {}
     for aid in alphas:
         t0 = time.time()
         rep = run_alpha(aid, frames, cfg, backtester, lc_cfg, log, ledger)
@@ -404,16 +413,14 @@ def main() -> int:
             json.dumps(rep, indent=2, sort_keys=True) + "\n"
         )
         summary = " ".join(
-            f"{p}:rf={rep['policies'][p]['refit_count']}"
-            f",pnl={rep['policies'][p]['net_pnl']:.0f}"
+            f"{p}:rf={rep['policies'][p]['refit_count']},pnl={rep['policies'][p]['net_pnl']:.0f}"
             for p in POLICY_NAMES
         )
         print(f"{aid}: {summary} ({time.time() - t0:.1f}s)")
 
     ledger.save()
     _write_report(results, cfg, ledger, log, time.time() - t_start)
-    print(f"\nDone in {time.time() - t_start:.0f}s -> "
-          f"{REPORTS_DIR / 'ADAPTIVE_REPORT.md'}")
+    print(f"\nDone in {time.time() - t_start:.0f}s -> {REPORTS_DIR / 'ADAPTIVE_REPORT.md'}")
     return 0
 
 

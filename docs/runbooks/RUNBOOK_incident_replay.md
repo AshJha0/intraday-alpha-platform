@@ -29,7 +29,7 @@ are below.
 
 ```bash
 cd python && PYTHONPATH=src python3 -m iap.mvp run                 # -> ../data/mvp/<run_id>/
-# mvp run 58a10f2194a3c81c: events=16578 decisions=355 parents=66 children=105 fills=55 pnl=-22.676287 USD digest=d938eeae68c85a6c... out=.../data/mvp/58a10f2194a3c81c
+# mvp run 58a10f2194a3c81c: events=16578 decisions=355 parents=66 children=105 fills=55 pnl=-22.651183 USD digest=d938eeae68c85a6c... out=.../data/mvp/58a10f2194a3c81c
 ```
 
 **Java paper vertical** (`java/paper.sh`, state directory `--state-dir` /
@@ -38,10 +38,10 @@ cd python && PYTHONPATH=src python3 -m iap.mvp run                 # -> ../data/
 
 | file | what |
 |---|---|
-| `decision_traces.jsonl` | one `DecisionTrace` per pre-trade risk decision, appended and fsynced at every checkpoint (1,024 events), at session end and from the shutdown hook; never rotated |
+| `decision_traces.jsonl` | one `DecisionTrace` per pre-trade risk decision, appended and fsynced at every checkpoint (1,024 events), at session end and at a requested stop (since v1.3.0 the shutdown hook only raises a stop flag; the trading thread writes the checkpoint and the session ends `STOPPED`); never rotated |
 | `risk_audit.jsonl` | every `RiskEvent`, same cadence |
-| `risk_snapshot.json`, `session_state.json` (x-version 2: `trace_lines`, `audit_lines`, the event cursor) | the restart state |
-| `config_audit.jsonl`, `admin_audit.jsonl` | which configuration ran; who called the kill-switch API |
+| `risk_snapshot.json`, `session_state.json` (x-version 2: `trace_lines`, `audit_lines`, the event cursor and, since v1.3.0, `risk_snapshot_sha256`) | the restart state. `session_state.json` is the commit point of a checkpoint and names its risk snapshot by hash; a `risk_snapshot.json.next` beside them is a checkpoint that was interrupted after the commit and is rolled forward on `--resume` — archive it with the rest |
+| `config_audit.jsonl`, `admin_audit.jsonl` | which configuration ran; who called the kill-switch API (since v1.3.0 each line carries `operator`, `remote` and the token's sha256; a kill answered `202` has a second line when the risk engine recorded it) |
 | the session report (x-version 3) | `trace: {count, digest, jsonl}`, `risk.audit_sha256`, `config_sha256`; `/status` carries `trace_count`, `trace_digest` live |
 
 The input stream of a paper session is the file the session was started on
@@ -124,6 +124,12 @@ queries above. The risk audit is byte-identical across Rust, Java and Python
 engines, so `risk_audit.jsonl` can be replayed through `iap.risk` under a
 debugger with the same decisions (API_TRADING.md §1.2).
 
+A session that ended `STOPPED` (a requested stop, `platform_session_state`
+4) has no session report: its evidence is the state directory. Resume it to
+completion first (`RUNBOOK_paper_trading.md` §5) if the incident needs the
+report's digests, or work from `decision_traces.jsonl` and
+`risk_audit.jsonl` directly — both are complete up to the checkpoint.
+
 ## 4. Debug — step the engine
 
 The engine is a plain Python object; drive it over the captured stream with
@@ -184,7 +190,13 @@ For a smaller pin, `configs/mvp/mvp_tiny.json` + `generator_tiny.json` are
 the fast fixtures the tests use; a scenario-shaped incident (a kill switch
 engaged mid-session, a venue halted, a NO_ROUTE child) becomes a scripted
 test in `python/tests/test_mvp.py` in the style of the kill-switch case,
-and its row in `docs/SCENARIOS.md`. For a Java incident, the equivalent pin
+and its row in `docs/SCENARIOS.md`. A risk-engine incident that needs its
+own engine state — a fail-closed configuration, an engine awaiting
+bootstrap, a restore, a kill command that does not parse — is pinned as a
+scenario of the edge golden instead (`tests/golden/expected_risk_edge_decisions.json`,
+generator `python/tools/make_golden_risk_edge.py`; COOKBOOK recipe 34
+replays it): each scenario builds a fresh engine, and Rust, Java and Python
+must reproduce its decisions and audit bytes. For a Java incident, the equivalent pin
 is a `PaperTraceTest`-style case over the same vector asserting the
 `trace.digest`.
 

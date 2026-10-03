@@ -14,12 +14,14 @@ Outputs (do not hand-edit):
                                 The Deployment/CronJob mount it with
                                 items[].path so the pod sees the nested tree.
   configmap-prometheus.yaml  <- deployment/prometheus/{prometheus,recording,alerts}.yml
+  configmap-alertmanager.yaml <- deployment/alertmanager/alertmanager.yml
   configmap-grafana.yaml     <- deployment/grafana/provisioning + dashboards
 
 Equivalent to `kubectl create configmap ... --from-file=... --dry-run=client
 -o yaml`, but deterministic (sorted keys, stable ordering) and usable without
 kubectl. Requires PyYAML.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -60,8 +62,7 @@ CONFIGS = REPO / "configs"
 
 def config_files() -> list[Path]:
     """Every JSON file under configs/, sorted by relative path."""
-    return sorted(CONFIGS.rglob("*.json"),
-                  key=lambda p: p.relative_to(CONFIGS).as_posix())
+    return sorted(CONFIGS.rglob("*.json"), key=lambda p: p.relative_to(CONFIGS).as_posix())
 
 
 def configmap_key(path: Path) -> str:
@@ -73,9 +74,9 @@ def configmap_items() -> list[dict[str, str]]:
     """The `items:` list a volume needs to project the nested tree back
     (key -> path). tests/harness/check_deployment.py asserts the committed
     manifests carry exactly this list."""
-    return [{"key": configmap_key(p),
-             "path": p.relative_to(CONFIGS).as_posix()}
-            for p in config_files()]
+    return [
+        {"key": configmap_key(p), "path": p.relative_to(CONFIGS).as_posix()} for p in config_files()
+    ]
 
 
 def configmap(name: str, files: dict[str, Path]) -> dict:
@@ -99,8 +100,7 @@ def configmap(name: str, files: dict[str, Path]) -> dict:
 
 def write(out: Path, src_desc: str, *manifests: dict) -> None:
     body = "---\n".join(
-        yaml.dump(m, default_flow_style=False, sort_keys=False, width=100)
-        for m in manifests
+        yaml.dump(m, default_flow_style=False, sort_keys=False, width=100) for m in manifests
     )
     out.write_text(HEADER.format(src=src_desc) + body)
     try:
@@ -113,10 +113,13 @@ def write(out: Path, src_desc: str, *manifests: dict) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
-        "--out-dir", type=Path, default=K8S,
+        "--out-dir",
+        type=Path,
+        default=K8S,
         help="write the manifests here instead of deployment/k8s (used by "
-             "tests/harness/check_deployment.py to diff against the committed "
-             "files without touching the working tree)")
+        "tests/harness/check_deployment.py to diff against the committed "
+        "files without touching the working tree)",
+    )
     args = ap.parse_args()
     out_dir = args.out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -153,7 +156,19 @@ def main() -> int:
         ),
     )
 
-    # 3. Grafana provisioning + dashboards.
+    # 3. Alertmanager routing (mounted at /etc/alertmanager). The webhook URL
+    #    is NOT here: alertmanager.yml reads it from the Secret-backed file
+    #    /etc/alertmanager/secrets/webhook_url.
+    write(
+        out_dir / "configmap-alertmanager.yaml",
+        "deployment/alertmanager/alertmanager.yml",
+        configmap(
+            "iap-alertmanager-config",
+            {"alertmanager.yml": REPO / "deployment" / "alertmanager" / "alertmanager.yml"},
+        ),
+    )
+
+    # 4. Grafana provisioning + dashboards.
     graf = REPO / "deployment" / "grafana"
     write(
         out_dir / "configmap-grafana.yaml",
@@ -161,7 +176,10 @@ def main() -> int:
         configmap(
             "iap-grafana-provisioning",
             {
-                "datasources-prometheus.yml": graf / "provisioning" / "datasources" / "prometheus.yml",
+                "datasources-prometheus.yml": graf
+                / "provisioning"
+                / "datasources"
+                / "prometheus.yml",
                 "dashboards-provider.yml": graf / "provisioning" / "dashboards" / "dashboards.yml",
             },
         ),

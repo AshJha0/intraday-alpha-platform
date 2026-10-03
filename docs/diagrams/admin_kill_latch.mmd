@@ -1,0 +1,32 @@
+sequenceDiagram
+    autonumber
+    actor Op as Operator
+    participant MX as MetricsServer<br/>(binds loopback unless IAP_BIND_ADDR)
+    participant AD as AdminService
+    participant TT as Trading thread
+    participant RK as RiskEngine
+    participant EX as ExecutionSimulator
+
+    Op->>MX: POST /admin/kill with scope, id, reason and a Bearer token
+    MX->>AD: handle(kill, token, params, remote address)
+    alt no token, or the token matches no operator
+        AD-->>Op: 401 or 403, audited — after 10 failures in a 60 s window, 429
+    else authenticated operator
+        AD->>AD: raise killPending BEFORE waiting
+        Note over TT: from this moment the order path sends no new order<br/>(exec_orders_blocked_kill_pending_total)
+        AD->>AD: queue the command, wait up to 5 s
+        alt the trading thread drains in time
+            TT->>AD: drain() — at an event boundary, before a pre-trade check,<br/>or between realtime pacing slices on a quiet feed
+            AD->>RK: engageKill(scope, id, current event time, reason)
+            AD->>EX: request a cancel for every working child order
+            AD-->>Op: 200 applied — the message says what was cancelled
+        else the wait expires
+            AD-->>Op: 202 kill latched — the command is never withdrawn
+            TT->>AD: drain() at the next opportunity
+            AD->>RK: engageKill(scope, id, current event time, reason)
+            AD->>EX: request a cancel for every working child order
+            AD->>AD: second audit line — applied after the request returned 202
+        end
+    end
+    Note over AD: every accepted call appends to admin_audit.jsonl —<br/>operator, remote address, token sha256, never the token
+    Note over Op,AD: clear, override and roll are withdrawn on timeout (503)<br/>only a kill stays queued

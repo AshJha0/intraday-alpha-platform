@@ -9,7 +9,6 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-
 from iap.core.events import EventType, MarketEvent, SessionStatus
 from iap.execution import (
     AlgoType,
@@ -33,8 +32,16 @@ SEC = 1_000_000_000
 
 def parent(algo: AlgoType, qty: int, slices: int, **kw) -> ParentOrder:
     return ParentOrder(
-        parent_id=1, instrument_id=7, venue_id=1, side=0, qty=qty, algo=algo,
-        start_ts=T0, end_ts=T0 + 100 * SEC, slices=slices, **kw,
+        parent_id=1,
+        instrument_id=7,
+        venue_id=1,
+        side=0,
+        qty=qty,
+        algo=algo,
+        start_ts=T0,
+        end_ts=T0 + 100 * SEC,
+        slices=slices,
+        **kw,
     )
 
 
@@ -147,21 +154,35 @@ def test_invalid_parents_rejected():
 
 def algo_config() -> ExecConfig:
     v1 = VenueSpec(
-        venue_id=1, name="TST", taker_fee_per_share=0.003,
-        maker_rebate_per_share=0.002, latency_mean_ns=100_000, latency_jitter_ns=0,
+        venue_id=1,
+        name="TST",
+        taker_fee_per_share=0.003,
+        maker_rebate_per_share=0.002,
+        latency_mean_ns=100_000,
+        latency_jitter_ns=0,
     )
     v2 = replace(v1, venue_id=2, taker_fee_per_share=0.001, maker_rebate_per_share=0.0025)
     return ExecConfig(
-        seed=7, venues={1: v1, 2: v2},
+        seed=7,
+        venues={1: v1, 2: v2},
         instruments={7: InstrumentSpec(7, 0.01, 1.0, 1_000_000.0)},
     )
 
 
 def _ev(seq, ts, etype, side, px, qty, oid, tid=0, venue=1) -> MarketEvent:
     return MarketEvent(
-        event_id=seq, instrument_id=7, venue_id=venue, exchange_ts=ts,
-        receive_ts=ts, sequence=seq, event_type=int(etype), side=side,
-        price_ticks=px, qty=qty, order_id=oid, trade_id=tid,
+        event_id=seq,
+        instrument_id=7,
+        venue_id=venue,
+        exchange_ts=ts,
+        receive_ts=ts,
+        sequence=seq,
+        event_type=int(etype),
+        side=side,
+        price_ticks=px,
+        qty=qty,
+        order_id=oid,
+        trade_id=tid,
     )
 
 
@@ -455,9 +476,7 @@ def test_replay_gated_venue_status_is_respected_by_scheduler():
     res = replay.run(evs)
     assert res.fills == []
     orders = replay.simulator.orders.values()
-    reasons = {
-        pid: {o.cancel_reason for o in orders if o.parent_id == pid} for pid in (1, 2)
-    }
+    reasons = {pid: {o.cancel_reason for o in orders if o.parent_id == pid} for pid in (1, 2)}
     assert reasons[1] == {CancelReason.EXPIRED}
     assert reasons[2] == {CancelReason.VENUE_NOT_TRADING}
     assert replay.simulator.counters.venue_not_trading_cancels == 2

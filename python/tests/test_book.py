@@ -1,7 +1,6 @@
 """Order-book semantics tests — pinned behavior from conventions section 4."""
 
 import pytest
-
 from conftest import add, mkev
 from iap.core.events import EventType, SessionStatus, Side
 from iap.orderbook.book import ConsolidatedBook, OrderBook
@@ -140,8 +139,15 @@ def test_snapshot_recovery_rebuilds_book_and_clears_stale():
     ]
     for i, (side, price, qty, oid) in enumerate(burst):
         b.apply(
-            mkev(10 + i, EventType.SNAPSHOT, side, price, qty, order_id=oid,
-                 trade_id=len(burst) - 1 - i)
+            mkev(
+                10 + i,
+                EventType.SNAPSHOT,
+                side,
+                price,
+                qty,
+                order_id=oid,
+                trade_id=len(burst) - 1 - i,
+            )
         )
     assert b.stale is False
     assert b.best_bid() == (2450, 500)
@@ -181,12 +187,11 @@ def test_mid_burst_gap_marks_burst_broken():
     b.apply(add(9, Side.BID, 2449, 100, 44))  # gap -> stale
     assert b.stale
     # burst of 4 records; the record with trade_id == 1 goes missing
-    b.apply(mkev(10, EventType.SNAPSHOT, Side.BID, 2450, 500, order_id=101,
-                 trade_id=3))
-    b.apply(mkev(11, EventType.SNAPSHOT, Side.BID, 2449, 400, order_id=102,
-                 trade_id=2))
-    b.apply(mkev(13, EventType.SNAPSHOT, Side.ASK, 2452, 700, order_id=104,
-                 trade_id=0))  # seq 12 missing: gap INSIDE the burst
+    b.apply(mkev(10, EventType.SNAPSHOT, Side.BID, 2450, 500, order_id=101, trade_id=3))
+    b.apply(mkev(11, EventType.SNAPSHOT, Side.BID, 2449, 400, order_id=102, trade_id=2))
+    b.apply(
+        mkev(13, EventType.SNAPSHOT, Side.ASK, 2452, 700, order_id=104, trade_id=0)
+    )  # seq 12 missing: gap INSIDE the burst
     assert b.gaps_detected == 2
     assert b.stale is True  # broken burst must NOT clear stale
     # book events stay blocked until a complete burst arrives
@@ -199,8 +204,17 @@ def test_mid_burst_gap_marks_burst_broken():
         (Side.ASK, 2451, 600, 113),
     ]
     for i, (side, price, qty, oid) in enumerate(burst):
-        b.apply(mkev(15 + i, EventType.SNAPSHOT, side, price, qty,
-                     order_id=oid, trade_id=len(burst) - 1 - i))
+        b.apply(
+            mkev(
+                15 + i,
+                EventType.SNAPSHOT,
+                side,
+                price,
+                qty,
+                order_id=oid,
+                trade_id=len(burst) - 1 - i,
+            )
+        )
     assert b.stale is False
     assert b.best_bid() == (2450, 500)
     assert b.best_ask() == (2451, 600)
@@ -210,14 +224,13 @@ def test_mid_burst_gap_marks_burst_broken():
 def test_broken_burst_state_survives_checkpoint_restore():
     b = _seeded()
     b.apply(add(9, Side.BID, 2449, 100, 44))  # gap -> stale
-    b.apply(mkev(10, EventType.SNAPSHOT, Side.BID, 2450, 500, order_id=101,
-                 trade_id=2))
-    b.apply(mkev(12, EventType.SNAPSHOT, Side.BID, 2449, 400, order_id=102,
-                 trade_id=1))  # gap inside the burst
+    b.apply(mkev(10, EventType.SNAPSHOT, Side.BID, 2450, 500, order_id=101, trade_id=2))
+    b.apply(
+        mkev(12, EventType.SNAPSHOT, Side.BID, 2449, 400, order_id=102, trade_id=1)
+    )  # gap inside the burst
     restored = OrderBook.restore(b.checkpoint())
     for book in (b, restored):
-        book.apply(mkev(13, EventType.SNAPSHOT, Side.ASK, 2451, 600,
-                        order_id=103, trade_id=0))
+        book.apply(mkev(13, EventType.SNAPSHOT, Side.ASK, 2451, 600, order_id=103, trade_id=0))
     assert b.stale is True and restored.stale is True
     assert b.checkpoint() == restored.checkpoint()
 

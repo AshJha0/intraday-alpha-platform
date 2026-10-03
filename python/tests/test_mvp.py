@@ -14,10 +14,9 @@ from __future__ import annotations
 import json
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 import pytest
-
 from iap.alpha import load_params_file
 from iap.contracts.protocols import (
     Alpha,
@@ -81,7 +80,7 @@ def tiny_run(tiny_cfg: MvpConfig, tmp_path_factory: pytest.TempPathFactory) -> R
     return run_session(tiny_cfg, feed, out)
 
 
-def _traces(run: RunResult) -> List[DecisionTrace]:
+def _traces(run: RunResult) -> list[DecisionTrace]:
     with open(run.out_dir / TRACES_FILE, encoding="ascii") as fh:
         return [DecisionTrace.from_dict(json.loads(line)) for line in fh if line.strip()]
 
@@ -89,32 +88,55 @@ def _traces(run: RunResult) -> List[DecisionTrace]:
 # ------------------------------------------------------------- config
 
 
-def _doc() -> Dict[str, Any]:
+def _doc() -> dict[str, Any]:
     return json.loads(TINY_CONFIG.read_text())
 
 
-@pytest.mark.parametrize("mutate, needle", [
-    (lambda d: d.__setitem__("x-version", 2), "x-version"),
-    (lambda d: d.pop("seed"), "seed"),
-    (lambda d: d.__setitem__("seed", -1), "seed"),
-    (lambda d: d.__setitem__("venues", ["XV1", "XV1"]), "venues"),
-    (lambda d: d["session"].__setitem__("close", "13:30:00"), "session"),
-    (lambda d: d["session"].__setitem__("open", "1:30:00"), "session.open"),
-    (lambda d: d["portfolio"].__setitem__("ewma_lambda", 1.0), "ewma_lambda"),
-    (lambda d: d["portfolio"].__setitem__("conf_min", 1.5), "conf_min"),
-    (lambda d: d["portfolio"]["solver"].__setitem__("iters", 0), "iters"),
-    (lambda d: d["execution"].__setitem__("urgency_bands", [{"max_urgency": 0.5, "algo": "TWAP"}]),
-     "urgency_bands"),
-    (lambda d: d["execution"].__setitem__("urgency_bands", [
-        {"max_urgency": 0.5, "algo": "TWAP"}, {"max_urgency": 1.0, "algo": "VWAP"}]), "VWAP"),
-    (lambda d: d["execution"].__setitem__("urgency_bands", [
-        {"max_urgency": 0.5, "algo": "TWAP"}, {"max_urgency": 0.4, "algo": "IS"},
-        {"max_urgency": 1.0, "algo": "POV"}]), "ascending"),
-    (lambda d: d["execution"].__setitem__("parent_window_ns", 2_000_000_000), "parent_window_ns"),
-    (lambda d: d["sor"].__setitem__("prefer_rebate", "yes"), "prefer_rebate"),
-    (lambda d: d["reference"].__setitem__("risk", "configs/risk/nope.json"), "reference.risk"),
-    (lambda d: d.__setitem__("notes", "not a list"), "notes"),
-])
+@pytest.mark.parametrize(
+    "mutate, needle",
+    [
+        (lambda d: d.__setitem__("x-version", 2), "x-version"),
+        (lambda d: d.pop("seed"), "seed"),
+        (lambda d: d.__setitem__("seed", -1), "seed"),
+        (lambda d: d.__setitem__("venues", ["XV1", "XV1"]), "venues"),
+        (lambda d: d["session"].__setitem__("close", "13:30:00"), "session"),
+        (lambda d: d["session"].__setitem__("open", "1:30:00"), "session.open"),
+        (lambda d: d["portfolio"].__setitem__("ewma_lambda", 1.0), "ewma_lambda"),
+        (lambda d: d["portfolio"].__setitem__("conf_min", 1.5), "conf_min"),
+        (lambda d: d["portfolio"]["solver"].__setitem__("iters", 0), "iters"),
+        (
+            lambda d: d["execution"].__setitem__(
+                "urgency_bands", [{"max_urgency": 0.5, "algo": "TWAP"}]
+            ),
+            "urgency_bands",
+        ),
+        (
+            lambda d: d["execution"].__setitem__(
+                "urgency_bands",
+                [{"max_urgency": 0.5, "algo": "TWAP"}, {"max_urgency": 1.0, "algo": "VWAP"}],
+            ),
+            "VWAP",
+        ),
+        (
+            lambda d: d["execution"].__setitem__(
+                "urgency_bands",
+                [
+                    {"max_urgency": 0.5, "algo": "TWAP"},
+                    {"max_urgency": 0.4, "algo": "IS"},
+                    {"max_urgency": 1.0, "algo": "POV"},
+                ],
+            ),
+            "ascending",
+        ),
+        (
+            lambda d: d["execution"].__setitem__("parent_window_ns", 2_000_000_000),
+            "parent_window_ns",
+        ),
+        (lambda d: d["sor"].__setitem__("prefer_rebate", "yes"), "prefer_rebate"),
+        (lambda d: d["reference"].__setitem__("risk", "configs/risk/nope.json"), "reference.risk"),
+        (lambda d: d.__setitem__("notes", "not a list"), "notes"),
+    ],
+)
 def test_config_validation_names_the_key(mutate, needle: str) -> None:
     doc = _doc()
     mutate(doc)
@@ -187,8 +209,10 @@ def test_market_data_source_filters_by_event_time(tiny_run: RunResult) -> None:
 
 def test_streaming_alpha_matches_batch_scorer_and_alpha_golden() -> None:
     names = [s.name for s in build_registry()]
-    models = load_params_file(REPO_ROOT / "configs" / "strategies" / "alpha_params.json",
-                              expected_feature_version=registry_hash())
+    models = load_params_file(
+        REPO_ROOT / "configs" / "strategies" / "alpha_params.json",
+        expected_feature_version=registry_hash(),
+    )
     golden = json.loads((GOLDEN_DIR / "expected_alpha.json").read_text())
     for aid in ("EQ01", "EQ03", "EQ06"):
         adapter = LinearZAlpha(models[aid], names, 1_000_000_000)
@@ -200,15 +224,25 @@ def test_streaming_alpha_matches_batch_scorer_and_alpha_golden() -> None:
                 i = names.index(fname)
                 values[i] = float(val)
                 validity[i] = True
-            vec = FeatureVector(instrument_id=12, timestamp=case["exchange_ts"],
-                                feature_version=registry_hash(), values=values, validity=validity)
+            vec = FeatureVector(
+                instrument_id=12,
+                timestamp=case["exchange_ts"],
+                feature_version=registry_hash(),
+                values=values,
+                validity=validity,
+            )
             sig = adapter.generate(vec)
             assert sig.expected_return == pytest.approx(case["expected_return"], abs=1e-9, rel=1e-9)
             assert sig.confidence == pytest.approx(case["confidence"], abs=1e-9, rel=1e-9)
             assert sig.model_version == aid and sig.instrument_id == 12
         # an invalid input scores (0, 0), never NaN
-        vec = FeatureVector(instrument_id=12, timestamp=1, feature_version=registry_hash(),
-                            values=[0.0] * len(names), validity=[False] * len(names))
+        vec = FeatureVector(
+            instrument_id=12,
+            timestamp=1,
+            feature_version=registry_hash(),
+            values=[0.0] * len(names),
+            validity=[False] * len(names),
+        )
         sig = adapter.generate(vec)
         assert sig.expected_return == 0.0 and sig.confidence == 0.0
     members = [LinearZAlpha(models[a], names, 10**9) for a in ("EQ06", "EQ01", "EQ03")]
@@ -238,9 +272,13 @@ def test_fills_are_bounded_and_inside_their_parent_window(tiny_run: RunResult) -
         st = tr.stages
         for po in st.parent_orders:
             children = [c for c in st.child_orders if c.parent_order_id == po.parent_order_id]
-            submitted = {c.child_order_id: c for c in children
-                         if any(r.order_id == c.child_order_id and r.status is ExecStatus.NEW
-                                for r in st.fills)}
+            submitted = {
+                c.child_order_id: c
+                for c in children
+                if any(
+                    r.order_id == c.child_order_id and r.status is ExecStatus.NEW for r in st.fills
+                )
+            }
             n_children += len(submitted)
             for cid, child in submitted.items():
                 filled = sum(r.filled_qty for r in st.fills if r.order_id == cid)
@@ -281,8 +319,9 @@ def test_store_row_counts_equal_trace_stage_counts(tiny_run: RunResult) -> None:
         "decision_traces": len(traces),
         "alpha_signals": sum(len(t.stages.signal) for t in traces),
         "portfolio_targets": sum(1 for t in traces if t.stages.portfolio is not None),
-        "portfolio_legs": sum(len(t.stages.portfolio.targets) for t in traces
-                              if t.stages.portfolio is not None),
+        "portfolio_legs": sum(
+            len(t.stages.portfolio.targets) for t in traces if t.stages.portfolio is not None
+        ),
         "risk_decisions": sum(len(t.stages.risk) for t in traces),
         "parent_orders": sum(len(t.stages.parent_orders) for t in traces),
         "child_orders": sum(len(t.stages.child_orders) for t in traces),
@@ -290,7 +329,11 @@ def test_store_row_counts_equal_trace_stage_counts(tiny_run: RunResult) -> None:
         "executions": sum(len(t.stages.fills) for t in traces),
         "tca_results": sum(len(t.stages.tca) for t in traces),
         "attribution": sum(1 for t in traces if t.stages.attribution is not None),
-        "instruments": 1, "venues": 3, "alphas": 3, "sessions": 1, "feature_versions": 1,
+        "instruments": 1,
+        "venues": 3,
+        "alphas": 3,
+        "sessions": 1,
+        "feature_versions": 1,
     }
     with Store.open(tiny_run.out_dir / STORE_FILE) as store:
         counts = store.counts()
@@ -330,7 +373,8 @@ def test_risk_decisions_reference_children_and_rejects_never_submit(tiny_run: Ru
 
 
 def test_engaged_kill_switch_rejects_every_child_and_nothing_fills(
-        tiny_cfg: MvpConfig, tiny_run: RunResult) -> None:
+    tiny_cfg: MvpConfig, tiny_run: RunResult
+) -> None:
     """The wiring under a REJECT: once the global kill switch is latched,
     every generated child is checked, rejected with KILL_GLOBAL, never
     submitted and never filled, while the loop keeps tracing decisions."""
@@ -350,8 +394,9 @@ def test_engaged_kill_switch_rejects_every_child_and_nothing_fills(
     assert eng.counters.child_orders_generated > 0
     assert eng.counters.risk_rejected > 0
     assert eng.counters.child_orders_submitted == submitted_before
-    rejected = [rd for tr in sink.traces for rd in tr.stages.risk
-                if rd.decision is not Decision.ALLOW]
+    rejected = [
+        rd for tr in sink.traces for rd in tr.stages.risk if rd.decision is not Decision.ALLOW
+    ]
     assert rejected
     assert all(rd.rule_id == Rules.KILL_GLOBAL and rd.rule_index == 1 for rd in rejected)
     for tr in sink.traces:
@@ -370,7 +415,9 @@ def test_paper_evidence_and_report_are_consistent(tiny_run: RunResult) -> None:
         assert row["state_at_run"] == "CANDIDATE"
         paper = row["paper"]
         assert row["research_ic_defined"]
-        assert row["ic_defined"] == (per_alpha[aid]["at_research_horizon"]["realized_ic"] is not None)
+        assert row["ic_defined"] == (
+            per_alpha[aid]["at_research_horizon"]["realized_ic"] is not None
+        )
         if not row["ic_defined"]:
             assert paper is None
             continue
@@ -411,25 +458,35 @@ def test_undefined_ic_writes_paper_null_and_lifecycle_reads_no_evidence(tmp_path
         assert row["research_ic_defined"]
         if aid in undefined:
             assert row["paper"] is None and row["n_ic_samples"] < 3
-            assert run.report["alpha"]["per_alpha"][aid]["at_research_horizon"]["realized_ic"] is None
+            assert (
+                run.report["alpha"]["per_alpha"][aid]["at_research_horizon"]["realized_ic"] is None
+            )
         else:
-            assert row["paper"]["realized_ic"] == \
-                run.report["alpha"]["per_alpha"][aid]["at_research_horizon"]["realized_ic"]
+            assert (
+                row["paper"]["realized_ic"]
+                == run.report["alpha"]["per_alpha"][aid]["at_research_horizon"]["realized_ic"]
+            )
     text = (out / PAPER_EVIDENCE_FILE).read_text()
     assert '"realized_ic": 0.0' not in text
 
     # The lifecycle reads the block as written: an absent block moves nothing.
-    policy = load_policy_config(REPO_ROOT / "configs" / "strategies" / "lifecycle.json",
-                                REPO_ROOT / "configs" / "strategies" / "strategies.json")
+    policy = load_policy_config(
+        REPO_ROOT / "configs" / "strategies" / "lifecycle.json",
+        REPO_ROOT / "configs" / "strategies" / "strategies.json",
+    )
     registry = AlphaRegistry.load(REPO_ROOT / "research" / "alpha_registry.json")
     machine = AlphaLifecycle(policy, registry, None)
     aid = sorted(undefined)[0]
     rec = registry.get(aid)
-    rec.state = LifecycleState.PAPER          # in memory only; the file is untouched
+    rec.state = LifecycleState.PAPER  # in memory only; the file is untouched
     block = ev["alphas"][aid]["paper"]
-    evidence = Evidence(research=None, capacity_usd=None, validation=None,
-                        paper=None if block is None else PaperEvidence.from_dict(block),
-                        live=None)
+    evidence = Evidence(
+        research=None,
+        capacity_usd=None,
+        validation=None,
+        paper=None if block is None else PaperEvidence.from_dict(block),
+        live=None,
+    )
     ts = ev["event_ts"] + 1
     assert machine.advance(aid, ts, evidence) is None
     assert rec.last_evaluation.outcome is Outcome.NO_EVIDENCE
@@ -437,29 +494,44 @@ def test_undefined_ic_writes_paper_null_and_lifecycle_reads_no_evidence(tmp_path
     assert registry.get(aid).state is LifecycleState.PAPER
     # What the old artefact would have produced: a fabricated 0.0 passes the
     # tracking gate on silence — the exact failure the null block prevents.
-    fabricated = Evidence(research=None, capacity_usd=None, validation=None, live=None,
-                          paper=PaperEvidence(n_sessions=1, realized_ic=0.0, research_ic=0.0,
-                                              net_pnl=0.0, n_kill_events=0, tracking_error=0.0))
+    fabricated = Evidence(
+        research=None,
+        capacity_usd=None,
+        validation=None,
+        live=None,
+        paper=PaperEvidence(
+            n_sessions=1,
+            realized_ic=0.0,
+            research_ic=0.0,
+            net_pnl=0.0,
+            n_kill_events=0,
+            tracking_error=0.0,
+        ),
+    )
     machine.advance(aid, ts + 1, fabricated)
     assert rec.last_evaluation.gates["paper_ic_tracking"].passed
 
 
-def test_run_twice_is_bit_identical(tiny_cfg: MvpConfig, tiny_run: RunResult,
-                                    tmp_path: Path) -> None:
+def test_run_twice_is_bit_identical(
+    tiny_cfg: MvpConfig, tiny_run: RunResult, tmp_path: Path
+) -> None:
     feed = generate_feed(tiny_cfg, tmp_path / "second")
     assert feed.events_sha256 == tiny_run.feed.events_sha256
     assert feed.data_version == tiny_run.feed.data_version
     second = run_session(tiny_cfg, feed, tmp_path / "second")
     assert second.trace_digest == tiny_run.trace_digest
     assert compare_runs(tiny_run.report, second.report) == []
-    assert (tmp_path / "second" / TRACES_FILE).read_bytes() == \
-        (tiny_run.out_dir / TRACES_FILE).read_bytes()
-    assert (tmp_path / "second" / REPORT_JSON).read_bytes() == \
-        (tiny_run.out_dir / REPORT_JSON).read_bytes()
+    assert (tmp_path / "second" / TRACES_FILE).read_bytes() == (
+        tiny_run.out_dir / TRACES_FILE
+    ).read_bytes()
+    assert (tmp_path / "second" / REPORT_JSON).read_bytes() == (
+        tiny_run.out_dir / REPORT_JSON
+    ).read_bytes()
 
 
-def test_a_different_seed_changes_the_stream(tiny_cfg: MvpConfig, tiny_run: RunResult,
-                                             tmp_path: Path) -> None:
+def test_a_different_seed_changes_the_stream(
+    tiny_cfg: MvpConfig, tiny_run: RunResult, tmp_path: Path
+) -> None:
     other = tiny_cfg.with_overrides(seed=tiny_cfg.seed + 1)
     feed = generate_feed(other, tmp_path)
     assert feed.data_version != tiny_run.feed.data_version
@@ -485,7 +557,7 @@ def _research_frame(cfg: MvpConfig, run: RunResult) -> Any:
     eng = FeatureEngine({iid: feature_context(cfg, ref)}, cadence_ns=cfg.decision_cadence_ns)
     series = MidSeries()
     last_seq = 0
-    ts_list: List[int] = []
+    ts_list: list[int] = []
     rows = []
     last_event_ts = 0
     for ev in run.feed.events:
@@ -514,7 +586,8 @@ def _research_frame(cfg: MvpConfig, run: RunResult) -> Any:
 
 
 def test_realized_ic_is_pinned_to_the_research_label_definition(
-        tiny_cfg: MvpConfig, tiny_run: RunResult) -> None:
+    tiny_cfg: MvpConfig, tiny_run: RunResult
+) -> None:
     """The MVP's per-decision realized returns ARE the research labels
     (``iap.labels.compute_labels`` on an independently built frame): same
     anchors, same valid set, same mid / cost label to 1e-9, same IC as
@@ -546,8 +619,9 @@ def test_realized_ic_is_pinned_to_the_research_label_definition(
         for h in {engine.horizon, m.horizon}:
             pairs = engine.realized_pairs(alpha.alpha_id, h)
             valid = frame[f"label_valid_{h}"].to_numpy(dtype=bool)
-            assert [i for i, _, _, _ in pairs] == \
-                [i for i in range(len(er)) if conf[i] > 0.0 and valid[i]]
+            assert [i for i, _, _, _ in pairs] == [
+                i for i in range(len(er)) if conf[i] > 0.0 and valid[i]
+            ]
             for i, _, mid, cost in pairs:
                 assert mid == pytest.approx(frame[f"label_mid_{h}"].iloc[i], abs=1e-9)
                 assert cost == pytest.approx(frame[f"label_cost_{h}"].iloc[i], abs=1e-9)
@@ -565,8 +639,10 @@ def test_realized_ic_is_pinned_to_the_research_label_definition(
     # the report carries exactly these numbers
     for aid, row in tiny_run.report["alpha"]["per_alpha"].items():
         assert row["realized_ic"] == engine.realized_ic(aid).ic
-        assert row["at_research_horizon"]["realized_ic"] == \
-            engine.realized_ic(aid, row["research_horizon"]).ic
+        assert (
+            row["at_research_horizon"]["realized_ic"]
+            == engine.realized_ic(aid, row["research_horizon"]).ic
+        )
 
 
 def test_realized_returns_agree_with_the_tca_timeline(tiny_run: RunResult) -> None:
@@ -587,8 +663,9 @@ def test_realized_returns_agree_with_the_tca_timeline(tiny_run: RunResult) -> No
     assert checked > 0
 
 
-def test_shift_by_one_and_truncation_leakage_probes(tiny_cfg: MvpConfig,
-                                                    tiny_run: RunResult) -> None:
+def test_shift_by_one_and_truncation_leakage_probes(
+    tiny_cfg: MvpConfig, tiny_run: RunResult
+) -> None:
     """Two leakage probes (conventions §7, ``iap.validation.leakage``):
 
     * shift-by-one — the report carries ``realized_ic_shifted`` (the signal
@@ -612,8 +689,10 @@ def test_shift_by_one_and_truncation_leakage_probes(tiny_cfg: MvpConfig,
         ys = [m for i, _, m, _ in pairs if pos[i] > 0]
         assert res.ic_shifted == pearson(xs, ys)
     block = tiny_run.report["alpha"]
-    assert block["ensemble"]["realized_ic_shifted"] == \
-        engine.realized_ic(engine.ensemble.alpha_id).ic_shifted
+    assert (
+        block["ensemble"]["realized_ic_shifted"]
+        == engine.realized_ic(engine.ensemble.alpha_id).ic_shifted
+    )
 
     full = _traces(tiny_run)
     events = tiny_run.feed.events
@@ -631,7 +710,7 @@ def test_shift_by_one_and_truncation_leakage_probes(tiny_cfg: MvpConfig,
         part.finish()
         before = [t for t in full if t.event_ts <= cut_ts]
         assert len(sink.traces) >= len(before) > 0
-        for want, got in zip(before, sink.traces[:len(before)]):
+        for want, got in zip(before, sink.traces[: len(before)], strict=False):
             assert got.trace_id == want.trace_id
             assert got.stages.signal == want.stages.signal
             assert got.stages.portfolio == want.stages.portfolio
@@ -657,8 +736,8 @@ def test_control_blocked_children_are_counted_not_traced(tiny_run: RunResult) ->
     for trace in _traces(tiny_run):
         st = trace.stages
         child_ids = {ch.child_order_id for ch in st.child_orders}
-        assert {vd.child_order_id for vd in st.routing} == child_ids   # routed <=> traced
-        assert {rd.order_id for rd in st.risk} <= child_ids            # risk-checked <=> traced
+        assert {vd.child_order_id for vd in st.routing} == child_ids  # routed <=> traced
+        assert {rd.order_id for rd in st.risk} <= child_ids  # risk-checked <=> traced
         traced_children += len(st.child_orders)
         for po in st.parent_orders:
             for control in blocked:
@@ -668,12 +747,14 @@ def test_control_blocked_children_are_counted_not_traced(tiny_run: RunResult) ->
     assert blocked["slice_interval"] == c.slice_interval_blocked
     assert blocked["latency_budget"] == c.latency_budget_blocked
     assert blocked["participation"] == c.participation_blocked
-    assert c.slice_interval_blocked > 0                # the control fires in the tiny run
+    assert c.slice_interval_blocked > 0  # the control fires in the tiny run
     assert traced_children == c.child_orders_submitted + c.risk_rejected + c.sor_no_route
     assert traced_children == c.child_orders_generated - sum(blocked.values())
     with Store.open(tiny_run.out_dir / STORE_FILE) as store:
-        rows = store.query("SELECT parent_order_id, n_child_orders, n_children_allowed, "
-                           "n_children_rejected FROM v_order_chain ORDER BY parent_order_id")
+        rows = store.query(
+            "SELECT parent_order_id, n_child_orders, n_children_allowed, "
+            "n_children_rejected FROM v_order_chain ORDER BY parent_order_id"
+        )
         assert sum(r["n_child_orders"] for r in rows) == traced_children
         assert sum(r["n_children_allowed"] for r in rows) == c.risk_allowed
         assert sum(r["n_children_rejected"] for r in rows) == c.risk_rejected
@@ -691,14 +772,15 @@ def test_signal_stage_is_ensemble_first_then_components(tiny_run: RunResult) -> 
         for po in trace.stages.parent_orders:
             assert po.alpha_id == trace.stages.signal[0].model_version
     with Store.open(tiny_run.out_dir / STORE_FILE) as store:
-        rows = store.query("SELECT parent_order_id, signal_expected_return, "
-                           "signal_model_version FROM v_order_chain ORDER BY parent_order_id")
-        assert rows and all(r["signal_model_version"] == engine.ensemble.alpha_id
-                            for r in rows)
+        rows = store.query(
+            "SELECT parent_order_id, signal_expected_return, "
+            "signal_model_version FROM v_order_chain ORDER BY parent_order_id"
+        )
+        assert rows and all(r["signal_model_version"] == engine.ensemble.alpha_id for r in rows)
         text = store.explain(rows[0]["parent_order_id"])
     lines = text.splitlines()
     assert lines[1].startswith(f"Alpha:      {engine.ensemble.alpha_id}  ")
-    assert [ln.split()[1] for ln in lines[2:2 + len(members)]] == members
+    assert [ln.split()[1] for ln in lines[2 : 2 + len(members)]] == members
 
 
 # ------------------------------------------------------------- helpers
@@ -711,3 +793,50 @@ def test_helpers() -> None:
     assert pearson([1.0, 2.0], [1.0, 2.0]) is None
     assert Side.BID.value == 0
     assert isinstance(SingleStockPortfolio("MVP", "x", "a" * 64, "b" * 64), PortfolioConstructor)
+
+
+def test_gap_gate_reopens_only_when_no_venue_is_stale() -> None:
+    """One venue's recovery must not clear the instrument gate while another is stale."""
+    from types import SimpleNamespace
+
+    from iap.core.events import EventType
+
+    class _Book:
+        def __init__(self) -> None:
+            self.stale = False
+
+        def best_bid(self) -> None:
+            return None
+
+        def best_ask(self) -> None:
+            return None
+
+    calls: list[str] = []
+    risk = SimpleNamespace(
+        on_sequence_gap=lambda iid, ts: calls.append("gap"),
+        on_feed_recovered=lambda iid, ts: calls.append("recovered"),
+        on_market=lambda *a: calls.append("market"),
+    )
+    books = {1: _Book(), 2: _Book()}
+    eng = SimpleNamespace(
+        _last_data_ts={},
+        _venue_stale={},
+        book=SimpleNamespace(books=books),
+        counters=SimpleNamespace(sequence_gaps=0, feed_recoveries=0),
+        risk_engine=risk,
+        iid=1,
+    )
+    ev = SimpleNamespace(event_type=EventType.HEARTBEAT, venue_id=1, exchange_ts=10)
+
+    books[1].stale = True
+    MvpEngine._on_market(eng, ev)  # type: ignore[arg-type]
+    books[2].stale = True
+    MvpEngine._on_market(eng, ev)  # type: ignore[arg-type]
+    assert calls == ["gap", "gap"]
+    books[1].stale = False  # venue 1 recovers, venue 2 is still stale
+    MvpEngine._on_market(eng, ev)  # type: ignore[arg-type]
+    assert calls == ["gap", "gap"] and eng.counters.feed_recoveries == 0
+    books[2].stale = False  # the last stale venue recovers: gate reopens
+    MvpEngine._on_market(eng, ev)  # type: ignore[arg-type]
+    assert calls == ["gap", "gap", "recovered"]
+    assert eng.counters.feed_recoveries == 1 and eng.counters.sequence_gaps == 2

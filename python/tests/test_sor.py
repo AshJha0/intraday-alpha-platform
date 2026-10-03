@@ -10,7 +10,6 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-
 from iap.core.events import EventType, MarketEvent, SessionStatus
 from iap.execution import (
     NO_ROUTE,
@@ -33,8 +32,12 @@ I64_MAX = (1 << 63) - 1
 
 def sor_venues():
     v1 = VenueSpec(
-        venue_id=1, name="TST", taker_fee_per_share=0.003,
-        maker_rebate_per_share=0.002, latency_mean_ns=100_000, latency_jitter_ns=0,
+        venue_id=1,
+        name="TST",
+        taker_fee_per_share=0.003,
+        maker_rebate_per_share=0.002,
+        latency_mean_ns=100_000,
+        latency_jitter_ns=0,
     )
     v2 = replace(v1, venue_id=2, taker_fee_per_share=0.001, maker_rebate_per_share=0.0025)
     return {1: v1, 2: v2}
@@ -52,11 +55,22 @@ class Book:
             self.seq[vid] += 1
         self.seq[vid] += 1
         s = self.seq[vid]
-        self.book.apply(MarketEvent(
-            event_id=s, instrument_id=7, venue_id=vid, exchange_ts=T0 + s,
-            receive_ts=T0 + s, sequence=s, event_type=int(etype), side=side,
-            price_ticks=px, qty=qty, order_id=oid, trade_id=0,
-        ))
+        self.book.apply(
+            MarketEvent(
+                event_id=s,
+                instrument_id=7,
+                venue_id=vid,
+                exchange_ts=T0 + s,
+                receive_ts=T0 + s,
+                sequence=s,
+                event_type=int(etype),
+                side=side,
+                price_ticks=px,
+                qty=qty,
+                order_id=oid,
+                trade_id=0,
+            )
+        )
 
     def add(self, vid, side, px, qty, oid, gap=False):
         self.push(vid, EventType.ADD, side, px, qty, oid, gap)
@@ -170,11 +184,22 @@ def test_stale_venue_recovers_after_a_complete_snapshot_burst():
         [(0, 99, 100, 31), (1, 100, 500, 32)], start=0
     ):
         s += 1
-        b.book.apply(MarketEvent(
-            event_id=s, instrument_id=7, venue_id=1, exchange_ts=T0 + s,
-            receive_ts=T0 + s, sequence=s, event_type=int(EventType.SNAPSHOT),
-            side=side, price_ticks=px, qty=qty, order_id=oid, trade_id=1 - countdown,
-        ))
+        b.book.apply(
+            MarketEvent(
+                event_id=s,
+                instrument_id=7,
+                venue_id=1,
+                exchange_ts=T0 + s,
+                receive_ts=T0 + s,
+                sequence=s,
+                event_type=int(EventType.SNAPSHOT),
+                side=side,
+                price_ticks=px,
+                qty=qty,
+                order_id=oid,
+                trade_id=1 - countdown,
+            )
+        )
     b.seq[1] = s
     assert not b.book.books[1].stale
     assert sor.route_aggressive(b.book, 0, [1, 2]) == 1  # best ask again

@@ -8,9 +8,12 @@ package com.iap.risk;
  */
 public record InstrumentRef(double tickSize, double qtyUnit, String quoteCcy) {
     public InstrumentRef {
-        if (!(tickSize > 0.0) || !(qtyUnit > 0.0)) {
+        // Finite AND > 0: NaN fails `> 0`, +Infinity must fail too (an
+        // infinite tick or unit makes every notional Infinity or NaN).
+        if (!(Double.isFinite(tickSize) && tickSize > 0.0)
+                || !(Double.isFinite(qtyUnit) && qtyUnit > 0.0)) {
             throw new IllegalArgumentException(
-                    "tick_size and qty_unit must be > 0");
+                    "tick_size and qty_unit must be finite and > 0");
         }
         if (quoteCcy == null || quoteCcy.isEmpty()) {
             throw new IllegalArgumentException("quote_ccy must be non-empty");

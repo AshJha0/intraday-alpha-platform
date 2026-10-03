@@ -1,0 +1,39 @@
+flowchart TD
+    %% Hard risk engine, v1.3.0 (2026-10-03): where the fail-closed branches added by the
+    %% review sit in the pinned check order (PLATFORM_CONVENTIONS.md 11.1). Every NEW branch
+    %% reuses an existing rule id, so the check order and the main risk golden are unchanged.
+    OR["OrderRequest"] --> C0{"0 config parsed, reference data valid,<br/>positions bootstrapped?"}
+    C0 -- no --> R0["REJECT CONFIG_MISSING / NOT_BOOTSTRAPPED<br/>NEW: an invalid InstrumentRef (NaN, infinite or<br/>non-positive tick_size / qty_unit) lands the whole engine here"]
+    C0 -- yes --> C4{"1-4 kill switches:<br/>global, strategy, instrument, venue"}
+    C4 -->|"engaged for this order's scope"| R4["REJECT KILL_GLOBAL / KILL_STRATEGY /<br/>KILL_INSTRUMENT / KILL_VENUE"]
+    C4 -->|"venue 0 (route via SOR) and ANY venue kill engaged"| R4V["REJECT KILL_VENUE — NEW<br/>venue 0 (SOR) order rejected:<br/>venue N kill switch engaged"]
+    C4 -->|"clear"| C7{"5-7 malformed order, unknown instrument,<br/>duplicate order id"}
+    C7 -->|"fails"| R7["REJECT MALFORMED_ORDER / UNKNOWN_INSTRUMENT /<br/>DUPLICATE_ORDER_ID"]
+    C7 -->|"duplicate-window arithmetic leaves i64"| RTS["REJECT MALFORMED_ORDER — NEW<br/>timestamp arithmetic overflows i64 (fail-closed)"]
+    C7 -->|"ok"| C8{"8 venue connectivity"}
+    C8 -->|"the named venue is down"| R8["REJECT VENUE_DISCONNECTED"]
+    C8 -->|"venue 0 and EVERY known venue is down"| R8V["REJECT VENUE_DISCONNECTED — NEW<br/>venue 0 (SOR) order rejected:<br/>every known venue is disconnected"]
+    C8 -->|"ok"| C10{"9-10 sequence gap, reference price"}
+    C10 -->|"gap, no mark, bid + ask leaves i64 (NEW),<br/>or mark older than the stale timeout"| R10["REJECT SEQUENCE_GAP / STALE_PRICE"]
+    C10 -->|"mark stamped beyond event clock + stale timeout"| R10F["REJECT STALE_PRICE — NEW<br/>reference price timestamp is more than the timeout<br/>ahead of the latest order event time"]
+    C10 -->|"mark age leaves i64"| RTS
+    C10 -->|"ok"| C12{"11-14 fat-finger qty, conversion rate,<br/>fat-finger notional, price band"}
+    C12 -->|"rate missing, stale, or stamped beyond<br/>event clock + stale timeout (NEW)"| R12["REJECT FX_RATE_MISSING"]
+    C12 -->|"rate age leaves i64"| RTS
+    C12 -->|"limit breached, or the float is NaN (NEW)"| R13["REJECT FAT_FINGER_QTY / FAT_FINGER_NOTIONAL /<br/>PRICE_BAND"]
+    C12 -->|"ok"| C15{"15-16 order-rate throttle, self-match"}
+    C15 -->|"elapsed time leaves i64"| RTS
+    C15 -->|"no token, tokens NaN (NEW), or would cross"| R15["REJECT RATE_THROTTLE / SELF_MATCH"]
+    C15 -->|"ok"| C17{"17 worst-case position projection:<br/>position + open orders + qty"}
+    C17 -->|"leaves the symmetric i64 domain"| R17O["REJECT MALFORMED_ORDER — NEW<br/>projected position overflows i64 (fail-closed)"]
+    C17 -->|"over max_position_qty"| R17["REJECT POSITION_LIMIT"]
+    C17 -->|"ok"| C22{"18-22 instrument, gross and net notional,<br/>daily and strategy loss"}
+    C22 -->|"breached, unvaluable, or NaN (NEW)"| R22["REJECT INSTRUMENT_NOTIONAL / GROSS_NOTIONAL /<br/>NET_NOTIONAL / DAILY_LOSS / STRATEGY_LOSS"]
+    C22 -->|"ok"| ALLOW["ALLOW<br/>order tracked open until on_order_done or a full fill"]
+    FILL["on_fill"] --> FO{"would the strategy lot or the aggregate position<br/>leave the symmetric i64 domain?"}
+    FO -->|"yes — NEW"| KG["nothing is booked, on_fill returns false,<br/>the GLOBAL kill latches<br/>audit: KILL_SWITCH_ENGAGED"]
+    FO -->|"no"| BOOKED["book the fill, re-evaluate the loss limits"]
+    KG -.-> C4
+    CLK["event clock = the later of this order's timestamp<br/>and the newest primed throttle-bucket time"] -.-> C10
+    CLK -.-> C12
+    PIN["pinned by tests/golden/expected_risk_edge_decisions.json + _audit.jsonl<br/>(Rust, Java, Python: exact decisions, byte-identical audit);<br/>NaN, invalid reference data and the future-stamped rate<br/>by per-language rule tests only"] -.-> ALLOW

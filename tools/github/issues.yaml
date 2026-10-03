@@ -550,6 +550,157 @@ epics:
     out_of_scope:
       - "Any agent-initiated order, allocation or lifecycle transition"
 
+  - key: E25
+    title: "Epic: Real historical exchange data (ITCH/PITCH, FX ECN) with a point-in-time master"
+    labels: [type:epic, area:marketdata, phase:phase3, priority:p2]
+    milestone: "Phase 3"
+    objective: >
+      Replace the seeded synthetic generator as the only data source with
+      decoders for real historical feeds (equity ITCH/PITCH-style order-by-order
+      feeds and FX ECN streams) that emit the same canonical MarketEvents, and
+      back them with a point-in-time security master and corporate-action
+      history so a study run today sees exactly the universe, symbology and
+      prices that were knowable on each historical date.
+    scope:
+      - "ITCH/PITCH and FX ECN decoders into the canonical event types, with the existing normalizer/QC and golden discipline"
+      - "a point-in-time (as-of) security master: listings, delistings, symbol changes, venue and lot-size history"
+      - "corporate actions (splits, dividends, mergers, spin-offs) applied point-in-time without lookahead"
+    acceptance:
+      - "A day of real vendor sample data decodes to canonical events whose book reconstruction matches the vendor's own end-of-day state"
+      - "Every instrument attribute used by a study is read through an as-of query; a test proves no attribute is read from a later date"
+    out_of_scope:
+      - "Licensing, redistribution or storing vendor data in this repository"
+      - "Live (non-historical) feed handlers"
+
+  - key: E26
+    title: "Epic: Latency engineering — measured, gated, allocation-free hot path"
+    labels: [type:epic, area:performance, phase:phase3, priority:p2]
+    milestone: "Backlog"
+    objective: >
+      Move from throughput benchmarks to latency evidence: tick-to-trade
+      percentiles measured with a stated methodology and gated in CI against
+      budgets, an audited allocation-free hot path in the C++ and Rust (and
+      GC-quiet Java) implementations, and hardware timestamps so measured
+      latency is not the process's own view of itself.
+    scope:
+      - "a tick-to-trade harness reporting p50/p99/p99.9/max per language with coordinated-omission-safe recording"
+      - "allocation audits of the decode -> book -> feature -> alpha -> risk path"
+      - "NIC/kernel hardware timestamping and clock-synchronisation error budgets"
+    acceptance:
+      - "CI fails when a tracked percentile exceeds its recorded budget by more than the stated noise margin"
+      - "The hot path of each production language allocates zero bytes in steady state, proven by a counter or allocator hook"
+    out_of_scope:
+      - "Kernel bypass networking and FPGA offload"
+
+  - key: E27
+    title: "Epic: Simulator calibration to live fills, multi-horizon markouts, venue/algo TCA"
+    labels: [type:epic, area:execution, area:tca, phase:phase3, priority:p2]
+    milestone: "Backlog"
+    objective: >
+      Make the execution simulator answerable to reality: calibrate its fill,
+      queue and impact models to live (or paper-venue) fills, report markouts at
+      several horizons so adverse selection is visible beyond one number, and
+      attribute cost by venue and by algorithm so routing and algo choices
+      can be judged from evidence.
+    scope:
+      - "a calibration pipeline fitting simulator parameters to observed fills with held-out validation"
+      - "markouts at multiple horizons in the TCA module and its golden"
+      - "venue-level and algo-level TCA attribution tables"
+    acceptance:
+      - "A calibration report states, per parameter, the fitted value, its uncertainty and the held-out error of simulated versus observed fills"
+      - "Markout horizons are configuration, appear in expected_tca.json, and are identical across the languages that implement TCA"
+    out_of_scope:
+      - "Trading real capital to collect fills"
+
+  - key: E28
+    title: "Epic: Book-level risk — factors, stress scenarios, regulatory pre-trade controls, drop-copy reconciliation"
+    labels: [type:epic, area:risk, phase:phase3, priority:p1]
+    milestone: "Backlog"
+    objective: >
+      Extend the per-order, per-instrument fail-closed risk engine to the book:
+      exposures to common factors, stress scenarios run against the live
+      book, the regulatory pre-trade control set, and reconciliation of the
+      platform's own order and fill state against an independent drop-copy so
+      a divergence is a halt, not a surprise.
+    scope:
+      - "factor exposure limits (market, sector, currency) as engine rules with golden vectors in all three engines"
+      - "stress scenarios (gap, volatility shock, liquidity withdrawal) evaluated on the book with limits"
+      - "regulatory pre-trade controls (price collars, fat-finger, order-rate and notional caps) mapped to rule ids"
+      - "drop-copy reconciliation with break detection that engages the kill switch"
+    acceptance:
+      - "Every new rule is a Rust change first, then golden regeneration, then the Java and Python ports, with the byte-identical risk goldens still green"
+      - "A reconciliation break in a replayed session produces a RiskEvent and a latched halt"
+    out_of_scope:
+      - "Real-time portfolio margin and clearing-house exposure"
+
+  - key: E29
+    title: "Epic: Research throughput — feature store, distributed runs, marginal-contribution allocation"
+    labels: [type:epic, area:research, phase:phase3, priority:p2, lang:python]
+    milestone: "Backlog"
+    objective: >
+      Remove the recompute ceiling on research: a point-in-time feature store
+      with content-addressed, versioned feature sets, experiment runs that
+      shard across workers and merge into the ledger deterministically, and a
+      capital-allocation step that weights alphas by marginal contribution to
+      the portfolio rather than by stand-alone statistics.
+    scope:
+      - "a feature store with as-of reads, content hashes and cache keys derived from the registry and the data digest"
+      - "sharded ExperimentRunner execution with a deterministic ledger merge"
+      - "allocation by marginal (incremental) contribution including correlation, closing lifecycle gate 8"
+    acceptance:
+      - "A sharded run produces a ledger and result documents byte-identical to the single-process run"
+      - "Allocation weights are a deterministic function of the ledgered evidence and reproduce from the manifest"
+    out_of_scope:
+      - "A managed cluster or cloud scheduler"
+
+  - key: E30
+    title: "Epic: Agent layer — write broker, blackboard, pre-registration, hidden-seed reserve, human approvals, evals"
+    labels: [type:epic, area:agentic, phase:phase2, priority:p2]
+    milestone: "Backlog"
+    objective: >
+      Specify and build the controls that let several research agents work
+      against the platform without being able to fool it or each other: a write
+      broker that is the only path to repository state, an append-only
+      blackboard for tasks, claims and findings, hypothesis pre-registration,
+      reserve evaluation sessions on a seed the agents never see, human
+      approvals that are authenticated rather than asserted, a read-only MCP
+      surface, evaluations that prove the controls catch known failures, and
+      a rule for handling untrusted free text. Extends the read-only layer of
+      E24 and never touches the trading path.
+    scope:
+      - "an agent write broker and an append-only JSONL blackboard (tasks, claims, findings) with content-hashed tasks and leases"
+      - "hypothesis pre-registration committed before any data is read"
+      - "reserve sessions run on a hidden seed held by the evaluator"
+      - "authenticated HUMAN approvals for every actor = HUMAN lifecycle edge"
+      - "agent evaluations: planted leak, seeded bug, shuffled-label null, citation resolution"
+      - "handling of untrusted free text from ledgers, reports and tool output"
+    acceptance:
+      - "No agent can change repository, ledger or lifecycle state except through the broker, and every broker write is attributable and replayable"
+      - "Each evaluation fails when its control is removed: the leak is not found, the bug is not caught, the null is not rejected, a fabricated citation is not flagged"
+    out_of_scope:
+      - "Any agent-initiated order, allocation or lifecycle transition without an authenticated human approval"
+
+  - key: E31
+    title: "Epic: Differential fuzzing, property tests, crash injection and risk golden coverage"
+    labels: [type:epic, area:testing, phase:phase2, priority:p1]
+    milestone: "Backlog"
+    objective: >
+      Find the defects the hand-written goldens cannot: fuzz the three risk
+      engines against each other, state invariants of the execution simulator
+      as properties, fuzz snapshot and restore, inject crashes into the Java
+      paper-trading loop, and close the gaps in risk golden coverage for the
+      branches that matter most when something has already gone wrong.
+    scope:
+      - "differential fuzzing of the Rust, Java and Python risk engines on generated order/fill/market sequences"
+      - "property-based tests of simulator invariants"
+      - "snapshot/restore fuzzing and crash-injection on the Java paper-trading path"
+      - "risk golden cases for KILL_VENUE, bootstrap, restore and the fail-closed branches"
+    acceptance:
+      - "A fuzz run of at least a stated number of sequences produces byte-identical decisions and audit logs across the three engines, or a minimised reproducer"
+      - "A killed-and-restored session has the same kill-switch latch, positions and audit continuity as an uninterrupted one"
+    out_of_scope:
+      - "Formal verification of the engines"
+
 # ----------------------------------------------------------------------------
 issues:
   # ---------------------------------------------------------------- E01 ----
@@ -906,6 +1057,32 @@ issues:
     evidence:
       - "python/src/iap/reference/refdata.py; configs/instruments/instruments.json; configs/venues/venues.json"
       - "python/tests/test_refdata.py"
+
+  - key: M08
+    epic: E03
+    title: "Bundled dataset: equity continuous flow that reaches the close"
+    labels: [type:bug, area:marketdata, phase:w1, priority:p2, lang:python]
+    milestone: "Backlog"
+    status: backlog
+    estimate_days: 3
+    context: >
+      In the pinned dataset every equity stream stops its continuous flow
+      38-43% of the way through the 6.5 h session (mean 40.5%) and prints
+      nothing until the close auction: slots_per_stream is a hard slot
+      budget, the base rate is slots / duration * 1.30 (the margin multiplies
+      the rate, so the budget would run out at 77% even without clustering)
+      and the self-exciting multiplier (1 + excitation) is not calibrated
+      for. equities.fill_session (opt-in since v1.3.0, default off) removes
+      the budget. Turning it on by default moves every artefact derived from
+      the dataset: qc_report.json, the feature files, the alpha and ML
+      reports, the baselines, the experiment ledger and the headline
+      numbers.
+    acceptance:
+      - "The default generator config produces equity flow up to the close in every session, with the event count chosen deliberately (rate calibrated, or the budget sized for the full session)"
+      - "Every dataset-derived artefact is regenerated in one change, with the before/after of each headline number recorded (golden regeneration protocol, CONTRIBUTING.md §4)"
+      - "A test pins the session coverage of the default config"
+    evidence:
+      - "python/src/iap/marketdata/generator.py (_eq_session_stream); python/tests/test_generator.py (test_fill_session_is_opt_in_and_carries_equity_flow_to_the_close pins the opt-in today)"
 
   # ---------------------------------------------------------------- E04 ----
   - key: RP01
@@ -2185,7 +2362,7 @@ issues:
 
   - key: O02
     epic: E16
-    title: "16 alerts with promtool unit tests, recording rules and two Grafana dashboards"
+    title: "22 alerts with promtool unit tests, recording rules and two Grafana dashboards"
     labels: [type:feature, area:observability, area:deployment, phase:w6, priority:p1]
     milestone: "Week 6"
     status: done
@@ -2194,7 +2371,9 @@ issues:
       SequenceGapDetected, BookStale, StaleFeed, KillSwitchEngaged,
       LiveVsBacktestDrift, AlphaLifecycleRetired, FillRateDrop, ... with
       alerts_test.yml; dashboards whose every metric has a producer (checked
-      by check_deployment.py).
+      by check_deployment.py). 16 alerts at Week 6; v1.3.0 added the Watchdog
+      heartbeat and six rules on the STOPPED session state and the five
+      safety counters (22 alerts and the heartbeat).
     acceptance:
       - "promtool check/test rules pass in CI; dashboard metric provenance check passes"
     evidence:
@@ -2775,13 +2954,454 @@ issues:
     title: "Policy test: no trading-path module imports a network or LLM client"
     labels: [type:feature, area:agentic, area:testing, priority:p1, lang:python, phase:phase2]
     milestone: "Backlog"
-    status: backlog
+    status: done
     estimate_days: 0.5
     context: >
-      Make the "never on the trading path" rule mechanical: a test walks the
-      import graph of iap.{risk,execution,portfolio,orderbook,features,alpha,
-      trace,mvp} and fails on any network, HTTP or LLM SDK import.
+      The "never on the trading path" rule is mechanical for the Python
+      reference since v1.3.0: an AST scan of every module under
+      iap.{risk,execution,orderbook,portfolio,mvp,core,marketdata,features,
+      alpha} fails on a static import, or a dynamic import with a literal
+      name, of a network module or an LLM / agent SDK. Stated gaps: iap.trace
+      and iap.replay are not scanned, and the Rust, C++ and Java trees are
+      enforced in review only.
     acceptance:
-      - "tests/integration/test_trading_path_isolation.py passes and lists the denied module prefixes"
+      - "python/tests/test_import_policy.py passes and names the denied network and LLM module sets"
     evidence:
-      - "docs/governance/SECURITY.md; tests/integration/ (proposed)"
+      - "python/tests/test_import_policy.py; PLATFORM_CONVENTIONS.md section 13.7; docs/RESEARCH_VALIDITY.md"
+
+  # ---------------------------------------------------------------- E25-E31 ----
+  # Backlog epics added 2026-10-03 (all status: backlog; paths marked (proposed) do not exist yet).
+  - key: XD01
+    epic: E25
+    title: "ITCH/PITCH order-by-order decoder into canonical MarketEvents"
+    labels: [type:feature, area:marketdata, lang:python, lang:rust, priority:p2, phase:phase3]
+    milestone: "Phase 3"
+    status: backlog
+    estimate_days: 8
+    context: "The only data source is the seeded generator. A decoder for an ITCH/PITCH-style historical feed (add, modify, execute, cancel, delete, trade messages with nanosecond timestamps) emitting the canonical MBO events lets the existing book, feature and replay stack run on real order flow."
+    acceptance:
+      - "Decoding a vendor sample file yields canonical events and a book reconstruction equal to the vendor's end-of-day book"
+      - "Unknown or malformed messages are counted and rejected by the QC stage, never silently dropped"
+    evidence:
+      - "python/src/iap/marketdata/ (decoder proposed); rust/marketdata/ (decoder proposed); schemas/FORMAT.md"
+
+  - key: XD02
+    epic: E25
+    title: "FX ECN feed normalisation (per-venue conventions, last-look, firm vs indicative)"
+    labels: [type:feature, area:marketdata, lang:python, priority:p2, phase:phase3]
+    milestone: "Phase 3"
+    status: backlog
+    estimate_days: 6
+    context: "FX venues differ in tick conventions, depth semantics, last-look and whether a quote is firm. Normalisation must preserve those differences as fields so execution studies do not treat indicative liquidity as firm."
+    acceptance:
+      - "Each supported ECN has a documented mapping to canonical events and a golden sample"
+      - "Indicative and firm quotes are distinguishable in the normalized output"
+    evidence:
+      - "python/src/iap/marketdata/ (proposed); configs/venues/venues.json"
+
+  - key: XD03
+    epic: E25
+    title: "Point-in-time security master with as-of queries"
+    labels: [type:feature, area:marketdata, area:store, lang:python, priority:p2, phase:phase3]
+    milestone: "Phase 3"
+    status: backlog
+    estimate_days: 7
+    context: "Instrument attributes (symbol, listing venue, lot size, tick size, status) change over time. Studies must read them as of the event date or survivorship and lookahead bias enter through reference data."
+    acceptance:
+      - "An as-of query API returns the instrument record valid on a given date, including delisted names"
+      - "A test fails any study code path that reads an instrument attribute not valid at the study date"
+    evidence:
+      - "configs/instruments/instruments.json; schemas/sql/iap_v1.sql; python/src/iap/store/ (security master proposed)"
+
+  - key: XD04
+    epic: E25
+    title: "Corporate-action adjustment engine (splits, dividends, mergers) applied point-in-time"
+    labels: [type:feature, area:marketdata, lang:python, priority:p2, phase:phase3]
+    milestone: "Phase 3"
+    status: backlog
+    estimate_days: 6
+    context: "Prices and sizes are integer ticks and shares; a split or dividend changes their meaning. Adjustments must be applied as of the date they became known, never retroactively, and must keep the integer-tick contract."
+    acceptance:
+      - "A split and a cash dividend fixture adjust history exactly, with a documented rounding rule on ticks"
+      - "Features and labels computed on adjusted data equal those computed on contemporaneous unadjusted data after re-basing"
+    evidence:
+      - "PLATFORM_CONVENTIONS.md section 1 (price_ticks); python/src/iap/marketdata/ (proposed)"
+
+  - key: LT01
+    epic: E26
+    title: "Tick-to-trade percentile harness gated in CI"
+    labels: [type:feature, area:performance, area:testing, lang:cpp, lang:rust, lang:java, priority:p2]
+    milestone: "Backlog"
+    status: backlog
+    estimate_days: 5
+    context: "benchmarks/ reports throughput and a latency table, but no percentile is compared with a budget in CI. A harness recording p50/p99/p99.9/max with coordinated-omission-safe timing, per language, with budgets stored beside the goldens, makes a latency regression a failing check."
+    acceptance:
+      - "A budget file lists a percentile budget and a noise margin per language and stage"
+      - "CI fails on a regression beyond the margin and reports the measured distribution"
+    evidence:
+      - "benchmarks/; cpp/bench/bench_all.cpp; docs/papers/06_cpp_vs_rust_vs_java_event_driven.md"
+
+  - key: LT02
+    epic: E26
+    title: "Allocation-free hot-path audit for C++, Rust and Java"
+    labels: [type:feature, area:performance, lang:cpp, lang:rust, lang:java, priority:p2]
+    milestone: "Backlog"
+    status: backlog
+    estimate_days: 4
+    context: "The hot path (decode, book update, feature, alpha, risk) is intended to avoid allocation after warm-up. That intent is unproven: nothing counts allocations."
+    acceptance:
+      - "A counting allocator hook (C++, Rust) and allocation-rate telemetry (Java) report zero steady-state allocations on the replay of the golden vector"
+      - "The audit runs in CI and fails when a new allocation appears on the path"
+    evidence:
+      - "cpp/src/; rust/*/src; java/src/main/java/com/iap/ (audit proposed)"
+
+  - key: LT03
+    epic: E26
+    title: "Hardware timestamps and a clock-synchronisation error budget"
+    labels: [type:feature, area:performance, area:observability, priority:p2, phase:phase3]
+    milestone: "Backlog"
+    status: backlog
+    estimate_days: 5
+    context: "In-process timestamps measure the process's view of time. Ingress and egress hardware timestamps (SO_TIMESTAMPING or NIC PTP) plus a stated clock-sync error budget are needed before any latency number can be quoted against an exchange."
+    acceptance:
+      - "A capture path records NIC timestamps and a report states the synchronisation error bound"
+      - "Latency histograms are labelled with their timestamp source"
+    evidence:
+      - "docs/papers/04_alpha_decay_vs_latency.md; deployment/grafana/README.md"
+
+  - key: LT04
+    epic: E26
+    title: "Jitter and GC-pause budgets with CPU isolation methodology"
+    labels: [type:research, area:performance, lang:java, priority:p2]
+    milestone: "Backlog"
+    status: backlog
+    estimate_days: 3
+    context: "The Java platform exports jvm_gc_pause_ns and alerts on it, but no budget ties pause time to the tick-to-trade percentile, and the benchmark methodology does not specify CPU pinning or isolation."
+    acceptance:
+      - "A documented methodology (pinning, isolation, warm-up) and a measured effect of GC pauses on the p99.9 tick-to-trade"
+      - "The GcPauseHigh threshold is derived from that measurement rather than chosen"
+    evidence:
+      - "deployment/prometheus/alerts.yml; java/src/main/java/com/iap/monitoring/"
+
+  - key: CAL01
+    epic: E27
+    title: "Calibrate simulator fill and queue models to live fills"
+    labels: [type:research, area:execution, lang:python, priority:p2]
+    milestone: "Backlog"
+    status: backlog
+    estimate_days: 8
+    context: "The execution simulator's queue-position and fill probabilities are modelled, not fitted. With observed fills (live or paper-venue) the parameters can be estimated and validated out of sample."
+    acceptance:
+      - "A calibration report gives each parameter's fitted value, uncertainty and the held-out error of simulated versus observed fills"
+      - "The calibrated parameters are config values carried by the golden-pinned config files"
+    evidence:
+      - "python/src/iap/execution/; cpp/src/execution/; configs/execution/execution.json"
+
+  - key: CAL02
+    epic: E27
+    title: "Multi-horizon markouts in TCA"
+    labels: [type:feature, area:tca, lang:python, lang:cpp, lang:rust, lang:java, priority:p2]
+    milestone: "Backlog"
+    status: backlog
+    estimate_days: 4
+    context: "TCA reports a single markout horizon. Adverse selection shows up differently at 1s, 10s, 1m and 5m, and a policy that looks fine at one horizon can be losing at another."
+    acceptance:
+      - "Horizons are configuration; markouts per horizon appear in expected_tca.json and match across languages"
+      - "The MVP report shows the markout curve, not a single number"
+    evidence:
+      - "python/src/iap/tca/; tests/golden/expected_tca.json; API_PORTFOLIO_TCA.md"
+
+  - key: CAL03
+    epic: E27
+    title: "Venue-level and algorithm-level cost attribution report"
+    labels: [type:feature, area:tca, area:execution, lang:python, priority:p2]
+    milestone: "Backlog"
+    status: backlog
+    estimate_days: 5
+    context: "Cost is attributed per parent order but not rolled up by venue and by algorithm (TWAP, VWAP, POV, IS) with confidence intervals, so a routing or algo choice cannot yet be judged from the evidence."
+    acceptance:
+      - "A report table of cost per venue and per algo with sample sizes and bootstrap intervals"
+      - "The table is regenerated from the store and reproduces from a fixed seed"
+    evidence:
+      - "python/src/iap/tca/; python/src/iap/execution/; docs/MVP.md"
+
+  - key: CAL04
+    epic: E27
+    title: "Calibration drift monitor: simulated versus realised fill residuals"
+    labels: [type:feature, area:execution, area:observability, priority:p2]
+    milestone: "Backlog"
+    status: backlog
+    estimate_days: 3
+    context: "Calibration decays when the market changes. A residual monitor comparing simulated and realised fill rates and slippage turns that decay into an alert and a recalibration trigger."
+    acceptance:
+      - "A residual metric is exported and alerted on, with a promtool unit test"
+      - "A threshold breach is recorded as a ledger event requesting recalibration"
+    evidence:
+      - "deployment/prometheus/alerts.yml; python/src/iap/adaptive/"
+
+  - key: BR01
+    epic: E28
+    title: "Book-level factor exposure limits (market, sector, currency)"
+    labels: [type:feature, area:risk, lang:rust, lang:java, lang:python, priority:p1]
+    milestone: "Backlog"
+    status: backlog
+    estimate_days: 8
+    context: "Limits today are per order, per instrument and per notional. Correlated positions can add up to a book exposure no single rule sees; factor exposure limits close that gap."
+    acceptance:
+      - "Factor exposures are computed from positions and a documented loading table, and limited by config"
+      - "The rule is a Rust change first, with a golden vector and byte-identical Java and Python ports"
+    evidence:
+      - "rust/risk/src/limits_eval.rs; configs/risk/risk.json; API_TRADING.md"
+
+  - key: BR02
+    epic: E28
+    title: "Stress scenarios evaluated on the live book"
+    labels: [type:feature, area:risk, lang:python, lang:java, priority:p1]
+    milestone: "Backlog"
+    status: backlog
+    estimate_days: 6
+    context: "No scenario is applied to the current book. Gap, volatility-shock and liquidity-withdrawal scenarios with a loss limit make an unsafe position visible before the market produces the loss."
+    acceptance:
+      - "Each scenario has a definition, a golden result on a fixture book and a limit that blocks new risk when breached"
+      - "Scenario results are exported as metrics and written to the risk audit"
+    evidence:
+      - "python/src/iap/risk/; java/src/main/java/com/iap/risk/ (scenarios proposed)"
+
+  - key: BR03
+    epic: E28
+    title: "Regulatory pre-trade control set (price collar, fat-finger, order rate, notional) mapped to rule ids"
+    labels: [type:feature, area:risk, lang:rust, priority:p1, phase:phase3]
+    milestone: "Backlog"
+    status: backlog
+    estimate_days: 10
+    context: "Builds on the gap analysis requested by C01: the pinned limits are the platform's own, not a mapped regulatory set (SEC 15c3-5, MiFID II RTS 6). Each regulatory control should be an existing rule id or a new one with a golden."
+    acceptance:
+      - "A table maps every control to a rule id, with a golden case that trips it"
+      - "Fail-closed semantics are unchanged: a missing input rejects, it never allows"
+    evidence:
+      - "rust/risk/src/; README.md (Out of scope); PLATFORM_CONVENTIONS.md section 11.1"
+
+  - key: BR04
+    epic: E28
+    title: "Drop-copy reconciliation with break detection that latches the kill switch"
+    labels: [type:feature, area:risk, area:observability, lang:java, priority:p1, phase:phase3]
+    milestone: "Backlog"
+    status: backlog
+    estimate_days: 8
+    context: "Internal order and fill state is the only record of what the platform did. An independent drop-copy compared to it detects a divergence (unacknowledged fill, missing cancel) that would otherwise stay silent."
+    acceptance:
+      - "A reconciliation job compares internal and drop-copy state and emits a break event with the differing records"
+      - "A break in a replayed session latches the kill switch and appears in the risk audit"
+    evidence:
+      - "java/src/main/java/com/iap/platform/; docs/runbooks/RUNBOOK_incident_kill_switch.md"
+
+  - key: RT01
+    epic: E29
+    title: "Point-in-time feature store with content-addressed versions"
+    labels: [type:feature, area:research, area:store, lang:python, priority:p2]
+    milestone: "Backlog"
+    status: backlog
+    estimate_days: 8
+    context: "Features are regenerated as one flat parquet set. A store with as-of reads, a content hash per feature set and a cache key built from the registry and the data digest avoids recompute and makes lookahead structurally impossible."
+    acceptance:
+      - "A study reads features through an as-of API; the leakage test fails a read from a later timestamp"
+      - "The cache key changes exactly when the registry or the data digest changes"
+    evidence:
+      - "python/src/iap/features/; data/reference/feature_registry.json; python/src/iap/store/"
+
+  - key: RT02
+    epic: E29
+    title: "Sharded ExperimentRunner with deterministic ledger merge"
+    labels: [type:feature, area:research, lang:python, priority:p2]
+    milestone: "Backlog"
+    status: backlog
+    estimate_days: 6
+    context: "Experiments run one process at a time. Sharding by configuration across workers requires a merge that produces the same ledger bytes as a serial run, or the multiple-testing denominator becomes untrustworthy."
+    acceptance:
+      - "A sharded run's research/experiments.json and result documents are byte-identical to the serial run"
+      - "A worker crash leaves the ledger unchanged and the run resumable"
+    evidence:
+      - "python/src/iap/research/; research/experiments.json"
+
+  - key: RT03
+    epic: E29
+    title: "Capital allocation by marginal contribution (closing lifecycle gate 8)"
+    labels: [type:feature, area:research, area:portfolio, lang:python, priority:p2]
+    milestone: "Backlog"
+    status: backlog
+    estimate_days: 6
+    context: "Alphas are judged stand-alone; gate 8 (cross-alpha correlation and incremental contribution) is not yet a lifecycle gate (see AF03). Allocation should follow marginal contribution to portfolio net P&L after costs."
+    acceptance:
+      - "Weights are a deterministic function of the ledgered evidence and reproduce from the manifest"
+      - "An alpha that adds nothing after correlation gets zero weight in a fixture"
+    evidence:
+      - "python/src/iap/lifecycle/; python/src/iap/portfolio/; docs/governance/GOVERNANCE.md section 2"
+
+  - key: AL01
+    epic: E30
+    title: "Agent write broker and append-only blackboard (tasks, claims, findings)"
+    labels: [type:feature, area:agentic, lang:python, priority:p2, phase:phase2]
+    milestone: "Backlog"
+    status: backlog
+    estimate_days: 6
+    context: "Several agents need a shared work surface without a shared write path to the repository. An append-only JSONL blackboard holds tasks, claims and findings; tasks are content-hashed so identical work is recognised, and claims are leases that expire so a dead agent does not hold a task forever. The broker is the only writer."
+    acceptance:
+      - "Tasks, claims and findings are append-only JSONL records, each attributable to an agent identity"
+      - "A task's id is the hash of its content; a claim lease expires and the task becomes claimable again"
+      - "No agent has write access to the repository, ledger or store except through the broker, and a test proves it"
+    evidence:
+      - "tools/agents/ (proposed); research/experiments.json"
+
+  - key: AL02
+    epic: E30
+    title: "Hypothesis pre-registration before any data is read"
+    labels: [type:feature, area:agentic, area:research, lang:python, priority:p2, phase:phase2]
+    milestone: "Backlog"
+    status: backlog
+    estimate_days: 3
+    context: "The multiple-testing ledger counts looks, but only if each look is declared before it happens. A pre-registration records the hypothesis, the sign and the test in a hash committed to the blackboard before any data access."
+    acceptance:
+      - "The ExperimentRunner refuses a run whose hypothesis hash was not registered before the run's data access"
+      - "The pre-registration hash appears in the ledger entry"
+    evidence:
+      - "python/src/iap/research/; research/experiments.json"
+
+  - key: AL03
+    epic: E30
+    title: "Reserve sessions evaluated on a hidden seed"
+    labels: [type:feature, area:agentic, area:research, lang:python, priority:p2, phase:phase2]
+    milestone: "Backlog"
+    status: backlog
+    estimate_days: 4
+    context: "The holdout is spent once an agent has seen it. Reserve sessions are generated from a seed held only by the evaluator, so an agent can be scored on data it could not have tuned against."
+    acceptance:
+      - "The hidden seed is never exposed to agents or written to any readable artefact; only the verdict is"
+      - "Each reserve session is single-use and its use is recorded in the ledger"
+    evidence:
+      - "configs/marketdata/generator.json; python/src/iap/marketdata/; docs/governance/REPRODUCIBILITY.md"
+
+  - key: AL04
+    epic: E30
+    title: "Authenticated HUMAN approvals for lifecycle edges"
+    labels: [type:feature, area:agentic, area:lifecycle, lang:python, priority:p1, phase:phase2]
+    milestone: "Backlog"
+    status: backlog
+    estimate_days: 4
+    context: "Edges with actor = HUMAN today carry a self-asserted actor and a reason. If agents can write to the lifecycle log, the approval must be bound to an authenticated human, or the actor field is a claim an agent can make."
+    acceptance:
+      - "A HUMAN transition is accepted only with a signature verifiable against a registered approver key"
+      - "A transition with actor = HUMAN and no valid signature is rejected and logged"
+    evidence:
+      - "python/src/iap/lifecycle/; research/lifecycle_transitions.jsonl; docs/LIFECYCLE.md"
+
+  - key: AL05
+    epic: E30
+    title: "Read-only MCP server: authenticated transport, versioned resource schemas, golden outputs"
+    labels: [type:feature, area:agentic, lang:python, priority:p2, phase:phase2]
+    milestone: "Backlog"
+    status: backlog
+    estimate_days: 3
+    context: "Extends AG01. A read-only MCP surface needs authentication, rate limits, versioned resource schemas and golden-tested outputs so an agent reads exactly what the ledger says and nothing else."
+    acceptance:
+      - "Resources have schemas and a golden output; the server exposes no tool with side effects"
+      - "An unauthenticated or over-quota client is refused and the refusal is logged"
+    evidence:
+      - "tools/mcp/ (proposed)"
+
+  - key: AL06
+    epic: E30
+    title: "Agent evaluations: planted leak, seeded bug, shuffled-label null, citation resolution"
+    labels: [type:research, area:agentic, area:testing, lang:python, priority:p2, phase:phase2]
+    milestone: "Backlog"
+    status: backlog
+    estimate_days: 6
+    context: "A control is only worth having if removing it makes a known failure go undetected. Four evaluations make that testable: an agent must find a planted lookahead leak, catch a seeded bug, reject a shuffled-label null, and every citation it makes must resolve to a real ledger entry or file."
+    acceptance:
+      - "Each evaluation passes with the control present and fails with it disabled"
+      - "Citation resolution fails on a fabricated ledger id or path"
+    evidence:
+      - "tools/agents/evals/ (proposed); research/experiments.json"
+
+  - key: AL07
+    epic: E30
+    title: "Untrusted free-text handling for agent inputs"
+    labels: [type:feature, area:agentic, lang:python, priority:p1, phase:phase2]
+    milestone: "Backlog"
+    status: backlog
+    estimate_days: 3
+    context: "Ledger reasons, report text, issue bodies and tool output are free text that an agent will read. Treat it as data: delimit it, bound its length, never follow instructions found in it, and never let it reach a tool call unreviewed."
+    acceptance:
+      - "Adversarial fixtures (instructions embedded in a ledger reason or report) do not change agent actions in the evaluation harness"
+      - "Free text passed to an agent is delimited and length-bounded by one shared function"
+    evidence:
+      - "tools/agents/ (proposed); docs/governance/SECURITY.md"
+
+  - key: FZ01
+    epic: E31
+    title: "Differential fuzzing of the Rust, Java and Python risk engines"
+    labels: [type:feature, area:testing, area:risk, lang:rust, lang:java, lang:python, priority:p1]
+    milestone: "Backlog"
+    status: backlog
+    estimate_days: 6
+    context: "The three engines are held byte-identical by fixed golden vectors only. A generator of order, fill and market sequences, with the three engines run on each and decisions and audit logs compared byte for byte, finds divergences the fixtures do not cover."
+    acceptance:
+      - "A fuzz run of a stated number of sequences gives identical decisions and audit logs across the engines, or a minimised reproducer"
+      - "The fuzz harness runs in CI at a small fixed budget and nightly at a large one"
+    evidence:
+      - "rust/risk/; java/src/main/java/com/iap/risk/; python/src/iap/risk/; tests/golden/expected_risk_decisions.json"
+
+  - key: FZ02
+    epic: E31
+    title: "Property-based tests of execution simulator invariants"
+    labels: [type:feature, area:testing, area:execution, lang:python, priority:p2]
+    milestone: "Backlog"
+    status: backlog
+    estimate_days: 4
+    context: "Simulator tests are example-based. Invariants (no negative quantity, fills never exceed the order, quantity is conserved, same seed gives the same fills) hold for all inputs or they do not; generated inputs test that."
+    acceptance:
+      - "A property suite with shrinking covers the stated invariants for every algorithm"
+      - "A planted violation is caught within the test's default budget"
+    evidence:
+      - "python/src/iap/execution/; cpp/src/execution/; tests/"
+
+  - key: FZ03
+    epic: E31
+    title: "Snapshot/restore fuzzing across the three risk engines"
+    labels: [type:feature, area:testing, area:risk, lang:rust, lang:java, lang:python, priority:p1]
+    milestone: "Backlog"
+    status: backlog
+    estimate_days: 4
+    context: "Restore must continue exactly as an uninterrupted run would. Taking a snapshot at a random point, restoring, and comparing the continuation with the uninterrupted run tests every state the engine can be in."
+    acceptance:
+      - "For every sampled cut point the restored continuation equals the uninterrupted run, byte for byte"
+      - "Corrupt and truncated snapshots fail closed"
+    evidence:
+      - "rust/risk/src/audit.rs; java/src/main/java/com/iap/risk/RiskAudit.java; tests/golden/expected_risk_snapshot.json"
+
+  - key: FZ04
+    epic: E31
+    title: "Crash injection on the Java paper-trading path"
+    labels: [type:feature, area:testing, lang:java, priority:p1]
+    milestone: "Backlog"
+    status: backlog
+    estimate_days: 5
+    context: "The platform claims a restart resumes from its checkpoint with the kill-switch latch and audit log intact. Killing the process at random points (including mid-write) and restarting is the only way to prove that."
+    acceptance:
+      - "After a kill at any injected point the restored session keeps the latch, positions and an audit log that is a valid prefix extension"
+      - "A torn write to the state directory is detected and refused rather than loaded"
+    evidence:
+      - "java/src/main/java/com/iap/platform/PaperTrading.java; docs/runbooks/RUNBOOK_paper_trading.md"
+
+  - key: FZ05
+    epic: E31
+    title: "Risk golden coverage for KILL_VENUE, bootstrap, restore and fail-closed branches"
+    labels: [type:feature, area:testing, area:risk, lang:rust, lang:java, lang:python, priority:p1]
+    milestone: "Backlog"
+    status: backlog
+    estimate_days: 4
+    context: "The risk goldens exercise the main rule set; the branches that matter most after something has gone wrong (venue-scoped kill, first-start bootstrap, restore from a snapshot, every fail-closed default) need their own golden cases in all three engines."
+    acceptance:
+      - "A coverage report lists each branch and the golden case that reaches it"
+      - "Every fail-closed branch has a case whose expected decision is a rejection"
+    evidence:
+      - "rust/risk/tests/golden_risk.rs; tests/golden/expected_risk_decisions.json; java/src/test/java/com/iap/RiskGoldenTest.java"

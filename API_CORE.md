@@ -79,7 +79,15 @@ first 5 uniforms). Any language-level helper draws must be derived from
 `apply(event)` mutates state; semantics (all pinned). Every event handed to
 `apply` ends in exactly one of `events_applied` or one drop counter, or is
 held in the reorder buffer — the **accounting invariant** every port's tests
-check.
+check. `apply` returns that verdict (`ApplyStatus` `APPLIED` / `DROPPED` /
+`HELD`; API_FEATURES.md §2) and every downstream consumer must ignore an
+event that is not `APPLIED`. The feature engine always did; since v1.3.0
+the execution simulator's passive queue tracking does too — it runs after
+the book update and only for an `APPLIED` event, reading the order an
+EXECUTE names from the book (`resting_orders()`) and the size a CANCEL
+removed from the level (`level_qty` before and after), and it treats ids
+in the synthetic range below as "not known to be ahead" (API_TRADING.md
+§2.4).
 
 | event | semantics |
 |---|---|
@@ -222,6 +230,13 @@ MIGRATIONS.md entry.
 calendar, fx_week), `configs/venues/venues.json` (ids, fees, latency profiles),
 `configs/marketdata/generator.json` (seeds — conventions §3). Prices convert via
 `price_ticks * tick_size`; never floats on contracts.
+
+Generator keys that change the dataset are opt-in and off by default, so the
+pinned files stay byte-identical: `planted.*` (effects of known size),
+`equities.halt.reopen_auction`, and `equities.fill_session` — with the
+default `false`, an equity stream's continuous flow stops when its
+`slots_per_stream` budget is spent, 38–43% of the way through the session;
+`true` continues it to the close (LEARN.md §2.3).
 
 `ReferenceData` (Python reference) validates fail-fast at load: `tick_size >
 0` finite, integer `lot_size >= 1`, `ref_price > 0`, `adv >= 0`, at least one

@@ -7,23 +7,49 @@ parent order from the run's SQLite store and ``replay``s the captured
 stream — the operator flow of docs/MVP.md, driven exactly as an operator
 would drive it.
 """
+
 from __future__ import annotations
 
 import json
 import subprocess
 import sys
 
-REPORT_SECTIONS = ("run", "counts", "risk", "routing", "controls", "pnl", "alpha",
-                   "execution", "portfolio", "trace")
-ARTEFACTS = ("config.json", "events.jsonl", "events.iap1", "feed.json", "traces.jsonl",
-             "iap.sqlite", "risk_audit.jsonl", "report.json", "report.md",
-             "paper_evidence.json")
+REPORT_SECTIONS = (
+    "run",
+    "counts",
+    "risk",
+    "routing",
+    "controls",
+    "pnl",
+    "alpha",
+    "execution",
+    "portfolio",
+    "trace",
+)
+ARTEFACTS = (
+    "config.json",
+    "events.jsonl",
+    "events.iap1",
+    "feed.json",
+    "traces.jsonl",
+    "iap.sqlite",
+    "risk_audit.jsonl",
+    "report.json",
+    "report.md",
+    "paper_evidence.json",
+)
 
 
 def _mvp(repo_root, *args):
     env = {"PYTHONPATH": str(repo_root / "python" / "src"), "PATH": "/usr/bin:/bin"}
-    return subprocess.run([sys.executable, "-m", "iap.mvp", *args], cwd=repo_root,
-                          capture_output=True, text=True, env=env, check=False)
+    return subprocess.run(
+        [sys.executable, "-m", "iap.mvp", *args],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
+    )
 
 
 def test_cli_run_explain_replay(repo_root, tmp_path):

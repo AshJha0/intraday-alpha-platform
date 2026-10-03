@@ -11,7 +11,6 @@ import math
 from dataclasses import replace
 
 import pytest
-
 from iap.core.events import EventType, MarketEvent, SessionStatus
 from iap.core.rng import SplitMix64
 from iap.execution import (
@@ -40,9 +39,13 @@ def make_config(jitter_ns: int = 0) -> ExecConfig:
         impact_coeff_bps_per_pct_adv=2.0,
         venues={
             VEN: VenueSpec(
-                venue_id=VEN, name="TST", is_fx=False,
-                taker_fee_per_share=0.003, maker_rebate_per_share=0.002,
-                latency_mean_ns=150_000, latency_jitter_ns=jitter_ns,
+                venue_id=VEN,
+                name="TST",
+                is_fx=False,
+                taker_fee_per_share=0.003,
+                maker_rebate_per_share=0.002,
+                latency_mean_ns=150_000,
+                latency_jitter_ns=jitter_ns,
             )
         },
         instruments={INS: InstrumentSpec(INS, 0.01, 1.0, 1_000_000.0)},
@@ -67,10 +70,18 @@ class Feeder:
     def ev(self, ts, etype, side, px, qty, oid, tid=0) -> MarketEvent:
         self.seq += 1
         return MarketEvent(
-            event_id=self.seq, instrument_id=INS, venue_id=VEN,
-            exchange_ts=ts, receive_ts=ts, sequence=self.seq,
-            event_type=int(etype), side=side, price_ticks=px, qty=qty,
-            order_id=oid, trade_id=tid,
+            event_id=self.seq,
+            instrument_id=INS,
+            venue_id=VEN,
+            exchange_ts=ts,
+            receive_ts=ts,
+            sequence=self.seq,
+            event_type=int(etype),
+            side=side,
+            price_ticks=px,
+            qty=qty,
+            order_id=oid,
+            trade_id=tid,
         )
 
     def add(self, ts, side, px, qty, oid):
@@ -102,10 +113,18 @@ class Feeder:
     def snapshot(self, ts, side, px, qty, oid, countdown):
         self.seq += 1
         return MarketEvent(
-            event_id=self.seq, instrument_id=INS, venue_id=VEN,
-            exchange_ts=ts, receive_ts=ts, sequence=self.seq,
-            event_type=int(EventType.SNAPSHOT), side=side, price_ticks=px,
-            qty=qty, order_id=oid, trade_id=countdown,
+            event_id=self.seq,
+            instrument_id=INS,
+            venue_id=VEN,
+            exchange_ts=ts,
+            receive_ts=ts,
+            sequence=self.seq,
+            event_type=int(EventType.SNAPSHOT),
+            side=side,
+            price_ticks=px,
+            qty=qty,
+            order_id=oid,
+            trade_id=countdown,
         )
 
 
@@ -119,8 +138,15 @@ def seed_book(sim: ExecutionSimulator, f: Feeder) -> None:
 
 def child(side, otype, px, qty, decision_ts, **kw) -> ChildOrder:
     return ChildOrder(
-        parent_id=99, instrument_id=INS, venue_id=VEN, side=side, type=otype,
-        limit_ticks=px, qty=qty, decision_ts=decision_ts, **kw,
+        parent_id=99,
+        instrument_id=INS,
+        venue_id=VEN,
+        side=side,
+        type=otype,
+        limit_ticks=px,
+        qty=qty,
+        decision_ts=decision_ts,
+        **kw,
     )
 
 
@@ -159,7 +185,7 @@ def test_queue_execute_depletes_ahead_then_fills():
     assert sim.orders[oid].remaining == 20  # partial fill
     assert sim.orders[oid].state == OrderState.ACTIVE
     # Next EXECUTE fills the remainder (leftover capped at our remaining).
-    sim.on_event(f.exec(T0 + 4_000_000, 0, 100, 500, 13))
+    sim.on_event(f.exec(T0 + 4_000_000, 0, 100, 500, 12))
     assert len(sim.fills) == 2
     assert sim.fills[1].qty == 20
     assert sim.orders[oid].state == OrderState.FILLED
@@ -169,22 +195,24 @@ def test_queue_cancel_ahead_reduces_position_deterministically():
     sim = ExecutionSimulator(make_config())
     f = Feeder()
     seed_book(sim, f)
+    sim.on_event(f.add(T0 + 4, 0, 100, 60, 13))  # bid 100 now displays 360
     oid = sim.submit(child(0, OrderType.LIMIT, 100, 50, T0 + 10))
     sim.on_event(f.heartbeat(T0 + 10 + LAT + 1))
-    assert sim.orders[oid].ahead_qty == 300
-    # An observed CANCEL at our level reduces ahead by its FULL qty.
+    assert sim.orders[oid].ahead_qty == 360
+    # An applied CANCEL of an order ahead of us reduces ahead by the
+    # displayed size it removed (order 11 = 300), whatever qty it quotes.
     sim.on_event(f.cancel(T0 + 2_000_000, 0, 100, 250, 11))
-    assert sim.orders[oid].ahead_qty == 50
+    assert sim.orders[oid].ahead_qty == 60
     # A cancel at another level does nothing.
     sim.on_event(f.cancel(T0 + 2_100_000, 0, 99, 400, 12))
-    assert sim.orders[oid].ahead_qty == 50
+    assert sim.orders[oid].ahead_qty == 60
     # MODIFY events never change queue position (pinned).
-    sim.on_event(f.modify(T0 + 2_200_000, 0, 100, 10, 11))
+    sim.on_event(f.modify(T0 + 2_200_000, 0, 100, 10, 13))
+    assert sim.orders[oid].ahead_qty == 60
+    # An EXECUTE quoting 70 on order 13 trades only its remaining 10.
+    sim.on_event(f.exec(T0 + 3_000_000, 0, 100, 70, 13))
     assert sim.orders[oid].ahead_qty == 50
-    # A 60-EXECUTE: 50 ahead, 10 to us.
-    sim.on_event(f.exec(T0 + 3_000_000, 0, 100, 60, 11))
-    assert len(sim.fills) == 1
-    assert sim.fills[0].qty == 10
+    assert sim.fills == []
 
 
 def test_queue_cancel_decrement_floors_at_zero():
@@ -226,6 +254,7 @@ def test_queue_single_share_trade_through_cannot_fill_a_million():
     f = Feeder()
     sim.on_event(f.add(T0, 0, 100, 500, 11))
     sim.on_event(f.add(T0 + 1, 1, 101, 200, 21))
+    sim.on_event(f.add(T0 + 2, 0, 99, 1_000, 12))  # the order that prints at 99
     oid = sim.submit(child(0, OrderType.LIMIT, 100, 1_000_000, T0 + 10))
     sim.on_event(f.heartbeat(T0 + 10 + LAT + 1))
     assert sim.orders[oid].ahead_qty == 500
@@ -248,16 +277,14 @@ def test_queue_same_price_children_share_one_print_and_queue_behind_each_other()
     sim = ExecutionSimulator(make_config())
     f = Feeder()
     seed_book(sim, f)  # bid 100 displayed 300
-    ids = [
-        sim.submit(child(0, OrderType.LIMIT, 100, 1000, T0 + 10 + k))
-        for k in range(4)
-    ]
+    ids = [sim.submit(child(0, OrderType.LIMIT, 100, 1000, T0 + 10 + k)) for k in range(4)]
     sim.on_event(f.heartbeat(T0 + 20 + LAT + 1))  # all four rest
     # Queue position: 300 displayed, then each earlier sibling's 1000.
     assert [sim.orders[i].ahead_qty for i in ids] == [300, 1300, 2300, 3300]
     # ONE print of 400 at 100: 300 clears the display, 100 reaches the FIRST
     # child and nobody else. Old rule: 4 x 100 = 400 filled.
-    sim.on_event(f.exec(T0 + 2_000_000, 0, 100, 400, 11))
+    # (order 12 = 400 at 99 trades through our level.)
+    sim.on_event(f.exec(T0 + 2_000_000, 0, 99, 400, 12))
     assert len(sim.fills) == 1
     assert sim.fills[0].order_id == ids[0]
     assert (sim.fills[0].qty, sim.fills[0].price_ticks) == (100, 100)
@@ -305,6 +332,90 @@ def test_queue_marketable_add_trading_through_fills_in_full():
     assert len(sim.fills) == 1
     assert (sim.fills[0].price_ticks, sim.fills[0].qty) == (101, 50)
     assert sim.orders[oid].state == OrderState.FILLED
+
+
+def test_queue_crossed_display_is_consumed_once_until_it_changes():
+    """A static crossing display fills us once, not once per event."""
+    sim = ExecutionSimulator(make_config())
+    f = Feeder()
+    sim.on_event(f.add(T0, 0, 99, 400, 12))
+    sim.on_event(f.add(T0 + 1, 1, 101, 200, 21))
+    oid = sim.submit(child(0, OrderType.LIMIT, 100, 1_000, T0 + 10))
+    sim.on_event(f.heartbeat(T0 + 10 + LAT + 1))  # rests alone at 100
+    assert sim.orders[oid].ahead_qty == 0
+    # An ask of 50 posts at our bid: the crossed display fills us 50.
+    sim.on_event(f.add(T0 + 2_000_000, 1, 100, 50, 31))
+    assert [x.qty for x in sim.fills] == [50]
+    # Unrelated events on the unchanged display: nothing more to take.
+    for k in range(3):
+        sim.on_event(f.heartbeat(T0 + 3_000_000 + k))
+    assert [x.qty for x in sim.fills] == [50]
+    # 30 more post on top: exactly the NEW 30 is available.
+    sim.on_event(f.add(T0 + 4_000_000, 1, 100, 30, 32))
+    assert [x.qty for x in sim.fills] == [50, 30]
+    # The first ask cancels (display 80 -> 30): no liquidity is resurrected.
+    sim.on_event(f.cancel(T0 + 5_000_000, 1, 100, 50, 31))
+    sim.on_event(f.heartbeat(T0 + 6_000_000))
+    assert [x.qty for x in sim.fills] == [50, 30]
+    assert sim.orders[oid].remaining == 920
+
+
+def test_queue_events_dropped_by_the_book_are_not_tracked():
+    """A retransmitted duplicate / unknown-order EXECUTE trades nothing."""
+    sim = ExecutionSimulator(make_config())
+    f = Feeder()
+    seed_book(sim, f)
+    oid = sim.submit(child(0, OrderType.LIMIT, 100, 50, T0 + 10))
+    sim.on_event(f.heartbeat(T0 + 10 + LAT + 1))
+    execute = f.exec(T0 + 2_000_000, 0, 100, 200, 11)
+    sim.on_event(execute)
+    assert sim.orders[oid].ahead_qty == 100
+    sim.on_event(execute)  # same sequence again: the book drops it
+    assert sim.orders[oid].ahead_qty == 100
+    assert sim.fills == []
+    sim.on_event(f.exec(T0 + 3_000_000, 0, 100, 500, 77))  # unknown order
+    assert sim.orders[oid].ahead_qty == 100
+    assert sim.fills == []
+
+
+def test_queue_execute_is_tracked_as_the_book_saw_it():
+    """Qty capped at the order's remaining; side/price from the book order."""
+    sim = ExecutionSimulator(make_config())
+    f = Feeder()
+    seed_book(sim, f)
+    oid = sim.submit(child(0, OrderType.LIMIT, 100, 50, T0 + 10))
+    sim.on_event(f.heartbeat(T0 + 10 + LAT + 1))
+    # The event quotes 500 but order 11 only had 300: 300 traded, no fill.
+    sim.on_event(f.exec(T0 + 2_000_000, 0, 100, 500, 11))
+    assert sim.orders[oid].ahead_qty == 0
+    assert sim.fills == []
+    # The event says ask 100, the book says order 12 is a bid at 99: a
+    # 30-lot trade through our bid, filled at our limit.
+    sim.on_event(f.exec(T0 + 3_000_000, 1, 100, 30, 12))
+    assert [(x.qty, x.price_ticks) for x in sim.fills] == [(30, 100)]
+
+
+def test_queue_cancel_from_behind_does_not_advance_us():
+    sim = ExecutionSimulator(make_config())
+    f = Feeder()
+    seed_book(sim, f)
+    sim.on_event(f.add(T0 + 4, 0, 100, 80, 14))  # bid 100 now displays 380
+    oid = sim.submit(child(0, OrderType.LIMIT, 100, 50, T0 + 10))
+    sim.on_event(f.heartbeat(T0 + 10 + LAT + 1))
+    assert sim.orders[oid].ahead_qty == 380
+    # An order joins the level after us and cancels: it was never ahead.
+    sim.on_event(f.add(T0 + 2_000_000, 0, 100, 400, 13))
+    sim.on_event(f.cancel(T0 + 2_100_000, 0, 100, 400, 13))
+    assert sim.orders[oid].ahead_qty == 380
+    # An order that was ahead at join time cancels: we advance by its size.
+    sim.on_event(f.cancel(T0 + 2_200_000, 0, 100, 80, 14))
+    assert sim.orders[oid].ahead_qty == 300
+    # A size increase re-queues order 11 at the tail (behind us); its
+    # later cancel does not advance us (MODIFY itself never changes ahead).
+    sim.on_event(f.modify(T0 + 2_300_000, 0, 100, 500, 11))
+    sim.on_event(f.cancel(T0 + 2_400_000, 0, 100, 500, 11))
+    assert sim.orders[oid].ahead_qty == 300
+    assert sim.fills == []
 
 
 def test_queue_crossing_quote_fills_bounded_by_the_crossing_display():
@@ -764,9 +875,7 @@ def test_expiry_expires_pending_and_resting_orders_before_activation():
     r = sim.submit(child(0, OrderType.LIMIT, 100, 50, T0 + 10, expire_ts=T0 + 5_000_000))
     sim.on_event(f.heartbeat(T0 + 10 + LAT + 1))
     assert sim.orders[r].state == OrderState.ACTIVE
-    late = sim.submit(
-        child(0, OrderType.MARKET, 0, 50, T0 + 4_900_000, expire_ts=T0 + 5_000_000)
-    )
+    late = sim.submit(child(0, OrderType.MARKET, 0, 50, T0 + 4_900_000, expire_ts=T0 + 5_000_000))
     sim.on_event(f.exec(T0 + 5_000_000, 0, 99, 400, 12))  # trade-through!
     assert sim.orders[r].state == OrderState.CANCELLED
     assert sim.orders[r].cancel_reason == CancelReason.EXPIRED
@@ -1072,8 +1181,12 @@ def test_property_simulated_fills_never_mutate_the_replayed_book(seed):
     sim = ExecutionSimulator(make_config())
     bare = OrderBook(INS, VEN)
     f = Feeder()
-    events = [f.add(T0, 0, 100, 300, 11), f.add(T0 + 1, 0, 99, 400, 12),
-              f.add(T0 + 2, 1, 101, 200, 21), f.add(T0 + 3, 1, 102, 500, 22)]
+    events = [
+        f.add(T0, 0, 100, 300, 11),
+        f.add(T0 + 1, 0, 99, 400, 12),
+        f.add(T0 + 2, 1, 101, 200, 21),
+        f.add(T0 + 3, 1, 102, 500, 22),
+    ]
     ts = T0 + 10
     for k in range(200):
         ts += 1_000 + rng.below(300_000)

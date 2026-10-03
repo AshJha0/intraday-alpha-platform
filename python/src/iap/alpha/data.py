@@ -13,8 +13,8 @@ mapped back to native rows the same way (latest grid point <= row ts).
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Dict, List, Mapping, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -24,19 +24,19 @@ NS_DAY = 86_400_000_000_000
 LABEL_PREFIXES = ("label_mid_", "label_cost_", "label_valid_")
 
 
-def label_columns(df: pd.DataFrame) -> List[str]:
+def label_columns(df: pd.DataFrame) -> list[str]:
     return [c for c in df.columns if c.startswith(LABEL_PREFIXES)]
 
 
 def load_features(
     features_dir, instrument_ids: Sequence[int] | None = None
-) -> Dict[int, pd.DataFrame]:
+) -> dict[int, pd.DataFrame]:
     """Load per-instrument feature frames, sorted by exchange_ts."""
     features_dir = Path(features_dir)
     paths = sorted(features_dir.glob("features_*.parquet"))
     if not paths:
         raise ValueError(f"no feature parquet files in {features_dir}")
-    out: Dict[int, pd.DataFrame] = {}
+    out: dict[int, pd.DataFrame] = {}
     for p in paths:
         try:
             iid = int(p.stem.split("_")[1])
@@ -53,7 +53,7 @@ def load_features(
     return out
 
 
-def session_days(frames: Mapping[int, pd.DataFrame]) -> List[int]:
+def session_days(frames: Mapping[int, pd.DataFrame]) -> list[int]:
     """Sorted distinct UTC day indices (exchange_ts // day) across frames."""
     days: set[int] = set()
     for df in frames.values():
@@ -63,10 +63,10 @@ def session_days(frames: Mapping[int, pd.DataFrame]) -> List[int]:
 
 def split_by_day(
     frames: Mapping[int, pd.DataFrame], day: int
-) -> Tuple[Dict[int, pd.DataFrame], Dict[int, pd.DataFrame]]:
+) -> tuple[dict[int, pd.DataFrame], dict[int, pd.DataFrame]]:
     """(rows on days < day, rows on days >= day) — both re-indexed."""
-    lo: Dict[int, pd.DataFrame] = {}
-    hi: Dict[int, pd.DataFrame] = {}
+    lo: dict[int, pd.DataFrame] = {}
+    hi: dict[int, pd.DataFrame] = {}
     for iid, df in frames.items():
         d = df["exchange_ts"].to_numpy() // NS_DAY
         lo[iid] = df[d < day].reset_index(drop=True)
@@ -74,7 +74,7 @@ def split_by_day(
     return lo, hi
 
 
-def ts_span(frames: Mapping[int, pd.DataFrame]) -> Tuple[int, int]:
+def ts_span(frames: Mapping[int, pd.DataFrame]) -> tuple[int, int]:
     t0 = min(int(df["exchange_ts"].iloc[0]) for df in frames.values() if len(df))
     t1 = max(int(df["exchange_ts"].iloc[-1]) for df in frames.values() if len(df))
     return t0, t1

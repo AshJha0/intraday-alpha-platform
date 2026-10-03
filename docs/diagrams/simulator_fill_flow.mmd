@@ -1,0 +1,30 @@
+flowchart TD
+    %% Execution simulator, one market event (rule 9 processing order after v1.3.0).
+    %% C++ reference cpp/include/iap/execution/execution.hpp; Java and Python ports.
+    EV["MarketEvent for one instrument and venue"] --> EXP["1 expiries due at the event time"]
+    EXP --> ACT["2 activations and cancel arrivals, merged by time<br/>aggressive orders walk displayed MINUS consumed depth<br/>and debit the overlay (rule 3b)"]
+    ACT --> PRE["3 capture the pre-event state:<br/>opposite depth (for an ADD), the book order an EXECUTE names,<br/>displayed size at our levels (for a CANCEL or MODIFY)"]
+    PRE --> APPLY{"book.apply(event)"}
+    APPLY -->|"DROPPED or HELD:<br/>duplicate sequence, unknown order id, stale book"| NOTRACK["no queue tracking —<br/>the event trades nothing and moves nobody"]
+    APPLY -->|"APPLIED"| KIND{"event type"}
+    KIND -->|"EXECUTE"| EXE["traded = min(event qty, the book order's remaining)<br/>at the BOOK order's side and price,<br/>whatever the event quotes"]
+    KIND -->|"marketable ADD"| MADD["expand into the volume it consumes per level<br/>of the pre-event opposite depth — each level its own pool"]
+    EXE --> POOL["one pool per observed trade, shared in queue order<br/>(arrival_ts, then order_id): pay down ahead_qty first,<br/>then fill from what is left — never more than traded"]
+    MADD --> POOL
+    KIND -->|"CANCEL"| CAN{"is the cancelled order<br/>known to be ahead of us?"}
+    CAN -->|"real order id that did not join the level after we did"| ADV["ahead_qty -= displayed size the book removed<br/>(floored at 0) — a cancel never fills us"]
+    CAN -->|"joined after us, was re-queued by a size increase,<br/>or carries a synthetic QUOTE / SNAPSHOT id"| STAY["ahead_qty unchanged"]
+    KIND -->|"ADD at our level, or MODIFY that grows<br/>an order at our level (real id)"| BEH["remember the id as BEHIND us"]
+    POOL --> OVR
+    ADV --> OVR
+    STAY --> OVR
+    BEH --> OVR
+    NOTRACK --> OVR["4 overlay reset: for each level whose displayed size changed,<br/>consumed = min(consumed, new displayed size)"]
+    OVR --> CROSS{"5 does the opposite best cross a resting order's limit<br/>(rule 4), or did the venue just re-open (rule 8)?"}
+    CROSS -- no --> DONE["next event"]
+    CROSS -- yes --> CP["pool = displayed size of the crossing level<br/>MINUS what the overlay already consumed"]
+    CP --> CF["share the pool in queue order (ahead_qty first),<br/>then DEBIT the overlay with what was used —<br/>an unchanged display is consumed once, not once per event"]
+    CF --> DONE
+    GATE["venue gate (rule 8): book missing, stale or not TRADING<br/>means no fill of any kind"] -.-> POOL
+    GATE -.-> CP
+    WAS["before v1.3.0: tracking ran on the raw event before apply,<br/>a cancel subtracted its full quoted qty,<br/>and the crossing pool was rebuilt from the display on every event"] -.-> NOTRACK

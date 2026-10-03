@@ -20,6 +20,8 @@ metadata:
     app.kubernetes.io/version: "11.1.0"
 spec:
   replicas: 1
+  strategy:
+    type: Recreate   # the dashboards/state volume is ReadWriteOnce
   selector:
     matchLabels:
       app.kubernetes.io/name: grafana
@@ -31,6 +33,7 @@ spec:
         app.kubernetes.io/component: observability
         app.kubernetes.io/version: "11.1.0"
     spec:
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         runAsUser: 472
@@ -40,7 +43,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: grafana
-          image: grafana/grafana:11.1.0   # digest-pin at release: @sha256:<record-me>
+          image: grafana/grafana:11.1.0@sha256:079600c9517b678c10cda6006b4487d3174512fd4c6cface37df7822756ed7a5
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -110,7 +113,8 @@ spec:
           configMap:
             name: iap-grafana-dashboards
         - name: storage
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: iap-grafana   # users, preferences and ad-hoc dashboards survive restarts
 ---
 apiVersion: v1
 kind: Service

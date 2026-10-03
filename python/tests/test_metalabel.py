@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-
 from iap.core.rng import SplitMix64
 from iap.models.dataset import Dataset
 from iap.models.metalabel import (
@@ -36,15 +35,21 @@ def _meta_dataset(n: int = 8000, seed: int = 11) -> Dataset:
     y_cost = y_mid - cost
     X = np.column_stack([pred, noise])
     meta = np.zeros((n, 6))
-    meta[:, 0] = 2.0          # spread bps
-    meta[:, 1] = 1e-4         # rvol
-    meta[:, 2] = 500.0        # depth
+    meta[:, 0] = 2.0  # spread bps
+    meta[:, 1] = 1e-4  # rvol
+    meta[:, 2] = 500.0  # depth
     meta[:, 3] = np.array([rng.normal() for _ in range(n)]) * 0.1
-    meta[:, 4] = 0.25         # half-spread cost bps
-    meta[:, 5] = 0.5          # expected impact bps
-    return Dataset(X=X, y=y_cost, y_mid=y_mid, ts=ts,
-                   instrument_id=np.ones(n, dtype=np.int32),
-                   feature_names=["f0", "f1"], meta_context=meta), pred
+    meta[:, 4] = 0.25  # half-spread cost bps
+    meta[:, 5] = 0.5  # expected impact bps
+    return Dataset(
+        X=X,
+        y=y_cost,
+        y_mid=y_mid,
+        ts=ts,
+        instrument_id=np.ones(n, dtype=np.int32),
+        feature_names=["f0", "f1"],
+        meta_context=meta,
+    ), pred
 
 
 @pytest.fixture(scope="module")
@@ -55,10 +60,17 @@ def meta_result():
 
 def test_meta_labeling_output_contract(meta_result):
     res, _, _ = meta_result
-    for key in ("auc_test", "brier_test", "economics_gate_off",
-                "economics_gate_tau", "economics_gate_best_tau",
-                "calibration_curve", "tau_sweep_calibration",
-                "base_rate_test", "segments"):
+    for key in (
+        "auc_test",
+        "brier_test",
+        "economics_gate_off",
+        "economics_gate_tau",
+        "economics_gate_best_tau",
+        "calibration_curve",
+        "tau_sweep_calibration",
+        "base_rate_test",
+        "segments",
+    ):
         assert key in res
     seg = res["segments"]
     assert seg["train"] > seg["calibration"] > 0 and seg["test"] > 0
@@ -79,7 +91,7 @@ def test_calibration_curve_monotone(meta_result):
     # weak monotonicity of empirical frequencies (allow small-sample noise
     # in adjacent bins but require the overall trend)
     lo = np.mean([row["empirical"] for row in curve[: len(curve) // 2]])
-    hi = np.mean([row["empirical"] for row in curve[len(curve) // 2:]])
+    hi = np.mean([row["empirical"] for row in curve[len(curve) // 2 :]])
     assert hi > lo
 
 
@@ -114,15 +126,14 @@ def test_meta_gate_economics_consistency(meta_result):
 def test_build_meta_features_contract():
     pred = np.array([1e-3, -2e-3])
     direction = np.array([1, -1])
-    ctx = np.array([[2.0, 1e-4, 100.0, 0.3, 0.5, 0.2],
-                    [3.0, 2e-4, np.nan, -0.4, 0.6, 0.1]])
+    ctx = np.array([[2.0, 1e-4, 100.0, 0.3, 0.5, 0.2], [3.0, 2e-4, np.nan, -0.4, 0.6, 0.1]])
     X = build_meta_features(pred, direction, ctx)
     assert X.shape == (2, len(META_FEATURE_NAMES))
-    assert X[0, 0] == 1e-3          # |pred|
-    assert X[1, 1] == -2e-3         # signed pred
-    assert X[0, 5] == 0.3           # imbalance * +1
-    assert X[1, 5] == 0.4           # imbalance * -1
-    assert np.isfinite(X).all()     # NaN depth -> 0
+    assert X[0, 0] == 1e-3  # |pred|
+    assert X[1, 1] == -2e-3  # signed pred
+    assert X[0, 5] == 0.3  # imbalance * +1
+    assert X[1, 5] == 0.4  # imbalance * -1
+    assert np.isfinite(X).all()  # NaN depth -> 0
 
 
 def test_meta_labeling_input_validation():
@@ -147,8 +158,7 @@ def test_split_purges_label_horizon_at_both_boundaries():
 
     # reconstruct the usable meta-sample set exactly as run_meta_labeling does
     half_bps = ds.meta_context[:, 4]
-    cost_est = np.maximum(
-        2.0 * np.where(np.isfinite(half_bps), half_bps, 0.0) / 1e4, 0.0)
+    cost_est = np.maximum(2.0 * np.where(np.isfinite(half_bps), half_bps, 0.0) / 1e4, 0.0)
     direction = signal_directions(np.nan_to_num(pred, nan=0.0), cost_est)
     usable = np.isfinite(pred) & (direction != 0)
     ts = ds.ts[np.flatnonzero(usable)]
@@ -160,11 +170,9 @@ def test_split_purges_label_horizon_at_both_boundaries():
     b2 = int(ts[min(int(round(0.75 * n_rows)), n_rows - 1)])
 
     exp_train = int((ts + TARGET_HORIZON_NS <= b1).sum())
-    exp_cal = int(((ts > b1 + _EMBARGO_NS)
-                   & (ts + TARGET_HORIZON_NS <= b2)).sum())
+    exp_cal = int(((ts > b1 + _EMBARGO_NS) & (ts + TARGET_HORIZON_NS <= b2)).sum())
     exp_test = int((ts > b2 + _EMBARGO_NS).sum())
-    assert res["segments"] == {"train": exp_train, "calibration": exp_cal,
-                               "test": exp_test}
+    assert res["segments"] == {"train": exp_train, "calibration": exp_cal, "test": exp_test}
     # the purge really removes something vs the unpurged boundaries (rows
     # exist whose label window would straddle each boundary)
     assert exp_train < int((ts <= b1).sum())
@@ -182,12 +190,11 @@ def test_isotonic_falls_back_to_platt_on_a_thin_calibration_segment():
     """Isotonic on a few dozen positives interpolates noise into a step
     function; the platform falls back to Platt and says which it used."""
     import numpy as np
-    from sklearn.ensemble import HistGradientBoostingClassifier
-
     from iap.models.metalabel import (
         MIN_ISOTONIC_POSITIVES,
         _fit_isotonic_calibrated,
     )
+    from sklearn.ensemble import HistGradientBoostingClassifier
 
     rng = np.random.default_rng(3)
     n = 800
@@ -225,13 +232,11 @@ def test_metalabel_manifest_records_features_target_and_segments(tmp_path):
     tracker = ExperimentTracker(models_dir=tmp_path / "models")
     res = run_meta_labeling(ds, pred, tracker=tracker, primary_name="unitp")
 
-    man = json.loads(
-        (tracker.run_dir(res["run_id"]) / "manifest.json").read_text())
+    man = json.loads((tracker.run_dir(res["run_id"]) / "manifest.json").read_text())
     assert man["features"] == list(META_FEATURE_NAMES)
     assert man["target"] and "net P&L" in man["target"]
     assert man["folds"] is not None
-    assert [f["segment"] for f in man["folds"]] == [
-        "train", "calibration", "test"]
+    assert [f["segment"] for f in man["folds"]] == ["train", "calibration", "test"]
     for seg in man["folds"]:
         assert seg["n"] > 0 and len(seg["window"]) == 2
 
@@ -250,8 +255,7 @@ def _clustered_meta_dataset(n: int = 8000, seed: int = 11):
     ts = []
     for k in range(n):
         d, j = divmod(k, per_day)
-        ts.append(min(d, days - 1) * day + 13 * 3600 * _S
-                  + j * (9360 * _S // per_day))
+        ts.append(min(d, days - 1) * day + 13 * 3600 * _S + j * (9360 * _S // per_day))
     ds.ts[:] = np.asarray(sorted(ts), dtype=np.int64)
     return ds, pred
 
@@ -270,7 +274,7 @@ def test_meta_split_uses_row_mass_not_wall_clock():
     seg = res["segments"]
     total = seg["train"] + seg["calibration"] + seg["test"]
     fractions = [seg[k] / total for k in ("train", "calibration", "test")]
-    for got, want in zip(fractions, (0.50, 0.25, 0.25)):
+    for got, want in zip(fractions, (0.50, 0.25, 0.25), strict=False):
         assert abs(got - want) < 0.02, fractions
 
     # the wall-clock rule the defect used, evaluated on the same timestamps
@@ -296,8 +300,7 @@ def test_meta_split_keeps_calibration_positives_for_isotonic():
     res = run_meta_labeling(ds, pred)
 
     half_bps = ds.meta_context[:, 4]
-    cost_est = np.maximum(
-        2.0 * np.where(np.isfinite(half_bps), half_bps, 0.0) / 1e4, 0.0)
+    cost_est = np.maximum(2.0 * np.where(np.isfinite(half_bps), half_bps, 0.0) / 1e4, 0.0)
     direction = signal_directions(np.nan_to_num(pred, nan=0.0), cost_est)
     idx = np.flatnonzero(np.isfinite(pred) & (direction != 0))
     net = realized_net(direction[idx], ds.y_mid[idx], ds.y[idx])
@@ -306,5 +309,4 @@ def test_meta_split_keeps_calibration_positives_for_isotonic():
     # a quarter of the samples must bring (very nearly) a quarter of the
     # positives; the purge and embargo account for the small shortfall
     expected = 0.25 * total_positives
-    assert res["calibration_positives"] >= 0.9 * expected, (
-        res["calibration_positives"], expected)
+    assert res["calibration_positives"] >= 0.9 * expected, (res["calibration_positives"], expected)

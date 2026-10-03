@@ -4,7 +4,12 @@
 instrument / venue — spec §16), and the incident procedure around them.
 **Owner:** risk. **Related alerts:** `KillSwitchEngaged`,
 `LossLimitUtilizationHigh`, `GrossNotionalUtilizationHigh`, `StaleFeed`,
-`SequenceGapDetected`, `PlatformSessionFailed`, `TargetDown`.
+`SequenceGapDetected`, `PlatformSessionFailed`, `TargetDown`,
+`KillPendingNotRecorded`, `AdminAuthRateLimited`, `AdminAuditSuppressed`,
+and the `Watchdog` heartbeat. Alerts reach a human only through Alertmanager
+(`deployment/alertmanager/alertmanager.yml`), and **only once a webhook URL
+has been supplied** — the in-repo placeholder delivers nowhere
+(`docs/governance/REPO_SETTINGS.md` §6). Check that before relying on a page.
 
 **First principle: the risk engine is fail-closed.** When in doubt, engage.
 An unnecessary halt costs basis points; a missing halt costs the loss limit.
@@ -25,12 +30,71 @@ kubectl -n intraday-alpha create secret generic iap-admin-token \
 export IAP_ADMIN_TOKEN='<from your secret store>'
 ```
 
+**More than one operator (since v1.3.0).** `IAP_ADMIN_TOKEN` /
+`IAP_ADMIN_TOKEN_FILE` configure one shared token, recorded in the audit as
+operator `admin`. To attribute each call to a person, point
+`IAP_ADMIN_TOKENS_FILE` at a file of `operator_id:sha256hex` lines — the
+file holds the SHA-256 of each operator's token, never a token (blank lines
+and `#` comments are ignored; a malformed line, a duplicate id or an
+unreadable file stops the process at startup):
+
+```bash
+TOKEN="$(openssl rand -hex 32)"                      # give this to the operator
+printf 'alice:%s\n' "$(printf %s "$TOKEN" | sha256sum | cut -d' ' -f1)" >> admin_tokens
+export IAP_ADMIN_TOKENS_FILE="$PWD/admin_tokens"
+```
+
+The bundled k8s manifest and compose file wire only `IAP_ADMIN_TOKEN`;
+mounting a tokens file is an operator change to the deployment.
+
+**Where the call can come from (since v1.3.0).** The listener binds
+`127.0.0.1` unless `IAP_BIND_ADDR` names another address. A process started
+with `java/paper.sh` is therefore reachable from the same host only. The
+container image, compose and the k8s manifest set `IAP_BIND_ADDR=0.0.0.0`;
+in Kubernetes the NetworkPolicy then admits the admin port only from
+Prometheus and from pods labelled `iap.role=operator`, so run the `curl`
+commands of this runbook from such a pod:
+
+```bash
+kubectl -n intraday-alpha run op --rm -it --restart=Never \
+  --image=<an image that has curl> --labels=iap.role=operator -- sh
+```
+
+Compose publishes the port on the host's loopback only.
+
 Verify it is armed before the session (the routes answer 401, not 404):
 
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' -X POST localhost:8080/admin/kill
 # 401 = admin API armed, credentials required   |   404 = NO TOKEN CONFIGURED
 ```
+
+Do not script this probe in a loop: every unauthenticated call is a failed
+authentication, and after 10 of them inside one 60 s window further failed
+authentications answer `429` until the window rolls. A request carrying a
+valid token is never rate-limited, so the kill itself still goes through.
+
+**Admin authentication abuse.** {#admin-auth-abuse}
+`AdminAuthRateLimited` (critical) fires when `admin_auth_rate_limited_total`
+appears or increases: more than 10 failed authentications arrived inside
+one 60 s window and further failures are answered `429`.
+`AdminAuditSuppressed` (warning) fires when `admin_audit_suppressed_total`
+appears or increases: rejected requests went past the audit cap (the
+rate-limited failures, and any reject beyond 100 audit lines per window)
+and are recorded as one `audit_summary` line per window instead of line by
+line. Neither blocks an operator: a valid token is never rate-limited.
+
+```bash
+grep -c '"code":401' <state-dir>/admin_audit.jsonl        # failed authentications audited
+grep '"action":"audit_summary"' <state-dir>/admin_audit.jsonl | tail -3
+grep -o '"remote":"[^"]*"' <state-dir>/admin_audit.jsonl | sort | uniq -c | sort -rn | head
+```
+
+One remote address with a stale token is a client to fix (a probe left in a
+loop, a rotated token). Several, or an address that should not reach the
+port at all, is a network exposure: check `IAP_BIND_ADDR`, the compose port
+publication and the NetworkPolicies before anything else, and rotate the
+token if it may have been observed.
 
 ## 1. How the kill switch works (rust/risk engine, `com.iap.risk` port)
 
@@ -67,10 +131,26 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST localhost:8080/admin/kill
   The HTTP handler never touches risk state itself — it enqueues the command
   and the **trading thread** applies it at the next event boundary, so the
   resulting `RiskEvent` carries the current **event time** and sorts into the
-  audit log exactly where a programmatic call would. Every request, accepted
-  or refused, appends a line to `<state-dir>/admin_audit.jsonl` with the
-  actor's token **sha256** (never the token) and increments
-  `admin_requests_total{action=...}`.
+  audit log exactly where a programmatic call would. Every accepted
+  request appends a line to `<state-dir>/admin_audit.jsonl` with the
+  `operator` id, the `remote` address and the token's **sha256** (never the
+  token) and increments `admin_requests_total{action=...}`; rejected
+  requests are audited too, up to 100 lines per 60 s window, with one
+  `audit_summary` line per window counting what was suppressed.
+- **A kill latches before it is recorded (since v1.3.0).** The moment the
+  platform accepts a `kill` it raises a pending-kill latch and the order
+  path sends nothing new, whether or not the trading thread has reached an
+  event boundary. The trading thread drains admin commands at every event
+  boundary, before every pre-trade check, and — in realtime mode — between
+  pacing slices while the feed is quiet. Once the risk engine holds the
+  kill, the platform requests a cancel for every working (in-flight or
+  resting) child order through the simulator's cancel path.
+- **Venue kills and SOR (since v1.3.0).** While any venue kill is engaged,
+  an order that names venue 0 ("route via SOR") is rejected with
+  `KILL_VENUE` (`venue 0 (SOR) order rejected: venue <id> kill switch
+  engaged`), and the paper platform's pre-trade request names the venue the
+  child is actually routed to. A venue kill therefore halts SOR-routed flow
+  as well as flow pinned to that venue; it used not to.
 - **Restart semantics (Java platform).** The latch is CHECKPOINTED: it is in
   `<state-dir>/risk_snapshot.json` and a `--resume` restart comes back
   latched, with positions and realized P&L intact
@@ -109,9 +189,17 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST localhost:8080/admin/kill
    #   -d 'scope=venue'      -d 'id=2'
    ```
    `reason` is REQUIRED (1..256 chars) and is written verbatim into the risk
-   audit log — put the incident id and the approver in it. Responses: `200`
-   applied, `401` no token, `403` wrong token, `400` bad arguments, `404` the
-   admin API is not configured (see §0), `503` no session is running.
+   audit log — put the incident id and the approver in it. Responses:
+
+   | code | meaning | what to do |
+   |---|---|---|
+   | `200` | applied: the risk engine recorded it (the message says what happened to working child orders) | verify (§3) |
+   | `202` | **kill latched, not yet recorded**: the trading thread did not reach the command within the 5 s wait. No new order is sent from this moment; the risk engine records the kill at the next event boundary and a second line in `admin_audit.jsonl` confirms it (`applied after the request returned 202`) | treat as halted; verify (§3) and watch for the second audit line. Do **not** resend in a loop |
+   | `401` / `403` | no token / wrong token | fix the credential; mind the rate limit |
+   | `429` | more than 10 failed authentications in the current 60 s window | a valid token is not affected: retry with the right one |
+   | `400` | bad arguments (scope, id, missing reason, limit) | fix the request |
+   | `404` | the admin API is not configured (§0) | use the config path (b) |
+   | `503` | no session is running, or — for `clear` / `override` / `roll` only — the command was withdrawn on timeout and will not be applied | a kill is never withdrawn while the session runs; for the other verbs, resend |
 
    **(b) Config path — the deploy-time hard stop (minutes, needs a restart).**
    Use when the process is not running, is not reachable, or when the halt
@@ -166,12 +254,34 @@ Then confirm it is having the intended effect:
        <state-dir>/risk_audit.jsonl | tail -5 | python3 -m json.tool
   tail -3 <state-dir>/admin_audit.jsonl        # who called, with what status
   ```
+- After a `202`: the gauge turns to 1 when the trading thread applies the
+  kill. Until then the halt is the pending latch — orders the strategy tries
+  to send are counted in `exec_orders_blocked_kill_pending_total` rather
+  than rejected by the risk engine. If the session ends first, the audit
+  trail is closed with a `503` line (`session ended before the latched kill
+  reached the risk engine`).
+- **A kill that stays pending.** {#kill-pending}
+  `KillPendingNotRecorded` (critical) fires when
+  `exec_orders_blocked_kill_pending_total` has kept climbing for 3 m: orders
+  are being withheld, so nothing new is sent, but the kill is still only the
+  admin service's pending latch. It is not in the risk engine, so it is not
+  in `risk_snapshot.json` and **a restart would lose it**. Do not restart.
+  Check `/status` (`events_processed` must be advancing — a wedged trading
+  thread cannot drain the command; `/health` turns 503 after 30 s) and the
+  tail of `admin_audit.jsonl` for the `202` line without its
+  `applied after the request returned 202` follow-up. If the thread is
+  wedged, set the config master switch (§2 step 1) so the next start comes
+  up halted, then stop the process.
 - A halted platform is deliberately **still healthy and still ready**
   (`/health` and `/ready` return 200 with `"trading":"halted"`) — do not read
   a green probe as "the halt did not take"; read the gauge.
-- Confirm no working orders remain at venues (execution layer cancel sweep);
-  in paper/replay, confirm the venue sim shows no resting orders for the
-  killed scope.
+- Confirm no working orders remain at venues. In the paper platform the
+  kill requests the cancels itself and the `200` message (or the second
+  audit line after a `202`) states how many working children were asked to
+  cancel; the cancels travel the simulator's latency path, so the terminal
+  reports arrive on the following events. If the message says the resting
+  children were **not** cancelled, the halt still stops new orders, and the
+  open children are an explicit item for the risk owner.
 
 ## 4. During the halt
 
@@ -239,7 +349,9 @@ curl -sS -X POST $A/clear -H "Authorization: Bearer $TOKEN" \
 # 3. Restart instead of API? It does NOT clear anything: the Java platform
 #    checkpoints the latch and --resume restores it (conventions 12.3), and a
 #    restart without a snapshot is NOT_BOOTSTRAPPED and needs
-#    bootstrap_positions. Neither path clears a latch on its own.
+#    bootstrap_positions. Neither path clears a latch on its own. A SIGTERM
+#    during the halt ends the session as STOPPED (platform_session_state 4)
+#    with a resumable checkpoint that still carries the latch.
 # 4. Redeploy config as in §2 step 1.
 ```
 

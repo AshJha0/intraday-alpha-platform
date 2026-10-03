@@ -66,16 +66,21 @@ def migrate(doc: dict) -> tuple[dict, list[str]]:
         before_looks = config.pop("looks", None)
         before_count = int(entry.get("count", 1))
         key = ExperimentLedger.experiment_key(entry["alpha_id"], kind, config)
-        if (before_looks is None and before_count == LOOKS_PER_EXPERIMENT
-                and entry.get("key") == key):
+        if (
+            before_looks is None
+            and before_count == LOOKS_PER_EXPERIMENT
+            and entry.get("key") == key
+        ):
             continue  # already migrated
         entry["config"] = config
         entry["count"] = LOOKS_PER_EXPERIMENT
         entry["key"] = key
-        dropped = (f"looks {before_looks} -> (identity dropped), "
-                   if before_looks is not None else "")
-        changes.append(f"{entry['alpha_id']} [{kind}]: {dropped}"
-                       f"count {before_count} -> {LOOKS_PER_EXPERIMENT}")
+        dropped = (
+            f"looks {before_looks} -> (identity dropped), " if before_looks is not None else ""
+        )
+        changes.append(
+            f"{entry['alpha_id']} [{kind}]: {dropped}count {before_count} -> {LOOKS_PER_EXPERIMENT}"
+        )
     doc["total_experiments"] = sum(int(e.get("count", 1)) for e in doc["entries"])
     doc["distinct_experiments"] = len(doc["entries"])
     return doc, changes
@@ -85,15 +90,16 @@ def main() -> int:
     check_only = "--check" in sys.argv[1:]
     original = LEDGER.read_text(encoding="utf-8")
     doc, changes = migrate(json.loads(original))
-    rendered = json.dumps(doc, indent=2, sort_keys=True, ensure_ascii=True,
-                          allow_nan=False) + "\n"
+    rendered = json.dumps(doc, indent=2, sort_keys=True, ensure_ascii=True, allow_nan=False) + "\n"
     if not changes and rendered == original:
         print("ledger already migrated — no change")
         return 0
     for line in changes:
         print(line)
-    print(f"total_experiments -> {doc['total_experiments']} "
-          f"over {doc['distinct_experiments']} distinct experiments")
+    print(
+        f"total_experiments -> {doc['total_experiments']} "
+        f"over {doc['distinct_experiments']} distinct experiments"
+    )
     if check_only:
         print("--check: the ledger would change", file=sys.stderr)
         return 1

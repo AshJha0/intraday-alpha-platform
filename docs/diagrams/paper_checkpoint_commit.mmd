@@ -1,0 +1,38 @@
+sequenceDiagram
+    autonumber
+    participant TT as Trading thread<br/>(the only writer)
+    participant SS as SessionStore
+    participant FS as State directory
+    participant RK as RiskEngine
+
+    Note over TT,FS: CHECKPOINT — every 1024 events, at session end, on a stop request
+    TT->>SS: append audit and trace lines, fsync
+    TT->>RK: snapshot()
+    RK-->>TT: risk snapshot bytes
+    TT->>SS: commitCheckpoint(state, snapshot)
+    SS->>FS: write risk_snapshot.json.next, fsync
+    Note over FS: a crash here leaves the previous state<br/>with the previous snapshot
+    SS->>FS: replace session_state.json carrying risk_snapshot_sha256 — THE COMMIT
+    Note over FS: a crash here leaves the new state<br/>and the new snapshot under its .next name
+    SS->>FS: rename risk_snapshot.json.next onto risk_snapshot.json
+
+    Note over TT,RK: RESUME (--resume)
+    TT->>SS: read session_state.json
+    SS->>FS: sha256 of risk_snapshot.json
+    alt the hash equals risk_snapshot_sha256
+        SS-->>TT: the committed snapshot
+    else risk_snapshot.json.next carries the committed hash
+        SS->>FS: roll forward — rename .next into place
+        SS-->>TT: the committed snapshot
+    else neither file matches
+        SS-->>TT: refuse to resume, both hashes named
+    end
+    TT->>RK: restore(limits, instruments, snapshot)
+    TT->>RK: onOrderDone for every open order of the snapshot
+    Note over RK: their simulator no longer exists —<br/>counted in risk_resume_open_orders_released_total
+    TT->>TT: seed the account from the restored positions (no second buy)
+    TT->>TT: continue at the persisted event cursor
+
+    Note over TT,FS: STOP — the shutdown hook only raises a flag and waits up to 10 s
+    TT->>TT: sees the flag at the next event boundary or pacing slice
+    TT->>SS: checkpoint as above, then end the session as STOPPED (state 4)

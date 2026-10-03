@@ -42,7 +42,6 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import List
 
 
 class AlgoType(IntEnum):
@@ -72,7 +71,7 @@ class ParentOrder:
     max_child_qty: int = 1000
 
 
-def slice_weights(parent: ParentOrder) -> List[float]:
+def slice_weights(parent: ParentOrder) -> list[float]:
     """Slice weights for TWAP/VWAP/IS (raises ValueError for POV or slices <= 0)."""
     if parent.algo == AlgoType.POV:
         raise ValueError("POV has no precomputed slice weights")
@@ -81,7 +80,7 @@ def slice_weights(parent: ParentOrder) -> List[float]:
         raise ValueError("slices must be > 0")
     if n == 1:
         return [1.0]
-    w: List[float] = []
+    w: list[float] = []
     for i in range(n):
         if parent.algo == AlgoType.TWAP:
             w.append(1.0)
@@ -93,7 +92,7 @@ def slice_weights(parent: ParentOrder) -> List[float]:
     return w
 
 
-def slice_quantities(parent: ParentOrder) -> List[int]:
+def slice_quantities(parent: ParentOrder) -> list[int]:
     """Integer child quantities per slice (largest remainder; sums to ``qty``)."""
     if parent.qty <= 0:
         raise ValueError("parent qty must be > 0")
@@ -122,7 +121,7 @@ def slice_quantities(parent: ParentOrder) -> List[int]:
     return q
 
 
-def slice_times(parent: ParentOrder) -> List[int]:
+def slice_times(parent: ParentOrder) -> list[int]:
     """Due time of each slice: ``start_ts + i * span // N``."""
     if parent.end_ts <= parent.start_ts:
         raise ValueError("parent window must have end_ts > start_ts")

@@ -8,27 +8,22 @@ frames.  Used to validate the engine's incremental arithmetic at 1e-9.
 from __future__ import annotations
 
 import math
-from typing import List
 
 import pandas as pd
-
 from iap.core.events import EventType, MarketEvent
 from iap.orderbook.book import OrderBook
 
 NS = 1_000_000_000
 
-_TOUCH = (EventType.ADD, EventType.MODIFY, EventType.CANCEL,
-          EventType.EXECUTE, EventType.QUOTE)
+_TOUCH = (EventType.ADD, EventType.MODIFY, EventType.CANCEL, EventType.EXECUTE, EventType.QUOTE)
 
 
 def is_book_touch(ev: MarketEvent) -> bool:
     """Book-refresh trigger, mirroring the pinned engine rule."""
-    return ev.event_type in _TOUCH or (
-        ev.event_type == EventType.SNAPSHOT and ev.trade_id == 0
-    )
+    return ev.event_type in _TOUCH or (ev.event_type == EventType.SNAPSHOT and ev.trade_id == 0)
 
 
-def book_frames(events: List[MarketEvent], depth_levels: int = 10):
+def book_frames(events: list[MarketEvent], depth_levels: int = 10):
     """(book_df, trade_df) built from a single-venue reference OrderBook.
 
     book_df has one row per book-refresh event: ts, best bid/ask price+size,
@@ -39,8 +34,8 @@ def book_frames(events: List[MarketEvent], depth_levels: int = 10):
     """
     book = OrderBook(events[0].instrument_id, 0)
     rows, trows = [], []
-    prev_bid: List = []
-    prev_ask: List = []
+    prev_bid: list = []
+    prev_ask: list = []
     have_prev = False
     for n, ev in enumerate(events, start=1):
         if is_book_touch(ev):
@@ -55,15 +50,13 @@ def book_frames(events: List[MarketEvent], depth_levels: int = 10):
             for k in (1, 3, 5, 10):
                 row[f"b{k}"] = sum(q for _, q in bid[:k])
                 row[f"a{k}"] = sum(q for _, q in ask[:k])
-            for i, k in enumerate((1, 3, 5, 10)):
+            for _i, k in enumerate((1, 3, 5, 10)):
                 row[f"ofi{k}"] = (
-                    _delta(prev_bid, bid, k) - _delta(prev_ask, ask, k)
-                    if have_prev else 0
+                    _delta(prev_bid, bid, k) - _delta(prev_ask, ask, k) if have_prev else 0
                 )
             dep_b, rep_b = _queue_delta(prev_bid, bid, True)
             dep_a, rep_a = _queue_delta(prev_ask, ask, False)
-            row.update(dep_b=dep_b, rep_b=rep_b, dep_a=dep_a, rep_a=rep_a,
-                       has_prev=have_prev)
+            row.update(dep_b=dep_b, rep_b=rep_b, dep_a=dep_a, rep_a=rep_a, has_prev=have_prev)
             rows.append(row)
             prev_bid, prev_ask = bid, ask
             have_prev = True
@@ -72,14 +65,16 @@ def book_frames(events: List[MarketEvent], depth_levels: int = 10):
             if ev.event_type == EventType.TRADE:
                 bb, ba = book.best_bid(), book.best_ask()
                 mid2 = (bb[0] + ba[0]) if (bb and ba) else None
-                trows.append({
-                    "ts": ev.exchange_ts,
-                    "n": n,
-                    "qty": ev.qty,
-                    "signed": ev.qty if ev.side == 0 else -ev.qty,
-                    "price_ticks": ev.price_ticks,
-                    "mid2": mid2,
-                })
+                trows.append(
+                    {
+                        "ts": ev.exchange_ts,
+                        "n": n,
+                        "qty": ev.qty,
+                        "signed": ev.qty if ev.side == 0 else -ev.qty,
+                        "price_ticks": ev.price_ticks,
+                        "mid2": mid2,
+                    }
+                )
     return pd.DataFrame(rows), pd.DataFrame(trows)
 
 
@@ -115,16 +110,17 @@ def mid_change_frame(book_df: pd.DataFrame) -> pd.DataFrame:
     the first after a stale-recovery reset, which clears the series).
     """
     rows = []
-    hist_mid2 = None      # last recorded sample value
+    hist_mid2 = None  # last recorded sample value
     for r in book_df.itertuples():
         if pd.notna(r.bp) and pd.notna(r.ap):
             mid2 = r.bp + r.ap
             if hist_mid2 is None or mid2 != hist_mid2:
-                dlm = (math.log(mid2) - math.log(hist_mid2)
-                       if hist_mid2 is not None
-                       else float("nan"))
-                rows.append({"ts": r.ts, "n": r.n, "mid2": mid2,
-                             "logmid": math.log(mid2), "dlm": dlm})
+                dlm = (
+                    math.log(mid2) - math.log(hist_mid2) if hist_mid2 is not None else float("nan")
+                )
+                rows.append(
+                    {"ts": r.ts, "n": r.n, "mid2": mid2, "logmid": math.log(mid2), "dlm": dlm}
+                )
                 hist_mid2 = mid2
     return pd.DataFrame(rows)
 

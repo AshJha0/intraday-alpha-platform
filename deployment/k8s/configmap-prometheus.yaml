@@ -150,6 +150,42 @@ data:
     \ }} of the limit\"\n          description: >-\n            Gross exposure has been above 90% of global.max_gross_notional\
     \ for\n            5m; the next sizing decision will be rejected by the pre-trade\n            check.\
     \ Runbook: docs/runbooks/RUNBOOK_paper_trading.md#exposure\n          runbook: docs/runbooks/RUNBOOK_paper_trading.md\n\
+    \n      # A child order left for a venue other than the one the pre-trade check\n      # approved\
+    \ (PaperTrading.RiskWiring.onOrderSubmitted). The platform\n      # cancels the child and counts it;\
+    \ the counter is created on the first\n      # occurrence and never decreases, so `> 0` holds for\
+    \ the rest of the\n      # process \u2014 a wiring defect stays visible until someone restarts.\n\
+    \      - alert: RoutedVenueMismatch\n        expr: risk_routed_venue_mismatch_total > 0\n        for:\
+    \ 0m\n        labels:\n          severity: page\n          domain: risk\n        annotations:\n  \
+    \        summary: \"{{ $value | printf \\\"%.0f\\\" }} child order(s) routed to a venue the risk check\
+    \ did not approve on {{ $labels.service }}\"\n          description: >-\n            A child order\
+    \ was submitted to a venue other than the one named\n            in its pre-trade risk request, so\
+    \ a venue kill or disconnect was\n            checked against the wrong venue. The child was cancelled\n\
+    \            (fail-closed), but this is a routing/risk wiring defect, not a\n            market event:\
+    \ engage the kill switch and investigate. Runbook:\n            docs/runbooks/RUNBOOK_paper_trading.md#routed-venue-mismatch\n\
+    \          runbook: docs/runbooks/RUNBOOK_paper_trading.md\n\n      # An admin kill is accepted (latched\
+    \ in AdminService) before the risk\n      # engine records it; the order path withholds every order\
+    \ meanwhile and\n      # counts each one. One or two withheld orders are the normal race. A\n    \
+    \  # counter that keeps climbing for minutes means the kill is still not\n      # in the risk engine\
+    \ \u2014 so not in the snapshot a restart would restore.\n      - alert: KillPendingNotRecorded\n\
+    \        expr: increase(exec_orders_blocked_kill_pending_total[2m]) > 0\n        for: 3m\n       \
+    \ labels:\n          severity: critical\n          domain: risk\n        annotations:\n          summary:\
+    \ \"Orders withheld for a pending admin kill for over 3m on {{ $labels.service }}\"\n          description:\
+    \ >-\n            Orders have been withheld for more than 3m because an admin kill\n            was\
+    \ accepted (202) but the risk engine has not recorded it. No\n            new order is being sent,\
+    \ but the latch is not yet in the risk\n            snapshot and would not survive a restart. Do NOT\
+    \ restart; verify\n            the halt and the admin audit first. Runbook:\n            docs/runbooks/RUNBOOK_incident_kill_switch.md#kill-pending\n\
+    \          runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md\n\n      # --resume released open\
+    \ orders the restored risk snapshot still\n      # tracked (the simulator that held them is gone).\
+    \ The counter is set\n      # once at resume, so the alert stays up for the life of that process.\n\
+    \      - alert: ResumeReleasedOpenOrders\n        expr: risk_resume_open_orders_released_total > 0\n\
+    \        for: 0m\n        labels:\n          severity: warning\n          domain: risk\n        annotations:\n\
+    \          summary: \"Resume released {{ $value | printf \\\"%.0f\\\" }} orphaned open order(s) on\
+    \ {{ $labels.service }}\"\n          description: >-\n            The session resumed from a checkpoint\
+    \ whose risk snapshot tracked\n            open child orders; they no longer exist in the execution\n\
+    \            simulator and were released so they do not inflate position\n            projections.\
+    \ Positions and realized P&L are restored, the\n            working orders are not: reconcile before\
+    \ trusting the session.\n            The alert stays up until the process ends. Runbook:\n       \
+    \     docs/runbooks/RUNBOOK_paper_trading.md#resume-released-orders\n          runbook: docs/runbooks/RUNBOOK_paper_trading.md\n\
     \n  - name: iap-infrastructure\n    rules:\n      # GC pause: p99 pause above 10ms breaks the order-path\
     \ latency budget.\n      # NOTE under ZGC the MX bean reports concurrent-cycle time rather than\n\
     \      # stop-the-world pause time (deployment/grafana/README.md).\n      - alert: GcPauseHigh\n \
@@ -166,9 +202,23 @@ data:
     \ >-\n            platform_session_state = 3 (FAILED). /health is 503 with the\n            reason;\
     \ the container exits non-zero. Check the pod logs and\n            <state-dir>/config_audit.jsonl.\
     \ Runbook:\n            docs/runbooks/RUNBOOK_paper_trading.md#failed-session\n          runbook:\
-    \ docs/runbooks/RUNBOOK_paper_trading.md\n\n      # An unexpected restart re-reads the checkpoint;\
-    \ a burst of restarts is\n      # a crash loop (and each one re-warms the book from the stream).\n\
-    \      - alert: SessionRestartsClimbing\n        expr: increase(risk_session_restarts_total[15m])\
+    \ docs/runbooks/RUNBOOK_paper_trading.md\n\n      # A STOPPED session (value 4: a stop was requested,\
+    \ the session\n      # checkpointed mid-stream and exited 0) that nobody resumed. The gauge\n    \
+    \  # goes stale when the process exits, so the rule reads the LAST value\n      # scraped in the past\
+    \ hour: a resumed process reports 0/1 and clears\n      # it. The process usually exits within one\
+    \ scrape interval of setting\n      # 4; when the value was never scraped this rule cannot fire and\n\
+    \      # TargetDown is the signal (RUNBOOK_paper_trading.md#stopped-session).\n      - alert: SessionStoppedNotResumed\n\
+    \        expr: last_over_time(platform_session_state[1h]) == 4\n        for: 10m\n        labels:\n\
+    \          severity: warning\n          domain: infrastructure\n        annotations:\n          summary:\
+    \ \"Paper-trading session STOPPED and not resumed on {{ $labels.service }}\"\n          description:\
+    \ >-\n            The last scraped platform_session_state is 4 (STOPPED) and no\n            resumed\
+    \ session has reported for 10m. The session checkpointed\n            mid-stream and exited 0, so\
+    \ nothing restarts it; positions are\n            as the checkpoint left them. Resume it with --resume\
+    \ or record\n            why it stays down. The alert clears on resume, or one hour after\n      \
+    \      the stop. Runbook:\n            docs/runbooks/RUNBOOK_paper_trading.md#stopped-session\n  \
+    \        runbook: docs/runbooks/RUNBOOK_paper_trading.md\n\n      # An unexpected restart re-reads\
+    \ the checkpoint; a burst of restarts is\n      # a crash loop (and each one re-warms the book from\
+    \ the stream).\n      - alert: SessionRestartsClimbing\n        expr: increase(risk_session_restarts_total[15m])\
     \ > 2\n        for: 0m\n        labels:\n          severity: warning\n          domain: infrastructure\n\
     \        annotations:\n          summary: \"{{ $value | printf \\\"%.0f\\\" }} session restarts in\
     \ 15m on {{ $labels.service }}\"\n          description: >-\n            The platform resumed from\
@@ -182,7 +232,37 @@ data:
     \ {{ $labels.job }}/{{ $labels.instance }} down\"\n          description: >-\n            Prometheus\
     \ cannot scrape {{ $labels.instance }}. If this is\n            java-platform during a trading session,\
     \ treat as a platform\n            incident. Runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md\n\
-    \          runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md\n"
+    \          runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md\n\n  # The admin (kill-switch) API.\
+    \ Both counters are created on their first\n  # increment, so `increase()` alone misses the first\
+    \ occurrence: the second\n  # arm fires while the series is younger than the window.\n  - name: iap-admin-api\n\
+    \    rules:\n      - alert: AdminAuthRateLimited\n        expr: >\n          increase(admin_auth_rate_limited_total[10m])\
+    \ > 0\n          or (admin_auth_rate_limited_total > 0\n              unless admin_auth_rate_limited_total\
+    \ offset 10m)\n        for: 0m\n        labels:\n          severity: critical\n          domain: admin\n\
+    \        annotations:\n          summary: \"Admin API is rate-limiting failed authentications on {{\
+    \ $labels.service }}\"\n          description: >-\n            More than 10 failed authentications\
+    \ reached the admin API within\n            one 60s window, so further failures answer 429. Either\
+    \ a client\n            holds a wrong or rotated token, or the port is being probed. A\n         \
+    \   request with a valid token is never rate-limited, so the kill\n            switch stays usable.\
+    \ Read <state-dir>/admin_audit.jsonl for the\n            remote addresses. Runbook:\n           \
+    \ docs/runbooks/RUNBOOK_incident_kill_switch.md#admin-auth-abuse\n          runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md\n\
+    \n      - alert: AdminAuditSuppressed\n        expr: >\n          increase(admin_audit_suppressed_total[10m])\
+    \ > 0\n          or (admin_audit_suppressed_total > 0\n              unless admin_audit_suppressed_total\
+    \ offset 10m)\n        for: 0m\n        labels:\n          severity: warning\n          domain: admin\n\
+    \        annotations:\n          summary: \"Rejected admin requests are no longer individually audited\
+    \ on {{ $labels.service }}\"\n          description: >-\n            Rejected admin requests exceeded\
+    \ the per-window audit cap, so\n            the remainder were counted and summarised (one audit_summary\n\
+    \            line per window) instead of audited one by one. Accepted\n            requests are always\
+    \ audited. Find the source of the rejected\n            traffic in <state-dir>/admin_audit.jsonl.\
+    \ Runbook:\n            docs/runbooks/RUNBOOK_incident_kill_switch.md#admin-auth-abuse\n         \
+    \ runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md\n\n  # Heartbeat: fires permanently by design.\
+    \ Alertmanager routes it to the\n  # `watchdog` receiver (deployment/alertmanager/alertmanager.yml);\
+    \ an external\n  # dead-man's-switch on that receiver turns \"this stopped arriving\" into the\n \
+    \ # page, which proves rule evaluation, Alertmanager and delivery are alive.\n  - name: iap-meta\n\
+    \    rules:\n      - alert: Watchdog\n        expr: vector(1)\n        labels:\n          severity:\
+    \ none\n          domain: meta\n        annotations:\n          summary: \"Alerting pipeline heartbeat\
+    \ (always firing)\"\n          description: >-\n            This alert is always firing. If it stops\
+    \ arriving at the\n            heartbeat receiver, Prometheus rule evaluation or Alertmanager is\n\
+    \            down and no other alert can be trusted.\n          runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md\n"
   prometheus.yml: "# =============================================================================\n#\
     \ prometheus.yml \u2014 Intraday Alpha Platform scrape configuration (spec \xA725)\n#\n# ONE source\
     \ of metrics today: the Java platform (com.iap.monitoring registry\n# served by com.iap.api.MetricsServer)\
@@ -197,11 +277,14 @@ data:
     \ _bucket{le=\"2^i - 1\"}, powers of two in nanoseconds).\n# =============================================================================\n\
     \nglobal:\n  scrape_interval: 15s\n  evaluation_interval: 15s\n  external_labels:\n    platform: intraday-alpha\n\
     \    env: local\n\nrule_files:\n  - /etc/prometheus/recording.yml\n  - /etc/prometheus/alerts.yml\n\
-    \nscrape_configs:\n  # Java platform monitoring API (port 8080, /metrics \u2014 LIVE, served by\n\
-    \  # com.iap.api.MetricsServer).\n  - job_name: java-platform\n    metrics_path: /metrics\n    static_configs:\n\
-    \      - targets: [\"java-platform:8080\"]\n        labels:\n          service: java-platform\n  \
-    \        language: java\n\n  # Prometheus self-scrape (rule/alert health).\n  - job_name: prometheus\n\
-    \    static_configs:\n      - targets: [\"localhost:9090\"]\n        labels:\n          service: prometheus\n"
+    \n# Alert delivery: Alertmanager (deployment/alertmanager/). The same hostname\n# resolves in docker-compose\
+    \ (service name) and Kubernetes (Service name).\nalerting:\n  alertmanagers:\n    - static_configs:\n\
+    \        - targets: [\"alertmanager:9093\"]\n\nscrape_configs:\n  # Java platform monitoring API (port\
+    \ 8080, /metrics \u2014 LIVE, served by\n  # com.iap.api.MetricsServer).\n  - job_name: java-platform\n\
+    \    metrics_path: /metrics\n    static_configs:\n      - targets: [\"java-platform:8080\"]\n    \
+    \    labels:\n          service: java-platform\n          language: java\n\n  # Prometheus self-scrape\
+    \ (rule/alert health).\n  - job_name: prometheus\n    static_configs:\n      - targets: [\"localhost:9090\"\
+    ]\n        labels:\n          service: prometheus\n"
   recording.yml: "# =============================================================================\n# recording.yml\
     \ \u2014 precomputed rates and tail-latency quantiles (spec \xA722/\xA725)\n#\n# Histogram note: the\
     \ live Java monitoring endpoint (com.iap.api.MetricsServer)\n# exposes fixed log2 histograms \u2014\

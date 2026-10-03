@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-
 from iap.core.rng import SplitMix64
 from iap.portfolio.diagnostics import constraint_audit
 from iap.portfolio.optimizer import (
@@ -26,9 +25,14 @@ def _problem(seed: int = 5, n: int = 8):
     w_prev = np.array([rng.normal() * 0.05 for _ in range(n)])
     tc = np.full(n, 1e-4)
     cons = Constraints(
-        w_min=np.full(n, -0.25), w_max=np.full(n, 0.25),
-        gross_cap=1.0, net_cap=0.3, participation=np.full(n, 0.2),
-        turnover_cap=0.8, vol_target=0.02)
+        w_min=np.full(n, -0.25),
+        w_max=np.full(n, 0.25),
+        gross_cap=1.0,
+        net_cap=0.3,
+        participation=np.full(n, 0.2),
+        turnover_cap=0.8,
+        vol_target=0.02,
+    )
     return alpha, Sigma, w_prev, tc, cons
 
 
@@ -41,8 +45,7 @@ def test_project_l1_ball_hand_cases():
     p = project_l1_ball(np.array([2.0, -1.0]), 1.0)
     assert abs(np.abs(p).sum() - 1.0) < 1e-12
     assert p[0] == 1.0 and p[1] == 0.0  # exact simplex projection
-    assert np.array_equal(project_l1_ball(np.array([3.0]), 0.0),
-                          np.array([0.0]))
+    assert np.array_equal(project_l1_ball(np.array([3.0]), 0.0), np.array([0.0]))
 
 
 def test_projection_satisfies_all_constraints():
@@ -89,25 +92,23 @@ def test_solve_deterministic():
 def test_solve_beats_projected_candidates():
     """Brute-force check: no projected candidate beats the PGD solution."""
     alpha, Sigma, w_prev, tc, cons = _problem()
-    res = solve(alpha, Sigma, w_prev, 5.0, tc, cons,
-                iters=1500, step_decay=0.002, proj_passes=12)
+    res = solve(alpha, Sigma, w_prev, 5.0, tc, cons, iters=1500, step_decay=0.002, proj_passes=12)
     rng = SplitMix64(123)
     best_cand = -np.inf
     for _ in range(300):
         v = np.array([rng.normal() * 0.2 for _ in range(8)])
         w = project(v, cons, w_prev, Sigma, passes=12)
         if max_violation(w, cons, w_prev, Sigma) <= 1e-7:
-            best_cand = max(best_cand,
-                            objective(w, alpha, Sigma, w_prev, 5.0, tc))
+            best_cand = max(best_cand, objective(w, alpha, Sigma, w_prev, 5.0, tc))
     assert res.objective >= best_cand - 1e-9
 
 
 def test_solve_matches_slsqp_reference():
     """CVX-style reference: SLSQP optimum within 1e-5 of the PGD objective."""
     from scipy.optimize import minimize
+
     alpha, Sigma, w_prev, tc, cons = _problem()
-    res = solve(alpha, Sigma, w_prev, 5.0, tc, cons,
-                iters=1500, step_decay=0.002, proj_passes=12)
+    res = solve(alpha, Sigma, w_prev, 5.0, tc, cons, iters=1500, step_decay=0.002, proj_passes=12)
 
     def negf(w):
         return -objective(w, alpha, Sigma, w_prev, 5.0, tc)
@@ -115,19 +116,26 @@ def test_solve_matches_slsqp_reference():
     cl = [
         {"type": "ineq", "fun": lambda w: cons.gross_cap - np.abs(w).sum()},
         {"type": "ineq", "fun": lambda w: cons.net_cap - abs(w.sum())},
-        {"type": "ineq",
-         "fun": lambda w: cons.turnover_cap - np.abs(w - w_prev).sum()},
-        {"type": "ineq",
-         "fun": lambda w: cons.vol_target ** 2 - w @ Sigma @ w},
+        {"type": "ineq", "fun": lambda w: cons.turnover_cap - np.abs(w - w_prev).sum()},
+        {"type": "ineq", "fun": lambda w: cons.vol_target**2 - w @ Sigma @ w},
     ]
-    bounds = [(max(cons.w_min[i], w_prev[i] - cons.participation[i]),
-               min(cons.w_max[i], w_prev[i] + cons.participation[i]))
-              for i in range(8)]
+    bounds = [
+        (
+            max(cons.w_min[i], w_prev[i] - cons.participation[i]),
+            min(cons.w_max[i], w_prev[i] + cons.participation[i]),
+        )
+        for i in range(8)
+    ]
     ref = -np.inf
     for x0 in (w_prev, np.zeros(8), res.weights):
-        r = minimize(negf, x0, bounds=bounds, constraints=cl,
-                     method="SLSQP",
-                     options={"maxiter": 1000, "ftol": 1e-14})
+        r = minimize(
+            negf,
+            x0,
+            bounds=bounds,
+            constraints=cl,
+            method="SLSQP",
+            options={"maxiter": 1000, "ftol": 1e-14},
+        )
         if r.success:
             ref = max(ref, -r.fun)
     assert ref > -np.inf
@@ -137,8 +145,7 @@ def test_solve_matches_slsqp_reference():
 def test_no_improving_feasible_coordinate_move():
     """KKT-style check: projected coordinate perturbations do not improve."""
     alpha, Sigma, w_prev, tc, cons = _problem()
-    res = solve(alpha, Sigma, w_prev, 5.0, tc, cons,
-                iters=1500, step_decay=0.002, proj_passes=12)
+    res = solve(alpha, Sigma, w_prev, 5.0, tc, cons, iters=1500, step_decay=0.002, proj_passes=12)
     f0 = res.objective
     eps = 1e-4
     for i in range(8):
@@ -149,8 +156,7 @@ def test_no_improving_feasible_coordinate_move():
             if max_violation(w, cons, w_prev, Sigma) <= 1e-7:
                 # a genuinely suboptimal point improves linearly
                 # (~eps * |grad| ~ 3e-7); PGD terminal noise is ~3e-8
-                assert objective(w, alpha, Sigma, w_prev, 5.0, tc) \
-                    <= f0 + 1e-7
+                assert objective(w, alpha, Sigma, w_prev, 5.0, tc) <= f0 + 1e-7
 
 
 def test_unconstrained_analytic_optimum():
@@ -161,16 +167,14 @@ def test_unconstrained_analytic_optimum():
     lam = 5.0
     w_star = np.linalg.solve(2.0 * lam * Sigma, alpha)
     cons = Constraints(w_min=np.full(n, -10.0), w_max=np.full(n, 10.0))
-    res = solve(alpha, Sigma, np.zeros(n), lam, np.zeros(n), cons,
-                iters=3000, step_decay=0.0)
+    res = solve(alpha, Sigma, np.zeros(n), lam, np.zeros(n), cons, iters=3000, step_decay=0.0)
     assert np.max(np.abs(res.weights - w_star)) < 1e-6
 
 
 def test_vol_target_binds_and_audited():
     alpha, Sigma, w_prev, tc, cons = _problem()
     cons.vol_target = 0.004  # force it to bind
-    res = solve(alpha, Sigma, w_prev, 5.0, tc, cons,
-                iters=1500, step_decay=0.002, proj_passes=12)
+    res = solve(alpha, Sigma, w_prev, 5.0, tc, cons, iters=1500, step_decay=0.002, proj_passes=12)
     audit = constraint_audit(res.weights, cons, w_prev, Sigma)
     vol_rows = [r for r in audit["constraints"] if r["name"] == "volatility"]
     assert len(vol_rows) == 1
@@ -181,8 +185,7 @@ def test_vol_target_binds_and_audited():
 
 def test_constraint_audit_reports_turnover_and_exposures():
     n = 3
-    cons = Constraints(w_min=np.full(n, -1.0), w_max=np.full(n, 1.0),
-                       gross_cap=0.5, net_cap=0.1)
+    cons = Constraints(w_min=np.full(n, -1.0), w_max=np.full(n, 1.0), gross_cap=0.5, net_cap=0.1)
     w = np.array([0.3, -0.2, 0.0])
     audit = constraint_audit(w, cons, np.zeros(n))
     assert abs(audit["gross"] - 0.5) < 1e-15
@@ -209,8 +212,7 @@ def test_solver_input_validation():
         bad = Constraints(w_min=np.ones(n), w_max=np.zeros(n))
         solve(a, S, wp, 1.0, tc, bad)  # w_min > w_max
     with pytest.raises(ValueError):
-        c2 = Constraints(w_min=np.zeros(n), w_max=np.ones(n),
-                         vol_target=0.01)
+        c2 = Constraints(w_min=np.zeros(n), w_max=np.ones(n), vol_target=0.01)
         c2.validate(n)
         project(np.ones(n), c2, wp, None)  # vol target without Sigma
 
@@ -226,10 +228,8 @@ def test_portfolio_infeasible_raises_or_flags():
     and the residual breach named as RISK so a caller can alarm."""
     n = 2
     w_prev = np.array([0.5, 0.5])
-    cons = Constraints(w_min=-np.ones(n), w_max=np.ones(n), gross_cap=0.5,
-                       turnover_cap=0.0)
-    res = solve(np.array([0.01, 0.02]), np.eye(n) * 1e-4, w_prev, 1.0,
-                np.zeros(n), cons, iters=50)
+    cons = Constraints(w_min=-np.ones(n), w_max=np.ones(n), gross_cap=0.5, turnover_cap=0.0)
+    res = solve(np.array([0.01, 0.02]), np.eye(n) * 1e-4, w_prev, 1.0, np.zeros(n), cons, iters=50)
     assert res.feasible is False
     assert res.status == "INFEASIBLE"
     assert np.array_equal(res.weights, w_prev)
@@ -245,9 +245,15 @@ def test_portfolio_infeasible_raises_or_flags():
     assert gross["slack"] < 0
     assert abs(audit["max_violation"] - 0.5) < 1e-12
     # a feasible problem reports feasible True / OPTIMAL
-    ok = solve(np.array([0.01, 0.02]), np.eye(n) * 1e-4, np.zeros(n), 1.0,
-               np.zeros(n), Constraints(w_min=-np.ones(n), w_max=np.ones(n),
-                                        gross_cap=0.5), iters=50)
+    ok = solve(
+        np.array([0.01, 0.02]),
+        np.eye(n) * 1e-4,
+        np.zeros(n),
+        1.0,
+        np.zeros(n),
+        Constraints(w_min=-np.ones(n), w_max=np.ones(n), gross_cap=0.5),
+        iters=50,
+    )
     assert ok.feasible is True and ok.status == "OPTIMAL"
     assert ok.violations == () and ok.violation_kind == "NONE"
     assert ok.risk_violation == 0.0
@@ -268,8 +274,7 @@ def test_portfolio_rejects_nonfinite_inputs():
     with pytest.raises(ValueError, match="risk_aversion"):
         solve(a, S, wp, np.nan, tc, cons)
     with pytest.raises(ValueError, match="finite"):
-        solve(a, S, wp, 1.0, tc, Constraints(w_min=np.array([-np.inf, 0.0]),
-                                             w_max=np.ones(n)))
+        solve(a, S, wp, 1.0, tc, Constraints(w_min=np.array([-np.inf, 0.0]), w_max=np.ones(n)))
 
 
 def test_portfolio_zero_sigma_lambda_zero_auto_eta():
@@ -279,8 +284,7 @@ def test_portfolio_zero_sigma_lambda_zero_auto_eta():
     n = 3
     alpha = np.array([0.01, -0.02, 0.0])
     cons = Constraints(w_min=-np.ones(n), w_max=np.ones(n))
-    res = solve(alpha, np.zeros((n, n)), np.zeros(n), 0.0,
-                np.full(n, 1e-4), cons, iters=100)
+    res = solve(alpha, np.zeros((n, n)), np.zeros(n), 0.0, np.full(n, 1e-4), cons, iters=100)
     assert res.feasible
     assert np.all(np.isfinite(res.weights))
     assert np.isfinite(res.objective)
@@ -301,11 +305,15 @@ def test_infeasible_vol_spike_moves_instead_of_freezing_the_book():
     feasible set is empty. Holding leaves the book at 10.6x the vol target
     indefinitely; the solver had a vol-compliant iterate in hand."""
     sigma_bar = 0.0053
-    Sigma = np.array([[sigma_bar ** 2]])
+    Sigma = np.array([[sigma_bar**2]])
     w_prev = np.array([1.0])
-    cons = Constraints(w_min=np.array([-1.5]), w_max=np.array([1.5]),
-                       participation=np.array([0.5]), turnover_cap=0.5,
-                       vol_target=0.0005)
+    cons = Constraints(
+        w_min=np.array([-1.5]),
+        w_max=np.array([1.5]),
+        participation=np.array([0.5]),
+        turnover_cap=0.5,
+        vol_target=0.0005,
+    )
     res = solve(np.array([0.02]), Sigma, w_prev, 1.0, np.zeros(1), cons)
 
     assert res.feasible is False and res.status == "INFEASIBLE"
@@ -326,13 +334,16 @@ def test_infeasible_returns_the_least_violating_candidate():
     violation, total violation, earliest candidate), so every iterate is
     compared against holding rather than discarded."""
     sigma_bar = 0.0053
-    Sigma = np.array([[sigma_bar ** 2]])
+    Sigma = np.array([[sigma_bar**2]])
     w_prev = np.array([1.0])
-    cons = Constraints(w_min=np.array([-1.5]), w_max=np.array([1.5]),
-                       participation=np.array([0.5]), turnover_cap=0.5,
-                       vol_target=0.0005)
-    res = solve(np.array([0.02]), Sigma, w_prev, 1.0, np.zeros(1), cons,
-                iters=25)
+    cons = Constraints(
+        w_min=np.array([-1.5]),
+        w_max=np.array([1.5]),
+        participation=np.array([0.5]),
+        turnover_cap=0.5,
+        vol_target=0.0005,
+    )
+    res = solve(np.array([0.02]), Sigma, w_prev, 1.0, np.zeros(1), cons, iters=25)
     chosen = (res.risk_violation, res.max_violation)
 
     # replay every candidate the solver saw and check none beats the answer
@@ -341,14 +352,14 @@ def test_infeasible_returns_the_least_violating_candidate():
     eta0 = 1.0 / max(2.0 * 1.0 * float(np.abs(Sigma).sum(axis=1).max()), 1e-6)
     for k in range(25):
         eta = eta0 / (1.0 + 0.01 * k)
-        w = project(w + eta * (np.array([0.02]) - 2.0 * (Sigma @ w)),
-                    cons, w_prev, Sigma, 8)
+        w = project(w + eta * (np.array([0.02]) - 2.0 * (Sigma @ w)), cons, w_prev, Sigma, 8)
         seen.append(w.copy())
     for cand in seen:
         b = violation_breakdown(cand, cons, w_prev, Sigma)
-        rank = (max(0.0, max((b[n] for n in ("BOX", "VOL") if n in b),
-                             default=0.0)),
-                max(0.0, max(b.values(), default=0.0)))
+        rank = (
+            max(0.0, max((b[n] for n in ("BOX", "VOL") if n in b), default=0.0)),
+            max(0.0, max(b.values(), default=0.0)),
+        )
         assert chosen <= rank, f"discarded candidate {cand} was better"
 
 
@@ -369,14 +380,22 @@ def test_constraints_reject_nonfinite_bounds_and_caps():
         with pytest.raises(ValueError, match=f"{cap} must be finite"):
             cons.validate(n)
     with pytest.raises(ValueError, match="participation must be finite"):
-        Constraints(w_min=-ones, w_max=ones,
-                    participation=np.array([0.1, np.nan])).validate(n)
-    with pytest.raises(ValueError,
-                       match="currency_matrix/currency_bounds must be finite"):
-        Constraints(w_min=-ones, w_max=ones,
-                    currency_matrix=np.array([[1.0, 1.0]]),
-                    currency_bounds=np.array([np.nan])).validate(n)
+        Constraints(w_min=-ones, w_max=ones, participation=np.array([0.1, np.nan])).validate(n)
+    with pytest.raises(ValueError, match="currency_matrix/currency_bounds must be finite"):
+        Constraints(
+            w_min=-ones,
+            w_max=ones,
+            currency_matrix=np.array([[1.0, 1.0]]),
+            currency_bounds=np.array([np.nan]),
+        ).validate(n)
     # and the result of a valid solve is never NaN
-    res = solve(np.array([0.01, 0.02]), np.eye(n) * 1e-4, np.zeros(n), 1.0,
-                np.zeros(n), Constraints(w_min=-ones, w_max=ones), iters=10)
+    res = solve(
+        np.array([0.01, 0.02]),
+        np.eye(n) * 1e-4,
+        np.zeros(n),
+        1.0,
+        np.zeros(n),
+        Constraints(w_min=-ones, w_max=ones),
+        iters=10,
+    )
     assert not np.isnan(res.max_violation)

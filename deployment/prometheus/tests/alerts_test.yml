@@ -22,6 +22,25 @@ tests:
   # consecutive events, which is small on a healthy replay.
   # ---------------------------------------------------------------------------
   - interval: 15s
+    name: Watchdog fires permanently (heartbeat, no input series needed)
+    input_series: []
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: Watchdog
+        exp_alerts:
+          - exp_labels:
+              alertname: Watchdog
+              severity: none
+              domain: meta
+            exp_annotations:
+              summary: "Alerting pipeline heartbeat (always firing)"
+              runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+              description: >-
+                This alert is always firing. If it stops arriving at the
+                heartbeat receiver, Prometheus rule evaluation or Alertmanager is
+                down and no other alert can be trusted.
+
+  - interval: 15s
     name: StaleFeed does not fire on a replayed session with 10-day-old data
     input_series:
       # event time ~ 2026-08-22, i.e. ~10 days behind wall clock
@@ -252,3 +271,212 @@ tests:
                 reason; the container exits non-zero. Check the pod logs and
                 <state-dir>/config_audit.jsonl. Runbook:
                 docs/runbooks/RUNBOOK_paper_trading.md#failed-session
+
+  # ---------------------------------------------------------------------------
+  # v1.3.0 safety rules. platform_session_state 4 (STOPPED): the process
+  # exits right after setting it, so the series goes stale; the rule reads the
+  # last scraped value and clears when a resumed session reports.
+  # ---------------------------------------------------------------------------
+  - interval: 15s
+    name: SessionStoppedNotResumed fires 10m after a scraped STOPPED that nobody resumed
+    input_series:
+      - series: 'platform_session_state{job="java-platform",service="java-platform"}'
+        values: '1 1 1 4 stale'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: SessionStoppedNotResumed
+        exp_alerts: []          # `for: 10m` not yet satisfied
+      - eval_time: 12m
+        alertname: SessionStoppedNotResumed
+        exp_alerts:
+          - exp_labels:
+              alertname: SessionStoppedNotResumed
+              severity: warning
+              domain: infrastructure
+              job: java-platform
+              service: java-platform
+            exp_annotations:
+              summary: "Paper-trading session STOPPED and not resumed on java-platform"
+              runbook: docs/runbooks/RUNBOOK_paper_trading.md
+              description: >-
+                The last scraped platform_session_state is 4 (STOPPED) and no
+                resumed session has reported for 10m. The session checkpointed
+                mid-stream and exited 0, so nothing restarts it; positions are
+                as the checkpoint left them. Resume it with --resume or record
+                why it stays down. The alert clears on resume, or one hour after
+                the stop. Runbook:
+                docs/runbooks/RUNBOOK_paper_trading.md#stopped-session
+      - eval_time: 12m
+        alertname: PlatformSessionFailed
+        exp_alerts: []          # a stop is not a failure
+
+  - interval: 15s
+    name: SessionStoppedNotResumed stays silent once the session is resumed
+    input_series:
+      - series: 'platform_session_state{job="java-platform",service="java-platform"}'
+        values: '1 1 1 4 stale _ _ _ 0 1+0x60'
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: SessionStoppedNotResumed
+        exp_alerts: []
+
+  - interval: 15s
+    name: RoutedVenueMismatch pages on the first mismatched child
+    input_series:
+      - series: 'risk_routed_venue_mismatch_total{job="java-platform",service="java-platform"}'
+        values: '_ _ 1+0x10'
+    alert_rule_test:
+      - eval_time: 15s
+        alertname: RoutedVenueMismatch
+        exp_alerts: []
+      - eval_time: 1m
+        alertname: RoutedVenueMismatch
+        exp_alerts:
+          - exp_labels:
+              alertname: RoutedVenueMismatch
+              severity: page
+              domain: risk
+              job: java-platform
+              service: java-platform
+            exp_annotations:
+              summary: "1 child order(s) routed to a venue the risk check did not approve on java-platform"
+              runbook: docs/runbooks/RUNBOOK_paper_trading.md
+              description: >-
+                A child order was submitted to a venue other than the one named
+                in its pre-trade risk request, so a venue kill or disconnect was
+                checked against the wrong venue. The child was cancelled
+                (fail-closed), but this is a routing/risk wiring defect, not a
+                market event: engage the kill switch and investigate. Runbook:
+                docs/runbooks/RUNBOOK_paper_trading.md#routed-venue-mismatch
+
+  - interval: 15s
+    name: KillPendingNotRecorded fires only when orders keep being withheld
+    input_series:
+      # the normal race: two orders withheld, then the kill is recorded
+      - series: 'exec_orders_blocked_kill_pending_total{job="java-platform",service="race"}'
+        values: '_ _ 1 2+0x40'
+      # stuck: the counter climbs on every scrape
+      - series: 'exec_orders_blocked_kill_pending_total{job="java-platform",service="stuck"}'
+        values: '_ _ 1+1x40'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: KillPendingNotRecorded
+        exp_alerts: []          # `for: 3m` not yet satisfied
+      - eval_time: 6m
+        alertname: KillPendingNotRecorded
+        exp_alerts:
+          - exp_labels:
+              alertname: KillPendingNotRecorded
+              severity: critical
+              domain: risk
+              job: java-platform
+              service: stuck
+            exp_annotations:
+              summary: "Orders withheld for a pending admin kill for over 3m on stuck"
+              runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+              description: >-
+                Orders have been withheld for more than 3m because an admin kill
+                was accepted (202) but the risk engine has not recorded it. No
+                new order is being sent, but the latch is not yet in the risk
+                snapshot and would not survive a restart. Do NOT restart; verify
+                the halt and the admin audit first. Runbook:
+                docs/runbooks/RUNBOOK_incident_kill_switch.md#kill-pending
+
+  - interval: 15s
+    name: ResumeReleasedOpenOrders warns when a resume released orphaned orders
+    input_series:
+      - series: 'risk_resume_open_orders_released_total{job="java-platform",service="java-platform"}'
+        values: '2+0x10'
+      - series: 'risk_resume_open_orders_released_total{job="java-platform",service="clean-resume"}'
+        values: '0+0x10'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: ResumeReleasedOpenOrders
+        exp_alerts:
+          - exp_labels:
+              alertname: ResumeReleasedOpenOrders
+              severity: warning
+              domain: risk
+              job: java-platform
+              service: java-platform
+            exp_annotations:
+              summary: "Resume released 2 orphaned open order(s) on java-platform"
+              runbook: docs/runbooks/RUNBOOK_paper_trading.md
+              description: >-
+                The session resumed from a checkpoint whose risk snapshot tracked
+                open child orders; they no longer exist in the execution
+                simulator and were released so they do not inflate position
+                projections. Positions and realized P&L are restored, the
+                working orders are not: reconcile before trusting the session.
+                The alert stays up until the process ends. Runbook:
+                docs/runbooks/RUNBOOK_paper_trading.md#resume-released-orders
+
+  # ---------------------------------------------------------------------------
+  # The admin counters do not exist until their first increment, which
+  # `increase()` cannot see: the first-appearance arm must fire on it, and
+  # the increase arm on a later burst.
+  # ---------------------------------------------------------------------------
+  - interval: 15s
+    name: AdminAuthRateLimited fires on the first appearance of the counter
+    input_series:
+      - series: 'admin_auth_rate_limited_total{job="java-platform",service="java-platform"}'
+        values: '_ _ _ _ 3+0x100'
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: AdminAuthRateLimited
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: AdminAuthRateLimited
+        exp_alerts:
+          - exp_labels:
+              alertname: AdminAuthRateLimited
+              severity: critical
+              domain: admin
+              job: java-platform
+              service: java-platform
+            exp_annotations:
+              summary: "Admin API is rate-limiting failed authentications on java-platform"
+              runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+              description: >-
+                More than 10 failed authentications reached the admin API within
+                one 60s window, so further failures answer 429. Either a client
+                holds a wrong or rotated token, or the port is being probed. A
+                request with a valid token is never rate-limited, so the kill
+                switch stays usable. Read <state-dir>/admin_audit.jsonl for the
+                remote addresses. Runbook:
+                docs/runbooks/RUNBOOK_incident_kill_switch.md#admin-auth-abuse
+      - eval_time: 20m
+        alertname: AdminAuthRateLimited
+        exp_alerts: []          # no new 429 for over 10m
+
+  - interval: 15s
+    name: AdminAuditSuppressed fires on a later burst and clears afterwards
+    input_series:
+      - series: 'admin_audit_suppressed_total{job="java-platform",service="java-platform"}'
+        values: '5+0x60 9+0x100'
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: AdminAuditSuppressed
+        exp_alerts: []          # series older than 10m, no increase
+      - eval_time: 17m
+        alertname: AdminAuditSuppressed
+        exp_alerts:
+          - exp_labels:
+              alertname: AdminAuditSuppressed
+              severity: warning
+              domain: admin
+              job: java-platform
+              service: java-platform
+            exp_annotations:
+              summary: "Rejected admin requests are no longer individually audited on java-platform"
+              runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+              description: >-
+                Rejected admin requests exceeded the per-window audit cap, so
+                the remainder were counted and summarised (one audit_summary
+                line per window) instead of audited one by one. Accepted
+                requests are always audited. Find the source of the rejected
+                traffic in <state-dir>/admin_audit.jsonl. Runbook:
+                docs/runbooks/RUNBOOK_incident_kill_switch.md#admin-auth-abuse
+      - eval_time: 30m
+        alertname: AdminAuditSuppressed
+        exp_alerts: []

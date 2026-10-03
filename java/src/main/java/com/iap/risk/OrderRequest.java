@@ -1,5 +1,7 @@
 package com.iap.risk;
 
+import java.math.BigDecimal;
+
 /**
  * Strategy order request (schemas/order/order_request.schema.json), mirroring the
  * Rust {@code venue::OrderRequest} field-for-field. Order type codes:
@@ -22,6 +24,40 @@ public record OrderRequest(long orderId, long instrumentId, int side,
     public static final int MID = 6;
 
     /**
+     * Rust {@code {}} ({@code Display}) of an f64, for byte parity of the
+     * reason text with the reference ({@code rust/venue/src/messages.rs})
+     * and the Python port ({@code rust_display_f64}): the shortest
+     * round-trip digits in plain decimal notation (never scientific),
+     * integral values without a fraction ({@code 2}, not {@code 2.0}),
+     * {@code -0} for negative zero, {@code NaN} / {@code inf} /
+     * {@code -inf}. {@link Double#toString} (shortest round-trip digits
+     * since JDK 19) supplies the digits; only the layout differs.
+     */
+    public static String rustDisplay(double v) {
+        if (Double.isNaN(v)) {
+            return "NaN";
+        }
+        if (Double.isInfinite(v)) {
+            return v > 0 ? "inf" : "-inf";
+        }
+        if (v == 0.0) {
+            return Double.doubleToRawLongBits(v) < 0 ? "-0" : "0";
+        }
+        String plain = new BigDecimal(Double.toString(v)).toPlainString();
+        if (plain.indexOf('.') >= 0) {
+            int end = plain.length();
+            while (plain.charAt(end - 1) == '0') {
+                end--;
+            }
+            if (plain.charAt(end - 1) == '.') {
+                end--;
+            }
+            plain = plain.substring(0, end);
+        }
+        return plain;
+    }
+
+    /**
      * Contract-level validation ({@code null} when valid, else the reason)
      * — venue- and risk-independent, only the schema's own rules (mirrors
      * {@code venue::order_validation_error}).
@@ -37,7 +73,7 @@ public record OrderRequest(long orderId, long instrumentId, int side,
             return "qty must be > 0: " + qty;
         }
         if (!(Double.isFinite(urgency) && urgency >= 0.0 && urgency <= 1.0)) {
-            return "urgency must be in [0, 1]: " + urgency;
+            return "urgency must be in [0, 1]: " + rustDisplay(urgency);
         }
         switch (orderType) {
             case MARKET -> {

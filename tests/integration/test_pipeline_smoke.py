@@ -7,6 +7,7 @@ asserts that the chain produces a ``FeatureVector`` whose ``feature_version``
 is the feature-registry hash — the contract every downstream consumer keys on
 (schemas/features/feature_vector.schema.json, API_FEATURES.md §1).
 """
+
 from __future__ import annotations
 
 from iap.core.codec import read_jsonl

@@ -30,8 +30,6 @@ in the window" — an undefined denominator, so ``ret_vol_adj`` is INVALID, not
 
 from __future__ import annotations
 
-from typing import List
-
 from iap.features._famutil import put
 from iap.features.spec import EPS, WINDOW_NS, FeatureSpec, mkspec
 
@@ -40,48 +38,72 @@ FAMILY = "price"
 HORIZONS = ("1s", "5s", "10s", "30s", "1m")
 
 
-def specs() -> List[FeatureSpec]:
+def specs() -> list[FeatureSpec]:
     """Registry entries for the price family (pinned order)."""
-    out: List[FeatureSpec] = []
+    out: list[FeatureSpec] = []
     for h in HORIZONS:
-        out.append(mkspec(
-            f"ret_simple_{h}_v1", FAMILY,
-            f"Simple mid-to-mid return over {h}: mid(t)/mid(t-{h}) - 1 "
-            f"(mid sampled at-or-before t-{h}).",
-            horizon=h))
+        out.append(
+            mkspec(
+                f"ret_simple_{h}_v1",
+                FAMILY,
+                f"Simple mid-to-mid return over {h}: mid(t)/mid(t-{h}) - 1 "
+                f"(mid sampled at-or-before t-{h}).",
+                horizon=h,
+            )
+        )
     for h in HORIZONS:
-        out.append(mkspec(
-            f"ret_log_{h}_v1", FAMILY,
-            f"Log mid return over {h}: ln mid(t) - ln mid(t-{h}).",
-            horizon=h))
+        out.append(
+            mkspec(
+                f"ret_log_{h}_v1",
+                FAMILY,
+                f"Log mid return over {h}: ln mid(t) - ln mid(t-{h}).",
+                horizon=h,
+            )
+        )
     for h in HORIZONS:
-        out.append(mkspec(
-            f"ret_accel_{h}_v1", FAMILY,
-            f"Return acceleration over {h}: ret_log(t,{h}) - ret_log(t-{h},{h}).",
-            depends_on=(f"ret_log_{h}_v1",),
-            horizon=h))
+        out.append(
+            mkspec(
+                f"ret_accel_{h}_v1",
+                FAMILY,
+                f"Return acceleration over {h}: ret_log(t,{h}) - ret_log(t-{h},{h}).",
+                depends_on=(f"ret_log_{h}_v1",),
+                horizon=h,
+            )
+        )
     for h in HORIZONS:
-        out.append(mkspec(
-            f"ret_resid_{h}_v1", FAMILY,
-            f"Residual log return over {h} vs the cross-asset reference: "
-            f"ret_log_{h} - beta_w5m * ref_ret_{h}.",
-            depends_on=(f"ret_log_{h}_v1", "beta_w5m_v1", f"ref_ret_{h}_v1"),
-            horizon=h))
+        out.append(
+            mkspec(
+                f"ret_resid_{h}_v1",
+                FAMILY,
+                f"Residual log return over {h} vs the cross-asset reference: "
+                f"ret_log_{h} - beta_w5m * ref_ret_{h}.",
+                depends_on=(f"ret_log_{h}_v1", "beta_w5m_v1", f"ref_ret_{h}_v1"),
+                horizon=h,
+            )
+        )
     for h in HORIZONS:
-        out.append(mkspec(
-            f"mid_change_ticks_{h}_v1", FAMILY,
-            f"Mid change over {h} in ticks: (mid_ticks(t) - mid_ticks(t-{h})).",
-            horizon=h))
+        out.append(
+            mkspec(
+                f"mid_change_ticks_{h}_v1",
+                FAMILY,
+                f"Mid change over {h} in ticks: (mid_ticks(t) - mid_ticks(t-{h})).",
+                horizon=h,
+            )
+        )
     for h in HORIZONS:
-        out.append(mkspec(
-            f"ret_vol_adj_{h}_v1", FAMILY,
-            f"Volatility-adjusted log return over {h}: ret_log_{h} / (rvol_w1m + EPS).",
-            depends_on=(f"ret_log_{h}_v1", "rvol_w1m_v1"),
-            horizon=h))
+        out.append(
+            mkspec(
+                f"ret_vol_adj_{h}_v1",
+                FAMILY,
+                f"Volatility-adjusted log return over {h}: ret_log_{h} / (rvol_w1m + EPS).",
+                depends_on=(f"ret_log_{h}_v1", "rvol_w1m_v1"),
+                horizon=h,
+            )
+        )
     return out
 
 
-def compute(st, values: List[float], valid: List[bool]) -> None:
+def compute(st, values: list[float], valid: list[bool]) -> None:
     """Append the 30 price-family values for the current emission."""
     t = st.t
     ok = st.book_ok

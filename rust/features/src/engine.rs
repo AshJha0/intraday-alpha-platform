@@ -396,10 +396,10 @@ impl FeatureEngine {
 
         if status != ApplyStatus::Applied {
             self.events_dropped += 1;
-            if stale_changed {
-                if Self::refresh_book(st, ev.venue_id, t, just_recovered, false) {
-                    self.oversized_depth_skipped += 1;
-                }
+            if stale_changed
+                && Self::refresh_book(st, ev.venue_id, t, just_recovered, false)
+            {
+                self.oversized_depth_skipped += 1;
             }
             return Ok(self.emit_if_due(ev.instrument_id, t));
         }

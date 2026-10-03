@@ -16,9 +16,9 @@ import json
 import math
 
 import pytest
-
+from conftest import CONFIGS_DIR, GOLDEN_DIR
 from iap.alpha import build
-from iap.backtest import Backtester, BacktestConfig, CostModel
+from iap.backtest import BacktestConfig, Backtester, CostModel
 from iap.contracts.types import ExperimentResult, ExperimentSpec
 from iap.contracts.validate import validate, validate_typed
 from iap.research import LOOKS_PER_EXPERIMENT, verify_experiment_id
@@ -36,8 +36,6 @@ from iap.research.golden import (
 )
 from iap.research.runner import document_drift, load_instrument_meta, restrict_frames
 from iap.validation import validate_alpha
-
-from conftest import CONFIGS_DIR, GOLDEN_DIR
 
 TOL = 1e-9
 GOLDEN = GOLDEN_DIR / "expected_experiment_golden_frame.json"
@@ -117,6 +115,7 @@ def test_golden_document_round_trips(golden, spec, result):
     doc = golden_document(spec, result)
     assert document_drift(golden, doc) == []
     assert set(doc) == set(golden)
+
     # Structure and every non-float leaf are identical text after rendering
     # with floats masked.
     def _mask(node):
@@ -129,6 +128,7 @@ def test_golden_document_round_trips(golden, spec, result):
         if isinstance(node, list):
             return [_mask(v) for v in node]
         return node
+
     assert render_golden(_mask(doc)) == render_golden(_mask(golden))
 
 
@@ -145,10 +145,14 @@ def test_golden_walk_forward_metrics_match_validate_alpha(golden, spec, frames):
     meta = load_instrument_meta(CONFIGS_DIR)
     cfg = spec.configuration
     backtester = Backtester(
-        CostModel.load(CONFIGS_DIR / "execution" / "execution.json"), meta,
-        BacktestConfig(latency_ns=cfg["latency_ns"],
-                       max_decision_age_ns=cfg["max_decision_age_ns"],
-                       flatten_at_session_end=cfg["flatten_at_session_end"]))
+        CostModel.load(CONFIGS_DIR / "execution" / "execution.json"),
+        meta,
+        BacktestConfig(
+            latency_ns=cfg["latency_ns"],
+            max_decision_age_ns=cfg["max_decision_age_ns"],
+            flatten_at_session_end=cfg["flatten_at_session_end"],
+        ),
+    )
     exec_cfg = json.loads((CONFIGS_DIR / "execution" / "execution.json").read_text())
 
     def factory():
@@ -156,11 +160,16 @@ def test_golden_walk_forward_metrics_match_validate_alpha(golden, spec, frames):
         model.horizon = GOLDEN_HORIZON
         return model
 
-    window = restrict_frames(frames, spec.train_period.start_ts,
-                             spec.test_period.start_ts)
-    report = validate_alpha(factory, window, backtester, meta,
-                            float(exec_cfg["defaults"]["max_participation"]),
-                            n_folds=cfg["n_folds"], embargo_ns=cfg["embargo_ns"])
+    window = restrict_frames(frames, spec.train_period.start_ts, spec.test_period.start_ts)
+    report = validate_alpha(
+        factory,
+        window,
+        backtester,
+        meta,
+        float(exec_cfg["defaults"]["max_participation"]),
+        n_folds=cfg["n_folds"],
+        embargo_ns=cfg["embargo_ns"],
+    )
     want = golden["result"]
     _close(report["oos_ic"], want["ic"])
     _close(report["oos_rank_ic"], want["rank_ic"])

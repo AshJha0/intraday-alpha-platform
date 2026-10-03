@@ -1089,3 +1089,308 @@ fn unmarked_held_lot_makes_daily_pnl_undeterminable() {
         "global daily pnl undeterminable: conversion rate missing"
     );
 }
+
+// ------------------------------------------------ fail-closed review fixes
+
+/// FAIL-OPEN regression: a mark stamped AFTER the order had a negative age
+/// and was never stale (and every genuine update behind it is dropped as a
+/// regression). Beyond the stale window ahead of the engine's event clock
+/// it rejects with STALE_PRICE.
+#[test]
+fn future_stamped_market_data_fails_closed() {
+    let mut eng = engine();
+    let t = T0 + 100_000_000;
+    eng.on_market(1, 2450, 2452, T0 + 3600 * NS);
+    let d = eng.check_order(&order(1, 0, 100, 2450));
+    assert_eq!(d.decision, Decision::Reject);
+    assert_eq!(d.rule_id, rules::STALE_PRICE, "{}", d.reason);
+    assert_eq!(
+        d.reason,
+        format!(
+            "reference price timestamp {} is more than 5000000000ns ahead of the latest order event time {t}",
+            T0 + 3600 * NS
+        )
+    );
+    // the genuine update is behind the poisoned state: dropped, still closed
+    eng.on_market(1, 2450, 2452, t);
+    assert_eq!(eng.metrics.counter_value("risk_market_regressions_dropped_total"), 1);
+    assert_eq!(eng.check_order(&order(2, 0, 100, 2450)).rule_id, rules::STALE_PRICE);
+    // boundary: exactly the window ahead is trusted, one ns more is not
+    let mut o = order(3, 0, 100, 3120);
+    o.instrument_id = 2;
+    eng.on_market(2, 3119, 3121, t + 5 * NS);
+    assert!(eng.check_order(&o).allowed());
+    eng.on_market(2, 3119, 3121, t + 5 * NS + 1);
+    o.order_id = 4;
+    assert_eq!(eng.check_order(&o).rule_id, rules::STALE_PRICE);
+    // the engine clock, not the order's own (regressed) timestamp, decides:
+    // an order stamped 10s behind an order already seen is not "future data"
+    let mut eng2 = engine();
+    assert!(eng2.check_order(&order(5, 0, 10, 2450)).allowed());
+    let mut late = order(6, 0, 10, 2450);
+    late.timestamp = t - 10 * NS;
+    assert!(eng2.check_order(&late).allowed());
+}
+
+#[test]
+fn future_stamped_conversion_rate_fails_closed() {
+    let mut eng = fx_engine();
+    let t = T0 + 100_000_000;
+    eng.on_market(108, 85_315, 85_325, t);
+    eng.on_market(102, 127_335, 127_345, t + 3600 * NS);
+    let d = eng.check_order(&typed(1, 108, 0, 100, 0, OrderType::Market, t));
+    assert_eq!(d.rule_id, rules::FX_RATE_MISSING, "{}", d.reason);
+    assert_eq!(
+        d.reason,
+        format!(
+            "conversion rate GBP -> USD timestamp {} is more than 5000000000ns ahead of the latest order event time {t}",
+            t + 3600 * NS
+        )
+    );
+}
+
+/// `x > NaN` is false: a NaN limit used to ALLOW. Every float limit
+/// comparison is `!(x <= limit)`, so NaN rejects.
+#[test]
+fn nan_limit_never_passes_a_check() {
+    type Poison = fn(&mut RiskLimits);
+    let cases: [(Poison, &str); 8] = [
+        (|l| l.max_order_notional = f64::NAN, rules::FAT_FINGER_NOTIONAL),
+        (|l| l.price_band_bps = f64::NAN, rules::PRICE_BAND),
+        (|l| l.max_instrument_notional = f64::NAN, rules::INSTRUMENT_NOTIONAL),
+        (|l| l.max_gross_notional = f64::NAN, rules::GROSS_NOTIONAL),
+        (|l| l.max_net_notional = f64::NAN, rules::NET_NOTIONAL),
+        (|l| l.max_daily_loss = f64::NAN, rules::DAILY_LOSS),
+        (|l| l.strategy_max_daily_loss = f64::NAN, rules::STRATEGY_LOSS),
+        (|l| l.order_rate_burst = f64::NAN, rules::RATE_THROTTLE),
+    ];
+    for (poison, rule) in cases {
+        let mut limits = RiskLimits::from_json(&config()).unwrap();
+        poison(&mut limits);
+        let mut eng = RiskEngine::with_ticks(limits, ticks());
+        eng.on_market(1, 2450, 2452, T0);
+        let d = eng.check_order(&order(1, 0, 100, 2450));
+        assert_eq!(d.decision, Decision::Reject, "{rule}");
+        assert_eq!(d.rule_id, rule, "{}", d.reason);
+    }
+}
+
+/// Reference data is validated like the Java record / Python dataclass:
+/// `try_new` refuses it, and an engine handed an invalid entry anyway
+/// (the fields are public) lands fail-closed instead of computing NaN
+/// notionals that pass every limit.
+#[test]
+fn invalid_reference_data_fails_closed() {
+    for bad in [f64::NAN, f64::INFINITY, 0.0, -1.0] {
+        assert!(InstrumentRef::try_new(bad, 1.0, "USD").is_err(), "tick {bad}");
+        assert!(InstrumentRef::try_new(0.01, bad, "USD").is_err(), "unit {bad}");
+    }
+    assert!(InstrumentRef::try_new(0.01, 1.0, "").is_err());
+    assert_eq!(
+        InstrumentRef::try_new(0.01, 1.0, "USD").unwrap(),
+        InstrumentRef::equity(0.01)
+    );
+    let mut refs = BTreeMap::new();
+    refs.insert(1u32, InstrumentRef::equity(0.01));
+    refs.insert(2u32, InstrumentRef::new(f64::NAN, 1.0, "USD"));
+    let mut eng = RiskEngine::from_config(&config(), refs.clone());
+    eng.on_market(1, 2450, 2452, T0);
+    let d = eng.check_order(&order(1, 0, 100, 2450));
+    assert_eq!(d.rule_id, rules::CONFIG_MISSING);
+    assert_eq!(d.severity, Severity::Breach);
+    assert_eq!(
+        d.reason,
+        "fail-closed: invalid reference data for instrument 2: tick_size and qty_unit must be finite and > 0"
+    );
+    // the direct constructor takes the same landing
+    let mut eng = RiskEngine::new(RiskLimits::from_json(&config()).unwrap(), refs);
+    eng.on_market(1, 2450, 2452, T0);
+    assert_eq!(eng.check_order(&order(2, 0, 100, 2450)).rule_id, rules::CONFIG_MISSING);
+}
+
+#[test]
+fn position_overflow_rejects_orders_and_kills_on_fills() {
+    // check_order: the projection leaves i64 -> MALFORMED_ORDER reject
+    let mut eng = engine();
+    assert!(eng.on_fill(&fill("S1", 1, 0, i64::MAX, 2451)));
+    assert!(!eng.kill_switch_engaged());
+    let d = eng.check_order(&order(1, 0, 100, 2450));
+    assert_eq!(d.decision, Decision::Reject);
+    assert_eq!(d.rule_id, rules::MALFORMED_ORDER, "{}", d.reason);
+    assert_eq!(d.severity, Severity::Warn);
+    assert_eq!(d.reason, "projected position overflows i64 (fail-closed)");
+    // on_fill: nothing applied, GLOBAL kill latched through the kill path
+    let mut before = eng.snapshot();
+    let n = eng.audit().len();
+    let over = Fill {
+        order_id: 7,
+        ..fill("S1", 1, 0, 1, 2451)
+    };
+    assert!(!eng.on_fill(&over));
+    assert!(eng.kill_switch_engaged());
+    assert_eq!(eng.position(1), i64::MAX);
+    assert_eq!(eng.audit().len(), n + 1);
+    let ev = eng.audit().last().unwrap();
+    assert_eq!(ev.rule_id, rules::KILL_SWITCH_ENGAGED);
+    assert_eq!(ev.scope, Scope::Global);
+    assert_eq!(ev.decision, Decision::Kill as u8);
+    assert_eq!(
+        ev.reason,
+        "fill for order 7 overflows i64 position accounting (fail-closed)"
+    );
+    before["kill_global"] = serde_json::json!(true);
+    assert_eq!(eng.snapshot(), before);
+    assert_eq!(eng.check_order(&order(2, 1, 100, 2452)).rule_id, rules::KILL_GLOBAL);
+    // the short side: -i64::MAX is the floor of the symmetric domain
+    let mut eng2 = engine();
+    assert!(eng2.on_fill(&fill("S1", 1, 1, i64::MAX, 2451)));
+    assert_eq!(eng2.check_order(&order(3, 1, 100, 2452)).rule_id, rules::MALFORMED_ORDER);
+    assert!(!eng2.on_fill(&fill("S1", 1, 1, 1, 2451)));
+    assert!(eng2.kill_switch_engaged());
+    assert_eq!(eng2.position(1), -i64::MAX);
+    // another strategy's lot is fine, the AGGREGATE position overflows
+    let mut eng3 = engine();
+    assert!(eng3.on_fill(&fill("S1", 1, 0, i64::MAX, 2451)));
+    assert!(!eng3.on_fill(&fill("S2", 1, 0, 1, 2451)));
+    assert!(eng3.kill_switch_engaged());
+    // a mark whose bid + ask leaves i64 is no mark at all
+    let mut eng4 = engine();
+    eng4.on_market(1, i64::MAX, i64::MAX, T0 + 1);
+    let mut o = order(4, 0, 100, 2450);
+    o.timestamp = T0 + 2;
+    let d = eng4.check_order(&o);
+    assert_eq!(d.rule_id, rules::STALE_PRICE);
+    assert_eq!(d.reason, "no reference price for instrument 1");
+    assert!(eng4.on_fill(&fill("S1", 1, 0, 1, 1)));
+    assert_eq!(eng4.global_daily_pnl(), None);
+}
+
+#[test]
+fn sor_order_rejected_while_any_venue_kill_is_engaged() {
+    let sor = |id: u64| {
+        let mut o = order(id, 0, 100, 2450);
+        o.venue_id = 0;
+        o
+    };
+    let mut eng = engine();
+    eng.engage_kill(Scope::Venue, "7", T0, "halt").expect("kill scope id parses");
+    eng.engage_kill(Scope::Venue, "3", T0, "halt").expect("kill scope id parses");
+    assert!(eng.check_order(&order(1, 0, 100, 2450)).allowed()); // venue 1 untouched
+    eng.on_order_done(1);
+    let d = eng.check_order(&sor(2));
+    assert_eq!(d.rule_id, rules::KILL_VENUE);
+    assert_eq!(d.severity, Severity::Breach);
+    assert_eq!(d.reason, "venue 0 (SOR) order rejected: venue 3 kill switch engaged");
+    let ev = eng.audit().last().unwrap();
+    assert_eq!(ev.scope, Scope::Venue);
+    assert_eq!(ev.scope_id, "0");
+    eng.clear_kill(Scope::Venue, "3", T0, "clear").expect("kill scope id parses");
+    let d = eng.check_order(&sor(3));
+    assert_eq!(d.reason, "venue 0 (SOR) order rejected: venue 7 kill switch engaged");
+    eng.clear_kill(Scope::Venue, "7", T0, "clear").expect("kill scope id parses");
+    assert!(eng.check_order(&sor(4)).allowed());
+    // disconnects: the router stays open while any known venue is up and
+    // closes when EVERY known venue is down
+    eng.on_order_done(4);
+    eng.on_venue_disconnect(3, T0);
+    let d = eng.check_order(&sor(5));
+    assert_eq!(d.rule_id, rules::VENUE_DISCONNECTED);
+    assert_eq!(d.severity, Severity::Warn);
+    assert_eq!(d.reason, "venue 0 (SOR) order rejected: every known venue is disconnected");
+    assert_eq!(eng.audit().last().unwrap().scope_id, "0");
+    eng.on_venue_reconnect(5, T0);
+    assert!(eng.check_order(&sor(6)).allowed());
+    eng.on_order_done(6);
+    eng.on_venue_disconnect(5, T0);
+    assert_eq!(eng.check_order(&sor(7)).rule_id, rules::VENUE_DISCONNECTED);
+    eng.on_venue_reconnect(3, T0);
+    assert!(eng.check_order(&sor(8)).allowed());
+}
+
+/// `u16::from_str`: optional single `+`, ASCII digits only. Pins the
+/// grammar the Java and Python ports reproduce.
+#[test]
+fn kill_scope_id_grammar_is_from_str() {
+    let mut eng = engine();
+    eng.engage_kill(Scope::Venue, "+1", T0, "plus form").expect("+1 parses");
+    assert_eq!(eng.check_order(&order(1, 0, 100, 2450)).rule_id, rules::KILL_VENUE);
+    eng.clear_kill(Scope::Venue, "01", T0, "leading zero").expect("01 parses");
+    assert!(eng.check_order(&order(2, 0, 100, 2450)).allowed());
+    for bad in ["-0", "+", "", "++1", " 1", "\u{661}", "\u{ff11}", "65536"] {
+        let err = eng
+            .engage_kill(Scope::Venue, bad, T0, "ops")
+            .expect_err("must not parse");
+        assert!(err.to_string().contains("escalated to GLOBAL"), "{bad:?}: {err}");
+        eng.clear_kill(Scope::Global, "", T0, "escalation reviewed").expect("global clears");
+    }
+    let mut o = order(3, 0, 100, 2450);
+    o.urgency = 2.0;
+    assert_eq!(
+        venue::order_validation_error(&o).as_deref(),
+        Some("urgency must be in [0, 1]: 2")
+    );
+    o.urgency = f64::INFINITY;
+    assert_eq!(
+        venue::order_validation_error(&o).as_deref(),
+        Some("urgency must be in [0, 1]: inf")
+    );
+}
+
+/// i64::MIN / i64::MAX timestamps on orders, market updates and fills: every
+/// timestamp difference is checked, an overflow is a MALFORMED_ORDER reject
+/// (never a wrap, never a panic) and state-in paths apply cleanly.
+#[test]
+fn extreme_timestamps_fail_closed_without_overflow() {
+    const WHY: &str = "timestamp arithmetic overflows i64 (fail-closed)";
+    let at = |id: u64, iid: u32, ts: i64| {
+        let mut o = order(id, 0, 100, if iid == 1 { 2450 } else { 3120 });
+        o.instrument_id = iid;
+        o.timestamp = ts;
+        o
+    };
+    // orders: age vs a mark at T0
+    let mut eng = engine();
+    let d = eng.check_order(&at(1, 1, i64::MIN));
+    assert_eq!(d.decision, Decision::Reject);
+    assert_eq!(d.rule_id, rules::MALFORMED_ORDER, "{}", d.reason);
+    assert_eq!(d.severity, Severity::Warn);
+    assert_eq!(d.reason, WHY);
+    assert_eq!(eng.check_order(&at(2, 1, i64::MAX)).rule_id, rules::STALE_PRICE);
+    // market updates: stored as given, the checks reject
+    let mut eng = RiskEngine::from_config_ticks(&config(), ticks());
+    eng.on_market(1, 2450, 2452, i64::MIN);
+    let d = eng.check_order(&at(3, 1, T0));
+    assert_eq!(d.rule_id, rules::MALFORMED_ORDER);
+    assert_eq!(d.reason, WHY);
+    assert!(eng.check_order(&at(4, 1, i64::MIN)).allowed()); // age 0
+    eng.on_market(2, 3119, 3121, i64::MAX);
+    assert_eq!(eng.check_order(&at(5, 2, T0)).rule_id, rules::STALE_PRICE);
+    // fills: the timestamp only stamps the audit
+    for ts in [i64::MIN, i64::MAX] {
+        let f = Fill {
+            ts,
+            ..fill("S1", 1, 0, 1, 2451)
+        };
+        assert!(eng.on_fill(&f));
+    }
+    assert_eq!(eng.position(1), 2);
+    assert!(!eng.kill_switch_engaged());
+    // throttle elapsed: the bucket clock is at T0, the order at i64::MIN + 10
+    let mut eng = RiskEngine::from_config_ticks(&config(), ticks());
+    eng.on_market(1, 2450, 2452, T0);
+    assert!(eng.check_order(&at(6, 1, T0)).allowed());
+    eng.on_market(2, 3119, 3121, i64::MIN + 10);
+    let before = eng.snapshot()["buckets"].clone();
+    let d = eng.check_order(&at(7, 2, i64::MIN + 10));
+    assert_eq!(d.rule_id, rules::MALFORMED_ORDER, "{}", d.reason);
+    assert_eq!(d.reason, WHY);
+    assert_eq!(eng.snapshot()["buckets"], before);
+    // duplicate window: the id's age and the prune cutoff
+    let mut doc = config();
+    doc["per_order"]["duplicate_order_window_ns"] = serde_json::json!(10);
+    let mut eng = RiskEngine::from_config_ticks(&doc, ticks());
+    eng.on_market(1, 2450, 2452, T0);
+    assert!(eng.check_order(&at(8, 1, T0)).allowed());
+    assert_eq!(eng.check_order(&at(8, 1, i64::MIN)).reason, WHY);
+    assert_eq!(eng.check_order(&at(9, 1, i64::MIN)).reason, WHY);
+}

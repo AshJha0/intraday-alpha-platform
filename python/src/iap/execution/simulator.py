@@ -20,10 +20,11 @@ this module is self-contained:
    remainders are cancelled (``UNFILLED_REMAINDER``); FOK fills fully or
    not at all (checked against displayed depth within the limit first).
 3b. **Displayed-liquidity consumption.** A per-(instrument, venue, side,
-   price) overlay records the displayed size our aggressive fills already
-   consumed; walks see ``displayed - consumed`` and debit it. When an
-   applied event changes a level's displayed size, its overlay entry
-   becomes ``min(consumed, new displayed)`` (0 removes it).
+   price) overlay records the displayed size our aggressive fills AND the
+   rule-4 / rule-8 crossing check already consumed; walks and crossing
+   pools see ``displayed - consumed`` and debit it. When an applied event
+   changes a level's displayed size, its overlay entry becomes
+   ``min(consumed, new displayed)`` (0 removes it).
 4. **Passive queue position.** Governing principle: the simulator never
    fills more than the market actually traded, and our own resting orders
    queue behind each other. A resting LIMIT remainder at ``P`` starts with
@@ -39,13 +40,23 @@ this module is self-contained:
    order when it prints AT its limit or STRICTLY WORSE (below our bid /
    above our ask — the market traded THROUGH us); a trade-through fills at
    OUR limit but is bounded by the observed volume, not a free fill of the
-   whole residual. A CANCEL at ``(side, P)`` depletes ``ahead_qty`` by its
-   full qty (floored at 0) and never fills us; a marketable ADD is
+   whole residual. Only events the book reports APPLIED are tracked (a
+   retransmitted duplicate the book drops trades nothing), and an applied EXECUTE
+   trades ``min(event qty, the book order's remaining)`` at the BOOK
+   order's side and price, whatever the event quotes. An applied
+   CANCEL depletes ``ahead_qty`` by the displayed size it removed from
+   our level (floored at 0) only when the cancelled order is KNOWN to be
+   ahead of us: a real (non-synthetic) order id that did not join the
+   level after we did (an ADD at our level, or a MODIFY that grew it and
+   so moved to the tail, after our rest is behind us); synthetic
+   QUOTE/SNAPSHOT ids never deplete it. A CANCEL never fills us; a
+   marketable ADD is
    expanded into the per-level volumes it consumes over the pre-event
    displayed depth, each level's volume being its own pool; after the
    event is applied, an opposite best crossing ``P`` fills us at ``P``,
-   bounded by the DISPLAYED size of that crossing level (one pool per
-   side, ``ahead_qty`` consumed first) — EXEMPT while the display still
+   bounded by the DISPLAYED size of that crossing level net of the rule-3b
+   overlay, which the check debits (one pool per side, ``ahead_qty``
+   consumed first; an unchanged display is never consumed twice) — EXEMPT while the display still
    shows the liquidity our own aggressive leg consumed, until the display
    first shows an uncrossed opposite best; MODIFY never changes
    ``ahead_qty``. Passive fills are stamped with the triggering event's
@@ -72,8 +83,9 @@ this module is self-contained:
    fills at the TOUCH price — bounded by the same displayed-size pool and
    ``ahead_qty`` consumption as the rule-4 crossing check.
 9. **Processing order.** Expiries, then activations and cancel arrivals
-   merged by time, then passive queue tracking on the raw event, then the
-   book update, then the overlay reset, then the post-apply crossing check.
+   merged by time, then the book update, then passive queue tracking of
+   the event if the book APPLIED it (against the pre-event depth), then
+   the overlay reset, then the post-apply crossing check.
 
 Deterministic: same config + seed => identical fills, bit for bit
 (SplitMix64 only, no wall clock, no unordered iteration).
@@ -83,7 +95,6 @@ from __future__ import annotations
 
 import bisect
 from dataclasses import replace
-from typing import Dict, List, Optional, Tuple
 
 from iap.core.events import EventType, MarketEvent, SessionStatus
 from iap.core.rng import SplitMix64
@@ -99,10 +110,16 @@ from iap.execution.types import (
     OrderType,
     VenueSpec,
 )
-from iap.orderbook.book import DEPTH_LEVELS, ConsolidatedBook, OrderBook
+from iap.orderbook.book import (
+    DEPTH_LEVELS,
+    SYNTHETIC_ID_BASE,
+    ApplyStatus,
+    ConsolidatedBook,
+    OrderBook,
+)
 
 #: Overlay key: (instrument_id, venue_id, side, price_ticks).
-OverlayKey = Tuple[int, int, int, int]
+OverlayKey = tuple[int, int, int, int]
 
 
 class ExecutionSimulator:
@@ -111,18 +128,21 @@ class ExecutionSimulator:
     def __init__(self, config: ExecConfig) -> None:
         self._config = config
         self._rng = SplitMix64(config.seed)
-        self._books: Dict[int, ConsolidatedBook] = {}
-        self._orders: Dict[int, ChildOrder] = {}
+        self._books: dict[int, ConsolidatedBook] = {}
+        self._orders: dict[int, ChildOrder] = {}
         # (arrival_ts, order_id), sorted — the activation queue (rule 2).
-        self._pending: List[Tuple[int, int]] = []
+        self._pending: list[tuple[int, int]] = []
         # ACTIVE order ids in activation order (rule 4 tracking order).
-        self._resting: List[int] = []
+        self._resting: list[int] = []
         # (cancel effective ts, order_id), sorted (rule 7).
-        self._cancels: List[Tuple[int, int]] = []
+        self._cancels: list[tuple[int, int]] = []
         # Rule 3b overlay: consumed displayed size per level.
-        self._consumed: Dict[OverlayKey, int] = {}
+        self._consumed: dict[OverlayKey, int] = {}
+        # Rule 4: per resting order, the market order ids that joined its
+        # level after it did (membership only, never iterated).
+        self._behind: dict[int, set[int]] = {}
         self._counters = ExecCounters()
-        self._fills: List[Fill] = []
+        self._fills: list[Fill] = []
         self._next_order_id = 1
         self._next_fill_id = 1
 
@@ -137,16 +157,16 @@ class ExecutionSimulator:
         return self._counters
 
     @property
-    def fills(self) -> List[Fill]:
+    def fills(self) -> list[Fill]:
         """Every fill emitted so far, in emission (fill_id) order."""
         return self._fills
 
     @property
-    def orders(self) -> Dict[int, ChildOrder]:
+    def orders(self) -> dict[int, ChildOrder]:
         """All submitted orders keyed by order_id (ascending insertion order)."""
         return self._orders
 
-    def venue_book(self, instrument_id: int, venue_id: int) -> Optional[OrderBook]:
+    def venue_book(self, instrument_id: int, venue_id: int) -> OrderBook | None:
         """Venue book for (instrument, venue); None before any event touched it."""
         cons = self._books.get(instrument_id)
         return None if cons is None else cons.books.get(venue_id)
@@ -160,13 +180,9 @@ class ExecutionSimulator:
         return cons
 
     @staticmethod
-    def venue_open(book: Optional[OrderBook]) -> bool:
+    def venue_open(book: OrderBook | None) -> bool:
         """True when the venue book exists, is not stale and is TRADING (rule 8)."""
-        return (
-            book is not None
-            and not book.stale
-            and book.status == int(SessionStatus.TRADING)
-        )
+        return book is not None and not book.stale and book.status == int(SessionStatus.TRADING)
 
     def _venue(self, venue_id: int) -> VenueSpec:
         return self._config.venue(venue_id)
@@ -178,16 +194,8 @@ class ExecutionSimulator:
 
     def _latency_to(self, venue: VenueSpec, decision_ts: int) -> int:
         """Rule 1 / rule 7 arrival time: one jitter draw per call."""
-        jitter = (
-            self._rng.below(venue.latency_jitter_ns + 1)
-            if venue.latency_jitter_ns > 0 else 0
-        )
-        return (
-            decision_ts
-            + self._config.latency.internal_ns
-            + venue.latency_mean_ns
-            + jitter
-        )
+        jitter = self._rng.below(venue.latency_jitter_ns + 1) if venue.latency_jitter_ns > 0 else 0
+        return decision_ts + self._config.latency.internal_ns + venue.latency_mean_ns + jitter
 
     def submit(self, child: ChildOrder) -> int:
         """Submit a child order (decision-time semantics, rule 1); returns its order_id.
@@ -253,13 +261,12 @@ class ExecutionSimulator:
         o.state = OrderState.CANCELLED
         o.cancel_reason = reason
         o.resting = False
+        self._behind.pop(o.order_id, None)
         self._pending = [e for e in self._pending if e[1] != o.order_id]
         self._resting = [i for i in self._resting if i != o.order_id]
         self._cancels = [e for e in self._cancels if e[1] != o.order_id]
 
-    def _fill_fee(
-        self, o: ChildOrder, price_ticks: int, qty: int, liq: Liquidity
-    ) -> float:
+    def _fill_fee(self, o: ChildOrder, price_ticks: int, qty: int, liq: Liquidity) -> float:
         """Rule 5."""
         v = self._venue(o.venue_id)
         if v.is_fx:
@@ -303,11 +310,10 @@ class ExecutionSimulator:
         if o.remaining == 0:
             o.state = OrderState.FILLED
             o.resting = False
+            self._behind.pop(o.order_id, None)
             self._cancels = [e for e in self._cancels if e[1] != o.order_id]
 
-    def _consumed_at(
-        self, instrument_id: int, venue_id: int, side: int, price_ticks: int
-    ) -> int:
+    def _consumed_at(self, instrument_id: int, venue_id: int, side: int, price_ticks: int) -> int:
         return self._consumed.get((instrument_id, venue_id, side, price_ticks), 0)
 
     def _aggressive_fill(self, o: ChildOrder, book: OrderBook) -> None:
@@ -399,7 +405,7 @@ class ExecutionSimulator:
 
     def _expire_due(self, t: int) -> None:
         """Rule 7: time-in-force, pending or resting, before any activation."""
-        due: List[int] = []
+        due: list[int] = []
         for _, oid in self._pending:
             o = self._orders[oid]
             if o.expire_ts != 0 and o.expire_ts <= t:
@@ -464,8 +470,7 @@ class ExecutionSimulator:
                 # Both fill at OUR limit (we never get price improvement) and
                 # both are capped by the observed volume.
                 through = (
-                    price_ticks < o.limit_ticks if o.side == 0
-                    else price_ticks > o.limit_ticks
+                    price_ticks < o.limit_ticks if o.side == 0 else price_ticks > o.limit_ticks
                 )
                 if price_ticks == o.limit_ticks or through:
                     dec = min(o.ahead_qty, budget)
@@ -493,10 +498,23 @@ class ExecutionSimulator:
         best_ask = book.best_ask()
         best_bid = book.best_bid()
         # Indexed by OUR side: a buy crosses against the ask, a sell the bid.
-        budget = [
-            0 if best_ask is None else best_ask[1],
-            0 if best_bid is None else best_bid[1],
+        # Rule 3b: the pool is the displayed size net of what was already
+        # consumed since the level's display last changed.
+        pool_start = [
+            0
+            if best_ask is None
+            else max(
+                best_ask[1] - self._consumed_at(ev.instrument_id, ev.venue_id, 1, best_ask[0]),
+                0,
+            ),
+            0
+            if best_bid is None
+            else max(
+                best_bid[1] - self._consumed_at(ev.instrument_id, ev.venue_id, 0, best_bid[0]),
+                0,
+            ),
         ]
+        budget = list(pool_start)
         i = 0
         while i < len(self._resting):
             o = self._orders[self._resting[i]]
@@ -522,7 +540,10 @@ class ExecutionSimulator:
                         # Rule 8 uncrosses AT THE TOUCH; the rule-4 crossing
                         # fills at our own limit (no price improvement).
                         self._emit_fill(
-                            o, opp[0] if reopened else o.limit_ticks, fill, t,
+                            o,
+                            opp[0] if reopened else o.limit_ticks,
+                            fill,
+                            t,
                             Liquidity.MAKER,
                         )
                         budget[o.side] -= fill
@@ -532,6 +553,25 @@ class ExecutionSimulator:
                 del self._resting[i]
             else:
                 i += 1
+        # Debit the overlay so the same display is not consumed again.
+        for our_side, opp in ((0, best_ask), (1, best_bid)):
+            used = pool_start[our_side] - budget[our_side]
+            if used > 0:
+                key = (ev.instrument_id, ev.venue_id, 1 - our_side, opp[0])
+                self._consumed[key] = self._consumed.get(key, 0) + used
+
+    def _level_before(self, ev: MarketEvent, pre: OrderBook | None) -> list[tuple[int, int]]:
+        """(order_id, displayed qty at its level) for our orders on ev's book."""
+        out: list[tuple[int, int]] = []
+        for oid in self._resting:
+            o = self._orders[oid]
+            if (
+                o.instrument_id == ev.instrument_id
+                and o.venue_id == ev.venue_id
+                and o.state == OrderState.ACTIVE
+            ):
+                out.append((oid, 0 if pre is None else pre.level_qty(o.side, o.limit_ticks)))
+        return out
 
     # -------------------------------------------------------------- events
 
@@ -544,34 +584,81 @@ class ExecutionSimulator:
         self._expire_due(t)
         self._activate_and_cancel_due(t)
 
-        # 2. Passive queue tracking on the raw event (rule 4), before the
-        #    book is mutated — only while the venue is open (rule 8).
+        # 2. Capture the pre-event state queue tracking needs, snapshot the
+        #    displayed sizes behind this venue's overlay entries, then apply
+        #    the event.
         et = ev.event_type
         pre = self.venue_book(ev.instrument_id, ev.venue_id)
         pre_open = self.venue_open(pre)
-        if self._resting and pre_open:
+        add_depth: list[tuple[int, int]] = []
+        if self._resting and pre_open and et == EventType.ADD:
+            add_depth = pre.depth(1 if ev.side == 0 else 0, DEPTH_LEVELS)
+        # The book's own record of the order an EXECUTE names (side, price, qty).
+        exec_order: tuple[int, int, int] | None = None
+        if self._resting and pre_open and et == EventType.EXECUTE:
+            for boid, bside, bprice, bqty in pre.resting_orders():
+                if boid == ev.order_id:
+                    exec_order = (bside, bprice, bqty)
+                    break
+        level_before: list[tuple[int, int]] = []
+        if self._resting and et in (EventType.CANCEL, EventType.MODIFY):
+            level_before = self._level_before(ev, pre)
+        watched: list[tuple[OverlayKey, int]] = []
+        for key in self._consumed:
+            if key[0] == ev.instrument_id and key[1] == ev.venue_id:
+                before = 0 if pre is None else pre.level_qty(key[2], key[3])
+                watched.append((key, before))
+        applied = self.instrument_book(ev.instrument_id).apply(ev) == ApplyStatus.APPLIED
+        book = self.venue_book(ev.instrument_id, ev.venue_id)
+
+        # 3. Passive queue tracking (rule 4) — only for an event the book
+        #    APPLIED; fills only while the venue was open (rule 8).
+        if applied and self._resting:
+            real_id = ev.order_id < SYNTHETIC_ID_BASE
             if et == EventType.EXECUTE:
-                self._track_consumption(
-                    ev.instrument_id, ev.venue_id, ev.side, ev.price_ticks, ev.qty, t
-                )
+                if exec_order is not None:
+                    self._track_consumption(
+                        ev.instrument_id,
+                        ev.venue_id,
+                        exec_order[0],
+                        exec_order[1],
+                        min(ev.qty, exec_order[2]),
+                        t,
+                    )
             elif et == EventType.CANCEL:
-                for oid in self._resting:
+                for oid, before in level_before:
                     o = self._orders[oid]
-                    if (
-                        o.instrument_id == ev.instrument_id
-                        and o.venue_id == ev.venue_id
-                        and o.side == ev.side
-                        and ev.price_ticks == o.limit_ticks
-                        and o.state == OrderState.ACTIVE
-                    ):
-                        o.ahead_qty -= min(o.ahead_qty, ev.qty)
+                    removed = before - book.level_qty(o.side, o.limit_ticks)
+                    behind = self._behind.get(oid)
+                    if behind is not None and ev.order_id in behind:
+                        behind.discard(ev.order_id)
+                    elif removed > 0 and real_id and pre_open:
+                        # Synthetic (non-MBO) ids are assumed behind us.
+                        o.ahead_qty -= min(o.ahead_qty, removed)
+            elif et == EventType.MODIFY:
+                for oid, before in level_before:
+                    o = self._orders[oid]
+                    if real_id and book.level_qty(o.side, o.limit_ticks) > before:
+                        # A size increase moves the order to the level's tail.
+                        self._behind.setdefault(oid, set()).add(ev.order_id)
             elif et == EventType.ADD:
+                if real_id:
+                    for oid in self._resting:
+                        o = self._orders[oid]
+                        if (
+                            o.instrument_id == ev.instrument_id
+                            and o.venue_id == ev.venue_id
+                            and o.side == ev.side
+                            and o.limit_ticks == ev.price_ticks
+                            and o.state == OrderState.ACTIVE
+                        ):
+                            self._behind.setdefault(oid, set()).add(ev.order_id)
                 # Marketable-ADD expansion (rule 4): the replayed book matches
                 # a crossing ADD internally without EXECUTE events; walk the
                 # pre-event displayed opposite depth and track the consumption.
                 consumed_side = 1 if ev.side == 0 else 0
                 incoming = ev.qty
-                for p, q in pre.depth(consumed_side, DEPTH_LEVELS):
+                for p, q in add_depth:
                     if incoming <= 0:
                         break
                     crosses = p <= ev.price_ticks if ev.side == 0 else p >= ev.price_ticks
@@ -583,16 +670,8 @@ class ExecutionSimulator:
                     )
                     incoming -= consumed
 
-        # 3. Snapshot the displayed sizes behind this venue's overlay entries,
-        #    apply the event, then cap the entries whose display changed at
-        #    the new displayed size (rule 3b).
-        watched: List[Tuple[OverlayKey, int]] = []
-        for key in self._consumed:
-            if key[0] == ev.instrument_id and key[1] == ev.venue_id:
-                before = 0 if pre is None else pre.level_qty(key[2], key[3])
-                watched.append((key, before))
-        self.instrument_book(ev.instrument_id).apply(ev)
-        book = self.venue_book(ev.instrument_id, ev.venue_id)
+        #    Cap the overlay entries whose display changed at the new
+        #    displayed size (rule 3b).
         for key, before in watched:
             after = 0 if book is None else book.level_qty(key[2], key[3])
             if after != before:

@@ -24,8 +24,8 @@ end to end while every rule stays where it is pinned:
 from __future__ import annotations
 
 import math
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Mapping, Sequence, Tuple
 
 from iap.contracts.ids import NO_ROUTE
 from iap.contracts.types import (
@@ -47,9 +47,8 @@ from iap.execution.simulator import ExecutionSimulator
 from iap.execution.sor import SmartOrderRouter
 from iap.execution.types import ChildOrder as SimChild
 from iap.execution.types import Fill as SimFill
-from iap.execution.types import Liquidity, OrderState
+from iap.execution.types import Liquidity, OrderState, VenueSpec
 from iap.execution.types import OrderType as SimOrderType
-from iap.execution.types import VenueSpec
 from iap.orderbook.book import ConsolidatedBook
 from iap.risk.engine import RiskEngine
 from iap.risk.events import Rules
@@ -71,11 +70,15 @@ __all__ = [
 ]
 
 #: Pinned check index of every rule id (``NOT_BOOTSTRAPPED`` shares check 0).
-_RULE_INDEX: Dict[str, int] = {rid: i for i, rid in enumerate(Rules.CHECK_ORDER)}
+_RULE_INDEX: dict[str, int] = {rid: i for i, rid in enumerate(Rules.CHECK_ORDER)}
 _RULE_INDEX[Rules.NOT_BOOTSTRAPPED] = 0
 
-_SIM_ORDER_TYPE = {OrderType.MARKET: SimOrderType.MARKET, OrderType.LIMIT: SimOrderType.LIMIT,
-                   OrderType.IOC: SimOrderType.IOC, OrderType.FOK: SimOrderType.FOK}
+_SIM_ORDER_TYPE = {
+    OrderType.MARKET: SimOrderType.MARKET,
+    OrderType.LIMIT: SimOrderType.LIMIT,
+    OrderType.IOC: SimOrderType.IOC,
+    OrderType.FOK: SimOrderType.FOK,
+}
 
 
 def rule_index_of(rule_id: str) -> int:
@@ -107,21 +110,33 @@ class RiskEngineAdapter:
 
     def evaluate(self, order: ChildOrder, state: RiskContext) -> RiskDecision:
         request = OrderRequest(
-            order_id=order.child_order_id, instrument_id=order.instrument_id,
-            side=int(order.side), qty=order.qty, price_ticks=order.price_ticks,
-            order_type=int(order.order_type), venue_id=order.venue_id,
-            strategy_id=state.strategy_id, urgency=state.urgency,
+            order_id=order.child_order_id,
+            instrument_id=order.instrument_id,
+            side=int(order.side),
+            qty=order.qty,
+            price_ticks=order.price_ticks,
+            order_type=int(order.order_type),
+            venue_id=order.venue_id,
+            strategy_id=state.strategy_id,
+            urgency=state.urgency,
             timestamp=state.timestamp_ns,
         )
         outcome = self.engine.check_order(request)
         # ``check_order`` appended exactly one RiskEvent carrying these four
         # fields at the order's timestamp; rebuilding the record from the
         # returned decision avoids copying the whole audit log per child.
-        event = {"timestamp": request.timestamp, "decision": int(outcome.decision),
-                 "rule_id": outcome.rule_id, "reason": outcome.reason}
+        event = {
+            "timestamp": request.timestamp,
+            "decision": int(outcome.decision),
+            "rule_id": outcome.rule_id,
+            "reason": outcome.reason,
+        }
         return RiskDecision.from_risk_event(
-            event, order_id=order.child_order_id, strategy_id=state.strategy_id,
-            instrument_id=order.instrument_id, rule_index=rule_index_of(outcome.rule_id),
+            event,
+            order_id=order.child_order_id,
+            strategy_id=state.strategy_id,
+            instrument_id=order.instrument_id,
+            rule_index=rule_index_of(outcome.rule_id),
         )
 
 
@@ -139,8 +154,8 @@ class MarketView:
 @dataclass
 class _ParentSchedule:
     parent: ParentOrder
-    slice_qty: List[int] = field(default_factory=list)
-    slice_due: List[int] = field(default_factory=list)
+    slice_qty: list[int] = field(default_factory=list)
+    slice_due: list[int] = field(default_factory=list)
     next_slice: int = 0
     next_child: int = 0
     pov_volume: int = 0
@@ -157,9 +172,16 @@ class AlgoScheduler:
     Child ids are drawn from the engine's order-id sequence (``next_id``).
     """
 
-    def __init__(self, max_child_qty: int, twap_slices: int, is_slices: int,
-                 is_risk_aversion: float, pov_participation: float,
-                 next_id: Callable[[], int], committed: Callable[[int], int]) -> None:
+    def __init__(
+        self,
+        max_child_qty: int,
+        twap_slices: int,
+        is_slices: int,
+        is_risk_aversion: float,
+        pov_participation: float,
+        next_id: Callable[[], int],
+        committed: Callable[[int], int],
+    ) -> None:
         if max_child_qty <= 0:
             raise ValueError("max_child_qty must be > 0")
         self._max_child_qty = max_child_qty
@@ -169,7 +191,7 @@ class AlgoScheduler:
         self._pov_participation = pov_participation
         self._next_id = next_id
         self._committed = committed
-        self._schedules: Dict[int, _ParentSchedule] = {}
+        self._schedules: dict[int, _ParentSchedule] = {}
 
     def open(self, parent: ParentOrder) -> None:
         """Register a parent (computes its slice schedule)."""
@@ -179,11 +201,16 @@ class AlgoScheduler:
         if parent.algo is not Algo.POV:
             slices = self._twap_slices if parent.algo is Algo.TWAP else self._is_slices
             po = _algos.ParentOrder(
-                parent_id=parent.parent_order_id, instrument_id=parent.instrument_id,
-                side=int(parent.side), qty=parent.qty,
+                parent_id=parent.parent_order_id,
+                instrument_id=parent.instrument_id,
+                side=int(parent.side),
+                qty=parent.qty,
                 algo=_algos.AlgoType.TWAP if parent.algo is Algo.TWAP else _algos.AlgoType.IS,
-                start_ts=parent.decision_ts, end_ts=parent.end_ts, slices=slices,
-                risk_aversion=self._is_risk_aversion, max_child_qty=self._max_child_qty,
+                start_ts=parent.decision_ts,
+                end_ts=parent.end_ts,
+                slices=slices,
+                risk_aversion=self._is_risk_aversion,
+                max_child_qty=self._max_child_qty,
             )
             ps.slice_qty = _algos.slice_quantities(po)
             ps.slice_due = _algos.slice_times(po)
@@ -192,7 +219,7 @@ class AlgoScheduler:
     def close(self, parent_order_id: int) -> None:
         del self._schedules[parent_order_id]
 
-    def params_for(self, algo: Algo) -> Dict[str, float]:
+    def params_for(self, algo: Algo) -> dict[str, float]:
         """The ``ParentOrder.params`` block of an algo."""
         if algo is Algo.TWAP:
             return {"slices": float(self._twap_slices)}
@@ -200,21 +227,30 @@ class AlgoScheduler:
             return {"slices": float(self._is_slices), "risk_aversion": self._is_risk_aversion}
         return {"participation": self._pov_participation}
 
-    def _child(self, ps: _ParentSchedule, qty: int, decision_ts: int,
-               order_type: OrderType) -> ChildOrder:
+    def _child(
+        self, ps: _ParentSchedule, qty: int, decision_ts: int, order_type: OrderType
+    ) -> ChildOrder:
         p = ps.parent
         child = ChildOrder(
-            child_order_id=self._next_id(), parent_order_id=p.parent_order_id,
-            instrument_id=p.instrument_id, venue_id=0, side=p.side, qty=qty, price_ticks=0,
-            order_type=order_type, submit_ts=decision_ts, expire_ts=p.end_ts,
+            child_order_id=self._next_id(),
+            parent_order_id=p.parent_order_id,
+            instrument_id=p.instrument_id,
+            venue_id=0,
+            side=p.side,
+            qty=qty,
+            price_ticks=0,
+            order_type=order_type,
+            submit_ts=decision_ts,
+            expire_ts=p.end_ts,
             slice_index=ps.next_child,
         )
         ps.next_child += 1
         return child
 
-    def _split(self, ps: _ParentSchedule, slice_qty: int, decision_ts: int,
-               order_type: OrderType) -> List[ChildOrder]:
-        out: List[ChildOrder] = []
+    def _split(
+        self, ps: _ParentSchedule, slice_qty: int, decision_ts: int, order_type: OrderType
+    ) -> list[ChildOrder]:
+        out: list[ChildOrder] = []
         left = slice_qty
         while left > 0:
             q = min(left, self._max_child_qty)
@@ -222,15 +258,20 @@ class AlgoScheduler:
             left -= q
         return out
 
-    def generate_child_orders(self, parent: ParentOrder,
-                              market: MarketView) -> Sequence[ChildOrder]:
+    def generate_child_orders(
+        self, parent: ParentOrder, market: MarketView
+    ) -> Sequence[ChildOrder]:
         """Children due at ``market.event`` for ``parent`` (possibly none)."""
         ps = self._schedules[parent.parent_order_id]
         ev = market.event
         t = ev.exchange_ts
         if parent.algo is Algo.POV:
-            if (ev.instrument_id != parent.instrument_id or ev.event_type != EventType.TRADE
-                    or t < parent.decision_ts or t >= parent.end_ts):
+            if (
+                ev.instrument_id != parent.instrument_id
+                or ev.event_type != EventType.TRADE
+                or t < parent.decision_ts
+                or t >= parent.end_ts
+            ):
                 return ()
             ps.pov_volume += ev.qty
             target = int(math.floor(self._pov_participation * float(ps.pov_volume)))
@@ -238,7 +279,7 @@ class AlgoScheduler:
             if deficit <= 0:
                 return ()
             return (self._child(ps, min(deficit, self._max_child_qty), t, OrderType.MARKET),)
-        out: List[ChildOrder] = []
+        out: list[ChildOrder] = []
         passive = parent.algo is Algo.TWAP
         while ps.next_slice < len(ps.slice_due) and t >= ps.slice_due[ps.next_slice]:
             q = ps.slice_qty[ps.next_slice]
@@ -263,8 +304,9 @@ class SorMarket:
 class SorAdapter:
     """``route(child, market)`` -> :class:`VenueDecision` over the pinned router."""
 
-    def __init__(self, router: SmartOrderRouter, venues: Mapping[int, VenueSpec],
-                 candidates: Sequence[int]) -> None:
+    def __init__(
+        self, router: SmartOrderRouter, venues: Mapping[int, VenueSpec], candidates: Sequence[int]
+    ) -> None:
         self._router = router
         self._venues = dict(sorted(venues.items()))
         self._candidates = sorted(candidates)
@@ -280,7 +322,7 @@ class SorAdapter:
         side = int(order.side)
         # Ranking by repeated routing over the remaining candidates reuses the
         # router's own tie-break ladder for every rank, not just the winner.
-        ranks: Dict[int, int] = {}
+        ranks: dict[int, int] = {}
         remaining = list(self._candidates)
         rank = 1
         while remaining:
@@ -300,23 +342,34 @@ class SorAdapter:
                     quote = vb.best_bid() if side == 0 else vb.best_ask()
                 else:
                     quote = vb.best_ask() if side == 0 else vb.best_bid()
-            scores.append(VenueScore(
-                venue_id=vid, eligible=vid in ranks,
-                displayed_price_ticks=quote[0] if quote else 0,
-                displayed_qty=quote[1] if quote else 0,
-                taker_fee=spec.taker_fee_per_share, maker_rebate=spec.maker_rebate_per_share,
-                commission_per_million=spec.commission_per_million,
-                latency_mean_ns=spec.latency_mean_ns, rank=ranks.get(vid, 0),
-            ))
+            scores.append(
+                VenueScore(
+                    venue_id=vid,
+                    eligible=vid in ranks,
+                    displayed_price_ticks=quote[0] if quote else 0,
+                    displayed_qty=quote[1] if quote else 0,
+                    taker_fee=spec.taker_fee_per_share,
+                    maker_rebate=spec.maker_rebate_per_share,
+                    commission_per_million=spec.commission_per_million,
+                    latency_mean_ns=spec.latency_mean_ns,
+                    rank=ranks.get(vid, 0),
+                )
+            )
         winner = next((v for v, r in ranks.items() if r == 1), NO_ROUTE)
         intent = "passive" if venues.passive else "aggressive"
         if winner == NO_ROUTE:
             reason = f"NO_ROUTE: no eligible venue quotes the {intent} side"
         else:
-            reason = f"{intent}: best {'rebate' if venues.passive else 'displayed price'} " \
-                     f"among eligible venues (ties: fee, commission, venue id)"
-        return VenueDecision(child_order_id=order.child_order_id, venue_id=winner,
-                             reason=reason, candidates=tuple(scores))
+            reason = (
+                f"{intent}: best {'rebate' if venues.passive else 'displayed price'} "
+                f"among eligible venues (ties: fee, commission, venue id)"
+            )
+        return VenueDecision(
+            child_order_id=order.child_order_id,
+            venue_id=winner,
+            reason=reason,
+            candidates=tuple(scores),
+        )
 
 
 # ---------------------------------------------------------------- simulator
@@ -335,23 +388,37 @@ class SimulatorAdapter:
 
     def __init__(self, simulator: ExecutionSimulator) -> None:
         self.simulator = simulator
-        self._sim_id_of: Dict[int, int] = {}      #: child_order_id -> sim order id
-        self._child_id_of: Dict[int, int] = {}    #: sim order id -> child_order_id
-        self._live: List[int] = []                #: sim ids not yet reported terminal
-        self._filled_qty: Dict[int, int] = {}     #: sim order id -> cumulative fill qty
+        self._sim_id_of: dict[int, int] = {}  #: child_order_id -> sim order id
+        self._child_id_of: dict[int, int] = {}  #: sim order id -> child_order_id
+        self._live: list[int] = []  #: sim ids not yet reported terminal
+        self._filled_qty: dict[int, int] = {}  #: sim order id -> cumulative fill qty
         self._fills_reported = 0
         self._next_execution_id = 1
-        self.fills_by_execution: Dict[int, SimFill] = {}
+        self.fills_by_execution: dict[int, SimFill] = {}
 
-    def _report(self, child_id: int, status: ExecStatus, qty: int, price: int,
-                venue_id: int, ts: int, fees: float) -> ExecutionReport:
+    def _report(
+        self,
+        child_id: int,
+        status: ExecStatus,
+        qty: int,
+        price: int,
+        venue_id: int,
+        ts: int,
+        fees: float,
+    ) -> ExecutionReport:
         eid = self._next_execution_id
         self._next_execution_id += 1
         latency = self.simulator.config.venue(venue_id).latency_mean_ns
         return ExecutionReport(
-            order_id=child_id, execution_id=eid, status=status, filled_qty=qty,
-            fill_price_ticks=price, venue_id=venue_id, exchange_ts=ts,
-            receive_ts=ts + latency, fees=fees,
+            order_id=child_id,
+            execution_id=eid,
+            status=status,
+            filled_qty=qty,
+            fill_price_ticks=price,
+            venue_id=venue_id,
+            exchange_ts=ts,
+            receive_ts=ts + latency,
+            fees=fees,
         )
 
     def sim_order_id(self, child_order_id: int) -> int:
@@ -374,20 +441,28 @@ class SimulatorAdapter:
         if order.child_order_id in self._sim_id_of:
             raise ValueError(f"submit: duplicate child_order_id {order.child_order_id}")
         child = SimChild(
-            parent_id=order.parent_order_id, instrument_id=order.instrument_id,
-            venue_id=order.venue_id, side=int(order.side), type=_SIM_ORDER_TYPE[order.order_type],
-            limit_ticks=order.price_ticks, qty=order.qty, decision_ts=order.submit_ts,
+            parent_id=order.parent_order_id,
+            instrument_id=order.instrument_id,
+            venue_id=order.venue_id,
+            side=int(order.side),
+            type=_SIM_ORDER_TYPE[order.order_type],
+            limit_ticks=order.price_ticks,
+            qty=order.qty,
+            decision_ts=order.submit_ts,
             expire_ts=order.expire_ts,
         )
         sim_id = self.simulator.submit(child)
         self._sim_id_of[order.child_order_id] = sim_id
         self._child_id_of[sim_id] = order.child_order_id
         self._live.append(sim_id)
-        return (self._report(order.child_order_id, ExecStatus.NEW, 0, 0, order.venue_id,
-                             order.submit_ts, 0.0),)
+        return (
+            self._report(
+                order.child_order_id, ExecStatus.NEW, 0, 0, order.venue_id, order.submit_ts, 0.0
+            ),
+        )
 
-    def _drain(self, terminal_ts: int) -> List[ExecutionReport]:
-        reports: List[ExecutionReport] = []
+    def _drain(self, terminal_ts: int) -> list[ExecutionReport]:
+        reports: list[ExecutionReport] = []
         fills = self.simulator.fills
         orders = self.simulator.orders
         while self._fills_reported < len(fills):
@@ -411,10 +486,10 @@ class SimulatorAdapter:
             if o.state == OrderState.CANCELLED:
                 del self._live[i]
                 child_id = self._child_id_of[sim_id]
-                status = ExecStatus.EXPIRED if o.cancel_reason.name == "EXPIRED" \
-                    else ExecStatus.CANCELED
-                reports.append(self._report(child_id, status, 0, 0, o.venue_id,
-                                            terminal_ts, 0.0))
+                status = (
+                    ExecStatus.EXPIRED if o.cancel_reason.name == "EXPIRED" else ExecStatus.CANCELED
+                )
+                reports.append(self._report(child_id, status, 0, 0, o.venue_id, terminal_ts, 0.0))
                 continue
             i += 1
         return reports
@@ -439,8 +514,8 @@ class TcaMarket:
 
     timeline: tca_fills.MarketTimeline
     tick_size: float
-    liquidity: Mapping[int, Liquidity]       #: execution_id -> liquidity
-    child_latency_ns: Mapping[int, int]      #: child_order_id -> decision->arrival ns
+    liquidity: Mapping[int, Liquidity]  #: execution_id -> liquidity
+    child_latency_ns: Mapping[int, int]  #: child_order_id -> decision->arrival ns
 
 
 def _latency_stats(values: Sequence[int]) -> LatencyStats:
@@ -476,29 +551,44 @@ class TcaAdapter:
     def _ticks(price: float, tick: float) -> float:
         return price / tick
 
-    def analyse(self, parent_order: ParentOrder, executions: Sequence[ExecutionReport],
-                market: TcaMarket) -> TCAResult:
+    def analyse(
+        self, parent_order: ParentOrder, executions: Sequence[ExecutionReport], market: TcaMarket
+    ) -> TCAResult:
         tick = market.tick_size
         tl = market.timeline
         order = tca_fills.ParentOrder(
-            order_id=parent_order.parent_order_id, instrument_id=parent_order.instrument_id,
-            side=int(parent_order.side), qty_target=parent_order.qty,
-            decision_ts=parent_order.decision_ts, arrival_ts=parent_order.arrival_ts,
+            order_id=parent_order.parent_order_id,
+            instrument_id=parent_order.instrument_id,
+            side=int(parent_order.side),
+            qty_target=parent_order.qty,
+            decision_ts=parent_order.decision_ts,
+            arrival_ts=parent_order.arrival_ts,
             end_ts=parent_order.end_ts,
         )
         fees_total = 0.0
-        venue_fills: Dict[int, List[Tuple[float, int]]] = {}
+        venue_fills: dict[int, list[tuple[float, int]]] = {}
         for rep in executions:
             if rep.status not in (ExecStatus.PARTIAL, ExecStatus.FILLED):
                 continue
-            liq = tca_fills.MAKER if market.liquidity[rep.execution_id] == Liquidity.MAKER \
+            liq = (
+                tca_fills.MAKER
+                if market.liquidity[rep.execution_id] == Liquidity.MAKER
                 else tca_fills.TAKER
-            order.fills.append(tca_fills.stamp_fill(
-                tl, rep.exchange_ts, rep.fill_price_ticks * tick, rep.filled_qty,
-                int(parent_order.side), liq))
+            )
+            order.fills.append(
+                tca_fills.stamp_fill(
+                    tl,
+                    rep.exchange_ts,
+                    rep.fill_price_ticks * tick,
+                    rep.filled_qty,
+                    int(parent_order.side),
+                    liq,
+                )
+            )
             fees_total += rep.fees
             venue_fills.setdefault(rep.venue_id, []).append(
-                (rep.fill_price_ticks * tick, rep.filled_qty))
+                (rep.fill_price_ticks * tick, rep.filled_qty)
+            )
         rec = order_tca(order, tl)
         perold = rec["perold"]
         m_d = float(rec["decision_mid"])
@@ -517,8 +607,11 @@ class TcaAdapter:
         latencies = [market.child_latency_ns[c] for c in sorted(market.child_latency_ns)]
         return TCAResult(
             parent_order_id=parent_order.parent_order_id,
-            instrument_id=parent_order.instrument_id, side=parent_order.side,
-            qty=parent_order.qty, filled_qty=filled, fill_rate=filled / parent_order.qty,
+            instrument_id=parent_order.instrument_id,
+            side=parent_order.side,
+            qty=parent_order.qty,
+            filled_qty=filled,
+            fill_rate=filled / parent_order.qty,
             arrival_price_ticks=int(math.floor(m_a / tick + 0.5)),
             avg_fill_price=self._ticks(order.fill_vwap, tick) if filled else 0.0,
             interval_vwap=self._ticks(vwap_mkt, tick) if vwap_mkt else 0.0,

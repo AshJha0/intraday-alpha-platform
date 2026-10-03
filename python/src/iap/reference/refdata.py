@@ -33,7 +33,6 @@ import datetime as _dt
 import json
 import math
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 _NS_PER_SEC = 1_000_000_000
@@ -49,7 +48,7 @@ DEFAULT_FX_WEEK = {
 }
 
 
-def _parse_hms(timestr: str, what: str) -> Tuple[int, int, int]:
+def _parse_hms(timestr: str, what: str) -> tuple[int, int, int]:
     parts = timestr.split(":")
     if len(parts) != 3 or not all(p.isdigit() for p in parts):
         raise ValueError(f"{what}: time must be HH:MM:SS, got {timestr!r}")
@@ -68,7 +67,7 @@ def _zone(name: str, what: str) -> ZoneInfo:
         raise ValueError(f"{what}: unknown IANA timezone {name!r}") from None
 
 
-def _local_ns(date: _dt.date, hms: Tuple[int, int, int], tz: ZoneInfo) -> int:
+def _local_ns(date: _dt.date, hms: tuple[int, int, int], tz: ZoneInfo) -> int:
     local = _dt.datetime(date.year, date.month, date.day, *hms, tzinfo=tz)
     return int(local.timestamp()) * _NS_PER_SEC
 
@@ -99,16 +98,16 @@ class Instrument:
         self.lot_size: int = row["lot_size"]
         self.ref_price: float = row["ref_price"]
         self.adv: int = row["adv"]
-        self.venues: List[str] = list(row["venues"])
-        self.pip: Optional[float] = row.get("pip")
+        self.venues: list[str] = list(row["venues"])
+        self.pip: float | None = row.get("pip")
         #: Settlement / P&L currency of an EQUITY/ETF (``currency``) and the
         #: FX pair legs (``base_currency`` / ``quote_currency``); optional in
         #: the schema, consumed by the risk engine's reference data
         #: (``iap.risk.refdata``) which fails closed when the one it needs
         #: is absent.
-        self.currency: Optional[str] = row.get("currency")
-        self.base_currency: Optional[str] = row.get("base_currency")
-        self.quote_currency: Optional[str] = row.get("quote_currency")
+        self.currency: str | None = row.get("currency")
+        self.base_currency: str | None = row.get("base_currency")
+        self.quote_currency: str | None = row.get("quote_currency")
         what = f"instrument {self.symbol!r}"
         if not isinstance(self.symbol, str) or not self.symbol:
             raise ValueError(f"{what}: symbol must be a non-empty string")
@@ -120,8 +119,11 @@ class Instrument:
             raise ValueError(f"{what}: tick_size must be > 0, got {self.tick_size!r}")
         if type(self.lot_size) is not int or self.lot_size < 1:
             raise ValueError(f"{what}: lot_size must be an integer >= 1, got {self.lot_size!r}")
-        if not (isinstance(self.ref_price, (int, float)) and math.isfinite(self.ref_price)
-                and self.ref_price > 0):
+        if not (
+            isinstance(self.ref_price, (int, float))
+            and math.isfinite(self.ref_price)
+            and self.ref_price > 0
+        ):
             raise ValueError(f"{what}: ref_price must be > 0, got {self.ref_price!r}")
         if type(self.adv) is not int or self.adv < 0:
             raise ValueError(f"{what}: adv must be an integer >= 0, got {self.adv!r}")
@@ -151,8 +153,15 @@ class Instrument:
 class Venue:
     """Static reference data for one venue (validated on construction)."""
 
-    __slots__ = ("venue", "venue_id", "asset_class", "fees", "latency_mean_ns",
-                 "latency_jitter_ns", "supports")
+    __slots__ = (
+        "venue",
+        "venue_id",
+        "asset_class",
+        "fees",
+        "latency_mean_ns",
+        "latency_jitter_ns",
+        "supports",
+    )
 
     def __init__(self, row: dict) -> None:
         self.venue: str = row["venue"]
@@ -161,12 +170,11 @@ class Venue:
         self.fees: dict = {
             k: v
             for k, v in row.items()
-            if k in ("taker_fee_per_share", "maker_rebate_per_share",
-                     "commission_per_million")
+            if k in ("taker_fee_per_share", "maker_rebate_per_share", "commission_per_million")
         }
         self.latency_mean_ns: int = row["latency"]["mean_ns"]
         self.latency_jitter_ns: int = row["latency"]["jitter_ns"]
-        self.supports: List[str] = list(row["supports"])
+        self.supports: list[str] = list(row["supports"])
         what = f"venue {self.venue!r}"
         if not isinstance(self.venue, str) or not self.venue:
             raise ValueError(f"{what}: venue must be a non-empty string")
@@ -227,8 +235,8 @@ class ReferenceData:
     configs/venues/venues.json."""
 
     def __init__(self, instruments_cfg: dict, venues_cfg: dict) -> None:
-        self._venue_by_name: Dict[str, Venue] = {}
-        self._venue_by_id: Dict[int, Venue] = {}
+        self._venue_by_name: dict[str, Venue] = {}
+        self._venue_by_id: dict[int, Venue] = {}
         for row in venues_cfg["venues"]:
             ven = Venue(row)
             if ven.venue in self._venue_by_name:
@@ -237,8 +245,8 @@ class ReferenceData:
                 raise ValueError(f"duplicate venue id: {ven.venue_id} ({ven.venue})")
             self._venue_by_name[ven.venue] = ven
             self._venue_by_id[ven.venue_id] = ven
-        self._by_symbol: Dict[str, Instrument] = {}
-        self._by_id: Dict[int, Instrument] = {}
+        self._by_symbol: dict[str, Instrument] = {}
+        self._by_id: dict[int, Instrument] = {}
         for row in instruments_cfg["instruments"]:
             inst = Instrument(row)
             if inst.symbol in self._by_symbol or inst.instrument_id in self._by_id:
@@ -257,15 +265,14 @@ class ReferenceData:
             self._by_symbol[inst.symbol] = inst
             self._by_id[inst.instrument_id] = inst
         calendar = instruments_cfg["calendar"]
-        self.trading_days: List[str] = list(calendar["trading_days"])
+        self.trading_days: list[str] = list(calendar["trading_days"])
         for d in self.trading_days:
             _dt.date.fromisoformat(d)  # ValueError on malformed dates
         if self.trading_days != sorted(set(self.trading_days)):
             raise ValueError("calendar.trading_days must be sorted and unique")
         default_tz = calendar.get("timezone", "UTC")
-        self._sessions: Dict[str, _Session] = {
-            ac: _Session(ac, cfg, default_tz)
-            for ac, cfg in instruments_cfg["sessions"].items()
+        self._sessions: dict[str, _Session] = {
+            ac: _Session(ac, cfg, default_tz) for ac, cfg in instruments_cfg["sessions"].items()
         }
         self.fx_week = _FxWeek(instruments_cfg.get("fx_week", DEFAULT_FX_WEEK))
 
@@ -274,7 +281,7 @@ class ReferenceData:
         return "EQUITY" if asset_class in ("EQUITY", "ETF") else asset_class
 
     @classmethod
-    def load(cls, config_dir) -> "ReferenceData":
+    def load(cls, config_dir) -> ReferenceData:
         """Load from a configs/ directory (expects instruments/instruments.json,
         venues/venues.json — the domain layout of PLATFORM_CONVENTIONS.md §0)."""
         config_dir = Path(config_dir)
@@ -297,13 +304,11 @@ class ReferenceData:
     def has_instrument(self, instrument_id: int) -> bool:
         return instrument_id in self._by_id
 
-    def instruments(self, asset_class: Optional[str] = None) -> List[Instrument]:
+    def instruments(self, asset_class: str | None = None) -> list[Instrument]:
         """All instruments (sorted by id), optionally filtered by asset class."""
         out = [self._by_id[k] for k in sorted(self._by_id)]
         if asset_class is not None:
-            classes = (
-                ("EQUITY", "ETF") if asset_class == "EQUITY" else (asset_class,)
-            )
+            classes = ("EQUITY", "ETF") if asset_class == "EQUITY" else (asset_class,)
             out = [i for i in out if i.asset_class in classes]
         return out
 
@@ -326,13 +331,13 @@ class ReferenceData:
     def has_venue(self, venue_id: int) -> bool:
         return venue_id in self._venue_by_id
 
-    def venues(self, asset_class: Optional[str] = None) -> List[Venue]:
+    def venues(self, asset_class: str | None = None) -> list[Venue]:
         out = [self._venue_by_id[k] for k in sorted(self._venue_by_id)]
         if asset_class is not None:
             out = [v for v in out if v.asset_class == asset_class]
         return out
 
-    def venue_ids_for(self, instrument_id: int) -> List[int]:
+    def venue_ids_for(self, instrument_id: int) -> list[int]:
         """Sorted venue ids on which the instrument trades."""
         inst = self.instrument(instrument_id)
         return sorted(self._venue_by_name[v].venue_id for v in inst.venues)
@@ -353,7 +358,7 @@ class ReferenceData:
             raise ValueError(f"no session definition for asset class {asset_class!r}")
         return sess
 
-    def session_bounds_ns(self, asset_class: str, date: str) -> Tuple[int, int]:
+    def session_bounds_ns(self, asset_class: str, date: str) -> tuple[int, int]:
         """(open_ns, close_ns) UTC ns since epoch for asset_class on a trading day.
 
         Local session times are converted through the session's IANA zone, so

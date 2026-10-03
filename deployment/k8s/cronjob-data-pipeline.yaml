@@ -42,6 +42,7 @@ spec:
             app.kubernetes.io/component: data
         spec:
           restartPolicy: Never
+          automountServiceAccountToken: false
           securityContext:
             runAsNonRoot: true
             runAsUser: 10001
@@ -51,7 +52,8 @@ spec:
               type: RuntimeDefault
           containers:
             - name: pipeline
-              image: iap/python:1.0.0   # digest-pin at release: @sha256:<release manifest>
+              # Release step: pin by digest from release-manifest.json.
+              image: ghcr.io/ashjha0/intraday-alpha-platform-python:v1.3.0
               imagePullPolicy: IfNotPresent
               # Configs from the ConfigMap (not the baked copy) so a config
               # change does not require an image rebuild; every config change

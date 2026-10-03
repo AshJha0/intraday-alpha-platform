@@ -9,7 +9,15 @@ itself one of the lessons.
 Reading order matters less than you'd think; each section stands alone but
 cross-references the others. If you only have an hour, read §6 (honest alpha
 research), §7 (ML and meta-labeling), §12 (golden parity) and §20 (the MVP
-and its IC audit) — they carry the platform's central ideas.
+and its IC audit) — they carry the platform's central ideas. If you have a
+second hour, read §21–§26: they are the v1.3.0 review written up as case
+studies — what was wrong in the safety code, why the tests had not caught
+it, and what each fix pins.
+
+For a shorter, top-down explanation of how the quant, algo and AI sides fit
+together — one page per subsystem, each ending with where to look and a
+command that runs — start with [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md)
+and come back here for the depth.
 
 Contents:
 
@@ -33,9 +41,15 @@ Contents:
 18. [The decision trace, and replaying an incident](#18-the-decision-trace-and-replaying-an-incident)
 19. [The data model: an index, not a database](#19-the-data-model-an-index-not-a-database)
 20. [The MVP walkthrough, with the honest numbers](#20-the-mvp-walkthrough-with-the-honest-numbers)
-21. [Twelve pitfalls this platform is built to avoid](#21-twelve-pitfalls-this-platform-is-built-to-avoid)
-22. [Twelve interview questions (with answers from this repo)](#22-twelve-interview-questions-with-answers-from-this-repo)
-23. [Further reading](#23-further-reading)
+21. [Fail-closed risk engineering: four bugs, worked](#21-fail-closed-risk-engineering-four-bugs-worked)
+22. [Simulator realism: the fills that never happened](#22-simulator-realism-the-fills-that-never-happened)
+23. [Statistical power: what a null result is worth](#23-statistical-power-what-a-null-result-is-worth)
+24. [Multiple testing, and three ways to game a gate](#24-multiple-testing-and-three-ways-to-game-a-gate)
+25. [Crash consistency and commit points](#25-crash-consistency-and-commit-points)
+26. [Supply-chain hygiene](#26-supply-chain-hygiene)
+27. [Twelve pitfalls this platform is built to avoid](#27-twelve-pitfalls-this-platform-is-built-to-avoid)
+28. [Twelve interview questions (with answers from this repo)](#28-twelve-interview-questions-with-answers-from-this-repo)
+29. [Further reading](#29-further-reading)
 
 ---
 
@@ -180,6 +194,28 @@ From `configs/marketdata/generator.json` (seed 20260829, 2 sessions):
   182 out-of-order, 173 invalid, 81 clamped timestamps — every one counted.
 
 ### 2.3 Its limits — read this before believing any result
+
+**Equity flow stops about 40% into each session.** Each equity stream gets
+a budget of `slots_per_stream` flow slots per session, and the loop that
+spends it draws inter-arrival times at `slots / duration × 1.30 ×
+(1 + excitation)`. The 1.30 multiplies the rate, so the budget would run
+out 77% of the way through even with no clustering (measured: 74.5–79.6%
+with the excitation kick set to 0); the self-exciting multiplier then about
+halves the mean inter-arrival time, and nothing in the calibration accounts
+for it. Measured on the bundled dataset: the last continuous event of an
+equity stream falls 37.6–43.2% into the 6.5-hour session (mean 40.5%,
+about 2 h 38 min after the open), followed by nothing until the close
+auction prints. FX has the same kind of budget with a 1.05 margin and no
+excitation, and ends 91.7–99.8% of the way through (mean 95.2%). What this
+means for everything downstream: an equity "session" is its first 2 h 40
+min; two sessions are about 5.3 hours of continuous equity flow, not 13;
+the walk-forward folds are cut by row mass, so all four folds partition
+that window and none of them sees afternoon flow; a feature row exists at
+the close, nearly four hours after the one before it. The
+default stays as it is because every golden vector, report and headline
+number derives from it. `equities.fill_session: true` removes the budget
+(flow to the close, about 2.5 times the equity events); regenerating the
+research on it is backlog issue M08.
 
 The generator's mid is **strongly mean-reverting** around its regime
 process. Consequences you will see all over the research reports:
@@ -523,9 +559,9 @@ one experiment.
 
 The current ledger holds **70 distinct configurations / 1068 looks**: a
 one-time design scan (216 experiments: 24 alphas × 9 horizons), 24 promotion
-pipelines at 21 experiments each (504), 40 adaptive deployments (10 alphas ×
+pipelines at 28 experiments each (672), 40 adaptive deployments (10 alphas ×
 4 refit policies), and — since 2026-09-19 — five `ExperimentRunner` runs at
-21 each (105; §6.8). That translates into a selection yardstick: Bonferroni
+28 each (140; §6.8). That translates into a selection yardstick: Bonferroni
 per-test threshold |t| ≥ **4.071**, and an expected **max |t| ≈ 3.735 under
 the global null**. Meaning: FX08's uncrossed t = 2.02 — or FX11's 1.40 — is
 *consistent with pure selection* over this many trials, and the report says
@@ -587,22 +623,31 @@ reproduce `research/alpha_reports/{EQ01,EQ03,EQ06}.json` at 1e-9
 ## 7. ML with meta-labeling
 
 `research/ml_reports/run_ml.py` implements spec §14; `ML_REPORT.md` is the
-committed result: 208,334 valid rows, 51 curated predictors across all 10
-families, target `label_cost_5s`, walk-forward with 60 s embargo and 5 s
-purge.
+committed result: 206,190 valid rows, 51 curated predictors across all 10
+families, target `label_cost_5s`, four expanding walk-forward folds with a
+60 s embargo and a 5 s purge.
 
 ### 7.1 The gate: advanced models must earn the right to run
 
-Rule: **trees and the MLP run only if the best linear baseline achieves
-positive mean OOS IC**. Simple models establish whether signal exists;
-capacity-rich models then refine it. In the committed run elastic net scored
-mean OOS IC 0.6542 → gate PASSED → XGBoost, LightGBM and an MLP ran
-(LightGBM won at 0.7037). Had the target been the mid-to-mid label, the gate
-would have correctly blocked them.
+Rule: **trees and the MLP run only if the best linear baseline's pooled OOS
+IC against the mid-to-mid label is positive**. Simple models establish
+whether signal exists; capacity-rich models then refine it. In the
+committed run the best linear baseline (ridge) scores **−0.0430** against
+the mid-to-mid label → gate **FAILED** → XGBoost, LightGBM and the MLP were
+never fitted. Nothing above the linear tier was trained, so there is no
+tree or MLP behaviour on this dataset to read anything into.
+
+The gate did not always read that label. It used to read the model's own
+target, the cost-adjusted return, on which the same linear models score a
+mean fold IC of 0.9352 — and passed trivially, for the reason §7.2
+explains. An earlier committed run therefore trained the full zoo and
+crowned LightGBM at an "IC" of 0.70. Moving the gate to the frictionless
+label is what turned a pass into the honest fail.
 
 ### 7.2 The crossed-book artifact: found, fixed, and honestly residual
 
-An IC of 0.70 at 5 seconds would be the greatest alpha ever recorded. It is
+An IC of 0.70 at 5 seconds — or the 0.94 the linear models score on the
+cost-adjusted target today — would be the greatest alpha ever recorded. It is
 nothing of the sort — and this section is now a case study in *finding and
 fixing a data-generation artifact*, told in two acts.
 
@@ -624,8 +669,8 @@ consolidated FX book is still crossed **29.5%** of the time, because
 aggregated LP quotes go stale between venue updates (a real phenomenon of
 FX aggregation, amplified here by the synthetic update cadence). The
 spread component therefore still drives the headline numbers:
-corr(spread, target) = −0.938, and the winning LightGBM IC of 0.70 remains
-mostly spread prediction.
+corr(spread, target) = −0.937, and the linear models' IC of 0.94 on the
+cost-adjusted target is mostly spread prediction.
 
 Crucially, none of this was ever **leakage** — the shift-by-one test passes
 throughout, because the spread at decision time legitimately is in the
@@ -635,10 +680,10 @@ mid-to-mid label — is ~0 to slightly negative for every model:
 **no exploitable 5 s directional signal exists in this dataset**, exactly
 what a near-random-walk generator should yield. The economics agree: under
 the conservative cost model (realized costs floored at zero — you are never
-paid to cross a crossed synthetic book), every model sits near 0 bps/signal
-(LightGBM: −0.098), while "label-exact" economics still show +1.2 bps/signal
-of residual book-artifact. The report instructs the reader to trust only
-the conservative column.
+paid to cross a crossed synthetic book), every model sits slightly below
+0 bps/signal (elastic net: −0.147), while "label-exact" economics still show
++0.434 — a gap of 0.581 bps/signal of residual book-artifact. The report
+instructs the reader to trust only the conservative column.
 
 Two lessons now. First, the old one: **a model can ace its target and tell
 you nothing about alpha — always decompose what the target actually
@@ -654,19 +699,28 @@ Meta-labeling (López de Prado) separates *direction* (primary model) from
 primary signal will be profitable net of costs, conditioned on alpha
 strength, spread, volatility, depth, queue imbalance and expected cost.
 
-The committed run gates LightGBM's pooled OOS predictions: chronological
-50/25/25 train/calibration/test split (60 s embargo), **isotonic
-calibration** on the middle segment, and an *economic* meta-label (realized
-net P&L > 0 under the conservative cost model — not "was the sign right").
-Results: test AUC 0.552, Brier 0.0683, test base rate of profitable signals
-0.073 — and at both τ = 0.5 and the calibration-chosen best τ = 0.300 the
-gate keeps **zero** of the 5,212 test signals. That is not a malfunction:
-with so few signals profitable net of costs, abstaining can be the
-economically correct output, and the gate-off row (−941.7 total net bps,
-−0.18 bps/trade) shows exactly what was declined. The machinery details
-still matter: thresholds must be chosen on a calibration segment in
-probability space and evaluated economically — and a gate whose honest
-answer is "don't trade" must be allowed to say so.
+The committed run gates the elastic net's pooled OOS predictions (the linear
+tier is the only one that ran): chronological 50/25/25
+train/calibration/test split (60 s embargo), probability calibration on the
+middle segment, and an *economic* meta-label (realized net P&L > 0 under
+the conservative cost model — not "was the sign right"). The calibration is
+**Platt scaling**, a two-parameter sigmoid, because the calibration segment
+holds only 324 positives — below the pinned minimum of 500 for the isotonic
+path.
+Results: test AUC 0.753, Brier 0.0344, test base rate of profitable signals
+0.037 — and at both τ = 0.5 and the calibration-chosen best τ = 0.300 the
+gate keeps **zero** of the 11,461 test signals. The report flags this
+`gate_degenerate: true` and refuses to dress it up: a gate that never fires
+produces no evidence either way about whether abstaining pays. It shows
+only that the calibrated probabilities sit under the threshold at a 3.7 %
+base rate. The gate-off row (−2,281.9 total net bps, −0.20 bps/trade) is
+what the ungated primary would have done. The machinery details still
+matter: thresholds must be chosen on a calibration segment in probability
+space and evaluated economically — and a gate that took no trades must be
+reported as untested, not as vindicated. (Since v1.3.0 the reported
+`auc_test` is `null` rather than a fabricated 0.5 when a test segment holds
+a single class, and `impute_nan=False` is an opt-in alternative to imputing
+missing meta-features to zero.)
 
 ### 7.4 Manifests: every fit is an audited experiment
 
@@ -836,16 +890,23 @@ everything else and simulates child-order lifecycles with pinned rules
   market stream stays authoritative); impact is charged economically
   instead.
 - **Passive queue position**: `ahead_qty` starts as the displayed size at
-  your level; observed EXECUTEs at your level deplete it (leftover volume
-  after it reaches zero fills *you*); CANCELs decrement it in full
-  (deterministic choice, documented); trade-throughs (executions at prices
-  worse than yours) fill you completely; marketable ADDs — which generate no
-  EXECUTE events (§3) — are *expanded* into their per-level consumptions and
-  run through the same rules; a book whose display crosses your price fills
-  you, with a carefully pinned exemption preventing double-counting of
-  liquidity you already took. MODIFYs deliberately do nothing (a modified
-  order's queue position is unknowable from public data — pinned as ignored
-  rather than guessed).
+  your level plus your own earlier orders resting there; EXECUTEs the book
+  applied at your level deplete it (leftover volume after it reaches zero
+  fills *you*, and one observed trade is one pool shared in queue order); a
+  CANCEL advances you only when the cancelled order is known to be ahead of
+  you, by the size the book actually removed; a trade-through (an execution
+  at a price worse than yours) fills you at your limit but only up to the
+  volume that printed; marketable ADDs — which generate no EXECUTE events
+  (§3) — are *expanded* into their per-level consumptions and run through
+  the same rules; a book whose display crosses your price fills you up to
+  the displayed size that has not already been consumed, with a carefully
+  pinned exemption preventing double-counting of liquidity you already
+  took. MODIFYs never change `ahead_qty` (a modified order's queue position
+  is unknowable from public data — pinned as ignored rather than guessed).
+  The earlier versions of three of these rules — full-amount cancels, free
+  trade-throughs, a crossing pool rebuilt on every event — were each
+  optimistic in the direction that flatters a backtest; §22 is the case
+  study.
 - **Liquidity is consumed, not copied** (rule 3b): two children hitting
   the same displayed level inside one decision share one copy of it — the
   second sees the thin remainder. Simulated fills still never mutate the
@@ -941,11 +1002,11 @@ match**.
   the portfolio golden is checked against an SLSQP optimum. Golden files are
   regenerated only deliberately, with a MIGRATIONS.md entry.
 - **One command proves parity**: `tests/harness/run_all.sh` runs all four
-  suites and prints the table (a full harness run on 2026-09-20: python 1388,
-  cpp 285, rust 313, java 482 tests passed; golden groups 164/68/62/102; all
-  PASS, plus `integration` (15) and `replay` (4) rows for the repo-level
-  pytest suites, a `deployment` row — 16 structural checks passed, 2 skipped
-  for tools absent here — and a `numbers` row that re-derives every headline
+  suites and prints the table (the v1.3.0 counts from CI, 2026-10-03: python 1565,
+  cpp 289, rust 323, java 510 tests passed; golden groups 166/68/64/104; all
+  PASS, plus `integration` (17) and `replay` (4) rows for the repo-level
+  pytest suites, a `deployment` row — 25 structural checks passed in CI,
+  where promtool and kubeconform are installed — and a `numbers` row that re-derives every headline
   figure in the docs from its artefact). The Java golden group runs all
   thirteen `*GoldenTest` classes (it once ran two of them and reported 18),
   the Rust group nine golden targets. The 2026-09-19/20 release added a new
@@ -1267,7 +1328,7 @@ average-cost lots per (strategy, instrument, quote currency), the event-time
 token bucket, the latching loss limits, snapshot / restore — and its
 arithmetic *order*: `float(bid + ask) * tick / 2.0`, `BTreeMap` iteration in
 sorted key order so float sums accumulate identically, a fold from `-0.0`
-because Rust 1.95's `Iterator::sum::<f64>()` does. Two things had to be
+because Rust's `Iterator::sum::<f64>()` does. Two things had to be
 reproduced rather than approximated: **serde_json's bytes** (ryu float
 layout `1e+16` / `1e-6` / `3.0`, sorted keys, `\u00xx` escapes, accessor
 strictness where `50000.0` is not an integer) for the audit lines and the
@@ -1281,11 +1342,15 @@ cross-checked against the real Rust toolchain on 24,993 random doubles and
 mismatches.
 
 The port also pins the one thing a Python port can silently get wrong:
-integers. Every i64/u64 operation is range-checked; out of domain raises
-`OverflowError` at the same statement where Rust's overflow-checked
-arithmetic panics — never a Python bigint, never a wrap.
+integers. Every i64/u64 operation is range-checked — never a Python bigint,
+never a wrap. Until v1.3.0 "out of domain" meant an `OverflowError` at the
+statement where Rust's overflow-checked test build panics, which sounds
+equivalent and was not: an exception in the order path is a crash, the Rust
+release build and Java wrapped instead, and none of the three *rejected*.
+The arithmetic an order or a fill can drive out of range is now a decision
+in all three engines (§21.3).
 
-### 16.3 `iap.execution`: nine rules, six fills, bit for bit
+### 16.3 `iap.execution`: nine rules, seven fills, bit for bit
 
 The simulator port implements the nine pinned rules of `execution.hpp`
 (§10.2) — latency with one SplitMix64 jitter draw per submit *or cancel*,
@@ -1298,7 +1363,7 @@ scenario and matches `expected_replay_fills.json`: ids, ticks, quantities,
 timestamps and liquidity flags exact; every money field within the 1e-9 the
 C++ and Java tests use *and additionally bit-identical*, because the
 `%.17g` doubles in the file round-trip to exactly the Python doubles when
-the IEEE operations happen in the same left-to-right order. Fifty-eight rule
+the IEEE operations happen in the same left-to-right order. Sixty-four rule
 tests mirror every scenario of the C++ and Java suites, and 15 property
 cases add what a scenario cannot: the book after every event is identical
 to a bare `OrderBook` replay (simulated fills never touch it), fills stay
@@ -1513,7 +1578,7 @@ index that lied about what its sources contain would be worse than none.
 
 ```bash
 cd python && PYTHONPATH=src python3 -m iap.mvp run
-# mvp run 58a10f2194a3c81c: events=16578 decisions=355 parents=66 children=105 fills=55 pnl=-22.676287 USD digest=d938eeae68c85a6c...
+# mvp run 58a10f2194a3c81c: events=16578 decisions=355 parents=66 children=105 fills=55 pnl=-22.651183 USD digest=d938eeae68c85a6c...
 ```
 
 Seven seconds later `data/mvp/58a10f2194a3c81c/` holds the captured stream,
@@ -1528,21 +1593,21 @@ over the Protocols of §15. The per-event order mirrors the Java
 `BacktestEngine` / `PaperTrading` wiring rule for rule (docs/MVP.md §4 is
 the row-by-row review), and the §12.1 money identity — `pnl.total ==
 (gross − spread) − fees − impact`, risk daily P&L == gross − spread — is
-asserted after every fill (|diff| 5.8e-12 on the golden run).
+asserted after every fill (|diff| 3.3e-11 on the golden run).
 
 ### 20.2 The numbers, stated as they are
 
 Seed 12345: 16,578 events, 355 decisions, 66 parent orders, 212 children
 generated of which 105 submitted (107 blocked by the 500 ms slice-interval
-control, exactly as the Java loop would), 55 fills, 20.5 % fill rate.
+control, exactly as the Java loop would), 55 fills, 20.2 % fill rate.
 Risk: 105 ALLOW, 0 REJECT, 0 KILL, 9 sequence gaps each recovered by the
-following SNAPSHOT burst, 72 mark regressions dropped. Routing: XV3 74.7 %,
-XV1 13.5 %, XV2 11.7 % of filled quantity (aggressive routing picks the
+following SNAPSHOT burst, 72 mark regressions dropped. Routing: XV3 75.9 %,
+XV1 12.1 %, XV2 11.9 % of filled quantity (aggressive routing picks the
 cheapest taker fee on price ties; passive routing prefers XV1's rebate).
 TCA: implementation shortfall +0.106 bps quantity-weighted; TWAP fills
-3.4 % (passive limits at a 1 s horizon mostly expire), POV 13.9 %, IS
-69.1 %. **P&L −22.65 USD** on 3,176 shares: +0.039 bps of alpha
-contribution against −0.40 bps of execution cost. The report field is
+3.0 % (passive limits at a 1 s horizon mostly expire), POV 13.9 %, IS
+68.9 %. **P&L −22.65 USD** on 3,126 shares: +0.039 bps of alpha
+contribution against −0.41 bps of execution cost. The report field is
 `alpha.cost_negative: true`. This is the research finding of §6 — real
 signal, no money after costs — reproduced by a full loop on a different
 synthetic stream, and it is the headline number of the MVP, not a footnote.
@@ -1551,7 +1616,7 @@ synthetic stream, and it is the headline number of the MVP, not a footnote.
 
 The first version of the loop reported realized ICs of 0.285 / 0.338 /
 −0.102 for EQ01 / EQ03 / EQ06 against research ICs of 0.027 / 0.030 /
-0.043 — an order of magnitude apart. The pitfalls of §21 say what to do
+0.043 — an order of magnitude apart. The pitfalls of §27 say what to do
 with a number like that, and docs/MVP.md §7.1 records doing it:
 
 1. **Pin the definition.** The realized IC is now computed by
@@ -1607,7 +1672,809 @@ there rather than left for a reader to discover.
 
 ---
 
-## 21. Twelve pitfalls this platform is built to avoid
+## 21. Fail-closed risk engineering: four bugs, worked
+
+§9 states the principle: when anything is wrong or unknown, the answer is
+REJECT. The v1.3.0 review found four places where the hard risk engine did
+the opposite, in all three languages at once. None was exotic. Each is a
+guard that was correct for every input anyone had fed it, and open for one
+nobody had. They are worth studying one by one because the pattern repeats
+in every safety system: *a check that cannot fail is not a check*.
+
+All four fixes kept the existing rule ids, so the pinned check order of
+PLATFORM_CONVENTIONS.md §11.1 did not move, and the goldens that existed
+before are reproduced unchanged. The normative text is §11.1; API_TRADING.md
+§1.4 has the table of conditions, rule ids and reason strings.
+
+### 21.1 The mark from the future
+
+The stale-price gate asked one question: is the reference price too old?
+
+```
+age = order.timestamp - mark.timestamp
+if age > stale_feed_timeout_ns:  reject STALE_PRICE
+```
+
+Now give it a mark stamped one hour *ahead* of the order — a corrupt
+timestamp, a venue clock that jumped, a unit mix-up. The age is minus one
+hour. Minus one hour is not greater than five seconds, so the mark is
+trusted. It gets worse: the engine drops market updates older than the one
+it holds (they are counted as regressions, conventions §11.1), so every genuine update that
+arrives afterwards is *behind* the corrupt stamp and is discarded. The
+engine now prices every order off a frozen, wrong mark, and will do so
+until event time catches up with the corrupt stamp.
+
+The obvious fix — reject when `age < -timeout` — is wrong, and the golden
+says why. Step 107 of the main risk golden is an order whose *own* clock has
+regressed by nine seconds; the pinned behaviour is that it still reaches the
+throttle and is rejected `RATE_THROTTLE`. An order with a stale clock next
+to a healthy mark must not be confused with a healthy order next to a mark
+from the future. So the engine measures the mark against its **event
+clock** — the latest order event time it knows, this order's timestamp or
+the newest throttle-bucket time, whichever is later:
+
+```
+if mark.timestamp > clock + stale_feed_timeout_ns:  reject STALE_PRICE
+   "reference price timestamp <ts> is more than <timeout>ns ahead of the
+    latest order event time <clock>"
+```
+
+The conversion rate gets the same rule (`FX_RATE_MISSING`). No config key
+and no snapshot field was added. Notice what the fix does *not* do: it does
+not recover the instrument. Genuine updates behind the corrupt stamp are
+still dropped by the regression rule, so orders in that instrument keep
+rejecting. That is the point. Closed, counted and visible in the audit log
+is the safe side of a corrupt clock; a human decides what happens next.
+
+### 21.2 NaN is not greater than anything
+
+Every float limit was written the natural way:
+
+```
+if order_notional > max_order_notional:  reject FAT_FINGER_NOTIONAL
+```
+
+IEEE-754 says every ordered comparison with NaN is false. A NaN notional
+is not greater than the limit, so the order passes — and it passes every
+other float limit after it for the same reason. Where does a NaN come from?
+A `tick_size` of NaN in the reference data turns every notional into NaN;
+the Java record even accepted `+Infinity`, because `Infinity > 0` is true.
+
+Two fixes, one for each end. At the source, reference data must be finite
+and positive: Java and Python refuse to construct an invalid
+`InstrumentRef`, and Rust — whose struct fields are public, so construction
+cannot be the guard — re-validates in `RiskEngine::new` and lands the
+whole engine on `CONFIG_MISSING`. At the comparison, every limit is written
+so that NaN *fails* it:
+
+```
+if not (order_notional <= max_order_notional):  reject FAT_FINGER_NOTIONAL
+```
+
+The two forms agree on every real number and differ only on NaN, which is
+exactly the case the first form got wrong. The same rewrite covers the
+price band, the throttle (`not (tokens >= 1)`), the instrument, gross and
+net notional limits and both loss limits (`not (pnl > -limit)`).
+
+### 21.3 One overflow, three languages, three behaviours
+
+A position projection is `pos + open_orders + qty`. Feed it quantities near
+2^63 and the three engines did three different things:
+
+| engine | what happened | what the caller saw |
+|---|---|---|
+| Python port | an explicit range check raised `OverflowError` | an exception in the order path: a crash, not a decision |
+| Rust, test profile | overflow-checked arithmetic panicked | the same, and the goldens are proven under this profile |
+| Rust, release build; Java | two's-complement wrap | nothing: the sum wrapped and the limit check ran on the wrapped number |
+
+Three implementations "held byte-identical by golden tests" disagreed, and
+the goldens could not see it because no golden step overflowed. Now all
+three do the same thing, and it is a decision:
+
+- Position accounting lives in the **symmetric** domain
+  `[-i64::MAX, i64::MAX]`. Excluding `i64::MIN` matters: it has no negation,
+  so `abs()` of it overflows again one line later.
+- A projection that leaves the domain rejects `MALFORMED_ORDER`,
+  `projected position overflows i64 (fail-closed)`.
+- A *fill* that cannot be booked is harder: a fill is a fact, it cannot be
+  rejected. The engine applies nothing and latches the GLOBAL kill, because
+  an engine that cannot book a fill no longer knows its exposure.
+- Timestamp differences (mark age, the duplicate window, the throttle's
+  elapsed time) are checked the same way and reject `MALFORMED_ORDER`,
+  `timestamp arithmetic overflows i64 (fail-closed)`.
+
+As a backstop the Rust release profile now builds with
+`overflow-checks = true`, so an unchecked add that slips through panics
+instead of wrapping. The primary control is still the checked arithmetic:
+a panic in a risk engine is an outage.
+
+### 21.4 Venue 0
+
+An order names its venue; venue 0 means "the smart order router will
+choose". The venue kill check was written per venue:
+
+```
+if order.venue_id != 0 and venue_killed[order.venue_id]:  reject KILL_VENUE
+```
+
+Kill venue 2 during an incident and every order pinned to venue 2 is
+rejected. Every order sent through the router sails through — and the
+router is free to send it to venue 2. The paper platform made this the
+common case: a SOR session passed venue 0 to the pre-trade check for every
+child. The same hole existed for disconnected venues.
+
+The fix is in two places, because the defect was. In the engine, a venue-0
+order rejects `KILL_VENUE` while *any* venue kill is engaged (the reason
+names the lowest killed venue id), and rejects `VENUE_DISCONNECTED` when
+*every* venue the engine knows of is disconnected — while one is up the
+router still has somewhere to go. In the Java wiring, the pre-trade request
+now names the venue the child is actually routed to (a replica of the
+engine's router, evaluated at the same instant), and a child that leaves
+for a different venue than the one approved is counted and cancelled.
+
+### 21.5 Why the tests had not caught any of it
+
+The main risk golden drives **one engine through one script**. That is the
+right design for pinning a rule order, and it structurally cannot reach a
+configuration that fails closed, an engine awaiting bootstrap, a restore,
+or a kill command that does not parse — each needs a different engine. The
+new edge golden (`tests/golden/expected_risk_edge_decisions.json`) is eight
+independent scenarios, each with its own engine, and all three languages
+must reproduce its decisions and its audit log byte for byte.
+
+It does not cover everything, and the gaps are stated: the NaN comparisons,
+the invalid-reference-data landing and the future-stamped conversion rate
+are pinned by per-language rule tests only. Differential fuzzing of the
+three engines against each other is the tool that would have found the
+overflow disagreement without a human reading the code; it is backlog
+(EPICS E31).
+
+**Check yourself.**
+
+*Q. A mark is stamped two seconds ahead of the order. Is that rejected?*
+No. The tolerance is the same window as staleness, `stale_feed_timeout_ns`
+(5 s in `configs/risk/risk.json`); a small positive skew between a feed
+clock and an order clock is normal. Only a stamp more than the timeout
+beyond the event clock is treated as untrusted.
+
+*Q. Why is "reject" the wrong answer for a fill that overflows the
+position?* A fill has already happened at the venue. Rejecting it would
+leave the engine's position different from reality with nothing to say so.
+Not booking it and latching the kill switch says: stop, the books no longer
+reconcile.
+
+*Q. Three engines agreed on every golden step and still disagreed on
+overflow. What does parity prove?* That the implementations agree on the
+inputs in the golden. It proves nothing about inputs that are not there,
+and it cannot tell agreement on the right answer from agreement on a wrong
+one (§22 has the same lesson from the simulator).
+
+**Exercise.** Run the regression tests for these four cases, then see the
+NaN rule in two lines:
+
+```bash
+cd python
+PYTHONPATH=src python3 -m pytest -q tests/test_risk_rules.py \
+  -k "future_stamped or nan_limit or overflow or sor_order or extreme_timestamps"
+# 7 passed, 82 deselected
+python3 -c "nan = float('nan'); limit = 1e6; print(nan > limit, not (nan <= limit))"
+# False True
+```
+
+Then replay the edge golden (COOKBOOK recipe 34) and find, in its output,
+the audit line each of §21.1, §21.3 and §21.4 produces.
+
+---
+
+## 22. Simulator realism: the fills that never happened
+
+A backtest is only as honest as its fills. §10.2 lists the simulator's
+rules; this chapter is about three ways it was generous, each found by
+asking the same question of a rule: *where did that liquidity come from?*
+PLATFORM_CONVENTIONS.md §14.1 states the governing principle — the
+simulator never fills more than the market actually traded — and
+API_TRADING.md §2.4 lists the v1.3.0 rule changes.
+
+### 22.1 The over-fill: 50 shares, sold twenty times
+
+Rest a buy for 1,000 at 100. An ask of 50 posts at 100: the book is now
+crossed against our order, no trade prints, and the simulator's crossing
+check fills us from the displayed size of that crossing level. Fifty
+shares. Correct so far.
+
+The check ran after every event, and it rebuilt its pool from the display
+each time. The ask still showed 50 — simulated fills never mutate the
+replayed book, by design — so the next event, any event, a heartbeat,
+filled another 50. Twenty unrelated events later a 1,000-share order was
+filled against 50 shares of liquidity.
+
+The simulator already had the right tool. Rule 3b keeps an *overlay* of
+displayed size our aggressive fills have consumed, precisely so that two
+children cannot take the same shares. The crossing check simply did not
+use it. Now its pool is `displayed − consumed` and it debits the overlay
+with what it takes. The overlay's existing refresh rule does the rest:
+when a level's displayed size changes, the consumed amount becomes
+`min(consumed, new displayed)`, so only liquidity added *on top of* a
+consumed level becomes available. The regression test walks exactly that
+sequence: 50 fills once; three unrelated events fill nothing; 30 more
+shares post and exactly the new 30 fill; the first ask cancels and nothing
+is resurrected.
+
+### 22.2 The duplicate execute: trusting the wire over the book
+
+Queue tracking read the raw event stream: an EXECUTE at our level reduces
+the quantity ahead of us and, once that reaches zero, fills us. It ran
+*before* the book applied the event and never asked whether the book
+accepted it.
+
+The book rejects things. A retransmitted duplicate (same sequence number)
+is dropped. An EXECUTE naming an order id the book does not hold is
+dropped. An EXECUTE quoting 500 against an order with 300 remaining trades
+300. In each case the simulator had tracked the event as quoted: the
+duplicate advanced our queue a second time, the phantom order traded
+volume that never existed, the over-quoted execute moved 200 shares too
+many.
+
+The rule is now one sentence — **queue tracking trusts the book, not the
+event**. It runs after the book update and only when the book reports the
+event `APPLIED`. An execute trades `min(event qty, the book order's
+remaining)` at the *book* order's side and price, whatever the event says.
+The pre-event depth is captured first, so the order in which fills are
+produced did not change.
+
+### 22.3 The cancel from behind
+
+When someone cancels at our price level, do we move up the queue? Only if
+they were ahead of us. The old rule moved us up for every cancel at the
+level, by the quantity the event quoted — pinned and documented as a
+"deterministic choice", and optimistic: a cancel at our level may just as
+well be an order that joined after us, and crediting it moves us up a queue
+we have not actually advanced in.
+
+The simulator now remembers, per resting order of ours, which market
+orders joined the level after it did — an ADD at our price, or a MODIFY
+that increased an order's size and so sent it to the back. A cancel of one
+of those does not advance us. A cancel of a real order that was there
+before us does, by the displayed size the book actually removed. On a
+level without order ids (QUOTE and SNAPSHOT records get synthetic ids) the
+simulator cannot know, and assumes the cancel came from behind. Every one
+of those choices can only reduce fills.
+
+### 22.4 The lesson the goldens could not teach
+
+All three defects were implemented identically in C++, Java and Python,
+and the fills golden passed throughout — before and after. The golden
+sessions simply contain no static crossed display, no dropped event and no
+cancel from behind, so the fix reproduces `expected_replay_fills.json`,
+`expected_mvp.json` and `expected_tca.json` unchanged. Cross-language
+parity told us three implementations agreed. It could not tell us they
+agreed on a rule that fabricated liquidity. That needs a different kind of
+test: an invariant ("filled quantity never exceeds what the market
+displayed or traded") checked over generated event sequences. The existing
+property tests cover filled ≤ submitted, fills inside the order's window
+and an untouched book; the liquidity-conservation invariant is backlog
+(EPICS E31, FZ02).
+
+And the simulator is still a model. None of this calibrates it to real
+fills; that is a separate backlog epic (E27) and, without live or
+paper-venue fills to calibrate against, cannot be done in this repository.
+
+**Check yourself.**
+
+*Q. Why not let simulated fills mutate the replayed book, so the 50 shares
+are simply gone?* Because the tape is the record of what the market did
+without us. Mutating it makes every later event inconsistent with the book
+it is applied to. The overlay keeps the tape authoritative and still stops
+us taking the same shares twice.
+
+*Q. The cancel rule is conservative on QUOTE-driven levels. Is that a
+bias?* Yes, a deliberate one, in the direction that understates passive
+fills. A backtest that is wrong should be wrong against you.
+
+*Q. Did these fixes change any reported result?* No committed number moved:
+the golden sessions do not contain the patterns. Simulated fills of other
+sessions can only shrink.
+
+**Exercise.**
+
+```bash
+cd python
+PYTHONPATH=src python3 -m pytest -q tests/test_execution_rules.py \
+  -k "crossed_display or dropped_by_the_book or as_the_book_saw_it or cancel_from_behind"
+# 4 passed, 60 deselected
+```
+
+Read `test_queue_crossed_display_is_consumed_once_until_it_changes` and
+predict the fill list after each event before reading the asserts.
+
+---
+
+## 23. Statistical power: what a null result is worth
+
+The platform's headline is a null: of the flagship alphas on the bundled
+data, none is promoted. Is that evidence that the validation chain is
+rigorous, or that it cannot find anything?
+
+A null result cannot answer that by itself. A test that never rejects and
+a test that rejects exactly when it should produce the same output on data
+with nothing in it. And for some hypotheses the bundled data has nothing
+in it by construction: in the default generator the aggressor sign is a
+fair coin and no instrument leads another (both planted strengths default
+to zero; §2.3 notes the cross-venue case). Reporting "no effect found"
+there is correct and uninformative — it does not distinguish a working
+detector from a broken one.
+
+What separates them is a **positive control**: put an effect of known size
+into the data and see whether the chain finds it. That is the
+planted-signal power study (`python -m iap.research power`,
+`research/power/POWER_REPORT.md`).
+
+### 23.1 What is planted
+
+The generator gained an opt-in `planted` block. It is off by default, adds
+no random draw when off, and the pinned dataset was regenerated and hashed
+before and after: byte-identical. Two effects:
+
+- **Informed order flow.** The generator precomputes the efficient price
+  path, so it knows the future. With strength `s`, the aggressor of an
+  execution is a buyer with probability
+  `0.5 + 0.5 · s · tanh(g / scale)`, where `g` is a kernel-weighted
+  efficient-price move over the coming seconds (20 one-second steps in the
+  reference configuration). Trade sign leads price —
+  the footprint of informed flow. Detector: EQ04.
+- **Lead-lag.** Every other equity's efficient-price move at step `k`
+  gains `beta` times the leader's move at step `k − lag`. Detector: EQ10.
+
+A *level* scales both (0 is the null, 1 the reference effect of
+`research/power/generator_planted.json`), and a *break* scenario reverses
+both effects from the middle of the sample. Each cell is run on three
+generator seeds through the real feature pipeline and `validate_alpha`.
+
+### 23.2 What came back
+
+From the committed report (rates are over the three seeds of a cell):
+
+| effect | scenario | level | mean gate IC | mean t (within-bucket) | significant | verdict ITERATE or better | PROMOTE |
+|---|---|---:|---:|---:|---:|---:|---:|
+| order flow (EQ04) | stable | 0 | −0.0134 | −1.35 | 0.00 | 0.00 | 0.00 |
+| order flow (EQ04) | stable | 0.5 | +0.0324 | +2.72 | 0.33 | 1.00 | 0.00 |
+| order flow (EQ04) | stable | 1 | +0.0726 | +5.96 | 1.00 | 1.00 | 0.00 |
+| order flow (EQ04) | stable | 2 | +0.1579 | +13.42 | 1.00 | 1.00 | 0.00 |
+| lead-lag (EQ10) | stable | 0 | +0.0006 | +0.65 | 0.00 | 0.33 | 0.00 |
+| lead-lag (EQ10) | stable | 1 | +0.0060 | +1.12 | 0.00 | 0.33 | 0.00 |
+| lead-lag (EQ10) | stable | 2 | +0.0216 | +2.53 | 0.33 | 0.67 | 0.00 |
+| both | break | 0.5 – 2 | within ±0.036 | all negative | 0.00 | 0.00 | 0.00 |
+
+Read it row by row.
+
+- **The chain has power, for one effect.** At the reference size the
+  order-flow effect is flagged significant in three seeds of three; at half
+  size, one of three.
+- **For the other it has almost none.** The lead-lag effect at the
+  reference size is flagged in zero of three seeds, and at twice the size
+  in one of three by the statistic the gate reads. A real effect of that
+  size would be reported as "not found".
+- **The null row is not clean.** With nothing planted, one lead-lag seed
+  of three still came out ITERATE. Its t was nowhere near significant; the
+  ITERATE band is deliberately loose. With three seeds that is one event,
+  not a rate — but it is a false "evidence" and the table shows it.
+- **The break rows behave.** An effect that reverses mid-sample is
+  flagged in no cell, and fold sign consistency falls to between 0.25 and
+  0.50, against 0.83 to 1.00 in the stable cells at the reference size and
+  above.
+- **Nothing is promoted, at any size.** Not even the planted effect with
+  a t of 13. Zero folds survive 1× costs in every cell, and no bootstrap
+  interval for net P&L lies above zero.
+
+That last row is the one that changes how to read the headline. PROMOTE
+requires positive net P&L after costs under the research execution model,
+and in this generator's cost structure even a large, real, stable, planted
+effect does not clear it. So "0 PROMOTE on the bundled data" is not
+evidence that the chain is a strict judge of alpha. It is at least partly
+a statement about the generator's spreads relative to the size of any
+signal in it, traded with a sign-following policy that pays the spread on
+every flip. The significance half of the chain is informative. The
+promotion half has not been shown to be reachable.
+
+### 23.3 What the corrected statistics change
+
+The report scores each run three ways: the within-bucket Newey–West t that
+the gate reads; the **pooled-slope HAC t**, which tests the pooled IC
+directly and keeps signal that lives between buckets; and the within-bucket
+t against a **ledger-derived threshold** — the multiple-testing threshold
+of the study's own 42 tests, t ≥ 3.24 rather than 3. In this grid they
+agree almost everywhere. The one cell where they differ is lead-lag at
+twice the reference size: the pooled t flags two seeds of three where the
+within-bucket t flags one. That is weak evidence the pooled statistic has
+more power for a between-bucket effect, and it is why both are reported
+and neither replaced the pinned one (§24.4).
+
+### 23.4 What this study is not
+
+Three seeds per cell: a rate moves in steps of 0.33, and the report says
+"this calibrates the chain, it is not a precise power curve". The planted
+effects are the generator's own construction, detected by the two alphas
+written for exactly those effects; power against an effect of a different
+shape is unknown. And it is synthetic end to end. A power statement about
+real markets needs real data (EPICS E25).
+
+**Check yourself.**
+
+*Q. The order-flow detector reports a mean IC of −0.013 with t −1.35 on the
+null. Is that a problem?* It is a reminder that "nothing planted" is not
+"nothing there": the generator's microstructure produces small correlations
+of its own (§2.3). The row is not significant and produced no evidence; a
+level-0 row that *was* significant would be the problem.
+
+*Q. Why is a study with three seeds worth committing?* Because the
+alternative was no positive control at all, and because its limits are
+printed in the report. A wider grid is compute, not design.
+
+*Q. What single result here most limits the claims the rest of the
+repository can make?* PROMOTE is zero in every cell. The chain has been
+shown to detect; it has not been shown to promote.
+
+**Exercise.** Run the tiny grid of COOKBOOK recipe 27 and compare its
+`stable` level-1 rows with the three-seed report: which cells agree, and
+which could not possibly agree with one seed? Then run the tests that pin
+the planted generator:
+
+```bash
+cd python && PYTHONPATH=src python3 -m pytest -q tests/test_planted_signals.py
+# 29 passed (about a minute)
+```
+
+---
+
+## 24. Multiple testing, and three ways to game a gate
+
+§6.6 explains the ledger: every look is counted, and the count sets a
+selection yardstick. A count only protects you if it cannot be dodged. The
+v1.3.0 review asked how a researcher — or an automated agent with a goal —
+could get a result past the promotion gate without the result deserving
+it. It found three ways. None needed bad faith; each was a parameter the
+tooling offered.
+
+### 24.1 Cheaper costs
+
+`cost_multiplier` is a legitimate research knob: stress an alpha at 2× and
+see whether it survives. It also accepts 0.5. Every alpha in the registry
+is held at CANDIDATE by the same gate, `net_pnl_after_costs`, so halving
+the costs is the shortest path to a pass. The same goes for running with
+fewer folds, a shorter embargo, a faster latency assumption, a longer
+permitted decision age, or without flattening at the session end.
+
+### 24.2 A chosen holdout
+
+The runner derives its three periods from the dataset's session calendar:
+train on the earlier sessions, purge and embargo, test on the last. The
+spec also accepts explicit periods, which is necessary for reproducing a
+run. It means a caller can choose the holdout — try several and keep the
+one that looks best. The ledger counts each as a look, but the surviving
+result is the maximum of several, and reads like a single test.
+
+### 24.3 Free looks
+
+`--dry-run` computed every statistic, printed it, and wrote nothing —
+including nothing to the ledger. An unlimited supply of uncounted looks:
+run dry until the numbers are good, then run once for the record. The
+denominator the whole multiple-testing argument rests on was optional.
+
+A fourth, accidental variant: two writers. The ledger was read, updated in
+memory and written back. Two processes doing that at once both succeed and
+one update is lost. Lost looks are uncounted looks.
+
+### 24.4 How they are closed
+
+The principle is: **anything can be run; not everything is evidence.**
+Forbidding `cost_multiplier=0.5` would remove a useful experiment. Instead
+the result carries a mark.
+
+- **Gate eligibility.** A result is promotion evidence only if its
+  configuration is at least as conservative as the pinned protocol
+  (`cost_multiplier >= 1.0`, `latency_ns >= 1 s`, `embargo_ns >= 60 s`,
+  `n_folds >= 4`, `max_decision_age_ns <= 60 s`, session flattening on)
+  *and* its periods are the ones derived from the dataset. The runner
+  writes the verdict and the reasons to `eligibility.json` beside the
+  result. In the lifecycle, evidence flagged not eligible makes every gate
+  that reads the research block fail with a null value — exactly as if the
+  number were missing.
+- **A dry run is a look.** `--dry-run` still writes no experiment
+  directory, and now debits the ledger. A rerun of an identical
+  configuration adds nothing, as before.
+- **The ledger is safe for parallel writers.** A lock file created with
+  `O_CREAT | O_EXCL`, the ledger re-read under the lock, this writer's
+  pending records replayed onto the fresh state, a temporary file and an
+  atomic replace. Two processes that both record now both land. A lock
+  left by a killed process is never broken automatically — a human removes
+  it, because the tool cannot know whether the other writer is dead.
+- **The threshold can follow the count.** The ledger has always computed
+  the Bonferroni threshold its count implies, and no gate read it. With
+  `tstat_threshold="ledger"` the PROMOTE gate becomes the larger of 3.0
+  and that threshold — on today's ledger about 4.07 instead of 3. It is
+  opt-in, like every corrected statistic in this release, so that its
+  effect can be measured before it is adopted and no committed verdict
+  moves silently. On the bundled data it would change no verdict: nothing
+  is promoted under either threshold.
+
+Why opt-in rather than simply fixed? Because the committed reports, the
+ledger and the goldens were produced under the pinned definitions, and a
+platform whose numbers change when the code is upgraded has lost the
+ability to say what changed. The pinned default stays reproducible; the
+corrected method sits beside it with a name; docs/RESEARCH_VALIDITY.md
+lists every pair.
+
+What is *not* closed: the determination is made by the runner, in Python,
+on the researcher's own machine. The reader re-derives the configuration
+bounds from the spec, so a hand-edited `eligibility.json` cannot make a
+half-cost run eligible
+(`test_sidecar_cannot_overrule_the_configuration_bounds`). The period check
+needs the dataset, so it is taken from the sidecar as written — and a
+result document produced without the runner at all is not stopped by
+anything in this repository. The stronger controls — pre-registration
+before the data is read, a reserve session on a seed the researcher never
+sees, an authenticated human approval for each promotion — are designed
+and are backlog (EPICS E30).
+
+**Check yourself.**
+
+*Q. An experiment ran with `cost_multiplier=2.0` and `n_folds=6`. Is it
+gate-eligible?* Yes: both are stricter than the protocol. Eligibility is a
+one-sided bound, not an equality.
+
+*Q. A colleague reproduces a published run by passing its three periods
+explicitly. They equal the derived periods. Eligible?* Yes. The rule
+compares the periods with the ones derived from the dataset, not how they
+were supplied.
+
+*Q. Why does the ledger refuse to break a stale lock automatically?* The
+safe failure of a lock is to block. Breaking it on a timeout turns "one
+writer died" into "two writers at once", which is the bug the lock exists
+to prevent.
+
+**Exercise.** COOKBOOK recipe 35 builds an eligible and a non-eligible
+spec and prints the reasons; recipe 29 runs an experiment against the
+ledger-derived threshold on a scratch ledger. Then:
+
+```bash
+cd python && PYTHONPATH=src python3 -m pytest -q \
+  tests/test_research_store_safety.py tests/test_research_validity.py
+# 69 passed
+```
+
+`test_research_store_safety.py` includes the two-process ledger test; read
+it and say what would be lost if the re-read under the lock were removed.
+
+---
+
+## 25. Crash consistency and commit points
+
+A process can be killed between any two instructions. "What is on disk if
+it dies *here*?" has to have a good answer at every line that writes
+state. The Java paper platform's checkpoint did not, in three ways, and
+the research store had the same disease in a milder form.
+
+### 25.1 Two atomic writes are not one atomic checkpoint
+
+A checkpoint is two files: `risk_snapshot.json` (positions, lots, open
+orders, kill latches) and `session_state.json` (the event cursor, P&L, the
+order-id sequence). Each was written correctly — temporary file, `fsync`,
+atomic rename. A crash can still fall *between* the two renames, and then
+the directory holds the risk state of one checkpoint beside the cursor of
+another. Resume from that and the engine replays events its risk state has
+already seen, or skips events it has not.
+
+Atomicity of the parts does not give atomicity of the whole. The fix is
+the oldest one in storage: a **single commit point**.
+
+1. Write the new snapshot, fully and fsynced, under a side name
+   (`risk_snapshot.json.next`). The previous checkpoint is untouched.
+2. Replace `session_state.json` atomically. It now carries the sha256 of
+   exactly those snapshot bytes. *This rename is the commit.*
+3. Rename the snapshot into place.
+
+Crash before step 2: the old state and the old snapshot, a consistent
+pair. Crash between 2 and 3: the new state, and the new snapshot under its
+`.next` name — resume sees that the hash of `risk_snapshot.json` does not
+match, finds that the `.next` file's does, and rolls forward. Any other
+mismatch — an edited, truncated or foreign snapshot — is refused with both
+hashes in the message. There is no instant at which the directory holds a
+cursor and a risk state from different moments.
+
+### 25.2 State that was restored, and state that was not
+
+`--resume` restored the risk engine. It did not restore the strategy's
+*account*, which started flat. A flat account next to a risk engine
+holding 500 shares makes the strategy buy its 500 shares again. And the
+snapshot's open orders were restored faithfully — children of an execution
+simulator that no longer existed, which would therefore never fill, never
+cancel and never report. Each one stayed in every position projection for
+the rest of the session.
+
+Both come from one mistake: restoring one component and leaving the
+components it must agree with at their defaults. Now the account is seeded
+from the restored positions, and the orphaned open orders are released
+through the engine's normal order-done path, with a counter saying how
+many.
+
+### 25.3 The helpful shutdown hook
+
+On SIGTERM a JVM shutdown hook took a final checkpoint. Considerate — and
+a data race. The trading loop holds no lock across an event, so the hook's
+thread serialised the risk engine's maps while the trading thread was
+still mutating them.
+
+The rule: **one writer.** The hook now does nothing but raise a volatile
+flag and wait, bounded, ten seconds. The trading thread reads the flag at
+every event boundary — and between pacing slices when a realtime feed is
+quiet — writes the checkpoint itself, and ends the session in a new state,
+`STOPPED`. If the wait expires the last periodic checkpoint stands, and at
+most one interval is replayed.
+
+The admin kill switch had the mirror-image bug: commands were queued for
+the trading thread, and a kill sent while the feed was quiet waited for
+the next market event, timed out, and was *removed from the queue*. An
+operator pressed the big red button and the platform kept trading. A kill now latches
+the instant it is accepted — the order path sends nothing from that
+moment — is never withdrawn, and answers `202` if the trading thread has
+not recorded it within the wait.
+
+### 25.4 The same pattern in the research store
+
+Different language, same shape. An experiment was two files in a
+directory; a reader could see one without the other. Now the directory is
+staged under `.staging-<id>-<pid>` and moved into place in one rename, and
+a listing skips and reports a directory it cannot read instead of failing.
+A model run id was "the next free number"; two processes could pick the
+same one. Now creating the directory *is* the claim: `mkdir` without
+`exist_ok` either succeeds or tells you someone else got there first.
+
+**Check yourself.**
+
+*Q. Why hash the snapshot instead of putting a sequence number in both
+files?* A sequence number says which checkpoint a file claims to belong
+to. A content hash says the bytes are the ones that were committed. It
+also catches an edited or truncated snapshot, which a counter cannot.
+
+*Q. The audit log is appended and flushed before the state file is
+renamed. After a hard kill it can be longer than the state file says. Is
+that corruption?* No — it is the expected torn case, and the direction is
+deliberate. The extra lines are decisions that happened after the last
+commit. Resume refuses the mismatch rather than guessing, and the runbook
+says what to do; the opposite order would lose decisions silently.
+
+*Q. A `risk_snapshot.json.next` file is sitting in the state directory.
+Delete it?* No. It may be the only copy of the snapshot the committed
+state refers to.
+
+**Exercise.** The Java tests run in CI (`PlatformSafetyTest`:
+`checkpointHasOneCommitPointVerifiedOnResume`,
+`stopRequestCheckpointsOnTheTradingThreadAndResumes`,
+`killLatchesImmediatelyAndIsNeverDropped`); with a JDK,
+`cd java && bash build.sh && bash test.sh`. The Python half runs anywhere:
+
+```bash
+cd python && PYTHONPATH=src python3 -m pytest -q tests/test_research_store_safety.py
+```
+
+Then write down, for `commitCheckpoint`'s three steps, the directory
+contents after a crash following each one, and what `--resume` does with
+it. `docs/DIAGRAMS.md` §13 is the answer key.
+
+---
+
+## 26. Supply-chain hygiene
+
+The code in this repository is a small fraction of the code that runs when
+its CI does. The rest arrives by name — an action, a package, a base image,
+a compiler — and a name is a pointer someone else can move. Supply-chain
+hygiene is replacing names with things that cannot move, and being exact
+about which replacements have actually been made.
+
+### 26.1 Tags move; hashes do not
+
+`uses: actions/checkout@v4` runs whatever the tag `v4` points to when the
+job starts. A tag is mutable: whoever controls that repository, or
+compromises it, can repoint it. Every `uses:` in the three workflows is
+therefore pinned to a 40-character commit SHA, with the human-readable
+version in a trailing comment. A SHA names content. Dependabot is
+configured to propose bumps and rewrites the SHA and the comment together,
+so pinning does not mean never updating — it means updating by a reviewed
+change.
+
+The same idea applies one level down:
+
+- **Base images** are pinned by digest (`FROM debian:bookworm-slim@sha256:…`).
+- **The Rust toolchain** is pinned in `rust/rust-toolchain.toml`, and CI
+  and the Rust Dockerfile name the same version; a harness check fails if
+  they drift.
+- **Tools downloaded in CI** (promtool, kubeconform) are verified against a
+  recorded SHA-256 before they are installed.
+- **Rust dependencies** are locked: every cargo invocation passes
+  `--locked`, so a build fails rather than silently resolving something
+  newer than `Cargo.lock`.
+
+### 26.2 Version pins are weaker than byte pins — say so
+
+Python is the honest exception. `python/requirements-ci.txt` lists the
+exact version of every package CI installs, direct and transitive. Its own
+header says what that is worth: *"No hashes: they were not generated, so
+this pins versions, not bytes."* A version pin stops an unplanned upgrade;
+it does not stop a re-uploaded artefact under the same version. Writing
+the limitation into the file is better than letting a reader assume the
+stronger property.
+
+### 26.3 Least privilege, and provenance
+
+Each workflow starts with `permissions: contents: read`, and a job that
+needs more asks for exactly that (the release job that pushes images gets
+`packages: write`; nothing else does). A compromised step in the test job
+cannot push an image.
+
+The release workflow builds the four images on a `v*` tag, refuses to run
+unless the tagged commit has a green CI run, pushes to the registry,
+attaches a build-provenance attestation to each image and writes a
+manifest of image digests. Deployment manifests are then to be pinned to
+those digests, and the provenance can be verified before deploying.
+
+### 26.4 A control that is only a file
+
+Here the honest part matters most. Several of these controls exist as
+files and not yet as facts:
+
+- The release workflow **has never run**. It can only be exercised by a
+  tag, so its first run is its test.
+- The deployment manifests reference the release **by tag**. They are to
+  be pinned by digest after the first release run produces a manifest.
+- Branch protection, required status checks, required reviews, Dependabot
+  alerts and secret scanning are **repository settings that are not
+  configured**. `docs/governance/REPO_SETTINGS.md` has the commands; until
+  someone runs them, "pull requests only" is a convention one maintainer
+  follows.
+- Tag signing is a practice. Nothing verifies a signature.
+- No image vulnerability scan is wired into a workflow.
+
+A governance document that says "required" where the truth is "not yet
+configured" is worse than no document, because it stops the reader from
+checking. GOVERNANCE.md opens with a table of exactly this: each control,
+whether it is enforced, and by what.
+
+**Check yourself.**
+
+*Q. `--locked` fails the build when `Cargo.lock` is out of date. Isn't
+that a nuisance?* It is the feature. The alternative is a build that
+quietly uses a dependency version nobody reviewed.
+
+*Q. An action is pinned by SHA. What can still go wrong?* The pinned
+commit can itself be malicious or vulnerable — pinning fixes *which* code
+runs, not whether it is good. That is what review of the Dependabot bump,
+and CodeQL over the workflows, are for.
+
+*Q. Why does the import-policy test belong in a chapter about supply
+chain?* It is the same idea turned inward: the trading path is not allowed
+to acquire a dependency on a network or LLM client by accident. A test
+that parses the imports makes that a property of the code, not of
+reviewers' attention (and it, too, has a stated gap: it scans the Python
+packages, not `iap.replay`, and not the other three languages).
+
+**Exercise.**
+
+```bash
+python3 tests/harness/check_deployment.py --verbose | grep -E "image_pinning|workflow_supply_chain|rust_toolchain_pinned"
+#   [ok  ] image_pinning
+#   [ok  ] workflow_supply_chain: 3 workflows
+#   [ok  ] rust_toolchain_pinned: 1.98.1
+cd python && PYTHONPATH=src python3 -m pytest -q tests/test_import_policy.py
+# 25 passed
+```
+
+Then open `.github/workflows/ci.yml`, pick one `uses:` line, and find the
+release that SHA belongs to. That lookup is what a reviewer of a
+Dependabot bump is being asked to do.
+
+---
+
+## 27. Twelve pitfalls this platform is built to avoid
 
 1. **Lookahead in labels or benchmarks.** One pinned at-or-before rule for
    labels, TCA and features; shift-by-one tests enforce it mechanically.
@@ -1647,14 +2514,15 @@ there rather than left for a reader to discover.
 
 ---
 
-## 22. Twelve interview questions (with answers from this repo)
+## 28. Twelve interview questions (with answers from this repo)
 
 **Q1. Why can order-flow imbalance be a real predictor and still lose
 money?**
 Because significance and tradability are different tests. EQ03: OOS IC
-0.026, t 7.24, every non-degenerate fold positive — and −199,913 net at 1×
-costs, since 277 signal flips/hour pay the spread continuously. IC measures
-correlation; P&L measures correlation × horizon × turnover − costs.
+0.030, t 10.6 on uncrossed rows, every fold positive — and −70,651 net at 1×
+costs, since 671 signal flips per active hour pay the spread continuously.
+IC measures correlation; P&L measures correlation × horizon × turnover −
+costs.
 
 **Q2. What is the microprice and when does it beat the mid?**
 `(Pb·Qa + Pa·Qb)/(Qb+Qa)` — the size-weighted touch price that leans toward
@@ -1684,13 +2552,16 @@ the data-generating process, fix the data, not the story.
 **Q5. What is meta-labeling, and what does it mean when the gate keeps zero
 trades?**
 A secondary model predicting whether *acting* on the primary signal is
-profitable net of costs. With a profitable-trade base rate of 0.073,
+profitable net of costs. With a profitable-trade base rate of 0.037,
 calibrated probabilities rarely approach 0.5, so thresholds must be chosen
 on a held-out calibration segment in probability space and evaluated
 economically. On this dataset even the calibration-chosen τ = 0.300 declines
-every test signal — the correct output, since the gate-off alternative
-realized −0.18 net bps/trade. A conviction model must be allowed to say
-"don't trade."
+every test signal, and the gate-off alternative realized −0.20 net
+bps/trade. That looks like a vindication and is not one: a gate that never
+fires has shown neither skill nor the value of abstaining, and the report
+flags it `gate_degenerate`. A conviction model must be allowed to say
+"don't trade" — and a gate that said nothing else must be reported as
+untested.
 
 **Q6. How do you make a portfolio optimizer "production-grade"?**
 Make it deterministic and auditable: pin the algorithm (PGD + prox step,
@@ -1708,8 +2579,9 @@ byte-identical audit-log replay, and kill switches as first-class events.
 **Q8. How do you model queue position for a passive order from public MBO
 data?**
 Track `ahead_qty` = displayed size at your level when you rest; EXECUTEs at
-your level deplete it (overflow fills you), CANCELs decrement it (this repo
-pins the deterministic full-amount choice), trade-throughs and crossing
+your level deplete it (overflow fills you), a CANCEL decrements it only when
+the cancelled order is known to be ahead of you (a real order id that did not
+join the level after you; by the size the book removed), trade-throughs and crossing
 displays fill you entirely, and marketable ADDs — which match silently —
 must be expanded into their per-level consumptions. What's unknowable
 (a MODIFY's queue effect) gets pinned as ignored rather than guessed.
@@ -1768,7 +2640,7 @@ the path does not have is 64 zeros, not a made-up hash.
 
 ---
 
-## 23. Further reading
+## 29. Further reading
 
 Inside this repository, in suggested order:
 
@@ -1788,11 +2660,16 @@ Inside this repository, in suggested order:
    (C++/Rust/Java case study) especially.
 8. `cpp/include/iap/execution/execution.hpp` — the header comment is the
    best short document on deterministic fill modeling in the repo.
+0. `docs/HOW_IT_WORKS.md` — the whole platform top-down in one sitting,
+   before any of the below.
 9. `docs/MVP.md` — the loop end to end, the wiring review, the IC audit and
    the success-criteria table; then `docs/LIFECYCLE.md`,
    `docs/DECISION_TRACE.md` and `docs/DATA_MODEL.md` for the three
    subsystems it exercises, and `docs/ROADMAP.md` for what is done with
    evidence and what is backlog.
+10. `docs/RESEARCH_VALIDITY.md` and `research/power/POWER_REPORT.md` — the
+    opt-in corrected methods and the planted-signal study behind §23–§24;
+    `CHANGELOG.md` for what v1.3.0 fixed and what it leaves open.
 
 Classic external literature these designs draw on (find current editions):
 

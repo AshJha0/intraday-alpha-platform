@@ -10,7 +10,6 @@ from __future__ import annotations
 import math
 
 import pytest
-
 from bruteforce_features import (
     approx,
     at_or_before,
@@ -52,8 +51,12 @@ def eq(contexts):
     engine, vecs = _run(events, contexts)
     book_df, trade_df = book_frames(events)
     return {
-        "events": events, "vecs": vecs, "book": book_df, "trades": trade_df,
-        "chg": mid_change_frame(book_df), "first_ts": events[0].exchange_ts,
+        "events": events,
+        "vecs": vecs,
+        "book": book_df,
+        "trades": trade_df,
+        "chg": mid_change_frame(book_df),
+        "first_ts": events[0].exchange_ts,
         "tick": 0.01,
     }
 
@@ -72,6 +75,7 @@ def _probe(data, i, idx, name):
 
 
 # ------------------------------------------------------------------- price
+
 
 def test_price_ret_log_30s_vs_pandas(eq, idx):
     checked = 0
@@ -103,6 +107,7 @@ def test_price_ret_simple_5s_vs_pandas(eq, idx):
 
 
 # ------------------------------------------------------------------- micro
+
 
 def test_micro_imbalance_l5_and_spread(eq, idx):
     for i in EQ_PROBES:
@@ -147,11 +152,14 @@ def test_micro_queue_depletion_rate_vs_pandas(eq, idx):
 
 # -------------------------------------------------------------------- flow
 
+
 def test_flow_ofi_multilevel_vs_pandas(eq, idx):
-    combos = [("ofi_l1_w1s_v1", "ofi1", 1 * NS),
-              ("ofi_l3_w5s_v1", "ofi3", 5 * NS),
-              ("ofi_l5_w5s_v1", "ofi5", 5 * NS),
-              ("ofi_l10_w30s_v1", "ofi10", 30 * NS)]
+    combos = [
+        ("ofi_l1_w1s_v1", "ofi1", 1 * NS),
+        ("ofi_l3_w5s_v1", "ofi3", 5 * NS),
+        ("ofi_l5_w5s_v1", "ofi5", 5 * NS),
+        ("ofi_l10_w30s_v1", "ofi10", 30 * NS),
+    ]
     checked = 0
     for i in EQ_PROBES:
         for name, col, w_ns in combos:
@@ -188,9 +196,14 @@ def test_flow_signed_volume_and_imbalance_vs_pandas(eq, idx):
 
 def test_flow_cancel_intensity_vs_pandas(eq, idx):
     from iap.core.events import EventType
-    cancels = [(ev.exchange_ts, n) for n, ev in enumerate(eq["events"], 1)
-               if ev.event_type == EventType.CANCEL]
+
+    cancels = [
+        (ev.exchange_ts, n)
+        for n, ev in enumerate(eq["events"], 1)
+        if ev.event_type == EventType.CANCEL
+    ]
     import pandas as pd
+
     cdf = pd.DataFrame(cancels, columns=["ts", "n"])
     checked = 0
     for i in EQ_PROBES:
@@ -206,6 +219,7 @@ def test_flow_cancel_intensity_vs_pandas(eq, idx):
 
 # --------------------------------------------------------------- liquidity
 
+
 def test_liquidity_effective_spread_vs_pandas(eq, idx):
     checked = 0
     for i in EQ_PROBES:
@@ -218,8 +232,7 @@ def test_liquidity_effective_spread_vs_pandas(eq, idx):
             assert not ok
             continue
         tick = eq["tick"]
-        eff = (2.0 * (w.price_ticks * tick - w.mid2 * tick / 2).abs()
-               / (w.mid2 * tick / 2) * 1e4)
+        eff = 2.0 * (w.price_ticks * tick - w.mid2 * tick / 2).abs() / (w.mid2 * tick / 2) * 1e4
         assert ok and approx(got, float(eff.mean()))
         checked += 1
     assert checked >= 2
@@ -234,6 +247,7 @@ def test_liquidity_quoted_depth_total(eq, idx):
 
 # --------------------------------------------------------------------- vol
 
+
 def test_vol_rvol_w1m_vs_pandas(eq, idx):
     checked = 0
     for i in EQ_PROBES:
@@ -242,7 +256,7 @@ def test_vol_rvol_w1m_vs_pandas(eq, idx):
             assert not ok
             continue
         w = window(eq["chg"].dropna(subset=["dlm"]), t, 60 * NS, i)
-        assert ok and approx(got, math.sqrt(float((w.dlm ** 2).sum()) / 60.0))
+        assert ok and approx(got, math.sqrt(float((w.dlm**2).sum()) / 60.0))
         checked += 1
     assert checked >= 3
 
@@ -267,10 +281,12 @@ def test_vol_range_bps_vs_pandas(eq, idx):
 
 # --------------------------------------------------------------------- tod
 
+
 def test_tod_minute_of_day_and_norm_spread(eq, idx):
     # independent expanding-profile recomputation for norm_spread_m5
     tick = eq["tick"]
     import pandas as pd
+
     prof_count = {}
     prof_sum = {}
     checked = 0
@@ -281,8 +297,7 @@ def test_tod_minute_of_day_and_norm_spread(eq, idx):
         # emission time means no spread metric — pinned _metric_value rule)
         state = at_or_before(eq["book"], t, i)
         spread_bps = None
-        if (state is not None and pd.notna(state.bp)
-                and pd.notna(state.ap)):
+        if state is not None and pd.notna(state.bp) and pd.notna(state.ap):
             mid = (state.bp + state.ap) * tick / 2
             spread_bps = (state.ap - state.bp) * tick / mid * 1e4
         bucket = int(((t // NS) % 86_400) // 300)
@@ -304,6 +319,7 @@ def test_tod_minute_of_day_and_norm_spread(eq, idx):
 
 
 # ------------------------------------------------------------------ xasset
+
 
 def test_xasset_ref_ret_is_own_ret_for_reference_instrument(fx, idx):
     """EUR/USD is its own reference: ref_ret_h must equal ret_log_h."""
@@ -335,11 +351,13 @@ def test_xasset_beta_and_corr_self_reference(fx, idx):
 
 # ------------------------------------------------------------------- venue
 
+
 def test_venue_update_share_vs_pandas(fx, idx):
     import pandas as pd
+
     updates = pd.DataFrame(
-        {"ts": [ev.exchange_ts for ev in fx["events"]],
-         "vid": [ev.venue_id for ev in fx["events"]]})
+        {"ts": [ev.exchange_ts for ev in fx["events"]], "vid": [ev.venue_id for ev in fx["events"]]}
+    )
     checked = 0
     for i in FX_PROBES:
         vec = fx["vecs"][i - 1]
@@ -354,12 +372,13 @@ def test_venue_update_share_vs_pandas(fx, idx):
         assert vec.validity[j]
         assert approx(vec.values[j], float(shares.max()))
         j = idx["venue_update_hhi_w10s_v1"]
-        assert approx(vec.values[j], float((shares ** 2).sum()))
+        assert approx(vec.values[j], float((shares**2).sum()))
         checked += 1
     assert checked >= 2
 
 
 # ------------------------------------------------------------------ regime
+
 
 def test_regime_meanrev_vs_pandas(eq, idx):
     checked = 0
@@ -374,7 +393,7 @@ def test_regime_meanrev_vs_pandas(eq, idx):
             continue
         now = at_or_before(eq["chg"], t, i)
         mean = float(w.mid2.mean())
-        var = float((w.mid2 ** 2).mean()) - mean * mean
+        var = float((w.mid2**2).mean()) - mean * mean
         std = math.sqrt(max(var, 0.0))
         assert ok and approx(got, -(now.mid2 - mean) / (std + 1e-12))
         checked += 1
@@ -382,6 +401,7 @@ def test_regime_meanrev_vs_pandas(eq, idx):
 
 
 # -------------------------------------------------------------------- exec
+
 
 def test_exec_half_spread_and_fill_prob_consistency(eq, idx):
     for i in EQ_PROBES:
@@ -395,16 +415,17 @@ def test_exec_half_spread_and_fill_prob_consistency(eq, idx):
         jq = idx["depth_bid_l1_v1"]
         jf = idx["fill_prob_bid_h1s_v1"]
         if vec.validity[jd] and vec.validity[jq] and vec.validity[jf]:
-            expected = 1.0 - math.exp(
-                -vec.values[jd] * 1.0 / vec.values[jq])
+            expected = 1.0 - math.exp(-vec.values[jd] * 1.0 / vec.values[jq])
             assert approx(vec.values[jf], expected)
 
 
 # -------------------------------------------------------- jump detector trim
 
+
 def _quote(seq, side, price, qty, ts):
     from conftest import mkev
     from iap.core.events import EventType
+
     return mkev(seq, EventType.QUOTE, side, price, qty, order_id=seq, ts=ts)
 
 
@@ -436,9 +457,7 @@ def test_jump_detector_trims_stale_rvol_window(contexts):
     # long quiet gap: every warm-phase sample is now OLDER than 1m
     t_jump = t + 80_000_000_000
     q(0, 1040, t_jump)  # big move; stale-window mean would flag a jump
-    assert st.jumps.count == 0, (
-        "stale samples outside (t-1m, t] contaminated the jump baseline"
-    )
+    assert st.jumps.count == 0, "stale samples outside (t-1m, t] contaminated the jump baseline"
 
     # control: rebuild a warm in-window baseline, then a genuine jump fires
     for k in range(JUMP_MIN_OBS + 35):

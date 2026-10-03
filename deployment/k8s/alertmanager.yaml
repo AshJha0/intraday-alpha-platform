@@ -1,0 +1,123 @@
+# =============================================================================
+# alertmanager — alert routing for Prometheus (deployment/alertmanager/).
+# Routing comes from the GENERATED iap-alertmanager-config ConfigMap
+# (configmap-alertmanager.yaml — regenerate with generate_configmaps.py).
+#
+# The webhook receiver URL is a secret and is NOT in the repo: alertmanager.yml
+# reads it from /etc/alertmanager/secrets/webhook_url (`url_file`), which this
+# pod mounts from the iap-alertmanager-webhook Secret. Create it out of band
+# before first apply (the pod stays in ContainerCreating until it exists):
+#   kubectl -n intraday-alpha create secret generic iap-alertmanager-webhook \
+#     --from-literal=url='<https webhook URL>'
+# Until a real URL is supplied, alerts are routed and visible in the
+# Alertmanager UI but not delivered anywhere.
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager
+  namespace: intraday-alpha
+  labels:
+    app.kubernetes.io/part-of: intraday-alpha-platform
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/component: observability
+    app.kubernetes.io/version: "v0.27.0"
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate   # single notification-log volume; never two instances
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: alertmanager
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/part-of: intraday-alpha-platform
+        app.kubernetes.io/name: alertmanager
+        app.kubernetes.io/component: observability
+        app.kubernetes.io/version: "v0.27.0"
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: alertmanager
+          image: prom/alertmanager:v0.27.0@sha256:e13b6ed5cb929eeaee733479dce55e10eb3bc2e9c4586c705a4e8da41e5eacf5
+          imagePullPolicy: IfNotPresent
+          args:
+            - --config.file=/etc/alertmanager/config/alertmanager.yml
+            - --storage.path=/alertmanager
+          ports:
+            - name: http
+              containerPort: 9093
+          volumeMounts:
+            - name: config
+              mountPath: /etc/alertmanager/config
+              readOnly: true
+            - name: webhook
+              mountPath: /etc/alertmanager/secrets
+              readOnly: true
+            - name: data
+              mountPath: /alertmanager
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          livenessProbe:
+            httpGet:
+              path: /-/healthy
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+      volumes:
+        - name: config
+          configMap:
+            name: iap-alertmanager-config
+            items:
+              - key: alertmanager.yml
+                path: alertmanager.yml
+        - name: webhook
+          secret:
+            secretName: iap-alertmanager-webhook
+            items:
+              - key: url
+                path: webhook_url
+        - name: data
+          emptyDir: {}   # silences/notification log are rebuildable; use a PVC to keep silences across restarts
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager
+  namespace: intraday-alpha
+  labels:
+    app.kubernetes.io/part-of: intraday-alpha-platform
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/component: observability
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: alertmanager
+  ports:
+    - name: http
+      port: 9093
+      targetPort: http

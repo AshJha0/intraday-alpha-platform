@@ -30,11 +30,11 @@ f(w) = alpha·w  -  lambda * wᵀ Σ w  -  Σ_i tc_i * |w_i - w_prev_i|
 | name | definition |
 |---|---|
 | position box | `w_min_i <= w_i <= w_max_i` |
-| participation | `|w_i - w_prev_i| <= participation_i` |
-| net exposure | `|Σ_i w_i| <= net_cap` |
-| currency exposure | `|(E w)_c| <= currency_bounds_c` for each currency c |
-| gross exposure | `Σ_i |w_i| <= gross_cap` |
-| turnover | `Σ_i |w_i - w_prev_i| <= turnover_cap` |
+| participation | `\|w_i - w_prev_i\| <= participation_i` |
+| net exposure | `\|Σ_i w_i\| <= net_cap` |
+| currency exposure | `\|(E w)_c\| <= currency_bounds_c` for each currency c |
+| gross exposure | `Σ_i \|w_i\| <= gross_cap` |
+| turnover | `Σ_i \|w_i - w_prev_i\| <= turnover_cap` |
 | volatility target | `sqrt(wᵀ Σ w) <= vol_target` |
 
 Currency exposure matrix `E` (currencies × pairs): for pair column
@@ -100,7 +100,7 @@ as `u_1 >= ... >= u_n`; with cumulative sums `c_j = Σ_{i<=j} u_i`, let
 
 | parameter | default |
 |---|---|
-| `eta0` | `null` → auto: `1 / max(2*lambda*maxRowSum(|Σ|), 1e-6)` |
+| `eta0` | `null` → auto: `1 / max(2*lambda*maxRowSum(\|Σ\|), 1e-6)` |
 | `step_decay` | 0.01 |
 | `iters` | 500 |
 | `proj_passes` | 8 |
@@ -294,3 +294,25 @@ cpu_count, machine, system, python}` — plus `metrics.json` and `model.pkl`.
   `qty_unit = lot_size` for FX and `1` for EQUITY/ETF; passing lot counts
   against a base-unit ADV understates FX impact by `lot_size` and is a
   contract violation.
+- **Opt-in research cost and fill options (Python `iap.backtest`, v1.3.0;
+  every default is the pinned behaviour above, and the simulator, the Java
+  services and every committed report use the defaults).**
+  `CostModel(impact_model="sqrt", sqrt_impact_coeff_bps=...)` replaces the
+  linear impact with `sqrt_impact_coeff_bps × sqrt(|q| × unit / adv)` bps
+  (the coefficient is the impact of trading one full ADV); both keys are
+  read from the `cost_model` config block when present and the committed
+  config does not carry them. `CostModel.breakeven_size` /
+  `iap.validation.metrics.capacity_breakeven` give the order size at which
+  the edge per round trip equals spread + fee + impact — 0 when the edge
+  does not cover spread + fee, `inf` when the model charges no impact —
+  beside the pinned capacity proxy `max_participation × ADV × price`, which
+  no gate stopped reading. `BacktestConfig(cap_fills_at_l1=True)` caps
+  each fill at the displayed L1 size on the side it takes (default: any
+  size at the touch); `BacktestConfig(position_policy="cost_aware",
+  horizon_ns=..., hysteresis=0.5)` enters only when `|expected_return|`
+  exceeds the row's round-trip cost, holds to the label horizon or an
+  opposite signal that itself clears the cost, and renews an expired hold
+  only above `hysteresis ×` that cost (default policy `"sign"`: the sign of
+  the expected return, re-decided every row);
+  `BacktestConfig(block_rows_column="label_valid_<h>")` makes no decision
+  on rows where that column is false (default: every row trades).

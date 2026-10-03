@@ -59,6 +59,28 @@ schema, ``x-version`` 1:
 IC baselines use ``"kind": "ic"`` and replace edges/expected_frac with
 ``{"ic_mean", "ic_std", "n_buckets_baseline", "bucket_ns", "horizon"}``.
 
+4. **Two-sample HAC z** (opt-in alternative to monitor 3;
+   :func:`rolling_ic_z_hac`, selected with ``adaptive.ic_z_method = "hac"``
+   — the pinned z of monitor 3 stays the default and the cross-language
+   contract).  The pinned z treats the baseline mean as a known constant
+   and the live bucket ICs as independent and equally informative.  None of
+   the three holds: the baseline mean is itself an estimate from
+   ``n_buckets_baseline`` buckets; bucket ICs of overlapping-label signals
+   are autocorrelated; and fixed time buckets carry very different pair
+   counts.  The corrected statistic is the two-sample form
+
+       z = (mean_w(live) - ic_mean) / sqrt(var_live + var_base)
+
+   where ``mean_w`` / ``var_live`` are the pair-count-weighted mean of the
+   live bucket ICs and its Bartlett (Newey-West) variance
+   (:func:`iap.validation.metrics.hac_mean_variance`, lag rule
+   :func:`iap.validation.metrics.nw_lags`), and ``var_base`` is the variance
+   of the baseline mean: HAC from the baseline's own bucket series when the
+   caller has it, otherwise ``ic_std^2 / n_buckets_baseline`` (all the
+   serialized baseline can support).  It is never larger in magnitude than
+   the pinned z on independent equal buckets, and it does not fire on the
+   baseline's own sampling error.
+
 Everything here is deterministic and wall-clock-free (conventions §3).
 """
 
@@ -68,11 +90,16 @@ import json
 import math
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
-from iap.validation.metrics import bucket_ics
+from iap.validation.metrics import (
+    HORIZONS_NS,
+    bucket_ics,
+    bucket_ics_with_counts,
+    hac_mean_variance,
+    nw_lags,
+)
 
 PSI_EPS = 1e-6
 PSI_BUCKETS = 10
@@ -100,6 +127,7 @@ def _registry_hash() -> str:
     """Current feature-registry hash (empty if the registry is unavailable)."""
     try:
         from iap.features.registry import registry_hash
+
         return registry_hash()
     except Exception:  # pragma: no cover - registry always present in-repo
         return ""
@@ -130,13 +158,13 @@ def _check_feature_version(blob: dict, expected, what: str) -> str:
 class DriftBaseline:
     """Pinned PSI baseline for one scalar distribution (schema above)."""
 
-    kind: str                 # "signal" | "feature"
+    kind: str  # "signal" | "feature"
     name: str
     alpha_id: str
     source: str
     n: int
-    edges: Tuple[float, ...]           # 9 interior decile edges
-    expected_frac: Tuple[float, ...]   # 10 baseline bucket fractions
+    edges: tuple[float, ...]  # 9 interior decile edges
+    expected_frac: tuple[float, ...]  # 10 baseline bucket fractions
     mean: float
     std: float
     min: float
@@ -153,7 +181,7 @@ class DriftBaseline:
             raise ValueError(
                 f"baseline needs {PSI_BUCKETS} expected fractions, got {len(self.expected_frac)}"
             )
-        if any(b < a for a, b in zip(self.edges, self.edges[1:])):
+        if any(b < a for a, b in zip(self.edges, self.edges[1:], strict=False)):
             raise ValueError("baseline edges must be non-decreasing")
 
     # -- serialization ----------------------------------------------------
@@ -183,15 +211,15 @@ class DriftBaseline:
         path.write_text(json.dumps(self.to_dict(), indent=2, sort_keys=True) + "\n")
 
     @staticmethod
-    def from_dict(blob: dict, expected_feature_version="") -> "DriftBaseline":
+    def from_dict(blob: dict, expected_feature_version="") -> DriftBaseline:
         if int(blob.get("x-version", 0)) != BASELINE_VERSION:
             raise ValueError(
                 f"unsupported baseline x-version {blob.get('x-version')!r} "
                 f"(pinned {BASELINE_VERSION}); see MIGRATIONS.md"
             )
         fv = _check_feature_version(
-            blob, expected_feature_version,
-            f"baseline {blob.get('name')!r}")
+            blob, expected_feature_version, f"baseline {blob.get('name')!r}"
+        )
         if int(blob.get("n_buckets", 0)) != PSI_BUCKETS:
             raise ValueError("baseline n_buckets mismatch (pinned 10)")
         if float(blob.get("psi_eps", -1.0)) != PSI_EPS:
@@ -212,9 +240,8 @@ class DriftBaseline:
         )
 
     @staticmethod
-    def load(path, expected_feature_version="") -> "DriftBaseline":
-        return DriftBaseline.from_dict(
-            json.loads(Path(path).read_text()), expected_feature_version)
+    def load(path, expected_feature_version="") -> DriftBaseline:
+        return DriftBaseline.from_dict(json.loads(Path(path).read_text()), expected_feature_version)
 
 
 def bucket_counts(values: np.ndarray, edges) -> np.ndarray:
@@ -237,9 +264,7 @@ def capture_baseline(
     module docstring).  Raises on < MIN_BASELINE_N finite values."""
     v = _finite(values)
     if v.size < MIN_BASELINE_N:
-        raise ValueError(
-            f"baseline {name!r}: need >= {MIN_BASELINE_N} finite values, got {v.size}"
-        )
+        raise ValueError(f"baseline {name!r}: need >= {MIN_BASELINE_N} finite values, got {v.size}")
     q = np.arange(1, PSI_BUCKETS) / PSI_BUCKETS
     edges = np.quantile(v, q)  # linear interpolation (numpy default), pinned
     counts = bucket_counts(v, edges)
@@ -259,7 +284,7 @@ def capture_baseline(
     )
 
 
-def psi(baseline: DriftBaseline, values, min_samples: int = 1) -> Optional[float]:
+def psi(baseline: DriftBaseline, values, min_samples: int = 1) -> float | None:
     """Population stability index of ``values`` against ``baseline``
     (pinned formula, module docstring).  None with < min_samples finite
     values — a monitor with no data must not report stability."""
@@ -310,7 +335,7 @@ def ks_pvalue(d: float, n_a: int, n_b: int) -> float:
     return float(min(1.0, max(0.0, 2.0 * total)))
 
 
-def ks_test(a, b) -> Tuple[float, float]:
+def ks_test(a, b) -> tuple[float, float]:
     """(D, asymptotic p-value) for two samples."""
     x = _finite(a)
     y = _finite(b)
@@ -331,7 +356,7 @@ class ICBaseline:
     alpha_id: str
     source: str
     ic_mean: float
-    ic_std: float                 # population std (ddof=0) of bucket ICs
+    ic_std: float  # population std (ddof=0) of bucket ICs
     n_buckets_baseline: int
     bucket_ns: int
     horizon: str
@@ -362,17 +387,16 @@ class ICBaseline:
         path.write_text(json.dumps(self.to_dict(), indent=2, sort_keys=True) + "\n")
 
     @staticmethod
-    def from_dict(blob: dict, expected_feature_version="") -> "ICBaseline":
-        if int(blob.get("x-version", 0)) != BASELINE_VERSION \
-                or blob.get("kind") != "ic":
+    def from_dict(blob: dict, expected_feature_version="") -> ICBaseline:
+        if int(blob.get("x-version", 0)) != BASELINE_VERSION or blob.get("kind") != "ic":
             raise ValueError(
                 f"not a v{BASELINE_VERSION} IC baseline "
                 f"(x-version {blob.get('x-version')!r}, kind "
                 f"{blob.get('kind')!r}); see MIGRATIONS.md"
             )
         fv = _check_feature_version(
-            blob, expected_feature_version,
-            f"IC baseline {blob.get('name')!r}")
+            blob, expected_feature_version, f"IC baseline {blob.get('name')!r}"
+        )
         kind = str(blob.get("baseline_kind", "")).lower()
         if kind != "oos":
             # An IN-SAMPLE baseline (the warmup model scored on its own
@@ -398,9 +422,8 @@ class ICBaseline:
         )
 
     @staticmethod
-    def load(path, expected_feature_version="") -> "ICBaseline":
-        return ICBaseline.from_dict(
-            json.loads(Path(path).read_text()), expected_feature_version)
+    def load(path, expected_feature_version="") -> ICBaseline:
+        return ICBaseline.from_dict(json.loads(Path(path).read_text()), expected_feature_version)
 
 
 def capture_ic_baseline(
@@ -427,9 +450,7 @@ def capture_ic_baseline(
         raise ValueError("IC baselines must be out-of-sample (baseline_kind='oos')")
     bics = bucket_ics(ts, scores, labels, bucket_ns=bucket_ns)
     if bics.size < min_buckets:
-        raise ValueError(
-            f"ic baseline {name!r}: need >= {min_buckets} IC buckets, got {bics.size}"
-        )
+        raise ValueError(f"ic baseline {name!r}: need >= {min_buckets} IC buckets, got {bics.size}")
     return ICBaseline(
         name=name,
         alpha_id=alpha_id,
@@ -448,10 +469,10 @@ def capture_ic_baseline(
 class ICWindowResult:
     """One rolling-IC evaluation."""
 
-    rolling_ic: Optional[float]   # mean live bucket IC (None: too little data)
-    z: Optional[float]            # z vs baseline (None: unavailable/degenerate)
+    rolling_ic: float | None  # mean live bucket IC (None: too little data)
+    z: float | None  # z vs baseline (None: unavailable/degenerate)
     n_buckets: int = 0
-    bucket_ics: List[float] = field(default_factory=list)
+    bucket_ics: list[float] = field(default_factory=list)
 
 
 def rolling_ic_z(
@@ -470,11 +491,87 @@ def rolling_ic_z(
     mean_live = float(bics.mean())
     if baseline.ic_std <= _STD_EPS:
         return ICWindowResult(
-            rolling_ic=mean_live, z=None, n_buckets=int(bics.size),
+            rolling_ic=mean_live,
+            z=None,
+            n_buckets=int(bics.size),
             bucket_ics=[float(v) for v in bics],
         )
     z = (mean_live - baseline.ic_mean) / (baseline.ic_std / math.sqrt(bics.size))
     return ICWindowResult(
-        rolling_ic=mean_live, z=float(z), n_buckets=int(bics.size),
+        rolling_ic=mean_live,
+        z=float(z),
+        n_buckets=int(bics.size),
+        bucket_ics=[float(v) for v in bics],
+    )
+
+
+#: Pinned IC z methods: the cross-language contract and the opt-in HAC form.
+IC_Z_METHODS = ("pinned", "hac")
+
+
+def two_sample_hac_z(
+    live_mean: float,
+    live_var: float,
+    base_mean: float,
+    base_var: float,
+) -> float | None:
+    """``(live_mean - base_mean) / sqrt(live_var + base_var)``; ``None`` when
+    either variance is unavailable or their sum is not positive."""
+    if not (
+        math.isfinite(live_mean)
+        and math.isfinite(base_mean)
+        and math.isfinite(live_var)
+        and math.isfinite(base_var)
+    ):
+        return None
+    total = live_var + base_var
+    if live_var < 0.0 or base_var < 0.0 or total <= _STD_EPS * _STD_EPS:
+        return None
+    return float((live_mean - base_mean) / math.sqrt(total))
+
+
+def rolling_ic_z_hac(
+    baseline: ICBaseline,
+    ts: np.ndarray,
+    scores: np.ndarray,
+    labels: np.ndarray,
+    min_buckets: int = 4,
+    lags: int | None = None,
+    baseline_bucket_ics: np.ndarray | None = None,
+    baseline_bucket_counts: np.ndarray | None = None,
+) -> ICWindowResult:
+    """Rolling realized IC vs the baseline as a two-sample HAC z (monitor 4
+    of the module docstring).
+
+    ``lags`` defaults to :func:`nw_lags` of the baseline's horizon and
+    bucket.  ``baseline_bucket_ics`` / ``baseline_bucket_counts`` are the
+    research window's own bucket series when the caller still has it (the
+    baseline mean and its HAC variance are then recomputed from it, pair
+    weighted); without them the serialized ``ic_mean`` and
+    ``ic_std^2 / n_buckets_baseline`` are used.  ``rolling_ic`` is the
+    pair-count-weighted live mean — the quantity the z is about.
+    """
+    if lags is None:
+        lags = nw_lags(HORIZONS_NS[baseline.horizon], baseline.bucket_ns)
+    bics, counts = bucket_ics_with_counts(ts, scores, labels, bucket_ns=baseline.bucket_ns)
+    n = int(bics.size)
+    if n < max(min_buckets, 1):
+        return ICWindowResult(rolling_ic=None, z=None, n_buckets=n)
+    live_mean, live_var, _ = hac_mean_variance(bics, lags=lags, weights=counts)
+    if baseline_bucket_ics is not None:
+        base_mean, base_var, _ = hac_mean_variance(
+            baseline_bucket_ics, lags=lags, weights=baseline_bucket_counts
+        )
+    else:
+        base_mean = baseline.ic_mean
+        base_var = (
+            baseline.ic_std**2 / baseline.n_buckets_baseline
+            if baseline.n_buckets_baseline > 0
+            else float("nan")
+        )
+    return ICWindowResult(
+        rolling_ic=float(live_mean),
+        z=two_sample_hac_z(live_mean, live_var, base_mean, base_var),
+        n_buckets=n,
         bucket_ics=[float(v) for v in bics],
     )

@@ -12,8 +12,6 @@ from __future__ import annotations
 import json
 
 import pytest
-from jsonschema import Draft202012Validator
-
 from iap.contracts.examples import (
     GOLDEN_X_VERSION,
     all_examples,
@@ -37,6 +35,7 @@ from iap.contracts.versions import (
     content_hash,
     schema_dir,
 )
+from jsonschema import Draft202012Validator
 
 GOLDEN_NAME = "expected_contracts_examples.json"
 
@@ -68,14 +67,14 @@ NEW_SCHEMAS = (
 
 @pytest.fixture(scope="module")
 def golden(golden_dir):
-    with open(golden_dir / GOLDEN_NAME, "r", encoding="utf-8") as fh:
+    with open(golden_dir / GOLDEN_NAME, encoding="utf-8") as fh:
         return json.load(fh)
 
 
 @pytest.mark.parametrize("relpath", sorted(SCHEMA_VERSIONS))
 def test_schema_file_is_consistent(relpath):
     path = schema_dir() / relpath
-    with open(path, "r", encoding="utf-8") as fh:
+    with open(path, encoding="utf-8") as fh:
         doc = json.load(fh)
     assert doc["$schema"] == "https://json-schema.org/draft/2020-12/schema"
     assert doc["$id"] == SCHEMA_BASE_URI + relpath
@@ -177,8 +176,11 @@ def test_explain_matches_pinned_block(golden):
 
 def test_trace_id_pinned(golden):
     t = golden["trace_id"]
-    assert make_trace_id(t["session_id"], t["instrument_id"], t["event_ts"],
-                         t["sequence"]) == t["expected"] == EXPECTED_TRACE_ID
+    assert (
+        make_trace_id(t["session_id"], t["instrument_id"], t["event_ts"], t["sequence"])
+        == t["expected"]
+        == EXPECTED_TRACE_ID
+    )
     assert example_trace().trace_id == EXPECTED_TRACE_ID
 
 

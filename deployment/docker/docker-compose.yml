@@ -9,7 +9,10 @@
 #                  monitoring API live on :8080 — /metrics, /health, /ready,
 #                  /status, POST /admin/* when GRAFANA-style secrets provide
 #                  IAP_ADMIN_TOKEN)
-#   prometheus  -> scrapes java-platform (the only metrics producer)
+#   prometheus  -> scrapes java-platform (the only metrics producer) and
+#                  sends alerts to alertmanager (webhook receiver; the
+#                  always-firing Watchdog alert proves the path end to end)
+#   alertmanager -> routes alerts to the webhook whose URL is a secret file
 #   grafana     -> provisioned dashboards (deployment/grafana/)
 #
 # The rust-telemetry-exporter sidecar was REMOVED in round 3: no Rust binary
@@ -18,12 +21,14 @@
 #
 # Run from the repo root:   docker compose -f deployment/docker/docker-compose.yml up --build
 #
-# Image pinning: iap/* images are built from this repo; third-party images are
-# tag-pinned here and MUST be digest-pinned at release, e.g.
-#   image: prom/prometheus:v2.53.0@sha256:<digest recorded in release manifest>
-# (kept symbolic in-repo: this environment builds offline and cannot resolve
-# digests). All images build offline-agnostic — in particular the Java image
-# uses NO Maven (Maven Central unreachable; see docs/BUILD_NOTES.md).
+# Image pinning: the iap images are built from this repo here (`build:`) and are
+# named after the GHCR images .github/workflows/release.yml publishes
+# (ghcr.io/ashjha0/intraday-alpha-platform-<lang>:<tag>); pulling instead of
+# building uses the same names. The release step pins each of them by digest
+# from release-manifest.json (<name>:<tag>@sha256:...). Third-party images are
+# pinned here by tag AND digest. All images build offline-agnostic — in
+# particular the Java image uses NO Maven (Maven Central unreachable; see
+# docs/BUILD_NOTES.md).
 # =============================================================================
 
 name: intraday-alpha-platform
@@ -32,6 +37,11 @@ volumes:
   iap-data: {}        # generated market data — never baked into images
   prom-data: {}
   grafana-data: {}
+  alertmanager-data: {}
+
+secrets:
+  alert_webhook_url:
+    file: ${ALERT_WEBHOOK_URL_FILE:-../alertmanager/webhook_url.placeholder}
 
 networks:
   iap-net:
@@ -43,7 +53,7 @@ services:
     build:
       context: ../..
       dockerfile: deployment/docker/Dockerfile.python
-    image: iap/python:1.0.0
+    image: ghcr.io/ashjha0/intraday-alpha-platform-python:v1.3.0
     container_name: iap-data-generator
     # Deterministic batch job: identical seed => bit-identical /data outputs
     # (configs/marketdata/generator.json pins seed 20260829). Runs to completion; the
@@ -64,7 +74,7 @@ services:
     build:
       context: ../..
       dockerfile: deployment/docker/Dockerfile.cpp
-    image: iap/cpp:1.0.0
+    image: ghcr.io/ashjha0/intraday-alpha-platform-cpp:v1.3.0
     container_name: iap-cpp-replay
     # Deterministic replay + execution-sim pass over the golden vectors;
     # writes its methodology/results table to the shared volume.
@@ -81,7 +91,7 @@ services:
     build:
       context: ../..
       dockerfile: deployment/docker/Dockerfile.rust
-    image: iap/rust:1.0.0
+    image: ghcr.io/ashjha0/intraday-alpha-platform-rust:v1.3.0
     container_name: iap-rust-replay
     command: ["/golden"]
     restart: "no"
@@ -97,7 +107,7 @@ services:
     build:
       context: ../..
       dockerfile: deployment/docker/Dockerfile.java
-    image: iap/java:1.0.0
+    image: ghcr.io/ashjha0/intraday-alpha-platform-java:v1.3.0
     container_name: iap-java-platform
     # The paper-trading vertical (com.iap.platform.PaperTrading) over the
     # golden equity vector, paced 60x realtime, serving GET /metrics
@@ -113,8 +123,13 @@ services:
     restart: on-failure
     networks: [iap-net]
     ports:
-      - "8080:8080"
+      # Loopback only: /metrics, /status and the admin API are not for the LAN.
+      - "127.0.0.1:8080:8080"
     environment:
+      # The server defaults to 127.0.0.1 inside the container; bind all
+      # interfaces so Prometheus (iap-net) and the published loopback port
+      # reach it.
+      IAP_BIND_ADDR: 0.0.0.0
       # PLATFORM_CONVENTIONS.md §12.2: the entrypoint reads IAP_CONFIG_DIR, so
       # the bind mount below is what the process actually loads. This makes the
       # kill-switch runbook's config path real:
@@ -125,6 +140,11 @@ services:
       # routes are not registered. Set IAP_ADMIN_TOKEN in the environment or an
       # .env file (git-ignored, SECURITY.md) to enable the manual halt path.
       IAP_ADMIN_TOKEN: ${IAP_ADMIN_TOKEN:-}
+    # Immutable root filesystem: the JVM writes only to /tmp (tmpfs) and the
+    # /data volume.
+    read_only: true
+    tmpfs:
+      - /tmp
     volumes:
       # configs mounted READ-ONLY over the baked-in copy: an operator edit plus
       # a restart is a real config change (round-3 SEV-1).
@@ -149,18 +169,19 @@ services:
 
   # ----------------------------------------------------------- observability
   prometheus:
-    image: prom/prometheus:v2.53.0
-    # digest-pin at release: prom/prometheus:v2.53.0@sha256:<record-me>
+    image: prom/prometheus:v2.53.0@sha256:075b1ba2c4ebb04bc3a6ab86c06ec8d8099f8fda1c96ef6d104d9bb1def1d8bc
     container_name: iap-prometheus
     restart: unless-stopped
     networks: [iap-net]
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     volumes:
       - ../prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ../prometheus/recording.yml:/etc/prometheus/recording.yml:ro
       - ../prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
       - prom-data:/prometheus
+    depends_on:
+      - alertmanager
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
@@ -176,9 +197,39 @@ services:
       timeout: 5s
       retries: 3
 
+  alertmanager:
+    image: prom/alertmanager:v0.27.0@sha256:e13b6ed5cb929eeaee733479dce55e10eb3bc2e9c4586c705a4e8da41e5eacf5
+    container_name: iap-alertmanager
+    restart: unless-stopped
+    networks: [iap-net]
+    ports:
+      - "127.0.0.1:9093:9093"
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    volumes:
+      - ../alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    # The webhook receiver URL is a secret (it usually embeds a token): it is
+    # read from this file at send time (alertmanager.yml `url_file`), never
+    # written into the config. Point ALERT_WEBHOOK_URL_FILE at a git-ignored
+    # file containing the URL; the default is a placeholder that goes nowhere.
+    secrets:
+      - source: alert_webhook_url
+        target: /etc/alertmanager/secrets/webhook_url
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9093/-/healthy >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
   grafana:
-    image: grafana/grafana:11.1.0
-    # digest-pin at release: grafana/grafana:11.1.0@sha256:<record-me>
+    image: grafana/grafana:11.1.0@sha256:079600c9517b678c10cda6006b4487d3174512fd4c6cface37df7822756ed7a5
     container_name: iap-grafana
     restart: unless-stopped
     networks: [iap-net]

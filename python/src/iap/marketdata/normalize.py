@@ -46,7 +46,6 @@ from __future__ import annotations
 import json
 from collections import deque
 from pathlib import Path
-from typing import Deque, Dict, List, Set, Tuple
 
 from iap.core.codec import iter_jsonl, write_iap1, write_jsonl
 from iap.core.events import FIELDS, MarketEvent, validation_error
@@ -68,7 +67,7 @@ _COUNTER_KEYS = (
 )
 
 
-def _new_counter() -> Dict[str, int]:
+def _new_counter() -> dict[str, int]:
     return {k: 0 for k in _COUNTER_KEYS}
 
 
@@ -78,8 +77,8 @@ class _StreamQC:
     __slots__ = ("recent", "recent_set", "max_seq", "max_exchange_ts", "epoch", "started")
 
     def __init__(self) -> None:
-        self.recent: Deque[int] = deque()
-        self.recent_set: Set[int] = set()
+        self.recent: deque[int] = deque()
+        self.recent_set: set[int] = set()
         self.max_seq = 0
         self.max_exchange_ts = 0
         self.epoch = 0
@@ -98,15 +97,20 @@ class _StreamQC:
 
 
 def _drop_ts_regressions(
-    kept: List[Tuple[MarketEvent, int]], per_stream: Dict[str, Dict[str, int]]
-) -> List[Tuple[MarketEvent, int]]:
+    kept: list[tuple[MarketEvent, int]], per_stream: dict[str, dict[str, int]]
+) -> list[tuple[MarketEvent, int]]:
     """Drop in-stream exchange_ts regressions (checked in (epoch, sequence) order)."""
     order = sorted(
         range(len(kept)),
-        key=lambda i: (kept[i][0].venue_id, kept[i][0].instrument_id, kept[i][1],
-                       kept[i][0].sequence, kept[i][0].event_id),
+        key=lambda i: (
+            kept[i][0].venue_id,
+            kept[i][0].instrument_id,
+            kept[i][1],
+            kept[i][0].sequence,
+            kept[i][0].event_id,
+        ),
     )
-    drop: Set[int] = set()
+    drop: set[int] = set()
     last_key = None
     running_max = 0
     for i in order:
@@ -129,16 +133,16 @@ def _drop_ts_regressions(
 def normalize_file(
     raw_path: Path,
     out_dir: Path,
-    stream_qc: Dict[str, _StreamQC],
-    per_stream: Dict[str, Dict[str, int]],
-) -> List[MarketEvent]:
+    stream_qc: dict[str, _StreamQC],
+    per_stream: dict[str, dict[str, int]],
+) -> list[MarketEvent]:
     """Normalize one raw JSONL file; returns the kept, event-time-ordered events.
 
     ``stream_qc``/``per_stream`` are shared across files of a run so sequences
     that continue across sessions are checked continuously (and resets that
     happen at a session boundary are detected as resets, not duplicates).
     """
-    kept: List[Tuple[MarketEvent, int]] = []  # (event, stream epoch)
+    kept: list[tuple[MarketEvent, int]] = []  # (event, stream epoch)
     for ev in iter_jsonl(raw_path):
         key = f"{ev.venue_id}:{ev.instrument_id}"
         counters = per_stream.get(key)
@@ -198,8 +202,14 @@ def normalize_file(
     # final tiebreak. Step 4 guarantees the sort never inverts sequence
     # order inside a stream.
     kept.sort(
-        key=lambda row: (row[0].exchange_ts, row[0].venue_id, row[0].instrument_id,
-                         row[1], row[0].sequence, row[0].event_id)
+        key=lambda row: (
+            row[0].exchange_ts,
+            row[0].venue_id,
+            row[0].instrument_id,
+            row[1],
+            row[0].sequence,
+            row[0].event_id,
+        )
     )
     out = [ev for ev, _ in kept]
     for i, ev in enumerate(out):
@@ -241,7 +251,7 @@ class _ParquetSink:
         self._writer = pq.ParquetWriter(path, self.schema)
         self.rows = 0
 
-    def write(self, stem: str, events: List[MarketEvent]) -> None:
+    def write(self, stem: str, events: list[MarketEvent]) -> None:
         if not events:
             return
         pa = self._pa
@@ -268,9 +278,9 @@ def normalize_run(raw_dir, normalized_dir) -> dict:
     if not raw_files:
         raise ValueError(f"no raw *.jsonl files found in {raw_dir}")
 
-    stream_qc: Dict[str, _StreamQC] = {}
-    per_stream: Dict[str, Dict[str, int]] = {}
-    file_counts: Dict[str, dict] = {}
+    stream_qc: dict[str, _StreamQC] = {}
+    per_stream: dict[str, dict[str, int]] = {}
+    file_counts: dict[str, dict] = {}
     sink = _ParquetSink(normalized_dir / "events.parquet")
     try:
         for raw_path in raw_files:

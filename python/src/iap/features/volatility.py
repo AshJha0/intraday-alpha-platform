@@ -28,7 +28,6 @@ Validity: warmup of the window; mean/std statistics need enough samples
 from __future__ import annotations
 
 from math import sqrt
-from typing import List
 
 from iap.features._famutil import put
 from iap.features.spec import EPS, WINDOW_NS, FeatureSpec, mkspec
@@ -40,41 +39,82 @@ JUMP_K = 4.0
 JUMP_MIN_OBS = 30
 
 
-def specs() -> List[FeatureSpec]:
+def specs() -> list[FeatureSpec]:
     """Registry entries for the volatility family (pinned order)."""
-    out: List[FeatureSpec] = []
+    out: list[FeatureSpec] = []
     for w in RV_WINDOWS:
-        out.append(mkspec(f"rvol_w{w}_v1", FAMILY,
-                          f"Realized vol over {w}: sqrt(sum dlm^2 / {w} in seconds).",
-                          window=w))
-    out.append(mkspec("volofvol_w5m_v1", FAMILY,
-                      "Std of squared mid-change log returns over 5m "
-                      "(vol-of-vol proxy).", window="5m"))
+        out.append(
+            mkspec(
+                f"rvol_w{w}_v1",
+                FAMILY,
+                f"Realized vol over {w}: sqrt(sum dlm^2 / {w} in seconds).",
+                window=w,
+            )
+        )
+    out.append(
+        mkspec(
+            "volofvol_w5m_v1",
+            FAMILY,
+            "Std of squared mid-change log returns over 5m (vol-of-vol proxy).",
+            window="5m",
+        )
+    )
     for w in ("10s", "1m"):
-        out.append(mkspec(f"mean_abs_ret_w{w}_v1", FAMILY,
-                          f"Mean |dlm| per mid change over {w}.", window=w))
+        out.append(
+            mkspec(
+                f"mean_abs_ret_w{w}_v1", FAMILY, f"Mean |dlm| per mid change over {w}.", window=w
+            )
+        )
     for w in RV_WINDOWS:
-        out.append(mkspec(f"range_bps_w{w}_v1", FAMILY,
-                          f"High-low mid range over {w} in bps of current mid.",
-                          window=w))
-    out.append(mkspec("jump_flag_w1m_v1", FAMILY,
-                      f"1 if max|dlm| over 1m > {JUMP_K}x mean|dlm| over 1m "
-                      f"(>= {JUMP_MIN_OBS} mid changes).", window="1m",
-                      k=JUMP_K, min_obs=JUMP_MIN_OBS))
-    out.append(mkspec("jump_count_w5m_v1", FAMILY,
-                      f"Number of threshold jumps (|dlm| > {JUMP_K}x prevailing "
-                      f"1m mean|dlm|) detected in the last 5m.", window="5m",
-                      k=JUMP_K, min_obs=JUMP_MIN_OBS))
-    out.append(mkspec("vol_ratio_w10s_w1m_v1", FAMILY,
-                      "rvol_w10s / (rvol_w1m + EPS): short-vs-medium vol ratio.",
-                      depends_on=("rvol_w10s_v1", "rvol_w1m_v1")))
-    out.append(mkspec("vol_ratio_w1m_w5m_v1", FAMILY,
-                      "rvol_w1m / (rvol_w5m + EPS): medium-vs-long vol ratio.",
-                      depends_on=("rvol_w1m_v1", "rvol_w5m_v1")))
+        out.append(
+            mkspec(
+                f"range_bps_w{w}_v1",
+                FAMILY,
+                f"High-low mid range over {w} in bps of current mid.",
+                window=w,
+            )
+        )
+    out.append(
+        mkspec(
+            "jump_flag_w1m_v1",
+            FAMILY,
+            f"1 if max|dlm| over 1m > {JUMP_K}x mean|dlm| over 1m (>= {JUMP_MIN_OBS} mid changes).",
+            window="1m",
+            k=JUMP_K,
+            min_obs=JUMP_MIN_OBS,
+        )
+    )
+    out.append(
+        mkspec(
+            "jump_count_w5m_v1",
+            FAMILY,
+            f"Number of threshold jumps (|dlm| > {JUMP_K}x prevailing "
+            f"1m mean|dlm|) detected in the last 5m.",
+            window="5m",
+            k=JUMP_K,
+            min_obs=JUMP_MIN_OBS,
+        )
+    )
+    out.append(
+        mkspec(
+            "vol_ratio_w10s_w1m_v1",
+            FAMILY,
+            "rvol_w10s / (rvol_w1m + EPS): short-vs-medium vol ratio.",
+            depends_on=("rvol_w10s_v1", "rvol_w1m_v1"),
+        )
+    )
+    out.append(
+        mkspec(
+            "vol_ratio_w1m_w5m_v1",
+            FAMILY,
+            "rvol_w1m / (rvol_w5m + EPS): medium-vs-long vol ratio.",
+            depends_on=("rvol_w1m_v1", "rvol_w5m_v1"),
+        )
+    )
     return out
 
 
-def compute(st, values: List[float], valid: List[bool]) -> None:
+def compute(st, values: list[float], valid: list[bool]) -> None:
     """Append the 13 volatility values for the current emission."""
     rvols = {w: st.rvol(w) for w in RV_WINDOWS}
     for w in RV_WINDOWS:
@@ -84,8 +124,8 @@ def compute(st, values: List[float], valid: List[bool]) -> None:
     vv = None
     if st.warm(WINDOW_NS["5m"]) and win.count >= 2:
         n = win.count
-        ex = win.sums[0] / n          # E[dlm^2]
-        ex2 = win.sums[2] / n         # E[dlm^4]
+        ex = win.sums[0] / n  # E[dlm^2]
+        ex2 = win.sums[2] / n  # E[dlm^4]
         vv = sqrt(max(ex2 - ex * ex, 0.0))
     put(values, valid, vv, vv is not None)
     for w in ("10s", "1m"):

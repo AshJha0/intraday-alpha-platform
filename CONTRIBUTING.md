@@ -10,9 +10,11 @@ the working procedure.
 
 ## 1. Branching
 
-- `main` is protected: pull requests only, CI green
+- `main` is meant to be protected: pull requests only, CI green
   (`.github/workflows/ci.yml`), the reviewers `CODEOWNERS` names for the
-  paths touched.
+  paths touched. That protection is a repository setting that is **not yet
+  configured** (`docs/governance/REPO_SETTINGS.md`), so for now it is a
+  convention the maintainer follows.
 - Branch names carry the area and the plan key or issue number:
   `feat/execution-X07-python-port`, `fix/orderbook-B03-reorder-window`,
   `docs/EPICS-refresh`, `research/EQ03-cost-threshold`.
@@ -34,6 +36,8 @@ cd rust   && cargo test --workspace && cd ..
 cd java   && bash build.sh && bash test.sh && cd ..
 python3 -m pytest -q tests/integration tests/replay      # repo-level suites
 python3 tests/harness/check_deployment.py --verbose      # deployment checks
+ruff check python tests tools research deployment        # lint (ruff==0.16.10, config: ruff.toml)
+ruff format --check python tests tools research deployment   # formatting (drop --check to apply)
 ```
 
 Each language's full run must stay under 120 s; the repo-level suites well
@@ -57,9 +61,9 @@ fills are exact integers; features, alphas, portfolio and TCA compare at
 abs and rel 1e-9; adaptive PSI/KS at 1e-10 with exact refit booleans and
 lifecycle state sequences; canonical-JSON lines, trace digests, the risk
 audit / snapshot and the lifecycle registry are byte-identical; the 7-state
-lifecycle golden is compared exactly, field by field. The 2026-09-20 table
-reads python 1388 / cpp 285 / rust 313 / java 482 (golden 164/68/62/102),
-`integration` 13, `replay` 4.
+lifecycle golden is compared exactly, field by field. The v1.3.0 table
+(2026-10-03, counts from CI) reads python 1565 / cpp 289 / rust 323 /
+java 510 (golden 166/68/64/104), `integration` 15, `replay` 4.
 
 ## 4. Golden regeneration protocol
 

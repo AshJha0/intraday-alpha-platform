@@ -9,7 +9,6 @@ import math
 import numpy as np
 import pandas as pd
 import pytest
-
 from iap.alpha.base import LinearAlpha
 from iap.validation import (
     MIN_TEST_PAIRS,
@@ -38,8 +37,7 @@ def test_ic_matches_hand_pearson():
     # hand Pearson
     mx, my = x.mean(), y.mean()
     hand = float(
-        np.sum((x - mx) * (y - my))
-        / math.sqrt(np.sum((x - mx) ** 2) * np.sum((y - my) ** 2))
+        np.sum((x - mx) * (y - my)) / math.sqrt(np.sum((x - mx) ** 2) * np.sum((y - my) ** 2))
     )
     assert abs(ic(x, y) - hand) < 1e-12
 
@@ -84,8 +82,8 @@ def test_newey_west_tstat_hand_calc():
 def test_bucket_ics_partitions_by_time():
     ts = np.array([0, 1, 2, 3] * 5 + [400, 401, 402, 403] * 5, dtype=np.int64) * NS_S
     x = np.tile([1.0, 2.0, 3.0, 4.0], 10)
-    y1 = np.tile([1.0, 2.0, 3.0, 4.0], 5)          # perfect in bucket 0
-    y2 = np.tile([4.0, 3.0, 2.0, 1.0], 5)          # perfectly inverse in bucket 1
+    y1 = np.tile([1.0, 2.0, 3.0, 4.0], 5)  # perfect in bucket 0
+    y2 = np.tile([4.0, 3.0, 2.0, 1.0], 5)  # perfectly inverse in bucket 1
     y = np.concatenate([y1, y2])
     b = bucket_ics(ts, x, y, bucket_ns=300 * NS_S, min_obs=4)
     assert b.shape == (2,)
@@ -114,15 +112,13 @@ def test_walk_forward_expanding_and_disjoint():
     horizon = 5 * NS_S
     seen_tests = []
     prev_train_max = -1
-    for fold, train, test in sp.split_frames(frames, horizon):
+    for _fold, train, test in sp.split_frames(frames, horizon):
         tr, te = train[1], test[1]
         assert len(te) > 0
         # every test row inside the fold bounds, no overlap with other folds
         for a, b in seen_tests:
             assert te["exchange_ts"].iloc[0] >= b or te["exchange_ts"].iloc[-1] < a
-        seen_tests.append(
-            (int(te["exchange_ts"].iloc[0]), int(te["exchange_ts"].iloc[-1]) + 1)
-        )
+        seen_tests.append((int(te["exchange_ts"].iloc[0]), int(te["exchange_ts"].iloc[-1]) + 1))
         # expanding: train grows monotonically
         assert int(tr["exchange_ts"].iloc[-1]) > prev_train_max
         prev_train_max = int(tr["exchange_ts"].iloc[-1])
@@ -136,7 +132,7 @@ def test_purging_removes_overlapping_labels():
     frames = _frames_1s_rows()
     horizon = 5 * NS_S
     sp = WalkForwardSplitter(n_folds=4, embargo_ns=0)
-    for fold, train, test in sp.split_frames(frames, horizon):
+    for fold, train, _test in sp.split_frames(frames, horizon):
         tr_ts = train[1]["exchange_ts"].to_numpy()
         assert np.all(tr_ts + horizon < fold.test_start)
         # and purging is tight: the row just inside the boundary IS kept
@@ -149,7 +145,7 @@ def test_embargo_widens_the_gap():
     horizon = 5 * NS_S
     embargo = 10 * NS_S
     sp = WalkForwardSplitter(n_folds=4, embargo_ns=embargo)
-    for fold, train, test in sp.split_frames(frames, horizon):
+    for fold, train, _test in sp.split_frames(frames, horizon):
         tr_ts = train[1]["exchange_ts"].to_numpy()
         assert np.all(tr_ts + horizon + embargo < fold.test_start)
 
@@ -258,9 +254,9 @@ def test_leakage_shift_test_catches_peek_ahead():
     m = _PeekAheadAlpha()
     m.fit(frames)
     res = LeakageTester().run(m, frames)
-    assert res.label_guard_ok is True   # never touches label columns
+    assert res.label_guard_ok is True  # never touches label columns
     assert abs(res.ic_unshifted) > 0.9  # implausibly perfect
-    assert res.shift_ok is False        # destroyed by one-event shift
+    assert res.shift_ok is False  # destroyed by one-event shift
     assert res.passed is False
 
 
@@ -286,14 +282,16 @@ def test_leakage_detector_catches_sub_threshold_leak():
     rng = np.random.default_rng(11)
     ts = np.arange(n, dtype=np.int64) * 100_000_000 + NS_S
     future = rng.standard_normal(n) * 1e-4
-    leak = 0.12 * (future / 1e-4) + np.sqrt(1 - 0.12 ** 2) * rng.standard_normal(n)
-    df = pd.DataFrame({
-        "exchange_ts": ts,
-        "sig_feature": leak,
-        "ret_feature": np.concatenate(([0.0], future[:-1])),
-        "label_mid_1s": future,
-        "label_valid_1s": np.ones(n, dtype=bool),
-    })
+    leak = 0.12 * (future / 1e-4) + np.sqrt(1 - 0.12**2) * rng.standard_normal(n)
+    df = pd.DataFrame(
+        {
+            "exchange_ts": ts,
+            "sig_feature": leak,
+            "ret_feature": np.concatenate(([0.0], future[:-1])),
+            "label_mid_1s": future,
+            "label_valid_1s": np.ones(n, dtype=bool),
+        }
+    )
     m = _HonestAlpha()
     frames = {1: df}
     m.fit(frames)
@@ -387,20 +385,23 @@ def _two_day_frames(rows_per_day=4000, seed=3):
     ts = []
     for d in (0, 1):
         base = d * day + 13 * 3600 * NS_S + 1800 * NS_S
-        ts.extend(base + np.arange(rows_per_day, dtype=np.int64)
-                  * (9360 * NS_S // rows_per_day))
+        ts.extend(base + np.arange(rows_per_day, dtype=np.int64) * (9360 * NS_S // rows_per_day))
         ts.append(d * day + 20 * 3600 * NS_S)  # 20:00 close print
     ts = np.array(sorted(ts), dtype=np.int64)
     n = ts.size
     z = rng.standard_normal(n)
     future = (0.05 * z + rng.standard_normal(n)) * 1e-4
-    return {1: pd.DataFrame({
-        "exchange_ts": ts,
-        "sig_feature": z,
-        "spread_ticks_v1": np.ones(n),
-        "label_mid_1s": future,
-        "label_valid_1s": np.ones(n, dtype=bool),
-    })}
+    return {
+        1: pd.DataFrame(
+            {
+                "exchange_ts": ts,
+                "sig_feature": z,
+                "spread_ticks_v1": np.ones(n),
+                "label_mid_1s": future,
+                "label_valid_1s": np.ones(n, dtype=bool),
+            }
+        )
+    }
 
 
 def test_walk_forward_splits_on_row_mass_not_wall_span():
@@ -432,8 +433,9 @@ def test_walk_forward_degenerate_fold_is_reported_and_fails_the_gate():
     ]
     n_run = len(fold_rows)
     n_nondeg = sum(1 for r in fold_rows if not r["degenerate"])
-    positive = sum(1 for r in fold_rows
-                   if not r["degenerate"] and r["ic"] is not None and r["ic"] > 0)
+    positive = sum(
+        1 for r in fold_rows if not r["degenerate"] and r["ic"] is not None and r["ic"] > 0
+    )
     assert n_nondeg == 2
     assert positive / n_run == 0.5  # NOT 1.00
     assert n_nondeg < MIN_NONDEGENERATE_FOLDS  # blocks PROMOTE
@@ -470,17 +472,23 @@ def test_crossed_rows_are_split_out_of_the_reported_ic():
     rng.shuffle(crossed)
     z = rng.standard_normal(n)
     lab = np.where(crossed, 0.5 * z, 0.0) * 1e-4 + rng.standard_normal(n) * 1e-6
-    df = pd.DataFrame({
-        "exchange_ts": np.arange(n, dtype=np.int64) * NS_S,
-        "spread_ticks_v1": np.where(crossed, -1.0, 1.0),
-        "label_mid_1s": lab,
-        "label_valid_1s": np.ones(n, dtype=bool),
-    })
-    scores = {1: pd.DataFrame({
-        "exchange_ts": df["exchange_ts"],
-        "expected_return": z,
-        "confidence": np.ones(n),
-    })}
+    df = pd.DataFrame(
+        {
+            "exchange_ts": np.arange(n, dtype=np.int64) * NS_S,
+            "spread_ticks_v1": np.where(crossed, -1.0, 1.0),
+            "label_mid_1s": lab,
+            "label_valid_1s": np.ones(n, dtype=bool),
+        }
+    )
+    scores = {
+        1: pd.DataFrame(
+            {
+                "exchange_ts": df["exchange_ts"],
+                "expected_return": z,
+                "confidence": np.ones(n),
+            }
+        )
+    }
     ts, er, y, cr = _pooled_arrays(scores, {1: df}, "1s")
     assert abs(np.mean(cr) - 0.3) < 0.02
     pooled = ic(er, y)
@@ -499,8 +507,7 @@ def test_ledger_reruns_do_not_inflate_the_denominator(tmp_path):
     for _ in range(5):
         led = ExperimentLedger(path)
         for aid in ("EQ01", "EQ02"):
-            led.record(aid, "alpha_validation", config={"folds": 4},
-                       result={"ic": 0.02})
+            led.record(aid, "alpha_validation", config={"folds": 4}, result={"ic": 0.02})
         led.save()
     led = ExperimentLedger(path)
     assert led.total_experiments == 2
@@ -562,20 +569,37 @@ class _BackwardsAlpha(LinearAlpha):
 
 
 def _validate_backwards():
-    from iap.backtest import Backtester, BacktestConfig, CostModel
+    from iap.backtest import BacktestConfig, Backtester, CostModel
     from iap.validation.validate import validate_alpha
 
     frames = _backwards_frames()
-    meta = {1: {"tick_size": 0.01, "lot_size": 1, "adv": 1_000_000.0,
-                "asset_class": "EQUITY", "ref_price": 25.0}}
+    meta = {
+        1: {
+            "tick_size": 0.01,
+            "lot_size": 1,
+            "adv": 1_000_000.0,
+            "asset_class": "EQUITY",
+            "ref_price": 25.0,
+        }
+    }
     bt = Backtester(
-        CostModel(impact_coeff_bps_per_pct_adv=2.0,
-                  equity_taker_fee_per_share=0.003,
-                  fx_commission_per_million=2.5),
-        meta, BacktestConfig(max_pos_qty=100, latency_rows=1))
-    return validate_alpha(_BackwardsAlpha, frames, bt,
-                          {1: {"adv": 1_000_000.0, "ref_price": 25.0}},
-                          0.1, n_folds=4, embargo_ns=NS_S)
+        CostModel(
+            impact_coeff_bps_per_pct_adv=2.0,
+            equity_taker_fee_per_share=0.003,
+            fx_commission_per_million=2.5,
+        ),
+        meta,
+        BacktestConfig(max_pos_qty=100, latency_rows=1),
+    )
+    return validate_alpha(
+        _BackwardsAlpha,
+        frames,
+        bt,
+        {1: {"adv": 1_000_000.0, "ref_price": 25.0}},
+        0.1,
+        n_folds=4,
+        embargo_ns=NS_S,
+    )
 
 
 @pytest.fixture(scope="module")
@@ -631,17 +655,18 @@ def test_decay_curve_applies_the_confidence_mask():
     z = rng.standard_normal(n)
     future = (0.3 * z + rng.standard_normal(n)) * 1e-4
     dead = np.zeros(n, dtype=bool)
-    dead[: int(0.6 * n)] = True          # 60 % invalid, as in FX02's last fold
+    dead[: int(0.6 * n)] = True  # 60 % invalid, as in FX02's last fold
     rng.shuffle(dead)
-    er = np.where(dead, 0.0, z)          # what score() emits at confidence 0
-    frame = pd.DataFrame({
-        "exchange_ts": np.arange(n, dtype=np.int64) * NS_S,
-        "label_mid_1s": future,
-        "label_valid_1s": np.ones(n, dtype=bool),
-    })
+    er = np.where(dead, 0.0, z)  # what score() emits at confidence 0
+    frame = pd.DataFrame(
+        {
+            "exchange_ts": np.arange(n, dtype=np.int64) * NS_S,
+            "label_mid_1s": future,
+            "label_valid_1s": np.ones(n, dtype=bool),
+        }
+    )
     unmasked = decay_curve(er, frame, horizons=("1s",))["1s"]
-    masked = decay_curve(np.where(dead, np.nan, er), frame,
-                         horizons=("1s",))["1s"]
+    masked = decay_curve(np.where(dead, np.nan, er), frame, horizons=("1s",))["1s"]
     honest = ic(np.where(dead, np.nan, z), np.where(dead, np.nan, future))
     assert abs(masked - honest) < 1e-12
     assert abs(unmasked) < abs(masked), "the zeros diluted the reported IC"
@@ -656,7 +681,7 @@ def test_newey_west_tstat_weights_buckets_by_pair_count():
     """
     from iap.validation.metrics import bucket_ics_with_counts
 
-    ics = np.array([0.02] * 11 + [-0.40])       # 11 fat buckets + 1 thin one
+    ics = np.array([0.02] * 11 + [-0.40])  # 11 fat buckets + 1 thin one
     counts = np.array([2000] * 11 + [20])
     equal = newey_west_tstat(ics, lags=2)
     weighted = newey_west_tstat(ics, lags=2, weights=counts)
@@ -667,8 +692,7 @@ def test_newey_west_tstat_weights_buckets_by_pair_count():
     assert abs(same - equal) < 1e-12
 
     # counts come out of the bucketer alongside the ICs, aligned
-    ts = np.concatenate([np.zeros(40, np.int64),
-                         np.full(10, 400, np.int64)]) * NS_S
+    ts = np.concatenate([np.zeros(40, np.int64), np.full(10, 400, np.int64)]) * NS_S
     x = np.concatenate([np.arange(40.0), np.arange(10.0)])
     y = np.concatenate([np.arange(40.0), -np.arange(10.0)])
     b, c = bucket_ics_with_counts(ts, x, y, bucket_ns=300 * NS_S, min_obs=4)

@@ -15,12 +15,12 @@ reproduce the remaining audit tail bit for bit.
 
 from __future__ import annotations
 
+import copy
 import json
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 import pytest
-
 from iap.risk import (
     Decision,
     Fill,
@@ -33,11 +33,19 @@ from iap.risk import (
     instrument_refs_from_golden,
 )
 
-_NOTIFICATION_RULES = frozenset({
-    "VENUE_DISCONNECT", "VENUE_RECONNECT", "KILL_SWITCH_ENGAGED",
-    "KILL_SWITCH_CLEARED", "LOSS_LIMIT_OVERRIDE", "SESSION_ROLLED",
-    "BOOTSTRAP_COMPLETE", "STATE_RESTORED", "MALFORMED_FILL",
-})
+_NOTIFICATION_RULES = frozenset(
+    {
+        "VENUE_DISCONNECT",
+        "VENUE_RECONNECT",
+        "KILL_SWITCH_ENGAGED",
+        "KILL_SWITCH_CLEARED",
+        "LOSS_LIMIT_OVERRIDE",
+        "SESSION_ROLLED",
+        "BOOTSTRAP_COMPLETE",
+        "STATE_RESTORED",
+        "MALFORMED_FILL",
+    }
+)
 
 
 def is_notification(rule_id: str, decision: int) -> bool:
@@ -48,7 +56,7 @@ def is_notification(rule_id: str, decision: int) -> bool:
 
 
 @pytest.fixture(scope="module")
-def golden(golden_dir: Path) -> Dict[str, Any]:
+def golden(golden_dir: Path) -> dict[str, Any]:
     with open(golden_dir / "expected_risk_decisions.json") as f:
         return json.load(f)
 
@@ -59,12 +67,12 @@ def repo_root(golden_dir: Path) -> Path:
 
 
 @pytest.fixture(scope="module")
-def config(golden: Dict[str, Any], repo_root: Path) -> Dict[str, Any]:
+def config(golden: dict[str, Any], repo_root: Path) -> dict[str, Any]:
     with open(repo_root / golden["config"]) as f:
         return json.load(f)
 
 
-def parse_order(v: Dict[str, Any]) -> OrderRequest:
+def parse_order(v: dict[str, Any]) -> OrderRequest:
     return OrderRequest(
         order_id=v["order_id"],
         instrument_id=v["instrument_id"],
@@ -79,27 +87,29 @@ def parse_order(v: Dict[str, Any]) -> OrderRequest:
     )
 
 
-def build(golden: Dict[str, Any], config: Dict[str, Any]) -> RiskEngine:
+def build(golden: dict[str, Any], config: dict[str, Any]) -> RiskEngine:
     """Build the engine exactly as the reference harness does."""
     return RiskEngine.from_config(config, instrument_refs_from_golden(golden["instruments"]))
 
 
-def apply(eng: RiskEngine, i: int, step: Dict[str, Any], check: bool) -> None:
+def apply(eng: RiskEngine, i: int, step: dict[str, Any], check: bool) -> None:
     """Apply one step (order steps are checked when ``check``)."""
     kind = step["type"]
     ts = step.get("ts")
     if kind == "market":
         eng.on_market(step["instrument_id"], step["bid_ticks"], step["ask_ticks"], ts)
     elif kind == "fill":
-        eng.on_fill(Fill(
-            ts=ts,
-            strategy_id=step["strategy_id"],
-            instrument_id=step["instrument_id"],
-            order_id=step["order_id"],
-            side=step["side"],
-            qty=step["qty"],
-            price_ticks=step["price_ticks"],
-        ))
+        eng.on_fill(
+            Fill(
+                ts=ts,
+                strategy_id=step["strategy_id"],
+                instrument_id=step["instrument_id"],
+                order_id=step["order_id"],
+                side=step["side"],
+                qty=step["qty"],
+                price_ticks=step["price_ticks"],
+            )
+        )
     elif kind == "cancel":
         eng.on_order_done(step["order_id"])
     elif kind == "gap":
@@ -111,14 +121,17 @@ def apply(eng: RiskEngine, i: int, step: Dict[str, Any], check: bool) -> None:
     elif kind == "venue_up":
         eng.on_venue_reconnect(step["venue_id"], ts)
     elif kind == "kill":
-        eng.engage_kill(Scope.parse(step["scope"]), step["scope_id"], ts,
-                        step.get("reason", ""))
+        eng.engage_kill(Scope.parse(step["scope"]), step["scope_id"], ts, step.get("reason", ""))
     elif kind == "unkill":
-        eng.clear_kill(Scope.parse(step["scope"]), step["scope_id"], ts,
-                       step.get("reason", ""))
+        eng.clear_kill(Scope.parse(step["scope"]), step["scope_id"], ts, step.get("reason", ""))
     elif kind == "override_loss":
-        eng.override_loss_limit(Scope.parse(step["scope"]), step["scope_id"],
-                                step["new_limit"], ts, step.get("approver", ""))
+        eng.override_loss_limit(
+            Scope.parse(step["scope"]),
+            step["scope_id"],
+            step["new_limit"],
+            ts,
+            step.get("approver", ""),
+        )
     elif kind == "roll_session":
         eng.roll_session(ts, step.get("reason", ""))
     elif kind == "order":
@@ -126,17 +139,18 @@ def apply(eng: RiskEngine, i: int, step: Dict[str, Any], check: bool) -> None:
         d = eng.check_order(order)
         if check:
             exp = step["expect"]
-            assert int(d.decision) == exp["decision"], \
+            assert int(d.decision) == exp["decision"], (
                 f"step {i} order {order.order_id}: decision ({d.rule_id} / {d.reason})"
-            assert d.rule_id == exp["rule_id"], \
+            )
+            assert d.rule_id == exp["rule_id"], (
                 f"step {i} order {order.order_id}: rule ({d.reason})"
-            assert int(d.severity) == exp["severity"], \
-                f"step {i} order {order.order_id}: severity"
+            )
+            assert int(d.severity) == exp["severity"], f"step {i} order {order.order_id}: severity"
     else:
         raise AssertionError(f"unknown step type {kind}")
 
 
-def replay(golden: Dict[str, Any], config: Dict[str, Any], check: bool) -> str:
+def replay(golden: dict[str, Any], config: dict[str, Any], check: bool) -> str:
     """Run the golden script once; returns the audit JSONL."""
     eng = build(golden, config)
     for i, step in enumerate(golden["steps"]):
@@ -144,7 +158,7 @@ def replay(golden: Dict[str, Any], config: Dict[str, Any], check: bool) -> str:
     return eng.audit_jsonl()
 
 
-def _n_orders(golden: Dict[str, Any]) -> int:
+def _n_orders(golden: dict[str, Any]) -> int:
     return sum(1 for s in golden["steps"] if s["type"] == "order")
 
 
@@ -160,7 +174,7 @@ def test_golden_notification_events_in_order(golden, config):
     notif = [e for e in events if is_notification(e.rule_id, e.decision)]
     expected = golden["expected_notification_events"]
     assert len(notif) == len(expected), "notification event count"
-    for got, want in zip(notif, expected):
+    for got, want in zip(notif, expected, strict=False):
         assert got.rule_id == want["rule_id"]
         assert got.scope == Scope.parse(want["scope"])
         assert got.scope_id == want["scope_id"]
@@ -168,8 +182,13 @@ def test_golden_notification_events_in_order(golden, config):
     # the script exercises: a mark-driven latch, a re-latch after a clear
     # without override, an override, a session roll and a malformed fill
     ids = {e.rule_id for e in notif}
-    for must in ("LOSS_LIMIT_OVERRIDE", "SESSION_ROLLED", "MALFORMED_FILL",
-                 "DAILY_LOSS", "STRATEGY_LOSS"):
+    for must in (
+        "LOSS_LIMIT_OVERRIDE",
+        "SESSION_ROLLED",
+        "MALFORMED_FILL",
+        "DAILY_LOSS",
+        "STRATEGY_LOSS",
+    ):
         assert must in ids, f"golden must pin {must}"
 
 
@@ -192,14 +211,15 @@ def test_golden_snapshot_matches_byte_for_byte(golden, config, golden_dir):
     want_bytes = (golden_dir / "expected_risk_snapshot.json").read_bytes()
     # canonical serde_json::to_string_pretty layout + the writer's newline
     assert (eng.snapshot_json(pretty=True) + "\n").encode("utf-8") == want_bytes
-    assert eng.snapshot() == json.loads(want_bytes), \
+    assert eng.snapshot() == json.loads(want_bytes), (
         f"snapshot after step {k} must equal the golden"
+    )
     # the compact form is the same document
     assert json.loads(eng.snapshot_json(pretty=False)) == eng.snapshot()
 
 
 def test_golden_snapshot_restore_reproduces_the_audit_tail(golden, config, golden_dir):
-    steps: List[Dict[str, Any]] = golden["steps"]
+    steps: list[dict[str, Any]] = golden["steps"]
     k = golden["snapshot_after_step"]
     # 1. the engine's own snapshot after step k equals the golden snapshot
     eng = build(golden, config)
@@ -221,7 +241,7 @@ def test_golden_snapshot_restore_reproduces_the_audit_tail(golden, config, golde
         apply(eng, i, steps[i], check=True)
     full_lines = eng.audit_jsonl().splitlines()
     tail = restored.audit_jsonl().splitlines()[1:]
-    assert tail == full_lines[len(full_lines) - len(tail):]
+    assert tail == full_lines[len(full_lines) - len(tail) :]
     assert restored.snapshot() == eng.snapshot(), "state converges"
     assert restored.snapshot_json() == eng.snapshot_json()
 
@@ -229,7 +249,7 @@ def test_golden_snapshot_restore_reproduces_the_audit_tail(golden, config, golde
 def test_golden_restore_from_every_step_is_bit_identical(golden, config):
     """Restoring the snapshot taken after ANY step and replaying the rest
     reproduces the unbroken run's decisions, audit tail and final state."""
-    steps: List[Dict[str, Any]] = golden["steps"]
+    steps: list[dict[str, Any]] = golden["steps"]
     refs = instrument_refs_from_golden(golden["instruments"])
     limits = RiskLimits.from_json(config)
     unbroken = build(golden, config)
@@ -243,7 +263,7 @@ def test_golden_restore_from_every_step_is_bit_identical(golden, config):
         for i in range(cut + 1, len(steps)):
             apply(restored, i, steps[i], check=True)
         tail = restored.audit_jsonl().splitlines()[1:]
-        assert tail == full_audit[len(full_audit) - len(tail):], f"cut at step {cut}"
+        assert tail == full_audit[len(full_audit) - len(tail) :], f"cut at step {cut}"
         assert restored.snapshot_json() == unbroken.snapshot_json(), f"cut at step {cut}"
 
 
@@ -252,3 +272,108 @@ def test_golden_fixed_format_cases(golden):
     assert len(cases) >= 10
     for v, d, want in cases:
         assert fmt_fixed(v, d) == want, f"fmt_fixed({v}, {d})"
+
+
+# ----------------------------------------------------------- edge fixture
+# tests/golden/expected_risk_edge_decisions.json (+ _audit.jsonl), generated
+# by python/tools/make_golden_risk_edge.py: independent scenarios reaching
+# the branches the single-engine script above cannot.
+
+
+def _parse_fill(v: dict[str, Any]) -> Fill:
+    return Fill(
+        ts=v["ts"],
+        strategy_id=v["strategy_id"],
+        instrument_id=v["instrument_id"],
+        order_id=v["order_id"],
+        side=v["side"],
+        qty=v["qty"],
+        price_ticks=v["price_ticks"],
+    )
+
+
+def _must_fail(call, *args) -> None:
+    try:
+        call(*args)
+    except ValueError:
+        return
+    raise AssertionError("a malformed kill command must fail")
+
+
+def replay_edge(
+    golden: dict[str, Any], config: dict[str, Any], check: bool, fill_expect: bool = False
+) -> str:
+    """Run every scenario of the edge fixture; returns the concatenated
+    audit JSONL. ``fill_expect`` (the generator) writes each order step's
+    ``expect`` instead of checking it."""
+    refs = instrument_refs_from_golden(golden["instruments"])
+    out: list[str] = []
+    for sc in golden["scenarios"]:
+        doc = copy.deepcopy(config)
+        if "config_remove" in sc:
+            section, key = sc["config_remove"]
+            del doc[section][key]
+        eng = RiskEngine.from_config(doc, refs)
+        if sc.get("require_bootstrap", False):
+            eng.require_bootstrap()
+        for i, step in enumerate(sc["steps"]):
+            kind = step["type"]
+            if kind == "bad_kill":
+                _must_fail(
+                    eng.engage_kill,
+                    Scope.parse(step["scope"]),
+                    step["scope_id"],
+                    step["ts"],
+                    step.get("reason", ""),
+                )
+            elif kind == "bad_unkill":
+                _must_fail(
+                    eng.clear_kill,
+                    Scope.parse(step["scope"]),
+                    step["scope_id"],
+                    step["ts"],
+                    step.get("reason", ""),
+                )
+            elif kind == "bootstrap":
+                eng.bootstrap_positions([_parse_fill(f) for f in step["fills"]], step["ts"])
+            elif kind == "restore":
+                out.append(eng.audit_jsonl())
+                eng = RiskEngine.restore(
+                    RiskLimits.from_json(doc), refs, eng.snapshot(), step["ts"]
+                )
+            elif kind == "order" and fill_expect:
+                d = eng.check_order(parse_order(step["order"]))
+                step["expect"] = {
+                    "decision": int(d.decision),
+                    "rule_id": d.rule_id,
+                    "severity": int(d.severity),
+                }
+            else:
+                apply(eng, i, step, check)
+        out.append(eng.audit_jsonl())
+    return "".join(out)
+
+
+@pytest.fixture(scope="module")
+def edge(golden_dir: Path) -> dict[str, Any]:
+    with open(golden_dir / "expected_risk_edge_decisions.json") as f:
+        return json.load(f)
+
+
+def test_golden_edge_decisions_match(edge, config):
+    assert edge["x-version"] == 1
+    assert len(edge["scenarios"]) >= 8
+    replay_edge(edge, config, check=True)
+
+
+def test_golden_edge_audit_log_matches_byte_for_byte(edge, config, golden_dir):
+    a = replay_edge(edge, config, check=False)
+    assert a == replay_edge(edge, config, check=False), "audit must be deterministic"
+    want = (golden_dir / "expected_risk_edge_audit.jsonl").read_bytes()
+    assert a.encode("utf-8") == want, "edge audit JSONL must be byte-identical"
+    lines = a.splitlines()
+    for rule, frag in edge["must_pin"]:
+        key = f'"rule_id":"{rule}"'
+        assert any(key in line and frag in line for line in lines), (
+            f"edge golden must pin {rule}: {frag}"
+        )

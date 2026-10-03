@@ -23,7 +23,7 @@ _MASK64 = (1 << 64) - 1
 _GOLDEN_GAMMA = 0x9E3779B97F4A7C15
 _MIX1 = 0xBF58476D1CE4E5B9
 _MIX2 = 0x94D049BB133111EB
-_TWO_POW_NEG53 = 2.0 ** -53
+_TWO_POW_NEG53 = 2.0**-53
 
 
 class SplitMix64:
@@ -79,6 +79,6 @@ class SplitMix64:
             u1 = self.uniform()
         return math.sqrt(-2.0 * math.log(u1)) * math.cos(2.0 * math.pi * u2)
 
-    def split(self) -> "SplitMix64":
+    def split(self) -> SplitMix64:
         """Derive an independent child stream (seeded by next_u64)."""
         return SplitMix64(self.next_u64())

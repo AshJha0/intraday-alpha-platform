@@ -10,20 +10,33 @@ Modules:
   with Bonferroni + deflated-Sharpe-style reporting.
 - ``stress``   — pinned cost/latency/regime stress grid.
 - ``validate`` — per-alpha orchestrator + pinned §20 promotion gates.
+- ``diagnostics`` — per-fold cost survival / decay / regime and the
+  stationary-bootstrap interval for net P&L (additive, no gate reads it).
+
+The opt-in corrected methods are indexed in docs/RESEARCH_VALIDITY.md.
 """
 
+from iap.validation.diagnostics import (  # noqa: F401
+    fold_diagnostics,
+    stationary_bootstrap_ci,
+)
 from iap.validation.leakage import LeakageResult, LeakageTester  # noqa: F401
 from iap.validation.ledger import ExperimentLedger  # noqa: F401
 from iap.validation.metrics import (  # noqa: F401
     HORIZON_ORDER,
     HORIZONS_NS,
     bucket_ics,
+    capacity_breakeven,
     capacity_proxy_usd,
     decay_curve,
+    hac_mean_variance,
     hit_rate,
     ic,
+    ic_with_blackout_reopen,
+    instrument_ics,
     newey_west_tstat,
     nw_lags,
+    pooled_slope_hac_tstat,
     rank_ic,
     signal_turnover,
 )

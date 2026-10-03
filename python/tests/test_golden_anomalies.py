@@ -9,7 +9,6 @@ cross-language checkpoint JSON shape.
 import json
 
 import pytest
-
 from bruteforce_book import BruteForceBook
 from iap.core.codec import read_jsonl, write_jsonl
 from iap.marketdata.golden_anomalies import anomaly_vector
@@ -98,10 +97,18 @@ def test_golden_anomaly_accounting_invariant(golden_dir, name):
             fed[ev.venue_id] = fed.get(ev.venue_id, 0) + 1
         for vid, book in cons.books.items():
             c = book.counters()
-            drops = sum(c[k] for k in (
-                "duplicates_dropped", "dropped_while_stale", "unknown_order_events",
-                "invalid_side_dropped", "invalid_payload_dropped", "unknown_type_dropped",
-                "modify_price_mismatch"))
+            drops = sum(
+                c[k]
+                for k in (
+                    "duplicates_dropped",
+                    "dropped_while_stale",
+                    "unknown_order_events",
+                    "invalid_side_dropped",
+                    "invalid_payload_dropped",
+                    "unknown_type_dropped",
+                    "modify_price_mismatch",
+                )
+            )
             assert c["events_applied"] + drops + book.pending_count() == fed[vid]
 
 

@@ -12,7 +12,6 @@ from __future__ import annotations
 import re
 import sqlite3
 from pathlib import Path
-from typing import Tuple
 
 from iap.contracts.versions import schema_dir
 
@@ -42,11 +41,11 @@ def ddl_path() -> Path:
 
 def load_ddl() -> str:
     """The DDL text, exactly as on disk."""
-    with open(ddl_path(), "r", encoding="utf-8") as fh:
+    with open(ddl_path(), encoding="utf-8") as fh:
         return fh.read()
 
 
-def split_statements(sql: str) -> Tuple[str, ...]:
+def split_statements(sql: str) -> tuple[str, ...]:
     """Split DDL text into statements.
 
     ``--`` comments are removed first (the DDL never puts ``--`` inside a
@@ -85,21 +84,23 @@ def split_statements(sql: str) -> Tuple[str, ...]:
     return tuple(out)
 
 
-def statements() -> Tuple[str, ...]:
+def statements() -> tuple[str, ...]:
     """The statements of the on-disk DDL, in file order."""
     return split_statements(load_ddl())
 
 
-def table_names(sql: str) -> Tuple[str, ...]:
+def table_names(sql: str) -> tuple[str, ...]:
     """Table names created by ``sql``, in definition order."""
-    return tuple(m.group(1) for stmt in split_statements(sql)
-                 for m in [_CREATE_TABLE.match(stmt)] if m)
+    return tuple(
+        m.group(1) for stmt in split_statements(sql) for m in [_CREATE_TABLE.match(stmt)] if m
+    )
 
 
-def view_names(sql: str) -> Tuple[str, ...]:
+def view_names(sql: str) -> tuple[str, ...]:
     """View names created by ``sql``, in definition order."""
-    return tuple(m.group(1) for stmt in split_statements(sql)
-                 for m in [_CREATE_VIEW.match(stmt)] if m)
+    return tuple(
+        m.group(1) for stmt in split_statements(sql) for m in [_CREATE_VIEW.match(stmt)] if m
+    )
 
 
 def apply(conn: sqlite3.Connection) -> int:

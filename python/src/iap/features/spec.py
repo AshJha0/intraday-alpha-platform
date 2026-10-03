@@ -8,14 +8,13 @@ lists in the pinned family order (see :mod:`iap.features.registry`).
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Dict, Tuple
+from dataclasses import dataclass
 
 NS_PER_SEC = 1_000_000_000
 NS_PER_MS = 1_000_000
 
 #: Pinned window / horizon labels -> nanoseconds (event time, exchange_ts).
-WINDOW_NS: Dict[str, int] = {
+WINDOW_NS: dict[str, int] = {
     "1s": 1 * NS_PER_SEC,
     "5s": 5 * NS_PER_SEC,
     "10s": 10 * NS_PER_SEC,
@@ -50,9 +49,9 @@ class FeatureSpec:
     name: str
     family: str
     version: int
-    params: Tuple[Tuple[str, object], ...]  # sorted (key, value) pairs
+    params: tuple[tuple[str, object], ...]  # sorted (key, value) pairs
     doc: str
-    depends_on: Tuple[str, ...] = ()
+    depends_on: tuple[str, ...] = ()
 
     def to_dict(self) -> dict:
         """JSON-able registry entry (canonical key order)."""
@@ -70,7 +69,7 @@ def mkspec(
     name: str,
     family: str,
     doc: str,
-    depends_on: Tuple[str, ...] = (),
+    depends_on: tuple[str, ...] = (),
     version: int = 1,
     **params: object,
 ) -> FeatureSpec:

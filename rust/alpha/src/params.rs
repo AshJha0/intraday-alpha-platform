@@ -53,6 +53,8 @@ pub const PINNED_CONF_SCALE: f64 = 2.0;
 impl AlphaParams {
     /// True when the fit found no usable evidence: every row scores
     /// `(0.0, 0.0)` (pinned dead-alpha rule).
+    // `!(sigma > 0.0)` is deliberately true for NaN; `<= 0.0` would change that.
+    #[allow(clippy::neg_cmp_op_on_partial_ord)]
     pub fn is_dead(&self) -> bool {
         !(self.sigma > 0.0) || self.beta == 0.0
     }

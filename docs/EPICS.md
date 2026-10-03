@@ -15,11 +15,11 @@ planned paths of the current release, **backlog** says what would prove it done.
 
 | | count | estimate (days) |
 |---|---:|---:|
-| epics | 24 | |
-| issues | 123 | 340 |
-| issues `done` | 96 | 229 |
+| epics | 31 | |
+| issues | 155 | 511 |
+| issues `done` | 97 | 229.5 |
 | issues `in-progress` | 0 | 0 |
-| issues `backlog` | 27 | 111 |
+| issues `backlog` | 58 | 281.5 |
 
 ### By milestone
 
@@ -33,38 +33,45 @@ planned paths of the current release, **backlog** says what would prove it done.
 | Week 5 | 2 | 10 | 10 | 0 | 0 |
 | Week 6 | 7 | 24 | 24 | 0 | 0 |
 | Phase 2 | 3 | 9 | 7 | 0 | 2 |
-| Phase 3 | 1 | 5 | 1 | 0 | 4 |
-| Backlog | 1 | 21 | 0 | 0 | 21 |
+| Phase 3 | 2 | 9 | 1 | 0 | 8 |
+| Backlog | 7 | 49 | 1 | 0 | 48 |
 
 Issues are listed under their epic; an issue's own milestone can differ from
 the epic's (a backlog item under a finished epic sits in **Backlog**).
 
 ## Epics
 
-- [E01 — Architecture and contracts](#e01-architecture-and-contracts) · Phase 0 · partial · 7 issues
-- [E02 — Repository engineering, CI and governance](#e02-repository-engineering-ci-and-governance) · Phase 0 · partial · 4 issues
-- [E03 — Synthetic market data generator and normalization](#e03-synthetic-market-data-generator-and-normalization) · Week 1 · done · 7 issues
-- [E04 — Deterministic replay as a flagship feature](#e04-deterministic-replay-as-a-flagship-feature) · Week 1 · partial · 5 issues
-- [E05 — Order book with integer ticks (L1/L2/MBO)](#e05-order-book-with-integer-ticks-l1l2mbo) · Week 2 · done · 5 issues
-- [E06 — Feature engine (native 40, registry 205)](#e06-feature-engine-native-40-registry-205) · Week 2 · partial · 6 issues
-- [E07 — Alpha engine — 24 flagship alphas](#e07-alpha-engine-24-flagship-alphas) · Week 3 · partial · 8 issues
-- [E08 — Research framework — validation, ledger, ExperimentRunner](#e08-research-framework-validation-ledger-experimentrunner) · Week 3 · partial · 9 issues
-- [E09 — Portfolio construction](#e09-portfolio-construction) · Week 4 · done · 4 issues
-- [E10 — Hard risk engine (fail-closed)](#e10-hard-risk-engine-fail-closed) · Week 4 · done · 6 issues
-- [E11 — Execution algorithms, SOR and execution simulator](#e11-execution-algorithms-sor-and-execution-simulator) · Week 5 · partial · 9 issues
-- [E12 — Performance architecture](#e12-performance-architecture) · Week 5 · partial · 4 issues
-- [E13 — Transaction-cost analysis](#e13-transaction-cost-analysis) · Week 6 · partial · 5 issues
-- [E14 — Cross-language parity (golden tests Python == C++ == Rust == Java)](#e14-cross-language-parity-golden-tests-python-c-rust-java) · Week 6 · done · 4 issues
-- [E15 — Alpha promotion lifecycle](#e15-alpha-promotion-lifecycle) · Week 6 · partial · 5 issues
-- [E16 — Observability and the decision trace](#e16-observability-and-the-decision-trace) · Week 6 · partial · 6 issues
-- [E17 — Data model and store](#e17-data-model-and-store) · Week 6 · partial · 3 issues
-- [E18 — End-to-end MVP loop](#e18-end-to-end-mvp-loop) · Week 6 · done · 3 issues
-- [E19 — Six-level testing strategy](#e19-six-level-testing-strategy) · Week 6 · partial · 4 issues
-- [E20 — ML layer — gated model zoo and meta-labeling](#e20-ml-layer-gated-model-zoo-and-meta-labeling) · Phase 2 · partial · 4 issues
-- [E21 — Adaptive layer — drift, refit policies](#e21-adaptive-layer-drift-refit-policies) · Phase 2 · partial · 4 issues
-- [E22 — Research platform — alpha factory](#e22-research-platform-alpha-factory) · Phase 2 · partial · 4 issues
-- [E23 — Production engineering (documented out of scope)](#e23-production-engineering-documented-out-of-scope) · Phase 3 · partial · 5 issues
-- [E24 — Agentic AI / MCP research layer (read-only)](#e24-agentic-ai-mcp-research-layer-read-only) · Backlog · backlog · 2 issues
+- [E01 — Architecture and contracts](#e01--architecture-and-contracts) · Phase 0 · partial · 7 issues
+- [E02 — Repository engineering, CI and governance](#e02--repository-engineering-ci-and-governance) · Phase 0 · partial · 4 issues
+- [E03 — Synthetic market data generator and normalization](#e03--synthetic-market-data-generator-and-normalization) · Week 1 · partial · 8 issues
+- [E04 — Deterministic replay as a flagship feature](#e04--deterministic-replay-as-a-flagship-feature) · Week 1 · partial · 5 issues
+- [E05 — Order book with integer ticks (L1/L2/MBO)](#e05--order-book-with-integer-ticks-l1l2mbo) · Week 2 · done · 5 issues
+- [E06 — Feature engine (native 40, registry 205)](#e06--feature-engine-native-40-registry-205) · Week 2 · partial · 6 issues
+- [E07 — Alpha engine — 24 flagship alphas](#e07--alpha-engine--24-flagship-alphas) · Week 3 · partial · 8 issues
+- [E08 — Research framework — validation, ledger, ExperimentRunner](#e08--research-framework--validation-ledger-experimentrunner) · Week 3 · partial · 9 issues
+- [E09 — Portfolio construction](#e09--portfolio-construction) · Week 4 · done · 4 issues
+- [E10 — Hard risk engine (fail-closed)](#e10--hard-risk-engine-fail-closed) · Week 4 · done · 6 issues
+- [E11 — Execution algorithms, SOR and execution simulator](#e11--execution-algorithms-sor-and-execution-simulator) · Week 5 · partial · 9 issues
+- [E12 — Performance architecture](#e12--performance-architecture) · Week 5 · partial · 4 issues
+- [E13 — Transaction-cost analysis](#e13--transaction-cost-analysis) · Week 6 · partial · 5 issues
+- [E14 — Cross-language parity (golden tests Python == C++ == Rust == Java)](#e14--cross-language-parity-golden-tests-python--c--rust--java) · Week 6 · done · 4 issues
+- [E15 — Alpha promotion lifecycle](#e15--alpha-promotion-lifecycle) · Week 6 · partial · 5 issues
+- [E16 — Observability and the decision trace](#e16--observability-and-the-decision-trace) · Week 6 · partial · 6 issues
+- [E17 — Data model and store](#e17--data-model-and-store) · Week 6 · partial · 3 issues
+- [E18 — End-to-end MVP loop](#e18--end-to-end-mvp-loop) · Week 6 · done · 3 issues
+- [E19 — Six-level testing strategy](#e19--six-level-testing-strategy) · Week 6 · partial · 4 issues
+- [E20 — ML layer — gated model zoo and meta-labeling](#e20--ml-layer--gated-model-zoo-and-meta-labeling) · Phase 2 · partial · 4 issues
+- [E21 — Adaptive layer — drift, refit policies](#e21--adaptive-layer--drift-refit-policies) · Phase 2 · partial · 4 issues
+- [E22 — Research platform — alpha factory](#e22--research-platform--alpha-factory) · Phase 2 · partial · 4 issues
+- [E23 — Production engineering (documented out of scope)](#e23--production-engineering-documented-out-of-scope) · Phase 3 · partial · 5 issues
+- [E24 — Agentic AI / MCP research layer (read-only)](#e24--agentic-ai--mcp-research-layer-read-only) · Backlog · partial · 2 issues
+- [E25 — Real historical exchange data (ITCH/PITCH, FX ECN) with a point-in-time master](#e25--real-historical-exchange-data-itchpitch-fx-ecn-with-a-point-in-time-master) · Phase 3 · backlog · 4 issues
+- [E26 — Latency engineering — measured, gated, allocation-free hot path](#e26--latency-engineering--measured-gated-allocation-free-hot-path) · Backlog · backlog · 4 issues
+- [E27 — Simulator calibration to live fills, multi-horizon markouts, venue/algo TCA](#e27--simulator-calibration-to-live-fills-multi-horizon-markouts-venuealgo-tca) · Backlog · backlog · 4 issues
+- [E28 — Book-level risk — factors, stress scenarios, regulatory pre-trade controls, drop-copy reconciliation](#e28--book-level-risk--factors-stress-scenarios-regulatory-pre-trade-controls-drop-copy-reconciliation) · Backlog · backlog · 4 issues
+- [E29 — Research throughput — feature store, distributed runs, marginal-contribution allocation](#e29--research-throughput--feature-store-distributed-runs-marginal-contribution-allocation) · Backlog · backlog · 3 issues
+- [E30 — Agent layer — write broker, blackboard, pre-registration, hidden-seed reserve, human approvals, evals](#e30--agent-layer--write-broker-blackboard-pre-registration-hidden-seed-reserve-human-approvals-evals) · Backlog · backlog · 7 issues
+- [E31 — Differential fuzzing, property tests, crash injection and risk golden coverage](#e31--differential-fuzzing-property-tests-crash-injection-and-risk-golden-coverage) · Backlog · backlog · 5 issues
 
 ## Phase 0
 
@@ -126,7 +133,7 @@ Market data + deterministic replay: the seeded synthetic generator (trades, quot
 
 ### E03 — Synthetic market data generator and normalization
 
-**Status:** done · **Milestone:** Week 1 · **Issues:** 7 (done 7, in-progress 0, backlog 0) · **Estimate:** 13 days · **Labels:** `type:epic`, `area:marketdata`, `phase:w1`, `priority:p0`, `lang:python`, `status:done`
+**Status:** partial · **Milestone:** Week 1 · **Issues:** 8 (done 7, in-progress 0, backlog 1) · **Estimate:** 16 days · **Labels:** `type:epic`, `area:marketdata`, `phase:w1`, `priority:p0`, `lang:python`, `status:partial`
 
 A seeded generator that produces realistic multi-venue equity MBO and FX quote/trade streams — regime-switching price, clustered flow, FIFO queue dynamics, auctions, halts and injected feed anomalies — followed by a normalization stage that validates sequences and writes the canonical dataset with a QC report that anchors data_version.
 
@@ -134,9 +141,9 @@ A seeded generator that produces realistic multi-venue equity MBO and FX quote/t
 
 **Acceptance criteria:**
 
-- [x] Same seed => byte-identical raw and normalized files (JSONL, IAP1, SHA-256)
-- [x] qc_report.json counts gaps, duplicates, out-of-order, invalid and ts-clamped events
-- [x] The golden vectors events_eq_mbo.jsonl / events_fx_quote.jsonl and the anomaly vectors are produced by this generator
+- [ ] Same seed => byte-identical raw and normalized files (JSONL, IAP1, SHA-256)
+- [ ] qc_report.json counts gaps, duplicates, out-of-order, invalid and ts-clamped events
+- [ ] The golden vectors events_eq_mbo.jsonl / events_fx_quote.jsonl and the anomaly vectors are produced by this generator
 
 **Out of scope:** Real market data, real calendars, corporate actions (Phase 3).
 
@@ -149,6 +156,7 @@ A seeded generator that produces realistic multi-venue equity MBO and FX quote/t
 | M05 | Feed anomaly injection and the pinned anomaly golden vectors | done | 2 | Week 1 | `python/src/iap/marketdata/golden_anomalies.py; python/src/iap/marketdata/generator.py (_inject_file_anomalies)`<br>`tests/golden/events_eq_anomalies.jsonl; tests/golden/events_fx_anomalies.jsonl; tests/golden/expected_anomaly_states.json`<br>`python/tests/test_golden_anomalies.py; java AnomalyGoldenTest` |
 | M06 | Normalization, sequence validation and the QC report (data_version anchor) | done | 2 | Week 1 | `python/src/iap/marketdata/normalize.py; python/src/iap/marketdata/__main__.py; python/tests/test_normalize.py`<br>`docs/runbooks/RUNBOOK_data_pipeline.md; README headline numbers (data/normalized/qc_report.json)` |
 | M07 | Reference data service: instruments, venues, sessions, synthetic calendar | done | 1 | Week 1 | `python/src/iap/reference/refdata.py; configs/instruments/instruments.json; configs/venues/venues.json`<br>`python/tests/test_refdata.py` |
+| M08 | Bundled dataset: equity continuous flow that reaches the close | backlog | 3 | Backlog | `python/src/iap/marketdata/generator.py (_eq_session_stream); python/tests/test_generator.py (test_fill_session_is_opt_in_and_carries_equity_flow_to_the_close pins the opt-in today)` |
 
 ### E04 — Deterministic replay as a flagship feature
 
@@ -485,7 +493,7 @@ See what the platform did and why: Prometheus metrics with a pinned name contrac
 | key | title | status | est. (d) | milestone | evidence |
 |---|---|---|---:|---|---|
 | O01 | Prometheus /metrics, /health, /ready, /status with the telemetry metric-name contract | done | 2 | Week 6 | `java/src/main/java/com/iap/{monitoring,api}/; java MetricsExpositionTest, MetricsConcurrencyTest, ApiEndpointTest`<br>`rust/telemetry/src/; rust/telemetry/tests/metrics.rs; PLATFORM_CONVENTIONS.md §12.4-12.6` |
-| O02 | 16 alerts with promtool unit tests, recording rules and two Grafana dashboards | done | 2 | Week 6 | `deployment/prometheus/{alerts,recording,prometheus}.yml; deployment/prometheus/tests/alerts_test.yml`<br>`deployment/grafana/dashboards/{market_data_latency,trading_risk}.json; deployment/grafana/README.md` |
+| O02 | 22 alerts with promtool unit tests, recording rules and two Grafana dashboards | done | 2 | Week 6 | `deployment/prometheus/{alerts,recording,prometheus}.yml; deployment/prometheus/tests/alerts_test.yml`<br>`deployment/grafana/dashboards/{market_data_latency,trading_risk}.json; deployment/grafana/README.md` |
 | O03 | Audit logs (risk decisions, admin actions, config changes) and the session report | done | 1 | Week 6 | `java/src/main/java/com/iap/platform/{PaperTrading,SessionStore,AdminService}.java; java PaperObservabilityTest, PaperStateRecoveryTest`<br>`docs/governance/GOVERNANCE.md §3` |
 | O04 | Decision trace: signal -> decision -> order -> execution -> P&L with explain() | done | 3 | Week 6 | `python/src/iap/trace/{builder,sinks,digest,explain,attribution}.py; python/src/iap/contracts/ids.py (make_trace_id); schemas/trace/decision_trace.schema.json`<br>`python/tests/test_trace.py; python/tests/test_contracts.py (explain byte-stable); tests/golden/expected_contracts_examples.json (pinned explain block); tests/golden/expected_canonical_json.json (trace_id, trace_digest)`<br>`docs/DECISION_TRACE.md` |
 | O05 | Decision trace ports in Java, Rust and C++ | done | 3 | Week 6 | `java/src/main/java/com/iap/trace/ + java/src/main/java/com/iap/contracts/ (java TraceGoldenTest, CanonicalJsonGoldenTest, PaperTraceTest)`<br>`rust/contracts/src/{canonical,sha256,trace}.rs; rust/telemetry/src/trace.rs (rust/contracts/tests/{golden_canonical_json,golden_trace}.rs)`<br>`cpp/include/iap/contracts/{canonical_json,trace}.hpp; cpp/src/contracts/; cpp/src/replay/exec_replay.cpp (cpp/tests/{test_canonical_json_golden,test_trace_golden,test_replay_trace}.cpp)` |
@@ -652,13 +660,35 @@ Name what a live deployment would need beyond this repository — real feed hand
 | PR04 | Regulatory pre-trade controls, best-execution reporting, surveillance and audit retention | backlog | 15 | Phase 3 | `README.md (Out of scope); PLATFORM_CONVENTIONS.md §11.1` |
 | PR05 | Authenticate the read endpoints and manage secrets outside the environment | backlog | 2 | Phase 3 | `java/src/main/java/com/iap/api/MetricsServer.java; deployment/k8s/networkpolicy.yaml; docs/governance/SECURITY.md` |
 
+### E25 — Real historical exchange data (ITCH/PITCH, FX ECN) with a point-in-time master
+
+**Status:** backlog · **Milestone:** Phase 3 · **Issues:** 4 (done 0, in-progress 0, backlog 4) · **Estimate:** 27 days · **Labels:** `type:epic`, `area:marketdata`, `phase:phase3`, `priority:p2`, `status:backlog`
+
+Replace the seeded synthetic generator as the only data source with decoders for real historical feeds (equity ITCH/PITCH-style order-by-order feeds and FX ECN streams) that emit the same canonical MarketEvents, and back them with a point-in-time security master and corporate-action history so a study run today sees exactly the universe, symbology and prices that were knowable on each historical date.
+
+**Scope:** ITCH/PITCH and FX ECN decoders into the canonical event types, with the existing normalizer/QC and golden discipline; a point-in-time (as-of) security master: listings, delistings, symbol changes, venue and lot-size history; corporate actions (splits, dividends, mergers, spin-offs) applied point-in-time without lookahead.
+
+**Acceptance criteria:**
+
+- [ ] A day of real vendor sample data decodes to canonical events whose book reconstruction matches the vendor's own end-of-day state
+- [ ] Every instrument attribute used by a study is read through an as-of query; a test proves no attribute is read from a later date
+
+**Out of scope:** Licensing, redistribution or storing vendor data in this repository; Live (non-historical) feed handlers.
+
+| key | title | status | est. (d) | milestone | evidence |
+|---|---|---|---:|---|---|
+| XD01 | ITCH/PITCH order-by-order decoder into canonical MarketEvents | backlog | 8 | Phase 3 | `python/src/iap/marketdata/ (decoder proposed); rust/marketdata/ (decoder proposed); schemas/FORMAT.md` |
+| XD02 | FX ECN feed normalisation (per-venue conventions, last-look, firm vs indicative) | backlog | 6 | Phase 3 | `python/src/iap/marketdata/ (proposed); configs/venues/venues.json` |
+| XD03 | Point-in-time security master with as-of queries | backlog | 7 | Phase 3 | `configs/instruments/instruments.json; schemas/sql/iap_v1.sql; python/src/iap/store/ (security master proposed)` |
+| XD04 | Corporate-action adjustment engine (splits, dividends, mergers) applied point-in-time | backlog | 6 | Phase 3 | `PLATFORM_CONVENTIONS.md section 1 (price_ticks); python/src/iap/marketdata/ (proposed)` |
+
 ## Backlog
 
 Unscheduled work with a written scope and proof-of-done, including the read-only agentic/MCP research layer.
 
 ### E24 — Agentic AI / MCP research layer (read-only)
 
-**Status:** backlog · **Milestone:** Backlog · **Issues:** 2 (done 0, in-progress 0, backlog 2) · **Estimate:** 3.5 days · **Labels:** `type:epic`, `area:agentic`, `priority:p2`, `phase:phase2`, `status:backlog`
+**Status:** partial · **Milestone:** Backlog · **Issues:** 2 (done 1, in-progress 0, backlog 1) · **Estimate:** 3.5 days · **Labels:** `type:epic`, `area:agentic`, `priority:p2`, `phase:phase2`, `status:partial`
 
 Let an agent read the ledger, reports, lifecycle log and decision traces through a read-only interface for hypothesis drafting and incident explanation — never on the trading path, never able to flip a verdict or touch the risk engine.
 
@@ -674,7 +704,142 @@ Let an agent read the ledger, reports, lifecycle log and decision traces through
 | key | title | status | est. (d) | milestone | evidence |
 |---|---|---|---:|---|---|
 | AG01 | Read-only MCP server over the ledger, reports, lifecycle log and decision traces | backlog | 3 | Backlog | `tools/mcp/ (proposed)` |
-| AG03 | Policy test: no trading-path module imports a network or LLM client | backlog | 0.5 | Backlog | `docs/governance/SECURITY.md; tests/integration/ (proposed)` |
+| AG03 | Policy test: no trading-path module imports a network or LLM client | done | 0.5 | Backlog | `python/tests/test_import_policy.py; PLATFORM_CONVENTIONS.md section 13.7; docs/RESEARCH_VALIDITY.md` |
+
+### E26 — Latency engineering — measured, gated, allocation-free hot path
+
+**Status:** backlog · **Milestone:** Backlog · **Issues:** 4 (done 0, in-progress 0, backlog 4) · **Estimate:** 17 days · **Labels:** `type:epic`, `area:performance`, `phase:phase3`, `priority:p2`, `status:backlog`
+
+Move from throughput benchmarks to latency evidence: tick-to-trade percentiles measured with a stated methodology and gated in CI against budgets, an audited allocation-free hot path in the C++ and Rust (and GC-quiet Java) implementations, and hardware timestamps so measured latency is not the process's own view of itself.
+
+**Scope:** a tick-to-trade harness reporting p50/p99/p99.9/max per language with coordinated-omission-safe recording; allocation audits of the decode -> book -> feature -> alpha -> risk path; NIC/kernel hardware timestamping and clock-synchronisation error budgets.
+
+**Acceptance criteria:**
+
+- [ ] CI fails when a tracked percentile exceeds its recorded budget by more than the stated noise margin
+- [ ] The hot path of each production language allocates zero bytes in steady state, proven by a counter or allocator hook
+
+**Out of scope:** Kernel bypass networking and FPGA offload.
+
+| key | title | status | est. (d) | milestone | evidence |
+|---|---|---|---:|---|---|
+| LT01 | Tick-to-trade percentile harness gated in CI | backlog | 5 | Backlog | `benchmarks/; cpp/bench/bench_all.cpp; docs/papers/06_cpp_vs_rust_vs_java_event_driven.md` |
+| LT02 | Allocation-free hot-path audit for C++, Rust and Java | backlog | 4 | Backlog | `cpp/src/; rust/*/src; java/src/main/java/com/iap/ (audit proposed)` |
+| LT03 | Hardware timestamps and a clock-synchronisation error budget | backlog | 5 | Backlog | `docs/papers/04_alpha_decay_vs_latency.md; deployment/grafana/README.md` |
+| LT04 | Jitter and GC-pause budgets with CPU isolation methodology | backlog | 3 | Backlog | `deployment/prometheus/alerts.yml; java/src/main/java/com/iap/monitoring/` |
+
+### E27 — Simulator calibration to live fills, multi-horizon markouts, venue/algo TCA
+
+**Status:** backlog · **Milestone:** Backlog · **Issues:** 4 (done 0, in-progress 0, backlog 4) · **Estimate:** 20 days · **Labels:** `type:epic`, `area:execution`, `area:tca`, `phase:phase3`, `priority:p2`, `status:backlog`
+
+Make the execution simulator answerable to reality: calibrate its fill, queue and impact models to live (or paper-venue) fills, report markouts at several horizons so adverse selection is visible beyond one number, and attribute cost by venue and by algorithm so routing and algo choices can be judged from evidence.
+
+**Scope:** a calibration pipeline fitting simulator parameters to observed fills with held-out validation; markouts at multiple horizons in the TCA module and its golden; venue-level and algo-level TCA attribution tables.
+
+**Acceptance criteria:**
+
+- [ ] A calibration report states, per parameter, the fitted value, its uncertainty and the held-out error of simulated versus observed fills
+- [ ] Markout horizons are configuration, appear in expected_tca.json, and are identical across the languages that implement TCA
+
+**Out of scope:** Trading real capital to collect fills.
+
+| key | title | status | est. (d) | milestone | evidence |
+|---|---|---|---:|---|---|
+| CAL01 | Calibrate simulator fill and queue models to live fills | backlog | 8 | Backlog | `python/src/iap/execution/; cpp/src/execution/; configs/execution/execution.json` |
+| CAL02 | Multi-horizon markouts in TCA | backlog | 4 | Backlog | `python/src/iap/tca/; tests/golden/expected_tca.json; API_PORTFOLIO_TCA.md` |
+| CAL03 | Venue-level and algorithm-level cost attribution report | backlog | 5 | Backlog | `python/src/iap/tca/; python/src/iap/execution/; docs/MVP.md` |
+| CAL04 | Calibration drift monitor: simulated versus realised fill residuals | backlog | 3 | Backlog | `deployment/prometheus/alerts.yml; python/src/iap/adaptive/` |
+
+### E28 — Book-level risk — factors, stress scenarios, regulatory pre-trade controls, drop-copy reconciliation
+
+**Status:** backlog · **Milestone:** Backlog · **Issues:** 4 (done 0, in-progress 0, backlog 4) · **Estimate:** 32 days · **Labels:** `type:epic`, `area:risk`, `phase:phase3`, `priority:p1`, `status:backlog`
+
+Extend the per-order, per-instrument fail-closed risk engine to the book: exposures to common factors, stress scenarios run against the live book, the regulatory pre-trade control set, and reconciliation of the platform's own order and fill state against an independent drop-copy so a divergence is a halt, not a surprise.
+
+**Scope:** factor exposure limits (market, sector, currency) as engine rules with golden vectors in all three engines; stress scenarios (gap, volatility shock, liquidity withdrawal) evaluated on the book with limits; regulatory pre-trade controls (price collars, fat-finger, order-rate and notional caps) mapped to rule ids; drop-copy reconciliation with break detection that engages the kill switch.
+
+**Acceptance criteria:**
+
+- [ ] Every new rule is a Rust change first, then golden regeneration, then the Java and Python ports, with the byte-identical risk goldens still green
+- [ ] A reconciliation break in a replayed session produces a RiskEvent and a latched halt
+
+**Out of scope:** Real-time portfolio margin and clearing-house exposure.
+
+| key | title | status | est. (d) | milestone | evidence |
+|---|---|---|---:|---|---|
+| BR01 | Book-level factor exposure limits (market, sector, currency) | backlog | 8 | Backlog | `rust/risk/src/limits_eval.rs; configs/risk/risk.json; API_TRADING.md` |
+| BR02 | Stress scenarios evaluated on the live book | backlog | 6 | Backlog | `python/src/iap/risk/; java/src/main/java/com/iap/risk/ (scenarios proposed)` |
+| BR03 | Regulatory pre-trade control set (price collar, fat-finger, order rate, notional) mapped to rule ids | backlog | 10 | Backlog | `rust/risk/src/; README.md (Out of scope); PLATFORM_CONVENTIONS.md section 11.1` |
+| BR04 | Drop-copy reconciliation with break detection that latches the kill switch | backlog | 8 | Backlog | `java/src/main/java/com/iap/platform/; docs/runbooks/RUNBOOK_incident_kill_switch.md` |
+
+### E29 — Research throughput — feature store, distributed runs, marginal-contribution allocation
+
+**Status:** backlog · **Milestone:** Backlog · **Issues:** 3 (done 0, in-progress 0, backlog 3) · **Estimate:** 20 days · **Labels:** `type:epic`, `area:research`, `phase:phase3`, `priority:p2`, `lang:python`, `status:backlog`
+
+Remove the recompute ceiling on research: a point-in-time feature store with content-addressed, versioned feature sets, experiment runs that shard across workers and merge into the ledger deterministically, and a capital-allocation step that weights alphas by marginal contribution to the portfolio rather than by stand-alone statistics.
+
+**Scope:** a feature store with as-of reads, content hashes and cache keys derived from the registry and the data digest; sharded ExperimentRunner execution with a deterministic ledger merge; allocation by marginal (incremental) contribution including correlation, closing lifecycle gate 8.
+
+**Acceptance criteria:**
+
+- [ ] A sharded run produces a ledger and result documents byte-identical to the single-process run
+- [ ] Allocation weights are a deterministic function of the ledgered evidence and reproduce from the manifest
+
+**Out of scope:** A managed cluster or cloud scheduler.
+
+| key | title | status | est. (d) | milestone | evidence |
+|---|---|---|---:|---|---|
+| RT01 | Point-in-time feature store with content-addressed versions | backlog | 8 | Backlog | `python/src/iap/features/; data/reference/feature_registry.json; python/src/iap/store/` |
+| RT02 | Sharded ExperimentRunner with deterministic ledger merge | backlog | 6 | Backlog | `python/src/iap/research/; research/experiments.json` |
+| RT03 | Capital allocation by marginal contribution (closing lifecycle gate 8) | backlog | 6 | Backlog | `python/src/iap/lifecycle/; python/src/iap/portfolio/; docs/governance/GOVERNANCE.md section 2` |
+
+### E30 — Agent layer — write broker, blackboard, pre-registration, hidden-seed reserve, human approvals, evals
+
+**Status:** backlog · **Milestone:** Backlog · **Issues:** 7 (done 0, in-progress 0, backlog 7) · **Estimate:** 29 days · **Labels:** `type:epic`, `area:agentic`, `phase:phase2`, `priority:p2`, `status:backlog`
+
+Specify and build the controls that let several research agents work against the platform without being able to fool it or each other: a write broker that is the only path to repository state, an append-only blackboard for tasks, claims and findings, hypothesis pre-registration, reserve evaluation sessions on a seed the agents never see, human approvals that are authenticated rather than asserted, a read-only MCP surface, evaluations that prove the controls catch known failures, and a rule for handling untrusted free text. Extends the read-only layer of E24 and never touches the trading path.
+
+**Scope:** an agent write broker and an append-only JSONL blackboard (tasks, claims, findings) with content-hashed tasks and leases; hypothesis pre-registration committed before any data is read; reserve sessions run on a hidden seed held by the evaluator; authenticated HUMAN approvals for every actor = HUMAN lifecycle edge; agent evaluations: planted leak, seeded bug, shuffled-label null, citation resolution; handling of untrusted free text from ledgers, reports and tool output.
+
+**Acceptance criteria:**
+
+- [ ] No agent can change repository, ledger or lifecycle state except through the broker, and every broker write is attributable and replayable
+- [ ] Each evaluation fails when its control is removed: the leak is not found, the bug is not caught, the null is not rejected, a fabricated citation is not flagged
+
+**Out of scope:** Any agent-initiated order, allocation or lifecycle transition without an authenticated human approval.
+
+| key | title | status | est. (d) | milestone | evidence |
+|---|---|---|---:|---|---|
+| AL01 | Agent write broker and append-only blackboard (tasks, claims, findings) | backlog | 6 | Backlog | `tools/agents/ (proposed); research/experiments.json` |
+| AL02 | Hypothesis pre-registration before any data is read | backlog | 3 | Backlog | `python/src/iap/research/; research/experiments.json` |
+| AL03 | Reserve sessions evaluated on a hidden seed | backlog | 4 | Backlog | `configs/marketdata/generator.json; python/src/iap/marketdata/; docs/governance/REPRODUCIBILITY.md` |
+| AL04 | Authenticated HUMAN approvals for lifecycle edges | backlog | 4 | Backlog | `python/src/iap/lifecycle/; research/lifecycle_transitions.jsonl; docs/LIFECYCLE.md` |
+| AL05 | Read-only MCP server: authenticated transport, versioned resource schemas, golden outputs | backlog | 3 | Backlog | `tools/mcp/ (proposed)` |
+| AL06 | Agent evaluations: planted leak, seeded bug, shuffled-label null, citation resolution | backlog | 6 | Backlog | `tools/agents/evals/ (proposed); research/experiments.json` |
+| AL07 | Untrusted free-text handling for agent inputs | backlog | 3 | Backlog | `tools/agents/ (proposed); docs/governance/SECURITY.md` |
+
+### E31 — Differential fuzzing, property tests, crash injection and risk golden coverage
+
+**Status:** backlog · **Milestone:** Backlog · **Issues:** 5 (done 0, in-progress 0, backlog 5) · **Estimate:** 23 days · **Labels:** `type:epic`, `area:testing`, `phase:phase2`, `priority:p1`, `status:backlog`
+
+Find the defects the hand-written goldens cannot: fuzz the three risk engines against each other, state invariants of the execution simulator as properties, fuzz snapshot and restore, inject crashes into the Java paper-trading loop, and close the gaps in risk golden coverage for the branches that matter most when something has already gone wrong.
+
+**Scope:** differential fuzzing of the Rust, Java and Python risk engines on generated order/fill/market sequences; property-based tests of simulator invariants; snapshot/restore fuzzing and crash-injection on the Java paper-trading path; risk golden cases for KILL_VENUE, bootstrap, restore and the fail-closed branches.
+
+**Acceptance criteria:**
+
+- [ ] A fuzz run of at least a stated number of sequences produces byte-identical decisions and audit logs across the three engines, or a minimised reproducer
+- [ ] A killed-and-restored session has the same kill-switch latch, positions and audit continuity as an uninterrupted one
+
+**Out of scope:** Formal verification of the engines.
+
+| key | title | status | est. (d) | milestone | evidence |
+|---|---|---|---:|---|---|
+| FZ01 | Differential fuzzing of the Rust, Java and Python risk engines | backlog | 6 | Backlog | `rust/risk/; java/src/main/java/com/iap/risk/; python/src/iap/risk/; tests/golden/expected_risk_decisions.json` |
+| FZ02 | Property-based tests of execution simulator invariants | backlog | 4 | Backlog | `python/src/iap/execution/; cpp/src/execution/; tests/` |
+| FZ03 | Snapshot/restore fuzzing across the three risk engines | backlog | 4 | Backlog | `rust/risk/src/audit.rs; java/src/main/java/com/iap/risk/RiskAudit.java; tests/golden/expected_risk_snapshot.json` |
+| FZ04 | Crash injection on the Java paper-trading path | backlog | 5 | Backlog | `java/src/main/java/com/iap/platform/PaperTrading.java; docs/runbooks/RUNBOOK_paper_trading.md` |
+| FZ05 | Risk golden coverage for KILL_VENUE, bootstrap, restore and fail-closed branches | backlog | 4 | Backlog | `rust/risk/tests/golden_risk.rs; tests/golden/expected_risk_decisions.json; java/src/test/java/com/iap/RiskGoldenTest.java` |
 
 ## Labels
 

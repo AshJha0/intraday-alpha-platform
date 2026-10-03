@@ -13,8 +13,9 @@ Public surface:
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Dict, List, Mapping
+from typing import Dict, List  # noqa: UP035  (unused; kept so iap.alpha.Dict/List stay importable)
 
 import pandas as pd
 
@@ -56,9 +57,9 @@ from iap.alpha.fx import (
 )
 from iap.alpha.fx_exposure import (  # noqa: F401
     CURRENCIES,
+    PAIR_CURRENCIES,
     FX05CrossPairRelativeValue,
     FX06CurrencyFactorMomentum,
-    PAIR_CURRENCIES,
     currency_exposures,
     exposure_matrix,
     free_exposure_matrix,
@@ -67,7 +68,7 @@ from iap.alpha.fx_exposure import (  # noqa: F401
 )
 
 #: pinned registry — ids exactly as named in spec §§11-12
-ALPHA_CLASSES: Dict[str, type] = {
+ALPHA_CLASSES: dict[str, type] = {
     "EQ01": EQ01Microprice,
     "EQ02": EQ02OfiL1,
     "EQ03": EQ03OfiMultiLevel,
@@ -94,7 +95,7 @@ ALPHA_CLASSES: Dict[str, type] = {
     "FX12": FX12VenueToxicity,
 }
 
-ALPHA_IDS: List[str] = list(ALPHA_CLASSES)
+ALPHA_IDS: list[str] = list(ALPHA_CLASSES)
 
 
 def build(alpha_id: str) -> AlphaModel:
@@ -104,11 +105,11 @@ def build(alpha_id: str) -> AlphaModel:
     return ALPHA_CLASSES[alpha_id]()
 
 
-def build_all() -> Dict[str, AlphaModel]:
+def build_all() -> dict[str, AlphaModel]:
     return {aid: build(aid) for aid in ALPHA_IDS}
 
 
-def fit_all(train: Mapping[int, pd.DataFrame]) -> Dict[str, AlphaModel]:
+def fit_all(train: Mapping[int, pd.DataFrame]) -> dict[str, AlphaModel]:
     """Fit every flagship alpha on the training frames (sorted id order)."""
     models = build_all()
     for aid in ALPHA_IDS:
@@ -157,8 +158,12 @@ def save_params(models: Mapping[str, AlphaModel], path) -> dict:
         ),
         **params_provenance(),
         "train_window": (
-            {"start_ts": min(w["start_ts"] for w in windows),
-             "end_ts": max(w["end_ts"] for w in windows)} if windows else None
+            {
+                "start_ts": min(w["start_ts"] for w in windows),
+                "end_ts": max(w["end_ts"] for w in windows),
+            }
+            if windows
+            else None
         ),
         "params": per,
     }
@@ -168,7 +173,7 @@ def save_params(models: Mapping[str, AlphaModel], path) -> dict:
     return blob
 
 
-def load_params_file(path, expected_feature_version: str = "") -> Dict[str, AlphaModel]:
+def load_params_file(path, expected_feature_version: str = "") -> dict[str, AlphaModel]:
     """Build models and restore fitted parameters from save_params output.
 
     ``expected_feature_version`` defaults to the running engine's registry
@@ -178,6 +183,7 @@ def load_params_file(path, expected_feature_version: str = "") -> Dict[str, Alph
     blob = json.loads(Path(path).read_text())
     if expected_feature_version == "":
         from iap.features.registry import registry_hash
+
         expected_feature_version = registry_hash()
     if expected_feature_version is not None:
         got = blob.get("feature_version")
@@ -187,7 +193,7 @@ def load_params_file(path, expected_feature_version: str = "") -> Dict[str, Alph
                 f"registry hash {expected_feature_version!r} — the parameters "
                 "were fitted against a different feature registry"
             )
-    models: Dict[str, AlphaModel] = {}
+    models: dict[str, AlphaModel] = {}
     for aid, p in blob["params"].items():
         m = build(aid)
         m.load_params(p)

@@ -24,14 +24,11 @@ violate conventions §1).
 
 from __future__ import annotations
 
+from collections.abc import Iterator, Mapping, Sequence
 from typing import (
     Any,
-    Iterator,
-    Mapping,
     Optional,
     Protocol,
-    Sequence,
-    Tuple,
     runtime_checkable,
 )
 
@@ -116,23 +113,17 @@ class BookViewLike(Protocol):
     from the integer best levels.
     """
 
-    def best_bid(self) -> Optional[Tuple[int, int]]:
-        ...
+    def best_bid(self) -> Optional[tuple[int, int]]: ...
 
-    def best_ask(self) -> Optional[Tuple[int, int]]:
-        ...
+    def best_ask(self) -> Optional[tuple[int, int]]: ...
 
-    def depth(self, side: int, levels: int = 10) -> Sequence[Tuple[int, int]]:
-        ...
+    def depth(self, side: int, levels: int = 10) -> Sequence[tuple[int, int]]: ...
 
-    def order_count(self, side: int, levels: int = 10) -> Sequence[Tuple[int, int]]:
-        ...
+    def order_count(self, side: int, levels: int = 10) -> Sequence[tuple[int, int]]: ...
 
-    def is_crossed(self) -> bool:
-        ...
+    def is_crossed(self) -> bool: ...
 
-    def is_locked(self) -> bool:
-        ...
+    def is_locked(self) -> bool: ...
 
 
 @runtime_checkable
@@ -151,14 +142,11 @@ class OrderBookLike(BookViewLike, Protocol):
         """Apply one event; returns the ``ApplyStatus``."""
         ...
 
-    def is_fresh(self, now_ns: int, max_age_ns: int) -> bool:
-        ...
+    def is_fresh(self, now_ns: int, max_age_ns: int) -> bool: ...
 
-    def state_summary(self) -> Mapping[str, Any]:
-        ...
+    def state_summary(self) -> Mapping[str, Any]: ...
 
-    def checkpoint(self) -> Mapping[str, Any]:
-        ...
+    def checkpoint(self) -> Mapping[str, Any]: ...
 
 
 @runtime_checkable
@@ -187,15 +175,12 @@ class Feature(Protocol):
     """
 
     @property
-    def feature_id(self) -> str:
-        ...
+    def feature_id(self) -> str: ...
 
     @property
-    def version(self) -> str:
-        ...
+    def version(self) -> str: ...
 
-    def calculate(self, context: Any) -> Optional[float]:
-        ...
+    def calculate(self, context: Any) -> Optional[float]: ...
 
 
 @runtime_checkable
@@ -208,8 +193,7 @@ class FeatureEngineLike(Protocol):
 
     feature_version: str
 
-    def apply(self, event: Any) -> Optional[FeatureVectorLike]:
-        ...
+    def apply(self, event: Any) -> Optional[FeatureVectorLike]: ...
 
 
 @runtime_checkable
@@ -229,15 +213,12 @@ class Alpha(Protocol):
     """
 
     @property
-    def alpha_id(self) -> str:
-        ...
+    def alpha_id(self) -> str: ...
 
     @property
-    def version(self) -> str:
-        ...
+    def version(self) -> str: ...
 
-    def generate(self, features: FeatureVectorLike) -> AlphaSignal:
-        ...
+    def generate(self, features: FeatureVectorLike) -> AlphaSignal: ...
 
 
 @runtime_checkable
@@ -252,9 +233,9 @@ class PortfolioConstructor(Protocol):
     INFEASIBLE, never NaN.
     """
 
-    def construct(self, signals: Sequence[AlphaSignal], portfolio_state: Any,
-                  constraints: Any) -> PortfolioTarget:
-        ...
+    def construct(
+        self, signals: Sequence[AlphaSignal], portfolio_state: Any, constraints: Any
+    ) -> PortfolioTarget: ...
 
 
 @runtime_checkable
@@ -271,8 +252,7 @@ class RiskEngineLike(Protocol):
     reproducible bit-for-bit from the audit log.
     """
 
-    def evaluate(self, order: Any, state: Any) -> RiskDecision:
-        ...
+    def evaluate(self, order: Any, state: Any) -> RiskDecision: ...
 
 
 @runtime_checkable
@@ -286,9 +266,7 @@ class ExecutionAlgorithm(Protocol):
     market's event clock only.
     """
 
-    def generate_child_orders(self, parent: ParentOrder,
-                              market: Any) -> Sequence[ChildOrder]:
-        ...
+    def generate_child_orders(self, parent: ParentOrder, market: Any) -> Sequence[ChildOrder]: ...
 
 
 @runtime_checkable
@@ -301,8 +279,7 @@ class SmartOrderRouterLike(Protocol):
     Ties break on ``venue_id`` ascending — never on iteration order.
     """
 
-    def route(self, order: ChildOrder, venues: Any) -> VenueDecision:
-        ...
+    def route(self, order: ChildOrder, venues: Any) -> VenueDecision: ...
 
 
 @runtime_checkable
@@ -318,11 +295,9 @@ class ExecutionSimulatorLike(Protocol):
     simulator's config.
     """
 
-    def submit(self, order: ChildOrder) -> Sequence[ExecutionReport]:
-        ...
+    def submit(self, order: ChildOrder) -> Sequence[ExecutionReport]: ...
 
-    def on_market_event(self, event: MarketEventLike) -> Sequence[ExecutionReport]:
-        ...
+    def on_market_event(self, event: MarketEventLike) -> Sequence[ExecutionReport]: ...
 
 
 @runtime_checkable
@@ -336,9 +311,9 @@ class TCAEngine(Protocol):
     timeline; never fabricates a benchmark.
     """
 
-    def analyse(self, parent_order: ParentOrder,
-                executions: Sequence[ExecutionReport], market: Any) -> TCAResult:
-        ...
+    def analyse(
+        self, parent_order: ParentOrder, executions: Sequence[ExecutionReport], market: Any
+    ) -> TCAResult: ...
 
 
 @runtime_checkable
@@ -351,8 +326,7 @@ class ExperimentRunner(Protocol):
     ``research/experiments/<experiment_id>/``.
     """
 
-    def run(self, spec: ExperimentSpec) -> ExperimentResult:
-        ...
+    def run(self, spec: ExperimentSpec) -> ExperimentResult: ...
 
 
 @runtime_checkable
@@ -363,11 +337,9 @@ class LifecycleGate(Protocol):
     :class:`GateResult`.  Pure function of its arguments."""
 
     @property
-    def name(self) -> str:
-        ...
+    def name(self) -> str: ...
 
-    def evaluate(self, alpha_id: str, evidence: Any) -> GateResult:
-        ...
+    def evaluate(self, alpha_id: str, evidence: Any) -> GateResult: ...
 
 
 @runtime_checkable
@@ -384,12 +356,11 @@ class AlphaLifecycle(Protocol):
     service.
     """
 
-    def state(self, alpha_id: str) -> LifecycleState:
-        ...
+    def state(self, alpha_id: str) -> LifecycleState: ...
 
-    def advance(self, alpha_id: str, event_ts: int,
-                evidence: Any) -> Optional[LifecycleTransition]:
-        ...
+    def advance(
+        self, alpha_id: str, event_ts: int, evidence: Any
+    ) -> Optional[LifecycleTransition]: ...
 
 
 @runtime_checkable
@@ -398,5 +369,4 @@ class TraceSink(Protocol):
     non-blocking with respect to the decision path and must not mutate the
     trace; ordering by ``(event_ts, sequence)`` is the sink's contract."""
 
-    def emit(self, trace: DecisionTrace) -> None:
-        ...
+    def emit(self, trace: DecisionTrace) -> None: ...

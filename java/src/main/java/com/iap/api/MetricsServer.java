@@ -2,6 +2,7 @@ package com.iap.api;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -35,6 +36,12 @@ import com.sun.net.httpserver.HttpServer;
  *       is installed (otherwise 404).</li>
  * </ul>
  *
+ * <p>Bind address: the listener binds {@value #DEFAULT_BIND_ADDR} unless
+ * {@code $IAP_BIND_ADDR} (or the explicit constructor argument) names another
+ * address — the admin verbs must not be reachable from other hosts by
+ * default. A containerised deployment that is scraped or probed from outside
+ * the network namespace sets {@code IAP_BIND_ADDR=0.0.0.0}.
+ *
  * <p>Concurrency (PLATFORM_CONVENTIONS.md §12.4): the registry is lock-free,
  * so rendering an exposition never blocks the trading thread. Handlers run
  * on a small bounded pool rather than the dispatcher thread, and
@@ -50,6 +57,16 @@ public final class MetricsServer {
     private static final String MAX_RSP_TIME = "20";
     /** Hard cap on an admin request body (form encoded; 8 KiB is ample). */
     private static final int MAX_BODY_BYTES = 8192;
+    /** Environment variable naming the listener's bind address. */
+    public static final String BIND_ADDR_ENV = "IAP_BIND_ADDR";
+    /** Loopback only unless configured otherwise. */
+    public static final String DEFAULT_BIND_ADDR = "127.0.0.1";
+
+    /** The bind address: trimmed {@code $IAP_BIND_ADDR}, else loopback. */
+    public static String bindAddress(Map<String, String> env) {
+        String v = env.get(BIND_ADDR_ENV);
+        return v == null || v.isBlank() ? DEFAULT_BIND_ADDR : v.trim();
+    }
 
     /** An HTTP status plus a JSON body. */
     public record HttpResult(int code, String json) {
@@ -82,6 +99,17 @@ public final class MetricsServer {
     public interface AdminHandler {
         /** Apply one admin action. */
         HttpResult handle(String action, String token, Map<String, String> params);
+
+        /**
+         * Apply one admin action, with the peer's address for the audit.
+         * The default ignores the address.
+         *
+         * @param remoteAddr the remote IP address, or {@code ""} when unknown
+         */
+        default HttpResult handle(String action, String token,
+                Map<String, String> params, String remoteAddr) {
+            return handle(action, token, params);
+        }
     }
 
     /** The admin actions the server routes (PLATFORM_CONVENTIONS.md §12.5). */
@@ -112,13 +140,27 @@ public final class MetricsServer {
     public MetricsServer(MetricsRegistry registry, int port,
             Supplier<String> statusJson, Probe health, Probe ready,
             AdminHandler admin) throws IOException {
+        this(registry, port, statusJson, health, ready, admin, null);
+    }
+
+    /**
+     * Bind (port 0 = ephemeral) on an explicit address without starting.
+     *
+     * @param bindAddr address to bind, or {@code null} for
+     *                 {@link #bindAddress} of the process environment
+     */
+    public MetricsServer(MetricsRegistry registry, int port,
+            Supplier<String> statusJson, Probe health, Probe ready,
+            AdminHandler admin, String bindAddr) throws IOException {
         this.registry = registry;
         this.status = statusJson;
         // Bound how long a stalled peer may hold a handler thread. These are
         // read by the JDK http server at construction time.
         System.setProperty("sun.net.httpserver.maxReqTime", MAX_REQ_TIME);
         System.setProperty("sun.net.httpserver.maxRspTime", MAX_RSP_TIME);
-        this.server = HttpServer.create(new InetSocketAddress(port), 0);
+        String addr = bindAddr != null ? bindAddr : bindAddress(System.getenv());
+        this.server = HttpServer.create(
+                new InetSocketAddress(InetAddress.getByName(addr), port), 0);
         ThreadPoolExecutor tp = new ThreadPoolExecutor(HANDLER_THREADS,
                 HANDLER_THREADS, 60L, TimeUnit.SECONDS,
                 new ArrayBlockingQueue<>(HANDLER_QUEUE), r -> {
@@ -186,7 +228,10 @@ public final class MetricsServer {
             return;
         }
         params.putAll(parseQuery(new String(body, StandardCharsets.UTF_8)));
-        HttpResult r = admin.handle(action, bearerToken(ex), params);
+        InetSocketAddress peer = ex.getRemoteAddress();
+        String remote = peer == null || peer.getAddress() == null ? ""
+                : peer.getAddress().getHostAddress();
+        HttpResult r = admin.handle(action, bearerToken(ex), params, remote);
         respond(ex, r.code(), "application/json", r.json());
     }
 
@@ -280,6 +325,11 @@ public final class MetricsServer {
     /** The actual bound port (useful with port 0). */
     public int port() {
         return server.getAddress().getPort();
+    }
+
+    /** The address the listener is bound to. */
+    public String boundAddress() {
+        return server.getAddress().getAddress().getHostAddress();
     }
 
     /** Stop the server and its handler pool (immediately). */

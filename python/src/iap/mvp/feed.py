@@ -24,9 +24,10 @@ in ``[start_ns, end_ns)`` in file order (already event-time ordered).
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Tuple, Union
+from typing import Any
 
 from iap.core.codec import (
     iter_jsonl,
@@ -61,7 +62,7 @@ FEED_MANIFEST = "feed.json"
 _FEED_VERSION = 1
 
 
-def compose_reference_documents(cfg: MvpConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+def compose_reference_documents(cfg: MvpConfig) -> tuple[dict[str, Any], dict[str, Any]]:
     """``(instruments_cfg, venues_cfg)`` for :class:`ReferenceData`.
 
     The instruments document is the MVP instruments file with the session
@@ -79,14 +80,15 @@ def compose_reference_documents(cfg: MvpConfig) -> Tuple[Dict[str, Any], Dict[st
         raise ValueError(f"{where}: missing 'instruments' array")
     symbols = [row.get("symbol") for row in rows]
     if cfg.instrument not in symbols:
-        raise ValueError(f"{where}: instrument {cfg.instrument!r} is not defined "
-                         f"(have {symbols})")
+        raise ValueError(f"{where}: instrument {cfg.instrument!r} is not defined (have {symbols})")
     calendar = instruments_doc.get("calendar")
     if not isinstance(calendar, dict) or "trading_days" not in calendar:
         raise ValueError(f"{where}: missing calendar.trading_days")
     if cfg.session.trading_day not in calendar["trading_days"]:
-        raise ValueError(f"{where}: session trading_day {cfg.session.trading_day!r} "
-                         "is not in calendar.trading_days")
+        raise ValueError(
+            f"{where}: session trading_day {cfg.session.trading_day!r} "
+            "is not in calendar.trading_days"
+        )
     session = {
         "timezone": cfg.session.timezone,
         "open": cfg.session.open,
@@ -117,8 +119,9 @@ def build_reference_data(cfg: MvpConfig) -> ReferenceData:
     ref = ReferenceData(instruments_cfg, venues_cfg)
     inst = ref.instrument(cfg.instrument)
     if inst.asset_class not in ("EQUITY", "ETF"):
-        raise ValueError(f"MVP instrument {cfg.instrument!r} must be an equity, "
-                         f"got {inst.asset_class}")
+        raise ValueError(
+            f"MVP instrument {cfg.instrument!r} must be an equity, got {inst.asset_class}"
+        )
     listed = set(inst.venues)
     for v in cfg.venues:
         if v not in listed:
@@ -130,14 +133,14 @@ def build_reference_data(cfg: MvpConfig) -> ReferenceData:
 class FeedResult:
     """The captured stream and its identity."""
 
-    events: Tuple[MarketEvent, ...]
+    events: tuple[MarketEvent, ...]
     instrument_id: int
-    data_version: str        #: sha256 of the IAP1 encoding of the stream
-    events_sha256: str       #: sha256 of ``events.jsonl`` bytes
-    iap1_sha256: str         #: sha256 of ``events.iap1`` bytes (== data_version)
+    data_version: str  #: sha256 of the IAP1 encoding of the stream
+    events_sha256: str  #: sha256 of ``events.jsonl`` bytes
+    iap1_sha256: str  #: sha256 of ``events.iap1`` bytes (== data_version)
     n_events_generated: int  #: normalized events before the instrument filter
-    generator_stats: Dict[str, Any]
-    qc_totals: Dict[str, int]
+    generator_stats: dict[str, Any]
+    qc_totals: dict[str, int]
 
     @property
     def first_ts(self) -> int:
@@ -148,13 +151,14 @@ class FeedResult:
         return self.events[-1].exchange_ts
 
 
-def stream_versions(events: List[MarketEvent], jsonl_path: Path,
-                    iap1_path: Path) -> Tuple[str, str, str]:
+def stream_versions(
+    events: list[MarketEvent], jsonl_path: Path, iap1_path: Path
+) -> tuple[str, str, str]:
     """``(data_version, events_sha256, iap1_sha256)`` of a captured stream."""
     return sha256_events_iap1(events), sha256_file(jsonl_path), sha256_file(iap1_path)
 
 
-def generate_feed(cfg: MvpConfig, run_dir: Union[str, Path]) -> FeedResult:
+def generate_feed(cfg: MvpConfig, run_dir: str | Path) -> FeedResult:
     """Generate, normalise and capture the MVP session into ``run_dir``."""
     run_dir = Path(run_dir)
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -169,7 +173,7 @@ def generate_feed(cfg: MvpConfig, run_dir: Union[str, Path]) -> FeedResult:
     qc = normalize_run(raw_dir, normalized_dir)
 
     instrument_id = ref.instrument(cfg.instrument).instrument_id
-    events: List[MarketEvent] = []
+    events: list[MarketEvent] = []
     n_generated = 0
     for path in sorted(normalized_dir.glob("*.normalized.jsonl")):
         for ev in iter_jsonl(path):
@@ -204,13 +208,18 @@ def generate_feed(cfg: MvpConfig, run_dir: Union[str, Path]) -> FeedResult:
         json.dump(manifest, fh, indent=2, sort_keys=True)
         fh.write("\n")
     return FeedResult(
-        events=tuple(events), instrument_id=instrument_id, data_version=data_version,
-        events_sha256=events_sha, iap1_sha256=iap1_sha, n_events_generated=n_generated,
-        generator_stats=gen_stats, qc_totals=dict(qc["totals"]),
+        events=tuple(events),
+        instrument_id=instrument_id,
+        data_version=data_version,
+        events_sha256=events_sha,
+        iap1_sha256=iap1_sha,
+        n_events_generated=n_generated,
+        generator_stats=gen_stats,
+        qc_totals=dict(qc["totals"]),
     )
 
 
-def load_feed(run_dir: Union[str, Path]) -> FeedResult:
+def load_feed(run_dir: str | Path) -> FeedResult:
     """Load a captured stream (the incident-replay input) and re-derive its
     identity from the bytes on disk — never from the manifest."""
     run_dir = Path(run_dir)
@@ -230,13 +239,19 @@ def load_feed(run_dir: Union[str, Path]) -> FeedResult:
         raise ValueError(f"{jsonl_path}: contains events of another instrument")
     data_version, events_sha, iap1_sha = stream_versions(events, jsonl_path, iap1_path)
     if data_version != iap1_sha:
-        raise ValueError(f"{iap1_path}: bytes do not match {jsonl_path} (data_version "
-                         f"{data_version} != iap1 sha256 {iap1_sha})")
+        raise ValueError(
+            f"{iap1_path}: bytes do not match {jsonl_path} (data_version "
+            f"{data_version} != iap1 sha256 {iap1_sha})"
+        )
     return FeedResult(
-        events=tuple(events), instrument_id=instrument_id, data_version=data_version,
-        events_sha256=events_sha, iap1_sha256=iap1_sha,
+        events=tuple(events),
+        instrument_id=instrument_id,
+        data_version=data_version,
+        events_sha256=events_sha,
+        iap1_sha256=iap1_sha,
         n_events_generated=int(manifest["n_events_generated"]),
-        generator_stats=dict(manifest["generator"]), qc_totals=dict(manifest["qc_totals"]),
+        generator_stats=dict(manifest["generator"]),
+        qc_totals=dict(manifest["qc_totals"]),
     )
 
 
@@ -244,7 +259,7 @@ class JsonlMarketDataSource:
     """:class:`~iap.contracts.protocols.MarketDataSource` over a captured
     ``events.jsonl`` (event-time ordered)."""
 
-    def __init__(self, path: Union[str, Path]) -> None:
+    def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
         if not self.path.is_file():
             raise ValueError(f"market data file not found: {self.path}")

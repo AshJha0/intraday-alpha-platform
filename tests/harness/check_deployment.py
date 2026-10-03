@@ -44,10 +44,27 @@ Checks (each one is a named case; exit code 0 iff no case FAILED):
   dashboards_valid            dashboard JSON parses, datasource uid stable, and
                               every panel expression names a real metric
   java_golden_gate_complete   JAVA_GOLDEN_CLASSES == the *GoldenTest.java set
+  alerting_wired              Prometheus -> Alertmanager in config, compose and
+                              k8s, plus the always-firing Watchdog rule
+  k8s_pod_hardening           automountServiceAccountToken false everywhere,
+                              java root fs read-only with a /tmp emptyDir, its
+                              own state PVC, explicit storageClassName on every
+                              PVC, IAP_BIND_ADDR set
+  k8s_network_policy          default-deny ingress AND egress, DNS egress, the
+                              operator -> java admin ingress rule
+  compose_exposure            8080/9090 published on 127.0.0.1 only
+  image_pinning               every Dockerfile FROM and every third-party
+                              compose/k8s image carries a sha256 digest; iap
+                              images use the ghcr names with one version tag
+  workflow_supply_chain       every `uses:` in .github/workflows is a full
+                              commit SHA, runners are pinned, every cargo
+                              invocation is --locked, permissions are declared
+  rust_toolchain_pinned       rust-toolchain.toml == ci.yml == Dockerfile.rust
 
 Usage:
     python3 tests/harness/check_deployment.py [--verbose]
 """
+
 from __future__ import annotations
 
 import json
@@ -77,9 +94,7 @@ def record(case: str, status: str, detail: str = "") -> None:
 
 
 def run(cmd: list[str], cwd: Path | None = None) -> tuple[int, str]:
-    proc = subprocess.run(
-        cmd, cwd=cwd, capture_output=True, text=True, timeout=300
-    )
+    proc = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=300)
     return proc.returncode, (proc.stdout + proc.stderr).strip()
 
 
@@ -93,43 +108,117 @@ def have(tool: str) -> bool:
 # com.iap.risk.RiskEngine + com.iap.monitoring.GcMetrics; `up` is Prometheus's own.
 EXPORTED_METRICS = {
     # market data
-    "md_events_total", "md_sequence_gaps_total", "md_duplicates_total",
-    "md_last_event_unixtime", "md_last_event_wallclock_unixtime",
-    "md_event_time_gap_seconds", "book_stale",
+    "md_events_total",
+    "md_sequence_gaps_total",
+    "md_duplicates_total",
+    "md_last_event_unixtime",
+    "md_last_event_wallclock_unixtime",
+    "md_event_time_gap_seconds",
+    "book_stale",
     # platform lifecycle
-    "platform_mode", "platform_session_state", "risk_session_restarts_total",
+    "platform_mode",
+    "platform_session_state",
+    "risk_session_restarts_total",
     "admin_requests_total",
+    # safety counters of the 2026-10-03 paper-platform review (§12.6); every
+    # one is created on first use, so a rule must not rely on a zero sample
+    "risk_routed_venue_mismatch_total",
+    "risk_resume_open_orders_released_total",
+    "exec_orders_blocked_kill_pending_total",
+    "admin_auth_rate_limited_total",
+    "admin_audit_suppressed_total",
     # latency histograms
-    "decode_latency_ns", "book_update_latency_ns", "order_path_latency_ns",
-    "exec_slippage_bps", "jvm_gc_pause_ns",
+    "decode_latency_ns",
+    "book_update_latency_ns",
+    "order_path_latency_ns",
+    "exec_slippage_bps",
+    "jvm_gc_pause_ns",
     # alpha / portfolio
-    "alpha_signals_total", "alpha_live_vs_backtest_drift", "alpha_rolling_ic",
-    "alpha_lifecycle_state", "portfolio_solves_total",
-    "portfolio_gross_notional", "portfolio_net_notional", "portfolio_drawdown",
+    "alpha_signals_total",
+    "alpha_live_vs_backtest_drift",
+    "alpha_rolling_ic",
+    "alpha_lifecycle_state",
+    "portfolio_solves_total",
+    "portfolio_gross_notional",
+    "portfolio_net_notional",
+    "portfolio_drawdown",
     # execution
-    "exec_orders_submitted_total", "exec_fills_total",
+    "exec_orders_submitted_total",
+    "exec_fills_total",
     "exec_child_orders_rejected_total",
     # risk
-    "risk_events_total", "risk_decisions_total", "risk_allowed_total",
-    "risk_rejected_total", "risk_realized_pnl", "risk_unrealized_pnl",
-    "risk_daily_pnl", "risk_kill_switch_engaged", "risk_limit",
+    "risk_events_total",
+    "risk_decisions_total",
+    "risk_allowed_total",
+    "risk_rejected_total",
+    "risk_realized_pnl",
+    "risk_unrealized_pnl",
+    "risk_daily_pnl",
+    "risk_kill_switch_engaged",
+    "risk_limit",
     # decision trace (com.iap.platform.PaperTraces, 2026-09-19; the names
     # rust/telemetry::trace pins) — exported, not yet on a panel (EPICS O06)
-    "trace_records_total", "trace_tca_skipped_total",
+    "trace_records_total",
+    "trace_tca_skipped_total",
     # prometheus itself
     "up",
 }
 
 # Go text/template builtins plus Prometheus's own template functions.
 ALLOWED_TEMPLATE_FUNCS = {
-    "and", "call", "html", "index", "slice", "js", "len", "not", "or",
-    "print", "printf", "println", "urlquery", "eq", "ne", "lt", "le", "gt",
-    "ge", "if", "else", "end", "range", "with", "template", "block", "define",
-    "humanize", "humanize1024", "humanizeDuration", "humanizePercentage",
-    "humanizeTimestamp", "title", "toUpper", "toLower", "match",
-    "reReplaceAll", "graphLink", "tableLink", "parseDuration", "stripPort",
-    "stripDomain", "toTime", "pathPrefix", "externalURL", "value", "args",
-    "safeHtml", "sortByLabel", "first", "label", "strvalue", "query",
+    "and",
+    "call",
+    "html",
+    "index",
+    "slice",
+    "js",
+    "len",
+    "not",
+    "or",
+    "print",
+    "printf",
+    "println",
+    "urlquery",
+    "eq",
+    "ne",
+    "lt",
+    "le",
+    "gt",
+    "ge",
+    "if",
+    "else",
+    "end",
+    "range",
+    "with",
+    "template",
+    "block",
+    "define",
+    "humanize",
+    "humanize1024",
+    "humanizeDuration",
+    "humanizePercentage",
+    "humanizeTimestamp",
+    "title",
+    "toUpper",
+    "toLower",
+    "match",
+    "reReplaceAll",
+    "graphLink",
+    "tableLink",
+    "parseDuration",
+    "stripPort",
+    "stripDomain",
+    "toTime",
+    "pathPrefix",
+    "externalURL",
+    "value",
+    "args",
+    "safeHtml",
+    "sortByLabel",
+    "first",
+    "label",
+    "strvalue",
+    "query",
 }
 
 RULE_FILES = [PROM / "alerts.yml", PROM / "recording.yml"]
@@ -154,8 +243,7 @@ def all_rules() -> list[dict]:
 def check_prometheus_rules() -> None:
     if have("promtool"):
         rc, out = run(["promtool", "check", "rules", *map(str, RULE_FILES)])
-        record("prometheus_rules_load", "PASS" if rc == 0 else "FAIL",
-               "" if rc == 0 else out)
+        record("prometheus_rules_load", "PASS" if rc == 0 else "FAIL", "" if rc == 0 else out)
         return
     # Fallback: strict YAML + Go-template syntax + rule-shape validation.
     problems = []
@@ -177,16 +265,21 @@ def check_prometheus_rules() -> None:
                 if "alert" not in rule and "record" not in rule:
                     problems.append(f"{f.name}: rule is neither alert nor record")
                 problems += template_problems(rule, f.name)
-    record("prometheus_rules_load", "PASS" if not problems else "FAIL",
-           "promtool absent, used the strict fallback parser"
-           if not problems else "; ".join(problems[:5]))
+    record(
+        "prometheus_rules_load",
+        "PASS" if not problems else "FAIL",
+        "promtool absent, used the strict fallback parser"
+        if not problems
+        else "; ".join(problems[:5]),
+    )
 
 
 def template_problems(rule: dict, where: str) -> list[str]:
     """Every {{ ... }} action must balance and use a known function."""
     problems = []
-    for field, text in list(rule.get("annotations", {}).items()) + \
-            list(rule.get("labels", {}).items()):
+    for field, text in list(rule.get("annotations", {}).items()) + list(
+        rule.get("labels", {}).items()
+    ):
         if not isinstance(text, str):
             continue
         if text.count("{{") != text.count("}}"):
@@ -198,8 +291,8 @@ def template_problems(rule: dict, where: str) -> list[str]:
                 name = segment.strip().split(" ")[0]
                 if name and name not in ALLOWED_TEMPLATE_FUNCS:
                     problems.append(
-                        f"{where} {rule.get('alert')}.{field}: "
-                        f'function "{name}" not defined')
+                        f'{where} {rule.get("alert")}.{field}: function "{name}" not defined'
+                    )
     return problems
 
 
@@ -207,8 +300,9 @@ def check_annotation_functions() -> None:
     problems = []
     for rule in all_rules():
         problems += template_problems(rule, "alerts.yml")
-    record("alert_annotation_functions", "PASS" if not problems else "FAIL",
-           "; ".join(problems[:5]))
+    record(
+        "alert_annotation_functions", "PASS" if not problems else "FAIL", "; ".join(problems[:5])
+    )
 
 
 def check_prometheus_config() -> None:
@@ -231,8 +325,11 @@ def check_prometheus_config() -> None:
             name = Path(ref).name
             src = PROM / name
             if not src.exists():
-                record("prometheus_config", "FAIL",
-                       f"rule_files references {ref}, but {src} does not exist")
+                record(
+                    "prometheus_config",
+                    "FAIL",
+                    f"rule_files references {ref}, but {src} does not exist",
+                )
                 return
             (stage / name).write_text(src.read_text())
             staged_rules.append(str(stage / name))
@@ -240,8 +337,7 @@ def check_prometheus_config() -> None:
         staged_cfg = stage / "prometheus.yml"
         staged_cfg.write_text(yaml.safe_dump(doc, sort_keys=False))
         rc, out = run(["promtool", "check", "config", str(staged_cfg)])
-        record("prometheus_config", "PASS" if rc == 0 else "FAIL",
-               "" if rc == 0 else out)
+        record("prometheus_config", "PASS" if rc == 0 else "FAIL", "" if rc == 0 else out)
 
 
 def check_prometheus_rule_tests() -> None:
@@ -262,12 +358,48 @@ def check_prometheus_rule_tests() -> None:
 
 METRIC_RE = re.compile(r"[a-zA-Z_:][a-zA-Z0-9_:]*")
 PROMQL_KEYWORDS = {
-    "by", "without", "on", "ignoring", "group_left", "group_right", "and",
-    "or", "unless", "offset", "bool", "rate", "increase", "sum", "avg", "min",
-    "max", "count", "clamp_min", "clamp_max", "histogram_quantile", "time",
-    "vector", "absent", "topk", "bottomk", "delta", "irate", "quantile",
-    "le", "job", "service", "instance", "limit", "mode", "alpha", "instrument",
-    "m", "h", "s", "d",
+    "by",
+    "without",
+    "on",
+    "ignoring",
+    "group_left",
+    "group_right",
+    "and",
+    "or",
+    "unless",
+    "offset",
+    "bool",
+    "rate",
+    "increase",
+    "sum",
+    "avg",
+    "min",
+    "max",
+    "count",
+    "clamp_min",
+    "clamp_max",
+    "histogram_quantile",
+    "time",
+    "vector",
+    "absent",
+    "last_over_time",
+    "topk",
+    "bottomk",
+    "delta",
+    "irate",
+    "quantile",
+    "le",
+    "job",
+    "service",
+    "instance",
+    "limit",
+    "mode",
+    "alpha",
+    "instrument",
+    "m",
+    "h",
+    "s",
+    "d",
 }
 
 
@@ -276,8 +408,7 @@ def referenced_metrics(expr: str) -> set[str]:
     stripped = re.sub(r'"[^"]*"', "", expr)
     # Drop numeric literals first, exponent and duration suffixes included
     # (10e6, 1e-9, 5m, 0.5): otherwise "e6" and "m" look like metric names.
-    stripped = re.sub(r"\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?[smhdwy]?\b", " ",
-                      stripped)
+    stripped = re.sub(r"\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?[smhdwy]?\b", " ", stripped)
     names = set()
     for token in METRIC_RE.findall(stripped):
         if token in PROMQL_KEYWORDS or token.startswith("job:"):
@@ -300,10 +431,14 @@ def check_metric_provenance() -> None:
             if base in EXPORTED_METRICS or metric in recorded:
                 continue
             unknown.setdefault(metric, []).append(name)
-    record("alert_metric_provenance", "PASS" if not unknown else "FAIL",
-           "" if not unknown else
-           "no producer for " + ", ".join(
-               f"{m} (used by {', '.join(v)})" for m, v in unknown.items()))
+    record(
+        "alert_metric_provenance",
+        "PASS" if not unknown else "FAIL",
+        ""
+        if not unknown
+        else "no producer for "
+        + ", ".join(f"{m} (used by {', '.join(v)})" for m, v in unknown.items()),
+    )
 
 
 # ---------------------------------------------------------------- docker ---
@@ -321,8 +456,7 @@ def check_docker_build_context() -> None:
     script = ROOT / "tests" / "harness" / "check_docker_build.py"
     rc, out = run([sys.executable, str(script)])
     tail = [ln for ln in out.splitlines() if ln.startswith("docker build checks")]
-    record("docker_build_context", "PASS" if rc == 0 else "FAIL",
-           (tail[-1] if tail else out)[:300])
+    record("docker_build_context", "PASS" if rc == 0 else "FAIL", (tail[-1] if tail else out)[:300])
 
 
 def check_compose_config() -> None:
@@ -331,9 +465,14 @@ def check_compose_config() -> None:
         return
     env = dict(os.environ)
     env.setdefault("GRAFANA_ADMIN_PASSWORD", "check-deployment-placeholder")
-    proc = subprocess.run(["docker", "compose", "config", "-q"],
-                          cwd=COMPOSE.parent, capture_output=True, text=True,
-                          env=env, timeout=300)
+    proc = subprocess.run(
+        ["docker", "compose", "config", "-q"],
+        cwd=COMPOSE.parent,
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=300,
+    )
     out = (proc.stdout + proc.stderr).strip()
     record("compose_config", "PASS" if proc.returncode == 0 else "FAIL", out)
 
@@ -348,16 +487,19 @@ def check_compose_log_limits() -> None:
         opts = (svc.get("logging") or {}).get("options") or {}
         if "max-size" not in opts or "max-file" not in opts:
             bad.append(name)
-    record("compose_log_limits", "PASS" if not bad else "FAIL",
-           "" if not bad else
-           "no logging.options.max-size/max-file: " + ", ".join(bad))
+    record(
+        "compose_log_limits",
+        "PASS" if not bad else "FAIL",
+        "" if not bad else "no logging.options.max-size/max-file: " + ", ".join(bad),
+    )
 
 
 def check_config_dir_wiring() -> None:
     """§12.2 — IAP_CONFIG_DIR is honoured by the code, image and compose."""
     problems = []
-    java = (ROOT / "java" / "src" / "main" / "java" / "com" / "iap" / "config"
-            / "ConfigService.java").read_text()
+    java = (
+        ROOT / "java" / "src" / "main" / "java" / "com" / "iap" / "config" / "ConfigService.java"
+    ).read_text()
     if "IAP_CONFIG_DIR" not in java:
         problems.append("no Java code reads IAP_CONFIG_DIR")
     dockerfile = (DEPLOY / "docker" / "Dockerfile.java").read_text()
@@ -376,8 +518,7 @@ def check_config_dir_wiring() -> None:
     k8s = (DEPLOY / "k8s" / "java-platform.yaml").read_text()
     if "IAP_CONFIG_DIR" not in k8s:
         problems.append("k8s java-platform sets no IAP_CONFIG_DIR")
-    record("compose_and_dockerfile_env", "PASS" if not problems else "FAIL",
-           "; ".join(problems))
+    record("compose_and_dockerfile_env", "PASS" if not problems else "FAIL", "; ".join(problems))
 
 
 DOCKERIGNORE = ROOT / ".dockerignore"
@@ -386,8 +527,11 @@ DOCKERIGNORE = ROOT / ".dockerignore"
 def dockerignore_patterns() -> list[str]:
     if not DOCKERIGNORE.exists():
         return []
-    return [ln.strip() for ln in DOCKERIGNORE.read_text().splitlines()
-            if ln.strip() and not ln.strip().startswith("#")]
+    return [
+        ln.strip()
+        for ln in DOCKERIGNORE.read_text().splitlines()
+        if ln.strip() and not ln.strip().startswith("#")
+    ]
 
 
 def check_dockerignore() -> None:
@@ -397,8 +541,11 @@ def check_dockerignore() -> None:
     pats = dockerignore_patterns()
     required = ["cpp/build/", "rust/target/", "java/out/", ".git/"]
     missing = [r for r in required if r not in pats]
-    record("dockerignore_present", "PASS" if not missing else "FAIL",
-           "" if not missing else "missing patterns: " + ", ".join(missing))
+    record(
+        "dockerignore_present",
+        "PASS" if not missing else "FAIL",
+        "" if not missing else "missing patterns: " + ", ".join(missing),
+    )
 
 
 COPY_RE = re.compile(r"^COPY\s+(?:--from=\S+\s+)?(.+)$", re.M)
@@ -429,10 +576,9 @@ def check_dockerfile_copy_sources() -> None:
                     p = pat.rstrip("/")
                     if src == p or src.startswith(p + "/"):
                         problems.append(
-                            f"{df.name}: COPY {src} is excluded by "
-                            f".dockerignore pattern {pat}")
-    record("dockerfile_copy_sources", "PASS" if not problems else "FAIL",
-           "; ".join(problems[:5]))
+                            f"{df.name}: COPY {src} is excluded by .dockerignore pattern {pat}"
+                        )
+    record("dockerfile_copy_sources", "PASS" if not problems else "FAIL", "; ".join(problems[:5]))
 
 
 # ------------------------------------------------------------------- k8s ---
@@ -459,14 +605,18 @@ def check_k8s_parse() -> None:
         for key in ("apiVersion", "kind", "metadata"):
             if key not in doc:
                 problems.append(f"{f.name}: document without {key}")
-    record("k8s_manifests_parse", "PASS" if not problems else "FAIL",
-           "; ".join(problems[:5]) or f"{len(docs)} documents")
+    record(
+        "k8s_manifests_parse",
+        "PASS" if not problems else "FAIL",
+        "; ".join(problems[:5]) or f"{len(docs)} documents",
+    )
 
 
 def check_k8s_dry_run() -> None:
     if have("kubeconform"):
-        rc, out = run(["kubeconform", "-strict", "-summary",
-                       *[str(p) for p in sorted(K8S.glob("*.yaml"))]])
+        rc, out = run(
+            ["kubeconform", "-strict", "-summary", *[str(p) for p in sorted(K8S.glob("*.yaml"))]]
+        )
         record("k8s_dry_run", "PASS" if rc == 0 else "FAIL", out)
         return
     if have("kubectl"):
@@ -480,9 +630,8 @@ def check_k8s_singleton() -> None:
     """§12.7 — the trading vertical is a singleton with probes that can fail."""
     problems = []
     found = False
-    for f, doc in k8s_docs():
-        if doc["kind"] == "PodDisruptionBudget" and \
-                doc["metadata"]["name"] == "java-platform":
+    for _f, doc in k8s_docs():
+        if doc["kind"] == "PodDisruptionBudget" and doc["metadata"]["name"] == "java-platform":
             problems.append("a PDB on a single-replica singleton blocks drains")
         if doc["kind"] != "Deployment" or doc["metadata"]["name"] != "java-platform":
             continue
@@ -498,14 +647,14 @@ def check_k8s_singleton() -> None:
         if live.get("path") != "/health":
             problems.append("livenessProbe must GET /health")
         if ready.get("path") != "/ready":
-            problems.append("readinessProbe must GET /ready (not /metrics: a "
-                            "TCP bind is not readiness)")
+            problems.append(
+                "readinessProbe must GET /ready (not /metrics: a TCP bind is not readiness)"
+            )
         if "startupProbe" not in container:
             problems.append("no startupProbe for the decode phase")
     if not found:
         problems.append("no java-platform Deployment found")
-    record("k8s_trading_singleton", "PASS" if not problems else "FAIL",
-           "; ".join(problems))
+    record("k8s_trading_singleton", "PASS" if not problems else "FAIL", "; ".join(problems))
 
 
 def check_configmaps_in_sync() -> None:
@@ -525,8 +674,11 @@ def check_configmaps_in_sync() -> None:
                 drift.append(f"{name}: not produced by the generator")
             elif produced.read_text() != text:
                 drift.append(f"{name}: differs from the generator output")
-    record("configmaps_in_sync", "PASS" if not drift else "FAIL",
-           "; ".join(drift) or f"{len(committed)} ConfigMaps")
+    record(
+        "configmaps_in_sync",
+        "PASS" if not drift else "FAIL",
+        "; ".join(drift) or f"{len(committed)} ConfigMaps",
+    )
 
 
 def check_configmap_items_in_sync() -> None:
@@ -554,15 +706,18 @@ def check_configmap_items_in_sync() -> None:
                     f"{f.name} volume {vol.get('name')!r}: items differ from "
                     f"generate_configmaps.configmap_items() "
                     f"(missing {sorted(set(want) - set(got))}, "
-                    f"extra {sorted(set(got) - set(want))})")
+                    f"extra {sorted(set(got) - set(want))})"
+                )
     if consumers == 0:
         problems.append("no manifest mounts the iap-configs ConfigMap")
     for key, path in want:
         if "/" in key or key.replace("__", "/") != path:
             problems.append(f"key {key!r} does not encode path {path!r}")
-    record("configmap_items_in_sync", "PASS" if not problems else "FAIL",
-           "; ".join(problems[:5]) or
-           f"{consumers} consumer(s) x {len(want)} files")
+    record(
+        "configmap_items_in_sync",
+        "PASS" if not problems else "FAIL",
+        "; ".join(problems[:5]) or f"{consumers} consumer(s) x {len(want)} files",
+    )
 
 
 def iter_volumes(doc: dict):
@@ -570,7 +725,7 @@ def iter_volumes(doc: dict):
     kind = doc.get("kind")
     spec = doc.get("spec") or {}
     if kind == "CronJob":
-        spec = ((spec.get("jobTemplate") or {}).get("spec") or {})
+        spec = (spec.get("jobTemplate") or {}).get("spec") or {}
         kind = "Job"
     if kind in ("Deployment", "Job", "StatefulSet", "DaemonSet"):
         spec = (spec.get("template") or {}).get("spec") or {}
@@ -595,8 +750,7 @@ def check_dashboards() -> None:
             for target in panel.get("targets", []):
                 ds = (target.get("datasource") or {}).get("uid")
                 if ds != "prometheus":
-                    problems.append(
-                        f"{f.name}: panel {panel['id']} datasource uid {ds!r}")
+                    problems.append(f"{f.name}: panel {panel['id']} datasource uid {ds!r}")
                 expr = target.get("expr", "")
                 placeholder = "PLACEHOLDER" in panel.get("title", "")
                 for metric in referenced_metrics(expr):
@@ -609,9 +763,9 @@ def check_dashboards() -> None:
                     problems.append(
                         f"{f.name}: panel {panel['id']} "
                         f"({panel.get('title')}) uses {metric}, which no "
-                        f"producer exports")
-    record("dashboards_valid", "PASS" if not problems else "FAIL",
-           "; ".join(problems[:5]))
+                        f"producer exports"
+                    )
+    record("dashboards_valid", "PASS" if not problems else "FAIL", "; ".join(problems[:5]))
 
 
 # -------------------------------------------------------------- harness ----
@@ -620,13 +774,13 @@ def check_java_golden_gate() -> None:
     run_all = (ROOT / "tests" / "harness" / "run_all.sh").read_text()
     m = re.search(r'JAVA_GOLDEN_CLASSES="([^"]*)"', run_all)
     if not m:
-        record("java_golden_gate_complete", "FAIL",
-               "JAVA_GOLDEN_CLASSES not found in run_all.sh")
+        record("java_golden_gate_complete", "FAIL", "JAVA_GOLDEN_CLASSES not found in run_all.sh")
         return
     listed = {c.split(".")[-1] for c in m.group(1).split()}
-    on_disk = {p.stem for p in
-               (ROOT / "java" / "src" / "test" / "java" / "com" / "iap")
-               .glob("*GoldenTest.java")}
+    on_disk = {
+        p.stem
+        for p in (ROOT / "java" / "src" / "test" / "java" / "com" / "iap").glob("*GoldenTest.java")
+    }
     missing = sorted(on_disk - listed)
     extra = sorted(listed - on_disk)
     detail = ""
@@ -634,14 +788,288 @@ def check_java_golden_gate() -> None:
         detail += "not in the golden gate: " + ", ".join(missing)
     if extra:
         detail += (" " if detail else "") + "listed but absent: " + ", ".join(extra)
-    record("java_golden_gate_complete",
-           "PASS" if not (missing or extra) else "FAIL",
-           detail or f"{len(on_disk)} golden classes")
+    record(
+        "java_golden_gate_complete",
+        "PASS" if not (missing or extra) else "FAIL",
+        detail or f"{len(on_disk)} golden classes",
+    )
+
+
+# ----------------------------------------------- governance hardening ------
+WORKFLOWS = ROOT / ".github" / "workflows"
+
+
+def pod_specs() -> list[tuple[str, str, dict]]:
+    """(file, workload name, pod spec) for every workload in deployment/k8s."""
+    out = []
+    for f, doc in k8s_docs():
+        kind = doc.get("kind")
+        spec = doc.get("spec") or {}
+        if kind == "CronJob":
+            spec = (spec.get("jobTemplate") or {}).get("spec") or {}
+        if kind in ("Deployment", "CronJob", "Job", "StatefulSet", "DaemonSet"):
+            pod = (spec.get("template") or {}).get("spec") or {}
+            out.append((f.name, doc["metadata"]["name"], pod))
+    return out
+
+
+def check_alerting_wired() -> None:
+    problems = []
+    prom = yaml.safe_load((PROM / "prometheus.yml").read_text())
+    targets = [
+        t
+        for am in (prom.get("alerting") or {}).get("alertmanagers", [])
+        for sc in am.get("static_configs", [])
+        for t in sc.get("targets", [])
+    ]
+    if "alertmanager:9093" not in targets:
+        problems.append("prometheus.yml has no alerting.alertmanagers target alertmanager:9093")
+    if "alertmanager" not in compose_doc().get("services", {}):
+        problems.append("compose has no alertmanager service")
+    kinds = {(d["kind"], d["metadata"]["name"]) for _, d in k8s_docs()}
+    for want in [
+        ("Deployment", "alertmanager"),
+        ("Service", "alertmanager"),
+        ("ConfigMap", "iap-alertmanager-config"),
+    ]:
+        if want not in kinds:
+            problems.append(f"k8s is missing {want[0]}/{want[1]}")
+    am_cfg = (DEPLOY / "alertmanager" / "alertmanager.yml").read_text()
+    if "url_file" not in am_cfg or re.search(r"^\s*-?\s*url:\s", am_cfg, re.M):
+        problems.append(
+            "alertmanager.yml must read the webhook URL from url_file, never an inline url"
+        )
+    if not any(
+        r.get("alert") == "Watchdog" and r.get("expr").strip() == "vector(1)" for r in all_rules()
+    ):
+        problems.append("no always-firing Watchdog rule (expr: vector(1))")
+    record("alerting_wired", "PASS" if not problems else "FAIL", "; ".join(problems))
+
+
+def check_k8s_pod_hardening() -> None:
+    problems = []
+    pods = pod_specs()
+    for _fname, name, pod in pods:
+        if pod.get("automountServiceAccountToken") is not False:
+            problems.append(f"{name}: automountServiceAccountToken is not false")
+    claims = {}
+    for _fname, name, pod in pods:
+        for vol in pod.get("volumes") or []:
+            pvc = (vol.get("persistentVolumeClaim") or {}).get("claimName")
+            if pvc:
+                claims.setdefault(pvc, []).append(name)
+    for pvc, users in claims.items():
+        if len(set(users)) > 1:
+            problems.append(f"PVC {pvc} is shared by {sorted(set(users))}")
+    declared = {
+        d["metadata"]["name"]: d for _, d in k8s_docs() if d["kind"] == "PersistentVolumeClaim"
+    }
+    for pvc in claims:
+        if pvc not in declared:
+            problems.append(f"workload claims {pvc}, which pvc.yaml does not declare")
+    for pvc, doc in declared.items():
+        if not (doc.get("spec") or {}).get("storageClassName"):
+            problems.append(f"PVC {pvc} has no explicit storageClassName")
+    java = [p for _, n, p in pods if n == "java-platform"]
+    if not java:
+        problems.append("no java-platform workload")
+    else:
+        pod = java[0]
+        c = pod["containers"][0]
+        if (c.get("securityContext") or {}).get("readOnlyRootFilesystem") is not True:
+            problems.append("java-platform readOnlyRootFilesystem must be true")
+        mounts = {m["mountPath"]: m["name"] for m in c.get("volumeMounts", [])}
+        vols = {v["name"]: v for v in pod.get("volumes", [])}
+        if "/tmp" not in mounts or "emptyDir" not in vols.get(mounts["/tmp"], {}):
+            problems.append("java-platform needs an emptyDir mounted at /tmp")
+        env = {e["name"]: e.get("value") for e in c.get("env", [])}
+        if "-XX:-UsePerfData" not in (env.get("JAVA_OPTS") or ""):
+            problems.append("java-platform JAVA_OPTS lacks -XX:-UsePerfData")
+        if env.get("IAP_BIND_ADDR") != "0.0.0.0":
+            problems.append("java-platform must set IAP_BIND_ADDR=0.0.0.0")
+        state = (vols.get(mounts.get("/data", ""), {}).get("persistentVolumeClaim") or {}).get(
+            "claimName"
+        )
+        if state != "iap-java-state":
+            problems.append(
+                f"java-platform /data claim is {state!r}, expected its own iap-java-state"
+            )
+    jenv = compose_doc()["services"]["java-platform"].get("environment") or {}
+    if isinstance(jenv, list):
+        jenv = dict(e.split("=", 1) for e in jenv if "=" in e)
+    if str(jenv.get("IAP_BIND_ADDR")) != "0.0.0.0":
+        problems.append("compose java-platform must set IAP_BIND_ADDR=0.0.0.0")
+    record(
+        "k8s_pod_hardening",
+        "PASS" if not problems else "FAIL",
+        "; ".join(problems[:6]) or f"{len(pods)} workloads",
+    )
+
+
+def check_k8s_network_policy() -> None:
+    problems = []
+    pols = [d for _, d in k8s_docs() if d["kind"] == "NetworkPolicy"]
+
+    def deny(direction: str) -> bool:
+        return any(
+            (
+                p["spec"].get("podSelector") == {}
+                and direction in p["spec"].get("policyTypes", [])
+                and not p["spec"].get(direction.lower())
+            )
+            for p in pols
+        )
+
+    if not deny("Ingress"):
+        problems.append("no default-deny ingress policy")
+    if not deny("Egress"):
+        problems.append("no default-deny egress policy")
+    dns = False
+    for p in pols:
+        for rule in p["spec"].get("egress") or []:
+            ports = {(x.get("protocol"), x.get("port")) for x in rule.get("ports", [])}
+            if {("UDP", 53), ("TCP", 53)} <= ports:
+                dns = True
+    if not dns:
+        problems.append("no DNS (53 UDP+TCP) egress allowance")
+    operator = False
+    for p in pols:
+        sel = (p["spec"].get("podSelector") or {}).get("matchLabels", {})
+        if sel.get("app.kubernetes.io/name") != "java-platform":
+            continue
+        for rule in p["spec"].get("ingress") or []:
+            froms = [f.get("podSelector", {}).get("matchLabels", {}) for f in rule.get("from", [])]
+            ports = [x.get("port") for x in rule.get("ports", [])]
+            if {"iap.role": "operator"} in froms and 8080 in ports:
+                operator = True
+    if not operator:
+        problems.append(
+            "no ingress rule letting iap.role=operator pods reach the java admin port 8080"
+        )
+    record(
+        "k8s_network_policy",
+        "PASS" if not problems else "FAIL",
+        "; ".join(problems) or f"{len(pols)} policies",
+    )
+
+
+def check_compose_exposure() -> None:
+    problems = []
+    for name, svc in compose_doc()["services"].items():
+        for port in svc.get("ports", []) or []:
+            s = str(port)
+            host_port = s.split(":")[-2] if s.count(":") >= 1 else s
+            if host_port in ("8080", "9090", "9093") and not s.startswith("127.0.0.1:"):
+                problems.append(f"{name} publishes {s} on all interfaces")
+    record("compose_exposure", "PASS" if not problems else "FAIL", "; ".join(problems))
+
+
+def check_image_pinning() -> None:
+    problems = []
+    digest = re.compile(r"@sha256:[0-9a-f]{64}$")
+    for df in sorted((DEPLOY / "docker").glob("Dockerfile.*")):
+        for m in re.finditer(r"^FROM\s+(\S+)", df.read_text(), re.M):
+            ref = m.group(1)
+            if not digest.search(ref):
+                problems.append(f"{df.name}: FROM {ref} is not digest-pinned")
+    iap_tags = set()
+
+    def check_ref(where: str, ref: str) -> None:
+        if ref.startswith("ghcr.io/ashjha0/intraday-alpha-platform-"):
+            tag = ref.split(":", 1)[1].split("@")[0] if ":" in ref else ""
+            if not re.fullmatch(r"v\d+\.\d+\.\d+", tag):
+                problems.append(f"{where}: {ref} must carry a vX.Y.Z tag")
+            iap_tags.add(tag)
+        elif ref.startswith("iap/"):
+            problems.append(f"{where}: {ref} must use the ghcr.io/ashjha0 name")
+        elif not digest.search(ref):
+            problems.append(f"{where}: third-party image {ref} is not digest-pinned")
+
+    for name, svc in compose_doc()["services"].items():
+        if "image" in svc:
+            check_ref(f"compose {name}", svc["image"])
+    for _fname, name, pod in pod_specs():
+        for c in pod.get("containers", []):
+            check_ref(f"k8s {name}", c["image"])
+    if len(iap_tags) > 1:
+        problems.append(f"iap images use several version tags: {sorted(iap_tags)}")
+    record("image_pinning", "PASS" if not problems else "FAIL", "; ".join(problems[:6]))
+
+
+def check_workflow_supply_chain() -> None:
+    problems = []
+    files = sorted(WORKFLOWS.glob("*.yml"))
+    cargo = re.compile(r"cargo\s+(build|test|clippy|llvm-cov|check|run|doc)(.*)")
+
+    def code_lines(path: Path):
+        """Non-comment, non-label lines (comments/step names may say 'cargo test')."""
+        for line in path.read_text().splitlines():
+            stripped = line.strip()
+            if stripped.startswith(("#", "- name:", "name:", "note ")):
+                continue
+            yield line.split(" #")[0]
+
+    for f in files:
+        text = f.read_text()
+        doc = yaml.safe_load(text)
+        if "permissions" not in doc:
+            problems.append(f"{f.name}: no top-level permissions")
+        for m in re.finditer(r"^\s*(?:-\s+)?uses:\s*(\S+)", text, re.M):
+            ref = m.group(1)
+            if ref.startswith("./"):
+                continue
+            if not re.search(r"@[0-9a-f]{40}$", ref):
+                problems.append(f"{f.name}: {ref} is not pinned to a commit SHA")
+        for m in re.finditer(r"runs-on:\s*(\S+)", text):
+            if m.group(1) in ("ubuntu-latest", "windows-latest", "macos-latest"):
+                problems.append(f"{f.name}: unpinned runner {m.group(1)}")
+        for line in code_lines(f):
+            m = cargo.search(line)
+            if m and "--locked" not in m.group(2):
+                problems.append(f"{f.name}: cargo {m.group(1)} without --locked")
+    for extra in [ROOT / "tests" / "harness" / "run_all.sh", DEPLOY / "docker" / "Dockerfile.rust"]:
+        for line in code_lines(extra):
+            m = cargo.search(line)
+            if m and "--locked" not in m.group(2):
+                problems.append(f"{extra.name}: cargo {m.group(1)} without --locked")
+    record(
+        "workflow_supply_chain",
+        "PASS" if not problems else "FAIL",
+        "; ".join(problems[:6]) or f"{len(files)} workflows",
+    )
+
+
+def check_rust_toolchain_pinned() -> None:
+    problems = []
+    toml_text = (ROOT / "rust" / "rust-toolchain.toml").read_text()
+    m = re.search(r'channel\s*=\s*"([^"]+)"', toml_text)
+    if not m or not re.fullmatch(r"\d+\.\d+\.\d+", m.group(1)):
+        record(
+            "rust_toolchain_pinned",
+            "FAIL",
+            "rust/rust-toolchain.toml must pin an exact X.Y.Z channel",
+        )
+        return
+    want = m.group(1)
+    for f in sorted(WORKFLOWS.glob("*.yml")):
+        for tc in re.findall(r'toolchain:\s*"?([0-9][^"\s#]*)"?', f.read_text()):
+            if tc != want:
+                problems.append(f"{f.name}: toolchain {tc} != {want}")
+        if "dtolnay/rust-toolchain" in f.read_text() and not re.search(
+            r'toolchain:\s*"?\d', f.read_text()
+        ):
+            problems.append(f"{f.name}: rust-toolchain action without a pinned toolchain")
+    df = (DEPLOY / "docker" / "Dockerfile.rust").read_text()
+    if f"FROM rust:{want}-" not in df:
+        problems.append(f"Dockerfile.rust build stage is not rust:{want}-*")
+    cargo = (ROOT / "rust" / "Cargo.toml").read_text()
+    if not re.search(r"\[profile\.release\][^\[]*overflow-checks\s*=\s*true", cargo):
+        problems.append("rust/Cargo.toml [profile.release] lacks overflow-checks = true")
+    record("rust_toolchain_pinned", "PASS" if not problems else "FAIL", "; ".join(problems) or want)
 
 
 def main() -> int:
-    print("deployment structural validation "
-          "(PLATFORM_CONVENTIONS.md §12.7 / GOVERNANCE.md §1)")
+    print("deployment structural validation (PLATFORM_CONVENTIONS.md §12.7 / GOVERNANCE.md §1)")
     print(f"repo: {ROOT}")
     print("prometheus:")
     check_prometheus_rules()
@@ -665,13 +1093,20 @@ def main() -> int:
     print("grafana / harness:")
     check_dashboards()
     check_java_golden_gate()
+    print("governance hardening:")
+    check_alerting_wired()
+    check_k8s_pod_hardening()
+    check_k8s_network_policy()
+    check_compose_exposure()
+    check_image_pinning()
+    check_workflow_supply_chain()
+    check_rust_toolchain_pinned()
 
     failed = [c for c, s, _ in RESULTS if s == "FAIL"]
     skipped = [c for c, s, _ in RESULTS if s == "SKIP"]
     passed = [c for c, s, _ in RESULTS if s == "PASS"]
     print()
-    print(f"deployment checks: {len(passed)} passed, {len(failed)} failed, "
-          f"{len(skipped)} skipped")
+    print(f"deployment checks: {len(passed)} passed, {len(failed)} failed, {len(skipped)} skipped")
     if skipped:
         print("  skipped (tool not installed): " + ", ".join(skipped))
     if failed:

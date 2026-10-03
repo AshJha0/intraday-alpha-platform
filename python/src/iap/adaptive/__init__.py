@@ -20,6 +20,7 @@ lives in :mod:`iap.backtest.adaptive`.
 """
 
 from iap.adaptive.drift import (  # noqa: F401
+    IC_Z_METHODS,
     KS_PVALUE_TERMS,
     MIN_BASELINE_N,
     PSI_BUCKETS,
@@ -35,9 +36,12 @@ from iap.adaptive.drift import (  # noqa: F401
     ks_test,
     psi,
     rolling_ic_z,
+    rolling_ic_z_hac,
+    two_sample_hac_z,
 )
 from iap.adaptive.lifecycle import (  # noqa: F401
     ACTIVE,
+    BREACH_RULES,
     RETIRED,
     STATES,
     WATCH,

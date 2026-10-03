@@ -6,9 +6,8 @@ import math
 from bisect import bisect_right
 
 import pytest
-
-from conftest import GOLDEN_DIR, REPO_ROOT
 from bruteforce_features import book_frames
+from conftest import GOLDEN_DIR
 from iap.core.codec import read_jsonl
 from iap.labels.labels import (
     HORIZON_ORDER,
@@ -51,8 +50,18 @@ def eq_series():
 
 def test_pinned_horizons():
     assert list(HORIZON_ORDER) == [
-        "10ms", "50ms", "100ms", "500ms", "1s", "5s", "10s", "30s",
-        "1m", "5m", "15m"]
+        "10ms",
+        "50ms",
+        "100ms",
+        "500ms",
+        "1s",
+        "5s",
+        "10s",
+        "30s",
+        "1m",
+        "5m",
+        "15m",
+    ]
     assert HORIZONS_NS["10ms"] == 10_000_000
     assert HORIZONS_NS["15m"] == 900 * NS
 
@@ -75,8 +84,7 @@ def test_cost_adjusted_formula():
     lab = out["1s"]
     assert lab.valid[0]
     # buy at 100.5, sell at 101.6
-    assert math.isclose(lab.cost[0], ((102.0 - 0.4) - (100.0 + 0.5)) / 100.0,
-                        rel_tol=1e-12)
+    assert math.isclose(lab.cost[0], ((102.0 - 0.4) - (100.0 + 0.5)) / 100.0, rel_tol=1e-12)
     assert math.isclose(lab.mid[0], 0.02, rel_tol=1e-12)
     # cost-adjusted is always <= mid-to-mid by the two half-spreads
     assert lab.cost[0] < lab.mid[0]
@@ -84,11 +92,10 @@ def test_cost_adjusted_formula():
 
 def test_horizon_past_stream_end_is_invalid():
     s = _series([(0, 100.0, 0.5), (2 * NS, 101.0, 0.5)])
-    out = compute_labels([0, 2 * NS], s, last_event_ts=2 * NS,
-                         horizons=("1s", "5s"))
-    assert out["1s"].valid[0]          # 0 + 1s <= 2s observed
-    assert not out["5s"].valid[0]      # 0 + 5s > last event -> invalid
-    assert not out["1s"].valid[1]      # 2s + 1s > last event -> invalid
+    out = compute_labels([0, 2 * NS], s, last_event_ts=2 * NS, horizons=("1s", "5s"))
+    assert out["1s"].valid[0]  # 0 + 1s <= 2s observed
+    assert not out["5s"].valid[0]  # 0 + 5s > last event -> invalid
+    assert not out["1s"].valid[1]  # 2s + 1s > last event -> invalid
     assert math.isnan(out["5s"].mid[0])
 
 
@@ -103,13 +110,12 @@ def test_no_lookahead_truncation_invariance(eq_series):
         full = compute_labels(anchors, series, last_ts, horizons=(h,))[h]
         cut = bisect_right(series.ts, t + h_ns)
         assert cut < len(series.ts), "probe anchor too close to stream end"
-        trunc = MidSeries(series.ts[:cut], series.mid[:cut],
-                          series.half_spread[:cut], series.tradable[:cut])
+        trunc = MidSeries(
+            series.ts[:cut], series.mid[:cut], series.half_spread[:cut], series.tradable[:cut]
+        )
         age = max_sample_age(series)
-        full = compute_labels(anchors, series, last_ts, horizons=(h,),
-                              max_age_ns=age)[h]
-        got = compute_labels(anchors, trunc, t + h_ns, horizons=(h,),
-                             max_age_ns=age)[h]
+        full = compute_labels(anchors, series, last_ts, horizons=(h,), max_age_ns=age)[h]
+        got = compute_labels(anchors, trunc, t + h_ns, horizons=(h,), max_age_ns=age)[h]
         assert full.valid[0] == got.valid[0]
         assert full.reason[0] == got.reason[0]
         if full.valid[0]:
@@ -131,20 +137,21 @@ def test_shifted_series_breaks_alignment(eq_series):
     series = MidSeries(ts, mid, hs, [True] * len(ts))
     anchors = series.ts[20:-20:2]
     age = max_sample_age(series)
-    good = compute_labels(anchors, series, last_ts, horizons=("30s",),
-                          max_age_ns=age)["30s"]
-    shifted = MidSeries(series.ts[:-1], series.mid[1:], series.half_spread[1:],
-                        [True] * (len(ts) - 1))
-    bad = compute_labels(anchors, shifted, last_ts, horizons=("30s",),
-                         max_age_ns=age)["30s"]
+    good = compute_labels(anchors, series, last_ts, horizons=("30s",), max_age_ns=age)["30s"]
+    shifted = MidSeries(
+        series.ts[:-1], series.mid[1:], series.half_spread[1:], [True] * (len(ts) - 1)
+    )
+    bad = compute_labels(anchors, shifted, last_ts, horizons=("30s",), max_age_ns=age)["30s"]
     diffs = sum(
-        1 for g, b, gv, bv in zip(good.mid, bad.mid, good.valid, bad.valid)
-        if gv and bv and g != b)
-    valid_both = sum(1 for gv, bv in zip(good.valid, bad.valid) if gv and bv)
+        1
+        for g, b, gv, bv in zip(good.mid, bad.mid, good.valid, bad.valid, strict=False)
+        if gv and bv and g != b
+    )
+    valid_both = sum(1 for gv, bv in zip(good.valid, bad.valid, strict=False) if gv and bv)
     assert valid_both >= 20
     assert diffs / valid_both > 0.2, (
-        "shifting the mid series barely changed labels — alignment test "
-        "cannot detect leaks")
+        "shifting the mid series barely changed labels — alignment test cannot detect leaks"
+    )
 
 
 def test_two_pointer_matches_bisect_bruteforce(eq_series):
@@ -160,8 +167,7 @@ def test_two_pointer_matches_bisect_bruteforce(eq_series):
         for i, t in enumerate(anchors):
             b = bisect_right(series.ts, t) - 1
             k = bisect_right(series.ts, t + h_ns) - 1
-            valid = (b >= 0 and k >= 0 and last_ts >= t + h_ns
-                     and t + h_ns - series.ts[k] <= age)
+            valid = b >= 0 and k >= 0 and last_ts >= t + h_ns and t + h_ns - series.ts[k] <= age
             assert lab.valid[i] == valid, (h, i)
             if valid:
                 m0, hs0 = series.mid[b], series.half_spread[b]
@@ -211,8 +217,9 @@ def test_scenario_labels_invalid_across_halt():
     samples += [(reopen_ts + k * NS, 100.3, 0.5) for k in range(1, 200)]
     s = _series(samples)
     anchors = [t for t in s.ts if t <= halt_ts] + [reopen_ts + 100 * NS]
-    out = compute_labels(anchors, s, last_event_ts=s.ts[-1],
-                         horizons=("1m", "5m"), max_age_ns=BIG_AGE)
+    out = compute_labels(
+        anchors, s, last_event_ts=s.ts[-1], horizons=("1m", "5m"), max_age_ns=BIG_AGE
+    )
     for h in ("1m", "5m"):
         h_ns = HORIZONS_NS[h]
         lab = out[h]
@@ -235,16 +242,16 @@ def test_scenario_labels_invalid_when_prevailing_mid_is_stale():
     A 15 m label anchored at 16:00 must be INVALID (its forward mid is the
     frozen 16:05 quote), while a 1 s label at 16:04 is valid.
     """
-    end_quote = 3600 * NS          # "16:05"
+    end_quote = 3600 * NS  # "16:05"
     close_print = end_quote + 4 * 3600 * NS  # "20:00"
-    samples = [(k * NS, 100.0 + k * 0.001, 0.5)
-               for k in range(0, 3601)]
+    samples = [(k * NS, 100.0 + k * 0.001, 0.5) for k in range(0, 3601)]
     samples.append((close_print, 101.0, 0.5))
     s = _series(samples)
     max_age = 5 * NS
     anchors = [end_quote - 900 * NS, end_quote - 300 * NS, end_quote - NS]
-    out = compute_labels(anchors, s, last_event_ts=close_print,
-                         horizons=("1s", "15m"), max_age_ns=max_age)
+    out = compute_labels(
+        anchors, s, last_event_ts=close_print, horizons=("1s", "15m"), max_age_ns=max_age
+    )
     # 15m from 16:00 lands in the dead zone -> stale forward mid
     assert not out["15m"].valid[1]
     assert out["15m"].reason[1] & LabelReason.FORWARD_STALE
@@ -257,11 +264,10 @@ def test_scenario_labels_invalid_when_prevailing_mid_is_stale():
 def test_labels_invalid_across_a_stale_venue_gap():
     samples = [(k * NS, 100.0, 0.5) for k in range(0, 60)]
     samples.append((60 * NS, float("nan"), float("nan"), False))  # venue stale
-    samples += [(k * NS, 100.5, 0.5) for k in range(180, 260)]     # recovered
+    samples += [(k * NS, 100.5, 0.5) for k in range(180, 260)]  # recovered
     s = _series(samples)
     anchors = [30 * NS, 190 * NS]
-    out = compute_labels(anchors, s, last_event_ts=s.ts[-1],
-                         horizons=("1m",), max_age_ns=BIG_AGE)
+    out = compute_labels(anchors, s, last_event_ts=s.ts[-1], horizons=("1m",), max_age_ns=BIG_AGE)
     assert not out["1m"].valid[0]
     assert out["1m"].reason[0] & LabelReason.BLACKOUT
     assert out["1m"].valid[1]
@@ -270,8 +276,8 @@ def test_labels_invalid_across_a_stale_venue_gap():
 def test_max_sample_age_scales_with_the_median_gap():
     dense = _series([(k * NS, 100.0, 0.5) for k in range(100)])
     sparse = _series([(k * 15 * NS, 100.0, 0.5) for k in range(100)])
-    assert max_sample_age(dense) == 5 * NS       # floor
-    assert max_sample_age(sparse) == 30 * NS     # 2 x median gap
+    assert max_sample_age(dense) == 5 * NS  # floor
+    assert max_sample_age(sparse) == 30 * NS  # 2 x median gap
     assert max_sample_age(MidSeries()) == 5 * NS
 
 

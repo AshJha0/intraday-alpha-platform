@@ -44,7 +44,8 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
        lifecycle, held together by cross-language golden tests, and run end to end by one
        command (<code>python -m iap.mvp run</code>) whose golden result is honestly cost-negative.</p>
     <nav>
-      <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/LEARN.md">Learn (guide)</a>
+      <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/HOW_IT_WORKS.md">How it works</a>
+      <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/LEARN.md">Learn (guide)</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/COOKBOOK.md">Cookbook</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/ARCHITECTURE.md">Architecture</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/DIAGRAMS.md">Diagrams</a>
@@ -64,7 +65,7 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
 <div class="wrap">
   <h2>Measured, not claimed</h2>
   <div class="numbers">
-    Cross-language parity&nbsp;&nbsp;&nbsp; python 1388&nbsp; · cpp 285&nbsp; · rust 313&nbsp; · java 482 tests — 2,468 green, one command; golden groups 164/68/62/102<br>
+    Cross-language parity&nbsp;&nbsp;&nbsp; python 1565&nbsp; · cpp 289&nbsp; · rust 323&nbsp; · java 510 tests — 2,687 green, one command; golden groups 166/68/64/104<br>
     Golden suites&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; identical book states, byte-identical IAP1 SHA-256, features/alphas to 1e-9, byte-identical canonical JSON, trace digests, risk audit and lifecycle registry in all four languages<br>
     C++ hot path&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; IAP1 decode 184.1 ns/event (CRC-32 verified) · book update 26.4 ns · replay 27.2M events/s · 48-feature engine 514.1 ns/event · one decision trace 31.7 µs/trace off the event loop<br>
     Determinism&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; full dataset regeneration is byte-identical (sha256-verified); replays reproduce fills exactly; the MVP run twice and replayed from its capture reproduces its trace digest<br>
@@ -74,7 +75,8 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
     Promotion lifecycle&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 7 states · 17 pinned edges · 18 gates; bundled data: 24 alphas at CANDIDATE, 0 beyond — every one fails net P&amp;L after costs<br>
     MVP golden run&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 16,578 events · 355 decisions · 66 parent orders · 55 fills · P&amp;L −22.65 USD (cost-negative, stated) · digest d938eeae…<br>
     Adaptive lifecycle&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; PSI/KS drift monitors · 126 drift-triggered refits in the study · RETIRED halts allocation in the backtest, pages a human live<br>
-    Verdicts (honest)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0 PROMOTE · 11 ITERATE · 13 REJECT — on clean synthetic data, nothing survives costs, and we say so
+    Verdicts (honest)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0 PROMOTE · 11 ITERATE · 13 REJECT — on clean synthetic data, nothing survives costs, and we say so<br>
+    Power study&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; planted order-flow effect flagged in 3 of 3 seeds at the reference size · planted lead-lag in 0 of 3 · nothing promoted at any size — 3 seeds per cell, a calibration, not a power curve
   </div>
 
   <div class="honest">
@@ -85,6 +87,49 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
     and research report was regenerated, and the alpha promotion count honestly fell from 2 to 0.
     The full story is a worked case study in
     <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/LEARN.md">LEARN.md §7</a>.
+  </div>
+
+  <div class="honest">
+    <strong>v1.3.0 (2026-10-03): the safety code was wrong in ways its tests could not see.</strong>
+    A review found the hard risk engine trusting a reference price stamped in the future,
+    letting NaN through its limit checks, overflowing 64-bit arithmetic differently in each
+    of its three languages, and letting router-bound orders past a venue kill. The execution
+    simulator re-filled a resting order against the same displayed shares on every event. The
+    paper platform could resume a cursor beside a risk snapshot from another moment. All
+    three engines agreed byte for byte throughout — parity proves agreement, not correctness.
+    Each is fixed, pinned by a regression test, and written up as a case study in
+    <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/LEARN.md">LEARN.md §21–§25</a>;
+    the <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/CHANGELOG.md">changelog</a>
+    lists what is still open.
+  </div>
+
+  <h2>Start here</h2>
+  <div class="grid">
+    <div class="card"><h3>How the quant, algo and AI sides work</h3>
+      <p>A guided explanation for a newcomer: the pipeline on one page, how a signal is
+         researched and judged, how an order becomes fills, the risk engine that says no,
+         what the ML layer showed, and where the line for LLMs and agents is drawn. Every
+         section ends with where to look and a command that runs.
+         <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/HOW_IT_WORKS.md">HOW_IT_WORKS</a></p></div>
+    <div class="card"><h3>AI, LLMs and agents: the boundary</h3>
+      <p>No LLM, agent or MCP code exists in this repository. The rule is pinned first: LLM
+         reasoning is never on the trading path, is read-only, and cannot override risk or
+         send an order. What exists is the foundation — a research store safe for parallel
+         writers, gate eligibility, an import-policy test, JSON tooling. The agent layer is a
+         backlog epic, and the page says what would be theatre on this data.
+         <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/HOW_IT_WORKS.md#6-ai-llms-and-agents-the-boundary-what-exists-what-is-planned">HOW_IT_WORKS §6</a></p></div>
+    <div class="card"><h3>Research validity &amp; the power study</h3>
+      <p>Corrected statistics and policies added opt-in beside every pinned default, so no
+         committed number moves: a pooled-slope HAC t, a ledger-derived threshold, a cost-aware
+         position policy, a recompute leakage probe, per-fold diagnostics. A planted-signal
+         study measures what the validation chain can detect — and shows it promotes nothing.
+         <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/RESEARCH_VALIDITY.md">RESEARCH_VALIDITY</a>,
+         <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/research/power/POWER_REPORT.md">POWER_REPORT</a></p></div>
+    <div class="card"><h3>Distance to production</h3>
+      <p>Stated plainly, with a backlog epic for each gap: real exchange data, measured
+         tick-to-trade latency, a simulator calibrated to live fills, book-level risk,
+         research throughput. Nothing here is a claim about a market.
+         <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/ARCHITECTURE.md#14-distance-to-production-at-a-top-tier-firm">ARCHITECTURE §14</a></p></div>
   </div>
 
   <h2>What's inside</h2>
@@ -115,9 +160,11 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
          a persistent multiple-testing ledger, and cost/latency/regime stress — the §20
          promotion gates, enforced literally.</p></div>
     <div class="card"><h3>ML &amp; meta-labeling</h3>
-      <p>Linear baselines gate the advanced models (literally — trees/MLP only run if the
-         baseline shows OOS signal), LightGBM/XGBoost, isotonic-calibrated trade/no-trade
-         meta-labels evaluated economically, and full reproducibility manifests
+      <p>Linear baselines gate the advanced models, literally: trees and the MLP run only if
+         the best linear model shows OOS signal against the frictionless label. On the bundled
+         data it does not (IC &minus;0.043), so they were never fitted. A calibrated
+         trade/no-trade meta-label gate, evaluated economically, takes zero trades and is
+         reported as degenerate rather than as a success. Reproducibility manifests
          (data/feature/model versions, windows, hardware) on every fit.</p></div>
     <div class="card"><h3>Portfolio construction</h3>
       <p>alpha'w − λ·w'Σw − tc(Δw) under position/gross/net/participation/turnover/
@@ -127,13 +174,16 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
     <div class="card"><h3>Fail-closed risk</h3>
       <p>Fat-finger, price-band, stale-price, position/notional/gross/net, loss limits,
          rate throttle, duplicate-order and self-match prevention, sequence-gap gating,
-         venue-disconnect handling and four-scope kill switches — Rust reference + Java
-         port with byte-identical audit logs, replayable.</p></div>
+         venue-disconnect handling and four-scope kill switches — Rust reference with Java
+         and Python ports, byte-identical audit logs, replayable. Since v1.3.0 also closed
+         against future-stamped marks, NaN, integer overflow and router-bound orders under a
+         venue kill, with an edge golden all three engines replay.</p></div>
     <div class="card"><h3>Execution &amp; SOR</h3>
       <p>Market/limit/IOC/FOK, VWAP/TWAP/POV/IS parent algos, deterministic queue-position
          modeling for passive orders (pinned depletion rules), fees/rebates/impact,
          venue latency with seeded jitter, and fee-aware smart order routing — C++ reference
-         fills reproduced exactly by Java.</p></div>
+         fills reproduced exactly by Java and Python. The simulator never fills more than the
+         market displayed or traded.</p></div>
     <div class="card"><h3>Event-driven backtester</h3>
       <p>Replays every market event in event-time through book → features → alphas →
          portfolio → risk → execution with modeled decision/wire/venue latency, partial
@@ -176,13 +226,15 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
     <div class="card"><h3>The executable MVP</h3>
       <p><code>python -m iap.mvp run</code>: seeded feed → books → features → EQ01/EQ03/EQ06 →
          portfolio → hard risk → TWAP/POV/IS → SOR over three venues → simulator → TCA → trace →
-         SQLite → report, deterministic twice over. The golden run loses 22.68 USD, the realized-IC
+         SQLite → report, deterministic twice over. The golden run loses 22.65 USD, the realized-IC
          gap is audited to the data rather than a leak, and the document says so.</p></div>
     <div class="card"><h3>Observability &amp; deployment</h3>
       <p>Prometheus metrics (rust telemetry + 19 live Java metrics with /metrics, /health),
          recording + alert rules, two Grafana dashboards, structured JSONL logs,
          Dockerfiles + docker-compose + Kubernetes manifests, runbooks, governance and
-         reproducibility docs, and a paper-trading mode.</p></div>
+         reproducibility docs, and a paper-trading mode. Alertmanager routes the alerts;
+         delivery needs an operator-supplied webhook. NetworkPolicies default-deny ingress
+         and egress.</p></div>
     <div class="card"><h3>Research papers</h3>
       <p>Six case studies written from the platform's own measured outputs: OFI
          predictability, microprice/queue dynamics in FX, cross-venue lead-lag, alpha decay

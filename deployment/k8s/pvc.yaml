@@ -1,4 +1,10 @@
-# Shared market-data volume: written by the daily data-pipeline CronJob,
+# PERSISTENT VOLUMES. storageClassName is set explicitly on every claim and is
+# a PLACEHOLDER: "standard" is the default class on kind/minikube/GKE. Replace
+# it with a class that exists in your cluster (`kubectl get storageclass`)
+# before applying; a claim naming a missing class stays Pending forever, and
+# an omitted class silently binds to whatever the cluster default is.
+#
+# iap-data: shared market-data volume: written by the daily data-pipeline CronJob,
 # read by replay/backtest workloads. Generated data is reproducible from the
 # pinned seed (configs/marketdata/generator.json), so the PVC is cheap to rebuild —
 # raw IMMUTABILITY is a pipeline property (files are never rewritten in
@@ -18,3 +24,45 @@ spec:
   resources:
     requests:
       storage: 10Gi
+  storageClassName: standard   # PLACEHOLDER: set to your cluster's StorageClass
+---
+# iap-java-state: the java trading Deployment's durable state (/data/state:
+# risk snapshot, kill-switch latch, session accounting, audit JSONL). Separate
+# from iap-data so the trading pod and the data-pipeline CronJob never contend
+# for one ReadWriteOnce claim. Use a class with real durability and backups:
+# losing this volume loses the latch and the audit trail.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: iap-java-state
+  namespace: intraday-alpha
+  labels:
+    app.kubernetes.io/part-of: intraday-alpha-platform
+    app.kubernetes.io/name: iap-java-state
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+  storageClassName: standard   # PLACEHOLDER: set to your cluster's StorageClass
+---
+# iap-grafana: Grafana's /var/lib/grafana (sqlite DB: users, preferences,
+# non-provisioned dashboards).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: iap-grafana
+  namespace: intraday-alpha
+  labels:
+    app.kubernetes.io/part-of: intraday-alpha-platform
+    app.kubernetes.io/name: iap-grafana
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: standard   # PLACEHOLDER: set to your cluster's StorageClass

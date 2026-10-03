@@ -325,6 +325,9 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    // The midpoint literals below are deliberate exact-decimal test vectors for
+    // float formatting; shortening them would change what the test checks.
+    #[allow(clippy::excessive_precision)]
     #[test]
     fn float_layout_matches_python_repr() {
         let cases: [(f64, &str); 18] = [

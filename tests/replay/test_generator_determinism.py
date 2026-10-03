@@ -7,6 +7,7 @@ that the IAP1 digest is the one pinned in
 ``tests/golden/expected_codec_sha256.json`` — so a determinism regression AND
 a silent generator change both fail here.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -24,8 +25,7 @@ def _sha256(data: bytes) -> str:
 def test_golden_eq_vector_is_byte_identical_across_runs(configs_dir, golden_dir):
     refdata = ReferenceData.load(configs_dir)
     first = generate_golden_eq(refdata, seed=GOLDEN_EQ_SEED, n=2000)
-    second = generate_golden_eq(ReferenceData.load(configs_dir),
-                                seed=GOLDEN_EQ_SEED, n=2000)
+    second = generate_golden_eq(ReferenceData.load(configs_dir), seed=GOLDEN_EQ_SEED, n=2000)
 
     assert len(first) == 2000 and first == second
 

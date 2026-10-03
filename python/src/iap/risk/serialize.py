@@ -34,7 +34,7 @@ Pinned rules:
 from __future__ import annotations
 
 import math
-from typing import Any, List
+from typing import Any
 
 __all__ = ["json_escape", "format_f64", "rust_display_f64", "to_canonical_json"]
 
@@ -51,7 +51,7 @@ _SHORT_ESCAPES = {
 
 def json_escape(s: str) -> str:
     """Escape ``s`` for a JSON string body exactly like ``serde_json``."""
-    out: List[str] = []
+    out: list[str] = []
     for ch in s:
         esc = _SHORT_ESCAPES.get(ch)
         if esc is not None:
@@ -127,7 +127,7 @@ def rust_display_f64(v: float) -> str:
     return sign + "0." + "0" * (-kk) + digits
 
 
-def _write(value: Any, pretty: bool, depth: int, out: List[str]) -> None:
+def _write(value: Any, pretty: bool, depth: int, out: list[str]) -> None:
     if value is None:
         out.append("null")
     elif isinstance(value, bool):
@@ -180,6 +180,6 @@ def to_canonical_json(value: Any, pretty: bool = False) -> str:
     """Serialise ``value`` (None/bool/int/float/str/dict/list) as
     ``serde_json`` would: ``pretty=False`` mirrors ``Value::to_string``,
     ``pretty=True`` mirrors ``to_string_pretty``. No trailing newline."""
-    out: List[str] = []
+    out: list[str] = []
     _write(value, pretty, 0, out)
     return "".join(out)

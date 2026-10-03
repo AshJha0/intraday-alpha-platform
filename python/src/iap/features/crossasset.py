@@ -33,7 +33,6 @@ need window warmup, >= 4 pairs, and var > 1e-18 in every denominator.
 from __future__ import annotations
 
 from math import sqrt
-from typing import List, Optional
 
 from iap.features._famutil import put
 from iap.features.spec import WINDOW_NS, FeatureSpec, mkspec
@@ -46,39 +45,63 @@ MIN_PAIRS = 4
 MIN_VAR = 1e-18
 
 
-def specs() -> List[FeatureSpec]:
+def specs() -> list[FeatureSpec]:
     """Registry entries for the cross-asset family (pinned order)."""
-    out: List[FeatureSpec] = []
+    out: list[FeatureSpec] = []
     for h in REF_HORIZONS:
-        out.append(mkspec(
-            f"ref_ret_{h}_v1", FAMILY,
-            f"Reference-instrument (ETF / EUR/USD) log mid return over {h} "
-            f"(lead-lag input).", horizon=h))
-    out.append(mkspec(
-        "beta_w5m_v1", FAMILY,
-        "OLS beta of own vs reference contemporaneous 1s log returns over 5m: "
-        "cov(x,y)/var(y).", window="5m", min_pairs=MIN_PAIRS))
+        out.append(
+            mkspec(
+                f"ref_ret_{h}_v1",
+                FAMILY,
+                f"Reference-instrument (ETF / EUR/USD) log mid return over {h} (lead-lag input).",
+                horizon=h,
+            )
+        )
+    out.append(
+        mkspec(
+            "beta_w5m_v1",
+            FAMILY,
+            "OLS beta of own vs reference contemporaneous 1s log returns over 5m: cov(x,y)/var(y).",
+            window="5m",
+            min_pairs=MIN_PAIRS,
+        )
+    )
     for w in CORR_WINDOWS:
-        out.append(mkspec(
-            f"corr_contemp_w{w}_v1", FAMILY,
-            f"Correlation of own vs reference contemporaneous 1s log returns "
-            f"over {w} (FX: correlation proxy vs EUR/USD).",
-            window=w, min_pairs=MIN_PAIRS))
+        out.append(
+            mkspec(
+                f"corr_contemp_w{w}_v1",
+                FAMILY,
+                f"Correlation of own vs reference contemporaneous 1s log returns "
+                f"over {w} (FX: correlation proxy vs EUR/USD).",
+                window=w,
+                min_pairs=MIN_PAIRS,
+            )
+        )
     for w in CORR_WINDOWS:
-        out.append(mkspec(
-            f"leadlag_corr_w{w}_v1", FAMILY,
-            f"Correlation of own 1s return vs reference 1s return lagged 1s "
-            f"over {w} (positive = reference leads).",
-            window=w, min_pairs=MIN_PAIRS))
-    out.append(mkspec(
-        "resid_vol_w1m_v1", FAMILY,
-        "Std of the beta-residual 1s return over 1m: "
-        "sqrt(max(var(x) - cov^2/var(y), 0)).",
-        depends_on=("beta_w5m_v1",), window="1m", min_pairs=MIN_PAIRS))
+        out.append(
+            mkspec(
+                f"leadlag_corr_w{w}_v1",
+                FAMILY,
+                f"Correlation of own 1s return vs reference 1s return lagged 1s "
+                f"over {w} (positive = reference leads).",
+                window=w,
+                min_pairs=MIN_PAIRS,
+            )
+        )
+    out.append(
+        mkspec(
+            "resid_vol_w1m_v1",
+            FAMILY,
+            "Std of the beta-residual 1s return over 1m: sqrt(max(var(x) - cov^2/var(y), 0)).",
+            depends_on=("beta_w5m_v1",),
+            window="1m",
+            min_pairs=MIN_PAIRS,
+        )
+    )
     return out
 
 
-def _moments(win) -> Optional[tuple]:
+def _moments(win) -> tuple | None:
     """(var_x, var_y, cov) population moments from a pair window, or None."""
     n = win.count
     if n < MIN_PAIRS:
@@ -91,12 +114,10 @@ def _moments(win) -> Optional[tuple]:
     return var_x, var_y, cov
 
 
-def compute(st, values: List[float], valid: List[bool]) -> None:
+def compute(st, values: list[float], valid: list[bool]) -> None:
     """Append the 11 cross-asset values for the current emission."""
-    t = st.t
     for h in REF_HORIZONS:
-        put(values, valid, st.ref_ret_log(WINDOW_NS[h]),
-            st.ref_ret_log(WINDOW_NS[h]) is not None)
+        put(values, valid, st.ref_ret_log(WINDOW_NS[h]), st.ref_ret_log(WINDOW_NS[h]) is not None)
     beta = st.beta_w5m()
     put(values, valid, beta, beta is not None)
     for w in CORR_WINDOWS:

@@ -27,7 +27,7 @@ books => same route.
 
 from __future__ import annotations
 
-from typing import Mapping, Optional, Sequence
+from collections.abc import Mapping, Sequence
 
 from iap.execution.config import SorOptions
 from iap.execution.simulator import ExecutionSimulator
@@ -47,9 +47,7 @@ def _sorted_candidates(candidates: Sequence[int]) -> list:
 class SmartOrderRouter:
     """Deterministic venue selection (rules in the module docstring)."""
 
-    def __init__(
-        self, venues: Mapping[int, VenueSpec], options: SorOptions = SorOptions()
-    ) -> None:
+    def __init__(self, venues: Mapping[int, VenueSpec], options: SorOptions = SorOptions()) -> None:  # noqa: B008 (frozen dataclass default, one shared immutable instance is intended)
         self._venues = dict(sorted(venues.items()))
         self._options = options
 
@@ -57,7 +55,7 @@ class SmartOrderRouter:
     def options(self) -> SorOptions:
         return self._options
 
-    def _eligible(self, book: ConsolidatedBook, vid: int) -> Optional[OrderBook]:
+    def _eligible(self, book: ConsolidatedBook, vid: int) -> OrderBook | None:
         """The venue book when the venue is eligible, else None."""
         vb = book.books.get(vid)
         if vb is None or not ExecutionSimulator.venue_open(vb):
@@ -67,9 +65,7 @@ class SmartOrderRouter:
             return None
         return vb
 
-    def route_aggressive(
-        self, book: ConsolidatedBook, side: int, candidates: Sequence[int]
-    ) -> int:
+    def route_aggressive(self, book: ConsolidatedBook, side: int, candidates: Sequence[int]) -> int:
         """Venue with the most favourable displayed opposite best; ``NO_ROUTE`` if none."""
         have = False
         best_vid = NO_ROUTE
@@ -103,9 +99,7 @@ class SmartOrderRouter:
                 best_comm = comm
         return best_vid if have else NO_ROUTE
 
-    def route_passive(
-        self, book: ConsolidatedBook, side: int, candidates: Sequence[int]
-    ) -> int:
+    def route_passive(self, book: ConsolidatedBook, side: int, candidates: Sequence[int]) -> int:
         """Venue to rest on (rebate preference per options); ``NO_ROUTE`` if none."""
         have = False
         best_vid = NO_ROUTE

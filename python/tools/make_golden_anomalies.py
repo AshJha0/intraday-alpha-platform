@@ -88,9 +88,12 @@ def cross_validate(events) -> None:
         brute = brutes.setdefault(ev.venue_id, BruteForceBook())
         book.apply(ev)
         brute.apply(ev)
-        if (book.state_summary() != brute.state_summary()
-                or book.counters() != brute.counters()
-                or book.stale != brute.stale or book.status != brute.status):
+        if (
+            book.state_summary() != brute.state_summary()
+            or book.counters() != brute.counters()
+            or book.stale != brute.stale
+            or book.status != brute.status
+        ):
             raise SystemExit(
                 f"VALIDATION FAILED at event {i} ({ev}):\n"
                 f"reference:   {book.state_summary()} {book.counters()}\n"
@@ -101,15 +104,27 @@ def cross_validate(events) -> None:
 def reject_cases() -> str:
     base = encode_jsonl_line(MarketEvent(1, 2, 3, 4, 5, 6, 1, 0, 2450, 100, 10, 0))
     rej = [
-        ("# JSONL lines every decoder must REJECT (tests/golden, pinned; consumed by all four suites)", None),
-        ("# blank lines and '#' comments are ignored; the ACCEPT block lists lines every decoder must accept", None),
-        ("# out-of-range unsigned", base.replace('"event_id":1', '"event_id":18446744073709551616')),
+        (
+            "# JSONL lines every decoder must REJECT (tests/golden, pinned; consumed by all four suites)",
+            None,
+        ),
+        (
+            "# blank lines and '#' comments are ignored; the ACCEPT block lists lines every decoder must accept",
+            None,
+        ),
+        (
+            "# out-of-range unsigned",
+            base.replace('"event_id":1', '"event_id":18446744073709551616'),
+        ),
         ("# u32 overflow", base.replace('"instrument_id":2', '"instrument_id":4294967296')),
         ("# u16 overflow", base.replace('"venue_id":3', '"venue_id":70000')),
         ("# u8 overflow", base.replace('"event_type":1', '"event_type":256')),
         ("# u8 overflow (side)", base.replace('"side":0', '"side":300')),
         ("# i64 overflow", base.replace('"qty":100', '"qty":9223372036854775808')),
-        ("# i64 underflow", base.replace('"price_ticks":2450', '"price_ticks":-9223372036854775809')),
+        (
+            "# i64 underflow",
+            base.replace('"price_ticks":2450', '"price_ticks":-9223372036854775809'),
+        ),
         ("# negative unsigned", base.replace('"order_id":10', '"order_id":-1')),
         ("# negative zero on unsigned", base.replace('"sequence":6', '"sequence":-0')),
         ("# float", base.replace('"qty":100', '"qty":100.0')),
@@ -120,9 +135,12 @@ def reject_cases() -> str:
         ("# string", base.replace('"qty":100', '"qty":"100"')),
         ("# null", base.replace('"qty":100', '"qty":null')),
         ("# duplicate key", base.replace('"trade_id":0', '"trade_id":0,"trade_id":77')),
-        ("# missing key", base.replace(',"trade_id":0', '')),
+        ("# missing key", base.replace(',"trade_id":0', "")),
         ("# extra key", base.replace('"trade_id":0}', '"trade_id":0,"extra":1}')),
-        ("# misordered keys", base.replace('"event_id":1,"instrument_id":2', '"instrument_id":2,"event_id":1')),
+        (
+            "# misordered keys",
+            base.replace('"event_id":1,"instrument_id":2', '"instrument_id":2,"event_id":1'),
+        ),
         ("# renamed key", base.replace('"qty"', '"quantity"')),
         ("# trailing content", base + " x"),
         ("# trailing comma", base.replace('"trade_id":0}', '"trade_id":0,}')),
@@ -131,7 +149,7 @@ def reject_cases() -> str:
         ("# garbage", "not json at all {"),
         ("# hex", base.replace('"qty":100', '"qty":0x64')),
         ("# empty value", base.replace('"qty":100', '"qty":')),
-        ("# unquoted key", base.replace('"qty":100', 'qty:100')),
+        ("# unquoted key", base.replace('"qty":100', "qty:100")),
     ]
     acc = [
         ("# ACCEPT", None),
@@ -139,8 +157,16 @@ def reject_cases() -> str:
         ("# whitespace between tokens is tolerated", base.replace(",", ", ").replace(":", ": ")),
         ("# negative zero on signed", base.replace('"price_ticks":2450', '"price_ticks":-0')),
         ("# u64 max", base.replace('"order_id":10', '"order_id":18446744073709551615')),
-        ("# i64 extremes", base.replace('"qty":100', '"qty":-9223372036854775808').replace('"price_ticks":2450', '"price_ticks":9223372036854775807')),
-        ("# u8 max event_type/side (domain, not semantics)", base.replace('"event_type":1', '"event_type":255').replace('"side":0', '"side":255')),
+        (
+            "# i64 extremes",
+            base.replace('"qty":100', '"qty":-9223372036854775808').replace(
+                '"price_ticks":2450', '"price_ticks":9223372036854775807'
+            ),
+        ),
+        (
+            "# u8 max event_type/side (domain, not semantics)",
+            base.replace('"event_type":1', '"event_type":255').replace('"side":0', '"side":255'),
+        ),
     ]
     lines = []
     for comment, line in rej + acc:

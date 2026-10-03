@@ -14,8 +14,8 @@ optimizer.  Deterministic: sorted instruments, fixed bucket boundaries.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
-from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -25,10 +25,10 @@ _BAR_NS = 60_000_000_000
 
 
 def bars_from_features(
-    features_dir: Optional[Path] = None,
-    instruments: Optional[Sequence[int]] = None,
+    features_dir: Path | None = None,
+    instruments: Sequence[int] | None = None,
     bar_ns: int = _BAR_NS,
-) -> Tuple[List[int], np.ndarray, np.ndarray]:
+) -> tuple[list[int], np.ndarray, np.ndarray]:
     """Build a (bar_ts, instruments) aligned log-return matrix.
 
     Returns ``(instrument_ids, bar_ts, returns)`` where ``returns`` is
@@ -37,10 +37,8 @@ def bars_from_features(
     """
     if bar_ns <= 0:
         raise ValueError("bar_ns must be > 0")
-    fdir = Path(features_dir) if features_dir is not None \
-        else _REPO / "data" / "features"
-    files = sorted(fdir.glob("features_*.parquet"),
-                   key=lambda p: int(p.stem.split("_")[1]))
+    fdir = Path(features_dir) if features_dir is not None else _REPO / "data" / "features"
+    files = sorted(fdir.glob("features_*.parquet"), key=lambda p: int(p.stem.split("_")[1]))
     if instruments is not None:
         want = set(int(i) for i in instruments)
         files = [p for p in files if int(p.stem.split("_")[1]) in want]
@@ -65,8 +63,7 @@ def bars_from_features(
     if not common:
         raise ValueError("no common bars across instruments")
     bar_ts = np.array(sorted(common), dtype=np.int64)
-    mids = np.column_stack([
-        series[iid].loc[bar_ts].to_numpy(dtype=np.float64) for iid in ids])
+    mids = np.column_stack([series[iid].loc[bar_ts].to_numpy(dtype=np.float64) for iid in ids])
     if np.any(mids <= 0):
         raise ValueError("non-positive mid encountered in bar construction")
     rets = np.diff(np.log(mids), axis=0)
