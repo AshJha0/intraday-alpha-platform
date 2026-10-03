@@ -300,7 +300,7 @@ scenario (`cpp/tools/make_replay_fills_golden.cpp`: `events_eq_mbo.jsonl`,
 seed 20260829, the XV1 venue profile from `configs/venues/venues.json`,
 instrument 1 tick 0.01 / lot 1 / ADV 38e6, VWAP BUY 400 × 4 + IS SELL
 600 × 3) and matches `tests/golden/expected_replay_fills.json` (x-version 2,
-6 fills):
+7 fills since the 2026-09-20 regeneration):
 
 - ids / ticks / qty / ts / liquidity: **exact**;
 - fee / impact_cost / notional / avg_price / fees / rebates / impact /

@@ -2182,13 +2182,17 @@ ability to say what changed. The pinned default stays reproducible; the
 corrected method sits beside it with a name; docs/RESEARCH_VALIDITY.md
 lists every pair.
 
-What is *not* closed: eligibility is self-reported by the runner, in
-Python. Someone who edits `eligibility.json` by hand, or writes a result
-document without the runner, is not stopped by anything in this
-repository. The stronger controls — pre-registration before the data is
-read, a reserve session on a seed the researcher never sees, an
-authenticated human approval for each promotion — are designed and are
-backlog (EPICS E30).
+What is *not* closed: the determination is made by the runner, in Python,
+on the researcher's own machine. The reader re-derives the configuration
+bounds from the spec, so a hand-edited `eligibility.json` cannot make a
+half-cost run eligible
+(`test_sidecar_cannot_overrule_the_configuration_bounds`). The period check
+needs the dataset, so it is taken from the sidecar as written — and a
+result document produced without the runner at all is not stopped by
+anything in this repository. The stronger controls — pre-registration
+before the data is read, a reserve session on a seed the researcher never
+sees, an authenticated human approval for each promotion — are designed
+and are backlog (EPICS E30).
 
 **Check yourself.**
 
@@ -2493,9 +2497,10 @@ Dependabot bump is being asked to do.
 **Q1. Why can order-flow imbalance be a real predictor and still lose
 money?**
 Because significance and tradability are different tests. EQ03: OOS IC
-0.026, t 7.24, every non-degenerate fold positive — and −199,913 net at 1×
-costs, since 277 signal flips/hour pay the spread continuously. IC measures
-correlation; P&L measures correlation × horizon × turnover − costs.
+0.030, t 10.6 on uncrossed rows, every fold positive — and −70,651 net at 1×
+costs, since 671 signal flips per active hour pay the spread continuously.
+IC measures correlation; P&L measures correlation × horizon × turnover −
+costs.
 
 **Q2. What is the microprice and when does it beat the mid?**
 `(Pb·Qa + Pa·Qb)/(Qb+Qa)` — the size-weighted touch price that leans toward

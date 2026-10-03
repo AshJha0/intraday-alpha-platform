@@ -206,12 +206,18 @@ rep = validate_alpha(lambda: build("EQ03"), frames, bt, meta,
 print({k: rep[k] for k in ("oos_ic", "oos_rank_ic", "nw_tstat",
                            "oos_hit_rate", "fold_sign_consistency",
                            "net_pnl_1x_cost", "verdict")})
-# EQ03 -> oos_ic 0.0256, nw_tstat 7.24, verdict ITERATE
+# EQ03 -> oos_ic 0.0299, nw_tstat 10.89, fold_sign_consistency 1.0,
+#         net_pnl_1x_cost -80532.25, verdict ITERATE
 EOF
 ```
 
-Compare against the committed `research/alpha_reports/EQ03.json` — the run
-is deterministic, so the numbers must match.
+Compare against the committed `research/alpha_reports/EQ03.json`: the run
+is deterministic, and the walk-forward statistics (IC, rank IC, t, hit rate,
+fold consistency, verdict) match it. The net P&L does not (the report says
+−70,651): the report's backtester runs under the pinned research execution
+model — `BacktestConfig(latency_ns=1 s, max_decision_age_ns=60 s,
+flatten_at_session_end=True)` — and this demo uses the default
+`BacktestConfig()`. Both are negative.
 
 ## 5. Run the full 24-alpha promotion report
 
