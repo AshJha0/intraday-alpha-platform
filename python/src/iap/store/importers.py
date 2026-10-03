@@ -374,6 +374,8 @@ def import_experiment_documents(store: Store, experiments_dir: PathLike) -> Impo
     col = _Collector()
     base = Path(experiments_dir)
     for spec_path in sorted(base.glob("*/spec.json")):
+        if spec_path.parent.name.startswith("."):
+            continue  # a run directory still being staged by the runner
         run_dir = spec_path.parent
         try:
             spec = ExperimentSpec.from_dict(_load_json(spec_path))

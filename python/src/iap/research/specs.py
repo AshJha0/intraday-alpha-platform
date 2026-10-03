@@ -38,13 +38,33 @@ The defaults are exactly the pinned research execution model of
 configuration reproduces the flagship promotion report's protocol.
 
 **Period derivation (pinned)** — see :func:`derive_periods`.
+
+**Gate eligibility (pinned)** — see :func:`gate_eligibility`.  Any
+well-formed configuration and any ordered period set can be RUN and is
+recorded and ledgered: a half-cost backtest, a zero-latency fill or a
+hand-picked holdout are legitimate questions.  They are not legitimate
+PROMOTION evidence, because each of them is a knob an automated caller can
+turn until the gates pass.  A result is *gate-eligible* only when
+
+* every protocol knob is at least as conservative as
+  :data:`DEFAULT_CONFIGURATION` (:data:`GATE_ELIGIBILITY_BOUNDS`:
+  ``cost_multiplier >= 1.0``, ``latency_ns >= 1 s``, ``embargo_ns >= 60 s``,
+  ``n_folds >= 4``, ``max_decision_age_ns <= 60 s``,
+  ``flatten_at_session_end`` true), and
+* its three periods are exactly the ones :func:`derive_periods` derives from
+  the dataset it ran on — i.e. the caller did not choose the holdout.
+
+Eligibility is not part of the spec and never changes an experiment id; the
+runner writes it beside the result (``eligibility.json``) and
+``iap.lifecycle.gates`` refuses research evidence flagged not eligible.
 """
 
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 import pandas as pd
 
@@ -62,10 +82,14 @@ from iap.validation.metrics import HORIZONS_NS
 __all__ = [
     "DEFAULT_CONFIGURATION",
     "DEFAULT_SEED",
+    "ELIGIBILITY_VERSION",
+    "GATE_ELIGIBILITY_BOUNDS",
+    "GateEligibility",
     "NS_DAY",
     "build_spec",
     "derive_periods",
     "experiment_id_of",
+    "gate_eligibility",
     "model_definition_hash",
     "normalise_configuration",
     "pinned_horizon",
@@ -88,22 +112,32 @@ DEFAULT_CONFIGURATION: Dict[str, Any] = {
 DEFAULT_SEED = 20_260_919
 
 
+def _invalid(message: str) -> ResearchError:
+    """A spec that cannot be built or does not verify (code ``invalid_spec``)."""
+    return ResearchError(message, code="invalid_spec")
+
+
+def _corrupt(message: str) -> ResearchError:
+    """A persisted document that is damaged (code ``experiment_corrupt``)."""
+    return ResearchError(message, code="experiment_corrupt")
+
+
 def _require_int(cfg: Mapping[str, Any], key: str, minimum: int) -> int:
     value = cfg[key]
     if isinstance(value, bool) or not isinstance(value, int):
-        raise ResearchError(f"configuration.{key}: expected an integer, got {value!r}")
+        raise _invalid(f"configuration.{key}: expected an integer, got {value!r}")
     if value < minimum:
-        raise ResearchError(f"configuration.{key}: must be >= {minimum}, got {value}")
+        raise _invalid(f"configuration.{key}: must be >= {minimum}, got {value}")
     return int(value)
 
 
 def _require_float(cfg: Mapping[str, Any], key: str, exclusive_min: float) -> float:
     value = cfg[key]
     if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise ResearchError(f"configuration.{key}: expected a number, got {value!r}")
+        raise _invalid(f"configuration.{key}: expected a number, got {value!r}")
     out = float(value)
     if not math.isfinite(out) or out <= exclusive_min:
-        raise ResearchError(
+        raise _invalid(
             f"configuration.{key}: must be a finite number > {exclusive_min}, got {value!r}")
     return out
 
@@ -111,7 +145,7 @@ def _require_float(cfg: Mapping[str, Any], key: str, exclusive_min: float) -> fl
 def _require_bool(cfg: Mapping[str, Any], key: str) -> bool:
     value = cfg[key]
     if not isinstance(value, bool):
-        raise ResearchError(f"configuration.{key}: expected a boolean, got {value!r}")
+        raise _invalid(f"configuration.{key}: expected a boolean, got {value!r}")
     return value
 
 
@@ -126,7 +160,7 @@ def normalise_configuration(configuration: Optional[Mapping[str, Any]]) -> Dict[
     given = dict(configuration or {})
     unknown = sorted(set(given) - set(DEFAULT_CONFIGURATION))
     if unknown:
-        raise ResearchError(
+        raise _invalid(
             f"unknown configuration keys {unknown}; pinned keys are "
             f"{sorted(DEFAULT_CONFIGURATION)}")
     merged = {**DEFAULT_CONFIGURATION, **given}
@@ -143,14 +177,14 @@ def normalise_configuration(configuration: Optional[Mapping[str, Any]]) -> Dict[
 def pinned_horizon(alpha_id: str) -> str:
     """The alpha's own label horizon (the default when a spec names none)."""
     if alpha_id not in ALPHA_CLASSES:
-        raise ResearchError(
+        raise _invalid(
             f"unknown alpha_id {alpha_id!r}; known: {sorted(ALPHA_CLASSES)}")
     return str(ALPHA_CLASSES[alpha_id].horizon)
 
 
 def _check_horizon(horizon: str) -> str:
     if horizon not in VALID_HORIZONS:
-        raise ResearchError(
+        raise _invalid(
             f"unknown horizon {horizon!r}; pinned horizons: {list(VALID_HORIZONS)}")
     return horizon
 
@@ -180,7 +214,7 @@ def model_definition_hash(alpha_id: str, horizon: str) -> str:
 def _version(explicit: Optional[str], source, what: str, repo_root: Optional[Path]) -> str:
     value = explicit if explicit is not None else source(repo_root)
     if not is_sha256_hex(value):
-        raise ResearchError(
+        raise _invalid(
             f"{what} {value!r} is not a sha256 hex digest; the tracker could not "
             "fingerprint the bundled data (is data/ present?) — pass it explicitly")
     return value
@@ -213,13 +247,13 @@ def derive_periods(
     always satisfies the contract invariant (ordered, non-overlapping).
     """
     if not frames:
-        raise ResearchError("cannot derive periods from an empty frame set")
+        raise _invalid("cannot derive periods from an empty frame set")
     nonempty = [df for df in frames.values() if len(df)]
     if not nonempty:
-        raise ResearchError("cannot derive periods: every frame is empty")
+        raise _invalid("cannot derive periods: every frame is empty")
     days = session_days(frames)
     if len(days) < 2:
-        raise ResearchError(
+        raise _invalid(
             f"period derivation needs >= 2 sessions (UTC days), found {len(days)}; "
             "pass train/validation/test periods explicitly")
     last_day = days[-1]
@@ -232,7 +266,7 @@ def derive_periods(
     )
     purge_start = test_start - HORIZONS_NS[_check_horizon(horizon)] - int(embargo_ns)
     if purge_start <= t_first:
-        raise ResearchError(
+        raise _invalid(
             "period derivation: the purge + embargo zone before the last session "
             "swallows every earlier row — nothing is left to train on")
     return (
@@ -242,10 +276,129 @@ def derive_periods(
     )
 
 
+#: ``x-version`` of the ``eligibility.json`` sidecar document.
+ELIGIBILITY_VERSION = 1
+
+#: Configuration bounds of a gate-eligible result: ``(kind, bound)`` per key,
+#: ``min`` = the value must be >= bound, ``max`` = <= bound, ``is`` = equal.
+#: Every bound is the :data:`DEFAULT_CONFIGURATION` value, so the pinned
+#: protocol is eligible and any knob turned in the flattering direction
+#: (cheaper, faster, less embargo, fewer folds, staler fills, overnight
+#: carry) is not.
+GATE_ELIGIBILITY_BOUNDS: Dict[str, Tuple[str, Any]] = {
+    "n_folds": ("min", DEFAULT_CONFIGURATION["n_folds"]),
+    "embargo_ns": ("min", DEFAULT_CONFIGURATION["embargo_ns"]),
+    "cost_multiplier": ("min", DEFAULT_CONFIGURATION["cost_multiplier"]),
+    "latency_ns": ("min", DEFAULT_CONFIGURATION["latency_ns"]),
+    "max_decision_age_ns": ("max", DEFAULT_CONFIGURATION["max_decision_age_ns"]),
+    "flatten_at_session_end": ("is", DEFAULT_CONFIGURATION["flatten_at_session_end"]),
+}
+
+
+@dataclass(frozen=True)
+class GateEligibility:
+    """Whether a result may be used as lifecycle-gate evidence, and why not.
+
+    ``periods_verified`` says the period check was actually made against a
+    dataset; ``False`` means only the configuration bounds were checked
+    (a run directory written before the sidecar existed)."""
+
+    eligible: bool
+    reasons: Tuple[str, ...]
+    periods_verified: bool
+
+    def to_dict(self, experiment_id: str) -> Dict[str, Any]:
+        """The ``eligibility.json`` document for ``experiment_id``."""
+        return {
+            "x-version": ELIGIBILITY_VERSION,
+            "experiment_id": experiment_id,
+            "gate_eligible": self.eligible,
+            "periods_verified": self.periods_verified,
+            "reasons": list(self.reasons),
+        }
+
+    @staticmethod
+    def from_dict(doc: Mapping[str, Any], experiment_id: str) -> "GateEligibility":
+        """Strict inverse of :meth:`to_dict` for ``experiment_id``."""
+        want = {"x-version", "experiment_id", "gate_eligible",
+                "periods_verified", "reasons"}
+        if not isinstance(doc, Mapping) or set(doc) != want:
+            raise _corrupt(
+                f"eligibility document for {experiment_id}: expected keys "
+                f"{sorted(want)}")
+        if doc["x-version"] != ELIGIBILITY_VERSION:
+            raise _corrupt(
+                f"eligibility document for {experiment_id}: x-version "
+                f"{doc['x-version']!r}, this build reads {ELIGIBILITY_VERSION}")
+        if doc["experiment_id"] != experiment_id:
+            raise _corrupt(
+                f"eligibility document belongs to {doc['experiment_id']!r}, "
+                f"not {experiment_id!r}")
+        reasons = doc["reasons"]
+        if (not isinstance(doc["gate_eligible"], bool)
+                or not isinstance(doc["periods_verified"], bool)
+                or not isinstance(reasons, list)
+                or not all(isinstance(r, str) for r in reasons)):
+            raise _corrupt(
+                f"eligibility document for {experiment_id}: malformed fields")
+        if doc["gate_eligible"] and reasons:
+            raise _corrupt(
+                f"eligibility document for {experiment_id}: eligible with reasons")
+        return GateEligibility(eligible=doc["gate_eligible"], reasons=tuple(reasons),
+                               periods_verified=doc["periods_verified"])
+
+
+def _configuration_violations(configuration: Mapping[str, Any]) -> List[str]:
+    out: List[str] = []
+    for key, (kind, bound) in GATE_ELIGIBILITY_BOUNDS.items():
+        value = configuration[key]
+        if kind == "min" and value < bound:
+            out.append(f"configuration.{key}={value!r} is below the gate-eligible "
+                       f"minimum {bound!r}")
+        elif kind == "max" and value > bound:
+            out.append(f"configuration.{key}={value!r} is above the gate-eligible "
+                       f"maximum {bound!r}")
+        elif kind == "is" and value is not bound:
+            out.append(f"configuration.{key}={value!r} must be {bound!r} for a "
+                       "gate-eligible result")
+    return out
+
+
+def gate_eligibility(
+    spec: ExperimentSpec,
+    frames: Optional[Mapping[int, pd.DataFrame]] = None,
+) -> GateEligibility:
+    """Is ``spec``'s result admissible as promotion evidence (module docs)?
+
+    ``frames`` is the dataset the spec runs on (the WHOLE feature store, as
+    :func:`build_spec` receives it).  With it, the spec's periods must equal
+    :func:`derive_periods` of that dataset; a dataset the periods cannot be
+    derived from (fewer than two sessions) makes every period set
+    caller-chosen.  Without ``frames`` only the configuration bounds are
+    checked and ``periods_verified`` is ``False``.
+    """
+    reasons = _configuration_violations(spec.configuration)
+    verified = frames is not None
+    if frames is not None:
+        try:
+            derived = derive_periods(frames, spec.horizon,
+                                     int(spec.configuration["embargo_ns"]))
+        except ResearchError as exc:
+            reasons.append(f"periods are caller-chosen: none can be derived ({exc})")
+        else:
+            given = (spec.train_period, spec.validation_period, spec.test_period)
+            if tuple(p.to_dict() for p in given) != tuple(p.to_dict() for p in derived):
+                reasons.append(
+                    "periods are caller-chosen: they differ from the periods "
+                    "derived from the dataset's session calendar")
+    return GateEligibility(eligible=not reasons, reasons=tuple(reasons),
+                           periods_verified=verified)
+
+
 def experiment_id_of(body: Mapping[str, Any]) -> str:
     """The pinned id of a spec body (a spec dict WITHOUT ``experiment_id``)."""
     if "experiment_id" in body:
-        raise ResearchError("experiment_id_of: body must not carry experiment_id")
+        raise _invalid("experiment_id_of: body must not carry experiment_id")
     return content_hash(dict(body))[:16]
 
 
@@ -255,7 +408,7 @@ def verify_experiment_id(spec: ExperimentSpec) -> None:
     del body["experiment_id"]
     want = experiment_id_of(body)
     if spec.experiment_id != want:
-        raise ResearchError(
+        raise _invalid(
             f"experiment_id {spec.experiment_id!r} does not match the spec body "
             f"(expected {want!r}): the document was edited or built by hand")
 
@@ -298,10 +451,10 @@ def build_spec(
     config = normalise_configuration(configuration)
     given = (train_period, validation_period, test_period)
     if any(p is None for p in given) and not all(p is None for p in given):
-        raise ResearchError("train/validation/test periods must be given together")
+        raise _invalid("train/validation/test periods must be given together")
     if all(p is None for p in given):
         if frames is None:
-            raise ResearchError(
+            raise _invalid(
                 "no periods given and no frames to derive them from")
         train_period, validation_period, test_period = derive_periods(
             frames, horizon, config["embargo_ns"])
@@ -324,5 +477,5 @@ def build_spec(
         spec = ExperimentSpec.from_dict({"experiment_id": experiment_id_of(body), **body})
         validate_typed(spec)
     except ValueError as exc:  # ContractError / ContractValidationError
-        raise ResearchError(f"invalid experiment spec: {exc}") from exc
+        raise _invalid(f"invalid experiment spec: {exc}") from exc
     return spec

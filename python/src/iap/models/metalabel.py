@@ -75,8 +75,21 @@ META_FEATURE_NAMES = (
 
 
 def build_meta_features(pred: np.ndarray, direction: np.ndarray,
-                        meta_context: np.ndarray) -> np.ndarray:
-    """Assemble the pinned meta-feature matrix (NaN -> 0, documented)."""
+                        meta_context: np.ndarray,
+                        impute_nan: bool = True) -> np.ndarray:
+    """Assemble the pinned meta-feature matrix.
+
+    ``impute_nan=True`` (pinned default) replaces every non-finite entry by
+    0 — the behaviour the committed ML report and model runs were produced
+    with.  It is a known weakness for the tree model: 0 is a legitimate
+    value of several meta-features (``queue_imbalance_signed``,
+    ``alpha_signed``), so "missing" and "balanced" become indistinguishable,
+    and ``HistGradientBoostingClassifier`` handles NaN natively (a learned
+    missing-value direction per split).  ``impute_nan=False`` keeps NaN for
+    missing values (infinities still become NaN) so the classifier can use
+    that; it is opt-in because it changes the fitted model and therefore
+    the pinned report numbers.
+    """
     if meta_context.shape[1] != len(META_CONTEXT_COLUMNS):
         raise ValueError("meta_context has wrong column count")
     spread = meta_context[:, 0]
@@ -95,7 +108,7 @@ def build_meta_features(pred: np.ndarray, direction: np.ndarray,
         half_cost,
         impact,
     ])
-    return np.where(np.isfinite(X), X, 0.0)
+    return np.where(np.isfinite(X), X, 0.0 if impute_nan else np.nan)
 
 
 #: Minimum POSITIVE calibration samples before isotonic regression is used
@@ -152,12 +165,16 @@ def run_meta_labeling(
     tracker: Optional[ExperimentTracker] = None,
     primary_name: str = "primary",
     tau: float = 0.5,
+    impute_nan: bool = True,
 ) -> Dict[str, Any]:
     """Train + calibrate + economically evaluate the meta-label gate.
 
     ``primary_pred`` is the pooled OOS prediction vector (NaN where a sample
     was never out-of-sample).  ``tau`` is the pinned probability threshold of
     the meta-gate; a calibration-set sweep is also reported.
+    ``impute_nan`` is passed to :func:`build_meta_features` (default: the
+    pinned NaN -> 0 imputation).  ``auc_test`` is ``None`` when the test
+    segment holds a single class (AUC undefined).
     """
     primary_pred = np.asarray(primary_pred, dtype=np.float64)
     if len(primary_pred) != len(ds):
@@ -177,7 +194,7 @@ def run_meta_labeling(
     net = realized_net(direction[idx], ds.y_mid[idx], ds.y[idx])
     y_meta = (net > 0.0).astype(np.int8)
     X_meta = build_meta_features(primary_pred[idx], direction[idx],
-                                 ds.meta_context[idx])
+                                 ds.meta_context[idx], impute_nan=impute_nan)
 
     # chronological 50/25/25 split with embargo (ts is already sorted
     # because the dataset is sorted by exchange_ts). PURGING (pinned): rows
@@ -250,8 +267,13 @@ def run_meta_labeling(
                       "empirical": float(y_meta[te][m].mean()),
                       "count": int(m.sum())})
 
-    auc = float(roc_auc_score(y_meta[te], p_test)) \
-        if len(np.unique(y_meta[te])) > 1 else 0.5
+    # AUC is undefined on a single-class test segment.  It is reported as
+    # ``None`` (JSON null), never as a fabricated 0.5: 0.5 reads as "the
+    # model was evaluated and has no skill", which is a different statement
+    # from "the segment could not rank anything".
+    auc: Optional[float] = (
+        float(roc_auc_score(y_meta[te], p_test))
+        if len(np.unique(y_meta[te])) > 1 else None)
     result: Dict[str, Any] = {
         "primary_model": primary_name,
         "n_meta_samples": int(len(idx)),

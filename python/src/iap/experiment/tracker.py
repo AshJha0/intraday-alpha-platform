@@ -49,6 +49,8 @@ import subprocess
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from iap.experiment.locking import FileLock, atomic_write_text
+
 logger = logging.getLogger(__name__)
 
 _REPO = Path(__file__).resolve().parents[4]
@@ -204,9 +206,9 @@ class ExperimentTracker:
         return {"experiment_count": 0, "runs": []}
 
     def _write_ledger(self, ledger: Dict[str, Any]) -> None:
-        with open(self._ledger_path(), "w") as f:
-            json.dump(ledger, f, indent=2, sort_keys=True)
-            f.write("\n")
+        atomic_write_text(
+            self._ledger_path(),
+            json.dumps(ledger, indent=2, sort_keys=True) + "\n")
 
     @property
     def experiment_count(self) -> int:
@@ -216,16 +218,34 @@ class ExperimentTracker:
     # -------------------------------------------------------------- runs
 
     def new_run(self, name: str) -> str:
-        """Allocate the next sequential run id (``run_NNNN_<name>``)."""
+        """Allocate the next sequential run id (``run_NNNN_<name>``).
+
+        Safe under concurrent writers (pinned): the ledger read-modify-write
+        runs under an exclusive lock file, and the run DIRECTORY is the
+        atomic claim on the number — it is created without ``exist_ok``, and
+        a sequence number whose directory already exists (under any name: a
+        run a crashed writer claimed but never ledgered) is skipped, never
+        shared.  ``count + 1`` followed by ``mkdir(exist_ok=True)`` let two
+        writers allocate the same id and overwrite each other's artefacts.
+        """
         if not name or any(c in name for c in "/\\ "):
             raise ValueError(f"invalid run name: {name!r}")
-        ledger = self.read_ledger()
-        seq = ledger["experiment_count"] + 1
-        run_id = f"run_{seq:04d}_{name}"
-        ledger["experiment_count"] = seq
-        ledger["runs"].append({"run_id": run_id, "name": name})
-        (self.models_dir / run_id).mkdir(parents=True, exist_ok=True)
-        self._write_ledger(ledger)
+        with FileLock(self._ledger_path()):
+            ledger = self.read_ledger()
+            seq = ledger["experiment_count"] + 1
+            while True:
+                run_id = f"run_{seq:04d}_{name}"
+                taken = any(self.models_dir.glob(f"run_{seq:04d}_*"))
+                if not taken:
+                    try:
+                        (self.models_dir / run_id).mkdir(parents=True)
+                        break
+                    except FileExistsError:
+                        pass
+                seq += 1
+            ledger["experiment_count"] = seq
+            ledger["runs"].append({"run_id": run_id, "name": name})
+            self._write_ledger(ledger)
         return run_id
 
     def run_dir(self, run_id: str) -> Path:

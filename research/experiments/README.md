@@ -11,6 +11,7 @@ research/experiments/
   <experiment_id>/
     spec.json                   ExperimentSpec  — what was asked
     result.json                 ExperimentResult — what came back
+    eligibility.json            may the result be used as promotion evidence?
 ```
 
 - `<experiment_id>` is the runner's deterministic id for the spec: the
@@ -40,18 +41,43 @@ research/experiments/
 
 Every experiment that reaches this folder is also entered into the
 multiple-testing ledger `research/experiments.json` (kind
-`experiment_runner`, 21 looks per experiment, de-duplicated by alpha × kind ×
+`experiment_runner`, 28 looks per experiment — itemised at
+`iap.research.LOOKS_PER_EXPERIMENT` — de-duplicated by alpha × kind ×
 spec), so a promotion claim can be audited against the number of things
-that were tried.
+that were tried. A `--dry-run` writes no experiment directory but still
+debits its looks: it evaluates and prints every statistic, so it is a look.
+
+- `eligibility.json` (`x-version` 1; written by the runner since 2026-10,
+  absent from the five directories below) records whether the result is
+  **gate-eligible** (`iap.research.specs.gate_eligibility`). Any valid
+  configuration can be run and is ledgered, but a result is promotion
+  evidence only if every protocol knob is at least as conservative as the
+  pinned default (`cost_multiplier >= 1.0`, `latency_ns >= 1 s`,
+  `embargo_ns >= 60 s`, `n_folds >= 4`, `max_decision_age_ns <= 60 s`,
+  session flattening on) and its periods are the ones derived from the
+  dataset's session calendar rather than chosen by the caller. The
+  lifecycle gates fail every research gate on evidence flagged not eligible
+  (`iap.lifecycle.gates`). A directory without the file is judged on its
+  configuration alone. Eligibility is not part of the spec and never
+  changes an experiment id.
+- New directories are staged under `.staging-<id>-<pid>` and moved into
+  place in one rename, so a reader never sees a half-written experiment;
+  the ledger is updated under a lock file (`experiments.json.lock`) with an
+  atomic replace, so parallel writers lose no update. A listing skips a
+  corrupt or incomplete directory and reports it instead of failing.
 
 Produce, list and inspect experiments with
 
 ```bash
 cd python
 PYTHONPATH=src python3 -m iap.research run --alpha EQ03 --horizon 1s
-PYTHONPATH=src python3 -m iap.research list
-PYTHONPATH=src python3 -m iap.research show <experiment_id>
+PYTHONPATH=src python3 -m iap.research list [--json]
+PYTHONPATH=src python3 -m iap.research show <experiment_id> [--json]
 ```
+
+`--json` prints one JSON document (spec, result, gate eligibility; `list`
+adds the skipped directories); the top-level `--json-errors` flag turns
+every failure into one JSON object on stderr with a stable `code`.
 
 Documents are JSON with sorted keys, 2-space indentation and no wall-clock
 timestamps (identical rerun ⇒ identical file; only `git_commit` and the
@@ -83,7 +109,7 @@ reproduce `research/alpha_reports/{EQ01,EQ03,EQ06}.json` at 1e-9
 EQ03 @ 1 s is a new configuration compared to nothing. EQ06 @ 1 s and @ 10 s
 share identical holdout economics because the linear alpha's trades depend
 only on z and sign(β), not on the horizon's β magnitude. These five runs
-(5 × 21 = 105 entries) moved the ledger from 760 / 65 to **1068 looks over 70 distinct
+(5 experiments × 28 looks each) moved the ledger from 760 / 65 to **1068 looks over 70 distinct
 configurations** (Bonferroni |t| ≥ 4.071, expected max |t| ≈ 3.735); they were not de-duplicated against
 the `promotion_pipeline` entries — the denominator only grows.
 

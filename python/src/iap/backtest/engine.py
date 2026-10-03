@@ -38,6 +38,58 @@ Pinned semantics (mirrored by the accounting-identity tests):
   ``sign(expected_return) * max_pos_qty`` when ``confidence >= conf_min``,
   else flat.  No pyramiding, no hysteresis — a research backtester
   measures signal economics, not execution tuning.
+
+  That default (``position_policy="sign"``) ignores two things the alpha
+  itself states: the HORIZON its expected return is over and the COST of
+  acting on it.  It re-decides on every row, so a 5-second forecast is
+  traded as if it were a one-row forecast, and it trades a forecast of a
+  tenth of a basis point through a spread of two.  The opt-in
+  ``position_policy="cost_aware"`` (pinned; the default is unchanged and
+  every committed report uses it) is the rule the forecast implies:
+
+  * *entry threshold* at a decision row = the round-trip cost of a position
+    as a return, ``(2 * half_spread + round_trip_fee) / mid`` scaled by the
+    cost model's multiplier (:meth:`CostModel.round_trip_cost_return`;
+    impact is excluded — it depends on the size, the threshold is per
+    unit).  A row whose mid or half-spread is invalid has no threshold and
+    cannot open or flip a position;
+  * *enter* (from flat) only when ``confidence >= conf_min`` and
+    ``|expected_return|`` exceeds the entry threshold;
+  * *hold* the position until ``horizon_ns`` of event time has elapsed
+    since entry — the forecast is about that window, so intermediate rows
+    do not re-decide — or until an OPPOSITE signal that itself clears the
+    entry threshold arrives, which flips the position and restarts the
+    clock;
+  * *hysteresis*: when the horizon has elapsed, a same-direction signal that
+    clears ``hysteresis * entry threshold`` (``0 <= hysteresis <= 1``)
+    renews the hold for another horizon without trading; otherwise the
+    position is closed.  Staying in costs nothing, getting back in costs
+    the spread again, so the bar to stay is lower than the bar to enter.
+
+  Latency, decision age, executability and session flattening apply to the
+  resulting target exactly as they do to the default rule.
+
+- **Fill cap at displayed size** (opt-in, ``cap_fills_at_l1``; default off):
+  by default a trade toward the target fills in full at ``mid +- half
+  spread`` whatever its size — a 1 000-share order "fills" at the touch of
+  a book showing 100.  With the flag, the quantity traded at a row is capped
+  at the displayed L1 size on the side it takes (``depth_ask_l1_v1`` for a
+  buy, ``depth_bid_l1_v1`` for a sell; a missing or non-finite size is 0,
+  i.e. nothing fills).  The unfilled remainder is NOT queued: the next row
+  that carries a decision trades toward that row's target, again capped —
+  the same "a real router would re-evaluate" rule as for unexecutable rows.
+  The session-end flatten is exempt (it models the closing auction, and a
+  capped flatten would carry inventory overnight).
+- **Blocked rows** (opt-in, ``block_rows_column``; default ``None``): rows
+  where the named boolean frame column is False produce NO decision (the
+  position carries).  With ``block_rows_column="label_valid_<h>"`` the
+  backtest trades exactly the rows the IC is measured on.  The IC drops
+  every row whose label is invalid — halts, auctions, stale books, the end
+  of the session — while the default backtest keeps trading through them,
+  so the two statistics describe different row populations; the flag
+  removes that selection difference (at the price of using label validity,
+  which is only known after the fact, as a row filter — it is a diagnostic
+  of the bias, not a tradable rule).
 - **Accounting identity** (tested exactly): with cash updated only by
   executions and equity marked at the last valid mid,
 
@@ -84,6 +136,8 @@ SESSION_HOURS = {"EQUITY": 6.5, "ETF": 6.5, "FX": 21.0}
 #: Bar gap above which the Sharpe series is NOT zero-filled (session break).
 SESSION_GAP_NS = 30 * 60 * NS_S
 TRADING_DAYS_PER_YEAR = 252
+#: Pinned position policies (module docs, position rule).
+POSITION_POLICIES = ("sign", "cost_aware")
 
 
 @dataclass(frozen=True)
@@ -100,8 +154,29 @@ class BacktestConfig:
     flatten_at_session_end: bool = False
     #: row gap that marks a session boundary (pinned default: 30 minutes)
     session_gap_ns: int = 30 * 60 * NS_S
+    #: "sign" (pinned default) or "cost_aware" (module docs, position rule)
+    position_policy: str = "sign"
+    #: label horizon the expected return is over; required by "cost_aware"
+    horizon_ns: Optional[int] = None
+    #: fraction of the entry threshold a same-direction signal must clear to
+    #: renew an expired hold ("cost_aware" only)
+    hysteresis: float = 0.5
+    #: cap each fill at the displayed L1 size on the side it takes
+    cap_fills_at_l1: bool = False
+    #: boolean frame column; rows where it is False make no decision
+    block_rows_column: Optional[str] = None
 
     def __post_init__(self) -> None:
+        if self.position_policy not in POSITION_POLICIES:
+            raise ValueError(
+                f"unknown position_policy {self.position_policy!r}; "
+                f"known: {POSITION_POLICIES}")
+        if self.horizon_ns is not None and self.horizon_ns <= 0:
+            raise ValueError("horizon_ns must be positive")
+        if self.position_policy == "cost_aware" and self.horizon_ns is None:
+            raise ValueError("position_policy 'cost_aware' needs horizon_ns")
+        if not 0.0 <= self.hysteresis <= 1.0:
+            raise ValueError("hysteresis must be in [0, 1]")
         if self.latency_rows < 0:
             raise ValueError("latency_rows must be >= 0")
         if self.max_pos_qty <= 0:
@@ -240,6 +315,106 @@ def _ffill(values: np.ndarray, initial: float) -> np.ndarray:
     return v[idx][1:]
 
 
+def _capped_positions(exec_target: np.ndarray, bid_size: np.ndarray,
+                      ask_size: np.ndarray, exempt: np.ndarray) -> np.ndarray:
+    """Positions when each fill is capped at the displayed L1 size.
+
+    ``exec_target[i]`` is the target at row i (NaN = no decision / cannot
+    trade: carry).  A buy takes ``ask_size[i]``, a sell ``bid_size[i]``; a
+    non-finite or negative size fills nothing.  ``exempt`` rows (the
+    session-end flatten) fill in full.
+    """
+    n = len(exec_target)
+    pos = np.zeros(n)
+    cur = 0.0
+    for i in range(n):
+        tgt = exec_target[i]
+        if np.isfinite(tgt) and tgt != cur:
+            want = tgt - cur
+            if exempt[i]:
+                cur = tgt
+            else:
+                size = ask_size[i] if want > 0 else bid_size[i]
+                cap = size if np.isfinite(size) and size > 0.0 else 0.0
+                cur += np.sign(want) * min(abs(want), cap)
+        pos[i] = cur
+    return pos
+
+
+def _block_decisions(exec_target: np.ndarray, target: np.ndarray,
+                     allowed: np.ndarray, ts: np.ndarray,
+                     cfg: "BacktestConfig") -> np.ndarray:
+    """``exec_target`` rebuilt with the decisions of blocked rows removed
+    (same latency / decision-age mapping as the engine's own)."""
+    n = len(target)
+    kept = np.where(allowed, target, np.nan)
+    out = np.full(n, np.nan)
+    if cfg.latency_ns is not None:
+        j = np.searchsorted(ts, ts + int(cfg.latency_ns), side="left")
+        for i in range(n):
+            k = int(j[i])
+            if k >= n:
+                break
+            if (cfg.max_decision_age_ns is not None
+                    and ts[k] - ts[i] > cfg.max_decision_age_ns):
+                continue
+            if allowed[i]:
+                out[k] = kept[i]
+    elif cfg.latency_rows == 0:
+        out[:] = kept
+    elif cfg.latency_rows < n:
+        out[cfg.latency_rows:] = kept[: n - cfg.latency_rows]
+        if cfg.max_decision_age_ns is not None:
+            age = np.full(n, 0, dtype=np.int64)
+            age[cfg.latency_rows:] = ts[cfg.latency_rows:] - ts[: n - cfg.latency_rows]
+            out[age > cfg.max_decision_age_ns] = np.nan
+    return out
+
+
+def cost_aware_targets(
+    ts: np.ndarray,
+    expected_return: np.ndarray,
+    confidence: np.ndarray,
+    entry_threshold: np.ndarray,
+    conf_min: float,
+    horizon_ns: int,
+    hysteresis: float,
+) -> np.ndarray:
+    """Desired position sign (-1 / 0 / +1) per decision row under the
+    ``cost_aware`` policy (module docs, position rule).
+
+    ``entry_threshold`` is the per-row round-trip cost as a return; a
+    non-finite entry means the row cannot open or flip a position.  A row
+    whose expected return is non-finite or whose confidence is below
+    ``conf_min`` carries no signal: it neither enters nor renews, and an
+    expired hold is closed on it.
+    """
+    n = len(ts)
+    out = np.zeros(n)
+    pos = 0.0
+    entry_ts = 0
+    for i in range(n):
+        e = expected_return[i]
+        thr = entry_threshold[i]
+        has_signal = bool(np.isfinite(e) and confidence[i] >= conf_min)
+        sign = float(np.sign(e)) if has_signal else 0.0
+        clears_entry = bool(has_signal and np.isfinite(thr) and abs(e) > thr)
+        if pos == 0.0:
+            if clears_entry and sign != 0.0:
+                pos, entry_ts = sign, ts[i]
+        elif clears_entry and sign == -pos:
+            pos, entry_ts = sign, ts[i]
+        elif ts[i] - entry_ts >= horizon_ns:
+            renews = bool(has_signal and sign == pos and np.isfinite(thr)
+                          and abs(e) > hysteresis * thr)
+            if renews:
+                entry_ts = ts[i]
+            else:
+                pos = 0.0
+        out[i] = pos
+    return out
+
+
 class Backtester:
     """Vectorized per-instrument research backtester."""
 
@@ -342,8 +517,16 @@ class Backtester:
         conf = scores["confidence"].to_numpy(dtype=float)
 
         # decision at i -> desired target at its execution row
-        target = np.where(conf >= cfg.conf_min, np.sign(er), 0.0) * cfg.max_pos_qty
-        target[~np.isfinite(er)] = 0.0
+        if cfg.position_policy == "cost_aware":
+            threshold = self.cost_model.round_trip_cost_return(
+                mid, hs, meta["asset_class"])
+            target = cost_aware_targets(
+                ts, er, conf, threshold, cfg.conf_min, int(cfg.horizon_ns),
+                cfg.hysteresis) * cfg.max_pos_qty
+        else:
+            target = (np.where(conf >= cfg.conf_min, np.sign(er), 0.0)
+                      * cfg.max_pos_qty)
+            target[~np.isfinite(er)] = 0.0
         exec_target = np.full(n, np.nan)
         if cfg.latency_ns is not None:
             # TIME mode: execute at the first row at-or-after t + latency.
@@ -368,6 +551,17 @@ class Backtester:
                     ts[cfg.latency_rows:] - ts[: n - cfg.latency_rows])
                 exec_target[age > cfg.max_decision_age_ns] = np.nan
 
+        if cfg.block_rows_column is not None:
+            if cfg.block_rows_column not in frame.columns:
+                raise ValueError(
+                    f"instrument {iid}: frame lacks block_rows_column "
+                    f"{cfg.block_rows_column!r}")
+            allowed = frame[cfg.block_rows_column].to_numpy(dtype=bool)
+            # Blocked at the DECISION row: no target is produced there, so
+            # nothing is aged in from it (set before the latency mapping
+            # would have been equivalent only in rows mode).
+            exec_target = _block_decisions(exec_target, target, allowed, ts, cfg)
+
         executable = np.isfinite(mid) & np.isfinite(hs) & (hs >= 0.0)
         exec_target[~executable] = np.nan  # cannot trade here; carry position
 
@@ -389,7 +583,24 @@ class Backtester:
                 np.maximum.accumulate(last_exec, out=last_exec)
                 flat_rows = last_exec[boundary]
                 exec_target[flat_rows[flat_rows >= 0]] = 0.0
-        pos = _ffill(exec_target, 0.0)
+                forced_flat = np.zeros(n, dtype=bool)
+                forced_flat[flat_rows[flat_rows >= 0]] = True
+            else:
+                forced_flat = np.zeros(n, dtype=bool)
+        else:
+            forced_flat = np.zeros(n, dtype=bool)
+        if cfg.cap_fills_at_l1:
+            for name in ("depth_bid_l1_v1", "depth_ask_l1_v1"):
+                if name not in frame.columns:
+                    raise ValueError(
+                        f"instrument {iid}: cap_fills_at_l1 needs frame column {name!r}")
+            pos = _capped_positions(
+                exec_target,
+                frame["depth_bid_l1_v1"].to_numpy(dtype=float),
+                frame["depth_ask_l1_v1"].to_numpy(dtype=float),
+                forced_flat)
+        else:
+            pos = _ffill(exec_target, 0.0)
         trades = np.diff(pos, prepend=0.0)
         trade_rows = trades != 0.0
 

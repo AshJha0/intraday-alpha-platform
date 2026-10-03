@@ -42,8 +42,10 @@ from iap.models.pipeline import run_model_comparison  # noqa: E402
 from iap.models.zoo import TREE_FALLBACK_ACTIVE, model_names  # noqa: E402
 
 
-def _fmt(x: float, nd: int = 4) -> str:
-    return f"{x:.{nd}f}"
+def _fmt(x, nd: int = 4) -> str:
+    # None = a statistic that is undefined on this sample (e.g. the AUC of a
+    # single-class test segment), never a number to print.
+    return "n/a" if x is None else f"{x:.{nd}f}"
 
 
 def main() -> None:
