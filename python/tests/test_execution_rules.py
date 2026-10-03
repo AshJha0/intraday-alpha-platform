@@ -183,10 +183,10 @@ def test_queue_cancel_ahead_reduces_position_deterministically():
     # MODIFY events never change queue position (pinned).
     sim.on_event(f.modify(T0 + 2_200_000, 0, 100, 10, 13))
     assert sim.orders[oid].ahead_qty == 60
-    # A 70-EXECUTE: 60 ahead, 10 to us.
+    # An EXECUTE quoting 70 on order 13 trades only its remaining 10.
     sim.on_event(f.exec(T0 + 3_000_000, 0, 100, 70, 13))
-    assert len(sim.fills) == 1
-    assert sim.fills[0].qty == 10
+    assert sim.orders[oid].ahead_qty == 50
+    assert sim.fills == []
 
 
 def test_queue_cancel_decrement_floors_at_zero():
@@ -260,7 +260,8 @@ def test_queue_same_price_children_share_one_print_and_queue_behind_each_other()
     assert [sim.orders[i].ahead_qty for i in ids] == [300, 1300, 2300, 3300]
     # ONE print of 400 at 100: 300 clears the display, 100 reaches the FIRST
     # child and nobody else. Old rule: 4 x 100 = 400 filled.
-    sim.on_event(f.exec(T0 + 2_000_000, 0, 100, 400, 11))
+    # (order 12 = 400 at 99 trades through our level.)
+    sim.on_event(f.exec(T0 + 2_000_000, 0, 99, 400, 12))
     assert len(sim.fills) == 1
     assert sim.fills[0].order_id == ids[0]
     assert (sim.fills[0].qty, sim.fills[0].price_ticks) == (100, 100)
@@ -352,6 +353,23 @@ def test_queue_events_dropped_by_the_book_are_not_tracked():
     sim.on_event(f.exec(T0 + 3_000_000, 0, 100, 500, 77))  # unknown order
     assert sim.orders[oid].ahead_qty == 100
     assert sim.fills == []
+
+
+def test_queue_execute_is_tracked_as_the_book_saw_it():
+    """Qty capped at the order's remaining; side/price from the book order."""
+    sim = ExecutionSimulator(make_config())
+    f = Feeder()
+    seed_book(sim, f)
+    oid = sim.submit(child(0, OrderType.LIMIT, 100, 50, T0 + 10))
+    sim.on_event(f.heartbeat(T0 + 10 + LAT + 1))
+    # The event quotes 500 but order 11 only had 300: 300 traded, no fill.
+    sim.on_event(f.exec(T0 + 2_000_000, 0, 100, 500, 11))
+    assert sim.orders[oid].ahead_qty == 0
+    assert sim.fills == []
+    # The event says ask 100, the book says order 12 is a bid at 99: a
+    # 30-lot trade through our bid, filled at our limit.
+    sim.on_event(f.exec(T0 + 3_000_000, 1, 100, 30, 12))
+    assert [(x.qty, x.price_ticks) for x in sim.fills] == [(30, 100)]
 
 
 def test_queue_cancel_from_behind_does_not_advance_us():

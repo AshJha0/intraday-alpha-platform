@@ -832,7 +832,7 @@ orders queue behind each other.** Concretely:
   is consumed once, not once per event.
 - Queue tracking trusts the **book**, not the raw event: an event the book
   does not report `APPLIED` (a retransmitted duplicate, an unknown order id)
-  trades nothing and moves nobody.
+  trades nothing and moves nobody, and an applied EXECUTE trades `min(event qty, the order's remaining)` at the book order's own side and price.
 - A **cancel** advances us only when the cancelled order is known to be ahead:
   a real order id that did not join our level after we did. It then removes
   the displayed size the book actually dropped. Orders that joined (or were

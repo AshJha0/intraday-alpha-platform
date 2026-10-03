@@ -13,6 +13,7 @@ import com.iap.core.SessionStatus;
 import com.iap.core.Side;
 import com.iap.core.SplitMix64;
 import com.iap.orderbook.ApplyStatus;
+import com.iap.orderbook.BookCheckpoint;
 import com.iap.orderbook.ConsolidatedBook;
 import com.iap.orderbook.OrderBook;
 
@@ -66,7 +67,9 @@ import com.iap.orderbook.OrderBook;
  *       us); a trade-through fills at OUR limit but is bounded by the
  *       observed volume, not a free fill of the whole residual. Only
  *       events the book reports APPLIED are tracked (a retransmitted
- *       duplicate the book drops trades nothing). An applied CANCEL reduces
+ *       duplicate the book drops trades nothing), and an applied EXECUTE
+ *       trades min(event qty, the book order's remaining) at the BOOK
+ *       order's side and price. An applied CANCEL reduces
  *       ahead_qty by the displayed size it removed from our level (floored
  *       at 0) only when the cancelled order is KNOWN to be ahead of us: a
  *       real (non-synthetic) order id that did not join the level after we
@@ -671,6 +674,12 @@ public final class ExecutionSimulator {
             addDepth = pre.depth(ev.side == 0 ? Side.ASK : Side.BID,
                     OrderBook.DEPTH_LEVELS);
         }
+        // The book's own record of the order an EXECUTE names:
+        // {side, price, qty}, or null.
+        long[] execOrder = null;
+        if (!resting.isEmpty() && preOpen && et == EventType.EXECUTE) {
+            execOrder = bookOrder(pre, ev.orderId);
+        }
         // Our order ids on this book and the displayed qty at their level
         // before the event.
         ArrayList<Long> levelIds = new ArrayList<>();
@@ -708,9 +717,10 @@ public final class ExecutionSimulator {
                     OrderBook.SYNTHETIC_ID_BASE) < 0;
             Long evOrder = ev.orderId;
             if (et == EventType.EXECUTE) {
-                if (preOpen) {
-                    trackConsumption(ev.instrumentId, ev.venueId, ev.side,
-                            ev.priceTicks, ev.qty, t);
+                if (execOrder != null) {
+                    trackConsumption(ev.instrumentId, ev.venueId,
+                            (int) execOrder[0], execOrder[1],
+                            Math.min(ev.qty, execOrder[2]), t);
                 }
             } else if (et == EventType.CANCEL) {
                 for (int i = 0; i < levelIds.size(); i++) {
@@ -786,6 +796,18 @@ public final class ExecutionSimulator {
         if (venueOpen(book)) {
             crossingCheck(ev, book, !preOpen);
         }
+    }
+
+    /** {side, price, qty} of a resting book order, null when absent. */
+    private static long[] bookOrder(OrderBook book, long orderId) {
+        for (BookCheckpoint.LevelCheckpoint lvl : book.checkpoint().levels) {
+            for (int i = 0; i < lvl.orderIds.length; i++) {
+                if (lvl.orderIds[i] == orderId) {
+                    return new long[] {lvl.side, lvl.priceTicks, lvl.qtys[i]};
+                }
+            }
+        }
+        return null;
     }
 
     private static long overlayLevelQty(OrderBook book, String key) {

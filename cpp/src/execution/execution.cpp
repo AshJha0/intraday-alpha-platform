@@ -529,6 +529,18 @@ void ExecutionSimulator::on_event(const MarketEvent& ev) {
         add_depth =
             pre->depth(ev.side == 0 ? Side::ASK : Side::BID, DEPTH_LEVELS);
     }
+    // The book's own record of the order an EXECUTE names.
+    bool have_exec_order = false;
+    RestingOrder exec_order;
+    if (!resting_.empty() && pre_open && et == EventType::EXECUTE) {
+        for (const RestingOrder& r : pre->resting_orders()) {
+            if (r.order_id == ev.order_id) {
+                exec_order = r;
+                have_exec_order = true;
+                break;
+            }
+        }
+    }
     // (our order id, displayed qty at its level before the event).
     std::vector<std::pair<std::uint64_t, std::int64_t>> level_before;
     if (et == EventType::CANCEL || et == EventType::MODIFY) {
@@ -571,9 +583,10 @@ void ExecutionSimulator::on_event(const MarketEvent& ev) {
     if (applied && book != nullptr && !resting_.empty()) {
         const bool real_id = ev.order_id < SYNTHETIC_ID_BASE;
         if (et == EventType::EXECUTE) {
-            if (pre_open) {
-                track_consumption(ev.instrument_id, ev.venue_id, ev.side,
-                                  ev.price_ticks, ev.qty, t);
+            if (have_exec_order) {
+                track_consumption(ev.instrument_id, ev.venue_id,
+                                  exec_order.side, exec_order.price_ticks,
+                                  std::min(ev.qty, exec_order.qty), t);
             }
         } else if (et == EventType::CANCEL) {
             for (const auto& [id, before] : level_before) {

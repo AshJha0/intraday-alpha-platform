@@ -941,8 +941,8 @@ match**.
   the portfolio golden is checked against an SLSQP optimum. Golden files are
   regenerated only deliberately, with a MIGRATIONS.md entry.
 - **One command proves parity**: `tests/harness/run_all.sh` runs all four
-  suites and prints the table (a full harness run on 2026-09-20: python 1391,
-  cpp 288, rust 313, java 485 tests passed; golden groups 164/68/62/102; all
+  suites and prints the table (a full harness run on 2026-09-20: python 1392,
+  cpp 289, rust 313, java 486 tests passed; golden groups 164/68/62/102; all
   PASS, plus `integration` (15) and `replay` (4) rows for the repo-level
   pytest suites, a `deployment` row — 16 structural checks passed, 2 skipped
   for tools absent here — and a `numbers` row that re-derives every headline
@@ -1708,8 +1708,9 @@ byte-identical audit-log replay, and kill switches as first-class events.
 **Q8. How do you model queue position for a passive order from public MBO
 data?**
 Track `ahead_qty` = displayed size at your level when you rest; EXECUTEs at
-your level deplete it (overflow fills you), CANCELs decrement it (this repo
-pins the deterministic full-amount choice), trade-throughs and crossing
+your level deplete it (overflow fills you), a CANCEL decrements it only when
+the cancelled order is known to be ahead of you (a real order id that did not
+join the level after you; by the size the book removed), trade-throughs and crossing
 displays fill you entirely, and marketable ADDs — which match silently —
 must be expanded into their per-level consumptions. What's unknowable
 (a MODIFY's queue effect) gets pinned as ignored rather than guessed.

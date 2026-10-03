@@ -41,7 +41,9 @@ this module is self-contained:
    above our ask — the market traded THROUGH us); a trade-through fills at
    OUR limit but is bounded by the observed volume, not a free fill of the
    whole residual. Only events the book reports APPLIED are tracked (a
-   retransmitted duplicate the book drops trades nothing). An applied
+   retransmitted duplicate the book drops trades nothing), and an applied EXECUTE
+   trades ``min(event qty, the book order's remaining)`` at the BOOK
+   order's side and price, whatever the event quotes. An applied
    CANCEL depletes ``ahead_qty`` by the displayed size it removed from
    our level (floored at 0) only when the cancelled order is KNOWN to be
    ahead of us: a real (non-synthetic) order id that did not join the
@@ -608,6 +610,13 @@ class ExecutionSimulator:
         add_depth: List[Tuple[int, int]] = []
         if self._resting and pre_open and et == EventType.ADD:
             add_depth = pre.depth(1 if ev.side == 0 else 0, DEPTH_LEVELS)
+        # The book's own record of the order an EXECUTE names (side, price, qty).
+        exec_order: Optional[Tuple[int, int, int]] = None
+        if self._resting and pre_open and et == EventType.EXECUTE:
+            for boid, bside, bprice, bqty in pre.resting_orders():
+                if boid == ev.order_id:
+                    exec_order = (bside, bprice, bqty)
+                    break
         level_before: List[Tuple[int, int]] = []
         if self._resting and et in (EventType.CANCEL, EventType.MODIFY):
             level_before = self._level_before(ev, pre)
@@ -626,10 +635,10 @@ class ExecutionSimulator:
         if applied and self._resting:
             real_id = ev.order_id < SYNTHETIC_ID_BASE
             if et == EventType.EXECUTE:
-                if pre_open:
+                if exec_order is not None:
                     self._track_consumption(
-                        ev.instrument_id, ev.venue_id, ev.side, ev.price_ticks,
-                        ev.qty, t,
+                        ev.instrument_id, ev.venue_id, exec_order[0],
+                        exec_order[1], min(ev.qty, exec_order[2]), t,
                     )
             elif et == EventType.CANCEL:
                 for oid, before in level_before:

@@ -70,6 +70,9 @@
 //        residual.
 //      - only events the book reports APPLIED are tracked: a
 //        retransmitted duplicate the book drops trades nothing;
+//      - an applied EXECUTE trades min(event qty, the book order's
+//        remaining before the event) at the BOOK order's side and price,
+//        whatever the event quotes;
 //      - an applied CANCEL reduces ahead_qty by the displayed size it
 //        removed from our level (floored at 0) only when the cancelled
 //        order is KNOWN to be ahead of us: a real (non-synthetic) order id

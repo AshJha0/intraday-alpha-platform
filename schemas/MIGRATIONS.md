@@ -659,15 +659,18 @@ P&L moved (−22.68 -> −22.65 USD); nothing was promoted, before or after.
   MODIFY to the tail of, our level after we rested). Synthetic QUOTE/SNAPSHOT
   ids never reduce it. Before, any CANCEL at `(side, P)` reduced it by the
   event's quoted qty, even for an order that joined behind us.
+- **Rule 4 executes.** An applied EXECUTE is tracked as the book saw it:
+  `min(event qty, the order's remaining before the event)` at the book
+  order's own side and price, not the event's quoted side/price/qty.
 - Identical edits in `cpp/src/execution/execution.cpp` (reference),
   `python/src/iap/execution/simulator.py` and
-  `java/.../execution/ExecutionSimulator.java`; three regression tests per
+  `java/.../execution/ExecutionSimulator.java`; four regression tests per
   language (`test_execution_rules.py`, `test_execution.cpp`,
   `ExecutionSimTest.java`).
 - **Goldens:** `expected_replay_fills.json`, `expected_mvp.json` and
   `expected_tca.json` are reproduced unchanged by the new rules (the golden
   sessions contain none of the three patterns), so nothing was regenerated
   and no `x-version` moved. The README parity-table test counts move
-  python 1388 -> 1391, cpp 285 -> 288, java 482 -> 485.
+  python 1388 -> 1392, cpp 285 -> 289, java 482 -> 486.
 - Migration path for stored data: none (simulated fills of other sessions may
   shrink; re-run to refresh).

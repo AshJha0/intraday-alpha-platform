@@ -177,10 +177,10 @@ TEST(ExecQueue, CancelAheadReducesPositionDeterministically) {
     // MODIFY events never change queue position (pinned).
     sim.on_event(f.modify(T0 + 2'200'000, 0, 100, 10, 13));
     EXPECT_EQ(sim.orders().at(id).ahead_qty, 60);
-    // Now a 70-EXECUTE: 60 ahead, 10 to us.
+    // An EXECUTE quoting 70 on order 13 trades only its remaining 10.
     sim.on_event(f.exec(T0 + 3'000'000, 0, 100, 70, 13));
-    ASSERT_EQ(sim.fills().size(), 1u);
-    EXPECT_EQ(sim.fills()[0].qty, 10);
+    EXPECT_EQ(sim.orders().at(id).ahead_qty, 50);
+    EXPECT_TRUE(sim.fills().empty());
 }
 
 TEST(ExecQueue, TradeThroughFillsAtOurPriceBoundedByTradedVolume) {
@@ -254,7 +254,8 @@ TEST(ExecQueue, SamePriceChildrenShareOnePrintAndQueueBehindEachOther) {
     EXPECT_EQ(sim.orders().at(ids[3]).ahead_qty, 3300);
     // ONE print of 400 at 100: 300 clears the display, 100 reaches the
     // FIRST child and nobody else. Old rule: 4 x 100 = 400 filled.
-    sim.on_event(f.exec(T0 + 2'000'000, 0, 100, 400, 11));
+    // (order 12 = 400 at 99 trades through our level.)
+    sim.on_event(f.exec(T0 + 2'000'000, 0, 99, 400, 12));
     ASSERT_EQ(sim.fills().size(), 1u);
     EXPECT_EQ(sim.fills()[0].order_id, ids[0]);
     EXPECT_EQ(sim.fills()[0].qty, 100);
@@ -359,6 +360,25 @@ TEST(ExecQueue, EventsDroppedByTheBookAreNotTracked) {
     sim.on_event(f.exec(T0 + 3'000'000, 0, 100, 500, 77));  // unknown order
     EXPECT_EQ(sim.orders().at(id).ahead_qty, 100);
     EXPECT_TRUE(sim.fills().empty());
+}
+
+// Qty capped at the order's remaining; side/price from the book order.
+TEST(ExecQueue, ExecuteIsTrackedAsTheBookSawIt) {
+    ExecutionSimulator sim(test_config());
+    EventFeeder f;
+    seed_book(sim, f);
+    const auto id = sim.submit(child(0, OrderType::LIMIT, 100, 50, T0 + 10));
+    sim.on_event(f.heartbeat(T0 + 10 + LAT + 1));
+    // The event quotes 500 but order 11 only had 300: 300 traded, no fill.
+    sim.on_event(f.exec(T0 + 2'000'000, 0, 100, 500, 11));
+    EXPECT_EQ(sim.orders().at(id).ahead_qty, 0);
+    EXPECT_TRUE(sim.fills().empty());
+    // The event says ask 100, the book says order 12 is a bid at 99: a
+    // 30-lot trade through our bid, filled at our limit.
+    sim.on_event(f.exec(T0 + 3'000'000, 1, 100, 30, 12));
+    ASSERT_EQ(sim.fills().size(), 1u);
+    EXPECT_EQ(sim.fills()[0].qty, 30);
+    EXPECT_EQ(sim.fills()[0].price_ticks, 100);
 }
 
 TEST(ExecQueue, CancelFromBehindDoesNotAdvanceUs) {
