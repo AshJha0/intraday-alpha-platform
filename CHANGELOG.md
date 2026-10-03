@@ -189,7 +189,7 @@ API_TRADING.md §2.4)**
 - `images` CI job also runs on pull requests that touch image inputs.
 - `CODEOWNERS` names `@AshJha0` (the `@iap/*` teams never existed).
 - Versions: `python/pyproject.toml` 1.3.0; image references `v1.3.0`.
-- Parity table: python 1563 / cpp 289 / rust 323 / java 510 tests, golden
+- Parity table: python 1565 / cpp 289 / rust 323 / java 510 tests, golden
   groups 166/68/64/104.
 
 ### Security
@@ -255,7 +255,7 @@ API_TRADING.md §2.4)**
   only. Differential fuzzing of the three engines is backlog (E31).
 - **The power study is three seeds per cell.** A rate moves in steps of
   0.33; it calibrates the chain and is not a power curve.
-- **The Python suite exceeds its 120 s target** (1563 tests, five to six minutes in
+- **The Python suite exceeds its 120 s target** (1565 tests, five to six minutes in
   CI under coverage).
 - **`iap.__version__` still reads 1.0.0**; the package metadata says 1.3.0.
 - **There is no LLM, agent or MCP code.** The agent layer is a backlog epic

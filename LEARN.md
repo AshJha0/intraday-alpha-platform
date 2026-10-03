@@ -1002,7 +1002,7 @@ match**.
   the portfolio golden is checked against an SLSQP optimum. Golden files are
   regenerated only deliberately, with a MIGRATIONS.md entry.
 - **One command proves parity**: `tests/harness/run_all.sh` runs all four
-  suites and prints the table (the v1.3.0 counts from CI, 2026-10-03: python 1563,
+  suites and prints the table (the v1.3.0 counts from CI, 2026-10-03: python 1565,
   cpp 289, rust 323, java 510 tests passed; golden groups 166/68/64/104; all
   PASS, plus `integration` (17) and `replay` (4) rows for the repo-level
   pytest suites, a `deployment` row — 25 structural checks passed in CI,

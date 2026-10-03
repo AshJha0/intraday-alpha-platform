@@ -273,7 +273,7 @@ hot paths allocation-conscious (primitive arrays, no boxing). All: no dead code,
   `iap.contracts.validate`), each with a lower and an upper bound, plus `ml` and `dev` extras; CI
   installs the exact versions pinned in `python/requirements-ci.txt` in every Python job.
 - Keep each language's full test run < 120s (python 83 s, cpp 1 s, rust 2 s, java 20 s on the
-  2-CPU baseline, 2026-09-20). **The Python suite no longer meets this at v1.3.0**: 1563 tests took
+  2-CPU baseline, 2026-09-20). **The Python suite no longer meets this at v1.3.0**: 1565 tests took
   319 s and 358 s in two CI runs (with coverage) on 2026-10-03, and no baseline timing has been re-captured
   (docs/BUILD_NOTES.md). CI is `.github/workflows/ci.yml`, which runs exactly these commands
   plus `tests/harness/run_golden.sh` and the deployment validation (§12.7).
