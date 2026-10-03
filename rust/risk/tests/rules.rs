@@ -1323,3 +1323,62 @@ fn kill_scope_id_grammar_is_from_str() {
         Some("urgency must be in [0, 1]: inf")
     );
 }
+
+/// i64::MIN / i64::MAX timestamps on orders, market updates and fills: every
+/// timestamp difference is checked, an overflow is a MALFORMED_ORDER reject
+/// (never a wrap, never a panic) and state-in paths apply cleanly.
+#[test]
+fn extreme_timestamps_fail_closed_without_overflow() {
+    const WHY: &str = "timestamp arithmetic overflows i64 (fail-closed)";
+    let at = |id: u64, iid: u32, ts: i64| {
+        let mut o = order(id, 0, 100, if iid == 1 { 2450 } else { 3120 });
+        o.instrument_id = iid;
+        o.timestamp = ts;
+        o
+    };
+    // orders: age vs a mark at T0
+    let mut eng = engine();
+    let d = eng.check_order(&at(1, 1, i64::MIN));
+    assert_eq!(d.decision, Decision::Reject);
+    assert_eq!(d.rule_id, rules::MALFORMED_ORDER, "{}", d.reason);
+    assert_eq!(d.severity, Severity::Warn);
+    assert_eq!(d.reason, WHY);
+    assert_eq!(eng.check_order(&at(2, 1, i64::MAX)).rule_id, rules::STALE_PRICE);
+    // market updates: stored as given, the checks reject
+    let mut eng = RiskEngine::from_config_ticks(&config(), ticks());
+    eng.on_market(1, 2450, 2452, i64::MIN);
+    let d = eng.check_order(&at(3, 1, T0));
+    assert_eq!(d.rule_id, rules::MALFORMED_ORDER);
+    assert_eq!(d.reason, WHY);
+    assert!(eng.check_order(&at(4, 1, i64::MIN)).allowed()); // age 0
+    eng.on_market(2, 3119, 3121, i64::MAX);
+    assert_eq!(eng.check_order(&at(5, 2, T0)).rule_id, rules::STALE_PRICE);
+    // fills: the timestamp only stamps the audit
+    for ts in [i64::MIN, i64::MAX] {
+        let f = Fill {
+            ts,
+            ..fill("S1", 1, 0, 1, 2451)
+        };
+        assert!(eng.on_fill(&f));
+    }
+    assert_eq!(eng.position(1), 2);
+    assert!(!eng.kill_switch_engaged());
+    // throttle elapsed: the bucket clock is at T0, the order at i64::MIN + 10
+    let mut eng = RiskEngine::from_config_ticks(&config(), ticks());
+    eng.on_market(1, 2450, 2452, T0);
+    assert!(eng.check_order(&at(6, 1, T0)).allowed());
+    eng.on_market(2, 3119, 3121, i64::MIN + 10);
+    let before = eng.snapshot()["buckets"].clone();
+    let d = eng.check_order(&at(7, 2, i64::MIN + 10));
+    assert_eq!(d.rule_id, rules::MALFORMED_ORDER, "{}", d.reason);
+    assert_eq!(d.reason, WHY);
+    assert_eq!(eng.snapshot()["buckets"], before);
+    // duplicate window: the id's age and the prune cutoff
+    let mut doc = config();
+    doc["per_order"]["duplicate_order_window_ns"] = serde_json::json!(10);
+    let mut eng = RiskEngine::from_config_ticks(&doc, ticks());
+    eng.on_market(1, 2450, 2452, T0);
+    assert!(eng.check_order(&at(8, 1, T0)).allowed());
+    assert_eq!(eng.check_order(&at(8, 1, i64::MIN)).reason, WHY);
+    assert_eq!(eng.check_order(&at(9, 1, i64::MIN)).reason, WHY);
+}

@@ -15,7 +15,18 @@ use crate::engine::{pos_add, pos_sub, Bucket, RiskDecision, RiskEngine, NS_PER_S
 use crate::event::{fmt_fixed, rules, Decision, Scope, Severity};
 use crate::limits::RiskLimits;
 
+/// Reason of the `MALFORMED_ORDER` reject when a timestamp difference
+/// (order age, duplicate window, throttle elapsed) leaves i64.
+const TS_OVERFLOW: &str = "timestamp arithmetic overflows i64 (fail-closed)";
+
 impl RiskEngine {
+    /// The reject for a timestamp difference that leaves i64: such an order
+    /// (or the state it is compared with) carries a time no check can
+    /// reason about — never wrapped, never a panic.
+    fn ts_overflow() -> RiskDecision {
+        Self::reject(rules::MALFORMED_ORDER, Severity::Warn, TS_OVERFLOW.to_string())
+    }
+
     pub(crate) fn decision_scope(&self, order: &OrderRequest, rule_id: &str) -> (Scope, String) {
         match rule_id {
             rules::KILL_GLOBAL
@@ -76,7 +87,9 @@ impl RiskEngine {
             None => Err(format!("no conversion rate for {ccy} -> {}", limits.reporting_ccy)),
             Some((rate, mark_ts)) => {
                 if mark_ts != i64::MAX && limits.stale_book_reject {
-                    let age = ts - mark_ts;
+                    let Some(age) = ts.checked_sub(mark_ts) else {
+                        return Err(TS_OVERFLOW.to_string());
+                    };
                     if age > limits.stale_feed_timeout_ns {
                         return Err(format!(
                             "conversion rate {ccy} -> {} age {age}ns exceeds {}ns",
@@ -172,7 +185,12 @@ impl RiskEngine {
         // 7. duplicate order id
         if let Some(&prev_ts) = self.seen_orders.get(&order.order_id) {
             let window = limits.duplicate_order_window_ns;
-            if window == 0 || order.timestamp - prev_ts <= window {
+            let within = window == 0
+                || match order.timestamp.checked_sub(prev_ts) {
+                    Some(since) => since <= window,
+                    None => return Self::ts_overflow(),
+                };
+            if within {
                 return Self::reject(
                     rules::DUPLICATE_ORDER_ID,
                     Warn,
@@ -182,7 +200,10 @@ impl RiskEngine {
         }
         if limits.duplicate_order_window_ns > 0 {
             // prune ids that fell out of the window (bounded growth)
-            let cutoff = order.timestamp - limits.duplicate_order_window_ns;
+            let Some(cutoff) = order.timestamp.checked_sub(limits.duplicate_order_window_ns)
+            else {
+                return Self::ts_overflow();
+            };
             self.seen_orders.retain(|_, &mut ts| ts >= cutoff);
         }
         self.seen_orders.insert(order.order_id, order.timestamp);
@@ -210,7 +231,9 @@ impl RiskEngine {
         let clock = self.event_clock(order.timestamp);
         let mid = match md {
             Some(md) if md.bid_ticks > 0 && md.ask_ticks > 0 => {
-                let age = order.timestamp - md.ts;
+                let Some(age) = order.timestamp.checked_sub(md.ts) else {
+                    return Self::ts_overflow();
+                };
                 if limits.stale_book_reject && age > limits.stale_feed_timeout_ns {
                     return Self::reject(
                         rules::STALE_PRICE,
@@ -268,7 +291,14 @@ impl RiskEngine {
         // 12. conversion rate to the reporting currency
         let fx = match self.pretrade_rate(&limits, &ins.quote_ccy, order.timestamp, clock) {
             Ok(r) => r,
-            Err(why) => return Self::reject(rules::FX_RATE_MISSING, Warn, why),
+            Err(why) => {
+                let rule = if why == TS_OVERFLOW {
+                    rules::MALFORMED_ORDER
+                } else {
+                    rules::FX_RATE_MISSING
+                };
+                return Self::reject(rule, Warn, why);
+            }
         };
         // 13. fat-finger notional (priced orders use the limit price,
         // unpriced the mid); notional in the reporting currency
@@ -320,7 +350,10 @@ impl RiskEngine {
                 bucket.primed = true;
                 bucket.last_ts = order.timestamp;
             }
-            let elapsed = (order.timestamp - bucket.last_ts).max(0);
+            let Some(elapsed) = order.timestamp.checked_sub(bucket.last_ts) else {
+                return Self::ts_overflow();
+            };
+            let elapsed = elapsed.max(0);
             bucket.tokens = (bucket.tokens
                 + elapsed as f64 * limits.max_order_rate_per_sec / NS_PER_SEC)
                 .min(limits.order_rate_burst);

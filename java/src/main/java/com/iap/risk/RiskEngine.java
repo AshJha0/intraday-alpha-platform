@@ -286,6 +286,15 @@ public final class RiskEngine {
         }
     }
 
+    /** {@code a - b} as an i64, {@code null} on overflow ({@code checked_sub}). */
+    static Long tsSub(long a, long b) {
+        try {
+            return Math.subtractExact(a, b);
+        } catch (ArithmeticException ex) {
+            return null;
+        }
+    }
+
     /** Saturating i64 add (Rust {@code i64::saturating_add}). */
     static long satAdd(long a, long b) {
         try {

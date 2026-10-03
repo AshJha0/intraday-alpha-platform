@@ -790,4 +790,68 @@ public class RiskRuleTest {
                 10, 2450, OrderRequest.LIMIT, 1, "S1", Double.NaN,
                 TS).validationError());
     }
+
+    private static RiskEngine unmarked(RiskLimits limits) {
+        TreeMap<Long, Double> ticks = new TreeMap<>();
+        ticks.put(1L, 0.01);
+        ticks.put(2L, 0.01);
+        return new RiskEngine(limits, RiskEngine.equityRefs(ticks));
+    }
+
+    /**
+     * i64 MIN / MAX timestamps on orders, market updates and fills: every
+     * timestamp difference is checked, an overflow is a MALFORMED_ORDER
+     * reject (never a wrap) and state-in paths apply cleanly.
+     */
+    @Test
+    public void extremeTimestampsFailClosedWithoutOverflow() {
+        String why = "timestamp arithmetic overflows i64 (fail-closed)";
+        long min = Long.MIN_VALUE;
+        long max = Long.MAX_VALUE;
+        RiskLimits limits = RiskLimits.fromJson(configDoc());
+        // orders: age vs a mark at TS
+        RiskEngine eng = engine();
+        RiskDecision d = eng.checkOrder(buyOn(1, 1, 2450, 1, min));
+        assertEquals(Decision.REJECT, d.decision());
+        assertEquals(Rules.MALFORMED_ORDER, d.ruleId());
+        assertEquals(Severity.WARN, d.severity());
+        assertEquals(why, d.reason());
+        expect(eng, buyOn(2, 1, 2450, 1, max), Rules.STALE_PRICE);
+        // market updates: stored as given, the checks reject
+        eng = unmarked(limits);
+        eng.onMarket(1, 2450, 2452, min);
+        d = eng.checkOrder(buyOn(3, 1, 2450, 1, TS));
+        assertEquals(Rules.MALFORMED_ORDER, d.ruleId());
+        assertEquals(why, d.reason());
+        expect(eng, buyOn(4, 1, 2450, 1, min), Rules.ALLOW); // age 0
+        eng.onMarket(2, 3119, 3121, max);
+        expect(eng, buyOn(5, 2, 3120, 1, TS), Rules.STALE_PRICE);
+        // fills: the timestamp only stamps the audit
+        assertTrue(eng.onFill(new RiskFill(min, "S1", 1, 0, 0, 1, 2451)));
+        assertTrue(eng.onFill(new RiskFill(max, "S1", 1, 0, 0, 1, 2451)));
+        assertEquals(2, eng.position(1));
+        assertFalse(eng.killSwitchEngaged());
+        // throttle elapsed: the bucket clock is at TS, the order at MIN + 10
+        eng = unmarked(limits);
+        eng.onMarket(1, 2450, 2452, TS);
+        expect(eng, buyOn(6, 1, 2450, 1, TS), Rules.ALLOW);
+        eng.onMarket(2, 3119, 3121, min + 10);
+        d = eng.checkOrder(buyOn(7, 2, 3120, 1, min + 10));
+        assertEquals(Rules.MALFORMED_ORDER, d.ruleId());
+        assertEquals(why, d.reason());
+        expect(eng, buyOn(10, 1, 2450, 1, TS + 1), Rules.ALLOW);
+        // duplicate window: the id's age and the prune cutoff
+        RiskLimits l = limits;
+        eng = unmarked(new RiskLimits(l.killSwitchEngaged(),
+                l.maxGrossNotional(), l.maxNetNotional(), l.maxDailyLoss(),
+                l.maxOrderRatePerSec(), l.orderRateBurst(), l.maxOrderQty(),
+                l.maxOrderNotional(), l.priceBandBps(), l.staleBookReject(),
+                10L, l.maxPositionQty(), l.maxInstrumentNotional(),
+                l.strategyMaxDailyLoss(), l.maxSequenceGapBeforeHalt(),
+                l.staleFeedTimeoutNs(), l.reportingCcy(), l.fxConversion()));
+        eng.onMarket(1, 2450, 2452, TS);
+        expect(eng, buyOn(8, 1, 2450, 1, TS), Rules.ALLOW);
+        assertEquals(why, eng.checkOrder(buyOn(8, 1, 2450, 1, min)).reason());
+        assertEquals(why, eng.checkOrder(buyOn(9, 1, 2450, 1, min)).reason());
+    }
 }

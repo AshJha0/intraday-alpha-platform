@@ -1533,7 +1533,7 @@ def test_i64_overflow_fails_closed_like_rust_checked_arithmetic(config_doc):
     """Position / mark arithmetic that would leave i64 fails closed exactly
     like the Rust engine's checked arithmetic (an unusable mark, a REJECT, a
     GLOBAL kill) — never a wrapped or bigint result, and never an
-    exception; timestamp arithmetic still raises ``OverflowError``."""
+    exception; timestamp arithmetic rejects ``MALFORMED_ORDER``."""
     i64_max = (1 << 63) - 1
     eng = engine(config_doc)
     eng.on_market(1, i64_max, i64_max, T0 + 1)
@@ -1546,11 +1546,11 @@ def test_i64_overflow_fails_closed_like_rust_checked_arithmetic(config_doc):
     eng2.on_fill(fill("S1", 1, 0, i64_max, 2451))
     assert not eng2.on_fill(fill("S1", 1, 0, 1, 2451))
     assert eng2.kill_switch_engaged() and eng2.position(1) == i64_max
-    # timestamps: an age computation that leaves i64 raises
+    # timestamps: an age computation that leaves i64 rejects
     eng3 = RiskEngine.from_config_ticks(config_doc, ticks())
     eng3.on_market(1, 2450, 2452, -(1 << 63))
-    with pytest.raises(OverflowError):
-        eng3.check_order(order(1, 0, 100, 2450, timestamp=1))
+    assert eng3.check_order(order(1, 0, 100, 2450, timestamp=1)).rule_id \
+        == Rules.MALFORMED_ORDER
     # and typed arguments are domain-checked at the boundary
     with pytest.raises(ValueError):
         eng.on_market(1 << 32, 1, 1, 0)
@@ -2146,3 +2146,52 @@ def test_kill_scope_id_grammar_is_rust_from_str(config_doc):
         == "urgency must be in [0, 1]: 2"
     assert order_validation_error(order(3, 0, 100, 2450, urgency=float("inf"))) \
         == "urgency must be in [0, 1]: inf"
+
+
+def test_extreme_timestamps_fail_closed_without_overflow(config_doc):
+    """i64::MIN / i64::MAX timestamps on orders, market updates and fills:
+    every timestamp difference is checked, an overflow is a MALFORMED_ORDER
+    reject (never a wrap, never an exception) and state-in paths apply
+    cleanly."""
+    why = "timestamp arithmetic overflows i64 (fail-closed)"
+    i64_min, i64_max = -(1 << 63), (1 << 63) - 1
+
+    def at(oid: int, iid: int, ts: int) -> OrderRequest:
+        return order(oid, 0, 100, 2450 if iid == 1 else 3120,
+                     instrument_id=iid, timestamp=ts)
+
+    # orders: age vs a mark at T0
+    eng = engine(config_doc)
+    d = eng.check_order(at(1, 1, i64_min))
+    assert d.decision == Decision.REJECT and d.rule_id == Rules.MALFORMED_ORDER
+    assert d.severity == Severity.WARN and d.reason == why
+    assert eng.check_order(at(2, 1, i64_max)).rule_id == Rules.STALE_PRICE
+    # market updates: stored as given, the checks reject
+    eng = RiskEngine.from_config_ticks(config_doc, ticks())
+    eng.on_market(1, 2450, 2452, i64_min)
+    d = eng.check_order(at(3, 1, T0))
+    assert d.rule_id == Rules.MALFORMED_ORDER and d.reason == why
+    assert eng.check_order(at(4, 1, i64_min)).allowed()  # age 0
+    eng.on_market(2, 3119, 3121, i64_max)
+    assert eng.check_order(at(5, 2, T0)).rule_id == Rules.STALE_PRICE
+    # fills: the timestamp only stamps the audit
+    for ts in (i64_min, i64_max):
+        assert eng.on_fill(fill("S1", 1, 0, 1, 2451, ts=ts))
+    assert eng.position(1) == 2 and not eng.kill_switch_engaged()
+    # throttle elapsed: the bucket clock is at T0, the order at i64::MIN + 10
+    eng = RiskEngine.from_config_ticks(config_doc, ticks())
+    eng.on_market(1, 2450, 2452, T0)
+    assert eng.check_order(at(6, 1, T0)).allowed()
+    eng.on_market(2, 3119, 3121, i64_min + 10)
+    before = eng.snapshot()["buckets"]
+    d = eng.check_order(at(7, 2, i64_min + 10))
+    assert d.rule_id == Rules.MALFORMED_ORDER and d.reason == why
+    assert eng.snapshot()["buckets"] == before
+    # duplicate window: the id's age and the prune cutoff
+    doc = config(config_doc)
+    doc["per_order"]["duplicate_order_window_ns"] = 10
+    eng = RiskEngine.from_config_ticks(doc, ticks())
+    eng.on_market(1, 2450, 2452, T0)
+    assert eng.check_order(at(8, 1, T0)).allowed()
+    assert eng.check_order(at(8, 1, i64_min)).reason == why
+    assert eng.check_order(at(9, 1, i64_min)).reason == why

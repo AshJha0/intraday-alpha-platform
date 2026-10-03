@@ -43,6 +43,22 @@ final class LimitsEvaluator {
         };
     }
 
+    /**
+     * Reason of the {@code MALFORMED_ORDER} reject when a timestamp
+     * difference (order age, duplicate window, throttle elapsed) leaves i64.
+     */
+    static final String TS_OVERFLOW =
+            "timestamp arithmetic overflows i64 (fail-closed)";
+
+    /**
+     * The reject for a timestamp difference that leaves i64: such an order
+     * (or the state it is compared with) carries a time no check can reason
+     * about — never wrapped.
+     */
+    private static RiskDecision tsOverflow() {
+        return reject(Rules.MALFORMED_ORDER, Severity.WARN, TS_OVERFLOW);
+    }
+
     private static RiskDecision reject(String ruleId, Severity severity,
             String reason) {
         return new RiskDecision(Decision.REJECT, ruleId, severity, reason);
@@ -80,7 +96,11 @@ final class LimitsEvaluator {
         }
         if (RiskEngine.hasMarkTs(rate) && e.limits.staleBookReject()) {
             long markTs = e.fxMarkTs(ccy);
-            long age = ts - markTs;
+            Long checkedAge = RiskEngine.tsSub(ts, markTs);
+            if (checkedAge == null) {
+                return TS_OVERFLOW;
+            }
+            long age = checkedAge;
             if (age > e.limits.staleFeedTimeoutNs()) {
                 return "conversion rate " + ccy + " -> " + e.limits.reportingCcy()
                         + " age " + age + "ns exceeds "
@@ -152,14 +172,27 @@ final class LimitsEvaluator {
         Long prevTs = e.seenOrders.get(order.orderId());
         if (prevTs != null) {
             long window = e.limits.duplicateOrderWindowNs();
-            if (window == 0 || order.timestamp() - prevTs <= window) {
+            boolean within = true;
+            if (window != 0) {
+                Long since = RiskEngine.tsSub(order.timestamp(), prevTs);
+                if (since == null) {
+                    return tsOverflow();
+                }
+                within = since <= window;
+            }
+            if (within) {
                 return reject(Rules.DUPLICATE_ORDER_ID, Severity.WARN,
                         "order_id " + Long.toUnsignedString(order.orderId())
                                 + " already used at ts " + prevTs);
             }
         }
         if (e.limits.duplicateOrderWindowNs() > 0) {
-            long cutoff = order.timestamp() - e.limits.duplicateOrderWindowNs();
+            Long checkedCutoff = RiskEngine.tsSub(order.timestamp(),
+                    e.limits.duplicateOrderWindowNs());
+            if (checkedCutoff == null) {
+                return tsOverflow();
+            }
+            long cutoff = checkedCutoff;
             e.seenOrders.values().removeIf(ts -> ts < cutoff);
         }
         e.seenOrders.put(order.orderId(), order.timestamp());
@@ -179,7 +212,11 @@ final class LimitsEvaluator {
         long clock = eventClock(e, order.timestamp());
         double mid;
         if (md != null && md.bidTicks > 0 && md.askTicks > 0) {
-            long age = order.timestamp() - md.ts;
+            Long checkedAge = RiskEngine.tsSub(order.timestamp(), md.ts);
+            if (checkedAge == null) {
+                return tsOverflow();
+            }
+            long age = checkedAge;
             if (e.limits.staleBookReject() && age > e.limits.staleFeedTimeoutNs()) {
                 return reject(Rules.STALE_PRICE, Severity.WARN,
                         "reference price age " + age + "ns exceeds "
@@ -219,7 +256,9 @@ final class LimitsEvaluator {
         Object rateOrReason = pretradeRate(e, ins.quoteCcy(), order.timestamp(),
                 clock);
         if (rateOrReason instanceof String why) {
-            return reject(Rules.FX_RATE_MISSING, Severity.WARN, why);
+            return reject(TS_OVERFLOW.equals(why)
+                    ? Rules.MALFORMED_ORDER : Rules.FX_RATE_MISSING,
+                    Severity.WARN, why);
         }
         double fx = (Double) rateOrReason;
         // 13. fat-finger notional (priced orders use the limit price,
@@ -258,7 +297,11 @@ final class LimitsEvaluator {
                 bucket.primed = true;
                 bucket.lastTs = order.timestamp();
             }
-            long elapsed = Math.max(order.timestamp() - bucket.lastTs, 0);
+            Long gap = RiskEngine.tsSub(order.timestamp(), bucket.lastTs);
+            if (gap == null) {
+                return tsOverflow();
+            }
+            long elapsed = Math.max(gap.longValue(), 0L);
             bucket.tokens = Math.min(bucket.tokens
                     + (double) elapsed * e.limits.maxOrderRatePerSec() / RiskEngine.NS_PER_SEC,
                     e.limits.orderRateBurst());

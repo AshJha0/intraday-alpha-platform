@@ -148,6 +148,17 @@ def _sum_ticks(bid_ticks: int, ask_ticks: int) -> Optional[int]:
     return v if _I64_MIN <= v <= _I64_MAX else None
 
 
+def _ts_sub(a: int, b: int) -> Optional[int]:
+    """``a - b`` as an i64, ``None`` on overflow (``i64::checked_sub``)."""
+    v = a - b
+    return v if _I64_MIN <= v <= _I64_MAX else None
+
+
+#: Reason of the ``MALFORMED_ORDER`` reject when a timestamp difference
+#: (order age, duplicate window, throttle elapsed) leaves i64.
+_TS_OVERFLOW = "timestamp arithmetic overflows i64 (fail-closed)"
+
+
 def _u64(v: int) -> int:
     if v < 0 or v > _U64_MAX:
         raise OverflowError(f"u64 overflow: {v}")
@@ -1036,7 +1047,9 @@ class RiskEngine:
             return None, f"no conversion rate for {ccy} -> {limits.reporting_ccy}"
         rate, mark_ts = found
         if mark_ts != _I64_MAX and limits.stale_book_reject:
-            age = _i64(ts - mark_ts)
+            age = _ts_sub(ts, mark_ts)
+            if age is None:
+                return None, _TS_OVERFLOW
             if age > limits.stale_feed_timeout_ns:
                 return None, (
                     f"conversion rate {ccy} -> {limits.reporting_ccy} age {age}ns "
@@ -1095,12 +1108,20 @@ class RiskEngine:
         prev_ts = self._seen_orders.get(order.order_id)
         if prev_ts is not None:
             window = limits.duplicate_order_window_ns
-            if window == 0 or _i64(order.timestamp - prev_ts) <= window:
+            within = True
+            if window != 0:
+                since = _ts_sub(order.timestamp, prev_ts)
+                if since is None:
+                    return reject(Rules.MALFORMED_ORDER, warn, _TS_OVERFLOW)
+                within = since <= window
+            if within:
                 return reject(Rules.DUPLICATE_ORDER_ID, warn,
                               f"order_id {order.order_id} already used at ts {prev_ts}")
         if limits.duplicate_order_window_ns > 0:
             # prune ids that fell out of the window (bounded growth)
-            cutoff = _i64(order.timestamp - limits.duplicate_order_window_ns)
+            cutoff = _ts_sub(order.timestamp, limits.duplicate_order_window_ns)
+            if cutoff is None:
+                return reject(Rules.MALFORMED_ORDER, warn, _TS_OVERFLOW)
             self._seen_orders = {
                 oid: ts for oid, ts in self._seen_orders.items() if ts >= cutoff
             }
@@ -1116,7 +1137,9 @@ class RiskEngine:
                           f"instrument {order.instrument_id} feed has an unrecovered gap")
         clock = self._event_clock(order.timestamp)
         if md is not None and md.bid_ticks > 0 and md.ask_ticks > 0:
-            age = _i64(order.timestamp - md.ts)
+            age = _ts_sub(order.timestamp, md.ts)
+            if age is None:
+                return reject(Rules.MALFORMED_ORDER, warn, _TS_OVERFLOW)
             if limits.stale_book_reject and age > limits.stale_feed_timeout_ns:
                 return reject(Rules.STALE_PRICE, warn,
                               f"reference price age {age}ns exceeds "
@@ -1149,7 +1172,8 @@ class RiskEngine:
         # 12. conversion rate to the reporting currency
         fx, why = self._pretrade_rate(limits, ins.quote_ccy, order.timestamp, clock)
         if fx is None:
-            return reject(Rules.FX_RATE_MISSING, warn, why)
+            rule = Rules.MALFORMED_ORDER if why == _TS_OVERFLOW else Rules.FX_RATE_MISSING
+            return reject(rule, warn, why)
         # 13. fat-finger notional (priced orders use the limit price,
         # unpriced the mid); notional in the reporting currency
         ref_price = float(order.price_ticks) * tick if order.price_ticks > 0 else mid
@@ -1175,7 +1199,10 @@ class RiskEngine:
             bucket.tokens = limits.order_rate_burst
             bucket.primed = True
             bucket.last_ts = order.timestamp
-        elapsed = max(_i64(order.timestamp - bucket.last_ts), 0)
+        gap = _ts_sub(order.timestamp, bucket.last_ts)
+        if gap is None:
+            return reject(Rules.MALFORMED_ORDER, warn, _TS_OVERFLOW)
+        elapsed = max(gap, 0)
         bucket.tokens = min(
             bucket.tokens + float(elapsed) * limits.max_order_rate_per_sec / _NS_PER_SEC,
             limits.order_rate_burst,
