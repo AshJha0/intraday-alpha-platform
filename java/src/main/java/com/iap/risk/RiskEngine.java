@@ -176,8 +176,11 @@ public final class RiskEngine {
         try {
             return new RiskEngine(RiskLimits.fromJson(doc), instruments, metrics);
         } catch (RuntimeException e) {
-            return failClosed(e.getMessage() == null
-                    ? e.getClass().getSimpleName() : e.getMessage(), metrics);
+            // "invalid argument: " is the Rust reference's rendering of the
+            // parse error (IapError::InvalidArgument), so the CONFIG_MISSING
+            // reason is byte-identical in the audit log.
+            return failClosed("invalid argument: " + (e.getMessage() == null
+                    ? e.getClass().getSimpleName() : e.getMessage()), metrics);
         }
     }
 

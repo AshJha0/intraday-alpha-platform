@@ -15,6 +15,7 @@ reproduce the remaining audit tail bit for bit.
 
 from __future__ import annotations
 
+import copy
 import json
 from pathlib import Path
 from typing import Any, Dict, List
@@ -252,3 +253,93 @@ def test_golden_fixed_format_cases(golden):
     assert len(cases) >= 10
     for v, d, want in cases:
         assert fmt_fixed(v, d) == want, f"fmt_fixed({v}, {d})"
+
+
+# ----------------------------------------------------------- edge fixture
+# tests/golden/expected_risk_edge_decisions.json (+ _audit.jsonl), generated
+# by python/tools/make_golden_risk_edge.py: independent scenarios reaching
+# the branches the single-engine script above cannot.
+
+
+def _parse_fill(v: Dict[str, Any]) -> Fill:
+    return Fill(
+        ts=v["ts"],
+        strategy_id=v["strategy_id"],
+        instrument_id=v["instrument_id"],
+        order_id=v["order_id"],
+        side=v["side"],
+        qty=v["qty"],
+        price_ticks=v["price_ticks"],
+    )
+
+
+def _must_fail(call, *args) -> None:
+    try:
+        call(*args)
+    except ValueError:
+        return
+    raise AssertionError("a malformed kill command must fail")
+
+
+def replay_edge(golden: Dict[str, Any], config: Dict[str, Any], check: bool,
+                fill_expect: bool = False) -> str:
+    """Run every scenario of the edge fixture; returns the concatenated
+    audit JSONL. ``fill_expect`` (the generator) writes each order step's
+    ``expect`` instead of checking it."""
+    refs = instrument_refs_from_golden(golden["instruments"])
+    out: List[str] = []
+    for sc in golden["scenarios"]:
+        doc = copy.deepcopy(config)
+        if "config_remove" in sc:
+            section, key = sc["config_remove"]
+            del doc[section][key]
+        eng = RiskEngine.from_config(doc, refs)
+        if sc.get("require_bootstrap", False):
+            eng.require_bootstrap()
+        for i, step in enumerate(sc["steps"]):
+            kind = step["type"]
+            if kind == "bad_kill":
+                _must_fail(eng.engage_kill, Scope.parse(step["scope"]),
+                           step["scope_id"], step["ts"], step.get("reason", ""))
+            elif kind == "bad_unkill":
+                _must_fail(eng.clear_kill, Scope.parse(step["scope"]),
+                           step["scope_id"], step["ts"], step.get("reason", ""))
+            elif kind == "bootstrap":
+                eng.bootstrap_positions([_parse_fill(f) for f in step["fills"]],
+                                        step["ts"])
+            elif kind == "restore":
+                out.append(eng.audit_jsonl())
+                eng = RiskEngine.restore(RiskLimits.from_json(doc), refs,
+                                         eng.snapshot(), step["ts"])
+            elif kind == "order" and fill_expect:
+                d = eng.check_order(parse_order(step["order"]))
+                step["expect"] = {"decision": int(d.decision), "rule_id": d.rule_id,
+                                  "severity": int(d.severity)}
+            else:
+                apply(eng, i, step, check)
+        out.append(eng.audit_jsonl())
+    return "".join(out)
+
+
+@pytest.fixture(scope="module")
+def edge(golden_dir: Path) -> Dict[str, Any]:
+    with open(golden_dir / "expected_risk_edge_decisions.json") as f:
+        return json.load(f)
+
+
+def test_golden_edge_decisions_match(edge, config):
+    assert edge["x-version"] == 1
+    assert len(edge["scenarios"]) >= 8
+    replay_edge(edge, config, check=True)
+
+
+def test_golden_edge_audit_log_matches_byte_for_byte(edge, config, golden_dir):
+    a = replay_edge(edge, config, check=False)
+    assert a == replay_edge(edge, config, check=False), "audit must be deterministic"
+    want = (golden_dir / "expected_risk_edge_audit.jsonl").read_bytes()
+    assert a.encode("utf-8") == want, "edge audit JSONL must be byte-identical"
+    lines = a.splitlines()
+    for rule, frag in edge["must_pin"]:
+        key = f'"rule_id":"{rule}"'
+        assert any(key in line and frag in line for line in lines), \
+            f"edge golden must pin {rule}: {frag}"

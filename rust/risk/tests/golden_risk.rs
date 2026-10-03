@@ -288,3 +288,97 @@ fn fixed_format_golden_cases() {
         assert_eq!(risk::fmt_fixed(v, d), c[2].as_str().unwrap(), "fmt_fixed({v}, {d})");
     }
 }
+
+// ----------------------------------------------------------- edge fixture
+// tests/golden/expected_risk_edge_decisions.json (+ _audit.jsonl), generated
+// by python/tools/make_golden_risk_edge.py: independent scenarios reaching
+// the branches the single-engine script above cannot.
+
+fn parse_fill(v: &serde_json::Value) -> Fill {
+    Fill {
+        ts: v["ts"].as_i64().unwrap(),
+        strategy_id: v["strategy_id"].as_str().unwrap().to_string(),
+        instrument_id: v["instrument_id"].as_u64().unwrap() as u32,
+        order_id: v["order_id"].as_u64().unwrap(),
+        side: v["side"].as_u64().unwrap() as u8,
+        qty: v["qty"].as_i64().unwrap(),
+        price_ticks: v["price_ticks"].as_i64().unwrap(),
+    }
+}
+
+/// Run every scenario of the edge fixture; returns the concatenated audit
+/// JSONL (across a `restore` step: the old engine's log, then the restored
+/// engine's).
+fn replay_edge(golden: &serde_json::Value, check: bool) -> String {
+    let base = load_json(golden["config"].as_str().expect("config path"));
+    let mut out = String::new();
+    for sc in golden["scenarios"].as_array().unwrap() {
+        let mut doc = base.clone();
+        if let Some(rm) = sc["config_remove"].as_array() {
+            doc[rm[0].as_str().unwrap()]
+                .as_object_mut()
+                .unwrap()
+                .remove(rm[1].as_str().unwrap());
+        }
+        let mut eng = RiskEngine::from_config(&doc, instruments(golden));
+        if sc["require_bootstrap"].as_bool() == Some(true) {
+            eng.require_bootstrap();
+        }
+        for (i, step) in sc["steps"].as_array().unwrap().iter().enumerate() {
+            let ts = || step["ts"].as_i64().unwrap();
+            let scope = || parse_scope(step["scope"].as_str().unwrap());
+            let scope_id = || step["scope_id"].as_str().unwrap();
+            let reason = || step["reason"].as_str().unwrap_or("");
+            match step["type"].as_str().unwrap() {
+                "bad_kill" => assert!(
+                    eng.engage_kill(scope(), scope_id(), ts(), reason()).is_err(),
+                    "step {i}: a malformed kill command must fail"
+                ),
+                "bad_unkill" => assert!(
+                    eng.clear_kill(scope(), scope_id(), ts(), reason()).is_err(),
+                    "step {i}: a malformed kill command must fail"
+                ),
+                "bootstrap" => {
+                    let fills: Vec<Fill> =
+                        step["fills"].as_array().unwrap().iter().map(parse_fill).collect();
+                    eng.bootstrap_positions(&fills, ts());
+                }
+                "restore" => {
+                    out.push_str(&eng.audit_jsonl());
+                    let limits = RiskLimits::from_json(&doc).unwrap();
+                    let snap = eng.snapshot();
+                    eng = RiskEngine::restore(limits, instruments(golden), &snap, ts()).unwrap();
+                }
+                _ => apply(&mut eng, i, step, check),
+            }
+        }
+        out.push_str(&eng.audit_jsonl());
+    }
+    out
+}
+
+#[test]
+fn golden_edge_decisions_match() {
+    let golden = load_json("tests/golden/expected_risk_edge_decisions.json");
+    assert_eq!(golden["x-version"].as_u64(), Some(1));
+    assert!(golden["scenarios"].as_array().unwrap().len() >= 8);
+    replay_edge(&golden, true);
+}
+
+#[test]
+fn golden_edge_audit_log_matches_byte_for_byte() {
+    let golden = load_json("tests/golden/expected_risk_edge_decisions.json");
+    let a = replay_edge(&golden, false);
+    assert_eq!(a, replay_edge(&golden, false), "audit must be deterministic");
+    let want =
+        std::fs::read_to_string(repo_path("tests/golden/expected_risk_edge_audit.jsonl")).unwrap();
+    assert_eq!(a, want, "edge audit JSONL must be byte-identical to the golden");
+    for pin in golden["must_pin"].as_array().unwrap() {
+        let key = format!("\"rule_id\":\"{}\"", pin[0].as_str().unwrap());
+        let frag = pin[1].as_str().unwrap();
+        assert!(
+            a.lines().any(|l| l.contains(&key) && l.contains(frag)),
+            "edge golden must pin {key}: {frag}"
+        );
+    }
+}
