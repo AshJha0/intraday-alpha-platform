@@ -1,0 +1,552 @@
+"""``python -m iap.marketdata ingest``: layout, manifest, determinism, the
+point-in-time reference data it writes, the research hook, a throughput
+smoke test and the opt-in run over real sample files.
+
+No vendor data: ITCH bytes come from ``itch50_encoder``, LOBSTER files from
+``lobster_fixture``.  The last two tests are skipped unless environment
+variables point at files the owner obtained (docs/REAL_DATA.md §7).
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import shutil
+import time
+import tracemalloc
+from pathlib import Path
+
+import pytest
+from conftest import CONFIGS_DIR, REPO_ROOT
+from iap.core.codec import read_iap1, read_jsonl, sha256_file
+from iap.core.events import EventType, validation_error
+from iap.experiment import tracker
+from iap.features.__main__ import main as features_main
+from iap.features.context import build_contexts
+from iap.marketdata.__main__ import main as marketdata_main
+from iap.marketdata.feederrors import BookDivergenceError, IngestError
+from iap.marketdata.ingest import ingest, load_manifest, real_dataset_version
+from iap.marketdata.itch50 import Itch50Mapper, Itch50Reader
+from iap.reference.refdata import ReferenceData
+from iap.reference.secmaster import SecurityMaster, SecurityMasterError
+from iap.research.__main__ import main as research_main
+from itch50_encoder import Itch50Encoder, build_session, hms_ns
+from lobster_fixture import write_lobster
+
+SYMBOLS = ("AAPL", "MSFT", "QQQ")
+D1, D2 = "2019-12-30", "2019-12-31"
+
+
+def _day(tmp_path: Path, seed: int, name: str, compress: bool = False, **kw) -> Path:
+    kw.setdefault("n_actions", 1500)
+    enc, _ = build_session(seed, symbols=SYMBOLS, etp_symbols=("QQQ",), **kw)
+    return enc.write(tmp_path / name, compress=compress)
+
+
+def _cli(*args: str) -> int:
+    return marketdata_main(["ingest", *args])
+
+
+def _ingest_cli(path: Path, date: str, out: Path, *extra: str) -> int:
+    return _cli(
+        "--format", "itch50", "--input", str(path), "--date", date,
+        "--symbols", ",".join(SYMBOLS), "--out", str(out), *extra,
+    )  # fmt: skip
+
+
+def _tree(root: Path) -> dict[str, str]:
+    return {
+        p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+        for p in sorted(root.rglob("*"))
+        if p.is_file()
+    }
+
+
+def test_ingest_writes_the_generator_layout_and_a_manifest(tmp_path, capsys):
+    src = _day(tmp_path, 7, "20191230.NASDAQ_ITCH50.gz", compress=True)
+    out = tmp_path / "ds"
+    assert _ingest_cli(src, D1, out) == 0
+    summary = json.loads(capsys.readouterr().out)
+    assert set(_tree(out)) == {
+        "dataset.json",
+        "raw/eq_20191230.jsonl",
+        "normalized/eq_20191230.normalized.jsonl",
+        "normalized/eq_20191230.normalized.iap1",
+        "normalized/events.parquet",
+        "normalized/qc_report.json",
+        "configs/instruments/instruments.json",
+        "configs/venues/venues.json",
+        "configs/execution/execution.json",
+        "reference/security_master.json",
+    }
+    manifest = load_manifest(out)
+    assert manifest["kind"] == "real" and manifest["x-version"] == 1
+    assert manifest["source"] == {"format": "itch50", "venue": "XNAS", "venue_id": 101}
+    assert [u["symbol"] for u in manifest["universe"]] == list(SYMBOLS)
+    assert [u["instrument_id"] for u in manifest["universe"]] == [1, 2, 3]
+    session = manifest["sessions"][D1]
+    assert session["inputs"] == [
+        {"file": src.name, "sha256": sha256_file(src), "bytes": src.stat().st_size}
+    ]
+    messages = session["messages"]
+    reader = Itch50Reader(src)
+    list(reader)
+    assert messages["total"] == reader.messages_read
+    assert messages["by_type"] == {k: v for k, v in sorted(reader.counts.items()) if v}
+    assert messages["skipped_unknown"] == 0 and messages["filtered_other_symbols"] > 0
+    assert session["raw"]["sha256"] == sha256_file(out / "raw" / "eq_20191230.jsonl")
+    assert session["book_check"]["clean"] is True
+    assert session["mapping"]["outside_session_dropped"] == len(SYMBOLS)
+    assert manifest["dataset_version"] == real_dataset_version(out / "normalized")
+    assert summary["dataset_version"] == manifest["dataset_version"]
+    assert summary["events"] == session["raw"]["events"] > 1000
+    # no wall clock and no absolute path in any written JSON document
+    for name in ("dataset.json", "normalized/qc_report.json"):
+        text = (out / name).read_text()
+        assert str(tmp_path) not in text and tmp_path.as_posix() not in text
+        assert "timing" not in text and b"\r" not in (out / name).read_bytes()
+
+    raw = read_jsonl(out / "raw" / "eq_20191230.jsonl")
+    normalized = read_iap1(out / "normalized" / "eq_20191230.normalized.iap1")
+    assert len(raw) == len(normalized) == session["raw"]["events"]
+    assert all(validation_error(ev) is None for ev in raw)
+    assert {ev.venue_id for ev in raw} == {101}
+    assert all(ev.receive_ts == ev.exchange_ts for ev in raw)
+    assert [ev.event_id for ev in normalized] == list(range(1, len(normalized) + 1))
+    totals = manifest["normalized"]["qc_totals"]
+    assert totals["events_in"] == totals["events_out"] == len(raw)
+    assert all(totals[k] == 0 for k in totals if k not in ("events_in", "events_out"))
+
+
+def test_same_input_gives_identical_output_bytes(tmp_path, capsys):
+    src = _day(tmp_path, 7, "day.itch")
+    a, b = tmp_path / "a", tmp_path / "deeper" / "b"
+    b.parent.mkdir()
+    assert _ingest_cli(src, D1, a) == 0 and _ingest_cli(src, D1, b) == 0
+    capsys.readouterr()
+    tree = _tree(a)
+    assert tree == _tree(b) and len(tree) == 10
+    # re-ingesting the same session into the same directory changes nothing
+    assert _ingest_cli(src, D1, a) == 0
+    assert _tree(a) == tree
+    # the compressed form of the same bytes maps to the same events
+    packed = tmp_path / "day.itch.gz"
+    enc, _ = build_session(7, symbols=SYMBOLS, etp_symbols=("QQQ",), n_actions=1500)
+    enc.write(packed, compress=True)
+    c = tmp_path / "c"
+    assert _ingest_cli(packed, D1, c) == 0
+    other = _tree(c)
+    assert {k: v for k, v in other.items() if k != "dataset.json"} == {
+        k: v for k, v in tree.items() if k != "dataset.json"
+    }
+    assert load_manifest(c)["dataset_version"] == load_manifest(a)["dataset_version"]
+
+
+def test_dataset_version_is_content_pinned_and_disjoint_from_synthetic(tmp_path, capsys):
+    a, b = tmp_path / "a", tmp_path / "b"
+    assert _ingest_cli(_day(tmp_path, 7, "d7.itch"), D1, a) == 0
+    assert _ingest_cli(_day(tmp_path, 8, "d8.itch"), D1, b) == 0
+    capsys.readouterr()
+    va, vb = load_manifest(a)["dataset_version"], load_manifest(b)["dataset_version"]
+    assert va != vb and len(va) == 64 and int(va, 16) >= 0
+    # the synthetic fingerprint of the very same normalized bytes is another value
+    root = tmp_path / "as_synthetic"
+    shutil.copytree(a / "normalized", root / "data" / "normalized")
+    assert tracker.data_version(root) != va
+
+
+def test_reference_data_of_the_dataset_loads_through_the_existing_services(tmp_path, capsys):
+    out = tmp_path / "ds"
+    assert _ingest_cli(_day(tmp_path, 7, "d.itch"), D1, out) == 0
+    capsys.readouterr()
+    refdata = ReferenceData.load(out / "configs")
+    assert [i.symbol for i in refdata.instruments()] == list(SYMBOLS)
+    aapl, qqq = refdata.instrument("AAPL"), refdata.instrument("QQQ")
+    assert (aapl.asset_class, aapl.tick_size, aapl.lot_size, aapl.currency) == (
+        "EQUITY", 0.01, 100, "USD",
+    )  # fmt: skip
+    assert qqq.asset_class == "ETF"  # from the directory's ETP flag
+    assert refdata.venue_ids_for(1) == [101] and refdata.venue(101).venue == "XNAS"
+    assert refdata.trading_days == [D1]
+    open_ns, close_ns = refdata.session_bounds_ns("EQUITY", D1)
+    assert close_ns - open_ns == 23_400 * 10**9
+    assert refdata.session_timezone("EQUITY") == "America/New_York"
+    manifest = load_manifest(out)
+    per = manifest["sessions"][D1]["per_symbol"]["AAPL"]
+    assert per["ref_price_source"] == "opening_cross"
+    assert aapl.ref_price == per["ref_price_e4"] / 10_000 and aapl.adv == per["volume"] > 0
+    contexts = build_contexts(out / "configs")
+    assert contexts[1].ref_instrument_id == 3 and contexts[1].session_timezone == "America/New_York"
+
+    master = SecurityMaster.load(out / "reference" / "security_master.json")
+    rec = master.as_of("QQQ", D1)
+    assert (rec.etp_flag, rec.asset_class, rec.round_lot_size, rec.source) == (
+        "Y",
+        "ETF",
+        100,
+        "itch50",
+    )
+    assert rec.locate == manifest_locate(tmp_path / "d.itch", "QQQ")
+    with pytest.raises(SecurityMasterError):
+        master.as_of("QQQ", "2019-12-27")
+
+
+def manifest_locate(path: Path, symbol: str) -> int:
+    reader = Itch50Reader(path, symbols=(symbol,))
+    list(reader)
+    return reader.directory[symbol].locate
+
+
+def test_a_second_session_extends_the_dataset(tmp_path, capsys):
+    out = tmp_path / "ds"
+    assert _ingest_cli(_day(tmp_path, 8, "d2.itch"), D2, out) == 0
+    first = load_manifest(out)["dataset_version"]
+    assert _ingest_cli(_day(tmp_path, 7, "d1.itch"), D1, out) == 0  # an EARLIER date, later
+    capsys.readouterr()
+    manifest = load_manifest(out)
+    assert list(manifest["sessions"]) == [D1, D2] and manifest["dataset_version"] != first
+    assert ReferenceData.load(out / "configs").trading_days == [D1, D2]
+    qc = json.loads((out / "normalized" / "qc_report.json").read_text())
+    assert sorted(qc["files"]) == ["eq_20191230.jsonl", "eq_20191231.jsonl"]
+    # per-instrument sequences restart every session: one counted reset per stream
+    assert qc["totals"]["sequence_resets"] == len(SYMBOLS) and qc["totals"]["gaps"] == 0
+    master = SecurityMaster.load(out / "reference" / "security_master.json")
+    assert master.dates("AAPL") == [D1, D2]
+    # order of ingestion does not matter: the same two sessions, the other way round
+    other = tmp_path / "other"
+    assert _ingest_cli(tmp_path / "d1.itch", D1, other) == 0
+    assert _ingest_cli(tmp_path / "d2.itch", D2, other) == 0
+    capsys.readouterr()
+    assert _tree(other) == _tree(out)
+
+
+def test_ingest_refuses_inconsistent_requests(tmp_path, capsys):
+    src = _day(tmp_path, 7, "d.itch")
+    out = tmp_path / "ds"
+    assert _ingest_cli(src, D1, out) == 0
+    before = _tree(out)
+    with pytest.raises(IngestError, match="one format and one universe"):
+        ingest("itch50", [src], D2, ["AAPL"], out, configs_dir=CONFIGS_DIR)
+    with pytest.raises(IngestError, match="no Stock Directory"):
+        ingest("itch50", [src], D1, ["AAPL", "NOPE"], tmp_path / "x1", configs_dir=CONFIGS_DIR)
+    with pytest.raises(IngestError, match="YYYY-MM-DD"):
+        ingest("itch50", [src], "30/12/2019", SYMBOLS, tmp_path / "x2", configs_dir=CONFIGS_DIR)
+    with pytest.raises(IngestError, match="input file not found"):
+        ingest("itch50", [tmp_path / "nope"], D1, SYMBOLS, tmp_path / "x3", configs_dir=CONFIGS_DIR)
+    with pytest.raises(IngestError, match="--symbols is required"):
+        ingest("itch50", [src], D1, None, tmp_path / "x4", configs_dir=CONFIGS_DIR)
+    with pytest.raises(IngestError, match="twice"):
+        ingest("itch50", [src], D1, ["AAPL", "AAPL"], tmp_path / "x5", configs_dir=CONFIGS_DIR)
+    with pytest.raises(IngestError, match="exactly one --input"):
+        ingest("itch50", [src, src], D1, SYMBOLS, tmp_path / "x6", configs_dir=CONFIGS_DIR)
+    with pytest.raises(IngestError, match="unknown format"):
+        ingest("pitch", [src], D1, SYMBOLS, tmp_path / "x7", configs_dir=CONFIGS_DIR)
+    with pytest.raises(IngestError, match="execution config template not found"):
+        ingest("itch50", [src], D1, SYMBOLS, tmp_path / "x8", configs_dir=tmp_path)
+    occupied = tmp_path / "occupied"
+    occupied.mkdir()
+    (occupied / "note.txt").write_text("mine")
+    with pytest.raises(IngestError, match="not empty and is not an ingested dataset"):
+        ingest("itch50", [src], D1, SYMBOLS, occupied, configs_dir=CONFIGS_DIR)
+    assert _tree(out) == before  # the refused requests left the dataset alone
+    # the CLI turns them into exit code 1 and one line on stderr
+    capsys.readouterr()
+    assert _ingest_cli(src, D1, tmp_path / "x9", "--symbols", "NOPE") == 1
+    assert "error: " in capsys.readouterr().err
+    assert not (tmp_path / "x9" / "dataset.json").exists()
+
+
+def test_truncated_input_fails_the_ingest_with_the_offset(tmp_path, capsys):
+    src = _day(tmp_path, 7, "d.itch")
+    cut = tmp_path / "cut.itch"
+    cut.write_bytes(src.read_bytes()[:-5])
+    assert _ingest_cli(cut, D1, tmp_path / "ds") == 1
+    assert "byte offset" in capsys.readouterr().err
+    assert not (tmp_path / "ds").exists()  # no spool, no partial file, no empty directories
+
+
+def test_limit_messages_ingests_the_head_of_the_file(tmp_path, capsys):
+    src = _day(tmp_path, 7, "d.itch")
+    out = tmp_path / "ds"
+    assert _ingest_cli(src, D1, out, "--limit-messages", "400") == 0
+    capsys.readouterr()
+    session = load_manifest(out)["sessions"][D1]
+    assert session["limit_messages"] == 400
+    assert session["messages"]["total"] == 400 and session["messages"]["limit_reached"] is True
+    full = tmp_path / "full"
+    assert _ingest_cli(src, D1, full) == 0
+    capsys.readouterr()
+    assert session["raw"]["events"] < load_manifest(full)["sessions"][D1]["raw"]["events"]
+
+
+def _penny_and_subpenny_day(tmp_path: Path) -> Path:
+    enc = Itch50Encoder()
+    enc.system_event(hms_ns(3), "O")
+    enc.stock_directory(1, hms_ns(3, 0, 1), "BIGCO")
+    enc.stock_directory(2, hms_ns(3, 0, 1), "PENNY", round_lot_size=1)
+    enc.system_event(hms_ns(9, 30), "Q")
+    t = hms_ns(9, 30, 1)
+    enc.add(1, t, 11, "B", 100, "BIGCO", 1_500_000)
+    enc.add(1, t + 1, 12, "S", 100, "BIGCO", 1_500_100)
+    enc.trade(1, t + 2, "B", 30, "BIGCO", 1_500_050, 1)  # hidden midpoint print
+    enc.add(2, t + 3, 21, "B", 1000, "PENNY", 4_321)  # $0.4321: sub-penny quoting below $1
+    enc.add(2, t + 4, 22, "S", 1000, "PENNY", 4_400)
+    enc.executed(2, t + 5, 21, 400, 2)
+    return enc.write(tmp_path / "ticks.itch")
+
+
+def test_tick_size_follows_the_displayed_prices(tmp_path):
+    src = _penny_and_subpenny_day(tmp_path)
+    out = tmp_path / "ds"
+    manifest = ingest("itch50", [src], D1, ["BIGCO", "PENNY"], out, configs_dir=CONFIGS_DIR)
+    ticks = {u["symbol"]: (u["tick_size"], u["lot_size"]) for u in manifest["universe"]}
+    assert ticks == {"BIGCO": (0.01, 100), "PENNY": (0.0001, 1)}
+    raw = read_jsonl(out / "raw" / "eq_20191230.jsonl")
+    prices = {(ev.instrument_id, ev.event_type): ev.price_ticks for ev in raw if ev.price_ticks}
+    assert prices[(1, int(EventType.ADD))] == 15_001 and prices[(1, int(EventType.TRADE))] == 15_001
+    assert prices[(2, int(EventType.EXECUTE))] == 4_321  # exact: one tick is 1/10000 dollar
+    assert manifest["sessions"][D1]["raw"]["trade_prices_rounded_to_tick"] == 1
+    assert manifest["sessions"][D1]["per_symbol"]["PENNY"]["ref_price_source"] == "first_trade"
+    with pytest.raises(
+        IngestError, match="not a\n?.*multiple of the 0.01 tick|multiple of the 0.01"
+    ):
+        ingest(
+            "itch50", [src], D1, ["BIGCO", "PENNY"], tmp_path / "forced",
+            configs_dir=CONFIGS_DIR, tick_size="0.01",
+        )  # fmt: skip
+    fine = ingest(
+        "itch50", [src], D1, ["BIGCO", "PENNY"], tmp_path / "fine",
+        configs_dir=CONFIGS_DIR, tick_size="0.0001",
+    )  # fmt: skip
+    assert {u["tick_size_e4"] for u in fine["universe"]} == {1}
+
+
+def test_corporate_actions_table_is_validated_and_copied(tmp_path):
+    src = _day(tmp_path, 7, "d.itch")
+    table = tmp_path / "ca.csv"
+    table.write_text(
+        "ex_date,symbol,action,ratio_new,ratio_old,cash_amount,new_symbol\n"
+        "2020-08-31,AAPL,SPLIT,4,1,,\n"
+    )
+    out = tmp_path / "ds"
+    manifest = ingest(
+        "itch50", [src], D1, SYMBOLS, out, configs_dir=CONFIGS_DIR, corporate_actions=table
+    )
+    copied = out / "reference" / "corporate_actions.csv"
+    assert copied.read_bytes() == table.read_bytes()
+    assert manifest["corporate_actions"] == {
+        "file": "reference/corporate_actions.csv",
+        "sha256": sha256_file(copied),
+        "actions": 1,
+    }
+    table.write_text("nonsense\n")
+    with pytest.raises(ValueError, match="header must be exactly"):
+        ingest("itch50", [src], D1, SYMBOLS, out, configs_dir=CONFIGS_DIR, corporate_actions=table)
+
+
+def test_lobster_ingest_verifies_the_book_and_fails_on_a_wrong_orderbook_file(tmp_path, capsys):
+    date = "2012-06-21"
+    files = tmp_path / "lobster"
+    files.mkdir()
+    aapl, aapl_book, _ = write_lobster(files, "AAPL", date, 1, n_messages=400)
+    msft, _, _ = write_lobster(files, "MSFT", date, 2, n_messages=400)
+    out = tmp_path / "ds"
+    args = ["--format", "lobster", "--input", str(msft), str(aapl), "--date", date]
+    assert _cli(*args, "--out", str(out)) == 0  # symbols and orderbook files from the names
+    summary = json.loads(capsys.readouterr().out)
+    assert summary["book_verification"] == {"AAPL": "match", "MSFT": "match"}
+    manifest = load_manifest(out)
+    session = manifest["sessions"][date]
+    assert manifest["source"]["format"] == "lobster" and session["symbols"] == ["AAPL", "MSFT"]
+    assert [i["file"] for i in session["inputs"]] == [
+        msft.name, aapl.name, msft.name.replace("message", "orderbook"), aapl_book.name,
+    ]  # fmt: skip
+    assert session["book_verification"]["AAPL"] == {
+        "status": "match", "levels": 5, "rows_verified": 400,
+    }  # fmt: skip
+    assert session["book_check"]["clean"] is True
+    assert session["messages"]["total"] == 800 and session["mapping"]["seeded_levels"] == 20
+    assert (
+        SecurityMaster.load(out / "reference" / "security_master.json").as_of("MSFT", date).source
+        == "lobster"
+    )
+    tree = _tree(out)
+    again = tmp_path / "again"
+    assert _cli(*args, "--out", str(again)) == 0
+    assert _tree(again) == tree  # byte-deterministic
+
+    rows = aapl_book.read_text().splitlines()
+    fields = rows[250].split(",")
+    fields[1] = str(int(fields[1]) + 100)
+    rows[250] = ",".join(fields)
+    aapl_book.write_text("\n".join(rows) + "\n")
+    capsys.readouterr()
+    bad = tmp_path / "bad"
+    assert _cli(*args, "--out", str(bad)) == 3
+    err = capsys.readouterr().err
+    assert "AAPL: reconstructed book diverges" in err and '"message_index": 250' in err
+    assert not (bad / "dataset.json").exists()
+    with pytest.raises(BookDivergenceError) as exc:
+        ingest("lobster", [msft, aapl], date, None, tmp_path / "bad2", configs_dir=CONFIGS_DIR)
+    assert exc.value.report["first_divergence"]["side"] == "ask"
+    assert _cli(*args, "--out", str(bad), "--allow-book-divergence") == 0
+    capsys.readouterr()
+    recorded = load_manifest(bad)["sessions"][date]["book_verification"]
+    assert recorded["AAPL"]["status"] == "diverged" and recorded["MSFT"]["status"] == "match"
+    assert recorded["AAPL"]["rows_verified"] == 250
+
+
+def test_research_runs_on_an_ingested_dataset_by_path(tmp_path, capsys):
+    """ingest -> features -> ``python -m iap.research run --dataset-dir``: the
+    spec and every ledger entry carry the REAL dataset's version, and the
+    checkout's own ledger and experiments folder are not touched."""
+    out = tmp_path / "ds"
+    for seed, date in ((7, D1), (8, D2)):
+        src = _day(tmp_path, seed, f"{date}.itch", n_actions=6000, spacing_ns=10**9)
+        assert _ingest_cli(src, date, out) == 0
+    assert (
+        features_main(
+            [
+                "--data-dir", str(out / "normalized"),
+                "--out-dir", str(out / "features"),
+                "--configs", str(out / "configs"),
+                "--registry-out", str(out / "reference" / "feature_registry.json"),
+            ]
+        )
+        == 0
+    )  # fmt: skip
+    repo_ledger = REPO_ROOT / "research" / "experiments.json"
+    ledger_before = repo_ledger.read_bytes()
+    experiments_before = sorted(p.name for p in (REPO_ROOT / "research" / "experiments").iterdir())
+    capsys.readouterr()
+    assert research_main(["run", "--alpha", "EQ03", "--dataset-dir", str(out)]) == 0
+    printed = capsys.readouterr().out
+    version = load_manifest(out)["dataset_version"]
+    assert f"dataset_version    {version}" in printed
+    assert repo_ledger.read_bytes() == ledger_before
+    assert sorted(p.name for p in (REPO_ROOT / "research" / "experiments").iterdir()) == (
+        experiments_before
+    )
+    (spec_path,) = (out / "research" / "experiments").glob("*/spec.json")
+    spec = json.loads(spec_path.read_text())
+    summary = json.loads((out / "features" / "features_summary.json").read_text())
+    assert spec["dataset_version"] == version != tracker.data_version()
+    assert spec["feature_version"] == summary["registry_hash"]
+    ledger = json.loads((out / "research" / "experiments.json").read_text())
+    assert [d["dataset_version"] for d in ledger["datasets"]] == [version]
+    assert research_main(["run", "--alpha", "EQ03", "--dataset-dir", str(tmp_path / "nope")]) == 1
+    assert "needs dataset.json" in capsys.readouterr().err
+
+
+def _bulk_file(path: Path, n_messages: int) -> int:
+    """A large valid file built without the simulator: add / execute / delete
+    cycles over one wanted symbol and three others."""
+    enc = Itch50Encoder()
+    symbols = ("AAPL", "MSFT", "AMZN", "GOOG")
+    enc.system_event(hms_ns(3), "O")
+    for i, s in enumerate(symbols):
+        enc.stock_directory(i + 1, hms_ns(3, 0, 1), s)
+    enc.system_event(hms_ns(9, 30), "Q")
+    ts = hms_ns(9, 30)
+    ref = 0
+    while enc.messages < n_messages - 1:
+        for i, s in enumerate(symbols):
+            ref += 1
+            ts += 1000
+            side = "B" if ref % 2 else "S"
+            price = 1_500_000 + (-100 if side == "B" else 100) * (1 + ref % 5)
+            enc.add(i + 1, ts, ref, side, 200, s, price)
+            enc.cancel(i + 1, ts + 1, ref, 100)
+            enc.delete(i + 1, ts + 2, ref)
+    enc.system_event(hms_ns(16), "M")
+    enc.write(path)
+    return enc.messages
+
+
+def test_parser_throughput_smoke_and_bounded_memory(tmp_path):
+    """Generous lower bounds only (CI runners vary); the measured rates are
+    printed with ``-s`` / ``-rP`` and quoted in docs/REAL_DATA.md."""
+    path = tmp_path / "bulk.itch"
+    n = _bulk_file(path, 300_000)
+    size = path.stat().st_size
+
+    t0 = time.perf_counter()
+    reader = Itch50Reader(path, symbols=("AAPL",))
+    yielded = sum(1 for _ in reader)
+    filtered_rate = n / (time.perf_counter() - t0)
+    assert reader.messages_read == n and reader.filtered == n - yielded
+    t0 = time.perf_counter()
+    assert sum(1 for _ in Itch50Reader(path)) == n
+    decode_rate = n / (time.perf_counter() - t0)
+    t0 = time.perf_counter()
+    mapper = Itch50Mapper(D1, ("AAPL",))
+    events = sum(1 for _ in mapper.events(Itch50Reader(path, symbols=("AAPL",))))
+    mapped_rate = n / (time.perf_counter() - t0)
+    print(
+        f"\nITCH 5.0 parser throughput over {n:,} messages ({size / 1e6:.1f} MB): "
+        f"filtered to 1 of 4 symbols {filtered_rate:,.0f} msg/s; decode all {decode_rate:,.0f} "
+        f"msg/s; filter + map to canonical events {mapped_rate:,.0f} msg/s ({events:,} events)"
+    )
+    assert filtered_rate > 20_000 and decode_rate > 10_000 and mapped_rate > 10_000
+    assert mapper.live_orders == 0  # state is the live orders only
+
+    # bounded memory: streaming the whole file keeps a small, size-independent peak
+    tracemalloc.start()
+    try:
+        mapper = Itch50Mapper(D1, ("AAPL",))
+        peak_orders = 0
+        for i, _ in enumerate(
+            mapper.events(Itch50Reader(path, symbols=("AAPL",), limit_messages=120_000))
+        ):
+            if i % 1000 == 0:
+                peak_orders = max(peak_orders, mapper.live_orders)
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    print(f"peak traced memory while streaming {size / 1e6:.1f} MB: {peak / 1e6:.2f} MB")
+    assert peak < 6_000_000 < size
+    assert peak_orders <= 1
+
+
+@pytest.mark.skipif(
+    not os.environ.get("IAP_REAL_ITCH50_FILE"),
+    reason="set IAP_REAL_ITCH50_FILE (+ IAP_REAL_ITCH50_DATE, optional IAP_REAL_ITCH50_SYMBOLS, "
+    "IAP_REAL_LIMIT_MESSAGES) to a TotalView-ITCH 5.0 file you obtained (docs/REAL_DATA.md)",
+)
+def test_real_itch50_sample_ingests_with_a_clean_book(tmp_path):
+    src = Path(os.environ["IAP_REAL_ITCH50_FILE"])
+    date = os.environ["IAP_REAL_ITCH50_DATE"]
+    symbols = os.environ.get("IAP_REAL_ITCH50_SYMBOLS", "AAPL,MSFT").split(",")
+    limit = os.environ.get("IAP_REAL_LIMIT_MESSAGES")
+    manifest = ingest(
+        "itch50", [src], date, symbols, tmp_path / "ds",
+        configs_dir=CONFIGS_DIR, limit_messages=int(limit) if limit else None,
+    )  # fmt: skip
+    session = manifest["sessions"][date]
+    print(json.dumps({k: session[k] for k in ("messages", "mapping", "book_check")}, indent=1))
+    check = session["book_check"]
+    assert check["dropped"] == 0 and check["crossing_adds"] == 0, check
+    assert session["mapping"]["unknown_order_refs"] == 0
+    assert session["mapping"]["duplicate_order_refs"] == 0
+    totals = manifest["normalized"]["qc_totals"]
+    assert totals["invalid"] == 0 and totals["gaps"] == 0 and totals["duplicates"] == 0
+    assert totals["events_out"] == session["raw"]["events"] > 0
+
+
+@pytest.mark.skipif(
+    not os.environ.get("IAP_REAL_LOBSTER_MESSAGE_FILE"),
+    reason="set IAP_REAL_LOBSTER_MESSAGE_FILE (+ IAP_REAL_LOBSTER_DATE; the orderbook file must "
+    "sit beside it) to a LOBSTER sample you obtained (docs/REAL_DATA.md)",
+)
+def test_real_lobster_sample_reconstructs_the_vendor_book(tmp_path):
+    msg = Path(os.environ["IAP_REAL_LOBSTER_MESSAGE_FILE"])
+    date = os.environ["IAP_REAL_LOBSTER_DATE"]
+    manifest = ingest("lobster", [msg], date, None, tmp_path / "ds", configs_dir=CONFIGS_DIR)
+    session = manifest["sessions"][date]
+    print(
+        json.dumps({k: session[k] for k in ("messages", "mapping", "book_verification")}, indent=1)
+    )
+    (report,) = session["book_verification"].values()
+    assert report["status"] == "match" and report["rows_verified"] == session["messages"]["total"]
+    assert session["book_check"]["dropped"] == 0

@@ -1,4 +1,4 @@
-"""End-to-end synthetic market-data pipeline entry point.
+"""End-to-end market-data pipeline entry point (synthetic, and real ingest).
 
 Usage (from ``python/`` with ``PYTHONPATH=src``, or with ``iap`` installed):
 
@@ -9,6 +9,12 @@ Runs: generator -> data/raw/*.jsonl, then the raw->normalized pipeline ->
 data/normalized/ (*.normalized.jsonl, *.normalized.iap1, events.parquet,
 qc_report.json). Prints run stats as JSON on stdout. Fully deterministic for
 a given seed/config.
+
+    python3 -m iap.marketdata ingest --format {itch50,lobster} --input FILE...
+                              --date YYYY-MM-DD --symbols A,B --out DATASET
+
+ingests REAL historical files the owner obtained (``iap.marketdata.ingest``,
+docs/REAL_DATA.md) into a dataset directory of the same layout.
 """
 
 from __future__ import annotations
@@ -27,6 +33,11 @@ _REPO_ROOT = Path(__file__).resolve().parents[4]
 
 
 def main(argv=None) -> int:
+    args_in = list(sys.argv[1:] if argv is None else argv)
+    if args_in[:1] == ["ingest"]:
+        from iap.marketdata.ingest import main as ingest_main
+
+        return ingest_main(args_in[1:])
     parser = argparse.ArgumentParser(
         prog="python3 -m iap.marketdata",
         description="Generate synthetic raw market data and normalize it.",
@@ -55,7 +66,7 @@ def main(argv=None) -> int:
         "is absent (default: fail fast — a silently defaulted config "
         "changes the dataset version without a trace)",
     )
-    args = parser.parse_args(argv)
+    args = parser.parse_args(args_in)
 
     configs_dir = Path(args.configs_dir)
     config_path = (
