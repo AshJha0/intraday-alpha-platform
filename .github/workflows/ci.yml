@@ -32,6 +32,13 @@
 #   images                       builds the four images; needs every other job;
 #                                runs on push to main and on PRs that change
 #                                image inputs
+#   regenerate                   manual only (workflow_dispatch with
+#                                regenerate=true): runs
+#                                tools/regenerate_dataset_artifacts.py — the
+#                                dataset and every committed artefact derived
+#                                from it — and uploads the changed files, so
+#                                the artefacts are produced in the environment
+#                                that verifies them
 #
 # Local equivalent of the whole thing:  bash tests/harness/run_all.sh
 # =============================================================================
@@ -42,6 +49,11 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      regenerate:
+        description: "Also run the dataset-artefact regeneration and upload the changed files"
+        type: boolean
+        default: false
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -398,6 +410,57 @@ jobs:
           if [ "$rc" = "2" ]; then
             echo "::warning::research-ledger numbers are stale — regenerate the research reports and the doc rows together"
           fi
+
+  # Manual: regenerate every committed artefact that derives from the seeded
+  # dataset (tools/regenerate_dataset_artifacts.py has the chain and its
+  # order) and upload the files that changed. Nothing is committed from here:
+  # the maintainer downloads the artifact (`gh run download`), reviews the
+  # diff and commits it (CONTRIBUTING.md §4). It exists because the last
+  # digits of the float artefacts depend on the platform and library
+  # versions, and the suites above compare some of them exactly — so they are
+  # generated where they are checked: this runner, Python 3.11, the pinned
+  # requirements, plus the `ml` extra (python/pyproject.toml) at pinned
+  # versions for the gated tree models of research/ml_reports.
+  regenerate:
+    if: github.event_name == 'workflow_dispatch' && inputs.regenerate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - name: Install the research stack (+ the ml extra, pinned)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r python/requirements-ci.txt
+          pip install xgboost==3.2.0 lightgbm==4.7.0
+      - name: regenerate (dataset -> features -> research -> goldens)
+        run: python3 tools/regenerate_dataset_artifacts.py --timings-out regeneration_timings.json
+      - name: collect what changed
+        run: |
+          git status --short | tee regeneration_status.txt
+          git diff --stat | tail -n 1
+          python3 - <<'PY'
+          import hashlib, json, pathlib
+          norm = pathlib.Path("data/normalized")
+          out = {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+                 for p in sorted(list(pathlib.Path("data/raw").glob("*.jsonl")) + list(norm.glob("*.iap1")))}
+          pathlib.Path("regeneration_dataset_sha256.json").write_text(json.dumps(out, indent=2) + "\n")
+          PY
+          cp data/normalized/qc_report.json regeneration_qc_report.json
+          cp data/features/features_summary.json regeneration_features_summary.json
+          # A regenerated step may also REMOVE a file (a baseline of an alpha
+          # that left the adaptive subset): list those, do not tar them.
+          git ls-files --deleted | tee regeneration_deleted.txt
+          git ls-files --modified --others --exclude-standard \
+            | { grep -vxFf regeneration_deleted.txt || true; } > regeneration_files.txt
+          tar -czf regenerated.tar.gz --files-from=regeneration_files.txt
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: regenerated-artefacts
+          path: regenerated.tar.gz
+          if-no-files-found: error
 
   # Which PRs touch image inputs: the image build runs on those, not on every PR.
   changes:
