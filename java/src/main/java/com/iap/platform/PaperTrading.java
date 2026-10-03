@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import com.iap.adaptive.BaselineLoader;
 import com.iap.adaptive.DriftMonitor;
@@ -24,8 +26,12 @@ import com.iap.codec.JsonlCodec;
 import com.iap.config.ConfigService;
 import com.iap.core.MarketEvent;
 import com.iap.execution.ExecConfig;
+import com.iap.execution.ChildOrder;
+import com.iap.execution.ExecutionSimulator;
 import com.iap.execution.Fill;
+import com.iap.execution.InstrumentSpec;
 import com.iap.execution.LatencyConfig;
+import com.iap.execution.OrderState;
 import com.iap.features.Features;
 import com.iap.monitoring.Counter;
 import com.iap.monitoring.GcMetrics;
@@ -44,6 +50,8 @@ import com.iap.risk.RiskEngine;
 import com.iap.risk.RiskEvent;
 import com.iap.risk.RiskFill;
 import com.iap.risk.RiskLimits;
+import com.iap.sor.SmartOrderRouter;
+import com.iap.sor.SorOptions;
 import com.iap.trace.JsonlTraceSink;
 import com.iap.trace.PortfolioTargetRec;
 import com.iap.trace.TraceDigest;
@@ -65,10 +73,16 @@ import com.iap.trace.TraceDigest;
  * <p><b>Durable state (PLATFORM_CONVENTIONS.md §12.3).</b> Risk snapshot,
  * platform accounting, the risk audit JSONL and the config audit are
  * written to {@code --state-dir} at event-driven checkpoints (every
- * {@link #CHECKPOINT_EVERY_EVENTS} events), at session end, and from a JVM
- * shutdown hook. {@code --resume} restores them, so a restart mid-session
- * keeps positions, realized P&amp;L and any latched kill switch: the daily
- * loss limit is a daily limit, not a per-restart limit.
+ * {@link #CHECKPOINT_EVERY_EVENTS} events), at session end, and when the JVM
+ * is asked to stop: the shutdown hook only raises a stop flag and waits
+ * (bounded) while the trading thread — the ONLY writer of trading state —
+ * checkpoints at its next event boundary and ends the session as
+ * {@link SessionState#STOPPED}. {@code --resume} restores them, so a restart
+ * mid-session keeps positions, realized P&amp;L and any latched kill switch:
+ * the daily loss limit is a daily limit, not a per-restart limit. On resume
+ * the engine's account is seeded with the restored risk positions (the
+ * strategy does not re-buy what it already holds) and the open orders of the
+ * snapshot — children of a simulator that no longer exists — are released.
  *
  * <p><b>Decision traces.</b> Every pre-trade decision cycle is recorded as
  * one {@code DecisionTrace} ({@link PaperTraces}: signal → sizing target →
@@ -99,6 +113,16 @@ public final class PaperTrading {
      */
     public static final long LIVENESS_STALL_NS = 30_000_000_000L;
 
+    /** How long the shutdown hook waits for the trading thread's checkpoint. */
+    public static final long SHUTDOWN_WAIT_MS = 10_000;
+
+    /**
+     * Longest uninterrupted sleep of the realtime pacer: between slices the
+     * loop applies admin commands and honours a stop request, so neither
+     * waits for the next market event on a quiet feed.
+     */
+    private static final long IDLE_SLICE_NS = 20_000_000L;
+
     /** Session lifecycle for {@code platform_session_state} / {@code /status}. */
     public enum SessionState {
         /** Configs loaded, events decoding, no event processed yet. */
@@ -108,7 +132,13 @@ public final class PaperTrading {
         /** The last event was processed and the report was written. */
         FINISHED(2),
         /** The session aborted; the process exits non-zero. */
-        FAILED(3);
+        FAILED(3),
+        /**
+         * A stop was requested (JVM shutdown or {@link Result#requestStop}):
+         * the trading thread checkpointed at an event boundary and left the
+         * loop before the end of the stream. The checkpoint is resumable.
+         */
+        STOPPED(4);
 
         private final int code;
 
@@ -175,6 +205,11 @@ public final class PaperTrading {
          * {@code $IAP_ADMIN_TOKEN_FILE}; empty = admin API disabled.
          */
         public String adminToken;
+        /**
+         * Address the monitoring/admin listener binds. {@code null} = read
+         * {@code $IAP_BIND_ADDR}, else loopback ({@code 127.0.0.1}).
+         */
+        public String bindAddress;
         /**
          * Lifecycle hook called on the trading thread once the monitoring
          * server is bound and the session is about to process its first
@@ -250,6 +285,20 @@ public final class PaperTrading {
         public Path stateDir;
         /** The admin service (drained by the trading thread). */
         public AdminService admin;
+        /**
+         * Raised by the shutdown hook (or {@link #requestStop}); read by the
+         * trading thread at every event boundary and between idle slices.
+         */
+        public volatile boolean stopRequested;
+
+        /**
+         * Ask the trading thread to checkpoint and end the session at its
+         * next event boundary ({@link SessionState#STOPPED}). Safe from any
+         * thread: it only sets a flag.
+         */
+        public void requestStop() {
+            stopRequested = true;
+        }
     }
 
     private PaperTrading() {
@@ -323,8 +372,9 @@ public final class PaperTrading {
         // Resolve the admin token FIRST: a named-but-unreadable
         // $IAP_ADMIN_TOKEN_FILE is a configuration error, and §12.2 says
         // configuration fails before anything is opened or decoded.
-        String adminToken = opts.adminToken != null ? opts.adminToken
-                : AdminService.tokenFromEnv(System.getenv());
+        Map<String, String> adminOperators = opts.adminToken != null
+                ? AdminService.singleOperator(opts.adminToken)
+                : AdminService.operatorsFromEnv(System.getenv());
         MetricsRegistry reg = new MetricsRegistry();
         GcMetrics gc = new GcMetrics(reg);
         Result res = new Result();
@@ -450,11 +500,21 @@ public final class PaperTrading {
 
         // ------------------------------------------------------ risk engine
         RiskEngine risk;
+        Map<String, Object> resumedRisk = null;
         if (opts.resume) {
             long restoreTs = events.get(startIndex).exchangeTs;
+            // Only the snapshot session_state.json commits to (by sha256) is
+            // accepted: the cursor and the risk state are one checkpoint.
+            resumedRisk = store.readCommittedRiskSnapshot(st);
             risk = RiskEngine.restore(limits, cfg.riskInstruments(),
-                    store.readRiskSnapshot(), restoreTs, reg);
+                    resumedRisk, restoreTs, reg);
             reg.counter("risk_session_restarts_total").add(st.restarts);
+            // The simulator is not snapshotted, so the children the snapshot
+            // tracks as open no longer exist and will never report: release
+            // them, or they would inflate every projection for the rest of
+            // the session.
+            reg.counter("risk_resume_open_orders_released_total")
+                    .add(releaseOrphanedOpenOrders(risk, resumedRisk));
         } else {
             risk = RiskEngine.fromConfig(cfg.riskDoc(), cfg.riskInstruments(),
                     reg);
@@ -472,6 +532,8 @@ public final class PaperTrading {
             PgdResult lastSolve;   // null until the first solve
         }
         Sizing sizing = new Sizing();
+        sizing.positionWeight =
+                (double) risk.position(opts.instrumentId) / opts.maxPos;
         BacktestEngine[] engineHolder = new BacktestEngine[1];
         PaperTraces[] tracesHolder = new PaperTraces[1];
         final String portfolioVersion = sizingProblemVersion(opts.maxPos);
@@ -600,7 +662,8 @@ public final class PaperTrading {
         };
 
         // ---- hard risk wiring (PLATFORM_CONVENTIONS.md §11.4, pinned) ----
-        RiskWiring wiring = new RiskWiring(risk, "PAPER", opts.venueId, reg);
+        RiskWiring wiring = new RiskWiring(risk, "PAPER", opts.venueId, reg)
+                .withRouting(exec, cfg.sorOptions(), engineHolder);
         wiring.riskOrderSeq = st.riskOrderSeq;
         double unit = exec.instrument(opts.instrumentId).qtyUnit();
         ExecMetrics execMetrics = new ExecMetrics(wiring, reg, engineHolder,
@@ -619,22 +682,33 @@ public final class PaperTrading {
                 traces, fx, opts.maxPos, opts.venueId, cfg.executionLimits(),
                 cfg.sorOptions());
         engineHolder[0] = engine;
+        if (resumedRisk != null) {
+            // The account starts from the restored risk positions, never
+            // flat: a flat account beside a restored risk engine would make
+            // the strategy buy its whole position a second time.
+            seedAccounts(engine, resumedRisk, exec, opts.instrumentId, basePnl);
+        }
 
         // ------------------------------------------- probes + admin + server
         res.eventsProcessed = st.eventCursor;
         res.eventsPending = events.size() - startIndex;
         res.lastEventWallNs = System.nanoTime();
-        Object checkpointLock = new Object();
-        AdminService admin = new AdminService(risk, store, reg, adminToken,
+        AdminService admin = new AdminService(risk, store, reg, adminOperators,
                 () -> res.lastEventTs,
                 () -> res.state == SessionState.RUNNING);
         res.admin = admin;
+        // A kill is consulted before every order (RiskWiring.hook) and, once
+        // the risk engine holds it, the working children are cancelled
+        // through the simulator's cancel path.
+        wiring.withAdmin(admin);
+        admin.onKill((scope, scopeId, ts) ->
+                cancelWorkingChildren(engineHolder[0], ts));
         long staleFeedNs = limits.staleFeedTimeoutNs();
         MetricsServer server = null;
         if (opts.port >= 0) {
             server = new MetricsServer(reg, opts.port, () -> statusJson(res, opts),
                     () -> health(res), () -> ready(res, opts, staleFeedNs),
-                    admin.enabled() ? admin : null);
+                    admin.enabled() ? admin : null, opts.bindAddress);
             server.start();
             res.httpPort = server.port();
         }
@@ -664,8 +738,6 @@ public final class PaperTrading {
         execMetrics.counters(st.ordersSubmitted, st.fillCount);
         gSessionState.set(SessionState.STARTING.code());
 
-        // Mutable holders so the shutdown hook checkpoints the same live
-        // values the trading loop advances (§12.3).
         long[] progress = {st.eventCursor};   // processed events
         // Audit bookkeeping: auditBase is the number of lines a PREVIOUS leg
         // already wrote to the file; auditCursor is the index into THIS
@@ -676,34 +748,47 @@ public final class PaperTrading {
         long prevReceiveTs = events.get(startIndex).receiveTs;
         long[] bookHealth = {0, 0}; // last exported {gaps, duplicates}
         Thread hook0 = null;
+        CountDownLatch loopExited = new CountDownLatch(1);
         try {
-            final SessionStore.State stf = st;
+            // The shutdown hook never reads or writes trading state (§12.3):
+            // the loop does not hold a lock across engine.onEvent, so a
+            // snapshot taken from another thread would iterate the risk maps
+            // mid-mutation. The hook raises the stop flag and waits, bounded;
+            // the trading thread — the only writer — checkpoints at its next
+            // event boundary and leaves. If the wait expires, the last
+            // periodic checkpoint stands (at most one interval is lost).
             hook0 = new Thread(() -> {
-                synchronized (checkpointLock) {
-                    if (res.state != SessionState.RUNNING) {
-                        return;
-                    }
-                    try {
-                        stf.eventCursor = progress[0];
-                        stf.riskOrderSeq = wiring.riskOrderSeq;
-                        stf.fillCount = execMetrics.fills();
-                        stf.ordersSubmitted = execMetrics.submitted();
-                        auditCursor[0] = checkpoint(store, risk, stf,
-                                auditBase, auditCursor[0], equityPeak[0], traceSink);
-                    } catch (RuntimeException ignored) {
-                        // a shutdown hook must never throw
-                    }
+                if (res.state != SessionState.RUNNING) {
+                    return;
+                }
+                res.stopRequested = true;
+                try {
+                    loopExited.await(SHUTDOWN_WAIT_MS, TimeUnit.MILLISECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                 }
             }, "iap-checkpoint");
             Runtime.getRuntime().addShutdownHook(hook0);
             res.state = SessionState.RUNNING;
             gSessionState.set(SessionState.RUNNING.code());
+            // Between pacing slices the idle loop still applies admin
+            // commands, so a kill is recorded while the feed is quiet.
+            Runnable idle = () -> {
+                if (admin.drain() > 0) {
+                    res.halted = risk.killSwitchEngaged();
+                }
+            };
+            boolean stopped = false;
             for (int i = startIndex; i < events.size(); i++) {
                 MarketEvent ev = events.get(i);
                 if (opts.realtime) {
                     long waitNs = (long) ((ev.receiveTs - prevReceiveTs)
                             / opts.speed);
-                    sleepNs(waitNs);
+                    pacedSleep(waitNs, res, idle);
+                }
+                if (res.stopRequested) {
+                    stopped = true;
+                    break;
                 }
                 long gapNs = ev.receiveTs - prevReceiveTs;
                 prevReceiveTs = ev.receiveTs;
@@ -751,24 +836,48 @@ public final class PaperTrading {
                 if (opts.checkpointEveryEvents > 0
                         && progress[0] % opts.checkpointEveryEvents == 0) {
                     gc.sample();
-                    synchronized (checkpointLock) {
-                        st.eventCursor = progress[0];
-                        st.riskOrderSeq = wiring.riskOrderSeq;
-                        st.fillCount = execMetrics.fills();
-                        st.ordersSubmitted = execMetrics.submitted();
-                        auditCursor[0] = checkpoint(store, risk, st,
-                                auditBase, auditCursor[0], equityPeak[0], traceSink);
-                    }
+                    st.eventCursor = progress[0];
+                    st.riskOrderSeq = wiring.riskOrderSeq;
+                    st.fillCount = execMetrics.fills();
+                    st.ordersSubmitted = execMetrics.submitted();
+                    bookPnl(st, engine, basePnl, baseGross);
+                    auditCursor[0] = checkpoint(store, risk, st,
+                            auditBase, auditCursor[0], equityPeak[0], traceSink);
                 }
             }
-            BacktestEngine.Summary summary;
-            synchronized (checkpointLock) {
-                summary = engine.finish();
-                traces.finish();
-                sampleBookHealth(cGaps, cDups, gStale, engine, opts.instrumentId,
-                        bookHealth);
-                gc.sample();
+            if (stopped) {
+                // Stop requested mid-stream: checkpoint here, on the trading
+                // thread, and end the session without finishing the engine —
+                // the state on disk is a resumable mid-session checkpoint.
+                st.eventCursor = progress[0];
+                st.riskOrderSeq = wiring.riskOrderSeq;
+                st.fillCount = execMetrics.fills();
+                st.ordersSubmitted = execMetrics.submitted();
+                st.configSha256 = res.configSha256;
+                bookPnl(st, engine, basePnl, baseGross);
+                auditCursor[0] = checkpoint(store, risk, st, auditBase,
+                        auditCursor[0], equityPeak[0], traceSink);
+                res.eventsProcessed = progress[0];
+                res.fillCount = st.fillCount;
+                res.ordersSubmitted = st.ordersSubmitted;
+                res.totalPnl = st.totalPnl;
+                res.grossPnl = st.grossPnl;
+                res.killSwitchEngaged = risk.killSwitchEngaged();
+                res.halted = res.killSwitchEngaged;
+                res.riskAudit = risk;
+                res.counters = engine.counters();
+                res.metrics = reg;
+                res.traceDigest = traceSink.digest().hexDigest();
+                res.traceCount = traceSink.count();
+                res.state = SessionState.STOPPED;
+                gSessionState.set(SessionState.STOPPED.code());
+                return res;
             }
+            BacktestEngine.Summary summary = engine.finish();
+            traces.finish();
+            sampleBookHealth(cGaps, cDups, gStale, engine, opts.instrumentId,
+                    bookHealth);
+            gc.sample();
             res.eventsProcessed = progress[0];
             res.fillCount = baseFills + summary.fillCount;
             BacktestEngine.Account a = summary.accounts.get(opts.instrumentId);
@@ -806,21 +915,19 @@ public final class PaperTrading {
             // sha256, so every audit line must already be on disk. The state
             // on disk then describes a COMPLETED session (cursor at the end),
             // so a resume of it is refused.
-            synchronized (checkpointLock) {
-                st.eventCursor = progress[0];
-                st.riskOrderSeq = wiring.riskOrderSeq;
-                st.totalPnl = res.totalPnl;
-                st.grossPnl = res.grossPnl;
-                st.fillCount = res.fillCount;
-                st.ordersSubmitted = res.ordersSubmitted;
-                st.configSha256 = res.configSha256;
-                checkpoint(store, risk, st, auditBase, auditCursor[0],
-                        equityPeak[0], traceSink);
-                res.traceDigest = traceSink.digest().hexDigest();
-                res.traceCount = traceSink.count();
-                res.state = SessionState.FINISHED;
-                gSessionState.set(SessionState.FINISHED.code());
-            }
+            st.eventCursor = progress[0];
+            st.riskOrderSeq = wiring.riskOrderSeq;
+            st.totalPnl = res.totalPnl;
+            st.grossPnl = res.grossPnl;
+            st.fillCount = res.fillCount;
+            st.ordersSubmitted = res.ordersSubmitted;
+            st.configSha256 = res.configSha256;
+            checkpoint(store, risk, st, auditBase, auditCursor[0],
+                    equityPeak[0], traceSink);
+            res.traceDigest = traceSink.digest().hexDigest();
+            res.traceCount = traceSink.count();
+            res.state = SessionState.FINISHED;
+            gSessionState.set(SessionState.FINISHED.code());
             res.reportJson = reportJson(res, opts, reg, store);
             if (opts.reportPath != null) {
                 Files.createDirectories(
@@ -834,6 +941,7 @@ public final class PaperTrading {
             gSessionState.set(SessionState.FAILED.code());
             throw e;
         } finally {
+            loopExited.countDown();
             admin.shutdown();
             if (hook0 != null) {
                 try {
@@ -850,10 +958,13 @@ public final class PaperTrading {
     }
 
     /**
-     * Persist one checkpoint (§12.3), in commit order: audit lines, then the
-     * risk snapshot, then {@code session_state.json} last — the state file is
-     * the commit point, so a crash between writes leaves a consistent (older)
-     * checkpoint rather than a cursor pointing past unsaved risk state.
+     * Persist one checkpoint (§12.3). Called ONLY on the trading thread. The
+     * audit and trace lines are appended first; the risk snapshot and
+     * {@code session_state.json} are then committed as one unit by
+     * {@link SessionStore#commitCheckpoint}: the state file is the single
+     * commit point and records the snapshot's sha256, so a crash at any
+     * instant leaves either the previous or the new (cursor, risk state)
+     * pair — never a cursor beside a risk snapshot of another instant.
      *
      * @return the new audit-line cursor
      */
@@ -870,9 +981,117 @@ public final class PaperTrading {
         traces.flush();
         st.traceLines = traces.count();
         st.equityPeak = equityPeak;
-        store.writeAtomic(SessionStore.RISK_SNAPSHOT, risk.snapshot());
-        store.writeAtomic(SessionStore.SESSION_STATE, st.toJson());
+        store.commitCheckpoint(st, risk.snapshot());
         return audit.size();
+    }
+
+    /**
+     * Session-cumulative P&amp;L for a checkpoint taken mid-session: the
+     * carried-in bases plus this leg's live account totals (the same sums
+     * {@code BacktestEngine.finish} reports at the end).
+     */
+    private static void bookPnl(SessionStore.State st, BacktestEngine engine,
+            double basePnl, double baseGross) {
+        double total = 0.0;
+        double gross = 0.0;
+        for (BacktestEngine.Account a : engine.accounts().values()) {
+            total += a.pnlReporting;
+            gross += a.grossPnl;
+        }
+        st.totalPnl = basePnl + total;
+        st.grossPnl = baseGross + gross;
+    }
+
+    /**
+     * Release every open order of a restored risk snapshot through
+     * {@code RiskEngine.onOrderDone}: the execution simulator is not part of
+     * the checkpoint, so those children can never fill or report.
+     *
+     * @return the number of orders released
+     */
+    public static int releaseOrphanedOpenOrders(RiskEngine risk,
+            Map<String, Object> snapshot) {
+        Object open = snapshot.get("open");
+        if (!(open instanceof Map)) {
+            return 0;
+        }
+        int n = 0;
+        for (String id : com.iap.config.Json.object(open).keySet()) {
+            risk.onOrderDone(Long.parseUnsignedLong(id));
+            n++;
+        }
+        return n;
+    }
+
+    /**
+     * Seed the fresh engine's accounts from a restored risk snapshot: the
+     * position, and — when the snapshot holds a two-sided mark — that mark,
+     * with cash set so the traded instrument's equity continues from the
+     * carried-in P&amp;L (the drawdown gauge does not jump on a restart).
+     * P&amp;L increments start at zero: the session totals are the
+     * checkpointed bases plus this leg's increments.
+     */
+    public static void seedAccounts(BacktestEngine engine, Map<String, Object> snapshot,
+            ExecConfig exec, long tradedInstrument, double basePnl) {
+        Object positions = snapshot.get("positions");
+        if (!(positions instanceof Map)) {
+            return;
+        }
+        Object market = snapshot.get("market");
+        for (Map.Entry<String, Object> e
+                : com.iap.config.Json.object(positions).entrySet()) {
+            long iid = Long.parseLong(e.getKey());
+            long pos = com.iap.config.Json.asLong(e.getValue());
+            if (pos == 0) {
+                continue;
+            }
+            BacktestEngine.Account a = new BacktestEngine.Account();
+            a.position = pos;
+            Object md = market instanceof Map
+                    ? com.iap.config.Json.object(market).get(e.getKey()) : null;
+            if (md instanceof Map) {
+                Map<String, Object> m = com.iap.config.Json.object(md);
+                long bid = com.iap.config.Json.asLong(m.get("bid_ticks"));
+                long ask = com.iap.config.Json.asLong(m.get("ask_ticks"));
+                if (bid > 0 && ask > 0) {
+                    InstrumentSpec ins = exec.instrument(iid);
+                    a.mark = (double) (bid + ask) * ins.tickSize() / 2.0;
+                    a.markValid = true;
+                    a.cash = (iid == tradedInstrument ? basePnl : 0.0)
+                            - (double) pos * ins.qtyUnit() * a.mark;
+                }
+            }
+            engine.accounts().put(iid, a);
+        }
+    }
+
+    /**
+     * Kill path: request a cancel for every working (in-flight or resting)
+     * child through the simulator's cancel path. The terminal reports reach
+     * the risk engine through the normal listener chain on the next event.
+     *
+     * @return the note recorded in the admin audit
+     */
+    public static String cancelWorkingChildren(BacktestEngine engine, long ts) {
+        if (engine == null) {
+            return "resting child orders were NOT cancelled (the engine is"
+                    + " not running); new orders are stopped";
+        }
+        ExecutionSimulator sim = engine.simulator();
+        List<Long> ids = new ArrayList<>(sim.pendingIds());
+        ids.addAll(sim.restingIds());
+        int requested = 0;
+        for (long id : ids) {
+            ChildOrder o = sim.orders().get(id);
+            if (o == null || o.state == OrderState.FILLED
+                    || o.state == OrderState.CANCELLED) {
+                continue;
+            }
+            sim.cancel(id, Math.max(ts, o.decisionTs));
+            requested++;
+        }
+        return "cancel requested for " + requested
+                + " working child orders; new orders are stopped";
     }
 
     /** Export the live risk limits as gauges so alerts never hard-code them. */
@@ -951,8 +1170,11 @@ public final class PaperTrading {
      *       {@code risk.onFill} BEFORE the next decision;</li>
      *   <li>{@code onOrderTerminal}: every FILLED/CANCELLED child reaches
      *       {@code risk.onOrderDone} (open-order tracking);</li>
-     *   <li>{@code onMarket}: per-venue stale transitions become
-     *       {@code onSequenceGap} / {@code onFeedRecovered}; the reference
+     *   <li>{@code onMarket}: a venue going stale becomes
+     *       {@code onSequenceGap}; {@code onFeedRecovered} is reported only
+     *       when a venue recovers AND no venue of that instrument is stale
+     *       any more (the gap gate is per instrument: one venue's recovery
+     *       must not reopen it while another is still stale); the reference
      *       price is the best bid/ask over NON-STALE venue books, stamped
      *       with the oldest market-data time (last applied non-HEARTBEAT
      *       event) among the venues at the consolidated touch — a frozen
@@ -962,8 +1184,12 @@ public final class PaperTrading {
      *       age;</li>
      *   <li>{@link #hook()}: the pre-trade check runs with a fresh
      *       strategy-side order id (consumed even when rejected — the
-     *       duplicate-id rule is session-wide), a MARKET order on the session
-     *       venue, stamped with the decision event time; {@code
+     *       duplicate-id rule is session-wide), a MARKET order on the venue
+     *       the child is actually ROUTED to (the pinned session venue, or —
+     *       under SOR, session venue 0 — the venue the router picks for this
+     *       decision, so the venue kill / disconnect rules apply to it),
+     *       stamped with the decision event time; a pending admin kill
+     *       blocks the order before the check; {@code
      *       onOrderSubmitted} maps the simulator's child id to that risk id,
      *       so fills and terminal reports reach the risk engine under the id
      *       it tracks as open.</li>
@@ -974,7 +1200,9 @@ public final class PaperTrading {
         private final String strategyId;
         private final int venueId;
         private final MetricsRegistry reg;
-        private final TreeMap<Integer, Boolean> venueStale = new TreeMap<>();
+        /** instrument -> venue -> stale at the last market callback. */
+        private final TreeMap<Long, TreeMap<Integer, Boolean>> venueStale =
+                new TreeMap<>();
         /** venue -> exchange_ts of its last applied market-data event. */
         private final TreeMap<Integer, Long> lastDataTs = new TreeMap<>();
         /** simulator child id -> risk order id. */
@@ -986,8 +1214,16 @@ public final class PaperTrading {
          */
         long riskOrderSeq;
         private long pendingRiskId;
+        /** Venue the last pre-trade check approved (0 = unknown). */
+        private int pendingVenue;
         /** Trace recorder notified of every pre-trade decision (nullable). */
         PaperTraces traces;
+        /** Admin service whose pending kill gates every order (nullable). */
+        private AdminService admin;
+        /** The engine's router replica, for SOR sessions (nullable). */
+        private SmartOrderRouter sor;
+        private List<Integer> sorCandidates = List.of();
+        private BacktestEngine[] engineHolder;
 
         public RiskWiring(RiskEngine risk, String strategyId, int venueId,
                 MetricsRegistry reg) {
@@ -995,6 +1231,39 @@ public final class PaperTrading {
             this.strategyId = strategyId;
             this.venueId = venueId;
             this.reg = reg;
+        }
+
+        /**
+         * Give the wiring the engine's routing inputs so that, under SOR
+         * (session venue 0), the pre-trade check names the venue the child
+         * will actually be routed to. Same venues, same options, same book
+         * and same deterministic router as {@code BacktestEngine.decide},
+         * evaluated at the same instant — so the same venue.
+         *
+         * @param engineHolder holder the engine is published in once built
+         */
+        public RiskWiring withRouting(ExecConfig exec, SorOptions sorOptions,
+                BacktestEngine[] engineHolder) {
+            this.sor = new SmartOrderRouter(exec.venues, sorOptions);
+            this.sorCandidates = new ArrayList<>(exec.venues.keySet());
+            this.engineHolder = engineHolder;
+            return this;
+        }
+
+        /** Consult this admin service's kill latch before every order. */
+        public RiskWiring withAdmin(AdminService admin) {
+            this.admin = admin;
+            return this;
+        }
+
+        /** The venue a child of this decision is routed to (0 = unknown). */
+        private int routedVenue(long instrumentId, int side) {
+            if (venueId != 0 || sor == null || engineHolder == null
+                    || engineHolder[0] == null) {
+                return venueId;
+            }
+            return sor.routeAggressive(engineHolder[0].simulator()
+                    .instrumentBook(instrumentId), side, sorCandidates);
         }
 
         @Override
@@ -1007,6 +1276,14 @@ public final class PaperTrading {
         @Override
         public void onOrderSubmitted(com.iap.execution.ChildOrder o) {
             riskIdOf.put(o.orderId, pendingRiskId);
+            if (pendingVenue != 0 && o.venueId != pendingVenue) {
+                // The child left for a venue the risk check did not approve.
+                // Fail closed: count it and pull the child back.
+                reg.counter("risk_routed_venue_mismatch_total").inc();
+                if (engineHolder != null && engineHolder[0] != null) {
+                    engineHolder[0].simulator().cancel(o.orderId, o.decisionTs);
+                }
+            }
         }
 
         @Override
@@ -1024,17 +1301,29 @@ public final class PaperTrading {
             }
             long bestBid = Long.MIN_VALUE;
             long bestAsk = Long.MAX_VALUE;
+            TreeMap<Integer, Boolean> staleByVenue = venueStale.computeIfAbsent(
+                    ev.instrumentId, k -> new TreeMap<>());
+            boolean venueRecovered = false;
+            boolean anyStale = false;
             for (var e : book.venues().entrySet()) {
-                OrderBook vb = e.getValue();
-                boolean stale = vb.isStale();
-                Boolean prev = venueStale.put(e.getKey(), stale);
+                boolean stale = e.getValue().isStale();
+                Boolean prev = staleByVenue.put(e.getKey(), stale);
                 boolean was = prev != null && prev;
                 if (stale && !was) {
                     risk.onSequenceGap(ev.instrumentId, ev.exchangeTs);
                 } else if (!stale && was) {
-                    risk.onFeedRecovered(ev.instrumentId, ev.exchangeTs);
+                    venueRecovered = true;
                 }
-                if (stale) {
+                anyStale |= stale;
+            }
+            // The gap gate is per instrument: it reopens only when a venue
+            // recovered and NO venue of the instrument is stale any more.
+            if (venueRecovered && !anyStale) {
+                risk.onFeedRecovered(ev.instrumentId, ev.exchangeTs);
+            }
+            for (var e : book.venues().entrySet()) {
+                OrderBook vb = e.getValue();
+                if (vb.isStale()) {
                     continue;
                 }
                 long[] bb = vb.bestBid();
@@ -1076,12 +1365,27 @@ public final class PaperTrading {
                 if (delta == 0) {
                     return 0;
                 }
+                AdminService adm = admin;
+                if (adm != null) {
+                    // Apply any admin command that arrived since the event
+                    // boundary, so an accepted kill is in the risk engine
+                    // before this order is checked; a kill still pending
+                    // after that blocks the order outright.
+                    adm.drain();
+                    if (adm.killPending()) {
+                        reg.counter("exec_orders_blocked_kill_pending_total")
+                                .inc();
+                        return 0;
+                    }
+                }
                 long t0 = System.nanoTime();
                 long orderId = ++riskOrderSeq;
                 pendingRiskId = orderId;
+                int side = delta > 0 ? 0 : 1;
+                pendingVenue = routedVenue(iid, side);
                 OrderRequest req = new OrderRequest(orderId, iid,
-                        delta > 0 ? 0 : 1, Math.abs(delta), 0, OrderRequest.MARKET,
-                        venueId, strategyId, 0.5, ts);
+                        side, Math.abs(delta), 0, OrderRequest.MARKET,
+                        pendingVenue, strategyId, 0.5, ts);
                 RiskDecision d = risk.checkOrder(req);
                 reg.histogram("order_path_latency_ns")
                         .record(System.nanoTime() - t0);
@@ -1230,8 +1534,8 @@ public final class PaperTrading {
                 new double[] {expectedReturn}, sigma,
                 new double[] {positionWeight}, SIZING_RISK_AVERSION,
                 new double[] {SIZING_COST_BPS}, cons,
-                new SolverParams(null, SIZING_STEP, SIZING_MAX_ITER, SIZING_PATIENCE,
-                        SIZING_FEAS_TOL));
+                new SolverParams(null, SIZING_STEP_DECAY, SIZING_ITERS,
+                        SIZING_PROJ_PASSES, SIZING_FEAS_TOL));
     }
 
     // The pinned single-asset sizing problem (PLATFORM_CONVENTIONS.md §12,
@@ -1240,9 +1544,11 @@ public final class PaperTrading {
     private static final double SIZING_VOL_TARGET = 5e-4; // per-bar vol target
     private static final double SIZING_RISK_AVERSION = 6.0;
     private static final double SIZING_COST_BPS = 1e-4;
-    private static final double SIZING_STEP = 0.01;
-    private static final int SIZING_MAX_ITER = 100;
-    private static final int SIZING_PATIENCE = 4;
+    // Named after the SolverParams components they feed (eta0 is auto):
+    // stepDecay, iters, projPasses — not a step size / patience.
+    private static final double SIZING_STEP_DECAY = 0.01;
+    private static final int SIZING_ITERS = 100;
+    private static final int SIZING_PROJ_PASSES = 4;
     private static final double SIZING_FEAS_TOL = 1e-7;
 
     /** {@code portfolio_version}: content hash of the sizing problem (constraints + solver). */
@@ -1253,9 +1559,9 @@ public final class PaperTrading {
         problem.put("vol_target", SIZING_VOL_TARGET);
         problem.put("risk_aversion", SIZING_RISK_AVERSION);
         problem.put("cost_bps", SIZING_COST_BPS);
-        problem.put("step", SIZING_STEP);
-        problem.put("max_iter", (long) SIZING_MAX_ITER);
-        problem.put("patience", (long) SIZING_PATIENCE);
+        problem.put("step_decay", SIZING_STEP_DECAY);
+        problem.put("iters", (long) SIZING_ITERS);
+        problem.put("proj_passes", (long) SIZING_PROJ_PASSES);
         problem.put("feas_tol", SIZING_FEAS_TOL);
         problem.put("covariance", "ewma_1min_bars");
         problem.put("max_pos", maxPos);
@@ -1290,14 +1596,29 @@ public final class PaperTrading {
         stale.set(anyStale ? 1.0 : 0.0);
     }
 
-    private static void sleepNs(long ns) {
+    /**
+     * Realtime pacing: sleep {@code ns} in slices of at most
+     * {@link #IDLE_SLICE_NS}, running {@code idle} (admin drain) before each
+     * slice and returning early once a stop is requested.
+     */
+    private static void pacedSleep(long ns, Result res, Runnable idle) {
         if (ns <= 0) {
             return;
         }
-        try {
-            Thread.sleep(ns / 1_000_000L, (int) (ns % 1_000_000L));
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+        long deadline = System.nanoTime() + ns;
+        while (!res.stopRequested) {
+            long left = deadline - System.nanoTime();
+            if (left <= 0) {
+                return;
+            }
+            idle.run();
+            long slice = Math.min(left, IDLE_SLICE_NS);
+            try {
+                Thread.sleep(slice / 1_000_000L, (int) (slice % 1_000_000L));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
         }
     }
 
