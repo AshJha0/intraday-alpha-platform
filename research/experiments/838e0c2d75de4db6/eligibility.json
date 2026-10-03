@@ -1,0 +1,10 @@
+{
+  "experiment_id": "838e0c2d75de4db6",
+  "gate_eligible": true,
+  "methods": "v2",
+  "periods_verified": true,
+  "reasons": [],
+  "significance_threshold": 4.369768877739336,
+  "threshold_looks": 4020,
+  "x-version": 2
+}

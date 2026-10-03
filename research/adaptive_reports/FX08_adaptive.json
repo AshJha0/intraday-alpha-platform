@@ -19,24 +19,24 @@
   "n_blocks": 169,
   "policies": {
     "drift_triggered": {
-      "deployed_ic": 0.12037535449738983,
+      "deployed_ic": 0.1200153452584803,
       "drift_event_count": 0,
       "final_state": "ACTIVE",
-      "gross_pnl": 94449.99999936175,
+      "gross_pnl": 5.797294318121718,
       "ic_baseline_kind": "oos",
       "ic_baseline_rows": 658,
       "lifecycle_transitions": [],
       "n_evals": 169,
       "n_ic_evals": 159,
       "n_informative_evals": 155,
-      "net_pnl": -2986298.7877751295,
+      "net_pnl": -1414.0649216540282,
       "policy": {
         "ic_z_threshold": -2.0,
         "min_refit_gap_ns": 3600000000000,
         "policy": "drift_triggered",
         "psi_threshold": 0.25
       },
-      "refit_count": 20,
+      "refit_count": 6,
       "refit_events": [
         {
           "block": 0,
@@ -47,175 +47,63 @@
           "ts": 1787538602028520532
         },
         {
-          "block": 15,
-          "n_train": 5068,
-          "reasons": [
-            "ic_z=-2.8740 < threshold -2.0"
-          ],
-          "ts": 1787552102028520532
-        },
-        {
-          "block": 28,
-          "n_train": 7597,
-          "reasons": [
-            "ic_z=-2.2957 < threshold -2.0"
-          ],
-          "ts": 1787563802028520532
-        },
-        {
-          "block": 32,
-          "n_train": 8353,
-          "reasons": [
-            "ic_z=-3.4375 < threshold -2.0"
-          ],
-          "ts": 1787567402028520532
-        },
-        {
-          "block": 36,
-          "n_train": 9127,
-          "reasons": [
-            "ic_z=-2.4577 < threshold -2.0"
-          ],
-          "ts": 1787571002028520532
-        },
-        {
-          "block": 40,
-          "n_train": 9886,
-          "reasons": [
-            "ic_z=-2.8333 < threshold -2.0"
-          ],
-          "ts": 1787574602028520532
-        },
-        {
           "block": 44,
           "n_train": 10671,
           "reasons": [
-            "ic_z=-3.8208 < threshold -2.0"
+            "ic_z=-2.1177 < threshold -2.0"
           ],
           "ts": 1787578202028520532
         },
         {
-          "block": 48,
-          "n_train": 11534,
+          "block": 102,
+          "n_train": 16104,
           "reasons": [
-            "ic_z=-3.2559 < threshold -2.0"
+            "ic_z=-2.2028 < threshold -2.0"
           ],
-          "ts": 1787581802028520532
+          "ts": 1787630402028520532
         },
         {
-          "block": 53,
-          "n_train": 12591,
+          "block": 116,
+          "n_train": 16021,
           "reasons": [
-            "ic_z=-2.3562 < threshold -2.0"
+            "ic_z=-2.0316 < threshold -2.0"
           ],
-          "ts": 1787586302028520532
+          "ts": 1787643002028520532
         },
         {
-          "block": 57,
-          "n_train": 13399,
+          "block": 120,
+          "n_train": 16028,
           "reasons": [
-            "ic_z=-3.4788 < threshold -2.0"
+            "ic_z=-2.1671 < threshold -2.0"
           ],
-          "ts": 1787589902028520532
+          "ts": 1787646602028520532
         },
         {
-          "block": 71,
-          "n_train": 16009,
+          "block": 149,
+          "n_train": 16079,
           "reasons": [
-            "ic_z=-3.5834 < threshold -2.0"
+            "ic_z=-2.0305 < threshold -2.0"
           ],
-          "ts": 1787602502028520532
-        },
-        {
-          "block": 97,
-          "n_train": 16148,
-          "reasons": [
-            "ic_z=-2.2528 < threshold -2.0"
-          ],
-          "ts": 1787625902028520532
-        },
-        {
-          "block": 101,
-          "n_train": 16101,
-          "reasons": [
-            "ic_z=-2.9026 < threshold -2.0"
-          ],
-          "ts": 1787629502028520532
-        },
-        {
-          "block": 105,
-          "n_train": 16053,
-          "reasons": [
-            "ic_z=-2.7016 < threshold -2.0"
-          ],
-          "ts": 1787633102028520532
-        },
-        {
-          "block": 115,
-          "n_train": 16029,
-          "reasons": [
-            "ic_z=-2.7916 < threshold -2.0"
-          ],
-          "ts": 1787642102028520532
-        },
-        {
-          "block": 119,
-          "n_train": 16016,
-          "reasons": [
-            "ic_z=-3.8186 < threshold -2.0"
-          ],
-          "ts": 1787645702028520532
-        },
-        {
-          "block": 123,
-          "n_train": 16150,
-          "reasons": [
-            "ic_z=-3.3206 < threshold -2.0"
-          ],
-          "ts": 1787649302028520532
-        },
-        {
-          "block": 144,
-          "n_train": 16124,
-          "reasons": [
-            "ic_z=-2.3065 < threshold -2.0"
-          ],
-          "ts": 1787668202028520532
-        },
-        {
-          "block": 148,
-          "n_train": 16098,
-          "reasons": [
-            "ic_z=-2.9256 < threshold -2.0"
-          ],
-          "ts": 1787671802028520532
-        },
-        {
-          "block": 153,
-          "n_train": 16031,
-          "reasons": [
-            "ic_z=-2.2305 < threshold -2.0"
-          ],
-          "ts": 1787676302028520532
+          "ts": 1787672702028520532
         }
       ],
-      "rolling_ic_mean": 0.09304610842581888,
-      "rolling_ic_std": 0.06052191495873666,
-      "total_costs": 3080748.7877750006,
-      "trade_count": 10537
+      "rolling_ic_mean": 0.0963833767355528,
+      "rolling_ic_std": 0.0513674159949591,
+      "total_costs": 1419.8622159721726,
+      "trade_count": 3895
     },
     "scheduled_daily": {
-      "deployed_ic": 0.12047640811385504,
+      "deployed_ic": 0.12047640811385481,
       "drift_event_count": 0,
       "final_state": "ACTIVE",
-      "gross_pnl": 93989.99999934486,
+      "gross_pnl": -13.261055832572907,
       "ic_baseline_kind": "oos",
       "ic_baseline_rows": 658,
       "lifecycle_transitions": [],
       "n_evals": 169,
       "n_ic_evals": 159,
       "n_informative_evals": 155,
-      "net_pnl": -2958435.263225163,
+      "net_pnl": -1732.483501520552,
       "policy": {
         "period_ns": 86400000000000,
         "policy": "scheduled"
@@ -239,23 +127,23 @@
           "ts": 1787616002028520532
         }
       ],
-      "rolling_ic_mean": 0.09306356833761346,
-      "rolling_ic_std": 0.06051445459806934,
-      "total_costs": 3052425.263225,
-      "trade_count": 10466
+      "rolling_ic_mean": 0.09638337673555282,
+      "rolling_ic_std": 0.05136741599495911,
+      "total_costs": 1719.2224456882448,
+      "trade_count": 4703
     },
     "scheduled_weekly": {
-      "deployed_ic": 0.12128021640279497,
+      "deployed_ic": 0.12128021640279513,
       "drift_event_count": 0,
       "final_state": "ACTIVE",
-      "gross_pnl": 96844.99999935957,
+      "gross_pnl": -30.393159806974165,
       "ic_baseline_kind": "oos",
       "ic_baseline_rows": 658,
       "lifecycle_transitions": [],
       "n_evals": 169,
       "n_ic_evals": 159,
       "n_informative_evals": 155,
-      "net_pnl": -2945450.5597376334,
+      "net_pnl": -1810.3167412973596,
       "policy": {
         "period_ns": 604800000000000,
         "policy": "scheduled"
@@ -271,23 +159,23 @@
           "ts": 1787538602028520532
         }
       ],
-      "rolling_ic_mean": 0.09306356833761346,
-      "rolling_ic_std": 0.06051445459806934,
-      "total_costs": 3042295.5597375007,
-      "trade_count": 10460
+      "rolling_ic_mean": 0.0963833767355528,
+      "rolling_ic_std": 0.05136741599495911,
+      "total_costs": 1779.9235814906058,
+      "trade_count": 4882
     },
     "static": {
-      "deployed_ic": 0.12128021640279497,
+      "deployed_ic": 0.12128021640279513,
       "drift_event_count": 0,
       "final_state": "ACTIVE",
-      "gross_pnl": 96844.99999935957,
+      "gross_pnl": -30.393159806974165,
       "ic_baseline_kind": "oos",
       "ic_baseline_rows": 658,
       "lifecycle_transitions": [],
       "n_evals": 169,
       "n_ic_evals": 159,
       "n_informative_evals": 155,
-      "net_pnl": -2945450.5597376334,
+      "net_pnl": -1810.3167412973596,
       "policy": {
         "policy": "static"
       },
@@ -302,10 +190,10 @@
           "ts": 1787538602028520532
         }
       ],
-      "rolling_ic_mean": 0.09306356833761346,
-      "rolling_ic_std": 0.06051445459806934,
-      "total_costs": 3042295.5597375007,
-      "trade_count": 10460
+      "rolling_ic_mean": 0.0963833767355528,
+      "rolling_ic_std": 0.05136741599495911,
+      "total_costs": 1779.9235814906058,
+      "trade_count": 4882
     }
   },
   "universe": [

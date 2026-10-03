@@ -1,5 +1,5 @@
 {
-  "description": "Adaptability-layer goldens (iap.adaptive; normative contract /API_ADAPTIVE.md). PSI/KS float tolerance 1e-10; trigger booleans and lifecycle states exact. Regenerate with python/tools/make_golden_adaptive.py (brute-force validated at 1e-12 before writing).",
+  "description": "Adaptability-layer goldens (iap.adaptive; normative contract /API_ADAPTIVE.md). PSI/KS float tolerance 1e-10; trigger booleans and lifecycle states exact; the CUSUM statistic at 1e-12. `lifecycle` runs the default retirement rule (CUSUM, v1.5.0), `lifecycle_legacy_consecutive` the rule up to v1.4.0 on the same path; `rolling_ic` pins the pair-count-weighted mean bucket IC. Regenerate with python/tools/make_golden_adaptive.py (brute-force validated at 1e-12 before writing).",
   "drift_trigger": {
     "expected": [
       false,
@@ -93,11 +93,48 @@
   },
   "lifecycle": {
     "config": {
+      "breach_rule": "cusum",
+      "cusum_h": 0.01,
+      "cusum_k": 0.0025,
       "reactivate_evals": 3,
       "reactivate_ic_gate": 0.005,
       "retire_breach_evals": 6,
       "watch_ic_gate": 0.0
     },
+    "expected_cusum": [
+      0.0,
+      0.0009375,
+      0.003125,
+      0.0025625,
+      0.0035,
+      0.0044375000000000005,
+      0.0053750000000000004,
+      0.0053750000000000004,
+      0.0063125,
+      0.00725,
+      0.0070625,
+      0.0055,
+      0.0046875,
+      0.0031249999999999997,
+      0.00031249999999999984,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0009375,
+      0.003125,
+      0.003125,
+      0.003125,
+      0.003125,
+      0.003125,
+      0.003125,
+      0.003125,
+      0.009062500000000001,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
     "expected_states": [
       "ACTIVE",
       "WATCH",
@@ -109,14 +146,14 @@
       "WATCH",
       "WATCH",
       "WATCH",
-      "RETIRED",
-      "RETIRED",
-      "RETIRED",
-      "RETIRED",
-      "RETIRED",
       "WATCH",
       "WATCH",
       "WATCH",
+      "WATCH",
+      "WATCH",
+      "ACTIVE",
+      "ACTIVE",
+      "ACTIVE",
       "ACTIVE",
       "WATCH",
       "WATCH",
@@ -125,6 +162,11 @@
       "WATCH",
       "WATCH",
       "WATCH",
+      "WATCH",
+      "WATCH",
+      "RETIRED",
+      "RETIRED",
+      "RETIRED",
       "WATCH"
     ],
     "expected_transition_count": 5,
@@ -135,23 +177,23 @@
         "to": "WATCH"
       },
       {
-        "eval_index": 11,
-        "from": "WATCH",
-        "to": "RETIRED"
-      },
-      {
         "eval_index": 16,
-        "from": "RETIRED",
-        "to": "WATCH"
-      },
-      {
-        "eval_index": 19,
         "from": "WATCH",
         "to": "ACTIVE"
       },
       {
         "eval_index": 20,
         "from": "ACTIVE",
+        "to": "WATCH"
+      },
+      {
+        "eval_index": 29,
+        "from": "WATCH",
+        "to": "RETIRED"
+      },
+      {
+        "eval_index": 32,
+        "from": "RETIRED",
         "to": "WATCH"
       }
     ],
@@ -182,7 +224,12 @@
       false,
       false,
       false,
-      false
+      false,
+      true,
+      true,
+      true,
+      true,
+      true
     ],
     "ic_path": [
       0.02,
@@ -211,8 +258,196 @@
       -0.02,
       -0.02,
       -0.02,
-      -0.02
+      -0.02,
+      -0.05,
+      -0.05,
+      0.01,
+      0.01,
+      0.01
     ],
+    "new_fraction": 0.125,
+    "ts_step_ns": 900000000000
+  },
+  "lifecycle_legacy_consecutive": {
+    "config": {
+      "breach_rule": "consecutive",
+      "cusum_h": 0.01,
+      "cusum_k": 0.0025,
+      "reactivate_evals": 3,
+      "reactivate_ic_gate": 0.005,
+      "retire_breach_evals": 6,
+      "watch_ic_gate": 0.0
+    },
+    "expected_cusum": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "expected_states": [
+      "ACTIVE",
+      "WATCH",
+      "WATCH",
+      "WATCH",
+      "WATCH",
+      "WATCH",
+      "WATCH",
+      "WATCH",
+      "WATCH",
+      "WATCH",
+      "RETIRED",
+      "RETIRED",
+      "RETIRED",
+      "RETIRED",
+      "RETIRED",
+      "WATCH",
+      "WATCH",
+      "WATCH",
+      "ACTIVE",
+      "WATCH",
+      "WATCH",
+      "WATCH",
+      "WATCH",
+      "WATCH",
+      "WATCH",
+      "WATCH",
+      "WATCH",
+      "WATCH",
+      "WATCH",
+      "WATCH",
+      "WATCH",
+      "ACTIVE"
+    ],
+    "expected_transition_count": 6,
+    "expected_transitions": [
+      {
+        "eval_index": 2,
+        "from": "ACTIVE",
+        "to": "WATCH"
+      },
+      {
+        "eval_index": 11,
+        "from": "WATCH",
+        "to": "RETIRED"
+      },
+      {
+        "eval_index": 16,
+        "from": "RETIRED",
+        "to": "WATCH"
+      },
+      {
+        "eval_index": 19,
+        "from": "WATCH",
+        "to": "ACTIVE"
+      },
+      {
+        "eval_index": 20,
+        "from": "ACTIVE",
+        "to": "WATCH"
+      },
+      {
+        "eval_index": 32,
+        "from": "WATCH",
+        "to": "ACTIVE"
+      }
+    ],
+    "ic_informative": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "ic_path": [
+      0.02,
+      -0.01,
+      -0.02,
+      0.002,
+      -0.01,
+      -0.01,
+      -0.01,
+      null,
+      -0.01,
+      -0.01,
+      -0.001,
+      0.01,
+      0.004,
+      0.01,
+      0.02,
+      0.005,
+      0.005,
+      0.03,
+      0.06,
+      -0.01,
+      -0.02,
+      -0.02,
+      -0.02,
+      -0.02,
+      -0.02,
+      -0.02,
+      -0.02,
+      -0.05,
+      -0.05,
+      0.01,
+      0.01,
+      0.01
+    ],
+    "new_fraction": 0.125,
     "ts_step_ns": 900000000000
   },
   "psi_ks": {
@@ -279,36 +514,41 @@
   "rolling_ic": {
     "alpha_id": "EQ01",
     "bucket_ns": 300000000000,
-    "description": "EQ01 on the golden EQ frame. Feed mid_series through onMid (one sample per book_ok refresh) and signals through onSignal, then read ic(t) at each evaluation time; tolerance 1e-10, null = NaN.",
+    "description": "EQ01 on the golden EQ frame. Feed mid_series through onMid (one sample per book_ok refresh) and signals through onSignal, then read ic(t) at each evaluation time; tolerance 1e-10, null = NaN. rolling_ic is the PAIR-COUNT-WEIGHTED mean of the bucket ICs (the default since v1.5.0); rolling_ic_unweighted is the legacy mean.",
     "evaluations": [
       {
         "n_buckets": 4,
         "n_matured": 409,
-        "rolling_ic": 0.13748463011140902,
+        "rolling_ic": 0.10908740899163036,
+        "rolling_ic_unweighted": 0.13748463011140902,
         "t": 1787579594701745177
       },
       {
         "n_buckets": 9,
         "n_matured": 812,
-        "rolling_ic": 0.08798479955742905,
+        "rolling_ic": 0.048024167081086526,
+        "rolling_ic_unweighted": 0.08798479955742905,
         "t": 1787580989403490354
       },
       {
         "n_buckets": 13,
         "n_matured": 1229,
-        "rolling_ic": 0.02996804291995884,
+        "rolling_ic": 0.021846789090185115,
+        "rolling_ic_unweighted": 0.02996804291995884,
         "t": 1787582384105235531
       },
       {
         "n_buckets": 18,
         "n_matured": 1553,
-        "rolling_ic": 0.05273727636876049,
+        "rolling_ic": 0.04296717780611018,
+        "rolling_ic_unweighted": 0.05273727636876049,
         "t": 1787583778806980708
       },
       {
         "n_buckets": 23,
         "n_matured": 1934,
-        "rolling_ic": 0.05648953824061221,
+        "rolling_ic": 0.04785494584710743,
+        "rolling_ic_unweighted": 0.05648953824061221,
         "t": 1787585173508725885
       }
     ],
@@ -17735,6 +17975,7 @@
         24.27
       ]
     ],
+    "weighting": "pair_count",
     "window_ns": 7200000000000
   },
   "signal_eq01": {
@@ -17748,5 +17989,5 @@
       "psi": 0.013532785723193493
     }
   },
-  "x-version": 1
+  "x-version": 2
 }

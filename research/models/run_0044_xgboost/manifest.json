@@ -1,0 +1,151 @@
+{
+  "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
+  "experiment_id": "run_0044_xgboost",
+  "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
+  "features": [
+    "ret_log_1s_v1",
+    "ret_log_5s_v1",
+    "ret_log_10s_v1",
+    "ret_log_30s_v1",
+    "ret_accel_5s_v1",
+    "ret_resid_5s_v1",
+    "ret_vol_adj_5s_v1",
+    "mid_change_ticks_1s_v1",
+    "micro_mid_dev_bps_v1",
+    "spread_bps_v1",
+    "imbalance_l1_v1",
+    "imbalance_l3_v1",
+    "imbalance_l5_v1",
+    "imbalance_l1_avg_w1s_v1",
+    "imbalance_l5_avg_w10s_v1",
+    "depth_total_l1_v1",
+    "depth_total_l5_v1",
+    "queue_depletion_rate_bid_w1s_v1",
+    "queue_depletion_rate_ask_w1s_v1",
+    "ofi_norm_l5_w5s_v1",
+    "ofi_norm_l5_w30s_v1",
+    "signed_volume_w1s_v1",
+    "signed_volume_w10s_v1",
+    "trade_imbalance_w1s_v1",
+    "trade_imbalance_w10s_v1",
+    "trade_intensity_w1s_v1",
+    "cancel_add_ratio_w1s_v1",
+    "quoted_depth_ratio_v1",
+    "effective_spread_bps_w10s_v1",
+    "participation_w10s_v1",
+    "depth_slope_bid_v1",
+    "depth_slope_ask_v1",
+    "rvol_w10s_v1",
+    "rvol_w1m_v1",
+    "vol_ratio_w10s_w1m_v1",
+    "range_bps_w10s_v1",
+    "jump_flag_w1m_v1",
+    "minute_of_day_v1",
+    "session_frac_v1",
+    "norm_spread_m5_v1",
+    "ref_ret_5s_v1",
+    "beta_w5m_v1",
+    "leadlag_corr_w1m_v1",
+    "venue_depth_hhi_v1",
+    "venue_imbalance_divergence_v1",
+    "trend_score_w1m_v1",
+    "meanrev_score_w1m_v1",
+    "vol_regime_ratio_v1",
+    "half_spread_cost_bps_v1",
+    "expected_impact_bps_v1",
+    "fill_prob_bid_h1s_v1"
+  ],
+  "folds": [
+    {
+      "fold": 0,
+      "n_test": 41910,
+      "n_train": 42135,
+      "test_window": [
+        1787584793460109191,
+        1787595890600918684
+      ],
+      "train_window": [
+        1787529602028520532,
+        1787584728120125038
+      ]
+    },
+    {
+      "fold": 1,
+      "n_test": 41902,
+      "n_train": 84278,
+      "test_window": [
+        1787595951149318965,
+        1787665641271144929
+      ],
+      "train_window": [
+        1787529602028520532,
+        1787595885837400897
+      ]
+    },
+    {
+      "fold": 2,
+      "n_test": 41883,
+      "n_train": 126430,
+      "test_window": [
+        1787665701441330311,
+        1787676869738604246
+      ],
+      "train_window": [
+        1787529602028520532,
+        1787665635979837154
+      ]
+    },
+    {
+      "fold": 3,
+      "n_test": 41929,
+      "n_train": 168570,
+      "test_window": [
+        1787676929981606096,
+        1787691459285005656
+      ],
+      "train_window": [
+        1787529602028520532,
+        1787676864680373395
+      ]
+    }
+  ],
+  "git_commit": "59c81d27a0dbc2ad1cd7eaede92f43ed25bddca3",
+  "git_dirty": true,
+  "git_dirty_hash": "41d42aaab5934e0c3d06a3af6d8190d1abdca550583233f2faaa98d3baca8a78",
+  "hardware": {
+    "cpu_count": 4,
+    "cpu_model": "AMD EPYC 7763 64-Core Processor",
+    "machine": "x86_64",
+    "python": "3.11.16",
+    "system": "Linux"
+  },
+  "hyperparams": {
+    "colsample_bytree": 0.8,
+    "learning_rate": 0.08,
+    "max_depth": 4,
+    "min_child_weight": 20,
+    "n_estimators": 120,
+    "n_jobs": 2,
+    "random_state": 7,
+    "subsample": 0.9,
+    "tree_method": "hist"
+  },
+  "library_versions": {
+    "lightgbm": "4.7.0",
+    "numpy": "2.4.6",
+    "pandas": "3.0.6",
+    "pyarrow": "25.0.1",
+    "sklearn": "1.9.1",
+    "xgboost": "3.2.0"
+  },
+  "model_version": "xgboost_v1",
+  "target": "label_cost_5s",
+  "test_window": {
+    "end_ts": 1787691459285005656,
+    "start_ts": 1787676929981606096
+  },
+  "train_window": {
+    "end_ts": 1787676864680373395,
+    "start_ts": 1787529602028520532
+  }
+}
