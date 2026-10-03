@@ -168,6 +168,10 @@ _DEFAULT_CONFIG = {
 }
 
 
+#: ``x-version`` of a generator config document (``load_generator_config``):
+#: 2 since v1.4.0, when the default equity flow calibration became "session".
+GENERATOR_CONFIG_X_VERSION = 2
+
 #: ``equities.flow.calibration`` values (module docs).
 FLOW_CALIBRATION_SESSION = "session"
 FLOW_CALIBRATION_LEGACY = "legacy_budget"
@@ -232,13 +236,36 @@ def _merge_config(base: dict, override: dict) -> dict:
 
 
 def load_generator_config(path=None) -> dict:
-    """Load configs/marketdata/generator.json merged over built-in defaults."""
+    """Load configs/marketdata/generator.json merged over built-in defaults.
+
+    ``x-version`` 2 (v1.4.0) is the document whose default equity flow
+    calibration is ``"session"``.  An ``x-version`` 1 document was written
+    against the v1.3.0 rule: loading it under the new default would produce
+    a different dataset without anyone asking for it, so it is rejected
+    unless it names ``equities.flow.calibration`` itself (``"legacy_budget"``
+    reproduces the v1.3.0 data).  A document without ``x-version`` takes the
+    current defaults.
+    """
     cfg = dict(_DEFAULT_CONFIG)
     if path is not None:
         with open(path, encoding="utf-8") as f:
             file_cfg = json.load(f)
-        file_cfg.pop("x-version", None)
+        version = file_cfg.pop("x-version", None)
         file_cfg.pop("description", None)
+        if version is not None and version not in (1, GENERATOR_CONFIG_X_VERSION):
+            raise ValueError(
+                f"{path}: unsupported generator config x-version {version!r} "
+                f"(this build reads 1 and {GENERATOR_CONFIG_X_VERSION})"
+            )
+        explicit = file_cfg.get("equities", {}).get("flow", {}).get("calibration")
+        if version == 1 and explicit is None:
+            raise ValueError(
+                f"{path}: x-version 1 generator config without equities.flow.calibration — "
+                'since v1.4.0 the default is "session" (flow to the close), which is not the '
+                "dataset this document was written for. Set equities.flow.calibration to "
+                '"legacy_budget" to reproduce the v1.3.0 data, or to "session" and bump '
+                f"x-version to {GENERATOR_CONFIG_X_VERSION}."
+            )
         cfg = _merge_config(cfg, file_cfg)
     return cfg
 

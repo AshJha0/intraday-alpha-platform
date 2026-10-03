@@ -8,6 +8,7 @@ from iap.marketdata.generator import (
     excitation_time_factor,
     generate_golden_eq,
     generate_golden_fx,
+    load_generator_config,
 )
 
 SMALL_CFG = {
@@ -396,3 +397,26 @@ def test_excitation_time_factor_is_pinned_and_explains_the_legacy_stop():
     assert factor == excitation_time_factor(1.4, 0.82, 8.0, 0.16)  # deterministic
     assert excitation_time_factor(0.0, 0.82, 8.0, 0.16) == 1.0  # no excitation, no speed-up
     assert excitation_time_factor(0.5, 0.82, 8.0, 0.16) > factor  # weaker kick, slower flow
+
+
+def test_generator_config_x_version_gate(tmp_path):
+    """An x-version 1 document predates the calibration key: it must name
+    the calibration it wants instead of silently getting the new default."""
+    import json
+
+    def write(doc):
+        path = tmp_path / "generator.json"
+        path.write_text(json.dumps(doc), encoding="utf-8")
+        return path
+
+    with pytest.raises(ValueError, match="x-version 1 generator config"):
+        load_generator_config(write({"x-version": 1, "seed": 5}))
+    legacy = load_generator_config(
+        write({"x-version": 1, "equities": {"flow": {"calibration": "legacy_budget"}}})
+    )
+    assert legacy["equities"]["flow"]["calibration"] == "legacy_budget"
+    assert legacy["equities"]["flow"]["excitation_kick"] == 1.4  # merged over the defaults
+    current = load_generator_config(write({"x-version": 2, "seed": 5}))
+    assert current["equities"]["flow"]["calibration"] == "session"
+    with pytest.raises(ValueError, match="unsupported generator config x-version"):
+        load_generator_config(write({"x-version": 3}))
