@@ -67,6 +67,8 @@ jobs:
           echo "::error::workflow_dispatch only runs the verify-ci guard (dry_run=true); a release is made by pushing a v* tag"
           exit 1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false   # the guard reads; nothing here pushes
       - name: the tagged commit has a green ci run
         env:
           GH_TOKEN: ${{ github.token }}
