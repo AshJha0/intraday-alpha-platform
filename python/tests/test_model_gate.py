@@ -40,7 +40,7 @@ def _signal_dataset(flip_after_first_segment: bool) -> Dataset:
     rng = SplitMix64(42)
     span = 5000 * _S
     # 1500 samples in the first fifth, 60 in each later fifth
-    ts_list, x_list, y_list = [], [], []
+    ts_list, _x_list, _y_list = [], [], []
     for i in range(1500):
         ts_list.append(int(i * (span / 5) / 1500))
     for seg in range(1, 5):

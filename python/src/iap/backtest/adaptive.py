@@ -64,7 +64,6 @@ from iap.adaptive.drift import (
     rolling_ic_z_hac,
 )
 from iap.adaptive.lifecycle import (
-    ACTIVE,
     RETIRED,
     LifecycleConfig,
     LifecycleLog,

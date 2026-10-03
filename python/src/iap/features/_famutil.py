@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from math import isfinite
-from typing import List, Optional
+from typing import List
 
 NAN = float("nan")
 

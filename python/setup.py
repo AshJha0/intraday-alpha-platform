@@ -18,7 +18,6 @@ declarative way to include data that lives outside the package directory.
 
 from __future__ import annotations
 
-import os
 import shutil
 from pathlib import Path
 

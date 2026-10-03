@@ -43,7 +43,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from iap.alpha import build, load_params_file  # noqa: E402
+from iap.alpha import load_params_file  # noqa: E402
 from iap.alpha.data import asof_to_grid, load_features, make_grid, split_by_day, session_days  # noqa: E402
 from iap.alpha.fx_exposure import FX05CrossPairRelativeValue, solve_factor_returns  # noqa: E402
 from iap.alpha.goldenframes import build_golden_frame  # noqa: E402

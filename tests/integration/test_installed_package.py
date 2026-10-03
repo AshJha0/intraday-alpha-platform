@@ -24,7 +24,6 @@ import hashlib
 import json
 import os
 import subprocess
-import sys
 import venv
 from pathlib import Path
 
@@ -63,7 +62,7 @@ def installed(repo_root, tmp_path_factory) -> dict:
         capture_output=True, text=True, check=True, cwd=str(base)).stdout.strip()
     site = Path(where)
     assert venv_dir in site.parents, f"iap resolved outside the venv: {site}"
-    assert not (repo_root / "python" / "src") in site.parents
+    assert (repo_root / "python" / "src") not in site.parents
     return {"python": python, "site": site, "cwd": base}
 
 
