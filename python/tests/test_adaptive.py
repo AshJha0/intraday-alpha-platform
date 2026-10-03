@@ -6,6 +6,14 @@ round-trips, refit-policy trigger boundaries, the lifecycle state machine
 (incl. re-activation and log completeness), and the adaptive walk-forward
 backtest: accounting identity, determinism, no-lookahead (shift test),
 warmup/retirement gating and config validation.
+
+The defaults are the v1.5.0 rules — the CUSUM retirement rule, the
+two-sample HAC drift z with the pair-count-weighted rolling IC, and the
+research backtester's cost-aware / fill-capped / row-blocked configuration.
+Every rule up to v1.4.0 is exercised under its explicit legacy name
+(``LifecycleConfig.legacy``, ``rolling_ic_z`` / ``ic_z_method="legacy"``,
+``BacktestConfig.legacy``, ``CostModel.with_linear_impact``); a test that
+pins the old numbers says "legacy" in its name.
 """
 
 from __future__ import annotations
@@ -40,9 +48,11 @@ from iap.adaptive import (
     load_adaptive_config,
     psi,
     rolling_ic_z,
+    rolling_ic_z_hac,
     validate_adaptive_config,
 )
-from iap.adaptive.drift import BASELINE_VERSION
+from iap.adaptive.drift import BASELINE_VERSION, DEFAULT_IC_Z_METHOD
+from iap.adaptive.lifecycle import DEFAULT_BREACH_RULE, DEFAULT_CUSUM_H, DEFAULT_CUSUM_K
 from iap.alpha.base import LinearAlpha, col
 from iap.backtest import BacktestConfig, Backtester, CostModel
 from iap.backtest.adaptive import AdaptiveDeployment
@@ -141,7 +151,9 @@ class _ToyAlpha(LinearAlpha):
 
 def _make_frames(n_rows=21_600, t0=1_700_000_000_000_000_000, seed=7):
     """Two-instrument synthetic frames: 1s rows, causal-ish signal x_v1
-    correlated with the next-second return label."""
+    correlated with the next-second return label.  The displayed L1 sizes
+    (which the default fill cap of the research backtester reads) are ten
+    times the default ``max_pos_qty``, so the cap never binds here."""
     frames = {}
     for iid in (1, 2):
         rng = SplitMix64(seed + iid)
@@ -162,6 +174,8 @@ def _make_frames(n_rows=21_600, t0=1_700_000_000_000_000_000, seed=7):
                 "x_v1": sig,
                 "mid_price_v1": mid,
                 "spread_ticks_v1": np.ones(n_rows),
+                "depth_bid_l1_v1": np.full(n_rows, 10_000.0),
+                "depth_ask_l1_v1": np.full(n_rows, 10_000.0),
                 "label_mid_1s": label,
                 "label_valid_1s": valid,
             }
@@ -340,12 +354,20 @@ def test_rolling_ic_matches_golden(golden):
     Java asserts this section (`AdaptiveGoldenTest.
     rollingIcMatchesThePythonResearchLabel`), but the vector was PRODUCED by
     the Python reference (`python/tools/make_golden_adaptive.py`) — so
-    without this test a regression in `rolling_ic_z` / `bucket_ics` would
-    leave the committed golden stale and Java would happily keep passing
-    against the stale file.  Everything below is rebuilt from the golden's
-    own embedded `mid_series` / `signals`; nothing is read from the frame.
+    without this test a regression in `rolling_ic_z_hac` / `rolling_ic_z` /
+    `bucket_ics` would leave the committed golden stale and Java would
+    happily keep passing against the stale file.  Everything below is rebuilt
+    from the golden's own embedded `mid_series` / `signals`; nothing is read
+    from the frame.
+
+    x-version 2 (v1.5.0): `rolling_ic` is the PAIR-COUNT-WEIGHTED mean bucket
+    IC of the default monitor (`rolling_ic_z_hac`); the legacy unweighted
+    mean (`rolling_ic_z`) is pinned beside it as `rolling_ic_unweighted`.
+    Both are asserted.
     """
+    assert golden["x-version"] == 2
     g = golden["rolling_ic"]
+    assert g["weighting"] == "pair_count"
     h_ns = int(g["horizon_ns"])
     window_ns = int(g["window_ns"])
     bucket_ns = int(g["bucket_ns"])
@@ -382,17 +404,27 @@ def test_rolling_ic_matches_golden(golden):
     for i, ev in enumerate(evals):
         t_eval = int(ev["t"])
         m = (sig_ts >= t_eval - window_ns) & (sig_ts + h_ns <= t_eval)
-        res = rolling_ic_z(base, sig_ts[m], sig_v[m], ret[m], min_buckets)
+        res = rolling_ic_z_hac(base, sig_ts[m], sig_v[m], ret[m], min_buckets)
+        legacy = rolling_ic_z(base, sig_ts[m], sig_v[m], ret[m], min_buckets)
         assert int(np.sum(m & np.isfinite(ret))) == ev["n_matured"], (
             f"eval {i}: matured-row count drifted from the golden"
         )
         assert res.n_buckets == ev["n_buckets"], f"eval {i}: bucket count"
+        assert legacy.n_buckets == ev["n_buckets"], f"eval {i}: legacy bucket count"
         if ev["rolling_ic"] is None:
             assert res.rolling_ic is None, f"eval {i}: expected a null IC"
         else:
             assert res.rolling_ic == pytest.approx(ev["rolling_ic"], abs=1e-10), (
-                f"eval {i}: rolling_ic"
+                f"eval {i}: rolling_ic (pair-count weighted, the default)"
             )
+        if ev["rolling_ic_unweighted"] is None:
+            assert legacy.rolling_ic is None, f"eval {i}: expected a null legacy IC"
+        else:
+            assert legacy.rolling_ic == pytest.approx(ev["rolling_ic_unweighted"], abs=1e-10), (
+                f"eval {i}: rolling_ic_unweighted (the legacy mean)"
+            )
+    # the two means are different statistics on this frame, not one number twice
+    assert all(abs(ev["rolling_ic"] - ev["rolling_ic_unweighted"]) > 1e-3 for ev in evals)
 
 
 def test_ic_baseline_roundtrip(tmp_path):
@@ -562,6 +594,16 @@ def test_config_validation_rejects_bad_blocks(adaptive_cfg):
         (lambda c: c["lifecycle"].pop("watch_ic_gate"), "lifecycle"),
         (lambda c: c["lifecycle"].update(retire_breach_evals=0), "retire_breach_evals"),
         (lambda c: c["lifecycle"].update(reactivate_ic_gate=-9.0), "reactivate_ic_gate"),
+        # x-version 2 (v1.5.0): the block must NAME its z and its retirement
+        # rule; a v1.4.0 block is rejected, not read under the other rule
+        (lambda c: c.update({"x-version": 1}), "x-version must be 2"),
+        (lambda c: c.pop("x-version"), "x-version must be 2"),
+        (lambda c: c.pop("ic_z_method"), "ic_z_method"),
+        (lambda c: c.update(ic_z_method="pinned"), "ic_z_method"),
+        (lambda c: c["lifecycle"].pop("breach_rule"), "breach_rule"),
+        (lambda c: c["lifecycle"].update(breach_rule="ewma"), "unknown breach_rule"),
+        (lambda c: c["lifecycle"].pop("cusum_h"), "cusum_h"),
+        (lambda c: c["lifecycle"].pop("cusum_k"), "cusum_k"),
     ):
         bad = copy.deepcopy(adaptive_cfg)
         mutate(bad)
@@ -569,13 +611,49 @@ def test_config_validation_rejects_bad_blocks(adaptive_cfg):
             validate_adaptive_config(bad)
 
 
+def test_shipped_adaptive_config_names_the_default_rules_and_legacy_validates(adaptive_cfg):
+    """The pinned block names the v1.5.0 defaults; the same block naming the
+    legacy z and the legacy retirement rule is still a valid configuration
+    (and may then omit the CUSUM parameters)."""
+    import copy
+
+    assert adaptive_cfg["x-version"] == 2
+    assert adaptive_cfg["ic_z_method"] == DEFAULT_IC_Z_METHOD == "hac"
+    lc = LifecycleConfig.from_config(adaptive_cfg["lifecycle"])
+    assert lc.breach_rule == DEFAULT_BREACH_RULE == "cusum"
+    assert (lc.cusum_k, lc.cusum_h) == (DEFAULT_CUSUM_K, DEFAULT_CUSUM_H) == (0.0025, 0.01)
+    assert lc.to_dict() == adaptive_cfg["lifecycle"]
+
+    old = copy.deepcopy(adaptive_cfg)
+    old["ic_z_method"] = "legacy"
+    old["lifecycle"]["breach_rule"] = "consecutive"
+    del old["lifecycle"]["cusum_k"], old["lifecycle"]["cusum_h"]
+    validate_adaptive_config(old)
+    assert LifecycleConfig.from_config(old["lifecycle"]) == LifecycleConfig.legacy(
+        lc.watch_ic_gate, lc.reactivate_ic_gate, lc.retire_breach_evals, lc.reactivate_evals
+    )
+
+
 # ---------------------------------------------------------------------------
 # lifecycle state machine
 # ---------------------------------------------------------------------------
 
+# The default retirement rule (CUSUM, cusum_k 0.0025, cusum_h 0.01) ...
 _LC = LifecycleConfig(
     watch_ic_gate=0.0, reactivate_ic_gate=0.005, retire_breach_evals=3, reactivate_evals=2
 )
+# ... and the same gates under the rule up to v1.4.0, named.
+_LC_LEGACY = LifecycleConfig.legacy(
+    watch_ic_gate=0.0, reactivate_ic_gate=0.005, retire_breach_evals=3, reactivate_evals=2
+)
+
+
+def test_lifecycle_default_rule_is_cusum_and_legacy_names_the_consecutive_rule():
+    assert _LC.breach_rule == "cusum" and (_LC.cusum_k, _LC.cusum_h) == (0.0025, 0.01)
+    assert _LC_LEGACY.breach_rule == "consecutive"
+    assert _LC_LEGACY == LifecycleConfig(0.0, 0.005, 3, 2, breach_rule="consecutive")
+    assert (_LC_LEGACY.watch_ic_gate, _LC_LEGACY.reactivate_ic_gate) == (0.0, 0.005)
+    assert (_LC_LEGACY.retire_breach_evals, _LC_LEGACY.reactivate_evals) == (3, 2)
 
 
 def _walk(path, cfg=_LC, log=None):
@@ -584,40 +662,138 @@ def _walk(path, cfg=_LC, log=None):
     return t, states
 
 
-def test_lifecycle_active_to_watch():
-    t, states = _walk([0.02, -0.01])
+@pytest.mark.parametrize("cfg", [_LC, _LC_LEGACY], ids=["cusum", "legacy_consecutive"])
+def test_lifecycle_active_to_watch(cfg):
+    t, states = _walk([0.02, -0.01], cfg=cfg)
     assert states == [ACTIVE, WATCH]
     assert t.transitions[0].reason.startswith("rolling_ic")
 
 
-def test_lifecycle_reactivation_from_watch():
-    t, states = _walk([-0.01, 0.01, 0.01])
+@pytest.mark.parametrize("cfg", [_LC, _LC_LEGACY], ids=["cusum", "legacy_consecutive"])
+def test_lifecycle_reactivation_from_watch(cfg):
+    t, states = _walk([-0.01, 0.01, 0.01], cfg=cfg)
     assert states == [WATCH, WATCH, ACTIVE]
     assert [tr.to_state for tr in t.transitions] == [WATCH, ACTIVE]
 
 
-def test_lifecycle_persistent_breach_retires():
-    t, states = _walk([-0.01, -0.01, -0.01])
+def test_lifecycle_legacy_consecutive_persistent_breach_retires():
+    t, states = _walk([-0.01, -0.01, -0.01], cfg=_LC_LEGACY)
     assert states == [WATCH, WATCH, RETIRED]
     assert not t.allocatable
+    assert t.cusum == 0.0  # the legacy rule never moves the CUSUM statistic
 
 
-def test_lifecycle_retired_recovers_to_watch_then_active():
-    t, states = _walk([-0.01, -0.01, -0.01, 0.01, 0.01, 0.01, 0.01])
+def test_lifecycle_cusum_persistent_breach_retires():
+    """Default rule, disjoint readings (new_fraction 1), gate 0, k 0.0025,
+    h 0.01: S = 0 + (0 - (-0.01) - 0.0025) = 0.0075 on the reading that
+    enters WATCH (S is kept); the second breach takes S to 0.015 >= 0.01 and
+    retires — one reading earlier than three consecutive breaches."""
+    t = LifecycleTracker(alpha_id="ZZ99", config=_LC, policy="test")
+    assert t.update(1 * NS_S, -0.01) == WATCH
+    assert t.cusum == pytest.approx(0.0075, abs=1e-15)
+    assert t.update(2 * NS_S, -0.01) == RETIRED
+    assert not t.allocatable
+    assert t.cusum == 0.0  # reset by the verdict
+    assert "CUSUM 0.015000 >= 0.01" in t.transitions[-1].reason
+    assert t.update(3 * NS_S, -0.01) == RETIRED
+    assert t.breach_count == 0  # not used by the CUSUM rule
+    # a shallow breach inside the slack adds nothing: 0 - (-0.002) - 0.0025 < 0
+    shallow = LifecycleTracker(alpha_id="ZZ99", config=_LC, policy="test")
+    assert [shallow.update(k * NS_S, -0.002) for k in range(1, 40)] == [WATCH] * 39
+    assert shallow.cusum == 0.0
+
+
+def test_lifecycle_legacy_consecutive_retired_recovers_to_watch_then_active():
+    t, states = _walk([-0.01, -0.01, -0.01, 0.01, 0.01, 0.01, 0.01], cfg=_LC_LEGACY)
     assert states == [WATCH, WATCH, RETIRED, RETIRED, WATCH, WATCH, ACTIVE]
 
 
-def test_lifecycle_neutral_zone_resets_counters():
+def test_lifecycle_cusum_retired_recovers_to_watch_then_active():
+    """Default rule on the same path: retired on the second breach (S 0.015),
+    the third breach lands in RETIRED, and the recovery rule is the legacy
+    one — two readings >= 0.005 to WATCH, two more to ACTIVE."""
+    t, states = _walk([-0.01, -0.01, -0.01, 0.01, 0.01, 0.01, 0.01])
+    assert states == [WATCH, RETIRED, RETIRED, RETIRED, WATCH, WATCH, ACTIVE]
+    assert [(tr.from_state, tr.to_state) for tr in t.transitions] == [
+        (ACTIVE, WATCH),
+        (WATCH, RETIRED),
+        (RETIRED, WATCH),
+        (WATCH, ACTIVE),
+    ]
+    assert t.cusum == 0.0
+
+
+def test_lifecycle_legacy_consecutive_neutral_zone_resets_counters():
     # breaches interrupted by a neutral reading never accumulate to retire
-    t, states = _walk([-0.01, -0.01, 0.002, -0.01, -0.01, 0.002, -0.01])
+    t, states = _walk([-0.01, -0.01, 0.002, -0.01, -0.01, 0.002, -0.01], cfg=_LC_LEGACY)
     assert RETIRED not in states
     assert states[-1] == WATCH
 
 
-def test_lifecycle_none_is_no_evidence():
-    t, states = _walk([-0.01, None, -0.01, None, -0.01])
+def test_lifecycle_cusum_neutral_zone_drains_but_does_not_reset():
+    """Default rule: a neutral reading (gate <= ic < reactivate gate) drains
+    S by ``ic + k`` instead of resetting a counter.  Gate 0, k 0.0025,
+    h 0.01, new_fraction 1; each -0.005 adds 0.0025, each 0.002 takes 0.0045:
+
+        reading  -0.005  0.002  -0.005  -0.005  0.002   -0.005
+        S        0.0025  0      0.0025  0.005   0.0005  0.003
+
+    then three more -0.005 readings: 0.0055, 0.008, 0.0105 >= 0.01 -> RETIRED.
+    """
+    t = LifecycleTracker(alpha_id="ZZ99", config=_LC, policy="test")
+    path = [-0.005, 0.002, -0.005, -0.005, 0.002, -0.005]
+    want = [0.0025, 0.0, 0.0025, 0.005, 0.0005, 0.003]
+    for k, (v, s) in enumerate(zip(path, want, strict=True)):
+        assert t.update((k + 1) * NS_S, v) == WATCH
+        assert t.cusum == pytest.approx(s, abs=1e-15)
+    assert t.update(7 * NS_S, -0.005) == WATCH
+    assert t.update(8 * NS_S, -0.005) == WATCH
+    assert t.cusum == pytest.approx(0.008, abs=1e-15)
+    assert t.update(9 * NS_S, -0.005) == RETIRED
+    # the legacy path of the test above, under the default rule, retires on
+    # its second breach: -0.01 twice is S = 0.015 whatever follows
+    _, states = _walk([-0.01, -0.01, 0.002, -0.01, -0.01, 0.002, -0.01])
+    assert states == [WATCH, RETIRED] + [RETIRED] * 5
+
+
+def test_lifecycle_legacy_consecutive_none_is_no_evidence():
+    t, states = _walk([-0.01, None, -0.01, None, -0.01], cfg=_LC_LEGACY)
     # Nones neither breach nor recover: breaches accumulate to retirement
     assert states == [WATCH, WATCH, WATCH, WATCH, RETIRED]
+
+
+def test_lifecycle_cusum_none_is_no_evidence():
+    """Default rule: a missing reading moves neither the state nor S, so the
+    evidence accumulates across it — S 0.0075, (None), 0.015 -> RETIRED."""
+    t = LifecycleTracker(alpha_id="ZZ99", config=_LC, policy="test")
+    assert t.update(1 * NS_S, -0.01) == WATCH
+    assert t.update(2 * NS_S, None) == WATCH
+    assert t.cusum == pytest.approx(0.0075, abs=1e-15)
+    assert t.update(3 * NS_S, -0.01) == RETIRED
+    assert t.update(4 * NS_S, None) == RETIRED
+    assert t.update(5 * NS_S, -0.01) == RETIRED
+    assert t.eval_index == 5 and len(t.transitions) == 2
+
+
+def test_lifecycle_cusum_weights_a_reading_by_its_new_fraction():
+    """The replay passes block / window = 1/8: eight readings of one bad
+    stretch are worth one disjoint reading.  -0.01 at new_fraction 0.125
+    adds 0.125 * 0.0075 = 0.0009375 per reading, so S reaches 0.01 on the
+    11th (0.0103125) — and the reading must itself be a breach to retire."""
+    t = LifecycleTracker(alpha_id="ZZ99", config=_LC, policy="test")
+    states = [t.update(k * NS_S, -0.01, new_fraction=0.125) for k in range(1, 11)]
+    assert states == [WATCH] * 10
+    assert t.cusum == pytest.approx(10 * 0.0009375, abs=1e-15)
+    assert t.update(11 * NS_S, -0.01, new_fraction=0.125) == RETIRED
+    with pytest.raises(ValueError, match="new_fraction"):
+        LifecycleTracker(alpha_id="ZZ99", config=_LC).update(1, -0.01, new_fraction=1.5)
+    # the legacy rule does not read new_fraction: three breaches retire
+    legacy = LifecycleTracker(alpha_id="ZZ99", config=_LC_LEGACY, policy="test")
+    assert [legacy.update(k * NS_S, -0.01, new_fraction=0.125) for k in range(1, 4)] == [
+        WATCH,
+        WATCH,
+        RETIRED,
+    ]
 
 
 def test_lifecycle_bad_config_raises():
@@ -625,31 +801,74 @@ def test_lifecycle_bad_config_raises():
         LifecycleConfig(0.0, -0.5, 3, 2)  # reactivate below watch gate
     with pytest.raises(ValueError):
         LifecycleConfig(0.0, 0.0, 0, 1)
+    with pytest.raises(ValueError, match="unknown breach_rule"):
+        LifecycleConfig(0.0, 0.005, 3, 2, breach_rule="ewma")
+    with pytest.raises(ValueError, match="cusum_h"):
+        LifecycleConfig(0.0, 0.005, 3, 2, cusum_h=0.0)
+    with pytest.raises(ValueError, match="cusum_k"):
+        LifecycleConfig(0.0, 0.005, 3, 2, cusum_k=-1e-9)
+    with pytest.raises(ValueError, match="names no 'breach_rule'"):  # a v1.4.0 block
+        LifecycleConfig.from_config(
+            {
+                "watch_ic_gate": 0.0,
+                "reactivate_ic_gate": 0.005,
+                "retire_breach_evals": 3,
+                "reactivate_evals": 2,
+            }
+        )
 
 
-def test_golden_lifecycle_sequence(golden):
-    g = golden["lifecycle"]
-    cfg = LifecycleConfig(
-        **{
-            k: g["config"][k]
-            for k in (
-                "watch_ic_gate",
-                "reactivate_ic_gate",
-                "retire_breach_evals",
-                "reactivate_evals",
-            )
-        }
-    )
+@pytest.mark.parametrize(
+    ("section", "rule"),
+    [("lifecycle", "cusum"), ("lifecycle_legacy_consecutive", "consecutive")],
+)
+def test_golden_lifecycle_sequence(golden, adaptive_cfg, section, rule):
+    """x-version 2 (v1.5.0): ``lifecycle`` is the default rule of the pinned
+    config (CUSUM), ``lifecycle_legacy_consecutive`` the rule up to v1.4.0 on
+    the same path; states, transitions and the CUSUM statistic after every
+    reading are pinned for both."""
+    g = golden[section]
+    cfg = LifecycleConfig.from_config(g["config"])
+    assert cfg.to_dict() == g["config"] and cfg.breach_rule == rule
+    shipped = LifecycleConfig.from_config(adaptive_cfg["lifecycle"])
+    if section == "lifecycle":
+        assert cfg == shipped, "the default golden runs the shipped adaptive.lifecycle block"
+    else:
+        assert cfg == LifecycleConfig.legacy(
+            shipped.watch_ic_gate,
+            shipped.reactivate_ic_gate,
+            shipped.retire_breach_evals,
+            shipped.reactivate_evals,
+        )
+    # the replay's share of new rows per reading: block / IC window
+    assert g["new_fraction"] == adaptive_cfg["block_ns"] / adaptive_cfg["ic_window_ns"] == 0.125
+    assert g["ic_path"] == golden["lifecycle"]["ic_path"], "both rules read the same path"
     t = LifecycleTracker(alpha_id="GOLDEN", config=cfg, policy="golden")
-    states = []
+    states, cusum = [], []
     informative = g["ic_informative"]
-    assert len(informative) == len(g["ic_path"])
+    assert len(informative) == len(g["ic_path"]) == len(g["expected_cusum"])
     for k, v in enumerate(g["ic_path"]):
-        states.append(t.update((k + 1) * int(g["ts_step_ns"]), v, informative=bool(informative[k])))
+        states.append(
+            t.update(
+                (k + 1) * int(g["ts_step_ns"]),
+                v,
+                informative=bool(informative[k]),
+                new_fraction=float(g["new_fraction"]),
+            )
+        )
+        cusum.append(t.cusum)
     assert states == g["expected_states"]
-    # the golden path ends with six UNINFORMATIVE breaches that move nothing
-    assert not any(informative[-6:])
-    assert states[-1] == states[-7] == "WATCH"
+    assert cusum == pytest.approx(g["expected_cusum"], abs=1e-12)
+    # the golden path holds a block of six UNINFORMATIVE breaches (readings
+    # 22-27, a frozen IC window re-read) that move nothing: neither the
+    # state nor the CUSUM statistic
+    quiet = [k for k, flag in enumerate(informative) if not flag]
+    assert quiet == [21, 22, 23, 24, 25, 26]
+    assert all(v is not None and v < cfg.watch_ic_gate for v in g["ic_path"][21:27])
+    assert all(states[k] == states[20] == "WATCH" for k in quiet)
+    assert all(cusum[k] == cusum[20] for k in quiet)
+    if rule == "consecutive":
+        assert all(c == 0.0 for c in cusum)
     assert len(t.transitions) == g["expected_transition_count"]
     got = [
         {"from": tr.from_state, "to": tr.to_state, "eval_index": tr.eval_index}
@@ -658,11 +877,15 @@ def test_golden_lifecycle_sequence(golden):
     assert got == g["expected_transitions"]
 
 
-def test_lifecycle_log_completeness(tmp_path):
+@pytest.mark.parametrize("cfg", [_LC, _LC_LEGACY], ids=["cusum", "legacy_consecutive"])
+def test_lifecycle_log_completeness(tmp_path, cfg):
+    # three transitions under either rule: WATCH, RETIRED (on the second
+    # breach under CUSUM, the third under the legacy count), back to WATCH
     log = LifecycleLog(tmp_path / "lc.jsonl", truncate=True)
-    t, _ = _walk([-0.01, -0.01, -0.01, 0.01, 0.01], log=log)
+    t, _ = _walk([-0.01, -0.01, -0.01, 0.01, 0.01], cfg=cfg, log=log)
     rows = log.read_all()
     assert len(rows) == len(t.transitions) == 3
+    assert [r["to"] for r in rows] == [WATCH, RETIRED, WATCH]
     last_ts = -1
     for r in rows:
         assert r["from"] in STATES and r["to"] in STATES
@@ -746,15 +969,25 @@ def test_adaptive_warmup_never_trades(toy_deployment, adaptive_cfg):
         assert (sc["expected_return"].to_numpy()[warm] == 0.0).all()
 
 
-def test_adaptive_retirement_halts_allocation(toy_deployment, adaptive_cfg, tmp_path):
+@pytest.mark.parametrize("rule", ["cusum", "legacy_consecutive"])
+def test_adaptive_retirement_halts_allocation(toy_deployment, adaptive_cfg, tmp_path, rule):
     # gates the toy alpha can never satisfy: every eval breaches
-    lc = LifecycleConfig(
+    gates = dict(
         watch_ic_gate=0.9, reactivate_ic_gate=0.95, retire_breach_evals=3, reactivate_evals=2
     )
+    lc = LifecycleConfig(**gates) if rule == "cusum" else LifecycleConfig.legacy(**gates)
+    assert lc.breach_rule == ("cusum" if rule == "cusum" else "consecutive")
     log = LifecycleLog(tmp_path / "lc.jsonl", truncate=True)
     res = toy_deployment.run(build_policy("static", adaptive_cfg), lc, log)
     assert res.final_state == RETIRED
     retire_ts = next(t["event_ts"] for t in res.transitions if t["to"] == RETIRED)
+    # Every reading is ~0.9 under the gate.  Legacy: the third consecutive
+    # breach retires.  CUSUM: each reading is 1/8 new, so the first adds
+    # about 0.125 * 0.9 >> cusum_h = 0.01 on entering WATCH, and the second
+    # breach — the first WATCH reading — retires.
+    informative = [r["block"] for r in res.eval_rows if r["informative"]]
+    retire_block = next(r["block"] for r in res.eval_rows if r["ts"] == retire_ts)
+    assert retire_block == informative[1 if rule == "cusum" else 2]
     for _iid, sc in res.scores.items():
         after = sc["exchange_ts"].to_numpy() >= retire_ts
         assert (sc["confidence"].to_numpy()[after] == 0.0).all()
@@ -771,9 +1004,10 @@ def test_adaptive_static_matches_manual_deployment(toy_deployment, adaptive_cfg,
     model = _ToyAlpha()
     model.fit(toy_deployment._train_window(toy_deployment.deploy_start))
     scores = model.score(toy_frames)
+    # the default position policy and row block need the label horizon
     bt = Backtester(
         CostModel.load(CONFIGS_DIR / "execution" / "execution.json"), _META, BacktestConfig()
-    )
+    ).for_horizon(_ToyAlpha.horizon)
     manual = {}
     for iid, sc in scores.items():
         ts = sc["exchange_ts"].to_numpy()
@@ -787,6 +1021,84 @@ def test_adaptive_static_matches_manual_deployment(toy_deployment, adaptive_cfg,
         )
     ref = bt.run(frames=toy_frames, scores=manual, asset_class="EQUITY")
     assert res.backtest.total_pnl == pytest.approx(ref.total_pnl, abs=1e-9)
+    assert res.backtest.trade_count == ref.trade_count > 0
+
+
+def test_adaptive_backtest_runs_the_default_research_rules(toy_deployment, adaptive_cfg):
+    """The deployment hands its scores to the research backtester under the
+    v1.5.0 defaults, with the alpha's label horizon set."""
+    cfg = toy_deployment.backtester.config
+    assert cfg.position_policy == "cost_aware" and cfg.cap_fills_at_l1
+    assert cfg.block_rows_label() == "scored_rows:1s" and cfg.horizon_ns == NS_S
+    assert toy_deployment.backtester.cost_model.impact_model == "sqrt"
+    res = toy_deployment.run(build_policy("static", adaptive_cfg))
+    for r in res.backtest.per_instrument.values():
+        # cost-aware: flat or the full position (the 10 000 displayed never caps)
+        assert set(np.unique(r.positions)) <= {-1000.0, 0.0, 1000.0}
+        assert r.trade_count > 0
+        # the last row has no valid label: it is blocked and makes no decision
+        assert r.positions[-1] == r.positions[-2]
+
+
+def test_adaptive_legacy_rules_are_selectable_by_name(toy_frames, adaptive_cfg, toy_deployment):
+    """Every rule up to v1.4.0, named: sign positions / uncapped fills /
+    every row traded, linear impact, the legacy z, the consecutive rule."""
+    bt = Backtester(
+        CostModel.load(CONFIGS_DIR / "execution" / "execution.json").with_linear_impact(),
+        _META,
+        BacktestConfig.legacy(),
+    )
+    legacy_cfg = {**adaptive_cfg, "ic_z_method": "legacy"}
+    validate_adaptive_config(legacy_cfg)
+    dep = AdaptiveDeployment(_ToyAlpha, toy_frames, legacy_cfg, bt, 0.25)
+    assert dep.backtester.config.position_policy == "sign"
+    assert dep.backtester.cost_model.impact_model == "linear"
+    shipped = LifecycleConfig.from_config(adaptive_cfg["lifecycle"])
+    lc = LifecycleConfig.legacy(
+        shipped.watch_ic_gate,
+        shipped.reactivate_ic_gate,
+        shipped.retire_breach_evals,
+        shipped.reactivate_evals,
+    )
+    pol = build_policy("static", adaptive_cfg)
+    old = dep.run(pol, lc)
+    new = toy_deployment.run(pol, shipped)
+    bt_old = old.backtest
+    assert abs(bt_old.total_pnl - (bt_old.gross_pnl - bt_old.total_costs)) < 1e-9
+    # the sign rule re-decides on every row; the cost-aware rule trades only
+    # forecasts that clear the round-trip cost
+    assert bt_old.trade_count > 10 * new.backtest.trade_count > 0
+    # the deployed (shadow) scores do not depend on the backtest rules
+    for i in old.scores:
+        assert np.array_equal(
+            old.scores[i]["expected_return"].to_numpy(),
+            new.scores[i]["expected_return"].to_numpy(),
+        )
+    # the two z's: same windows and bucket counts; on these uniform 1 s rows
+    # every full bucket holds the same number of pairs, so the legacy
+    # unweighted rolling IC and the pair-weighted one agree closely while
+    # the z statistics differ (the HAC z adds the baseline's own variance)
+    rows_old = [r for r in old.eval_rows if r["ic_z"] is not None]
+    rows_new = [r for r in new.eval_rows if r["ic_z"] is not None]
+    assert len(rows_old) == len(rows_new) > 0
+    for a, b in zip(rows_old, rows_new, strict=True):
+        assert a["ts"] == b["ts"] and a["n_ic_buckets"] == b["n_ic_buckets"]
+        assert a["rolling_ic"] == pytest.approx(b["rolling_ic"], abs=5e-3)
+    assert any(abs(a["ic_z"] - b["ic_z"]) > 1e-6 for a, b in zip(rows_old, rows_new, strict=True))
+
+
+def test_adaptive_config_must_name_the_ic_z_method(toy_frames, adaptive_cfg):
+    bt = Backtester(
+        CostModel.load(CONFIGS_DIR / "execution" / "execution.json"), _META, BacktestConfig()
+    )
+    pol = build_policy("static", adaptive_cfg)
+    unnamed = {k: v for k, v in adaptive_cfg.items() if k != "ic_z_method"}
+    with pytest.raises(ValueError, match="names no 'ic_z_method'"):
+        AdaptiveDeployment(_ToyAlpha, toy_frames, unnamed, bt, 0.25).run(pol)
+    with pytest.raises(ValueError, match="ic_z_method 'pinned' unknown"):
+        AdaptiveDeployment(
+            _ToyAlpha, toy_frames, {**adaptive_cfg, "ic_z_method": "pinned"}, bt, 0.25
+        ).run(pol)
 
 
 def test_adaptive_scheduled_fires_on_day_boundary(adaptive_cfg):
@@ -818,7 +1130,9 @@ def test_adaptive_eval_rows_are_complete(toy_deployment, adaptive_cfg):
         assert set(row) >= {"ts", "psi", "ks", "rolling_ic", "ic_z", "refit"}
 
 
-def test_rolling_ic_z_hand_computed():
+def test_rolling_ic_z_legacy_hand_computed():
+    """``rolling_ic_z`` is the LEGACY monitor (``ic_z_method="legacy"``): the
+    unweighted mean bucket IC and a z that treats the baseline as exact."""
     base = ICBaseline(
         "b",
         "ZZ99",
@@ -841,15 +1155,62 @@ def test_rolling_ic_z_hand_computed():
     assert r2.rolling_ic is None and r2.z is None
 
 
+def test_rolling_ic_z_hac_hand_computed():
+    """The DEFAULT monitor (``ic_z_method="hac"``): the pair-count-weighted
+    mean bucket IC and the two-sample z.
+
+    Two buckets: 10 pairs with IC +1 and 30 pairs with IC -1.
+      weighted mean  m = (10 * 1 + 30 * -1) / 40 = -0.5   (unweighted: 0)
+      deviations     d = [1.5, -0.5]
+      lag-0 variance sum(w^2 d^2) / sum(w^2) = (100 * 2.25 + 900 * 0.25) / 1000 = 0.45
+      n_eff          (sum w)^2 / sum(w^2) = 1600 / 1000 = 1.6
+      var_live       0.45 / 1.6 = 0.28125
+      var_base       ic_std^2 / n_buckets_baseline = 0.01 / 30
+      z              (-0.5 - 0.2) / sqrt(0.28125 + 0.01 / 30)
+    """
+    base = ICBaseline(
+        "b",
+        "ZZ99",
+        "",
+        ic_mean=0.2,
+        ic_std=0.1,
+        n_buckets_baseline=30,
+        bucket_ns=100 * NS_S,
+        horizon="1s",
+    )
+    ts = np.concatenate([np.arange(10), 100 * NS_S + np.arange(30)]).astype(np.int64)
+    x = np.concatenate([np.arange(10.0), np.arange(30.0)])
+    y = np.concatenate([2.0 * np.arange(10.0) + 1.0, -np.arange(30.0)])
+    r = rolling_ic_z_hac(base, ts, x, y, min_buckets=2, lags=0)
+    assert r.n_buckets == 2 and r.bucket_ics == pytest.approx([1.0, -1.0], abs=1e-12)
+    assert r.rolling_ic == pytest.approx(-0.5, abs=1e-12)
+    assert r.z == pytest.approx(-0.7 / math.sqrt(0.28125 + 0.01 / 30.0), abs=1e-9)
+    # the legacy monitor on the same rows: unweighted mean 0, and a z that
+    # ignores both the pair counts and the baseline's sampling error
+    legacy = rolling_ic_z(base, ts, x, y, min_buckets=2)
+    assert legacy.rolling_ic == pytest.approx(0.0, abs=1e-12)
+    assert legacy.z == pytest.approx((0.0 - 0.2) / (0.1 / math.sqrt(2)), abs=1e-9)
+    assert abs(r.z) < abs(legacy.z)
+    # default lags (nw_lags of a 1 s horizon in 100 s buckets = 2): with two
+    # buckets the lag-1 term is 2 * (1 - 1/3) * (1.5 * -0.5) = -1.0, the
+    # long-run variance 0.45 - 1.0 is not positive, and the monitor reports
+    # the rolling IC without fabricating a z
+    r_default = rolling_ic_z_hac(base, ts, x, y, min_buckets=2)
+    assert r_default.rolling_ic == pytest.approx(-0.5, abs=1e-12) and r_default.z is None
+    # below min_buckets: silent
+    r2 = rolling_ic_z_hac(base, ts, x, y, min_buckets=3)
+    assert r2.rolling_ic is None and r2.z is None and r2.n_buckets == 2
+
+
 # -- round-3: informative evaluations, OOS IC baseline ---------------------
 
 
-def test_lifecycle_ignores_uninformative_evaluations():
+def test_lifecycle_legacy_consecutive_ignores_uninformative_evaluations():
     """Six re-reads of the SAME matured window are one reading, not six
-    consecutive breaches (API_ADAPTIVE section 6)."""
+    consecutive breaches (API_ADAPTIVE section 6) — the legacy rule."""
     from iap.adaptive.lifecycle import ACTIVE, RETIRED, WATCH
 
-    cfg = LifecycleConfig(
+    cfg = LifecycleConfig.legacy(
         watch_ic_gate=0.0, reactivate_ic_gate=0.005, retire_breach_evals=6, reactivate_evals=3
     )
     tr = LifecycleTracker(alpha_id="EQ03", config=cfg)
@@ -866,6 +1227,29 @@ def test_lifecycle_ignores_uninformative_evaluations():
     assert states[-1] == RETIRED
     assert tr2.state == RETIRED
     assert ACTIVE not in states[1:]
+
+
+def test_lifecycle_cusum_ignores_uninformative_evaluations():
+    """The default rule: re-reads of an unchanged matured window add nothing
+    to the CUSUM statistic.  One -0.04 reading at new_fraction 1/8 enters
+    WATCH with S = 0.125 * (0.04 - 0.0025) = 0.0046875 < 0.01; seven
+    uninformative re-reads leave S there.  With new evidence the same
+    readings reach 0.009375 and then 0.0140625 >= 0.01 on the third."""
+    cfg = LifecycleConfig(
+        watch_ic_gate=0.0, reactivate_ic_gate=0.005, retire_breach_evals=6, reactivate_evals=3
+    )
+    assert cfg.breach_rule == "cusum"
+    tr = LifecycleTracker(alpha_id="EQ03", config=cfg)
+    assert tr.update(1, -0.04, new_fraction=0.125) == WATCH
+    for k in range(2, 9):
+        assert tr.update(k, -0.04, informative=False, new_fraction=0.125) == WATCH
+    assert tr.state == WATCH
+    assert tr.cusum == pytest.approx(0.0046875, abs=1e-15)
+    assert tr.eval_index == 8 and len(tr.transitions) == 1
+
+    tr2 = LifecycleTracker(alpha_id="EQ03", config=cfg)
+    states = [tr2.update(k, -0.04, new_fraction=0.125) for k in range(1, 4)]
+    assert states == [WATCH, WATCH, RETIRED]
 
 
 def test_drift_refit_requires_new_evidence():

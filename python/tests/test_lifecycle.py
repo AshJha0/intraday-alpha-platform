@@ -9,10 +9,19 @@ determinism and round trips, the bootstrap on the real reports (0 alphas
 beyond CANDIDATE; failed-gate sets agree with REPORT.md verdicts), and two
 SplitMix64-driven property tests (RETIRED never moves by SYSTEM; the state
 index never jumps more than one step forward except a manual retire).
+
+Two policies (v1.5.0).  The ``config`` fixture is the DEFAULT policy: the
+``statistical_significance`` gate reads the threshold carried by the
+evidence (``tstat_threshold = "ledger"``) and the live retirement rule is
+the CUSUM.  The ``legacy`` fixture is the v1.4.0 policy selected by name
+(``iap.lifecycle.golden.legacy_config``: the fixed 3.0 threshold and the
+consecutive-breach rule); the tests written for those rules run under it
+with their assertions unchanged and say "legacy" in their names.
 """
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import math
 
@@ -61,20 +70,38 @@ from iap.lifecycle.bootstrap import (
     render_status,
     research_evidence,
     run_bootstrap,
+    significance_threshold_from_report,
 )
 from iap.lifecycle.config import repo_root
+from iap.lifecycle.golden import legacy_config
 from iap.lifecycle.golden import research as golden_research
+from iap.validation.ledger import ExperimentLedger
 from iap.validation.validate import GATES as VALIDATE_GATES
 
 S = LifecycleState
 T0 = 1_700_000_000_000_000_000
 STEP = 900_000_000_000
 ROOT = repo_root()
+#: The ledger threshold the helper evidence carries (golden t 4.0 clears it).
+THRESHOLD = 3.5
+#: One 15-minute block of a 2-hour rolling-IC window (``live.new_fraction``).
+BLOCK_FRACTION = 0.125
 
 
 @pytest.fixture(scope="module")
 def config() -> PolicyConfig:
+    """The default policy (ledger significance threshold, CUSUM retirement)."""
     return load_policy_config()
+
+
+@pytest.fixture(scope="module")
+def legacy(config) -> PolicyConfig:
+    """The v1.4.0 policy by name (fixed threshold, consecutive breaches)."""
+    return legacy_config(config)
+
+
+def _policy(config: PolicyConfig, name: str) -> PolicyConfig:
+    return config if name == "default" else legacy_config(config)
 
 
 def _machine(config: PolicyConfig, alpha_id: str = "LCX", log=None) -> AlphaLifecycle:
@@ -90,10 +117,22 @@ def _ev(**kw) -> Evidence:
     return Evidence(**base)
 
 
-def _live(ic, informative=True, n_buckets=8, eval_index=1) -> LiveEvidence:
+def _live(
+    ic, informative=True, n_buckets=8, eval_index=1, new_fraction=BLOCK_FRACTION
+) -> LiveEvidence:
     return LiveEvidence(
-        rolling_ic=ic, n_buckets=n_buckets, eval_index=eval_index, informative=informative
+        rolling_ic=ic,
+        n_buckets=n_buckets,
+        eval_index=eval_index,
+        informative=informative,
+        new_fraction=new_fraction,
     )
+
+
+def _cusum_step(stat: float, ic: float, live: LifecycleConfig, fraction: float) -> float:
+    """One CUSUM update, as pinned in ``iap.adaptive.lifecycle``."""
+    stat = stat + fraction * (live.watch_ic_gate - ic - live.cusum_k)
+    return stat if stat > 0.0 else 0.0
 
 
 GOOD_VALIDATION = ValidationEvidence(
@@ -115,7 +154,7 @@ def _to_state(machine: AlphaLifecycle, alpha_id: str, target: LifecycleState, ts
     good = golden_research(alpha_id)
     plan = [
         (S.CANDIDATE, _ev(research=good)),
-        (S.VALIDATING, _ev(research=good, capacity_usd=5e6)),
+        (S.VALIDATING, _ev(research=good, capacity_usd=5e6, significance_threshold=THRESHOLD)),
         (S.PAPER, _ev(validation=GOOD_VALIDATION)),
         (S.ACTIVE, _ev(paper=GOOD_PAPER)),
     ]
@@ -150,6 +189,38 @@ def test_config_defaults_equal_pinned_validate_gates(config):
     with open(ROOT / "configs" / "strategies" / "strategies.json") as fh:
         live = json.load(fh)["adaptive"]["lifecycle"]
     assert config.live == LifecycleConfig.from_config(live)
+    # the v1.5.0 defaults: the evidence's ledger threshold, the CUSUM rule
+    assert config.tstat_threshold == "ledger"
+    assert (config.live.breach_rule, config.live.cusum_k, config.live.cusum_h) == (
+        "cusum",
+        0.0025,
+        0.01,
+    )
+
+
+def test_legacy_config_names_the_v140_policy(config, legacy):
+    """``legacy_config`` keeps every gate and selects the two v1.4.0 rules
+    by name: the fixed threshold and the consecutive-breach rule."""
+    assert legacy.tstat_threshold == "fixed"
+    assert legacy.live == LifecycleConfig.legacy(0.0, 0.005, 6, 3)
+    assert legacy.live.breach_rule == "consecutive"
+    assert (legacy.policy, legacy.gates, legacy.max_consecutive_failures) == (
+        config.policy,
+        config.gates,
+        config.max_consecutive_failures,
+    )
+    assert legacy != config
+    assert PolicyConfig.from_dict(legacy.to_dict()) == legacy
+    assert legacy.to_dict()["tstat_threshold"] == "fixed"
+    assert legacy.to_dict()["live"]["breach_rule"] == "consecutive"
+    with pytest.raises(ValueError, match="tstat_threshold"):
+        PolicyConfig(
+            config.policy,
+            config.gates,
+            config.max_consecutive_failures,
+            config.live,
+            tstat_threshold="bonferroni",
+        )
 
 
 def test_config_round_trip(config):
@@ -159,7 +230,11 @@ def test_config_round_trip(config):
 @pytest.mark.parametrize(
     "mutate, message",
     [
-        (lambda d: d.__setitem__("x-version", 2), "x-version"),
+        (lambda d: d.__setitem__("x-version", 1), "x-version"),  # a v1.4.0 document
+        (lambda d: d.__setitem__("x-version", 3), "x-version"),
+        (lambda d: d.pop("tstat_threshold"), "missing keys"),
+        (lambda d: d.__setitem__("tstat_threshold", "bonferroni"), "tstat_threshold"),
+        (lambda d: d.__setitem__("tstat_threshold", 3.0), "tstat_threshold"),
         (lambda d: d["gates"].pop("min_oos_ic"), "missing keys"),
         (lambda d: d["gates"].__setitem__("extra", 1.0), "unknown keys"),
         (lambda d: d["gates"].__setitem__("min_oos_ic", "0.01"), "expected a number"),
@@ -194,6 +269,24 @@ def test_config_rejects_non_finite_and_missing_strategies(tmp_path):
     (tmp_path / "strategies.json").write_text(json.dumps({"adaptive": {}}))
     with pytest.raises(ValueError, match="adaptive.lifecycle"):
         load_policy_config(path, tmp_path / "strategies.json")
+    # a live block written for v1.4.0 names no retirement rule: rejected, not
+    # read under the new default
+    v140_live = {
+        "watch_ic_gate": 0.0,
+        "reactivate_ic_gate": 0.005,
+        "retire_breach_evals": 6,
+        "reactivate_evals": 3,
+    }
+    (tmp_path / "strategies.json").write_text(json.dumps({"adaptive": {"lifecycle": v140_live}}))
+    with pytest.raises(ValueError, match="breach_rule"):
+        load_policy_config(path, tmp_path / "strategies.json")
+    # ... and naming the legacy rule keeps the rule it was written for
+    (tmp_path / "strategies.json").write_text(
+        json.dumps({"adaptive": {"lifecycle": {**v140_live, "breach_rule": "consecutive"}}})
+    )
+    loaded = load_policy_config(path, tmp_path / "strategies.json")
+    assert loaded.live == LifecycleConfig.legacy(0.0, 0.005, 6, 3)
+    assert loaded.tstat_threshold == "ledger"
 
 
 # --------------------------------------------------------------------------
@@ -232,6 +325,26 @@ def test_evidence_rejects_nan_and_wrong_types():
         _ev(research={"ic": 1.0})
     with pytest.raises(ValueError, match="evidence.live"):
         _ev(live=GOOD_PAPER)
+    # live.new_fraction (v1.5.0) is required and lies in (0, 1]
+    with pytest.raises(TypeError, match="new_fraction"):
+        LiveEvidence(rolling_ic=0.0, n_buckets=8, eval_index=1, informative=True)
+    for bad in (0.0, -0.125, 1.5):
+        with pytest.raises(ValueError, match=r"new_fraction must be in \(0, 1\]"):
+            _live(0.0, new_fraction=bad)
+    with pytest.raises(ValueError, match="non-finite"):
+        _live(0.0, new_fraction=float("nan"))
+    with pytest.raises(ValueError, match="expected a number"):
+        _live(0.0, new_fraction=True)
+    assert _live(0.0, new_fraction=1).new_fraction == 1.0
+    # evidence.significance_threshold (v1.5.0): None, or a finite number > 0
+    for bad in (0.0, -3.0):
+        with pytest.raises(ValueError, match="significance_threshold must be > 0"):
+            _ev(significance_threshold=bad)
+    with pytest.raises(ValueError, match="non-finite"):
+        _ev(significance_threshold=float("inf"))
+    with pytest.raises(ValueError, match="expected a number"):
+        _ev(significance_threshold="3.5")
+    assert _ev().significance_threshold is None
 
 
 def test_evidence_round_trip_and_strict_keys():
@@ -241,10 +354,31 @@ def test_evidence_round_trip_and_strict_keys():
         validation=GOOD_VALIDATION,
         paper=GOOD_PAPER,
         live=_live(None),
+        significance_threshold=THRESHOLD,
     )
     doc = json.loads(json.dumps(ev.to_dict()))
     assert Evidence.from_dict(doc) == ev
     assert Evidence.from_dict(Evidence.empty().to_dict()) == Evidence.empty()
+    # significance_threshold is ALWAYS serialised (null allowed) and required
+    assert doc["significance_threshold"] == THRESHOLD
+    assert list(Evidence.empty().to_dict()) == [
+        "research",
+        "capacity_usd",
+        "significance_threshold",
+        "validation",
+        "paper",
+        "live",
+    ]
+    assert Evidence.empty().to_dict()["significance_threshold"] is None
+    unjudged = {**doc, "significance_threshold": None}
+    assert Evidence.from_dict(unjudged).significance_threshold is None
+    with pytest.raises(ValueError, match=r"missing keys \['significance_threshold'\]"):
+        Evidence.from_dict({k: v for k, v in doc.items() if k != "significance_threshold"})
+    # live.new_fraction is serialised and required
+    assert doc["live"]["new_fraction"] == BLOCK_FRACTION
+    v140_live = {k: v for k, v in doc["live"].items() if k != "new_fraction"}
+    with pytest.raises(ValueError, match=r"live: missing keys \['new_fraction'\]"):
+        Evidence.from_dict({**doc, "live": v140_live})
     doc["extra"] = 1
     with pytest.raises(ValueError, match="unknown keys"):
         Evidence.from_dict(doc)
@@ -306,16 +440,75 @@ def _research_gate_cases(config):
     ]
 
 
-def test_research_gates_positive_negative(config):
-    gates = build_gates(config)
-    for name, result, expect_pass, expect_value in _research_gate_cases(config):
-        out = gates[name].evaluate("LCX", _ev(research=result))
+@pytest.mark.parametrize("policy", ["default", "legacy"])
+def test_research_gates_positive_negative(config, policy):
+    """The gate table against the configured thresholds.  Under the legacy
+    fixed policy the evidence carries no significance threshold (the v1.4.0
+    form of this test); under the default policy it carries one equal to the
+    configured floor, so ``max(floor, floor)`` is the same threshold and the
+    same table holds."""
+    cfg = _policy(config, policy)
+    carried = cfg.gates.min_nw_tstat if policy == "default" else None
+    gates = build_gates(cfg)
+    for name, result, expect_pass, expect_value in _research_gate_cases(cfg):
+        out = gates[name].evaluate("LCX", _ev(research=result, significance_threshold=carried))
         assert out.passed is expect_pass, (name, result.to_dict())
         if expect_value is None:
             assert out.value is None and out.threshold is None
         else:
             assert out.value == pytest.approx(expect_value, abs=1e-12)
             assert out.threshold == gates[name].threshold
+
+
+def test_significance_gate_reads_the_evidence_threshold(config, legacy):
+    """Default policy: threshold = max(min_nw_tstat, evidence threshold),
+    inclusive; evidence without one FAILS with threshold null (value kept).
+    Legacy fixed policy: min_nw_tstat alone, the evidence field is not read."""
+    gate = build_gates(config)["statistical_significance"]
+    floor = config.gates.min_nw_tstat
+    assert floor == 3.0 and gate.threshold == floor
+    at_floor = golden_research("LCX", t_stat=3.0)
+
+    def judge(result, threshold, cfg_gate=gate):
+        out = cfg_gate.evaluate("LCX", _ev(research=result, significance_threshold=threshold))
+        validate_typed(out)
+        return (out.passed, out.value, out.threshold)
+
+    # a threshold equal to the floor: inclusive pass
+    assert judge(at_floor, 3.0) == (True, 3.0, 3.0)
+    # a threshold below the floor is replaced by the floor: max(3.0, 2.0) = 3.0
+    assert judge(at_floor, 2.0) == (True, 3.0, 3.0)
+    assert judge(golden_research("LCX", t_stat=2.99), 2.0) == (False, 2.99, 3.0)
+    # a threshold above the floor applies: t 3.0 < 3.5 fails, t 4.0 passes,
+    # t 3.5 passes (inclusive)
+    assert judge(at_floor, 3.5) == (False, 3.0, 3.5)
+    assert judge(golden_research("LCX", t_stat=4.0), 3.5) == (True, 4.0, 3.5)
+    assert judge(golden_research("LCX", t_stat=3.5), 3.5) == (True, 3.5, 3.5)
+    # no threshold in the evidence: fails whatever the t, threshold null
+    assert judge(at_floor, None) == (False, 3.0, None)
+    assert judge(golden_research("LCX", t_stat=30.0), None) == (False, 30.0, None)
+    # no research block: value null; the threshold is what the evidence gives
+    out = gate.evaluate("LCX", Evidence.empty())
+    assert (out.passed, out.value, out.threshold) == (False, None, None)
+    out = gate.evaluate("LCX", _ev(significance_threshold=4.5))
+    assert (out.passed, out.value, out.threshold) == (False, None, 4.5)
+    # the legacy fixed policy reads the config alone
+    fixed = build_gates(legacy)["statistical_significance"]
+    assert judge(at_floor, None, fixed) == (True, 3.0, 3.0)
+    assert judge(at_floor, 8.0, fixed) == (True, 3.0, 3.0)
+    assert judge(golden_research("LCX", t_stat=2.99), None, fixed) == (False, 2.99, 3.0)
+    out = fixed.evaluate("LCX", Evidence.empty())
+    assert (out.passed, out.value, out.threshold) == (False, None, 3.0)
+    # no other gate reads the evidence threshold
+    ok = golden_research("LCX")
+    for name, other in build_gates(config).items():
+        if name == "statistical_significance":
+            continue
+        bare = other.evaluate("LCX", _ev(research=ok, capacity_usd=5e6))
+        judged = other.evaluate(
+            "LCX", _ev(research=ok, capacity_usd=5e6, significance_threshold=9.0)
+        )
+        assert bare == judged, name
 
 
 def test_gates_fail_with_null_value_when_evidence_absent(config):
@@ -476,7 +669,9 @@ def test_candidate_leakage_demotion_and_hold(config):
     m = _machine(config)
     _to_state(m, "LCX", S.CANDIDATE)
     leaking = golden_research("LCX", leakage_passed=False, verdict=Verdict.REJECT)
-    tr = m.advance("LCX", T0 + 10, _ev(research=leaking, capacity_usd=5e6))
+    tr = m.advance(
+        "LCX", T0 + 10, _ev(research=leaking, capacity_usd=5e6, significance_threshold=THRESHOLD)
+    )
     assert tr is not None and (tr.from_state, tr.to_state) == (S.CANDIDATE, S.RESEARCH)
     assert tr.actor is Actor.SYSTEM and "leakage" in tr.reason
     assert not tr.gates["leakage_clean"].passed
@@ -486,16 +681,65 @@ def test_candidate_leakage_demotion_and_hold(config):
     _to_state(m2, "LCX", S.CANDIDATE)
     weak = golden_research("LCX", t_stat=1.0)
     for k in range(5):
-        assert m2.advance("LCX", T0 + 10 + k, _ev(research=weak, capacity_usd=5e6)) is None
+        evidence = _ev(research=weak, capacity_usd=5e6, significance_threshold=THRESHOLD)
+        assert m2.advance("LCX", T0 + 10 + k, evidence) is None
         assert m2.evaluations[-1].failed_gates == ["statistical_significance"]
+        assert m2.evaluations[-1].gates["statistical_significance"] == GateResult(
+            passed=False, value=1.0, threshold=THRESHOLD
+        )
     assert m2.state("LCX") is S.CANDIDATE and m2.record("LCX").consecutive_failures == 0
 
 
 def test_candidate_capacity_missing_fails_capacity_gate_only(config):
     m = _machine(config)
     _to_state(m, "LCX", S.CANDIDATE)
+    evidence = _ev(research=golden_research("LCX"), significance_threshold=THRESHOLD)
+    assert m.advance("LCX", T0 + 10, evidence) is None
+    assert m.evaluations[-1].failed_gates == ["capacity"]
+
+
+def test_legacy_candidate_capacity_missing_fails_capacity_gate_only(legacy):
+    """The v1.4.0 form: evidence with no significance threshold."""
+    m = _machine(legacy)
+    _to_state(m, "LCX", S.CANDIDATE)
     assert m.advance("LCX", T0 + 10, _ev(research=golden_research("LCX"))) is None
     assert m.evaluations[-1].failed_gates == ["capacity"]
+
+
+def test_candidate_without_a_significance_threshold_is_not_promoted(config, legacy):
+    """Default policy: research evidence nobody recorded a multiple-testing
+    threshold for holds at CANDIDATE (the gate fails, threshold null), and a
+    threshold above the t holds too; the same evidence with a threshold the
+    t clears is promoted.  The legacy policy promotes the bare evidence."""
+    good = golden_research("LCX")  # t 4.0
+    m = _machine(config)
+    _to_state(m, "LCX", S.CANDIDATE)
+    assert m.advance("LCX", T0 + 10, _ev(research=good, capacity_usd=5e6)) is None
+    held = m.evaluations[-1]
+    assert held.outcome == Outcome.HOLD and held.failed_gates == ["statistical_significance"]
+    assert held.gates["statistical_significance"] == GateResult(
+        passed=False, value=4.0, threshold=None
+    )
+    validate_typed(held.gates["statistical_significance"])
+    above = _ev(research=good, capacity_usd=5e6, significance_threshold=4.5)
+    assert m.advance("LCX", T0 + 11, above) is None
+    assert m.evaluations[-1].gates["statistical_significance"] == GateResult(
+        passed=False, value=4.0, threshold=4.5
+    )
+    assert m.state("LCX") is S.CANDIDATE and m.record("LCX").consecutive_failures == 0
+    cleared = _ev(research=good, capacity_usd=5e6, significance_threshold=THRESHOLD)
+    tr = m.advance("LCX", T0 + 12, cleared)
+    assert tr is not None and tr.to_state is S.VALIDATING
+    assert tr.gates["statistical_significance"] == GateResult(
+        passed=True, value=4.0, threshold=THRESHOLD
+    )
+    validate_typed(tr)
+
+    old = _machine(legacy)
+    _to_state(old, "LCX", S.CANDIDATE)
+    tr = old.advance("LCX", T0 + 10, _ev(research=good, capacity_usd=5e6))
+    assert tr is not None and tr.to_state is S.VALIDATING
+    assert tr.gates["statistical_significance"] == GateResult(passed=True, value=4.0, threshold=3.0)
 
 
 @pytest.mark.parametrize("state", [S.VALIDATING, S.PAPER])
@@ -550,29 +794,68 @@ def test_silence_and_success_reset_counter(config, state):
 
 
 def test_live_edges_match_the_adaptive_tracker(config):
-    """The wrapped machine reproduces LifecycleTracker state-for-state on
-    the golden adaptive ic_path, up to the (terminal) retirement."""
+    """The wrapped machine reproduces LifecycleTracker state-for-state — and
+    the CUSUM statistic bit-for-bit — on the golden adaptive ic_path, up to
+    and including the (terminal) retirement."""
     with open(ROOT / "tests" / "golden" / "expected_adaptive.json") as fh:
         lc = json.load(fh)["lifecycle"]
-    tracker = LifecycleTracker("EQ01", LifecycleConfig.from_config(lc["config"]), policy="p")
+    live = LifecycleConfig.from_config(lc["config"])
+    assert live == config.live and live.breach_rule == "cusum"
+    fraction = lc["new_fraction"]
+    assert fraction == BLOCK_FRACTION
+    tracker = LifecycleTracker("EQ01", live, policy="p")
     m = _machine(config, "EQ01")
     ts = _to_state(m, "EQ01", S.ACTIVE)
+    retired_at = None
     for k, (ic, informative) in enumerate(zip(lc["ic_path"], lc["ic_informative"], strict=False)):
         ts += lc["ts_step_ns"]
-        expected = tracker.update(ts, ic, informative)
-        if expected == "RETIRED":
-            break
-        m.advance("EQ01", ts, _ev(live=_live(ic, informative, eval_index=k)))
+        expected = tracker.update(ts, ic, informative, new_fraction=fraction)
+        m.advance("EQ01", ts, _ev(live=_live(ic, informative, eval_index=k, new_fraction=fraction)))
         assert m.state("EQ01").name == expected == lc["expected_states"][k]
         rec = m.record("EQ01")
         assert (rec.breach_count, rec.recovery_count) == (
             tracker.breach_count,
             tracker.recovery_count,
         )
+        assert rec.breach_count == 0, "the CUSUM rule does not count breaches"
+        assert rec.cusum == tracker.cusum == lc["expected_cusum"][k]
+        if expected == "RETIRED":
+            retired_at = k
+            break
+    assert retired_at == 28 and m.state("EQ01") is S.RETIRED
+    assert "persistent breach: CUSUM" in m.transitions[-1].reason
 
 
-def test_live_breach_watch_retire_and_wrapping(config):
-    m = _machine(config)
+def test_legacy_live_edges_match_the_adaptive_tracker(legacy):
+    """The same delegation under the consecutive rule, on a hand-written
+    path: breach -> WATCH (1), neutral (reset), two breaches, three
+    recoveries -> ACTIVE, then six consecutive breaches -> RETIRED."""
+    path = [0.01, -0.01, 0.002, -0.01, -0.01, 0.005, 0.005, 0.005] + [-0.001] * 6
+    states = ["ACTIVE"] + ["WATCH"] * 6 + ["ACTIVE"] + ["WATCH"] * 5 + ["RETIRED"]
+    breaches = [0, 1, 0, 1, 2, 0, 0, 0, 1, 2, 3, 4, 5, 0]
+    tracker = LifecycleTracker("EQ01", legacy.live, policy="p")
+    m = _machine(legacy, "EQ01")
+    ts = _to_state(m, "EQ01", S.ACTIVE)
+    for k, ic in enumerate(path):
+        ts += STEP
+        expected = tracker.update(ts, ic, True, new_fraction=BLOCK_FRACTION)
+        m.advance("EQ01", ts, _ev(live=_live(ic, eval_index=k)))
+        assert m.state("EQ01").name == expected == states[k]
+        rec = m.record("EQ01")
+        assert (rec.breach_count, rec.recovery_count) == (
+            tracker.breach_count,
+            tracker.recovery_count,
+        )
+        assert rec.breach_count == breaches[k]
+        assert rec.cusum == tracker.cusum == 0.0
+    assert m.transitions[-1].reason == (
+        "persistent breach: 6 consecutive evals below watch gate 0.0"
+    )
+
+
+def test_legacy_live_breach_watch_retire_and_wrapping(legacy):
+    """The consecutive-breach rule (the default up to v1.4.0), by name."""
+    m = _machine(legacy)
     ts = _to_state(m, "LCX", S.ACTIVE)
     assert m.advance("LCX", ts + 1, _ev(live=_live(0.01))) is None
     assert m.evaluations[-1].outcome == Outcome.HOLD
@@ -585,12 +868,12 @@ def test_live_breach_watch_retire_and_wrapping(config):
     tr = m.advance("LCX", ts + 5, _ev(live=_live(-0.01)))
     assert tr is not None and (tr.from_state, tr.to_state) == (S.ACTIVE, S.WATCH)
     assert tr.gates == {
-        "rolling_ic": GateResult(passed=False, value=-0.01, threshold=config.live.watch_ic_gate)
+        "rolling_ic": GateResult(passed=False, value=-0.01, threshold=legacy.live.watch_ic_gate)
     }
-    assert tr.policy == config.policy and tr.actor is Actor.SYSTEM
+    assert tr.policy == legacy.policy and tr.actor is Actor.SYSTEM
     assert "watch gate" in tr.reason
     assert m.record("LCX").breach_count == 1, "the entering breach counts"
-    n = config.live.retire_breach_evals
+    n = legacy.live.retire_breach_evals
     for k in range(2, n):
         assert m.advance("LCX", ts + 5 + k, _ev(live=_live(-0.01))) is None
         assert m.record("LCX").breach_count == k
@@ -599,24 +882,184 @@ def test_live_breach_watch_retire_and_wrapping(config):
     assert "persistent breach" in tr.reason
     validate_typed(tr)
     assert m.record("LCX").breach_count == 0
+    assert m.record("LCX").cusum == 0.0, "the consecutive rule never moves the statistic"
 
 
-def test_live_neutral_zone_and_reactivation(config):
-    m = _machine(config)
+def test_legacy_live_neutral_zone_and_reactivation(legacy):
+    """Consecutive rule: the neutral zone resets both counters."""
+    m = _machine(legacy)
     ts = _to_state(m, "LCX", S.WATCH)
     assert m.advance("LCX", ts + 1, _ev(live=_live(-0.01))) is None
     assert m.record("LCX").breach_count == 2
     assert m.advance("LCX", ts + 2, _ev(live=_live(0.002))) is None
     assert (m.record("LCX").breach_count, m.record("LCX").recovery_count) == (0, 0)
-    n = config.live.reactivate_evals
+    n = legacy.live.reactivate_evals
     for k in range(1, n):
         assert m.advance("LCX", ts + 2 + k, _ev(live=_live(0.005))) is None
         assert m.record("LCX").recovery_count == k
     tr = m.advance("LCX", ts + 2 + n, _ev(live=_live(0.005)))
     assert tr is not None and (tr.from_state, tr.to_state) == (S.WATCH, S.ACTIVE)
     assert tr.gates["rolling_ic"] == GateResult(
-        passed=True, value=0.005, threshold=config.live.reactivate_ic_gate
+        passed=True, value=0.005, threshold=legacy.live.reactivate_ic_gate
     )
+
+
+def test_live_cusum_breach_watch_retire_and_wrapping(config):
+    """The default retirement rule.  With gate 0.0, k 0.0025, h 0.01 and
+    new_fraction 0.125, a reading of -0.01 adds
+
+        0.125 * (0.0 - (-0.01) - 0.0025) = 0.0009375
+
+    so S after n such breaches is n * 0.0009375: 0.009375 after ten (under
+    h) and 0.0103125 after eleven — the eleventh breach retires, where the
+    consecutive rule retired at the sixth."""
+    live = config.live
+    m = _machine(config)
+    ts = _to_state(m, "LCX", S.ACTIVE)
+    # healthy: 0.125 * (0.0 - 0.01 - 0.0025) < 0, S clamps at 0
+    assert m.advance("LCX", ts + 1, _ev(live=_live(0.01))) is None
+    assert m.evaluations[-1].outcome == Outcome.HOLD and m.record("LCX").cusum == 0.0
+    assert m.advance("LCX", ts + 2, _ev(live=_live(None))) is None
+    assert m.evaluations[-1].outcome == Outcome.NO_EVIDENCE
+    assert m.advance("LCX", ts + 3, _ev(live=_live(-0.5, informative=False))) is None
+    assert m.evaluations[-1].outcome == Outcome.NO_EVIDENCE
+    assert m.advance("LCX", ts + 4, Evidence.empty()) is None
+    assert m.state("LCX") is S.ACTIVE and m.record("LCX").cusum == 0.0, "silence moves nothing"
+    tr = m.advance("LCX", ts + 5, _ev(live=_live(-0.01)))
+    assert tr is not None and (tr.from_state, tr.to_state) == (S.ACTIVE, S.WATCH)
+    assert tr.gates == {
+        "rolling_ic": GateResult(passed=False, value=-0.01, threshold=live.watch_ic_gate)
+    }
+    assert tr.policy == config.policy and tr.actor is Actor.SYSTEM
+    assert tr.reason == "rolling_ic -0.010000 < watch gate 0.0"
+    rec = m.record("LCX")
+    assert rec.breach_count == 0, "the CUSUM rule keeps no breach count"
+    assert rec.cusum == 0.0009375, "S survives the entry into WATCH"
+    stat = rec.cusum
+    for n in range(2, 11):
+        assert m.advance("LCX", ts + 5 + n, _ev(live=_live(-0.01))) is None, n
+        stat = _cusum_step(stat, -0.01, live, BLOCK_FRACTION)
+        assert m.record("LCX").cusum == stat == pytest.approx(n * 0.0009375, abs=1e-15)
+        assert m.record("LCX").breach_count == 0
+        assert m.evaluations[-1].outcome == Outcome.HOLD
+        assert m.evaluations[-1].gates["rolling_ic"] == GateResult(
+            passed=False, value=-0.01, threshold=live.watch_ic_gate
+        )
+    assert m.state("LCX") is S.WATCH and stat < live.cusum_h, "ten breaches: 0.009375 < 0.01"
+    tr = m.advance("LCX", ts + 5 + 11, _ev(live=_live(-0.01)))
+    assert tr is not None and (tr.from_state, tr.to_state) == (S.WATCH, S.RETIRED)
+    assert tr.reason == (
+        f"persistent breach: CUSUM {_cusum_step(stat, -0.01, live, BLOCK_FRACTION):.6f} "
+        ">= 0.01 (slack 0.0025) below watch gate 0.0"
+    )
+    assert tr.reason.startswith("persistent breach: CUSUM 0.01031")
+    assert tr.gates == {
+        "rolling_ic": GateResult(passed=False, value=-0.01, threshold=live.watch_ic_gate)
+    }
+    validate_typed(tr)
+    assert (m.record("LCX").breach_count, m.record("LCX").cusum) == (0, 0.0)
+
+
+def test_live_cusum_ignores_breaches_inside_the_slack(config):
+    """Readings just under the watch gate but inside the slack k add no
+    evidence: 0.125 * (0.0 - (-0.001) - 0.0025) < 0.  Eight of them never
+    retire the alpha (the consecutive rule retires at the sixth)."""
+    m = _machine(config)
+    ts = _to_state(m, "LCX", S.ACTIVE)
+    tr = m.advance("LCX", ts + 1, _ev(live=_live(-0.001)))
+    assert tr is not None and tr.to_state is S.WATCH
+    for k in range(2, 9):
+        assert m.advance("LCX", ts + k, _ev(live=_live(-0.001))) is None
+        assert m.state("LCX") is S.WATCH
+        assert (m.record("LCX").cusum, m.record("LCX").breach_count) == (0.0, 0)
+
+
+def test_live_cusum_retires_only_on_a_breach_and_never_on_entry(config):
+    """A reading of -0.09 puts S at 0.125 * (0.09 - 0.0025) = 0.0109375, over
+    h = 0.01, at once: it only enters WATCH.  A reading ABOVE the gate
+    (0.004: S - 0.125 * 0.0065 = 0.010125, still over h) does not retire.
+    The next breach (-0.003: S + 0.125 * 0.0005 = 0.0101875) does."""
+    live = config.live
+    m = _machine(config)
+    ts = _to_state(m, "LCX", S.ACTIVE)
+    tr = m.advance("LCX", ts + 1, _ev(live=_live(-0.09)))
+    assert tr is not None and (tr.from_state, tr.to_state) == (S.ACTIVE, S.WATCH)
+    assert m.record("LCX").cusum == 0.0109375 >= live.cusum_h
+    assert m.advance("LCX", ts + 2, _ev(live=_live(0.004))) is None
+    assert m.state("LCX") is S.WATCH
+    assert m.record("LCX").cusum == pytest.approx(0.010125, abs=1e-15)
+    assert m.record("LCX").cusum >= live.cusum_h
+    assert m.evaluations[-1].gates["rolling_ic"].passed
+    tr = m.advance("LCX", ts + 3, _ev(live=_live(-0.003)))
+    assert tr is not None and (tr.from_state, tr.to_state) == (S.WATCH, S.RETIRED)
+    assert tr.reason == (
+        "persistent breach: CUSUM 0.010187 >= 0.01 (slack 0.0025) below watch gate 0.0"
+    )
+    assert tr.gates["rolling_ic"] == GateResult(passed=False, value=-0.003, threshold=0.0)
+    assert m.record("LCX").cusum == 0.0
+    # a disjoint window (new_fraction 1.0) weighs eight times a block:
+    # entry on -0.0105: S = 0.125 * (0.0105 - 0.0025) = 0.001; then
+    # 1.0 * (0.0135 - 0.0025) = 0.011 on top gives 0.012 >= 0.01 on the second
+    # reading (a block-weighted -0.0135 adds 0.001375 only and holds)
+    m2 = _machine(config)
+    ts = _to_state(m2, "LCX", S.ACTIVE)
+    tr = m2.advance("LCX", ts + 1, _ev(live=_live(-0.0105)))
+    assert tr is not None and tr.to_state is S.WATCH
+    assert m2.record("LCX").cusum == pytest.approx(0.001, abs=1e-15)
+    tr = m2.advance("LCX", ts + 2, _ev(live=_live(-0.0135, new_fraction=1.0)))
+    assert tr is not None and tr.to_state is S.RETIRED
+    assert tr.reason == (
+        "persistent breach: CUSUM 0.012000 >= 0.01 (slack 0.0025) below watch gate 0.0"
+    )
+    m3 = _machine(config)
+    ts = _to_state(m3, "LCX", S.WATCH)
+    assert m3.advance("LCX", ts + 1, _ev(live=_live(-0.0135))) is None
+    assert m3.record("LCX").cusum == pytest.approx(0.0009375 + 0.001375, abs=1e-15)
+
+
+def test_live_cusum_neutral_zone_drains_and_reactivation(config):
+    """CUSUM rule: the neutral zone resets the recovery count and DRAINS S
+    (it does not reset it); three recoveries re-activate and reset S.
+
+    S: 0.0009375 (entry, -0.01) -> 0.001875 (-0.01)
+       -> 0.001875 - 0.125 * (0.002 + 0.0025) = 0.0013125 (neutral 0.002)
+       -> 0.0013125 - 0.125 * (0.005 + 0.0025) = 0.000375 (recovery 1)
+       -> 0 (recovery 2, clamped) -> 0 (recovery 3: ACTIVE)."""
+    live = config.live
+    m = _machine(config)
+    ts = _to_state(m, "LCX", S.WATCH)
+    assert m.record("LCX").cusum == 0.0009375
+    assert m.advance("LCX", ts + 1, _ev(live=_live(-0.01))) is None
+    assert (m.record("LCX").breach_count, m.record("LCX").cusum) == (0, 0.001875)
+    assert m.advance("LCX", ts + 2, _ev(live=_live(0.005))) is None
+    assert m.record("LCX").recovery_count == 1
+    assert m.record("LCX").cusum == pytest.approx(0.0009375, abs=1e-15)
+    assert m.advance("LCX", ts + 3, _ev(live=_live(-0.01))) is None
+    assert m.record("LCX").recovery_count == 0, "a breach resets the recovery count"
+    assert m.record("LCX").cusum == pytest.approx(0.001875, abs=1e-15)
+    assert m.advance("LCX", ts + 4, _ev(live=_live(0.005))) is None
+    assert m.record("LCX").recovery_count == 1
+    assert m.advance("LCX", ts + 5, _ev(live=_live(-0.01))) is None
+    stat = m.record("LCX").cusum
+    assert stat == pytest.approx(0.001875, abs=1e-15)
+    assert m.advance("LCX", ts + 6, _ev(live=_live(0.002))) is None
+    stat = _cusum_step(stat, 0.002, live, BLOCK_FRACTION)
+    assert m.record("LCX").cusum == stat == pytest.approx(0.0013125, abs=1e-15)
+    assert (m.record("LCX").breach_count, m.record("LCX").recovery_count) == (0, 0)
+    n = live.reactivate_evals
+    drained = [0.000375, 0.0]
+    for k in range(1, n):
+        assert m.advance("LCX", ts + 6 + k, _ev(live=_live(0.005))) is None
+        assert m.record("LCX").recovery_count == k
+        stat = _cusum_step(stat, 0.005, live, BLOCK_FRACTION)
+        assert m.record("LCX").cusum == stat == pytest.approx(drained[k - 1], abs=1e-15)
+    tr = m.advance("LCX", ts + 6 + n, _ev(live=_live(0.005)))
+    assert tr is not None and (tr.from_state, tr.to_state) == (S.WATCH, S.ACTIVE)
+    assert tr.gates["rolling_ic"] == GateResult(
+        passed=True, value=0.005, threshold=live.reactivate_ic_gate
+    )
+    assert tr.reason == "re-activation: 3 consecutive evals >= reactivate gate 0.005"
+    assert (m.record("LCX").recovery_count, m.record("LCX").cusum) == (0, 0.0)
 
 
 def test_retired_is_terminal_for_system(config):
@@ -675,9 +1118,11 @@ def test_human_only_edges_reject_system_and_empty_reason(config):
 # --------------------------------------------------------------------------
 
 
-def test_registry_and_log_round_trip_and_bytes(config, tmp_path):
+@pytest.mark.parametrize("policy", ["default", "legacy"])
+def test_registry_and_log_round_trip_and_bytes(config, tmp_path, policy):
+    cfg = _policy(config, policy)
     log_path = tmp_path / "transitions.jsonl"
-    m = _machine(config, "LC01", LifecycleTransitionLog(log_path))
+    m = _machine(cfg, "LC01", LifecycleTransitionLog(log_path))
     m.register("LC02", T0)
     ts = _to_state(m, "LC01", S.WATCH)
     m.advance("LC02", ts, _ev(research=golden_research("LC02", t_stat=1.0)))
@@ -686,7 +1131,8 @@ def test_registry_and_log_round_trip_and_bytes(config, tmp_path):
     m.registry.save(reg_path)
     text = reg_path.read_text()
     assert text.endswith("\n") and text == m.registry.render()
-    assert json.loads(text)["x-version"] == 1
+    assert json.loads(text)["x-version"] == 2
+    assert all("cusum" in rec for rec in json.loads(text)["alphas"].values())
     loaded = AlphaRegistry.load(reg_path)
     assert loaded.render() == text
     assert loaded.alpha_ids() == ["LC01", "LC02"]
@@ -697,19 +1143,47 @@ def test_registry_and_log_round_trip_and_bytes(config, tmp_path):
     for line in log_path.read_text().splitlines():
         assert line == json.dumps(json.loads(line), sort_keys=True, separators=(",", ":"))
 
-    # a reloaded registry resumes the live counters exactly
-    m2 = AlphaLifecycle(config, loaded)
-    assert loaded.get("LC01").breach_count == 1
-    assert m2.advance("LC01", ts + 5, _ev(live=_live(-0.01))) is None
-    assert loaded.get("LC01").breach_count == 2
+    # a reloaded registry resumes the live sub-machine exactly
+    m2 = AlphaLifecycle(cfg, loaded)
+    if policy == "legacy":  # the consecutive rule resumes its breach count
+        assert loaded.get("LC01").breach_count == 1
+        assert m2.advance("LC01", ts + 5, _ev(live=_live(-0.01))) is None
+        assert loaded.get("LC01").breach_count == 2
+        assert loaded.get("LC01").cusum == 0.0
+    else:  # the CUSUM rule resumes its statistic: 0.0009375 per -0.01 block
+        assert (loaded.get("LC01").breach_count, loaded.get("LC01").cusum) == (0, 0.0009375)
+        assert m2.advance("LC01", ts + 5, _ev(live=_live(-0.01))) is None
+        assert (loaded.get("LC01").breach_count, loaded.get("LC01").cusum) == (0, 0.001875)
+        # ... through a second save / load as well
+        loaded.save(reg_path)
+        again = AlphaRegistry.load(reg_path)
+        assert again.get("LC01").cusum == 0.001875
+        m3 = AlphaLifecycle(cfg, again)
+        assert m3.advance("LC01", ts + 6, _ev(live=_live(-0.01))) is None
+        assert again.get("LC01").cusum == pytest.approx(0.0028125, abs=1e-15)
+        assert again.get("LC01").cusum == _cusum_step(0.001875, -0.01, cfg.live, BLOCK_FRACTION)
 
 
 def test_registry_rejects_bad_documents(tmp_path):
     reg = AlphaRegistry("p")
     reg.add(AlphaRecord.new("A1", T0))
     doc = reg.to_dict()
-    with pytest.raises(ValueError, match="x-version"):
-        AlphaRegistry.from_dict({**doc, "x-version": 2})
+    assert doc["x-version"] == 2 and doc["alphas"]["A1"]["cusum"] == 0.0
+    for wrong in (1, 3):  # 1 = a registry written by v1.4.0 (no cusum)
+        with pytest.raises(ValueError, match="x-version"):
+            AlphaRegistry.from_dict({**doc, "x-version": wrong})
+    for bad_cusum in (-0.001, float("nan"), float("inf"), True, "0.0", None):
+        bad = json.loads(json.dumps(doc))
+        bad["alphas"]["A1"]["cusum"] = bad_cusum
+        with pytest.raises(ValueError, match="cusum"):
+            AlphaRegistry.from_dict(bad)
+    bad = json.loads(json.dumps(doc))
+    del bad["alphas"]["A1"]["cusum"]
+    with pytest.raises(KeyError, match="cusum"):
+        AlphaRegistry.from_dict(bad)
+    kept = json.loads(json.dumps(doc))
+    kept["alphas"]["A1"]["cusum"] = 0.00625
+    assert AlphaRegistry.from_dict(kept).get("A1").cusum == 0.00625
     bad = json.loads(json.dumps(doc))
     bad["alphas"]["A1"]["state_index"] = 3
     with pytest.raises(ValueError, match="state_index"):
@@ -747,21 +1221,43 @@ def test_bootstrap_no_alpha_beyond_candidate(bootstrap):
     assert all(t.to_state is S.CANDIDATE for t in bootstrap.machine.transitions)
 
 
+#: PROMOTE gate of the report (``promote_gates`` key) -> lifecycle gate.
+_REPORT_GATE = {
+    "leakage": "leakage_clean",
+    "ic": "oos_ic",
+    "significance": "statistical_significance",
+    "fold_consistency": "fold_consistency",
+    "folds": "fold_count",
+    "hypothesis": "hypothesis_sign",
+    "cost": "net_pnl_after_costs",
+}
+
+
 def test_bootstrap_failed_gates_agree_with_report_verdicts(bootstrap):
     """ITERATE alphas fail exactly the PROMOTE gates the report says they fail;
-    REJECT alphas (all leakage-clean here) fail the ITERATE thresholds."""
+    REJECT alphas (all leakage-clean here) fail the ITERATE thresholds.
+
+    Since v1.5.0 the significance gate compares the report's ``gate_tstat``
+    (the pooled-slope HAC t its PROMOTE gate read) with the threshold the
+    report was judged at — the ledger's Bonferroni |t|, never below the
+    configured 3.0 floor — carried by the evidence."""
     ledger = load_ledger_entries(ROOT)
     for row in bootstrap.rows:
         rep = load_report(ROOT, row.alpha_id)
         ev = bootstrap.registry.get(row.alpha_id).last_evaluation
         assert ev is not None and ev.state is S.CANDIDATE
         expected_failed = []
-        gate_ic, gate_t = rep["gate_ic"], rep["nw_tstat_uncrossed"]
+        gate_ic, gate_t = rep["gate_ic"], rep["gate_tstat"]
+        judged_at = significance_threshold_from_report(rep)
+        assert judged_at == rep["gates"]["min_nw_tstat"] == rep["ledger_t_threshold"]
+        assert judged_at == ExperimentLedger.bonferroni_t_threshold_at(rep["ledger_looks"])
+        assert rep["ledger_looks"] == ledger[row.alpha_id]["gate_looks"]
+        t_threshold = max(VALIDATE_GATES["min_nw_tstat"], judged_at)
         if not rep["leakage"]["passed"]:
             expected_failed.append("leakage_clean")
         if gate_ic < VALIDATE_GATES["min_oos_ic"]:
             expected_failed.append("oos_ic")
-        if gate_t < VALIDATE_GATES["min_nw_tstat"]:
+        if gate_t < t_threshold:
             expected_failed.append("statistical_significance")
         if rep["fold_sign_consistency"] < VALIDATE_GATES["min_fold_sign_consistency"]:
             expected_failed.append("fold_consistency")
@@ -773,6 +1269,14 @@ def test_bootstrap_failed_gates_agree_with_report_verdicts(bootstrap):
             expected_failed.append("net_pnl_after_costs")
         report_gates = [g for g in ev.failed_gates if g not in ("capacity", "stability")]
         assert report_gates == expected_failed, row.alpha_id
+        # ... which is exactly the set of PROMOTE gates the report itself
+        # records as failed
+        assert set(rep["promote_gates"]) == set(_REPORT_GATE)
+        assert set(report_gates) == {
+            _REPORT_GATE[name] for name, passed in rep["promote_gates"].items() if not passed
+        }, row.alpha_id
+        sig = ev.gates["statistical_significance"]
+        assert (sig.value, sig.threshold) == (gate_t, t_threshold), row.alpha_id
         assert row.verdict == rep["verdict"]
         if rep["verdict"] == "ITERATE":
             assert ev.gates["oos_ic"].value >= VALIDATE_GATES["iterate_min_ic"]
@@ -792,30 +1296,47 @@ def test_bootstrap_failed_gates_agree_with_report_verdicts(bootstrap):
     # moved when fold_sign_consistency stopped scoring the beta-SIGNED signal
     # (an alpha backwards in every fold used to report 1.00 consistency and
     # pass this gate) and when the walk-forward stopped training inside its
-    # own declared holdout. FX01 clears statistical_significance on the
-    # pair-count-weighted Newey-West t; EQ07, FX01 and FX03 fail
-    # fold_consistency, which they previously passed falsely.
+    # own declared holdout. EQ07, FX01 and FX03 fail fold_consistency, which
+    # they previously passed falsely.
     # Updated 2026-10-03 (v1.4.0 dataset: equity flow to the close; the FX
     # data and therefore the FX rows are unchanged). On the full session the
     # equity ICs are lower: EQ01 and EQ05 keep their ITERATE verdict but no
-    # longer clear the PROMOTE significance gate (uncrossed t 2.67 / 2.45),
-    # EQ05 also falls under the 0.01 IC gate (0.0061), and both now fail the
-    # crossed/uncrossed stability gate. EQ03 still fails the cost gate alone.
-    assert by_id["EQ01"] == ("statistical_significance", "net_pnl_after_costs", "stability")
-    assert by_id["EQ03"] == ("net_pnl_after_costs",)
+    # longer clear the PROMOTE significance gate, EQ05 also falls under the
+    # 0.01 IC gate, and both now fail the crossed/uncrossed stability gate.
+    # Updated 2026-10-04 (v1.5.0 default methods; same dataset). The gate t is
+    # the pooled-slope HAC t against the ledger's Bonferroni threshold (4.37
+    # at 3936 looks) instead of the bucket t against 3.0: FX01 (gate t 2.26)
+    # no longer clears significance, EQ03 (5.16) still does. Under the
+    # cost-aware position policy no alpha clears its round-trip cost, so every
+    # alpha fails the cost gate and — the capacity now being the breakeven
+    # capacity — the capacity gate with it: EQ03 fails those two alone.
+    assert by_id["EQ01"] == (
+        "statistical_significance",
+        "net_pnl_after_costs",
+        "capacity",
+        "stability",
+    )
+    assert by_id["EQ03"] == ("net_pnl_after_costs", "capacity")
     assert by_id["EQ05"] == (
         "oos_ic",
         "statistical_significance",
         "net_pnl_after_costs",
+        "capacity",
         "stability",
     )
-    assert by_id["FX01"] == ("fold_consistency", "net_pnl_after_costs")
+    assert by_id["FX01"] == (
+        "statistical_significance",
+        "fold_consistency",
+        "net_pnl_after_costs",
+        "capacity",
+    )
     assert by_id["EQ07"] == (
         "oos_ic",
         "statistical_significance",
         "fold_consistency",
         "hypothesis_sign",
         "net_pnl_after_costs",
+        "capacity",
         "stability",
     )
     assert set(by_id["FX03"]) >= {"statistical_significance", "hypothesis_sign", "fold_consistency"}
@@ -845,12 +1366,47 @@ def test_pipeline_entry_selection_is_per_dataset():
         select_pipeline_entries(entries + [dict(entries[1], key="again")], new)
 
 
+def test_pipeline_entry_selection_prefers_the_default_method_bundle():
+    """Since v1.5.0 the ledger also keeps one entry per method bundle: the
+    evidence is the entry recorded under the default bundle; a legacy-methods
+    entry (or one that names no bundle) of the same dataset is history and
+    backs the alpha only when it has no default-bundle entry."""
+    from iap.lifecycle.bootstrap import select_pipeline_entries
+
+    data = "b" * 64
+
+    def entry(alpha_id, key, methods=None):
+        config = {} if methods is None else {"methods": methods}
+        return {
+            "alpha_id": alpha_id,
+            "kind": "promotion_pipeline",
+            "key": key,
+            "dataset_version": data,
+            "config": config,
+        }
+
+    entries = [
+        entry("EQ01", "k-unnamed"),  # written before v1.5.0: the legacy bundle
+        entry("EQ01", "k-v2", "v2"),
+        entry("EQ02", "k-legacy", "legacy_v1"),
+    ]
+    picked = select_pipeline_entries(entries, data)
+    assert picked["EQ01"]["key"] == "k-v2"
+    assert picked["EQ02"]["key"] == "k-legacy"  # nothing under the default yet
+    assert select_pipeline_entries(entries, data, methods="legacy_v1")["EQ01"]["key"] == "k-unnamed"
+    with pytest.raises(ValueError, match="duplicate promotion_pipeline entry for EQ01"):
+        select_pipeline_entries(entries + [entry("EQ01", "k-v2-again", "v2")], data)
+
+
 def test_committed_ledger_backs_every_alpha_on_the_current_dataset():
     params = load_params_document(ROOT)
     ledger = load_ledger_entries(ROOT)
     assert sorted(ledger) == sorted(ALPHA_IDS)
     assert {e["dataset_version"] for e in ledger.values()} == {params["data_version"]}
     assert ledger == load_ledger_entries(ROOT, params["data_version"])
+    # ... under the default method bundle, all judged at one look count
+    assert {e["config"]["methods"] for e in ledger.values()} == {"v2"}
+    assert len({e["gate_looks"] for e in ledger.values()}) == 1
 
 
 def test_bootstrap_research_mapping(bootstrap):
@@ -860,7 +1416,28 @@ def test_bootstrap_research_mapping(bootstrap):
     result, missing = research_evidence("EQ03", rep, ledger["EQ03"], params)
     assert missing == [] and result is not None
     assert result.ic == rep["gate_ic"] == rep["oos_ic_uncrossed"]
-    assert result.t_stat == rep["nw_tstat_uncrossed"]
+    # the t the PROMOTE gate read: the pooled-slope HAC t on uncrossed rows
+    assert result.t_stat == rep["gate_tstat"] == rep["nw_tstat_pooled_uncrossed"]
+    assert rep["methods"]["significance"] == "pooled_slope"
+    # a report written before v1.5.0 has no gate_tstat: what ITS gate read
+    v140 = {k: v for k, v in rep.items() if k != "gate_tstat"}
+    old, old_missing = research_evidence("EQ03", v140, ledger["EQ03"], params)
+    assert old_missing == [] and old.t_stat == rep["nw_tstat_uncrossed"]
+    assert dataclasses.replace(old, t_stat=result.t_stat) == result
+    v140["nw_tstat_uncrossed"] = None
+    old, _ = research_evidence("EQ03", v140, ledger["EQ03"], params)
+    assert old.t_stat == rep["nw_tstat"]
+    # the threshold the report was judged at travels beside the result
+    judged_at = significance_threshold_from_report(rep)
+    assert judged_at == rep["gates"]["min_nw_tstat"]
+    assert judged_at == ExperimentLedger.bonferroni_t_threshold_at(ledger["EQ03"]["gate_looks"])
+    assert judged_at > VALIDATE_GATES["min_nw_tstat"]
+    sig = bootstrap.registry.get("EQ03").last_evaluation.gates["statistical_significance"]
+    assert sig == GateResult(passed=True, value=rep["gate_tstat"], threshold=judged_at)
+    assert significance_threshold_from_report({}) is None
+    assert significance_threshold_from_report({"gates": {"min_nw_tstat": None}}) is None
+    assert significance_threshold_from_report({"gates": {"min_nw_tstat": 0.0}}) is None
+    assert significance_threshold_from_report({"gates": {"min_nw_tstat": 3.0}}) == 3.0
     assert result.rank_ic == rep["oos_rank_ic"]
     assert result.experiment_id == ledger["EQ03"]["key"][:16]
     assert result.n_experiments_in_ledger == ledger["EQ03"]["n"]
@@ -897,6 +1474,17 @@ def test_bootstrap_nan_metric_is_reported_not_crashed(tmp_path):
     )
     assert unledgered is not None and unledgered.n_experiments_in_ledger == 0
     assert unledgered.experiment_id == "EQ03-unledgered"
+    # the gate t: gate_tstat when the report has the key (even when null) ...
+    rep = load_report(ROOT, "EQ03")
+    rep["gate_tstat"] = None
+    result, missing = research_evidence("EQ03", rep, ledger["EQ03"], load_params_document(ROOT))
+    assert result is None and missing == ["gate_tstat"]
+    # ... and for a report written before v1.5.0 the v1.4.0 rule, unchanged
+    del rep["gate_tstat"]
+    rep["nw_tstat_uncrossed"] = None
+    rep["nw_tstat"] = None
+    result, missing = research_evidence("EQ03", rep, ledger["EQ03"], load_params_document(ROOT))
+    assert result is None and missing == ["nw_tstat"]
 
     # end to end: a copy of the tree with one NaN report stays at RESEARCH
     root = tmp_path / "repo"
@@ -912,8 +1500,7 @@ def test_bootstrap_nan_metric_is_reported_not_crashed(tmp_path):
     for aid in ("EQ01", "EQ03"):
         doc = load_report(ROOT, aid)
         if aid == "EQ03":
-            doc["nw_tstat_uncrossed"] = None
-            doc["nw_tstat"] = None
+            doc["gate_tstat"] = None
         (root / "research" / "alpha_reports" / f"{aid}.json").write_text(json.dumps(doc))
     out = run_bootstrap(root, write=True, alpha_ids=["EQ01", "EQ03"])
     states = {r.alpha_id: r.state for r in out.rows}
@@ -921,7 +1508,7 @@ def test_bootstrap_nan_metric_is_reported_not_crashed(tmp_path):
     eq03 = out.registry.get("EQ03")
     assert eq03.last_evaluation.failed_gates == ["ledger_entry_exists", "leakage_clean"]
     assert eq03.last_evaluation.gates["ledger_entry_exists"].value is None
-    assert [r.missing_metrics for r in out.rows if r.alpha_id == "EQ03"] == [("nw_tstat",)]
+    assert [r.missing_metrics for r in out.rows if r.alpha_id == "EQ03"] == [("gate_tstat",)]
     assert (root / "research" / "alpha_registry.json").is_file()
     assert len((root / "research" / "lifecycle_transitions.jsonl").read_text().splitlines()) == 1
     table = render_status(out.registry)
@@ -1022,6 +1609,8 @@ def _random_evidence(rng: SplitMix64, alpha_id: str, state: LifecycleState) -> E
                 verdict=Verdict.REJECT if leak else Verdict.PROMOTE,
             ),
             capacity_usd=5e5 + rng.uniform() * 4e6,
+            # judged at a ledger threshold in [3.0, 4.0), or (1 in 8) at none
+            significance_threshold=None if rng.below(8) == 0 else 3.0 + rng.uniform(),
         )
     if pick == 2:
         return _ev(
@@ -1044,12 +1633,21 @@ def _random_evidence(rng: SplitMix64, alpha_id: str, state: LifecycleState) -> E
             )
         )
     ic = None if rng.below(5) == 0 else rng.uniform() * 0.04 - 0.02
-    return _ev(live=_live(ic, informative=rng.below(6) > 0, eval_index=rng.below(1000)))
+    return _ev(
+        live=_live(
+            ic,
+            informative=rng.below(6) > 0,
+            eval_index=rng.below(1000),
+            new_fraction=(1 + rng.below(8)) / 8.0,  # 0.125 .. 1.0
+        )
+    )
 
 
-def test_property_state_index_steps_and_retired_terminal(config):
+@pytest.mark.parametrize("policy", ["default", "legacy"])
+def test_property_state_index_steps_and_retired_terminal(config, policy):
+    cfg = _policy(config, policy)
     rng = SplitMix64(20260919)
-    m = _machine(config, "P1")
+    m = _machine(cfg, "P1")
     m.register("P2", T0)
     ts = T0
     reached = set()
@@ -1086,14 +1684,23 @@ def test_property_state_index_steps_and_retired_terminal(config):
         else:
             assert after is before
         assert m.record(aid).consecutive_failures < config.max_consecutive_failures
+        rec = m.record(aid)
+        if policy == "legacy":
+            assert rec.cusum == 0.0
+            assert rec.breach_count < cfg.live.retire_breach_evals
+        else:
+            assert rec.breach_count == 0 and rec.cusum >= 0.0
+        if after not in (S.ACTIVE, S.WATCH):
+            assert (rec.breach_count, rec.recovery_count, rec.cusum) == (0, 0, 0.0)
     assert reached >= {S.CANDIDATE, S.VALIDATING, S.PAPER, S.ACTIVE, S.WATCH, S.RETIRED}
     assert m.transitions and all(isinstance(t, LifecycleTransition) for t in m.transitions)
 
 
-def test_property_transition_log_replays_to_registry(config, tmp_path):
+@pytest.mark.parametrize("policy", ["default", "legacy"])
+def test_property_transition_log_replays_to_registry(config, tmp_path, policy):
     rng = SplitMix64(7)
     log = LifecycleTransitionLog(tmp_path / "t.jsonl")
-    m = _machine(config, "P1", log)
+    m = _machine(_policy(config, policy), "P1", log)
     ts = T0
     for _ in range(600):
         ts += STEP

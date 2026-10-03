@@ -236,10 +236,9 @@ def test_golden_params_match_serialized_params(golden, models):
         assert live["horizon"] == p["horizon"]
 
 
-def test_golden_backtest_eq01(golden_bt, models, eq_frame):
-    cfg = golden_bt["config"]
+def _golden_backtest_meta() -> dict:
     inst = json.loads((CONFIGS_DIR / "instruments" / "instruments.json").read_text())["instruments"]
-    meta = {
+    return {
         int(r["instrument_id"]): {
             "tick_size": float(r["tick_size"]),
             "lot_size": int(r["lot_size"]),
@@ -249,25 +248,80 @@ def test_golden_backtest_eq01(golden_bt, models, eq_frame):
         }
         for r in inst
     }
+
+
+def _check_golden_backtest(res, want: dict) -> None:
+    """One backtest block of expected_backtest.json: counts exact, money at
+    1e-9 abs/rel, and the accounting identity on the run itself."""
+    assert res.trade_count == want["trade_count"]  # exact
+    assert res.traded_qty == want["traded_qty"]  # exact
+    assert res.n_rows == want["n_rows"]  # exact
+    _close(res.total_pnl, want["total_pnl"])
+    _close(res.total_costs, want["total_costs"])
+    _close(res.gross_pnl, want["gross_pnl"])
+    _close(res.spread_cost, want["spread_cost"])
+    _close(res.fee_cost, want["fee_cost"])
+    _close(res.impact_cost, want["impact_cost"])
+    # accounting identity on the golden run itself
+    _close(res.total_pnl, res.gross_pnl - res.total_costs)
+
+
+def test_golden_backtest_eq01_legacy_rules(golden_bt, models, eq_frame):
+    """The CROSS-LANGUAGE vector: EQ01 under the legacy (v1.4.0) research
+    rules, every one of them named by the golden file's ``config``."""
+    assert golden_bt["x-version"] == 2
+    assert golden_bt["alpha_id"] == "EQ01"
+    cfg = golden_bt["config"]
+    assert cfg["position_policy"] == "sign"
+    assert cfg["cap_fills_at_l1"] is False
+    assert cfg["block_rows_column"] is None
+    assert cfg["impact_model"] == "linear"
+    cm = CostModel.load(
+        CONFIGS_DIR / "execution" / "execution.json", multiplier=cfg["cost_multiplier"]
+    ).with_linear_impact()
+    assert cm.impact_model == cfg["impact_model"]
+    config = BacktestConfig.legacy(
+        max_pos_qty=cfg["max_pos_qty"],
+        conf_min=cfg["conf_min"],
+        latency_rows=cfg["latency_rows"],
+    )
+    # BacktestConfig.legacy() IS the rule set the golden config names
+    assert config.position_policy == cfg["position_policy"]
+    assert config.cap_fills_at_l1 == cfg["cap_fills_at_l1"]
+    assert config.block_rows_column == cfg["block_rows_column"]
+    bt = Backtester(cm, _golden_backtest_meta(), config)
+    scores = models["EQ01"].score({1: eq_frame})
+    res = bt.run({1: eq_frame}, scores, "EQUITY").per_instrument[1]
+    _check_golden_backtest(res, golden_bt)
+
+
+def test_golden_backtest_default_rules(golden_bt, models, eq_frame):
+    """The Python-only vector under the v1.5.0 DEFAULTS (cost-aware
+    positions, L1 fill cap, scored rows only, square-root impact): the
+    config is built from the defaults alone and must equal what the golden
+    file's ``default_rules.config`` names."""
+    blob = golden_bt["default_rules"]
+    cfg = blob["config"]
+    aid = blob["alpha_id"]
+    assert aid == "EQ06"
+    assert models[aid].horizon == blob["horizon"]
     cm = CostModel.load(
         CONFIGS_DIR / "execution" / "execution.json", multiplier=cfg["cost_multiplier"]
     )
-    bt = Backtester(
-        cm,
-        meta,
-        BacktestConfig(
-            max_pos_qty=cfg["max_pos_qty"],
-            conf_min=cfg["conf_min"],
-            latency_rows=cfg["latency_rows"],
-        ),
+    assert cm.impact_model == cfg["impact_model"] == "sqrt"
+    config = BacktestConfig(
+        max_pos_qty=cfg["max_pos_qty"],
+        conf_min=cfg["conf_min"],
+        latency_rows=cfg["latency_rows"],
     )
-    scores = models["EQ01"].score({1: eq_frame})
+    assert config.position_policy == cfg["position_policy"] == "cost_aware"
+    assert config.cap_fills_at_l1 is cfg["cap_fills_at_l1"] is True
+    assert config.block_rows_column == cfg["block_rows_column"] == "auto"
+    bt = Backtester(cm, _golden_backtest_meta(), config).for_horizon(blob["horizon"])
+    scores = models[aid].score({1: eq_frame})
     res = bt.run({1: eq_frame}, scores, "EQUITY").per_instrument[1]
-    assert res.trade_count == golden_bt["trade_count"]  # exact
-    assert res.traded_qty == golden_bt["traded_qty"]  # exact
-    assert res.n_rows == golden_bt["n_rows"]  # exact
-    _close(res.total_pnl, golden_bt["total_pnl"])
-    _close(res.total_costs, golden_bt["total_costs"])
-    _close(res.gross_pnl, golden_bt["gross_pnl"])
-    # accounting identity on the golden run itself
-    _close(res.total_pnl, res.gross_pnl - res.total_costs)
+    assert res.trade_count >= 5  # the vector exists to pin a run that trades
+    _check_golden_backtest(res, blob)
+    # without the horizon the default policy refuses to run (no silent fall-back)
+    with pytest.raises(ValueError, match="needs horizon_ns"):
+        Backtester(cm, _golden_backtest_meta(), config).run({1: eq_frame}, scores, "EQUITY")

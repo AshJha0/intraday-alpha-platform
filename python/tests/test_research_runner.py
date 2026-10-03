@@ -13,6 +13,7 @@ import dataclasses
 import json
 import math
 from pathlib import Path
+from statistics import NormalDist
 
 import numpy as np
 import pandas as pd
@@ -27,6 +28,7 @@ from iap.contracts.versions import content_hash
 from iap.research import (
     DEFAULT_CONFIGURATION,
     LEDGER_KIND,
+    LEGACY_LOOKS_PER_EXPERIMENT,
     LOOKS_PER_EXPERIMENT,
     ExperimentRegistry,
     ExperimentRunner,
@@ -47,7 +49,9 @@ from iap.research.runner import (
     restrict_frames,
 )
 from iap.validation import validate_alpha
+from iap.validation.leakage import RecomputeSources
 from iap.validation.ledger import ExperimentLedger
+from iap.validation.methods import METHODS_LEGACY, METHODS_V2, methods
 from iap.validation.metrics import HORIZONS_NS
 from iap.validation.splits import Fold
 
@@ -73,6 +77,12 @@ def frames() -> dict[int, pd.DataFrame]:
 @pytest.fixture(scope="module")
 def spec(frames) -> ExperimentSpec:
     return golden_spec(GOLDEN_DIR, frames)
+
+
+@pytest.fixture(scope="module")
+def legacy_spec(frames) -> ExperimentSpec:
+    """The same experiment under the explicitly named v1.4.0 rules."""
+    return _spec(frames, configuration={"methods": METHODS_LEGACY})
 
 
 def _periods(frames, horizon: str, test_row: int = 1200):
@@ -151,6 +161,7 @@ def test_spec_is_deterministic_and_pinned_id(frames):
         dict(configuration={"embargo_ns": 0}),
         dict(configuration={"cost_multiplier": 2.0}),
         dict(configuration={"flatten_at_session_end": False}),
+        dict(configuration={"methods": METHODS_LEGACY}),
         dict(horizon="1s"),
         dict(seed=2),
         dict(alpha_id="EQ01"),
@@ -173,6 +184,11 @@ def test_equivalent_configurations_hash_identically(frames):
         == _spec(frames, configuration=dict(DEFAULT_CONFIGURATION)).experiment_id
     )
     assert normalise_configuration({}) == DEFAULT_CONFIGURATION
+    # the method bundle is a pinned key and defaults to v2
+    assert DEFAULT_CONFIGURATION["methods"] == METHODS_V2 == "v2"
+    assert _spec(frames, configuration={"methods": "v2"}).experiment_id == (
+        _spec(frames, configuration=None).experiment_id
+    )
     assert list(normalise_configuration({"n_folds": 4})) == list(DEFAULT_CONFIGURATION)
 
 
@@ -188,6 +204,9 @@ def test_equivalent_configurations_hash_identically(frames):
         {"cost_multiplier": float("nan")},
         {"max_decision_age_ns": 0},
         {"flatten_at_session_end": 1},
+        {"methods": "v3"},  # not a known bundle
+        {"methods": None},
+        {"tstat_threshold": "ledger"},  # the v1.4.0 knob is part of the bundle now
     ],
 )
 def test_configuration_is_strictly_validated(bad):
@@ -363,8 +382,10 @@ def test_non_overlapping_periods_are_enforced(frames):
 def _report(**overrides) -> dict:
     report = {
         "oos_ic": 0.02,
+        "gate_ic": 0.025,
         "oos_rank_ic": 0.03,
         "nw_tstat": 3.5,
+        "gate_tstat": 3.25,
         "nw_lags": 2,
         "oos_hit_rate": 0.52,
         "turnover_flips_per_hour": 40.0,
@@ -399,7 +420,37 @@ def _holdout(**overrides) -> dict:
     return h
 
 
-def test_build_result_mapping(spec):
+def test_build_result_mapping_v2_records_the_gate_statistics(spec):
+    """Default bundle: ``ic`` / ``t_stat`` are the two numbers the verdict
+    read (``gate_ic`` / ``gate_tstat``), not ``oos_ic`` / ``nw_tstat``."""
+    assert spec.configuration["methods"] == METHODS_V2
+    r = build_result(spec, _report(), _holdout(), 21, "deadbeef")
+    assert (
+        r.ic,
+        r.rank_ic,
+        r.t_stat,
+        r.nw_lags,
+        r.hit_rate,
+        r.turnover,
+        r.fold_consistency,
+        r.n_folds,
+    ) == (0.025, 0.03, 3.25, 2, 0.52, 40.0, 1.0, 4)
+    assert r.net_return_bps == 12.0 - 4.5
+    assert r.leakage_passed and r.hypothesis_sign_confirmed
+    assert r.verdict is Verdict.PROMOTE
+    assert r.n_experiments_in_ledger == 21 and r.git_commit == "deadbeef"
+    assert r.created_ts == spec.test_period.end_ts
+    assert r.leakage_detail == _report()["leakage"]
+    # the gate statistics alone feed it: the legacy keys may be absent
+    report = _report()
+    del report["oos_ic"], report["nw_tstat"]
+    assert build_result(spec, report, _holdout(), 21, "deadbeef") == r
+
+
+def test_build_result_mapping_legacy_v1(legacy_spec):
+    """``legacy_v1`` keeps the mapping up to v1.4.0: ``oos_ic -> ic`` and
+    ``nw_tstat -> t_stat``."""
+    spec = legacy_spec
     r = build_result(spec, _report(), _holdout(), 21, "deadbeef")
     assert (
         r.ic,
@@ -419,27 +470,52 @@ def test_build_result_mapping(spec):
     assert r.leakage_detail == _report()["leakage"]
 
 
-@pytest.mark.parametrize(
-    "report_overrides, holdout_overrides, name",
-    [
-        ({"oos_ic": None}, {}, "oos_ic"),
-        ({"oos_ic": float("nan")}, {}, "oos_ic"),
-        ({"nw_tstat": float("inf")}, {}, "nw_tstat"),
-        ({"oos_hit_rate": None}, {}, "oos_hit_rate"),
-        ({"turnover_flips_per_hour": None}, {}, "turnover_flips_per_hour"),
-        ({"fold_sign_consistency": None}, {}, "fold_sign_consistency"),
-        ({}, {"sharpe": float("nan")}, "sharpe"),
-        ({}, {"max_drawdown_bps": None}, "max_drawdown_bps"),
-        ({}, {"gross_return_bps": float("-inf")}, "gross_return_bps"),
-    ],
-)
-def test_nan_metric_is_a_runner_error_naming_the_metric(
-    spec, report_overrides, holdout_overrides, name
+_NAN_METRIC_CASES = [
+    ({"oos_ic": None}, {}, "oos_ic"),
+    ({"oos_ic": float("nan")}, {}, "oos_ic"),
+    ({"nw_tstat": float("inf")}, {}, "nw_tstat"),
+    ({"oos_hit_rate": None}, {}, "oos_hit_rate"),
+    ({"turnover_flips_per_hour": None}, {}, "turnover_flips_per_hour"),
+    ({"fold_sign_consistency": None}, {}, "fold_sign_consistency"),
+    ({}, {"sharpe": float("nan")}, "sharpe"),
+    ({}, {"max_drawdown_bps": None}, "max_drawdown_bps"),
+    ({}, {"gross_return_bps": float("-inf")}, "gross_return_bps"),
+]
+
+#: report key the legacy mapping reads -> the key ``v2`` reads in its place
+_V2_KEY = {"oos_ic": "gate_ic", "nw_tstat": "gate_tstat"}
+
+
+@pytest.mark.parametrize("report_overrides, holdout_overrides, name", _NAN_METRIC_CASES)
+def test_nan_metric_is_a_runner_error_naming_the_metric_legacy_v1(
+    legacy_spec, report_overrides, holdout_overrides, name
 ):
     with pytest.raises(ResearchError, match=name):
         build_result(
-            spec, _report(**report_overrides), _holdout(**holdout_overrides), 21, "deadbeef"
+            legacy_spec, _report(**report_overrides), _holdout(**holdout_overrides), 21, "deadbeef"
         )
+
+
+@pytest.mark.parametrize("report_overrides, holdout_overrides, name", _NAN_METRIC_CASES)
+def test_nan_metric_is_a_runner_error_naming_the_metric(
+    spec, report_overrides, holdout_overrides, name
+):
+    """Default bundle: the same cases, on the keys ``v2`` reads."""
+    overrides = {_V2_KEY.get(k, k): v for k, v in report_overrides.items()}
+    name = _V2_KEY.get(name, name)
+    with pytest.raises(ResearchError, match=f"metric '{name}'"):
+        build_result(spec, _report(**overrides), _holdout(**holdout_overrides), 21, "deadbeef")
+
+
+@pytest.mark.parametrize("key", ["oos_ic", "nw_tstat"])
+def test_v2_result_does_not_read_the_legacy_statistics(spec, legacy_spec, key):
+    """A report whose legacy statistic is missing still maps under ``v2``
+    (it reads the gate's) and is refused under ``legacy_v1``."""
+    report = _report(**{key: None})
+    r = build_result(spec, report, _holdout(), 21, "deadbeef")
+    assert (r.ic, r.t_stat) == (0.025, 3.25)
+    with pytest.raises(ResearchError, match=f"metric '{key}'"):
+        build_result(legacy_spec, report, _holdout(), 21, "deadbeef")
 
 
 def test_nan_inside_leakage_detail_is_an_error_too(spec):
@@ -475,10 +551,31 @@ def test_runner_rejects_a_spec_whose_id_is_not_its_hash(frames, tmp_path, spec):
 def test_runner_rejects_an_unnormalised_configuration(frames, tmp_path, spec):
     body = spec.to_dict()
     del body["experiment_id"]
-    body["configuration"] = {"n_folds": 4}  # missing the other pinned keys
+    body["configuration"] = {"n_folds": 4, "methods": "v2"}  # missing the other pinned keys
     partial = ExperimentSpec.from_dict({"experiment_id": experiment_id_of(body), **body})
     with pytest.raises(ResearchError, match="not normalised"):
         _runner(frames, tmp_path, dry_run=True).run(partial)
+
+
+def test_runner_refuses_a_spec_that_names_no_method_bundle(frames, tmp_path, spec):
+    """A pre-v1.5.0 spec (no ``configuration.methods``) cannot be re-run
+    under its old id: the runner says so instead of guessing a bundle, and
+    takes no look."""
+    body = spec.to_dict()
+    del body["experiment_id"]
+    del body["configuration"]["methods"]
+    old = ExperimentSpec.from_dict({"experiment_id": experiment_id_of(body), **body})
+    with pytest.raises(ResearchError, match="names no method bundle") as err:
+        _runner(frames, tmp_path, dry_run=True).run(old)
+    assert err.value.code == "invalid_spec"
+    assert not (tmp_path / "experiments.json").exists()
+
+
+def test_runner_no_longer_takes_a_tstat_threshold(frames, tmp_path):
+    """The v1.3.0 / v1.4.0 keyword is gone: the threshold policy is part of
+    the spec's method bundle."""
+    with pytest.raises(TypeError, match="tstat_threshold"):
+        _runner(frames, tmp_path, dry_run=True, tstat_threshold="ledger")
 
 
 def test_runner_needs_an_input_source(tmp_path):
@@ -685,7 +782,9 @@ def test_registry_rejects_corrupt_documents(frames, tmp_path, spec):
         reg.load_result(spec.experiment_id)
 
 
-def test_cli_list_and_show(frames, tmp_path, spec, capsys):
+def test_cli_list_and_show_legacy_v1(frames, tmp_path, legacy_spec, capsys):
+    """The golden-frame experiment under the v1.4.0 rules is a REJECT."""
+    spec = legacy_spec
     _runner(frames, tmp_path).run(spec)
     out_dir = str(tmp_path / "experiments")
     assert cli_main(["--out-dir", out_dir, "list"]) == 0
@@ -696,8 +795,51 @@ def test_cli_list_and_show(frames, tmp_path, spec, capsys):
     assert cli_main(["--out-dir", out_dir, "show", spec.experiment_id]) == 0
     shown = capsys.readouterr().out
     assert "VERDICT: REJECT" in shown and spec.dataset_version in shown
+    assert "methods=legacy_v1" in shown
     assert cli_main(["--out-dir", out_dir, "show", "0000000000000000"]) == 1
     assert "error:" in capsys.readouterr().err
+
+
+def test_cli_list_and_show(frames, tmp_path, spec, capsys):
+    """Default bundle: the same experiment is an ITERATE that never trades
+    (cost-aware policy), judged at the ledger threshold of its own looks."""
+    result = _runner(frames, tmp_path).run(spec)
+    assert result.verdict is Verdict.ITERATE
+    out_dir = str(tmp_path / "experiments")
+    assert cli_main(["--out-dir", out_dir, "list"]) == 0
+    listed = capsys.readouterr().out
+    assert spec.experiment_id in listed and "ITERATE" in listed and "REJECT" not in listed
+    assert cli_main(["--out-dir", out_dir, "list", "--alpha", "EQ01"]) == 0
+    assert "no experiments" in capsys.readouterr().out
+    assert cli_main(["--out-dir", out_dir, "show", spec.experiment_id]) == 0
+    shown = capsys.readouterr().out
+    assert "VERDICT: ITERATE" in shown and spec.dataset_version in shown
+    assert "methods=v2" in shown
+    threshold = ExperimentLedger.bonferroni_t_threshold_at(LOOKS_PER_EXPERIMENT)
+    assert (
+        f"PROMOTE t threshold: {threshold:.4f} "
+        f"(ledger Bonferroni |t| at {LOOKS_PER_EXPERIMENT} looks)"
+    ) in shown
+    assert cli_main(["--out-dir", out_dir, "show", "0000000000000000"]) == 1
+    assert "error:" in capsys.readouterr().err
+
+
+def test_cli_run_options_name_the_bundle_not_the_threshold(capsys):
+    """``run`` takes ``--methods`` and ``--normalized-dir``; the v1.4.0
+    ``--tstat-threshold`` flag is gone (a usage error, exit 2)."""
+    with pytest.raises(SystemExit) as stop:
+        cli_main(["run", "--help"])
+    assert stop.value.code == 0
+    usage = capsys.readouterr().out
+    assert "--methods" in usage and "--normalized-dir" in usage
+    assert "legacy_v1" in usage and "--tstat-threshold" not in usage
+    with pytest.raises(SystemExit) as stop:
+        cli_main(["run", "--alpha", "EQ03", "--tstat-threshold", "fixed"])
+    assert stop.value.code == 2
+    assert "--tstat-threshold" in capsys.readouterr().err
+    with pytest.raises(SystemExit) as stop:
+        cli_main(["run", "--alpha", "EQ03", "--methods", "v3"])
+    assert stop.value.code == 2
 
 
 # ---------------------------------------------------------------------------
@@ -761,15 +903,27 @@ def test_eq03_report_reproduces_through_the_runner(tmp_path):
     meta = load_instrument_meta(CONFIGS_DIR)
     exec_cfg = json.loads((CONFIGS_DIR / "execution" / "execution.json").read_text())
     cfg = spec.configuration
-    backtester = Backtester(
-        CostModel.load(CONFIGS_DIR / "execution" / "execution.json"),
-        meta,
-        BacktestConfig(
-            latency_ns=cfg["latency_ns"],
-            max_decision_age_ns=cfg["max_decision_age_ns"],
-            flatten_at_session_end=cfg["flatten_at_session_end"],
-        ),
+    bundle = methods(cfg["methods"])
+    assert bundle.name == METHODS_V2
+    config = bundle.backtest_config(
+        latency_ns=cfg["latency_ns"],
+        max_decision_age_ns=cfg["max_decision_age_ns"],
+        flatten_at_session_end=cfg["flatten_at_session_end"],
     )
+    # the v2 backtest rules are the BacktestConfig defaults
+    assert config == BacktestConfig(
+        latency_ns=cfg["latency_ns"],
+        max_decision_age_ns=cfg["max_decision_age_ns"],
+        flatten_at_session_end=cfg["flatten_at_session_end"],
+    )
+    backtester = Backtester(
+        bundle.cost_model(CostModel.load(CONFIGS_DIR / "execution" / "execution.json")),
+        meta,
+        config,
+    ).for_horizon(spec.horizon)
+    # a fresh ledger: the run is judged at the Bonferroni |t| of its own looks
+    ledger_t = ExperimentLedger.bonferroni_t_threshold_at(LOOKS_PER_EXPERIMENT)
+    recompute = RecomputeSources(FEATURES_DIR.parent / "normalized", CONFIGS_DIR).get("EQUITY")
 
     def factory():
         model = EQ03OfiMultiLevel()
@@ -785,11 +939,19 @@ def test_eq03_report_reproduces_through_the_runner(tmp_path):
         float(exec_cfg["defaults"]["max_participation"]),
         n_folds=int(cfg["n_folds"]),
         embargo_ns=int(cfg["embargo_ns"]),
+        ledger_t_threshold=ledger_t,
+        ledger_looks=LOOKS_PER_EXPERIMENT,
+        seed=int(spec.seed),
+        recompute=recompute,
+        **bundle.validate_kwargs(),
     )
+    assert direct["gates"]["min_nw_tstat"] == max(3.0, ledger_t)
+    assert runner.last_eligibility.significance_threshold == direct["gates"]["min_nw_tstat"]
+    assert runner.last_eligibility.threshold_looks == LOOKS_PER_EXPERIMENT
     for field, key in (
-        ("ic", "oos_ic"),
+        ("ic", "gate_ic"),
         ("rank_ic", "oos_rank_ic"),
-        ("t_stat", "nw_tstat"),
+        ("t_stat", "gate_tstat"),
         ("hit_rate", "oos_hit_rate"),
         ("turnover", "turnover_flips_per_hour"),
         ("fold_consistency", "fold_sign_consistency"),
@@ -815,10 +977,13 @@ def test_eq03_report_reproduces_through_the_runner(tmp_path):
     # 3. The committed report is the WEAKER whole-window protocol, so it
     #    must differ. Pinned explicitly so the two can never silently
     #    converge (which would mean the holdout leaked back in).
-    assert abs(result.ic - report["oos_ic"]) > TOL, (
+    #    ``result.ic`` is the gate's IC under v2, so it is compared with
+    #    the report's gate IC, and the plain pooled IC with its counterpart.
+    assert abs(result.ic - report["gate_ic"]) > TOL, (
         "the runner's holdout-honouring IC equals run_all.py's whole-window "
         "IC — the walk-forward window has leaked back into the holdout"
     )
+    assert abs(runner.last_report["oos_ic"] - report["oos_ic"]) > TOL
 
 
 def test_document_drift_tolerates_last_ulp_but_not_semantics():
@@ -862,23 +1027,24 @@ def test_persist_keeps_committed_bytes_when_numbers_agree(tmp_path, spec):
     path = runner.experiment_dir(spec.experiment_id) / "result.json"
     first = path.read_bytes()
     nudged = build_result(
-        spec, _report(oos_ic=_report()["oos_ic"] * (1 + 1e-13)), _holdout(), 21, "deadbeef"
+        spec, _report(gate_ic=_report()["gate_ic"] * (1 + 1e-13)), _holdout(), 21, "deadbeef"
     )
     runner._persist(spec, nudged)
     assert path.read_bytes() == first
     with pytest.raises(ResearchError, match="reproduced different values"):
-        runner._persist(spec, build_result(spec, _report(oos_ic=0.5), _holdout(), 21, "deadbeef"))
+        runner._persist(spec, build_result(spec, _report(gate_ic=0.5), _holdout(), 21, "deadbeef"))
 
 
-def test_looks_per_experiment_counts_every_look_the_chain_takes():
+def test_legacy_looks_per_experiment_counts_every_look_the_legacy_chain_takes():
     """The multiple-testing denominator must track the evidence chain.
 
-    ``LOOKS_PER_EXPERIMENT`` was 21 while the chain evaluated the time-latency
+    The legacy count was 21 while the chain evaluated the time-latency
     grid (4 backtests), the crossed/uncrossed IC split (2) and the leakage
     shift IC — looks that were added without being added to the denominator,
     which makes every Bonferroni-corrected t in the reports look better than
     it is.  This test recomputes the total from the grids themselves, so a
-    new stress axis cannot be added silently again.
+    new stress axis cannot be added silently again.  It is what a
+    ``legacy_v1`` run debits.
     """
     from iap.validation.metrics import HORIZON_ORDER
     from iap.validation.stress import (
@@ -899,7 +1065,52 @@ def test_looks_per_experiment_counts_every_look_the_chain_takes():
         + 1  # holdout backtest
     )
     assert expected == 28
-    assert LOOKS_PER_EXPERIMENT == expected
+    assert LEGACY_LOOKS_PER_EXPERIMENT == expected
+    assert methods(METHODS_LEGACY).looks(4) == expected
+    # the legacy chain ran decay / cost / regime on the last fold only
+    assert methods(METHODS_LEGACY).looks(7) == expected
+
+
+def test_looks_per_experiment_counts_every_look_the_chain_takes():
+    """Default bundle, recomputed from the grids: decay, cost stress and the
+    regime split run in EVERY fold, and the statistics reported beside the
+    gate are debited too.
+
+    By hand at the pinned four folds: 11 decay horizons + 3 cost multipliers
+    + 2 regimes = 16 per fold -> 64; fixed 1 + 1 + 2 + 4 + 2 + 3 + 4 + 1 + 1
+    = 19; the holdout backtest 1; 64 + 19 + 1 = 84.
+    """
+    from iap.validation.metrics import HORIZON_ORDER
+    from iap.validation.stress import (
+        COST_MULTIPLIERS,
+        LATENCY_SHIFTS,
+        LATENCY_TIMES_NS,
+    )
+    from iap.validation.validate import looks_per_validation
+
+    per_fold = (
+        len(HORIZON_ORDER)  # decay curve, one IC per pinned horizon
+        + len(COST_MULTIPLIERS)  # cost stress grid
+        + 2  # regime split: high vol, low vol
+    )
+    fixed = (
+        1  # pooled walk-forward OOS IC with the gate's t
+        + 1  # the other t-statistic
+        + 2  # crossed / uncrossed conditional IC
+        + 4  # instrument-mean and vol-scaled IC, all rows and uncrossed
+        + 2  # the IC under the other row policy, all rows and uncrossed
+        + len(LATENCY_SHIFTS)  # latency stress, ROW grid
+        + len(LATENCY_TIMES_NS)  # latency stress, TIME grid
+        + 1  # leakage shift-by-one IC
+        + 1  # bootstrap interval of the pooled net P&L
+    )
+    assert (per_fold, fixed) == (16, 19)
+    expected = fixed + 4 * per_fold + 1  # + the holdout backtest
+    assert expected == 84
+    assert LOOKS_PER_EXPERIMENT == expected == looks_per_validation(4) + 1
+    assert methods(METHODS_V2).looks(4) == expected
+    # another fold count debits its own total: 19 + 16 * 3 + 1
+    assert methods(METHODS_V2).looks(3) == 68
 
 
 def test_ledger_records_the_full_look_count(frames, tmp_path):
@@ -907,4 +1118,77 @@ def test_ledger_records_the_full_look_count(frames, tmp_path):
     runner = _runner(frames, tmp_path, dry_run=True)
     spec = _spec(frames)
     result = runner.run(spec)
-    assert result.n_experiments_in_ledger == LOOKS_PER_EXPERIMENT == 28
+    assert result.n_experiments_in_ledger == LOOKS_PER_EXPERIMENT == 84
+    entry = ExperimentLedger(tmp_path / "experiments.json").entries[0]
+    assert (entry["count"], entry["gate_looks"]) == (84, 84)
+
+
+def test_ledger_records_the_full_look_count_legacy_v1(frames, tmp_path):
+    """A ``legacy_v1`` run debits the 28 looks of the chain up to v1.4.0 and
+    is judged at the fixed threshold (no gate look count)."""
+    runner = _runner(frames, tmp_path, dry_run=True)
+    spec = _spec(frames, configuration={"methods": METHODS_LEGACY})
+    result = runner.run(spec)
+    assert result.n_experiments_in_ledger == LEGACY_LOOKS_PER_EXPERIMENT == 28
+    entry = ExperimentLedger(tmp_path / "experiments.json").entries[0]
+    assert entry["count"] == 28 and "gate_looks" not in entry
+    assert runner.last_eligibility.significance_threshold == 3.0
+    assert runner.last_eligibility.threshold_looks is None
+    assert not runner.last_eligibility.eligible
+
+
+def test_ledger_threshold_is_the_bonferroni_t_at_the_recorded_gate_looks(frames, tmp_path):
+    """v2: PROMOTE needs ``max(3.0, Bonferroni |t| at N)`` with N the run's
+    gate look count — the ledger total once the run's looks are in it for a
+    new spec, the count recorded on its entry for a rerun.
+
+    By hand: a = 84 looks on an empty ledger, two-sided 5 % Bonferroni is
+    z(1 - 0.05 / 84 / 2) = z(1 - 2.976e-4) = 3.434; b arrives at 168 looks,
+    z(1 - 0.05 / 168 / 2) = z(1 - 1.488e-4) = 3.617; a's rerun stays at 84.
+    The expected values come from the standard library's normal quantile,
+    an implementation independent of the ledger's.
+    """
+    want_84 = NormalDist().inv_cdf(1.0 - 0.05 / 84 / 2.0)
+    want_168 = NormalDist().inv_cdf(1.0 - 0.05 / 168 / 2.0)
+    assert (round(want_84, 3), round(want_168, 3)) == (3.434, 3.617)
+    a, b = _spec(frames, "5s"), _spec(frames, "1s")
+    runner = _runner(frames, tmp_path, dry_run=True)
+    runner.run(a)
+    first = runner.last_eligibility
+    assert first.threshold_looks == LOOKS_PER_EXPERIMENT
+    assert first.significance_threshold == ExperimentLedger.bonferroni_t_threshold_at(84)
+    assert first.significance_threshold == pytest.approx(want_84, abs=1e-6)
+    assert runner.last_report["gates"]["min_nw_tstat"] == first.significance_threshold
+    assert runner.last_report["tstat_threshold_policy"] == "ledger"
+    runner.run(b)
+    second = runner.last_eligibility
+    assert second.threshold_looks == 2 * LOOKS_PER_EXPERIMENT
+    assert second.significance_threshold == ExperimentLedger.bonferroni_t_threshold_at(168)
+    assert second.significance_threshold == pytest.approx(want_168, abs=1e-6)
+    # a rerun (fresh runner, ledger now at 168) is judged where it first was
+    again = _runner(frames, tmp_path, dry_run=True)
+    again.run(a)
+    assert again.last_eligibility.threshold_looks == LOOKS_PER_EXPERIMENT
+    assert again.last_eligibility.significance_threshold == first.significance_threshold
+    entries = {e["config"]["experiment_id"]: e for e in again.ledger.entries}
+    assert entries[a.experiment_id]["gate_looks"] == 84
+    assert entries[b.experiment_id]["gate_looks"] == 168
+
+
+def test_zero_trade_holdout_reports_a_zero_sharpe(frames, tmp_path, spec):
+    """Under the cost-aware policy the golden alpha never clears its
+    round-trip cost: the holdout makes no trade, every P&L number is 0 and
+    the 0/0 Sharpe is reported as 0.0 — a result, not a runner error.  The
+    same holdout under ``legacy_v1`` (sign policy) trades."""
+    result = _runner(frames, tmp_path, dry_run=True).run(spec)
+    assert (
+        result.gross_return_bps,
+        result.transaction_cost_bps,
+        result.net_return_bps,
+        result.max_drawdown_bps,
+        result.sharpe,
+    ) == (0.0, 0.0, 0.0, 0.0, 0.0)
+    legacy = _runner(frames, tmp_path / "legacy", dry_run=True).run(
+        _spec(frames, configuration={"methods": METHODS_LEGACY})
+    )
+    assert legacy.transaction_cost_bps > 0.0 and legacy.sharpe != 0.0

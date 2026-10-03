@@ -20,9 +20,12 @@ from iap.experiment.tracker import ExperimentTracker
 from iap.lifecycle.config import load_policy_config
 from iap.lifecycle.evidence import Evidence
 from iap.lifecycle.gates import GATE_SPECS, build_gates
+from iap.lifecycle.golden import legacy_config
 from iap.research import (
     DEFAULT_CONFIGURATION,
     GATE_ELIGIBILITY_BOUNDS,
+    LEGACY_LOOKS_PER_EXPERIMENT,
+    LOOKS_PER_EXPERIMENT,
     ExperimentRegistry,
     ExperimentRunner,
     GateEligibility,
@@ -354,9 +357,15 @@ def test_default_protocol_on_derived_periods_is_gate_eligible():
     two_day = _two_day_frames()
     spec = _derived_spec(two_day)
     got = gate_eligibility(spec, two_day)
-    assert got == GateEligibility(eligible=True, reasons=(), periods_verified=True)
-    assert gate_eligibility(spec) == GateEligibility(True, (), False)
+    assert got == GateEligibility(eligible=True, reasons=(), periods_verified=True, methods="v2")
+    assert gate_eligibility(spec) == GateEligibility(True, (), False, "v2")
+    # a determination made from the spec alone records no threshold; the
+    # runner's is recorded as given
+    assert (got.significance_threshold, got.threshold_looks) == (None, None)
+    judged = gate_eligibility(spec, two_day, significance_threshold=3.5, threshold_looks=84)
+    assert judged == GateEligibility(True, (), True, "v2", 3.5, 84)
     assert {k: v[1] for k, v in GATE_ELIGIBILITY_BOUNDS.items()} == DEFAULT_CONFIGURATION
+    assert DEFAULT_CONFIGURATION["methods"] == "v2"
 
 
 @pytest.mark.parametrize(
@@ -368,6 +377,7 @@ def test_default_protocol_on_derived_periods_is_gate_eligible():
         ({"n_folds": 2}, "n_folds=2 is below"),
         ({"max_decision_age_ns": 3_600_000_000_000}, "max_decision_age_ns=3600000000000 is above"),
         ({"flatten_at_session_end": False}, "flatten_at_session_end=False must be True"),
+        ({"methods": "legacy_v1"}, "methods='legacy_v1' must be 'v2'"),
     ],
 )
 def test_flattering_configurations_run_but_are_not_gate_eligible(override, fragment):
@@ -375,6 +385,17 @@ def test_flattering_configurations_run_but_are_not_gate_eligible(override, fragm
     spec = _derived_spec(two_day, override)  # still a VALID spec
     got = gate_eligibility(spec, two_day)
     assert not got.eligible and len(got.reasons) == 1 and fragment in got.reasons[0]
+
+
+def test_run_facts_make_a_result_not_gate_eligible():
+    """``run_reasons`` (the recompute probe did not run, no reopen labels)
+    are reasons like any other: the default protocol on derived periods is
+    not eligible when the run could not apply the whole default chain."""
+    two_day = _two_day_frames()
+    spec = _derived_spec(two_day)
+    got = gate_eligibility(spec, two_day, run_reasons=["the recompute leakage probe did not run"])
+    assert not got.eligible and got.reasons == ("the recompute leakage probe did not run",)
+    assert got.periods_verified and got.methods == "v2"
 
 
 @pytest.mark.parametrize(
@@ -416,11 +437,15 @@ def test_eligibility_never_changes_an_experiment_id():
     """The committed experiments must keep their ids: eligibility is not in
     the spec, and the pinned configuration normalises exactly as before.
 
-    Two generations are committed: the five run on the v1.3.0 dataset, which
-    predate the sidecar (judged on their configuration alone), and the same
-    five alpha x horizon pairs run on the v1.4.0 dataset — new ids, because
-    ``dataset_version`` is part of the spec — each with its
-    ``eligibility.json`` and periods verified against the dataset."""
+    Three generations are committed: the five run on the v1.3.0 dataset,
+    which predate the sidecar; the same five alpha x horizon pairs run on the
+    v1.4.0 dataset — new ids, because ``dataset_version`` is part of the spec
+    — each with an ``x-version`` 1 ``eligibility.json``; and the same five
+    run again under the v1.5.0 default method bundle — new ids once more,
+    because ``configuration.methods`` is part of the spec — each with an
+    ``x-version`` 2 sidecar carrying the threshold it was judged at.  Only
+    the third generation is gate-eligible: a spec that names no method
+    bundle was computed under what is now ``legacy_v1``."""
     legacy_dataset = "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b"
     legacy_ids = [
         "217fa0cb1d89a9c8",
@@ -429,38 +454,67 @@ def test_eligibility_never_changes_an_experiment_id():
         "d0dd1ab0711d33a1",
         "d7b554d0a3fa3b26",
     ]
-    current_ids = [
+    v14_ids = [
         "20f1b9093e7d0d04",
         "695e7b1e2bd2253e",
         "852863faa44b7b07",
         "876b08e20c46e6fd",
         "f0f6c49b553f6b59",
     ]
+    current_ids = [
+        "00ebeb2b537b5155",
+        "6e4a3431a3acf8a5",
+        "838e0c2d75de4db6",
+        "9d895cf7148c4a8d",
+        "d87e34a9c67c1891",
+    ]
+    pre_methods_configuration = {k: v for k, v in DEFAULT_CONFIGURATION.items() if k != "methods"}
     reg = ExperimentRegistry(REPO_ROOT / "research" / "experiments")
-    assert reg.experiment_ids() == sorted(legacy_ids + current_ids)
-    current_datasets = set()
+    assert reg.experiment_ids() == sorted(legacy_ids + v14_ids + current_ids)
+    datasets = {"v14": set(), "current": set()}
+    looks = []
     for rec in reg.records():
-        assert rec.spec.configuration == DEFAULT_CONFIGURATION
         got = reg.gate_eligibility(rec.experiment_id)
-        assert got.eligible
+        if rec.experiment_id in current_ids:
+            assert rec.spec.configuration == DEFAULT_CONFIGURATION
+            assert got.eligible and got.reasons == ()
+            assert got.periods_verified  # the sidecar the runner wrote
+            assert got.methods == "v2"
+            # the threshold the result was judged at is the ledger's
+            # Bonferroni |t| at the recorded look count
+            assert got.threshold_looks is not None
+            assert got.significance_threshold == ExperimentLedger.bonferroni_t_threshold_at(
+                got.threshold_looks
+            )
+            looks.append(got.threshold_looks)
+            datasets["current"].add(rec.spec.dataset_version)
+            continue
+        # written before v1.5.0: the pinned protocol of its day, no bundle
+        assert rec.spec.configuration == pre_methods_configuration
+        assert not got.eligible and len(got.reasons) == 1
+        assert "predates the v1.5.0 method bundles" in got.reasons[0]
+        assert (got.methods, got.significance_threshold, got.threshold_looks) == (None, None, None)
         if rec.experiment_id in legacy_ids:
             assert rec.spec.dataset_version == legacy_dataset
             assert not got.periods_verified  # no sidecar: config only
         else:
             assert rec.spec.dataset_version != legacy_dataset
             assert got.periods_verified  # the sidecar the runner wrote
-            current_datasets.add(rec.spec.dataset_version)
-    assert len(current_datasets) == 1
-    # the same five alpha x horizon pairs in both generations
+            datasets["v14"].add(rec.spec.dataset_version)
+    assert len(datasets["current"]) == 1 and datasets["current"] == datasets["v14"]
+    # one experiment's looks apart: each was judged at the ledger total
+    # including its own looks
+    assert sorted(looks) == [min(looks) + k * LOOKS_PER_EXPERIMENT for k in range(5)]
+    # the same five alpha x horizon pairs in all three generations
     pairs = {
         ids_name: sorted(
             (rec.spec.alpha_id, rec.spec.horizon)
             for rec in reg.records()
             if rec.experiment_id in ids
         )
-        for ids_name, ids in (("legacy", legacy_ids), ("current", current_ids))
+        for ids_name, ids in (("legacy", legacy_ids), ("v14", v14_ids), ("current", current_ids))
     }
-    assert pairs["legacy"] == pairs["current"]
+    assert pairs["legacy"] == pairs["v14"] == pairs["current"]
     assert reg.skipped == []
 
 
@@ -477,11 +531,28 @@ def test_runner_records_eligibility_beside_the_result(frames, tmp_path):
         )
     )
     assert doc["gate_eligible"] is False and doc["periods_verified"] is True
-    assert doc["x-version"] == 1 and doc["experiment_id"] == cheap.experiment_id
+    assert doc["x-version"] == 2 and doc["experiment_id"] == cheap.experiment_id
+    # the first run on an empty ledger is judged at its own looks
+    assert doc["methods"] == "v2" and doc["threshold_looks"] == LOOKS_PER_EXPERIMENT == 84
+    assert doc["significance_threshold"] == ExperimentLedger.bonferroni_t_threshold_at(84)
+    assert sorted(doc) == [
+        "experiment_id",
+        "gate_eligible",
+        "methods",
+        "periods_verified",
+        "reasons",
+        "significance_threshold",
+        "threshold_looks",
+        "x-version",
+    ]
     got = reg.gate_eligibility(cheap.experiment_id)
     assert not got.eligible
     assert any("cost_multiplier" in r for r in got.reasons)
     assert any("caller-chosen" in r for r in got.reasons)  # one-session fixture
+    # frames in memory: no normalized events, so the recompute probe did not run
+    assert any("recompute leakage probe did not run" in r for r in got.reasons)
+    assert got.significance_threshold == doc["significance_threshold"]
+    assert (got.methods, got.threshold_looks) == ("v2", 84)
     assert ExperimentLedger(tmp_path / "experiments.json").distinct_experiments == 1
 
 
@@ -501,8 +572,13 @@ def test_sidecar_cannot_overrule_the_configuration_bounds(frames, tmp_path):
     assert err.value.code == "experiment_corrupt"
 
 
+SIGNIFICANCE_THRESHOLD = 3.25  # below the fixture result's t of 3.5
+
+
 def _result(spec):
-    return build_result(spec, _report(), _holdout(), 28, "deadbeef")
+    return build_result(
+        spec, _report(gate_ic=0.02, gate_tstat=3.5), _holdout(), LOOKS_PER_EXPERIMENT, "deadbeef"
+    )
 
 
 def test_lifecycle_gates_refuse_non_eligible_research_evidence(frames):
@@ -510,7 +586,14 @@ def test_lifecycle_gates_refuse_non_eligible_research_evidence(frames):
     and passes on the identical result when it is eligible."""
     gates = build_gates(load_policy_config())
     result = _result(_spec(frames))
-    ok = Evidence(research=result, capacity_usd=1e9, validation=None, paper=None, live=None)
+    ok = Evidence(
+        research=result,
+        capacity_usd=1e9,
+        validation=None,
+        paper=None,
+        live=None,
+        significance_threshold=SIGNIFICANCE_THRESHOLD,
+    )
     refused = Evidence(
         research=result,
         capacity_usd=1e9,
@@ -518,6 +601,7 @@ def test_lifecycle_gates_refuse_non_eligible_research_evidence(frames):
         paper=None,
         live=None,
         research_gate_eligible=False,
+        significance_threshold=SIGNIFICANCE_THRESHOLD,
     )
     research_gates = [s.name for s in GATE_SPECS if s.block == "research"]
     assert len(research_gates) == 9
@@ -530,11 +614,61 @@ def test_lifecycle_gates_refuse_non_eligible_research_evidence(frames):
     assert len(GATE_SPECS) == 18  # no new row: the table is pinned
 
 
-def test_evidence_document_is_unchanged_unless_flagged(frames):
+def test_significance_gate_needs_the_threshold_the_result_was_judged_at(frames):
+    """Default lifecycle policy: eligible evidence WITHOUT a significance
+    threshold fails ``statistical_significance`` (value kept, threshold
+    null); the legacy fixed policy passes the same evidence at 3.0."""
+    config = load_policy_config()
+    assert config.tstat_threshold == "ledger"
+    result = _result(_spec(frames))
+    bare = Evidence(research=result, capacity_usd=1e9, validation=None, paper=None, live=None)
+    got = build_gates(config)["statistical_significance"].evaluate("EQ03", bare)
+    assert (got.passed, got.value, got.threshold) == (False, 3.5, None)
+    for name in (s.name for s in GATE_SPECS if s.block == "research"):
+        if name != "statistical_significance":
+            assert build_gates(config)[name].evaluate("EQ03", bare).passed, name
+    fixed = build_gates(legacy_config(config))["statistical_significance"].evaluate("EQ03", bare)
+    assert (fixed.passed, fixed.value, fixed.threshold) == (True, 3.5, 3.0)
+    # refused evidence under the legacy policy still fails, value null
+    refused = Evidence(
+        research=result,
+        capacity_usd=1e9,
+        validation=None,
+        paper=None,
+        live=None,
+        research_gate_eligible=False,
+    )
+    got = build_gates(legacy_config(config))["statistical_significance"].evaluate("EQ03", refused)
+    assert (got.passed, got.value, got.threshold) == (False, None, 3.0)
+
+
+def test_evidence_document_gains_the_eligibility_key_only_when_flagged(frames):
+    """``research_gate_eligible`` is serialised only when False;
+    ``significance_threshold`` (v1.5.0) is always serialised, null when the
+    evidence carries none."""
     result = _result(_spec(frames))
     ok = Evidence(research=result, capacity_usd=1.0, validation=None, paper=None, live=None)
-    assert sorted(ok.to_dict()) == ["capacity_usd", "live", "paper", "research", "validation"]
+    assert sorted(ok.to_dict()) == [
+        "capacity_usd",
+        "live",
+        "paper",
+        "research",
+        "significance_threshold",
+        "validation",
+    ]
+    assert ok.to_dict()["significance_threshold"] is None
     assert Evidence.from_dict(ok.to_dict()) == ok
+    judged = Evidence(
+        research=result,
+        capacity_usd=1.0,
+        validation=None,
+        paper=None,
+        live=None,
+        significance_threshold=SIGNIFICANCE_THRESHOLD,
+    )
+    assert sorted(judged.to_dict()) == sorted(ok.to_dict())
+    assert judged.to_dict()["significance_threshold"] == SIGNIFICANCE_THRESHOLD
+    assert Evidence.from_dict(judged.to_dict()) == judged
     flagged = Evidence(
         research=result,
         capacity_usd=1.0,
@@ -683,32 +817,55 @@ def test_cli_run_reports_spec_errors_as_json(tmp_path, capsys):
     assert not (tmp_path / "experiments.json").exists()  # nothing was looked at
 
 
-def test_runner_rejects_an_unknown_tstat_policy(frames, tmp_path):
-    with pytest.raises(ResearchError, match="unknown tstat_threshold"):
-        _runner(frames, tmp_path, tstat_threshold="bonferroni")
+def test_runner_takes_its_tstat_policy_from_the_method_bundle(frames, tmp_path):
+    """The runner has no ``tstat_threshold`` argument since v1.5.0: the
+    policy is the spec's method bundle, and an unknown bundle is refused
+    when the spec is built."""
+    with pytest.raises(TypeError, match="tstat_threshold"):
+        _runner(frames, tmp_path, tstat_threshold="ledger")
+    with pytest.raises(ResearchError, match="configuration.methods: expected one of") as err:
+        _spec(frames, configuration={"methods": "bonferroni"})
+    assert err.value.code == "invalid_spec"
 
 
 def test_runner_ledger_policy_uses_the_post_debit_threshold(frames, tmp_path, monkeypatch):
+    """Default bundle: the run is judged at the Bonferroni threshold of the
+    ledger total INCLUDING its own looks, and a rerun at the look count its
+    first run was judged at.  The ``legacy_v1`` bundle keeps the fixed
+    threshold (no ledger threshold is passed)."""
     import iap.research.runner as runner_mod
 
     seen = {}
     real = runner_mod.validate_alpha
 
     def spy(*args, **kwargs):
-        seen.update(policy=kwargs["tstat_threshold"], threshold=kwargs["ledger_t_threshold"])
+        seen.update(
+            policy=kwargs["tstat_threshold"],
+            threshold=kwargs["ledger_t_threshold"],
+            looks=kwargs["ledger_looks"],
+        )
         return real(*args, **kwargs)
 
     monkeypatch.setattr(runner_mod, "validate_alpha", spy)
+    legacy = _spec(frames, configuration={"methods": "legacy_v1"})
+    _runner(frames, tmp_path, dry_run=True).run(legacy)
+    assert seen == {"policy": "fixed", "threshold": None, "looks": None}
+    assert LEGACY_LOOKS_PER_EXPERIMENT == 28 and LOOKS_PER_EXPERIMENT == 84
+    # the default bundle on a ledger holding the legacy run's 28 looks:
+    # 28 + 84 = 112 once its own are debited
     spec = _spec(frames)
     _runner(frames, tmp_path, dry_run=True).run(spec)
-    assert seen == {"policy": "fixed", "threshold": None}
-    runner = _runner(frames, tmp_path, dry_run=True, tstat_threshold="ledger")
-    runner.run(_spec(frames, "1s"))  # a NEW spec: 28 more looks
-    assert seen["policy"] == "ledger"
-    assert seen["threshold"] == ExperimentLedger.bonferroni_t_threshold_at(56)
-    runner = _runner(frames, tmp_path, dry_run=True, tstat_threshold="ledger")
-    runner.run(spec)  # a rerun: no new looks
-    assert seen["threshold"] == ExperimentLedger.bonferroni_t_threshold_at(56)
+    assert seen["policy"] == "ledger" and seen["looks"] == 112
+    assert seen["threshold"] == ExperimentLedger.bonferroni_t_threshold_at(112)
+    runner = _runner(frames, tmp_path, dry_run=True)
+    runner.run(_spec(frames, "1s"))  # a NEW spec: 84 more looks
+    assert seen["policy"] == "ledger" and seen["looks"] == 196
+    assert seen["threshold"] == ExperimentLedger.bonferroni_t_threshold_at(196)
+    runner = _runner(frames, tmp_path, dry_run=True)
+    runner.run(spec)  # a rerun: no new looks, judged where its first run was
+    assert seen["looks"] == 112
+    assert seen["threshold"] == ExperimentLedger.bonferroni_t_threshold_at(112)
+    assert ExperimentLedger(tmp_path / "experiments.json").total_experiments == 196
 
 
 @pytest.fixture()

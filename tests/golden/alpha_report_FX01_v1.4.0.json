@@ -1,0 +1,236 @@
+{
+  "alpha_id": "FX01",
+  "asset_class": "FX",
+  "capacity_usd_by_instrument": {
+    "101": 217300000.0,
+    "102": 254680000.00000003,
+    "103": 29504000000.000004,
+    "104": 132420000.0,
+    "105": 270960000.0,
+    "106": 176380000.0,
+    "107": 122280000.00000001,
+    "108": 170640000.0
+  },
+  "crossed_frac": 0.2865171296750761,
+  "decay_ic_by_horizon": {
+    "100ms": 0.0021158292463399333,
+    "10ms": null,
+    "10s": 0.008995082720161796,
+    "15m": -0.006968366587569247,
+    "1m": 0.02777870886292666,
+    "1s": 0.004764987708599016,
+    "30s": 0.029350393523485754,
+    "500ms": -0.009589947798646779,
+    "50ms": -0.0005967772461400915,
+    "5m": -0.00596980581478207,
+    "5s": 0.01371318921504627
+  },
+  "fold_sign_consistency": 0.0,
+  "folds": [
+    {
+      "beta_fit": 2.0741648903364318e-07,
+      "degenerate": false,
+      "fold": 1,
+      "hit_rate": 0.5583333333333333,
+      "ic": -0.01536601029497482,
+      "ic_er": -0.01536601029497482,
+      "n_test_pairs": 10185,
+      "n_test_rows": 10513,
+      "n_train": 10175,
+      "rank_ic": 0.004997188070156834,
+      "test_end": 1787586977627048093,
+      "test_start": 1787558317737182847
+    },
+    {
+      "beta_fit": 8.882590005894967e-08,
+      "degenerate": false,
+      "fold": 2,
+      "hit_rate": 0.5128205128205128,
+      "ic": -0.025515664080301727,
+      "ic_er": -0.025515664080301637,
+      "n_test_pairs": 10201,
+      "n_test_rows": 10514,
+      "n_train": 20364,
+      "rank_ic": -0.0010785305067197025,
+      "test_end": 1787630328370755824,
+      "test_start": 1787586977627048093
+    },
+    {
+      "beta_fit": 3.553552647587987e-08,
+      "degenerate": false,
+      "fold": 3,
+      "hit_rate": 0.5203252032520326,
+      "ic": -0.0014033255897357951,
+      "ic_er": -0.0014033255897357507,
+      "n_test_pairs": 10195,
+      "n_test_rows": 10513,
+      "n_train": 30560,
+      "rank_ic": 0.007242511956451974,
+      "test_end": 1787659076592875059,
+      "test_start": 1787630328370755824
+    },
+    {
+      "beta_fit": 2.5526408682628618e-08,
+      "degenerate": false,
+      "fold": 4,
+      "hit_rate": 0.5096153846153846,
+      "ic": -0.01891238963344307,
+      "ic_er": -0.01891238963344305,
+      "n_test_pairs": 10167,
+      "n_test_rows": 10514,
+      "n_train": 40764,
+      "rank_ic": 0.0018149230772121923,
+      "test_end": 1787691480577291027,
+      "test_start": 1787659076592875059
+    }
+  ],
+  "gate_ic": 0.018288646675376993,
+  "gates": {
+    "iterate_min_ic": 0.005,
+    "iterate_min_tstat": 1.5,
+    "min_fold_sign_consistency": 0.7,
+    "min_nondegenerate_folds": 3,
+    "min_nw_tstat": 3.0,
+    "min_oos_ic": 0.01,
+    "min_test_pairs": 32
+  },
+  "horizon": "500ms",
+  "hypothesis_confirmed": true,
+  "ic_bucket_pairs": {
+    "max": 136.0,
+    "mean": 105.04059040590406,
+    "median": 106.0,
+    "min": 8.0,
+    "n_buckets": 271,
+    "p25": 100.0,
+    "p75": 113.0,
+    "total_pairs": 28466
+  },
+  "ic_bucket_pairs_uncrossed": {
+    "max": 107.0,
+    "mean": 75.86384976525821,
+    "median": 77.0,
+    "min": 22.0,
+    "n_buckets": 213,
+    "p25": 67.0,
+    "p75": 84.0,
+    "total_pairs": 16159
+  },
+  "leakage": {
+    "ic_shifted": -0.007630864272188563,
+    "ic_unshifted": -0.01891238963344305,
+    "label_guard_ok": true,
+    "median_row_gap_ns": 15350321189,
+    "passed": true,
+    "required_shift_ratio": 0.0,
+    "shift_ok": true,
+    "suspicious_ic": 0.03,
+    "truncation_ok": true
+  },
+  "n_degenerate_folds": 0,
+  "n_folds_run": 4,
+  "n_ic_buckets": 271,
+  "n_ic_buckets_uncrossed": 213,
+  "n_nondegenerate_folds": 4,
+  "name": "fx_quote_imbalance",
+  "net_pnl_1x_cost": -9866.624206889275,
+  "nw_lags": 2,
+  "nw_tstat": 0.10951799974756816,
+  "nw_tstat_pooled": -1.4592226234704215,
+  "nw_tstat_pooled_uncrossed": 2.2572730900249756,
+  "nw_tstat_uncrossed": 3.2662378799347884,
+  "oos_hit_rate": 0.5258620689655172,
+  "oos_ic": -0.015345115315985525,
+  "oos_ic_by_instrument": {
+    "101": -0.00033776673900871347,
+    "102": -0.017863454446337017,
+    "103": -0.0031951621811628964,
+    "104": -0.051998328620444956,
+    "105": -0.015848300766617706,
+    "106": -0.026808255591816498,
+    "107": 0.014685149972186425,
+    "108": -0.011323425485584711
+  },
+  "oos_ic_crossed": -0.030189679082871405,
+  "oos_ic_instrument_mean": -0.01408619298234826,
+  "oos_ic_pooled_er": -0.012754328079361275,
+  "oos_ic_uncrossed": 0.018288646675376993,
+  "oos_ic_vol_scaled": -0.014054247441462216,
+  "oos_rank_ic": 0.003198235359960507,
+  "stress": {
+    "cost": {
+      "x0.5": {
+        "total_costs": 5414.835951604703,
+        "total_pnl": -4451.788255284996,
+        "trade_count": 689
+      },
+      "x1": {
+        "total_costs": 10829.671903209406,
+        "total_pnl": -9866.624206889275,
+        "trade_count": 689
+      },
+      "x2": {
+        "total_costs": 21659.343806418812,
+        "total_pnl": -20696.296110099454,
+        "trade_count": 689
+      }
+    },
+    "latency": {
+      "+0ev": {
+        "ic": -0.01891238963344307,
+        "latency_rows": 1,
+        "total_pnl": -11151.061069606734
+      },
+      "+1ev": {
+        "ic": -0.007630864272188572,
+        "latency_rows": 2,
+        "total_pnl": -11641.286071457329
+      },
+      "+5ev": {
+        "ic": -0.0004828234996933894,
+        "latency_rows": 6,
+        "total_pnl": -13337.595066970585
+      }
+    },
+    "latency_time": {
+      "100ms": {
+        "latency_ns": 100000000,
+        "total_pnl": -10361.653984169037,
+        "trade_count": 716
+      },
+      "1s": {
+        "latency_ns": 1000000000,
+        "total_pnl": -9866.624206889275,
+        "trade_count": 689
+      },
+      "500ms": {
+        "latency_ns": 500000000,
+        "total_pnl": -10134.730054446398,
+        "trade_count": 704
+      },
+      "5s": {
+        "latency_ns": 5000000000,
+        "total_pnl": -8162.624306039622,
+        "trade_count": 587
+      }
+    },
+    "regime": {
+      "ic_high_vol": -0.05221170725781004,
+      "ic_low_vol": 0.0038793192426419764
+    }
+  },
+  "turnover_active_hours": 64.84386954637472,
+  "turnover_flips_per_hour": 44.08841554496834,
+  "turnover_span_hours": 64.84386954637472,
+  "universe": [
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    108
+  ],
+  "verdict": "ITERATE"
+}

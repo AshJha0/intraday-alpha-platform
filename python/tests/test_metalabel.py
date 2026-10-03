@@ -133,7 +133,49 @@ def test_build_meta_features_contract():
     assert X[1, 1] == -2e-3  # signed pred
     assert X[0, 5] == 0.3  # imbalance * +1
     assert X[1, 5] == 0.4  # imbalance * -1
+    # default (v1.5.0): a missing depth stays NaN for the tree model — it is
+    # the ONLY non-finite entry (row 1, log_depth_l1)
+    missing = ~np.isfinite(X)
+    assert np.isnan(X[1, 4])
+    assert missing.sum() == 1 and missing[1, 4]
+    assert X[0, 4] == np.log1p(100.0)
+
+
+def test_build_meta_features_legacy_imputation_zero_fills():
+    """``impute_nan=True`` names the rule up to v1.4.0: NaN depth -> 0, and
+    every other entry is the default matrix's."""
+    pred = np.array([1e-3, -2e-3])
+    direction = np.array([1, -1])
+    ctx = np.array([[2.0, 1e-4, 100.0, 0.3, 0.5, 0.2], [3.0, 2e-4, np.nan, -0.4, 0.6, 0.1]])
+    X = build_meta_features(pred, direction, ctx, impute_nan=True)
+    assert X.shape == (2, len(META_FEATURE_NAMES))
+    assert X[0, 0] == 1e-3  # |pred|
+    assert X[1, 1] == -2e-3  # signed pred
+    assert X[0, 5] == 0.3  # imbalance * +1
+    assert X[1, 5] == 0.4  # imbalance * -1
     assert np.isfinite(X).all()  # NaN depth -> 0
+    assert X[1, 4] == 0.0
+    default = build_meta_features(pred, direction, ctx)
+    keep = np.isfinite(default)
+    assert np.array_equal(X[keep], default[keep])
+    # an infinity is "missing" too: NaN by default, 0 under the legacy rule
+    ctx_inf = ctx.copy()
+    ctx_inf[0, 0] = np.inf
+    assert np.isnan(build_meta_features(pred, direction, ctx_inf)[0, 2])
+    assert build_meta_features(pred, direction, ctx_inf, impute_nan=True)[0, 2] == 0.0
+
+
+def test_meta_labeling_records_the_imputation_rule(meta_result):
+    """The result says which rule built its features: the default keeps NaN
+    and counts the missing values; the legacy rule is named."""
+    res, ds, pred = meta_result
+    assert res["impute_nan"] is False
+    assert res["n_missing_meta_values"] == 0  # the synthetic context is complete
+    legacy = run_meta_labeling(ds, pred, impute_nan=True)
+    assert legacy["impute_nan"] is True and legacy["n_missing_meta_values"] is None
+    # nothing is missing here, so the two rules fit the same model
+    assert legacy["auc_test"] == res["auc_test"]
+    assert legacy["economics_gate_off"] == res["economics_gate_off"]
 
 
 def test_meta_labeling_input_validation():
