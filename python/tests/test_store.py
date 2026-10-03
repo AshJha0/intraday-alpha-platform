@@ -965,7 +965,10 @@ def test_cli_build_explain_sql(tmp_path: Path, capsys: pytest.CaptureFixture[str
     lines = out.splitlines()
     assert lines[0].split() == ["table", "rows"]
     table = {line.split()[0]: int(line.split()[1]) for line in lines[1:]}
-    assert table["alphas"] == 24 and table["model_runs"] == 33
+    # one row per tracked model run on disk (the model ledger is append-only:
+    # every ML rerun adds its fits, so the count is derived, not a literal)
+    n_model_runs = sum(1 for d in (RESEARCH / "models").glob("run_*") if d.is_dir())
+    assert table["alphas"] == 24 and table["model_runs"] == n_model_runs >= 40
     assert list(table) == sorted(table)
 
     with Store.open(db) as s:

@@ -1,0 +1,107 @@
+{
+  "asset_mix_warning": [],
+  "economics": {
+    "conservative_costs": true,
+    "hit_rate": 0.06483494761810635,
+    "mean_gross_bps_per_signal": -0.00217104794965555,
+    "mean_net_bps_per_signal": -0.11102003072767852,
+    "n_long": 9404,
+    "n_samples": 167624,
+    "n_short": 5773,
+    "n_trades": 15177,
+    "total_net_bps": -1684.9510063539767
+  },
+  "economics_label_exact": {
+    "conservative_costs": false,
+    "hit_rate": 0.5843051986558608,
+    "mean_gross_bps_per_signal": -0.00217104794965555,
+    "mean_net_bps_per_signal": 0.1948428037140676,
+    "n_long": 9404,
+    "n_samples": 167624,
+    "n_short": 5773,
+    "n_trades": 15177,
+    "total_net_bps": 2957.1292319684035
+  },
+  "ic_tstat": 558.4790525522436,
+  "mean_ic": 0.9539405476700092,
+  "mean_rank_ic": 0.9705895183834854,
+  "model": "xgboost",
+  "n_degenerate_folds": 0,
+  "n_folds": 4,
+  "per_fold": [
+    {
+      "degenerate": false,
+      "fold": 0,
+      "ic": 0.9516785567258622,
+      "n_test": 41910,
+      "n_train": 42135,
+      "rank_ic": 0.9732971763449323,
+      "test_asset_classes": [],
+      "test_window": [
+        1787584793460109191,
+        1787595890600918684
+      ],
+      "train_asset_classes": [],
+      "train_window": [
+        1787529602028520532,
+        1787584728120125038
+      ]
+    },
+    {
+      "degenerate": false,
+      "fold": 1,
+      "ic": 0.9584685488971562,
+      "n_test": 41902,
+      "n_train": 84278,
+      "rank_ic": 0.9656341732324284,
+      "test_asset_classes": [],
+      "test_window": [
+        1787595951149318965,
+        1787665641271144929
+      ],
+      "train_asset_classes": [],
+      "train_window": [
+        1787529602028520532,
+        1787595885837400897
+      ]
+    },
+    {
+      "degenerate": false,
+      "fold": 2,
+      "ic": 0.9509602946067207,
+      "n_test": 41883,
+      "n_train": 126430,
+      "rank_ic": 0.9693650501555401,
+      "test_asset_classes": [],
+      "test_window": [
+        1787665701441330311,
+        1787676869738604246
+      ],
+      "train_asset_classes": [],
+      "train_window": [
+        1787529602028520532,
+        1787665635979837154
+      ]
+    },
+    {
+      "degenerate": false,
+      "fold": 3,
+      "ic": 0.9546547904502979,
+      "n_test": 41929,
+      "n_train": 168570,
+      "rank_ic": 0.9740616738010408,
+      "test_asset_classes": [],
+      "test_window": [
+        1787676929981606096,
+        1787691459285005656
+      ],
+      "train_asset_classes": [],
+      "train_window": [
+        1787529602028520532,
+        1787676864680373395
+      ]
+    }
+  ],
+  "pooled_ic": 0.9546980221127728,
+  "pooled_ic_vs_mid": 0.00456703734775323
+}
