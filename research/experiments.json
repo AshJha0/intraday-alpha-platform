@@ -1,7 +1,14 @@
 {
   "bonferroni_p_threshold": 4.6816479400749066e-05,
   "bonferroni_t_threshold": 4.0709764661247005,
-  "description": "Multiple-testing ledger (spec \u00a713). Deterministic: no wall-clock; identical rerun => identical file. Experiments are de-duplicated by (alpha_id, kind, canonical config): re-running the same script does not inflate the Bonferroni denominator.",
+  "datasets": [
+    {
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
+      "entries": 70,
+      "looks": 1068
+    }
+  ],
+  "description": "Multiple-testing ledger (spec \u00a713). Deterministic: no wall-clock; identical rerun => identical file. Experiments are de-duplicated by (alpha_id, kind, canonical config, dataset_version): re-running the same script on the same dataset does not inflate the Bonferroni denominator; the same configuration on a new dataset is a new look, and the looks of earlier datasets are kept (`datasets`).",
   "distinct_experiments": 70,
   "entries": [
     {
@@ -11,6 +18,7 @@
         "horizons_scanned": 9
       },
       "count": 216,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "348c137c221e41a23fe2f541523ae21988e8b599578d0f9468a0c1bed3ad139d",
       "kind": "design_horizon_scan",
       "n": 216,
@@ -24,6 +32,7 @@
         "n_folds": 4
       },
       "count": 28,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "a1ff6119c9514054940a0587881959ca0f6a8f20455d6f8f1388538b5b2b80d2",
       "kind": "promotion_pipeline",
       "n": 237,
@@ -42,6 +51,7 @@
         "n_folds": 4
       },
       "count": 28,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "374f4992019ef43d43d0b6585ee20c9b170652818e0cee808c1fa2630dafe959",
       "kind": "promotion_pipeline",
       "n": 258,
@@ -60,6 +70,7 @@
         "n_folds": 4
       },
       "count": 28,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "ec372323a6b0bce40bc609cba75cf6f3e29c05539c443135de86f274086b6042",
       "kind": "promotion_pipeline",
       "n": 279,
@@ -78,6 +89,7 @@
         "n_folds": 4
       },
       "count": 28,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "e28d4e231fb4bcd62f7b326e94e7b83211b0d387ecc79b583e8ecfd3210c06cb",
       "kind": "promotion_pipeline",
       "n": 300,
@@ -96,6 +108,7 @@
         "n_folds": 4
       },
       "count": 28,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "0ae9eee1ad53d51ee11a695ed8f44447769e474f3983b867e0a4204b14c6dc91",
       "kind": "promotion_pipeline",
       "n": 321,
@@ -114,6 +127,7 @@
         "n_folds": 4
       },
       "count": 28,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "51cc3461f629059a68bca72e72c71714e079edb6f4595f4294c1fa71b165917b",
       "kind": "promotion_pipeline",
       "n": 342,
@@ -132,6 +146,7 @@
         "n_folds": 4
       },
       "count": 28,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "c17b9ee080d029c52b1a6cdc8e1fe35c68269b95de3ca4b258e39e3706adec59",
       "kind": "promotion_pipeline",
       "n": 363,
@@ -150,6 +165,7 @@
         "n_folds": 4
       },
       "count": 28,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "8c117b3c0951ad92dc172103ede918215f7b3e23e73659e1d13bc6e8959fe5c7",
       "kind": "promotion_pipeline",
       "n": 384,
@@ -168,6 +184,7 @@
         "n_folds": 4
       },
       "count": 28,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "b5f3f3f17eb85a319ff796e6eef275d095d7f0afdd754f709bb3fd491648316d",
       "kind": "promotion_pipeline",
       "n": 405,
@@ -186,6 +203,7 @@
         "n_folds": 4
       },
       "count": 28,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "0d8985551e58859566a9a0c204c8a0ab59b61c59c7110654d4f39454674a01af",
       "kind": "promotion_pipeline",
       "n": 426,
@@ -204,6 +222,7 @@
         "n_folds": 4
       },
       "count": 28,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "ae1cb6667c49b90dd1d396eb362d8e5bb86deb68a8e516502d267a1b532fa97f",
       "kind": "promotion_pipeline",
       "n": 447,
@@ -222,6 +241,7 @@
         "n_folds": 4
       },
       "count": 28,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "8060a89cd5ce46c5703aa70caa64d59bcbbe181dc5d2edc1389a86e5fa0d711a",
       "kind": "promotion_pipeline",
       "n": 468,
@@ -240,6 +260,7 @@
         "n_folds": 4
       },
       "count": 28,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "6494622dda477de9bb16e18717e50eb9e7dfa91ab92c57e206077667b0a37a5b",
       "kind": "promotion_pipeline",
       "n": 489,
@@ -258,6 +279,7 @@
         "n_folds": 4
       },
       "count": 28,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "15ff8a987ac258856adfd4a9fc7027e71cca3db8d01523f62a7ee55b11661b78",
       "kind": "promotion_pipeline",
       "n": 510,
@@ -276,6 +298,7 @@
         "n_folds": 4
       },
       "count": 28,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "163a2469989bb65377bd8cc03a499dc080d6b14dbfbd42d3ef6ad654bebb5f60",
       "kind": "promotion_pipeline",
       "n": 531,
@@ -294,6 +317,7 @@
         "n_folds": 4
       },
       "count": 28,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "68ff29387785372e4b246c442fc435c0682aecffcd251bc699ab7c1531055064",
       "kind": "promotion_pipeline",
       "n": 552,
@@ -312,6 +336,7 @@
         "n_folds": 4
       },
       "count": 28,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "1e0520f5011f827ead854c1d619a71589eae200f8077ac36c71a7af84fc6b114",
       "kind": "promotion_pipeline",
       "n": 573,
@@ -330,6 +355,7 @@
         "n_folds": 4
       },
       "count": 28,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "3bb58196e7de494f5d717e942a44dcf2f8506642ae60d228fc781bef086d7f44",
       "kind": "promotion_pipeline",
       "n": 594,
@@ -348,6 +374,7 @@
         "n_folds": 4
       },
       "count": 28,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "f484a0e5658e336fed7c64bfbe55ec73f5c87e9e3163d5ea4efcdd18ee4bff6e",
       "kind": "promotion_pipeline",
       "n": 615,
@@ -366,6 +393,7 @@
         "n_folds": 4
       },
       "count": 28,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "c4921fa0e464bbd3d8c28613d281551799cbaa3c7878c0b8d8165c5c53afb8fd",
       "kind": "promotion_pipeline",
       "n": 636,
@@ -384,6 +412,7 @@
         "n_folds": 4
       },
       "count": 28,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "7a267e543bec0ee1c4e2bb5ff9a4e58b318ab85628e029d7a0043863288caf97",
       "kind": "promotion_pipeline",
       "n": 657,
@@ -402,6 +431,7 @@
         "n_folds": 4
       },
       "count": 28,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "d4d0ea0efe0769081defdb25bb40713cbff4bf4b1312b455e102920580cce031",
       "kind": "promotion_pipeline",
       "n": 678,
@@ -420,6 +450,7 @@
         "n_folds": 4
       },
       "count": 28,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "ee43b9878263ff8ec8cacf639996269f428491565c5f87ef7175a4873b9edd52",
       "kind": "promotion_pipeline",
       "n": 699,
@@ -438,6 +469,7 @@
         "n_folds": 4
       },
       "count": 28,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "4d77a1778fd4e4de62acd4a7691ea33562643637105d661b655fb6799be226ea",
       "kind": "promotion_pipeline",
       "n": 720,
@@ -454,6 +486,7 @@
         "policy": "static"
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "d5848408e7c2ee0d3d3e7854d7a25ce53bca5516b7b82b2aa51c6eb0e0e8173c",
       "kind": "adaptive_deployment",
       "n": 721,
@@ -474,6 +507,7 @@
         "policy": "scheduled"
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "122b26e375c07cc013635d60244e980aecc0e5b8909bce36ae98b8935e1cb24d",
       "kind": "adaptive_deployment",
       "n": 722,
@@ -494,6 +528,7 @@
         "policy": "scheduled"
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "d625176d60664250524c312d0fabb65c184dc0e4c5c7ce1ff7fd8694524eef6f",
       "kind": "adaptive_deployment",
       "n": 723,
@@ -516,6 +551,7 @@
         "psi_threshold": 0.25
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "473ce6e12ed41fba797751f7d02bbedc754371657e30274a5c482b75be3f4c0b",
       "kind": "adaptive_deployment",
       "n": 724,
@@ -535,6 +571,7 @@
         "policy": "static"
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "d2510de2c345e6ebf81fd7e5ef08a7667e94a3cb9c01e937f9ca88038917deb9",
       "kind": "adaptive_deployment",
       "n": 725,
@@ -555,6 +592,7 @@
         "policy": "scheduled"
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "d47dcc0cf619fc3df558f5182e65cf705be94936c894a5916a7dc206762b2403",
       "kind": "adaptive_deployment",
       "n": 726,
@@ -575,6 +613,7 @@
         "policy": "scheduled"
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "2c44c60ad9fc03514f2bb116dbd1b0d8115f57edc04aebf5654c277fc0f2c129",
       "kind": "adaptive_deployment",
       "n": 727,
@@ -597,6 +636,7 @@
         "psi_threshold": 0.25
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "7024647a419ff9d216ccf322b00449fb04845fde37b69679cf8bed1c296c017b",
       "kind": "adaptive_deployment",
       "n": 728,
@@ -616,6 +656,7 @@
         "policy": "static"
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "3c075c9322b69f855b4a84ccadc208c8338adacf93f6e40d6979139e14f94def",
       "kind": "adaptive_deployment",
       "n": 729,
@@ -636,6 +677,7 @@
         "policy": "scheduled"
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "2e934faea190270faa0b10748893c330268ee4409b6f6601f0b200db543c29fb",
       "kind": "adaptive_deployment",
       "n": 730,
@@ -656,6 +698,7 @@
         "policy": "scheduled"
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "4483c4e101094c4472c80fbdb287e85c89bb03ab0b883578e900989259c9e272",
       "kind": "adaptive_deployment",
       "n": 731,
@@ -678,6 +721,7 @@
         "psi_threshold": 0.25
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "a8356f3c3a4655ca23361a4d363b7d6ac398d4a743fe38e5b76c97e635968290",
       "kind": "adaptive_deployment",
       "n": 732,
@@ -697,6 +741,7 @@
         "policy": "static"
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "d5e4e57b1cf6ae782f01c135c9bb21d643d63f2d4835253b1123b9c8c5ccd52f",
       "kind": "adaptive_deployment",
       "n": 733,
@@ -717,6 +762,7 @@
         "policy": "scheduled"
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "ffaec57d4300b349885ad97e65a768c33536a9c900225dd4e81ee556e368d8e5",
       "kind": "adaptive_deployment",
       "n": 734,
@@ -737,6 +783,7 @@
         "policy": "scheduled"
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "ab8e5fbcdf0b484b32e5954b8f8f18d8b8ad080738c49316e11bbc5ee67b2dc8",
       "kind": "adaptive_deployment",
       "n": 735,
@@ -759,6 +806,7 @@
         "psi_threshold": 0.25
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "f1572df8623141b968dc9503dd533c77a3f846c3fc885dbda7ab0dbb96b17327",
       "kind": "adaptive_deployment",
       "n": 736,
@@ -778,6 +826,7 @@
         "policy": "static"
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "afc285d7b7cec9c12d9846f5a5ce0f25442b82f9d5224d3a271711f29362e743",
       "kind": "adaptive_deployment",
       "n": 737,
@@ -798,6 +847,7 @@
         "policy": "scheduled"
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "f638bd70e26c7e4c6e9120b364b9b285085b8453ab5627618335f061cbbe9f1d",
       "kind": "adaptive_deployment",
       "n": 738,
@@ -818,6 +868,7 @@
         "policy": "scheduled"
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "2213fdd7f1b94036bf33fe41cb2094c7668828973d3c59f322f2d5fb9dbea627",
       "kind": "adaptive_deployment",
       "n": 739,
@@ -840,6 +891,7 @@
         "psi_threshold": 0.25
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "b2ac06e849b0d43f22f53311abe3949901cc08da2c19f4f9b1053579062d3535",
       "kind": "adaptive_deployment",
       "n": 740,
@@ -859,6 +911,7 @@
         "policy": "static"
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "13caf81f486d8976bb6986cf7afa0d4992e09972b262c57aa9b6d4e3862be42f",
       "kind": "adaptive_deployment",
       "n": 741,
@@ -879,6 +932,7 @@
         "policy": "scheduled"
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "0e2a71c9593391bd245e04725c9e36b1e1d58f4f1f5c3ef30c28fdbcc72aa1f1",
       "kind": "adaptive_deployment",
       "n": 742,
@@ -899,6 +953,7 @@
         "policy": "scheduled"
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "b738535d83eeaa2f4245b19eb6dc0f92935aae666049a5ba4552f5ca6e8382a6",
       "kind": "adaptive_deployment",
       "n": 743,
@@ -921,6 +976,7 @@
         "psi_threshold": 0.25
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "960bf3e8e18fdc808ac071978b38b04a86b85ba2b370bd17998c87a03fd17f34",
       "kind": "adaptive_deployment",
       "n": 744,
@@ -940,6 +996,7 @@
         "policy": "static"
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "438ec8140932eee6ff741c6f0806a6223d5fda68d3e41210a5f20b9672cd77a2",
       "kind": "adaptive_deployment",
       "n": 745,
@@ -960,6 +1017,7 @@
         "policy": "scheduled"
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "7d7b791b2e4a74c723b4577d8f31348365d4532a2f163d8482009214427fc698",
       "kind": "adaptive_deployment",
       "n": 746,
@@ -980,6 +1038,7 @@
         "policy": "scheduled"
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "c6fa55b11ae3681cd5665c298cd8b06e567706d3865c0c99408030598366784d",
       "kind": "adaptive_deployment",
       "n": 747,
@@ -1002,6 +1061,7 @@
         "psi_threshold": 0.25
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "2ff8310394c70e42c7e0e797bb2cc3dd49e5fca4c667b2a71c48433355aee5a2",
       "kind": "adaptive_deployment",
       "n": 748,
@@ -1021,6 +1081,7 @@
         "policy": "static"
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "df7b3412b90eebe23c3c2850713b46c3c0938c9fb687850f0d8f6aeb09f54b9d",
       "kind": "adaptive_deployment",
       "n": 749,
@@ -1041,6 +1102,7 @@
         "policy": "scheduled"
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "aa489e800ba9777a441e864770e396cd106260c0a5fd5470860dbb4cb5351a08",
       "kind": "adaptive_deployment",
       "n": 750,
@@ -1061,6 +1123,7 @@
         "policy": "scheduled"
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "1d61e496a31b6e8359f264e60e1bbf78832941f9741e75dab9a1d0a34e8e5fa9",
       "kind": "adaptive_deployment",
       "n": 751,
@@ -1083,6 +1146,7 @@
         "psi_threshold": 0.25
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "eea44a47cc4ce3ebc0c5afc6380a66edf167103689f4b0df51e87845c6a2c29c",
       "kind": "adaptive_deployment",
       "n": 752,
@@ -1102,6 +1166,7 @@
         "policy": "static"
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "5bf8eada336010359b7a49f30707517e1c865451b7dc262dfa59b7f0634afbf7",
       "kind": "adaptive_deployment",
       "n": 753,
@@ -1122,6 +1187,7 @@
         "policy": "scheduled"
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "f3781629b967e55cca98adbe729cd9f8378ab2bc1147b4873268bce2d3eb8d63",
       "kind": "adaptive_deployment",
       "n": 754,
@@ -1142,6 +1208,7 @@
         "policy": "scheduled"
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "0bc56eb417646ab4d23a1fb4a2018a9aa9a4bb3e2dca8f283b92c560f161e715",
       "kind": "adaptive_deployment",
       "n": 755,
@@ -1164,6 +1231,7 @@
         "psi_threshold": 0.25
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "869521c5bf1b668e357a6c05a55959b2a4519ccccfd953deb1da326bf7c5f9ac",
       "kind": "adaptive_deployment",
       "n": 756,
@@ -1183,6 +1251,7 @@
         "policy": "static"
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "009fb2cdfce29d5163659f8933963978c237213c928e870c3850b89dd6ec1a4a",
       "kind": "adaptive_deployment",
       "n": 757,
@@ -1203,6 +1272,7 @@
         "policy": "scheduled"
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "6a3b827bf89bad5d72a2e519455f8b61127bb55375b7aff53ae7318c454f0533",
       "kind": "adaptive_deployment",
       "n": 758,
@@ -1223,6 +1293,7 @@
         "policy": "scheduled"
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "e145619e1735850e6770e3fa091c6413517573ad15099b285344314def9d58f4",
       "kind": "adaptive_deployment",
       "n": 759,
@@ -1245,6 +1316,7 @@
         "psi_threshold": 0.25
       },
       "count": 1,
+      "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
       "key": "ed8c14cf51766b25a2e5c3136d0f43405477868575425b2e5c08d4096232a7d0",
       "kind": "adaptive_deployment",
       "n": 760,
@@ -1477,5 +1549,5 @@
   "expected_max_null_t": 3.734579767395561,
   "pinned_alpha": 0.05,
   "total_experiments": 1068,
-  "x-version": 1
+  "x-version": 2
 }

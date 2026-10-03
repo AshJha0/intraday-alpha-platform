@@ -18,6 +18,7 @@ import math
 
 import pytest
 from iap.adaptive.lifecycle import LifecycleConfig, LifecycleTracker
+from iap.alpha import ALPHA_IDS
 from iap.contracts.protocols import AlphaLifecycle as AlphaLifecycleProtocol
 from iap.contracts.protocols import LifecycleGate as LifecycleGateProtocol
 from iap.contracts.types import (
@@ -805,6 +806,38 @@ def test_bootstrap_failed_gates_agree_with_report_verdicts(bootstrap):
         "net_pnl_after_costs",
     )
     assert set(by_id["FX03"]) >= {"statistical_significance", "hypothesis_sign", "fold_consistency"}
+
+
+def test_pipeline_entry_selection_is_per_dataset():
+    """The ledger keeps one promotion_pipeline entry per alpha AND dataset;
+    the evidence is the entry of the dataset alpha_params.json names."""
+    from iap.lifecycle.bootstrap import select_pipeline_entries
+
+    old, new = "a" * 64, "b" * 64
+    entries = [
+        {"alpha_id": "EQ01", "kind": "promotion_pipeline", "key": "k-old", "dataset_version": old},
+        {"alpha_id": "EQ01", "kind": "promotion_pipeline", "key": "k-new", "dataset_version": new},
+        {"alpha_id": "EQ02", "kind": "promotion_pipeline", "key": "k-unstamped"},
+        {"alpha_id": "EQ01", "kind": "adaptive_deployment", "key": "other-kind"},
+    ]
+    assert select_pipeline_entries(entries, new)["EQ01"]["key"] == "k-new"
+    assert select_pipeline_entries(entries, old)["EQ01"]["key"] == "k-old"
+    # an entry written before the dataset stamp existed still backs its alpha
+    assert select_pipeline_entries(entries, new)["EQ02"]["key"] == "k-unstamped"
+    # a dataset the ledger has never seen: nothing stamped matches
+    assert set(select_pipeline_entries(entries, "c" * 64)) == {"EQ02"}
+    with pytest.raises(ValueError, match="duplicate promotion_pipeline entry for EQ01"):
+        select_pipeline_entries(entries, None)
+    with pytest.raises(ValueError, match="duplicate"):
+        select_pipeline_entries(entries + [dict(entries[1], key="again")], new)
+
+
+def test_committed_ledger_backs_every_alpha_on_the_current_dataset():
+    params = load_params_document(ROOT)
+    ledger = load_ledger_entries(ROOT)
+    assert sorted(ledger) == sorted(ALPHA_IDS)
+    assert {e["dataset_version"] for e in ledger.values()} == {params["data_version"]}
+    assert ledger == load_ledger_entries(ROOT, params["data_version"])
 
 
 def test_bootstrap_research_mapping(bootstrap):

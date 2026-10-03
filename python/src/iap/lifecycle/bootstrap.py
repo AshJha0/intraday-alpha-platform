@@ -5,7 +5,9 @@ Bootstrap reads, for each of the 24 flagship alphas (``iap.alpha.ALPHA_IDS``):
 
 * ``research/alpha_reports/<ID>.json`` — the ``validate_alpha`` report;
 * ``research/experiments.json`` — the multiple-testing ledger (the alpha's
-  ``promotion_pipeline`` entry gives ``experiment_id`` and the ledger count);
+  ``promotion_pipeline`` entry ON THE DATASET ``alpha_params.json`` NAMES
+  gives ``experiment_id`` and the ledger count; entries of earlier datasets
+  are history and are not evidence);
 * ``configs/strategies/alpha_params.json`` — the serialized model (its
   ``data_version`` / ``feature_version`` / ``git_commit`` provenance, and the
   alpha's parameter block whose content hash is the ``model_version``);
@@ -107,6 +109,7 @@ __all__ = [
     "render_status",
     "research_evidence",
     "run_bootstrap",
+    "select_pipeline_entries",
 ]
 
 #: Reference notional for expressing the report's USD P&L in bps.
@@ -137,20 +140,53 @@ def load_report(root: Path, alpha_id: str) -> dict[str, Any]:
         return json.load(fh)
 
 
-def load_ledger_entries(root: Path) -> dict[str, dict[str, Any]]:
-    """``{alpha_id: promotion_pipeline ledger entry}``."""
+def select_pipeline_entries(
+    entries: list[dict[str, Any]], dataset_version: str | None, source: str = "ledger"
+) -> dict[str, dict[str, Any]]:
+    """``{alpha_id: promotion_pipeline ledger entry}`` for one dataset.
+
+    Since v1.4.0 the ledger keeps the looks of every dataset it has seen
+    (``iap.validation.ledger``, "Dataset scope"), so an alpha can have one
+    ``promotion_pipeline`` entry per dataset.  The entry that backs the
+    current evidence is the one stamped with ``dataset_version`` (the
+    ``data_version`` of ``alpha_params.json``); an entry with no stamp at
+    all (a ledger written before the rule) is used when no stamped entry
+    matches.  With ``dataset_version = None`` every entry is a candidate.
+    Two candidates of the same rank for one alpha are an error.
+    """
+    exact: dict[str, dict[str, Any]] = {}
+    unstamped: dict[str, dict[str, Any]] = {}
+    for entry in entries:
+        if entry["kind"] != _LEDGER_KIND:
+            continue
+        stamp = entry.get("dataset_version")
+        if dataset_version is None or stamp == dataset_version:
+            bucket = exact
+        elif stamp is None:
+            bucket = unstamped
+        else:
+            continue  # another dataset's look: history, not this evidence
+        if entry["alpha_id"] in bucket:
+            raise ValueError(f"{source}: duplicate {_LEDGER_KIND} entry for {entry['alpha_id']}")
+        bucket[entry["alpha_id"]] = entry
+    return {**unstamped, **exact}
+
+
+def load_ledger_entries(
+    root: Path, dataset_version: str | None = None
+) -> dict[str, dict[str, Any]]:
+    """``{alpha_id: promotion_pipeline ledger entry}`` for ``dataset_version``
+    (:func:`select_pipeline_entries`).  ``None`` means the dataset in force:
+    the ``data_version`` of ``alpha_params.json`` when that file exists (the
+    entries that back the current evidence), every entry otherwise."""
     path = root / LEDGER_RELPATH
     if not path.is_file():
         raise ValueError(f"{path}: experiments ledger not found")
     with open(path, encoding="utf-8") as fh:
         doc = json.load(fh)
-    out: dict[str, dict[str, Any]] = {}
-    for entry in doc["entries"]:
-        if entry["kind"] == _LEDGER_KIND:
-            if entry["alpha_id"] in out:
-                raise ValueError(f"{path}: duplicate {_LEDGER_KIND} entry for {entry['alpha_id']}")
-            out[entry["alpha_id"]] = entry
-    return out
+    if dataset_version is None and (root / PARAMS_RELPATH).is_file():
+        dataset_version = str(load_params_document(root)["data_version"])
+    return select_pipeline_entries(doc["entries"], dataset_version, str(path))
 
 
 def load_params_document(root: Path) -> dict[str, Any]:
@@ -403,8 +439,8 @@ def run_bootstrap(
     )
     ids = sorted(alpha_ids if alpha_ids is not None else ALPHA_IDS)
     reports = {aid: load_report(root, aid) for aid in ids}
-    ledger = load_ledger_entries(root)
     params_doc = load_params_document(root)
+    ledger = load_ledger_entries(root, str(params_doc["data_version"]))
     event_ts = bootstrap_event_ts(reports)
 
     registry = AlphaRegistry(cfg.policy)

@@ -241,14 +241,18 @@ def _list(args: argparse.Namespace) -> int:
     if not records:
         print(f"no experiments under {registry.root}")
         return 0
+    # ``dataset`` (first 8 hex of dataset_version) tells apart the same
+    # alpha x horizon run on different datasets: the folder keeps the
+    # experiments of every dataset the ledger has seen.
     print(
-        f"{'experiment':<16}  {'alpha':<6}  {'horizon':<7}  {'IC':>10}  "
+        f"{'experiment':<16}  {'alpha':<6}  {'horizon':<7}  {'dataset':<8}  {'IC':>10}  "
         f"{'NW t':>8}  {'net bps':>10}  verdict"
     )
     for rec in records:
         r = rec.result
         print(
             f"{rec.experiment_id:<16}  {rec.spec.alpha_id:<6}  {rec.spec.horizon:<7}  "
+            f"{rec.spec.dataset_version[:8]:<8}  "
             f"{r.ic:>+10.6f}  {r.t_stat:>+8.3f}  {r.net_return_bps:>+10.4f}  "
             f"{r.verdict.value}"
         )

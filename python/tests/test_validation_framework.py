@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import math
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -26,6 +27,7 @@ from iap.validation import (
 from iap.validation.metrics import HORIZONS_NS as _H
 
 NS_S = 1_000_000_000
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 # -- metric formulas vs hand calculations -------------------------------
@@ -361,6 +363,67 @@ def test_ledger_bonferroni_math(tmp_path):
     assert abs(led.bonferroni_t_threshold() - 3.2905) < 5e-3
     assert abs(led.expected_max_null_t() - math.sqrt(2 * math.log(50))) < 1e-12
     assert "50 experiments" in led.note()
+
+
+def test_ledger_is_dataset_scoped(tmp_path):
+    """Dataset scope (v1.4.0): the same configuration on another dataset is a
+    new look recorded BESIDE the old one — the old result is not overwritten
+    and the denominator only grows; a rerun on the same dataset is still
+    de-duplicated; an unscoped ledger keeps the pre-v1.4.0 key."""
+    path = tmp_path / "experiments.json"
+    cfg = {"horizon": "5s", "n_folds": 4}
+    old = ExperimentLedger(path, dataset_version="a" * 64)
+    old.record("EQ01", "promotion_pipeline", config=cfg, result={"oos_ic": 0.03}, count=28)
+    old.save()
+
+    new = ExperimentLedger(path, dataset_version="b" * 64)
+    assert new.would_add("EQ01", "promotion_pipeline", cfg, 28) == 28
+    assert new.record("EQ01", "promotion_pipeline", config=cfg, result={"oos_ic": 0.01}, count=28)
+    assert new.total_experiments == 56 and new.distinct_experiments == 2
+    # a rerun on the same dataset adds nothing
+    assert new.would_add("EQ01", "promotion_pipeline", cfg, 28) == 0
+    assert new.record("EQ01", "promotion_pipeline", config=cfg, result={"oos_ic": 0.011}) == 56
+    new.save()
+
+    blob = json.loads(path.read_text())
+    assert blob["x-version"] == 2
+    first, second = blob["entries"]
+    assert first["dataset_version"] == "a" * 64 and first["result"] == {"oos_ic": 0.03}
+    assert second["dataset_version"] == "b" * 64 and second["result"] == {"oos_ic": 0.011}
+    assert first["key"] != second["key"]
+    assert blob["datasets"] == [
+        {"dataset_version": "a" * 64, "entries": 1, "looks": 28},
+        {"dataset_version": "b" * 64, "entries": 1, "looks": 28},
+    ]
+
+    unscoped = ExperimentLedger.experiment_key("EQ01", "promotion_pipeline", cfg)
+    assert unscoped not in (first["key"], second["key"])
+    assert unscoped == ExperimentLedger.experiment_key("EQ01", "promotion_pipeline", cfg, None)
+    # the runner's entries name their dataset inside the config
+    assert (
+        ExperimentLedger.entry_dataset_version({"config": {"dataset_version": "c" * 64}})
+        == "c" * 64
+    )
+    assert ExperimentLedger.entry_dataset_version({"config": {}}) is None
+
+
+def test_committed_ledger_names_a_dataset_on_every_entry():
+    """research/experiments.json after the v1.4.0 migration
+    (research/migrate_ledger_dataset_scope.py): no entry without a dataset,
+    the retired v1.3.0 dataset's 1068 looks still counted, the total equal to
+    the sum over datasets."""
+    blob = json.loads((REPO_ROOT / "research" / "experiments.json").read_text())
+    assert blob["x-version"] == 2
+    assert all(ExperimentLedger.entry_dataset_version(e) for e in blob["entries"])
+    by_dataset = {d["dataset_version"]: d for d in blob["datasets"]}
+    legacy = by_dataset["203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b"]
+    assert legacy == {
+        "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
+        "entries": 70,
+        "looks": 1068,
+    }
+    assert blob["total_experiments"] == sum(d["looks"] for d in blob["datasets"])
+    assert blob["distinct_experiments"] == sum(d["entries"] for d in blob["datasets"])
 
 
 def test_ledger_file_is_deterministic(tmp_path):

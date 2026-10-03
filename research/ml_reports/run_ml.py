@@ -98,8 +98,8 @@ def main() -> None:
         f"{len(FEATURE_SET)} curated predictors (all 10 registry "
         "families represented). Walk-forward: 4 expanding folds whose "
         "boundaries are quantiles of the ROW INDEX (not of the wall "
-        "span — this data occupies ~2.6 h of each 24 h day, so equal "
-        "wall segments produced wildly unequal folds), 60s embargo, 5s "
+        "span — the equity session is 6.5 h of each 24 h day, so equal "
+        "wall segments produce wildly unequal folds), 60s embargo, 5s "
         "label-horizon purge at every train boundary."
     )
     L.append("")
@@ -381,11 +381,33 @@ def main() -> None:
             "trivially, because that target embeds the observable "
             "half-spread — which is why it is no longer the gate."
         )
-    L.append(
-        "2. No 5s directional alpha exists in this bundled synthetic "
-        "sample. Apparent IC is spread-component prediction; conservative "
-        "economics are ~flat. Nothing here should be promoted."
-    )
+    # Conclusion 2 is DERIVED too: the directional measure is the IC vs the
+    # mid-to-mid label and the economic one the conservative net per signal,
+    # both read from the table above for every model that was fitted.
+    mid_ic = {n: results["models"][n]["pooled_ic_vs_mid"] for n in trained}
+    cons = {n: results["models"][n]["economics"]["mean_net_bps_per_signal"] for n in trained}
+    top = max(mid_ic, key=lambda n: mid_ic[n])
+    if max(cons.values()) <= 0.0:
+        L.append(
+            "2. No model here earns its costs. The largest pooled OOS IC vs "
+            f"the mid-to-mid label is {_fmt(mid_ic[top])} (`{top}`), and the "
+            "conservative net is negative for every fitted model "
+            f"({_fmt(min(cons.values()), 3)} to {_fmt(max(cons.values()), 3)} "
+            "bps/signal). The headline IC is spread-component prediction, "
+            "not direction. Nothing here should be promoted."
+        )
+    else:
+        winners = sorted(n for n in trained if cons[n] > 0.0)
+        L.append(
+            "2. The largest pooled OOS IC vs the mid-to-mid label is "
+            f"{_fmt(mid_ic[top])} (`{top}`), and the conservative net per "
+            f"signal is positive for {', '.join(f'`{n}`' for n in winners)} "
+            f"(up to {_fmt(max(cons.values()), 3)} bps/signal). That is one "
+            "target, one horizon and two synthetic sessions, read after "
+            "every fit in the model ledger: it is a reason to put the model "
+            "through the ledgered validation chain, not a result. Nothing "
+            "here is promoted by this report."
+        )
     if degenerate:
         L.append(
             "3. The meta-labeling machinery ran end to end, but its gate is "

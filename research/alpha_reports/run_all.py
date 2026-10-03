@@ -47,6 +47,7 @@ from iap.alpha import ALPHA_IDS, build, fit_all, save_params  # noqa: E402
 from iap.alpha.data import load_features, session_days, split_by_day  # noqa: E402
 from iap.backtest import BacktestConfig, Backtester, CostModel  # noqa: E402
 from iap.backtest.engine import ensemble_scores  # noqa: E402
+from iap.experiment.tracker import data_version  # noqa: E402
 from iap.research import LOOKS_PER_EXPERIMENT  # noqa: E402
 from iap.validation import ExperimentLedger, validate_alpha  # noqa: E402
 from iap.validation.validate import GATES  # noqa: E402
@@ -153,6 +154,7 @@ def data_quality_lines() -> list:
         and isinstance(v.get("crossed_frac"), (int, float))
         and np.isfinite(v["crossed_frac"])
     )
+    eq_gap, fx_gap = row_gap_ranges()
     if fx_crossed:
         fx_range = (
             f"{fx_crossed[0] * 100:.0f}-{fx_crossed[-1] * 100:.0f} % "
@@ -168,8 +170,8 @@ def data_quality_lines() -> list:
         "  those rows reverts mechanically when the stale LP refreshes — a",
         "  vol-scaled momentum signal is paid for measuring that artefact.",
         "  Every IC in this report is therefore split crossed/uncrossed.",
-        "- **mean row gap** is the spacing of emissions. Equity rows are ~3.3 s",
-        '  apart, FX rows ~15-22 s: any "+1 event" latency claim means two',
+        f"- **mean row gap** is the spacing of emissions. Equity rows are {eq_gap}",
+        f'  apart, FX rows {fx_gap}: any "+1 event" latency claim means two',
         "  different things, which is why the latency stress is in event time.",
         "- **zero 1s / zero 1m** is the fraction of VALID labels that are",
         "  exactly 0. A 500 ms-5 s FX label is 89-99 % zeros: a REJECT at those",
@@ -177,10 +179,35 @@ def data_quality_lines() -> list:
         "  evidence against the hypothesis.",
         "- **label max age** is the pinned freshness bound",
         "  `max(5 s, 2 x median quote gap)`: a label whose forward mid is",
-        "  older than this is INVALID (API_FEATURES section 6), which is why",
-        "  15 m equity labels near the session close no longer exist.",
+        "  older than this is INVALID (API_FEATURES section 6). Equity rows",
+        "  are sparse relative to the 5 s floor, so the bound removes a",
+        "  material share of the equity labels at horizons of 10 s and more",
+        "  (`valid 1m` above); 15 m labels anchored in the last 15 minutes of",
+        "  a session do not exist at all.",
     ]
     return lines
+
+
+def row_gap_ranges() -> tuple[str, str]:
+    """``(equity, FX)`` mean-row-gap ranges as prose (``~3.1-3.3 s``), read
+    from ``features_summary.json`` so the text cannot drift from the table."""
+    path = REPO / "data" / "features" / "features_summary.json"
+    if not path.is_file():
+        return "an unknown gap", "an unknown gap"
+    inst = json.loads(path.read_text()).get("instruments", {})
+
+    def span(pick) -> str:
+        gaps = sorted(
+            v["mean_row_gap_ns"] / 1e9
+            for iid, v in inst.items()
+            if pick(int(iid)) and isinstance(v.get("mean_row_gap_ns"), (int, float))
+        )
+        if not gaps:
+            return "an unknown gap"
+        lo, hi = f"{gaps[0]:.1f}", f"{gaps[-1]:.1f}"
+        return f"~{lo} s" if lo == hi else f"~{lo}-{hi} s"
+
+    return span(lambda i: i < 100), span(lambda i: i >= 100)
 
 
 def _write_report(
@@ -237,9 +264,9 @@ def _write_report(
     a("")
     a("## Master table (walk-forward OOS, expanding purged+embargoed folds)")
     a("")
-    a("Folds are quantiles of the ROW INDEX, not of the wall span: this data")
-    a("occupies ~2.6 h of each 24 h day, so equal wall segments used to leave")
-    a("two of four folds EMPTY while the report still claimed 4 folds. A fold")
+    a("Folds are quantiles of the ROW INDEX, not of the wall span: the equity")
+    a("session is 6.5 h of each 24 h day, so equal wall segments leave folds")
+    a("EMPTY or badly unequal while a report still claims 4 folds. A fold")
     a("with fewer than 32 usable pairs is DEGENERATE and counts as a failed")
     a("fold in `folds+`; PROMOTE needs >= 3 non-degenerate folds.")
     a("")
@@ -293,8 +320,9 @@ def _write_report(
     a("")
     a("## Cost and latency stress (last fold, net P&L)")
     a("")
-    a("Latency is stressed in EVENT TIME (a row is ~3.3 s on equities and")
-    a('~15 s on FX, so an "+N events" grid is not a latency budget). The')
+    eq_gap, fx_gap = row_gap_ranges()
+    a(f"Latency is stressed in EVENT TIME (a row is {eq_gap} on equities and")
+    a(f'{fx_gap} on FX, so an "+N events" grid is not a latency budget). The')
     a("event grid is kept as the last three columns for continuity.")
     a("")
     a(
@@ -412,8 +440,8 @@ def main() -> int:
     max_participation = float(exec_cfg["defaults"]["max_participation"])
     cost_model = CostModel.load(REPO / "configs" / "execution" / "execution.json")
     # Round-3 pinned research execution model: latency in EVENT TIME, a
-    # bounded decision age (a 4-hour-old decision no longer "fills" at the
-    # 20:00 close print) and no overnight carry.
+    # bounded decision age (a decision made before a long quote gap no
+    # longer "fills" at whatever row comes next) and no overnight carry.
     backtester = Backtester(
         cost_model,
         meta,
@@ -424,7 +452,9 @@ def main() -> int:
         ),
     )
 
-    ledger = ExperimentLedger(LEDGER_PATH)
+    # Dataset-scoped (iap.validation.ledger): the same configuration on a
+    # regenerated dataset is a new look, recorded beside the old one.
+    ledger = ExperimentLedger(LEDGER_PATH, dataset_version=data_version(REPO))
     if ledger.total_experiments == 0:
         ledger.record(
             "ALL",
