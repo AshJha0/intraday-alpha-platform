@@ -1,10 +1,10 @@
 flowchart TD
-    SUB["Child LIMIT order submitted<br/>arrival = decision_ts + fixed latency + seeded jitter (one draw)"] --> JOIN["Join level at price p:<br/>ahead_qty = displayed depth at p on arrival"]
-    JOIN --> OBS{"next market event at level p"}
-    OBS -->|"EXECUTE qty q ahead"| DEC1["ahead_qty -= q<br/>(leftover after ahead exhausted fills US)"]
-    OBS -->|"CANCEL qty q ahead"| DEC2["ahead_qty -= q"]
+    SUB["Child LIMIT order submitted<br/>arrival = decision_ts + fixed latency + seeded jitter (one draw)"] --> JOIN["Join level at price p:<br/>ahead_qty = displayed depth at p on arrival<br/>+ our own earlier orders resting there"]
+    JOIN --> OBS{"next market event at level p<br/>that the book APPLIED"}
+    OBS -->|"EXECUTE: q = min(event qty,<br/>the book order's remaining)"| DEC1["ahead_qty -= q<br/>(leftover after ahead exhausted fills US,<br/>one pool per trade, shared in queue order)"]
+    OBS -->|"CANCEL of an order known<br/>to be ahead of us"| DEC2["ahead_qty -= displayed size<br/>the book removed"]
     OBS -->|"marketable ADD consumes level"| DEC3["treated like EXECUTE volume<br/>(marketable-ADD expansion)"]
-    OBS -->|"trade-through: opposite side<br/>crosses our price"| FILL["FILL (maker) at our price<br/>+ rebate - none of the spread"]
+    OBS -->|"trade-through, or the display crosses our price:<br/>bounded by the traded volume / by displayed minus consumed"| FILL["FILL (maker) at our price<br/>+ rebate - none of the spread"]
     DEC1 --> CHK{"ahead_qty <= 0 and<br/>incoming volume remains?"}
     DEC2 --> OBS
     DEC3 --> OBS
@@ -14,4 +14,5 @@ flowchart TD
     CROSS["crossing exemption: displayed liquidity a<br/>marketable limit already consumed is not<br/>double-counted against ahead_qty"] -.-> DEC3
     GATE["venue gate (rule 8): book missing / stale / not TRADING<br/>=> no fill of any kind; MARKET/IOC/FOK cancelled VENUE_NOT_TRADING,<br/>LIMIT rests; re-open fills crossed resting orders at the touch"] -.-> OBS
     TIF["cancel (rule 7): same latency path, effective at<br/>max(cancel arrival, order arrival); expire_ts = parent end_ts<br/>expires pending or resting before activation"] -.-> OBS
-    OVL["overlay (rule 3b): displayed liquidity our earlier child<br/>consumed is not re-used by a later child"] -.-> SUB
+    OVL["overlay (rule 3b): displayed liquidity an earlier child<br/>or the crossing check consumed is not re-used"] -.-> SUB
+    BEHIND["a cancel from an order that joined after us, or with a<br/>synthetic QUOTE / SNAPSHOT id, does not advance us;<br/>an event the book dropped moves nobody (diagram 12)"] -.-> OBS

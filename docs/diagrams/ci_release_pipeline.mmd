@@ -1,0 +1,47 @@
+flowchart LR
+    %% .github/workflows/{ci,codeql,release}.yml and dependabot.yml as of v1.3.0.
+    PR["pull request<br/>or push to main"] --> PY
+    PR --> INT
+    PR --> CPP
+    PR --> RS
+    PR --> JV
+    PR --> GOLD
+    PR --> DEP
+    PR --> ASAN
+    PR --> ADV
+    PR --> CHG
+    subgraph CI["ci.yml — every action pinned to a commit SHA, token contents: read"]
+        PY["python<br/>pytest with coverage<br/>seeded dataset restored or regenerated"]
+        INT["integration<br/>tests/integration + tests/replay"]
+        CPP["cpp<br/>build, ctest, gcov report"]
+        RS["rust<br/>cargo test --locked<br/>clippy (advisory), llvm-cov"]
+        JV["java<br/>javac -Xlint:all -Werror, JUnit4"]
+        GOLD["golden<br/>run_golden.sh — promotion gate 10"]
+        DEP["deployment<br/>check_deployment.py<br/>check_headline_numbers.py"]
+        ASAN["cpp-sanitizers<br/>ASan + UBSan over ctest — blocking"]
+        ADV["advisory — non-blocking<br/>ruff, pip-audit, cargo audit"]
+        CHG["changes<br/>does the change touch image inputs?"]
+        IMG["images<br/>build the four images, run the C++ and Rust containers<br/>on push to main, and on PRs that touch image inputs"]
+    end
+    PY --> IMG
+    INT --> IMG
+    CPP --> IMG
+    RS --> IMG
+    JV --> IMG
+    GOLD --> IMG
+    DEP --> IMG
+    CHG --> IMG
+    PR --> CQL["codeql.yml<br/>python, java-kotlin, c-cpp, actions<br/>also weekly"]
+    DB["dependabot.yml<br/>weekly: github-actions, pip, cargo, docker"] -.->|"bump PRs through the same gate"| PR
+    TAG["git tag v*"] --> VER
+    subgraph REL["release.yml — not yet exercised by a tag"]
+        VER["verify-ci<br/>the tagged commit has a green ci run"]
+        BLD["images<br/>build and push to GHCR, one per language"]
+        ATT["attest build provenance<br/>per image digest"]
+        MAN["manifest<br/>release-manifest.json attached to the release"]
+        VER --> BLD
+        BLD --> ATT
+        ATT --> MAN
+    end
+    MAN -.->|"manual step: pin the deployment manifests<br/>to name:tag@digest, verify the attestation"| DEPLOY["deployment/docker<br/>deployment/k8s"]
+    NOTE["repository settings NOT configured:<br/>branch protection, required checks, required reviews<br/>(docs/governance/REPO_SETTINGS.md)"] -.-> PR
