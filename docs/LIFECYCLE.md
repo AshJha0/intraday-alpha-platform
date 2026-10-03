@@ -162,6 +162,23 @@ the evidence, it never touches the registry; the block is `null`, i.e.
 producer yet (the held-out replay hash and the parity flag are filled in by
 hand from `python -m iap.mvp replay` and `tests/harness/run_golden.sh`).
 
+**Gate eligibility of the research block (v1.3.0, Python reference).**
+`Evidence` carries one more field, `research_gate_eligible` (default
+`True`). It says whether the `research` result may be used as promotion
+evidence at all: `iap.research.specs.gate_eligibility` requires the
+experiment's configuration to be at least as conservative as the pinned
+protocol (`cost_multiplier >= 1.0`, `latency_ns >= 1 s`, `embargo_ns >=
+60 s`, `n_folds >= 4`, `max_decision_age_ns <= 60 s`, session flattening
+on) and its periods to be the ones derived from the dataset. When the flag
+is `False`, every gate that reads the `research` block fails with
+`value = null`, exactly as if the number were missing — a property of the
+evidence, not a new row of the gate table, so the table, the edges and the
+golden are unchanged. The key is serialised only when `False`; existing
+evidence documents are byte-identical. The Java and Rust ports do not read
+it: their strict readers reject a document that carries the key, which is
+the safe failure, and evidence flagged not eligible must not be handed to
+them.
+
 ## 5. Registry and log formats
 
 `research/alpha_registry.json`:

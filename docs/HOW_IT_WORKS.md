@@ -512,7 +512,8 @@ latched kill is checkpointed and restored.
 An operator can engage one over an authenticated HTTP call on the Java
 platform. Since v1.3.0 that kill takes effect the moment it is accepted,
 before the trading thread records it; if recording takes longer than the
-wait, the caller is told `202` (latched), never that it failed.
+wait, the caller is told `202` (latched) rather than that it failed, for as
+long as the session is running.
 
 ### 4.4 Three languages, one byte stream
 

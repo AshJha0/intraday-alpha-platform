@@ -30,11 +30,11 @@ f(w) = alpha·w  -  lambda * wᵀ Σ w  -  Σ_i tc_i * |w_i - w_prev_i|
 | name | definition |
 |---|---|
 | position box | `w_min_i <= w_i <= w_max_i` |
-| participation | `|w_i - w_prev_i| <= participation_i` |
-| net exposure | `|Σ_i w_i| <= net_cap` |
-| currency exposure | `|(E w)_c| <= currency_bounds_c` for each currency c |
-| gross exposure | `Σ_i |w_i| <= gross_cap` |
-| turnover | `Σ_i |w_i - w_prev_i| <= turnover_cap` |
+| participation | `\|w_i - w_prev_i\| <= participation_i` |
+| net exposure | `\|Σ_i w_i\| <= net_cap` |
+| currency exposure | `\|(E w)_c\| <= currency_bounds_c` for each currency c |
+| gross exposure | `Σ_i \|w_i\| <= gross_cap` |
+| turnover | `Σ_i \|w_i - w_prev_i\| <= turnover_cap` |
 | volatility target | `sqrt(wᵀ Σ w) <= vol_target` |
 
 Currency exposure matrix `E` (currencies × pairs): for pair column
@@ -100,7 +100,7 @@ as `u_1 >= ... >= u_n`; with cumulative sums `c_j = Σ_{i<=j} u_i`, let
 
 | parameter | default |
 |---|---|
-| `eta0` | `null` → auto: `1 / max(2*lambda*maxRowSum(|Σ|), 1e-6)` |
+| `eta0` | `null` → auto: `1 / max(2*lambda*maxRowSum(\|Σ\|), 1e-6)` |
 | `step_decay` | 0.01 |
 | `iters` | 500 |
 | `proj_passes` | 8 |

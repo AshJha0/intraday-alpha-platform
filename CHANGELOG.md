@@ -221,8 +221,8 @@ API_TRADING.md §2.4)**
   only. Differential fuzzing of the three engines is backlog (E31).
 - **The power study is three seeds per cell.** A rate moves in steps of
   0.33; it calibrates the chain and is not a power curve.
-- **The Python suite exceeds its 120 s target** (1562 tests, 319 s in CI
-  under coverage).
+- **The Python suite exceeds its 120 s target** (1562 tests, five to six minutes in
+  CI under coverage).
 - **`iap.__version__` still reads 1.0.0**; the package metadata says 1.3.0.
 - **There is no LLM, agent or MCP code.** The agent layer is a backlog epic
   (E24, E30); what exists is the foundation it would need.

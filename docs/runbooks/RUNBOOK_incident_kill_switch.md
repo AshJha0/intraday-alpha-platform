@@ -56,7 +56,7 @@ commands of this runbook from such a pod:
 
 ```bash
 kubectl -n intraday-alpha run op --rm -it --restart=Never \
-  --image=curlimages/curl --labels=iap.role=operator -- sh
+  --image=<an image that has curl> --labels=iap.role=operator -- sh
 ```
 
 Compose publishes the port on the host's loopback only.
