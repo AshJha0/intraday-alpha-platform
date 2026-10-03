@@ -148,8 +148,10 @@ JSON
    `deployment/docker/docker-compose.yml`,
    `deployment/k8s/java-platform.yaml`, `deployment/k8s/cronjob-data-pipeline.yaml`)
    and bump the version tag in the same files. The repository references
-   `v1.2.0`, which was tagged before the release workflow existed, so no such
-   image exists yet; the next release must bump these references.
+   `v1.3.0` by tag only: those images exist once the `v1.3.0` tag has been
+   pushed and `release.yml` has run for it (no image was ever published for
+   `v1.2.0`, which was tagged before the release workflow existed), and the
+   digests are pinned from that run's `release-manifest.json` afterwards.
 4. Verify provenance before deploying:
    `gh attestation verify oci://ghcr.io/ashjha0/intraday-alpha-platform-java@sha256:<digest> --repo AshJha0/intraday-alpha-platform`.
 5. Make the GHCR packages public (or grant the cluster a pull secret):
