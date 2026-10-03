@@ -10,7 +10,7 @@
 #
 # SINGLETON (PLATFORM_CONVENTIONS.md §12.7): replicas 1 + strategy Recreate.
 # Two copies of a strategy/risk loop with no leader election duplicate orders
-# the moment a real venue adapter is wired, and the iap-data PVC is
+# the moment a real venue adapter is wired, and the state PVC is
 # ReadWriteOnce — a second replica (or a RollingUpdate surge pod) hits
 # Multi-Attach. There is deliberately no PodDisruptionBudget: minAvailable 1
 # on a single replica blocks every node drain.
@@ -18,9 +18,12 @@
 # CONFIG (§12.2): the entrypoint reads $IAP_CONFIG_DIR, so the iap-configs
 # ConfigMap mounted at /etc/iap/configs is what the process actually loads —
 # the kill-switch runbook's "regenerate the ConfigMap, rollout restart" path
-# is real. STATE (§12.3): /data/state on the PVC holds the risk snapshot,
-# session accounting and the audit JSONL, so a restart resumes instead of
-# starting flat and un-latched.
+# is real. STATE (§12.3): /data/state on the iap-java-state PVC holds the risk
+# snapshot, session accounting and the audit JSONL, so a restart resumes
+# instead of starting flat and un-latched. The claim is separate from the
+# data-pipeline CronJob's iap-data on purpose: a ReadWriteOnce claim shared by
+# two workloads either pins them to one node or fails with Multi-Attach, and
+# the trading state must not share a lifecycle with regenerable market data.
 # =============================================================================
 apiVersion: apps/v1
 kind: Deployment
@@ -54,6 +57,7 @@ spec:
         prometheus.io/port: "8080"
         prometheus.io/path: /metrics
     spec:
+      automountServiceAccountToken: false   # no API access needed
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
@@ -63,7 +67,9 @@ spec:
           type: RuntimeDefault
       containers:
         - name: java-platform
-          image: iap/java:1.0.0   # digest-pin at release: iap/java@sha256:<release manifest>
+          # Release step: pin by digest from release-manifest.json
+          # (ghcr.io/ashjha0/intraday-alpha-platform-java:v1.2.0@sha256:...).
+          image: ghcr.io/ashjha0/intraday-alpha-platform-java:v1.2.0
           imagePullPolicy: IfNotPresent
           ports:
             - name: metrics
@@ -71,7 +77,14 @@ spec:
               protocol: TCP
           env:
             - name: JAVA_OPTS
-              value: "-XX:+UseZGC -Xms256m -Xmx768m -Xlog:gc*:stdout:time,level,tags"
+              # -XX:-UsePerfData: no /tmp/hsperfdata_* mmap file, so the
+              # JVM needs no writable root filesystem (only the /tmp emptyDir).
+              value: "-XX:+UseZGC -XX:-UsePerfData -Xms256m -Xmx768m -Xlog:gc*:stdout:time,level,tags"
+            # The server binds 127.0.0.1 by default; inside the pod it must
+            # listen on all interfaces so the kubelet probes and Prometheus
+            # (reached only through the NetworkPolicies) can connect.
+            - name: IAP_BIND_ADDR
+              value: 0.0.0.0
             - name: IAP_CONFIG_DIR
               value: /etc/iap/configs
             - name: IAP_STATE_DIR
@@ -93,6 +106,8 @@ spec:
               readOnly: true
             - name: data
               mountPath: /data
+            - name: tmp
+              mountPath: /tmp
           resources:
             requests:
               cpu: 500m
@@ -127,7 +142,7 @@ spec:
             failureThreshold: 2
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: false   # JVM writes hsperfdata/tmp
+            readOnlyRootFilesystem: true   # writes only to /tmp (emptyDir) and /data (PVC)
             capabilities:
               drop: ["ALL"]
       volumes:
@@ -170,7 +185,10 @@ spec:
                 path: venues/venues.json
         - name: data
           persistentVolumeClaim:
-            claimName: iap-data
+            claimName: iap-java-state   # its own claim; NOT the data-pipeline's iap-data
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
 ---
 apiVersion: v1
 kind: Service

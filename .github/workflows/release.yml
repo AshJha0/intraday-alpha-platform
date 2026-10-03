@@ -1,0 +1,149 @@
+# =============================================================================
+# release — on a v* tag: build the four images, push them to GHCR, record the
+# image digests in release-manifest.json, attest build provenance for each
+# image, and attach the manifest to the GitHub release.
+#
+#   images:  ghcr.io/ashjha0/intraday-alpha-platform-{python,java,cpp,rust}:<tag>
+#   manifest: release-manifest.json  (tag, commit, per-image reference+digest)
+#
+# The release is created if it does not exist yet (generated notes); an
+# existing release keeps its notes, only the manifest asset is added/replaced.
+# The tag's commit must already have a green `ci` run: the images are the
+# artefact of a tree whose full suite and golden gate passed (GOVERNANCE
+# promotion gate 10).
+#
+# Digest pinning (the release step for deployment/): after the workflow
+# finishes, replace the version tags in deployment/docker/docker-compose.yml
+# and deployment/k8s/{java-platform,cronjob-data-pipeline}.yaml with
+# <name>:<tag>@<digest> using release-manifest.json, and verify provenance:
+#   gh attestation verify oci://ghcr.io/ashjha0/intraday-alpha-platform-java@<digest> \
+#     --repo AshJha0/intraday-alpha-platform
+#
+# UNTESTED until the first tag is pushed: this workflow can only be exercised
+# by a tag, so its first real run is the validation.
+# =============================================================================
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify-ci:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: the tagged commit has a green ci run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          n=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml \
+                --commit "$GITHUB_SHA" --status success --json databaseId --jq 'length')
+          if [ "$n" -lt 1 ]; then
+            echo "::error::no successful ci run for $GITHUB_SHA; do not release an untested tree"
+            exit 1
+          fi
+
+  images:
+    needs: verify-ci
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        lang: [python, java, cpp, rust]
+    env:
+      IMAGE: ghcr.io/ashjha0/intraday-alpha-platform-${{ matrix.lang }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: build and push
+        id: push
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: deployment/docker/Dockerfile.${{ matrix.lang }}
+          push: true
+          tags: ${{ env.IMAGE }}:${{ github.ref_name }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ github.ref_name }}
+      - name: attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+      - name: record the digest
+        run: |
+          mkdir -p digest
+          printf '%s\n' "${{ steps.push.outputs.digest }}" > "digest/${{ matrix.lang }}.txt"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: digest-${{ matrix.lang }}
+          path: digest/${{ matrix.lang }}.txt
+          if-no-files-found: error
+
+  manifest:
+    needs: images
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: digest-*
+          path: digests
+          merge-multiple: true
+      - name: write release-manifest.json
+        run: |
+          jq -n \
+            --arg tag "$GITHUB_REF_NAME" \
+            --arg commit "$GITHUB_SHA" \
+            --arg built "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg python "$(cat digests/python.txt)" \
+            --arg java "$(cat digests/java.txt)" \
+            --arg cpp "$(cat digests/cpp.txt)" \
+            --arg rust "$(cat digests/rust.txt)" \
+            '{tag: $tag, commit: $commit, built_at: $built,
+              images: ({python: $python, java: $java, cpp: $cpp, rust: $rust}
+                | to_entries
+                | map({language: .key,
+                       name: ("ghcr.io/ashjha0/intraday-alpha-platform-" + .key),
+                       digest: .value,
+                       reference: ("ghcr.io/ashjha0/intraday-alpha-platform-" + .key + ":" + $tag + "@" + .value)}))}' \
+            > release-manifest.json
+          cat release-manifest.json
+          jq -e '.images | length == 4 and all(.digest | test("^sha256:[0-9a-f]{64}$"))' release-manifest.json
+      - name: create the release if absent, attach the manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+              --verify-tag --title "$GITHUB_REF_NAME" --generate-notes
+          fi
+          gh release upload "$GITHUB_REF_NAME" release-manifest.json \
+            --repo "$GITHUB_REPOSITORY" --clobber

@@ -25,7 +25,12 @@
 #                                check rules/config, promtool test rules, the
 #                                Dockerfile/compose/k8s/ConfigMap/dashboard
 #                                checks and the docker build-context proof
-#   images                       builds the four images; needs every other job
+#   cpp-sanitizers               ASan+UBSan ctest (blocking; green on first run)
+#   advisory                     ruff, pip-audit, cargo audit (non-blocking);
+#                                clippy is a non-blocking step of the rust job
+#   images                       builds the four images; needs every other job;
+#                                runs on push to main and on PRs that change
+#                                image inputs
 #
 # Local equivalent of the whole thing:  bash tests/harness/run_all.sh
 # =============================================================================
@@ -46,17 +51,17 @@ permissions:
 
 jobs:
   python:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11"
       - name: Install the research stack
         run: |
           python -m pip install --upgrade pip
-          pip install numpy pandas scipy scikit-learn pyarrow jsonschema referencing pytest pytest-cov pyyaml
+          pip install -r python/requirements-ci.txt
       # The seeded dataset (data/normalized + data/features, git-ignored) is
       # what test_research_runner::test_eq03_report_reproduces_through_the_runner,
       # test_alpha_golden::test_golden_fx05_via_class_on_bundled_data and the
@@ -67,7 +72,7 @@ jobs:
       # (~10 s market data + ~60 s features; identical seed => identical bytes).
       - name: Restore the seeded dataset
         id: dataset-cache
-        uses: actions/cache@v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             data/raw
@@ -103,24 +108,24 @@ jobs:
           --cov-report=xml:../coverage-python.xml
       - name: upload python coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-python
           path: coverage-python.xml
           if-no-files-found: ignore
 
   integration:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11"
       - name: Install the research stack
         run: |
           python -m pip install --upgrade pip
-          pip install numpy pandas scipy scikit-learn pyarrow jsonschema referencing pytest pyyaml
+          pip install -r python/requirements-ci.txt
       # Run from the repo root: tests/conftest.py puts python/src on sys.path.
       - name: integration (cross-component end-to-end runs)
         run: python3 -m pytest -q tests/integration
@@ -128,10 +133,10 @@ jobs:
         run: python3 -m pytest -q tests/replay
 
   cpp:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Toolchain
         run: |
           sudo apt-get update
@@ -165,47 +170,60 @@ jobs:
           lcov --list ../coverage-cpp.info || true
       - name: upload cpp coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-cpp
           path: coverage-cpp.info
           if-no-files-found: ignore
 
   rust:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # v1 (toolchain pinned by input)
+        with:
+          toolchain: "1.98.1"      # == rust/rust-toolchain.toml (check_deployment.py enforces)
+          components: clippy, llvm-tools-preview
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: rust
       - name: cargo test (workspace)
         working-directory: rust
-        run: cargo test --workspace
+        run: cargo test --workspace --locked
+      # ADVISORY: nobody has run clippy over this workspace yet, so the first
+      # CI run may report findings. continue-on-error keeps it from failing the
+      # job until the baseline is clean; then drop continue-on-error to make it
+      # a gate. Findings are listed in the log of this step.
+      - name: cargo clippy (advisory)
+        continue-on-error: true
+        working-directory: rust
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
       # Coverage for the risk crate at minimum (the normative risk engine,
       # PLATFORM_CONVENTIONS.md §11.1). Report-only, uploaded as an artifact;
       # no threshold gate (no existing baseline).
       - name: install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
+        uses: taiki-e/install-action@83ac0ad63c0167e6f06796fab0fce28db1bf3db0 # v2.87.22
+        with:
+          tool: cargo-llvm-cov
       - name: rust/risk coverage (cargo-llvm-cov)
         working-directory: rust
         run: |
-          cargo llvm-cov -p risk --summary-only --cobertura --output-path ../coverage-rust-risk.xml
+          cargo llvm-cov --locked -p risk --summary-only --cobertura --output-path ../coverage-rust-risk.xml
       - name: upload rust risk coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-rust-risk
           path: coverage-rust-risk.xml
           if-no-files-found: ignore
 
   java:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: "21"
@@ -230,20 +248,84 @@ jobs:
         run: |
           echo "::notice::Java coverage skipped: no Maven/Gradle and no JaCoCo jar vendored in java/lib/ (see docs/BUILD_NOTES.md)"
 
-  golden:
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
+  # Memory/UB sanitizers over the full C++ ctest suite, in a separate build
+  # dir so the timed Release build and the coverage build are unaffected.
+  # Blocking: it passed on the first CI run (285 of 285 tests, no sanitizer
+  # report), so a new ASan/UBSan finding now fails the workflow.
+  cpp-sanitizers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            g++ cmake make libgtest-dev libeigen3-dev
+      - name: build (ASan + UBSan)
+        working-directory: cpp
+        run: |
+          cmake -S . -B build-asan -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -O1" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+          cmake --build build-asan -j2
+      - name: ctest under sanitizers
+        working-directory: cpp
+        env:
+          ASAN_OPTIONS: detect_leaks=1:strict_string_checks=1:halt_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: ctest --test-dir build-asan --output-on-failure
+
+  # Non-blocking supply-chain and lint signals. Each step is continue-on-error
+  # so a finding is reported in the log (and the step summary) without failing
+  # the workflow; none of them is a required check.
+  advisory:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11"
-      - uses: actions/setup-java@v4
+      - name: ruff check
+        continue-on-error: true
+        run: |
+          python -m pip install ruff==0.16.10
+          ruff check python tests tools --output-format=concise
+      - name: pip-audit (python/requirements-ci.txt)
+        continue-on-error: true
+        run: |
+          python -m pip install pip-audit==2.10.1
+          pip-audit -r python/requirements-ci.txt --no-deps --disable-pip
+      - uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # v1 (toolchain pinned by input)
+        with:
+          toolchain: "1.98.1"      # == rust/rust-toolchain.toml (check_deployment.py enforces)
+      - name: install cargo-audit
+        uses: taiki-e/install-action@83ac0ad63c0167e6f06796fab0fce28db1bf3db0 # v2.87.22
+        with:
+          tool: cargo-audit
+      - name: cargo audit (rust/Cargo.lock)
+        continue-on-error: true
+        working-directory: rust
+        run: cargo audit
+
+  golden:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: "21"
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # v1 (toolchain pinned by input)
+        with:
+          toolchain: "1.98.1"      # == rust/rust-toolchain.toml (check_deployment.py enforces)
+          components: clippy, llvm-tools-preview
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: rust
       - name: Toolchain
@@ -252,12 +334,12 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             g++ cmake make libgtest-dev libeigen3-dev junit4
           python -m pip install --upgrade pip
-          pip install numpy pandas scipy scikit-learn pyarrow jsonschema referencing pytest pyyaml
+          pip install -r python/requirements-ci.txt
       # Same seeded dataset as the python job (same cache key): the Python
       # golden group includes test_golden_fx05_via_class_on_bundled_data.
       - name: Restore the seeded dataset
         id: dataset-cache
-        uses: actions/cache@v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             data/raw
@@ -276,16 +358,16 @@ jobs:
         run: bash tests/harness/run_golden.sh
 
   deployment:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0        # check_docker_build.py materialises the tracked tree
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11"
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: "21"
@@ -294,7 +376,7 @@ jobs:
           # check_headline_numbers.py imports iap.contracts / iap.lifecycle from
           # python/src to re-derive the contract counts: it needs the same
           # research stack as the python job (jsonschema/referencing/numpy).
-          pip install numpy pandas scipy scikit-learn pyarrow jsonschema referencing pyyaml
+          pip install -r python/requirements-ci.txt
           curl -fsSL -o /tmp/prometheus.tar.gz \
             https://github.com/prometheus/prometheus/releases/download/v2.53.0/prometheus-2.53.0.linux-amd64.tar.gz
           echo "d9900a11e3c89261e6416e3c9989858bad7b206af8b6838dfe9a5392d8ddc60d  /tmp/prometheus.tar.gz" | sha256sum -c -
@@ -320,18 +402,45 @@ jobs:
             echo "::warning::research-ledger numbers are stale — regenerate the research reports and the doc rows together"
           fi
 
-  images:
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    needs: [python, integration, cpp, rust, java, golden, deployment]
-    # Image builds are the merge-to-main promotion gate (GOVERNANCE gate 10),
-    # not a per-PR check: only run on push to main, so every PR still
-    # requires this job to be green to merge (via branch protection /
-    # required-status-check naming the job), but forked/topic-branch PRs
-    # don't pay for four docker builds on every push.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  # Which PRs touch image inputs: the image build runs on those, not on every PR.
+  changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      docker: ${{ steps.filter.outputs.docker }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: filter
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        with:
+          filters: |
+            docker:
+              - 'deployment/docker/**'
+              - '**/Dockerfile*'
+              - '.dockerignore'
+              - 'python/requirements-ci.txt'
+              - 'rust/rust-toolchain.toml'
+              - 'rust/Cargo.lock'
+
+  images:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    needs: [python, integration, cpp, rust, java, golden, deployment, changes]
+    # Image builds are the merge-to-main promotion gate (GOVERNANCE gate 10).
+    # They run on every push to main, and on a pull request only when it
+    # changes image inputs (deployment/docker/**, any Dockerfile, the pinned
+    # Python/Rust inputs): see the `changes` job. On other PRs this job is
+    # skipped, so it must NOT be listed as a required status check (a skipped
+    # required check blocks the merge); the required set is in
+    # docs/governance/REPO_SETTINGS.md.
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'pull_request' && needs.changes.outputs.docker == 'true')
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # GOVERNANCE promotion gate 10: an image is only ever built from a tree
       # whose full suite and golden gate are green — hence `needs:` above.
       - name: build all four images

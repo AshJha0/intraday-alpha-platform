@@ -349,3 +349,22 @@ groups:
             java-platform during a trading session, treat as a platform
             incident. Runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
           runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+
+  # Heartbeat: fires permanently by design. Alertmanager routes it to the
+  # `watchdog` receiver (deployment/alertmanager/alertmanager.yml); an external
+  # dead-man's-switch on that receiver turns "this stopped arriving" into the
+  # page, which proves rule evaluation, Alertmanager and delivery are alive.
+  - name: iap-meta
+    rules:
+      - alert: Watchdog
+        expr: vector(1)
+        labels:
+          severity: none
+          domain: meta
+        annotations:
+          summary: "Alerting pipeline heartbeat (always firing)"
+          description: >-
+            This alert is always firing. If it stops arriving at the
+            heartbeat receiver, Prometheus rule evaluation or Alertmanager is
+            down and no other alert can be trusted.
+          runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md

@@ -1,0 +1,24 @@
+# Normalise text to LF in the repository and in working trees (the golden
+# vectors and canonical-JSON byte-parity checks depend on exact bytes).
+* text=auto eol=lf
+
+# Golden vectors are compared byte for byte across four languages: never
+# convert their line endings.
+tests/golden/** -text
+
+# Binary artefacts.
+*.parquet binary
+*.iap1 binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.jar binary
+*.class binary
+*.zip binary
+*.gz binary
+*.tar binary
+*.woff binary
+*.woff2 binary

@@ -1,0 +1,31 @@
+# GENERATED FILE — do not edit by hand.
+# Source of truth: deployment/alertmanager/alertmanager.yml
+# Regenerate: python3 deployment/k8s/generate_configmaps.py
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: iap-alertmanager-config
+  namespace: intraday-alpha
+  labels:
+    app.kubernetes.io/part-of: intraday-alpha-platform
+    app.kubernetes.io/component: config
+    app.kubernetes.io/managed-by: generate-configmaps
+data:
+  alertmanager.yml: "# =============================================================================\n\
+    # alertmanager.yml \u2014 routing for the alerts in deployment/prometheus/alerts.yml\n#\n# Single\
+    \ source of truth for both targets: docker-compose mounts this file,\n# and deployment/k8s/configmap-alertmanager.yaml\
+    \ is GENERATED from it\n# (deployment/k8s/generate_configmaps.py).\n#\n# The receiver is a generic\
+    \ webhook. Its URL is a SECRET (it normally embeds a\n# token), so it is never written here: `url_file`\
+    \ makes Alertmanager read it\n# from a mounted file at send time \u2014\n#   docker-compose: the `alert_webhook_url`\
+    \ secret (ALERT_WEBHOOK_URL_FILE)\n#   Kubernetes:     the `iap-alertmanager-webhook` Secret, key\
+    \ `url`\n# The in-repo placeholder (deployment/alertmanager/webhook_url.placeholder)\n# points nowhere;\
+    \ with it, alerts are routed and visible in the Alertmanager\n# UI but not delivered. Real delivery\
+    \ therefore needs the operator to supply a\n# URL \u2014 see docs/governance/REPO_SETTINGS.md (\"\
+    Operational settings\").\n#\n# Watchdog is the always-firing heartbeat from alerts.yml. It is sent\
+    \ to the\n# `watchdog` receiver (a no-op here). To get a dead-man's-switch, point that\n# receiver\
+    \ at an external heartbeat service that pages when it STOPS arriving.\n# =============================================================================\n\
+    global:\n  resolve_timeout: 5m\n\nroute:\n  receiver: webhook\n  group_by: [alertname, service]\n\
+    \  group_wait: 30s\n  group_interval: 5m\n  repeat_interval: 4h\n  routes:\n    - matchers:\n    \
+    \    - alertname = \"Watchdog\"\n      receiver: watchdog\n      group_wait: 0s\n      repeat_interval:\
+    \ 1m\n\nreceivers:\n  - name: webhook\n    webhook_configs:\n      - url_file: /etc/alertmanager/secrets/webhook_url\n\
+    \        send_resolved: true\n  - name: watchdog\n"

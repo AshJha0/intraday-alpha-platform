@@ -21,13 +21,11 @@
 #   docker build -f deployment/docker/Dockerfile.python -t iap/python:1.0.0 .
 #
 # Image pinning policy (docs/governance/SECURITY.md): base images are pinned by
-# tag here and MUST be pinned by digest at release time, e.g.
-#   FROM python:3.11-slim@sha256:<digest recorded in the release manifest>
-# (digest left symbolic in-repo because this environment builds offline and
-# cannot resolve registry digests deterministically).
+# digest in every Dockerfile (tag kept for readability); Dependabot's docker
+# ecosystem proposes bumps. The built iap/* images are pinned by digest in the
+# release manifest produced by .github/workflows/release.yml.
 # =============================================================================
-FROM python:3.11-slim
-# digest-pin at release: python:3.11-slim@sha256:<record-me>
+FROM python:3.11-slim@sha256:bab1b7ef4b450c81002278d035eff85ebe394ae94df904f7a3ba14f7e16e487b
 
 # Never run as root in production images.
 RUN groupadd --gid 10001 iap && \
@@ -50,8 +48,10 @@ COPY schemas schemas
 # optimizer.  The test suite (pytest, pyyaml: the `dev` extra) is NOT installed.
 COPY python/pyproject.toml python/pyproject.toml
 COPY python/setup.py python/setup.py
+COPY python/requirements-ci.txt python/requirements-ci.txt
 COPY python/src python/src
-RUN pip install --no-cache-dir ./python
+# -c: the exact versions CI tests against, so the image resolves the same set.
+RUN pip install --no-cache-dir -c python/requirements-ci.txt ./python
 # The MVP's alpha lifecycle registry (configs/mvp/mvp.json reference.alpha_registry).
 COPY research/alpha_registry.json research/alpha_registry.json
 

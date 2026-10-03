@@ -33,3 +33,9 @@ opt-level = 2
 
 [profile.test]
 opt-level = 2
+
+# Release builds keep integer-overflow checks on: the risk engine's checked
+# arithmetic is the primary control, this is the backstop so an unchecked add
+# or multiply that slips through panics instead of silently wrapping.
+[profile.release]
+overflow-checks = true

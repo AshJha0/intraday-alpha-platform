@@ -13,12 +13,12 @@
 #
 # Offline-agnostic: everything comes from Debian packages + the repo itself —
 # no external package registries at build time beyond apt.
-# Digest pinning policy: see Dockerfile.python header / SECURITY.md.
+# Digest pinning policy: see Dockerfile.python header / SECURITY.md (base images are
+# pinned by digest below; Dependabot's docker ecosystem proposes bumps).
 # =============================================================================
 
 # ---------------------------------------------------------------- build stage
-FROM debian:bookworm-slim AS build
-# digest-pin at release: debian:bookworm-slim@sha256:<record-me>
+FROM debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251 AS build
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         g++ cmake make libgtest-dev libeigen3-dev \
@@ -57,8 +57,7 @@ RUN cd cpp && bash build.sh
 RUN cd cpp && ctest --test-dir build --output-on-failure
 
 # -------------------------------------------------------------- runtime stage
-FROM debian:bookworm-slim
-# digest-pin at release: debian:bookworm-slim@sha256:<record-me>
+FROM debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251
 
 RUN groupadd --gid 10001 iap && \
     useradd --uid 10001 --gid iap --create-home --shell /usr/sbin/nologin iap
@@ -84,8 +83,13 @@ ENV IAP_GOLDEN_DIR=/build/tests/golden
 USER iap
 WORKDIR /home/iap
 
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-    CMD test -x /usr/local/bin/iap-replay-sim || exit 1
+# No HEALTHCHECK, deliberately. This is a finite batch replay that exits when
+# the pass is done, and the binary has no cheap self-test mode: its only
+# argument is the path of a results file to write, so `--version`/`--help`
+# would create a file of that name instead of probing.
+# The previous `test -x <binary>` could never fail, so it reported health it
+# did not measure. Liveness for a batch job is its exit code (compose
+# service_completed_successfully, k8s Job status).
 
 # Runs the full deterministic replay + execution-sim benchmark pass and prints
 # throughput/latency methodology output. Pass an argument (a writable path,

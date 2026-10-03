@@ -44,6 +44,22 @@ Checks (each one is a named case; exit code 0 iff no case FAILED):
   dashboards_valid            dashboard JSON parses, datasource uid stable, and
                               every panel expression names a real metric
   java_golden_gate_complete   JAVA_GOLDEN_CLASSES == the *GoldenTest.java set
+  alerting_wired              Prometheus -> Alertmanager in config, compose and
+                              k8s, plus the always-firing Watchdog rule
+  k8s_pod_hardening           automountServiceAccountToken false everywhere,
+                              java root fs read-only with a /tmp emptyDir, its
+                              own state PVC, explicit storageClassName on every
+                              PVC, IAP_BIND_ADDR set
+  k8s_network_policy          default-deny ingress AND egress, DNS egress, the
+                              operator -> java admin ingress rule
+  compose_exposure            8080/9090 published on 127.0.0.1 only
+  image_pinning               every Dockerfile FROM and every third-party
+                              compose/k8s image carries a sha256 digest; iap
+                              images use the ghcr names with one version tag
+  workflow_supply_chain       every `uses:` in .github/workflows is a full
+                              commit SHA, runners are pinned, every cargo
+                              invocation is --locked, permissions are declared
+  rust_toolchain_pinned       rust-toolchain.toml == ci.yml == Dockerfile.rust
 
 Usage:
     python3 tests/harness/check_deployment.py [--verbose]
@@ -639,6 +655,256 @@ def check_java_golden_gate() -> None:
            detail or f"{len(on_disk)} golden classes")
 
 
+# ----------------------------------------------- governance hardening ------
+WORKFLOWS = ROOT / ".github" / "workflows"
+
+
+def pod_specs() -> list[tuple[str, str, dict]]:
+    """(file, workload name, pod spec) for every workload in deployment/k8s."""
+    out = []
+    for f, doc in k8s_docs():
+        kind = doc.get("kind")
+        spec = doc.get("spec") or {}
+        if kind == "CronJob":
+            spec = (spec.get("jobTemplate") or {}).get("spec") or {}
+        if kind in ("Deployment", "CronJob", "Job", "StatefulSet", "DaemonSet"):
+            pod = (spec.get("template") or {}).get("spec") or {}
+            out.append((f.name, doc["metadata"]["name"], pod))
+    return out
+
+
+def check_alerting_wired() -> None:
+    problems = []
+    prom = yaml.safe_load((PROM / "prometheus.yml").read_text())
+    targets = [t for am in (prom.get("alerting") or {}).get("alertmanagers", [])
+               for sc in am.get("static_configs", []) for t in sc.get("targets", [])]
+    if "alertmanager:9093" not in targets:
+        problems.append("prometheus.yml has no alerting.alertmanagers target "
+                        "alertmanager:9093")
+    if "alertmanager" not in compose_doc().get("services", {}):
+        problems.append("compose has no alertmanager service")
+    kinds = {(d["kind"], d["metadata"]["name"]) for _, d in k8s_docs()}
+    for want in [("Deployment", "alertmanager"), ("Service", "alertmanager"),
+                 ("ConfigMap", "iap-alertmanager-config")]:
+        if want not in kinds:
+            problems.append(f"k8s is missing {want[0]}/{want[1]}")
+    am_cfg = (DEPLOY / "alertmanager" / "alertmanager.yml").read_text()
+    if "url_file" not in am_cfg or re.search(r"^\s*-?\s*url:\s", am_cfg, re.M):
+        problems.append("alertmanager.yml must read the webhook URL from "
+                        "url_file, never an inline url")
+    if not any(r.get("alert") == "Watchdog" and r.get("expr").strip() == "vector(1)"
+               for r in all_rules()):
+        problems.append("no always-firing Watchdog rule (expr: vector(1))")
+    record("alerting_wired", "PASS" if not problems else "FAIL",
+           "; ".join(problems))
+
+
+def check_k8s_pod_hardening() -> None:
+    problems = []
+    pods = pod_specs()
+    for fname, name, pod in pods:
+        if pod.get("automountServiceAccountToken") is not False:
+            problems.append(f"{name}: automountServiceAccountToken is not false")
+    claims = {}
+    for fname, name, pod in pods:
+        for vol in pod.get("volumes") or []:
+            pvc = (vol.get("persistentVolumeClaim") or {}).get("claimName")
+            if pvc:
+                claims.setdefault(pvc, []).append(name)
+    for pvc, users in claims.items():
+        if len(set(users)) > 1:
+            problems.append(f"PVC {pvc} is shared by {sorted(set(users))}")
+    declared = {d["metadata"]["name"]: d for _, d in k8s_docs()
+                if d["kind"] == "PersistentVolumeClaim"}
+    for pvc in claims:
+        if pvc not in declared:
+            problems.append(f"workload claims {pvc}, which pvc.yaml does not declare")
+    for pvc, doc in declared.items():
+        if not (doc.get("spec") or {}).get("storageClassName"):
+            problems.append(f"PVC {pvc} has no explicit storageClassName")
+    java = [p for _, n, p in pods if n == "java-platform"]
+    if not java:
+        problems.append("no java-platform workload")
+    else:
+        pod = java[0]
+        c = pod["containers"][0]
+        if (c.get("securityContext") or {}).get("readOnlyRootFilesystem") is not True:
+            problems.append("java-platform readOnlyRootFilesystem must be true")
+        mounts = {m["mountPath"]: m["name"] for m in c.get("volumeMounts", [])}
+        vols = {v["name"]: v for v in pod.get("volumes", [])}
+        if "/tmp" not in mounts or "emptyDir" not in vols.get(mounts["/tmp"], {}):
+            problems.append("java-platform needs an emptyDir mounted at /tmp")
+        env = {e["name"]: e.get("value") for e in c.get("env", [])}
+        if "-XX:-UsePerfData" not in (env.get("JAVA_OPTS") or ""):
+            problems.append("java-platform JAVA_OPTS lacks -XX:-UsePerfData")
+        if env.get("IAP_BIND_ADDR") != "0.0.0.0":
+            problems.append("java-platform must set IAP_BIND_ADDR=0.0.0.0")
+        state = (vols.get(mounts.get("/data", ""), {}).get("persistentVolumeClaim")
+                 or {}).get("claimName")
+        if state != "iap-java-state":
+            problems.append(f"java-platform /data claim is {state!r}, "
+                            "expected its own iap-java-state")
+    jenv = (compose_doc()["services"]["java-platform"].get("environment") or {})
+    if isinstance(jenv, list):
+        jenv = dict(e.split("=", 1) for e in jenv if "=" in e)
+    if str(jenv.get("IAP_BIND_ADDR")) != "0.0.0.0":
+        problems.append("compose java-platform must set IAP_BIND_ADDR=0.0.0.0")
+    record("k8s_pod_hardening", "PASS" if not problems else "FAIL",
+           "; ".join(problems[:6]) or f"{len(pods)} workloads")
+
+
+def check_k8s_network_policy() -> None:
+    problems = []
+    pols = [d for _, d in k8s_docs() if d["kind"] == "NetworkPolicy"]
+
+    def deny(direction: str) -> bool:
+        return any((p["spec"].get("podSelector") == {} and
+                    direction in p["spec"].get("policyTypes", []) and
+                    not p["spec"].get(direction.lower()))
+                   for p in pols)
+
+    if not deny("Ingress"):
+        problems.append("no default-deny ingress policy")
+    if not deny("Egress"):
+        problems.append("no default-deny egress policy")
+    dns = False
+    for p in pols:
+        for rule in p["spec"].get("egress") or []:
+            ports = {(x.get("protocol"), x.get("port")) for x in rule.get("ports", [])}
+            if {("UDP", 53), ("TCP", 53)} <= ports:
+                dns = True
+    if not dns:
+        problems.append("no DNS (53 UDP+TCP) egress allowance")
+    operator = False
+    for p in pols:
+        sel = (p["spec"].get("podSelector") or {}).get("matchLabels", {})
+        if sel.get("app.kubernetes.io/name") != "java-platform":
+            continue
+        for rule in p["spec"].get("ingress") or []:
+            froms = [f.get("podSelector", {}).get("matchLabels", {})
+                     for f in rule.get("from", [])]
+            ports = [x.get("port") for x in rule.get("ports", [])]
+            if {"iap.role": "operator"} in froms and 8080 in ports:
+                operator = True
+    if not operator:
+        problems.append("no ingress rule letting iap.role=operator pods reach "
+                        "the java admin port 8080")
+    record("k8s_network_policy", "PASS" if not problems else "FAIL",
+           "; ".join(problems) or f"{len(pols)} policies")
+
+
+def check_compose_exposure() -> None:
+    problems = []
+    for name, svc in compose_doc()["services"].items():
+        for port in svc.get("ports", []) or []:
+            s = str(port)
+            host_port = s.split(":")[-2] if s.count(":") >= 1 else s
+            if host_port in ("8080", "9090", "9093") and not s.startswith("127.0.0.1:"):
+                problems.append(f"{name} publishes {s} on all interfaces")
+    record("compose_exposure", "PASS" if not problems else "FAIL",
+           "; ".join(problems))
+
+
+def check_image_pinning() -> None:
+    problems = []
+    digest = re.compile(r"@sha256:[0-9a-f]{64}$")
+    for df in sorted((DEPLOY / "docker").glob("Dockerfile.*")):
+        for m in re.finditer(r"^FROM\s+(\S+)", df.read_text(), re.M):
+            ref = m.group(1)
+            if not digest.search(ref):
+                problems.append(f"{df.name}: FROM {ref} is not digest-pinned")
+    iap_tags = set()
+
+    def check_ref(where: str, ref: str) -> None:
+        if ref.startswith("ghcr.io/ashjha0/intraday-alpha-platform-"):
+            tag = ref.split(":", 1)[1].split("@")[0] if ":" in ref else ""
+            if not re.fullmatch(r"v\d+\.\d+\.\d+", tag):
+                problems.append(f"{where}: {ref} must carry a vX.Y.Z tag")
+            iap_tags.add(tag)
+        elif ref.startswith("iap/"):
+            problems.append(f"{where}: {ref} must use the ghcr.io/ashjha0 name")
+        elif not digest.search(ref):
+            problems.append(f"{where}: third-party image {ref} is not digest-pinned")
+
+    for name, svc in compose_doc()["services"].items():
+        if "image" in svc:
+            check_ref(f"compose {name}", svc["image"])
+    for fname, name, pod in pod_specs():
+        for c in pod.get("containers", []):
+            check_ref(f"k8s {name}", c["image"])
+    if len(iap_tags) > 1:
+        problems.append(f"iap images use several version tags: {sorted(iap_tags)}")
+    record("image_pinning", "PASS" if not problems else "FAIL",
+           "; ".join(problems[:6]))
+
+
+def check_workflow_supply_chain() -> None:
+    problems = []
+    files = sorted(WORKFLOWS.glob("*.yml"))
+    cargo = re.compile(r"cargo\s+(build|test|clippy|llvm-cov|check|run|doc)(.*)")
+
+    def code_lines(path: Path):
+        """Non-comment, non-label lines (comments/step names may say 'cargo test')."""
+        for line in path.read_text().splitlines():
+            stripped = line.strip()
+            if stripped.startswith(("#", "- name:", "name:", "note ")):
+                continue
+            yield line.split(" #")[0]
+
+    for f in files:
+        text = f.read_text()
+        doc = yaml.safe_load(text)
+        if "permissions" not in doc:
+            problems.append(f"{f.name}: no top-level permissions")
+        for m in re.finditer(r"^\s*(?:-\s+)?uses:\s*(\S+)", text, re.M):
+            ref = m.group(1)
+            if ref.startswith("./"):
+                continue
+            if not re.search(r"@[0-9a-f]{40}$", ref):
+                problems.append(f"{f.name}: {ref} is not pinned to a commit SHA")
+        for m in re.finditer(r"runs-on:\s*(\S+)", text):
+            if m.group(1) in ("ubuntu-latest", "windows-latest", "macos-latest"):
+                problems.append(f"{f.name}: unpinned runner {m.group(1)}")
+        for line in code_lines(f):
+            m = cargo.search(line)
+            if m and "--locked" not in m.group(2):
+                problems.append(f"{f.name}: cargo {m.group(1)} without --locked")
+    for extra in [ROOT / "tests" / "harness" / "run_all.sh",
+                  DEPLOY / "docker" / "Dockerfile.rust"]:
+        for line in code_lines(extra):
+            m = cargo.search(line)
+            if m and "--locked" not in m.group(2):
+                problems.append(f"{extra.name}: cargo {m.group(1)} without --locked")
+    record("workflow_supply_chain", "PASS" if not problems else "FAIL",
+           "; ".join(problems[:6]) or f"{len(files)} workflows")
+
+
+def check_rust_toolchain_pinned() -> None:
+    problems = []
+    toml_text = (ROOT / "rust" / "rust-toolchain.toml").read_text()
+    m = re.search(r'channel\s*=\s*"([^"]+)"', toml_text)
+    if not m or not re.fullmatch(r"\d+\.\d+\.\d+", m.group(1)):
+        record("rust_toolchain_pinned", "FAIL",
+               "rust/rust-toolchain.toml must pin an exact X.Y.Z channel")
+        return
+    want = m.group(1)
+    for f in sorted(WORKFLOWS.glob("*.yml")):
+        for tc in re.findall(r'toolchain:\s*"?([0-9][^"\s#]*)"?', f.read_text()):
+            if tc != want:
+                problems.append(f"{f.name}: toolchain {tc} != {want}")
+        if "dtolnay/rust-toolchain" in f.read_text() and \
+                not re.search(r'toolchain:\s*"?\d', f.read_text()):
+            problems.append(f"{f.name}: rust-toolchain action without a pinned toolchain")
+    df = (DEPLOY / "docker" / "Dockerfile.rust").read_text()
+    if f"FROM rust:{want}-" not in df:
+        problems.append(f"Dockerfile.rust build stage is not rust:{want}-*")
+    cargo = (ROOT / "rust" / "Cargo.toml").read_text()
+    if not re.search(r"\[profile\.release\][^\[]*overflow-checks\s*=\s*true", cargo):
+        problems.append("rust/Cargo.toml [profile.release] lacks overflow-checks = true")
+    record("rust_toolchain_pinned", "PASS" if not problems else "FAIL",
+           "; ".join(problems) or want)
+
+
 def main() -> int:
     print("deployment structural validation "
           "(PLATFORM_CONVENTIONS.md §12.7 / GOVERNANCE.md §1)")
@@ -665,6 +931,14 @@ def main() -> int:
     print("grafana / harness:")
     check_dashboards()
     check_java_golden_gate()
+    print("governance hardening:")
+    check_alerting_wired()
+    check_k8s_pod_hardening()
+    check_k8s_network_policy()
+    check_compose_exposure()
+    check_image_pinning()
+    check_workflow_supply_chain()
+    check_rust_toolchain_pinned()
 
     failed = [c for c, s, _ in RESULTS if s == "FAIL"]
     skipped = [c for c, s, _ in RESULTS if s == "SKIP"]

@@ -10,9 +10,11 @@ the working procedure.
 
 ## 1. Branching
 
-- `main` is protected: pull requests only, CI green
+- `main` is meant to be protected: pull requests only, CI green
   (`.github/workflows/ci.yml`), the reviewers `CODEOWNERS` names for the
-  paths touched.
+  paths touched. That protection is a repository setting that is **not yet
+  configured** (`docs/governance/REPO_SETTINGS.md`), so for now it is a
+  convention the maintainer follows.
 - Branch names carry the area and the plan key or issue number:
   `feat/execution-X07-python-port`, `fix/orderbook-B03-reorder-window`,
   `docs/EPICS-refresh`, `research/EQ03-cost-threshold`.
