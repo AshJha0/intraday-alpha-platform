@@ -206,21 +206,36 @@ def _write_report(results: dict[str, dict], cfg, ledger, log, runtime_s: float) 
         f"- Drift baselines come from a {cfg['warmup_ns'] / NS_H:.1f}-hour warmup of the "
         "same generator —"
     )
-    a("  real regime shifts are not in the data, so PSI stays mostly below")
-    a("  threshold and most drift-triggered refits come from the rolling-IC")
-    a("  z-score, which is noisy at this sample size.")
-    a("- P&L differences between policies below are **within noise**; do not")
-    n_pos = sum(
-        1 for r in results.values() for pol in r["policies"].values() if pol["net_pnl"] > 0.0
+    a("  real regime shifts are not in the data, so a drift trigger that")
+    a("  fires here is reacting to sampling noise or to a monitor that drifts")
+    a("  by construction (see the drift monitor readout).")
+    # Which trigger fired, counted from the refit log (a refit can name both).
+    drift_refits = [
+        ev
+        for r in results.values()
+        for ev in r["policies"]["drift_triggered"]["refit_events"]
+        if not any(reason.startswith("initial") for reason in ev["reasons"])
+    ]
+    n_psi = sum(1 for ev in drift_refits if any(x.startswith("psi[") for x in ev["reasons"]))
+    n_icz = sum(1 for ev in drift_refits if any(x.startswith("ic_z") for x in ev["reasons"]))
+    a(
+        f"  Of the {len(drift_refits)} drift-triggered refits, {n_psi} name a PSI breach "
+        f"and {n_icz} the rolling-IC z"
     )
-    n_all = sum(len(r["policies"]) for r in results.values())
+    a("  (a refit can name both).")
+    all_pols = [pol for r in results.values() for pol in r["policies"].values()]
+    n_all = len(all_pols)
+    n_pos = sum(1 for pol in all_pols if pol["net_pnl"] > 0.0)
+    n_idle = sum(1 for pol in all_pols if pol["trade_count"] == 0)
+    n_neg = sum(1 for pol in all_pols if pol["net_pnl"] < 0.0)
+    a("- Do not read a ranking of the policies into the P&L below.")
     if n_pos == 0:
-        a("  read a ranking into them. Every alpha is net-negative after costs")
-        a(f"  under every policy on this data (0 of {n_all} deployments positive),")
-        a("  as the promotion report shows.")
+        a(f"  No deployment ends above zero after costs (0 of {n_all}): {n_neg} trade and")
+        a(f"  lose, {n_idle} make no trade at all — the forecast never clears the")
+        a("  round-trip cost — as the promotion report shows.")
     else:
-        a(f"  read a ranking into them. {n_pos} of {n_all} deployments end with a")
-        a("  positive net P&L; with two sessions that is not evidence of an edge.")
+        a(f"  {n_pos} of {n_all} deployments end with a positive net P&L ({n_neg} lose,")
+        a(f"  {n_idle} make no trade); with two sessions that is not evidence of an edge.")
     a("")
     a("What the study DOES establish: the adaptability machinery is")
     a("deterministic and leak-free (asserted + shift-tested), refits trigger")
@@ -329,10 +344,29 @@ def _write_report(results: dict[str, dict], cfg, ledger, log, runtime_s: float) 
     a("scheduled_weekly are bitwise identical here (weekly never fires), so")
     a("wins credited to `static` are shared with `scheduled_weekly` by")
     a("construction. With one synthetic day of true out-of-warmup data these")
-    a("win counts are coin flips, not evidence. The honest headline: **on")
-    a("this sample, refitting neither rescues nor ruins any alpha — the")
-    a("differences are one to two orders of magnitude smaller than the cost")
-    a("drag.** A real ranking needs months of sessions.")
+    a("win counts are coin flips, not evidence.")
+    # The headline is derived: does any policy make an alpha profitable, and
+    # how far apart do the policies land on one alpha.
+    spreads = {
+        aid: max(p["net_pnl"] for p in r["policies"].values())
+        - min(p["net_pnl"] for p in r["policies"].values())
+        for aid, r in results.items()
+    }
+    widest = max(sorted(spreads), key=lambda aid: spreads[aid])
+    n_same = sum(1 for v in spreads.values() if v == 0.0)
+    rescued = (
+        "no refit policy makes any alpha profitable"
+        if n_pos == 0
+        else (f"{n_pos} of {n_all} deployments end above zero")
+    )
+    a(
+        f"The honest headline: **on this sample {rescued}.** The policies are not "
+        "interchangeable, though: a refit changes how often an alpha's forecast clears "
+        f"its costs, and so how much it trades. On {n_same} of {len(spreads)} alphas "
+        "every policy ends at the same net P&L; the widest gap between two policies on "
+        f"one alpha is {spreads[widest]:,.0f} USD ({widest}), and it is a difference in "
+        "costs paid, not in edge found. A real ranking needs months of sessions."
+    )
     a("")
     a("## Lifecycle activity")
     a("")
