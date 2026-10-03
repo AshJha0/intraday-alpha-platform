@@ -3,19 +3,19 @@
     "EQ01": {
       "cases": [
         {
-          "confidence": 0.18742230645107524,
+          "confidence": 0.15552070646785693,
           "event_index_1based": 500,
           "exchange_ts": 1787579830566121437,
-          "expected_return": -4.7173070452966073e-07,
+          "expected_return": -1.817879607159296e-08,
           "inputs": {
             "micro_mid_dev_bps_v1": -0.4329887979608475
           }
         },
         {
-          "confidence": 0.38893055721357467,
+          "confidence": 0.3262456497851159,
           "event_index_1based": 800,
           "exchange_ts": 1787580867425137640,
-          "expected_return": -9.789148860750269e-07,
+          "expected_return": -3.813481350095157e-08,
           "inputs": {
             "micro_mid_dev_bps_v1": -0.9224666758914777
           }
@@ -24,7 +24,7 @@
           "confidence": 1.0,
           "event_index_1based": 1200,
           "exchange_ts": 1787582205026985949,
-          "expected_return": -5.033880048347409e-06,
+          "expected_return": -2.337797517059268e-07,
           "inputs": {
             "micro_mid_dev_bps_v1": -8.643753858819014
           }
@@ -33,16 +33,16 @@
           "confidence": 1.0,
           "event_index_1based": 1600,
           "exchange_ts": 1787583691858510619,
-          "expected_return": 3.3009589201527644e-06,
+          "expected_return": 1.3026404312801366e-07,
           "inputs": {
             "micro_mid_dev_bps_v1": 3.2079924841323955
           }
         },
         {
-          "confidence": 1.0,
+          "confidence": 0.8792694932579406,
           "event_index_1based": 2000,
           "exchange_ts": 1787585173508725885,
-          "expected_return": -2.6218203688761593e-06,
+          "expected_return": -1.0277770190821871e-07,
           "inputs": {
             "micro_mid_dev_bps_v1": -2.5080166962249995
           }
@@ -50,7 +50,7 @@
       ],
       "ic_window": {
         "horizon": "1s",
-        "ic": 0.004227378112753775,
+        "ic": -0.0003050016729740142,
         "rows_0based": [
           100,
           1900
@@ -62,10 +62,10 @@
     "EQ03": {
       "cases": [
         {
-          "confidence": 0.030853233266961228,
+          "confidence": 0.03449143653277688,
           "event_index_1based": 500,
           "exchange_ts": 1787579830566121437,
-          "expected_return": -2.5048697392587233e-07,
+          "expected_return": -1.6448163165501033e-07,
           "inputs": {
             "ofi_norm_l1_w1s_v1": -0.02958579881656804,
             "ofi_norm_l5_w1s_v1": -0.012019230769230766,
@@ -73,10 +73,10 @@
           }
         },
         {
-          "confidence": 0.052325024322463984,
+          "confidence": 0.05378475608437193,
           "event_index_1based": 800,
           "exchange_ts": 1787580867425137640,
-          "expected_return": 4.248091890313112e-07,
+          "expected_return": 2.5648698135600694e-07,
           "inputs": {
             "ofi_norm_l1_w1s_v1": 0.0,
             "ofi_norm_l5_w1s_v1": 0.0,
@@ -84,10 +84,10 @@
           }
         },
         {
-          "confidence": 0.49965961870952247,
+          "confidence": 0.5320306250278509,
           "event_index_1based": 1200,
           "exchange_ts": 1787582205026985949,
-          "expected_return": -4.056567582416961e-06,
+          "expected_return": -2.537130200763215e-06,
           "inputs": {
             "ofi_norm_l1_w1s_v1": -0.17241379310344815,
             "ofi_norm_l5_w1s_v1": 0.0,
@@ -95,10 +95,10 @@
           }
         },
         {
-          "confidence": 0.9886768687956344,
+          "confidence": 1.0,
           "event_index_1based": 1600,
           "exchange_ts": 1787583691858510619,
-          "expected_return": 8.02673337060977e-06,
+          "expected_return": 4.995402518681369e-06,
           "inputs": {
             "ofi_norm_l1_w1s_v1": 0.5714285714285711,
             "ofi_norm_l5_w1s_v1": 0.09195402298850573,
@@ -106,10 +106,10 @@
           }
         },
         {
-          "confidence": 0.4981532034419541,
+          "confidence": 0.5304318826620552,
           "event_index_1based": 2000,
           "exchange_ts": 1787585173508725885,
-          "expected_return": -4.044337505958394e-06,
+          "expected_return": -2.52950617058772e-06,
           "inputs": {
             "ofi_norm_l1_w1s_v1": -0.2641509433962263,
             "ofi_norm_l5_w1s_v1": -0.07253886010362692,
@@ -119,7 +119,7 @@
       ],
       "ic_window": {
         "horizon": "5s",
-        "ic": 0.02808560364322377,
+        "ic": 0.02844381684211371,
         "rows_0based": [
           100,
           1900
@@ -131,46 +131,46 @@
     "EQ06": {
       "cases": [
         {
-          "confidence": 0.00344120659410307,
+          "confidence": 0.0012593058529399568,
           "event_index_1based": 500,
           "exchange_ts": 1787579830566121437,
-          "expected_return": -5.144450135918008e-08,
+          "expected_return": -1.5321021809817773e-08,
           "inputs": {
             "ret_vol_adj_10s_v1": 0.0
           }
         },
         {
-          "confidence": 0.9390276399009827,
+          "confidence": 0.8973671000169413,
           "event_index_1based": 800,
           "exchange_ts": 1787580867425137640,
-          "expected_return": -1.4038043743137981e-05,
+          "expected_return": -1.0917586763116562e-05,
           "inputs": {
             "ret_vol_adj_10s_v1": -6.59799409096418
           }
         },
         {
-          "confidence": 0.00344120659410307,
+          "confidence": 0.0012593058529399568,
           "event_index_1based": 1200,
           "exchange_ts": 1787582205026985949,
-          "expected_return": -5.144450135918008e-08,
+          "expected_return": -1.5321021809817773e-08,
           "inputs": {
             "ret_vol_adj_10s_v1": 0.0
           }
         },
         {
-          "confidence": 0.00344120659410307,
+          "confidence": 0.0012593058529399568,
           "event_index_1based": 1600,
           "exchange_ts": 1787583691858510619,
-          "expected_return": -5.144450135918008e-08,
+          "expected_return": -1.5321021809817773e-08,
           "inputs": {
             "ret_vol_adj_10s_v1": 0.0
           }
         },
         {
-          "confidence": 0.00344120659410307,
+          "confidence": 0.0012593058529399568,
           "event_index_1based": 2000,
           "exchange_ts": 1787585173508725885,
-          "expected_return": -5.144450135918008e-08,
+          "expected_return": -1.5321021809817773e-08,
           "inputs": {
             "ret_vol_adj_10s_v1": 0.0
           }
@@ -178,7 +178,7 @@
       ],
       "ic_window": {
         "horizon": "10s",
-        "ic": -0.03163596966452791,
+        "ic": -0.03153121455387007,
         "rows_0based": [
           100,
           1900
@@ -432,8 +432,8 @@
   "params": {
     "EQ01": {
       "alpha_id": "EQ01",
-      "beta": 1.2584700120868522e-06,
-      "beta_fit": 1.2584700120868522e-06,
+      "beta": 5.84449379264817e-08,
+      "beta_fit": 5.84449379264817e-08,
       "conf_scale": 2.0,
       "dead": false,
       "features": [
@@ -443,9 +443,9 @@
       "horizon": "1s",
       "hypothesis_confirmed": true,
       "model": "linear_z_v1",
-      "mu": 0.022273319056195184,
-      "n_train": 77816,
-      "sigma": 1.2145355737992412,
+      "mu": 0.01289768995965269,
+      "n_train": 80238,
+      "sigma": 1.433527721314541,
       "train_window": {
         "end_ts": 1787603100184527543,
         "start_ts": 1787529602028520532
@@ -454,8 +454,8 @@
     },
     "EQ03": {
       "alpha_id": "EQ03",
-      "beta": 4.0593310230811845e-06,
-      "beta_fit": 4.0593310230811845e-06,
+      "beta": 2.3843836063294293e-06,
+      "beta_fit": 2.3843836063294293e-06,
       "conf_scale": 2.0,
       "dead": false,
       "features": [
@@ -467,9 +467,9 @@
       "horizon": "5s",
       "hypothesis_confirmed": true,
       "model": "linear_z_v1",
-      "mu": -0.0008108714668119846,
-      "n_train": 77277,
-      "sigma": 0.1681551269012764,
+      "mu": -0.0002571942424055844,
+      "n_train": 79973,
+      "sigma": 0.15844419707850682,
       "train_window": {
         "end_ts": 1787603100184527543,
         "start_ts": 1787529602028520532
@@ -478,8 +478,8 @@
     },
     "EQ06": {
       "alpha_id": "EQ06",
-      "beta": 7.474776644816464e-06,
-      "beta_fit": 7.474776644816464e-06,
+      "beta": 6.08312181431125e-06,
+      "beta_fit": 6.08312181431125e-06,
       "conf_scale": 2.0,
       "dead": false,
       "features": [
@@ -489,9 +489,9 @@
       "horizon": "10s",
       "hypothesis_confirmed": true,
       "model": "linear_z_v1",
-      "mu": 0.024268266367893764,
-      "n_train": 68941,
-      "sigma": 3.5261274939832927,
+      "mu": 0.009272202106182985,
+      "n_train": 56441,
+      "sigma": 3.6814734421084916,
       "train_window": {
         "end_ts": 1787603100184527543,
         "start_ts": 1787529602028520532
