@@ -10,7 +10,11 @@
 # existing release keeps its notes, only the manifest asset is added/replaced.
 # The tag's commit must already have a green `ci` run: the images are the
 # artefact of a tree whose full suite and golden gate passed (GOVERNANCE
-# promotion gate 10).
+# promotion gate 10). The guard is tests/harness/verify_ci_green.py: it
+# retries an API that does not answer (up to 10 consecutive failures, about
+# ten minutes), fails at once when ci ran and did not succeed, waits up to
+# 40 minutes for a run that is still in progress, and fails after a 2-minute
+# grace when no run exists. It prints what it saw on every attempt.
 #
 # Digest pinning (the release step for deployment/): after the workflow
 # finishes, replace the version tags in deployment/docker/docker-compose.yml
@@ -19,17 +23,30 @@
 #   gh attestation verify oci://ghcr.io/ashjha0/intraday-alpha-platform-java@<digest> \
 #     --repo AshJha0/intraday-alpha-platform
 #
-# UNTESTED until the first tag is pushed: this workflow can only be exercised
-# by a tag, so its first real run is the validation.
+# Dry run (workflow_dispatch): runs ONLY the verify-ci guard, against the
+# commit given as `sha`. No image is built or pushed and no release is
+# written — the `images` and `manifest` jobs run on tag pushes alone. It is
+# how the guard is exercised without a tag:
+#   gh workflow run release.yml --ref <branch> -f dry_run=true -f sha=<40 hex>
 # =============================================================================
 name: release
 
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Run only the verify-ci guard (no image push, no release write). Must stay true: a release is made by pushing a tag."
+        type: boolean
+        default: true
+      sha:
+        description: "Commit whose ci run the guard checks (full 40-hex id)"
+        type: string
+        required: true
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.ref }}-${{ inputs.sha || github.sha }}
   cancel-in-progress: false
 
 permissions:
@@ -38,24 +55,28 @@ permissions:
 jobs:
   verify-ci:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    # 40 min for a ci run still in progress + the API retry budget + slack.
+    timeout-minutes: 60
     permissions:
       contents: read
       actions: read
     steps:
+      - name: a manual run is a dry run
+        if: github.event_name == 'workflow_dispatch' && !inputs.dry_run
+        run: |
+          echo "::error::workflow_dispatch only runs the verify-ci guard (dry_run=true); a release is made by pushing a v* tag"
+          exit 1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: the tagged commit has a green ci run
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          n=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml \
-                --commit "$GITHUB_SHA" --status success --json databaseId --jq 'length')
-          if [ "$n" -lt 1 ]; then
-            echo "::error::no successful ci run for $GITHUB_SHA; do not release an untested tree"
-            exit 1
-          fi
+          VERIFY_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.sha || github.sha }}
+        run: python3 tests/harness/verify_ci_green.py --repo "$GITHUB_REPOSITORY" --sha "$VERIFY_SHA"
 
   images:
     needs: verify-ci
+    # Tag pushes only: a workflow_dispatch run stops after verify-ci.
+    if: github.event_name == 'push'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
@@ -107,6 +128,7 @@ jobs:
 
   manifest:
     needs: images
+    if: github.event_name == 'push'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:

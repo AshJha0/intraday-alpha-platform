@@ -60,6 +60,11 @@ Checks (each one is a named case; exit code 0 iff no case FAILED):
                               commit SHA, runners are pinned, every cargo
                               invocation is --locked, permissions are declared
   rust_toolchain_pinned       rust-toolchain.toml == ci.yml == Dockerfile.rust
+  release_guard               release.yml verifies the commit with
+                              tests/harness/verify_ci_green.py, its manual
+                              trigger is a dry run (a `dry_run` and a `sha`
+                              input) and the image and manifest jobs run on
+                              tag pushes only
 
 Usage:
     python3 tests/harness/check_deployment.py [--verbose]
@@ -1068,6 +1073,42 @@ def check_rust_toolchain_pinned() -> None:
     record("rust_toolchain_pinned", "PASS" if not problems else "FAIL", "; ".join(problems) or want)
 
 
+def check_release_guard() -> None:
+    """The release workflow's guard and its dry-run trigger.
+
+    A manual run must not be able to publish: the jobs that push images and
+    write the release are conditioned on a tag push, and the guard is the
+    tested script rather than an inline one-liner (the one-liner compared an
+    empty API answer as a number and failed the v1.4.0 release once)."""
+    problems = []
+    path = WORKFLOWS / "release.yml"
+    doc = yaml.safe_load(path.read_text())
+    triggers = doc.get(True, doc.get("on", {})) or {}  # YAML 1.1 reads `on` as True
+    dispatch = triggers.get("workflow_dispatch") or {}
+    inputs = dispatch.get("inputs") or {}
+    if set(inputs) != {"dry_run", "sha"}:
+        problems.append(f"workflow_dispatch inputs are {sorted(inputs)}, want dry_run and sha")
+    elif inputs["dry_run"].get("default") is not True or not inputs["sha"].get("required"):
+        problems.append("dry_run must default to true and sha must be required")
+    if (triggers.get("push") or {}).get("tags") != ["v*"]:
+        problems.append("release.yml must still run on v* tag pushes")
+    jobs = doc.get("jobs", {})
+    steps = jobs.get("verify-ci", {}).get("steps", [])
+    if "tests/harness/verify_ci_green.py" not in " ".join(str(s.get("run", "")) for s in steps):
+        problems.append("verify-ci does not run tests/harness/verify_ci_green.py")
+    if not (ROOT / "tests" / "harness" / "verify_ci_green.py").is_file():
+        problems.append("tests/harness/verify_ci_green.py is missing")
+    for name in ("images", "manifest"):
+        cond = str(jobs.get(name, {}).get("if", ""))
+        if "github.event_name == 'push'" not in cond:
+            problems.append(f"job {name} is not limited to tag pushes (if: {cond!r})")
+    if "verify-ci" not in str(jobs.get("images", {}).get("needs", "")):
+        problems.append("job images does not need verify-ci")
+    if "images" not in str(jobs.get("manifest", {}).get("needs", "")):
+        problems.append("job manifest does not need images")
+    record("release_guard", "PASS" if not problems else "FAIL", "; ".join(problems[:6]))
+
+
 def main() -> int:
     print("deployment structural validation (PLATFORM_CONVENTIONS.md §12.7 / GOVERNANCE.md §1)")
     print(f"repo: {ROOT}")
@@ -1101,6 +1142,7 @@ def main() -> int:
     check_image_pinning()
     check_workflow_supply_chain()
     check_rust_toolchain_pinned()
+    check_release_guard()
 
     failed = [c for c, s, _ in RESULTS if s == "FAIL"]
     skipped = [c for c, s, _ in RESULTS if s == "SKIP"]
