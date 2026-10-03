@@ -66,9 +66,7 @@ def _sha256_file(path: Path) -> str:
 
 def _git(root: Path, *args: str) -> Optional[str]:
     try:
-        out = subprocess.run(
-            ["git", *args], cwd=root, capture_output=True, text=True, timeout=10
-        )
+        out = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, timeout=10)
         if out.returncode == 0:
             return out.stdout
     except (OSError, subprocess.SubprocessError) as exc:
@@ -94,9 +92,7 @@ def git_status(repo_root: Optional[Path] = None) -> Dict[str, Any]:
     return {
         "git_commit": commit,
         "git_dirty": bool(dirty),
-        "git_dirty_hash": (
-            hashlib.sha256(dirty.encode()).hexdigest() if dirty else None
-        ),
+        "git_dirty_hash": (hashlib.sha256(dirty.encode()).hexdigest() if dirty else None),
     }
 
 
@@ -180,13 +176,10 @@ class ExperimentTracker:
 
     LEDGER = "ledger.json"
 
-    def __init__(self, models_dir: Optional[Path] = None,
-                 repo_root: Optional[Path] = None) -> None:
+    def __init__(self, models_dir: Optional[Path] = None, repo_root: Optional[Path] = None) -> None:
         self.repo_root = Path(repo_root) if repo_root is not None else _REPO
         self.models_dir = (
-            Path(models_dir)
-            if models_dir is not None
-            else self.repo_root / "research" / "models"
+            Path(models_dir) if models_dir is not None else self.repo_root / "research" / "models"
         )
         self.models_dir.mkdir(parents=True, exist_ok=True)
 
@@ -206,9 +199,7 @@ class ExperimentTracker:
         return {"experiment_count": 0, "runs": []}
 
     def _write_ledger(self, ledger: Dict[str, Any]) -> None:
-        atomic_write_text(
-            self._ledger_path(),
-            json.dumps(ledger, indent=2, sort_keys=True) + "\n")
+        atomic_write_text(self._ledger_path(), json.dumps(ledger, indent=2, sort_keys=True) + "\n")
 
     @property
     def experiment_count(self) -> int:
@@ -272,8 +263,7 @@ class ExperimentTracker:
         rows the run used — without them a manifest cannot reproduce a fit
         (spec §14/§26).
         """
-        for w, label in ((train_window, "train_window"),
-                         (test_window, "test_window")):
+        for w, label in ((train_window, "train_window"), (test_window, "test_window")):
             if w and ("start_ts" not in w or "end_ts" not in w):
                 raise ValueError(f"{label} must carry start_ts/end_ts")
         manifest = {

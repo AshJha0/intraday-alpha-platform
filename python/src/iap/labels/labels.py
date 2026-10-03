@@ -90,12 +90,12 @@ class LabelReason:
     """Bit flags recorded per (anchor, horizon) when a label is invalid."""
 
     OK = 0
-    NOT_OBSERVED = 1 << 0        # stream ended before t + h
-    NO_ANCHOR = 1 << 1           # no prevailing sample at t, or mid <= 0
+    NOT_OBSERVED = 1 << 0  # stream ended before t + h
+    NO_ANCHOR = 1 << 1  # no prevailing sample at t, or mid <= 0
     ANCHOR_NOT_TRADABLE = 1 << 2  # book not two-sided / stale / halted at t
-    NO_FORWARD = 1 << 3          # no prevailing sample at t + h
-    FORWARD_STALE = 1 << 4       # prevailing mid at t + h older than max_age
-    BLACKOUT = 1 << 5            # a non-tradable sample inside (t, t + h]
+    NO_FORWARD = 1 << 3  # no prevailing sample at t + h
+    FORWARD_STALE = 1 << 4  # prevailing mid at t + h older than max_age
+    BLACKOUT = 1 << 5  # a non-tradable sample inside (t, t + h]
 
     NAMES = (
         (NOT_OBSERVED, "not_observed"),
@@ -126,8 +126,7 @@ class MidSeries:
     half_spread: List[float] = field(default_factory=list)
     tradable: List[bool] = field(default_factory=list)
 
-    def append(self, ts: int, mid: float, half_spread: float,
-               tradable: bool = True) -> None:
+    def append(self, ts: int, mid: float, half_spread: float, tradable: bool = True) -> None:
         if self.ts and ts < self.ts[-1]:
             raise ValueError("MidSeries timestamps must be non-decreasing")
         self.ts.append(ts)
@@ -160,8 +159,7 @@ class MidSeries:
 
 def max_sample_age(series: MidSeries) -> int:
     """Pinned freshness bound for the prevailing mid of an instrument."""
-    return max(LABEL_MAX_AGE_FLOOR_NS,
-               LABEL_MAX_AGE_GAP_MULT * series.median_gap_ns())
+    return max(LABEL_MAX_AGE_FLOOR_NS, LABEL_MAX_AGE_GAP_MULT * series.median_gap_ns())
 
 
 @dataclass
@@ -231,8 +229,7 @@ def compute_labels(
     next_tradable = [m] * (m + 1)
     if blackout_reopen:
         for i in range(m - 1, -1, -1):
-            next_tradable[i] = i if (tradable[i] and mids[i] > 0.0) \
-                else next_tradable[i + 1]
+            next_tradable[i] = i if (tradable[i] and mids[i] > 0.0) else next_tradable[i + 1]
 
     # base pointer: latest series index with ts <= anchor
     out: Dict[str, LabelResult] = {}
@@ -291,7 +288,12 @@ def compute_labels(
             lab_mid[i] = m1 / m0 - 1.0
             lab_cost[i] = ((m1 - hs1) - (m0 + hs0)) / m0
             lab_valid[i] = True
-        out[h] = LabelResult(horizon=h, mid=lab_mid, cost=lab_cost,
-                             valid=lab_valid, reason=lab_reason,
-                             reopen_mid=lab_reopen)
+        out[h] = LabelResult(
+            horizon=h,
+            mid=lab_mid,
+            cost=lab_cost,
+            valid=lab_valid,
+            reason=lab_reason,
+            reopen_mid=lab_reopen,
+        )
     return out

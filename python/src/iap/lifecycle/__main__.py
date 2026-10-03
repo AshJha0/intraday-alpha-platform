@@ -34,8 +34,10 @@ from iap.lifecycle.registry import AlphaRegistry, LifecycleTransitionLog
 
 
 def _load(root: Path):
-    cfg = load_policy_config(root / "configs" / "strategies" / "lifecycle.json",
-                             root / "configs" / "strategies" / "strategies.json")
+    cfg = load_policy_config(
+        root / "configs" / "strategies" / "lifecycle.json",
+        root / "configs" / "strategies" / "strategies.json",
+    )
     path = root / REGISTRY_RELPATH
     if not path.is_file():
         raise SystemExit(f"{path}: not found — run `python -m iap.lifecycle bootstrap`")
@@ -59,8 +61,10 @@ def cmd_bootstrap(root: Path, dry_run: bool, force: bool) -> int:
     print(f"states: {result.count_by_state()}")
     for row in result.rows:
         if row.missing_metrics:
-            print(f"{row.alpha_id}: report metrics missing/non-finite: "
-                  f"{', '.join(row.missing_metrics)} — kept at RESEARCH")
+            print(
+                f"{row.alpha_id}: report metrics missing/non-finite: "
+                f"{', '.join(row.missing_metrics)} — kept at RESEARCH"
+            )
     if not dry_run:
         print(f"wrote {root / REGISTRY_RELPATH} and {root / TRANSITIONS_RELPATH}")
     return 0
@@ -72,8 +76,7 @@ def cmd_status(root: Path) -> int:
     return 0
 
 
-def cmd_manual(root: Path, alpha_id: str, reason: str, event_ts: Optional[int],
-               action: str) -> int:
+def cmd_manual(root: Path, alpha_id: str, reason: str, event_ts: Optional[int], action: str) -> int:
     _, registry, machine = _load(root)
     ts = event_ts if event_ts is not None else _default_event_ts(registry)
     if action == "retire":
@@ -81,24 +84,30 @@ def cmd_manual(root: Path, alpha_id: str, reason: str, event_ts: Optional[int],
     else:
         tr = machine.reset_to_research(alpha_id, ts, reason, actor=Actor.HUMAN)
     registry.save(root / REGISTRY_RELPATH)
-    print(f"{tr.alpha_id}: {tr.from_state.name} -> {tr.to_state.name} at {tr.event_ts} "
-          f"({tr.actor.value}): {tr.reason}")
+    print(
+        f"{tr.alpha_id}: {tr.from_state.name} -> {tr.to_state.name} at {tr.event_ts} "
+        f"({tr.actor.value}): {tr.reason}"
+    )
     return 0
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    parser = argparse.ArgumentParser(prog="python -m iap.lifecycle",
-                                     description=__doc__.splitlines()[0])
-    parser.add_argument("--root", type=Path, default=None,
-                        help="repository root (default: this checkout)")
+    parser = argparse.ArgumentParser(
+        prog="python -m iap.lifecycle", description=__doc__.splitlines()[0]
+    )
+    parser.add_argument(
+        "--root", type=Path, default=None, help="repository root (default: this checkout)"
+    )
     sub = parser.add_subparsers(dest="command", required=True)
     p_boot = sub.add_parser("bootstrap", help="build the registry from research/")
-    p_boot.add_argument("--dry-run", action="store_true",
-                        help="compute and print, write nothing")
-    p_boot.add_argument("--force", action="store_true",
-                        help="rebuild research/lifecycle_transitions.jsonl even though it "
-                             "already holds transitions (the log is append-only; without "
-                             "--force a non-empty log is refused with exit code 3)")
+    p_boot.add_argument("--dry-run", action="store_true", help="compute and print, write nothing")
+    p_boot.add_argument(
+        "--force",
+        action="store_true",
+        help="rebuild research/lifecycle_transitions.jsonl even though it "
+        "already holds transitions (the log is append-only; without "
+        "--force a non-empty log is refused with exit code 3)",
+    )
     sub.add_parser("status", help="print the registry table")
     for name in ("retire", "reset"):
         p = sub.add_parser(name, help=f"{name} an alpha (HUMAN action)")

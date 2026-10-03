@@ -140,8 +140,9 @@ def horizon_name(horizon_ns: int) -> str:
     for name, ns in HORIZONS_NS.items():
         if ns == horizon_ns:
             return name
-    raise ValueError(f"horizon_ns {horizon_ns} is not a pinned label horizon "
-                     f"({', '.join(HORIZONS_NS)})")
+    raise ValueError(
+        f"horizon_ns {horizon_ns} is not a pinned label horizon ({', '.join(HORIZONS_NS)})"
+    )
 
 
 def load_controls(cfg: MvpConfig) -> ControlsSpec:
@@ -179,10 +180,14 @@ def feature_context(cfg: MvpConfig, ref: ReferenceData) -> InstrumentContext:
     h0, m0, _ = (int(x) for x in cfg.session.open.split(":"))
     h1, m1, s1 = (int(x) for x in cfg.session.close.split(":"))
     return InstrumentContext(
-        instrument_id=inst.instrument_id, symbol=inst.symbol, asset_class=inst.asset_class,
-        tick_size=float(inst.tick_size), session_open_min=h0 * 60 + m0,
+        instrument_id=inst.instrument_id,
+        symbol=inst.symbol,
+        asset_class=inst.asset_class,
+        tick_size=float(inst.tick_size),
+        session_open_min=h0 * 60 + m0,
         session_close_min=h1 * 60 + m1 + (1 if s1 >= 30 else 0),
-        ref_instrument_id=inst.instrument_id, session_timezone=cfg.session.timezone,
+        ref_instrument_id=inst.instrument_id,
+        session_timezone=cfg.session.timezone,
         clock=SessionClock(cfg.session.timezone),
     )
 
@@ -271,7 +276,7 @@ class Counters:
     decisions_without_covariance: int = 0
     decisions_flat: int = 0
     decisions_parent_live: int = 0
-    decisions_window_beyond_session: int = 0   #: parent window would end after the session close
+    decisions_window_beyond_session: int = 0  #: parent window would end after the session close
     parent_orders: int = 0
     child_orders_generated: int = 0
     child_orders_submitted: int = 0
@@ -344,7 +349,7 @@ class _LiveParent:
     decision: "_Decision"
     children: Dict[int, ChildOrder] = field(default_factory=dict)  #: submitted, by id
     reports: List[ExecutionReport] = field(default_factory=list)
-    rejected: int = 0          #: generated but not submitted (any reason)
+    rejected: int = 0  #: generated but not submitted (any reason)
     #: control-blocked children by control (never routed to risk or a venue;
     #: written into ParentOrder.params as children_blocked_<control>)
     blocked: Dict[str, int] = field(default_factory=lambda: dict.fromkeys(BLOCK_CONTROLS, 0))
@@ -371,16 +376,24 @@ class MvpEngine:
     in stream order, then :meth:`finish`; traces reach ``sink`` in decision
     order as they become ready."""
 
-    def __init__(self, cfg: MvpConfig, feed: FeedResult, sink: TraceSink, *,
-                 ref: Optional[ReferenceData] = None) -> None:
+    def __init__(
+        self,
+        cfg: MvpConfig,
+        feed: FeedResult,
+        sink: TraceSink,
+        *,
+        ref: Optional[ReferenceData] = None,
+    ) -> None:
         self.cfg = cfg
         self.feed = feed
         self.sink = sink
         self.ref = ref if ref is not None else build_reference_data(cfg)
         inst = self.ref.instrument(cfg.instrument)
         if inst.instrument_id != feed.instrument_id:
-            raise ValueError(f"feed instrument {feed.instrument_id} != config instrument "
-                             f"{inst.instrument_id} ({cfg.instrument})")
+            raise ValueError(
+                f"feed instrument {feed.instrument_id} != config instrument "
+                f"{inst.instrument_id} ({cfg.instrument})"
+            )
         self.iid = inst.instrument_id
         self.tick = float(inst.tick_size)
         self.strategy_id = cfg.strategy_id
@@ -390,7 +403,8 @@ class MvpEngine:
         # (open/close in the session's zone -> UTC ns); the loop never reads
         # the end of the captured stream, which a live loop cannot know.
         self.session_open_ts, self.session_close_ts = self.ref.session_bounds_ns(
-            inst.asset_class, cfg.session.trading_day)
+            inst.asset_class, cfg.session.trading_day
+        )
         self.counters = Counters()
         self.account = Account()
 
@@ -399,22 +413,34 @@ class MvpEngine:
         for name in cfg.venues:
             v = self.ref.venue(name)
             venues[v.venue_id] = VenueSpec(
-                venue_id=v.venue_id, name=v.venue, is_fx=False,
+                venue_id=v.venue_id,
+                name=v.venue,
+                is_fx=False,
                 taker_fee_per_share=float(v.fees.get("taker_fee_per_share", 0.0)),
                 maker_rebate_per_share=float(v.fees.get("maker_rebate_per_share", 0.0)),
                 commission_per_million=float(v.fees.get("commission_per_million", 0.0)),
-                latency_mean_ns=v.latency_mean_ns, latency_jitter_ns=v.latency_jitter_ns,
+                latency_mean_ns=v.latency_mean_ns,
+                latency_jitter_ns=v.latency_jitter_ns,
             )
         self.venues = dict(sorted(venues.items()))
         self.venue_names = {vid: spec.name for vid, spec in self.venues.items()}
-        latency = LatencyConfig(cfg.execution.latency_decision_ns, cfg.execution.latency_risk_ns,
-                                cfg.execution.latency_wire_ns)
+        latency = LatencyConfig(
+            cfg.execution.latency_decision_ns,
+            cfg.execution.latency_risk_ns,
+            cfg.execution.latency_wire_ns,
+        )
         exec_doc = cfg.reference_documents()[cfg.reference["execution"]]
         self.exec_config = ExecConfig(
-            latency=latency, seed=cfg.seed,
-            impact_coeff_bps_per_pct_adv=float(exec_doc["cost_model"]["impact_coeff_bps_per_pct_adv"]),
-            instruments={self.iid: InstrumentSpec(self.iid, self.tick, 1.0, float(inst.adv),
-                                                  inst.currency or "USD")},
+            latency=latency,
+            seed=cfg.seed,
+            impact_coeff_bps_per_pct_adv=float(
+                exec_doc["cost_model"]["impact_coeff_bps_per_pct_adv"]
+            ),
+            instruments={
+                self.iid: InstrumentSpec(
+                    self.iid, self.tick, 1.0, float(inst.adv), inst.currency or "USD"
+                )
+            },
             venues=self.venues,
         )
         self.sim = SimulatorAdapter(ExecutionSimulator(self.exec_config))
@@ -422,46 +448,61 @@ class MvpEngine:
         sor_file = load_sor_options(cfg.reference_path("execution"))
         sor_options = SorOptions(cfg.sor.prefer_rebate, cfg.sor.max_venue_latency_ns)
         if sor_options != sor_file:
-            raise ValueError("mvp.json sor block must equal execution.json sor "
-                             f"({sor_options} != {sor_file})")
-        self.sor = SorAdapter(SmartOrderRouter(self.venues, sor_options), self.venues,
-                              list(self.venues))
+            raise ValueError(
+                f"mvp.json sor block must equal execution.json sor ({sor_options} != {sor_file})"
+            )
+        self.sor = SorAdapter(
+            SmartOrderRouter(self.venues, sor_options), self.venues, list(self.venues)
+        )
         self._next_parent_id = 1
         self._next_child_id = 1
         self.scheduler = AlgoScheduler(
-            self.controls.max_child_qty, cfg.execution.twap_slices, cfg.execution.is_slices,
-            cfg.execution.is_risk_aversion, cfg.execution.pov_participation,
-            self._new_child_id, self._committed,
+            self.controls.max_child_qty,
+            cfg.execution.twap_slices,
+            cfg.execution.is_slices,
+            cfg.execution.is_risk_aversion,
+            cfg.execution.pov_participation,
+            self._new_child_id,
+            self._committed,
         )
         self.min_venue_latency_ns = min(v.latency_mean_ns for v in self.venues.values())
 
         # ---- risk ---------------------------------------------------------
         risk_doc = cfg.reference_documents()[cfg.reference["risk"]]
         self.risk_engine = RiskEngine.from_config(
-            risk_doc, instrument_refs_from_reference_data(self.ref))
+            risk_doc, instrument_refs_from_reference_data(self.ref)
+        )
         self.risk = RiskEngineAdapter(self.risk_engine)
         self._venue_stale: Dict[int, bool] = {}
         self._last_data_ts: Dict[int, int] = {}
         self._mark_ts: Optional[int] = None
 
         # ---- features + alphas + portfolio --------------------------------
-        self.features = FeatureEngine({self.iid: feature_context(cfg, self.ref)},
-                                      cadence_ns=cfg.decision_cadence_ns)
+        self.features = FeatureEngine(
+            {self.iid: feature_context(cfg, self.ref)}, cadence_ns=cfg.decision_cadence_ns
+        )
         self.feature_version = self.features.feature_version
         self._mid_index = self.features.feature_names.index(_MID_FEATURE)
         self.horizon = horizon_name(cfg.horizon_ns)
         self.alphas: Tuple[LinearZAlpha, ...] = load_alphas(
-            cfg.reference_path("alpha_params"), cfg.alphas, self.features.feature_names,
-            self.feature_version, cfg.horizon_ns)
+            cfg.reference_path("alpha_params"),
+            cfg.alphas,
+            self.features.feature_names,
+            self.feature_version,
+            cfg.horizon_ns,
+        )
         self.ensemble = AlphaEnsemble(self.alphas, cfg.horizon_ns)
         for alpha in self.alphas:
             if alpha.model.horizon not in HORIZONS_NS:
-                raise ValueError(f"{alpha.alpha_id}: fitted horizon {alpha.model.horizon!r} "
-                                 "is not a pinned label horizon")
+                raise ValueError(
+                    f"{alpha.alpha_id}: fitted horizon {alpha.model.horizon!r} "
+                    "is not a pinned label horizon"
+                )
         self.model_version = self.ensemble.version
         self.constraints = PortfolioConstraints(cfg.portfolio)
-        self.portfolio = SingleStockPortfolio(self.strategy_id, self.ensemble.alpha_id,
-                                              self.feature_version, self.model_version)
+        self.portfolio = SingleStockPortfolio(
+            self.strategy_id, self.ensemble.alpha_id, self.feature_version, self.model_version
+        )
         self.tca = TcaAdapter()
         self.data_version = feed.data_version
         self.config_version = cfg.config_version()
@@ -511,8 +552,10 @@ class MvpEngine:
         if self._finished:
             raise RuntimeError("engine already finished")
         if ev.instrument_id != self.iid:
-            raise ValueError(f"event {ev.event_id} is for instrument {ev.instrument_id}, "
-                             f"engine trades {self.iid}")
+            raise ValueError(
+                f"event {ev.event_id} is for instrument {ev.instrument_id}, "
+                f"engine trades {self.iid}"
+            )
         t = ev.exchange_ts
         if self.first_ts is None:
             self.first_ts = t
@@ -578,25 +621,39 @@ class MvpEngine:
             if rep.status in (ExecStatus.PARTIAL, ExecStatus.FILLED):
                 fill = self.sim.fills_by_execution[rep.execution_id]
                 price = float(rep.fill_price_ticks) * self.tick
-                self.account.book_fill(int(fill.side), rep.filled_qty, price, rep.fees,
-                                       fill.impact_cost)
+                self.account.book_fill(
+                    int(fill.side), rep.filled_qty, price, rep.fees, fill.impact_cost
+                )
                 self.counters.fills += 1
                 filled = True
                 if live is not None:
                     live.fill_fees += rep.fees
                     live.fill_impact += fill.impact_cost
-                applied = self.risk_engine.on_fill(RiskFill(
-                    ts=rep.exchange_ts, strategy_id=self.strategy_id, instrument_id=self.iid,
-                    order_id=rep.order_id, side=int(fill.side), qty=rep.filled_qty,
-                    price_ticks=rep.fill_price_ticks))
+                applied = self.risk_engine.on_fill(
+                    RiskFill(
+                        ts=rep.exchange_ts,
+                        strategy_id=self.strategy_id,
+                        instrument_id=self.iid,
+                        order_id=rep.order_id,
+                        side=int(fill.side),
+                        qty=rep.filled_qty,
+                        price_ticks=rep.fill_price_ticks,
+                    )
+                )
                 if not applied:
                     # The account booked a fill the risk engine refused as
                     # malformed: the two positions have diverged and the
                     # §12.1 identity is gone — fail closed, never continue.
-                    raise RuntimeError(f"risk engine rejected fill execution "
-                                       f"{rep.execution_id} of child {rep.order_id} as malformed")
-            if rep.status in (ExecStatus.FILLED, ExecStatus.CANCELED, ExecStatus.EXPIRED,
-                              ExecStatus.REJECTED):
+                    raise RuntimeError(
+                        f"risk engine rejected fill execution "
+                        f"{rep.execution_id} of child {rep.order_id} as malformed"
+                    )
+            if rep.status in (
+                ExecStatus.FILLED,
+                ExecStatus.CANCELED,
+                ExecStatus.EXPIRED,
+                ExecStatus.REJECTED,
+            ):
                 self.risk_engine.on_order_done(rep.order_id)
         if filled:
             # §12.1 (PaperUnitsTest): after EVERY fill the risk position equals
@@ -657,8 +714,9 @@ class MvpEngine:
                 continue
             bb = vb.best_bid()
             ba = vb.best_ask()
-            at_touch = (bb is not None and bb[0] == best_bid) or \
-                (ba is not None and ba[0] == best_ask)
+            at_touch = (bb is not None and bb[0] == best_bid) or (
+                ba is not None and ba[0] == best_ask
+            )
             data_ts = self._last_data_ts.get(vid)
             if at_touch and data_ts is not None:
                 mark_ts = data_ts if mark_ts is None else min(mark_ts, data_ts)
@@ -685,8 +743,9 @@ class MvpEngine:
         bb, ba = self.book.best_bid(), self.book.best_ask()
         if bb is None or ba is None:
             return
-        if not tl.append_state_pinned(ev.exchange_ts, bb[0] * self.tick, ba[0] * self.tick,
-                                      bb[1], ba[1]):
+        if not tl.append_state_pinned(
+            ev.exchange_ts, bb[0] * self.tick, ba[0] * self.tick, bb[1], ba[1]
+        ):
             self.counters.timeline_crossed_skipped += 1
 
     # ------------------------------------------------------------- decisions
@@ -732,8 +791,16 @@ class MvpEngine:
     def _decide(self, ev: MarketEvent, vec: FeatureVector) -> None:
         t = ev.exchange_ts
         self.counters.decisions += 1
-        builder = TraceBuilder(self.session_id, self.iid, t, ev.sequence, self.data_version,
-                               self.feature_version, self.model_version, self.config_version)
+        builder = TraceBuilder(
+            self.session_id,
+            self.iid,
+            t,
+            ev.sequence,
+            self.data_version,
+            self.feature_version,
+            self.model_version,
+            self.config_version,
+        )
         decision = _Decision(builder)
         self._decisions.append(decision)
         index = len(self.decision_ts)
@@ -753,14 +820,16 @@ class MvpEngine:
         for alpha in self.ensemble.members:
             builder.add_signal(member_signals[alpha.alpha_id])
 
-        state = PortfolioState(self.iid, t, self.account.position, self.account.mark,
-                               tuple(self.bar_returns))
+        state = PortfolioState(
+            self.iid, t, self.account.position, self.account.mark, tuple(self.bar_returns)
+        )
         if not self.portfolio.ready(state, self.constraints) or not self.account.mark_valid:
             self.counters.decisions_without_covariance += 1
             decision.ready = True
             return
         target: PortfolioTarget = self.portfolio.construct(
-            list(member_signals.values()) + [signal], state, self.constraints)
+            list(member_signals.values()) + [signal], state, self.constraints
+        )
         builder.set_portfolio(target)
         delta = target.targets[0].target_qty - (self.account.position + self._inflight_signed())
         if delta == 0:
@@ -779,12 +848,18 @@ class MvpEngine:
         urgency = signal.confidence
         algo = self.cfg.execution.algo_for(urgency)
         parent = ParentOrder(
-            parent_order_id=self._next_parent_id, strategy_id=self.strategy_id,
-            alpha_id=self.ensemble.alpha_id, instrument_id=self.iid,
-            side=Side.BID if delta > 0 else Side.ASK, qty=abs(delta), algo=algo,
+            parent_order_id=self._next_parent_id,
+            strategy_id=self.strategy_id,
+            alpha_id=self.ensemble.alpha_id,
+            instrument_id=self.iid,
+            side=Side.BID if delta > 0 else Side.ASK,
+            qty=abs(delta),
+            algo=algo,
             decision_ts=t,
             arrival_ts=t + self.exec_config.latency.internal_ns + self.min_venue_latency_ns,
-            end_ts=end_ts, urgency=urgency, limit_price_ticks=0,
+            end_ts=end_ts,
+            urgency=urgency,
+            limit_price_ticks=0,
             params=self.scheduler.params_for(algo),
         )
         self._next_parent_id += 1
@@ -825,8 +900,9 @@ class MvpEngine:
             if passive:
                 best = None
                 if venue_book is not None:
-                    best = venue_book.best_bid() if child.side is Side.BID \
-                        else venue_book.best_ask()
+                    best = (
+                        venue_book.best_bid() if child.side is Side.BID else venue_book.best_ask()
+                    )
                 if best is not None:
                     price = best[0]
                 else:
@@ -837,14 +913,18 @@ class MvpEngine:
             acct = self.account
             # A control-blocked child never leaves the strategy (BLOCK_CONTROLS):
             # counted, not traced.
-            if (ctl.min_slice_interval_ns > 0 and acct.last_child_decision_ts is not None
-                    and t - acct.last_child_decision_ts < ctl.min_slice_interval_ns):
+            if (
+                ctl.min_slice_interval_ns > 0
+                and acct.last_child_decision_ts is not None
+                and t - acct.last_child_decision_ts < ctl.min_slice_interval_ns
+            ):
                 self.counters.slice_interval_blocked += 1
                 live.blocked["slice_interval"] += 1
                 live.rejected += 1
                 continue
-            venue_latency = self.exec_config.latency.internal_ns + \
-                self.venues[vd.venue_id].latency_mean_ns
+            venue_latency = (
+                self.exec_config.latency.internal_ns + self.venues[vd.venue_id].latency_mean_ns
+            )
             if venue_latency > ctl.latency_budget_ns:
                 self.counters.latency_budget_blocked += 1
                 live.blocked["latency_budget"] += 1
@@ -853,8 +933,9 @@ class MvpEngine:
             if ctl.max_participation < 1.0:
                 depth = self._contra_depth(venue_book, child.side)
                 cap_depth = int(math.floor(ctl.max_participation * depth))
-                cap_volume = int(math.floor(ctl.max_participation * acct.session_volume)) \
-                    - acct.filled_qty
+                cap_volume = (
+                    int(math.floor(ctl.max_participation * acct.session_volume)) - acct.filled_qty
+                )
                 cap = max(min(cap_depth, cap_volume), 0)
                 if cap == 0:
                     self.counters.participation_blocked += 1
@@ -867,7 +948,8 @@ class MvpEngine:
             builder.add_routing(vd)
             builder.add_child_order(routed)
             rd: RiskDecision = self.risk.evaluate(
-                routed, RiskContext(self.strategy_id, parent.urgency, t))
+                routed, RiskContext(self.strategy_id, parent.urgency, t)
+            )
             builder.add_risk(rd)
             if rd.decision is not Decision.ALLOW:
                 self.counters.risk_rejected += 1
@@ -891,8 +973,11 @@ class MvpEngine:
             self._closing.append(live)
             self._live = None
         for live in list(self._closing):
-            if live.all_terminal(self.sim) and self.timeline.last_ts is not None \
-                    and self.timeline.last_ts >= live.parent.end_ts:
+            if (
+                live.all_terminal(self.sim)
+                and self.timeline.last_ts is not None
+                and self.timeline.last_ts >= live.parent.end_ts
+            ):
                 self._finalise(live, force=False)
                 self._closing.remove(live)
 
@@ -908,17 +993,27 @@ class MvpEngine:
         live.parent = parent
         self.scheduler.close(parent.parent_order_id)
         tl = self.timeline
-        can_tca = live.all_terminal(self.sim) and tl.last_ts is not None \
-            and tl.last_ts >= parent.end_ts
+        can_tca = (
+            live.all_terminal(self.sim) and tl.last_ts is not None and tl.last_ts >= parent.end_ts
+        )
         if not can_tca:
             if not force:
                 raise RuntimeError(f"parent {parent.parent_order_id} finalised too early")
             self.counters.parents_without_tca += 1
-            self.outcomes.append(OrderOutcome(
-                parent=parent, signal=live.signal, tca=None, attribution=None,
-                realized_bps=0.0, filled_notional=0.0,
-                n_children_submitted=len(live.children),
-                n_children_rejected=live.rejected, venue_qty={}, latencies_ns=()))
+            self.outcomes.append(
+                OrderOutcome(
+                    parent=parent,
+                    signal=live.signal,
+                    tca=None,
+                    attribution=None,
+                    realized_bps=0.0,
+                    filled_notional=0.0,
+                    n_children_submitted=len(live.children),
+                    n_children_rejected=live.rejected,
+                    venue_qty={},
+                    latencies_ns=(),
+                )
+            )
             live.decision.ready = True
             return
         liquidity: Dict[int, Liquidity] = {}
@@ -928,8 +1023,9 @@ class MvpEngine:
                 fill = self.sim.fills_by_execution[rep.execution_id]
                 liquidity[rep.execution_id] = fill.liquidity
                 venue_qty[rep.venue_id] = venue_qty.get(rep.venue_id, 0) + rep.filled_qty
-        latencies = {cid: self.sim.arrival_ts(cid) - child.submit_ts
-                     for cid, child in live.children.items()}
+        latencies = {
+            cid: self.sim.arrival_ts(cid) - child.submit_ts for cid, child in live.children.items()
+        }
         market = TcaMarket(tl, self.tick, liquidity, latencies)
         tca = self.tca.analyse(parent, live.reports, market)
         builder.add_tca(tca)
@@ -952,12 +1048,20 @@ class MvpEngine:
             realized_bps = (mtm - live.fill_fees - live.fill_impact) / filled_notional * 1e4
         attribution = attribute(parent, live.signal, tca, realized_bps)
         builder.set_attribution(attribution)
-        self.outcomes.append(OrderOutcome(
-            parent=parent, signal=live.signal, tca=tca, attribution=attribution,
-            realized_bps=realized_bps, filled_notional=filled_notional,
-            n_children_submitted=len(live.children),
-            n_children_rejected=live.rejected, venue_qty=dict(sorted(venue_qty.items())),
-            latencies_ns=tuple(latencies[c] for c in sorted(latencies))))
+        self.outcomes.append(
+            OrderOutcome(
+                parent=parent,
+                signal=live.signal,
+                tca=tca,
+                attribution=attribution,
+                realized_bps=realized_bps,
+                filled_notional=filled_notional,
+                n_children_submitted=len(live.children),
+                n_children_rejected=live.rejected,
+                venue_qty=dict(sorted(venue_qty.items())),
+                latencies_ns=tuple(latencies[c] for c in sorted(latencies)),
+            )
+        )
         self.counters.parents_finalised += 1
         live.decision.ready = True
 
@@ -985,13 +1089,14 @@ class MvpEngine:
         the account position."""
         acct = self.account
         if self.risk_engine.position(self.iid) != acct.position:
-            raise RuntimeError(f"risk position {self.risk_engine.position(self.iid)} != "
-                               f"account position {acct.position}")
+            raise RuntimeError(
+                f"risk position {self.risk_engine.position(self.iid)} != "
+                f"account position {acct.position}"
+            )
         lhs = self.risk_daily_pnl()
         rhs = acct.gross_pnl - acct.spread_cost
         if abs(lhs - rhs) > _PNL_IDENTITY_TOL * max(1.0, abs(lhs), abs(rhs)):
-            raise RuntimeError(f"P&L identity broken: risk daily {lhs!r} != "
-                               f"gross - spread {rhs!r}")
+            raise RuntimeError(f"P&L identity broken: risk daily {lhs!r} != gross - spread {rhs!r}")
 
     def labels(self, horizon: str) -> LabelResult:
         """The research forward labels (:func:`iap.labels.compute_labels`) at
@@ -1004,8 +1109,13 @@ class MvpEngine:
         cached = self._labels.get(horizon)
         if cached is not None and cached[0] == key:
             return cached[1]
-        result = compute_labels(self.decision_ts, self.mid_series, last_ts, [horizon],
-                                max_age_ns=max_sample_age(self.mid_series))[horizon]
+        result = compute_labels(
+            self.decision_ts,
+            self.mid_series,
+            last_ts,
+            [horizon],
+            max_age_ns=max_sample_age(self.mid_series),
+        )[horizon]
         self._labels[horizon] = (key, result)
         return result
 
@@ -1039,9 +1149,14 @@ class MvpEngine:
             if k > 0:
                 xs_shift.append(signals[k - 1])
                 ys_shift.append(m)
-        return IcResult(horizon=h, ic=pearson(xs, ys), ic_cost=pearson(xs, cs),
-                        ic_shifted=pearson(xs_shift, ys_shift), n=len(pairs),
-                        n_signals=len(self.ic_samples[alpha_id]))
+        return IcResult(
+            horizon=h,
+            ic=pearson(xs, ys),
+            ic_cost=pearson(xs, cs),
+            ic_shifted=pearson(xs_shift, ys_shift),
+            n=len(pairs),
+            n_signals=len(self.ic_samples[alpha_id]),
+        )
 
     def n_kill_events(self) -> int:
         return sum(1 for e in self.risk_engine.audit() if e.decision == RiskDecisionCode.KILL)

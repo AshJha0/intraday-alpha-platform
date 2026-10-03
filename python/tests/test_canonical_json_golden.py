@@ -48,12 +48,16 @@ def test_golden_pins_rounding_ties(golden: dict) -> None:
     golden — Rust's ``{:e}`` did until 2026-09-20 (review finding 1)."""
     from decimal import Decimal
 
-    values = [struct.unpack("<d", struct.pack("<Q", int(c["bits_hex"], 16)))[0]
-              for c in golden["float_repr"]]
+    values = [
+        struct.unpack("<d", struct.pack("<Q", int(c["bits_hex"], 16)))[0]
+        for c in golden["float_repr"]
+    ]
     reprs = {v: c["repr"] for v, c in zip(values, golden["float_repr"])}
-    for value, want in ((1059438285926254.25, "1059438285926254.2"),
-                        (26363981746409.3125, "26363981746409.312"),
-                        (1000000000000000.25, "1000000000000000.2")):
+    for value, want in (
+        (1059438285926254.25, "1059438285926254.2"),
+        (26363981746409.3125, "26363981746409.312"),
+        (1000000000000000.25, "1000000000000000.2"),
+    ):
         assert reprs[value] == want
 
     def exact_digits(v: float) -> tuple[int, ...]:
@@ -96,8 +100,11 @@ def test_golden_documents(golden: dict) -> None:
 
 def test_golden_rejects(golden: dict) -> None:
     probes = {
-        "nan": float("nan"), "inf": float("inf"), "-inf": float("-inf"),
-        "nested nan": {"a": [1, {"b": float("nan")}]}, "integer key": {1: "x"},
+        "nan": float("nan"),
+        "inf": float("inf"),
+        "-inf": float("-inf"),
+        "nested nan": {"a": [1, {"b": float("nan")}]},
+        "integer key": {1: "x"},
     }
     assert {r["case"] for r in golden["rejects"]} == set(probes)
     for probe in probes.values():
@@ -108,8 +115,12 @@ def test_golden_rejects(golden: dict) -> None:
 def test_golden_trace_id(golden: dict) -> None:
     pin = golden["trace_id"]
     inputs = pin["inputs"]
-    assert make_trace_id(inputs["session_id"], inputs["instrument_id"],
-                         inputs["event_ts"], inputs["sequence"]) == pin["expected"]
+    assert (
+        make_trace_id(
+            inputs["session_id"], inputs["instrument_id"], inputs["event_ts"], inputs["sequence"]
+        )
+        == pin["expected"]
+    )
     assert hashlib.sha256(pin["preimage"].encode("ascii")).hexdigest()[:32] == pin["expected"]
 
 

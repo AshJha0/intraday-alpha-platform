@@ -49,8 +49,7 @@ _EMBARGO_NS = 60_000_000_000
 # overlapping the boundary. That construction is only leak-free while the
 # label horizon fits inside the embargo.
 assert TARGET_HORIZON_NS < _EMBARGO_NS, (
-    "meta-label split requires label horizon < embargo "
-    f"({TARGET_HORIZON_NS} >= {_EMBARGO_NS})"
+    f"meta-label split requires label horizon < embargo ({TARGET_HORIZON_NS} >= {_EMBARGO_NS})"
 )
 
 #: Pinned meta-classifier hyperparameters (recorded in the run manifest).
@@ -63,8 +62,8 @@ META_HYPERPARAMS: Dict[str, Any] = {
 }
 
 META_FEATURE_NAMES = (
-    "alpha_strength",          # |primary prediction|
-    "alpha_signed",            # primary prediction
+    "alpha_strength",  # |primary prediction|
+    "alpha_signed",  # primary prediction
     "spread_bps",
     "rvol_1m",
     "log_depth_l1",
@@ -74,9 +73,9 @@ META_FEATURE_NAMES = (
 )
 
 
-def build_meta_features(pred: np.ndarray, direction: np.ndarray,
-                        meta_context: np.ndarray,
-                        impute_nan: bool = True) -> np.ndarray:
+def build_meta_features(
+    pred: np.ndarray, direction: np.ndarray, meta_context: np.ndarray, impute_nan: bool = True
+) -> np.ndarray:
     """Assemble the pinned meta-feature matrix.
 
     ``impute_nan=True`` (pinned default) replaces every non-finite entry by
@@ -98,16 +97,18 @@ def build_meta_features(pred: np.ndarray, direction: np.ndarray,
     imb = meta_context[:, 3]
     half_cost = meta_context[:, 4]
     impact = meta_context[:, 5]
-    X = np.column_stack([
-        np.abs(pred),
-        pred,
-        spread,
-        rvol,
-        np.log1p(np.maximum(depth, 0.0)),
-        imb * direction,
-        half_cost,
-        impact,
-    ])
+    X = np.column_stack(
+        [
+            np.abs(pred),
+            pred,
+            spread,
+            rvol,
+            np.log1p(np.maximum(depth, 0.0)),
+            imb * direction,
+            half_cost,
+            impact,
+        ]
+    )
     return np.where(np.isfinite(X), X, 0.0 if impute_nan else np.nan)
 
 
@@ -121,8 +122,7 @@ def build_meta_features(pred: np.ndarray, direction: np.ndarray,
 MIN_ISOTONIC_POSITIVES = 500
 
 
-def _fit_isotonic_calibrated(base: Any, X_cal: np.ndarray,
-                             y_cal: np.ndarray) -> Any:
+def _fit_isotonic_calibrated(base: Any, X_cal: np.ndarray, y_cal: np.ndarray) -> Any:
     """Calibrate a prefit classifier on held-out calibration data.
 
     Isotonic when the calibration segment carries at least
@@ -134,6 +134,7 @@ def _fit_isotonic_calibrated(base: Any, X_cal: np.ndarray,
     method = "isotonic" if n_pos >= MIN_ISOTONIC_POSITIVES else "sigmoid"
     try:  # sklearn >= 1.6
         from sklearn.frozen import FrozenEstimator
+
         calib = CalibratedClassifierCV(FrozenEstimator(base), method=method)
     except ImportError:  # pragma: no cover - older sklearn
         calib = CalibratedClassifierCV(base, method=method, cv="prefit")
@@ -143,9 +144,9 @@ def _fit_isotonic_calibrated(base: Any, X_cal: np.ndarray,
     return calib
 
 
-def _economics_from_mask(direction: np.ndarray, y_mid: np.ndarray,
-                         y_cost: np.ndarray,
-                         take: np.ndarray) -> Dict[str, float]:
+def _economics_from_mask(
+    direction: np.ndarray, y_mid: np.ndarray, y_cost: np.ndarray, take: np.ndarray
+) -> Dict[str, float]:
     d = np.where(take, direction, 0)
     net = realized_net(d, y_mid, y_cost)
     traded = d != 0
@@ -181,10 +182,8 @@ def run_meta_labeling(
         raise ValueError("primary_pred length mismatch with dataset")
 
     half_bps = ds.meta_context[:, 4]
-    cost_est = np.maximum(
-        2.0 * np.where(np.isfinite(half_bps), half_bps, 0.0) / 1e4, 0.0)
-    direction = signal_directions(np.nan_to_num(primary_pred, nan=0.0),
-                                  cost_est)
+    cost_est = np.maximum(2.0 * np.where(np.isfinite(half_bps), half_bps, 0.0) / 1e4, 0.0)
+    direction = signal_directions(np.nan_to_num(primary_pred, nan=0.0), cost_est)
     usable = np.isfinite(primary_pred) & (direction != 0)
     idx = np.flatnonzero(usable)
     if len(idx) < 300:
@@ -193,8 +192,9 @@ def run_meta_labeling(
     ts = ds.ts[idx]
     net = realized_net(direction[idx], ds.y_mid[idx], ds.y[idx])
     y_meta = (net > 0.0).astype(np.int8)
-    X_meta = build_meta_features(primary_pred[idx], direction[idx],
-                                 ds.meta_context[idx], impute_nan=impute_nan)
+    X_meta = build_meta_features(
+        primary_pred[idx], direction[idx], ds.meta_context[idx], impute_nan=impute_nan
+    )
 
     # chronological 50/25/25 split with embargo (ts is already sorted
     # because the dataset is sorted by exchange_ts). PURGING (pinned): rows
@@ -215,8 +215,8 @@ def run_meta_labeling(
     b2 = int(ts[min(int(round(0.75 * n_rows)), n_rows - 1)])
     if not (int(ts[0]) < b1 < b2):
         raise ValueError(
-            "meta split boundaries are not strictly increasing "
-            "(too many identical timestamps)")
+            "meta split boundaries are not strictly increasing (too many identical timestamps)"
+        )
     tr = ts + TARGET_HORIZON_NS <= b1
     ca = (ts > b1 + _EMBARGO_NS) & (ts + TARGET_HORIZON_NS <= b2)
     te = ts > b2 + _EMBARGO_NS
@@ -235,23 +235,25 @@ def run_meta_labeling(
     # rate of profitable trades can sit far below 0.5, so absolute levels
     # alone can land above the whole probability distribution).
     fixed = [round(0.30 + 0.05 * i, 2) for i in range(9)]  # 0.30 .. 0.70
-    p_cal_deciles = [float(np.quantile(p_cal, q))
-                     for q in (0.1, 0.25, 0.5, 0.75, 0.9)]
+    p_cal_deciles = [float(np.quantile(p_cal, q)) for q in (0.1, 0.25, 0.5, 0.75, 0.9)]
     taus = sorted(set(round(t, 6) for t in fixed + p_cal_deciles))
-    cal_net = realized_net(direction[idx][ca], ds.y_mid[idx][ca],
-                           ds.y[idx][ca])
+    cal_net = realized_net(direction[idx][ca], ds.y_mid[idx][ca], ds.y[idx][ca])
     sweep = []
     for t in taus:
         take = p_cal >= t
-        sweep.append({"tau": t, "n_trades": int(take.sum()),
-                      "total_net_bps": float(cal_net[take].sum() * 1e4)})
+        sweep.append(
+            {
+                "tau": t,
+                "n_trades": int(take.sum()),
+                "total_net_bps": float(cal_net[take].sum() * 1e4),
+            }
+        )
     best_tau = max(sweep, key=lambda r: r["total_net_bps"])["tau"]
 
     # economics on the TEST segment: gate off / gate at tau / gate at best_tau
     d_te = direction[idx][te]
     ym_te, yc_te = ds.y_mid[idx][te], ds.y[idx][te]
-    econ_off = _economics_from_mask(d_te, ym_te, yc_te,
-                                    np.ones(len(d_te), dtype=bool))
+    econ_off = _economics_from_mask(d_te, ym_te, yc_te, np.ones(len(d_te), dtype=bool))
     econ_tau = _economics_from_mask(d_te, ym_te, yc_te, p_test >= tau)
     econ_best = _economics_from_mask(d_te, ym_te, yc_te, p_test >= best_tau)
 
@@ -263,22 +265,26 @@ def run_meta_labeling(
         m = which == b
         if m.sum() == 0:
             continue
-        curve.append({"bin": b, "p_mean": float(p_test[m].mean()),
-                      "empirical": float(y_meta[te][m].mean()),
-                      "count": int(m.sum())})
+        curve.append(
+            {
+                "bin": b,
+                "p_mean": float(p_test[m].mean()),
+                "empirical": float(y_meta[te][m].mean()),
+                "count": int(m.sum()),
+            }
+        )
 
     # AUC is undefined on a single-class test segment.  It is reported as
     # ``None`` (JSON null), never as a fabricated 0.5: 0.5 reads as "the
     # model was evaluated and has no skill", which is a different statement
     # from "the segment could not rank anything".
     auc: Optional[float] = (
-        float(roc_auc_score(y_meta[te], p_test))
-        if len(np.unique(y_meta[te])) > 1 else None)
+        float(roc_auc_score(y_meta[te], p_test)) if len(np.unique(y_meta[te])) > 1 else None
+    )
     result: Dict[str, Any] = {
         "primary_model": primary_name,
         "n_meta_samples": int(len(idx)),
-        "segments": {"train": int(tr.sum()), "calibration": int(ca.sum()),
-                     "test": int(te.sum())},
+        "segments": {"train": int(tr.sum()), "calibration": int(ca.sum()), "test": int(te.sum())},
         "base_rate_test": float(y_meta[te].mean()),
         "auc_test": auc,
         "brier_test": float(brier_score_loss(y_meta[te], p_test)),
@@ -286,13 +292,12 @@ def run_meta_labeling(
         "best_tau_from_calibration": best_tau,
         "tau_sweep_calibration": sweep,
         "calibration_method": getattr(calib, "iap_calibration_method", ""),
-        "calibration_positives": int(
-            getattr(calib, "iap_calibration_positives", 0)),
+        "calibration_positives": int(getattr(calib, "iap_calibration_positives", 0)),
         # A gate that declines EVERY test signal is degenerate: say so
         # explicitly instead of reporting it as an economic decision.
         "gate_degenerate": bool(
-            int(np.sum(p_test >= tau)) == 0
-            and int(np.sum(p_test >= best_tau)) == 0),
+            int(np.sum(p_test >= tau)) == 0 and int(np.sum(p_test >= best_tau)) == 0
+        ),
         "n_taken_at_tau": int(np.sum(p_test >= tau)),
         "n_taken_at_best_tau": int(np.sum(p_test >= best_tau)),
         "economics_gate_off": econ_off,
@@ -307,22 +312,25 @@ def run_meta_labeling(
         # manifest has to say which rows trained, calibrated and scored, or
         # the fit cannot be replayed (spec §14/§26).
         segment_records = [
-            {"segment": label, "n": int(mask.sum()),
-             "window": [int(ts[mask].min()), int(ts[mask].max())]}
-            for label, mask in (("train", tr), ("calibration", ca),
-                                ("test", te))]
+            {
+                "segment": label,
+                "n": int(mask.sum()),
+                "window": [int(ts[mask].min()), int(ts[mask].max())],
+            }
+            for label, mask in (("train", tr), ("calibration", ca), ("test", te))
+        ]
         tracker.write_manifest(
             run_id,
             model_version="metalabel_isotonic_v1",
             hyperparams=dict(META_HYPERPARAMS),
-            train_window={"start_ts": int(ts[tr].min()),
-                          "end_ts": int(ts[tr].max())},
-            test_window={"start_ts": int(ts[te].min()),
-                         "end_ts": int(ts[te].max())},
+            train_window={"start_ts": int(ts[tr].min()), "end_ts": int(ts[tr].max())},
+            test_window={"start_ts": int(ts[te].min()), "end_ts": int(ts[te].max())},
             features=list(META_FEATURE_NAMES),
-            target=("meta_label_net_pnl_positive (1 iff the primary signal's "
-                    "realized net P&L > 0 under the conservative cost model; "
-                    f"primary = {primary_name})"),
+            target=(
+                "meta_label_net_pnl_positive (1 iff the primary signal's "
+                "realized net P&L > 0 under the conservative cost model; "
+                f"primary = {primary_name})"
+            ),
             folds=segment_records,
         )
         tracker.write_metrics(run_id, result)

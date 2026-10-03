@@ -45,31 +45,54 @@ def specs() -> List[FeatureSpec]:
     out: List[FeatureSpec] = []
     for h in FILL_HORIZONS:
         for side in ("bid", "ask"):
-            out.append(mkspec(
-                f"fill_prob_{side}_h{h}_v1", FAMILY,
-                f"P(back-of-L1-{side}-queue order fills within {h}): "
-                f"1 - exp(-depletion_rate_{side}_w10s * h_s / Q_{side}_L1).",
-                depends_on=(f"queue_depletion_rate_{side}_w10s_v1",
-                            f"depth_{side}_l1_v1"),
-                side=side, horizon=h))
-    out.append(mkspec("half_spread_cost_bps_v1", FAMILY,
-                      "Immediate crossing cost: spread_bps / 2.",
-                      depends_on=("spread_bps_v1",)))
-    out.append(mkspec(
-        "expected_impact_bps_v1", FAMILY,
-        "Impact proxy: half_spread_bps * sqrt(1 + traded_volume_w10s / "
-        "(quoted_depth_total + EPS)).",
-        depends_on=("half_spread_cost_bps_v1", "traded_volume_w10s_v1",
-                    "quoted_depth_total_v1")))
-    out.append(mkspec(
-        "alpha_decay_proxy_v1", FAMILY,
-        "Information arrival speed: rvol_w10s / (rvol_w1m + EPS).",
-        depends_on=("rvol_w10s_v1", "rvol_w1m_v1")))
-    out.append(mkspec(
-        "urgency_score_v1", FAMILY,
-        "Urgency to act: |imbalance_l1| * alpha_decay_proxy / (1 + spread_ticks).",
-        depends_on=("imbalance_l1_v1", "alpha_decay_proxy_v1",
-                    "spread_ticks_v1")))
+            out.append(
+                mkspec(
+                    f"fill_prob_{side}_h{h}_v1",
+                    FAMILY,
+                    f"P(back-of-L1-{side}-queue order fills within {h}): "
+                    f"1 - exp(-depletion_rate_{side}_w10s * h_s / Q_{side}_L1).",
+                    depends_on=(f"queue_depletion_rate_{side}_w10s_v1", f"depth_{side}_l1_v1"),
+                    side=side,
+                    horizon=h,
+                )
+            )
+    out.append(
+        mkspec(
+            "half_spread_cost_bps_v1",
+            FAMILY,
+            "Immediate crossing cost: spread_bps / 2.",
+            depends_on=("spread_bps_v1",),
+        )
+    )
+    out.append(
+        mkspec(
+            "expected_impact_bps_v1",
+            FAMILY,
+            "Impact proxy: half_spread_bps * sqrt(1 + traded_volume_w10s / "
+            "(quoted_depth_total + EPS)).",
+            depends_on=(
+                "half_spread_cost_bps_v1",
+                "traded_volume_w10s_v1",
+                "quoted_depth_total_v1",
+            ),
+        )
+    )
+    out.append(
+        mkspec(
+            "alpha_decay_proxy_v1",
+            FAMILY,
+            "Information arrival speed: rvol_w10s / (rvol_w1m + EPS).",
+            depends_on=("rvol_w10s_v1", "rvol_w1m_v1"),
+        )
+    )
+    out.append(
+        mkspec(
+            "urgency_score_v1",
+            FAMILY,
+            "Urgency to act: |imbalance_l1| * alpha_decay_proxy / (1 + spread_ticks).",
+            depends_on=("imbalance_l1_v1", "alpha_decay_proxy_v1", "spread_ticks_v1"),
+        )
+    )
     return out
 
 

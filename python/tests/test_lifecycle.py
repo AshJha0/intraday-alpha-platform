@@ -91,18 +91,25 @@ def _ev(**kw) -> Evidence:
 
 
 def _live(ic, informative=True, n_buckets=8, eval_index=1) -> LiveEvidence:
-    return LiveEvidence(rolling_ic=ic, n_buckets=n_buckets, eval_index=eval_index,
-                        informative=informative)
+    return LiveEvidence(
+        rolling_ic=ic, n_buckets=n_buckets, eval_index=eval_index, informative=informative
+    )
 
 
-GOOD_VALIDATION = ValidationEvidence(holdout_ic=0.018, research_ic=0.02,
-                                     replay_hash_match=True, parity=True)
-GOOD_PAPER = PaperEvidence(n_sessions=5, realized_ic=0.015, research_ic=0.02,
-                           net_pnl=100.0, n_kill_events=0, tracking_error=0.001)
+GOOD_VALIDATION = ValidationEvidence(
+    holdout_ic=0.018, research_ic=0.02, replay_hash_match=True, parity=True
+)
+GOOD_PAPER = PaperEvidence(
+    n_sessions=5,
+    realized_ic=0.015,
+    research_ic=0.02,
+    net_pnl=100.0,
+    n_kill_events=0,
+    tracking_error=0.001,
+)
 
 
-def _to_state(machine: AlphaLifecycle, alpha_id: str, target: LifecycleState,
-              ts: int = T0) -> int:
+def _to_state(machine: AlphaLifecycle, alpha_id: str, target: LifecycleState, ts: int = T0) -> int:
     """Drive a fresh alpha to ``target`` along the happy path; returns the
     next free event time."""
     good = golden_research(alpha_id)
@@ -149,18 +156,21 @@ def test_config_round_trip(config):
     assert PolicyConfig.from_dict(config.to_dict()) == config
 
 
-@pytest.mark.parametrize("mutate, message", [
-    (lambda d: d.__setitem__("x-version", 2), "x-version"),
-    (lambda d: d["gates"].pop("min_oos_ic"), "missing keys"),
-    (lambda d: d["gates"].__setitem__("extra", 1.0), "unknown keys"),
-    (lambda d: d["gates"].__setitem__("min_oos_ic", "0.01"), "expected a number"),
-    (lambda d: d["gates"].__setitem__("min_folds", 0), "< 1"),
-    (lambda d: d["gates"].__setitem__("min_folds", 2.0), "expected an integer"),
-    (lambda d: d["gates"].__setitem__("min_fold_sign_consistency", 1.5), "[0, 1]"),
-    (lambda d: d["gates"].__setitem__("ic_rank_gap_eps", 0.0), "> 0"),
-    (lambda d: d["demotion"].__setitem__("max_consecutive_failures", 0), "< 1"),
-    (lambda d: d.__setitem__("policy", ""), "policy"),
-])
+@pytest.mark.parametrize(
+    "mutate, message",
+    [
+        (lambda d: d.__setitem__("x-version", 2), "x-version"),
+        (lambda d: d["gates"].pop("min_oos_ic"), "missing keys"),
+        (lambda d: d["gates"].__setitem__("extra", 1.0), "unknown keys"),
+        (lambda d: d["gates"].__setitem__("min_oos_ic", "0.01"), "expected a number"),
+        (lambda d: d["gates"].__setitem__("min_folds", 0), "< 1"),
+        (lambda d: d["gates"].__setitem__("min_folds", 2.0), "expected an integer"),
+        (lambda d: d["gates"].__setitem__("min_fold_sign_consistency", 1.5), "[0, 1]"),
+        (lambda d: d["gates"].__setitem__("ic_rank_gap_eps", 0.0), "> 0"),
+        (lambda d: d["demotion"].__setitem__("max_consecutive_failures", 0), "< 1"),
+        (lambda d: d.__setitem__("policy", ""), "policy"),
+    ],
+)
 def test_config_fail_fast(tmp_path, mutate, message):
     with open(ROOT / "configs" / "strategies" / "lifecycle.json") as fh:
         doc = json.load(fh)
@@ -193,16 +203,29 @@ def test_config_rejects_non_finite_and_missing_strategies(tmp_path):
 
 def test_evidence_rejects_nan_and_wrong_types():
     with pytest.raises(ValueError, match="non-finite"):
-        ValidationEvidence(holdout_ic=float("nan"), research_ic=0.0,
-                           replay_hash_match=True, parity=True)
+        ValidationEvidence(
+            holdout_ic=float("nan"), research_ic=0.0, replay_hash_match=True, parity=True
+        )
     with pytest.raises(ValueError, match="expected a bool"):
         ValidationEvidence(holdout_ic=0.0, research_ic=0.0, replay_hash_match=1, parity=True)
     with pytest.raises(ValueError, match="expected an integer"):
-        PaperEvidence(n_sessions=2.0, realized_ic=0.0, research_ic=0.0, net_pnl=0.0,
-                      n_kill_events=0, tracking_error=0.0)
+        PaperEvidence(
+            n_sessions=2.0,
+            realized_ic=0.0,
+            research_ic=0.0,
+            net_pnl=0.0,
+            n_kill_events=0,
+            tracking_error=0.0,
+        )
     with pytest.raises(ValueError, match=">= 0"):
-        PaperEvidence(n_sessions=2, realized_ic=0.0, research_ic=0.0, net_pnl=0.0,
-                      n_kill_events=0, tracking_error=-1.0)
+        PaperEvidence(
+            n_sessions=2,
+            realized_ic=0.0,
+            research_ic=0.0,
+            net_pnl=0.0,
+            n_kill_events=0,
+            tracking_error=-1.0,
+        )
     with pytest.raises(ValueError, match="capacity_usd"):
         _ev(capacity_usd=-1.0)
     with pytest.raises(ValueError, match="ExperimentResult"):
@@ -212,8 +235,13 @@ def test_evidence_rejects_nan_and_wrong_types():
 
 
 def test_evidence_round_trip_and_strict_keys():
-    ev = Evidence(research=golden_research("LC01"), capacity_usd=5e6,
-                  validation=GOOD_VALIDATION, paper=GOOD_PAPER, live=_live(None))
+    ev = Evidence(
+        research=golden_research("LC01"),
+        capacity_usd=5e6,
+        validation=GOOD_VALIDATION,
+        paper=GOOD_PAPER,
+        live=_live(None),
+    )
     doc = json.loads(json.dumps(ev.to_dict()))
     assert Evidence.from_dict(doc) == ev
     assert Evidence.from_dict(Evidence.empty().to_dict()) == Evidence.empty()
@@ -252,8 +280,12 @@ def _research_gate_cases(config):
         ("ledger_entry_exists", ok, True, float(ok.n_experiments_in_ledger)),
         ("ledger_entry_exists", golden_research("LCX", n_ledger=0), False, 0.0),
         ("leakage_clean", ok, True, None),
-        ("leakage_clean", golden_research("LCX", leakage_passed=False,
-                                          verdict=Verdict.REJECT), False, None),
+        (
+            "leakage_clean",
+            golden_research("LCX", leakage_passed=False, verdict=Verdict.REJECT),
+            False,
+            None,
+        ),
         ("oos_ic", golden_research("LCX", ic=g.min_oos_ic), True, g.min_oos_ic),
         ("oos_ic", golden_research("LCX", ic=0.009), False, 0.009),
         ("statistical_significance", golden_research("LCX", t_stat=3.0), True, 3.0),
@@ -303,8 +335,11 @@ def test_capacity_and_validation_and_paper_gates(config):
     v = _ev(validation=GOOD_VALIDATION)
     assert gates["holdout_ic_tracks_research"].evaluate("X", v).value == pytest.approx(0.002)
     assert gates["holdout_ic_tracks_research"].evaluate("X", v).passed
-    far = _ev(validation=ValidationEvidence(holdout_ic=0.0, research_ic=0.02,
-                                            replay_hash_match=False, parity=False))
+    far = _ev(
+        validation=ValidationEvidence(
+            holdout_ic=0.0, research_ic=0.02, replay_hash_match=False, parity=False
+        )
+    )
     assert not gates["holdout_ic_tracks_research"].evaluate("X", far).passed
     assert not gates["replay_reproducible"].evaluate("X", far).passed
     assert not gates["cross_language_parity"].evaluate("X", far).passed
@@ -314,12 +349,28 @@ def test_capacity_and_validation_and_paper_gates(config):
     p = _ev(paper=GOOD_PAPER)
     for name in ("paper_min_sessions", "paper_ic_tracking", "paper_net_pnl", "no_kill_events"):
         assert gates[name].evaluate("X", p).passed, name
-    bad = _ev(paper=PaperEvidence(n_sessions=4, realized_ic=0.0, research_ic=0.02,
-                                  net_pnl=-0.5, n_kill_events=1, tracking_error=0.0))
+    bad = _ev(
+        paper=PaperEvidence(
+            n_sessions=4,
+            realized_ic=0.0,
+            research_ic=0.02,
+            net_pnl=-0.5,
+            n_kill_events=1,
+            tracking_error=0.0,
+        )
+    )
     for name in ("paper_min_sessions", "paper_ic_tracking", "paper_net_pnl", "no_kill_events"):
         assert not gates[name].evaluate("X", bad).passed, name
-    zero = _ev(paper=PaperEvidence(n_sessions=5, realized_ic=0.01, research_ic=0.02,
-                                   net_pnl=0.0, n_kill_events=0, tracking_error=0.0))
+    zero = _ev(
+        paper=PaperEvidence(
+            n_sessions=5,
+            realized_ic=0.01,
+            research_ic=0.02,
+            net_pnl=0.0,
+            n_kill_events=0,
+            tracking_error=0.0,
+        )
+    )
     assert gates["paper_net_pnl"].evaluate("X", zero).passed, "paper net P&L >= 0 (inclusive)"
     assert gates["paper_ic_tracking"].evaluate("X", zero).passed, "gap 0.01 <= 0.01"
 
@@ -352,8 +403,11 @@ def test_transition_table_shape():
         else:
             assert e.actor is Actor.SYSTEM
     assert set(PROMOTION_EDGES) == {S.RESEARCH, S.CANDIDATE, S.VALIDATING, S.PAPER}
-    manual_retire = {e.from_state for e in ALLOWED_TRANSITIONS
-                     if e.kind is EdgeKind.MANUAL and e.to_state is S.RETIRED}
+    manual_retire = {
+        e.from_state
+        for e in ALLOWED_TRANSITIONS
+        if e.kind is EdgeKind.MANUAL and e.to_state is S.RETIRED
+    }
     assert manual_retire == set(LifecycleState) - {S.RETIRED}
     assert edge_for(S.RETIRED, S.RESEARCH, EdgeKind.MANUAL).actor is Actor.HUMAN
     with pytest.raises(KeyError):
@@ -385,8 +439,12 @@ def test_happy_path_every_promotion_edge(config):
     m = _machine(config)
     _to_state(m, "LCX", S.ACTIVE)
     states = [(t.from_state, t.to_state) for t in m.transitions]
-    assert states == [(S.RESEARCH, S.CANDIDATE), (S.CANDIDATE, S.VALIDATING),
-                      (S.VALIDATING, S.PAPER), (S.PAPER, S.ACTIVE)]
+    assert states == [
+        (S.RESEARCH, S.CANDIDATE),
+        (S.CANDIDATE, S.VALIDATING),
+        (S.VALIDATING, S.PAPER),
+        (S.PAPER, S.ACTIVE),
+    ]
     for t, edge_state in zip(m.transitions, (S.RESEARCH, S.CANDIDATE, S.VALIDATING, S.PAPER)):
         assert list(t.gates) == list(PROMOTION_EDGES[edge_state].gates)
         assert all(g.passed for g in t.gates.values())
@@ -402,7 +460,10 @@ def test_research_presence_gate_and_hold(config):
     m = _machine(config)
     assert m.advance("LCX", T0 + 1, Evidence.empty()) is None
     ev = m.evaluations[-1]
-    assert ev.outcome == Outcome.HOLD and ev.failed_gates == ["ledger_entry_exists", "leakage_clean"]
+    assert ev.outcome == Outcome.HOLD and ev.failed_gates == [
+        "ledger_entry_exists",
+        "leakage_clean",
+    ]
     assert ev.gates["ledger_entry_exists"].value is None
     assert m.advance("LCX", T0 + 2, _ev(research=golden_research("LCX", n_ledger=0))) is None
     assert m.evaluations[-1].failed_gates == ["ledger_entry_exists"]
@@ -439,8 +500,11 @@ def test_candidate_capacity_missing_fails_capacity_gate_only(config):
 def test_persistent_failure_demotes_to_candidate(config, state):
     m = _machine(config)
     ts = _to_state(m, "LCX", state)
-    bad = (_ev(validation=ValidationEvidence(0.0, 0.02, False, False)) if state is S.VALIDATING
-           else _ev(paper=PaperEvidence(1, 0.0, 0.02, -1.0, 2, 0.0)))
+    bad = (
+        _ev(validation=ValidationEvidence(0.0, 0.02, False, False))
+        if state is S.VALIDATING
+        else _ev(paper=PaperEvidence(1, 0.0, 0.02, -1.0, 2, 0.0))
+    )
     n = config.max_consecutive_failures
     for k in range(1, n):
         ts += STEP
@@ -460,8 +524,11 @@ def test_persistent_failure_demotes_to_candidate(config, state):
 def test_silence_and_success_reset_counter(config, state):
     m = _machine(config)
     ts = _to_state(m, "LCX", state)
-    bad = (_ev(validation=ValidationEvidence(0.0, 0.02, True, True)) if state is S.VALIDATING
-           else _ev(paper=PaperEvidence(1, 0.015, 0.02, 1.0, 0, 0.0)))
+    bad = (
+        _ev(validation=ValidationEvidence(0.0, 0.02, True, True))
+        if state is S.VALIDATING
+        else _ev(paper=PaperEvidence(1, 0.015, 0.02, 1.0, 0, 0.0))
+    )
     good = _ev(validation=GOOD_VALIDATION) if state is S.VALIDATING else _ev(paper=GOOD_PAPER)
     assert m.advance("LCX", ts + 1, bad) is None
     assert m.record("LCX").consecutive_failures == 1
@@ -496,8 +563,10 @@ def test_live_edges_match_the_adaptive_tracker(config):
         m.advance("EQ01", ts, _ev(live=_live(ic, informative, eval_index=k)))
         assert m.state("EQ01").name == expected == lc["expected_states"][k]
         rec = m.record("EQ01")
-        assert (rec.breach_count, rec.recovery_count) == (tracker.breach_count,
-                                                          tracker.recovery_count)
+        assert (rec.breach_count, rec.recovery_count) == (
+            tracker.breach_count,
+            tracker.recovery_count,
+        )
 
 
 def test_live_breach_watch_retire_and_wrapping(config):
@@ -513,8 +582,9 @@ def test_live_breach_watch_retire_and_wrapping(config):
     assert m.state("LCX") is S.ACTIVE
     tr = m.advance("LCX", ts + 5, _ev(live=_live(-0.01)))
     assert tr is not None and (tr.from_state, tr.to_state) == (S.ACTIVE, S.WATCH)
-    assert tr.gates == {"rolling_ic": GateResult(passed=False, value=-0.01,
-                                                 threshold=config.live.watch_ic_gate)}
+    assert tr.gates == {
+        "rolling_ic": GateResult(passed=False, value=-0.01, threshold=config.live.watch_ic_gate)
+    }
     assert tr.policy == config.policy and tr.actor is Actor.SYSTEM
     assert "watch gate" in tr.reason
     assert m.record("LCX").breach_count == 1, "the entering breach counts"
@@ -542,16 +612,20 @@ def test_live_neutral_zone_and_reactivation(config):
         assert m.record("LCX").recovery_count == k
     tr = m.advance("LCX", ts + 2 + n, _ev(live=_live(0.005)))
     assert tr is not None and (tr.from_state, tr.to_state) == (S.WATCH, S.ACTIVE)
-    assert tr.gates["rolling_ic"] == GateResult(passed=True, value=0.005,
-                                                threshold=config.live.reactivate_ic_gate)
+    assert tr.gates["rolling_ic"] == GateResult(
+        passed=True, value=0.005, threshold=config.live.reactivate_ic_gate
+    )
 
 
 def test_retired_is_terminal_for_system(config):
     m = _machine(config)
     ts = _to_state(m, "LCX", S.CANDIDATE)
     m.retire("LCX", ts + 1, "desk decision")
-    for ev in (_ev(live=_live(0.5)), _ev(research=golden_research("LCX"), capacity_usd=1e9),
-               Evidence.empty()):
+    for ev in (
+        _ev(live=_live(0.5)),
+        _ev(research=golden_research("LCX"), capacity_usd=1e9),
+        Evidence.empty(),
+    ):
         assert m.advance("LCX", ts + 2, ev) is None
         assert m.evaluations[-1].outcome == Outcome.TERMINAL
     assert m.state("LCX") is S.RETIRED
@@ -702,10 +776,15 @@ def test_bootstrap_failed_gates_agree_with_report_verdicts(bootstrap):
             assert ev.gates["oos_ic"].value >= VALIDATE_GATES["iterate_min_ic"]
             assert ev.gates["statistical_significance"].value >= VALIDATE_GATES["iterate_min_tstat"]
         else:
-            assert (ev.gates["oos_ic"].value < VALIDATE_GATES["iterate_min_ic"]
-                    or ev.gates["statistical_significance"].value < VALIDATE_GATES["iterate_min_tstat"])
-        assert ev.gates["ledger_entry_exists"].value == float(ledger[row.alpha_id]["n"]) \
-            if "ledger_entry_exists" in ev.gates else True
+            assert (
+                ev.gates["oos_ic"].value < VALIDATE_GATES["iterate_min_ic"]
+                or ev.gates["statistical_significance"].value < VALIDATE_GATES["iterate_min_tstat"]
+            )
+        assert (
+            ev.gates["ledger_entry_exists"].value == float(ledger[row.alpha_id]["n"])
+            if "ledger_entry_exists" in ev.gates
+            else True
+        )
     by_id = {r.alpha_id: r.failed_gates for r in bootstrap.rows}
     # Hand cross-checks against REPORT.md. Updated 2026-09-20: several gates
     # moved when fold_sign_consistency stopped scoring the beta-SIGNED signal
@@ -717,10 +796,14 @@ def test_bootstrap_failed_gates_agree_with_report_verdicts(bootstrap):
     assert by_id["EQ01"] == ("net_pnl_after_costs",)
     assert by_id["EQ05"] == ("net_pnl_after_costs",)
     assert by_id["FX01"] == ("fold_consistency", "net_pnl_after_costs")
-    assert by_id["EQ07"] == ("oos_ic", "statistical_significance", "fold_consistency",
-                             "hypothesis_sign", "net_pnl_after_costs")
-    assert set(by_id["FX03"]) >= {"statistical_significance", "hypothesis_sign",
-                                  "fold_consistency"}
+    assert by_id["EQ07"] == (
+        "oos_ic",
+        "statistical_significance",
+        "fold_consistency",
+        "hypothesis_sign",
+        "net_pnl_after_costs",
+    )
+    assert set(by_id["FX03"]) >= {"statistical_significance", "hypothesis_sign", "fold_consistency"}
 
 
 def test_bootstrap_research_mapping(bootstrap):
@@ -738,14 +821,20 @@ def test_bootstrap_research_mapping(bootstrap):
     scale = 1e4 / REFERENCE_NOTIONAL_USD
     assert result.net_return_bps == pytest.approx(rep["stress"]["cost"]["x1"]["total_pnl"] * scale)
     assert result.transaction_cost_bps == pytest.approx(
-        rep["stress"]["cost"]["x1"]["total_costs"] * scale)
+        rep["stress"]["cost"]["x1"]["total_costs"] * scale
+    )
     assert result.verdict is Verdict.ITERATE and result.leakage_passed
     assert result.dataset_version == params["data_version"]
-    assert capacity_from_report(rep) == pytest.approx(sum(rep["capacity_usd_by_instrument"].values()))
+    assert capacity_from_report(rep) == pytest.approx(
+        sum(rep["capacity_usd_by_instrument"].values())
+    )
     rec = bootstrap.registry.get("EQ03")
     assert (rec.experiment_id, rec.data_version, rec.feature_version, rec.model_version) == (
-        result.experiment_id, result.dataset_version, result.feature_version,
-        result.model_version)
+        result.experiment_id,
+        result.dataset_version,
+        result.feature_version,
+        result.model_version,
+    )
     validate_typed(result)
 
 
@@ -756,8 +845,9 @@ def test_bootstrap_nan_metric_is_reported_not_crashed(tmp_path):
     ledger = load_ledger_entries(ROOT)
     result, missing = research_evidence("EQ03", rep, ledger["EQ03"], load_params_document(ROOT))
     assert result is None and missing == ["gate_ic", "oos_rank_ic"]
-    unledgered, _ = research_evidence("EQ03", load_report(ROOT, "EQ03"), None,
-                                      load_params_document(ROOT))
+    unledgered, _ = research_evidence(
+        "EQ03", load_report(ROOT, "EQ03"), None, load_params_document(ROOT)
+    )
     assert unledgered is not None and unledgered.n_experiments_in_ledger == 0
     assert unledgered.experiment_id == "EQ03-unledgered"
 
@@ -767,9 +857,11 @@ def test_bootstrap_nan_metric_is_reported_not_crashed(tmp_path):
         (root / rel).mkdir(parents=True)
     for name in ("lifecycle.json", "strategies.json", "alpha_params.json"):
         (root / "configs" / "strategies" / name).write_bytes(
-            (ROOT / "configs" / "strategies" / name).read_bytes())
+            (ROOT / "configs" / "strategies" / name).read_bytes()
+        )
     (root / "research" / "experiments.json").write_bytes(
-        (ROOT / "research" / "experiments.json").read_bytes())
+        (ROOT / "research" / "experiments.json").read_bytes()
+    )
     for aid in ("EQ01", "EQ03"):
         doc = load_report(ROOT, aid)
         if aid == "EQ03":
@@ -802,9 +894,11 @@ def test_bootstrap_refuses_to_truncate_the_transition_log_without_force(tmp_path
         (root / rel).mkdir(parents=True)
     for name in ("lifecycle.json", "strategies.json", "alpha_params.json"):
         (root / "configs" / "strategies" / name).write_bytes(
-            (ROOT / "configs" / "strategies" / name).read_bytes())
+            (ROOT / "configs" / "strategies" / name).read_bytes()
+        )
     (root / "research" / "experiments.json").write_bytes(
-        (ROOT / "research" / "experiments.json").read_bytes())
+        (ROOT / "research" / "experiments.json").read_bytes()
+    )
     for path in sorted((ROOT / "research" / "alpha_reports").glob("*.json")):
         (root / "research" / "alpha_reports" / path.name).write_bytes(path.read_bytes())
     log_path = root / "research" / "lifecycle_transitions.jsonl"
@@ -827,7 +921,7 @@ def test_bootstrap_refuses_to_truncate_the_transition_log_without_force(tmp_path
     with pytest.raises(TransitionLogExists, match="25 transition"):
         run_bootstrap(root, write=True)
     assert log_path.read_bytes() == audited
-    assert registry_path.read_bytes() != first_registry     # the retire is still there
+    assert registry_path.read_bytes() != first_registry  # the retire is still there
     rc = lifecycle_main(["--root", str(root), "bootstrap"])
     assert rc == 3 and "append-only" in capsys.readouterr().err
     assert log_path.read_bytes() == audited
@@ -849,8 +943,15 @@ def test_bootstrap_refuses_to_truncate_the_transition_log_without_force(tmp_path
 # --------------------------------------------------------------------------
 
 
-_BLOCK_FOR_STATE = {S.RESEARCH: 1, S.CANDIDATE: 1, S.VALIDATING: 2, S.PAPER: 3,
-                    S.ACTIVE: 4, S.WATCH: 4, S.RETIRED: 4}
+_BLOCK_FOR_STATE = {
+    S.RESEARCH: 1,
+    S.CANDIDATE: 1,
+    S.VALIDATING: 2,
+    S.PAPER: 3,
+    S.ACTIVE: 4,
+    S.WATCH: 4,
+    S.RETIRED: 4,
+}
 
 
 def _random_evidence(rng: SplitMix64, alpha_id: str, state: LifecycleState) -> Evidence:
@@ -862,22 +963,39 @@ def _random_evidence(rng: SplitMix64, alpha_id: str, state: LifecycleState) -> E
     if pick == 1:
         leak = rng.below(8) == 0
         ic = rng.uniform() * 0.04
-        return _ev(research=golden_research(
-            alpha_id, ic=ic, rank_ic=ic * (0.5 + rng.uniform()),
-            t_stat=2.0 + rng.uniform() * 4.0,
-            fold_consistency=round(0.5 + rng.uniform() * 0.5, 2),
-            net_bps=rng.uniform() * 10.0 - 1.0, leakage_passed=not leak,
-            verdict=Verdict.REJECT if leak else Verdict.PROMOTE),
-            capacity_usd=5e5 + rng.uniform() * 4e6)
+        return _ev(
+            research=golden_research(
+                alpha_id,
+                ic=ic,
+                rank_ic=ic * (0.5 + rng.uniform()),
+                t_stat=2.0 + rng.uniform() * 4.0,
+                fold_consistency=round(0.5 + rng.uniform() * 0.5, 2),
+                net_bps=rng.uniform() * 10.0 - 1.0,
+                leakage_passed=not leak,
+                verdict=Verdict.REJECT if leak else Verdict.PROMOTE,
+            ),
+            capacity_usd=5e5 + rng.uniform() * 4e6,
+        )
     if pick == 2:
-        return _ev(validation=ValidationEvidence(
-            holdout_ic=0.005 + rng.uniform() * 0.03, research_ic=0.02,
-            replay_hash_match=rng.below(4) > 0, parity=rng.below(4) > 0))
+        return _ev(
+            validation=ValidationEvidence(
+                holdout_ic=0.005 + rng.uniform() * 0.03,
+                research_ic=0.02,
+                replay_hash_match=rng.below(4) > 0,
+                parity=rng.below(4) > 0,
+            )
+        )
     if pick == 3:
-        return _ev(paper=PaperEvidence(
-            n_sessions=3 + rng.below(6), realized_ic=0.005 + rng.uniform() * 0.03,
-            research_ic=0.02, net_pnl=rng.uniform() * 200.0 - 20.0,
-            n_kill_events=int(rng.below(4) == 0), tracking_error=rng.uniform()))
+        return _ev(
+            paper=PaperEvidence(
+                n_sessions=3 + rng.below(6),
+                realized_ic=0.005 + rng.uniform() * 0.03,
+                research_ic=0.02,
+                net_pnl=rng.uniform() * 200.0 - 20.0,
+                n_kill_events=int(rng.below(4) == 0),
+                tracking_error=rng.uniform(),
+            )
+        )
     ic = None if rng.below(5) == 0 else rng.uniform() * 0.04 - 0.02
     return _ev(live=_live(ic, informative=rng.below(6) > 0, eval_index=rng.below(1000)))
 
@@ -911,8 +1029,11 @@ def test_property_state_index_steps_and_retired_terminal(config):
         assert int(after) - int(before) <= 1, "never more than one step forward"
         if tr is not None:
             assert tr.actor is Actor.SYSTEM and (tr.from_state, tr.to_state) == (before, after)
-            kind = EdgeKind.LIVE if before in (S.ACTIVE, S.WATCH) else (
-                EdgeKind.PROMOTION if int(after) > int(before) else EdgeKind.DEMOTION)
+            kind = (
+                EdgeKind.LIVE
+                if before in (S.ACTIVE, S.WATCH)
+                else (EdgeKind.PROMOTION if int(after) > int(before) else EdgeKind.DEMOTION)
+            )
             edge_for(before, after, kind)
             validate_typed(tr)
         else:
@@ -940,5 +1061,6 @@ def test_property_transition_log_replays_to_registry(config, tmp_path):
         assert t.from_state is replay
         replay = t.to_state
     assert replay is m.state("P1")
-    assert not any(math.isnan(g.value) for t in m.transitions
-                   for g in t.gates.values() if g.value is not None)
+    assert not any(
+        math.isnan(g.value) for t in m.transitions for g in t.gates.values() if g.value is not None
+    )

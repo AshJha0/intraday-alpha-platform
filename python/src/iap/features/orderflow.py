@@ -51,59 +51,110 @@ def specs() -> List[FeatureSpec]:
     out: List[FeatureSpec] = []
     for k in OFI_LEVELS:
         for w in OFI_WINDOWS:
-            out.append(mkspec(
-                f"ofi_l{k}_w{w}_v1", FAMILY,
-                f"Order-flow imbalance over the best {k} level(s), summed over {w}: "
-                f"sum of per-event (bid depth delta - ask depth delta) within top {k}.",
-                levels=k, window=w))
+            out.append(
+                mkspec(
+                    f"ofi_l{k}_w{w}_v1",
+                    FAMILY,
+                    f"Order-flow imbalance over the best {k} level(s), summed over {w}: "
+                    f"sum of per-event (bid depth delta - ask depth delta) within top {k}.",
+                    levels=k,
+                    window=w,
+                )
+            )
     for k in OFI_NORM_LEVELS:
         for w in OFI_WINDOWS:
-            out.append(mkspec(
-                f"ofi_norm_l{k}_w{w}_v1", FAMILY,
-                f"ofi_l{k}_w{w} normalized by the 10s mean two-sided depth over "
-                f"the best {k} level(s): ofi / (mean depth_total_l{k} + EPS).",
-                depends_on=(f"ofi_l{k}_w{w}_v1", f"depth_bid_l{k}_avg_w10s_v1",
-                            f"depth_ask_l{k}_avg_w10s_v1"),
-                levels=k, window=w))
+            out.append(
+                mkspec(
+                    f"ofi_norm_l{k}_w{w}_v1",
+                    FAMILY,
+                    f"ofi_l{k}_w{w} normalized by the 10s mean two-sided depth over "
+                    f"the best {k} level(s): ofi / (mean depth_total_l{k} + EPS).",
+                    depends_on=(
+                        f"ofi_l{k}_w{w}_v1",
+                        f"depth_bid_l{k}_avg_w10s_v1",
+                        f"depth_ask_l{k}_avg_w10s_v1",
+                    ),
+                    levels=k,
+                    window=w,
+                )
+            )
     for w in TRADE_WINDOWS:
-        out.append(mkspec(
-            f"signed_volume_w{w}_v1", FAMILY,
-            f"Signed traded volume over {w}: +qty for buy-aggressor TRADEs "
-            f"(side=BID), -qty for sells.", window=w))
+        out.append(
+            mkspec(
+                f"signed_volume_w{w}_v1",
+                FAMILY,
+                f"Signed traded volume over {w}: +qty for buy-aggressor TRADEs "
+                f"(side=BID), -qty for sells.",
+                window=w,
+            )
+        )
     for w in TRADE_WINDOWS:
-        out.append(mkspec(
-            f"trade_imbalance_w{w}_v1", FAMILY,
-            f"Trade imbalance over {w}: (buy_qty - sell_qty)/(buy_qty + sell_qty).",
-            window=w))
+        out.append(
+            mkspec(
+                f"trade_imbalance_w{w}_v1",
+                FAMILY,
+                f"Trade imbalance over {w}: (buy_qty - sell_qty)/(buy_qty + sell_qty).",
+                window=w,
+            )
+        )
     for w in TRADE_WINDOWS:
-        out.append(mkspec(f"trade_count_w{w}_v1", FAMILY,
-                          f"Number of TRADE events in {w}.", window=w))
+        out.append(
+            mkspec(f"trade_count_w{w}_v1", FAMILY, f"Number of TRADE events in {w}.", window=w)
+        )
     for w in TRADE_WINDOWS:
-        out.append(mkspec(f"trade_intensity_w{w}_v1", FAMILY,
-                          f"TRADE events per second over {w}.",
-                          depends_on=(f"trade_count_w{w}_v1",), window=w))
+        out.append(
+            mkspec(
+                f"trade_intensity_w{w}_v1",
+                FAMILY,
+                f"TRADE events per second over {w}.",
+                depends_on=(f"trade_count_w{w}_v1",),
+                window=w,
+            )
+        )
     for w in EV_WINDOWS:
-        out.append(mkspec(f"add_intensity_w{w}_v1", FAMILY,
-                          f"ADD events per second over {w}.", window=w))
+        out.append(
+            mkspec(f"add_intensity_w{w}_v1", FAMILY, f"ADD events per second over {w}.", window=w)
+        )
     for w in EV_WINDOWS:
-        out.append(mkspec(f"cancel_intensity_w{w}_v1", FAMILY,
-                          f"CANCEL events per second over {w}.", window=w))
+        out.append(
+            mkspec(
+                f"cancel_intensity_w{w}_v1", FAMILY, f"CANCEL events per second over {w}.", window=w
+            )
+        )
     for w in SHORT_WINDOWS:
-        out.append(mkspec(f"modify_intensity_w{w}_v1", FAMILY,
-                          f"MODIFY events per second over {w}.", window=w))
+        out.append(
+            mkspec(
+                f"modify_intensity_w{w}_v1", FAMILY, f"MODIFY events per second over {w}.", window=w
+            )
+        )
     for w in EV_WINDOWS:
-        out.append(mkspec(f"execute_intensity_w{w}_v1", FAMILY,
-                          f"EXECUTE events per second over {w}.", window=w))
+        out.append(
+            mkspec(
+                f"execute_intensity_w{w}_v1",
+                FAMILY,
+                f"EXECUTE events per second over {w}.",
+                window=w,
+            )
+        )
     for w in SHORT_WINDOWS:
-        out.append(mkspec(f"add_qty_w{w}_v1", FAMILY,
-                          f"Summed qty of ADD events over {w}.", window=w))
+        out.append(
+            mkspec(f"add_qty_w{w}_v1", FAMILY, f"Summed qty of ADD events over {w}.", window=w)
+        )
     for w in SHORT_WINDOWS:
-        out.append(mkspec(f"cancel_qty_w{w}_v1", FAMILY,
-                          f"Summed qty of CANCEL events over {w}.", window=w))
+        out.append(
+            mkspec(
+                f"cancel_qty_w{w}_v1", FAMILY, f"Summed qty of CANCEL events over {w}.", window=w
+            )
+        )
     for w in SHORT_WINDOWS:
-        out.append(mkspec(f"cancel_add_ratio_w{w}_v1", FAMILY,
-                          f"cancel_count / add_count over {w} (valid when adds > 0).",
-                          window=w))
+        out.append(
+            mkspec(
+                f"cancel_add_ratio_w{w}_v1",
+                FAMILY,
+                f"cancel_count / add_count over {w} (valid when adds > 0).",
+                window=w,
+            )
+        )
     return out
 
 
@@ -141,8 +192,8 @@ def compute(st, values: List[float], valid: List[bool]) -> None:
         put(values, valid, st.trades[w].count if wok else None, wok)
     for w in TRADE_WINDOWS:
         wok = st.warm(WINDOW_NS[w])
-        put(values, valid,
-            st.trades[w].count / (WINDOW_NS[w] / 1e9) if wok else None, wok)
+        put(values, valid, st.trades[w].count / (WINDOW_NS[w] / 1e9) if wok else None, wok)
+
     # evstats sums layout: [add_c, add_q, can_c, can_q, mod_c, exe_c, exe_q]
     def _rate(w: str, i: int):
         wok = st.warm(WINDOW_NS[w])

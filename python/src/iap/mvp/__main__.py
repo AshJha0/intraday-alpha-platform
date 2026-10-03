@@ -52,15 +52,22 @@ DEFAULT_OUT_ROOT = REPO_ROOT / "data" / "mvp"
 
 def _summary(res: RunResult) -> str:
     r = res.report
-    return (f"mvp run {r['run']['run_id']}: events={r['counts']['n_events']} "
-            f"decisions={r['counts']['n_decisions']} parents={r['counts']['n_parent_orders']} "
-            f"children={r['counts']['n_child_orders_submitted']} fills={r['counts']['n_fills']} "
-            f"pnl={r['pnl']['total']:.6f} USD digest={res.trace_digest[:16]}... "
-            f"out={res.out_dir}")
+    return (
+        f"mvp run {r['run']['run_id']}: events={r['counts']['n_events']} "
+        f"decisions={r['counts']['n_decisions']} parents={r['counts']['n_parent_orders']} "
+        f"children={r['counts']['n_child_orders_submitted']} fills={r['counts']['n_fills']} "
+        f"pnl={r['pnl']['total']:.6f} USD digest={res.trace_digest[:16]}... "
+        f"out={res.out_dir}"
+    )
 
 
-def cmd_run(config: Optional[Path], seed: Optional[int], instrument: Optional[str],
-            out: Optional[Path], repo_root: Optional[Path] = None) -> RunResult:
+def cmd_run(
+    config: Optional[Path],
+    seed: Optional[int],
+    instrument: Optional[str],
+    out: Optional[Path],
+    repo_root: Optional[Path] = None,
+) -> RunResult:
     """Generate the feed and run one session into ``out``."""
     cfg = load_config(config, seed=seed, instrument=instrument, repo_root=repo_root)
     out_dir = Path(out) if out is not None else DEFAULT_OUT_ROOT / cfg.run_id
@@ -77,8 +84,7 @@ def _config_from_run(run_dir: Path, repo_root: Optional[Path] = None) -> MvpConf
     return MvpConfig.from_document(recorded["document"], where=str(path), repo_root=repo_root)
 
 
-def cmd_replay(run_dir: Path, out: Optional[Path],
-               repo_root: Optional[Path] = None) -> List[str]:
+def cmd_replay(run_dir: Path, out: Optional[Path], repo_root: Optional[Path] = None) -> List[str]:
     """Re-run from the captured stream; return the list of differences."""
     run_dir = Path(run_dir)
     cfg = _config_from_run(run_dir, repo_root)
@@ -92,8 +98,10 @@ def cmd_replay(run_dir: Path, out: Optional[Path],
     if feed.data_version != expected["run"]["data_version"]:
         diffs.append(f"data_version: {expected['run']['data_version']} != {feed.data_version}")
     if recorded["config_version"] != cfg.config_version():
-        diffs.append(f"config_version: {recorded['config_version']} != {cfg.config_version()} "
-                     "(a reference document changed since the run)")
+        diffs.append(
+            f"config_version: {recorded['config_version']} != {cfg.config_version()} "
+            "(a reference document changed since the run)"
+        )
     if diffs:
         return diffs
     out_dir = Path(out) if out is not None else run_dir / "replay"
@@ -104,8 +112,12 @@ def cmd_replay(run_dir: Path, out: Optional[Path],
     return diffs
 
 
-def cmd_verify(config: Optional[Path], seed: Optional[int],
-               instrument: Optional[str], repo_root: Optional[Path] = None) -> List[str]:
+def cmd_verify(
+    config: Optional[Path],
+    seed: Optional[int],
+    instrument: Optional[str],
+    repo_root: Optional[Path] = None,
+) -> List[str]:
     """Run twice from scratch (temporary directories); return the differences."""
     cfg = load_config(config, seed=seed, instrument=instrument, repo_root=repo_root)
     with tempfile.TemporaryDirectory(prefix="iap-mvp-verify-") as tmp:
@@ -118,8 +130,9 @@ def cmd_verify(config: Optional[Path], seed: Optional[int],
         first, second = runs
         diffs: List[str] = []
         if first.feed.events_sha256 != second.feed.events_sha256:
-            diffs.append(f"events_sha256: {first.feed.events_sha256} != "
-                         f"{second.feed.events_sha256}")
+            diffs.append(
+                f"events_sha256: {first.feed.events_sha256} != {second.feed.events_sha256}"
+            )
         if first.trace_digest != second.trace_digest:
             diffs.append(f"trace_digest: {first.trace_digest} != {second.trace_digest}")
         diffs.extend(compare_runs(first.report, second.report))
@@ -136,31 +149,40 @@ def cmd_explain(run_dir: Path, parent_order_id: int) -> str:
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="python -m iap.mvp",
-                                     description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(prog="python -m iap.mvp", description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
 
     def add_root(p: argparse.ArgumentParser) -> None:
-        p.add_argument("--repo-root", type=Path, default=None, dest="repo_root",
-                       help=f"directory the config's reference paths resolve against "
-                            f"(default {REPO_ROOT})")
+        p.add_argument(
+            "--repo-root",
+            type=Path,
+            default=None,
+            dest="repo_root",
+            help=f"directory the config's reference paths resolve against (default {REPO_ROOT})",
+        )
 
     def add_cfg(p: argparse.ArgumentParser) -> None:
-        p.add_argument("--config", type=Path, default=None,
-                       help=f"MVP config (default {DEFAULT_CONFIG_PATH})")
+        p.add_argument(
+            "--config", type=Path, default=None, help=f"MVP config (default {DEFAULT_CONFIG_PATH})"
+        )
         p.add_argument("--seed", type=int, default=None, help="override the config seed")
         p.add_argument("--instrument", default=None, help="override the instrument symbol")
         add_root(p)
 
     p_run = sub.add_parser("run", help="generate the feed and run one session")
     add_cfg(p_run)
-    p_run.add_argument("--out", type=Path, default=None,
-                       help=f"run directory (default {DEFAULT_OUT_ROOT}/<run_id>)")
+    p_run.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help=f"run directory (default {DEFAULT_OUT_ROOT}/<run_id>)",
+    )
 
     p_replay = sub.add_parser("replay", help="re-run from a captured events.jsonl")
     p_replay.add_argument("--run", type=Path, required=True, help="run directory")
-    p_replay.add_argument("--out", type=Path, default=None,
-                          help="replay output directory (default <run>/replay)")
+    p_replay.add_argument(
+        "--out", type=Path, default=None, help="replay output directory (default <run>/replay)"
+    )
     add_root(p_replay)
 
     p_verify = sub.add_parser("verify", help="run twice from scratch, compare")
@@ -195,8 +217,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 for d in diffs:
                     print("  " + d, file=sys.stderr)
                 return 1
-            print("verify OK: two runs from scratch produced identical digest, report "
-                  "and event stream")
+            print(
+                "verify OK: two runs from scratch produced identical digest, report "
+                "and event stream"
+            )
             return 0
         print(cmd_explain(args.run, args.parent_order_id))
         return 0

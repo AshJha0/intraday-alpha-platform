@@ -138,8 +138,7 @@ class GateThresholds:
     def from_block(block: Mapping[str, Any], where: str) -> "GateThresholds":
         _require_keys(block, _GATE_KEYS_FLOAT + _GATE_KEYS_INT, where)
         values: Dict[str, Any] = {k: _as_float(block, k, where) for k in _GATE_KEYS_FLOAT}
-        values["min_experiments_in_ledger"] = _as_int(
-            block, "min_experiments_in_ledger", where, 1)
+        values["min_experiments_in_ledger"] = _as_int(block, "min_experiments_in_ledger", where, 1)
         values["min_folds"] = _as_int(block, "min_folds", where, 1)
         values["min_paper_sessions"] = _as_int(block, "min_paper_sessions", where, 1)
         values["max_kill_events"] = _as_int(block, "max_kill_events", where, 0)
@@ -205,7 +204,8 @@ class PolicyConfig:
             policy=str(doc["policy"]),
             gates=GateThresholds.from_block(doc["gates"], "config.gates"),
             max_consecutive_failures=_as_int(
-                doc["demotion"], "max_consecutive_failures", "config.demotion", 1),
+                doc["demotion"], "max_consecutive_failures", "config.demotion", 1
+            ),
             live=LifecycleConfig.from_config(doc["live"]),
         )
 
@@ -220,8 +220,9 @@ def _read_json(path: Path) -> Dict[str, Any]:
     return doc
 
 
-def load_policy_config(lifecycle_path: Optional[Path] = None,
-                       strategies_path: Optional[Path] = None) -> PolicyConfig:
+def load_policy_config(
+    lifecycle_path: Optional[Path] = None, strategies_path: Optional[Path] = None
+) -> PolicyConfig:
     """Load and validate the policy from the two pinned config files.
 
     Raises ``ValueError`` naming the file and key on any inconsistency.
@@ -232,15 +233,13 @@ def load_policy_config(lifecycle_path: Optional[Path] = None,
     where = str(lc_path)
     _require_keys(doc, ("x-version", "description", "policy", "gates", "demotion"), where)
     if doc["x-version"] != LIFECYCLE_CONFIG_VERSION:
-        raise ValueError(
-            f"{where}: x-version {doc['x-version']!r} != {LIFECYCLE_CONFIG_VERSION}")
+        raise ValueError(f"{where}: x-version {doc['x-version']!r} != {LIFECYCLE_CONFIG_VERSION}")
     policy = doc["policy"]
     if not isinstance(policy, str) or not policy:
         raise ValueError(f"{where}.policy: expected a non-empty string")
     _require_keys(doc["demotion"], ("max_consecutive_failures",), f"{where}.demotion")
     gates = GateThresholds.from_block(doc["gates"], f"{where}.gates")
-    max_failures = _as_int(doc["demotion"], "max_consecutive_failures",
-                           f"{where}.demotion", 1)
+    max_failures = _as_int(doc["demotion"], "max_consecutive_failures", f"{where}.demotion", 1)
 
     strategies = _read_json(st_path)
     try:
@@ -251,5 +250,6 @@ def load_policy_config(lifecycle_path: Optional[Path] = None,
         live = LifecycleConfig.from_config(live_block)
     except (KeyError, TypeError, ValueError) as exc:
         raise ValueError(f"{st_path}: adaptive.lifecycle: {exc}") from None
-    return PolicyConfig(policy=policy, gates=gates,
-                        max_consecutive_failures=max_failures, live=live)
+    return PolicyConfig(
+        policy=policy, gates=gates, max_consecutive_failures=max_failures, live=live
+    )

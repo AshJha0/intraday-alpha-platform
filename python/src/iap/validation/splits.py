@@ -50,9 +50,9 @@ class Fold:
     """One walk-forward fold (event-time boundaries, ns)."""
 
     index: int
-    train_end: int   # exclusive: train rows have t + purge + embargo < test_start
+    train_end: int  # exclusive: train rows have t + purge + embargo < test_start
     test_start: int  # inclusive
-    test_end: int    # exclusive
+    test_end: int  # exclusive
 
     def train_mask(self, ts: np.ndarray, horizon_ns: int, embargo_ns: int) -> np.ndarray:
         ts = np.asarray(ts, dtype=np.int64)
@@ -90,9 +90,7 @@ class WalkForwardSplitter:
         seg = (t1 - t0) // (self.n_folds + 1)
         if seg <= 0:
             raise ValueError("span too short for the requested fold count")
-        return self._folds_from_bounds(
-            [t0 + seg * k for k in range(1, self.n_folds + 1)], t1
-        )
+        return self._folds_from_bounds([t0 + seg * k for k in range(1, self.n_folds + 1)], t1)
 
     def folds_by_row_mass(self, ts_pooled: np.ndarray) -> List[Fold]:
         """Fold boundaries at quantiles of the pooled row index (pinned).
@@ -107,8 +105,7 @@ class WalkForwardSplitter:
         n = ts.size
         if n < (self.n_folds + 1) * MIN_TEST_PAIRS:
             raise ValueError(
-                f"too few rows ({n}) for {self.n_folds} folds at "
-                f"{MIN_TEST_PAIRS} test pairs each"
+                f"too few rows ({n}) for {self.n_folds} folds at {MIN_TEST_PAIRS} test pairs each"
             )
         bounds: List[int] = []
         for k in range(1, self.n_folds + 1):
@@ -145,9 +142,7 @@ class WalkForwardSplitter:
         if not nonempty:
             raise ValueError("no rows to split")
         if self.mode == "row_mass":
-            pooled = np.concatenate(
-                [df["exchange_ts"].to_numpy(dtype=np.int64) for df in nonempty]
-            )
+            pooled = np.concatenate([df["exchange_ts"].to_numpy(dtype=np.int64) for df in nonempty])
             folds = self.folds_by_row_mass(pooled)
         else:
             t0 = min(int(df["exchange_ts"].iloc[0]) for df in nonempty)

@@ -36,28 +36,56 @@ def specs() -> List[FeatureSpec]:
     """Registry entries for the regime family (pinned order)."""
     out: List[FeatureSpec] = []
     for w in WINDOWS:
-        out.append(mkspec(
-            f"trend_score_w{w}_v1", FAMILY,
-            f"Normalized drift over {w}: ret_log / (rvol_w{w} * sqrt(w_s) + EPS).",
-            depends_on=(f"rvol_w{w}_v1",), window=w))
+        out.append(
+            mkspec(
+                f"trend_score_w{w}_v1",
+                FAMILY,
+                f"Normalized drift over {w}: ret_log / (rvol_w{w} * sqrt(w_s) + EPS).",
+                depends_on=(f"rvol_w{w}_v1",),
+                window=w,
+            )
+        )
     for w in WINDOWS:
-        out.append(mkspec(
-            f"meanrev_score_w{w}_v1", FAMILY,
-            f"Mean-reversion z-score over {w}: -(mid - mean)/(std + EPS).",
-            window=w))
-    out.append(mkspec("vol_regime_flag_v1", FAMILY,
-                      "1 when rvol_w1m > rvol_w5m (elevated short-term vol).",
-                      depends_on=("vol_regime_ratio_v1",)))
-    out.append(mkspec("vol_regime_ratio_v1", FAMILY,
-                      "rvol_w1m / (rvol_w5m + EPS).",
-                      depends_on=("rvol_w1m_v1", "rvol_w5m_v1")))
-    out.append(mkspec("liq_regime_flag_v1", FAMILY,
-                      "1 when current quoted depth exceeds its 1m mean.",
-                      depends_on=("liq_regime_ratio_v1",)))
-    out.append(mkspec("liq_regime_ratio_v1", FAMILY,
-                      "quoted_depth_total / (mean quoted depth over 1m + EPS).",
-                      depends_on=("quoted_depth_total_v1",
-                                  "quoted_depth_avg_w1m_v1")))
+        out.append(
+            mkspec(
+                f"meanrev_score_w{w}_v1",
+                FAMILY,
+                f"Mean-reversion z-score over {w}: -(mid - mean)/(std + EPS).",
+                window=w,
+            )
+        )
+    out.append(
+        mkspec(
+            "vol_regime_flag_v1",
+            FAMILY,
+            "1 when rvol_w1m > rvol_w5m (elevated short-term vol).",
+            depends_on=("vol_regime_ratio_v1",),
+        )
+    )
+    out.append(
+        mkspec(
+            "vol_regime_ratio_v1",
+            FAMILY,
+            "rvol_w1m / (rvol_w5m + EPS).",
+            depends_on=("rvol_w1m_v1", "rvol_w5m_v1"),
+        )
+    )
+    out.append(
+        mkspec(
+            "liq_regime_flag_v1",
+            FAMILY,
+            "1 when current quoted depth exceeds its 1m mean.",
+            depends_on=("liq_regime_ratio_v1",),
+        )
+    )
+    out.append(
+        mkspec(
+            "liq_regime_ratio_v1",
+            FAMILY,
+            "quoted_depth_total / (mean quoted depth over 1m + EPS).",
+            depends_on=("quoted_depth_total_v1", "quoted_depth_avg_w1m_v1"),
+        )
+    )
     return out
 
 
@@ -92,14 +120,22 @@ def compute(st, values: List[float], valid: List[bool]) -> None:
         if (rv1m is not None and rv5m is not None and st.rv["5m"].count > 0)
         else None
     )
-    put(values, valid, 1.0 if (ratio is not None and ratio > 1.0) else
-        (0.0 if ratio is not None else None), ratio is not None)
+    put(
+        values,
+        valid,
+        1.0 if (ratio is not None and ratio > 1.0) else (0.0 if ratio is not None else None),
+        ratio is not None,
+    )
     put(values, valid, ratio, ratio is not None)
     lr = None
     da = st.depthavg["1m"]
     if st.book_ok and st.warm(WINDOW_NS["1m"]) and da.count > 0:
         if da.sums[11] > 0:  # exact integer depth sum
             lr = (st.db10 + st.da10) / (da.sums[11] / da.count + EPS)
-    put(values, valid, 1.0 if (lr is not None and lr > 1.0) else
-        (0.0 if lr is not None else None), lr is not None)
+    put(
+        values,
+        valid,
+        1.0 if (lr is not None and lr > 1.0) else (0.0 if lr is not None else None),
+        lr is not None,
+    )
     put(values, valid, lr, lr is not None)

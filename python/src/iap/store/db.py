@@ -18,8 +18,20 @@ import json
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
-from typing import (Any, Callable, Dict, Iterator, List, Mapping, Optional,
-                    Sequence, Tuple, Type, TypeVar, Union)
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterator,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+)
 
 from iap.contracts.types import (
     AlphaSignal,
@@ -50,18 +62,40 @@ Row = Dict[str, Any]
 #: Normalized decomposition of a decision trace, rewritten together by
 #: :meth:`Store.insert_trace` (delete-then-insert, keyed by ``trace_id``).
 STAGE_TABLES: Tuple[str, ...] = (
-    "alpha_signals", "portfolio_targets", "portfolio_legs", "risk_decisions",
-    "parent_orders", "child_orders", "venue_decisions", "executions",
-    "tca_results", "attribution",
+    "alpha_signals",
+    "portfolio_targets",
+    "portfolio_legs",
+    "risk_decisions",
+    "parent_orders",
+    "child_orders",
+    "venue_decisions",
+    "executions",
+    "tca_results",
+    "attribution",
 )
 
 #: The lifecycle state names accepted by ``alphas.current_state``.
 LIFECYCLE_STATES: Tuple[str, ...] = (
-    "RESEARCH", "CANDIDATE", "VALIDATING", "PAPER", "ACTIVE", "WATCH", "RETIRED")
+    "RESEARCH",
+    "CANDIDATE",
+    "VALIDATING",
+    "PAPER",
+    "ACTIVE",
+    "WATCH",
+    "RETIRED",
+)
 
 _TRACE_HEADER: Tuple[str, ...] = (
-    "trace_id", "session_id", "instrument_id", "event_ts", "sequence",
-    "data_version", "feature_version", "model_version", "config_version")
+    "trace_id",
+    "session_id",
+    "instrument_id",
+    "event_ts",
+    "sequence",
+    "data_version",
+    "feature_version",
+    "model_version",
+    "config_version",
+)
 
 
 def _j(obj: Any) -> str:
@@ -85,6 +119,7 @@ def _unflag(value: Optional[int]) -> Optional[bool]:
 # back.  Column names equal the contract field names except where a field is
 # nested (JSON column, flattened sub-record) or a boolean (0/1 BIGINT).
 # --------------------------------------------------------------------------
+
 
 def _enc_alpha_signal(sig: AlphaSignal) -> Row:
     return sig.to_dict()
@@ -166,8 +201,9 @@ def _enc_tca_result(tr: TCAResult) -> Row:
 def _dec_tca_result(row: Row) -> TCAResult:
     d = _pick(row, TCAResult, skip=("venue_contribution_bps", "latency_ns"))
     d["venue_contribution_bps"] = _uj(row["venue_contribution_json"])
-    d["latency_ns"] = {key: row[f"latency_{key}_ns"]
-                       for key in ("min", "mean", "max", "p50", "p99")}
+    d["latency_ns"] = {
+        key: row[f"latency_{key}_ns"] for key in ("min", "mean", "max", "p50", "p99")
+    }
     return TCAResult.from_dict(d)
 
 
@@ -197,8 +233,7 @@ def _dec_experiment_spec(row: Row) -> ExperimentSpec:
     d = _pick(row, ExperimentSpec, skip=skip)
     d["configuration"] = _uj(row["configuration_json"])
     for name in _PERIODS:
-        d[f"{name}_period"] = {"start_ts": row[f"{name}_start_ts"],
-                               "end_ts": row[f"{name}_end_ts"]}
+        d[f"{name}_period"] = {"start_ts": row[f"{name}_start_ts"], "end_ts": row[f"{name}_end_ts"]}
     return ExperimentSpec.from_dict(d)
 
 
@@ -244,8 +279,11 @@ def _dec_decision_trace(row: Row) -> DecisionTrace:
 
 def _pick(row: Row, cls: Type[Contract], skip: Sequence[str] = ()) -> Row:
     """The contract's scalar fields out of a row (nested ones in ``skip``)."""
-    return {name: row[name] for name in cls.__dataclass_fields__  # type: ignore[attr-defined]
-            if name not in skip}
+    return {
+        name: row[name]
+        for name in cls.__dataclass_fields__  # type: ignore[attr-defined]
+        if name not in skip
+    }
 
 
 _Codec = Tuple[str, Callable[[Any], Row], Callable[[Row], Any]]
@@ -263,8 +301,11 @@ _CODECS: Dict[Type[Contract], _Codec] = {
     Attribution: ("attribution", _enc_attribution, _dec_attribution),
     ExperimentSpec: ("experiments", _enc_experiment_spec, _dec_experiment_spec),
     ExperimentResult: ("experiment_results", _enc_experiment_result, _dec_experiment_result),
-    LifecycleTransition: ("lifecycle_transitions", _enc_lifecycle_transition,
-                          _dec_lifecycle_transition),
+    LifecycleTransition: (
+        "lifecycle_transitions",
+        _enc_lifecycle_transition,
+        _dec_lifecycle_transition,
+    ),
     DecisionTrace: ("decision_traces", _enc_decision_trace, _dec_decision_trace),
 }
 
@@ -311,8 +352,7 @@ class Store:
         rows = self.query("SELECT x_version FROM schema_version ORDER BY x_version")
         versions = [r["x_version"] for r in rows]
         if versions != [ddl.DDL_X_VERSION]:
-            raise RuntimeError(
-                f"store: schema_version rows {versions} != [{ddl.DDL_X_VERSION}]")
+            raise RuntimeError(f"store: schema_version rows {versions} != [{ddl.DDL_X_VERSION}]")
         self._columns_cache.clear()
         self._pk_cache.clear()
 
@@ -346,14 +386,15 @@ class Store:
 
     def tables(self) -> Tuple[str, ...]:
         """All table names, sorted."""
-        rows = self.query("SELECT name FROM sqlite_master WHERE type = 'table' "
-                          "AND name NOT LIKE 'sqlite_%' ORDER BY name")
+        rows = self.query(
+            "SELECT name FROM sqlite_master WHERE type = 'table' "
+            "AND name NOT LIKE 'sqlite_%' ORDER BY name"
+        )
         return tuple(r["name"] for r in rows)
 
     def views(self) -> Tuple[str, ...]:
         """All view names, sorted."""
-        rows = self.query("SELECT name FROM sqlite_master WHERE type = 'view' "
-                          "ORDER BY name")
+        rows = self.query("SELECT name FROM sqlite_master WHERE type = 'view' ORDER BY name")
         return tuple(r["name"] for r in rows)
 
     def columns(self, table: str) -> Tuple[str, ...]:
@@ -366,8 +407,8 @@ class Store:
             cols = tuple(r["name"] for r in info)
             self._columns_cache[table] = cols
             self._pk_cache[table] = tuple(
-                r["name"] for r in sorted((r for r in info if r["pk"]),
-                                          key=lambda r: r["pk"]))
+                r["name"] for r in sorted((r for r in info if r["pk"]), key=lambda r: r["pk"])
+            )
         return cols
 
     def primary_key(self, table: str) -> Tuple[str, ...]:
@@ -405,14 +446,15 @@ class Store:
         if unknown:
             raise ValueError(f"store: {table} has no columns {unknown}")
         cols = sorted(row)
-        sql = (f"INSERT OR REPLACE INTO {self._ident(table)} "
-               f"({', '.join(cols)}) VALUES ({', '.join('?' for _ in cols)})")
+        sql = (
+            f"INSERT OR REPLACE INTO {self._ident(table)} "
+            f"({', '.join(cols)}) VALUES ({', '.join('?' for _ in cols)})"
+        )
         cur.execute(sql, tuple(row[c] for c in cols))
 
     def counts(self) -> Dict[str, int]:
         """``{table: row count}`` for every table, sorted by name."""
-        return {t: self.query(f"SELECT COUNT(*) AS n FROM {t}")[0]["n"]
-                for t in self.tables()}
+        return {t: self.query(f"SELECT COUNT(*) AS n FROM {t}")[0]["n"] for t in self.tables()}
 
     def export_jsonl(self, table: str, path: Union[str, Path]) -> int:
         """Write ``table`` (or view) as canonical JSON lines ordered by its
@@ -420,8 +462,9 @@ class Store:
         Byte-deterministic for equal contents."""
         cols = self.columns(table)
         order = self.primary_key(table) or cols
-        rows = self.query(f"SELECT {', '.join(cols)} FROM {self._ident(table)} "
-                          f"ORDER BY {', '.join(order)}")
+        rows = self.query(
+            f"SELECT {', '.join(cols)} FROM {self._ident(table)} ORDER BY {', '.join(order)}"
+        )
         with open(path, "w", encoding="ascii", newline="\n") as fh:
             for row in rows:
                 fh.write(canonical_json(row))
@@ -438,9 +481,11 @@ class Store:
             raise ValueError(f"store: {table} has no columns {unknown}")
         keys = sorted(where)
         clause = (" WHERE " + " AND ".join(f"{k} = ?" for k in keys)) if keys else ""
-        rows = self.query(f"SELECT {', '.join(cols)} FROM {table}{clause} "
-                          f"ORDER BY {', '.join(self.primary_key(table))}",
-                          [where[k] for k in keys])
+        rows = self.query(
+            f"SELECT {', '.join(cols)} FROM {table}{clause} "
+            f"ORDER BY {', '.join(self.primary_key(table))}",
+            [where[k] for k in keys],
+        )
         return tuple(dec(r) for r in rows)
 
     @staticmethod
@@ -448,19 +493,22 @@ class Store:
         try:
             return _CODECS[cls]
         except KeyError:
-            raise TypeError(f"store: {cls.__name__} has no table "
-                            "(nested record types are embedded)") from None
+            raise TypeError(
+                f"store: {cls.__name__} has no table (nested record types are embedded)"
+            ) from None
 
     # -- typed writes: trace stages (linked by trace_id) ---------------------
 
-    def insert_alpha_signal(self, signal: AlphaSignal, *, trace_id: str,
-                            signal_index: int = 0) -> None:
+    def insert_alpha_signal(
+        self, signal: AlphaSignal, *, trace_id: str, signal_index: int = 0
+    ) -> None:
         validate_typed(signal)
         with self._tx() as cur:
             self._write_alpha_signal(cur, signal, trace_id, signal_index)
 
-    def _write_alpha_signal(self, cur: sqlite3.Cursor, signal: AlphaSignal,
-                            trace_id: str, signal_index: int) -> None:
+    def _write_alpha_signal(
+        self, cur: sqlite3.Cursor, signal: AlphaSignal, trace_id: str, signal_index: int
+    ) -> None:
         row = _enc_alpha_signal(signal)
         row.update(trace_id=trace_id, signal_index=signal_index)
         self._upsert(cur, "alpha_signals", row)
@@ -470,8 +518,9 @@ class Store:
         with self._tx() as cur:
             self._write_portfolio_target(cur, target, trace_id)
 
-    def _write_portfolio_target(self, cur: sqlite3.Cursor, target: PortfolioTarget,
-                                trace_id: str) -> None:
+    def _write_portfolio_target(
+        self, cur: sqlite3.Cursor, target: PortfolioTarget, trace_id: str
+    ) -> None:
         row = _enc_portfolio_target(target)
         row["trace_id"] = trace_id
         self._upsert(cur, "portfolio_targets", row)
@@ -481,14 +530,16 @@ class Store:
             leg_row["trace_id"] = trace_id
             self._upsert(cur, "portfolio_legs", leg_row)
 
-    def insert_risk_decision(self, decision: RiskDecision, *, trace_id: str,
-                             risk_index: int = 0) -> None:
+    def insert_risk_decision(
+        self, decision: RiskDecision, *, trace_id: str, risk_index: int = 0
+    ) -> None:
         validate_typed(decision)
         with self._tx() as cur:
             self._write_risk_decision(cur, decision, trace_id, risk_index)
 
-    def _write_risk_decision(self, cur: sqlite3.Cursor, decision: RiskDecision,
-                             trace_id: str, risk_index: int) -> None:
+    def _write_risk_decision(
+        self, cur: sqlite3.Cursor, decision: RiskDecision, trace_id: str, risk_index: int
+    ) -> None:
         row = _enc_risk_decision(decision)
         row.update(trace_id=trace_id, risk_index=risk_index)
         self._upsert(cur, "risk_decisions", row)
@@ -524,26 +575,39 @@ class Store:
         already stored (``NULL`` when the child order is unknown)."""
         validate_typed(report)
         with self._tx() as cur:
-            rows = self.query("SELECT parent_order_id FROM child_orders "
-                              "WHERE trace_id = ? AND child_order_id = ?",
-                              (trace_id, report.order_id))
+            rows = self.query(
+                "SELECT parent_order_id FROM child_orders "
+                "WHERE trace_id = ? AND child_order_id = ?",
+                (trace_id, report.order_id),
+            )
             parent = rows[0]["parent_order_id"] if rows else None
             self._write_execution(cur, report, trace_id, parent)
 
-    def _write_execution(self, cur: sqlite3.Cursor, report: ExecutionReport,
-                         trace_id: str, parent_order_id: Optional[int]) -> None:
+    def _write_execution(
+        self,
+        cur: sqlite3.Cursor,
+        report: ExecutionReport,
+        trace_id: str,
+        parent_order_id: Optional[int],
+    ) -> None:
         row = _enc_execution_report(report)
         row.update(trace_id=trace_id, parent_order_id=parent_order_id)
         self._upsert(cur, "executions", row)
 
-    def insert_attribution(self, attribution: Attribution, *, trace_id: str,
-                           parent_order_id: Optional[int] = None) -> None:
+    def insert_attribution(
+        self, attribution: Attribution, *, trace_id: str, parent_order_id: Optional[int] = None
+    ) -> None:
         validate_typed(attribution)
         with self._tx() as cur:
             self._write_attribution(cur, attribution, trace_id, parent_order_id)
 
-    def _write_attribution(self, cur: sqlite3.Cursor, attribution: Attribution,
-                           trace_id: str, parent_order_id: Optional[int]) -> None:
+    def _write_attribution(
+        self,
+        cur: sqlite3.Cursor,
+        attribution: Attribution,
+        trace_id: str,
+        parent_order_id: Optional[int],
+    ) -> None:
         row = _enc_attribution(attribution)
         row.update(trace_id=trace_id, parent_order_id=parent_order_id)
         self._upsert(cur, "attribution", row)
@@ -560,50 +624,87 @@ class Store:
         with self._tx() as cur:
             self._upsert(cur, "experiment_results", _enc_experiment_result(result))
 
-    def insert_lifecycle_transition(self, transition: LifecycleTransition, *,
-                                    source: str = "api",
-                                    eval_index: Optional[int] = None) -> None:
+    def insert_lifecycle_transition(
+        self,
+        transition: LifecycleTransition,
+        *,
+        source: str = "api",
+        eval_index: Optional[int] = None,
+    ) -> None:
         """``source`` names the artefact (``lifecycle_log``,
         ``lifecycle_transitions``) or ``api`` for a live write."""
         validate_typed(transition)
         with self._tx() as cur:
             self._write_lifecycle_transition(cur, transition, source, eval_index)
 
-    def _write_lifecycle_transition(self, cur: sqlite3.Cursor,
-                                    transition: LifecycleTransition, source: str,
-                                    eval_index: Optional[int]) -> None:
+    def _write_lifecycle_transition(
+        self,
+        cur: sqlite3.Cursor,
+        transition: LifecycleTransition,
+        source: str,
+        eval_index: Optional[int],
+    ) -> None:
         row = _enc_lifecycle_transition(transition)
         row.update(source=source, eval_index=eval_index)
         self._upsert(cur, "lifecycle_transitions", row)
 
     # -- reference rows (no contract type) ----------------------------------
 
-    def insert_session(self, session_id: str, *, data_version: str,
-                       config_version: str, seed: int, start_ts: int,
-                       end_ts: int, n_events: int) -> None:
+    def insert_session(
+        self,
+        session_id: str,
+        *,
+        data_version: str,
+        config_version: str,
+        seed: int,
+        start_ts: int,
+        end_ts: int,
+        n_events: int,
+    ) -> None:
         """One replay / paper / backtest session (event-time bounds)."""
-        self.upsert("sessions", {
-            "session_id": session_id, "data_version": data_version,
-            "config_version": config_version, "seed": seed,
-            "start_ts": start_ts, "end_ts": end_ts, "n_events": n_events})
+        self.upsert(
+            "sessions",
+            {
+                "session_id": session_id,
+                "data_version": data_version,
+                "config_version": config_version,
+                "seed": seed,
+                "start_ts": start_ts,
+                "end_ts": end_ts,
+                "n_events": n_events,
+            },
+        )
 
-    def insert_alpha(self, alpha_id: str, *, asset_class: str, family: str,
-                     horizon: str, economic_rationale: str,
-                     current_state: str = "RESEARCH") -> None:
+    def insert_alpha(
+        self,
+        alpha_id: str,
+        *,
+        asset_class: str,
+        family: str,
+        horizon: str,
+        economic_rationale: str,
+        current_state: str = "RESEARCH",
+    ) -> None:
         if current_state not in LIFECYCLE_STATES:
             raise ValueError(f"store: unknown lifecycle state {current_state!r}")
-        self.upsert("alphas", {
-            "alpha_id": alpha_id, "asset_class": asset_class, "family": family,
-            "horizon": horizon, "economic_rationale": economic_rationale,
-            "current_state": current_state})
+        self.upsert(
+            "alphas",
+            {
+                "alpha_id": alpha_id,
+                "asset_class": asset_class,
+                "family": family,
+                "horizon": horizon,
+                "economic_rationale": economic_rationale,
+                "current_state": current_state,
+            },
+        )
 
     def set_alpha_state(self, alpha_id: str, state: str) -> bool:
         """Update ``alphas.current_state``; False if the alpha is unknown."""
         if state not in LIFECYCLE_STATES:
             raise ValueError(f"store: unknown lifecycle state {state!r}")
         with self._tx() as cur:
-            cur.execute("UPDATE alphas SET current_state = ? WHERE alpha_id = ?",
-                        (state, alpha_id))
+            cur.execute("UPDATE alphas SET current_state = ? WHERE alpha_id = ?", (state, alpha_id))
             return cur.rowcount > 0
 
     # -- decision traces ----------------------------------------------------
@@ -643,8 +744,8 @@ class Store:
                 self._write_linked(cur, tr, tid)
             if st.attribution is not None:
                 self._write_attribution(
-                    cur, st.attribution, tid,
-                    parents[0].parent_order_id if parents else None)
+                    cur, st.attribution, tid, parents[0].parent_order_id if parents else None
+                )
         return tid
 
     def get_trace(self, trace_id: str) -> DecisionTrace:
@@ -652,15 +753,18 @@ class Store:
         ``KeyError`` when absent."""
         rows = self.query(
             f"SELECT {', '.join(_TRACE_HEADER)}, stages_json FROM decision_traces "
-            "WHERE trace_id = ?", (trace_id,))
+            "WHERE trace_id = ?",
+            (trace_id,),
+        )
         if not rows:
             raise KeyError(f"store: no trace {trace_id!r}")
         return _dec_decision_trace(rows[0])
 
     def trace_id_for_order(self, parent_order_id: int) -> str:
         """The trace that carries ``parent_order_id``; ``KeyError`` if none."""
-        rows = self.query("SELECT trace_id FROM parent_orders WHERE parent_order_id = ?",
-                          (parent_order_id,))
+        rows = self.query(
+            "SELECT trace_id FROM parent_orders WHERE parent_order_id = ?", (parent_order_id,)
+        )
         if not rows:
             raise KeyError(f"store: no parent order {parent_order_id}")
         return rows[0]["trace_id"]
@@ -670,8 +774,7 @@ class Store:
         rows = self.query("SELECT venue_id, venue FROM venues ORDER BY venue_id")
         return {r["venue_id"]: r["venue"] for r in rows}
 
-    def explain(self, parent_order_id: int,
-                venue_names: Optional[Mapping[int, str]] = None) -> str:
+    def explain(self, parent_order_id: int, venue_names: Optional[Mapping[int, str]] = None) -> str:
         """:func:`iap.contracts.types.explain` of the order's trace, with
         venue display names from the venues table (``venue_names`` entries
         override them)."""

@@ -103,8 +103,13 @@ def _drop_ts_regressions(
     """Drop in-stream exchange_ts regressions (checked in (epoch, sequence) order)."""
     order = sorted(
         range(len(kept)),
-        key=lambda i: (kept[i][0].venue_id, kept[i][0].instrument_id, kept[i][1],
-                       kept[i][0].sequence, kept[i][0].event_id),
+        key=lambda i: (
+            kept[i][0].venue_id,
+            kept[i][0].instrument_id,
+            kept[i][1],
+            kept[i][0].sequence,
+            kept[i][0].event_id,
+        ),
     )
     drop: Set[int] = set()
     last_key = None
@@ -198,8 +203,14 @@ def normalize_file(
     # final tiebreak. Step 4 guarantees the sort never inverts sequence
     # order inside a stream.
     kept.sort(
-        key=lambda row: (row[0].exchange_ts, row[0].venue_id, row[0].instrument_id,
-                         row[1], row[0].sequence, row[0].event_id)
+        key=lambda row: (
+            row[0].exchange_ts,
+            row[0].venue_id,
+            row[0].instrument_id,
+            row[1],
+            row[0].sequence,
+            row[0].event_id,
+        )
     )
     out = [ev for ev, _ in kept]
     for i, ev in enumerate(out):

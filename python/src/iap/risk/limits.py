@@ -197,9 +197,7 @@ def _need_f64(doc: Any, section: str, key: str) -> float:
 def _need_pos_f64(doc: Any, section: str, key: str) -> float:
     v = _need_f64(doc, section, key)
     if v <= 0.0:
-        raise ValueError(
-            f"risk.json: {section}.{key} must be > 0, got {rust_display_f64(v)}"
-        )
+        raise ValueError(f"risk.json: {section}.{key} must be > 0, got {rust_display_f64(v)}")
     return v
 
 
@@ -228,17 +226,11 @@ def _parse_conversion(doc: Any) -> Dict[str, FxConversion]:
         spec = table[ccy]
         iid = _as_u64(spec.get("instrument_id")) if isinstance(spec, dict) else None
         if iid is None:
-            raise ValueError(
-                f"risk.json: currency.conversion.{ccy}.instrument_id missing/invalid"
-            )
+            raise ValueError(f"risk.json: currency.conversion.{ccy}.instrument_id missing/invalid")
         if iid == 0 or iid > _U32_MAX:
-            raise ValueError(
-                f"risk.json: currency.conversion.{ccy}.instrument_id out of u32 range"
-            )
+            raise ValueError(f"risk.json: currency.conversion.{ccy}.instrument_id out of u32 range")
         invert = spec.get("invert")
         if not isinstance(invert, bool):
-            raise ValueError(
-                f"risk.json: currency.conversion.{ccy}.invert missing/non-bool"
-            )
+            raise ValueError(f"risk.json: currency.conversion.{ccy}.invert missing/non-bool")
         out[ccy] = FxConversion(instrument_id=iid, invert=invert)
     return out

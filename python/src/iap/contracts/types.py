@@ -289,21 +289,18 @@ def _normalise(hint: Any, value: Any, path: str, meta: Mapping[str, Any]) -> Any
         try:
             return hint(value)
         except ValueError:
-            raise ContractError(
-                f"{path}: {value!r} not in {hint.__name__}") from None
+            raise ContractError(f"{path}: {value!r} not in {hint.__name__}") from None
     if isinstance(hint, type) and issubclass(hint, Contract):
         if isinstance(value, hint):
             return value
         if isinstance(value, dict):
             return hint.from_dict(value, _path=path)
-        raise ContractError(
-            f"{path}: expected {hint.__name__}, got {_type_name(value)}")
+        raise ContractError(f"{path}: expected {hint.__name__}, got {_type_name(value)}")
     if origin is tuple:
         (item,) = (a for a in typing.get_args(hint) if a is not Ellipsis)
         if not isinstance(value, (list, tuple)):
             raise ContractError(f"{path}: expected list, got {_type_name(value)}")
-        return tuple(_normalise(item, v, f"{path}[{i}]", {})
-                     for i, v in enumerate(value))
+        return tuple(_normalise(item, v, f"{path}[{i}]", {}) for i, v in enumerate(value))
     if origin is dict:
         _, item = typing.get_args(hint)
         if not isinstance(value, dict):
@@ -313,7 +310,8 @@ def _normalise(hint: Any, value: Any, path: str, meta: Mapping[str, Any]) -> Any
             if not isinstance(k, str):
                 raise ContractError(f"{path}: non-string key {k!r}")
             if meta.get("key_pattern") == "decimal" and not (
-                    k.isdigit() and (k == "0" or not k.startswith("0"))):
+                k.isdigit() and (k == "0" or not k.startswith("0"))
+            ):
                 raise ContractError(f"{path}: key {k!r} is not a decimal id")
             out[k] = _normalise(item, v, f"{path}.{k}", {})
         return out
@@ -358,8 +356,9 @@ class Contract:
     def __post_init__(self) -> None:
         hints = _hints(type(self))
         for f in fields(self):  # type: ignore[arg-type]
-            value = _normalise(hints[f.name], getattr(self, f.name),
-                               f"{type(self).__name__}.{f.name}", f.metadata)
+            value = _normalise(
+                hints[f.name], getattr(self, f.name), f"{type(self).__name__}.{f.name}", f.metadata
+            )
             object.__setattr__(self, f.name, value)
         self.check_invariants()
 
@@ -369,12 +368,10 @@ class Contract:
 
     def to_dict(self) -> Dict[str, Any]:
         """JSON-ready dict, keys in schema property order."""
-        return {f.name: _to_json(getattr(self, f.name))
-                for f in fields(self)}  # type: ignore[arg-type]
+        return {f.name: _to_json(getattr(self, f.name)) for f in fields(self)}  # type: ignore[arg-type]
 
     @classmethod
-    def from_dict(cls: Type[T], data: Mapping[str, Any], *,
-                  _path: str = "") -> T:
+    def from_dict(cls: Type[T], data: Mapping[str, Any], *, _path: str = "") -> T:
         """Strict inverse of :meth:`to_dict`.
 
         Unknown keys, missing keys, wrong scalar types (``1`` is not ``1.0``
@@ -394,8 +391,7 @@ class Contract:
         hints = _hints(cls)
         kwargs = {}
         for f in fields(cls):  # type: ignore[arg-type]
-            kwargs[f.name] = _normalise(hints[f.name], data[f.name],
-                                        f"{path}.{f.name}", f.metadata)
+            kwargs[f.name] = _normalise(hints[f.name], data[f.name], f"{path}.{f.name}", f.metadata)
         return cls(**kwargs)
 
 
@@ -501,8 +497,7 @@ class AlphaSignal(Contract):
 
     def check_invariants(self) -> None:
         if self.confidence == 0.0 and self.expected_return != 0.0:
-            raise ContractError(
-                "AlphaSignal: expected_return must be 0 when confidence is 0")
+            raise ContractError("AlphaSignal: expected_return must be 0 when confidence is 0")
 
 
 # --------------------------------------------------------------------------
@@ -547,8 +542,7 @@ class PortfolioTarget(Contract):
     def check_invariants(self) -> None:
         ids = [leg.instrument_id for leg in self.targets]
         if ids != sorted(set(ids)):
-            raise ContractError(
-                "PortfolioTarget: targets must be sorted by unique instrument_id")
+            raise ContractError("PortfolioTarget: targets must be sorted by unique instrument_id")
 
 
 # --------------------------------------------------------------------------
@@ -579,13 +573,18 @@ class RiskDecision(Contract):
         if self.decision is Decision.ALLOW and self.rule_index != -1:
             raise ContractError("RiskDecision: ALLOW requires rule_index == -1")
         if self.decision is not Decision.ALLOW and self.rule_index < 0:
-            raise ContractError(
-                "RiskDecision: REJECT/KILL require a pinned rule_index >= 0")
+            raise ContractError("RiskDecision: REJECT/KILL require a pinned rule_index >= 0")
 
     @classmethod
-    def from_risk_event(cls, event: Mapping[str, Any], *, order_id: int,
-                        strategy_id: str, instrument_id: int,
-                        rule_index: int = -1) -> "RiskDecision":
+    def from_risk_event(
+        cls,
+        event: Mapping[str, Any],
+        *,
+        order_id: int,
+        strategy_id: str,
+        instrument_id: int,
+        rule_index: int = -1,
+    ) -> "RiskDecision":
         """Build from a ``RiskEvent`` dict (schema field names) and the order
         context the event does not carry.  ``rule_index`` defaults to ``-1``
         and must be supplied for REJECT / KILL."""
@@ -634,9 +633,11 @@ class ParentOrder(Contract):
     params: Dict[str, float]
 
     def check_invariants(self) -> None:
-        _ts_ordered(("decision_ts", self.decision_ts, "arrival_ts", self.arrival_ts),
-                    ("arrival_ts", self.arrival_ts, "end_ts", self.end_ts),
-                    owner="ParentOrder")
+        _ts_ordered(
+            ("decision_ts", self.decision_ts, "arrival_ts", self.arrival_ts),
+            ("arrival_ts", self.arrival_ts, "end_ts", self.end_ts),
+            owner="ParentOrder",
+        )
 
 
 @contract(V.CHILD_ORDER_VERSION, "order/child_order.schema.json")
@@ -686,8 +687,9 @@ class VenueScore(Contract):
 
     def check_invariants(self) -> None:
         if self.eligible != (self.rank > 0):
-            raise ContractError("VenueScore: eligible venues carry rank >= 1, "
-                                "ineligible ones rank 0")
+            raise ContractError(
+                "VenueScore: eligible venues carry rank >= 1, ineligible ones rank 0"
+            )
 
 
 @contract(V.VENUE_DECISION_VERSION, _VENUE_SCHEMA)
@@ -703,12 +705,11 @@ class VenueDecision(Contract):
     def check_invariants(self) -> None:
         ids = [c.venue_id for c in self.candidates]
         if ids != sorted(set(ids)):
-            raise ContractError(
-                "VenueDecision: candidates must be sorted by unique venue_id")
+            raise ContractError("VenueDecision: candidates must be sorted by unique venue_id")
         if self.venue_id and not any(
-                c.venue_id == self.venue_id and c.eligible for c in self.candidates):
-            raise ContractError(
-                "VenueDecision: routed venue must be an eligible candidate")
+            c.venue_id == self.venue_id and c.eligible for c in self.candidates
+        ):
+            raise ContractError("VenueDecision: routed venue must be an eligible candidate")
 
 
 @contract(V.EXECUTION_REPORT_VERSION, "execution/execution_report.schema.json")
@@ -859,10 +860,14 @@ class ExperimentSpec(Contract):
     def check_invariants(self) -> None:
         if self.model_version is not None and not is_sha256_hex(self.model_version):
             raise ContractError("ExperimentSpec: model_version must be sha256 hex")
-        if not (self.train_period.end_ts <= self.validation_period.start_ts
-                and self.validation_period.end_ts <= self.test_period.start_ts):
-            raise ContractError("ExperimentSpec: periods must be ordered "
-                                "train <= validation <= test without overlap")
+        if not (
+            self.train_period.end_ts <= self.validation_period.start_ts
+            and self.validation_period.end_ts <= self.test_period.start_ts
+        ):
+            raise ContractError(
+                "ExperimentSpec: periods must be ordered "
+                "train <= validation <= test without overlap"
+            )
 
 
 @contract(V.EXPERIMENT_RESULT_VERSION, "research/experiment_result.schema.json")
@@ -909,8 +914,7 @@ class ExperimentResult(Contract):
             raise ContractError("ExperimentResult: model_version must be sha256 hex")
         if not self.leakage_passed and self.verdict is not Verdict.REJECT:
             raise ContractError("ExperimentResult: leakage failure forces REJECT")
-        if abs((self.gross_return_bps - self.transaction_cost_bps)
-               - self.net_return_bps) > 1e-9:
+        if abs((self.gross_return_bps - self.transaction_cost_bps) - self.net_return_bps) > 1e-9:
             raise ContractError("ExperimentResult: net != gross - cost")
 
 
@@ -973,8 +977,7 @@ class Attribution(Contract):
     total_bps: float
 
     def check_invariants(self) -> None:
-        total = (self.alpha_bps + self.spread_bps + self.impact_bps
-                 + self.fees_bps + self.timing_bps)
+        total = self.alpha_bps + self.spread_bps + self.impact_bps + self.fees_bps + self.timing_bps
         if abs(total - self.total_bps) > 1e-9:
             raise ContractError("Attribution: total_bps != sum of components")
 
@@ -1033,8 +1036,7 @@ def _bps(value: float) -> str:
     return f"{value:+.1f} bps"
 
 
-def explain(trace: DecisionTrace,
-            venue_names: Optional[Mapping[int, str]] = None) -> str:
+def explain(trace: DecisionTrace, venue_names: Optional[Mapping[int, str]] = None) -> str:
     """Render the decision chain, one block per stage::
 
         Order 12345
@@ -1059,26 +1061,32 @@ def explain(trace: DecisionTrace,
     st = trace.stages
     parents = st.parent_orders
     names = dict(venue_names or {})
-    lines = [f"Order {parents[0].parent_order_id}" if parents
-             else f"Trace {trace.trace_id}"]
+    lines = [f"Order {parents[0].parent_order_id}" if parents else f"Trace {trace.trace_id}"]
 
     alpha_label = parents[0].alpha_id if parents else None
     if st.signal:
         for i, sig in enumerate(st.signal):
             label = alpha_label if i == 0 and alpha_label else sig.model_version
-            lines.append(_line(
-                "Alpha",
-                f"{label}  expected return = "
-                f"{_bps(sig.expected_return * 1e4)}  "
-                f"confidence = {sig.confidence:.2f}"))
+            lines.append(
+                _line(
+                    "Alpha",
+                    f"{label}  expected return = "
+                    f"{_bps(sig.expected_return * 1e4)}  "
+                    f"confidence = {sig.confidence:.2f}",
+                )
+            )
     else:
         lines.append(_line("Alpha", "(none)"))
 
     if st.portfolio is not None:
-        legs = [leg for leg in st.portfolio.targets
-                if leg.instrument_id == trace.instrument_id] or list(st.portfolio.targets)
-        body = (f"target = {legs[0].target_qty:+,d} shares" if legs
-                else f"{st.portfolio.solver_status.value}  no target")
+        legs = [
+            leg for leg in st.portfolio.targets if leg.instrument_id == trace.instrument_id
+        ] or list(st.portfolio.targets)
+        body = (
+            f"target = {legs[0].target_qty:+,d} shares"
+            if legs
+            else f"{st.portfolio.solver_status.value}  no target"
+        )
         lines.append(_line("Portfolio", body))
     else:
         lines.append(_line("Portfolio", "(none)"))
@@ -1107,8 +1115,10 @@ def explain(trace: DecisionTrace,
         routed[vd.venue_id] = routed.get(vd.venue_id, 0) + child_qty.get(vd.child_order_id, 0)
     total_routed = sum(routed.values())
     if total_routed:
-        parts = [f"{names.get(v, str(v))} = {100.0 * q / total_routed:.0f}%"
-                 for v, q in sorted(routed.items())]
+        parts = [
+            f"{names.get(v, str(v))} = {100.0 * q / total_routed:.0f}%"
+            for v, q in sorted(routed.items())
+        ]
         lines.append(_line("SOR", "  ".join(parts)))
     else:
         lines.append(_line("SOR", "(none)"))
@@ -1116,8 +1126,9 @@ def explain(trace: DecisionTrace,
     target_qty = sum(po.qty for po in parents)
     filled = sum(er.filled_qty for er in st.fills)
     if target_qty:
-        lines.append(_line(
-            "Fills", f"{filled:,d} / {target_qty:,d} ({100.0 * filled / target_qty:.1f}%)"))
+        lines.append(
+            _line("Fills", f"{filled:,d} / {target_qty:,d} ({100.0 * filled / target_qty:.1f}%)")
+        )
     else:
         lines.append(_line("Fills", "(none)"))
 
@@ -1129,10 +1140,13 @@ def explain(trace: DecisionTrace,
 
     a = st.attribution
     if a is not None:
-        lines.append(_line(
-            "Attribution",
-            f"alpha = {_bps(a.alpha_bps)}  spread = {_bps(a.spread_bps)}  "
-            f"impact = {_bps(a.impact_bps)}  fees = {_bps(a.fees_bps)}"))
+        lines.append(
+            _line(
+                "Attribution",
+                f"alpha = {_bps(a.alpha_bps)}  spread = {_bps(a.spread_bps)}  "
+                f"impact = {_bps(a.impact_bps)}  fees = {_bps(a.fees_bps)}",
+            )
+        )
     else:
         lines.append(_line("Attribution", "(none)"))
     return "\n".join(lines)

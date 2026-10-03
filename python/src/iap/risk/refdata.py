@@ -101,9 +101,7 @@ def instrument_refs_from_golden(table: Mapping[Any, Any]) -> Dict[int, Instrumen
         spec = table[key]
         if not isinstance(spec, dict):
             raise ValueError(f"instrument {key!r}: reference must be an object")
-        out[_check_iid(key)] = InstrumentRef(
-            spec["tick_size"], spec["qty_unit"], spec["quote_ccy"]
-        )
+        out[_check_iid(key)] = InstrumentRef(spec["tick_size"], spec["qty_unit"], spec["quote_ccy"])
     return out
 
 
@@ -132,9 +130,7 @@ def _ref_from_row(row: Mapping[str, Any]) -> tuple[int, InstrumentRef]:
         unit = 1.0
         ccy = row.get("currency")
     else:
-        raise ValueError(
-            f"instruments.json: unknown asset_class {asset_class} for {iid}"
-        )
+        raise ValueError(f"instruments.json: unknown asset_class {asset_class} for {iid}")
     if not isinstance(ccy, str) or not ccy:
         raise ValueError(f"instruments.json: missing currency for {iid}")
     return iid, InstrumentRef(float(tick), unit, ccy)

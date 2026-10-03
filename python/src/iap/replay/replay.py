@@ -120,10 +120,7 @@ class ReplayEngine:
         """Replay an event stream; returns summary stats."""
         for ev in events:
             self.apply(ev)
-            if (
-                self.snapshot_every
-                and self.events_processed % self.snapshot_every == 0
-            ):
+            if self.snapshot_every and self.events_processed % self.snapshot_every == 0:
                 snap = self.book_states()
                 snap["index"] = self.events_processed
                 self.snapshots_emitted += 1
@@ -132,10 +129,7 @@ class ReplayEngine:
                     self.snapshots.pop(0)
                 if on_snapshot is not None:
                     on_snapshot(self.events_processed, snap)
-            if (
-                self.checkpoint_every
-                and self.events_processed % self.checkpoint_every == 0
-            ):
+            if self.checkpoint_every and self.events_processed % self.checkpoint_every == 0:
                 self.checkpoints.append(self.checkpoint())
                 if len(self.checkpoints) > self.keep_checkpoints:
                     self.checkpoints.pop(0)
@@ -156,8 +150,7 @@ class ReplayEngine:
         for iid in sorted(self.books):
             cons = self.books[iid]
             out["instruments"][str(iid)] = {
-                str(vid): cons.books[vid].state_summary()
-                for vid in sorted(cons.books)
+                str(vid): cons.books[vid].state_summary() for vid in sorted(cons.books)
             }
         return out
 
@@ -181,18 +174,14 @@ class ReplayEngine:
                 if self.universe is None
                 else {str(k): sorted(v) for k, v in sorted(self.universe.items())}
             ),
-            "books": {
-                str(iid): self.books[iid].checkpoint() for iid in sorted(self.books)
-            },
+            "books": {str(iid): self.books[iid].checkpoint() for iid in sorted(self.books)},
         }
 
     @classmethod
     def restore(cls, cp: dict) -> "ReplayEngine":
         """Rebuild an engine from ``checkpoint()`` output."""
         if cp.get("x-version") != ENGINE_CHECKPOINT_VERSION:
-            raise ValueError(
-                f"unsupported engine checkpoint x-version: {cp.get('x-version')!r}"
-            )
+            raise ValueError(f"unsupported engine checkpoint x-version: {cp.get('x-version')!r}")
         universe = cp["universe"]
         engine = cls(
             checkpoint_every=cp["checkpoint_every"],

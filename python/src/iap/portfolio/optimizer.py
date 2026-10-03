@@ -82,10 +82,10 @@ class Constraints:
     gross_cap: Optional[float] = None
     net_cap: Optional[float] = None
     participation: Optional[np.ndarray] = None  # per-asset |trade| cap
-    turnover_cap: Optional[float] = None        # total L1 trade cap
-    vol_target: Optional[float] = None          # sqrt(w'Sigma w) cap
-    currency_matrix: Optional[np.ndarray] = None   # (C, N)
-    currency_bounds: Optional[np.ndarray] = None   # (C,)
+    turnover_cap: Optional[float] = None  # total L1 trade cap
+    vol_target: Optional[float] = None  # sqrt(w'Sigma w) cap
+    currency_matrix: Optional[np.ndarray] = None  # (C, N)
+    currency_bounds: Optional[np.ndarray] = None  # (C,)
 
     def validate(self, n: int) -> None:
         self.w_min = np.asarray(self.w_min, dtype=np.float64)
@@ -109,12 +109,10 @@ class Constraints:
         if self.net_cap is not None and self.net_cap < 0:
             raise ValueError("net_cap must be >= 0")
         if self.participation is not None:
-            self.participation = np.asarray(self.participation,
-                                            dtype=np.float64)
+            self.participation = np.asarray(self.participation, dtype=np.float64)
             if not np.all(np.isfinite(self.participation)):
                 raise ValueError("participation must be finite")
-            if self.participation.shape != (n,) or \
-                    np.any(self.participation < 0):
+            if self.participation.shape != (n,) or np.any(self.participation < 0):
                 raise ValueError("participation must be (n,) and >= 0")
         if self.turnover_cap is not None and self.turnover_cap < 0:
             raise ValueError("turnover_cap must be >= 0")
@@ -123,16 +121,16 @@ class Constraints:
         if (self.currency_matrix is None) != (self.currency_bounds is None):
             raise ValueError("currency_matrix and currency_bounds go together")
         if self.currency_matrix is not None:
-            self.currency_matrix = np.asarray(self.currency_matrix,
-                                              dtype=np.float64)
-            self.currency_bounds = np.asarray(self.currency_bounds,
-                                              dtype=np.float64)
+            self.currency_matrix = np.asarray(self.currency_matrix, dtype=np.float64)
+            self.currency_bounds = np.asarray(self.currency_bounds, dtype=np.float64)
             if self.currency_matrix.shape[1] != n:
                 raise ValueError("currency_matrix must have n columns")
             if self.currency_bounds.shape != (self.currency_matrix.shape[0],):
                 raise ValueError("currency_bounds shape mismatch")
-            if not (np.all(np.isfinite(self.currency_matrix))
-                    and np.all(np.isfinite(self.currency_bounds))):
+            if not (
+                np.all(np.isfinite(self.currency_matrix))
+                and np.all(np.isfinite(self.currency_bounds))
+            ):
                 raise ValueError("currency_matrix/currency_bounds must be finite")
             if np.any(self.currency_bounds < 0):
                 raise ValueError("currency_bounds must be >= 0")
@@ -181,16 +179,17 @@ class PGDResult:
         return "NONE"
 
 
-def objective(w: np.ndarray, alpha: np.ndarray, Sigma: np.ndarray,
-              w_prev: np.ndarray, risk_aversion: float,
-              tc_linear: np.ndarray) -> float:
+def objective(
+    w: np.ndarray,
+    alpha: np.ndarray,
+    Sigma: np.ndarray,
+    w_prev: np.ndarray,
+    risk_aversion: float,
+    tc_linear: np.ndarray,
+) -> float:
     """The research objective f(w) (see module docstring)."""
     w = np.asarray(w, dtype=np.float64)
-    return float(
-        alpha @ w
-        - risk_aversion * (w @ Sigma @ w)
-        - tc_linear @ np.abs(w - w_prev)
-    )
+    return float(alpha @ w - risk_aversion * (w @ Sigma @ w) - tc_linear @ np.abs(w - w_prev))
 
 
 def project_l1_ball(v: np.ndarray, radius: float) -> np.ndarray:
@@ -211,8 +210,13 @@ def project_l1_ball(v: np.ndarray, radius: float) -> np.ndarray:
     return np.sign(v) * np.maximum(a - theta, 0.0)
 
 
-def project(v: np.ndarray, cons: Constraints, w_prev: np.ndarray,
-            Sigma: Optional[np.ndarray], passes: int = 8) -> np.ndarray:
+def project(
+    v: np.ndarray,
+    cons: Constraints,
+    w_prev: np.ndarray,
+    Sigma: Optional[np.ndarray],
+    passes: int = 8,
+) -> np.ndarray:
     """Cyclic projection onto the constraint set (pinned order, fixed passes)."""
     w = np.asarray(v, dtype=np.float64).copy()
     n = len(w)
@@ -257,19 +261,20 @@ def project(v: np.ndarray, cons: Constraints, w_prev: np.ndarray,
     return w
 
 
-def violation_breakdown(w: np.ndarray, cons: Constraints, w_prev: np.ndarray,
-                        Sigma: Optional[np.ndarray]) -> Dict[str, float]:
+def violation_breakdown(
+    w: np.ndarray, cons: Constraints, w_prev: np.ndarray, Sigma: Optional[np.ndarray]
+) -> Dict[str, float]:
     """Per-constraint violation of w, keyed by the names in
     :data:`RISK_CONSTRAINTS` / :data:`TRADING_CONSTRAINTS`, in the pinned
     projection order. An inactive constraint is absent; an active one that
     holds maps to a value <= 0. ``max_violation`` is the maximum of these
     (floored at 0), so the two can never disagree."""
     out: Dict[str, float] = {}
-    out["BOX"] = max(float(np.max(cons.w_min - w, initial=0.0)),
-                     float(np.max(w - cons.w_max, initial=0.0)))
+    out["BOX"] = max(
+        float(np.max(cons.w_min - w, initial=0.0)), float(np.max(w - cons.w_max, initial=0.0))
+    )
     if cons.participation is not None:
-        out["PARTICIPATION"] = float(
-            np.max(np.abs(w - w_prev) - cons.participation, initial=0.0))
+        out["PARTICIPATION"] = float(np.max(np.abs(w - w_prev) - cons.participation, initial=0.0))
     if cons.net_cap is not None:
         out["NET"] = abs(float(w.sum())) - cons.net_cap
     if cons.currency_matrix is not None:
@@ -284,8 +289,9 @@ def violation_breakdown(w: np.ndarray, cons: Constraints, w_prev: np.ndarray,
     return out
 
 
-def max_violation(w: np.ndarray, cons: Constraints, w_prev: np.ndarray,
-                  Sigma: Optional[np.ndarray]) -> float:
+def max_violation(
+    w: np.ndarray, cons: Constraints, w_prev: np.ndarray, Sigma: Optional[np.ndarray]
+) -> float:
     """Largest constraint violation of w (0 when feasible)."""
     v = 0.0
     for value in violation_breakdown(w, cons, w_prev, Sigma).values():
@@ -308,10 +314,10 @@ def _risk_violation(breakdown: Dict[str, float]) -> float:
 def _violated(breakdown: Dict[str, float], tol: float) -> Tuple[str, ...]:
     """Names of the constraints violated by more than ``tol``, in the
     pinned projection order (deterministic, never unordered)."""
-    order = ("BOX", "PARTICIPATION", "NET", "CURRENCY", "GROSS", "TURNOVER",
-             "VOL")
-    return tuple(name for name in order
-                 if breakdown.get(name) is not None and breakdown[name] > tol)
+    order = ("BOX", "PARTICIPATION", "NET", "CURRENCY", "GROSS", "TURNOVER", "VOL")
+    return tuple(
+        name for name in order if breakdown.get(name) is not None and breakdown[name] > tol
+    )
 
 
 def solve(
@@ -350,13 +356,16 @@ def solve(
     if np.any(tc_linear < 0):
         raise ValueError("tc_linear must be >= 0")
     # pinned: NaN/inf never propagate into weights
-    for name, arr in (("alpha", alpha), ("Sigma", Sigma), ("w_prev", w_prev),
-                      ("tc_linear", tc_linear)):
+    for name, arr in (
+        ("alpha", alpha),
+        ("Sigma", Sigma),
+        ("w_prev", w_prev),
+        ("tc_linear", tc_linear),
+    ):
         if not np.all(np.isfinite(arr)):
             raise ValueError(f"{name} must be finite")
     if eta0 is None:
-        L = max(2.0 * risk_aversion * float(np.abs(Sigma).sum(axis=1).max()),
-                1e-6)
+        L = max(2.0 * risk_aversion * float(np.abs(Sigma).sum(axis=1).max()), 1e-6)
         eta0 = 1.0 / L
     if iters < 1 or proj_passes < 1 or eta0 <= 0 or step_decay < 0:
         raise ValueError("bad solver parameters")
@@ -410,8 +419,7 @@ def solve(
         w = project(v, constraints, w_prev, Sigma, proj_passes)
         fw = f(w)
         trajectory.append(fw)
-        if max_violation(w, constraints, w_prev, Sigma) <= feas_tol \
-                and fw > best_f:
+        if max_violation(w, constraints, w_prev, Sigma) <= feas_tol and fw > best_f:
             best_f = fw
             best_w = w.copy()
             best_k = k + 1

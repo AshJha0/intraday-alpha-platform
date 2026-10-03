@@ -40,10 +40,10 @@ from typing import Dict, List, Optional
 class RefitContext:
     """Everything a policy may look at — knowable strictly before now_ns."""
 
-    now_ns: int                       # decision event time (block boundary)
-    last_fit_ns: int                  # event time of the last (re)fit
+    now_ns: int  # decision event time (block boundary)
+    last_fit_ns: int  # event time of the last (re)fit
     psi_by_series: Dict[str, Optional[float]] = field(default_factory=dict)
-    ic_z: Optional[float] = None      # rolling realized-IC z vs research
+    ic_z: Optional[float] = None  # rolling realized-IC z vs research
 
     @property
     def elapsed_ns(self) -> int:
@@ -139,13 +139,9 @@ class DriftTriggeredPolicy(RefitPolicy):
         for series in sorted(ctx.psi_by_series):
             v = ctx.psi_by_series[series]
             if v is not None and v > self.psi_threshold:
-                reasons.append(
-                    f"psi[{series}]={v:.6f} > threshold {self.psi_threshold}"
-                )
+                reasons.append(f"psi[{series}]={v:.6f} > threshold {self.psi_threshold}")
         if ctx.ic_z is not None and ctx.ic_z < self.ic_z_threshold:
-            reasons.append(
-                f"ic_z={ctx.ic_z:.4f} < threshold {self.ic_z_threshold}"
-            )
+            reasons.append(f"ic_z={ctx.ic_z:.4f} < threshold {self.ic_z_threshold}")
         return RefitDecision(refit=bool(reasons), reasons=reasons)
 
     def describe(self) -> dict:
@@ -162,12 +158,20 @@ class DriftTriggeredPolicy(RefitPolicy):
 # ---------------------------------------------------------------------------
 
 _REQ_INT_FIELDS = (
-    "block_ns", "warmup_ns", "train_window_ns", "embargo_ns",
-    "monitor_window_ns", "ic_window_ns", "ic_bucket_ns",
-    "min_psi_samples", "min_ic_buckets",
+    "block_ns",
+    "warmup_ns",
+    "train_window_ns",
+    "embargo_ns",
+    "monitor_window_ns",
+    "ic_window_ns",
+    "ic_bucket_ns",
+    "min_psi_samples",
+    "min_ic_buckets",
 )
 _REQ_LIFECYCLE = (
-    "watch_ic_gate", "reactivate_ic_gate", "retire_breach_evals",
+    "watch_ic_gate",
+    "reactivate_ic_gate",
+    "retire_breach_evals",
     "reactivate_evals",
 )
 

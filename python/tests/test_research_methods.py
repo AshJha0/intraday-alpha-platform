@@ -48,13 +48,23 @@ from conftest import CONFIGS_DIR, GOLDEN_DIR
 from test_validation_framework import _BackwardsAlpha, _backwards_frames
 
 NS_S = 1_000_000_000
-META = {1: {"tick_size": 0.01, "lot_size": 100, "adv": 1_000_000.0,
-            "asset_class": "EQUITY", "ref_price": 25.0}}
+META = {
+    1: {
+        "tick_size": 0.01,
+        "lot_size": 100,
+        "adv": 1_000_000.0,
+        "asset_class": "EQUITY",
+        "ref_price": 25.0,
+    }
+}
 
 
 def _cost_model(**kw) -> CostModel:
-    base = dict(impact_coeff_bps_per_pct_adv=2.0, equity_taker_fee_per_share=0.003,
-                fx_commission_per_million=2.5)
+    base = dict(
+        impact_coeff_bps_per_pct_adv=2.0,
+        equity_taker_fee_per_share=0.003,
+        fx_commission_per_million=2.5,
+    )
     base.update(kw)
     return CostModel(**base)
 
@@ -82,33 +92,41 @@ def test_linear_costs_are_unchanged_by_the_new_fields():
 
 
 def test_sqrt_impact_hand_calc_and_concavity():
-    cm = _cost_model().with_sqrt_impact(100.0)        # 100 bps at one ADV
+    cm = _cost_model().with_sqrt_impact(100.0)  # 100 bps at one ADV
     assert cm.impact_model == "sqrt" and cm.with_multiplier(2.0).impact_model == "sqrt"
-    q = np.array([10_000.0, 40_000.0])                # 1 % and 4 % of ADV
-    c = cm.cost_components(q, np.array([25.0, 25.0]), np.array([0.01, 0.01]),
-                           "EQUITY", adv=1_000_000.0, lot_size=100)
-    assert c["impact"][0] == pytest.approx(100.0 * 0.1 * 1e-4 * 10_000 * 25.0)   # 10 bps
-    assert c["impact"][1] == pytest.approx(100.0 * 0.2 * 1e-4 * 40_000 * 25.0)   # 20 bps
+    q = np.array([10_000.0, 40_000.0])  # 1 % and 4 % of ADV
+    c = cm.cost_components(
+        q, np.array([25.0, 25.0]), np.array([0.01, 0.01]), "EQUITY", adv=1_000_000.0, lot_size=100
+    )
+    assert c["impact"][0] == pytest.approx(100.0 * 0.1 * 1e-4 * 10_000 * 25.0)  # 10 bps
+    assert c["impact"][1] == pytest.approx(100.0 * 0.2 * 1e-4 * 40_000 * 25.0)  # 20 bps
     # 4x the size costs 2x the bps (sqrt), not 4x (linear)
     assert cm.impact_bps(np.array([0.04]))[0] == pytest.approx(
-        2.0 * cm.impact_bps(np.array([0.01]))[0])
+        2.0 * cm.impact_bps(np.array([0.01]))[0]
+    )
     lin = _cost_model()
     assert lin.impact_bps(np.array([0.04]))[0] == pytest.approx(
-        4.0 * lin.impact_bps(np.array([0.01]))[0])
+        4.0 * lin.impact_bps(np.array([0.01]))[0]
+    )
     # spread and fee are the same under both models
-    lc = lin.cost_components(q, np.array([25.0, 25.0]), np.array([0.01, 0.01]),
-                             "EQUITY", adv=1_000_000.0, lot_size=100)
+    lc = lin.cost_components(
+        q, np.array([25.0, 25.0]), np.array([0.01, 0.01]), "EQUITY", adv=1_000_000.0, lot_size=100
+    )
     assert np.array_equal(lc["spread"], c["spread"]) and np.array_equal(lc["fee"], c["fee"])
 
 
 def test_breakeven_size_is_where_edge_equals_cost():
-    for cm in (_cost_model(), _cost_model().with_sqrt_impact(100.0),
-               _cost_model(multiplier=2.0).with_sqrt_impact(60.0)):
-        edge = 30e-4                                   # 30 bps per round trip
+    for cm in (
+        _cost_model(),
+        _cost_model().with_sqrt_impact(100.0),
+        _cost_model(multiplier=2.0).with_sqrt_impact(60.0),
+    ):
+        edge = 30e-4  # 30 bps per round trip
         q = cm.breakeven_size(edge, 25.0, 0.01, "EQUITY", 1_000_000.0, 100)
         assert 0.0 < q < float("inf")
-        comp = cm.cost_components(np.array([q]), np.array([25.0]), np.array([0.01]),
-                                  "EQUITY", 1_000_000.0, 100)
+        comp = cm.cost_components(
+            np.array([q]), np.array([25.0]), np.array([0.01]), "EQUITY", 1_000_000.0, 100
+        )
         round_trip = 2.0 * float(comp["spread"][0] + comp["fee"][0] + comp["impact"][0])
         assert round_trip == pytest.approx(edge * q * 25.0, rel=1e-9)
         # one share more loses money, one less makes it
@@ -144,13 +162,15 @@ def test_capacity_breakeven_grows_with_the_edge_unlike_the_participation_proxy()
 
 def _l1_frame(n, bid_size, ask_size, mids=None, valid=None):
     ts = NS_S + np.arange(n, dtype=np.int64) * NS_S
-    frame = pd.DataFrame({
-        "exchange_ts": ts,
-        "mid_price_v1": np.full(n, 25.0) if mids is None else np.asarray(mids, float),
-        "spread_ticks_v1": np.full(n, 2.0),
-        "depth_bid_l1_v1": np.asarray(bid_size, dtype=float),
-        "depth_ask_l1_v1": np.asarray(ask_size, dtype=float),
-    })
+    frame = pd.DataFrame(
+        {
+            "exchange_ts": ts,
+            "mid_price_v1": np.full(n, 25.0) if mids is None else np.asarray(mids, float),
+            "spread_ticks_v1": np.full(n, 2.0),
+            "depth_bid_l1_v1": np.asarray(bid_size, dtype=float),
+            "depth_ask_l1_v1": np.asarray(ask_size, dtype=float),
+        }
+    )
     if valid is not None:
         frame["label_valid_1s"] = np.asarray(valid, dtype=bool)
     return frame
@@ -158,11 +178,13 @@ def _l1_frame(n, bid_size, ask_size, mids=None, valid=None):
 
 def _scores(er):
     n = len(er)
-    return pd.DataFrame({
-        "exchange_ts": NS_S + np.arange(n, dtype=np.int64) * NS_S,
-        "expected_return": np.asarray(er, dtype=float),
-        "confidence": np.ones(n),
-    })
+    return pd.DataFrame(
+        {
+            "exchange_ts": NS_S + np.arange(n, dtype=np.int64) * NS_S,
+            "expected_return": np.asarray(er, dtype=float),
+            "confidence": np.ones(n),
+        }
+    )
 
 
 def test_fill_cap_limits_each_fill_to_the_displayed_size():
@@ -170,31 +192,37 @@ def test_fill_cap_limits_each_fill_to_the_displayed_size():
     frame = _l1_frame(6, bid_size=[500] * 6, ask_size=[300, 300, 300, np.nan, 300, 300])
     cfg = dict(max_pos_qty=1000, latency_rows=0)
     full = Backtester(_cost_model(), META, BacktestConfig(**cfg)).run_instrument(
-        1, frame, _scores(er))
-    capped = Backtester(_cost_model(), META, BacktestConfig(
-        cap_fills_at_l1=True, **cfg)).run_instrument(1, frame, _scores(er))
-    assert full.positions.tolist() == [1000] * 6            # fills 1000 at a 300 touch
+        1, frame, _scores(er)
+    )
+    capped = Backtester(
+        _cost_model(), META, BacktestConfig(cap_fills_at_l1=True, **cfg)
+    ).run_instrument(1, frame, _scores(er))
+    assert full.positions.tolist() == [1000] * 6  # fills 1000 at a 300 touch
     assert capped.positions.tolist() == [300, 600, 900, 900, 1000, 1000]
     assert capped.trade_count == 4 and capped.traded_qty == 1000
     # selling takes the BID size
-    down = Backtester(_cost_model(), META, BacktestConfig(
-        cap_fills_at_l1=True, **cfg)).run_instrument(1, frame, _scores([-1e-3] * 6))
+    down = Backtester(
+        _cost_model(), META, BacktestConfig(cap_fills_at_l1=True, **cfg)
+    ).run_instrument(1, frame, _scores([-1e-3] * 6))
     assert down.positions.tolist() == [-500, -1000, -1000, -1000, -1000, -1000]
 
 
 def test_fill_cap_keeps_the_accounting_identity_and_exempts_the_session_flatten():
     day = 86_400 * NS_S
     n = 8
-    frame = _l1_frame(n, bid_size=[100] * n, ask_size=[400] * n,
-                      mids=25.0 + 0.01 * np.arange(n))
+    frame = _l1_frame(n, bid_size=[100] * n, ask_size=[400] * n, mids=25.0 + 0.01 * np.arange(n))
     ts = frame["exchange_ts"].to_numpy().copy()
-    ts[4:] += day                                      # two sessions of four rows
+    ts[4:] += day  # two sessions of four rows
     frame["exchange_ts"] = ts
     scores = _scores([1e-3] * n)
     scores["exchange_ts"] = ts
-    res = Backtester(_cost_model(), META, BacktestConfig(
-        max_pos_qty=1000, latency_rows=0, cap_fills_at_l1=True,
-        flatten_at_session_end=True)).run_instrument(1, frame, scores)
+    res = Backtester(
+        _cost_model(),
+        META,
+        BacktestConfig(
+            max_pos_qty=1000, latency_rows=0, cap_fills_at_l1=True, flatten_at_session_end=True
+        ),
+    ).run_instrument(1, frame, scores)
     # builds 400 a row, then is flat at each close although the bid shows 100
     assert res.positions.tolist() == [400, 800, 1000, 0, 400, 800, 1000, 0]
     mark = frame["mid_price_v1"].to_numpy()
@@ -202,7 +230,8 @@ def test_fill_cap_keeps_the_accounting_identity_and_exempts_the_session_flatten(
     assert res.total_pnl == pytest.approx(gross - res.total_costs, abs=1e-9)
     with pytest.raises(ValueError, match="cap_fills_at_l1 needs"):
         Backtester(_cost_model(), META, BacktestConfig(cap_fills_at_l1=True)).run_instrument(
-            1, frame.drop(columns=["depth_ask_l1_v1"]), scores)
+            1, frame.drop(columns=["depth_ask_l1_v1"]), scores
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -214,41 +243,55 @@ def test_blocked_rows_make_no_decision_and_default_is_unchanged():
     er = [1e-3, 1e-3, -1e-3, -1e-3, 1e-3, 1e-3]
     valid = [True, True, False, False, True, True]
     frame = _l1_frame(6, [1e9] * 6, [1e9] * 6, valid=valid)
-    base = Backtester(_cost_model(), META, BacktestConfig(
-        max_pos_qty=100, latency_rows=0)).run_instrument(1, frame, _scores(er))
-    assert base.positions.tolist() == [100, 100, -100, -100, 100, 100]
-    blocked = Backtester(_cost_model(), META, BacktestConfig(
-        max_pos_qty=100, latency_rows=0, block_rows_column="label_valid_1s")
+    base = Backtester(
+        _cost_model(), META, BacktestConfig(max_pos_qty=100, latency_rows=0)
     ).run_instrument(1, frame, _scores(er))
-    assert blocked.positions.tolist() == [100] * 6          # the two rows are skipped
+    assert base.positions.tolist() == [100, 100, -100, -100, 100, 100]
+    blocked = Backtester(
+        _cost_model(),
+        META,
+        BacktestConfig(max_pos_qty=100, latency_rows=0, block_rows_column="label_valid_1s"),
+    ).run_instrument(1, frame, _scores(er))
+    assert blocked.positions.tolist() == [100] * 6  # the two rows are skipped
     assert blocked.trade_count == 1 and base.trade_count == 3
     with pytest.raises(ValueError, match="block_rows_column"):
-        Backtester(_cost_model(), META, BacktestConfig(
-            block_rows_column="label_valid_5s")).run_instrument(1, frame, _scores(er))
+        Backtester(
+            _cost_model(), META, BacktestConfig(block_rows_column="label_valid_5s")
+        ).run_instrument(1, frame, _scores(er))
 
 
-@pytest.mark.parametrize("latency", [
-    dict(latency_rows=1), dict(latency_rows=2, max_decision_age_ns=10 * NS_S),
-    dict(latency_ns=NS_S), dict(latency_ns=NS_S, max_decision_age_ns=10 * NS_S),
-])
+@pytest.mark.parametrize(
+    "latency",
+    [
+        dict(latency_rows=1),
+        dict(latency_rows=2, max_decision_age_ns=10 * NS_S),
+        dict(latency_ns=NS_S),
+        dict(latency_ns=NS_S, max_decision_age_ns=10 * NS_S),
+    ],
+)
 def test_blocking_applies_at_the_decision_row_under_every_latency_mode(latency):
-    rng = np.random.default_rng(3)                     # test-only fixture data
+    rng = np.random.default_rng(3)  # test-only fixture data
     n = 60
     er = rng.standard_normal(n) * 1e-3
     valid = rng.uniform(size=n) > 0.4
     frame = _l1_frame(n, [1e9] * n, [1e9] * n, valid=valid)
-    blocked = Backtester(_cost_model(), META, BacktestConfig(
-        max_pos_qty=100, block_rows_column="label_valid_1s", **latency)
+    blocked = Backtester(
+        _cost_model(),
+        META,
+        BacktestConfig(max_pos_qty=100, block_rows_column="label_valid_1s", **latency),
     ).run_instrument(1, frame, _scores(er))
     # reference: a backtest of scores whose blocked rows carry "no decision"
     # is exactly a backtest in which those rows repeat the previous target
     all_true = frame.assign(label_valid_1s=True)
-    same = Backtester(_cost_model(), META, BacktestConfig(
-        max_pos_qty=100, block_rows_column="label_valid_1s", **latency)
+    same = Backtester(
+        _cost_model(),
+        META,
+        BacktestConfig(max_pos_qty=100, block_rows_column="label_valid_1s", **latency),
     ).run_instrument(1, all_true, _scores(er))
-    plain = Backtester(_cost_model(), META, BacktestConfig(
-        max_pos_qty=100, **latency)).run_instrument(1, frame, _scores(er))
-    assert np.array_equal(same.positions, plain.positions)   # nothing blocked = default
+    plain = Backtester(
+        _cost_model(), META, BacktestConfig(max_pos_qty=100, **latency)
+    ).run_instrument(1, frame, _scores(er))
+    assert np.array_equal(same.positions, plain.positions)  # nothing blocked = default
     assert not np.array_equal(blocked.positions, plain.positions)
     assert blocked.trade_count <= plain.trade_count
 
@@ -268,11 +311,11 @@ def test_blackout_reopen_return_is_opt_in_and_scores_the_reopen_price():
     series = _halt_series()
     anchors = [t * NS_S for t in range(25)]
     plain = compute_labels(anchors, series, 29 * NS_S, horizons=("5s",))["5s"]
-    assert plain.reopen_mid == []                            # default: untouched
-    lab = compute_labels(anchors, series, 29 * NS_S, horizons=("5s",),
-                         blackout_reopen=True)["5s"]
-    assert (lab.mid == plain.mid or all(
-        (a == b) or (a != a and b != b) for a, b in zip(lab.mid, plain.mid)))
+    assert plain.reopen_mid == []  # default: untouched
+    lab = compute_labels(anchors, series, 29 * NS_S, horizons=("5s",), blackout_reopen=True)["5s"]
+    assert lab.mid == plain.mid or all(
+        (a == b) or (a != a and b != b) for a, b in zip(lab.mid, plain.mid)
+    )
     assert lab.valid == plain.valid and lab.reason == plain.reason
     # anchors 5..9: the 5 s horizon ends inside or just after the halt
     for t in range(5, 10):
@@ -289,8 +332,7 @@ def test_blackout_reopen_needs_a_reopen():
     s = MidSeries()
     for t in range(12):
         s.append(t * NS_S, 100.0 if t < 8 else float("nan"), 0.01, t < 8)
-    lab = compute_labels([5 * NS_S], s, 11 * NS_S, horizons=("5s",),
-                         blackout_reopen=True)["5s"]
+    lab = compute_labels([5 * NS_S], s, 11 * NS_S, horizons=("5s",), blackout_reopen=True)["5s"]
     assert lab.reason[0] == LabelReason.BLACKOUT and math.isnan(lab.reopen_mid[0])
 
 
@@ -307,16 +349,16 @@ def test_ic_with_blackout_reopen_removes_the_survivor_selection():
     halted = np.arange(n) % 5 == 0
     valid[halted] = False
     reason[halted] = LabelReason.BLACKOUT
-    reopen[halted] = -3.0 * x[halted]                   # wrong-footed by the reopen
-    other = np.arange(n) % 97 == 1                      # invalid for another reason
+    reopen[halted] = -3.0 * x[halted]  # wrong-footed by the reopen
+    other = np.arange(n) % 97 == 1  # invalid for another reason
     valid[other] = False
     reason[other] = LabelReason.BLACKOUT | LabelReason.FORWARD_STALE
     reopen[other] = 50.0
     out = ic_with_blackout_reopen(x, label, valid, reason, reopen)
     assert out["ic_valid_only"] == pytest.approx(ic(x, np.where(valid, label, np.nan)))
     assert out["ic_valid_only"] > 0.2
-    assert out["ic"] < 0.0                               # the sign flips
-    assert out["n_blackout_scored"] == int((halted & ~other).sum())   # BLACKOUT alone
+    assert out["ic"] < 0.0  # the sign flips
+    assert out["n_blackout_scored"] == int((halted & ~other).sum())  # BLACKOUT alone
     assert out["n_valid"] == int(valid.sum())
     # with nothing to rescue the two agree exactly
     none = ic_with_blackout_reopen(x, label, valid, reason, np.full(n, np.nan))
@@ -340,10 +382,8 @@ def test_instrument_ics_hand_calc():
     assert out["by_instrument"] == pytest.approx(want)
     assert out["instrument_mean"] == pytest.approx(np.mean(list(want.values())))
     assert out["n_instruments"] == 3 and out["n_skipped"] == 0
-    zx = np.concatenate([(x[ids == i] - x[ids == i].mean()) / x[ids == i].std()
-                         for i in (1, 2, 3)])
-    zy = np.concatenate([(y[ids == i] - y[ids == i].mean()) / y[ids == i].std()
-                         for i in (1, 2, 3)])
+    zx = np.concatenate([(x[ids == i] - x[ids == i].mean()) / x[ids == i].std() for i in (1, 2, 3)])
+    zy = np.concatenate([(y[ids == i] - y[ids == i].mean()) / y[ids == i].std() for i in (1, 2, 3)])
     assert out["vol_scaled"] == pytest.approx(float(np.corrcoef(zx, zy)[0, 1]))
 
 
@@ -381,7 +421,7 @@ def test_instrument_ics_removes_between_instrument_level_differences():
 
 def test_instrument_ics_degenerate_inputs():
     ids = np.repeat([1, 2], 40)
-    x = np.concatenate([np.arange(40.0), np.ones(40)])       # instrument 2 is flat
+    x = np.concatenate([np.arange(40.0), np.ones(40)])  # instrument 2 is flat
     y = np.concatenate([np.arange(40.0) ** 2, np.arange(40.0)])
     out = instrument_ics(ids, x, y)
     assert out["n_instruments"] == 1 and out["n_skipped"] == 1
@@ -393,12 +433,30 @@ def test_instrument_ics_degenerate_inputs():
 
 def _validate_backwards(**kw):
     frames = _backwards_frames()
-    meta = {1: {"tick_size": 0.01, "lot_size": 1, "adv": 1_000_000.0,
-                "asset_class": "EQUITY", "ref_price": 25.0}}
+    meta = {
+        1: {
+            "tick_size": 0.01,
+            "lot_size": 1,
+            "adv": 1_000_000.0,
+            "asset_class": "EQUITY",
+            "ref_price": 25.0,
+        }
+    }
     bt = Backtester(_cost_model(), meta, BacktestConfig(max_pos_qty=100, latency_rows=1))
-    return frames, bt, validate_alpha(
-        _BackwardsAlpha, frames, bt, {1: {"adv": 1_000_000.0, "ref_price": 25.0}},
-        0.1, n_folds=4, embargo_ns=NS_S, **kw)
+    return (
+        frames,
+        bt,
+        validate_alpha(
+            _BackwardsAlpha,
+            frames,
+            bt,
+            {1: {"adv": 1_000_000.0, "ref_price": 25.0}},
+            0.1,
+            n_folds=4,
+            embargo_ns=NS_S,
+            **kw,
+        ),
+    )
 
 
 def test_validation_report_carries_the_scale_free_ics():
@@ -423,7 +481,8 @@ def test_hac_mean_variance_is_the_newey_west_tstat_decomposed():
         m, var, n = hac_mean_variance(s, lags=lags, weights=w)
         assert n == 60
         assert m / math.sqrt(var) == pytest.approx(
-            newey_west_tstat(s, lags=lags, weights=w), rel=1e-12)
+            newey_west_tstat(s, lags=lags, weights=w), rel=1e-12
+        )
     m, var, n = hac_mean_variance(np.array([0.1]), lags=2)
     assert (m, n) == (0.1, 1) and math.isnan(var)
     assert hac_mean_variance(np.array([]))[2] == 0
@@ -431,16 +490,25 @@ def test_hac_mean_variance_is_the_newey_west_tstat_decomposed():
 
 def _ic_window(seed, n_buckets, slope, per=200, bucket_ns=300 * NS_S):
     rng = np.random.default_rng(seed)
-    ts = np.repeat(np.arange(n_buckets, dtype=np.int64) * bucket_ns, per) + \
-        np.tile(np.arange(per, dtype=np.int64) * NS_S, n_buckets)
+    ts = np.repeat(np.arange(n_buckets, dtype=np.int64) * bucket_ns, per) + np.tile(
+        np.arange(per, dtype=np.int64) * NS_S, n_buckets
+    )
     x = rng.standard_normal(n_buckets * per)
     y = slope * x + rng.standard_normal(n_buckets * per)
     return ts, x, y
 
 
 def _baseline(ic_mean, ic_std, n):
-    return ICBaseline(name="b", alpha_id="A", source="t", ic_mean=ic_mean, ic_std=ic_std,
-                      n_buckets_baseline=n, bucket_ns=300 * NS_S, horizon="1s")
+    return ICBaseline(
+        name="b",
+        alpha_id="A",
+        source="t",
+        ic_mean=ic_mean,
+        ic_std=ic_std,
+        n_buckets_baseline=n,
+        bucket_ns=300 * NS_S,
+        horizon="1s",
+    )
 
 
 def test_two_sample_hac_z_hand_calc_and_guards():
@@ -458,28 +526,28 @@ def test_hac_z_accounts_for_the_baseline_mean_error():
     ~ 1 + n_live / n_base, the HAC z ~ 1."""
     pinned, hac = [], []
     for seed in range(60):
-        bts, bx, by = _ic_window(1000 + seed, 8, 0.05)       # a SHORT baseline
+        bts, bx, by = _ic_window(1000 + seed, 8, 0.05)  # a SHORT baseline
         bics, bcounts = bucket_ics_with_counts(bts, bx, by)
         baseline = _baseline(float(bics.mean()), float(bics.std()), int(bics.size))
-        ts, x, y = _ic_window(5000 + seed, 24, 0.05)         # a 3x longer live window
+        ts, x, y = _ic_window(5000 + seed, 24, 0.05)  # a 3x longer live window
         pinned.append(rolling_ic_z(baseline, ts, x, y).z)
         got = rolling_ic_z_hac(baseline, ts, x, y, lags=1)
         hac.append(got.z)
         assert got.n_buckets == 24 and len(got.bucket_ics) == 24
-    assert np.var(pinned) > 2.5                              # ~ 1 + 24/8, and more
+    assert np.var(pinned) > 2.5  # ~ 1 + 24/8, and more
     assert np.var(hac) < 1.6
-    assert np.mean(np.abs(np.asarray(pinned)) > 2.0) > 3 * np.mean(
-        np.abs(np.asarray(hac)) > 2.0)
+    assert np.mean(np.abs(np.asarray(pinned)) > 2.0) > 3 * np.mean(np.abs(np.asarray(hac)) > 2.0)
 
 
 def test_hac_z_still_detects_a_real_shift_and_uses_the_baseline_series():
     bts, bx, by = _ic_window(7, 60, 0.20)
     bics, bcounts = bucket_ics_with_counts(bts, bx, by)
     baseline = _baseline(float(bics.mean()), float(bics.std()), int(bics.size))
-    ts, x, y = _ic_window(8, 30, 0.0)                         # the signal is gone
+    ts, x, y = _ic_window(8, 30, 0.0)  # the signal is gone
     summary = rolling_ic_z_hac(baseline, ts, x, y)
-    series = rolling_ic_z_hac(baseline, ts, x, y, baseline_bucket_ics=bics,
-                              baseline_bucket_counts=bcounts)
+    series = rolling_ic_z_hac(
+        baseline, ts, x, y, baseline_bucket_ics=bics, baseline_bucket_counts=bcounts
+    )
     assert summary.z < -5.0 and series.z < -5.0
     assert summary.rolling_ic == pytest.approx(series.rolling_ic)
     # too few live buckets: silence, as in the pinned monitor
@@ -503,8 +571,9 @@ def test_hac_z_widens_under_autocorrelated_bucket_ics():
 
 
 def _tracker(**kw):
-    cfg = dict(watch_ic_gate=0.0, reactivate_ic_gate=0.01, retire_breach_evals=3,
-               reactivate_evals=2)
+    cfg = dict(
+        watch_ic_gate=0.0, reactivate_ic_gate=0.01, retire_breach_evals=3, reactivate_evals=2
+    )
     cfg.update(kw)
     return LifecycleTracker(alpha_id="A", config=LifecycleConfig(**cfg))
 
@@ -516,8 +585,10 @@ def test_lifecycle_config_defaults_to_the_consecutive_rule():
     block = pinned["adaptive"]["lifecycle"]
     assert "breach_rule" not in block
     assert LifecycleConfig.from_config(block).breach_rule == "consecutive"
-    assert LifecycleConfig.from_config(
-        {**block, "breach_rule": "cusum", "cusum_h": 0.05}).cusum_h == 0.05
+    assert (
+        LifecycleConfig.from_config({**block, "breach_rule": "cusum", "cusum_h": 0.05}).cusum_h
+        == 0.05
+    )
     with pytest.raises(ValueError, match="unknown breach_rule"):
         LifecycleConfig(0.0, 0.01, 3, 2, breach_rule="ewma")
     with pytest.raises(ValueError, match="cusum_h"):
@@ -554,26 +625,26 @@ def test_cusum_does_not_retire_on_one_bad_stretch_seen_through_overlapping_windo
     assert overlapping.cusum == pytest.approx(3 * 0.02 / 6.0)
     assert disjoint.state == RETIRED
     assert "CUSUM" in disjoint.transitions[-1].reason
-    assert disjoint.cusum == 0.0                          # reset by the verdict
+    assert disjoint.cusum == 0.0  # reset by the verdict
     # the overlapping tracker retires after the evidence has accumulated
     for i in range(3, 20):
         if overlapping.update(i, -0.02, new_fraction=1.0 / 6.0) == RETIRED:
             break
-    assert overlapping.state == RETIRED and i == 14       # 15 readings * 0.02 / 6
+    assert overlapping.state == RETIRED and i == 14  # 15 readings * 0.02 / 6
 
 
 def test_cusum_slack_drains_and_recovery_is_unchanged():
     t = _tracker(breach_rule="cusum", cusum_h=0.05, cusum_k=0.005)
-    assert t.update(0, -0.02) == WATCH                    # entering WATCH: as before
+    assert t.update(0, -0.02) == WATCH  # entering WATCH: as before
     assert t.cusum == pytest.approx(0.015)
-    t.update(1, -0.004)                                   # under the gate, inside the slack
+    t.update(1, -0.004)  # under the gate, inside the slack
     assert t.cusum == pytest.approx(0.014) and t.state == WATCH
-    t.update(2, None)                                     # silence moves nothing
+    t.update(2, None)  # silence moves nothing
     t.update(3, -0.5, informative=False)
     assert t.cusum == pytest.approx(0.014)
     t.update(4, 0.02)
-    assert t.state == WATCH and t.cusum == 0.0            # drained by a good reading
-    assert t.update(5, 0.02) == ACTIVE                    # two recoveries re-activate
+    assert t.state == WATCH and t.cusum == 0.0  # drained by a good reading
+    assert t.update(5, 0.02) == ACTIVE  # two recoveries re-activate
     with pytest.raises(ValueError, match="new_fraction"):
         t.update(6, 0.0, new_fraction=0.0)
     # a retired alpha recovers through WATCH exactly as under the pinned rule
@@ -599,14 +670,19 @@ def _toy_builder(events):
     centred 3-event mean — it reads the NEXT event (feature look-ahead)."""
     px = np.array([e.px for e in events], dtype=float)
     n = len(px)
-    causal = np.array([px[max(0, i - 2): i + 1].mean() for i in range(n)])
-    centred = np.array([px[max(0, i - 1): i + 2].mean() for i in range(n)])
-    return {1: pd.DataFrame({
-        "exchange_ts": np.array([e.exchange_ts for e in events], dtype=np.int64),
-        "causal": causal - px, "centred": centred - px,
-        "label_mid_1s": np.concatenate((px[1:] / px[:-1] - 1.0, [np.nan])),
-        "label_valid_1s": np.concatenate((np.ones(n - 1, dtype=bool), [False])),
-    })}
+    causal = np.array([px[max(0, i - 2) : i + 1].mean() for i in range(n)])
+    centred = np.array([px[max(0, i - 1) : i + 2].mean() for i in range(n)])
+    return {
+        1: pd.DataFrame(
+            {
+                "exchange_ts": np.array([e.exchange_ts for e in events], dtype=np.int64),
+                "causal": causal - px,
+                "centred": centred - px,
+                "label_mid_1s": np.concatenate((px[1:] / px[:-1] - 1.0, [np.nan])),
+                "label_valid_1s": np.concatenate((np.ones(n - 1, dtype=bool), [False])),
+            }
+        )
+    }
 
 
 class _ToyAlpha(LinearAlpha):
@@ -662,8 +738,15 @@ def test_recompute_probe_catches_feature_lookahead_the_frame_probe_cannot_see():
     leaky = _LeakyFeatureAlpha()
     leaky.fit(frames)
     # the leaky alpha is far "better" — which is the whole danger
-    assert abs(ic(leaky.score(frames)[1]["expected_return"].to_numpy(),
-                  frames[1]["label_mid_1s"].to_numpy())) > 0.3
+    assert (
+        abs(
+            ic(
+                leaky.score(frames)[1]["expected_return"].to_numpy(),
+                frames[1]["label_mid_1s"].to_numpy(),
+            )
+        )
+        > 0.3
+    )
 
     got = tester.recompute_probe(leaky, events, _toy_builder, n_probes=3)
     assert not got.ok and got.n_anchors == 3
@@ -756,35 +839,39 @@ def test_stationary_bootstrap_degenerate_and_invalid_inputs():
 
 def test_fold_diagnostics_reports_every_fold_and_matches_the_last_fold_of_validate():
     frames, bt, report = _validate_backwards()
-    diag = fold_diagnostics(_BackwardsAlpha, frames, bt, n_folds=4, embargo_ns=NS_S,
-                            seed=20_260_919, n_boot=200)
+    diag = fold_diagnostics(
+        _BackwardsAlpha, frames, bt, n_folds=4, embargo_ns=NS_S, seed=20_260_919, n_boot=200
+    )
     assert diag["n_folds_run"] == 4 == len(diag["folds"])
     assert [f["fold"] for f in diag["folds"]] == [r["fold"] for r in report["folds"]]
     for f, r in zip(diag["folds"], report["folds"]):
         assert f["n_test_pairs"] == r["n_test_pairs"] and f["degenerate"] == r["degenerate"]
         assert sorted(f["net_pnl_by_cost"]) == ["x0.5", "x1", "x2"]
-        assert f["net_pnl_by_cost"]["x0.5"] > f["net_pnl_by_cost"]["x1"] > \
-            f["net_pnl_by_cost"]["x2"]
+        assert (
+            f["net_pnl_by_cost"]["x0.5"] > f["net_pnl_by_cost"]["x1"] > f["net_pnl_by_cost"]["x2"]
+        )
         assert f["survives_1x_cost"] == (f["net_pnl_by_cost"]["x1"] > 0.0)
         assert set(f["regime"]) == {"ic_high_vol", "ic_low_vol"}
-        assert f["decay_ic_by_horizon"]["1s"] < 0.0           # backwards in EVERY fold
+        assert f["decay_ic_by_horizon"]["1s"] < 0.0  # backwards in EVERY fold
     # the last fold is exactly what validate_alpha reports as its one view
     last = diag["folds"][-1]
     assert last["net_pnl_by_cost"]["x1"] == pytest.approx(report["net_pnl_1x_cost"])
     assert last["regime"] == pytest.approx(report["stress"]["regime"])
-    assert last["decay_ic_by_horizon"]["1s"] == pytest.approx(
-        report["decay_ic_by_horizon"]["1s"])
+    assert last["decay_ic_by_horizon"]["1s"] == pytest.approx(report["decay_ic_by_horizon"]["1s"])
     assert diag["n_folds_survive_1x_cost"] == 0
     boot = diag["net_pnl_bootstrap"]
     assert boot["seed"] == 20_260_919 and boot["n_boot"] == 200
     assert boot["estimate"] == pytest.approx(diag["net_pnl_1x_pooled"])
     assert diag["net_pnl_1x_pooled"] == pytest.approx(
-        sum(f["net_pnl_by_cost"]["x1"] for f in diag["folds"]))
-    assert boot["ci_high"] < 0.0                              # loses money, reliably
-    again = fold_diagnostics(_BackwardsAlpha, frames, bt, n_folds=4, embargo_ns=NS_S,
-                             seed=20_260_919, n_boot=200)
+        sum(f["net_pnl_by_cost"]["x1"] for f in diag["folds"])
+    )
+    assert boot["ci_high"] < 0.0  # loses money, reliably
+    again = fold_diagnostics(
+        _BackwardsAlpha, frames, bt, n_folds=4, embargo_ns=NS_S, seed=20_260_919, n_boot=200
+    )
     assert again == diag
     json.dumps(diag, allow_nan=False)
     with pytest.raises(ValueError, match="multipliers must include 1.0"):
-        fold_diagnostics(_BackwardsAlpha, frames, bt, n_folds=4, embargo_ns=NS_S,
-                         multipliers=(0.5, 2.0))
+        fold_diagnostics(
+            _BackwardsAlpha, frames, bt, n_folds=4, embargo_ns=NS_S, multipliers=(0.5, 2.0)
+        )

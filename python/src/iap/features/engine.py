@@ -76,10 +76,15 @@ _HIST_KEEP_NS = 660 * _NS
 #: port, and 2^40 units leaves >= 2^23 samples of headroom per window.
 FEATURE_MAX_QTY = 1 << 40
 
-_BOOK_TOUCH = frozenset({
-    EventType.ADD, EventType.MODIFY, EventType.CANCEL,
-    EventType.EXECUTE, EventType.QUOTE,
-})
+_BOOK_TOUCH = frozenset(
+    {
+        EventType.ADD,
+        EventType.MODIFY,
+        EventType.CANCEL,
+        EventType.EXECUTE,
+        EventType.QUOTE,
+    }
+)
 
 
 @dataclass
@@ -158,7 +163,7 @@ class _InstState:
         self.venue_cache: Dict[int, tuple] = {}  # vid -> (bid10, ask10)
         self.venue_last_ts: Dict[int, int] = {}
         # rolling structures
-        self.hist2 = TimeSeries()   # mid2 (int) at mid changes
+        self.hist2 = TimeSeries()  # mid2 (int) at mid changes
         self.histlog = TimeSeries()  # ln(mid2) at mid changes
         self.rv = {w: RollingSum(WINDOW_NS[w], 3) for w in ("10s", "1m", "5m")}
         self.ext_mid = {w: RollingExtrema(WINDOW_NS[w]) for w in ("10s", "1m", "5m")}
@@ -192,12 +197,7 @@ class _InstState:
         Two-sided merged book, no stale venue, no venue in HALT or AUCTION.
         The label layer marks every other refresh as a blackout sample.
         """
-        return (
-            self.book_ok
-            and not self.stale_venues
-            and not self.halt
-            and not self.auction
-        )
+        return self.book_ok and not self.stale_venues and not self.halt and not self.auction
 
     def mid2_at(self, ts: int) -> Optional[int]:
         """Latest mid2 sample at-or-before ts (None during warmup)."""
@@ -262,8 +262,17 @@ class _InstState:
 
     def trim_all(self, t: int) -> None:
         """Evict expired samples from every rolling structure at time t."""
-        for group in (self.rv, self.midstat, self.ofi, self.depthavg,
-                      self.trades, self.evstats, self.queue, self.xc, self.xl):
+        for group in (
+            self.rv,
+            self.midstat,
+            self.ofi,
+            self.depthavg,
+            self.trades,
+            self.evstats,
+            self.queue,
+            self.xc,
+            self.xl,
+        ):
             for win in group.values():
                 win.trim(t)
         for ext in self.ext_mid.values():
@@ -297,9 +306,7 @@ class FeatureEngine:
         self.feature_names = [s.name for s in self.registry]
         self.feature_version = registry_hash()
         self.families = [(fam, family_module(fam).compute) for fam in FAMILY_ORDER]
-        self._fam_sizes = {
-            fam: len(family_module(fam).specs()) for fam in FAMILY_ORDER
-        }
+        self._fam_sizes = {fam: len(family_module(fam).specs()) for fam in FAMILY_ORDER}
         self.states: Dict[int, _InstState] = {}
         self._profiles = profiles if profiles is not None else {}
         self.events_processed = 0
@@ -320,9 +327,7 @@ class FeatureEngine:
         if st is None:
             ctx = self.contexts.get(instrument_id)
             if ctx is None:
-                raise ValueError(
-                    f"no InstrumentContext for instrument {instrument_id}"
-                )
+                raise ValueError(f"no InstrumentContext for instrument {instrument_id}")
             profile = self._profiles.get(instrument_id)
             if profile is None:
                 profile = SessionProfile(timeofday.PROFILE_METRICS)
@@ -369,9 +374,7 @@ class FeatureEngine:
         # The merged view is a function of WHICH venues are stale, so the
         # trigger is a change of the stale SET (a second venue going stale
         # must remove it from the view too), not of "any venue is stale".
-        stale_now = tuple(
-            vid for vid in sorted(st.cons.books) if st.cons.books[vid].stale
-        )
+        stale_now = tuple(vid for vid in sorted(st.cons.books) if st.cons.books[vid].stale)
         stale_changed = stale_now != st.stale_venues
         just_recovered = bool(st.stale_venues) and not stale_now
         st.stale_venues = stale_now
@@ -380,8 +383,7 @@ class FeatureEngine:
             st.events_dropped += 1
             self.events_dropped += 1
             if stale_changed:
-                self._refresh_book(st, ev.venue_id, t, just_recovered,
-                                   samples=False)
+                self._refresh_book(st, ev.venue_id, t, just_recovered, samples=False)
             return self._maybe_emit(st, t)
         st.venue_last_ts[ev.venue_id] = t
         st.venue_updates.add(t, ev.venue_id)
@@ -407,23 +409,16 @@ class FeatureEngine:
             self._add_evstats(st, t, (0, 0, 0, 0, 0, 1, ev.qty))
 
         et = ev.event_type
-        if et in _BOOK_TOUCH or (
-            et == EventType.SNAPSHOT and ev.trade_id == 0
-        ):
+        if et in _BOOK_TOUCH or (et == EventType.SNAPSHOT and ev.trade_id == 0):
             self._refresh_book(st, ev.venue_id, t, just_recovered)
         elif stale_changed:
-            self._refresh_book(st, ev.venue_id, t, just_recovered,
-                               samples=False)
+            self._refresh_book(st, ev.venue_id, t, just_recovered, samples=False)
 
         return self._maybe_emit(st, t)
 
     def _maybe_emit(self, st: _InstState, t: int) -> Optional[FeatureVector]:
         """Cadence check (pure event time); emits at most one vector."""
-        if (
-            self.cadence_ns == 0
-            or st.last_emit is None
-            or t - st.last_emit >= self.cadence_ns
-        ):
+        if self.cadence_ns == 0 or st.last_emit is None or t - st.last_emit >= self.cadence_ns:
             vec = self._emit(st, t)
             st.last_emit = t
             return vec
@@ -464,9 +459,14 @@ class FeatureEngine:
         for win in st.trades.values():
             win.add(ev.exchange_ts, vals)
 
-    def _refresh_book(self, st: _InstState, venue_id: int, t: int,
-                      just_recovered: bool = False,
-                      samples: bool = True) -> None:
+    def _refresh_book(
+        self,
+        st: _InstState,
+        venue_id: int,
+        t: int,
+        just_recovered: bool = False,
+        samples: bool = True,
+    ) -> None:
         """Recompute the merged view (pinned, API_FEATURES §2).
 
         ``samples=False`` is a *staleness refresh*: the merged view and
@@ -524,9 +524,7 @@ class FeatureEngine:
         # OFI contributions + L1 queue deltas (defined per side, book_ok or
         # not).  The first refresh after a recovery has no previous depth
         # and contributes nothing (same rule as the very first refresh).
-        sample_flow = samples and (not just_recovered) and bool(
-            prev_bid or prev_ask or bid or ask
-        )
+        sample_flow = samples and (not just_recovered) and bool(prev_bid or prev_ask or bid or ask)
         if sample_flow:
             contribs = [0, 0, 0, 0]
             for i, k in enumerate((1, 3, 5, 10)):
@@ -567,12 +565,22 @@ class FeatureEngine:
 
         # depth/imbalance/spread sample (every two-sided refresh)
         imb = []
-        for bk, ak in ((st.db1, st.da1), (st.db3, st.da3),
-                       (st.db5, st.da5), (st.db10, st.da10)):
+        for bk, ak in ((st.db1, st.da1), (st.db3, st.da3), (st.db5, st.da5), (st.db10, st.da10)):
             imb.append((bk - ak) / (bk + ak) if bk + ak > 0 else 0.0)
-        dvals = (st.db1, st.da1, st.db5, st.da5, st.db10, st.da10,
-                 imb[0], imb[1], imb[2], imb[3],
-                 st.spread_ticks, st.db10 + st.da10)
+        dvals = (
+            st.db1,
+            st.da1,
+            st.db5,
+            st.da5,
+            st.db10,
+            st.da10,
+            imb[0],
+            imb[1],
+            imb[2],
+            imb[3],
+            st.spread_ticks,
+            st.db10 + st.da10,
+        )
         for win in st.depthavg.values():
             win.add(t, dvals)
 
@@ -619,8 +627,7 @@ class FeatureEngine:
                 y1 = ref.logmid_at(t)
                 y0 = ref.logmid_at(t - WINDOW_NS["1s"])
                 if y1 is not None and y0 is not None:
-                    pair = (x, y1 - y0, x * x,
-                            (y1 - y0) * (y1 - y0), x * (y1 - y0))
+                    pair = (x, y1 - y0, x * x, (y1 - y0) * (y1 - y0), x * (y1 - y0))
                     for win in st.xc.values():
                         win.add(t, pair)
                     yl0 = ref.logmid_at(t - 2 * WINDOW_NS["1s"])
@@ -701,8 +708,7 @@ class FeatureEngine:
             got = len(values) - before
             if got != self._fam_sizes[fam]:
                 raise RuntimeError(
-                    f"family {fam} appended {got} values, "
-                    f"registry says {self._fam_sizes[fam]}"
+                    f"family {fam} appended {got} values, registry says {self._fam_sizes[fam]}"
                 )
         vec = FeatureVector(
             instrument_id=st.ctx.instrument_id,

@@ -43,18 +43,18 @@ _KEYS = FIELDS  # canonical key order
 
 #: Domain of every field: (min, max). Unsigned fields reject a leading '-'.
 _DOMAIN: Tuple[Tuple[int, int], ...] = (
-    (0, U64_MAX),      # event_id
-    (0, U32_MAX),      # instrument_id
-    (0, U16_MAX),      # venue_id
+    (0, U64_MAX),  # event_id
+    (0, U32_MAX),  # instrument_id
+    (0, U16_MAX),  # venue_id
     (I64_MIN, I64_MAX),  # exchange_ts
     (I64_MIN, I64_MAX),  # receive_ts
-    (0, U64_MAX),      # sequence
-    (0, 0xFF),         # event_type
-    (0, 0xFF),         # side
+    (0, U64_MAX),  # sequence
+    (0, 0xFF),  # event_type
+    (0, 0xFF),  # side
     (I64_MIN, I64_MAX),  # price_ticks
     (I64_MIN, I64_MAX),  # qty
-    (0, U64_MAX),      # order_id
-    (0, U64_MAX),      # trade_id
+    (0, U64_MAX),  # order_id
+    (0, U64_MAX),  # trade_id
 )
 _SIGNED = tuple(lo < 0 for lo, _ in _DOMAIN)
 
@@ -62,9 +62,14 @@ _SIGNED = tuple(lo < 0 for lo, _ in _DOMAIN)
 _INT = r"(-?(?:0|[1-9][0-9]*))"
 _WS = r"[ \t\r\n]*"
 _LINE_RE = re.compile(
-    _WS + r"\{" + _WS
+    _WS
+    + r"\{"
+    + _WS
     + (_WS + "," + _WS).join(f'"{k}"{_WS}:{_WS}{_INT}' for k in _KEYS)
-    + _WS + r"\}" + _WS + r"\Z"
+    + _WS
+    + r"\}"
+    + _WS
+    + r"\Z"
 )
 
 
@@ -78,9 +83,18 @@ def encode_jsonl_line(ev: MarketEvent) -> str:
         '"receive_ts":%d,"sequence":%d,"event_type":%d,"side":%d,'
         '"price_ticks":%d,"qty":%d,"order_id":%d,"trade_id":%d}'
         % (
-            ev.event_id, ev.instrument_id, ev.venue_id, ev.exchange_ts,
-            ev.receive_ts, ev.sequence, ev.event_type, ev.side,
-            ev.price_ticks, ev.qty, ev.order_id, ev.trade_id,
+            ev.event_id,
+            ev.instrument_id,
+            ev.venue_id,
+            ev.exchange_ts,
+            ev.receive_ts,
+            ev.sequence,
+            ev.event_type,
+            ev.side,
+            ev.price_ticks,
+            ev.qty,
+            ev.order_id,
+            ev.trade_id,
         )
     )
 
@@ -112,9 +126,7 @@ def decode_jsonl_line(line: str) -> MarketEvent:
     vals = []
     for i, tok in enumerate(m.groups()):
         if tok[0] == "-" and not _SIGNED[i]:
-            raise ValueError(
-                f"JSONL field {_KEYS[i]!r} must be a non-negative integer: {tok}"
-            )
+            raise ValueError(f"JSONL field {_KEYS[i]!r} must be a non-negative integer: {tok}")
         v = int(tok)
         lo, hi = _DOMAIN[i]
         if not (lo <= v <= hi):
@@ -254,14 +266,10 @@ def decode_iap1_ex(data: bytes) -> Iap1Decoded:
         if reserved != 0:
             raise ValueError(f"IAP1 trailer reserved field must be 0: {reserved}")
         if count_echo != count:
-            raise ValueError(
-                f"IAP1 trailer count echo {count_echo} != header count {count}"
-            )
+            raise ValueError(f"IAP1 trailer count echo {count_echo} != header count {count}")
         actual = crc32(data[:body_size])
         if actual != crc:
-            raise ValueError(
-                f"IAP1 CRC-32 mismatch: trailer 0x{crc:08X}, computed 0x{actual:08X}"
-            )
+            raise ValueError(f"IAP1 CRC-32 mismatch: trailer 0x{crc:08X}, computed 0x{actual:08X}")
     events: List[MarketEvent] = []
     unpack = _RECORD.unpack_from
     off = IAP1_HEADER_SIZE

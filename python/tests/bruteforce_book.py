@@ -20,10 +20,18 @@ I64_MIN = -(2**63)
 RESERVED = 0xFFFF_0000_0000_0000
 
 COUNTERS = (
-    "duplicates_dropped", "gaps_detected", "dropped_while_stale",
-    "unknown_order_events", "invalid_side_dropped", "invalid_payload_dropped",
-    "unknown_type_dropped", "modify_price_mismatch", "snapshot_restarts",
-    "sequence_resets", "late_recovered", "events_applied",
+    "duplicates_dropped",
+    "gaps_detected",
+    "dropped_while_stale",
+    "unknown_order_events",
+    "invalid_side_dropped",
+    "invalid_payload_dropped",
+    "unknown_type_dropped",
+    "modify_price_mismatch",
+    "snapshot_restarts",
+    "sequence_resets",
+    "late_recovered",
+    "events_applied",
 )
 
 
@@ -110,8 +118,9 @@ class BruteForceBook:
             bad = True
         elif et == EXECUTE and ev.qty <= 0:
             bad = True
-        elif et in (QUOTE, SNAPSHOT) and (ev.qty <= 0 or ev.price_ticks <= 0
-                                          or ev.order_id >= RESERVED):
+        elif et in (QUOTE, SNAPSHOT) and (
+            ev.qty <= 0 or ev.price_ticks <= 0 or ev.order_id >= RESERVED
+        ):
             bad = True
         elif et == TRADE and (ev.qty <= 0 or ev.price_ticks <= 0):
             bad = True
@@ -243,9 +252,7 @@ class BruteForceBook:
 
     def _levels(self, side, n):
         prices = sorted(self.sides[side], reverse=(side == BID))[:n]
-        return [
-            [p, sum(q for _, q in self.sides[side][p])] for p in prices
-        ]
+        return [[p, sum(q for _, q in self.sides[side][p])] for p in prices]
 
     def _counts(self, side, n):
         prices = sorted(self.sides[side], reverse=(side == BID))[:n]

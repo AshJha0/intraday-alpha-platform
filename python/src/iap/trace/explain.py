@@ -27,13 +27,13 @@ def find_trace_jsonl(path: Union[str, Path], parent_order_id: int) -> DecisionTr
                 trace = DecisionTrace.from_dict(json.loads(text))
             except ValueError as exc:
                 raise ValueError(f"{path}:{lineno}: not a DecisionTrace ({exc})") from exc
-            if any(po.parent_order_id == parent_order_id
-                   for po in trace.stages.parent_orders):
+            if any(po.parent_order_id == parent_order_id for po in trace.stages.parent_orders):
                 return trace
     raise KeyError(f"{path}: no trace carries parent order {parent_order_id}")
 
 
-def explain_jsonl(path: Union[str, Path], parent_order_id: int,
-                  venue_names: Optional[Mapping[int, str]] = None) -> str:
+def explain_jsonl(
+    path: Union[str, Path], parent_order_id: int, venue_names: Optional[Mapping[int, str]] = None
+) -> str:
     """:func:`explain` of the trace in ``path`` that carries the order."""
     return explain(find_trace_jsonl(path, parent_order_id), venue_names)

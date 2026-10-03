@@ -52,7 +52,8 @@ def _check_side(side_doc, contexts):
             if exp["valid"]:
                 got, want = vec.values[i], exp["value"]
                 assert abs(got - want) <= TOL + TOL * abs(want), (
-                    f"event {cp} {name}: {got!r} != {want!r}")
+                    f"event {cp} {name}: {got!r} != {want!r}"
+                )
 
 
 def test_golden_eq_checkpoints(golden, contexts):
@@ -78,8 +79,10 @@ def test_golden_covers_every_family(golden):
                 if entry["valid"]:
                     covered.add(reg[name])
     from iap.features.spec import FAMILY_ORDER
+
     assert covered == set(FAMILY_ORDER), (
-        f"families without a valid golden value: {set(FAMILY_ORDER) - covered}")
+        f"families without a valid golden value: {set(FAMILY_ORDER) - covered}"
+    )
 
 
 def test_engine_determinism(golden, contexts):

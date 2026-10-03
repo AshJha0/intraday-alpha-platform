@@ -57,8 +57,12 @@ class FileLock:
     other writer and times out.
     """
 
-    def __init__(self, target, timeout_s: float = DEFAULT_TIMEOUT_S,
-                 retry_interval_s: float = RETRY_INTERVAL_S) -> None:
+    def __init__(
+        self,
+        target,
+        timeout_s: float = DEFAULT_TIMEOUT_S,
+        retry_interval_s: float = RETRY_INTERVAL_S,
+    ) -> None:
         if timeout_s < 0 or retry_interval_s <= 0:
             raise ValueError("timeout_s must be >= 0 and retry_interval_s > 0")
         target = Path(target)
@@ -72,8 +76,7 @@ class FileLock:
         deadline = time.monotonic() + self.timeout_s
         while True:
             try:
-                fd = os.open(str(self.lock_path),
-                             os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                fd = os.open(str(self.lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
             except FileExistsError:
                 pass
             except PermissionError:
@@ -91,7 +94,8 @@ class FileLock:
                     f"could not acquire {self.lock_path} within "
                     f"{self.timeout_s:g}s; another writer holds it — if no "
                     "writer is running, the lock is stale and must be removed "
-                    "by hand")
+                    "by hand"
+                )
             time.sleep(self.retry_interval_s)
 
     def release(self) -> None:
@@ -117,8 +121,9 @@ class FileLock:
         self.release()
 
 
-def atomic_write_text(path, text: str, encoding: Optional[str] = None,
-                      newline: Optional[str] = None) -> None:
+def atomic_write_text(
+    path, text: str, encoding: Optional[str] = None, newline: Optional[str] = None
+) -> None:
     """Replace ``path`` with ``text`` atomically (temp file + ``os.replace``).
 
     The temporary file lives in the target's directory (same file system, so

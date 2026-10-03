@@ -35,6 +35,7 @@ Usage:
               daemon is reachable)
     --keep    leave the temp clone in place for inspection
 """
+
 from __future__ import annotations
 
 import fnmatch
@@ -57,8 +58,7 @@ def record(case: str, ok: bool, detail: str = "") -> None:
 
 
 def run(cmd: list[str], cwd: Path | None = None, timeout: int = 1800):
-    return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True,
-                          timeout=timeout)
+    return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout)
 
 
 def docker_daemon_available() -> bool:
@@ -73,8 +73,11 @@ def dockerignore_rules() -> list[str]:
     f = ROOT / ".dockerignore"
     if not f.exists():
         return []
-    return [ln.strip() for ln in f.read_text().splitlines()
-            if ln.strip() and not ln.strip().startswith("#")]
+    return [
+        ln.strip()
+        for ln in f.read_text().splitlines()
+        if ln.strip() and not ln.strip().startswith("#")
+    ]
 
 
 def ignored(rel: str, rules: list[str]) -> bool:
@@ -83,8 +86,7 @@ def ignored(rel: str, rules: list[str]) -> bool:
         if fnmatch.fnmatch(rel, pat) or rel.startswith(pat + "/"):
             return True
         # `**/__pycache__/` style
-        if pat.startswith("**/") and (
-                fnmatch.fnmatch(rel, pat[3:]) or f"/{pat[3:]}" in f"/{rel}"):
+        if pat.startswith("**/") and (fnmatch.fnmatch(rel, pat[3:]) or f"/{pat[3:]}" in f"/{rel}"):
             return True
     return False
 
@@ -98,8 +100,7 @@ def build_context(dest: Path) -> tuple[int, int]:
     edits) is staged but not yet committed. On a committed tree the two are
     identical. A tracked file deleted from the working tree is skipped, so
     the result is what the next commit would contain."""
-    proc = run(["git", "ls-files", "-z", "--cached", "--full-name"],
-               cwd=ROOT, timeout=300)
+    proc = run(["git", "ls-files", "-z", "--cached", "--full-name"], cwd=ROOT, timeout=300)
     if proc.returncode != 0:
         raise RuntimeError(f"git ls-files failed: {proc.stderr.strip()}")
     dest.mkdir(parents=True, exist_ok=True)
@@ -139,8 +140,7 @@ def stages(text: str) -> list[tuple[str | None, list[tuple[str | None, list[str]
     positions = [(m.start(), m.group(2)) for m in FROM_RE.finditer(text)]
     for i, (start, name) in enumerate(positions):
         end = positions[i + 1][0] if i + 1 < len(positions) else len(text)
-        copies = [(m.group(1), m.group(2).split())
-                  for m in COPY_RE.finditer(text[start:end])]
+        copies = [(m.group(1), m.group(2).split()) for m in COPY_RE.finditer(text[start:end])]
         out.append((name, copies))
     return out
 
@@ -155,10 +155,9 @@ def check_copy_sources(ctx: Path) -> None:
                 for src in args[:-1]:
                     if not (ctx / src).exists():
                         problems.append(
-                            f"{df.name}: COPY {src} — missing from a clean "
-                            f"build context")
-    record("copy_sources_exist_in_clean_context", not problems,
-           "; ".join(problems) or "all stages")
+                            f"{df.name}: COPY {src} — missing from a clean build context"
+                        )
+    record("copy_sources_exist_in_clean_context", not problems, "; ".join(problems) or "all stages")
 
 
 def check_build_inputs(ctx: Path) -> None:
@@ -168,34 +167,41 @@ def check_build_inputs(ctx: Path) -> None:
     # C++: cpp/CMakeLists.txt compiles IAP_GOLDEN_DIR = <src>/../tests/golden;
     # test_alpha_golden.cpp and test_replay_fills.cpp read
     # <golden>/../../configs; bench_all reads the same path AT RUNTIME.
-    for rel in ["tests/golden/events_eq_mbo.jsonl",
-                "configs/strategies/alpha_params.json",
-                "configs/venues/venues.json"]:
+    for rel in [
+        "tests/golden/events_eq_mbo.jsonl",
+        "configs/strategies/alpha_params.json",
+        "configs/venues/venues.json",
+    ]:
         if not (ctx / rel).exists():
             problems.append(f"cpp: {rel} absent (ctest / bench_all read it)")
 
     # Rust: rules.rs -> ../../configs/risk/risk.json;
     # golden_alpha.rs -> configs/strategies/alpha_params.json;
     # golden_features.rs -> ../../data/reference/feature_registry.json.
-    for rel in ["configs/risk/risk.json",
-                "data/reference/feature_registry.json"]:
+    for rel in ["configs/risk/risk.json", "data/reference/feature_registry.json"]:
         if not (ctx / rel).exists():
             problems.append(f"rust: {rel} absent (cargo test reads it)")
 
     # Java: the entrypoint reads $IAP_CONFIG_DIR (default /app/configs) and
     # /golden/events_eq_mbo.jsonl and /app/baselines.
-    for rel in ["configs/risk/risk.json", "configs/strategies/alpha_params.json",
-                "tests/golden/events_eq_mbo.jsonl", "research/baselines"]:
+    for rel in [
+        "configs/risk/risk.json",
+        "configs/strategies/alpha_params.json",
+        "tests/golden/events_eq_mbo.jsonl",
+        "research/baselines",
+    ]:
         if not (ctx / rel).exists():
             problems.append(f"java: {rel} absent (the entrypoint reads it)")
 
     # The context must NOT carry host build state: that is the CMakeCache bug.
     for rel in ["cpp/build", "rust/target", "java/out"]:
         if (ctx / rel).exists():
-            problems.append(f"{rel} leaked into the build context "
-                            f"(.dockerignore must exclude it)")
-    record("build_and_runtime_inputs_present", not problems,
-           "; ".join(problems) or "cpp / rust / java inputs resolve")
+            problems.append(f"{rel} leaked into the build context (.dockerignore must exclude it)")
+    record(
+        "build_and_runtime_inputs_present",
+        not problems,
+        "; ".join(problems) or "cpp / rust / java inputs resolve",
+    )
 
 
 def check_java_build_stage(ctx: Path) -> None:
@@ -205,29 +211,44 @@ def check_java_build_stage(ctx: Path) -> None:
         return
     proc = run(["bash", "build.sh"], cwd=ctx / "java", timeout=900)
     ok = proc.returncode == 0 and (ctx / "java" / "out" / "main").is_dir()
-    record("java_build_stage_runs", ok,
-           (proc.stdout + proc.stderr).strip()[-400:] if not ok
-           else "javac -Xlint:all -Werror clean in a fresh clone")
+    record(
+        "java_build_stage_runs",
+        ok,
+        (proc.stdout + proc.stderr).strip()[-400:]
+        if not ok
+        else "javac -Xlint:all -Werror clean in a fresh clone",
+    )
 
 
 def check_real_docker_build(force: bool) -> None:
     if not docker_daemon_available():
         if force:
-            record("docker_build_all_images", False,
-                   "--docker requested but no Docker daemon is reachable")
+            record(
+                "docker_build_all_images",
+                False,
+                "--docker requested but no Docker daemon is reachable",
+            )
         else:
-            record("docker_build_all_images", True,
-                   "SKIPPED — no Docker daemon; the context checks above are "
-                   "the substitute (see this script's docstring)")
+            record(
+                "docker_build_all_images",
+                True,
+                "SKIPPED — no Docker daemon; the context checks above are "
+                "the substitute (see this script's docstring)",
+            )
         return
-    for df in ["Dockerfile.python", "Dockerfile.java", "Dockerfile.cpp",
-               "Dockerfile.rust"]:
+    for df in ["Dockerfile.python", "Dockerfile.java", "Dockerfile.cpp", "Dockerfile.rust"]:
         tag = "iap/check-" + df.split(".")[1].lower() + ":harness"
-        proc = run(["docker", "build", "-f", f"deployment/docker/{df}",
-                    "-t", tag, "."], cwd=ROOT, timeout=3600)
+        proc = run(
+            ["docker", "build", "-f", f"deployment/docker/{df}", "-t", tag, "."],
+            cwd=ROOT,
+            timeout=3600,
+        )
         if proc.returncode != 0:
-            record("docker_build_all_images", False,
-                   f"{df}: {(proc.stdout + proc.stderr).strip()[-600:]}")
+            record(
+                "docker_build_all_images",
+                False,
+                f"{df}: {(proc.stdout + proc.stderr).strip()[-600:]}",
+            )
             return
     record("docker_build_all_images", True, "4 images built")
 
@@ -240,8 +261,11 @@ def main() -> int:
     ctx = tmp / "context"
     try:
         kept, removed = build_context(ctx)
-        record("clean_clone_context", True,
-               f"{kept} files kept, {removed} paths excluded by .dockerignore")
+        record(
+            "clean_clone_context",
+            True,
+            f"{kept} files kept, {removed} paths excluded by .dockerignore",
+        )
         check_copy_sources(ctx)
         check_build_inputs(ctx)
         check_java_build_stage(ctx)
@@ -253,8 +277,7 @@ def main() -> int:
             shutil.rmtree(tmp, ignore_errors=True)
     failed = [c for c, ok, _ in RESULTS if not ok]
     print()
-    print(f"docker build checks: {len(RESULTS) - len(failed)} passed, "
-          f"{len(failed)} failed")
+    print(f"docker build checks: {len(RESULTS) - len(failed)} passed, {len(failed)} failed")
     if failed:
         print("  FAILED: " + ", ".join(failed))
         return 1

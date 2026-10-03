@@ -50,31 +50,55 @@ def specs() -> List[FeatureSpec]:
     """Registry entries for the cross-asset family (pinned order)."""
     out: List[FeatureSpec] = []
     for h in REF_HORIZONS:
-        out.append(mkspec(
-            f"ref_ret_{h}_v1", FAMILY,
-            f"Reference-instrument (ETF / EUR/USD) log mid return over {h} "
-            f"(lead-lag input).", horizon=h))
-    out.append(mkspec(
-        "beta_w5m_v1", FAMILY,
-        "OLS beta of own vs reference contemporaneous 1s log returns over 5m: "
-        "cov(x,y)/var(y).", window="5m", min_pairs=MIN_PAIRS))
+        out.append(
+            mkspec(
+                f"ref_ret_{h}_v1",
+                FAMILY,
+                f"Reference-instrument (ETF / EUR/USD) log mid return over {h} (lead-lag input).",
+                horizon=h,
+            )
+        )
+    out.append(
+        mkspec(
+            "beta_w5m_v1",
+            FAMILY,
+            "OLS beta of own vs reference contemporaneous 1s log returns over 5m: cov(x,y)/var(y).",
+            window="5m",
+            min_pairs=MIN_PAIRS,
+        )
+    )
     for w in CORR_WINDOWS:
-        out.append(mkspec(
-            f"corr_contemp_w{w}_v1", FAMILY,
-            f"Correlation of own vs reference contemporaneous 1s log returns "
-            f"over {w} (FX: correlation proxy vs EUR/USD).",
-            window=w, min_pairs=MIN_PAIRS))
+        out.append(
+            mkspec(
+                f"corr_contemp_w{w}_v1",
+                FAMILY,
+                f"Correlation of own vs reference contemporaneous 1s log returns "
+                f"over {w} (FX: correlation proxy vs EUR/USD).",
+                window=w,
+                min_pairs=MIN_PAIRS,
+            )
+        )
     for w in CORR_WINDOWS:
-        out.append(mkspec(
-            f"leadlag_corr_w{w}_v1", FAMILY,
-            f"Correlation of own 1s return vs reference 1s return lagged 1s "
-            f"over {w} (positive = reference leads).",
-            window=w, min_pairs=MIN_PAIRS))
-    out.append(mkspec(
-        "resid_vol_w1m_v1", FAMILY,
-        "Std of the beta-residual 1s return over 1m: "
-        "sqrt(max(var(x) - cov^2/var(y), 0)).",
-        depends_on=("beta_w5m_v1",), window="1m", min_pairs=MIN_PAIRS))
+        out.append(
+            mkspec(
+                f"leadlag_corr_w{w}_v1",
+                FAMILY,
+                f"Correlation of own 1s return vs reference 1s return lagged 1s "
+                f"over {w} (positive = reference leads).",
+                window=w,
+                min_pairs=MIN_PAIRS,
+            )
+        )
+    out.append(
+        mkspec(
+            "resid_vol_w1m_v1",
+            FAMILY,
+            "Std of the beta-residual 1s return over 1m: sqrt(max(var(x) - cov^2/var(y), 0)).",
+            depends_on=("beta_w5m_v1",),
+            window="1m",
+            min_pairs=MIN_PAIRS,
+        )
+    )
     return out
 
 
@@ -94,8 +118,7 @@ def _moments(win) -> Optional[tuple]:
 def compute(st, values: List[float], valid: List[bool]) -> None:
     """Append the 11 cross-asset values for the current emission."""
     for h in REF_HORIZONS:
-        put(values, valid, st.ref_ret_log(WINDOW_NS[h]),
-            st.ref_ret_log(WINDOW_NS[h]) is not None)
+        put(values, valid, st.ref_ret_log(WINDOW_NS[h]), st.ref_ret_log(WINDOW_NS[h]) is not None)
     beta = st.beta_w5m()
     put(values, valid, beta, beta is not None)
     for w in CORR_WINDOWS:

@@ -120,8 +120,11 @@ class Instrument:
             raise ValueError(f"{what}: tick_size must be > 0, got {self.tick_size!r}")
         if type(self.lot_size) is not int or self.lot_size < 1:
             raise ValueError(f"{what}: lot_size must be an integer >= 1, got {self.lot_size!r}")
-        if not (isinstance(self.ref_price, (int, float)) and math.isfinite(self.ref_price)
-                and self.ref_price > 0):
+        if not (
+            isinstance(self.ref_price, (int, float))
+            and math.isfinite(self.ref_price)
+            and self.ref_price > 0
+        ):
             raise ValueError(f"{what}: ref_price must be > 0, got {self.ref_price!r}")
         if type(self.adv) is not int or self.adv < 0:
             raise ValueError(f"{what}: adv must be an integer >= 0, got {self.adv!r}")
@@ -151,8 +154,15 @@ class Instrument:
 class Venue:
     """Static reference data for one venue (validated on construction)."""
 
-    __slots__ = ("venue", "venue_id", "asset_class", "fees", "latency_mean_ns",
-                 "latency_jitter_ns", "supports")
+    __slots__ = (
+        "venue",
+        "venue_id",
+        "asset_class",
+        "fees",
+        "latency_mean_ns",
+        "latency_jitter_ns",
+        "supports",
+    )
 
     def __init__(self, row: dict) -> None:
         self.venue: str = row["venue"]
@@ -161,8 +171,7 @@ class Venue:
         self.fees: dict = {
             k: v
             for k, v in row.items()
-            if k in ("taker_fee_per_share", "maker_rebate_per_share",
-                     "commission_per_million")
+            if k in ("taker_fee_per_share", "maker_rebate_per_share", "commission_per_million")
         }
         self.latency_mean_ns: int = row["latency"]["mean_ns"]
         self.latency_jitter_ns: int = row["latency"]["jitter_ns"]
@@ -264,8 +273,7 @@ class ReferenceData:
             raise ValueError("calendar.trading_days must be sorted and unique")
         default_tz = calendar.get("timezone", "UTC")
         self._sessions: Dict[str, _Session] = {
-            ac: _Session(ac, cfg, default_tz)
-            for ac, cfg in instruments_cfg["sessions"].items()
+            ac: _Session(ac, cfg, default_tz) for ac, cfg in instruments_cfg["sessions"].items()
         }
         self.fx_week = _FxWeek(instruments_cfg.get("fx_week", DEFAULT_FX_WEEK))
 
@@ -301,9 +309,7 @@ class ReferenceData:
         """All instruments (sorted by id), optionally filtered by asset class."""
         out = [self._by_id[k] for k in sorted(self._by_id)]
         if asset_class is not None:
-            classes = (
-                ("EQUITY", "ETF") if asset_class == "EQUITY" else (asset_class,)
-            )
+            classes = ("EQUITY", "ETF") if asset_class == "EQUITY" else (asset_class,)
             out = [i for i in out if i.asset_class in classes]
         return out
 

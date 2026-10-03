@@ -43,11 +43,11 @@ class ParentOrder:
 
     order_id: int
     instrument_id: int
-    side: int                # 0 = BID (buy), 1 = ASK (sell)
+    side: int  # 0 = BID (buy), 1 = ASK (sell)
     qty_target: int
-    decision_ts: int         # when the signal fired
-    arrival_ts: int          # when the first child could act (post-delay)
-    end_ts: int              # end of the execution horizon
+    decision_ts: int  # when the signal fired
+    arrival_ts: int  # when the first child could act (post-delay)
+    end_ts: int  # end of the execution horizon
     fills: List[Fill] = field(default_factory=list)
 
     @property
@@ -87,8 +87,7 @@ class MarketTimeline:
         #: crossed consolidated states skipped by the builder (pinned §2.1)
         self.crossed_states_skipped: int = 0
 
-    def append(self, ts: int, bid: float, ask: float,
-               bid_sz: int, ask_sz: int) -> None:
+    def append(self, ts: int, bid: float, ask: float, bid_sz: int, ask_sz: int) -> None:
         """Append one BBO state. Locked (bid == ask, half-spread 0) is a
         legal state; crossed (ask < bid) is not (builders skip + count it)."""
         if self.ts and ts < self.ts[-1]:
@@ -101,8 +100,9 @@ class MarketTimeline:
         self.bid_sz.append(bid_sz)
         self.ask_sz.append(ask_sz)
 
-    def append_state_pinned(self, ts: int, bid: float, ask: float,
-                            bid_sz: int, ask_sz: int) -> bool:
+    def append_state_pinned(
+        self, ts: int, bid: float, ask: float, bid_sz: int, ask_sz: int
+    ) -> bool:
         """Builder rule (pinned §2.1): a CROSSED state (ask < bid) is skipped
         and counted in ``crossed_states_skipped`` (False); a LOCKED state is
         appended like any other (True)."""
@@ -158,8 +158,9 @@ class MarketTimeline:
         return float("nan") if i is None else self.mid(i)
 
 
-def stamp_fill(timeline: MarketTimeline, ts: int, price: float, qty: int,
-               side: int, liquidity: str = TAKER) -> Fill:
+def stamp_fill(
+    timeline: MarketTimeline, ts: int, price: float, qty: int, side: int, liquidity: str = TAKER
+) -> Fill:
     """Build a :class:`Fill` with the pinned reference state (§2.4): the
     state prevailing at ``ts`` for a TAKER fill, the state strictly before
     ``ts`` (``prevailing(ts - 1)``) for a MAKER fill. Raises when no state
@@ -173,6 +174,12 @@ def stamp_fill(timeline: MarketTimeline, ts: int, price: float, qty: int,
     if i is None:
         raise ValueError(f"fill at {ts} precedes the first market state")
     opp = timeline.ask_sz[i] if side == 0 else timeline.bid_sz[i]
-    return Fill(ts=ts, price=price, qty=qty, mid_at_fill=timeline.mid(i),
-                half_spread_at_fill=timeline.half_spread(i),
-                opp_depth_at_fill=opp, liquidity=liquidity)
+    return Fill(
+        ts=ts,
+        price=price,
+        qty=qty,
+        mid_at_fill=timeline.mid(i),
+        half_spread_at_fill=timeline.half_spread(i),
+        opp_depth_at_fill=opp,
+        liquidity=liquidity,
+    )

@@ -44,7 +44,7 @@ def test_realized_net_conservative_floors_negative_cost():
     exact = realized_net(d, y_mid, y_cost, conservative=False)
     cons = realized_net(d, y_mid, y_cost, conservative=True)
     assert abs(exact[0] - 0.002) < 1e-15  # synthetic arb captured
-    assert cons[0] == 0.0                  # floored away
+    assert cons[0] == 0.0  # floored away
 
 
 def test_signal_economics_hand_case():
@@ -64,8 +64,7 @@ def test_signal_economics_hand_case():
 
 
 def test_signal_economics_no_trades():
-    econ = signal_economics(np.zeros(5), np.zeros(5), np.zeros(5),
-                            np.full(5, 0.001))
+    econ = signal_economics(np.zeros(5), np.zeros(5), np.zeros(5), np.full(5, 0.001))
     assert econ["n_trades"] == 0
     assert econ["mean_net_bps_per_signal"] == 0.0
 

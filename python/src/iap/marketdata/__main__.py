@@ -32,31 +32,35 @@ def main(argv=None) -> int:
         description="Generate synthetic raw market data and normalize it.",
     )
     parser.add_argument(
-        "--configs-dir", default=str(_REPO_ROOT / "configs"),
+        "--configs-dir",
+        default=str(_REPO_ROOT / "configs"),
         help="configs/ directory (instruments/instruments.json, "
-             "venues/venues.json, marketdata/generator.json)",
+        "venues/venues.json, marketdata/generator.json)",
     )
     parser.add_argument(
-        "--config", default=None,
+        "--config",
+        default=None,
         help="generator config JSON (default: <configs-dir>/marketdata/generator.json)",
     )
     parser.add_argument(
-        "--out", default=str(_REPO_ROOT / "data"),
+        "--out",
+        default=str(_REPO_ROOT / "data"),
         help="data directory root (raw/ and normalized/ are created inside)",
     )
-    parser.add_argument("--seed", type=int, default=None,
-                        help="override the config seed")
+    parser.add_argument("--seed", type=int, default=None, help="override the config seed")
     parser.add_argument(
-        "--allow-default-config", action="store_true",
+        "--allow-default-config",
+        action="store_true",
         help="run with the built-in generator defaults when the config file "
-             "is absent (default: fail fast — a silently defaulted config "
-             "changes the dataset version without a trace)",
+        "is absent (default: fail fast — a silently defaulted config "
+        "changes the dataset version without a trace)",
     )
     args = parser.parse_args(argv)
 
     configs_dir = Path(args.configs_dir)
-    config_path = (Path(args.config) if args.config
-                   else configs_dir / "marketdata" / "generator.json")
+    config_path = (
+        Path(args.config) if args.config else configs_dir / "marketdata" / "generator.json"
+    )
     # Fail fast (PLATFORM_CONVENTIONS.md §8/§12.2, SPEC §26): a missing or
     # typo'd generator.json used to fall back to the built-in defaults
     # silently. That is identical to the committed file TODAY, so a ConfigMap

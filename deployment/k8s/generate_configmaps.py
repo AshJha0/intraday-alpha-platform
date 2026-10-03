@@ -21,6 +21,7 @@ Equivalent to `kubectl create configmap ... --from-file=... --dry-run=client
 -o yaml`, but deterministic (sorted keys, stable ordering) and usable without
 kubectl. Requires PyYAML.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -61,8 +62,7 @@ CONFIGS = REPO / "configs"
 
 def config_files() -> list[Path]:
     """Every JSON file under configs/, sorted by relative path."""
-    return sorted(CONFIGS.rglob("*.json"),
-                  key=lambda p: p.relative_to(CONFIGS).as_posix())
+    return sorted(CONFIGS.rglob("*.json"), key=lambda p: p.relative_to(CONFIGS).as_posix())
 
 
 def configmap_key(path: Path) -> str:
@@ -74,9 +74,9 @@ def configmap_items() -> list[dict[str, str]]:
     """The `items:` list a volume needs to project the nested tree back
     (key -> path). tests/harness/check_deployment.py asserts the committed
     manifests carry exactly this list."""
-    return [{"key": configmap_key(p),
-             "path": p.relative_to(CONFIGS).as_posix()}
-            for p in config_files()]
+    return [
+        {"key": configmap_key(p), "path": p.relative_to(CONFIGS).as_posix()} for p in config_files()
+    ]
 
 
 def configmap(name: str, files: dict[str, Path]) -> dict:
@@ -100,8 +100,7 @@ def configmap(name: str, files: dict[str, Path]) -> dict:
 
 def write(out: Path, src_desc: str, *manifests: dict) -> None:
     body = "---\n".join(
-        yaml.dump(m, default_flow_style=False, sort_keys=False, width=100)
-        for m in manifests
+        yaml.dump(m, default_flow_style=False, sort_keys=False, width=100) for m in manifests
     )
     out.write_text(HEADER.format(src=src_desc) + body)
     try:
@@ -114,10 +113,13 @@ def write(out: Path, src_desc: str, *manifests: dict) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
-        "--out-dir", type=Path, default=K8S,
+        "--out-dir",
+        type=Path,
+        default=K8S,
         help="write the manifests here instead of deployment/k8s (used by "
-             "tests/harness/check_deployment.py to diff against the committed "
-             "files without touching the working tree)")
+        "tests/harness/check_deployment.py to diff against the committed "
+        "files without touching the working tree)",
+    )
     args = ap.parse_args()
     out_dir = args.out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -174,7 +176,10 @@ def main() -> int:
         configmap(
             "iap-grafana-provisioning",
             {
-                "datasources-prometheus.yml": graf / "provisioning" / "datasources" / "prometheus.yml",
+                "datasources-prometheus.yml": graf
+                / "provisioning"
+                / "datasources"
+                / "prometheus.yml",
                 "dashboards-provider.yml": graf / "provisioning" / "dashboards" / "dashboards.yml",
             },
         ),

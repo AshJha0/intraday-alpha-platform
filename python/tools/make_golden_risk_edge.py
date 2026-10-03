@@ -59,31 +59,54 @@ DESCRIPTION = (
 )
 
 
-def order(oid: int, iid: int, side: int, qty: int, price: int, ts: int,
-          venue: int = 1, strategy: str = "S1") -> Dict[str, Any]:
-    return {"type": "order", "order": {
-        "order_id": oid, "instrument_id": iid, "side": side, "qty": qty,
-        "price_ticks": price, "order_type": 2 if price > 0 else 1,
-        "venue_id": venue, "strategy_id": strategy, "urgency": 0.5,
-        "timestamp": ts,
-    }}
+def order(
+    oid: int,
+    iid: int,
+    side: int,
+    qty: int,
+    price: int,
+    ts: int,
+    venue: int = 1,
+    strategy: str = "S1",
+) -> Dict[str, Any]:
+    return {
+        "type": "order",
+        "order": {
+            "order_id": oid,
+            "instrument_id": iid,
+            "side": side,
+            "qty": qty,
+            "price_ticks": price,
+            "order_type": 2 if price > 0 else 1,
+            "venue_id": venue,
+            "strategy_id": strategy,
+            "urgency": 0.5,
+            "timestamp": ts,
+        },
+    }
 
 
 def market(iid: int, bid: int, ask: int, ts: int) -> Dict[str, Any]:
-    return {"type": "market", "instrument_id": iid, "bid_ticks": bid,
-            "ask_ticks": ask, "ts": ts}
+    return {"type": "market", "instrument_id": iid, "bid_ticks": bid, "ask_ticks": ask, "ts": ts}
 
 
-def fill(strategy: str, iid: int, side: int, qty: int, price: int, ts: int,
-         order_id: int = 0) -> Dict[str, Any]:
-    return {"type": "fill", "strategy_id": strategy, "instrument_id": iid,
-            "order_id": order_id, "side": side, "qty": qty, "price_ticks": price,
-            "ts": ts}
+def fill(
+    strategy: str, iid: int, side: int, qty: int, price: int, ts: int, order_id: int = 0
+) -> Dict[str, Any]:
+    return {
+        "type": "fill",
+        "strategy_id": strategy,
+        "instrument_id": iid,
+        "order_id": order_id,
+        "side": side,
+        "qty": qty,
+        "price_ticks": price,
+        "ts": ts,
+    }
 
 
 def kill(kind: str, scope: str, scope_id: str, ts: int, reason: str) -> Dict[str, Any]:
-    return {"type": kind, "scope": scope, "scope_id": scope_id, "ts": ts,
-            "reason": reason}
+    return {"type": kind, "scope": scope, "scope_id": scope_id, "ts": ts, "reason": reason}
 
 
 def marks(ts: int = T0) -> List[Dict[str, Any]]:
@@ -93,92 +116,129 @@ def marks(ts: int = T0) -> List[Dict[str, Any]]:
 def scenarios() -> List[Dict[str, Any]]:
     t = T0 + 100 * MS
     return [
-        {"name": "venue_kills_and_malformed_kill_commands", "steps": marks() + [
-            kill("kill", "VENUE", "1", T0, "venue 1 halted"),
-            order(1, 1, 0, 100, 2450, t),
-            order(2, 1, 0, 100, 2450, t + 10 * MS, venue=0),
-            order(3, 1, 0, 100, 2450, t + 20 * MS, venue=2),
-            {"type": "cancel", "order_id": 3},
-            kill("unkill", "VENUE", "1", T0, "venue 1 resumed"),
-            order(4, 1, 0, 100, 2450, t + 30 * MS, venue=0),
-            {"type": "cancel", "order_id": 4},
-            kill("bad_kill", "INSTRUMENT", "AAPL", T0, "ops halt by ticker"),
-            order(5, 1, 0, 100, 2450, t + 40 * MS),
-            kill("bad_unkill", "VENUE", "-0", T0, "ops clear"),
-            order(6, 1, 0, 100, 2450, t + 50 * MS),
-            kill("unkill", "GLOBAL", "", T0, "escalation reviewed"),
-            order(7, 1, 0, 100, 2450, t + 60 * MS),
-        ]},
-        {"name": "sor_orders_and_venue_disconnects", "steps": marks() + [
-            {"type": "venue_down", "venue_id": 1, "ts": T0},
-            {"type": "venue_up", "venue_id": 2, "ts": T0},
-            order(1, 1, 0, 100, 2450, t, venue=0),
-            {"type": "cancel", "order_id": 1},
-            {"type": "venue_down", "venue_id": 2, "ts": T0},
-            order(2, 1, 0, 100, 2450, t + 10 * MS, venue=0),
-            order(3, 1, 0, 100, 2450, t + 20 * MS, venue=3),
-            {"type": "cancel", "order_id": 3},
-            {"type": "venue_up", "venue_id": 1, "ts": T0},
-            order(4, 1, 0, 100, 2450, t + 30 * MS, venue=0),
-        ]},
-        {"name": "market_regression_future_marks_and_timestamp_overflow", "steps": marks() + [
-            market(1, 9000, 9002, T0 - 1),          # regression: dropped
-            order(1, 1, 0, 100, 2450, t),           # still priced off 24.51
-            {"type": "cancel", "order_id": 1},
-            market(2, 3119, 3121, T0 + 3600 * SEC),  # future-stamped
-            order(2, 2, 0, 100, 3120, t + 10 * MS),
-            market(2, 3119, 3121, t + 20 * MS),     # genuine update: dropped
-            order(3, 2, 0, 100, 3120, t + 20 * MS),
-            order(4, 1, 0, 100, 2450, I64_MIN),     # age overflows i64
-            order(5, 1, 0, 100, 2450, I64_MAX),     # merely stale
-            order(6, 1, 0, 100, 2450, t + 30 * MS),
-        ]},
-        {"name": "unvaluable_exposure_fails_closed", "steps": marks() + [
-            fill("S1", 2, 0, 100, 3120, T0 + 1),
-            market(2, 3119, 0, T0 + 2),             # instrument 2 one-sided
-            order(1, 1, 0, 100, 2450, t),           # position has no mark
-            fill("S2", 2, 1, 100, 3120, T0 + 3),    # flat in aggregate, lots held
-            order(2, 1, 0, 100, 2450, t + 10 * MS),  # pnl undeterminable
-            market(2, 3119, 3121, T0 + 4),
-            order(3, 2, 0, 100, 0, t + 20 * MS, strategy="S3"),  # MARKET, stays open
-            market(2, 0, 3121, T0 + 5),
-            order(4, 1, 0, 100, 2450, t + 30 * MS),  # open order has no mark
-            {"type": "cancel", "order_id": 3},
-            market(2, 3119, 3121, T0 + 6),
-            order(5, 1, 0, 100, 2450, t + 40 * MS),
-        ]},
-        {"name": "cleared_latch_still_at_loss_limit", "steps": marks() + [
-            fill("S1", 1, 0, 10_000, 3000, T0 + 1),  # -54,900 vs limit 50,000
-            order(1, 1, 0, 100, 2450, t),            # KILL_STRATEGY
-            kill("unkill", "STRATEGY", "S1", T0 + 2, "cleared without override"),
-            order(2, 1, 0, 100, 2450, t + 10 * MS),  # check 22: at loss limit
-            order(3, 1, 0, 100, 2450, t + 20 * MS, strategy="S2"),
-        ]},
-        {"name": "position_overflow", "steps": marks() + [
-            fill("S1", 1, 0, I64_MAX, 2451, T0 + 1),
-            order(1, 1, 0, 100, 2450, t),            # projection overflows
-            order(2, 1, 1, 100, 2452, t + 10 * MS),  # the reducing side is computable
-            fill("S1", 1, 0, 1, 2451, T0 + 2, order_id=7),  # GLOBAL kill
-            order(3, 1, 1, 100, 2452, t + 20 * MS),
-        ]},
-        {"name": "config_missing", "config_remove": ["per_order", "max_order_qty"],
-         "steps": marks() + [
-            order(1, 1, 0, 100, 2450, t),
-            order(2, 2, 1, 1, 3121, t + 10 * MS),
-        ]},
-        {"name": "bootstrap_and_restore", "require_bootstrap": True, "steps": marks() + [
-            order(1, 1, 0, 100, 2450, t),            # NOT_BOOTSTRAPPED
-            {"type": "bootstrap", "ts": T0 + 1, "fills": [
-                fill("S1", 1, 0, 100, 2451, T0),
-                fill("S1", 1, 0, 0, 2451, T0, order_id=9),   # malformed: dropped
-                fill("S2", 2, 1, 50, 3120, T0),
-            ]},
-            order(2, 1, 0, 100, 2450, t + 10 * MS),
-            {"type": "restore", "ts": t + 20 * MS},
-            order(2, 1, 0, 100, 2450, t + 30 * MS),  # duplicate id survives
-            order(3, 1, 1, 100, 2450, t + 40 * MS),  # self-match vs restored order 2
-            order(4, 2, 0, 10, 3120, t + 50 * MS, strategy="S2"),
-        ]},
+        {
+            "name": "venue_kills_and_malformed_kill_commands",
+            "steps": marks()
+            + [
+                kill("kill", "VENUE", "1", T0, "venue 1 halted"),
+                order(1, 1, 0, 100, 2450, t),
+                order(2, 1, 0, 100, 2450, t + 10 * MS, venue=0),
+                order(3, 1, 0, 100, 2450, t + 20 * MS, venue=2),
+                {"type": "cancel", "order_id": 3},
+                kill("unkill", "VENUE", "1", T0, "venue 1 resumed"),
+                order(4, 1, 0, 100, 2450, t + 30 * MS, venue=0),
+                {"type": "cancel", "order_id": 4},
+                kill("bad_kill", "INSTRUMENT", "AAPL", T0, "ops halt by ticker"),
+                order(5, 1, 0, 100, 2450, t + 40 * MS),
+                kill("bad_unkill", "VENUE", "-0", T0, "ops clear"),
+                order(6, 1, 0, 100, 2450, t + 50 * MS),
+                kill("unkill", "GLOBAL", "", T0, "escalation reviewed"),
+                order(7, 1, 0, 100, 2450, t + 60 * MS),
+            ],
+        },
+        {
+            "name": "sor_orders_and_venue_disconnects",
+            "steps": marks()
+            + [
+                {"type": "venue_down", "venue_id": 1, "ts": T0},
+                {"type": "venue_up", "venue_id": 2, "ts": T0},
+                order(1, 1, 0, 100, 2450, t, venue=0),
+                {"type": "cancel", "order_id": 1},
+                {"type": "venue_down", "venue_id": 2, "ts": T0},
+                order(2, 1, 0, 100, 2450, t + 10 * MS, venue=0),
+                order(3, 1, 0, 100, 2450, t + 20 * MS, venue=3),
+                {"type": "cancel", "order_id": 3},
+                {"type": "venue_up", "venue_id": 1, "ts": T0},
+                order(4, 1, 0, 100, 2450, t + 30 * MS, venue=0),
+            ],
+        },
+        {
+            "name": "market_regression_future_marks_and_timestamp_overflow",
+            "steps": marks()
+            + [
+                market(1, 9000, 9002, T0 - 1),  # regression: dropped
+                order(1, 1, 0, 100, 2450, t),  # still priced off 24.51
+                {"type": "cancel", "order_id": 1},
+                market(2, 3119, 3121, T0 + 3600 * SEC),  # future-stamped
+                order(2, 2, 0, 100, 3120, t + 10 * MS),
+                market(2, 3119, 3121, t + 20 * MS),  # genuine update: dropped
+                order(3, 2, 0, 100, 3120, t + 20 * MS),
+                order(4, 1, 0, 100, 2450, I64_MIN),  # age overflows i64
+                order(5, 1, 0, 100, 2450, I64_MAX),  # merely stale
+                order(6, 1, 0, 100, 2450, t + 30 * MS),
+            ],
+        },
+        {
+            "name": "unvaluable_exposure_fails_closed",
+            "steps": marks()
+            + [
+                fill("S1", 2, 0, 100, 3120, T0 + 1),
+                market(2, 3119, 0, T0 + 2),  # instrument 2 one-sided
+                order(1, 1, 0, 100, 2450, t),  # position has no mark
+                fill("S2", 2, 1, 100, 3120, T0 + 3),  # flat in aggregate, lots held
+                order(2, 1, 0, 100, 2450, t + 10 * MS),  # pnl undeterminable
+                market(2, 3119, 3121, T0 + 4),
+                order(3, 2, 0, 100, 0, t + 20 * MS, strategy="S3"),  # MARKET, stays open
+                market(2, 0, 3121, T0 + 5),
+                order(4, 1, 0, 100, 2450, t + 30 * MS),  # open order has no mark
+                {"type": "cancel", "order_id": 3},
+                market(2, 3119, 3121, T0 + 6),
+                order(5, 1, 0, 100, 2450, t + 40 * MS),
+            ],
+        },
+        {
+            "name": "cleared_latch_still_at_loss_limit",
+            "steps": marks()
+            + [
+                fill("S1", 1, 0, 10_000, 3000, T0 + 1),  # -54,900 vs limit 50,000
+                order(1, 1, 0, 100, 2450, t),  # KILL_STRATEGY
+                kill("unkill", "STRATEGY", "S1", T0 + 2, "cleared without override"),
+                order(2, 1, 0, 100, 2450, t + 10 * MS),  # check 22: at loss limit
+                order(3, 1, 0, 100, 2450, t + 20 * MS, strategy="S2"),
+            ],
+        },
+        {
+            "name": "position_overflow",
+            "steps": marks()
+            + [
+                fill("S1", 1, 0, I64_MAX, 2451, T0 + 1),
+                order(1, 1, 0, 100, 2450, t),  # projection overflows
+                order(2, 1, 1, 100, 2452, t + 10 * MS),  # the reducing side is computable
+                fill("S1", 1, 0, 1, 2451, T0 + 2, order_id=7),  # GLOBAL kill
+                order(3, 1, 1, 100, 2452, t + 20 * MS),
+            ],
+        },
+        {
+            "name": "config_missing",
+            "config_remove": ["per_order", "max_order_qty"],
+            "steps": marks()
+            + [
+                order(1, 1, 0, 100, 2450, t),
+                order(2, 2, 1, 1, 3121, t + 10 * MS),
+            ],
+        },
+        {
+            "name": "bootstrap_and_restore",
+            "require_bootstrap": True,
+            "steps": marks()
+            + [
+                order(1, 1, 0, 100, 2450, t),  # NOT_BOOTSTRAPPED
+                {
+                    "type": "bootstrap",
+                    "ts": T0 + 1,
+                    "fills": [
+                        fill("S1", 1, 0, 100, 2451, T0),
+                        fill("S1", 1, 0, 0, 2451, T0, order_id=9),  # malformed: dropped
+                        fill("S2", 2, 1, 50, 3120, T0),
+                    ],
+                },
+                order(2, 1, 0, 100, 2450, t + 10 * MS),
+                {"type": "restore", "ts": t + 20 * MS},
+                order(2, 1, 0, 100, 2450, t + 30 * MS),  # duplicate id survives
+                order(3, 1, 1, 100, 2450, t + 40 * MS),  # self-match vs restored order 2
+                order(4, 2, 0, 10, 3120, t + 50 * MS, strategy="S2"),
+            ],
+        },
     ]
 
 
@@ -227,16 +287,15 @@ def main() -> None:
         if not any(key in line and frag in line for line in audit.splitlines()):
             raise SystemExit(f"must_pin not reached: {rule} / {frag}")
     out = ROOT / "tests" / "golden"
-    with open(out / "expected_risk_edge_decisions.json", "w", encoding="utf-8",
-              newline="\n") as f:
+    with open(out / "expected_risk_edge_decisions.json", "w", encoding="utf-8", newline="\n") as f:
         f.write(json.dumps(golden, indent=2) + "\n")
-    with open(out / "expected_risk_edge_audit.jsonl", "w", encoding="utf-8",
-              newline="\n") as f:
+    with open(out / "expected_risk_edge_audit.jsonl", "w", encoding="utf-8", newline="\n") as f:
         f.write(audit)
-    n_orders = sum(1 for sc in golden["scenarios"] for s in sc["steps"]
-                   if s["type"] == "order")
-    print(f"{len(golden['scenarios'])} scenarios, {n_orders} orders, "
-          f"{len(audit.splitlines())} audit lines")
+    n_orders = sum(1 for sc in golden["scenarios"] for s in sc["steps"] if s["type"] == "order")
+    print(
+        f"{len(golden['scenarios'])} scenarios, {n_orders} orders, "
+        f"{len(audit.splitlines())} audit lines"
+    )
 
 
 if __name__ == "__main__":

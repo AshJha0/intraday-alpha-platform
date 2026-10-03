@@ -54,9 +54,7 @@ class SessionStatus(IntEnum):
 
 
 #: Event types whose payload carries a live price/qty/order_id.
-_BOOK_TYPES = frozenset(
-    {EventType.ADD, EventType.MODIFY, EventType.CANCEL, EventType.EXECUTE}
-)
+_BOOK_TYPES = frozenset({EventType.ADD, EventType.MODIFY, EventType.CANCEL, EventType.EXECUTE})
 
 
 @dataclass(slots=True)
@@ -133,7 +131,9 @@ def validation_error(ev: MarketEvent) -> Optional[str]:
 
     et = ev.event_type
     if ev.order_id >= SYNTHETIC_ID_BASE and et in (
-        EventType.ADD, EventType.QUOTE, EventType.SNAPSHOT
+        EventType.ADD,
+        EventType.QUOTE,
+        EventType.SNAPSHOT,
     ):
         return f"order_id in reserved synthetic range: {ev.order_id}"
     if et in _BOOK_TYPES:

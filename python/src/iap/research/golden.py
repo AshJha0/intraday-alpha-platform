@@ -71,8 +71,7 @@ GOLDEN_COMMIT = "golden-fixture"
 
 def golden_frames(golden_dir: Path, configs_dir: Path) -> Dict[int, pd.DataFrame]:
     """The golden instrument's feature + label frame."""
-    frame = build_golden_frame(Path(golden_dir) / GOLDEN_EVENTS, configs_dir,
-                               GOLDEN_INSTRUMENT)
+    frame = build_golden_frame(Path(golden_dir) / GOLDEN_EVENTS, configs_dir, GOLDEN_INSTRUMENT)
     return {GOLDEN_INSTRUMENT: frame}
 
 
@@ -80,11 +79,14 @@ def golden_spec(golden_dir: Path, frames: Dict[int, pd.DataFrame]) -> Experiment
     """The pinned spec over ``frames`` (see the module docs)."""
     ts = frames[GOLDEN_INSTRUMENT]["exchange_ts"].to_numpy()
     test_start = int(ts[GOLDEN_TEST_ROW])
-    purge_start = (test_start - HORIZONS_NS[GOLDEN_HORIZON]
-                   - int(DEFAULT_CONFIGURATION["embargo_ns"]))
+    purge_start = (
+        test_start - HORIZONS_NS[GOLDEN_HORIZON] - int(DEFAULT_CONFIGURATION["embargo_ns"])
+    )
     vector = (Path(golden_dir) / GOLDEN_EVENTS).read_bytes()
     return build_spec(
-        GOLDEN_ALPHA, GOLDEN_HORIZON, {},
+        GOLDEN_ALPHA,
+        GOLDEN_HORIZON,
+        {},
         dataset_version=hashlib.sha256(vector).hexdigest(),
         feature_version=registry_hash(),
         seed=GOLDEN_SEED,
@@ -94,13 +96,18 @@ def golden_spec(golden_dir: Path, frames: Dict[int, pd.DataFrame]) -> Experiment
     )
 
 
-def golden_result(spec: ExperimentSpec, frames: Dict[int, pd.DataFrame],
-                  configs_dir: Path, scratch_dir: Path) -> ExperimentResult:
+def golden_result(
+    spec: ExperimentSpec, frames: Dict[int, pd.DataFrame], configs_dir: Path, scratch_dir: Path
+) -> ExperimentResult:
     """Run the golden spec on a fresh ledger under ``scratch_dir`` (nothing
     is written: the runner is a dry run) and pin the provenance."""
     runner = ExperimentRunner(
-        None, Path(scratch_dir) / "experiments.json", Path(scratch_dir) / "experiments",
-        configs_dir, dry_run=True, frames=frames,
+        None,
+        Path(scratch_dir) / "experiments.json",
+        Path(scratch_dir) / "experiments",
+        configs_dir,
+        dry_run=True,
+        frames=frames,
     )
     result = runner.run(spec)
     return dataclasses.replace(result, git_commit=GOLDEN_COMMIT)

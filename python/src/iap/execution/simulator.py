@@ -183,11 +183,7 @@ class ExecutionSimulator:
     @staticmethod
     def venue_open(book: Optional[OrderBook]) -> bool:
         """True when the venue book exists, is not stale and is TRADING (rule 8)."""
-        return (
-            book is not None
-            and not book.stale
-            and book.status == int(SessionStatus.TRADING)
-        )
+        return book is not None and not book.stale and book.status == int(SessionStatus.TRADING)
 
     def _venue(self, venue_id: int) -> VenueSpec:
         return self._config.venue(venue_id)
@@ -199,16 +195,8 @@ class ExecutionSimulator:
 
     def _latency_to(self, venue: VenueSpec, decision_ts: int) -> int:
         """Rule 1 / rule 7 arrival time: one jitter draw per call."""
-        jitter = (
-            self._rng.below(venue.latency_jitter_ns + 1)
-            if venue.latency_jitter_ns > 0 else 0
-        )
-        return (
-            decision_ts
-            + self._config.latency.internal_ns
-            + venue.latency_mean_ns
-            + jitter
-        )
+        jitter = self._rng.below(venue.latency_jitter_ns + 1) if venue.latency_jitter_ns > 0 else 0
+        return decision_ts + self._config.latency.internal_ns + venue.latency_mean_ns + jitter
 
     def submit(self, child: ChildOrder) -> int:
         """Submit a child order (decision-time semantics, rule 1); returns its order_id.
@@ -279,9 +267,7 @@ class ExecutionSimulator:
         self._resting = [i for i in self._resting if i != o.order_id]
         self._cancels = [e for e in self._cancels if e[1] != o.order_id]
 
-    def _fill_fee(
-        self, o: ChildOrder, price_ticks: int, qty: int, liq: Liquidity
-    ) -> float:
+    def _fill_fee(self, o: ChildOrder, price_ticks: int, qty: int, liq: Liquidity) -> float:
         """Rule 5."""
         v = self._venue(o.venue_id)
         if v.is_fx:
@@ -328,9 +314,7 @@ class ExecutionSimulator:
             self._behind.pop(o.order_id, None)
             self._cancels = [e for e in self._cancels if e[1] != o.order_id]
 
-    def _consumed_at(
-        self, instrument_id: int, venue_id: int, side: int, price_ticks: int
-    ) -> int:
+    def _consumed_at(self, instrument_id: int, venue_id: int, side: int, price_ticks: int) -> int:
         return self._consumed.get((instrument_id, venue_id, side, price_ticks), 0)
 
     def _aggressive_fill(self, o: ChildOrder, book: OrderBook) -> None:
@@ -487,8 +471,7 @@ class ExecutionSimulator:
                 # Both fill at OUR limit (we never get price improvement) and
                 # both are capped by the observed volume.
                 through = (
-                    price_ticks < o.limit_ticks if o.side == 0
-                    else price_ticks > o.limit_ticks
+                    price_ticks < o.limit_ticks if o.side == 0 else price_ticks > o.limit_ticks
                 )
                 if price_ticks == o.limit_ticks or through:
                     dec = min(o.ahead_qty, budget)
@@ -519,14 +502,16 @@ class ExecutionSimulator:
         # Rule 3b: the pool is the displayed size net of what was already
         # consumed since the level's display last changed.
         pool_start = [
-            0 if best_ask is None else max(
-                best_ask[1]
-                - self._consumed_at(ev.instrument_id, ev.venue_id, 1, best_ask[0]),
+            0
+            if best_ask is None
+            else max(
+                best_ask[1] - self._consumed_at(ev.instrument_id, ev.venue_id, 1, best_ask[0]),
                 0,
             ),
-            0 if best_bid is None else max(
-                best_bid[1]
-                - self._consumed_at(ev.instrument_id, ev.venue_id, 0, best_bid[0]),
+            0
+            if best_bid is None
+            else max(
+                best_bid[1] - self._consumed_at(ev.instrument_id, ev.venue_id, 0, best_bid[0]),
                 0,
             ),
         ]
@@ -556,7 +541,10 @@ class ExecutionSimulator:
                         # Rule 8 uncrosses AT THE TOUCH; the rule-4 crossing
                         # fills at our own limit (no price improvement).
                         self._emit_fill(
-                            o, opp[0] if reopened else o.limit_ticks, fill, t,
+                            o,
+                            opp[0] if reopened else o.limit_ticks,
+                            fill,
+                            t,
                             Liquidity.MAKER,
                         )
                         budget[o.side] -= fill
@@ -573,9 +561,7 @@ class ExecutionSimulator:
                 key = (ev.instrument_id, ev.venue_id, 1 - our_side, opp[0])
                 self._consumed[key] = self._consumed.get(key, 0) + used
 
-    def _level_before(
-        self, ev: MarketEvent, pre: Optional[OrderBook]
-    ) -> List[Tuple[int, int]]:
+    def _level_before(self, ev: MarketEvent, pre: Optional[OrderBook]) -> List[Tuple[int, int]]:
         """(order_id, displayed qty at its level) for our orders on ev's book."""
         out: List[Tuple[int, int]] = []
         for oid in self._resting:
@@ -585,9 +571,7 @@ class ExecutionSimulator:
                 and o.venue_id == ev.venue_id
                 and o.state == OrderState.ACTIVE
             ):
-                out.append(
-                    (oid, 0 if pre is None else pre.level_qty(o.side, o.limit_ticks))
-                )
+                out.append((oid, 0 if pre is None else pre.level_qty(o.side, o.limit_ticks)))
         return out
 
     # -------------------------------------------------------------- events
@@ -625,9 +609,7 @@ class ExecutionSimulator:
             if key[0] == ev.instrument_id and key[1] == ev.venue_id:
                 before = 0 if pre is None else pre.level_qty(key[2], key[3])
                 watched.append((key, before))
-        applied = (
-            self.instrument_book(ev.instrument_id).apply(ev) == ApplyStatus.APPLIED
-        )
+        applied = self.instrument_book(ev.instrument_id).apply(ev) == ApplyStatus.APPLIED
         book = self.venue_book(ev.instrument_id, ev.venue_id)
 
         # 3. Passive queue tracking (rule 4) — only for an event the book
@@ -637,8 +619,12 @@ class ExecutionSimulator:
             if et == EventType.EXECUTE:
                 if exec_order is not None:
                     self._track_consumption(
-                        ev.instrument_id, ev.venue_id, exec_order[0],
-                        exec_order[1], min(ev.qty, exec_order[2]), t,
+                        ev.instrument_id,
+                        ev.venue_id,
+                        exec_order[0],
+                        exec_order[1],
+                        min(ev.qty, exec_order[2]),
+                        t,
                     )
             elif et == EventType.CANCEL:
                 for oid, before in level_before:

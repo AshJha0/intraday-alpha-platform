@@ -149,12 +149,17 @@ def data_quality_lines() -> list:
     # The FX crossed-book range is DERIVED from the same table rows above:
     # a hard-coded range here once contradicted the table two lines below it.
     fx_crossed = sorted(
-        v["crossed_frac"] for iid, v in inst.items()
-        if int(iid) >= 100 and isinstance(v.get("crossed_frac"), (int, float))
-        and np.isfinite(v["crossed_frac"]))
+        v["crossed_frac"]
+        for iid, v in inst.items()
+        if int(iid) >= 100
+        and isinstance(v.get("crossed_frac"), (int, float))
+        and np.isfinite(v["crossed_frac"])
+    )
     if fx_crossed:
-        fx_range = (f"{fx_crossed[0] * 100:.0f}-{fx_crossed[-1] * 100:.0f} % "
-                    f"of rows (mean {np.mean(fx_crossed) * 100:.0f} %)")
+        fx_range = (
+            f"{fx_crossed[0] * 100:.0f}-{fx_crossed[-1] * 100:.0f} % "
+            f"of rows (mean {np.mean(fx_crossed) * 100:.0f} %)"
+        )
     else:
         fx_range = "not measurable from features_summary.json"
     lines += [
@@ -166,7 +171,7 @@ def data_quality_lines() -> list:
         "  vol-scaled momentum signal is paid for measuring that artefact.",
         "  Every IC in this report is therefore split crossed/uncrossed.",
         "- **mean row gap** is the spacing of emissions. Equity rows are ~3.3 s",
-        "  apart, FX rows ~15-22 s: any \"+1 event\" latency claim means two",
+        '  apart, FX rows ~15-22 s: any "+1 event" latency claim means two',
         "  different things, which is why the latency stress is in event time.",
         "- **zero 1s / zero 1m** is the fraction of VALID labels that are",
         "  exactly 0. A 500 ms-5 s FX label is 89-99 % zeros: a REJECT at those",
@@ -180,9 +185,13 @@ def data_quality_lines() -> list:
     return lines
 
 
-def _write_report(reports: Dict[str, dict], ledger: ExperimentLedger,
-                  day2_bt: Dict[str, dict], ensembles: Dict[str, dict],
-                  runtime_s: float) -> None:
+def _write_report(
+    reports: Dict[str, dict],
+    ledger: ExperimentLedger,
+    day2_bt: Dict[str, dict],
+    ensembles: Dict[str, dict],
+    runtime_s: float,
+) -> None:
     lines = []
     a = lines.append
     a("# Flagship alpha promotion report (spec §§11-13, §20)")
@@ -211,12 +220,16 @@ def _write_report(reports: Dict[str, dict], ledger: ExperimentLedger,
     a("## Pinned promotion gates (spec §20)")
     a("")
     a(f"- PROMOTE: leakage pass AND UNCROSSED OOS IC >= {GATES['min_oos_ic']}")
-    a(f"  AND its NW t >= {GATES['min_nw_tstat']} AND fold sign consistency >= "
-      f"{GATES['min_fold_sign_consistency']} AND >= "
-      f"{GATES['min_nondegenerate_folds']} non-degenerate folds AND hypothesis "
-      "confirmed AND net P&L > 0 at 1x costs.")
-    a(f"- ITERATE: leakage pass AND OOS IC >= {GATES['iterate_min_ic']} AND "
-      f"NW t >= {GATES['iterate_min_tstat']}.")
+    a(
+        f"  AND its NW t >= {GATES['min_nw_tstat']} AND fold sign consistency >= "
+        f"{GATES['min_fold_sign_consistency']} AND >= "
+        f"{GATES['min_nondegenerate_folds']} non-degenerate folds AND hypothesis "
+        "confirmed AND net P&L > 0 at 1x costs."
+    )
+    a(
+        f"- ITERATE: leakage pass AND OOS IC >= {GATES['iterate_min_ic']} AND "
+        f"NW t >= {GATES['iterate_min_tstat']}."
+    )
     a("- REJECT: otherwise (always, on leakage failure).")
     a("")
     a("## Which rows are trustworthy (read this before the tables)")
@@ -237,10 +250,14 @@ def _write_report(reports: Dict[str, dict], ledger: ExperimentLedger,
     a("(a crossed book means a stale venue quote whose mid mechanically")
     a("reverts). **The gates read `IC unc` and its NW t.**")
     a("")
-    a("| alpha | horizon | IC | IC unc | IC crs | crs% | NW t unc | L | hit "
-      "| folds+ | deg | hyp | leak | net P&L 1x | flips/h | verdict |")
-    a("|-------|---------|----|--------|--------|------|----------|---|-----"
-      "|--------|-----|-----|------|-----------|---------|---------|")
+    a(
+        "| alpha | horizon | IC | IC unc | IC crs | crs% | NW t unc | L | hit "
+        "| folds+ | deg | hyp | leak | net P&L 1x | flips/h | verdict |"
+    )
+    a(
+        "|-------|---------|----|--------|--------|------|----------|---|-----"
+        "|--------|-----|-----|------|-----------|---------|---------|"
+    )
     for aid in ALPHA_IDS:
         r = reports[aid]
         a(
@@ -262,30 +279,34 @@ def _write_report(reports: Dict[str, dict], ledger: ExperimentLedger,
     n_iterate = sum(1 for r in reports.values() if r["verdict"] == "ITERATE")
     n_reject = sum(1 for r in reports.values() if r["verdict"] == "REJECT")
     a("")
-    a(f"**Verdicts: {n_promote} PROMOTE / {n_iterate} ITERATE / "
-      f"{n_reject} REJECT** (of {len(reports)}).")
+    a(
+        f"**Verdicts: {n_promote} PROMOTE / {n_iterate} ITERATE / "
+        f"{n_reject} REJECT** (of {len(reports)})."
+    )
     a("")
     a("## Decay curves (OOS IC by horizon, last fold)")
     a("")
-    horizons = ["10ms", "50ms", "100ms", "500ms", "1s", "5s", "10s", "30s",
-                "1m", "5m", "15m"]
+    horizons = ["10ms", "50ms", "100ms", "500ms", "1s", "5s", "10s", "30s", "1m", "5m", "15m"]
     a("| alpha | " + " | ".join(horizons) + " |")
     a("|-------|" + "|".join(["------"] * len(horizons)) + "|")
     for aid in ALPHA_IDS:
         d = reports[aid]["decay_ic_by_horizon"]
-        a(f"| {aid} | " + " | ".join(_fmt(d.get(h), "+.3f") for h in horizons)
-          + " |")
+        a(f"| {aid} | " + " | ".join(_fmt(d.get(h), "+.3f") for h in horizons) + " |")
     a("")
     a("## Cost and latency stress (last fold, net P&L)")
     a("")
     a("Latency is stressed in EVENT TIME (a row is ~3.3 s on equities and")
-    a("~15 s on FX, so an \"+N events\" grid is not a latency budget). The")
+    a('~15 s on FX, so an "+N events" grid is not a latency budget). The')
     a("event grid is kept as the last three columns for continuity.")
     a("")
-    a("| alpha | x0.5 cost | x1 cost | x2 cost | 100ms P&L | 500ms | 1s "
-      "| 5s | +0ev IC | +1ev IC | +5ev IC |")
-    a("|-------|-----------|---------|---------|-----------|-------|----"
-      "|----|---------|---------|---------|")
+    a(
+        "| alpha | x0.5 cost | x1 cost | x2 cost | 100ms P&L | 500ms | 1s "
+        "| 5s | +0ev IC | +1ev IC | +5ev IC |"
+    )
+    a(
+        "|-------|-----------|---------|---------|-----------|-------|----"
+        "|----|---------|---------|---------|"
+    )
     for aid in ALPHA_IDS:
         st = reports[aid]["stress"]
         lt = st.get("latency_time", {})
@@ -294,8 +315,9 @@ def _write_report(reports: Dict[str, dict], ledger: ExperimentLedger,
             f"{_fmt(st['cost']['x1']['total_pnl'], '+.0f')} | "
             f"{_fmt(st['cost']['x2']['total_pnl'], '+.0f')} | "
             + " | ".join(
-                _fmt(lt.get(k, {}).get("total_pnl"), '+.0f')
-                for k in ("100ms", "500ms", "1s", "5s")) + " | "
+                _fmt(lt.get(k, {}).get("total_pnl"), "+.0f") for k in ("100ms", "500ms", "1s", "5s")
+            )
+            + " | "
             f"{_fmt(st['latency']['+0ev']['ic'], '+.4f')} | "
             f"{_fmt(st['latency']['+1ev']['ic'], '+.4f')} | "
             f"{_fmt(st['latency']['+5ev']['ic'], '+.4f')} |"
@@ -307,13 +329,14 @@ def _write_report(reports: Dict[str, dict], ledger: ExperimentLedger,
     a("|-------|-------------|------------|")
     for aid in ALPHA_IDS:
         rg = reports[aid]["stress"]["regime"]
-        a(f"| {aid} | {_fmt(rg['ic_high_vol'], '+.4f')} | "
-          f"{_fmt(rg['ic_low_vol'], '+.4f')} |")
+        a(f"| {aid} | {_fmt(rg['ic_high_vol'], '+.4f')} | {_fmt(rg['ic_low_vol'], '+.4f')} |")
     a("")
     a("## Day-2 out-of-sample backtest (day-1-fitted params, 1x costs)")
     a("")
-    a("These are the exact parameters serialized to "
-      "`configs/strategies/alpha_params.json` (the port contract).")
+    a(
+        "These are the exact parameters serialized to "
+        "`configs/strategies/alpha_params.json` (the port contract)."
+    )
     a("")
     a("| alpha | net P&L | gross P&L | costs | trades | ann. Sharpe | maxDD |")
     a("|-------|---------|-----------|-------|--------|-------------|-------|")
@@ -335,36 +358,46 @@ def _write_report(reports: Dict[str, dict], ledger: ExperimentLedger,
             f" {m['trade_count']} | {_fmt(m['sharpe_ann'], '+.2f')} |"
         )
     a("")
-    a("Sharpe scaling: 1-minute event-time bars, annualized by "
-      "sqrt(252 * session_hours * 60) (6.5h equities, 21h FX); assumes "
-      "independent bar P&L — a research yardstick, not a production claim.")
+    a(
+        "Sharpe scaling: 1-minute event-time bars, annualized by "
+        "sqrt(252 * session_hours * 60) (6.5h equities, 21h FX); assumes "
+        "independent bar P&L — a research yardstick, not a production claim."
+    )
     a("")
     a("## Multiple testing")
     a("")
     a(ledger.note())
     a("")
-    a(f"`ledger_n_at_report` = **{ledger.total_experiments}** "
-      f"({ledger.distinct_experiments} distinct configurations). This number is")
+    a(
+        f"`ledger_n_at_report` = **{ledger.total_experiments}** "
+        f"({ledger.distinct_experiments} distinct configurations). This number is"
+    )
     a("read from `research/experiments.json` at render time, so the report and")
-    a("the ledger can never disagree — the stale \"1 224 experiments\" note")
+    a('the ledger can never disagree — the stale "1 224 experiments" note')
     a("earlier versions carried is gone.")
     a("")
     a("Every walk-forward evaluation, decay-curve horizon, stress variant and")
-    a("backtest in this run is counted in `research/experiments.json` "
-      f"({LOOKS_PER_ALPHA} looks per alpha per run), plus the one-time design "
-      f"horizon scan ({DESIGN_SCAN_COUNT} looks). Experiments are "
-      "DE-DUPLICATED by (alpha, kind, configuration): re-running this script "
-      "does not inflate the denominator, so the selection-adjusted threshold "
-      "is a property of the research design, not of how often the script ran.")
+    a(
+        "backtest in this run is counted in `research/experiments.json` "
+        f"({LOOKS_PER_ALPHA} looks per alpha per run), plus the one-time design "
+        f"horizon scan ({DESIGN_SCAN_COUNT} looks). Experiments are "
+        "DE-DUPLICATED by (alpha, kind, configuration): re-running this script "
+        "does not inflate the denominator, so the selection-adjusted threshold "
+        "is a property of the research design, not of how often the script ran."
+    )
     a("")
-    a("Alphas whose |NW t| (uncrossed) is below the selection yardstick "
-      f"{ledger.expected_max_null_t():.2f} are consistent with pure selection "
-      "over this many looks, whatever their verdict:")
+    a(
+        "Alphas whose |NW t| (uncrossed) is below the selection yardstick "
+        f"{ledger.expected_max_null_t():.2f} are consistent with pure selection "
+        "over this many looks, whatever their verdict:"
+    )
     below = [
-        aid for aid in ALPHA_IDS
-        if (reports[aid].get("nw_tstat_uncrossed") is not None
-            and abs(reports[aid]["nw_tstat_uncrossed"])
-            < ledger.expected_max_null_t())
+        aid
+        for aid in ALPHA_IDS
+        if (
+            reports[aid].get("nw_tstat_uncrossed") is not None
+            and abs(reports[aid]["nw_tstat_uncrossed"]) < ledger.expected_max_null_t()
+        )
     ]
     a("")
     a("- " + (", ".join(below) if below else "none"))
@@ -383,16 +416,21 @@ def main() -> int:
     # Round-3 pinned research execution model: latency in EVENT TIME, a
     # bounded decision age (a 4-hour-old decision no longer "fills" at the
     # 20:00 close print) and no overnight carry.
-    backtester = Backtester(cost_model, meta, BacktestConfig(
-        latency_ns=RESEARCH_LATENCY_NS,
-        max_decision_age_ns=RESEARCH_MAX_DECISION_AGE_NS,
-        flatten_at_session_end=True,
-    ))
+    backtester = Backtester(
+        cost_model,
+        meta,
+        BacktestConfig(
+            latency_ns=RESEARCH_LATENCY_NS,
+            max_decision_age_ns=RESEARCH_MAX_DECISION_AGE_NS,
+            flatten_at_session_end=True,
+        ),
+    )
 
     ledger = ExperimentLedger(LEDGER_PATH)
     if ledger.total_experiments == 0:
         ledger.record(
-            "ALL", "design_horizon_scan",
+            "ALL",
+            "design_horizon_scan",
             config={"horizons_scanned": 9, "alphas": 24},
             count=DESIGN_SCAN_COUNT,
         )
@@ -401,12 +439,16 @@ def main() -> int:
     for aid in ALPHA_IDS:
         t0 = time.time()
         rep = validate_alpha(
-            lambda aid=aid: build(aid), frames, backtester, meta,
+            lambda aid=aid: build(aid),
+            frames,
+            backtester,
+            meta,
             max_participation,
         )
         reports[aid] = rep
         ledger.record(
-            aid, "promotion_pipeline",
+            aid,
+            "promotion_pipeline",
             # The config is the experiment's IDENTITY — what was looked at.
             # How many looks that costs is the recording's size and travels
             # in `count`, not here: carrying `looks` in the identity meant
@@ -414,19 +456,22 @@ def main() -> int:
             # alpha into a second "configuration", double-counting the
             # multiple-testing denominator the ledger exists to keep honest.
             config={
-                "n_folds": 4, "embargo_s": 60, "horizon": rep["horizon"],
+                "n_folds": 4,
+                "embargo_s": 60,
+                "horizon": rep["horizon"],
             },
             result={
-                "oos_ic": rep["oos_ic"], "nw_tstat": rep["nw_tstat"],
+                "oos_ic": rep["oos_ic"],
+                "nw_tstat": rep["nw_tstat"],
                 "verdict": rep["verdict"],
             },
             count=LOOKS_PER_ALPHA,
         )
-        (REPORTS_DIR / f"{aid}.json").write_text(
-            json.dumps(rep, indent=2, sort_keys=True) + "\n"
+        (REPORTS_DIR / f"{aid}.json").write_text(json.dumps(rep, indent=2, sort_keys=True) + "\n")
+        print(
+            f"{aid}: ic={rep['oos_ic']} t={rep['nw_tstat']} "
+            f"verdict={rep['verdict']} ({time.time() - t0:.1f}s)"
         )
-        print(f"{aid}: ic={rep['oos_ic']} t={rep['nw_tstat']} "
-              f"verdict={rep['verdict']} ({time.time() - t0:.1f}s)")
 
     # -- day-1 final fit -> serialized params + day-2 OOS backtest --------
     days = session_days(frames)
@@ -462,8 +507,7 @@ def main() -> int:
         res = backtester.run(scores=ens, frames=test, asset_class=ac)
         capital = _capital_usd(backtester, meta, ens)
         ensembles[
-            f"{ac} equal-weight, non-REJECT only ({len(members)} alphas: "
-            f"{', '.join(members)})"
+            f"{ac} equal-weight, non-REJECT only ({len(members)} alphas: {', '.join(members)})"
         ] = res.metrics(capital)
 
     ledger.save()

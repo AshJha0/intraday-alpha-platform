@@ -159,22 +159,22 @@ def _make_frames(n_rows=21_600, t0=1_700_000_000_000_000_000, seed=7):
         noise = np.array([rng.normal() for _ in range(n_rows)])
         sig = label * 5e3 + noise  # correlated with the label, plus noise
         sig[-1] = noise[-1]
-        frames[iid] = pd.DataFrame({
-            "exchange_ts": ts,
-            "x_v1": sig,
-            "mid_price_v1": mid,
-            "spread_ticks_v1": np.ones(n_rows),
-            "label_mid_1s": label,
-            "label_valid_1s": valid,
-        })
+        frames[iid] = pd.DataFrame(
+            {
+                "exchange_ts": ts,
+                "x_v1": sig,
+                "mid_price_v1": mid,
+                "spread_ticks_v1": np.ones(n_rows),
+                "label_mid_1s": label,
+                "label_valid_1s": valid,
+            }
+        )
     return frames
 
 
 _META = {
-    1: {"asset_class": "EQUITY", "tick_size": 0.01, "lot_size": 1,
-        "adv": 1e6, "ref_price": 100.0},
-    2: {"asset_class": "EQUITY", "tick_size": 0.01, "lot_size": 1,
-        "adv": 1e6, "ref_price": 100.0},
+    1: {"asset_class": "EQUITY", "tick_size": 0.01, "lot_size": 1, "adv": 1e6, "ref_price": 100.0},
+    2: {"asset_class": "EQUITY", "tick_size": 0.01, "lot_size": 1, "adv": 1e6, "ref_price": 100.0},
 }
 
 
@@ -185,13 +185,15 @@ def toy_frames():
 
 @pytest.fixture(scope="module")
 def toy_deployment(toy_frames, adaptive_cfg):
-    bt = Backtester(CostModel.load(CONFIGS_DIR / "execution" / "execution.json"), _META,
-                    BacktestConfig())
+    bt = Backtester(
+        CostModel.load(CONFIGS_DIR / "execution" / "execution.json"), _META, BacktestConfig()
+    )
     return AdaptiveDeployment(
-        _ToyAlpha, toy_frames, adaptive_cfg, bt,
-        psi_threshold=float(
-            adaptive_cfg["policies"]["drift_triggered"]["psi_threshold"]
-        ),
+        _ToyAlpha,
+        toy_frames,
+        adaptive_cfg,
+        bt,
+        psi_threshold=float(adaptive_cfg["policies"]["drift_triggered"]["psi_threshold"]),
     )
 
 
@@ -224,9 +226,7 @@ def test_psi_ks_match_golden(golden, synth_baseline, synth_samples):
         assert abs(p - cases[name]["ks_p"]) <= TOL
     gb = golden["psi_ks"]["baseline"]
     assert list(synth_baseline.edges) == pytest.approx(gb["edges"], abs=TOL)
-    assert list(synth_baseline.expected_frac) == pytest.approx(
-        gb["expected_frac"], abs=TOL
-    )
+    assert list(synth_baseline.expected_frac) == pytest.approx(gb["expected_frac"], abs=TOL)
 
 
 def test_ks_matches_bruteforce(synth_samples):
@@ -245,8 +245,7 @@ def test_psi_epsilon_guard_disjoint_sample(synth_baseline):
     # every current value beyond the top edge: 9 empty buckets, no nan/inf
     v = psi(synth_baseline, np.full(500, 99.0))
     assert math.isfinite(v)
-    bf = brute_psi(synth_baseline.edges, synth_baseline.expected_frac,
-                   np.full(500, 99.0))
+    bf = brute_psi(synth_baseline.edges, synth_baseline.expected_frac, np.full(500, 99.0))
     assert abs(v - bf) <= TOL
     assert v > 2.0  # total shift is a huge PSI
 
@@ -290,6 +289,7 @@ def test_bucket_edge_value_falls_in_lower_bucket():
     b = capture_baseline(base, "feature", "edge_check")
     edge = b.edges[4]  # the median edge
     from iap.adaptive import bucket_counts
+
     counts = bucket_counts(np.array([edge]), b.edges)
     assert counts[4] == 1 and counts.sum() == 1
 
@@ -323,6 +323,7 @@ def test_baseline_schema_fields(synth_baseline):
 
 def test_signal_eq01_baseline_matches_golden(golden):
     from conftest import REPO_ROOT
+
     path = REPO_ROOT / "research" / "baselines" / "signal_eq01.json"
     b = DriftBaseline.load(path)
     g = golden["signal_eq01"]
@@ -369,28 +370,46 @@ def test_rolling_ic_matches_golden(golden):
     observed = (sig_ts + h_ns) <= mid_ts[-1]
     ret = np.where(have & observed, fwd / sig_mid - 1.0, np.nan)
 
-    base = ICBaseline(name="golden", alpha_id=g["alpha_id"], source="golden",
-                      ic_mean=0.0, ic_std=1.0, n_buckets_baseline=8,
-                      bucket_ns=bucket_ns, horizon=g["horizon"])
+    base = ICBaseline(
+        name="golden",
+        alpha_id=g["alpha_id"],
+        source="golden",
+        ic_mean=0.0,
+        ic_std=1.0,
+        n_buckets_baseline=8,
+        bucket_ns=bucket_ns,
+        horizon=g["horizon"],
+    )
     evals = g["evaluations"]
     assert len(evals) >= 5, "the golden must pin several evaluation times"
     for i, ev in enumerate(evals):
         t_eval = int(ev["t"])
         m = (sig_ts >= t_eval - window_ns) & (sig_ts + h_ns <= t_eval)
         res = rolling_ic_z(base, sig_ts[m], sig_v[m], ret[m], min_buckets)
-        assert int(np.sum(m & np.isfinite(ret))) == ev["n_matured"], \
+        assert int(np.sum(m & np.isfinite(ret))) == ev["n_matured"], (
             f"eval {i}: matured-row count drifted from the golden"
+        )
         assert res.n_buckets == ev["n_buckets"], f"eval {i}: bucket count"
         if ev["rolling_ic"] is None:
             assert res.rolling_ic is None, f"eval {i}: expected a null IC"
         else:
-            assert res.rolling_ic == pytest.approx(
-                ev["rolling_ic"], abs=1e-10), f"eval {i}: rolling_ic"
+            assert res.rolling_ic == pytest.approx(ev["rolling_ic"], abs=1e-10), (
+                f"eval {i}: rolling_ic"
+            )
 
 
 def test_ic_baseline_roundtrip(tmp_path):
-    b = ICBaseline("run_test_ic", "ZZ99", "unit test", 0.05, 0.02, 30,
-                   300 * NS_S, "1s", feature_version=registry_hash())
+    b = ICBaseline(
+        "run_test_ic",
+        "ZZ99",
+        "unit test",
+        0.05,
+        0.02,
+        30,
+        300 * NS_S,
+        "1s",
+        feature_version=registry_hash(),
+    )
     p = tmp_path / "ic.json"
     b.save(p)
     assert ICBaseline.load(p) == b
@@ -404,8 +423,17 @@ def test_baseline_loader_rejects_a_foreign_feature_registry(tmp_path):
     """Pinned (API_ADAPTIVE section 4): a baseline captured against another
     feature registry describes a feature whose semantics may have changed
     under the same name, so PSI/IC against it is meaningless."""
-    b = ICBaseline("run_test_ic", "ZZ99", "unit test", 0.05, 0.02, 30,
-                   300 * NS_S, "1s", feature_version=registry_hash())
+    b = ICBaseline(
+        "run_test_ic",
+        "ZZ99",
+        "unit test",
+        0.05,
+        0.02,
+        30,
+        300 * NS_S,
+        "1s",
+        feature_version=registry_hash(),
+    )
     p = tmp_path / "ic.json"
     b.save(p)
     blob = json.loads(p.read_text())
@@ -434,8 +462,7 @@ def test_drift_baseline_carries_the_registry_hash(synth_baseline, tmp_path):
 
 
 def _ctx(now, last, psi_by=None, ic_z=None):
-    return RefitContext(now_ns=now, last_fit_ns=last,
-                        psi_by_series=psi_by or {}, ic_z=ic_z)
+    return RefitContext(now_ns=now, last_fit_ns=last, psi_by_series=psi_by or {}, ic_z=ic_z)
 
 
 def test_static_never_refits():
@@ -462,14 +489,14 @@ def test_scheduled_invalid_period_raises():
 
 def test_drift_policy_psi_threshold_edge():
     p = DriftTriggeredPolicy(0.25, -2.0, 0)
-    assert not p.should_refit(_ctx(1, 0, {"s": 0.25})).refit      # == : no
-    assert p.should_refit(_ctx(1, 0, {"s": 0.25 + 1e-9})).refit   # > : yes
+    assert not p.should_refit(_ctx(1, 0, {"s": 0.25})).refit  # == : no
+    assert p.should_refit(_ctx(1, 0, {"s": 0.25 + 1e-9})).refit  # > : yes
 
 
 def test_drift_policy_icz_threshold_edge():
     p = DriftTriggeredPolicy(0.25, -2.0, 0)
-    assert not p.should_refit(_ctx(1, 0, ic_z=-2.0)).refit        # == : no
-    assert p.should_refit(_ctx(1, 0, ic_z=-2.0 - 1e-9)).refit     # < : yes
+    assert not p.should_refit(_ctx(1, 0, ic_z=-2.0)).refit  # == : no
+    assert p.should_refit(_ctx(1, 0, ic_z=-2.0 - 1e-9)).refit  # < : yes
 
 
 def test_drift_policy_min_gap_blocks_trigger():
@@ -493,16 +520,21 @@ def test_drift_policy_reasons_name_all_breaches():
 def test_golden_trigger_sequence(golden):
     g = golden["drift_trigger"]
     p = DriftTriggeredPolicy(
-        g["policy"]["psi_threshold"], g["policy"]["ic_z_threshold"],
+        g["policy"]["psi_threshold"],
+        g["policy"]["ic_z_threshold"],
         g["policy"]["min_refit_gap_ns"],
     )
     last_fit = int(g["initial_last_fit_ns"])
     got = []
     for step in g["steps"]:
-        dec = p.should_refit(RefitContext(
-            now_ns=int(step["now_ns"]), last_fit_ns=last_fit,
-            psi_by_series=step["psi"], ic_z=step["ic_z"],
-        ))
+        dec = p.should_refit(
+            RefitContext(
+                now_ns=int(step["now_ns"]),
+                last_fit_ns=last_fit,
+                psi_by_series=step["psi"],
+                ic_z=step["ic_z"],
+            )
+        )
         got.append(bool(dec.refit))
         if dec.refit:
             last_fit = int(step["now_ns"])
@@ -521,6 +553,7 @@ def test_validate_and_build_policies(adaptive_cfg):
 
 def test_config_validation_rejects_bad_blocks(adaptive_cfg):
     import copy
+
     ok = copy.deepcopy(adaptive_cfg)
     validate_adaptive_config(ok)  # the shipped config must validate
     for mutate, match in (
@@ -528,13 +561,10 @@ def test_config_validation_rejects_bad_blocks(adaptive_cfg):
         (lambda c: c.update(block_ns=0), "positive integer"),
         (lambda c: c.update(warmup_ns=1), "warmup_ns"),
         (lambda c: c["policies"].pop("drift_triggered"), "drift_triggered"),
-        (lambda c: c["policies"]["drift_triggered"].update(psi_threshold=-1),
-         "psi_threshold"),
+        (lambda c: c["policies"]["drift_triggered"].update(psi_threshold=-1), "psi_threshold"),
         (lambda c: c["lifecycle"].pop("watch_ic_gate"), "lifecycle"),
-        (lambda c: c["lifecycle"].update(retire_breach_evals=0),
-         "retire_breach_evals"),
-        (lambda c: c["lifecycle"].update(reactivate_ic_gate=-9.0),
-         "reactivate_ic_gate"),
+        (lambda c: c["lifecycle"].update(retire_breach_evals=0), "retire_breach_evals"),
+        (lambda c: c["lifecycle"].update(reactivate_ic_gate=-9.0), "reactivate_ic_gate"),
     ):
         bad = copy.deepcopy(adaptive_cfg)
         mutate(bad)
@@ -546,8 +576,9 @@ def test_config_validation_rejects_bad_blocks(adaptive_cfg):
 # lifecycle state machine
 # ---------------------------------------------------------------------------
 
-_LC = LifecycleConfig(watch_ic_gate=0.0, reactivate_ic_gate=0.005,
-                      retire_breach_evals=3, reactivate_evals=2)
+_LC = LifecycleConfig(
+    watch_ic_gate=0.0, reactivate_ic_gate=0.005, retire_breach_evals=3, reactivate_evals=2
+)
 
 
 def _walk(path, cfg=_LC, log=None):
@@ -594,30 +625,39 @@ def test_lifecycle_none_is_no_evidence():
 
 def test_lifecycle_bad_config_raises():
     with pytest.raises(ValueError):
-        LifecycleConfig(0.0, -0.5, 3, 2)   # reactivate below watch gate
+        LifecycleConfig(0.0, -0.5, 3, 2)  # reactivate below watch gate
     with pytest.raises(ValueError):
         LifecycleConfig(0.0, 0.0, 0, 1)
 
 
 def test_golden_lifecycle_sequence(golden):
     g = golden["lifecycle"]
-    cfg = LifecycleConfig(**{k: g["config"][k] for k in (
-        "watch_ic_gate", "reactivate_ic_gate", "retire_breach_evals",
-        "reactivate_evals")})
+    cfg = LifecycleConfig(
+        **{
+            k: g["config"][k]
+            for k in (
+                "watch_ic_gate",
+                "reactivate_ic_gate",
+                "retire_breach_evals",
+                "reactivate_evals",
+            )
+        }
+    )
     t = LifecycleTracker(alpha_id="GOLDEN", config=cfg, policy="golden")
     states = []
     informative = g["ic_informative"]
     assert len(informative) == len(g["ic_path"])
     for k, v in enumerate(g["ic_path"]):
-        states.append(t.update((k + 1) * int(g["ts_step_ns"]), v,
-                               informative=bool(informative[k])))
+        states.append(t.update((k + 1) * int(g["ts_step_ns"]), v, informative=bool(informative[k])))
     assert states == g["expected_states"]
     # the golden path ends with six UNINFORMATIVE breaches that move nothing
     assert not any(informative[-6:])
     assert states[-1] == states[-7] == "WATCH"
     assert len(t.transitions) == g["expected_transition_count"]
-    got = [{"from": tr.from_state, "to": tr.to_state,
-            "eval_index": tr.eval_index} for tr in t.transitions]
+    got = [
+        {"from": tr.from_state, "to": tr.to_state, "eval_index": tr.eval_index}
+        for tr in t.transitions
+    ]
     assert got == g["expected_transitions"]
 
 
@@ -664,8 +704,9 @@ def test_adaptive_determinism(toy_deployment, adaptive_cfg):
 def test_adaptive_no_lookahead_shift(toy_frames, adaptive_cfg):
     """Mutating every row at or after a cutoff leaves all deployed scores
     strictly before the cutoff bit-identical (row-level no-lookahead)."""
-    bt = Backtester(CostModel.load(CONFIGS_DIR / "execution" / "execution.json"), _META,
-                    BacktestConfig())
+    bt = Backtester(
+        CostModel.load(CONFIGS_DIR / "execution" / "execution.json"), _META, BacktestConfig()
+    )
     dep = AdaptiveDeployment(_ToyAlpha, toy_frames, adaptive_cfg, bt, 0.25)
     cutoff = dep.block_bounds[len(dep.block_bounds) // 2]
 
@@ -691,6 +732,7 @@ def test_adaptive_no_lookahead_shift(toy_frames, adaptive_cfg):
 
 def test_adaptive_refits_train_only_on_purged_past(toy_deployment):
     from iap.validation.metrics import HORIZONS_NS
+
     h = HORIZONS_NS["1s"] + toy_deployment.embargo_ns
     for tb in toy_deployment.block_bounds:
         train = toy_deployment._train_window(tb)
@@ -707,27 +749,23 @@ def test_adaptive_warmup_never_trades(toy_deployment, adaptive_cfg):
         assert (sc["expected_return"].to_numpy()[warm] == 0.0).all()
 
 
-def test_adaptive_retirement_halts_allocation(toy_deployment, adaptive_cfg,
-                                              tmp_path):
+def test_adaptive_retirement_halts_allocation(toy_deployment, adaptive_cfg, tmp_path):
     # gates the toy alpha can never satisfy: every eval breaches
-    lc = LifecycleConfig(watch_ic_gate=0.9, reactivate_ic_gate=0.95,
-                         retire_breach_evals=3, reactivate_evals=2)
+    lc = LifecycleConfig(
+        watch_ic_gate=0.9, reactivate_ic_gate=0.95, retire_breach_evals=3, reactivate_evals=2
+    )
     log = LifecycleLog(tmp_path / "lc.jsonl", truncate=True)
     res = toy_deployment.run(build_policy("static", adaptive_cfg), lc, log)
     assert res.final_state == RETIRED
-    retire_ts = next(t["event_ts"] for t in res.transitions
-                     if t["to"] == RETIRED)
+    retire_ts = next(t["event_ts"] for t in res.transitions if t["to"] == RETIRED)
     for iid, sc in res.scores.items():
         after = sc["exchange_ts"].to_numpy() >= retire_ts
         assert (sc["confidence"].to_numpy()[after] == 0.0).all()
     # log carries exactly the run's transitions
-    assert [r["event_ts"] for r in log.read_all()] == [
-        t["event_ts"] for t in res.transitions
-    ]
+    assert [r["event_ts"] for r in log.read_all()] == [t["event_ts"] for t in res.transitions]
 
 
-def test_adaptive_static_matches_manual_deployment(toy_deployment,
-                                                   adaptive_cfg, toy_frames):
+def test_adaptive_static_matches_manual_deployment(toy_deployment, adaptive_cfg, toy_frames):
     """StaticPolicy == fit once on the purged warmup, score everything,
     zero out warmup rows, run the standard backtester."""
     res = toy_deployment.run(build_policy("static", adaptive_cfg))
@@ -736,17 +774,20 @@ def test_adaptive_static_matches_manual_deployment(toy_deployment,
     model = _ToyAlpha()
     model.fit(toy_deployment._train_window(toy_deployment.deploy_start))
     scores = model.score(toy_frames)
-    bt = Backtester(CostModel.load(CONFIGS_DIR / "execution" / "execution.json"), _META,
-                    BacktestConfig())
+    bt = Backtester(
+        CostModel.load(CONFIGS_DIR / "execution" / "execution.json"), _META, BacktestConfig()
+    )
     manual = {}
     for iid, sc in scores.items():
         ts = sc["exchange_ts"].to_numpy()
         live = ts >= toy_deployment.deploy_start
-        manual[iid] = pd.DataFrame({
-            "exchange_ts": ts,
-            "expected_return": np.where(live, sc["expected_return"], 0.0),
-            "confidence": np.where(live, sc["confidence"], 0.0),
-        })
+        manual[iid] = pd.DataFrame(
+            {
+                "exchange_ts": ts,
+                "expected_return": np.where(live, sc["expected_return"], 0.0),
+                "confidence": np.where(live, sc["confidence"], 0.0),
+            }
+        )
     ref = bt.run(frames=toy_frames, scores=manual, asset_class="EQUITY")
     assert res.backtest.total_pnl == pytest.approx(ref.total_pnl, abs=1e-9)
 
@@ -756,8 +797,9 @@ def test_adaptive_scheduled_fires_on_day_boundary(adaptive_cfg):
     day = 86_400_000_000_000
     t0 = (1_700_000_000_000_000_000 // day) * day + day - 4 * 3600 * NS_S
     frames = _make_frames(n_rows=6 * 3600, t0=t0, seed=11)
-    bt = Backtester(CostModel.load(CONFIGS_DIR / "execution" / "execution.json"), _META,
-                    BacktestConfig())
+    bt = Backtester(
+        CostModel.load(CONFIGS_DIR / "execution" / "execution.json"), _META, BacktestConfig()
+    )
     dep = AdaptiveDeployment(_ToyAlpha, frames, adaptive_cfg, bt, 0.25)
     res = dep.run(build_policy("scheduled_daily", adaptive_cfg))
     assert res.refit_count == 2  # initial fit + one day-boundary refit
@@ -780,8 +822,16 @@ def test_adaptive_eval_rows_are_complete(toy_deployment, adaptive_cfg):
 
 
 def test_rolling_ic_z_hand_computed():
-    base = ICBaseline("b", "ZZ99", "", ic_mean=0.2, ic_std=0.1,
-                      n_buckets_baseline=30, bucket_ns=10 * NS_S, horizon="1s")
+    base = ICBaseline(
+        "b",
+        "ZZ99",
+        "",
+        ic_mean=0.2,
+        ic_std=0.1,
+        n_buckets_baseline=30,
+        bucket_ns=10 * NS_S,
+        horizon="1s",
+    )
     # two buckets of 10 perfectly correlated pairs => bucket ICs [1, 1]
     ts = np.concatenate([np.arange(10), 10 * NS_S + np.arange(10)]).astype(np.int64)
     x = np.concatenate([np.arange(10.0), np.arange(10.0)])
@@ -802,8 +852,9 @@ def test_lifecycle_ignores_uninformative_evaluations():
     consecutive breaches (API_ADAPTIVE section 6)."""
     from iap.adaptive.lifecycle import ACTIVE, RETIRED, WATCH
 
-    cfg = LifecycleConfig(watch_ic_gate=0.0, reactivate_ic_gate=0.005,
-                          retire_breach_evals=6, reactivate_evals=3)
+    cfg = LifecycleConfig(
+        watch_ic_gate=0.0, reactivate_ic_gate=0.005, retire_breach_evals=6, reactivate_evals=3
+    )
     tr = LifecycleTracker(alpha_id="EQ03", config=cfg)
     # one genuine breach enters WATCH, then the feed goes quiet
     assert tr.update(1, -0.04) == WATCH
@@ -823,15 +874,18 @@ def test_lifecycle_ignores_uninformative_evaluations():
 def test_drift_refit_requires_new_evidence():
     """drift_triggered must not fire twice on the same ic_z recomputed from
     an unchanged matured set."""
-    pol = DriftTriggeredPolicy(psi_threshold=0.25, ic_z_threshold=-2.0,
-                               min_refit_gap_ns=3600 * NS_S)
+    pol = DriftTriggeredPolicy(
+        psi_threshold=0.25, ic_z_threshold=-2.0, min_refit_gap_ns=3600 * NS_S
+    )
     hour = 3600 * NS_S
-    ctx = RefitContext(now_ns=10 * hour, last_fit_ns=1 * hour,
-                       psi_by_series={"signal": 0.01}, ic_z=-7.5)
+    ctx = RefitContext(
+        now_ns=10 * hour, last_fit_ns=1 * hour, psi_by_series={"signal": 0.01}, ic_z=-7.5
+    )
     assert pol.should_refit(ctx).refit is True
     # the deployment passes ic_z=None for an uninformative evaluation
-    stale = RefitContext(now_ns=11 * hour, last_fit_ns=10 * hour,
-                         psi_by_series={"signal": 0.01}, ic_z=None)
+    stale = RefitContext(
+        now_ns=11 * hour, last_fit_ns=10 * hour, psi_by_series={"signal": 0.01}, ic_z=None
+    )
     assert pol.should_refit(stale).refit is False
 
 
@@ -842,8 +896,7 @@ def test_ic_baseline_must_be_out_of_sample():
     rng = np.random.default_rng(4)
     x = rng.standard_normal(400)
     y = 0.1 * x + rng.standard_normal(400)
-    base = capture_ic_baseline(ts, x, y, name="t", alpha_id="EQ01",
-                               horizon="1m", source="unit")
+    base = capture_ic_baseline(ts, x, y, name="t", alpha_id="EQ01", horizon="1m", source="unit")
     assert base.baseline_kind == "oos"
     assert base.to_dict()["baseline_kind"] == "oos"
     # a file claiming an in-sample baseline is rejected at load
@@ -855,5 +908,4 @@ def test_ic_baseline_must_be_out_of_sample():
     with pytest.raises(ValueError, match="must be 'oos'"):
         ICBaseline.from_dict(blob)
     with pytest.raises(ValueError, match="out-of-sample"):
-        capture_ic_baseline(ts, x, y, name="t", alpha_id="EQ01",
-                            horizon="1m", baseline_kind="is")
+        capture_ic_baseline(ts, x, y, name="t", alpha_id="EQ01", horizon="1m", baseline_kind="is")

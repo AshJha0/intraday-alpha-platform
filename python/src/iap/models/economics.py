@@ -40,14 +40,13 @@ from typing import Dict
 import numpy as np
 
 
-def signal_directions(pred: np.ndarray, cost_est: np.ndarray,
-                      threshold: float = 0.0) -> np.ndarray:
+def signal_directions(pred: np.ndarray, cost_est: np.ndarray, threshold: float = 0.0) -> np.ndarray:
     """Return -1/0/+1 trade directions for buy-side cost-adjusted predictions."""
     pred = np.asarray(pred, dtype=np.float64)
     cost_est = np.asarray(cost_est, dtype=np.float64)
     if pred.shape != cost_est.shape:
         raise ValueError("pred and cost_est must have identical shapes")
-    long_net = pred                     # predicted net of going long
+    long_net = pred  # predicted net of going long
     short_net = -pred - 2.0 * cost_est  # implied net of going short
     d = np.zeros(pred.shape, dtype=np.int8)
     d[long_net > threshold] = 1
@@ -55,9 +54,9 @@ def signal_directions(pred: np.ndarray, cost_est: np.ndarray,
     return d
 
 
-def realized_net(direction: np.ndarray, y_mid: np.ndarray,
-                 y_cost: np.ndarray,
-                 conservative: bool = True) -> np.ndarray:
+def realized_net(
+    direction: np.ndarray, y_mid: np.ndarray, y_cost: np.ndarray, conservative: bool = True
+) -> np.ndarray:
     """Realized net return per signal (0 where direction == 0).
 
     ``conservative`` floors the realized round-trip cost at zero (crossed
@@ -94,9 +93,7 @@ def signal_economics(
         "n_long": int((d > 0).sum()),
         "n_short": int((d < 0).sum()),
         "total_net_bps": float(net.sum() * 1e4),
-        "mean_net_bps_per_signal": (
-            float(traded_net.mean() * 1e4) if n_trades else 0.0),
-        "mean_gross_bps_per_signal": (
-            float(gross[traded].mean() * 1e4) if n_trades else 0.0),
+        "mean_net_bps_per_signal": (float(traded_net.mean() * 1e4) if n_trades else 0.0),
+        "mean_gross_bps_per_signal": (float(gross[traded].mean() * 1e4) if n_trades else 0.0),
         "hit_rate": float((traded_net > 0).mean()) if n_trades else 0.0,
     }

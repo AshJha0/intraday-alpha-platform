@@ -40,9 +40,13 @@ def make_config(jitter_ns: int = 0) -> ExecConfig:
         impact_coeff_bps_per_pct_adv=2.0,
         venues={
             VEN: VenueSpec(
-                venue_id=VEN, name="TST", is_fx=False,
-                taker_fee_per_share=0.003, maker_rebate_per_share=0.002,
-                latency_mean_ns=150_000, latency_jitter_ns=jitter_ns,
+                venue_id=VEN,
+                name="TST",
+                is_fx=False,
+                taker_fee_per_share=0.003,
+                maker_rebate_per_share=0.002,
+                latency_mean_ns=150_000,
+                latency_jitter_ns=jitter_ns,
             )
         },
         instruments={INS: InstrumentSpec(INS, 0.01, 1.0, 1_000_000.0)},
@@ -67,10 +71,18 @@ class Feeder:
     def ev(self, ts, etype, side, px, qty, oid, tid=0) -> MarketEvent:
         self.seq += 1
         return MarketEvent(
-            event_id=self.seq, instrument_id=INS, venue_id=VEN,
-            exchange_ts=ts, receive_ts=ts, sequence=self.seq,
-            event_type=int(etype), side=side, price_ticks=px, qty=qty,
-            order_id=oid, trade_id=tid,
+            event_id=self.seq,
+            instrument_id=INS,
+            venue_id=VEN,
+            exchange_ts=ts,
+            receive_ts=ts,
+            sequence=self.seq,
+            event_type=int(etype),
+            side=side,
+            price_ticks=px,
+            qty=qty,
+            order_id=oid,
+            trade_id=tid,
         )
 
     def add(self, ts, side, px, qty, oid):
@@ -102,10 +114,18 @@ class Feeder:
     def snapshot(self, ts, side, px, qty, oid, countdown):
         self.seq += 1
         return MarketEvent(
-            event_id=self.seq, instrument_id=INS, venue_id=VEN,
-            exchange_ts=ts, receive_ts=ts, sequence=self.seq,
-            event_type=int(EventType.SNAPSHOT), side=side, price_ticks=px,
-            qty=qty, order_id=oid, trade_id=countdown,
+            event_id=self.seq,
+            instrument_id=INS,
+            venue_id=VEN,
+            exchange_ts=ts,
+            receive_ts=ts,
+            sequence=self.seq,
+            event_type=int(EventType.SNAPSHOT),
+            side=side,
+            price_ticks=px,
+            qty=qty,
+            order_id=oid,
+            trade_id=countdown,
         )
 
 
@@ -119,8 +139,15 @@ def seed_book(sim: ExecutionSimulator, f: Feeder) -> None:
 
 def child(side, otype, px, qty, decision_ts, **kw) -> ChildOrder:
     return ChildOrder(
-        parent_id=99, instrument_id=INS, venue_id=VEN, side=side, type=otype,
-        limit_ticks=px, qty=qty, decision_ts=decision_ts, **kw,
+        parent_id=99,
+        instrument_id=INS,
+        venue_id=VEN,
+        side=side,
+        type=otype,
+        limit_ticks=px,
+        qty=qty,
+        decision_ts=decision_ts,
+        **kw,
     )
 
 
@@ -251,10 +278,7 @@ def test_queue_same_price_children_share_one_print_and_queue_behind_each_other()
     sim = ExecutionSimulator(make_config())
     f = Feeder()
     seed_book(sim, f)  # bid 100 displayed 300
-    ids = [
-        sim.submit(child(0, OrderType.LIMIT, 100, 1000, T0 + 10 + k))
-        for k in range(4)
-    ]
+    ids = [sim.submit(child(0, OrderType.LIMIT, 100, 1000, T0 + 10 + k)) for k in range(4)]
     sim.on_event(f.heartbeat(T0 + 20 + LAT + 1))  # all four rest
     # Queue position: 300 displayed, then each earlier sibling's 1000.
     assert [sim.orders[i].ahead_qty for i in ids] == [300, 1300, 2300, 3300]
@@ -852,9 +876,7 @@ def test_expiry_expires_pending_and_resting_orders_before_activation():
     r = sim.submit(child(0, OrderType.LIMIT, 100, 50, T0 + 10, expire_ts=T0 + 5_000_000))
     sim.on_event(f.heartbeat(T0 + 10 + LAT + 1))
     assert sim.orders[r].state == OrderState.ACTIVE
-    late = sim.submit(
-        child(0, OrderType.MARKET, 0, 50, T0 + 4_900_000, expire_ts=T0 + 5_000_000)
-    )
+    late = sim.submit(child(0, OrderType.MARKET, 0, 50, T0 + 4_900_000, expire_ts=T0 + 5_000_000))
     sim.on_event(f.exec(T0 + 5_000_000, 0, 99, 400, 12))  # trade-through!
     assert sim.orders[r].state == OrderState.CANCELLED
     assert sim.orders[r].cancel_reason == CancelReason.EXPIRED
@@ -1160,8 +1182,12 @@ def test_property_simulated_fills_never_mutate_the_replayed_book(seed):
     sim = ExecutionSimulator(make_config())
     bare = OrderBook(INS, VEN)
     f = Feeder()
-    events = [f.add(T0, 0, 100, 300, 11), f.add(T0 + 1, 0, 99, 400, 12),
-              f.add(T0 + 2, 1, 101, 200, 21), f.add(T0 + 3, 1, 102, 500, 22)]
+    events = [
+        f.add(T0, 0, 100, 300, 11),
+        f.add(T0 + 1, 0, 99, 400, 12),
+        f.add(T0 + 2, 1, 101, 200, 21),
+        f.add(T0 + 3, 1, 102, 500, 22),
+    ]
     ts = T0 + 10
     for k in range(200):
         ts += 1_000 + rng.below(300_000)

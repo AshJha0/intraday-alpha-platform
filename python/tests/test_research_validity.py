@@ -34,34 +34,48 @@ from test_validation_framework import _BackwardsAlpha, _backwards_frames
 NS_S = 1_000_000_000
 NS_DAY = 86_400 * NS_S
 
-META = {1: {"tick_size": 0.01, "lot_size": 100, "adv": 1_000_000.0,
-            "asset_class": "EQUITY", "ref_price": 25.0}}
+META = {
+    1: {
+        "tick_size": 0.01,
+        "lot_size": 100,
+        "adv": 1_000_000.0,
+        "asset_class": "EQUITY",
+        "ref_price": 25.0,
+    }
+}
 
 
 def _cost_model(multiplier: float = 1.0) -> CostModel:
-    return CostModel(impact_coeff_bps_per_pct_adv=2.0,
-                     equity_taker_fee_per_share=0.003,
-                     fx_commission_per_million=2.5, multiplier=multiplier)
+    return CostModel(
+        impact_coeff_bps_per_pct_adv=2.0,
+        equity_taker_fee_per_share=0.003,
+        fx_commission_per_million=2.5,
+        multiplier=multiplier,
+    )
 
 
 def _frame(ts, mids, spread_ticks=2.0) -> pd.DataFrame:
     n = len(mids)
-    return pd.DataFrame({
-        "exchange_ts": np.asarray(ts, dtype=np.int64),
-        "mid_price_v1": np.asarray(mids, dtype=float),
-        "spread_ticks_v1": np.full(n, spread_ticks, dtype=float),
-        "label_mid_1s": np.zeros(n),
-        "label_valid_1s": np.ones(n, dtype=bool),
-    })
+    return pd.DataFrame(
+        {
+            "exchange_ts": np.asarray(ts, dtype=np.int64),
+            "mid_price_v1": np.asarray(mids, dtype=float),
+            "spread_ticks_v1": np.full(n, spread_ticks, dtype=float),
+            "label_mid_1s": np.zeros(n),
+            "label_valid_1s": np.ones(n, dtype=bool),
+        }
+    )
 
 
 def _scores(ts, er, conf=None) -> pd.DataFrame:
     n = len(er)
-    return pd.DataFrame({
-        "exchange_ts": np.asarray(ts, dtype=np.int64),
-        "expected_return": np.asarray(er, dtype=float),
-        "confidence": np.ones(n) if conf is None else np.asarray(conf, dtype=float),
-    })
+    return pd.DataFrame(
+        {
+            "exchange_ts": np.asarray(ts, dtype=np.int64),
+            "expected_return": np.asarray(er, dtype=float),
+            "confidence": np.ones(n) if conf is None else np.asarray(conf, dtype=float),
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -98,16 +112,21 @@ def _two_session_inputs():
     return frames, scores
 
 
-BASE = BacktestConfig(max_pos_qty=100, conf_min=0.5, latency_rows=1,
-                      max_decision_age_ns=60 * NS_S, flatten_at_session_end=True,
-                      session_gap_ns=45 * 60 * NS_S)
+BASE = BacktestConfig(
+    max_pos_qty=100,
+    conf_min=0.5,
+    latency_rows=1,
+    max_decision_age_ns=60 * NS_S,
+    flatten_at_session_end=True,
+    session_gap_ns=45 * 60 * NS_S,
+)
 
 
 def test_time_latency_stress_changes_only_latency_ns(recorded):
     frames, scores = _two_session_inputs()
     base = Backtester(_cost_model(), META, BASE, reporting_ccy="EUR")
     latency_stress_time(base, frames, scores, "EQUITY", "1s", latencies_ns=(NS_S,))
-    (cfg, ccy), = recorded
+    ((cfg, ccy),) = recorded
     assert ccy == "EUR"
     assert cfg == dataclasses.replace(BASE, latency_ns=NS_S)
 
@@ -135,8 +154,9 @@ def test_row_latency_stress_v2_carries_every_base_field(recorded):
     frames, scores = _two_session_inputs()
     timed = dataclasses.replace(BASE, latency_ns=NS_S)
     base = Backtester(_cost_model(), META, timed)
-    latency_stress(base, frames, scores, "EQUITY", "1s", shifts=(0, 2),
-                   version=STRESS_VERSION_CARRY)
+    latency_stress(
+        base, frames, scores, "EQUITY", "1s", shifts=(0, 2), version=STRESS_VERSION_CARRY
+    )
     assert [c for c, _ in recorded] == [
         dataclasses.replace(BASE, latency_rows=1, latency_ns=None),
         dataclasses.replace(BASE, latency_rows=3, latency_ns=None),
@@ -150,12 +170,14 @@ def test_row_latency_stress_v2_keeps_the_base_strategy_flat_overnight():
     v1 stressed strategy is not and books the overnight jump."""
     frames, scores = _two_session_inputs()
     base = Backtester(_cost_model(), META, BASE)
-    v1 = latency_stress(base, frames, scores, "EQUITY", "1s", shifts=(0,),
-                        version=STRESS_VERSION_LEGACY)["+0ev"]["total_pnl"]
-    v2 = latency_stress(base, frames, scores, "EQUITY", "1s", shifts=(0,),
-                        version=STRESS_VERSION_CARRY)["+0ev"]["total_pnl"]
-    assert v1 > 400.0                 # 100 shares * the 5.00 overnight gap
-    assert v2 < 0.0                   # flat overnight: only costs remain
+    v1 = latency_stress(
+        base, frames, scores, "EQUITY", "1s", shifts=(0,), version=STRESS_VERSION_LEGACY
+    )["+0ev"]["total_pnl"]
+    v2 = latency_stress(
+        base, frames, scores, "EQUITY", "1s", shifts=(0,), version=STRESS_VERSION_CARRY
+    )["+0ev"]["total_pnl"]
+    assert v1 > 400.0  # 100 shares * the 5.00 overnight gap
+    assert v2 < 0.0  # flat overnight: only costs remain
     assert v2 == pytest.approx(base.run(frames, scores, "EQUITY").total_pnl)
 
 
@@ -169,7 +191,7 @@ def test_row_latency_stress_rejects_unknown_version():
 def test_row_latency_ic_is_null_not_nan():
     """A row-grid IC that cannot be computed is None (JSON null): a raw NaN
     is not valid JSON and bypassed the report's own NaN policy."""
-    frames, scores = _two_session_inputs()        # constant label: IC undefined
+    frames, scores = _two_session_inputs()  # constant label: IC undefined
     base = Backtester(_cost_model(), META, BASE)
     for version in (STRESS_VERSION_LEGACY, STRESS_VERSION_CARRY):
         out = latency_stress(base, frames, scores, "EQUITY", "1s", version=version)
@@ -184,7 +206,7 @@ def test_row_latency_ic_is_null_not_nan():
 
 def test_pooled_slope_hac_tstat_hand_calc():
     """Two-row buckets, lag 1, against the formula written out."""
-    rng = np.random.default_rng(5)        # test-only fixture data
+    rng = np.random.default_rng(5)  # test-only fixture data
     n_buckets, per = 12, 2
     ts = np.repeat(np.arange(n_buckets, dtype=np.int64) * 300 * NS_S, per) + NS_S
     x = rng.standard_normal(n_buckets * per)
@@ -206,8 +228,9 @@ def test_pooled_slope_hac_tstat_is_scale_and_shift_invariant_and_signed():
     y = 0.1 * x + rng.standard_normal(n)
     t = pooled_slope_hac_tstat(ts, x, y, lags=2)
     assert t > 3.0
-    assert pooled_slope_hac_tstat(ts, 7.0 * x + 3.0, 1e-4 * y - 2.0, lags=2) == \
-        pytest.approx(t, rel=1e-9)
+    assert pooled_slope_hac_tstat(ts, 7.0 * x + 3.0, 1e-4 * y - 2.0, lags=2) == pytest.approx(
+        t, rel=1e-9
+    )
     assert pooled_slope_hac_tstat(ts, -x, y, lags=2) == pytest.approx(-t, rel=1e-9)
 
 
@@ -219,12 +242,13 @@ def test_pooled_slope_hac_tstat_keeps_the_between_bucket_signal():
     rng = np.random.default_rng(8)
     n_buckets, per = 60, 50
     level = rng.standard_normal(n_buckets)
-    ts = np.repeat(np.arange(n_buckets, dtype=np.int64) * 300 * NS_S, per) + \
-        np.tile(np.arange(per, dtype=np.int64) * NS_S, n_buckets)
+    ts = np.repeat(np.arange(n_buckets, dtype=np.int64) * 300 * NS_S, per) + np.tile(
+        np.arange(per, dtype=np.int64) * NS_S, n_buckets
+    )
     x = np.repeat(level, per)
     y = 0.5 * x + rng.standard_normal(n_buckets * per)
     bics, counts = bucket_ics_with_counts(ts, x, y)
-    assert bics.size == 0                                  # nothing to average
+    assert bics.size == 0  # nothing to average
     assert np.isnan(newey_west_tstat(bics, lags=2, weights=counts))
     assert pooled_slope_hac_tstat(ts, x, y, lags=2) > 5.0
 
@@ -239,16 +263,17 @@ def test_pooled_slope_hac_tstat_is_not_fooled_by_within_bucket_duplication():
     base_ts = np.arange(n_buckets, dtype=np.int64) * 300 * NS_S
     t1 = pooled_slope_hac_tstat(base_ts, xb, yb, lags=0)
     copies = 25
-    t25 = pooled_slope_hac_tstat(np.repeat(base_ts, copies), np.repeat(xb, copies),
-                                 np.repeat(yb, copies), lags=0)
+    t25 = pooled_slope_hac_tstat(
+        np.repeat(base_ts, copies), np.repeat(xb, copies), np.repeat(yb, copies), lags=0
+    )
     assert t25 == pytest.approx(t1, rel=1e-9)
 
 
 def test_pooled_slope_hac_tstat_degenerate_inputs():
     ts = np.arange(100, dtype=np.int64) * 300 * NS_S
     x = np.arange(100, dtype=float)
-    assert np.isnan(pooled_slope_hac_tstat(ts[:5], x[:5], x[:5] ** 2))   # < 8 buckets
-    assert np.isnan(pooled_slope_hac_tstat(ts, np.ones(100), x))        # flat score
+    assert np.isnan(pooled_slope_hac_tstat(ts[:5], x[:5], x[:5] ** 2))  # < 8 buckets
+    assert np.isnan(pooled_slope_hac_tstat(ts, np.ones(100), x))  # flat score
     assert np.isnan(pooled_slope_hac_tstat(ts, x, np.full(100, np.nan)))
     with pytest.raises(ValueError):
         pooled_slope_hac_tstat(ts, x[:-1], x)
@@ -258,12 +283,26 @@ def test_pooled_slope_hac_tstat_degenerate_inputs():
 
 def _validate(**kwargs):
     frames = _backwards_frames()
-    meta = {1: {"tick_size": 0.01, "lot_size": 1, "adv": 1_000_000.0,
-                "asset_class": "EQUITY", "ref_price": 25.0}}
+    meta = {
+        1: {
+            "tick_size": 0.01,
+            "lot_size": 1,
+            "adv": 1_000_000.0,
+            "asset_class": "EQUITY",
+            "ref_price": 25.0,
+        }
+    }
     bt = Backtester(_cost_model(), meta, BacktestConfig(max_pos_qty=100, latency_rows=1))
-    return validate_alpha(_BackwardsAlpha, frames, bt,
-                          {1: {"adv": 1_000_000.0, "ref_price": 25.0}},
-                          0.1, n_folds=4, embargo_ns=NS_S, **kwargs)
+    return validate_alpha(
+        _BackwardsAlpha,
+        frames,
+        bt,
+        {1: {"adv": 1_000_000.0, "ref_price": 25.0}},
+        0.1,
+        n_folds=4,
+        embargo_ns=NS_S,
+        **kwargs,
+    )
 
 
 @pytest.fixture(scope="module")
@@ -294,8 +333,8 @@ def test_effective_gates_fixed_is_the_pinned_table():
 
 def test_effective_gates_ledger_never_loosens_and_needs_a_threshold():
     assert effective_gates("ledger", 4.07)["min_nw_tstat"] == 4.07
-    assert effective_gates("ledger", 1.96)["min_nw_tstat"] == 3.0     # never looser
-    assert GATES["min_nw_tstat"] == 3.0                               # table untouched
+    assert effective_gates("ledger", 1.96)["min_nw_tstat"] == 3.0  # never looser
+    assert GATES["min_nw_tstat"] == 3.0  # table untouched
     for bad in (None, float("nan"), 0.0, -1.0):
         with pytest.raises(ValueError, match="ledger_t_threshold"):
             effective_gates("ledger", bad)
@@ -308,7 +347,7 @@ def test_ledger_threshold_helpers(tmp_path):
     led.record("EQ01", "k", {"a": 1}, count=100)
     assert led.bonferroni_t_threshold_at(100) == led.bonferroni_t_threshold()
     assert led.bonferroni_t_threshold_at(1000) > led.bonferroni_t_threshold()
-    assert led.would_add("EQ01", "k", {"a": 1}, 28) == 0          # a rerun
+    assert led.would_add("EQ01", "k", {"a": 1}, 28) == 0  # a rerun
     assert led.would_add("EQ01", "k", {"a": 2}, 28) == 28
 
 
@@ -334,21 +373,33 @@ def test_ledger_policy_changes_only_the_tstat_gate():
     df["mid_price_v1"] = 25.0 * (1.0 + np.concatenate(([0.0], np.cumsum(label)[:-1])))
     df["spread_ticks_v1"] = 0.0
     frames = {1: df}
-    meta = {1: {"tick_size": 0.01, "lot_size": 1, "adv": 1_000_000.0,
-                "asset_class": "EQUITY", "ref_price": 25.0}}
-    free = CostModel(impact_coeff_bps_per_pct_adv=0.0, equity_taker_fee_per_share=0.0,
-                     fx_commission_per_million=0.0)
+    meta = {
+        1: {
+            "tick_size": 0.01,
+            "lot_size": 1,
+            "adv": 1_000_000.0,
+            "asset_class": "EQUITY",
+            "ref_price": 25.0,
+        }
+    }
+    free = CostModel(
+        impact_coeff_bps_per_pct_adv=0.0,
+        equity_taker_fee_per_share=0.0,
+        fx_commission_per_million=0.0,
+    )
     bt = Backtester(free, meta, BacktestConfig(max_pos_qty=100, latency_rows=0))
     args = (_PromotableAlpha, frames, bt, {1: {"adv": 1_000_000.0, "ref_price": 25.0}}, 0.1)
     fixed = validate_alpha(*args, n_folds=4, embargo_ns=NS_S)
     t = fixed["nw_tstat_uncrossed"]
     assert fixed["verdict"] == "PROMOTE" and t > 3.0
-    below = validate_alpha(*args, n_folds=4, embargo_ns=NS_S,
-                           tstat_threshold="ledger", ledger_t_threshold=t - 0.5)
-    above = validate_alpha(*args, n_folds=4, embargo_ns=NS_S,
-                           tstat_threshold="ledger", ledger_t_threshold=t + 0.5)
+    below = validate_alpha(
+        *args, n_folds=4, embargo_ns=NS_S, tstat_threshold="ledger", ledger_t_threshold=t - 0.5
+    )
+    above = validate_alpha(
+        *args, n_folds=4, embargo_ns=NS_S, tstat_threshold="ledger", ledger_t_threshold=t + 0.5
+    )
     assert below["verdict"] == "PROMOTE"
-    assert above["verdict"] == "ITERATE"                      # evidence, not promotion
+    assert above["verdict"] == "ITERATE"  # evidence, not promotion
     assert above["gates"]["min_nw_tstat"] == pytest.approx(t + 0.5)
     assert above["tstat_threshold_policy"] == "ledger"
     assert above["ledger_t_threshold"] == pytest.approx(t + 0.5)
@@ -385,12 +436,12 @@ def test_position_policy_defaults_and_validation():
 
 def test_round_trip_cost_return_hand_calc():
     cm = _cost_model()
-    eq = cm.round_trip_cost_return(np.array([25.0, np.nan, 25.0]),
-                                   np.array([0.01, 0.01, -0.01]), "EQUITY")
+    eq = cm.round_trip_cost_return(
+        np.array([25.0, np.nan, 25.0]), np.array([0.01, 0.01, -0.01]), "EQUITY"
+    )
     assert eq[0] == pytest.approx((2 * 0.01 + 2 * 0.003) / 25.0)
     assert np.isnan(eq[1]) and np.isnan(eq[2])
-    fx = _cost_model(multiplier=2.0).round_trip_cost_return(
-        np.array([1.1]), np.array([2e-5]), "FX")
+    fx = _cost_model(multiplier=2.0).round_trip_cost_return(np.array([1.1]), np.array([2e-5]), "FX")
     assert fx[0] == pytest.approx(2.0 * (2 * 2e-5 / 1.1 + 2 * 2.5e-6))
     with pytest.raises(ValueError):
         cm.round_trip_cost_return(np.array([1.0]), np.array([0.1]), "BOND")
@@ -400,14 +451,18 @@ def _targets(er, thr=1.0, conf=None, horizon=3, hysteresis=0.5, ts=None):
     n = len(er)
     ts = np.arange(n, dtype=np.int64) if ts is None else np.asarray(ts, dtype=np.int64)
     return cost_aware_targets(
-        ts, np.asarray(er, dtype=float),
+        ts,
+        np.asarray(er, dtype=float),
         np.ones(n) if conf is None else np.asarray(conf, dtype=float),
         np.full(n, thr) if np.isscalar(thr) else np.asarray(thr, dtype=float),
-        0.5, horizon, hysteresis).tolist()
+        0.5,
+        horizon,
+        hysteresis,
+    ).tolist()
 
 
 def test_cost_aware_enters_only_above_the_cost_hurdle():
-    assert _targets([0.9, 1.0, -1.0, 0.0]) == [0, 0, 0, 0]       # never strictly above
+    assert _targets([0.9, 1.0, -1.0, 0.0]) == [0, 0, 0, 0]  # never strictly above
     assert _targets([0.9, 1.1, 0.0, 0.0])[:2] == [0, 1]
     assert _targets([-1.1, 0.0])[0] == -1
     # low confidence, NaN forecast and an unpriceable row cannot open
@@ -431,8 +486,7 @@ def test_cost_aware_flips_only_on_an_opposite_signal_that_clears_the_hurdle():
 
 def test_cost_aware_hysteresis_band_renews_an_expired_hold():
     # at expiry (t=3) a same-direction signal above 0.5 * hurdle renews ...
-    assert _targets([2.0, 0.0, 0.0, 0.6, 0.0, 0.0, 0.0], horizon=3) == \
-        [1, 1, 1, 1, 1, 1, 0]
+    assert _targets([2.0, 0.0, 0.0, 0.6, 0.0, 0.0, 0.0], horizon=3) == [1, 1, 1, 1, 1, 1, 0]
     # ... one inside the band does not, and it is not enough to re-enter
     assert _targets([2.0, 0.0, 0.0, 0.4, 0.6], horizon=3) == [1, 1, 1, 0, 0]
     # hysteresis 1.0 = no band: staying needs the full entry hurdle
@@ -454,8 +508,13 @@ def test_default_policy_is_bit_identical_with_the_new_fields_present():
     er = rng.standard_normal(200) * 1e-3
     mids = 25.0 + np.cumsum(rng.standard_normal(200)) * 0.01
     a = _policy_backtest(er, BacktestConfig(max_pos_qty=100), mids)
-    b = _policy_backtest(er, BacktestConfig(max_pos_qty=100, position_policy="sign",
-                                            horizon_ns=5 * NS_S, hysteresis=0.1), mids)
+    b = _policy_backtest(
+        er,
+        BacktestConfig(
+            max_pos_qty=100, position_policy="sign", horizon_ns=5 * NS_S, hysteresis=0.1
+        ),
+        mids,
+    )
     assert np.array_equal(a.positions, b.positions)
     assert a.total_pnl == b.total_pnl and a.trade_count == b.trade_count
 
@@ -463,12 +522,15 @@ def test_default_policy_is_bit_identical_with_the_new_fields_present():
 def test_cost_aware_backtest_trades_less_and_respects_the_hurdle():
     """Forecasts below the round-trip cost never trade under cost_aware; the
     default rule trades every one of them and pays the spread each time."""
-    hurdle = (2 * 0.01 + 2 * 0.003) / 25.0                 # 1.04e-3
+    hurdle = (2 * 0.01 + 2 * 0.003) / 25.0  # 1.04e-3
     er = np.tile([0.5 * hurdle, -0.5 * hurdle], 50)
     sign = _policy_backtest(er, BacktestConfig(max_pos_qty=100, latency_rows=0))
-    aware = _policy_backtest(er, BacktestConfig(
-        max_pos_qty=100, latency_rows=0, position_policy="cost_aware",
-        horizon_ns=5 * NS_S))
+    aware = _policy_backtest(
+        er,
+        BacktestConfig(
+            max_pos_qty=100, latency_rows=0, position_policy="cost_aware", horizon_ns=5 * NS_S
+        ),
+    )
     assert sign.trade_count == 100 and sign.total_pnl < 0.0
     assert aware.trade_count == 0 and aware.total_pnl == 0.0
 
@@ -476,10 +538,13 @@ def test_cost_aware_backtest_trades_less_and_respects_the_hurdle():
 def test_cost_aware_backtest_holds_for_the_label_horizon():
     hurdle = (2 * 0.01 + 2 * 0.003) / 25.0
     er = np.zeros(20)
-    er[2] = 3 * hurdle                      # one forecast over a 5 s horizon
-    res = _policy_backtest(er, BacktestConfig(
-        max_pos_qty=100, latency_rows=0, position_policy="cost_aware",
-        horizon_ns=5 * NS_S))
+    er[2] = 3 * hurdle  # one forecast over a 5 s horizon
+    res = _policy_backtest(
+        er,
+        BacktestConfig(
+            max_pos_qty=100, latency_rows=0, position_policy="cost_aware", horizon_ns=5 * NS_S
+        ),
+    )
     assert res.positions.tolist() == [0, 0] + [100] * 5 + [0] * 13
     assert res.trade_count == 2
     # the default rule holds it for exactly one row
@@ -492,12 +557,17 @@ def test_cost_aware_policy_composes_with_latency_and_session_flattening():
     day = NS_DAY + 14 * 3600 * NS_S + np.arange(10, dtype=np.int64) * NS_S
     ts = np.concatenate([day, day + NS_DAY])
     er = np.zeros(20)
-    er[7] = 3 * hurdle                      # entered 3 rows before the close
-    cfg = BacktestConfig(max_pos_qty=100, latency_rows=1, position_policy="cost_aware",
-                         horizon_ns=3600 * NS_S, flatten_at_session_end=True)
+    er[7] = 3 * hurdle  # entered 3 rows before the close
+    cfg = BacktestConfig(
+        max_pos_qty=100,
+        latency_rows=1,
+        position_policy="cost_aware",
+        horizon_ns=3600 * NS_S,
+        flatten_at_session_end=True,
+    )
     bt = Backtester(_cost_model(), META, cfg)
     res = bt.run_instrument(1, _frame(ts, np.full(20, 25.0)), _scores(ts, er))
-    assert res.positions[:10].tolist() == [0] * 8 + [100, 0]     # latency 1, flat at close
+    assert res.positions[:10].tolist() == [0] * 8 + [100, 0]  # latency 1, flat at close
     # the hold (still inside its horizon) resumes after the gap, as the sign
     # rule's standing target would
     assert res.positions[10] == 100
@@ -530,8 +600,8 @@ def test_single_class_test_segment_reports_no_auc():
 
     ds, pred = _meta_dataset()
     n = len(pred)
-    tail = np.arange(n) >= int(0.7 * n)           # covers the whole test segment
-    y_mid = np.where(tail, -np.sign(pred) * 1e-4, ds.y_mid)   # every tail trade loses
+    tail = np.arange(n) >= int(0.7 * n)  # covers the whole test segment
+    y_mid = np.where(tail, -np.sign(pred) * 1e-4, ds.y_mid)  # every tail trade loses
     losing = dataclasses.replace(ds, y_mid=y_mid, y=y_mid - 5e-5)
     res = run_meta_labeling(losing, pred)
     assert res["base_rate_test"] == 0.0

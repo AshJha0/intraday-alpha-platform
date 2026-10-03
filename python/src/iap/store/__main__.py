@@ -46,21 +46,31 @@ def render_counts(counts: "dict[str, int]") -> str:
 
 def build_parser() -> argparse.ArgumentParser:
     common = argparse.ArgumentParser(add_help=False)
-    common.add_argument("--db", default=None,
-                        help=f"SQLite file (default <repo-root>/{DEFAULT_DB.as_posix()})")
-    common.add_argument("--repo-root", default=None,
-                        help="repository root holding configs/ and research/ "
-                             "(default: resolved from the package location)")
-    parser = argparse.ArgumentParser(prog="python -m iap.store", description=__doc__,
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    common.add_argument(
+        "--db", default=None, help=f"SQLite file (default <repo-root>/{DEFAULT_DB.as_posix()})"
+    )
+    common.add_argument(
+        "--repo-root",
+        default=None,
+        help="repository root holding configs/ and research/ "
+        "(default: resolved from the package location)",
+    )
+    parser = argparse.ArgumentParser(
+        prog="python -m iap.store",
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("build", parents=[common],
-                   help="apply the DDL and import every artefact present")
-    ex = sub.add_parser("explain", parents=[common],
-                        help="render the decision chain of a parent order")
+    sub.add_parser(
+        "build", parents=[common], help="apply the DDL and import every artefact present"
+    )
+    ex = sub.add_parser(
+        "explain", parents=[common], help="render the decision chain of a parent order"
+    )
     ex.add_argument("parent_order_id", type=int)
-    q = sub.add_parser("sql", parents=[common],
-                       help="run one query; one canonical JSON line per row")
+    q = sub.add_parser(
+        "sql", parents=[common], help="run one query; one canonical JSON line per row"
+    )
     q.add_argument("query")
     return parser
 
@@ -75,11 +85,9 @@ def sql_error_message(exc: sqlite3.Error) -> str:
     """
     text = str(exc)
     if "readonly database" in text.lower():
-        return (f"error: {text} (the store is opened read-only; use `build` "
-                "to rebuild it)")
+        return f"error: {text} (the store is opened read-only; use `build` to rebuild it)"
     if isinstance(exc, sqlite3.ProgrammingError) and "one statement" in text.lower():
-        return ("error: `sql` runs exactly one statement; several were given "
-                f"({text})")
+        return f"error: `sql` runs exactly one statement; several were given ({text})"
     return f"error: {text}"
 
 
@@ -98,16 +106,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             store.init()
             reports = import_all(store, root)
             counts = store.counts()
-        warnings: List[str] = [f"{step}: {w}" for step, rep in reports.items()
-                               for w in rep.warnings]
+        warnings: List[str] = [
+            f"{step}: {w}" for step, rep in reports.items() for w in rep.warnings
+        ]
         print(render_counts(counts))
         for line in warnings:
             print(f"warning: {line}", file=sys.stderr)
         return 0
 
     if not db.is_file():
-        print(f"error: no store at {db} (run `python -m iap.store build` first)",
-              file=sys.stderr)
+        print(f"error: no store at {db} (run `python -m iap.store build` first)", file=sys.stderr)
         return 2
     # explain / sql never write: the file is opened read-only (mode=ro), so
     # an arbitrary statement cannot alter the index (rebuild it with `build`).
@@ -126,8 +134,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             # sqlite3.Warning: Python < 3.12 raises it (not ProgrammingError)
             # for a multi-statement string.
             if isinstance(exc, sqlite3.Warning):
-                print("error: `sql` runs exactly one statement; several were "
-                      f"given ({exc})", file=sys.stderr)
+                print(
+                    f"error: `sql` runs exactly one statement; several were given ({exc})",
+                    file=sys.stderr,
+                )
             else:
                 print(sql_error_message(exc), file=sys.stderr)
             return 1

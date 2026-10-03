@@ -30,7 +30,7 @@ class Fold:
     train_idx: np.ndarray
     test_idx: np.ndarray
     train_window: Tuple[int, int]  # [start_ts, end_ts) actually used by train
-    test_window: Tuple[int, int]   # [start_ts, end_ts) actually used by test
+    test_window: Tuple[int, int]  # [start_ts, end_ts) actually used by test
 
 
 class WalkForwardSplitter:
@@ -86,7 +86,7 @@ class WalkForwardSplitter:
         folds: List[Fold] = []
         self.degenerate_folds: List[int] = []
         for k in range(self.n_folds):
-            train_end = bounds[k + 1]         # exclusive train boundary
+            train_end = bounds[k + 1]  # exclusive train boundary
             test_start = train_end + self.embargo_ns
             test_end = bounds[k + 2]
             # purge: train anchors whose label window crosses the boundary
@@ -105,8 +105,7 @@ class WalkForwardSplitter:
                     train_idx=train_idx,
                     test_idx=test_idx,
                     train_window=(t0, int(ts[train_idx].max())),
-                    test_window=(int(ts[test_idx].min()),
-                                 int(ts[test_idx].max())),
+                    test_window=(int(ts[test_idx].min()), int(ts[test_idx].max())),
                 )
             )
         if not folds:

@@ -56,14 +56,30 @@ def _norm_ppf(p: float) -> float:
     deterministic, |err| < 1.2e-8 — plenty for reporting thresholds)."""
     if not 0.0 < p < 1.0:
         raise ValueError("p must be in (0, 1)")
-    a = (-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02,
-         1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00)
-    b = (-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02,
-         6.680131188771972e+01, -1.328068155288572e+01)
-    c = (-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00,
-         -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00)
-    d = (7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00,
-         3.754408661907416e+00)
+    a = (
+        -3.969683028665376e01,
+        2.209460984245205e02,
+        -2.759285104469687e02,
+        1.383577518672690e02,
+        -3.066479806614716e01,
+        2.506628277459239e00,
+    )
+    b = (
+        -5.447609879822406e01,
+        1.615858368580409e02,
+        -1.556989798598866e02,
+        6.680131188771972e01,
+        -1.328068155288572e01,
+    )
+    c = (
+        -7.784894002430293e-03,
+        -3.223964580411365e-01,
+        -2.400758277161838e00,
+        -2.549732539343734e00,
+        4.374664141464968e00,
+        2.938163982698783e00,
+    )
+    d = (7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e00, 3.754408661907416e00)
     plow, phigh = 0.02425, 1 - 0.02425
     if p < plow:
         q = math.sqrt(-2 * math.log(p))
@@ -74,8 +90,10 @@ def _norm_ppf(p: float) -> float:
         return -_norm_ppf(1 - p)
     q = p - 0.5
     r = q * q
-    return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q / (
-        ((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1
+    return (
+        (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5])
+        * q
+        / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1)
     )
 
 
@@ -101,9 +119,7 @@ class ExperimentLedger:
         if self.path.exists():
             blob = json.loads(self.path.read_text())
             self.entries = list(blob.get("entries", []))
-            self.total_experiments = int(
-                blob.get("total_experiments", len(self.entries))
-            )
+            self.total_experiments = int(blob.get("total_experiments", len(self.entries)))
             for i, e in enumerate(self.entries):
                 key = e.get("key") or self.experiment_key(
                     e.get("alpha_id", ""), e.get("kind", ""), e.get("config")
@@ -111,12 +127,12 @@ class ExperimentLedger:
                 self._index.setdefault(key, i)
 
     @staticmethod
-    def experiment_key(alpha_id: str, kind: str,
-                       config: Optional[dict]) -> str:
+    def experiment_key(alpha_id: str, kind: str, config: Optional[dict]) -> str:
         """Pinned experiment identity: alpha, kind and canonical config."""
         payload = json.dumps(
             {"alpha_id": alpha_id, "kind": kind, "config": config or {}},
-            sort_keys=True, separators=(",", ":"),
+            sort_keys=True,
+            separators=(",", ":"),
         )
         return hashlib.sha256(payload.encode()).hexdigest()
 
@@ -186,8 +202,7 @@ class ExperimentLedger:
         n = max(int(total_experiments), 1)
         return abs(_norm_ppf(PINNED_ALPHA / n / 2.0))
 
-    def would_add(self, alpha_id: str, kind: str, config: Optional[dict],
-                  count: int) -> int:
+    def would_add(self, alpha_id: str, kind: str, config: Optional[dict], count: int) -> int:
         """Looks a ``record`` of this identity would add right now: ``count``
         for a new identity, 0 for a rerun (de-duplicated)."""
         key = self.experiment_key(alpha_id, kind, config)

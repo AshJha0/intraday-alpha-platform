@@ -34,8 +34,7 @@ __all__ = ["TraceBuilder"]
 
 def _expect(value: object, cls: type, what: str) -> None:
     if not isinstance(value, cls):
-        raise TypeError(f"TraceBuilder.{what}: expected {cls.__name__}, "
-                        f"got {type(value).__name__}")
+        raise TypeError(f"TraceBuilder.{what}: expected {cls.__name__}, got {type(value).__name__}")
 
 
 class TraceBuilder:
@@ -47,9 +46,17 @@ class TraceBuilder:
     an equal trace.
     """
 
-    def __init__(self, session_id: str, instrument_id: int, event_ts: int,
-                 sequence: int, data_version: str, feature_version: str,
-                 model_version: str, config_version: str) -> None:
+    def __init__(
+        self,
+        session_id: str,
+        instrument_id: int,
+        event_ts: int,
+        sequence: int,
+        data_version: str,
+        feature_version: str,
+        model_version: str,
+        config_version: str,
+    ) -> None:
         self.session_id = session_id
         self.instrument_id = instrument_id
         self.event_ts = event_ts
@@ -71,8 +78,7 @@ class TraceBuilder:
     @property
     def trace_id(self) -> str:
         """The id the built trace will carry."""
-        return make_trace_id(self.session_id, self.instrument_id,
-                             self.event_ts, self.sequence)
+        return make_trace_id(self.session_id, self.instrument_id, self.event_ts, self.sequence)
 
     # -- stages -------------------------------------------------------------
 
@@ -139,20 +145,31 @@ class TraceBuilder:
     def stages(self) -> TraceStages:
         """The stages accumulated so far (frozen copy)."""
         return TraceStages(
-            signal=tuple(self._signal), portfolio=self._portfolio,
-            risk=tuple(self._risk), parent_orders=tuple(self._parent_orders),
-            child_orders=tuple(self._child_orders), routing=tuple(self._routing),
-            fills=tuple(self._fills), tca=tuple(self._tca),
-            attribution=self._attribution)
+            signal=tuple(self._signal),
+            portfolio=self._portfolio,
+            risk=tuple(self._risk),
+            parent_orders=tuple(self._parent_orders),
+            child_orders=tuple(self._child_orders),
+            routing=tuple(self._routing),
+            fills=tuple(self._fills),
+            tca=tuple(self._tca),
+            attribution=self._attribution,
+        )
 
     def build(self) -> DecisionTrace:
         """The validated trace (type invariants and JSON schema).  Raises
         ``ContractError`` / ``ContractValidationError`` on a violation."""
         trace = DecisionTrace(
-            trace_id=self.trace_id, session_id=self.session_id,
-            instrument_id=self.instrument_id, event_ts=self.event_ts,
-            sequence=self.sequence, data_version=self.data_version,
-            feature_version=self.feature_version, model_version=self.model_version,
-            config_version=self.config_version, stages=self.stages())
+            trace_id=self.trace_id,
+            session_id=self.session_id,
+            instrument_id=self.instrument_id,
+            event_ts=self.event_ts,
+            sequence=self.sequence,
+            data_version=self.data_version,
+            feature_version=self.feature_version,
+            model_version=self.model_version,
+            config_version=self.config_version,
+            stages=self.stages(),
+        )
         validate_typed(trace)
         return trace

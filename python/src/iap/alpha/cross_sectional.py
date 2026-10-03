@@ -29,13 +29,11 @@ class CrossSectionalLinearAlpha(LinearAlpha):
 
     cross_sectional = True
     GRID_STEP_NS: int = 5_000_000_000  # 5s default
-    MAX_AGE_NS: int | None = None      # staleness cap for grid sampling
+    MAX_AGE_NS: int | None = None  # staleness cap for grid sampling
     INPUT_FEATURE: str = ""
 
     def raw_signal(self, df: pd.DataFrame) -> pd.Series:
-        raise RuntimeError(
-            f"{self.alpha_id} is cross-sectional; use signals() over the universe"
-        )
+        raise RuntimeError(f"{self.alpha_id} is cross-sectional; use signals() over the universe")
 
     def grid_signals(self, mat: np.ndarray) -> np.ndarray:
         """Cross-sectional transform per grid column (NaN-aware)."""
@@ -91,7 +89,7 @@ class EQ11CrossSectionalReversal(CrossSectionalLinearAlpha):
     INPUT_FEATURE = "ret_log_1m_v1"
     GRID_STEP_NS = 5_000_000_000
     MAX_AGE_NS = 60_000_000_000  # a name quiet for > 1m drops out of the cross-section
-    MIN_NAMES = 4                # need a real cross-section
+    MIN_NAMES = 4  # need a real cross-section
 
     def universe(self, instrument_ids):
         return sorted(i for i in instrument_ids if i in EQ_CONSTITUENT_IDS)

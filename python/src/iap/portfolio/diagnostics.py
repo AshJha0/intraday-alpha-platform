@@ -41,13 +41,15 @@ def constraint_audit(
 
     def row(name: str, value: float, bound: float) -> None:
         slack = bound - value
-        rows.append({
-            "name": name,
-            "value": float(value),
-            "bound": float(bound),
-            "slack": float(slack),
-            "binding": bool(slack <= bind_tol),
-        })
+        rows.append(
+            {
+                "name": name,
+                "value": float(value),
+                "bound": float(bound),
+                "slack": float(slack),
+                "binding": bool(slack <= bind_tol),
+            }
+        )
 
     for i in range(n):
         if w[i] - cons.w_min[i] <= bind_tol:
@@ -58,20 +60,17 @@ def constraint_audit(
         trade = np.abs(w - w_prev)
         for i in range(n):
             if cons.participation[i] - trade[i] <= bind_tol:
-                row(f"participation[{i}]", float(trade[i]),
-                    float(cons.participation[i]))
+                row(f"participation[{i}]", float(trade[i]), float(cons.participation[i]))
     if cons.net_cap is not None:
         row("net_exposure", abs(float(w.sum())), float(cons.net_cap))
     if cons.gross_cap is not None:
         row("gross_exposure", float(np.abs(w).sum()), float(cons.gross_cap))
     if cons.turnover_cap is not None:
-        row("turnover", float(np.abs(w - w_prev).sum()),
-            float(cons.turnover_cap))
+        row("turnover", float(np.abs(w - w_prev).sum()), float(cons.turnover_cap))
     if cons.currency_matrix is not None:
         expo = cons.currency_matrix @ w
         for c in range(len(expo)):
-            row(f"currency[{c}]", abs(float(expo[c])),
-                float(cons.currency_bounds[c]))
+            row(f"currency[{c}]", abs(float(expo[c])), float(cons.currency_bounds[c]))
     realized_vol = None
     if Sigma is not None:
         realized_vol = float(np.sqrt(max(w @ Sigma @ w, 0.0)))
@@ -88,6 +87,5 @@ def constraint_audit(
         "gross": float(np.abs(w).sum()),
         "net": float(w.sum()),
         "realized_vol": realized_vol,
-        "target_vol": (float(cons.vol_target)
-                       if cons.vol_target is not None else None),
+        "target_vol": (float(cons.vol_target) if cons.vol_target is not None else None),
     }

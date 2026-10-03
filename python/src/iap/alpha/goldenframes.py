@@ -55,11 +55,9 @@ def build_golden_frame(events_path, configs_dir, instrument_id: int) -> pd.DataF
         if st.refresh_seq != last_refresh_seq:
             last_refresh_seq = st.refresh_seq
             if st.label_tradable:
-                series.append(ev.exchange_ts, st.mid,
-                              st.spread_ticks * st.tick / 2.0, True)
+                series.append(ev.exchange_ts, st.mid, st.spread_ticks * st.tick / 2.0, True)
             else:
-                series.append(ev.exchange_ts, float("nan"), float("nan"),
-                              False)
+                series.append(ev.exchange_ts, float("nan"), float("nan"), False)
         if vec is None:
             raise RuntimeError("cadence 0 must emit after every event")
         vals = np.asarray(vec.values, dtype=float).copy()
@@ -70,8 +68,7 @@ def build_golden_frame(events_path, configs_dir, instrument_id: int) -> pd.DataF
     frame = pd.DataFrame(np.vstack(rows), columns=names)
     frame.insert(0, "exchange_ts", np.asarray(ts_list, dtype=np.int64))
     frame.insert(0, "instrument_id", np.uint32(instrument_id))
-    labels = compute_labels(ts_list, series, last_event_ts,
-                            max_age_ns=max_sample_age(series))
+    labels = compute_labels(ts_list, series, last_event_ts, max_age_ns=max_sample_age(series))
     for h in HORIZON_ORDER:
         lab = labels[h]
         frame[f"label_mid_{h}"] = np.asarray(lab.mid, dtype=float)

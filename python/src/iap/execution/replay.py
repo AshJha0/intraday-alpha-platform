@@ -255,9 +255,7 @@ class ExecutionReplay:
                 if f.parent_id != p.parent_id:
                     continue
                 if f.ts < p.start_ts or f.ts > p.end_ts:
-                    raise RuntimeError(
-                        "fill outside the parent window (time-in-force broken)"
-                    )
+                    raise RuntimeError("fill outside the parent window (time-in-force broken)")
                 r.filled_qty += f.qty
                 r.notional += float(f.qty) * lot * float(f.price_ticks) * tick
                 if f.fee >= 0.0:
@@ -266,9 +264,7 @@ class ExecutionReplay:
                     r.rebates += -f.fee
                 r.impact += f.impact_cost
             r.unfilled_qty = p.qty - r.filled_qty
-            r.avg_price = (
-                r.notional / (float(r.filled_qty) * lot) if r.filled_qty > 0 else 0.0
-            )
+            r.avg_price = r.notional / (float(r.filled_qty) * lot) if r.filled_qty > 0 else 0.0
             r.total_cost = r.fees - r.rebates + r.impact
             res.parents[r.parent_id] = r
         return res

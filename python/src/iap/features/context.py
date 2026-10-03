@@ -65,9 +65,7 @@ class SessionClock:
         hour = ts_ns // _NS_H
         off = self._cache.get(hour)
         if off is None:
-            dt = datetime.fromtimestamp(hour * 3600, tz=timezone.utc).astimezone(
-                self._zone
-            )
+            dt = datetime.fromtimestamp(hour * 3600, tz=timezone.utc).astimezone(self._zone)
             off = int(dt.utcoffset().total_seconds())
             self._cache[hour] = off
         return off

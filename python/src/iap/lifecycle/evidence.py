@@ -105,14 +105,26 @@ class ValidationEvidence:
     parity: bool
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "holdout_ic", _check_float(self.holdout_ic, "validation.holdout_ic"))
-        object.__setattr__(self, "research_ic", _check_float(self.research_ic, "validation.research_ic"))
-        object.__setattr__(self, "replay_hash_match", _check_bool(self.replay_hash_match, "validation.replay_hash_match"))
+        object.__setattr__(
+            self, "holdout_ic", _check_float(self.holdout_ic, "validation.holdout_ic")
+        )
+        object.__setattr__(
+            self, "research_ic", _check_float(self.research_ic, "validation.research_ic")
+        )
+        object.__setattr__(
+            self,
+            "replay_hash_match",
+            _check_bool(self.replay_hash_match, "validation.replay_hash_match"),
+        )
         object.__setattr__(self, "parity", _check_bool(self.parity, "validation.parity"))
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"holdout_ic": self.holdout_ic, "research_ic": self.research_ic,
-                "replay_hash_match": self.replay_hash_match, "parity": self.parity}
+        return {
+            "holdout_ic": self.holdout_ic,
+            "research_ic": self.research_ic,
+            "replay_hash_match": self.replay_hash_match,
+            "parity": self.parity,
+        }
 
     @staticmethod
     def from_dict(data: Mapping[str, Any]) -> "ValidationEvidence":
@@ -142,16 +154,24 @@ class PaperEvidence:
         object.__setattr__(self, "realized_ic", _check_float(self.realized_ic, "paper.realized_ic"))
         object.__setattr__(self, "research_ic", _check_float(self.research_ic, "paper.research_ic"))
         object.__setattr__(self, "net_pnl", _check_float(self.net_pnl, "paper.net_pnl"))
-        object.__setattr__(self, "n_kill_events", _check_int(self.n_kill_events, "paper.n_kill_events"))
-        object.__setattr__(self, "tracking_error", _check_float(self.tracking_error, "paper.tracking_error"))
+        object.__setattr__(
+            self, "n_kill_events", _check_int(self.n_kill_events, "paper.n_kill_events")
+        )
+        object.__setattr__(
+            self, "tracking_error", _check_float(self.tracking_error, "paper.tracking_error")
+        )
         if self.tracking_error < 0.0:
             raise ValueError("paper.tracking_error must be >= 0")
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"n_sessions": self.n_sessions, "realized_ic": self.realized_ic,
-                "research_ic": self.research_ic, "net_pnl": self.net_pnl,
-                "n_kill_events": self.n_kill_events,
-                "tracking_error": self.tracking_error}
+        return {
+            "n_sessions": self.n_sessions,
+            "realized_ic": self.realized_ic,
+            "research_ic": self.research_ic,
+            "net_pnl": self.net_pnl,
+            "n_kill_events": self.n_kill_events,
+            "tracking_error": self.tracking_error,
+        }
 
     @staticmethod
     def from_dict(data: Mapping[str, Any]) -> "PaperEvidence":
@@ -183,8 +203,12 @@ class LiveEvidence:
         object.__setattr__(self, "informative", _check_bool(self.informative, "live.informative"))
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"rolling_ic": self.rolling_ic, "n_buckets": self.n_buckets,
-                "eval_index": self.eval_index, "informative": self.informative}
+        return {
+            "rolling_ic": self.rolling_ic,
+            "n_buckets": self.n_buckets,
+            "eval_index": self.eval_index,
+            "informative": self.informative,
+        }
 
     @staticmethod
     def from_dict(data: Mapping[str, Any]) -> "LiveEvidence":
@@ -209,8 +233,10 @@ class Evidence:
 
     def __post_init__(self) -> None:
         object.__setattr__(
-            self, "research_gate_eligible",
-            _check_bool(self.research_gate_eligible, "evidence.research_gate_eligible"))
+            self,
+            "research_gate_eligible",
+            _check_bool(self.research_gate_eligible, "evidence.research_gate_eligible"),
+        )
         if self.research is not None and not isinstance(self.research, ExperimentResult):
             raise ValueError("evidence.research must be an ExperimentResult or None")
         if self.capacity_usd is not None:
@@ -218,8 +244,11 @@ class Evidence:
             if cap < 0.0:
                 raise ValueError("evidence.capacity_usd must be >= 0")
             object.__setattr__(self, "capacity_usd", cap)
-        for name, cls in (("validation", ValidationEvidence), ("paper", PaperEvidence),
-                          ("live", LiveEvidence)):
+        for name, cls in (
+            ("validation", ValidationEvidence),
+            ("paper", PaperEvidence),
+            ("live", LiveEvidence),
+        ):
             value = getattr(self, name)
             if value is not None and not isinstance(value, cls):
                 raise ValueError(f"evidence.{name} must be a {cls.__name__} or None")
@@ -227,8 +256,7 @@ class Evidence:
     @staticmethod
     def empty() -> "Evidence":
         """No evidence at all (every block absent)."""
-        return Evidence(research=None, capacity_usd=None, validation=None,
-                        paper=None, live=None)
+        return Evidence(research=None, capacity_usd=None, validation=None, paper=None, live=None)
 
     def to_dict(self) -> Dict[str, Any]:
         """JSON-ready document; absent blocks are ``null``.

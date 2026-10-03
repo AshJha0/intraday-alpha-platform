@@ -91,8 +91,7 @@ def test_golden_scenario_replays_exactly(golden, alpha_id):
             transition = machine.retire(alpha_id, ts, step["reason"], actor=Actor.HUMAN)
             assert expected["outcome"] == Outcome.TRANSITION
         else:
-            transition = machine.reset_to_research(alpha_id, ts, step["reason"],
-                                                   actor=Actor.HUMAN)
+            transition = machine.reset_to_research(alpha_id, ts, step["reason"], actor=Actor.HUMAN)
             assert expected["outcome"] == Outcome.TRANSITION
         rec = registry.get(alpha_id)
         assert rec.state.name == expected["state"]
@@ -116,11 +115,16 @@ def test_golden_scenarios_cover_every_system_edge(golden):
             if tr is not None:
                 seen.add((tr["from_state"], tr["to_state"], tr["actor"]))
     expected = {
-        ("RESEARCH", "CANDIDATE", "SYSTEM"), ("CANDIDATE", "VALIDATING", "SYSTEM"),
-        ("VALIDATING", "PAPER", "SYSTEM"), ("PAPER", "ACTIVE", "SYSTEM"),
-        ("ACTIVE", "WATCH", "SYSTEM"), ("WATCH", "ACTIVE", "SYSTEM"),
-        ("WATCH", "RETIRED", "SYSTEM"), ("CANDIDATE", "RESEARCH", "SYSTEM"),
-        ("PAPER", "CANDIDATE", "SYSTEM"), ("CANDIDATE", "RETIRED", "HUMAN"),
+        ("RESEARCH", "CANDIDATE", "SYSTEM"),
+        ("CANDIDATE", "VALIDATING", "SYSTEM"),
+        ("VALIDATING", "PAPER", "SYSTEM"),
+        ("PAPER", "ACTIVE", "SYSTEM"),
+        ("ACTIVE", "WATCH", "SYSTEM"),
+        ("WATCH", "ACTIVE", "SYSTEM"),
+        ("WATCH", "RETIRED", "SYSTEM"),
+        ("CANDIDATE", "RESEARCH", "SYSTEM"),
+        ("PAPER", "CANDIDATE", "SYSTEM"),
+        ("CANDIDATE", "RETIRED", "HUMAN"),
         ("RETIRED", "RESEARCH", "HUMAN"),
     }
     assert seen == expected
@@ -131,8 +135,10 @@ def test_bootstrap_matches_committed_artefacts(tmp_path):
     committed_log = (ROOT / TRANSITIONS_RELPATH).read_text(encoding="utf-8")
     result = run_bootstrap(ROOT, write=False)
     assert result.registry.render() == committed_registry
-    lines = [json.dumps(validate_typed(t), sort_keys=True, separators=(",", ":"))
-             for t in result.machine.transitions]
+    lines = [
+        json.dumps(validate_typed(t), sort_keys=True, separators=(",", ":"))
+        for t in result.machine.transitions
+    ]
     assert "\n".join(lines) + "\n" == committed_log
     loaded = AlphaRegistry.load(ROOT / REGISTRY_RELPATH)
     assert loaded.render() == committed_registry

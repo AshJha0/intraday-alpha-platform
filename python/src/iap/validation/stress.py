@@ -156,8 +156,7 @@ def latency_stress(
     one (module docs): 1 = the historic four-field rebuild, 2 = the base
     config with only the row latency changed."""
     if version not in STRESS_VERSIONS:
-        raise ValueError(
-            f"unknown stress version {version!r}; known: {STRESS_VERSIONS}")
+        raise ValueError(f"unknown stress version {version!r}; known: {STRESS_VERSIONS}")
     out: Dict[str, dict] = {}
     base = backtester_base.config
     base_latency = base.latency_rows
@@ -172,8 +171,12 @@ def latency_stress(
             )
         else:
             cfg = replace(base, latency_rows=base_latency + k, latency_ns=None)
-        bt = Backtester(backtester_base.cost_model, backtester_base.meta, cfg,
-                        reporting_ccy=backtester_base.reporting_ccy)
+        bt = Backtester(
+            backtester_base.cost_model,
+            backtester_base.meta,
+            cfg,
+            reporting_ccy=backtester_base.reporting_ccy,
+        )
         res = bt.run(frames, scores, asset_class)
         out[f"+{k}ev"] = {
             "ic": _fnum(ic(x, y)),
@@ -201,12 +204,18 @@ def latency_stress_time(
     base = backtester_base.config
     for ns in latencies_ns:
         cfg = replace(base, latency_ns=int(ns))
-        bt = Backtester(backtester_base.cost_model, backtester_base.meta, cfg,
-                        reporting_ccy=backtester_base.reporting_ccy)
+        bt = Backtester(
+            backtester_base.cost_model,
+            backtester_base.meta,
+            cfg,
+            reporting_ccy=backtester_base.reporting_ccy,
+        )
         res = bt.run(frames, scores, asset_class)
-        label = "0ms" if ns == 0 else (
-            f"{ns // 1_000_000}ms" if ns < 1_000_000_000
-            else f"{ns // 1_000_000_000}s")
+        label = (
+            "0ms"
+            if ns == 0
+            else (f"{ns // 1_000_000}ms" if ns < 1_000_000_000 else f"{ns // 1_000_000_000}s")
+        )
         out[label] = {
             "latency_ns": int(ns),
             "total_pnl": res.total_pnl,
@@ -228,6 +237,7 @@ def regime_split(
     carries the opposite sign to the gate IC and reads as a regime the alpha
     "works in" when it is the regime it is most wrong in.
     """
+
     def high(df: pd.DataFrame) -> np.ndarray:
         f = df["vol_regime_flag_v1"].to_numpy(dtype=float)
         return np.where(np.isfinite(f), f, 0.0) > 0.5

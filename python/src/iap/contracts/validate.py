@@ -67,8 +67,10 @@ def _load_all(root: str) -> Tuple[Tuple[str, Dict[str, Any]], ...]:
 
 @lru_cache(maxsize=None)
 def _registry(root: str) -> Registry:
-    resources = [(doc["$id"], Resource(contents=doc, specification=DRAFT202012))
-                 for _, doc in _load_all(root)]
+    resources = [
+        (doc["$id"], Resource(contents=doc, specification=DRAFT202012))
+        for _, doc in _load_all(root)
+    ]
     return Registry().with_resources(resources)
 
 
@@ -90,8 +92,7 @@ def _validator(root: str, schema_relpath: str, fragment: str) -> Draft202012Vali
     doc = load_schema(schema_relpath)
     Draft202012Validator.check_schema(doc)
     if fragment:
-        doc = {"$schema": doc["$schema"],
-               "$ref": f"{doc['$id']}#{fragment}"}
+        doc = {"$schema": doc["$schema"], "$ref": f"{doc['$id']}#{fragment}"}
     return Draft202012Validator(doc, registry=_registry(root))
 
 
@@ -112,12 +113,11 @@ def validate(obj_dict: Mapping[str, Any], schema_relpath: str) -> None:
     if rel not in SCHEMA_VERSIONS:
         raise KeyError(f"unknown schema {rel!r}")
     validator = _validator(str(schema_dir()), rel, fragment)
-    errors = sorted(validator.iter_errors(obj_dict),
-                    key=lambda e: (e.json_path, e.message))
+    errors = sorted(validator.iter_errors(obj_dict), key=lambda e: (e.json_path, e.message))
     if errors:
         raise ContractValidationError(
-            schema_relpath,
-            tuple(f"{e.json_path}: {e.message}" for e in errors))
+            schema_relpath, tuple(f"{e.json_path}: {e.message}" for e in errors)
+        )
 
 
 def validate_typed(instance: Contract) -> Dict[str, Any]:
@@ -129,8 +129,8 @@ def validate_typed(instance: Contract) -> Dict[str, Any]:
     if doc["x-version"] != instance.x_version:
         raise ContractValidationError(
             instance.SCHEMA,
-            (f"x-version mismatch: type {instance.x_version}, "
-             f"schema {doc['x-version']}",))
+            (f"x-version mismatch: type {instance.x_version}, schema {doc['x-version']}",),
+        )
     data = instance.to_dict()
     validate(data, instance.SCHEMA)
     return data

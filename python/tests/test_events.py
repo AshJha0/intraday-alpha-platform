@@ -17,20 +17,37 @@ from iap.core.events import (
 def test_enum_values_pinned():
     assert (Side.BID, Side.ASK) == (0, 1)
     assert [
-        EventType.ADD, EventType.MODIFY, EventType.CANCEL, EventType.EXECUTE,
-        EventType.TRADE, EventType.QUOTE, EventType.SNAPSHOT, EventType.STATUS,
+        EventType.ADD,
+        EventType.MODIFY,
+        EventType.CANCEL,
+        EventType.EXECUTE,
+        EventType.TRADE,
+        EventType.QUOTE,
+        EventType.SNAPSHOT,
+        EventType.STATUS,
         EventType.HEARTBEAT,
     ] == [1, 2, 3, 4, 5, 6, 7, 8, 9]
     assert [
-        SessionStatus.TRADING, SessionStatus.HALT,
-        SessionStatus.AUCTION, SessionStatus.CLOSE,
+        SessionStatus.TRADING,
+        SessionStatus.HALT,
+        SessionStatus.AUCTION,
+        SessionStatus.CLOSE,
     ] == [1, 2, 3, 4]
 
 
 def test_field_order_is_canonical():
     assert FIELDS == (
-        "event_id", "instrument_id", "venue_id", "exchange_ts", "receive_ts",
-        "sequence", "event_type", "side", "price_ticks", "qty", "order_id",
+        "event_id",
+        "instrument_id",
+        "venue_id",
+        "exchange_ts",
+        "receive_ts",
+        "sequence",
+        "event_type",
+        "side",
+        "price_ticks",
+        "qty",
+        "order_id",
         "trade_id",
     )
 

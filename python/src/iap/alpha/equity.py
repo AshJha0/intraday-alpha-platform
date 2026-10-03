@@ -214,9 +214,7 @@ class EQ08VwapDeviation(LinearAlpha):
         num = pd.Series(pw, index=idx).rolling(self.WINDOW).sum().to_numpy()
         den = pd.Series(ww, index=idx).rolling(self.WINDOW).sum().to_numpy()
         vwap = np.where(den > 0, num / np.where(den > 0, den, 1.0), np.nan)
-        dev_bps = np.where(
-            ok & np.isfinite(vwap) & (mid > 0), (mid - vwap) / mid * 1e4, np.nan
-        )
+        dev_bps = np.where(ok & np.isfinite(vwap) & (mid > 0), (mid - vwap) / mid * 1e4, np.nan)
         return pd.Series(-dev_bps, index=df.index)
 
 
@@ -263,9 +261,7 @@ class EQ10IndexLeadLag(LinearAlpha):
     features = ("ref_ret_1s_v1",)
 
     def universe(self, instrument_ids):
-        return sorted(
-            i for i in instrument_ids if i in EQ_CONSTITUENT_IDS and i != ETF_ID
-        )
+        return sorted(i for i in instrument_ids if i in EQ_CONSTITUENT_IDS and i != ETF_ID)
 
     def raw_signal(self, df: pd.DataFrame) -> pd.Series:
         return col(df, "ref_ret_1s_v1")

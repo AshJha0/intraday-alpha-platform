@@ -141,20 +141,24 @@ COUNTER_NAMES = (
 #: Event types whose application indexes book state by ``side`` (insertion
 #: into (side, price) levels, or the trade-flow sign). ``side`` outside
 #: {BID, ASK} on these is malformed => dropped + counted (pinned).
-_SIDE_INDEXED = frozenset({
-    int(EventType.ADD),
-    int(EventType.QUOTE),
-    int(EventType.SNAPSHOT),
-    int(EventType.TRADE),
-})
+_SIDE_INDEXED = frozenset(
+    {
+        int(EventType.ADD),
+        int(EventType.QUOTE),
+        int(EventType.SNAPSHOT),
+        int(EventType.TRADE),
+    }
+)
 
 #: Event types that are applied while the book is stale.
-_APPLIED_WHILE_STALE = frozenset({
-    int(EventType.SNAPSHOT),
-    int(EventType.STATUS),
-    int(EventType.TRADE),
-    int(EventType.HEARTBEAT),
-})
+_APPLIED_WHILE_STALE = frozenset(
+    {
+        int(EventType.SNAPSHOT),
+        int(EventType.STATUS),
+        int(EventType.TRADE),
+        int(EventType.HEARTBEAT),
+    }
+)
 
 _KNOWN_TYPES = frozenset(int(t) for t in EventType)
 _STATUS_CODES = frozenset(int(s) for s in SessionStatus)
@@ -262,11 +266,7 @@ class OrderBook:
                 f"event routed to wrong book: event {ev.instrument_id}@{ev.venue_id}, "
                 f"book {self.instrument_id}@{self.venue_id}"
             )
-        if (
-            self.reorder_window
-            and self.has_sequence
-            and ev.sequence > self.last_sequence + 1
-        ):
+        if self.reorder_window and self.has_sequence and ev.sequence > self.last_sequence + 1:
             # Out-of-sequence event ahead of a hole: hold it back until the
             # missing sequences arrive (bounded by reorder_window).
             if ev.sequence in self._pending:
@@ -308,9 +308,7 @@ class OrderBook:
                 return
             self._apply_sequenced(ev, from_buffer=True)
 
-    def _apply_sequenced(
-        self, ev: MarketEvent, from_buffer: bool = False
-    ) -> ApplyStatus:
+    def _apply_sequenced(self, ev: MarketEvent, from_buffer: bool = False) -> ApplyStatus:
         """Sequence check + dispatch for one event (no hold-back)."""
         et = ev.event_type
         if self.has_sequence:
@@ -648,11 +646,7 @@ class OrderBook:
 
     def is_fresh(self, now_ns: int, max_age_ns: int) -> bool:
         """True if not stale and the last event was received within max_age_ns."""
-        return (
-            not self.stale
-            and self.has_sequence
-            and now_ns - self.receive_ts <= max_age_ns
-        )
+        return not self.stale and self.has_sequence and now_ns - self.receive_ts <= max_age_ns
 
     def _sorted_levels(self, side: int) -> List[_Level]:
         levels = [lvl for (s, _), lvl in self._levels.items() if s == side]
@@ -692,7 +686,7 @@ class OrderBook:
     def checkpoint(self) -> dict:
         """Full deterministic serialization (JSON-able; keys sorted explicitly)."""
         levels_out = []
-        for (side, price) in sorted(self._levels):
+        for side, price in sorted(self._levels):
             level = self._levels[(side, price)]
             levels_out.append(
                 {
@@ -724,8 +718,7 @@ class OrderBook:
             "snapshot_synthetic_next": list(self._snapshot_synthetic_next),
             "reorder_window": self.reorder_window,
             "reorder_pending": [
-                [getattr(self._pending[seq], f) for f in FIELDS]
-                for seq in sorted(self._pending)
+                [getattr(self._pending[seq], f) for f in FIELDS] for seq in sorted(self._pending)
             ],
             "counters": self.counters(),
         }
@@ -734,9 +727,7 @@ class OrderBook:
     def restore(cls, cp: dict) -> "OrderBook":
         """Rebuild an identical book from ``checkpoint()`` output."""
         if cp.get("x-version") != CHECKPOINT_VERSION:
-            raise ValueError(
-                f"unsupported book checkpoint x-version: {cp.get('x-version')!r}"
-            )
+            raise ValueError(f"unsupported book checkpoint x-version: {cp.get('x-version')!r}")
         book = cls(cp["instrument_id"], cp["venue_id"], cp["reorder_window"])
         for lvl in cp["levels"]:
             if lvl["side"] not in (0, 1):
@@ -749,14 +740,11 @@ class OrderBook:
             # into the feature engine's merged depth and rolling windows.
             if lvl["price_ticks"] <= 0:
                 raise ValueError(
-                    f"non-positive price_ticks {lvl['price_ticks']} "
-                    "in checkpoint level"
+                    f"non-positive price_ticks {lvl['price_ticks']} in checkpoint level"
                 )
             for oid, qty in lvl["orders"]:
                 if qty <= 0:
-                    raise ValueError(
-                        f"non-positive qty {qty} for order_id {oid} in checkpoint"
-                    )
+                    raise ValueError(f"non-positive qty {qty} for order_id {oid} in checkpoint")
                 if oid in book._orders:
                     raise ValueError(f"duplicate order_id {oid} in checkpoint")
                 book._insert_order(lvl["side"], lvl["price_ticks"], oid, qty)
@@ -764,9 +752,7 @@ class OrderBook:
         # order; _orders must iterate in original insertion order so e.g.
         # resting_orders() is checkpoint-round-trip exact).
         arrival = cp["arrival_order"]
-        if len(arrival) != len(book._orders) or any(
-            oid not in book._orders for oid in arrival
-        ):
+        if len(arrival) != len(book._orders) or any(oid not in book._orders for oid in arrival):
             raise ValueError("checkpoint arrival_order inconsistent with levels")
         book._orders = {oid: book._orders[oid] for oid in arrival}
         book.last_sequence = cp["last_sequence"]

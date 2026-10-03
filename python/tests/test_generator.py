@@ -53,8 +53,14 @@ def test_golden_eq_vector_properties(refdata):
     # exchange-time ordered
     assert all(a.exchange_ts <= b.exchange_ts for a, b in zip(eq, eq[1:]))
     types = {e.event_type for e in eq}
-    assert {EventType.ADD, EventType.MODIFY, EventType.CANCEL,
-            EventType.EXECUTE, EventType.TRADE, EventType.STATUS} <= types
+    assert {
+        EventType.ADD,
+        EventType.MODIFY,
+        EventType.CANCEL,
+        EventType.EXECUTE,
+        EventType.TRADE,
+        EventType.STATUS,
+    } <= types
     assert EventType.SNAPSHOT not in types  # golden vector is anomaly-free
 
 
@@ -102,8 +108,12 @@ def test_event_id_monotone_per_file(refdata, tmp_path):
 def test_run_injects_all_anomaly_classes(refdata, tmp_path):
     cfg = dict(SMALL_CFG)
     cfg["anomalies"] = {
-        "gap_prob": 0.004, "gap_max_events": 3, "dup_prob": 0.01,
-        "ooo_prob": 0.006, "invalid_prob": 0.004, "ts_violation_prob": 0.004,
+        "gap_prob": 0.004,
+        "gap_max_events": 3,
+        "dup_prob": 0.01,
+        "ooo_prob": 0.006,
+        "invalid_prob": 0.004,
+        "ts_violation_prob": 0.004,
     }
     _, stats, events = _run(refdata, tmp_path, cfg)
     inj = stats["injected_anomalies"]
@@ -115,8 +125,7 @@ def test_run_injects_all_anomaly_classes(refdata, tmp_path):
     # invalid events really are invalid; everything else validates or is a
     # ts violation (receive < exchange).
     n_invalid = sum(
-        1 for e in events
-        if e.receive_ts >= e.exchange_ts and validation_error(e) is not None
+        1 for e in events if e.receive_ts >= e.exchange_ts and validation_error(e) is not None
     )
     assert n_invalid == inj["invalid"]
     n_tsv = sum(1 for e in events if e.receive_ts < e.exchange_ts)
@@ -125,8 +134,7 @@ def test_run_injects_all_anomaly_classes(refdata, tmp_path):
 
 def test_run_contains_halt_and_auctions(refdata, tmp_path):
     _, stats, events = _run(refdata, tmp_path)
-    halted = [e for e in events
-              if e.event_type == EventType.STATUS and e.qty == SessionStatus.HALT]
+    halted = [e for e in events if e.event_type == EventType.STATUS and e.qty == SessionStatus.HALT]
     assert len(halted) == 2  # SYN.EQ.007 on both venues, session 0
     assert all(e.instrument_id == 7 for e in halted)
     stat = [e for e in events if e.event_type == EventType.STATUS]
@@ -138,8 +146,12 @@ def test_run_contains_halt_and_auctions(refdata, tmp_path):
 def test_gap_injection_comes_with_snapshot_recovery(refdata, tmp_path):
     cfg = dict(SMALL_CFG)
     cfg["anomalies"] = {
-        "gap_prob": 0.01, "gap_max_events": 2, "dup_prob": 0.0,
-        "ooo_prob": 0.0, "invalid_prob": 0.0, "ts_violation_prob": 0.0,
+        "gap_prob": 0.01,
+        "gap_max_events": 2,
+        "dup_prob": 0.0,
+        "ooo_prob": 0.0,
+        "invalid_prob": 0.0,
+        "ts_violation_prob": 0.0,
     }
     _, stats, events = _run(refdata, tmp_path, cfg)
     assert stats["injected_anomalies"]["gaps"] > 0
@@ -152,10 +164,18 @@ def test_gap_injection_comes_with_snapshot_recovery(refdata, tmp_path):
 
 def test_multi_session_sequences_continue(refdata, tmp_path):
     cfg = {
-        "seed": 5, "sessions": 2,
-        "equities": {"slots_per_stream": 60}, "fx": {"slots_per_pair": 50},
-        "anomalies": {"gap_prob": 0, "gap_max_events": 1, "dup_prob": 0,
-                      "ooo_prob": 0, "invalid_prob": 0, "ts_violation_prob": 0},
+        "seed": 5,
+        "sessions": 2,
+        "equities": {"slots_per_stream": 60},
+        "fx": {"slots_per_pair": 50},
+        "anomalies": {
+            "gap_prob": 0,
+            "gap_max_events": 1,
+            "dup_prob": 0,
+            "ooo_prob": 0,
+            "invalid_prob": 0,
+            "ts_violation_prob": 0,
+        },
     }
     gen = MarketDataGenerator(refdata, cfg)
     out = tmp_path / "run"
@@ -194,11 +214,18 @@ def test_consolidated_equity_book_rarely_crossed(refdata, tmp_path):
     from iap.orderbook.book import ConsolidatedBook
 
     cfg = {
-        "seed": 424242, "sessions": 1,
-        "equities": {"slots_per_stream": 1800}, "fx": {"slots_per_pair": 10},
-        "anomalies": {"gap_prob": 0, "gap_max_events": 1, "dup_prob": 0,
-                      "ooo_prob": 0, "invalid_prob": 0,
-                      "ts_violation_prob": 0},
+        "seed": 424242,
+        "sessions": 1,
+        "equities": {"slots_per_stream": 1800},
+        "fx": {"slots_per_pair": 10},
+        "anomalies": {
+            "gap_prob": 0,
+            "gap_max_events": 1,
+            "dup_prob": 0,
+            "ooo_prob": 0,
+            "invalid_prob": 0,
+            "ts_violation_prob": 0,
+        },
     }
     gen = MarketDataGenerator(refdata, cfg)
     out = tmp_path / "run"
@@ -207,8 +234,7 @@ def test_consolidated_equity_book_rarely_crossed(refdata, tmp_path):
     books = {}
     total = crossed = 0
     for ev in read_jsonl(out / eq_file):
-        cons = books.setdefault(ev.instrument_id,
-                                ConsolidatedBook(ev.instrument_id))
+        cons = books.setdefault(ev.instrument_id, ConsolidatedBook(ev.instrument_id))
         cons.apply(ev)
         bb, ba = cons.best_bid(), cons.best_ask()
         if bb is None or ba is None:
@@ -231,16 +257,16 @@ def test_equity_venues_share_one_efficient_price(refdata, tmp_path):
     stats = gen.generate_run(out)
     eq_file = next(n for n in sorted(stats["files"]) if n.startswith("eq_"))
     events = read_jsonl(out / eq_file)
-    close_ns = max(e.exchange_ts for e in events
-                   if e.event_type == EventType.STATUS
-                   and e.qty == SessionStatus.CLOSE)
+    close_ns = max(
+        e.exchange_ts
+        for e in events
+        if e.event_type == EventType.STATUS and e.qty == SessionStatus.CLOSE
+    )
     # close-auction trade prints per (instrument, venue)
     prints = {}
     for e in events:
-        if (e.event_type == EventType.TRADE
-                and e.exchange_ts > close_ns - 60_000_000_000):
-            prints.setdefault((e.instrument_id, e.venue_id),
-                              []).append(e.price_ticks)
+        if e.event_type == EventType.TRADE and e.exchange_ts > close_ns - 60_000_000_000:
+            prints.setdefault((e.instrument_id, e.venue_id), []).append(e.price_ticks)
     by_inst = {}
     for (iid, vid), prices in prints.items():
         by_inst.setdefault(iid, {})[vid] = sorted(set(prices))

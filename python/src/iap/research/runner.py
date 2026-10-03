@@ -181,8 +181,9 @@ DOCUMENT_TOL = 1e-9
 BPS = 1e4
 
 
-def document_drift(previous: Any, current: Any, *, tol: float = DOCUMENT_TOL,
-                   path: str = "$") -> List[str]:
+def document_drift(
+    previous: Any, current: Any, *, tol: float = DOCUMENT_TOL, path: str = "$"
+) -> List[str]:
     """Paths where ``current`` differs from ``previous`` beyond ``tol``.
 
     Floats agree when ``|a - b| <= tol + tol * |b|``; ints, bools, strings,
@@ -193,8 +194,11 @@ def document_drift(previous: Any, current: Any, *, tol: float = DOCUMENT_TOL,
     if isinstance(previous, bool) or isinstance(current, bool):
         return [] if (type(previous) is type(current) and previous == current) else [path]
     if isinstance(previous, float) and isinstance(current, float):
-        if math.isfinite(previous) and math.isfinite(current) and \
-                abs(previous - current) <= tol + tol * abs(current):
+        if (
+            math.isfinite(previous)
+            and math.isfinite(current)
+            and abs(previous - current) <= tol + tol * abs(current)
+        ):
             return []
         return [path]
     if isinstance(previous, Mapping) and isinstance(current, Mapping):
@@ -202,8 +206,7 @@ def document_drift(previous: Any, current: Any, *, tol: float = DOCUMENT_TOL,
             return [path]
         drift: List[str] = []
         for key in sorted(previous):
-            drift.extend(document_drift(previous[key], current[key], tol=tol,
-                                        path=f"{path}.{key}"))
+            drift.extend(document_drift(previous[key], current[key], tol=tol, path=f"{path}.{key}"))
         return drift
     if isinstance(previous, (list, tuple)) and isinstance(current, (list, tuple)):
         if len(previous) != len(current):
@@ -217,16 +220,22 @@ def document_drift(previous: Any, current: Any, *, tol: float = DOCUMENT_TOL,
 
 def _finite(value: Any, name: str) -> float:
     """``value`` as a finite float, or a :class:`ResearchError` naming it."""
-    if value is None or isinstance(value, bool) or not isinstance(value, (int, float, np.floating, np.integer)):
+    if (
+        value is None
+        or isinstance(value, bool)
+        or not isinstance(value, (int, float, np.floating, np.integer))
+    ):
         raise ResearchError(
             f"metric {name!r} was not computed (got {value!r}); a result is never "
             "fabricated — the experiment window is too small or too sparse",
-            code="metric_not_computed")
+            code="metric_not_computed",
+        )
     out = float(value)
     if not math.isfinite(out):
         raise ResearchError(
             f"metric {name!r} is not finite ({out}); a result is never fabricated",
-            code="metric_not_computed")
+            code="metric_not_computed",
+        )
     return out
 
 
@@ -271,8 +280,9 @@ def load_instrument_meta(configs_dir: Path) -> Dict[int, dict]:
     return meta
 
 
-def holdout_capital_usd(backtester: Backtester, meta: Mapping[int, dict],
-                        instrument_ids: List[int]) -> float:
+def holdout_capital_usd(
+    backtester: Backtester, meta: Mapping[int, dict], instrument_ids: List[int]
+) -> float:
     """Research capital line: ``max_pos_qty x ref_price x unit`` per
     instrument, converted to USD at the conversion pair's ``ref_price``
     (``run_all.py``'s ``_capital_usd``)."""
@@ -284,8 +294,9 @@ def holdout_capital_usd(backtester: Backtester, meta: Mapping[int, dict],
     return total
 
 
-def restrict_frames(frames: Mapping[int, pd.DataFrame], start_ts: int,
-                    end_ts: int) -> Dict[int, pd.DataFrame]:
+def restrict_frames(
+    frames: Mapping[int, pd.DataFrame], start_ts: int, end_ts: int
+) -> Dict[int, pd.DataFrame]:
     """Rows with ``start_ts <= exchange_ts < end_ts`` per instrument."""
     out: Dict[int, pd.DataFrame] = {}
     for iid in sorted(frames):
@@ -294,8 +305,7 @@ def restrict_frames(frames: Mapping[int, pd.DataFrame], start_ts: int,
     return out
 
 
-def _assert_holdout_is_held_out(window: Mapping[int, pd.DataFrame],
-                                test_start_ts: int) -> None:
+def _assert_holdout_is_held_out(window: Mapping[int, pd.DataFrame], test_start_ts: int) -> None:
     """Fail loudly if any walk-forward row reaches into the declared holdout.
 
     The walk-forward window and the holdout backtest are separate pieces of
@@ -310,14 +320,14 @@ def _assert_holdout_is_held_out(window: Mapping[int, pd.DataFrame],
             raise ResearchError(
                 f"instrument {iid}: walk-forward window reaches ts {int(ts.max())}, "
                 f"at or past the declared holdout start {test_start_ts} — the "
-                "reported OOS statistics would not be out of sample")
+                "reported OOS statistics would not be out of sample"
+            )
 
 
 def render_document(doc: Mapping[str, Any]) -> str:
     """The persisted form: sorted keys, 2-space indent, ASCII, no NaN,
     trailing newline — byte-deterministic for a given document."""
-    return json.dumps(doc, indent=2, sort_keys=True, ensure_ascii=True,
-                      allow_nan=False) + "\n"
+    return json.dumps(doc, indent=2, sort_keys=True, ensure_ascii=True, allow_nan=False) + "\n"
 
 
 def build_result(
@@ -407,7 +417,8 @@ class ExperimentRunner:
         if tstat_threshold not in TSTAT_THRESHOLD_POLICIES:
             raise ResearchError(
                 f"unknown tstat_threshold {tstat_threshold!r}; "
-                f"known: {list(TSTAT_THRESHOLD_POLICIES)}")
+                f"known: {list(TSTAT_THRESHOLD_POLICIES)}"
+            )
         self.tstat_threshold = tstat_threshold
         #: eligibility of the most recent ``run`` (``None`` before any run)
         self.last_eligibility: Optional[GateEligibility] = None
@@ -418,7 +429,8 @@ class ExperimentRunner:
         self.dry_run = bool(dry_run)
         self.repo_root = Path(repo_root) if repo_root is not None else None
         self._frames: Optional[Dict[int, pd.DataFrame]] = (
-            {int(k): v for k, v in frames.items()} if frames is not None else None)
+            {int(k): v for k, v in frames.items()} if frames is not None else None
+        )
         self.meta = load_instrument_meta(self.configs_dir)
         exec_cfg = json.loads((self.configs_dir / "execution" / "execution.json").read_text())
         self.max_participation = float(exec_cfg["defaults"]["max_participation"])
@@ -448,10 +460,12 @@ class ExperimentRunner:
     @staticmethod
     def _model_factory(spec: ExperimentSpec) -> Callable[[], AlphaModel]:
         """A fresh unfitted model per call, scored at the spec's horizon."""
+
         def factory() -> AlphaModel:
             model = build(spec.alpha_id)
             model.horizon = spec.horizon
             return model
+
         return factory
 
     @staticmethod
@@ -463,19 +477,26 @@ class ExperimentRunner:
             raise ResearchError(f"unknown horizon {spec.horizon!r}")
         if normalise_configuration(spec.configuration) != dict(spec.configuration):
             raise ResearchError(
-                "spec.configuration is not normalised — build specs with "
-                "iap.research.build_spec")
+                "spec.configuration is not normalised — build specs with iap.research.build_spec"
+            )
 
     # -- evidence -------------------------------------------------------
 
-    def _holdout(self, spec: ExperimentSpec, window: Mapping[int, pd.DataFrame],
-                 factory: Callable[[], AlphaModel]) -> Dict[str, float]:
+    def _holdout(
+        self,
+        spec: ExperimentSpec,
+        window: Mapping[int, pd.DataFrame],
+        factory: Callable[[], AlphaModel],
+    ) -> Dict[str, float]:
         """Fit on the (purged, embargoed) train period, backtest the test period."""
         cfg = spec.configuration
         horizon_ns = HORIZONS_NS[spec.horizon]
-        fold = Fold(index=0, train_end=spec.test_period.start_ts,
-                    test_start=spec.test_period.start_ts,
-                    test_end=spec.test_period.end_ts)
+        fold = Fold(
+            index=0,
+            train_end=spec.test_period.start_ts,
+            test_start=spec.test_period.start_ts,
+            test_end=spec.test_period.end_ts,
+        )
         train: Dict[int, pd.DataFrame] = {}
         test: Dict[int, pd.DataFrame] = {}
         for iid, df in window.items():
@@ -499,7 +520,8 @@ class ExperimentRunner:
         if abs(net - (gross - costs)) > _IDENTITY_TOL * max(1.0, abs(gross), abs(costs)):
             raise ResearchError(
                 f"backtester accounting identity violated: net {net} != gross {gross} "
-                f"- costs {costs}")
+                f"- costs {costs}"
+            )
         return {
             "gross_return_bps": gross / capital * BPS,
             "transaction_cost_bps": costs / capital * BPS,
@@ -509,7 +531,8 @@ class ExperimentRunner:
 
     def _ledger_total_after(self, spec: ExperimentSpec, report: Mapping[str, Any]) -> int:
         return self.ledger.record(
-            spec.alpha_id, LEDGER_KIND,
+            spec.alpha_id,
+            LEDGER_KIND,
             config=spec.to_dict(),
             result={
                 "experiment_id": spec.experiment_id,
@@ -525,9 +548,13 @@ class ExperimentRunner:
     def experiment_dir(self, experiment_id: str) -> Path:
         return self.out_dir / experiment_id
 
-    def _persist(self, spec: ExperimentSpec, result: ExperimentResult,
-                 eligibility: Optional[GateEligibility] = None) -> None:
-        if eligibility is None:       # no dataset at hand: configuration only
+    def _persist(
+        self,
+        spec: ExperimentSpec,
+        result: ExperimentResult,
+        eligibility: Optional[GateEligibility] = None,
+    ) -> None:
+        if eligibility is None:  # no dataset at hand: configuration only
             eligibility = gate_eligibility(spec)
         spec_doc = validate_typed(spec)
         result_doc = validate_typed(result)
@@ -553,7 +580,8 @@ class ExperimentRunner:
                     f"values at {drift}; the same spec on the same data must give "
                     f"the same result (floats compared at {DOCUMENT_TOL:g}) — remove "
                     "the directory deliberately if the evidence chain changed",
-                    code="not_reproducible")
+                    code="not_reproducible",
+                )
             # Same numbers: keep the committed bytes (the last ulp of a BLAS
             # reduction is CPU-dependent; the artefact must not churn).
             reproduced = all(previous.get(k) == result_doc[k] for k in _PROVENANCE_FIELDS)
@@ -614,19 +642,23 @@ class ExperimentRunner:
         # the two makes the holdout genuinely held out and makes
         # ``validation_period`` the boundary it claims to be;
         # ``_assert_holdout_is_held_out`` stops it regressing.
-        full_window = restrict_frames(self.frames(), spec.train_period.start_ts,
-                                      spec.test_period.end_ts)
+        full_window = restrict_frames(
+            self.frames(), spec.train_period.start_ts, spec.test_period.end_ts
+        )
         universe = probe.universe(sorted(full_window))
         full_window = {iid: full_window[iid] for iid in universe}
         if not any(len(df) for df in full_window.values()):
             raise ResearchError(
-                f"no rows for {spec.alpha_id}'s universe inside the experiment window")
-        wf_window = restrict_frames(full_window, spec.train_period.start_ts,
-                                    spec.test_period.start_ts)
+                f"no rows for {spec.alpha_id}'s universe inside the experiment window"
+            )
+        wf_window = restrict_frames(
+            full_window, spec.train_period.start_ts, spec.test_period.start_ts
+        )
         if not any(len(df) for df in wf_window.values()):
             raise ResearchError(
                 f"no rows for {spec.alpha_id}'s universe before the declared "
-                "holdout — the walk-forward would have nothing to evaluate")
+                "holdout — the walk-forward would have nothing to evaluate"
+            )
         _assert_holdout_is_held_out(wf_window, spec.test_period.start_ts)
         cfg = spec.configuration
         ledger_t = None
@@ -635,13 +667,19 @@ class ExperimentRunner:
             # it (a rerun adds none): the run is judged against the
             # denominator it contributes to.
             ledger_t = self.ledger.bonferroni_t_threshold_at(
-                self.ledger.total_experiments + self.ledger.would_add(
-                    spec.alpha_id, LEDGER_KIND, spec.to_dict(),
-                    LOOKS_PER_EXPERIMENT))
+                self.ledger.total_experiments
+                + self.ledger.would_add(
+                    spec.alpha_id, LEDGER_KIND, spec.to_dict(), LOOKS_PER_EXPERIMENT
+                )
+            )
         try:
             report = validate_alpha(
-                factory, wf_window, self._backtester(spec, 1.0), self.meta,
-                self.max_participation, n_folds=int(cfg["n_folds"]),
+                factory,
+                wf_window,
+                self._backtester(spec, 1.0),
+                self.meta,
+                self.max_participation,
+                n_folds=int(cfg["n_folds"]),
                 embargo_ns=int(cfg["embargo_ns"]),
                 tstat_threshold=self.tstat_threshold,
                 ledger_t_threshold=ledger_t,
@@ -652,8 +690,7 @@ class ExperimentRunner:
         eligibility = gate_eligibility(spec, self.frames())
         total = self._ledger_total_after(spec, report)
         try:
-            result = build_result(spec, report, holdout, total,
-                                  tracker.git_commit(self.repo_root))
+            result = build_result(spec, report, holdout, total, tracker.git_commit(self.repo_root))
         except ResearchError:
             # The statistics were computed and the failure names one of
             # them: the looks are debited even though no result exists.

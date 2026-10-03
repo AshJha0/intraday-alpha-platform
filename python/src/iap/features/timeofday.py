@@ -45,34 +45,47 @@ OPEN_CLOSE_PHASE_MIN = 30
 def specs() -> List[FeatureSpec]:
     """Registry entries for the time-of-day family (pinned order)."""
     out: List[FeatureSpec] = []
-    out.append(mkspec("minute_of_day_v1", FAMILY,
-                      "Minutes since UTC midnight (fractional)."))
-    out.append(mkspec("session_frac_v1", FAMILY,
-                      "Fraction of the configured session elapsed, clipped to [0,1]."))
-    out.append(mkspec("is_open_phase_v1", FAMILY,
-                      f"1 during the first {OPEN_CLOSE_PHASE_MIN} session minutes."))
-    out.append(mkspec("is_close_phase_v1", FAMILY,
-                      f"1 during the last {OPEN_CLOSE_PHASE_MIN} session minutes."))
-    out.append(mkspec("is_trading_v1", FAMILY,
-                      "1 when no venue reports HALT or AUCTION."))
-    out.append(mkspec("is_auction_v1", FAMILY,
-                      "1 when any venue reports AUCTION (and none HALT)."))
+    out.append(mkspec("minute_of_day_v1", FAMILY, "Minutes since UTC midnight (fractional)."))
+    out.append(
+        mkspec(
+            "session_frac_v1",
+            FAMILY,
+            "Fraction of the configured session elapsed, clipped to [0,1].",
+        )
+    )
+    out.append(
+        mkspec(
+            "is_open_phase_v1",
+            FAMILY,
+            f"1 during the first {OPEN_CLOSE_PHASE_MIN} session minutes.",
+        )
+    )
+    out.append(
+        mkspec(
+            "is_close_phase_v1",
+            FAMILY,
+            f"1 during the last {OPEN_CLOSE_PHASE_MIN} session minutes.",
+        )
+    )
+    out.append(mkspec("is_trading_v1", FAMILY, "1 when no venue reports HALT or AUCTION."))
+    out.append(mkspec("is_auction_v1", FAMILY, "1 when any venue reports AUCTION (and none HALT)."))
     out.append(mkspec("is_halt_v1", FAMILY, "1 when any venue reports HALT."))
     docs = {
         "volume": "traded_volume_w1m normalized by its expanding 5-minute-of-day "
-                  "session profile mean (>= 10 prior observations).",
-        "spread": "spread_bps normalized by its expanding 5-minute-of-day "
-                  "session profile mean.",
-        "vol": "rvol_w1m normalized by its expanding 5-minute-of-day "
-               "session profile mean.",
+        "session profile mean (>= 10 prior observations).",
+        "spread": "spread_bps normalized by its expanding 5-minute-of-day session profile mean.",
+        "vol": "rvol_w1m normalized by its expanding 5-minute-of-day session profile mean.",
         "depth": "quoted_depth_total normalized by its expanding "
-                 "5-minute-of-day session profile mean.",
+        "5-minute-of-day session profile mean.",
     }
-    deps = {"volume": ("traded_volume_w1m_v1",), "spread": ("spread_bps_v1",),
-            "vol": ("rvol_w1m_v1",), "depth": ("quoted_depth_total_v1",)}
+    deps = {
+        "volume": ("traded_volume_w1m_v1",),
+        "spread": ("spread_bps_v1",),
+        "vol": ("rvol_w1m_v1",),
+        "depth": ("quoted_depth_total_v1",),
+    }
     for m in PROFILE_METRICS:
-        out.append(mkspec(f"norm_{m}_m5_v1", FAMILY, docs[m],
-                          depends_on=deps[m], bucket_minutes=5))
+        out.append(mkspec(f"norm_{m}_m5_v1", FAMILY, docs[m], depends_on=deps[m], bucket_minutes=5))
     return out
 
 
@@ -80,8 +93,7 @@ def compute(st, values: List[float], valid: List[bool]) -> None:
     """Append the 11 time-of-day values for the current emission."""
     t = st.t
     off = st.ctx.clock.offset_seconds(t)
-    minute = (((t // 1_000_000_000 + off) % 86_400) / 60.0
-              + ((t % 1_000_000_000) / 6e10))
+    minute = ((t // 1_000_000_000 + off) % 86_400) / 60.0 + ((t % 1_000_000_000) / 6e10)
     put(values, valid, minute, True)
     o, c = st.ctx.session_open_min, st.ctx.session_close_min
     frac = (minute - o) / (c - o) if c > o else 0.0

@@ -51,8 +51,7 @@ def direction_of(expected_return: float) -> Direction:
 class LinearZAlpha:
     """One fitted ``linear_z_v1`` alpha as a streaming scorer (see module doc)."""
 
-    def __init__(self, model: LinearAlpha, feature_names: Sequence[str],
-                 horizon_ns: int) -> None:
+    def __init__(self, model: LinearAlpha, feature_names: Sequence[str], horizon_ns: int) -> None:
         if not model.is_fitted():
             raise ValueError(f"{model.alpha_id}: parameters not loaded")
         self._model = model
@@ -61,8 +60,7 @@ class LinearZAlpha:
         missing = [f for f in model.features if f not in index]
         if missing:
             raise ValueError(f"{model.alpha_id}: features {missing} are not in the registry")
-        self._columns: Tuple[Tuple[str, int], ...] = tuple(
-            (f, index[f]) for f in model.features)
+        self._columns: Tuple[Tuple[str, int], ...] = tuple((f, index[f]) for f in model.features)
         self._version = content_hash(model.params())
 
     @property
@@ -101,9 +99,13 @@ class LinearZAlpha:
             er = m.beta * z
             conf = min(1.0, abs(z) / m.conf_scale)
         return AlphaSignal(
-            timestamp=features.timestamp, instrument_id=features.instrument_id,
-            expected_return=er, confidence=conf, horizon_ns=self._horizon_ns,
-            direction=direction_of(er), model_version=m.alpha_id,
+            timestamp=features.timestamp,
+            instrument_id=features.instrument_id,
+            expected_return=er,
+            confidence=conf,
+            horizon_ns=self._horizon_ns,
+            direction=direction_of(er),
+            model_version=m.alpha_id,
         )
 
 
@@ -123,11 +125,13 @@ class AlphaEnsemble:
                 raise ValueError(f"{m.alpha_id}: a dead alpha cannot enter the ensemble")
         self._horizon_ns = int(horizon_ns)
         self._alpha_id = "-".join(m.alpha_id for m in self._members)
-        self._version = content_hash({
-            "ensemble": "equal_weight_z_v1",
-            "members": {m.alpha_id: m.version for m in self._members},
-            "horizon_ns": self._horizon_ns,
-        })
+        self._version = content_hash(
+            {
+                "ensemble": "equal_weight_z_v1",
+                "members": {m.alpha_id: m.version for m in self._members},
+                "horizon_ns": self._horizon_ns,
+            }
+        )
 
     @property
     def members(self) -> Tuple[LinearZAlpha, ...]:
@@ -153,23 +157,36 @@ class AlphaEnsemble:
             sig = signals[m.alpha_id]
             if sig.instrument_id != iid or sig.timestamp != ts:
                 raise ValueError("ensemble: member signals must share instrument and time")
-            frames[m.alpha_id] = {iid: pd.DataFrame({
-                "exchange_ts": np.array([ts], dtype=np.int64),
-                "expected_return": np.array([sig.expected_return], dtype=float),
-                "confidence": np.array([sig.confidence], dtype=float),
-            })}
+            frames[m.alpha_id] = {
+                iid: pd.DataFrame(
+                    {
+                        "exchange_ts": np.array([ts], dtype=np.int64),
+                        "expected_return": np.array([sig.expected_return], dtype=float),
+                        "confidence": np.array([sig.confidence], dtype=float),
+                    }
+                )
+            }
         out = ensemble_scores(frames, self._betas)[iid]
         er = float(out["expected_return"].iloc[0])
         conf = float(out["confidence"].iloc[0])
         return AlphaSignal(
-            timestamp=ts, instrument_id=iid, expected_return=er, confidence=conf,
-            horizon_ns=self._horizon_ns, direction=direction_of(er),
+            timestamp=ts,
+            instrument_id=iid,
+            expected_return=er,
+            confidence=conf,
+            horizon_ns=self._horizon_ns,
+            direction=direction_of(er),
             model_version=self._alpha_id,
         )
 
 
-def load_alphas(params_path, alpha_ids: Sequence[str], feature_names: Sequence[str],
-                feature_version: str, horizon_ns: int) -> Tuple[LinearZAlpha, ...]:
+def load_alphas(
+    params_path,
+    alpha_ids: Sequence[str],
+    feature_names: Sequence[str],
+    feature_version: str,
+    horizon_ns: int,
+) -> Tuple[LinearZAlpha, ...]:
     """Load the configured alphas from ``alpha_params.json`` (registry-hash checked)."""
     models = load_params_file(params_path, expected_feature_version=feature_version)
     out = []

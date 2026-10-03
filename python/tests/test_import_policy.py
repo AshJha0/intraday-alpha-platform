@@ -24,27 +24,84 @@ IAP_DIR = REPO_ROOT / "python" / "src" / "iap"
 
 #: Packages on the trading / data path (§13.7 plus the MVP and alpha layers).
 GUARDED_PACKAGES = (
-    "risk", "execution", "orderbook", "portfolio", "mvp", "core",
-    "marketdata", "features", "alpha", "replay", "trace",
+    "risk",
+    "execution",
+    "orderbook",
+    "portfolio",
+    "mvp",
+    "core",
+    "marketdata",
+    "features",
+    "alpha",
+    "replay",
+    "trace",
 )
 
 #: Top-level module names that are network clients / servers or transports.
-NETWORK_MODULES = frozenset({
-    "socket", "socketserver", "ssl", "select", "selectors", "asyncio",
-    "http", "urllib", "urllib2", "urllib3", "ftplib", "smtplib", "poplib",
-    "imaplib", "telnetlib", "xmlrpc", "webbrowser",
-    "requests", "httpx", "aiohttp", "websocket", "websockets", "grpc",
-    "pycurl", "tornado", "twisted", "zmq", "paramiko", "boto3", "botocore",
-    "flask", "fastapi", "starlette", "uvicorn", "django",
-})
+NETWORK_MODULES = frozenset(
+    {
+        "socket",
+        "socketserver",
+        "ssl",
+        "select",
+        "selectors",
+        "asyncio",
+        "http",
+        "urllib",
+        "urllib2",
+        "urllib3",
+        "ftplib",
+        "smtplib",
+        "poplib",
+        "imaplib",
+        "telnetlib",
+        "xmlrpc",
+        "webbrowser",
+        "requests",
+        "httpx",
+        "aiohttp",
+        "websocket",
+        "websockets",
+        "grpc",
+        "pycurl",
+        "tornado",
+        "twisted",
+        "zmq",
+        "paramiko",
+        "boto3",
+        "botocore",
+        "flask",
+        "fastapi",
+        "starlette",
+        "uvicorn",
+        "django",
+    }
+)
 
 #: Top-level module names of LLM / agent clients and inference SDKs.
-LLM_MODULES = frozenset({
-    "anthropic", "openai", "cohere", "mistralai", "groq", "replicate",
-    "google", "vertexai", "langchain", "langchain_core", "langchain_openai",
-    "langgraph", "llama_index", "litellm", "ollama", "transformers",
-    "huggingface_hub", "mcp", "claude_agent_sdk",
-})
+LLM_MODULES = frozenset(
+    {
+        "anthropic",
+        "openai",
+        "cohere",
+        "mistralai",
+        "groq",
+        "replicate",
+        "google",
+        "vertexai",
+        "langchain",
+        "langchain_core",
+        "langchain_openai",
+        "langgraph",
+        "llama_index",
+        "litellm",
+        "ollama",
+        "transformers",
+        "huggingface_hub",
+        "mcp",
+        "claude_agent_sdk",
+    }
+)
 
 FORBIDDEN = NETWORK_MODULES | LLM_MODULES
 
@@ -65,15 +122,23 @@ def imported_modules(tree: ast.AST) -> Iterator[Tuple[int, str]]:
                 yield node.lineno, node.module
         elif isinstance(node, ast.Call) and node.args:
             func = node.func
-            name = (func.attr if isinstance(func, ast.Attribute)
-                    else func.id if isinstance(func, ast.Name) else "")
+            name = (
+                func.attr
+                if isinstance(func, ast.Attribute)
+                else func.id
+                if isinstance(func, ast.Name)
+                else ""
+            )
             if name in ("import_module", "__import__") and _literal(node.args[0]):
                 yield node.lineno, _literal(node.args[0])
 
 
 def violations(source: str) -> List[Tuple[int, str]]:
-    return [(line, module) for line, module in imported_modules(ast.parse(source))
-            if module.split(".")[0] in FORBIDDEN]
+    return [
+        (line, module)
+        for line, module in imported_modules(ast.parse(source))
+        if module.split(".")[0] in FORBIDDEN
+    ]
 
 
 def _modules(package: str) -> List[Path]:
@@ -94,32 +159,41 @@ def test_no_network_or_llm_import_on_the_trading_path(package):
             found.append(f"{path.relative_to(REPO_ROOT).as_posix()}:{line}: imports {module}")
     assert not found, (
         "network / LLM client imported on the trading path "
-        "(PLATFORM_CONVENTIONS.md §13.7):\n" + "\n".join(found))
+        "(PLATFORM_CONVENTIONS.md §13.7):\n" + "\n".join(found)
+    )
 
 
-@pytest.mark.parametrize("source, expected", [
-    ("import socket\n", [(1, "socket")]),
-    ("import os, http.client\n", [(1, "http.client")]),
-    ("from urllib.request import urlopen\n", [(1, "urllib.request")]),
-    ("def f():\n    import requests\n", [(2, "requests")]),
-    ("from typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    import httpx\n", [(3, "httpx")]),
-    ("try:\n    import anthropic\nexcept ImportError:\n    anthropic = None\n",
-     [(2, "anthropic")]),
-    ("import importlib\nm = importlib.import_module('openai')\n", [(2, "openai")]),
-    ("m = __import__('aiohttp')\n", [(1, "aiohttp")]),
-    ("from google.generativeai import GenerativeModel\n", [(1, "google.generativeai")]),
-])
+@pytest.mark.parametrize(
+    "source, expected",
+    [
+        ("import socket\n", [(1, "socket")]),
+        ("import os, http.client\n", [(1, "http.client")]),
+        ("from urllib.request import urlopen\n", [(1, "urllib.request")]),
+        ("def f():\n    import requests\n", [(2, "requests")]),
+        ("from typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    import httpx\n", [(3, "httpx")]),
+        (
+            "try:\n    import anthropic\nexcept ImportError:\n    anthropic = None\n",
+            [(2, "anthropic")],
+        ),
+        ("import importlib\nm = importlib.import_module('openai')\n", [(2, "openai")]),
+        ("m = __import__('aiohttp')\n", [(1, "aiohttp")]),
+        ("from google.generativeai import GenerativeModel\n", [(1, "google.generativeai")]),
+    ],
+)
 def test_scanner_catches_every_import_form(source, expected):
     assert violations(source) == expected
 
 
-@pytest.mark.parametrize("source", [
-    "import json, math, sqlite3\n",
-    "from . import socket\n",                  # a sibling module, not the stdlib one
-    "from .http import thing\n",
-    "import numpy as np\nfrom iap.core.rng import SplitMix64\n",
-    "name = 'requests'\n",                     # a string, not an import
-    "import socketlike\nimport httptools2\n",   # prefix of a name is not the name
-])
+@pytest.mark.parametrize(
+    "source",
+    [
+        "import json, math, sqlite3\n",
+        "from . import socket\n",  # a sibling module, not the stdlib one
+        "from .http import thing\n",
+        "import numpy as np\nfrom iap.core.rng import SplitMix64\n",
+        "name = 'requests'\n",  # a string, not an import
+        "import socketlike\nimport httptools2\n",  # prefix of a name is not the name
+    ],
+)
 def test_scanner_does_not_flag_clean_modules(source):
     assert violations(source) == []

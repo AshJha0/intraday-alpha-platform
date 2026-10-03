@@ -59,8 +59,9 @@ class JsonlTraceSink:
 
     def __init__(self, path: Union[str, Path], append: bool = False) -> None:
         self.path = Path(path)
-        self._fh: Optional[IO[str]] = open(self.path, "a" if append else "w",
-                                           encoding="ascii", newline="\n")
+        self._fh: Optional[IO[str]] = open(
+            self.path, "a" if append else "w", encoding="ascii", newline="\n"
+        )
         self.digest = TraceDigest()
 
     def emit(self, trace: DecisionTrace) -> None:

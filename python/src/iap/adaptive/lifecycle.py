@@ -103,8 +103,7 @@ class LifecycleConfig:
         if self.reactivate_ic_gate < self.watch_ic_gate:
             raise ValueError("reactivate_ic_gate must be >= watch_ic_gate")
         if self.breach_rule not in BREACH_RULES:
-            raise ValueError(
-                f"unknown breach_rule {self.breach_rule!r}; known: {BREACH_RULES}")
+            raise ValueError(f"unknown breach_rule {self.breach_rule!r}; known: {BREACH_RULES}")
         if self.cusum_k < 0.0:
             raise ValueError("cusum_k must be >= 0")
         if self.breach_rule == "cusum" and not self.cusum_h > 0.0:
@@ -184,8 +183,7 @@ class LifecycleTracker:
     #: CUSUM statistic (stays 0.0 under the "consecutive" rule)
     cusum: float = 0.0
 
-    def _transition(self, to_state: str, ts: int, reason: str,
-                    rolling_ic: Optional[float]) -> None:
+    def _transition(self, to_state: str, ts: int, reason: str, rolling_ic: Optional[float]) -> None:
         tr = Transition(
             alpha_id=self.alpha_id,
             policy=self.policy,
@@ -203,10 +201,15 @@ class LifecycleTracker:
         self.breach_count = 0
         self.recovery_count = 0
         if to_state != WATCH or tr.from_state == RETIRED:
-            self.cusum = 0.0   # a verdict was reached; evidence starts over
+            self.cusum = 0.0  # a verdict was reached; evidence starts over
 
-    def update(self, ts: int, rolling_ic: Optional[float],
-               informative: bool = True, new_fraction: float = 1.0) -> str:
+    def update(
+        self,
+        ts: int,
+        rolling_ic: Optional[float],
+        informative: bool = True,
+        new_fraction: float = 1.0,
+    ) -> str:
         """One evaluation at event time ts; returns the (possibly new) state.
 
         ``informative`` is False when the evaluation's matured set gained no
@@ -227,7 +230,8 @@ class LifecycleTracker:
         if self.state == ACTIVE:
             if breach:
                 self._transition(
-                    WATCH, ts,
+                    WATCH,
+                    ts,
                     f"rolling_ic {rolling_ic:.6f} < watch gate {cfg.watch_ic_gate}",
                     rolling_ic,
                 )
@@ -240,7 +244,8 @@ class LifecycleTracker:
                 self.recovery_count = 0
                 if self.breach_count >= cfg.retire_breach_evals:
                     self._transition(
-                        RETIRED, ts,
+                        RETIRED,
+                        ts,
                         f"persistent breach: {cfg.retire_breach_evals} consecutive "
                         f"evals below watch gate {cfg.watch_ic_gate}",
                         rolling_ic,
@@ -250,7 +255,8 @@ class LifecycleTracker:
                 self.breach_count = 0
                 if self.recovery_count >= cfg.reactivate_evals:
                     self._transition(
-                        ACTIVE, ts,
+                        ACTIVE,
+                        ts,
                         f"re-activation: {cfg.reactivate_evals} consecutive evals "
                         f">= reactivate gate {cfg.reactivate_ic_gate}",
                         rolling_ic,
@@ -265,7 +271,8 @@ class LifecycleTracker:
             self.recovery_count += 1
             if self.recovery_count >= cfg.reactivate_evals:
                 self._transition(
-                    WATCH, ts,
+                    WATCH,
+                    ts,
                     f"recovery from retirement: {cfg.reactivate_evals} consecutive "
                     f"evals >= reactivate gate {cfg.reactivate_ic_gate}; "
                     "probation before ACTIVE",
@@ -275,20 +282,23 @@ class LifecycleTracker:
             self.recovery_count = 0
         return self.state
 
-    def _update_cusum(self, ts: int, rolling_ic: float, breach: bool,
-                      recover: bool, new_fraction: float) -> str:
+    def _update_cusum(
+        self, ts: int, rolling_ic: float, breach: bool, recover: bool, new_fraction: float
+    ) -> str:
         """The CUSUM retirement rule (module docs)."""
         cfg = self.config
         if not 0.0 < new_fraction <= 1.0:
             raise ValueError("new_fraction must be in (0, 1]")
         if self.state != RETIRED:
-            self.cusum = max(0.0, self.cusum + new_fraction * (
-                cfg.watch_ic_gate - rolling_ic - cfg.cusum_k))
+            self.cusum = max(
+                0.0, self.cusum + new_fraction * (cfg.watch_ic_gate - rolling_ic - cfg.cusum_k)
+            )
 
         if self.state == ACTIVE:
             if breach:
                 self._transition(
-                    WATCH, ts,
+                    WATCH,
+                    ts,
                     f"rolling_ic {rolling_ic:.6f} < watch gate {cfg.watch_ic_gate}",
                     rolling_ic,
                 )
@@ -298,7 +308,8 @@ class LifecycleTracker:
             if self.cusum >= cfg.cusum_h:
                 stat = self.cusum
                 self._transition(
-                    RETIRED, ts,
+                    RETIRED,
+                    ts,
                     f"persistent breach: CUSUM {stat:.6f} >= {cfg.cusum_h} "
                     f"(slack {cfg.cusum_k}) below watch gate {cfg.watch_ic_gate}",
                     rolling_ic,
@@ -307,7 +318,8 @@ class LifecycleTracker:
                 self.recovery_count += 1
                 if self.recovery_count >= cfg.reactivate_evals:
                     self._transition(
-                        ACTIVE, ts,
+                        ACTIVE,
+                        ts,
                         f"re-activation: {cfg.reactivate_evals} consecutive evals "
                         f">= reactivate gate {cfg.reactivate_ic_gate}",
                         rolling_ic,
@@ -321,7 +333,8 @@ class LifecycleTracker:
             self.recovery_count += 1
             if self.recovery_count >= cfg.reactivate_evals:
                 self._transition(
-                    WATCH, ts,
+                    WATCH,
+                    ts,
                     f"recovery from retirement: {cfg.reactivate_evals} consecutive "
                     f"evals >= reactivate gate {cfg.reactivate_ic_gate}; "
                     "probation before ACTIVE",

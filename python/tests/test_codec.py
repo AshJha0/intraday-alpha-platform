@@ -14,9 +14,7 @@ from iap.core.events import EventType, MarketEvent
 def _sample_events(n=20):
     evs = []
     for i in range(1, n + 1):
-        evs.append(
-            mkev(i, EventType.ADD, i % 2, 2400 + i, 100 * i, order_id=1000 + i)
-        )
+        evs.append(mkev(i, EventType.ADD, i % 2, 2400 + i, 100 * i, order_id=1000 + i))
     return evs
 
 
@@ -93,7 +91,10 @@ def test_jsonl_rejects_out_of_range_and_duplicate_keys():
         codec.decode_jsonl_line(base.replace('"trade_id":11', '"trade_id":0,"trade_id":77'))
     with pytest.raises(ValueError, match="non-negative"):
         codec.decode_jsonl_line(base.replace('"sequence":6', '"sequence":-0'))
-    assert codec.decode_jsonl_line(base.replace('"price_ticks":-8', '"price_ticks":-0')).price_ticks == 0
+    assert (
+        codec.decode_jsonl_line(base.replace('"price_ticks":-8', '"price_ticks":-0')).price_ticks
+        == 0
+    )
 
 
 def test_iap1_empty_vector_round_trip():

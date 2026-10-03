@@ -37,9 +37,9 @@ _REPO = Path(__file__).resolve().parents[4]
 #: Pinned simulation parameters.
 SIM_SEED = 20260829
 N_SLICES = 4
-SLICE_NS = 15_000_000_000          # 15s between child slices
-SKIP_PROB = 0.15                   # per-child unfilled probability
-IMPACT_COEF = 3.0                  # ticks per unit of child participation
+SLICE_NS = 15_000_000_000  # 15s between child slices
+SKIP_PROB = 0.15  # per-child unfilled probability
+IMPACT_COEF = 3.0  # ticks per unit of child participation
 IMPACT_CAP_TICKS = 5
 DELAY_MIN_MS = 200
 DELAY_MAX_MS = 1500
@@ -53,8 +53,7 @@ GOLDEN_STREAMS: Dict[str, Tuple[int, float, int]] = {
 }
 
 
-def build_timeline(events_path: Path, instrument_id: int,
-                   tick_size: float) -> MarketTimeline:
+def build_timeline(events_path: Path, instrument_id: int, tick_size: float) -> MarketTimeline:
     """Replay a golden event file into a MarketTimeline for one instrument."""
     if tick_size <= 0:
         raise ValueError("tick_size must be > 0")
@@ -73,8 +72,7 @@ def build_timeline(events_path: Path, instrument_id: int,
         if bb is None or ba is None:
             continue
         # pinned: crossed states skipped + counted, locked states kept
-        tl.append_state_pinned(ev.exchange_ts, bb[0] * tick_size,
-                               ba[0] * tick_size, bb[1], ba[1])
+        tl.append_state_pinned(ev.exchange_ts, bb[0] * tick_size, ba[0] * tick_size, bb[1], ba[1])
     if len(tl) < 50:
         raise ValueError(f"timeline too short from {events_path}")
     return tl
@@ -123,8 +121,7 @@ def simulate_parent_orders(
         )
         child_qty = qty_target // N_SLICES
         for j in range(N_SLICES):
-            qty = child_qty if j < N_SLICES - 1 \
-                else qty_target - child_qty * (N_SLICES - 1)
+            qty = child_qty if j < N_SLICES - 1 else qty_target - child_qty * (N_SLICES - 1)
             if qty <= 0 or skip_draws[j] < SKIP_PROB:
                 continue
             t_child = arrival_ts + j * SLICE_NS
@@ -133,23 +130,23 @@ def simulate_parent_orders(
                 continue
             if side == 0:  # buy: cross at ask + impact ticks
                 contra_depth = max(timeline.ask_sz[i], 1)
-                extra = min(IMPACT_CAP_TICKS,
-                            int(IMPACT_COEF * qty / contra_depth))
+                extra = min(IMPACT_CAP_TICKS, int(IMPACT_COEF * qty / contra_depth))
                 price = timeline.ask[i] + extra * tick_size
-            else:          # sell: hit bid - impact ticks
+            else:  # sell: hit bid - impact ticks
                 contra_depth = max(timeline.bid_sz[i], 1)
-                extra = min(IMPACT_CAP_TICKS,
-                            int(IMPACT_COEF * qty / contra_depth))
+                extra = min(IMPACT_CAP_TICKS, int(IMPACT_COEF * qty / contra_depth))
                 price = timeline.bid[i] - extra * tick_size
-            order.fills.append(Fill(
-                ts=t_child,
-                price=price,
-                qty=qty,
-                mid_at_fill=timeline.mid(i),
-                half_spread_at_fill=timeline.half_spread(i),
-                opp_depth_at_fill=contra_depth,
-                liquidity=TAKER,
-            ))
+            order.fills.append(
+                Fill(
+                    ts=t_child,
+                    price=price,
+                    qty=qty,
+                    mid_at_fill=timeline.mid(i),
+                    half_spread_at_fill=timeline.half_spread(i),
+                    opp_depth_at_fill=contra_depth,
+                    liquidity=TAKER,
+                )
+            )
         orders.append(order)
     return orders
 
@@ -161,15 +158,13 @@ def bundled_order_set(
 ) -> Dict[int, Tuple[MarketTimeline, List[ParentOrder], float]]:
     """The pinned bundled parent-order set: {instrument_id: (timeline, orders,
     tick_size)} built from the golden vectors (EQ then FX, pinned order)."""
-    gdir = Path(golden_dir) if golden_dir is not None \
-        else _REPO / "tests" / "golden"
+    gdir = Path(golden_dir) if golden_dir is not None else _REPO / "tests" / "golden"
     rng = SplitMix64(seed)
     out: Dict[int, Tuple[MarketTimeline, List[ParentOrder], float]] = {}
     next_id = 1
     for (fname, (iid, tick, lot)), n in zip(GOLDEN_STREAMS.items(), n_orders):
         tl = build_timeline(gdir / fname, iid, tick)
-        orders = simulate_parent_orders(tl, iid, tick, lot, n, rng,
-                                        first_order_id=next_id)
+        orders = simulate_parent_orders(tl, iid, tick, lot, n, rng, first_order_id=next_id)
         next_id += len(orders)
         out[iid] = (tl, orders, tick)
     return out

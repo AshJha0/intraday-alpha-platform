@@ -47,7 +47,17 @@ EPS = 1e-12
 
 #: pinned label horizons (must mirror iap.labels.HORIZONS_NS keys)
 VALID_HORIZONS = (
-    "10ms", "50ms", "100ms", "500ms", "1s", "5s", "10s", "30s", "1m", "5m", "15m",
+    "10ms",
+    "50ms",
+    "100ms",
+    "500ms",
+    "1s",
+    "5s",
+    "10s",
+    "30s",
+    "1m",
+    "5m",
+    "15m",
 )
 
 #: pinned universes (configs/instruments/instruments.json)
@@ -64,14 +74,15 @@ class AlphaModel(ABC):
     #: pinned identifiers — every concrete subclass overrides these
     alpha_id: str = ""
     name: str = ""
-    asset_class: str = ""            # "EQUITY" | "FX"
-    horizon: str = ""                # pinned label horizon
-    features: Tuple[str, ...] = ()   # registry feature names read by score()
-    cross_sectional: bool = False    # True: score needs the whole universe
+    asset_class: str = ""  # "EQUITY" | "FX"
+    horizon: str = ""  # pinned label horizon
+    features: Tuple[str, ...] = ()  # registry feature names read by score()
+    cross_sectional: bool = False  # True: score needs the whole universe
 
     def __init_subclass__(cls, **kwargs) -> None:
         super().__init_subclass__(**kwargs)
         import inspect
+
         if inspect.isabstract(cls) or not getattr(cls, "alpha_id", ""):
             return  # abstract/intermediate bases carry no alpha_id
         doc = inspect.getdoc(cls) or ""
@@ -87,6 +98,7 @@ class AlphaModel(ABC):
     def economic_rationale(cls) -> str:
         """The alpha's stated economic hypothesis (from the class docstring)."""
         import inspect
+
         doc = inspect.getdoc(cls) or ""
         idx = doc.find("Economic rationale:")
         return doc[idx:] if idx >= 0 else doc
@@ -202,11 +214,7 @@ class LinearAlpha(AlphaModel):
                 raise ValueError(f"{self.alpha_id}: train frame {iid} lacks {label_col}")
             x = sig.to_numpy(dtype=float)
             y = df[label_col].to_numpy(dtype=float)
-            ok = (
-                np.isfinite(x)
-                & np.isfinite(y)
-                & df[valid_col].to_numpy(dtype=bool)
-            )
+            ok = np.isfinite(x) & np.isfinite(y) & df[valid_col].to_numpy(dtype=bool)
             xs.append(x[ok])
             ys.append(y[ok])
         x = np.concatenate(xs) if xs else np.empty(0)
@@ -214,11 +222,13 @@ class LinearAlpha(AlphaModel):
         self.n_train = int(x.size)
         spans = [
             (int(df["exchange_ts"].iloc[0]), int(df["exchange_ts"].iloc[-1]))
-            for df in train.values() if len(df)
+            for df in train.values()
+            if len(df)
         ]
         self.train_window = (
-            {"start_ts": min(a for a, _ in spans),
-             "end_ts": max(b for _, b in spans)} if spans else None
+            {"start_ts": min(a for a, _ in spans), "end_ts": max(b for _, b in spans)}
+            if spans
+            else None
         )
         if x.size < 32:
             # not enough evidence: dead alpha, honestly zero
@@ -250,7 +260,8 @@ class LinearAlpha(AlphaModel):
             if not dead:
                 z[ok] = np.clip(
                     (x[ok] - self.mu) / (self.sigma + EPS),
-                    -self.z_clip, self.z_clip,
+                    -self.z_clip,
+                    self.z_clip,
                 )
             er = self.beta * z
             conf = np.minimum(1.0, np.abs(z) / self.conf_scale)
@@ -297,40 +308,37 @@ class LinearAlpha(AlphaModel):
         """
         aid = self.alpha_id
         if blob.get("alpha_id") != aid:
-            raise ValueError(
-                f"params for {blob.get('alpha_id')!r} loaded into {aid}"
-            )
+            raise ValueError(f"params for {blob.get('alpha_id')!r} loaded into {aid}")
         model = blob.get("model")
         if model != "linear_z_v1":
             raise ValueError(f"{aid}: unsupported model {model!r}")
         horizon = blob.get("horizon")
         if horizon is not None and horizon != self.horizon:
-            raise ValueError(
-                f"{aid}: params horizon {horizon!r} != class horizon "
-                f"{self.horizon!r}")
+            raise ValueError(f"{aid}: params horizon {horizon!r} != class horizon {self.horizon!r}")
         feats = blob.get("features")
         if feats is not None and tuple(feats) != tuple(self.features):
             raise ValueError(
-                f"{aid}: params features {list(feats)} != class features "
-                f"{list(self.features)}")
+                f"{aid}: params features {list(feats)} != class features {list(self.features)}"
+            )
         z_clip = float(blob.get("z_clip", self.Z_CLIP))
         conf_scale = float(blob.get("conf_scale", self.CONF_SCALE))
         if z_clip != self.Z_CLIP or conf_scale != self.CONF_SCALE:
             raise ValueError(
                 f"{aid}: z_clip/conf_scale must be the pinned "
-                f"{self.Z_CLIP}/{self.CONF_SCALE} (got {z_clip}/{conf_scale})")
+                f"{self.Z_CLIP}/{self.CONF_SCALE} (got {z_clip}/{conf_scale})"
+            )
         mu = float(blob["mu"])
         sigma = float(blob["sigma"])
         beta = float(blob["beta"])
         beta_fit = float(blob.get("beta_fit", beta))
-        for name, v in (("mu", mu), ("sigma", sigma), ("beta", beta),
-                        ("beta_fit", beta_fit)):
+        for name, v in (("mu", mu), ("sigma", sigma), ("beta", beta), ("beta_fit", beta_fit)):
             if not np.isfinite(v):
                 raise ValueError(f"{aid}: non-finite {name}")
         if sigma <= 0.0 and beta != 0.0:
             raise ValueError(
                 f"{aid}: sigma <= 0 is only legal for a dead alpha "
-                f"(beta == 0); got sigma={sigma}, beta={beta}")
+                f"(beta == 0); got sigma={sigma}, beta={beta}"
+            )
         self.mu, self.sigma, self.beta, self.beta_fit = mu, sigma, beta, beta_fit
         self.z_clip, self.conf_scale = z_clip, conf_scale
         self.n_train = int(blob.get("n_train", 0))

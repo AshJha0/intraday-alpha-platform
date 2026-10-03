@@ -22,8 +22,15 @@ from iap.mvp.engine import IcResult, MvpEngine, OrderOutcome
 from iap.mvp.feed import FeedResult
 from iap.risk.events import Rules
 
-__all__ = ["IC_DEFINITION", "REPORT_VERSION", "build_report", "check_finite",
-           "render_markdown", "research_ic_of", "report_json"]
+__all__ = [
+    "IC_DEFINITION",
+    "REPORT_VERSION",
+    "build_report",
+    "check_finite",
+    "render_markdown",
+    "research_ic_of",
+    "report_json",
+]
 
 REPORT_VERSION = 2
 
@@ -63,8 +70,14 @@ def _latency_block(values: Sequence[int]) -> Dict[str, Any]:
     def rank(q: float) -> int:
         return s[min(n - 1, max(0, int(math.ceil(q * n)) - 1))]
 
-    return {"count": n, "min": s[0], "mean": sum(s) / n, "max": s[-1],
-            "p50": rank(0.5), "p99": rank(0.99)}
+    return {
+        "count": n,
+        "min": s[0],
+        "mean": sum(s) / n,
+        "max": s[-1],
+        "p50": rank(0.5),
+        "p99": rank(0.99),
+    }
 
 
 #: How every realized IC in the report is defined (echoed in ``report.json``).
@@ -81,9 +94,14 @@ IC_DEFINITION = (
 
 def _ic_block(ic: IcResult) -> Dict[str, Any]:
     """The report keys of one :class:`IcResult`."""
-    return {"horizon": ic.horizon, "realized_ic": ic.ic, "realized_ic_cost": ic.ic_cost,
-            "realized_ic_shifted": ic.ic_shifted, "n_ic_samples": ic.n,
-            "n_signals": ic.n_signals}
+    return {
+        "horizon": ic.horizon,
+        "realized_ic": ic.ic,
+        "realized_ic_cost": ic.ic_cost,
+        "realized_ic_shifted": ic.ic_shifted,
+        "n_ic_samples": ic.n,
+        "n_signals": ic.n_signals,
+    }
 
 
 def research_ic_of(registry: AlphaRegistry, alpha_id: str) -> Optional[float]:
@@ -122,23 +140,28 @@ def _execution_block(outcomes: Sequence[OrderOutcome]) -> Dict[str, Any]:
             "filled_qty": int(sum(o.tca.filled_qty for o in group)),
             "fill_rate": sum(o.tca.filled_qty for o in group) / sum(g_qty),
             "implementation_shortfall_bps_qty_weighted": _weighted(
-                [o.tca.implementation_shortfall_bps for o in group], g_qty),
+                [o.tca.implementation_shortfall_bps for o in group], g_qty
+            ),
             "slippage_bps_filled_weighted": _weighted(
-                [o.tca.slippage_bps for o in group], [float(o.tca.filled_qty) for o in group]),
+                [o.tca.slippage_bps for o in group], [float(o.tca.filled_qty) for o in group]
+            ),
         }
     latencies = [lat for o in outcomes for lat in o.latencies_ns]
     total_qty = sum(o.parent.qty for o in outcomes)
     total_filled = sum(o.tca.filled_qty for o in with_tca)
-    residuals = [o.realized_bps - o.attribution.total_bps for o in with_tca
-                 if o.attribution is not None]
+    residuals = [
+        o.realized_bps - o.attribution.total_bps for o in with_tca if o.attribution is not None
+    ]
     return {
         "n_parent_orders": len(outcomes),
         "n_orders_with_tca": len(with_tca),
         "qty_target": int(total_qty),
         "qty_filled": int(total_filled),
         "fill_rate": (total_filled / total_qty) if total_qty else 0.0,
-        "implementation_shortfall_bps": {"mean": _mean(is_bps),
-                                         "qty_weighted": _weighted(is_bps, qty)},
+        "implementation_shortfall_bps": {
+            "mean": _mean(is_bps),
+            "qty_weighted": _weighted(is_bps, qty),
+        },
         "delay_cost_bps_qty_weighted": qw("delay_cost_bps"),
         "trading_cost_bps_qty_weighted": qw("trading_cost_bps"),
         "opportunity_cost_bps_qty_weighted": qw("opportunity_cost_bps"),
@@ -152,12 +175,14 @@ def _execution_block(outcomes: Sequence[OrderOutcome]) -> Dict[str, Any]:
         "per_algo": per_algo,
         "attribution_residual_bps_mean": _mean(residuals),
         "realized_bps_filled_weighted": _weighted(
-            [o.realized_bps for o in with_tca], [o.filled_notional for o in with_tca]),
+            [o.realized_bps for o in with_tca], [o.filled_notional for o in with_tca]
+        ),
     }
 
 
-def build_report(engine: MvpEngine, feed: FeedResult, trace_digest: str,
-                 registry: AlphaRegistry) -> Dict[str, Any]:
+def build_report(
+    engine: MvpEngine, feed: FeedResult, trace_digest: str, registry: AlphaRegistry
+) -> Dict[str, Any]:
     """The report document (see module docstring).  Raises on a non-finite number."""
     if not engine.counters.events:
         raise ValueError("report: the engine processed no events")
@@ -171,16 +196,24 @@ def build_report(engine: MvpEngine, feed: FeedResult, trace_digest: str,
     with_tca = [o for o in outcomes if o.tca is not None and o.attribution is not None]
     notional = [o.filled_notional for o in with_tca]
     alpha_contribution = _weighted([o.attribution.alpha_bps for o in with_tca], notional)
-    cost_bps = _weighted([o.attribution.spread_bps + o.attribution.impact_bps
-                          + o.attribution.fees_bps + o.attribution.timing_bps
-                          for o in with_tca], notional)
+    cost_bps = _weighted(
+        [
+            o.attribution.spread_bps
+            + o.attribution.impact_bps
+            + o.attribution.fees_bps
+            + o.attribution.timing_bps
+            for o in with_tca
+        ],
+        notional,
+    )
     venue_fill_qty: Dict[str, int] = {name: 0 for name in engine.venue_names.values()}
     for o in outcomes:
         for vid, q in o.venue_qty.items():
             venue_fill_qty[engine.venue_names[vid]] += q
     total_filled = sum(venue_fill_qty.values())
-    venue_shares = {name: (q / total_filled if total_filled else 0.0)
-                    for name, q in venue_fill_qty.items()}
+    venue_shares = {
+        name: (q / total_filled if total_filled else 0.0) for name, q in venue_fill_qty.items()
+    }
     by_rule = engine.risk_decisions_by_rule()
     per_alpha: Dict[str, Any] = {}
     for alpha in engine.alphas:
@@ -192,34 +225,57 @@ def build_report(engine: MvpEngine, feed: FeedResult, trace_digest: str,
             "research_horizon": alpha.model.horizon,
             "at_research_horizon": _ic_block(at_fit),
             "research_ic": research,
-            "ic_gap": (abs(at_fit.ic - research)
-                       if at_fit.ic is not None and research is not None else None),
-            "lifecycle_state": (registry.get(alpha.alpha_id).state.name
-                                if alpha.alpha_id in registry else None),
-            "beta": alpha.beta, "params_version": alpha.version,
+            "ic_gap": (
+                abs(at_fit.ic - research)
+                if at_fit.ic is not None and research is not None
+                else None
+            ),
+            "lifecycle_state": (
+                registry.get(alpha.alpha_id).state.name if alpha.alpha_id in registry else None
+            ),
+            "beta": alpha.beta,
+            "params_version": alpha.version,
         }
     ens = engine.realized_ic(engine.ensemble.alpha_id)
     report: Dict[str, Any] = {
         "x-version": REPORT_VERSION,
         "run": {
-            "run_id": cfg.run_id, "session_id": engine.session_id, "seed": cfg.seed,
-            "instrument": cfg.instrument, "instrument_id": engine.iid,
-            "strategy_id": engine.strategy_id, "alphas": list(cfg.alphas),
-            "venues": list(cfg.venues), "config_version": engine.config_version,
-            "data_version": engine.data_version, "events_sha256": feed.events_sha256,
-            "feature_version": engine.feature_version, "model_version": engine.model_version,
-            "trace_digest": trace_digest, "n_traces": len(engine.trace_ids),
-            "first_ts": engine.first_ts, "last_ts": engine.last_ts,
-            "horizon_ns": cfg.horizon_ns, "decision_cadence_ns": cfg.decision_cadence_ns,
+            "run_id": cfg.run_id,
+            "session_id": engine.session_id,
+            "seed": cfg.seed,
+            "instrument": cfg.instrument,
+            "instrument_id": engine.iid,
+            "strategy_id": engine.strategy_id,
+            "alphas": list(cfg.alphas),
+            "venues": list(cfg.venues),
+            "config_version": engine.config_version,
+            "data_version": engine.data_version,
+            "events_sha256": feed.events_sha256,
+            "feature_version": engine.feature_version,
+            "model_version": engine.model_version,
+            "trace_digest": trace_digest,
+            "n_traces": len(engine.trace_ids),
+            "first_ts": engine.first_ts,
+            "last_ts": engine.last_ts,
+            "horizon_ns": cfg.horizon_ns,
+            "decision_cadence_ns": cfg.decision_cadence_ns,
         },
         "counts": {
-            "n_events": counters.events, "n_events_generated": feed.n_events_generated,
-            "n_decisions": counters.decisions, "n_parent_orders": counters.parent_orders,
+            "n_events": counters.events,
+            "n_events_generated": feed.n_events_generated,
+            "n_decisions": counters.decisions,
+            "n_parent_orders": counters.parent_orders,
             "n_child_orders_generated": counters.child_orders_generated,
             "n_child_orders_submitted": counters.child_orders_submitted,
             "n_fills": counters.fills,
-            "fill_rate": ((sum(o.tca.filled_qty for o in outcomes if o.tca is not None)
-                           / sum(o.parent.qty for o in outcomes)) if outcomes else 0.0),
+            "fill_rate": (
+                (
+                    sum(o.tca.filled_qty for o in outcomes if o.tca is not None)
+                    / sum(o.parent.qty for o in outcomes)
+                )
+                if outcomes
+                else 0.0
+            ),
             "counters": counters.to_dict(),
             "qc_totals": dict(sorted(feed.qc_totals.items())),
             "simulator": engine.sim.simulator.counters.to_dict(),
@@ -231,13 +287,16 @@ def build_report(engine: MvpEngine, feed: FeedResult, trace_digest: str,
         },
         "risk": {
             "decisions_by_rule": by_rule,
-            "allowed": counters.risk_allowed, "rejected": counters.risk_rejected,
+            "allowed": counters.risk_allowed,
+            "rejected": counters.risk_rejected,
             "kill_events": engine.n_kill_events(),
             "kill_switch_engaged": engine.risk_engine.kill_switch_engaged(),
             "audit_events": engine.risk_engine.audit_len(),
-            "sequence_gaps": counters.sequence_gaps, "feed_recoveries": counters.feed_recoveries,
+            "sequence_gaps": counters.sequence_gaps,
+            "feed_recoveries": counters.feed_recoveries,
             "market_regressions_dropped": engine.risk_engine.metrics.counter_value(
-                "risk_market_regressions_dropped_total"),
+                "risk_market_regressions_dropped_total"
+            ),
             "final_position": engine.risk_engine.position(engine.iid),
             "open_orders": engine.risk_engine.open_order_count(),
         },
@@ -262,7 +321,8 @@ def build_report(engine: MvpEngine, feed: FeedResult, trace_digest: str,
             "gross": acct.gross_pnl,
             "spread_cost": acct.spread_cost,
             "fees_net": acct.fees_net,
-            "fees": acct.fees, "rebates": acct.rebates,
+            "fees": acct.fees,
+            "rebates": acct.rebates,
             "impact": acct.impact,
             "execution_cost": acct.spread_cost + acct.fees_net + acct.impact,
             "identity_lhs_risk_daily": risk_daily,
@@ -281,12 +341,17 @@ def build_report(engine: MvpEngine, feed: FeedResult, trace_digest: str,
         "alpha": {
             "contribution_bps_notional_weighted": alpha_contribution,
             "cost_bps_notional_weighted": cost_bps,
-            "net_bps_notional_weighted": (alpha_contribution + cost_bps
-                                          if alpha_contribution is not None and cost_bps is not None
-                                          else None),
+            "net_bps_notional_weighted": (
+                alpha_contribution + cost_bps
+                if alpha_contribution is not None and cost_bps is not None
+                else None
+            ),
             "per_alpha": per_alpha,
-            "ensemble": {"alpha_id": engine.ensemble.alpha_id, **_ic_block(ens),
-                         "model_version": engine.model_version},
+            "ensemble": {
+                "alpha_id": engine.ensemble.alpha_id,
+                **_ic_block(ens),
+                "model_version": engine.model_version,
+            },
             "ic_definition": IC_DEFINITION,
             "cost_negative": (pnl_total < 0.0),
         },
@@ -307,7 +372,8 @@ def build_report(engine: MvpEngine, feed: FeedResult, trace_digest: str,
     }
     check_finite(report)
     if abs(pnl_total - (identity_rhs - acct.fees_net - acct.impact)) > 1e-9 * max(
-            1.0, abs(pnl_total)):
+        1.0, abs(pnl_total)
+    ):
         raise ValueError("report: pnl.total != (gross - spread) - fees_net - impact")
     if Rules.ALLOW in by_rule and by_rule[Rules.ALLOW] != counters.risk_allowed:
         raise ValueError("report: allowed risk decisions disagree with the audit")
@@ -331,8 +397,9 @@ def _fmt(v: Any, digits: int = 4) -> str:
     return str(v)
 
 
-def _table(headers: Sequence[str], rows: Sequence[Sequence[str]],
-           align: str = "right") -> List[str]:
+def _table(
+    headers: Sequence[str], rows: Sequence[Sequence[str]], align: str = "right"
+) -> List[str]:
     """A Markdown table: header row, alignment row, one line per row."""
     sep = "---:" if align == "right" else "---"
     lines = ["| " + " | ".join(headers) + " |", "|" + "|".join([sep] * len(headers)) + "|"]
@@ -358,97 +425,253 @@ def render_markdown(report: Mapping[str, Any]) -> str:
     verdict = "COST-NEGATIVE" if a["cost_negative"] else "net positive"
     out: List[str] = []
     out += [f"# MVP run `{r['run_id']}` — {r['instrument']} (instrument {r['instrument_id']})", ""]
-    out += [f"Session `{r['session_id']}`, seed {r['seed']}, alphas {', '.join(r['alphas'])}, "
-            f"venues {', '.join(r['venues'])}, holding horizon {r['horizon_ns'] / 1e9:g} s, "
-            f"decision cadence {r['decision_cadence_ns'] / 1e9:g} s.", ""]
+    out += [
+        f"Session `{r['session_id']}`, seed {r['seed']}, alphas {', '.join(r['alphas'])}, "
+        f"venues {', '.join(r['venues'])}, holding horizon {r['horizon_ns'] / 1e9:g} s, "
+        f"decision cadence {r['decision_cadence_ns'] / 1e9:g} s.",
+        "",
+    ]
     out += ["## Versions", ""]
-    out += _table(["what", "value"], [
-        [key, f"`{r[key]}`"] for key in ("config_version", "data_version", "events_sha256",
-                                         "feature_version", "model_version", "trace_digest")],
-        align="left")
+    out += _table(
+        ["what", "value"],
+        [
+            [key, f"`{r[key]}`"]
+            for key in (
+                "config_version",
+                "data_version",
+                "events_sha256",
+                "feature_version",
+                "model_version",
+                "trace_digest",
+            )
+        ],
+        align="left",
+    )
     out += ["", "## Counts", ""]
-    out += _table(["events", "decisions", "parent orders", "children generated",
-                   "children submitted", "fills", "fill rate"],
-                  [[_fmt(c["n_events"]), _fmt(c["n_decisions"]), _fmt(c["n_parent_orders"]),
-                    _fmt(c["n_child_orders_generated"]), _fmt(c["n_child_orders_submitted"]),
-                    _fmt(c["n_fills"]), _fmt(c["fill_rate"])]])
-    out += ["", "Decision outcomes: " + ", ".join(
-        f"{key} = {c['counters'][key]}" for key in (
-            "decisions_without_covariance", "decisions_flat", "decisions_parent_live",
-            "decisions_window_beyond_session")), ""]
+    out += _table(
+        [
+            "events",
+            "decisions",
+            "parent orders",
+            "children generated",
+            "children submitted",
+            "fills",
+            "fill rate",
+        ],
+        [
+            [
+                _fmt(c["n_events"]),
+                _fmt(c["n_decisions"]),
+                _fmt(c["n_parent_orders"]),
+                _fmt(c["n_child_orders_generated"]),
+                _fmt(c["n_child_orders_submitted"]),
+                _fmt(c["n_fills"]),
+                _fmt(c["fill_rate"]),
+            ]
+        ],
+    )
+    out += [
+        "",
+        "Decision outcomes: "
+        + ", ".join(
+            f"{key} = {c['counters'][key]}"
+            for key in (
+                "decisions_without_covariance",
+                "decisions_flat",
+                "decisions_parent_live",
+                "decisions_window_beyond_session",
+            )
+        ),
+        "",
+    ]
     out += ["## Risk", ""]
-    out += _table(["rule", "decisions"],
-                  [[rule, str(n)] for rule, n in k["decisions_by_rule"].items()])
-    out += ["", f"Allowed {k['allowed']}, rejected {k['rejected']}, kill events "
-            f"{k['kill_events']}, kill switch engaged: {_fmt(k['kill_switch_engaged'])}, "
-            f"sequence gaps "
-            f"{k['sequence_gaps']}, feed recoveries {k['feed_recoveries']}, "
-            f"final position {k['final_position']}, open orders {k['open_orders']}.", ""]
+    out += _table(
+        ["rule", "decisions"], [[rule, str(n)] for rule, n in k["decisions_by_rule"].items()]
+    )
+    out += [
+        "",
+        f"Allowed {k['allowed']}, rejected {k['rejected']}, kill events "
+        f"{k['kill_events']}, kill switch engaged: {_fmt(k['kill_switch_engaged'])}, "
+        f"sequence gaps "
+        f"{k['sequence_gaps']}, feed recoveries {k['feed_recoveries']}, "
+        f"final position {k['final_position']}, open orders {k['open_orders']}.",
+        "",
+    ]
     out += ["## Routing and controls", ""]
-    out += _table(["venue", "filled qty", "share"],
-                  [[name, _fmt(q), f"{rt['venue_shares'][name] * 100:.1f}%"]
-                   for name, q in rt["venue_fill_qty"].items()])
-    out += ["", f"NO_ROUTE: {rt['no_route']}; participation capped {ct['participation_capped']}, "
-            f"blocked {ct['participation_blocked']}; slice-interval blocked "
-            f"{ct['slice_interval_blocked']}; latency-budget blocked "
-            f"{ct['latency_budget_blocked']} (max_participation {ct['max_participation']}, "
-            f"min_slice_interval {ct['min_slice_interval_ns'] / 1e6:g} ms, latency budget "
-            f"{ct['latency_budget_ns'] / 1e6:g} ms, max_child_qty {ct['max_child_qty']}).", ""]
+    out += _table(
+        ["venue", "filled qty", "share"],
+        [
+            [name, _fmt(q), f"{rt['venue_shares'][name] * 100:.1f}%"]
+            for name, q in rt["venue_fill_qty"].items()
+        ],
+    )
+    out += [
+        "",
+        f"NO_ROUTE: {rt['no_route']}; participation capped {ct['participation_capped']}, "
+        f"blocked {ct['participation_blocked']}; slice-interval blocked "
+        f"{ct['slice_interval_blocked']}; latency-budget blocked "
+        f"{ct['latency_budget_blocked']} (max_participation {ct['max_participation']}, "
+        f"min_slice_interval {ct['min_slice_interval_ns'] / 1e6:g} ms, latency budget "
+        f"{ct['latency_budget_ns'] / 1e6:g} ms, max_child_qty {ct['max_child_qty']}).",
+        "",
+    ]
     out += ["## P&L (USD, PLATFORM_CONVENTIONS §12.1)", ""]
-    out += _table(["total", "risk daily (realized + unrealized)", "gross", "spread cost",
-                   "fees net", "impact", "execution cost", "identity abs diff"],
-                  [[_fmt(p["total"], 2), _fmt(p["risk_daily"], 2), _fmt(p["gross"], 2),
-                    _fmt(p["spread_cost"], 2), _fmt(p["fees_net"], 2), _fmt(p["impact"], 2),
-                    _fmt(p["execution_cost"], 2), f"{p['identity_abs_diff']:.2e}"]])
-    out += ["", f"`pnl.total == (gross - spread_cost) - fees_net - impact` holds; realized "
-            f"{_fmt(p['realized'], 2)}, unrealized {_fmt(p['unrealized'], 2)}, max drawdown "
-            f"{_fmt(p['max_drawdown'], 2)}, traded {_fmt(p['traded_qty'])} shares against a "
-            f"session volume of {_fmt(p['session_volume'])}, final position "
-            f"{p['final_position']}.", "",
-            f"**Honest result: the session is {verdict}** (total {_fmt(p['total'], 2)} USD).", ""]
+    out += _table(
+        [
+            "total",
+            "risk daily (realized + unrealized)",
+            "gross",
+            "spread cost",
+            "fees net",
+            "impact",
+            "execution cost",
+            "identity abs diff",
+        ],
+        [
+            [
+                _fmt(p["total"], 2),
+                _fmt(p["risk_daily"], 2),
+                _fmt(p["gross"], 2),
+                _fmt(p["spread_cost"], 2),
+                _fmt(p["fees_net"], 2),
+                _fmt(p["impact"], 2),
+                _fmt(p["execution_cost"], 2),
+                f"{p['identity_abs_diff']:.2e}",
+            ]
+        ],
+    )
+    out += [
+        "",
+        f"`pnl.total == (gross - spread_cost) - fees_net - impact` holds; realized "
+        f"{_fmt(p['realized'], 2)}, unrealized {_fmt(p['unrealized'], 2)}, max drawdown "
+        f"{_fmt(p['max_drawdown'], 2)}, traded {_fmt(p['traded_qty'])} shares against a "
+        f"session volume of {_fmt(p['session_volume'])}, final position "
+        f"{p['final_position']}.",
+        "",
+        f"**Honest result: the session is {verdict}** (total {_fmt(p['total'], 2)} USD).",
+        "",
+    ]
     out += ["## Alpha", ""]
-    out += [f"Alpha contribution (notional-weighted, bps): "
-            f"{_fmt(a['contribution_bps_notional_weighted'])}; execution cost (bps): "
-            f"{_fmt(a['cost_bps_notional_weighted'])}; net (bps): "
-            f"{_fmt(a['net_bps_notional_weighted'])}.", ""]
+    out += [
+        f"Alpha contribution (notional-weighted, bps): "
+        f"{_fmt(a['contribution_bps_notional_weighted'])}; execution cost (bps): "
+        f"{_fmt(a['cost_bps_notional_weighted'])}; net (bps): "
+        f"{_fmt(a['net_bps_notional_weighted'])}.",
+        "",
+    ]
     h = ens["horizon"]
-    alpha_rows = [[aid, str(row["lifecycle_state"]), _fmt(row["realized_ic"]),
-                   _fmt(row["realized_ic_cost"]), _fmt(row["realized_ic_shifted"]),
-                   str(row["n_ic_samples"]), row["research_horizon"],
-                   _fmt(row["at_research_horizon"]["realized_ic"]),
-                   _fmt(row["at_research_horizon"]["realized_ic_cost"]),
-                   str(row["at_research_horizon"]["n_ic_samples"]),
-                   _fmt(row["research_ic"]), _fmt(row["ic_gap"])]
-                  for aid, row in a["per_alpha"].items()]
-    alpha_rows.append([f"{ens['alpha_id']} (ensemble)", "—", _fmt(ens["realized_ic"]),
-                       _fmt(ens["realized_ic_cost"]), _fmt(ens["realized_ic_shifted"]),
-                       str(ens["n_ic_samples"]), "—", "—", "—", "—", "—", "—"])
-    out += _table(["alpha", "lifecycle", f"IC@{h} mid", f"IC@{h} cost", f"IC@{h} shift-1", "n",
-                   "fitted h", "IC@h mid", "IC@h cost", "n@h", "research IC@h", "gap"],
-                  alpha_rows)
+    alpha_rows = [
+        [
+            aid,
+            str(row["lifecycle_state"]),
+            _fmt(row["realized_ic"]),
+            _fmt(row["realized_ic_cost"]),
+            _fmt(row["realized_ic_shifted"]),
+            str(row["n_ic_samples"]),
+            row["research_horizon"],
+            _fmt(row["at_research_horizon"]["realized_ic"]),
+            _fmt(row["at_research_horizon"]["realized_ic_cost"]),
+            str(row["at_research_horizon"]["n_ic_samples"]),
+            _fmt(row["research_ic"]),
+            _fmt(row["ic_gap"]),
+        ]
+        for aid, row in a["per_alpha"].items()
+    ]
+    alpha_rows.append(
+        [
+            f"{ens['alpha_id']} (ensemble)",
+            "—",
+            _fmt(ens["realized_ic"]),
+            _fmt(ens["realized_ic_cost"]),
+            _fmt(ens["realized_ic_shifted"]),
+            str(ens["n_ic_samples"]),
+            "—",
+            "—",
+            "—",
+            "—",
+            "—",
+            "—",
+        ]
+    )
+    out += _table(
+        [
+            "alpha",
+            "lifecycle",
+            f"IC@{h} mid",
+            f"IC@{h} cost",
+            f"IC@{h} shift-1",
+            "n",
+            "fitted h",
+            "IC@h mid",
+            "IC@h cost",
+            "n@h",
+            "research IC@h",
+            "gap",
+        ],
+        alpha_rows,
+    )
     out += ["", "Realized IC definition: " + a["ic_definition"] + ".", ""]
     out += ["", "## Execution (TCA)", ""]
-    out += [f"Orders with TCA {e['n_orders_with_tca']} / {e['n_parent_orders']}; target "
-            f"{_fmt(e['qty_target'])}, filled {_fmt(e['qty_filled'])} "
-            f"(fill rate {_fmt(e['fill_rate'])}).", ""]
-    out += _table(["IS mean", "IS qty-weighted", "delay", "trading", "opportunity", "spread",
-                   "impact", "fees", "timing", "slippage"],
-                  [[_fmt(is_["mean"]), _fmt(is_["qty_weighted"]),
-                    _fmt(e["delay_cost_bps_qty_weighted"]),
-                    _fmt(e["trading_cost_bps_qty_weighted"]),
-                    _fmt(e["opportunity_cost_bps_qty_weighted"]),
-                    _fmt(e["spread_cost_bps_qty_weighted"]), _fmt(e["impact_bps_qty_weighted"]),
-                    _fmt(e["fees_bps_qty_weighted"]), _fmt(e["timing_cost_bps_qty_weighted"]),
-                    _fmt(e["slippage_bps_filled_weighted"])]])
-    out += ["", f"Participation (mean) {_fmt(e['participation_rate_mean'])}; decision->arrival "
-            f"latency over {lat['count']} children: min {lat['min']} ns, p50 {lat['p50']} ns, "
-            f"p99 {lat['p99']} ns, max {lat['max']} ns; attribution residual (mean bps) "
-            f"{_fmt(e['attribution_residual_bps_mean'])}.", ""]
-    out += _table(["algo", "orders", "qty", "filled", "fill rate", "IS qty-weighted"],
-                  [[algo, str(row["n_orders"]), _fmt(row["qty"]), _fmt(row["filled_qty"]),
-                    _fmt(row["fill_rate"]), _fmt(row["implementation_shortfall_bps_qty_weighted"])]
-                   for algo, row in e["per_algo"].items()])
+    out += [
+        f"Orders with TCA {e['n_orders_with_tca']} / {e['n_parent_orders']}; target "
+        f"{_fmt(e['qty_target'])}, filled {_fmt(e['qty_filled'])} "
+        f"(fill rate {_fmt(e['fill_rate'])}).",
+        "",
+    ]
+    out += _table(
+        [
+            "IS mean",
+            "IS qty-weighted",
+            "delay",
+            "trading",
+            "opportunity",
+            "spread",
+            "impact",
+            "fees",
+            "timing",
+            "slippage",
+        ],
+        [
+            [
+                _fmt(is_["mean"]),
+                _fmt(is_["qty_weighted"]),
+                _fmt(e["delay_cost_bps_qty_weighted"]),
+                _fmt(e["trading_cost_bps_qty_weighted"]),
+                _fmt(e["opportunity_cost_bps_qty_weighted"]),
+                _fmt(e["spread_cost_bps_qty_weighted"]),
+                _fmt(e["impact_bps_qty_weighted"]),
+                _fmt(e["fees_bps_qty_weighted"]),
+                _fmt(e["timing_cost_bps_qty_weighted"]),
+                _fmt(e["slippage_bps_filled_weighted"]),
+            ]
+        ],
+    )
+    out += [
+        "",
+        f"Participation (mean) {_fmt(e['participation_rate_mean'])}; decision->arrival "
+        f"latency over {lat['count']} children: min {lat['min']} ns, p50 {lat['p50']} ns, "
+        f"p99 {lat['p99']} ns, max {lat['max']} ns; attribution residual (mean bps) "
+        f"{_fmt(e['attribution_residual_bps_mean'])}.",
+        "",
+    ]
+    out += _table(
+        ["algo", "orders", "qty", "filled", "fill rate", "IS qty-weighted"],
+        [
+            [
+                algo,
+                str(row["n_orders"]),
+                _fmt(row["qty"]),
+                _fmt(row["filled_qty"]),
+                _fmt(row["fill_rate"]),
+                _fmt(row["implementation_shortfall_bps_qty_weighted"]),
+            ]
+            for algo, row in e["per_algo"].items()
+        ],
+    )
     out += ["", "## Decision trace", ""]
-    out += [f"{t['n_traces']} traces, digest `{t['digest']}`; first ids "
-            f"{', '.join(t['first_trace_ids'])}; last ids {', '.join(t['last_trace_ids'])}.", ""]
+    out += [
+        f"{t['n_traces']} traces, digest `{t['digest']}`; first ids "
+        f"{', '.join(t['first_trace_ids'])}; last ids {', '.join(t['last_trace_ids'])}.",
+        "",
+    ]
     return "\n".join(out)

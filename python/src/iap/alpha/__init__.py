@@ -157,8 +157,12 @@ def save_params(models: Mapping[str, AlphaModel], path) -> dict:
         ),
         **params_provenance(),
         "train_window": (
-            {"start_ts": min(w["start_ts"] for w in windows),
-             "end_ts": max(w["end_ts"] for w in windows)} if windows else None
+            {
+                "start_ts": min(w["start_ts"] for w in windows),
+                "end_ts": max(w["end_ts"] for w in windows),
+            }
+            if windows
+            else None
         ),
         "params": per,
     }
@@ -178,6 +182,7 @@ def load_params_file(path, expected_feature_version: str = "") -> Dict[str, Alph
     blob = json.loads(Path(path).read_text())
     if expected_feature_version == "":
         from iap.features.registry import registry_hash
+
         expected_feature_version = registry_hash()
     if expected_feature_version is not None:
         got = blob.get("feature_version")

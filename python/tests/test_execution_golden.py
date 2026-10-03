@@ -48,14 +48,27 @@ def golden_config(configs_dir) -> ExecConfig:
 
 def golden_parents(t0: int):
     vwap = ParentOrder(
-        parent_id=1, instrument_id=1, venue_id=1, side=0, qty=400,
-        algo=AlgoType.VWAP, start_ts=t0 + 60 * SEC, end_ts=t0 + 660 * SEC,
+        parent_id=1,
+        instrument_id=1,
+        venue_id=1,
+        side=0,
+        qty=400,
+        algo=AlgoType.VWAP,
+        start_ts=t0 + 60 * SEC,
+        end_ts=t0 + 660 * SEC,
         slices=4,
     )
     is_ = ParentOrder(
-        parent_id=2, instrument_id=1, venue_id=1, side=1, qty=600,
-        algo=AlgoType.IS, start_ts=t0 + 120 * SEC, end_ts=t0 + 720 * SEC,
-        slices=3, risk_aversion=1.0,
+        parent_id=2,
+        instrument_id=1,
+        venue_id=1,
+        side=1,
+        qty=600,
+        algo=AlgoType.IS,
+        start_ts=t0 + 120 * SEC,
+        end_ts=t0 + 720 * SEC,
+        slices=3,
+        risk_aversion=1.0,
     )
     return [vwap, is_]
 
@@ -77,9 +90,7 @@ def configs_dir(golden_dir):
 
 
 def run_golden_scenario(events, configs_dir):
-    replay = ExecutionReplay(
-        golden_config(configs_dir), golden_parents(events[0].exchange_ts)
-    )
+    replay = ExecutionReplay(golden_config(configs_dir), golden_parents(events[0].exchange_ts))
     return replay.run(events), replay
 
 
@@ -213,9 +224,7 @@ def test_golden_both_parents_complete_with_mixed_liquidity(events, configs_dir):
 
 
 def test_golden_one_shot_run_enforced(events, configs_dir):
-    replay = ExecutionReplay(
-        golden_config(configs_dir), golden_parents(events[0].exchange_ts)
-    )
+    replay = ExecutionReplay(golden_config(configs_dir), golden_parents(events[0].exchange_ts))
     replay.run(events)
     with pytest.raises(RuntimeError):
         replay.run(events)

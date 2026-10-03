@@ -93,8 +93,13 @@ def stationary_bootstrap_ci(
         raise ValueError("mean_block must be >= 1")
     out: Dict[str, object] = {
         "estimate": float(v.sum()) if n else 0.0,
-        "ci_low": None, "ci_high": None, "level": float(level), "n": n,
-        "n_boot": int(n_boot), "mean_block": float(mean_block), "seed": int(seed),
+        "ci_low": None,
+        "ci_high": None,
+        "level": float(level),
+        "n": n,
+        "n_boot": int(n_boot),
+        "mean_block": float(mean_block),
+        "seed": int(seed),
         "frac_resamples_le_zero": None,
     }
     if n < 8:
@@ -196,19 +201,22 @@ def fold_diagnostics(
             for t, pnl in zip(r.bar_ts, r.bar_pnl):
                 bars[int(t)] = bars.get(int(t), 0.0) + float(pnl)
         if "vol_regime_flag_v1" in next(iter(test.values())).columns:
-            regime = {k: _fnum(v) for k, v in
-                      regime_split(scores, test, horizon, beta=beta).items()}
+            regime = {
+                k: _fnum(v) for k, v in regime_split(scores, test, horizon, beta=beta).items()
+            }
         else:
             regime = {}
-        folds.append({
-            "fold": fold.index,
-            "n_test_pairs": n_pairs,
-            "degenerate": n_pairs < MIN_TEST_PAIRS,
-            "net_pnl_by_cost": {k: _fnum(v["total_pnl"]) for k, v in cost.items()},
-            "survives_1x_cost": bool(cost[key_1x]["total_pnl"] > 0.0),
-            "decay_ic_by_horizon": {h: _fnum(float(np.mean(v))) for h, v in decay.items()},
-            "regime": regime,
-        })
+        folds.append(
+            {
+                "fold": fold.index,
+                "n_test_pairs": n_pairs,
+                "degenerate": n_pairs < MIN_TEST_PAIRS,
+                "net_pnl_by_cost": {k: _fnum(v["total_pnl"]) for k, v in cost.items()},
+                "survives_1x_cost": bool(cost[key_1x]["total_pnl"] > 0.0),
+                "decay_ic_by_horizon": {h: _fnum(float(np.mean(v))) for h, v in decay.items()},
+                "regime": regime,
+            }
+        )
     series = [bars[t] for t in sorted(bars)]
     return {
         "folds": folds,

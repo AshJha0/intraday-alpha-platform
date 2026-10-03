@@ -56,9 +56,7 @@ class ExecConfig:
         if not isinstance(self.seed, int) or self.seed < 0:
             raise ValueError(f"seed must be a non-negative int, got {self.seed!r}")
         # Freeze the maps in ascending key order (deterministic iteration).
-        object.__setattr__(
-            self, "instruments", dict(sorted(self.instruments.items()))
-        )
+        object.__setattr__(self, "instruments", dict(sorted(self.instruments.items())))
         object.__setattr__(self, "venues", dict(sorted(self.venues.items())))
 
     def venue(self, venue_id: int) -> VenueSpec:
@@ -124,16 +122,17 @@ def load_venues(path: PathLike) -> Dict[int, VenueSpec]:
             name=name,
             is_fx=row.get("asset_class") == "FX",
             taker_fee_per_share=(
-                _number(row, "taker_fee_per_share", where)
-                if "taker_fee_per_share" in row else 0.0
+                _number(row, "taker_fee_per_share", where) if "taker_fee_per_share" in row else 0.0
             ),
             maker_rebate_per_share=(
                 _number(row, "maker_rebate_per_share", where)
-                if "maker_rebate_per_share" in row else 0.0
+                if "maker_rebate_per_share" in row
+                else 0.0
             ),
             commission_per_million=(
                 _number(row, "commission_per_million", where)
-                if "commission_per_million" in row else 0.0
+                if "commission_per_million" in row
+                else 0.0
             ),
             latency_mean_ns=_integer(lat, "mean_ns", f"{where} latency"),
             latency_jitter_ns=_integer(lat, "jitter_ns", f"{where} latency"),
@@ -201,9 +200,7 @@ def load_sor_options(path: PathLike) -> SorOptions:
     return SorOptions(pr, int(_number(sor, "max_venue_latency_ns", f"{path} sor")))
 
 
-def load_exec_config(
-    config_dir: PathLike, latency: LatencyConfig = LatencyConfig()
-) -> ExecConfig:
+def load_exec_config(config_dir: PathLike, latency: LatencyConfig = LatencyConfig()) -> ExecConfig:
     """Build the ``ExecConfig`` the platform runs with from a config directory.
 
     Mirrors the Java ``PaperTrading`` wiring: ``LatencyConfig`` defaults (or

@@ -66,8 +66,7 @@ def build_registry() -> List[FeatureSpec]:
             for s in fam_specs:
                 if s.family != family:
                     raise ValueError(
-                        f"feature {s.name} declares family {s.family!r}, "
-                        f"module owns {family!r}"
+                        f"feature {s.name} declares family {s.family!r}, module owns {family!r}"
                     )
             specs.extend(fam_specs)
         names = [s.name for s in specs]
@@ -78,9 +77,7 @@ def build_registry() -> List[FeatureSpec]:
         for s in specs:
             for dep in s.depends_on:
                 if dep not in name_set:
-                    raise ValueError(
-                        f"feature {s.name} depends on unregistered {dep!r}"
-                    )
+                    raise ValueError(f"feature {s.name} depends on unregistered {dep!r}")
         _cache.extend(specs)
     return list(_cache)
 
@@ -92,9 +89,7 @@ def registry_dicts() -> List[dict]:
 
 def registry_hash() -> str:
     """sha256 hex of the canonical registry JSON — the feature_version."""
-    canonical = json.dumps(
-        registry_dicts(), sort_keys=True, separators=(",", ":")
-    ).encode("utf-8")
+    canonical = json.dumps(registry_dicts(), sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(canonical).hexdigest()
 
 
@@ -113,13 +108,12 @@ def write_registry(path: Union[str, Path]) -> dict:
     doc = {
         "x-version": 1,
         "description": "Pinned feature registry (conventions §6). "
-                       "FeatureVector.values follows this order; "
-                       "registry_hash is the FeatureVector feature_version.",
+        "FeatureVector.values follows this order; "
+        "registry_hash is the FeatureVector feature_version.",
         "registry_hash": registry_hash(),
         "count": len(build_registry()),
         "families": {
-            fam: sum(1 for s in build_registry() if s.family == fam)
-            for fam in FAMILY_ORDER
+            fam: sum(1 for s in build_registry() if s.family == fam) for fam in FAMILY_ORDER
         },
         "features": registry_dicts(),
     }

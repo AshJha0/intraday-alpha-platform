@@ -36,8 +36,7 @@ from iap.mvp.config import PortfolioSpec
 from iap.portfolio.covariance import ewma_covariance
 from iap.portfolio.optimizer import Constraints, solve
 
-__all__ = ["PortfolioState", "PortfolioConstraints", "SingleStockPortfolio",
-           "round_half_away"]
+__all__ = ["PortfolioState", "PortfolioConstraints", "SingleStockPortfolio", "round_half_away"]
 
 
 def round_half_away(x: float) -> int:
@@ -52,8 +51,8 @@ class PortfolioState:
     instrument_id: int
     timestamp_ns: int
     position_qty: int
-    mark_price: float                 #: last consolidated mid (quote ccy)
-    bar_returns: Tuple[float, ...]    #: completed 1-minute bar log returns
+    mark_price: float  #: last consolidated mid (quote ccy)
+    bar_returns: Tuple[float, ...]  #: completed 1-minute bar log returns
 
 
 @dataclass(frozen=True)
@@ -65,12 +64,21 @@ class PortfolioConstraints:
     def to_dict(self) -> Dict[str, Any]:
         s = self.spec
         return {
-            "risk_aversion": s.risk_aversion, "tc_bps": s.tc_bps,
-            "max_position_qty": s.max_position_qty, "max_notional": s.max_notional,
-            "turnover_cap": s.turnover_cap, "vol_target_per_bar": s.vol_target_per_bar,
-            "ewma_lambda": s.ewma_lambda, "min_bars": s.min_bars, "conf_min": s.conf_min,
-            "solver": {"iters": s.solver.iters, "proj_passes": s.solver.proj_passes,
-                       "step_decay": s.solver.step_decay, "feas_tol": s.solver.feas_tol},
+            "risk_aversion": s.risk_aversion,
+            "tc_bps": s.tc_bps,
+            "max_position_qty": s.max_position_qty,
+            "max_notional": s.max_notional,
+            "turnover_cap": s.turnover_cap,
+            "vol_target_per_bar": s.vol_target_per_bar,
+            "ewma_lambda": s.ewma_lambda,
+            "min_bars": s.min_bars,
+            "conf_min": s.conf_min,
+            "solver": {
+                "iters": s.solver.iters,
+                "proj_passes": s.solver.proj_passes,
+                "step_decay": s.solver.step_decay,
+                "feas_tol": s.solver.feas_tol,
+            },
             "weight_unit": "position / max_position_qty",
             "covariance": "ewma_1m_bars",
         }
@@ -79,8 +87,9 @@ class PortfolioConstraints:
 class SingleStockPortfolio:
     """See the module docstring."""
 
-    def __init__(self, strategy_id: str, acting_alpha_id: str, feature_version: str,
-                 model_version: str) -> None:
+    def __init__(
+        self, strategy_id: str, acting_alpha_id: str, feature_version: str, model_version: str
+    ) -> None:
         self._strategy_id = strategy_id
         self._acting = acting_alpha_id
         self._feature_version = feature_version
@@ -108,8 +117,12 @@ class SingleStockPortfolio:
     def portfolio_version(constraints: PortfolioConstraints) -> str:
         return content_hash(constraints.to_dict())
 
-    def construct(self, signals: Sequence[AlphaSignal], portfolio_state: PortfolioState,
-                  constraints: PortfolioConstraints) -> PortfolioTarget:
+    def construct(
+        self,
+        signals: Sequence[AlphaSignal],
+        portfolio_state: PortfolioState,
+        constraints: PortfolioConstraints,
+    ) -> PortfolioTarget:
         """One deterministic solve (see module doc); raises before warm-up."""
         state = portfolio_state
         spec = constraints.spec
@@ -117,8 +130,9 @@ class SingleStockPortfolio:
             raise ValueError(f"portfolio: {len(state.bar_returns)} bars < min_bars {spec.min_bars}")
         acting = [s for s in signals if s.model_version == self._acting]
         if len(acting) != 1:
-            raise ValueError(f"portfolio: expected exactly one {self._acting!r} signal, "
-                             f"got {len(acting)}")
+            raise ValueError(
+                f"portfolio: expected exactly one {self._acting!r} signal, got {len(acting)}"
+            )
         sig = acting[0]
         if sig.instrument_id != state.instrument_id:
             raise ValueError("portfolio: signal instrument != state instrument")
@@ -131,15 +145,22 @@ class SingleStockPortfolio:
         returns = np.asarray(state.bar_returns, dtype=np.float64).reshape(-1, 1)
         sigma = ewma_covariance(returns, lam=spec.ewma_lambda, init_window=spec.min_bars)
         cons = Constraints(
-            w_min=np.array([-w_max]), w_max=np.array([w_max]),
+            w_min=np.array([-w_max]),
+            w_max=np.array([w_max]),
             participation=np.array([spec.turnover_cap]),
             vol_target=spec.vol_target_per_bar,
         )
         result = solve(
-            np.array([alpha]), sigma, np.array([w_prev]), spec.risk_aversion,
-            np.array([spec.tc_bps * 1e-4]), cons,
-            step_decay=spec.solver.step_decay, iters=spec.solver.iters,
-            proj_passes=spec.solver.proj_passes, feas_tol=spec.solver.feas_tol,
+            np.array([alpha]),
+            sigma,
+            np.array([w_prev]),
+            spec.risk_aversion,
+            np.array([spec.tc_bps * 1e-4]),
+            cons,
+            step_decay=spec.solver.step_decay,
+            iters=spec.solver.iters,
+            proj_passes=spec.solver.proj_passes,
+            feas_tol=spec.solver.feas_tol,
         )
         self.solves += 1
         w = float(result.weights[0])
@@ -159,12 +180,21 @@ class SingleStockPortfolio:
                 self.infeasible_risk_solves += 1
         target_qty = round_half_away(w * float(spec.max_position_qty))
         return PortfolioTarget(
-            strategy_id=self._strategy_id, timestamp_ns=state.timestamp_ns,
+            strategy_id=self._strategy_id,
+            timestamp_ns=state.timestamp_ns,
             portfolio_version=self.portfolio_version(constraints),
-            feature_version=self._feature_version, model_version=self._model_version,
-            solver_status=SolverStatus(result.status), objective_value=float(result.objective),
+            feature_version=self._feature_version,
+            model_version=self._model_version,
+            solver_status=SolverStatus(result.status),
+            objective_value=float(result.objective),
             turnover=abs(w - w_prev),
-            targets=(PortfolioLeg(
-                instrument_id=state.instrument_id, target_qty=target_qty, target_weight=w,
-                expected_return_bps=sig.expected_return * 1e4, prev_qty=state.position_qty),),
+            targets=(
+                PortfolioLeg(
+                    instrument_id=state.instrument_id,
+                    target_qty=target_qty,
+                    target_weight=w,
+                    expected_return_bps=sig.expected_return * 1e4,
+                    prev_qty=state.position_qty,
+                ),
+            ),
         )

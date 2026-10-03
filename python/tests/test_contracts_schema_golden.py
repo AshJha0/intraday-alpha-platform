@@ -177,8 +177,11 @@ def test_explain_matches_pinned_block(golden):
 
 def test_trace_id_pinned(golden):
     t = golden["trace_id"]
-    assert make_trace_id(t["session_id"], t["instrument_id"], t["event_ts"],
-                         t["sequence"]) == t["expected"] == EXPECTED_TRACE_ID
+    assert (
+        make_trace_id(t["session_id"], t["instrument_id"], t["event_ts"], t["sequence"])
+        == t["expected"]
+        == EXPECTED_TRACE_ID
+    )
     assert example_trace().trace_id == EXPECTED_TRACE_ID
 
 

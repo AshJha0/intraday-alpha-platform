@@ -92,14 +92,16 @@ def statements() -> Tuple[str, ...]:
 
 def table_names(sql: str) -> Tuple[str, ...]:
     """Table names created by ``sql``, in definition order."""
-    return tuple(m.group(1) for stmt in split_statements(sql)
-                 for m in [_CREATE_TABLE.match(stmt)] if m)
+    return tuple(
+        m.group(1) for stmt in split_statements(sql) for m in [_CREATE_TABLE.match(stmt)] if m
+    )
 
 
 def view_names(sql: str) -> Tuple[str, ...]:
     """View names created by ``sql``, in definition order."""
-    return tuple(m.group(1) for stmt in split_statements(sql)
-                 for m in [_CREATE_VIEW.match(stmt)] if m)
+    return tuple(
+        m.group(1) for stmt in split_statements(sql) for m in [_CREATE_VIEW.match(stmt)] if m
+    )
 
 
 def apply(conn: sqlite3.Connection) -> int:

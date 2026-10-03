@@ -209,12 +209,8 @@ class SessionProfile:
         if not 0.0 < decay <= 1.0:
             raise ValueError("decay must be in (0, 1]")
         self.decay = float(decay)
-        self._count: Dict[str, List[float]] = {
-            m: [0.0] * self.BUCKETS for m in metrics
-        }
-        self._sum: Dict[str, List[float]] = {
-            m: [0.0] * self.BUCKETS for m in metrics
-        }
+        self._count: Dict[str, List[float]] = {m: [0.0] * self.BUCKETS for m in metrics}
+        self._sum: Dict[str, List[float]] = {m: [0.0] * self.BUCKETS for m in metrics}
 
     @staticmethod
     def bucket_of(ts_ns: int, utc_offset_s: int = 0) -> int:

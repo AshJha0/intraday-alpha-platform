@@ -54,9 +54,7 @@ def golden_bt():
 
 @pytest.fixture(scope="module")
 def models():
-    assert PARAMS_PATH.exists(), (
-        f"{PARAMS_PATH} missing — run research/alpha_reports/run_all.py"
-    )
+    assert PARAMS_PATH.exists(), f"{PARAMS_PATH} missing — run research/alpha_reports/run_all.py"
     return load_params_file(PARAMS_PATH)
 
 
@@ -171,8 +169,7 @@ def test_golden_fx05_brute_force_from_embedded_inputs(golden):
         pair_ids = sorted(int(k) for k in case["inputs"])
         r = np.array(
             [
-                float("nan") if case["inputs"][str(k)] is None
-                else float(case["inputs"][str(k)])
+                float("nan") if case["inputs"][str(k)] is None else float(case["inputs"][str(k)])
                 for k in pair_ids
             ]
         )
@@ -268,9 +265,9 @@ def test_golden_backtest_eq01(golden_bt, models, eq_frame):
     )
     scores = models["EQ01"].score({1: eq_frame})
     res = bt.run({1: eq_frame}, scores, "EQUITY").per_instrument[1]
-    assert res.trade_count == golden_bt["trade_count"]      # exact
-    assert res.traded_qty == golden_bt["traded_qty"]        # exact
-    assert res.n_rows == golden_bt["n_rows"]                # exact
+    assert res.trade_count == golden_bt["trade_count"]  # exact
+    assert res.traded_qty == golden_bt["traded_qty"]  # exact
+    assert res.n_rows == golden_bt["n_rows"]  # exact
     _close(res.total_pnl, golden_bt["total_pnl"])
     _close(res.total_costs, golden_bt["total_costs"])
     _close(res.gross_pnl, golden_bt["gross_pnl"])

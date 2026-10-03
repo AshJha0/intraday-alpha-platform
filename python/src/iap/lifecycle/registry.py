@@ -126,8 +126,7 @@ class GateEvaluation:
             "gates": {name: g.to_dict() for name, g in self.gates.items()},
             "failed_gates": self.failed_gates,
             "consecutive_failures": self.consecutive_failures,
-            "transition": (None if self.transition is None
-                           else self.transition.to_dict()),
+            "transition": (None if self.transition is None else self.transition.to_dict()),
         }
 
     @staticmethod
@@ -143,8 +142,7 @@ class GateEvaluation:
             outcome=str(data["outcome"]),
             gates={name: GateResult.from_dict(data["gates"][name]) for name in order},
             consecutive_failures=int(data["consecutive_failures"]),
-            transition=(None if transition is None
-                        else LifecycleTransition.from_dict(transition)),
+            transition=(None if transition is None else LifecycleTransition.from_dict(transition)),
         )
         if evaluation.failed_gates != list(data["failed_gates"]):
             raise ValueError("GateEvaluation: failed_gates does not match gates")
@@ -178,23 +176,38 @@ class AlphaRecord:
             raise ValueError("AlphaRecord.since_ts must be an int")
         self.experiment_id = _check_optional_id(self.experiment_id, "AlphaRecord.experiment_id")
         self.data_version = _check_optional_sha(self.data_version, "AlphaRecord.data_version")
-        self.feature_version = _check_optional_sha(self.feature_version,
-                                                   "AlphaRecord.feature_version")
+        self.feature_version = _check_optional_sha(
+            self.feature_version, "AlphaRecord.feature_version"
+        )
         self.model_version = _check_optional_sha(self.model_version, "AlphaRecord.model_version")
         for name in ("consecutive_failures", "breach_count", "recovery_count"):
             _check_count(getattr(self, name), f"AlphaRecord.{name}")
 
     @staticmethod
-    def new(alpha_id: str, since_ts: int, *, experiment_id: Optional[str] = None,
-            data_version: Optional[str] = None, feature_version: Optional[str] = None,
-            model_version: Optional[str] = None) -> "AlphaRecord":
+    def new(
+        alpha_id: str,
+        since_ts: int,
+        *,
+        experiment_id: Optional[str] = None,
+        data_version: Optional[str] = None,
+        feature_version: Optional[str] = None,
+        model_version: Optional[str] = None,
+    ) -> "AlphaRecord":
         """A freshly registered alpha: RESEARCH, no history, zero counters."""
         return AlphaRecord(
-            alpha_id=alpha_id, state=LifecycleState.RESEARCH, since_ts=since_ts,
-            last_transition=None, last_evaluation=None, experiment_id=experiment_id,
-            data_version=data_version, feature_version=feature_version,
-            model_version=model_version, consecutive_failures=0,
-            breach_count=0, recovery_count=0)
+            alpha_id=alpha_id,
+            state=LifecycleState.RESEARCH,
+            since_ts=since_ts,
+            last_transition=None,
+            last_evaluation=None,
+            experiment_id=experiment_id,
+            data_version=data_version,
+            feature_version=feature_version,
+            model_version=model_version,
+            consecutive_failures=0,
+            breach_count=0,
+            recovery_count=0,
+        )
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -202,10 +215,12 @@ class AlphaRecord:
             "state": self.state.name,
             "state_index": int(self.state),
             "since_ts": self.since_ts,
-            "last_transition": (None if self.last_transition is None
-                                else self.last_transition.to_dict()),
-            "last_evaluation": (None if self.last_evaluation is None
-                                else self.last_evaluation.to_dict()),
+            "last_transition": (
+                None if self.last_transition is None else self.last_transition.to_dict()
+            ),
+            "last_evaluation": (
+                None if self.last_evaluation is None else self.last_evaluation.to_dict()
+            ),
             "experiment_id": self.experiment_id,
             "data_version": self.data_version,
             "feature_version": self.feature_version,
@@ -285,8 +300,10 @@ class AlphaRegistry:
     def render(self) -> str:
         """The exact file text: sorted keys, 2-space indent, ASCII, one
         trailing newline."""
-        return json.dumps(self.to_dict(), sort_keys=True, indent=2,
-                          ensure_ascii=True, allow_nan=False) + "\n"
+        return (
+            json.dumps(self.to_dict(), sort_keys=True, indent=2, ensure_ascii=True, allow_nan=False)
+            + "\n"
+        )
 
     def save(self, path: Path) -> None:
         path = Path(path)
@@ -296,14 +313,14 @@ class AlphaRegistry:
     @staticmethod
     def from_dict(doc: Mapping[str, Any]) -> "AlphaRegistry":
         if doc.get("x-version") != REGISTRY_VERSION:
-            raise ValueError(f"alpha registry: x-version {doc.get('x-version')!r} "
-                             f"!= {REGISTRY_VERSION}")
+            raise ValueError(
+                f"alpha registry: x-version {doc.get('x-version')!r} != {REGISTRY_VERSION}"
+            )
         registry = AlphaRegistry(str(doc["policy"]))
         for alpha_id in sorted(doc["alphas"]):
             record = AlphaRecord.from_dict(doc["alphas"][alpha_id])
             if record.alpha_id != alpha_id:
-                raise ValueError(f"alpha registry: key {alpha_id!r} != record "
-                                 f"{record.alpha_id!r}")
+                raise ValueError(f"alpha registry: key {alpha_id!r} != record {record.alpha_id!r}")
             registry.add(record)
         return registry
 

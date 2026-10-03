@@ -68,8 +68,7 @@ _REPO = Path(__file__).resolve().parents[4]
 class _InstrumentBuffer:
     """Accumulates emitted rows for one instrument within one input file."""
 
-    __slots__ = ("ts", "values", "bits", "series", "last_event_ts",
-                 "last_refresh_seq")
+    __slots__ = ("ts", "values", "bits", "series", "last_event_ts", "last_refresh_seq")
 
     def __init__(self) -> None:
         self.ts: List[int] = []
@@ -112,8 +111,7 @@ def _flush_file(
         row_counts[iid] = row_counts.get(iid, 0) + rows
 
         max_age = max_sample_age(buf.series)
-        labels = compute_labels(buf.ts, buf.series, buf.last_event_ts,
-                                max_age_ns=max_age)
+        labels = compute_labels(buf.ts, buf.series, buf.last_event_ts, max_age_ns=max_age)
         # Data-quality facts a researcher must see before trusting a row
         # (RESEARCH round-3): how many emissions came from a CROSSED merged
         # book (a stale LP quote makes spread_ticks < 0), how far apart the
@@ -123,14 +121,21 @@ def _flush_file(
         gaps = np.diff(ts_arr)
         spread = vals[:, names.index("spread_ticks_v1")]
         spread_ok = validity[:, names.index("spread_ticks_v1")].astype(bool)
-        stats = label_stats.setdefault(iid, {
-            "rows": 0, "crossed_rows": 0, "spread_valid_rows": 0,
-            "gap_sum_ns": 0, "gap_count": 0, "median_sample_gap_ns": 0,
-            "label_max_age_ns": 0, "series_samples": 0,
-            "tradable_samples": 0,
-            "by_horizon": {h: {"valid": 0, "zero": 0, "reason": {}}
-                           for h in HORIZON_ORDER},
-        })
+        stats = label_stats.setdefault(
+            iid,
+            {
+                "rows": 0,
+                "crossed_rows": 0,
+                "spread_valid_rows": 0,
+                "gap_sum_ns": 0,
+                "gap_count": 0,
+                "median_sample_gap_ns": 0,
+                "label_max_age_ns": 0,
+                "series_samples": 0,
+                "tradable_samples": 0,
+                "by_horizon": {h: {"valid": 0, "zero": 0, "reason": {}} for h in HORIZON_ORDER},
+            },
+        )
         stats["rows"] += rows
         stats["spread_valid_rows"] += int(spread_ok.sum())
         stats["crossed_rows"] += int(((spread < 0) & spread_ok).sum())
@@ -159,7 +164,7 @@ def _flush_file(
         for j, name in enumerate(names):
             cols[name] = pa.array(vals[:, j], type=pa.float64())
         cols["validity_bits"] = pa.array(
-            [bytes(buf.bits[i * nbytes:(i + 1) * nbytes]) for i in range(rows)],
+            [bytes(buf.bits[i * nbytes : (i + 1) * nbytes]) for i in range(rows)],
             type=pa.binary(nbytes),
         )
         for h in HORIZON_ORDER:
@@ -195,17 +200,22 @@ def _build_schema(names: List[str]) -> pa.Schema:
 
 
 def main(argv: List[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(prog="python -m iap.features",
-                                 description=__doc__.splitlines()[0])
+    ap = argparse.ArgumentParser(prog="python -m iap.features", description=__doc__.splitlines()[0])
     ap.add_argument("--data-dir", default=str(_REPO / "data" / "normalized"))
     ap.add_argument("--out-dir", default=str(_REPO / "data" / "features"))
     ap.add_argument("--configs", default=str(_REPO / "configs"))
-    ap.add_argument("--registry-out",
-                    default=str(_REPO / "data" / "reference" / "feature_registry.json"))
-    ap.add_argument("--cadence-ms", type=int, default=100,
-                    help="emission cadence per instrument (0 = every event)")
-    ap.add_argument("--files", nargs="*", default=None,
-                    help="specific input file names inside --data-dir")
+    ap.add_argument(
+        "--registry-out", default=str(_REPO / "data" / "reference" / "feature_registry.json")
+    )
+    ap.add_argument(
+        "--cadence-ms",
+        type=int,
+        default=100,
+        help="emission cadence per instrument (0 = every event)",
+    )
+    ap.add_argument(
+        "--files", nargs="*", default=None, help="specific input file names inside --data-dir"
+    )
     args = ap.parse_args(argv)
 
     t_start = time.time()
@@ -238,9 +248,7 @@ def main(argv: List[str] | None = None) -> int:
 
     for path in files:
         events = _load_events(path)
-        engine = FeatureEngine(
-            contexts, cadence_ns=args.cadence_ms * 1_000_000, profiles=profiles
-        )
+        engine = FeatureEngine(contexts, cadence_ns=args.cadence_ms * 1_000_000, profiles=profiles)
         buffers: Dict[int, _InstrumentBuffer] = {}
         for ev in events:
             vec = engine.apply(ev)
@@ -256,24 +264,20 @@ def main(argv: List[str] | None = None) -> int:
             if st.refresh_seq != buf.last_refresh_seq:
                 buf.last_refresh_seq = st.refresh_seq
                 if st.label_tradable:
-                    buf.series.append(
-                        ev.exchange_ts, st.mid,
-                        st.spread_ticks * st.tick / 2.0, True
-                    )
+                    buf.series.append(ev.exchange_ts, st.mid, st.spread_ticks * st.tick / 2.0, True)
                 else:
-                    buf.series.append(
-                        ev.exchange_ts, float("nan"), float("nan"), False
-                    )
+                    buf.series.append(ev.exchange_ts, float("nan"), float("nan"), False)
             if vec is not None:
                 buf.ts.append(vec.timestamp)
                 buf.values.extend(vec.values)
                 buf.bits.extend(vec.validity_bits())
         total_events += engine.events_processed
         total_vectors += engine.vectors_emitted
-        _flush_file(writers, out_dir, schema, buffers, names, fam_valid,
-                    row_counts, label_stats)
-        print(f"{path.name}: {len(events)} events -> "
-              f"{engine.vectors_emitted} vectors", file=sys.stderr)
+        _flush_file(writers, out_dir, schema, buffers, names, fam_valid, row_counts, label_stats)
+        print(
+            f"{path.name}: {len(events)} events -> {engine.vectors_emitted} vectors",
+            file=sys.stderr,
+        )
 
     for writer in writers.values():
         writer.close()
@@ -298,23 +302,20 @@ def main(argv: List[str] | None = None) -> int:
             # data-quality facts (see the module docstring)
             "crossed_frac": (
                 round(st["crossed_rows"] / st["spread_valid_rows"], 6)
-                if st.get("spread_valid_rows") else None
+                if st.get("spread_valid_rows")
+                else None
             ),
-            "mean_row_gap_ns": (
-                int(st["gap_sum_ns"] / gap_n) if gap_n else None
-            ),
+            "mean_row_gap_ns": (int(st["gap_sum_ns"] / gap_n) if gap_n else None),
             "median_sample_gap_ns": st.get("median_sample_gap_ns"),
             "label_max_age_ns": st.get("label_max_age_ns"),
             "tradable_sample_frac": (
                 round(st["tradable_samples"] / st["series_samples"], 6)
-                if st.get("series_samples") else None
+                if st.get("series_samples")
+                else None
             ),
-            "label_valid_frac_by_horizon": {
-                h: round(by_h[h]["valid"] / rows, 6) for h in by_h
-            },
+            "label_valid_frac_by_horizon": {h: round(by_h[h]["valid"] / rows, 6) for h in by_h},
             "label_zero_frac_by_horizon": {
-                h: (round(by_h[h]["zero"] / by_h[h]["valid"], 6)
-                    if by_h[h]["valid"] else None)
+                h: (round(by_h[h]["zero"] / by_h[h]["valid"], 6) if by_h[h]["valid"] else None)
                 for h in by_h
             },
             "label_invalid_reasons_by_horizon": {
@@ -335,8 +336,10 @@ def main(argv: List[str] | None = None) -> int:
     with open(out_dir / "features_summary.json", "w") as f:
         json.dump(summary, f, indent=2)
         f.write("\n")
-    print(json.dumps({k: v for k, v in summary.items() if k != "instruments"},
-                     indent=2), file=sys.stderr)
+    print(
+        json.dumps({k: v for k, v in summary.items() if k != "instruments"}, indent=2),
+        file=sys.stderr,
+    )
     return 0
 
 

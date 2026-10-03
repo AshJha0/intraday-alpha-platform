@@ -136,8 +136,13 @@ def instrument_ics(
         zx.append((xi - xi.mean()) / xi.std())
         zy.append((yi - yi.mean()) / yi.std())
     if not by:
-        return {"instrument_mean": float("nan"), "vol_scaled": float("nan"),
-                "by_instrument": {}, "n_instruments": 0, "n_skipped": skipped}
+        return {
+            "instrument_mean": float("nan"),
+            "vol_scaled": float("nan"),
+            "by_instrument": {},
+            "n_instruments": 0,
+            "n_skipped": skipped,
+        }
     return {
         "instrument_mean": float(np.mean(list(by.values()))),
         "vol_scaled": float(np.corrcoef(np.concatenate(zx), np.concatenate(zy))[0, 1]),
@@ -323,10 +328,16 @@ def bucket_size_summary(counts: np.ndarray) -> Dict[str, float]:
     c = np.asarray(counts, dtype=float)
     c = c[np.isfinite(c)]
     if c.size == 0:
-        return {"n_buckets": 0, "total_pairs": 0, "min": float("nan"),
-                "p25": float("nan"), "median": float("nan"),
-                "p75": float("nan"), "max": float("nan"),
-                "mean": float("nan")}
+        return {
+            "n_buckets": 0,
+            "total_pairs": 0,
+            "min": float("nan"),
+            "p25": float("nan"),
+            "median": float("nan"),
+            "p75": float("nan"),
+            "max": float("nan"),
+            "mean": float("nan"),
+        }
     return {
         "n_buckets": int(c.size),
         "total_pairs": int(c.sum()),
@@ -507,8 +518,7 @@ def signal_turnover_detail(
     pos[~np.isfinite(pos)] = 0.0
     nan = float("nan")
     if len(pos) < 2 or len(ts) != len(pos):
-        return {"flips": nan, "active_hours": nan, "span_hours": nan,
-                "flips_per_hour": nan}
+        return {"flips": nan, "active_hours": nan, "span_hours": nan, "flips_per_hour": nan}
     changes = float(np.sum(pos[1:] != pos[:-1]))
     gaps = np.diff(ts)
     intra = gaps[(gaps > 0) & (gaps <= int(session_gap_ns))]
@@ -531,8 +541,7 @@ def signal_turnover(
 ) -> float:
     """Position flips per hour of OPEN market time (see
     :func:`signal_turnover_detail` for the denominator and why)."""
-    return signal_turnover_detail(
-        ts, scores, conf, conf_min, session_gap_ns)["flips_per_hour"]
+    return signal_turnover_detail(ts, scores, conf, conf_min, session_gap_ns)["flips_per_hour"]
 
 
 def capacity_breakeven(
@@ -559,8 +568,7 @@ def capacity_breakeven(
     0 for an edge that does not cover spread + fee, and ``inf`` when the
     cost model charges no impact.  Additive: no gate reads it.
     """
-    units = cost_model.breakeven_size(edge_return, mid, half_spread, asset_class,
-                                      adv, lot_size)
+    units = cost_model.breakeven_size(edge_return, mid, half_spread, asset_class, adv, lot_size)
     unit = float(lot_size) if asset_class == "FX" else 1.0
     return {
         "units": float(units),

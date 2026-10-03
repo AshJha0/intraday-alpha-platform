@@ -11,6 +11,7 @@ that exists on disk, in-progress cites planned paths), the eight modules of
 the 2026-09-19/20 release are done with their evidence present, and
 ``docs/EPICS.md`` is exactly what the YAML renders to.
 """
+
 from __future__ import annotations
 
 import importlib.util
@@ -28,9 +29,14 @@ RENDERED = "docs/EPICS.md"
 # in-progress set while the release was being built; every one of them is now
 # a `done` issue whose evidence names the module on disk.
 RELEASE_MODULE_PATHS = (
-    "python/src/iap/contracts", "python/src/iap/risk", "python/src/iap/execution",
-    "python/src/iap/lifecycle", "python/src/iap/trace", "python/src/iap/store",
-    "python/src/iap/research", "python/src/iap/mvp",
+    "python/src/iap/contracts",
+    "python/src/iap/risk",
+    "python/src/iap/execution",
+    "python/src/iap/lifecycle",
+    "python/src/iap/trace",
+    "python/src/iap/store",
+    "python/src/iap/research",
+    "python/src/iap/mvp",
 )
 
 
@@ -91,8 +97,7 @@ def test_done_evidence_points_at_real_paths(plan, repo_root):
 
 def test_release_modules_are_done_with_evidence_on_disk(plan):
     """Each release module is named by a `done` issue and exists on disk."""
-    done_text = "\n".join("\n".join(i["evidence"]) for i in plan["issues"]
-                          if i["status"] == "done")
+    done_text = "\n".join("\n".join(i["evidence"]) for i in plan["issues"] if i["status"] == "done")
     root = Path(__file__).resolve().parents[2]
     for path in RELEASE_MODULE_PATHS:
         assert path in done_text, f"no done issue cites {path}"
@@ -102,8 +107,9 @@ def test_release_modules_are_done_with_evidence_on_disk(plan):
     for it in plan["issues"]:
         if it["status"] == "in-progress":
             marked = any("planned" in ev or "generated" in ev for ev in it["evidence"])
-            assert marked or _any_path_exists(it["evidence"]), \
+            assert marked or _any_path_exists(it["evidence"]), (
                 f"{it['key']}: in-progress evidence must be marked as planned or exist"
+            )
 
 
 def _any_path_exists(evidence) -> bool:
@@ -137,8 +143,13 @@ def test_bodies_render(tool, plan):
 
 
 def test_dry_run_subprocess(repo_root):
-    r = subprocess.run([sys.executable, TOOL, "--dry-run"], cwd=repo_root,
-                       capture_output=True, text=True, timeout=60)
+    r = subprocess.run(
+        [sys.executable, TOOL, "--dry-run"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
     assert r.returncode == 0, r.stderr
     assert "issues by status:" in r.stdout
     assert "nothing was sent to GitHub" in r.stdout
@@ -147,17 +158,28 @@ def test_dry_run_subprocess(repo_root):
 
 
 def test_only_filter_and_bad_filter(repo_root):
-    ok = subprocess.run([sys.executable, TOOL, "--only", "epic:E10"], cwd=repo_root,
-                        capture_output=True, text=True, timeout=60)
+    ok = subprocess.run(
+        [sys.executable, TOOL, "--only", "epic:E10"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
     assert ok.returncode == 0 and "E10" in ok.stdout and "E11 " not in ok.stdout
-    bad = subprocess.run([sys.executable, TOOL, "--only", "epic:NOPE"], cwd=repo_root,
-                         capture_output=True, text=True, timeout=60)
+    bad = subprocess.run(
+        [sys.executable, TOOL, "--only", "epic:NOPE"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
     assert bad.returncode == 2 and "no epic" in bad.stderr
 
 
 def test_invalid_plan_is_rejected(tool, plan, tmp_path):
     import copy
     import yaml
+
     broken = copy.deepcopy(plan)
     broken["issues"][0]["epic"] = "E99"
     broken["issues"][1]["acceptance"] = []
@@ -168,8 +190,13 @@ def test_invalid_plan_is_rejected(tool, plan, tmp_path):
     assert any("duplicate title" in p for p in problems)
     path = tmp_path / "broken.yaml"
     path.write_text(yaml.safe_dump(broken), encoding="utf-8")
-    r = subprocess.run([sys.executable, TOOL, "--plan", str(path)], capture_output=True, text=True,
-                       cwd=Path(__file__).resolve().parents[2], timeout=60)
+    r = subprocess.run(
+        [sys.executable, TOOL, "--plan", str(path)],
+        capture_output=True,
+        text=True,
+        cwd=Path(__file__).resolve().parents[2],
+        timeout=60,
+    )
     assert r.returncode == 2 and "failed validation" in r.stderr
 
 
@@ -177,7 +204,13 @@ def test_epics_md_is_in_sync_with_the_yaml(tool, plan, repo_root):
     rendered = tool.render_md(plan)
     current = (repo_root / RENDERED).read_text(encoding="utf-8")
     assert current == rendered, (
-        f"{RENDERED} is stale; regenerate with: python3 {TOOL} --render-md {RENDERED}")
-    r = subprocess.run([sys.executable, TOOL, "--check-md", RENDERED], cwd=repo_root,
-                       capture_output=True, text=True, timeout=60)
+        f"{RENDERED} is stale; regenerate with: python3 {TOOL} --render-md {RENDERED}"
+    )
+    r = subprocess.run(
+        [sys.executable, TOOL, "--check-md", RENDERED],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
     assert r.returncode == 0, r.stderr

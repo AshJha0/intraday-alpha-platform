@@ -163,9 +163,7 @@ class FX05CrossPairRelativeValue(CrossSectionalLinearAlpha):
     _pair_ids: List[int] = []
 
     def signals(self, data):  # remember grid pair order for grid_signals
-        self._pair_ids = sorted(
-            i for i in self.universe(list(data)) if len(data[i])
-        )
+        self._pair_ids = sorted(i for i in self.universe(list(data)) if len(data[i]))
         return super().signals(data)
 
     def grid_signals(self, mat: np.ndarray) -> np.ndarray:
@@ -210,9 +208,7 @@ class FX06CurrencyFactorMomentum(CrossSectionalLinearAlpha):
     _pair_ids: List[int] = []
 
     def signals(self, data):
-        self._pair_ids = sorted(
-            i for i in self.universe(list(data)) if len(data[i])
-        )
+        self._pair_ids = sorted(i for i in self.universe(list(data)) if len(data[i]))
         return super().signals(data)
 
     def grid_signals(self, mat: np.ndarray) -> np.ndarray:

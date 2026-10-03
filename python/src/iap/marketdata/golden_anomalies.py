@@ -71,23 +71,31 @@ _ANOMALIES = {
 class _Script:
     """Scripted emitter on one stream (advances time by 1 ms per event)."""
 
-    def __init__(self, gen: MarketDataGenerator, stream: _Stream,
-                 rng: SplitMix64, t: int) -> None:
+    def __init__(self, gen: MarketDataGenerator, stream: _Stream, rng: SplitMix64, t: int) -> None:
         self.gen = gen
         self.stream = stream
         self.rng = rng
         self.t = t
         self.out: List[MarketEvent] = []
 
-    def emit(self, event_type, side=0, price=0, qty=0, order_id=0,
-             trade_id=0) -> MarketEvent:
+    def emit(self, event_type, side=0, price=0, qty=0, order_id=0, trade_id=0) -> MarketEvent:
         self.t += 1_000_000
-        return self.gen._emit(self.stream, self.out, self.rng, self.t, event_type,
-                              side=side, price=price, qty=qty, order_id=order_id,
-                              trade_id=trade_id)
+        return self.gen._emit(
+            self.stream,
+            self.out,
+            self.rng,
+            self.t,
+            event_type,
+            side=side,
+            price=price,
+            qty=qty,
+            order_id=order_id,
+            trade_id=trade_id,
+        )
 
-    def raw(self, sequence: int, event_type: int, side=0, price=0, qty=0,
-            order_id=0, trade_id=0) -> MarketEvent:
+    def raw(
+        self, sequence: int, event_type: int, side=0, price=0, qty=0, order_id=0, trade_id=0
+    ) -> MarketEvent:
         """Emit an event with an explicit sequence (not applied to the internal book)."""
         self.t += 1_000_000
         venue = self.stream.venue
@@ -95,9 +103,20 @@ class _Script:
         if receive <= self.stream.last_receive:
             receive = self.stream.last_receive + 1
         self.stream.last_receive = receive
-        ev = MarketEvent(0, self.stream.inst.instrument_id, venue.venue_id, self.t,
-                         receive, sequence, int(event_type), int(side), price, qty,
-                         order_id, trade_id)
+        ev = MarketEvent(
+            0,
+            self.stream.inst.instrument_id,
+            venue.venue_id,
+            self.t,
+            receive,
+            sequence,
+            int(event_type),
+            int(side),
+            price,
+            qty,
+            order_id,
+            trade_id,
+        )
         self.out.append(ev)
         return ev
 
@@ -111,8 +130,14 @@ class _Script:
         """records: [(side, price, qty, oid)] -> full burst with countdown."""
         n = len(records)
         for i, (side, price, qty, oid) in enumerate(records):
-            self.emit(EventType.SNAPSHOT, side=side, price=price, qty=qty,
-                      order_id=0 if zero_ids else oid, trade_id=n - 1 - i)
+            self.emit(
+                EventType.SNAPSHOT,
+                side=side,
+                price=price,
+                qty=qty,
+                order_id=0 if zero_ids else oid,
+                trade_id=n - 1 - i,
+            )
 
     def book_records(self):
         """Current internal book as SNAPSHOT records (bids then asks)."""
@@ -120,8 +145,7 @@ class _Script:
         for side in (int(Side.BID), int(Side.ASK)):
             for level in self.stream.book._sorted_levels(side):
                 for oid, q in level.orders.items():
-                    recs.append((side, level.price, q,
-                                 oid if oid < SYNTHETIC_ID_BASE else 0))
+                    recs.append((side, level.price, q, oid if oid < SYNTHETIC_ID_BASE else 0))
         return recs
 
     def head(self, side: int):
@@ -146,11 +170,21 @@ def _eq_scripted(script: _Script, venue_index: int) -> None:
         recs = [(BID, 2440, lot, st.new_order_id()), (ASK, 2450, lot, st.new_order_id())]
     script.snapshot_burst(recs)
     if book.best_bid() is None:
-        script.emit(EventType.ADD, side=BID, price=book.best_ask()[0] - 2, qty=lot,
-                    order_id=st.new_order_id())
+        script.emit(
+            EventType.ADD,
+            side=BID,
+            price=book.best_ask()[0] - 2,
+            qty=lot,
+            order_id=st.new_order_id(),
+        )
     if book.best_ask() is None:
-        script.emit(EventType.ADD, side=ASK, price=book.best_bid()[0] + 2, qty=lot,
-                    order_id=st.new_order_id())
+        script.emit(
+            EventType.ADD,
+            side=ASK,
+            price=book.best_bid()[0] + 2,
+            qty=lot,
+            order_id=st.new_order_id(),
+        )
     bb = book.best_bid()[0]
     ba = book.best_ask()[0]
 
@@ -161,19 +195,20 @@ def _eq_scripted(script: _Script, venue_index: int) -> None:
     script.emit(EventType.ADD, side=ASK, price=0, qty=lot, order_id=st.new_order_id())
     script.emit(EventType.ADD, side=ASK, price=ba + 1, qty=-lot, order_id=st.new_order_id())
     script.emit(EventType.ADD, side=ASK, price=ba + 1, qty=lot, order_id=0)
-    script.emit(EventType.ADD, side=ASK, price=ba + 1, qty=lot,
-                order_id=SYNTHETIC_ID_BASE | 7)
+    script.emit(EventType.ADD, side=ASK, price=ba + 1, qty=lot, order_id=SYNTHETIC_ID_BASE | 7)
     script.emit(EventType.TRADE, side=BID, price=ba, qty=0, trade_id=st.new_trade_id())
     script.emit(EventType.QUOTE, side=BID, price=bb, qty=0, order_id=st.new_order_id())
     script.emit(EventType.STATUS, qty=9)
-    script.emit(0, side=BID, price=bb, qty=lot, order_id=st.new_order_id())   # unknown type
+    script.emit(0, side=BID, price=bb, qty=lot, order_id=st.new_order_id())  # unknown type
     script.emit(10, side=BID, price=bb, qty=lot, order_id=st.new_order_id())  # unknown type
     script.emit(EventType.ADD, side=9, price=bb, qty=lot, order_id=st.new_order_id())
 
     # --- MODIFY price mismatch, duplicate ADD id, unknown ids
     hb = script.head(BID)
     script.emit(EventType.MODIFY, side=BID, price=hb[1] + 5, qty=hb[2] + lot, order_id=hb[0])
-    script.emit(EventType.MODIFY, side=BID, price=0, qty=hb[2] + lot, order_id=hb[0])  # ok: price 0 = unchanged
+    script.emit(
+        EventType.MODIFY, side=BID, price=0, qty=hb[2] + lot, order_id=hb[0]
+    )  # ok: price 0 = unchanged
     script.emit(EventType.ADD, side=BID, price=bb - 1, qty=lot, order_id=hb[0])  # duplicate id
     script.emit(EventType.CANCEL, side=BID, price=bb, qty=0, order_id=st.next_order + 500_000)
 
@@ -181,7 +216,9 @@ def _eq_scripted(script: _Script, venue_index: int) -> None:
     big = st.new_order_id()
     script.emit(EventType.ADD, side=BID, price=bb - 3, qty=I64_MAX, order_id=big)
     script.emit(EventType.ADD, side=BID, price=bb - 3, qty=I64_MAX, order_id=st.new_order_id())
-    script.emit(EventType.MODIFY, side=BID, price=bb - 3, qty=I64_MAX, order_id=big)  # no-op decrease
+    script.emit(
+        EventType.MODIFY, side=BID, price=bb - 3, qty=I64_MAX, order_id=big
+    )  # no-op decrease
     script.emit(EventType.CANCEL, side=BID, price=bb - 3, qty=0, order_id=big)
     flow = book.trade_flow
     if flow < 0:
@@ -202,10 +239,18 @@ def _eq_scripted(script: _Script, venue_index: int) -> None:
     script.emit(EventType.CANCEL, side=ASK, price=ba + 2, qty=0, order_id=huge)
 
     # --- interrupted SNAPSHOT burst restarted without a gap
-    script.emit(EventType.SNAPSHOT, side=BID, price=bb, qty=lot, order_id=st.new_order_id(), trade_id=3)
-    script.emit(EventType.SNAPSHOT, side=BID, price=bb - 1, qty=lot, order_id=st.new_order_id(), trade_id=2)
-    recs = [(BID, bb, 2 * lot, st.new_order_id()), (BID, bb - 1, lot, st.new_order_id()),
-            (ASK, ba, 2 * lot, st.new_order_id()), (ASK, ba + 1, lot, st.new_order_id())]
+    script.emit(
+        EventType.SNAPSHOT, side=BID, price=bb, qty=lot, order_id=st.new_order_id(), trade_id=3
+    )
+    script.emit(
+        EventType.SNAPSHOT, side=BID, price=bb - 1, qty=lot, order_id=st.new_order_id(), trade_id=2
+    )
+    recs = [
+        (BID, bb, 2 * lot, st.new_order_id()),
+        (BID, bb - 1, lot, st.new_order_id()),
+        (ASK, ba, 2 * lot, st.new_order_id()),
+        (ASK, ba + 1, lot, st.new_order_id()),
+    ]
     script.snapshot_burst(recs)  # trade_id 3.. restarts the burst
 
     # --- id-less (L2) burst with a repeated explicit id inside it
@@ -214,7 +259,9 @@ def _eq_scripted(script: _Script, venue_index: int) -> None:
     script.emit(EventType.SNAPSHOT, side=BID, price=bb, qty=lot, order_id=0, trade_id=n - 1)
     script.emit(EventType.SNAPSHOT, side=BID, price=bb - 1, qty=2 * lot, order_id=0, trade_id=n - 2)
     script.emit(EventType.SNAPSHOT, side=ASK, price=ba, qty=lot, order_id=dup_id, trade_id=n - 3)
-    script.emit(EventType.SNAPSHOT, side=ASK, price=ba + 1, qty=lot, order_id=dup_id, trade_id=n - 4)
+    script.emit(
+        EventType.SNAPSHOT, side=ASK, price=ba + 1, qty=lot, order_id=dup_id, trade_id=n - 4
+    )
     script.emit(EventType.SNAPSHOT, side=ASK, price=ba + 2, qty=3 * lot, order_id=0, trade_id=0)
     # MBO events on the synthetic ids: EXECUTE against the synthetic bid head.
     hb = script.head(BID)
@@ -228,23 +275,34 @@ def _eq_scripted(script: _Script, venue_index: int) -> None:
     # --- duplicate + HEARTBEAT/TRADE interleaved inside a burst
     recs = script.book_records()
     n = len(recs)
-    first = script.emit(EventType.SNAPSHOT, side=recs[0][0], price=recs[0][1],
-                        qty=recs[0][2], order_id=recs[0][3], trade_id=n - 1)
+    first = script.emit(
+        EventType.SNAPSHOT,
+        side=recs[0][0],
+        price=recs[0][1],
+        qty=recs[0][2],
+        order_id=recs[0][3],
+        trade_id=n - 1,
+    )
     script.dup(first)
     script.emit(EventType.HEARTBEAT)
     script.emit(EventType.TRADE, side=ASK, price=bb, qty=lot, trade_id=st.new_trade_id())
     for i, (side, price, qty, oid) in enumerate(recs[1:], start=1):
-        script.emit(EventType.SNAPSHOT, side=side, price=price, qty=qty, order_id=oid,
-                    trade_id=n - 1 - i)
+        script.emit(
+            EventType.SNAPSHOT, side=side, price=price, qty=qty, order_id=oid, trade_id=n - 1 - i
+        )
 
     # --- STATUS transitions while stale, ADD after CLOSE
     st.seq += 1  # gap -> stale
     script.emit(EventType.STATUS, qty=int(SessionStatus.HALT))
-    script.emit(EventType.ADD, side=BID, price=bb, qty=lot, order_id=st.new_order_id())  # dropped (stale)
+    script.emit(
+        EventType.ADD, side=BID, price=bb, qty=lot, order_id=st.new_order_id()
+    )  # dropped (stale)
     script.emit(EventType.STATUS, qty=int(SessionStatus.AUCTION))
     script.snapshot_burst(script.book_records())  # recovers; status stays AUCTION
     script.emit(EventType.STATUS, qty=int(SessionStatus.CLOSE))
-    script.emit(EventType.ADD, side=BID, price=bb - 2, qty=lot, order_id=st.new_order_id())  # applies
+    script.emit(
+        EventType.ADD, side=BID, price=bb - 2, qty=lot, order_id=st.new_order_id()
+    )  # applies
 
     # --- AUCTION call phase: crossed book, uncrossed by EXECUTEs
     script.emit(EventType.STATUS, qty=int(SessionStatus.AUCTION))
@@ -252,8 +310,12 @@ def _eq_scripted(script: _Script, venue_index: int) -> None:
     ba = book.best_ask()[0]
     cross_bid = st.new_order_id()
     cross_ask = st.new_order_id()
-    script.emit(EventType.ADD, side=BID, price=ba + 1, qty=lot, order_id=cross_bid)  # rests (crossed)
-    script.emit(EventType.ADD, side=ASK, price=bb - 1, qty=lot, order_id=cross_ask)  # rests (crossed)
+    script.emit(
+        EventType.ADD, side=BID, price=ba + 1, qty=lot, order_id=cross_bid
+    )  # rests (crossed)
+    script.emit(
+        EventType.ADD, side=ASK, price=bb - 1, qty=lot, order_id=cross_ask
+    )  # rests (crossed)
     script.emit(EventType.EXECUTE, side=BID, price=ba + 1, qty=lot, order_id=cross_bid)
     script.emit(EventType.EXECUTE, side=ASK, price=bb - 1, qty=lot, order_id=cross_ask)
     script.emit(EventType.TRADE, side=BID, price=ba, qty=lot, trade_id=st.new_trade_id())
@@ -265,8 +327,12 @@ def _eq_scripted(script: _Script, venue_index: int) -> None:
     recs = script.book_records()
     st.seq = 0
     script.snapshot_burst(recs)
-    script.emit(EventType.ADD, side=BID, price=book.best_bid()[0], qty=lot, order_id=st.new_order_id())
-    script.emit(EventType.ADD, side=ASK, price=book.best_ask()[0], qty=lot, order_id=st.new_order_id())
+    script.emit(
+        EventType.ADD, side=BID, price=book.best_bid()[0], qty=lot, order_id=st.new_order_id()
+    )
+    script.emit(
+        EventType.ADD, side=ASK, price=book.best_ask()[0], qty=lot, order_id=st.new_order_id()
+    )
 
     # --- late retransmission block: sequences s+1, s+2, s+3, s+6, s+4, s+5, s+7
     base = st.seq
@@ -307,8 +373,15 @@ def _fx_scripted(scripts: List[_Script]) -> None:
     pri.emit(EventType.QUOTE, side=ASK, price=mid + 1, qty=0, order_id=pri.stream.new_order_id())
     pri.emit(EventType.QUOTE, side=ASK, price=0, qty=3, order_id=pri.stream.new_order_id())
     # id-less SNAPSHOT burst on PRI (L2 snapshot)
-    pri.snapshot_burst([(BID, mid - 2, 10, 0), (BID, mid - 3, 20, 0),
-                        (ASK, mid + 2, 12, 0), (ASK, mid + 4, 30, 0)], zero_ids=True)
+    pri.snapshot_burst(
+        [
+            (BID, mid - 2, 10, 0),
+            (BID, mid - 3, 20, 0),
+            (ASK, mid + 2, 12, 0),
+            (ASK, mid + 4, 30, 0),
+        ],
+        zero_ids=True,
+    )
     # gap on LP2: stays stale (excluded from the consolidated view) ...
     lp2.stream.seq += 2
     lp2.emit(EventType.QUOTE, side=BID, price=mid + 5, qty=50, order_id=0)  # dropped while stale
@@ -332,10 +405,14 @@ def generate_golden_eq_anomalies(
     refdata: ReferenceData, seed: int = GOLDEN_EQ_ANOMALY_SEED, natural: int = 600
 ) -> List[MarketEvent]:
     """SYN.EQ.001 @ XV1+XV2 anomaly vector (arrival order, event_id 1..N)."""
-    gen = MarketDataGenerator(refdata, {"seed": seed, "anomalies": _ANOMALIES,
-                                        "equities": {"halt": {"reopen_auction": True,
-                                                              "reopen_call_s": 30,
-                                                              "duration_s": 120}}})
+    gen = MarketDataGenerator(
+        refdata,
+        {
+            "seed": seed,
+            "anomalies": _ANOMALIES,
+            "equities": {"halt": {"reopen_auction": True, "reopen_call_s": 30, "duration_s": 120}},
+        },
+    )
     inst = refdata.instrument("SYN.EQ.001")
     date = refdata.trading_days[0]
     open_ns, close_ns = refdata.session_bounds_ns("EQUITY", date)
@@ -351,9 +428,17 @@ def generate_golden_eq_anomalies(
             stream.seq = -1  # XV2 numbers its stream from sequence 0
         rng = SplitMix64(seed + vi)
         natural_events.extend(
-            gen._eq_session_stream(stream, price, rng, open_ns, close_ns, slots=natural + 200,
-                                   halt_window=halt_window, anomalies=_ANOMALIES,
-                                   max_events=natural)
+            gen._eq_session_stream(
+                stream,
+                price,
+                rng,
+                open_ns,
+                close_ns,
+                slots=natural + 200,
+                halt_window=halt_window,
+                anomalies=_ANOMALIES,
+                max_events=natural,
+            )
         )
         streams.append(stream)
     natural_events = gen._inject_file_anomalies(natural_events, gen._rng("anom-golden", 0, 0))
@@ -379,13 +464,21 @@ def generate_golden_fx_anomalies(
     rng = SplitMix64(seed)
     date = refdata.trading_days[0]
     open_ns, close_ns = refdata.session_bounds_ns("FX", date)
-    natural_events = gen._fx_pair_session(inst, streams, rng, open_ns, close_ns,
-                                          slots=natural + 200, anomalies=_ANOMALIES,
-                                          max_events=natural)
+    natural_events = gen._fx_pair_session(
+        inst,
+        streams,
+        rng,
+        open_ns,
+        close_ns,
+        slots=natural + 200,
+        anomalies=_ANOMALIES,
+        max_events=natural,
+    )
     natural_events = gen._inject_file_anomalies(natural_events, gen._rng("anom-golden", 1, 0))
     t0 = max(max(ev.exchange_ts, ev.receive_ts) for ev in natural_events) + NS
-    scripts = [_Script(gen, s, SplitMix64(seed + 100 + i), t0 + i * 100_000)
-               for i, s in enumerate(streams)]
+    scripts = [
+        _Script(gen, s, SplitMix64(seed + 100 + i), t0 + i * 100_000) for i, s in enumerate(streams)
+    ]
     _fx_scripted(scripts)
     events = natural_events + _merge_arrival([s.out for s in scripts])
     for i, ev in enumerate(events):

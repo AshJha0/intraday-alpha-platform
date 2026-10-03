@@ -93,9 +93,14 @@ def test_int_ids_validate_domain():
     assert ids.venue_id(65535) == 65535
     assert ids.order_id(2**64 - 1) == 2**64 - 1
     assert ids.timestamp(-(2**63)) == -(2**63)
-    for fn, bad in ((ids.instrument_id, 2**32), (ids.venue_id, -1),
-                    (ids.order_id, 2**64), (ids.timestamp, 2**63),
-                    (ids.event_id, True), (ids.trade_id, 1.0)):
+    for fn, bad in (
+        (ids.instrument_id, 2**32),
+        (ids.venue_id, -1),
+        (ids.order_id, 2**64),
+        (ids.timestamp, 2**63),
+        (ids.event_id, True),
+        (ids.trade_id, 1.0),
+    ):
         with pytest.raises(ValueError):
             fn(bad)
 
@@ -144,10 +149,16 @@ def test_canonical_json_is_sorted_compact_ascii():
     assert len(content_hash([])) == 64
 
 
-@pytest.mark.parametrize("bad", [
-    float("nan"), float("inf"), -float("inf"),
-    {"x": [1, {"y": float("nan")}]}, [math.inf],
-])
+@pytest.mark.parametrize(
+    "bad",
+    [
+        float("nan"),
+        float("inf"),
+        -float("inf"),
+        {"x": [1, {"y": float("nan")}]},
+        [math.inf],
+    ],
+)
 def test_canonical_json_rejects_non_finite(bad):
     with pytest.raises(ValueError):
         canonical_json(bad)
@@ -159,11 +170,14 @@ def test_canonical_json_rejects_non_string_keys():
 
 
 def test_schema_inventory_matches_disk():
-    on_disk = sorted(p.relative_to(schema_dir()).as_posix()
-                     for p in schema_dir().rglob("*.schema.json"))
+    on_disk = sorted(
+        p.relative_to(schema_dir()).as_posix() for p in schema_dir().rglob("*.schema.json")
+    )
     assert on_disk == sorted(SCHEMA_VERSIONS)
-    assert schema_id("alpha/alpha_signal.schema.json") == \
-        "https://iap.example/schemas/alpha/alpha_signal.schema.json"
+    assert (
+        schema_id("alpha/alpha_signal.schema.json")
+        == "https://iap.example/schemas/alpha/alpha_signal.schema.json"
+    )
 
 
 def test_schema_dir_resolution_order(monkeypatch, tmp_path):
@@ -261,8 +275,9 @@ def test_int_ranges_and_enums_enforced():
     lt = EXAMPLES["LifecycleTransition"].to_dict()
     with pytest.raises(ContractError, match="LifecycleState name"):
         LifecycleTransition.from_dict({**lt, "to_state": 4})
-    assert LifecycleTransition.from_dict({**lt, "to_state": "WATCH"}).to_state \
-        is LifecycleState.WATCH
+    assert (
+        LifecycleTransition.from_dict({**lt, "to_state": "WATCH"}).to_state is LifecycleState.WATCH
+    )
 
 
 def test_cross_field_invariants():
@@ -309,43 +324,63 @@ def test_contracts_are_frozen_and_hashable_scalars():
 
 def test_lifecycle_state_is_ordered():
     order = [s.name for s in sorted(LifecycleState)]
-    assert order == ["RESEARCH", "CANDIDATE", "VALIDATING", "PAPER",
-                     "ACTIVE", "WATCH", "RETIRED"]
+    assert order == ["RESEARCH", "CANDIDATE", "VALIDATING", "PAPER", "ACTIVE", "WATCH", "RETIRED"]
     assert LifecycleState.PAPER < LifecycleState.ACTIVE < LifecycleState.RETIRED
 
 
 def test_risk_decision_from_risk_event():
-    event = {"timestamp": 5, "scope": "INSTRUMENT", "scope_id": "1",
-             "rule_id": "MAX_ORDER_QTY", "severity": 3, "decision": 2,
-             "reason": "qty 50000 > 20000"}
-    rd = RiskDecision.from_risk_event(event, order_id=7, strategy_id="S1",
-                                      instrument_id=1, rule_index=4)
+    event = {
+        "timestamp": 5,
+        "scope": "INSTRUMENT",
+        "scope_id": "1",
+        "rule_id": "MAX_ORDER_QTY",
+        "severity": 3,
+        "decision": 2,
+        "reason": "qty 50000 > 20000",
+    }
+    rd = RiskDecision.from_risk_event(
+        event, order_id=7, strategy_id="S1", instrument_id=1, rule_index=4
+    )
     assert rd.decision is Decision.REJECT and rd.rule_index == 4
     assert rd.timestamp_ns == 5 and rd.rule_id == "MAX_ORDER_QTY"
     validate_typed(rd)
     with pytest.raises(ContractError):
-        RiskDecision.from_risk_event(event, order_id=7, strategy_id="S1",
-                                     instrument_id=1)
+        RiskDecision.from_risk_event(event, order_id=7, strategy_id="S1", instrument_id=1)
     with pytest.raises(ContractError, match="missing"):
-        RiskDecision.from_risk_event({}, order_id=7, strategy_id="S1",
-                                     instrument_id=1)
+        RiskDecision.from_risk_event({}, order_id=7, strategy_id="S1", instrument_id=1)
 
 
 def test_explain_renders_none_stages():
     trace = example_trace()
-    empty = DecisionTrace(**{**{f.name: getattr(trace, f.name)
-                                for f in dataclasses.fields(trace)},
-                             "stages": TraceStages(
-                                 signal=(), portfolio=None, risk=(), parent_orders=(),
-                                 child_orders=(), routing=(), fills=(), tca=(),
-                                 attribution=None)})
+    empty = DecisionTrace(
+        **{
+            **{f.name: getattr(trace, f.name) for f in dataclasses.fields(trace)},
+            "stages": TraceStages(
+                signal=(),
+                portfolio=None,
+                risk=(),
+                parent_orders=(),
+                child_orders=(),
+                routing=(),
+                fills=(),
+                tca=(),
+                attribution=None,
+            ),
+        }
+    )
     text = explain(empty)
     lines = text.splitlines()
     assert lines[0] == f"Trace {trace.trace_id}"
     assert lines[1:] == [
-        "Alpha:      (none)", "Portfolio:  (none)", "Risk:       (none)",
-        "Execution:  (none)", "SOR:        (none)", "Fills:      (none)",
-        "TCA:        (none)", "Attribution: (none)"]
+        "Alpha:      (none)",
+        "Portfolio:  (none)",
+        "Risk:       (none)",
+        "Execution:  (none)",
+        "SOR:        (none)",
+        "Fills:      (none)",
+        "TCA:        (none)",
+        "Attribution: (none)",
+    ]
     # unnamed venues render as their decimal id
     assert "SOR:        1 = 45%  2 = 35%  3 = 20%" in explain(trace)
     assert "XV1 = 45%" in explain(trace, VENUE_NAMES)
@@ -357,18 +392,21 @@ def test_explain_labels_the_acting_signal_and_its_components():
     trace: ensemble first, members after)."""
     trace = example_trace()
     acting = trace.stages.signal[0]
-    member = dataclasses.replace(acting, model_version="EQ01", expected_return=0.0001,
-                                 confidence=0.5)
-    multi = dataclasses.replace(trace, stages=dataclasses.replace(
-        trace.stages, signal=(acting, member)))
+    member = dataclasses.replace(
+        acting, model_version="EQ01", expected_return=0.0001, confidence=0.5
+    )
+    multi = dataclasses.replace(
+        trace, stages=dataclasses.replace(trace.stages, signal=(acting, member))
+    )
     lines = explain(multi, VENUE_NAMES).splitlines()
     pinned = explain(trace, VENUE_NAMES).splitlines()
-    assert lines[1] == pinned[1]                       # unchanged for the acting signal
+    assert lines[1] == pinned[1]  # unchanged for the acting signal
     assert lines[2] == "Alpha:      EQ01  expected return = +1.0 bps  confidence = 0.50"
     assert lines[3:] == pinned[2:]
     # without a parent order every signal is labelled by its model_version
-    orderless = dataclasses.replace(multi, stages=dataclasses.replace(
-        multi.stages, parent_orders=()))
+    orderless = dataclasses.replace(
+        multi, stages=dataclasses.replace(multi.stages, parent_orders=())
+    )
     lines = explain(orderless, VENUE_NAMES).splitlines()
     assert lines[1].startswith(f"Alpha:      {acting.model_version}  ")
     assert lines[2].startswith("Alpha:      EQ01  ")
@@ -394,8 +432,9 @@ def test_validate_nested_definition_via_fragment():
     leg = EXAMPLES["PortfolioLeg"].to_dict()
     validate(leg, "portfolio/portfolio_target.schema.json#/$defs/PortfolioLeg")
     with pytest.raises(ContractValidationError):
-        validate({**leg, "target_qty": 1.5},
-                 "portfolio/portfolio_target.schema.json#/$defs/PortfolioLeg")
+        validate(
+            {**leg, "target_qty": 1.5}, "portfolio/portfolio_target.schema.json#/$defs/PortfolioLeg"
+        )
 
 
 def test_validate_typed_returns_dict():
@@ -409,17 +448,29 @@ def test_validate_typed_returns_dict():
 
 
 def test_protocols_satisfied_by_existing_classes():
-    ev = MarketEvent(event_id=1, instrument_id=1, venue_id=1, exchange_ts=0,
-                     receive_ts=0, sequence=1, event_type=9, side=0,
-                     price_ticks=0, qty=0, order_id=0, trade_id=0)
+    ev = MarketEvent(
+        event_id=1,
+        instrument_id=1,
+        venue_id=1,
+        exchange_ts=0,
+        receive_ts=0,
+        sequence=1,
+        event_type=9,
+        side=0,
+        price_ticks=0,
+        qty=0,
+        order_id=0,
+        trade_id=0,
+    )
     assert isinstance(ev, MarketEventLike)
     assert isinstance(OrderBook(1, 1), OrderBookLike)
     assert isinstance(OrderBook(1, 1), BookViewLike)
     assert isinstance(ConsolidatedBook(1), BookViewLike)
     # the consolidated merge has no state_summary / is_fresh of its own
     assert not isinstance(ConsolidatedBook(1), OrderBookLike)
-    fv = FeatureVector(instrument_id=1, timestamp=0, feature_version="x",
-                       values=[0.0], validity=[True])
+    fv = FeatureVector(
+        instrument_id=1, timestamp=0, feature_version="x", values=[0.0], validity=[True]
+    )
     assert isinstance(fv, FeatureVectorLike)
     engine = FeatureEngine(build_contexts(CONFIGS_DIR))
     assert isinstance(engine, FeatureEngineLike)
@@ -427,17 +478,24 @@ def test_protocols_satisfied_by_existing_classes():
     # interfaces (documented in protocols.py), not protocol members
     assert not isinstance(AlphaModel, Alpha)
     tracker = LifecycleTracker(
-        alpha_id="EQ03", policy="p",
-        config=LifecycleConfig(watch_ic_gate=0.0, reactivate_ic_gate=0.0,
-                               retire_breach_evals=2, reactivate_evals=2))
+        alpha_id="EQ03",
+        policy="p",
+        config=LifecycleConfig(
+            watch_ic_gate=0.0, reactivate_ic_gate=0.0, retire_breach_evals=2, reactivate_evals=2
+        ),
+    )
     assert not isinstance(tracker, AlphaLifecycle)
 
 
 def test_example_types_cover_every_contract():
     from iap.contracts import types as T
     from iap.contracts.types import Contract
-    declared = {name for name in T.__all__
-                if isinstance(getattr(T, name), type)
-                and issubclass(getattr(T, name), Contract)
-                and getattr(T, name) is not Contract}
+
+    declared = {
+        name
+        for name in T.__all__
+        if isinstance(getattr(T, name), type)
+        and issubclass(getattr(T, name), Contract)
+        and getattr(T, name) is not Contract
+    }
     assert declared == {cls.__name__ for cls, _ in EXAMPLE_TYPES}
