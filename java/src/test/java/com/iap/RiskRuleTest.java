@@ -275,9 +275,9 @@ public class RiskRuleTest {
         RiskEngine eng = engine();
         eng.onVenueDisconnect(1, TS + 1);
         expect(eng, limitBuy(1, 10, 2450, TS + 2), Rules.VENUE_DISCONNECTED);
-        // venue 0 = SOR-routed, connectivity check skipped
+        // venue 0 = SOR-routed: every known venue is down, nowhere to route
         expect(eng, new OrderRequest(2, 1, 0, 10, 2450, OrderRequest.LIMIT, 0,
-                "S1", 0.5, TS + 3), Rules.ALLOW);
+                "S1", 0.5, TS + 3), Rules.VENUE_DISCONNECTED);
         eng.onVenueReconnect(1, TS + 4);
         expect(eng, limitBuy(3, 10, 2450, TS + 5), Rules.ALLOW);
     }
@@ -736,10 +736,23 @@ public class RiskRuleTest {
                 eng.checkOrder(buyOn(3, 1, 2450, 0, TS + 3)).reason());
         eng.clearKill(Scope.VENUE, "7", TS, "clear");
         expect(eng, buyOn(4, 1, 2450, 0, TS + 4), Rules.ALLOW);
-        // a venue DISCONNECT does not close the router (unchanged)
+        // disconnects: the router stays open while any known venue is up
+        // and closes when EVERY known venue is down
         eng.onOrderDone(4);
         eng.onVenueDisconnect(3, TS);
-        expect(eng, buyOn(5, 1, 2450, 0, TS + 5), Rules.ALLOW);
+        d = eng.checkOrder(buyOn(5, 1, 2450, 0, TS + 5));
+        assertEquals(Rules.VENUE_DISCONNECTED, d.ruleId());
+        assertEquals(Severity.WARN, d.severity());
+        assertEquals("venue 0 (SOR) order rejected: every known venue is "
+                + "disconnected", d.reason());
+        assertEquals("0", eng.audit().get(eng.audit().size() - 1).scopeId());
+        eng.onVenueReconnect(5, TS);
+        expect(eng, buyOn(6, 1, 2450, 0, TS + 6), Rules.ALLOW);
+        eng.onOrderDone(6);
+        eng.onVenueDisconnect(5, TS);
+        expect(eng, buyOn(7, 1, 2450, 0, TS + 7), Rules.VENUE_DISCONNECTED);
+        eng.onVenueReconnect(3, TS);
+        expect(eng, buyOn(8, 1, 2450, 0, TS + 8), Rules.ALLOW);
     }
 
     /**

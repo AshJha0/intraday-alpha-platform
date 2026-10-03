@@ -202,6 +202,14 @@ final class LimitsEvaluator {
             return reject(Rules.VENUE_DISCONNECTED, Severity.WARN,
                     "venue " + order.venueId() + " is disconnected");
         }
+        // venue 0 = "route via SOR": while at least one known venue is up
+        // the router has somewhere to go, but when EVERY known venue is
+        // disconnected no venue could take the order.
+        if (order.venueId() == 0 && !e.venuesDown.isEmpty()
+                && !e.venuesDown.containsValue(false)) {
+            return reject(Rules.VENUE_DISCONNECTED, Severity.WARN,
+                    "venue 0 (SOR) order rejected: every known venue is disconnected");
+        }
         // 9-10. market-data gate
         RiskEngine.MarketState md = e.market.get(order.instrumentId());
         if (md != null && md.gated) {

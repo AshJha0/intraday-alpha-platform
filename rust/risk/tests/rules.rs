@@ -1289,10 +1289,22 @@ fn sor_order_rejected_while_any_venue_kill_is_engaged() {
     assert_eq!(d.reason, "venue 0 (SOR) order rejected: venue 7 kill switch engaged");
     eng.clear_kill(Scope::Venue, "7", T0, "clear").expect("kill scope id parses");
     assert!(eng.check_order(&sor(4)).allowed());
-    // a venue DISCONNECT does not close the router (unchanged)
+    // disconnects: the router stays open while any known venue is up and
+    // closes when EVERY known venue is down
     eng.on_order_done(4);
     eng.on_venue_disconnect(3, T0);
-    assert!(eng.check_order(&sor(5)).allowed());
+    let d = eng.check_order(&sor(5));
+    assert_eq!(d.rule_id, rules::VENUE_DISCONNECTED);
+    assert_eq!(d.severity, Severity::Warn);
+    assert_eq!(d.reason, "venue 0 (SOR) order rejected: every known venue is disconnected");
+    assert_eq!(eng.audit().last().unwrap().scope_id, "0");
+    eng.on_venue_reconnect(5, T0);
+    assert!(eng.check_order(&sor(6)).allowed());
+    eng.on_order_done(6);
+    eng.on_venue_disconnect(5, T0);
+    assert_eq!(eng.check_order(&sor(7)).rule_id, rules::VENUE_DISCONNECTED);
+    eng.on_venue_reconnect(3, T0);
+    assert!(eng.check_order(&sor(8)).allowed());
 }
 
 /// `u16::from_str`: optional single `+`, ASCII digits only. Pins the

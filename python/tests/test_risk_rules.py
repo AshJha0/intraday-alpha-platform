@@ -521,11 +521,12 @@ def test_venue_disconnect_rejects_until_reconnect(config_doc):
     d = eng.check_order(order(1, 0, 100, 2450))
     assert d.rule_id == Rules.VENUE_DISCONNECTED
     assert d.reason == "venue 1 is disconnected"
-    # a different venue still works, and venue 0 (SOR) skips the check
+    # a different venue still works; venue 0 (SOR) has nowhere to route
+    # while every known venue is down
     assert eng.check_order(order(2, 0, 100, 2450, venue_id=2)).allowed()
     eng.on_order_done(2)
-    assert eng.check_order(order(4, 0, 100, 2450, venue_id=0)).allowed()
-    eng.on_order_done(4)
+    assert eng.check_order(order(4, 0, 100, 2450, venue_id=0)).rule_id \
+        == Rules.VENUE_DISCONNECTED
     eng.on_venue_reconnect(1, T0 + NS)
     assert eng.check_order(order(3, 0, 100, 2450)).allowed()
     ids = [e.rule_id for e in eng.audit()]
@@ -2125,10 +2126,22 @@ def test_sor_order_rejected_while_any_venue_kill_is_engaged(config_doc):
     assert d.reason == "venue 0 (SOR) order rejected: venue 7 kill switch engaged"
     eng.clear_kill(Scope.VENUE, "7", T0, "clear")
     assert eng.check_order(order(4, 0, 100, 2450, venue_id=0)).allowed()
-    # a venue DISCONNECT does not close the router (unchanged)
+    # disconnects: the router stays open while any known venue is up and
+    # closes when EVERY known venue is down
     eng.on_order_done(4)
     eng.on_venue_disconnect(3, T0)
-    assert eng.check_order(order(5, 0, 100, 2450, venue_id=0)).allowed()
+    d = eng.check_order(order(5, 0, 100, 2450, venue_id=0))
+    assert d.rule_id == Rules.VENUE_DISCONNECTED and d.severity == Severity.WARN
+    assert d.reason == "venue 0 (SOR) order rejected: every known venue is disconnected"
+    assert eng.audit()[-1].scope_id == "0"
+    eng.on_venue_reconnect(5, T0)
+    assert eng.check_order(order(6, 0, 100, 2450, venue_id=0)).allowed()
+    eng.on_order_done(6)
+    eng.on_venue_disconnect(5, T0)
+    assert eng.check_order(order(7, 0, 100, 2450, venue_id=0)).rule_id \
+        == Rules.VENUE_DISCONNECTED
+    eng.on_venue_reconnect(3, T0)
+    assert eng.check_order(order(8, 0, 100, 2450, venue_id=0)).allowed()
 
 
 def test_kill_scope_id_grammar_is_rust_from_str(config_doc):

@@ -1130,6 +1130,13 @@ class RiskEngine:
         if order.venue_id != 0 and self._venues_down.get(order.venue_id, False):
             return reject(Rules.VENUE_DISCONNECTED, warn,
                           f"venue {order.venue_id} is disconnected")
+        # venue 0 = "route via SOR": while at least one known venue is up the
+        # router has somewhere to go, but when EVERY known venue is
+        # disconnected no venue could take the order.
+        if order.venue_id == 0 and self._venues_down \
+                and all(self._venues_down.values()):
+            return reject(Rules.VENUE_DISCONNECTED, warn,
+                          "venue 0 (SOR) order rejected: every known venue is disconnected")
         # 9-10. market-data gate
         md = self._market.get(order.instrument_id)
         if md is not None and md.gated:

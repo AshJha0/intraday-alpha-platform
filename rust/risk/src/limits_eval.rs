@@ -217,6 +217,19 @@ impl RiskEngine {
                 format!("venue {} is disconnected", order.venue_id),
             );
         }
+        // venue 0 = "route via SOR": while at least one known venue is up
+        // the router has somewhere to go, but when EVERY known venue is
+        // disconnected no venue could take the order.
+        if order.venue_id == 0
+            && !self.venues_down.is_empty()
+            && self.venues_down.values().all(|down| *down)
+        {
+            return Self::reject(
+                rules::VENUE_DISCONNECTED,
+                Warn,
+                "venue 0 (SOR) order rejected: every known venue is disconnected".into(),
+            );
+        }
         // 9-10. market-data gate
         let md = self.market.get(&order.instrument_id).copied();
         if let Some(md) = md {
