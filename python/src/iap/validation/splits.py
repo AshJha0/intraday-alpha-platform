@@ -17,10 +17,11 @@ interval logic — deterministic, no RNG, never a random shuffle.
 
 **Segmenting by ROW MASS, not wall span (pinned, round-3).**  Dividing the
 wall-clock span ``[t0, t1]`` into equal segments is only equivalent to equal
-evidence when the data is uniform in time.  It is not: this platform's
-equity frames occupy 13:30-16:05 UTC of each day plus a lone 20:00 close
-print, so equal wall segments put ~100 % of the rows in two of four folds
-and left the other two EMPTY — a "4-fold walk-forward" that was a 2-fold.
+evidence when the data is uniform in time.  It is not: an equity session is
+13:30-20:00 UTC, 6.5 h of each 24 h day (and up to v1.3.0 the bundled
+equity flow stopped at about 16:05, leaving a lone 20:00 close print), so
+equal wall segments put ~100 % of the rows in two of four folds and left
+the other two EMPTY — a "4-fold walk-forward" that was a 2-fold.
 Boundaries are therefore quantiles of the pooled row index: segment k ends
 at the timestamp of pooled row ``round(k * N / (n_folds + 1))``, so every
 fold carries (approximately) the same number of rows whatever the calendar

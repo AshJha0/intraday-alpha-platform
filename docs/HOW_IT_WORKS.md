@@ -10,15 +10,22 @@ Three things to know before reading:
 
 1. **All market data is synthetic.** A seeded generator produces every
    event. Every number below is a statement about that generator and this
-   pipeline, not about a market. One property of the bundled dataset to
-   keep in mind: equity flow stops about 40% of the way through each
-   session (a generator limitation, not a design choice — README
-   "Real-world usage notes", LEARN.md §2.3), so the equity results describe
-   roughly the first 2 h 40 min of each of the two sessions.
+   pipeline, not about a market. Up to v1.3.0 the generator had a defect:
+   equity flow stopped about 40% of the way through each session. v1.4.0
+   fixes it (`equities.flow.calibration = "session"`; every equity stream
+   now runs to the close) and regenerates the dataset and everything
+   computed from it, so every number below is a v1.4.0 number. About the
+   same number of equity events is now spread over the whole 6.5-hour
+   session, so the flow is about 2.5 times sparser in time than the old
+   compressed flow (equity rows are a little over 3 s apart), and the
+   equity signals are weaker on it. `"legacy_budget"` reproduces the
+   v1.3.0 dataset byte for byte.
 2. **The results are negative, and that is the headline.** 24 alphas were
-   researched; none is promoted. The end-to-end loop loses 22.65 USD on its
-   golden session. The ML gate fails. The platform is built so that those
-   sentences are trustworthy, not so that they read well.
+   researched; none is promoted. The end-to-end loop loses 81.53 USD on its
+   golden session. The ML gate passes on this dataset — the linear baseline
+   has a small positive IC, so the trees and the network are fitted — and
+   no model earns its costs. The platform is built so that those sentences
+   are trustworthy, not so that they read well.
 3. **Corrected methods are opt-in.** Where the v1.3.0 review found a better
    statistic or policy, it was added *beside* the pinned default, with the
    default unchanged, so that no committed number moves. Each one is named
@@ -74,8 +81,8 @@ floats.
 
 The loop above is not a diagram of intent. One command runs it on one
 synthetic instrument and writes a trace for every decision. On its golden
-session (16,578 events, 355 decisions) it fills 55 times and loses 22.65
-USD: about +0.04 bps of alpha against −0.41 bps of execution cost.
+session (15,805 events, 800 decisions) it fills 169 times and loses 81.53
+USD: about +0.02 bps of alpha against −0.41 bps of execution cost.
 
 **Where to look**
 
@@ -88,7 +95,7 @@ USD: about +0.04 bps of alpha against −0.41 bps of execution cost.
 
 ```bash
 cd python
-PYTHONPATH=src python3 -m iap.mvp run                                   # ~7 s; prints events, decisions, fills, P&L, digest
+PYTHONPATH=src python3 -m iap.mvp run                                   # under a minute; prints events, decisions, fills, P&L, digest
 PYTHONPATH=src python3 -m iap.mvp explain --run ../data/mvp/58a10f2194a3c81c 5   # one order: signal -> risk -> routing -> fills -> TCA
 ```
 
@@ -122,8 +129,10 @@ in code:
   without a stated reason to work is rejected at construction.
 - The fitted sign must agree with that rationale (`hypothesis_confirmed`).
   An alpha that is statistically strong in the *opposite* direction to its
-  own story cannot be promoted. EQ09 is the standing example: a large
-  t-statistic, the wrong sign, REJECT.
+  own story cannot be promoted. FX09 is the standing example: a t-statistic
+  of −3.76, the wrong sign, REJECT. (On the v1.3.0 dataset EQ09 was a
+  second one, with a t of −5.65; on the regenerated dataset its t is −0.84
+  and it is simply not significant.)
 
 The second rule is what stops a researcher from fitting first and writing
 the story afterwards.
@@ -137,6 +146,15 @@ from 10 ms to 15 minutes, in two forms — mid-to-mid, and cost-adjusted
 stream was observed through `t + h`, the book was tradable at both ends,
 and no halt, auction or stale-venue gap falls inside the horizon. A signal
 just before a halt is therefore never credited with the reopening jump.
+
+One more condition matters on the v1.4.0 dataset. The price at `t + h` must
+be fresh: no older than `max(5 s, 2 × the instrument's median quote gap)`.
+Equity quotes are now about 2 s apart at the median, so the 5 s floor
+binds, and on the sparser flow a material share of equity labels at
+horizons of 10 s and more is invalid as `forward_stale`. The valid fraction
+per equity is 0.99–1.00 at 5 s, 0.79–0.81 at 10 s, 0.75–0.77 at 1 minute
+and 0.45–0.63 at 15 minutes (`data/features/features_summary.json`). Those
+rows are excluded from every IC; they are not scored as zero returns.
 
 ### 2.4 IC
 
@@ -190,13 +208,16 @@ reads the pinned statistic.
 
 Try enough things and something will look significant. So every look at
 the data is recorded in a ledger (`research/experiments.json`), identified
-by alpha, kind and configuration, so that re-running a script does not
-inflate the count. Today it holds 1,068 looks over 70 distinct
-configurations. From that count come two yardsticks printed in every
-report: the largest t expected from pure noise over that many trials
-(about 3.73) and the Bonferroni threshold (about 4.07). An alpha with a t
-of 3.2 passes the fixed gate and sits *below* both yardsticks, and the
-report says so.
+by alpha, kind, configuration and — since v1.4.0 — dataset, so that
+re-running a script does not inflate the count. Today it holds 1,920 looks
+over 139 entries: the 1,068 looks taken on the v1.3.0 dataset are kept, and
+regenerating the reports on the v1.4.0 dataset added 852. A statistic
+computed on a different dataset is a different look, and the denominator
+only grows: regenerating the data does not reset it. From that count come
+two yardsticks printed in every report: the largest t expected from pure
+noise over that many trials (about 3.89) and the Bonferroni threshold
+(about 4.21). An alpha with a t of 3.2 passes the fixed gate and sits
+*below* both yardsticks, and the report says so.
 
 Two things changed in v1.3.0. A `--dry-run` used to compute everything and
 record nothing; it now debits its looks. And the gate can be made to follow
@@ -207,7 +228,7 @@ larger of 3.0 and the ledger's Bonferroni threshold.
 
 The research cost model charges half the spread, venue fees, and an impact
 that is linear in the order's share of daily volume. This is where every
-alpha dies: EQ03 has an IC of 0.030 with a t above 10 and loses 70,651 at
+alpha dies: EQ03 has an IC of 0.019 with a t of 5.8 and loses 148,562 at
 1× costs, because it flips its position hundreds of times an hour and pays
 the spread each time.
 
@@ -222,9 +243,10 @@ Opt-in alternatives, each with the pinned default unchanged:
 
 The cost-aware policy does not rescue anything. In COOKBOOK recipe 28 —
 EQ03 scored over both sessions with the default backtest configuration, so
-not comparable with the report's 70,651 — it reduces 25,418 trades to 4 and
-a loss of 458,645 to a loss of 70, because the signal almost never clears
-its own costs. That is the same finding from the other side.
+not comparable with the report's 148,562 — it reduces 38,222 trades to none
+and a loss of 826,926 to zero, because the signal never clears its own
+costs. A policy that never trades is not a result; it is the same finding
+from the other side.
 
 ### 2.9 Stress
 
@@ -243,7 +265,12 @@ validation:
 1. **Label guard.** Score once normally and once with every label column
    replaced by garbage. Any difference proves the scoring path reads labels.
 2. **Shift-by-one.** Lag the scores by one row. A real signal degrades
-   gracefully; a leak collapses.
+   gracefully; a leak collapses. The converse does not hold: on the v1.4.0
+   MVP session the lagged IC does not collapse (EQ01: 0.217 unlagged, 0.149
+   lagged by one decision), because the signals persist from one decision
+   to the next. That is persistence, not a leak, and not proof of
+   cleanliness either — the evidence against a leak is the pinned label
+   definition and the truncation probe (docs/MVP.md).
 3. **Truncation probe.** Re-score on a truncated feature frame. The score
    at the cut must be bit-identical.
 4. **Recompute probe** (opt-in). Rebuild the *features* from truncated raw
@@ -266,7 +293,9 @@ promotion needs every gate of its edge to pass:
 | ACTIVE ⇄ WATCH → RETIRED | rolling live IC |
 
 On the bundled data all 24 alphas reach CANDIDATE and stop there. Every
-one fails the same gate: net P&L after costs.
+one fails the same gate: net P&L after costs. For four of them (EQ02,
+EQ03, EQ12, FX04) it is the only gate that fails; on the v1.3.0 dataset it
+was the only one for eight.
 
 Since v1.3.0 there is one more condition, and it is about the evidence
 rather than the alpha. A research result is **gate-eligible** only if it
@@ -287,31 +316,41 @@ power`). From `research/power/POWER_REPORT.md`, three seeds per cell:
 | planted effect | size | flagged significant | verdict ITERATE or better | PROMOTE |
 |---|---|---:|---:|---:|
 | order flow | none (null) | 0 of 3 | 0 of 3 | 0 of 3 |
-| order flow | half the reference | 1 of 3 | 3 of 3 | 0 of 3 |
-| order flow | reference | 3 of 3 | 3 of 3 | 0 of 3 |
+| order flow | half the reference | 0 of 3 | 0 of 3 | 0 of 3 |
+| order flow | reference | 1 of 3 | 3 of 3 | 0 of 3 |
 | order flow | twice the reference | 3 of 3 | 3 of 3 | 0 of 3 |
-| lead-lag | none (null) | 0 of 3 | 1 of 3 | 0 of 3 |
-| lead-lag | reference | 0 of 3 | 1 of 3 | 0 of 3 |
-| lead-lag | twice the reference | 1 of 3 | 2 of 3 | 0 of 3 |
+| lead-lag | none (null) | 0 of 3 | 0 of 3 | 0 of 3 |
+| lead-lag | reference | 0 of 3 | 0 of 3 | 0 of 3 |
+| lead-lag | twice the reference | 0 of 3 | 0 of 3 | 0 of 3 |
 | either, reversed mid-sample | any | 0 of 3 | 0 of 3 | 0 of 3 |
 
 What it means:
 
-- The chain **can detect** a planted order-flow effect, reliably at the
-  reference size (mean IC 0.073, mean t 5.96).
-- It has **almost no power** against the planted lead-lag at the reference
-  size. A real effect like that would be reported as absent.
+- The chain **can detect** a planted order-flow effect, reliably only at
+  twice the reference size (mean IC 0.081, mean t 6.35). At the reference
+  size it reports evidence in every seed and significance in one of three
+  (mean IC 0.031, mean t 2.90). At half the reference it sees nothing.
+- It has **no measured power** against the planted lead-lag at any size
+  tested (mean t 0.88 at twice the reference). A real effect like that
+  would be reported as absent.
 - It is **not fooled** by an effect that reverses half-way through.
-- The null row is not perfectly clean: one seed of three produced ITERATE
-  with nothing planted.
+- The null rows are clean: no seed produced a detection with nothing
+  planted. Three seeds per cell cannot bound a false-positive rate.
 - It **promotes nothing, at any size** — not even an effect with a mean t
-  above 13. No fold survives 1× costs in any cell.
+  above 6. No fold survives 1× costs in any cell.
 
 The last point limits what the headline can claim. "0 PROMOTE" is not
 proof that the chain is a strict judge of alpha; PROMOTE has not been shown
 to be reachable in this generator's cost structure. With three seeds per
 cell a rate moves in steps of a third: this calibrates the chain, it is
 not a power curve.
+
+The chain is less sensitive on the v1.4.0 generator than it was on the
+v1.3.0 one. There the order-flow effect was significant in 3 of 3 seeds at
+the reference size and in 1 of 3 at half of it, and the lead-lag was
+flagged in 1 of 3 at twice the reference (and gave one ITERATE with nothing
+planted). The planted effects and the seeds are the same; the flow they are
+planted in is about 2.5 times sparser in time.
 
 **Where to look**
 
@@ -331,7 +370,7 @@ not a power curve.
 
 ```bash
 cd python
-PYTHONPATH=src python3 -m iap.research show 217fa0cb1d89a9c8   # one committed experiment: spec, result table, VERDICT, eligibility
+PYTHONPATH=src python3 -m iap.research show f0f6c49b553f6b59   # one committed experiment: spec, result table, VERDICT, eligibility
 PYTHONPATH=src python3 -m iap.lifecycle status                 # 24 alphas, all CANDIDATE, with the gate each one fails
 PYTHONPATH=src python3 -m pytest -q tests/test_validation_framework.py tests/test_research_validity.py
 ```
@@ -406,9 +445,12 @@ v1.3.0 corrected four of these rules, in C++, Java and Python together:
 | execute size | the quantity the event quoted | **capped** at the book order's remaining size, at the book order's side and price |
 | cancels | every cancel at our level moved us up by its quoted size | only a cancel of an order **known to be ahead of us**, by the size the book removed |
 
-All four changes can only reduce simulated fills. The fills golden, the
-MVP golden and the TCA golden are reproduced unchanged, because the golden
-sessions contain none of these patterns.
+All four changes can only reduce simulated fills. At v1.3.0 the fills
+golden, the MVP golden and the TCA golden were reproduced unchanged,
+because the golden sessions contain none of these patterns. (The MVP golden
+was regenerated in v1.4.0 for a different reason: its session comes from
+the generator, whose flow calibration changed. The fills and TCA goldens
+are built on the fixed golden vectors and are still byte-identical.)
 
 The simulator remains a model. It has no PEG or MID order types, and it is
 not calibrated against real fills (backlog, EPICS E27).
@@ -578,11 +620,20 @@ baseline shows positive out-of-sample IC against the mid-to-mid label.**
 Simple models establish that a signal exists; complex models may then
 refine it. If the linear model finds nothing, a tree will find the noise.
 
-**Result: the gate fails.** The best linear baseline (ridge) scores an IC
-of −0.043 against the mid-to-mid label. XGBoost, LightGBM and the network
-were never fitted on this data.
+**Result: the gate passes, and no model earns its costs.** The best linear
+baseline (ridge) scores an IC of +0.008 against the mid-to-mid label, so
+XGBoost, LightGBM and the network were fitted. None of them improves on
+it: their mid-label ICs are +0.005, +0.008 and −0.002. After conservative
+costs every one of the six models loses money per signal, from −0.11 bps
+(OLS, ridge, LightGBM) to −2.61 bps (the network). An IC of 0.008 is
+positive and is not a tradable edge; the gate says a model may be tried,
+not that it works.
 
-The same linear models score an IC of 0.94 against the *cost-adjusted*
+On the v1.3.0 dataset the same gate failed (ridge −0.043) and the advanced
+models were never fitted. The sign of a number that small moved with the
+dataset; the conclusion — nothing here should be promoted — did not.
+
+The same linear models score an IC of 0.96 against the *cost-adjusted*
 label. That number is an artefact: the cost-adjusted target contains the
 observable spread, and predicting the spread is easy. The gate once read
 that label and passed trivially. The lesson is in LEARN.md §7.2 — a model
@@ -595,9 +646,9 @@ which way; a second model predicts whether acting on that signal will be
 profitable after costs, and the trade is taken only above a probability
 threshold.
 
-**Result: the gate is degenerate on this data.** 3.7 % of test signals are
-profitable after costs. The calibrated meta-model (AUC 0.753) puts every
-test probability below the threshold, so it takes zero of 11,461 trades.
+**Result: the gate is degenerate on this data.** 6.2 % of test signals are
+profitable after costs. The calibrated meta-model (AUC 0.655) puts every
+test probability below the threshold, so it takes zero of 4,100 trades.
 The report flags this `gate_degenerate: true` and does not present it as a
 good decision: a gate that never fires is no evidence either way.
 
@@ -616,7 +667,7 @@ drift-triggered.
 
 **Result: no policy demonstrably beats static.** On two synthetic sessions
 the weekly schedule cannot fire even once, the drift-triggered policy
-refits 126 times in total, every policy is net-negative after costs, and
+refits 122 times in total, every policy is net-negative after costs, and
 the differences between policies are within noise. The report opens with
 that statement. What the study does establish is that the machinery is
 deterministic and leak-free.
@@ -642,7 +693,7 @@ nothing reduces the position automatically.
 **How to run it**
 
 ```bash
-grep -A 4 "^## The gate" research/ml_reports/ML_REPORT.md       # the gate rule and its FAILED result
+grep -A 4 "^## The gate" research/ml_reports/ML_REPORT.md       # the gate rule and its PASSED result
 cd python
 PYTHONPATH=src python3 -m pytest -q tests/test_model_gate.py tests/test_adaptive.py
 ```
@@ -713,10 +764,12 @@ Four things that would look impressive and establish nothing, with the
 reason for each:
 
 - **Deep sequence models over the order book.** The dataset is two
-  synthetic sessions, about 206,000 rows. The linear baseline already
-  fails the gate against the frictionless label, and the one high IC in
-  the ML report is spread prediction. A high-capacity model would fit the
-  generator's noise process. The gate of §5.1 exists to stop exactly this.
+  synthetic sessions, about 211,000 rows. The best linear IC against the
+  frictionless label is 0.008, the one high IC in the ML report is spread
+  prediction, and the models with more capacity that the gate of §5.1 let
+  through did no better: the trees did not beat the linear baseline and
+  the small network was the worst model fitted. A higher-capacity model
+  would fit the generator's noise process.
 - **Reinforcement-learning execution against the platform's own
   simulator.** The simulator's fills are a pinned rule set, its impact is
   a formula, the replayed book never reacts to our orders, and none of it
@@ -729,8 +782,9 @@ reason for each:
   be a look for the ledger, and the boundary of §6.1 forbids it on the
   trading path in any case.
 - **Agent debate.** Several agents arguing about 24 alphas on the same two
-  sessions add no data. Evidence comes from sessions, and these have been
-  looked at 1,068 times. Debate multiplies looks; it does not add a
+  sessions add no data. Evidence comes from sessions, and the ledger
+  already holds 1,920 looks at them (1,068 on the v1.3.0 dataset, 852 on
+  the regenerated one). Debate multiplies looks; it does not add a
   holdout. Without pre-registration and a hidden reserve seed — both
   backlog — there is also no way to score who was right.
 
@@ -824,4 +878,4 @@ PYTHONPATH=src python3 -m iap.mvp replay --run ../data/mvp/58a10f2194a3c81c     
 | the pictures | [DIAGRAMS.md](DIAGRAMS.md) |
 | every pinned rule | [../PLATFORM_CONVENTIONS.md](../PLATFORM_CONVENTIONS.md) |
 | what is done and what is backlog | [ROADMAP.md](ROADMAP.md), [EPICS.md](EPICS.md) |
-| what changed in v1.3.0 | [../CHANGELOG.md](../CHANGELOG.md) |
+| what changed in v1.3.0 and v1.4.0 | [../CHANGELOG.md](../CHANGELOG.md) |

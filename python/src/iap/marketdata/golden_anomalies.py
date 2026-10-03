@@ -408,7 +408,12 @@ def generate_golden_eq_anomalies(
         {
             "seed": seed,
             "anomalies": _ANOMALIES,
-            "equities": {"halt": {"reopen_auction": True, "reopen_call_s": 30, "duration_s": 120}},
+            # A fixed test vector: the v1.3.0 flow rule, so its bytes never
+            # move with the dataset default (generator module docs).
+            "equities": {
+                "halt": {"reopen_auction": True, "reopen_call_s": 30, "duration_s": 120},
+                "flow": {"calibration": "legacy_budget"},
+            },
         },
     )
     inst = refdata.instrument("SYN.EQ.001")

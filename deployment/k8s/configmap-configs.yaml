@@ -407,78 +407,34 @@ data:
         }
       ]
     }
-  marketdata__generator.json: |
-    {
-      "x-version": 1,
-      "description": "Synthetic market-data generator config (iap.marketdata.generator). All randomness is SplitMix64 seeded from `seed`; identical seed => bit-identical output files. Equities: ONE shared regime-switching efficient price per instrument (sigma per sqrt-second, 1s grid) with per-venue bounded AR(1) microstructure noise (`venue_noise`) and self-exciting MBO flow, so the consolidated multi-venue book stays uncrossed; FX streams are QUOTE+TRADE across LP1/LP2/PRI. `anomalies` are injected for QC testing and disabled for golden vectors.",
-      "seed": 20260829,
-      "sessions": 2,
-      "equities": {
-        "slots_per_stream": 3850,
-        "vol_regimes": {
-          "sigma_ticks_per_s": [
-            0.15,
-            0.4
-          ],
-          "switch_prob_per_s": 0.0007
-        },
-        "venue_noise": {
-          "rho": 0.9,
-          "sigma_ticks": 0.12,
-          "max_ticks": 0.45
-        },
-        "flow": {
-          "excitation_kick": 1.4,
-          "excitation_decay": 0.82,
-          "max_excitation": 8.0
-        },
-        "book": {
-          "max_resting_orders": 160,
-          "qty_lots_max": 10
-        },
-        "mix": {
-          "add": 0.46,
-          "cancel": 0.26,
-          "modify": 0.12,
-          "execute": 0.16
-        },
-        "halt": {
-          "instrument": "SYN.EQ.007",
-          "session_index": 0,
-          "duration_s": 300
-        },
-        "auction_prints": 3
-      },
-      "fx": {
-        "slots_per_pair": 3300,
-        "vol_regimes": {
-          "sigma_ticks": [
-            0.8,
-            3.0
-          ],
-          "switch_prob": 0.003
-        },
-        "spread_ticks": {
-          "PRI": 2,
-          "LP1": 3,
-          "LP2": 5
-        },
-        "trade_prob": 0.12,
-        "qty_units_max": 20
-      },
-      "anomalies": {
-        "gap_prob": 0.0006,
-        "gap_max_events": 3,
-        "dup_prob": 0.0015,
-        "ooo_prob": 0.001,
-        "invalid_prob": 0.0005,
-        "ts_violation_prob": 0.0005
-      }
-    }
+  marketdata__generator.json: "{\n  \"x-version\": 2,\n  \"description\": \"Synthetic market-data generator\
+    \ config (iap.marketdata.generator). All randomness is SplitMix64 seeded from `seed`; identical seed\
+    \ => bit-identical output files. Equities: ONE shared regime-switching efficient price per instrument\
+    \ (sigma per sqrt-second, 1s grid) with per-venue bounded AR(1) microstructure noise (`venue_noise`)\
+    \ and self-exciting MBO flow, so the consolidated multi-venue book stays uncrossed; `flow.calibration`\
+    \ \\\"session\\\" (x-version 2, v1.4.0) calibrates the base rate for the self-excitation so `slots_per_stream`\
+    \ expected flow slots span the whole session and flow reaches the close \u2014 \\\"legacy_budget\\\
+    \" reproduces the v1.3.0 dataset (data_version 203c8f54...), whose equity flow stopped about 40% into\
+    \ each session. FX streams are QUOTE+TRADE across LP1/LP2/PRI. `anomalies` are injected for QC testing\
+    \ and disabled for golden vectors.\",\n  \"seed\": 20260829,\n  \"sessions\": 2,\n  \"equities\":\
+    \ {\n    \"slots_per_stream\": 3850,\n    \"vol_regimes\": {\n      \"sigma_ticks_per_s\": [\n   \
+    \     0.15,\n        0.4\n      ],\n      \"switch_prob_per_s\": 0.0007\n    },\n    \"venue_noise\"\
+    : {\n      \"rho\": 0.9,\n      \"sigma_ticks\": 0.12,\n      \"max_ticks\": 0.45\n    },\n    \"\
+    flow\": {\n      \"excitation_kick\": 1.4,\n      \"excitation_decay\": 0.82,\n      \"max_excitation\"\
+    : 8.0,\n      \"calibration\": \"session\"\n    },\n    \"book\": {\n      \"max_resting_orders\"\
+    : 160,\n      \"qty_lots_max\": 10\n    },\n    \"mix\": {\n      \"add\": 0.46,\n      \"cancel\"\
+    : 0.26,\n      \"modify\": 0.12,\n      \"execute\": 0.16\n    },\n    \"halt\": {\n      \"instrument\"\
+    : \"SYN.EQ.007\",\n      \"session_index\": 0,\n      \"duration_s\": 300\n    },\n    \"auction_prints\"\
+    : 3\n  },\n  \"fx\": {\n    \"slots_per_pair\": 3300,\n    \"vol_regimes\": {\n      \"sigma_ticks\"\
+    : [\n        0.8,\n        3.0\n      ],\n      \"switch_prob\": 0.003\n    },\n    \"spread_ticks\"\
+    : {\n      \"PRI\": 2,\n      \"LP1\": 3,\n      \"LP2\": 5\n    },\n    \"trade_prob\": 0.12,\n \
+    \   \"qty_units_max\": 20\n  },\n  \"anomalies\": {\n    \"gap_prob\": 0.0006,\n    \"gap_max_events\"\
+    : 3,\n    \"dup_prob\": 0.0015,\n    \"ooo_prob\": 0.001,\n    \"invalid_prob\": 0.0005,\n    \"ts_violation_prob\"\
+    : 0.0005\n  }\n}\n"
   mvp__generator.json: |
     {
-      "x-version": 1,
-      "description": "MVP market-data generator config (iap.mvp.feed over iap.marketdata.generator, unmodified): seed 12345 (overridden by mvp.json seed / --seed so that one seed drives the whole run), ONE session, equities only (the MVP reference data lists no FX instrument, so the generator's FX branch emits nothing). The MVP instrument SYN.EQ.AAPL trades on XV1/XV2/XV3; each venue stream gets slots_per_stream flow slots spread over the mvp.json session window (the generator's own rate rule: lambda0 = slots / duration * 1.3, so roughly 77% of the slots are consumed before the close). The QC anomaly injection stays at the bundled rates so the loop exercises sequence-gap gating (SNAPSHOT recovery -> risk on_sequence_gap / on_feed_recovered), duplicates and out-of-order arrivals; the intraday halt targets the MVP instrument itself so the venue trading-state gate (simulator rule 8, SOR eligibility, NO_ROUTE) is exercised too.",
+      "x-version": 2,
+      "description": "MVP market-data generator config (iap.mvp.feed over iap.marketdata.generator, unmodified): seed 12345 (overridden by mvp.json seed / --seed so that one seed drives the whole run), ONE session, equities only (the MVP reference data lists no FX instrument, so the generator's FX branch emits nothing). The MVP instrument SYN.EQ.AAPL trades on XV1/XV2/XV3; each venue stream gets slots_per_stream EXPECTED flow slots spread over the whole mvp.json session window (flow.calibration \"session\", x-version 2: the base rate is calibrated for the self-excitation and flow runs to the close; up to v1.3.0 the slot budget was spent about a third of the way into the session). The QC anomaly injection stays at the bundled rates so the loop exercises sequence-gap gating (SNAPSHOT recovery -> risk on_sequence_gap / on_feed_recovered), duplicates and out-of-order arrivals; the intraday halt targets the MVP instrument itself so the venue trading-state gate (simulator rule 8, SOR eligibility, NO_ROUTE) is exercised too.",
       "seed": 12345,
       "sessions": 1,
       "equities": {
@@ -487,13 +443,16 @@ data:
           "instrument": "SYN.EQ.AAPL",
           "session_index": 0,
           "duration_s": 45
+        },
+        "flow": {
+          "calibration": "session"
         }
       }
     }
   mvp__generator_tiny.json: |
     {
-      "x-version": 1,
-      "description": "Generator config of the tiny test session (configs/mvp/mvp_tiny.json): the MVP generator config with fewer flow slots per venue stream and a weaker self-excitation kick, so the 8-minute test session holds a few thousand events whose flow reaches past the 3-minute portfolio warm-up.",
+      "x-version": 2,
+      "description": "Generator config of the tiny test session (configs/mvp/mvp_tiny.json): the MVP generator config with fewer flow slots per venue stream and a weaker self-excitation kick; with flow.calibration \"session\" (x-version 2) the 8-minute test session holds a few thousand events spread over the whole window.",
       "seed": 12345,
       "sessions": 1,
       "equities": {
@@ -504,7 +463,8 @@ data:
           "duration_s": 45
         },
         "flow": {
-          "excitation_kick": 0.5
+          "excitation_kick": 0.5,
+          "calibration": "session"
         }
       }
     }
@@ -786,17 +746,17 @@ data:
     }
   strategies__alpha_params.json: |
     {
-      "data_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
+      "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
       "description": "Fitted flagship-alpha parameters (iap.alpha). model linear_z_v1: er = beta * clip((raw - mu)/(sigma + 1e-12), +-z_clip); conf = min(1, |z|/conf_scale); a dead alpha (sigma <= 0 or beta == 0) scores (0, 0) on every row. The provenance header identifies the feature registry, the data and the commit these numbers were fitted with; every loader rejects a feature_version that differs from its engine's registry hash. See /API_ALPHA.md section 2.",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
-      "git_commit": "fc41ac6f1381cc88d235fa206ba94f7bd104d469",
+      "git_commit": "29f0822534e3c6d74e09cbe393d5d58e6edf4919",
       "git_dirty": true,
-      "git_dirty_hash": "63cf5f68b6a83680d1d578488fbf0e72f20b8ceec8f7974a3aaaf70ca74863fc",
+      "git_dirty_hash": "a1cb60d7b06295999e581ea66f375d920881be62214f127fa2cb5c684632ebe9",
       "params": {
         "EQ01": {
           "alpha_id": "EQ01",
-          "beta": 1.2584700120868522e-06,
-          "beta_fit": 1.2584700120868522e-06,
+          "beta": 5.84449379264817e-08,
+          "beta_fit": 5.84449379264817e-08,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -806,9 +766,9 @@ data:
           "horizon": "1s",
           "hypothesis_confirmed": true,
           "model": "linear_z_v1",
-          "mu": 0.022273319056195184,
-          "n_train": 77816,
-          "sigma": 1.2145355737992412,
+          "mu": 0.01289768995965269,
+          "n_train": 80238,
+          "sigma": 1.433527721314541,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -817,8 +777,8 @@ data:
         },
         "EQ02": {
           "alpha_id": "EQ02",
-          "beta": 4.217118712653277e-06,
-          "beta_fit": 4.217118712653277e-06,
+          "beta": 2.858082900639863e-06,
+          "beta_fit": 2.858082900639863e-06,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -828,9 +788,9 @@ data:
           "horizon": "5s",
           "hypothesis_confirmed": true,
           "model": "linear_z_v1",
-          "mu": -0.0012738553275802992,
-          "n_train": 77277,
-          "sigma": 0.31061745430647164,
+          "mu": -0.00039288399208881026,
+          "n_train": 79973,
+          "sigma": 0.28278680274391194,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -839,8 +799,8 @@ data:
         },
         "EQ03": {
           "alpha_id": "EQ03",
-          "beta": 4.0593310230811845e-06,
-          "beta_fit": 4.0593310230811845e-06,
+          "beta": 2.3843836063294293e-06,
+          "beta_fit": 2.3843836063294293e-06,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -852,9 +812,9 @@ data:
           "horizon": "5s",
           "hypothesis_confirmed": true,
           "model": "linear_z_v1",
-          "mu": -0.0008108714668119846,
-          "n_train": 77277,
-          "sigma": 0.1681551269012764,
+          "mu": -0.0002571942424055844,
+          "n_train": 79973,
+          "sigma": 0.15844419707850682,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -863,8 +823,8 @@ data:
         },
         "EQ04": {
           "alpha_id": "EQ04",
-          "beta": -3.085951576646263e-10,
-          "beta_fit": -3.085951576646263e-10,
+          "beta": -4.6639911343519124e-07,
+          "beta_fit": -4.6639911343519124e-07,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -874,9 +834,9 @@ data:
           "horizon": "5s",
           "hypothesis_confirmed": false,
           "model": "linear_z_v1",
-          "mu": 0.00011426026947002353,
-          "n_train": 56836,
-          "sigma": 0.8099374389660473,
+          "mu": -0.005906000644076835,
+          "n_train": 36251,
+          "sigma": 0.9180397767878333,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -885,8 +845,8 @@ data:
         },
         "EQ05": {
           "alpha_id": "EQ05",
-          "beta": 1.016442386331674e-06,
-          "beta_fit": 1.016442386331674e-06,
+          "beta": 3.1255142007509825e-07,
+          "beta_fit": 3.1255142007509825e-07,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -899,9 +859,9 @@ data:
           "horizon": "1s",
           "hypothesis_confirmed": true,
           "model": "linear_z_v1",
-          "mu": 0.0031872069008533387,
-          "n_train": 77779,
-          "sigma": 0.6622249473747265,
+          "mu": -0.00535011339304477,
+          "n_train": 80242,
+          "sigma": 0.648421966412934,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -910,8 +870,8 @@ data:
         },
         "EQ06": {
           "alpha_id": "EQ06",
-          "beta": 7.474776644816464e-06,
-          "beta_fit": 7.474776644816464e-06,
+          "beta": 6.08312181431125e-06,
+          "beta_fit": 6.08312181431125e-06,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -921,9 +881,9 @@ data:
           "horizon": "10s",
           "hypothesis_confirmed": true,
           "model": "linear_z_v1",
-          "mu": 0.024268266367893764,
-          "n_train": 68941,
-          "sigma": 3.5261274939832927,
+          "mu": 0.009272202106182985,
+          "n_train": 56441,
+          "sigma": 3.6814734421084916,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -932,8 +892,8 @@ data:
         },
         "EQ07": {
           "alpha_id": "EQ07",
-          "beta": -3.3775269149210177e-06,
-          "beta_fit": -3.3775269149210177e-06,
+          "beta": -1.188348563757847e-06,
+          "beta_fit": -1.188348563757847e-06,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -943,9 +903,9 @@ data:
           "horizon": "10s",
           "hypothesis_confirmed": false,
           "model": "linear_z_v1",
-          "mu": -0.005653538256606401,
-          "n_train": 68941,
-          "sigma": 1.4555473214078707,
+          "mu": -0.0005622499912300753,
+          "n_train": 56441,
+          "sigma": 1.8937179246046851,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -954,8 +914,8 @@ data:
         },
         "EQ08": {
           "alpha_id": "EQ08",
-          "beta": -8.424071200526209e-06,
-          "beta_fit": -8.424071200526209e-06,
+          "beta": -9.367249881022218e-06,
+          "beta_fit": -9.367249881022218e-06,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -966,9 +926,9 @@ data:
           "horizon": "10s",
           "hypothesis_confirmed": false,
           "model": "linear_z_v1",
-          "mu": 0.2752485740120898,
-          "n_train": 75304,
-          "sigma": 5.06525329153586,
+          "mu": 0.3059255946215191,
+          "n_train": 63945,
+          "sigma": 5.378637770336121,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -977,8 +937,8 @@ data:
         },
         "EQ09": {
           "alpha_id": "EQ09",
-          "beta": -5.244767556971614e-06,
-          "beta_fit": -5.244767556971614e-06,
+          "beta": -6.91491308712436e-06,
+          "beta_fit": -6.91491308712436e-06,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -988,9 +948,9 @@ data:
           "horizon": "10s",
           "hypothesis_confirmed": false,
           "model": "linear_z_v1",
-          "mu": 2.577610208743877e-06,
-          "n_train": 40388,
-          "sigma": 0.00023141427859777527,
+          "mu": 2.4933549132173555e-07,
+          "n_train": 22492,
+          "sigma": 0.00026574977380172915,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -999,8 +959,8 @@ data:
         },
         "EQ10": {
           "alpha_id": "EQ10",
-          "beta": -3.701223857157952e-07,
-          "beta_fit": -3.701223857157952e-07,
+          "beta": -1.0382831773333301e-07,
+          "beta_fit": -1.0382831773333301e-07,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -1010,9 +970,9 @@ data:
           "horizon": "1s",
           "hypothesis_confirmed": false,
           "model": "linear_z_v1",
-          "mu": -3.794293101820597e-08,
-          "n_train": 70707,
-          "sigma": 5.600352985597542e-06,
+          "mu": -8.497863556144523e-10,
+          "n_train": 73086,
+          "sigma": 6.415846458099899e-06,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -1021,8 +981,8 @@ data:
         },
         "EQ11": {
           "alpha_id": "EQ11",
-          "beta": 3.728640692345463e-05,
-          "beta_fit": 3.728640692345463e-05,
+          "beta": 7.596592782546579e-05,
+          "beta_fit": 7.596592782546579e-05,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -1032,9 +992,9 @@ data:
           "horizon": "15m",
           "hypothesis_confirmed": true,
           "model": "linear_z_v1",
-          "mu": -0.0019159047277148768,
-          "n_train": 41476,
-          "sigma": 0.9981837407739049,
+          "mu": -0.02394215245476243,
+          "n_train": 40730,
+          "sigma": 0.9512438512337923,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -1043,8 +1003,8 @@ data:
         },
         "EQ12": {
           "alpha_id": "EQ12",
-          "beta": 4.459918684072455e-06,
-          "beta_fit": 4.459918684072455e-06,
+          "beta": 2.8437574758648306e-06,
+          "beta_fit": 2.8437574758648306e-06,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -1055,9 +1015,9 @@ data:
           "horizon": "5s",
           "hypothesis_confirmed": true,
           "model": "linear_z_v1",
-          "mu": -0.001694905134649208,
-          "n_train": 75426,
-          "sigma": 0.3151908793113707,
+          "mu": -0.00033390039599797637,
+          "n_train": 79190,
+          "sigma": 0.2867460000743925,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532

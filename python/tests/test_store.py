@@ -916,7 +916,10 @@ def test_import_tca_orders_and_perold_identity(store: Store) -> None:
 
 def test_import_model_runs_and_baselines(store: Store) -> None:
     rep = import_model_runs(store, RESEARCH / "models")
-    assert rep.inserted["model_runs"] == 33 and not rep.warnings
+    # one row per tracked run directory: the model ledger is append-only and
+    # every ML rerun adds its fits (33 up to v1.3.0, 40 with the v1.4.0 run)
+    n_runs = sum(1 for d in (RESEARCH / "models").glob("run_*") if d.is_dir())
+    assert rep.inserted["model_runs"] == n_runs >= 40 and not rep.warnings
     ols = store.query("SELECT * FROM model_runs WHERE run_id='run_0001_ols'")[0]
     assert ols["model_version"] == "ols_v1" and ols["mean_ic"] is not None
     assert json.loads(ols["manifest_json"])["experiment_id"] == "run_0001_ols"
@@ -965,7 +968,10 @@ def test_cli_build_explain_sql(tmp_path: Path, capsys: pytest.CaptureFixture[str
     lines = out.splitlines()
     assert lines[0].split() == ["table", "rows"]
     table = {line.split()[0]: int(line.split()[1]) for line in lines[1:]}
-    assert table["alphas"] == 24 and table["model_runs"] == 33
+    # one row per tracked model run on disk (the model ledger is append-only:
+    # every ML rerun adds its fits, so the count is derived, not a literal)
+    n_model_runs = sum(1 for d in (RESEARCH / "models").glob("run_*") if d.is_dir())
+    assert table["alphas"] == 24 and table["model_runs"] == n_model_runs >= 40
     assert list(table) == sorted(table)
 
     with Store.open(db) as s:

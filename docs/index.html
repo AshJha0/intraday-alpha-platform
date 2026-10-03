@@ -65,25 +65,25 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
 <div class="wrap">
   <h2>Measured, not claimed</h2>
   <div class="numbers">
-    Cross-language parity&nbsp;&nbsp;&nbsp; python 1565&nbsp; · cpp 289&nbsp; · rust 323&nbsp; · java 510 tests — 2,687 green, one command; golden groups 166/68/64/104<br>
+    Cross-language parity&nbsp;&nbsp;&nbsp; python 1573&nbsp; · cpp 289&nbsp; · rust 323&nbsp; · java 510 tests — 2,695 green, one command; golden groups 166/68/64/104<br>
     Golden suites&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; identical book states, byte-identical IAP1 SHA-256, features/alphas to 1e-9, byte-identical canonical JSON, trace digests, risk audit and lifecycle registry in all four languages<br>
     C++ hot path&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; IAP1 decode 184.1 ns/event (CRC-32 verified) · book update 26.4 ns · replay 27.2M events/s · 48-feature engine 514.1 ns/event · one decision trace 31.7 µs/trace off the event loop<br>
     Determinism&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; full dataset regeneration is byte-identical (sha256-verified); replays reproduce fills exactly; the MVP run twice and replayed from its capture reproduces its trace digest<br>
     Contracts&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 17 JSON Schemas · 22 typed contracts · 18 Protocols; Python risk and execution ports proven by the Rust and C++ goldens (audit + snapshot byte-identical, fills bit-identical)<br>
     Feature factory&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 205 registered, versioned features across 10 families; validity-bitset semantics, no NaN ever valid<br>
-    Alpha research&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 24 flagship alphas · walk-forward + purging/embargo · 1068-look multiple-testing ledger over 70 distinct configurations (expected max |t| 3.735, Bonferroni |t| ≥ 4.071)<br>
+    Alpha research&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 24 flagship alphas · walk-forward + purging/embargo · 1920-look multiple-testing ledger over 139 distinct configurations, both datasets counted (expected max |t| 3.888, Bonferroni |t| ≥ 4.206)<br>
     Promotion lifecycle&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 7 states · 17 pinned edges · 18 gates; bundled data: 24 alphas at CANDIDATE, 0 beyond — every one fails net P&amp;L after costs<br>
-    MVP golden run&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 16,578 events · 355 decisions · 66 parent orders · 55 fills · P&amp;L −22.65 USD (cost-negative, stated) · digest d938eeae…<br>
-    Adaptive lifecycle&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; PSI/KS drift monitors · 126 drift-triggered refits in the study · RETIRED halts allocation in the backtest, pages a human live<br>
-    Verdicts (honest)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0 PROMOTE · 11 ITERATE · 13 REJECT — on clean synthetic data, nothing survives costs, and we say so<br>
-    Power study&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; planted order-flow effect flagged in 3 of 3 seeds at the reference size · planted lead-lag in 0 of 3 · nothing promoted at any size — 3 seeds per cell, a calibration, not a power curve
+    MVP golden run&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 15,805 events · 800 decisions · 235 parent orders · 169 fills · P&amp;L −81.53 USD (cost-negative, stated) · digest f51890da…<br>
+    Adaptive lifecycle&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; PSI/KS drift monitors · 122 drift-triggered refits in the study · RETIRED halts allocation in the backtest, pages a human live<br>
+    Verdicts (honest)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0 PROMOTE · 10 ITERATE · 14 REJECT — on clean synthetic data, nothing survives costs, and we say so<br>
+    Power study&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; planted order-flow effect reaches t ≥ 3 in 1 of 3 seeds at the reference size and 3 of 3 at twice that size · planted lead-lag not detected at any size · nothing promoted at any size — 3 seeds per cell, a calibration, not a power curve
   </div>
 
   <div class="honest">
     <strong>Research truth over backtest cosmetics.</strong> The adversarial review of this
     platform found — and fixed — a generator artifact that left the consolidated equity book
     crossed 95% of the time and silently inflated ML information coefficients. After the fix
-    (a shared efficient price per instrument) the crossed fraction is 0.8%, every golden file
+    (a shared efficient price per instrument) the crossed fraction is 0.26% on the current dataset, every golden file
     and research report was regenerated, and the alpha promotion count honestly fell from 2 to 0.
     The full story is a worked case study in
     <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/LEARN.md">LEARN.md §7</a>.
@@ -103,6 +103,21 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
     lists what is still open.
   </div>
 
+  <div class="honest">
+    <strong>v1.4.0 (2026-10-03): the dataset was wrong, and every number that came from it was regenerated.</strong>
+    Up to v1.3.0 the seeded generator stopped each equity stream's continuous flow 37.6–43.2% of
+    the way through the session, so the equity research had only seen the first part of each day.
+    The flow calibration is fixed (flow now reaches the close; the old dataset is still
+    reproducible byte for byte with <code>equities.flow.calibration = "legacy_budget"</code>) and
+    the reports, the ledger, the lifecycle registry and four goldens were regenerated in one CI
+    job. The equity statistics are weaker on the corrected data: one alpha fell from ITERATE to
+    REJECT, EQ03's uncrossed IC went from 0.0298 (t 10.57) to 0.0190 (t 5.78), and the power
+    study detects less than it did. The ML gate now passes and the tree models and the MLP were
+    fitted; none earns its costs. The MVP session trades more and loses more. The looks spent on
+    the old dataset stay in the multiple-testing ledger. Still 0 PROMOTE; details in the
+    <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/CHANGELOG.md">changelog</a>.
+  </div>
+
   <h2>Start here</h2>
   <div class="grid">
     <div class="card"><h3>How the quant, algo and AI sides work</h3>
@@ -119,8 +134,8 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
          backlog epic, and the page says what would be theatre on this data.
          <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/HOW_IT_WORKS.md#6-ai-llms-and-agents-the-boundary-what-exists-what-is-planned">HOW_IT_WORKS §6</a></p></div>
     <div class="card"><h3>Research validity &amp; the power study</h3>
-      <p>Corrected statistics and policies added opt-in beside every pinned default, so no
-         committed number moves: a pooled-slope HAC t, a ledger-derived threshold, a cost-aware
+      <p>Corrected statistics and policies added opt-in beside every pinned default, so they
+         move no committed number: a pooled-slope HAC t, a ledger-derived threshold, a cost-aware
          position policy, a recompute leakage probe, per-fold diagnostics. A planted-signal
          study measures what the validation chain can detect — and shows it promotes nothing.
          <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/RESEARCH_VALIDITY.md">RESEARCH_VALIDITY</a>,
@@ -162,7 +177,8 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
     <div class="card"><h3>ML &amp; meta-labeling</h3>
       <p>Linear baselines gate the advanced models, literally: trees and the MLP run only if
          the best linear model shows OOS signal against the frictionless label. On the bundled
-         data it does not (IC &minus;0.043), so they were never fitted. A calibrated
+         data it does, barely (ridge, pooled OOS IC +0.0081), so xgboost, lightgbm and the MLP
+         were fitted — and no model earns its costs. A calibrated
          trade/no-trade meta-label gate, evaluated economically, takes zero trades and is
          reported as degenerate rather than as a success. Reproducibility manifests
          (data/feature/model versions, windows, hardware) on every fit.</p></div>
@@ -226,8 +242,8 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
     <div class="card"><h3>The executable MVP</h3>
       <p><code>python -m iap.mvp run</code>: seeded feed → books → features → EQ01/EQ03/EQ06 →
          portfolio → hard risk → TWAP/POV/IS → SOR over three venues → simulator → TCA → trace →
-         SQLite → report, deterministic twice over. The golden run loses 22.65 USD, the realized-IC
-         gap is audited to the data rather than a leak, and the document says so.</p></div>
+         SQLite → report, deterministic twice over. The golden run loses 81.53 USD, the realized-IC
+         gap is attributed to the data rather than a leak, and the document says so.</p></div>
     <div class="card"><h3>Observability &amp; deployment</h3>
       <p>Prometheus metrics (rust telemetry + 19 live Java metrics with /metrics, /health),
          recording + alert rules, two Grafana dashboards, structured JSONL logs,

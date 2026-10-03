@@ -15,6 +15,6 @@ flowchart TD
     S3 --> REP
     S4 --> REP
     S5 --> REP
-    REP --> READ["committed result:<br/>order flow flagged in 3 of 3 seeds at level 1, 1 of 3 at level 0.5<br/>lead-lag flagged in 0 of 3 at level 1, 1 of 3 at level 2<br/>break rows: 0 everywhere · PROMOTE: 0 in every cell<br/>no P&L interval above zero in any cell"]
+    REP --> READ["committed result:<br/>order flow flagged in 3 of 3 seeds at level 2, 1 of 3 at level 1, 0 of 3 at level 0.5<br/>lead-lag flagged in 0 of 3 at every level<br/>break rows: 0 everywhere · PROMOTE: 0 in every cell<br/>no P&L interval above zero in any cell"]
     OFF["the planted block is OFF by default: the pinned dataset is<br/>byte-identical with or without it; the study never touches<br/>data/ or the research ledger"] -.-> GEN
     LIM["3 seeds per cell: a rate moves in steps of 0.33 —<br/>this calibrates the chain, it is not a power curve"] -.-> READ

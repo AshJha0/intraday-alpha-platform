@@ -53,22 +53,22 @@ the full design, data flow, and diagrams.
 |---|---|---|
 | Registered features | **205** (10 families; 40-feature native core set ported to C++/Rust/Java) | `data/reference/feature_registry.json` |
 | Flagship alphas | **24** (EQ01–EQ12, FX01–FX12), each with an enforced `Economic rationale:` docstring | `python/src/iap/alpha/`, `research/alpha_reports/` |
-| Promotion verdicts | **0 PROMOTE / 11 ITERATE / 13 REJECT** (gated on *uncrossed* IC) | `research/alpha_reports/REPORT.md` |
+| Promotion verdicts | **0 PROMOTE / 10 ITERATE / 14 REJECT** (gated on *uncrossed* IC) | `research/alpha_reports/REPORT.md` |
 | Lifecycle registry | **24 alphas at CANDIDATE, 0 beyond** — every one fails `net_pnl_after_costs` at 1× costs (7 states, 17 pinned edges, 18 gates) | `research/alpha_registry.json`, `research/lifecycle_transitions.jsonl`, `tests/golden/expected_lifecycle.json` |
-| Experiments ledger | 1068 recorded looks over **70 distinct configurations** (de-duplicated by alpha × kind × config); expected max \|t\| under the global null ≈ 3.735, Bonferroni per-test \|t\| ≥ 4.071 | `research/experiments.json` |
+| Experiments ledger | 1920 recorded looks over **139 distinct configurations** (de-duplicated by alpha × kind × config × dataset: 70 configurations of the v1.3.0 dataset are kept as history, 69 are on the current one); expected max \|t\| under the global null ≈ 3.888, Bonferroni per-test \|t\| ≥ 4.206 | `research/experiments.json` |
 | Contracts | **17** JSON Schemas (all `x-version` 1) mirrored by **22** typed Python contracts and **18** runtime-checkable Protocols; one pinned instance each | `schemas/`, `python/src/iap/contracts/`, `tests/golden/expected_contracts_examples.json` |
 | Python reference ports proven by the ports' own goldens | risk: `expected_risk_decisions.json` exact, audit JSONL + snapshot **byte-identical**; execution: `expected_replay_fills.json` **bit-identical** | `python/tests/test_risk_golden.py`, `python/tests/test_execution_golden.py` |
-| MVP golden run (`python -m iap.mvp run`, seed 12345) | **16,578** events · **355** decisions · **66** parent orders · **55** fills · P&L **−22.65 USD** (cost-negative: +0.039 bps alpha vs −0.41 bps execution cost) · trace digest `d938eeae…` reproduced by run-twice and replay-from-capture | `tests/golden/expected_mvp.json` |
-| Adaptive deployment study | 4 refit policies × 10 alphas; 126 drift-triggered refits; FX01 retired under every policy | `research/adaptive_reports/ADAPTIVE_REPORT.md` |
-| Bundled dataset | 2 synthetic sessions, 19 instruments, 310,159 normalized events | `data/normalized/qc_report.json` |
-| Feature emission | 208,437 vectors at 100 ms cadence | `data/features/features_summary.json` |
+| MVP golden run (`python -m iap.mvp run`, seed 12345) | **15,805** events · **800** decisions · **235** parent orders · **169** fills · P&L **−81.53 USD** (cost-negative: +0.022 bps alpha vs −0.41 bps execution cost) · trace digest `f51890da…` reproduced by run-twice and replay-from-capture | `tests/golden/expected_mvp.json` |
+| Adaptive deployment study | 4 refit policies × 10 alphas; 122 drift-triggered refits; FX01 retired under every policy | `research/adaptive_reports/ADAPTIVE_REPORT.md` |
+| Bundled dataset | 2 synthetic sessions, 19 instruments, 308,975 normalized events (`data_version` `116b7787…`; equity flow runs to the close since v1.4.0) | `data/normalized/qc_report.json` |
+| Feature emission | 213,021 vectors at 100 ms cadence | `data/features/features_summary.json` |
 | C++ hot path | IAP1 decode 184.1 ns/event (CRC-32 verified); book update 26.4 ns; replay 27.2M events/s; one 5.6 KB decision trace serialised in 31.7 µs off the event loop | `benchmarks/results_cpp.md` |
 
 The honesty is the point (spec §32): of 24 alphas on the bundled synthetic
 data, **none** survives every promotion gate — leakage tests, OOS IC ≥ 0.01,
 Newey–West t ≥ 3.0, fold consistency, *hypothesis sign confirmed*, and
-positive net P&L at 1× modeled costs. Eleven are statistically real enough
-for ITERATE (EQ03: uncrossed IC 0.0298, t 10.6,
+positive net P&L at 1× modeled costs. Ten are statistically real enough
+for ITERATE (EQ03: uncrossed IC 0.0190, t 5.8,
 leakage-clean), yet every one of the 24 loses money net of modeled costs at 1×.
 
 A correctness review on 2026-09-20 moved several of these numbers, always
@@ -96,10 +96,56 @@ its admin listener to every interface. On the research side the corrected
 statistics are **opt-in** — every default is the previously pinned
 behaviour, so no committed number moved — and a planted-signal power study
 ([research/power/POWER_REPORT.md](research/power/POWER_REPORT.md)) measures
-what the validation chain can and cannot detect: at the reference effect
-size it flags the planted order-flow signal in 3 of 3 seeds and the planted
-lead-lag in 0 of 3, promotes nothing at any size, and no bootstrap P&L
-interval lies above zero. Still 0 PROMOTE.
+what the validation chain can and cannot detect: on the v1.3.0 dataset it
+flagged the planted order-flow signal in 3 of 3 seeds at the reference
+effect size and the planted lead-lag in 0 of 3, promoted nothing at any
+size, and no bootstrap P&L interval lay above zero (the current figures,
+which are weaker, are in the next paragraph). Still 0 PROMOTE.
+
+v1.4.0 (2026-10-03) corrects the dataset itself. Up to v1.3.0 a generator
+bug ended each equity stream's continuous flow 37.6–43.2% of the way
+through the 6.5-hour session, so all equity research had seen only about
+the first 2 h 40 min after the open, with events packed about 2.5 times as
+densely as they are now. The default calibration is now
+`equities.flow.calibration = "session"` (generator config `x-version` 2):
+flow runs to the close, and `"legacy_budget"` reproduces the v1.3.0 dataset
+byte for byte. Everything derived from the dataset was regenerated in one
+pass (`tools/regenerate_dataset_artifacts.py`, run by the manual
+`regenerate` CI job); the FX files are byte-identical and every FX alpha
+report is unchanged. What moved, all of it on the equity side:
+
+- **Verdicts: 0 PROMOTE / 10 ITERATE / 14 REJECT** (was 0 / 11 / 13). EQ11
+  falls from ITERATE to REJECT (uncrossed t 1.40). The equity statistics are
+  weaker throughout — EQ03's uncrossed IC is 0.0190 at t 5.78, where the
+  compressed flow gave 0.0298 at t 10.57 — and only four alphas (EQ02,
+  EQ03, EQ12, FX04) now fail the cost gate alone; the others also fail a
+  statistical or stability gate.
+- **Labels.** Equity rows are now about 3.1–3.3 s apart (median quote gap
+  about 2 s), so the 5 s floor of the label freshness rule binds and a
+  material share of equity labels at horizons of 10 s and longer is invalid
+  as stale: the valid fraction is 0.99–1.00 at 5 s, 0.79–0.81 at 10 s,
+  0.75–0.77 at 1 m and 0.45–0.63 at 15 m.
+- **ML.** The linear gate now **passes**: the best baseline (ridge) has a
+  pooled OOS IC of +0.0081 against the mid-to-mid label (it was −0.0430, a
+  fail), so xgboost, lightgbm and the MLP were fitted instead of skipped.
+  None earns its costs — the conservative net is
+  negative for every model (−0.110 to −2.612 bps per signal) — and the
+  meta-label gate is still degenerate (zero trades).
+- **Power study.** The chain is less sensitive than the v1.3.0 run
+  suggested. The planted order-flow effect at the reference size reaches
+  t ≥ 3 in 1 of 3 seeds (ITERATE-level evidence in 3 of 3), at twice the
+  size in 3 of 3, and at half the size in none; the planted lead-lag is not
+  detected at any size. Nothing is flagged at the null level, nothing is
+  promoted, and no bootstrap P&L interval lies above zero.
+- **MVP.** The golden session trades through all 15 minutes instead of the
+  first part of them: 800 decisions and 169 fills (was 355 and 55), and it
+  loses 81.53 USD (was 22.65).
+- **Ledger.** The looks already spent on the v1.3.0 dataset (1068) are kept
+  and the regenerated pipelines added 852 more, so the multiple-testing
+  yardstick is harsher (Bonferroni \|t\| ≥ 4.206), not reset.
+
+The conclusions did not change: 0 PROMOTE, 24 alphas held at CANDIDATE by
+`net_pnl_after_costs`, a cost-negative MVP.
 
 Two conditioning rules do most of the culling, and both were added after a
 round-3 audit found the earlier numbers were measuring the wrong thing. IC is
@@ -121,13 +167,13 @@ same thing from two more directions: the promotion lifecycle
 ([docs/LIFECYCLE.md](docs/LIFECYCLE.md)) bootstraps all 24 alphas to
 CANDIDATE and advances none, because the `net_pnl_after_costs` gate fails
 for every one; and the executable MVP ([docs/MVP.md](docs/MVP.md)) runs the
-full loop on one synthetic equity and loses 22.65 USD on 3,126 shares — an
-alpha contribution of +0.039 bps against −0.41 bps of modelled execution
-cost. Its realized mid-to-mid IC (0.28 for EQ01 at 1 s) is an order of
-magnitude above the research IC (0.027); that gap was audited on
-2026-09-20 and is a property of the synthetic generator's mean-reverting
-venue noise, not a leak — and the cost-adjusted IC (0.017) still does not
-pay (docs/MVP.md §7.1).
+full loop on one synthetic equity and loses 81.53 USD on 8,229 shares — an
+alpha contribution of +0.022 bps against −0.41 bps of modelled execution
+cost. Its realized mid-to-mid IC (0.22 for EQ01 at 1 s) is about twenty
+times the research IC (0.010); the audit of that gap (2026-09-20, on the
+v1.3.0 session) attributed it to the synthetic generator's mean-reverting
+venue noise, not a leak — and the cost-adjusted IC (−0.024) is negative
+(docs/MVP.md §7.1).
 
 **Models decay, and the platform now treats that as a first-class
 concern.** The adaptability layer (`python/src/iap/adaptive` — the
@@ -238,7 +284,7 @@ cd java   && bash build.sh && bash test.sh && cd ..
 bash tests/harness/run_all.sh              # add --golden-only for the fast parity check
 python3 -m pytest -q tests/integration tests/replay   # the two repo-level suites alone
 
-# 4. Run the whole platform loop on one instrument, fully traced (docs/MVP.md; ~7 s)
+# 4. Run the whole platform loop on one instrument, fully traced (docs/MVP.md; under a minute)
 cd python && PYTHONPATH=src python3 -m iap.mvp run                    # -> ../data/mvp/<run_id>/
 PYTHONPATH=src python3 -m iap.mvp verify                              # run twice, identical bytes
 PYTHONPATH=src python3 -m iap.mvp replay --run ../data/mvp/<run_id>   # same digest from the capture
@@ -279,12 +325,12 @@ python3 tools/github/create_issues.py --dry-run   # the epics/issues plan (docs/
 ===================== cross-language parity table =====================
 language | tests passed | golden passed  | time   | status
 ---------+--------------+----------------+--------+-------
-python   | 1565         | 166            |    -s | PASS
+python   | 1573         | 166            |    -s | PASS
 cpp      | 289          | 68             |    -s | PASS
 rust     | 323          | 64             |    -s | PASS
 java     | 510          | 104            |    -s | PASS
 integration | 17           | -              |    -s | PASS
-replay   | 4            | -              |    -s | PASS
+replay   | 6            | -              |    -s | PASS
 deployment | -            | -              |    -s | PASS
 numbers  | -            | -              |    -s | PASS
 =======================================================================
@@ -359,7 +405,7 @@ golden tests — the engineering discipline this repo is built around
 | [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) | how the quant, algo and AI sides work — a guided explanation for a newcomer: the pipeline on one page, the research statistics and gates, the execution algorithms and simulator rules, the fail-closed risk engine, the ML layer with its negative results, the LLM/agent boundary (what exists, what is backlog, what would be theatre on this data), determinism and replay; every section ends with where to look and a command that runs |
 | [COOKBOOK.md](COOKBOOK.md) | 35 task-oriented recipes with runnable commands |
 | [docs/RESEARCH_VALIDITY.md](docs/RESEARCH_VALIDITY.md) + [research/power/POWER_REPORT.md](research/power/POWER_REPORT.md) | the opt-in corrected research methods (each with its pinned default), the research store under parallel writers, gate eligibility; the planted-signal power study of the validation chain |
-| [CHANGELOG.md](CHANGELOG.md) | release notes, newest first (v1.3.0: fail-closed risk, simulator fill rules, paper-platform safety, governance and deployment hardening, research validity) |
+| [CHANGELOG.md](CHANGELOG.md) | release notes, newest first (v1.4.0: the generator's equity flow calibration fixed so flow reaches the close, and every dataset-derived artefact regenerated; v1.3.0: fail-closed risk, simulator fill rules, paper-platform safety, governance and deployment hardening, research validity) |
 | [docs/MVP.md](docs/MVP.md) | the executable MVP (`python -m iap.mvp run / replay / verify / explain`): one deterministic, fully traced trading loop on a synthetic equity — the loop module by module, the §11.4 wiring rules with code references, the determinism contract, the incident replay flow, the honest golden-run results (cost-negative) with the realized-IC audit, and the success-criteria table |
 | [docs/LIFECYCLE.md](docs/LIFECYCLE.md) | the 7-state promotion lifecycle: states, the 17-edge transition table, the 18 gates with config keys and defaults, evidence documents, registry and transition-log formats, the bootstrap result (24 CANDIDATE / 0 beyond), the golden, the Java/Rust ports, the RETIRED-is-observational caveat |
 | [docs/DECISION_TRACE.md](docs/DECISION_TRACE.md) | the decision trace: the record, ids, canonical JSON rules, the stream digest with its known answers, sinks, the pinned `explain()` block, store views, emission points in Python / Java / C++ / Rust, incident replay |
@@ -380,7 +426,7 @@ golden tests — the engineering discipline this repo is built around
 | [research/ml_reports/ML_REPORT.md](research/ml_reports/ML_REPORT.md) | gated model comparison + meta-labeling (incl. the crossed-book artifact story) |
 | [research/adaptive_reports/ADAPTIVE_REPORT.md](research/adaptive_reports/ADAPTIVE_REPORT.md) | the honest adaptive-deployment study: static vs scheduled vs drift-triggered refits, lifecycle retirements, and what two sessions cannot prove |
 | [research/tca/TCA_REPORT.md](research/tca/TCA_REPORT.md) | simulated parent-order TCA |
-| [research/experiments/README.md](research/experiments/README.md) | the ExperimentRunner's spec / result documents and the five committed experiments |
+| [research/experiments/README.md](research/experiments/README.md) | the ExperimentRunner's spec / result documents and the ten committed experiments (five on the current dataset, five kept from the v1.3.0 dataset) |
 | [benchmarks/RESULTS.md](benchmarks/RESULTS.md) | benchmark index; C++ table in [results_cpp.md](benchmarks/results_cpp.md) + methodology |
 | [docs/runbooks/](docs/runbooks/) | data pipeline, backtest, paper trading, kill-switch incident, incident replay runbooks |
 | [docs/governance/](docs/governance/) | governance, reproducibility, security |
@@ -405,20 +451,26 @@ data, symbols, or fee schedules are included — instruments are `SYN.EQ.*` /
 `LP2`, `PRI`. Every number in the reports is a statement about this
 generator and this pipeline, not about any market.
 
-**The equity sessions are morning-only in effect (known limitation).** In
-the bundled dataset each equity stream's continuous flow stops 38–43% of
-the way through the 6.5-hour session (mean 40.5%, about 2 h 38 min after
-the open); the next events are the close-auction prints. FX flow runs to
-92–100% of its 21-hour session. The cause is a slot budget in the generator
-that is spent early — the base rate carries a 1.30 margin and the
-self-exciting flow multiplier is not calibrated for
-(`generator.py` `_eq_session_stream`; CHANGELOG.md "Known limitations").
-So the equity research covers about 5.3 hours of continuous flow across the
-two sessions, not 13; the row-mass walk-forward folds partition that
-window, and nothing is learned or tested on afternoon flow. The default is
-kept because every pinned number derives from it;
-`equities.fill_session: true` in the generator config produces flow up to
-the close (backlog issue M08, docs/EPICS.md).
+**Equity flow covers the whole session since v1.4.0.** The generator's
+default flow calibration is `equities.flow.calibration = "session"`
+(`configs/marketdata/generator.json`, `x-version` 2): the base rate of the
+self-exciting flow is `slots_per_stream × excitation_time_factor /
+duration`, where `excitation_time_factor` = E[1 / (1 + excitation)] (0.522
+for the pinned config), there is no slot budget, and each equity stream
+trades up to the close auction. FX flow is unchanged and runs to 92–100%
+of its 21-hour session. Up to v1.3.0 a slot budget was spent early and
+equity flow stopped 37.6–43.2% of the way through each 6.5-hour session;
+`"legacy_budget"` reproduces that dataset (`data_version` `203c8f54…`) byte
+for byte, and `equities.fill_session` belongs to the legacy rule only (it
+is an error with the default). `tests/replay/test_generator_determinism.py`
+pins the raw-file hashes of both datasets; backlog issue M08 is done
+(docs/EPICS.md). The consequence to keep in mind when reading the equity
+numbers: about the same number of events is now spread over the whole
+session, so equity rows are 3.1–3.3 s apart (median quote gap about 2 s)
+and, under the label freshness rule `max(5 s, 2 × median quote gap)`, a
+share of equity labels at horizons of 10 s and longer is invalid as stale
+(valid fraction 0.79–0.81 at 10 s, 0.45–0.63 at 15 m;
+`data/features/features_summary.json`).
 
 **Units and conventions (binding, `PLATFORM_CONVENTIONS.md` §1).**
 
@@ -455,20 +507,26 @@ example trace in `tests/golden/expected_contracts_examples.json` uses the
 same synthetic venue 3. Nothing about XV3 describes any real venue.
 
 **The realized-IC audit (docs/MVP.md §7.1).** The MVP's realized IC (EQ01
-0.283, EQ03 0.336 at 1 s) sits an order of magnitude above the research IC
-of the same fitted alphas (0.027 / 0.030). The audit concluded this is a
-property of the data, not a leak: the generator quotes every venue around
-one shared efficient price with a bounded AR(1) venue noise (ρ 0.9 per
-≈ 200 ms slot) and cancels resting orders the efficient price has moved
-through, so the displayed book leans towards the efficient price and the
-mid converges to it within about a second — which is exactly what
-microprice and OFI measure. The research code path on the captured stream
-gives the same numbers at the 1 s and 100 ms cadences; the truncation probe
-reproduces every earlier signal bit for bit; the shift-by-one probe
-collapses the IC but cannot discriminate at a cadence equal to the horizon
-(stated as such). The cost-adjusted IC (0.017 / 0.065) and the −22.65 USD
-session say the same thing the research reports say: a real feed would not
-be this kind, and even this one does not pay the spread.
+0.217, EQ03 0.110 at 1 s) sits well above the research IC of the same
+fitted alphas (0.010 / 0.019) — about twenty times for EQ01, six for EQ03 —
+and EQ06's is negative on this session (−0.079 at 1 s against a research
+IC of 0.027). The audit of 2026-09-20, made on the v1.3.0 session,
+concluded that the gap is a property of the data, not a leak: the generator
+quotes every venue around one shared efficient price with a bounded AR(1)
+venue noise (ρ 0.9 per slot) and cancels resting orders the efficient price
+has moved through, so the displayed book leans towards the efficient price
+and the mid converges to it — which is exactly what microprice and OFI
+measure. The leak evidence is the pinned label definition (the realized IC
+is computed by `iap.labels.compute_labels`) and the truncation probe, which
+reproduces every earlier signal bit for bit. The shift-by-one probe is not
+part of that evidence on the current session: it no longer collapses the
+IC (EQ01 0.149 shifted against 0.217, EQ03 0.116 against 0.110), because
+with flow spread over the whole session the signals persist from one
+decision to the next. That is persistence, not look-ahead, and the probe
+cannot tell the two apart at a cadence equal to the horizon. The
+cost-adjusted IC (−0.024 / −0.029) and the −81.53 USD session say the same
+thing the research reports say: a real feed would not be this kind, and
+even this one does not pay the spread.
 
 **Out of scope for a live deployment** (each would be a project of its own):
 

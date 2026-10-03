@@ -52,6 +52,7 @@ from iap.alpha import build  # noqa: E402
 from iap.alpha.data import load_features  # noqa: E402
 from iap.backtest import BacktestConfig, Backtester, CostModel  # noqa: E402
 from iap.backtest.adaptive import AdaptiveDeployment  # noqa: E402
+from iap.experiment.tracker import data_version  # noqa: E402
 from iap.validation import ExperimentLedger  # noqa: E402
 
 REPORTS_DIR = REPO / "research" / "adaptive_reports"
@@ -188,21 +189,34 @@ def _write_report(results: dict[str, dict], cfg, ledger, log, runtime_s: float) 
     a("")
     a("## READ THIS FIRST — what two sessions can and cannot show")
     a("")
-    a("**The sample is two synthetic sessions (~2.6 dense hours each).** That")
-    a("is far too short to conclude that any refit policy improves live P&L:")
+    a("**The sample is two synthetic sessions (6.5 h of equity flow and about")
+    a("21 h of FX quotes each).** That is far too short to conclude that any")
+    a("refit policy improves live P&L:")
     a("")
     a("- **SCHEDULED(weekly) cannot fire even once** — the sample crosses no")
     a("  week boundary, so it is *identical to STATIC here by construction*.")
     a("  Its column exists to prove the machinery, not to rank it.")
     a("- SCHEDULED(daily) fires exactly once (the day-2 boundary), so the")
     a("  comparison rests on a single refit on a single synthetic day.")
-    a("- Drift baselines come from a 2.5-hour warmup of the same generator —")
+    a(
+        f"- Drift baselines come from a {cfg['warmup_ns'] / NS_H:.1f}-hour warmup of the "
+        "same generator —"
+    )
     a("  real regime shifts are not in the data, so PSI stays mostly below")
     a("  threshold and most drift-triggered refits come from the rolling-IC")
     a("  z-score, which is noisy at this sample size.")
     a("- P&L differences between policies below are **within noise**; do not")
-    a("  read a ranking into them. All alphas remain net-negative after")
-    a("  costs on this data, exactly as the promotion report shows.")
+    n_pos = sum(
+        1 for r in results.values() for pol in r["policies"].values() if pol["net_pnl"] > 0.0
+    )
+    n_all = sum(len(r["policies"]) for r in results.values())
+    if n_pos == 0:
+        a("  read a ranking into them. Every alpha is net-negative after costs")
+        a(f"  under every policy on this data (0 of {n_all} deployments positive),")
+        a("  as the promotion report shows.")
+    else:
+        a(f"  read a ranking into them. {n_pos} of {n_all} deployments end with a")
+        a("  positive net P&L; with two sessions that is not evidence of an edge.")
     a("")
     a("What the study DOES establish: the adaptability machinery is")
     a("deterministic and leak-free (asserted + shift-tested), refits trigger")
@@ -400,7 +414,9 @@ def main() -> int:
         ),
     )
     log = LifecycleLog(LIFECYCLE_LOG, truncate=True)
-    ledger = ExperimentLedger(LEDGER_PATH)
+    # Dataset-scoped (iap.validation.ledger): a deployment replayed on a
+    # regenerated dataset is a new look, recorded beside the old one.
+    ledger = ExperimentLedger(LEDGER_PATH, dataset_version=data_version(REPO))
 
     alphas = select_alphas()
     print(f"alpha subset: {alphas}")

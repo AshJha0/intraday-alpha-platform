@@ -261,15 +261,25 @@ def import_experiments_ledger(store: Store, path: PathLike) -> ImportReport:
 # --------------------------------------------------------------------------
 
 
-def _ledger_entries(ledger_path: PathLike | None) -> dict[str, dict[str, Any]]:
-    """``{alpha_id: promotion_pipeline ledger entry}`` (empty without a ledger)."""
+def _ledger_entries(
+    ledger_path: PathLike | None, dataset_version: str | None = None
+) -> dict[str, dict[str, Any]]:
+    """``{alpha_id: promotion_pipeline ledger entry}`` (empty without a ledger).
+
+    The ledger keeps one entry per alpha AND dataset (``iap.validation.ledger``,
+    "Dataset scope"): the entry stamped with ``dataset_version`` wins, so the
+    row agrees with the registry (``iap.lifecycle.bootstrap``); an alpha with
+    no entry on that dataset falls back to its latest entry."""
     if ledger_path is None or not Path(ledger_path).is_file():
         return {}
-    out: dict[str, dict[str, Any]] = {}
+    latest: dict[str, dict[str, Any]] = {}
+    exact: dict[str, dict[str, Any]] = {}
     for entry in _load_json(Path(ledger_path))["entries"]:
         if entry["kind"] == "promotion_pipeline":
-            out[entry["alpha_id"]] = entry
-    return out
+            latest[entry["alpha_id"]] = entry
+            if dataset_version is not None and entry.get("dataset_version") == dataset_version:
+                exact[entry["alpha_id"]] = entry
+    return {**latest, **exact}
 
 
 def _rationales() -> dict[str, str]:
@@ -369,7 +379,9 @@ def import_alpha_reports(
     root = Path(repo_root) if repo_root is not None else default_repo_root()
     col = _Collector()
     params_doc = _params_document(root, dataset_version, feature_version, col)
-    ledger = _ledger_entries(ledger_path)
+    ledger = _ledger_entries(
+        ledger_path, None if params_doc is None else str(params_doc["data_version"])
+    )
     rationales = _rationales()
     states = {
         r["alpha_id"]: r["current_state"]

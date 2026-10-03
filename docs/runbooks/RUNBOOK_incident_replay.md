@@ -29,7 +29,7 @@ are below.
 
 ```bash
 cd python && PYTHONPATH=src python3 -m iap.mvp run                 # -> ../data/mvp/<run_id>/
-# mvp run 58a10f2194a3c81c: events=16578 decisions=355 parents=66 children=105 fills=55 pnl=-22.651183 USD digest=d938eeae68c85a6c... out=.../data/mvp/58a10f2194a3c81c
+# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=235 children=348 fills=169 pnl=-81.531396 USD digest=f51890da0c3c66cd... out=.../data/mvp/58a10f2194a3c81c
 ```
 
 **Java paper vertical** (`java/paper.sh`, state directory `--state-dir` /
@@ -89,17 +89,17 @@ with a test to write (§6).
 # the chain of one parent order, with venue names, from the store
 PYTHONPATH=src python3 -m iap.mvp explain --run ../data/mvp/<run_id> 17
 # Order 17
-# Alpha:      EQ01-EQ03-EQ06  expected return = +0.0 bps  confidence = 0.12   <- acting (ensemble) signal
-# Alpha:      EQ01  expected return = -0.0 bps  confidence = 0.02             <- its components
-# Alpha:      EQ03  expected return = +0.0 bps  confidence = 0.34
+# Alpha:      EQ01-EQ03-EQ06  expected return = -0.0 bps  confidence = 0.10   <- acting (ensemble) signal
+# Alpha:      EQ01  expected return = +0.0 bps  confidence = 0.06             <- its components
+# Alpha:      EQ03  expected return = -0.0 bps  confidence = 0.25
 # Alpha:      EQ06  expected return = +0.0 bps  confidence = 0.00
-# Portfolio:  target = +97 shares
+# Portfolio:  target = -250 shares
 # Risk:       ALLOW
 # Risk:       ALLOW
 # Execution:  TWAP
 # SOR:        XV1 = 100%
 # Fills:      0 / 250 (0.0%)
-# TCA:        IS = 0.0 bps
+# TCA:        IS = -0.0 bps
 # Attribution: alpha = +0.0 bps  spread = -0.0 bps  impact = -0.0 bps  fees = -0.0 bps
 
 # every order as one row: signal -> risk -> children -> fills -> TCA -> attribution

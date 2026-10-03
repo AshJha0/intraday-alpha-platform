@@ -1,5 +1,7 @@
 # Predictability of Order-Flow Imbalance in Liquid Equity Markets: Significant, Stable, and Still Not Worth Trading
 
+> Dated record. The figures below are those of the dataset in force when the paper was written; the 2026-10-03 update at the end restates them on the v1.4.0 dataset and re-checks each conclusion.
+
 *Intraday Alpha Platform research series, paper 1 of 6 (spec §28). Generated 2026-08-29 from the repository's committed research artifacts.*
 
 ---
@@ -377,3 +379,146 @@ No verdict, IC, t-statistic or P&L figure in this paper changes; the five
 new experiments are all ITERATE and net-negative at 1× costs, like every
 alpha before them. The analysis above is left as written and the research
 reports quote the ledger at their own render time (`ledger_n_at_report`).
+
+## Erratum / Update — 2026-10-03 (v1.4.0: the equity flow now reaches the close)
+
+**What changed in the data.** Up to v1.3.0 the generator stopped the equity
+continuous flow 37.6-43.2 % of the way through each 6.5 h session and
+emitted nothing more until the 20:00 close auction. v1.4.0 calibrates the
+flow rate to the session (`equities.flow.calibration = "session"`, the
+default; `"legacy_budget"` reproduces the v1.3.0 dataset byte for byte), so
+every equity stream now trades to the close. The number of equity events is
+about the same (105,282 / 104,468 on days 1 / 2), so the flow is spread over
+the whole session and is sparser in time. Every figure in this paper is
+measured on equities and therefore moved. This section supersedes the body
+and the "current" figures quoted in the 2026-09-06 and 2026-09-20 errata
+above; those are left as dated records.
+
+**Data (§2), re-derived** from `data/normalized/qc_report.json` and
+`data/features/features_summary.json`: 308,975 normalized events in total
+(equities 105,282 + 104,468, FX 49,668 + 49,557, the FX files unchanged), 46
+streams, 262 sequence gaps (396 missing events), 450 duplicates, 128
+out-of-order arrivals, 173 invalid events. Instrument 1 has 14,609 feature
+rows; its median inter-emission gap is 2.1 s and its mean row gap 3.2 s (the
+body's ~0.9 s median was the spacing inside the compressed v1.3.0 window).
+Equity rows are 3.1-3.3 s apart on average across the 11 instruments, and
+0.1-0.7 % of them have a crossed consolidated book.
+
+**What the 2026-09-06 erratum says about the session is no longer true of
+the data.** Item 1 describes equity frames that "occupy 13:30-16:05 UTC of
+each day plus a lone 20:00 close print", and item 4 speaks of "the dead zone
+before the close print". Neither exists in v1.4.0. Folds are still quantiles
+of the row index; all four are non-degenerate (EQ02: 31,980 / 31,735 /
+31,891 / 31,887 test pairs). What thins the labels now is the freshness rule
+`max(5 s, 2 x median quote gap)`: the equity median gap is about 2 s, so the
+5 s floor binds, and a label whose forward mid is older than 5 s is invalid.
+The valid fraction per equity instrument is 99.4-99.7 % at 5 s, 78.7-80.5 %
+at 10 s, 75.3-77.2 % at 1 m and 44.7-63.4 % at 15 m. Item 6's "the next row,
+which is 3.3 s on equities" was an average that included the dead zone;
+3.1-3.3 s is now the real spacing.
+
+**Headline statistics (§4.1), current** (`research/alpha_reports/REPORT.md`,
+`EQ02.json`, `EQ03.json`, `EQ12.json`; the gates read the uncrossed IC and
+its Newey-West t):
+
+| alpha | horizon | IC | IC unc | NW t unc | Rank IC | hit | folds+ | leak | net P&L 1x | flips/h | verdict |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| EQ02 | 5s | 0.0253 | 0.0253 | 7.52 | 0.0337 | 0.524 | 4/4 | pass | -139,468 | 378 | ITERATE |
+| EQ03 | 5s | 0.0190 | 0.0190 | 5.78 | 0.0214 | 0.513 | 4/4 | pass | -148,562 | 423 | ITERATE |
+| EQ12 | 5s | 0.0263 | 0.0263 | 7.52 | 0.0339 | 0.525 | 4/4 | pass | -137,421 | 371 | ITERATE |
+
+On v1.3.0 the uncrossed IC / t were 0.0312 / 9.58, 0.0298 / 10.57 and
+0.0315 / 9.28. Fold ICs: EQ02 0.0323 / 0.0236 / 0.0244 / 0.0217; EQ03
+0.0315 / 0.0132 / 0.0178 / 0.0148; EQ12 0.0320 / 0.0238 / 0.0271 / 0.0229.
+Leakage (last fold, unshifted vs shifted by one row): EQ02 0.0217 vs 0.0092,
+EQ03 0.0148 vs 0.0040, EQ12 0.0229 vs 0.0092. In the lifecycle registry
+(`research/alpha_registry.json`) all three fail one gate only,
+`net_pnl_after_costs`.
+
+**Decay (§4.2), last fold:**
+
+| alpha | 10ms | 50ms | 100ms | 500ms | 1s | 5s | 10s | 30s | 1m | 5m | 15m |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| EQ02 | +0.004 | -0.003 | +0.006 | +0.020 | +0.021 | +0.037 | +0.044 | +0.032 | +0.027 | +0.012 | +0.008 |
+| EQ03 | +0.003 | -0.002 | +0.004 | +0.015 | +0.017 | +0.033 | +0.039 | +0.027 | +0.022 | +0.012 | +0.008 |
+| EQ12 | +0.004 | -0.004 | +0.005 | +0.022 | +0.023 | +0.040 | +0.046 | +0.033 | +0.027 | +0.012 | +0.009 |
+
+**Costs (§4.3).** Cost stress, last fold: EQ02 -69,109 / -139,468 / -280,186
+at 0.5x / 1x / 2x over 6,437 trades; EQ03 -73,661 / -148,562 / -298,364 over
+6,843; EQ12 -68,073 / -137,421 / -276,117 over 6,303. Held-out day 2: EQ02
+gross +2,265, costs 368,947, net -366,682 over 16,789 trades; EQ03 +2,190 /
+385,681 / -383,491 over 17,518; EQ12 +2,385 / 361,519 / -359,134 over
+16,315. Costs are 152-176 times gross. The 1x losses are about twice the
+v1.3.0 ones (EQ02 was -66,620 over 3,692 trades) because the alphas now
+trade for the whole session.
+
+**Latency (§4.4).** Event grid, last-fold IC at +0 / +1 / +5 rows: EQ02
+0.0217 / 0.0092 / 0.0097; EQ03 0.0148 / 0.0040 / 0.0099. Time grid, net P&L
+at 100 ms / 500 ms / 1 s / 5 s: EQ02 -149,377 / -144,931 / -139,468 /
+-92,498 (6,892 / 6,688 / 6,437 / 4,361 trades); EQ03 -161,581 / -155,533 /
+-148,562 / -98,064. Regime split: EQ02 +0.0300 high-vol / +0.0144 low-vol;
+EQ03 +0.0190 / +0.0136; EQ12 +0.0316 / +0.0148.
+
+**Capacity (§4.5).** Unchanged: $34.3-46.6M per single stock, $1.31B for the
+index ETF.
+
+**Multiple testing (§3.3).** `research/experiments.json` is now scoped by
+dataset: the 1068 looks of the v1.3.0 dataset are kept and the regenerated
+pipelines added 852, for 1920 looks over 139 entries. Expected max |t| under
+the global null is 3.888 and the Bonferroni per-test threshold 4.206
+(REPORT.md was rendered mid-regeneration at 1740 looks and prints 3.86 /
+4.18). EQ02, EQ03 and EQ12 clear both. On equities they are now the only
+alphas that do: EQ01 (2.67), EQ05 (2.45) and EQ06 (3.68) cleared the v1.3.0
+yardstick and are below the current one.
+
+**Conclusions, re-checked.**
+
+1. *OFI is a statistically real predictor at 5 s (positive OOS IC, sign
+   consistency, leakage pass, selection-adjusted t).* **Holds, weaker.** IC
+   0.019-0.026 at t 5.78-7.52, four positive folds of four, above both
+   ledger thresholds. The ICs are 16-36 % lower and the t-statistics 19-45 %
+   lower than on v1.3.0.
+2. *Positive IC at every horizon from 500 ms to 15 m, nothing below
+   100 ms, peak near 10 s.* **Holds**, with a caveat that is new. The peak
+   is still at 10 s (0.039-0.046). But a 10 s label exists on only about
+   80 % of rows and a 5 s label on over 99 %, so the 5 s and 10 s points are
+   no longer measured on the same rows: the 10 s point is conditional on a
+   quote arriving within 5 s of the horizon. The location of the peak
+   should not be read more finely than "between 5 s and 30 s".
+3. *Multi-level OFI (EQ03) earns the strongest and most stable statistics
+   of the family.* **No longer holds.** EQ03 now has the lowest IC and the
+   lowest t of the three (0.0190 / 5.78 against 0.0253 / 7.52 for L1 OFI).
+   The body's statement that the three variants are indistinguishable in IC
+   does not describe the current table either; no test of the difference
+   was run.
+4. *Liquidity conditioning (EQ12) adds nothing material.* **Holds.** EQ12
+   and EQ02 have the same t (7.52) and ICs of 0.0263 and 0.0253.
+5. *Cost-negative at every multiplier, including half costs; costs are
+   about two orders of magnitude above gross.* **Holds.** See the figures
+   above; all 24 alphas are net-negative at 1x.
+6. *The size of the loss is a turnover problem (EQ08 contrast).* **Holds.**
+   EQ08 trades 26 flips/h and loses -7,362, the smallest loss on the equity
+   book; it is a REJECT (t -1.67, hypothesis sign not confirmed).
+7. *One row of extra lag costs about a fifth of the IC, five rows about
+   three quarters: the signal survives one emission but not five.* **No
+   longer holds.** One row now costs 58 % (EQ02) and 73 % (EQ03) of the
+   last-fold IC, and the +5 figure is not lower than the +1 figure. A row is
+   now about 3 s, not about 1 s, so most of the loss falls inside the first
+   row and the event grid no longer resolves a gradual decline. On the time
+   grid the loss shrinks with latency only because fewer trades are made
+   (EQ02 loses about 21.7 per trade at 100 ms and 21.2 at 5 s).
+8. *The edge is present in both volatility regimes, slightly stronger in
+   low-vol.* The first half **holds**; the second **no longer holds** (it
+   is now about twice as large in high-vol for EQ02 and EQ12). Regime
+   conditioning still offers no rescue from costs.
+9. *Capacity is not the constraint.* **Holds**, unchanged.
+10. *ITERATE, not PROMOTE; statistical significance is the cheapest gate
+    and net-of-cost economics is the one that fails.* **Holds.** The cost
+    gate is the only gate the three alphas fail.
+
+One related result from the planted-signal study
+(`research/power/POWER_REPORT.md`): on data generated with the v1.4.0 flow,
+a planted informed-order-flow effect of the reference size is detected at
+t >= 3 in 1 of 3 seeds, and one of half that size in none (on v1.3.0: 3 of 3
+and 1 of 3). The validation chain has less power on the sparser flow, which
+is consistent with the lower t-statistics above.

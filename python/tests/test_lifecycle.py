@@ -18,6 +18,7 @@ import math
 
 import pytest
 from iap.adaptive.lifecycle import LifecycleConfig, LifecycleTracker
+from iap.alpha import ALPHA_IDS
 from iap.contracts.protocols import AlphaLifecycle as AlphaLifecycleProtocol
 from iap.contracts.protocols import LifecycleGate as LifecycleGateProtocol
 from iap.contracts.types import (
@@ -791,11 +792,23 @@ def test_bootstrap_failed_gates_agree_with_report_verdicts(bootstrap):
     # moved when fold_sign_consistency stopped scoring the beta-SIGNED signal
     # (an alpha backwards in every fold used to report 1.00 consistency and
     # pass this gate) and when the walk-forward stopped training inside its
-    # own declared holdout. EQ05 and FX01 now clear statistical_significance
-    # on the pair-count-weighted Newey-West t; EQ07, FX01 and FX03 now fail
+    # own declared holdout. FX01 clears statistical_significance on the
+    # pair-count-weighted Newey-West t; EQ07, FX01 and FX03 fail
     # fold_consistency, which they previously passed falsely.
-    assert by_id["EQ01"] == ("net_pnl_after_costs",)
-    assert by_id["EQ05"] == ("net_pnl_after_costs",)
+    # Updated 2026-10-03 (v1.4.0 dataset: equity flow to the close; the FX
+    # data and therefore the FX rows are unchanged). On the full session the
+    # equity ICs are lower: EQ01 and EQ05 keep their ITERATE verdict but no
+    # longer clear the PROMOTE significance gate (uncrossed t 2.67 / 2.45),
+    # EQ05 also falls under the 0.01 IC gate (0.0061), and both now fail the
+    # crossed/uncrossed stability gate. EQ03 still fails the cost gate alone.
+    assert by_id["EQ01"] == ("statistical_significance", "net_pnl_after_costs", "stability")
+    assert by_id["EQ03"] == ("net_pnl_after_costs",)
+    assert by_id["EQ05"] == (
+        "oos_ic",
+        "statistical_significance",
+        "net_pnl_after_costs",
+        "stability",
+    )
     assert by_id["FX01"] == ("fold_consistency", "net_pnl_after_costs")
     assert by_id["EQ07"] == (
         "oos_ic",
@@ -803,8 +816,41 @@ def test_bootstrap_failed_gates_agree_with_report_verdicts(bootstrap):
         "fold_consistency",
         "hypothesis_sign",
         "net_pnl_after_costs",
+        "stability",
     )
     assert set(by_id["FX03"]) >= {"statistical_significance", "hypothesis_sign", "fold_consistency"}
+
+
+def test_pipeline_entry_selection_is_per_dataset():
+    """The ledger keeps one promotion_pipeline entry per alpha AND dataset;
+    the evidence is the entry of the dataset alpha_params.json names."""
+    from iap.lifecycle.bootstrap import select_pipeline_entries
+
+    old, new = "a" * 64, "b" * 64
+    entries = [
+        {"alpha_id": "EQ01", "kind": "promotion_pipeline", "key": "k-old", "dataset_version": old},
+        {"alpha_id": "EQ01", "kind": "promotion_pipeline", "key": "k-new", "dataset_version": new},
+        {"alpha_id": "EQ02", "kind": "promotion_pipeline", "key": "k-unstamped"},
+        {"alpha_id": "EQ01", "kind": "adaptive_deployment", "key": "other-kind"},
+    ]
+    assert select_pipeline_entries(entries, new)["EQ01"]["key"] == "k-new"
+    assert select_pipeline_entries(entries, old)["EQ01"]["key"] == "k-old"
+    # an entry written before the dataset stamp existed still backs its alpha
+    assert select_pipeline_entries(entries, new)["EQ02"]["key"] == "k-unstamped"
+    # a dataset the ledger has never seen: nothing stamped matches
+    assert set(select_pipeline_entries(entries, "c" * 64)) == {"EQ02"}
+    with pytest.raises(ValueError, match="duplicate promotion_pipeline entry for EQ01"):
+        select_pipeline_entries(entries, None)
+    with pytest.raises(ValueError, match="duplicate"):
+        select_pipeline_entries(entries + [dict(entries[1], key="again")], new)
+
+
+def test_committed_ledger_backs_every_alpha_on_the_current_dataset():
+    params = load_params_document(ROOT)
+    ledger = load_ledger_entries(ROOT)
+    assert sorted(ledger) == sorted(ALPHA_IDS)
+    assert {e["dataset_version"] for e in ledger.values()} == {params["data_version"]}
+    assert ledger == load_ledger_entries(ROOT, params["data_version"])
 
 
 def test_bootstrap_research_mapping(bootstrap):

@@ -50,6 +50,16 @@ grows to its real depth:
 | Java JSONL decode, one full day (`data/normalized/eq_20260824.normalized.jsonl`) | 105,640 | `decode_latency_ns` from a paper session | ≤ 1,023 ns | ≤ 8,191 ns | ≤ 32,767 ns |
 | Java book+features+alpha+risk per event, instrument 11 of that day | 9,736 | `book_update_latency_ns` (the whole `onEvent`, not a bare book apply) | ≤ 65,535 ns | ≤ 524,287 ns | ≤ 8,388,607 ns |
 
+**Dataset note (v1.4.0, 2026-10-03).** These cold rows, and the cold reference
+table of `results_cpp.md`, were measured over the `eq_20260824.normalized.jsonl`
+of the v1.3.0 dataset (105,640 events, flow packed into the first 40% of the
+session). The v1.4.0 generator writes a different file under the same name
+(105,282 events, flow to the close). The timings were **not re-measured**: they
+need the baseline machine, and a run on other hardware would not be comparable
+with the hot table. To reproduce the measured input, generate the dataset with
+`equities.flow.calibration` set to `"legacy_budget"`; the commands below run on
+either file, with event counts that differ accordingly.
+
 Reproduce (from the repo root, after `python3 -m iap.marketdata`):
 
 ```bash

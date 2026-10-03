@@ -5,6 +5,8 @@ data/normalized/
 data/orderbooks/
 data/features/
 # data/reference/feature_registry.json is tracked (the feature_version source)
+# wall-clock timings of tools/regenerate_dataset_artifacts.py (not an artefact)
+data/regeneration_timings.json
 
 # --- pickled estimators (manifest.json / metrics.json per run ARE tracked)
 research/models/*/model.pkl

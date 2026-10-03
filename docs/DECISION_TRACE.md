@@ -117,7 +117,7 @@ lowercase SHA-256 over everything hashed so far. Known answers
 | the golden `DecisionTrace` example, one line (5627 bytes, line sha256 `8ecadebd…`) | `bf60a300d151c9cea462e339b0dac407c595fdc5e3c59efd588d5aada8455162` |
 | the same trace twice | `e6f6ea54e5d5ff314dc11d235efc4caa4065e3604756101dbdce215502e053ca` |
 | empty stream | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
-| the MVP golden session (355 traces, seed 12345) | `d938eeae68c85a6c2acaf7fb3f7d1333f29c3ad8e036fb5af7a4d1b48c9ea2cc` (`expected_mvp.json`) |
+| the MVP golden session (800 traces, seed 12345; v1.4.0 dataset) | `f51890da0c3c66cd488073fd7149099729767f5f65d03a7656e59f2da9c6a708` (`expected_mvp.json`) |
 
 `TraceDigest.of_jsonl(path)` re-canonicalises a file line by line and must
 equal the digest the emitting sink reported; same seed ⇒ same digest; any
@@ -166,7 +166,7 @@ as their decimal id. The text above is pinned in
 (`contracts::trace::explain`) and C++ (`iap::contracts::explain`); the
 multi-signal rule has one test in each suite (schemas/MIGRATIONS.md
 2026-09-20). Expected returns render at 0.1 bp — the MVP's fitted alphas
-show `+0.0 bps`; the exact values are in the trace.
+show `+0.0 bps` or `-0.0 bps`; the exact values are in the trace.
 
 Entry points: `python -m iap.store explain [--db …] <parent_order_id>`,
 `python -m iap.mvp explain --run <dir> <parent_order_id>`,

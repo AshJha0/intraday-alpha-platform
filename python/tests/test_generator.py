@@ -5,8 +5,10 @@ from iap.core.codec import encode_iap1, read_jsonl, sha256_bytes
 from iap.core.events import EventType, SessionStatus, validation_error
 from iap.marketdata.generator import (
     MarketDataGenerator,
+    excitation_time_factor,
     generate_golden_eq,
     generate_golden_fx,
+    load_generator_config,
 )
 
 SMALL_CFG = {
@@ -287,41 +289,134 @@ def _last_continuous_fractions(refdata, events, date):
     return [(t - open_ns) / (close_ns - open_ns) for t in last.values()]
 
 
-def test_fill_session_is_opt_in_and_carries_equity_flow_to_the_close(refdata, tmp_path):
-    """Known limitation, pinned: the slot budget ends continuous equity flow
-    well before the close (rate margin 1.30 and the uncalibrated excitation
-    multiplier). ``equities.fill_session`` removes the budget; left off — the
-    default — the output is byte-identical to a config without the key."""
-    quiet = {
-        "gap_prob": 0,
-        "gap_max_events": 1,
-        "dup_prob": 0,
-        "ooo_prob": 0,
-        "invalid_prob": 0,
-        "ts_violation_prob": 0,
-    }
-    base = {
+_QUIET = {
+    "gap_prob": 0,
+    "gap_max_events": 1,
+    "dup_prob": 0,
+    "ooo_prob": 0,
+    "invalid_prob": 0,
+    "ts_violation_prob": 0,
+}
+
+
+def _eq_run(refdata, tmp_path, tag, equities):
+    """One quiet single-session run; returns (equity events, raw bytes)."""
+    cfg = {
         "seed": 31,
         "sessions": 1,
-        "anomalies": quiet,
-        "equities": {"slots_per_stream": 400},
+        "anomalies": _QUIET,
+        "equities": equities,
         "fx": {"slots_per_pair": 10},
     }
-    off = dict(base, equities={"slots_per_stream": 400, "fill_session": False})
-    on = dict(base, equities={"slots_per_stream": 400, "fill_session": True})
     date = refdata.trading_days[0]
     name = f"eq_{date.replace('-', '')}.jsonl"
+    MarketDataGenerator(refdata, cfg).generate_run(tmp_path / tag)
+    path = tmp_path / tag / name
+    return read_jsonl(path), path.read_bytes()
 
-    runs = {}
-    for tag, cfg in (("absent", base), ("off", off), ("on", on)):
-        MarketDataGenerator(refdata, cfg).generate_run(tmp_path / tag)
-        runs[tag] = read_jsonl(tmp_path / tag / name)
-    assert (tmp_path / "absent" / name).read_bytes() == (tmp_path / "off" / name).read_bytes()
 
-    budgeted = _last_continuous_fractions(refdata, runs["off"], date)
-    filled = _last_continuous_fractions(refdata, runs["on"], date)
-    assert len(budgeted) == len(filled) == 22  # 11 instruments x 2 venues
-    assert max(budgeted) < 0.6, max(budgeted)  # the limitation
-    assert min(filled) > 0.98, min(filled)  # flow reaches the close
-    assert len(runs["on"]) > 2 * len(runs["off"])  # ... with more events
-    assert all(validation_error(e) is None for e in runs["on"])
+def test_default_flow_calibration_spans_the_session(refdata, tmp_path):
+    """The default (``flow.calibration = "session"``) spreads
+    ``slots_per_stream`` expected slots over the WHOLE session: every equity
+    stream's continuous flow starts at the open and reaches the close, and the
+    event count stays that of the slot budget (no 2.5x blow-up)."""
+    date = refdata.trading_days[0]
+    events, raw = _eq_run(refdata, tmp_path, "default", {"slots_per_stream": 400})
+    explicit, raw_explicit = _eq_run(
+        refdata,
+        tmp_path,
+        "explicit",
+        {"slots_per_stream": 400, "flow": {"calibration": "session"}},
+    )
+    assert raw == raw_explicit  # "session" IS the default
+    legacy, _ = _eq_run(
+        refdata,
+        tmp_path,
+        "legacy",
+        {"slots_per_stream": 400, "flow": {"calibration": "legacy_budget"}},
+    )
+
+    last = _last_continuous_fractions(refdata, events, date)
+    assert len(last) == 22  # 11 instruments x 2 venues
+    assert min(last) > 0.95, min(last)  # flow reaches the close on every stream
+    assert sum(last) / len(last) > 0.98
+
+    # ... and it is spread over the session, not packed into its start: each
+    # quarter of the clock holds a comparable share of the continuous events.
+    open_ns, close_ns = refdata.session_bounds_ns("EQUITY", date)
+    quarters = [0, 0, 0, 0]
+    for e in events:
+        if open_ns < e.exchange_ts < close_ns and e.event_type != EventType.STATUS:
+            quarters[min(3, int(4 * (e.exchange_ts - open_ns) / (close_ns - open_ns)))] += 1
+    assert min(quarters) > 0.15 * sum(quarters), quarters
+
+    # the slot budget keeps its meaning: the event count is the legacy one
+    # to within the dispersion of a self-exciting process, not a multiple.
+    assert 0.8 * len(legacy) < len(events) < 1.25 * len(legacy), (len(events), len(legacy))
+    assert all(validation_error(e) is None for e in events)
+
+
+def test_legacy_budget_keeps_the_v1_3_0_flow_rule(refdata, tmp_path):
+    """``flow.calibration = "legacy_budget"`` is the v1.3.0 generator: the
+    slot budget is spent well before the close (rate margin 1.30, excitation
+    uncalibrated), and its ``fill_session`` opt-in still removes the budget at
+    that rate. tests/replay pins the full v1.3.0 dataset hashes."""
+    date = refdata.trading_days[0]
+    legacy = {"slots_per_stream": 400, "flow": {"calibration": "legacy_budget"}}
+    budgeted, raw_budgeted = _eq_run(refdata, tmp_path, "off", legacy)
+    _, raw_false = _eq_run(refdata, tmp_path, "false", dict(legacy, fill_session=False))
+    filled, _ = _eq_run(refdata, tmp_path, "on", dict(legacy, fill_session=True))
+    assert raw_budgeted == raw_false
+
+    early = _last_continuous_fractions(refdata, budgeted, date)
+    late = _last_continuous_fractions(refdata, filled, date)
+    assert len(early) == len(late) == 22
+    assert max(early) < 0.6, max(early)  # the v1.3.0 limitation
+    assert min(late) > 0.98, min(late)
+    assert len(filled) > 2 * len(budgeted)  # same rate, no budget: far more events
+
+
+def test_flow_calibration_is_validated(refdata):
+    with pytest.raises(ValueError, match="flow.calibration must be one of"):
+        MarketDataGenerator(refdata, {"equities": {"flow": {"calibration": "budget"}}})
+    # fill_session belongs to the legacy rule; under "session" it would be a
+    # silent no-op on a config written for v1.3.0 semantics
+    with pytest.raises(ValueError, match="fill_session"):
+        MarketDataGenerator(refdata, {"equities": {"fill_session": True}})
+    with pytest.raises(ValueError, match="excitation_decay"):
+        MarketDataGenerator(refdata, {"equities": {"flow": {"excitation_decay": 1.0}}})
+
+
+def test_excitation_time_factor_is_pinned_and_explains_the_legacy_stop():
+    """E[1 / (1 + excitation)] for the pinned flow config. The v1.3.0 rule
+    ran the base rate 1.30x too fast on top of it, so its budget was spent
+    factor / 1.30 = 40 % of the way through the session — the observed stop."""
+    factor = excitation_time_factor(1.4, 0.82, 8.0, 0.16)
+    assert factor == pytest.approx(0.522, abs=0.003)
+    assert factor / 1.30 == pytest.approx(0.405, abs=0.01)
+    assert factor == excitation_time_factor(1.4, 0.82, 8.0, 0.16)  # deterministic
+    assert excitation_time_factor(0.0, 0.82, 8.0, 0.16) == 1.0  # no excitation, no speed-up
+    assert excitation_time_factor(0.5, 0.82, 8.0, 0.16) > factor  # weaker kick, slower flow
+
+
+def test_generator_config_x_version_gate(tmp_path):
+    """An x-version 1 document predates the calibration key: it must name
+    the calibration it wants instead of silently getting the new default."""
+    import json
+
+    def write(doc):
+        path = tmp_path / "generator.json"
+        path.write_text(json.dumps(doc), encoding="utf-8")
+        return path
+
+    with pytest.raises(ValueError, match="x-version 1 generator config"):
+        load_generator_config(write({"x-version": 1, "seed": 5}))
+    legacy = load_generator_config(
+        write({"x-version": 1, "equities": {"flow": {"calibration": "legacy_budget"}}})
+    )
+    assert legacy["equities"]["flow"]["calibration"] == "legacy_budget"
+    assert legacy["equities"]["flow"]["excitation_kick"] == 1.4  # merged over the defaults
+    current = load_generator_config(write({"x-version": 2, "seed": 5}))
+    assert current["equities"]["flow"]["calibration"] == "session"
+    with pytest.raises(ValueError, match="unsupported generator config x-version"):
+        load_generator_config(write({"x-version": 3}))

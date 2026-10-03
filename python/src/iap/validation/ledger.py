@@ -16,6 +16,22 @@ function of how often a script had been run, which made the correction
 meaningless.  A genuinely new configuration (a different threshold, a
 different window) has a different config hash and is counted.
 
+**Dataset scope (pinned, v1.4.0).**  A statistic computed on a different
+dataset is a different look.  A ledger opened with ``dataset_version`` (the
+content hash ``iap.experiment.tracker.data_version()``) stamps every entry
+it records with that version and folds it into the identity, so re-running
+a report pipeline after the dataset changed ADDS its looks instead of
+overwriting the results of the same configuration on the old data.  The
+looks of every earlier dataset stay in the file and in
+``total_experiments``: the denominator only grows, and the corrected
+thresholds only tighten.  An entry recorded before the rule keeps the key it
+was given; ``research/migrate_ledger_dataset_scope.py`` stamped those with
+the dataset they were run on.  The ``experiment_runner`` entries carry
+``dataset_version`` inside their config (the ``ExperimentSpec``), which is
+already part of their identity, so the runner opens the ledger unscoped and
+its keys are unchanged.  The rendered file lists the datasets with their
+entry and look counts (``datasets``, first-appearance order).
+
 Multiple-testing math reported with every batch:
 
 - Bonferroni: a per-test significance threshold ``alpha / n_experiments``
@@ -48,6 +64,10 @@ from pathlib import Path
 from iap.experiment.locking import FileLock, atomic_write_text
 
 PINNED_ALPHA = 0.05
+
+#: ``x-version`` of ``research/experiments.json``: 2 since v1.4.0 (entries
+#: carry ``dataset_version``; the document lists ``datasets``).
+LEDGER_X_VERSION = 2
 
 
 def _norm_ppf(p: float) -> float:
@@ -99,9 +119,14 @@ def _norm_ppf(p: float) -> float:
 class ExperimentLedger:
     """Persistent experiment counter + entries (research/experiments.json)."""
 
-    def __init__(self, path, lock_timeout_s: float = 30.0) -> None:
+    def __init__(
+        self, path, lock_timeout_s: float = 30.0, dataset_version: str | None = None
+    ) -> None:
         self.path = Path(path)
         self.lock_timeout_s = float(lock_timeout_s)
+        #: Dataset scope of every ``record`` of this instance (module docs);
+        #: ``None`` = unscoped (identity is alpha, kind and config alone).
+        self.dataset_version = dataset_version
         self.entries: list[dict] = []
         self.total_experiments = 0
         self._index: dict[str, int] = {}
@@ -121,19 +146,36 @@ class ExperimentLedger:
             self.total_experiments = int(blob.get("total_experiments", len(self.entries)))
             for i, e in enumerate(self.entries):
                 key = e.get("key") or self.experiment_key(
-                    e.get("alpha_id", ""), e.get("kind", ""), e.get("config")
+                    e.get("alpha_id", ""),
+                    e.get("kind", ""),
+                    e.get("config"),
+                    e.get("dataset_version"),
                 )
                 self._index.setdefault(key, i)
 
     @staticmethod
-    def experiment_key(alpha_id: str, kind: str, config: dict | None) -> str:
-        """Pinned experiment identity: alpha, kind and canonical config."""
-        payload = json.dumps(
-            {"alpha_id": alpha_id, "kind": kind, "config": config or {}},
-            sort_keys=True,
-            separators=(",", ":"),
-        )
+    def experiment_key(
+        alpha_id: str, kind: str, config: dict | None, dataset_version: str | None = None
+    ) -> str:
+        """Pinned experiment identity: alpha, kind and canonical config,
+        plus the dataset when the ledger is dataset-scoped (module docs).
+        Without ``dataset_version`` the payload — and the key — is exactly
+        the pre-v1.4.0 one."""
+        doc: dict = {"alpha_id": alpha_id, "kind": kind, "config": config or {}}
+        if dataset_version is not None:
+            doc["dataset_version"] = dataset_version
+        payload = json.dumps(doc, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(payload.encode()).hexdigest()
+
+    @staticmethod
+    def entry_dataset_version(entry: dict) -> str | None:
+        """The dataset an entry was recorded on: its ``dataset_version``
+        stamp, else the one inside its config (``experiment_runner``
+        entries), else ``None`` (unknown)."""
+        stamp = entry.get("dataset_version")
+        if stamp is None:
+            stamp = (entry.get("config") or {}).get("dataset_version")
+        return None if stamp is None else str(stamp)
 
     def record(
         self,
@@ -158,7 +200,7 @@ class ExperimentLedger:
         result: dict | None,
         count: int,
     ) -> int:
-        key = self.experiment_key(alpha_id, kind, config)
+        key = self.experiment_key(alpha_id, kind, config, self.dataset_version)
         prev = self._index.get(key)
         if prev is not None:
             # Same identity: a rerun, not a new experiment (pinned).
@@ -168,17 +210,18 @@ class ExperimentLedger:
             return self.total_experiments
         self.total_experiments += count
         self._index[key] = len(self.entries)
-        self.entries.append(
-            {
-                "n": self.total_experiments,
-                "key": key,
-                "alpha_id": alpha_id,
-                "kind": kind,
-                "count": count,
-                "config": config or {},
-                "result": result or {},
-            }
-        )
+        entry = {
+            "n": self.total_experiments,
+            "key": key,
+            "alpha_id": alpha_id,
+            "kind": kind,
+            "count": count,
+            "config": config or {},
+            "result": result or {},
+        }
+        if self.dataset_version is not None:
+            entry["dataset_version"] = self.dataset_version
+        self.entries.append(entry)
         return self.total_experiments
 
     # -- multiple-testing report ----------------------------------------
@@ -204,7 +247,7 @@ class ExperimentLedger:
     def would_add(self, alpha_id: str, kind: str, config: dict | None, count: int) -> int:
         """Looks a ``record`` of this identity would add right now: ``count``
         for a new identity, 0 for a rerun (de-duplicated)."""
-        key = self.experiment_key(alpha_id, kind, config)
+        key = self.experiment_key(alpha_id, kind, config, self.dataset_version)
         return 0 if key in self._index else int(count)
 
     def expected_max_null_t(self) -> float:
@@ -215,8 +258,19 @@ class ExperimentLedger:
 
     @property
     def distinct_experiments(self) -> int:
-        """Distinct (alpha, kind, config) identities recorded."""
+        """Distinct (alpha, kind, config[, dataset]) identities recorded."""
         return len(self._index)
+
+    def datasets(self) -> list[dict]:
+        """Entries and looks per dataset, in first-appearance order
+        (``dataset_version`` ``None`` = recorded without a dataset stamp)."""
+        out: dict[str | None, dict] = {}
+        for e in self.entries:
+            version = self.entry_dataset_version(e)
+            row = out.setdefault(version, {"dataset_version": version, "entries": 0, "looks": 0})
+            row["entries"] += 1
+            row["looks"] += int(e.get("count", 1))
+        return list(out.values())
 
     def note(self) -> str:
         return (
@@ -230,14 +284,17 @@ class ExperimentLedger:
 
     def _render(self) -> str:
         blob = {
-            "x-version": 1,
+            "x-version": LEDGER_X_VERSION,
             "description": (
                 "Multiple-testing ledger (spec §13). Deterministic: no "
                 "wall-clock; identical rerun => identical file. Experiments "
-                "are de-duplicated by (alpha_id, kind, canonical config): "
-                "re-running the same script does not inflate the Bonferroni "
-                "denominator."
+                "are de-duplicated by (alpha_id, kind, canonical config, "
+                "dataset_version): re-running the same script on the same "
+                "dataset does not inflate the Bonferroni denominator; the "
+                "same configuration on a new dataset is a new look, and the "
+                "looks of earlier datasets are kept (`datasets`)."
             ),
+            "datasets": self.datasets(),
             "distinct_experiments": self.distinct_experiments,
             "total_experiments": self.total_experiments,
             "pinned_alpha": PINNED_ALPHA,

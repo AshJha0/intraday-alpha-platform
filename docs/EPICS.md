@@ -17,16 +17,16 @@ planned paths of the current release, **backlog** says what would prove it done.
 |---|---:|---:|
 | epics | 31 | |
 | issues | 155 | 511 |
-| issues `done` | 97 | 229.5 |
+| issues `done` | 98 | 232.5 |
 | issues `in-progress` | 0 | 0 |
-| issues `backlog` | 58 | 281.5 |
+| issues `backlog` | 57 | 278.5 |
 
 ### By milestone
 
 | milestone | epics | issues | done | in-progress | backlog |
 |---|---:|---:|---:|---:|---:|
 | Phase 0 | 2 | 9 | 9 | 0 | 0 |
-| Week 1 | 2 | 11 | 11 | 0 | 0 |
+| Week 1 | 2 | 12 | 12 | 0 | 0 |
 | Week 2 | 2 | 10 | 10 | 0 | 0 |
 | Week 3 | 2 | 14 | 14 | 0 | 0 |
 | Week 4 | 2 | 10 | 10 | 0 | 0 |
@@ -34,7 +34,7 @@ planned paths of the current release, **backlog** says what would prove it done.
 | Week 6 | 7 | 24 | 24 | 0 | 0 |
 | Phase 2 | 3 | 9 | 7 | 0 | 2 |
 | Phase 3 | 2 | 9 | 1 | 0 | 8 |
-| Backlog | 7 | 49 | 1 | 0 | 48 |
+| Backlog | 7 | 48 | 1 | 0 | 47 |
 
 Issues are listed under their epic; an issue's own milestone can differ from
 the epic's (a backlog item under a finished epic sits in **Backlog**).
@@ -43,7 +43,7 @@ the epic's (a backlog item under a finished epic sits in **Backlog**).
 
 - [E01 — Architecture and contracts](#e01--architecture-and-contracts) · Phase 0 · partial · 7 issues
 - [E02 — Repository engineering, CI and governance](#e02--repository-engineering-ci-and-governance) · Phase 0 · partial · 4 issues
-- [E03 — Synthetic market data generator and normalization](#e03--synthetic-market-data-generator-and-normalization) · Week 1 · partial · 8 issues
+- [E03 — Synthetic market data generator and normalization](#e03--synthetic-market-data-generator-and-normalization) · Week 1 · done · 8 issues
 - [E04 — Deterministic replay as a flagship feature](#e04--deterministic-replay-as-a-flagship-feature) · Week 1 · partial · 5 issues
 - [E05 — Order book with integer ticks (L1/L2/MBO)](#e05--order-book-with-integer-ticks-l1l2mbo) · Week 2 · done · 5 issues
 - [E06 — Feature engine (native 40, registry 205)](#e06--feature-engine-native-40-registry-205) · Week 2 · partial · 6 issues
@@ -133,7 +133,7 @@ Market data + deterministic replay: the seeded synthetic generator (trades, quot
 
 ### E03 — Synthetic market data generator and normalization
 
-**Status:** partial · **Milestone:** Week 1 · **Issues:** 8 (done 7, in-progress 0, backlog 1) · **Estimate:** 16 days · **Labels:** `type:epic`, `area:marketdata`, `phase:w1`, `priority:p0`, `lang:python`, `status:partial`
+**Status:** done · **Milestone:** Week 1 · **Issues:** 8 (done 8, in-progress 0, backlog 0) · **Estimate:** 16 days · **Labels:** `type:epic`, `area:marketdata`, `phase:w1`, `priority:p0`, `lang:python`, `status:done`
 
 A seeded generator that produces realistic multi-venue equity MBO and FX quote/trade streams — regime-switching price, clustered flow, FIFO queue dynamics, auctions, halts and injected feed anomalies — followed by a normalization stage that validates sequences and writes the canonical dataset with a QC report that anchors data_version.
 
@@ -141,9 +141,9 @@ A seeded generator that produces realistic multi-venue equity MBO and FX quote/t
 
 **Acceptance criteria:**
 
-- [ ] Same seed => byte-identical raw and normalized files (JSONL, IAP1, SHA-256)
-- [ ] qc_report.json counts gaps, duplicates, out-of-order, invalid and ts-clamped events
-- [ ] The golden vectors events_eq_mbo.jsonl / events_fx_quote.jsonl and the anomaly vectors are produced by this generator
+- [x] Same seed => byte-identical raw and normalized files (JSONL, IAP1, SHA-256)
+- [x] qc_report.json counts gaps, duplicates, out-of-order, invalid and ts-clamped events
+- [x] The golden vectors events_eq_mbo.jsonl / events_fx_quote.jsonl and the anomaly vectors are produced by this generator
 
 **Out of scope:** Real market data, real calendars, corporate actions (Phase 3).
 
@@ -156,7 +156,7 @@ A seeded generator that produces realistic multi-venue equity MBO and FX quote/t
 | M05 | Feed anomaly injection and the pinned anomaly golden vectors | done | 2 | Week 1 | `python/src/iap/marketdata/golden_anomalies.py; python/src/iap/marketdata/generator.py (_inject_file_anomalies)`<br>`tests/golden/events_eq_anomalies.jsonl; tests/golden/events_fx_anomalies.jsonl; tests/golden/expected_anomaly_states.json`<br>`python/tests/test_golden_anomalies.py; java AnomalyGoldenTest` |
 | M06 | Normalization, sequence validation and the QC report (data_version anchor) | done | 2 | Week 1 | `python/src/iap/marketdata/normalize.py; python/src/iap/marketdata/__main__.py; python/tests/test_normalize.py`<br>`docs/runbooks/RUNBOOK_data_pipeline.md; README headline numbers (data/normalized/qc_report.json)` |
 | M07 | Reference data service: instruments, venues, sessions, synthetic calendar | done | 1 | Week 1 | `python/src/iap/reference/refdata.py; configs/instruments/instruments.json; configs/venues/venues.json`<br>`python/tests/test_refdata.py` |
-| M08 | Bundled dataset: equity continuous flow that reaches the close | backlog | 3 | Backlog | `python/src/iap/marketdata/generator.py (_eq_session_stream); python/tests/test_generator.py (test_fill_session_is_opt_in_and_carries_equity_flow_to_the_close pins the opt-in today)` |
+| M08 | Bundled dataset: equity continuous flow that reaches the close | done | 3 | Week 1 | `python/src/iap/marketdata/generator.py (excitation_time_factor, _eq_session_stream); configs/marketdata/generator.json (x-version 2)`<br>`python/tests/test_generator.py (test_default_flow_calibration_spans_the_session, test_legacy_budget_keeps_the_v1_3_0_flow_rule); tests/replay/test_generator_determinism.py (raw-file hashes of both datasets)`<br>`tools/regenerate_dataset_artifacts.py; schemas/MIGRATIONS.md (2026-10-03, v1.4.0); CHANGELOG.md (v1.4.0)` |
 
 ### E04 — Deterministic replay as a flagship feature
 

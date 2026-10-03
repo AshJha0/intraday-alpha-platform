@@ -8,7 +8,7 @@ Three pinned stress axes for every alpha:
   {0, 1, 5} emission events (kept for continuity with earlier reports); the
   TIME grid delays execution by {100 ms, 500 ms, 1 s, 5 s} of event time
   (``LATENCY_TIMES_NS``).  Only the time grid is comparable across
-  instruments: one emission row is ~3.3 s on equities and ~15 s on FX in
+  instruments: one emission row is ~3 s on equities and ~15-22 s on FX in
   this dataset, so "+1 event" means two very different latencies and a
   report that quotes it is not describing a latency budget at all.
 - **Regimes**: IC split by the volatility-regime flag

@@ -21,36 +21,36 @@ How often does the validation chain (`iap.validation.validate_alpha`, the pinned
 | lead_lag | EQ10 | break | 0.5 | 3 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
 | lead_lag | EQ10 | break | 1 | 3 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
 | lead_lag | EQ10 | break | 2 | 3 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
-| lead_lag | EQ10 | stable | 0 | 3 | 0.00 | 0.00 | 0.00 | 0.33 | 0.00 | 0.00 |
+| lead_lag | EQ10 | stable | 0 | 3 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
 | lead_lag | EQ10 | stable | 0.5 | 3 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
-| lead_lag | EQ10 | stable | 1 | 3 | 0.00 | 0.00 | 0.00 | 0.33 | 0.00 | 0.00 |
-| lead_lag | EQ10 | stable | 2 | 3 | 0.33 | 0.67 | 0.33 | 0.67 | 0.00 | 0.00 |
+| lead_lag | EQ10 | stable | 1 | 3 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| lead_lag | EQ10 | stable | 2 | 3 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
 | order_flow | EQ04 | break | 0.5 | 3 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
 | order_flow | EQ04 | break | 1 | 3 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
 | order_flow | EQ04 | break | 2 | 3 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
 | order_flow | EQ04 | stable | 0 | 3 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
-| order_flow | EQ04 | stable | 0.5 | 3 | 0.33 | 0.33 | 0.33 | 1.00 | 0.00 | 0.00 |
-| order_flow | EQ04 | stable | 1 | 3 | 1.00 | 1.00 | 1.00 | 1.00 | 0.00 | 0.00 |
+| order_flow | EQ04 | stable | 0.5 | 3 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| order_flow | EQ04 | stable | 1 | 3 | 0.33 | 0.33 | 0.33 | 1.00 | 0.00 | 0.00 |
 | order_flow | EQ04 | stable | 2 | 3 | 1.00 | 1.00 | 1.00 | 1.00 | 0.00 | 0.00 |
 
 ## Statistics behind the rates (means over the seeds of a cell)
 
 | effect | alpha | scenario | level | gate IC (pooled) | IC (vol-scaled) | t within | t pooled | fold consistency | folds surviving 1x cost |
 |---|---|---|---:|---:|---:|---:|---:|---:|---:|
-| lead_lag | EQ10 | break | 0.5 | +0.0013 | +0.0010 | -0.42 | +0.00 | 0.42 | 0.00 |
-| lead_lag | EQ10 | break | 1 | -0.0081 | -0.0072 | -0.52 | -0.65 | 0.50 | 0.00 |
-| lead_lag | EQ10 | break | 2 | +0.0009 | +0.0004 | -0.31 | -0.13 | 0.50 | 0.00 |
-| lead_lag | EQ10 | stable | 0 | +0.0006 | +0.0007 | +0.65 | +0.11 | 0.42 | 0.00 |
-| lead_lag | EQ10 | stable | 0.5 | +0.0005 | +0.0013 | +0.66 | +0.24 | 0.58 | 0.00 |
-| lead_lag | EQ10 | stable | 1 | +0.0060 | +0.0057 | +1.12 | +0.90 | 0.92 | 0.00 |
-| lead_lag | EQ10 | stable | 2 | +0.0216 | +0.0224 | +2.53 | +2.77 | 0.83 | 0.00 |
-| order_flow | EQ04 | break | 0.5 | -0.0193 | -0.0171 | -1.53 | -1.44 | 0.25 | 0.00 |
-| order_flow | EQ04 | break | 1 | -0.0250 | -0.0306 | -1.50 | -1.08 | 0.50 | 0.00 |
-| order_flow | EQ04 | break | 2 | -0.0358 | -0.0487 | -0.97 | -0.84 | 0.42 | 0.00 |
-| order_flow | EQ04 | stable | 0 | -0.0134 | -0.0160 | -1.35 | -1.15 | 0.25 | 0.00 |
-| order_flow | EQ04 | stable | 0.5 | +0.0324 | +0.0318 | +2.72 | +2.43 | 0.83 | 0.00 |
-| order_flow | EQ04 | stable | 1 | +0.0726 | +0.0763 | +5.96 | +5.94 | 1.00 | 0.00 |
-| order_flow | EQ04 | stable | 2 | +0.1579 | +0.1771 | +13.42 | +10.25 | 1.00 | 0.00 |
+| lead_lag | EQ10 | break | 0.5 | -0.0001 | +0.0004 | +0.43 | +0.12 | 0.42 | 0.00 |
+| lead_lag | EQ10 | break | 1 | -0.0019 | -0.0010 | -0.23 | -0.24 | 0.42 | 0.00 |
+| lead_lag | EQ10 | break | 2 | -0.0025 | -0.0031 | -0.69 | -0.40 | 0.50 | 0.00 |
+| lead_lag | EQ10 | stable | 0 | -0.0018 | -0.0023 | -0.40 | -0.23 | 0.42 | 0.00 |
+| lead_lag | EQ10 | stable | 0.5 | +0.0047 | +0.0045 | +0.58 | +0.68 | 0.58 | 0.00 |
+| lead_lag | EQ10 | stable | 1 | +0.0111 | +0.0120 | +0.64 | +1.15 | 0.75 | 0.00 |
+| lead_lag | EQ10 | stable | 2 | +0.0130 | +0.0122 | +0.88 | +1.69 | 0.92 | 0.00 |
+| order_flow | EQ04 | break | 0.5 | -0.0247 | -0.0247 | -2.36 | -2.22 | 0.08 | 0.00 |
+| order_flow | EQ04 | break | 1 | -0.0213 | -0.0221 | -1.92 | -1.56 | 0.33 | 0.00 |
+| order_flow | EQ04 | break | 2 | -0.0364 | -0.0417 | -2.24 | -1.92 | 0.33 | 0.00 |
+| order_flow | EQ04 | stable | 0 | -0.0050 | -0.0043 | -0.46 | -0.47 | 0.42 | 0.00 |
+| order_flow | EQ04 | stable | 0.5 | +0.0041 | +0.0072 | +0.29 | +0.31 | 0.67 | 0.00 |
+| order_flow | EQ04 | stable | 1 | +0.0313 | +0.0423 | +2.90 | +2.92 | 0.92 | 0.00 |
+| order_flow | EQ04 | stable | 2 | +0.0813 | +0.0919 | +6.35 | +6.08 | 1.00 | 0.00 |
 
 `evidence` = verdict ITERATE or PROMOTE; `promote` additionally needs fold consistency, a confirmed hypothesis sign and net P&L > 0 at 1x costs. Rates are over the seeds of the cell.
 

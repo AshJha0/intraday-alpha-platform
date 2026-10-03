@@ -28,8 +28,8 @@ is reported in the CI log and does not fail the run, because none has been
 triaged yet); the lint and sanitizer steps are **blocking**:
 
 - Python: `pip-audit` against `python/requirements-ci.txt` (the `advisory` job
-  in `ci.yml`, non-blocking), plus `ruff check` (blocking; the rule set is
-  correctness-only — `ruff.toml`).
+  in `ci.yml`, non-blocking), plus `ruff check` (blocking; rules E, W, F, I,
+  UP and B — `ruff.toml`) and `ruff format --check` (blocking).
 - Rust: `cargo audit` against `Cargo.lock` (RustSec advisory DB, `advisory`
   job, non-blocking) and `cargo clippy -D warnings` (a blocking step of the
   `rust` job).

@@ -1,6 +1,6 @@
 {
-  "x-version": 1,
-  "description": "Synthetic market-data generator config (iap.marketdata.generator). All randomness is SplitMix64 seeded from `seed`; identical seed => bit-identical output files. Equities: ONE shared regime-switching efficient price per instrument (sigma per sqrt-second, 1s grid) with per-venue bounded AR(1) microstructure noise (`venue_noise`) and self-exciting MBO flow, so the consolidated multi-venue book stays uncrossed; FX streams are QUOTE+TRADE across LP1/LP2/PRI. `anomalies` are injected for QC testing and disabled for golden vectors.",
+  "x-version": 2,
+  "description": "Synthetic market-data generator config (iap.marketdata.generator). All randomness is SplitMix64 seeded from `seed`; identical seed => bit-identical output files. Equities: ONE shared regime-switching efficient price per instrument (sigma per sqrt-second, 1s grid) with per-venue bounded AR(1) microstructure noise (`venue_noise`) and self-exciting MBO flow, so the consolidated multi-venue book stays uncrossed; `flow.calibration` \"session\" (x-version 2, v1.4.0) calibrates the base rate for the self-excitation so `slots_per_stream` expected flow slots span the whole session and flow reaches the close — \"legacy_budget\" reproduces the v1.3.0 dataset (data_version 203c8f54...), whose equity flow stopped about 40% into each session. FX streams are QUOTE+TRADE across LP1/LP2/PRI. `anomalies` are injected for QC testing and disabled for golden vectors.",
   "seed": 20260829,
   "sessions": 2,
   "equities": {
@@ -20,7 +20,8 @@
     "flow": {
       "excitation_kick": 1.4,
       "excitation_decay": 0.82,
-      "max_excitation": 8.0
+      "max_excitation": 8.0,
+      "calibration": "session"
     },
     "book": {
       "max_resting_orders": 160,

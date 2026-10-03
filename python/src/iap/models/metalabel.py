@@ -205,11 +205,11 @@ def run_meta_labeling(
     # Boundaries at quantiles of the ROW INDEX, not of the wall span (pinned,
     # round-4 — the same correction both walk-forward splitters already carry,
     # iap.validation.splits.folds_by_row_mass and iap.models.splits.split).
-    # These frames occupy ~2.6 h of each 24 h day, so wall-span boundaries put
-    # the documented 50/25/25 at an actual 50.0 / 6.0 / 43.9 on the 206 190-row
-    # dataset: the calibration window landed almost entirely in the dormant
-    # overnight stretch and carried 324 positives against the 500 isotonic
-    # regression needs, so the calibrator silently fell back to Platt.
+    # The frames are not uniform in time (an equity session is 6.5 h of each
+    # 24 h day), so wall-span boundaries do not give the documented 50/25/25:
+    # on the dataset this was found on (v1.3.0 and earlier, 206 190 rows) they
+    # gave 50.0 / 6.0 / 43.9 and the calibration window landed almost entirely
+    # in the dormant overnight stretch.
     n_rows = ts.size
     b1 = int(ts[min(int(round(0.50 * n_rows)), n_rows - 1)])
     b2 = int(ts[min(int(round(0.75 * n_rows)), n_rows - 1)])

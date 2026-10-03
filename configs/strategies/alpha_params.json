@@ -1,15 +1,15 @@
 {
-  "data_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
+  "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
   "description": "Fitted flagship-alpha parameters (iap.alpha). model linear_z_v1: er = beta * clip((raw - mu)/(sigma + 1e-12), +-z_clip); conf = min(1, |z|/conf_scale); a dead alpha (sigma <= 0 or beta == 0) scores (0, 0) on every row. The provenance header identifies the feature registry, the data and the commit these numbers were fitted with; every loader rejects a feature_version that differs from its engine's registry hash. See /API_ALPHA.md section 2.",
   "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
-  "git_commit": "fc41ac6f1381cc88d235fa206ba94f7bd104d469",
+  "git_commit": "29f0822534e3c6d74e09cbe393d5d58e6edf4919",
   "git_dirty": true,
-  "git_dirty_hash": "63cf5f68b6a83680d1d578488fbf0e72f20b8ceec8f7974a3aaaf70ca74863fc",
+  "git_dirty_hash": "a1cb60d7b06295999e581ea66f375d920881be62214f127fa2cb5c684632ebe9",
   "params": {
     "EQ01": {
       "alpha_id": "EQ01",
-      "beta": 1.2584700120868522e-06,
-      "beta_fit": 1.2584700120868522e-06,
+      "beta": 5.84449379264817e-08,
+      "beta_fit": 5.84449379264817e-08,
       "conf_scale": 2.0,
       "dead": false,
       "features": [
@@ -19,9 +19,9 @@
       "horizon": "1s",
       "hypothesis_confirmed": true,
       "model": "linear_z_v1",
-      "mu": 0.022273319056195184,
-      "n_train": 77816,
-      "sigma": 1.2145355737992412,
+      "mu": 0.01289768995965269,
+      "n_train": 80238,
+      "sigma": 1.433527721314541,
       "train_window": {
         "end_ts": 1787603100184527543,
         "start_ts": 1787529602028520532
@@ -30,8 +30,8 @@
     },
     "EQ02": {
       "alpha_id": "EQ02",
-      "beta": 4.217118712653277e-06,
-      "beta_fit": 4.217118712653277e-06,
+      "beta": 2.858082900639863e-06,
+      "beta_fit": 2.858082900639863e-06,
       "conf_scale": 2.0,
       "dead": false,
       "features": [
@@ -41,9 +41,9 @@
       "horizon": "5s",
       "hypothesis_confirmed": true,
       "model": "linear_z_v1",
-      "mu": -0.0012738553275802992,
-      "n_train": 77277,
-      "sigma": 0.31061745430647164,
+      "mu": -0.00039288399208881026,
+      "n_train": 79973,
+      "sigma": 0.28278680274391194,
       "train_window": {
         "end_ts": 1787603100184527543,
         "start_ts": 1787529602028520532
@@ -52,8 +52,8 @@
     },
     "EQ03": {
       "alpha_id": "EQ03",
-      "beta": 4.0593310230811845e-06,
-      "beta_fit": 4.0593310230811845e-06,
+      "beta": 2.3843836063294293e-06,
+      "beta_fit": 2.3843836063294293e-06,
       "conf_scale": 2.0,
       "dead": false,
       "features": [
@@ -65,9 +65,9 @@
       "horizon": "5s",
       "hypothesis_confirmed": true,
       "model": "linear_z_v1",
-      "mu": -0.0008108714668119846,
-      "n_train": 77277,
-      "sigma": 0.1681551269012764,
+      "mu": -0.0002571942424055844,
+      "n_train": 79973,
+      "sigma": 0.15844419707850682,
       "train_window": {
         "end_ts": 1787603100184527543,
         "start_ts": 1787529602028520532
@@ -76,8 +76,8 @@
     },
     "EQ04": {
       "alpha_id": "EQ04",
-      "beta": -3.085951576646263e-10,
-      "beta_fit": -3.085951576646263e-10,
+      "beta": -4.6639911343519124e-07,
+      "beta_fit": -4.6639911343519124e-07,
       "conf_scale": 2.0,
       "dead": false,
       "features": [
@@ -87,9 +87,9 @@
       "horizon": "5s",
       "hypothesis_confirmed": false,
       "model": "linear_z_v1",
-      "mu": 0.00011426026947002353,
-      "n_train": 56836,
-      "sigma": 0.8099374389660473,
+      "mu": -0.005906000644076835,
+      "n_train": 36251,
+      "sigma": 0.9180397767878333,
       "train_window": {
         "end_ts": 1787603100184527543,
         "start_ts": 1787529602028520532
@@ -98,8 +98,8 @@
     },
     "EQ05": {
       "alpha_id": "EQ05",
-      "beta": 1.016442386331674e-06,
-      "beta_fit": 1.016442386331674e-06,
+      "beta": 3.1255142007509825e-07,
+      "beta_fit": 3.1255142007509825e-07,
       "conf_scale": 2.0,
       "dead": false,
       "features": [
@@ -112,9 +112,9 @@
       "horizon": "1s",
       "hypothesis_confirmed": true,
       "model": "linear_z_v1",
-      "mu": 0.0031872069008533387,
-      "n_train": 77779,
-      "sigma": 0.6622249473747265,
+      "mu": -0.00535011339304477,
+      "n_train": 80242,
+      "sigma": 0.648421966412934,
       "train_window": {
         "end_ts": 1787603100184527543,
         "start_ts": 1787529602028520532
@@ -123,8 +123,8 @@
     },
     "EQ06": {
       "alpha_id": "EQ06",
-      "beta": 7.474776644816464e-06,
-      "beta_fit": 7.474776644816464e-06,
+      "beta": 6.08312181431125e-06,
+      "beta_fit": 6.08312181431125e-06,
       "conf_scale": 2.0,
       "dead": false,
       "features": [
@@ -134,9 +134,9 @@
       "horizon": "10s",
       "hypothesis_confirmed": true,
       "model": "linear_z_v1",
-      "mu": 0.024268266367893764,
-      "n_train": 68941,
-      "sigma": 3.5261274939832927,
+      "mu": 0.009272202106182985,
+      "n_train": 56441,
+      "sigma": 3.6814734421084916,
       "train_window": {
         "end_ts": 1787603100184527543,
         "start_ts": 1787529602028520532
@@ -145,8 +145,8 @@
     },
     "EQ07": {
       "alpha_id": "EQ07",
-      "beta": -3.3775269149210177e-06,
-      "beta_fit": -3.3775269149210177e-06,
+      "beta": -1.188348563757847e-06,
+      "beta_fit": -1.188348563757847e-06,
       "conf_scale": 2.0,
       "dead": false,
       "features": [
@@ -156,9 +156,9 @@
       "horizon": "10s",
       "hypothesis_confirmed": false,
       "model": "linear_z_v1",
-      "mu": -0.005653538256606401,
-      "n_train": 68941,
-      "sigma": 1.4555473214078707,
+      "mu": -0.0005622499912300753,
+      "n_train": 56441,
+      "sigma": 1.8937179246046851,
       "train_window": {
         "end_ts": 1787603100184527543,
         "start_ts": 1787529602028520532
@@ -167,8 +167,8 @@
     },
     "EQ08": {
       "alpha_id": "EQ08",
-      "beta": -8.424071200526209e-06,
-      "beta_fit": -8.424071200526209e-06,
+      "beta": -9.367249881022218e-06,
+      "beta_fit": -9.367249881022218e-06,
       "conf_scale": 2.0,
       "dead": false,
       "features": [
@@ -179,9 +179,9 @@
       "horizon": "10s",
       "hypothesis_confirmed": false,
       "model": "linear_z_v1",
-      "mu": 0.2752485740120898,
-      "n_train": 75304,
-      "sigma": 5.06525329153586,
+      "mu": 0.3059255946215191,
+      "n_train": 63945,
+      "sigma": 5.378637770336121,
       "train_window": {
         "end_ts": 1787603100184527543,
         "start_ts": 1787529602028520532
@@ -190,8 +190,8 @@
     },
     "EQ09": {
       "alpha_id": "EQ09",
-      "beta": -5.244767556971614e-06,
-      "beta_fit": -5.244767556971614e-06,
+      "beta": -6.91491308712436e-06,
+      "beta_fit": -6.91491308712436e-06,
       "conf_scale": 2.0,
       "dead": false,
       "features": [
@@ -201,9 +201,9 @@
       "horizon": "10s",
       "hypothesis_confirmed": false,
       "model": "linear_z_v1",
-      "mu": 2.577610208743877e-06,
-      "n_train": 40388,
-      "sigma": 0.00023141427859777527,
+      "mu": 2.4933549132173555e-07,
+      "n_train": 22492,
+      "sigma": 0.00026574977380172915,
       "train_window": {
         "end_ts": 1787603100184527543,
         "start_ts": 1787529602028520532
@@ -212,8 +212,8 @@
     },
     "EQ10": {
       "alpha_id": "EQ10",
-      "beta": -3.701223857157952e-07,
-      "beta_fit": -3.701223857157952e-07,
+      "beta": -1.0382831773333301e-07,
+      "beta_fit": -1.0382831773333301e-07,
       "conf_scale": 2.0,
       "dead": false,
       "features": [
@@ -223,9 +223,9 @@
       "horizon": "1s",
       "hypothesis_confirmed": false,
       "model": "linear_z_v1",
-      "mu": -3.794293101820597e-08,
-      "n_train": 70707,
-      "sigma": 5.600352985597542e-06,
+      "mu": -8.497863556144523e-10,
+      "n_train": 73086,
+      "sigma": 6.415846458099899e-06,
       "train_window": {
         "end_ts": 1787603100184527543,
         "start_ts": 1787529602028520532
@@ -234,8 +234,8 @@
     },
     "EQ11": {
       "alpha_id": "EQ11",
-      "beta": 3.728640692345463e-05,
-      "beta_fit": 3.728640692345463e-05,
+      "beta": 7.596592782546579e-05,
+      "beta_fit": 7.596592782546579e-05,
       "conf_scale": 2.0,
       "dead": false,
       "features": [
@@ -245,9 +245,9 @@
       "horizon": "15m",
       "hypothesis_confirmed": true,
       "model": "linear_z_v1",
-      "mu": -0.0019159047277148768,
-      "n_train": 41476,
-      "sigma": 0.9981837407739049,
+      "mu": -0.02394215245476243,
+      "n_train": 40730,
+      "sigma": 0.9512438512337923,
       "train_window": {
         "end_ts": 1787603100184527543,
         "start_ts": 1787529602028520532
@@ -256,8 +256,8 @@
     },
     "EQ12": {
       "alpha_id": "EQ12",
-      "beta": 4.459918684072455e-06,
-      "beta_fit": 4.459918684072455e-06,
+      "beta": 2.8437574758648306e-06,
+      "beta_fit": 2.8437574758648306e-06,
       "conf_scale": 2.0,
       "dead": false,
       "features": [
@@ -268,9 +268,9 @@
       "horizon": "5s",
       "hypothesis_confirmed": true,
       "model": "linear_z_v1",
-      "mu": -0.001694905134649208,
-      "n_train": 75426,
-      "sigma": 0.3151908793113707,
+      "mu": -0.00033390039599797637,
+      "n_train": 79190,
+      "sigma": 0.2867460000743925,
       "train_window": {
         "end_ts": 1787603100184527543,
         "start_ts": 1787529602028520532

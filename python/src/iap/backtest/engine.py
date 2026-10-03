@@ -12,8 +12,8 @@ Pinned semantics (mirrored by the accounting-identity tests):
   Latency has TWO pinned modes (round-3):
 
   - ``latency_rows`` (default 1) — the historic rows mode, kept as the
-    golden regression.  A row is 3.3 s on equities and 15 s on FX in the
-    bundled data, so "+1 row" is NOT comparable across instruments.
+    golden regression.  A row is about 3 s on equities and 15-22 s on FX
+    in the bundled data, so "+1 row" is NOT comparable across instruments.
   - ``latency_ns`` — TIME mode: the decision at ``t`` executes at the first
     row with ``exchange_ts >= t + latency_ns``.  Set it and it overrides
     ``latency_rows``.  This is the mode any latency claim in a report must
@@ -21,9 +21,11 @@ Pinned semantics (mirrored by the accounting-identity tests):
 
 - **Decision age** (pinned): ``max_decision_age_ns`` drops a target whose
   execution row is older than the bound instead of filling it.  Without it a
-  16:05 decision "filled" at the 20:00 close print and a 20:00 decision at
-  the next day's 13:30 open — the overnight gap credited to a 1-second
-  alpha.  ``None`` keeps the unbounded legacy behaviour (goldens only).
+  decision made before a long quote gap "filled" at whatever row came next
+  (on the pre-v1.4.0 dataset: a 16:05 decision at the 20:00 close print) and
+  a 20:00 decision at the next day's 13:30 open — the overnight gap credited
+  to a 1-second alpha.  ``None`` keeps the unbounded legacy behaviour
+  (goldens only).
 
 - **Session flattening** (pinned): with ``flatten_at_session_end=True`` the
   target is forced to 0 on the last EXECUTABLE row at or before any gap

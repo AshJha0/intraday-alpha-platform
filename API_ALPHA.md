@@ -193,7 +193,16 @@ accounting identity `total_pnl = gross_pnl - total_costs`).  `total_pnl`,
 Regeneration (deliberate, versioned changes only — schemas/MIGRATIONS.md):
 `research/alpha_reports/run_all.py` (refits `alpha_params.json`), then
 `PYTHONPATH=src python3 python/tools/make_golden_alpha.py` (brute-force
-cross-validated before writing).
+cross-validated before writing). When the DATASET changes, do not run the
+two by hand: `tools/regenerate_dataset_artifacts.py` runs every
+dataset-derived step in dependency order (dataset → features → alpha
+reports and `alpha_params.json` → experiments → lifecycle → ML → adaptive →
+power → goldens → TCA → ConfigMaps). v1.4.0 was its first use: the
+parameters, `expected_alpha.json` and `expected_backtest.json` in this tree
+are fitted on dataset `116b7787…` (the `data_version` in the header of
+`alpha_params.json`). The equity parameters moved (EQ01 `beta` 1.26e-06 →
+5.84e-08, EQ03 4.06e-06 → 2.38e-06, EQ06 7.47e-06 → 6.08e-06); the FX
+parameters did not, because the FX data is byte-identical.
 
 ## 7. Validation expectations for ports
 

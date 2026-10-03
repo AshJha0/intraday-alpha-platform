@@ -2,7 +2,7 @@
 
 Deterministic simulation (SplitMix64 seed `20260829`) over the cross-language golden vectors (`tests/golden/events_eq_mbo.jsonl`, `events_fx_quote.jsonl`), replayed through the reference consolidated book. Execution model: 4 child slices 15s apart, marketable at the touch plus depth-dependent impact ticks, 15% per-child unfill probability. This is a research TCA harness, not the production backtester.
 
-**Timeline rule (pinned, API_PORTFOLIO_TCA.md §2.1)**: crossed consolidated states (cross-venue bid > ask, a synthetic-generator artifact) are SKIPPED and counted, locked states (half-spread 0) are kept; markouts past the timeline end or across a HALT are undefined (excluded, never a stale mid); every fill must lie in [arrival, end]. Crossed states skipped per instrument: 1: 0 of 1935, 101: 55 of 799. Spread-cost lines are therefore never negative by construction (conventions §7: honest, not hidden).
+**Timeline rule (pinned, API_PORTFOLIO_TCA.md §2.1)**: crossed consolidated states (cross-venue bid > ask, a synthetic-generator artifact) are SKIPPED and counted, locked states (half-spread 0) are kept; markouts past the timeline end or across a HALT are undefined (excluded, never a stale mid); every fill must lie in [arrival, end]. Crossed states skipped per instrument: 1: 0 of 1935, 101: 55 of 799. Spread-cost lines in THIS report are never negative because every fill in the bundled research set is a TAKER fill; a MAKER fill earns the half-spread and reports a negative spread cost (conventions §7: honest, not hidden).
 
 ## Instrument 1
 

@@ -72,9 +72,10 @@ class WalkForwardSplitter:
             raise ValueError("timestamp span must be positive")
         n_seg = self.n_folds + 1
         # Segment boundaries at quantiles of the ROW INDEX, not of the wall
-        # span (pinned, round-3 — mirrors iap.validation.splits): this data
-        # occupies 2.6 h of each 24 h day, so equal wall segments put ~100 %
-        # of the rows in two folds and left the others empty.
+        # span (pinned, round-3 — mirrors iap.validation.splits): the rows
+        # are not uniform in time (an equity session is 6.5 h of each 24 h
+        # day), so equal wall segments put most of the rows in two folds and
+        # leave the others empty or thin.
         order = np.sort(ts)
         n = order.size
         bounds = [t0]

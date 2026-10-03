@@ -31,16 +31,29 @@ bit-identical output files):
     the pinned dataset is unchanged), close auction (STATUS AUCTION + prints
     + STATUS CLOSE). Multi-day capable; books and sequences persist across
     sessions.
-  * KNOWN LIMITATION — continuous flow stops early.  ``slots_per_stream`` is
-    a hard budget of flow slots per stream and session, and the base rate is
-    ``slots / duration * 1.30``: the margin multiplies the RATE, so even
-    unclustered flow spends the budget 1/1.30 = 77% of the way through, and
-    the self-exciting multiplier ``(1 + excitation)`` is not in the
-    calibration at all.  With the pinned config the last continuous event
-    of a stream falls 38-43% into the session (mean 40.5%); nothing follows
-    until the close auction.  ``equities.fill_session`` (off by default so
-    the pinned dataset is unchanged) removes the budget: flow continues to
-    the close at the same intensity, and the event count grows accordingly.
+  * Flow calibration (``equities.flow.calibration``, since v1.4.0).  The
+    self-exciting multiplier ``(1 + excitation)`` shortens every
+    inter-arrival time, so a base rate of ``slots / duration`` would spend
+    ``slots_per_stream`` slots long before the close.  With the default,
+    ``"session"``, the base rate is
+    ``slots_per_stream * excitation_time_factor / duration`` where
+    ``excitation_time_factor`` = E[1 / (1 + excitation)] over the slot chain
+    (:func:`excitation_time_factor`, a pinned SplitMix64 estimate that
+    depends only on ``flow`` and ``mix``), and there is no slot budget: flow
+    runs until the close, so ``slots_per_stream`` is the EXPECTED number of
+    flow slots per stream and session, spread over the whole session.
+    ``"legacy_budget"`` is the v1.3.0 rule, kept so the v1.3.0 dataset
+    (``data_version`` ``203c8f54...``) and the fixed golden vectors stay
+    reproducible byte for byte: ``slots_per_stream`` is a hard budget and
+    the base rate is ``slots / duration * 1.30``, uncalibrated for the
+    excitation, so the last continuous event of a stream falls 38-43% into
+    the session and nothing follows until the close auction.  Under
+    ``"legacy_budget"`` only, ``equities.fill_session: true`` (the v1.3.0
+    opt-in) removes the budget and keeps that uncalibrated rate (about 2.5
+    times the events).  The golden-vector builders below and in
+    ``golden_anomalies`` select ``"legacy_budget"`` explicitly: they cut a
+    fixed number of events from the start of a stream and are test inputs,
+    not the dataset.
 - FX (8 G10 pairs, venues LP1/LP2/PRI): QUOTE (full L1 side replace) + TRADE
   streams; one shared regime-switching mid per pair, venue-specific spreads
   and venue-specific latency in receive_ts.
@@ -111,7 +124,12 @@ _DEFAULT_CONFIG = {
         "slots_per_stream": 3850,
         "vol_regimes": {"sigma_ticks_per_s": [0.15, 0.4], "switch_prob_per_s": 0.0007},
         "venue_noise": {"rho": 0.9, "sigma_ticks": 0.12, "max_ticks": 0.45},
-        "flow": {"excitation_kick": 1.4, "excitation_decay": 0.82, "max_excitation": 8.0},
+        "flow": {
+            "excitation_kick": 1.4,
+            "excitation_decay": 0.82,
+            "max_excitation": 8.0,
+            "calibration": "session",
+        },
         "book": {"max_resting_orders": 160, "qty_lots_max": 10},
         "mix": {"add": 0.46, "cancel": 0.26, "modify": 0.12, "execute": 0.16},
         "halt": {
@@ -150,6 +168,63 @@ _DEFAULT_CONFIG = {
 }
 
 
+#: ``x-version`` of a generator config document (``load_generator_config``):
+#: 2 since v1.4.0, when the default equity flow calibration became "session".
+GENERATOR_CONFIG_X_VERSION = 2
+
+#: ``equities.flow.calibration`` values (module docs).
+FLOW_CALIBRATION_SESSION = "session"
+FLOW_CALIBRATION_LEGACY = "legacy_budget"
+FLOW_CALIBRATIONS = (FLOW_CALIBRATION_SESSION, FLOW_CALIBRATION_LEGACY)
+
+#: Pinned estimator of :func:`excitation_time_factor`: one SplitMix64 stream
+#: with this seed, this many slots.  Independent of the dataset seed, so the
+#: factor is a pure function of the flow parameters.
+_CALIBRATION_SEED = 0x1A9CA11B
+_CALIBRATION_SLOTS = 1 << 17
+
+_TIME_FACTOR_CACHE: dict[tuple[float, float, float, float], float] = {}
+
+
+def excitation_time_factor(
+    excitation_kick: float, excitation_decay: float, max_excitation: float, execute_prob: float
+) -> float:
+    """E[1 / (1 + excitation)] over the equity slot chain.
+
+    A flow slot waits ``Exp(1) / (lambda0 * (1 + excitation))``; each slot
+    decays the excitation by ``excitation_decay`` and, with probability
+    ``execute_prob`` (the aggression share of the mix), kicks it up by
+    ``excitation_kick`` capped at ``max_excitation``.  The mean wait of a
+    slot is therefore ``factor / lambda0``, and ``lambda0 = slots * factor /
+    duration`` spreads ``slots`` expected slots over ``duration``.
+
+    Estimated on a pinned SplitMix64 stream (``_CALIBRATION_SEED``,
+    ``_CALIBRATION_SLOTS`` slots): deterministic, the same in every run, and
+    cached per parameter set.
+    """
+    key = (
+        float(excitation_kick),
+        float(excitation_decay),
+        float(max_excitation),
+        float(execute_prob),
+    )
+    cached = _TIME_FACTOR_CACHE.get(key)
+    if cached is not None:
+        return cached
+    kick, decay, cap, prob = key
+    rng = SplitMix64(_CALIBRATION_SEED)
+    excitation = 0.0
+    total = 0.0
+    for _ in range(_CALIBRATION_SLOTS):
+        total += 1.0 / (1.0 + excitation)
+        excitation *= decay
+        if rng.uniform() < prob:
+            excitation = min(excitation + kick, cap)
+    factor = total / _CALIBRATION_SLOTS
+    _TIME_FACTOR_CACHE[key] = factor
+    return factor
+
+
 def _merge_config(base: dict, override: dict) -> dict:
     out = dict(base)
     for k, v in override.items():
@@ -161,13 +236,36 @@ def _merge_config(base: dict, override: dict) -> dict:
 
 
 def load_generator_config(path=None) -> dict:
-    """Load configs/marketdata/generator.json merged over built-in defaults."""
+    """Load configs/marketdata/generator.json merged over built-in defaults.
+
+    ``x-version`` 2 (v1.4.0) is the document whose default equity flow
+    calibration is ``"session"``.  An ``x-version`` 1 document was written
+    against the v1.3.0 rule: loading it under the new default would produce
+    a different dataset without anyone asking for it, so it is rejected
+    unless it names ``equities.flow.calibration`` itself (``"legacy_budget"``
+    reproduces the v1.3.0 data).  A document without ``x-version`` takes the
+    current defaults.
+    """
     cfg = dict(_DEFAULT_CONFIG)
     if path is not None:
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             file_cfg = json.load(f)
-        file_cfg.pop("x-version", None)
+        version = file_cfg.pop("x-version", None)
         file_cfg.pop("description", None)
+        if version is not None and version not in (1, GENERATOR_CONFIG_X_VERSION):
+            raise ValueError(
+                f"{path}: unsupported generator config x-version {version!r} "
+                f"(this build reads 1 and {GENERATOR_CONFIG_X_VERSION})"
+            )
+        explicit = file_cfg.get("equities", {}).get("flow", {}).get("calibration")
+        if version == 1 and explicit is None:
+            raise ValueError(
+                f"{path}: x-version 1 generator config without equities.flow.calibration — "
+                'since v1.4.0 the default is "session" (flow to the close), which is not the '
+                "dataset this document was written for. Set equities.flow.calibration to "
+                '"legacy_budget" to reproduce the v1.3.0 data, or to "session" and bump '
+                f"x-version to {GENERATOR_CONFIG_X_VERSION}."
+            )
         cfg = _merge_config(cfg, file_cfg)
     return cfg
 
@@ -351,7 +449,46 @@ class MarketDataGenerator:
         self._fx_streams: dict[tuple[int, int], _Stream] = {}
         self._eq_prices: dict[int, _EffPrice] = {}  # per-instrument shared mid
         self._rngs: dict[tuple[str, int, int], SplitMix64] = {}
+        self._check_flow()
         self._check_planted()
+
+    # ------------------------------------------------------------------ flow
+
+    def _check_flow(self) -> None:
+        """Validate the equity flow calibration (module docs); fail fast."""
+        eq = self.cfg["equities"]
+        flow, mix = eq["flow"], eq["mix"]
+        calibration = flow["calibration"]
+        if calibration not in FLOW_CALIBRATIONS:
+            raise ValueError(
+                f"equities.flow.calibration must be one of {list(FLOW_CALIBRATIONS)}, "
+                f"got {calibration!r}"
+            )
+        if calibration == FLOW_CALIBRATION_SESSION and eq["fill_session"]:
+            raise ValueError(
+                "equities.fill_session is the v1.3.0 opt-in of the legacy flow rule: set "
+                'equities.flow.calibration to "legacy_budget" with it, or drop it '
+                '(the default calibration "session" always carries flow to the close)'
+            )
+        if not 0.0 < float(flow["excitation_decay"]) < 1.0:
+            raise ValueError("equities.flow.excitation_decay must be in (0, 1)")
+        if float(flow["excitation_kick"]) < 0.0 or float(flow["max_excitation"]) < 0.0:
+            raise ValueError("equities.flow.excitation_kick / max_excitation must be >= 0")
+        passive = float(mix["add"]) + float(mix["cancel"]) + float(mix["modify"])
+        if not 0.0 <= passive <= 1.0:
+            raise ValueError("equities.mix add + cancel + modify must be in [0, 1]")
+
+    def eq_time_factor(self) -> float:
+        """:func:`excitation_time_factor` of this generator's flow config."""
+        eq = self.cfg["equities"]
+        flow, mix = eq["flow"], eq["mix"]
+        passive = float(mix["add"]) + float(mix["cancel"]) + float(mix["modify"])
+        return excitation_time_factor(
+            flow["excitation_kick"],
+            flow["excitation_decay"],
+            flow["max_excitation"],
+            max(0.0, 1.0 - passive),
+        )
 
     # --------------------------------------------------------------- planted
 
@@ -828,11 +965,17 @@ class MarketDataGenerator:
                         )
 
         duration_s = max((close_ns - t) / NS, 1.0)
-        lambda0 = slots / duration_s * 1.30
         halted = halt_window is None
-        # The slot budget ends continuous flow well before the close (module
-        # docs, "KNOWN LIMITATION"); fill_session draws slots until the close.
-        budget = itertools.count() if cfg["fill_session"] else range(slots)
+        if cfg["flow"]["calibration"] == FLOW_CALIBRATION_SESSION:
+            # Calibrated: ``slots`` EXPECTED slots over the session and no
+            # budget, so flow runs until the close (module docs).
+            lambda0 = slots * self.eq_time_factor() / duration_s
+            budget = itertools.count()
+        else:
+            # v1.3.0 rule: the slot budget ends continuous flow well before
+            # the close; fill_session draws slots until the close.
+            lambda0 = slots / duration_s * 1.30
+            budget = itertools.count() if cfg["fill_session"] else range(slots)
         for _ in budget:
             rate = lambda0 * (1.0 + stream.excitation)
             t += int(rng.exponential(rate) * NS) + 1
@@ -1182,9 +1325,14 @@ def generate_golden_eq(
     """Pinned single-instrument (SYN.EQ.001 @ XV1) clean MBO golden vector.
 
     No anomalies, no halt; exactly ``n`` events in exchange-time order with
-    event_id 1..n and contiguous sequences.
+    event_id 1..n and contiguous sequences.  The vector is a fixed test
+    input cut from the start of a stream: it keeps the v1.3.0 flow rule
+    (``legacy_budget``) so its bytes never move with the dataset default.
     """
-    gen = MarketDataGenerator(refdata, {"seed": seed})
+    gen = MarketDataGenerator(
+        refdata,
+        {"seed": seed, "equities": {"flow": {"calibration": FLOW_CALIBRATION_LEGACY}}},
+    )
     inst = refdata.instrument("SYN.EQ.001")
     venue = refdata.venue("XV1")
     stream = _Stream(inst, venue)

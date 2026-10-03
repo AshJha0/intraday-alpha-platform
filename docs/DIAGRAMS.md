@@ -35,7 +35,7 @@ flowchart TD
     FILLS --> TCA["TCA + attribution<br/>Perold IS = delay + trading + opportunity (exact)<br/>Python reference, Java service"]
     TCA --> TRACE["Decision trace — one DecisionTrace per decision<br/>signal · portfolio · risk · orders · routing · fills · TCA · attribution<br/>canonical JSONL + stream digest + SQLite index (iap.store); explain()"]
     LBL --> RESEARCH
-    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (1068 looks / 70 configs)<br/>REPORT.md, ML_REPORT.md, model manifests"]
+    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (1920 looks / 139 configs, two datasets)<br/>REPORT.md, ML_REPORT.md, model manifests"]
     RESEARCH --> LIFE["Alpha promotion lifecycle (iap.lifecycle)<br/>RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE <-> WATCH -> RETIRED<br/>18 gates, 17 edges; bundled data: 24 CANDIDATE / 0 beyond"]
     LIFE -. "gated, ledgered transitions<br/>(research/alpha_registry.json)" .-> ALPHA
 ```
@@ -43,7 +43,7 @@ flowchart TD
 ## 2. Cross-language golden-test topology
 
 How one validated Python reference pins four implementations. The parity table is
-printed by `tests/harness/run_all.sh` (python 1565 · cpp 289 · rust 323 · java 510
+printed by `tests/harness/run_all.sh` (python 1573 · cpp 289 · rust 323 · java 510
 tests; 166/68/64/104 in the golden groups — the Java gate runs all thirteen
 `*GoldenTest` classes, the Rust gate nine golden targets). Two goldens are
 owned by a port language and consumed by Python as well: the fills golden
@@ -608,7 +608,7 @@ flowchart TD
     FEAT --> CHILD["8. per child: AlgoScheduler → SorAdapter.route (3 venues)<br/>→ controls (slice interval, latency budget, participation)<br/>→ RiskEngineAdapter.evaluate (RiskDecision) → submit<br/>a REJECT is never submitted"]
     CHILD --> TRACE["9. TraceBuilder per decision → JsonlTraceSink + StoreTraceSink + TraceDigest"]
     TRACE --> OUT["data/mvp/RUN_ID/: traces.jsonl · iap.sqlite · risk_audit.jsonl<br/>report.json / report.md · paper_evidence.json · config.json"]
-    OUT --> VERIFY["python -m iap.mvp verify — run twice, identical bytes<br/>python -m iap.mvp replay --run … — same digest from the captured stream<br/>golden: tests/golden/expected_mvp.json (16,578 events, 355 decisions,<br/>66 parents, 55 fills, P&L −22.65 USD, digest d938eeae…)"]
+    OUT --> VERIFY["python -m iap.mvp verify — run twice, identical bytes<br/>python -m iap.mvp replay --run … — same digest from the captured stream<br/>golden: tests/golden/expected_mvp.json (15,805 events, 800 decisions,<br/>235 parents, 169 fills, P&L −81.53 USD, digest f51890da…)"]
     SIM -. "next event" .-> SIM
 ```
 
@@ -871,17 +871,22 @@ flowchart TD
     S3 --> REP
     S4 --> REP
     S5 --> REP
-    REP --> READ["committed result:<br/>order flow flagged in 3 of 3 seeds at level 1, 1 of 3 at level 0.5<br/>lead-lag flagged in 0 of 3 at level 1, 1 of 3 at level 2<br/>break rows: 0 everywhere · PROMOTE: 0 in every cell<br/>no P&L interval above zero in any cell"]
+    REP --> READ["committed result:<br/>order flow flagged in 3 of 3 seeds at level 2, 1 of 3 at level 1, 0 of 3 at level 0.5<br/>lead-lag flagged in 0 of 3 at every level<br/>break rows: 0 everywhere · PROMOTE: 0 in every cell<br/>no P&L interval above zero in any cell"]
     OFF["the planted block is OFF by default: the pinned dataset is<br/>byte-identical with or without it; the study never touches<br/>data/ or the research ledger"] -.-> GEN
     LIM["3 seeds per cell: a rate moves in steps of 0.33 —<br/>this calibrates the chain, it is not a power curve"] -.-> READ
 ```
 
 ## 17. CI and release pipeline
 
-The three workflows and Dependabot as they stand at v1.3.0: which jobs gate
+The three workflows and Dependabot as they stand at v1.4.0: which jobs gate
 the image build, which steps are blocking (clippy and ruff are, since the
 tree was made lint-clean; `pip-audit` and `cargo audit` report without
 failing the run), and what the tag-triggered release does.
+v1.4.0 added one job that runs only on a manual dispatch: `regenerate`
+runs `tools/regenerate_dataset_artifacts.py` (the dataset and every
+committed artefact derived from it) and uploads the changed files, so the
+artefacts are produced in the environment that verifies them. It gates
+nothing and commits nothing.
 Two boxes say what is not true yet: the release workflow has not been
 exercised by a tag, and branch protection is not configured
 (`docs/governance/REPO_SETTINGS.md`, LEARN.md §26).
@@ -889,7 +894,7 @@ Source: [`diagrams/ci_release_pipeline.mmd`](diagrams/ci_release_pipeline.mmd).
 
 ```mermaid
 flowchart LR
-    %% .github/workflows/{ci,codeql,release}.yml and dependabot.yml as of v1.3.0.
+    %% .github/workflows/{ci,codeql,release}.yml and dependabot.yml as of v1.4.0.
     PR["pull request<br/>or push to main"] --> PY
     PR --> INT
     PR --> CPP
@@ -921,6 +926,7 @@ flowchart LR
     GOLD --> IMG
     DEP --> IMG
     CHG --> IMG
+    DISP["workflow_dispatch<br/>regenerate = true (manual only)"] --> REGEN["regenerate (job of ci.yml)<br/>tools/regenerate_dataset_artifacts.py:<br/>dataset, features, research reports, goldens<br/>uploads the changed files; commits nothing"]
     PR --> CQL["codeql.yml<br/>python, java-kotlin, c-cpp, actions<br/>also weekly"]
     DB["dependabot.yml<br/>weekly: github-actions, pip, cargo, docker"] -.->|"bump PRs through the same gate"| PR
     TAG["git tag v*"] --> VER

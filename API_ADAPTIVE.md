@@ -149,7 +149,12 @@ nondegenerate variance to count), `ic_mean`/`ic_std` over those buckets.
 deployed model on its own warmup rows makes `ic_mean` optimistic, so live
 `ic_z` is biased negative and every drift-triggered refit fires on the
 IS/OOS gap instead of on drift (20-40 "drift" refits per alpha in 1.5 days
-on the bundled data; 3 with an OOS baseline).  The reference splits the
+on the bundled data of the time; when the rule was introduced EQ03 fell
+from 25 to 3).  On the v1.4.0 dataset the drift policy fits EQ01, EQ03 and
+EQ06 once each (the initial fit, no refit); an OOS baseline does not make
+refits rare everywhere — FX05, FX08 and FX10 record 34, 20 and 40 fits,
+and the study 122 across its ten alphas
+(`research/adaptive_reports/ADAPTIVE_REPORT.md`).  The reference splits the
 warmup: fit on its first `BASELINE_FIT_FRAC` (2/3) and take the baseline
 bucket ICs from the purged held-out tail.  The serialized baseline carries
 `"baseline_kind": "oos"` and **a loader rejects any other value** (including
@@ -231,7 +236,9 @@ so after a feed goes quiet the window content is frozen — six re-reads of
 one bad reading used to retire an alpha (EQ03 went WATCH -> RETIRED on six
 copies of the identical rolling IC -0.04115436621771814 and stayed retired
 through the next session's open). Silence is not evidence, and neither is
-re-reading.
+re-reading. In the v1.4.0 study the equity deployments (EQ01, EQ03, EQ06)
+run 112 evaluations of which 42 are informative — the equity session is
+6.5 h of a 24 h day; the FX deployments run 169 of which 152–155 are.
 
 Ports take the flag explicitly:
 `LifecycleGauge.update(rollingIc, informative)`; the golden `ic_path`

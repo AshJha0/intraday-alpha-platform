@@ -8,8 +8,8 @@
     "bucket_ns": 300000000000,
     "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
     "horizon": "1s",
-    "ic_mean": 0.025655404105777446,
-    "ic_std": 0.051898821826393375,
+    "ic_mean": -0.0014963779330414637,
+    "ic_std": 0.05762480434089997,
     "kind": "ic",
     "n_buckets_baseline": 10,
     "name": "run_eq01_ic",
@@ -19,17 +19,38 @@
   "n_blocks": 112,
   "policies": {
     "drift_triggered": {
-      "deployed_ic": 0.02150472070042302,
+      "deployed_ic": 0.011075300312645066,
       "drift_event_count": 0,
       "final_state": "ACTIVE",
-      "gross_pnl": 1449.999999999836,
+      "gross_pnl": 2929.999999999986,
       "ic_baseline_kind": "oos",
-      "ic_baseline_rows": 23618,
-      "lifecycle_transitions": [],
+      "ic_baseline_rows": 9824,
+      "lifecycle_transitions": [
+        {
+          "alpha_id": "EQ01",
+          "eval_index": 10,
+          "event_ts": 1787596200000000000,
+          "from": "ACTIVE",
+          "policy": "drift_triggered",
+          "reason": "rolling_ic -0.008080 < watch gate 0.0",
+          "rolling_ic": -0.008080326339754114,
+          "to": "WATCH"
+        },
+        {
+          "alpha_id": "EQ01",
+          "eval_index": 89,
+          "event_ts": 1787667300000000000,
+          "from": "WATCH",
+          "policy": "drift_triggered",
+          "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
+          "rolling_ic": 0.01756673304985357,
+          "to": "ACTIVE"
+        }
+      ],
       "n_evals": 112,
-      "n_ic_evals": 23,
-      "n_informative_evals": 13,
-      "net_pnl": -55476.43455378761,
+      "n_ic_evals": 46,
+      "n_informative_evals": 42,
+      "net_pnl": -166749.69096449006,
       "policy": {
         "ic_z_threshold": -2.0,
         "min_refit_gap_ns": 3600000000000,
@@ -40,30 +61,51 @@
       "refit_events": [
         {
           "block": 0,
-          "n_train": 72864,
+          "n_train": 30632,
           "reasons": [
             "initial deployment fit"
           ],
           "ts": 1787587200000000000
         }
       ],
-      "rolling_ic_mean": 0.02181287870260303,
-      "rolling_ic_std": 0.017998890934414657,
-      "total_costs": 56926.43455378788,
-      "trade_count": 2808
+      "rolling_ic_mean": 0.018383677537445468,
+      "rolling_ic_std": 0.01749314298236448,
+      "total_costs": 169679.69096448962,
+      "trade_count": 6908
     },
     "scheduled_daily": {
-      "deployed_ic": 0.0213126112375627,
+      "deployed_ic": 0.0022179909318522637,
       "drift_event_count": 0,
       "final_state": "ACTIVE",
-      "gross_pnl": 1384.999999999838,
+      "gross_pnl": 2610.0000000000064,
       "ic_baseline_kind": "oos",
-      "ic_baseline_rows": 23618,
-      "lifecycle_transitions": [],
+      "ic_baseline_rows": 9824,
+      "lifecycle_transitions": [
+        {
+          "alpha_id": "EQ01",
+          "eval_index": 10,
+          "event_ts": 1787596200000000000,
+          "from": "ACTIVE",
+          "policy": "scheduled_daily",
+          "reason": "rolling_ic -0.008080 < watch gate 0.0",
+          "rolling_ic": -0.008080326339754114,
+          "to": "WATCH"
+        },
+        {
+          "alpha_id": "EQ01",
+          "eval_index": 89,
+          "event_ts": 1787667300000000000,
+          "from": "WATCH",
+          "policy": "scheduled_daily",
+          "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
+          "rolling_ic": 0.018586570382538345,
+          "to": "ACTIVE"
+        }
+      ],
       "n_evals": 112,
-      "n_ic_evals": 23,
-      "n_informative_evals": 13,
-      "net_pnl": -54728.55683396566,
+      "n_ic_evals": 46,
+      "n_informative_evals": 42,
+      "net_pnl": -161280.0755377595,
       "policy": {
         "period_ns": 86400000000000,
         "policy": "scheduled"
@@ -72,7 +114,7 @@
       "refit_events": [
         {
           "block": 0,
-          "n_train": 72864,
+          "n_train": 30632,
           "reasons": [
             "initial deployment fit"
           ],
@@ -80,30 +122,51 @@
         },
         {
           "block": 32,
-          "n_train": 77816,
+          "n_train": 80238,
           "reasons": [
             "scheduled: period boundary crossed (1787587200000000000 -> 1787616000000000000, period 86400000000000)"
           ],
           "ts": 1787616000000000000
         }
       ],
-      "rolling_ic_mean": 0.021766408700970536,
-      "rolling_ic_std": 0.018051824985471022,
-      "total_costs": 56113.55683396598,
-      "trade_count": 2758
+      "rolling_ic_mean": 0.018467847096979385,
+      "rolling_ic_std": 0.01770665297316232,
+      "total_costs": 163890.07553775914,
+      "trade_count": 6655
     },
     "scheduled_weekly": {
-      "deployed_ic": 0.02150472070042302,
+      "deployed_ic": 0.011075300312645066,
       "drift_event_count": 0,
       "final_state": "ACTIVE",
-      "gross_pnl": 1449.999999999836,
+      "gross_pnl": 2929.999999999986,
       "ic_baseline_kind": "oos",
-      "ic_baseline_rows": 23618,
-      "lifecycle_transitions": [],
+      "ic_baseline_rows": 9824,
+      "lifecycle_transitions": [
+        {
+          "alpha_id": "EQ01",
+          "eval_index": 10,
+          "event_ts": 1787596200000000000,
+          "from": "ACTIVE",
+          "policy": "scheduled_weekly",
+          "reason": "rolling_ic -0.008080 < watch gate 0.0",
+          "rolling_ic": -0.008080326339754114,
+          "to": "WATCH"
+        },
+        {
+          "alpha_id": "EQ01",
+          "eval_index": 89,
+          "event_ts": 1787667300000000000,
+          "from": "WATCH",
+          "policy": "scheduled_weekly",
+          "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
+          "rolling_ic": 0.01756673304985357,
+          "to": "ACTIVE"
+        }
+      ],
       "n_evals": 112,
-      "n_ic_evals": 23,
-      "n_informative_evals": 13,
-      "net_pnl": -55476.43455378761,
+      "n_ic_evals": 46,
+      "n_informative_evals": 42,
+      "net_pnl": -166749.69096449006,
       "policy": {
         "period_ns": 604800000000000,
         "policy": "scheduled"
@@ -112,30 +175,51 @@
       "refit_events": [
         {
           "block": 0,
-          "n_train": 72864,
+          "n_train": 30632,
           "reasons": [
             "initial deployment fit"
           ],
           "ts": 1787587200000000000
         }
       ],
-      "rolling_ic_mean": 0.02181287870260303,
-      "rolling_ic_std": 0.017998890934414657,
-      "total_costs": 56926.43455378788,
-      "trade_count": 2808
+      "rolling_ic_mean": 0.018383677537445468,
+      "rolling_ic_std": 0.01749314298236448,
+      "total_costs": 169679.69096448962,
+      "trade_count": 6908
     },
     "static": {
-      "deployed_ic": 0.02150472070042302,
+      "deployed_ic": 0.011075300312645066,
       "drift_event_count": 0,
       "final_state": "ACTIVE",
-      "gross_pnl": 1449.999999999836,
+      "gross_pnl": 2929.999999999986,
       "ic_baseline_kind": "oos",
-      "ic_baseline_rows": 23618,
-      "lifecycle_transitions": [],
+      "ic_baseline_rows": 9824,
+      "lifecycle_transitions": [
+        {
+          "alpha_id": "EQ01",
+          "eval_index": 10,
+          "event_ts": 1787596200000000000,
+          "from": "ACTIVE",
+          "policy": "static",
+          "reason": "rolling_ic -0.008080 < watch gate 0.0",
+          "rolling_ic": -0.008080326339754114,
+          "to": "WATCH"
+        },
+        {
+          "alpha_id": "EQ01",
+          "eval_index": 89,
+          "event_ts": 1787667300000000000,
+          "from": "WATCH",
+          "policy": "static",
+          "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
+          "rolling_ic": 0.01756673304985357,
+          "to": "ACTIVE"
+        }
+      ],
       "n_evals": 112,
-      "n_ic_evals": 23,
-      "n_informative_evals": 13,
-      "net_pnl": -55476.43455378761,
+      "n_ic_evals": 46,
+      "n_informative_evals": 42,
+      "net_pnl": -166749.69096449006,
       "policy": {
         "policy": "static"
       },
@@ -143,17 +227,17 @@
       "refit_events": [
         {
           "block": 0,
-          "n_train": 72864,
+          "n_train": 30632,
           "reasons": [
             "initial deployment fit"
           ],
           "ts": 1787587200000000000
         }
       ],
-      "rolling_ic_mean": 0.02181287870260303,
-      "rolling_ic_std": 0.017998890934414657,
-      "total_costs": 56926.43455378788,
-      "trade_count": 2808
+      "rolling_ic_mean": 0.018383677537445468,
+      "rolling_ic_std": 0.01749314298236448,
+      "total_costs": 169679.69096448962,
+      "trade_count": 6908
     }
   },
   "universe": [

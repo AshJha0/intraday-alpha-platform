@@ -61,7 +61,9 @@ Given `research/models/<run_id>/manifest.json`:
 # 1. Exact code + configs
 git checkout <manifest.git_commit>
 
-# 2. Regenerate the dataset (deterministic; seed pinned in configs/marketdata/generator.json)
+# 2. Regenerate the dataset (deterministic; seed pinned in configs/marketdata/generator.json).
+#    The committed config produces the current dataset (116b7787…). A manifest that pins
+#    203c8f54… (v1.3.0) needs equities.flow.calibration = "legacy_budget" — see §3.3.
 cd python && PYTHONPATH=src python3 -m iap.marketdata
 
 # 3. Verify the dataset version matches (content hash of the .iap1 files)
@@ -108,10 +110,21 @@ Recipe: `cd python && PYTHONPATH=src python3 -m iap.research run --alpha EQ03
 **refuses** a rerun that reproduces different evidence under the same id
 (`ResearchError`) — remove the directory deliberately if the evidence chain
 changed. `git_commit = unversioned-workspace` marks a scratch run exactly as
-for manifests. The five committed experiments (`c73bb6294d226163`,
-`d7b554d0a3fa3b26`, `217fa0cb1d89a9c8`, `4a2900e4a6705542`,
-`d0dd1ab0711d33a1`) pin dataset `203c8f54…`, features `585dd7b9…`, commit
-`fc41ac6f…` and `n_experiments_in_ledger = 1068`; the pinned-horizon runs
+for manifests. Ten experiments are committed, the same five alpha × horizon
+pairs on two datasets. The five of the current dataset (`876b08e20c46e6fd`,
+`695e7b1e2bd2253e`, `852863faa44b7b07`, `f0f6c49b553f6b59`,
+`20f1b9093e7d0d04`) pin dataset `116b7787…`, features `585dd7b9…`, commit
+`29f08225…` and `n_experiments_in_ledger` 1768, 1796, 1824, 1852 and 1880
+in that order (each run adds 28 looks), and carry an `eligibility.json`. The
+five of the v1.3.0 dataset (`c73bb6294d226163`, `d7b554d0a3fa3b26`,
+`217fa0cb1d89a9c8`, `4a2900e4a6705542`, `d0dd1ab0711d33a1`) pin dataset
+`203c8f54…`, the same features, commit `fc41ac6f…` and
+`n_experiments_in_ledger = 1068`; they are kept as history and the recipe
+above reproduces them only on a dataset generated with
+`equities.flow.calibration = "legacy_budget"` (§3.3). `dataset_version` is
+part of the spec, so the same alpha × horizon has a different
+`experiment_id` on each dataset, and the ledger identity is (alpha, kind,
+config, dataset). The pinned-horizon runs
 are the contract-driven runner's own numbers: since 2026-09-20 the
 walk-forward stops where the declared holdout starts, so they no longer
 equal `research/alpha_reports/{EQ01,EQ03,EQ06}.json`, whose walk-forward
@@ -131,7 +144,10 @@ still spans the whole window (a weaker, disclosed protocol).
   §13.2), `report.json` and the stream sha256, refusing first if a
   reference document changed (`config_version`). The golden run is
   `tests/golden/expected_mvp.json`: seed 12345, run `58a10f2194a3c81c`,
-  digest `d938eeae68c85a6c2acaf7fb3f7d1333f29c3ad8e036fb5af7a4d1b48c9ea2cc`.
+  digest `f51890da0c3c66cd488073fd7149099729767f5f65d03a7656e59f2da9c6a708`
+  (v1.4.0; the run id is unchanged from v1.3.0 because `mvp.json` and the
+  seed are, while the stream, the fitted parameters and therefore the
+  digest moved with the generator fix).
 - **A Java paper session** is reproduced by re-running `java/paper.sh` on
   the same vector and configuration: `decision_traces.jsonl` and the
   report's `trace.digest` are a pure function of the event stream
@@ -147,9 +163,52 @@ still spans the whole window (a weaker, disclosed protocol).
 - **The lifecycle registry** (`research/alpha_registry.json`) is
   reproduced by `python -m iap.lifecycle bootstrap` from the alpha reports,
   the ledger and `alpha_params.json` at the pinned bootstrap event time
-  (the latest fold `test_end`, `1787691480577291027`); an identical rerun
-  gives identical bytes, and the Rust / Java loaders re-render the file
-  byte-identically.
+  (the latest fold `test_end`, `1787691480577291027` — 2026-08-25
+  20:58:00.577 UTC, an FX fold, so it did not move with the v1.4.0
+  dataset); an identical rerun gives identical bytes, and the Rust / Java
+  loaders re-render the file byte-identically. For v1.4.0 the registry and
+  `research/lifecycle_transitions.jsonl` were rebuilt with
+  `bootstrap --force`; the transition log of the v1.3.0 dataset is archived
+  as `research/archive/lifecycle_transitions.dataset-203c8f54.jsonl`.
+
+## 3.3 Regenerating everything that derives from the dataset
+
+The seeded dataset is never committed, but the alpha reports,
+`alpha_params.json`, the runner experiments, the lifecycle registry, the ML
+and adaptive reports, the power study and four goldens are computed from
+it. When the dataset changes they are regenerated together, in dependency
+order, by one script:
+
+```bash
+python3 tools/regenerate_dataset_artifacts.py --list     # the steps, in order
+python3 tools/regenerate_dataset_artifacts.py            # the whole chain
+python3 tools/regenerate_dataset_artifacts.py --only goldens,tca
+```
+
+- The script starts from a ledger that has not seen the dataset (the
+  pipelines are ledgered per dataset; a second run on the same dataset
+  would be recorded as reruns and append a second set of model runs —
+  `--allow-rerun` overrides), stops at the first failing step, and prints
+  the wall-clock time of every step.
+- The artefacts committed for v1.4.0 were produced by the manual
+  `regenerate` job of `.github/workflows/ci.yml` (Ubuntu, Python 3.11,
+  `python/requirements-ci.txt` plus the `ml` extra) at commit `29f0822…` —
+  the environment the test suites then verify them in. A run on another
+  platform reproduces them to the tolerances of this document (integer and
+  byte paths exactly, float paths to 1e-9, tree-model fits only under the
+  recorded `library_versions`), not necessarily to the byte.
+- Goldens that do not depend on the dataset must come out byte-identical;
+  that is the proof they are independent. For v1.4.0 four changed
+  (`expected_alpha.json`, `expected_backtest.json`,
+  `expected_adaptive.json`, `expected_mvp.json`).
+- **The way back to the v1.3.0 dataset.** The generator's default flow
+  calibration is `equities.flow.calibration = "session"` (config
+  `x-version` 2), which gives `data_version` `116b7787…`. Setting it to
+  `"legacy_budget"` regenerates the v1.3.0 raw files byte for byte
+  (`data_version` `203c8f54…`);
+  `tests/replay/test_generator_determinism.py` pins the raw-file hashes of
+  both. An `x-version` 1 generator config that does not name the
+  calibration is refused rather than silently given the new default.
 
 ## 4. Release manifests
 
@@ -173,18 +232,21 @@ manifest; never rebuild-and-hope.
 The model ledger is append-only history, so manifests from superseded
 rounds are retained rather than rewritten. Only the runs pinning the
 *current* dataset hash can be replayed with the §3 recipe from this
-snapshot:
+snapshot and its default configuration:
 
 | runs | `git_commit` | `data_version` | reconstructible here? |
 |---|---|---|---|
 | `run_0001…run_0007` | `unversioned-workspace` | `4b77389e…` (round 1, pre generator fix) | no |
 | `run_0008…run_0021` | `unversioned-workspace` | `9ac06659…` (round 2) | no |
-| `run_0022` onward | a real 40-hex commit | `203c8f54…` (current) | yes |
+| `run_0022…run_0033` | real 40-hex commits (`3fff88d7…`, `a87ca00f…`, `0768cbe4…`; `git_dirty` true) | `203c8f54…` (round 3 to v1.3.0; equity flow stopped about 40% into each session) | not with the default configuration; yes with `equities.flow.calibration = "legacy_budget"` (§3.3) |
+| `run_0034…run_0040` | `29f08225…` (`git_dirty` true; written by the CI `regenerate` job) | `116b7787…` (current, v1.4.0) | yes |
 
 The rule, not the run numbers, is what to check: a run is replayable from
 this snapshot iff its `data_version` equals the value
 `iap.experiment.tracker.data_version()` returns for the working tree — every
-ML rerun appends four more runs, so any fixed list here goes stale.
+ML rerun appends more runs (four while the linear gate failed, seven now
+that it passes and the tree models and the MLP are fitted), so any fixed
+list here goes stale.
 
 Two round-3 changes are visible in that table and are the reason it can be
 stated at all. First, `git_commit` is now resolved with `git rev-parse HEAD`
@@ -196,11 +258,15 @@ runs therefore cannot be tied to a revision after the fact. Second,
 files; it used to hash `qc_report.json`, which embedded an absolute
 `raw_dir` path — so the fingerprint moved when the checkout moved and did
 *not* move when the data changed. `4b77389e…` and `9ac06659…` are values of
-that older, path-dependent scheme and are not comparable to `203c8f54…`.
+that older, path-dependent scheme and are not comparable to `203c8f54…`
+or `116b7787…`.
 
 The round-3 dataset regeneration is what retired `9ac06659…`: labels no
 longer span halts or stale gaps and the feature engine consumes only
 applied events, so the normalized and feature frames genuinely differ.
+The v1.4.0 regeneration is what retired `203c8f54…`: the equity flow
+calibration was fixed so that flow reaches the close, which changes every
+equity file (the FX files are byte-identical).
 Only runs pinning the current `data_version` back any number in the current
 `research/ml_reports/ML_REPORT.md`; the `unversioned-workspace` runs back
 the round-1 and round-2 reports preserved in the papers' dated bodies.
