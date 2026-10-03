@@ -25,7 +25,7 @@
 #                                check rules/config, promtool test rules, the
 #                                Dockerfile/compose/k8s/ConfigMap/dashboard
 #                                checks and the docker build-context proof
-#   cpp-sanitizers               ASan+UBSan ctest (non-blocking until seen green)
+#   cpp-sanitizers               ASan+UBSan ctest (blocking; green on first run)
 #   advisory                     ruff, pip-audit, cargo audit (non-blocking);
 #                                clippy is a non-blocking step of the rust job
 #   images                       builds the four images; needs every other job;
@@ -250,13 +250,11 @@ jobs:
 
   # Memory/UB sanitizers over the full C++ ctest suite, in a separate build
   # dir so the timed Release build and the coverage build are unaffected.
-  # continue-on-error is job-level: it is a non-blocking check until it has
-  # been seen passing in CI; flip it off (and add the job to the required
-  # checks in docs/governance/REPO_SETTINGS.md) once it is green.
+  # Blocking: it passed on the first CI run (285 of 285 tests, no sanitizer
+  # report), so a new ASan/UBSan finding now fails the workflow.
   cpp-sanitizers:
     runs-on: ubuntu-24.04
     timeout-minutes: 40
-    continue-on-error: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Toolchain

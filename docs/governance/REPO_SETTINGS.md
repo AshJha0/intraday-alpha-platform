@@ -23,7 +23,7 @@ pushes and branch deletion. The required check names are the job ids of
 `.github/workflows/ci.yml`: `python`, `integration`, `cpp`, `rust`, `java`,
 `golden`, `deployment`. Do **not** add `images` (it is skipped on pull requests
 that do not touch image inputs, and a skipped required check blocks the merge)
-or the non-blocking jobs (`cpp-sanitizers`, `advisory`).
+or the non-blocking `advisory` job. `cpp-sanitizers` is blocking in CI and may be added to the required list.
 
 `required_approving_review_count` is 0 below because GitHub does not let an
 author approve their own pull request, and this repository currently has one
