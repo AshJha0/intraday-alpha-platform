@@ -3,10 +3,15 @@
 //! an `impl RiskEngine` continued from `engine.rs`: [`RiskEngine::check_order`]
 //! (the public entry point) still lives there and calls
 //! [`RiskEngine::evaluate`] here.
+//!
+//! Every f64 limit comparison is written `!(x <= limit)` (never
+//! `x > limit`): a NaN on either side compares false both ways, and the
+//! negated form makes it REJECT instead of passing the check. For finite
+//! values the two forms are identical.
 
 use venue::{order_validation_error, OrderRequest};
 
-use crate::engine::{Bucket, RiskDecision, RiskEngine, NS_PER_SEC};
+use crate::engine::{pos_add, pos_sub, Bucket, RiskDecision, RiskEngine, NS_PER_SEC};
 use crate::event::{fmt_fixed, rules, Decision, Scope, Severity};
 use crate::limits::RiskLimits;
 
@@ -41,9 +46,32 @@ impl RiskEngine {
         }
     }
 
+    /// The latest order event time the engine knows: this order's timestamp
+    /// or the newest throttle-bucket time, whichever is later. A market
+    /// state stamped beyond this clock by more than the stale timeout is
+    /// future-stamped (see check 10). Using the engine's clock rather than
+    /// the order's own timestamp keeps an order whose clock merely
+    /// REGRESSED (pinned: it still reaches the throttle) apart from market
+    /// data that is genuinely ahead of everything seen.
+    fn event_clock(&self, order_ts: i64) -> i64 {
+        self.buckets
+            .values()
+            .filter(|b| b.primed)
+            .map(|b| b.last_ts)
+            .fold(order_ts, i64::max)
+    }
+
     /// Pre-trade conversion rate: present and fresh (age within the stale
-    /// timeout), else the FX_RATE_MISSING reason.
-    fn pretrade_rate(&self, limits: &RiskLimits, ccy: &str, ts: i64) -> Result<f64, String> {
+    /// timeout, and not stamped beyond the engine's event clock by more
+    /// than the timeout — a future-stamped rate is as untrusted as an old
+    /// one), else the FX_RATE_MISSING reason.
+    fn pretrade_rate(
+        &self,
+        limits: &RiskLimits,
+        ccy: &str,
+        ts: i64,
+        clock: i64,
+    ) -> Result<f64, String> {
         match self.fx_rate(ccy) {
             None => Err(format!("no conversion rate for {ccy} -> {}", limits.reporting_ccy)),
             Some((rate, mark_ts)) => {
@@ -52,6 +80,12 @@ impl RiskEngine {
                     if age > limits.stale_feed_timeout_ns {
                         return Err(format!(
                             "conversion rate {ccy} -> {} age {age}ns exceeds {}ns",
+                            limits.reporting_ccy, limits.stale_feed_timeout_ns
+                        ));
+                    }
+                    if mark_ts > clock.saturating_add(limits.stale_feed_timeout_ns) {
+                        return Err(format!(
+                            "conversion rate {ccy} -> {} timestamp {mark_ts} is more than {}ns ahead of the latest order event time {clock}",
                             limits.reporting_ccy, limits.stale_feed_timeout_ns
                         ));
                     }
@@ -110,6 +144,18 @@ impl RiskEngine {
                 format!("venue {} kill switch engaged", order.venue_id),
             );
         }
+        // venue 0 = "route via SOR": the destination is not known here, so
+        // ANY engaged venue kill rejects (lowest killed venue id named) —
+        // the router must not be a way around a venue halt.
+        if order.venue_id == 0 {
+            if let Some((vid, _)) = self.kill_venues.iter().find(|(_, on)| **on) {
+                return Self::reject(
+                    rules::KILL_VENUE,
+                    Breach,
+                    format!("venue 0 (SOR) order rejected: venue {vid} kill switch engaged"),
+                );
+            }
+        }
         // 5. schema-level validation
         if let Some(reason) = order_validation_error(order) {
             return Self::reject(rules::MALFORMED_ORDER, Warn, reason);
@@ -161,6 +207,7 @@ impl RiskEngine {
                 );
             }
         }
+        let clock = self.event_clock(order.timestamp);
         let mid = match md {
             Some(md) if md.bid_ticks > 0 && md.ask_ticks > 0 => {
                 let age = order.timestamp - md.ts;
@@ -174,7 +221,33 @@ impl RiskEngine {
                         ),
                     );
                 }
-                (md.bid_ticks + md.ask_ticks) as f64 * tick / 2.0
+                // FAIL-OPEN defect: a market state stamped AFTER the order
+                // has a negative age, which never exceeded the timeout, so a
+                // future-stamped (corrupt / mis-clocked) mark was trusted
+                // for as long as it stayed ahead — and every genuine update
+                // behind it was dropped as a regression. Stamped beyond the
+                // engine's event clock by more than the same window, it is
+                // exactly as untrusted as a stale one.
+                if limits.stale_book_reject
+                    && md.ts > clock.saturating_add(limits.stale_feed_timeout_ns)
+                {
+                    return Self::reject(
+                        rules::STALE_PRICE,
+                        Warn,
+                        format!(
+                            "reference price timestamp {} is more than {}ns ahead of the latest order event time {clock}",
+                            md.ts, limits.stale_feed_timeout_ns
+                        ),
+                    );
+                }
+                let Some(sum_ticks) = md.bid_ticks.checked_add(md.ask_ticks) else {
+                    return Self::reject(
+                        rules::STALE_PRICE,
+                        Warn,
+                        format!("no reference price for instrument {}", order.instrument_id),
+                    );
+                };
+                sum_ticks as f64 * tick / 2.0
             }
             _ => {
                 return Self::reject(
@@ -193,7 +266,7 @@ impl RiskEngine {
             );
         }
         // 12. conversion rate to the reporting currency
-        let fx = match self.pretrade_rate(&limits, &ins.quote_ccy, order.timestamp) {
+        let fx = match self.pretrade_rate(&limits, &ins.quote_ccy, order.timestamp, clock) {
             Ok(r) => r,
             Err(why) => return Self::reject(rules::FX_RATE_MISSING, Warn, why),
         };
@@ -205,7 +278,7 @@ impl RiskEngine {
             mid
         };
         let order_notional = order.qty as f64 * ins.qty_unit * ref_price * fx;
-        if order_notional > limits.max_order_notional {
+        if !(order_notional <= limits.max_order_notional) {
             return Self::reject(
                 rules::FAT_FINGER_NOTIONAL,
                 Warn,
@@ -220,7 +293,7 @@ impl RiskEngine {
         // 14. price band (priced orders only)
         if order.price_ticks > 0 {
             let dev_bps = ((order.price_ticks as f64 * tick) - mid).abs() / mid * 1e4;
-            if dev_bps > limits.price_band_bps {
+            if !(dev_bps <= limits.price_band_bps) {
                 return Self::reject(
                     rules::PRICE_BAND,
                     Warn,
@@ -252,7 +325,7 @@ impl RiskEngine {
                 + elapsed as f64 * limits.max_order_rate_per_sec / NS_PER_SEC)
                 .min(limits.order_rate_burst);
             bucket.last_ts = bucket.last_ts.max(order.timestamp);
-            if bucket.tokens < 1.0 {
+            if !(bucket.tokens >= 1.0) {
                 return Self::reject(
                     rules::RATE_THROTTLE,
                     Warn,
@@ -291,16 +364,26 @@ impl RiskEngine {
         }
         // 17. position limit (worst-case projection incl. open orders)
         let pos = self.position(order.instrument_id);
-        let open_same: i64 = self
+        // Checked (symmetric i64 domain): a projection that overflows is
+        // not a number the limit can be compared with — reject, never wrap.
+        let open_same = self
             .open
             .values()
             .filter(|r| r.instrument_id == order.instrument_id && r.side == order.side)
-            .map(|r| r.qty)
-            .sum();
-        let projected = if order.side == 0 {
-            pos + open_same + order.qty
-        } else {
-            pos - open_same - order.qty
+            .try_fold(0i64, |acc, r| pos_add(acc, r.qty));
+        let projected = open_same.and_then(|open_same| {
+            if order.side == 0 {
+                pos_add(pos, open_same).and_then(|v| pos_add(v, order.qty))
+            } else {
+                pos_sub(pos, open_same).and_then(|v| pos_sub(v, order.qty))
+            }
+        });
+        let Some(projected) = projected else {
+            return Self::reject(
+                rules::MALFORMED_ORDER,
+                Warn,
+                "projected position overflows i64 (fail-closed)".into(),
+            );
         };
         if projected.abs() > limits.max_position_qty {
             return Self::reject(
@@ -314,7 +397,7 @@ impl RiskEngine {
         }
         // 18. per-instrument notional (projection marked at the mid)
         let projected_notional = projected.abs() as f64 * ins.qty_unit * mid * fx;
-        if projected_notional > limits.max_instrument_notional {
+        if !(projected_notional <= limits.max_instrument_notional) {
             return Self::reject(
                 rules::INSTRUMENT_NOTIONAL,
                 Warn,
@@ -398,7 +481,7 @@ impl RiskEngine {
             net += if r.side == 0 { v } else { -v };
         }
         gross += order_notional;
-        if gross > limits.max_gross_notional {
+        if !(gross <= limits.max_gross_notional) {
             return Self::reject(
                 rules::GROSS_NOTIONAL,
                 Warn,
@@ -414,7 +497,7 @@ impl RiskEngine {
         } else {
             -order_notional
         };
-        if net.abs() > limits.max_net_notional {
+        if !(net.abs() <= limits.max_net_notional) {
             return Self::reject(
                 rules::NET_NOTIONAL,
                 Warn,
@@ -435,7 +518,7 @@ impl RiskEngine {
             );
         };
         let global_limit = self.effective_global_loss(&limits);
-        if global_pnl <= -global_limit {
+        if !(global_pnl > -global_limit) {
             return Self::reject(
                 rules::DAILY_LOSS,
                 Breach,
@@ -454,7 +537,7 @@ impl RiskEngine {
             );
         };
         let strat_limit = self.effective_strategy_loss(&limits, &order.strategy_id);
-        if strat_pnl <= -strat_limit {
+        if !(strat_pnl > -strat_limit) {
             return Self::reject(
                 rules::STRATEGY_LOSS,
                 Breach,

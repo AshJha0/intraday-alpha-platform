@@ -106,6 +106,7 @@
 
 use std::collections::BTreeMap;
 
+use marketdata::IapError;
 use serde_json::Value;
 use telemetry::Registry;
 use venue::{OrderRequest, OrderType};
@@ -129,13 +130,46 @@ pub struct InstrumentRef {
 }
 
 impl InstrumentRef {
-    /// Reference data for an instrument.
+    /// Reference data for an instrument, unvalidated (the fields are public
+    /// anyway). [`RiskEngine::new`] re-validates every entry and lands
+    /// fail-closed on an invalid one; prefer [`InstrumentRef::try_new`].
     pub fn new(tick_size: f64, qty_unit: f64, quote_ccy: &str) -> InstrumentRef {
         InstrumentRef {
             tick_size,
             qty_unit,
             quote_ccy: quote_ccy.to_string(),
         }
+    }
+
+    /// Validated reference data (the Java record / Python dataclass
+    /// constructor semantics): `tick_size` and `qty_unit` finite and > 0,
+    /// `quote_ccy` non-empty.
+    pub fn try_new(
+        tick_size: f64,
+        qty_unit: f64,
+        quote_ccy: &str,
+    ) -> Result<InstrumentRef, IapError> {
+        let r = InstrumentRef::new(tick_size, qty_unit, quote_ccy);
+        match r.validation_error() {
+            Some(why) => Err(IapError::InvalidArgument(why.to_string())),
+            None => Ok(r),
+        }
+    }
+
+    /// `Some(reason)` when this entry is not usable reference data. A NaN
+    /// tick size or qty unit would turn every notional into NaN, and NaN
+    /// compares false against every limit: such an entry must never reach
+    /// the checks.
+    pub fn validation_error(&self) -> Option<&'static str> {
+        if !(self.tick_size.is_finite() && self.tick_size > 0.0)
+            || !(self.qty_unit.is_finite() && self.qty_unit > 0.0)
+        {
+            return Some("tick_size and qty_unit must be finite and > 0");
+        }
+        if self.quote_ccy.is_empty() {
+            return Some("quote_ccy must be non-empty");
+        }
+        None
     }
 
     /// A USD equity: qty in shares, prices in USD.
@@ -216,6 +250,18 @@ pub(crate) struct Lot {
     pub(crate) avg_price: f64,
 }
 
+/// `a + b` inside the SYMMETRIC i64 domain `[-i64::MAX, i64::MAX]`: `None`
+/// on overflow and on `i64::MIN`, so a later negation / `abs` of the result
+/// can never overflow either.
+pub(crate) fn pos_add(a: i64, b: i64) -> Option<i64> {
+    a.checked_add(b).filter(|v| *v != i64::MIN)
+}
+
+/// `a - b` inside the symmetric i64 domain (see [`pos_add`]).
+pub(crate) fn pos_sub(a: i64, b: i64) -> Option<i64> {
+    a.checked_sub(b).filter(|v| *v != i64::MIN)
+}
+
 /// Fail-closed hard risk engine.
 pub struct RiskEngine {
     pub(crate) limits: Option<RiskLimits>,
@@ -243,8 +289,24 @@ pub struct RiskEngine {
 }
 
 impl RiskEngine {
-    /// New engine from parsed limits + per-instrument reference data.
+    /// New engine from parsed limits + per-instrument reference data. An
+    /// invalid reference entry (see [`InstrumentRef::validation_error`])
+    /// lands the engine FAIL-CLOSED (`CONFIG_MISSING` on every order), the
+    /// counterpart of the Java / Python constructors refusing to build it.
     pub fn new(limits: RiskLimits, instruments: BTreeMap<u32, InstrumentRef>) -> RiskEngine {
+        let bad_ref = instruments.iter().find_map(|(iid, r)| {
+            r.validation_error()
+                .map(|why| format!("invalid reference data for instrument {iid}: {why}"))
+        });
+        let mut eng = RiskEngine::build(limits, instruments);
+        if let Some(why) = bad_ref {
+            eng.limits = None;
+            eng.config_error = why;
+        }
+        eng
+    }
+
+    fn build(limits: RiskLimits, instruments: BTreeMap<u32, InstrumentRef>) -> RiskEngine {
         let kill_global = limits.kill_switch_engaged;
         let mut eng = RiskEngine {
             limits: Some(limits),
@@ -285,7 +347,7 @@ impl RiskEngine {
     /// `CONFIG_MISSING` carrying `reason`. This is the mandatory landing
     /// state for any configuration error.
     pub fn fail_closed(reason: &str) -> RiskEngine {
-        let mut eng = RiskEngine::new(
+        let mut eng = RiskEngine::build(
             // limits are absent; the placeholder is never read
             RiskLimits {
                 kill_switch_engaged: false,
@@ -475,6 +537,31 @@ impl RiskEngine {
             });
             return false;
         }
+        // Checked position accounting, BEFORE anything is applied: a fill
+        // that would take the strategy lot or the aggregate position out of
+        // the symmetric i64 domain cannot be booked, and an engine that
+        // cannot book a fill no longer knows its exposure. Latch the GLOBAL
+        // kill (release builds used to wrap silently here).
+        let signed = if fill.side == 0 { fill.qty } else { -fill.qty };
+        let lot_pos = self
+            .lots
+            .get(&(fill.strategy_id.clone(), fill.instrument_id))
+            .map_or(0, |l| l.pos);
+        if lot_pos == i64::MIN
+            || pos_add(lot_pos, signed).is_none()
+            || pos_add(self.position(fill.instrument_id), signed).is_none()
+        {
+            let _ = self.engage_kill(
+                Scope::Global,
+                "",
+                fill.ts,
+                &format!(
+                    "fill for order {} overflows i64 position accounting (fail-closed)",
+                    fill.order_id
+                ),
+            );
+            return false;
+        }
         let ins = &self.instruments[&fill.instrument_id];
         let ccy = ins.quote_ccy.clone();
         let unit = ins.qty_unit;
@@ -516,7 +603,6 @@ impl RiskEngine {
             }
         }
         realized *= unit;
-        let signed = if fill.side == 0 { fill.qty } else { -fill.qty };
         *self.positions.entry(fill.instrument_id).or_insert(0) += signed;
         *self
             .realized
@@ -525,10 +611,13 @@ impl RiskEngine {
         // open order reduction
         if fill.order_id != 0 {
             let remove = match self.open.get_mut(&fill.order_id) {
-                Some(r) => {
-                    r.qty -= fill.qty;
-                    r.qty <= 0
-                }
+                Some(r) => match pos_sub(r.qty, fill.qty) {
+                    Some(left) if left > 0 => {
+                        r.qty = left;
+                        false
+                    }
+                    _ => true,
+                },
                 None => false,
             };
             if remove {
@@ -553,21 +642,22 @@ impl RiskEngine {
             return None;
         }
         let tick = self.instruments.get(&conv.instrument_id)?.tick_size;
-        let mid = (md.bid_ticks + md.ask_ticks) as f64 * tick / 2.0;
+        let mid = md.bid_ticks.checked_add(md.ask_ticks)? as f64 * tick / 2.0;
         if mid <= 0.0 {
             return None;
         }
         Some((if conv.invert { 1.0 / mid } else { mid }, md.ts))
     }
 
-    /// Last consolidated mid as a real price (quote ccy), if two-sided.
+    /// Last consolidated mid as a real price (quote ccy), if two-sided
+    /// (`None` too when `bid + ask` leaves i64: no usable mark).
     pub(crate) fn mark_price(&self, instrument_id: u32) -> Option<f64> {
         let md = self.market.get(&instrument_id)?;
         if md.bid_ticks <= 0 || md.ask_ticks <= 0 {
             return None;
         }
         let tick = self.instruments.get(&instrument_id)?.tick_size;
-        Some((md.bid_ticks + md.ask_ticks) as f64 * tick / 2.0)
+        Some(md.bid_ticks.checked_add(md.ask_ticks)? as f64 * tick / 2.0)
     }
 
     /// Daily P&L of one strategy in the reporting currency: realized +
