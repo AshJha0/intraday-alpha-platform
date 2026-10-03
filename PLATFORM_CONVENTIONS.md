@@ -365,10 +365,10 @@ The nine pinned rules in `cpp/include/iap/execution/execution.hpp` are the contr
 (1) latency = decision + risk + wire + venue mean + one SplitMix64 jitter draw per submission
 *or cancel*; (2) activation before the first event at/after arrival; (3) aggressive walks of
 displayed top-10 depth, one fill per level, simulated fills never mutate the replayed book;
-(3b) displayed liquidity consumed by an earlier child is debited in an overlay and never
-re-used by a later child on the same display — a level refresh caps the overlay at
-`min(consumed, new displayed)`; (4) deterministic queue position (full-amount cancel decrement,
-trade-through, marketable-ADD expansion, crossing with the double-count exemption); (5) fees;
+(3b) displayed liquidity consumed by an earlier child or by the crossing check is debited in an
+overlay and never re-used on the same display — a level refresh caps the overlay at
+`min(consumed, new displayed)`; (4) deterministic queue position (only book-APPLIED events are tracked;
+a cancel advances us only when the cancelled order is known to be ahead; trade-through, marketable-ADD expansion, crossing with the double-count exemption); (5) fees;
 (6) linear impact identical to the research cost model, `impact_bps = coeff × (qty × qty_unit /
 adv × 100)`; (7) cancels travel the same latency path, take effect at `max(cancel arrival, order
 arrival)`, `expire_ts` (time-in-force) expires pending or resting orders before activation,
@@ -827,7 +827,17 @@ orders queue behind each other.** Concretely:
   flatters a backtest, and let a one-share print fill a million-share order.
 - A **crossing / reopen** has no traded volume, so its pool is the displayed
   size of the crossing opposite best, again shared in queue order. Rule-4
-  crossing fills at our limit; rule-8 reopen fills at the touch.
+  crossing fills at our limit; rule-8 reopen fills at the touch. The pool is
+  net of the rule-3b overlay and debits it, so a display that has not changed
+  is consumed once, not once per event.
+- Queue tracking trusts the **book**, not the raw event: an event the book
+  does not report `APPLIED` (a retransmitted duplicate, an unknown order id)
+  trades nothing and moves nobody, and an applied EXECUTE trades `min(event qty, the order's remaining)` at the book order's own side and price.
+- A **cancel** advances us only when the cancelled order is known to be ahead:
+  a real order id that did not join our level after we did. It then removes
+  the displayed size the book actually dropped. Orders that joined (or were
+  re-queued by a size increase) after us, and synthetic QUOTE/SNAPSHOT ids,
+  never reduce `ahead_qty`.
 
 Before this, every resting order at a level was credited with the *full*
 observed trade quantity, so N children at one price filled N times the

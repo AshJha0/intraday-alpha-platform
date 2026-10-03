@@ -155,7 +155,7 @@ public class ExecutionSimTest {
         assertEquals(20, sim.orders().get(id).remaining); // partial fill
         assertEquals(OrderState.ACTIVE, sim.orders().get(id).state);
         // Next EXECUTE fills the remainder (leftover capped at remaining).
-        sim.onEvent(f.exec(T0 + 4_000_000, 0, 100, 500, 13));
+        sim.onEvent(f.exec(T0 + 4_000_000, 0, 100, 500, 12));
         assertEquals(2, sim.fills().size());
         assertEquals(20, sim.fills().get(1).qty());
         assertEquals(OrderState.FILLED, sim.orders().get(id).state);
@@ -166,23 +166,25 @@ public class ExecutionSimTest {
         ExecutionSimulator sim = new ExecutionSimulator(testConfig(0));
         Feeder f = new Feeder();
         seedBook(sim, f);
+        sim.onEvent(f.add(T0 + 4, 0, 100, 60, 13)); // bid 100 displays 360
         long id = sim.submit(child(0, OrderType.LIMIT, 100, 50, T0 + 10));
         sim.onEvent(f.heartbeat(T0 + 10 + LAT + 1));
-        assertEquals(300, sim.orders().get(id).aheadQty);
-        // Pinned: an observed CANCEL at our level reduces ahead by its FULL
-        // qty (deterministic, no probabilistic split).
+        assertEquals(360, sim.orders().get(id).aheadQty);
+        // Pinned: an applied CANCEL of an order ahead of us reduces ahead
+        // by the displayed size it removed (order 11 = 300), whatever qty
+        // it quotes.
         sim.onEvent(f.cancel(T0 + 2_000_000, 0, 100, 250, 11));
-        assertEquals(50, sim.orders().get(id).aheadQty);
+        assertEquals(60, sim.orders().get(id).aheadQty);
         // A cancel at another level does nothing.
         sim.onEvent(f.cancel(T0 + 2_100_000, 0, 99, 400, 12));
-        assertEquals(50, sim.orders().get(id).aheadQty);
+        assertEquals(60, sim.orders().get(id).aheadQty);
         // MODIFY events never change queue position (pinned).
-        sim.onEvent(f.modify(T0 + 2_200_000, 0, 100, 10, 11));
+        sim.onEvent(f.modify(T0 + 2_200_000, 0, 100, 10, 13));
+        assertEquals(60, sim.orders().get(id).aheadQty);
+        // An EXECUTE quoting 70 on order 13 trades only its remaining 10.
+        sim.onEvent(f.exec(T0 + 3_000_000, 0, 100, 70, 13));
         assertEquals(50, sim.orders().get(id).aheadQty);
-        // Now a 60-EXECUTE: 50 ahead, 10 to us.
-        sim.onEvent(f.exec(T0 + 3_000_000, 0, 100, 60, 11));
-        assertEquals(1, sim.fills().size());
-        assertEquals(10, sim.fills().get(0).qty());
+        assertTrue(sim.fills().isEmpty());
     }
 
     @Test
@@ -216,6 +218,7 @@ public class ExecutionSimTest {
         Feeder f = new Feeder();
         sim.onEvent(f.add(T0, 0, 100, 500, 11));
         sim.onEvent(f.add(T0 + 1, 1, 101, 200, 21));
+        sim.onEvent(f.add(T0 + 2, 0, 99, 1_000, 12)); // the order printing at 99
         long id = sim.submit(child(0, OrderType.LIMIT, 100, 1_000_000, T0 + 10));
         sim.onEvent(f.heartbeat(T0 + 10 + LAT + 1));
         assertEquals(500, sim.orders().get(id).aheadQty);
@@ -252,7 +255,8 @@ public class ExecutionSimTest {
         assertEquals(3300, sim.orders().get(ids[3]).aheadQty);
         // ONE print of 400 at 100: 300 clears the display, 100 reaches the
         // FIRST child and nobody else. Old rule: 4 x 100 = 400 filled.
-        sim.onEvent(f.exec(T0 + 2_000_000, 0, 100, 400, 11));
+        // (order 12 = 400 at 99 trades through our level.)
+        sim.onEvent(f.exec(T0 + 2_000_000, 0, 99, 400, 12));
         assertEquals(1, sim.fills().size());
         assertEquals(ids[0], sim.fills().get(0).orderId());
         assertEquals(100, sim.fills().get(0).qty());
@@ -312,6 +316,99 @@ public class ExecutionSimTest {
         assertEquals(101, sim.fills().get(0).priceTicks());
         assertEquals(50, sim.fills().get(0).qty());
         assertEquals(OrderState.FILLED, sim.orders().get(id).state);
+    }
+
+    /** A static crossing display fills us once, not once per event. */
+    @Test
+    public void crossedDisplayIsConsumedOnceUntilItChanges() {
+        ExecutionSimulator sim = new ExecutionSimulator(testConfig(0));
+        Feeder f = new Feeder();
+        sim.onEvent(f.add(T0, 0, 99, 400, 12));
+        sim.onEvent(f.add(T0 + 1, 1, 101, 200, 21));
+        long id = sim.submit(child(0, OrderType.LIMIT, 100, 1_000, T0 + 10));
+        sim.onEvent(f.heartbeat(T0 + 10 + LAT + 1)); // rests alone at 100
+        assertEquals(0, sim.orders().get(id).aheadQty);
+        // An ask of 50 posts at our bid: the crossed display fills us 50.
+        sim.onEvent(f.add(T0 + 2_000_000, 1, 100, 50, 31));
+        assertEquals(1, sim.fills().size());
+        assertEquals(50, sim.fills().get(0).qty());
+        // Unrelated events on the unchanged display: nothing more to take.
+        for (int k = 0; k < 3; k++) {
+            sim.onEvent(f.heartbeat(T0 + 3_000_000 + k));
+        }
+        assertEquals(1, sim.fills().size());
+        // 30 more post on top: exactly the NEW 30 is available.
+        sim.onEvent(f.add(T0 + 4_000_000, 1, 100, 30, 32));
+        assertEquals(2, sim.fills().size());
+        assertEquals(30, sim.fills().get(1).qty());
+        // The first ask cancels (display 80 -> 30): nothing is resurrected.
+        sim.onEvent(f.cancel(T0 + 5_000_000, 1, 100, 50, 31));
+        sim.onEvent(f.heartbeat(T0 + 6_000_000));
+        assertEquals(2, sim.fills().size());
+        assertEquals(920, sim.orders().get(id).remaining);
+    }
+
+    /** A retransmitted duplicate / unknown-order EXECUTE trades nothing. */
+    @Test
+    public void eventsDroppedByTheBookAreNotTracked() {
+        ExecutionSimulator sim = new ExecutionSimulator(testConfig(0));
+        Feeder f = new Feeder();
+        seedBook(sim, f);
+        long id = sim.submit(child(0, OrderType.LIMIT, 100, 50, T0 + 10));
+        sim.onEvent(f.heartbeat(T0 + 10 + LAT + 1));
+        MarketEvent execute = f.exec(T0 + 2_000_000, 0, 100, 200, 11);
+        sim.onEvent(execute);
+        assertEquals(100, sim.orders().get(id).aheadQty);
+        sim.onEvent(execute); // same sequence again: the book drops it
+        assertEquals(100, sim.orders().get(id).aheadQty);
+        assertTrue(sim.fills().isEmpty());
+        sim.onEvent(f.exec(T0 + 3_000_000, 0, 100, 500, 77)); // unknown order
+        assertEquals(100, sim.orders().get(id).aheadQty);
+        assertTrue(sim.fills().isEmpty());
+    }
+
+    /** Qty capped at the order's remaining; side/price from the book. */
+    @Test
+    public void executeIsTrackedAsTheBookSawIt() {
+        ExecutionSimulator sim = new ExecutionSimulator(testConfig(0));
+        Feeder f = new Feeder();
+        seedBook(sim, f);
+        long id = sim.submit(child(0, OrderType.LIMIT, 100, 50, T0 + 10));
+        sim.onEvent(f.heartbeat(T0 + 10 + LAT + 1));
+        // The event quotes 500 but order 11 only had 300: no fill.
+        sim.onEvent(f.exec(T0 + 2_000_000, 0, 100, 500, 11));
+        assertEquals(0, sim.orders().get(id).aheadQty);
+        assertTrue(sim.fills().isEmpty());
+        // The event says ask 100, the book says order 12 is a bid at 99: a
+        // 30-lot trade through our bid, filled at our limit.
+        sim.onEvent(f.exec(T0 + 3_000_000, 1, 100, 30, 12));
+        assertEquals(1, sim.fills().size());
+        assertEquals(30, sim.fills().get(0).qty());
+        assertEquals(100, sim.fills().get(0).priceTicks());
+    }
+
+    @Test
+    public void cancelFromBehindDoesNotAdvanceUs() {
+        ExecutionSimulator sim = new ExecutionSimulator(testConfig(0));
+        Feeder f = new Feeder();
+        seedBook(sim, f);
+        sim.onEvent(f.add(T0 + 4, 0, 100, 80, 14)); // bid 100 displays 380
+        long id = sim.submit(child(0, OrderType.LIMIT, 100, 50, T0 + 10));
+        sim.onEvent(f.heartbeat(T0 + 10 + LAT + 1));
+        assertEquals(380, sim.orders().get(id).aheadQty);
+        // An order joins the level after us and cancels: never ahead.
+        sim.onEvent(f.add(T0 + 2_000_000, 0, 100, 400, 13));
+        sim.onEvent(f.cancel(T0 + 2_100_000, 0, 100, 400, 13));
+        assertEquals(380, sim.orders().get(id).aheadQty);
+        // An order that was ahead at join time cancels: we advance by it.
+        sim.onEvent(f.cancel(T0 + 2_200_000, 0, 100, 80, 14));
+        assertEquals(300, sim.orders().get(id).aheadQty);
+        // A size increase re-queues order 11 at the tail (behind us); its
+        // later cancel does not advance us (MODIFY never changes ahead).
+        sim.onEvent(f.modify(T0 + 2_300_000, 0, 100, 500, 11));
+        sim.onEvent(f.cancel(T0 + 2_400_000, 0, 100, 500, 11));
+        assertEquals(300, sim.orders().get(id).aheadQty);
+        assertTrue(sim.fills().isEmpty());
     }
 
     @Test

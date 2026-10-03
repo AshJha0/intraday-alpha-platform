@@ -1,6 +1,7 @@
 package com.iap.execution;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
@@ -11,6 +12,8 @@ import com.iap.core.MarketEvent;
 import com.iap.core.SessionStatus;
 import com.iap.core.Side;
 import com.iap.core.SplitMix64;
+import com.iap.orderbook.ApplyStatus;
+import com.iap.orderbook.BookCheckpoint;
 import com.iap.orderbook.ConsolidatedBook;
 import com.iap.orderbook.OrderBook;
 
@@ -40,8 +43,9 @@ import com.iap.orderbook.OrderBook;
  *       book. Unfilled MARKET/IOC remainders are cancelled
  *       (UNFILLED_REMAINDER); FOK fills fully or not at all.
  *       <b>3b — displayed-liquidity consumption</b>: a per-(instrument,
- *       venue, side, price) overlay of what OUR aggressive fills already
- *       consumed; walks see {@code displayed - consumed} and debit it; when
+ *       venue, side, price) overlay of what OUR aggressive fills and the
+ *       rule-4 / rule-8 crossing check already consumed; walks and crossing
+ *       pools see {@code displayed - consumed} and debit it; when
  *       an applied event changes a level's displayed size the entry becomes
  *       {@code min(consumed, new displayed)} (0 removes it). Two children
  *       on the same display share one copy of the liquidity.</li>
@@ -61,14 +65,25 @@ import com.iap.orderbook.OrderBook;
  *       trade reaches an order when it prints AT its limit or STRICTLY
  *       WORSE (below our bid / above our ask — the market traded THROUGH
  *       us); a trade-through fills at OUR limit but is bounded by the
- *       observed volume, not a free fill of the whole residual. An observed
- *       CANCEL at (side, P) reduces ahead_qty by its full qty, floored at
- *       0, and never fills us; a MARKETABLE incoming ADD is expanded into
+ *       observed volume, not a free fill of the whole residual. Only
+ *       events the book reports APPLIED are tracked (a retransmitted
+ *       duplicate the book drops trades nothing), and an applied EXECUTE
+ *       trades min(event qty, the book order's remaining) at the BOOK
+ *       order's side and price. An applied CANCEL reduces
+ *       ahead_qty by the displayed size it removed from our level (floored
+ *       at 0) only when the cancelled order is KNOWN to be ahead of us: a
+ *       real (non-synthetic) order id that did not join the level after we
+ *       did (an ADD at our level, or a MODIFY that grew it and so moved to
+ *       the tail, after our rest is behind us); synthetic QUOTE/SNAPSHOT
+ *       ids never reduce it. A CANCEL never fills us; a MARKETABLE incoming
+ *       ADD is expanded into
  *       the per-level volumes it consumes over the pre-event displayed
  *       depth, each level's volume being its own pool; after the event is
  *       applied, a crossed displayed opposite best fills us at P, bounded
- *       by the DISPLAYED size of that crossing level (one pool per side,
- *       ahead_qty consumed first) — EXEMPTION: a remainder that rests while
+ *       by the DISPLAYED size of that crossing level net of the rule-3b
+ *       overlay, which the check debits (one pool per side, ahead_qty
+ *       consumed first; an unchanged display is never consumed twice) —
+ *       EXEMPTION: a remainder that rests while
  *       the display already crosses its price (the aggressive leg just
  *       consumed that display) is crossing-exempt until the display first
  *       shows an uncrossed opposite best; MODIFY events never change
@@ -100,8 +115,9 @@ import com.iap.orderbook.OrderBook;
  *       after which the venue is open again, crossed resting orders fill at
  *       the TOUCH (uncross) price — bounded by the same displayed-size pool
  *       and ahead_qty consumption as the rule-4 crossing check.</li>
- *   <li><b>Event order</b>: expiries; activations + cancel arrivals; passive
- *       queue tracking; book update; overlay cap; crossing check.</li>
+ *   <li><b>Event order</b>: expiries; activations + cancel arrivals; book
+ *       update; passive queue tracking of the event if the book APPLIED it
+ *       (against the pre-event depth); overlay cap; crossing check.</li>
  * </ol>
  *
  * <p>Deterministic: same config + seed = identical fills, bit for bit
@@ -117,6 +133,9 @@ public final class ExecutionSimulator {
     private final ArrayList<Long> cancels = new ArrayList<>(); // (effective, id)
     /** Rule 3b overlay: "instrument|venue|side|price" -> consumed qty. */
     private final TreeMap<String, Long> consumed = new TreeMap<>();
+    // Rule 4: per resting order, the market order ids that joined its level
+    // after it did (membership only, never iterated).
+    private final TreeMap<Long, HashSet<Long>> behind = new TreeMap<>();
     private final ExecCounters counters;
     private final ArrayList<Fill> fills = new ArrayList<>(256);
     private long nextOrderId = 1;
@@ -142,6 +161,9 @@ public final class ExecutionSimulator {
         this.resting.addAll(o.resting);
         this.cancels.addAll(o.cancels);
         this.consumed.putAll(o.consumed);
+        for (Map.Entry<Long, HashSet<Long>> e : o.behind.entrySet()) {
+            this.behind.put(e.getKey(), new HashSet<>(e.getValue()));
+        }
         this.counters = o.counters.copy();
         this.fills.addAll(o.fills);
         this.nextOrderId = o.nextOrderId;
@@ -259,6 +281,7 @@ public final class ExecutionSimulator {
         o.cancelReason = reason;
         o.resting = false;
         Long boxed = o.orderId;
+        behind.remove(boxed);
         pending.remove(boxed);
         resting.remove(boxed);
         cancels.remove(boxed);
@@ -342,6 +365,7 @@ public final class ExecutionSimulator {
         if (o.remaining == 0) {
             o.state = OrderState.FILLED;
             o.resting = false;
+            behind.remove(Long.valueOf(o.orderId));
             cancels.remove(Long.valueOf(o.orderId));
         }
     }
@@ -576,10 +600,15 @@ public final class ExecutionSimulator {
         long[] bestAsk = book.bestAsk();
         long[] bestBid = book.bestBid();
         // Indexed by OUR side: a buy crosses against the ask, a sell the bid.
-        long[] budget = {
-            bestAsk == null ? 0L : bestAsk[1],
-            bestBid == null ? 0L : bestBid[1],
+        // Rule 3b: the pool is the displayed size net of what was already
+        // consumed since the level's display last changed.
+        long[] poolStart = {
+            bestAsk == null ? 0L : Math.max(bestAsk[1]
+                    - consumedAt(ev.instrumentId, ev.venueId, 1, bestAsk[0]), 0L),
+            bestBid == null ? 0L : Math.max(bestBid[1]
+                    - consumedAt(ev.instrumentId, ev.venueId, 0, bestBid[0]), 0L),
         };
+        long[] budget = {poolStart[0], poolStart[1]};
         for (int i = 0; i < resting.size();) {
             ChildOrder o = orders.get(resting.get(i));
             if (o.instrumentId == ev.instrumentId && o.venueId == ev.venueId
@@ -615,6 +644,15 @@ public final class ExecutionSimulator {
                 i++;
             }
         }
+        // Debit the overlay so the same display is not consumed again.
+        for (int s = 0; s < 2; s++) {
+            long used = poolStart[s] - budget[s];
+            if (used > 0) {
+                long[] opp = s == 0 ? bestAsk : bestBid;
+                consumed.merge(overlayKey(ev.instrumentId, ev.venueId, 1 - s,
+                        opp[0]), used, Long::sum);
+            }
+        }
     }
 
     /** Process one market event (rule 9 order). */
@@ -625,33 +663,106 @@ public final class ExecutionSimulator {
         expireDue(t);
         activateAndCancelDue(t);
 
-        // 2. Passive queue tracking on the raw event (rule 4), before the
-        //    book is mutated — only while the venue is open (rule 8).
+        // 2. Capture the pre-event state queue tracking needs, snapshot the
+        //    displayed sizes behind this venue's overlay entries, then
+        //    apply the event.
         int et = ev.eventType;
         OrderBook pre = venueBook(ev.instrumentId, ev.venueId);
         boolean preOpen = venueOpen(pre);
-        if (!resting.isEmpty() && preOpen) {
+        long[][] addDepth = new long[0][];
+        if (!resting.isEmpty() && preOpen && et == EventType.ADD) {
+            addDepth = pre.depth(ev.side == 0 ? Side.ASK : Side.BID,
+                    OrderBook.DEPTH_LEVELS);
+        }
+        // The book's own record of the order an EXECUTE names:
+        // {side, price, qty}, or null.
+        long[] execOrder = null;
+        if (!resting.isEmpty() && preOpen && et == EventType.EXECUTE) {
+            execOrder = bookOrder(pre, ev.orderId);
+        }
+        // Our order ids on this book and the displayed qty at their level
+        // before the event.
+        ArrayList<Long> levelIds = new ArrayList<>();
+        ArrayList<Long> levelBefore = new ArrayList<>();
+        if (et == EventType.CANCEL || et == EventType.MODIFY) {
+            for (long id : resting) {
+                ChildOrder o = orders.get(id);
+                if (o.instrumentId == ev.instrumentId
+                        && o.venueId == ev.venueId
+                        && o.state == OrderState.ACTIVE) {
+                    levelIds.add(id);
+                    levelBefore.add(pre == null ? 0L : levelQty(pre,
+                            o.side == 0 ? Side.BID : Side.ASK, o.limitTicks));
+                }
+            }
+        }
+        String prefix = ev.instrumentId + "|" + ev.venueId + "|";
+        ArrayList<String> watched = new ArrayList<>();
+        ArrayList<Long> before = new ArrayList<>();
+        for (Map.Entry<String, Long> e : consumed.tailMap(prefix).entrySet()) {
+            if (!e.getKey().startsWith(prefix)) {
+                break;
+            }
+            watched.add(e.getKey());
+            before.add(pre == null ? 0L : overlayLevelQty(pre, e.getKey()));
+        }
+        boolean applied =
+                instrumentBook(ev.instrumentId).apply(ev) == ApplyStatus.APPLIED;
+        OrderBook book = venueBook(ev.instrumentId, ev.venueId);
+
+        // 3. Passive queue tracking (rule 4) — only for an event the book
+        //    APPLIED; fills only while the venue was open (rule 8).
+        if (applied && book != null && !resting.isEmpty()) {
+            boolean realId = Long.compareUnsigned(ev.orderId,
+                    OrderBook.SYNTHETIC_ID_BASE) < 0;
+            Long evOrder = ev.orderId;
             if (et == EventType.EXECUTE) {
-                trackConsumption(ev.instrumentId, ev.venueId, ev.side,
-                        ev.priceTicks, ev.qty, t);
+                if (execOrder != null) {
+                    trackConsumption(ev.instrumentId, ev.venueId,
+                            (int) execOrder[0], execOrder[1],
+                            Math.min(ev.qty, execOrder[2]), t);
+                }
             } else if (et == EventType.CANCEL) {
-                for (long id : resting) {
-                    ChildOrder o = orders.get(id);
-                    if (o.instrumentId == ev.instrumentId
-                            && o.venueId == ev.venueId && o.side == ev.side
-                            && ev.priceTicks == o.limitTicks
-                            && o.state == OrderState.ACTIVE) {
-                        o.aheadQty -= Math.min(o.aheadQty, ev.qty);
+                for (int i = 0; i < levelIds.size(); i++) {
+                    ChildOrder o = orders.get(levelIds.get(i));
+                    long removed = levelBefore.get(i) - levelQty(book,
+                            o.side == 0 ? Side.BID : Side.ASK, o.limitTicks);
+                    HashSet<Long> set = behind.get(levelIds.get(i));
+                    if (set != null && set.contains(evOrder)) {
+                        set.remove(evOrder);
+                    } else if (removed > 0 && realId && preOpen) {
+                        // Synthetic (non-MBO) ids are assumed behind us.
+                        o.aheadQty -= Math.min(o.aheadQty, removed);
+                    }
+                }
+            } else if (et == EventType.MODIFY) {
+                for (int i = 0; i < levelIds.size(); i++) {
+                    ChildOrder o = orders.get(levelIds.get(i));
+                    if (realId && levelQty(book,
+                            o.side == 0 ? Side.BID : Side.ASK, o.limitTicks)
+                            > levelBefore.get(i)) {
+                        // A size increase moves the order to the level's tail.
+                        behind.computeIfAbsent(levelIds.get(i),
+                                k -> new HashSet<>()).add(evOrder);
                     }
                 }
             } else if (et == EventType.ADD) {
+                if (realId) {
+                    for (long id : resting) {
+                        ChildOrder o = orders.get(id);
+                        if (o.instrumentId == ev.instrumentId
+                                && o.venueId == ev.venueId && o.side == ev.side
+                                && o.limitTicks == ev.priceTicks
+                                && o.state == OrderState.ACTIVE) {
+                            behind.computeIfAbsent(id,
+                                    k -> new HashSet<>()).add(evOrder);
+                        }
+                    }
+                }
                 // Marketable-ADD expansion (rule 4).
                 int consumedSide = ev.side == 0 ? 1 : 0;
-                long[][] depth = pre.depth(
-                        consumedSide == 0 ? Side.BID : Side.ASK,
-                        OrderBook.DEPTH_LEVELS);
                 long incoming = ev.qty;
-                for (long[] lvl : depth) {
+                for (long[] lvl : addDepth) {
                     if (incoming <= 0) {
                         break;
                     }
@@ -668,21 +779,7 @@ public final class ExecutionSimulator {
             }
         }
 
-        // 3. Snapshot the displayed sizes behind this venue's overlay
-        //    entries, apply the event, cap the entries whose display
-        //    changed (rule 3b).
-        String prefix = ev.instrumentId + "|" + ev.venueId + "|";
-        ArrayList<String> watched = new ArrayList<>();
-        ArrayList<Long> before = new ArrayList<>();
-        for (Map.Entry<String, Long> e : consumed.tailMap(prefix).entrySet()) {
-            if (!e.getKey().startsWith(prefix)) {
-                break;
-            }
-            watched.add(e.getKey());
-            before.add(pre == null ? 0L : overlayLevelQty(pre, e.getKey()));
-        }
-        instrumentBook(ev.instrumentId).apply(ev);
-        OrderBook book = venueBook(ev.instrumentId, ev.venueId);
+        //    Cap the overlay entries whose display changed (rule 3b).
         for (int i = 0; i < watched.size(); i++) {
             long after = book == null ? 0L : overlayLevelQty(book, watched.get(i));
             if (after != before.get(i)) {
@@ -699,6 +796,18 @@ public final class ExecutionSimulator {
         if (venueOpen(book)) {
             crossingCheck(ev, book, !preOpen);
         }
+    }
+
+    /** {side, price, qty} of a resting book order, null when absent. */
+    private static long[] bookOrder(OrderBook book, long orderId) {
+        for (BookCheckpoint.LevelCheckpoint lvl : book.checkpoint().levels) {
+            for (int i = 0; i < lvl.orderIds.length; i++) {
+                if (lvl.orderIds[i] == orderId) {
+                    return new long[] {lvl.side, lvl.priceTicks, lvl.qtys[i]};
+                }
+            }
+        }
+        return null;
     }
 
     private static long overlayLevelQty(OrderBook book, String key) {
