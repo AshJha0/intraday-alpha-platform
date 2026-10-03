@@ -40,12 +40,18 @@ python3 -m json.tool data/normalized/qc_report.json | head -40
 
 Expect in `qc_report.json`: per-stream event counts, and gap/duplicate/
 out-of-order/invalid counters consistent with `configs/marketdata/generator.json`
-`anomalies` rates (goldens run with anomalies disabled). The report's sha256
-is the **dataset version** used by every experiment manifest
-(`docs/governance/REPRODUCIBILITY.md`):
+`anomalies` rates (goldens run with anomalies disabled). For the committed
+config (v1.4.0) the totals are 309,598 events in and 308,975 out, and every
+equity stream trades up to the close auction (up to v1.3.0 equity flow
+stopped about 40% of the way through each session; that dataset is
+reproduced by `equities.flow.calibration = "legacy_budget"`). The **dataset
+version** used by every experiment manifest is the content hash of the
+normalized `.iap1` files, not of the QC report
+(`docs/governance/REPRODUCIBILITY.md` §1–§2):
 
 ```bash
-sha256sum data/normalized/qc_report.json
+cd python && PYTHONPATH=src python3 -c "from iap.experiment.tracker import data_version; print(data_version())"
+# 116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573   (committed config, v1.4.0)
 ```
 
 Cross-check determinism after any pipeline code change:

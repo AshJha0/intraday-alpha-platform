@@ -1,5 +1,7 @@
 # Microprice and Queue Dynamics as Short-Horizon FX Predictors: A Negative Result with a Regime-Conditioned Exception
 
+> Dated record. The figures below are those of the dataset in force when the paper was written; the 2026-10-03 update at the end restates them on the v1.4.0 dataset and re-checks each conclusion.
+
 *Intraday Alpha Platform research series, paper 2 of 6 (spec §28). Generated 2026-08-29 from the repository's committed research artifacts.*
 
 ---
@@ -410,3 +412,99 @@ No verdict, IC, t-statistic or P&L figure in this paper changes; the five
 new experiments are all ITERATE and net-negative at 1× costs, like every
 alpha before them. The analysis above is left as written and the research
 reports quote the ledger at their own render time (`ledger_n_at_report`).
+
+## Erratum / Update — 2026-10-03 (v1.4.0: the equity flow now reaches the close)
+
+**What changed in the data.** Up to v1.3.0 the generator stopped the equity
+continuous flow about 40 % of the way through each session; v1.4.0
+calibrates the flow rate to the session, so equities trade to the close
+(paper 01's update of the same date has the detail). The FX raw and
+normalized files are byte-identical to v1.3.0. So the FX statistics in this
+paper did not move, the ledger denominator did, and the two equity alphas
+the paper uses as a contrast (EQ01, EQ05) did. This section supersedes the
+"current" figures quoted in the earlier errata, which stay as dated records.
+
+**FX figures: unchanged by this release, restated.** Every field of
+`FX01.json` … `FX12.json` that existed in v1.3.0 has the same value now (the
+files gained five reporting fields, nothing else). Current values
+(`research/alpha_reports/REPORT.md`):
+
+| alpha | horizon | IC | IC unc | IC crs | crs% | NW t unc | folds+ | hyp | net P&L 1x | verdict |
+|---|---|---|---|---|---|---|---|---|---|---|
+| FX01 | 500ms | -0.0153 | 0.0183 | -0.0302 | 0.287 | 3.27 | 0/4 | yes | -9,867 | ITERATE |
+| FX09 | 1m | -0.1284 | -0.0472 | -0.2100 | 0.317 | -3.76 | 0/4 | no | -27,477 | REJECT |
+
+Cost stress at 0.5x / 1x / 2x: FX01 -4,452 / -9,867 / -20,696; FX09
+-12,963 / -27,477 / -56,504. Day 2: FX01 gross +2,344, costs 27,578, net
+-25,234 over 1,723 trades; FX09 +3,954 / 72,227 / -68,273 over 4,555.
+Regime split (last fold, pooled rows): FX01 -0.0522 high-vol / +0.0039
+low-vol; FX09 -0.1922 / -0.1275. FX 1 m label validity is 73.8-75.9 % and
+the freshness bound 33-37 s. Where these differ from the "Erratum to the
+errata" above (FX01 t 2.65, FX09 t -3.81, FX09 -27,386 at 1x, day-2
+-68,183) the difference arose between that erratum and v1.3.0, not in this
+release; its cause was not re-derived here.
+
+**Ledger.** `research/experiments.json` now holds 1920 looks over 139
+entries (the 1068 looks of the v1.3.0 dataset are kept; the regenerated
+pipelines added 852). Expected max |t| under the global null is 3.888 and
+the Bonferroni per-test threshold 4.206. FX01 (3.27) is below the yardstick,
+as before. FX09's |t| of 3.76 was just above the v1.3.0 yardstick (3.735)
+and is now below it: on the current ledger even its negative uncrossed IC is
+within what selection alone produces. Of the twelve FX alphas only FX04
+(4.79, paper 3) is above the yardstick.
+
+**Equity contrast: moved.** EQ01 (microprice on the equity MBO book, 1 s):
+uncrossed IC 0.0102 at Newey-West t 2.67 (v1.3.0: 0.0273 / 4.77), fold ICs
+-0.0115 / +0.0198 / +0.0241 / +0.0062 (3 of 4 positive), hypothesis sign
+confirmed, 91 flips/h, -38,230 at 1x (-18,730 at 0.5x, -77,230 at 2x), day-2
+net -93,699 on a gross of +1,855; verdict ITERATE. In the lifecycle registry
+it now fails `statistical_significance`, `net_pnl_after_costs` and
+`stability`, not the cost gate alone. Regime split +0.0013 high-vol /
++0.0134 low-vol. Its last-fold decay curve no longer peaks at 1-5 s: it
+rises from +0.023 at 1 s to +0.053 at 5 m (one fold, and labels of 10 s and
+more exist on at most 80 % of equity rows). EQ05 (queue dynamics, 1 s):
+uncrossed IC 0.0061 at t 2.45, ITERATE by the lenient gate, 528 flips/h,
+-300,873 at 1x.
+
+**ML study (§4.7), current** (`research/ml_reports/ML_REPORT.md`). The gate
+now passes: ridge reaches a pooled OOS IC of +0.0081 against the mid-to-mid
+label, so xgboost, lightgbm and the MLP were fitted (on v1.3.0 the gate
+failed and they were not). Their IC against the mid-to-mid label is 0.0046,
+0.0078 and -0.0024, and the conservative net is negative for every model
+(-0.110 to -2.612 bps per signal).
+
+**Conclusions, re-checked.**
+
+1. *The microprice carries no stable signal on the synthetic FX quote book
+   (FX01).* **Holds**, unchanged: no fold is positive on pooled rows, the
+   uncrossed IC clears only the lenient ITERATE gate, and its t is below the
+   selection yardstick.
+2. *The same feature on the equity MBO book is significant, sign-stable and
+   hypothesis-confirmed, failing only the cost gate.* **No longer holds.**
+   EQ01's t of 2.67 is below the PROMOTE gate of 3.0 and below the selection
+   yardstick, and one fold of four is negative. It is still an ITERATE and
+   its sign is still the hypothesised one.
+3. *"Microprice predictability is a property of the book mechanism, not of
+   the formula" (opposite verdicts on the two book models).* **No longer
+   holds on this evidence.** The two alphas now have the same verdict, and
+   the FX one has the larger uncrossed t (3.27 against 2.67). The argument
+   about what an L1 quote book can and cannot reveal is unaffected, but the
+   current numbers do not show the contrast the paper built on.
+4. *EQ01 is not regime-dependent.* **No longer holds**: its last-fold IC is
+   +0.0134 in low-vol states and +0.0013 in high-vol states.
+5. *FX09 cannot be promoted; the claim that it carries the strongest FX
+   statistics stays withdrawn.* **Holds**, unchanged: REJECT, negative
+   uncrossed IC, hypothesis sign not confirmed, negative at every cost
+   multiplier.
+6. *Regime concentration is the one structural positive.* **Holds** as a
+   description, unchanged, and with the limit already stated in the round-3
+   erratum: these are pooled-row ICs, and on FX the pooled rows include the
+   crossed ones.
+7. *True queue dynamics are unobservable on an L1 quote book; the queue
+   conclusions belong to equities (EQ05).* The first part **holds** (it is
+   structural). The equity part **holds, weaker**: EQ05's uncrossed IC is
+   0.0061 (v1.3.0: 0.0150) and its t 2.45.
+8. *A tree or MLP does not rescue the result.* **Holds**, and now on models
+   that were fitted rather than on a gate that stopped them.
+9. *Neither alpha is promotable and both lose money at every cost
+   multiplier.* **Holds.**

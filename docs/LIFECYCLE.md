@@ -137,8 +137,14 @@ signal–label relation rather than its strength. `gap ≤ 1.0` ⇔ `rank_ic ∈
 [0, 2·ic]` for a positive IC: same sign, not more than double. Known
 limitation on the bundled reports: `ic` is the uncrossed gate IC while
 `oos_rank_ic` is pooled (the report has no uncrossed rank IC), so on FX
-(≈ 30 % crossed rows) the two are computed on different row sets — which is
+(19–37 % crossed rows) the two are computed on different row sets — which is
 why `stability` is among the failed gates of FX03/05/08/09/10/11/12 below.
+On the v1.4.0 dataset six equity alphas fail it as well (EQ01, EQ04, EQ05,
+EQ06, EQ07, EQ09), and there the row sets are nearly the same (under 1 % of
+equity rows are crossed): the rank IC is more than double the Pearson IC
+(EQ01 0.031 against 0.010, EQ05 0.018 against 0.006, EQ06 0.060 against
+0.027, EQ09 −0.052 against −0.022) or has the opposite sign (EQ04, EQ07).
+On those six the gate is measuring what it was written to measure.
 
 ## 4. Evidence documents
 
@@ -198,7 +204,7 @@ them.
 order of `gates` is pinned. `AlphaRegistry.load` is strict (`x-version`,
 key = record id, `state_index` = state, `gate_order` / `failed_gates`
 consistent with `gates`); the Rust and Java loaders are equally strict and
-re-render the committed file byte-identically (72 473 bytes, 24 records).
+re-render the committed file byte-identically (72 853 bytes, 24 records).
 
 `research/lifecycle_transitions.jsonl`: `canonical_json(validate_typed(t))`
 per line. Replaying the log from RESEARCH reproduces each alpha's state
@@ -208,7 +214,16 @@ per line. Replaying the log from RESEARCH reproduces each alpha's state
 
 `python -m iap.lifecycle bootstrap` reads `research/alpha_reports/<ID>.json`,
 the `promotion_pipeline` entries of `research/experiments.json` and
-`configs/strategies/alpha_params.json`, builds one `ExperimentResult` per
+`configs/strategies/alpha_params.json`. Since v1.4.0 the ledger is
+dataset-scoped (x-version 2) and keeps the looks of every dataset it has
+seen, so an alpha has one `promotion_pipeline` entry per dataset; the entry
+that backs the registry's evidence is the one stamped with the
+`data_version` that `alpha_params.json` names
+(`iap.lifecycle.bootstrap.select_pipeline_entries`; an unstamped entry is
+used only when no stamped one matches, entries of another dataset are
+history, and two candidates for one alpha are an error). On the committed
+tree that is dataset `116b7787…`; the 24 entries of dataset `203c8f54…`
+(v1.3.0 and earlier) stay in the ledger and are not read. Bootstrap builds one `ExperimentResult` per
 alpha (`ic ← gate_ic`, the uncrossed IC the PROMOTE gate reads; `t_stat ←
 nw_tstat_uncrossed`; `n_experiments_in_ledger ← the ledger entry's n`;
 `gross/cost/net_return_bps ← stress.cost.x1` in bps of a 1e6 USD reference
@@ -227,32 +242,41 @@ lines are appended to it — so `bootstrap` refuses to truncate a non-empty
 writes. Rebuilding with `--force` is a deliberate, reviewed act (CONTRIBUTING.md
 §4) that discards the manual lines, so archive the old log first.
 
-Result — **24 CANDIDATE, 0 VALIDATING, 0 PROMOTE**; every alpha fails
+That is what v1.4.0 did when the dataset was regenerated: the log of the
+v1.3.0 dataset is archived at
+`research/archive/lifecycle_transitions.dataset-203c8f54.jsonl`, and the
+registry and the log were rebuilt with `bootstrap --force` from the reports
+of dataset `116b7787…`. The bootstrap event time did not move: it is
+the latest fold `test_end`, which the FX reports set, and the FX data is
+byte-identical in the two datasets.
+
+Result on the v1.4.0 dataset — **24 CANDIDATE, 0 VALIDATING, 0 PROMOTE**
+(report verdicts: 0 PROMOTE / 10 ITERATE / 14 REJECT); every alpha fails
 `net_pnl_after_costs`:
 
 | alpha | report verdict | state | failed gates (CANDIDATE → VALIDATING) |
 |---|---|---|---|
-| EQ01 | ITERATE | CANDIDATE | net_pnl_after_costs |
+| EQ01 | ITERATE | CANDIDATE | statistical_significance, net_pnl_after_costs, stability |
 | EQ02 | ITERATE | CANDIDATE | net_pnl_after_costs |
 | EQ03 | ITERATE | CANDIDATE | net_pnl_after_costs |
-| EQ04 | REJECT | CANDIDATE | oos_ic, statistical_significance, fold_consistency, net_pnl_after_costs |
-| EQ05 | ITERATE | CANDIDATE | statistical_significance, net_pnl_after_costs |
-| EQ06 | ITERATE | CANDIDATE | net_pnl_after_costs |
-| EQ07 | REJECT | CANDIDATE | oos_ic, statistical_significance, hypothesis_sign, net_pnl_after_costs |
-| EQ08 | REJECT | CANDIDATE | oos_ic, statistical_significance, hypothesis_sign, net_pnl_after_costs |
-| EQ09 | REJECT | CANDIDATE | oos_ic, statistical_significance, hypothesis_sign, net_pnl_after_costs |
-| EQ10 | REJECT | CANDIDATE | oos_ic, statistical_significance, hypothesis_sign, net_pnl_after_costs |
-| EQ11 | ITERATE | CANDIDATE | net_pnl_after_costs |
+| EQ04 | REJECT | CANDIDATE | oos_ic, statistical_significance, fold_consistency, hypothesis_sign, net_pnl_after_costs, stability |
+| EQ05 | ITERATE | CANDIDATE | oos_ic, statistical_significance, net_pnl_after_costs, stability |
+| EQ06 | ITERATE | CANDIDATE | net_pnl_after_costs, stability |
+| EQ07 | REJECT | CANDIDATE | oos_ic, statistical_significance, fold_consistency, hypothesis_sign, net_pnl_after_costs, stability |
+| EQ08 | REJECT | CANDIDATE | oos_ic, statistical_significance, fold_consistency, hypothesis_sign, net_pnl_after_costs |
+| EQ09 | REJECT | CANDIDATE | oos_ic, statistical_significance, fold_consistency, hypothesis_sign, net_pnl_after_costs, stability |
+| EQ10 | REJECT | CANDIDATE | oos_ic, statistical_significance, net_pnl_after_costs |
+| EQ11 | REJECT | CANDIDATE | statistical_significance, net_pnl_after_costs |
 | EQ12 | ITERATE | CANDIDATE | net_pnl_after_costs |
-| FX01 | ITERATE | CANDIDATE | statistical_significance, fold_consistency, net_pnl_after_costs |
-| FX02 | REJECT | CANDIDATE | oos_ic, statistical_significance, fold_consistency, hypothesis_sign, net_pnl_after_costs |
-| FX03 | REJECT | CANDIDATE | statistical_significance, hypothesis_sign, net_pnl_after_costs, stability |
+| FX01 | ITERATE | CANDIDATE | fold_consistency, net_pnl_after_costs |
+| FX02 | REJECT | CANDIDATE | oos_ic, statistical_significance, hypothesis_sign, net_pnl_after_costs |
+| FX03 | ITERATE | CANDIDATE | statistical_significance, fold_consistency, hypothesis_sign, net_pnl_after_costs, stability |
 | FX04 | ITERATE | CANDIDATE | net_pnl_after_costs |
-| FX05 | REJECT | CANDIDATE | oos_ic, statistical_significance, hypothesis_sign, net_pnl_after_costs, stability |
+| FX05 | REJECT | CANDIDATE | oos_ic, statistical_significance, fold_consistency, hypothesis_sign, net_pnl_after_costs, stability |
 | FX06 | REJECT | CANDIDATE | statistical_significance, net_pnl_after_costs |
 | FX07 | REJECT | CANDIDATE | oos_ic, statistical_significance, fold_consistency, hypothesis_sign, net_pnl_after_costs |
 | FX08 | ITERATE | CANDIDATE | statistical_significance, net_pnl_after_costs, stability |
-| FX09 | REJECT | CANDIDATE | oos_ic, statistical_significance, hypothesis_sign, net_pnl_after_costs, stability |
+| FX09 | REJECT | CANDIDATE | oos_ic, statistical_significance, fold_consistency, hypothesis_sign, net_pnl_after_costs, stability |
 | FX10 | REJECT | CANDIDATE | statistical_significance, net_pnl_after_costs, stability |
 | FX11 | REJECT | CANDIDATE | statistical_significance, net_pnl_after_costs, stability |
 | FX12 | REJECT | CANDIDATE | oos_ic, statistical_significance, fold_consistency, net_pnl_after_costs, stability |
@@ -264,11 +288,22 @@ thresholds and asserts equality (excluding `capacity` — all pass — and
 `stability`, which REPORT.md does not know), plus the ITERATE rule and hand
 pins for EQ01 / EQ05 / FX01 / EQ07. FX01 is ITERATE despite a negative
 *pooled* IC because the gate reads the uncrossed IC (README, "Two
-conditioning rules").
+conditioning rules"). EQ05 is ITERATE while failing `oos_ic`: its uncrossed
+IC (0.0061) and Newey-West t (2.45) clear the ITERATE thresholds and miss
+the PROMOTE ones.
 
-Seven of the ten ITERATE alphas (EQ01, EQ02, EQ03, EQ06, EQ11, EQ12, FX04)
-fail *only* the cost gate: the statistics are real, the economics are not. That is the promotion report's
-finding restated by the machine, which is the point of pinning both.
+Of the ten ITERATE alphas, four (EQ02, EQ03, EQ12, FX04) fail *only* the
+cost gate: for those the statistics clear every threshold and the economics
+do not. The other six also fail a statistical or shape gate — EQ01
+(`statistical_significance`, `stability`), EQ05 (`oos_ic`,
+`statistical_significance`, `stability`), EQ06 (`stability`), FX01
+(`fold_consistency`), FX03 and FX08 (several). On the v1.3.0 dataset EQ01,
+EQ05, EQ06 and EQ11 failed only the cost gate as well; with equity flow
+spread over the whole session their t-statistics fell (EQ01 4.77 → 2.67,
+EQ05 4.92 → 2.45, EQ11 3.04 → 1.40, which moved EQ11 from ITERATE to
+REJECT), and EQ06 kept its t (3.68) and lost the Pearson/rank agreement.
+That is the promotion report's finding restated by the machine, which is
+the point of pinning both.
 
 ## 7. Golden — `tests/golden/expected_lifecycle.json`
 

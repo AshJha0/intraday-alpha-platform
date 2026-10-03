@@ -1,5 +1,7 @@
 # Alpha Decay versus Latency and Infrastructure Investment: What One Event of Lag Costs
 
+> Dated record. The figures below are those of the dataset in force when the paper was written; the 2026-10-03 update at the end restates them on the v1.4.0 dataset and re-checks each conclusion.
+
 *Intraday Alpha Platform research series, paper 4 of 6 (spec §28). Generated 2026-08-29 from the repository's committed research artifacts.*
 
 ---
@@ -396,3 +398,153 @@ this paper (`tests/harness/check_headline_numbers.py`, `cpp_benchmark_numbers`).
 The new rows: serialising one 5.6 KB `DecisionTrace` costs 31.7 µs (+ 30.3 µs
 to hash), paid once per decision off the event loop; ≈ 37 ns/event amortised
 on the 2,000-event golden replay.
+
+## Erratum / Update — 2026-10-03 (v1.4.0: the equity flow now reaches the close)
+
+**What changed in the data.** Up to v1.3.0 the generator stopped the equity
+continuous flow about 40 % of the way through each 6.5 h session; v1.4.0
+calibrates the flow rate to the session, so equities trade to the close
+(paper 01's update of the same date has the detail). About the same number
+of equity events now covers the whole session, so equity rows are further
+apart: instrument 1 has 14,609 feature rows with a median inter-emission gap
+of 2.1 s and a mean row gap of 3.2 s (3.1-3.3 s across the 11 instruments),
+where the body measured ~0.9 s inside the compressed window. The FX files
+are byte-identical to v1.3.0 (instrument 101: 6,573 rows, median gap
+14.9 s). The benchmark figures do not depend on the dataset. This section
+supersedes the body's equity rows and the "current" figures in the earlier
+errata, which stay as dated records.
+
+**The event-lag grid (§3.1), current** (`research/alpha_reports/REPORT.md`,
+cost and latency stress table; retention shown where the +0 IC exceeds
+0.01). The FX rows are the v1.3.0 values: every field of the FX JSONs that
+existed then is unchanged.
+
+| alpha | +0ev IC | +1ev IC | +5ev IC | retained at +1 | retained at +5 |
+|---|---|---|---|---|---|
+| EQ01 | +0.0062 | -0.0049 | +0.0023 | — | — |
+| EQ02 | +0.0217 | +0.0092 | +0.0097 | 42% | 45% |
+| EQ03 | +0.0148 | +0.0040 | +0.0099 | 27% | 67% |
+| EQ04 | +0.0182 | +0.0147 | +0.0001 | 81% | 1% |
+| EQ05 | +0.0075 | +0.0040 | -0.0079 | — | — |
+| EQ06 | +0.0194 | +0.0141 | +0.0334 | 73% | 172% |
+| EQ07 | -0.0013 | -0.0096 | -0.0064 | — | — |
+| EQ08 | -0.0407 | -0.0451 | -0.0450 | — | — |
+| EQ09 | -0.0212 | -0.0273 | -0.0280 | — | — |
+| EQ10 | +0.0031 | +0.0020 | -0.0111 | — | — |
+| EQ11 | +0.0124 | +0.0097 | +0.0120 | 78% | 97% |
+| EQ12 | +0.0229 | +0.0092 | +0.0105 | 40% | 46% |
+| FX01 | -0.0189 | -0.0076 | -0.0005 | — | — |
+| FX02 | +0.0300 | +0.0252 | -0.0149 | 84% | — |
+| FX03 | -0.0035 | +0.0019 | -0.0106 | — | — |
+| FX04 | +0.0071 | -0.0102 | -0.0047 | — | — |
+| FX05 | +0.0121 | +0.0311 | +0.0752 | 257% | 621% |
+| FX06 | +0.0801 | +0.0617 | +0.0188 | 77% | 23% |
+| FX07 | +0.0091 | +0.0369 | +0.0433 | — | — |
+| FX08 | +0.1406 | +0.1169 | +0.0581 | 83% | 41% |
+| FX09 | -0.1617 | -0.1342 | -0.0481 | — | — |
+| FX10 | +0.1184 | +0.0919 | +0.0079 | 78% | 7% |
+| FX11 | +0.1095 | +0.0888 | +0.0444 | 81% | 41% |
+| FX12 | -0.0013 | -0.0060 | -0.0162 | — | — |
+
+FX09's IC is negative (it is a REJECT, paper 2); its magnitude falls to 83 %
+at one row and 30 % at five.
+
+**The time grid** (net P&L at 1x costs and trade count, last fold,
+`stress.latency_time` in the per-alpha JSONs):
+
+| alpha | 100 ms | 500 ms | 1 s | 5 s | trades at 100 ms / 5 s |
+|---|---|---|---|---|---|
+| EQ01 | -41,725 | -39,814 | -38,230 | -31,560 | 1,705 / 1,364 |
+| EQ02 | -149,377 | -144,931 | -139,468 | -92,498 | 6,892 / 4,361 |
+| EQ03 | -161,581 | -155,533 | -148,562 | -98,064 | 7,446 / 4,624 |
+| EQ05 | -329,553 | -315,478 | -300,873 | -201,940 | 15,067 / 9,302 |
+| EQ06 | -83,859 | -83,010 | -81,593 | -75,110 | 4,266 / 3,827 |
+| EQ08 | -7,812 | -7,628 | -7,362 | -6,563 | 405 / 348 |
+| EQ09 | -13,799 | -13,715 | -13,335 | -11,092 | 659 / 549 |
+| EQ11 | -29,332 | -29,342 | -29,015 | -27,730 | 1,432 / 1,349 |
+| EQ12 | -147,889 | -143,078 | -137,421 | -90,552 | 6,794 / 4,235 |
+
+The §3.3 table on the event grid (+0 / +1 / +5 rows): EQ06 -83,833 /
+-84,182 / -84,026; EQ08 -7,799 / -8,099 / -8,393; EQ09 -13,799 / -14,023 /
+-13,704.
+
+**Decay by horizon, equity alphas** (last-fold OOS IC,
+`decay_ic_by_horizon`):
+
+| alpha | 100ms | 500ms | 1s | 5s | 10s | 30s | 1m | 5m | 15m |
+|---|---|---|---|---|---|---|---|---|---|
+| EQ01 | +0.012 | +0.021 | +0.023 | +0.038 | +0.044 | +0.044 | +0.050 | +0.053 | +0.033 |
+| EQ02 | +0.006 | +0.020 | +0.021 | +0.037 | +0.044 | +0.032 | +0.027 | +0.012 | +0.008 |
+| EQ03 | +0.004 | +0.015 | +0.017 | +0.033 | +0.039 | +0.027 | +0.022 | +0.012 | +0.008 |
+| EQ05 | -0.000 | +0.007 | +0.015 | +0.034 | +0.054 | +0.048 | +0.047 | +0.021 | -0.000 |
+| EQ06 | +0.013 | +0.016 | +0.021 | +0.042 | +0.046 | +0.073 | +0.074 | +0.015 | +0.007 |
+| EQ08 | -0.001 | -0.012 | -0.013 | -0.035 | -0.060 | -0.046 | -0.032 | +0.019 | +0.130 |
+| EQ11 | +0.001 | -0.003 | -0.012 | -0.029 | -0.046 | -0.058 | -0.053 | -0.020 | +0.012 |
+| EQ12 | +0.005 | +0.022 | +0.023 | +0.040 | +0.046 | +0.033 | +0.027 | +0.012 | +0.009 |
+
+The OFI hump (EQ02, EQ03, EQ12: near zero at 100 ms, peak at 10 s, slow
+decline) is still there. Three shapes changed. EQ01's curve peaked at 1-5 s
+and fell to +0.006 at 1 m on v1.3.0; it now rises to +0.053 at 5 m. EQ06's
+peak moved from 10-30 s to 30 s-1 m. EQ11's 15 m point fell from +0.179 to
++0.012, and EQ08's from +0.277 to +0.130. These curves are also less
+comparable across horizons than before. The label freshness rule is
+`max(5 s, 2 x median quote gap)`; the equity median gap is about 2 s, so the
+5 s floor binds and a label whose forward mid is older than 5 s is invalid.
+The valid fraction per equity instrument is 99.4-99.7 % at 5 s, 78.7-80.5 %
+at 10 s, 75.3-77.2 % at 1 m and 44.7-63.4 % at 15 m. Every point at 10 s and
+beyond is measured on the rows that were followed by a fresh quote at the
+horizon, which is a different and more active subset than the 5 s point
+uses.
+
+**What the 2026-09-06 erratum says about the session.** Item 1's "one
+emission row is ~3.3 s on the equity book" was an average that included the
+dead zone; 3.1-3.3 s is now the real spacing, and FX rows are 21.7-22.1 s
+apart on average. Item 2's example of a 16:05 decision filling at the 20:00
+close print describes the v1.3.0 data; there is no such gap now, and the
+60 s decision-age bound and session flattening remain in force. Item 3's
+15 m equity label validity of 47 % is now 44.7-63.4 %.
+
+**Ledger.** 1920 looks over 139 entries (the 1068 looks of the v1.3.0
+dataset are kept); expected max |t| under the global null 3.888, Bonferroni
+per-test threshold 4.206. Verdicts: 0 PROMOTE / 10 ITERATE / 14 REJECT
+(EQ11 moved from ITERATE to REJECT); all 24 alphas are net-negative at 1x.
+
+**Conclusions, re-checked.**
+
+1. *Fast flow alphas (EQ01, EQ02, EQ03, EQ12) shed a fifth to a third of
+   their IC per event and most of it by five.* **No longer holds as
+   stated.** The OFI alphas now lose 58-73 % at the first row, and the +5
+   value is not below the +1 value (EQ03: 27 % retained at +1, 67 % at +5).
+   EQ01's IC is under 0.01 at every lag and changes sign twice. That the
+   OFI family is the latency-sensitive part of the equity book still holds;
+   the per-event rate does not, because one row is now about 3 s and most of
+   the loss falls inside it. The event grid no longer resolves the decline;
+   it would take a grid finer than one row.
+2. *Slow equity alphas (EQ06-EQ09, EQ11) are indifferent to five events of
+   lag.* **Holds, weaker.** EQ08, EQ09 and EQ11 are flat across the grid,
+   but EQ08 and EQ09 are flat at a negative IC, EQ07 is noise, and EQ11's
+   +0 IC is 0.012 (0.151 on v1.3.0). EQ06 moves from 0.019 to 0.014 to
+   0.033, which is noise of the same size as its level. There is little
+   positive IC left in this class for lag to remove.
+3. *FX regime alphas keep about 80 % at one event and lose most by five.*
+   **Holds**, unchanged (77-83 % at +1, 7-41 % at +5), with the crossed-book
+   caveat of the round-3 erratum.
+4. *Stressed net P&L moves by well under 1 %; latency has no money value
+   when costs dominate gross.* The number **no longer holds**; the
+   conclusion **holds**. On the event grid EQ06 moves 0.4 % and EQ09 1.6 %,
+   but EQ08 moves 7.6 % by five rows. On the time grid the loss falls by
+   10-39 % between 100 ms and 5 s for the alphas tabulated above except
+   EQ11 (5 %), and it falls because fewer trades are made, not because any
+   edge is recovered: EQ02 loses 21.7 per trade at 100 ms and 21.2 at 5 s.
+   No alpha is positive at any latency, so latency still never reaches the
+   P&L line as alpha. The time-grid pattern was already present on v1.3.0
+   (EQ02: -73,990 at 100 ms, -53,411 at 5 s); the body predates that grid.
+5. *The software stack contributes none of the staleness: about 0.76 µs
+   per event against the inter-event gap.* **Holds.** The gap is now 2.1 s
+   (median, instrument 1), still six orders of magnitude above the hot
+   path. The feed is still about 155k events a day (308,975 over two days).
+6. *Every alpha is cost-negative at 1x, so until the cost problem is
+   solved the latency budget is not where the P&L is.* **Holds.**
+7. *Latency spend belongs on reacting to the next event, not on shaving
+   nanoseconds.* **Holds**, and the equity figures now make it sharper:
+   being one row late costs the OFI alphas more than half their IC.

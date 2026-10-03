@@ -61,9 +61,9 @@ fills are exact integers; features, alphas, portfolio and TCA compare at
 abs and rel 1e-9; adaptive PSI/KS at 1e-10 with exact refit booleans and
 lifecycle state sequences; canonical-JSON lines, trace digests, the risk
 audit / snapshot and the lifecycle registry are byte-identical; the 7-state
-lifecycle golden is compared exactly, field by field. The v1.3.0 table
-(2026-10-03, counts from CI) reads python 1565 / cpp 289 / rust 323 /
-java 510 (golden 166/68/64/104), `integration` 15, `replay` 4.
+lifecycle golden is compared exactly, field by field. The v1.4.0 table
+(2026-10-03, counts from CI) reads python 1573 / cpp 289 / rust 323 /
+java 510 (golden 166/68/64/104), `integration` 17, `replay` 6.
 
 ## 4. Golden regeneration protocol
 
@@ -107,6 +107,39 @@ Steps, in order:
    that is 1 ulp off in float parsing or prints `4.9E-324` for `5e-324` is
    wrong, not "within tolerance" (`PLATFORM_CONVENTIONS.md` §13.1).
 
+### 4.1 When the dataset itself changes
+
+The seeded dataset is not committed, but the alpha reports,
+`alpha_params.json`, the registry, the ML / adaptive / power reports, the
+baselines and four goldens (`expected_alpha.json`, `expected_backtest.json`,
+`expected_adaptive.json`, `expected_mvp.json`) are computed from it or from
+parameters fitted on it. A change to the generator, its config, the
+normaliser or the feature engine that moves `data_version` is therefore one
+change with one regeneration, never a partial one
+(`PLATFORM_CONVENTIONS.md` §3):
+
+1. Change the code; update the pinned raw-file hashes in
+   `tests/replay/test_generator_determinism.py`; bump the generator config
+   `x-version` if the meaning of the document moved.
+2. Run the whole chain with `tools/regenerate_dataset_artifacts.py` — on the
+   CI runner, through the manual `regenerate` job
+   (`gh workflow run ci.yml --ref <branch> -f regenerate=true`, then
+   `gh run download <run-id> -n regenerated-artefacts`). The last digits of
+   the float artefacts depend on the platform and the library versions, and
+   some suites compare them exactly, so they are produced where they are
+   verified. The script refuses to run the report pipelines twice on one
+   dataset: start from the ledger as committed.
+3. The ledger keeps the looks of the old dataset and adds the new ones
+   (`iap.validation.ledger`, "Dataset scope"); archive
+   `research/lifecycle_transitions.jsonl` under `research/archive/` before
+   `bootstrap --force` rebuilds it.
+4. The goldens that do not depend on the dataset must come out of the same
+   run byte-identical; a difference there is a finding, not noise to commit.
+5. Record old → new for every headline number in `CHANGELOG.md`, add the
+   `schemas/MIGRATIONS.md` entry, and update every document that quotes a
+   number (step 6 above, plus a grep for the old figures: the harness does
+   not know every sentence).
+
 ## 5. Determinism rules for any change
 
 `PLATFORM_CONVENTIONS.md` §3, checked in review and by the goldens:
@@ -131,10 +164,12 @@ Research truth is the product (spec §32). Two rules are mechanical:
    the SHA-256 of the canonical spec and writes
    `research/experiments/<id>/{spec,result}.json`) *before* its result is
    read, and every report prints the denominator and the expected max |t|
-   under the global null (1068 looks / 70 configurations, max |t| ≈ 3.735 as
-   of 2026-09-20). Runner entries are never de-duplicated against the
-   report pipeline's entries even when the computation coincides: the
-   denominator only grows.
+   under the global null (1920 looks / 139 configurations, max |t| ≈ 3.888 as
+   of 2026-10-03: the looks made on the v1.3.0 dataset plus the 852
+   made on the v1.4.0 one). Runner entries are never de-duplicated against
+   the report pipeline's entries even when the computation coincides, and a
+   dataset change adds its looks beside the old ones: the denominator only
+   grows.
 2. **A PR cannot flip a verdict without the ledger entry.** A change to a
    verdict in `research/alpha_reports/*.json` (PROMOTE / ITERATE / REJECT),
    to a lifecycle state in `research/alpha_registry.json` /

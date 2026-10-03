@@ -397,6 +397,24 @@ scaled up for sparse FX streams where a 15 s gap between LP quotes is the
 normal cadence, not an outage. The value used is recorded per instrument in
 `data/features/features_summary.json`.
 
+On the bundled dataset (v1.4.0) the floor binds on every equity
+instrument: the median gap between distinct samples is 1.99–2.13 s, so
+`max_age_ns` = 5 s, and a material share of equity labels at horizons of
+10 s and more is invalid as `forward_stale`. Valid fraction per equity
+instrument: 5 s 0.994–0.997, 10 s 0.787–0.805, 1 m 0.753–0.772, 15 m
+0.447–0.634 (at 15 m rule 4, a halt or auction inside the window, removes
+a comparable share). The step between 5 s and 10 s is the floor itself: at
+`h` <= 5 s the sample the anchor row was emitted on is at most 5 s old at
+`t + h`, so the forward leg is almost never stale; at 10 s it is stale
+whenever no sample falls in `[t + 5 s, t + 10 s]`. On FX
+`max_age_ns` is 33.3–36.6 s and the valid fraction is 0.966–0.972 up to
+10 s and 0.70–0.76 at 1 m and beyond. The dataset of v1.3.0 and earlier
+additionally had a four-hour quote gap before the close print (equity flow
+stopped about 40 % into the session, a generator bug fixed in v1.4.0); that
+gap is gone, and equity flow now runs to the close at about 2.5 times the
+spacing it had inside the old active window, which is why the 5 s floor
+now removes more labels at short horizons than it did.
+
 The per-anchor reason bitmask (`iap.labels.LabelReason`) is written to the
 feature parquet as `label_reason_<h>` (uint8), so a report can state WHY a
 horizon has few usable rows instead of guessing.
@@ -419,8 +437,8 @@ realised reopen return instead of dropping them.
 ## 7. Performance expectations
 
 The reference Python engine processes the bundled two-day, 19-instrument
-normalized dataset (~300k events, ~208k emissions at 100 ms cadence) in
-under a minute. Native ports are the hot path: budget order-of-magnitude
+normalized dataset (308,975 events, 213,021 emissions at 100 ms cadence)
+in about a minute. Native ports are the hot path: budget order-of-magnitude
 targets are <= 1 µs/event state update and <= 5 µs per 40-feature
 emission on the benchmark hardware (2 CPUs — methodology per
 `benchmarks/RESULTS.md`), with zero steady-state allocation

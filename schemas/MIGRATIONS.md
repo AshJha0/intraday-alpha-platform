@@ -806,3 +806,143 @@ and the seeded dataset are byte-identical. Index: docs/RESEARCH_VALIDITY.md.
   (cpp 289 unchanged); golden groups 164/68/62/102 -> 166/68/64/104.
 - No schema, golden or stored data changed by this entry.
 
+## 2026-10-03 — v1.4.0: generator config v1 -> v2 (flow calibration), the bundled dataset regenerated, `research/experiments.json` v1 -> v2 (dataset scope), four goldens regenerated
+
+No wire schema under `schemas/` changed and no golden event vector moved.
+What changed is the bundled dataset itself and, with it, every artefact
+computed from it. One change, one regeneration
+(`tools/regenerate_dataset_artifacts.py`, run by the manual `regenerate` job
+of `ci.yml`: run 37152702105 at commit `29f0822`, Ubuntu, Python 3.11,
+`python/requirements-ci.txt` plus xgboost 3.2.0 and lightgbm 4.7.0; 346 s).
+CHANGELOG.md (v1.4.0, "Results") has old → new for every headline number.
+
+- **Why.** Up to v1.3.0 the continuous flow of every equity stream stopped
+  37.6–43.2% of the way through its session (mean 40.5%): `slots_per_stream`
+  was a hard slot budget, the base rate was `slots / duration × 1.30`, and
+  the self-exciting multiplier `(1 + excitation)` was not calibrated for.
+  v1.3.0 recorded it as a known limitation (issue M08). Every equity
+  research number was a statement about the first 2 h 40 min of a session.
+- **Generator config `x-version` 1 -> 2** (`configs/marketdata/generator.json`,
+  `configs/mvp/generator.json`, `configs/mvp/generator_tiny.json`,
+  `research/power/generator_planted.json`). New key
+  `equities.flow.calibration`: `"session"` (default) — base rate
+  `slots_per_stream × E[1 / (1 + excitation)] / duration`, no slot budget,
+  flow to the close; `"legacy_budget"` — the v1.3.0 rule. The meaning of
+  `slots_per_stream` under the default is "expected slots per stream and
+  session". `equities.fill_session` is valid only with `"legacy_budget"`.
+  `load_generator_config` rejects an `x-version` 1 document that does not
+  name its calibration, and any `x-version` other than 1 or 2.
+- **`dataset_version` / `data_version`.** Content-derived, so it moves with
+  the bytes and needs no bump of its own:
+  `203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b` ->
+  `116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573`.
+  Normalized events 310,159 -> 308,975 (equity 105,640 + 105,294 ->
+  105,282 + 104,468; FX 49,668 + 49,557 unchanged). The FX raw and
+  normalized files are byte-identical; `tests/replay/test_generator_determinism.py`
+  pins the SHA-256 of the raw files for the default and for
+  `"legacy_budget"`, which regenerates the v1.3.0 files exactly.
+- **`feature_version` is unchanged** (`585dd7b9…`): it is the hash of the
+  feature registry, and no feature definition changed. Consequence: every
+  loader that checks `feature_version` (`alpha_params.json`, the baselines)
+  accepts a file fitted on either dataset. The dataset an artefact was
+  computed on is named by its own `data_version` / `dataset_version` field
+  (`alpha_params.json` header, experiment specs, model manifests, ledger
+  entries), and that is the field to check.
+- **The golden event vectors keep the v1.3.0 flow rule.**
+  `generate_golden_eq` and `generate_golden_eq_anomalies` select
+  `"legacy_budget"` explicitly: they cut a fixed number of events from the
+  start of a stream and are test inputs, not the dataset. Every golden that
+  is built only from those vectors or from a script came out of the
+  regeneration run byte-identical: `events_*.jsonl`,
+  `expected_book_states.json`, `expected_checkpoint_eq_1000.json`,
+  `expected_codec_sha256.json`, `splitmix64.json`, `expected_features.json`,
+  `expected_features_anomalies.json`, `expected_anomaly_states.json`,
+  `jsonl_reject_cases.txt`, `expected_tca.json`, `expected_contracts_examples.json`,
+  `expected_canonical_json.json`, `expected_lifecycle.json`,
+  `expected_experiment_golden_frame.json`, `expected_risk_edge_*`. The
+  goldens owned by generators this run does not execute were not touched:
+  `expected_risk_{decisions,snapshot}.json` + `expected_risk_audit.jsonl`
+  (Rust), `expected_replay_fills.json` (C++), `expected_portfolio.json`.
+- **Goldens regenerated** — the four that are computed from parameters
+  fitted on the dataset, or from the generator's default flow:
+  - `configs/strategies/alpha_params.json` (x-version 2, unchanged layout):
+    the twelve equity parameter blocks are refitted; the twelve FX blocks
+    are identical. Header `data_version` `116b7787…`, `git_commit` `29f0822…`.
+  - `tests/golden/expected_alpha.json`, `expected_backtest.json`
+    (`python/tools/make_golden_alpha.py`): the golden vectors scored with
+    the refitted equity parameters. Consumed by C++, Rust and Java through
+    `alpha_params.json` — no port changed.
+  - `tests/golden/expected_adaptive.json` + `research/baselines/signal_eq01.json`
+    (`make_golden_adaptive.py`): the EQ01 signal sections.
+  - `tests/golden/expected_mvp.json` (`make_golden_mvp.py`): the MVP
+    generator config takes the new default, so the session stream changes
+    (`data_version` `25cf9b7f…` -> `0e0fe161…`, 16,578 -> 15,805 events) and
+    with it every count and the digest (`d938eeae…` -> `f51890da…`); the run
+    id `58a10f2194a3c81c` is unchanged because `mvp.json` and the seed are.
+- **`research/experiments.json` x-version 1 -> 2 — dataset scope, history
+  carried.** The conventions did not say what happens to the ledger when the
+  dataset changes. The precedent (2026-09-06) was a reset; that reset was
+  made because the count was an artefact of how often scripts had run, which
+  is not the case here. The choice made, and now pinned
+  (PLATFORM_CONVENTIONS.md §13.6): **prior looks are carried, new looks are
+  added, nothing is overwritten.** Reasons: the denominator exists to count
+  everything that was tried, and what was tried on the old dataset informed
+  what is run on the new one (the same 24 alphas at the same horizons, chosen
+  by a scan on that data); a reset would have made the corrected thresholds
+  easier at exactly the moment the data changed; and without a dataset in the
+  identity the regenerated pipelines would have landed on the old keys,
+  replacing the old results in place and counting nothing.
+  - Entry field `dataset_version` (new) and identity (alpha, kind, canonical
+    config, dataset) for a ledger opened with a dataset; top-level `datasets`
+    (new): entries and looks per dataset, first-appearance order.
+  - `research/migrate_ledger_dataset_scope.py` (idempotent, `--check`) stamped
+    the 65 report-pipeline entries with `203c8f54…`. No key, `n`, `count`,
+    `config` or `result` changed, so every `experiment_id` derived from a key
+    still resolves. The five `experiment_runner` entries already named their
+    dataset in the config.
+  - After the regeneration: 1068 looks / 70 entries on `203c8f54…` plus 852
+    looks / 69 entries on `116b7787…` (24 × 28 promotion pipeline, 5 × 28
+    runner, 40 adaptive deployments) = 1920 looks / 139 entries. The design
+    horizon scan (216 looks) is not repeated: no horizon was re-chosen.
+  - Readers: `iap.lifecycle.bootstrap.load_ledger_entries` /
+    `select_pipeline_entries` and `iap.store.importers` take, per alpha, the
+    `promotion_pipeline` entry of the dataset `alpha_params.json` names. A
+    reader that assumed one such entry per alpha must be updated.
+- **`research/lifecycle_transitions.jsonl`** is append-only within a dataset.
+  For the dataset change it was rebuilt with `bootstrap --force`, as
+  docs/LIFECYCLE.md §6 prescribes, after the old log was archived unchanged
+  as `research/archive/lifecycle_transitions.dataset-203c8f54.jsonl` (24
+  bootstrap lines, no manual line). The registry and the log are x-version 1
+  as before; 24 CANDIDATE, 0 beyond, before and after.
+- **`research/experiments/`** keeps the five directories of the old dataset
+  and gains the same five alpha × horizon pairs on the new one (new ids:
+  `dataset_version` is in the spec). **`research/models/ledger.json`** is
+  append-only as before: runs `run_0034`…`run_0040` are added; every
+  manifest names its `data_version`.
+- **Provenance of the regenerated artefacts.** `git_commit` is `29f0822`
+  (the commit the chain ran on); `git_dirty` is `true` wherever a step ran
+  after an earlier step had written a tracked file — the same as in every
+  earlier regeneration.
+- **Not regenerated, and why.** The cold-path rows of
+  `benchmarks/results_cpp.md` and the Java cold table of
+  `benchmarks/RESULTS.md` are timings over the v1.3.0 file
+  `eq_20260824.normalized.jsonl` (105,640 events) on the baseline machine;
+  they are labelled as such and were not re-measured.
+- **Found on the way.** `research/adaptive_reports/` as committed at v1.3.0
+  had last been generated before the backtester corrections of 2026-09-20:
+  re-running the v1.3.0 code on the v1.3.0 dataset moves each FX deployment
+  by one trade, to exactly the numbers of this regeneration. The FX rows of
+  the adaptive study therefore differ from v1.3.0 although the FX data does
+  not. `research/tca/TCA_REPORT.md` differs by one sentence for the same
+  kind of reason (prose changed on 2026-09-20, report not re-rendered);
+  `tca_orders.json` is byte-identical.
+- Versions and bookkeeping: `python/pyproject.toml` and `iap.__version__`
+  1.3.0 -> 1.4.0; image references `v1.3.0` -> `v1.4.0` (by tag; digests are
+  pinned from `release-manifest.json` after the release workflow has run);
+  `deployment/k8s/configmap-configs.yaml` regenerated for the changed config
+  documents. README parity table: python 1565 -> 1573, replay 4 -> 6.
+- Migration path for stored data: none can be migrated — regenerate.
+  `python3 -m iap.marketdata && python3 -m iap.features` for the dataset;
+  `python3 tools/regenerate_dataset_artifacts.py` for everything committed
+  (CONTRIBUTING.md §4.1). To keep working on the v1.3.0 dataset set
+  `equities.flow.calibration` to `"legacy_budget"`.

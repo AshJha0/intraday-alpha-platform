@@ -1,5 +1,5 @@
 flowchart LR
-    %% .github/workflows/{ci,codeql,release}.yml and dependabot.yml as of v1.3.0.
+    %% .github/workflows/{ci,codeql,release}.yml and dependabot.yml as of v1.4.0.
     PR["pull request<br/>or push to main"] --> PY
     PR --> INT
     PR --> CPP
@@ -31,6 +31,7 @@ flowchart LR
     GOLD --> IMG
     DEP --> IMG
     CHG --> IMG
+    DISP["workflow_dispatch<br/>regenerate = true (manual only)"] --> REGEN["regenerate (job of ci.yml)<br/>tools/regenerate_dataset_artifacts.py:<br/>dataset, features, research reports, goldens<br/>uploads the changed files; commits nothing"]
     PR --> CQL["codeql.yml<br/>python, java-kotlin, c-cpp, actions<br/>also weekly"]
     DB["dependabot.yml<br/>weekly: github-actions, pip, cargo, docker"] -.->|"bump PRs through the same gate"| PR
     TAG["git tag v*"] --> VER

@@ -232,11 +232,18 @@ calendar, fx_week), `configs/venues/venues.json` (ids, fees, latency profiles),
 `price_ticks * tick_size`; never floats on contracts.
 
 Generator keys that change the dataset are opt-in and off by default, so the
-pinned files stay byte-identical: `planted.*` (effects of known size),
-`equities.halt.reopen_auction`, and `equities.fill_session` — with the
-default `false`, an equity stream's continuous flow stops when its
-`slots_per_stream` budget is spent, 38–43% of the way through the session;
-`true` continues it to the close (LEARN.md §2.3).
+pinned files stay byte-identical: `planted.*` (effects of known size) and
+`equities.halt.reopen_auction`. One key selects between two pinned datasets:
+`equities.flow.calibration` (generator config `x-version` 2, v1.4.0). The
+default `"session"` calibrates the base rate for the self-excitation and has
+no slot budget, so `slots_per_stream` expected flow slots span the whole
+session and equity flow reaches the close; `"legacy_budget"` is the v1.3.0
+rule — a hard budget at an uncalibrated rate, flow stopping 38–43% of the way
+through the session — and reproduces the v1.3.0 dataset byte for byte
+(`tests/replay/test_generator_determinism.py` pins the raw-file hashes of
+both). `equities.fill_session` belongs to the legacy rule only and is an
+error with the default calibration. An `x-version` 1 generator document that
+does not name its calibration is rejected (LEARN.md §2.3).
 
 `ReferenceData` (Python reference) validates fail-fast at load: `tick_size >
 0` finite, integer `lot_size >= 1`, `ref_price > 0`, `adv >= 0`, at least one

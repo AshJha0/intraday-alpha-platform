@@ -56,8 +56,19 @@ iap/
                    one halt, SNAPSHOT-recovered sequence gaps, duplicate /
                    out-of-order / invalid / ts-violation injection for QC.
                    FX: QUOTE+TRADE across LP1/LP2/PRI with venue latency.
+                   Equity flow calibration (equities.flow.calibration,
+                   generator config x-version 2, v1.4.0): the default
+                   "session" sets the base rate to slots_per_stream *
+                   excitation_time_factor / duration with no slot budget, so
+                   continuous flow runs to the close; "legacy_budget" is the
+                   v1.3.0 rule (a hard slot budget at an uncalibrated rate,
+                   flow ending 38-43% into the session) and reproduces the
+                   v1.3.0 dataset byte for byte; equities.fill_session
+                   belongs to the legacy rule only and is an error with the
+                   default.
                    Also builds the pinned golden vectors
-                   (generate_golden_eq / generate_golden_fx).
+                   (generate_golden_eq / generate_golden_fx), which select
+                   "legacy_budget" explicitly and are unchanged.
     normalize.py   Raw -> normalized pipeline: ts normalization, invalid /
                    duplicate / gap / out-of-order QC per stream, event-time
                    re-ordering, JSONL + IAP1 + Parquet outputs, qc_report.json.
@@ -132,8 +143,12 @@ iap/
                    cost survival / decay / regime and a seeded
                    stationary-bootstrap interval for net P&L; read by no
                    gate), ledger.py (the multiple-testing ledger,
-                   research/experiments.json, de-duplicated by alpha x kind x
-                   config; locked read-modify-write), validate.py
+                   research/experiments.json, x-version 2: de-duplicated by
+                   alpha x kind x config x dataset — a ledger opened with a
+                   dataset_version stamps its entries with it, so a rerun on
+                   a regenerated dataset adds its looks and the looks of
+                   every earlier dataset stay in the total; locked
+                   read-modify-write), validate.py
                    (validate_alpha, the pinned GATES, the opt-in ledger-derived
                    t threshold and the PROMOTE / ITERATE / REJECT verdict).
   experiment/      tracker.py — data_version() (sha256 over the normalized IAP1
@@ -240,7 +255,9 @@ iap/
                    [--horizon 1s] [--config k=v] [--seed N] [--dry-run]
                    [--tstat-threshold fixed|ledger] | list [--json] |
                    show <id> [--json] | power` — result table, verdict, gate
-                   eligibility and the ledger's expected-max-|t| note.
+                   eligibility and the ledger's expected-max-|t| note; `list`
+                   prints a `dataset` column (the folder keeps the
+                   experiments of every dataset the ledger has seen).
   lifecycle/       Alpha promotion lifecycle RESEARCH -> CANDIDATE -> VALIDATING
                    -> PAPER -> ACTIVE -> WATCH -> RETIRED (LifecycleState 0..6)
                    with a gate at every edge; extends (never alters) the
@@ -265,8 +282,12 @@ iap/
                    (research/lifecycle_transitions.jsonl, canonical JSON lines,
                    schema-validated).
     bootstrap.py   Report -> ExperimentResult mapping (gate_ic / uncrossed t),
-                   run_bootstrap over the 24 flagship alphas at the pinned event
-                   time (latest fold test_end), render_status.
+                   select_pipeline_entries (the promotion_pipeline ledger
+                   entry of each alpha for ONE dataset: the data_version
+                   that alpha_params.json names; entries of other datasets
+                   are history), run_bootstrap over the 24 flagship alphas at
+                   the pinned event time (latest fold test_end),
+                   render_status.
     golden.py      The LC01/LC02/LC03 scripted scenarios behind
                    tests/golden/expected_lifecycle.json
                    (python/tools/make_golden_lifecycle.py).
@@ -376,9 +397,17 @@ Tests live in `python/tests/` (run: `cd python && PYTHONPATH=src python3 -m
 pytest -q`); `python/tests/bruteforce_book.py` is an independent naive book
 used to validate golden states; `python/tools/make_golden.py` (re)generates
 `tests/golden/` — only on deliberate, versioned changes (the MVP golden:
-`python/tools/make_golden_mvp.py`).
+`python/tools/make_golden_mvp.py`). When the seeded dataset itself changes,
+`tools/regenerate_dataset_artifacts.py` (repository root) regenerates every
+committed artefact derived from it in dependency order — dataset, features,
+alpha reports and `alpha_params.json`, runner experiments, lifecycle
+registry, ML reports, adaptive study, power study, goldens, TCA,
+ConfigMaps — and refuses to run on a ledger that has already seen that
+dataset unless `--allow-rerun` is given (`--list` prints the steps). The
+artefacts committed for v1.4.0 were produced by it in the manual
+`regenerate` job of `.github/workflows/ci.yml`.
 
-Dependencies are declared in `python/pyproject.toml` (1.1.0): numpy, pandas,
+Dependencies are declared in `python/pyproject.toml` (1.4.0): numpy, pandas,
 scipy, scikit-learn, pyarrow, jsonschema, referencing; extras `ml`
 (xgboost, lightgbm) and `dev` (pytest, pyyaml). Console entry points:
 `iap-marketdata`, `iap-features`, `iap-tca`, `iap-research`, `iap-lifecycle`,

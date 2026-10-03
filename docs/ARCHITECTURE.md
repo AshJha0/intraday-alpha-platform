@@ -125,7 +125,7 @@ flowchart TD
     FILLS --> TCA["TCA + attribution<br/>Perold IS = delay + trading + opportunity (exact)<br/>Python reference, Java service"]
     TCA --> TRACE["Decision trace — one DecisionTrace per decision<br/>signal · portfolio · risk · orders · routing · fills · TCA · attribution<br/>canonical JSONL + stream digest + SQLite index (iap.store); explain()"]
     LBL --> RESEARCH
-    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (1068 looks / 70 configs)<br/>REPORT.md, ML_REPORT.md, model manifests"]
+    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (1920 looks / 139 configs, two datasets)<br/>REPORT.md, ML_REPORT.md, model manifests"]
     RESEARCH --> LIFE["Alpha promotion lifecycle (iap.lifecycle)<br/>RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE <-> WATCH -> RETIRED<br/>18 gates, 17 edges; bundled data: 24 CANDIDATE / 0 beyond"]
     LIFE -. "gated, ledgered transitions<br/>(research/alpha_registry.json)" .-> ALPHA
 ```
@@ -281,9 +281,9 @@ and are matched by Java, Rust and C++ (the trace and canonical-JSON ports)
 and by Java and Rust (the lifecycle ports). The harness
 (`tests/harness/run_all.sh`, with `run_golden.sh` as the golden-only alias)
 runs every suite with the canonical commands and prints the parity table; a
-v1.3.0 CI run (2026-10-03) passes 1565/289/323/510 tests (166/68/64/104
+v1.4.0 CI run (2026-10-03) passes 1573/289/323/510 tests (166/68/64/104
 golden) across python/cpp/rust/java, plus the repo-level `integration` (17)
-and `replay` (4) rows — the same counts the README parity table records.
+and `replay` (6) rows — the same counts the README parity table records.
 
 ## 7. Hot-path engineering notes per language
 
@@ -338,10 +338,10 @@ are exported so pauses are observable rather than assumed away. Demo-scale
 replay ≈ 3.5M events/s.
 
 **Python** (`python/`): correctness-first reference; vectorized
-(NumPy/pandas) where it matters — the 205-feature × 310k-event pipeline runs
-in under a minute, the full 24-alpha promotion pipeline in ~16 s, the MVP
-session (16,578 events through simulator, risk, features, three alphas,
-optimizer, TCA and traces) in ~7 s. Speed is a convenience here, not a
+(NumPy/pandas) where it matters — the 205-feature × 309k-event pipeline runs
+in about a minute, the full 24-alpha promotion pipeline in ~18 s, the MVP
+session (15,805 events through simulator, risk, features, three alphas,
+optimizer, TCA and traces) in under a minute. Speed is a convenience here, not a
 contract; the contract is that Python's semantics are the ones everyone
 else must reproduce — and, for risk and execution, that Python reproduces
 the Rust and C++ goldens statement for statement.
@@ -591,13 +591,16 @@ book → `FeatureEngine` → three fitted `linear_z_v1` alphas ensembled →
 §12.1 money identity is asserted after every fill. `verify` runs it twice
 and compares bytes; `replay` re-runs it from the captured stream and must
 reproduce the trace digest; `tests/golden/expected_mvp.json` pins the golden
-run (seed 12345: 16,578 events, 355 decisions, 66 parents, 55 fills,
-−22.65 USD, digest `d938eeae…`) as the cross-language pin for any port of
+run (seed 12345: 15,805 events, 800 decisions, 235 parents, 169 fills,
+−81.53 USD, digest `f51890da…`) as the cross-language pin for any port of
 the loop (docs/MVP.md §9 lists what a port must reproduce). The result is
 cost-negative and the realized-IC audit (docs/MVP.md §7.1) is part of the
-document: an order-of-magnitude gap between the MVP's mid-to-mid IC and the
-research IC of the same alphas, traced to the synthetic generator's
-mean-reverting venue noise, not to a leak.
+document: the MVP's mid-to-mid IC is 0.13–0.21 away from the research IC
+of the same alphas (EQ01 +0.217 against 0.010, EQ03 +0.110 against 0.019,
+EQ06 −0.079 against 0.027), so all three fail the lifecycle's
+`paper_ic_tracking` band of 0.01. docs/MVP.md §7.1 gives the audit of that
+gap and the evidence that it is not a leak (the pinned label definition and
+the truncation probe).
 
 ## 10. Known deviations from the spec blueprint (documented, not hidden)
 
@@ -706,8 +709,8 @@ will find the cheapest path to a pass faster than a person: cheaper costs, a
 chosen holdout, uncounted looks. v1.3.0 closed those three in the tooling
 (LEARN.md §24) and measured what the validation chain can detect at all
 (the planted-signal power study, LEARN.md §23). It did not build the agents,
-and on two synthetic sessions that have been looked at more than a thousand
-times, more searching is not what the platform lacks (HOW_IT_WORKS.md §6.4
+and on two synthetic sessions whose ledger now holds 1920 looks (1068 on
+the v1.3.0 dataset, 852 on the regenerated v1.4.0 one), more searching is not what the platform lacks (HOW_IT_WORKS.md §6.4
 lists what would be theatre on this data, and why). DIAGRAMS.md §19 draws
 the planned layer and labels it as planned.
 
@@ -828,7 +831,8 @@ staging directories.
   ledger merge are backlog (E29 RT02).
 
 **Identity under concurrency.** The ledger de-duplicates by (alpha, kind,
-canonical configuration). A rerun adds no looks whichever writer lands
+canonical configuration, dataset — the dataset since v1.4.0, ledger
+x-version 2). A rerun adds no looks whichever writer lands
 first; a new configuration adds its 28 exactly once. With a single writer
 the locked path writes exactly the bytes the unlocked implementation wrote,
 so the committed ledger did not change.
@@ -866,8 +870,8 @@ written to be consistent with:
 1. **No result here is a claim about a market.** The alphas are evaluated
    on a generator whose mid is mean-reverting by construction; the costs are
    a model; the fills are a model. The honest findings — nothing promoted, a
-   cost-negative loop, an ML gate that fails — are findings about this
-   pipeline on this data.
+   cost-negative loop, no ML model that earns its costs — are findings about
+   this pipeline on this data.
 2. **The latency figures are not tick-to-trade.** They are in-memory stage
    timings and belong next to their methodology (`benchmarks/RESULTS.md`).
 3. **What transfers is the discipline, not the numbers**: contracts with

@@ -1,5 +1,7 @@
 # C++ vs Rust vs Java for Event-Driven Low-Latency Trading: Evidence from Four Parallel Ports of One Platform
 
+> Dated record. The paper does not depend on the bundled dataset; the 2026-10-03 note at the end says which two references to it are affected by v1.4.0.
+
 *Intraday Alpha Platform research series, paper 6 of 6 (spec §28). Generated 2026-08-29 from this repository's code, tests and benchmark artifacts. This is an engineering case study of THIS codebase, not a language shoot-out with general claims.*
 
 ---
@@ -362,3 +364,34 @@ this paper (`tests/harness/check_headline_numbers.py`, `cpp_benchmark_numbers`).
 The new rows: serialising one 5.6 KB `DecisionTrace` costs 31.7 µs (+ 30.3 µs
 to hash), paid once per decision off the event loop; ≈ 37 ns/event amortised
 on the 2,000-event golden replay.
+
+## Erratum / Update — 2026-10-03 (v1.4.0: the equity flow now reaches the close)
+
+v1.4.0 regenerated the bundled synthetic dataset: the generator used to stop
+the equity continuous flow about 40 % of the way through each session and
+now runs it to the close (paper 01's update of the same date has the
+detail). This paper is built on the pinned golden vectors
+(`tests/golden/events_eq_mbo.jsonl`, `events_fx_quote.jsonl`), the parity
+tests and the benchmarks, none of which derive from that dataset; the golden
+vectors and `benchmarks/results_cpp.md` are unchanged by the release. Its
+measurements and conclusions stand as last corrected above. Two references
+need a note.
+
+1. **The cold single-pass reference table** in `benchmarks/results_cpp.md`,
+   which the 2026-09-06 benchmark erratum points to, was measured over
+   `data/normalized/eq_20260824.normalized.jsonl` as it was in v1.3.0
+   (105,640 events). Those rows have not been re-measured. The v1.4.0 file
+   of that name has 105,282 events (`data/normalized/qc_report.json`), and
+   they are spread over the whole session, not the first 40 % of it.
+2. **"The ~0.9 s median inter-event gap"** in the 2026-09-20 erratum is the
+   v1.3.0 equity spacing. On v1.4.0 the median inter-emission gap of
+   instrument 1 is 2.1 s (mean row gap 3.2 s;
+   `data/features/features_summary.json`). The measured hot path of
+   ≈ 0.76 µs/event is still six orders of magnitude below it, so the
+   sentence's conclusion holds.
+
+§4.2's remark that 4M events/s is about three orders of magnitude above the
+feed's peak needs was not re-derived on the new data. The average equity
+rate is lower than before (105,282 events over a 6.5 h session is about 4.5
+events/s), so the remark is not weakened. The test counts in §4.3 are the
+paper's own dated record and are not restated here.

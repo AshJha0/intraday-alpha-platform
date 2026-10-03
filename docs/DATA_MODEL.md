@@ -107,7 +107,7 @@ invariants that are expressible in SQL are `CHECK`s too, so a hand-written
 |---|---|---|---|
 | `experiments` | `experiment_id` | `alpha_id`, `dataset_version`, `feature_version`, `model_version` (NULL = unfitted), `configuration_json`, `train_start_ts ≤ train_end_ts ≤ validation_start_ts ≤ validation_end_ts ≤ test_start_ts ≤ test_end_ts` (chained CHECKs), `seed ≥0`, `horizon` | `ExperimentSpec` (`schemas/research/experiment_spec.schema.json`) |
 | `experiment_results` | `experiment_id` | `alpha_id`, `dataset_version`, `feature_version`, `model_version`, `ic`, `rank_ic`, `t_stat`, `nw_lags ≥0`, `hit_rate ∈[0,1]`, `turnover ≥0`, `gross_return_bps`, `transaction_cost_bps ≥0`, `net_return_bps`, `max_drawdown_bps ≥0`, `sharpe`, `fold_consistency ∈[0,1]`, `n_folds ≥0`, `leakage_passed ∈{0,1}`, `leakage_detail_json`, `hypothesis_sign_confirmed ∈{0,1,NULL}`, `verdict ∈ {PROMOTE, ITERATE, REJECT}`, `n_experiments_in_ledger ≥0`, `git_commit`, `created_ts ≥0`; `CHECK (leakage_passed = 1 OR verdict = 'REJECT')` | `ExperimentResult` (`schemas/research/experiment_result.schema.json`); `net = gross − cost` is enforced by the contract on write |
-| `ledger_entries` | `ledger_key` (sha256 of alpha/kind/config) | `alpha_id` (`ALL` for program-wide scans), `kind`, `config_json`, `count ≥1` (looks this key represents), `n ≥0` (ledger position at registration), `reruns ≥0`, `oos_ic`, `nw_tstat`, `verdict` (promotion entries; NULL otherwise), `result_json` | `research/experiments.json` `entries[]` — the multiple-testing ledger (spec §13). `SUM(count)` = `total_experiments`, `COUNT(*)` = `distinct_experiments` |
+| `ledger_entries` | `ledger_key` (sha256 of alpha/kind/config, plus the dataset version for entries written since the ledger became dataset-scoped in v1.4.0) | `alpha_id` (`ALL` for program-wide scans), `kind`, `config_json`, `count ≥1` (looks this key represents), `n ≥0` (ledger position at registration), `reruns ≥0`, `oos_ic`, `nw_tstat`, `verdict` (promotion entries; NULL otherwise), `result_json` | `research/experiments.json` `entries[]` — the multiple-testing ledger (spec §13). `SUM(count)` = `total_experiments`, `COUNT(*)` = `distinct_experiments` |
 | `lifecycle_transitions` | `(alpha_id, policy, event_ts, from_state, to_state, source)` | `from_state`, `to_state` ∈ state names, `from ≠ to`, `source ∈ {lifecycle_log, lifecycle_transitions, api}`, `reason`, `gates_json` ({name: GateResult}), `actor ∈ {SYSTEM, HUMAN}`, `eval_index` (lifecycle_log only) | `LifecycleTransition` (`schemas/alpha/lifecycle_transition.schema.json`). `source` says which artefact the row came from: the research policy comparison, the lifecycle service's ledger, or a live write |
 | `model_runs` | `run_id` (= manifest `experiment_id`) | `name`, `model_version`, `data_version`, `feature_version`, `git_commit`, `git_dirty ∈{0,1,NULL}`, `train_start_ts ≤ train_end_ts`, `test_start_ts ≤ test_end_ts`, `hyperparams_json`, `hardware_json`, `manifest_json` (whole manifest), `metrics_json` (whole metrics document), lifted scalars `mean_ic`, `mean_rank_ic`, `ic_tstat`, `pooled_ic`, `auc_test`, `brier_test` | `research/models/ledger.json` + `<run_id>/manifest.json` (+ `metrics.json`) — docs/governance/REPRODUCIBILITY.md |
 | `drift_baselines` | `name` | `alpha_id`, `kind ∈ {feature, signal, ic}`, `x_version`, `feature_version`, `source`; histogram baselines: `n`, `n_buckets`, `mean`, `std`, `min_value`, `max_value`, `psi_eps`, `edges_json`, `expected_frac_json`; IC baselines: `horizon`, `baseline_kind`, `bucket_ns`, `ic_mean`, `ic_std`, `n_buckets_baseline` | `research/baselines/*.json` (API_ADAPTIVE PSI / rolling-IC baselines) |
@@ -254,7 +254,10 @@ SELECT alpha_id, current_state, verdict, ROUND(ic, 4) AS ic,
        ROUND(t_stat, 2) AS t_stat, leakage_passed, ledger_count
 FROM v_alpha_scorecard
 ORDER BY alpha_id;
--- {"alpha_id":"EQ03","current_state":"CANDIDATE","ic":0.0185,"ledger_count":67,...,"verdict":"ITERATE"}
+-- {"alpha_id":"EQ03","current_state":"CANDIDATE","ic":0.0271,"leakage_passed":1,"ledger_count":176,"t_stat":4.84,"verdict":"ITERATE"}
+-- (v1.4.0 snapshot. The "latest result" is chosen by created_ts and then by the greatest experiment_id; every
+--  committed result carries the same created_ts, and the store holds the results of two datasets, so check
+--  experiment_results.dataset_version before reading a row as a statement about the current dataset.)
 ```
 
 **2. Why was order X rejected?** — the risk verdict of a parent order
@@ -306,7 +309,7 @@ FROM drift_baselines b
 JOIN v_alpha_scorecard s ON s.alpha_id = b.alpha_id
 WHERE b.kind = 'ic'
 ORDER BY b.alpha_id;
--- {"alpha_id":"EQ03","baseline_ic":0.038,"baseline_ic_std":0.0139,"gap":-0.0195,"horizon":"5s","research_ic":0.0185}
+-- {"alpha_id":"EQ03","baseline_ic":0.0161,"baseline_ic_std":0.0604,"gap":0.011,"horizon":"5s","research_ic":0.0271}   (v1.4.0 snapshot)
 ```
 
 **5. The multiple-testing denominator** — what every promotion claim is
@@ -317,7 +320,7 @@ Bonferroni-corrected against (`research/experiments.json` `total_experiments`
 SELECT COUNT(*) AS distinct_experiments, SUM(count) AS total_experiments,
        ROUND(0.05 / SUM(count), 8) AS bonferroni_p
 FROM ledger_entries;
--- {"bonferroni_p":5.78e-05,"distinct_experiments":70,"total_experiments":865}   (snapshot; the ledger only grows)
+-- {"bonferroni_p":2.604e-05,"distinct_experiments":139,"total_experiments":1920}   (v1.4.0 snapshot; the ledger only grows)
 
 SELECT kind, n_entries, n_alphas, total_count, n_promote, n_iterate, n_reject
 FROM v_experiment_ledger_summary ORDER BY kind;

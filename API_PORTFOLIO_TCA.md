@@ -256,7 +256,8 @@ Java implements §2.1–§2.7 against production fills instead.
 Every model fit directory `research/models/<run_id>/` contains
 `manifest.json` with exactly:
 `experiment_id, git_commit ("unversioned-workspace" outside a checkout),
-data_version (sha256 of data/normalized/qc_report.json), feature_version
+data_version (content hash of the `data/normalized/*.normalized.iap1`
+files, `iap.experiment.tracker.data_version()`), feature_version
 (feature-registry hash), model_version, hyperparams, train_window
 {start_ts, end_ts}, test_window {start_ts, end_ts}, hardware {cpu_model,
 cpu_count, machine, system, python}` — plus `metrics.json` and `model.pkl`.

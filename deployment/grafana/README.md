@@ -146,12 +146,13 @@ Kubernetes the NetworkPolicies admit Prometheus and pods labelled
 ### The STOPPED state (value 4) — what does and does not know about it
 
 `platform_session_state` gained the value `4` in v1.3.0. The producer exports
-it; one alert rule reads it and the dashboard has not been taught it yet.
-Stated so that nobody reads a blank panel as a healthy one:
+it, the dashboard maps it and one alert rule reads it; what limits all three
+is that the value is rarely there to be scraped. Stated so that nobody reads
+a blank panel as a healthy one:
 
 | artefact | today | what it needs |
 |---|---|---|
-| `dashboards/market_data_latency.json`, panel **Session state** (and its generated copy in `deployment/k8s/configmap-grafana.yaml`) | the description and the value mappings enumerate 0–3; the value 4 has no mapping, so the stat shows the bare number `4` in the colour of the highest threshold (red, the FAILED colour) | a mapping `4 → STOPPED`, a threshold step that is not the FAILED red, and the description updated |
+| `dashboards/market_data_latency.json`, panel **Session state** (and its generated copy in `deployment/k8s/configmap-grafana.yaml`) | the description and the value mappings enumerate 0–4: the value 4 shows as `STOPPED` on its own threshold step (orange, not the FAILED red) | nothing |
 | `alerts.yml` `PlatformSessionFailed` (`platform_session_state == 3`) | does not fire on 4 — correct, a stop is not a failure | nothing |
 | `alerts.yml` `FeedWallClockStall` (`... and platform_session_state == 1`) | does not fire on 4 — correct | nothing |
 | `alerts.yml` `SessionStoppedNotResumed` (`last_over_time(platform_session_state[1h]) == 4`, `for: 10m`, warning) | fires when the LAST value scraped in the past hour is 4 and no resumed session has reported since; clears on resume or one hour after the stop | the process to stay scrapeable after a stop: it exits 0 right after its checkpoint, so the value 4 is scraped only when a scrape (every 15 s) lands in that instant. When it does not, this rule cannot fire and `TargetDown` is the only signal |

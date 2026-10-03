@@ -138,6 +138,15 @@ docs/DATA_MODEL.md §9: a column change is a new `iap_vN.sql`, never an in-place
   uniform = (next >> 11) * 2^-53. Every language implements it identically; goldens depend on it.
 - The synthetic generator, the backtester fill model, and every simulation take explicit seeds
   from configs; identical seed ⇒ identical outputs bit-for-bit (integer paths) across runs.
+- **The bundled dataset is pinned by content** (2026-10-03, v1.4.0): `data_version` is the sha256
+  over the normalized IAP1 bytes (docs/governance/REPRODUCIBILITY.md §1) and the raw-file hashes
+  of the committed generator config are asserted in `tests/replay/test_generator_determinism.py`,
+  for the default (`equities.flow.calibration = "session"`) and for the documented legacy value
+  (`"legacy_budget"`, the dataset of v1.3.0 and earlier). A change to the dataset is a change to
+  that test, a `x-version` bump of the generator config when the document's meaning moves, a
+  MIGRATIONS.md entry, and a regeneration of **everything** derived from it in one change by
+  `tools/regenerate_dataset_artifacts.py` — never a partial one: a repository that quotes
+  numbers from two datasets is wrong even when every number is individually true.
 - No wall-clock, no iteration over unordered maps on any deterministic path; sort keys explicitly.
 - The same bytes must produce the same book state and the same counters in every language,
   including on malformed input: the anomaly goldens (`events_*_anomalies.jsonl`) pin this.
@@ -268,7 +277,7 @@ hot paths allocation-conscious (primitive arrays, no boxing). All: no dead code,
   `deployment/`; run by `run_all.sh` as a further row — see §12.7); docs:
   `python3 tests/harness/check_headline_numbers.py` (the `numbers` row: every documented count,
   benchmark figure, ledger denominator, lifecycle / contract / MVP number vs its artefact)
-- Python dependencies: `python/pyproject.toml` (1.3.0) declares numpy, pandas, scipy, scikit-learn,
+- Python dependencies: `python/pyproject.toml` (1.4.0) declares numpy, pandas, scipy, scikit-learn,
   pyarrow, **jsonschema and referencing** (offline schema validation in
   `iap.contracts.validate`), each with a lower and an upper bound, plus `ml` and `dev` extras; CI
   installs the exact versions pinned in `python/requirements-ci.txt` in every Python job.
@@ -800,8 +809,12 @@ Admin endpoints (`RUNBOOK_incident_kill_switch.md` §2 — the manual ENGAGE pat
   jobs (all four languages plus the `integration` and `replay` rows), `tests/harness/run_golden.sh`,
   and `tests/harness/check_deployment.py` (YAML/compose/promtool/Dockerfile/configmap checks, and
   since 2026-10-03 image pinning, workflow supply-chain shape, the Rust toolchain pin, network
-  policy and exposure checks), plus a blocking C++ ASan+UBSan job, blocking lint (`cargo clippy
-  -D warnings`, `ruff check` with the correctness-only rule set of `ruff.toml`) and non-blocking
+  policy and exposure checks), a manual `regenerate` job (`workflow_dispatch` with
+  `regenerate=true`: `tools/regenerate_dataset_artifacts.py` on the CI runner, the changed files
+  uploaded as an artifact — dataset-derived artefacts are produced in the environment that
+  verifies them, CONTRIBUTING.md §4), plus a blocking C++ ASan+UBSan job, blocking lint (`cargo clippy
+  -D warnings`, `ruff check` with rules E, W, F, I, UP and B of `ruff.toml`, `ruff format
+  --check`) and non-blocking
   `pip-audit` and `cargo audit`. Every `uses:` is pinned to a commit SHA, runners are
   `ubuntu-24.04`, cargo runs `--locked`, and the workflow token is `contents: read`. CodeQL
   (`codeql.yml`), Dependabot (`dependabot.yml`) and a tag-triggered release workflow
@@ -938,7 +951,12 @@ Wire schemas: §2 (all 17 at 1). Non-wire documents carry their own `x-version` 
 1, the MVP `report.json` 2 and `paper_evidence.json` 3 (2026-09-20), the Java `session_state.json`
 2 and paper session report 3 (2026-09-19); and, added 2026-10-03, each at 1:
 `tests/golden/expected_risk_edge_decisions.json`, the research gate-eligibility sidecar
-`research/experiments/<id>/eligibility.json` and `research/power/POWER_REPORT.json`. Two
+`research/experiments/<id>/eligibility.json` and `research/power/POWER_REPORT.json`; and,
+since v1.4.0, at 2: the generator config documents (`configs/marketdata/generator.json`,
+`configs/mvp/generator{,_tiny}.json`, `research/power/generator_planted.json` — the default
+equity flow calibration changed, `load_generator_config` rejects a version-1 document that does
+not name its calibration) and the multiple-testing ledger `research/experiments.json` (entries
+carry `dataset_version`, the document lists `datasets`). Two
 additive fields did not bump a version because an old reader's input stays valid:
 `session_state.json` `risk_snapshot_sha256` (absent ⇒ resume unverified) and the evidence key
 `research_gate_eligible`, serialised only when `false`. A golden regenerated for a deliberate
@@ -967,6 +985,20 @@ without `exist_ok`. A new experiment directory is staged as `.staging-<id>-<pid>
 into place in one rename; a listing skips and reports unreadable directories. **A `--dry-run`
 writes no experiment directory but still debits its looks in the ledger** — a dry run is a look
 — and a rerun of an identical configuration adds none.
+
+**The ledger is dataset-scoped; history is carried** (2026-10-03, v1.4.0). A statistic computed
+on another dataset is another look. The report pipelines open the ledger with the current
+`data_version`; an entry is identified by (alpha, kind, canonical config, dataset) and carries
+`dataset_version`. When the dataset changes, the looks already recorded stay in the file and in
+`total_experiments` — the denominator only grows, the corrected thresholds only tighten — and
+the regenerated pipelines add theirs beside them; nothing is overwritten and nothing is reset.
+`datasets` in the document is the per-dataset summary. The lifecycle bootstrap and the store
+take, per alpha, the `promotion_pipeline` entry of the dataset `alpha_params.json` names:
+entries of other datasets are history, not evidence. The transition log
+`research/lifecycle_transitions.jsonl` is append-only within a dataset; a dataset change rebuilds
+it with `bootstrap --force` after the old log has been archived under `research/archive/`
+(docs/LIFECYCLE.md §6). The model ledger `research/models/ledger.json` is append-only across
+datasets: every manifest names its `data_version`.
 
 **Gate eligibility** (2026-10-03, Python reference). Any valid specification can be run and is
 recorded and ledgered; its result is promotion evidence only if the configuration is at least as

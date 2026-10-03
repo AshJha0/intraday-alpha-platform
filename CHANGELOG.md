@@ -1,7 +1,7 @@
 # Changelog
 
-Release notes for tagged versions, newest first. The v1.3.0 entry is written
-in the repository; notes for v1.1.1 and v1.2.0 are copied from their GitHub
+Release notes for tagged versions, newest first. The v1.3.0 and v1.4.0
+entries are written in the repository; notes for v1.1.1 and v1.2.0 are copied from their GitHub
 releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
@@ -9,6 +9,206 @@ that tag.
 ## Unreleased
 
 Nothing yet.
+
+## v1.4.0 — 2026-10-03
+
+The bundled dataset is regenerated. Up to v1.3.0 the continuous flow of every
+equity stream stopped 37.6–43.2% of the way through its session; the
+generator now calibrates the flow so that it reaches the close, and that is
+the default. Every artefact that derives from the dataset — the alpha
+reports and fitted parameters, the ledger, the experiments, the registry,
+the ML, adaptive and power reports, the baselines, four goldens — was
+regenerated in one pass, and every document that quotes a number was
+re-derived from the new artefacts. No promotion gate, threshold, cost
+model or alpha definition was changed, and nothing was tuned to recover a
+v1.3.0 conclusion. Pull request
+[#19](https://github.com/AshJha0/intraday-alpha-platform/pull/19).
+
+### Fixed
+
+- **Equity flow reaches the close (issue M08).** `slots_per_stream` was a
+  hard budget of flow slots, the base rate was `slots / duration × 1.30`,
+  and the self-exciting multiplier `(1 + excitation)` — which about halves
+  the mean inter-arrival time — was not in the calibration, so the budget
+  was spent 40% of the way through the session. The base rate is now
+  `slots_per_stream × E[1 / (1 + excitation)] / duration` (the factor is
+  0.522 for the pinned flow parameters; `excitation_time_factor`, a pinned
+  SplitMix64 estimate) and there is no budget: flow runs until the close,
+  and `slots_per_stream` is the expected number of slots per stream and
+  session. Every equity stream now ends 99.8–100.0% of the way through the
+  session. The event count is deliberately the old one (raw equity events
+  211,359 → 210,175), so the flow is about 2.5 times sparser in time than
+  the compressed flow of v1.3.0 was inside its window.
+- **Report prose that described the old data shape** is derived from the
+  data or states the session length: the row-gap sentences of `REPORT.md`,
+  the "~2.6 dense hours" of `ADAPTIVE_REPORT.md` and `ML_REPORT.md`, the
+  "every alpha is net-negative" sentence of `ADAPTIVE_REPORT.md`, and
+  conclusion 2 of `ML_REPORT.md`, which asserted "no directional alpha"
+  whatever the table above it said.
+- **Two lines of the v1.3.0 entry below** that the published release notes
+  had already corrected: ruff runs rules E, W, F, I, UP and B plus
+  `ruff format --check` (not a "correctness-only rule set"), and the
+  session-state dashboard panel maps all five values 0–4 (not 0–3). The
+  same two statements are corrected in PLATFORM_CONVENTIONS.md §12.7,
+  docs/governance/SECURITY.md and deployment/grafana/README.md.
+
+### Changed
+
+- **`equities.flow.calibration`** (generator config, new): `"session"` — the
+  default — is the rule above; `"legacy_budget"` is the v1.3.0 rule and
+  reproduces the v1.3.0 dataset byte for byte. `equities.fill_session`, the
+  v1.3.0 opt-in, belongs to the legacy rule and is an error with the
+  default. The golden-vector builders select `"legacy_budget"` explicitly,
+  so every golden event vector is unchanged.
+- **Generator config `x-version` 1 → 2** (`configs/marketdata/generator.json`,
+  `configs/mvp/generator.json`, `configs/mvp/generator_tiny.json`,
+  `research/power/generator_planted.json`). `load_generator_config` rejects
+  an `x-version` 1 document that does not name its calibration.
+- **Dataset identity.** `data_version`
+  `203c8f54…` → `116b7787…`. `feature_version` is unchanged (no feature
+  definition changed). `tests/replay/test_generator_determinism.py` pins the
+  raw-file hashes of both datasets; the FX files are the same bytes in both.
+- **The multiple-testing ledger is dataset-scoped (`x-version` 1 → 2) and
+  keeps its history.** An entry is identified by (alpha, kind, config,
+  dataset) and carries `dataset_version`. The 1068 looks recorded on the
+  v1.3.0 dataset stay in the file and in the denominator; the regenerated
+  pipelines add 852. `research/migrate_ledger_dataset_scope.py` stamped the
+  existing entries without changing a key. The lifecycle bootstrap and the
+  store read, per alpha, the entry of the dataset `alpha_params.json` names.
+- **Lifecycle transition log.** Rebuilt by `bootstrap --force` for the new
+  dataset; the log bootstrapped on the v1.3.0 dataset is archived as
+  `research/archive/lifecycle_transitions.dataset-203c8f54.jsonl`.
+- **`python -m iap.research list`** prints the dataset of each experiment:
+  the folder now holds the five runner experiments of each dataset.
+- Versions: `python/pyproject.toml` and `iap.__version__` 1.4.0; image
+  references `v1.4.0`.
+- Parity table: python 1573 / cpp 289 / rust 323 / java 510 tests, golden
+  groups 166/68/64/104; `replay` 6 (was 4).
+
+### Added
+
+- **`tools/regenerate_dataset_artifacts.py`**: the whole regeneration chain
+  in dependency order with per-step timing, and a guard against running the
+  report pipelines twice on one dataset.
+- **CI job `regenerate`** (manual: `workflow_dispatch` with
+  `regenerate=true`): runs the script on the CI runner and uploads the
+  changed files. The committed artefacts of this release were produced by
+  it (run 37152702105, 346 s), because the last digits of the float
+  artefacts depend on platform and library versions and some suites compare
+  them exactly. CONTRIBUTING.md §4.1 has the procedure.
+- Tests: session coverage of the default calibration, the legacy rule and
+  its `fill_session` opt-in, the calibration factor, the config `x-version`
+  gate, the raw-file hashes of both datasets, the dataset scope of the
+  ledger, the per-dataset selection of ledger entries.
+
+### Results
+
+What the new data says, against what v1.3.0 reported. Nothing is promoted,
+before or after.
+
+| | v1.3.0 | v1.4.0 |
+|---|---|---|
+| equity flow ends (fraction of the session, per stream) | 37.6–43.2% (mean 40.5%) | 99.8–100.0% |
+| normalized events | 310,159 | 308,975 |
+| feature vectors (100 ms cadence) | 208,437 | 213,021 |
+| promotion verdicts | 0 PROMOTE / 11 ITERATE / 13 REJECT | 0 PROMOTE / 10 ITERATE / 14 REJECT |
+| alphas that lose money at 1× costs | 24 of 24 | 24 of 24 |
+| lifecycle registry | 24 CANDIDATE, 0 beyond | 24 CANDIDATE, 0 beyond |
+| alphas failing the cost gate alone | 8 | 4 (EQ02, EQ03, EQ12, FX04) |
+| ledger | 1068 looks, 70 entries | 1920 looks, 139 entries (1068 carried + 852) |
+| expected max \|t\| under the null; Bonferroni \|t\| | 3.735; 4.071 | 3.888; 4.206 |
+| ML gate (best linear pooled OOS IC vs the mid label) | FAILED (ridge −0.0430); trees and MLP never fitted | PASSED (ridge +0.0081); xgboost, lightgbm and MLP fitted; no model earns its costs |
+| meta-labeling gate | degenerate (0 trades) | degenerate (0 trades) |
+| adaptive study, drift-triggered refits; retired under every policy | 126; FX01 | 122; FX01 |
+| power study, planted order flow at the reference size: significant / evidence | 3 of 3 / 3 of 3 seeds | 1 of 3 / 3 of 3 seeds |
+| power study, planted lead-lag at twice the reference size: significant (within) | 1 of 3 seeds | 0 of 3 seeds |
+| power study, PROMOTE on any planted effect | 0 | 0 |
+| MVP session: events, decisions, parents, fills | 16,578, 355, 66, 55 | 15,805, 800, 235, 169 |
+| MVP session: shares filled; P&L | 3,126; −22.65 USD | 8,229; −81.53 USD |
+| MVP trace digest | `d938eeae…` | `f51890da…` |
+
+- **Alphas.** Every equity alpha that was ITERATE has a lower IC on the full
+  session (EQ03: uncrossed IC 0.0298 → 0.0190, Newey–West t 10.57 → 5.78;
+  EQ01: 0.0273 → 0.0102, t 4.77 → 2.67). EQ11 (15-minute horizon) falls from
+  ITERATE to REJECT (t 3.04 → 1.40). The FX reports are unchanged: the FX
+  data is byte-identical. EQ01 and EQ05 keep ITERATE but no longer clear the
+  PROMOTE significance gate. The net losses of the equity ITERATE alphas at
+  1× costs are roughly twice as large (EQ03: −70,651 → −148,562 USD).
+- **ML.** The gate that blocked the tree and MLP tiers passes, on a pooled
+  IC of +0.0081. Decomposed for this release (the numbers are in the pull
+  request), the equity part of that IC is positive in three folds and
+  negative in one, and the FX part is the same in both datasets; the move
+  from −0.0430 is entirely the equity part. The models the gate lets
+  through do no better (xgboost +0.0046,
+  lightgbm +0.0078, MLP −0.0024 against the mid label) and every model's
+  conservative net is negative. The report's conclusion is the same as
+  before; the reason is now measured rather than gated away.
+- **Power study.** The validation chain detects less on the sparser flow:
+  the planted order flow at the reference size clears t ≥ 3 in one seed of
+  three, the planted lead-lag in none at any size. The chain still promotes
+  nothing, and at level 0 it reports nothing.
+- **MVP.** The loop trades to the close: 2.6 times the shares, 3.6 times the
+  loss, the same cost per share against about half the alpha contribution
+  (+0.022 bps of filled notional, was +0.039; cost −0.41 bps in both). The
+  realized IC of the session no longer collapses under a one-decision shift
+  (EQ01 +0.217 → +0.149): the signals persist for several seconds on the
+  slower flow. docs/MVP.md §7.1 has the audit and why this is persistence
+  and not a leak; `paper_ic_tracking` now fails all three MVP alphas.
+- **Adaptive study.** The FX deployments move by one trade each although the
+  FX data is unchanged. The reports committed with v1.3.0 had last been
+  generated before the backtester corrections of 2026-09-20; re-running the
+  v1.3.0 code on the v1.3.0 dataset reproduces the new FX numbers. The
+  statement in the v1.3.0 entry that "no committed number can move" was
+  therefore not true of `research/adaptive_reports/`.
+
+### Migration notes
+
+- A generator config written for v1.3.0 (`x-version` 1) is rejected until it
+  names `equities.flow.calibration`: `"legacy_budget"` to keep the data it
+  was written for, or `"session"` with `x-version` 2. `fill_session: true`
+  needs `"legacy_budget"`.
+- Anything stored under the old `data_version` — feature parquet files,
+  baselines, fitted parameters, experiment directories — describes the old
+  dataset. Regenerate with `python -m iap.marketdata`, `python -m iap.features`
+  and, for the committed artefacts, `tools/regenerate_dataset_artifacts.py`.
+  `alpha_params.json` loaders check `feature_version`, which did not change,
+  so an old parameter file still loads: check its `data_version` header.
+- A reader of `research/experiments.json` must accept `x-version` 2, the
+  entry field `dataset_version` and the top-level `datasets`; an alpha now
+  has one `promotion_pipeline` entry per dataset.
+- The five experiment directories of the v1.3.0 dataset are kept. Their
+  results can be reproduced only on that dataset (`"legacy_budget"`).
+- A Java paper session scores with `alpha_params.json`: on the same event
+  stream its equity signals, and therefore its orders, differ from a v1.3.0
+  session's, and its `config_sha256` changes (`alpha_params.json` and
+  `generator.json` are among the hashed files). State directories written
+  by v1.3.0 resume as before.
+
+### Known limitations
+
+Those of v1.3.0 stand, except the equity-flow one, which is fixed. New or
+restated:
+
+- **The equity flow is sparse relative to the label freshness floor.** Rows
+  are about 3.2 s apart and the pinned freshness bound is
+  `max(5 s, 2 × median quote gap)` = 5 s, so 19–21% of equity labels at a
+  10 s horizon and 23–25% at one minute are invalid as `forward_stale`, and
+  37–55% at fifteen minutes (with blackouts). Raising `slots_per_stream`
+  would restore the density the v1.3.0 research ran on at 2.5 times the
+  events; it was not done, so that the slot count keeps its documented
+  meaning and the fix is the calibration alone.
+- **FX flow still ends 92–100% of the way through its session** (a slot
+  budget with a 1.05 margin and no excitation). It was left alone so that
+  the FX data stays byte-identical.
+- **The cold-path benchmark rows were not re-measured.**
+  `benchmarks/results_cpp.md` and the Java cold table in
+  `benchmarks/RESULTS.md` were measured over the v1.3.0 file
+  `eq_20260824.normalized.jsonl` (105,640 events; the v1.4.0 file has
+  105,282) on the baseline machine, which is not available to CI.
+- **The regenerated artefacts carry `git_dirty: true`** after the first
+  step: the chain writes tracked files as it goes, so every later step sees
+  a modified tree. The commit they name (`29f0822`) is the one the chain
+  ran on.
 
 ## v1.3.0 — 2026-10-03
 
@@ -154,9 +354,10 @@ API_TRADING.md §2.4)**
   `exec_orders_blocked_kill_pending_total`, `admin_auth_rate_limited_total`,
   `admin_audit_suppressed_total`).
 - **CI and release**: CodeQL, Dependabot configuration, a blocking C++
-  ASan+UBSan job, blocking `cargo clippy -D warnings` and `ruff check`
-  (correctness-only rule set, `ruff.toml`; the tree was made lint-clean for
-  the release), non-blocking `pip-audit` / `cargo audit`, a
+  ASan+UBSan job, blocking `cargo clippy -D warnings`, blocking `ruff check`
+  (rules E, W, F, I, UP and B, `ruff.toml`) and `ruff format --check` (the
+  tree was made lint-clean and formatted for the release), non-blocking
+  `pip-audit` / `cargo audit`, a
   tag-triggered release workflow (images to GHCR, build-provenance
   attestation, `release-manifest.json`).
 - **Deployment**: Alertmanager (compose and Kubernetes) with a `Watchdog`
@@ -220,11 +421,12 @@ API_TRADING.md §2.4)**
 - **Alerts are routed but not delivered** until an operator supplies a
   webhook URL; audit logs are not shipped off-host; no image vulnerability
   scan is wired in.
-- **The `STOPPED` state is half known downstream.** The session-state
-  dashboard panel maps 0–3 only. `SessionStoppedNotResumed` reads the value
-  4, but a stopped process exits right after its checkpoint, so the value
-  is scraped only when a scrape lands in that instant; otherwise
-  `TargetDown` is the only alert (deployment/grafana/README.md).
+- **The `STOPPED` state is rarely observed downstream.** The session-state
+  dashboard panel maps all five values, 0–4, and `SessionStoppedNotResumed`
+  reads the value 4, but a stopped process exits right after its
+  checkpoint, so the value is scraped only when a scrape lands in that
+  instant; otherwise `TargetDown` is the only alert
+  (deployment/grafana/README.md).
 - **Equity flow in the bundled dataset stops about 40% into each session.**
   Every equity stream's continuous flow ends 38–43% of the way through the
   6.5-hour session (mean 40.5%, about 2 h 38 min after the open) and

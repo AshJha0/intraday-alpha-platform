@@ -1,5 +1,7 @@
 # Cross-Venue Lead-Lag Effects in FX: A Carefully Measured Null
 
+> Dated record. The figures below are those of the dataset in force when the paper was written; the 2026-10-03 update at the end restates them on the v1.4.0 dataset and re-checks each conclusion.
+
 *Intraday Alpha Platform research series, paper 3 of 6 (spec §28). Generated 2026-08-29 from the repository's committed research artifacts.*
 
 ---
@@ -339,3 +341,91 @@ No verdict, IC, t-statistic or P&L figure in this paper changes; the five
 new experiments are all ITERATE and net-negative at 1× costs, like every
 alpha before them. The analysis above is left as written and the research
 reports quote the ledger at their own render time (`ledger_n_at_report`).
+
+## Erratum / Update — 2026-10-03 (v1.4.0: the equity flow now reaches the close)
+
+**What changed in the data.** Up to v1.3.0 the generator stopped the equity
+continuous flow about 40 % of the way through each session; v1.4.0
+calibrates the flow rate to the session, so equities trade to the close
+(paper 01's update of the same date has the detail). The FX raw and
+normalized files are byte-identical to v1.3.0. The FX statistics in this
+paper therefore did not move; the ledger denominator did, and so did EQ10,
+the one equity alpha in §4.7. This section supersedes the "current" figures
+quoted in the earlier errata, which stay as dated records.
+
+**FX figures: unchanged by this release, restated.** Every field of
+`FX03.json`, `FX04.json`, `FX05.json`, `FX07.json` and `FX12.json` that
+existed in v1.3.0 has the same value now. Current values
+(`research/alpha_reports/REPORT.md`):
+
+| alpha | horizon | IC | IC unc | IC crs | crs% | NW t unc | folds+ | hyp | net P&L 1x | flips/h | verdict |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| FX03 | 1m | -0.0065 | 0.0108 | -0.0284 | 0.291 | 1.86 | 1/4 | no | -27,063 | 74 | ITERATE |
+| FX04 | 30s | 0.0100 | 0.0297 | -0.0075 | 0.287 | 4.79 | 4/4 | yes | -32,566 | 63 | ITERATE |
+| FX12 | 1m | 0.0036 | 0.0083 | -0.0002 | 0.291 | 1.22 | 2/4 | yes | -29,666 | 52 | REJECT |
+| FX07 | 1m | -0.0053 | -0.0121 | -0.0010 | 0.295 | 0.22 | 2/4 | no | -9,757 | 35 | REJECT |
+| FX05 | 5m | -0.0376 | -0.0065 | -0.0681 | 0.330 | 0.53 | 1/4 | no | -3,980 | 11 | REJECT |
+
+Note that FX03 is an ITERATE, not a REJECT: its uncrossed IC and t clear the
+lenient gate (IC >= 0.005, t >= 1.5). It cannot be promoted — its fitted
+sign contradicts its rationale and one fold of four is positive. That was
+already the case on v1.3.0; the "FX03 REJECT" of the 2026-09-06 currency
+erratum predates the gates that read the uncrossed IC.
+
+Cost stress at 0.5x / 1x / 2x: FX03 -13,843 / -27,063 / -53,503; FX04
+-16,725 / -32,566 / -64,250. Day 2: FX03 net -69,720 (costs 68,618); FX04
+net -79,775 (costs 80,445). Latency probe, last-fold IC at +0 / +1 / +5
+rows: FX04 +0.0071 / -0.0102 / -0.0047; FX03 -0.0035 / +0.0019 / -0.0106.
+Regime split: FX04 +0.0052 high-vol / +0.0124 low-vol. Capacity $122-271M
+per pair, $29.5B for instrument 103. The venue diagnostics of §4.5 were
+recomputed from the current feature frames and are the same (52,568 rows;
+median staleness spread 81,014 ms; median top-venue update share 1.00).
+
+**Ledger.** `research/experiments.json` now holds 1920 looks over 139
+entries (the 1068 looks of the v1.3.0 dataset are kept; the regenerated
+pipelines added 852). Expected max |t| under the global null is 3.888 and
+the Bonferroni per-test threshold 4.206. FX04's t of 4.79 is above both.
+FX03 (1.86), FX12 (1.22), FX07 (0.22) and FX05 (0.53) are below the
+yardstick, as are all other FX alphas.
+
+**EQ10 (§4.7), moved.** Index-constituent lead-lag on equities: uncrossed IC
+0.0041 at Newey-West t 0.78, 3 of 4 folds positive, hypothesis sign
+confirmed, -29,541 at 1x; REJECT (v1.3.0: -0.0034 / -0.58).
+
+**Conclusions, re-checked.**
+
+1. *Cross-venue lead-lag in FX has no economic content on this dataset;
+   FX03, FX04 and FX12 are cost-negative at every multiplier.* **Holds**,
+   unchanged.
+2. *FX04 passes the statistical gates and is held at ITERATE by the cost
+   gate; a significant t appears on rows whose true lead-lag is zero, so the
+   gates are necessary and not sufficient.* **Holds**, unchanged, and it
+   survives the larger denominator: 4.79 against a Bonferroni threshold of
+   4.206. In the lifecycle registry the cost gate is the only one FX04
+   fails. (The body's reading of FX04 as selection noise at t 1.71 was
+   already superseded by the round-3 erratum.)
+3. *FX04's IC changes sign under one row of lag and is larger in the
+   low-volatility regime.* **Holds**, unchanged. These are pooled-row
+   last-fold figures.
+4. *The venue diagnostics explain why no effect should be identifiable
+   (staleness spread of about 81 s against a 30 s horizon; one venue
+   supplies all updates in the median 10 s window).* **Holds**, unchanged.
+5. *Every lead-lag construct in the book lands within noise of zero, and
+   the agreement of four differently built signals makes the null
+   informative.* The first part **holds, weaker**: three of the four are
+   within noise (FX03 t 1.86, FX07 0.22, EQ10 0.78), and FX04 is not (item
+   2). The second part **no longer holds for the equity leg**. The
+   planted-signal study (`research/power/POWER_REPORT.md`) plants an ETF
+   lead-lag of known size in data generated with the v1.4.0 flow and scores
+   it with EQ10: it is detected in 0 of 3 seeds at every level, including
+   twice the reference size (mean t 0.88). On v1.3.0 it was detected in 1 of
+   3 seeds at that level. A test that does not find a planted effect cannot
+   make its null informative, so EQ10's REJECT says little about whether
+   index-constituent lead-lag is present. The planted lead is two
+   one-second steps and equity rows are now about 3.2 s apart, which is the
+   likely reason; that was not tested. No such study exists for the FX
+   alphas.
+6. *Capacity is not the constraint.* **Holds**, unchanged.
+7. *A lead-lag study should publish its staleness and update-share
+   diagnostics next to its IC table.* **Holds**, and item 5 adds the same
+   point for power: publish whether the test can detect a planted effect.

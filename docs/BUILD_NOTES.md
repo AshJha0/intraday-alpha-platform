@@ -17,15 +17,15 @@ gated on all of them. Run the whole thing locally with
 ## Python (reference implementation)
 
 ```bash
-cd python && PYTHONPATH=src python3 -m pytest -q          # full suite (1565 tests; five to six minutes in the CI job, with coverage)
+cd python && PYTHONPATH=src python3 -m pytest -q          # full suite (1573 tests; five to six minutes in the CI job, with coverage)
 cd python && PYTHONPATH=src python3 -m pytest -q -k golden # the golden group (166)
 cd python && PYTHONPATH=src python3 -m iap.marketdata      # end-to-end pipeline
-cd python && PYTHONPATH=src python3 -m iap.mvp run         # the traced MVP loop (~7 s)
+cd python && PYTHONPATH=src python3 -m iap.mvp run         # the traced MVP loop (under a minute)
 cd python && PYTHONPATH=src python3 tools/make_golden.py   # regen goldens (deliberate only; every
                                                            # make_golden_*.py refuses to overwrite without --force)
 ```
 
-- **Timing.** The v1.3.0 suite is 1565 tests (166 in the `-k golden` group). The CI
+- **Timing.** The suite is 1573 tests at v1.4.0 (166 in the `-k golden` group); the timings that follow are those of the v1.3.0 suite (1565 tests). The CI
   `python` job ran it in 319 s and in 358 s in two runs on GitHub-hosted runners
   on 2026-10-03, under `--cov` instrumentation. The last harness capture on the 2-CPU container baseline
   (2026-09-20, 1362 tests) read 83 s for the `python` row — the full suite, 71 s,
@@ -36,7 +36,7 @@ cd python && PYTHONPATH=src python3 tools/make_golden.py   # regen goldens (deli
   file on CI hardware**; no uninstrumented baseline timing has been re-captured for
   v1.3.0, and nothing was removed to make the number fit.
 - Python 3.11, src layout (`python/src/iap`), packaging via `python/pyproject.toml`
-  (1.3.0; installable with `pip install -e python` if preferred over PYTHONPATH;
+  (1.4.0; installable with `pip install -e python` if preferred over PYTHONPATH;
   console scripts `iap-marketdata`, `iap-features`, `iap-tca`, `iap-research`,
   `iap-lifecycle`, `iap-store`, `iap-mvp`).
 - Dependencies (declared in `pyproject.toml`): numpy, pandas, scipy, scikit-learn,

@@ -10,7 +10,12 @@ What belongs here:
 - generator determinism — the same seed produces byte-identical event vectors
   (`test_generator_determinism.py`: the golden EQ vector generated twice in
   one process, compared as canonical JSONL bytes, IAP1 bytes and SHA-256, and
-  against the pinned `tests/golden/expected_codec_sha256.json`);
+  against the pinned `tests/golden/expected_codec_sha256.json`; and the raw
+  files of the bundled dataset generated under both flow calibrations and
+  compared with their recorded SHA-256 — the default `"session"` (v1.4.0,
+  equity flow reaches the close) and `"legacy_budget"` (the v1.3.0 dataset,
+  `data_version` `203c8f54…`), so neither dataset can change without the
+  test changing);
 - replay determinism — a pipeline stage re-run over the same input emits the
   same output bytes (books, feature vectors, fills, risk audit JSONL);
 - the MVP loop run twice from scratch and replayed from its captured stream

@@ -32,7 +32,7 @@ every stage is the reference implementation the goldens already pin.
 |---|---|
 | instrument | `SYN.EQ.AAPL`, instrument_id 12, USD, tick 0.01, lot 100, ADV 60M, ref price 190 (`configs/mvp/instruments.json`; not part of the bundled universe, so nothing bundled is shadowed) |
 | venues | XV1, XV2 (verbatim from `configs/venues/venues.json`) + XV3 (venue_id 3; cheapest taker fee 0.0025/share, lowest rebate 0.001/share, slowest 300 µs ± 100 µs — `configs/mvp/venues.json`) |
-| data | seeded synthetic MBO (`iap.marketdata.generator`, unmodified) for ONE session 13:30–13:45 UTC on 2026-08-24, QC anomalies on (gaps with SNAPSHOT recovery, duplicates, out-of-order, invalid, ts violations), a 45 s halt at 30 % of the session; normalised by `iap.marketdata.normalize` (unmodified); 16,578 events on the golden seed 12345 |
+| data | seeded synthetic MBO (`iap.marketdata.generator`, unmodified) for ONE session 13:30–13:45 UTC on 2026-08-24, QC anomalies on (gaps with SNAPSHOT recovery, duplicates, out-of-order, invalid, ts violations), a 45 s halt at 30 % of the session; normalised by `iap.marketdata.normalize` (unmodified); 15,805 events on the golden seed 12345, spread over the whole 15 minutes (generator `flow.calibration` `"session"`, `configs/mvp/generator.json` x-version 2; up to v1.3.0 the flow was spent in the first 45 % of the session) |
 | strategy | three golden `linear_z_v1` alphas (fitted parameters from `configs/strategies/alpha_params.json`, feature-registry hash checked) ensembled equal-weight in z-space (`iap.backtest.engine.ensemble_scores`); decision every 1 s of event time |
 | holding period | 1 s (`horizon_ns` = parent window = decision cadence: one live parent per decision cycle) |
 | portfolio | single-stock mean-variance (`iap.portfolio.optimizer.solve`, PGD, 100 iterations / 4 projection passes), EWMA variance of 1-minute bar log returns (`iap.portfolio.covariance.ewma_covariance`, λ 0.94), box ±500 shares, notional cap 1 M USD, turnover cap 0.5 per decision, vol target 5e-4 per bar, t-cost 0.001 bp (see §7 — deliberately below the modelled cost), confidence floor 0.1 |
@@ -115,15 +115,15 @@ that implements it and the evidence that it runs.
 
 | rule (§11.4 / §12.1) | where | evidence |
 |---|---|---|
-| reference prices handed to risk = consolidated best bid / ask over the NON-STALE venue books, stamped with the minimum `lastDataTs` (last non-HEARTBEAT event) of the venues at the touch; no fresh two-sided venue ⇒ the previous mark ages | `engine.MvpEngine._on_market` (verbatim port of `RiskWiring.onMarket`, sorted venue iteration) | `report.risk.market_regressions_dropped` = 72 (older stamps dropped by the risk engine AND by the account, identically) |
-| per-venue stale transitions → `on_sequence_gap` / `on_feed_recovered` | `_on_market` (`Counters.sequence_gaps`, `feed_recoveries`) | 9 gaps / 9 recoveries on the golden run; `python/tests/test_mvp.py::test_engaged_kill_switch_...` drives the gates |
+| reference prices handed to risk = consolidated best bid / ask over the NON-STALE venue books, stamped with the minimum `lastDataTs` (last non-HEARTBEAT event) of the venues at the touch; no fresh two-sided venue ⇒ the previous mark ages | `engine.MvpEngine._on_market` (verbatim port of `RiskWiring.onMarket`, sorted venue iteration) | `report.risk.market_regressions_dropped` = 28 (older stamps dropped by the risk engine AND by the account, identically) |
+| per-venue stale transitions → `on_sequence_gap` / `on_feed_recovered` | `_on_market` (`Counters.sequence_gaps`, `feed_recoveries`) | 8 gaps / 8 recoveries on the golden run; `python/tests/test_mvp.py::test_engaged_kill_switch_...` drives the gates |
 | venue connect / disconnect → `onVenueDown/Up` | not applicable: the simulator has no venue gateway (the Java `PaperTrading` wiring does not call them either); `RiskEngine.on_venue_disconnect/reconnect` exist for the live gateway | — |
 | every fill fed to risk BEFORE the next decision; every terminal child report → `on_order_done` | `_process_reports` — step 1 of `on_event`, before the decision (step 6); FILLED / CANCELED / EXPIRED / REJECTED → `on_order_done`; a `False` from `on_fill` raises | `report.risk.open_orders` = 0 at the end; `test_fills_are_bounded_and_inside_their_parent_window` |
-| `max_participation` (share of session volume AND of displayed contra depth), `min_slice_interval_ns` (per-instrument child spacing), `latency_budget_ns` (decision → arrival) block the child and increment counters | `_issue_children`, the `BacktestEngine.decide` chain in the same order: SOR → slice interval → latency budget → participation (cap / block) → risk → submit | `report.controls`: 107 slice-interval blocks, 0 / 0 participation, 0 latency (200 µs internal + 300 µs XV3 < 2 ms) |
+| `max_participation` (share of session volume AND of displayed contra depth), `min_slice_interval_ns` (per-instrument child spacing), `latency_budget_ns` (decision → arrival) block the child and increment counters | `_issue_children`, the `BacktestEngine.decide` chain in the same order: SOR → slice interval → latency budget → participation (cap / block) → risk → submit | `report.controls`: 159 slice-interval blocks, participation capped 2 / blocked 0, 0 latency (200 µs internal + 300 µs XV3 < 2 ms) |
 | optimizer `INFEASIBLE` holds the previous weights, never NaN; the platform keeps the position | `portfolio.SingleStockPortfolio.construct` (`w = w_prev`, `round_half_away`) | `report.portfolio.infeasible_solves` (0 on the golden run; `test_mvp.py` exercises the branch) |
 | SOR before risk (participation measured on the routed venue, the risk engine sees the real venue); NO_ROUTE never reaches risk, is counted | `adapters.SorAdapter.route` (`sor_no_route`) → `RiskEngineAdapter.evaluate` | `report.routing.no_route` = 0; every `RiskDecision` references a routed child (`test_risk_decisions_reference_children_and_rejects_never_submit`) |
 | a REJECT is never submitted; every pre-trade decision is in the audit | `_issue_children` (`continue` on non-ALLOW); `risk_audit.jsonl` | `report.risk.audit_events` == `allowed + rejected` (checked in `build_report`) |
-| §12.1: `pnl.total == (grossPnl − spreadCost) − feesNet − impact`; risk daily P&L == gross − spread (1e-9 rel); risk position == account position — after EVERY fill and at session end | `MvpEngine.assert_pnl_identity` (called from `_process_reports` and `finish`), `report.pnl.identity_abs_diff` | 3.3e-11 on the golden run; `test_pnl_identity_holds` |
+| §12.1: `pnl.total == (grossPnl − spreadCost) − feesNet − impact`; risk daily P&L == gross − spread (1e-9 rel); risk position == account position — after EVERY fill and at session end | `MvpEngine.assert_pnl_identity` (called from `_process_reports` and `finish`), `report.pnl.identity_abs_diff` | 6.8e-11 on the golden run; `test_pnl_identity_holds` |
 | qty unit: equity qty in shares, `qty_unit` 1.0, no second `lot_size` application | `InstrumentSpec(..., 1.0, ...)` in `MvpEngine.__init__`; `instrument_refs_from_reference_data` for the risk engine | the identity above would break otherwise |
 | no wall clock, no unordered iteration, integer prices on every contract | every module (§5 audit) | `verify` / `replay` reproduce the digest |
 
@@ -168,7 +168,7 @@ and optimizer are the reference components with their own determinism
 tests.
 
 Same seed ⇒ same `events.jsonl` bytes ⇒ same traces, same digest, same
-`report.json` bytes (`python -m iap.mvp verify`, 13 s for two runs;
+`report.json` bytes (`python -m iap.mvp verify`, two runs from scratch;
 `tests/replay/test_mvp_replay_determinism.py`).
 Everything downstream of the feed is a pure function of the captured
 stream + the configuration, which is what makes the incident replay
@@ -200,17 +200,17 @@ possible.
    ```bash
    PYTHONPATH=src python3 -m iap.mvp explain --run ../data/mvp/<run_id> 17
    # Order 17
-   # Alpha:      EQ01-EQ03-EQ06  expected return = +0.0 bps  confidence = 0.12   <- acting (ensemble) signal
-   # Alpha:      EQ01  expected return = -0.0 bps  confidence = 0.02             <- its components
-   # Alpha:      EQ03  expected return = +0.0 bps  confidence = 0.34
+   # Alpha:      EQ01-EQ03-EQ06  expected return = -0.0 bps  confidence = 0.10   <- acting (ensemble) signal
+   # Alpha:      EQ01  expected return = +0.0 bps  confidence = 0.06             <- its components
+   # Alpha:      EQ03  expected return = -0.0 bps  confidence = 0.25
    # Alpha:      EQ06  expected return = +0.0 bps  confidence = 0.00
-   # Portfolio:  target = +97 shares
+   # Portfolio:  target = -250 shares
    # Risk:       ALLOW
    # Risk:       ALLOW
    # Execution:  TWAP
    # SOR:        XV1 = 100%
    # Fills:      0 / 250 (0.0%)
-   # TCA:        IS = 0.0 bps
+   # TCA:        IS = -0.0 bps
    # Attribution: alpha = +0.0 bps  spread = -0.0 bps  impact = -0.0 bps  fees = -0.0 bps
    PYTHONPATH=src python3 -m iap.store sql --db ../data/mvp/<run_id>/iap.sqlite \
      "SELECT parent_order_id, signal_model_version, risk_rule_id, filled_qty, implementation_shortfall_bps FROM v_order_chain ORDER BY parent_order_id"
@@ -233,44 +233,57 @@ possible.
 
 ## 7. Honest results of the golden run (seed 12345, `report.md`)
 
-Run id `58a10f2194a3c81c`, 16,578 events, 355 decisions, 66 parent orders,
-212 children generated / 105 submitted, 55 fills, fill rate 20.2 %.
-Trace digest `d938eeae68c85a6c2acaf7fb3f7d1333f29c3ad8e036fb5af7a4d1b48c9ea2cc`.
-Wall time ≈ 7 s (1 s feed generation + normalisation, 6 s loop) on the CI box.
+Run id `58a10f2194a3c81c`, 15,805 events, 800 decisions, 235 parent orders,
+507 children generated / 348 submitted, 169 fills, fill rate 15.1 %.
+Trace digest `f51890da0c3c66cd488073fd7149099729767f5f65d03a7656e59f2da9c6a708`.
+Wall time: about 2.2× the v1.3.0 session on the same machine (27 s → 59 s on
+the laptop this was measured on; 0.8 s of that is feed generation and
+normalisation) — there are 800 decisions to make instead of 355.
+
+These are the numbers of the v1.4.0 golden (2026-10-03). The run id is the
+one of v1.3.0 because `mvp.json` and the seed did not change; the stream did:
+the generator now spreads each venue's flow over the whole 15 minutes
+instead of spending it in the first 45 % (the last continuous event of the
+v1.3.0 stream came 6.8 minutes in), so the session decides and trades to
+the close. The numbers of the v1.3.0 golden are in CHANGELOG.md (v1.4.0,
+"Results") and schemas/MIGRATIONS.md (2026-10-03).
 
 | P&L (USD) | value |
 |---|---:|
-| total (`risk daily − fees_net − impact`) | **−22.65** |
-| risk daily (realized −14.34 + unrealized −1.30) | −15.64 |
-| gross (mark-to-market) | +6.70 |
-| spread cost | 22.34 |
-| fees net (7.44 taker fees − 0.45 maker rebates) | 6.99 |
-| impact | 0.02 |
-| identity \|risk daily − (gross − spread)\| | 3.3e-11 |
+| total (`risk daily − fees_net − impact`) | **−81.53** |
+| risk daily (realized −56.02 + unrealized −4.33) | −60.36 |
+| gross (mark-to-market) | +1.43 |
+| spread cost | 61.79 |
+| fees net (21.32 taker fees − 0.20 maker rebates) | 21.12 |
+| impact | 0.06 |
+| identity \|risk daily − (gross − spread)\| | 6.8e-11 |
 
-**The session is cost-negative.** The alpha contribution is +0.039 bps of
-filled notional against −0.41 bps of execution cost (net −0.37 bps, about
-22 USD on 3,126 shares × 190 USD): the fitted expected returns are
-0.001–0.05 bp per decision while crossing a 1-tick spread on a 190 USD
-stock costs ~0.5 bp. This is the same picture the research reports give
-(every alpha fails `net_pnl_after_costs` at 1× costs) and the report
-states it as such (`alpha.cost_negative: true`).
+**The session is cost-negative.** The alpha contribution is +0.022 bps of
+filled notional against −0.41 bps of execution cost (net −0.39 bps, about
+82 USD on 8,229 shares × 190 USD): the fitted expected returns are
+hundredths of a basis point per decision while crossing a 1-tick spread on
+a 190 USD stock costs ~0.5 bp. The loss is 3.6 times the v1.3.0 one on 2.6
+times the shares: the loop now trades for the whole session and pays the
+same cost per share for an alpha contribution that is about half as large.
+This is the same picture the research reports give (every alpha fails
+`net_pnl_after_costs` at 1× costs) and the report states it as such
+(`alpha.cost_negative: true`).
 
 ### 7.1 Realized IC — the audit
 
 | alpha | IC@1s mid | IC@1s cost | IC@1s shift-1 | n | fitted h | IC@h mid | IC@h cost | IC@h shift-1 | n@h | research IC@h | gap |
 |---|---:|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|
-| EQ01 | +0.283 | +0.017 | +0.031 | 345 | 1s | +0.283 | +0.017 | +0.031 | 345 | +0.027 | 0.256 |
-| EQ03 | +0.336 | +0.065 | −0.034 | 270 | 5s | +0.223 | +0.099 | +0.017 | 242 | +0.030 | 0.193 |
-| EQ06 | −0.106 | +0.330 | +0.021 | 50 | 10s | +0.065 | +0.114 | −0.014 | 37 | +0.043 | 0.021 |
-| ensemble | +0.291 | +0.045 | −0.015 | 345 | — | — | — | — | — | — | — |
+| EQ01 | +0.217 | −0.024 | +0.149 | 790 | 1s | +0.217 | −0.024 | +0.149 | 790 | +0.010 | 0.207 |
+| EQ03 | +0.110 | −0.029 | +0.116 | 707 | 5s | +0.147 | +0.067 | +0.070 | 677 | +0.019 | 0.128 |
+| EQ06 | −0.079 | +0.079 | −0.047 | 354 | 10s | −0.130 | +0.033 | −0.098 | 301 | +0.027 | 0.157 |
+| ensemble | +0.104 | −0.003 | +0.111 | 790 | — | — | — | — | — | — | — |
 
-The previous version of this loop reported 0.285 / 0.338 / −0.102 with a
-timeline-based label and compared every alpha against a research IC
-measured at a different horizon. That gap (≈ 10× the research IC) was
-audited on 2026-09-20; the outcome, in order of evidence:
+The realized ICs are several times the research ICs. That gap was audited
+on 2026-09-20, on the v1.3.0 session; the audit's conclusions are restated
+here on the v1.4.0 session, and one of its observations no longer holds
+(item 3).
 
-1. **Definition, pinned.** `MvpEngine.realized_ic` now IS the research
+1. **Definition, pinned.** `MvpEngine.realized_ic` IS the research
    definition: `iap.labels.compute_labels` (event-time labels, mid-to-mid
    and cost-adjusted, anchor = state after events ≤ t, forward = state
    after events ≤ t+h, invalid when the stream ends before t+h, when the
@@ -283,12 +296,9 @@ audited on 2026-09-20; the outcome, in order of evidence:
    rebuilds the frame independently (fresh `FeatureEngine`, `MidSeries`,
    `compute_labels`) and asserts the same anchors, the same valid set, the
    same per-decision mid / cost labels to 1e-9 and the same IC to 1e-12
-   at the MVP horizon and at every fitted horizon; the old timeline
-   label agreed with it to 2e-16 on the common set (kept as
-   `test_realized_returns_agree_with_the_tca_timeline`), the difference
-   being 8 / 7 / 2 windows that contained a stale-venue blackout the old
-   definition did not exclude (n 352 → 345, 277 → 270, 52 → 50) and, for
-   EQ03 / EQ06, the horizon itself.
+   at the MVP horizon and at every fitted horizon; the timeline-based
+   label the loop used before 2026-09-20 agrees with it on the common set
+   (kept as `test_realized_returns_agree_with_the_tca_timeline`).
 2. **Not a leak.** The feature vector at t is built from events with
    `exchange_ts ≤ t` and scored before any later event is read (the engine
    is single-pass; `test_shift_by_one_and_truncation_leakage_probes` cuts
@@ -298,61 +308,79 @@ audited on 2026-09-20; the outcome, in order of evidence:
    event (research alignment: the anchor includes the present), and the
    label end is the prevailing state at t+h. The research scoring path
    (`LinearAlpha.raw_signal` → z → `beta·z`, `iap.validation.metrics.ic`)
-   run on the same captured stream gives 0.283 / 0.336 / −0.106 at the
-   1 s cadence and 0.275 / 0.276 / −0.111 at the 100 ms research cadence
-   (2,844 rows): **the number is a property of the data, not of the MVP.**
-3. **Shift-by-one.** Lagging the signal by one decision collapses the IC
-   to +0.031 / −0.034 / +0.021 (ensemble −0.015). Read honestly: at a 1 s
-   cadence equal to the 1 s horizon the shifted signal's window does not
-   overlap the label's, so a genuine 1 s signal AND a same-window leak
-   both collapse — the collapse confirms non-overlapping forward labels,
-   it does not by itself discriminate (this is exactly why
+   run on the same captured stream gives 0.217 / 0.110 / −0.079 at the
+   1 s cadence and 0.207 / 0.119 / −0.087 at the 100 ms research cadence
+   (5,095 rows): **the number is a property of the data, not of the MVP.**
+3. **Shift-by-one does not collapse the IC on this session.** Lagging the
+   signal by one decision gives +0.149 / +0.116 / −0.047 (ensemble +0.111)
+   against +0.217 / +0.110 / −0.079 (+0.104) unshifted. On the v1.3.0
+   session the same probe collapsed to +0.031 / −0.034 / +0.021. The
+   difference is the flow, not the loop: the slots that were packed into
+   the first 45 % of the session are now spread over all of it, each
+   venue's AR(1) noise and the book's lean towards the efficient price
+   move about 0.4 times as often per second (≈ 1,100 events a minute
+   against ≈ 2,600), and the signal outlives the
+   1 s horizon — EQ01's signal has an autocorrelation of 0.78 from one
+   decision to the next, and its IC against this decision's label decays
+   0.217 → 0.149 → 0.109 → 0.085 at lags of 0 to 3 decisions and is gone
+   by lag 5. A persistent signal survives a one-decision shift; so would a
+   same-window leak. The probe therefore does not discriminate here — as
+   it did not before, for the opposite reason (at a cadence equal to the
+   horizon a genuine 1 s signal and a leak both collapsed; this is why
    `iap.validation.leakage` scales its required survival ratio by
    `1 − row_gap / horizon`, which is 0 here). At the 100 ms cadence the
-   one-row shift keeps 0.219 of 0.275 (EQ01), the signature of a fast,
-   genuine, autocorrelated microstructure signal. The discriminating
-   evidence is items 1–2.
+   one-row shift keeps 0.184 of 0.207 (EQ01). The discriminating evidence
+   is items 1–2, and `test_golden_pins_the_honest_numbers` pins that the
+   shifted IC is reported and has this size rather than asserting a
+   collapse.
 4. **Why the synthetic stream is this predictable.** The generator
    (`iap.marketdata.generator`, unmodified, pinned) quotes every venue
    around ONE shared efficient price plus a bounded AR(1) venue noise
    (ρ 0.9 per flow slot, ≈ 200 ms) and cancels resting orders the
    efficient price has moved through: the displayed book leans towards the
-   efficient price and the mid converges to it within about a second.
+   efficient price and the mid converges to it over a few seconds.
    Microprice deviation (EQ01) and OFI (EQ03) measure precisely that lean,
    so mid-to-mid IC at 1 s is large; the same alphas fitted on the
-   bundled two-day dataset (registry `oos_ic` 0.027 / 0.030 / 0.043) sit
-   an order of magnitude lower. A real feed would not be this kind.
+   bundled two-day dataset (registry `oos_ic` 0.010 / 0.019 / 0.027) sit
+   an order of magnitude lower, on flow that is some thirty times sparser
+   (a slot every 6 s per venue stream against 0.2 s here). A real feed
+   would not be this kind. EQ06 (10 s momentum) has the wrong sign at both
+   horizons on this session.
 5. **It still does not pay.** The cost-adjusted IC (buy at the ask now,
-   sell at the bid at t+h) is +0.017 (EQ01) / +0.065 (EQ03) at 1 s: the
-   predicted move is smaller than the spread, which is the −22.65 USD
-   above and the research verdicts.
-6. **The gap the lifecycle sees.** `ic_gap` is now measured at the alpha's
-   FITTED horizon (like for like with the registry's `oos_ic`): 0.256 /
-   0.193 / 0.021. `paper_evidence.json` carries that IC, so the
-   `paper_ic_tracking` gate (max gap 0.01) fails EQ01 and EQ03 on this
-   data — correctly: paper behaviour that differs this much from research
-   is a finding, not a promotion. When an alpha's realized IC is undefined
+   sell at the bid at t+h) is −0.024 (EQ01) / −0.029 (EQ03) at 1 s — not
+   small and positive as on the v1.3.0 session, negative: the predicted
+   move is smaller than the spread, which is the −81.53 USD above and the
+   research verdicts.
+6. **The gap the lifecycle sees.** `ic_gap` is measured at the alpha's
+   FITTED horizon (like for like with the registry's `oos_ic`): 0.207 /
+   0.128 / 0.157. `paper_evidence.json` carries that IC, so the
+   `paper_ic_tracking` gate (max gap 0.01) fails all three alphas on this
+   data (EQ01 and EQ03 on the v1.3.0 session; EQ06's gap was 0.021 there)
+   — correctly: paper behaviour that differs this much from research is a
+   finding, not a promotion. When an alpha's realized IC is undefined
    (fewer than three valid label pairs — a short or halted session) or the
    registry has no research IC, its `paper` block is `null` (x-version 3,
    2026-09-20) and the lifecycle records `NO_EVIDENCE`: an undefined
    statistic is never written as `0.0` into an artefact a gate reads.
 
-Execution: IS qty-weighted +0.106 bps (delay 0, trading +0.080, opportunity
-+0.026); spread +0.079, impact −0.003 (passive fills captured spread), fees
-+0.024, timing +0.004; slippage vs arrival +0.40 bps (fill-weighted). Per
-algo: TWAP 31 orders / 3.0 % filled (passive limits at a 1 s horizon mostly
-expire: 51 expired children), POV 20 / 13.9 %, IS 15 / 68.9 %. Routing:
-XV3 75.9 %, XV1 12.1 %, XV2 11.9 % of filled qty (aggressive routing picks
-the cheapest taker fee on price ties; passive routing prefers XV1's rebate).
-Controls: 107 children blocked by `min_slice_interval_ns` (POV children on
+Execution: IS qty-weighted +0.063 bps (delay 0, trading +0.060, opportunity
++0.004); spread +0.056, impact +0.003, fees +0.020, timing −0.000;
+slippage vs arrival +0.39 bps (fill-weighted). Per algo: TWAP 104 orders /
+0.4 % filled (passive limits at a 1 s horizon almost never fill: 184
+expired children), POV 88 / 6.3 %, IS 43 / 72.9 %. Routing: XV3 70.9 %,
+XV1 19.8 %, XV2 9.3 % of filled qty (aggressive routing picks the
+cheapest taker fee on price ties; passive routing prefers XV1's rebate).
+Controls: 159 children blocked by `min_slice_interval_ns` (POV children on
 consecutive prints, and a new parent's first slice inside 500 ms of the
-previous parent's last child), 0 by participation, 0 by the latency
-budget, 0 NO_ROUTE. Risk: 105 ALLOW, 0 REJECT, 0 KILL, 9 sequence-gap
-gates each recovered by the following SNAPSHOT burst, 72 mark regressions
-dropped (older reference stamps, `risk_market_regressions_dropped_total`). Decision → arrival latency: min 350 µs, p50 394 µs, p99 582 µs.
+previous parent's last child), 2 capped and 0 blocked by participation, 0
+by the latency budget, 0 NO_ROUTE. Risk: 348 ALLOW, 0 REJECT, 0 KILL, 8
+sequence-gap gates each recovered by the following SNAPSHOT burst, 28 mark
+regressions dropped (older reference stamps,
+`risk_market_regressions_dropped_total`). Decision → arrival latency: min
+350 µs, p50 394 µs, p99 597 µs.
 
-Warm-up: 175 of 355 decisions produced no target (the first 1-minute bars
-for the EWMA variance; EQ06 needs a 1-minute realised-vol window), 114
+Warm-up: 169 of 800 decisions produced no target (the first 1-minute bars
+for the EWMA variance; EQ06 needs a 1-minute realised-vol window), 396
 were flat (target == position + in-flight).
 
 ## 8. MVP success criteria
@@ -372,7 +400,7 @@ were flat (target == position + in-flight).
 | TCA per parent (Perold identities as contract invariants) | done | `TcaAdapter`; `report.execution` |
 | Attribution per decision, residual reported | done | `engine._finalise`; `report.execution.attribution_residual_bps_mean` |
 | Decision trace: one validated `DecisionTrace` per decision, JSONL + SQLite, digest; `explain` distinguishes the acting signal from its components in all four languages | done | `traces.jsonl`, `iap.sqlite`; `test_mvp.py::test_store_row_counts_equal_trace_stage_counts`, `::test_signal_stage_is_ensemble_first_then_components`; `python/tests/test_contracts.py::test_explain_labels_the_acting_signal_and_its_components` + the Java / Rust / C++ twins |
-| §12.1 money identity, after every fill | done | `MvpEngine.assert_pnl_identity` (from `_process_reports` and `finish`); `report.pnl.identity_abs_diff` 3.3e-11 |
+| §12.1 money identity, after every fill | done | `MvpEngine.assert_pnl_identity` (from `_process_reports` and `finish`); `report.pnl.identity_abs_diff` 6.8e-11 |
 | Realized IC = the research label definition; leakage probes | done | `MvpEngine.realized_ic` over `iap.labels.compute_labels`; `test_mvp.py::test_realized_ic_is_pinned_to_the_research_label_definition`, `::test_realized_returns_agree_with_the_tca_timeline`, `::test_shift_by_one_and_truncation_leakage_probes`; `test_mvp_golden.py::test_golden_pins_the_honest_numbers`; §7.1 |
 | Determinism: run twice ⇒ identical bytes; replay from capture ⇒ same digest | done | `python -m iap.mvp verify` / `replay`; `tests/replay/test_mvp_replay_determinism.py`; `test_mvp_golden.py` |
 | Lifecycle: paper evidence for the CANDIDATE alphas, registry untouched | done | `paper_evidence.json`; `test_mvp.py::test_paper_evidence_and_report_are_consistent` |
@@ -385,15 +413,16 @@ were flat (target == position + in-flight).
 Known limits (stated, not hidden): one instrument and one session (the Java
 paper vertical covers the universe); the optimizer's t-cost is set below
 the modelled cost so the loop trades (§2, config notes); the generator's
-self-exciting flow consumes its slots in the first ~60 % of the session so
-the last minutes carry only the close auction; passive TWAP children at a
+flow covers the whole session since v1.4.0 (about 1,000–1,300 events a
+minute, fewer around the 45 s halt), which is why a one-decision shift no
+longer separates signal from label (§7.1 item 3); passive TWAP children at a
 1 s horizon almost never fill; per-alpha `net_pnl` in the paper evidence is
 the shared book's total (an ensemble session cannot be split per alpha);
 the simulator has no PEG/MID order types (documented optimism, §11.2); the
 realized IC is a single-instrument time-series IC over one 15-minute
-session (345 pairs — no fold structure, no Newey-West t-stat, no
+session (790 pairs — no fold structure, no Newey-West t-stat, no
 multiple-testing ledger entry: it is paper evidence for the lifecycle, not
-a research verdict); the shift-by-one probe cannot discriminate a leak at
-a cadence equal to the horizon (§7.1 item 3) — the pinned-definition and
-truncation tests are the leak evidence; `explain` renders expected returns
+a research verdict); the shift-by-one probe cannot discriminate a leak
+from a persistent signal on this session (§7.1 item 3) — the
+pinned-definition and truncation tests are the leak evidence; `explain` renders expected returns
 at 0.1 bp resolution (pinned format).

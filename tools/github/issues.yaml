@@ -1062,27 +1062,31 @@ issues:
     epic: E03
     title: "Bundled dataset: equity continuous flow that reaches the close"
     labels: [type:bug, area:marketdata, phase:w1, priority:p2, lang:python]
-    milestone: "Backlog"
-    status: backlog
+    milestone: "Week 1"
+    status: done
     estimate_days: 3
     context: >
-      In the pinned dataset every equity stream stops its continuous flow
-      38-43% of the way through the 6.5 h session (mean 40.5%) and prints
-      nothing until the close auction: slots_per_stream is a hard slot
-      budget, the base rate is slots / duration * 1.30 (the margin multiplies
-      the rate, so the budget would run out at 77% even without clustering)
-      and the self-exciting multiplier (1 + excitation) is not calibrated
-      for. equities.fill_session (opt-in since v1.3.0, default off) removes
-      the budget. Turning it on by default moves every artefact derived from
-      the dataset: qc_report.json, the feature files, the alpha and ML
-      reports, the baselines, the experiment ledger and the headline
-      numbers.
+      Up to v1.3.0 every equity stream of the bundled dataset stopped its
+      continuous flow 38-43% of the way through the 6.5 h session (mean
+      40.5%) and printed nothing until the close auction: slots_per_stream
+      was a hard slot budget, the base rate was slots / duration * 1.30 and
+      the self-exciting multiplier (1 + excitation) was not calibrated for.
+      Fixed in v1.4.0: equities.flow.calibration = "session" (the default,
+      generator config x-version 2) scales the base rate by E[1 / (1 +
+      excitation)] and drops the budget, so slots_per_stream expected slots
+      span the session and flow reaches the close with about the same number
+      of events; "legacy_budget" reproduces the v1.3.0 dataset. Every
+      artefact derived from the dataset was regenerated in the same release
+      by tools/regenerate_dataset_artifacts.py (CHANGELOG.md v1.4.0 has the
+      before/after of each headline number).
     acceptance:
       - "The default generator config produces equity flow up to the close in every session, with the event count chosen deliberately (rate calibrated, or the budget sized for the full session)"
       - "Every dataset-derived artefact is regenerated in one change, with the before/after of each headline number recorded (golden regeneration protocol, CONTRIBUTING.md §4)"
       - "A test pins the session coverage of the default config"
     evidence:
-      - "python/src/iap/marketdata/generator.py (_eq_session_stream); python/tests/test_generator.py (test_fill_session_is_opt_in_and_carries_equity_flow_to_the_close pins the opt-in today)"
+      - "python/src/iap/marketdata/generator.py (excitation_time_factor, _eq_session_stream); configs/marketdata/generator.json (x-version 2)"
+      - "python/tests/test_generator.py (test_default_flow_calibration_spans_the_session, test_legacy_budget_keeps_the_v1_3_0_flow_rule); tests/replay/test_generator_determinism.py (raw-file hashes of both datasets)"
+      - "tools/regenerate_dataset_artifacts.py; schemas/MIGRATIONS.md (2026-10-03, v1.4.0); CHANGELOG.md (v1.4.0)"
 
   # ---------------------------------------------------------------- E04 ----
   - key: RP01
