@@ -180,7 +180,43 @@ def _print_json(doc: Any) -> None:
     print(json.dumps(doc, indent=2, sort_keys=True, ensure_ascii=True, allow_nan=False))
 
 
+def _dataset_versions(args: argparse.Namespace) -> tuple[str | None, str | None]:
+    """``--dataset-dir``: run on an ingested dataset (docs/REAL_DATA.md).
+
+    Points every path that was left at its checkout default into the
+    dataset directory and returns its ``(dataset_version, feature_version)``
+    — read from ``dataset.json`` and ``features/features_summary.json`` — so
+    the spec, the experiment id and the ledger entries carry the REAL
+    dataset's version and its looks are never pooled with synthetic ones.
+    """
+    if args.dataset_dir is None:
+        return None, None
+    root = Path(args.dataset_dir)
+    try:
+        dataset_version = json.loads((root / "dataset.json").read_text())["dataset_version"]
+        feature_version = json.loads((root / "features" / "features_summary.json").read_text())[
+            "registry_hash"
+        ]
+    except (OSError, ValueError, KeyError) as exc:
+        raise ResearchError(
+            f"--dataset-dir {root}: needs dataset.json (python -m iap.marketdata ingest) and "
+            f"features/features_summary.json (python -m iap.features): {exc!r}",
+            code="invalid_spec",
+        ) from exc
+    for name, default, target in (
+        ("features_dir", REPO / "data" / "features", root / "features"),
+        ("configs_dir", REPO / "configs", root / "configs"),
+        ("ledger", REPO / "research" / "experiments.json", root / "research" / "experiments.json"),
+        ("out_dir", REPO / "research" / "experiments", root / "research" / "experiments"),
+    ):
+        if getattr(args, name) == default:
+            setattr(args, name, target)
+    args.ledger.parent.mkdir(parents=True, exist_ok=True)
+    return dataset_version, feature_version
+
+
 def _run(args: argparse.Namespace) -> int:
+    dataset_version, feature_version = _dataset_versions(args)
     runner = ExperimentRunner(
         args.features_dir,
         args.ledger,
@@ -197,6 +233,8 @@ def _run(args: argparse.Namespace) -> int:
         seed=args.seed,
         frames=runner.frames(),
         repo_root=args.repo_root,
+        dataset_version=dataset_version,
+        feature_version=feature_version,
     )
     print(render_spec(spec))
     print()
@@ -358,6 +396,13 @@ def _parser() -> argparse.ArgumentParser:
         choices=TSTAT_THRESHOLD_POLICIES,
         default="fixed",
         help="PROMOTE t-stat gate: the fixed 3.0 (default) or the ledger's Bonferroni |t|",
+    )
+    run.add_argument(
+        "--dataset-dir",
+        type=Path,
+        default=None,
+        help="an ingested real dataset (python -m iap.marketdata ingest): features, configs, "
+        "ledger and experiments default to that directory and its dataset_version is recorded",
     )
     run.add_argument("--features-dir", type=Path, default=REPO / "data" / "features")
     run.add_argument("--ledger", type=Path, default=REPO / "research" / "experiments.json")

@@ -200,7 +200,9 @@ months of sessions, and the report says so in print.
 
 **All bundled market data is synthetic** (seeded generator,
 `python/src/iap/marketdata/generator.py`). Every research result is a
-statement about this dataset and pipeline, not about real markets.
+statement about this dataset and pipeline, not about real markets. Real
+historical files you obtain yourself (Nasdaq TotalView-ITCH 5.0, LOBSTER)
+can be ingested into the same pipeline: [docs/REAL_DATA.md](docs/REAL_DATA.md).
 
 ## Repository map
 
@@ -403,7 +405,8 @@ golden tests — the engineering discipline this repo is built around
 |---|---|
 | [LEARN.md](LEARN.md) | textbook walkthrough: microstructure, generator, book, features, honest alpha research, ML/meta-labeling, portfolio, risk, execution, TCA, parity, latency economics, adaptability, contracts & Protocols, the Python risk/execution reference, the 7-state lifecycle, the decision trace, the data model, the MVP walkthrough with its honest numbers, the v1.3.0 review as six case-study chapters (fail-closed risk bugs, simulator realism, statistical power, gate gaming, crash consistency, supply-chain hygiene), pitfalls, interview Q&A |
 | [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) | how the quant, algo and AI sides work — a guided explanation for a newcomer: the pipeline on one page, the research statistics and gates, the execution algorithms and simulator rules, the fail-closed risk engine, the ML layer with its negative results, the LLM/agent boundary (what exists, what is backlog, what would be theatre on this data), determinism and replay; every section ends with where to look and a command that runs |
-| [COOKBOOK.md](COOKBOOK.md) | 35 task-oriented recipes with runnable commands |
+| [COOKBOOK.md](COOKBOOK.md) | 36 task-oriented recipes with runnable commands |
+| [docs/REAL_DATA.md](docs/REAL_DATA.md) | real historical data: what `python -m iap.marketdata ingest` reads (Nasdaq TotalView-ITCH 5.0, LOBSTER), how to obtain files yourself (nothing is bundled), the commands from a downloaded file to an alpha report, the mapping table to canonical events, the point-in-time security master and corporate-actions table, known limitations, and what a first real-data study can and cannot conclude |
 | [docs/RESEARCH_VALIDITY.md](docs/RESEARCH_VALIDITY.md) + [research/power/POWER_REPORT.md](research/power/POWER_REPORT.md) | the opt-in corrected research methods (each with its pinned default), the research store under parallel writers, gate eligibility; the planted-signal power study of the validation chain |
 | [CHANGELOG.md](CHANGELOG.md) | release notes, newest first (v1.4.0: the generator's equity flow calibration fixed so flow reaches the close, and every dataset-derived artefact regenerated; v1.3.0: fail-closed risk, simulator fill rules, paper-platform safety, governance and deployment hardening, research validity) |
 | [docs/MVP.md](docs/MVP.md) | the executable MVP (`python -m iap.mvp run / replay / verify / explain`): one deterministic, fully traced trading loop on a synthetic equity — the loop module by module, the §11.4 wiring rules with code references, the determinism contract, the incident replay flow, the honest golden-run results (cost-negative) with the realized-IC audit, and the success-criteria table |
