@@ -13,12 +13,15 @@ maps the outcome onto the contract:
 2. **Walk-forward evidence** — :func:`iap.validation.validate.validate_alpha`
    over the window: expanding walk-forward with ``n_folds`` folds, purged
    at the horizon and embargoed by ``embargo_ns`` (row-mass boundaries,
-   never a random split), leakage tests, Newey-West-lite t on 5-minute
-   bucket ICs, fold sign consistency, hypothesis sign, the pinned
-   cost / latency / regime stress grid and the §20 verdict.  The research
-   backtester it carries uses the spec's ``latency_ns``,
-   ``max_decision_age_ns`` and ``flatten_at_session_end`` at 1x costs (the
-   gates read the 1x cost survival; the stress grid is absolute).
+   never a random split), leakage tests (with the recompute probe when the
+   normalized events are beside the feature store), the pooled IC and its
+   HAC t, fold sign consistency, hypothesis sign, the pinned cost / latency
+   / regime stress grid, per-fold diagnostics and the §20 verdict — all
+   under the method bundle the spec names (``configuration.methods``,
+   :mod:`iap.validation.methods`).  The research backtester it carries uses
+   the spec's ``latency_ns``, ``max_decision_age_ns`` and
+   ``flatten_at_session_end`` at 1x costs (the gates read the 1x cost
+   survival; the stress grid is absolute).
 3. **Holdout economics** — a fresh model fitted on ``train_period`` (rows
    that ALSO satisfy the splitter's purge + embargo mask against
    ``test_period.start_ts``; ``validation_period`` rows are never fitted on),
@@ -28,14 +31,29 @@ maps the outcome onto the contract:
    (``max_pos_qty x ref_price x unit`` per universe instrument, converted
    to USD — ``run_all.py``'s ``_capital_usd``); Sharpe is the backtester's
    annualised 1-minute-bar Sharpe.
-4. **Ledger.**  The run is one entry of :data:`LOOKS_PER_EXPERIMENT` looks
-   in the multiple-testing ledger under kind ``"experiment_runner"`` with
-   the full spec as its configuration; the ledger de-duplicates by
-   (alpha, kind, config), so re-running a spec does not inflate the
-   denominator.  ``n_experiments_in_ledger`` is the total after recording.
+4. **Ledger.**  The run is one entry in the multiple-testing ledger under
+   kind ``"experiment_runner"`` with the full spec as its configuration,
+   debiting ``ResearchMethods.looks(n_folds)`` looks — what the chain
+   evaluates under the spec's bundle (84 under ``v2`` at four folds,
+   :data:`LOOKS_PER_EXPERIMENT`; 28 under ``legacy_v1``).  The ledger
+   de-duplicates by (alpha, kind, config), so re-running a spec does not
+   inflate the denominator.  ``n_experiments_in_ledger`` is the total
+   after recording.
+
+   *The t threshold (pinned, ``v2``).*  PROMOTE needs the gate t to reach
+   ``max(3.0, Bonferroni |t| at N looks)`` with ``N`` the run's gate look
+   count (``iap.validation.ledger``, "Gate look count"): the looks in the
+   ledger before the run plus the looks this run adds, or — for a spec
+   that has been run before — the count recorded on its entry.  A rerun is
+   therefore judged at the threshold of its first run and reproduces its
+   verdict; ``N`` is stored on the ledger entry (``gate_looks``) and, with
+   the threshold, in ``eligibility.json``.
 5. **Result.**  The mapping from ``validate_alpha``'s report (contracts
-   notes §2): ``oos_ic -> ic``, ``oos_rank_ic -> rank_ic``,
-   ``nw_tstat -> t_stat``, ``nw_lags``, ``oos_hit_rate -> hit_rate``,
+   notes §2).  Under ``v2``: ``gate_ic -> ic`` and ``gate_tstat -> t_stat``
+   — the two numbers the verdict read (the pooled IC on uncrossed rows and
+   its pooled-slope HAC t).  Under ``legacy_v1``: ``oos_ic -> ic`` and
+   ``nw_tstat -> t_stat``, the mapping up to v1.4.0.  In both:
+   ``oos_rank_ic -> rank_ic``, ``nw_lags``, ``oos_hit_rate -> hit_rate``,
    ``turnover_flips_per_hour -> turnover``, ``fold_sign_consistency ->
    fold_consistency``, ``n_folds_run -> n_folds``, ``leakage.passed ->
    leakage_passed``, ``leakage -> leakage_detail``, ``hypothesis_confirmed
@@ -44,6 +62,15 @@ maps the outcome onto the contract:
    ``test_period.end_ts`` — event time, never the wall clock.  Every
    float must be finite: a metric the chain could not compute raises
    :class:`ResearchError` naming it — nothing is ever filled in.
+
+   *A holdout without a trade (pinned).*  Under the cost-aware position
+   policy an alpha whose expected return never clears its round-trip cost
+   does not trade at all.  Its holdout P&L series is identically zero:
+   gross, cost, net and drawdown are 0 and the Sharpe ratio is 0/0.  That
+   outcome is a result, not a failure of the chain, so ``sharpe`` is
+   reported as ``0.0`` for a holdout with ZERO trades (and only then — a
+   non-finite Sharpe of a holdout that traded still raises).  A net return
+   of 0 does not pass the strict ``net_return_bps > 0`` gate.
 6. **Persistence**: ``<out_dir>/<experiment_id>/spec.json``,
    ``result.json`` and ``eligibility.json`` — schema-validated, sorted
    keys, 2-space indent, ASCII, LF, trailing newline — and the ledger file.
@@ -66,18 +93,13 @@ maps the outcome onto the contract:
    free and persist only the winner.  The later real run of the same spec
    de-duplicates against the dry run's entry, so nothing is counted twice.
 7. **Gate eligibility** — :func:`iap.research.specs.gate_eligibility` on the
-   spec and the runner's dataset, kept on the runner as ``last_eligibility``
-   and persisted as ``eligibility.json``.  A result from a configuration
-   outside the pinned bounds, or on caller-chosen periods, is recorded and
-   ledgered like any other but flagged not gate-eligible.
-
-**Opt-in t-stat policy.**  ``tstat_threshold="ledger"`` makes the verdict's
-PROMOTE gate use the ledger's Bonferroni |t| at the total the ledger will
-have once this run's looks are debited (never below the fixed 3.0).  The
-default ``"fixed"`` is the pinned behaviour.  Under ``"ledger"`` the verdict
-depends on the ledger snapshot, so a rerun after the ledger has grown can
-legitimately reproduce a different verdict — which the rerun check then
-refuses under the same id, as it should: one id holds one verdict.
+   spec, the runner's dataset and the facts of the run, kept on the runner
+   as ``last_eligibility`` and persisted as ``eligibility.json``.  A result
+   from a configuration outside the pinned bounds, under the legacy method
+   bundle, on caller-chosen periods, or from a run that could not apply the
+   whole default chain (no normalized events for the recompute probe, no
+   ``label_reopen`` columns in the frames) is recorded and ledgered like
+   any other but flagged not gate-eligible.
 """
 
 from __future__ import annotations
@@ -109,14 +131,17 @@ from iap.research.specs import (
     pinned_horizon,
     verify_experiment_id,
 )
+from iap.validation.leakage import RecomputeSources
 from iap.validation.ledger import ExperimentLedger
+from iap.validation.methods import METHODS_LEGACY, METHODS_V2, ResearchMethods, methods
 from iap.validation.metrics import HORIZONS_NS
 from iap.validation.splits import Fold
-from iap.validation.validate import TSTAT_THRESHOLD_POLICIES, validate_alpha
+from iap.validation.validate import validate_alpha
 
 __all__ = [
     "DOCUMENT_TOL",
     "LEDGER_KIND",
+    "LEGACY_LOOKS_PER_EXPERIMENT",
     "LOOKS_PER_EXPERIMENT",
     "ExperimentRunner",
     "build_result",
@@ -127,24 +152,23 @@ __all__ = [
     "restrict_frames",
 ]
 
-#: Looks at the data one experiment makes.  The ledger is the denominator of
-#: every multiple-testing correction in the research, so it counts what the
-#: chain ACTUALLY evaluates, not a round number:
+#: Looks at the data one experiment makes under the default method bundle
+#: at the pinned four folds.  The ledger is the denominator of every
+#: multiple-testing correction in the research, so it counts what the chain
+#: ACTUALLY evaluates, not a round number.  The itemisation is
+#: :func:`iap.validation.validate.looks_per_validation` (83 at four folds:
+#: 19 pooled statistics and stresses, plus 16 per fold — 11 decay ICs, 3 cost
+#: backtests, 2 regime ICs) plus the 1 holdout backtest of the declared test
+#: period.  A spec with another fold count debits
+#: ``methods(...).looks(n_folds)``; this constant is the default case.
 #:
-#:   1  pooled walk-forward OOS IC / Newey-West t (the headline evaluation)
-#:  11  decay curve, one IC per pinned label horizon (metrics.HORIZON_ORDER)
-#:   3  cost stress, one backtest per stress.COST_MULTIPLIERS entry
-#:   3  latency stress, ROW grid (stress.LATENCY_SHIFTS)
-#:   4  latency stress, TIME grid (stress.LATENCY_TIMES_NS)
-#:   2  regime split, IC in high vol and in low vol (stress.regime_split)
-#:   2  crossed / uncrossed conditional IC (the gate reads the uncrossed one)
-#:   1  leakage shift-by-one IC (LeakageTester.shift_test)
-#:   1  holdout backtest on the declared test period
-#: = 28.  The previous value, 21, omitted the time-latency grid, the
-#: crossed-book split and the leakage shift IC — three families of looks that
-#: were added to the chain without being added to its denominator, which
-#: makes every corrected t-stat in the reports look better than it is.
-LOOKS_PER_EXPERIMENT = 28
+#: Up to v1.4.0 the chain evaluated decay, cost stress and regime on the
+#: last fold only and counted 28 (:data:`LEGACY_LOOKS_PER_EXPERIMENT`, what
+#: a ``legacy_v1`` run still debits).  The statistics v1.3.0 added beside
+#: the gate — the pooled-slope t, the scale-free ICs — were computed and
+#: reported without being counted; they are counted now.
+LOOKS_PER_EXPERIMENT = methods(METHODS_V2).looks(4)
+LEGACY_LOOKS_PER_EXPERIMENT = methods(METHODS_LEGACY).looks(4)
 
 #: Ledger ``kind`` of every runner entry.
 LEDGER_KIND = "experiment_runner"
@@ -156,15 +180,27 @@ ELIGIBILITY_FILE = "eligibility.json"
 #: Prefix of the staging directory a new experiment is assembled in.
 STAGING_PREFIX = ".staging-"
 
-#: ``ExperimentResult`` field <- ``validate_alpha`` report key.
-_REPORT_METRICS = (
-    ("ic", "oos_ic"),
-    ("rank_ic", "oos_rank_ic"),
-    ("t_stat", "nw_tstat"),
-    ("hit_rate", "oos_hit_rate"),
-    ("turnover", "turnover_flips_per_hour"),
-    ("fold_consistency", "fold_sign_consistency"),
-)
+#: ``ExperimentResult`` field <- ``validate_alpha`` report key, per method
+#: bundle (module docs, step 5): ``v2`` records the two numbers the verdict
+#: read; ``legacy_v1`` keeps the mapping up to v1.4.0.
+_REPORT_METRICS = {
+    METHODS_V2: (
+        ("ic", "gate_ic"),
+        ("rank_ic", "oos_rank_ic"),
+        ("t_stat", "gate_tstat"),
+        ("hit_rate", "oos_hit_rate"),
+        ("turnover", "turnover_flips_per_hour"),
+        ("fold_consistency", "fold_sign_consistency"),
+    ),
+    METHODS_LEGACY: (
+        ("ic", "oos_ic"),
+        ("rank_ic", "oos_rank_ic"),
+        ("t_stat", "nw_tstat"),
+        ("hit_rate", "oos_hit_rate"),
+        ("turnover", "turnover_flips_per_hour"),
+        ("fold_consistency", "fold_sign_consistency"),
+    ),
+}
 
 #: Result fields a rerun may legitimately change (provenance, not evidence).
 _PROVENANCE_FIELDS = ("git_commit", "n_experiments_in_ledger")
@@ -345,9 +381,11 @@ def build_result(
     ``gross - cost`` so the contract identity holds exactly.  Any metric
     that is missing, ``None`` or non-finite raises :class:`ResearchError`
     naming it (``validate_alpha`` reports an incomputable metric as
-    ``None``).
+    ``None``).  Which report keys feed ``ic`` and ``t_stat`` follows the
+    spec's method bundle (:data:`_REPORT_METRICS`).
     """
-    metrics = {field: _finite(report.get(key), key) for field, key in _REPORT_METRICS}
+    bundle = str(spec.configuration.get("methods", METHODS_LEGACY))
+    metrics = {field: _finite(report.get(key), key) for field, key in _REPORT_METRICS[bundle]}
     leakage = report.get("leakage")
     if not isinstance(leakage, Mapping) or "passed" not in leakage:
         raise ResearchError("report carries no leakage block")
@@ -397,8 +435,11 @@ class ExperimentRunner:
     (``research/experiments``), ``configs_dir`` the ``configs/`` tree
     (instruments + execution cost model).  With ``dry_run`` no experiment
     directory is written, but the ledger is saved — a dry run is a look
-    (module docs, step 6).  ``tstat_threshold`` is the opt-in PROMOTE
-    t-stat policy (``"fixed"`` | ``"ledger"``).
+    (module docs, step 6).  ``normalized_dir`` holds the normalized event
+    files the recompute leakage probe rebuilds features from; it defaults
+    to ``<feature_store_dir>/../normalized`` and to nothing when the runner
+    is given frames in memory (the probe then does not run and the result
+    is not gate-eligible).
     """
 
     def __init__(
@@ -411,19 +452,18 @@ class ExperimentRunner:
         dry_run: bool = False,
         frames: Mapping[int, pd.DataFrame] | None = None,
         repo_root: Path | None = None,
-        tstat_threshold: str = "fixed",
+        normalized_dir: Path | None = None,
     ) -> None:
         if feature_store_dir is None and frames is None:
             raise ResearchError("ExperimentRunner needs a feature_store_dir or frames")
-        if tstat_threshold not in TSTAT_THRESHOLD_POLICIES:
-            raise ResearchError(
-                f"unknown tstat_threshold {tstat_threshold!r}; "
-                f"known: {list(TSTAT_THRESHOLD_POLICIES)}"
-            )
-        self.tstat_threshold = tstat_threshold
         #: eligibility of the most recent ``run`` (``None`` before any run)
         self.last_eligibility: GateEligibility | None = None
+        #: ``validate_alpha`` report of the most recent ``run``
+        self.last_report: dict[str, Any] | None = None
         self.feature_store_dir = Path(feature_store_dir) if feature_store_dir else None
+        if normalized_dir is None and self.feature_store_dir is not None and frames is None:
+            normalized_dir = self.feature_store_dir.parent / "normalized"
+        self.normalized_dir = Path(normalized_dir) if normalized_dir is not None else None
         self.ledger_path = Path(ledger_path)
         self.out_dir = Path(out_dir)
         self.configs_dir = Path(configs_dir)
@@ -437,6 +477,7 @@ class ExperimentRunner:
         self.max_participation = float(exec_cfg["defaults"]["max_participation"])
         self.cost_model = CostModel.load(self.configs_dir / "execution" / "execution.json")
         self.ledger = ExperimentLedger(self.ledger_path)
+        self._recompute = RecomputeSources(self.normalized_dir, self.configs_dir)
 
     # -- inputs ---------------------------------------------------------
 
@@ -446,17 +487,25 @@ class ExperimentRunner:
             self._frames = load_features(self.feature_store_dir)
         return self._frames
 
+    @staticmethod
+    def _methods(spec: ExperimentSpec) -> ResearchMethods:
+        return methods(str(spec.configuration["methods"]))
+
     def _backtester(self, spec: ExperimentSpec, cost_multiplier: float) -> Backtester:
+        """The research backtester under the spec's protocol and method
+        bundle, with the spec's label horizon set."""
         cfg = spec.configuration
-        return Backtester(
-            self.cost_model.with_multiplier(cost_multiplier),
-            self.meta,
-            BacktestConfig(
-                latency_ns=int(cfg["latency_ns"]),
-                max_decision_age_ns=int(cfg["max_decision_age_ns"]),
-                flatten_at_session_end=bool(cfg["flatten_at_session_end"]),
-            ),
+        bundle = self._methods(spec)
+        config: BacktestConfig = bundle.backtest_config(
+            latency_ns=int(cfg["latency_ns"]),
+            max_decision_age_ns=int(cfg["max_decision_age_ns"]),
+            flatten_at_session_end=bool(cfg["flatten_at_session_end"]),
         )
+        return Backtester(
+            bundle.cost_model(self.cost_model).with_multiplier(cost_multiplier),
+            self.meta,
+            config,
+        ).for_horizon(spec.horizon)
 
     @staticmethod
     def _model_factory(spec: ExperimentSpec) -> Callable[[], AlphaModel]:
@@ -476,6 +525,14 @@ class ExperimentRunner:
         pinned_horizon(spec.alpha_id)
         if spec.horizon not in HORIZONS_NS:
             raise ResearchError(f"unknown horizon {spec.horizon!r}")
+        if "methods" not in spec.configuration:
+            raise ResearchError(
+                "spec.configuration names no method bundle: the spec was written before "
+                "v1.5.0, when the legacy methods were the only ones. It cannot be re-run "
+                "under its old id — build it again with configuration methods='legacy_v1' "
+                "to reproduce it, or 'v2' for the default protocol",
+                code="invalid_spec",
+            )
         if normalise_configuration(spec.configuration) != dict(spec.configuration):
             raise ResearchError(
                 "spec.configuration is not normalised — build specs with iap.research.build_spec"
@@ -523,14 +580,33 @@ class ExperimentRunner:
                 f"backtester accounting identity violated: net {net} != gross {gross} "
                 f"- costs {costs}"
             )
+        # A holdout that made no trade has an identically-zero P&L series and
+        # a 0/0 Sharpe; it is reported as 0.0 (module docs, step 5).  Any
+        # other non-finite Sharpe is left for build_result to refuse.
+        sharpe = 0.0 if result.trade_count == 0 else float(metrics["sharpe_ann"])
         return {
             "gross_return_bps": gross / capital * BPS,
             "transaction_cost_bps": costs / capital * BPS,
             "max_drawdown_bps": float(metrics["max_drawdown"]) / capital * BPS,
-            "sharpe": float(metrics["sharpe_ann"]),
+            "sharpe": sharpe,
         }
 
-    def _ledger_total_after(self, spec: ExperimentSpec, report: Mapping[str, Any]) -> int:
+    def _looks(self, spec: ExperimentSpec) -> int:
+        """Looks this spec's run debits (module docs, step 4)."""
+        return self._methods(spec).looks(int(spec.configuration["n_folds"]))
+
+    def _gate_looks(self, spec: ExperimentSpec) -> int:
+        """The look count this spec's t threshold is derived from: recorded
+        on its ledger entry when it has run before, else the ledger total
+        once this run's looks are in it."""
+        identity = (spec.alpha_id, LEDGER_KIND, spec.to_dict(), self._looks(spec))
+        return self.ledger.gate_looks_for(
+            spec.alpha_id, LEDGER_KIND, spec.to_dict(), self.ledger.batch_total([identity])
+        )
+
+    def _ledger_total_after(
+        self, spec: ExperimentSpec, report: Mapping[str, Any], gate_looks: int | None
+    ) -> int:
         return self.ledger.record(
             spec.alpha_id,
             LEDGER_KIND,
@@ -539,9 +615,12 @@ class ExperimentRunner:
                 "experiment_id": spec.experiment_id,
                 "oos_ic": report["oos_ic"],
                 "nw_tstat": report["nw_tstat"],
+                "gate_ic": report["gate_ic"],
+                "gate_tstat": report["gate_tstat"],
                 "verdict": report["verdict"],
             },
-            count=LOOKS_PER_EXPERIMENT,
+            count=self._looks(spec),
+            gate_looks=gate_looks,
         )
 
     # -- persistence ----------------------------------------------------
@@ -662,17 +741,17 @@ class ExperimentRunner:
             )
         _assert_holdout_is_held_out(wf_window, spec.test_period.start_ts)
         cfg = spec.configuration
-        ledger_t = None
-        if self.tstat_threshold == "ledger":
-            # The threshold the ledger implies once THIS run's looks are in
-            # it (a rerun adds none): the run is judged against the
-            # denominator it contributes to.
-            ledger_t = self.ledger.bonferroni_t_threshold_at(
-                self.ledger.total_experiments
-                + self.ledger.would_add(
-                    spec.alpha_id, LEDGER_KIND, spec.to_dict(), LOOKS_PER_EXPERIMENT
-                )
-            )
+        bundle = self._methods(spec)
+        gate_looks: int | None = None
+        ledger_t: float | None = None
+        if bundle.tstat_threshold == "ledger":
+            # The run is judged against the denominator it contributes to,
+            # and a rerun against the one its first run was judged at
+            # (iap.validation.ledger, "Gate look count").
+            gate_looks = self._gate_looks(spec)
+            ledger_t = self.ledger.bonferroni_t_threshold_at(gate_looks)
+        asset_class = "FX" if probe.asset_class == "FX" else "EQUITY"
+        recompute = self._recompute.get(asset_class) if bundle.recompute_probe else None
         try:
             report = validate_alpha(
                 factory,
@@ -682,14 +761,35 @@ class ExperimentRunner:
                 self.max_participation,
                 n_folds=int(cfg["n_folds"]),
                 embargo_ns=int(cfg["embargo_ns"]),
-                tstat_threshold=self.tstat_threshold,
                 ledger_t_threshold=ledger_t,
+                ledger_looks=gate_looks,
+                seed=int(spec.seed),
+                recompute=recompute,
+                **bundle.validate_kwargs(),
             )
         except ValueError as exc:  # splitter: too few rows / degenerate boundaries
             raise ResearchError(f"walk-forward validation impossible: {exc}") from exc
+        self.last_report = report
         holdout = self._holdout(spec, full_window, factory)
-        eligibility = gate_eligibility(spec, self.frames())
-        total = self._ledger_total_after(spec, report)
+        run_reasons: list[str] = []
+        if bundle.recompute_probe and report["leakage"]["recompute_ok"] is None:
+            run_reasons.append(
+                "the recompute leakage probe did not run: no normalized event file for "
+                f"{asset_class} beside the feature store"
+            )
+        if bundle.name == METHODS_V2 and not report["label_reopen_available"]:
+            run_reasons.append(
+                "the frames carry no label_reopen column: the default row policy could "
+                "not score BLACKOUT rows (feature store written before v1.5.0)"
+            )
+        eligibility = gate_eligibility(
+            spec,
+            self.frames(),
+            run_reasons=run_reasons,
+            significance_threshold=float(report["gates"]["min_nw_tstat"]),
+            threshold_looks=gate_looks,
+        )
+        total = self._ledger_total_after(spec, report, gate_looks)
         try:
             result = build_result(spec, report, holdout, total, tracker.git_commit(self.repo_root))
         except ResearchError:

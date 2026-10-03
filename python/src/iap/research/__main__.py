@@ -4,7 +4,7 @@
 
     python -m iap.research [--json-errors] run --alpha EQ03 [--horizon 1s]
                                [--config n_folds=3 ...] [--seed N] [--dry-run]
-                               [--tstat-threshold fixed|ledger]
+                               [--methods v2|legacy_v1]
     python -m iap.research list [--alpha EQ03] [--horizon 1s] [--json]
     python -m iap.research show <experiment_id> [--json]
     python -m iap.research power [--levels 0,0.5,1,2] [--seeds 3]
@@ -20,7 +20,12 @@ the ledger.  ``--dry-run`` writes no experiment directory but STILL debits
 the looks in the ledger (a dry run is a look).  Paths default to the
 checkout; every one can be overridden for a scratch store.  ``--config``
 values are parsed as JSON (``n_folds=3``, ``cost_multiplier=2.0``,
-``flatten_at_session_end=false``).
+``flatten_at_session_end=false``).  ``--methods`` names the research method
+bundle (:mod:`iap.validation.methods`): ``v2``, the default, or
+``legacy_v1``, the rules up to v1.4.0 — it is the ``methods`` key of the
+configuration and therefore part of the experiment id.  (The v1.3.0 /
+v1.4.0 flag ``--tstat-threshold`` is gone: the ledger threshold is part of
+``v2`` and the fixed 3.0 part of ``legacy_v1``.)
 
 ``power`` runs the planted-signal power study (:mod:`iap.research.power`)
 and writes ``POWER_REPORT.md`` / ``POWER_REPORT.json``.
@@ -52,15 +57,15 @@ from iap.research.registry import ExperimentRecord, ExperimentRegistry
 from iap.research.runner import ExperimentRunner
 from iap.research.specs import DEFAULT_SEED, GateEligibility, build_spec
 from iap.validation.ledger import ExperimentLedger
-from iap.validation.validate import TSTAT_THRESHOLD_POLICIES
+from iap.validation.methods import METHODS
 
 REPO = Path(__file__).resolve().parents[4]
 
 #: (label, field, format) rows of the result table, in reading order.
 _RESULT_ROWS = (
-    ("IC (pooled OOS, z)", "ic", "+.6f"),
+    ("IC (the gate's: pooled OOS, z)", "ic", "+.6f"),
     ("rank IC", "rank_ic", "+.6f"),
-    ("NW t-stat", "t_stat", "+.4f"),
+    ("t-stat (the gate's)", "t_stat", "+.4f"),
     ("NW lags", "nw_lags", "d"),
     ("hit rate", "hit_rate", ".4f"),
     ("turnover (flips/h)", "turnover", ".2f"),
@@ -145,15 +150,25 @@ def render_ledger_note(ledger: ExperimentLedger) -> str:
 
 
 def render_eligibility(eligibility: GateEligibility) -> str:
-    """One line (plus one per reason) on whether the result is gate evidence."""
+    """One line (plus one per reason) on whether the result is gate evidence,
+    and the significance threshold the result was judged at when recorded."""
+    lines: list[str] = []
+    if eligibility.significance_threshold is not None:
+        source = (
+            f"ledger Bonferroni |t| at {eligibility.threshold_looks} looks"
+            if eligibility.threshold_looks is not None
+            else "fixed"
+        )
+        lines.append(f"PROMOTE t threshold: {eligibility.significance_threshold:.4f} ({source})")
     if eligibility.eligible:
         note = (
             ""
             if eligibility.periods_verified
             else " (configuration only; periods not verified against a dataset)"
         )
-        return f"gate eligible: yes{note}"
-    lines = ["gate eligible: NO — recorded and ledgered, but not promotion evidence"]
+        lines.append(f"gate eligible: yes{note}")
+        return "\n".join(lines)
+    lines.append("gate eligible: NO — recorded and ledgered, but not promotion evidence")
     lines += [f"  - {reason}" for reason in eligibility.reasons]
     return "\n".join(lines)
 
@@ -163,6 +178,9 @@ def _eligibility_doc(eligibility: GateEligibility) -> dict[str, Any]:
         "gate_eligible": eligibility.eligible,
         "periods_verified": eligibility.periods_verified,
         "reasons": list(eligibility.reasons),
+        "methods": eligibility.methods,
+        "significance_threshold": eligibility.significance_threshold,
+        "threshold_looks": eligibility.threshold_looks,
     }
 
 
@@ -188,12 +206,20 @@ def _run(args: argparse.Namespace) -> int:
         args.configs_dir,
         dry_run=args.dry_run,
         repo_root=args.repo_root,
-        tstat_threshold=args.tstat_threshold,
+        normalized_dir=args.normalized_dir,
     )
+    configuration = _parse_config(args.config)
+    if args.methods is not None:
+        if configuration.get("methods", args.methods) != args.methods:
+            raise ResearchError(
+                f"--methods {args.methods} contradicts --config methods={configuration['methods']}",
+                code="invalid_spec",
+            )
+        configuration["methods"] = args.methods
     spec = build_spec(
         args.alpha,
         args.horizon,
-        _parse_config(args.config),
+        configuration,
         seed=args.seed,
         frames=runner.frames(),
         repo_root=args.repo_root,
@@ -354,12 +380,19 @@ def _parser() -> argparse.ArgumentParser:
         "written, the looks are still debited in the ledger",
     )
     run.add_argument(
-        "--tstat-threshold",
-        choices=TSTAT_THRESHOLD_POLICIES,
-        default="fixed",
-        help="PROMOTE t-stat gate: the fixed 3.0 (default) or the ledger's Bonferroni |t|",
+        "--methods",
+        choices=sorted(METHODS),
+        default=None,
+        help="research method bundle: v2 (default) or legacy_v1 (the rules up to v1.4.0)",
     )
     run.add_argument("--features-dir", type=Path, default=REPO / "data" / "features")
+    run.add_argument(
+        "--normalized-dir",
+        type=Path,
+        default=None,
+        help="normalized events for the recompute leakage probe "
+        "(default: <features-dir>/../normalized)",
+    )
     run.add_argument("--ledger", type=Path, default=REPO / "research" / "experiments.json")
     run.add_argument("--configs-dir", type=Path, default=REPO / "configs")
     run.add_argument(
