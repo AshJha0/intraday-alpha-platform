@@ -154,31 +154,54 @@ final class KillSwitch {
             case GLOBAL -> e.setKillGlobal(engaged);
             case STRATEGY -> e.killStrategies.put(scopeId, engaged);
             case INSTRUMENT -> {
-                try {
-                    // Instrument ids are u32 (the Rust reference parses the
-                    // scope id with parse::<u32>()).
-                    e.killInstruments.put(
-                            Integer.toUnsignedLong(
-                                    Integer.parseUnsignedInt(scopeId)),
-                            engaged);
-                } catch (NumberFormatException ex) {
+                // Instrument ids are u32 (the Rust reference parses the
+                // scope id with parse::<u32>()).
+                long iid = parseUint(scopeId, 0xFFFFFFFFL);
+                if (iid < 0) {
                     return false;
                 }
+                e.killInstruments.put(iid, engaged);
             }
             case VENUE -> {
-                int vid;
-                try {
-                    vid = Integer.parseInt(scopeId);
-                } catch (NumberFormatException ex) {
+                long vid = parseUint(scopeId, 0xFFFFL);
+                if (vid < 0) {
                     return false;
                 }
-                if (vid < 0 || vid > 0xFFFF) {
-                    return false;
-                }
-                e.killVenues.put(vid, engaged);
+                e.killVenues.put((int) vid, engaged);
             }
         }
         return true;
+    }
+
+    /**
+     * Rust {@code str::parse::<uN>()} for an unsigned id of at most
+     * {@code hi} ({@code hi <= u32::MAX}): an optional single leading
+     * {@code +}, then one or more ASCII digits {@code 0-9}, value within
+     * range. Returns {@code -1} for anything else. {@link Integer#parseInt}
+     * is NOT that grammar: it accepts {@code -0} and every Unicode decimal
+     * digit (Arabic-Indic, fullwidth, ...), so a scope id the reference
+     * rejects used to address a real scope here.
+     */
+    static long parseUint(String s, long hi) {
+        if (s == null) {
+            return -1;
+        }
+        int i = !s.isEmpty() && s.charAt(0) == '+' ? 1 : 0;
+        if (i == s.length()) {
+            return -1;
+        }
+        long v = 0;
+        for (; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c < '0' || c > '9') {
+                return -1;
+            }
+            v = v * 10 + (c - '0');
+            if (v > hi) {
+                return -1;
+            }
+        }
+        return v;
     }
 
     /** {@code "INSTRUMENT"} / {@code "VENUE"} / ... for malformed-kill reasons. */

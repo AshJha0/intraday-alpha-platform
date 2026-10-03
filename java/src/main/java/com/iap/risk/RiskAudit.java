@@ -356,11 +356,11 @@ final class RiskAudit {
     }
 
     private static long parseU32(String s, String what) {
-        try {
-            return Integer.toUnsignedLong(Integer.parseUnsignedInt(s));
-        } catch (NumberFormatException e) {
+        long v = KillSwitch.parseUint(s, 0xFFFFFFFFL);
+        if (v < 0) {
             throw bad(what);
         }
+        return v;
     }
 
     private static long parseU32Value(Object v, String what) {
@@ -372,14 +372,10 @@ final class RiskAudit {
     }
 
     private static int parseU16(String s, String what) {
-        try {
-            int v = Integer.parseInt(s);
-            if (v < 0 || v > 0xFFFF) {
-                throw bad(what);
-            }
-            return v;
-        } catch (NumberFormatException e) {
+        long v = KillSwitch.parseUint(s, 0xFFFFL);
+        if (v < 0) {
             throw bad(what);
         }
+        return (int) v;
     }
 }
