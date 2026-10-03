@@ -11,6 +11,11 @@ import java.util.Map;
  * ({@code rust/risk/src/limits_eval.rs}). {@link RiskEngine#checkOrder} (the
  * public entry point) still lives on {@code RiskEngine} and calls
  * {@link #evaluate}.
+ *
+ * <p>Every double limit comparison is written {@code !(x <= limit)} (never
+ * {@code x > limit}): a NaN on either side compares false both ways, and the
+ * negated form makes it REJECT instead of passing the check. For finite
+ * values the two forms are identical.
  */
 final class LimitsEvaluator {
     private LimitsEvaluator() {
@@ -43,18 +48,49 @@ final class LimitsEvaluator {
         return new RiskDecision(Decision.REJECT, ruleId, severity, reason);
     }
 
-    /** Pre-trade conversion rate (fresh) or the FX_RATE_MISSING reason. */
-    private static Object pretradeRate(RiskEngine e, String ccy, long ts) {
+    /**
+     * The latest order event time the engine knows: this order's timestamp
+     * or the newest throttle-bucket time, whichever is later. A market
+     * state stamped beyond this clock by more than the stale timeout is
+     * future-stamped (see check 10). Using the engine's clock rather than
+     * the order's own timestamp keeps an order whose clock merely REGRESSED
+     * (pinned: it still reaches the throttle) apart from market data that
+     * is genuinely ahead of everything seen.
+     */
+    private static long eventClock(RiskEngine e, long orderTs) {
+        long clock = orderTs;
+        for (RiskEngine.Bucket b : e.buckets.values()) {
+            if (b.primed && b.lastTs > clock) {
+                clock = b.lastTs;
+            }
+        }
+        return clock;
+    }
+
+    /**
+     * Pre-trade conversion rate (fresh, and not stamped beyond the engine's
+     * event clock by more than the stale timeout) or the FX_RATE_MISSING
+     * reason.
+     */
+    private static Object pretradeRate(RiskEngine e, String ccy, long ts,
+            long clock) {
         double[] rate = e.fxRate(ccy);
         if (rate == null) {
             return "no conversion rate for " + ccy + " -> " + e.limits.reportingCcy();
         }
         if (RiskEngine.hasMarkTs(rate) && e.limits.staleBookReject()) {
-            long age = ts - e.fxMarkTs(ccy);
+            long markTs = e.fxMarkTs(ccy);
+            long age = ts - markTs;
             if (age > e.limits.staleFeedTimeoutNs()) {
                 return "conversion rate " + ccy + " -> " + e.limits.reportingCcy()
                         + " age " + age + "ns exceeds "
                         + e.limits.staleFeedTimeoutNs() + "ns";
+            }
+            if (markTs > RiskEngine.satAdd(clock, e.limits.staleFeedTimeoutNs())) {
+                return "conversion rate " + ccy + " -> " + e.limits.reportingCcy()
+                        + " timestamp " + markTs + " is more than "
+                        + e.limits.staleFeedTimeoutNs()
+                        + "ns ahead of the latest order event time " + clock;
             }
         }
         return rate[0];
@@ -87,6 +123,18 @@ final class LimitsEvaluator {
                 && e.killVenues.getOrDefault(order.venueId(), false)) {
             return reject(Rules.KILL_VENUE, Severity.BREACH,
                     "venue " + order.venueId() + " kill switch engaged");
+        }
+        // venue 0 = "route via SOR": the destination is not known here, so
+        // ANY engaged venue kill rejects (lowest killed venue id named) —
+        // the router must not be a way around a venue halt.
+        if (order.venueId() == 0) {
+            for (Map.Entry<Integer, Boolean> kv : e.killVenues.entrySet()) {
+                if (kv.getValue()) {
+                    return reject(Rules.KILL_VENUE, Severity.BREACH,
+                            "venue 0 (SOR) order rejected: venue " + kv.getKey()
+                                    + " kill switch engaged");
+                }
+            }
         }
         // 5. schema-level validation
         String invalid = order.validationError();
@@ -128,6 +176,7 @@ final class LimitsEvaluator {
                     "instrument " + order.instrumentId()
                             + " feed has an unrecovered gap");
         }
+        long clock = eventClock(e, order.timestamp());
         double mid;
         if (md != null && md.bidTicks > 0 && md.askTicks > 0) {
             long age = order.timestamp() - md.ts;
@@ -136,7 +185,26 @@ final class LimitsEvaluator {
                         "reference price age " + age + "ns exceeds "
                                 + e.limits.staleFeedTimeoutNs() + "ns");
             }
-            mid = (double) (md.bidTicks + md.askTicks) * tick / 2.0;
+            // FAIL-OPEN defect: a market state stamped AFTER the order has a
+            // negative age, which never exceeded the timeout, so a
+            // future-stamped (corrupt / mis-clocked) mark was trusted for as
+            // long as it stayed ahead — and every genuine update behind it
+            // was dropped as a regression. Stamped beyond the engine's event
+            // clock by more than the same window, it is exactly as untrusted
+            // as a stale one.
+            if (e.limits.staleBookReject()
+                    && md.ts > RiskEngine.satAdd(clock, e.limits.staleFeedTimeoutNs())) {
+                return reject(Rules.STALE_PRICE, Severity.WARN,
+                        "reference price timestamp " + md.ts + " is more than "
+                                + e.limits.staleFeedTimeoutNs()
+                                + "ns ahead of the latest order event time " + clock);
+            }
+            Long sumTicks = RiskEngine.sumTicks(md.bidTicks, md.askTicks);
+            if (sumTicks == null) {
+                return reject(Rules.STALE_PRICE, Severity.WARN,
+                        "no reference price for instrument " + order.instrumentId());
+            }
+            mid = (double) sumTicks.longValue() * tick / 2.0;
         } else {
             return reject(Rules.STALE_PRICE, Severity.WARN,
                     "no reference price for instrument " + order.instrumentId());
@@ -148,7 +216,8 @@ final class LimitsEvaluator {
                             + e.limits.maxOrderQty());
         }
         // 12. conversion rate to the reporting currency
-        Object rateOrReason = pretradeRate(e, ins.quoteCcy(), order.timestamp());
+        Object rateOrReason = pretradeRate(e, ins.quoteCcy(), order.timestamp(),
+                clock);
         if (rateOrReason instanceof String why) {
             return reject(Rules.FX_RATE_MISSING, Severity.WARN, why);
         }
@@ -158,7 +227,7 @@ final class LimitsEvaluator {
         double refPrice = order.priceTicks() > 0
                 ? (double) order.priceTicks() * tick : mid;
         double orderNotional = (double) order.qty() * ins.qtyUnit() * refPrice * fx;
-        if (orderNotional > e.limits.maxOrderNotional()) {
+        if (!(orderNotional <= e.limits.maxOrderNotional())) {
             return reject(Rules.FAT_FINGER_NOTIONAL, Severity.WARN,
                     "notional " + RiskEngine.fmtFixed(orderNotional, 2) + " "
                             + e.limits.reportingCcy() + " exceeds max_order_notional "
@@ -168,7 +237,7 @@ final class LimitsEvaluator {
         if (order.priceTicks() > 0) {
             double devBps = Math.abs((double) order.priceTicks() * tick - mid)
                     / mid * 1e4;
-            if (devBps > e.limits.priceBandBps()) {
+            if (!(devBps <= e.limits.priceBandBps())) {
                 return reject(Rules.PRICE_BAND, Severity.WARN,
                         "price deviates " + RiskEngine.fmtFixed(devBps, 1)
                                 + "bps from mid, band "
@@ -194,7 +263,7 @@ final class LimitsEvaluator {
                     + (double) elapsed * e.limits.maxOrderRatePerSec() / RiskEngine.NS_PER_SEC,
                     e.limits.orderRateBurst());
             bucket.lastTs = Math.max(bucket.lastTs, order.timestamp());
-            if (bucket.tokens < 1.0) {
+            if (!(bucket.tokens >= 1.0)) {
                 return reject(Rules.RATE_THROTTLE, Severity.WARN,
                         "strategy " + order.strategyId() + " exceeded "
                                 + RiskEngine.fmtFixed(e.limits.maxOrderRatePerSec(), 2)
@@ -226,15 +295,33 @@ final class LimitsEvaluator {
         }
         // 17. position limit (worst-case projection incl. open orders)
         long pos = e.position(order.instrumentId());
-        long openSame = 0;
+        // Checked (symmetric i64 domain): a projection that overflows is
+        // not a number the limit can be compared with — reject, never wrap.
+        Long openSame = 0L;
         for (RiskEngine.OpenOrder r : e.open.values()) {
             if (r.instrumentId == order.instrumentId() && r.side == order.side()) {
-                openSame += r.qty;
+                openSame = RiskEngine.posAdd(openSame, r.qty);
+                if (openSame == null) {
+                    break;
+                }
             }
         }
-        long projected = order.side() == 0
-                ? pos + openSame + order.qty()
-                : pos - openSame - order.qty();
+        Long checked = null;
+        if (openSame != null) {
+            checked = order.side() == 0
+                    ? RiskEngine.posAdd(pos, openSame)
+                    : RiskEngine.posSub(pos, openSame);
+        }
+        if (checked != null) {
+            checked = order.side() == 0
+                    ? RiskEngine.posAdd(checked, order.qty())
+                    : RiskEngine.posSub(checked, order.qty());
+        }
+        if (checked == null) {
+            return reject(Rules.MALFORMED_ORDER, Severity.WARN,
+                    "projected position overflows i64 (fail-closed)");
+        }
+        long projected = checked;
         if (Math.abs(projected) > e.limits.maxPositionQty()) {
             return reject(Rules.POSITION_LIMIT, Severity.WARN,
                     "projected position " + projected
@@ -244,7 +331,7 @@ final class LimitsEvaluator {
         // 18. per-instrument notional (projection marked at the mid)
         double projectedNotional = (double) Math.abs(projected) * ins.qtyUnit()
                 * mid * fx;
-        if (projectedNotional > e.limits.maxInstrumentNotional()) {
+        if (!(projectedNotional <= e.limits.maxInstrumentNotional())) {
             return reject(Rules.INSTRUMENT_NOTIONAL, Severity.WARN,
                     "projected notional " + RiskEngine.fmtFixed(projectedNotional, 2)
                             + " exceeds max_instrument_notional "
@@ -315,14 +402,14 @@ final class LimitsEvaluator {
             net += r.side == 0 ? v : -v;
         }
         gross += orderNotional;
-        if (gross > e.limits.maxGrossNotional()) {
+        if (!(gross <= e.limits.maxGrossNotional())) {
             return reject(Rules.GROSS_NOTIONAL, Severity.WARN,
                     "projected gross notional " + RiskEngine.fmtFixed(gross, 2)
                             + " exceeds max_gross_notional "
                             + RiskEngine.fmtFixed(e.limits.maxGrossNotional(), 2));
         }
         net += order.side() == 0 ? orderNotional : -orderNotional;
-        if (Math.abs(net) > e.limits.maxNetNotional()) {
+        if (!(Math.abs(net) <= e.limits.maxNetNotional())) {
             return reject(Rules.NET_NOTIONAL, Severity.WARN,
                     "projected net notional " + RiskEngine.fmtFixed(net, 2)
                             + " exceeds max_net_notional "
@@ -336,7 +423,7 @@ final class LimitsEvaluator {
                     "global daily pnl undeterminable: conversion rate missing");
         }
         double globalLimit = e.effectiveGlobalLoss();
-        if (globalPnl <= -globalLimit) {
+        if (!(globalPnl > -globalLimit)) {
             return reject(Rules.DAILY_LOSS, Severity.BREACH,
                     "global daily pnl " + RiskEngine.fmtFixed(globalPnl, 2)
                             + " at daily loss limit " + RiskEngine.fmtFixed(globalLimit, 2));
@@ -347,7 +434,7 @@ final class LimitsEvaluator {
                     "strategy daily pnl undeterminable: conversion rate missing");
         }
         double stratLimit = e.effectiveStrategyLoss(order.strategyId());
-        if (stratPnl <= -stratLimit) {
+        if (!(stratPnl > -stratLimit)) {
             return reject(Rules.STRATEGY_LOSS, Severity.BREACH,
                     "strategy daily pnl " + RiskEngine.fmtFixed(stratPnl, 2)
                             + " at loss limit " + RiskEngine.fmtFixed(stratLimit, 2));

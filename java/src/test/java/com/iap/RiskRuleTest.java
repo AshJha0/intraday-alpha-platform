@@ -11,6 +11,7 @@ import java.util.TreeMap;
 import org.junit.Test;
 
 import com.iap.risk.Decision;
+import com.iap.risk.InstrumentRef;
 import com.iap.risk.OrderRequest;
 import com.iap.risk.RiskDecision;
 import com.iap.risk.RiskEngine;
@@ -553,5 +554,240 @@ public class RiskRuleTest {
                 + "\"rule_id\":\"KILL_SWITCH_ENGAGED\","
                 + "\"scope\":\"GLOBAL\",\"scope_id\":\"\","
                 + "\"severity\":3,\"timestamp\":7}", ev.toJsonLine());
+    }
+
+    // -------------------------------------------- fail-closed review fixes
+
+    private static OrderRequest buyOn(long id, long iid, long px, int venue,
+            long ts) {
+        return new OrderRequest(id, iid, 0, 100, px, OrderRequest.LIMIT, venue,
+                "S1", 0.5, ts);
+    }
+
+    /**
+     * FAIL-OPEN regression: a mark stamped AFTER the order had a negative
+     * age and was never stale (and every genuine update behind it is
+     * dropped as a regression). Beyond the stale window ahead of the
+     * engine's event clock it rejects with STALE_PRICE.
+     */
+    @Test
+    public void futureStampedMarketDataFailsClosed() {
+        RiskEngine eng = engine();
+        long t = TS + 100_000_000L;
+        eng.onMarket(1, 2450, 2452, TS + 3600 * SEC);
+        RiskDecision d = eng.checkOrder(limitBuy(1, 100, 2450, t));
+        assertEquals(Decision.REJECT, d.decision());
+        assertEquals(Rules.STALE_PRICE, d.ruleId());
+        assertEquals("reference price timestamp " + (TS + 3600 * SEC)
+                + " is more than 5000000000ns ahead of the latest order event time "
+                + t, d.reason());
+        // the genuine update is behind the poisoned state: dropped, still closed
+        eng.onMarket(1, 2450, 2452, t);
+        assertEquals(1, eng.metrics.counterValue(
+                "risk_market_regressions_dropped_total"));
+        expect(eng, limitBuy(2, 100, 2450, t), Rules.STALE_PRICE);
+        // boundary: exactly the window ahead is trusted, one ns more is not
+        eng.onMarket(2, 3119, 3121, t + 5 * SEC);
+        expect(eng, buyOn(3, 2, 3120, 1, t), Rules.ALLOW);
+        eng.onMarket(2, 3119, 3121, t + 5 * SEC + 1);
+        expect(eng, buyOn(4, 2, 3120, 1, t), Rules.STALE_PRICE);
+        // the engine clock, not the order's own (regressed) timestamp,
+        // decides: an order stamped 10s behind an order already seen is not
+        // "future data"
+        RiskEngine eng2 = engine();
+        expect(eng2, limitBuy(5, 10, 2450, t), Rules.ALLOW);
+        expect(eng2, limitBuy(6, 10, 2450, t - 10 * SEC), Rules.ALLOW);
+    }
+
+    @Test
+    public void futureStampedConversionRateFailsClosed() {
+        TreeMap<Long, InstrumentRef> refs = new TreeMap<>();
+        refs.put(1L, InstrumentRef.equity(0.01));
+        refs.put(102L, new InstrumentRef(1e-5, 1000.0, "USD"));
+        refs.put(108L, new InstrumentRef(1e-5, 1000.0, "GBP"));
+        RiskEngine eng = RiskEngine.fromConfig(configDoc(), refs);
+        long t = TS + 100_000_000L;
+        eng.onMarket(108, 85_315, 85_325, t);
+        eng.onMarket(102, 127_335, 127_345, t + 3600 * SEC);
+        RiskDecision d = eng.checkOrder(new OrderRequest(1, 108, 0, 100, 0,
+                OrderRequest.MARKET, 1, "S1", 0.5, t));
+        assertEquals(Rules.FX_RATE_MISSING, d.ruleId());
+        assertEquals("conversion rate GBP -> USD timestamp " + (t + 3600 * SEC)
+                + " is more than 5000000000ns ahead of the latest order event time "
+                + t, d.reason());
+    }
+
+    /** The repo limits with one double limit replaced by NaN (0-based slot). */
+    private static RiskLimits nanLimit(int slot) {
+        RiskLimits l = RiskLimits.fromJson(configDoc());
+        double nan = Double.NaN;
+        return new RiskLimits(l.killSwitchEngaged(),
+                slot == 0 ? nan : l.maxGrossNotional(),
+                slot == 1 ? nan : l.maxNetNotional(),
+                slot == 2 ? nan : l.maxDailyLoss(),
+                l.maxOrderRatePerSec(),
+                slot == 3 ? nan : l.orderRateBurst(),
+                l.maxOrderQty(),
+                slot == 4 ? nan : l.maxOrderNotional(),
+                slot == 5 ? nan : l.priceBandBps(),
+                l.staleBookReject(), l.duplicateOrderWindowNs(),
+                l.maxPositionQty(),
+                slot == 6 ? nan : l.maxInstrumentNotional(),
+                slot == 7 ? nan : l.strategyMaxDailyLoss(),
+                l.maxSequenceGapBeforeHalt(), l.staleFeedTimeoutNs(),
+                l.reportingCcy(), l.fxConversion());
+    }
+
+    /**
+     * {@code x > NaN} is false: a NaN limit used to ALLOW. Every double
+     * limit comparison is {@code !(x <= limit)}, so NaN rejects; and
+     * reference data must be finite as well as positive.
+     */
+    @Test
+    public void nanLimitOrReferenceDataNeverPassesACheck() {
+        String[] rules = {Rules.GROSS_NOTIONAL, Rules.NET_NOTIONAL,
+            Rules.DAILY_LOSS, Rules.RATE_THROTTLE, Rules.FAT_FINGER_NOTIONAL,
+            Rules.PRICE_BAND, Rules.INSTRUMENT_NOTIONAL, Rules.STRATEGY_LOSS};
+        for (int slot = 0; slot < rules.length; slot++) {
+            TreeMap<Long, Double> ticks = new TreeMap<>();
+            ticks.put(1L, 0.01);
+            RiskEngine eng = new RiskEngine(nanLimit(slot),
+                    RiskEngine.equityRefs(ticks));
+            eng.onMarket(1, 2450, 2452, TS);
+            expect(eng, limitBuy(1, 100, 2450, TS + 1), rules[slot]);
+        }
+        for (double bad : new double[] {Double.NaN, Double.POSITIVE_INFINITY,
+            0.0, -1.0}) {
+            expectIae(() -> new InstrumentRef(bad, 1.0, "USD"),
+                    "must be finite and > 0");
+            expectIae(() -> new InstrumentRef(0.01, bad, "USD"),
+                    "must be finite and > 0");
+        }
+    }
+
+    @Test
+    public void positionOverflowRejectsOrdersAndKillsOnFills() {
+        long max = Long.MAX_VALUE;
+        // checkOrder: the projection leaves i64 -> MALFORMED_ORDER reject
+        RiskEngine eng = engine();
+        assertTrue(eng.onFill(new RiskFill(TS + SEC, "S1", 1, 0, 0, max, 2451)));
+        assertFalse(eng.killSwitchEngaged());
+        RiskDecision d = eng.checkOrder(limitBuy(1, 100, 2450, TS + 1));
+        assertEquals(Decision.REJECT, d.decision());
+        assertEquals(Rules.MALFORMED_ORDER, d.ruleId());
+        assertEquals(Severity.WARN, d.severity());
+        assertEquals("projected position overflows i64 (fail-closed)", d.reason());
+        // onFill: nothing applied, GLOBAL kill latched through the kill path
+        String before = eng.snapshot();
+        int n = eng.audit().size();
+        assertFalse(eng.onFill(new RiskFill(TS + SEC, "S1", 1, 7, 0, 1, 2451)));
+        assertTrue(eng.killSwitchEngaged());
+        assertEquals(max, eng.position(1));
+        assertEquals(n + 1, eng.audit().size());
+        com.iap.risk.RiskEvent ev = eng.audit().get(n);
+        assertEquals(Rules.KILL_SWITCH_ENGAGED, ev.ruleId());
+        assertEquals(Scope.GLOBAL, ev.scope());
+        assertEquals(Decision.KILL.code(), ev.decision());
+        assertEquals("fill for order 7 overflows i64 position accounting "
+                + "(fail-closed)", ev.reason());
+        assertEquals(before.replace("\"kill_global\":false", "\"kill_global\":true"),
+                eng.snapshot());
+        expect(eng, new OrderRequest(2, 1, 1, 100, 2452, OrderRequest.LIMIT, 1,
+                "S1", 0.5, TS + 2), Rules.KILL_GLOBAL);
+        // the short side: -i64::MAX is the floor of the symmetric domain
+        RiskEngine eng2 = engine();
+        assertTrue(eng2.onFill(new RiskFill(TS + SEC, "S1", 1, 0, 1, max, 2451)));
+        expect(eng2, new OrderRequest(3, 1, 1, 100, 2452, OrderRequest.LIMIT, 1,
+                "S1", 0.5, TS + 1), Rules.MALFORMED_ORDER);
+        assertFalse(eng2.onFill(new RiskFill(TS + SEC, "S1", 1, 0, 1, 1, 2451)));
+        assertTrue(eng2.killSwitchEngaged());
+        assertEquals(-max, eng2.position(1));
+        // another strategy's lot is fine, the AGGREGATE position overflows
+        RiskEngine eng3 = engine();
+        assertTrue(eng3.onFill(new RiskFill(TS + SEC, "S1", 1, 0, 0, max, 2451)));
+        assertFalse(eng3.onFill(new RiskFill(TS + SEC, "S2", 1, 0, 0, 1, 2451)));
+        assertTrue(eng3.killSwitchEngaged());
+        // a mark whose bid + ask leaves i64 is no mark at all
+        RiskEngine eng4 = engine();
+        eng4.onMarket(1, max, max, TS + 1);
+        RiskDecision d4 = eng4.checkOrder(limitBuy(4, 100, 2450, TS + 2));
+        assertEquals(Rules.STALE_PRICE, d4.ruleId());
+        assertEquals("no reference price for instrument 1", d4.reason());
+        assertTrue(eng4.onFill(new RiskFill(TS + SEC, "S1", 1, 0, 0, 1, 1)));
+    }
+
+    @Test
+    public void sorOrderRejectedWhileAnyVenueKillIsEngaged() {
+        RiskEngine eng = engine();
+        eng.engageKill(Scope.VENUE, "7", TS, "halt");
+        eng.engageKill(Scope.VENUE, "3", TS, "halt");
+        expect(eng, limitBuy(1, 100, 2450, TS + 1), Rules.ALLOW); // venue 1 untouched
+        eng.onOrderDone(1);
+        RiskDecision d = eng.checkOrder(buyOn(2, 1, 2450, 0, TS + 2));
+        assertEquals(Rules.KILL_VENUE, d.ruleId());
+        assertEquals(Severity.BREACH, d.severity());
+        assertEquals("venue 0 (SOR) order rejected: venue 3 kill switch engaged",
+                d.reason());
+        com.iap.risk.RiskEvent ev = eng.audit().get(eng.audit().size() - 1);
+        assertEquals(Scope.VENUE, ev.scope());
+        assertEquals("0", ev.scopeId());
+        eng.clearKill(Scope.VENUE, "3", TS, "clear");
+        assertEquals("venue 0 (SOR) order rejected: venue 7 kill switch engaged",
+                eng.checkOrder(buyOn(3, 1, 2450, 0, TS + 3)).reason());
+        eng.clearKill(Scope.VENUE, "7", TS, "clear");
+        expect(eng, buyOn(4, 1, 2450, 0, TS + 4), Rules.ALLOW);
+        // a venue DISCONNECT does not close the router (unchanged)
+        eng.onOrderDone(4);
+        eng.onVenueDisconnect(3, TS);
+        expect(eng, buyOn(5, 1, 2450, 0, TS + 5), Rules.ALLOW);
+    }
+
+    /**
+     * Kill scope ids follow Rust {@code u16::from_str} / {@code u32::from_str}:
+     * an optional single {@code +}, ASCII digits only — {@code Integer.parseInt}
+     * accepted {@code -0} and non-ASCII digits the reference rejects.
+     */
+    @Test
+    public void killScopeIdGrammarIsRustFromStr() {
+        RiskEngine eng = engine();
+        eng.engageKill(Scope.VENUE, "+1", TS, "plus form");
+        expect(eng, limitBuy(1, 100, 2450, TS + 1), Rules.KILL_VENUE);
+        eng.clearKill(Scope.VENUE, "01", TS, "leading zero");
+        expect(eng, limitBuy(2, 100, 2450, TS + 2), Rules.ALLOW);
+        for (Scope scope : new Scope[] {Scope.VENUE, Scope.INSTRUMENT}) {
+            for (String bad : new String[] {"-0", "+", "", "++1", " 1",
+                "١", "１", "4294967296"}) {
+                expectIae(() -> eng.engageKill(scope, bad, TS, "ops"),
+                        "escalated to GLOBAL");
+                eng.clearKill(Scope.GLOBAL, "", TS, "escalation reviewed");
+            }
+        }
+        expectIae(() -> eng.engageKill(Scope.VENUE, "65536", TS, "ops"),
+                "escalated to GLOBAL");
+    }
+
+    /** Rust {@code {}} of an f64 in the urgency reason, not Java's. */
+    @Test
+    public void urgencyReasonUsesRustFloatDisplay() {
+        assertEquals("2", OrderRequest.rustDisplay(2.0));
+        assertEquals("-5", OrderRequest.rustDisplay(-5.0));
+        assertEquals("0.5", OrderRequest.rustDisplay(0.5));
+        assertEquals("1.5", OrderRequest.rustDisplay(1.5));
+        assertEquals("-0", OrderRequest.rustDisplay(-0.0));
+        assertEquals("0", OrderRequest.rustDisplay(0.0));
+        assertEquals("0.0000001", OrderRequest.rustDisplay(1e-7));
+        assertEquals("1000000000000000000000", OrderRequest.rustDisplay(1e21));
+        assertEquals("123456789.125", OrderRequest.rustDisplay(123456789.125));
+        assertEquals("NaN", OrderRequest.rustDisplay(Double.NaN));
+        assertEquals("inf", OrderRequest.rustDisplay(Double.POSITIVE_INFINITY));
+        assertEquals("-inf", OrderRequest.rustDisplay(Double.NEGATIVE_INFINITY));
+        assertEquals("urgency must be in [0, 1]: 2", new OrderRequest(1, 1, 0,
+                10, 2450, OrderRequest.LIMIT, 1, "S1", 2.0, TS).validationError());
+        assertEquals("urgency must be in [0, 1]: inf", new OrderRequest(1, 1, 0,
+                10, 2450, OrderRequest.LIMIT, 1, "S1",
+                Double.POSITIVE_INFINITY, TS).validationError());
+        assertEquals("urgency must be in [0, 1]: NaN", new OrderRequest(1, 1, 0,
+                10, 2450, OrderRequest.LIMIT, 1, "S1", Double.NaN,
+                TS).validationError());
     }
 }
