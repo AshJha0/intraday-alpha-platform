@@ -18,9 +18,11 @@ pipeline replays events through the FeatureEngine and writes, per instrument:
 with columns: instrument_id, exchange_ts, one float64 column per registered
 feature (NaN where invalid), a packed validity bitset, and per-horizon label
 columns label_mid_<h> / label_cost_<h> / label_valid_<h> / label_reason_<h>
-(event-time forward returns, mid-to-mid and cost-adjusted; two-pointer
-sweep, no lookahead; the reason bitmask explains every invalid label —
-iap.labels.LabelReason).
+/ label_reopen_<h> (event-time forward returns, mid-to-mid and
+cost-adjusted; two-pointer sweep, no lookahead; the reason bitmask explains
+every invalid label — iap.labels.LabelReason; label_reopen_<h>, written
+since v1.5.0, is the realised reopen return of a row whose label is invalid
+for BLACKOUT alone and NaN everywhere else).
 
 A summary JSON is written to data/features/features_summary.json: rows,
 valid fraction per family, registry hash, and the data-quality facts a
@@ -172,6 +174,7 @@ def _flush_file(
             cols[f"label_cost_{h}"] = pa.array(lab.cost, type=pa.float64())
             cols[f"label_valid_{h}"] = pa.array(lab.valid, type=pa.bool_())
             cols[f"label_reason_{h}"] = pa.array(lab.reason, type=pa.uint8())
+            cols[f"label_reopen_{h}"] = pa.array(lab.reopen_mid, type=pa.float64())
         table = pa.table(cols, schema=schema)
         writer = writers.get(iid)
         if writer is None:
@@ -195,6 +198,7 @@ def _build_schema(names: list[str]) -> pa.Schema:
         fields.append(pa.field(f"label_cost_{h}", pa.float64()))
         fields.append(pa.field(f"label_valid_{h}", pa.bool_()))
         fields.append(pa.field(f"label_reason_{h}", pa.uint8()))
+        fields.append(pa.field(f"label_reopen_{h}", pa.float64()))
     return pa.schema(fields)
 
 

@@ -12,25 +12,37 @@ and half-spread ``hs`` (all in price units of the instrument):
     impact_bps  = impact_coeff_bps_per_pct_adv * (|q| * unit / adv * 100)
 
 with notional = |q| * unit * m, so every cost is in real quote-currency
-terms, matching the engine's P&L accounting (also scaled by unit).  The
-impact term is linear in child size as a fraction of ADV — a deliberately
-simple, auditable research model; the production simulator owns queue-level
-realism.  A ``multiplier`` scales the TOTAL cost (stress grid
-{0.5, 1, 2} pinned in the config).
+terms, matching the engine's P&L accounting (also scaled by unit).  A
+``multiplier`` scales the TOTAL cost (stress grid {0.5, 1, 2} pinned in the
+config).
 
-**Opt-in square-root impact** (``impact_model="sqrt"``; the pinned default
-is ``"linear"`` and every committed report uses it).  Linear impact makes
-the cost per share proportional to size, which understates the cost of
-small orders relative to large ones and makes capacity look unbounded only
-quadratically.  The empirical regularity is concave:
+**Impact model (pinned; the default changed in v1.5.0).**
 
-    impact_bps  = sqrt_impact_coeff_bps * sqrt(|q| * unit / adv)
+* ``impact_model="sqrt"`` — the default.  The empirical regularity is
+  concave in size:
 
-with ``sqrt_impact_coeff_bps`` the impact, in basis points, of trading one
-full ADV (the familiar ``Y * sigma_daily``; e.g. Y ~ 1 and a 1 % daily
-volatility give 100 bps).  Both keys are read from the ``cost_model`` config
-block when present (``impact_model``, ``sqrt_impact_coeff_bps``) and default
-to the linear model when absent, so the committed config is unchanged.
+      impact_bps  = sqrt_impact_coeff_bps * sqrt(|q| * unit / adv)
+
+  with ``sqrt_impact_coeff_bps`` the impact, in basis points, of trading one
+  full ADV (the familiar ``Y * sigma_daily``).  The pinned coefficient is
+  :data:`DEFAULT_SQRT_IMPACT_COEFF_BPS` = 100 bps (``Y`` = 1 at a 1 % daily
+  volatility) — a convention chosen before any result was computed with it,
+  not a calibration to this dataset.
+* ``impact_model="linear"`` — the LEGACY rule, the formula in the block
+  above and the default up to v1.4.0.  Cost per share proportional to size
+  understates the cost of small orders relative to large ones (a 1 000-share
+  child in a 5 M-share ADV pays 0.04 bps, against 1.4 bps under the square
+  root) and makes capacity look unbounded only quadratically.  It stays
+  selectable by name; the Java ``com.iap.backtest.CostModel`` implements
+  this rule only, and says so.
+
+``CostModel.load`` requires the ``cost_model`` block of
+``configs/execution/execution.json`` to NAME its ``impact_model`` (the
+document is ``x-version`` 2 since v1.5.0): a block written for v1.4.0 is
+rejected rather than silently priced under the other rule.  The execution
+simulator (``iap.execution``, C++ / Java) is a different component with its
+own pinned impact rule 6 — linear, read from
+``impact_coeff_bps_per_pct_adv`` — and is not changed by this default.
 """
 
 from __future__ import annotations
@@ -41,8 +53,14 @@ from pathlib import Path
 
 import numpy as np
 
-#: Pinned impact models (module docs).
-IMPACT_MODELS = ("linear", "sqrt")
+#: Pinned impact models (module docs): the default, then the legacy rule.
+IMPACT_MODELS = ("sqrt", "linear")
+#: The default impact model.
+DEFAULT_IMPACT_MODEL = "sqrt"
+#: The rule that was the default up to v1.4.0.
+LEGACY_IMPACT_MODEL = "linear"
+#: Pinned square-root coefficient: bps of impact for trading one full ADV.
+DEFAULT_SQRT_IMPACT_COEFF_BPS = 100.0
 
 
 @dataclass(frozen=True)
@@ -51,10 +69,10 @@ class CostModel:
     equity_taker_fee_per_share: float
     fx_commission_per_million: float
     multiplier: float = 1.0
-    #: "linear" (pinned default) or "sqrt" (module docs)
-    impact_model: str = "linear"
+    #: "sqrt" (default) or "linear" (legacy) — module docs
+    impact_model: str = DEFAULT_IMPACT_MODEL
     #: impact in bps of trading one full ADV (``impact_model="sqrt"`` only)
-    sqrt_impact_coeff_bps: float = 0.0
+    sqrt_impact_coeff_bps: float = DEFAULT_SQRT_IMPACT_COEFF_BPS
 
     def __post_init__(self) -> None:
         if self.impact_model not in IMPACT_MODELS:
@@ -68,17 +86,36 @@ class CostModel:
         cm = blob.get("cost_model")
         if cm is None:
             raise ValueError(f"{execution_config_path}: missing 'cost_model' section")
+        if "impact_model" not in cm:
+            raise ValueError(
+                f"{execution_config_path}: cost_model names no 'impact_model'. Since "
+                f"v1.5.0 the default is {DEFAULT_IMPACT_MODEL!r} (with "
+                f"'sqrt_impact_coeff_bps'); a document written for v1.4.0 must say "
+                f"{LEGACY_IMPACT_MODEL!r} to keep the rule it was written for"
+            )
+        model = str(cm["impact_model"])
+        if model == "sqrt" and "sqrt_impact_coeff_bps" not in cm:
+            raise ValueError(
+                f"{execution_config_path}: cost_model.impact_model 'sqrt' needs "
+                "'sqrt_impact_coeff_bps'"
+            )
         return cls(
             impact_coeff_bps_per_pct_adv=float(cm["impact_coeff_bps_per_pct_adv"]),
             equity_taker_fee_per_share=float(cm["equity_taker_fee_per_share"]),
             fx_commission_per_million=float(cm["fx_commission_per_million"]),
             multiplier=multiplier,
-            impact_model=str(cm.get("impact_model", "linear")),
-            sqrt_impact_coeff_bps=float(cm.get("sqrt_impact_coeff_bps", 0.0)),
+            impact_model=model,
+            sqrt_impact_coeff_bps=float(
+                cm.get("sqrt_impact_coeff_bps", DEFAULT_SQRT_IMPACT_COEFF_BPS)
+            ),
         )
 
     def with_multiplier(self, multiplier: float) -> CostModel:
         return replace(self, multiplier=multiplier)
+
+    def with_linear_impact(self) -> CostModel:
+        """This model under the LEGACY linear impact rule (module docs)."""
+        return replace(self, impact_model=LEGACY_IMPACT_MODEL)
 
     def with_sqrt_impact(self, coeff_bps: float) -> CostModel:
         """This model with square-root impact of ``coeff_bps`` at one ADV."""
