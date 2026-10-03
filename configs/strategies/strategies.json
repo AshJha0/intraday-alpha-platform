@@ -2,8 +2,8 @@
   "x-version": 1,
   "description": "Strategy registry skeleton; alpha waves extend. All disabled by default. The 'adaptive' block pins the adaptability layer (drift thresholds, refit policies, lifecycle gates) — see /API_ADAPTIVE.md.",
   "adaptive": {
-    "x-version": 1,
-    "description": "Pinned adaptability parameters (iap.adaptive / iap.backtest.adaptive; normative contract /API_ADAPTIVE.md). All durations are event-time nanoseconds; no wall-clock anywhere.",
+    "x-version": 2,
+    "description": "Pinned adaptability parameters (iap.adaptive / iap.backtest.adaptive; normative contract /API_ADAPTIVE.md). All durations are event-time nanoseconds; no wall-clock anywhere. x-version 2 (v1.5.0): the block names ic_z_method ('hac' = the two-sample HAC z with the pair-weighted rolling IC, the default; 'legacy' = the z up to v1.4.0) and lifecycle.breach_rule ('cusum' with cusum_k / cusum_h, the default; 'consecutive' = retire_breach_evals consecutive breaches, the rule up to v1.4.0, which is the only reader of retire_breach_evals).",
     "block_ns": 900000000000,
     "warmup_ns": 9000000000000,
     "train_window_ns": 86400000000000,
@@ -13,6 +13,7 @@
     "ic_bucket_ns": 300000000000,
     "min_psi_samples": 200,
     "min_ic_buckets": 4,
+    "ic_z_method": "hac",
     "policies": {
       "static": {},
       "scheduled_weekly": {
@@ -31,7 +32,10 @@
       "watch_ic_gate": 0.0,
       "reactivate_ic_gate": 0.005,
       "retire_breach_evals": 6,
-      "reactivate_evals": 3
+      "reactivate_evals": 3,
+      "breach_rule": "cusum",
+      "cusum_k": 0.0025,
+      "cusum_h": 0.01
     }
   },
   "defaults": {

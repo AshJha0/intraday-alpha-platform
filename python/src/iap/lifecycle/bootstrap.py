@@ -5,15 +5,19 @@ Bootstrap reads, for each of the 24 flagship alphas (``iap.alpha.ALPHA_IDS``):
 
 * ``research/alpha_reports/<ID>.json`` — the ``validate_alpha`` report;
 * ``research/experiments.json`` — the multiple-testing ledger (the alpha's
-  ``promotion_pipeline`` entry ON THE DATASET ``alpha_params.json`` NAMES
-  gives ``experiment_id`` and the ledger count; entries of earlier datasets
-  are history and are not evidence);
+  ``promotion_pipeline`` entry ON THE DATASET ``alpha_params.json`` NAMES,
+  under the default research methods, gives ``experiment_id`` and the ledger
+  count; entries of earlier datasets and of the legacy methods are history
+  and are not evidence);
 * ``configs/strategies/alpha_params.json`` — the serialized model (its
   ``data_version`` / ``feature_version`` / ``git_commit`` provenance, and the
   alpha's parameter block whose content hash is the ``model_version``);
 
-builds ``Evidence.research`` (an ``ExperimentResult``) and
-``Evidence.capacity_usd``, registers every alpha at RESEARCH, advances each
+builds ``Evidence.research`` (an ``ExperimentResult``),
+``Evidence.capacity_usd`` and ``Evidence.significance_threshold`` (the
+PROMOTE t threshold the report was judged at, ``gates.min_nw_tstat`` of the
+report — the ledger-derived threshold under the default methods),
+registers every alpha at RESEARCH, advances each
 one at the pinned bootstrap event time until it stops moving (at most
 ``STATE_COUNT`` steps; on the bundled data: RESEARCH -> CANDIDATE, then the
 CANDIDATE -> VALIDATING evaluation holds), and writes
@@ -38,8 +42,12 @@ ic                          ``gate_ic`` (= ``oos_ic_uncrossed`` when finite,
                             else ``oos_ic`` — exactly what the PROMOTE gate
                             in ``iap.validation.validate`` reads)
 rank_ic                     ``oos_rank_ic``
-t_stat                      ``nw_tstat_uncrossed`` when finite, else
-                            ``nw_tstat`` (the report's ``gate_t``)
+t_stat                      ``gate_tstat`` — the t the PROMOTE gate read
+                            (the pooled-slope HAC t on uncrossed rows under
+                            the default methods).  A report written before
+                            v1.5.0 has no such key: ``nw_tstat_uncrossed``
+                            when finite, else ``nw_tstat``, which is what
+                            its gate read
 nw_lags                     ``nw_lags``
 hit_rate                    ``oos_hit_rate``
 turnover                    ``turnover_flips_per_hour``
@@ -91,6 +99,7 @@ from iap.lifecycle.config import PolicyConfig, load_policy_config, repo_root
 from iap.lifecycle.evidence import Evidence
 from iap.lifecycle.machine import STATE_COUNT, AlphaLifecycle
 from iap.lifecycle.registry import AlphaRegistry, LifecycleTransitionLog
+from iap.validation.methods import DEFAULT_METHODS, METHODS_LEGACY
 
 __all__ = [
     "BootstrapRow",
@@ -110,6 +119,7 @@ __all__ = [
     "research_evidence",
     "run_bootstrap",
     "select_pipeline_entries",
+    "significance_threshold_from_report",
 ]
 
 #: Reference notional for expressing the report's USD P&L in bps.
@@ -140,36 +150,51 @@ def load_report(root: Path, alpha_id: str) -> dict[str, Any]:
         return json.load(fh)
 
 
+def _entry_methods(entry: Mapping[str, Any]) -> str:
+    """The method bundle a ``promotion_pipeline`` entry was recorded under
+    (an entry written before v1.5.0 names none: the legacy bundle)."""
+    return str((entry.get("config") or {}).get("methods", METHODS_LEGACY))
+
+
 def select_pipeline_entries(
-    entries: list[dict[str, Any]], dataset_version: str | None, source: str = "ledger"
+    entries: list[dict[str, Any]],
+    dataset_version: str | None,
+    source: str = "ledger",
+    methods: str = DEFAULT_METHODS,
 ) -> dict[str, dict[str, Any]]:
     """``{alpha_id: promotion_pipeline ledger entry}`` for one dataset.
 
     Since v1.4.0 the ledger keeps the looks of every dataset it has seen
-    (``iap.validation.ledger``, "Dataset scope"), so an alpha can have one
-    ``promotion_pipeline`` entry per dataset.  The entry that backs the
-    current evidence is the one stamped with ``dataset_version`` (the
-    ``data_version`` of ``alpha_params.json``); an entry with no stamp at
-    all (a ledger written before the rule) is used when no stamped entry
-    matches.  With ``dataset_version = None`` every entry is a candidate.
-    Two candidates of the same rank for one alpha are an error.
+    (``iap.validation.ledger``, "Dataset scope"), and since v1.5.0 those of
+    every method bundle, so an alpha can have one ``promotion_pipeline``
+    entry per dataset and bundle.  The entry that backs the current evidence
+    is the one stamped with ``dataset_version`` (the ``data_version`` of
+    ``alpha_params.json``) and recorded under ``methods`` (the default
+    bundle); an entry of the same dataset under another bundle is used only
+    when the alpha has none under ``methods`` (a ledger that has not been
+    regenerated yet), and an entry with no dataset stamp at all (a ledger
+    written before the rule) only when no stamped entry matches.  With
+    ``dataset_version = None`` every entry is a candidate.  Two candidates
+    of the same rank for one alpha are an error.
     """
-    exact: dict[str, dict[str, Any]] = {}
-    unstamped: dict[str, dict[str, Any]] = {}
+    # rank 0: this dataset + these methods; 1: this dataset, other methods;
+    # 2: no dataset stamp.  The lowest rank present wins per alpha.
+    ranked: dict[str, dict[int, dict[str, Any]]] = {}
     for entry in entries:
         if entry["kind"] != _LEDGER_KIND:
             continue
         stamp = entry.get("dataset_version")
         if dataset_version is None or stamp == dataset_version:
-            bucket = exact
+            rank = 0 if _entry_methods(entry) == methods else 1
         elif stamp is None:
-            bucket = unstamped
+            rank = 2
         else:
             continue  # another dataset's look: history, not this evidence
-        if entry["alpha_id"] in bucket:
+        by_rank = ranked.setdefault(entry["alpha_id"], {})
+        if rank in by_rank:
             raise ValueError(f"{source}: duplicate {_LEDGER_KIND} entry for {entry['alpha_id']}")
-        bucket[entry["alpha_id"]] = entry
-    return {**unstamped, **exact}
+        by_rank[rank] = entry
+    return {alpha_id: by_rank[min(by_rank)] for alpha_id, by_rank in ranked.items()}
 
 
 def load_ledger_entries(
@@ -244,8 +269,11 @@ def research_evidence(
         return out
 
     gate_ic = num("gate_ic", report.get("gate_ic"))
-    t_unc = _finite(report.get("nw_tstat_uncrossed"))
-    t_stat = t_unc if t_unc is not None else num("nw_tstat", report.get("nw_tstat"))
+    if "gate_tstat" in report:
+        t_stat = num("gate_tstat", report.get("gate_tstat"))
+    else:  # a report written before v1.5.0: what its gate read
+        t_unc = _finite(report.get("nw_tstat_uncrossed"))
+        t_stat = t_unc if t_unc is not None else num("nw_tstat", report.get("nw_tstat"))
     rank_ic = num("oos_rank_ic", report.get("oos_rank_ic"))
     hit_rate = num("oos_hit_rate", report.get("oos_hit_rate"))
     turnover = num("turnover_flips_per_hour", report.get("turnover_flips_per_hour"))
@@ -301,6 +329,15 @@ def research_evidence(
     return result, missing
 
 
+def significance_threshold_from_report(report: Mapping[str, Any]) -> float | None:
+    """The PROMOTE t threshold a report was judged at: its
+    ``gates["min_nw_tstat"]`` (the ledger-derived threshold under the
+    default methods, the fixed 3.0 under the legacy ones); ``None`` when
+    the report carries no finite positive value."""
+    value = _finite((report.get("gates") or {}).get("min_nw_tstat"))
+    return value if value is not None and value > 0.0 else None
+
+
 #: What the alpha-report format does not record and the mapping cannot know.
 UNRECORDED_BY_REPORT = ("seed", "max_drawdown_bps", "sharpe", "train_period", "validation_period")
 
@@ -344,7 +381,13 @@ def alpha_report_spec(
             "is gated"
         ),
         "ic_source": "gate_ic (the uncrossed IC the PROMOTE gate reads)",
-        "t_stat_source": "nw_tstat_uncrossed when finite, else nw_tstat",
+        "t_stat_source": (
+            "gate_tstat (the t the PROMOTE gate reads)"
+            if "gate_tstat" in report
+            else "nw_tstat_uncrossed when finite, else nw_tstat"
+        ),
+        "methods": report.get("methods"),
+        "significance_threshold": significance_threshold_from_report(report),
         "experiment_id_source": (
             "<alpha_id>-unledgered (no promotion_pipeline ledger entry)"
             if result.experiment_id == f"{alpha_id}-unledgered"
@@ -456,6 +499,7 @@ def run_bootstrap(
             validation=None,
             paper=None,
             live=None,
+            significance_threshold=significance_threshold_from_report(report),
         )
         machine.register(
             aid,

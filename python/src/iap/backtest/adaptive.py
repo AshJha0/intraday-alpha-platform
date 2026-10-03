@@ -130,7 +130,9 @@ class AdaptiveDeployment:
         self.horizon_ns = HORIZONS_NS[probe.horizon]
         self.features = tuple(probe.features)
         self.cfg = adaptive_cfg
-        self.backtester = backtester
+        # The research backtester's default position policy and row block
+        # need the alpha's label horizon (iap.backtest.engine).
+        self.backtester = backtester.for_horizon(probe.horizon)
         self.psi_threshold = float(psi_threshold)
 
         universe = probe.universe(list(frames))
@@ -342,7 +344,12 @@ class AdaptiveDeployment:
         ic_window_ns = int(cfg["ic_window_ns"])
         min_buckets = int(cfg["min_ic_buckets"])
         block_ns = int(cfg["block_ns"])
-        ic_z_method = str(cfg.get("ic_z_method", "pinned"))
+        if "ic_z_method" not in cfg:
+            raise ValueError(
+                "adaptive config names no 'ic_z_method': 'hac' (the default since "
+                "v1.5.0) or 'legacy' (the z up to v1.4.0)"
+            )
+        ic_z_method = str(cfg["ic_z_method"])
         if ic_z_method not in IC_Z_METHODS:
             raise ValueError(f"adaptive.ic_z_method {ic_z_method!r} unknown; known: {IC_Z_METHODS}")
 
@@ -373,7 +380,8 @@ class AdaptiveDeployment:
 
         tracker = LifecycleTracker(
             alpha_id=self.alpha_id,
-            config=lifecycle_cfg or LifecycleConfig(-1.0, -1.0, 10**9, 1),
+            # no lifecycle given: gates no reading can breach (IC >= -1)
+            config=lifecycle_cfg or LifecycleConfig.legacy(-1.0, -1.0, 10**9, 1),
             policy=policy_label if policy_label is not None else policy.name,
             log=lifecycle_log,
         )
@@ -396,8 +404,8 @@ class AdaptiveDeployment:
             x_a = np.concatenate(x_l)
             y_a = np.concatenate(y_l)
             if self.ic_baseline is not None:
-                # "pinned" (default; the cross-language contract) or the
-                # opt-in two-sample HAC z (adaptive.drift, monitor 4).
+                # the two-sample HAC z with the pair-weighted rolling IC
+                # (default) or the legacy z (adaptive.drift, monitors 4 / 3)
                 if ic_z_method == "hac":
                     icw = rolling_ic_z_hac(self.ic_baseline, ts_a, x_a, y_a, min_buckets)
                 else:
@@ -418,16 +426,15 @@ class AdaptiveDeployment:
             if informative:
                 last_matured = matured
 
-            if tracker.config.breach_rule == "cusum":
-                # successive windows overlap: one block of new rows per reading
-                state = tracker.update(
-                    tb,
-                    rolling_ic,
-                    informative=informative,
-                    new_fraction=min(1.0, block_ns / float(ic_window_ns)),
-                )
-            else:
-                state = tracker.update(tb, rolling_ic, informative=informative)
+            # Successive windows overlap: each reading brings one block of new
+            # rows (the CUSUM rule weights it by that share; the legacy
+            # consecutive rule does not read it).
+            state = tracker.update(
+                tb,
+                rolling_ic,
+                informative=informative,
+                new_fraction=min(1.0, block_ns / float(ic_window_ns)),
+            )
             if state == RETIRED:
                 # halt allocation for the coming block (through end-of-data
                 # after the final evaluation — no eval can lift it)

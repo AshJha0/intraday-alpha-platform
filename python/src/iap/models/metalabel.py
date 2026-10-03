@@ -74,20 +74,19 @@ META_FEATURE_NAMES = (
 
 
 def build_meta_features(
-    pred: np.ndarray, direction: np.ndarray, meta_context: np.ndarray, impute_nan: bool = True
+    pred: np.ndarray, direction: np.ndarray, meta_context: np.ndarray, impute_nan: bool = False
 ) -> np.ndarray:
     """Assemble the pinned meta-feature matrix.
 
-    ``impute_nan=True`` (pinned default) replaces every non-finite entry by
-    0 — the behaviour the committed ML report and model runs were produced
-    with.  It is a known weakness for the tree model: 0 is a legitimate
-    value of several meta-features (``queue_imbalance_signed``,
-    ``alpha_signed``), so "missing" and "balanced" become indistinguishable,
-    and ``HistGradientBoostingClassifier`` handles NaN natively (a learned
-    missing-value direction per split).  ``impute_nan=False`` keeps NaN for
-    missing values (infinities still become NaN) so the classifier can use
-    that; it is opt-in because it changes the fitted model and therefore
-    the pinned report numbers.
+    ``impute_nan=False`` (the default since v1.5.0) keeps NaN for a missing
+    value (infinities become NaN too): ``HistGradientBoostingClassifier``
+    handles NaN natively, with a learned missing-value direction per split.
+    ``impute_nan=True`` is the LEGACY rule, the default up to v1.4.0: every
+    non-finite entry becomes 0.  That is a weakness for the tree model — 0
+    is a legitimate value of several meta-features
+    (``queue_imbalance_signed``, ``alpha_signed``), so "missing" and
+    "balanced" become indistinguishable — and it stays selectable by name
+    so the model runs up to ``run_0040`` can be reproduced.
     """
     if meta_context.shape[1] != len(META_CONTEXT_COLUMNS):
         raise ValueError("meta_context has wrong column count")
@@ -166,16 +165,18 @@ def run_meta_labeling(
     tracker: ExperimentTracker | None = None,
     primary_name: str = "primary",
     tau: float = 0.5,
-    impute_nan: bool = True,
+    impute_nan: bool = False,
 ) -> dict[str, Any]:
     """Train + calibrate + economically evaluate the meta-label gate.
 
     ``primary_pred`` is the pooled OOS prediction vector (NaN where a sample
     was never out-of-sample).  ``tau`` is the pinned probability threshold of
     the meta-gate; a calibration-set sweep is also reported.
-    ``impute_nan`` is passed to :func:`build_meta_features` (default: the
-    pinned NaN -> 0 imputation).  ``auc_test`` is ``None`` when the test
-    segment holds a single class (AUC undefined).
+    ``impute_nan`` is passed to :func:`build_meta_features` (default
+    ``False``: NaN is kept for the tree model; ``True`` is the legacy NaN ->
+    0 imputation) and recorded in the result and the run manifest.
+    ``auc_test`` is ``None`` when the test segment holds a single class
+    (AUC undefined).
     """
     primary_pred = np.asarray(primary_pred, dtype=np.float64)
     if len(primary_pred) != len(ds):
@@ -283,6 +284,8 @@ def run_meta_labeling(
     )
     result: dict[str, Any] = {
         "primary_model": primary_name,
+        "impute_nan": bool(impute_nan),
+        "n_missing_meta_values": int(np.sum(~np.isfinite(X_meta))) if not impute_nan else None,
         "n_meta_samples": int(len(idx)),
         "segments": {"train": int(tr.sum()), "calibration": int(ca.sum()), "test": int(te.sum())},
         "base_rate_test": float(y_meta[te].mean()),
@@ -322,7 +325,7 @@ def run_meta_labeling(
         tracker.write_manifest(
             run_id,
             model_version="metalabel_isotonic_v1",
-            hyperparams=dict(META_HYPERPARAMS),
+            hyperparams={**META_HYPERPARAMS, "impute_nan": bool(impute_nan)},
             train_window={"start_ts": int(ts[tr].min()), "end_ts": int(ts[tr].max())},
             test_window={"start_ts": int(ts[te].min()), "end_ts": int(ts[te].max())},
             features=list(META_FEATURE_NAMES),

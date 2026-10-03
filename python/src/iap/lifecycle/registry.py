@@ -3,9 +3,10 @@
 * :class:`AlphaRecord` — one alpha's lifecycle row: state, when it entered
   it, the last transition and gate evaluation, the versions of the research
   it was registered from, and the counters the machine needs to resume
-  exactly (demotion failures, live breach / recovery counts).
+  exactly (demotion failures, live breach / recovery counts and — since
+  v1.5.0 — the CUSUM statistic of the live retirement rule).
 * :class:`AlphaRegistry` — the records, persisted to
-  ``research/alpha_registry.json`` (``x-version`` 1, sorted keys, 2-space
+  ``research/alpha_registry.json`` (``x-version`` 2, sorted keys, 2-space
   indent, ASCII, trailing newline; identical state ⇒ identical bytes).
 * :class:`GateEvaluation` — what one ``advance`` call evaluated, whether or
   not it moved the alpha (the machine's evaluations log; the latest one is
@@ -22,6 +23,7 @@ No wall clock anywhere: every timestamp is the event time the caller passed.
 from __future__ import annotations
 
 import json
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -41,8 +43,9 @@ __all__ = [
     "Outcome",
 ]
 
-#: ``x-version`` of ``research/alpha_registry.json``.
-REGISTRY_VERSION = 1
+#: ``x-version`` of ``research/alpha_registry.json``: 2 since v1.5.0 (each
+#: record carries ``cusum``).
+REGISTRY_VERSION = 2
 
 _REGISTRY_DESCRIPTION = (
     "Alpha promotion lifecycle registry (iap.lifecycle). One record per alpha: "
@@ -167,8 +170,19 @@ class AlphaRecord:
     consecutive_failures: int
     breach_count: int
     recovery_count: int
+    #: CUSUM statistic of the live retirement rule (0.0 outside ACTIVE /
+    #: WATCH and under the consecutive rule)
+    cusum: float = 0.0
 
     def __post_init__(self) -> None:
+        if (
+            isinstance(self.cusum, bool)
+            or not isinstance(self.cusum, (int, float))
+            or not math.isfinite(self.cusum)
+            or self.cusum < 0.0
+        ):
+            raise ValueError("AlphaRecord.cusum: expected a finite number >= 0")
+        self.cusum = float(self.cusum)
         if not is_generic_id(self.alpha_id):
             raise ValueError(f"AlphaRecord: {self.alpha_id!r} is not a valid alpha id")
         if not isinstance(self.state, LifecycleState):
@@ -229,6 +243,7 @@ class AlphaRecord:
             "consecutive_failures": self.consecutive_failures,
             "breach_count": self.breach_count,
             "recovery_count": self.recovery_count,
+            "cusum": self.cusum,
         }
 
     @staticmethod
@@ -251,6 +266,7 @@ class AlphaRecord:
             consecutive_failures=int(data["consecutive_failures"]),
             breach_count=int(data["breach_count"]),
             recovery_count=int(data["recovery_count"]),
+            cusum=data["cusum"],
         )
 
 

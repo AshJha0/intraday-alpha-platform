@@ -17,6 +17,22 @@ with ``value = null`` (a missing number never passes); the machine decides
 separately whether an absent block counts as a failure or as silence
 (``iap.lifecycle.machine``).
 
+**The significance threshold (pinned, v1.5.0).**  ``statistical_significance``
+is the one gate whose threshold is not a config constant.  Under the default
+policy (``PolicyConfig.tstat_threshold = "ledger"``) it is
+
+    max(gates.min_nw_tstat, evidence.significance_threshold)
+
+— the multiple-testing threshold the research result was judged at, never
+below the configured floor — and when the evidence carries no
+``significance_threshold`` the gate FAILS with ``threshold = null`` (the
+value is still reported): a missing threshold never passes either.  Under
+``"fixed"`` — the rule up to v1.4.0 — the threshold is ``min_nw_tstat`` and
+the evidence field is not read.  The metric is ``research.t_stat``, which
+under the default research methods is the pooled-slope HAC t the PROMOTE
+gate read; the gate table itself (names, blocks, comparison kinds, edges)
+is unchanged, and the Java and Rust ports implement both policies.
+
 **Non-eligible research evidence is refused (pinned).**  When the evidence
 carries ``research_gate_eligible = False`` (``iap.lifecycle.evidence``; the
 result came from a configuration outside the pinned protocol bounds or from
@@ -34,7 +50,7 @@ gate                        block       metric                                  
 ledger_entry_exists         research    n_experiments_in_ledger (min)              min_experiments_in_ledger
 leakage_clean               research    leakage_passed (bool)                      —
 oos_ic                      research    ic (min)                                   min_oos_ic
-statistical_significance    research    t_stat (min)                               min_nw_tstat
+statistical_significance    research    t_stat (min)                               min_nw_tstat (floor; see above)
 fold_consistency            research    fold_consistency (min)                     min_fold_sign_consistency
 fold_count                  research    n_folds (min)                              min_folds
 hypothesis_sign             research    hypothesis_sign_confirmed is True (bool)   —
@@ -79,11 +95,15 @@ __all__ = [
     "GATE_SPECS",
     "Gate",
     "GateSpec",
+    "SIGNIFICANCE_GATE",
     "build_gates",
     "ic_rank_gap",
 ]
 
 Metric = float | int | bool | None
+
+#: The gate whose threshold comes from the evidence under the ledger policy.
+SIGNIFICANCE_GATE = "statistical_significance"
 
 
 def ic_rank_gap(ic: float, rank_ic: float, eps: float) -> float:
@@ -259,8 +279,20 @@ class Gate:
 
     @property
     def threshold(self) -> float | None:
-        """The bound threshold (``None`` for a boolean gate)."""
+        """The configured threshold (``None`` for a boolean gate).  For
+        ``statistical_significance`` this is the floor ``min_nw_tstat``;
+        :meth:`threshold_for` gives the threshold applied to an evidence."""
         return self._spec.threshold(self._config)
+
+    def threshold_for(self, evidence: Evidence) -> float | None:
+        """The threshold this gate applies to ``evidence`` (module docs,
+        "The significance threshold")."""
+        configured = self.threshold
+        if self._spec.name != SIGNIFICANCE_GATE or self._config.tstat_threshold == "fixed":
+            return configured
+        if evidence.significance_threshold is None:
+            return None
+        return max(float(configured), float(evidence.significance_threshold))
 
     def evaluate(self, alpha_id: str, evidence: Any) -> GateResult:
         """Pure: the same evidence always yields the same result.
@@ -268,7 +300,7 @@ class Gate:
         if not isinstance(evidence, Evidence):
             raise TypeError(f"gate {self.name}: expected Evidence, got {type(evidence).__name__}")
         metric = self._spec.metric(evidence, self._config)
-        threshold = self.threshold
+        threshold = self.threshold_for(evidence)
         if self._spec.block == "research" and not evidence.research_gate_eligible:
             # Recorded, ledgered, but not promotion evidence (module docs).
             return GateResult(
@@ -279,6 +311,8 @@ class Gate:
         if metric is None:
             return GateResult(passed=False, value=None, threshold=threshold)
         value = float(metric)
+        if threshold is None:  # the ledger policy with no threshold in the evidence
+            return GateResult(passed=False, value=value, threshold=None)
         if self._spec.kind == "min":
             passed = value >= threshold
         elif self._spec.kind == "max":
