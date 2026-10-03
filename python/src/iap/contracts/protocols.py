@@ -27,6 +27,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Mapping, Sequence
 from typing import (
     Any,
+    Optional,
     Protocol,
     runtime_checkable,
 )
@@ -112,9 +113,9 @@ class BookViewLike(Protocol):
     from the integer best levels.
     """
 
-    def best_bid(self) -> tuple[int, int] | None: ...
+    def best_bid(self) -> Optional[tuple[int, int]]: ...
 
-    def best_ask(self) -> tuple[int, int] | None: ...
+    def best_ask(self) -> Optional[tuple[int, int]]: ...
 
     def depth(self, side: int, levels: int = 10) -> Sequence[tuple[int, int]]: ...
 
@@ -179,7 +180,7 @@ class Feature(Protocol):
     @property
     def version(self) -> str: ...
 
-    def calculate(self, context: Any) -> float | None: ...
+    def calculate(self, context: Any) -> Optional[float]: ...
 
 
 @runtime_checkable
@@ -192,7 +193,7 @@ class FeatureEngineLike(Protocol):
 
     feature_version: str
 
-    def apply(self, event: Any) -> FeatureVectorLike | None: ...
+    def apply(self, event: Any) -> Optional[FeatureVectorLike]: ...
 
 
 @runtime_checkable
@@ -359,7 +360,7 @@ class AlphaLifecycle(Protocol):
 
     def advance(
         self, alpha_id: str, event_ts: int, evidence: Any
-    ) -> LifecycleTransition | None: ...
+    ) -> Optional[LifecycleTransition]: ...
 
 
 @runtime_checkable

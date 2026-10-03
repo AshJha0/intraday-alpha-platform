@@ -33,6 +33,7 @@ from enum import Enum, IntEnum
 from typing import (
     Any,
     ClassVar,
+    Optional,
     TypeVar,
 )
 
@@ -845,7 +846,7 @@ class ExperimentSpec(Contract):
     alpha_id: str = field(metadata=_IDENT)
     dataset_version: str = field(metadata=_SHA256)
     feature_version: str = field(metadata=_SHA256)
-    model_version: str | None
+    model_version: Optional[str]
     configuration: dict[str, Any]
     train_period: Period
     validation_period: Period
@@ -883,7 +884,7 @@ class ExperimentResult(Contract):
     alpha_id: str = field(metadata=_IDENT)
     dataset_version: str = field(metadata=_SHA256)
     feature_version: str = field(metadata=_SHA256)
-    model_version: str | None
+    model_version: Optional[str]
     ic: float
     rank_ic: float
     t_stat: float
@@ -899,7 +900,7 @@ class ExperimentResult(Contract):
     n_folds: int = field(metadata=_U32)
     leakage_passed: bool
     leakage_detail: dict[str, Any]
-    hypothesis_sign_confirmed: bool | None
+    hypothesis_sign_confirmed: Optional[bool]
     verdict: Verdict
     n_experiments_in_ledger: int = field(metadata=_U64)
     git_commit: str = field(metadata={"non_empty": True})
@@ -927,8 +928,8 @@ class GateResult(Contract):
     ``threshold`` (either may be ``None`` for a boolean gate)."""
 
     passed: bool
-    value: float | None
-    threshold: float | None
+    value: Optional[float]
+    threshold: Optional[float]
 
 
 @contract(V.LIFECYCLE_TRANSITION_VERSION, _LIFECYCLE_SCHEMA)
@@ -985,14 +986,14 @@ class TraceStages(Contract):
     after a REJECT)."""
 
     signal: tuple[AlphaSignal, ...]
-    portfolio: PortfolioTarget | None
+    portfolio: Optional[PortfolioTarget]
     risk: tuple[RiskDecision, ...]
     parent_orders: tuple[ParentOrder, ...]
     child_orders: tuple[ChildOrder, ...]
     routing: tuple[VenueDecision, ...]
     fills: tuple[ExecutionReport, ...]
     tca: tuple[TCAResult, ...]
-    attribution: Attribution | None
+    attribution: Optional[Attribution]
 
 
 @contract(V.DECISION_TRACE_VERSION, _TRACE_SCHEMA)
@@ -1032,7 +1033,7 @@ def _bps(value: float) -> str:
     return f"{value:+.1f} bps"
 
 
-def explain(trace: DecisionTrace, venue_names: Mapping[int, str] | None = None) -> str:
+def explain(trace: DecisionTrace, venue_names: Optional[Mapping[int, str]] = None) -> str:
     """Render the decision chain, one block per stage::
 
         Order 12345

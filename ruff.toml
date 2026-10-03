@@ -15,6 +15,9 @@ ignore = ["E501", "E741", "UP042"]
 [lint.per-file-ignores]
 # Re-exports in package __init__ files are intentional.
 "__init__.py" = ["F401"]
+# contracts/types.py introspects annotations at runtime (typing.get_origin(...) is typing.Union);
+# `X | Y` / `Optional` rewrites yield types.UnionType and break the contract normaliser.
+"python/src/iap/contracts/**" = ["UP007", "UP045"]
 
 [format]
 quote-style = "double"
