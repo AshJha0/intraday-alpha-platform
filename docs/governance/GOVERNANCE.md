@@ -55,8 +55,9 @@ dependency graph rather than by a promise in a Dockerfile header. The `images`
 job runs on pushes to `main` and on pull requests that change image inputs
 (`deployment/docker/**`, any Dockerfile, the pinned Python and Rust inputs); it
 is skipped on other pull requests, so it is not a required status check. The
-workflow also runs non-blocking advisory jobs (clippy, ruff, `pip-audit`,
-`cargo audit`, a C++ ASan+UBSan pass) that report findings without failing the
+workflow also runs a blocking C++ ASan+UBSan job over the full ctest suite
+and non-blocking advisory steps (clippy, ruff, `pip-audit`, `cargo audit`)
+that report findings without failing the
 run, and `.github/workflows/codeql.yml` scans for vulnerabilities. A red `ci`
 run does not by itself prevent a merge until the branch ruleset exists.
 `CODEOWNERS` names the reviewers this table and SECURITY.md refer to (all

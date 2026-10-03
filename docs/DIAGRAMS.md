@@ -43,8 +43,8 @@ flowchart TD
 ## 2. Cross-language golden-test topology
 
 How one validated Python reference pins four implementations. The parity table is
-printed by `tests/harness/run_all.sh` (python 1392 · cpp 289 · rust 313 · java 486
-tests; 164/68/62/102 in the golden groups — the Java gate runs all thirteen
+printed by `tests/harness/run_all.sh` (python 1562 · cpp 289 · rust 323 · java 510
+tests; 166/68/64/104 in the golden groups — the Java gate runs all thirteen
 `*GoldenTest` classes, the Rust gate nine golden targets). Two goldens are
 owned by a port language and consumed by Python as well: the fills golden
 (C++) by `iap.execution`, the risk goldens (Rust) by `iap.risk`.
@@ -60,10 +60,10 @@ flowchart LR
     MG --> EXP[("expected_*.json<br/>codec sha256 | book states | features<br/>alpha | backtest | risk decisions + audit + snapshot<br/>replay fills | portfolio | tca (+ timeline cases) | adaptive<br/>contracts examples | canonical json + trace digest<br/>lifecycle | experiment golden frame | mvp")]
     CPPTOOL["cpp/tools/make_replay_fills_golden<br/>(C++ is the fills reference;<br/>Python iap.execution consumes it too)"] --> EXP
     RSTOOL["rust/risk/src/bin/make_risk_golden<br/>(Rust is the risk reference;<br/>Python iap.risk consumes it too)"] --> EXP
-    GV --> PY["python: pytest -k golden<br/>164 tests"]
+    GV --> PY["python: pytest -k golden<br/>166 tests"]
     GV --> CPP["cpp: ctest -R Golden<br/>68 tests"]
-    GV --> RS["rust: 9 golden test targets<br/>62 tests"]
-    GV --> JV["java: all thirteen *GoldenTest (JUnitCore)<br/>102 golden-group tests"]
+    GV --> RS["rust: 9 golden test targets<br/>64 tests"]
+    GV --> JV["java: all thirteen *GoldenTest (JUnitCore)<br/>104 golden-group tests"]
     EXP --> PY
     EXP --> CPP
     EXP --> RS

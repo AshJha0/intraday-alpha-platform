@@ -58,7 +58,7 @@ the full design, data flow, and diagrams.
 | Experiments ledger | 1068 recorded looks over **70 distinct configurations** (de-duplicated by alpha × kind × config); expected max \|t\| under the global null ≈ 3.735, Bonferroni per-test \|t\| ≥ 4.071 | `research/experiments.json` |
 | Contracts | **17** JSON Schemas (all `x-version` 1) mirrored by **22** typed Python contracts and **18** runtime-checkable Protocols; one pinned instance each | `schemas/`, `python/src/iap/contracts/`, `tests/golden/expected_contracts_examples.json` |
 | Python reference ports proven by the ports' own goldens | risk: `expected_risk_decisions.json` exact, audit JSONL + snapshot **byte-identical**; execution: `expected_replay_fills.json` **bit-identical** | `python/tests/test_risk_golden.py`, `python/tests/test_execution_golden.py` |
-| MVP golden run (`python -m iap.mvp run`, seed 12345) | **16,578** events · **355** decisions · **66** parent orders · **55** fills · P&L **−22.65 USD** (cost-negative: +0.039 bps alpha vs −0.40 bps execution cost) · trace digest `d938eeae…` reproduced by run-twice and replay-from-capture | `tests/golden/expected_mvp.json` |
+| MVP golden run (`python -m iap.mvp run`, seed 12345) | **16,578** events · **355** decisions · **66** parent orders · **55** fills · P&L **−22.65 USD** (cost-negative: +0.039 bps alpha vs −0.41 bps execution cost) · trace digest `d938eeae…` reproduced by run-twice and replay-from-capture | `tests/golden/expected_mvp.json` |
 | Adaptive deployment study | 4 refit policies × 10 alphas; 126 drift-triggered refits; FX01 retired under every policy | `research/adaptive_reports/ADAPTIVE_REPORT.md` |
 | Bundled dataset | 2 synthetic sessions, 19 instruments, 310,159 normalized events | `data/normalized/qc_report.json` |
 | Feature emission | 208,437 vectors at 100 ms cadence | `data/features/features_summary.json` |
@@ -82,6 +82,25 @@ full observed trade volume, fabricating liquidity that was never there.
 `schemas/MIGRATIONS.md` lists the goldens regenerated because of them.
 Nothing was promoted before the review and nothing is promoted after it.
 
+A second review, released as v1.3.0 on 2026-10-03
+([CHANGELOG.md](CHANGELOG.md)), found the same class of defect in the
+safety code itself. The hard risk engine trusted a mark stamped in the
+future, let NaN through float comparisons, could overflow i64 position and
+timestamp arithmetic, and let a venue-0 (SOR) order pass a venue kill; all
+three engines now reject in each case and a new edge golden pins those
+branches byte for byte. The execution simulator re-filled a resting order
+against the same displayed size on every event and tracked events the book
+had dropped. The Java paper platform could resume a cursor beside a risk
+snapshot of another instant, drop an admin kill on a quiet feed, and bound
+its admin listener to every interface. On the research side the corrected
+statistics are **opt-in** — every default is the previously pinned
+behaviour, so no committed number moved — and a planted-signal power study
+([research/power/POWER_REPORT.md](research/power/POWER_REPORT.md)) measures
+what the validation chain can and cannot detect: at the reference effect
+size it flags the planted order-flow signal in 3 of 3 seeds and the planted
+lead-lag in 0 of 3, promotes nothing at any size, and no bootstrap P&L
+interval lies above zero. Still 0 PROMOTE.
+
 Two conditioning rules do most of the culling, and both were added after a
 round-3 audit found the earlier numbers were measuring the wrong thing. IC is
 now computed **only on uncrossed cross-sections** (`spread_ticks_v1 >= 0`)
@@ -102,8 +121,8 @@ same thing from two more directions: the promotion lifecycle
 ([docs/LIFECYCLE.md](docs/LIFECYCLE.md)) bootstraps all 24 alphas to
 CANDIDATE and advances none, because the `net_pnl_after_costs` gate fails
 for every one; and the executable MVP ([docs/MVP.md](docs/MVP.md)) runs the
-full loop on one synthetic equity and loses 22.65 USD on 3,176 shares — an
-alpha contribution of +0.039 bps against −0.40 bps of modelled execution
+full loop on one synthetic equity and loses 22.65 USD on 3,126 shares — an
+alpha contribution of +0.039 bps against −0.41 bps of modelled execution
 cost. Its realized mid-to-mid IC (0.28 for EQ01 at 1 s) is an order of
 magnitude above the research IC (0.027); that gap was audited on
 2026-09-20 and is a property of the synthetic generator's mean-reverting
@@ -188,17 +207,20 @@ intraday-alpha-platform/
   java/                     javac build: com.iap.* — full platform layer + paper trading
                             (+ contracts, trace, lifecycle; PaperTrading emits decision traces)
   research/                 alpha_reports/, ml_reports/, adaptive_reports/, baselines/,
-                            tca/, models/, experiments/<id>/{spec,result}.json,
+                            tca/, models/, experiments/<id>/{spec,result}.json
+                            (+ eligibility.json for runs made since v1.3.0),
                             experiments.json (the ledger), alpha_registry.json,
-                            lifecycle_transitions.jsonl, lifecycle_log.jsonl
-  deployment/               docker/, k8s/, grafana/, prometheus/
+                            lifecycle_transitions.jsonl, lifecycle_log.jsonl,
+                            power/ (planted-signal power study: generator config + report)
+  deployment/               docker/, k8s/, grafana/, prometheus/, alertmanager/
   tools/github/             issues.yaml (epics/issues source of truth) + create_issues.py
 ```
 
 ## Quick start
 
 Prerequisites are already the environment baseline: Python 3.11 (+ pyarrow),
-g++ 13 / CMake / GoogleTest, Rust 1.95, Java 21 (JUnit4 jar at
+g++ 13 / CMake / GoogleTest, Rust (the toolchain is pinned to 1.98.1 in
+`rust/rust-toolchain.toml`), Java 21 (JUnit4 jar at
 `/usr/share/java/junit4.jar` — there is deliberately **no Maven**; see
 [docs/BUILD_NOTES.md](docs/BUILD_NOTES.md)).
 
@@ -251,22 +273,22 @@ python3 tests/harness/check_headline_numbers.py   # every number in this README 
 python3 tools/github/create_issues.py --dry-run   # the epics/issues plan (docs/EPICS.md)
 ```
 
-## Cross-language parity (captured from `tests/harness/run_all.sh`)
+## Cross-language parity (the `tests/harness/run_all.sh` table, counts from CI)
 
 ```
 ===================== cross-language parity table =====================
 language | tests passed | golden passed  | time   | status
 ---------+--------------+----------------+--------+-------
-python   | 1392         | 164            |   83s | PASS
-cpp      | 289          | 68             |    1s | PASS
-rust     | 313          | 62             |    2s | PASS
-java     | 486          | 102            |   20s | PASS
-integration | 15           | -              |   15s | PASS
-replay   | 4            | -              |   15s | PASS
-deployment | -            | -              |    4s | PASS
+python   | 1562         | 166            |    -s | PASS
+cpp      | 289          | 68             |    -s | PASS
+rust     | 323          | 64             |    -s | PASS
+java     | 510          | 104            |    -s | PASS
+integration | 15           | -              |    -s | PASS
+replay   | 4            | -              |    -s | PASS
+deployment | -            | -              |    -s | PASS
 numbers  | -            | -              |    -s | PASS
 =======================================================================
-deployment checks: 16 passed, 0 failed, 2 skipped
+deployment checks: 25 passed, 0 failed, 0 skipped
 headline numbers: all headline numbers match their artefacts
 (a '-' count means the suite did not run in this mode, or has no golden
  group (integration/replay); '?' means it ran but its count could not be
@@ -274,10 +296,19 @@ headline numbers: all headline numbers match their artefacts
 >> PARITY OK — all languages passed (full suites).
 ```
 
-(Captured 2026-09-20 from a warm build tree; a cold C++/Rust/Java build adds
-compile time. The two skipped deployment checks are `promtool` and
-`kubeconform`, which are not installed in this environment; the rule files
-they would check are validated structurally instead. The `golden passed`
+(Counts for v1.3.0, 2026-10-03. They are taken from the CI jobs of the
+release line rather than from one local harness run: each CI job runs the
+canonical commands of the matching `run_all.sh` row, and CI installs
+`promtool` and `kubeconform`, so no deployment check is skipped there — a
+local run without those tools reports them as skipped and validates the
+rule files structurally instead. The time column is left blank because the
+CI jobs also build coverage and sanitizer trees, so their durations are not
+the harness's. The Java and Rust counts are additionally re-derived from
+the source tree (`@Test` / `#[test]`) by `check_headline_numbers.py`. The
+v1.3.0 growth is the new regression tests: fail-closed risk rules and the
+edge golden in three languages, the simulator fill rules, the Java
+`PlatformSafetyTest`, and the research-validity and research-store suites
+in Python. The `golden passed`
 column counts each language's golden-group tests: byte-exact IAP1 SHA-256
 codec parity, exact-integer book states, 1e-9-tolerance
 feature/alpha/portfolio/TCA/fill comparisons, exact risk decisions with
@@ -325,7 +356,10 @@ golden tests — the engineering discipline this repo is built around
 | document | what it covers |
 |---|---|
 | [LEARN.md](LEARN.md) | textbook walkthrough: microstructure, generator, book, features, honest alpha research, ML/meta-labeling, portfolio, risk, execution, TCA, parity, latency economics, adaptability, contracts & Protocols, the Python risk/execution reference, the 7-state lifecycle, the decision trace, the data model, the MVP walkthrough with its honest numbers, pitfalls, interview Q&A |
-| [COOKBOOK.md](COOKBOOK.md) | 26 task-oriented recipes with runnable commands |
+| [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) | how the quant, algo and AI sides work — a guided explanation for a newcomer: the pipeline on one page, the research statistics and gates, the execution algorithms and simulator rules, the fail-closed risk engine, the ML layer with its negative results, the LLM/agent boundary (what exists, what is backlog, what would be theatre on this data), determinism and replay; every section ends with where to look and a command that runs |
+| [COOKBOOK.md](COOKBOOK.md) | 35 task-oriented recipes with runnable commands |
+| [docs/RESEARCH_VALIDITY.md](docs/RESEARCH_VALIDITY.md) + [research/power/POWER_REPORT.md](research/power/POWER_REPORT.md) | the opt-in corrected research methods (each with its pinned default), the research store under parallel writers, gate eligibility; the planted-signal power study of the validation chain |
+| [CHANGELOG.md](CHANGELOG.md) | release notes, newest first (v1.3.0: fail-closed risk, simulator fill rules, paper-platform safety, governance and deployment hardening, research validity) |
 | [docs/MVP.md](docs/MVP.md) | the executable MVP (`python -m iap.mvp run / replay / verify / explain`): one deterministic, fully traced trading loop on a synthetic equity — the loop module by module, the §11.4 wiring rules with code references, the determinism contract, the incident replay flow, the honest golden-run results (cost-negative) with the realized-IC audit, and the success-criteria table |
 | [docs/LIFECYCLE.md](docs/LIFECYCLE.md) | the 7-state promotion lifecycle: states, the 17-edge transition table, the 18 gates with config keys and defaults, evidence documents, registry and transition-log formats, the bootstrap result (24 CANDIDATE / 0 beyond), the golden, the Java/Rust ports, the RETIRED-is-observational caveat |
 | [docs/DECISION_TRACE.md](docs/DECISION_TRACE.md) | the decision trace: the record, ids, canonical JSON rules, the stream digest with its known answers, sinks, the pinned `explain()` block, store views, emission points in Python / Java / C++ / Rust, incident replay |
@@ -333,7 +367,7 @@ golden tests — the engineering discipline this repo is built around
 | [API_TRADING.md](API_TRADING.md) | the Python reference ports of the hard risk engine (`iap.risk`) and the execution stack (`iap.execution`): public APIs, golden parity statements, what is pinned about each port |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | the six-week plan (Phase 0 → Week 6) and Phase 2/3 mapped to what exists with evidence, what is backlog, the MVP success criteria |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | system design, per-language responsibilities, contracts, the research → trading → execution → adaptive loop with lifecycle and trace, determinism, golden topology, hot-path notes, observability, the MVP vertical, deployment, the agentic-AI design rule |
-| [docs/DIAGRAMS.md](docs/DIAGRAMS.md) | all ten architecture diagrams on one page (pipeline, golden topology, paper trading, responsibility matrix, risk decision flow, queue-position model, data model, lifecycle state machine, decision-trace chain, MVP loop) |
+| [docs/DIAGRAMS.md](docs/DIAGRAMS.md) | all nineteen architecture diagrams on one page (pipeline, golden topology, paper trading, responsibility matrix, risk decision flow, queue-position model, data model, lifecycle state machine, decision-trace chain, MVP loop; and, since v1.3.0, the fail-closed risk branches, the simulator fill/queue flow, the paper-platform checkpoint commit point and resume, the admin kill latch, the research run with ledger lock and eligibility, the power study, the CI/release pipeline, the deployment topology, and the planned agent layer — labelled as backlog) |
 | [docs/DATA_MODEL.md](docs/DATA_MODEL.md) | the relational data model (`schemas/sql/iap_v1.sql`, SQLite + PostgreSQL): every table, the views, portability rules, how the store indexes the flat-file artefacts, query cookbook |
 | [docs/index.html](docs/index.html) + [docs/GITHUB_PAGES.md](docs/GITHUB_PAGES.md) | the GitHub Pages landing site and how to publish it (Settings → Pages → main branch, /docs folder) |
 | [docs/SPECIFICATION.md](docs/SPECIFICATION.md) | the governing institutional specification (verbatim) |
@@ -350,7 +384,7 @@ golden tests — the engineering discipline this repo is built around
 | [benchmarks/RESULTS.md](benchmarks/RESULTS.md) | benchmark index; C++ table in [results_cpp.md](benchmarks/results_cpp.md) + methodology |
 | [docs/runbooks/](docs/runbooks/) | data pipeline, backtest, paper trading, kill-switch incident, incident replay runbooks |
 | [docs/governance/](docs/governance/) | governance, reproducibility, security |
-| [docs/EPICS.md](docs/EPICS.md) + [CONTRIBUTING.md](CONTRIBUTING.md) | the build plan as epics/issues with honest done / backlog status (generated from `tools/github/issues.yaml`; nothing in progress as of 2026-09-20); how to contribute |
+| [docs/EPICS.md](docs/EPICS.md) + [CONTRIBUTING.md](CONTRIBUTING.md) | the build plan as epics/issues with honest done / backlog status (generated from `tools/github/issues.yaml`; nothing in progress as of 2026-10-03); how to contribute |
 | [schemas/README.md](schemas/README.md) / [schemas/FORMAT.md](schemas/FORMAT.md) / [schemas/MIGRATIONS.md](schemas/MIGRATIONS.md) | the 17-schema index + the SQL DDL; normative wire layout (JSONL + IAP1 binary); every versioned change |
 | [tests/README.md](tests/README.md) | the six-level testing strategy with exact commands and the golden inventory |
 | [deployment/grafana/README.md](deployment/grafana/README.md) | dashboards and observability stack (incl. the trace metrics) |
@@ -440,8 +474,9 @@ be this kind, and even this one does not pay the spread.
   ([paper 5](docs/papers/05_queue_aware_execution_adverse_selection.md));
 - production hardening: the read endpoints (`/metrics` `/health` `/ready`
   `/status`) are unauthenticated and rely on the NetworkPolicy — only the
-  write surface (`POST /admin/*`, the kill switch) is token-authenticated and
-  audited; and there is no HA/failover (the trading vertical is a deliberate
+  write surface (`POST /admin/*`, the kill switch) is token-authenticated,
+  rate-limited on failed authentication and audited, and the listener binds
+  loopback unless `IAP_BIND_ADDR` says otherwise; and there is no HA/failover (the trading vertical is a deliberate
   singleton) or kernel-bypass networking. The C++ latency figures are
   single-threaded in-memory measurements, not tick-to-trade on a real network.
 

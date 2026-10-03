@@ -1,7 +1,7 @@
 # COOKBOOK — task-oriented recipes
 
 Every recipe below is runnable from a fresh checkout of this repository in
-the standard environment (Python 3.11 + pyarrow, g++ 13/CMake, Rust 1.95,
+the standard environment (Python 3.11 + pyarrow, g++ 13/CMake, Rust 1.98.1,
 Java 21; see [docs/BUILD_NOTES.md](docs/BUILD_NOTES.md)). Paths are relative
 to the repo root unless a recipe says otherwise. Recipes that read
 `data/features/` need recipes 1 and 3 to have run first (the repo ships with
@@ -520,12 +520,13 @@ bash tests/harness/run_all.sh --golden-only   # golden groups only (fast)
 ```
 
 Exit code 0 iff every language passed; logs land in a temp dir printed on
-the first line. A full-suite run (2026-09-20): python 1392 / cpp 289 /
-rust 313 / java 486 tests passed (golden groups 164/68/62/102), plus
+the first line. The v1.3.0 counts (CI, 2026-10-03): python 1562 / cpp 289 /
+rust 323 / java 510 tests passed (golden groups 166/68/64/104), plus
 `integration` (15) and `replay` (4) rows for the repo-level pytest suites, a
-`deployment` row (16 structural checks passed, 2 skipped for absent tools)
-and a `numbers` row (every headline figure re-derived from its artefact),
-all PASS.
+`deployment` row (25 structural checks passed in CI, where `promtool` and
+`kubeconform` are installed; a machine without them reports those checks as
+skipped) and a `numbers` row (every headline figure re-derived from its
+artefact), all PASS.
 
 ## 15. Generate the TCA report
 
@@ -813,7 +814,7 @@ synthetic equity `SYN.EQ.AAPL` and writes every artefact under
 ```bash
 cd python
 PYTHONPATH=src python3 -m iap.mvp run                       # configs/mvp/mvp.json, seed 12345
-# mvp run 58a10f2194a3c81c: events=16578 decisions=355 parents=66 children=105 fills=55 pnl=-22.676287 USD digest=d938eeae68c85a6c... out=.../data/mvp/58a10f2194a3c81c
+# mvp run 58a10f2194a3c81c: events=16578 decisions=355 parents=66 children=105 fills=55 pnl=-22.651183 USD digest=d938eeae68c85a6c... out=.../data/mvp/58a10f2194a3c81c
 PYTHONPATH=src python3 -m iap.mvp run --seed 7 --out /tmp/mvp7          # another seed, explicit directory
 PYTHONPATH=src python3 -m iap.mvp verify                                  # run twice from scratch, compare digest/report/stream
 cat ../data/mvp/58a10f2194a3c81c/report.md                                # the honest numbers (cost-negative)

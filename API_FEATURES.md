@@ -406,6 +406,16 @@ pinned in one place: the anchor uses events with `ts <= t`, the forward leg
 is determined by the anchor state plus events strictly after `t` — shifting
 either series by one event must break the alignment tests.
 
+**Opt-in: the reopen return of a BLACKOUT label (v1.3.0).**
+`compute_labels(..., blackout_reopen=True)` (default `False`; labels and
+validity are unchanged either way) also fills `LabelResult.reopen_mid`: for
+an anchor whose label is invalid for `blackout` and nothing else, the
+return from the anchor mid to the first tradable mid at or after `t + h`.
+It is not a tradable `h`-horizon return — the label stays invalid — and
+exists so that the selection rule 4 makes can be measured:
+`iap.validation.metrics.ic_with_blackout_reopen` scores those rows at the
+realised reopen return instead of dropping them.
+
 ## 7. Performance expectations
 
 The reference Python engine processes the bundled two-day, 19-instrument

@@ -941,11 +941,11 @@ match**.
   the portfolio golden is checked against an SLSQP optimum. Golden files are
   regenerated only deliberately, with a MIGRATIONS.md entry.
 - **One command proves parity**: `tests/harness/run_all.sh` runs all four
-  suites and prints the table (a full harness run on 2026-09-20: python 1392,
-  cpp 289, rust 313, java 486 tests passed; golden groups 164/68/62/102; all
+  suites and prints the table (the v1.3.0 counts from CI, 2026-10-03: python 1562,
+  cpp 289, rust 323, java 510 tests passed; golden groups 166/68/64/104; all
   PASS, plus `integration` (15) and `replay` (4) rows for the repo-level
-  pytest suites, a `deployment` row — 16 structural checks passed, 2 skipped
-  for tools absent here — and a `numbers` row that re-derives every headline
+  pytest suites, a `deployment` row — 25 structural checks passed in CI,
+  where promtool and kubeconform are installed — and a `numbers` row that re-derives every headline
   figure in the docs from its artefact). The Java golden group runs all
   thirteen `*GoldenTest` classes (it once ran two of them and reported 18),
   the Rust group nine golden targets. The 2026-09-19/20 release added a new
@@ -1513,7 +1513,7 @@ index that lied about what its sources contain would be worse than none.
 
 ```bash
 cd python && PYTHONPATH=src python3 -m iap.mvp run
-# mvp run 58a10f2194a3c81c: events=16578 decisions=355 parents=66 children=105 fills=55 pnl=-22.676287 USD digest=d938eeae68c85a6c...
+# mvp run 58a10f2194a3c81c: events=16578 decisions=355 parents=66 children=105 fills=55 pnl=-22.651183 USD digest=d938eeae68c85a6c...
 ```
 
 Seven seconds later `data/mvp/58a10f2194a3c81c/` holds the captured stream,
@@ -1528,21 +1528,21 @@ over the Protocols of §15. The per-event order mirrors the Java
 `BacktestEngine` / `PaperTrading` wiring rule for rule (docs/MVP.md §4 is
 the row-by-row review), and the §12.1 money identity — `pnl.total ==
 (gross − spread) − fees − impact`, risk daily P&L == gross − spread — is
-asserted after every fill (|diff| 5.8e-12 on the golden run).
+asserted after every fill (|diff| 3.3e-11 on the golden run).
 
 ### 20.2 The numbers, stated as they are
 
 Seed 12345: 16,578 events, 355 decisions, 66 parent orders, 212 children
 generated of which 105 submitted (107 blocked by the 500 ms slice-interval
-control, exactly as the Java loop would), 55 fills, 20.5 % fill rate.
+control, exactly as the Java loop would), 55 fills, 20.2 % fill rate.
 Risk: 105 ALLOW, 0 REJECT, 0 KILL, 9 sequence gaps each recovered by the
-following SNAPSHOT burst, 72 mark regressions dropped. Routing: XV3 74.7 %,
-XV1 13.5 %, XV2 11.7 % of filled quantity (aggressive routing picks the
+following SNAPSHOT burst, 72 mark regressions dropped. Routing: XV3 75.9 %,
+XV1 12.1 %, XV2 11.9 % of filled quantity (aggressive routing picks the
 cheapest taker fee on price ties; passive routing prefers XV1's rebate).
 TCA: implementation shortfall +0.106 bps quantity-weighted; TWAP fills
-3.4 % (passive limits at a 1 s horizon mostly expire), POV 13.9 %, IS
-69.1 %. **P&L −22.65 USD** on 3,176 shares: +0.039 bps of alpha
-contribution against −0.40 bps of execution cost. The report field is
+3.0 % (passive limits at a 1 s horizon mostly expire), POV 13.9 %, IS
+68.9 %. **P&L −22.65 USD** on 3,126 shares: +0.039 bps of alpha
+contribution against −0.41 bps of execution cost. The report field is
 `alpha.cost_negative: true`. This is the research finding of §6 — real
 signal, no money after costs — reproduced by a full loop on a different
 synthetic stream, and it is the headline number of the MVP, not a footnote.

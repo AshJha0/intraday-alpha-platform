@@ -17,24 +17,26 @@ gated on all of them. Run the whole thing locally with
 ## Python (reference implementation)
 
 ```bash
-cd python && PYTHONPATH=src python3 -m pytest -q          # full suite (1362 tests, ~83s on the 2-CPU baseline)
-cd python && PYTHONPATH=src python3 -m pytest -q -k golden # the golden group (164)
+cd python && PYTHONPATH=src python3 -m pytest -q          # full suite (1562 tests; 319 s in the CI job, with coverage, 2026-10-03)
+cd python && PYTHONPATH=src python3 -m pytest -q -k golden # the golden group (166)
 cd python && PYTHONPATH=src python3 -m iap.marketdata      # end-to-end pipeline
 cd python && PYTHONPATH=src python3 -m iap.mvp run         # the traced MVP loop (~7 s)
 cd python && PYTHONPATH=src python3 tools/make_golden.py   # regen goldens (deliberate only; every
                                                            # make_golden_*.py refuses to overwrite without --force)
 ```
 
-- **Timing.** ~83 s is what the harness measures: the `python` row of the README
-  parity table (captured from `tests/harness/run_all.sh`, 2026-09-20) reads 83 s,
-  and that row is this full suite (1362 tests, 71 s of it the suite itself) plus the
-  `-k golden` re-run (164 tests, ~18 s), so the pytest command above is most of it.
-  The suite grew from 626 to 1362 tests with the 2026-09-19/20 release (contracts,
-  risk and execution ports, lifecycle, trace, store, research runner, MVP) and stays
-  inside the 120 s budget without shrinking any fixture. As everywhere else here,
-  the number is for the 2-CPU container baseline and will move with the machine.
+- **Timing.** The v1.3.0 suite is 1562 tests (166 in the `-k golden` group). The CI
+  `python` job ran it in 319 s on a GitHub-hosted runner on 2026-10-03, under
+  `--cov` instrumentation. The last harness capture on the 2-CPU container baseline
+  (2026-09-20, 1362 tests) read 83 s for the `python` row — the full suite, 71 s,
+  plus the `-k golden` re-run. The growth since then is the v1.3.0 regression
+  suites (fail-closed risk rules and the edge golden, simulator fill rules, research
+  validity, the research store under two processes, the planted-signal tests). **The
+  Python suite therefore no longer meets the 120 s target stated at the top of this
+  file on CI hardware**; no uninstrumented baseline timing has been re-captured for
+  v1.3.0, and nothing was removed to make the number fit.
 - Python 3.11, src layout (`python/src/iap`), packaging via `python/pyproject.toml`
-  (1.1.0; installable with `pip install -e python` if preferred over PYTHONPATH;
+  (1.3.0; installable with `pip install -e python` if preferred over PYTHONPATH;
   console scripts `iap-marketdata`, `iap-features`, `iap-tca`, `iap-research`,
   `iap-lifecycle`, `iap-store`, `iap-mvp`).
 - Dependencies (declared in `pyproject.toml`): numpy, pandas, scipy, scikit-learn,
@@ -55,7 +57,7 @@ cd cpp && bash build.sh && ctest --test-dir build --output-on-failure
 ```
 
 C++17, g++13/CMake/GoogleTest/Eigen available; `-Wall -Wextra -Werror` clean; build
-with `-j2` (2-CPU environment); 267 tests, 68 in the golden group. Layout: `include/iap/{marketdata,orderbook,features,
+with `-j2` (2-CPU environment); 289 tests, 68 in the golden group. Layout: `include/iap/{marketdata,orderbook,features,
 alpha,execution,sor,replay,contracts,util}` + `src/` mirrors; `contracts/` is the
 canonical-JSON / decision-trace contract (`canonical_json.hpp`, `trace.hpp`),
 `util/sha256.hpp` the SHA-256 the codec goldens and the trace digest share. The
@@ -65,7 +67,7 @@ golden group is `ctest --test-dir build -R Golden` (suites `*Golden`, including
 ## Rust
 
 ```bash
-cd rust && cargo test        # workspace (eleven crates, 298 tests, ~55 s after a full rebuild)
+cd rust && cargo test        # workspace (eleven crates, 323 tests, ~55 s after a full rebuild)
 ```
 
 Crates: `marketdata`, `orderbook`, `replay`, `eventbus`, `telemetry`, `features`,
@@ -81,7 +83,7 @@ byte-identical `research/alpha_registry.json`). Golden targets run by
 `research/alpha_registry.json` relative to the crate (the Docker image copies
 them).
 
-Rust 1.95, crates.io reachable; keep deps to serde/serde_json only (`rand` was
+Rust 1.98.1 (pinned in `rust/rust-toolchain.toml`; CI and `Dockerfile.rust` name the same version and `check_deployment.py` fails if they drift; the workspace MSRV stays 1.75; the figures in the papers were measured with rustc 1.95.0), crates.io reachable; keep deps to serde/serde_json only (`rand` was
 permitted historically but is NOT used — the pinned RNG is SplitMix64,
 conventions §3 — and SECURITY.md §1 allows serde/serde_json alone) (+ crossbeam
 where justified); zero warnings. `serde_json` is built with its
@@ -92,7 +94,7 @@ canonical-JSON byte parity the contracts / lifecycle goldens pin.
 ## Java — why there is NO Maven build
 
 ```bash
-cd java && bash build.sh && bash test.sh    # 475 tests; the thirteen *GoldenTest classes are 102 of them
+cd java && bash build.sh && bash test.sh    # 510 tests; the thirteen *GoldenTest classes are 104 of them
 ```
 
 **Maven/Gradle are deliberately not used: Maven Central is unreachable from
