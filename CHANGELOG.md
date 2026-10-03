@@ -114,6 +114,11 @@ API_TRADING.md §2.4)**
   (3,126 shares, −0.41 bps execution cost, the fill-rate, routing and
   per-algorithm rows), which several documents had not followed after the
   2026-09-20 regeneration.
+- The 31 table-of-contents links of docs/EPICS.md resolve. The generator
+  collapsed the two spaces around a dash into one hyphen; GitHub keeps both
+  (`e01--architecture-and-contracts`). `create_issues.py` now has
+  `github_slug`, which follows GitHub's rule, and the issue-plan test checks
+  every anchor against the rendered headings.
 
 ### Added
 
@@ -157,6 +162,16 @@ API_TRADING.md §2.4)**
 - **Deployment**: Alertmanager (compose and Kubernetes) with a `Watchdog`
   heartbeat; NetworkPolicies for default-deny egress and an operator ingress
   rule; a separate state PVC for the Java platform and a Grafana PVC.
+- **Alert rules for the paper-platform safety signals** (22 alerts and the
+  heartbeat, from 16): `SessionStoppedNotResumed` on the `STOPPED` session
+  state, `RoutedVenueMismatch`, `KillPendingNotRecorded`,
+  `ResumeReleasedOpenOrders`, `AdminAuthRateLimited` and
+  `AdminAuditSuppressed` on the five safety counters, each with a
+  `promtool` unit test and a runbook section. The counters are in the
+  deployment harness's exported-metrics list.
+- **Generator `equities.fill_session`** (off by default; the pinned dataset
+  is byte-identical with the key absent or false): equity flow continues to
+  the close instead of stopping when the slot budget is spent.
 - **Documentation**: docs/HOW_IT_WORKS.md, docs/RESEARCH_VALIDITY.md,
   docs/governance/REPO_SETTINGS.md, this changelog; new LEARN chapters,
   COOKBOOK recipes 27–35 and nine diagrams; seven backlog epics (E25–E31).
@@ -174,7 +189,7 @@ API_TRADING.md §2.4)**
 - `images` CI job also runs on pull requests that touch image inputs.
 - `CODEOWNERS` names `@AshJha0` (the `@iap/*` teams never existed).
 - Versions: `python/pyproject.toml` 1.3.0; image references `v1.3.0`.
-- Parity table: python 1562 / cpp 289 / rust 323 / java 510 tests, golden
+- Parity table: python 1563 / cpp 289 / rust 323 / java 510 tests, golden
   groups 166/68/64/104.
 
 ### Security
@@ -205,9 +220,28 @@ API_TRADING.md §2.4)**
 - **Alerts are routed but not delivered** until an operator supplies a
   webhook URL; audit logs are not shipped off-host; no image vulnerability
   scan is wired in.
-- **The `STOPPED` state is not known downstream.** The session-state
-  dashboard panel maps 0–3 only, and no rule refers to the value 4
-  (deployment/grafana/README.md).
+- **The `STOPPED` state is half known downstream.** The session-state
+  dashboard panel maps 0–3 only. `SessionStoppedNotResumed` reads the value
+  4, but a stopped process exits right after its checkpoint, so the value
+  is scraped only when a scrape lands in that instant; otherwise
+  `TargetDown` is the only alert (deployment/grafana/README.md).
+- **Equity flow in the bundled dataset stops about 40% into each session.**
+  Every equity stream's continuous flow ends 38–43% of the way through the
+  6.5-hour session (mean 40.5%, about 2 h 38 min after the open) and
+  nothing follows until the close auction; FX is not affected in the same
+  way (its flow ends 92–100% of the way through, mean 95%). The cause is in
+  `python/src/iap/marketdata/generator.py` `_eq_session_stream`:
+  `slots_per_stream` is a hard budget of flow slots, the base rate is
+  `slots / duration * 1.30` — the margin multiplies the rate, so the budget
+  would be spent at 77% even without clustering — and the self-exciting
+  multiplier `(1 + excitation)`, which about halves the mean inter-arrival
+  time, is not in the calibration. Every equity research number is
+  therefore a statement about roughly the first 2 h 40 min of each of the
+  two sessions (about 5.3 hours of continuous flow in total, not 13), and
+  the walk-forward folds, cut by row mass, partition that window. The
+  default is unchanged because every golden, report and headline number
+  derives from it; `equities.fill_session: true` generates flow to the
+  close (about 2.5 times the equity events). Backlog issue M08.
 - **Ports implement the pinned research defaults only.** The opt-in HAC z,
   the CUSUM rule and the gate-eligibility flag exist in the Python reference
   alone; the Java and Rust lifecycle readers reject evidence carrying
@@ -221,7 +255,7 @@ API_TRADING.md §2.4)**
   only. Differential fuzzing of the three engines is backlog (E31).
 - **The power study is three seeds per cell.** A rate moves in steps of
   0.33; it calibrates the chain and is not a power curve.
-- **The Python suite exceeds its 120 s target** (1562 tests, five to six minutes in
+- **The Python suite exceeds its 120 s target** (1563 tests, five to six minutes in
   CI under coverage).
 - **`iap.__version__` still reads 1.0.0**; the package metadata says 1.3.0.
 - **There is no LLM, agent or MCP code.** The agent layer is a backlog epic

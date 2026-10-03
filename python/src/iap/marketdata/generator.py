@@ -31,6 +31,16 @@ bit-identical output files):
     the pinned dataset is unchanged), close auction (STATUS AUCTION + prints
     + STATUS CLOSE). Multi-day capable; books and sequences persist across
     sessions.
+  * KNOWN LIMITATION — continuous flow stops early.  ``slots_per_stream`` is
+    a hard budget of flow slots per stream and session, and the base rate is
+    ``slots / duration * 1.30``: the margin multiplies the RATE, so even
+    unclustered flow spends the budget 1/1.30 = 77% of the way through, and
+    the self-exciting multiplier ``(1 + excitation)`` is not in the
+    calibration at all.  With the pinned config the last continuous event
+    of a stream falls 38-43% into the session (mean 40.5%); nothing follows
+    until the close auction.  ``equities.fill_session`` (off by default so
+    the pinned dataset is unchanged) removes the budget: flow continues to
+    the close at the same intensity, and the event count grows accordingly.
 - FX (8 G10 pairs, venues LP1/LP2/PRI): QUOTE (full L1 side replace) + TRADE
   streams; one shared regime-switching mid per pair, venue-specific spreads
   and venue-specific latency in receive_ts.
@@ -77,6 +87,7 @@ Raw files are written in *arrival order* (sorted by receive_ts) with
 
 from __future__ import annotations
 
+import itertools
 import json
 import math
 from pathlib import Path
@@ -107,6 +118,7 @@ _DEFAULT_CONFIG = {
         "halt": {"instrument": "SYN.EQ.007", "session_index": 0, "duration_s": 300,
                  "reopen_auction": False, "reopen_call_s": 60},
         "auction_prints": 3,
+        "fill_session": False,
     },
     "fx": {
         "slots_per_pair": 3300,
@@ -665,7 +677,10 @@ class MarketDataGenerator:
         duration_s = max((close_ns - t) / NS, 1.0)
         lambda0 = slots / duration_s * 1.30
         halted = halt_window is None
-        for _ in range(slots):
+        # The slot budget ends continuous flow well before the close (module
+        # docs, "KNOWN LIMITATION"); fill_session draws slots until the close.
+        budget = itertools.count() if cfg["fill_session"] else range(slots)
+        for _ in budget:
             rate = lambda0 * (1.0 + stream.excitation)
             t += int(rng.exponential(rate) * NS) + 1
             if not halted and t >= halt_window[0]:

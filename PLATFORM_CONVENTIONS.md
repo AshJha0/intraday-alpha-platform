@@ -273,7 +273,7 @@ hot paths allocation-conscious (primitive arrays, no boxing). All: no dead code,
   `iap.contracts.validate`), each with a lower and an upper bound, plus `ml` and `dev` extras; CI
   installs the exact versions pinned in `python/requirements-ci.txt` in every Python job.
 - Keep each language's full test run < 120s (python 83 s, cpp 1 s, rust 2 s, java 20 s on the
-  2-CPU baseline, 2026-09-20). **The Python suite no longer meets this at v1.3.0**: 1562 tests took
+  2-CPU baseline, 2026-09-20). **The Python suite no longer meets this at v1.3.0**: 1563 tests took
   319 s and 358 s in two CI runs (with coverage) on 2026-10-03, and no baseline timing has been re-captured
   (docs/BUILD_NOTES.md). CI is `.github/workflows/ci.yml`, which runs exactly these commands
   plus `tests/harness/run_golden.sh` and the deployment validation (§12.7).
@@ -729,6 +729,11 @@ Admin endpoints (`RUNBOOK_incident_kill_switch.md` §2 — the manual ENGAGE pat
 - Safety counters added 2026-10-03: `risk_routed_venue_mismatch_total`,
   `risk_resume_open_orders_released_total`, `exec_orders_blocked_kill_pending_total`,
   `admin_auth_rate_limited_total`, `admin_audit_suppressed_total` (§11.4, §12.3, §12.5).
+  Each is created on first use (the resume counter at `--resume`, possibly at 0), so a rule must
+  not depend on a zero sample: `increase()` never sees a series' first value. The rules that read
+  them — `RoutedVenueMismatch`, `ResumeReleasedOpenOrders`, `KillPendingNotRecorded`,
+  `AdminAuthRateLimited`, `AdminAuditSuppressed` — and `SessionStoppedNotResumed` for state 4 are
+  in `deployment/prometheus/alerts.yml`.
 - `md_sequence_gaps_total` / `md_duplicates_total` are updated **on every event**, never sampled:
   `max_sequence_gap_before_halt = 1` means a single gap halts trading, so a single gap must be
   visible on the next scrape. `book_stale{...}` (0/1) exposes the resulting stale state.

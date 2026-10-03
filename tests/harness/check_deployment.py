@@ -115,6 +115,11 @@ EXPORTED_METRICS = {
     # platform lifecycle
     "platform_mode", "platform_session_state", "risk_session_restarts_total",
     "admin_requests_total",
+    # safety counters of the 2026-10-03 paper-platform review (§12.6); every
+    # one is created on first use, so a rule must not rely on a zero sample
+    "risk_routed_venue_mismatch_total", "risk_resume_open_orders_released_total",
+    "exec_orders_blocked_kill_pending_total", "admin_auth_rate_limited_total",
+    "admin_audit_suppressed_total",
     # latency histograms
     "decode_latency_ns", "book_update_latency_ns", "order_path_latency_ns",
     "exec_slippage_bps", "jvm_gc_pause_ns",
@@ -281,7 +286,7 @@ PROMQL_KEYWORDS = {
     "by", "without", "on", "ignoring", "group_left", "group_right", "and",
     "or", "unless", "offset", "bool", "rate", "increase", "sum", "avg", "min",
     "max", "count", "clamp_min", "clamp_max", "histogram_quantile", "time",
-    "vector", "absent", "topk", "bottomk", "delta", "irate", "quantile",
+    "vector", "absent", "last_over_time", "topk", "bottomk", "delta", "irate", "quantile",
     "le", "job", "service", "instance", "limit", "mode", "alpha", "instrument",
     "m", "h", "s", "d",
 }

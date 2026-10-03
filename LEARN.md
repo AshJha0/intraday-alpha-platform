@@ -195,6 +195,28 @@ From `configs/marketdata/generator.json` (seed 20260829, 2 sessions):
 
 ### 2.3 Its limits — read this before believing any result
 
+**Equity flow stops about 40% into each session.** Each equity stream gets
+a budget of `slots_per_stream` flow slots per session, and the loop that
+spends it draws inter-arrival times at `slots / duration × 1.30 ×
+(1 + excitation)`. The 1.30 multiplies the rate, so the budget would run
+out 77% of the way through even with no clustering (measured: 74.5–79.6%
+with the excitation kick set to 0); the self-exciting multiplier then about
+halves the mean inter-arrival time, and nothing in the calibration accounts
+for it. Measured on the bundled dataset: the last continuous event of an
+equity stream falls 37.6–43.2% into the 6.5-hour session (mean 40.5%,
+about 2 h 38 min after the open), followed by nothing until the close
+auction prints. FX has the same kind of budget with a 1.05 margin and no
+excitation, and ends 91.7–99.8% of the way through (mean 95.2%). What this
+means for everything downstream: an equity "session" is its first 2 h 40
+min; two sessions are about 5.3 hours of continuous equity flow, not 13;
+the walk-forward folds are cut by row mass, so all four folds partition
+that window and none of them sees afternoon flow; a feature row exists at
+the close, nearly four hours after the one before it. The
+default stays as it is because every golden vector, report and headline
+number derives from it. `equities.fill_session: true` removes the budget
+(flow to the close, about 2.5 times the equity events); regenerating the
+research on it is backlog issue M08.
+
 The generator's mid is **strongly mean-reverting** around its regime
 process. Consequences you will see all over the research reports:
 
@@ -980,9 +1002,9 @@ match**.
   the portfolio golden is checked against an SLSQP optimum. Golden files are
   regenerated only deliberately, with a MIGRATIONS.md entry.
 - **One command proves parity**: `tests/harness/run_all.sh` runs all four
-  suites and prints the table (the v1.3.0 counts from CI, 2026-10-03: python 1562,
+  suites and prints the table (the v1.3.0 counts from CI, 2026-10-03: python 1563,
   cpp 289, rust 323, java 510 tests passed; golden groups 166/68/64/104; all
-  PASS, plus `integration` (15) and `replay` (4) rows for the repo-level
+  PASS, plus `integration` (17) and `replay` (4) rows for the repo-level
   pytest suites, a `deployment` row — 25 structural checks passed in CI,
   where promtool and kubeconform are installed — and a `numbers` row that re-derives every headline
   figure in the docs from its artefact). The Java golden group runs all

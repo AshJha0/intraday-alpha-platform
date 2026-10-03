@@ -181,3 +181,31 @@ def test_epics_md_is_in_sync_with_the_yaml(tool, plan, repo_root):
     r = subprocess.run([sys.executable, TOOL, "--check-md", RENDERED], cwd=repo_root,
                        capture_output=True, text=True, timeout=60)
     assert r.returncode == 0, r.stderr
+
+
+def test_github_slug_matches_githubs_heading_anchor_algorithm(tool):
+    slug = tool.github_slug
+    # the dash is dropped, the two spaces around it both become hyphens
+    assert slug("E01 — Architecture and contracts") == "e01--architecture-and-contracts"
+    assert slug("E07 — Alpha engine — 24 flagship alphas") == "e07--alpha-engine--24-flagship-alphas"
+    # punctuation goes, hyphens and underscores stay, nothing is collapsed
+    assert slug("E05 — Order book with integer ticks (L1/L2/MBO)") == \
+        "e05--order-book-with-integer-ticks-l1l2mbo"
+    assert slug("Hard risk engine (fail-closed)") == "hard-risk-engine-fail-closed"
+    assert slug("snake_case & more") == "snake_case--more"
+    assert slug("By milestone") == "by-milestone"
+    # duplicates are numbered in document order
+    seen: dict[str, int] = {}
+    assert [slug(h, seen) for h in ("Summary", "Summary", "summary")] == \
+        ["summary", "summary-1", "summary-2"]
+
+
+def test_every_toc_anchor_in_epics_md_resolves_to_a_heading(tool, plan):
+    import re
+    rendered = tool.render_md(plan)
+    seen: dict[str, int] = {}
+    slugs = {tool.github_slug(m.group(1), seen)
+             for m in re.finditer(r"^#{1,6} (.+)$", rendered, flags=re.M)}
+    anchors = re.findall(r"\]\(#([^)]+)\)", rendered)
+    assert len(anchors) >= len(plan["epics"])
+    assert [a for a in anchors if a not in slugs] == []

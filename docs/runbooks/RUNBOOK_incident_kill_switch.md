@@ -4,8 +4,9 @@
 instrument / venue — spec §16), and the incident procedure around them.
 **Owner:** risk. **Related alerts:** `KillSwitchEngaged`,
 `LossLimitUtilizationHigh`, `GrossNotionalUtilizationHigh`, `StaleFeed`,
-`SequenceGapDetected`, `PlatformSessionFailed`, `TargetDown`, and the
-`Watchdog` heartbeat. Alerts reach a human only through Alertmanager
+`SequenceGapDetected`, `PlatformSessionFailed`, `TargetDown`,
+`KillPendingNotRecorded`, `AdminAuthRateLimited`, `AdminAuditSuppressed`,
+and the `Watchdog` heartbeat. Alerts reach a human only through Alertmanager
 (`deployment/alertmanager/alertmanager.yml`), and **only once a webhook URL
 has been supplied** — the in-repo placeholder delivers nowhere
 (`docs/governance/REPO_SETTINGS.md` §6). Check that before relying on a page.
@@ -72,6 +73,28 @@ Do not script this probe in a loop: every unauthenticated call is a failed
 authentication, and after 10 of them inside one 60 s window further failed
 authentications answer `429` until the window rolls. A request carrying a
 valid token is never rate-limited, so the kill itself still goes through.
+
+**Admin authentication abuse.** {#admin-auth-abuse}
+`AdminAuthRateLimited` (critical) fires when `admin_auth_rate_limited_total`
+appears or increases: more than 10 failed authentications arrived inside
+one 60 s window and further failures are answered `429`.
+`AdminAuditSuppressed` (warning) fires when `admin_audit_suppressed_total`
+appears or increases: rejected requests went past the audit cap (the
+rate-limited failures, and any reject beyond 100 audit lines per window)
+and are recorded as one `audit_summary` line per window instead of line by
+line. Neither blocks an operator: a valid token is never rate-limited.
+
+```bash
+grep -c '"code":401' <state-dir>/admin_audit.jsonl        # failed authentications audited
+grep '"action":"audit_summary"' <state-dir>/admin_audit.jsonl | tail -3
+grep -o '"remote":"[^"]*"' <state-dir>/admin_audit.jsonl | sort | uniq -c | sort -rn | head
+```
+
+One remote address with a stale token is a client to fix (a probe left in a
+loop, a rotated token). Several, or an address that should not reach the
+port at all, is a network exposure: check `IAP_BIND_ADDR`, the compose port
+publication and the NetworkPolicies before anything else, and rotate the
+token if it may have been observed.
 
 ## 1. How the kill switch works (rust/risk engine, `com.iap.risk` port)
 
@@ -237,6 +260,18 @@ Then confirm it is having the intended effect:
   than rejected by the risk engine. If the session ends first, the audit
   trail is closed with a `503` line (`session ended before the latched kill
   reached the risk engine`).
+- **A kill that stays pending.** {#kill-pending}
+  `KillPendingNotRecorded` (critical) fires when
+  `exec_orders_blocked_kill_pending_total` has kept climbing for 3 m: orders
+  are being withheld, so nothing new is sent, but the kill is still only the
+  admin service's pending latch. It is not in the risk engine, so it is not
+  in `risk_snapshot.json` and **a restart would lose it**. Do not restart.
+  Check `/status` (`events_processed` must be advancing — a wedged trading
+  thread cannot drain the command; `/health` turns 503 after 30 s) and the
+  tail of `admin_audit.jsonl` for the `202` line without its
+  `applied after the request returned 202` follow-up. If the thread is
+  wedged, set the config master switch (§2 step 1) so the next start comes
+  up halted, then stop the process.
 - A halted platform is deliberately **still healthy and still ready**
   (`/health` and `/ready` return 200 with `"trading":"halted"`) — do not read
   a green probe as "the halt did not take"; read the gauge.

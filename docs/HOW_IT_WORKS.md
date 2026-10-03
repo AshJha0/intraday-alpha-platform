@@ -10,7 +10,11 @@ Three things to know before reading:
 
 1. **All market data is synthetic.** A seeded generator produces every
    event. Every number below is a statement about that generator and this
-   pipeline, not about a market.
+   pipeline, not about a market. One property of the bundled dataset to
+   keep in mind: equity flow stops about 40% of the way through each
+   session (a generator limitation, not a design choice — README
+   "Real-world usage notes", LEARN.md §2.3), so the equity results describe
+   roughly the first 2 h 40 min of each of the two sessions.
 2. **The results are negative, and that is the headline.** 24 alphas were
    researched; none is promoted. The end-to-end loop loses 22.65 USD on its
    golden session. The ML gate fails. The platform is built so that those

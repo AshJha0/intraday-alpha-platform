@@ -281,8 +281,8 @@ and are matched by Java, Rust and C++ (the trace and canonical-JSON ports)
 and by Java and Rust (the lifecycle ports). The harness
 (`tests/harness/run_all.sh`, with `run_golden.sh` as the golden-only alias)
 runs every suite with the canonical commands and prints the parity table; a
-v1.3.0 CI run (2026-10-03) passes 1562/289/323/510 tests (166/68/64/104
-golden) across python/cpp/rust/java, plus the repo-level `integration` (15)
+v1.3.0 CI run (2026-10-03) passes 1563/289/323/510 tests (166/68/64/104
+golden) across python/cpp/rust/java, plus the repo-level `integration` (17)
 and `replay` (4) rows — the same counts the README parity table records.
 
 ## 7. Hot-path engineering notes per language
@@ -375,8 +375,10 @@ histograms end `_ns` with fixed log2 buckets, gauges are bare nouns.
   FeedWallClockStall, SignalRateCollapse, LiveVsBacktestDrift,
   AlphaLifecycleRetired, FillRateDrop, PreTradeRejectRatioHigh,
   LossLimitUtilizationHigh, KillSwitchEngaged, GrossNotionalUtilizationHigh,
-  GcPauseHigh, PlatformSessionFailed, SessionRestartsClimbing, TargetDown,
-  and the always-firing `Watchdog` heartbeat — each with a runbook anchor in
+  RoutedVenueMismatch, KillPendingNotRecorded, ResumeReleasedOpenOrders,
+  GcPauseHigh, PlatformSessionFailed, SessionStoppedNotResumed,
+  SessionRestartsClimbing, TargetDown, AdminAuthRateLimited,
+  AdminAuditSuppressed, and the always-firing `Watchdog` heartbeat — each with a runbook anchor in
   `docs/runbooks/`). Since v1.3.0 Prometheus delivers to Alertmanager
   (`deployment/alertmanager/`), which routes to a webhook whose URL is an
   operator-supplied secret; with the in-repo placeholder, alerts are routed

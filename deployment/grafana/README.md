@@ -84,14 +84,14 @@ metrics (verified against a running `/metrics` scrape and the sources):
 | `md_event_time_gap_seconds` | gauge | event-time gap between the last two consecutive processed events — the staleness signal `StaleFeed` alerts on, correct in replay AND live (risk.json `stale_feed_timeout_ns` = 5 s) |
 | `book_stale{instrument=...}` | gauge | 0/1: any venue book of the instrument is stale (fail-closed trading until a SNAPSHOT) |
 | `platform_mode{mode="asap"\|"realtime"}` | gauge | 1 for the running mode, 0 for the other — the label rules use to scope wall-clock budgets |
-| `platform_session_state` | gauge | 0 STARTING, 1 RUNNING, 2 FINISHED, 3 FAILED, 4 STOPPED (since v1.3.0: a stop was requested and the session checkpointed mid-stream; resumable). See "The STOPPED state" below — the dashboard and the rules do not know the value 4 yet |
+| `platform_session_state` | gauge | 0 STARTING, 1 RUNNING, 2 FINISHED, 3 FAILED, 4 STOPPED (since v1.3.0: a stop was requested and the session checkpointed mid-stream; resumable). See "The STOPPED state" below — the dashboard does not know the value 4 yet; `SessionStoppedNotResumed` is the rule that reads it |
 | `risk_session_restarts_total` | counter | `--resume` restarts of this session (state recovered from the checkpoint) |
 | `admin_requests_total{action=...}` | counter | kill-switch admin API calls, accepted or refused |
-| `admin_auth_rate_limited_total` | counter | failed authentications answered `429` (more than 10 in a 60 s window). Registered on first use; no rule or panel uses it |
-| `admin_audit_suppressed_total` | counter | rejected admin requests that were answered but not individually audited (rate-limited failures, and rejects beyond 100 audit lines per window). Registered on first use; no rule or panel uses it |
-| `exec_orders_blocked_kill_pending_total` | counter | orders withheld because an admin kill was accepted but not yet recorded by the risk engine. Registered on first use; no rule or panel uses it |
-| `risk_routed_venue_mismatch_total` | counter | children that left for a venue other than the one the pre-trade check approved, and were cancelled. Any non-zero value is a wiring defect. Registered on first use; no rule or panel uses it |
-| `risk_resume_open_orders_released_total` | counter | open orders of a restored risk snapshot released at `--resume` (their simulator no longer exists). No rule or panel uses it |
+| `admin_auth_rate_limited_total` | counter | failed authentications answered `429` (more than 10 in a 60 s window). Registered on first use; `AdminAuthRateLimited` alerts on it, no panel uses it |
+| `admin_audit_suppressed_total` | counter | rejected admin requests that were answered but not individually audited (rate-limited failures, and rejects beyond 100 audit lines per window). Registered on first use; `AdminAuditSuppressed` alerts on it, no panel uses it |
+| `exec_orders_blocked_kill_pending_total` | counter | orders withheld because an admin kill was accepted but not yet recorded by the risk engine. Registered on first use; `KillPendingNotRecorded` alerts when it keeps climbing for 3 m, no panel uses it |
+| `risk_routed_venue_mismatch_total` | counter | children that left for a venue other than the one the pre-trade check approved, and were cancelled. Any non-zero value is a wiring defect. Registered on first use; `RoutedVenueMismatch` pages on any non-zero value, no panel uses it |
+| `risk_resume_open_orders_released_total` | counter | open orders of a restored risk snapshot released at `--resume` (their simulator no longer exists). Registered at resume (possibly at 0); `ResumeReleasedOpenOrders` warns on a non-zero value, no panel uses it |
 | `decode_latency_ns` | histogram | feed decode latency |
 | `book_update_latency_ns` | histogram | book apply latency |
 | `order_path_latency_ns` | histogram | decision-to-wire latency |
@@ -146,20 +146,43 @@ Kubernetes the NetworkPolicies admit Prometheus and pods labelled
 ### The STOPPED state (value 4) — what does and does not know about it
 
 `platform_session_state` gained the value `4` in v1.3.0. The producer exports
-it; nothing downstream has been taught it yet. Stated so that nobody reads a
-blank panel as a healthy one:
+it; one alert rule reads it and the dashboard has not been taught it yet.
+Stated so that nobody reads a blank panel as a healthy one:
 
 | artefact | today | what it needs |
 |---|---|---|
 | `dashboards/market_data_latency.json`, panel **Session state** (and its generated copy in `deployment/k8s/configmap-grafana.yaml`) | the description and the value mappings enumerate 0–3; the value 4 has no mapping, so the stat shows the bare number `4` in the colour of the highest threshold (red, the FAILED colour) | a mapping `4 → STOPPED`, a threshold step that is not the FAILED red, and the description updated |
 | `alerts.yml` `PlatformSessionFailed` (`platform_session_state == 3`) | does not fire on 4 — correct, a stop is not a failure | nothing |
 | `alerts.yml` `FeedWallClockStall` (`... and platform_session_state == 1`) | does not fire on 4 — correct | nothing |
-| a rule for "stopped and not resumed" | none exists | a decision first: a STOPPED process exits 0 right after its checkpoint, so the gauge is rarely scraped at 4 and `TargetDown` is what fires when it has gone; a rule on the value alone would be near-useless |
+| `alerts.yml` `SessionStoppedNotResumed` (`last_over_time(platform_session_state[1h]) == 4`, `for: 10m`, warning) | fires when the LAST value scraped in the past hour is 4 and no resumed session has reported since; clears on resume or one hour after the stop | the process to stay scrapeable after a stop: it exits 0 right after its checkpoint, so the value 4 is scraped only when a scrape (every 15 s) lands in that instant. When it does not, this rule cannot fire and `TargetDown` is the only signal |
 
 In practice the value is visible for only an instant: the process
 checkpoints, sets the gauge and exits. The durable evidence of a stop is the
 process's last stdout line (`status=STOPPED`) and the checkpoint in the state
 directory (`docs/runbooks/RUNBOOK_paper_trading.md` §5–§6).
+
+### Alerts on the v1.3.0 safety signals
+
+`alerts.yml` holds 23 rules: 22 alerts and the always-firing `Watchdog`.
+Six of them read the session state and the safety counters the paper
+platform gained in v1.3.0:
+
+| alert | expression | severity | meaning |
+|---|---|---|---|
+| `SessionStoppedNotResumed` | `last_over_time(platform_session_state[1h]) == 4` for 10 m | warning | a stop was scraped and nobody resumed (see the table above for when it cannot fire) |
+| `RoutedVenueMismatch` | `risk_routed_venue_mismatch_total > 0` | page | a child left for a venue the risk check did not approve; stays up until the process ends |
+| `KillPendingNotRecorded` | `increase(exec_orders_blocked_kill_pending_total[2m]) > 0` for 3 m | critical | an accepted kill is still not in the risk engine while orders keep being withheld |
+| `ResumeReleasedOpenOrders` | `risk_resume_open_orders_released_total > 0` | warning | `--resume` released orphaned open orders; stays up until the process ends |
+| `AdminAuthRateLimited` | increase over 10 m, or first appearance of `admin_auth_rate_limited_total` | critical | failed authentications are being answered `429` |
+| `AdminAuditSuppressed` | increase over 10 m, or first appearance of `admin_audit_suppressed_total` | warning | rejected admin requests are summarised, not audited one by one |
+
+The four admin and execution counters are created on their first increment,
+and `increase()` cannot see a series' first sample. The two admin rules
+therefore carry a second arm (`x > 0 unless x offset 10m`) that fires while
+the series is younger than the window; `RoutedVenueMismatch` reads the
+value itself; `KillPendingNotRecorded` needs the counter to keep climbing,
+so the missed first sample does not matter. Each rule has a
+`promtool test rules` case in `deployment/prometheus/tests/alerts_test.yml`.
 
 ### Alert delivery (since v1.3.0)
 
