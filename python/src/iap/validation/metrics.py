@@ -47,6 +47,7 @@ from collections.abc import Sequence
 import numpy as np
 
 from iap.backtest.engine import SESSION_GAP_NS
+from iap.labels.frames import DEFAULT_IC_ROWS, scored_labels
 
 EPS = 1e-12
 NS_S = 1_000_000_000
@@ -482,12 +483,13 @@ def decay_curve(
     scores: np.ndarray,
     frame,
     horizons: Sequence[str] = HORIZON_ORDER,
+    ic_rows: str = DEFAULT_IC_ROWS,
 ) -> dict[str, float]:
-    """IC of one score series against every pinned horizon's mid label."""
+    """IC of one score series against every pinned horizon's mid label, on
+    the rows ``ic_rows`` scores (:mod:`iap.labels.frames`)."""
     out: dict[str, float] = {}
     for h in horizons:
-        lab = frame[f"label_mid_{h}"].to_numpy(dtype=float).copy()
-        lab[~frame[f"label_valid_{h}"].to_numpy(dtype=bool)] = np.nan
+        lab, _ = scored_labels(frame, h, ic_rows)
         out[h] = ic(scores, lab)
     return out
 

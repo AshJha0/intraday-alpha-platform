@@ -15,27 +15,28 @@ Three pinned stress axes for every alpha:
   (``vol_regime_flag_v1``: 1 = short-horizon vol elevated) — a promotable
   alpha should not owe its entire IC to one regime.
 
-**Stress version (pinned).**  Every stressed backtest must differ from the
-base backtest in the stressed parameter ONLY.  The cost and time-latency
-grids do (``dataclasses.replace`` on the base config, the base reporting
-currency carried).  The ROW latency grid historically did not: it rebuilt
-the config from four fields and silently dropped ``max_decision_age_ns``,
-``flatten_at_session_end`` and ``session_gap_ns``, so its P&L column
-described a strategy that carries positions overnight and fills stale
-decisions even when the base strategy does neither.
+**Stress version (pinned; the default changed in v1.5.0).**  Every stressed
+backtest must differ from the base backtest in the stressed parameter ONLY.
+The cost and time-latency grids always did (``dataclasses.replace`` on the
+base config, the base reporting currency carried).  The ROW latency grid
+historically did not: it rebuilt the config from four fields and silently
+dropped ``max_decision_age_ns``, ``flatten_at_session_end`` and
+``session_gap_ns``, so its P&L column described a strategy that carries
+positions overnight and fills stale decisions even when the base strategy
+does neither.
 
-- ``version=1`` (:data:`STRESS_VERSION_LEGACY`, the default) reproduces that
-  historic row grid exactly.  It is the default only because the committed
-  reports under ``research/alpha_reports`` were produced with it and are
-  pinned; it is a known defect, kept reproducible.
-- ``version=2`` (:data:`STRESS_VERSION_CARRY`) derives the row-grid config
-  with ``dataclasses.replace(base, latency_rows=base.latency_rows + k,
-  latency_ns=None)`` — every other field (decision age, session flattening,
-  session gap, position policy, ...) is the base strategy's.  ``latency_ns``
-  is cleared on purpose: the grid is DEFINED in rows, and a set
-  ``latency_ns`` overrides ``latency_rows`` in the engine, which would make
-  every row of the grid the same backtest.  New work (the power study,
-  any regenerated report) should pass ``version=2``.
+- ``version=2`` (:data:`STRESS_VERSION_CARRY`, the default) derives the
+  row-grid config with ``dataclasses.replace(base,
+  latency_rows=base.latency_rows + k, latency_ns=None)`` — every other field
+  (decision age, session flattening, session gap, position policy, ...) is
+  the base strategy's.  ``latency_ns`` is cleared on purpose: the grid is
+  DEFINED in rows, and a set ``latency_ns`` overrides ``latency_rows`` in
+  the engine, which would make every row of the grid the same backtest.
+- ``version=1`` (:data:`STRESS_VERSION_LEGACY`) reproduces the historic row
+  grid exactly — the four-field rebuild under the legacy backtest rules
+  (``BacktestConfig.legacy``), which is what "four fields and every other
+  default" meant when the reports up to v1.4.0 were produced.  It is a
+  known defect, kept selectable so those reports stay reproducible.
 
 A non-finite row-grid IC is reported as ``None`` (JSON ``null``), never as a
 raw NaN, like every other statistic in a validation report.
@@ -49,7 +50,8 @@ from dataclasses import replace
 import numpy as np
 import pandas as pd
 
-from iap.backtest.engine import BacktestConfig, Backtester
+from iap.backtest.engine import BacktestConfig, Backtester, BacktestResult
+from iap.labels.frames import DEFAULT_IC_ROWS, scored_labels
 from iap.validation.metrics import ic
 
 COST_MULTIPLIERS = (0.5, 1.0, 2.0)
@@ -63,9 +65,11 @@ LATENCY_TIMES_NS = (100_000_000, 500_000_000, 1_000_000_000, 5_000_000_000)
 #: Row-latency grid as historically computed (drops decision age / session
 #: flattening / session gap from the stressed config) — see module docs.
 STRESS_VERSION_LEGACY = 1
-#: Row-latency grid that carries every base-config field.
+#: Row-latency grid that carries every base-config field (the default).
 STRESS_VERSION_CARRY = 2
 STRESS_VERSIONS = (STRESS_VERSION_LEGACY, STRESS_VERSION_CARRY)
+#: The default stress version.
+DEFAULT_STRESS_VERSION = STRESS_VERSION_CARRY
 
 
 def _fnum(v: float) -> float | None:
@@ -79,8 +83,10 @@ def _pooled(
     lag_events: int = 0,
     row_mask=None,
     beta: float = 0.0,
+    ic_rows: str = DEFAULT_IC_ROWS,
 ):
-    """Pooled (score, label) arrays.
+    """Pooled (score, label) arrays on the rows ``ic_rows`` scores
+    (:mod:`iap.labels.frames`).
 
     ``beta`` is the fitted coefficient of the model that produced ``scores``.
     When it is nonzero the score is divided by it, i.e. the STANDARDIZED
@@ -97,8 +103,7 @@ def _pooled(
         er[sc["confidence"].to_numpy(dtype=float) <= 0.0] = np.nan
         if beta != 0.0:
             er = er / beta
-        lab = df[f"label_mid_{horizon}"].to_numpy(dtype=float).copy()
-        lab[~df[f"label_valid_{horizon}"].to_numpy(dtype=bool)] = np.nan
+        lab, _ = scored_labels(df, horizon, ic_rows)
         if row_mask is not None:
             lab = lab.copy()
             lab[~row_mask(df)] = np.nan
@@ -114,15 +119,18 @@ def _pooled(
     return np.concatenate(xs), np.concatenate(ys)
 
 
-def cost_stress(
+def cost_stress_results(
     backtester_base: Backtester,
     frames: Mapping[int, pd.DataFrame],
     scores: Mapping[int, pd.DataFrame],
     asset_class: str,
     multipliers: Sequence[float] = COST_MULTIPLIERS,
-) -> dict[str, dict]:
-    """Net backtest results across the pinned cost-multiplier grid."""
+) -> tuple[dict[str, dict], dict[str, BacktestResult]]:
+    """:func:`cost_stress` and, per grid point, the full backtest result
+    (the per-fold diagnostics read the 1x bar P&L and the per-instrument
+    gross from it instead of running the same backtest a second time)."""
     out: dict[str, dict] = {}
+    results: dict[str, BacktestResult] = {}
     for m in multipliers:
         bt = Backtester(
             backtester_base.cost_model.with_multiplier(m),
@@ -131,12 +139,25 @@ def cost_stress(
             reporting_ccy=backtester_base.reporting_ccy,
         )
         res = bt.run(frames, scores, asset_class)
-        out[f"x{m:g}"] = {
+        key = f"x{m:g}"
+        results[key] = res
+        out[key] = {
             "total_pnl": res.total_pnl,
             "total_costs": res.total_costs,
             "trade_count": res.trade_count,
         }
-    return out
+    return out, results
+
+
+def cost_stress(
+    backtester_base: Backtester,
+    frames: Mapping[int, pd.DataFrame],
+    scores: Mapping[int, pd.DataFrame],
+    asset_class: str,
+    multipliers: Sequence[float] = COST_MULTIPLIERS,
+) -> dict[str, dict]:
+    """Net backtest results across the pinned cost-multiplier grid."""
+    return cost_stress_results(backtester_base, frames, scores, asset_class, multipliers)[0]
 
 
 def latency_stress(
@@ -147,23 +168,24 @@ def latency_stress(
     horizon: str,
     shifts: Sequence[int] = LATENCY_SHIFTS,
     beta: float = 0.0,
-    version: int = STRESS_VERSION_LEGACY,
+    version: int = DEFAULT_STRESS_VERSION,
+    ic_rows: str = DEFAULT_IC_ROWS,
 ) -> dict[str, dict]:
     """IC and net P&L when execution lags the decision by extra events.
 
     ``beta`` standardizes the score before scoring it (see :func:`_pooled`).
     ``version`` selects how the stressed config is derived from the base
-    one (module docs): 1 = the historic four-field rebuild, 2 = the base
-    config with only the row latency changed."""
+    one (module docs): 2 (default) = the base config with only the row
+    latency changed, 1 = the historic four-field rebuild (legacy)."""
     if version not in STRESS_VERSIONS:
         raise ValueError(f"unknown stress version {version!r}; known: {STRESS_VERSIONS}")
     out: dict[str, dict] = {}
     base = backtester_base.config
     base_latency = base.latency_rows
     for k in shifts:
-        x, y = _pooled(scores, frames, horizon, lag_events=k, beta=beta)
+        x, y = _pooled(scores, frames, horizon, lag_events=k, beta=beta, ic_rows=ic_rows)
         if version == STRESS_VERSION_LEGACY:
-            cfg = BacktestConfig(
+            cfg = BacktestConfig.legacy(
                 max_pos_qty=base.max_pos_qty,
                 conf_min=base.conf_min,
                 latency_rows=base_latency + k,
@@ -229,6 +251,7 @@ def regime_split(
     frames: Mapping[int, pd.DataFrame],
     horizon: str,
     beta: float = 0.0,
+    ic_rows: str = DEFAULT_IC_ROWS,
 ) -> dict[str, float]:
     """IC in high-vol vs low-vol regimes (vol_regime_flag_v1).
 
@@ -246,6 +269,6 @@ def regime_split(
         f = df["vol_regime_flag_v1"].to_numpy(dtype=float)
         return np.isfinite(f) & (f < 0.5)
 
-    xh, yh = _pooled(scores, frames, horizon, row_mask=high, beta=beta)
-    xl, yl = _pooled(scores, frames, horizon, row_mask=low, beta=beta)
+    xh, yh = _pooled(scores, frames, horizon, row_mask=high, beta=beta, ic_rows=ic_rows)
+    xl, yl = _pooled(scores, frames, horizon, row_mask=low, beta=beta, ic_rows=ic_rows)
     return {"ic_high_vol": ic(xh, yh), "ic_low_vol": ic(xl, yl)}

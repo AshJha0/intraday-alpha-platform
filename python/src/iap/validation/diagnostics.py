@@ -1,22 +1,31 @@
-"""Per-fold diagnostics and a bootstrap interval for net P&L (additive).
+"""Per-fold diagnostics and a bootstrap interval for net P&L.
 
-:func:`iap.validation.validate.validate_alpha` computes its cost survival,
-decay curve, regime split and stress grid on the LAST walk-forward fold only
-(the largest-train model on its test segment), and reports net P&L as one
-number.  Both are thin evidence: a gate that reads "net P&L > 0 at 1x costs"
-from a single fold cannot tell an alpha that survives costs in every fold
-from one that survives in the last and loses in the other three, and a
-point estimate carries no statement about its own noise.
+Up to v1.4.0 :func:`iap.validation.validate.validate_alpha` computed its
+cost survival, decay curve and regime split on the LAST walk-forward fold
+only (the largest-train model on its test segment) and reported net P&L as
+one number.  Both are thin evidence: "net P&L > 0 at 1x costs" from a single
+fold cannot tell an alpha that survives costs in every fold from one that
+survives in the last and loses in the other three, and a point estimate
+carries no statement about its own noise.
 
-This module adds the missing views WITHOUT touching the report
-``validate_alpha`` returns (the committed reports and the
-``ExperimentResult`` contract are pinned; no gate reads anything here):
+Since v1.5.0 these views are REPORTED FIELDS of every validation result
+(``fold_diagnostics``, ``n_folds_survive_1x_cost``, ``net_pnl_1x_pooled``,
+``net_pnl_bootstrap``): ``validate_alpha`` builds one :func:`fold_row` per
+fold inside its own walk-forward loop.  They are report-only — no gate
+reads them.  The cost gate still reads the last fold's net P&L at 1x, and a
+gate on the bootstrap interval was NOT added: the lifecycle gate table
+(``iap.lifecycle.gates``) reads one scalar, ``net_return_bps > 0``, from an
+``ExperimentResult``, so gating on an interval needs a new evidence field
+and a new gate row in the 17-edge table that Python, Java and Rust pin —
+a redesign, not a default change.
 
-* :func:`fold_diagnostics` — the same walk-forward split, a fresh model per
-  fold, and for EVERY fold: net P&L across the pinned cost grid and whether
-  it survives 1x costs, the decay curve of the standardized signal, and the
-  regime split; plus the pooled 1-minute bar P&L of all test segments and
-  its bootstrap interval.
+* :func:`fold_row` — one fold's diagnostics: net P&L across the pinned cost
+  grid and whether it survives 1x costs, the decay curve of the
+  standardized signal, and the regime split;
+* :func:`fold_diagnostics` — the standalone form: the same walk-forward
+  split, a fresh model per fold, a :func:`fold_row` for EVERY fold, plus
+  the pooled 1-minute bar P&L of all test segments and its bootstrap
+  interval (what ``validate_alpha`` embeds in its report);
 * :func:`stationary_bootstrap_ci` — a percentile confidence interval for the
   SUM of a dependent series by the stationary bootstrap (Politis & Romano,
   1994): blocks of geometrically distributed length (mean ``mean_block``)
@@ -44,16 +53,19 @@ from collections.abc import Mapping, Sequence
 import numpy as np
 import pandas as pd
 
-from iap.backtest.engine import Backtester
+from iap.backtest.engine import Backtester, BacktestResult
 from iap.core.rng import SplitMix64
+from iap.labels.frames import DEFAULT_IC_ROWS, scored_labels
 from iap.validation.metrics import HORIZONS_NS, decay_curve
 from iap.validation.splits import MIN_TEST_PAIRS, WalkForwardSplitter
-from iap.validation.stress import COST_MULTIPLIERS, cost_stress, regime_split
+from iap.validation.stress import COST_MULTIPLIERS, cost_stress_results, regime_split
 
 __all__ = [
     "BOOTSTRAP_LEVEL",
     "BOOTSTRAP_RESAMPLES",
+    "bar_series",
     "fold_diagnostics",
+    "fold_row",
     "stationary_bootstrap_ci",
 ]
 
@@ -135,6 +147,79 @@ def stationary_bootstrap_ci(
     return out
 
 
+_KEY_1X = f"x{1.0:g}"
+
+
+def fold_row(
+    fold_index: int,
+    scores: Mapping[int, pd.DataFrame],
+    test: Mapping[int, pd.DataFrame],
+    horizon: str,
+    beta: float,
+    backtester: Backtester,
+    asset_class: str,
+    multipliers: Sequence[float] = COST_MULTIPLIERS,
+    ic_rows: str = DEFAULT_IC_ROWS,
+) -> tuple[dict[str, object], dict[str, dict], dict[str, BacktestResult]]:
+    """One fold's diagnostics from its fitted model's ``scores`` on ``test``.
+
+    Returns ``(row, cost, results)``: ``row`` is the reported record
+    (``fold``, ``n_test_pairs``, ``degenerate``, ``net_pnl_by_cost``,
+    ``trade_count_1x``, ``survives_1x_cost``, ``decay_ic_by_horizon``,
+    ``regime``); ``cost`` the cost-stress grid of the fold
+    (:func:`iap.validation.stress.cost_stress` shape) and ``results`` the
+    backtest result per grid point, so the caller reads the 1x bar P&L
+    without running the backtest again.  The standardized signal
+    ``z = er / beta`` is what decay and regime read; rows with confidence
+    <= 0 carry no prediction.  ``backtester`` must already carry the label
+    horizon (:meth:`Backtester.for_horizon`) when its policy needs one.
+    """
+    if 1.0 not in [float(m) for m in multipliers]:
+        raise ValueError("multipliers must include 1.0 (the cost-survival grid point)")
+    n_pairs = 0
+    decay: dict[str, list[float]] = {}
+    for iid, sc in scores.items():
+        er = sc["expected_return"].to_numpy(dtype=float).copy()
+        er[sc["confidence"].to_numpy(dtype=float) <= 0.0] = np.nan
+        lab, _ = scored_labels(test[iid], horizon, ic_rows)
+        n_pairs += int(np.sum(np.isfinite(er) & np.isfinite(lab)))
+        z = er / beta if beta != 0.0 else er
+        horizons = [h for h in HORIZONS_NS if f"label_mid_{h}" in test[iid].columns]
+        for h, v in decay_curve(z, test[iid], horizons, ic_rows).items():
+            if np.isfinite(v):
+                decay.setdefault(h, []).append(v)
+    cost, results = cost_stress_results(backtester, test, scores, asset_class, multipliers)
+    if "vol_regime_flag_v1" in next(iter(test.values())).columns:
+        regime = {
+            k: _fnum(v)
+            for k, v in regime_split(scores, test, horizon, beta=beta, ic_rows=ic_rows).items()
+        }
+    else:
+        regime = {}
+    row: dict[str, object] = {
+        "fold": int(fold_index),
+        "n_test_pairs": n_pairs,
+        "degenerate": n_pairs < MIN_TEST_PAIRS,
+        "net_pnl_by_cost": {k: _fnum(v["total_pnl"]) for k, v in cost.items()},
+        "trade_count_1x": int(cost[_KEY_1X]["trade_count"]),
+        "survives_1x_cost": bool(cost[_KEY_1X]["total_pnl"] > 0.0),
+        "decay_ic_by_horizon": {h: _fnum(float(np.mean(v))) for h, v in decay.items()},
+        "regime": regime,
+    }
+    return row, cost, results
+
+
+def bar_series(results: Sequence[BacktestResult]) -> list[float]:
+    """The 1-minute bar P&L of several backtests pooled by bar timestamp, in
+    time order — the series the bootstrap interval is taken over."""
+    bars: dict[int, float] = {}
+    for result in results:
+        for r in result.per_instrument.values():
+            for t, pnl in zip(r.bar_ts, r.bar_pnl, strict=False):
+                bars[int(t)] = bars.get(int(t), 0.0) + float(pnl)
+    return [bars[t] for t in sorted(bars)]
+
+
 def fold_diagnostics(
     model_factory,
     frames: Mapping[int, pd.DataFrame],
@@ -144,19 +229,17 @@ def fold_diagnostics(
     seed: int = 0,
     n_boot: int = BOOTSTRAP_RESAMPLES,
     multipliers: Sequence[float] = COST_MULTIPLIERS,
+    ic_rows: str = DEFAULT_IC_ROWS,
 ) -> dict[str, object]:
     """Cost survival, decay and regime split for EVERY walk-forward fold,
     and a stationary-bootstrap interval for the pooled net P&L.
 
     The split, the per-fold fresh model and the scoring conventions are
-    ``validate_alpha``'s own (the standardized signal ``z = er / beta`` is
-    what decay and regime read; rows with confidence <= 0 carry no
-    prediction).  Returns::
+    ``validate_alpha``'s own, and since v1.5.0 ``validate_alpha`` reports the
+    same block itself; this standalone form exists for callers that want the
+    diagnostics without the rest of the validation.  Returns::
 
-        {"folds": [{"fold", "n_test_pairs", "degenerate",
-                    "net_pnl_by_cost": {"x0.5": ..., "x1": ..., "x2": ...},
-                    "survives_1x_cost": bool,
-                    "decay_ic_by_horizon": {...}, "regime": {...}}, ...],
+        {"folds": [fold_row, ...],
          "n_folds_run", "n_folds_survive_1x_cost",
          "net_pnl_1x_pooled", "net_pnl_bootstrap": {...}}
 
@@ -171,53 +254,21 @@ def fold_diagnostics(
     uframes = {i: frames[i] for i in universe}
     asset_class = "FX" if probe.asset_class == "FX" else "EQUITY"
     splitter = WalkForwardSplitter(n_folds=n_folds, embargo_ns=embargo_ns)
-    key_1x = f"x{1.0:g}"
-    if 1.0 not in [float(m) for m in multipliers]:
-        raise ValueError("multipliers must include 1.0 (the cost-survival grid point)")
+    bt = backtester.for_horizon(horizon)
 
     folds: list[dict] = []
-    bars: dict[int, float] = {}
+    results_1x: list[BacktestResult] = []
     for fold, train, test in splitter.split_frames(uframes, horizon_ns):
         model = model_factory()
         model.fit(train)
         scores = model.score(test)
         beta = float(model.params().get("beta", 0.0) or 0.0)
-        n_pairs = 0
-        decay: dict[str, list[float]] = {}
-        for iid, sc in scores.items():
-            er = sc["expected_return"].to_numpy(dtype=float).copy()
-            er[sc["confidence"].to_numpy(dtype=float) <= 0.0] = np.nan
-            lab = test[iid][f"label_mid_{horizon}"].to_numpy(dtype=float)
-            ok = test[iid][f"label_valid_{horizon}"].to_numpy(dtype=bool)
-            n_pairs += int(np.sum(np.isfinite(er) & np.isfinite(lab) & ok))
-            z = er / beta if beta != 0.0 else er
-            horizons = [h for h in HORIZONS_NS if f"label_mid_{h}" in test[iid].columns]
-            for h, v in decay_curve(z, test[iid], horizons).items():
-                if np.isfinite(v):
-                    decay.setdefault(h, []).append(v)
-        cost = cost_stress(backtester, test, scores, asset_class, multipliers)
-        result = backtester.run(test, scores, asset_class)
-        for r in result.per_instrument.values():
-            for t, pnl in zip(r.bar_ts, r.bar_pnl, strict=False):
-                bars[int(t)] = bars.get(int(t), 0.0) + float(pnl)
-        if "vol_regime_flag_v1" in next(iter(test.values())).columns:
-            regime = {
-                k: _fnum(v) for k, v in regime_split(scores, test, horizon, beta=beta).items()
-            }
-        else:
-            regime = {}
-        folds.append(
-            {
-                "fold": fold.index,
-                "n_test_pairs": n_pairs,
-                "degenerate": n_pairs < MIN_TEST_PAIRS,
-                "net_pnl_by_cost": {k: _fnum(v["total_pnl"]) for k, v in cost.items()},
-                "survives_1x_cost": bool(cost[key_1x]["total_pnl"] > 0.0),
-                "decay_ic_by_horizon": {h: _fnum(float(np.mean(v))) for h, v in decay.items()},
-                "regime": regime,
-            }
+        row, _, results = fold_row(
+            fold.index, scores, test, horizon, beta, bt, asset_class, multipliers, ic_rows
         )
-    series = [bars[t] for t in sorted(bars)]
+        folds.append(row)
+        results_1x.append(results[_KEY_1X])
+    series = bar_series(results_1x)
     return {
         "folds": folds,
         "n_folds_run": len(folds),
