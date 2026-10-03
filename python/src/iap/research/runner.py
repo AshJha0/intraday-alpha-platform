@@ -44,18 +44,48 @@ maps the outcome onto the contract:
    ``test_period.end_ts`` — event time, never the wall clock.  Every
    float must be finite: a metric the chain could not compute raises
    :class:`ResearchError` naming it — nothing is ever filled in.
-6. **Persistence** (skipped with ``dry_run``): ``<out_dir>/<experiment_id>/
-   spec.json`` and ``result.json`` — schema-validated, sorted keys,
-   2-space indent, ASCII, trailing newline — and the ledger file.  A
-   rerun that reproduces a different result under the same id (anything
+6. **Persistence**: ``<out_dir>/<experiment_id>/spec.json``,
+   ``result.json`` and ``eligibility.json`` — schema-validated, sorted
+   keys, 2-space indent, ASCII, LF, trailing newline — and the ledger file.
+   A rerun that reproduces a different result under the same id (anything
    but ``git_commit`` / ``n_experiments_in_ledger``) is refused: the
    same spec on the same data must give the same numbers.
+
+   *Atomicity (pinned).*  A new experiment directory is staged under
+   ``<out_dir>/.staging-<id>-<pid>`` and moved into place with one
+   ``os.replace``, so a reader — or a second writer — sees either no
+   directory or a complete one, never a ``spec.json`` without its
+   ``result.json``.  A writer that loses the race to claim the id falls
+   through to the rerun path (drift check, per-file atomic replace).
+
+   *Dry runs still cost looks (pinned).*  With ``dry_run`` no experiment
+   directory is written, but the ledger IS saved: a dry run evaluates all
+   :data:`LOOKS_PER_EXPERIMENT` statistics and shows them to the caller, so
+   it is a look at the data whether or not the documents are kept.  A dry
+   run that left the ledger untouched let a caller scan configurations for
+   free and persist only the winner.  The later real run of the same spec
+   de-duplicates against the dry run's entry, so nothing is counted twice.
+7. **Gate eligibility** — :func:`iap.research.specs.gate_eligibility` on the
+   spec and the runner's dataset, kept on the runner as ``last_eligibility``
+   and persisted as ``eligibility.json``.  A result from a configuration
+   outside the pinned bounds, or on caller-chosen periods, is recorded and
+   ledgered like any other but flagged not gate-eligible.
+
+**Opt-in t-stat policy.**  ``tstat_threshold="ledger"`` makes the verdict's
+PROMOTE gate use the ledger's Bonferroni |t| at the total the ledger will
+have once this run's looks are debited (never below the fixed 3.0).  The
+default ``"fixed"`` is the pinned behaviour.  Under ``"ledger"`` the verdict
+depends on the ledger snapshot, so a rerun after the ledger has grown can
+legitimately reproduce a different verdict — which the rerun check then
+refuses under the same id, as it should: one id holds one verdict.
 """
 
 from __future__ import annotations
 
 import json
 import math
+import os
+import shutil
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional
 
@@ -69,8 +99,11 @@ from iap.backtest import Backtester, BacktestConfig, CostModel
 from iap.contracts.types import ExperimentResult, ExperimentSpec, Verdict
 from iap.contracts.validate import validate_typed
 from iap.experiment import tracker
+from iap.experiment.locking import atomic_write_text
 from iap.research.errors import ResearchError
 from iap.research.specs import (
+    GateEligibility,
+    gate_eligibility,
     normalise_configuration,
     pinned_horizon,
     verify_experiment_id,
@@ -78,7 +111,7 @@ from iap.research.specs import (
 from iap.validation.ledger import ExperimentLedger
 from iap.validation.metrics import HORIZONS_NS
 from iap.validation.splits import Fold
-from iap.validation.validate import validate_alpha
+from iap.validation.validate import TSTAT_THRESHOLD_POLICIES, validate_alpha
 
 __all__ = [
     "DOCUMENT_TOL",
@@ -114,6 +147,13 @@ LOOKS_PER_EXPERIMENT = 28
 
 #: Ledger ``kind`` of every runner entry.
 LEDGER_KIND = "experiment_runner"
+
+#: Documents of one experiment directory.
+SPEC_FILE = "spec.json"
+RESULT_FILE = "result.json"
+ELIGIBILITY_FILE = "eligibility.json"
+#: Prefix of the staging directory a new experiment is assembled in.
+STAGING_PREFIX = ".staging-"
 
 #: ``ExperimentResult`` field <- ``validate_alpha`` report key.
 _REPORT_METRICS = (
@@ -180,11 +220,13 @@ def _finite(value: Any, name: str) -> float:
     if value is None or isinstance(value, bool) or not isinstance(value, (int, float, np.floating, np.integer)):
         raise ResearchError(
             f"metric {name!r} was not computed (got {value!r}); a result is never "
-            "fabricated — the experiment window is too small or too sparse")
+            "fabricated — the experiment window is too small or too sparse",
+            code="metric_not_computed")
     out = float(value)
     if not math.isfinite(out):
         raise ResearchError(
-            f"metric {name!r} is not finite ({out}); a result is never fabricated")
+            f"metric {name!r} is not finite ({out}); a result is never fabricated",
+            code="metric_not_computed")
     return out
 
 
@@ -342,9 +384,10 @@ class ExperimentRunner:
     ``ledger_path`` is the multiple-testing ledger
     (``research/experiments.json``), ``out_dir`` the experiments folder
     (``research/experiments``), ``configs_dir`` the ``configs/`` tree
-    (instruments + execution cost model).  With ``dry_run`` nothing is
-    written: the ledger is updated in memory only, so the result still
-    carries the count the run WOULD have had.
+    (instruments + execution cost model).  With ``dry_run`` no experiment
+    directory is written, but the ledger is saved — a dry run is a look
+    (module docs, step 6).  ``tstat_threshold`` is the opt-in PROMOTE
+    t-stat policy (``"fixed"`` | ``"ledger"``).
     """
 
     def __init__(
@@ -357,9 +400,17 @@ class ExperimentRunner:
         dry_run: bool = False,
         frames: Optional[Mapping[int, pd.DataFrame]] = None,
         repo_root: Optional[Path] = None,
+        tstat_threshold: str = "fixed",
     ) -> None:
         if feature_store_dir is None and frames is None:
             raise ResearchError("ExperimentRunner needs a feature_store_dir or frames")
+        if tstat_threshold not in TSTAT_THRESHOLD_POLICIES:
+            raise ResearchError(
+                f"unknown tstat_threshold {tstat_threshold!r}; "
+                f"known: {list(TSTAT_THRESHOLD_POLICIES)}")
+        self.tstat_threshold = tstat_threshold
+        #: eligibility of the most recent ``run`` (``None`` before any run)
+        self.last_eligibility: Optional[GateEligibility] = None
         self.feature_store_dir = Path(feature_store_dir) if feature_store_dir else None
         self.ledger_path = Path(ledger_path)
         self.out_dir = Path(out_dir)
@@ -474,11 +525,22 @@ class ExperimentRunner:
     def experiment_dir(self, experiment_id: str) -> Path:
         return self.out_dir / experiment_id
 
-    def _persist(self, spec: ExperimentSpec, result: ExperimentResult) -> None:
+    def _persist(self, spec: ExperimentSpec, result: ExperimentResult,
+                 eligibility: Optional[GateEligibility] = None) -> None:
+        if eligibility is None:       # no dataset at hand: configuration only
+            eligibility = gate_eligibility(spec)
         spec_doc = validate_typed(spec)
         result_doc = validate_typed(result)
+        docs = {
+            SPEC_FILE: render_document(spec_doc),
+            RESULT_FILE: render_document(result_doc),
+            ELIGIBILITY_FILE: render_document(eligibility.to_dict(spec.experiment_id)),
+        }
         target = self.experiment_dir(spec.experiment_id)
-        existing = target / "result.json"
+        if not target.exists() and self._claim_new_directory(target, docs):
+            self.ledger.save()
+            return
+        existing = target / RESULT_FILE
         reproduced = False
         if existing.is_file():
             previous = json.loads(existing.read_text())
@@ -490,15 +552,43 @@ class ExperimentRunner:
                     f"{existing}: rerun of {spec.experiment_id} reproduced different "
                     f"values at {drift}; the same spec on the same data must give "
                     f"the same result (floats compared at {DOCUMENT_TOL:g}) — remove "
-                    "the directory deliberately if the evidence chain changed")
+                    "the directory deliberately if the evidence chain changed",
+                    code="not_reproducible")
             # Same numbers: keep the committed bytes (the last ulp of a BLAS
             # reduction is CPU-dependent; the artefact must not churn).
             reproduced = all(previous.get(k) == result_doc[k] for k in _PROVENANCE_FIELDS)
         target.mkdir(parents=True, exist_ok=True)
-        (target / "spec.json").write_text(render_document(spec_doc), encoding="ascii")
-        if not (existing.is_file() and reproduced):
-            (target / "result.json").write_text(render_document(result_doc), encoding="ascii")
+        for name, text in docs.items():
+            if name == RESULT_FILE and existing.is_file() and reproduced:
+                continue
+            atomic_write_text(target / name, text, encoding="ascii", newline="\n")
         self.ledger.save()
+
+    def _claim_new_directory(self, target: Path, docs: Mapping[str, str]) -> bool:
+        """Assemble a complete experiment directory beside ``target`` and move
+        it into place in one ``os.replace``.  ``True`` when this writer
+        claimed the id; ``False`` when another writer got there first (the
+        caller then takes the rerun path against that writer's documents).
+        """
+        self.out_dir.mkdir(parents=True, exist_ok=True)
+        staging = self.out_dir / f"{STAGING_PREFIX}{target.name}-{os.getpid()}"
+        if staging.exists():
+            shutil.rmtree(staging)
+        staging.mkdir()
+        try:
+            for name, text in docs.items():
+                with open(staging / name, "w", encoding="ascii", newline="\n") as f:
+                    f.write(text)
+                    f.flush()
+                    os.fsync(f.fileno())
+            try:
+                os.replace(str(staging), str(target))
+            except OSError:
+                return False
+            return True
+        finally:
+            if staging.exists():
+                shutil.rmtree(staging, ignore_errors=True)
 
     # -- protocol -------------------------------------------------------
 
@@ -539,18 +629,39 @@ class ExperimentRunner:
                 "holdout — the walk-forward would have nothing to evaluate")
         _assert_holdout_is_held_out(wf_window, spec.test_period.start_ts)
         cfg = spec.configuration
+        ledger_t = None
+        if self.tstat_threshold == "ledger":
+            # The threshold the ledger implies once THIS run's looks are in
+            # it (a rerun adds none): the run is judged against the
+            # denominator it contributes to.
+            ledger_t = self.ledger.bonferroni_t_threshold_at(
+                self.ledger.total_experiments + self.ledger.would_add(
+                    spec.alpha_id, LEDGER_KIND, spec.to_dict(),
+                    LOOKS_PER_EXPERIMENT))
         try:
             report = validate_alpha(
                 factory, wf_window, self._backtester(spec, 1.0), self.meta,
                 self.max_participation, n_folds=int(cfg["n_folds"]),
                 embargo_ns=int(cfg["embargo_ns"]),
+                tstat_threshold=self.tstat_threshold,
+                ledger_t_threshold=ledger_t,
             )
         except ValueError as exc:  # splitter: too few rows / degenerate boundaries
             raise ResearchError(f"walk-forward validation impossible: {exc}") from exc
         holdout = self._holdout(spec, full_window, factory)
+        eligibility = gate_eligibility(spec, self.frames())
         total = self._ledger_total_after(spec, report)
-        result = build_result(spec, report, holdout, total,
-                              tracker.git_commit(self.repo_root))
-        if not self.dry_run:
-            self._persist(spec, result)
+        try:
+            result = build_result(spec, report, holdout, total,
+                                  tracker.git_commit(self.repo_root))
+        except ResearchError:
+            # The statistics were computed and the failure names one of
+            # them: the looks are debited even though no result exists.
+            self.ledger.save()
+            raise
+        self.last_eligibility = eligibility
+        if self.dry_run:
+            self.ledger.save()
+        else:
+            self._persist(spec, result, eligibility)
         return result

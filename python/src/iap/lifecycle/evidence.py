@@ -20,6 +20,18 @@ through ``to_dict`` / ``from_dict`` byte-exactly and a port can replay the
 golden's evidence without float drift.  A missing block means "no evidence
 for that stage" and, except for the RESEARCH -> CANDIDATE presence gate, an
 absent block moves nothing (silence is not evidence — API_ADAPTIVE.md §6).
+
+**Gate eligibility of the research block (pinned, Python reference).**
+``research_gate_eligible`` says whether the ``research`` result may be used
+as promotion evidence at all (``iap.research.specs.gate_eligibility``: the
+pinned protocol bounds and dataset-derived periods).  It defaults to
+``True`` and is serialised ONLY when ``False``, so every existing evidence
+document — and the cross-language golden — is unchanged byte-for-byte; a
+document that carries ``"research_gate_eligible": false`` makes every
+research-block gate fail (``iap.lifecycle.gates``).  The Java / Rust ports
+do not read the key: evidence flagged not eligible must not be handed to
+them (their strict readers reject the unknown key, which is the safe
+failure).
 """
 
 from __future__ import annotations
@@ -192,8 +204,13 @@ class Evidence:
     validation: Optional[ValidationEvidence]
     paper: Optional[PaperEvidence]
     live: Optional[LiveEvidence]
+    #: False = the research result is recorded but is NOT promotion evidence
+    research_gate_eligible: bool = True
 
     def __post_init__(self) -> None:
+        object.__setattr__(
+            self, "research_gate_eligible",
+            _check_bool(self.research_gate_eligible, "evidence.research_gate_eligible"))
         if self.research is not None and not isinstance(self.research, ExperimentResult):
             raise ValueError("evidence.research must be an ExperimentResult or None")
         if self.capacity_usd is not None:
@@ -214,20 +231,24 @@ class Evidence:
                         paper=None, live=None)
 
     def to_dict(self) -> Dict[str, Any]:
-        """JSON-ready document; absent blocks are ``null``."""
-        return {
+        """JSON-ready document; absent blocks are ``null``.
+        ``research_gate_eligible`` appears only when ``False`` (module docs)."""
+        doc: Dict[str, Any] = {
             "research": None if self.research is None else self.research.to_dict(),
             "capacity_usd": self.capacity_usd,
             "validation": None if self.validation is None else self.validation.to_dict(),
             "paper": None if self.paper is None else self.paper.to_dict(),
             "live": None if self.live is None else self.live.to_dict(),
         }
+        if not self.research_gate_eligible:
+            doc["research_gate_eligible"] = False
+        return doc
 
     @staticmethod
     def from_dict(data: Mapping[str, Any]) -> "Evidence":
         """Strict inverse of :meth:`to_dict`."""
         names = ("research", "capacity_usd", "validation", "paper", "live")
-        unknown = sorted(set(data) - set(names))
+        unknown = sorted(set(data) - set(names) - {"research_gate_eligible"})
         missing = [n for n in names if n not in data]
         if unknown:
             raise ValueError(f"evidence: unknown keys {unknown}")
@@ -243,4 +264,5 @@ class Evidence:
             validation=None if validation is None else ValidationEvidence.from_dict(validation),
             paper=None if paper is None else PaperEvidence.from_dict(paper),
             live=None if live is None else LiveEvidence.from_dict(live),
+            research_gate_eligible=data.get("research_gate_eligible", True),
         )

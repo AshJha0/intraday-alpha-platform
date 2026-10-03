@@ -59,7 +59,9 @@ from iap.adaptive.drift import (
     capture_ic_baseline,
     ks_test,
     psi,
+    IC_Z_METHODS,
     rolling_ic_z,
+    rolling_ic_z_hac,
 )
 from iap.adaptive.lifecycle import (
     ACTIVE,
@@ -337,6 +339,10 @@ class AdaptiveDeployment:
         ic_window_ns = int(cfg["ic_window_ns"])
         min_buckets = int(cfg["min_ic_buckets"])
         block_ns = int(cfg["block_ns"])
+        ic_z_method = str(cfg.get("ic_z_method", "pinned"))
+        if ic_z_method not in IC_Z_METHODS:
+            raise ValueError(
+                f"adaptive.ic_z_method {ic_z_method!r} unknown; known: {IC_Z_METHODS}")
 
         model = self._fit_at(self.deploy_start)
         last_fit_ns = self.deploy_start
@@ -385,7 +391,13 @@ class AdaptiveDeployment:
             x_a = np.concatenate(x_l)
             y_a = np.concatenate(y_l)
             if self.ic_baseline is not None:
-                icw = rolling_ic_z(self.ic_baseline, ts_a, x_a, y_a, min_buckets)
+                # "pinned" (default; the cross-language contract) or the
+                # opt-in two-sample HAC z (adaptive.drift, monitor 4).
+                if ic_z_method == "hac":
+                    icw = rolling_ic_z_hac(self.ic_baseline, ts_a, x_a, y_a,
+                                           min_buckets)
+                else:
+                    icw = rolling_ic_z(self.ic_baseline, ts_a, x_a, y_a, min_buckets)
                 rolling_ic, ic_z, n_ic_buckets = icw.rolling_ic, icw.z, icw.n_buckets
             else:
                 rolling_ic, ic_z, n_ic_buckets = None, None, 0
@@ -404,7 +416,13 @@ class AdaptiveDeployment:
             if informative:
                 last_matured = matured
 
-            state = tracker.update(tb, rolling_ic, informative=informative)
+            if tracker.config.breach_rule == "cusum":
+                # successive windows overlap: one block of new rows per reading
+                state = tracker.update(
+                    tb, rolling_ic, informative=informative,
+                    new_fraction=min(1.0, block_ns / float(ic_window_ns)))
+            else:
+                state = tracker.update(tb, rolling_ic, informative=informative)
             if state == RETIRED:
                 # halt allocation for the coming block (through end-of-data
                 # after the final evaluation — no eval can lift it)

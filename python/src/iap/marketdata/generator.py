@@ -40,6 +40,37 @@ bit-identical output files):
   violations. The generator reports exactly what it injected so the QC
   pipeline can be tested against ground truth.
 
+- Planted effects (``planted``, ALL OFF by default — the pinned dataset and
+  the golden vectors are byte-identical with the block absent or at its
+  defaults; opt-in configs live outside ``configs/``, see
+  ``research/power/generator_planted.json``).  They exist so the validation
+  chain can be scored against a KNOWN truth (``iap.research.power``):
+  * ``order_flow`` — informed aggressor flow with a price-impact kernel.
+    The efficient path is precomputed, so its future increments are known
+    to the generator; with ``strength`` s > 0 the aggressor of an EXECUTE is
+    a buyer with probability ``0.5 + 0.5 * s * tanh(g / scale)`` where
+    ``g = sum_{j=0..K-1} decay^j * (path[k+1+j] - path[k+j])`` is the
+    kernel-weighted efficient-price move over the NEXT ``kernel_steps``
+    seconds and ``scale`` its low-vol-regime standard deviation.  Trade
+    sign therefore leads the mid along an exponential kernel, exactly the
+    footprint of permanent impact, on every venue consistently (the shared
+    efficient price is untouched, so the consolidated book stays
+    uncrossed).  The draw that picked the aggressor at 0.5 is the same draw:
+    no extra random number is consumed, enabled or not.
+  * ``lead_lag`` — the ``leader`` instrument's efficient-price move over
+    grid step ``k - lag_steps``, IN TICKS, is added, times ``beta``, to
+    every other equity's efficient-price move at step ``k``.  Ticks, not
+    returns: every instrument's own innovation has the same tick volatility
+    (``vol_regimes.sigma_ticks_per_s``), so ``beta`` is the planted move per
+    unit of the follower's own noise and the lagged correlation it creates
+    is ``beta / sqrt(1 + beta^2)`` whatever the price levels are.  The
+    leader's path comes from its own dedicated RNG stream, so computing it
+    first changes no draw.
+  * ``break`` — a mid-sample parameter break: from ``at_fraction`` of the
+    run onward (sessions are equal slices of [0, 1)) both planted
+    strengths are multiplied by ``post_multiplier`` (0 = the effect dies,
+    -1 = it reverses).
+
 Raw files are written in *arrival order* (sorted by receive_ts) with
 ``event_id`` assigned 1..N per file.
 """
@@ -47,6 +78,7 @@ Raw files are written in *arrival order* (sorted by receive_ts) with
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -91,6 +123,14 @@ _DEFAULT_CONFIG = {
         "invalid_prob": 0.0005,
         "ts_violation_prob": 0.0005,
     },
+    # Planted effects of known size (module docs).  Off: strength / beta 0
+    # and no break.  With these defaults no code path below differs from the
+    # generator without the block, and no RNG draw is added or reordered.
+    "planted": {
+        "order_flow": {"strength": 0.0, "kernel_decay": 0.7, "kernel_steps": 5},
+        "lead_lag": {"beta": 0.0, "leader": "SYN.ETF.IDX", "lag_steps": 1},
+        "break": {"at_fraction": None, "post_multiplier": 1.0},
+    },
 }
 
 
@@ -126,7 +166,8 @@ class _EffPrice:
     persist across sessions.
     """
 
-    __slots__ = ("inst", "rng", "mid_f", "regime", "open_ns", "path")
+    __slots__ = ("inst", "rng", "mid_f", "regime", "open_ns", "path",
+                 "flow_strength", "flow_weights", "flow_scale")
 
     STEP_NS = 1_000_000_000  # 1-second efficient-price grid
 
@@ -137,10 +178,25 @@ class _EffPrice:
         self.regime = 0
         self.open_ns = 0
         self.path: List[float] = [self.mid_f]
+        # Planted informed flow (None = off): per-step strength, kernel
+        # weights and the scale of the kernel-weighted move.
+        self.flow_strength: Optional[List[float]] = None
+        self.flow_weights: List[float] = []
+        self.flow_scale = 1.0
 
-    def new_session(self, open_ns: int, close_ns: int, vol_cfg: dict) -> None:
-        """Precompute this session's path, continuing from the prior level."""
-        steps = int((close_ns - open_ns) // self.STEP_NS) + 2
+    @classmethod
+    def session_steps(cls, open_ns: int, close_ns: int) -> int:
+        """Grid steps ``new_session`` precomputes for this window."""
+        return int((close_ns - open_ns) // cls.STEP_NS) + 2
+
+    def new_session(self, open_ns: int, close_ns: int, vol_cfg: dict,
+                    drift_ticks: Optional[List[float]] = None) -> None:
+        """Precompute this session's path, continuing from the prior level.
+
+        ``drift_ticks`` (planted lead-lag; ``None`` = off) is one extra move
+        in ticks per grid step, applied after the step's own innovation.
+        """
+        steps = self.session_steps(open_ns, close_ns)
         sigma = vol_cfg["sigma_ticks_per_s"]
         switch = vol_cfg["switch_prob_per_s"]
         lo = 0.5 * self.inst.ref_price_ticks
@@ -153,12 +209,46 @@ class _EffPrice:
             if rng.uniform() < switch:
                 regime ^= 1
             mid += rng.normal() * sigma[regime]
+            if drift_ticks is not None:
+                mid += drift_ticks[len(path) - 1]
             mid = min(max(mid, lo), hi)
             path.append(mid)
         self.open_ns = open_ns
         self.path = path
         self.mid_f = path[-1]  # carried into the next session
         self.regime = regime
+
+    def step_moves(self) -> List[float]:
+        """Per-step efficient-price moves (ticks) of the current session."""
+        path = self.path
+        return [path[k + 1] - path[k] for k in range(len(path) - 1)]
+
+    def set_informed_flow(self, strength: Optional[List[float]], decay: float,
+                          kernel_steps: int, sigma_ticks: float) -> None:
+        """Arm (or, with ``None``, disarm) planted informed flow for the
+        current session: ``strength[k]`` applies to trades in grid step k."""
+        self.flow_strength = strength
+        self.flow_weights = [decay ** j for j in range(kernel_steps)]
+        self.flow_scale = sigma_ticks * math.sqrt(
+            sum(w * w for w in self.flow_weights))
+
+    def buy_probability(self, ts: int) -> float:
+        """P(aggressor is the buyer) for an execution at ``ts``: exactly 0.5
+        unless informed flow is armed (module docs, ``order_flow``)."""
+        if self.flow_strength is None:
+            return 0.5
+        path = self.path
+        last = len(path) - 1
+        k = min(max((ts - self.open_ns) // self.STEP_NS, 0), last)
+        strength = self.flow_strength[min(k, len(self.flow_strength) - 1)]
+        if strength == 0.0:
+            return 0.5
+        move = 0.0
+        for j, w in enumerate(self.flow_weights):
+            if k + 1 + j > last:
+                break
+            move += w * (path[k + 1 + j] - path[k + j])
+        return 0.5 + 0.5 * strength * math.tanh(move / self.flow_scale)
 
     def mid_at(self, ts: int) -> float:
         """Efficient price at event time ts (grid floor; clamped to session)."""
@@ -235,6 +325,52 @@ class MarketDataGenerator:
         self._fx_streams: Dict[Tuple[int, int], _Stream] = {}
         self._eq_prices: Dict[int, _EffPrice] = {}  # per-instrument shared mid
         self._rngs: Dict[Tuple[str, int, int], SplitMix64] = {}
+        self._check_planted()
+
+    # --------------------------------------------------------------- planted
+
+    def _check_planted(self) -> None:
+        """Validate the ``planted`` block (module docs); fail fast."""
+        planted = self.cfg["planted"]
+        flow, lead, brk = planted["order_flow"], planted["lead_lag"], planted["break"]
+        if not 0.0 <= float(flow["strength"]) < 1.0:
+            raise ValueError("planted.order_flow.strength must be in [0, 1)")
+        if not 0.0 < float(flow["kernel_decay"]) <= 1.0:
+            raise ValueError("planted.order_flow.kernel_decay must be in (0, 1]")
+        if int(flow["kernel_steps"]) < 1:
+            raise ValueError("planted.order_flow.kernel_steps must be >= 1")
+        if not math.isfinite(float(lead["beta"])):
+            raise ValueError("planted.lead_lag.beta must be finite")
+        if int(lead["lag_steps"]) < 1:
+            raise ValueError("planted.lead_lag.lag_steps must be >= 1 (a "
+                             "contemporaneous link is not a lead)")
+        if float(lead["beta"]) != 0.0 and not any(
+                i.symbol == lead["leader"] for i in self.ref.instruments("EQUITY")):
+            raise ValueError(
+                f"planted.lead_lag.leader {lead['leader']!r} is not an equity "
+                "instrument of the reference data")
+        at = brk["at_fraction"]
+        if at is not None and not 0.0 < float(at) < 1.0:
+            raise ValueError("planted.break.at_fraction must be in (0, 1) or null")
+        post = float(brk["post_multiplier"])
+        if not math.isfinite(post) or abs(post * float(flow["strength"])) >= 1.0:
+            raise ValueError(
+                "planted.break.post_multiplier must be finite and keep "
+                "|post_multiplier * order_flow.strength| < 1")
+
+    def _planted_multipliers(self, session_index: int, sessions: int,
+                             steps: int) -> List[float]:
+        """Per-grid-step multiplier of the planted strengths for one session:
+        1 before the break, ``post_multiplier`` from it on (all 1 without)."""
+        brk = self.cfg["planted"]["break"]
+        at = brk["at_fraction"]
+        if at is None:
+            return [1.0] * steps
+        post = float(brk["post_multiplier"])
+        return [
+            post if (session_index + k / steps) / sessions >= float(at) else 1.0
+            for k in range(steps)
+        ]
 
     # ----------------------------------------------------------------- utils
 
@@ -402,8 +538,11 @@ class MarketDataGenerator:
                        price=price, qty=new_qty, order_id=oid)
         else:
             # Aggression: EXECUTE against the FIFO head of the best opposite
-            # level, plus the tape TRADE print.
-            aggressor = int(Side.BID) if rng.uniform() < 0.5 else int(Side.ASK)
+            # level, plus the tape TRADE print.  buy_probability is exactly
+            # 0.5 unless planted informed flow is armed; the draw is the
+            # same draw either way.
+            aggressor = (int(Side.BID) if rng.uniform() < price.buy_probability(ts)
+                         else int(Side.ASK))
             resting = int(Side.ASK) if aggressor == Side.BID else int(Side.BID)
             level = book._best_level(resting)
             if level is None:
@@ -719,6 +858,28 @@ class MarketDataGenerator:
             fx_open, fx_close = self.ref.session_bounds_ns("FX", date)
 
             eq_events: List[MarketEvent] = []
+            vol_cfg = self.cfg["equities"]["vol_regimes"]
+            planted = self.cfg["planted"]
+            flow_cfg, lead_cfg = planted["order_flow"], planted["lead_lag"]
+            flow_on = float(flow_cfg["strength"]) != 0.0
+            lead_on = float(lead_cfg["beta"]) != 0.0
+            multipliers: List[float] = []
+            leader_moves: List[float] = []
+            leader_id = -1
+            if flow_on or lead_on:
+                steps = _EffPrice.session_steps(eq_open, eq_close)
+                multipliers = self._planted_multipliers(si, len(dates), steps)
+            if lead_on:
+                # The leader's path first: it has its own dedicated RNG
+                # stream, so advancing it early changes no draw.
+                leader = self.ref.instrument(lead_cfg["leader"])
+                leader_id = leader.instrument_id
+                lead_price = self._eq_prices.get(leader_id)
+                if lead_price is None:
+                    lead_price = _EffPrice(leader, self._rng("eqmid", leader_id, 0))
+                    self._eq_prices[leader_id] = lead_price
+                lead_price.new_session(eq_open, eq_close, vol_cfg)
+                leader_moves = lead_price.step_moves()
             for inst in self.ref.instruments("EQUITY"):
                 # Advance the instrument's SHARED efficient price for this
                 # session (dedicated per-instrument RNG stream, so the path
@@ -729,9 +890,22 @@ class MarketDataGenerator:
                         inst, self._rng("eqmid", inst.instrument_id, 0)
                     )
                     self._eq_prices[inst.instrument_id] = price
-                price.new_session(
-                    eq_open, eq_close, self.cfg["equities"]["vol_regimes"]
-                )
+                if not lead_on:
+                    price.new_session(eq_open, eq_close, vol_cfg)
+                elif inst.instrument_id != leader_id:
+                    lag = int(lead_cfg["lag_steps"])
+                    beta = float(lead_cfg["beta"])
+                    price.new_session(eq_open, eq_close, vol_cfg, drift_ticks=[
+                        beta * multipliers[k] * leader_moves[k - lag] if k >= lag else 0.0
+                        for k in range(len(multipliers))
+                    ])
+                if flow_on:
+                    price.set_informed_flow(
+                        [float(flow_cfg["strength"]) * m for m in multipliers],
+                        float(flow_cfg["kernel_decay"]),
+                        int(flow_cfg["kernel_steps"]),
+                        float(vol_cfg["sigma_ticks_per_s"][0]),
+                    )
                 for venue in eq_venues:
                     key = (inst.instrument_id, venue.venue_id)
                     stream = self._eq_streams.get(key)

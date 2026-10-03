@@ -9,8 +9,12 @@ then prints a deterministic count table (one row per table, sorted) and
 the importers' warnings on stderr.  ``sql`` prints one canonical JSON
 line per row; ``sql`` and ``explain`` open the file **read-only**
 (``file:...?mode=ro``), so a statement that writes fails with exit code 1
-and the index can only change through ``build``.  Output never contains a
-wall-clock value.
+and the index can only change through ``build``.  ``sql`` takes exactly ONE
+statement: several statements separated by ``;`` are refused (exit code 1)
+rather than half-run.  Every SQLite failure exits 1 with the engine's own
+message; the "opened read-only" hint is added only when the failure IS a
+write to the read-only file, never to a syntax error or an unknown table.
+Output never contains a wall-clock value.
 """
 
 from __future__ import annotations
@@ -25,7 +29,7 @@ from iap.contracts.versions import canonical_json
 from iap.store.db import Store
 from iap.store.importers import default_repo_root, import_all
 
-__all__ = ["DEFAULT_DB", "build_parser", "main", "render_counts"]
+__all__ = ["DEFAULT_DB", "build_parser", "main", "render_counts", "sql_error_message"]
 
 #: Default database path, relative to the repository root (git-ignored).
 DEFAULT_DB = Path("data") / "store" / "iap.sqlite"
@@ -59,6 +63,24 @@ def build_parser() -> argparse.ArgumentParser:
                        help="run one query; one canonical JSON line per row")
     q.add_argument("query")
     return parser
+
+
+def sql_error_message(exc: sqlite3.Error) -> str:
+    """The stderr line for a failed ``sql`` statement.
+
+    SQLite reports a write to a ``mode=ro`` file as "attempt to write a
+    readonly database"; only that failure gets the rebuild hint.  A
+    multi-statement string (``sqlite3.ProgrammingError`` from ``execute``)
+    is named for what it is.
+    """
+    text = str(exc)
+    if "readonly database" in text.lower():
+        return (f"error: {text} (the store is opened read-only; use `build` "
+                "to rebuild it)")
+    if isinstance(exc, sqlite3.ProgrammingError) and "one statement" in text.lower():
+        return ("error: `sql` runs exactly one statement; several were given "
+                f"({text})")
+    return f"error: {text}"
 
 
 def _db_path(args: argparse.Namespace, root: Path) -> Path:
@@ -100,9 +122,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         try:
             for row in store.query(args.query):
                 print(canonical_json(row))
-        except sqlite3.OperationalError as exc:
-            print(f"error: {exc} (the store is opened read-only; use `build` to rebuild it)",
-                  file=sys.stderr)
+        except (sqlite3.Error, sqlite3.Warning) as exc:
+            # sqlite3.Warning: Python < 3.12 raises it (not ProgrammingError)
+            # for a multi-statement string.
+            if isinstance(exc, sqlite3.Warning):
+                print("error: `sql` runs exactly one statement; several were "
+                      f"given ({exc})", file=sys.stderr)
+            else:
+                print(sql_error_message(exc), file=sys.stderr)
             return 1
         except BrokenPipeError:
             return 0

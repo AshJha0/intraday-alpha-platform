@@ -59,6 +59,28 @@ schema, ``x-version`` 1:
 IC baselines use ``"kind": "ic"`` and replace edges/expected_frac with
 ``{"ic_mean", "ic_std", "n_buckets_baseline", "bucket_ns", "horizon"}``.
 
+4. **Two-sample HAC z** (opt-in alternative to monitor 3;
+   :func:`rolling_ic_z_hac`, selected with ``adaptive.ic_z_method = "hac"``
+   — the pinned z of monitor 3 stays the default and the cross-language
+   contract).  The pinned z treats the baseline mean as a known constant
+   and the live bucket ICs as independent and equally informative.  None of
+   the three holds: the baseline mean is itself an estimate from
+   ``n_buckets_baseline`` buckets; bucket ICs of overlapping-label signals
+   are autocorrelated; and fixed time buckets carry very different pair
+   counts.  The corrected statistic is the two-sample form
+
+       z = (mean_w(live) - ic_mean) / sqrt(var_live + var_base)
+
+   where ``mean_w`` / ``var_live`` are the pair-count-weighted mean of the
+   live bucket ICs and its Bartlett (Newey-West) variance
+   (:func:`iap.validation.metrics.hac_mean_variance`, lag rule
+   :func:`iap.validation.metrics.nw_lags`), and ``var_base`` is the variance
+   of the baseline mean: HAC from the baseline's own bucket series when the
+   caller has it, otherwise ``ic_std^2 / n_buckets_baseline`` (all the
+   serialized baseline can support).  It is never larger in magnitude than
+   the pinned z on independent equal buckets, and it does not fire on the
+   baseline's own sampling error.
+
 Everything here is deterministic and wall-clock-free (conventions §3).
 """
 
@@ -72,7 +94,13 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
-from iap.validation.metrics import bucket_ics
+from iap.validation.metrics import (
+    HORIZONS_NS,
+    bucket_ics,
+    bucket_ics_with_counts,
+    hac_mean_variance,
+    nw_lags,
+)
 
 PSI_EPS = 1e-6
 PSI_BUCKETS = 10
@@ -476,5 +504,70 @@ def rolling_ic_z(
     z = (mean_live - baseline.ic_mean) / (baseline.ic_std / math.sqrt(bics.size))
     return ICWindowResult(
         rolling_ic=mean_live, z=float(z), n_buckets=int(bics.size),
+        bucket_ics=[float(v) for v in bics],
+    )
+
+
+#: Pinned IC z methods: the cross-language contract and the opt-in HAC form.
+IC_Z_METHODS = ("pinned", "hac")
+
+
+def two_sample_hac_z(
+    live_mean: float,
+    live_var: float,
+    base_mean: float,
+    base_var: float,
+) -> Optional[float]:
+    """``(live_mean - base_mean) / sqrt(live_var + base_var)``; ``None`` when
+    either variance is unavailable or their sum is not positive."""
+    if not (math.isfinite(live_mean) and math.isfinite(base_mean)
+            and math.isfinite(live_var) and math.isfinite(base_var)):
+        return None
+    total = live_var + base_var
+    if live_var < 0.0 or base_var < 0.0 or total <= _STD_EPS * _STD_EPS:
+        return None
+    return float((live_mean - base_mean) / math.sqrt(total))
+
+
+def rolling_ic_z_hac(
+    baseline: ICBaseline,
+    ts: np.ndarray,
+    scores: np.ndarray,
+    labels: np.ndarray,
+    min_buckets: int = 4,
+    lags: Optional[int] = None,
+    baseline_bucket_ics: Optional[np.ndarray] = None,
+    baseline_bucket_counts: Optional[np.ndarray] = None,
+) -> ICWindowResult:
+    """Rolling realized IC vs the baseline as a two-sample HAC z (monitor 4
+    of the module docstring).
+
+    ``lags`` defaults to :func:`nw_lags` of the baseline's horizon and
+    bucket.  ``baseline_bucket_ics`` / ``baseline_bucket_counts`` are the
+    research window's own bucket series when the caller still has it (the
+    baseline mean and its HAC variance are then recomputed from it, pair
+    weighted); without them the serialized ``ic_mean`` and
+    ``ic_std^2 / n_buckets_baseline`` are used.  ``rolling_ic`` is the
+    pair-count-weighted live mean — the quantity the z is about.
+    """
+    if lags is None:
+        lags = nw_lags(HORIZONS_NS[baseline.horizon], baseline.bucket_ns)
+    bics, counts = bucket_ics_with_counts(ts, scores, labels,
+                                          bucket_ns=baseline.bucket_ns)
+    n = int(bics.size)
+    if n < max(min_buckets, 1):
+        return ICWindowResult(rolling_ic=None, z=None, n_buckets=n)
+    live_mean, live_var, _ = hac_mean_variance(bics, lags=lags, weights=counts)
+    if baseline_bucket_ics is not None:
+        base_mean, base_var, _ = hac_mean_variance(
+            baseline_bucket_ics, lags=lags, weights=baseline_bucket_counts)
+    else:
+        base_mean = baseline.ic_mean
+        base_var = (baseline.ic_std ** 2 / baseline.n_buckets_baseline
+                    if baseline.n_buckets_baseline > 0 else float("nan"))
+    return ICWindowResult(
+        rolling_ic=float(live_mean),
+        z=two_sample_hac_z(live_mean, live_var, base_mean, base_var),
+        n_buckets=n,
         bucket_ics=[float(v) for v in bics],
     )

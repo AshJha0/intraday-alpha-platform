@@ -26,6 +26,9 @@ from iap.research.runner import (  # noqa: F401
 from iap.research.specs import (  # noqa: F401
     DEFAULT_CONFIGURATION,
     DEFAULT_SEED,
+    GATE_ELIGIBILITY_BOUNDS,
+    GateEligibility,
+    gate_eligibility,
     build_spec,
     derive_periods,
     experiment_id_of,
@@ -38,6 +41,8 @@ from iap.research.specs import (  # noqa: F401
 __all__ = [
     "DEFAULT_CONFIGURATION",
     "DEFAULT_SEED",
+    "GATE_ELIGIBILITY_BOUNDS",
+    "GateEligibility",
     "LEDGER_KIND",
     "LOOKS_PER_EXPERIMENT",
     "ExperimentRecord",
@@ -48,6 +53,7 @@ __all__ = [
     "build_spec",
     "derive_periods",
     "experiment_id_of",
+    "gate_eligibility",
     "model_definition_hash",
     "normalise_configuration",
     "pinned_horizon",

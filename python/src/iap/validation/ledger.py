@@ -24,6 +24,18 @@ Multiple-testing math reported with every batch:
 - Deflated-Sharpe-style note: with n independent trials the expected
   maximum |t| under the global null grows like sqrt(2 ln n); any observed
   t-stat below that is consistent with pure selection.
+
+**Concurrent writers (pinned).**  ``save`` is a locked read-modify-write:
+under an exclusive lock file (``<ledger>.lock``, :mod:`iap.experiment.locking`)
+it re-reads the file, replays every ``record`` call this instance made since
+it last loaded or saved onto that fresh state, and replaces the file
+atomically.  Two processes that each load, record and save therefore both
+land — the second replays onto the first's result instead of overwriting it
+with a stale snapshot — and a reader never sees a torn document.  With a
+single writer the replay is the identity, so the bytes are exactly what the
+unlocked implementation wrote.  ``record`` still returns the running total
+of this instance's view; the total another writer raced in is visible after
+``save`` (``total_experiments``).
 """
 
 from __future__ import annotations
@@ -32,7 +44,9 @@ import hashlib
 import json
 import math
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
+
+from iap.experiment.locking import FileLock, atomic_write_text
 
 PINNED_ALPHA = 0.05
 
@@ -68,11 +82,22 @@ def _norm_ppf(p: float) -> float:
 class ExperimentLedger:
     """Persistent experiment counter + entries (research/experiments.json)."""
 
-    def __init__(self, path) -> None:
+    def __init__(self, path, lock_timeout_s: float = 30.0) -> None:
         self.path = Path(path)
+        self.lock_timeout_s = float(lock_timeout_s)
         self.entries: List[dict] = []
         self.total_experiments = 0
         self._index: Dict[str, int] = {}
+        #: ``record`` calls since the last load / save, replayed by ``save``
+        #: onto the file's then-current content (see the module docs).
+        self._pending: List[Tuple[str, str, Optional[dict], Optional[dict], int]] = []
+        self._load()
+
+    def _load(self) -> None:
+        """Reset the in-memory state to the file's content (empty if absent)."""
+        self.entries = []
+        self.total_experiments = 0
+        self._index = {}
         if self.path.exists():
             blob = json.loads(self.path.read_text())
             self.entries = list(blob.get("entries", []))
@@ -107,6 +132,17 @@ class ExperimentLedger:
         horizon scan) and return the running total."""
         if count < 1:
             raise ValueError("count must be >= 1")
+        self._pending.append((alpha_id, kind, config, result, count))
+        return self._apply(alpha_id, kind, config, result, count)
+
+    def _apply(
+        self,
+        alpha_id: str,
+        kind: str,
+        config: Optional[dict],
+        result: Optional[dict],
+        count: int,
+    ) -> int:
         key = self.experiment_key(alpha_id, kind, config)
         prev = self._index.get(key)
         if prev is not None:
@@ -141,6 +177,22 @@ class ExperimentLedger:
         p = self.bonferroni_threshold() / 2.0
         return abs(_norm_ppf(p))
 
+    @staticmethod
+    def bonferroni_t_threshold_at(total_experiments: int) -> float:
+        """The Bonferroni |t| threshold a ledger of ``total_experiments``
+        looks implies (the formula of :meth:`bonferroni_t_threshold`, for a
+        total that is not this instance's — e.g. the total a run WILL have
+        once its own looks are debited)."""
+        n = max(int(total_experiments), 1)
+        return abs(_norm_ppf(PINNED_ALPHA / n / 2.0))
+
+    def would_add(self, alpha_id: str, kind: str, config: Optional[dict],
+                  count: int) -> int:
+        """Looks a ``record`` of this identity would add right now: ``count``
+        for a new identity, 0 for a rerun (de-duplicated)."""
+        key = self.experiment_key(alpha_id, kind, config)
+        return 0 if key in self._index else int(count)
+
     def expected_max_null_t(self) -> float:
         """Deflated-Sharpe-style yardstick: E[max |t|] under the global null
         with n independent trials ~ sqrt(2 ln n)."""
@@ -162,7 +214,7 @@ class ExperimentLedger:
             f"with pure selection over this many trials."
         )
 
-    def save(self) -> None:
+    def _render(self) -> str:
         blob = {
             "x-version": 1,
             "description": (
@@ -180,5 +232,16 @@ class ExperimentLedger:
             "expected_max_null_t": self.expected_max_null_t(),
             "entries": self.entries,
         }
+        return json.dumps(blob, indent=2, sort_keys=True) + "\n"
+
+    def save(self) -> None:
+        """Locked read-modify-write (see the module docs): re-read the file,
+        replay this instance's pending ``record`` calls onto it, replace the
+        file atomically."""
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps(blob, indent=2, sort_keys=True) + "\n")
+        with FileLock(self.path, timeout_s=self.lock_timeout_s):
+            pending, self._pending = self._pending, []
+            self._load()
+            for op in pending:
+                self._apply(*op)
+            atomic_write_text(self.path, self._render())

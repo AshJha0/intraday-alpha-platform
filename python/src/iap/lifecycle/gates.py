@@ -17,6 +17,15 @@ with ``value = null`` (a missing number never passes); the machine decides
 separately whether an absent block counts as a failure or as silence
 (``iap.lifecycle.machine``).
 
+**Non-eligible research evidence is refused (pinned).**  When the evidence
+carries ``research_gate_eligible = False`` (``iap.lifecycle.evidence``; the
+result came from a configuration outside the pinned protocol bounds or from
+caller-chosen periods — ``iap.research.specs.gate_eligibility``), EVERY gate
+that reads the ``research`` block fails with ``value = null``, exactly as if
+the number were missing: a result that may not be used as evidence is not a
+number a gate can pass on.  This is a property of the evidence, not a new
+row of the gate table, so the table, the edges and the golden are unchanged.
+
 Gate inventory (config key in ``configs/strategies/lifecycle.json``):
 
 ==========================  ==========  =========================================  ==========================
@@ -244,6 +253,10 @@ class Gate:
                             f"{type(evidence).__name__}")
         metric = self._spec.metric(evidence, self._config)
         threshold = self.threshold
+        if self._spec.block == "research" and not evidence.research_gate_eligible:
+            # Recorded, ledgered, but not promotion evidence (module docs).
+            return GateResult(passed=False, value=None,
+                              threshold=None if self._spec.kind == "bool" else threshold)
         if self._spec.kind == "bool":
             return GateResult(passed=metric is True, value=None, threshold=None)
         if metric is None:

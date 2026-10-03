@@ -382,14 +382,27 @@ def test_runner_needs_an_input_source(tmp_path):
         ExperimentRunner(None, tmp_path / "l.json", tmp_path / "e", CONFIGS_DIR)
 
 
-def test_dry_run_computes_without_persisting(frames, tmp_path, spec):
+def test_dry_run_writes_no_experiment_but_debits_the_looks(frames, tmp_path, spec):
+    """A dry run is a look: no experiment directory, but the ledger is
+    saved — otherwise configurations could be scanned for free and only the
+    winner persisted.  The real run of the same spec then de-duplicates."""
     runner = _runner(frames, tmp_path, dry_run=True)
     result = runner.run(spec)
     assert result.experiment_id == spec.experiment_id
     assert result.n_experiments_in_ledger == LOOKS_PER_EXPERIMENT
     assert result.created_ts == spec.test_period.end_ts
-    assert not (tmp_path / "experiments.json").exists()
     assert not (tmp_path / "experiments").exists()
+    ledger = ExperimentLedger(tmp_path / "experiments.json")
+    assert ledger.total_experiments == LOOKS_PER_EXPERIMENT
+    assert ledger.distinct_experiments == 1
+    # a second dry run of ANOTHER spec costs its own looks ...
+    _runner(frames, tmp_path, dry_run=True).run(_spec(frames, "1s"))
+    assert ExperimentLedger(tmp_path / "experiments.json").total_experiments == \
+        2 * LOOKS_PER_EXPERIMENT
+    # ... and the real run of the first spec is a rerun, not a new look
+    real = _runner(frames, tmp_path).run(spec)
+    assert real.n_experiments_in_ledger == 2 * LOOKS_PER_EXPERIMENT
+    assert (tmp_path / "experiments" / spec.experiment_id / "result.json").is_file()
 
 
 def test_ledger_increments_by_exactly_the_looks_and_deduplicates(frames, tmp_path):
@@ -544,7 +557,12 @@ def test_registry_rejects_corrupt_documents(frames, tmp_path, spec):
     with pytest.raises(ResearchError, match="does not match the spec body"):
         reg.load_spec(spec.experiment_id)
     with pytest.raises(ResearchError):
-        list(reg.records())
+        reg.load(spec.experiment_id)
+    # a listing skips the corrupt directory and REPORTS it (never raises,
+    # never quietly shorter)
+    assert list(reg.records()) == []
+    assert [name for name, _ in reg.skipped] == [spec.experiment_id]
+    assert "does not match the spec body" in reg.skipped[0][1]
     (tmp_path / "experiments" / spec.experiment_id / "result.json").unlink()
     with pytest.raises(ResearchError, match="missing"):
         reg.load_result(spec.experiment_id)

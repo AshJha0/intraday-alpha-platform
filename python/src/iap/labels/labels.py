@@ -173,6 +173,10 @@ class LabelResult:
     cost: List[float]  # NaN where invalid
     valid: List[bool]
     reason: List[int] = field(default_factory=list)  # LabelReason bitmask
+    #: realised reopen return per anchor (``blackout_reopen=True`` only;
+    #: empty otherwise): NaN except where the label is invalid for BLACKOUT
+    #: alone and a tradable sample exists at or after t + h
+    reopen_mid: List[float] = field(default_factory=list)
 
 
 def compute_labels(
@@ -181,12 +185,22 @@ def compute_labels(
     last_event_ts: int,
     horizons: Sequence[str] = HORIZON_ORDER,
     max_age_ns: Optional[int] = None,
+    blackout_reopen: bool = False,
 ) -> Dict[str, LabelResult]:
     """Two-pointer forward-label sweep (see module docstring for semantics).
 
     ``anchors_ts`` must be non-decreasing.  ``last_event_ts`` is the
     timestamp of the last event observed for the instrument's stream.
     ``max_age_ns`` defaults to :func:`max_sample_age` of the series.
+
+    ``blackout_reopen`` (opt-in; the labels themselves are unchanged) also
+    fills :attr:`LabelResult.reopen_mid`: for an anchor whose label is
+    invalid for ``BLACKOUT`` and nothing else, the return from the anchor
+    mid to the FIRST tradable mid at or after ``t + h`` — what the position
+    was actually worth once the market could be traded again.  It is not a
+    tradable ``h``-horizon return (which is why the label stays invalid);
+    it exists so the selection the BLACKOUT rule makes can be measured
+    (:func:`iap.validation.metrics.ic_with_blackout_reopen`).
     """
     n = len(anchors_ts)
     for i in range(1, n):
@@ -212,6 +226,14 @@ def compute_labels(
     for i in range(m):
         bad[i + 1] = bad[i] + (0 if tradable[i] else 1)
 
+    # next_tradable[i] = smallest index >= i of a tradable sample with a
+    # positive mid (m when none) — only needed for the reopen return
+    next_tradable = [m] * (m + 1)
+    if blackout_reopen:
+        for i in range(m - 1, -1, -1):
+            next_tradable[i] = i if (tradable[i] and mids[i] > 0.0) \
+                else next_tradable[i + 1]
+
     # base pointer: latest series index with ts <= anchor
     out: Dict[str, LabelResult] = {}
     base_idx = [-1] * n
@@ -228,6 +250,7 @@ def compute_labels(
         lab_cost = [nan] * n
         lab_valid = [False] * n
         lab_reason = [0] * n
+        lab_reopen = [nan] * n if blackout_reopen else []
         k = -1  # latest series index with ts <= anchor + h
         for i in range(n):
             t = anchors_ts[i]
@@ -255,6 +278,13 @@ def compute_labels(
                 reason |= LabelReason.BLACKOUT
             lab_reason[i] = reason
             if reason:
+                if blackout_reopen and reason == LabelReason.BLACKOUT:
+                    # the forward sample itself when it is tradable (the
+                    # blackout was inside the horizon), else the first
+                    # tradable sample after it (the reopen)
+                    r = next_tradable[k]
+                    if r < m:
+                        lab_reopen[i] = mids[r] / mids[b] - 1.0
                 continue
             m0, hs0 = mids[b], hss[b]
             m1, hs1 = mids[k], hss[k]
@@ -262,5 +292,6 @@ def compute_labels(
             lab_cost[i] = ((m1 - hs1) - (m0 + hs0)) / m0
             lab_valid[i] = True
         out[h] = LabelResult(horizon=h, mid=lab_mid, cost=lab_cost,
-                             valid=lab_valid, reason=lab_reason)
+                             valid=lab_valid, reason=lab_reason,
+                             reopen_mid=lab_reopen)
     return out
