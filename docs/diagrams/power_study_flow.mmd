@@ -1,0 +1,20 @@
+flowchart TD
+    %% python -m iap.research power (iap.research.power) — research/power/POWER_REPORT.md.
+    %% The figures in the last node are the committed three-seed report.
+    CFG["research/power/generator_planted.json<br/>the reference effect, level 1.0:<br/>order_flow strength 0.4 · lead_lag beta 0.4 at a lag of 2 steps"] --> GRID["grid: levels 0, 0.5, 1, 2 · scenarios stable and break · 3 seeds per cell<br/>level 0 is the null; break reverses both effects mid-sample"]
+    GRID --> GEN["seeded generator with the planted block ON<br/>reduced universe: SYN.EQ.001, SYN.EQ.002, SYN.ETF.IDX"]
+    GEN --> PIPE["the real pipeline, unmodified:<br/>normalise, books, feature engine, labels"]
+    PIPE --> VAL["validate_alpha under the pinned research execution model<br/>detectors: EQ04 for order flow, EQ10 for lead-lag"]
+    VAL --> S1["sig within: gate IC > 0 and Newey-West t of<br/>within-bucket ICs >= 3 (what the PROMOTE gate reads)"]
+    VAL --> S2["sig pooled: pooled-slope HAC t >= 3"]
+    VAL --> S3["sig ledger: within-bucket t against the threshold<br/>of the study's own 42 tests (t >= 3.24)"]
+    VAL --> S4["evidence: verdict ITERATE or PROMOTE"]
+    VAL --> S5["promote; and 95% stationary-bootstrap interval<br/>of net P&L at 1x costs above zero"]
+    S1 --> REP["POWER_REPORT.md + POWER_REPORT.json<br/>detection rate per effect, scenario and level"]
+    S2 --> REP
+    S3 --> REP
+    S4 --> REP
+    S5 --> REP
+    REP --> READ["committed result:<br/>order flow flagged in 3 of 3 seeds at level 1, 1 of 3 at level 0.5<br/>lead-lag flagged in 0 of 3 at level 1, 1 of 3 at level 2<br/>break rows: 0 everywhere · PROMOTE: 0 in every cell<br/>no P&L interval above zero in any cell"]
+    OFF["the planted block is OFF by default: the pinned dataset is<br/>byte-identical with or without it; the study never touches<br/>data/ or the research ledger"] -.-> GEN
+    LIM["3 seeds per cell: a rate moves in steps of 0.33 —<br/>this calibrates the chain, it is not a power curve"] -.-> READ

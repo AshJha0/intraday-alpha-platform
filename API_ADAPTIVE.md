@@ -180,6 +180,22 @@ the signal rows and the rolling IC at 5 pinned evaluation times (EQ01 on
 the golden EQ frame); every port that implements the gauge reproduces them
 at 1e-10.
 
+**Opt-in: two-sample HAC z (Python reference only, v1.3.0).** The pinned
+`z` above treats the baseline mean as a known constant and the live bucket
+ICs as independent and equally informative. `adaptive.ic_z_method = "hac"`
+(default `"pinned"`; `iap.adaptive.drift.rolling_ic_z_hac`) uses
+
+```
+z = (mean_w(live) - ic_mean) / sqrt(var_live + var_base)
+```
+
+where `mean_w` / `var_live` are the pair-count-weighted mean of the live
+bucket ICs and its Bartlett (Newey-West) variance, and `var_base` is the
+variance of the baseline mean (HAC from the baseline's own bucket series
+when the caller has it, else `ic_std² / n_buckets_baseline`). The golden,
+the Java port and the committed adaptive report use the pinned `z`; no
+port implements the HAC form.
+
 ## 5. Refit policies (configs/strategies/strategies.json `adaptive.policies`)
 
 All decisions are pure functions of `(now_ns, last_fit_ns, PSI values,
@@ -244,6 +260,22 @@ Every transition appends one sorted-key JSON line to
 Golden state sequence (breach, neutral-zone reset, retirement, recovery,
 re-activation, relapse): `expected_adaptive.json` → `"lifecycle"` —
 exact states and transitions.
+
+**Opt-in: CUSUM retirement (Python reference only, v1.3.0).** Consecutive
+readings of a rolling window share most of their rows, so N breaches in a
+row can be one bad stretch seen N times. `breach_rule = "cusum"` (default
+`"consecutive"`, the rule above and the one the Java port mirrors) with
+`cusum_k >= 0` and `cusum_h > 0` accumulates
+
+```
+S <- max(0, S + new_fraction * (watch_ic_gate - rolling_ic - cusum_k))
+```
+
+where `new_fraction` in (0, 1] is the share of the reading's window that
+is new since the last counted evaluation. `S` accumulates in ACTIVE and
+WATCH; `S >= cusum_h` in WATCH retires the alpha. Entering WATCH, recovery
+and re-activation are unchanged and reset `S`; uninformative readings move
+nothing. With the rule off no code path differs and `S` stays 0.
 
 **Promotion lifecycle (pointer).** The ACTIVE/WATCH/RETIRED rules above are
 the live sub-machine of the full seven-state promotion lifecycle

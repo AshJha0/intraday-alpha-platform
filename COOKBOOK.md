@@ -1,7 +1,7 @@
 # COOKBOOK — task-oriented recipes
 
 Every recipe below is runnable from a fresh checkout of this repository in
-the standard environment (Python 3.11 + pyarrow, g++ 13/CMake, Rust 1.95,
+the standard environment (Python 3.11 + pyarrow, g++ 13/CMake, Rust 1.98.1,
 Java 21; see [docs/BUILD_NOTES.md](docs/BUILD_NOTES.md)). Paths are relative
 to the repo root unless a recipe says otherwise. Recipes that read
 `data/features/` need recipes 1 and 3 to have run first (the repo ships with
@@ -35,6 +35,21 @@ Contents:
 24. [Explain an MVP order](#24-explain-an-mvp-order)
 25. [Bootstrap and inspect the alpha promotion lifecycle](#25-bootstrap-and-inspect-the-alpha-promotion-lifecycle)
 26. [Run one alpha as a contract-driven experiment](#26-run-one-alpha-as-a-contract-driven-experiment)
+27. [Run the planted-signal power study on a tiny grid](#27-run-the-planted-signal-power-study-on-a-tiny-grid)
+28. [Backtest with the cost-aware position policy and compare with the default](#28-backtest-with-the-cost-aware-position-policy-and-compare-with-the-default)
+29. [Judge an experiment against the ledger-derived t threshold](#29-judge-an-experiment-against-the-ledger-derived-t-threshold)
+30. [Run the recompute leakage probe](#30-run-the-recompute-leakage-probe)
+31. [Per-fold diagnostics with a bootstrap interval](#31-per-fold-diagnostics-with-a-bootstrap-interval)
+32. [Read experiments as JSON, and get machine-readable errors](#32-read-experiments-as-json-and-get-machine-readable-errors)
+33. [Query the store read-only, and see what a refused statement looks like](#33-query-the-store-read-only-and-see-what-a-refused-statement-looks-like)
+34. [Replay the risk edge golden in Python](#34-replay-the-risk-edge-golden-in-python)
+35. [Check whether a result is gate-eligible](#35-check-whether-a-result-is-gate-eligible)
+
+Recipes 27–35 were added with v1.3.0. Every command block in them was run
+as printed, from a clean checkout of the release, before it was written
+down; the quoted outputs are what those runs printed. Recipes that write
+anything write under `data/store/` (git-ignored), never into the committed
+ledger or `research/experiments/`.
 
 ---
 
@@ -191,12 +206,18 @@ rep = validate_alpha(lambda: build("EQ03"), frames, bt, meta,
 print({k: rep[k] for k in ("oos_ic", "oos_rank_ic", "nw_tstat",
                            "oos_hit_rate", "fold_sign_consistency",
                            "net_pnl_1x_cost", "verdict")})
-# EQ03 -> oos_ic 0.0256, nw_tstat 7.24, verdict ITERATE
+# EQ03 -> oos_ic 0.0299, nw_tstat 10.89, fold_sign_consistency 1.0,
+#         net_pnl_1x_cost -80532.25, verdict ITERATE
 EOF
 ```
 
-Compare against the committed `research/alpha_reports/EQ03.json` — the run
-is deterministic, so the numbers must match.
+Compare against the committed `research/alpha_reports/EQ03.json`: the run
+is deterministic, and the walk-forward statistics (IC, rank IC, t, hit rate,
+fold consistency, verdict) match it. The net P&L does not (the report says
+−70,651): the report's backtester runs under the pinned research execution
+model — `BacktestConfig(latency_ns=1 s, max_decision_age_ns=60 s,
+flatten_at_session_end=True)` — and this demo uses the default
+`BacktestConfig()`. Both are negative.
 
 ## 5. Run the full 24-alpha promotion report
 
@@ -219,8 +240,11 @@ python3 research/ml_reports/run_ml.py        # < 5 min budget; ~1 min typical
 ```
 
 This runs the gated comparison (linear baselines always; XGBoost/LightGBM/MLP
-only if the best linear OOS IC is positive) and writes
-`research/ml_reports/ML_REPORT.md`. Every fit is a tracked run:
+only if the best linear pooled OOS IC against the mid-to-mid label is
+positive — on the bundled data it is −0.0430, so the gate fails and they are
+skipped) and writes `research/ml_reports/ML_REPORT.md`. Every fit is a
+tracked run (the tree-model directories below are from earlier rounds, when
+the gate read a different label):
 
 ```bash
 python3 -m json.tool research/models/ledger.json | head
@@ -250,13 +274,16 @@ for row in cc["curve"]:            # predicted-prob bin vs observed frequency
 EOF
 ```
 
-Committed result: AUC 0.552, Brier 0.0683, test base rate of profitable
-signals 0.073; both τ = 0.5 and the calibration-chosen best τ = 0.300 keep
-**zero** trades — the calibrated gate declines every test signal, which at
-this base rate is the economically defensible call (the gate-off row in
-ML_REPORT.md shows −941.7 total net bps was left untraded). Thresholds are
-chosen on the calibration segment, economically (LEARN.md §7.3). The pinned
-meta model is `research/models/run_0021_metalabel_lightgbm/`.
+Committed result: primary `elasticnet`, AUC 0.753, Brier 0.0344, test base
+rate of profitable signals 0.037; both τ = 0.5 and the calibration-chosen
+best τ = 0.300 keep **zero** of the 11,461 test signals. The report flags
+this `gate_degenerate: true` and does not present it as an economic
+decision — a gate that never fires is no evidence either way (the gate-off
+row shows −2,281.9 total net bps for the ungated primary). Calibration here
+is Platt scaling, not isotonic: the calibration segment has 324 positives,
+below the pinned isotonic minimum of 500. Thresholds are chosen on the
+calibration segment, economically (LEARN.md §7.3). The latest meta-label
+run directory is `research/models/run_0033_metalabel_elasticnet/`.
 
 ## 8. Optimize a portfolio with the golden problem
 
@@ -520,12 +547,13 @@ bash tests/harness/run_all.sh --golden-only   # golden groups only (fast)
 ```
 
 Exit code 0 iff every language passed; logs land in a temp dir printed on
-the first line. A full-suite run (2026-09-20): python 1392 / cpp 289 /
-rust 313 / java 486 tests passed (golden groups 164/68/62/102), plus
+the first line. The v1.3.0 counts (CI, 2026-10-03): python 1562 / cpp 289 /
+rust 323 / java 510 tests passed (golden groups 166/68/64/104), plus
 `integration` (15) and `replay` (4) rows for the repo-level pytest suites, a
-`deployment` row (16 structural checks passed, 2 skipped for absent tools)
-and a `numbers` row (every headline figure re-derived from its artefact),
-all PASS.
+`deployment` row (25 structural checks passed in CI, where `promtool` and
+`kubeconform` are installed; a machine without them reports those checks as
+skipped) and a `numbers` row (every headline figure re-derived from its
+artefact), all PASS.
 
 ## 15. Generate the TCA report
 
@@ -813,7 +841,7 @@ synthetic equity `SYN.EQ.AAPL` and writes every artefact under
 ```bash
 cd python
 PYTHONPATH=src python3 -m iap.mvp run                       # configs/mvp/mvp.json, seed 12345
-# mvp run 58a10f2194a3c81c: events=16578 decisions=355 parents=66 children=105 fills=55 pnl=-22.676287 USD digest=d938eeae68c85a6c... out=.../data/mvp/58a10f2194a3c81c
+# mvp run 58a10f2194a3c81c: events=16578 decisions=355 parents=66 children=105 fills=55 pnl=-22.651183 USD digest=d938eeae68c85a6c... out=.../data/mvp/58a10f2194a3c81c
 PYTHONPATH=src python3 -m iap.mvp run --seed 7 --out /tmp/mvp7          # another seed, explicit directory
 PYTHONPATH=src python3 -m iap.mvp verify                                  # run twice from scratch, compare digest/report/stream
 cat ../data/mvp/58a10f2194a3c81c/report.md                                # the honest numbers (cost-negative)
@@ -943,7 +971,7 @@ the promotion report runs plus a holdout backtest, writes a typed
 ```bash
 cd python
 PYTHONPATH=src python3 -m iap.research run --alpha EQ03 --horizon 1s               # spec block, result table, VERDICT, the ledger note
-PYTHONPATH=src python3 -m iap.research run --alpha EQ03 --horizon 1s --dry-run     # compute without touching the ledger or disk
+PYTHONPATH=src python3 -m iap.research run --alpha EQ03 --horizon 1s --dry-run     # no experiment directory is written; the looks ARE debited in the ledger
 PYTHONPATH=src python3 -m iap.research run --alpha EQ06 --config n_folds=3 --config cost_multiplier=2.0   # a different configuration = a different id
 PYTHONPATH=src python3 -m iap.research list                                        # every research/experiments/<id>/ with alpha, horizon, verdict
 PYTHONPATH=src python3 -m iap.research show d7b554d0a3fa3b26                       # the spec and result documents
@@ -956,10 +984,412 @@ provenance and may legitimately move), and a rerun that reproduces
 *different* evidence under the same id is refused, not overwritten. An empty
 configuration reproduces the flagship report's protocol: the pinned-horizon
 result (EQ03 @ 5 s, `217fa0cb1d89a9c8`) equals
-`research/alpha_reports/EQ03.json` at 1e-9. Every run adds 21 looks to
-`research/experiments.json`, which is why the five committed experiments
-moved the denominator from 760 to 865 (`check_headline_numbers.py` reports
-the docs stale until they follow). The golden
+`research/alpha_reports/EQ03.json` at 1e-9. Every new configuration adds
+28 looks to `research/experiments.json` (`iap.research.LOOKS_PER_EXPERIMENT`;
+a rerun of an identical spec adds none), and since v1.3.0 a `--dry-run`
+debits them too — it evaluates and prints every statistic, so it is a look
+(`check_headline_numbers.py` reports the docs stale until they follow the
+ledger). Runs made since v1.3.0 also write `eligibility.json` beside the
+result (recipe 35); the five committed experiments predate it. To
+experiment without moving the committed ledger, point `--ledger` and
+`--out-dir` at scratch files, as recipe 29 does. The golden
 `tests/golden/expected_experiment_golden_frame.json` pins one spec / result
 pair over the golden equity vector.
+
+## 27. Run the planted-signal power study on a tiny grid
+
+The validation chain reports 0 PROMOTE on the bundled data. That is only
+informative if the chain can find an effect when one exists. The power
+study ([research/power/POWER_REPORT.md](research/power/POWER_REPORT.md),
+LEARN.md §23) plants effects of known size in the generator — informed
+order flow and an ETF lead-lag — and runs the real feature pipeline and
+`validate_alpha` on the result. The committed report is 4 levels × 3 seeds;
+this is the smallest grid that still has a null row, a planted row and a
+break row (three generator runs, a few minutes):
+
+```bash
+cd python
+PYTHONPATH=src python3 -m iap.research power --levels 0,1 --seeds 1 \
+  --power-out-dir ../data/store/power-tiny
+# (progress on stderr)
+# stable level 0 seed 850875211: lead_lag=REJECT, order_flow=REJECT
+# stable level 1 seed 850875211: lead_lag=ITERATE, order_flow=ITERATE
+# break level 1 seed 850875211: lead_lag=REJECT, order_flow=REJECT
+# wrote ../data/store/power-tiny/POWER_REPORT.md and .../POWER_REPORT.json
+```
+
+The detection table it prints for this grid:
+
+```
+| effect | alpha | scenario | level | runs | sig (within) | sig (pooled) | sig (ledger) | evidence | promote | P&L CI > 0 |
+| lead_lag | EQ10 | break | 1 | 1 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| lead_lag | EQ10 | stable | 0 | 1 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| lead_lag | EQ10 | stable | 1 | 1 | 0.00 | 0.00 | 0.00 | 1.00 | 0.00 | 0.00 |
+| order_flow | EQ04 | break | 1 | 1 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| order_flow | EQ04 | stable | 0 | 1 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| order_flow | EQ04 | stable | 1 | 1 | 1.00 | 1.00 | 1.00 | 1.00 | 0.00 | 0.00 |
+```
+
+Read it the way the report tells you to: level 0 is the false-positive row;
+`stable` rows are power; `break` rows plant an effect that reverses
+mid-sample. With one seed a rate is 0 or 1 — this run shows the mechanics,
+the committed three-seed report is the one to quote, and even that moves in
+steps of 0.33. Never pass `--power-out-dir research/power` unless you mean
+to replace the committed report; the study itself never touches `data/` or
+the research ledger. The reference effect is
+`research/power/generator_planted.json` (deliberately outside `configs/`,
+which is shipped to the pods).
+
+## 28. Backtest with the cost-aware position policy and compare with the default
+
+The default research backtest takes `sign(expected_return)` and re-decides
+on every row, so an alpha with a real but small signal trades constantly
+and pays the spread each time. The opt-in `cost_aware` policy
+(`BacktestConfig`, docs/RESEARCH_VALIDITY.md §1) enters only when the
+expected return exceeds the round-trip cost of that row, holds for the
+label horizon, and renews only above `hysteresis ×` that cost:
+
+```bash
+PYTHONPATH=python/src python3 - <<'EOF'
+import json
+from iap.alpha import load_params_file
+from iap.alpha.data import load_features
+from iap.backtest import Backtester, BacktestConfig, CostModel
+from iap.validation.metrics import HORIZONS_NS
+
+meta = {int(r["instrument_id"]): {"symbol": r["symbol"],
+        "asset_class": r["asset_class"], "tick_size": float(r["tick_size"]),
+        "lot_size": int(r["lot_size"]), "adv": float(r["adv"]),
+        "ref_price": float(r.get("ref_price", 1.0))}
+        for r in json.load(open("configs/instruments/instruments.json"))["instruments"]}
+frames = load_features("data/features")
+m = load_params_file("configs/strategies/alpha_params.json")["EQ03"]
+scores = m.score({i: frames[i] for i in m.universe(list(frames))})
+costs = CostModel.load("configs/execution/execution.json")
+
+for name, cfg in (
+    ("sign (default)", BacktestConfig()),
+    ("cost_aware", BacktestConfig(position_policy="cost_aware",
+                                  horizon_ns=HORIZONS_NS[m.horizon], hysteresis=0.5)),
+):
+    res = Backtester(costs, meta, cfg).run(frames=frames, scores=scores, asset_class="EQUITY")
+    print(f"{name:15s} trades={res.trade_count:6d} gross={res.gross_pnl:12.2f} "
+          f"costs={res.total_costs:12.2f} net={res.total_pnl:12.2f}")
+EOF
+# sign (default)  trades= 25418 gross=     4230.00 costs=   462874.94 net=  -458644.94
+# cost_aware      trades=     4 gross=      -10.00 costs=       60.34 net=      -70.34
+```
+
+The honest reading: the default policy loses 458,644.94 because it pays
+462,874.94 of costs to collect 4,230.00 of gross; the cost-aware policy
+loses almost nothing because it almost never trades — EQ03's fitted
+expected return clears its own round-trip cost on four rows in two
+sessions. That is not a profitable strategy found; it is the same finding
+(real signal, smaller than the spread) stated from the other side. Like
+recipe 11 this scores the full two-day frame, including the day the
+parameters were fitted on, so neither number is the report's OOS figure.
+`cost_aware` needs `horizon_ns`; the two neighbouring options are
+`cap_fills_at_l1=True` (no fill larger than the displayed L1 size) and
+`block_rows_column="label_valid_<h>"` (trade only the rows the IC is
+measured on).
+
+## 29. Judge an experiment against the ledger-derived t threshold
+
+The PROMOTE gate asks for a Newey–West t of 3.0. The ledger has always
+computed what the count of looks implies — a Bonferroni |t| — and no gate
+read it. `--tstat-threshold ledger` makes the gate
+`max(3.0, the ledger's Bonferroni |t|)`: it can only tighten. This runs on
+a scratch copy of the ledger so the committed one does not move:
+
+```bash
+mkdir -p data/store/scratch && cp research/experiments.json data/store/scratch/ledger.json
+cd python
+PYTHONPATH=src python3 -m iap.research --out-dir ../data/store/scratch/experiments run \
+  --alpha EQ03 --tstat-threshold ledger --ledger ../data/store/scratch/ledger.json
+PYTHONPATH=src python3 - <<'EOF'
+from iap.validation.ledger import ExperimentLedger
+from iap.validation.validate import GATES, effective_gates
+
+ledger = ExperimentLedger("../data/store/scratch/ledger.json")
+t = ledger.bonferroni_t_threshold()
+print("looks:", ledger.total_experiments, "bonferroni |t|:", round(t, 3))
+print("fixed  min_nw_tstat:", GATES["min_nw_tstat"])
+print("ledger min_nw_tstat:", round(effective_gates("ledger", t)["min_nw_tstat"], 3))
+EOF
+# ... NW t-stat  +10.4490 ... VERDICT: ITERATE
+# gate eligible: yes
+# looks: 1068 bonferroni |t|: 4.071
+# fixed  min_nw_tstat: 3.0
+# ledger min_nw_tstat: 4.071
+```
+
+EQ03 at its pinned horizon is the committed experiment `217fa0cb1d89a9c8`,
+so the run is a rerun and adds no looks; its t of 10.45 clears either
+threshold and the verdict stays ITERATE because the alpha loses money after
+costs, not because of significance. The policy matters for alphas whose t
+sits between 3.0 and 4.07. From Python the same switch is
+`validate_alpha(..., tstat_threshold="ledger", ledger_t_threshold=t)` and
+`ExperimentRunner(..., tstat_threshold="ledger")`; a new configuration is
+judged against the threshold the ledger will have once its own 28 looks are
+in it.
+
+## 30. Run the recompute leakage probe
+
+The truncation probe re-scores a model on truncated *feature frames*. It
+cannot see look-ahead that is already baked into the frame — a centred
+window, a full-sample normalisation. The recompute probe truncates the
+*raw events* instead: it rebuilds the features from an event prefix at a
+few anchors and requires the last row to equal the same row of the full
+run, bit for bit:
+
+```bash
+PYTHONPATH=python/src python3 - <<'EOF'
+from iap.alpha import load_params_file
+from iap.core.codec import read_jsonl
+from iap.validation.leakage import LeakageTester, engine_frame_builder
+
+events = read_jsonl("tests/golden/events_eq_mbo.jsonl")
+build = engine_frame_builder("configs")
+model = load_params_file("configs/strategies/alpha_params.json")["EQ01"]
+
+clean = LeakageTester().recompute_probe(model, events, build, n_probes=3)
+print("reference engine:", clean.ok, "anchors:", clean.n_anchors, "leaky:", clean.leaky_columns)
+
+def leaky_build(evs):                       # a feature built with look-ahead:
+    frames = build(evs)                     # normalised by the FULL-sample mean
+    for f in frames.values():
+        f["dev_demeaned"] = f["micro_mid_dev_bps_v1"] - f["micro_mid_dev_bps_v1"].mean()
+    return frames
+
+leaky = LeakageTester().recompute_probe(None, events, leaky_build, n_probes=3)
+print("leaky pipeline:  ", leaky.ok, "anchors:", leaky.n_anchors, "leaky:", leaky.leaky_columns)
+EOF
+# reference engine: True anchors: 3 leaky: []
+# leaky pipeline:   False anchors: 3 leaky: ['dev_demeaned']
+```
+
+The reference feature engine passes on the golden equity vector (and the
+model's score at each anchor is unchanged). The second pipeline adds one
+column demeaned by the mean of everything it was given; the frame probe
+would never notice, and the recompute probe names the column. Cost is one
+feature rebuild per anchor, which is why it is opt-in and not part of
+`LeakageTester.run`; pass `model=None` to probe the features alone.
+
+## 31. Per-fold diagnostics with a bootstrap interval
+
+`validate_alpha` computes cost survival, decay and the regime split on the
+last walk-forward fold only and reports net P&L as one number.
+`iap.validation.diagnostics` computes them for every fold and puts a
+stationary-bootstrap interval (Politis & Romano; SplitMix64, seeded) around
+the pooled net P&L. No gate reads it:
+
+```bash
+PYTHONPATH=python/src python3 - <<'EOF'
+import json
+from iap.alpha import build
+from iap.alpha.data import load_features
+from iap.backtest import Backtester, BacktestConfig, CostModel
+from iap.validation.diagnostics import fold_diagnostics, stationary_bootstrap_ci
+
+meta = {int(r["instrument_id"]): {"symbol": r["symbol"],
+        "asset_class": r["asset_class"], "tick_size": float(r["tick_size"]),
+        "lot_size": int(r["lot_size"]), "adv": float(r["adv"]),
+        "ref_price": float(r.get("ref_price", 1.0))}
+        for r in json.load(open("configs/instruments/instruments.json"))["instruments"]}
+frames = load_features("data/features")
+bt = Backtester(CostModel.load("configs/execution/execution.json"), meta, BacktestConfig())
+
+d = fold_diagnostics(lambda: build("EQ03"), frames, bt, seed=20260919, n_boot=300)
+for f in d["folds"]:
+    print("fold", f["fold"], "pairs", f["n_test_pairs"],
+          "net@1x", round(f["net_pnl_by_cost"]["x1"], 2),
+          "survives 1x:", f["survives_1x_cost"])
+print("folds surviving 1x cost:", d["n_folds_survive_1x_cost"], "of", d["n_folds_run"])
+b = d["net_pnl_bootstrap"]
+print("pooled net P&L:", round(d["net_pnl_1x_pooled"], 2),
+      "95% CI:", [round(b["ci_low"], 2), round(b["ci_high"], 2)],
+      "mean block:", b["mean_block"], "resamples:", b["n_boot"])
+
+# the bootstrap on its own: a seeded interval for the SUM of a dependent series
+print(stationary_bootstrap_ci([1.0, -2.0, 0.5, 3.0, -1.0, 0.25, 2.0, -0.5, 1.5, -0.75],
+                              seed=7, n_boot=200))
+EOF
+# fold 1 pairs 31051 net@1x -91247.84 survives 1x: False
+# fold 2 pairs 30719 net@1x -91610.0 survives 1x: False
+# fold 3 pairs 30844 net@1x -105783.64 survives 1x: False
+# fold 4 pairs 30839 net@1x -80532.25 survives 1x: False
+# folds surviving 1x cost: 0 of 4
+# pooled net P&L: -369173.73 95% CI: [-402903.18, -328360.83] mean block: 6.0 resamples: 300
+# {'estimate': 4.0, 'ci_low': -2.75, 'ci_high': 10.75, 'level': 0.95, 'n': 10, 'n_boot': 200, 'mean_block': 2.0, 'seed': 7, 'frac_resamples_le_zero': 0.175}
+```
+
+EQ03 loses money after costs in every fold, not only the last, and the
+whole interval is below zero: the negative result is not one unlucky fold.
+The interval is pinned by its seed — pass `ExperimentSpec.seed` and two
+runs agree to the last digit; `n_boot` defaults to 1,000 (300 here to keep
+the recipe quick).
+
+## 32. Read experiments as JSON, and get machine-readable errors
+
+For a script or a tool the research CLI prints one JSON document on stdout
+(`--json`) and, with the top-level `--json-errors`, exactly one JSON object
+on stderr per failure with a stable `code` (`iap.research.errors`):
+
+```bash
+cd python
+PYTHONPATH=src python3 -m iap.research list --json > ../data/store/experiments.json
+python3 -c "import json; d=json.load(open('../data/store/experiments.json')); print(len(d['experiments']), 'experiments,', len(d['skipped']), 'skipped'); print([(e['experiment_id'], e['spec']['alpha_id'], e['result']['verdict'], e['gate_eligibility']['gate_eligible']) for e in d['experiments']])"
+PYTHONPATH=src python3 -m iap.research show 217fa0cb1d89a9c8 --json | python3 -c "import json,sys; d=json.load(sys.stdin); print(sorted(d)); print(d['gate_eligibility'])"
+PYTHONPATH=src python3 -m iap.research --json-errors show 0000000000000000; echo "exit=$?"
+PYTHONPATH=src python3 -m iap.research --json-errors run --horizon 1s; echo "exit=$?"
+# 5 experiments, 0 skipped
+# [('217fa0cb1d89a9c8', 'EQ03', 'ITERATE', True), ('4a2900e4a6705542', 'EQ06', 'ITERATE', True), ('c73bb6294d226163', 'EQ01', 'ITERATE', True), ('d0dd1ab0711d33a1', 'EQ06', 'ITERATE', True), ('d7b554d0a3fa3b26', 'EQ03', 'ITERATE', True)]
+# ['experiment_id', 'gate_eligibility', 'result', 'spec']
+# {'gate_eligible': True, 'periods_verified': False, 'reasons': []}
+# {"error": {"code": "experiment_not_found", "message": ".../research/experiments/0000000000000000: no such experiment"}}
+# exit=1
+# {"error": {"code": "usage_error", "message": "the following arguments are required: --alpha"}}
+# exit=2
+```
+
+`list --json` is `{"experiments": [...], "skipped": [...]}`: a directory
+that cannot be loaded (half-written, corrupt) is named in `skipped` with
+the reason instead of failing the listing. `periods_verified: false` on the
+committed experiments is honest: they predate the `eligibility.json`
+sidecar, so only their configuration bounds can be checked (recipe 35).
+Usage errors exit 2, everything else 1. Both commands only read.
+
+## 33. Query the store read-only, and see what a refused statement looks like
+
+`python -m iap.store sql` opens the SQLite file read-only and takes exactly
+one statement, so it is safe to hand to a tool — the index can only change
+through `build`:
+
+```bash
+cd python
+PYTHONPATH=src python3 -m iap.store build > /dev/null
+PYTHONPATH=src python3 -m iap.store sql "SELECT current_state, COUNT(*) AS n FROM v_alpha_scorecard GROUP BY current_state ORDER BY current_state"
+PYTHONPATH=src python3 -m iap.store sql "SELECT verdict, COUNT(*) AS n FROM v_alpha_scorecard GROUP BY verdict ORDER BY verdict"
+PYTHONPATH=src python3 -m iap.store sql "DELETE FROM alphas"; echo "exit=$?"
+PYTHONPATH=src python3 -m iap.store sql "SELECT 1; SELECT 2"; echo "exit=$?"
+PYTHONPATH=src python3 -m iap.store sql "SELECT * FROM no_such_table"; echo "exit=$?"
+# {"current_state":"CANDIDATE","n":24}
+# {"n":11,"verdict":"ITERATE"}
+# {"n":13,"verdict":"REJECT"}
+# error: attempt to write a readonly database (the store is opened read-only; use `build` to rebuild it)
+# exit=1
+# error: `sql` runs exactly one statement; several were given (You can only execute one statement at a time.)
+# exit=1
+# error: no such table: no_such_table
+# exit=1
+```
+
+The first two rows are the platform's headline result as a query: every
+alpha at CANDIDATE, none promoted. The three failures are the three ways a
+statement is refused: a write (with the rebuild hint, which is printed only
+for a write), several statements (refused rather than half-run), and a
+plain SQL error (the engine's own message, no hint). Add `--db <file>` to
+query an MVP run's store (recipe 24).
+
+## 34. Replay the risk edge golden in Python
+
+The main risk golden drives one engine through one script. The edge golden
+(`tests/golden/expected_risk_edge_decisions.json`, v1.3.0) is eight
+independent scenarios, each with its own engine, that reach what one script
+cannot: a venue kill and a venue-0 (SOR) order, kill commands that do not
+parse, every venue disconnected, a mark stamped in the future, timestamp
+and position overflow, unvaluable exposure, a missing config key, bootstrap
+and restore. Rust, Java and Python must reproduce every decision and the
+concatenated audit log byte for byte:
+
+```bash
+cd python
+PYTHONPATH=src python3 -m pytest -q tests/test_risk_golden.py -k edge
+PYTHONPATH=src python3 - <<'EOF'
+import json, sys
+sys.path.insert(0, "tests")                        # the shared replay driver lives in the test module
+from test_risk_golden import replay_edge
+
+edge = json.load(open("../tests/golden/expected_risk_edge_decisions.json"))
+config = json.load(open("../configs/risk/risk.json"))
+audit = replay_edge(edge, config, check=True)       # raises on any decision mismatch
+want = open("../tests/golden/expected_risk_edge_audit.jsonl", encoding="utf-8", newline="").read()
+print("scenarios:", len(edge["scenarios"]), "audit lines:", len(audit.splitlines()),
+      "byte-identical:", audit == want)
+for line in audit.splitlines():
+    ev = json.loads(line)
+    if "fail-closed" in ev["reason"]:
+        print(ev["rule_id"], "|", ev["reason"])
+EOF
+# 2 passed, 7 deselected
+# scenarios: 8 audit lines: 50 byte-identical: True
+# MALFORMED_KILL | kill scope id "AAPL" is not a valid INSTRUMENT id: escalated to GLOBAL (fail-closed): ops halt by ticker
+# MALFORMED_KILL | kill scope id "-0" is not a valid VENUE id: nothing cleared (fail-closed): ops clear
+# MALFORMED_ORDER | timestamp arithmetic overflows i64 (fail-closed)
+# GROSS_NOTIONAL | position in instrument 2 has no mark price (fail-closed)
+# GROSS_NOTIONAL | open order 3 in instrument 2 has no mark price (fail-closed)
+# MALFORMED_ORDER | projected position overflows i64 (fail-closed)
+# KILL_SWITCH_ENGAGED | fill for order 7 overflows i64 position accounting (fail-closed)
+# CONFIG_MISSING | fail-closed: invalid argument: risk.json: missing/non-integer per_order.max_order_qty
+# CONFIG_MISSING | fail-closed: invalid argument: risk.json: missing/non-integer per_order.max_order_qty
+# NOT_BOOTSTRAPPED | positions not bootstrapped (fail-closed)
+```
+
+The other two engines replay the same file: `cd rust && cargo test -p risk
+--test golden_risk` and Java `RiskGoldenTest` (recipe 9). To add a scenario,
+edit `python/tools/make_golden_risk_edge.py` and regenerate
+(`PYTHONPATH=python/src python3 python/tools/make_golden_risk_edge.py` from
+the repo root) — a deliberate `golden:` commit with a MIGRATIONS entry,
+after which all three engines must match again. LEARN.md §21 walks
+through the four bugs these scenarios pin.
+
+## 35. Check whether a result is gate-eligible
+
+Any valid specification can be run, and its looks are ledgered. Only a
+result produced under the pinned protocol or something stricter is
+promotion evidence: `cost_multiplier >= 1.0`, `latency_ns >= 1 s`,
+`embargo_ns >= 60 s`, `n_folds >= 4`, `max_decision_age_ns <= 60 s`,
+session flattening on, and periods equal to the ones derived from the
+dataset's session calendar. Halving the costs, or choosing the holdout by
+hand, still runs — and is marked:
+
+```bash
+PYTHONPATH=python/src python3 - <<'EOF'
+from iap.alpha.data import load_features
+from iap.research import build_spec
+from iap.research.registry import ExperimentRegistry
+from iap.research.specs import gate_eligibility
+
+frames = load_features("data/features")
+
+pinned = build_spec("EQ03", frames=frames)                       # the pinned protocol
+print(pinned.experiment_id, gate_eligibility(pinned, frames))
+
+cheap = build_spec("EQ03", configuration={"cost_multiplier": 0.5, "n_folds": 2},
+                   frames=frames)                                # valid, runnable, NOT evidence
+e = gate_eligibility(cheap, frames)
+print(cheap.experiment_id, "eligible:", e.eligible)
+for reason in e.reasons:
+    print("  -", reason)
+
+# a persisted run: the sidecar if the runner wrote one, else configuration bounds only
+print(ExperimentRegistry("research/experiments").gate_eligibility("217fa0cb1d89a9c8"))
+EOF
+# 217fa0cb1d89a9c8 GateEligibility(eligible=True, reasons=(), periods_verified=True)
+# 7cef8e3d4d520229 eligible: False
+#   - configuration.n_folds=2 is below the gate-eligible minimum 4
+#   - configuration.cost_multiplier=0.5 is below the gate-eligible minimum 1.0
+# GateEligibility(eligible=True, reasons=(), periods_verified=False)
+```
+
+The runner writes the determination to `eligibility.json` beside
+`result.json`, `python -m iap.research run` prints it (`gate eligible: yes`
+or `NO` with the reasons), and `show --json` / `list --json` carry it
+(recipe 32). In the lifecycle, `Evidence(research_gate_eligible=False)`
+makes every gate that reads the research block fail with a null value,
+exactly as if the number were missing; the flag is serialised only when
+false, so the committed evidence and the lifecycle golden are unchanged.
+The Java and Rust lifecycle ports do not read the key and reject a document
+that carries it. LEARN.md §24 explains which ways of gaming the gate this
+closes.
 

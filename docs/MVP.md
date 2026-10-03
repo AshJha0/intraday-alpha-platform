@@ -123,7 +123,7 @@ that implements it and the evidence that it runs.
 | optimizer `INFEASIBLE` holds the previous weights, never NaN; the platform keeps the position | `portfolio.SingleStockPortfolio.construct` (`w = w_prev`, `round_half_away`) | `report.portfolio.infeasible_solves` (0 on the golden run; `test_mvp.py` exercises the branch) |
 | SOR before risk (participation measured on the routed venue, the risk engine sees the real venue); NO_ROUTE never reaches risk, is counted | `adapters.SorAdapter.route` (`sor_no_route`) → `RiskEngineAdapter.evaluate` | `report.routing.no_route` = 0; every `RiskDecision` references a routed child (`test_risk_decisions_reference_children_and_rejects_never_submit`) |
 | a REJECT is never submitted; every pre-trade decision is in the audit | `_issue_children` (`continue` on non-ALLOW); `risk_audit.jsonl` | `report.risk.audit_events` == `allowed + rejected` (checked in `build_report`) |
-| §12.1: `pnl.total == (grossPnl − spreadCost) − feesNet − impact`; risk daily P&L == gross − spread (1e-9 rel); risk position == account position — after EVERY fill and at session end | `MvpEngine.assert_pnl_identity` (called from `_process_reports` and `finish`), `report.pnl.identity_abs_diff` | 5.8e-12 on the golden run; `test_pnl_identity_holds` |
+| §12.1: `pnl.total == (grossPnl − spreadCost) − feesNet − impact`; risk daily P&L == gross − spread (1e-9 rel); risk position == account position — after EVERY fill and at session end | `MvpEngine.assert_pnl_identity` (called from `_process_reports` and `finish`), `report.pnl.identity_abs_diff` | 3.3e-11 on the golden run; `test_pnl_identity_holds` |
 | qty unit: equity qty in shares, `qty_unit` 1.0, no second `lot_size` application | `InstrumentSpec(..., 1.0, ...)` in `MvpEngine.__init__`; `instrument_refs_from_reference_data` for the risk engine | the identity above would break otherwise |
 | no wall clock, no unordered iteration, integer prices on every contract | every module (§5 audit) | `verify` / `replay` reproduce the digest |
 
@@ -234,7 +234,7 @@ possible.
 ## 7. Honest results of the golden run (seed 12345, `report.md`)
 
 Run id `58a10f2194a3c81c`, 16,578 events, 355 decisions, 66 parent orders,
-212 children generated / 105 submitted, 55 fills, fill rate 20.5 %.
+212 children generated / 105 submitted, 55 fills, fill rate 20.2 %.
 Trace digest `d938eeae68c85a6c2acaf7fb3f7d1333f29c3ad8e036fb5af7a4d1b48c9ea2cc`.
 Wall time ≈ 7 s (1 s feed generation + normalisation, 6 s loop) on the CI box.
 
@@ -242,15 +242,15 @@ Wall time ≈ 7 s (1 s feed generation + normalisation, 6 s loop) on the CI box.
 |---|---:|
 | total (`risk daily − fees_net − impact`) | **−22.65** |
 | risk daily (realized −14.34 + unrealized −1.30) | −15.64 |
-| gross (mark-to-market) | +6.54 |
-| spread cost | 22.18 |
-| fees net (7.52 taker fees − 0.50 maker rebates) | 7.02 |
+| gross (mark-to-market) | +6.70 |
+| spread cost | 22.34 |
+| fees net (7.44 taker fees − 0.45 maker rebates) | 6.99 |
 | impact | 0.02 |
-| identity \|risk daily − (gross − spread)\| | 5.8e-12 |
+| identity \|risk daily − (gross − spread)\| | 3.3e-11 |
 
 **The session is cost-negative.** The alpha contribution is +0.039 bps of
-filled notional against −0.40 bps of execution cost (net −0.36 bps ≈ −22.7
-USD on 3,176 shares × 190 USD): the fitted expected returns are
+filled notional against −0.41 bps of execution cost (net −0.37 bps, about
+22 USD on 3,126 shares × 190 USD): the fitted expected returns are
 0.001–0.05 bp per decision while crossing a 1-tick spread on a 190 USD
 stock costs ~0.5 bp. This is the same picture the research reports give
 (every alpha fails `net_pnl_after_costs` at 1× costs) and the report
@@ -337,12 +337,12 @@ audited on 2026-09-20; the outcome, in order of evidence:
    2026-09-20) and the lifecycle records `NO_EVIDENCE`: an undefined
    statistic is never written as `0.0` into an artefact a gate reads.
 
-Execution: IS qty-weighted +0.106 bps (delay 0, trading +0.079, opportunity
-+0.026); spread +0.088, impact −0.013 (passive fills captured spread), fees
-+0.024, timing +0.004; slippage vs arrival +0.39 bps (fill-weighted). Per
-algo: TWAP 31 orders / 3.4 % filled (passive limits at a 1 s horizon mostly
-expire: 50 expired children), POV 20 / 13.9 %, IS 15 / 69.1 %. Routing:
-XV3 74.7 %, XV1 13.5 %, XV2 11.7 % of filled qty (aggressive routing picks
+Execution: IS qty-weighted +0.106 bps (delay 0, trading +0.080, opportunity
++0.026); spread +0.079, impact −0.003 (passive fills captured spread), fees
++0.024, timing +0.004; slippage vs arrival +0.40 bps (fill-weighted). Per
+algo: TWAP 31 orders / 3.0 % filled (passive limits at a 1 s horizon mostly
+expire: 51 expired children), POV 20 / 13.9 %, IS 15 / 68.9 %. Routing:
+XV3 75.9 %, XV1 12.1 %, XV2 11.9 % of filled qty (aggressive routing picks
 the cheapest taker fee on price ties; passive routing prefers XV1's rebate).
 Controls: 107 children blocked by `min_slice_interval_ns` (POV children on
 consecutive prints, and a new parent's first slice inside 500 ms of the
@@ -372,7 +372,7 @@ were flat (target == position + in-flight).
 | TCA per parent (Perold identities as contract invariants) | done | `TcaAdapter`; `report.execution` |
 | Attribution per decision, residual reported | done | `engine._finalise`; `report.execution.attribution_residual_bps_mean` |
 | Decision trace: one validated `DecisionTrace` per decision, JSONL + SQLite, digest; `explain` distinguishes the acting signal from its components in all four languages | done | `traces.jsonl`, `iap.sqlite`; `test_mvp.py::test_store_row_counts_equal_trace_stage_counts`, `::test_signal_stage_is_ensemble_first_then_components`; `python/tests/test_contracts.py::test_explain_labels_the_acting_signal_and_its_components` + the Java / Rust / C++ twins |
-| §12.1 money identity, after every fill | done | `MvpEngine.assert_pnl_identity` (from `_process_reports` and `finish`); `report.pnl.identity_abs_diff` 5.8e-12 |
+| §12.1 money identity, after every fill | done | `MvpEngine.assert_pnl_identity` (from `_process_reports` and `finish`); `report.pnl.identity_abs_diff` 3.3e-11 |
 | Realized IC = the research label definition; leakage probes | done | `MvpEngine.realized_ic` over `iap.labels.compute_labels`; `test_mvp.py::test_realized_ic_is_pinned_to_the_research_label_definition`, `::test_realized_returns_agree_with_the_tca_timeline`, `::test_shift_by_one_and_truncation_leakage_probes`; `test_mvp_golden.py::test_golden_pins_the_honest_numbers`; §7.1 |
 | Determinism: run twice ⇒ identical bytes; replay from capture ⇒ same digest | done | `python -m iap.mvp verify` / `replay`; `tests/replay/test_mvp_replay_determinism.py`; `test_mvp_golden.py` |
 | Lifecycle: paper evidence for the CANDIDATE alphas, registry untouched | done | `paper_evidence.json`; `test_mvp.py::test_paper_evidence_and_report_are_consistent` |

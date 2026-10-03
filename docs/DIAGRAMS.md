@@ -43,8 +43,8 @@ flowchart TD
 ## 2. Cross-language golden-test topology
 
 How one validated Python reference pins four implementations. The parity table is
-printed by `tests/harness/run_all.sh` (python 1392 · cpp 289 · rust 313 · java 486
-tests; 164/68/62/102 in the golden groups — the Java gate runs all thirteen
+printed by `tests/harness/run_all.sh` (python 1562 · cpp 289 · rust 323 · java 510
+tests; 166/68/64/104 in the golden groups — the Java gate runs all thirteen
 `*GoldenTest` classes, the Rust gate nine golden targets). Two goldens are
 owned by a port language and consumed by Python as well: the fills golden
 (C++) by `iap.execution`, the risk goldens (Rust) by `iap.risk`.
@@ -60,10 +60,10 @@ flowchart LR
     MG --> EXP[("expected_*.json<br/>codec sha256 | book states | features<br/>alpha | backtest | risk decisions + audit + snapshot<br/>replay fills | portfolio | tca (+ timeline cases) | adaptive<br/>contracts examples | canonical json + trace digest<br/>lifecycle | experiment golden frame | mvp")]
     CPPTOOL["cpp/tools/make_replay_fills_golden<br/>(C++ is the fills reference;<br/>Python iap.execution consumes it too)"] --> EXP
     RSTOOL["rust/risk/src/bin/make_risk_golden<br/>(Rust is the risk reference;<br/>Python iap.risk consumes it too)"] --> EXP
-    GV --> PY["python: pytest -k golden<br/>164 tests"]
+    GV --> PY["python: pytest -k golden<br/>166 tests"]
     GV --> CPP["cpp: ctest -R Golden<br/>68 tests"]
-    GV --> RS["rust: 9 golden test targets<br/>62 tests"]
-    GV --> JV["java: all thirteen *GoldenTest (JUnitCore)<br/>102 golden-group tests"]
+    GV --> RS["rust: 9 golden test targets<br/>64 tests"]
+    GV --> JV["java: all thirteen *GoldenTest (JUnitCore)<br/>104 golden-group tests"]
     EXP --> PY
     EXP --> CPP
     EXP --> RS
@@ -174,6 +174,8 @@ flowchart LR
 The pinned check order shared by the Rust reference, the Java port and the Python
 reference port (`iap.risk`, proven by the same goldens). Any missing or malformed
 limit configuration rejects (CONFIG_MISSING) — the engine never "fails open."
+This is the overview; diagram 11 places the fail-closed branches added in v1.3.0
+(future-stamped marks, NaN, overflow, venue-0 orders) in the same order.
 
 ```mermaid
 flowchart TD
@@ -211,16 +213,20 @@ flowchart TD
 The deterministic rule set (C++ reference headers `cpp/include/iap/execution/*.hpp`,
 mirrored by Java and by the Python reference port `iap.execution`, which reproduces
 `expected_replay_fills.json` bit for bit) that decides when a resting passive order
-fills during replay.
+fills during replay. The v1.3.0 corrections are in the labels: only events the
+book applied are tracked, an execute is capped at the book order's remaining size,
+a cancel advances us only when the cancelled order is known to be ahead, and a
+crossing display is bounded by what has not already been consumed. Diagram 12
+shows the same rules as one event's processing order.
 
 ```mermaid
 flowchart TD
-    SUB["Child LIMIT order submitted<br/>arrival = decision_ts + fixed latency + seeded jitter (one draw)"] --> JOIN["Join level at price p:<br/>ahead_qty = displayed depth at p on arrival"]
-    JOIN --> OBS{"next market event at level p"}
-    OBS -->|"EXECUTE qty q ahead"| DEC1["ahead_qty -= q<br/>(leftover after ahead exhausted fills US)"]
-    OBS -->|"CANCEL qty q ahead"| DEC2["ahead_qty -= q"]
+    SUB["Child LIMIT order submitted<br/>arrival = decision_ts + fixed latency + seeded jitter (one draw)"] --> JOIN["Join level at price p:<br/>ahead_qty = displayed depth at p on arrival<br/>+ our own earlier orders resting there"]
+    JOIN --> OBS{"next market event at level p<br/>that the book APPLIED"}
+    OBS -->|"EXECUTE: q = min(event qty,<br/>the book order's remaining)"| DEC1["ahead_qty -= q<br/>(leftover after ahead exhausted fills US,<br/>one pool per trade, shared in queue order)"]
+    OBS -->|"CANCEL of an order known<br/>to be ahead of us"| DEC2["ahead_qty -= displayed size<br/>the book removed"]
     OBS -->|"marketable ADD consumes level"| DEC3["treated like EXECUTE volume<br/>(marketable-ADD expansion)"]
-    OBS -->|"trade-through: opposite side<br/>crosses our price"| FILL["FILL (maker) at our price<br/>+ rebate - none of the spread"]
+    OBS -->|"trade-through, or the display crosses our price:<br/>bounded by the traded volume / by displayed minus consumed"| FILL["FILL (maker) at our price<br/>+ rebate - none of the spread"]
     DEC1 --> CHK{"ahead_qty <= 0 and<br/>incoming volume remains?"}
     DEC2 --> OBS
     DEC3 --> OBS
@@ -230,7 +236,8 @@ flowchart TD
     CROSS["crossing exemption: displayed liquidity a<br/>marketable limit already consumed is not<br/>double-counted against ahead_qty"] -.-> DEC3
     GATE["venue gate (rule 8): book missing / stale / not TRADING<br/>=> no fill of any kind; MARKET/IOC/FOK cancelled VENUE_NOT_TRADING,<br/>LIMIT rests; re-open fills crossed resting orders at the touch"] -.-> OBS
     TIF["cancel (rule 7): same latency path, effective at<br/>max(cancel arrival, order arrival); expire_ts = parent end_ts<br/>expires pending or resting before activation"] -.-> OBS
-    OVL["overlay (rule 3b): displayed liquidity our earlier child<br/>consumed is not re-used by a later child"] -.-> SUB
+    OVL["overlay (rule 3b): displayed liquidity an earlier child<br/>or the crossing check consumed is not re-used"] -.-> SUB
+    BEHIND["a cancel from an order that joined after us, or with a<br/>synthetic QUOTE / SNAPSHOT id, does not advance us;<br/>an event the book dropped moves nobody (diagram 12)"] -.-> OBS
 ```
 
 ## 7. Platform data model (`schemas/sql/iap_v1.sql`)
@@ -605,14 +612,430 @@ flowchart TD
     SIM -. "next event" .-> SIM
 ```
 
-## 11. Where to go deeper
+## 11. Hard-risk fail-closed branches (v1.3.0)
+
+Diagram 5 with the branches the 2026-10-03 review added, each marked NEW and
+placed where it sits in the pinned check order. All of them reuse existing rule
+ids, so the order itself and the main risk golden did not move; the reason
+strings are the ones the engines emit (API_TRADING.md §1.4). The right-hand
+flow is the fill path: a fill that cannot be booked latches the GLOBAL kill.
+Source: [`diagrams/risk_fail_closed_branches.mmd`](diagrams/risk_fail_closed_branches.mmd).
+
+```mermaid
+flowchart TD
+    %% Hard risk engine, v1.3.0 (2026-10-03): where the fail-closed branches added by the
+    %% review sit in the pinned check order (PLATFORM_CONVENTIONS.md 11.1). Every NEW branch
+    %% reuses an existing rule id, so the check order and the main risk golden are unchanged.
+    OR["OrderRequest"] --> C0{"0 config parsed, reference data valid,<br/>positions bootstrapped?"}
+    C0 -- no --> R0["REJECT CONFIG_MISSING / NOT_BOOTSTRAPPED<br/>NEW: an invalid InstrumentRef (NaN, infinite or<br/>non-positive tick_size / qty_unit) lands the whole engine here"]
+    C0 -- yes --> C4{"1-4 kill switches:<br/>global, strategy, instrument, venue"}
+    C4 -->|"engaged for this order's scope"| R4["REJECT KILL_GLOBAL / KILL_STRATEGY /<br/>KILL_INSTRUMENT / KILL_VENUE"]
+    C4 -->|"venue 0 (route via SOR) and ANY venue kill engaged"| R4V["REJECT KILL_VENUE — NEW<br/>venue 0 (SOR) order rejected:<br/>venue N kill switch engaged"]
+    C4 -->|"clear"| C7{"5-7 malformed order, unknown instrument,<br/>duplicate order id"}
+    C7 -->|"fails"| R7["REJECT MALFORMED_ORDER / UNKNOWN_INSTRUMENT /<br/>DUPLICATE_ORDER_ID"]
+    C7 -->|"duplicate-window arithmetic leaves i64"| RTS["REJECT MALFORMED_ORDER — NEW<br/>timestamp arithmetic overflows i64 (fail-closed)"]
+    C7 -->|"ok"| C8{"8 venue connectivity"}
+    C8 -->|"the named venue is down"| R8["REJECT VENUE_DISCONNECTED"]
+    C8 -->|"venue 0 and EVERY known venue is down"| R8V["REJECT VENUE_DISCONNECTED — NEW<br/>venue 0 (SOR) order rejected:<br/>every known venue is disconnected"]
+    C8 -->|"ok"| C10{"9-10 sequence gap, reference price"}
+    C10 -->|"gap, no mark, bid + ask leaves i64 (NEW),<br/>or mark older than the stale timeout"| R10["REJECT SEQUENCE_GAP / STALE_PRICE"]
+    C10 -->|"mark stamped beyond event clock + stale timeout"| R10F["REJECT STALE_PRICE — NEW<br/>reference price timestamp is more than the timeout<br/>ahead of the latest order event time"]
+    C10 -->|"mark age leaves i64"| RTS
+    C10 -->|"ok"| C12{"11-14 fat-finger qty, conversion rate,<br/>fat-finger notional, price band"}
+    C12 -->|"rate missing, stale, or stamped beyond<br/>event clock + stale timeout (NEW)"| R12["REJECT FX_RATE_MISSING"]
+    C12 -->|"rate age leaves i64"| RTS
+    C12 -->|"limit breached, or the float is NaN (NEW)"| R13["REJECT FAT_FINGER_QTY / FAT_FINGER_NOTIONAL /<br/>PRICE_BAND"]
+    C12 -->|"ok"| C15{"15-16 order-rate throttle, self-match"}
+    C15 -->|"elapsed time leaves i64"| RTS
+    C15 -->|"no token, tokens NaN (NEW), or would cross"| R15["REJECT RATE_THROTTLE / SELF_MATCH"]
+    C15 -->|"ok"| C17{"17 worst-case position projection:<br/>position + open orders + qty"}
+    C17 -->|"leaves the symmetric i64 domain"| R17O["REJECT MALFORMED_ORDER — NEW<br/>projected position overflows i64 (fail-closed)"]
+    C17 -->|"over max_position_qty"| R17["REJECT POSITION_LIMIT"]
+    C17 -->|"ok"| C22{"18-22 instrument, gross and net notional,<br/>daily and strategy loss"}
+    C22 -->|"breached, unvaluable, or NaN (NEW)"| R22["REJECT INSTRUMENT_NOTIONAL / GROSS_NOTIONAL /<br/>NET_NOTIONAL / DAILY_LOSS / STRATEGY_LOSS"]
+    C22 -->|"ok"| ALLOW["ALLOW<br/>order tracked open until on_order_done or a full fill"]
+    FILL["on_fill"] --> FO{"would the strategy lot or the aggregate position<br/>leave the symmetric i64 domain?"}
+    FO -->|"yes — NEW"| KG["nothing is booked, on_fill returns false,<br/>the GLOBAL kill latches<br/>audit: KILL_SWITCH_ENGAGED"]
+    FO -->|"no"| BOOKED["book the fill, re-evaluate the loss limits"]
+    KG -.-> C4
+    CLK["event clock = the later of this order's timestamp<br/>and the newest primed throttle-bucket time"] -.-> C10
+    CLK -.-> C12
+    PIN["pinned by tests/golden/expected_risk_edge_decisions.json + _audit.jsonl<br/>(Rust, Java, Python: exact decisions, byte-identical audit);<br/>NaN, invalid reference data and the future-stamped rate<br/>by per-language rule tests only"] -.-> ALLOW
+```
+
+## 12. Execution simulator: one event, fills and queue state (v1.3.0)
+
+The processing order of one market event (rule 9 of
+`cpp/include/iap/execution/execution.hpp`) after the two liquidity-fabrication
+fixes: queue tracking runs after the book update and only for an event the book
+applied, and the crossing pool is displayed size minus what the overlay already
+consumed. The dotted note at the bottom is what the code did before
+(API_TRADING.md §2.4, LEARN.md §22).
+Source: [`diagrams/simulator_fill_flow.mmd`](diagrams/simulator_fill_flow.mmd).
+
+```mermaid
+flowchart TD
+    %% Execution simulator, one market event (rule 9 processing order after v1.3.0).
+    %% C++ reference cpp/include/iap/execution/execution.hpp; Java and Python ports.
+    EV["MarketEvent for one instrument and venue"] --> EXP["1 expiries due at the event time"]
+    EXP --> ACT["2 activations and cancel arrivals, merged by time<br/>aggressive orders walk displayed MINUS consumed depth<br/>and debit the overlay (rule 3b)"]
+    ACT --> PRE["3 capture the pre-event state:<br/>opposite depth (for an ADD), the book order an EXECUTE names,<br/>displayed size at our levels (for a CANCEL or MODIFY)"]
+    PRE --> APPLY{"book.apply(event)"}
+    APPLY -->|"DROPPED or HELD:<br/>duplicate sequence, unknown order id, stale book"| NOTRACK["no queue tracking —<br/>the event trades nothing and moves nobody"]
+    APPLY -->|"APPLIED"| KIND{"event type"}
+    KIND -->|"EXECUTE"| EXE["traded = min(event qty, the book order's remaining)<br/>at the BOOK order's side and price,<br/>whatever the event quotes"]
+    KIND -->|"marketable ADD"| MADD["expand into the volume it consumes per level<br/>of the pre-event opposite depth — each level its own pool"]
+    EXE --> POOL["one pool per observed trade, shared in queue order<br/>(arrival_ts, then order_id): pay down ahead_qty first,<br/>then fill from what is left — never more than traded"]
+    MADD --> POOL
+    KIND -->|"CANCEL"| CAN{"is the cancelled order<br/>known to be ahead of us?"}
+    CAN -->|"real order id that did not join the level after we did"| ADV["ahead_qty -= displayed size the book removed<br/>(floored at 0) — a cancel never fills us"]
+    CAN -->|"joined after us, was re-queued by a size increase,<br/>or carries a synthetic QUOTE / SNAPSHOT id"| STAY["ahead_qty unchanged"]
+    KIND -->|"ADD at our level, or MODIFY that grows<br/>an order at our level (real id)"| BEH["remember the id as BEHIND us"]
+    POOL --> OVR
+    ADV --> OVR
+    STAY --> OVR
+    BEH --> OVR
+    NOTRACK --> OVR["4 overlay reset: for each level whose displayed size changed,<br/>consumed = min(consumed, new displayed size)"]
+    OVR --> CROSS{"5 does the opposite best cross a resting order's limit<br/>(rule 4), or did the venue just re-open (rule 8)?"}
+    CROSS -- no --> DONE["next event"]
+    CROSS -- yes --> CP["pool = displayed size of the crossing level<br/>MINUS what the overlay already consumed"]
+    CP --> CF["share the pool in queue order (ahead_qty first),<br/>then DEBIT the overlay with what was used —<br/>an unchanged display is consumed once, not once per event"]
+    CF --> DONE
+    GATE["venue gate (rule 8): book missing, stale or not TRADING<br/>means no fill of any kind"] -.-> POOL
+    GATE -.-> CP
+    WAS["before v1.3.0: tracking ran on the raw event before apply,<br/>a cancel subtracted its full quoted qty,<br/>and the crossing pool was rebuilt from the display on every event"] -.-> NOTRACK
+```
+
+## 13. Paper platform: checkpoint commit point and resume (v1.3.0)
+
+How the Java paper platform makes a checkpoint of two files atomic, and what
+`--resume` does with whatever a crash left behind
+(`com.iap.platform.SessionStore.commitCheckpoint` /
+`readCommittedRiskSnapshot`; PLATFORM_CONVENTIONS.md §12.3, LEARN.md §25). The
+last block is the stop path: the shutdown hook raises a flag and the trading
+thread writes the checkpoint.
+Source: [`diagrams/paper_checkpoint_commit.mmd`](diagrams/paper_checkpoint_commit.mmd).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant TT as Trading thread<br/>(the only writer)
+    participant SS as SessionStore
+    participant FS as State directory
+    participant RK as RiskEngine
+
+    Note over TT,FS: CHECKPOINT — every 1024 events, at session end, on a stop request
+    TT->>SS: append audit and trace lines, fsync
+    TT->>RK: snapshot()
+    RK-->>TT: risk snapshot bytes
+    TT->>SS: commitCheckpoint(state, snapshot)
+    SS->>FS: write risk_snapshot.json.next, fsync
+    Note over FS: a crash here leaves the previous state<br/>with the previous snapshot
+    SS->>FS: replace session_state.json carrying risk_snapshot_sha256 — THE COMMIT
+    Note over FS: a crash here leaves the new state<br/>and the new snapshot under its .next name
+    SS->>FS: rename risk_snapshot.json.next onto risk_snapshot.json
+
+    Note over TT,RK: RESUME (--resume)
+    TT->>SS: read session_state.json
+    SS->>FS: sha256 of risk_snapshot.json
+    alt the hash equals risk_snapshot_sha256
+        SS-->>TT: the committed snapshot
+    else risk_snapshot.json.next carries the committed hash
+        SS->>FS: roll forward — rename .next into place
+        SS-->>TT: the committed snapshot
+    else neither file matches
+        SS-->>TT: refuse to resume, both hashes named
+    end
+    TT->>RK: restore(limits, instruments, snapshot)
+    TT->>RK: onOrderDone for every open order of the snapshot
+    Note over RK: their simulator no longer exists —<br/>counted in risk_resume_open_orders_released_total
+    TT->>TT: seed the account from the restored positions (no second buy)
+    TT->>TT: continue at the persisted event cursor
+
+    Note over TT,FS: STOP — the shutdown hook only raises a flag and waits up to 10 s
+    TT->>TT: sees the flag at the next event boundary or pacing slice
+    TT->>SS: checkpoint as above, then end the session as STOPPED (state 4)
+```
+
+## 14. Admin kill switch: latch first, record second (v1.3.0)
+
+The path of `POST /admin/kill` through `com.iap.platform.AdminService`. The
+kill latches before the request waits for the trading thread, so the outcome of
+the wait changes only the response code — `200` applied, or `202` latched — never
+whether trading stops (PLATFORM_CONVENTIONS.md §12.5,
+`docs/runbooks/RUNBOOK_incident_kill_switch.md` §2).
+Source: [`diagrams/admin_kill_latch.mmd`](diagrams/admin_kill_latch.mmd).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Op as Operator
+    participant MX as MetricsServer<br/>(binds loopback unless IAP_BIND_ADDR)
+    participant AD as AdminService
+    participant TT as Trading thread
+    participant RK as RiskEngine
+    participant EX as ExecutionSimulator
+
+    Op->>MX: POST /admin/kill with scope, id, reason and a Bearer token
+    MX->>AD: handle(kill, token, params, remote address)
+    alt no token, or the token matches no operator
+        AD-->>Op: 401 or 403, audited — after 10 failures in a 60 s window, 429
+    else authenticated operator
+        AD->>AD: raise killPending BEFORE waiting
+        Note over TT: from this moment the order path sends no new order<br/>(exec_orders_blocked_kill_pending_total)
+        AD->>AD: queue the command, wait up to 5 s
+        alt the trading thread drains in time
+            TT->>AD: drain() — at an event boundary, before a pre-trade check,<br/>or between realtime pacing slices on a quiet feed
+            AD->>RK: engageKill(scope, id, current event time, reason)
+            AD->>EX: request a cancel for every working child order
+            AD-->>Op: 200 applied — the message says what was cancelled
+        else the wait expires
+            AD-->>Op: 202 kill latched — the command is never withdrawn
+            TT->>AD: drain() at the next opportunity
+            AD->>RK: engageKill(scope, id, current event time, reason)
+            AD->>EX: request a cancel for every working child order
+            AD->>AD: second audit line — applied after the request returned 202
+        end
+    end
+    Note over AD: every accepted call appends to admin_audit.jsonl —<br/>operator, remote address, token sha256, never the token
+    Note over Op,AD: clear, override and roll are withdrawn on timeout (503)<br/>only a kill stays queued
+```
+
+## 15. A research run: ledger lock, staged directory, eligibility (v1.3.0)
+
+One `python -m iap.research run`, from the request to the persisted evidence:
+where the ledger-derived threshold (opt-in) is read, where the looks are
+debited — a dry run included — how the experiment directory appears in one
+rename, and where gate eligibility is decided (PLATFORM_CONVENTIONS.md §13.6,
+docs/RESEARCH_VALIDITY.md §3–§4, LEARN.md §24).
+Source: [`diagrams/research_run_sequence.mmd`](diagrams/research_run_sequence.mmd).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor R as Researcher or tool
+    participant CLI as python -m iap.research run
+    participant RUN as ExperimentRunner
+    participant VAL as validate_alpha<br/>(purged, embargoed walk-forward)
+    participant LED as ExperimentLedger<br/>(research/experiments.json)
+    participant FS as research/experiments/
+
+    R->>CLI: run --alpha EQ03, optionally --config k=v, --dry-run, --tstat-threshold ledger
+    CLI->>RUN: build_spec — the experiment id is the hash of the request
+    RUN->>RUN: the walk-forward window ends where the holdout begins (asserted)
+    opt tstat_threshold is ledger (opt-in, default fixed 3.0)
+        RUN->>LED: the Bonferroni threshold once this run's looks are counted
+    end
+    RUN->>VAL: fresh model per fold, leakage probes, stress grids, verdict
+    VAL-->>RUN: report — pinned statistics plus the additive ones no gate reads
+    RUN->>RUN: holdout backtest on the test period
+    RUN->>RUN: gate_eligibility(spec, frames) — protocol bounds and derived periods
+    RUN->>LED: record 28 looks for a new configuration, none for a rerun
+    alt --dry-run
+        RUN->>LED: save — the looks are debited, no directory is written
+    else persist
+        RUN->>FS: stage .staging-ID-PID with spec.json, result.json, eligibility.json
+        RUN->>FS: one rename to research/experiments/ID
+        RUN->>LED: save
+    end
+    Note over LED: save takes experiments.json.lock (O_CREAT and O_EXCL, bounded retry),<br/>re-reads the file, replays this writer's pending records,<br/>writes a temp file and moves it into place with os.replace
+    RUN-->>CLI: ExperimentResult
+    CLI-->>R: result table, VERDICT, gate eligible yes or NO with reasons, ledger note
+    Note over R,FS: a result that is not gate-eligible is recorded and ledgered,<br/>and every lifecycle gate that reads it fails
+```
+
+## 16. The planted-signal power study
+
+`python -m iap.research power`: plant an effect of known size in the
+generator, run the unmodified pipeline and validation chain on it, and count
+how often each statistic flags it. The last node quotes the committed
+three-seed report, `research/power/POWER_REPORT.md` (LEARN.md §23, COOKBOOK
+recipe 27).
+Source: [`diagrams/power_study_flow.mmd`](diagrams/power_study_flow.mmd).
+
+```mermaid
+flowchart TD
+    %% python -m iap.research power (iap.research.power) — research/power/POWER_REPORT.md.
+    %% The figures in the last node are the committed three-seed report.
+    CFG["research/power/generator_planted.json<br/>the reference effect, level 1.0:<br/>order_flow strength 0.4 · lead_lag beta 0.4 at a lag of 2 steps"] --> GRID["grid: levels 0, 0.5, 1, 2 · scenarios stable and break · 3 seeds per cell<br/>level 0 is the null; break reverses both effects mid-sample"]
+    GRID --> GEN["seeded generator with the planted block ON<br/>reduced universe: SYN.EQ.001, SYN.EQ.002, SYN.ETF.IDX"]
+    GEN --> PIPE["the real pipeline, unmodified:<br/>normalise, books, feature engine, labels"]
+    PIPE --> VAL["validate_alpha under the pinned research execution model<br/>detectors: EQ04 for order flow, EQ10 for lead-lag"]
+    VAL --> S1["sig within: gate IC > 0 and Newey-West t of<br/>within-bucket ICs >= 3 (what the PROMOTE gate reads)"]
+    VAL --> S2["sig pooled: pooled-slope HAC t >= 3"]
+    VAL --> S3["sig ledger: within-bucket t against the threshold<br/>of the study's own 42 tests (t >= 3.24)"]
+    VAL --> S4["evidence: verdict ITERATE or PROMOTE"]
+    VAL --> S5["promote; and 95% stationary-bootstrap interval<br/>of net P&L at 1x costs above zero"]
+    S1 --> REP["POWER_REPORT.md + POWER_REPORT.json<br/>detection rate per effect, scenario and level"]
+    S2 --> REP
+    S3 --> REP
+    S4 --> REP
+    S5 --> REP
+    REP --> READ["committed result:<br/>order flow flagged in 3 of 3 seeds at level 1, 1 of 3 at level 0.5<br/>lead-lag flagged in 0 of 3 at level 1, 1 of 3 at level 2<br/>break rows: 0 everywhere · PROMOTE: 0 in every cell<br/>no P&L interval above zero in any cell"]
+    OFF["the planted block is OFF by default: the pinned dataset is<br/>byte-identical with or without it; the study never touches<br/>data/ or the research ledger"] -.-> GEN
+    LIM["3 seeds per cell: a rate moves in steps of 0.33 —<br/>this calibrates the chain, it is not a power curve"] -.-> READ
+```
+
+## 17. CI and release pipeline
+
+The three workflows and Dependabot as they stand at v1.3.0: which jobs gate
+the image build, which steps are blocking (clippy and ruff are, since the
+tree was made lint-clean; `pip-audit` and `cargo audit` report without
+failing the run), and what the tag-triggered release does.
+Two boxes say what is not true yet: the release workflow has not been
+exercised by a tag, and branch protection is not configured
+(`docs/governance/REPO_SETTINGS.md`, LEARN.md §26).
+Source: [`diagrams/ci_release_pipeline.mmd`](diagrams/ci_release_pipeline.mmd).
+
+```mermaid
+flowchart LR
+    %% .github/workflows/{ci,codeql,release}.yml and dependabot.yml as of v1.3.0.
+    PR["pull request<br/>or push to main"] --> PY
+    PR --> INT
+    PR --> CPP
+    PR --> RS
+    PR --> JV
+    PR --> GOLD
+    PR --> DEP
+    PR --> ASAN
+    PR --> ADV
+    PR --> CHG
+    subgraph CI["ci.yml — every action pinned to a commit SHA, token contents: read"]
+        PY["python<br/>pytest with coverage<br/>seeded dataset restored or regenerated"]
+        INT["integration<br/>tests/integration + tests/replay"]
+        CPP["cpp<br/>build, ctest, gcov report"]
+        RS["rust<br/>cargo test --locked<br/>clippy -D warnings (blocking), llvm-cov"]
+        JV["java<br/>javac -Xlint:all -Werror, JUnit4"]
+        GOLD["golden<br/>run_golden.sh — promotion gate 10"]
+        DEP["deployment<br/>check_deployment.py<br/>check_headline_numbers.py"]
+        ASAN["cpp-sanitizers<br/>ASan + UBSan over ctest — blocking"]
+        ADV["advisory<br/>ruff check (blocking)<br/>pip-audit, cargo audit (non-blocking)"]
+        CHG["changes<br/>does the change touch image inputs?"]
+        IMG["images<br/>build the four images, run the C++ and Rust containers<br/>on push to main, and on PRs that touch image inputs"]
+    end
+    PY --> IMG
+    INT --> IMG
+    CPP --> IMG
+    RS --> IMG
+    JV --> IMG
+    GOLD --> IMG
+    DEP --> IMG
+    CHG --> IMG
+    PR --> CQL["codeql.yml<br/>python, java-kotlin, c-cpp, actions<br/>also weekly"]
+    DB["dependabot.yml<br/>weekly: github-actions, pip, cargo, docker"] -.->|"bump PRs through the same gate"| PR
+    TAG["git tag v*"] --> VER
+    subgraph REL["release.yml — not yet exercised by a tag"]
+        VER["verify-ci<br/>the tagged commit has a green ci run"]
+        BLD["images<br/>build and push to GHCR, one per language"]
+        ATT["attest build provenance<br/>per image digest"]
+        MAN["manifest<br/>release-manifest.json attached to the release"]
+        VER --> BLD
+        BLD --> ATT
+        ATT --> MAN
+    end
+    MAN -.->|"manual step: pin the deployment manifests<br/>to name:tag@digest, verify the attestation"| DEPLOY["deployment/docker<br/>deployment/k8s"]
+    NOTE["repository settings NOT configured:<br/>branch protection, required checks, required reviews<br/>(docs/governance/REPO_SETTINGS.md)"] -.-> PR
+```
+
+## 18. Deployment topology: NetworkPolicies and alert delivery (v1.3.0)
+
+The Kubernetes deployment (`deployment/k8s/`): the workloads, the only flows
+the NetworkPolicies allow, and the path of an alert. The webhook receiver is
+outside the repository; with the placeholder URL alerts are routed and
+delivered nowhere (PLATFORM_CONVENTIONS.md §12.7,
+`deployment/grafana/README.md`).
+Source: [`diagrams/deployment_topology.mmd`](diagrams/deployment_topology.mmd).
+
+```mermaid
+flowchart LR
+    %% deployment/k8s as of v1.3.0: workloads, the flows the NetworkPolicies allow, alert delivery.
+    subgraph NS["namespace intraday-alpha — default-deny ingress AND egress"]
+        JP["java-platform (singleton, Recreate)<br/>:8080 /metrics /health /ready /status /admin/*<br/>IAP_BIND_ADDR=0.0.0.0 · read-only root fs<br/>egress: DNS only"]
+        PVC[("iap-java-state PVC<br/>risk snapshot, session state,<br/>audit and trace JSONL")]
+        PROM["prometheus :9090<br/>alerts.yml · recording.yml"]
+        AM["alertmanager :9093<br/>groups by alertname, service<br/>Watchdog to its own receiver"]
+        GRAF["grafana :3000<br/>two provisioned dashboards"]
+        CRON["data-pipeline CronJob<br/>iap-data PVC · egress: DNS only"]
+        OPP["operator pod<br/>label iap.role=operator"]
+    end
+    JP --- PVC
+    PROM -->|"scrape :8080"| JP
+    PROM -->|"alerts :9093"| AM
+    GRAF -->|"queries :9090"| PROM
+    OPP -->|"POST /admin/* with a token, :8080"| JP
+    ING["ingress controller namespace"] -->|":3000"| GRAF
+    AM -->|"HTTPS :443, non-private addresses only"| WH["webhook receiver<br/>URL from the iap-alertmanager-webhook Secret<br/>(the in-repo placeholder delivers nowhere)"]
+    KUBELET["kubelet probes<br/>startup + liveness /health · readiness /ready"] --> JP
+    CM["ConfigMaps generated by generate_configmaps.py<br/>from configs/, prometheus/, alertmanager/, grafana/<br/>kept in sync by check_deployment.py"] -.-> JP
+    CM -.-> PROM
+    CM -.-> AM
+    CM -.-> GRAF
+    CNI["enforcement needs a CNI that implements NetworkPolicy;<br/>one that does not ignores every policy silently"] -.-> NS
+    COMPOSE["docker-compose equivalent: the same services on one bridge network,<br/>java-platform, prometheus and alertmanager published on 127.0.0.1 only"] -.-> NS
+```
+
+## 19. Planned agent layer — PLANNED, BACKLOG, no code exists
+
+**This diagram describes a design, not the repository.** The upper subgraph
+is what exists at v1.3.0 and is useful without any agent; the lower one is the
+agent layer of backlog epics E24 and E30 ([EPICS.md](EPICS.md)), none of which
+has been built. The boundary at the bottom is pinned today (ARCHITECTURE.md
+§11, PLATFORM_CONVENTIONS.md §13.7): no LLM or agent on the trading path,
+read-only, unable to override risk or send an order.
+Source: [`diagrams/agent_layer_planned.mmd`](diagrams/agent_layer_planned.mmd).
+
+```mermaid
+flowchart TD
+    %% PLANNED — BACKLOG. Nothing inside the PLAN subgraph exists in this repository.
+    %% Epics E24 and E30 of docs/EPICS.md; the boundary is ARCHITECTURE.md 11 and
+    %% PLATFORM_CONVENTIONS.md 13.7.
+    subgraph TODAY["EXISTS TODAY (v1.3.0) — the foundation, useful without any agent"]
+        STORE["research store safe for parallel writers<br/>ledger lock, staged run directories"]
+        ELIG["gate eligibility<br/>eligibility.json · lifecycle refuses non-eligible evidence"]
+        POL["import-policy test<br/>no network or LLM client in the guarded Python packages"]
+        CLIJ["machine-readable tooling<br/>research list / show --json, --json-errors,<br/>read-only one-statement store sql"]
+        RUNNER["ExperimentRunner + multiple-testing ledger"]
+        LIFE["7-state lifecycle with HUMAN-only manual edges<br/>(the actor is asserted today, not authenticated)"]
+    end
+    subgraph PLAN["PLANNED — BACKLOG (E24, E30) — no code exists"]
+        AG["research agents<br/>draft hypotheses, run experiments, explain incidents"]
+        MCP["read-only MCP server — AG01, AL05<br/>ledger, reports, lifecycle log, decision traces"]
+        BRK["write broker — AL01<br/>the only path to repository, ledger and lifecycle state"]
+        BB["append-only blackboard — AL01<br/>tasks, claims, findings · content-hashed, leased"]
+        PRE["pre-registration — AL02<br/>hypothesis committed before any data is read"]
+        RES["reserve sessions on a hidden seed — AL03<br/>held by the evaluator, never seen by an agent"]
+        HUM["authenticated HUMAN approval — AL04<br/>for every actor = HUMAN lifecycle edge"]
+        EVL["agent evaluations — AL06<br/>planted leak, seeded bug, shuffled-label null,<br/>citation resolution"]
+        TXT["untrusted free-text handling — AL07"]
+    end
+    AG -->|"reads through"| MCP
+    MCP -->|"read-only"| STORE
+    MCP -->|"read-only"| CLIJ
+    AG -->|"every write goes through"| BRK
+    BRK --> BB
+    BRK --> PRE
+    PRE --> RUNNER
+    RUNNER --> STORE
+    RUNNER --> ELIG
+    ELIG --> HUM
+    RES --> HUM
+    HUM --> LIFE
+    EVL -.->|"each evaluation must fail when its control is removed"| BRK
+    TXT -.-> AG
+    POL -.-> WALL
+    WALL["PINNED BOUNDARY: no LLM or agent on the trading path.<br/>Read-only. Cannot override a risk decision, move a lifecycle state<br/>or send an order."] -.-> AG
+    WALL -.-> TRADE["trading path: book, features, alphas, portfolio,<br/>hard risk, execution — no edge from any box above"]
+```
+
+## 20. Where to go deeper
 
 | topic | document |
 |---|---|
 | Full architecture narrative, per-language engineering notes | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | Governing institutional specification (verbatim) | [SPECIFICATION.md](SPECIFICATION.md) |
 | Teaching walkthrough of every subsystem | [../LEARN.md](../LEARN.md) |
-| 26 runnable recipes | [../COOKBOOK.md](../COOKBOOK.md) |
+| How the quant, algo and AI sides work, top-down | [HOW_IT_WORKS.md](HOW_IT_WORKS.md) |
+| 35 runnable recipes | [../COOKBOOK.md](../COOKBOOK.md) |
 | Data model, views, SQLite/PostgreSQL portability, query cookbook | [DATA_MODEL.md](DATA_MODEL.md) |
 | The 7-state promotion lifecycle: gates, evidence, registry, bootstrap result | [LIFECYCLE.md](LIFECYCLE.md) |
 | The decision trace: record, ids, canonical JSON, digest, sinks, replay | [DECISION_TRACE.md](DECISION_TRACE.md) |
@@ -620,5 +1043,7 @@ flowchart TD
 | Typed contracts, Protocols, schema index, validation | [../API_CONTRACTS.md](../API_CONTRACTS.md) |
 | Python risk / execution reference ports and their golden parity | [../API_TRADING.md](../API_TRADING.md) |
 | Roadmap: what exists, with evidence; what is backlog | [ROADMAP.md](ROADMAP.md) |
+| Opt-in research methods, the safe research store, gate eligibility | [RESEARCH_VALIDITY.md](RESEARCH_VALIDITY.md) |
+| Release notes | [../CHANGELOG.md](../CHANGELOG.md) |
 | Six research papers from the platform's own numbers | [papers/INDEX.md](papers/INDEX.md) |
 | Benchmark methodology + results | [../benchmarks/RESULTS.md](../benchmarks/RESULTS.md) |

@@ -17,9 +17,9 @@ planned paths of the current release, **backlog** says what would prove it done.
 |---|---:|---:|
 | epics | 31 | |
 | issues | 154 | 508 |
-| issues `done` | 96 | 229 |
+| issues `done` | 97 | 229.5 |
 | issues `in-progress` | 0 | 0 |
-| issues `backlog` | 58 | 279 |
+| issues `backlog` | 57 | 278.5 |
 
 ### By milestone
 
@@ -34,7 +34,7 @@ planned paths of the current release, **backlog** says what would prove it done.
 | Week 6 | 7 | 24 | 24 | 0 | 0 |
 | Phase 2 | 3 | 9 | 7 | 0 | 2 |
 | Phase 3 | 2 | 9 | 1 | 0 | 8 |
-| Backlog | 7 | 48 | 0 | 0 | 48 |
+| Backlog | 7 | 48 | 1 | 0 | 47 |
 
 Issues are listed under their epic; an issue's own milestone can differ from
 the epic's (a backlog item under a finished epic sits in **Backlog**).
@@ -64,7 +64,7 @@ the epic's (a backlog item under a finished epic sits in **Backlog**).
 - [E21 — Adaptive layer — drift, refit policies](#e21-adaptive-layer-drift-refit-policies) · Phase 2 · partial · 4 issues
 - [E22 — Research platform — alpha factory](#e22-research-platform-alpha-factory) · Phase 2 · partial · 4 issues
 - [E23 — Production engineering (documented out of scope)](#e23-production-engineering-documented-out-of-scope) · Phase 3 · partial · 5 issues
-- [E24 — Agentic AI / MCP research layer (read-only)](#e24-agentic-ai-mcp-research-layer-read-only) · Backlog · backlog · 2 issues
+- [E24 — Agentic AI / MCP research layer (read-only)](#e24-agentic-ai-mcp-research-layer-read-only) · Backlog · partial · 2 issues
 - [E25 — Real historical exchange data (ITCH/PITCH, FX ECN) with a point-in-time master](#e25-real-historical-exchange-data-itchpitch-fx-ecn-with-a-point-in-time-master) · Phase 3 · backlog · 4 issues
 - [E26 — Latency engineering — measured, gated, allocation-free hot path](#e26-latency-engineering-measured-gated-allocation-free-hot-path) · Backlog · backlog · 4 issues
 - [E27 — Simulator calibration to live fills, multi-horizon markouts, venue/algo TCA](#e27-simulator-calibration-to-live-fills-multi-horizon-markouts-venuealgo-tca) · Backlog · backlog · 4 issues
@@ -687,7 +687,7 @@ Unscheduled work with a written scope and proof-of-done, including the read-only
 
 ### E24 — Agentic AI / MCP research layer (read-only)
 
-**Status:** backlog · **Milestone:** Backlog · **Issues:** 2 (done 0, in-progress 0, backlog 2) · **Estimate:** 3.5 days · **Labels:** `type:epic`, `area:agentic`, `priority:p2`, `phase:phase2`, `status:backlog`
+**Status:** partial · **Milestone:** Backlog · **Issues:** 2 (done 1, in-progress 0, backlog 1) · **Estimate:** 3.5 days · **Labels:** `type:epic`, `area:agentic`, `priority:p2`, `phase:phase2`, `status:partial`
 
 Let an agent read the ledger, reports, lifecycle log and decision traces through a read-only interface for hypothesis drafting and incident explanation — never on the trading path, never able to flip a verdict or touch the risk engine.
 
@@ -703,7 +703,7 @@ Let an agent read the ledger, reports, lifecycle log and decision traces through
 | key | title | status | est. (d) | milestone | evidence |
 |---|---|---|---:|---|---|
 | AG01 | Read-only MCP server over the ledger, reports, lifecycle log and decision traces | backlog | 3 | Backlog | `tools/mcp/ (proposed)` |
-| AG03 | Policy test: no trading-path module imports a network or LLM client | backlog | 0.5 | Backlog | `docs/governance/SECURITY.md; tests/integration/ (proposed)` |
+| AG03 | Policy test: no trading-path module imports a network or LLM client | done | 0.5 | Backlog | `python/tests/test_import_policy.py; PLATFORM_CONVENTIONS.md section 13.7; docs/RESEARCH_VALIDITY.md` |
 
 ### E26 — Latency engineering — measured, gated, allocation-free hot path
 

@@ -23,7 +23,7 @@ pushes and branch deletion. The required check names are the job ids of
 `.github/workflows/ci.yml`: `python`, `integration`, `cpp`, `rust`, `java`,
 `golden`, `deployment`. Do **not** add `images` (it is skipped on pull requests
 that do not touch image inputs, and a skipped required check blocks the merge)
-or the non-blocking `advisory` job. `cpp-sanitizers` is blocking in CI and may be added to the required list.
+or, without a decision, the `advisory` job: its `ruff check` step is blocking, but its `pip-audit` and `cargo audit` steps are not, so requiring the job requires only the lint. `cpp-sanitizers` is blocking in CI and may be added to the required list.
 
 `required_approving_review_count` is 0 below because GitHub does not let an
 author approve their own pull request, and this repository currently has one
@@ -148,8 +148,10 @@ JSON
    `deployment/docker/docker-compose.yml`,
    `deployment/k8s/java-platform.yaml`, `deployment/k8s/cronjob-data-pipeline.yaml`)
    and bump the version tag in the same files. The repository references
-   `v1.2.0`, which was tagged before the release workflow existed, so no such
-   image exists yet; the next release must bump these references.
+   `v1.3.0` by tag only: those images exist once the `v1.3.0` tag has been
+   pushed and `release.yml` has run for it (no image was ever published for
+   `v1.2.0`, which was tagged before the release workflow existed), and the
+   digests are pinned from that run's `release-manifest.json` afterwards.
 4. Verify provenance before deploying:
    `gh attestation verify oci://ghcr.io/ashjha0/intraday-alpha-platform-java@sha256:<digest> --repo AshJha0/intraday-alpha-platform`.
 5. Make the GHCR packages public (or grant the cluster a pull secret):

@@ -2926,16 +2926,20 @@ issues:
     title: "Policy test: no trading-path module imports a network or LLM client"
     labels: [type:feature, area:agentic, area:testing, priority:p1, lang:python, phase:phase2]
     milestone: "Backlog"
-    status: backlog
+    status: done
     estimate_days: 0.5
     context: >
-      Make the "never on the trading path" rule mechanical: a test walks the
-      import graph of iap.{risk,execution,portfolio,orderbook,features,alpha,
-      trace,mvp} and fails on any network, HTTP or LLM SDK import.
+      The "never on the trading path" rule is mechanical for the Python
+      reference since v1.3.0: an AST scan of every module under
+      iap.{risk,execution,orderbook,portfolio,mvp,core,marketdata,features,
+      alpha} fails on a static import, or a dynamic import with a literal
+      name, of a network module or an LLM / agent SDK. Stated gaps: iap.trace
+      and iap.replay are not scanned, and the Rust, C++ and Java trees are
+      enforced in review only.
     acceptance:
-      - "tests/integration/test_trading_path_isolation.py passes and lists the denied module prefixes"
+      - "python/tests/test_import_policy.py passes and names the denied network and LLM module sets"
     evidence:
-      - "docs/governance/SECURITY.md; tests/integration/ (proposed)"
+      - "python/tests/test_import_policy.py; PLATFORM_CONVENTIONS.md section 13.7; docs/RESEARCH_VALIDITY.md"
 
   # ---------------------------------------------------------------- E25-E31 ----
   # Backlog epics added 2026-10-03 (all status: backlog; paths marked (proposed) do not exist yet).

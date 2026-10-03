@@ -84,9 +84,14 @@ metrics (verified against a running `/metrics` scrape and the sources):
 | `md_event_time_gap_seconds` | gauge | event-time gap between the last two consecutive processed events — the staleness signal `StaleFeed` alerts on, correct in replay AND live (risk.json `stale_feed_timeout_ns` = 5 s) |
 | `book_stale{instrument=...}` | gauge | 0/1: any venue book of the instrument is stale (fail-closed trading until a SNAPSHOT) |
 | `platform_mode{mode="asap"\|"realtime"}` | gauge | 1 for the running mode, 0 for the other — the label rules use to scope wall-clock budgets |
-| `platform_session_state` | gauge | 0 STARTING, 1 RUNNING, 2 FINISHED, 3 FAILED |
+| `platform_session_state` | gauge | 0 STARTING, 1 RUNNING, 2 FINISHED, 3 FAILED, 4 STOPPED (since v1.3.0: a stop was requested and the session checkpointed mid-stream; resumable). See "The STOPPED state" below — the dashboard and the rules do not know the value 4 yet |
 | `risk_session_restarts_total` | counter | `--resume` restarts of this session (state recovered from the checkpoint) |
 | `admin_requests_total{action=...}` | counter | kill-switch admin API calls, accepted or refused |
+| `admin_auth_rate_limited_total` | counter | failed authentications answered `429` (more than 10 in a 60 s window). Registered on first use; no rule or panel uses it |
+| `admin_audit_suppressed_total` | counter | rejected admin requests that were answered but not individually audited (rate-limited failures, and rejects beyond 100 audit lines per window). Registered on first use; no rule or panel uses it |
+| `exec_orders_blocked_kill_pending_total` | counter | orders withheld because an admin kill was accepted but not yet recorded by the risk engine. Registered on first use; no rule or panel uses it |
+| `risk_routed_venue_mismatch_total` | counter | children that left for a venue other than the one the pre-trade check approved, and were cancelled. Any non-zero value is a wiring defect. Registered on first use; no rule or panel uses it |
+| `risk_resume_open_orders_released_total` | counter | open orders of a restored risk snapshot released at `--resume` (their simulator no longer exists). No rule or panel uses it |
 | `decode_latency_ns` | histogram | feed decode latency |
 | `book_update_latency_ns` | histogram | book apply latency |
 | `order_path_latency_ns` | histogram | decision-to-wire latency |
@@ -123,13 +128,52 @@ accordingly (p99 > 10 ms for 5 m).
 |---|---|---|---|
 | `GET /metrics` | the process is serving | — | — |
 | `GET /health` | the process can make progress | the session FAILED, or the trading loop has not advanced `events_processed` for 30 s with events pending | k8s `livenessProbe`, `startupProbe`, compose healthcheck |
-| `GET /ready` | a session is RUNNING and its feed is fresh | not started, FINISHED, or (realtime mode) no event within `stale_feed_timeout_ns` of wall clock | k8s `readinessProbe` |
+| `GET /ready` | a session is RUNNING and its feed is fresh | not started, FINISHED, STOPPED, or (realtime mode) no event within `stale_feed_timeout_ns` of wall clock | k8s `readinessProbe` |
 | `GET /status` | always — the JSON carries `events_processed` (live), `kill_switch_engaged`, `last_event_ts`, `mode`, `alpha_id`, `lifecycle`, `config_sha256`, `restarts` | — | operators, runbooks |
-| `POST /admin/{kill,clear,override,roll}` | the action was applied on the trading thread | 401/403 (token), 400 (arguments), 503 (no running session) | the kill-switch runbook |
+| `POST /admin/{kill,clear,override,roll}` | the action was applied on the trading thread (`202` for a kill that is latched but not yet recorded by the risk engine) | 401/403 (token), 429 (more than 10 failed authentications in 60 s), 400 (arguments), 503 (no running session, or a non-kill command withdrawn on timeout) | the kill-switch runbook |
 
 A **latched kill switch is neither unhealthy nor unready** — halted is a
 deliberate state, not a broken one. Both endpoints stay 200 and report
 `"trading":"halted"`; `KillSwitchEngaged` is the alert that pages.
+
+The listener binds `127.0.0.1` unless `IAP_BIND_ADDR` names another address
+(since v1.3.0). The image, compose and the k8s manifest set
+`IAP_BIND_ADDR=0.0.0.0` so that Prometheus and the probes can reach it;
+compose then publishes the port on the host's loopback only, and in
+Kubernetes the NetworkPolicies admit Prometheus and pods labelled
+`iap.role=operator`.
+
+### The STOPPED state (value 4) — what does and does not know about it
+
+`platform_session_state` gained the value `4` in v1.3.0. The producer exports
+it; nothing downstream has been taught it yet. Stated so that nobody reads a
+blank panel as a healthy one:
+
+| artefact | today | what it needs |
+|---|---|---|
+| `dashboards/market_data_latency.json`, panel **Session state** (and its generated copy in `deployment/k8s/configmap-grafana.yaml`) | the description and the value mappings enumerate 0–3; the value 4 has no mapping, so the stat shows the bare number `4` in the colour of the highest threshold (red, the FAILED colour) | a mapping `4 → STOPPED`, a threshold step that is not the FAILED red, and the description updated |
+| `alerts.yml` `PlatformSessionFailed` (`platform_session_state == 3`) | does not fire on 4 — correct, a stop is not a failure | nothing |
+| `alerts.yml` `FeedWallClockStall` (`... and platform_session_state == 1`) | does not fire on 4 — correct | nothing |
+| a rule for "stopped and not resumed" | none exists | a decision first: a STOPPED process exits 0 right after its checkpoint, so the gauge is rarely scraped at 4 and `TargetDown` is what fires when it has gone; a rule on the value alone would be near-useless |
+
+In practice the value is visible for only an instant: the process
+checkpoints, sets the gauge and exits. The durable evidence of a stop is the
+process's last stdout line (`status=STOPPED`) and the checkpoint in the state
+directory (`docs/runbooks/RUNBOOK_paper_trading.md` §5–§6).
+
+### Alert delivery (since v1.3.0)
+
+Prometheus now sends alerts to Alertmanager (`alertmanager:9093`;
+`deployment/alertmanager/alertmanager.yml`, mounted by compose and generated
+into `deployment/k8s/configmap-alertmanager.yaml`). Alerts are grouped by
+`alertname` and `service` and sent to a generic webhook whose URL is read
+from a mounted secret file. **The in-repo placeholder URL delivers nowhere**:
+until an operator supplies one (compose `ALERT_WEBHOOK_URL_FILE`, k8s Secret
+`iap-alertmanager-webhook`), alerts are routed and visible in the
+Alertmanager UI and reach nobody. `Watchdog` (`vector(1)`) fires
+permanently and is routed to its own receiver, which is a no-op here; point
+it at an external dead-man's-switch to be told when the alerting pipeline
+itself stops.
 
 ### PLACEHOLDER metrics (referenced, but no producer emits them yet)
 

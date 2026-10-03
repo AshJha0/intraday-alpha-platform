@@ -1,0 +1,40 @@
+flowchart TD
+    %% PLANNED — BACKLOG. Nothing inside the PLAN subgraph exists in this repository.
+    %% Epics E24 and E30 of docs/EPICS.md; the boundary is ARCHITECTURE.md 11 and
+    %% PLATFORM_CONVENTIONS.md 13.7.
+    subgraph TODAY["EXISTS TODAY (v1.3.0) — the foundation, useful without any agent"]
+        STORE["research store safe for parallel writers<br/>ledger lock, staged run directories"]
+        ELIG["gate eligibility<br/>eligibility.json · lifecycle refuses non-eligible evidence"]
+        POL["import-policy test<br/>no network or LLM client in the guarded Python packages"]
+        CLIJ["machine-readable tooling<br/>research list / show --json, --json-errors,<br/>read-only one-statement store sql"]
+        RUNNER["ExperimentRunner + multiple-testing ledger"]
+        LIFE["7-state lifecycle with HUMAN-only manual edges<br/>(the actor is asserted today, not authenticated)"]
+    end
+    subgraph PLAN["PLANNED — BACKLOG (E24, E30) — no code exists"]
+        AG["research agents<br/>draft hypotheses, run experiments, explain incidents"]
+        MCP["read-only MCP server — AG01, AL05<br/>ledger, reports, lifecycle log, decision traces"]
+        BRK["write broker — AL01<br/>the only path to repository, ledger and lifecycle state"]
+        BB["append-only blackboard — AL01<br/>tasks, claims, findings · content-hashed, leased"]
+        PRE["pre-registration — AL02<br/>hypothesis committed before any data is read"]
+        RES["reserve sessions on a hidden seed — AL03<br/>held by the evaluator, never seen by an agent"]
+        HUM["authenticated HUMAN approval — AL04<br/>for every actor = HUMAN lifecycle edge"]
+        EVL["agent evaluations — AL06<br/>planted leak, seeded bug, shuffled-label null,<br/>citation resolution"]
+        TXT["untrusted free-text handling — AL07"]
+    end
+    AG -->|"reads through"| MCP
+    MCP -->|"read-only"| STORE
+    MCP -->|"read-only"| CLIJ
+    AG -->|"every write goes through"| BRK
+    BRK --> BB
+    BRK --> PRE
+    PRE --> RUNNER
+    RUNNER --> STORE
+    RUNNER --> ELIG
+    ELIG --> HUM
+    RES --> HUM
+    HUM --> LIFE
+    EVL -.->|"each evaluation must fail when its control is removed"| BRK
+    TXT -.-> AG
+    POL -.-> WALL
+    WALL["PINNED BOUNDARY: no LLM or agent on the trading path.<br/>Read-only. Cannot override a risk decision, move a lifecycle state<br/>or send an order."] -.-> AG
+    WALL -.-> TRADE["trading path: book, features, alphas, portfolio,<br/>hard risk, execution — no edge from any box above"]

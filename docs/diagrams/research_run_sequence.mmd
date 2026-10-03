@@ -1,0 +1,31 @@
+sequenceDiagram
+    autonumber
+    actor R as Researcher or tool
+    participant CLI as python -m iap.research run
+    participant RUN as ExperimentRunner
+    participant VAL as validate_alpha<br/>(purged, embargoed walk-forward)
+    participant LED as ExperimentLedger<br/>(research/experiments.json)
+    participant FS as research/experiments/
+
+    R->>CLI: run --alpha EQ03, optionally --config k=v, --dry-run, --tstat-threshold ledger
+    CLI->>RUN: build_spec — the experiment id is the hash of the request
+    RUN->>RUN: the walk-forward window ends where the holdout begins (asserted)
+    opt tstat_threshold is ledger (opt-in, default fixed 3.0)
+        RUN->>LED: the Bonferroni threshold once this run's looks are counted
+    end
+    RUN->>VAL: fresh model per fold, leakage probes, stress grids, verdict
+    VAL-->>RUN: report — pinned statistics plus the additive ones no gate reads
+    RUN->>RUN: holdout backtest on the test period
+    RUN->>RUN: gate_eligibility(spec, frames) — protocol bounds and derived periods
+    RUN->>LED: record 28 looks for a new configuration, none for a rerun
+    alt --dry-run
+        RUN->>LED: save — the looks are debited, no directory is written
+    else persist
+        RUN->>FS: stage .staging-ID-PID with spec.json, result.json, eligibility.json
+        RUN->>FS: one rename to research/experiments/ID
+        RUN->>LED: save
+    end
+    Note over LED: save takes experiments.json.lock (O_CREAT and O_EXCL, bounded retry),<br/>re-reads the file, replays this writer's pending records,<br/>writes a temp file and moves it into place with os.replace
+    RUN-->>CLI: ExperimentResult
+    CLI-->>R: result table, VERDICT, gate eligible yes or NO with reasons, ledger note
+    Note over R,FS: a result that is not gate-eligible is recorded and ledgered,<br/>and every lifecycle gate that reads it fails
