@@ -50,10 +50,12 @@ from iap.adaptive import (  # noqa: E402
 )
 from iap.alpha import build  # noqa: E402
 from iap.alpha.data import load_features  # noqa: E402
-from iap.backtest import BacktestConfig, Backtester, CostModel  # noqa: E402
+from iap.backtest import Backtester, CostModel  # noqa: E402
 from iap.backtest.adaptive import AdaptiveDeployment  # noqa: E402
 from iap.experiment.tracker import data_version  # noqa: E402
+from iap.research.runner import load_instrument_meta  # noqa: E402
 from iap.validation import ExperimentLedger  # noqa: E402
+from iap.validation.methods import DEFAULT_METHODS, methods  # noqa: E402
 
 REPORTS_DIR = REPO / "research" / "adaptive_reports"
 ALPHA_REPORTS_DIR = REPO / "research" / "alpha_reports"
@@ -80,18 +82,11 @@ def select_alphas() -> list[str]:
 
 
 def _load_meta() -> dict[int, dict]:
-    cfg = json.loads((REPO / "configs" / "instruments" / "instruments.json").read_text())
-    out: dict[int, dict] = {}
-    for row in cfg["instruments"]:
-        out[int(row["instrument_id"])] = {
-            "symbol": row["symbol"],
-            "asset_class": row["asset_class"],
-            "tick_size": float(row["tick_size"]),
-            "lot_size": int(row["lot_size"]),
-            "adv": float(row["adv"]),
-            "ref_price": float(row.get("ref_price", 1.0)),
-        }
-    return out
+    """Instrument meta WITH the currencies (``iap.research.runner``): up to
+    v1.4.0 this script built its own rows without ``quote_currency``, so the
+    backtester took every FX pair for a USD-quoted instrument and summed
+    JPY / CAD / CHF / GBP P&L as USD (PLATFORM_CONVENTIONS.md §11.6)."""
+    return load_instrument_meta(REPO / "configs")
 
 
 def _fmt(v, spec=".4f", none="   -  "):
@@ -161,7 +156,16 @@ def run_alpha(aid: str, frames, cfg, backtester, lc_cfg, log, ledger) -> dict:
         ledger.record(
             aid,
             "adaptive_deployment",
-            config={"policy": pname, **res.policy},
+            # The identity names the rules the deployment was replayed under
+            # (v1.5.0): the same policy under another drift z, retirement
+            # rule or backtest bundle is another look, not a rerun.
+            config={
+                "policy": pname,
+                **res.policy,
+                "ic_z_method": str(cfg["ic_z_method"]),
+                "breach_rule": lc_cfg.breach_rule,
+                "methods": DEFAULT_METHODS,
+            },
             result={
                 "net_pnl": m.total_pnl,
                 "refits": res.refit_count,
@@ -236,10 +240,29 @@ def _write_report(results: dict[str, dict], cfg, ledger, log, runtime_s: float) 
         f" OR rolling-IC z < {dt['ic_z_threshold']}; min refit gap "
         f"{dt['min_refit_gap_ns'] / NS_H:.0f}h"
     )
+    if lc["breach_rule"] == "cusum":
+        retire = (
+            f"RETIRE on a breach once the CUSUM of the shortfall below the gate "
+            f"(slack {lc['cusum_k']}, each reading weighted by the "
+            f"{cfg['block_ns'] / cfg['ic_window_ns']:.3f} of its window that is new) "
+            f"reaches {lc['cusum_h']}"
+        )
+    else:
+        retire = f"RETIRE after {lc['retire_breach_evals']} consecutive breaches"
     a(
-        f"- lifecycle: WATCH below IC {lc['watch_ic_gate']}, RETIRE after "
-        f"{lc['retire_breach_evals']} consecutive breaches, re-activate at IC >= "
+        f"- lifecycle: WATCH below IC {lc['watch_ic_gate']}, {retire}, re-activate at IC >= "
         f"{lc['reactivate_ic_gate']} for {lc['reactivate_evals']} consecutive evals"
+    )
+    z_text = (
+        "two-sample HAC z of the pair-weighted rolling IC against the baseline"
+        if cfg["ic_z_method"] == "hac"
+        else "legacy z (baseline mean taken as known, buckets as independent)"
+    )
+    a(f"- rolling-IC z: {z_text} (`ic_z_method = {cfg['ic_z_method']}`)")
+    a(
+        f"- backtest: the `{DEFAULT_METHODS}` research rules (cost-aware positions, fills "
+        "capped at displayed size, only the rows the IC scores, square-root impact); "
+        "every P&L figure is in USD"
     )
     a("")
     a("## Master table (per alpha x policy)")
@@ -386,10 +409,11 @@ def _write_report(results: dict[str, dict], cfg, ledger, log, runtime_s: float) 
     a("rather than of the research design.")
     a("")
     a(
-        f"`ledger_n_at_report` = **{ledger.total_experiments}** "
-        f"({ledger.distinct_experiments} distinct configurations), read at"
+        f"The ledger held **{ledger.total_experiments}** recorded evaluations in "
+        f"{ledger.distinct_experiments} distinct configurations when this report was "
+        "rendered. Pipelines that run after it add theirs: the current total is in "
+        "`research/experiments.json`."
     )
-    a("render time.")
     a("")
     (REPORTS_DIR / "ADAPTIVE_REPORT.md").write_text("\n".join(lines) + "\n")
 
@@ -404,10 +428,11 @@ def main() -> int:
     frames = load_features(REPO / "data" / "features")
     # Same pinned research execution model as run_all.py (round-3): latency
     # in EVENT TIME, a bounded decision age and no overnight carry.
+    bundle = methods(DEFAULT_METHODS)
     backtester = Backtester(
-        CostModel.load(REPO / "configs" / "execution" / "execution.json"),
+        bundle.cost_model(CostModel.load(REPO / "configs" / "execution" / "execution.json")),
         meta,
-        BacktestConfig(
+        bundle.backtest_config(
             latency_ns=1_000_000_000,
             max_decision_age_ns=60_000_000_000,
             flatten_at_session_end=True,

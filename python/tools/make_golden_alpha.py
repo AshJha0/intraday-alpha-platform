@@ -37,6 +37,7 @@ from __future__ import annotations
 import json
 import math
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -76,7 +77,35 @@ FX05_IC_GRID_WINDOW = (100, 2500)
 
 #: pinned golden-backtest config (conf_min lower than the research default
 #: so the golden vector's tamer microprice deviations still produce trades)
-BT_CONFIG = {"max_pos_qty": 1000, "conf_min": 0.2, "latency_rows": 1, "cost_multiplier": 1.0}
+#: The cross-language backtest vector keeps the LEGACY research rules
+#: (the v1.4.0 defaults), named: the Java ``ResearchBacktester`` /
+#: ``CostModel`` implement exactly these and no others.
+BT_CONFIG = {
+    "max_pos_qty": 1000,
+    "conf_min": 0.2,
+    "latency_rows": 1,
+    "cost_multiplier": 1.0,
+    "position_policy": "sign",
+    "cap_fills_at_l1": False,
+    "block_rows_column": None,
+    "impact_model": "linear",
+}
+#: The Python-only vector under the DEFAULT rules (v1.5.0).  EQ06 at 1 % of
+#: the pinned costs: the golden frame's spread is about 19 bps round trip
+#: and no flagship alpha forecasts that much, so at 1x costs the cost-aware
+#: policy makes no trade here; the vector exists to pin the policy, the
+#: fill cap, the row block and the square-root impact on a run that trades.
+BT_DEFAULT_ALPHA = "EQ06"
+BT_DEFAULT_CONFIG = {
+    "max_pos_qty": 1000,
+    "conf_min": 0.2,
+    "latency_rows": 1,
+    "cost_multiplier": 0.01,
+    "position_policy": "cost_aware",
+    "cap_fills_at_l1": True,
+    "block_rows_column": "auto",
+    "impact_model": "sqrt",
+}
 
 
 def brute_force_z(raw: float, p: dict) -> tuple:
@@ -306,50 +335,84 @@ def main() -> int:
         }
         for r in inst
     }
-    cm = CostModel.load(
-        CONFIGS / "execution" / "execution.json", multiplier=BT_CONFIG["cost_multiplier"]
-    )
-    bt = Backtester(
-        cm,
-        meta,
-        BacktestConfig(
-            max_pos_qty=BT_CONFIG["max_pos_qty"],
-            conf_min=BT_CONFIG["conf_min"],
-            latency_rows=BT_CONFIG["latency_rows"],
-        ),
-    )
-    scores = models["EQ01"].score({1: eq_frame})
-    res = bt.run({1: eq_frame}, scores, "EQUITY")
-    r1 = res.per_instrument[1]
+
+    def golden_run(alpha_id: str, cfg: dict):
+        """One instrument-1 backtest of ``alpha_id`` under ``cfg`` (every
+        rule named: nothing is left to a default)."""
+        cm = CostModel.load(
+            CONFIGS / "execution" / "execution.json", multiplier=cfg["cost_multiplier"]
+        )
+        cm = replace(cm, impact_model=cfg["impact_model"])
+        bt = Backtester(
+            cm,
+            meta,
+            BacktestConfig(
+                max_pos_qty=cfg["max_pos_qty"],
+                conf_min=cfg["conf_min"],
+                latency_rows=cfg["latency_rows"],
+                position_policy=cfg["position_policy"],
+                cap_fills_at_l1=cfg["cap_fills_at_l1"],
+                block_rows_column=cfg["block_rows_column"],
+            ),
+        ).for_horizon(models[alpha_id].horizon)
+        scores = models[alpha_id].score({1: eq_frame})
+        return bt.run({1: eq_frame}, scores, "EQUITY").per_instrument[1]
+
+    def numbers(r) -> dict:
+        return {
+            "total_pnl": r.total_pnl,
+            "gross_pnl": r.gross_pnl,
+            "total_costs": r.total_costs,
+            "spread_cost": r.spread_cost,
+            "fee_cost": r.fee_cost,
+            "impact_cost": r.impact_cost,
+            "trade_count": r.trade_count,
+            "traded_qty": r.traded_qty,
+            "n_rows": r.n_rows,
+        }
+
+    r1 = golden_run("EQ01", BT_CONFIG)
+    r_default = golden_run(BT_DEFAULT_ALPHA, BT_DEFAULT_CONFIG)
     bt_out = {
-        "x-version": 1,
+        "x-version": 2,
         "description": (
-            "Research-backtester golden: EQ01 (day-1-fitted params from "
-            "expected_alpha.json) on the golden EQ frame. total_pnl / "
-            "total_costs at 1e-9 abs/rel; counts exact."
+            "Research-backtester golden on the golden EQ frame (day-1-fitted "
+            "params from expected_alpha.json). The top-level numbers are the "
+            "CROSS-LANGUAGE vector: EQ01 under the LEGACY research rules that "
+            "`config` names (sign position policy, fills not capped, every row "
+            "traded, linear impact — the defaults up to v1.4.0), which is the "
+            "only rule set the Java ResearchBacktester / CostModel implement. "
+            "`default_rules` is the Python-only vector under the v1.5.0 "
+            "defaults (cost-aware positions, L1 fill cap, scored rows only, "
+            "square-root impact) at the cost multiplier its config names. "
+            "total_pnl / total_costs at 1e-9 abs/rel; counts exact."
         ),
         "alpha_id": "EQ01",
         "source": "events_eq_mbo.jsonl",
         "instrument_id": 1,
         "config": BT_CONFIG,
-        "total_pnl": r1.total_pnl,
-        "gross_pnl": r1.gross_pnl,
-        "total_costs": r1.total_costs,
-        "spread_cost": r1.spread_cost,
-        "fee_cost": r1.fee_cost,
-        "impact_cost": r1.impact_cost,
-        "trade_count": r1.trade_count,
-        "traded_qty": r1.traded_qty,
-        "n_rows": r1.n_rows,
+        **numbers(r1),
+        "default_rules": {
+            "alpha_id": BT_DEFAULT_ALPHA,
+            "horizon": models[BT_DEFAULT_ALPHA].horizon,
+            "config": BT_DEFAULT_CONFIG,
+            **numbers(r_default),
+        },
     }
     if r1.trade_count < 5:
         raise SystemExit(f"EQ01 golden backtest nearly empty: {r1.trade_count}")
+    if r_default.trade_count < 5:
+        raise SystemExit(
+            f"{BT_DEFAULT_ALPHA} default-rules golden backtest nearly empty: "
+            f"{r_default.trade_count}"
+        )
     (GOLDEN / "expected_backtest.json").write_text(
         json.dumps(bt_out, indent=2, sort_keys=True) + "\n"
     )
     print(
-        f"backtest golden: pnl={r1.total_pnl:+.4f} trades={r1.trade_count} "
-        f"costs={r1.total_costs:.4f}"
+        f"backtest golden: legacy EQ01 pnl={r1.total_pnl:+.4f} trades={r1.trade_count} "
+        f"costs={r1.total_costs:.4f}; default {BT_DEFAULT_ALPHA} "
+        f"pnl={r_default.total_pnl:+.4f} trades={r_default.trade_count}"
     )
     return 0
 
