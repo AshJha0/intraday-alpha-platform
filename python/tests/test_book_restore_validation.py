@@ -11,16 +11,13 @@ feature engine's merged depth and rolling windows.
 from __future__ import annotations
 
 import pytest
-
 from iap.core.events import EventType, MarketEvent
 from iap.orderbook.book import OrderBook
 
 
 def _seed() -> dict:
     book = OrderBook(1, 1)
-    book.apply(
-        MarketEvent(1, 1, 1, 1_000, 1_000, 1, EventType.ADD, 0, 100, 10, 7, 0)
-    )
+    book.apply(MarketEvent(1, 1, 1, 1_000, 1_000, 1, EventType.ADD, 0, 100, 10, 7, 0))
     return book.checkpoint()
 
 

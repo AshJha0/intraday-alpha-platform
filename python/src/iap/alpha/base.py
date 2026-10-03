@@ -38,7 +38,7 @@ contradicts its rationale can at best be ITERATE, never PROMOTE.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Mapping, Optional, Sequence, Tuple
+from collections.abc import Mapping, Sequence
 
 import numpy as np
 import pandas as pd
@@ -47,14 +47,24 @@ EPS = 1e-12
 
 #: pinned label horizons (must mirror iap.labels.HORIZONS_NS keys)
 VALID_HORIZONS = (
-    "10ms", "50ms", "100ms", "500ms", "1s", "5s", "10s", "30s", "1m", "5m", "15m",
+    "10ms",
+    "50ms",
+    "100ms",
+    "500ms",
+    "1s",
+    "5s",
+    "10s",
+    "30s",
+    "1m",
+    "5m",
+    "15m",
 )
 
 #: pinned universes (configs/instruments/instruments.json)
-EQ_IDS: Tuple[int, ...] = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
-EQ_CONSTITUENT_IDS: Tuple[int, ...] = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+EQ_IDS: tuple[int, ...] = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
+EQ_CONSTITUENT_IDS: tuple[int, ...] = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
 ETF_ID = 11
-FX_IDS: Tuple[int, ...] = (101, 102, 103, 104, 105, 106, 107, 108)
+FX_IDS: tuple[int, ...] = (101, 102, 103, 104, 105, 106, 107, 108)
 FX_REF_ID = 101  # EUR/USD — cross-asset reference pair (features/context.py)
 
 
@@ -64,14 +74,15 @@ class AlphaModel(ABC):
     #: pinned identifiers — every concrete subclass overrides these
     alpha_id: str = ""
     name: str = ""
-    asset_class: str = ""            # "EQUITY" | "FX"
-    horizon: str = ""                # pinned label horizon
-    features: Tuple[str, ...] = ()   # registry feature names read by score()
-    cross_sectional: bool = False    # True: score needs the whole universe
+    asset_class: str = ""  # "EQUITY" | "FX"
+    horizon: str = ""  # pinned label horizon
+    features: tuple[str, ...] = ()  # registry feature names read by score()
+    cross_sectional: bool = False  # True: score needs the whole universe
 
     def __init_subclass__(cls, **kwargs) -> None:
         super().__init_subclass__(**kwargs)
         import inspect
+
         if inspect.isabstract(cls) or not getattr(cls, "alpha_id", ""):
             return  # abstract/intermediate bases carry no alpha_id
         doc = inspect.getdoc(cls) or ""
@@ -87,11 +98,12 @@ class AlphaModel(ABC):
     def economic_rationale(cls) -> str:
         """The alpha's stated economic hypothesis (from the class docstring)."""
         import inspect
+
         doc = inspect.getdoc(cls) or ""
         idx = doc.find("Economic rationale:")
         return doc[idx:] if idx >= 0 else doc
 
-    def universe(self, instrument_ids: Sequence[int]) -> List[int]:
+    def universe(self, instrument_ids: Sequence[int]) -> list[int]:
         """The subset of ``instrument_ids`` this alpha trades (sorted)."""
         base = EQ_IDS if self.asset_class == "EQUITY" else FX_IDS
         return sorted(i for i in instrument_ids if i in base)
@@ -103,7 +115,7 @@ class AlphaModel(ABC):
         """Fit parameters on training frames (labels may be read here only)."""
 
     @abstractmethod
-    def score(self, data: Mapping[int, pd.DataFrame]) -> Dict[int, pd.DataFrame]:
+    def score(self, data: Mapping[int, pd.DataFrame]) -> dict[int, pd.DataFrame]:
         """Score frames -> per-instrument (exchange_ts, expected_return, confidence)."""
 
     # -- parameter serialization (configs/strategies/alpha_params.json) ---
@@ -166,7 +178,7 @@ class LinearAlpha(AlphaModel):
         self.n_train: int = 0
         self.z_clip: float = self.Z_CLIP
         self.conf_scale: float = self.CONF_SCALE
-        self.train_window: Optional[Dict[str, int]] = None
+        self.train_window: dict[str, int] | None = None
         self._fitted = False
 
     @property
@@ -180,10 +192,10 @@ class LinearAlpha(AlphaModel):
     def raw_signal(self, df: pd.DataFrame) -> pd.Series:
         """Oriented causal raw signal for one instrument frame (NaN = invalid)."""
 
-    def signals(self, data: Mapping[int, pd.DataFrame]) -> Dict[int, pd.Series]:
+    def signals(self, data: Mapping[int, pd.DataFrame]) -> dict[int, pd.Series]:
         """Raw signals for every universe instrument (cross-sectional alphas
         override this to compute jointly)."""
-        out: Dict[int, pd.Series] = {}
+        out: dict[int, pd.Series] = {}
         for iid in self.universe(list(data)):
             out[iid] = self.raw_signal(data[iid])
         return out
@@ -194,19 +206,15 @@ class LinearAlpha(AlphaModel):
         label_col = f"label_mid_{self.horizon}"
         valid_col = f"label_valid_{self.horizon}"
         sigs = self.signals(train)
-        xs: List[np.ndarray] = []
-        ys: List[np.ndarray] = []
+        xs: list[np.ndarray] = []
+        ys: list[np.ndarray] = []
         for iid, sig in sigs.items():
             df = train[iid]
             if label_col not in df.columns:
                 raise ValueError(f"{self.alpha_id}: train frame {iid} lacks {label_col}")
             x = sig.to_numpy(dtype=float)
             y = df[label_col].to_numpy(dtype=float)
-            ok = (
-                np.isfinite(x)
-                & np.isfinite(y)
-                & df[valid_col].to_numpy(dtype=bool)
-            )
+            ok = np.isfinite(x) & np.isfinite(y) & df[valid_col].to_numpy(dtype=bool)
             xs.append(x[ok])
             ys.append(y[ok])
         x = np.concatenate(xs) if xs else np.empty(0)
@@ -214,11 +222,13 @@ class LinearAlpha(AlphaModel):
         self.n_train = int(x.size)
         spans = [
             (int(df["exchange_ts"].iloc[0]), int(df["exchange_ts"].iloc[-1]))
-            for df in train.values() if len(df)
+            for df in train.values()
+            if len(df)
         ]
         self.train_window = (
-            {"start_ts": min(a for a, _ in spans),
-             "end_ts": max(b for _, b in spans)} if spans else None
+            {"start_ts": min(a for a, _ in spans), "end_ts": max(b for _, b in spans)}
+            if spans
+            else None
         )
         if x.size < 32:
             # not enough evidence: dead alpha, honestly zero
@@ -237,10 +247,10 @@ class LinearAlpha(AlphaModel):
         self.beta = self.beta_fit  # free-signed; hypothesis check via sign
         self._fitted = True
 
-    def score(self, data: Mapping[int, pd.DataFrame]) -> Dict[int, pd.DataFrame]:
+    def score(self, data: Mapping[int, pd.DataFrame]) -> dict[int, pd.DataFrame]:
         if not self._fitted:
             raise RuntimeError(f"{self.alpha_id}: score() before fit()/load_params()")
-        out: Dict[int, pd.DataFrame] = {}
+        out: dict[int, pd.DataFrame] = {}
         dead = self.is_dead
         for iid, sig in self.signals(data).items():
             df = data[iid]
@@ -250,7 +260,8 @@ class LinearAlpha(AlphaModel):
             if not dead:
                 z[ok] = np.clip(
                     (x[ok] - self.mu) / (self.sigma + EPS),
-                    -self.z_clip, self.z_clip,
+                    -self.z_clip,
+                    self.z_clip,
                 )
             er = self.beta * z
             conf = np.minimum(1.0, np.abs(z) / self.conf_scale)
@@ -297,40 +308,37 @@ class LinearAlpha(AlphaModel):
         """
         aid = self.alpha_id
         if blob.get("alpha_id") != aid:
-            raise ValueError(
-                f"params for {blob.get('alpha_id')!r} loaded into {aid}"
-            )
+            raise ValueError(f"params for {blob.get('alpha_id')!r} loaded into {aid}")
         model = blob.get("model")
         if model != "linear_z_v1":
             raise ValueError(f"{aid}: unsupported model {model!r}")
         horizon = blob.get("horizon")
         if horizon is not None and horizon != self.horizon:
-            raise ValueError(
-                f"{aid}: params horizon {horizon!r} != class horizon "
-                f"{self.horizon!r}")
+            raise ValueError(f"{aid}: params horizon {horizon!r} != class horizon {self.horizon!r}")
         feats = blob.get("features")
         if feats is not None and tuple(feats) != tuple(self.features):
             raise ValueError(
-                f"{aid}: params features {list(feats)} != class features "
-                f"{list(self.features)}")
+                f"{aid}: params features {list(feats)} != class features {list(self.features)}"
+            )
         z_clip = float(blob.get("z_clip", self.Z_CLIP))
         conf_scale = float(blob.get("conf_scale", self.CONF_SCALE))
         if z_clip != self.Z_CLIP or conf_scale != self.CONF_SCALE:
             raise ValueError(
                 f"{aid}: z_clip/conf_scale must be the pinned "
-                f"{self.Z_CLIP}/{self.CONF_SCALE} (got {z_clip}/{conf_scale})")
+                f"{self.Z_CLIP}/{self.CONF_SCALE} (got {z_clip}/{conf_scale})"
+            )
         mu = float(blob["mu"])
         sigma = float(blob["sigma"])
         beta = float(blob["beta"])
         beta_fit = float(blob.get("beta_fit", beta))
-        for name, v in (("mu", mu), ("sigma", sigma), ("beta", beta),
-                        ("beta_fit", beta_fit)):
+        for name, v in (("mu", mu), ("sigma", sigma), ("beta", beta), ("beta_fit", beta_fit)):
             if not np.isfinite(v):
                 raise ValueError(f"{aid}: non-finite {name}")
         if sigma <= 0.0 and beta != 0.0:
             raise ValueError(
                 f"{aid}: sigma <= 0 is only legal for a dead alpha "
-                f"(beta == 0); got sigma={sigma}, beta={beta}")
+                f"(beta == 0); got sigma={sigma}, beta={beta}"
+            )
         self.mu, self.sigma, self.beta, self.beta_fit = mu, sigma, beta, beta_fit
         self.z_clip, self.conf_scale = z_clip, conf_scale
         self.n_train = int(blob.get("n_train", 0))

@@ -33,8 +33,8 @@ treated as a FAILED fold by the promotion gates, never silently dropped.
 
 from __future__ import annotations
 
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
-from typing import Dict, Iterator, List, Mapping, Tuple
 
 import numpy as np
 import pandas as pd
@@ -50,9 +50,9 @@ class Fold:
     """One walk-forward fold (event-time boundaries, ns)."""
 
     index: int
-    train_end: int   # exclusive: train rows have t + purge + embargo < test_start
+    train_end: int  # exclusive: train rows have t + purge + embargo < test_start
     test_start: int  # inclusive
-    test_end: int    # exclusive
+    test_end: int  # exclusive
 
     def train_mask(self, ts: np.ndarray, horizon_ns: int, embargo_ns: int) -> np.ndarray:
         ts = np.asarray(ts, dtype=np.int64)
@@ -82,7 +82,7 @@ class WalkForwardSplitter:
         self.embargo_ns = embargo_ns
         self.mode = mode
 
-    def folds(self, t0: int, t1: int) -> List[Fold]:
+    def folds(self, t0: int, t1: int) -> list[Fold]:
         """Fold boundaries over the closed event-time span [t0, t1]
         (wall-span mode; see :meth:`folds_by_row_mass` for the default)."""
         if t1 <= t0:
@@ -90,11 +90,9 @@ class WalkForwardSplitter:
         seg = (t1 - t0) // (self.n_folds + 1)
         if seg <= 0:
             raise ValueError("span too short for the requested fold count")
-        return self._folds_from_bounds(
-            [t0 + seg * k for k in range(1, self.n_folds + 1)], t1
-        )
+        return self._folds_from_bounds([t0 + seg * k for k in range(1, self.n_folds + 1)], t1)
 
-    def folds_by_row_mass(self, ts_pooled: np.ndarray) -> List[Fold]:
+    def folds_by_row_mass(self, ts_pooled: np.ndarray) -> list[Fold]:
         """Fold boundaries at quantiles of the pooled row index (pinned).
 
         ``ts_pooled`` is every row timestamp of every frame in the split
@@ -107,22 +105,21 @@ class WalkForwardSplitter:
         n = ts.size
         if n < (self.n_folds + 1) * MIN_TEST_PAIRS:
             raise ValueError(
-                f"too few rows ({n}) for {self.n_folds} folds at "
-                f"{MIN_TEST_PAIRS} test pairs each"
+                f"too few rows ({n}) for {self.n_folds} folds at {MIN_TEST_PAIRS} test pairs each"
             )
-        bounds: List[int] = []
+        bounds: list[int] = []
         for k in range(1, self.n_folds + 1):
             idx = int(round(k * n / (self.n_folds + 1)))
             bounds.append(int(ts[min(idx, n - 1)]))
-        if any(b <= a for a, b in zip(bounds, bounds[1:])) or bounds[0] <= ts[0]:
+        if any(b <= a for a, b in zip(bounds, bounds[1:], strict=False)) or bounds[0] <= ts[0]:
             raise ValueError(
                 "row-mass fold boundaries are not strictly increasing "
                 "(too many identical timestamps for this fold count)"
             )
         return self._folds_from_bounds(bounds, int(ts[-1]))
 
-    def _folds_from_bounds(self, starts: List[int], t1: int) -> List[Fold]:
-        out: List[Fold] = []
+    def _folds_from_bounds(self, starts: list[int], t1: int) -> list[Fold]:
+        out: list[Fold] = []
         for k, test_start in enumerate(starts, start=1):
             test_end = starts[k] if k < len(starts) else t1 + 1
             out.append(
@@ -139,23 +136,21 @@ class WalkForwardSplitter:
         self,
         frames: Mapping[int, pd.DataFrame],
         horizon_ns: int,
-    ) -> Iterator[Tuple[Fold, Dict[int, pd.DataFrame], Dict[int, pd.DataFrame]]]:
+    ) -> Iterator[tuple[Fold, dict[int, pd.DataFrame], dict[int, pd.DataFrame]]]:
         """Yield (fold, train_frames, test_frames) with purge+embargo applied."""
         nonempty = [df for df in frames.values() if len(df)]
         if not nonempty:
             raise ValueError("no rows to split")
         if self.mode == "row_mass":
-            pooled = np.concatenate(
-                [df["exchange_ts"].to_numpy(dtype=np.int64) for df in nonempty]
-            )
+            pooled = np.concatenate([df["exchange_ts"].to_numpy(dtype=np.int64) for df in nonempty])
             folds = self.folds_by_row_mass(pooled)
         else:
             t0 = min(int(df["exchange_ts"].iloc[0]) for df in nonempty)
             t1 = max(int(df["exchange_ts"].iloc[-1]) for df in nonempty)
             folds = self.folds(t0, t1)
         for fold in folds:
-            train: Dict[int, pd.DataFrame] = {}
-            test: Dict[int, pd.DataFrame] = {}
+            train: dict[int, pd.DataFrame] = {}
+            test: dict[int, pd.DataFrame] = {}
             for iid, df in frames.items():
                 ts = df["exchange_ts"].to_numpy()
                 train[iid] = df[fold.train_mask(ts, horizon_ns, self.embargo_ns)].reset_index(

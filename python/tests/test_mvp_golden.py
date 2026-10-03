@@ -12,7 +12,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from iap.mvp.__main__ import cmd_replay
 from iap.mvp.config import REPO_ROOT, load_config
 from iap.mvp.feed import generate_feed
@@ -62,14 +61,16 @@ def test_config_in_force_matches_the_golden(golden: dict) -> None:
     assert cfg.config_version() == golden["config_version"]
 
 
-def test_replay_from_captured_stream_reproduces_the_digest(golden: dict,
-                                                          golden_run: RunResult) -> None:
+def test_replay_from_captured_stream_reproduces_the_digest(
+    golden: dict, golden_run: RunResult
+) -> None:
     diffs = cmd_replay(golden_run.out_dir, golden_run.out_dir / "replay")
     assert diffs == [], "\n".join(diffs)
     replay_report = json.loads((golden_run.out_dir / "replay" / "report.json").read_text())
     assert replay_report["run"]["trace_digest"] == golden["trace_digest"]
-    assert (golden_run.out_dir / "replay" / "traces.jsonl").read_bytes() == \
-        (golden_run.out_dir / "traces.jsonl").read_bytes()
+    assert (golden_run.out_dir / "replay" / "traces.jsonl").read_bytes() == (
+        golden_run.out_dir / "traces.jsonl"
+    ).read_bytes()
 
 
 def test_golden_pins_the_honest_numbers(golden: dict) -> None:
@@ -92,10 +93,13 @@ def test_golden_pins_the_honest_numbers(golden: dict) -> None:
     alpha = report["alpha"]
     assert alpha["ic_definition"].startswith("Pearson(expected_return, label)")
     for aid, row in alpha["per_alpha"].items():
-        assert row["horizon"] == "1s" and row["at_research_horizon"]["horizon"] == \
-            row["research_horizon"]
+        assert (
+            row["horizon"] == "1s"
+            and row["at_research_horizon"]["horizon"] == row["research_horizon"]
+        )
         assert row["ic_gap"] == pytest.approx(
-            abs(row["at_research_horizon"]["realized_ic"] - row["research_ic"]), abs=1e-12)
+            abs(row["at_research_horizon"]["realized_ic"] - row["research_ic"]), abs=1e-12
+        )
         assert row["n_ic_samples"] <= row["n_signals"] <= report["counts"]["n_decisions"]
         if abs(row["realized_ic"]) >= 0.1:
             assert abs(row["realized_ic_shifted"]) <= 0.25 * abs(row["realized_ic"]), aid

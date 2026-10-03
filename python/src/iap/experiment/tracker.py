@@ -47,7 +47,7 @@ import pickle
 import platform
 import subprocess
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from iap.experiment.locking import FileLock, atomic_write_text
 
@@ -64,11 +64,9 @@ def _sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
-def _git(root: Path, *args: str) -> Optional[str]:
+def _git(root: Path, *args: str) -> str | None:
     try:
-        out = subprocess.run(
-            ["git", *args], cwd=root, capture_output=True, text=True, timeout=10
-        )
+        out = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, timeout=10)
         if out.returncode == 0:
             return out.stdout
     except (OSError, subprocess.SubprocessError) as exc:
@@ -76,14 +74,14 @@ def _git(root: Path, *args: str) -> Optional[str]:
     return None
 
 
-def git_commit(repo_root: Optional[Path] = None) -> str:
+def git_commit(repo_root: Path | None = None) -> str:
     """Current git commit, or ``"unversioned-workspace"`` outside a checkout."""
     root = Path(repo_root) if repo_root is not None else _REPO
     out = _git(root, "rev-parse", "HEAD")
     return out.strip() if out is not None else "unversioned-workspace"
 
 
-def git_status(repo_root: Optional[Path] = None) -> Dict[str, Any]:
+def git_status(repo_root: Path | None = None) -> dict[str, Any]:
     """``{"git_commit", "git_dirty", "git_dirty_hash"}`` for a manifest."""
     root = Path(repo_root) if repo_root is not None else _REPO
     commit = git_commit(root)
@@ -94,13 +92,11 @@ def git_status(repo_root: Optional[Path] = None) -> Dict[str, Any]:
     return {
         "git_commit": commit,
         "git_dirty": bool(dirty),
-        "git_dirty_hash": (
-            hashlib.sha256(dirty.encode()).hexdigest() if dirty else None
-        ),
+        "git_dirty_hash": (hashlib.sha256(dirty.encode()).hexdigest() if dirty else None),
     }
 
 
-def data_version(repo_root: Optional[Path] = None) -> str:
+def data_version(repo_root: Path | None = None) -> str:
     """Content fingerprint of the normalized dataset (pinned).
 
     sha256 over ``basename \n sha256(bytes) \n`` of every
@@ -124,11 +120,11 @@ def data_version(repo_root: Optional[Path] = None) -> str:
     return h.hexdigest()
 
 
-def library_versions() -> Dict[str, str]:
+def library_versions() -> dict[str, str]:
     """Versions of the libraries whose output is version-bound (spec §26)."""
     import importlib
 
-    out: Dict[str, str] = {}
+    out: dict[str, str] = {}
     for mod in ("numpy", "pandas", "sklearn", "lightgbm", "xgboost", "pyarrow"):
         try:
             out[mod] = str(importlib.import_module(mod).__version__)
@@ -137,7 +133,7 @@ def library_versions() -> Dict[str, str]:
     return out
 
 
-def feature_version(repo_root: Optional[Path] = None) -> str:
+def feature_version(repo_root: Path | None = None) -> str:
     """Feature registry hash as recorded by the feature pipeline."""
     root = Path(repo_root) if repo_root is not None else _REPO
     summary = root / "data" / "features" / "features_summary.json"
@@ -153,7 +149,7 @@ def feature_version(repo_root: Optional[Path] = None) -> str:
     return "no-feature-registry"
 
 
-def hardware_summary() -> Dict[str, Any]:
+def hardware_summary() -> dict[str, Any]:
     """CPU / platform summary recorded in every manifest (spec §26)."""
     model_name = "unknown"
     cpu_count = 0
@@ -180,13 +176,10 @@ class ExperimentTracker:
 
     LEDGER = "ledger.json"
 
-    def __init__(self, models_dir: Optional[Path] = None,
-                 repo_root: Optional[Path] = None) -> None:
+    def __init__(self, models_dir: Path | None = None, repo_root: Path | None = None) -> None:
         self.repo_root = Path(repo_root) if repo_root is not None else _REPO
         self.models_dir = (
-            Path(models_dir)
-            if models_dir is not None
-            else self.repo_root / "research" / "models"
+            Path(models_dir) if models_dir is not None else self.repo_root / "research" / "models"
         )
         self.models_dir.mkdir(parents=True, exist_ok=True)
 
@@ -195,7 +188,7 @@ class ExperimentTracker:
     def _ledger_path(self) -> Path:
         return self.models_dir / self.LEDGER
 
-    def read_ledger(self) -> Dict[str, Any]:
+    def read_ledger(self) -> dict[str, Any]:
         path = self._ledger_path()
         if path.is_file():
             with open(path) as f:
@@ -205,10 +198,8 @@ class ExperimentTracker:
             return ledger
         return {"experiment_count": 0, "runs": []}
 
-    def _write_ledger(self, ledger: Dict[str, Any]) -> None:
-        atomic_write_text(
-            self._ledger_path(),
-            json.dumps(ledger, indent=2, sort_keys=True) + "\n")
+    def _write_ledger(self, ledger: dict[str, Any]) -> None:
+        atomic_write_text(self._ledger_path(), json.dumps(ledger, indent=2, sort_keys=True) + "\n")
 
     @property
     def experiment_count(self) -> int:
@@ -257,13 +248,13 @@ class ExperimentTracker:
         self,
         run_id: str,
         model_version: str,
-        hyperparams: Dict[str, Any],
-        train_window: Dict[str, int],
-        test_window: Dict[str, int],
-        features: Optional[list] = None,
-        target: Optional[str] = None,
-        folds: Optional[list] = None,
-    ) -> Dict[str, Any]:
+        hyperparams: dict[str, Any],
+        train_window: dict[str, int],
+        test_window: dict[str, int],
+        features: list | None = None,
+        target: str | None = None,
+        folds: list | None = None,
+    ) -> dict[str, Any]:
         """Write ``manifest.json`` for a run; returns the manifest dict.
 
         ``train_window`` / ``test_window`` are ``{"start_ts": ns, "end_ts": ns}``
@@ -272,8 +263,7 @@ class ExperimentTracker:
         rows the run used — without them a manifest cannot reproduce a fit
         (spec §14/§26).
         """
-        for w, label in ((train_window, "train_window"),
-                         (test_window, "test_window")):
+        for w, label in ((train_window, "train_window"), (test_window, "test_window")):
             if w and ("start_ts" not in w or "end_ts" not in w):
                 raise ValueError(f"{label} must carry start_ts/end_ts")
         manifest = {
@@ -296,7 +286,7 @@ class ExperimentTracker:
             f.write("\n")
         return manifest
 
-    def write_metrics(self, run_id: str, metrics: Dict[str, Any]) -> None:
+    def write_metrics(self, run_id: str, metrics: dict[str, Any]) -> None:
         with open(self.run_dir(run_id) / "metrics.json", "w") as f:
             json.dump(metrics, f, indent=2, sort_keys=True)
             f.write("\n")

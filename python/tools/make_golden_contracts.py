@@ -29,8 +29,7 @@ GOLDEN = REPO / "tests" / "golden" / "expected_contracts_examples.json"
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--force", action="store_true",
-                        help="overwrite an existing golden file")
+    parser.add_argument("--force", action="store_true", help="overwrite an existing golden file")
     args = parser.parse_args(argv)
     if GOLDEN.exists() and not args.force:
         print(f"refusing to overwrite {GOLDEN} (use --force)", file=sys.stderr)

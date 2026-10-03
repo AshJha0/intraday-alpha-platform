@@ -23,6 +23,7 @@ Exit codes
   4  a gh command failed
   5  --check-md: the rendered file is out of sync with the YAML
 """
+
 from __future__ import annotations
 
 import argparse
@@ -34,15 +35,13 @@ import subprocess
 import sys
 import tempfile
 from collections import Counter, OrderedDict
+from collections.abc import Iterable, Sequence
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 try:
     import yaml
 except ImportError:  # pragma: no cover - reported to the user, not tested
-    sys.stderr.write(
-        "error: PyYAML is required: pip install --break-system-packages pyyaml\n"
-    )
+    sys.stderr.write("error: PyYAML is required: pip install --break-system-packages pyyaml\n")
     sys.exit(1)
 
 HERE = Path(__file__).resolve().parent
@@ -72,9 +71,10 @@ class GhError(Exception):
 # loading + validation
 # --------------------------------------------------------------------------
 
+
 def load_plan(path: Path = DEFAULT_PLAN) -> dict:
     """Load and validate the plan; raise PlanError listing every problem."""
-    with open(path, "r", encoding="utf-8") as fh:
+    with open(path, encoding="utf-8") as fh:
         plan = yaml.safe_load(fh)
     problems = validate(plan)
     if problems:
@@ -83,13 +83,16 @@ def load_plan(path: Path = DEFAULT_PLAN) -> dict:
 
 
 def _is_str_list(v, non_empty: bool = True) -> bool:
-    return isinstance(v, list) and (not non_empty or len(v) > 0) and all(
-        isinstance(x, str) and x.strip() for x in v)
+    return (
+        isinstance(v, list)
+        and (not non_empty or len(v) > 0)
+        and all(isinstance(x, str) and x.strip() for x in v)
+    )
 
 
-def validate(plan) -> List[str]:
+def validate(plan) -> list[str]:
     """Return a list of human-readable problems (empty means valid)."""
-    p: List[str] = []
+    p: list[str] = []
     if not isinstance(plan, dict):
         return ["top level must be a mapping"]
     for section in ("labels", "milestones", "epics", "issues"):
@@ -101,7 +104,7 @@ def validate(plan) -> List[str]:
         p.append("`repo:` must be 'owner/name'")
 
     # labels
-    label_names: List[str] = []
+    label_names: list[str] = []
     for i, lab in enumerate(plan["labels"]):
         if not isinstance(lab, dict) or not {"name", "color", "description"} <= set(lab):
             p.append(f"labels[{i}]: needs name, color, description")
@@ -110,7 +113,9 @@ def validate(plan) -> List[str]:
         if not re.fullmatch(r"[0-9A-Fa-f]{6}", str(lab["color"])):
             p.append(f"label {lab['name']!r}: color must be 6 hex digits, got {lab['color']!r}")
         if not re.fullmatch(r"(area|lang|type|priority|status|phase):[a-z0-9-]+", lab["name"]):
-            p.append(f"label {lab['name']!r}: must be <group>:<value> with group in area/lang/type/priority/status/phase")
+            p.append(
+                f"label {lab['name']!r}: must be <group>:<value> with group in area/lang/type/priority/status/phase"
+            )
     for name, n in Counter(label_names).items():
         if n > 1:
             p.append(f"duplicate label {name!r}")
@@ -122,7 +127,7 @@ def validate(plan) -> List[str]:
         p.append("missing label type:epic")
 
     # milestones
-    ms_titles: List[str] = []
+    ms_titles: list[str] = []
     for i, ms in enumerate(plan["milestones"]):
         if not isinstance(ms, dict) or not {"title", "description"} <= set(ms):
             p.append(f"milestones[{i}]: needs title, description")
@@ -144,7 +149,16 @@ def validate(plan) -> List[str]:
             continue
         key = e.get("key")
         where = f"epic {key!r}" if key else where
-        for field in ("key", "title", "labels", "milestone", "objective", "scope", "acceptance", "out_of_scope"):
+        for field in (
+            "key",
+            "title",
+            "labels",
+            "milestone",
+            "objective",
+            "scope",
+            "acceptance",
+            "out_of_scope",
+        ):
             if field not in e:
                 p.append(f"{where}: missing `{field}`")
         if not key:
@@ -170,7 +184,18 @@ def validate(plan) -> List[str]:
             continue
         key = it.get("key")
         where = f"issue {key!r}" if key else where
-        for field in ("key", "epic", "title", "labels", "milestone", "status", "estimate_days", "context", "acceptance", "evidence"):
+        for field in (
+            "key",
+            "epic",
+            "title",
+            "labels",
+            "milestone",
+            "status",
+            "estimate_days",
+            "context",
+            "acceptance",
+            "evidence",
+        ):
             if field not in it:
                 p.append(f"{where}: missing `{field}`")
         if not key:
@@ -191,7 +216,9 @@ def validate(plan) -> List[str]:
         if "acceptance" in it and not _is_str_list(it["acceptance"]):
             p.append(f"{where}: `acceptance` must be a non-empty list of acceptance criteria")
         if "evidence" in it and not _is_str_list(it["evidence"]):
-            p.append(f"{where}: `evidence` must be a non-empty list (files/tests for done, planned paths otherwise)")
+            p.append(
+                f"{where}: `evidence` must be a non-empty list (files/tests for done, planned paths otherwise)"
+            )
         if "context" in it and not (isinstance(it["context"], str) and it["context"].strip()):
             p.append(f"{where}: `context` must be non-empty text")
 
@@ -200,7 +227,9 @@ def validate(plan) -> List[str]:
             p.append(f"duplicate key {k!r} ({n} times across epics + issues)")
     for t, n in titles.items():
         if n > 1:
-            p.append(f"duplicate title {t!r} ({n} times) — titles are the idempotency key on GitHub")
+            p.append(
+                f"duplicate title {t!r} ({n} times) — titles are the idempotency key on GitHub"
+            )
     for t in titles:
         if len(t) > 256:
             p.append(f"title longer than GitHub's 256-character limit: {t[:60]!r}...")
@@ -211,7 +240,9 @@ def validate(plan) -> List[str]:
     return p
 
 
-def _check_labels(where: str, labs, defined: set, p: List[str], *, epic: bool, status: Optional[str] = None) -> None:
+def _check_labels(
+    where: str, labs, defined: set, p: list[str], *, epic: bool, status: str | None = None
+) -> None:
     if not _is_str_list(labs):
         p.append(f"{where}: `labels` must be a non-empty list")
         return
@@ -238,7 +269,8 @@ def _check_labels(where: str, labs, defined: set, p: List[str], *, epic: bool, s
 # derived views
 # --------------------------------------------------------------------------
 
-def issue_labels(it: dict) -> List[str]:
+
+def issue_labels(it: dict) -> list[str]:
     """Labels as they go to GitHub: the YAML labels plus the derived status label."""
     labs = list(it["labels"])
     st = f"status:{it['status']}"
@@ -262,7 +294,7 @@ def epic_status(children: Sequence[dict]) -> str:
     return "backlog"
 
 
-def epic_labels(e: dict, children: Sequence[dict]) -> List[str]:
+def epic_labels(e: dict, children: Sequence[dict]) -> list[str]:
     labs = list(e["labels"])
     st = f"status:{epic_status(children)}"
     if st not in labs:
@@ -270,24 +302,24 @@ def epic_labels(e: dict, children: Sequence[dict]) -> List[str]:
     return labs
 
 
-def children_of(plan: dict, epic_key: str) -> List[dict]:
+def children_of(plan: dict, epic_key: str) -> list[dict]:
     return [it for it in plan["issues"] if it["epic"] == epic_key]
 
 
-def select(plan: dict, only: Optional[str]) -> Tuple[List[dict], List[dict]]:
+def select(plan: dict, only: str | None) -> tuple[list[dict], list[dict]]:
     """Apply the --only filter; returns (epics, issues)."""
     if not only:
         return list(plan["epics"]), list(plan["issues"])
     if not only.startswith("epic:"):
         raise PlanError([f"--only expects epic:<key>, got {only!r}"])
-    key = only[len("epic:"):]
+    key = only[len("epic:") :]
     epics = [e for e in plan["epics"] if e["key"] == key]
     if not epics:
         raise PlanError([f"--only: no epic with key {key!r}"])
     return epics, children_of(plan, key)
 
 
-def status_counts(items: Iterable[dict]) -> Dict[str, int]:
+def status_counts(items: Iterable[dict]) -> dict[str, int]:
     c = Counter(it["status"] for it in items)
     return {s: c.get(s, 0) for s in STATUSES}
 
@@ -296,11 +328,12 @@ def status_counts(items: Iterable[dict]) -> Dict[str, int]:
 # bodies
 # --------------------------------------------------------------------------
 
+
 def _box(checked: bool) -> str:
     return "- [x]" if checked else "- [ ]"
 
 
-def epic_body(e: dict, children: Sequence[dict], numbers: Optional[Dict[str, int]] = None) -> str:
+def epic_body(e: dict, children: Sequence[dict], numbers: dict[str, int] | None = None) -> str:
     """The epic's GitHub body. With ``numbers`` (key -> issue number) the
     children appear as a task list of ``#N`` references; without, as keys."""
     st = epic_status(children)
@@ -326,9 +359,13 @@ def epic_body(e: dict, children: Sequence[dict], numbers: Optional[Dict[str, int
     return "\n".join(lines) + "\n"
 
 
-def issue_body(it: dict, epic: dict, epic_number: Optional[int] = None) -> str:
+def issue_body(it: dict, epic: dict, epic_number: int | None = None) -> str:
     done = it["status"] == "done"
-    part_of = f"Part of #{epic_number}" if epic_number else f"Part of epic `{epic['key']}` ({epic['title']})"
+    part_of = (
+        f"Part of #{epic_number}"
+        if epic_number
+        else f"Part of epic `{epic['key']}` ({epic['title']})"
+    )
     evidence_heading = {
         "done": "## Evidence (files and tests that prove it)",
         "in-progress": "## Planned paths",
@@ -359,38 +396,54 @@ def _fmt_days(d) -> str:
 # dry-run table
 # --------------------------------------------------------------------------
 
-def render_table(plan: dict, only: Optional[str] = None) -> str:
+
+def render_table(plan: dict, only: str | None = None) -> str:
     epics, issues = select(plan, only)
-    out: List[str] = []
+    out: list[str] = []
     out.append(f"repo: {plan['repo']}")
-    out.append(f"labels: {len(plan['labels'])}   milestones: {len(plan['milestones'])}   "
-               f"epics: {len(epics)}   issues: {len(issues)}")
+    out.append(
+        f"labels: {len(plan['labels'])}   milestones: {len(plan['milestones'])}   "
+        f"epics: {len(epics)}   issues: {len(issues)}"
+    )
     sc = status_counts(issues)
     out.append("issues by status: " + "  ".join(f"{s}={sc[s]}" for s in STATUSES))
-    out.append(f"estimate (days): done={_sum_days(issues, 'done'):g}  "
-               f"in-progress={_sum_days(issues, 'in-progress'):g}  backlog={_sum_days(issues, 'backlog'):g}")
+    out.append(
+        f"estimate (days): done={_sum_days(issues, 'done'):g}  "
+        f"in-progress={_sum_days(issues, 'in-progress'):g}  backlog={_sum_days(issues, 'backlog'):g}"
+    )
     out.append("")
     widths = (6, 12, 9, 5, 70)
     header = _row(("key", "status", "milestone", "days", "title"), widths)
     for e in epics:
-        kids = children_of(plan, e["key"]) if not only else [i for i in issues if i["epic"] == e["key"]]
-        out.append(f"{e['key']}  {e['title']}  [{e['milestone']}; {epic_status(kids)}; "
-                   f"{len(kids)} issues; {_sum_days(kids):g} days]")
+        kids = (
+            children_of(plan, e["key"])
+            if not only
+            else [i for i in issues if i["epic"] == e["key"]]
+        )
+        out.append(
+            f"{e['key']}  {e['title']}  [{e['milestone']}; {epic_status(kids)}; "
+            f"{len(kids)} issues; {_sum_days(kids):g} days]"
+        )
         out.append(header)
         out.append(_row(("-" * w for w in widths), widths))
         for c in kids:
-            out.append(_row((c["key"], c["status"], c["milestone"], f"{c['estimate_days']:g}", c["title"]), widths))
+            out.append(
+                _row(
+                    (c["key"], c["status"], c["milestone"], f"{c['estimate_days']:g}", c["title"]),
+                    widths,
+                )
+            )
         out.append("")
     return "\n".join(out)
 
 
-def _sum_days(items: Iterable[dict], status: Optional[str] = None) -> float:
+def _sum_days(items: Iterable[dict], status: str | None = None) -> float:
     return float(sum(i["estimate_days"] for i in items if status is None or i["status"] == status))
 
 
 def _row(cells: Iterable[str], widths: Sequence[int]) -> str:
     parts = []
-    for cell, w in zip(cells, widths):
+    for cell, w in zip(cells, widths, strict=False):
         cell = str(cell)
         if len(cell) > w:
             cell = cell[: w - 1] + "…"
@@ -402,16 +455,17 @@ def _row(cells: Iterable[str], widths: Sequence[int]) -> str:
 # markdown rendering (docs/EPICS.md)
 # --------------------------------------------------------------------------
 
+
 def render_md(plan: dict) -> str:
     epics, issues = plan["epics"], plan["issues"]
     sc = status_counts(issues)
     ms_order = [m["title"] for m in plan["milestones"]]
     ms_desc = {m["title"]: m["description"] for m in plan["milestones"]}
-    by_ms: "OrderedDict[str, List[dict]]" = OrderedDict((m, []) for m in ms_order)
+    by_ms: OrderedDict[str, list[dict]] = OrderedDict((m, []) for m in ms_order)
     for e in epics:
         by_ms[e["milestone"]].append(e)
 
-    L: List[str] = []
+    L: list[str] = []
     L.append("# Epics and issues")
     L.append("")
     L.append("<!-- GENERATED FILE — do not edit. Source: tools/github/issues.yaml; regenerate with")
@@ -441,7 +495,9 @@ def render_md(plan: dict) -> str:
     for m in ms_order:
         ms_issues = [i for i in issues if i["milestone"] == m]
         c = status_counts(ms_issues)
-        L.append(f"| {m} | {len(by_ms[m])} | {len(ms_issues)} | {c['done']} | {c['in-progress']} | {c['backlog']} |")
+        L.append(
+            f"| {m} | {len(by_ms[m])} | {len(ms_issues)} | {c['done']} | {c['in-progress']} | {c['backlog']} |"
+        )
     L.append("")
     L.append("Issues are listed under their epic; an issue's own milestone can differ from")
     L.append("the epic's (a backlog item under a finished epic sits in **Backlog**).")
@@ -450,8 +506,10 @@ def render_md(plan: dict) -> str:
     L.append("")
     for e in epics:
         kids = children_of(plan, e["key"])
-        L.append(f"- [{e['key']} — {_strip_epic(e['title'])}](#{_anchor(e)}) · {e['milestone']} · "
-                 f"{epic_status(kids)} · {len(kids)} issues")
+        L.append(
+            f"- [{e['key']} — {_strip_epic(e['title'])}](#{_anchor(e)}) · {e['milestone']} · "
+            f"{epic_status(kids)} · {len(kids)} issues"
+        )
     L.append("")
 
     for m in ms_order:
@@ -466,10 +524,12 @@ def render_md(plan: dict) -> str:
             c = status_counts(kids)
             L.append(f"### {e['key']} — {_strip_epic(e['title'])}")
             L.append("")
-            L.append(f"**Status:** {epic_status(kids)} · **Milestone:** {e['milestone']} · "
-                     f"**Issues:** {len(kids)} (done {c['done']}, in-progress {c['in-progress']}, "
-                     f"backlog {c['backlog']}) · **Estimate:** {_sum_days(kids):g} days · "
-                     f"**Labels:** " + ", ".join(f"`{l}`" for l in epic_labels(e, kids)))
+            L.append(
+                f"**Status:** {epic_status(kids)} · **Milestone:** {e['milestone']} · "
+                f"**Issues:** {len(kids)} (done {c['done']}, in-progress {c['in-progress']}, "
+                f"backlog {c['backlog']}) · **Estimate:** {_sum_days(kids):g} days · "
+                f"**Labels:** " + ", ".join(f"`{l}`" for l in epic_labels(e, kids))
+            )
             L.append("")
             L.append(e["objective"].strip())
             L.append("")
@@ -486,8 +546,10 @@ def render_md(plan: dict) -> str:
             L.append("|---|---|---|---:|---|---|")
             for it in kids:
                 ev = "<br>".join(f"`{_md_escape(x)}`" for x in it["evidence"])
-                L.append(f"| {it['key']} | {_md_escape(it['title'])} | {it['status']} | "
-                         f"{it['estimate_days']:g} | {it['milestone']} | {ev} |")
+                L.append(
+                    f"| {it['key']} | {_md_escape(it['title'])} | {it['status']} | "
+                    f"{it['estimate_days']:g} | {it['milestone']} | {ev} |"
+                )
             L.append("")
     L.append("## Labels")
     L.append("")
@@ -500,7 +562,7 @@ def render_md(plan: dict) -> str:
 
 
 def _strip_epic(title: str) -> str:
-    return title[len("Epic: "):] if title.startswith("Epic: ") else title
+    return title[len("Epic: ") :] if title.startswith("Epic: ") else title
 
 
 def _anchor(e: dict) -> str:
@@ -517,6 +579,7 @@ def _md_escape(s: str) -> str:
 # gh
 # --------------------------------------------------------------------------
 
+
 class Gh:
     """Thin wrapper over the gh CLI with idempotent helpers."""
 
@@ -528,21 +591,34 @@ class Gh:
     @staticmethod
     def ensure_available() -> None:
         if shutil.which("gh") is None:
-            raise GhError("the `gh` CLI is not installed — https://cli.github.com/ (then `gh auth login`)")
+            raise GhError(
+                "the `gh` CLI is not installed — https://cli.github.com/ (then `gh auth login`)"
+            )
         r = subprocess.run(["gh", "auth", "status"], capture_output=True, text=True)
         if r.returncode != 0:
-            raise GhError("gh is installed but not authenticated — run `gh auth login`\n" + (r.stderr or r.stdout).strip())
+            raise GhError(
+                "gh is installed but not authenticated — run `gh auth login`\n"
+                + (r.stderr or r.stdout).strip()
+            )
 
-    def run(self, args: Sequence[str], input_text: Optional[str] = None) -> str:
+    def run(self, args: Sequence[str], input_text: str | None = None) -> str:
         cmd = ["gh", *args]
         if self.verbose:
             print("  $ " + " ".join(_q(a) for a in cmd))
         r = subprocess.run(cmd, capture_output=True, text=True, input=input_text)
         if r.returncode != 0:
-            raise GhError(f"command failed ({r.returncode}): {' '.join(_q(a) for a in cmd)}\n{r.stderr.strip()}")
+            raise GhError(
+                f"command failed ({r.returncode}): {' '.join(_q(a) for a in cmd)}\n{r.stderr.strip()}"
+            )
         return r.stdout
 
-    def api_json(self, path: str, method: str = "GET", fields: Optional[Dict[str, str]] = None, paginate: bool = False):
+    def api_json(
+        self,
+        path: str,
+        method: str = "GET",
+        fields: dict[str, str] | None = None,
+        paginate: bool = False,
+    ):
         args = ["api", path, "-X", method]
         if paginate:
             args.append("--paginate")
@@ -561,34 +637,76 @@ class Gh:
 
     # -- labels -----------------------------------------------------------
     def label_create(self, name: str, color: str, description: str) -> None:
-        self.run(["label", "create", name, "--repo", self.repo, "--color", color,
-                  "--description", description, "--force"])
+        self.run(
+            [
+                "label",
+                "create",
+                name,
+                "--repo",
+                self.repo,
+                "--color",
+                color,
+                "--description",
+                description,
+                "--force",
+            ]
+        )
 
     # -- milestones -------------------------------------------------------
-    def milestones(self) -> Dict[str, int]:
+    def milestones(self) -> dict[str, int]:
         owner, name = self.repo.split("/", 1)
-        rows = self.api_json(f"repos/{owner}/{name}/milestones?state=all&per_page=100", paginate=True) or []
+        rows = (
+            self.api_json(f"repos/{owner}/{name}/milestones?state=all&per_page=100", paginate=True)
+            or []
+        )
         return {m["title"]: m["number"] for m in rows}
 
-    def milestone_ensure(self, title: str, description: str, existing: Dict[str, int]) -> int:
+    def milestone_ensure(self, title: str, description: str, existing: dict[str, int]) -> int:
         if title in existing:
             return existing[title]
         owner, name = self.repo.split("/", 1)
-        row = self.api_json(f"repos/{owner}/{name}/milestones", "POST",
-                            {"title": title, "description": description})
+        row = self.api_json(
+            f"repos/{owner}/{name}/milestones", "POST", {"title": title, "description": description}
+        )
         existing[title] = row["number"]
         return row["number"]
 
     # -- issues -----------------------------------------------------------
-    def issues_by_title(self) -> Dict[str, dict]:
-        out = self.run(["issue", "list", "--repo", self.repo, "--state", "all",
-                        "--json", "title,number,state", "--limit", "500"])
+    def issues_by_title(self) -> dict[str, dict]:
+        out = self.run(
+            [
+                "issue",
+                "list",
+                "--repo",
+                self.repo,
+                "--state",
+                "all",
+                "--json",
+                "title,number,state",
+                "--limit",
+                "500",
+            ]
+        )
         return {row["title"]: row for row in json.loads(out or "[]")}
 
-    def issue_find(self, title: str) -> Optional[dict]:
+    def issue_find(self, title: str) -> dict | None:
         """Exact-title lookup via search (authoritative even past the 500-row list)."""
-        out = self.run(["issue", "list", "--repo", self.repo, "--state", "all",
-                        "--search", f'in:title "{title}"', "--json", "title,number,state", "--limit", "500"])
+        out = self.run(
+            [
+                "issue",
+                "list",
+                "--repo",
+                self.repo,
+                "--state",
+                "all",
+                "--search",
+                f'in:title "{title}"',
+                "--json",
+                "title,number,state",
+                "--limit",
+                "500",
+            ]
+        )
         for row in json.loads(out or "[]"):
             if row["title"] == title:
                 return row
@@ -596,15 +714,35 @@ class Gh:
 
     def issue_create(self, title: str, body: str, labels: Sequence[str], milestone: str) -> int:
         with _body_file(body) as bf:
-            out = self.run(["issue", "create", "--repo", self.repo, "--title", title,
-                            "--body-file", bf, "--label", ",".join(labels), "--milestone", milestone])
+            out = self.run(
+                [
+                    "issue",
+                    "create",
+                    "--repo",
+                    self.repo,
+                    "--title",
+                    title,
+                    "--body-file",
+                    bf,
+                    "--label",
+                    ",".join(labels),
+                    "--milestone",
+                    milestone,
+                ]
+            )
         m = re.search(r"/issues/(\d+)\s*$", out.strip())
         if not m:
             raise GhError(f"could not parse the issue number from gh output: {out!r}")
         return int(m.group(1))
 
-    def issue_edit(self, number: int, *, body: Optional[str] = None, labels: Optional[Sequence[str]] = None,
-                   milestone: Optional[str] = None) -> None:
+    def issue_edit(
+        self,
+        number: int,
+        *,
+        body: str | None = None,
+        labels: Sequence[str] | None = None,
+        milestone: str | None = None,
+    ) -> None:
         args = ["issue", "edit", str(number), "--repo", self.repo]
         if labels:
             args += ["--add-label", ",".join(labels)]
@@ -662,7 +800,8 @@ class _body_file:
 # apply
 # --------------------------------------------------------------------------
 
-def apply(plan: dict, repo: str, only: Optional[str] = None) -> None:
+
+def apply(plan: dict, repo: str, only: str | None = None) -> None:
     Gh.ensure_available()
     gh = Gh(repo)
     epics, issues = select(plan, only)
@@ -679,10 +818,10 @@ def apply(plan: dict, repo: str, only: Optional[str] = None) -> None:
 
     print("== existing issues")
     known = gh.issues_by_title()
-    numbers: Dict[str, int] = {}
+    numbers: dict[str, int] = {}
     created = updated = closed = 0
 
-    def find(title: str) -> Optional[dict]:
+    def find(title: str) -> dict | None:
         row = known.get(title)
         if row is None:
             row = gh.issue_find(title)
@@ -700,7 +839,9 @@ def apply(plan: dict, repo: str, only: Optional[str] = None) -> None:
             gh.issue_edit(row["number"], labels=labels, milestone=e["milestone"])
             updated += 1
         else:
-            numbers[e["key"]] = gh.issue_create(e["title"], epic_body(e, kids), labels, e["milestone"])
+            numbers[e["key"]] = gh.issue_create(
+                e["title"], epic_body(e, kids), labels, e["milestone"]
+            )
             created += 1
         print(f"  {e['key']} -> #{numbers[e['key']]}")
 
@@ -735,22 +876,37 @@ def apply(plan: dict, repo: str, only: Optional[str] = None) -> None:
 
 def _close_comment(it: dict) -> str:
     ev = "\n".join(f"- `{x}`" for x in it["evidence"])
-    return ("Closing as **done**: this exists in the repository. Evidence (from "
-            "tools/github/issues.yaml):\n\n" + ev)
+    return (
+        "Closing as **done**: this exists in the repository. Evidence (from "
+        "tools/github/issues.yaml):\n\n" + ev
+    )
 
 
 # --------------------------------------------------------------------------
 # CLI
 # --------------------------------------------------------------------------
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+
+def main(argv: Sequence[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("--plan", type=Path, default=DEFAULT_PLAN, help="path to issues.yaml")
     mode = ap.add_mutually_exclusive_group()
-    mode.add_argument("--dry-run", action="store_true", help="validate and print the plan (default)")
-    mode.add_argument("--apply", action="store_true", help="create/update labels, milestones, epics, issues with gh")
-    mode.add_argument("--render-md", type=Path, metavar="PATH", help="write the markdown rendering to PATH")
-    mode.add_argument("--check-md", type=Path, metavar="PATH", help="exit 5 if PATH is not the current rendering")
+    mode.add_argument(
+        "--dry-run", action="store_true", help="validate and print the plan (default)"
+    )
+    mode.add_argument(
+        "--apply",
+        action="store_true",
+        help="create/update labels, milestones, epics, issues with gh",
+    )
+    mode.add_argument(
+        "--render-md", type=Path, metavar="PATH", help="write the markdown rendering to PATH"
+    )
+    mode.add_argument(
+        "--check-md", type=Path, metavar="PATH", help="exit 5 if PATH is not the current rendering"
+    )
     ap.add_argument("--repo", help="owner/name override (default: `repo:` in the YAML)")
     ap.add_argument("--only", metavar="epic:<key>", help="restrict to one epic and its issues")
     args = ap.parse_args(argv)
@@ -774,14 +930,18 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if args.render_md:
             text = render_md(plan)
             args.render_md.write_text(text, encoding="utf-8")
-            print(f"wrote {args.render_md} ({len(text.splitlines())} lines, "
-                  f"{len(plan['epics'])} epics, {len(plan['issues'])} issues)")
+            print(
+                f"wrote {args.render_md} ({len(text.splitlines())} lines, "
+                f"{len(plan['epics'])} epics, {len(plan['issues'])} issues)"
+            )
             return EXIT_OK
         if args.check_md:
             current = args.check_md.read_text(encoding="utf-8") if args.check_md.exists() else ""
             if current != render_md(plan):
-                sys.stderr.write(f"error: {args.check_md} is out of sync with {args.plan}; regenerate with\n"
-                                 f"  python3 {Path(__file__).relative_to(REPO_ROOT) if Path(__file__).is_relative_to(REPO_ROOT) else __file__} --render-md {args.check_md}\n")
+                sys.stderr.write(
+                    f"error: {args.check_md} is out of sync with {args.plan}; regenerate with\n"
+                    f"  python3 {Path(__file__).relative_to(REPO_ROOT) if Path(__file__).is_relative_to(REPO_ROOT) else __file__} --render-md {args.check_md}\n"
+                )
                 return EXIT_STALE
             print(f"{args.check_md} is in sync with {args.plan}")
             return EXIT_OK
@@ -798,7 +958,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     except GhError as exc:
         msg = str(exc)
         sys.stderr.write(f"error: {msg}\n")
-        return EXIT_NO_GH if ("not installed" in msg or "not authenticated" in msg) else EXIT_GH_FAILED
+        return (
+            EXIT_NO_GH if ("not installed" in msg or "not authenticated" in msg) else EXIT_GH_FAILED
+        )
 
 
 if __name__ == "__main__":

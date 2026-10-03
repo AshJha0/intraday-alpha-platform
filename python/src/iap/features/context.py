@@ -26,9 +26,8 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Dict, Union
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 _FX_REF_SYMBOL = "EUR/USD"
@@ -53,7 +52,7 @@ class SessionClock:
             self._zone = ZoneInfo(self.name)
         except (ZoneInfoNotFoundError, ValueError, KeyError) as exc:
             raise ValueError(f"unknown session timezone {name!r}") from exc
-        self._cache: Dict[int, int] = {}
+        self._cache: dict[int, int] = {}
 
     @property
     def is_utc(self) -> bool:
@@ -65,9 +64,7 @@ class SessionClock:
         hour = ts_ns // _NS_H
         off = self._cache.get(hour)
         if off is None:
-            dt = datetime.fromtimestamp(hour * 3600, tz=timezone.utc).astimezone(
-                self._zone
-            )
+            dt = datetime.fromtimestamp(hour * 3600, tz=UTC).astimezone(self._zone)
             off = int(dt.utcoffset().total_seconds())
             self._cache[hour] = off
         return off
@@ -99,7 +96,7 @@ def _minute_of_day(hhmmss: str) -> int:
     return h * 60 + m + (1 if s >= 30 else 0)
 
 
-def build_contexts(config_dir: Union[str, Path]) -> Dict[int, InstrumentContext]:
+def build_contexts(config_dir: str | Path) -> dict[int, InstrumentContext]:
     """Build {instrument_id: InstrumentContext} from
     configs/instruments/instruments.json."""
     config_dir = Path(config_dir)
@@ -117,8 +114,8 @@ def build_contexts(config_dir: Union[str, Path]) -> Dict[int, InstrumentContext]
         if row["symbol"] == _FX_REF_SYMBOL:
             fx_ref_id = row["instrument_id"]
 
-    clocks: Dict[str, SessionClock] = {}
-    out: Dict[int, InstrumentContext] = {}
+    clocks: dict[str, SessionClock] = {}
+    out: dict[int, InstrumentContext] = {}
     for row in rows:
         ac = row["asset_class"]
         sess = sessions.get(ac)

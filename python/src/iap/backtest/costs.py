@@ -41,7 +41,6 @@ from pathlib import Path
 
 import numpy as np
 
-
 #: Pinned impact models (module docs).
 IMPACT_MODELS = ("linear", "sqrt")
 
@@ -59,19 +58,16 @@ class CostModel:
 
     def __post_init__(self) -> None:
         if self.impact_model not in IMPACT_MODELS:
-            raise ValueError(
-                f"unknown impact_model {self.impact_model!r}; known: {IMPACT_MODELS}")
+            raise ValueError(f"unknown impact_model {self.impact_model!r}; known: {IMPACT_MODELS}")
         if self.sqrt_impact_coeff_bps < 0.0:
             raise ValueError("sqrt_impact_coeff_bps must be >= 0")
 
     @classmethod
-    def load(cls, execution_config_path, multiplier: float = 1.0) -> "CostModel":
+    def load(cls, execution_config_path, multiplier: float = 1.0) -> CostModel:
         blob = json.loads(Path(execution_config_path).read_text())
         cm = blob.get("cost_model")
         if cm is None:
-            raise ValueError(
-                f"{execution_config_path}: missing 'cost_model' section"
-            )
+            raise ValueError(f"{execution_config_path}: missing 'cost_model' section")
         return cls(
             impact_coeff_bps_per_pct_adv=float(cm["impact_coeff_bps_per_pct_adv"]),
             equity_taker_fee_per_share=float(cm["equity_taker_fee_per_share"]),
@@ -81,10 +77,10 @@ class CostModel:
             sqrt_impact_coeff_bps=float(cm.get("sqrt_impact_coeff_bps", 0.0)),
         )
 
-    def with_multiplier(self, multiplier: float) -> "CostModel":
+    def with_multiplier(self, multiplier: float) -> CostModel:
         return replace(self, multiplier=multiplier)
 
-    def with_sqrt_impact(self, coeff_bps: float) -> "CostModel":
+    def with_sqrt_impact(self, coeff_bps: float) -> CostModel:
         """This model with square-root impact of ``coeff_bps`` at one ADV."""
         return replace(self, impact_model="sqrt", sqrt_impact_coeff_bps=float(coeff_bps))
 
@@ -186,16 +182,16 @@ class CostModel:
         """
         if not (np.isfinite(edge_return) and adv > 0):
             raise ValueError("edge_return must be finite and adv positive")
-        fixed = float(self.round_trip_cost_return(
-            np.array([mid]), np.array([half_spread]), asset_class)[0])
+        fixed = float(
+            self.round_trip_cost_return(np.array([mid]), np.array([half_spread]), asset_class)[0]
+        )
         if not np.isfinite(fixed):
             raise ValueError("mid / half_spread do not price a round trip")
         room = float(edge_return) - fixed
         if room <= 0.0:
             return 0.0
         unit = float(lot_size) if asset_class == "FX" else 1.0
-        per_leg_bps = room / (2.0 * self.multiplier * 1e-4) if self.multiplier > 0 \
-            else float("inf")
+        per_leg_bps = room / (2.0 * self.multiplier * 1e-4) if self.multiplier > 0 else float("inf")
         if self.impact_model == "sqrt":
             if self.sqrt_impact_coeff_bps <= 0.0 or not np.isfinite(per_leg_bps):
                 return float("inf")

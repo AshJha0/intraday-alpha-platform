@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-
 from iap.portfolio.covariance import bars_from_features, ewma_covariance
 
 

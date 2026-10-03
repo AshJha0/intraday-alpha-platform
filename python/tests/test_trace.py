@@ -8,7 +8,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from iap.contracts.examples import VENUE_NAMES, all_examples, example_trace
 from iap.contracts.types import (
     AlphaSignal,
@@ -48,9 +47,16 @@ EMPTY_DIGEST = hashlib.sha256(b"").hexdigest()
 
 
 def _builder_for(trace: DecisionTrace) -> TraceBuilder:
-    return TraceBuilder(trace.session_id, trace.instrument_id, trace.event_ts,
-                        trace.sequence, trace.data_version, trace.feature_version,
-                        trace.model_version, trace.config_version)
+    return TraceBuilder(
+        trace.session_id,
+        trace.instrument_id,
+        trace.event_ts,
+        trace.sequence,
+        trace.data_version,
+        trace.feature_version,
+        trace.model_version,
+        trace.config_version,
+    )
 
 
 def _rebuild(trace: DecisionTrace) -> TraceBuilder:
@@ -93,6 +99,7 @@ def _next_decision(trace: DecisionTrace) -> DecisionTrace:
 # Builder
 # --------------------------------------------------------------------------
 
+
 def test_builder_reproduces_example_and_is_repeatable() -> None:
     trace = example_trace()
     b = _rebuild(trace)
@@ -122,14 +129,28 @@ def test_builder_rejects_wrong_types_and_invalid_traces() -> None:
         b.set_portfolio(trace.stages.risk[0])  # type: ignore[arg-type]
     with pytest.raises(TypeError):
         b.set_attribution(trace.stages.tca[0])  # type: ignore[arg-type]
-    bad = TraceBuilder(trace.session_id, trace.instrument_id, trace.event_ts, -1,
-                       trace.data_version, trace.feature_version, trace.model_version,
-                       trace.config_version)
+    bad = TraceBuilder(
+        trace.session_id,
+        trace.instrument_id,
+        trace.event_ts,
+        -1,
+        trace.data_version,
+        trace.feature_version,
+        trace.model_version,
+        trace.config_version,
+    )
     with pytest.raises(ValueError):  # make_trace_id rejects the sequence
         bad.build()
-    bad_hash = TraceBuilder(trace.session_id, trace.instrument_id, trace.event_ts,
-                            trace.sequence, "not-a-hash", trace.feature_version,
-                            trace.model_version, trace.config_version)
+    bad_hash = TraceBuilder(
+        trace.session_id,
+        trace.instrument_id,
+        trace.event_ts,
+        trace.sequence,
+        "not-a-hash",
+        trace.feature_version,
+        trace.model_version,
+        trace.config_version,
+    )
     with pytest.raises(ContractError):
         bad_hash.build()
 
@@ -137,6 +158,7 @@ def test_builder_rejects_wrong_types_and_invalid_traces() -> None:
 # --------------------------------------------------------------------------
 # Sinks
 # --------------------------------------------------------------------------
+
 
 def test_jsonl_sink_bytes_are_canonical_lines(tmp_path: Path) -> None:
     trace = example_trace()
@@ -146,7 +168,7 @@ def test_jsonl_sink_bytes_are_canonical_lines(tmp_path: Path) -> None:
         sink.emit(trace)
         sink.emit(other)
         assert sink.digest.count == 2
-    expected = (canonical_json(trace.to_dict()) + "\n" + canonical_json(other.to_dict()) + "\n")
+    expected = canonical_json(trace.to_dict()) + "\n" + canonical_json(other.to_dict()) + "\n"
     assert path.read_bytes() == expected.encode("ascii")
     with pytest.raises(RuntimeError):
         sink.emit(trace)
@@ -201,6 +223,7 @@ def test_sinks_validate_before_persisting(tmp_path: Path) -> None:
 # Digest
 # --------------------------------------------------------------------------
 
+
 def test_digest_known_answer_and_determinism() -> None:
     trace = example_trace()
     line = trace_line(trace)
@@ -212,9 +235,12 @@ def test_digest_known_answer_and_determinism() -> None:
     a = TraceDigest().update(trace).update(_with_signal(trace, confidence=0.5))
     b = TraceDigest().update(_rebuild(trace).build()).update(_with_signal(trace, confidence=0.5))
     assert a.hexdigest() == b.hexdigest() and a.count == 2
-    assert a.hexdigest() == hashlib.sha256(
-        (line + "\n" + trace_line(_with_signal(trace, confidence=0.5)) + "\n").encode("ascii")
-    ).hexdigest()
+    assert (
+        a.hexdigest()
+        == hashlib.sha256(
+            (line + "\n" + trace_line(_with_signal(trace, confidence=0.5)) + "\n").encode("ascii")
+        ).hexdigest()
+    )
 
 
 def test_digest_is_sensitive_to_one_field_and_to_order() -> None:
@@ -222,8 +248,9 @@ def test_digest_is_sensitive_to_one_field_and_to_order() -> None:
     base = TraceDigest().update(trace).hexdigest()
     changed = _with_signal(trace, expected_return=4.3e-4)
     assert TraceDigest().update(changed).hexdigest() != base
-    header_changed = DecisionTrace.from_dict({**trace.to_dict(), "sequence": trace.sequence + 1,
-                                              "trace_id": trace.trace_id})
+    header_changed = DecisionTrace.from_dict(
+        {**trace.to_dict(), "sequence": trace.sequence + 1, "trace_id": trace.trace_id}
+    )
     assert TraceDigest().update(header_changed).hexdigest() != base
     ab = TraceDigest().update(trace).update(changed).hexdigest()
     ba = TraceDigest().update(changed).update(trace).hexdigest()
@@ -245,18 +272,20 @@ def test_digest_of_jsonl_recanonicalises(tmp_path: Path) -> None:
 # Attribution
 # --------------------------------------------------------------------------
 
+
 def test_attribution_identity_and_signs() -> None:
     ex = all_examples()
     parent, signal, tca = ex["ParentOrder"], ex["AlphaSignal"], ex["TCAResult"]
     a = attribute(parent, signal, tca, realized_bps=2.0)
     assert isinstance(a, Attribution)
-    assert a.alpha_bps == pytest.approx(4.2)          # +4.2e-4 * 1e4, BID
+    assert a.alpha_bps == pytest.approx(4.2)  # +4.2e-4 * 1e4, BID
     assert a.spread_bps == -tca.spread_cost_bps == -0.8
     assert a.impact_bps == -tca.impact_bps == -0.5
     assert a.fees_bps == -tca.fees_bps == -0.4
     assert a.timing_bps == -tca.timing_cost_bps == -0.2
-    assert a.total_bps == pytest.approx(a.alpha_bps + a.spread_bps + a.impact_bps
-                                        + a.fees_bps + a.timing_bps)
+    assert a.total_bps == pytest.approx(
+        a.alpha_bps + a.spread_bps + a.impact_bps + a.fees_bps + a.timing_bps
+    )
     assert a.total_bps == pytest.approx(2.3)
     assert validate_typed(a)
     # residual is reported, never folded in
@@ -266,8 +295,9 @@ def test_attribution_identity_and_signs() -> None:
     assert residual_bps(a, 2.0) == report.residual_bps
     # selling on a negative forecast is positive alpha
     sell = ParentOrder.from_dict({**parent.to_dict(), "side": Side.ASK.value})
-    down = AlphaSignal.from_dict({**signal.to_dict(), "expected_return": -3.0e-4,
-                                  "direction": Direction.DOWN.value})
+    down = AlphaSignal.from_dict(
+        {**signal.to_dict(), "expected_return": -3.0e-4, "direction": Direction.DOWN.value}
+    )
     assert attribute(sell, down, tca, 0.0).alpha_bps == pytest.approx(3.0)
     assert attribute(sell, signal, tca, 0.0).alpha_bps == pytest.approx(-4.2)
 
@@ -291,6 +321,7 @@ def test_attribution_rejects_mismatches_and_non_finite() -> None:
 # Explain over JSONL
 # --------------------------------------------------------------------------
 
+
 def test_explain_jsonl_matches_golden(tmp_path: Path) -> None:
     trace = example_trace()
     other = _with_signal(trace, confidence=0.5)
@@ -304,7 +335,8 @@ def test_explain_jsonl_matches_golden(tmp_path: Path) -> None:
     with JsonlTraceSink(path) as sink:
         sink.emit(trace)
     assert explain_jsonl(path, 12345, VENUE_NAMES) == GOLDEN["explain"]["text"]
-    assert explain_jsonl(path, 12345) == GOLDEN["explain"]["text"].replace(
-        "XV1", "1").replace("XV2", "2").replace("XV3", "3")
+    assert explain_jsonl(path, 12345) == GOLDEN["explain"]["text"].replace("XV1", "1").replace(
+        "XV2", "2"
+    ).replace("XV3", "3")
     with pytest.raises(KeyError):
         explain_jsonl(path, 99)

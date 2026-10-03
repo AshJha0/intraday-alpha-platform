@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-
+from conftest import REPO_ROOT
 from iap.alpha import (
     ALPHA_CLASSES,
     ALPHA_IDS,
@@ -24,13 +24,9 @@ from iap.alpha import (
 from iap.alpha.data import load_features
 from iap.features.registry import build_registry
 
-from conftest import REPO_ROOT
-
 FEATURES_DIR = REPO_ROOT / "data" / "features"
 
-EXPECTED_IDS = [f"EQ{i:02d}" for i in range(1, 13)] + [
-    f"FX{i:02d}" for i in range(1, 13)
-]
+EXPECTED_IDS = [f"EQ{i:02d}" for i in range(1, 13)] + [f"FX{i:02d}" for i in range(1, 13)]
 
 
 @pytest.fixture(scope="module")
@@ -87,6 +83,7 @@ def test_declared_features_exist_in_registry(aid, registry_names):
 
 def test_class_without_rationale_cannot_exist():
     with pytest.raises(TypeError):
+
         class NoRationale(LinearAlpha):  # noqa: F811 - deliberate
             """No hypothesis here."""
 
@@ -124,9 +121,7 @@ def test_fit_score_contract(aid, small_frames, fitted_models):
         df = small_frames[iid]
         assert list(sc.columns) == ["exchange_ts", "expected_return", "confidence"]
         assert len(sc) == len(df)
-        assert np.array_equal(
-            sc["exchange_ts"].to_numpy(), df["exchange_ts"].to_numpy()
-        )
+        assert np.array_equal(sc["exchange_ts"].to_numpy(), df["exchange_ts"].to_numpy())
         er = sc["expected_return"].to_numpy()
         conf = sc["confidence"].to_numpy()
         assert np.isfinite(er).all(), f"{aid}/{iid}: non-finite expected_return"
@@ -143,8 +138,7 @@ def test_score_uses_only_declared_features(aid, small_frames, fitted_models):
     full = m.score(small_frames)
     keep = set(m.features) | {"instrument_id", "exchange_ts"}
     restricted = {
-        iid: df[[c for c in df.columns if c in keep]].copy()
-        for iid, df in small_frames.items()
+        iid: df[[c for c in df.columns if c in keep]].copy() for iid, df in small_frames.items()
     }
     out = m.score(restricted)
     for iid in full:
@@ -213,9 +207,9 @@ def test_exposure_matrix_rows_sum_to_zero():
 def test_currency_exposures_hand_calc():
     # long 5 EUR/USD, short 3 EUR/GBP, long 2 USD/JPY
     exp = currency_exposures({101: 5, 108: -3, 103: 2})
-    assert exp["EUR"] == 2.0    # +5 - 3
-    assert exp["GBP"] == 3.0    # -(-3)
-    assert exp["USD"] == -3.0   # -5 + 2
+    assert exp["EUR"] == 2.0  # +5 - 3
+    assert exp["GBP"] == 3.0  # -(-3)
+    assert exp["USD"] == -3.0  # -5 + 2
     assert exp["JPY"] == -2.0
     assert exp["AUD"] == 0.0
     # exposures conserve: total base+quote nets to zero
@@ -246,22 +240,33 @@ def test_dead_alpha_scores_confidence_zero():
     scores (0, 0), never confidence 1.0."""
     import numpy as np
     import pandas as pd
-
     from iap.alpha import build
 
     m = build("EQ01")
-    m.load_params({
-        "alpha_id": "EQ01", "model": "linear_z_v1", "horizon": m.horizon,
-        "features": list(m.features), "mu": 0.0, "sigma": 0.0, "beta": 0.0,
-        "beta_fit": 0.0, "z_clip": 4.0, "conf_scale": 2.0, "n_train": 3,
-        "fitted": True,
-    })
+    m.load_params(
+        {
+            "alpha_id": "EQ01",
+            "model": "linear_z_v1",
+            "horizon": m.horizon,
+            "features": list(m.features),
+            "mu": 0.0,
+            "sigma": 0.0,
+            "beta": 0.0,
+            "beta_fit": 0.0,
+            "z_clip": 4.0,
+            "conf_scale": 2.0,
+            "n_train": 3,
+            "fitted": True,
+        }
+    )
     assert m.is_dead
     n = 16
-    df = pd.DataFrame({
-        "exchange_ts": np.arange(n, dtype=np.int64) * 1_000_000_000,
-        **{f: np.linspace(-3.0, 3.0, n) for f in m.features},
-    })
+    df = pd.DataFrame(
+        {
+            "exchange_ts": np.arange(n, dtype=np.int64) * 1_000_000_000,
+            **{f: np.linspace(-3.0, 3.0, n) for f in m.features},
+        }
+    )
     sc = m.score({1: df})[1]
     assert np.all(sc["expected_return"].to_numpy() == 0.0)
     assert np.all(sc["confidence"].to_numpy() == 0.0)
@@ -272,9 +277,17 @@ def test_load_params_rejects_edited_or_impossible_files():
 
     m = build("EQ01")
     good = {
-        "alpha_id": "EQ01", "model": "linear_z_v1", "horizon": m.horizon,
-        "features": list(m.features), "mu": 0.0, "sigma": 1.0, "beta": 1e-4,
-        "beta_fit": 1e-4, "z_clip": 4.0, "conf_scale": 2.0, "n_train": 100,
+        "alpha_id": "EQ01",
+        "model": "linear_z_v1",
+        "horizon": m.horizon,
+        "features": list(m.features),
+        "mu": 0.0,
+        "sigma": 1.0,
+        "beta": 1e-4,
+        "beta_fit": 1e-4,
+        "z_clip": 4.0,
+        "conf_scale": 2.0,
+        "n_train": 100,
         "fitted": True,
     }
     m.load_params(dict(good))  # baseline: loads
@@ -303,12 +316,22 @@ def test_params_file_carries_provenance_and_rejects_a_foreign_registry(tmp_path)
     from iap.features.registry import registry_hash
 
     m = build("EQ01")
-    m.load_params({
-        "alpha_id": "EQ01", "model": "linear_z_v1", "horizon": m.horizon,
-        "features": list(m.features), "mu": 0.0, "sigma": 1.0, "beta": 1e-4,
-        "beta_fit": 1e-4, "z_clip": 4.0, "conf_scale": 2.0, "n_train": 100,
-        "fitted": True,
-    })
+    m.load_params(
+        {
+            "alpha_id": "EQ01",
+            "model": "linear_z_v1",
+            "horizon": m.horizon,
+            "features": list(m.features),
+            "mu": 0.0,
+            "sigma": 1.0,
+            "beta": 1e-4,
+            "beta_fit": 1e-4,
+            "z_clip": 4.0,
+            "conf_scale": 2.0,
+            "n_train": 100,
+            "fitted": True,
+        }
+    )
     path = tmp_path / "alpha_params.json"
     blob = save_params({"EQ01": m}, path)
     assert blob["x-version"] == 2
@@ -327,7 +350,6 @@ def test_fx05_universe_excludes_singleton_currencies():
     return: the residual is 0 by construction, so the pair must score NaN
     rather than a constant."""
     import numpy as np
-
     from iap.alpha.fx_exposure import (
         FX05CrossPairRelativeValue,
         identified_pairs,

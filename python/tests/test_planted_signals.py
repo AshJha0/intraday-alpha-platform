@@ -8,7 +8,7 @@ import json
 
 import numpy as np
 import pytest
-
+from conftest import CONFIGS_DIR, REPO_ROOT
 from iap.core.codec import encode_iap1, read_jsonl, sha256_bytes
 from iap.core.events import EventType, Side
 from iap.marketdata.generator import (
@@ -18,8 +18,6 @@ from iap.marketdata.generator import (
 )
 from iap.research import ResearchError, power
 from iap.research.__main__ import main as cli_main
-
-from conftest import CONFIGS_DIR, REPO_ROOT
 
 PLANTED_CONFIG = REPO_ROOT / "research" / "power" / "generator_planted.json"
 
@@ -68,9 +66,10 @@ def test_planted_block_defaults_to_off():
     assert planted["lead_lag"]["beta"] == 0.0
     assert planted["break"] == {"at_fraction": None, "post_multiplier": 1.0}
     pinned = json.loads((CONFIGS_DIR / "marketdata" / "generator.json").read_text())
-    assert "planted" not in pinned                    # the pinned dataset has none
-    assert load_generator_config(CONFIGS_DIR / "marketdata" / "generator.json")[
-        "planted"] == planted
+    assert "planted" not in pinned  # the pinned dataset has none
+    assert (
+        load_generator_config(CONFIGS_DIR / "marketdata" / "generator.json")["planted"] == planted
+    )
 
 
 def test_planted_off_is_byte_identical_to_no_planted_block(refdata, tmp_path):
@@ -78,8 +77,12 @@ def test_planted_off_is_byte_identical_to_no_planted_block(refdata, tmp_path):
     produce the same bytes: no draw is added or reordered when off."""
     _, base = _run(refdata, tmp_path, SMALL, "base")
     _, zeros = _run(refdata, tmp_path, _planted(0.0, 0.0), "zeros")
-    _, idle_break = _run(refdata, tmp_path, _planted(
-        0.0, 0.0, {"at_fraction": 0.5, "post_multiplier": -1.0}), "break")
+    _, idle_break = _run(
+        refdata,
+        tmp_path,
+        _planted(0.0, 0.0, {"at_fraction": 0.5, "post_multiplier": -1.0}),
+        "break",
+    )
     assert _digest(base) == _digest(zeros) == _digest(idle_break)
 
 
@@ -111,8 +114,7 @@ def test_lead_lag_plant_leaves_the_leader_untouched(refdata, tmp_path):
     follower = refdata.instrument("SYN.EQ.001").instrument_id
     assert base._eq_prices[follower].path != lead._eq_prices[follower].path
     # the follower consumed exactly as many draws as without the plant
-    assert base._eq_prices[follower].rng.next_u64() == \
-        lead._eq_prices[follower].rng.next_u64()
+    assert base._eq_prices[follower].rng.next_u64() == lead._eq_prices[follower].rng.next_u64()
 
 
 # ---------------------------------------------------------------------------
@@ -138,34 +140,35 @@ def _flow_alignment(gen, events, refdata, horizon_steps=10):
         price = gen._eq_prices[ev.instrument_id]
         k = int((ev.exchange_ts - price.open_ns) // price.STEP_NS)
         if k + horizon_steps >= len(price.path) or k < 60:
-            continue                                   # auction prints / the close
+            continue  # auction prints / the close
         move = price.path[k + horizon_steps] - price.path[k]
         if move == 0.0:
             continue
         sign = 1.0 if ev.side == Side.BID else -1.0
-        (first if k < FLOW_SPLIT * len(price.path) else second).append(
-            sign * np.sign(move))
+        (first if k < FLOW_SPLIT * len(price.path) else second).append(sign * np.sign(move))
     return float(np.mean(first)), float(np.mean(second)), min(len(first), len(second))
 
 
 def test_order_flow_sign_leads_the_efficient_price(refdata, tmp_path):
-    cfg = _planted(order_flow=0.6, sessions=1,
-                   equities={"slots_per_stream": 1500})
+    cfg = _planted(order_flow=0.6, sessions=1, equities={"slots_per_stream": 1500})
     off = copy.deepcopy(cfg)
     off["planted"]["order_flow"]["strength"] = 0.0
     gen, events = _run(refdata, tmp_path, cfg, "on")
     gen0, events0 = _run(refdata, tmp_path, off, "off")
     a, b, n = _flow_alignment(gen, events, refdata)
     a0, b0, n0 = _flow_alignment(gen0, events0, refdata)
-    assert n > 1000 and n0 > 1000              # each side of the split
-    assert a > 0.2 and b > 0.2                 # planted: flow leads the price
-    assert abs(a0) < 0.08 and abs(b0) < 0.08   # off: unrelated
+    assert n > 1000 and n0 > 1000  # each side of the split
+    assert a > 0.2 and b > 0.2  # planted: flow leads the price
+    assert abs(a0) < 0.08 and abs(b0) < 0.08  # off: unrelated
 
 
 def test_break_reverses_the_planted_flow_mid_sample(refdata, tmp_path):
-    cfg = _planted(order_flow=0.6, sessions=1,
-                   brk={"at_fraction": FLOW_SPLIT, "post_multiplier": -1.0},
-                   equities={"slots_per_stream": 1500})
+    cfg = _planted(
+        order_flow=0.6,
+        sessions=1,
+        brk={"at_fraction": FLOW_SPLIT, "post_multiplier": -1.0},
+        equities={"slots_per_stream": 1500},
+    )
     gen, events = _run(refdata, tmp_path, cfg, "brk")
     first, second, n = _flow_alignment(gen, events, refdata)
     assert n > 1000
@@ -179,8 +182,8 @@ def _lagged_corr(gen, refdata, lag, lo=0.0, hi=1.0):
         moves = gen._eq_prices[refdata.instrument(symbol).instrument_id].step_moves()
         n = len(moves)
         a, b = int(lo * n), int(hi * n)
-        x = np.asarray(leader[a:b - lag])
-        y = np.asarray(moves[a + lag:b])
+        x = np.asarray(leader[a : b - lag])
+        y = np.asarray(moves[a + lag : b])
         out.append(float(np.corrcoef(x, y)[0, 1]))
     return float(np.mean(out))
 
@@ -189,11 +192,13 @@ def test_lead_lag_plants_the_stated_lagged_correlation(refdata, tmp_path):
     """Lagged correlation of efficient moves is ~ beta / sqrt(1 + beta^2) at
     the configured lag and ~0 at any other lag or with the plant off."""
     beta = 0.75
-    cfg = _planted(beta=beta, sessions=1,
-                   equities={"vol_regimes": {"sigma_ticks_per_s": [0.2, 0.2],
-                                             "switch_prob_per_s": 0.0}})
+    cfg = _planted(
+        beta=beta,
+        sessions=1,
+        equities={"vol_regimes": {"sigma_ticks_per_s": [0.2, 0.2], "switch_prob_per_s": 0.0}},
+    )
     gen, _ = _run(refdata, tmp_path, cfg, "on")
-    want = beta / np.sqrt(1.0 + beta * beta)                 # 0.6
+    want = beta / np.sqrt(1.0 + beta * beta)  # 0.6
     assert _lagged_corr(gen, refdata, lag=2) == pytest.approx(want, abs=0.02)
     assert abs(_lagged_corr(gen, refdata, lag=1)) < 0.03
     assert abs(_lagged_corr(gen, refdata, lag=3)) < 0.03
@@ -204,10 +209,12 @@ def test_lead_lag_plants_the_stated_lagged_correlation(refdata, tmp_path):
 
 
 def test_break_reverses_the_lead_lag_mid_sample(refdata, tmp_path):
-    cfg = _planted(beta=0.75, sessions=1,
-                   brk={"at_fraction": 0.5, "post_multiplier": -1.0},
-                   equities={"vol_regimes": {"sigma_ticks_per_s": [0.2, 0.2],
-                                             "switch_prob_per_s": 0.0}})
+    cfg = _planted(
+        beta=0.75,
+        sessions=1,
+        brk={"at_fraction": 0.5, "post_multiplier": -1.0},
+        equities={"vol_regimes": {"sigma_ticks_per_s": [0.2, 0.2], "switch_prob_per_s": 0.0}},
+    )
     gen, _ = _run(refdata, tmp_path, cfg, "brk")
     assert _lagged_corr(gen, refdata, 2, 0.0, 0.5) == pytest.approx(0.6, abs=0.03)
     assert _lagged_corr(gen, refdata, 2, 0.5, 1.0) == pytest.approx(-0.6, abs=0.03)
@@ -216,29 +223,39 @@ def test_break_reverses_the_lead_lag_mid_sample(refdata, tmp_path):
 def test_break_fraction_spans_sessions(refdata):
     """``at_fraction`` is a fraction of the whole RUN: with two sessions the
     study's 0.5 reverses exactly the second one."""
-    gen = MarketDataGenerator(refdata, _planted(
-        0.5, 0.0, {"at_fraction": 0.5, "post_multiplier": 0.0}))
-    assert gen._planted_multipliers(0, 2, 10) == [1.0] * 10        # first session
-    assert gen._planted_multipliers(1, 2, 10) == [0.0] * 10        # second session
-    quarter = MarketDataGenerator(refdata, _planted(
-        0.5, 0.0, {"at_fraction": 0.25, "post_multiplier": 0.0}))
+    gen = MarketDataGenerator(
+        refdata, _planted(0.5, 0.0, {"at_fraction": 0.5, "post_multiplier": 0.0})
+    )
+    assert gen._planted_multipliers(0, 2, 10) == [1.0] * 10  # first session
+    assert gen._planted_multipliers(1, 2, 10) == [0.0] * 10  # second session
+    quarter = MarketDataGenerator(
+        refdata, _planted(0.5, 0.0, {"at_fraction": 0.25, "post_multiplier": 0.0})
+    )
     assert quarter._planted_multipliers(0, 2, 10) == [1.0] * 5 + [0.0] * 5
     stable = MarketDataGenerator(refdata, _planted(0.5, 0.0))
     assert stable._planted_multipliers(1, 2, 4) == [1.0] * 4
 
 
-@pytest.mark.parametrize("planted, message", [
-    ({"order_flow": {"strength": 1.0}}, "strength must be in"),
-    ({"order_flow": {"strength": -0.1}}, "strength must be in"),
-    ({"order_flow": {"kernel_decay": 0.0}}, "kernel_decay"),
-    ({"order_flow": {"kernel_steps": 0}}, "kernel_steps"),
-    ({"lead_lag": {"lag_steps": 0, "beta": 0.5}}, "lag_steps must be >= 1"),
-    ({"lead_lag": {"beta": 0.5, "leader": "SYN.NOPE"}}, "not an equity instrument"),
-    ({"lead_lag": {"beta": float("inf")}}, "beta must be finite"),
-    ({"break": {"at_fraction": 1.0, "post_multiplier": 1.0}}, "at_fraction"),
-    ({"order_flow": {"strength": 0.6},
-      "break": {"at_fraction": 0.5, "post_multiplier": 2.0}}, "post_multiplier"),
-])
+@pytest.mark.parametrize(
+    "planted, message",
+    [
+        ({"order_flow": {"strength": 1.0}}, "strength must be in"),
+        ({"order_flow": {"strength": -0.1}}, "strength must be in"),
+        ({"order_flow": {"kernel_decay": 0.0}}, "kernel_decay"),
+        ({"order_flow": {"kernel_steps": 0}}, "kernel_steps"),
+        ({"lead_lag": {"lag_steps": 0, "beta": 0.5}}, "lag_steps must be >= 1"),
+        ({"lead_lag": {"beta": 0.5, "leader": "SYN.NOPE"}}, "not an equity instrument"),
+        ({"lead_lag": {"beta": float("inf")}}, "beta must be finite"),
+        ({"break": {"at_fraction": 1.0, "post_multiplier": 1.0}}, "at_fraction"),
+        (
+            {
+                "order_flow": {"strength": 0.6},
+                "break": {"at_fraction": 0.5, "post_multiplier": 2.0},
+            },
+            "post_multiplier",
+        ),
+    ],
+)
 def test_planted_config_is_validated(refdata, planted, message):
     with pytest.raises(ValueError, match=message):
         MarketDataGenerator(refdata, {"planted": planted})
@@ -263,7 +280,7 @@ def test_study_seeds_are_deterministic_distinct_and_json_exact():
     seeds = power.study_seeds(20261003, 4)
     assert seeds == power.study_seeds(20261003, 4)
     assert seeds[:2] == power.study_seeds(20261003, 2)
-    assert len(set(seeds)) == 4 and all(0 <= s < 2 ** 31 for s in seeds)
+    assert len(set(seeds)) == 4 and all(0 <= s < 2**31 for s in seeds)
     assert power.study_seeds(1, 3) != power.study_seeds(2, 3)
     with pytest.raises(ResearchError):
         power.study_seeds(1, 0)
@@ -281,7 +298,7 @@ def test_cell_config_scales_both_reference_effects():
     assert null["planted"]["order_flow"]["strength"] == 0.0
     assert null["planted"]["lead_lag"]["beta"] == 0.0
     assert null["planted"]["break"]["at_fraction"] is None
-    assert base["planted"] == ref                       # the base is not mutated
+    assert base["planted"] == ref  # the base is not mutated
     with pytest.raises(ResearchError, match="unknown scenario"):
         power.cell_config(base, 1.0, "wobble", 1)
     with pytest.raises(ResearchError, match="level"):
@@ -289,17 +306,28 @@ def test_cell_config_scales_both_reference_effects():
 
 
 def _fake_row(alpha_id, t, ledger_t=None):
-    return {"alpha_id": alpha_id, "gate_ic": 0.01 * t, "t_within": t, "t_pooled": t + 0.5,
-            "ic_vol_scaled": 0.02 * t, "ic_instrument_mean": 0.02 * t,
-            "n_folds_survive_1x_cost": 4 if t >= 3.0 else 0,
-            "net_pnl_1x_pooled": t, "net_pnl_ci_low": t - 3.5, "net_pnl_ci_high": t + 3.5,
-            "sig_ledger": ledger_t is not None and t >= ledger_t,
-            "pnl_ci_positive": t - 3.5 > 0.0,
-            "fold_sign_consistency": 1.0 if t > 0 else 0.5,
-            "hypothesis_confirmed": t > 0, "leakage_passed": True,
-            "verdict": "ITERATE" if t >= 1.5 else "REJECT",
-            "sig_within": t >= 3.0, "sig_pooled": t + 0.5 >= 3.0,
-            "evidence": t >= 1.5, "promote": False}
+    return {
+        "alpha_id": alpha_id,
+        "gate_ic": 0.01 * t,
+        "t_within": t,
+        "t_pooled": t + 0.5,
+        "ic_vol_scaled": 0.02 * t,
+        "ic_instrument_mean": 0.02 * t,
+        "n_folds_survive_1x_cost": 4 if t >= 3.0 else 0,
+        "net_pnl_1x_pooled": t,
+        "net_pnl_ci_low": t - 3.5,
+        "net_pnl_ci_high": t + 3.5,
+        "sig_ledger": ledger_t is not None and t >= ledger_t,
+        "pnl_ci_positive": t - 3.5 > 0.0,
+        "fold_sign_consistency": 1.0 if t > 0 else 0.5,
+        "hypothesis_confirmed": t > 0,
+        "leakage_passed": True,
+        "verdict": "ITERATE" if t >= 1.5 else "REJECT",
+        "sig_within": t >= 3.0,
+        "sig_pooled": t + 0.5 >= 3.0,
+        "evidence": t >= 1.5,
+        "promote": False,
+    }
 
 
 @pytest.fixture()
@@ -309,9 +337,14 @@ def fake_pipeline(monkeypatch):
     built = []
 
     def fake_build(cfg, configs_dir, work_dir, universe=power.DEFAULT_UNIVERSE):
-        built.append((cfg["seed"], cfg["planted"]["order_flow"]["strength"],
-                      cfg["planted"]["lead_lag"]["beta"],
-                      cfg["planted"]["break"]["post_multiplier"]))
+        built.append(
+            (
+                cfg["seed"],
+                cfg["planted"]["order_flow"]["strength"],
+                cfg["planted"]["lead_lag"]["beta"],
+                cfg["planted"]["break"]["post_multiplier"],
+            )
+        )
         return {1: cfg}
 
     def fake_evaluate(frames, configs_dir, ledger_t_threshold=None, seed=0):
@@ -320,8 +353,10 @@ def fake_pipeline(monkeypatch):
         sign = cfg["planted"]["break"]["post_multiplier"]
         flow = 10.0 * cfg["planted"]["order_flow"]["strength"] * (1.0 if sign > 0 else 0.0)
         lead = 5.0 * cfg["planted"]["lead_lag"]["beta"] * (1.0 if sign > 0 else 0.0)
-        return {"order_flow": _fake_row("EQ04", flow, ledger_t_threshold),
-                "lead_lag": _fake_row("EQ10", lead, ledger_t_threshold)}
+        return {
+            "order_flow": _fake_row("EQ04", flow, ledger_t_threshold),
+            "lead_lag": _fake_row("EQ10", lead, ledger_t_threshold),
+        }
 
     monkeypatch.setattr(power, "build_planted_frames", fake_build)
     monkeypatch.setattr(power, "evaluate_run", fake_evaluate)
@@ -331,35 +366,47 @@ def fake_pipeline(monkeypatch):
 
 def test_power_study_grid_layout_and_rates(fake_pipeline, tmp_path):
     lines = []
-    doc = power.run_power_study(PLANTED_CONFIG, CONFIGS_DIR, levels=(0.0, 1.0, 2.0),
-                                n_seeds=2, scratch_dir=tmp_path / "scratch",
-                                progress=lines.append)
+    doc = power.run_power_study(
+        PLANTED_CONFIG,
+        CONFIGS_DIR,
+        levels=(0.0, 1.0, 2.0),
+        n_seeds=2,
+        scratch_dir=tmp_path / "scratch",
+        progress=lines.append,
+    )
     seeds = doc["seeds"]
     # stable at 3 levels + break at the 2 non-zero levels, 2 seeds each
     assert len(doc["runs"]) == (3 + 2) * 2 == len(fake_pipeline) == len(lines)
     assert [(r["scenario"], r["level"]) for r in doc["runs"][::2]] == [
-        ("stable", 0.0), ("stable", 1.0), ("stable", 2.0), ("break", 1.0), ("break", 2.0)]
+        ("stable", 0.0),
+        ("stable", 1.0),
+        ("stable", 2.0),
+        ("break", 1.0),
+        ("break", 2.0),
+    ]
     assert {r["seed"] for r in doc["runs"]} == set(seeds)
     cells = {(c["effect"], c["scenario"], c["level"]): c for c in doc["cells"]}
     assert len(cells) == 2 * 5
     null = cells[("order_flow", "stable", 0.0)]
     assert null["n_runs"] == 2 and null["rate_sig_within"] == 0.0 == null["rate_evidence"]
-    strong = cells[("order_flow", "stable", 1.0)]          # t = 10 * 0.4 = 4
+    strong = cells[("order_flow", "stable", 1.0)]  # t = 10 * 0.4 = 4
     assert strong["rate_sig_within"] == 1.0 and strong["mean_t_within"] == 4.0
     assert strong["alpha_id"] == "EQ04" and strong["rate_promote"] == 0.0
-    weak = cells[("lead_lag", "stable", 1.0)]              # t = 5 * 0.4 = 2
+    weak = cells[("lead_lag", "stable", 1.0)]  # t = 5 * 0.4 = 2
     assert weak["rate_sig_within"] == 0.0 and weak["rate_evidence"] == 1.0
-    assert weak["rate_sig_pooled"] == 0.0                  # 2.5 < 3
-    assert cells[("lead_lag", "stable", 2.0)]["rate_sig_pooled"] == 1.0   # 4.5
+    assert weak["rate_sig_pooled"] == 0.0  # 2.5 < 3
+    assert cells[("lead_lag", "stable", 2.0)]["rate_sig_pooled"] == 1.0  # 4.5
     assert cells[("order_flow", "break", 2.0)]["rate_evidence"] == 0.0
     # the study charges itself for its own looks: 10 runs x 2 detectors
     from iap.validation.ledger import ExperimentLedger
+
     assert doc["protocol"]["n_tests"] == 20
     assert doc["protocol"]["ledger_t_threshold"] == pytest.approx(
-        ExperimentLedger.bonferroni_t_threshold_at(20), abs=1e-6)
+        ExperimentLedger.bonferroni_t_threshold_at(20), abs=1e-6
+    )
     assert 3.0 < doc["protocol"]["ledger_t_threshold"] < 4.0
-    assert strong["rate_sig_ledger"] == 1.0                # t = 4 clears ~3.02
-    assert cells[("lead_lag", "stable", 2.0)]["rate_sig_within"] == 1.0   # t = 4
+    assert strong["rate_sig_ledger"] == 1.0  # t = 4 clears ~3.02
+    assert cells[("lead_lag", "stable", 2.0)]["rate_sig_within"] == 1.0  # t = 4
     assert weak["rate_sig_ledger"] == 0.0
     assert strong["rate_pnl_ci_positive"] == 1.0 and weak["rate_pnl_ci_positive"] == 0.0
     assert strong["mean_ic_vol_scaled"] == 0.08
@@ -385,16 +432,24 @@ def test_power_study_document_is_deterministic_and_renders(fake_pipeline, tmp_pa
     assert "| order_flow | EQ04 | stable | 1 | 2 | 1.00 | 1.00 | 1.00 |" in md
     assert "| lead_lag | EQ10 | break | 1 | 2 | 0.00 |" in md
     assert "## Statistics behind the rates" in md and "IC (vol-scaled)" in md
-    power.write_reports(a, tmp_path / "out")               # idempotent rewrite
+    power.write_reports(a, tmp_path / "out")  # idempotent rewrite
     assert paths["json"].read_bytes() == raw
 
 
 def test_power_study_counts_an_unvalidatable_run_as_a_miss():
     runs = [
-        {"scenario": "stable", "level": 1.0, "seed": 1,
-         "detectors": {"order_flow": _fake_row("EQ04", 4.0, 3.5)}},
-        {"scenario": "stable", "level": 1.0, "seed": 2,
-         "detectors": {"order_flow": {"alpha_id": "EQ04", "error": "too few rows"}}},
+        {
+            "scenario": "stable",
+            "level": 1.0,
+            "seed": 1,
+            "detectors": {"order_flow": _fake_row("EQ04", 4.0, 3.5)},
+        },
+        {
+            "scenario": "stable",
+            "level": 1.0,
+            "seed": 2,
+            "detectors": {"order_flow": {"alpha_id": "EQ04", "error": "too few rows"}},
+        },
     ]
     (cell,) = power.summarise(runs)
     assert cell["n_runs"] == 2 and cell["n_failed"] == 1
@@ -417,13 +472,11 @@ def test_power_study_rejects_bad_inputs(tmp_path, fake_pipeline):
 
 def test_power_cli_writes_the_reports(fake_pipeline, tmp_path, capsys):
     out = tmp_path / "power"
-    assert cli_main(["power", "--levels", "0,1", "--seeds", "1",
-                     "--power-out-dir", str(out)]) == 0
+    assert cli_main(["power", "--levels", "0,1", "--seeds", "1", "--power-out-dir", str(out)]) == 0
     captured = capsys.readouterr()
     assert captured.out.startswith("# Planted-signal power study")
     assert (out / "POWER_REPORT.md").is_file() and (out / "POWER_REPORT.json").is_file()
-    assert cli_main(["--json-errors", "power", "--levels", "a,b",
-                     "--power-out-dir", str(out)]) == 1
+    assert cli_main(["--json-errors", "power", "--levels", "a,b", "--power-out-dir", str(out)]) == 1
     err = json.loads(capsys.readouterr().err.strip().splitlines()[-1])
     assert err["error"]["code"] == "power_study_error"
 
@@ -435,26 +488,42 @@ def test_planted_pipeline_end_to_end_on_a_tiny_universe(tmp_path):
     base["equities"]["slots_per_stream"] = 400
     cfg = power.cell_config(base, 1.0, "stable", 31337)
     frames = power.build_planted_frames(cfg, CONFIGS_DIR, tmp_path / "work")
-    assert sorted(frames) == [1, 2, 11]                    # the reduced universe
+    assert sorted(frames) == [1, 2, 11]  # the reduced universe
     for df in frames.values():
         assert len(df) > 200
-        assert {"exchange_ts", "trade_imbalance_w10s_v1", "ref_ret_1s_v1",
-                "label_mid_5s", "label_valid_1s"} <= set(df.columns)
+        assert {
+            "exchange_ts",
+            "trade_imbalance_w10s_v1",
+            "ref_ret_1s_v1",
+            "label_mid_5s",
+            "label_valid_1s",
+        } <= set(df.columns)
     rows = power.evaluate_run(frames, CONFIGS_DIR, ledger_t_threshold=3.3, seed=31337)
     assert sorted(rows) == ["lead_lag", "order_flow"]
     for effect, row in rows.items():
         assert row["alpha_id"] == power.DETECTORS[effect]
         assert "error" in row or row["verdict"] in ("REJECT", "ITERATE", "PROMOTE")
         if "error" not in row:
-            assert {"ic_vol_scaled", "sig_ledger", "pnl_ci_positive",
-                    "n_folds_survive_1x_cost", "net_pnl_ci_low"} <= set(row)
-            assert not (row["sig_ledger"] and not row["sig_within"])   # never looser
-    assert rows == power.evaluate_run(frames, CONFIGS_DIR, ledger_t_threshold=3.3,
-                                      seed=31337)                     # seeded
+            assert {
+                "ic_vol_scaled",
+                "sig_ledger",
+                "pnl_ci_positive",
+                "n_folds_survive_1x_cost",
+                "net_pnl_ci_low",
+            } <= set(row)
+            assert not (row["sig_ledger"] and not row["sig_within"])  # never looser
+    assert rows == power.evaluate_run(
+        frames, CONFIGS_DIR, ledger_t_threshold=3.3, seed=31337
+    )  # seeded
     json.dumps(rows, allow_nan=False)
     # nothing leaked outside the work directory's own tree
     assert sorted(p.name for p in (tmp_path / "work").iterdir()) == [
-        "configs", "feature_registry.json", "features", "normalized", "raw"]
+        "configs",
+        "feature_registry.json",
+        "features",
+        "normalized",
+        "raw",
+    ]
 
 
 def test_committed_power_report_matches_its_json():
@@ -469,5 +538,4 @@ def test_committed_power_report_matches_its_json():
     assert doc["generator_config"] == PLANTED_CONFIG.name
     assert doc["seeds"] == power.study_seeds(doc["base_seed"], len(doc["seeds"]))
     assert doc["cells"] == power.summarise(doc["runs"])
-    assert md_path.read_text(encoding="utf-8").replace("\r\n", "\n") == \
-        power.render_markdown(doc)
+    assert md_path.read_text(encoding="utf-8").replace("\r\n", "\n") == power.render_markdown(doc)

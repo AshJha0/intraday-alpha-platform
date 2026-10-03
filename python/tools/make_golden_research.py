@@ -38,8 +38,7 @@ GOLDEN = GOLDEN_DIR / "expected_experiment_golden_frame.json"
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--force", action="store_true",
-                        help="overwrite an existing golden file")
+    parser.add_argument("--force", action="store_true", help="overwrite an existing golden file")
     args = parser.parse_args(argv)
     if GOLDEN.exists() and not args.force:
         print(f"refusing to overwrite {GOLDEN} (use --force)", file=sys.stderr)
@@ -50,8 +49,10 @@ def main(argv: list[str] | None = None) -> int:
         result = golden_result(spec, frames, CONFIGS_DIR, Path(scratch))
     text = render_golden(golden_document(spec, result))
     GOLDEN.write_text(text, encoding="ascii")
-    print(f"wrote {GOLDEN} ({len(text)} bytes): experiment {spec.experiment_id} "
-          f"verdict {result.verdict.value}")
+    print(
+        f"wrote {GOLDEN} ({len(text)} bytes): experiment {spec.experiment_id} "
+        f"verdict {result.verdict.value}"
+    )
     return 0
 
 

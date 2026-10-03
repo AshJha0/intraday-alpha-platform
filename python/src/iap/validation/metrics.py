@@ -42,7 +42,7 @@ auditable.
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Sequence, Tuple
+from collections.abc import Sequence
 
 import numpy as np
 
@@ -52,7 +52,7 @@ EPS = 1e-12
 NS_S = 1_000_000_000
 
 #: pinned label horizons in nanoseconds (mirrors iap.labels.HORIZONS_NS)
-HORIZONS_NS: Dict[str, int] = {
+HORIZONS_NS: dict[str, int] = {
     "10ms": 10_000_000,
     "50ms": 50_000_000,
     "100ms": 100_000_000,
@@ -65,10 +65,10 @@ HORIZONS_NS: Dict[str, int] = {
     "5m": 300 * NS_S,
     "15m": 900 * NS_S,
 }
-HORIZON_ORDER: Tuple[str, ...] = tuple(HORIZONS_NS)
+HORIZON_ORDER: tuple[str, ...] = tuple(HORIZONS_NS)
 
 
-def _pairwise(x: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+def _pairwise(x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     x = np.asarray(x, dtype=float)
     y = np.asarray(y, dtype=float)
     if x.shape != y.shape:
@@ -91,7 +91,7 @@ def instrument_ics(
     scores: np.ndarray,
     labels: np.ndarray,
     min_obs: int = 32,
-) -> Dict[str, object]:
+) -> dict[str, object]:
     """IC that does not let one instrument's scale dominate the pool.
 
     The pooled IC (:func:`ic` over every instrument's rows concatenated)
@@ -122,9 +122,9 @@ def instrument_ics(
         raise ValueError("instrument/score/label length mismatch")
     ok = np.isfinite(x) & np.isfinite(y)
     ids, x, y = ids[ok], x[ok], y[ok]
-    by: Dict[str, float] = {}
-    zx: List[np.ndarray] = []
-    zy: List[np.ndarray] = []
+    by: dict[str, float] = {}
+    zx: list[np.ndarray] = []
+    zy: list[np.ndarray] = []
     skipped = 0
     for iid in np.unique(ids):
         m = ids == iid
@@ -136,8 +136,13 @@ def instrument_ics(
         zx.append((xi - xi.mean()) / xi.std())
         zy.append((yi - yi.mean()) / yi.std())
     if not by:
-        return {"instrument_mean": float("nan"), "vol_scaled": float("nan"),
-                "by_instrument": {}, "n_instruments": 0, "n_skipped": skipped}
+        return {
+            "instrument_mean": float("nan"),
+            "vol_scaled": float("nan"),
+            "by_instrument": {},
+            "n_instruments": 0,
+            "n_skipped": skipped,
+        }
     return {
         "instrument_mean": float(np.mean(list(by.values()))),
         "vol_scaled": float(np.corrcoef(np.concatenate(zx), np.concatenate(zy))[0, 1]),
@@ -154,7 +159,7 @@ def ic_with_blackout_reopen(
     label_reason: np.ndarray,
     reopen_mid: np.ndarray,
     min_obs: int = 32,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """IC that keeps the rows a halt / auction / stale gap removed.
 
     A label whose horizon contains a non-tradable sample is INVALID
@@ -195,8 +200,8 @@ def ic_with_blackout_reopen(
 def hac_mean_variance(
     series: np.ndarray,
     lags: int = 2,
-    weights: Optional[np.ndarray] = None,
-) -> Tuple[float, float, int]:
+    weights: np.ndarray | None = None,
+) -> tuple[float, float, int]:
     """``(mean, variance of the mean, n)`` of a (pair-count weighted) series
     under a Bartlett long-run variance — the two ingredients of
     :func:`newey_west_tstat` (``t = mean / sqrt(variance)``), exposed so two
@@ -272,7 +277,7 @@ def bucket_ics_with_counts(
     labels: np.ndarray,
     bucket_ns: int = 300 * NS_S,
     min_obs: int = 8,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """IC per fixed event-time bucket **and** each bucket's pair count.
 
     The counts are the weights :func:`newey_west_tstat` uses: fixed time
@@ -288,8 +293,8 @@ def bucket_ics_with_counts(
     if ts.size == 0:
         return np.empty(0), np.empty(0, dtype=np.int64)
     buckets = ts // bucket_ns
-    out: List[float] = []
-    counts: List[int] = []
+    out: list[float] = []
+    counts: list[int] = []
     for b in np.unique(buckets):
         m = buckets == b
         if m.sum() < min_obs:
@@ -313,7 +318,7 @@ def bucket_ics(
     return bucket_ics_with_counts(ts, scores, labels, bucket_ns, min_obs)[0]
 
 
-def bucket_size_summary(counts: np.ndarray) -> Dict[str, float]:
+def bucket_size_summary(counts: np.ndarray) -> dict[str, float]:
     """Distribution of bucket pair counts, for auditing the NW weighting.
 
     A t-stat built from 30 buckets of 2 000 pairs is a very different
@@ -323,10 +328,16 @@ def bucket_size_summary(counts: np.ndarray) -> Dict[str, float]:
     c = np.asarray(counts, dtype=float)
     c = c[np.isfinite(c)]
     if c.size == 0:
-        return {"n_buckets": 0, "total_pairs": 0, "min": float("nan"),
-                "p25": float("nan"), "median": float("nan"),
-                "p75": float("nan"), "max": float("nan"),
-                "mean": float("nan")}
+        return {
+            "n_buckets": 0,
+            "total_pairs": 0,
+            "min": float("nan"),
+            "p25": float("nan"),
+            "median": float("nan"),
+            "p75": float("nan"),
+            "max": float("nan"),
+            "mean": float("nan"),
+        }
     return {
         "n_buckets": int(c.size),
         "total_pairs": int(c.sum()),
@@ -349,7 +360,7 @@ def nw_lags(horizon_ns: int, bucket_ns: int = 300 * NS_S) -> int:
 def newey_west_tstat(
     series: np.ndarray,
     lags: int = 2,
-    weights: Optional[np.ndarray] = None,
+    weights: np.ndarray | None = None,
 ) -> float:
     """t-stat of the (weighted) mean of ``series`` vs 0, with a
     Bartlett-weighted long-run variance (see module docstring).
@@ -471,9 +482,9 @@ def decay_curve(
     scores: np.ndarray,
     frame,
     horizons: Sequence[str] = HORIZON_ORDER,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """IC of one score series against every pinned horizon's mid label."""
-    out: Dict[str, float] = {}
+    out: dict[str, float] = {}
     for h in horizons:
         lab = frame[f"label_mid_{h}"].to_numpy(dtype=float).copy()
         lab[~frame[f"label_valid_{h}"].to_numpy(dtype=bool)] = np.nan
@@ -487,7 +498,7 @@ def signal_turnover_detail(
     conf: np.ndarray,
     conf_min: float = 0.25,
     session_gap_ns: int = SESSION_GAP_NS,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Flips, ACTIVE hours and wall span of a sign-following unit strategy.
 
     Position proxy: sign(score) where confidence >= conf_min else flat.
@@ -507,8 +518,7 @@ def signal_turnover_detail(
     pos[~np.isfinite(pos)] = 0.0
     nan = float("nan")
     if len(pos) < 2 or len(ts) != len(pos):
-        return {"flips": nan, "active_hours": nan, "span_hours": nan,
-                "flips_per_hour": nan}
+        return {"flips": nan, "active_hours": nan, "span_hours": nan, "flips_per_hour": nan}
     changes = float(np.sum(pos[1:] != pos[:-1]))
     gaps = np.diff(ts)
     intra = gaps[(gaps > 0) & (gaps <= int(session_gap_ns))]
@@ -531,8 +541,7 @@ def signal_turnover(
 ) -> float:
     """Position flips per hour of OPEN market time (see
     :func:`signal_turnover_detail` for the denominator and why)."""
-    return signal_turnover_detail(
-        ts, scores, conf, conf_min, session_gap_ns)["flips_per_hour"]
+    return signal_turnover_detail(ts, scores, conf, conf_min, session_gap_ns)["flips_per_hour"]
 
 
 def capacity_breakeven(
@@ -543,7 +552,7 @@ def capacity_breakeven(
     asset_class: str,
     adv: float,
     lot_size: int = 1,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Edge-based capacity: the size at which edge per trade equals cost.
 
     :func:`capacity_proxy_usd` is ``max_participation * ADV * price`` — a
@@ -559,8 +568,7 @@ def capacity_breakeven(
     0 for an edge that does not cover spread + fee, and ``inf`` when the
     cost model charges no impact.  Additive: no gate reads it.
     """
-    units = cost_model.breakeven_size(edge_return, mid, half_spread, asset_class,
-                                      adv, lot_size)
+    units = cost_model.breakeven_size(edge_return, mid, half_spread, asset_class, adv, lot_size)
     unit = float(lot_size) if asset_class == "FX" else 1.0
     return {
         "units": float(units),

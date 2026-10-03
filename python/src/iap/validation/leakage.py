@@ -61,8 +61,8 @@ Two independent detectors, both mandatory in the promotion pipeline:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict, field
-from typing import Callable, Dict, List, Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import asdict, dataclass, field
 
 import numpy as np
 import pandas as pd
@@ -74,13 +74,13 @@ _GARBAGE = 0.12345
 
 @dataclass
 class LeakageResult:
-    label_guard_ok: bool          # False = score() output depends on labels
+    label_guard_ok: bool  # False = score() output depends on labels
     ic_unshifted: float
     ic_shifted: float
-    shift_ok: bool                # False = lookahead signature
+    shift_ok: bool  # False = lookahead signature
     passed: bool
-    truncation_ok: bool = True    # False = score() depends on future rows
-    suspicious_ic: float = 0.0    # threshold actually applied
+    truncation_ok: bool = True  # False = score() depends on future rows
+    suspicious_ic: float = 0.0  # threshold actually applied
     required_shift_ratio: float = 0.0  # |ic_shifted|/|ic_unshifted| required
     median_row_gap_ns: int = 0
 
@@ -96,19 +96,20 @@ class RecomputeProbeResult:
     n_anchors: int
     #: ``{"instrument_id", "event_index", "row", "column"}`` per difference;
     #: ``column`` is a feature column, ``expected_return`` or ``confidence``
-    mismatches: List[dict] = field(default_factory=list)
+    mismatches: list[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return asdict(self)
 
     @property
-    def leaky_columns(self) -> List[str]:
+    def leaky_columns(self) -> list[str]:
         """Distinct offending columns (sorted)."""
         return sorted({m["column"] for m in self.mismatches})
 
 
-def engine_frame_builder(configs_dir, cadence_ns: int = 0
-                         ) -> Callable[[Sequence], Dict[int, pd.DataFrame]]:
+def engine_frame_builder(
+    configs_dir, cadence_ns: int = 0
+) -> Callable[[Sequence], dict[int, pd.DataFrame]]:
     """A ``build_frames(events)`` for :meth:`LeakageTester.recompute_probe`
     that replays events through the reference ``FeatureEngine`` (a fresh
     engine per call) and returns feature-only frames: ``exchange_ts`` + one
@@ -121,10 +122,10 @@ def engine_frame_builder(configs_dir, cadence_ns: int = 0
     contexts = build_contexts(configs_dir)
     names = [s.name for s in build_registry()]
 
-    def build(events: Sequence) -> Dict[int, pd.DataFrame]:
+    def build(events: Sequence) -> dict[int, pd.DataFrame]:
         engine = FeatureEngine(contexts, cadence_ns=cadence_ns)
-        ts: Dict[int, List[int]] = {}
-        rows: Dict[int, List[np.ndarray]] = {}
+        ts: dict[int, list[int]] = {}
+        rows: dict[int, list[np.ndarray]] = {}
         for ev in events:
             vec = engine.apply(ev)
             if vec is None:
@@ -133,7 +134,7 @@ def engine_frame_builder(configs_dir, cadence_ns: int = 0
             vals[~np.asarray(vec.validity, dtype=bool)] = np.nan
             ts.setdefault(vec.instrument_id, []).append(vec.timestamp)
             rows.setdefault(vec.instrument_id, []).append(vals)
-        out: Dict[int, pd.DataFrame] = {}
+        out: dict[int, pd.DataFrame] = {}
         for iid in sorted(rows):
             frame = pd.DataFrame(np.vstack(rows[iid]), columns=names)
             frame.insert(0, "exchange_ts", np.asarray(ts[iid], dtype=np.int64))
@@ -149,8 +150,8 @@ def _same(a, b) -> bool:
     return bool(a == b)
 
 
-def _obfuscate_labels(frames: Mapping[int, pd.DataFrame]) -> Dict[int, pd.DataFrame]:
-    out: Dict[int, pd.DataFrame] = {}
+def _obfuscate_labels(frames: Mapping[int, pd.DataFrame]) -> dict[int, pd.DataFrame]:
+    out: dict[int, pd.DataFrame] = {}
     for iid, df in frames.items():
         df2 = df.copy()
         for c in df2.columns:
@@ -202,15 +203,12 @@ class LeakageTester:
             ca = a[iid]["confidence"].to_numpy()
             cb = b[iid]["confidence"].to_numpy()
             if not (
-                np.array_equal(xa, xb, equal_nan=True)
-                and np.array_equal(ca, cb, equal_nan=True)
+                np.array_equal(xa, xb, equal_nan=True) and np.array_equal(ca, cb, equal_nan=True)
             ):
                 return False
         return True
 
-    def shift_test(
-        self, model, frames: Mapping[int, pd.DataFrame]
-    ) -> Dict[str, float]:
+    def shift_test(self, model, frames: Mapping[int, pd.DataFrame]) -> dict[str, float]:
         """(ic_unshifted, ic_shifted) pooled across the model's universe."""
         scores = model.score(frames)
         h = model.horizon
@@ -257,11 +255,12 @@ class LeakageTester:
             n = len(df)
             if n < 4:
                 continue
-            anchors = sorted({max(1, int(n * (k + 1) / (n_probes + 1)))
-                              for k in range(n_probes)})
+            anchors = sorted({max(1, int(n * (k + 1) / (n_probes + 1))) for k in range(n_probes)})
             for a in anchors:
-                trunc = {j: (d.iloc[:a].reset_index(drop=True) if j == iid
-                             else d) for j, d in frames.items()}
+                trunc = {
+                    j: (d.iloc[:a].reset_index(drop=True) if j == iid else d)
+                    for j, d in frames.items()
+                }
                 try:
                     part = model.score(trunc)
                 except Exception:
@@ -298,9 +297,10 @@ class LeakageTester:
             raise ValueError("recompute_probe needs >= 2 events and n_probes >= 1")
         full = build_frames(events)
         full_scores = model.score(full) if model is not None else {}
-        positions = sorted({min(n - 2, max(0, int(n * (k + 1) / (n_probes + 1)) - 1))
-                            for k in range(n_probes)})
-        mismatches: List[dict] = []
+        positions = sorted(
+            {min(n - 2, max(0, int(n * (k + 1) / (n_probes + 1)) - 1)) for k in range(n_probes)}
+        )
+        mismatches: list[dict] = []
         for p in positions:
             part = build_frames(events[: p + 1])
             part_scores = model.score(part) if model is not None and part else {}
@@ -317,18 +317,22 @@ class LeakageTester:
                     if str(column).startswith("label_"):
                         continue
                     if column not in full[iid].columns or not _same(
-                            part[iid][column].iloc[row], full[iid][column].iloc[row]):
+                        part[iid][column].iloc[row], full[iid][column].iloc[row]
+                    ):
                         mismatches.append({**where, "column": str(column)})
                 if iid in part_scores and iid in full_scores:
                     for column in ("expected_return", "confidence"):
-                        if not _same(part_scores[iid][column].iloc[row],
-                                     full_scores[iid][column].iloc[row]):
+                        if not _same(
+                            part_scores[iid][column].iloc[row], full_scores[iid][column].iloc[row]
+                        ):
                             mismatches.append({**where, "column": column})
-        return RecomputeProbeResult(ok=not mismatches, n_anchors=len(positions),
-                                    mismatches=mismatches)
+        return RecomputeProbeResult(
+            ok=not mismatches, n_anchors=len(positions), mismatches=mismatches
+        )
 
-    def run(self, model, frames: Mapping[int, pd.DataFrame],
-            probe_truncation: bool = True) -> LeakageResult:
+    def run(
+        self, model, frames: Mapping[int, pd.DataFrame], probe_truncation: bool = True
+    ) -> LeakageResult:
         guard = self.label_guard(model, frames)
         shifts = self.shift_test(model, frames)
         ic0, ic1 = shifts["ic_unshifted"], shifts["ic_shifted"]

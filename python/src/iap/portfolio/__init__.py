@@ -1,9 +1,9 @@
 """Research portfolio construction: PGD optimizer + diagnostics (spec §15)."""
 
-from iap.portfolio.optimizer import Constraints, PGDResult, objective, solve
-from iap.portfolio.covariance import ewma_covariance, bars_from_features
-from iap.portfolio.fx import currency_exposure_matrix
+from iap.portfolio.covariance import bars_from_features, ewma_covariance
 from iap.portfolio.diagnostics import constraint_audit
+from iap.portfolio.fx import currency_exposure_matrix
+from iap.portfolio.optimizer import Constraints, PGDResult, objective, solve
 
 __all__ = [
     "Constraints",

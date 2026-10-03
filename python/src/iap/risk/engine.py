@@ -98,8 +98,9 @@ from __future__ import annotations
 
 import math
 import re
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Any
 
 from iap.risk.events import Decision, RiskEvent, Rules, Scope, Severity, fmt_fixed
 from iap.risk.limits import RiskLimits
@@ -128,7 +129,7 @@ def _i64(v: int) -> int:
     return v
 
 
-def _pos_add(a: int, b: int) -> Optional[int]:
+def _pos_add(a: int, b: int) -> int | None:
     """``a + b`` inside the SYMMETRIC i64 domain ``[-i64::MAX, i64::MAX]``:
     ``None`` on overflow and on ``i64::MIN``, so a later negation / ``abs``
     of the result can never overflow either (``risk::engine::pos_add``)."""
@@ -136,19 +137,19 @@ def _pos_add(a: int, b: int) -> Optional[int]:
     return v if -_I64_MAX <= v <= _I64_MAX else None
 
 
-def _pos_sub(a: int, b: int) -> Optional[int]:
+def _pos_sub(a: int, b: int) -> int | None:
     """``a - b`` inside the symmetric i64 domain (see :func:`_pos_add`)."""
     v = a - b
     return v if -_I64_MAX <= v <= _I64_MAX else None
 
 
-def _sum_ticks(bid_ticks: int, ask_ticks: int) -> Optional[int]:
+def _sum_ticks(bid_ticks: int, ask_ticks: int) -> int | None:
     """``bid + ask`` as an i64, ``None`` on overflow (``checked_add``)."""
     v = bid_ticks + ask_ticks
     return v if _I64_MIN <= v <= _I64_MAX else None
 
 
-def _ts_sub(a: int, b: int) -> Optional[int]:
+def _ts_sub(a: int, b: int) -> int | None:
     """``a - b`` as an i64, ``None`` on overflow (``i64::checked_sub``)."""
     v = a - b
     return v if _I64_MIN <= v <= _I64_MAX else None
@@ -174,7 +175,7 @@ def _require(name: str, value: object, lo: int, hi: int) -> int:
     return value
 
 
-def _parse_uint(text: str, hi: int) -> Optional[int]:
+def _parse_uint(text: str, hi: int) -> int | None:
     """``str::parse::<uN>()``: ASCII digits with an optional leading ``+``,
     within range; ``None`` otherwise."""
     if not isinstance(text, str) or _UINT_RE.fullmatch(text) is None:
@@ -208,8 +209,8 @@ class RiskMetrics:
     __slots__ = ("_counters", "_gauges")
 
     def __init__(self) -> None:
-        self._counters: Dict[str, int] = {}
-        self._gauges: Dict[str, float] = {}
+        self._counters: dict[str, int] = {}
+        self._gauges: dict[str, float] = {}
 
     def inc(self, name: str, n: int = 1) -> None:
         """Increment a counter (created at 0 on first use)."""
@@ -223,15 +224,15 @@ class RiskMetrics:
         """Counter value, 0 when never touched."""
         return self._counters.get(name, 0)
 
-    def gauge_value(self, name: str) -> Optional[float]:
+    def gauge_value(self, name: str) -> float | None:
         """Gauge value, ``None`` when never set."""
         return self._gauges.get(name)
 
-    def counters(self) -> Dict[str, int]:
+    def counters(self) -> dict[str, int]:
         """Sorted copy of every counter."""
         return {k: self._counters[k] for k in sorted(self._counters)}
 
-    def gauges(self) -> Dict[str, float]:
+    def gauges(self) -> dict[str, float]:
         """Sorted copy of every gauge."""
         return {k: self._gauges[k] for k in sorted(self._gauges)}
 
@@ -277,14 +278,26 @@ class _Lot:
         self.avg_price = avg_price
 
 
-_GLOBAL_SCOPE_RULES = frozenset({
-    Rules.KILL_GLOBAL, Rules.GROSS_NOTIONAL, Rules.NET_NOTIONAL,
-    Rules.DAILY_LOSS, Rules.CONFIG_MISSING, Rules.NOT_BOOTSTRAPPED,
-})
-_STRATEGY_SCOPE_RULES = frozenset({
-    Rules.KILL_STRATEGY, Rules.MALFORMED_ORDER, Rules.DUPLICATE_ORDER_ID,
-    Rules.RATE_THROTTLE, Rules.STRATEGY_LOSS, Rules.ALLOW,
-})
+_GLOBAL_SCOPE_RULES = frozenset(
+    {
+        Rules.KILL_GLOBAL,
+        Rules.GROSS_NOTIONAL,
+        Rules.NET_NOTIONAL,
+        Rules.DAILY_LOSS,
+        Rules.CONFIG_MISSING,
+        Rules.NOT_BOOTSTRAPPED,
+    }
+)
+_STRATEGY_SCOPE_RULES = frozenset(
+    {
+        Rules.KILL_STRATEGY,
+        Rules.MALFORMED_ORDER,
+        Rules.DUPLICATE_ORDER_ID,
+        Rules.RATE_THROTTLE,
+        Rules.STRATEGY_LOSS,
+        Rules.ALLOW,
+    }
+)
 _VENUE_SCOPE_RULES = frozenset({Rules.KILL_VENUE, Rules.VENUE_DISCONNECTED})
 
 
@@ -299,36 +312,36 @@ class RiskEngine:
 
     def _init(
         self,
-        limits: Optional[RiskLimits],
+        limits: RiskLimits | None,
         instruments: Mapping[int, InstrumentRef],
         config_error: str,
     ) -> None:
-        refs: Dict[int, InstrumentRef] = {}
+        refs: dict[int, InstrumentRef] = {}
         for iid in sorted(instruments):
             ref = instruments[iid]
             if not isinstance(ref, InstrumentRef):
                 raise ValueError(f"instrument {iid!r}: reference must be an InstrumentRef")
             refs[_require("instrument_id", iid, 0, _U32_MAX)] = ref
-        self._limits: Optional[RiskLimits] = limits
+        self._limits: RiskLimits | None = limits
         self._config_error: str = config_error
-        self._instruments: Dict[int, InstrumentRef] = refs
+        self._instruments: dict[int, InstrumentRef] = refs
         self._bootstrapped: bool = True
         self._kill_global: bool = bool(limits.kill_switch_engaged) if limits else False
-        self._kill_strategies: Dict[str, bool] = {}
-        self._kill_instruments: Dict[int, bool] = {}
-        self._kill_venues: Dict[int, bool] = {}
-        self._venues_down: Dict[int, bool] = {}
-        self._market: Dict[int, _MarketState] = {}
-        self._seen_orders: Dict[int, int] = {}
-        self._buckets: Dict[str, _Bucket] = {}
-        self._open: Dict[int, _OpenOrder] = {}
-        self._positions: Dict[int, int] = {}
-        self._lots: Dict[Tuple[str, int], _Lot] = {}
+        self._kill_strategies: dict[str, bool] = {}
+        self._kill_instruments: dict[int, bool] = {}
+        self._kill_venues: dict[int, bool] = {}
+        self._venues_down: dict[int, bool] = {}
+        self._market: dict[int, _MarketState] = {}
+        self._seen_orders: dict[int, int] = {}
+        self._buckets: dict[str, _Bucket] = {}
+        self._open: dict[int, _OpenOrder] = {}
+        self._positions: dict[int, int] = {}
+        self._lots: dict[tuple[str, int], _Lot] = {}
         #: Realized P&L in the instrument's quote currency per (strategy, ccy).
-        self._realized: Dict[Tuple[str, str], float] = {}
-        self._loss_override_global: Optional[float] = None
-        self._loss_override_strategy: Dict[str, float] = {}
-        self._audit: List[RiskEvent] = []
+        self._realized: dict[tuple[str, str], float] = {}
+        self._loss_override_global: float | None = None
+        self._loss_override_strategy: dict[str, float] = {}
+        self._audit: list[RiskEvent] = []
         #: Engine metrics (decision counters, PnL gauges).
         self.metrics: RiskMetrics = RiskMetrics()
         self.metrics.set_gauge("risk_kill_switch_engaged", 1.0 if self._kill_global else 0.0)
@@ -336,13 +349,13 @@ class RiskEngine:
     # ------------------------------------------------------------ builders
 
     @classmethod
-    def with_ticks(cls, limits: RiskLimits, ticks: Mapping[int, float]) -> "RiskEngine":
+    def with_ticks(cls, limits: RiskLimits, ticks: Mapping[int, float]) -> RiskEngine:
         """New engine from parsed limits + tick sizes only (every instrument
         a USD equity: qty_unit 1)."""
         return cls(limits, equity_refs(ticks))
 
     @classmethod
-    def fail_closed(cls, reason: str) -> "RiskEngine":
+    def fail_closed(cls, reason: str) -> RiskEngine:
         """New engine in FAIL-CLOSED mode: every order is rejected with
         ``CONFIG_MISSING`` carrying ``reason``. This is the mandatory
         landing state for any configuration error."""
@@ -351,7 +364,7 @@ class RiskEngine:
         return eng
 
     @classmethod
-    def from_config(cls, doc: Any, instruments: Mapping[int, InstrumentRef]) -> "RiskEngine":
+    def from_config(cls, doc: Any, instruments: Mapping[int, InstrumentRef]) -> RiskEngine:
         """Build from a parsed ``configs/risk/risk.json`` document: a parse
         failure lands fail-closed instead of raising (hard risk never runs
         open). The reason carries the Rust error rendering
@@ -363,7 +376,7 @@ class RiskEngine:
         return cls(limits, instruments)
 
     @classmethod
-    def from_config_ticks(cls, doc: Any, ticks: Mapping[int, float]) -> "RiskEngine":
+    def from_config_ticks(cls, doc: Any, ticks: Mapping[int, float]) -> RiskEngine:
         """:meth:`from_config` with tick sizes only (USD equities)."""
         return cls.from_config(doc, equity_refs(ticks))
 
@@ -390,15 +403,17 @@ class RiskEngine:
             if not self.on_fill(f):
                 bad += 1
         self._bootstrapped = True
-        self._emit(RiskEvent(
-            timestamp=ts,
-            scope=Scope.GLOBAL,
-            scope_id="",
-            rule_id=Rules.BOOTSTRAP_COMPLETE,
-            severity=Severity.INFO,
-            decision=Decision.ALLOW,
-            reason=f"bootstrapped from {len(fills)} drop-copy fills ({bad} rejected)",
-        ))
+        self._emit(
+            RiskEvent(
+                timestamp=ts,
+                scope=Scope.GLOBAL,
+                scope_id="",
+                rule_id=Rules.BOOTSTRAP_COMPLETE,
+                severity=Severity.INFO,
+                decision=Decision.ALLOW,
+                reason=f"bootstrapped from {len(fills)} drop-copy fills ({bad} rejected)",
+            )
+        )
         return bad
 
     # ------------------------------------------------------------ state in
@@ -424,7 +439,8 @@ class RiskEngine:
         st.ask_ticks = ask_ticks
         st.ts = ts
         holders = [
-            sid for (sid, iid), lot in sorted(self._lots.items())
+            sid
+            for (sid, iid), lot in sorted(self._lots.items())
             if iid == instrument_id and lot.pos != 0
         ]
         # A conversion pair's mid moves every bucket in that currency: the
@@ -461,30 +477,34 @@ class RiskEngine:
         _require("venue_id", venue_id, 0, _U16_MAX)
         _require("ts", ts, _I64_MIN, _I64_MAX)
         self._venues_down[venue_id] = True
-        self._emit(RiskEvent(
-            timestamp=ts,
-            scope=Scope.VENUE,
-            scope_id=str(venue_id),
-            rule_id=Rules.VENUE_DISCONNECT,
-            severity=Severity.WARN,
-            decision=Decision.KILL,
-            reason=f"venue {venue_id} disconnected",
-        ))
+        self._emit(
+            RiskEvent(
+                timestamp=ts,
+                scope=Scope.VENUE,
+                scope_id=str(venue_id),
+                rule_id=Rules.VENUE_DISCONNECT,
+                severity=Severity.WARN,
+                decision=Decision.KILL,
+                reason=f"venue {venue_id} disconnected",
+            )
+        )
 
     def on_venue_reconnect(self, venue_id: int, ts: int) -> None:
         """Venue reconnect."""
         _require("venue_id", venue_id, 0, _U16_MAX)
         _require("ts", ts, _I64_MIN, _I64_MAX)
         self._venues_down[venue_id] = False
-        self._emit(RiskEvent(
-            timestamp=ts,
-            scope=Scope.VENUE,
-            scope_id=str(venue_id),
-            rule_id=Rules.VENUE_RECONNECT,
-            severity=Severity.INFO,
-            decision=Decision.ALLOW,
-            reason=f"venue {venue_id} reconnected",
-        ))
+        self._emit(
+            RiskEvent(
+                timestamp=ts,
+                scope=Scope.VENUE,
+                scope_id=str(venue_id),
+                rule_id=Rules.VENUE_RECONNECT,
+                severity=Severity.INFO,
+                decision=Decision.ALLOW,
+                reason=f"venue {venue_id} reconnected",
+            )
+        )
 
     def engage_kill(self, scope: Scope, scope_id: str, ts: int, reason: str) -> None:
         """Manually engage a kill switch. Raises ``ValueError`` (changing
@@ -503,27 +523,33 @@ class RiskEngine:
         if not self._set_kill(scope, scope_id, True):
             self.metrics.inc("risk_malformed_kills_total")
             self._set_kill(Scope.GLOBAL, "", True)
-            why = (f'kill scope id "{scope_id}" is not a valid {scope.name} id: '
-                   f"escalated to GLOBAL (fail-closed)")
-            self._emit(RiskEvent(
+            why = (
+                f'kill scope id "{scope_id}" is not a valid {scope.name} id: '
+                f"escalated to GLOBAL (fail-closed)"
+            )
+            self._emit(
+                RiskEvent(
+                    timestamp=ts,
+                    scope=scope,
+                    scope_id=scope_id,
+                    rule_id=Rules.MALFORMED_KILL,
+                    severity=Severity.BREACH,
+                    decision=Decision.KILL,
+                    reason=f"{why}: {reason}",
+                )
+            )
+            raise ValueError(why)
+        self._emit(
+            RiskEvent(
                 timestamp=ts,
                 scope=scope,
                 scope_id=scope_id,
-                rule_id=Rules.MALFORMED_KILL,
+                rule_id=Rules.KILL_SWITCH_ENGAGED,
                 severity=Severity.BREACH,
                 decision=Decision.KILL,
-                reason=f"{why}: {reason}",
-            ))
-            raise ValueError(why)
-        self._emit(RiskEvent(
-            timestamp=ts,
-            scope=scope,
-            scope_id=scope_id,
-            rule_id=Rules.KILL_SWITCH_ENGAGED,
-            severity=Severity.BREACH,
-            decision=Decision.KILL,
-            reason=reason,
-        ))
+                reason=reason,
+            )
+        )
 
     def clear_kill(self, scope: Scope, scope_id: str, ts: int, reason: str) -> None:
         """Clear a kill switch (the switch only — see the re-arm precedence).
@@ -534,27 +560,33 @@ class RiskEngine:
         _require("ts", ts, _I64_MIN, _I64_MAX)
         if not self._set_kill(scope, scope_id, False):
             self.metrics.inc("risk_malformed_kills_total")
-            why = (f'kill scope id "{scope_id}" is not a valid {scope.name} id: '
-                   f"nothing cleared (fail-closed)")
-            self._emit(RiskEvent(
+            why = (
+                f'kill scope id "{scope_id}" is not a valid {scope.name} id: '
+                f"nothing cleared (fail-closed)"
+            )
+            self._emit(
+                RiskEvent(
+                    timestamp=ts,
+                    scope=scope,
+                    scope_id=scope_id,
+                    rule_id=Rules.MALFORMED_KILL,
+                    severity=Severity.BREACH,
+                    decision=Decision.REJECT,
+                    reason=f"{why}: {reason}",
+                )
+            )
+            raise ValueError(why)
+        self._emit(
+            RiskEvent(
                 timestamp=ts,
                 scope=scope,
                 scope_id=scope_id,
-                rule_id=Rules.MALFORMED_KILL,
-                severity=Severity.BREACH,
-                decision=Decision.REJECT,
-                reason=f"{why}: {reason}",
-            ))
-            raise ValueError(why)
-        self._emit(RiskEvent(
-            timestamp=ts,
-            scope=scope,
-            scope_id=scope_id,
-            rule_id=Rules.KILL_SWITCH_CLEARED,
-            severity=Severity.INFO,
-            decision=Decision.ALLOW,
-            reason=reason,
-        ))
+                rule_id=Rules.KILL_SWITCH_CLEARED,
+                severity=Severity.INFO,
+                decision=Decision.ALLOW,
+                reason=reason,
+            )
+        )
 
     def override_loss_limit(
         self, scope: Scope, scope_id: str, new_limit: float, ts: int, approver: str
@@ -564,8 +596,11 @@ class RiskEngine:
         latched kill switch. ``ValueError`` on a non-positive/non-finite
         limit or an unsupported scope (nothing changes)."""
         _require("ts", ts, _I64_MIN, _I64_MAX)
-        if isinstance(new_limit, bool) or not isinstance(new_limit, (int, float)) \
-                or not (math.isfinite(new_limit) and new_limit > 0.0):
+        if (
+            isinstance(new_limit, bool)
+            or not isinstance(new_limit, (int, float))
+            or not (math.isfinite(new_limit) and new_limit > 0.0)
+        ):
             raise ValueError(f"loss limit override must be finite and > 0, got {new_limit!r}")
         new_limit = float(new_limit)
         limits = self._limits
@@ -581,18 +616,20 @@ class RiskEngine:
             self._loss_override_strategy[scope_id] = new_limit
         else:
             raise ValueError("loss limits exist at GLOBAL and STRATEGY scope only")
-        self._emit(RiskEvent(
-            timestamp=ts,
-            scope=scope,
-            scope_id=scope_id,
-            rule_id=Rules.LOSS_LIMIT_OVERRIDE,
-            severity=Severity.WARN,
-            decision=Decision.ALLOW,
-            reason=(
-                f"daily loss limit {fmt_fixed(old, 2)} -> {fmt_fixed(new_limit, 2)} "
-                f"approved by {approver}"
-            ),
-        ))
+        self._emit(
+            RiskEvent(
+                timestamp=ts,
+                scope=scope,
+                scope_id=scope_id,
+                rule_id=Rules.LOSS_LIMIT_OVERRIDE,
+                severity=Severity.WARN,
+                decision=Decision.ALLOW,
+                reason=(
+                    f"daily loss limit {fmt_fixed(old, 2)} -> {fmt_fixed(new_limit, 2)} "
+                    f"approved by {approver}"
+                ),
+            )
+        )
 
     def roll_session(self, ts: int, reason: str) -> None:
         """Session roll: realized P&L zeroed, every marked lot re-based to
@@ -608,15 +645,17 @@ class RiskEngine:
         self._loss_override_global = None
         self._loss_override_strategy.clear()
         self._refresh_pnl_gauges()
-        self._emit(RiskEvent(
-            timestamp=ts,
-            scope=Scope.GLOBAL,
-            scope_id="",
-            rule_id=Rules.SESSION_ROLLED,
-            severity=Severity.INFO,
-            decision=Decision.ALLOW,
-            reason=reason,
-        ))
+        self._emit(
+            RiskEvent(
+                timestamp=ts,
+                scope=Scope.GLOBAL,
+                scope_id="",
+                rule_id=Rules.SESSION_ROLLED,
+                severity=Severity.INFO,
+                decision=Decision.ALLOW,
+                reason=reason,
+            )
+        )
 
     def _set_kill(self, scope: Scope, scope_id: str, engaged: bool) -> bool:
         """Apply a kill-switch change. Returns ``False`` (changing NOTHING)
@@ -661,7 +700,7 @@ class RiskEngine:
         if not isinstance(fill, Fill):
             raise ValueError("fill must be a Fill")
         if fill.qty <= 0:
-            why: Optional[str] = f"qty must be > 0: {fill.qty}"
+            why: str | None = f"qty must be > 0: {fill.qty}"
         elif fill.side > 1:
             why = f"side must be 0 or 1: {fill.side}"
         elif fill.price_ticks <= 0:
@@ -672,15 +711,17 @@ class RiskEngine:
             why = None
         if why is not None:
             self.metrics.inc("risk_malformed_fills_total")
-            self._emit(RiskEvent(
-                timestamp=fill.ts,
-                scope=Scope.STRATEGY,
-                scope_id=fill.strategy_id,
-                rule_id=Rules.MALFORMED_FILL,
-                severity=Severity.WARN,
-                decision=Decision.REJECT,
-                reason=f"fill for order {fill.order_id} rejected: {why}",
-            ))
+            self._emit(
+                RiskEvent(
+                    timestamp=fill.ts,
+                    scope=Scope.STRATEGY,
+                    scope_id=fill.strategy_id,
+                    rule_id=Rules.MALFORMED_FILL,
+                    severity=Severity.WARN,
+                    decision=Decision.REJECT,
+                    reason=f"fill for order {fill.order_id} rejected: {why}",
+                )
+            )
             return False
         # Checked position accounting, BEFORE anything is applied: a fill
         # that would take the strategy lot or the aggregate position out of
@@ -691,13 +732,16 @@ class RiskEngine:
         signed = fill.qty if fill.side == 0 else -fill.qty
         held = self._lots.get((fill.strategy_id, fill.instrument_id))
         lot_pos = held.pos if held is not None else 0
-        if lot_pos == _I64_MIN \
-                or _pos_add(lot_pos, signed) is None \
-                or _pos_add(self.position(fill.instrument_id), signed) is None:
+        if (
+            lot_pos == _I64_MIN
+            or _pos_add(lot_pos, signed) is None
+            or _pos_add(self.position(fill.instrument_id), signed) is None
+        ):
             self.engage_kill(
-                Scope.GLOBAL, "", fill.ts,
-                f"fill for order {fill.order_id} overflows i64 position accounting "
-                f"(fail-closed)",
+                Scope.GLOBAL,
+                "",
+                fill.ts,
+                f"fill for order {fill.order_id} overflows i64 position accounting (fail-closed)",
             )
             return False
         ins = self._instruments[fill.instrument_id]
@@ -714,9 +758,9 @@ class RiskEngine:
             # buy
             if lot.pos >= 0:
                 new_pos = _i64(lot.pos + fill.qty)
-                lot.avg_price = (
-                    lot.avg_price * float(lot.pos) + price * float(fill.qty)
-                ) / float(new_pos)
+                lot.avg_price = (lot.avg_price * float(lot.pos) + price * float(fill.qty)) / float(
+                    new_pos
+                )
                 lot.pos = new_pos
             else:
                 closed = min(fill.qty, _i64(-lot.pos))
@@ -728,9 +772,9 @@ class RiskEngine:
             # sell
             if lot.pos <= 0:
                 new_short = _i64(_i64(-lot.pos) + fill.qty)
-                lot.avg_price = (
-                    lot.avg_price * float(-lot.pos) + price * float(fill.qty)
-                ) / float(new_short)
+                lot.avg_price = (lot.avg_price * float(-lot.pos) + price * float(fill.qty)) / float(
+                    new_short
+                )
                 lot.pos = _i64(lot.pos - fill.qty)
             else:
                 closed = min(fill.qty, lot.pos)
@@ -758,7 +802,7 @@ class RiskEngine:
 
     # ------------------------------------------------------------- money
 
-    def _fx_rate(self, ccy: str) -> Optional[Tuple[float, int]]:
+    def _fx_rate(self, ccy: str) -> tuple[float, int] | None:
         """Quote-currency -> reporting-currency rate and its mark time."""
         limits = self._limits
         if limits is None:
@@ -784,7 +828,7 @@ class RiskEngine:
             return None
         return (1.0 / mid if conv.invert else mid), md.ts
 
-    def _mark_price(self, instrument_id: int) -> Optional[float]:
+    def _mark_price(self, instrument_id: int) -> float | None:
         """Last consolidated mid as a real price (quote ccy), if two-sided
         (``None`` too when ``bid + ask`` leaves i64: no usable mark)."""
         md = self._market.get(instrument_id)
@@ -800,7 +844,7 @@ class RiskEngine:
             return None
         return float(sum_ticks) * ins.tick_size / 2.0
 
-    def _daily_pnl(self, sid: Optional[str]) -> Optional[float]:
+    def _daily_pnl(self, sid: str | None) -> float | None:
         """Realized + unrealized of every held lot in the reporting
         currency, for one strategy (``sid``) or the whole firm (``None``);
         ``None`` when a needed conversion rate is missing or a held lot has
@@ -831,13 +875,13 @@ class RiskEngine:
             total += float(lot.pos) * (mark - lot.avg_price) * ins.qty_unit * rate[0]
         return total
 
-    def strategy_daily_pnl(self, sid: str) -> Optional[float]:
+    def strategy_daily_pnl(self, sid: str) -> float | None:
         """Daily P&L of one strategy in the reporting currency: realized +
         unrealized of every marked lot. ``None`` when a needed conversion
         rate is missing (undeterminable)."""
         return self._daily_pnl(sid)
 
-    def global_daily_pnl(self) -> Optional[float]:
+    def global_daily_pnl(self) -> float | None:
         """Firm-wide daily P&L in the reporting currency (``None`` when a
         conversion rate is missing)."""
         return self._daily_pnl(None)
@@ -852,7 +896,7 @@ class RiskEngine:
         rates contribute 0)."""
         return self._realized_sum(sid)
 
-    def _realized_sum(self, sid: Optional[str]) -> float:
+    def _realized_sum(self, sid: str | None) -> float:
         # Rust ``Iterator::sum::<f64>()`` folds from -0.0 (its neutral
         # element since Rust 1.83), so an empty bucket set sums to -0.0.
         total = -0.0
@@ -901,36 +945,40 @@ class RiskEngine:
             limit = self._effective_strategy_loss(limits, sid)
             if pnl <= -limit:
                 self._kill_strategies[sid] = True
-                self._emit(RiskEvent(
-                    timestamp=ts,
-                    scope=Scope.STRATEGY,
-                    scope_id=sid,
-                    rule_id=Rules.STRATEGY_LOSS,
-                    severity=Severity.BREACH,
-                    decision=Decision.KILL,
-                    reason=(
-                        f"strategy daily pnl {fmt_fixed(pnl, 2)} breaches loss limit "
-                        f"{fmt_fixed(limit, 2)}"
-                    ),
-                ))
+                self._emit(
+                    RiskEvent(
+                        timestamp=ts,
+                        scope=Scope.STRATEGY,
+                        scope_id=sid,
+                        rule_id=Rules.STRATEGY_LOSS,
+                        severity=Severity.BREACH,
+                        decision=Decision.KILL,
+                        reason=(
+                            f"strategy daily pnl {fmt_fixed(pnl, 2)} breaches loss limit "
+                            f"{fmt_fixed(limit, 2)}"
+                        ),
+                    )
+                )
         if not self._kill_global:
             pnl = self.global_daily_pnl()
             if pnl is not None:
                 limit = self._effective_global_loss(limits)
                 if pnl <= -limit:
                     self._set_kill(Scope.GLOBAL, "", True)
-                    self._emit(RiskEvent(
-                        timestamp=ts,
-                        scope=Scope.GLOBAL,
-                        scope_id="",
-                        rule_id=Rules.DAILY_LOSS,
-                        severity=Severity.BREACH,
-                        decision=Decision.KILL,
-                        reason=(
-                            f"global daily pnl {fmt_fixed(pnl, 2)} breaches daily loss "
-                            f"limit {fmt_fixed(limit, 2)}"
-                        ),
-                    ))
+                    self._emit(
+                        RiskEvent(
+                            timestamp=ts,
+                            scope=Scope.GLOBAL,
+                            scope_id="",
+                            rule_id=Rules.DAILY_LOSS,
+                            severity=Severity.BREACH,
+                            decision=Decision.KILL,
+                            reason=(
+                                f"global daily pnl {fmt_fixed(pnl, 2)} breaches daily loss "
+                                f"limit {fmt_fixed(limit, 2)}"
+                            ),
+                        )
+                    )
 
     # --------------------------------------------------------- state reads
 
@@ -949,7 +997,7 @@ class RiskEngine:
         """Number of open (allowed, not yet terminal) orders tracked."""
         return len(self._open)
 
-    def audit(self) -> Tuple[RiskEvent, ...]:
+    def audit(self) -> tuple[RiskEvent, ...]:
         """The audit log so far (a copy)."""
         return tuple(self._audit)
 
@@ -979,15 +1027,17 @@ class RiskEngine:
             self.metrics.inc("risk_allowed_total")
         else:
             self.metrics.inc("risk_rejected_total")
-        self._emit(RiskEvent(
-            timestamp=order.timestamp,
-            scope=scope,
-            scope_id=scope_id,
-            rule_id=outcome.rule_id,
-            severity=outcome.severity,
-            decision=outcome.decision,
-            reason=outcome.reason,
-        ))
+        self._emit(
+            RiskEvent(
+                timestamp=order.timestamp,
+                scope=scope,
+                scope_id=scope_id,
+                rule_id=outcome.rule_id,
+                severity=outcome.severity,
+                decision=outcome.decision,
+                reason=outcome.reason,
+            )
+        )
         # track every allowed order as open (self-match / projections)
         if outcome.allowed():
             self._open[order.order_id] = _OpenOrder(
@@ -1007,7 +1057,7 @@ class RiskEngine:
         return 0
 
     @staticmethod
-    def _decision_scope(order: OrderRequest, rule_id: str) -> Tuple[Scope, str]:
+    def _decision_scope(order: OrderRequest, rule_id: str) -> tuple[Scope, str]:
         if rule_id in _GLOBAL_SCOPE_RULES:
             return Scope.GLOBAL, ""
         if rule_id in _STRATEGY_SCOPE_RULES:
@@ -1036,7 +1086,7 @@ class RiskEngine:
 
     def _pretrade_rate(
         self, limits: RiskLimits, ccy: str, ts: int, clock: int
-    ) -> Tuple[Optional[float], str]:
+    ) -> tuple[float | None, str]:
         """Pre-trade conversion rate: present and fresh (age within the
         stale timeout, and not stamped beyond the engine's event clock by
         more than the timeout — a future-stamped rate is as untrusted as an
@@ -1071,29 +1121,35 @@ class RiskEngine:
         if limits is None:
             return reject(Rules.CONFIG_MISSING, breach, f"fail-closed: {self._config_error}")
         if not self._bootstrapped:
-            return reject(Rules.NOT_BOOTSTRAPPED, breach,
-                          "positions not bootstrapped (fail-closed)")
+            return reject(
+                Rules.NOT_BOOTSTRAPPED, breach, "positions not bootstrapped (fail-closed)"
+            )
         # 1-4. kill switches, global > strategy > instrument > venue
         if self._kill_global:
             return reject(Rules.KILL_GLOBAL, breach, "global kill switch engaged")
         if self._strategy_killed(order.strategy_id):
-            return reject(Rules.KILL_STRATEGY, breach,
-                          f"strategy {order.strategy_id} kill switch engaged")
+            return reject(
+                Rules.KILL_STRATEGY, breach, f"strategy {order.strategy_id} kill switch engaged"
+            )
         if self._kill_instruments.get(order.instrument_id, False):
-            return reject(Rules.KILL_INSTRUMENT, breach,
-                          f"instrument {order.instrument_id} kill switch engaged")
+            return reject(
+                Rules.KILL_INSTRUMENT,
+                breach,
+                f"instrument {order.instrument_id} kill switch engaged",
+            )
         if order.venue_id != 0 and self._kill_venues.get(order.venue_id, False):
-            return reject(Rules.KILL_VENUE, breach,
-                          f"venue {order.venue_id} kill switch engaged")
+            return reject(Rules.KILL_VENUE, breach, f"venue {order.venue_id} kill switch engaged")
         # venue 0 = "route via SOR": the destination is not known here, so
         # ANY engaged venue kill rejects (lowest killed venue id named) —
         # the router must not be a way around a venue halt.
         if order.venue_id == 0:
             for vid in sorted(self._kill_venues):
                 if self._kill_venues[vid]:
-                    return reject(Rules.KILL_VENUE, breach,
-                                  f"venue 0 (SOR) order rejected: venue {vid} "
-                                  f"kill switch engaged")
+                    return reject(
+                        Rules.KILL_VENUE,
+                        breach,
+                        f"venue 0 (SOR) order rejected: venue {vid} kill switch engaged",
+                    )
         # 5. schema-level validation
         malformed = order_validation_error(order)
         if malformed is not None:
@@ -1101,8 +1157,11 @@ class RiskEngine:
         # 6. reference data
         ins = self._instruments.get(order.instrument_id)
         if ins is None:
-            return reject(Rules.UNKNOWN_INSTRUMENT, warn,
-                          f"no reference data for instrument {order.instrument_id}")
+            return reject(
+                Rules.UNKNOWN_INSTRUMENT,
+                warn,
+                f"no reference data for instrument {order.instrument_id}",
+            )
         tick = ins.tick_size
         # 7. duplicate order id
         prev_ts = self._seen_orders.get(order.order_id)
@@ -1115,42 +1174,49 @@ class RiskEngine:
                     return reject(Rules.MALFORMED_ORDER, warn, _TS_OVERFLOW)
                 within = since <= window
             if within:
-                return reject(Rules.DUPLICATE_ORDER_ID, warn,
-                              f"order_id {order.order_id} already used at ts {prev_ts}")
+                return reject(
+                    Rules.DUPLICATE_ORDER_ID,
+                    warn,
+                    f"order_id {order.order_id} already used at ts {prev_ts}",
+                )
         if limits.duplicate_order_window_ns > 0:
             # prune ids that fell out of the window (bounded growth)
             cutoff = _ts_sub(order.timestamp, limits.duplicate_order_window_ns)
             if cutoff is None:
                 return reject(Rules.MALFORMED_ORDER, warn, _TS_OVERFLOW)
-            self._seen_orders = {
-                oid: ts for oid, ts in self._seen_orders.items() if ts >= cutoff
-            }
+            self._seen_orders = {oid: ts for oid, ts in self._seen_orders.items() if ts >= cutoff}
         self._seen_orders[order.order_id] = order.timestamp
         # 8. venue connectivity
         if order.venue_id != 0 and self._venues_down.get(order.venue_id, False):
-            return reject(Rules.VENUE_DISCONNECTED, warn,
-                          f"venue {order.venue_id} is disconnected")
+            return reject(Rules.VENUE_DISCONNECTED, warn, f"venue {order.venue_id} is disconnected")
         # venue 0 = "route via SOR": while at least one known venue is up the
         # router has somewhere to go, but when EVERY known venue is
         # disconnected no venue could take the order.
-        if order.venue_id == 0 and self._venues_down \
-                and all(self._venues_down.values()):
-            return reject(Rules.VENUE_DISCONNECTED, warn,
-                          "venue 0 (SOR) order rejected: every known venue is disconnected")
+        if order.venue_id == 0 and self._venues_down and all(self._venues_down.values()):
+            return reject(
+                Rules.VENUE_DISCONNECTED,
+                warn,
+                "venue 0 (SOR) order rejected: every known venue is disconnected",
+            )
         # 9-10. market-data gate
         md = self._market.get(order.instrument_id)
         if md is not None and md.gated:
-            return reject(Rules.SEQUENCE_GAP, warn,
-                          f"instrument {order.instrument_id} feed has an unrecovered gap")
+            return reject(
+                Rules.SEQUENCE_GAP,
+                warn,
+                f"instrument {order.instrument_id} feed has an unrecovered gap",
+            )
         clock = self._event_clock(order.timestamp)
         if md is not None and md.bid_ticks > 0 and md.ask_ticks > 0:
             age = _ts_sub(order.timestamp, md.ts)
             if age is None:
                 return reject(Rules.MALFORMED_ORDER, warn, _TS_OVERFLOW)
             if limits.stale_book_reject and age > limits.stale_feed_timeout_ns:
-                return reject(Rules.STALE_PRICE, warn,
-                              f"reference price age {age}ns exceeds "
-                              f"{limits.stale_feed_timeout_ns}ns")
+                return reject(
+                    Rules.STALE_PRICE,
+                    warn,
+                    f"reference price age {age}ns exceeds {limits.stale_feed_timeout_ns}ns",
+                )
             # FAIL-OPEN defect: a market state stamped AFTER the order has a
             # negative age, which never exceeded the timeout, so a
             # future-stamped (corrupt / mis-clocked) mark was trusted for as
@@ -1158,24 +1224,35 @@ class RiskEngine:
             # was dropped as a regression. Stamped beyond the engine's event
             # clock by more than the same window, it is exactly as untrusted
             # as a stale one.
-            if limits.stale_book_reject \
-                    and md.ts > min(clock + limits.stale_feed_timeout_ns, _I64_MAX):
-                return reject(Rules.STALE_PRICE, warn,
-                              f"reference price timestamp {md.ts} is more than "
-                              f"{limits.stale_feed_timeout_ns}ns ahead of the latest "
-                              f"order event time {clock}")
+            if limits.stale_book_reject and md.ts > min(
+                clock + limits.stale_feed_timeout_ns, _I64_MAX
+            ):
+                return reject(
+                    Rules.STALE_PRICE,
+                    warn,
+                    f"reference price timestamp {md.ts} is more than "
+                    f"{limits.stale_feed_timeout_ns}ns ahead of the latest "
+                    f"order event time {clock}",
+                )
             sum_ticks = _sum_ticks(md.bid_ticks, md.ask_ticks)
             if sum_ticks is None:
-                return reject(Rules.STALE_PRICE, warn,
-                              f"no reference price for instrument {order.instrument_id}")
+                return reject(
+                    Rules.STALE_PRICE,
+                    warn,
+                    f"no reference price for instrument {order.instrument_id}",
+                )
             mid = float(sum_ticks) * tick / 2.0
         else:
-            return reject(Rules.STALE_PRICE, warn,
-                          f"no reference price for instrument {order.instrument_id}")
+            return reject(
+                Rules.STALE_PRICE, warn, f"no reference price for instrument {order.instrument_id}"
+            )
         # 11. fat-finger quantity
         if order.qty > limits.max_order_qty:
-            return reject(Rules.FAT_FINGER_QTY, warn,
-                          f"qty {order.qty} exceeds max_order_qty {limits.max_order_qty}")
+            return reject(
+                Rules.FAT_FINGER_QTY,
+                warn,
+                f"qty {order.qty} exceeds max_order_qty {limits.max_order_qty}",
+            )
         # 12. conversion rate to the reporting currency
         fx, why = self._pretrade_rate(limits, ins.quote_ccy, order.timestamp, clock)
         if fx is None:
@@ -1186,17 +1263,23 @@ class RiskEngine:
         ref_price = float(order.price_ticks) * tick if order.price_ticks > 0 else mid
         order_notional = float(order.qty) * ins.qty_unit * ref_price * fx
         if not (order_notional <= limits.max_order_notional):
-            return reject(Rules.FAT_FINGER_NOTIONAL, warn,
-                          f"notional {fmt_fixed(order_notional, 2)} {limits.reporting_ccy} "
-                          f"exceeds max_order_notional "
-                          f"{fmt_fixed(limits.max_order_notional, 2)}")
+            return reject(
+                Rules.FAT_FINGER_NOTIONAL,
+                warn,
+                f"notional {fmt_fixed(order_notional, 2)} {limits.reporting_ccy} "
+                f"exceeds max_order_notional "
+                f"{fmt_fixed(limits.max_order_notional, 2)}",
+            )
         # 14. price band (priced orders only)
         if order.price_ticks > 0:
             dev_bps = abs(float(order.price_ticks) * tick - mid) / mid * 1e4
             if not (dev_bps <= limits.price_band_bps):
-                return reject(Rules.PRICE_BAND, warn,
-                              f"price deviates {fmt_fixed(dev_bps, 1)}bps from mid, "
-                              f"band {fmt_fixed(limits.price_band_bps, 1)}bps")
+                return reject(
+                    Rules.PRICE_BAND,
+                    warn,
+                    f"price deviates {fmt_fixed(dev_bps, 1)}bps from mid, "
+                    f"band {fmt_fixed(limits.price_band_bps, 1)}bps",
+                )
         # 15. order-rate throttle (event-time token bucket per strategy)
         bucket = self._buckets.get(order.strategy_id)
         if bucket is None:
@@ -1216,10 +1299,13 @@ class RiskEngine:
         )
         bucket.last_ts = max(bucket.last_ts, order.timestamp)
         if not (bucket.tokens >= 1.0):
-            return reject(Rules.RATE_THROTTLE, warn,
-                          f"strategy {order.strategy_id} exceeded "
-                          f"{fmt_fixed(limits.max_order_rate_per_sec, 2)} orders/s "
-                          f"(burst {fmt_fixed(limits.order_rate_burst, 2)})")
+            return reject(
+                Rules.RATE_THROTTLE,
+                warn,
+                f"strategy {order.strategy_id} exceeded "
+                f"{fmt_fixed(limits.max_order_rate_per_sec, 2)} orders/s "
+                f"(burst {fmt_fixed(limits.order_rate_burst, 2)})",
+            )
         bucket.tokens -= 1.0
         # 16. self-match prevention (any venue; PEG at its pegged touch)
         my_price = self._tracked_price(order)
@@ -1228,18 +1314,20 @@ class RiskEngine:
             if r.instrument_id != order.instrument_id or r.side == order.side:
                 continue
             if my_price > 0 and r.price_ticks > 0:
-                crosses = my_price >= r.price_ticks if order.side == 0 \
-                    else my_price <= r.price_ticks
+                crosses = (
+                    my_price >= r.price_ticks if order.side == 0 else my_price <= r.price_ticks
+                )
             else:
                 crosses = True  # unpriced on either side: conservative
             if crosses:
-                return reject(Rules.SELF_MATCH, warn,
-                              f"would cross own open order {oid} at {r.price_ticks}")
+                return reject(
+                    Rules.SELF_MATCH, warn, f"would cross own open order {oid} at {r.price_ticks}"
+                )
         # 17. position limit (worst-case projection incl. open orders)
         pos = self.position(order.instrument_id)
         # Checked (symmetric i64 domain): a projection that overflows is
         # not a number the limit can be compared with — reject, never raise.
-        open_same: Optional[int] = 0
+        open_same: int | None = 0
         for oid in sorted(self._open):
             r = self._open[oid]
             if r.instrument_id == order.instrument_id and r.side == order.side:
@@ -1251,19 +1339,26 @@ class RiskEngine:
         if projected is not None:
             projected = step(projected, order.qty)
         if projected is None:
-            return reject(Rules.MALFORMED_ORDER, warn,
-                          "projected position overflows i64 (fail-closed)")
+            return reject(
+                Rules.MALFORMED_ORDER, warn, "projected position overflows i64 (fail-closed)"
+            )
         if abs(projected) > limits.max_position_qty:
-            return reject(Rules.POSITION_LIMIT, warn,
-                          f"projected position {projected} exceeds max_position_qty "
-                          f"{limits.max_position_qty}")
+            return reject(
+                Rules.POSITION_LIMIT,
+                warn,
+                f"projected position {projected} exceeds max_position_qty "
+                f"{limits.max_position_qty}",
+            )
         # 18. per-instrument notional (projection marked at the mid)
         projected_notional = float(abs(projected)) * ins.qty_unit * mid * fx
         if not (projected_notional <= limits.max_instrument_notional):
-            return reject(Rules.INSTRUMENT_NOTIONAL, warn,
-                          f"projected notional {fmt_fixed(projected_notional, 2)} exceeds "
-                          f"max_instrument_notional "
-                          f"{fmt_fixed(limits.max_instrument_notional, 2)}")
+            return reject(
+                Rules.INSTRUMENT_NOTIONAL,
+                warn,
+                f"projected notional {fmt_fixed(projected_notional, 2)} exceeds "
+                f"max_instrument_notional "
+                f"{fmt_fixed(limits.max_instrument_notional, 2)}",
+            )
         # 19-20. gross / net notional (filled positions + every open order
         # + this order; fail-closed on unmarked or unconvertible positions)
         gross = 0.0
@@ -1274,14 +1369,20 @@ class RiskEngine:
                 continue
             mark = self._mark_price(iid)
             if mark is None:
-                return reject(Rules.GROSS_NOTIONAL, warn,
-                              f"position in instrument {iid} has no mark price (fail-closed)")
+                return reject(
+                    Rules.GROSS_NOTIONAL,
+                    warn,
+                    f"position in instrument {iid} has no mark price (fail-closed)",
+                )
             pins = self._instruments[iid]
             rate = self._fx_rate(pins.quote_ccy)
             if rate is None:
-                return reject(Rules.GROSS_NOTIONAL, warn,
-                              f"position in instrument {iid} has no {pins.quote_ccy} "
-                              f"conversion rate (fail-closed)")
+                return reject(
+                    Rules.GROSS_NOTIONAL,
+                    warn,
+                    f"position in instrument {iid} has no {pins.quote_ccy} "
+                    f"conversion rate (fail-closed)",
+                )
             v = float(p) * pins.qty_unit * mark * rate[0]
             gross += abs(v)
             net += v
@@ -1302,54 +1403,78 @@ class RiskEngine:
                     # the aggregate and a correct GROSS_NOTIONAL reject became
                     # an ALLOW. An unvaluable open order is exactly as
                     # undeterminable as an unvaluable position: reject.
-                    return reject(Rules.GROSS_NOTIONAL, warn,
-                                  f"open order {oid} in instrument "
-                                  f"{r.instrument_id} has no mark price "
-                                  f"(fail-closed)")
+                    return reject(
+                        Rules.GROSS_NOTIONAL,
+                        warn,
+                        f"open order {oid} in instrument "
+                        f"{r.instrument_id} has no mark price "
+                        f"(fail-closed)",
+                    )
                 price = marked
             rate = self._fx_rate(oins.quote_ccy)
             if rate is None:
-                return reject(Rules.GROSS_NOTIONAL, warn,
-                              f"open order in instrument {r.instrument_id} has no "
-                              f"{oins.quote_ccy} conversion rate (fail-closed)")
+                return reject(
+                    Rules.GROSS_NOTIONAL,
+                    warn,
+                    f"open order in instrument {r.instrument_id} has no "
+                    f"{oins.quote_ccy} conversion rate (fail-closed)",
+                )
             v = float(r.qty) * oins.qty_unit * price * rate[0]
             gross += v
             net += v if r.side == 0 else -v
         gross += order_notional
         if not (gross <= limits.max_gross_notional):
-            return reject(Rules.GROSS_NOTIONAL, warn,
-                          f"projected gross notional {fmt_fixed(gross, 2)} exceeds "
-                          f"max_gross_notional {fmt_fixed(limits.max_gross_notional, 2)}")
+            return reject(
+                Rules.GROSS_NOTIONAL,
+                warn,
+                f"projected gross notional {fmt_fixed(gross, 2)} exceeds "
+                f"max_gross_notional {fmt_fixed(limits.max_gross_notional, 2)}",
+            )
         net += order_notional if order.side == 0 else -order_notional
         if not (abs(net) <= limits.max_net_notional):
-            return reject(Rules.NET_NOTIONAL, warn,
-                          f"projected net notional {fmt_fixed(net, 2)} exceeds "
-                          f"max_net_notional {fmt_fixed(limits.max_net_notional, 2)}")
+            return reject(
+                Rules.NET_NOTIONAL,
+                warn,
+                f"projected net notional {fmt_fixed(net, 2)} exceeds "
+                f"max_net_notional {fmt_fixed(limits.max_net_notional, 2)}",
+            )
         # 21-22. loss limits on daily P&L (belt-and-braces after a cleared
         # latch; undeterminable P&L rejects fail-closed)
         global_pnl = self.global_daily_pnl()
         if global_pnl is None:
-            return reject(Rules.FX_RATE_MISSING, warn,
-                          "global daily pnl undeterminable: conversion rate missing")
+            return reject(
+                Rules.FX_RATE_MISSING,
+                warn,
+                "global daily pnl undeterminable: conversion rate missing",
+            )
         global_limit = self._effective_global_loss(limits)
         if not (global_pnl > -global_limit):
-            return reject(Rules.DAILY_LOSS, breach,
-                          f"global daily pnl {fmt_fixed(global_pnl, 2)} at daily loss "
-                          f"limit {fmt_fixed(global_limit, 2)}")
+            return reject(
+                Rules.DAILY_LOSS,
+                breach,
+                f"global daily pnl {fmt_fixed(global_pnl, 2)} at daily loss "
+                f"limit {fmt_fixed(global_limit, 2)}",
+            )
         strat_pnl = self.strategy_daily_pnl(order.strategy_id)
         if strat_pnl is None:
-            return reject(Rules.FX_RATE_MISSING, warn,
-                          "strategy daily pnl undeterminable: conversion rate missing")
+            return reject(
+                Rules.FX_RATE_MISSING,
+                warn,
+                "strategy daily pnl undeterminable: conversion rate missing",
+            )
         strat_limit = self._effective_strategy_loss(limits, order.strategy_id)
         if not (strat_pnl > -strat_limit):
-            return reject(Rules.STRATEGY_LOSS, breach,
-                          f"strategy daily pnl {fmt_fixed(strat_pnl, 2)} at loss limit "
-                          f"{fmt_fixed(strat_limit, 2)}")
+            return reject(
+                Rules.STRATEGY_LOSS,
+                breach,
+                f"strategy daily pnl {fmt_fixed(strat_pnl, 2)} at loss limit "
+                f"{fmt_fixed(strat_limit, 2)}",
+            )
         return RiskDecision(Decision.ALLOW, Rules.ALLOW, Severity.INFO, "")
 
     # ---------------------------------------------------- snapshot/restore
 
-    def snapshot(self) -> Dict[str, Any]:
+    def snapshot(self) -> dict[str, Any]:
         """Serialise the full mutable state (positions, lots, realized P&L,
         kill/latch state, marks, open orders, throttle buckets, seen order
         ids, overrides, bootstrap flag) as a schema-versioned JSON-shaped
@@ -1361,14 +1486,18 @@ class RiskEngine:
             "bootstrapped": self._bootstrapped,
             "kill_global": self._kill_global,
             "kill_strategies": {k: self._kill_strategies[k] for k in sorted(self._kill_strategies)},
-            "kill_instruments": {str(k): self._kill_instruments[k]
-                                 for k in sorted(self._kill_instruments)},
+            "kill_instruments": {
+                str(k): self._kill_instruments[k] for k in sorted(self._kill_instruments)
+            },
             "kill_venues": {str(k): self._kill_venues[k] for k in sorted(self._kill_venues)},
             "venues_down": {str(k): self._venues_down[k] for k in sorted(self._venues_down)},
             "market": {
                 str(k): {
-                    "bid_ticks": m.bid_ticks, "ask_ticks": m.ask_ticks, "ts": m.ts,
-                    "gaps": m.gaps, "gated": m.gated,
+                    "bid_ticks": m.bid_ticks,
+                    "ask_ticks": m.ask_ticks,
+                    "ts": m.ts,
+                    "gaps": m.gaps,
+                    "gated": m.gated,
                 }
                 for k, m in sorted(self._market.items())
             },
@@ -1379,15 +1508,21 @@ class RiskEngine:
             },
             "open": {
                 str(k): {
-                    "instrument_id": o.instrument_id, "side": o.side,
-                    "price_ticks": o.price_ticks, "qty": o.qty,
+                    "instrument_id": o.instrument_id,
+                    "side": o.side,
+                    "price_ticks": o.price_ticks,
+                    "qty": o.qty,
                 }
                 for k, o in sorted(self._open.items())
             },
             "positions": {str(k): self._positions[k] for k in sorted(self._positions)},
             "lots": [
-                {"strategy_id": sid, "instrument_id": iid,
-                 "pos": lot.pos, "avg_price": lot.avg_price}
+                {
+                    "strategy_id": sid,
+                    "instrument_id": iid,
+                    "pos": lot.pos,
+                    "avg_price": lot.avg_price,
+                }
                 for (sid, iid), lot in sorted(self._lots.items())
             ],
             "realized": [
@@ -1413,7 +1548,7 @@ class RiskEngine:
         instruments: Mapping[int, InstrumentRef],
         snap: Any,
         ts: int,
-    ) -> "RiskEngine":
+    ) -> RiskEngine:
         """Rebuild an engine from ``limits``, ``instruments`` and a
         :meth:`snapshot` document (strict: unknown version or a malformed
         field is a ``ValueError``, nothing is restored). Emits a
@@ -1488,24 +1623,27 @@ class RiskEngine:
             ccy = r.str("ccy", "realized.ccy")
             eng._realized[(sid, ccy)] = r.f64("pnl", "realized.pnl")
         override = get.raw("loss_override_global")
-        eng._loss_override_global = None if override is None \
-            else _as_f64(override, "loss_override_global")
+        eng._loss_override_global = (
+            None if override is None else _as_f64(override, "loss_override_global")
+        )
         for k, v in get.obj("loss_override_strategy").items():
             eng._loss_override_strategy[k] = _as_f64(v, "loss_override_strategy")
         eng._refresh_pnl_gauges()
         n_pos = sum(1 for p in eng._positions.values() if p != 0)
-        eng._emit(RiskEvent(
-            timestamp=ts,
-            scope=Scope.GLOBAL,
-            scope_id="",
-            rule_id=Rules.STATE_RESTORED,
-            severity=Severity.INFO,
-            decision=Decision.ALLOW,
-            reason=(
-                f"restored snapshot v{SNAPSHOT_VERSION}: {n_pos} positions, "
-                f"{len(eng._open)} open orders"
-            ),
-        ))
+        eng._emit(
+            RiskEvent(
+                timestamp=ts,
+                scope=Scope.GLOBAL,
+                scope_id="",
+                rule_id=Rules.STATE_RESTORED,
+                severity=Severity.INFO,
+                decision=Decision.ALLOW,
+                reason=(
+                    f"restored snapshot v{SNAPSHOT_VERSION}: {n_pos} positions, "
+                    f"{len(eng._open)} open orders"
+                ),
+            )
+        )
         return eng
 
 
@@ -1570,11 +1708,11 @@ class _SnapReader:
     def raw(self, key: str) -> Any:
         return self._doc.get(key) if isinstance(self._doc, dict) else None
 
-    def u64_opt(self, key: str) -> Optional[int]:
+    def u64_opt(self, key: str) -> int | None:
         v = self.raw(key)
         return v if _is_int(v) and 0 <= v <= _U64_MAX else None
 
-    def bool(self, key: str, what: Optional[str] = None) -> bool:
+    def bool(self, key: str, what: str | None = None) -> bool:
         return _as_bool(self.raw(key), what or key)
 
     def i64(self, key: str, what: str) -> int:
@@ -1589,13 +1727,13 @@ class _SnapReader:
     def str(self, key: str, what: str) -> str:
         return _as_str(self.raw(key), what)
 
-    def obj(self, key: str) -> Dict[str, Any]:
+    def obj(self, key: str) -> dict[str, Any]:
         v = self.raw(key)
         if not isinstance(v, dict):
             raise _bad(key)
         return {k: v[k] for k in sorted(v)}
 
-    def arr(self, key: str) -> List[Any]:
+    def arr(self, key: str) -> list[Any]:
         v = self.raw(key)
         if not isinstance(v, list):
             raise _bad(key)

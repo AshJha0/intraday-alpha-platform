@@ -22,7 +22,6 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Optional
 
 from iap.risk.serialize import rust_display_f64
 
@@ -53,7 +52,7 @@ class OrderType(IntEnum):
     MID = 6
 
     @classmethod
-    def from_u8(cls, code: int) -> Optional["OrderType"]:
+    def from_u8(cls, code: int) -> OrderType | None:
         """Decode a wire value; ``None`` for unknown codes."""
         for member in cls:
             if member.value == code:
@@ -108,12 +107,12 @@ class OrderRequest:
             raise ValueError(f"urgency must be a float, got {self.urgency!r}")
         object.__setattr__(self, "urgency", float(self.urgency))
 
-    def validation_error(self) -> Optional[str]:
+    def validation_error(self) -> str | None:
         """Schema-level validation reason (``None`` when valid)."""
         return order_validation_error(self)
 
 
-def order_validation_error(order: OrderRequest) -> Optional[str]:
+def order_validation_error(order: OrderRequest) -> str | None:
     """Contract-level validation (``venue::order_validation_error``):
     ``None`` when valid, else the exact reason text."""
     if order.side > 1:

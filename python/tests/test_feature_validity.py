@@ -5,7 +5,6 @@ from __future__ import annotations
 import math
 
 import pytest
-
 from conftest import GOLDEN_DIR, REPO_ROOT, mkev
 from iap.core.codec import read_jsonl
 from iap.core.events import EventType
@@ -22,22 +21,20 @@ def contexts():
 @pytest.fixture(scope="module")
 def eq_vecs(contexts):
     engine = FeatureEngine(contexts, cadence_ns=0)
-    return [engine.apply(ev)
-            for ev in read_jsonl(GOLDEN_DIR / "events_eq_mbo.jsonl")]
+    return [engine.apply(ev) for ev in read_jsonl(GOLDEN_DIR / "events_eq_mbo.jsonl")]
 
 
 @pytest.fixture(scope="module")
 def fx_vecs(contexts):
     engine = FeatureEngine(contexts, cadence_ns=0)
-    return [engine.apply(ev)
-            for ev in read_jsonl(GOLDEN_DIR / "events_fx_quote.jsonl")]
+    return [engine.apply(ev) for ev in read_jsonl(GOLDEN_DIR / "events_fx_quote.jsonl")]
 
 
 def _assert_no_valid_nan(vecs):
     n = len(build_registry())
     for vec in vecs:
         assert len(vec.values) == n and len(vec.validity) == n
-        for x, ok in zip(vec.values, vec.validity):
+        for x, ok in zip(vec.values, vec.validity, strict=False):
             if ok:
                 assert math.isfinite(x)
             else:
@@ -66,12 +63,13 @@ def test_warmup_semantics(eq_vecs):
     first_ts = eq_vecs[0].timestamp
     for vec in eq_vecs:
         elapsed = vec.timestamp - first_ts
-        for name, w_ns in (("ofi_l1_w1s_v1", 1_000_000_000),
-                           ("rvol_w1m_v1", 60_000_000_000),
-                           ("signed_volume_w10s_v1", 10_000_000_000)):
+        for name, w_ns in (
+            ("ofi_l1_w1s_v1", 1_000_000_000),
+            ("rvol_w1m_v1", 60_000_000_000),
+            ("signed_volume_w10s_v1", 10_000_000_000),
+        ):
             if elapsed < w_ns:
-                assert not vec.validity[idx[name]], (
-                    f"{name} valid before warmup at +{elapsed}ns")
+                assert not vec.validity[idx[name]], f"{name} valid before warmup at +{elapsed}ns"
     # and they do eventually become valid
     last = eq_vecs[-1]
     for name in ("ofi_l1_w1s_v1", "rvol_w1m_v1", "signed_volume_w10s_v1"):
@@ -96,22 +94,27 @@ def test_stale_book_invalidates_book_features(contexts):
     assert vec.validity[idx["spread_ticks_v1"]]
     # gap: jump the sequence by 10 -> stale book
     seq += 10
-    vec = engine.apply(mkev(seq, EventType.ADD, side=0, price=1001, qty=50,
-                            order_id=3))
-    for name in ("mid_price_v1", "spread_bps_v1", "imbalance_l1_v1",
-                 "depth_bid_l1_v1", "half_spread_cost_bps_v1"):
+    vec = engine.apply(mkev(seq, EventType.ADD, side=0, price=1001, qty=50, order_id=3))
+    for name in (
+        "mid_price_v1",
+        "spread_bps_v1",
+        "imbalance_l1_v1",
+        "depth_bid_l1_v1",
+        "half_spread_cost_bps_v1",
+    ):
         assert not vec.validity[idx[name]], f"{name} valid on stale book"
     # clock features stay valid
-    for name in ("minute_of_day_v1", "is_trading_v1",
-                 "venue_staleness_max_ms_v1"):
+    for name in ("minute_of_day_v1", "is_trading_v1", "venue_staleness_max_ms_v1"):
         assert vec.validity[idx[name]], f"{name} invalid on stale book"
     # SNAPSHOT recovery burst restores validity
     seq += 1
-    engine.apply(mkev(seq, EventType.SNAPSHOT, side=0, price=1000, qty=100,
-                      order_id=11, trade_id=1))
+    engine.apply(
+        mkev(seq, EventType.SNAPSHOT, side=0, price=1000, qty=100, order_id=11, trade_id=1)
+    )
     seq += 1
-    vec = engine.apply(mkev(seq, EventType.SNAPSHOT, side=1, price=1002,
-                            qty=150, order_id=12, trade_id=0))
+    vec = engine.apply(
+        mkev(seq, EventType.SNAPSHOT, side=1, price=1002, qty=150, order_id=12, trade_id=0)
+    )
     assert vec.validity[idx["mid_price_v1"]]
 
 
@@ -144,7 +147,7 @@ def test_cadence_throttles_emissions(contexts):
     # emitted timestamps at least cadence apart (per instrument = the only one)
     engine = FeatureEngine(contexts, cadence_ns=1_000_000_000)
     ts = [v.timestamp for v in map(engine.apply, events) if v is not None]
-    assert all(b - a >= 1_000_000_000 for a, b in zip(ts, ts[1:]))
+    assert all(b - a >= 1_000_000_000 for a, b in zip(ts, ts[1:], strict=False))
 
 
 def test_unknown_instrument_raises(contexts):

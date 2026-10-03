@@ -19,9 +19,10 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional, Tuple, Union
+from typing import Any
 
 from iap.contracts.types import Algo
 from iap.contracts.versions import content_hash
@@ -47,8 +48,15 @@ MVP_CONFIG_VERSION = 1
 REPO_ROOT = Path(__file__).resolve().parents[4]
 DEFAULT_CONFIG_PATH = REPO_ROOT / "configs" / "mvp" / "mvp.json"
 
-_REFERENCE_KEYS = ("instruments", "venues", "generator", "risk", "execution",
-                   "alpha_params", "alpha_registry")
+_REFERENCE_KEYS = (
+    "instruments",
+    "venues",
+    "generator",
+    "risk",
+    "execution",
+    "alpha_params",
+    "alpha_registry",
+)
 _ALGOS = {a.value for a in Algo}
 _NS_PER_S = 1_000_000_000
 
@@ -67,7 +75,7 @@ class _Doc:
             raise ValueError(f"{self.where}: missing key {key!r}")
         return self.obj[key]
 
-    def sub(self, key: str) -> "_Doc":
+    def sub(self, key: str) -> _Doc:
         return _Doc(self._get(key), f"{self.where}.{key}")
 
     def integer(self, key: str, lo: int, hi: int) -> int:
@@ -99,7 +107,7 @@ class _Doc:
             raise ValueError(f"{self.where}.{key}: must be a boolean")
         return v
 
-    def string_list(self, key: str, n: Optional[int] = None) -> Tuple[str, ...]:
+    def string_list(self, key: str, n: int | None = None) -> tuple[str, ...]:
         v = self._get(key)
         if not isinstance(v, list) or not v or not all(isinstance(s, str) and s for s in v):
             raise ValueError(f"{self.where}.{key}: must be a non-empty list of strings")
@@ -109,14 +117,14 @@ class _Doc:
             raise ValueError(f"{self.where}.{key}: entries must be unique")
         return tuple(v)
 
-    def list_of_objects(self, key: str) -> Tuple["_Doc", ...]:
+    def list_of_objects(self, key: str) -> tuple[_Doc, ...]:
         v = self._get(key)
         if not isinstance(v, list) or not v:
             raise ValueError(f"{self.where}.{key}: must be a non-empty list")
         return tuple(_Doc(item, f"{self.where}.{key}[{i}]") for i, item in enumerate(v))
 
 
-def _hms(text: str, where: str) -> Tuple[int, int, int]:
+def _hms(text: str, where: str) -> tuple[int, int, int]:
     parts = text.split(":")
     if len(parts) != 3 or not all(p.isdigit() and len(p) == 2 for p in parts):
         raise ValueError(f"{where}: time must be HH:MM:SS, got {text!r}")
@@ -192,7 +200,7 @@ class ExecutionSpec:
     """Algo selection and child scheduling parameters."""
 
     parent_window_ns: int
-    urgency_bands: Tuple[UrgencyBand, ...]
+    urgency_bands: tuple[UrgencyBand, ...]
     twap_slices: int
     is_slices: int
     is_risk_aversion: float
@@ -221,27 +229,28 @@ class SorSpec:
 class MvpConfig:
     """The validated MVP configuration (see module docstring)."""
 
-    document: Dict[str, Any]
+    document: dict[str, Any]
     seed: int
     instrument: str
     strategy_id: str
-    venues: Tuple[str, ...]
-    alphas: Tuple[str, ...]
+    venues: tuple[str, ...]
+    alphas: tuple[str, ...]
     horizon_ns: int
     decision_cadence_ns: int
     session: SessionSpec
     portfolio: PortfolioSpec
     execution: ExecutionSpec
     sor: SorSpec
-    reference: Dict[str, str]
-    notes: Tuple[str, ...]
+    reference: dict[str, str]
+    notes: tuple[str, ...]
     repo_root: Path
 
     # ------------------------------------------------------------ loading
 
     @classmethod
-    def from_document(cls, doc: Mapping[str, Any], *, where: str = "mvp.json",
-                      repo_root: Optional[Path] = None) -> "MvpConfig":
+    def from_document(
+        cls, doc: Mapping[str, Any], *, where: str = "mvp.json", repo_root: Path | None = None
+    ) -> MvpConfig:
         """Validate a parsed ``mvp.json`` document."""
         root = Path(repo_root) if repo_root is not None else REPO_ROOT
         d = _Doc(doc, where)
@@ -255,8 +264,9 @@ class MvpConfig:
         cadence = d.integer("decision_cadence_ns", 1, (1 << 62))
 
         s = d.sub("session")
-        session = SessionSpec(s.string("trading_day"), s.string("timezone"),
-                              s.string("open"), s.string("close"))
+        session = SessionSpec(
+            s.string("trading_day"), s.string("timezone"), s.string("open"), s.string("close")
+        )
         _hms(session.open, f"{where}.session.open")
         _hms(session.close, f"{where}.session.close")
         if session.length_ns <= 0:
@@ -300,8 +310,10 @@ class MvpConfig:
         if bands[-1].max_urgency != 1.0:
             raise ValueError(f"{where}.execution.urgency_bands: the last band must end at 1.0")
         if any(b.algo is Algo.VWAP for b in bands):
-            raise ValueError(f"{where}.execution.urgency_bands: VWAP needs a session volume "
-                             "curve the MVP does not carry; use TWAP / POV / IS")
+            raise ValueError(
+                f"{where}.execution.urgency_bands: VWAP needs a session volume "
+                "curve the MVP does not carry; use TWAP / POV / IS"
+            )
         lat = e.sub("latency")
         execution = ExecutionSpec(
             parent_window_ns=e.integer("parent_window_ns", 1, (1 << 62)),
@@ -315,12 +327,13 @@ class MvpConfig:
             latency_wire_ns=lat.integer("wire_ns", 0, (1 << 62)),
         )
         if execution.parent_window_ns > cadence:
-            raise ValueError(f"{where}.execution.parent_window_ns: must not exceed "
-                             "decision_cadence_ns (one live parent per decision cycle)")
+            raise ValueError(
+                f"{where}.execution.parent_window_ns: must not exceed "
+                "decision_cadence_ns (one live parent per decision cycle)"
+            )
 
         so = d.sub("sor")
-        sor = SorSpec(so.boolean("prefer_rebate"),
-                      so.integer("max_venue_latency_ns", 0, (1 << 62)))
+        sor = SorSpec(so.boolean("prefer_rebate"), so.integer("max_venue_latency_ns", 0, (1 << 62)))
 
         r = d.sub("reference")
         reference = {k: r.string(k) for k in _REFERENCE_KEYS}
@@ -335,15 +348,24 @@ class MvpConfig:
             raise ValueError(f"{where}.x-version: expected {MVP_CONFIG_VERSION}")
         return cls(
             document=json.loads(json.dumps(doc)),
-            seed=seed, instrument=instrument, strategy_id=strategy_id,
-            venues=venues, alphas=alphas, horizon_ns=horizon_ns,
-            decision_cadence_ns=cadence, session=session, portfolio=portfolio,
-            execution=execution, sor=sor, reference=reference,
-            notes=tuple(notes_raw), repo_root=root,
+            seed=seed,
+            instrument=instrument,
+            strategy_id=strategy_id,
+            venues=venues,
+            alphas=alphas,
+            horizon_ns=horizon_ns,
+            decision_cadence_ns=cadence,
+            session=session,
+            portfolio=portfolio,
+            execution=execution,
+            sor=sor,
+            reference=reference,
+            notes=tuple(notes_raw),
+            repo_root=root,
         )
 
     @classmethod
-    def load(cls, path: Union[str, Path], *, repo_root: Optional[Path] = None) -> "MvpConfig":
+    def load(cls, path: str | Path, *, repo_root: Path | None = None) -> MvpConfig:
         """Load + validate ``path``; errors name the file."""
         p = Path(path)
         if not p.is_file():
@@ -355,16 +377,16 @@ class MvpConfig:
                 raise ValueError(f"{p}: invalid JSON ({exc})") from None
         return cls.from_document(doc, where=str(p), repo_root=repo_root)
 
-    def with_overrides(self, *, seed: Optional[int] = None,
-                       instrument: Optional[str] = None) -> "MvpConfig":
+    def with_overrides(
+        self, *, seed: int | None = None, instrument: str | None = None
+    ) -> MvpConfig:
         """A new config with ``seed`` / ``instrument`` replaced (re-validated)."""
         doc = json.loads(json.dumps(self.document))
         if seed is not None:
             doc["seed"] = seed
         if instrument is not None:
             doc["instrument"] = instrument
-        return MvpConfig.from_document(doc, where="mvp.json (overridden)",
-                                       repo_root=self.repo_root)
+        return MvpConfig.from_document(doc, where="mvp.json (overridden)", repo_root=self.repo_root)
 
     # ---------------------------------------------------------- documents
 
@@ -372,9 +394,9 @@ class MvpConfig:
         """Absolute path of a ``reference`` document."""
         return self.repo_root / self.reference[key]
 
-    def reference_documents(self) -> Dict[str, Any]:
+    def reference_documents(self) -> dict[str, Any]:
         """Every referenced JSON document, keyed by its repository-relative path."""
-        out: Dict[str, Any] = {}
+        out: dict[str, Any] = {}
         for key in _REFERENCE_KEYS:
             rel = self.reference[key]
             with open(self.repo_root / rel, encoding="utf-8") as fh:
@@ -404,15 +426,22 @@ def config_version_of(cfg: MvpConfig) -> str:
     return content_hash(docs)
 
 
-def load_config(path: Optional[Union[str, Path]] = None, *, seed: Optional[int] = None,
-                instrument: Optional[str] = None,
-                repo_root: Optional[Path] = None) -> MvpConfig:
+def load_config(
+    path: str | Path | None = None,
+    *,
+    seed: int | None = None,
+    instrument: str | None = None,
+    repo_root: Path | None = None,
+) -> MvpConfig:
     """Load ``configs/mvp/mvp.json`` (or ``path``) and apply CLI overrides.
     ``repo_root`` is the directory the ``reference`` paths resolve against
     (and where the default config lives); the repository by default."""
     if path is None:
-        path = (DEFAULT_CONFIG_PATH if repo_root is None
-                else Path(repo_root) / "configs" / "mvp" / "mvp.json")
+        path = (
+            DEFAULT_CONFIG_PATH
+            if repo_root is None
+            else Path(repo_root) / "configs" / "mvp" / "mvp.json"
+        )
     cfg = MvpConfig.load(path, repo_root=repo_root)
     if seed is not None or instrument is not None:
         cfg = cfg.with_overrides(seed=seed, instrument=instrument)

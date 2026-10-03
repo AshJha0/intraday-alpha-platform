@@ -131,8 +131,7 @@ def _check_generic_id(value: str, name: str) -> str:
     if not isinstance(value, str):
         raise ValueError(f"{name}: expected str, got {type(value).__name__}")
     if not is_generic_id(value):
-        raise ValueError(
-            f"{name}: {value!r} must match {_GENERIC_ID_PATTERN.pattern}")
+        raise ValueError(f"{name}: {value!r} must match {_GENERIC_ID_PATTERN.pattern}")
     return value
 
 
@@ -239,8 +238,7 @@ def trace_id(value: str) -> TraceId:
     return TraceId(value)
 
 
-def make_trace_id(session: str, instrument: int, event_ts: int,
-                  sequence: int) -> TraceId:
+def make_trace_id(session: str, instrument: int, event_ts: int, sequence: int) -> TraceId:
     """Deterministic trace id for one decision.
 
     The canonical key is the pipe-joined ASCII string
@@ -250,11 +248,13 @@ def make_trace_id(session: str, instrument: int, event_ts: int,
     reproduce it with a string concatenation and one hash call.  The session
     id alphabet excludes ``|`` so the key is unambiguous.
     """
-    key = "|".join((
-        session_id(session),
-        str(instrument_id(instrument)),
-        str(timestamp(event_ts)),
-        str(_check_int(sequence, 0, U64_MAX, "sequence")),
-    ))
+    key = "|".join(
+        (
+            session_id(session),
+            str(instrument_id(instrument)),
+            str(timestamp(event_ts)),
+            str(_check_int(sequence, 0, U64_MAX, "sequence")),
+        )
+    )
     digest = hashlib.sha256(key.encode("ascii")).hexdigest()
     return TraceId(digest[:32])

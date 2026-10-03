@@ -74,9 +74,7 @@ class VenueSpec:
         if not (0 <= self.venue_id <= 0xFFFF):
             raise ValueError(f"venue_id must be u16, got {self.venue_id}")
         if self.latency_mean_ns < 0 or self.latency_jitter_ns < 0:
-            raise ValueError(
-                f"venue {self.venue_id}: latency mean/jitter must be >= 0"
-            )
+            raise ValueError(f"venue {self.venue_id}: latency mean/jitter must be >= 0")
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,13 +99,10 @@ class InstrumentSpec:
             raise ValueError(f"instrument_id must be u32, got {self.instrument_id}")
         if not (self.tick_size > 0.0 and self.qty_unit > 0.0 and self.adv > 0.0):
             raise ValueError(
-                f"tick_size, qty_unit and adv must be > 0 for instrument "
-                f"{self.instrument_id}"
+                f"tick_size, qty_unit and adv must be > 0 for instrument {self.instrument_id}"
             )
         if not self.quote_ccy:
-            raise ValueError(
-                f"quote_ccy must be non-empty for instrument {self.instrument_id}"
-            )
+            raise ValueError(f"quote_ccy must be non-empty for instrument {self.instrument_id}")
 
 
 @dataclass(frozen=True, slots=True)

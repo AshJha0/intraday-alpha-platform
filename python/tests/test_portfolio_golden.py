@@ -6,7 +6,6 @@ import json
 
 import numpy as np
 import pytest
-
 from iap.portfolio.optimizer import (
     Constraints,
     max_violation,
@@ -35,9 +34,15 @@ def _build(golden):
         currency_matrix=np.array(p["currency_matrix"]),
         currency_bounds=np.array(c["currency_bounds"]),
     )
-    return (np.array(p["alpha"]), np.array(p["sigma"]),
-            np.array(p["w_prev"]), p["risk_aversion"],
-            np.array(p["tc_linear"]), cons, p["solver"])
+    return (
+        np.array(p["alpha"]),
+        np.array(p["sigma"]),
+        np.array(p["w_prev"]),
+        p["risk_aversion"],
+        np.array(p["tc_linear"]),
+        cons,
+        p["solver"],
+    )
 
 
 def test_golden_portfolio_weights_and_objective(golden):
@@ -66,6 +71,7 @@ def test_golden_portfolio_feasible(golden):
 def test_golden_portfolio_near_reference_optimum(golden):
     """CVX-style validation: SLSQP reference optimum within 1e-5."""
     from scipy.optimize import minimize
+
     alpha, Sigma, w_prev, ra, tc, cons, _ = _build(golden)
     cons.validate(8)
     E = cons.currency_matrix
@@ -77,23 +83,29 @@ def test_golden_portfolio_near_reference_optimum(golden):
     cl = [
         {"type": "ineq", "fun": lambda w: cons.gross_cap - np.abs(w).sum()},
         {"type": "ineq", "fun": lambda w: cons.net_cap - abs(w.sum())},
-        {"type": "ineq",
-         "fun": lambda w: cons.turnover_cap - np.abs(w - w_prev).sum()},
-        {"type": "ineq",
-         "fun": lambda w: cons.vol_target ** 2 - w @ Sigma @ w},
+        {"type": "ineq", "fun": lambda w: cons.turnover_cap - np.abs(w - w_prev).sum()},
+        {"type": "ineq", "fun": lambda w: cons.vol_target**2 - w @ Sigma @ w},
     ]
     for i in range(E.shape[0]):
-        cl.append({"type": "ineq",
-                   "fun": (lambda i: lambda w: cb[i] - abs(E[i] @ w))(i)})
-    bounds = [(max(cons.w_min[i], w_prev[i] - cons.participation[i]),
-               min(cons.w_max[i], w_prev[i] + cons.participation[i]))
-              for i in range(8)]
+        cl.append({"type": "ineq", "fun": (lambda i: lambda w: cb[i] - abs(E[i] @ w))(i)})  # noqa: B023  (i is bound by the inner lambda)
+    bounds = [
+        (
+            max(cons.w_min[i], w_prev[i] - cons.participation[i]),
+            min(cons.w_max[i], w_prev[i] + cons.participation[i]),
+        )
+        for i in range(8)
+    ]
     w_g = np.array(golden["expected"]["weights"])
     ref = -np.inf
     for x0 in (w_prev, np.zeros(8), w_g):
-        r = minimize(negf, x0, bounds=bounds, constraints=cl,
-                     method="SLSQP",
-                     options={"maxiter": 2000, "ftol": 1e-14})
+        r = minimize(
+            negf,
+            x0,
+            bounds=bounds,
+            constraints=cl,
+            method="SLSQP",
+            options={"maxiter": 2000, "ftol": 1e-14},
+        )
         if r.success:
             ref = max(ref, -r.fun)
     assert ref > -np.inf

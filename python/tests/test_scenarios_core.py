@@ -9,7 +9,6 @@ import json
 import struct
 
 import pytest
-
 from conftest import CONFIGS_DIR, add, mkev
 from iap.core import codec
 from iap.core.events import (
@@ -50,8 +49,18 @@ def _burst(book: OrderBook, seq: int, records, ids=True, **kw) -> int:
     """Apply a complete SNAPSHOT burst starting at ``seq``; returns next seq."""
     n = len(records)
     for i, (side, price, qty, oid) in enumerate(records):
-        book.apply(mkev(seq + i, EventType.SNAPSHOT, side, price, qty,
-                        order_id=oid if ids else 0, trade_id=n - 1 - i, **kw))
+        book.apply(
+            mkev(
+                seq + i,
+                EventType.SNAPSHOT,
+                side,
+                price,
+                qty,
+                order_id=oid if ids else 0,
+                trade_id=n - 1 - i,
+                **kw,
+            )
+        )
     return seq + n
 
 
@@ -60,10 +69,18 @@ BURST = [(BID, 2450, 500, 101), (BID, 2449, 400, 102), (ASK, 2451, 600, 103)]
 
 def _drops(book: OrderBook) -> int:
     c = book.counters()
-    return sum(c[k] for k in (
-        "duplicates_dropped", "dropped_while_stale", "unknown_order_events",
-        "invalid_side_dropped", "invalid_payload_dropped", "unknown_type_dropped",
-        "modify_price_mismatch"))
+    return sum(
+        c[k]
+        for k in (
+            "duplicates_dropped",
+            "dropped_while_stale",
+            "unknown_order_events",
+            "invalid_side_dropped",
+            "invalid_payload_dropped",
+            "unknown_type_dropped",
+            "modify_price_mismatch",
+        )
+    )
 
 
 # ------------------------------------------------ #2 snapshot-after-gap variants
@@ -121,8 +138,11 @@ def test_scenario_venue_sequence_reset_daily_restart():
     """LSE/Xetra-style daily reset: seqs 1..500, then a burst from seq 1 and 2.."""
     b = OrderBook(1, 1)
     for s in range(1, 501):
-        b.apply(add(s, BID if s % 2 else ASK, 2400 - (s % 7) if s % 2 else 2410 + (s % 7),
-                    100, 1000 + s))
+        b.apply(
+            add(
+                s, BID if s % 2 else ASK, 2400 - (s % 7) if s % 2 else 2410 + (s % 7), 100, 1000 + s
+            )
+        )
     assert b.last_sequence == 500 and not b.stale
     _burst(b, 1, BURST)  # sequence reset + recovery
     assert b.sequence_resets == 1 and b.sequence_epoch == 1
@@ -162,8 +182,9 @@ def test_scenario_two_day_capture_with_daily_reset_in_normaliser(tmp_path):
     raw = tmp_path / "raw"
     raw.mkdir()
     day1 = [add(s, BID, 100, 10, s, ts=10**18 + s * 10**6) for s in range(1, 51)]
-    day2 = [add(s, BID, 100, 10, 100 + s, ts=10**18 + 86400 * 10**9 + s * 10**6)
-            for s in range(1, 41)]
+    day2 = [
+        add(s, BID, 100, 10, 100 + s, ts=10**18 + 86400 * 10**9 + s * 10**6) for s in range(1, 41)
+    ]
     for evs, name in ((day1, "eq_day1.jsonl"), (day2, "eq_day2.jsonl")):
         for i, e in enumerate(evs):
             e.event_id = i + 1
@@ -184,7 +205,10 @@ def test_scenario_matching_engine_clock_step_in_stream(tmp_path):
     raw = tmp_path / "raw"
     raw.mkdir()
     ts = [100, 200, 400, 300, 500]
-    evs = [add(s, BID, 100 - s, 10, s, ts=10**18 + t * 10**6) for s, t in zip(range(1, 6), ts)]
+    evs = [
+        add(s, BID, 100 - s, 10, s, ts=10**18 + t * 10**6)
+        for s, t in zip(range(1, 6), ts, strict=False)
+    ]
     for i, e in enumerate(evs):
         e.event_id = i + 1
     codec.write_jsonl(raw / "s.jsonl", evs)
@@ -493,17 +517,20 @@ def _cfgs():
     return inst, ven
 
 
-@pytest.mark.parametrize("patch,match", [
-    ({"tick_size": 0}, "tick_size"),
-    ({"tick_size": -0.01}, "tick_size"),
-    ({"lot_size": 0}, "lot_size"),
-    ({"lot_size": 1.5}, "lot_size"),
-    ({"venues": ["XV9"]}, "not in venues.json"),
-    ({"venues": ["LP1"]}, "FX venue"),
-    ({"venues": []}, "at least one venue"),
-    ({"ref_price": 0}, "ref_price"),
-    ({"adv": -1}, "adv"),
-])
+@pytest.mark.parametrize(
+    "patch,match",
+    [
+        ({"tick_size": 0}, "tick_size"),
+        ({"tick_size": -0.01}, "tick_size"),
+        ({"lot_size": 0}, "lot_size"),
+        ({"lot_size": 1.5}, "lot_size"),
+        ({"venues": ["XV9"]}, "not in venues.json"),
+        ({"venues": ["LP1"]}, "FX venue"),
+        ({"venues": []}, "at least one venue"),
+        ({"ref_price": 0}, "ref_price"),
+        ({"adv": -1}, "adv"),
+    ],
+)
 def test_refdata_instrument_validation_fail_fast(patch, match):
     inst, ven = _cfgs()
     inst["instruments"][0].update(patch)
@@ -600,16 +627,24 @@ def test_normaliser_dedup_state_is_bounded():
 
 def test_scenario_generator_halt_with_reopening_auction(refdata):
     cfg = {
-        "seed": 777, "sessions": 1,
-        "equities": {"slots_per_stream": 400,
-                     "halt": {"instrument": "SYN.EQ.001", "session_index": 0,
-                              "duration_s": 120, "reopen_auction": True, "reopen_call_s": 30}},
+        "seed": 777,
+        "sessions": 1,
+        "equities": {
+            "slots_per_stream": 400,
+            "halt": {
+                "instrument": "SYN.EQ.001",
+                "session_index": 0,
+                "duration_s": 120,
+                "reopen_auction": True,
+                "reopen_call_s": 30,
+            },
+        },
         "fx": {"slots_per_pair": 10},
     }
     gen = MarketDataGenerator(refdata, cfg)
     inst = refdata.instrument("SYN.EQ.001")
-    from iap.marketdata.generator import _EffPrice, _Stream
     from iap.core.rng import SplitMix64
+    from iap.marketdata.generator import _EffPrice, _Stream
 
     date = refdata.trading_days[0]
     open_ns, close_ns = refdata.session_bounds_ns("EQUITY", date)
@@ -617,14 +652,15 @@ def test_scenario_generator_halt_with_reopening_auction(refdata):
     price.new_session(open_ns, close_ns, gen.cfg["equities"]["vol_regimes"])
     stream = _Stream(inst, refdata.venue("XV1"))
     halt_at = open_ns + 20 * 10**9
-    events = gen._eq_session_stream(stream, price, SplitMix64(1), open_ns, close_ns, 400,
-                                    (halt_at, halt_at + 120 * 10**9), None)
+    events = gen._eq_session_stream(
+        stream, price, SplitMix64(1), open_ns, close_ns, 400, (halt_at, halt_at + 120 * 10**9), None
+    )
     statuses = [(e.exchange_ts, e.qty) for e in events if e.event_type == EventType.STATUS]
     codes = [q for _, q in statuses]
     assert codes[:2] == [SessionStatus.AUCTION, SessionStatus.TRADING]
     i = codes.index(SessionStatus.HALT)
-    assert codes[i:i + 3] == [SessionStatus.HALT, SessionStatus.AUCTION, SessionStatus.TRADING]
-    t_halt, t_auc, t_trd = (t for t, _ in statuses[i:i + 3])
+    assert codes[i : i + 3] == [SessionStatus.HALT, SessionStatus.AUCTION, SessionStatus.TRADING]
+    t_halt, t_auc, t_trd = (t for t, _ in statuses[i : i + 3])
     assert t_trd - t_halt == 120 * 10**9 and t_trd - t_auc == 30 * 10**9
     call = [e for e in events if t_auc < e.exchange_ts < t_trd]
     types = [e.event_type for e in call]
@@ -653,8 +689,18 @@ def test_scenario_fx_lp_quote_feed_without_ids():
         seqs[vid] += 1
         side = BID if (k // 3) % 2 == 0 else ASK
         price = 108650 - 3 + (k % 5) if side == BID else 108650 + 3 + (k % 5)
-        cons.apply(mkev(seqs[vid], EventType.QUOTE, side, price, 5 + (k % 7),
-                        order_id=0, instrument_id=101, venue_id=vid))
+        cons.apply(
+            mkev(
+                seqs[vid],
+                EventType.QUOTE,
+                side,
+                price,
+                5 + (k % 7),
+                order_id=0,
+                instrument_id=101,
+                venue_id=vid,
+            )
+        )
     for vid, book in cons.books.items():
         assert book.order_count(BID) == [(book.best_bid()[0], 1)]
         assert book.order_count(ASK) == [(book.best_ask()[0], 1)]
@@ -676,8 +722,10 @@ def test_quote_explicit_id_rules():
     assert b.best_bid() == (99, 4) and b.order_count_total() == 1
     b.apply(mkev(4, EventType.QUOTE, ASK, 101, 7, order_id=0))
     b.apply(mkev(5, EventType.QUOTE, BID, 98, 3, order_id=0))  # replaces explicit 7
-    assert b.resting_orders() == [(synthetic_order_id(ASK, 0), ASK, 101, 7),
-                                  (synthetic_order_id(BID, 0), BID, 98, 3)]
+    assert b.resting_orders() == [
+        (synthetic_order_id(ASK, 0), ASK, 101, 7),
+        (synthetic_order_id(BID, 0), BID, 98, 3),
+    ]
 
 
 def test_snapshot_with_zero_ids_assigns_deterministic_synthetic_ids():
@@ -718,8 +766,11 @@ def test_status_while_stale_and_add_after_close():
 def test_dst_session_bounds_shift_in_utc():
     inst, ven = _cfgs()
     inst["calendar"]["trading_days"] = ["2026-10-30", "2026-11-02"]
-    inst["sessions"]["EQUITY"] = {"timezone": "America/New_York",
-                                  "open": "09:30:00", "close": "16:00:00"}
+    inst["sessions"]["EQUITY"] = {
+        "timezone": "America/New_York",
+        "open": "09:30:00",
+        "close": "16:00:00",
+    }
     ref = ReferenceData(inst, ven)
     before = ref.session_bounds_ns("EQUITY", "2026-10-30")
     after = ref.session_bounds_ns("EQUITY", "2026-11-02")
@@ -740,11 +791,11 @@ def test_fx_week_sunday_open_friday_close(refdata):
 
     assert not refdata.is_open("FX", ts("2026-01-03T12:00:00+00:00"))  # Saturday
     assert not refdata.is_open("FX", ts("2026-01-04T21:30:00+00:00"))  # Sun 16:30 NY
-    assert refdata.is_open("FX", ts("2026-01-04T22:00:00+00:00"))      # Sun 17:00 NY (EST)
-    assert refdata.is_open("FX", ts("2026-01-07T03:00:00+00:00"))      # mid-week
-    assert refdata.is_open("FX", ts("2026-01-09T21:59:59+00:00"))      # Fri 16:59:59 NY
+    assert refdata.is_open("FX", ts("2026-01-04T22:00:00+00:00"))  # Sun 17:00 NY (EST)
+    assert refdata.is_open("FX", ts("2026-01-07T03:00:00+00:00"))  # mid-week
+    assert refdata.is_open("FX", ts("2026-01-09T21:59:59+00:00"))  # Fri 16:59:59 NY
     assert not refdata.is_open("FX", ts("2026-01-09T22:00:00+00:00"))  # Fri 17:00 NY
-    assert refdata.is_open("FX", ts("2026-08-23T21:00:00+00:00"))      # Sun 17:00 NY (EDT)
+    assert refdata.is_open("FX", ts("2026-08-23T21:00:00+00:00"))  # Sun 17:00 NY (EDT)
     assert not refdata.is_open("FX", ts("2026-08-23T20:59:59+00:00"))
     # the synthetic FX daily session stays inside the week
     o, c = refdata.session_bounds_ns("FX", "2026-08-24")

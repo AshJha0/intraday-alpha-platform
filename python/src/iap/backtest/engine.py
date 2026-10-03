@@ -122,8 +122,8 @@ standard research-scaling caveat.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Dict, List, Mapping, Optional
 
 import numpy as np
 import pandas as pd
@@ -142,14 +142,14 @@ POSITION_POLICIES = ("sign", "cost_aware")
 
 @dataclass(frozen=True)
 class BacktestConfig:
-    max_pos_qty: int = 1000       # matches execution defaults max_child_qty
+    max_pos_qty: int = 1000  # matches execution defaults max_child_qty
     conf_min: float = 0.5
-    latency_rows: int = 1         # rows mode: decision t executes t+latency
+    latency_rows: int = 1  # rows mode: decision t executes t+latency
     bar_ns: int = BAR_NS
     #: TIME-mode latency (ns); overrides latency_rows when set (pinned)
-    latency_ns: Optional[int] = None
+    latency_ns: int | None = None
     #: drop a target whose execution row is older than this (ns)
-    max_decision_age_ns: Optional[int] = None
+    max_decision_age_ns: int | None = None
     #: force flat before any row gap larger than session_gap_ns
     flatten_at_session_end: bool = False
     #: row gap that marks a session boundary (pinned default: 30 minutes)
@@ -157,20 +157,20 @@ class BacktestConfig:
     #: "sign" (pinned default) or "cost_aware" (module docs, position rule)
     position_policy: str = "sign"
     #: label horizon the expected return is over; required by "cost_aware"
-    horizon_ns: Optional[int] = None
+    horizon_ns: int | None = None
     #: fraction of the entry threshold a same-direction signal must clear to
     #: renew an expired hold ("cost_aware" only)
     hysteresis: float = 0.5
     #: cap each fill at the displayed L1 size on the side it takes
     cap_fills_at_l1: bool = False
     #: boolean frame column; rows where it is False make no decision
-    block_rows_column: Optional[str] = None
+    block_rows_column: str | None = None
 
     def __post_init__(self) -> None:
         if self.position_policy not in POSITION_POLICIES:
             raise ValueError(
-                f"unknown position_policy {self.position_policy!r}; "
-                f"known: {POSITION_POLICIES}")
+                f"unknown position_policy {self.position_policy!r}; known: {POSITION_POLICIES}"
+            )
         if self.horizon_ns is not None and self.horizon_ns <= 0:
             raise ValueError("horizon_ns must be positive")
         if self.position_policy == "cost_aware" and self.horizon_ns is None:
@@ -192,26 +192,26 @@ class BacktestConfig:
 @dataclass
 class InstrumentResult:
     instrument_id: int
-    total_pnl: float              # reporting currency (USD)
-    gross_pnl: float              # price-move P&L before costs (reporting ccy)
-    total_costs: float            # reporting ccy
+    total_pnl: float  # reporting currency (USD)
+    gross_pnl: float  # price-move P&L before costs (reporting ccy)
+    total_costs: float  # reporting ccy
     spread_cost: float
     fee_cost: float
     impact_cost: float
     trade_count: int
     traded_qty: int
     n_rows: int
-    equity: np.ndarray = field(repr=False)      # reporting ccy, cumulative
+    equity: np.ndarray = field(repr=False)  # reporting ccy, cumulative
     positions: np.ndarray = field(repr=False)
     bar_ts: np.ndarray = field(repr=False)
-    bar_pnl: np.ndarray = field(repr=False)     # reporting ccy
+    bar_pnl: np.ndarray = field(repr=False)  # reporting ccy
     quote_currency: str = "USD"
-    total_pnl_native: float = 0.0               # quote-currency equity
+    total_pnl_native: float = 0.0  # quote-currency equity
 
 
 @dataclass
 class BacktestResult:
-    per_instrument: Dict[int, InstrumentResult]
+    per_instrument: dict[int, InstrumentResult]
     asset_class: str
 
     @property
@@ -220,9 +220,9 @@ class BacktestResult:
         return float(sum(r.total_pnl for r in self.per_instrument.values()))
 
     @property
-    def total_pnl_native_by_ccy(self) -> Dict[str, float]:
+    def total_pnl_native_by_ccy(self) -> dict[str, float]:
         """Unconverted P&L per quote currency (never summed across)."""
-        out: Dict[str, float] = {}
+        out: dict[str, float] = {}
         for r in self.per_instrument.values():
             out[r.quote_currency] = out.get(r.quote_currency, 0.0) + r.total_pnl_native
         return out
@@ -249,13 +249,13 @@ class BacktestResult:
         annualized Sharpe.  A gap longer than ``SESSION_GAP_NS`` is treated
         as a session boundary and is NOT filled (no overnight zero bars).
         """
-        bars: Dict[int, float] = {}
+        bars: dict[int, float] = {}
         for r in self.per_instrument.values():
-            for t, p in zip(r.bar_ts, r.bar_pnl):
+            for t, p in zip(r.bar_ts, r.bar_pnl, strict=False):
                 bars[int(t)] = bars.get(int(t), 0.0) + float(p)
         present = np.array(sorted(bars), dtype=np.int64)
         if present.size:
-            filled: List[int] = []
+            filled: list[int] = []
             for i, b in enumerate(present):
                 filled.append(int(b))
                 if i + 1 < present.size:
@@ -289,16 +289,10 @@ class BacktestResult:
                 else float("nan")
             ),
             "sharpe_ann": sharpe,
-            "sharpe_scaling": (
-                f"1m bars, sqrt({TRADING_DAYS_PER_YEAR}*{hours}h*60) bars/yr"
-            ),
-            "hit_rate_bars": (
-                float(np.mean(wins > 0)) if wins.size >= 8 else float("nan")
-            ),
+            "sharpe_scaling": (f"1m bars, sqrt({TRADING_DAYS_PER_YEAR}*{hours}h*60) bars/yr"),
+            "hit_rate_bars": (float(np.mean(wins > 0)) if wins.size >= 8 else float("nan")),
             "max_drawdown": maxdd,
-            "max_drawdown_frac_capital": (
-                maxdd / capital if capital > 0 else float("nan")
-            ),
+            "max_drawdown_frac_capital": (maxdd / capital if capital > 0 else float("nan")),
             "trade_count": self.trade_count,
             "turnover_qty_per_day": traded / days,
             "n_bars": int(pnl.size),
@@ -315,8 +309,9 @@ def _ffill(values: np.ndarray, initial: float) -> np.ndarray:
     return v[idx][1:]
 
 
-def _capped_positions(exec_target: np.ndarray, bid_size: np.ndarray,
-                      ask_size: np.ndarray, exempt: np.ndarray) -> np.ndarray:
+def _capped_positions(
+    exec_target: np.ndarray, bid_size: np.ndarray, ask_size: np.ndarray, exempt: np.ndarray
+) -> np.ndarray:
     """Positions when each fill is capped at the displayed L1 size.
 
     ``exec_target[i]`` is the target at row i (NaN = no decision / cannot
@@ -341,9 +336,13 @@ def _capped_positions(exec_target: np.ndarray, bid_size: np.ndarray,
     return pos
 
 
-def _block_decisions(exec_target: np.ndarray, target: np.ndarray,
-                     allowed: np.ndarray, ts: np.ndarray,
-                     cfg: "BacktestConfig") -> np.ndarray:
+def _block_decisions(
+    exec_target: np.ndarray,
+    target: np.ndarray,
+    allowed: np.ndarray,
+    ts: np.ndarray,
+    cfg: BacktestConfig,
+) -> np.ndarray:
     """``exec_target`` rebuilt with the decisions of blocked rows removed
     (same latency / decision-age mapping as the engine's own)."""
     n = len(target)
@@ -355,18 +354,17 @@ def _block_decisions(exec_target: np.ndarray, target: np.ndarray,
             k = int(j[i])
             if k >= n:
                 break
-            if (cfg.max_decision_age_ns is not None
-                    and ts[k] - ts[i] > cfg.max_decision_age_ns):
+            if cfg.max_decision_age_ns is not None and ts[k] - ts[i] > cfg.max_decision_age_ns:
                 continue
             if allowed[i]:
                 out[k] = kept[i]
     elif cfg.latency_rows == 0:
         out[:] = kept
     elif cfg.latency_rows < n:
-        out[cfg.latency_rows:] = kept[: n - cfg.latency_rows]
+        out[cfg.latency_rows :] = kept[: n - cfg.latency_rows]
         if cfg.max_decision_age_ns is not None:
             age = np.full(n, 0, dtype=np.int64)
-            age[cfg.latency_rows:] = ts[cfg.latency_rows:] - ts[: n - cfg.latency_rows]
+            age[cfg.latency_rows :] = ts[cfg.latency_rows :] - ts[: n - cfg.latency_rows]
             out[age > cfg.max_decision_age_ns] = np.nan
     return out
 
@@ -405,8 +403,9 @@ def cost_aware_targets(
         elif clears_entry and sign == -pos:
             pos, entry_ts = sign, ts[i]
         elif ts[i] - entry_ts >= horizon_ns:
-            renews = bool(has_signal and sign == pos and np.isfinite(thr)
-                          and abs(e) > hysteresis * thr)
+            renews = bool(
+                has_signal and sign == pos and np.isfinite(thr) and abs(e) > hysteresis * thr
+            )
             if renews:
                 entry_ts = ts[i]
             else:
@@ -422,7 +421,7 @@ class Backtester:
         self,
         cost_model: CostModel,
         instrument_meta: Mapping[int, dict],
-        config: Optional[BacktestConfig] = None,
+        config: BacktestConfig | None = None,
         reporting_ccy: str = "USD",
     ) -> None:
         """``instrument_meta[iid]``: dict with tick_size, lot_size, adv,
@@ -435,7 +434,7 @@ class Backtester:
         self.meta = dict(instrument_meta)
         self.config = config or BacktestConfig()
         self.reporting_ccy = reporting_ccy
-        self.fx_conversion: Dict[str, tuple] = {}
+        self.fx_conversion: dict[str, tuple] = {}
         for pid, m in sorted(self.meta.items()):
             base = m.get("base_currency")
             quote = m.get("quote_currency")
@@ -449,8 +448,7 @@ class Backtester:
     def quote_currency(self, iid: int) -> str:
         """Quote currency of an instrument (reporting ccy when unspecified)."""
         m = self.meta[iid]
-        return str(m.get("quote_currency") or m.get("currency")
-                   or self.reporting_ccy)
+        return str(m.get("quote_currency") or m.get("currency") or self.reporting_ccy)
 
     def reference_rate(self, ccy: str) -> float:
         """Static quote->reporting rate from the conversion pair's
@@ -475,8 +473,7 @@ class Backtester:
             raise ValueError(f"no conversion pair for {ccy} -> {self.reporting_ccy}")
         pid, invert = self.fx_conversion[ccy]
         if pid not in frames:
-            raise ValueError(
-                f"conversion pair {pid} for {ccy} is not in the frame set")
+            raise ValueError(f"conversion pair {pid} for {ccy} is not in the frame set")
         pf = frames[pid]
         pts = pf["exchange_ts"].to_numpy(dtype=np.int64)
         pmid = pf["mid_price_v1"].to_numpy(dtype=float)
@@ -492,8 +489,11 @@ class Backtester:
         return 1.0 / mid if invert else mid
 
     def run_instrument(
-        self, iid: int, frame: pd.DataFrame, scores: pd.DataFrame,
-        rate: Optional[np.ndarray] = None,
+        self,
+        iid: int,
+        frame: pd.DataFrame,
+        scores: pd.DataFrame,
+        rate: np.ndarray | None = None,
     ) -> InstrumentResult:
         """Run one instrument. ``rate`` is the per-row quote->reporting
         conversion (None = identity, i.e. the instrument is quoted in the
@@ -508,24 +508,21 @@ class Backtester:
         n = len(frame)
         ts = frame["exchange_ts"].to_numpy(dtype=np.int64)
         mid = frame["mid_price_v1"].to_numpy(dtype=float)
-        hs = (
-            frame["spread_ticks_v1"].to_numpy(dtype=float)
-            * float(meta["tick_size"])
-            / 2.0
-        )
+        hs = frame["spread_ticks_v1"].to_numpy(dtype=float) * float(meta["tick_size"]) / 2.0
         er = scores["expected_return"].to_numpy(dtype=float)
         conf = scores["confidence"].to_numpy(dtype=float)
 
         # decision at i -> desired target at its execution row
         if cfg.position_policy == "cost_aware":
-            threshold = self.cost_model.round_trip_cost_return(
-                mid, hs, meta["asset_class"])
-            target = cost_aware_targets(
-                ts, er, conf, threshold, cfg.conf_min, int(cfg.horizon_ns),
-                cfg.hysteresis) * cfg.max_pos_qty
+            threshold = self.cost_model.round_trip_cost_return(mid, hs, meta["asset_class"])
+            target = (
+                cost_aware_targets(
+                    ts, er, conf, threshold, cfg.conf_min, int(cfg.horizon_ns), cfg.hysteresis
+                )
+                * cfg.max_pos_qty
+            )
         else:
-            target = (np.where(conf >= cfg.conf_min, np.sign(er), 0.0)
-                      * cfg.max_pos_qty)
+            target = np.where(conf >= cfg.conf_min, np.sign(er), 0.0) * cfg.max_pos_qty
             target[~np.isfinite(er)] = 0.0
         exec_target = np.full(n, np.nan)
         if cfg.latency_ns is not None:
@@ -537,25 +534,23 @@ class Backtester:
                 k = int(j[i])
                 if k >= n:
                     break
-                if (cfg.max_decision_age_ns is not None
-                        and ts[k] - ts[i] > cfg.max_decision_age_ns):
+                if cfg.max_decision_age_ns is not None and ts[k] - ts[i] > cfg.max_decision_age_ns:
                     continue  # decision went stale before a row arrived
                 exec_target[k] = target[i]
         elif cfg.latency_rows == 0:
             exec_target[:] = target
         elif cfg.latency_rows < n:
-            exec_target[cfg.latency_rows:] = target[: n - cfg.latency_rows]
+            exec_target[cfg.latency_rows :] = target[: n - cfg.latency_rows]
             if cfg.max_decision_age_ns is not None:
                 age = np.full(n, 0, dtype=np.int64)
-                age[cfg.latency_rows:] = (
-                    ts[cfg.latency_rows:] - ts[: n - cfg.latency_rows])
+                age[cfg.latency_rows :] = ts[cfg.latency_rows :] - ts[: n - cfg.latency_rows]
                 exec_target[age > cfg.max_decision_age_ns] = np.nan
 
         if cfg.block_rows_column is not None:
             if cfg.block_rows_column not in frame.columns:
                 raise ValueError(
-                    f"instrument {iid}: frame lacks block_rows_column "
-                    f"{cfg.block_rows_column!r}")
+                    f"instrument {iid}: frame lacks block_rows_column {cfg.block_rows_column!r}"
+                )
             allowed = frame[cfg.block_rows_column].to_numpy(dtype=bool)
             # Blocked at the DECISION row: no target is produced there, so
             # nothing is aged in from it (set before the latency mapping
@@ -593,19 +588,21 @@ class Backtester:
             for name in ("depth_bid_l1_v1", "depth_ask_l1_v1"):
                 if name not in frame.columns:
                     raise ValueError(
-                        f"instrument {iid}: cap_fills_at_l1 needs frame column {name!r}")
+                        f"instrument {iid}: cap_fills_at_l1 needs frame column {name!r}"
+                    )
             pos = _capped_positions(
                 exec_target,
                 frame["depth_bid_l1_v1"].to_numpy(dtype=float),
                 frame["depth_ask_l1_v1"].to_numpy(dtype=float),
-                forced_flat)
+                forced_flat,
+            )
         else:
             pos = _ffill(exec_target, 0.0)
         trades = np.diff(pos, prepend=0.0)
         trade_rows = trades != 0.0
 
         costs = np.zeros(n)
-        comp: Dict[str, np.ndarray] = {}
+        comp: dict[str, np.ndarray] = {}
         if trade_rows.any():
             comp = self.cost_model.cost_components(
                 trades[trade_rows],
@@ -645,19 +642,16 @@ class Backtester:
             first_bad = int(np.flatnonzero(missing & (dEq_native != 0.0))[0])
             raise ValueError(
                 f"instrument {iid}: P&L at row {first_bad} (ts {ts[first_bad]}) "
-                f"has no {self.quote_currency(iid)} conversion rate (fail closed)")
+                f"has no {self.quote_currency(iid)} conversion rate (fail closed)"
+            )
         rate = np.where(missing, 1.0, rate)  # zero increments only
         dEq = dEq_native * rate
         equity = np.cumsum(dEq)
-        gross = (float(np.sum(pos[:-1] * unit * np.diff(mark) * rate[1:]))
-                 if n > 1 else 0.0)
+        gross = float(np.sum(pos[:-1] * unit * np.diff(mark) * rate[1:])) if n > 1 else 0.0
         total_costs = float((costs * rate).sum())
-        spread_total = float((comp["spread"] * rate[trade_rows]).sum()) \
-            if trade_rows.any() else 0.0
-        fee_total = float((comp["fee"] * rate[trade_rows]).sum()) \
-            if trade_rows.any() else 0.0
-        impact_total = float((comp["impact"] * rate[trade_rows]).sum()) \
-            if trade_rows.any() else 0.0
+        spread_total = float((comp["spread"] * rate[trade_rows]).sum()) if trade_rows.any() else 0.0
+        fee_total = float((comp["fee"] * rate[trade_rows]).sum()) if trade_rows.any() else 0.0
+        impact_total = float((comp["impact"] * rate[trade_rows]).sum()) if trade_rows.any() else 0.0
 
         # 1-minute bar P&L for Sharpe/drawdown aggregation (reporting ccy)
         bar_ids = ts // cfg.bar_ns
@@ -691,7 +685,7 @@ class Backtester:
         scores: Mapping[int, pd.DataFrame],
         asset_class: str,
     ) -> BacktestResult:
-        per: Dict[int, InstrumentResult] = {}
+        per: dict[int, InstrumentResult] = {}
         for iid in sorted(scores):
             if iid not in frames:
                 raise ValueError(f"scores for unknown instrument {iid}")
@@ -699,8 +693,8 @@ class Backtester:
             rate = None
             if ccy != self.reporting_ccy:
                 rate = self.rate_series(
-                    ccy, frames[iid]["exchange_ts"].to_numpy(dtype=np.int64),
-                    frames)
+                    ccy, frames[iid]["exchange_ts"].to_numpy(dtype=np.int64), frames
+                )
             per[iid] = self.run_instrument(iid, frames[iid], scores[iid], rate)
         return BacktestResult(per_instrument=per, asset_class=asset_class)
 
@@ -708,8 +702,8 @@ class Backtester:
 def ensemble_scores(
     all_scores: Mapping[str, Mapping[int, pd.DataFrame]],
     betas: Mapping[str, float],
-    eligible: Optional[Mapping[str, bool]] = None,
-) -> Dict[int, pd.DataFrame]:
+    eligible: Mapping[str, bool] | None = None,
+) -> dict[int, pd.DataFrame]:
     """Equal-weight ensemble across alphas (per asset class).
 
     Each alpha contributes its z-score (expected_return / beta when beta is
@@ -728,15 +722,15 @@ def ensemble_scores(
     table accordingly.
     """
     members = [
-        a for a in sorted(all_scores)
-        if abs(betas.get(a, 0.0)) > 0
-        and (eligible is None or bool(eligible.get(a, False)))
+        a
+        for a in sorted(all_scores)
+        if abs(betas.get(a, 0.0)) > 0 and (eligible is None or bool(eligible.get(a, False)))
     ]
     if not members:
         raise ValueError("no eligible alphas with nonzero beta to ensemble")
     iids = sorted(set.intersection(*(set(all_scores[a]) for a in members)))
     mean_abs_beta = float(np.mean([abs(betas[a]) for a in members]))
-    out: Dict[int, pd.DataFrame] = {}
+    out: dict[int, pd.DataFrame] = {}
     for iid in iids:
         zsum = None
         csum = None

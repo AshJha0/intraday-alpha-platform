@@ -13,7 +13,7 @@ integers and hashes exactly and floats at abs/rel 1e-9.
 from __future__ import annotations
 
 import json
-from typing import Any, Dict
+from typing import Any
 
 from iap.mvp.session import RunResult
 
@@ -23,7 +23,7 @@ GOLDEN_VERSION = 1
 GOLDEN_CONFIG_PATH = "configs/mvp/mvp.json"
 
 
-def golden_document(res: RunResult) -> Dict[str, Any]:
+def golden_document(res: RunResult) -> dict[str, Any]:
     """The golden document for one run (pure function of the run)."""
     report = res.report
     return {
@@ -63,6 +63,6 @@ def golden_document(res: RunResult) -> Dict[str, Any]:
     }
 
 
-def render(doc: Dict[str, Any]) -> str:
+def render(doc: dict[str, Any]) -> str:
     """The pinned on-disk rendering (2-space indent, sorted keys, ASCII, newline)."""
     return json.dumps(doc, indent=2, sort_keys=True, ensure_ascii=True, allow_nan=False) + "\n"

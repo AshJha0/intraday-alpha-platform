@@ -15,7 +15,6 @@ import sqlite3
 from pathlib import Path
 
 import pytest
-
 from iap.contracts.examples import VENUE_NAMES, all_examples, example_trace
 from iap.contracts.types import (
     Attribution,
@@ -60,25 +59,60 @@ RESEARCH = REPO / "research"
 GOLDEN = json.loads((REPO / "tests" / "golden" / "expected_contracts_examples.json").read_text())
 
 EXPECTED_TABLES = {
-    "schema_version", "instruments", "venues", "sessions", "feature_versions", "alphas",
-    "experiments", "experiment_results", "ledger_entries", "lifecycle_transitions",
-    "decision_traces", "alpha_signals", "portfolio_targets", "portfolio_legs",
-    "risk_decisions", "parent_orders", "child_orders", "venue_decisions", "executions",
-    "tca_results", "attribution", "tca_orders", "model_runs", "drift_baselines",
+    "schema_version",
+    "instruments",
+    "venues",
+    "sessions",
+    "feature_versions",
+    "alphas",
+    "experiments",
+    "experiment_results",
+    "ledger_entries",
+    "lifecycle_transitions",
+    "decision_traces",
+    "alpha_signals",
+    "portfolio_targets",
+    "portfolio_legs",
+    "risk_decisions",
+    "parent_orders",
+    "child_orders",
+    "venue_decisions",
+    "executions",
+    "tca_results",
+    "attribution",
+    "tca_orders",
+    "model_runs",
+    "drift_baselines",
 }
 EXPECTED_VIEWS = {"v_order_chain", "v_alpha_scorecard", "v_experiment_ledger_summary"}
 
 #: Stage tuple lengths of the example trace -> rows in the decomposition.
 EXAMPLE_DECOMPOSITION = {
-    "decision_traces": 1, "alpha_signals": 1, "portfolio_targets": 1, "portfolio_legs": 1,
-    "risk_decisions": 1, "parent_orders": 1, "child_orders": 3, "venue_decisions": 3,
-    "executions": 3, "tca_results": 1, "attribution": 1,
+    "decision_traces": 1,
+    "alpha_signals": 1,
+    "portfolio_targets": 1,
+    "portfolio_legs": 1,
+    "risk_decisions": 1,
+    "parent_orders": 1,
+    "child_orders": 3,
+    "venue_decisions": 3,
+    "executions": 3,
+    "tca_results": 1,
+    "attribution": 1,
 }
 
 #: Pinned snapshot minima (other agents append to the artefacts).
-PINNED_MIN = {"ledger_entries": 65, "alphas": 24, "model_runs": 33,
-              "lifecycle_transitions": 260, "instruments": 19, "venues": 5,
-              "tca_orders": 36, "drift_baselines": 36, "experiment_results": 24}
+PINNED_MIN = {
+    "ledger_entries": 65,
+    "alphas": 24,
+    "model_runs": 33,
+    "lifecycle_transitions": 260,
+    "instruments": 19,
+    "venues": 5,
+    "tca_orders": 36,
+    "drift_baselines": 36,
+    "experiment_results": 24,
+}
 
 
 @pytest.fixture()
@@ -103,6 +137,7 @@ def built(tmp_path_factory: pytest.TempPathFactory) -> Store:
 # DDL
 # --------------------------------------------------------------------------
 
+
 def test_ddl_applies_on_fresh_sqlite_and_is_idempotent() -> None:
     conn = sqlite3.connect(":memory:", isolation_level=None)
     n1 = apply(conn)
@@ -123,14 +158,48 @@ def test_ddl_names_match_expectations() -> None:
 
 
 _ALLOWED_TYPES = {"BIGINT", "TEXT", "DOUBLE PRECISION"}
-_ALLOWED_STARTS = ("CREATE TABLE IF NOT EXISTS ", "CREATE INDEX IF NOT EXISTS ",
-                   "DROP VIEW IF EXISTS ", "CREATE VIEW ", "INSERT INTO schema_version ")
+_ALLOWED_STARTS = (
+    "CREATE TABLE IF NOT EXISTS ",
+    "CREATE INDEX IF NOT EXISTS ",
+    "DROP VIEW IF EXISTS ",
+    "CREATE VIEW ",
+    "INSERT INTO schema_version ",
+)
 _FORBIDDEN = (
-    "AUTOINCREMENT", "SERIAL", "IDENTITY", "BOOLEAN", "INTEGER", "VARCHAR", "DATETIME",
-    "NOW(", "CURRENT_TIMESTAMP", "CURRENT_DATE", "INSERT OR REPLACE", "ON CONFLICT", "::", "ILIKE",
-    "LATERAL", "DISTINCT ON", "CREATE OR REPLACE", "CREATE VIEW IF", "PRAGMA",
-    "WITHOUT ROWID", "IIF(", "`", '"', "STRFTIME", "NULLS LAST", "NULLS FIRST",
-    "UNSIGNED", "TINYINT", "SMALLINT", "REAL", "FLOAT", "NUMERIC", "DECIMAL", "JSON",
+    "AUTOINCREMENT",
+    "SERIAL",
+    "IDENTITY",
+    "BOOLEAN",
+    "INTEGER",
+    "VARCHAR",
+    "DATETIME",
+    "NOW(",
+    "CURRENT_TIMESTAMP",
+    "CURRENT_DATE",
+    "INSERT OR REPLACE",
+    "ON CONFLICT",
+    "::",
+    "ILIKE",
+    "LATERAL",
+    "DISTINCT ON",
+    "CREATE OR REPLACE",
+    "CREATE VIEW IF",
+    "PRAGMA",
+    "WITHOUT ROWID",
+    "IIF(",
+    "`",
+    '"',
+    "STRFTIME",
+    "NULLS LAST",
+    "NULLS FIRST",
+    "UNSIGNED",
+    "TINYINT",
+    "SMALLINT",
+    "REAL",
+    "FLOAT",
+    "NUMERIC",
+    "DECIMAL",
+    "JSON",
 )
 _COLUMN = re.compile(r"^\s*(\w+)\s+(BIGINT|TEXT|DOUBLE PRECISION)\b")
 
@@ -153,7 +222,7 @@ def test_ddl_is_portable_by_whitelist() -> None:
             assert not hit, f"{token!r} in {stmt[:60]}"
         assert "--" not in stmt  # comments stripped by the splitter
         if stmt.startswith("CREATE TABLE"):
-            body = stmt[stmt.index("(") + 1:stmt.rindex(")")]
+            body = stmt[stmt.index("(") + 1 : stmt.rindex(")")]
             for line in body.split("\n"):
                 text = line.strip().rstrip(",")
                 if not text or text.startswith(("PRIMARY KEY", "CHECK", "FOREIGN KEY", "UNIQUE")):
@@ -177,11 +246,18 @@ def test_split_statements_handles_quotes_and_comments() -> None:
 # Store: round trips
 # --------------------------------------------------------------------------
 
+
 def test_init_checks_schema_version(store: Store) -> None:
     assert store.tables() == tuple(sorted(EXPECTED_TABLES))
     assert store.views() == tuple(sorted(EXPECTED_VIEWS))
     assert store.primary_key("lifecycle_transitions") == (
-        "alpha_id", "policy", "event_ts", "from_state", "to_state", "source")
+        "alpha_id",
+        "policy",
+        "event_ts",
+        "from_state",
+        "to_state",
+        "source",
+    )
     with pytest.raises(KeyError):
         store.columns("no_such_table")
 
@@ -208,14 +284,24 @@ def test_every_storable_example_round_trips(store: Store) -> None:
     assert store.fetch(type(ex["PortfolioTarget"]), trace_id=tid) == (ex["PortfolioTarget"],)
     assert store.fetch(RiskDecision, trace_id=tid) == (ex["RiskDecision"],)
     assert store.fetch(ParentOrder, parent_order_id=12345) == (ex["ParentOrder"],)
-    assert store.fetch(ChildOrder, child_order_id=ex["ChildOrder"].child_order_id) == (ex["ChildOrder"],)
-    assert store.fetch(VenueDecision, child_order_id=ex["VenueDecision"].child_order_id) == (ex["VenueDecision"],)
-    assert store.fetch(ExecutionReport, execution_id=ex["ExecutionReport"].execution_id) == (ex["ExecutionReport"],)
+    assert store.fetch(ChildOrder, child_order_id=ex["ChildOrder"].child_order_id) == (
+        ex["ChildOrder"],
+    )
+    assert store.fetch(VenueDecision, child_order_id=ex["VenueDecision"].child_order_id) == (
+        ex["VenueDecision"],
+    )
+    assert store.fetch(ExecutionReport, execution_id=ex["ExecutionReport"].execution_id) == (
+        ex["ExecutionReport"],
+    )
     assert store.fetch(TCAResult, parent_order_id=12345) == (ex["TCAResult"],)
     assert store.fetch(Attribution, trace_id=tid) == (ex["Attribution"],)
-    assert store.fetch(ExperimentSpec, experiment_id=ex["ExperimentSpec"].experiment_id) == (ex["ExperimentSpec"],)
+    assert store.fetch(ExperimentSpec, experiment_id=ex["ExperimentSpec"].experiment_id) == (
+        ex["ExperimentSpec"],
+    )
     assert store.fetch(ExperimentResult, alpha_id="EQ03") == (ex["ExperimentResult"],)
-    assert store.fetch(LifecycleTransition, alpha_id="EQ03", source="api") == (ex["LifecycleTransition"],)
+    assert store.fetch(LifecycleTransition, alpha_id="EQ03", source="api") == (
+        ex["LifecycleTransition"],
+    )
     assert store.get_trace(tid) == trace
     assert store.fetch(type(trace), trace_id=tid) == (trace,)
     # the example rows re-inserted standalone are the trace's own rows: no growth
@@ -241,8 +327,14 @@ def test_typed_insert_validates_and_rolls_back(store: Store) -> None:
     with pytest.raises(ValueError):
         store.upsert("alphas", {"alpha_id": "X", "nope": 1})
     with pytest.raises(ValueError):
-        store.insert_alpha("X", asset_class="EQUITY", family="f", horizon="1s",
-                           economic_rationale="", current_state="LIVE")
+        store.insert_alpha(
+            "X",
+            asset_class="EQUITY",
+            family="f",
+            horizon="1s",
+            economic_rationale="",
+            current_state="LIVE",
+        )
     with pytest.raises(KeyError):
         store.get_trace("f" * 32)
     with pytest.raises(KeyError):
@@ -253,15 +345,25 @@ def test_typed_insert_validates_and_rolls_back(store: Store) -> None:
 # Trace decomposition + explain
 # --------------------------------------------------------------------------
 
+
 def _name_example_venue_3(store: Store) -> None:
     """``configs/venues/venues.json`` names XV1/XV2 only; the pinned example
     routes to a third equity venue (``VENUE_NAMES[3] == "XV3"``), so the
     golden rendering needs that row in the venues table."""
-    store.upsert("venues", {
-        "venue_id": 3, "venue": VENUE_NAMES[3], "asset_class": "EQUITY",
-        "taker_fee_per_share": 0.0025, "maker_rebate_per_share": 0.001,
-        "commission_per_million": None, "latency_mean_ns": 300_000,
-        "latency_jitter_ns": 100_000, "supports_json": "[\"MBO\"]"})
+    store.upsert(
+        "venues",
+        {
+            "venue_id": 3,
+            "venue": VENUE_NAMES[3],
+            "asset_class": "EQUITY",
+            "taker_fee_per_share": 0.0025,
+            "maker_rebate_per_share": 0.001,
+            "commission_per_million": None,
+            "latency_mean_ns": 300_000,
+            "latency_jitter_ns": 100_000,
+            "supports_json": '["MBO"]',
+        },
+    )
 
 
 def test_insert_trace_decomposes_and_explain_matches_golden(store: Store) -> None:
@@ -281,9 +383,19 @@ def test_insert_trace_decomposes_and_explain_matches_golden(store: Store) -> Non
     store.insert_trace(trace)
     assert store.counts() == counts
     # a smaller trace with the same id replaces every stage row
-    smaller = trace.__class__.from_dict({**trace.to_dict(), "stages": {
-        **trace.stages.to_dict(), "child_orders": [], "routing": [], "fills": [],
-        "tca": [], "attribution": None}})
+    smaller = trace.__class__.from_dict(
+        {
+            **trace.to_dict(),
+            "stages": {
+                **trace.stages.to_dict(),
+                "child_orders": [],
+                "routing": [],
+                "fills": [],
+                "tca": [],
+                "attribution": None,
+            },
+        }
+    )
     store.insert_trace(smaller)
     after = store.counts()
     assert after["child_orders"] == after["venue_decisions"] == after["executions"] == 0
@@ -291,8 +403,11 @@ def test_insert_trace_decomposes_and_explain_matches_golden(store: Store) -> Non
     assert store.get_trace(trace.trace_id) == smaller
     assert all(t in after for t in STAGE_TABLES)
     assert store.explain(12345).splitlines()[5:] == [
-        "SOR:        (none)", "Fills:      0 / 20,000 (0.0%)", "TCA:        (none)",
-        "Attribution: (none)"]
+        "SOR:        (none)",
+        "Fills:      0 / 20,000 (0.0%)",
+        "TCA:        (none)",
+        "Attribution: (none)",
+    ]
 
 
 def test_v_order_chain_returns_the_example_chain(store: Store) -> None:
@@ -334,46 +449,110 @@ def test_v_order_chain_aggregates_per_child_risk_and_counts_only_fills(store: St
     r2 = replace(r2, child_order_id=2)
     t = parent.decision_ts
     risk = (
-        RiskDecision(order_id=1, strategy_id=parent.strategy_id, instrument_id=parent.instrument_id,
-                     timestamp_ns=t + 1, decision=Decision.ALLOW, rule_id="", rule_index=-1,
-                     reason="all checks passed"),
-        RiskDecision(order_id=2, strategy_id=parent.strategy_id, instrument_id=parent.instrument_id,
-                     timestamp_ns=t + 2, decision=Decision.REJECT, rule_id="RATE_THROTTLE",
-                     rule_index=9, reason="throttled"),
+        RiskDecision(
+            order_id=1,
+            strategy_id=parent.strategy_id,
+            instrument_id=parent.instrument_id,
+            timestamp_ns=t + 1,
+            decision=Decision.ALLOW,
+            rule_id="",
+            rule_index=-1,
+            reason="all checks passed",
+        ),
+        RiskDecision(
+            order_id=2,
+            strategy_id=parent.strategy_id,
+            instrument_id=parent.instrument_id,
+            timestamp_ns=t + 2,
+            decision=Decision.REJECT,
+            rule_id="RATE_THROTTLE",
+            rule_index=9,
+            reason="throttled",
+        ),
     )
     f = base.stages.fills[0]
     fills = (
-        replace(f, order_id=1, execution_id=1, status=ExecStatus.NEW, filled_qty=0,
-                fill_price_ticks=0, fees=0.0),
-        replace(f, order_id=1, execution_id=2, status=ExecStatus.PARTIAL, filled_qty=4_000,
-                fees=0.003 * 4_000),
-        replace(f, order_id=1, execution_id=3, status=ExecStatus.FILLED, filled_qty=5_000,
-                fees=0.003 * 5_000),
-        replace(f, order_id=1, execution_id=4, status=ExecStatus.CANCELED, filled_qty=0,
-                fill_price_ticks=0, fees=0.0),
+        replace(
+            f,
+            order_id=1,
+            execution_id=1,
+            status=ExecStatus.NEW,
+            filled_qty=0,
+            fill_price_ticks=0,
+            fees=0.0,
+        ),
+        replace(
+            f,
+            order_id=1,
+            execution_id=2,
+            status=ExecStatus.PARTIAL,
+            filled_qty=4_000,
+            fees=0.003 * 4_000,
+        ),
+        replace(
+            f,
+            order_id=1,
+            execution_id=3,
+            status=ExecStatus.FILLED,
+            filled_qty=5_000,
+            fees=0.003 * 5_000,
+        ),
+        replace(
+            f,
+            order_id=1,
+            execution_id=4,
+            status=ExecStatus.CANCELED,
+            filled_qty=0,
+            fill_price_ticks=0,
+            fees=0.0,
+        ),
     )
-    tca = replace(base.stages.tca[0], parent_order_id=1, filled_qty=9_000, fill_rate=0.45,
-                  n_fills=2)
-    trace = replace(base, stages=TraceStages(
-        signal=base.stages.signal, portfolio=base.stages.portfolio, risk=risk,
-        parent_orders=(parent,), child_orders=(c1, c2), routing=(r1, r2), fills=fills,
-        tca=(tca,), attribution=base.stages.attribution))
+    tca = replace(
+        base.stages.tca[0], parent_order_id=1, filled_qty=9_000, fill_rate=0.45, n_fills=2
+    )
+    trace = replace(
+        base,
+        stages=TraceStages(
+            signal=base.stages.signal,
+            portfolio=base.stages.portfolio,
+            risk=risk,
+            parent_orders=(parent,),
+            child_orders=(c1, c2),
+            routing=(r1, r2),
+            fills=fills,
+            tca=(tca,),
+            attribution=base.stages.attribution,
+        ),
+    )
     store.insert_trace(trace)
     rows = store.query("SELECT * FROM v_order_chain ORDER BY parent_order_id")
     assert len(rows) == 1
     row = rows[0]
     assert row["parent_order_id"] == 1
-    assert row["risk_decision"] == 2                      # one child REJECTed
+    assert row["risk_decision"] == 2  # one child REJECTed
     assert row["risk_rule_id"] == "RATE_THROTTLE" and row["risk_reason"] == "throttled"
     assert row["n_children_allowed"] == 1 and row["n_children_rejected"] == 1
     assert row["n_child_orders"] == 2 and row["n_venues_routed"] == 2
-    assert row["n_fills"] == 2                            # PARTIAL + FILLED only
+    assert row["n_fills"] == 2  # PARTIAL + FILLED only
     assert row["filled_qty"] == 9_000
     assert row["fees"] == pytest.approx(0.003 * 9_000)
     # A parent whose every child was allowed reads ALLOW with an empty rule.
-    allowed = replace(trace, stages=replace(trace.stages, risk=(
-        risk[0], replace(risk[1], decision=Decision.ALLOW, rule_id="", rule_index=-1,
-                         reason="all checks passed"))))
+    allowed = replace(
+        trace,
+        stages=replace(
+            trace.stages,
+            risk=(
+                risk[0],
+                replace(
+                    risk[1],
+                    decision=Decision.ALLOW,
+                    rule_id="",
+                    rule_index=-1,
+                    reason="all checks passed",
+                ),
+            ),
+        ),
+    )
     store.insert_trace(allowed)
     row = store.query("SELECT * FROM v_order_chain")[0]
     assert row["risk_decision"] == 1 and row["risk_rule_id"] == ""
@@ -399,26 +578,40 @@ def test_v_order_chain_on_the_mvp_golden_run(tmp_path: Path) -> None:
     root = Path(__file__).resolve().parents[2]
     run = tmp_path / "run"
     proc = subprocess.run(
-        [sys.executable, "-m", "iap.mvp", "run", "--repo-root", str(root),
-         "--config", str(root / "configs" / "mvp" / "mvp_tiny.json"), "--out", str(run)],
-        cwd=str(root / "python"), capture_output=True, text=True,
-        env={**__import__("os").environ, "PYTHONPATH": str(root / "python" / "src")})
+        [
+            sys.executable,
+            "-m",
+            "iap.mvp",
+            "run",
+            "--repo-root",
+            str(root),
+            "--config",
+            str(root / "configs" / "mvp" / "mvp_tiny.json"),
+            "--out",
+            str(run),
+        ],
+        cwd=str(root / "python"),
+        capture_output=True,
+        text=True,
+        env={**__import__("os").environ, "PYTHONPATH": str(root / "python" / "src")},
+    )
     assert proc.returncode == 0, proc.stderr[-2000:]
-    traces = [DecisionTrace.from_dict(json.loads(line))
-              for line in (run / "traces.jsonl").read_text().splitlines()]
+    traces = [
+        DecisionTrace.from_dict(json.loads(line))
+        for line in (run / "traces.jsonl").read_text().splitlines()
+    ]
     with_parent = [tr for tr in traces if tr.stages.parent_orders]
     assert with_parent, "the tiny run issued no parent order"
     with sqlite3.connect(run / "iap.sqlite") as conn:
         conn.row_factory = sqlite3.Row
-        rows = {r["parent_order_id"]: dict(r)
-                for r in conn.execute("SELECT * FROM v_order_chain")}
+        rows = {r["parent_order_id"]: dict(r) for r in conn.execute("SELECT * FROM v_order_chain")}
     assert len(rows) == len(with_parent)
     for tr in with_parent:
         po = tr.stages.parent_orders[0]
         row = rows[po.parent_order_id]
         risk = tr.stages.risk
         child_ids = {c.child_order_id for c in tr.stages.child_orders}
-        assert all(r.order_id in child_ids for r in risk)   # per-child decisions
+        assert all(r.order_id in child_ids for r in risk)  # per-child decisions
         if risk:
             assert row["risk_decision"] == max(r.decision.value for r in risk)
             assert row["n_children_allowed"] == sum(r.decision.value == 1 for r in risk)
@@ -427,7 +620,8 @@ def test_v_order_chain_on_the_mvp_golden_run(tmp_path: Path) -> None:
             assert row["risk_decision"] is None
         assert row["n_child_orders"] == len(tr.stages.child_orders)
         assert row["n_fills"] == sum(
-            f.status in (ExecStatus.PARTIAL, ExecStatus.FILLED) for f in tr.stages.fills)
+            f.status in (ExecStatus.PARTIAL, ExecStatus.FILLED) for f in tr.stages.fills
+        )
         assert row["filled_qty"] == sum(f.filled_qty for f in tr.stages.fills)
 
 
@@ -439,8 +633,10 @@ def test_export_jsonl_is_byte_deterministic(store: Store, tmp_path: Path) -> Non
     assert a.read_bytes() == b.read_bytes()
     lines = a.read_text().splitlines()
     assert [json.loads(line)["child_order_id"] for line in lines] == [1234501, 1234502, 1234503]
-    assert all(line == json.dumps(json.loads(line), sort_keys=True, separators=(",", ":"))
-               for line in lines)
+    assert all(
+        line == json.dumps(json.loads(line), sort_keys=True, separators=(",", ":"))
+        for line in lines
+    )
     # a second, independently built store exports the same bytes
     with Store.open(":memory:") as other:
         other.init()
@@ -457,6 +653,7 @@ def test_export_jsonl_is_byte_deterministic(store: Store, tmp_path: Path) -> Non
 # Importers on the real artefacts
 # --------------------------------------------------------------------------
 
+
 def _n_ledger_entries() -> int:
     return len(json.loads((RESEARCH / "experiments.json").read_text())["entries"])
 
@@ -468,12 +665,16 @@ def test_import_all_counts(built: Store) -> None:
         assert counts[table] >= minimum, (table, counts[table])
     assert counts["alphas"] == len(list((RESEARCH / "alpha_reports").glob("*.json")))
     assert counts["ledger_entries"] == _n_ledger_entries()
-    assert counts["model_runs"] == json.loads(
-        (RESEARCH / "models" / "ledger.json").read_text())["experiment_count"]
+    assert (
+        counts["model_runs"]
+        == json.loads((RESEARCH / "models" / "ledger.json").read_text())["experiment_count"]
+    )
     assert counts["drift_baselines"] == len(list((RESEARCH / "baselines").glob("*.json")))
     assert counts["instruments"] == 19 and counts["venues"] == 5
     assert counts["feature_versions"] == 1 and counts["schema_version"] == 1
-    log_rows = sum(1 for line in (RESEARCH / "lifecycle_log.jsonl").read_text().splitlines() if line.strip())
+    log_rows = sum(
+        1 for line in (RESEARCH / "lifecycle_log.jsonl").read_text().splitlines() if line.strip()
+    )
     assert counts["lifecycle_transitions"] >= log_rows == 260
     assert counts["experiments"] == counts["experiment_results"] >= 24
     # every warning is an "absent optional artefact", never a skipped record
@@ -504,8 +705,11 @@ def test_alpha_scorecard_view(built: Store) -> None:
     assert eq03["verdict"] in ("PROMOTE", "ITERATE", "REJECT")
     assert eq03["ledger_entries"] >= 1 and eq03["ledger_count"] >= 21
     assert eq03["latest_experiment_id"] is not None
-    assert all(r["current_state"] in (
-        "RESEARCH", "CANDIDATE", "VALIDATING", "PAPER", "ACTIVE", "WATCH", "RETIRED") for r in rows)
+    assert all(
+        r["current_state"]
+        in ("RESEARCH", "CANDIDATE", "VALIDATING", "PAPER", "ACTIVE", "WATCH", "RETIRED")
+        for r in rows
+    )
     rationale = built.query("SELECT economic_rationale FROM alphas WHERE alpha_id = 'EQ03'")[0]
     assert rationale["economic_rationale"].startswith("Economic rationale:")
 
@@ -523,7 +727,9 @@ def test_alpha_report_mapping_is_pinned(built: Store) -> None:
     rows = built.query(
         "SELECT r.*, e.configuration_json, e.model_version AS spec_model_version "
         "FROM experiment_results r JOIN experiments e ON e.experiment_id = r.experiment_id "
-        "WHERE r.alpha_id = 'EQ03' AND r.experiment_id = ?", (entry["key"][:16],))
+        "WHERE r.alpha_id = 'EQ03' AND r.experiment_id = ?",
+        (entry["key"][:16],),
+    )
     assert len(rows) == 1
     row = rows[0]
     params_doc = json.loads((REPO / "configs" / "strategies" / "alpha_params.json").read_text())
@@ -534,11 +740,17 @@ def test_alpha_report_mapping_is_pinned(built: Store) -> None:
     scale = 1e4 / REFERENCE_NOTIONAL_USD
     assert row["net_return_bps"] == pytest.approx(x1["total_pnl"] * scale)
     assert row["transaction_cost_bps"] == pytest.approx(x1["total_costs"] * scale)
-    assert row["gross_return_bps"] - row["transaction_cost_bps"] == pytest.approx(row["net_return_bps"])
+    assert row["gross_return_bps"] - row["transaction_cost_bps"] == pytest.approx(
+        row["net_return_bps"]
+    )
     assert row["dataset_version"] == params_doc["data_version"]
     assert row["feature_version"] == params_doc["feature_version"]
     assert row["git_commit"] == params_doc["git_commit"]
-    assert row["model_version"] == row["spec_model_version"] == content_hash(params_doc["params"]["EQ03"])
+    assert (
+        row["model_version"]
+        == row["spec_model_version"]
+        == content_hash(params_doc["params"]["EQ03"])
+    )
     assert row["n_experiments_in_ledger"] == entry["n"]
     cfg = json.loads(row["configuration_json"])
     assert cfg["source"] == "research/alpha_reports/EQ03.json"
@@ -554,7 +766,11 @@ def test_store_rows_equal_the_registry_evidence_for_every_alpha(built: Store) ->
     ``ExperimentResult`` the registry was bootstrapped from, field for
     field, and the registry record points at that row's ``experiment_id``."""
     from iap.lifecycle.bootstrap import (
-        load_ledger_entries, load_params_document, load_report, research_evidence)
+        load_ledger_entries,
+        load_params_document,
+        load_report,
+        research_evidence,
+    )
     from iap.lifecycle.registry import AlphaRegistry
     from iap.store.db import _dec_experiment_result
 
@@ -564,12 +780,14 @@ def test_store_rows_equal_the_registry_evidence_for_every_alpha(built: Store) ->
     checked = 0
     for rec in registry.records():
         aid = rec.alpha_id
-        result, missing = research_evidence(aid, load_report(REPO, aid), ledger.get(aid),
-                                            params_doc)
+        result, missing = research_evidence(
+            aid, load_report(REPO, aid), ledger.get(aid), params_doc
+        )
         assert result is not None, (aid, missing)
         assert rec.experiment_id == result.experiment_id
-        rows = built.query("SELECT * FROM experiment_results WHERE experiment_id = ?",
-                           (result.experiment_id,))
+        rows = built.query(
+            "SELECT * FROM experiment_results WHERE experiment_id = ?", (result.experiment_id,)
+        )
         assert len(rows) == 1, aid
         stored: ExperimentResult = _dec_experiment_result(rows[0])
         assert stored == result, aid
@@ -585,13 +803,12 @@ def test_import_alpha_reports_skips_nan_with_warning(tmp_path: Path) -> None:
     reports = tmp_path / "alpha_reports"
     reports.mkdir()
     (reports / "EQ03.json").write_text(json.dumps(src))
-    bad = dict(src, alpha_id="EQ04", gate_ic=float("nan"))   # the IC the mapping reads
+    bad = dict(src, alpha_id="EQ04", gate_ic=float("nan"))  # the IC the mapping reads
     (reports / "EQ04.json").write_text(json.dumps(bad))
     (reports / "notes.json").write_text(json.dumps({"x": 1}))
     with Store.open(":memory:") as s:
         s.init()
-        rep = import_alpha_reports(s, reports, dataset_version="a" * 64,
-                                   feature_version="b" * 64)
+        rep = import_alpha_reports(s, reports, dataset_version="a" * 64, feature_version="b" * 64)
         assert rep.inserted == {"alphas": 2, "experiment_results": 1, "experiments": 1}
         assert len(rep.warnings) == 2
         assert any("EQ04.json" in w and "non-finite" in w for w in rep.warnings)
@@ -600,14 +817,18 @@ def test_import_alpha_reports_skips_nan_with_warning(tmp_path: Path) -> None:
         # re-run keeps state and counts
         s.set_alpha_state("EQ03", "PAPER")
         import_alpha_reports(s, reports, dataset_version="a" * 64, feature_version="b" * 64)
-        assert s.query("SELECT current_state FROM alphas WHERE alpha_id='EQ03'")[0]["current_state"] == "PAPER"
+        assert (
+            s.query("SELECT current_state FROM alphas WHERE alpha_id='EQ03'")[0]["current_state"]
+            == "PAPER"
+        )
 
 
 def test_import_experiments_ledger(store: Store) -> None:
     rep = import_experiments_ledger(store, RESEARCH / "experiments.json")
     assert rep.inserted["ledger_entries"] == _n_ledger_entries() >= 65
-    row = store.query("SELECT * FROM ledger_entries WHERE alpha_id='EQ03' "
-                      "AND kind='promotion_pipeline'")[0]
+    row = store.query(
+        "SELECT * FROM ledger_entries WHERE alpha_id='EQ03' AND kind='promotion_pipeline'"
+    )[0]
     # 28, not 21: the look count now includes the time-latency grid, the
     # crossed/uncrossed split and the leakage shift IC. Asserted against the
     # constant rather than a literal so the two cannot drift apart again.
@@ -630,25 +851,40 @@ def test_import_lifecycle_log_gate_mapping(store: Store) -> None:
     back = next(t for t in rows if t.to_state.name == "ACTIVE")
     assert back.gates["reactivate_ic"].passed is True
     assert back.gates["reactivate_ic"].threshold == 0.005
-    assert store.query("SELECT COUNT(*) AS n FROM lifecycle_transitions WHERE eval_index IS NULL")[0]["n"] == 0
+    assert (
+        store.query("SELECT COUNT(*) AS n FROM lifecycle_transitions WHERE eval_index IS NULL")[0][
+            "n"
+        ]
+        == 0
+    )
     missing = RESEARCH / "does_not_exist.jsonl"
     assert import_lifecycle_log(store, missing).warnings == (f"absent: {missing}",)
 
 
-def test_import_lifecycle_transitions_tolerates_absence_and_bad_lines(store: Store, tmp_path: Path) -> None:
+def test_import_lifecycle_transitions_tolerates_absence_and_bad_lines(
+    store: Store, tmp_path: Path
+) -> None:
     missing = tmp_path / "lifecycle_transitions.jsonl"
     rep = import_lifecycle_transitions(store, missing)
     assert rep.inserted == {} and rep.warnings == (f"absent: {missing}",)
     ex = all_examples()["LifecycleTransition"]
-    store.insert_alpha("EQ03", asset_class="EQUITY", family="ofi_multilevel", horizon="5s",
-                       economic_rationale="")
-    lines = [json.dumps(ex.to_dict()), "not json", json.dumps({"alpha_id": "EQ03"}),
-             json.dumps({**ex.to_dict(), "alpha_id": "EQ99"})]
+    store.insert_alpha(
+        "EQ03", asset_class="EQUITY", family="ofi_multilevel", horizon="5s", economic_rationale=""
+    )
+    lines = [
+        json.dumps(ex.to_dict()),
+        "not json",
+        json.dumps({"alpha_id": "EQ03"}),
+        json.dumps({**ex.to_dict(), "alpha_id": "EQ99"}),
+    ]
     missing.write_text("\n".join(lines) + "\n")
     rep = import_lifecycle_transitions(store, missing)
     assert rep.inserted == {"alphas.current_state": 1, "lifecycle_transitions": 2}
     assert len(rep.warnings) == 3
-    assert store.query("SELECT current_state FROM alphas WHERE alpha_id='EQ03'")[0]["current_state"] == "ACTIVE"
+    assert (
+        store.query("SELECT current_state FROM alphas WHERE alpha_id='EQ03'")[0]["current_state"]
+        == "ACTIVE"
+    )
 
 
 def test_import_experiment_documents_roundtrip(store: Store, tmp_path: Path) -> None:
@@ -673,7 +909,8 @@ def test_import_tca_orders_and_perold_identity(store: Store) -> None:
     rows = store.query("SELECT * FROM tca_orders ORDER BY order_id")
     for r in rows:
         assert r["total_is_bps"] == pytest.approx(
-            r["delay_bps"] + r["trading_bps"] + r["opportunity_bps"], abs=1e-9)
+            r["delay_bps"] + r["trading_bps"] + r["opportunity_bps"], abs=1e-9
+        )
     assert rows[18]["order_id"] == 19 and rows[18]["vwap_slippage_bps"] is None
 
 
@@ -685,8 +922,12 @@ def test_import_model_runs_and_baselines(store: Store) -> None:
     assert json.loads(ols["manifest_json"])["experiment_id"] == "run_0001_ols"
     rep = import_baselines(store, RESEARCH / "baselines")
     assert rep.inserted["drift_baselines"] == 36 and not rep.warnings
-    kinds = {r["kind"]: r["n"] for r in store.query(
-        "SELECT kind, COUNT(*) AS n FROM drift_baselines GROUP BY kind ORDER BY kind")}
+    kinds = {
+        r["kind"]: r["n"]
+        for r in store.query(
+            "SELECT kind, COUNT(*) AS n FROM drift_baselines GROUP BY kind ORDER BY kind"
+        )
+    }
     expected: dict = {}
     for path in (RESEARCH / "baselines").glob("*.json"):
         kind = json.loads(path.read_text())["kind"]
@@ -716,6 +957,7 @@ def test_built_store_exports_deterministically(built: Store, tmp_path: Path) -> 
 # CLI
 # --------------------------------------------------------------------------
 
+
 def test_cli_build_explain_sql(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     db = tmp_path / "store" / "iap.sqlite"
     assert store_main(["build", "--db", str(db), "--repo-root", str(REPO)]) == 0
@@ -734,17 +976,36 @@ def test_cli_build_explain_sql(tmp_path: Path, capsys: pytest.CaptureFixture[str
     assert store_main(["explain", "--db", str(db), "1"]) == 1
     assert "no parent order 1" in capsys.readouterr().err
 
-    assert store_main(["sql", "--db", str(db),
-                       "SELECT alpha_id, COUNT(*) AS n FROM ledger_entries "
-                       "WHERE alpha_id = 'EQ03' GROUP BY alpha_id"]) == 0
+    assert (
+        store_main(
+            [
+                "sql",
+                "--db",
+                str(db),
+                "SELECT alpha_id, COUNT(*) AS n FROM ledger_entries "
+                "WHERE alpha_id = 'EQ03' GROUP BY alpha_id",
+            ]
+        )
+        == 0
+    )
     assert json.loads(capsys.readouterr().out.strip())["alpha_id"] == "EQ03"
     assert store_main(["sql", "--db", str(tmp_path / "none.sqlite"), "SELECT 1"]) == 2
     # sql is read-only: a writing statement fails and changes nothing.
     assert store_main(["sql", "--db", str(db), "DROP TABLE alphas"]) == 1
     assert "read-only" in capsys.readouterr().err
-    assert store_main(["sql", "--db", str(db), "INSERT INTO venues (venue_id, venue, "
-                       "asset_class, latency_mean_ns, latency_jitter_ns, supports_json) "
-                       "VALUES (99, 'X', 'EQUITY', 1, 0, '[]')"]) == 1
+    assert (
+        store_main(
+            [
+                "sql",
+                "--db",
+                str(db),
+                "INSERT INTO venues (venue_id, venue, "
+                "asset_class, latency_mean_ns, latency_jitter_ns, supports_json) "
+                "VALUES (99, 'X', 'EQUITY', 1, 0, '[]')",
+            ]
+        )
+        == 1
+    )
     capsys.readouterr()
     with Store.open(db) as s:
         assert s.counts()["alphas"] == 24

@@ -39,7 +39,7 @@ platform.
 from __future__ import annotations
 
 import math
-from typing import Dict, List, Mapping, Optional, Sequence
+from collections.abc import Mapping, Sequence
 
 import numpy as np
 import pandas as pd
@@ -61,7 +61,7 @@ BOOTSTRAP_RESAMPLES = 1000
 BOOTSTRAP_LEVEL = 0.95
 
 
-def _fnum(v: float) -> Optional[float]:
+def _fnum(v: float) -> float | None:
     return float(v) if np.isfinite(v) else None
 
 
@@ -69,9 +69,9 @@ def stationary_bootstrap_ci(
     values: Sequence[float],
     seed: int,
     n_boot: int = BOOTSTRAP_RESAMPLES,
-    mean_block: Optional[float] = None,
+    mean_block: float | None = None,
     level: float = BOOTSTRAP_LEVEL,
-) -> Dict[str, object]:
+) -> dict[str, object]:
     """Stationary-bootstrap percentile interval for ``sum(values)``.
 
     Returns ``{"estimate", "ci_low", "ci_high", "level", "n", "n_boot",
@@ -91,10 +91,15 @@ def stationary_bootstrap_ci(
         mean_block = float(max(1, round(n ** (1.0 / 3.0)))) if n else 1.0
     if not mean_block >= 1.0:
         raise ValueError("mean_block must be >= 1")
-    out: Dict[str, object] = {
+    out: dict[str, object] = {
         "estimate": float(v.sum()) if n else 0.0,
-        "ci_low": None, "ci_high": None, "level": float(level), "n": n,
-        "n_boot": int(n_boot), "mean_block": float(mean_block), "seed": int(seed),
+        "ci_low": None,
+        "ci_high": None,
+        "level": float(level),
+        "n": n,
+        "n_boot": int(n_boot),
+        "mean_block": float(mean_block),
+        "seed": int(seed),
         "frac_resamples_le_zero": None,
     }
     if n < 8:
@@ -139,7 +144,7 @@ def fold_diagnostics(
     seed: int = 0,
     n_boot: int = BOOTSTRAP_RESAMPLES,
     multipliers: Sequence[float] = COST_MULTIPLIERS,
-) -> Dict[str, object]:
+) -> dict[str, object]:
     """Cost survival, decay and regime split for EVERY walk-forward fold,
     and a stationary-bootstrap interval for the pooled net P&L.
 
@@ -170,15 +175,15 @@ def fold_diagnostics(
     if 1.0 not in [float(m) for m in multipliers]:
         raise ValueError("multipliers must include 1.0 (the cost-survival grid point)")
 
-    folds: List[dict] = []
-    bars: Dict[int, float] = {}
+    folds: list[dict] = []
+    bars: dict[int, float] = {}
     for fold, train, test in splitter.split_frames(uframes, horizon_ns):
         model = model_factory()
         model.fit(train)
         scores = model.score(test)
         beta = float(model.params().get("beta", 0.0) or 0.0)
         n_pairs = 0
-        decay: Dict[str, List[float]] = {}
+        decay: dict[str, list[float]] = {}
         for iid, sc in scores.items():
             er = sc["expected_return"].to_numpy(dtype=float).copy()
             er[sc["confidence"].to_numpy(dtype=float) <= 0.0] = np.nan
@@ -193,22 +198,25 @@ def fold_diagnostics(
         cost = cost_stress(backtester, test, scores, asset_class, multipliers)
         result = backtester.run(test, scores, asset_class)
         for r in result.per_instrument.values():
-            for t, pnl in zip(r.bar_ts, r.bar_pnl):
+            for t, pnl in zip(r.bar_ts, r.bar_pnl, strict=False):
                 bars[int(t)] = bars.get(int(t), 0.0) + float(pnl)
         if "vol_regime_flag_v1" in next(iter(test.values())).columns:
-            regime = {k: _fnum(v) for k, v in
-                      regime_split(scores, test, horizon, beta=beta).items()}
+            regime = {
+                k: _fnum(v) for k, v in regime_split(scores, test, horizon, beta=beta).items()
+            }
         else:
             regime = {}
-        folds.append({
-            "fold": fold.index,
-            "n_test_pairs": n_pairs,
-            "degenerate": n_pairs < MIN_TEST_PAIRS,
-            "net_pnl_by_cost": {k: _fnum(v["total_pnl"]) for k, v in cost.items()},
-            "survives_1x_cost": bool(cost[key_1x]["total_pnl"] > 0.0),
-            "decay_ic_by_horizon": {h: _fnum(float(np.mean(v))) for h, v in decay.items()},
-            "regime": regime,
-        })
+        folds.append(
+            {
+                "fold": fold.index,
+                "n_test_pairs": n_pairs,
+                "degenerate": n_pairs < MIN_TEST_PAIRS,
+                "net_pnl_by_cost": {k: _fnum(v["total_pnl"]) for k, v in cost.items()},
+                "survives_1x_cost": bool(cost[key_1x]["total_pnl"] > 0.0),
+                "decay_ic_by_horizon": {h: _fnum(float(np.mean(v))) for h, v in decay.items()},
+                "regime": regime,
+            }
+        )
     series = [bars[t] for t in sorted(bars)]
     return {
         "folds": folds,

@@ -67,8 +67,9 @@ scale-free, and with a threshold a port can state in one line.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Mapping, Optional, Tuple, Union
+from typing import Any
 
 from iap.contracts.types import GateResult
 from iap.lifecycle.config import PolicyConfig
@@ -82,7 +83,7 @@ __all__ = [
     "ic_rank_gap",
 ]
 
-Metric = Union[float, int, bool, None]
+Metric = float | int | bool | None
 
 
 def ic_rank_gap(ic: float, rank_ic: float, eps: float) -> float:
@@ -93,6 +94,7 @@ def ic_rank_gap(ic: float, rank_ic: float, eps: float) -> float:
 def _research(field: str) -> Callable[[Evidence, PolicyConfig], Metric]:
     def read(ev: Evidence, cfg: PolicyConfig) -> Metric:
         return None if ev.research is None else getattr(ev.research, field)
+
     return read
 
 
@@ -115,6 +117,7 @@ def _stability(ev: Evidence, cfg: PolicyConfig) -> Metric:
 def _validation(field: str) -> Callable[[Evidence, PolicyConfig], Metric]:
     def read(ev: Evidence, cfg: PolicyConfig) -> Metric:
         return None if ev.validation is None else getattr(ev.validation, field)
+
     return read
 
 
@@ -127,6 +130,7 @@ def _holdout_gap(ev: Evidence, cfg: PolicyConfig) -> Metric:
 def _paper(field: str) -> Callable[[Evidence, PolicyConfig], Metric]:
     def read(ev: Evidence, cfg: PolicyConfig) -> Metric:
         return None if ev.paper is None else getattr(ev.paper, field)
+
     return read
 
 
@@ -142,17 +146,18 @@ def _rolling_ic(ev: Evidence, cfg: PolicyConfig) -> Metric:
     return ev.live.rolling_ic
 
 
-def _threshold_from_gates(key: str) -> Callable[[PolicyConfig], Optional[float]]:
-    def read(cfg: PolicyConfig) -> Optional[float]:
+def _threshold_from_gates(key: str) -> Callable[[PolicyConfig], float | None]:
+    def read(cfg: PolicyConfig) -> float | None:
         return float(getattr(cfg.gates, key))
+
     return read
 
 
-def _threshold_none(cfg: PolicyConfig) -> Optional[float]:
+def _threshold_none(cfg: PolicyConfig) -> float | None:
     return None
 
 
-def _threshold_watch_gate(cfg: PolicyConfig) -> Optional[float]:
+def _threshold_watch_gate(cfg: PolicyConfig) -> float | None:
     return cfg.live.watch_ic_gate
 
 
@@ -163,9 +168,9 @@ class GateSpec:
     name: str
     block: str
     kind: str
-    threshold_key: Optional[str]
+    threshold_key: str | None
     metric: Callable[[Evidence, PolicyConfig], Metric]
-    threshold: Callable[[PolicyConfig], Optional[float]]
+    threshold: Callable[[PolicyConfig], float | None]
 
     def __post_init__(self) -> None:
         if self.kind not in ("min", "max", "gt", "bool"):
@@ -174,46 +179,58 @@ class GateSpec:
             raise ValueError(f"gate {self.name}: bool gates have no threshold key")
 
 
-def _spec(name: str, block: str, kind: str, key: Optional[str],
-          metric: Callable[[Evidence, PolicyConfig], Metric]) -> GateSpec:
+def _spec(
+    name: str,
+    block: str,
+    kind: str,
+    key: str | None,
+    metric: Callable[[Evidence, PolicyConfig], Metric],
+) -> GateSpec:
     if key is None:
         threshold = _threshold_none
     elif key == "watch_ic_gate":
         threshold = _threshold_watch_gate
     else:
         threshold = _threshold_from_gates(key)
-    return GateSpec(name=name, block=block, kind=kind, threshold_key=key,
-                    metric=metric, threshold=threshold)
+    return GateSpec(
+        name=name, block=block, kind=kind, threshold_key=key, metric=metric, threshold=threshold
+    )
 
 
 #: The complete gate table, in a fixed order (the machine evaluates the
 #: subset of an edge in the edge's own pinned order).
-GATE_SPECS: Tuple[GateSpec, ...] = (
-    _spec("ledger_entry_exists", "research", "min", "min_experiments_in_ledger",
-          _research("n_experiments_in_ledger")),
+GATE_SPECS: tuple[GateSpec, ...] = (
+    _spec(
+        "ledger_entry_exists",
+        "research",
+        "min",
+        "min_experiments_in_ledger",
+        _research("n_experiments_in_ledger"),
+    ),
     _spec("leakage_clean", "research", "bool", None, _research("leakage_passed")),
     _spec("oos_ic", "research", "min", "min_oos_ic", _research("ic")),
-    _spec("statistical_significance", "research", "min", "min_nw_tstat",
-          _research("t_stat")),
-    _spec("fold_consistency", "research", "min", "min_fold_sign_consistency",
-          _research("fold_consistency")),
+    _spec("statistical_significance", "research", "min", "min_nw_tstat", _research("t_stat")),
+    _spec(
+        "fold_consistency",
+        "research",
+        "min",
+        "min_fold_sign_consistency",
+        _research("fold_consistency"),
+    ),
     _spec("fold_count", "research", "min", "min_folds", _research("n_folds")),
     _spec("hypothesis_sign", "research", "bool", None, _hypothesis),
-    _spec("net_pnl_after_costs", "research", "gt", "min_net_return_bps",
-          _research("net_return_bps")),
+    _spec(
+        "net_pnl_after_costs", "research", "gt", "min_net_return_bps", _research("net_return_bps")
+    ),
     _spec("capacity", "capacity", "min", "min_capacity_usd", _capacity),
     _spec("stability", "research", "max", "max_ic_rank_gap", _stability),
-    _spec("holdout_ic_tracks_research", "validation", "max", "max_holdout_ic_gap",
-          _holdout_gap),
-    _spec("replay_reproducible", "validation", "bool", None,
-          _validation("replay_hash_match")),
+    _spec("holdout_ic_tracks_research", "validation", "max", "max_holdout_ic_gap", _holdout_gap),
+    _spec("replay_reproducible", "validation", "bool", None, _validation("replay_hash_match")),
     _spec("cross_language_parity", "validation", "bool", None, _validation("parity")),
-    _spec("paper_min_sessions", "paper", "min", "min_paper_sessions",
-          _paper("n_sessions")),
+    _spec("paper_min_sessions", "paper", "min", "min_paper_sessions", _paper("n_sessions")),
     _spec("paper_ic_tracking", "paper", "max", "max_paper_ic_gap", _paper_gap),
     _spec("paper_net_pnl", "paper", "min", "min_paper_net_pnl", _paper("net_pnl")),
-    _spec("no_kill_events", "paper", "max", "max_kill_events",
-          _paper("n_kill_events")),
+    _spec("no_kill_events", "paper", "max", "max_kill_events", _paper("n_kill_events")),
     _spec("rolling_ic", "live", "min", "watch_ic_gate", _rolling_ic),
 )
 
@@ -241,7 +258,7 @@ class Gate:
         return self._spec
 
     @property
-    def threshold(self) -> Optional[float]:
+    def threshold(self) -> float | None:
         """The bound threshold (``None`` for a boolean gate)."""
         return self._spec.threshold(self._config)
 
@@ -249,14 +266,14 @@ class Gate:
         """Pure: the same evidence always yields the same result.
         ``alpha_id`` is accepted for the protocol; no gate is alpha-specific."""
         if not isinstance(evidence, Evidence):
-            raise TypeError(f"gate {self.name}: expected Evidence, got "
-                            f"{type(evidence).__name__}")
+            raise TypeError(f"gate {self.name}: expected Evidence, got {type(evidence).__name__}")
         metric = self._spec.metric(evidence, self._config)
         threshold = self.threshold
         if self._spec.block == "research" and not evidence.research_gate_eligible:
             # Recorded, ledgered, but not promotion evidence (module docs).
-            return GateResult(passed=False, value=None,
-                              threshold=None if self._spec.kind == "bool" else threshold)
+            return GateResult(
+                passed=False, value=None, threshold=None if self._spec.kind == "bool" else threshold
+            )
         if self._spec.kind == "bool":
             return GateResult(passed=metric is True, value=None, threshold=None)
         if metric is None:
@@ -274,7 +291,7 @@ class Gate:
         return f"Gate({self.name!r}, {self._spec.kind}, threshold={self.threshold!r})"
 
 
-def build_gates(config: PolicyConfig) -> Dict[str, Gate]:
+def build_gates(config: PolicyConfig) -> dict[str, Gate]:
     """Every gate of the table bound to ``config``, keyed by name (insertion
     order = table order)."""
     return {spec.name: Gate(spec, config) for spec in GATE_SPECS}

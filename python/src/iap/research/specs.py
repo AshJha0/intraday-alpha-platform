@@ -62,9 +62,10 @@ runner writes it beside the result (``eligibility.json``) and
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Tuple
+from typing import Any
 
 import pandas as pd
 
@@ -99,7 +100,7 @@ __all__ = [
 NS_DAY = 86_400_000_000_000
 
 #: Pinned protocol defaults (= ``run_all.py``'s research execution model).
-DEFAULT_CONFIGURATION: Dict[str, Any] = {
+DEFAULT_CONFIGURATION: dict[str, Any] = {
     "n_folds": 4,
     "embargo_ns": 60_000_000_000,
     "cost_multiplier": 1.0,
@@ -138,7 +139,8 @@ def _require_float(cfg: Mapping[str, Any], key: str, exclusive_min: float) -> fl
     out = float(value)
     if not math.isfinite(out) or out <= exclusive_min:
         raise _invalid(
-            f"configuration.{key}: must be a finite number > {exclusive_min}, got {value!r}")
+            f"configuration.{key}: must be a finite number > {exclusive_min}, got {value!r}"
+        )
     return out
 
 
@@ -149,7 +151,7 @@ def _require_bool(cfg: Mapping[str, Any], key: str) -> bool:
     return value
 
 
-def normalise_configuration(configuration: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+def normalise_configuration(configuration: Mapping[str, Any] | None) -> dict[str, Any]:
     """Fill the pinned defaults, reject unknown keys, canonicalise types.
 
     ``cost_multiplier=1`` and ``cost_multiplier=1.0`` are the same protocol
@@ -161,8 +163,8 @@ def normalise_configuration(configuration: Optional[Mapping[str, Any]]) -> Dict[
     unknown = sorted(set(given) - set(DEFAULT_CONFIGURATION))
     if unknown:
         raise _invalid(
-            f"unknown configuration keys {unknown}; pinned keys are "
-            f"{sorted(DEFAULT_CONFIGURATION)}")
+            f"unknown configuration keys {unknown}; pinned keys are {sorted(DEFAULT_CONFIGURATION)}"
+        )
     merged = {**DEFAULT_CONFIGURATION, **given}
     return {
         "n_folds": _require_int(merged, "n_folds", 1),
@@ -177,15 +179,13 @@ def normalise_configuration(configuration: Optional[Mapping[str, Any]]) -> Dict[
 def pinned_horizon(alpha_id: str) -> str:
     """The alpha's own label horizon (the default when a spec names none)."""
     if alpha_id not in ALPHA_CLASSES:
-        raise _invalid(
-            f"unknown alpha_id {alpha_id!r}; known: {sorted(ALPHA_CLASSES)}")
+        raise _invalid(f"unknown alpha_id {alpha_id!r}; known: {sorted(ALPHA_CLASSES)}")
     return str(ALPHA_CLASSES[alpha_id].horizon)
 
 
 def _check_horizon(horizon: str) -> str:
     if horizon not in VALID_HORIZONS:
-        raise _invalid(
-            f"unknown horizon {horizon!r}; pinned horizons: {list(VALID_HORIZONS)}")
+        raise _invalid(f"unknown horizon {horizon!r}; pinned horizons: {list(VALID_HORIZONS)}")
     return horizon
 
 
@@ -200,29 +200,34 @@ def model_definition_hash(alpha_id: str, horizon: str) -> str:
     """
     model = build(alpha_id)
     params = model.params()
-    return content_hash({
-        "alpha_id": alpha_id,
-        "class": type(model).__name__,
-        "model": params["model"],
-        "horizon": _check_horizon(horizon),
-        "features": list(params["features"]),
-        "z_clip": params["z_clip"],
-        "conf_scale": params["conf_scale"],
-    })
+    return content_hash(
+        {
+            "alpha_id": alpha_id,
+            "class": type(model).__name__,
+            "model": params["model"],
+            "horizon": _check_horizon(horizon),
+            "features": list(params["features"]),
+            "z_clip": params["z_clip"],
+            "conf_scale": params["conf_scale"],
+        }
+    )
 
 
-def _version(explicit: Optional[str], source, what: str, repo_root: Optional[Path]) -> str:
+def _version(explicit: str | None, source, what: str, repo_root: Path | None) -> str:
     value = explicit if explicit is not None else source(repo_root)
     if not is_sha256_hex(value):
         raise _invalid(
             f"{what} {value!r} is not a sha256 hex digest; the tracker could not "
-            "fingerprint the bundled data (is data/ present?) — pass it explicitly")
+            "fingerprint the bundled data (is data/ present?) — pass it explicitly"
+        )
     return value
 
 
 def derive_periods(
-    frames: Mapping[int, pd.DataFrame], horizon: str, embargo_ns: int,
-) -> Tuple[Period, Period, Period]:
+    frames: Mapping[int, pd.DataFrame],
+    horizon: str,
+    embargo_ns: int,
+) -> tuple[Period, Period, Period]:
     """Walk-forward periods from the dataset's session calendar (pinned).
 
     Sessions are UTC days of ``exchange_ts`` (``iap.alpha.data.session_days``)
@@ -255,7 +260,8 @@ def derive_periods(
     if len(days) < 2:
         raise _invalid(
             f"period derivation needs >= 2 sessions (UTC days), found {len(days)}; "
-            "pass train/validation/test periods explicitly")
+            "pass train/validation/test periods explicitly"
+        )
     last_day = days[-1]
     t_first = min(int(df["exchange_ts"].iloc[0]) for df in nonempty)
     t_last = max(int(df["exchange_ts"].iloc[-1]) for df in nonempty)
@@ -268,7 +274,8 @@ def derive_periods(
     if purge_start <= t_first:
         raise _invalid(
             "period derivation: the purge + embargo zone before the last session "
-            "swallows every earlier row — nothing is left to train on")
+            "swallows every earlier row — nothing is left to train on"
+        )
     return (
         Period(start_ts=t_first, end_ts=purge_start),
         Period(start_ts=purge_start, end_ts=test_start),
@@ -285,7 +292,7 @@ ELIGIBILITY_VERSION = 1
 #: protocol is eligible and any knob turned in the flattering direction
 #: (cheaper, faster, less embargo, fewer folds, staler fills, overnight
 #: carry) is not.
-GATE_ELIGIBILITY_BOUNDS: Dict[str, Tuple[str, Any]] = {
+GATE_ELIGIBILITY_BOUNDS: dict[str, tuple[str, Any]] = {
     "n_folds": ("min", DEFAULT_CONFIGURATION["n_folds"]),
     "embargo_ns": ("min", DEFAULT_CONFIGURATION["embargo_ns"]),
     "cost_multiplier": ("min", DEFAULT_CONFIGURATION["cost_multiplier"]),
@@ -304,10 +311,10 @@ class GateEligibility:
     (a run directory written before the sidecar existed)."""
 
     eligible: bool
-    reasons: Tuple[str, ...]
+    reasons: tuple[str, ...]
     periods_verified: bool
 
-    def to_dict(self, experiment_id: str) -> Dict[str, Any]:
+    def to_dict(self, experiment_id: str) -> dict[str, Any]:
         """The ``eligibility.json`` document for ``experiment_id``."""
         return {
             "x-version": ELIGIBILITY_VERSION,
@@ -318,55 +325,61 @@ class GateEligibility:
         }
 
     @staticmethod
-    def from_dict(doc: Mapping[str, Any], experiment_id: str) -> "GateEligibility":
+    def from_dict(doc: Mapping[str, Any], experiment_id: str) -> GateEligibility:
         """Strict inverse of :meth:`to_dict` for ``experiment_id``."""
-        want = {"x-version", "experiment_id", "gate_eligible",
-                "periods_verified", "reasons"}
+        want = {"x-version", "experiment_id", "gate_eligible", "periods_verified", "reasons"}
         if not isinstance(doc, Mapping) or set(doc) != want:
             raise _corrupt(
-                f"eligibility document for {experiment_id}: expected keys "
-                f"{sorted(want)}")
+                f"eligibility document for {experiment_id}: expected keys {sorted(want)}"
+            )
         if doc["x-version"] != ELIGIBILITY_VERSION:
             raise _corrupt(
                 f"eligibility document for {experiment_id}: x-version "
-                f"{doc['x-version']!r}, this build reads {ELIGIBILITY_VERSION}")
+                f"{doc['x-version']!r}, this build reads {ELIGIBILITY_VERSION}"
+            )
         if doc["experiment_id"] != experiment_id:
             raise _corrupt(
-                f"eligibility document belongs to {doc['experiment_id']!r}, "
-                f"not {experiment_id!r}")
+                f"eligibility document belongs to {doc['experiment_id']!r}, not {experiment_id!r}"
+            )
         reasons = doc["reasons"]
-        if (not isinstance(doc["gate_eligible"], bool)
-                or not isinstance(doc["periods_verified"], bool)
-                or not isinstance(reasons, list)
-                or not all(isinstance(r, str) for r in reasons)):
-            raise _corrupt(
-                f"eligibility document for {experiment_id}: malformed fields")
+        if (
+            not isinstance(doc["gate_eligible"], bool)
+            or not isinstance(doc["periods_verified"], bool)
+            or not isinstance(reasons, list)
+            or not all(isinstance(r, str) for r in reasons)
+        ):
+            raise _corrupt(f"eligibility document for {experiment_id}: malformed fields")
         if doc["gate_eligible"] and reasons:
-            raise _corrupt(
-                f"eligibility document for {experiment_id}: eligible with reasons")
-        return GateEligibility(eligible=doc["gate_eligible"], reasons=tuple(reasons),
-                               periods_verified=doc["periods_verified"])
+            raise _corrupt(f"eligibility document for {experiment_id}: eligible with reasons")
+        return GateEligibility(
+            eligible=doc["gate_eligible"],
+            reasons=tuple(reasons),
+            periods_verified=doc["periods_verified"],
+        )
 
 
-def _configuration_violations(configuration: Mapping[str, Any]) -> List[str]:
-    out: List[str] = []
+def _configuration_violations(configuration: Mapping[str, Any]) -> list[str]:
+    out: list[str] = []
     for key, (kind, bound) in GATE_ELIGIBILITY_BOUNDS.items():
         value = configuration[key]
         if kind == "min" and value < bound:
-            out.append(f"configuration.{key}={value!r} is below the gate-eligible "
-                       f"minimum {bound!r}")
+            out.append(
+                f"configuration.{key}={value!r} is below the gate-eligible minimum {bound!r}"
+            )
         elif kind == "max" and value > bound:
-            out.append(f"configuration.{key}={value!r} is above the gate-eligible "
-                       f"maximum {bound!r}")
+            out.append(
+                f"configuration.{key}={value!r} is above the gate-eligible maximum {bound!r}"
+            )
         elif kind == "is" and value is not bound:
-            out.append(f"configuration.{key}={value!r} must be {bound!r} for a "
-                       "gate-eligible result")
+            out.append(
+                f"configuration.{key}={value!r} must be {bound!r} for a gate-eligible result"
+            )
     return out
 
 
 def gate_eligibility(
     spec: ExperimentSpec,
-    frames: Optional[Mapping[int, pd.DataFrame]] = None,
+    frames: Mapping[int, pd.DataFrame] | None = None,
 ) -> GateEligibility:
     """Is ``spec``'s result admissible as promotion evidence (module docs)?
 
@@ -381,8 +394,7 @@ def gate_eligibility(
     verified = frames is not None
     if frames is not None:
         try:
-            derived = derive_periods(frames, spec.horizon,
-                                     int(spec.configuration["embargo_ns"]))
+            derived = derive_periods(frames, spec.horizon, int(spec.configuration["embargo_ns"]))
         except ResearchError as exc:
             reasons.append(f"periods are caller-chosen: none can be derived ({exc})")
         else:
@@ -390,9 +402,9 @@ def gate_eligibility(
             if tuple(p.to_dict() for p in given) != tuple(p.to_dict() for p in derived):
                 reasons.append(
                     "periods are caller-chosen: they differ from the periods "
-                    "derived from the dataset's session calendar")
-    return GateEligibility(eligible=not reasons, reasons=tuple(reasons),
-                           periods_verified=verified)
+                    "derived from the dataset's session calendar"
+                )
+    return GateEligibility(eligible=not reasons, reasons=tuple(reasons), periods_verified=verified)
 
 
 def experiment_id_of(body: Mapping[str, Any]) -> str:
@@ -410,23 +422,24 @@ def verify_experiment_id(spec: ExperimentSpec) -> None:
     if spec.experiment_id != want:
         raise _invalid(
             f"experiment_id {spec.experiment_id!r} does not match the spec body "
-            f"(expected {want!r}): the document was edited or built by hand")
+            f"(expected {want!r}): the document was edited or built by hand"
+        )
 
 
 def build_spec(
     alpha_id: str,
-    horizon: Optional[str] = None,
-    configuration: Optional[Mapping[str, Any]] = None,
+    horizon: str | None = None,
+    configuration: Mapping[str, Any] | None = None,
     *,
-    dataset_version: Optional[str] = None,
-    feature_version: Optional[str] = None,
-    model_version: Optional[str] = None,
+    dataset_version: str | None = None,
+    feature_version: str | None = None,
+    model_version: str | None = None,
     seed: int = DEFAULT_SEED,
-    train_period: Optional[Period] = None,
-    validation_period: Optional[Period] = None,
-    test_period: Optional[Period] = None,
-    frames: Optional[Mapping[int, pd.DataFrame]] = None,
-    repo_root: Optional[Path] = None,
+    train_period: Period | None = None,
+    validation_period: Period | None = None,
+    test_period: Period | None = None,
+    frames: Mapping[int, pd.DataFrame] | None = None,
+    repo_root: Path | None = None,
 ) -> ExperimentSpec:
     """A validated, id-stamped :class:`ExperimentSpec`.
 
@@ -454,18 +467,21 @@ def build_spec(
         raise _invalid("train/validation/test periods must be given together")
     if all(p is None for p in given):
         if frames is None:
-            raise _invalid(
-                "no periods given and no frames to derive them from")
+            raise _invalid("no periods given and no frames to derive them from")
         train_period, validation_period, test_period = derive_periods(
-            frames, horizon, config["embargo_ns"])
-    body: Dict[str, Any] = {
+            frames, horizon, config["embargo_ns"]
+        )
+    body: dict[str, Any] = {
         "alpha_id": alpha_id,
-        "dataset_version": _version(dataset_version, tracker.data_version,
-                                    "dataset_version", repo_root),
-        "feature_version": _version(feature_version, tracker.feature_version,
-                                    "feature_version", repo_root),
-        "model_version": (model_version if model_version is not None
-                          else model_definition_hash(alpha_id, horizon)),
+        "dataset_version": _version(
+            dataset_version, tracker.data_version, "dataset_version", repo_root
+        ),
+        "feature_version": _version(
+            feature_version, tracker.feature_version, "feature_version", repo_root
+        ),
+        "model_version": (
+            model_version if model_version is not None else model_definition_hash(alpha_id, horizon)
+        ),
         "configuration": config,
         "train_period": train_period.to_dict(),
         "validation_period": validation_period.to_dict(),

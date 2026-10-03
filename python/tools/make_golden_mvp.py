@@ -22,7 +22,7 @@ import argparse
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from iap.mvp.config import load_config
 from iap.mvp.feed import generate_feed
@@ -33,7 +33,7 @@ REPO = Path(__file__).resolve().parents[2]
 GOLDEN = REPO / "tests" / "golden" / "expected_mvp.json"
 
 
-def build() -> Dict[str, Any]:
+def build() -> dict[str, Any]:
     """Run the golden session in a temporary directory and build the document."""
     cfg = load_config()
     with tempfile.TemporaryDirectory(prefix="iap-mvp-golden-") as tmp:
@@ -42,7 +42,7 @@ def build() -> Dict[str, Any]:
         return golden_document(run_session(cfg, feed, out))
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--force", action="store_true", help="overwrite an existing golden file")
     args = parser.parse_args(argv)

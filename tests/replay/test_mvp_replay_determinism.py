@@ -9,6 +9,7 @@ re-runs the loop from the CAPTURED ``events.jsonl`` of one run (the incident
 replay path, ``cmd_replay``) and asserts the same digest and the same
 ``traces.jsonl`` bytes.
 """
+
 from __future__ import annotations
 
 from iap.mvp.__main__ import cmd_replay, cmd_verify

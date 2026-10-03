@@ -20,7 +20,7 @@ momentum).
 
 from __future__ import annotations
 
-from typing import Dict, List, Mapping, Sequence, Tuple
+from collections.abc import Mapping, Sequence
 
 import numpy as np
 import pandas as pd
@@ -28,7 +28,7 @@ import pandas as pd
 from iap.alpha.cross_sectional import CrossSectionalLinearAlpha
 
 #: pinned pair -> (base, quote) map (configs/instruments/instruments.json)
-PAIR_CURRENCIES: Dict[int, Tuple[str, str]] = {
+PAIR_CURRENCIES: dict[int, tuple[str, str]] = {
     101: ("EUR", "USD"),
     102: ("GBP", "USD"),
     103: ("USD", "JPY"),
@@ -40,9 +40,9 @@ PAIR_CURRENCIES: Dict[int, Tuple[str, str]] = {
 }
 
 #: sorted currency list; NUMERAIRE is dropped from the factor solve
-CURRENCIES: Tuple[str, ...] = ("AUD", "CAD", "CHF", "EUR", "GBP", "JPY", "NZD", "USD")
+CURRENCIES: tuple[str, ...] = ("AUD", "CAD", "CHF", "EUR", "GBP", "JPY", "NZD", "USD")
 NUMERAIRE = "USD"
-FREE_CURRENCIES: Tuple[str, ...] = tuple(c for c in CURRENCIES if c != NUMERAIRE)
+FREE_CURRENCIES: tuple[str, ...] = tuple(c for c in CURRENCIES if c != NUMERAIRE)
 
 
 def identified_pairs(pair_ids: Sequence[int], observable: Sequence[bool]) -> np.ndarray:
@@ -92,7 +92,7 @@ def free_exposure_matrix(pair_ids: Sequence[int]) -> np.ndarray:
     return a[:, keep]
 
 
-def currency_exposures(positions: Mapping[int, float]) -> Dict[str, float]:
+def currency_exposures(positions: Mapping[int, float]) -> dict[str, float]:
     """Translate pair positions (base-notional units) into per-currency
     exposures: long 5 EUR/USD -> +5 EUR, -5 USD.  Exact A^T p."""
     out = {c: 0.0 for c in CURRENCIES}
@@ -105,7 +105,7 @@ def currency_exposures(positions: Mapping[int, float]) -> Dict[str, float]:
 
 def solve_factor_returns(
     pair_ids: Sequence[int], returns: np.ndarray
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """Least-squares currency factor returns from one cross-section.
 
     ``returns`` is aligned with ``pair_ids``; NaN entries are dropped from
@@ -160,12 +160,10 @@ class FX05CrossPairRelativeValue(CrossSectionalLinearAlpha):
     INPUT_FEATURE = "ret_log_1m_v1"
     GRID_STEP_NS = 30_000_000_000
     MAX_AGE_NS = 120_000_000_000
-    _pair_ids: List[int] = []
+    _pair_ids: list[int] = []
 
     def signals(self, data):  # remember grid pair order for grid_signals
-        self._pair_ids = sorted(
-            i for i in self.universe(list(data)) if len(data[i])
-        )
+        self._pair_ids = sorted(i for i in self.universe(list(data)) if len(data[i]))
         return super().signals(data)
 
     def grid_signals(self, mat: np.ndarray) -> np.ndarray:
@@ -207,12 +205,10 @@ class FX06CurrencyFactorMomentum(CrossSectionalLinearAlpha):
     GRID_STEP_NS = 60_000_000_000
     MAX_AGE_NS = 180_000_000_000
     SMOOTH = 5  # trailing grid points in the factor-momentum mean
-    _pair_ids: List[int] = []
+    _pair_ids: list[int] = []
 
     def signals(self, data):
-        self._pair_ids = sorted(
-            i for i in self.universe(list(data)) if len(data[i])
-        )
+        self._pair_ids = sorted(i for i in self.universe(list(data)) if len(data[i]))
         return super().signals(data)
 
     def grid_signals(self, mat: np.ndarray) -> np.ndarray:

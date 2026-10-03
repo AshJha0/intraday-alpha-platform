@@ -49,14 +49,14 @@ def _side_sign(side: Side) -> float:
 
 
 def _check_finite(name: str, value: float) -> float:
-    if isinstance(value, bool) or not isinstance(value, (int, float)) \
-            or not math.isfinite(value):
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
         raise ValueError(f"attribute: {name} must be a finite number, got {value!r}")
     return float(value)
 
 
-def attribute(parent: ParentOrder, signal: AlphaSignal, tca: TCAResult,
-              realized_bps: float) -> Attribution:
+def attribute(
+    parent: ParentOrder, signal: AlphaSignal, tca: TCAResult, realized_bps: float
+) -> Attribution:
     """The pinned decomposition (module doc) for ``parent``.
 
     ``realized_bps`` is the measured P&L of the order in bps of traded
@@ -67,20 +67,28 @@ def attribute(parent: ParentOrder, signal: AlphaSignal, tca: TCAResult,
     signal and TCA result must belong to the order's instrument.
     """
     if signal.instrument_id != parent.instrument_id:
-        raise ValueError(f"attribute: signal instrument {signal.instrument_id} != "
-                         f"order instrument {parent.instrument_id}")
+        raise ValueError(
+            f"attribute: signal instrument {signal.instrument_id} != "
+            f"order instrument {parent.instrument_id}"
+        )
     if tca.parent_order_id != parent.parent_order_id:
-        raise ValueError(f"attribute: TCA parent order {tca.parent_order_id} != "
-                         f"order {parent.parent_order_id}")
+        raise ValueError(
+            f"attribute: TCA parent order {tca.parent_order_id} != order {parent.parent_order_id}"
+        )
     _check_finite("realized_bps", realized_bps)
     alpha = _side_sign(parent.side) * signal.expected_return * 1e4
     spread = -tca.spread_cost_bps
     impact = -tca.impact_bps
     fees = -tca.fees_bps
     timing = -tca.timing_cost_bps
-    return Attribution(alpha_bps=alpha, spread_bps=spread, impact_bps=impact,
-                       fees_bps=fees, timing_bps=timing,
-                       total_bps=alpha + spread + impact + fees + timing)
+    return Attribution(
+        alpha_bps=alpha,
+        spread_bps=spread,
+        impact_bps=impact,
+        fees_bps=fees,
+        timing_bps=timing,
+        total_bps=alpha + spread + impact + fees + timing,
+    )
 
 
 def residual_bps(attribution: Attribution, realized_bps: float) -> float:
@@ -89,9 +97,13 @@ def residual_bps(attribution: Attribution, realized_bps: float) -> float:
     return _check_finite("realized_bps", realized_bps) - attribution.total_bps
 
 
-def attribution_report(parent: ParentOrder, signal: AlphaSignal, tca: TCAResult,
-                       realized_bps: float) -> AttributionReport:
+def attribution_report(
+    parent: ParentOrder, signal: AlphaSignal, tca: TCAResult, realized_bps: float
+) -> AttributionReport:
     """:func:`attribute` plus the residual, reported side by side."""
     attribution = attribute(parent, signal, tca, realized_bps)
-    return AttributionReport(attribution=attribution, realized_bps=float(realized_bps),
-                             residual_bps=residual_bps(attribution, realized_bps))
+    return AttributionReport(
+        attribution=attribution,
+        realized_bps=float(realized_bps),
+        residual_bps=residual_bps(attribution, realized_bps),
+    )

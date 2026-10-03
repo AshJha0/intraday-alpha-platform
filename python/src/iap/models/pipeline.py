@@ -19,15 +19,15 @@ meta-labeling stage.
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 
 from iap.experiment.tracker import ExperimentTracker
 from iap.models.dataset import (
-    Dataset,
     TARGET_COLUMN,
     TARGET_HORIZON_NS,
+    Dataset,
     TrainScaler,
 )
 from iap.models.economics import signal_economics
@@ -80,7 +80,7 @@ def rank_ic(pred: np.ndarray, y: np.ndarray) -> float:
     )
 
 
-def ic_tstat(fold_ics: List[float]) -> float:
+def ic_tstat(fold_ics: list[float]) -> float:
     """t-statistic of the per-fold IC series (mean / stderr)."""
     if len(fold_ics) < 2:
         return 0.0
@@ -106,10 +106,10 @@ def _cost_estimate(ds: Dataset, idx: np.ndarray) -> np.ndarray:
 def _evaluate_model(
     name: str,
     ds: Dataset,
-    folds: List[Fold],
-) -> Dict[str, Any]:
+    folds: list[Fold],
+) -> dict[str, Any]:
     """Train/evaluate one model across all folds; returns metrics + preds."""
-    per_fold: List[Dict[str, float]] = []
+    per_fold: list[dict[str, float]] = []
     pooled_pred = np.full(len(ds), np.nan)
     final_model: Any = None
     for fold in folds:
@@ -123,29 +123,29 @@ def _evaluate_model(
         pooled_pred[fold.test_idx] = pred
         y_te = ds.y[fold.test_idx]
         ic_f = information_coefficient(pred, y_te)
-        per_fold.append({
-            "fold": fold.fold,
-            "n_train": int(len(fold.train_idx)),
-            "n_test": int(len(fold.test_idx)),
-            "train_window": [int(fold.train_window[0]), int(fold.train_window[1])],
-            "test_window": [int(fold.test_window[0]), int(fold.test_window[1])],
-            "train_asset_classes": _asset_classes(ds, fold.train_idx),
-            "test_asset_classes": _asset_classes(ds, fold.test_idx),
-            "ic": ic_f,
-            "rank_ic": rank_ic(pred, y_te),
-            "degenerate": bool(not np.isfinite(ic_f)),
-        })
+        per_fold.append(
+            {
+                "fold": fold.fold,
+                "n_train": int(len(fold.train_idx)),
+                "n_test": int(len(fold.test_idx)),
+                "train_window": [int(fold.train_window[0]), int(fold.train_window[1])],
+                "test_window": [int(fold.test_window[0]), int(fold.test_window[1])],
+                "train_asset_classes": _asset_classes(ds, fold.train_idx),
+                "test_asset_classes": _asset_classes(ds, fold.test_idx),
+                "ic": ic_f,
+                "rank_ic": rank_ic(pred, y_te),
+                "degenerate": bool(not np.isfinite(ic_f)),
+            }
+        )
         final_model = model  # last fold = largest purged train window
 
     oos_mask = np.isfinite(pooled_pred)
     idx = np.flatnonzero(oos_mask)
     cost_est = _cost_estimate(ds, idx)
-    econ = signal_economics(
-        pooled_pred[idx], ds.y_mid[idx], ds.y[idx], cost_est,
-        conservative=True)
+    econ = signal_economics(pooled_pred[idx], ds.y_mid[idx], ds.y[idx], cost_est, conservative=True)
     econ_exact = signal_economics(
-        pooled_pred[idx], ds.y_mid[idx], ds.y[idx], cost_est,
-        conservative=False)
+        pooled_pred[idx], ds.y_mid[idx], ds.y[idx], cost_est, conservative=False
+    )
     fold_ics = [f["ic"] for f in per_fold if np.isfinite(f["ic"])]
     rank_ics = [f["rank_ic"] for f in per_fold if np.isfinite(f["rank_ic"])]
     return {
@@ -154,7 +154,8 @@ def _evaluate_model(
         "n_folds": len(per_fold),
         "n_degenerate_folds": sum(1 for f in per_fold if f["degenerate"]),
         "asset_mix_warning": [
-            f["fold"] for f in per_fold
+            f["fold"]
+            for f in per_fold
             if set(f["test_asset_classes"]) - set(f["train_asset_classes"])
         ],
         "mean_ic": float(np.mean(fold_ics)) if fold_ics else float("nan"),
@@ -164,8 +165,7 @@ def _evaluate_model(
         # IC against the MID-TO-MID label: the honest directional-signal
         # measure — the cost-adjusted target contains an observable spread
         # component that inflates raw IC.
-        "pooled_ic_vs_mid": information_coefficient(
-            pooled_pred[idx], ds.y_mid[idx]),
+        "pooled_ic_vs_mid": information_coefficient(pooled_pred[idx], ds.y_mid[idx]),
         "economics": econ,
         "economics_label_exact": econ_exact,
         "_pooled_pred": pooled_pred,
@@ -175,29 +175,33 @@ def _evaluate_model(
 
 def run_model_comparison(
     ds: Dataset,
-    tracker: Optional[ExperimentTracker] = None,
+    tracker: ExperimentTracker | None = None,
     n_folds: int = 4,
     embargo_ns: int = 60_000_000_000,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Full gated comparison. Returns per-model metrics + gate record.
 
     When ``tracker`` is given, each trained model becomes a tracked run with
     manifest.json / metrics.json / model.pkl per spec §14/§26.
     """
     splitter = WalkForwardSplitter(
-        n_folds=n_folds, embargo_ns=embargo_ns,
-        label_horizon_ns=TARGET_HORIZON_NS)
+        n_folds=n_folds, embargo_ns=embargo_ns, label_horizon_ns=TARGET_HORIZON_NS
+    )
     folds = splitter.split(ds.ts)
 
     fold_records = [
-        {"fold": f.fold, "n_train": int(len(f.train_idx)),
-         "n_test": int(len(f.test_idx)),
-         "train_window": [int(f.train_window[0]), int(f.train_window[1])],
-         "test_window": [int(f.test_window[0]), int(f.test_window[1])]}
-        for f in folds]
-    results: Dict[str, Any] = {"models": {}, "folds": fold_records}
+        {
+            "fold": f.fold,
+            "n_train": int(len(f.train_idx)),
+            "n_test": int(len(f.test_idx)),
+            "train_window": [int(f.train_window[0]), int(f.train_window[1])],
+            "test_window": [int(f.test_window[0]), int(f.test_window[1])],
+        }
+        for f in folds
+    ]
+    results: dict[str, Any] = {"models": {}, "folds": fold_records}
 
-    def _track(res: Dict[str, Any]) -> None:
+    def _track(res: dict[str, Any]) -> None:
         if tracker is None:
             return
         name = res["model"]
@@ -209,17 +213,16 @@ def run_model_comparison(
             run_id,
             model_version=f"{name}_v1",
             hyperparams=dict(HYPERPARAMS.get(name, {})),
-            train_window={"start_ts": int(last.train_window[0]),
-                          "end_ts": int(last.train_window[1])},
-            test_window={"start_ts": int(last.test_window[0]),
-                         "end_ts": int(last.test_window[1])},
+            train_window={
+                "start_ts": int(last.train_window[0]),
+                "end_ts": int(last.train_window[1]),
+            },
+            test_window={"start_ts": int(last.test_window[0]), "end_ts": int(last.test_window[1])},
             features=list(ds.feature_names),
             target=TARGET_COLUMN,
             folds=fold_records,
         )
-        tracker.write_metrics(
-            run_id, {k: v for k, v in res.items()
-                     if not k.startswith("_")})
+        tracker.write_metrics(run_id, {k: v for k, v in res.items() if not k.startswith("_")})
         tracker.save_model(run_id, res["_final_model"])
         res["run_id"] = run_id
 
@@ -233,18 +236,17 @@ def run_model_comparison(
     # OOS IC against the MID-TO-MID label.  The cost-adjusted target embeds
     # the observable half-spread (corr(spread, target) ~ -0.94), so gating on
     # it passed trivially — it measured spread, not direction (round-3).
-    tier0_ics = {
-        n: results["models"][n]["pooled_ic_vs_mid"] for n in model_names(0)
-    }
+    tier0_ics = {n: results["models"][n]["pooled_ic_vs_mid"] for n in model_names(0)}
     best_linear = max(
-        tier0_ics, key=lambda n: (tier0_ics[n] if np.isfinite(tier0_ics[n])
-                                  else -np.inf))
-    gate_passed = bool(np.isfinite(tier0_ics[best_linear])
-                       and tier0_ics[best_linear] > 0.0)
+        tier0_ics, key=lambda n: tier0_ics[n] if np.isfinite(tier0_ics[n]) else -np.inf
+    )
+    gate_passed = bool(np.isfinite(tier0_ics[best_linear]) and tier0_ics[best_linear] > 0.0)
     results["gate"] = {
-        "rule": ("advanced models run only if the best linear pooled OOS IC "
-                 "vs the MID-TO-MID label is > 0 (the cost-adjusted target "
-                 "embeds the observable half-spread)"),
+        "rule": (
+            "advanced models run only if the best linear pooled OOS IC "
+            "vs the MID-TO-MID label is > 0 (the cost-adjusted target "
+            "embeds the observable half-spread)"
+        ),
         "best_linear_model": best_linear,
         "best_linear_pooled_ic_vs_mid": tier0_ics[best_linear],
         "best_linear_mean_oos_ic": results["models"][best_linear]["mean_ic"],
@@ -253,7 +255,7 @@ def run_model_comparison(
     }
 
     # ---- Tier 1 + 2: only behind the gate
-    skipped: List[str] = []
+    skipped: list[str] = []
     for tier in (1, 2):
         for name in model_names(tier):
             if not gate_passed:

@@ -13,10 +13,8 @@ from __future__ import annotations
 import copy
 import json
 import math
-from typing import Dict, List
 
 import pytest
-
 from iap.core.rng import SplitMix64
 from iap.reference.refdata import ReferenceData
 from iap.risk import (
@@ -58,7 +56,7 @@ def config(config_doc: dict) -> dict:
     return copy.deepcopy(config_doc)
 
 
-def ticks() -> Dict[int, float]:
+def ticks() -> dict[int, float]:
     return {1: 0.01, 2: 0.01}
 
 
@@ -70,7 +68,7 @@ def engine(cfg: dict) -> RiskEngine:
     return eng
 
 
-def fx_refs() -> Dict[int, InstrumentRef]:
+def fx_refs() -> dict[int, InstrumentRef]:
     """Instruments 1/2 (USD equities) plus USD/JPY (103, qty_unit 1000,
     JPY) and EUR/GBP (108, GBP) with GBP/USD (102) as the GBP pair."""
     return {
@@ -89,27 +87,44 @@ def fx_engine(cfg: dict) -> RiskEngine:
     return eng
 
 
-def typed(oid: int, iid: int, side: int, qty: int, price: int, ot: OrderType,
-          ts: int, strategy: str = "S1", venue: int = 1) -> OrderRequest:
+def typed(
+    oid: int,
+    iid: int,
+    side: int,
+    qty: int,
+    price: int,
+    ot: OrderType,
+    ts: int,
+    strategy: str = "S1",
+    venue: int = 1,
+) -> OrderRequest:
     return OrderRequest(oid, iid, side, qty, price, int(ot), venue, strategy, 0.5, ts)
 
 
 def order(oid: int, side: int, qty: int, price: int, **kw) -> OrderRequest:
     fields = dict(
-        order_id=oid, instrument_id=1, side=side, qty=qty, price_ticks=price,
+        order_id=oid,
+        instrument_id=1,
+        side=side,
+        qty=qty,
+        price_ticks=price,
         order_type=int(OrderType.LIMIT if price > 0 else OrderType.MARKET),
-        venue_id=1, strategy_id="S1", urgency=0.5, timestamp=T0 + 100_000_000,
+        venue_id=1,
+        strategy_id="S1",
+        urgency=0.5,
+        timestamp=T0 + 100_000_000,
     )
     fields.update(kw)
     return OrderRequest(**fields)
 
 
-def fill(strategy: str, iid: int, side: int, qty: int, price: int,
-         ts: int = T0 + NS, order_id: int = 0) -> Fill:
+def fill(
+    strategy: str, iid: int, side: int, qty: int, price: int, ts: int = T0 + NS, order_id: int = 0
+) -> Fill:
     return Fill(ts, strategy, iid, order_id, side, qty, price)
 
 
-def kills(eng: RiskEngine) -> List[str]:
+def kills(eng: RiskEngine) -> list[str]:
     return [e.rule_id for e in eng.audit() if e.decision == int(Decision.KILL)]
 
 
@@ -136,7 +151,10 @@ def test_missing_limit_fails_closed(config_doc):
     assert d.severity == Severity.BREACH
     assert "max_order_qty" in d.reason
     # the reason carries the Rust error rendering
-    assert d.reason == "fail-closed: invalid argument: risk.json: missing/non-integer per_order.max_order_qty"
+    assert (
+        d.reason
+        == "fail-closed: invalid argument: risk.json: missing/non-integer per_order.max_order_qty"
+    )
     # and it stays closed for every order
     assert eng.check_order(order(2, 1, 1, 2452)).rule_id == Rules.CONFIG_MISSING
     # overrides are refused on a fail-closed engine
@@ -153,17 +171,25 @@ def test_invalid_config_value_fails_closed(config_doc):
     assert d.reason.endswith("global.max_daily_loss must be > 0, got 0")
     doc = config(config_doc)
     doc["global"]["max_daily_loss"] = -5.0
-    assert RiskEngine.from_config_ticks(doc, ticks()).check_order(
-        order(1, 0, 100, 2450)).rule_id == Rules.CONFIG_MISSING
+    assert (
+        RiskEngine.from_config_ticks(doc, ticks()).check_order(order(1, 0, 100, 2450)).rule_id
+        == Rules.CONFIG_MISSING
+    )
     doc = config(config_doc)
     doc["per_order"]["max_order_qty"] = "many"
-    assert RiskEngine.from_config_ticks(doc, ticks()).check_order(
-        order(1, 0, 100, 2450)).rule_id == Rules.CONFIG_MISSING
+    assert (
+        RiskEngine.from_config_ticks(doc, ticks()).check_order(order(1, 0, 100, 2450)).rule_id
+        == Rules.CONFIG_MISSING
+    )
     # an entirely empty document, and a non-object
-    assert RiskEngine.from_config_ticks({}, ticks()).check_order(
-        order(1, 0, 100, 2450)).rule_id == Rules.CONFIG_MISSING
-    assert RiskEngine.from_config_ticks([], ticks()).check_order(
-        order(1, 0, 100, 2450)).rule_id == Rules.CONFIG_MISSING
+    assert (
+        RiskEngine.from_config_ticks({}, ticks()).check_order(order(1, 0, 100, 2450)).rule_id
+        == Rules.CONFIG_MISSING
+    )
+    assert (
+        RiskEngine.from_config_ticks([], ticks()).check_order(order(1, 0, 100, 2450)).rule_id
+        == Rules.CONFIG_MISSING
+    )
 
 
 def test_config_kill_switch_engaged_starts_killed(config_doc):
@@ -352,22 +378,35 @@ def test_malformed_orders_reject(config_doc):
     assert d.reason == "qty must be > 0: 0"
     assert d.severity == Severity.WARN
     assert eng.check_order(order(2, 3, 100, 2450)).reason == "side must be 0 or 1: 3"
-    assert eng.check_order(order(3, 0, 100, 0, order_type=int(OrderType.LIMIT))).reason \
+    assert (
+        eng.check_order(order(3, 0, 100, 0, order_type=int(OrderType.LIMIT))).reason
         == "LIMIT order needs price_ticks > 0: 0"
-    assert eng.check_order(order(4, 0, 100, 2450, urgency=2.0)).reason \
+    )
+    assert (
+        eng.check_order(order(4, 0, 100, 2450, urgency=2.0)).reason
         == "urgency must be in [0, 1]: 2"
-    assert eng.check_order(order(5, 0, 10, 2450, order_type=9)).reason \
-        == "unknown order_type: 9"
-    assert eng.check_order(order(6, 0, 10, 2450, order_type=int(OrderType.MARKET))).reason \
+    )
+    assert eng.check_order(order(5, 0, 10, 2450, order_type=9)).reason == "unknown order_type: 9"
+    assert (
+        eng.check_order(order(6, 0, 10, 2450, order_type=int(OrderType.MARKET))).reason
         == "MARKET order must carry price_ticks 0: 2450"
-    assert eng.check_order(order(7, 0, 10, -1, order_type=int(OrderType.IOC))).reason \
+    )
+    assert (
+        eng.check_order(order(7, 0, 10, -1, order_type=int(OrderType.IOC))).reason
         == "price_ticks must be >= 0: -1"
-    assert eng.check_order(order(8, 0, 10, 5, order_type=int(OrderType.PEG))).reason \
+    )
+    assert (
+        eng.check_order(order(8, 0, 10, 5, order_type=int(OrderType.PEG))).reason
         == "PEG/MID orders carry price_ticks 0: 5"
-    assert eng.check_order(order(9, 0, 10, 2450, urgency=float("nan"))).reason \
+    )
+    assert (
+        eng.check_order(order(9, 0, 10, 2450, urgency=float("nan"))).reason
         == "urgency must be in [0, 1]: NaN"
-    assert eng.check_order(order(10, 0, 10, 2450, urgency=1.5)).reason \
+    )
+    assert (
+        eng.check_order(order(10, 0, 10, 2450, urgency=1.5)).reason
         == "urgency must be in [0, 1]: 1.5"
+    )
     # the schema check is side, type, qty, urgency, price — in that order
     assert order_validation_error(order(11, 5, 0, 0, order_type=0)) == "side must be 0 or 1: 5"
     assert order_validation_error(order(12, 0, 0, 0, order_type=0)) == "unknown order_type: 0"
@@ -415,7 +454,9 @@ def test_duplicate_order_id_rejects_even_after_reject(config_doc):
     assert eng.check_order(order(8, 0, 0, 2450)).rule_id == Rules.MALFORMED_ORDER
     # ... but only ids that reached the duplicate check are recorded:
     # order 8 failed schema validation BEFORE registration
-    assert eng.check_order(order(8, 0, 100, 2450)).allowed(), "id of a malformed order was not consumed"
+    assert eng.check_order(order(8, 0, 100, 2450)).allowed(), (
+        "id of a malformed order was not consumed"
+    )
     assert eng.check_order(order(8, 0, 100, 2450)).rule_id == Rules.DUPLICATE_ORDER_ID
     # a rejection AFTER registration (venue down) still consumes the id
     eng.on_venue_disconnect(1, T0)
@@ -468,7 +509,12 @@ def test_sequence_gap_gates_until_recovery(config_doc):
     eng.on_sequence_gap(2, T0)
     eng.on_sequence_gap(7, T0)
     assert eng.snapshot()["market"]["7"] == {
-        "bid_ticks": 0, "ask_ticks": 0, "ts": T0, "gaps": 1, "gated": True}
+        "bid_ticks": 0,
+        "ask_ticks": 0,
+        "ts": T0,
+        "gaps": 1,
+        "gated": True,
+    }
     eng.on_feed_recovered(8, T0)  # unknown instrument: no-op
     assert "8" not in eng.snapshot()["market"]
 
@@ -525,8 +571,7 @@ def test_venue_disconnect_rejects_until_reconnect(config_doc):
     # while every known venue is down
     assert eng.check_order(order(2, 0, 100, 2450, venue_id=2)).allowed()
     eng.on_order_done(2)
-    assert eng.check_order(order(4, 0, 100, 2450, venue_id=0)).rule_id \
-        == Rules.VENUE_DISCONNECTED
+    assert eng.check_order(order(4, 0, 100, 2450, venue_id=0)).rule_id == Rules.VENUE_DISCONNECTED
     eng.on_venue_reconnect(1, T0 + NS)
     assert eng.check_order(order(3, 0, 100, 2450)).allowed()
     ids = [e.rule_id for e in eng.audit()]
@@ -586,11 +631,14 @@ def test_throttle_is_an_event_time_token_bucket(config_doc):
     assert d.reason == "strategy S1 exceeded 500.00 orders/s (burst 4.00)"
     # 2ms of event time refills exactly one token at 500/s
     assert eng.check_order(order(15, 0, 10, 0, timestamp=base + 2_000_000)).allowed()
-    assert eng.check_order(order(16, 0, 10, 0, timestamp=base + 2_000_000)).rule_id \
+    assert (
+        eng.check_order(order(16, 0, 10, 0, timestamp=base + 2_000_000)).rule_id
         == Rules.RATE_THROTTLE
+    )
     # buckets are per strategy
-    assert eng.check_order(order(17, 0, 10, 0, timestamp=base + 2_000_000,
-                                 strategy_id="S2")).allowed()
+    assert eng.check_order(
+        order(17, 0, 10, 0, timestamp=base + 2_000_000, strategy_id="S2")
+    ).allowed()
     # a rejected order that reached check 15 consumed a token
     eng2 = engine(config_doc)
     for i in range(3):
@@ -606,8 +654,10 @@ def test_throttle_never_refills_backwards_in_time(config_doc):
     for i in range(4):
         assert eng.check_order(order(10 + i, 0, 10, 0, timestamp=base + i)).allowed()
     # an out-of-order earlier timestamp must not mint tokens
-    assert eng.check_order(order(20, 0, 10, 0, timestamp=base - 10 * NS)).rule_id \
+    assert (
+        eng.check_order(order(20, 0, 10, 0, timestamp=base - 10 * NS)).rule_id
         == Rules.RATE_THROTTLE
+    )
 
 
 def test_risk_throttle_regression_then_forward(config_doc):
@@ -618,10 +668,13 @@ def test_risk_throttle_regression_then_forward(config_doc):
     base = T0 + 100_000_000
     for i in range(4):
         assert eng.check_order(order(10 + i, 0, 10, 0, timestamp=base + i)).allowed()
-    assert eng.check_order(order(20, 0, 10, 0, timestamp=base - 10 * NS)).rule_id \
-        == Rules.RATE_THROTTLE  # thread B, clock behind
-    assert eng.check_order(order(21, 0, 10, 0, timestamp=base + 3)).rule_id \
-        == Rules.RATE_THROTTLE  # thread A, in order: no time has elapsed
+    assert (
+        eng.check_order(order(20, 0, 10, 0, timestamp=base - 10 * NS)).rule_id
+        == Rules.RATE_THROTTLE
+    )  # thread B, clock behind
+    assert (
+        eng.check_order(order(21, 0, 10, 0, timestamp=base + 3)).rule_id == Rules.RATE_THROTTLE
+    )  # thread A, in order: no time has elapsed
     assert eng.snapshot()["buckets"]["S1"]["last_ts"] == base + 3
     # and only real elapsed event time refills (2ms = one token at 500/s)
     assert eng.check_order(order(22, 0, 10, 0, timestamp=base + 2_000_003)).allowed()
@@ -720,8 +773,9 @@ def test_fills_release_resting_orders_for_self_match(config_doc):
 def test_self_match_is_firm_wide_across_strategies_and_venues(config_doc):
     eng = engine(config_doc)
     assert eng.check_order(order(1, 0, 100, 2450)).allowed()  # S1 bid @ 2450 on venue 1
-    d = eng.check_order(order(2, 1, 50, 2450, strategy_id="S2", venue_id=2,
-                              timestamp=T0 + 110_000_000))
+    d = eng.check_order(
+        order(2, 1, 50, 2450, strategy_id="S2", venue_id=2, timestamp=T0 + 110_000_000)
+    )
     assert d.rule_id == Rules.SELF_MATCH
 
 
@@ -815,8 +869,11 @@ def test_strategy_loss_limit_kills_the_strategy(config_doc):
     eng.on_fill(fill("S1", 1, 0, 95_000, 2452))  # avg 24.52
     eng.on_fill(fill("S1", 1, 1, 95_000, 2398))  # realized -51,300
     assert abs(eng.strategy_pnl("S1") - -51_300.0) < 1e-6
-    latch = [e for e in eng.audit() if e.rule_id == Rules.STRATEGY_LOSS
-             and e.decision == int(Decision.KILL)]
+    latch = [
+        e
+        for e in eng.audit()
+        if e.rule_id == Rules.STRATEGY_LOSS and e.decision == int(Decision.KILL)
+    ]
     assert len(latch) == 1
     assert latch[0].reason == "strategy daily pnl -51300.00 breaches loss limit 50000.00"
     assert latch[0].severity == int(Severity.BREACH)
@@ -854,8 +911,11 @@ def test_loss_limits_latch_on_unrealized_at_the_fill(config_doc):
     assert eng.unrealized_pnl() == 0.0
     assert eng.metrics.gauge_value("risk_daily_pnl") == eng.global_daily_pnl()
     assert eng.metrics.gauge_value("risk_realized_pnl") == eng.realized_pnl()
-    expect(eng, order(2, 0, 10, 3120, instrument_id=2, strategy_id="S3", timestamp=T0 + 6),
-           Rules.KILL_GLOBAL)
+    expect(
+        eng,
+        order(2, 0, 10, 3120, instrument_id=2, strategy_id="S3", timestamp=T0 + 6),
+        Rules.KILL_GLOBAL,
+    )
 
 
 def test_avg_cost_pnl_accounting_is_pinned(config_doc):
@@ -872,7 +932,8 @@ def test_avg_cost_pnl_accounting_is_pinned(config_doc):
     assert abs(eng.strategy_pnl("S1") - 25.0) < 1e-9
     assert eng.position(1) == -50
     assert eng.snapshot()["lots"] == [
-        {"strategy_id": "S1", "instrument_id": 1, "pos": -50, "avg_price": 24.0}]
+        {"strategy_id": "S1", "instrument_id": 1, "pos": -50, "avg_price": 24.0}
+    ]
     # buy 50 @ 23.00 closes the short: +50 * (24-23) = +50
     eng.on_fill(fill("S1", 1, 0, 50, 2300))
     assert abs(eng.strategy_pnl("S1") - 75.0) < 1e-9
@@ -912,28 +973,55 @@ def test_every_decision_is_audited_and_deterministic(config_doc):
     for line in log1.splitlines():
         ev = RiskEvent.from_json_line(line)
         assert ev.to_json_line() == line
-        assert set(ev.to_dict()) == {"timestamp", "scope", "scope_id", "rule_id",
-                                     "severity", "decision", "reason"}
+        assert set(ev.to_dict()) == {
+            "timestamp",
+            "scope",
+            "scope_id",
+            "rule_id",
+            "severity",
+            "decision",
+            "reason",
+        }
 
 
 def test_risk_event_json_line_round_trips_with_schema_keys():
-    ev = RiskEvent(42, Scope.INSTRUMENT, "1", Rules.PRICE_BAND, Severity.WARN,
-                   Decision.REJECT, "price 30 vs mid 24.51")
+    ev = RiskEvent(
+        42,
+        Scope.INSTRUMENT,
+        "1",
+        Rules.PRICE_BAND,
+        Severity.WARN,
+        Decision.REJECT,
+        "price 30 vs mid 24.51",
+    )
     line = ev.to_json_line()
-    assert list(json.loads(line)) == ["decision", "reason", "rule_id", "scope",
-                                      "scope_id", "severity", "timestamp"]
-    assert line == ('{"decision":2,"reason":"price 30 vs mid 24.51","rule_id":"PRICE_BAND",'
-                    '"scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":42}')
+    assert list(json.loads(line)) == [
+        "decision",
+        "reason",
+        "rule_id",
+        "scope",
+        "scope_id",
+        "severity",
+        "timestamp",
+    ]
+    assert line == (
+        '{"decision":2,"reason":"price 30 vs mid 24.51","rule_id":"PRICE_BAND",'
+        '"scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":42}'
+    )
     assert RiskEvent.from_json_line(line) == ev
     assert to_canonical_json(ev.to_dict()) == line
 
 
 def test_risk_event_bad_lines_are_rejected():
-    for bad in ("{}", "not json", "[]",
-                '{"timestamp":1,"scope":"PLANET","scope_id":"","rule_id":"X","severity":1,"decision":1,"reason":""}',
-                '{"timestamp":1,"scope":"GLOBAL","scope_id":"","rule_id":"X","severity":9,"decision":1,"reason":""}',
-                '{"timestamp":1.5,"scope":"GLOBAL","scope_id":"","rule_id":"X","severity":1,"decision":1,"reason":""}',
-                '{"timestamp":1,"scope":"GLOBAL","scope_id":"","rule_id":"X","severity":1,"decision":1,"reason":7}'):
+    for bad in (
+        "{}",
+        "not json",
+        "[]",
+        '{"timestamp":1,"scope":"PLANET","scope_id":"","rule_id":"X","severity":1,"decision":1,"reason":""}',
+        '{"timestamp":1,"scope":"GLOBAL","scope_id":"","rule_id":"X","severity":9,"decision":1,"reason":""}',
+        '{"timestamp":1.5,"scope":"GLOBAL","scope_id":"","rule_id":"X","severity":1,"decision":1,"reason":""}',
+        '{"timestamp":1,"scope":"GLOBAL","scope_id":"","rule_id":"X","severity":1,"decision":1,"reason":7}',
+    ):
         with pytest.raises(ValueError):
             RiskEvent.from_json_line(bad)
     # serde's derived deserializer ignores unknown fields
@@ -948,12 +1036,14 @@ def test_risk_event_bad_lines_are_rejected():
 
 
 def test_risk_event_json_escapes_like_serde_json():
-    ev = RiskEvent(7, Scope.GLOBAL, "", Rules.KILL_SWITCH_ENGAGED, 3, 3,
-                   "a\bb\fc\nd\re\tf\u0001g\"h\\i\u007fé")
+    ev = RiskEvent(
+        7, Scope.GLOBAL, "", Rules.KILL_SWITCH_ENGAGED, 3, 3, 'a\bb\fc\nd\re\tf\u0001g"h\\i\u007fé'
+    )
     assert ev.to_json_line() == (
         '{"decision":3,"reason":"a\\bb\\fc\\nd\\re\\tf\\u0001g\\"h\\\\i\u007fé",'
         '"rule_id":"KILL_SWITCH_ENGAGED","scope":"GLOBAL","scope_id":"",'
-        '"severity":3,"timestamp":7}')
+        '"severity":3,"timestamp":7}'
+    )
     assert RiskEvent.from_json_line(ev.to_json_line()) == ev
 
 
@@ -994,7 +1084,8 @@ def test_canonical_json_matches_serde_json():
     assert to_canonical_json(doc) == '{"a":{},"b":[],"c":[1,{"x":2.0}],"n":null,"t":true}'
     assert to_canonical_json(doc, pretty=True) == (
         '{\n  "a": {},\n  "b": [],\n  "c": [\n    1,\n    {\n      "x": 2.0\n    }\n  ],'
-        '\n  "n": null,\n  "t": true\n}')
+        '\n  "n": null,\n  "t": true\n}'
+    )
     with pytest.raises(ValueError):
         to_canonical_json({1: 2})
     with pytest.raises(ValueError):
@@ -1013,8 +1104,12 @@ def test_metrics_count_decisions(config_doc):
     assert eng.metrics.gauge_value("never_set") is None
     assert eng.metrics.gauge_value("risk_kill_switch_engaged") == 0.0
     assert list(eng.metrics.counters()) == sorted(eng.metrics.counters())
-    assert set(eng.metrics.gauges()) == {"risk_kill_switch_engaged", "risk_realized_pnl",
-                                         "risk_unrealized_pnl", "risk_daily_pnl"}
+    assert set(eng.metrics.gauges()) == {
+        "risk_kill_switch_engaged",
+        "risk_realized_pnl",
+        "risk_unrealized_pnl",
+        "risk_daily_pnl",
+    }
 
 
 # ------------------------------------------------ round-3 scenario tests
@@ -1163,12 +1258,18 @@ def test_risk_inflight_market_orders_count_in_projection(config_doc):
     assert "105000" in d.reason
     assert eng.open_order_count() == 2
     # IOC / FOK / MID are tracked the same way
-    assert eng.check_order(typed(4, 1, 0, 5_000, 0, OrderType.IOC, t + 30_000_000)).rule_id \
+    assert (
+        eng.check_order(typed(4, 1, 0, 5_000, 0, OrderType.IOC, t + 30_000_000)).rule_id
         == Rules.POSITION_LIMIT
-    assert eng.check_order(typed(6, 1, 0, 5_000, 0, OrderType.FOK, t + 40_000_000)).rule_id \
+    )
+    assert (
+        eng.check_order(typed(6, 1, 0, 5_000, 0, OrderType.FOK, t + 40_000_000)).rule_id
         == Rules.POSITION_LIMIT
-    assert eng.check_order(typed(7, 1, 0, 5_000, 0, OrderType.MID, t + 50_000_000)).rule_id \
+    )
+    assert (
+        eng.check_order(typed(7, 1, 0, 5_000, 0, OrderType.MID, t + 50_000_000)).rule_id
         == Rules.POSITION_LIMIT
+    )
     # fill of the first (order_id 1) releases it; the second is done at the venue
     eng.on_fill(Fill(t + 60_000_000, "S1", 1, 1, 0, 5_000, 2000))
     assert eng.open_order_count() == 1
@@ -1194,8 +1295,10 @@ def test_risk_peg_orders_tracked_for_self_match_and_projection(config_doc):
     assert eng.snapshot()["open"]["3"]["price_ticks"] == 2005
     # PEG qty counts in open_same: 99,900 + 100 pegged + 100 = 100,100
     eng.on_fill(fill("S1", 1, 0, 99_900, 2000))
-    assert eng.check_order(typed(4, 1, 0, 100, 1999, OrderType.LIMIT, t + 30_000_000)).rule_id \
+    assert (
+        eng.check_order(typed(4, 1, 0, 100, 1999, OrderType.LIMIT, t + 30_000_000)).rule_id
         == Rules.POSITION_LIMIT
+    )
     eng.on_order_done(1)
     assert eng.check_order(typed(5, 1, 0, 100, 1999, OrderType.LIMIT, t + 40_000_000)).allowed()
     # a PEG sell pegs to the ask; a PEG in an unmarked instrument is unpriced
@@ -1215,19 +1318,29 @@ def test_risk_gross_includes_resting_orders(config_doc):
     # (alternating sides so net stays flat)
     for i in range(40):
         side = 0 if i % 2 == 0 else 1
-        o = typed(i + 1, i + 1, side, 4_000, 3000, OrderType.LIMIT, t + i * 10_000_000,
-                  strategy=f"S{i % 4}")
+        o = typed(
+            i + 1,
+            i + 1,
+            side,
+            4_000,
+            3000,
+            OrderType.LIMIT,
+            t + i * 10_000_000,
+            strategy=f"S{i % 4}",
+        )
         assert eng.check_order(o).allowed(), f"resting order {i}"
     assert eng.open_order_count() == 40
     # 41st: 4.8M open + 240k = 5.04M > 5M gross while no position exists
-    d = eng.check_order(typed(41, 41, 0, 8_000, 3000, OrderType.LIMIT, t + 400_000_000,
-                              strategy="S0"))
+    d = eng.check_order(
+        typed(41, 41, 0, 8_000, 3000, OrderType.LIMIT, t + 400_000_000, strategy="S0")
+    )
     assert d.rule_id == Rules.GROSS_NOTIONAL, d.reason
     assert d.reason == "projected gross notional 5040000.00 exceeds max_gross_notional 5000000.00"
     # cancelling one frees the room
     eng.on_order_done(1)
-    assert eng.check_order(typed(42, 41, 0, 3_000, 3000, OrderType.LIMIT, t + 410_000_000,
-                                 strategy="S0")).allowed()
+    assert eng.check_order(
+        typed(42, 41, 0, 3_000, 3000, OrderType.LIMIT, t + 410_000_000, strategy="S0")
+    ).allowed()
 
 
 def test_risk_clear_kill_after_loss_latch_resumes_with_override(config_doc):
@@ -1248,8 +1361,11 @@ def test_risk_clear_kill_after_loss_latch_resumes_with_override(config_doc):
     # the next mark of a held instrument re-latches (no fill needed)
     eng.on_market(1, 2450, 2452, T0 + 3 * NS)
     assert eng.check_order(order(3, 0, 100, 2450)).rule_id == Rules.KILL_STRATEGY
-    n_latches = sum(1 for e in eng.audit() if e.rule_id == Rules.STRATEGY_LOSS
-                    and e.decision == int(Decision.KILL))
+    n_latches = sum(
+        1
+        for e in eng.audit()
+        if e.rule_id == Rules.STRATEGY_LOSS and e.decision == int(Decision.KILL)
+    )
     assert n_latches == 2
     # override below the loss is legal but ineffective
     eng.override_loss_limit(Scope.STRATEGY, "S1", 51_000.0, T0 + 4 * NS, "cro")
@@ -1278,10 +1394,15 @@ def test_risk_clear_kill_after_loss_latch_resumes_with_override(config_doc):
     assert eng.snapshot()["loss_override_strategy"] == {"S1": 75000.0}
     # invalid overrides are refused without side effects
     before = eng.snapshot_json()
-    for bad in ((Scope.STRATEGY, "S1", -1.0), (Scope.INSTRUMENT, "1", 10.0),
-                (Scope.GLOBAL, "", float("nan")), (Scope.VENUE, "1", 10.0),
-                (Scope.GLOBAL, "", float("inf")), (Scope.GLOBAL, "", 0.0),
-                (Scope.GLOBAL, "", True)):
+    for bad in (
+        (Scope.STRATEGY, "S1", -1.0),
+        (Scope.INSTRUMENT, "1", 10.0),
+        (Scope.GLOBAL, "", float("nan")),
+        (Scope.VENUE, "1", 10.0),
+        (Scope.GLOBAL, "", float("inf")),
+        (Scope.GLOBAL, "", 0.0),
+        (Scope.GLOBAL, "", True),
+    ):
         with pytest.raises(ValueError):
             eng.override_loss_limit(bad[0], bad[1], bad[2], T0, "x")  # type: ignore[arg-type]
     assert eng.snapshot_json() == before
@@ -1326,8 +1447,12 @@ def test_scenario_session_roll_rebases_daily_pnl_and_keeps_latches(config_doc):
     assert eng.position(1) == 95_000, "positions survive the roll"
     snap = eng.snapshot()
     assert snap["realized"] == [] and snap["loss_override_global"] is None
-    assert snap["lots"][0] == {"strategy_id": "S1", "instrument_id": 1, "pos": 95_000,
-                               "avg_price": 24.51}
+    assert snap["lots"][0] == {
+        "strategy_id": "S1",
+        "instrument_id": 1,
+        "pos": 95_000,
+        "avg_price": 24.51,
+    }
     assert eng.check_order(order(1, 0, 100, 2450, strategy_id="S2")).rule_id == Rules.KILL_STRATEGY
     # the override is gone: a 300k loss on the new day latches at 250k
     eng.on_market(1, 2099, 2101, T0 + 2 * NS)  # 95k * (21.00 - 24.51) = -333,450
@@ -1347,7 +1472,7 @@ def test_risk_snapshot_restore_roundtrip(config_doc):
     decisions and audit lines to the unbroken run; a fresh engine that
     requires a bootstrap rejects everything until positions arrive."""
 
-    def script(eng: RiskEngine, start: int, n: int) -> List[str]:
+    def script(eng: RiskEngine, start: int, n: int) -> list[str]:
         lines = []
         for k in range(start, start + n):
             t = T0 + 100_000_000 + k * 20_000_000
@@ -1360,8 +1485,17 @@ def test_risk_snapshot_restore_roundtrip(config_doc):
             d = eng.check_order(o)
             lines.append(f"{o.order_id}:{d.rule_id}")
             if k % 4 == 0:
-                eng.on_fill(Fill(t, o.strategy_id, o.instrument_id, o.order_id, side, 50,
-                                 2451 if o.instrument_id == 1 else 3120))
+                eng.on_fill(
+                    Fill(
+                        t,
+                        o.strategy_id,
+                        o.instrument_id,
+                        o.order_id,
+                        side,
+                        50,
+                        2451 if o.instrument_id == 1 else 3120,
+                    )
+                )
             if k % 7 == 0:
                 eng.on_order_done(o.order_id)
             if k % 9 == 0:
@@ -1383,7 +1517,7 @@ def test_risk_snapshot_restore_roundtrip(config_doc):
     assert len(first) == 30
     full_lines = unbroken.audit_jsonl().splitlines()
     tail = restored.audit_jsonl().splitlines()[1:]
-    assert full_lines[len(full_lines) - len(tail):] == tail
+    assert full_lines[len(full_lines) - len(tail) :] == tail
     assert restored.snapshot() == unbroken.snapshot()
     assert restored.snapshot_json() == unbroken.snapshot_json()
     # a malformed snapshot is refused as a whole
@@ -1405,7 +1539,8 @@ def test_risk_snapshot_restore_roundtrip(config_doc):
     assert d.reason == "positions not bootstrapped (fail-closed)"
     assert fresh.snapshot()["bootstrapped"] is False
     bad_count = fresh.bootstrap_positions(
-        [fill("S1", 1, 0, 95_000, 2452), fill("S1", 999, 0, 1, 1)], T0 + NS)
+        [fill("S1", 1, 0, 95_000, 2452), fill("S1", 999, 0, 1, 1)], T0 + NS
+    )
     assert bad_count == 1
     assert fresh.is_bootstrapped()
     assert fresh.position(1) == 95_000
@@ -1413,7 +1548,9 @@ def test_risk_snapshot_restore_roundtrip(config_doc):
     boot = next(e for e in fresh.audit() if e.rule_id == Rules.BOOTSTRAP_COMPLETE)
     assert boot.reason == "bootstrapped from 2 drop-copy fills (1 rejected)"
     # a restore of a not-bootstrapped snapshot keeps the gate closed
-    gated = RiskEngine.restore(limits, equity_refs(ticks()), engine_snapshot_unbootstrapped(config_doc), T0)
+    gated = RiskEngine.restore(
+        limits, equity_refs(ticks()), engine_snapshot_unbootstrapped(config_doc), T0
+    )
     assert gated.check_order(order(1, 0, 100, 2450)).rule_id == Rules.NOT_BOOTSTRAPPED
 
 
@@ -1476,7 +1613,9 @@ def test_restore_is_strict_field_by_field(config_doc):
     # the good snapshot restores everything, including the gauges
     restored = RiskEngine.restore(limits, refs, snap, T0 + 1)
     assert restored.snapshot() == snap
-    assert restored.metrics.gauge_value("risk_daily_pnl") == eng.metrics.gauge_value("risk_daily_pnl")
+    assert restored.metrics.gauge_value("risk_daily_pnl") == eng.metrics.gauge_value(
+        "risk_daily_pnl"
+    )
     assert restored.audit()[0].reason == "restored snapshot v1: 1 positions, 1 open orders"
     # a restored snapshot with a latched global switch stays latched
     eng.engage_kill(Scope.GLOBAL, "", T0, "x")
@@ -1501,9 +1640,13 @@ def test_malformed_fills_are_audited_and_dropped(config_doc):
         "fill for order 0 rejected: price_ticks must be > 0: 0",
         "fill for order 0 rejected: no reference data for instrument 999",
     ]
-    assert all(e.scope == Scope.STRATEGY and e.scope_id == "S1"
-               and e.severity == int(Severity.WARN) and e.decision == int(Decision.REJECT)
-               for e in bad)
+    assert all(
+        e.scope == Scope.STRATEGY
+        and e.scope_id == "S1"
+        and e.severity == int(Severity.WARN)
+        and e.decision == int(Decision.REJECT)
+        for e in bad
+    )
     assert eng.on_fill(fill("S1", 1, 0, 100, 2452))
     assert eng.position(1) == 100
     # a malformed fill through the bootstrap path is counted as rejected
@@ -1518,8 +1661,10 @@ def test_duplicate_window_expires_and_prunes(config_doc):
     eng.on_market(1, 2450, 2452, T0)
     assert eng.check_order(order(7, 0, 100, 2450, timestamp=T0)).allowed()
     # inside the window (<=)
-    assert eng.check_order(order(7, 0, 100, 2450, timestamp=T0 + NS)).rule_id \
+    assert (
+        eng.check_order(order(7, 0, 100, 2450, timestamp=T0 + NS)).rule_id
         == Rules.DUPLICATE_ORDER_ID
+    )
     # expired
     assert eng.check_order(order(7, 0, 100, 2450, timestamp=T0 + NS + 1)).allowed()
     snap = eng.snapshot()
@@ -1550,8 +1695,7 @@ def test_i64_overflow_fails_closed_like_rust_checked_arithmetic(config_doc):
     # timestamps: an age computation that leaves i64 rejects
     eng3 = RiskEngine.from_config_ticks(config_doc, ticks())
     eng3.on_market(1, 2450, 2452, -(1 << 63))
-    assert eng3.check_order(order(1, 0, 100, 2450, timestamp=1)).rule_id \
-        == Rules.MALFORMED_ORDER
+    assert eng3.check_order(order(1, 0, 100, 2450, timestamp=1)).rule_id == Rules.MALFORMED_ORDER
     # and typed arguments are domain-checked at the boundary
     with pytest.raises(ValueError):
         eng.on_market(1 << 32, 1, 1, 0)
@@ -1623,9 +1767,9 @@ def _exposure_state(eng: RiskEngine) -> dict:
     return snap
 
 
-def _random_script(seed: int, n: int) -> List[dict]:
+def _random_script(seed: int, n: int) -> list[dict]:
     rng = SplitMix64(seed)
-    steps: List[dict] = []
+    steps: list[dict] = []
     t = T0 + 100_000_000
     for k in range(n):
         t += rng.randint(0, 4_000_000)
@@ -1633,40 +1777,84 @@ def _random_script(seed: int, n: int) -> List[dict]:
         if r < 55:
             iid = 1 + rng.below(2)
             side = rng.below(2)
-            ot = [OrderType.LIMIT, OrderType.LIMIT, OrderType.MARKET, OrderType.PEG,
-                  OrderType.IOC][rng.below(5)]
+            ot = [OrderType.LIMIT, OrderType.LIMIT, OrderType.MARKET, OrderType.PEG, OrderType.IOC][
+                rng.below(5)
+            ]
             base = 2451 if iid == 1 else 3120
             px = 0 if ot in (OrderType.MARKET, OrderType.PEG) else base + rng.randint(-60, 60)
             if ot == OrderType.IOC and rng.below(2):
                 px = 0
             qty = [10, 100, 1_000, 5_000, 20_000, 60_000][rng.below(6)]
             oid = 1 + rng.below(40) if rng.below(10) == 0 else 1000 + k
-            steps.append({"type": "order", "order": typed(
-                oid, iid, side, qty, px, ot, t, strategy=f"S{rng.below(3)}",
-                venue=rng.below(3))})
+            steps.append(
+                {
+                    "type": "order",
+                    "order": typed(
+                        oid,
+                        iid,
+                        side,
+                        qty,
+                        px,
+                        ot,
+                        t,
+                        strategy=f"S{rng.below(3)}",
+                        venue=rng.below(3),
+                    ),
+                }
+            )
         elif r < 75:
             iid = 1 + rng.below(2)
             base = 2451 if iid == 1 else 3120
-            steps.append({"type": "fill", "fill": Fill(
-                t, f"S{rng.below(3)}", iid, 1000 + rng.below(max(k, 1)) if rng.below(2) else 0,
-                rng.below(2), [10, 100, 1_000, 5_000][rng.below(4)],
-                base + rng.randint(-300, 300))})
+            steps.append(
+                {
+                    "type": "fill",
+                    "fill": Fill(
+                        t,
+                        f"S{rng.below(3)}",
+                        iid,
+                        1000 + rng.below(max(k, 1)) if rng.below(2) else 0,
+                        rng.below(2),
+                        [10, 100, 1_000, 5_000][rng.below(4)],
+                        base + rng.randint(-300, 300),
+                    ),
+                }
+            )
         elif r < 88:
             iid = 1 + rng.below(2)
             base = 2451 if iid == 1 else 3120
             move = rng.randint(-200, 200)
-            steps.append({"type": "market", "iid": iid, "bid": base + move - 1,
-                          "ask": base + move + 1, "ts": t - rng.below(3) * NS})
+            steps.append(
+                {
+                    "type": "market",
+                    "iid": iid,
+                    "bid": base + move - 1,
+                    "ask": base + move + 1,
+                    "ts": t - rng.below(3) * NS,
+                }
+            )
         elif r < 93:
             steps.append({"type": "done", "oid": 1000 + rng.below(max(k, 1))})
         elif r < 96:
-            steps.append({"type": "gap" if rng.below(2) else "recover", "iid": 1 + rng.below(2), "ts": t})
+            steps.append(
+                {"type": "gap" if rng.below(2) else "recover", "iid": 1 + rng.below(2), "ts": t}
+            )
         elif r < 98:
-            steps.append({"type": "venue_down" if rng.below(2) else "venue_up",
-                          "vid": 1 + rng.below(2), "ts": t})
+            steps.append(
+                {
+                    "type": "venue_down" if rng.below(2) else "venue_up",
+                    "vid": 1 + rng.below(2),
+                    "ts": t,
+                }
+            )
         else:
-            steps.append({"type": "unkill", "scope": [Scope.GLOBAL, Scope.STRATEGY][rng.below(2)],
-                          "id": "" if rng.below(2) else "S1", "ts": t})
+            steps.append(
+                {
+                    "type": "unkill",
+                    "scope": [Scope.GLOBAL, Scope.STRATEGY][rng.below(2)],
+                    "id": "" if rng.below(2) else "S1",
+                    "ts": t,
+                }
+            )
     return steps
 
 
@@ -1745,10 +1933,10 @@ def test_property_applied_decisions_are_replayable(config_doc, seed):
     limits = RiskLimits.from_json(config_doc)
     for cut, snap_json in snaps:
         restored = RiskEngine.restore(limits, equity_refs(ticks()), json.loads(snap_json), 0)
-        for step in script[cut + 1:]:
+        for step in script[cut + 1 :]:
             _apply(restored, step)
         tail = restored.audit_jsonl().splitlines()[1:]
-        assert tail == full[len(full) - len(tail):], f"cut {cut}"
+        assert tail == full[len(full) - len(tail) :], f"cut {cut}"
         assert restored.snapshot_json() == a.snapshot_json(), f"cut {cut}"
         # the snapshot document itself round-trips through canonical JSON
         assert json.loads(snap_json) == restored_snapshot_parse(snap_json)
@@ -1768,9 +1956,23 @@ def test_snapshot_is_json_shaped_and_independent_of_the_engine(config_doc):
     assert eng.snapshot()["open"]["1"]["qty"] == 100, "snapshot is a copy"
     assert json.loads(eng.snapshot_json()) == eng.snapshot()
     assert set(eng.snapshot()) == {
-        "x-version", "bootstrapped", "kill_global", "kill_strategies", "kill_instruments",
-        "kill_venues", "venues_down", "market", "seen_orders", "buckets", "open",
-        "positions", "lots", "realized", "loss_override_global", "loss_override_strategy"}
+        "x-version",
+        "bootstrapped",
+        "kill_global",
+        "kill_strategies",
+        "kill_instruments",
+        "kill_venues",
+        "venues_down",
+        "market",
+        "seen_orders",
+        "buckets",
+        "open",
+        "positions",
+        "lots",
+        "realized",
+        "loss_override_global",
+        "loss_override_strategy",
+    }
     assert not math.isnan(eng.metrics.gauge_value("risk_daily_pnl"))
 
 
@@ -1886,11 +2088,15 @@ def test_reference_builders_reject_malformed_tables():
     with pytest.raises(ValueError, match="must be a u32"):
         instrument_refs_from_golden({"x": {"tick_size": 0.01, "qty_unit": 1, "quote_ccy": "USD"}})
     with pytest.raises(ValueError, match="must be a u32"):
-        instrument_refs_from_golden({1 << 32: {"tick_size": 0.01, "qty_unit": 1, "quote_ccy": "USD"}})
+        instrument_refs_from_golden(
+            {1 << 32: {"tick_size": 0.01, "qty_unit": 1, "quote_ccy": "USD"}}
+        )
     with pytest.raises(ValueError, match="must be a number"):
         InstrumentRef("0.01", 1.0, "USD")  # type: ignore[arg-type]
-    for row in ({"instrument_id": 0, "tick_size": 0.01, "lot_size": 1, "adv": 1, "asset_class": "EQUITY"},
-                {"instrument_id": 1, "tick_size": 0, "lot_size": 1, "adv": 1, "asset_class": "EQUITY"}):
+    for row in (
+        {"instrument_id": 0, "tick_size": 0.01, "lot_size": 1, "adv": 1, "asset_class": "EQUITY"},
+        {"instrument_id": 1, "tick_size": 0, "lot_size": 1, "adv": 1, "asset_class": "EQUITY"},
+    ):
         with pytest.raises(ValueError, match="bad instrument_id/tick_size"):
             instrument_refs_from_config({"instruments": [row]})
     with pytest.raises(ValueError, match="must be an object"):
@@ -1907,6 +2113,7 @@ def test_unvaluable_open_order_rejects_instead_of_vanishing_from_gross(config_do
     Five working MARKET children (9,000 @ mid 100.01 = 900,090 each,
     4,500,450 gross) then instrument 1's book goes one-sided (halt/open):
     the two children on instrument 1 are 1,800,180 of real exposure."""
+
     def build():
         eng = RiskEngine.from_config_ticks(config(config_doc), {1: 0.01, 2: 0.01, 3: 0.01})
         for iid in (1, 2, 3):
@@ -1922,8 +2129,7 @@ def test_unvaluable_open_order_rejects_instead_of_vanishing_from_gross(config_do
     healthy, ts = build()
     d = healthy.check_order(typed(6, 3, 0, 9_000, 0, OrderType.MARKET, ts + 100_000_000))
     assert d.rule_id == Rules.GROSS_NOTIONAL
-    assert d.reason == ("projected gross notional 5400540.00 exceeds "
-                        "max_gross_notional 5000000.00")
+    assert d.reason == ("projected gross notional 5400540.00 exceeds max_gross_notional 5000000.00")
 
     degraded, ts = build()
     degraded.on_market(1, 10_000, 0, ts)  # one-sided: instrument 1 has no mid
@@ -1952,8 +2158,9 @@ def test_unparseable_kill_scope_id_escalates_and_never_looks_successful(config_d
         'kill scope id "AAPL" is not a valid INSTRUMENT id: '
         "escalated to GLOBAL (fail-closed): ops halt"
     )
-    assert not [e for e in eng.audit() if e.rule_id == Rules.KILL_SWITCH_ENGAGED], \
+    assert not [e for e in eng.audit() if e.rule_id == Rules.KILL_SWITCH_ENGAGED], (
         "a phantom halt must never leave a success record"
+    )
 
     # a VENUE id above u16 is the same defect
     eng = engine(config_doc)
@@ -1966,10 +2173,12 @@ def test_unparseable_kill_scope_id_escalates_and_never_looks_successful(config_d
     eng.engage_kill(Scope.INSTRUMENT, "1", T0, "halt")
     with pytest.raises(ValueError, match="nothing cleared"):
         eng.clear_kill(Scope.INSTRUMENT, "AAPL", T0 + NS, "ops clear")
-    assert eng.check_order(order(2, 0, 100, 2450)).rule_id == Rules.KILL_INSTRUMENT, \
+    assert eng.check_order(order(2, 0, 100, 2450)).rule_id == Rules.KILL_INSTRUMENT, (
         "the real halt must still be in force"
-    assert not [e for e in eng.audit() if e.rule_id == Rules.KILL_SWITCH_CLEARED], \
+    )
+    assert not [e for e in eng.audit() if e.rule_id == Rules.KILL_SWITCH_CLEARED], (
         "nothing was cleared, so nothing may claim it was"
+    )
 
 
 def test_unmarked_held_lot_makes_daily_pnl_undeterminable(config_doc):
@@ -2022,8 +2231,7 @@ def test_future_stamped_market_data_fails_closed(config_doc):
     eng.on_market(2, 3119, 3121, t + 5 * NS)
     assert eng.check_order(order(3, 0, 100, 3120, instrument_id=2)).allowed()
     eng.on_market(2, 3119, 3121, t + 5 * NS + 1)
-    assert eng.check_order(order(4, 0, 100, 3120, instrument_id=2)).rule_id \
-        == Rules.STALE_PRICE
+    assert eng.check_order(order(4, 0, 100, 3120, instrument_id=2)).rule_id == Rules.STALE_PRICE
     # the engine clock, not the order's own (regressed) timestamp, decides:
     # an order stamped 10s behind an order already seen is not "future data"
     eng2 = engine(config_doc)
@@ -2060,8 +2268,7 @@ def test_nan_limit_or_reference_data_never_passes_a_check(config_doc):
         ("strategy_max_daily_loss", Rules.STRATEGY_LOSS),
         ("order_rate_burst", Rules.RATE_THROTTLE),
     ):
-        eng = RiskEngine.with_ticks(
-            dataclasses.replace(base, **{field: float("nan")}), ticks())
+        eng = RiskEngine.with_ticks(dataclasses.replace(base, **{field: float("nan")}), ticks())
         eng.on_market(1, 2450, 2452, T0)
         d = eng.check_order(order(1, 0, 100, 2450))
         assert d.decision == Decision.REJECT and d.rule_id == rule, field
@@ -2138,8 +2345,7 @@ def test_sor_order_rejected_while_any_venue_kill_is_engaged(config_doc):
     assert eng.check_order(order(6, 0, 100, 2450, venue_id=0)).allowed()
     eng.on_order_done(6)
     eng.on_venue_disconnect(5, T0)
-    assert eng.check_order(order(7, 0, 100, 2450, venue_id=0)).rule_id \
-        == Rules.VENUE_DISCONNECTED
+    assert eng.check_order(order(7, 0, 100, 2450, venue_id=0)).rule_id == Rules.VENUE_DISCONNECTED
     eng.on_venue_reconnect(3, T0)
     assert eng.check_order(order(8, 0, 100, 2450, venue_id=0)).allowed()
 
@@ -2155,10 +2361,14 @@ def test_kill_scope_id_grammar_is_rust_from_str(config_doc):
         with pytest.raises(ValueError, match="escalated to GLOBAL"):
             eng.engage_kill(Scope.VENUE, bad, T0, "ops")
         eng.clear_kill(Scope.GLOBAL, "", T0, "escalation reviewed")
-    assert order_validation_error(order(3, 0, 100, 2450, urgency=2.0)) \
+    assert (
+        order_validation_error(order(3, 0, 100, 2450, urgency=2.0))
         == "urgency must be in [0, 1]: 2"
-    assert order_validation_error(order(3, 0, 100, 2450, urgency=float("inf"))) \
+    )
+    assert (
+        order_validation_error(order(3, 0, 100, 2450, urgency=float("inf")))
         == "urgency must be in [0, 1]: inf"
+    )
 
 
 def test_extreme_timestamps_fail_closed_without_overflow(config_doc):
@@ -2170,8 +2380,7 @@ def test_extreme_timestamps_fail_closed_without_overflow(config_doc):
     i64_min, i64_max = -(1 << 63), (1 << 63) - 1
 
     def at(oid: int, iid: int, ts: int) -> OrderRequest:
-        return order(oid, 0, 100, 2450 if iid == 1 else 3120,
-                     instrument_id=iid, timestamp=ts)
+        return order(oid, 0, 100, 2450 if iid == 1 else 3120, instrument_id=iid, timestamp=ts)
 
     # orders: age vs a mark at T0
     eng = engine(config_doc)

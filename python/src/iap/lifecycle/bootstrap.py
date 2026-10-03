@@ -77,9 +77,10 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Tuple
+from typing import Any
 
 from iap.alpha import ALPHA_IDS
 from iap.contracts.types import ExperimentResult, ExperimentSpec, LifecycleState, Period, Verdict
@@ -120,7 +121,7 @@ TRANSITIONS_RELPATH = Path("research") / "lifecycle_transitions.jsonl"
 _LEDGER_KIND = "promotion_pipeline"
 
 
-def _finite(value: Any) -> Optional[float]:
+def _finite(value: Any) -> float | None:
     """``float(value)`` when it is a finite number, else ``None``."""
     if value is None or isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
@@ -128,36 +129,35 @@ def _finite(value: Any) -> Optional[float]:
     return out if math.isfinite(out) else None
 
 
-def load_report(root: Path, alpha_id: str) -> Dict[str, Any]:
+def load_report(root: Path, alpha_id: str) -> dict[str, Any]:
     path = root / REPORTS_RELPATH / f"{alpha_id}.json"
     if not path.is_file():
         raise ValueError(f"{path}: alpha report not found")
-    with open(path, "r", encoding="utf-8") as fh:
+    with open(path, encoding="utf-8") as fh:
         return json.load(fh)
 
 
-def load_ledger_entries(root: Path) -> Dict[str, Dict[str, Any]]:
+def load_ledger_entries(root: Path) -> dict[str, dict[str, Any]]:
     """``{alpha_id: promotion_pipeline ledger entry}``."""
     path = root / LEDGER_RELPATH
     if not path.is_file():
         raise ValueError(f"{path}: experiments ledger not found")
-    with open(path, "r", encoding="utf-8") as fh:
+    with open(path, encoding="utf-8") as fh:
         doc = json.load(fh)
-    out: Dict[str, Dict[str, Any]] = {}
+    out: dict[str, dict[str, Any]] = {}
     for entry in doc["entries"]:
         if entry["kind"] == _LEDGER_KIND:
             if entry["alpha_id"] in out:
-                raise ValueError(f"{path}: duplicate {_LEDGER_KIND} entry for "
-                                 f"{entry['alpha_id']}")
+                raise ValueError(f"{path}: duplicate {_LEDGER_KIND} entry for {entry['alpha_id']}")
             out[entry["alpha_id"]] = entry
     return out
 
 
-def load_params_document(root: Path) -> Dict[str, Any]:
+def load_params_document(root: Path) -> dict[str, Any]:
     path = root / PARAMS_RELPATH
     if not path.is_file():
         raise ValueError(f"{path}: alpha params not found")
-    with open(path, "r", encoding="utf-8") as fh:
+    with open(path, encoding="utf-8") as fh:
         doc = json.load(fh)
     for key in ("data_version", "feature_version", "git_commit", "params"):
         if key not in doc:
@@ -178,7 +178,7 @@ def bootstrap_event_ts(reports: Mapping[str, Mapping[str, Any]]) -> int:
     return max(latest_event_ts(r) for r in reports.values())
 
 
-def capacity_from_report(report: Mapping[str, Any]) -> Optional[float]:
+def capacity_from_report(report: Mapping[str, Any]) -> float | None:
     """Aggregate deployable notional: the sum of the per-instrument capacity
     proxies (``None`` when any of them is missing or non-finite)."""
     values = [_finite(v) for _, v in sorted(report["capacity_usd_by_instrument"].items())]
@@ -190,15 +190,15 @@ def capacity_from_report(report: Mapping[str, Any]) -> Optional[float]:
 def research_evidence(
     alpha_id: str,
     report: Mapping[str, Any],
-    ledger_entry: Optional[Mapping[str, Any]],
+    ledger_entry: Mapping[str, Any] | None,
     params_doc: Mapping[str, Any],
-) -> Tuple[Optional[ExperimentResult], List[str]]:
+) -> tuple[ExperimentResult | None, list[str]]:
     """Build the alpha's ``ExperimentResult`` from its artefacts.
 
     Returns ``(result, missing)``: ``result`` is ``None`` when any required
     metric is absent or non-finite, and ``missing`` names those metrics.
     """
-    missing: List[str] = []
+    missing: list[str] = []
 
     def num(key: str, value: Any) -> float:
         out = _finite(value)
@@ -266,12 +266,12 @@ def research_evidence(
 
 
 #: What the alpha-report format does not record and the mapping cannot know.
-UNRECORDED_BY_REPORT = ("seed", "max_drawdown_bps", "sharpe", "train_period",
-                        "validation_period")
+UNRECORDED_BY_REPORT = ("seed", "max_drawdown_bps", "sharpe", "train_period", "validation_period")
 
 
-def alpha_report_spec(alpha_id: str, report: Mapping[str, Any], result: ExperimentResult,
-                      source: str) -> ExperimentSpec:
+def alpha_report_spec(
+    alpha_id: str, report: Mapping[str, Any], result: ExperimentResult, source: str
+) -> ExperimentSpec:
     """The ``ExperimentSpec`` that goes with :func:`research_evidence`'s
     result — the same ``experiment_id``, versions and model hash — with the
     report's protocol recorded in ``configuration`` (gates, folds, universe,
@@ -284,41 +284,57 @@ def alpha_report_spec(alpha_id: str, report: Mapping[str, Any], result: Experime
     test_start = int(folds[0]["test_start"])
     test_end = max(int(f["test_end"]) for f in folds)
     capacity = capacity_from_report(report)
-    configuration: Dict[str, Any] = {
+    configuration: dict[str, Any] = {
         "source": source,
         "protocol": "purged walk-forward CV (research/alpha_reports/run_all.py)",
         "gates": report["gates"],
         "n_folds": int(report["n_folds_run"]),
-        "folds": [{"fold": int(f["fold"]), "test_start": int(f["test_start"]),
-                   "test_end": int(f["test_end"]), "n_train": int(f["n_train"]),
-                   "n_test_rows": int(f["n_test_rows"])} for f in folds],
+        "folds": [
+            {
+                "fold": int(f["fold"]),
+                "test_start": int(f["test_start"]),
+                "test_end": int(f["test_end"]),
+                "n_train": int(f["n_train"]),
+                "n_test_rows": int(f["n_test_rows"]),
+            }
+            for f in folds
+        ],
         "universe": [int(i) for i in report["universe"]],
         "capacity_usd": capacity,
-        "pnl_basis": (f"stress.cost.x1 total_pnl / total_costs (USD) in bps of the "
-                      f"{REFERENCE_NOTIONAL_USD:.0f} USD reference notional "
-                      "(iap.lifecycle.bootstrap.REFERENCE_NOTIONAL_USD); only the sign "
-                      "is gated"),
+        "pnl_basis": (
+            f"stress.cost.x1 total_pnl / total_costs (USD) in bps of the "
+            f"{REFERENCE_NOTIONAL_USD:.0f} USD reference notional "
+            "(iap.lifecycle.bootstrap.REFERENCE_NOTIONAL_USD); only the sign "
+            "is gated"
+        ),
         "ic_source": "gate_ic (the uncrossed IC the PROMOTE gate reads)",
         "t_stat_source": "nw_tstat_uncrossed when finite, else nw_tstat",
         "experiment_id_source": (
             "<alpha_id>-unledgered (no promotion_pipeline ledger entry)"
             if result.experiment_id == f"{alpha_id}-unledgered"
-            else f"{LEDGER_RELPATH.as_posix()} promotion_pipeline key[:16]"),
-        "version_sources": {"dataset_version": PARAMS_RELPATH.as_posix(),
-                            "feature_version": PARAMS_RELPATH.as_posix(),
-                            "model_version": f"content_hash({PARAMS_RELPATH.as_posix()} "
-                                             "params[alpha_id])",
-                            "git_commit": PARAMS_RELPATH.as_posix()},
+            else f"{LEDGER_RELPATH.as_posix()} promotion_pipeline key[:16]"
+        ),
+        "version_sources": {
+            "dataset_version": PARAMS_RELPATH.as_posix(),
+            "feature_version": PARAMS_RELPATH.as_posix(),
+            "model_version": f"content_hash({PARAMS_RELPATH.as_posix()} params[alpha_id])",
+            "git_commit": PARAMS_RELPATH.as_posix(),
+        },
         "unrecorded": list(UNRECORDED_BY_REPORT),
     }
     return ExperimentSpec(
-        experiment_id=result.experiment_id, alpha_id=alpha_id,
-        dataset_version=result.dataset_version, feature_version=result.feature_version,
-        model_version=result.model_version, configuration=configuration,
+        experiment_id=result.experiment_id,
+        alpha_id=alpha_id,
+        dataset_version=result.dataset_version,
+        feature_version=result.feature_version,
+        model_version=result.model_version,
+        configuration=configuration,
         train_period=Period(start_ts=test_start, end_ts=test_start),
         validation_period=Period(start_ts=test_start, end_ts=test_start),
         test_period=Period(start_ts=test_start, end_ts=test_end),
-        seed=0, horizon=str(report["horizon"]))
+        seed=0,
+        horizon=str(report["horizon"]),
+    )
 
 
 @dataclass(frozen=True)
@@ -328,8 +344,8 @@ class BootstrapRow:
     alpha_id: str
     verdict: str
     state: LifecycleState
-    failed_gates: Tuple[str, ...]
-    missing_metrics: Tuple[str, ...]
+    failed_gates: tuple[str, ...]
+    missing_metrics: tuple[str, ...]
 
 
 @dataclass
@@ -337,10 +353,10 @@ class BootstrapResult:
     event_ts: int
     registry: AlphaRegistry
     machine: AlphaLifecycle
-    rows: List[BootstrapRow]
+    rows: list[BootstrapRow]
 
-    def count_by_state(self) -> Dict[str, int]:
-        out: Dict[str, int] = {}
+    def count_by_state(self) -> dict[str, int]:
+        out: dict[str, int] = {}
         for row in self.rows:
             out[row.state.name] = out.get(row.state.name, 0) + 1
         return dict(sorted(out.items()))
@@ -351,9 +367,14 @@ class TransitionLogExists(FileExistsError):
     and ``force`` was not given (the log is an append-only audit)."""
 
 
-def run_bootstrap(root: Optional[Path] = None, *, config: Optional[PolicyConfig] = None,
-                  write: bool = True, force: bool = False,
-                  alpha_ids: Optional[List[str]] = None) -> BootstrapResult:
+def run_bootstrap(
+    root: Path | None = None,
+    *,
+    config: PolicyConfig | None = None,
+    write: bool = True,
+    force: bool = False,
+    alpha_ids: list[str] | None = None,
+) -> BootstrapResult:
     """Bootstrap (see module docstring).  ``write=False`` computes without
     touching ``research/``; ``alpha_ids`` defaults to ``iap.alpha.ALPHA_IDS``.
 
@@ -370,10 +391,16 @@ def run_bootstrap(root: Optional[Path] = None, *, config: Optional[PolicyConfig]
         raise TransitionLogExists(
             f"{log_path}: {n_lines} transition(s) already logged; bootstrap would truncate "
             "this append-only audit — rerun with --force (run_bootstrap(force=True)) "
-            "to rebuild it from research/, or --dry-run to compute without writing")
-    cfg = config if config is not None else load_policy_config(
-        root / "configs" / "strategies" / "lifecycle.json",
-        root / "configs" / "strategies" / "strategies.json")
+            "to rebuild it from research/, or --dry-run to compute without writing"
+        )
+    cfg = (
+        config
+        if config is not None
+        else load_policy_config(
+            root / "configs" / "strategies" / "lifecycle.json",
+            root / "configs" / "strategies" / "strategies.json",
+        )
+    )
     ids = sorted(alpha_ids if alpha_ids is not None else ALPHA_IDS)
     reports = {aid: load_report(root, aid) for aid in ids}
     ledger = load_ledger_entries(root)
@@ -383,25 +410,31 @@ def run_bootstrap(root: Optional[Path] = None, *, config: Optional[PolicyConfig]
     registry = AlphaRegistry(cfg.policy)
     log = LifecycleTransitionLog(log_path, truncate=True) if write else None
     machine = AlphaLifecycle(cfg, registry, log)
-    rows: List[BootstrapRow] = []
+    rows: list[BootstrapRow] = []
     for aid in ids:
         report = reports[aid]
         result, missing = research_evidence(aid, report, ledger.get(aid), params_doc)
-        evidence = Evidence(research=result, capacity_usd=capacity_from_report(report),
-                            validation=None, paper=None, live=None)
+        evidence = Evidence(
+            research=result,
+            capacity_usd=capacity_from_report(report),
+            validation=None,
+            paper=None,
+            live=None,
+        )
         machine.register(
-            aid, event_ts,
+            aid,
+            event_ts,
             experiment_id=None if result is None else result.experiment_id,
             data_version=None if result is None else result.dataset_version,
             feature_version=None if result is None else result.feature_version,
-            model_version=None if result is None else result.model_version)
+            model_version=None if result is None else result.model_version,
+        )
         for _ in range(STATE_COUNT):
             if machine.advance(aid, event_ts, evidence) is None:
                 break
         rec = registry.get(aid)
         failed = tuple(rec.last_evaluation.failed_gates) if rec.last_evaluation else ()
-        rows.append(BootstrapRow(aid, str(report["verdict"]), rec.state, failed,
-                                 tuple(missing)))
+        rows.append(BootstrapRow(aid, str(report["verdict"]), rec.state, failed, tuple(missing)))
     if write:
         registry.save(root / REGISTRY_RELPATH)
     return BootstrapResult(event_ts=event_ts, registry=registry, machine=machine, rows=rows)
@@ -414,7 +447,14 @@ def render_status(registry: AlphaRegistry) -> str:
     lines = [" | ".join(header), " | ".join("-" * len(h) for h in header)]
     for rec in registry.records():
         failed = rec.last_evaluation.failed_gates if rec.last_evaluation else []
-        lines.append(" | ".join((
-            rec.alpha_id, rec.state.name, str(rec.since_ts),
-            ", ".join(failed) if failed else "-")))
+        lines.append(
+            " | ".join(
+                (
+                    rec.alpha_id,
+                    rec.state.name,
+                    str(rec.since_ts),
+                    ", ".join(failed) if failed else "-",
+                )
+            )
+        )
     return "\n".join(lines)

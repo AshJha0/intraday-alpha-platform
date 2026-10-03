@@ -43,13 +43,13 @@ raw NaN, like every other statistic in a validation report.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import replace
-from typing import Dict, Mapping, Optional, Sequence
 
 import numpy as np
 import pandas as pd
 
-from iap.backtest.engine import Backtester, BacktestConfig
+from iap.backtest.engine import BacktestConfig, Backtester
 from iap.validation.metrics import ic
 
 COST_MULTIPLIERS = (0.5, 1.0, 2.0)
@@ -68,7 +68,7 @@ STRESS_VERSION_CARRY = 2
 STRESS_VERSIONS = (STRESS_VERSION_LEGACY, STRESS_VERSION_CARRY)
 
 
-def _fnum(v: float) -> Optional[float]:
+def _fnum(v: float) -> float | None:
     return float(v) if np.isfinite(v) else None
 
 
@@ -120,9 +120,9 @@ def cost_stress(
     scores: Mapping[int, pd.DataFrame],
     asset_class: str,
     multipliers: Sequence[float] = COST_MULTIPLIERS,
-) -> Dict[str, dict]:
+) -> dict[str, dict]:
     """Net backtest results across the pinned cost-multiplier grid."""
-    out: Dict[str, dict] = {}
+    out: dict[str, dict] = {}
     for m in multipliers:
         bt = Backtester(
             backtester_base.cost_model.with_multiplier(m),
@@ -148,7 +148,7 @@ def latency_stress(
     shifts: Sequence[int] = LATENCY_SHIFTS,
     beta: float = 0.0,
     version: int = STRESS_VERSION_LEGACY,
-) -> Dict[str, dict]:
+) -> dict[str, dict]:
     """IC and net P&L when execution lags the decision by extra events.
 
     ``beta`` standardizes the score before scoring it (see :func:`_pooled`).
@@ -156,9 +156,8 @@ def latency_stress(
     one (module docs): 1 = the historic four-field rebuild, 2 = the base
     config with only the row latency changed."""
     if version not in STRESS_VERSIONS:
-        raise ValueError(
-            f"unknown stress version {version!r}; known: {STRESS_VERSIONS}")
-    out: Dict[str, dict] = {}
+        raise ValueError(f"unknown stress version {version!r}; known: {STRESS_VERSIONS}")
+    out: dict[str, dict] = {}
     base = backtester_base.config
     base_latency = base.latency_rows
     for k in shifts:
@@ -172,8 +171,12 @@ def latency_stress(
             )
         else:
             cfg = replace(base, latency_rows=base_latency + k, latency_ns=None)
-        bt = Backtester(backtester_base.cost_model, backtester_base.meta, cfg,
-                        reporting_ccy=backtester_base.reporting_ccy)
+        bt = Backtester(
+            backtester_base.cost_model,
+            backtester_base.meta,
+            cfg,
+            reporting_ccy=backtester_base.reporting_ccy,
+        )
         res = bt.run(frames, scores, asset_class)
         out[f"+{k}ev"] = {
             "ic": _fnum(ic(x, y)),
@@ -190,23 +193,29 @@ def latency_stress_time(
     asset_class: str,
     horizon: str,
     latencies_ns: Sequence[int] = LATENCY_TIMES_NS,
-) -> Dict[str, dict]:
+) -> dict[str, dict]:
     """Net P&L when execution is delayed by a real amount of EVENT TIME.
 
     Unlike the row grid this is comparable across instruments and datasets:
     a decision at t executes at the first row with
     ``exchange_ts >= t + latency_ns`` (API_ALPHA / backtester §latency).
     """
-    out: Dict[str, dict] = {}
+    out: dict[str, dict] = {}
     base = backtester_base.config
     for ns in latencies_ns:
         cfg = replace(base, latency_ns=int(ns))
-        bt = Backtester(backtester_base.cost_model, backtester_base.meta, cfg,
-                        reporting_ccy=backtester_base.reporting_ccy)
+        bt = Backtester(
+            backtester_base.cost_model,
+            backtester_base.meta,
+            cfg,
+            reporting_ccy=backtester_base.reporting_ccy,
+        )
         res = bt.run(frames, scores, asset_class)
-        label = "0ms" if ns == 0 else (
-            f"{ns // 1_000_000}ms" if ns < 1_000_000_000
-            else f"{ns // 1_000_000_000}s")
+        label = (
+            "0ms"
+            if ns == 0
+            else (f"{ns // 1_000_000}ms" if ns < 1_000_000_000 else f"{ns // 1_000_000_000}s")
+        )
         out[label] = {
             "latency_ns": int(ns),
             "total_pnl": res.total_pnl,
@@ -220,7 +229,7 @@ def regime_split(
     frames: Mapping[int, pd.DataFrame],
     horizon: str,
     beta: float = 0.0,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """IC in high-vol vs low-vol regimes (vol_regime_flag_v1).
 
     ``beta`` standardizes the score before scoring it (see :func:`_pooled`):
@@ -228,6 +237,7 @@ def regime_split(
     carries the opposite sign to the gate IC and reads as a regime the alpha
     "works in" when it is the regime it is most wrong in.
     """
+
     def high(df: pd.DataFrame) -> np.ndarray:
         f = df["vol_regime_flag_v1"].to_numpy(dtype=float)
         return np.where(np.isfinite(f), f, 0.0) > 0.5

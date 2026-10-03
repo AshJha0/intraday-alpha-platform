@@ -36,6 +36,8 @@ cd rust   && cargo test --workspace && cd ..
 cd java   && bash build.sh && bash test.sh && cd ..
 python3 -m pytest -q tests/integration tests/replay      # repo-level suites
 python3 tests/harness/check_deployment.py --verbose      # deployment checks
+ruff check python tests tools research deployment        # lint (ruff==0.16.10, config: ruff.toml)
+ruff format --check python tests tools research deployment   # formatting (drop --check to apply)
 ```
 
 Each language's full run must stay under 120 s; the repo-level suites well

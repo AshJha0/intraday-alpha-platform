@@ -13,9 +13,10 @@ import hashlib
 import json
 import math
 import os
+from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Mapping
+from typing import Any
 
 __all__ = [
     "ALPHA_SIGNAL_VERSION",
@@ -69,25 +70,27 @@ DECISION_TRACE_VERSION = 1
 
 #: Schema path (relative to ``schemas/``) -> pinned ``x-version``.  This is
 #: the complete inventory; the golden test asserts it equals the files.
-SCHEMA_VERSIONS: Mapping[str, int] = MappingProxyType({
-    "market/market_event.schema.json": MARKET_EVENT_VERSION,
-    "market/book_update.schema.json": BOOK_UPDATE_VERSION,
-    "features/feature_vector.schema.json": FEATURE_VECTOR_VERSION,
-    "alpha/alpha_signal.schema.json": ALPHA_SIGNAL_VERSION,
-    "alpha/lifecycle_transition.schema.json": LIFECYCLE_TRANSITION_VERSION,
-    "order/order_request.schema.json": ORDER_REQUEST_VERSION,
-    "order/parent_order.schema.json": PARENT_ORDER_VERSION,
-    "order/child_order.schema.json": CHILD_ORDER_VERSION,
-    "execution/execution_report.schema.json": EXECUTION_REPORT_VERSION,
-    "execution/venue_decision.schema.json": VENUE_DECISION_VERSION,
-    "risk/risk_event.schema.json": RISK_EVENT_VERSION,
-    "risk/risk_decision.schema.json": RISK_DECISION_VERSION,
-    "portfolio/portfolio_target.schema.json": PORTFOLIO_TARGET_VERSION,
-    "tca/tca_result.schema.json": TCA_RESULT_VERSION,
-    "research/experiment_spec.schema.json": EXPERIMENT_SPEC_VERSION,
-    "research/experiment_result.schema.json": EXPERIMENT_RESULT_VERSION,
-    "trace/decision_trace.schema.json": DECISION_TRACE_VERSION,
-})
+SCHEMA_VERSIONS: Mapping[str, int] = MappingProxyType(
+    {
+        "market/market_event.schema.json": MARKET_EVENT_VERSION,
+        "market/book_update.schema.json": BOOK_UPDATE_VERSION,
+        "features/feature_vector.schema.json": FEATURE_VECTOR_VERSION,
+        "alpha/alpha_signal.schema.json": ALPHA_SIGNAL_VERSION,
+        "alpha/lifecycle_transition.schema.json": LIFECYCLE_TRANSITION_VERSION,
+        "order/order_request.schema.json": ORDER_REQUEST_VERSION,
+        "order/parent_order.schema.json": PARENT_ORDER_VERSION,
+        "order/child_order.schema.json": CHILD_ORDER_VERSION,
+        "execution/execution_report.schema.json": EXECUTION_REPORT_VERSION,
+        "execution/venue_decision.schema.json": VENUE_DECISION_VERSION,
+        "risk/risk_event.schema.json": RISK_EVENT_VERSION,
+        "risk/risk_decision.schema.json": RISK_DECISION_VERSION,
+        "portfolio/portfolio_target.schema.json": PORTFOLIO_TARGET_VERSION,
+        "tca/tca_result.schema.json": TCA_RESULT_VERSION,
+        "research/experiment_spec.schema.json": EXPERIMENT_SPEC_VERSION,
+        "research/experiment_result.schema.json": EXPERIMENT_RESULT_VERSION,
+        "trace/decision_trace.schema.json": DECISION_TRACE_VERSION,
+    }
+)
 
 
 def schema_id(relpath: str) -> str:
@@ -127,9 +130,11 @@ def schema_dir() -> Path:
     for path in candidates:
         if path.is_dir():
             return path
-    raise RuntimeError("schema directory not found: tried "
-                       + ", ".join(str(p) for p in candidates)
-                       + " (set $IAP_SCHEMA_DIR)")
+    raise RuntimeError(
+        "schema directory not found: tried "
+        + ", ".join(str(p) for p in candidates)
+        + " (set $IAP_SCHEMA_DIR)"
+    )
 
 
 #: Checkout-relative ``schemas/`` path (may not exist for an installed wheel;
@@ -144,8 +149,7 @@ def _reject_non_finite(obj: Any, path: str) -> None:
     elif isinstance(obj, dict):
         for k, v in obj.items():
             if not isinstance(k, str):
-                raise ValueError(
-                    f"canonical_json: non-string key {k!r} at {path}")
+                raise ValueError(f"canonical_json: non-string key {k!r} at {path}")
             _reject_non_finite(v, f"{path}.{k}")
     elif isinstance(obj, (list, tuple)):
         for i, v in enumerate(obj):
@@ -160,8 +164,9 @@ def canonical_json(obj: Any) -> str:
     :func:`json.dumps` and hash differently across languages).
     """
     _reject_non_finite(obj, "$")
-    return json.dumps(obj, sort_keys=True, separators=(",", ":"),
-                      ensure_ascii=True, allow_nan=False)
+    return json.dumps(
+        obj, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False
+    )
 
 
 def content_hash(obj: Any) -> str:

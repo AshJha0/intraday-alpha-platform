@@ -3,7 +3,6 @@
 import json
 
 import pytest
-
 from iap.core.rng import SplitMix64
 
 # Known-answer values for seed 42, computed independently below AND pinned in

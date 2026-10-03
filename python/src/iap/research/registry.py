@@ -23,8 +23,9 @@ experiments and are ignored.
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator, List, NamedTuple, Optional, Tuple
+from typing import NamedTuple
 
 from iap.contracts.types import ExperimentResult, ExperimentSpec, Verdict
 from iap.contracts.validate import validate_typed
@@ -53,21 +54,21 @@ class ExperimentRegistry:
         self.root = Path(root)
         #: directories the most recent ``records()`` / ``find()`` pass could
         #: not load: ``(directory name, reason)`` in name order
-        self.skipped: List[Tuple[str, str]] = []
+        self.skipped: list[tuple[str, str]] = []
 
-    def _directories(self) -> List[str]:
+    def _directories(self) -> list[str]:
         """Every candidate experiment directory (sorted; dot-directories —
         staging areas — excluded)."""
         if not self.root.is_dir():
             return []
-        return sorted(p.name for p in self.root.iterdir()
-                      if p.is_dir() and not p.name.startswith("."))
+        return sorted(
+            p.name for p in self.root.iterdir() if p.is_dir() and not p.name.startswith(".")
+        )
 
-    def experiment_ids(self) -> List[str]:
+    def experiment_ids(self) -> list[str]:
         """Ids of every experiment directory (sorted; a directory is an
         experiment iff it holds a ``spec.json``)."""
-        return [name for name in self._directories()
-                if (self.root / name / SPEC_FILE).is_file()]
+        return [name for name in self._directories() if (self.root / name / SPEC_FILE).is_file()]
 
     def _read(self, experiment_id: str, name: str) -> dict:
         path = self.root / experiment_id / name
@@ -76,11 +77,11 @@ class ExperimentRegistry:
         try:
             doc = json.loads(path.read_text(encoding="ascii"))
         except (UnicodeDecodeError, ValueError) as exc:
-            raise ResearchError(f"{path}: not a canonical JSON document ({exc})",
-                                code="experiment_corrupt") from exc
+            raise ResearchError(
+                f"{path}: not a canonical JSON document ({exc})", code="experiment_corrupt"
+            ) from exc
         if not isinstance(doc, dict):
-            raise ResearchError(f"{path}: expected a JSON object",
-                                code="experiment_corrupt")
+            raise ResearchError(f"{path}: expected a JSON object", code="experiment_corrupt")
         return doc
 
     def load_spec(self, experiment_id: str) -> ExperimentSpec:
@@ -90,13 +91,15 @@ class ExperimentRegistry:
             spec = ExperimentSpec.from_dict(doc)
             validate_typed(spec)
         except ValueError as exc:
-            raise ResearchError(f"{self.root / experiment_id / SPEC_FILE}: {exc}",
-                                code="experiment_corrupt") from exc
+            raise ResearchError(
+                f"{self.root / experiment_id / SPEC_FILE}: {exc}", code="experiment_corrupt"
+            ) from exc
         verify_experiment_id(spec)
         if spec.experiment_id != experiment_id:
             raise ResearchError(
                 f"directory {experiment_id!r} holds spec {spec.experiment_id!r}",
-                code="experiment_corrupt")
+                code="experiment_corrupt",
+            )
         return spec
 
     def load_result(self, experiment_id: str) -> ExperimentResult:
@@ -106,26 +109,29 @@ class ExperimentRegistry:
             result = ExperimentResult.from_dict(doc)
             validate_typed(result)
         except ValueError as exc:
-            raise ResearchError(f"{self.root / experiment_id / RESULT_FILE}: {exc}",
-                                code="experiment_corrupt") from exc
+            raise ResearchError(
+                f"{self.root / experiment_id / RESULT_FILE}: {exc}", code="experiment_corrupt"
+            ) from exc
         if result.experiment_id != experiment_id:
             raise ResearchError(
                 f"directory {experiment_id!r} holds result {result.experiment_id!r}",
-                code="experiment_corrupt")
+                code="experiment_corrupt",
+            )
         return result
 
     def load(self, experiment_id: str) -> ExperimentRecord:
         """Spec + result, cross-checked (same alpha, same versions)."""
         if not (self.root / experiment_id).is_dir():
-            raise ResearchError(f"{self.root / experiment_id}: no such experiment",
-                                code="experiment_not_found")
+            raise ResearchError(
+                f"{self.root / experiment_id}: no such experiment", code="experiment_not_found"
+            )
         spec = self.load_spec(experiment_id)
         result = self.load_result(experiment_id)
         for name in ("alpha_id", "dataset_version", "feature_version", "model_version"):
             if getattr(spec, name) != getattr(result, name):
                 raise ResearchError(
-                    f"{experiment_id}: spec.{name} != result.{name}",
-                    code="experiment_corrupt")
+                    f"{experiment_id}: spec.{name} != result.{name}", code="experiment_corrupt"
+                )
         return ExperimentRecord(experiment_id, spec, result)
 
     def gate_eligibility(self, experiment_id: str) -> GateEligibility:
@@ -144,12 +150,14 @@ class ExperimentRegistry:
         path = self.root / experiment_id / ELIGIBILITY_FILE
         if not path.is_file():
             return from_spec
-        recorded = GateEligibility.from_dict(self._read(experiment_id, ELIGIBILITY_FILE),
-                                             experiment_id)
+        recorded = GateEligibility.from_dict(
+            self._read(experiment_id, ELIGIBILITY_FILE), experiment_id
+        )
         reasons = list(from_spec.reasons)
         reasons += [r for r in recorded.reasons if r not in reasons]
-        return GateEligibility(eligible=not reasons, reasons=tuple(reasons),
-                               periods_verified=recorded.periods_verified)
+        return GateEligibility(
+            eligible=not reasons, reasons=tuple(reasons), periods_verified=recorded.periods_verified
+        )
 
     def records(self) -> Iterator[ExperimentRecord]:
         """Every LOADABLE experiment, in id order.  Directories that could
@@ -166,15 +174,16 @@ class ExperimentRegistry:
 
     def find(
         self,
-        alpha_id: Optional[str] = None,
-        horizon: Optional[str] = None,
-        verdict: Optional[Verdict] = None,
-    ) -> List[ExperimentRecord]:
+        alpha_id: str | None = None,
+        horizon: str | None = None,
+        verdict: Verdict | None = None,
+    ) -> list[ExperimentRecord]:
         """Records matching every given filter (``None`` = any), in id order.
         Unloadable directories are in :attr:`skipped` afterwards."""
         want_verdict = Verdict(verdict) if verdict is not None else None
         return [
-            rec for rec in self.records()
+            rec
+            for rec in self.records()
             if (alpha_id is None or rec.spec.alpha_id == alpha_id)
             and (horizon is None or rec.spec.horizon == horizon)
             and (want_verdict is None or rec.result.verdict is want_verdict)

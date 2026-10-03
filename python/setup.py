@@ -58,7 +58,9 @@ class build_py(_build_py):  # noqa: N801 (setuptools naming)
         # provenance for anyone reading site-packages.
         (target / "PACKAGED_FROM").write_text(
             "schemas/ of the repository checkout at build time; "
-            "the repository copy is the source of truth.\n", encoding="ascii")
+            "the repository copy is the source of truth.\n",
+            encoding="ascii",
+        )
 
 
 setup(cmdclass={"build_py": build_py})

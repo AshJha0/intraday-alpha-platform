@@ -3,7 +3,6 @@
 import json
 
 import pytest
-
 from conftest import add, mkev
 from iap.core.codec import read_iap1, read_jsonl, write_jsonl
 from iap.core.events import EventType, Side
@@ -16,8 +15,12 @@ CFG = {
     "equities": {"slots_per_stream": 120},
     "fx": {"slots_per_pair": 100},
     "anomalies": {
-        "gap_prob": 0.004, "gap_max_events": 3, "dup_prob": 0.01,
-        "ooo_prob": 0.006, "invalid_prob": 0.004, "ts_violation_prob": 0.004,
+        "gap_prob": 0.004,
+        "gap_max_events": 3,
+        "dup_prob": 0.01,
+        "ooo_prob": 0.006,
+        "invalid_prob": 0.004,
+        "ts_violation_prob": 0.004,
     },
 }
 
@@ -36,9 +39,9 @@ def test_qc_exact_counts_on_handcrafted_stream(tmp_path):
     evs = [
         add(1, Side.BID, 100, 10, 1),
         add(2, Side.ASK, 102, 10, 2),
-        add(2, Side.ASK, 102, 10, 2),          # duplicate (seq 2 again)
-        add(5, Side.BID, 99, 10, 3),           # gap (3,4 missing)
-        add(4, Side.BID, 98, 10, 4),           # out-of-order late arrival
+        add(2, Side.ASK, 102, 10, 2),  # duplicate (seq 2 again)
+        add(5, Side.BID, 99, 10, 3),  # gap (3,4 missing)
+        add(4, Side.BID, 98, 10, 4),  # out-of-order late arrival
         mkev(5, EventType.ADD, 9, 101, 10, 5),  # invalid: side 9 (reuses seq 5)
         add(6, Side.ASK, 103, 10, 6),
     ]
@@ -93,14 +96,12 @@ def test_normalized_outputs_clean_and_ordered(pipeline):
 
     root, _, report = pipeline
     seen_streams = set()
-    for fname, meta in report["files"].items():
+    for _fname, meta in report["files"].items():
         out = read_jsonl(root / "normalized" / meta["normalized_jsonl"])
         assert len(out) == meta["events_out"]
         assert [e.event_id for e in out] == list(range(1, len(out) + 1))
         assert all(validation_error(e) is None for e in out)
-        assert all(
-            a.exchange_ts <= b.exchange_ts for a, b in zip(out, out[1:])
-        )
+        assert all(a.exchange_ts <= b.exchange_ts for a, b in zip(out, out[1:], strict=False))
         # no duplicates survive
         per_stream = {}
         for e in out:
@@ -127,9 +128,19 @@ def test_parquet_dataset_row_count_and_columns(pipeline):
     assert table.num_rows == report["totals"]["events_out"]
     assert table.num_rows == report["parquet"]["rows"]
     assert table.column_names == [
-        "event_id", "instrument_id", "venue_id", "exchange_ts", "receive_ts",
-        "sequence", "event_type", "side", "price_ticks", "qty", "order_id",
-        "trade_id", "source",
+        "event_id",
+        "instrument_id",
+        "venue_id",
+        "exchange_ts",
+        "receive_ts",
+        "sequence",
+        "event_type",
+        "side",
+        "price_ticks",
+        "qty",
+        "order_id",
+        "trade_id",
+        "source",
     ]
 
 
@@ -141,9 +152,16 @@ def test_qc_report_written_with_per_stream_counts(pipeline):
     assert on_disk["totals"] == report["totals"]
     for counters in on_disk["per_stream"].values():
         assert set(counters) == {
-            "events_in", "events_out", "gaps", "gap_missing_events",
-            "duplicates", "out_of_order", "sequence_resets",
-            "ts_regression_dropped", "invalid", "ts_clamped",
+            "events_in",
+            "events_out",
+            "gaps",
+            "gap_missing_events",
+            "duplicates",
+            "out_of_order",
+            "sequence_resets",
+            "ts_regression_dropped",
+            "invalid",
+            "ts_clamped",
         }
 
 

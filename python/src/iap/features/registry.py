@@ -16,7 +16,6 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from typing import Dict, List, Union
 
 from iap.features import (
     crossasset,
@@ -45,7 +44,7 @@ _FAMILY_MODULES = {
     "exec": execution,
 }
 
-_cache: List[FeatureSpec] = []
+_cache: list[FeatureSpec] = []
 
 
 def family_module(family: str):
@@ -56,18 +55,17 @@ def family_module(family: str):
         raise ValueError(f"unknown feature family: {family!r}") from None
 
 
-def build_registry() -> List[FeatureSpec]:
+def build_registry() -> list[FeatureSpec]:
     """The full pinned registry (cached; order is normative)."""
     if not _cache:
-        specs: List[FeatureSpec] = []
+        specs: list[FeatureSpec] = []
         for family in FAMILY_ORDER:
             mod = _FAMILY_MODULES[family]
             fam_specs = mod.specs()
             for s in fam_specs:
                 if s.family != family:
                     raise ValueError(
-                        f"feature {s.name} declares family {s.family!r}, "
-                        f"module owns {family!r}"
+                        f"feature {s.name} declares family {s.family!r}, module owns {family!r}"
                     )
             specs.extend(fam_specs)
         names = [s.name for s in specs]
@@ -78,48 +76,43 @@ def build_registry() -> List[FeatureSpec]:
         for s in specs:
             for dep in s.depends_on:
                 if dep not in name_set:
-                    raise ValueError(
-                        f"feature {s.name} depends on unregistered {dep!r}"
-                    )
+                    raise ValueError(f"feature {s.name} depends on unregistered {dep!r}")
         _cache.extend(specs)
     return list(_cache)
 
 
-def registry_dicts() -> List[dict]:
+def registry_dicts() -> list[dict]:
     """Registry entries as JSON-able dicts in registry order."""
     return [s.to_dict() for s in build_registry()]
 
 
 def registry_hash() -> str:
     """sha256 hex of the canonical registry JSON — the feature_version."""
-    canonical = json.dumps(
-        registry_dicts(), sort_keys=True, separators=(",", ":")
-    ).encode("utf-8")
+    canonical = json.dumps(registry_dicts(), sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(canonical).hexdigest()
 
 
-def feature_names() -> List[str]:
+def feature_names() -> list[str]:
     """All registered names in registry (= FeatureVector value) order."""
     return [s.name for s in build_registry()]
 
 
-def feature_index() -> Dict[str, int]:
+def feature_index() -> dict[str, int]:
     """{name: position in FeatureVector.values}."""
     return {s.name: i for i, s in enumerate(build_registry())}
 
 
-def write_registry(path: Union[str, Path]) -> dict:
+def write_registry(path: str | Path) -> dict:
     """Write the registry JSON file; returns the written document."""
     doc = {
         "x-version": 1,
         "description": "Pinned feature registry (conventions §6). "
-                       "FeatureVector.values follows this order; "
-                       "registry_hash is the FeatureVector feature_version.",
+        "FeatureVector.values follows this order; "
+        "registry_hash is the FeatureVector feature_version.",
         "registry_hash": registry_hash(),
         "count": len(build_registry()),
         "families": {
-            fam: sum(1 for s in build_registry() if s.family == fam)
-            for fam in FAMILY_ORDER
+            fam: sum(1 for s in build_registry() if s.family == fam) for fam in FAMILY_ORDER
         },
         "features": registry_dicts(),
     }
@@ -131,7 +124,7 @@ def write_registry(path: Union[str, Path]) -> dict:
     return doc
 
 
-def load_registry(path: Union[str, Path]) -> dict:
+def load_registry(path: str | Path) -> dict:
     """Load a written registry document (verifies its content hash)."""
     with open(path) as f:
         doc = json.load(f)

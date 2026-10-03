@@ -44,10 +44,16 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from iap.alpha import load_params_file  # noqa: E402
-from iap.alpha.data import asof_to_grid, load_features, make_grid, split_by_day, session_days  # noqa: E402
+from iap.alpha.data import (  # noqa: E402
+    asof_to_grid,
+    load_features,
+    make_grid,
+    session_days,
+    split_by_day,
+)
 from iap.alpha.fx_exposure import FX05CrossPairRelativeValue, solve_factor_returns  # noqa: E402
 from iap.alpha.goldenframes import build_golden_frame  # noqa: E402
-from iap.backtest import Backtester, BacktestConfig, CostModel  # noqa: E402
+from iap.backtest import BacktestConfig, Backtester, CostModel  # noqa: E402
 from iap.validation.metrics import ic  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[2]
@@ -70,8 +76,7 @@ FX05_IC_GRID_WINDOW = (100, 2500)
 
 #: pinned golden-backtest config (conf_min lower than the research default
 #: so the golden vector's tamer microprice deviations still produce trades)
-BT_CONFIG = {"max_pos_qty": 1000, "conf_min": 0.2, "latency_rows": 1,
-             "cost_multiplier": 1.0}
+BT_CONFIG = {"max_pos_qty": 1000, "conf_min": 0.2, "latency_rows": 1, "cost_multiplier": 1.0}
 
 
 def brute_force_z(raw: float, p: dict) -> tuple:
@@ -85,14 +90,19 @@ def brute_force_z(raw: float, p: dict) -> tuple:
 
 def brute_force_raw(alpha_id: str, row) -> float:
     """Independent per-row raw-signal recomputation (single-frame alphas)."""
+
     def g(name):
         v = float(row[name])
         return v
+
     if alpha_id == "EQ01":
         return g("micro_mid_dev_bps_v1")
     if alpha_id == "EQ03":
-        return (0.5 * g("ofi_norm_l1_w1s_v1") + 0.3 * g("ofi_norm_l5_w1s_v1")
-                + 0.2 * g("ofi_norm_l5_w5s_v1"))
+        return (
+            0.5 * g("ofi_norm_l1_w1s_v1")
+            + 0.3 * g("ofi_norm_l5_w1s_v1")
+            + 0.2 * g("ofi_norm_l5_w5s_v1")
+        )
     if alpha_id == "EQ06":
         return g("ret_vol_adj_10s_v1")
     if alpha_id == "FX01":
@@ -124,20 +134,20 @@ def frame_cases(alpha_id: str, frame, model, params: dict, rows, ic_window):
         conf = float(scores["confidence"].iloc[r])
         if not (abs(er - er_bf) <= 1e-12 and abs(conf - conf_bf) <= 1e-12):
             raise SystemExit(
-                f"{alpha_id} row {r}: class ({er}, {conf}) != brute force "
-                f"({er_bf}, {conf_bf})"
+                f"{alpha_id} row {r}: class ({er}, {conf}) != brute force ({er_bf}, {conf_bf})"
             )
-        cases.append({
-            "event_index_1based": ev_index,
-            "exchange_ts": int(frame["exchange_ts"].iloc[r]),
-            "inputs": {
-                name: (float(row[name]) if math.isfinite(float(row[name]))
-                       else None)
-                for name in model.features
-            },
-            "expected_return": er,
-            "confidence": conf,
-        })
+        cases.append(
+            {
+                "event_index_1based": ev_index,
+                "exchange_ts": int(frame["exchange_ts"].iloc[r]),
+                "inputs": {
+                    name: (float(row[name]) if math.isfinite(float(row[name])) else None)
+                    for name in model.features
+                },
+                "expected_return": er,
+                "confidence": conf,
+            }
+        )
     lo, hi = ic_window
     h = GOLDEN_IC_HORIZON.get(alpha_id, model.horizon)
     er = scores["expected_return"].to_numpy(dtype=float)[lo:hi].copy()
@@ -150,25 +160,28 @@ def frame_cases(alpha_id: str, frame, model, params: dict, rows, ic_window):
     n_active = int(np.sum([c["confidence"] > 0 for c in cases]))
     if n_active < 4:
         raise SystemExit(f"{alpha_id}: only {n_active}/5 golden cases active")
-    return cases, {"rows_0based": [lo, hi], "horizon": h,
-                   "ic": float(window_ic)}
+    return cases, {"rows_0based": [lo, hi], "horizon": h, "ic": float(window_ic)}
 
 
 def fx05_cases(params: dict, models):
     """FX05 golden cases from the bundled day-2 features (inputs embedded)."""
     model = models["FX05"]
-    frames = load_features(REPO / "data" / "features",
-                           instrument_ids=list(range(101, 109)))
+    frames = load_features(REPO / "data" / "features", instrument_ids=list(range(101, 109)))
     days = session_days(frames)
     _, day2 = split_by_day(frames, days[1])
     pair_ids = sorted(day2)
     grid = make_grid(day2, FX05CrossPairRelativeValue.GRID_STEP_NS)
-    mat = np.vstack([
-        asof_to_grid(day2[i]["exchange_ts"].to_numpy(),
-                     day2[i]["ret_log_1m_v1"].to_numpy(dtype=float), grid,
-                     FX05CrossPairRelativeValue.MAX_AGE_NS)
-        for i in pair_ids
-    ])
+    mat = np.vstack(
+        [
+            asof_to_grid(
+                day2[i]["exchange_ts"].to_numpy(),
+                day2[i]["ret_log_1m_v1"].to_numpy(dtype=float),
+                grid,
+                FX05CrossPairRelativeValue.MAX_AGE_NS,
+            )
+            for i in pair_ids
+        ]
+    )
     scores = model.score(day2)
     p = params["FX05"]
     tgt = pair_ids.index(FX05_TARGET_PAIR)
@@ -192,23 +205,24 @@ def fx05_cases(params: dict, models):
         conf = float(scores[FX05_TARGET_PAIR]["confidence"].iloc[rrow])
         if not (abs(er - er_bf) <= 1e-12 and abs(conf - conf_bf) <= 1e-12):
             raise SystemExit(
-                f"FX05 grid {gi}: class ({er}, {conf}) != brute force "
-                f"({er_bf}, {conf_bf})"
+                f"FX05 grid {gi}: class ({er}, {conf}) != brute force ({er_bf}, {conf_bf})"
             )
-        cases.append({
-            "grid_index_0based": gi,
-            "grid_ts": int(grid[gi]),
-            "native_row_0based": rrow,
-            "native_exchange_ts": int(tts[rrow]),
-            "target_pair": FX05_TARGET_PAIR,
-            "inputs": {
-                str(pid): (float(v) if math.isfinite(v) else None)
-                for pid, v in zip(pair_ids, r_vec)
-            },
-            "raw_residual_signal": float(raw),
-            "expected_return": er,
-            "confidence": conf,
-        })
+        cases.append(
+            {
+                "grid_index_0based": gi,
+                "grid_ts": int(grid[gi]),
+                "native_row_0based": rrow,
+                "native_exchange_ts": int(tts[rrow]),
+                "target_pair": FX05_TARGET_PAIR,
+                "inputs": {
+                    str(pid): (float(v) if math.isfinite(v) else None)
+                    for pid, v in zip(pair_ids, r_vec, strict=False)
+                },
+                "raw_residual_signal": float(raw),
+                "expected_return": er,
+                "confidence": conf,
+            }
+        )
     # pinned IC over a grid-window of target-pair native rows
     lo, hi = FX05_IC_GRID_WINDOW
     m_lo, m_hi = int(grid[lo]), int(grid[hi])
@@ -233,9 +247,7 @@ def fx05_cases(params: dict, models):
 
 def main() -> int:
     if not PARAMS_PATH.exists():
-        raise SystemExit(
-            f"{PARAMS_PATH} missing — run research/alpha_reports/run_all.py first"
-        )
+        raise SystemExit(f"{PARAMS_PATH} missing — run research/alpha_reports/run_all.py first")
     models = load_params_file(PARAMS_PATH)
     params = {aid: m.params() for aid, m in models.items()}
 
@@ -252,8 +264,7 @@ def main() -> int:
             "(row k = emission after 1-based event k); FX05 from bundled "
             "day-2 features with inputs embedded."
         ),
-        "params": {aid: params[aid] for aid in
-                   ("EQ01", "EQ03", "EQ06", "FX01", "FX05", "FX09")},
+        "params": {aid: params[aid] for aid in ("EQ01", "EQ03", "EQ06", "FX01", "FX05", "FX09")},
         "alphas": {},
     }
     for aid, frame, rows, win, src in (
@@ -281,24 +292,32 @@ def main() -> int:
     }
     print(f"FX05: 5 cases ok, ic={icw['ic']:+.6f}")
 
-    (GOLDEN / "expected_alpha.json").write_text(
-        json.dumps(out, indent=2, sort_keys=True) + "\n"
-    )
+    (GOLDEN / "expected_alpha.json").write_text(json.dumps(out, indent=2, sort_keys=True) + "\n")
 
     # -- expected_backtest.json: EQ01 on the golden EQ frame --------------
     inst = json.loads((CONFIGS / "instruments" / "instruments.json").read_text())["instruments"]
-    meta = {int(r["instrument_id"]): {
-        "tick_size": float(r["tick_size"]), "lot_size": int(r["lot_size"]),
-        "adv": float(r["adv"]), "asset_class": r["asset_class"],
-        "ref_price": float(r["ref_price"]),
-    } for r in inst}
-    cm = CostModel.load(CONFIGS / "execution" / "execution.json",
-                        multiplier=BT_CONFIG["cost_multiplier"])
-    bt = Backtester(cm, meta, BacktestConfig(
-        max_pos_qty=BT_CONFIG["max_pos_qty"],
-        conf_min=BT_CONFIG["conf_min"],
-        latency_rows=BT_CONFIG["latency_rows"],
-    ))
+    meta = {
+        int(r["instrument_id"]): {
+            "tick_size": float(r["tick_size"]),
+            "lot_size": int(r["lot_size"]),
+            "adv": float(r["adv"]),
+            "asset_class": r["asset_class"],
+            "ref_price": float(r["ref_price"]),
+        }
+        for r in inst
+    }
+    cm = CostModel.load(
+        CONFIGS / "execution" / "execution.json", multiplier=BT_CONFIG["cost_multiplier"]
+    )
+    bt = Backtester(
+        cm,
+        meta,
+        BacktestConfig(
+            max_pos_qty=BT_CONFIG["max_pos_qty"],
+            conf_min=BT_CONFIG["conf_min"],
+            latency_rows=BT_CONFIG["latency_rows"],
+        ),
+    )
     scores = models["EQ01"].score({1: eq_frame})
     res = bt.run({1: eq_frame}, scores, "EQUITY")
     r1 = res.per_instrument[1]
@@ -328,8 +347,10 @@ def main() -> int:
     (GOLDEN / "expected_backtest.json").write_text(
         json.dumps(bt_out, indent=2, sort_keys=True) + "\n"
     )
-    print(f"backtest golden: pnl={r1.total_pnl:+.4f} trades={r1.trade_count} "
-          f"costs={r1.total_costs:.4f}")
+    print(
+        f"backtest golden: pnl={r1.total_pnl:+.4f} trades={r1.trade_count} "
+        f"costs={r1.total_costs:.4f}"
+    )
     return 0
 
 
