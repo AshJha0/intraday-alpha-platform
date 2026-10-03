@@ -9,6 +9,10 @@
 //! negated form makes it REJECT instead of passing the check. For finite
 //! values the two forms are identical.
 
+// Rewriting to `x > limit` would change NaN handling (fail-closed), so the lint is
+// allowed for this whole file.
+#![allow(clippy::neg_cmp_op_on_partial_ord)]
+
 use venue::{order_validation_error, OrderRequest};
 
 use crate::engine::{pos_add, pos_sub, Bucket, RiskDecision, RiskEngine, NS_PER_SEC};
