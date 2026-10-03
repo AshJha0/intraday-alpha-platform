@@ -553,7 +553,6 @@ def test_store_rows_equal_the_registry_evidence_for_every_alpha(built: Store) ->
     all 24 alphas the store's ``experiment_results`` row is the
     ``ExperimentResult`` the registry was bootstrapped from, field for
     field, and the registry record points at that row's ``experiment_id``."""
-    from iap.contracts.types import ExperimentResult
     from iap.lifecycle.bootstrap import (
         load_ledger_entries, load_params_document, load_report, research_evidence)
     from iap.lifecycle.registry import AlphaRegistry

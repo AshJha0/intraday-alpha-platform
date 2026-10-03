@@ -7,7 +7,7 @@ from bisect import bisect_right
 
 import pytest
 
-from conftest import GOLDEN_DIR, REPO_ROOT
+from conftest import GOLDEN_DIR
 from bruteforce_features import book_frames
 from iap.core.codec import read_jsonl
 from iap.labels.labels import (

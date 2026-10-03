@@ -159,7 +159,7 @@ def test_scenario_venue_disconnect_then_snapshot_recovery(contexts, idx):
     feed.send(EventType.ADD, t, side=1, price=1002, qty=100, order_id=2)
     # 400 s of mid changes so every window is warm and rvol > 0
     oid = 10
-    bid, ask = 1000, 1002
+    bid = 1000
     for k in range(200):
         t += 2 * NS
         step = 1 if k % 2 == 0 else -1

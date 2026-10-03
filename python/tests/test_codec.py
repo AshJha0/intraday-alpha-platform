@@ -8,7 +8,7 @@ import pytest
 
 from conftest import mkev
 from iap.core import codec
-from iap.core.events import EventType, MarketEvent, Side
+from iap.core.events import EventType, MarketEvent
 
 
 def _sample_events(n=20):

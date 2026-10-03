@@ -26,8 +26,9 @@
 #                                Dockerfile/compose/k8s/ConfigMap/dashboard
 #                                checks and the docker build-context proof
 #   cpp-sanitizers               ASan+UBSan ctest (blocking; green on first run)
-#   advisory                     ruff, pip-audit, cargo audit (non-blocking);
-#                                clippy is a non-blocking step of the rust job
+#   advisory                     ruff (blocking), pip-audit, cargo audit
+#                                (non-blocking); clippy is a blocking step of
+#                                the rust job
 #   images                       builds the four images; needs every other job;
 #                                runs on push to main and on PRs that change
 #                                image inputs
@@ -191,12 +192,8 @@ jobs:
       - name: cargo test (workspace)
         working-directory: rust
         run: cargo test --workspace --locked
-      # ADVISORY: nobody has run clippy over this workspace yet, so the first
-      # CI run may report findings. continue-on-error keeps it from failing the
-      # job until the baseline is clean; then drop continue-on-error to make it
-      # a gate. Findings are listed in the log of this step.
-      - name: cargo clippy (advisory)
-        continue-on-error: true
+      # BLOCKING: the workspace is clippy-clean; any new finding fails the job.
+      - name: cargo clippy
         working-directory: rust
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
       # Coverage for the risk crate at minimum (the normative risk engine,
@@ -287,8 +284,7 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11"
-      - name: ruff check
-        continue-on-error: true
+      - name: ruff check (blocking)
         run: |
           python -m pip install ruff==0.16.10
           ruff check python tests tools --output-format=concise

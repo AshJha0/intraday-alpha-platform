@@ -111,6 +111,8 @@ pub fn mid_labels(
 }
 
 /// [`mid_labels`] with an explicit freshness bound.
+// `!(x > 0.0)` is deliberately true for NaN; `x <= 0.0` would change that.
+#[allow(clippy::neg_cmp_op_on_partial_ord)]
 pub fn mid_labels_with_age(
     anchors_ts: &[i64],
     series: &MidSeries,

@@ -8,7 +8,7 @@ lists in the pinned family order (see :mod:`iap.features.registry`).
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, Tuple
 
 NS_PER_SEC = 1_000_000_000

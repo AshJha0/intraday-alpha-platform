@@ -32,7 +32,7 @@ from iap.contracts.types import (
     Verdict,
 )
 from iap.contracts.validate import ContractValidationError
-from iap.contracts.versions import canonical_json, content_hash
+from iap.contracts.versions import canonical_json
 from iap.store.db import Store
 
 __all__ = [

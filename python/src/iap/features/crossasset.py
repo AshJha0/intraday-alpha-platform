@@ -93,7 +93,6 @@ def _moments(win) -> Optional[tuple]:
 
 def compute(st, values: List[float], valid: List[bool]) -> None:
     """Append the 11 cross-asset values for the current emission."""
-    t = st.t
     for h in REF_HORIZONS:
         put(values, valid, st.ref_ret_log(WINDOW_NS[h]),
             st.ref_ret_log(WINDOW_NS[h]) is not None)

@@ -1,0 +1,11 @@
+# Lint config for `ruff check python tests tools` (run from the repo root, see
+# .github/workflows/ci.yml). Correctness-only rule set: pycodestyle E4/E7/E9
+# and pyflakes F. No formatter is used and style rules are deliberately off.
+target-version = "py311"
+line-length = 100
+
+[lint]
+select = ["E4", "E7", "E9", "F"]
+
+# E741: `l` is used as a short loop/comprehension name in tests/tools; renaming is style noise.
+ignore = ["E741"]

@@ -3,7 +3,7 @@
 import pytest
 
 from iap.core.codec import encode_iap1, read_jsonl, sha256_bytes
-from iap.core.events import EventType, SessionStatus, Side, validation_error
+from iap.core.events import EventType, SessionStatus, validation_error
 from iap.marketdata.generator import (
     MarketDataGenerator,
     generate_golden_eq,
