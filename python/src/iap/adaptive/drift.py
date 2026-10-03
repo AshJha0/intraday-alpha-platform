@@ -181,7 +181,7 @@ class DriftBaseline:
             raise ValueError(
                 f"baseline needs {PSI_BUCKETS} expected fractions, got {len(self.expected_frac)}"
             )
-        if any(b < a for a, b in zip(self.edges, self.edges[1:])):
+        if any(b < a for a, b in zip(self.edges, self.edges[1:], strict=False)):
             raise ValueError("baseline edges must be non-decreasing")
 
     # -- serialization ----------------------------------------------------

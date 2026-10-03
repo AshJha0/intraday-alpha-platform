@@ -100,7 +100,7 @@ class ExecutionReplay:
         self,
         config: ExecConfig,
         parents: Sequence[ParentOrder],
-        sor_options: SorOptions = SorOptions(),
+        sor_options: SorOptions = SorOptions(),  # noqa: B008 (frozen dataclass default, one shared immutable instance is intended)
     ) -> None:
         self._config = config
         self._sim = ExecutionSimulator(config)

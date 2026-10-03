@@ -34,7 +34,7 @@ def _assert_no_valid_nan(vecs):
     n = len(build_registry())
     for vec in vecs:
         assert len(vec.values) == n and len(vec.validity) == n
-        for x, ok in zip(vec.values, vec.validity):
+        for x, ok in zip(vec.values, vec.validity, strict=False):
             if ok:
                 assert math.isfinite(x)
             else:
@@ -147,7 +147,7 @@ def test_cadence_throttles_emissions(contexts):
     # emitted timestamps at least cadence apart (per instrument = the only one)
     engine = FeatureEngine(contexts, cadence_ns=1_000_000_000)
     ts = [v.timestamp for v in map(engine.apply, events) if v is not None]
-    assert all(b - a >= 1_000_000_000 for a, b in zip(ts, ts[1:]))
+    assert all(b - a >= 1_000_000_000 for a, b in zip(ts, ts[1:], strict=False))
 
 
 def test_unknown_instrument_raises(contexts):

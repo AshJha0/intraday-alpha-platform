@@ -51,7 +51,7 @@ def test_golden_pins_rounding_ties(golden: dict) -> None:
         struct.unpack("<d", struct.pack("<Q", int(c["bits_hex"], 16)))[0]
         for c in golden["float_repr"]
     ]
-    reprs = {v: c["repr"] for v, c in zip(values, golden["float_repr"])}
+    reprs = {v: c["repr"] for v, c in zip(values, golden["float_repr"], strict=False)}
     for value, want in (
         (1059438285926254.25, "1059438285926254.2"),
         (26363981746409.3125, "26363981746409.312"),

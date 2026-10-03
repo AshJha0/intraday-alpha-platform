@@ -112,7 +112,7 @@ def test_walk_forward_expanding_and_disjoint():
     horizon = 5 * NS_S
     seen_tests = []
     prev_train_max = -1
-    for fold, train, test in sp.split_frames(frames, horizon):
+    for _fold, train, test in sp.split_frames(frames, horizon):
         tr, te = train[1], test[1]
         assert len(te) > 0
         # every test row inside the fold bounds, no overlap with other folds
@@ -132,7 +132,7 @@ def test_purging_removes_overlapping_labels():
     frames = _frames_1s_rows()
     horizon = 5 * NS_S
     sp = WalkForwardSplitter(n_folds=4, embargo_ns=0)
-    for fold, train, test in sp.split_frames(frames, horizon):
+    for fold, train, _test in sp.split_frames(frames, horizon):
         tr_ts = train[1]["exchange_ts"].to_numpy()
         assert np.all(tr_ts + horizon < fold.test_start)
         # and purging is tight: the row just inside the boundary IS kept
@@ -145,7 +145,7 @@ def test_embargo_widens_the_gap():
     horizon = 5 * NS_S
     embargo = 10 * NS_S
     sp = WalkForwardSplitter(n_folds=4, embargo_ns=embargo)
-    for fold, train, test in sp.split_frames(frames, horizon):
+    for fold, train, _test in sp.split_frames(frames, horizon):
         tr_ts = train[1]["exchange_ts"].to_numpy()
         assert np.all(tr_ts + horizon + embargo < fold.test_start)
 

@@ -143,7 +143,7 @@ def compute(st, values: list[float], valid: list[bool]) -> None:
         if w in vols and w in depth_means:
             v = vols[w] / (vols[w] + depth_means[w] + EPS)
         put(values, valid, v, v is not None)
-    for side, levels in (("bid", st.depth_bid), ("ask", st.depth_ask)):
+    for _side, levels in (("bid", st.depth_bid), ("ask", st.depth_ask)):
         slope = None
         if ok and len(levels) >= 2:
             k = min(5, len(levels))

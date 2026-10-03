@@ -205,7 +205,10 @@ def test_scenario_matching_engine_clock_step_in_stream(tmp_path):
     raw = tmp_path / "raw"
     raw.mkdir()
     ts = [100, 200, 400, 300, 500]
-    evs = [add(s, BID, 100 - s, 10, s, ts=10**18 + t * 10**6) for s, t in zip(range(1, 6), ts)]
+    evs = [
+        add(s, BID, 100 - s, 10, s, ts=10**18 + t * 10**6)
+        for s, t in zip(range(1, 6), ts, strict=False)
+    ]
     for i, e in enumerate(evs):
         e.event_id = i + 1
     codec.write_jsonl(raw / "s.jsonl", evs)

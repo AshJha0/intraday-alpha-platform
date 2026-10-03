@@ -181,7 +181,7 @@ class AdaptiveDeployment:
         if any(len(df) == 0 for df in wframes.values()):
             return np.empty(0)
         vals = []
-        for i, sig in probe.signals(wframes).items():
+        for _i, sig in probe.signals(wframes).items():
             v = sig.to_numpy(dtype=float)
             vals.append(v[np.isfinite(v)])
         return np.concatenate(vals) if vals else np.empty(0)
@@ -317,7 +317,7 @@ class AdaptiveDeployment:
         """Fresh model fitted on the trailing purged window ending at fit_ts.
         Raises RuntimeError if any training row could see past fit_ts."""
         train = self._train_window(fit_ts)
-        for i, df in train.items():
+        for _i, df in train.items():
             if len(df):
                 last = int(df["exchange_ts"].iloc[-1])
                 if last + self.horizon_ns + self.embargo_ns >= fit_ts:

@@ -145,7 +145,6 @@ def run_alpha(aid: str, frames, cfg, backtester, lc_cfg, log, ledger) -> dict:
             "rolling_ic_mean": stab["mean"],
             "rolling_ic_std": stab["std"],
             "n_ic_evals": stab["n"],
-            "n_evals": res.n_evals,
             "n_informative_evals": res.n_informative_evals,
             "ic_baseline_kind": (dep.ic_baseline.baseline_kind if dep.ic_baseline else None),
             "ic_baseline_rows": getattr(dep, "ic_baseline_rows", 0),

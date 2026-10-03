@@ -381,7 +381,7 @@ def summarise(runs: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
         n = len(rows)
 
         def rate(key: str) -> float:
-            return round(sum(1 for r in ok if r[key]) / n, _ROUND)
+            return round(sum(1 for r in ok if r[key]) / n, _ROUND)  # noqa: B023 (closure is called within the same iteration)
 
         out.append(
             {

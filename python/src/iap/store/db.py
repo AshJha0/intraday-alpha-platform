@@ -422,7 +422,7 @@ class Store:
         cur = self._conn.execute(sql, tuple(params))
         try:
             names = [d[0] for d in cur.description] if cur.description else []
-            return [dict(zip(names, row)) for row in cur.fetchall()]
+            return [dict(zip(names, row, strict=False)) for row in cur.fetchall()]
         finally:
             cur.close()
 

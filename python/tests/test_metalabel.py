@@ -274,7 +274,7 @@ def test_meta_split_uses_row_mass_not_wall_clock():
     seg = res["segments"]
     total = seg["train"] + seg["calibration"] + seg["test"]
     fractions = [seg[k] / total for k in ("train", "calibration", "test")]
-    for got, want in zip(fractions, (0.50, 0.25, 0.25)):
+    for got, want in zip(fractions, (0.50, 0.25, 0.25), strict=False):
         assert abs(got - want) < 0.02, fractions
 
     # the wall-clock rule the defect used, evaluated on the same timestamps

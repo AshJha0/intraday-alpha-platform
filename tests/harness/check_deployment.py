@@ -622,7 +622,7 @@ def check_k8s_singleton() -> None:
     """§12.7 — the trading vertical is a singleton with probes that can fail."""
     problems = []
     found = False
-    for f, doc in k8s_docs():
+    for _f, doc in k8s_docs():
         if doc["kind"] == "PodDisruptionBudget" and doc["metadata"]["name"] == "java-platform":
             problems.append("a PDB on a single-replica singleton blocks drains")
         if doc["kind"] != "Deployment" or doc["metadata"]["name"] != "java-platform":
@@ -841,11 +841,11 @@ def check_alerting_wired() -> None:
 def check_k8s_pod_hardening() -> None:
     problems = []
     pods = pod_specs()
-    for fname, name, pod in pods:
+    for _fname, name, pod in pods:
         if pod.get("automountServiceAccountToken") is not False:
             problems.append(f"{name}: automountServiceAccountToken is not false")
     claims = {}
-    for fname, name, pod in pods:
+    for _fname, name, pod in pods:
         for vol in pod.get("volumes") or []:
             pvc = (vol.get("persistentVolumeClaim") or {}).get("claimName")
             if pvc:
@@ -980,7 +980,7 @@ def check_image_pinning() -> None:
     for name, svc in compose_doc()["services"].items():
         if "image" in svc:
             check_ref(f"compose {name}", svc["image"])
-    for fname, name, pod in pod_specs():
+    for _fname, name, pod in pod_specs():
         for c in pod.get("containers", []):
             check_ref(f"k8s {name}", c["image"])
     if len(iap_tags) > 1:

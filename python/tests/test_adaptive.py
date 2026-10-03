@@ -250,7 +250,7 @@ def test_psi_epsilon_guard_disjoint_sample(synth_baseline):
 def test_psi_monotone_under_growing_shift(synth_baseline, synth_samples):
     base, _, _ = synth_samples
     vals = [psi(synth_baseline, base[:2000] + s) for s in (0.0, 0.1, 0.3, 0.6)]
-    assert all(b > a for a, b in zip(vals, vals[1:]))
+    assert all(b > a for a, b in zip(vals, vals[1:], strict=False))
 
 
 def test_ks_bounds():
@@ -331,7 +331,7 @@ def test_signal_eq01_baseline_matches_golden(golden):
     # we verify the serialized geometry is internally consistent instead
     # (full sample reconstruction is covered by test_alpha_golden's frame)
     assert abs(sum(b.expected_frac) - 1.0) < 1e-12
-    assert all(e2 >= e1 for e1, e2 in zip(b.edges, b.edges[1:]))
+    assert all(e2 >= e1 for e1, e2 in zip(b.edges, b.edges[1:], strict=False))
 
 
 def test_rolling_ic_matches_golden(golden):
@@ -740,7 +740,7 @@ def test_adaptive_refits_train_only_on_purged_past(toy_deployment):
 
 def test_adaptive_warmup_never_trades(toy_deployment, adaptive_cfg):
     res = toy_deployment.run(build_policy("static", adaptive_cfg))
-    for iid, sc in res.scores.items():
+    for _iid, sc in res.scores.items():
         warm = sc["exchange_ts"].to_numpy() < toy_deployment.deploy_start
         assert (sc["confidence"].to_numpy()[warm] == 0.0).all()
         assert (sc["expected_return"].to_numpy()[warm] == 0.0).all()
@@ -755,7 +755,7 @@ def test_adaptive_retirement_halts_allocation(toy_deployment, adaptive_cfg, tmp_
     res = toy_deployment.run(build_policy("static", adaptive_cfg), lc, log)
     assert res.final_state == RETIRED
     retire_ts = next(t["event_ts"] for t in res.transitions if t["to"] == RETIRED)
-    for iid, sc in res.scores.items():
+    for _iid, sc in res.scores.items():
         after = sc["exchange_ts"].to_numpy() >= retire_ts
         assert (sc["confidence"].to_numpy()[after] == 0.0).all()
     # log carries exactly the run's transitions

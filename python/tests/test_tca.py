@@ -57,7 +57,7 @@ def test_perold_hand_case_sell():
 
 def test_perold_identity_components_sum_to_total():
     """delay + trading + opportunity == total, exactly (1e-9)."""
-    for iid, (tl, orders, _) in bundled_order_set().items():
+    for _iid, (tl, orders, _) in bundled_order_set().items():
         for o in orders:
             r = order_tca(o, tl)["perold"]
             assert (
@@ -208,7 +208,7 @@ def test_simulator_deterministic():
     for iid in a:
         oa, ob = a[iid][1], b[iid][1]
         assert len(oa) == len(ob)
-        for x, y in zip(oa, ob):
+        for x, y in zip(oa, ob, strict=False):
             assert x.order_id == y.order_id
             assert x.qty_target == y.qty_target
             assert x.decision_ts == y.decision_ts
@@ -218,7 +218,7 @@ def test_simulator_deterministic():
 
 
 def test_simulated_orders_are_sane():
-    for iid, (tl, orders, tick) in bundled_order_set().items():
+    for _iid, (_tl, orders, _tick) in bundled_order_set().items():
         for o in orders:
             assert 0 < o.qty_filled <= o.qty_target or o.qty_filled == 0
             assert o.decision_ts < o.arrival_ts < o.end_ts

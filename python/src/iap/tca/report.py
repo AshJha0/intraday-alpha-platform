@@ -34,7 +34,7 @@ def _mean(vals: list[float | None]) -> float | None:
 def compute_tca_records(golden_dir: Path | None = None) -> dict[int, dict]:
     """Run the bundled simulation and full TCA; {instrument_id: payload}."""
     out: dict[int, dict] = {}
-    for iid, (tl, orders, tick) in bundled_order_set(golden_dir).items():
+    for iid, (tl, orders, _tick) in bundled_order_set(golden_dir).items():
         recs = [order_tca(o, tl) for o in orders]
         # impact regression across ALL child fills of the instrument
         part: list[float] = []

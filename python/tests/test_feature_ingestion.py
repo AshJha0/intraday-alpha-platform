@@ -233,7 +233,7 @@ def test_scenario_venue_disconnect_then_snapshot_recovery(contexts, idx):
     assert vec.validity[idx["rvol_w10s_v1"]]
     rva = _val(vec, idx, "ret_vol_adj_10s_v1")
     assert (not rva[1]) or abs(rva[0]) < 1e3
-    for x, ok in zip(vec.values, vec.validity):
+    for x, ok in zip(vec.values, vec.validity, strict=False):
         assert (not ok) or math.isfinite(x)
 
 
@@ -266,7 +266,7 @@ def test_resiliency_halflife_invalid_without_replenishment(contexts, idx):
     feed = _Feed(engine)
     t = T0
     _warm_book(feed, t)
-    for k in range(12):
+    for _k in range(12):
         t += 1 * NS
         feed.send(EventType.MODIFY, t, side=0, price=0, qty=100, order_id=5)
     vec = feed.vec
@@ -339,7 +339,7 @@ def test_scenario_lp_withdraws_with_zero_price_quote(contexts, idx, price):
     assert engine.events_dropped == 1
     # the withdrawal was rejected: the previous quote still prevails
     assert vec.validity[idx["mid_price_v1"]]
-    for x, ok in zip(vec.values, vec.validity):
+    for x, ok in zip(vec.values, vec.validity, strict=False):
         assert (not ok) or math.isfinite(x)
 
 

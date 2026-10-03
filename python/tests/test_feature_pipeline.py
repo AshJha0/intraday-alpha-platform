@@ -97,7 +97,7 @@ def test_pipeline_labels_no_lookahead_tail(run_dir):
         mids = table.column(f"label_mid_{h}").to_pylist()
         import math
 
-        for t, v, m in zip(ts, valid, mids):
+        for t, v, m in zip(ts, valid, mids, strict=False):
             if t + h_ns > last:
                 assert not v, f"label_{h} valid past stream end"
             if not v:

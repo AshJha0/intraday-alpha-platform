@@ -47,7 +47,7 @@ def _sorted_candidates(candidates: Sequence[int]) -> list:
 class SmartOrderRouter:
     """Deterministic venue selection (rules in the module docstring)."""
 
-    def __init__(self, venues: Mapping[int, VenueSpec], options: SorOptions = SorOptions()) -> None:
+    def __init__(self, venues: Mapping[int, VenueSpec], options: SorOptions = SorOptions()) -> None:  # noqa: B008 (frozen dataclass default, one shared immutable instance is intended)
         self._venues = dict(sorted(venues.items()))
         self._options = options
 

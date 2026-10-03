@@ -50,7 +50,7 @@ def book_frames(events: list[MarketEvent], depth_levels: int = 10):
             for k in (1, 3, 5, 10):
                 row[f"b{k}"] = sum(q for _, q in bid[:k])
                 row[f"a{k}"] = sum(q for _, q in ask[:k])
-            for i, k in enumerate((1, 3, 5, 10)):
+            for _i, k in enumerate((1, 3, 5, 10)):
                 row[f"ofi{k}"] = (
                     _delta(prev_bid, bid, k) - _delta(prev_ask, ask, k) if have_prev else 0
                 )

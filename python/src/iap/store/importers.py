@@ -20,7 +20,7 @@ import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Union
+from typing import Any
 
 from iap.contracts.types import (
     Actor,
@@ -53,7 +53,7 @@ __all__ = [
     "import_tca_orders",
 ]
 
-PathLike = Union[str, Path]
+PathLike = str | Path
 
 #: The platform's pinned sentinel for "no git commit recorded"
 #: (docs/governance/REPRODUCIBILITY.md).

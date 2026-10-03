@@ -276,7 +276,7 @@ def validate_eq(events, vecs, names_idx, tick):
         t = vec.timestamp
 
         def engine_val(name):
-            return vec.values[names_idx[name]], vec.validity[names_idx[name]]
+            return vec.values[names_idx[name]], vec.validity[names_idx[name]]  # noqa: B023 (closure is called within the same iteration)
 
         # spread_bps / imbalance_l1 / microprice from the raw book state
         # (n-filters drop later events sharing the checkpoint's exchange_ts)

@@ -174,7 +174,7 @@ def test_golden_notification_events_in_order(golden, config):
     notif = [e for e in events if is_notification(e.rule_id, e.decision)]
     expected = golden["expected_notification_events"]
     assert len(notif) == len(expected), "notification event count"
-    for got, want in zip(notif, expected):
+    for got, want in zip(notif, expected, strict=False):
         assert got.rule_id == want["rule_id"]
         assert got.scope == Scope.parse(want["scope"])
         assert got.scope_id == want["scope_id"]

@@ -69,7 +69,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import Any, Union
+from typing import Any
 
 from iap.contracts.types import GateResult
 from iap.lifecycle.config import PolicyConfig
@@ -83,7 +83,7 @@ __all__ = [
     "ic_rank_gap",
 ]
 
-Metric = Union[float, int, bool, None]
+Metric = float | int | bool | None
 
 
 def ic_rank_gap(ic: float, rank_ic: float, eps: float) -> float:

@@ -162,7 +162,7 @@ def bundled_order_set(
     rng = SplitMix64(seed)
     out: dict[int, tuple[MarketTimeline, list[ParentOrder], float]] = {}
     next_id = 1
-    for (fname, (iid, tick, lot)), n in zip(GOLDEN_STREAMS.items(), n_orders):
+    for (fname, (iid, tick, lot)), n in zip(GOLDEN_STREAMS.items(), n_orders, strict=False):
         tl = build_timeline(gdir / fname, iid, tick)
         orders = simulate_parent_orders(tl, iid, tick, lot, n, rng, first_order_id=next_id)
         next_id += len(orders)

@@ -104,7 +104,7 @@ def test_golden_exact_fill_list_matches(golden, events, configs_dir):
     # volume and share one liquidity pool, so the old single 129-share fill
     # is now the 100 the tape actually showed plus a later 29.
     assert len(res.fills) == len(want_fills) == 7
-    for i, (got, want) in enumerate(zip(res.fills, want_fills)):
+    for i, (got, want) in enumerate(zip(res.fills, want_fills, strict=False)):
         what = f"fill {i + 1}"
         assert got.fill_id == want["fill_id"], what
         assert got.order_id == want["order_id"], what
@@ -133,7 +133,7 @@ def test_golden_exact_fill_list_matches(golden, events, configs_dir):
 def test_golden_rows_are_bit_identical_to_the_cpp_reference(golden, events, configs_dir):
     """Stronger than 1e-9: the C++ %.17g doubles round-trip to our doubles."""
     res, _ = run_golden_scenario(events, configs_dir)
-    for got, want in zip(res.fills, golden["fills"]):
+    for got, want in zip(res.fills, golden["fills"], strict=False):
         row = got.to_dict()
         assert row == {**want, "impact_cost": float(want["impact_cost"])}
         assert row["fee"] == want["fee"]

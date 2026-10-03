@@ -96,12 +96,12 @@ def test_normalized_outputs_clean_and_ordered(pipeline):
 
     root, _, report = pipeline
     seen_streams = set()
-    for fname, meta in report["files"].items():
+    for _fname, meta in report["files"].items():
         out = read_jsonl(root / "normalized" / meta["normalized_jsonl"])
         assert len(out) == meta["events_out"]
         assert [e.event_id for e in out] == list(range(1, len(out) + 1))
         assert all(validation_error(e) is None for e in out)
-        assert all(a.exchange_ts <= b.exchange_ts for a, b in zip(out, out[1:]))
+        assert all(a.exchange_ts <= b.exchange_ts for a, b in zip(out, out[1:], strict=False))
         # no duplicates survive
         per_stream = {}
         for e in out:

@@ -619,7 +619,7 @@ def check_test_counts(docs: dict[str, str]) -> None:
     report(
         "parity_table_parsed",
         True,
-        "README table: tests %s, golden %s (python/cpp/rust/java)"
+        "README table: tests %s, golden %s (python/cpp/rust/java)"  # noqa: UP031 (byte-pinned output format, kept as-is)
         % ("/".join(map(str, t_tuple)), "/".join(map(str, g_tuple))),
         PLATFORM_FAILURES,
     )

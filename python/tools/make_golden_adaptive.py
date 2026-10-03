@@ -191,8 +191,10 @@ def _rolling_ic_case(frame, model, cfg) -> dict:
         "window_ns": window_ns,
         "bucket_ns": bucket_ns,
         "min_buckets": min_buckets,
-        "mid_series": [[int(a), float(b)] for a, b in zip(mid_ts, mid_v)],
-        "signals": [[int(a), float(b), float(c)] for a, b, c in zip(sig_ts, sig_v, sig_mid)],
+        "mid_series": [[int(a), float(b)] for a, b in zip(mid_ts, mid_v, strict=False)],
+        "signals": [
+            [int(a), float(b), float(c)] for a, b, c in zip(sig_ts, sig_v, sig_mid, strict=False)
+        ],
         "evaluations": evals,
     }
 
@@ -331,7 +333,7 @@ def main() -> int:
     ic_informative = [True] * 20 + [True] + [False] * 6
     tracker = LifecycleTracker(alpha_id="GOLDEN", config=lc, policy="golden")
     states = []
-    for k, (v, inf) in enumerate(zip(ic_path, ic_informative)):
+    for k, (v, inf) in enumerate(zip(ic_path, ic_informative, strict=False)):
         states.append(tracker.update((k + 1) * NS_15M, v, informative=inf))
     expected_states = [
         "ACTIVE",

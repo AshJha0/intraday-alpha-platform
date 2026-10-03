@@ -216,7 +216,7 @@ def fx05_cases(params: dict, models):
                 "target_pair": FX05_TARGET_PAIR,
                 "inputs": {
                     str(pid): (float(v) if math.isfinite(v) else None)
-                    for pid, v in zip(pair_ids, r_vec)
+                    for pid, v in zip(pair_ids, r_vec, strict=False)
                 },
                 "raw_residual_signal": float(raw),
                 "expected_return": er,

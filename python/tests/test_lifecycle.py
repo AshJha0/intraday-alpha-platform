@@ -444,7 +444,9 @@ def test_happy_path_every_promotion_edge(config):
         (S.VALIDATING, S.PAPER),
         (S.PAPER, S.ACTIVE),
     ]
-    for t, edge_state in zip(m.transitions, (S.RESEARCH, S.CANDIDATE, S.VALIDATING, S.PAPER)):
+    for t, edge_state in zip(
+        m.transitions, (S.RESEARCH, S.CANDIDATE, S.VALIDATING, S.PAPER), strict=False
+    ):
         assert list(t.gates) == list(PROMOTION_EDGES[edge_state].gates)
         assert all(g.passed for g in t.gates.values())
         assert t.actor is Actor.SYSTEM and t.policy == config.policy
@@ -554,7 +556,7 @@ def test_live_edges_match_the_adaptive_tracker(config):
     tracker = LifecycleTracker("EQ01", LifecycleConfig.from_config(lc["config"]), policy="p")
     m = _machine(config, "EQ01")
     ts = _to_state(m, "EQ01", S.ACTIVE)
-    for k, (ic, informative) in enumerate(zip(lc["ic_path"], lc["ic_informative"])):
+    for k, (ic, informative) in enumerate(zip(lc["ic_path"], lc["ic_informative"], strict=False)):
         ts += lc["ts_step_ns"]
         expected = tracker.update(ts, ic, informative)
         if expected == "RETIRED":

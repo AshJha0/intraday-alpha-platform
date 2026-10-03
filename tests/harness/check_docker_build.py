@@ -148,7 +148,7 @@ def stages(text: str) -> list[tuple[str | None, list[tuple[str | None, list[str]
 def check_copy_sources(ctx: Path) -> None:
     problems = []
     for df in sorted(DOCKER_DIR.glob("Dockerfile.*")):
-        for stage_name, copies in stages(df.read_text()):
+        for _stage_name, copies in stages(df.read_text()):
             for from_stage, args in copies:
                 if from_stage is not None:
                     continue  # a previous stage's filesystem

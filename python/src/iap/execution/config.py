@@ -23,11 +23,10 @@ import json
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Union
 
 from iap.execution.types import InstrumentSpec, LatencyConfig, VenueSpec
 
-PathLike = Union[str, Path]
+PathLike = str | Path
 
 #: Config file paths relative to the config directory (conventions section 0).
 VENUES_FILE = "venues/venues.json"
@@ -201,7 +200,7 @@ def load_sor_options(path: PathLike) -> SorOptions:
     return SorOptions(pr, int(_number(sor, "max_venue_latency_ns", f"{path} sor")))
 
 
-def load_exec_config(config_dir: PathLike, latency: LatencyConfig = LatencyConfig()) -> ExecConfig:
+def load_exec_config(config_dir: PathLike, latency: LatencyConfig = LatencyConfig()) -> ExecConfig:  # noqa: B008 (frozen dataclass default, one shared immutable instance is intended)
     """Build the ``ExecConfig`` the platform runs with from a config directory.
 
     Mirrors the Java ``PaperTrading`` wiring: ``LatencyConfig`` defaults (or

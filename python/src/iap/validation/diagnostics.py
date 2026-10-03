@@ -198,7 +198,7 @@ def fold_diagnostics(
         cost = cost_stress(backtester, test, scores, asset_class, multipliers)
         result = backtester.run(test, scores, asset_class)
         for r in result.per_instrument.values():
-            for t, pnl in zip(r.bar_ts, r.bar_pnl):
+            for t, pnl in zip(r.bar_ts, r.bar_pnl, strict=False):
                 bars[int(t)] = bars.get(int(t), 0.0) + float(pnl)
         if "vol_regime_flag_v1" in next(iter(test.values())).columns:
             regime = {

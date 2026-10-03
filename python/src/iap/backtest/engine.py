@@ -251,7 +251,7 @@ class BacktestResult:
         """
         bars: dict[int, float] = {}
         for r in self.per_instrument.values():
-            for t, p in zip(r.bar_ts, r.bar_pnl):
+            for t, p in zip(r.bar_ts, r.bar_pnl, strict=False):
                 bars[int(t)] = bars.get(int(t), 0.0) + float(p)
         present = np.array(sorted(bars), dtype=np.int64)
         if present.size:

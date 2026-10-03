@@ -50,7 +50,7 @@ def test_golden_eq_vector_properties(refdata):
     assert all(validation_error(e) is None for e in eq)
     assert all(e.receive_ts >= e.exchange_ts for e in eq)
     # exchange-time ordered
-    assert all(a.exchange_ts <= b.exchange_ts for a, b in zip(eq, eq[1:]))
+    assert all(a.exchange_ts <= b.exchange_ts for a, b in zip(eq, eq[1:], strict=False))
     types = {e.event_type for e in eq}
     assert {
         EventType.ADD,

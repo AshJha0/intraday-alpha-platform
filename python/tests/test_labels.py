@@ -143,9 +143,11 @@ def test_shifted_series_breaks_alignment(eq_series):
     )
     bad = compute_labels(anchors, shifted, last_ts, horizons=("30s",), max_age_ns=age)["30s"]
     diffs = sum(
-        1 for g, b, gv, bv in zip(good.mid, bad.mid, good.valid, bad.valid) if gv and bv and g != b
+        1
+        for g, b, gv, bv in zip(good.mid, bad.mid, good.valid, bad.valid, strict=False)
+        if gv and bv and g != b
     )
-    valid_both = sum(1 for gv, bv in zip(good.valid, bad.valid) if gv and bv)
+    valid_both = sum(1 for gv, bv in zip(good.valid, bad.valid, strict=False) if gv and bv)
     assert valid_both >= 20
     assert diffs / valid_both > 0.2, (
         "shifting the mid series barely changed labels — alignment test cannot detect leaks"

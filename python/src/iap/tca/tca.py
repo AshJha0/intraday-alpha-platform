@@ -203,7 +203,7 @@ def impact_regression(
     sxx = sum((x - mx) ** 2 for x in participation)
     if sxx == 0.0:
         return {"slope_bps_per_participation": 0.0, "intercept_bps": my, "r2": 0.0, "n": float(n)}
-    sxy = sum((x - mx) * (y - my) for x, y in zip(participation, signed_cost_bps))
+    sxy = sum((x - mx) * (y - my) for x, y in zip(participation, signed_cost_bps, strict=False))
     slope = sxy / sxx
     syy = sum((y - my) ** 2 for y in signed_cost_bps)
     r2 = (sxy * sxy) / (sxx * syy) if syy > 0 else 0.0

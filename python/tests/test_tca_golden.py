@@ -112,7 +112,7 @@ def test_golden_timeline_cases_match(golden):
             with pytest.raises(ValueError, match=c["expect_error"]):
                 order_tca(order, tl)
             continue
-        for f, (mid, hs) in zip(order.fills, exp["fill_ref"]):
+        for f, (mid, hs) in zip(order.fills, exp["fill_ref"], strict=False):
             assert abs(f.mid_at_fill - mid) <= tol, c["name"]
             assert abs(f.half_spread_at_fill - hs) <= tol, c["name"]
         split = spread_and_impact_cost(order)

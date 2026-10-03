@@ -59,7 +59,7 @@ def _weighted(values: Sequence[float], weights: Sequence[float]) -> float | None
     total = sum(weights)
     if total <= 0.0:
         return None
-    return sum(v * w for v, w in zip(values, weights)) / total
+    return sum(v * w for v, w in zip(values, weights, strict=False)) / total
 
 
 def _latency_block(values: Sequence[int]) -> dict[str, Any]:

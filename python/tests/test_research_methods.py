@@ -312,7 +312,7 @@ def test_blackout_reopen_return_is_opt_in_and_scores_the_reopen_price():
     assert plain.reopen_mid == []  # default: untouched
     lab = compute_labels(anchors, series, 29 * NS_S, horizons=("5s",), blackout_reopen=True)["5s"]
     assert lab.mid == plain.mid or all(
-        (a == b) or (a != a and b != b) for a, b in zip(lab.mid, plain.mid)
+        (a == b) or (a != a and b != b) for a, b in zip(lab.mid, plain.mid, strict=False)
     )
     assert lab.valid == plain.valid and lab.reason == plain.reason
     # anchors 5..9: the 5 s horizon ends inside or just after the halt
@@ -842,7 +842,7 @@ def test_fold_diagnostics_reports_every_fold_and_matches_the_last_fold_of_valida
     )
     assert diag["n_folds_run"] == 4 == len(diag["folds"])
     assert [f["fold"] for f in diag["folds"]] == [r["fold"] for r in report["folds"]]
-    for f, r in zip(diag["folds"], report["folds"]):
+    for f, r in zip(diag["folds"], report["folds"], strict=False):
         assert f["n_test_pairs"] == r["n_test_pairs"] and f["degenerate"] == r["degenerate"]
         assert sorted(f["net_pnl_by_cost"]) == ["x0.5", "x1", "x2"]
         assert (

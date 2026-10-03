@@ -111,7 +111,7 @@ class WalkForwardSplitter:
         for k in range(1, self.n_folds + 1):
             idx = int(round(k * n / (self.n_folds + 1)))
             bounds.append(int(ts[min(idx, n - 1)]))
-        if any(b <= a for a, b in zip(bounds, bounds[1:])) or bounds[0] <= ts[0]:
+        if any(b <= a for a, b in zip(bounds, bounds[1:], strict=False)) or bounds[0] <= ts[0]:
             raise ValueError(
                 "row-mass fold boundaries are not strictly increasing "
                 "(too many identical timestamps for this fold count)"

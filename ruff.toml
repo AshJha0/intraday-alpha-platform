@@ -9,7 +9,8 @@ select = ["E", "W", "F", "I", "UP", "B"]
 
 # E501: line length is owned by `ruff format`; it cannot wrap long strings/URLs (ruff's own advice).
 # E741: `l` is used as a short loop/comprehension name in tests/tools; renaming is style noise.
-ignore = ["E501", "E741"]
+# UP042: StrEnum changes str()/format() output of enum members (wire/golden-pinned); keep (str, Enum).
+ignore = ["E501", "E741", "UP042"]
 
 [lint.per-file-ignores]
 # Re-exports in package __init__ files are intentional.

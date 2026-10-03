@@ -710,7 +710,7 @@ def test_shift_by_one_and_truncation_leakage_probes(
         part.finish()
         before = [t for t in full if t.event_ts <= cut_ts]
         assert len(sink.traces) >= len(before) > 0
-        for want, got in zip(before, sink.traces[: len(before)]):
+        for want, got in zip(before, sink.traces[: len(before)], strict=False):
             assert got.trace_id == want.trace_id
             assert got.stages.signal == want.stages.signal
             assert got.stages.portfolio == want.stages.portfolio

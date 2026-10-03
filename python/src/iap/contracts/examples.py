@@ -266,7 +266,7 @@ def _fills() -> tuple[ExecutionReport, ...]:
             receive_ts=child.submit_ts + 2_150_000,
             fees=0.003 * qty,
         )
-        for i, (child, (qty, status)) in enumerate(zip(_child_orders(), filled))
+        for i, (child, (qty, status)) in enumerate(zip(_child_orders(), filled, strict=False))
     )
 
 

@@ -203,7 +203,7 @@ def pearson(xs: Sequence[float], ys: Sequence[float]) -> float | None:
     syy = sum((y - my) ** 2 for y in ys)
     if sxx <= 0.0 or syy <= 0.0:
         return None
-    sxy = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
+    sxy = sum((x - mx) * (y - my) for x, y in zip(xs, ys, strict=False))
     return sxy / math.sqrt(sxx * syy)
 
 

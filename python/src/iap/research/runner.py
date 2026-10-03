@@ -213,7 +213,7 @@ def document_drift(
         if len(previous) != len(current):
             return [path]
         drift = []
-        for i, (a, b) in enumerate(zip(previous, current)):
+        for i, (a, b) in enumerate(zip(previous, current, strict=False)):
             drift.extend(document_drift(a, b, tol=tol, path=f"{path}[{i}]"))
         return drift
     return [] if (type(previous) is type(current) and previous == current) else [path]

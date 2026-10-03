@@ -87,7 +87,7 @@ def test_golden_portfolio_near_reference_optimum(golden):
         {"type": "ineq", "fun": lambda w: cons.vol_target**2 - w @ Sigma @ w},
     ]
     for i in range(E.shape[0]):
-        cl.append({"type": "ineq", "fun": (lambda i: lambda w: cb[i] - abs(E[i] @ w))(i)})
+        cl.append({"type": "ineq", "fun": (lambda i: lambda w: cb[i] - abs(E[i] @ w))(i)})  # noqa: B023  (i is bound by the inner lambda)
     bounds = [
         (
             max(cons.w_min[i], w_prev[i] - cons.participation[i]),

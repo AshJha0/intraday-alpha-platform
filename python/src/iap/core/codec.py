@@ -80,7 +80,7 @@ def encode_jsonl_line(ev: MarketEvent) -> str:
     Canonical form: keys in pinned order, compact separators, integers only.
     """
     return (
-        '{"event_id":%d,"instrument_id":%d,"venue_id":%d,"exchange_ts":%d,'
+        '{"event_id":%d,"instrument_id":%d,"venue_id":%d,"exchange_ts":%d,'  # noqa: UP031 (byte-pinned output format, kept as-is)
         '"receive_ts":%d,"sequence":%d,"event_type":%d,"side":%d,'
         '"price_ticks":%d,"qty":%d,"order_id":%d,"trade_id":%d}'
         % (

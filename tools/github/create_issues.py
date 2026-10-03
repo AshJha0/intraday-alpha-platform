@@ -443,7 +443,7 @@ def _sum_days(items: Iterable[dict], status: str | None = None) -> float:
 
 def _row(cells: Iterable[str], widths: Sequence[int]) -> str:
     parts = []
-    for cell, w in zip(cells, widths):
+    for cell, w in zip(cells, widths, strict=False):
         cell = str(cell)
         if len(cell) > w:
             cell = cell[: w - 1] + "…"
