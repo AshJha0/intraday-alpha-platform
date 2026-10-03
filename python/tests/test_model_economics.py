@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-
 from iap.models.economics import (
     realized_net,
     signal_directions,

@@ -28,7 +28,6 @@ import json
 import math
 
 import pytest
-
 from conftest import REPO_ROOT, mkev
 from iap.core.events import EventType, SessionStatus
 from iap.features.context import build_contexts
@@ -453,7 +452,7 @@ def _tz_config(tmp_path, tzname="America/New_York", open_="09:30:00", close="16:
 
 
 def _utc_ns(y, mo, d, h, mi):
-    return int(dt.datetime(y, mo, d, h, mi, tzinfo=dt.timezone.utc).timestamp()) * NS
+    return int(dt.datetime(y, mo, d, h, mi, tzinfo=dt.UTC).timestamp()) * NS
 
 
 def test_scenario_session_timezone_and_dst(tmp_path):

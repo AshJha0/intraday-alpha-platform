@@ -6,7 +6,6 @@ import json
 
 import numpy as np
 import pytest
-
 from iap.portfolio.optimizer import (
     Constraints,
     max_violation,

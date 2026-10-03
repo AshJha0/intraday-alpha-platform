@@ -8,7 +8,7 @@ knowing which constraints shaped it (spec §15: "constraint-auditable").
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 
@@ -21,9 +21,9 @@ def constraint_audit(
     w: np.ndarray,
     cons: Constraints,
     w_prev: np.ndarray,
-    Sigma: Optional[np.ndarray] = None,
+    Sigma: np.ndarray | None = None,
     bind_tol: float = _BIND_TOL,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Audit a weight vector against the constraint set.
 
     Returns ``{"constraints": [...], "turnover": .., "gross": .., "net": ..,
@@ -37,7 +37,7 @@ def constraint_audit(
     w_prev = np.asarray(w_prev, dtype=np.float64)
     n = len(w)
     cons.validate(n)
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
 
     def row(name: str, value: float, bound: float) -> None:
         slack = bound - value

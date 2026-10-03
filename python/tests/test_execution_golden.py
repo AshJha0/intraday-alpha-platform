@@ -20,7 +20,6 @@ import json
 import math
 
 import pytest
-
 from iap.core.codec import read_jsonl
 from iap.core.rng import SplitMix64
 from iap.execution import (

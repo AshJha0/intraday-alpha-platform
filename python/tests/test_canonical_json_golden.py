@@ -11,7 +11,6 @@ import struct
 from pathlib import Path
 
 import pytest
-
 from iap.contracts.examples import example_trace
 from iap.contracts.ids import make_trace_id
 from iap.contracts.versions import canonical_json, content_hash

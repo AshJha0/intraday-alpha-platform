@@ -25,8 +25,9 @@ target, bit for bit.
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Dict, Sequence, Tuple
+from typing import Any
 
 import numpy as np
 
@@ -52,7 +53,7 @@ class PortfolioState:
     timestamp_ns: int
     position_qty: int
     mark_price: float  #: last consolidated mid (quote ccy)
-    bar_returns: Tuple[float, ...]  #: completed 1-minute bar log returns
+    bar_returns: tuple[float, ...]  #: completed 1-minute bar log returns
 
 
 @dataclass(frozen=True)
@@ -61,7 +62,7 @@ class PortfolioConstraints:
 
     spec: PortfolioSpec
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         s = self.spec
         return {
             "risk_aversion": s.risk_aversion,

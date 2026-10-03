@@ -17,9 +17,10 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import Any, Union
 
 from iap.contracts.types import (
     Actor,
@@ -70,8 +71,8 @@ class ImportReport:
     """What one importer wrote: ``{table: rows written}`` plus the records
     it skipped, each described by one warning line."""
 
-    inserted: Dict[str, int] = field(default_factory=dict)
-    warnings: Tuple[str, ...] = ()
+    inserted: dict[str, int] = field(default_factory=dict)
+    warnings: tuple[str, ...] = ()
 
     @property
     def n_warnings(self) -> int:
@@ -82,8 +83,8 @@ class _Collector:
     """Accumulates per-table write counts and warning lines."""
 
     def __init__(self) -> None:
-        self.inserted: Dict[str, int] = {}
-        self.warnings: List[str] = []
+        self.inserted: dict[str, int] = {}
+        self.warnings: list[str] = []
 
     def wrote(self, table: str, n: int = 1) -> None:
         self.inserted[table] = self.inserted.get(table, 0) + n
@@ -101,7 +102,7 @@ def default_repo_root() -> Path:
 
 
 def _load_json(path: Path) -> Any:
-    with open(path, "r", encoding="utf-8") as fh:
+    with open(path, encoding="utf-8") as fh:
         return json.load(fh)
 
 
@@ -109,14 +110,14 @@ def _finite(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
-def _num_or_none(value: Any) -> Optional[float]:
+def _num_or_none(value: Any) -> float | None:
     """A finite number, else ``None`` (NULL) — for nullable columns."""
     return float(value) if _finite(value) else None
 
 
-def _read_jsonl(path: Path, col: _Collector) -> List[Tuple[int, Dict[str, Any]]]:
-    out: List[Tuple[int, Dict[str, Any]]] = []
-    with open(path, "r", encoding="utf-8") as fh:
+def _read_jsonl(path: Path, col: _Collector) -> list[tuple[int, dict[str, Any]]]:
+    out: list[tuple[int, dict[str, Any]]] = []
+    with open(path, encoding="utf-8") as fh:
         for lineno, line in enumerate(fh, 1):
             text = line.strip()
             if not text:
@@ -139,7 +140,7 @@ def _read_jsonl(path: Path, col: _Collector) -> List[Tuple[int, Dict[str, Any]]]
 
 
 def import_reference(
-    store: Store, configs_dir: PathLike, feature_registry: Optional[PathLike] = None
+    store: Store, configs_dir: PathLike, feature_registry: PathLike | None = None
 ) -> ImportReport:
     """``configs/instruments/instruments.json`` -> instruments,
     ``configs/venues/venues.json`` -> venues, and the feature registry
@@ -260,18 +261,18 @@ def import_experiments_ledger(store: Store, path: PathLike) -> ImportReport:
 # --------------------------------------------------------------------------
 
 
-def _ledger_entries(ledger_path: Optional[PathLike]) -> Dict[str, Dict[str, Any]]:
+def _ledger_entries(ledger_path: PathLike | None) -> dict[str, dict[str, Any]]:
     """``{alpha_id: promotion_pipeline ledger entry}`` (empty without a ledger)."""
     if ledger_path is None or not Path(ledger_path).is_file():
         return {}
-    out: Dict[str, Dict[str, Any]] = {}
+    out: dict[str, dict[str, Any]] = {}
     for entry in _load_json(Path(ledger_path))["entries"]:
         if entry["kind"] == "promotion_pipeline":
             out[entry["alpha_id"]] = entry
     return out
 
 
-def _rationales() -> Dict[str, str]:
+def _rationales() -> dict[str, str]:
     """``{alpha_id: economic rationale}`` from the flagship registry."""
     from iap.alpha import ALPHA_CLASSES
 
@@ -279,8 +280,8 @@ def _rationales() -> Dict[str, str]:
 
 
 def _params_document(
-    repo_root: Path, dataset_version: Optional[str], feature_version: Optional[str], col: _Collector
-) -> Optional[Dict[str, Any]]:
+    repo_root: Path, dataset_version: str | None, feature_version: str | None, col: _Collector
+) -> dict[str, Any] | None:
     """``configs/strategies/alpha_params.json`` — the provenance document
     the registry's mapping reads (``data_version``, ``feature_version``,
     ``git_commit`` and the per-alpha parameter blocks whose hash is the
@@ -291,7 +292,7 @@ def _params_document(
     from iap.lifecycle.bootstrap import PARAMS_RELPATH, load_params_document
 
     path = repo_root / PARAMS_RELPATH
-    doc: Optional[Dict[str, Any]] = None
+    doc: dict[str, Any] | None = None
     if path.is_file():
         doc = load_params_document(repo_root)
     elif dataset_version is None or feature_version is None:
@@ -317,9 +318,9 @@ def _params_document(
 def _report_to_contracts(
     report: Mapping[str, Any],
     source: str,
-    ledger_entry: Optional[Mapping[str, Any]],
+    ledger_entry: Mapping[str, Any] | None,
     params_doc: Mapping[str, Any],
-) -> Tuple[ExperimentSpec, ExperimentResult]:
+) -> tuple[ExperimentSpec, ExperimentResult]:
     """The pinned alpha-report -> (ExperimentSpec, ExperimentResult) mapping —
     ``iap.lifecycle.bootstrap.research_evidence`` / ``alpha_report_spec``,
     the one mapping the registry is built from, so the store row and the
@@ -347,10 +348,10 @@ def import_alpha_reports(
     store: Store,
     reports_dir: PathLike,
     *,
-    dataset_version: Optional[str] = None,
-    feature_version: Optional[str] = None,
-    ledger_path: Optional[PathLike] = None,
-    repo_root: Optional[PathLike] = None,
+    dataset_version: str | None = None,
+    feature_version: str | None = None,
+    ledger_path: PathLike | None = None,
+    repo_root: PathLike | None = None,
 ) -> ImportReport:
     """``research/alpha_reports/<ID>.json`` -> alphas (id, asset class,
     family = the report's ``name``, horizon, economic rationale from
@@ -532,7 +533,7 @@ def import_lifecycle_transitions(store: Store, path: PathLike) -> ImportReport:
     if not src.is_file():
         col.warn(f"absent: {src}")
         return col.report()
-    latest: Dict[str, Tuple[int, int, str]] = {}
+    latest: dict[str, tuple[int, int, str]] = {}
     for lineno, doc in _read_jsonl(src, col):
         try:
             transition = LifecycleTransition.from_dict(doc)
@@ -580,7 +581,7 @@ def import_alpha_registry(store: Store, path: PathLike) -> ImportReport:
 # Research TCA harness
 # --------------------------------------------------------------------------
 
-_TCA_REQUIRED: Tuple[str, ...] = (
+_TCA_REQUIRED: tuple[str, ...] = (
     "decision_mid",
     "arrival_mid",
     "end_mid",
@@ -589,7 +590,7 @@ _TCA_REQUIRED: Tuple[str, ...] = (
     "impact_cost",
     "timing_cost",
 )
-_TCA_PEROLD: Tuple[str, ...] = (
+_TCA_PEROLD: tuple[str, ...] = (
     "total_is_bps",
     "delay_bps",
     "trading_bps",
@@ -730,7 +731,7 @@ def import_baselines(store: Store, baselines_dir: PathLike) -> ImportReport:
         if kind not in ("feature", "signal", "ic"):
             col.warn(f"{path.name}: unknown baseline kind {kind!r}, skipped")
             continue
-        row: Dict[str, Any] = {
+        row: dict[str, Any] = {
             "name": doc["name"],
             "alpha_id": doc["alpha_id"],
             "kind": kind,
@@ -784,13 +785,13 @@ def import_baselines(store: Store, baselines_dir: PathLike) -> ImportReport:
 # --------------------------------------------------------------------------
 
 
-def import_all(store: Store, repo_root: Optional[PathLike] = None) -> Dict[str, ImportReport]:
+def import_all(store: Store, repo_root: PathLike | None = None) -> dict[str, ImportReport]:
     """Run every importer over the repository artefacts that exist, in the
     pinned order; ``{step: report}`` in that order."""
     root = Path(repo_root) if repo_root is not None else default_repo_root()
     research = root / "research"
     ledger = research / "experiments.json"
-    steps: Sequence[Tuple[str, Path, Any]] = (
+    steps: Sequence[tuple[str, Path, Any]] = (
         ("reference", root / "configs", lambda: import_reference(store, root / "configs")),
         ("experiments_ledger", ledger, lambda: import_experiments_ledger(store, ledger)),
         (
@@ -836,7 +837,7 @@ def import_all(store: Store, repo_root: Optional[PathLike] = None) -> Dict[str, 
             lambda: import_baselines(store, research / "baselines"),
         ),
     )
-    out: Dict[str, ImportReport] = {}
+    out: dict[str, ImportReport] = {}
     for name, required, run in steps:
         out[name] = run() if required.exists() else ImportReport({}, (f"absent: {required}",))
     return out

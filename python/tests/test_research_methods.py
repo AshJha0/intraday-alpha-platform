@@ -12,7 +12,7 @@ import math
 import numpy as np
 import pandas as pd
 import pytest
-
+from conftest import CONFIGS_DIR, GOLDEN_DIR
 from iap.adaptive.drift import (
     IC_Z_METHODS,
     ICBaseline,
@@ -28,7 +28,7 @@ from iap.adaptive.lifecycle import (
     LifecycleTracker,
 )
 from iap.alpha.base import LinearAlpha
-from iap.backtest import Backtester, BacktestConfig, CostModel
+from iap.backtest import BacktestConfig, Backtester, CostModel
 from iap.core.codec import read_jsonl
 from iap.labels.labels import LabelReason, MidSeries, compute_labels
 from iap.validation.diagnostics import fold_diagnostics, stationary_bootstrap_ci
@@ -43,9 +43,7 @@ from iap.validation.metrics import (
     newey_west_tstat,
 )
 from iap.validation.validate import validate_alpha
-
-from conftest import CONFIGS_DIR, GOLDEN_DIR
-from test_validation_framework import _BackwardsAlpha, _backwards_frames
+from test_validation_framework import _backwards_frames, _BackwardsAlpha
 
 NS_S = 1_000_000_000
 META = {

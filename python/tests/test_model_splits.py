@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-
 from iap.models.splits import WalkForwardSplitter
 
 _S = 1_000_000_000

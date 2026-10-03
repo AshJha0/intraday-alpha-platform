@@ -16,10 +16,7 @@ import math
 import numpy as np
 import pandas as pd
 import pytest
-
-from iap.adaptive.drift import BASELINE_VERSION
-from iap.features.registry import registry_hash
-
+from conftest import CONFIGS_DIR, GOLDEN_DIR
 from iap.adaptive import (
     ACTIVE,
     PSI_EPS,
@@ -45,12 +42,12 @@ from iap.adaptive import (
     rolling_ic_z,
     validate_adaptive_config,
 )
-from iap.backtest import Backtester, BacktestConfig, CostModel
-from iap.backtest.adaptive import AdaptiveDeployment
+from iap.adaptive.drift import BASELINE_VERSION
 from iap.alpha.base import LinearAlpha, col
+from iap.backtest import BacktestConfig, Backtester, CostModel
+from iap.backtest.adaptive import AdaptiveDeployment
 from iap.core.rng import SplitMix64
-
-from conftest import CONFIGS_DIR, GOLDEN_DIR
+from iap.features.registry import registry_hash
 
 NS_S = 1_000_000_000
 TOL = 1e-10

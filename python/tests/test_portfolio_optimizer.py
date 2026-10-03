@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-
 from iap.core.rng import SplitMix64
 from iap.portfolio.diagnostics import constraint_audit
 from iap.portfolio.optimizer import (

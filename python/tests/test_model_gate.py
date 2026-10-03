@@ -10,7 +10,6 @@ Also hosts the automatic shift-by-one leakage test required by conventions §7.
 from __future__ import annotations
 
 import numpy as np
-
 from iap.core.rng import SplitMix64
 from iap.models.dataset import Dataset
 from iap.models.pipeline import (

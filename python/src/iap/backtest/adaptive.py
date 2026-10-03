@@ -46,20 +46,20 @@ arithmetic, policies are pure functions, no wall-clock, no RNG.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Mapping, Optional
 
 import numpy as np
 import pandas as pd
 
 from iap.adaptive.drift import (
+    IC_Z_METHODS,
     DriftBaseline,
     ICBaseline,
     capture_baseline,
     capture_ic_baseline,
     ks_test,
     psi,
-    IC_Z_METHODS,
     rolling_ic_z,
     rolling_ic_z_hac,
 )
@@ -91,14 +91,14 @@ class AdaptiveResult:
     n_blocks: int
     n_evals: int
     n_informative_evals: int  # evaluations with new matured evidence
-    refit_events: List[dict]  # {"ts", "block", "reasons", "n_train"}
-    eval_rows: List[dict]  # per-eval monitor readouts
-    transitions: List[dict]  # lifecycle transitions (dicts)
+    refit_events: list[dict]  # {"ts", "block", "reasons", "n_train"}
+    eval_rows: list[dict]  # per-eval monitor readouts
+    transitions: list[dict]  # lifecycle transitions (dicts)
     final_state: str
     drift_event_count: int  # evals with any PSI > pinned threshold
     backtest: BacktestResult
-    deployed_ic: Optional[float]  # IC of gated deployed scores, matured rows
-    scores: Dict[int, pd.DataFrame] = field(repr=False, default_factory=dict)
+    deployed_ic: float | None  # IC of gated deployed scores, matured rows
+    scores: dict[int, pd.DataFrame] = field(repr=False, default_factory=dict)
 
     @property
     def refit_count(self) -> int:
@@ -136,7 +136,7 @@ class AdaptiveDeployment:
         universe = probe.universe(list(frames))
         if not universe:
             raise ValueError(f"{self.alpha_id}: empty universe for provided frames")
-        self.uframes: Dict[int, pd.DataFrame] = {
+        self.uframes: dict[int, pd.DataFrame] = {
             i: frames[i].reset_index(drop=True) for i in universe
         }
         self.universe = universe
@@ -167,7 +167,7 @@ class AdaptiveDeployment:
 
     # -- baselines --------------------------------------------------------
 
-    def _window(self, lo: int, hi: int) -> Dict[int, pd.DataFrame]:
+    def _window(self, lo: int, hi: int) -> dict[int, pd.DataFrame]:
         out = {}
         for i, df in self.uframes.items():
             m = (self._ts[i] >= lo) & (self._ts[i] < hi)
@@ -201,7 +201,7 @@ class AdaptiveDeployment:
             f"feature frames, universe {self.universe}"
         )
         self.signal_baseline_sample = self._pooled_signal(probe, warm)
-        self.signal_baseline: Optional[DriftBaseline] = None
+        self.signal_baseline: DriftBaseline | None = None
         if self.signal_baseline_sample.size >= 100:
             self.signal_baseline = capture_baseline(
                 self.signal_baseline_sample,
@@ -210,8 +210,8 @@ class AdaptiveDeployment:
                 alpha_id=self.alpha_id,
                 source=src,
             )
-        self.feature_baselines: Dict[str, DriftBaseline] = {}
-        self.feature_baseline_samples: Dict[str, np.ndarray] = {}
+        self.feature_baselines: dict[str, DriftBaseline] = {}
+        self.feature_baseline_samples: dict[str, np.ndarray] = {}
         for f in self.features:
             v = self._pooled_feature(f, warm)
             self.feature_baseline_samples[f] = v
@@ -254,7 +254,7 @@ class AdaptiveDeployment:
         y_a = np.concatenate(y_l) if y_l else np.empty(0)
         self.ic_baseline_rows = int(np.sum(np.isfinite(x_a) & np.isfinite(y_a)))
         try:
-            self.ic_baseline: Optional[ICBaseline] = capture_ic_baseline(
+            self.ic_baseline: ICBaseline | None = capture_ic_baseline(
                 ts_a,
                 x_a,
                 y_a,
@@ -282,7 +282,7 @@ class AdaptiveDeployment:
     def _precompute_drift(self, probe) -> None:
         monitor_ns = int(self.cfg["monitor_window_ns"])
         min_n = int(self.cfg["min_psi_samples"])
-        self.drift_rows: Dict[int, dict] = {}
+        self.drift_rows: dict[int, dict] = {}
         for tb in self.block_bounds[1:]:
             wframes = self._window(tb - monitor_ns, tb)
             psi_by, ks_by = {}, {}
@@ -304,7 +304,7 @@ class AdaptiveDeployment:
 
     # -- fitting ----------------------------------------------------------
 
-    def _train_window(self, fit_ts: int) -> Dict[int, pd.DataFrame]:
+    def _train_window(self, fit_ts: int) -> dict[int, pd.DataFrame]:
         lo = fit_ts - int(self.cfg["train_window_ns"])
         out = {}
         for i, df in self.uframes.items():
@@ -334,9 +334,9 @@ class AdaptiveDeployment:
     def run(
         self,
         policy: RefitPolicy,
-        lifecycle_cfg: Optional[LifecycleConfig] = None,
-        lifecycle_log: Optional[LifecycleLog] = None,
-        policy_label: Optional[str] = None,
+        lifecycle_cfg: LifecycleConfig | None = None,
+        lifecycle_log: LifecycleLog | None = None,
+        policy_label: str | None = None,
     ) -> AdaptiveResult:
         cfg = self.cfg
         ic_window_ns = int(cfg["ic_window_ns"])
@@ -348,7 +348,7 @@ class AdaptiveDeployment:
 
         model = self._fit_at(self.deploy_start)
         last_fit_ns = self.deploy_start
-        refit_events: List[dict] = [
+        refit_events: list[dict] = [
             {
                 "ts": self.deploy_start,
                 "block": 0,
@@ -378,7 +378,7 @@ class AdaptiveDeployment:
             log=lifecycle_log,
         )
 
-        eval_rows: List[dict] = []
+        eval_rows: list[dict] = []
         drift_event_count = 0
         last_matured = (-1, -1)  # (n matured pairs, last matured ts)
         for block_idx, tb in enumerate(self.block_bounds[1:], start=1):
@@ -483,7 +483,7 @@ class AdaptiveDeployment:
             )
 
         # gated deployed scores: warmup never trades; RETIRED blocks flat
-        scores_out: Dict[int, pd.DataFrame] = {}
+        scores_out: dict[int, pd.DataFrame] = {}
         for i in self.universe:
             g = gate[i] & (self._ts[i] >= self.deploy_start)
             er = np.where(g, er_asm[i], 0.0)

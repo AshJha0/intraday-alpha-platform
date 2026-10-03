@@ -26,17 +26,15 @@ imbalance features need book_ok and >= 1 active venue; update shares need
 
 from __future__ import annotations
 
-from typing import List
-
 from iap.features._famutil import put
 from iap.features.spec import WINDOW_NS, FeatureSpec, mkspec
 
 FAMILY = "venue"
 
 
-def specs() -> List[FeatureSpec]:
+def specs() -> list[FeatureSpec]:
     """Registry entries for the venue family (pinned order)."""
-    out: List[FeatureSpec] = []
+    out: list[FeatureSpec] = []
     out.append(
         mkspec(
             "venue_count_active_v1", FAMILY, "Number of venues with a two-sided, non-stale book."
@@ -102,7 +100,7 @@ def specs() -> List[FeatureSpec]:
     return out
 
 
-def compute(st, values: List[float], valid: List[bool]) -> None:
+def compute(st, values: list[float], valid: list[bool]) -> None:
     """Append the 10 venue values for the current emission."""
     rows = st.venue_rows  # [(vid, bid10, ask10, stale)] sorted by vid
     active = [(vid, b, a) for vid, b, a, stale in rows if b and a and not stale]

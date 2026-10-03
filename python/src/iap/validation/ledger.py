@@ -44,7 +44,6 @@ import hashlib
 import json
 import math
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 from iap.experiment.locking import FileLock, atomic_write_text
 
@@ -103,12 +102,12 @@ class ExperimentLedger:
     def __init__(self, path, lock_timeout_s: float = 30.0) -> None:
         self.path = Path(path)
         self.lock_timeout_s = float(lock_timeout_s)
-        self.entries: List[dict] = []
+        self.entries: list[dict] = []
         self.total_experiments = 0
-        self._index: Dict[str, int] = {}
+        self._index: dict[str, int] = {}
         #: ``record`` calls since the last load / save, replayed by ``save``
         #: onto the file's then-current content (see the module docs).
-        self._pending: List[Tuple[str, str, Optional[dict], Optional[dict], int]] = []
+        self._pending: list[tuple[str, str, dict | None, dict | None, int]] = []
         self._load()
 
     def _load(self) -> None:
@@ -127,7 +126,7 @@ class ExperimentLedger:
                 self._index.setdefault(key, i)
 
     @staticmethod
-    def experiment_key(alpha_id: str, kind: str, config: Optional[dict]) -> str:
+    def experiment_key(alpha_id: str, kind: str, config: dict | None) -> str:
         """Pinned experiment identity: alpha, kind and canonical config."""
         payload = json.dumps(
             {"alpha_id": alpha_id, "kind": kind, "config": config or {}},
@@ -140,8 +139,8 @@ class ExperimentLedger:
         self,
         alpha_id: str,
         kind: str,
-        config: Optional[dict] = None,
-        result: Optional[dict] = None,
+        config: dict | None = None,
+        result: dict | None = None,
         count: int = 1,
     ) -> int:
         """Record ``count`` experiments (count > 1 = a declared batch, e.g. a
@@ -155,8 +154,8 @@ class ExperimentLedger:
         self,
         alpha_id: str,
         kind: str,
-        config: Optional[dict],
-        result: Optional[dict],
+        config: dict | None,
+        result: dict | None,
         count: int,
     ) -> int:
         key = self.experiment_key(alpha_id, kind, config)
@@ -202,7 +201,7 @@ class ExperimentLedger:
         n = max(int(total_experiments), 1)
         return abs(_norm_ppf(PINNED_ALPHA / n / 2.0))
 
-    def would_add(self, alpha_id: str, kind: str, config: Optional[dict], count: int) -> int:
+    def would_add(self, alpha_id: str, kind: str, config: dict | None, count: int) -> int:
         """Looks a ``record`` of this identity would add right now: ``count``
         for a new identity, 0 for a rerun (de-duplicated)."""
         key = self.experiment_key(alpha_id, kind, config)

@@ -24,7 +24,7 @@ the same code path.
 from __future__ import annotations
 
 import math
-from typing import Dict, List, Mapping, Sequence, Tuple
+from collections.abc import Mapping, Sequence
 
 import numpy as np
 import pandas as pd
@@ -60,7 +60,7 @@ class LinearZAlpha:
         missing = [f for f in model.features if f not in index]
         if missing:
             raise ValueError(f"{model.alpha_id}: features {missing} are not in the registry")
-        self._columns: Tuple[Tuple[str, int], ...] = tuple((f, index[f]) for f in model.features)
+        self._columns: tuple[tuple[str, int], ...] = tuple((f, index[f]) for f in model.features)
         self._version = content_hash(model.params())
 
     @property
@@ -82,7 +82,7 @@ class LinearZAlpha:
 
     def raw(self, features: FeatureVector) -> float:
         """The oriented raw signal of one vector (NaN when any input is invalid)."""
-        row: Dict[str, List[float]] = {"exchange_ts": [features.timestamp]}
+        row: dict[str, list[float]] = {"exchange_ts": [features.timestamp]}
         for name, i in self._columns:
             row[name] = [features.values[i] if features.validity[i] else math.nan]
         return float(self._model.raw_signal(pd.DataFrame(row)).iloc[0])
@@ -118,7 +118,7 @@ class AlphaEnsemble:
         ids = [m.alpha_id for m in members]
         if len(set(ids)) != len(ids):
             raise ValueError(f"duplicate ensemble members: {ids}")
-        self._members: Tuple[LinearZAlpha, ...] = tuple(sorted(members, key=lambda m: m.alpha_id))
+        self._members: tuple[LinearZAlpha, ...] = tuple(sorted(members, key=lambda m: m.alpha_id))
         self._betas = {m.alpha_id: m.beta for m in self._members}
         for m in self._members:
             if m.beta == 0.0:
@@ -134,7 +134,7 @@ class AlphaEnsemble:
         )
 
     @property
-    def members(self) -> Tuple[LinearZAlpha, ...]:
+    def members(self) -> tuple[LinearZAlpha, ...]:
         return self._members
 
     @property
@@ -186,7 +186,7 @@ def load_alphas(
     feature_names: Sequence[str],
     feature_version: str,
     horizon_ns: int,
-) -> Tuple[LinearZAlpha, ...]:
+) -> tuple[LinearZAlpha, ...]:
     """Load the configured alphas from ``alpha_params.json`` (registry-hash checked)."""
     models = load_params_file(params_path, expected_feature_version=feature_version)
     out = []

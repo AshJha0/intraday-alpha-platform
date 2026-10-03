@@ -1,11 +1,20 @@
-# Lint config for `ruff check python tests tools` (run from the repo root, see
-# .github/workflows/ci.yml). Correctness-only rule set: pycodestyle E4/E7/E9
-# and pyflakes F. No formatter is used and style rules are deliberately off.
+# Lint + format config. CI runs, from the repo root:
+#   ruff check  python tests tools research deployment
+#   ruff format --check python tests tools research deployment
 target-version = "py311"
 line-length = 100
 
 [lint]
-select = ["E4", "E7", "E9", "F"]
+select = ["E", "W", "F", "I", "UP", "B"]
 
+# E501: line length is owned by `ruff format`; it cannot wrap long strings/URLs (ruff's own advice).
 # E741: `l` is used as a short loop/comprehension name in tests/tools; renaming is style noise.
-ignore = ["E741"]
+ignore = ["E501", "E741"]
+
+[lint.per-file-ignores]
+# Re-exports in package __init__ files are intentional.
+"__init__.py" = ["F401"]
+
+[format]
+quote-style = "double"
+indent-style = "space"

@@ -8,10 +8,8 @@ frames.  Used to validate the engine's incremental arithmetic at 1e-9.
 from __future__ import annotations
 
 import math
-from typing import List
 
 import pandas as pd
-
 from iap.core.events import EventType, MarketEvent
 from iap.orderbook.book import OrderBook
 
@@ -25,7 +23,7 @@ def is_book_touch(ev: MarketEvent) -> bool:
     return ev.event_type in _TOUCH or (ev.event_type == EventType.SNAPSHOT and ev.trade_id == 0)
 
 
-def book_frames(events: List[MarketEvent], depth_levels: int = 10):
+def book_frames(events: list[MarketEvent], depth_levels: int = 10):
     """(book_df, trade_df) built from a single-venue reference OrderBook.
 
     book_df has one row per book-refresh event: ts, best bid/ask price+size,
@@ -36,8 +34,8 @@ def book_frames(events: List[MarketEvent], depth_levels: int = 10):
     """
     book = OrderBook(events[0].instrument_id, 0)
     rows, trows = [], []
-    prev_bid: List = []
-    prev_ask: List = []
+    prev_bid: list = []
+    prev_ask: list = []
     have_prev = False
     for n, ev in enumerate(events, start=1):
         if is_book_touch(ev):

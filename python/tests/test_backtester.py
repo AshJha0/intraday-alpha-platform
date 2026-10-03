@@ -6,10 +6,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import pytest
-
-from iap.backtest import Backtester, BacktestConfig, CostModel, ensemble_scores
-
 from conftest import CONFIGS_DIR
+from iap.backtest import BacktestConfig, Backtester, CostModel, ensemble_scores
 
 NS_S = 1_000_000_000
 

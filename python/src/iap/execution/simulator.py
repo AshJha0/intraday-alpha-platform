@@ -95,7 +95,6 @@ from __future__ import annotations
 
 import bisect
 from dataclasses import replace
-from typing import Dict, List, Optional, Set, Tuple
 
 from iap.core.events import EventType, MarketEvent, SessionStatus
 from iap.core.rng import SplitMix64
@@ -120,7 +119,7 @@ from iap.orderbook.book import (
 )
 
 #: Overlay key: (instrument_id, venue_id, side, price_ticks).
-OverlayKey = Tuple[int, int, int, int]
+OverlayKey = tuple[int, int, int, int]
 
 
 class ExecutionSimulator:
@@ -129,21 +128,21 @@ class ExecutionSimulator:
     def __init__(self, config: ExecConfig) -> None:
         self._config = config
         self._rng = SplitMix64(config.seed)
-        self._books: Dict[int, ConsolidatedBook] = {}
-        self._orders: Dict[int, ChildOrder] = {}
+        self._books: dict[int, ConsolidatedBook] = {}
+        self._orders: dict[int, ChildOrder] = {}
         # (arrival_ts, order_id), sorted — the activation queue (rule 2).
-        self._pending: List[Tuple[int, int]] = []
+        self._pending: list[tuple[int, int]] = []
         # ACTIVE order ids in activation order (rule 4 tracking order).
-        self._resting: List[int] = []
+        self._resting: list[int] = []
         # (cancel effective ts, order_id), sorted (rule 7).
-        self._cancels: List[Tuple[int, int]] = []
+        self._cancels: list[tuple[int, int]] = []
         # Rule 3b overlay: consumed displayed size per level.
-        self._consumed: Dict[OverlayKey, int] = {}
+        self._consumed: dict[OverlayKey, int] = {}
         # Rule 4: per resting order, the market order ids that joined its
         # level after it did (membership only, never iterated).
-        self._behind: Dict[int, Set[int]] = {}
+        self._behind: dict[int, set[int]] = {}
         self._counters = ExecCounters()
-        self._fills: List[Fill] = []
+        self._fills: list[Fill] = []
         self._next_order_id = 1
         self._next_fill_id = 1
 
@@ -158,16 +157,16 @@ class ExecutionSimulator:
         return self._counters
 
     @property
-    def fills(self) -> List[Fill]:
+    def fills(self) -> list[Fill]:
         """Every fill emitted so far, in emission (fill_id) order."""
         return self._fills
 
     @property
-    def orders(self) -> Dict[int, ChildOrder]:
+    def orders(self) -> dict[int, ChildOrder]:
         """All submitted orders keyed by order_id (ascending insertion order)."""
         return self._orders
 
-    def venue_book(self, instrument_id: int, venue_id: int) -> Optional[OrderBook]:
+    def venue_book(self, instrument_id: int, venue_id: int) -> OrderBook | None:
         """Venue book for (instrument, venue); None before any event touched it."""
         cons = self._books.get(instrument_id)
         return None if cons is None else cons.books.get(venue_id)
@@ -181,7 +180,7 @@ class ExecutionSimulator:
         return cons
 
     @staticmethod
-    def venue_open(book: Optional[OrderBook]) -> bool:
+    def venue_open(book: OrderBook | None) -> bool:
         """True when the venue book exists, is not stale and is TRADING (rule 8)."""
         return book is not None and not book.stale and book.status == int(SessionStatus.TRADING)
 
@@ -406,7 +405,7 @@ class ExecutionSimulator:
 
     def _expire_due(self, t: int) -> None:
         """Rule 7: time-in-force, pending or resting, before any activation."""
-        due: List[int] = []
+        due: list[int] = []
         for _, oid in self._pending:
             o = self._orders[oid]
             if o.expire_ts != 0 and o.expire_ts <= t:
@@ -561,9 +560,9 @@ class ExecutionSimulator:
                 key = (ev.instrument_id, ev.venue_id, 1 - our_side, opp[0])
                 self._consumed[key] = self._consumed.get(key, 0) + used
 
-    def _level_before(self, ev: MarketEvent, pre: Optional[OrderBook]) -> List[Tuple[int, int]]:
+    def _level_before(self, ev: MarketEvent, pre: OrderBook | None) -> list[tuple[int, int]]:
         """(order_id, displayed qty at its level) for our orders on ev's book."""
-        out: List[Tuple[int, int]] = []
+        out: list[tuple[int, int]] = []
         for oid in self._resting:
             o = self._orders[oid]
             if (
@@ -591,20 +590,20 @@ class ExecutionSimulator:
         et = ev.event_type
         pre = self.venue_book(ev.instrument_id, ev.venue_id)
         pre_open = self.venue_open(pre)
-        add_depth: List[Tuple[int, int]] = []
+        add_depth: list[tuple[int, int]] = []
         if self._resting and pre_open and et == EventType.ADD:
             add_depth = pre.depth(1 if ev.side == 0 else 0, DEPTH_LEVELS)
         # The book's own record of the order an EXECUTE names (side, price, qty).
-        exec_order: Optional[Tuple[int, int, int]] = None
+        exec_order: tuple[int, int, int] | None = None
         if self._resting and pre_open and et == EventType.EXECUTE:
             for boid, bside, bprice, bqty in pre.resting_orders():
                 if boid == ev.order_id:
                     exec_order = (bside, bprice, bqty)
                     break
-        level_before: List[Tuple[int, int]] = []
+        level_before: list[tuple[int, int]] = []
         if self._resting and et in (EventType.CANCEL, EventType.MODIFY):
             level_before = self._level_before(ev, pre)
-        watched: List[Tuple[OverlayKey, int]] = []
+        watched: list[tuple[OverlayKey, int]] = []
         for key in self._consumed:
             if key[0] == ev.instrument_id and key[1] == ev.venue_id:
                 before = 0 if pre is None else pre.level_qty(key[2], key[3])

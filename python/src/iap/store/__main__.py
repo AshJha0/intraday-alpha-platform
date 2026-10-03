@@ -22,8 +22,8 @@ from __future__ import annotations
 import argparse
 import sqlite3
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import List, Optional, Sequence
 
 from iap.contracts.versions import canonical_json
 from iap.store.db import Store
@@ -35,7 +35,7 @@ __all__ = ["DEFAULT_DB", "build_parser", "main", "render_counts", "sql_error_mes
 DEFAULT_DB = Path("data") / "store" / "iap.sqlite"
 
 
-def render_counts(counts: "dict[str, int]") -> str:
+def render_counts(counts: dict[str, int]) -> str:
     """The count table: ``table`` left-justified, rows right-justified."""
     width = max(len("table"), *(len(t) for t in counts)) if counts else len("table")
     digits = max(len("rows"), *(len(str(n)) for n in counts.values())) if counts else len("rows")
@@ -95,7 +95,7 @@ def _db_path(args: argparse.Namespace, root: Path) -> Path:
     return Path(args.db) if args.db is not None else root / DEFAULT_DB
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     root = Path(args.repo_root) if args.repo_root is not None else default_repo_root()
     db = _db_path(args, root)
@@ -106,7 +106,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             store.init()
             reports = import_all(store, root)
             counts = store.counts()
-        warnings: List[str] = [
+        warnings: list[str] = [
             f"{step}: {w}" for step, rep in reports.items() for w in rep.warnings
         ]
         print(render_counts(counts))

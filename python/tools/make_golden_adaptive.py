@@ -53,12 +53,11 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "python" / "src"))
 
 import numpy as np  # noqa: E402
-
 from iap.adaptive import (  # noqa: E402
+    PSI_EPS,
     DriftTriggeredPolicy,
     LifecycleConfig,
     LifecycleTracker,
-    PSI_EPS,
     RefitContext,
     capture_baseline,
     ks_test,

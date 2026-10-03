@@ -80,7 +80,6 @@ from __future__ import annotations
 import json
 import math
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 from iap.core.codec import write_jsonl
 from iap.core.events import SYNTHETIC_ID_BASE, EventType, MarketEvent, SessionStatus, Side
@@ -191,11 +190,11 @@ class _EffPrice:
         self.mid_f = float(inst.ref_price_ticks)
         self.regime = 0
         self.open_ns = 0
-        self.path: List[float] = [self.mid_f]
+        self.path: list[float] = [self.mid_f]
         # Planted informed flow (None = off): per-step strength, kernel
         # weights and the scale of the kernel-weighted move.
-        self.flow_strength: Optional[List[float]] = None
-        self.flow_weights: List[float] = []
+        self.flow_strength: list[float] | None = None
+        self.flow_weights: list[float] = []
         self.flow_scale = 1.0
 
     @classmethod
@@ -204,7 +203,7 @@ class _EffPrice:
         return int((close_ns - open_ns) // cls.STEP_NS) + 2
 
     def new_session(
-        self, open_ns: int, close_ns: int, vol_cfg: dict, drift_ticks: Optional[List[float]] = None
+        self, open_ns: int, close_ns: int, vol_cfg: dict, drift_ticks: list[float] | None = None
     ) -> None:
         """Precompute this session's path, continuing from the prior level.
 
@@ -233,13 +232,13 @@ class _EffPrice:
         self.mid_f = path[-1]  # carried into the next session
         self.regime = regime
 
-    def step_moves(self) -> List[float]:
+    def step_moves(self) -> list[float]:
         """Per-step efficient-price moves (ticks) of the current session."""
         path = self.path
         return [path[k + 1] - path[k] for k in range(len(path) - 1)]
 
     def set_informed_flow(
-        self, strength: Optional[List[float]], decay: float, kernel_steps: int, sigma_ticks: float
+        self, strength: list[float] | None, decay: float, kernel_steps: int, sigma_ticks: float
     ) -> None:
         """Arm (or, with ``None``, disarm) planted informed flow for the
         current session: ``strength[k]`` applies to trades in grid step k."""
@@ -323,11 +322,11 @@ class _Stream:
 class MarketDataGenerator:
     """Deterministic synthetic generator over the configured universe."""
 
-    def __init__(self, refdata: ReferenceData, config: Optional[dict] = None) -> None:
+    def __init__(self, refdata: ReferenceData, config: dict | None = None) -> None:
         self.ref = refdata
         self.cfg = _merge_config(_DEFAULT_CONFIG, config or {})
         self.seed: int = self.cfg["seed"]
-        self.injected: Dict[str, int] = {
+        self.injected: dict[str, int] = {
             "gaps": 0,
             "gap_missing_events": 0,
             "duplicates": 0,
@@ -336,10 +335,10 @@ class MarketDataGenerator:
             "ts_violations": 0,
         }
         # Persistent stream state across sessions.
-        self._eq_streams: Dict[Tuple[int, int], _Stream] = {}
-        self._fx_streams: Dict[Tuple[int, int], _Stream] = {}
-        self._eq_prices: Dict[int, _EffPrice] = {}  # per-instrument shared mid
-        self._rngs: Dict[Tuple[str, int, int], SplitMix64] = {}
+        self._eq_streams: dict[tuple[int, int], _Stream] = {}
+        self._fx_streams: dict[tuple[int, int], _Stream] = {}
+        self._eq_prices: dict[int, _EffPrice] = {}  # per-instrument shared mid
+        self._rngs: dict[tuple[str, int, int], SplitMix64] = {}
         self._check_planted()
 
     # --------------------------------------------------------------- planted
@@ -377,7 +376,7 @@ class MarketDataGenerator:
                 "|post_multiplier * order_flow.strength| < 1"
             )
 
-    def _planted_multipliers(self, session_index: int, sessions: int, steps: int) -> List[float]:
+    def _planted_multipliers(self, session_index: int, sessions: int, steps: int) -> list[float]:
         """Per-grid-step multiplier of the planted strengths for one session:
         1 before the break, ``post_multiplier`` from it on (all 1 without)."""
         brk = self.cfg["planted"]["break"]
@@ -404,7 +403,7 @@ class MarketDataGenerator:
     @staticmethod
     def _emit(
         stream: _Stream,
-        out: List[MarketEvent],
+        out: list[MarketEvent],
         rng: SplitMix64,
         ts: int,
         event_type: int,
@@ -441,10 +440,10 @@ class MarketDataGenerator:
         return ev
 
     def _snapshot_burst(
-        self, stream: _Stream, out: List[MarketEvent], rng: SplitMix64, ts: int
+        self, stream: _Stream, out: list[MarketEvent], rng: SplitMix64, ts: int
     ) -> None:
         """Emit a full-book SNAPSHOT burst from the stream's internal state."""
-        records: List[Tuple[int, int, int, int]] = []  # (side, price, qty, oid)
+        records: list[tuple[int, int, int, int]] = []  # (side, price, qty, oid)
         for side in (int(Side.BID), int(Side.ASK)):
             for level in stream.book._sorted_levels(side):
                 for oid, q in level.orders.items():
@@ -473,10 +472,10 @@ class MarketDataGenerator:
     def _eq_add(
         self,
         stream: _Stream,
-        out: List[MarketEvent],
+        out: list[MarketEvent],
         rng: SplitMix64,
         ts: int,
-        forced_side: Optional[int] = None,
+        forced_side: int | None = None,
     ) -> None:
         cfg = self.cfg["equities"]
         mid = max(11, int(round(stream.mid_f)))
@@ -526,7 +525,7 @@ class MarketDataGenerator:
         )
 
     def _eq_slot(
-        self, stream: _Stream, price: _EffPrice, out: List[MarketEvent], rng: SplitMix64, ts: int
+        self, stream: _Stream, price: _EffPrice, out: list[MarketEvent], rng: SplitMix64, ts: int
     ) -> None:
         """Generate one flow slot (1-2 events) for an equity stream."""
         cfg = self.cfg["equities"]
@@ -663,7 +662,7 @@ class MarketDataGenerator:
             )
 
     def _reopen_auction(
-        self, stream: _Stream, out: List[MarketEvent], rng: SplitMix64, t_end: int, price: _EffPrice
+        self, stream: _Stream, out: list[MarketEvent], rng: SplitMix64, t_end: int, price: _EffPrice
     ) -> None:
         """Re-opening auction after a halt (pinned synthetic model).
 
@@ -760,10 +759,10 @@ class MarketDataGenerator:
         open_ns: int,
         close_ns: int,
         slots: int,
-        halt_window: Optional[Tuple[int, int]],
-        anomalies: Optional[dict],
-        max_events: Optional[int] = None,
-    ) -> List[MarketEvent]:
+        halt_window: tuple[int, int] | None,
+        anomalies: dict | None,
+        max_events: int | None = None,
+    ) -> list[MarketEvent]:
         """One session of MBO flow for one equity stream.
 
         ``price`` is the instrument's SHARED efficient price (already
@@ -771,7 +770,7 @@ class MarketDataGenerator:
         its venue noise on top.
         """
         cfg = self.cfg["equities"]
-        out: List[MarketEvent] = []
+        out: list[MarketEvent] = []
         t = open_ns
         stream.mid_f = price.mid_at(t)
         mid = max(11, int(round(stream.mid_f)))
@@ -878,17 +877,17 @@ class MarketDataGenerator:
     def _fx_pair_session(
         self,
         inst: Instrument,
-        streams: List[_Stream],
+        streams: list[_Stream],
         rng: SplitMix64,
         open_ns: int,
         close_ns: int,
         slots: int,
-        anomalies: Optional[dict],
-        max_events: Optional[int] = None,
-    ) -> List[MarketEvent]:
+        anomalies: dict | None,
+        max_events: int | None = None,
+    ) -> list[MarketEvent]:
         """One session of QUOTE+TRADE flow for one FX pair across venues."""
         cfg = self.cfg["fx"]
-        out: List[MarketEvent] = []
+        out: list[MarketEvent] = []
         pair_mid = streams[0].mid_f
         regime = streams[0].regime
         vol = cfg["vol_regimes"]
@@ -967,8 +966,8 @@ class MarketDataGenerator:
     # ------------------------------------------------------- anomaly injection
 
     def _inject_file_anomalies(
-        self, events: List[MarketEvent], rng: SplitMix64
-    ) -> List[MarketEvent]:
+        self, events: list[MarketEvent], rng: SplitMix64
+    ) -> list[MarketEvent]:
         """Duplicate / out-of-order / invalid / ts-violation injection.
 
         Operates on one raw file's events; returns the final arrival-ordered
@@ -976,8 +975,8 @@ class MarketDataGenerator:
         recovery); this pass handles the remaining anomaly classes.
         """
         an = self.cfg["anomalies"]
-        clones: List[MarketEvent] = []
-        last_exch: Dict[Tuple[int, int], int] = {}
+        clones: list[MarketEvent] = []
+        last_exch: dict[tuple[int, int], int] = {}
         for ev in events:
             stream_key = (ev.venue_id, ev.instrument_id)
             prev_exch = last_exch.get(stream_key, 0)
@@ -1015,7 +1014,7 @@ class MarketDataGenerator:
         return self._finalize_file(events)
 
     @staticmethod
-    def _finalize_file(events: List[MarketEvent]) -> List[MarketEvent]:
+    def _finalize_file(events: list[MarketEvent]) -> list[MarketEvent]:
         """Sort into arrival order and assign event_id 1..N."""
         events.sort(
             key=lambda e: (
@@ -1054,14 +1053,14 @@ class MarketDataGenerator:
             eq_open, eq_close = self.ref.session_bounds_ns("EQUITY", date)
             fx_open, fx_close = self.ref.session_bounds_ns("FX", date)
 
-            eq_events: List[MarketEvent] = []
+            eq_events: list[MarketEvent] = []
             vol_cfg = self.cfg["equities"]["vol_regimes"]
             planted = self.cfg["planted"]
             flow_cfg, lead_cfg = planted["order_flow"], planted["lead_lag"]
             flow_on = float(flow_cfg["strength"]) != 0.0
             lead_on = float(lead_cfg["beta"]) != 0.0
-            multipliers: List[float] = []
-            leader_moves: List[float] = []
+            multipliers: list[float] = []
+            leader_moves: list[float] = []
             leader_id = -1
             if flow_on or lead_on:
                 steps = _EffPrice.session_steps(eq_open, eq_close)
@@ -1135,7 +1134,7 @@ class MarketDataGenerator:
             stats["files"][eq_path.name] = len(eq_events)
             stats["total_events"] += len(eq_events)
 
-            fx_events: List[MarketEvent] = []
+            fx_events: list[MarketEvent] = []
             for inst in self.ref.instruments("FX"):
                 streams = []
                 for venue in fx_venues:
@@ -1164,7 +1163,7 @@ class MarketDataGenerator:
 
 def generate_golden_eq(
     refdata: ReferenceData, seed: int = GOLDEN_EQ_SEED, n: int = 2000
-) -> List[MarketEvent]:
+) -> list[MarketEvent]:
     """Pinned single-instrument (SYN.EQ.001 @ XV1) clean MBO golden vector.
 
     No anomalies, no halt; exactly ``n`` events in exchange-time order with
@@ -1200,7 +1199,7 @@ def generate_golden_eq(
 
 def generate_golden_fx(
     refdata: ReferenceData, seed: int = GOLDEN_FX_SEED, n: int = 800
-) -> List[MarketEvent]:
+) -> list[MarketEvent]:
     """Pinned EUR/USD QUOTE+TRADE golden vector across LP1/LP2/PRI.
 
     No anomalies; exactly ``n`` events in exchange-time order with event_id

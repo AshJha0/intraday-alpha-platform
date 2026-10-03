@@ -6,7 +6,6 @@ import dataclasses
 import math
 
 import pytest
-
 from conftest import CONFIGS_DIR
 from iap.adaptive.lifecycle import LifecycleConfig, LifecycleTracker
 from iap.alpha.base import AlphaModel

@@ -44,10 +44,16 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from iap.alpha import load_params_file  # noqa: E402
-from iap.alpha.data import asof_to_grid, load_features, make_grid, split_by_day, session_days  # noqa: E402
+from iap.alpha.data import (  # noqa: E402
+    asof_to_grid,
+    load_features,
+    make_grid,
+    session_days,
+    split_by_day,
+)
 from iap.alpha.fx_exposure import FX05CrossPairRelativeValue, solve_factor_returns  # noqa: E402
 from iap.alpha.goldenframes import build_golden_frame  # noqa: E402
-from iap.backtest import Backtester, BacktestConfig, CostModel  # noqa: E402
+from iap.backtest import BacktestConfig, Backtester, CostModel  # noqa: E402
 from iap.validation.metrics import ic  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[2]

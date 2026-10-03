@@ -98,8 +98,9 @@ from __future__ import annotations
 
 import math
 import re
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Any
 
 from iap.risk.events import Decision, RiskEvent, Rules, Scope, Severity, fmt_fixed
 from iap.risk.limits import RiskLimits
@@ -128,7 +129,7 @@ def _i64(v: int) -> int:
     return v
 
 
-def _pos_add(a: int, b: int) -> Optional[int]:
+def _pos_add(a: int, b: int) -> int | None:
     """``a + b`` inside the SYMMETRIC i64 domain ``[-i64::MAX, i64::MAX]``:
     ``None`` on overflow and on ``i64::MIN``, so a later negation / ``abs``
     of the result can never overflow either (``risk::engine::pos_add``)."""
@@ -136,19 +137,19 @@ def _pos_add(a: int, b: int) -> Optional[int]:
     return v if -_I64_MAX <= v <= _I64_MAX else None
 
 
-def _pos_sub(a: int, b: int) -> Optional[int]:
+def _pos_sub(a: int, b: int) -> int | None:
     """``a - b`` inside the symmetric i64 domain (see :func:`_pos_add`)."""
     v = a - b
     return v if -_I64_MAX <= v <= _I64_MAX else None
 
 
-def _sum_ticks(bid_ticks: int, ask_ticks: int) -> Optional[int]:
+def _sum_ticks(bid_ticks: int, ask_ticks: int) -> int | None:
     """``bid + ask`` as an i64, ``None`` on overflow (``checked_add``)."""
     v = bid_ticks + ask_ticks
     return v if _I64_MIN <= v <= _I64_MAX else None
 
 
-def _ts_sub(a: int, b: int) -> Optional[int]:
+def _ts_sub(a: int, b: int) -> int | None:
     """``a - b`` as an i64, ``None`` on overflow (``i64::checked_sub``)."""
     v = a - b
     return v if _I64_MIN <= v <= _I64_MAX else None
@@ -174,7 +175,7 @@ def _require(name: str, value: object, lo: int, hi: int) -> int:
     return value
 
 
-def _parse_uint(text: str, hi: int) -> Optional[int]:
+def _parse_uint(text: str, hi: int) -> int | None:
     """``str::parse::<uN>()``: ASCII digits with an optional leading ``+``,
     within range; ``None`` otherwise."""
     if not isinstance(text, str) or _UINT_RE.fullmatch(text) is None:
@@ -208,8 +209,8 @@ class RiskMetrics:
     __slots__ = ("_counters", "_gauges")
 
     def __init__(self) -> None:
-        self._counters: Dict[str, int] = {}
-        self._gauges: Dict[str, float] = {}
+        self._counters: dict[str, int] = {}
+        self._gauges: dict[str, float] = {}
 
     def inc(self, name: str, n: int = 1) -> None:
         """Increment a counter (created at 0 on first use)."""
@@ -223,15 +224,15 @@ class RiskMetrics:
         """Counter value, 0 when never touched."""
         return self._counters.get(name, 0)
 
-    def gauge_value(self, name: str) -> Optional[float]:
+    def gauge_value(self, name: str) -> float | None:
         """Gauge value, ``None`` when never set."""
         return self._gauges.get(name)
 
-    def counters(self) -> Dict[str, int]:
+    def counters(self) -> dict[str, int]:
         """Sorted copy of every counter."""
         return {k: self._counters[k] for k in sorted(self._counters)}
 
-    def gauges(self) -> Dict[str, float]:
+    def gauges(self) -> dict[str, float]:
         """Sorted copy of every gauge."""
         return {k: self._gauges[k] for k in sorted(self._gauges)}
 
@@ -311,36 +312,36 @@ class RiskEngine:
 
     def _init(
         self,
-        limits: Optional[RiskLimits],
+        limits: RiskLimits | None,
         instruments: Mapping[int, InstrumentRef],
         config_error: str,
     ) -> None:
-        refs: Dict[int, InstrumentRef] = {}
+        refs: dict[int, InstrumentRef] = {}
         for iid in sorted(instruments):
             ref = instruments[iid]
             if not isinstance(ref, InstrumentRef):
                 raise ValueError(f"instrument {iid!r}: reference must be an InstrumentRef")
             refs[_require("instrument_id", iid, 0, _U32_MAX)] = ref
-        self._limits: Optional[RiskLimits] = limits
+        self._limits: RiskLimits | None = limits
         self._config_error: str = config_error
-        self._instruments: Dict[int, InstrumentRef] = refs
+        self._instruments: dict[int, InstrumentRef] = refs
         self._bootstrapped: bool = True
         self._kill_global: bool = bool(limits.kill_switch_engaged) if limits else False
-        self._kill_strategies: Dict[str, bool] = {}
-        self._kill_instruments: Dict[int, bool] = {}
-        self._kill_venues: Dict[int, bool] = {}
-        self._venues_down: Dict[int, bool] = {}
-        self._market: Dict[int, _MarketState] = {}
-        self._seen_orders: Dict[int, int] = {}
-        self._buckets: Dict[str, _Bucket] = {}
-        self._open: Dict[int, _OpenOrder] = {}
-        self._positions: Dict[int, int] = {}
-        self._lots: Dict[Tuple[str, int], _Lot] = {}
+        self._kill_strategies: dict[str, bool] = {}
+        self._kill_instruments: dict[int, bool] = {}
+        self._kill_venues: dict[int, bool] = {}
+        self._venues_down: dict[int, bool] = {}
+        self._market: dict[int, _MarketState] = {}
+        self._seen_orders: dict[int, int] = {}
+        self._buckets: dict[str, _Bucket] = {}
+        self._open: dict[int, _OpenOrder] = {}
+        self._positions: dict[int, int] = {}
+        self._lots: dict[tuple[str, int], _Lot] = {}
         #: Realized P&L in the instrument's quote currency per (strategy, ccy).
-        self._realized: Dict[Tuple[str, str], float] = {}
-        self._loss_override_global: Optional[float] = None
-        self._loss_override_strategy: Dict[str, float] = {}
-        self._audit: List[RiskEvent] = []
+        self._realized: dict[tuple[str, str], float] = {}
+        self._loss_override_global: float | None = None
+        self._loss_override_strategy: dict[str, float] = {}
+        self._audit: list[RiskEvent] = []
         #: Engine metrics (decision counters, PnL gauges).
         self.metrics: RiskMetrics = RiskMetrics()
         self.metrics.set_gauge("risk_kill_switch_engaged", 1.0 if self._kill_global else 0.0)
@@ -348,13 +349,13 @@ class RiskEngine:
     # ------------------------------------------------------------ builders
 
     @classmethod
-    def with_ticks(cls, limits: RiskLimits, ticks: Mapping[int, float]) -> "RiskEngine":
+    def with_ticks(cls, limits: RiskLimits, ticks: Mapping[int, float]) -> RiskEngine:
         """New engine from parsed limits + tick sizes only (every instrument
         a USD equity: qty_unit 1)."""
         return cls(limits, equity_refs(ticks))
 
     @classmethod
-    def fail_closed(cls, reason: str) -> "RiskEngine":
+    def fail_closed(cls, reason: str) -> RiskEngine:
         """New engine in FAIL-CLOSED mode: every order is rejected with
         ``CONFIG_MISSING`` carrying ``reason``. This is the mandatory
         landing state for any configuration error."""
@@ -363,7 +364,7 @@ class RiskEngine:
         return eng
 
     @classmethod
-    def from_config(cls, doc: Any, instruments: Mapping[int, InstrumentRef]) -> "RiskEngine":
+    def from_config(cls, doc: Any, instruments: Mapping[int, InstrumentRef]) -> RiskEngine:
         """Build from a parsed ``configs/risk/risk.json`` document: a parse
         failure lands fail-closed instead of raising (hard risk never runs
         open). The reason carries the Rust error rendering
@@ -375,7 +376,7 @@ class RiskEngine:
         return cls(limits, instruments)
 
     @classmethod
-    def from_config_ticks(cls, doc: Any, ticks: Mapping[int, float]) -> "RiskEngine":
+    def from_config_ticks(cls, doc: Any, ticks: Mapping[int, float]) -> RiskEngine:
         """:meth:`from_config` with tick sizes only (USD equities)."""
         return cls.from_config(doc, equity_refs(ticks))
 
@@ -699,7 +700,7 @@ class RiskEngine:
         if not isinstance(fill, Fill):
             raise ValueError("fill must be a Fill")
         if fill.qty <= 0:
-            why: Optional[str] = f"qty must be > 0: {fill.qty}"
+            why: str | None = f"qty must be > 0: {fill.qty}"
         elif fill.side > 1:
             why = f"side must be 0 or 1: {fill.side}"
         elif fill.price_ticks <= 0:
@@ -801,7 +802,7 @@ class RiskEngine:
 
     # ------------------------------------------------------------- money
 
-    def _fx_rate(self, ccy: str) -> Optional[Tuple[float, int]]:
+    def _fx_rate(self, ccy: str) -> tuple[float, int] | None:
         """Quote-currency -> reporting-currency rate and its mark time."""
         limits = self._limits
         if limits is None:
@@ -827,7 +828,7 @@ class RiskEngine:
             return None
         return (1.0 / mid if conv.invert else mid), md.ts
 
-    def _mark_price(self, instrument_id: int) -> Optional[float]:
+    def _mark_price(self, instrument_id: int) -> float | None:
         """Last consolidated mid as a real price (quote ccy), if two-sided
         (``None`` too when ``bid + ask`` leaves i64: no usable mark)."""
         md = self._market.get(instrument_id)
@@ -843,7 +844,7 @@ class RiskEngine:
             return None
         return float(sum_ticks) * ins.tick_size / 2.0
 
-    def _daily_pnl(self, sid: Optional[str]) -> Optional[float]:
+    def _daily_pnl(self, sid: str | None) -> float | None:
         """Realized + unrealized of every held lot in the reporting
         currency, for one strategy (``sid``) or the whole firm (``None``);
         ``None`` when a needed conversion rate is missing or a held lot has
@@ -874,13 +875,13 @@ class RiskEngine:
             total += float(lot.pos) * (mark - lot.avg_price) * ins.qty_unit * rate[0]
         return total
 
-    def strategy_daily_pnl(self, sid: str) -> Optional[float]:
+    def strategy_daily_pnl(self, sid: str) -> float | None:
         """Daily P&L of one strategy in the reporting currency: realized +
         unrealized of every marked lot. ``None`` when a needed conversion
         rate is missing (undeterminable)."""
         return self._daily_pnl(sid)
 
-    def global_daily_pnl(self) -> Optional[float]:
+    def global_daily_pnl(self) -> float | None:
         """Firm-wide daily P&L in the reporting currency (``None`` when a
         conversion rate is missing)."""
         return self._daily_pnl(None)
@@ -895,7 +896,7 @@ class RiskEngine:
         rates contribute 0)."""
         return self._realized_sum(sid)
 
-    def _realized_sum(self, sid: Optional[str]) -> float:
+    def _realized_sum(self, sid: str | None) -> float:
         # Rust ``Iterator::sum::<f64>()`` folds from -0.0 (its neutral
         # element since Rust 1.83), so an empty bucket set sums to -0.0.
         total = -0.0
@@ -996,7 +997,7 @@ class RiskEngine:
         """Number of open (allowed, not yet terminal) orders tracked."""
         return len(self._open)
 
-    def audit(self) -> Tuple[RiskEvent, ...]:
+    def audit(self) -> tuple[RiskEvent, ...]:
         """The audit log so far (a copy)."""
         return tuple(self._audit)
 
@@ -1056,7 +1057,7 @@ class RiskEngine:
         return 0
 
     @staticmethod
-    def _decision_scope(order: OrderRequest, rule_id: str) -> Tuple[Scope, str]:
+    def _decision_scope(order: OrderRequest, rule_id: str) -> tuple[Scope, str]:
         if rule_id in _GLOBAL_SCOPE_RULES:
             return Scope.GLOBAL, ""
         if rule_id in _STRATEGY_SCOPE_RULES:
@@ -1085,7 +1086,7 @@ class RiskEngine:
 
     def _pretrade_rate(
         self, limits: RiskLimits, ccy: str, ts: int, clock: int
-    ) -> Tuple[Optional[float], str]:
+    ) -> tuple[float | None, str]:
         """Pre-trade conversion rate: present and fresh (age within the
         stale timeout, and not stamped beyond the engine's event clock by
         more than the timeout — a future-stamped rate is as untrusted as an
@@ -1326,7 +1327,7 @@ class RiskEngine:
         pos = self.position(order.instrument_id)
         # Checked (symmetric i64 domain): a projection that overflows is
         # not a number the limit can be compared with — reject, never raise.
-        open_same: Optional[int] = 0
+        open_same: int | None = 0
         for oid in sorted(self._open):
             r = self._open[oid]
             if r.instrument_id == order.instrument_id and r.side == order.side:
@@ -1473,7 +1474,7 @@ class RiskEngine:
 
     # ---------------------------------------------------- snapshot/restore
 
-    def snapshot(self) -> Dict[str, Any]:
+    def snapshot(self) -> dict[str, Any]:
         """Serialise the full mutable state (positions, lots, realized P&L,
         kill/latch state, marks, open orders, throttle buckets, seen order
         ids, overrides, bootstrap flag) as a schema-versioned JSON-shaped
@@ -1547,7 +1548,7 @@ class RiskEngine:
         instruments: Mapping[int, InstrumentRef],
         snap: Any,
         ts: int,
-    ) -> "RiskEngine":
+    ) -> RiskEngine:
         """Rebuild an engine from ``limits``, ``instruments`` and a
         :meth:`snapshot` document (strict: unknown version or a malformed
         field is a ``ValueError``, nothing is restored). Emits a
@@ -1707,11 +1708,11 @@ class _SnapReader:
     def raw(self, key: str) -> Any:
         return self._doc.get(key) if isinstance(self._doc, dict) else None
 
-    def u64_opt(self, key: str) -> Optional[int]:
+    def u64_opt(self, key: str) -> int | None:
         v = self.raw(key)
         return v if _is_int(v) and 0 <= v <= _U64_MAX else None
 
-    def bool(self, key: str, what: Optional[str] = None) -> bool:
+    def bool(self, key: str, what: str | None = None) -> bool:
         return _as_bool(self.raw(key), what or key)
 
     def i64(self, key: str, what: str) -> int:
@@ -1726,13 +1727,13 @@ class _SnapReader:
     def str(self, key: str, what: str) -> str:
         return _as_str(self.raw(key), what)
 
-    def obj(self, key: str) -> Dict[str, Any]:
+    def obj(self, key: str) -> dict[str, Any]:
         v = self.raw(key)
         if not isinstance(v, dict):
             raise _bad(key)
         return {k: v[k] for k in sorted(v)}
 
-    def arr(self, key: str) -> List[Any]:
+    def arr(self, key: str) -> list[Any]:
         v = self.raw(key)
         if not isinstance(v, list):
             raise _bad(key)

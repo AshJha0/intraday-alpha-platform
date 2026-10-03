@@ -12,7 +12,8 @@ the golden file.
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, Mapping, Tuple, Type
+from collections.abc import Mapping
+from typing import Any
 
 from iap.contracts.ids import make_trace_id
 from iap.contracts.types import (
@@ -179,10 +180,10 @@ def _parent_order() -> ParentOrder:
     )
 
 
-_CHILD_SLICES: Tuple[Tuple[int, int], ...] = ((1, 9_000), (2, 7_000), (3, 4_000))
+_CHILD_SLICES: tuple[tuple[int, int], ...] = ((1, 9_000), (2, 7_000), (3, 4_000))
 
 
-def _child_orders() -> Tuple[ChildOrder, ...]:
+def _child_orders() -> tuple[ChildOrder, ...]:
     return tuple(
         ChildOrder(
             child_order_id=PARENT_ORDER_ID * 100 + i + 1,
@@ -201,7 +202,7 @@ def _child_orders() -> Tuple[ChildOrder, ...]:
     )
 
 
-def _candidates() -> Tuple[VenueScore, ...]:
+def _candidates() -> tuple[VenueScore, ...]:
     return (
         VenueScore(
             venue_id=1,
@@ -239,7 +240,7 @@ def _candidates() -> Tuple[VenueScore, ...]:
     )
 
 
-def _routing() -> Tuple[VenueDecision, ...]:
+def _routing() -> tuple[VenueDecision, ...]:
     return tuple(
         VenueDecision(
             child_order_id=child.child_order_id,
@@ -251,7 +252,7 @@ def _routing() -> Tuple[VenueDecision, ...]:
     )
 
 
-def _fills() -> Tuple[ExecutionReport, ...]:
+def _fills() -> tuple[ExecutionReport, ...]:
     filled = ((9_000, ExecStatus.FILLED), (7_000, ExecStatus.FILLED), (2_000, ExecStatus.PARTIAL))
     return tuple(
         ExecutionReport(
@@ -310,7 +311,7 @@ def _attribution() -> Attribution:
 
 
 def _experiment_spec() -> ExperimentSpec:
-    body: Dict[str, Any] = {
+    body: dict[str, Any] = {
         "alpha_id": ALPHA_ID,
         "dataset_version": DATA_VERSION,
         "feature_version": FEATURE_VERSION,
@@ -406,7 +407,7 @@ def example_trace() -> DecisionTrace:
 
 
 #: Every contract type with its example builder, in golden-document order.
-EXAMPLE_TYPES: Tuple[Tuple[Type[Contract], Any], ...] = (
+EXAMPLE_TYPES: tuple[tuple[type[Contract], Any], ...] = (
     (MarketEventRef, _market_event_ref),
     (BookSnapshotRef, _book_snapshot_ref),
     (FeatureVectorRef, _feature_vector_ref),
@@ -432,12 +433,12 @@ EXAMPLE_TYPES: Tuple[Tuple[Type[Contract], Any], ...] = (
 )
 
 
-def all_examples() -> Dict[str, Contract]:
+def all_examples() -> dict[str, Contract]:
     """``{type name: example instance}`` in golden-document order."""
     return {cls.__name__: build() for cls, build in EXAMPLE_TYPES}
 
 
-def golden_document() -> Dict[str, Any]:
+def golden_document() -> dict[str, Any]:
     """The golden document (JSON-ready, key order pinned)."""
     canonical_input = {"b": [1, 2.5, None, True], "a": {"z": "é", "y": -0.0}}
     canonical_text = canonical_json(canonical_input)

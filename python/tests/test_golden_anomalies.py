@@ -9,7 +9,6 @@ cross-language checkpoint JSON shape.
 import json
 
 import pytest
-
 from bruteforce_book import BruteForceBook
 from iap.core.codec import read_jsonl, write_jsonl
 from iap.marketdata.golden_anomalies import anomaly_vector

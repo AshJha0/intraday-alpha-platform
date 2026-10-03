@@ -27,7 +27,7 @@ books => same route.
 
 from __future__ import annotations
 
-from typing import Mapping, Optional, Sequence
+from collections.abc import Mapping, Sequence
 
 from iap.execution.config import SorOptions
 from iap.execution.simulator import ExecutionSimulator
@@ -55,7 +55,7 @@ class SmartOrderRouter:
     def options(self) -> SorOptions:
         return self._options
 
-    def _eligible(self, book: ConsolidatedBook, vid: int) -> Optional[OrderBook]:
+    def _eligible(self, book: ConsolidatedBook, vid: int) -> OrderBook | None:
         """The venue book when the venue is eligible, else None."""
         vb = book.books.get(vid)
         if vb is None or not ExecutionSimulator.venue_open(vb):

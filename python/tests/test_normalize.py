@@ -3,7 +3,6 @@
 import json
 
 import pytest
-
 from conftest import add, mkev
 from iap.core.codec import read_iap1, read_jsonl, write_jsonl
 from iap.core.events import EventType, Side

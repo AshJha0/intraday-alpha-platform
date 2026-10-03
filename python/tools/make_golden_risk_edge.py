@@ -26,7 +26,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "python" / "src"))
@@ -68,7 +68,7 @@ def order(
     ts: int,
     venue: int = 1,
     strategy: str = "S1",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     return {
         "type": "order",
         "order": {
@@ -86,13 +86,13 @@ def order(
     }
 
 
-def market(iid: int, bid: int, ask: int, ts: int) -> Dict[str, Any]:
+def market(iid: int, bid: int, ask: int, ts: int) -> dict[str, Any]:
     return {"type": "market", "instrument_id": iid, "bid_ticks": bid, "ask_ticks": ask, "ts": ts}
 
 
 def fill(
     strategy: str, iid: int, side: int, qty: int, price: int, ts: int, order_id: int = 0
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     return {
         "type": "fill",
         "strategy_id": strategy,
@@ -105,15 +105,15 @@ def fill(
     }
 
 
-def kill(kind: str, scope: str, scope_id: str, ts: int, reason: str) -> Dict[str, Any]:
+def kill(kind: str, scope: str, scope_id: str, ts: int, reason: str) -> dict[str, Any]:
     return {"type": kind, "scope": scope, "scope_id": scope_id, "ts": ts, "reason": reason}
 
 
-def marks(ts: int = T0) -> List[Dict[str, Any]]:
+def marks(ts: int = T0) -> list[dict[str, Any]]:
     return [market(1, 2450, 2452, ts), market(2, 3119, 3121, ts)]
 
 
-def scenarios() -> List[Dict[str, Any]]:
+def scenarios() -> list[dict[str, Any]]:
     t = T0 + 100 * MS
     return [
         {
@@ -268,7 +268,7 @@ MUST_PIN = [
 
 
 def main() -> None:
-    golden: Dict[str, Any] = {
+    golden: dict[str, Any] = {
         "x-version": 1,
         "description": DESCRIPTION,
         "config": "configs/risk/risk.json",

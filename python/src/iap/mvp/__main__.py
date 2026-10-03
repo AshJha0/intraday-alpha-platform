@@ -30,8 +30,8 @@ import argparse
 import json
 import sys
 import tempfile
+from collections.abc import Sequence
 from pathlib import Path
-from typing import List, Optional, Sequence
 
 from iap.mvp.config import DEFAULT_CONFIG_PATH, REPO_ROOT, MvpConfig, load_config
 from iap.mvp.feed import generate_feed, load_feed
@@ -62,11 +62,11 @@ def _summary(res: RunResult) -> str:
 
 
 def cmd_run(
-    config: Optional[Path],
-    seed: Optional[int],
-    instrument: Optional[str],
-    out: Optional[Path],
-    repo_root: Optional[Path] = None,
+    config: Path | None,
+    seed: int | None,
+    instrument: str | None,
+    out: Path | None,
+    repo_root: Path | None = None,
 ) -> RunResult:
     """Generate the feed and run one session into ``out``."""
     cfg = load_config(config, seed=seed, instrument=instrument, repo_root=repo_root)
@@ -75,7 +75,7 @@ def cmd_run(
     return run_session(cfg, feed, out_dir)
 
 
-def _config_from_run(run_dir: Path, repo_root: Optional[Path] = None) -> MvpConfig:
+def _config_from_run(run_dir: Path, repo_root: Path | None = None) -> MvpConfig:
     path = run_dir / CONFIG_FILE
     if not path.is_file():
         raise ValueError(f"not a run directory (missing {CONFIG_FILE}): {run_dir}")
@@ -84,7 +84,7 @@ def _config_from_run(run_dir: Path, repo_root: Optional[Path] = None) -> MvpConf
     return MvpConfig.from_document(recorded["document"], where=str(path), repo_root=repo_root)
 
 
-def cmd_replay(run_dir: Path, out: Optional[Path], repo_root: Optional[Path] = None) -> List[str]:
+def cmd_replay(run_dir: Path, out: Path | None, repo_root: Path | None = None) -> list[str]:
     """Re-run from the captured stream; return the list of differences."""
     run_dir = Path(run_dir)
     cfg = _config_from_run(run_dir, repo_root)
@@ -92,7 +92,7 @@ def cmd_replay(run_dir: Path, out: Optional[Path], repo_root: Optional[Path] = N
     expected = load_report(run_dir)
     with open(run_dir / CONFIG_FILE, encoding="utf-8") as fh:
         recorded = json.load(fh)
-    diffs: List[str] = []
+    diffs: list[str] = []
     if feed.events_sha256 != expected["run"]["events_sha256"]:
         diffs.append(f"events_sha256: {expected['run']['events_sha256']} != {feed.events_sha256}")
     if feed.data_version != expected["run"]["data_version"]:
@@ -113,11 +113,11 @@ def cmd_replay(run_dir: Path, out: Optional[Path], repo_root: Optional[Path] = N
 
 
 def cmd_verify(
-    config: Optional[Path],
-    seed: Optional[int],
-    instrument: Optional[str],
-    repo_root: Optional[Path] = None,
-) -> List[str]:
+    config: Path | None,
+    seed: int | None,
+    instrument: str | None,
+    repo_root: Path | None = None,
+) -> list[str]:
     """Run twice from scratch (temporary directories); return the differences."""
     cfg = load_config(config, seed=seed, instrument=instrument, repo_root=repo_root)
     with tempfile.TemporaryDirectory(prefix="iap-mvp-verify-") as tmp:
@@ -128,7 +128,7 @@ def cmd_verify(
             feed = generate_feed(cfg, out_dir)
             runs.append(run_session(cfg, feed, out_dir))
         first, second = runs
-        diffs: List[str] = []
+        diffs: list[str] = []
         if first.feed.events_sha256 != second.feed.events_sha256:
             diffs.append(
                 f"events_sha256: {first.feed.events_sha256} != {second.feed.events_sha256}"
@@ -194,7 +194,7 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
         if args.command == "run":

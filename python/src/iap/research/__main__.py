@@ -42,8 +42,9 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Dict, List, NoReturn, Optional, Sequence
+from typing import Any, NoReturn
 
 from iap.contracts.types import ExperimentResult, ExperimentSpec
 from iap.research.errors import ResearchError
@@ -78,8 +79,8 @@ _RESULT_ROWS = (
 )
 
 
-def _parse_config(items: Sequence[str]) -> Dict[str, Any]:
-    out: Dict[str, Any] = {}
+def _parse_config(items: Sequence[str]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
     for item in items:
         key, sep, raw = item.partition("=")
         if not sep or not key:
@@ -157,7 +158,7 @@ def render_eligibility(eligibility: GateEligibility) -> str:
     return "\n".join(lines)
 
 
-def _eligibility_doc(eligibility: GateEligibility) -> Dict[str, Any]:
+def _eligibility_doc(eligibility: GateEligibility) -> dict[str, Any]:
     return {
         "gate_eligible": eligibility.eligible,
         "periods_verified": eligibility.periods_verified,
@@ -165,7 +166,7 @@ def _eligibility_doc(eligibility: GateEligibility) -> Dict[str, Any]:
     }
 
 
-def _record_doc(registry: ExperimentRegistry, rec: ExperimentRecord) -> Dict[str, Any]:
+def _record_doc(registry: ExperimentRegistry, rec: ExperimentRecord) -> dict[str, Any]:
     """The ``--json`` form of one experiment."""
     return {
         "experiment_id": rec.experiment_id,
@@ -397,7 +398,7 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     raw = list(sys.argv[1:] if argv is None else argv)
     _Parser.json_errors = "--json-errors" in raw
     args = _parser().parse_args(raw)

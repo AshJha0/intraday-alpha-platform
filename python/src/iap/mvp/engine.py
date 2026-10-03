@@ -62,10 +62,11 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
-from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 from iap.contracts.ids import NO_ROUTE
+from iap.contracts.protocols import TraceSink
 from iap.contracts.types import (
     AlphaSignal,
     Attribution,
@@ -83,8 +84,8 @@ from iap.contracts.types import (
 )
 from iap.core.events import EventType, MarketEvent, SessionStatus
 from iap.execution.config import ExecConfig, SorOptions, load_sor_options
-from iap.execution.sor import SmartOrderRouter
 from iap.execution.simulator import ExecutionSimulator
+from iap.execution.sor import SmartOrderRouter
 from iap.execution.types import InstrumentSpec, LatencyConfig, Liquidity, VenueSpec
 from iap.features.context import InstrumentContext, SessionClock
 from iap.features.engine import FeatureEngine, FeatureVector
@@ -113,7 +114,6 @@ from iap.risk.refdata import instrument_refs_from_reference_data
 from iap.tca.fills import MarketTimeline
 from iap.trace.attribution import attribute
 from iap.trace.builder import TraceBuilder
-from iap.contracts.protocols import TraceSink
 
 __all__ = [
     "BAR_NS",
@@ -192,7 +192,7 @@ def feature_context(cfg: MvpConfig, ref: ReferenceData) -> InstrumentContext:
     )
 
 
-def pearson(xs: Sequence[float], ys: Sequence[float]) -> Optional[float]:
+def pearson(xs: Sequence[float], ys: Sequence[float]) -> float | None:
     """Pearson correlation (``None`` with fewer than 3 pairs or a degenerate side)."""
     n = len(xs)
     if n < 3 or n != len(ys):
@@ -227,7 +227,7 @@ class Account:
     orders_submitted: int = 0
     session_volume: int = 0
     filled_qty: int = 0
-    last_child_decision_ts: Optional[int] = None
+    last_child_decision_ts: int | None = None
     equity_peak: float = 0.0
     max_drawdown: float = 0.0
 
@@ -294,7 +294,7 @@ class Counters:
     parents_without_tca: int = 0
     timeline_crossed_skipped: int = 0
 
-    def to_dict(self) -> Dict[str, int]:
+    def to_dict(self) -> dict[str, int]:
         return {k: int(v) for k, v in sorted(self.__dict__.items())}
 
 
@@ -311,9 +311,9 @@ class IcResult:
     """
 
     horizon: str
-    ic: Optional[float]
-    ic_cost: Optional[float]
-    ic_shifted: Optional[float]
+    ic: float | None
+    ic_cost: float | None
+    ic_shifted: float | None
     n: int
     n_signals: int
 
@@ -324,14 +324,14 @@ class OrderOutcome:
 
     parent: ParentOrder
     signal: AlphaSignal
-    tca: Optional[TCAResult]
-    attribution: Optional[Attribution]
+    tca: TCAResult | None
+    attribution: Attribution | None
     realized_bps: float
     filled_notional: float
     n_children_submitted: int
     n_children_rejected: int
-    venue_qty: Dict[int, int]
-    latencies_ns: Tuple[int, ...]
+    venue_qty: dict[int, int]
+    latencies_ns: tuple[int, ...]
 
 
 #: The declared controls a generated child can be blocked by, in check order
@@ -346,13 +346,13 @@ BLOCK_CONTROLS = ("slice_interval", "latency_budget", "participation")
 class _LiveParent:
     parent: ParentOrder
     signal: AlphaSignal
-    decision: "_Decision"
-    children: Dict[int, ChildOrder] = field(default_factory=dict)  #: submitted, by id
-    reports: List[ExecutionReport] = field(default_factory=list)
+    decision: _Decision
+    children: dict[int, ChildOrder] = field(default_factory=dict)  #: submitted, by id
+    reports: list[ExecutionReport] = field(default_factory=list)
     rejected: int = 0  #: generated but not submitted (any reason)
     #: control-blocked children by control (never routed to risk or a venue;
     #: written into ParentOrder.params as children_blocked_<control>)
-    blocked: Dict[str, int] = field(default_factory=lambda: dict.fromkeys(BLOCK_CONTROLS, 0))
+    blocked: dict[str, int] = field(default_factory=lambda: dict.fromkeys(BLOCK_CONTROLS, 0))
     fill_impact: float = 0.0
     fill_fees: float = 0.0
 
@@ -382,7 +382,7 @@ class MvpEngine:
         feed: FeedResult,
         sink: TraceSink,
         *,
-        ref: Optional[ReferenceData] = None,
+        ref: ReferenceData | None = None,
     ) -> None:
         self.cfg = cfg
         self.feed = feed
@@ -409,7 +409,7 @@ class MvpEngine:
         self.account = Account()
 
         # ---- execution: simulator, SOR, algos ------------------------------
-        venues: Dict[int, VenueSpec] = {}
+        venues: dict[int, VenueSpec] = {}
         for name in cfg.venues:
             v = self.ref.venue(name)
             venues[v.venue_id] = VenueSpec(
@@ -473,9 +473,9 @@ class MvpEngine:
             risk_doc, instrument_refs_from_reference_data(self.ref)
         )
         self.risk = RiskEngineAdapter(self.risk_engine)
-        self._venue_stale: Dict[int, bool] = {}
-        self._last_data_ts: Dict[int, int] = {}
-        self._mark_ts: Optional[int] = None
+        self._venue_stale: dict[int, bool] = {}
+        self._last_data_ts: dict[int, int] = {}
+        self._mark_ts: int | None = None
 
         # ---- features + alphas + portfolio --------------------------------
         self.features = FeatureEngine(
@@ -484,7 +484,7 @@ class MvpEngine:
         self.feature_version = self.features.feature_version
         self._mid_index = self.features.feature_names.index(_MID_FEATURE)
         self.horizon = horizon_name(cfg.horizon_ns)
-        self.alphas: Tuple[LinearZAlpha, ...] = load_alphas(
+        self.alphas: tuple[LinearZAlpha, ...] = load_alphas(
             cfg.reference_path("alpha_params"),
             cfg.alphas,
             self.features.feature_names,
@@ -509,28 +509,28 @@ class MvpEngine:
 
         # ---- rolling state -------------------------------------------------
         self.timeline = MarketTimeline()
-        self._current_bar: Optional[int] = None
-        self._bar_mid: Optional[float] = None
-        self._last_bar_mid: Optional[float] = None
-        self.bar_returns: List[float] = []
-        self._decisions: List[_Decision] = []
-        self._live: Optional[_LiveParent] = None
-        self._closing: List[_LiveParent] = []
-        self.outcomes: List[OrderOutcome] = []
+        self._current_bar: int | None = None
+        self._bar_mid: float | None = None
+        self._last_bar_mid: float | None = None
+        self.bar_returns: list[float] = []
+        self._decisions: list[_Decision] = []
+        self._live: _LiveParent | None = None
+        self._closing: list[_LiveParent] = []
+        self.outcomes: list[OrderOutcome] = []
         #: (decision index, expected_return) of every confidence > 0 signal
-        self.ic_samples: Dict[str, List[Tuple[int, float]]] = {a.alpha_id: [] for a in self.alphas}
+        self.ic_samples: dict[str, list[tuple[int, float]]] = {a.alpha_id: [] for a in self.alphas}
         self.ic_samples[self.ensemble.alpha_id] = []
         #: decision timestamps (label anchors), in decision order
-        self.decision_ts: List[int] = []
+        self.decision_ts: list[int] = []
         #: the research label series: one sample per feature-engine book refresh
         self.mid_series = MidSeries()
         self._last_refresh_seq = 0
-        self._labels: Dict[str, Tuple[int, LabelResult]] = {}
-        self.first_ts: Optional[int] = None
-        self.last_ts: Optional[int] = None
+        self._labels: dict[str, tuple[int, LabelResult]] = {}
+        self.first_ts: int | None = None
+        self.last_ts: int | None = None
         self._finished = False
-        self.trace_ids: List[str] = []
-        self._trace_id_set: Set[str] = set()
+        self.trace_ids: list[str] = []
+        self._trace_id_set: set[str] = set()
 
     # ------------------------------------------------------------- id pools
 
@@ -660,7 +660,7 @@ class MvpEngine:
             # the account position and the risk daily P&L equals gross - spread.
             self.assert_pnl_identity()
 
-    def _owner_of(self, child_order_id: int) -> Optional[_LiveParent]:
+    def _owner_of(self, child_order_id: int) -> _LiveParent | None:
         if self._live is not None and child_order_id in self._live.children:
             return self._live
         for live in self._closing:
@@ -674,8 +674,8 @@ class MvpEngine:
         """PaperTrading.RiskWiring.onMarket, verbatim semantics."""
         if ev.event_type != EventType.HEARTBEAT:
             self._last_data_ts[ev.venue_id] = ev.exchange_ts
-        best_bid: Optional[int] = None
-        best_ask: Optional[int] = None
+        best_bid: int | None = None
+        best_ask: int | None = None
         books = self.book.books
         # The gap gate is per INSTRUMENT but staleness is per venue: one
         # venue's recovery must not reopen the gate while another venue of
@@ -707,7 +707,7 @@ class MvpEngine:
                 best_ask = ba[0] if best_ask is None else min(best_ask, ba[0])
         if best_bid is None or best_ask is None:
             return  # no fresh two-sided venue: the previous mark ages
-        mark_ts: Optional[int] = None
+        mark_ts: int | None = None
         for vid in sorted(books):
             vb = books[vid]
             if vb.stale:
@@ -806,7 +806,7 @@ class MvpEngine:
         index = len(self.decision_ts)
         self.decision_ts.append(t)
         self._roll_bar(vec)
-        member_signals: Dict[str, AlphaSignal] = {}
+        member_signals: dict[str, AlphaSignal] = {}
         for alpha in self.ensemble.members:
             sig = alpha.generate(vec)
             member_signals[alpha.alpha_id] = sig
@@ -870,7 +870,7 @@ class MvpEngine:
 
     # -------------------------------------------------------------- children
 
-    def _contra_depth(self, book: Optional[OrderBook], side: Side) -> int:
+    def _contra_depth(self, book: OrderBook | None, side: Side) -> int:
         if book is None:
             return 0
         levels = book.depth(1 if side is Side.BID else 0, DEPTH_LEVELS)
@@ -1016,8 +1016,8 @@ class MvpEngine:
             )
             live.decision.ready = True
             return
-        liquidity: Dict[int, Liquidity] = {}
-        venue_qty: Dict[int, int] = {}
+        liquidity: dict[int, Liquidity] = {}
+        venue_qty: dict[int, int] = {}
         for rep in live.reports:
             if rep.status in (ExecStatus.PARTIAL, ExecStatus.FILLED):
                 fill = self.sim.fills_by_execution[rep.execution_id]
@@ -1119,18 +1119,18 @@ class MvpEngine:
         self._labels[horizon] = (key, result)
         return result
 
-    def realized_pairs(self, alpha_id: str, horizon: str) -> List[Tuple[int, float, float, float]]:
+    def realized_pairs(self, alpha_id: str, horizon: str) -> list[tuple[int, float, float, float]]:
         """``(decision index, expected_return, label_mid, label_cost)`` of the
         alpha's confidence > 0 decisions whose label at ``horizon`` is valid,
         in decision order."""
         lab = self.labels(horizon)
-        out: List[Tuple[int, float, float, float]] = []
+        out: list[tuple[int, float, float, float]] = []
         for index, er in self.ic_samples[alpha_id]:
             if lab.valid[index]:
                 out.append((index, er, lab.mid[index], lab.cost[index]))
         return out
 
-    def realized_ic(self, alpha_id: str, horizon: Optional[str] = None) -> IcResult:
+    def realized_ic(self, alpha_id: str, horizon: str | None = None) -> IcResult:
         """Realized IC of ``alpha_id`` at ``horizon`` (default: the MVP
         holding horizon) — see the module docstring for the definition."""
         h = self.horizon if horizon is None else horizon
@@ -1142,8 +1142,8 @@ class MvpEngine:
         # against this decision's label (conventions §7).
         signals = [er for _, er in self.ic_samples[alpha_id]]
         position = {index: k for k, (index, _) in enumerate(self.ic_samples[alpha_id])}
-        xs_shift: List[float] = []
-        ys_shift: List[float] = []
+        xs_shift: list[float] = []
+        ys_shift: list[float] = []
         for index, _, m, _ in pairs:
             k = position[index]
             if k > 0:
@@ -1161,8 +1161,8 @@ class MvpEngine:
     def n_kill_events(self) -> int:
         return sum(1 for e in self.risk_engine.audit() if e.decision == RiskDecisionCode.KILL)
 
-    def risk_decisions_by_rule(self) -> Dict[str, int]:
-        out: Dict[str, int] = {}
+    def risk_decisions_by_rule(self) -> dict[str, int]:
+        out: dict[str, int] = {}
         for e in self.risk_engine.audit():
             out[e.rule_id] = out.get(e.rule_id, 0) + 1
         return dict(sorted(out.items()))

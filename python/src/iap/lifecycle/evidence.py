@@ -37,8 +37,9 @@ failure).
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass, fields
-from typing import Any, Dict, Mapping, Optional
+from typing import Any
 
 from iap.contracts.types import ExperimentResult
 
@@ -118,7 +119,7 @@ class ValidationEvidence:
         )
         object.__setattr__(self, "parity", _check_bool(self.parity, "validation.parity"))
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "holdout_ic": self.holdout_ic,
             "research_ic": self.research_ic,
@@ -127,7 +128,7 @@ class ValidationEvidence:
         }
 
     @staticmethod
-    def from_dict(data: Mapping[str, Any]) -> "ValidationEvidence":
+    def from_dict(data: Mapping[str, Any]) -> ValidationEvidence:
         return _from_dict(ValidationEvidence, data, "validation")
 
 
@@ -163,7 +164,7 @@ class PaperEvidence:
         if self.tracking_error < 0.0:
             raise ValueError("paper.tracking_error must be >= 0")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "n_sessions": self.n_sessions,
             "realized_ic": self.realized_ic,
@@ -174,7 +175,7 @@ class PaperEvidence:
         }
 
     @staticmethod
-    def from_dict(data: Mapping[str, Any]) -> "PaperEvidence":
+    def from_dict(data: Mapping[str, Any]) -> PaperEvidence:
         return _from_dict(PaperEvidence, data, "paper")
 
 
@@ -190,7 +191,7 @@ class LiveEvidence:
     frozen window moves nothing — pinned, round-3).
     """
 
-    rolling_ic: Optional[float]
+    rolling_ic: float | None
     n_buckets: int
     eval_index: int
     informative: bool
@@ -202,7 +203,7 @@ class LiveEvidence:
         object.__setattr__(self, "eval_index", _check_int(self.eval_index, "live.eval_index"))
         object.__setattr__(self, "informative", _check_bool(self.informative, "live.informative"))
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "rolling_ic": self.rolling_ic,
             "n_buckets": self.n_buckets,
@@ -211,7 +212,7 @@ class LiveEvidence:
         }
 
     @staticmethod
-    def from_dict(data: Mapping[str, Any]) -> "LiveEvidence":
+    def from_dict(data: Mapping[str, Any]) -> LiveEvidence:
         return _from_dict(LiveEvidence, data, "live")
 
 
@@ -223,11 +224,11 @@ class Evidence:
     its universe); it sits beside ``research`` because
     :class:`ExperimentResult` carries no capacity field."""
 
-    research: Optional[ExperimentResult]
-    capacity_usd: Optional[float]
-    validation: Optional[ValidationEvidence]
-    paper: Optional[PaperEvidence]
-    live: Optional[LiveEvidence]
+    research: ExperimentResult | None
+    capacity_usd: float | None
+    validation: ValidationEvidence | None
+    paper: PaperEvidence | None
+    live: LiveEvidence | None
     #: False = the research result is recorded but is NOT promotion evidence
     research_gate_eligible: bool = True
 
@@ -254,14 +255,14 @@ class Evidence:
                 raise ValueError(f"evidence.{name} must be a {cls.__name__} or None")
 
     @staticmethod
-    def empty() -> "Evidence":
+    def empty() -> Evidence:
         """No evidence at all (every block absent)."""
         return Evidence(research=None, capacity_usd=None, validation=None, paper=None, live=None)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """JSON-ready document; absent blocks are ``null``.
         ``research_gate_eligible`` appears only when ``False`` (module docs)."""
-        doc: Dict[str, Any] = {
+        doc: dict[str, Any] = {
             "research": None if self.research is None else self.research.to_dict(),
             "capacity_usd": self.capacity_usd,
             "validation": None if self.validation is None else self.validation.to_dict(),
@@ -273,7 +274,7 @@ class Evidence:
         return doc
 
     @staticmethod
-    def from_dict(data: Mapping[str, Any]) -> "Evidence":
+    def from_dict(data: Mapping[str, Any]) -> Evidence:
         """Strict inverse of :meth:`to_dict`."""
         names = ("research", "capacity_usd", "validation", "paper", "live")
         unknown = sorted(set(data) - set(names) - {"research_gate_eligible"})

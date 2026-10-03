@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-
+from conftest import REPO_ROOT
 from iap.alpha import (
     ALPHA_CLASSES,
     ALPHA_IDS,
@@ -23,8 +23,6 @@ from iap.alpha import (
 )
 from iap.alpha.data import load_features
 from iap.features.registry import build_registry
-
-from conftest import REPO_ROOT
 
 FEATURES_DIR = REPO_ROOT / "data" / "features"
 
@@ -242,7 +240,6 @@ def test_dead_alpha_scores_confidence_zero():
     scores (0, 0), never confidence 1.0."""
     import numpy as np
     import pandas as pd
-
     from iap.alpha import build
 
     m = build("EQ01")
@@ -353,7 +350,6 @@ def test_fx05_universe_excludes_singleton_currencies():
     return: the residual is 0 by construction, so the pair must score NaN
     rather than a constant."""
     import numpy as np
-
     from iap.alpha.fx_exposure import (
         FX05CrossPairRelativeValue,
         identified_pairs,

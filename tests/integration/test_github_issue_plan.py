@@ -178,6 +178,7 @@ def test_only_filter_and_bad_filter(repo_root):
 
 def test_invalid_plan_is_rejected(tool, plan, tmp_path):
     import copy
+
     import yaml
 
     broken = copy.deepcopy(plan)

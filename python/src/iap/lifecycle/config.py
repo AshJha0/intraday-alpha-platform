@@ -26,9 +26,10 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional
+from typing import Any
 
 from iap.adaptive.lifecycle import LifecycleConfig
 
@@ -135,16 +136,16 @@ class GateThresholds:
             raise ValueError("gates.min_capacity_usd must be >= 0")
 
     @staticmethod
-    def from_block(block: Mapping[str, Any], where: str) -> "GateThresholds":
+    def from_block(block: Mapping[str, Any], where: str) -> GateThresholds:
         _require_keys(block, _GATE_KEYS_FLOAT + _GATE_KEYS_INT, where)
-        values: Dict[str, Any] = {k: _as_float(block, k, where) for k in _GATE_KEYS_FLOAT}
+        values: dict[str, Any] = {k: _as_float(block, k, where) for k in _GATE_KEYS_FLOAT}
         values["min_experiments_in_ledger"] = _as_int(block, "min_experiments_in_ledger", where, 1)
         values["min_folds"] = _as_int(block, "min_folds", where, 1)
         values["min_paper_sessions"] = _as_int(block, "min_paper_sessions", where, 1)
         values["max_kill_events"] = _as_int(block, "max_kill_events", where, 0)
         return GateThresholds(**values)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """JSON-ready view in config key order."""
         return {
             "min_experiments_in_ledger": self.min_experiments_in_ledger,
@@ -180,7 +181,7 @@ class PolicyConfig:
         if self.max_consecutive_failures < 1:
             raise ValueError("demotion.max_consecutive_failures must be >= 1")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """JSON-ready merged view (embedded in the lifecycle golden)."""
         return {
             "policy": self.policy,
@@ -195,7 +196,7 @@ class PolicyConfig:
         }
 
     @staticmethod
-    def from_dict(doc: Mapping[str, Any]) -> "PolicyConfig":
+    def from_dict(doc: Mapping[str, Any]) -> PolicyConfig:
         """Inverse of :meth:`to_dict` (used to run a golden from its own
         embedded config)."""
         _require_keys(doc, ("policy", "gates", "demotion", "live"), "config")
@@ -210,10 +211,10 @@ class PolicyConfig:
         )
 
 
-def _read_json(path: Path) -> Dict[str, Any]:
+def _read_json(path: Path) -> dict[str, Any]:
     if not path.is_file():
         raise ValueError(f"{path}: config file not found")
-    with open(path, "r", encoding="utf-8") as fh:
+    with open(path, encoding="utf-8") as fh:
         doc = json.load(fh)
     if not isinstance(doc, dict):
         raise ValueError(f"{path}: expected a JSON object")
@@ -221,7 +222,7 @@ def _read_json(path: Path) -> Dict[str, Any]:
 
 
 def load_policy_config(
-    lifecycle_path: Optional[Path] = None, strategies_path: Optional[Path] = None
+    lifecycle_path: Path | None = None, strategies_path: Path | None = None
 ) -> PolicyConfig:
     """Load and validate the policy from the two pinned config files.
 

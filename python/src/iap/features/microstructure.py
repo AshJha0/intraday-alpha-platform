@@ -41,8 +41,6 @@ least one sample (rates are valid with zero events once warm).
 
 from __future__ import annotations
 
-from typing import List
-
 from iap.features._famutil import put
 from iap.features.spec import WINDOW_NS, FeatureSpec, mkspec
 
@@ -54,9 +52,9 @@ IMB_LEVELS = (1, 3, 5, 10)
 DEPTH_LEVELS = (1, 5, 10)
 
 
-def specs() -> List[FeatureSpec]:
+def specs() -> list[FeatureSpec]:
     """Registry entries for the microstructure family (pinned order)."""
-    out: List[FeatureSpec] = []
+    out: list[FeatureSpec] = []
     out.append(
         mkspec(
             "mid_price_v1", FAMILY, "Consolidated mid price: (best_bid + best_ask)/2 * tick_size."
@@ -201,7 +199,7 @@ def specs() -> List[FeatureSpec]:
     return out
 
 
-def compute(st, values: List[float], valid: List[bool]) -> None:
+def compute(st, values: list[float], valid: list[bool]) -> None:
     """Append the 52 microstructure values for the current emission."""
     ok = st.book_ok
     tick = st.tick

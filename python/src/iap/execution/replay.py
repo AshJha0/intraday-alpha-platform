@@ -31,8 +31,8 @@ impact`` where fees/rebates/impact are exact sums over the parent's fills.
 from __future__ import annotations
 
 import math
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
-from typing import Dict, Iterable, List, Sequence
 
 from iap.core.events import EventType, MarketEvent
 from iap.execution.algos import AlgoType, ParentOrder, slice_quantities, slice_times
@@ -76,8 +76,8 @@ class ParentReport:
 class ExecReplayResult:
     """Outcome of one ``ExecutionReplay.run``."""
 
-    fills: List[Fill] = field(default_factory=list)
-    parents: Dict[int, ParentReport] = field(default_factory=dict)
+    fills: list[Fill] = field(default_factory=list)
+    parents: dict[int, ParentReport] = field(default_factory=dict)
     events_processed: int = 0
     sor_no_route: int = 0  #: children not submitted: no eligible venue
 
@@ -85,12 +85,12 @@ class ExecReplayResult:
 @dataclass(slots=True)
 class _ParentState:
     order: ParentOrder
-    slice_qty: List[int] = field(default_factory=list)  #: TWAP/VWAP/IS
-    slice_due: List[int] = field(default_factory=list)  #: TWAP/VWAP/IS
+    slice_qty: list[int] = field(default_factory=list)  #: TWAP/VWAP/IS
+    slice_due: list[int] = field(default_factory=list)  #: TWAP/VWAP/IS
     next_slice: int = 0
     filled_qty: int = 0  #: fills booked so far
     pov_volume: int = 0  #: window TRADE volume (POV)
-    child_ids: List[int] = field(default_factory=list)
+    child_ids: list[int] = field(default_factory=list)
 
 
 class ExecutionReplay:
@@ -105,8 +105,8 @@ class ExecutionReplay:
         self._config = config
         self._sim = ExecutionSimulator(config)
         self._sor = SmartOrderRouter(config.venues, sor_options)
-        self._sor_candidates: List[int] = sorted(config.venues)
-        self._parents: List[_ParentState] = []
+        self._sor_candidates: list[int] = sorted(config.venues)
+        self._parents: list[_ParentState] = []
         self._fills_booked = 0
         self._sor_no_route = 0
         self._ran = False

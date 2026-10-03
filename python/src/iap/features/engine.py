@@ -46,9 +46,9 @@ Pinned state-update semantics (family modules document the formulas):
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from math import log
-from typing import Callable, Dict, Iterable, List, Optional
 
 from iap.core.events import EventType, MarketEvent, SessionStatus
 from iap.features import crossasset, timeofday
@@ -94,8 +94,8 @@ class FeatureVector:
     instrument_id: int
     timestamp: int
     feature_version: str
-    values: List[float]
-    validity: List[bool]
+    values: list[float]
+    validity: list[bool]
 
     def validity_bits(self) -> bytes:
         """Validity as a little-endian-bit-packed bitset (bit i = feature i)."""
@@ -107,7 +107,7 @@ class FeatureVector:
         return bytes(out)
 
     @staticmethod
-    def unpack_bits(bits: bytes, n: int) -> List[bool]:
+    def unpack_bits(bits: bytes, n: int) -> list[bool]:
         """Inverse of :meth:`validity_bits`."""
         return [bool(bits[i >> 3] >> (i & 7) & 1) for i in range(n)]
 
@@ -119,13 +119,13 @@ class _InstState:
         self.ctx = ctx
         self.tick = ctx.tick_size
         self.cons = ConsolidatedBook(ctx.instrument_id)
-        self.ref: "_InstState" = self  # rewired by the engine
+        self.ref: _InstState = self  # rewired by the engine
         self.profile = profile
-        self.first_ts: Optional[int] = None
+        self.first_ts: int | None = None
         #: warmup anchor: max(first event ts, last stale->fresh recovery ts)
-        self.warm_ts: Optional[int] = None
+        self.warm_ts: int | None = None
         #: event time of the last stale->fresh recovery (None: never stale)
-        self.recovered_ts: Optional[int] = None
+        self.recovered_ts: int | None = None
         #: number of stale->fresh recoveries (rolling state resets)
         self.recoveries = 0
         #: sorted ids of this instrument's venues whose book is stale
@@ -142,11 +142,11 @@ class _InstState:
         self.oversized_depth_skipped = 0
         self.last_ts = 0
         self.t = 0
-        self.last_emit: Optional[int] = None
+        self.last_emit: int | None = None
         # current merged book view (refreshed on book-touching events)
         self.book_ok = False
-        self.depth_bid: List = []
-        self.depth_ask: List = []
+        self.depth_bid: list = []
+        self.depth_ask: list = []
         self.bid_p = self.bid_q = self.ask_p = self.ask_q = 0
         self.db1 = self.db3 = self.db5 = self.db10 = 0
         self.da1 = self.da3 = self.da5 = self.da10 = 0
@@ -159,9 +159,9 @@ class _InstState:
         self.oc_ask1 = 0
         self.halt = False
         self.auction = False
-        self.venue_rows: List = []  # [(vid, bid10, ask10, stale)] sorted
-        self.venue_cache: Dict[int, tuple] = {}  # vid -> (bid10, ask10)
-        self.venue_last_ts: Dict[int, int] = {}
+        self.venue_rows: list = []  # [(vid, bid10, ask10, stale)] sorted
+        self.venue_cache: dict[int, tuple] = {}  # vid -> (bid10, ask10)
+        self.venue_last_ts: dict[int, int] = {}
         # rolling structures
         self.hist2 = TimeSeries()  # mid2 (int) at mid changes
         self.histlog = TimeSeries()  # ln(mid2) at mid changes
@@ -199,22 +199,22 @@ class _InstState:
         """
         return self.book_ok and not self.stale_venues and not self.halt and not self.auction
 
-    def mid2_at(self, ts: int) -> Optional[int]:
+    def mid2_at(self, ts: int) -> int | None:
         """Latest mid2 sample at-or-before ts (None during warmup)."""
         return self.hist2.at_or_before(ts)
 
-    def logmid_at(self, ts: int) -> Optional[float]:
+    def logmid_at(self, ts: int) -> float | None:
         """Latest ln(mid2) sample at-or-before ts."""
         return self.histlog.at_or_before(ts)
 
-    def rvol(self, w: str) -> Optional[float]:
+    def rvol(self, w: str) -> float | None:
         """Realized vol over window w (None until the window is warm)."""
         if not self.warm(WINDOW_NS[w]):
             return None
         # max() guards against tiny negative float drift in a drained window
         return (max(self.rv[w].sums[0], 0.0) / (WINDOW_NS[w] / 1e9)) ** 0.5
 
-    def ref_ret_log(self, h_ns: int) -> Optional[float]:
+    def ref_ret_log(self, h_ns: int) -> float | None:
         """Reference-instrument log mid return over h (at-or-before reads)."""
         ref = self.ref
         now = ref.logmid_at(self.t)
@@ -223,7 +223,7 @@ class _InstState:
             return None
         return now - past
 
-    def beta_w5m(self) -> Optional[float]:
+    def beta_w5m(self) -> float | None:
         """OLS beta vs the reference over 5m of contemporaneous 1s pairs."""
         if not self.warm(WINDOW_NS["5m"]):
             return None
@@ -289,10 +289,10 @@ class FeatureEngine:
 
     def __init__(
         self,
-        contexts: Dict[int, InstrumentContext],
+        contexts: dict[int, InstrumentContext],
         cadence_ns: int = 0,
-        on_vector: Optional[Callable[[FeatureVector], None]] = None,
-        profiles: Optional[Dict[int, SessionProfile]] = None,
+        on_vector: Callable[[FeatureVector], None] | None = None,
+        profiles: dict[int, SessionProfile] | None = None,
     ) -> None:
         """``cadence_ns=0`` emits on every event; else at most once per
         cadence per instrument.  ``profiles`` lets a pipeline carry session
@@ -307,7 +307,7 @@ class FeatureEngine:
         self.feature_version = registry_hash()
         self.families = [(fam, family_module(fam).compute) for fam in FAMILY_ORDER]
         self._fam_sizes = {fam: len(family_module(fam).specs()) for fam in FAMILY_ORDER}
-        self.states: Dict[int, _InstState] = {}
+        self.states: dict[int, _InstState] = {}
         self._profiles = profiles if profiles is not None else {}
         self.events_processed = 0
         #: events the book dropped/held — never folded into rolling state
@@ -340,7 +340,7 @@ class FeatureEngine:
 
     # ----------------------------------------------------------------- apply
 
-    def apply(self, ev: MarketEvent) -> Optional[FeatureVector]:
+    def apply(self, ev: MarketEvent) -> FeatureVector | None:
         """Apply one event; returns the emitted FeatureVector, if any.
 
         Events the book DROPS or HOLDS (API_CORE §4 / API_FEATURES §2) are
@@ -416,7 +416,7 @@ class FeatureEngine:
 
         return self._maybe_emit(st, t)
 
-    def _maybe_emit(self, st: _InstState, t: int) -> Optional[FeatureVector]:
+    def _maybe_emit(self, st: _InstState, t: int) -> FeatureVector | None:
         """Cadence check (pure event time); emits at most one vector."""
         if self.cadence_ns == 0 or st.last_emit is None or t - st.last_emit >= self.cadence_ns:
             vec = self._emit(st, t)
@@ -488,8 +488,8 @@ class FeatureEngine:
             st.depth_ask = []
             st.book_ok = False
         # merged non-stale depth (sorted venue iteration — deterministic)
-        agg_b: Dict[int, int] = {}
-        agg_a: Dict[int, int] = {}
+        agg_b: dict[int, int] = {}
+        agg_a: dict[int, int] = {}
         rows = []
         for vid in sorted(st.venue_cache):
             b10, a10 = st.venue_cache[vid]
@@ -638,7 +638,7 @@ class FeatureEngine:
                             win.add(t, lpair)
 
     @staticmethod
-    def _delta(prev: List, curr: List, k: int) -> int:
+    def _delta(prev: list, curr: list, k: int) -> int:
         """Signed depth change within the best-k levels (OFI building block)."""
         d = 0
         pk = {p: q for p, q in prev[:k]}
@@ -652,7 +652,7 @@ class FeatureEngine:
         return d
 
     @staticmethod
-    def _queue_delta(prev: List, curr: List, is_bid: bool) -> tuple:
+    def _queue_delta(prev: list, curr: list, is_bid: bool) -> tuple:
         """(depleted, replenished) L1 qty per the pinned five-case rule."""
         if not prev and not curr:
             return 0, 0
@@ -700,8 +700,8 @@ class FeatureEngine:
                         st.oc_ask1 += c
                         break
 
-        values: List[float] = []
-        valid: List[bool] = []
+        values: list[float] = []
+        valid: list[bool] = []
         for fam, compute in self.families:
             before = len(values)
             compute(st, values, valid)

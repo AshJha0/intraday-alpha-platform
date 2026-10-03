@@ -8,8 +8,6 @@ from __future__ import annotations
 
 import bisect
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
-
 
 #: Fill liquidity flags (API_PORTFOLIO_TCA.md §2.4).
 TAKER = "TAKER"
@@ -48,7 +46,7 @@ class ParentOrder:
     decision_ts: int  # when the signal fired
     arrival_ts: int  # when the first child could act (post-delay)
     end_ts: int  # end of the execution horizon
-    fills: List[Fill] = field(default_factory=list)
+    fills: list[Fill] = field(default_factory=list)
 
     @property
     def sign(self) -> int:
@@ -76,14 +74,14 @@ class MarketTimeline:
     """
 
     def __init__(self) -> None:
-        self.ts: List[int] = []
-        self.bid: List[float] = []
-        self.ask: List[float] = []
-        self.bid_sz: List[int] = []
-        self.ask_sz: List[int] = []
-        self.trades: List[Tuple[int, float, int]] = []  # (ts, price, qty)
+        self.ts: list[int] = []
+        self.bid: list[float] = []
+        self.ask: list[float] = []
+        self.bid_sz: list[int] = []
+        self.ask_sz: list[int] = []
+        self.trades: list[tuple[int, float, int]] = []  # (ts, price, qty)
         #: HALT start timestamps (a markout window containing one is undefined)
-        self.halts: List[int] = []
+        self.halts: list[int] = []
         #: crossed consolidated states skipped by the builder (pinned §2.1)
         self.crossed_states_skipped: int = 0
 
@@ -120,7 +118,7 @@ class MarketTimeline:
         self.halts.append(ts)
 
     @property
-    def last_ts(self) -> Optional[int]:
+    def last_ts(self) -> int | None:
         """Timestamp of the last state (None when empty)."""
         return self.ts[-1] if self.ts else None
 
@@ -128,7 +126,7 @@ class MarketTimeline:
         """True when a HALT started inside ``(start_ts, end_ts]``."""
         return any(start_ts < h <= end_ts for h in self.halts)
 
-    def mid_defined_at(self, t: int, after_ts: Optional[int] = None) -> bool:
+    def mid_defined_at(self, t: int, after_ts: int | None = None) -> bool:
         """Pinned §2.5 'defined' rule: a prevailing mid exists at ``t``
         (``t`` lies inside the timeline, ``last_ts >= t``) and, when
         ``after_ts`` is given, no HALT started inside ``(after_ts, t]``."""
@@ -141,7 +139,7 @@ class MarketTimeline:
     def __len__(self) -> int:
         return len(self.ts)
 
-    def prevailing(self, t: int) -> Optional[int]:
+    def prevailing(self, t: int) -> int | None:
         """Index of the latest state with ts <= t, or None."""
         i = bisect.bisect_right(self.ts, t) - 1
         return i if i >= 0 else None

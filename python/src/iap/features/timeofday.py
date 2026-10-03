@@ -29,8 +29,6 @@ bucket, and a strictly positive profile mean.
 
 from __future__ import annotations
 
-from typing import List
-
 from iap.features._famutil import put
 from iap.features.rolling import SessionProfile
 from iap.features.spec import WINDOW_NS, FeatureSpec, mkspec
@@ -42,9 +40,9 @@ PROFILE_METRICS = ("volume", "spread", "vol", "depth")
 OPEN_CLOSE_PHASE_MIN = 30
 
 
-def specs() -> List[FeatureSpec]:
+def specs() -> list[FeatureSpec]:
     """Registry entries for the time-of-day family (pinned order)."""
-    out: List[FeatureSpec] = []
+    out: list[FeatureSpec] = []
     out.append(mkspec("minute_of_day_v1", FAMILY, "Minutes since UTC midnight (fractional)."))
     out.append(
         mkspec(
@@ -89,7 +87,7 @@ def specs() -> List[FeatureSpec]:
     return out
 
 
-def compute(st, values: List[float], valid: List[bool]) -> None:
+def compute(st, values: list[float], valid: list[bool]) -> None:
     """Append the 11 time-of-day values for the current emission."""
     t = st.t
     off = st.ctx.clock.offset_seconds(t)

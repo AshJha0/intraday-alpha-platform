@@ -9,7 +9,6 @@ import math
 import numpy as np
 import pandas as pd
 import pytest
-
 from iap.alpha.base import LinearAlpha
 from iap.validation import (
     MIN_TEST_PAIRS,
@@ -570,7 +569,7 @@ class _BackwardsAlpha(LinearAlpha):
 
 
 def _validate_backwards():
-    from iap.backtest import Backtester, BacktestConfig, CostModel
+    from iap.backtest import BacktestConfig, Backtester, CostModel
     from iap.validation.validate import validate_alpha
 
     frames = _backwards_frames()

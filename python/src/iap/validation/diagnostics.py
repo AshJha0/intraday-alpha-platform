@@ -39,7 +39,7 @@ platform.
 from __future__ import annotations
 
 import math
-from typing import Dict, List, Mapping, Optional, Sequence
+from collections.abc import Mapping, Sequence
 
 import numpy as np
 import pandas as pd
@@ -61,7 +61,7 @@ BOOTSTRAP_RESAMPLES = 1000
 BOOTSTRAP_LEVEL = 0.95
 
 
-def _fnum(v: float) -> Optional[float]:
+def _fnum(v: float) -> float | None:
     return float(v) if np.isfinite(v) else None
 
 
@@ -69,9 +69,9 @@ def stationary_bootstrap_ci(
     values: Sequence[float],
     seed: int,
     n_boot: int = BOOTSTRAP_RESAMPLES,
-    mean_block: Optional[float] = None,
+    mean_block: float | None = None,
     level: float = BOOTSTRAP_LEVEL,
-) -> Dict[str, object]:
+) -> dict[str, object]:
     """Stationary-bootstrap percentile interval for ``sum(values)``.
 
     Returns ``{"estimate", "ci_low", "ci_high", "level", "n", "n_boot",
@@ -91,7 +91,7 @@ def stationary_bootstrap_ci(
         mean_block = float(max(1, round(n ** (1.0 / 3.0)))) if n else 1.0
     if not mean_block >= 1.0:
         raise ValueError("mean_block must be >= 1")
-    out: Dict[str, object] = {
+    out: dict[str, object] = {
         "estimate": float(v.sum()) if n else 0.0,
         "ci_low": None,
         "ci_high": None,
@@ -144,7 +144,7 @@ def fold_diagnostics(
     seed: int = 0,
     n_boot: int = BOOTSTRAP_RESAMPLES,
     multipliers: Sequence[float] = COST_MULTIPLIERS,
-) -> Dict[str, object]:
+) -> dict[str, object]:
     """Cost survival, decay and regime split for EVERY walk-forward fold,
     and a stationary-bootstrap interval for the pooled net P&L.
 
@@ -175,15 +175,15 @@ def fold_diagnostics(
     if 1.0 not in [float(m) for m in multipliers]:
         raise ValueError("multipliers must include 1.0 (the cost-survival grid point)")
 
-    folds: List[dict] = []
-    bars: Dict[int, float] = {}
+    folds: list[dict] = []
+    bars: dict[int, float] = {}
     for fold, train, test in splitter.split_frames(uframes, horizon_ns):
         model = model_factory()
         model.fit(train)
         scores = model.score(test)
         beta = float(model.params().get("beta", 0.0) or 0.0)
         n_pairs = 0
-        decay: Dict[str, List[float]] = {}
+        decay: dict[str, list[float]] = {}
         for iid, sc in scores.items():
             er = sc["expected_return"].to_numpy(dtype=float).copy()
             er[sc["confidence"].to_numpy(dtype=float) <= 0.0] = np.nan

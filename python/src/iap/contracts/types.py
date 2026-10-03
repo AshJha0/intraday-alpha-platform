@@ -27,16 +27,12 @@ from __future__ import annotations
 
 import math
 import typing
+from collections.abc import Mapping
 from dataclasses import MISSING, dataclass, field, fields
 from enum import Enum, IntEnum
 from typing import (
     Any,
     ClassVar,
-    Dict,
-    Mapping,
-    Optional,
-    Tuple,
-    Type,
     TypeVar,
 )
 
@@ -332,10 +328,10 @@ def _to_json(value: Any) -> Any:
     raise ContractError(f"cannot serialise {_type_name(value)}")
 
 
-_HINTS_CACHE: Dict[type, Dict[str, Any]] = {}
+_HINTS_CACHE: dict[type, dict[str, Any]] = {}
 
 
-def _hints(cls: type) -> Dict[str, Any]:
+def _hints(cls: type) -> dict[str, Any]:
     hints = _HINTS_CACHE.get(cls)
     if hints is None:
         hints = typing.get_type_hints(cls)
@@ -366,12 +362,12 @@ class Contract:
         """Cross-field invariants; subclasses override and raise
         :class:`ContractError`.  Called after per-field domain checks."""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """JSON-ready dict, keys in schema property order."""
         return {f.name: _to_json(getattr(self, f.name)) for f in fields(self)}  # type: ignore[arg-type]
 
     @classmethod
-    def from_dict(cls: Type[T], data: Mapping[str, Any], *, _path: str = "") -> T:
+    def from_dict(cls: type[T], data: Mapping[str, Any], *, _path: str = "") -> T:
         """Strict inverse of :meth:`to_dict`.
 
         Unknown keys, missing keys, wrong scalar types (``1`` is not ``1.0``
@@ -415,7 +411,7 @@ def contract(x_version: int, schema: str):
     return wrap
 
 
-def _ts_ordered(*pairs: Tuple[str, int, str, int], owner: str) -> None:
+def _ts_ordered(*pairs: tuple[str, int, str, int], owner: str) -> None:
     for a_name, a, b_name, b in pairs:
         if a > b:
             raise ContractError(f"{owner}: {a_name} ({a}) > {b_name} ({b})")
@@ -537,7 +533,7 @@ class PortfolioTarget(Contract):
     solver_status: SolverStatus
     objective_value: float
     turnover: float = field(metadata=_NONNEG)
-    targets: Tuple[PortfolioLeg, ...]
+    targets: tuple[PortfolioLeg, ...]
 
     def check_invariants(self) -> None:
         ids = [leg.instrument_id for leg in self.targets]
@@ -584,7 +580,7 @@ class RiskDecision(Contract):
         strategy_id: str,
         instrument_id: int,
         rule_index: int = -1,
-    ) -> "RiskDecision":
+    ) -> RiskDecision:
         """Build from a ``RiskEvent`` dict (schema field names) and the order
         context the event does not carry.  ``rule_index`` defaults to ``-1``
         and must be supplied for REJECT / KILL."""
@@ -630,7 +626,7 @@ class ParentOrder(Contract):
     end_ts: int = field(metadata=_I64)
     urgency: float = field(metadata=_UNIT)
     limit_price_ticks: int = field(metadata={"min": 0, "max": I64_MAX})
-    params: Dict[str, float]
+    params: dict[str, float]
 
     def check_invariants(self) -> None:
         _ts_ordered(
@@ -700,7 +696,7 @@ class VenueDecision(Contract):
     child_order_id: int = field(metadata=_U64)
     venue_id: int = field(metadata=_U16)
     reason: str
-    candidates: Tuple[VenueScore, ...]
+    candidates: tuple[VenueScore, ...]
 
     def check_invariants(self) -> None:
         ids = [c.venue_id for c in self.candidates]
@@ -796,7 +792,7 @@ class TCAResult(Contract):
     slippage_bps: float
     participation_rate: float = field(metadata=_UNIT)
     n_fills: int = field(metadata=_U32)
-    venue_contribution_bps: Dict[str, float] = field(metadata=_DEC_KEYS)
+    venue_contribution_bps: dict[str, float] = field(metadata=_DEC_KEYS)
     algo: Algo
     latency_ns: LatencyStats
 
@@ -849,8 +845,8 @@ class ExperimentSpec(Contract):
     alpha_id: str = field(metadata=_IDENT)
     dataset_version: str = field(metadata=_SHA256)
     feature_version: str = field(metadata=_SHA256)
-    model_version: Optional[str]
-    configuration: Dict[str, Any]
+    model_version: str | None
+    configuration: dict[str, Any]
     train_period: Period
     validation_period: Period
     test_period: Period
@@ -887,7 +883,7 @@ class ExperimentResult(Contract):
     alpha_id: str = field(metadata=_IDENT)
     dataset_version: str = field(metadata=_SHA256)
     feature_version: str = field(metadata=_SHA256)
-    model_version: Optional[str]
+    model_version: str | None
     ic: float
     rank_ic: float
     t_stat: float
@@ -902,8 +898,8 @@ class ExperimentResult(Contract):
     fold_consistency: float = field(metadata=_UNIT)
     n_folds: int = field(metadata=_U32)
     leakage_passed: bool
-    leakage_detail: Dict[str, Any]
-    hypothesis_sign_confirmed: Optional[bool]
+    leakage_detail: dict[str, Any]
+    hypothesis_sign_confirmed: bool | None
     verdict: Verdict
     n_experiments_in_ledger: int = field(metadata=_U64)
     git_commit: str = field(metadata={"non_empty": True})
@@ -931,8 +927,8 @@ class GateResult(Contract):
     ``threshold`` (either may be ``None`` for a boolean gate)."""
 
     passed: bool
-    value: Optional[float]
-    threshold: Optional[float]
+    value: float | None
+    threshold: float | None
 
 
 @contract(V.LIFECYCLE_TRANSITION_VERSION, _LIFECYCLE_SCHEMA)
@@ -950,7 +946,7 @@ class LifecycleTransition(Contract):
     to_state: LifecycleState
     event_ts: int = field(metadata=_I64)
     reason: str
-    gates: Dict[str, GateResult]
+    gates: dict[str, GateResult]
     policy: str = field(metadata={"non_empty": True})
     actor: Actor
 
@@ -988,15 +984,15 @@ class TraceStages(Contract):
     Empty lists / ``None`` mean the stage did not run (e.g. no orders
     after a REJECT)."""
 
-    signal: Tuple[AlphaSignal, ...]
-    portfolio: Optional[PortfolioTarget]
-    risk: Tuple[RiskDecision, ...]
-    parent_orders: Tuple[ParentOrder, ...]
-    child_orders: Tuple[ChildOrder, ...]
-    routing: Tuple[VenueDecision, ...]
-    fills: Tuple[ExecutionReport, ...]
-    tca: Tuple[TCAResult, ...]
-    attribution: Optional[Attribution]
+    signal: tuple[AlphaSignal, ...]
+    portfolio: PortfolioTarget | None
+    risk: tuple[RiskDecision, ...]
+    parent_orders: tuple[ParentOrder, ...]
+    child_orders: tuple[ChildOrder, ...]
+    routing: tuple[VenueDecision, ...]
+    fills: tuple[ExecutionReport, ...]
+    tca: tuple[TCAResult, ...]
+    attribution: Attribution | None
 
 
 @contract(V.DECISION_TRACE_VERSION, _TRACE_SCHEMA)
@@ -1036,7 +1032,7 @@ def _bps(value: float) -> str:
     return f"{value:+.1f} bps"
 
 
-def explain(trace: DecisionTrace, venue_names: Optional[Mapping[int, str]] = None) -> str:
+def explain(trace: DecisionTrace, venue_names: Mapping[int, str] | None = None) -> str:
     """Render the decision chain, one block per stage::
 
         Order 12345
@@ -1110,7 +1106,7 @@ def explain(trace: DecisionTrace, venue_names: Optional[Mapping[int, str]] = Non
         lines.append(_line("Execution", "(none)"))
 
     child_qty = {c.child_order_id: c.qty for c in st.child_orders}
-    routed: Dict[int, int] = {}
+    routed: dict[int, int] = {}
     for vd in st.routing:
         routed[vd.venue_id] = routed.get(vd.venue_id, 0) + child_qty.get(vd.child_order_id, 0)
     total_routed = sum(routed.values())

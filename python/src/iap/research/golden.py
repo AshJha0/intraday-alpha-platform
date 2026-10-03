@@ -29,7 +29,7 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 import pandas as pd
 
@@ -69,13 +69,13 @@ GOLDEN_SEED = 1
 GOLDEN_COMMIT = "golden-fixture"
 
 
-def golden_frames(golden_dir: Path, configs_dir: Path) -> Dict[int, pd.DataFrame]:
+def golden_frames(golden_dir: Path, configs_dir: Path) -> dict[int, pd.DataFrame]:
     """The golden instrument's feature + label frame."""
     frame = build_golden_frame(Path(golden_dir) / GOLDEN_EVENTS, configs_dir, GOLDEN_INSTRUMENT)
     return {GOLDEN_INSTRUMENT: frame}
 
 
-def golden_spec(golden_dir: Path, frames: Dict[int, pd.DataFrame]) -> ExperimentSpec:
+def golden_spec(golden_dir: Path, frames: dict[int, pd.DataFrame]) -> ExperimentSpec:
     """The pinned spec over ``frames`` (see the module docs)."""
     ts = frames[GOLDEN_INSTRUMENT]["exchange_ts"].to_numpy()
     test_start = int(ts[GOLDEN_TEST_ROW])
@@ -97,7 +97,7 @@ def golden_spec(golden_dir: Path, frames: Dict[int, pd.DataFrame]) -> Experiment
 
 
 def golden_result(
-    spec: ExperimentSpec, frames: Dict[int, pd.DataFrame], configs_dir: Path, scratch_dir: Path
+    spec: ExperimentSpec, frames: dict[int, pd.DataFrame], configs_dir: Path, scratch_dir: Path
 ) -> ExperimentResult:
     """Run the golden spec on a fresh ledger under ``scratch_dir`` (nothing
     is written: the runner is a dry run) and pin the provenance."""
@@ -113,7 +113,7 @@ def golden_result(
     return dataclasses.replace(result, git_commit=GOLDEN_COMMIT)
 
 
-def golden_document(spec: ExperimentSpec, result: ExperimentResult) -> Dict[str, Any]:
+def golden_document(spec: ExperimentSpec, result: ExperimentResult) -> dict[str, Any]:
     """The golden file's content (both documents schema-validated)."""
     return {
         "x-version": GOLDEN_VERSION,
@@ -137,6 +137,6 @@ def golden_document(spec: ExperimentSpec, result: ExperimentResult) -> Dict[str,
     }
 
 
-def render_golden(doc: Dict[str, Any]) -> str:
+def render_golden(doc: dict[str, Any]) -> str:
     """Golden file bytes (same canonical form as the persisted documents)."""
     return render_document(doc)

@@ -12,7 +12,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from iap.mvp.__main__ import cmd_replay
 from iap.mvp.config import REPO_ROOT, load_config
 from iap.mvp.feed import generate_feed

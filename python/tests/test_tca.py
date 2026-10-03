@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-
 from iap.tca.fills import Fill, MarketTimeline, ParentOrder
 from iap.tca.simulator import bundled_order_set
 from iap.tca.tca import (
-    adverse_selection_with_counts,
-    validate_order_window,
     adverse_selection,
+    adverse_selection_with_counts,
     arrival_slippage_bps,
     impact_regression,
     interval_twap,
@@ -18,6 +16,7 @@ from iap.tca.tca import (
     order_tca,
     perold_decomposition,
     spread_and_impact_cost,
+    validate_order_window,
 )
 
 
@@ -366,6 +365,7 @@ def test_tca_locked_and_crossed_states_pinned(tmp_path):
     """Timeline builder: crossed consolidated states skipped + counted,
     locked states kept with half-spread 0 (pinned §2.1)."""
     import json
+
     from iap.tca.simulator import build_timeline
 
     t0 = 1_000_000_000_000

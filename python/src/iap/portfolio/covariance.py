@@ -14,8 +14,8 @@ optimizer.  Deterministic: sorted instruments, fixed bucket boundaries.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
-from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -25,10 +25,10 @@ _BAR_NS = 60_000_000_000
 
 
 def bars_from_features(
-    features_dir: Optional[Path] = None,
-    instruments: Optional[Sequence[int]] = None,
+    features_dir: Path | None = None,
+    instruments: Sequence[int] | None = None,
     bar_ns: int = _BAR_NS,
-) -> Tuple[List[int], np.ndarray, np.ndarray]:
+) -> tuple[list[int], np.ndarray, np.ndarray]:
     """Build a (bar_ts, instruments) aligned log-return matrix.
 
     Returns ``(instrument_ids, bar_ts, returns)`` where ``returns`` is

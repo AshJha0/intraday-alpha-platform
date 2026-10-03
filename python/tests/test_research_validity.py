@@ -10,8 +10,7 @@ import json
 import numpy as np
 import pandas as pd
 import pytest
-
-from iap.backtest import Backtester, BacktestConfig, CostModel
+from iap.backtest import BacktestConfig, Backtester, CostModel
 from iap.backtest.engine import POSITION_POLICIES, cost_aware_targets
 from iap.models.metalabel import META_CONTEXT_COLUMNS, build_meta_features
 from iap.validation.ledger import ExperimentLedger
@@ -28,8 +27,7 @@ from iap.validation.stress import (
     latency_stress_time,
 )
 from iap.validation.validate import GATES, effective_gates, validate_alpha
-
-from test_validation_framework import _BackwardsAlpha, _backwards_frames
+from test_validation_framework import _backwards_frames, _BackwardsAlpha
 
 NS_S = 1_000_000_000
 NS_DAY = 86_400 * NS_S

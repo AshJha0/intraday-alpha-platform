@@ -35,8 +35,8 @@ import subprocess
 import sys
 import tempfile
 from collections import Counter, OrderedDict
+from collections.abc import Iterable, Sequence
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 try:
     import yaml
@@ -74,7 +74,7 @@ class GhError(Exception):
 
 def load_plan(path: Path = DEFAULT_PLAN) -> dict:
     """Load and validate the plan; raise PlanError listing every problem."""
-    with open(path, "r", encoding="utf-8") as fh:
+    with open(path, encoding="utf-8") as fh:
         plan = yaml.safe_load(fh)
     problems = validate(plan)
     if problems:
@@ -90,9 +90,9 @@ def _is_str_list(v, non_empty: bool = True) -> bool:
     )
 
 
-def validate(plan) -> List[str]:
+def validate(plan) -> list[str]:
     """Return a list of human-readable problems (empty means valid)."""
-    p: List[str] = []
+    p: list[str] = []
     if not isinstance(plan, dict):
         return ["top level must be a mapping"]
     for section in ("labels", "milestones", "epics", "issues"):
@@ -104,7 +104,7 @@ def validate(plan) -> List[str]:
         p.append("`repo:` must be 'owner/name'")
 
     # labels
-    label_names: List[str] = []
+    label_names: list[str] = []
     for i, lab in enumerate(plan["labels"]):
         if not isinstance(lab, dict) or not {"name", "color", "description"} <= set(lab):
             p.append(f"labels[{i}]: needs name, color, description")
@@ -127,7 +127,7 @@ def validate(plan) -> List[str]:
         p.append("missing label type:epic")
 
     # milestones
-    ms_titles: List[str] = []
+    ms_titles: list[str] = []
     for i, ms in enumerate(plan["milestones"]):
         if not isinstance(ms, dict) or not {"title", "description"} <= set(ms):
             p.append(f"milestones[{i}]: needs title, description")
@@ -241,7 +241,7 @@ def validate(plan) -> List[str]:
 
 
 def _check_labels(
-    where: str, labs, defined: set, p: List[str], *, epic: bool, status: Optional[str] = None
+    where: str, labs, defined: set, p: list[str], *, epic: bool, status: str | None = None
 ) -> None:
     if not _is_str_list(labs):
         p.append(f"{where}: `labels` must be a non-empty list")
@@ -270,7 +270,7 @@ def _check_labels(
 # --------------------------------------------------------------------------
 
 
-def issue_labels(it: dict) -> List[str]:
+def issue_labels(it: dict) -> list[str]:
     """Labels as they go to GitHub: the YAML labels plus the derived status label."""
     labs = list(it["labels"])
     st = f"status:{it['status']}"
@@ -294,7 +294,7 @@ def epic_status(children: Sequence[dict]) -> str:
     return "backlog"
 
 
-def epic_labels(e: dict, children: Sequence[dict]) -> List[str]:
+def epic_labels(e: dict, children: Sequence[dict]) -> list[str]:
     labs = list(e["labels"])
     st = f"status:{epic_status(children)}"
     if st not in labs:
@@ -302,11 +302,11 @@ def epic_labels(e: dict, children: Sequence[dict]) -> List[str]:
     return labs
 
 
-def children_of(plan: dict, epic_key: str) -> List[dict]:
+def children_of(plan: dict, epic_key: str) -> list[dict]:
     return [it for it in plan["issues"] if it["epic"] == epic_key]
 
 
-def select(plan: dict, only: Optional[str]) -> Tuple[List[dict], List[dict]]:
+def select(plan: dict, only: str | None) -> tuple[list[dict], list[dict]]:
     """Apply the --only filter; returns (epics, issues)."""
     if not only:
         return list(plan["epics"]), list(plan["issues"])
@@ -319,7 +319,7 @@ def select(plan: dict, only: Optional[str]) -> Tuple[List[dict], List[dict]]:
     return epics, children_of(plan, key)
 
 
-def status_counts(items: Iterable[dict]) -> Dict[str, int]:
+def status_counts(items: Iterable[dict]) -> dict[str, int]:
     c = Counter(it["status"] for it in items)
     return {s: c.get(s, 0) for s in STATUSES}
 
@@ -333,7 +333,7 @@ def _box(checked: bool) -> str:
     return "- [x]" if checked else "- [ ]"
 
 
-def epic_body(e: dict, children: Sequence[dict], numbers: Optional[Dict[str, int]] = None) -> str:
+def epic_body(e: dict, children: Sequence[dict], numbers: dict[str, int] | None = None) -> str:
     """The epic's GitHub body. With ``numbers`` (key -> issue number) the
     children appear as a task list of ``#N`` references; without, as keys."""
     st = epic_status(children)
@@ -359,7 +359,7 @@ def epic_body(e: dict, children: Sequence[dict], numbers: Optional[Dict[str, int
     return "\n".join(lines) + "\n"
 
 
-def issue_body(it: dict, epic: dict, epic_number: Optional[int] = None) -> str:
+def issue_body(it: dict, epic: dict, epic_number: int | None = None) -> str:
     done = it["status"] == "done"
     part_of = (
         f"Part of #{epic_number}"
@@ -397,9 +397,9 @@ def _fmt_days(d) -> str:
 # --------------------------------------------------------------------------
 
 
-def render_table(plan: dict, only: Optional[str] = None) -> str:
+def render_table(plan: dict, only: str | None = None) -> str:
     epics, issues = select(plan, only)
-    out: List[str] = []
+    out: list[str] = []
     out.append(f"repo: {plan['repo']}")
     out.append(
         f"labels: {len(plan['labels'])}   milestones: {len(plan['milestones'])}   "
@@ -437,7 +437,7 @@ def render_table(plan: dict, only: Optional[str] = None) -> str:
     return "\n".join(out)
 
 
-def _sum_days(items: Iterable[dict], status: Optional[str] = None) -> float:
+def _sum_days(items: Iterable[dict], status: str | None = None) -> float:
     return float(sum(i["estimate_days"] for i in items if status is None or i["status"] == status))
 
 
@@ -461,11 +461,11 @@ def render_md(plan: dict) -> str:
     sc = status_counts(issues)
     ms_order = [m["title"] for m in plan["milestones"]]
     ms_desc = {m["title"]: m["description"] for m in plan["milestones"]}
-    by_ms: "OrderedDict[str, List[dict]]" = OrderedDict((m, []) for m in ms_order)
+    by_ms: OrderedDict[str, list[dict]] = OrderedDict((m, []) for m in ms_order)
     for e in epics:
         by_ms[e["milestone"]].append(e)
 
-    L: List[str] = []
+    L: list[str] = []
     L.append("# Epics and issues")
     L.append("")
     L.append("<!-- GENERATED FILE — do not edit. Source: tools/github/issues.yaml; regenerate with")
@@ -601,7 +601,7 @@ class Gh:
                 + (r.stderr or r.stdout).strip()
             )
 
-    def run(self, args: Sequence[str], input_text: Optional[str] = None) -> str:
+    def run(self, args: Sequence[str], input_text: str | None = None) -> str:
         cmd = ["gh", *args]
         if self.verbose:
             print("  $ " + " ".join(_q(a) for a in cmd))
@@ -616,7 +616,7 @@ class Gh:
         self,
         path: str,
         method: str = "GET",
-        fields: Optional[Dict[str, str]] = None,
+        fields: dict[str, str] | None = None,
         paginate: bool = False,
     ):
         args = ["api", path, "-X", method]
@@ -653,7 +653,7 @@ class Gh:
         )
 
     # -- milestones -------------------------------------------------------
-    def milestones(self) -> Dict[str, int]:
+    def milestones(self) -> dict[str, int]:
         owner, name = self.repo.split("/", 1)
         rows = (
             self.api_json(f"repos/{owner}/{name}/milestones?state=all&per_page=100", paginate=True)
@@ -661,7 +661,7 @@ class Gh:
         )
         return {m["title"]: m["number"] for m in rows}
 
-    def milestone_ensure(self, title: str, description: str, existing: Dict[str, int]) -> int:
+    def milestone_ensure(self, title: str, description: str, existing: dict[str, int]) -> int:
         if title in existing:
             return existing[title]
         owner, name = self.repo.split("/", 1)
@@ -672,7 +672,7 @@ class Gh:
         return row["number"]
 
     # -- issues -----------------------------------------------------------
-    def issues_by_title(self) -> Dict[str, dict]:
+    def issues_by_title(self) -> dict[str, dict]:
         out = self.run(
             [
                 "issue",
@@ -689,7 +689,7 @@ class Gh:
         )
         return {row["title"]: row for row in json.loads(out or "[]")}
 
-    def issue_find(self, title: str) -> Optional[dict]:
+    def issue_find(self, title: str) -> dict | None:
         """Exact-title lookup via search (authoritative even past the 500-row list)."""
         out = self.run(
             [
@@ -739,9 +739,9 @@ class Gh:
         self,
         number: int,
         *,
-        body: Optional[str] = None,
-        labels: Optional[Sequence[str]] = None,
-        milestone: Optional[str] = None,
+        body: str | None = None,
+        labels: Sequence[str] | None = None,
+        milestone: str | None = None,
     ) -> None:
         args = ["issue", "edit", str(number), "--repo", self.repo]
         if labels:
@@ -801,7 +801,7 @@ class _body_file:
 # --------------------------------------------------------------------------
 
 
-def apply(plan: dict, repo: str, only: Optional[str] = None) -> None:
+def apply(plan: dict, repo: str, only: str | None = None) -> None:
     Gh.ensure_available()
     gh = Gh(repo)
     epics, issues = select(plan, only)
@@ -818,10 +818,10 @@ def apply(plan: dict, repo: str, only: Optional[str] = None) -> None:
 
     print("== existing issues")
     known = gh.issues_by_title()
-    numbers: Dict[str, int] = {}
+    numbers: dict[str, int] = {}
     created = updated = closed = 0
 
-    def find(title: str) -> Optional[dict]:
+    def find(title: str) -> dict | None:
         row = known.get(title)
         if row is None:
             row = gh.issue_find(title)
@@ -887,7 +887,7 @@ def _close_comment(it: dict) -> str:
 # --------------------------------------------------------------------------
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )

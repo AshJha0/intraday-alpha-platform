@@ -13,9 +13,10 @@ import hashlib
 import json
 import math
 import os
+from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Mapping
+from typing import Any
 
 __all__ = [
     "ALPHA_SIGNAL_VERSION",

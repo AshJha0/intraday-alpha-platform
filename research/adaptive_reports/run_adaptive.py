@@ -37,13 +37,11 @@ import json
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "python" / "src"))
 
 import numpy as np  # noqa: E402
-
 from iap.adaptive import (  # noqa: E402
     LifecycleConfig,
     LifecycleLog,
@@ -52,7 +50,7 @@ from iap.adaptive import (  # noqa: E402
 )
 from iap.alpha import build  # noqa: E402
 from iap.alpha.data import load_features  # noqa: E402
-from iap.backtest import Backtester, BacktestConfig, CostModel  # noqa: E402
+from iap.backtest import BacktestConfig, Backtester, CostModel  # noqa: E402
 from iap.backtest.adaptive import AdaptiveDeployment  # noqa: E402
 from iap.validation import ExperimentLedger  # noqa: E402
 
@@ -67,7 +65,7 @@ POLICY_NAMES = ("static", "scheduled_weekly", "scheduled_daily", "drift_triggere
 NS_H = 3_600_000_000_000
 
 
-def select_alphas() -> List[str]:
+def select_alphas() -> list[str]:
     """Golden 6 + the 4 best remaining by walk-forward OOS IC (from the
     promotion reports — a *recorded* prior look, not a new one)."""
     scored = []
@@ -80,9 +78,9 @@ def select_alphas() -> List[str]:
     return list(GOLDEN_ALPHAS) + best
 
 
-def _load_meta() -> Dict[int, dict]:
+def _load_meta() -> dict[int, dict]:
     cfg = json.loads((REPO / "configs" / "instruments" / "instruments.json").read_text())
-    out: Dict[int, dict] = {}
+    out: dict[int, dict] = {}
     for row in cfg["instruments"]:
         out[int(row["instrument_id"])] = {
             "symbol": row["symbol"],
@@ -101,7 +99,7 @@ def _fmt(v, spec=".4f", none="   -  "):
     return format(v, spec)
 
 
-def _ic_stability(eval_rows: List[dict]) -> dict:
+def _ic_stability(eval_rows: list[dict]) -> dict:
     ics = [r["rolling_ic"] for r in eval_rows if r["rolling_ic"] is not None]
     if len(ics) < 2:
         return {"mean": None, "std": None, "n": len(ics)}
@@ -177,10 +175,10 @@ def run_alpha(aid: str, frames, cfg, backtester, lc_cfg, log, ledger) -> dict:
     return out
 
 
-def _write_report(results: Dict[str, dict], cfg, ledger, log, runtime_s: float) -> None:
+def _write_report(results: dict[str, dict], cfg, ledger, log, runtime_s: float) -> None:
     lc = cfg["lifecycle"]
     dt = cfg["policies"]["drift_triggered"]
-    lines: List[str] = []
+    lines: list[str] = []
     a = lines.append
     a("# Adaptive deployment report — STATIC vs SCHEDULED vs DRIFT-TRIGGERED")
     a("")
@@ -275,8 +273,8 @@ def _write_report(results: Dict[str, dict], cfg, ledger, log, runtime_s: float) 
     a("")
     a("### Which policy 'wins' where — and why that is not a conclusion")
     a("")
-    win_pnl: Dict[str, int] = {p: 0 for p in POLICY_NAMES}
-    win_ic: Dict[str, int] = {p: 0 for p in POLICY_NAMES}
+    win_pnl: dict[str, int] = {p: 0 for p in POLICY_NAMES}
+    win_ic: dict[str, int] = {p: 0 for p in POLICY_NAMES}
     for aid in results:
         ps = results[aid]["policies"]
         best_pnl = max(POLICY_NAMES, key=lambda p: ps[p]["net_pnl"])
@@ -407,7 +405,7 @@ def main() -> int:
 
     alphas = select_alphas()
     print(f"alpha subset: {alphas}")
-    results: Dict[str, dict] = {}
+    results: dict[str, dict] = {}
     for aid in alphas:
         t0 = time.time()
         rep = run_alpha(aid, frames, cfg, backtester, lc_cfg, log, ledger)

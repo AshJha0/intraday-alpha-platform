@@ -28,7 +28,6 @@ Validity: warmup of the window; mean/std statistics need enough samples
 from __future__ import annotations
 
 from math import sqrt
-from typing import List
 
 from iap.features._famutil import put
 from iap.features.spec import EPS, WINDOW_NS, FeatureSpec, mkspec
@@ -40,9 +39,9 @@ JUMP_K = 4.0
 JUMP_MIN_OBS = 30
 
 
-def specs() -> List[FeatureSpec]:
+def specs() -> list[FeatureSpec]:
     """Registry entries for the volatility family (pinned order)."""
-    out: List[FeatureSpec] = []
+    out: list[FeatureSpec] = []
     for w in RV_WINDOWS:
         out.append(
             mkspec(
@@ -115,7 +114,7 @@ def specs() -> List[FeatureSpec]:
     return out
 
 
-def compute(st, values: List[float], valid: List[bool]) -> None:
+def compute(st, values: list[float], valid: list[bool]) -> None:
     """Append the 13 volatility values for the current emission."""
     rvols = {w: st.rvol(w) for w in RV_WINDOWS}
     for w in RV_WINDOWS:

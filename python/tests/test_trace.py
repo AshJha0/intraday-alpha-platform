@@ -8,7 +8,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from iap.contracts.examples import VENUE_NAMES, all_examples, example_trace
 from iap.contracts.types import (
     AlphaSignal,

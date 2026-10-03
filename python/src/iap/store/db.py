@@ -16,21 +16,12 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 from typing import (
     Any,
-    Callable,
-    Dict,
-    Iterator,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
-    Tuple,
-    Type,
     TypeVar,
-    Union,
 )
 
 from iap.contracts.types import (
@@ -57,11 +48,11 @@ from iap.store import ddl
 __all__ = ["Store", "STAGE_TABLES", "LIFECYCLE_STATES"]
 
 C = TypeVar("C", bound=Contract)
-Row = Dict[str, Any]
+Row = dict[str, Any]
 
 #: Normalized decomposition of a decision trace, rewritten together by
 #: :meth:`Store.insert_trace` (delete-then-insert, keyed by ``trace_id``).
-STAGE_TABLES: Tuple[str, ...] = (
+STAGE_TABLES: tuple[str, ...] = (
     "alpha_signals",
     "portfolio_targets",
     "portfolio_legs",
@@ -75,7 +66,7 @@ STAGE_TABLES: Tuple[str, ...] = (
 )
 
 #: The lifecycle state names accepted by ``alphas.current_state``.
-LIFECYCLE_STATES: Tuple[str, ...] = (
+LIFECYCLE_STATES: tuple[str, ...] = (
     "RESEARCH",
     "CANDIDATE",
     "VALIDATING",
@@ -85,7 +76,7 @@ LIFECYCLE_STATES: Tuple[str, ...] = (
     "RETIRED",
 )
 
-_TRACE_HEADER: Tuple[str, ...] = (
+_TRACE_HEADER: tuple[str, ...] = (
     "trace_id",
     "session_id",
     "instrument_id",
@@ -106,11 +97,11 @@ def _uj(text: str) -> Any:
     return json.loads(text)
 
 
-def _flag(value: Optional[bool]) -> Optional[int]:
+def _flag(value: bool | None) -> int | None:
     return None if value is None else int(bool(value))
 
 
-def _unflag(value: Optional[int]) -> Optional[bool]:
+def _unflag(value: int | None) -> bool | None:
     return None if value is None else bool(value)
 
 
@@ -277,7 +268,7 @@ def _dec_decision_trace(row: Row) -> DecisionTrace:
     return DecisionTrace.from_dict(d)
 
 
-def _pick(row: Row, cls: Type[Contract], skip: Sequence[str] = ()) -> Row:
+def _pick(row: Row, cls: type[Contract], skip: Sequence[str] = ()) -> Row:
     """The contract's scalar fields out of a row (nested ones in ``skip``)."""
     return {
         name: row[name]
@@ -286,10 +277,10 @@ def _pick(row: Row, cls: Type[Contract], skip: Sequence[str] = ()) -> Row:
     }
 
 
-_Codec = Tuple[str, Callable[[Any], Row], Callable[[Row], Any]]
+_Codec = tuple[str, Callable[[Any], Row], Callable[[Row], Any]]
 
 #: contract type -> (table, encoder, decoder)
-_CODECS: Dict[Type[Contract], _Codec] = {
+_CODECS: dict[type[Contract], _Codec] = {
     AlphaSignal: ("alpha_signals", _enc_alpha_signal, _dec_alpha_signal),
     PortfolioTarget: ("portfolio_targets", _enc_portfolio_target, _dec_portfolio_target),
     RiskDecision: ("risk_decisions", _enc_risk_decision, _dec_risk_decision),
@@ -321,13 +312,13 @@ class Store:
 
     def __init__(self, conn: sqlite3.Connection) -> None:
         self._conn = conn
-        self._columns_cache: Dict[str, Tuple[str, ...]] = {}
-        self._pk_cache: Dict[str, Tuple[str, ...]] = {}
+        self._columns_cache: dict[str, tuple[str, ...]] = {}
+        self._pk_cache: dict[str, tuple[str, ...]] = {}
 
     # -- lifecycle ----------------------------------------------------------
 
     @classmethod
-    def open(cls, path: Union[str, Path] = ":memory:", *, read_only: bool = False) -> "Store":
+    def open(cls, path: str | Path = ":memory:", *, read_only: bool = False) -> Store:
         """Open (creating if needed) the database at ``path``.
 
         ``read_only=True`` opens an existing file through the
@@ -359,7 +350,7 @@ class Store:
     def close(self) -> None:
         self._conn.close()
 
-    def __enter__(self) -> "Store":
+    def __enter__(self) -> Store:
         return self
 
     def __exit__(self, *exc: Any) -> None:
@@ -384,7 +375,7 @@ class Store:
 
     # -- catalogue ----------------------------------------------------------
 
-    def tables(self) -> Tuple[str, ...]:
+    def tables(self) -> tuple[str, ...]:
         """All table names, sorted."""
         rows = self.query(
             "SELECT name FROM sqlite_master WHERE type = 'table' "
@@ -392,12 +383,12 @@ class Store:
         )
         return tuple(r["name"] for r in rows)
 
-    def views(self) -> Tuple[str, ...]:
+    def views(self) -> tuple[str, ...]:
         """All view names, sorted."""
         rows = self.query("SELECT name FROM sqlite_master WHERE type = 'view' ORDER BY name")
         return tuple(r["name"] for r in rows)
 
-    def columns(self, table: str) -> Tuple[str, ...]:
+    def columns(self, table: str) -> tuple[str, ...]:
         """Column names of ``table`` (or view) in definition order."""
         cols = self._columns_cache.get(table)
         if cols is None:
@@ -411,7 +402,7 @@ class Store:
             )
         return cols
 
-    def primary_key(self, table: str) -> Tuple[str, ...]:
+    def primary_key(self, table: str) -> tuple[str, ...]:
         """Primary-key columns of ``table`` in key order (empty for views)."""
         self.columns(table)
         return self._pk_cache[table]
@@ -424,7 +415,7 @@ class Store:
 
     # -- generic access -----------------------------------------------------
 
-    def query(self, sql: str, params: Sequence[Any] = ()) -> List[Row]:
+    def query(self, sql: str, params: Sequence[Any] = ()) -> list[Row]:
         """Run ``sql`` and return every row as a dict (column order of the
         SELECT).  Row order is whatever the statement's ``ORDER BY`` says —
         pass one for deterministic output."""
@@ -452,11 +443,11 @@ class Store:
         )
         cur.execute(sql, tuple(row[c] for c in cols))
 
-    def counts(self) -> Dict[str, int]:
+    def counts(self) -> dict[str, int]:
         """``{table: row count}`` for every table, sorted by name."""
         return {t: self.query(f"SELECT COUNT(*) AS n FROM {t}")[0]["n"] for t in self.tables()}
 
-    def export_jsonl(self, table: str, path: Union[str, Path]) -> int:
+    def export_jsonl(self, table: str, path: str | Path) -> int:
         """Write ``table`` (or view) as canonical JSON lines ordered by its
         primary key (all columns for a view); returns the row count.
         Byte-deterministic for equal contents."""
@@ -471,7 +462,7 @@ class Store:
                 fh.write("\n")
         return len(rows)
 
-    def fetch(self, cls: Type[C], **where: Any) -> Tuple[C, ...]:
+    def fetch(self, cls: type[C], **where: Any) -> tuple[C, ...]:
         """Every stored ``cls`` matching the equality filters, decoded
         through ``cls.from_dict`` and ordered by primary key."""
         table, _, dec = self._codec(cls)
@@ -489,7 +480,7 @@ class Store:
         return tuple(dec(r) for r in rows)
 
     @staticmethod
-    def _codec(cls: Type[Contract]) -> _Codec:
+    def _codec(cls: type[Contract]) -> _Codec:
         try:
             return _CODECS[cls]
         except KeyError:
@@ -588,14 +579,14 @@ class Store:
         cur: sqlite3.Cursor,
         report: ExecutionReport,
         trace_id: str,
-        parent_order_id: Optional[int],
+        parent_order_id: int | None,
     ) -> None:
         row = _enc_execution_report(report)
         row.update(trace_id=trace_id, parent_order_id=parent_order_id)
         self._upsert(cur, "executions", row)
 
     def insert_attribution(
-        self, attribution: Attribution, *, trace_id: str, parent_order_id: Optional[int] = None
+        self, attribution: Attribution, *, trace_id: str, parent_order_id: int | None = None
     ) -> None:
         validate_typed(attribution)
         with self._tx() as cur:
@@ -606,7 +597,7 @@ class Store:
         cur: sqlite3.Cursor,
         attribution: Attribution,
         trace_id: str,
-        parent_order_id: Optional[int],
+        parent_order_id: int | None,
     ) -> None:
         row = _enc_attribution(attribution)
         row.update(trace_id=trace_id, parent_order_id=parent_order_id)
@@ -629,7 +620,7 @@ class Store:
         transition: LifecycleTransition,
         *,
         source: str = "api",
-        eval_index: Optional[int] = None,
+        eval_index: int | None = None,
     ) -> None:
         """``source`` names the artefact (``lifecycle_log``,
         ``lifecycle_transitions``) or ``api`` for a live write."""
@@ -642,7 +633,7 @@ class Store:
         cur: sqlite3.Cursor,
         transition: LifecycleTransition,
         source: str,
-        eval_index: Optional[int],
+        eval_index: int | None,
     ) -> None:
         row = _enc_lifecycle_transition(transition)
         row.update(source=source, eval_index=eval_index)
@@ -769,12 +760,12 @@ class Store:
             raise KeyError(f"store: no parent order {parent_order_id}")
         return rows[0]["trace_id"]
 
-    def venue_names(self) -> Dict[int, str]:
+    def venue_names(self) -> dict[int, str]:
         """``{venue_id: display name}`` from the venues table (sorted)."""
         rows = self.query("SELECT venue_id, venue FROM venues ORDER BY venue_id")
         return {r["venue_id"]: r["venue"] for r in rows}
 
-    def explain(self, parent_order_id: int, venue_names: Optional[Mapping[int, str]] = None) -> str:
+    def explain(self, parent_order_id: int, venue_names: Mapping[int, str] | None = None) -> str:
         """:func:`iap.contracts.types.explain` of the order's trace, with
         venue display names from the venues table (``venue_names`` entries
         override them)."""

@@ -5,20 +5,20 @@ lookups over a trace JSONL file (the sink's output) by parent order.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Mapping, Optional, Union
 
 from iap.contracts.types import DecisionTrace, explain
 
 __all__ = ["explain", "explain_jsonl", "find_trace_jsonl"]
 
 
-def find_trace_jsonl(path: Union[str, Path], parent_order_id: int) -> DecisionTrace:
+def find_trace_jsonl(path: str | Path, parent_order_id: int) -> DecisionTrace:
     """The first trace in the JSONL file whose ``stages.parent_orders``
     carries ``parent_order_id``; ``KeyError`` when none does.  Lines are
     parsed through ``DecisionTrace.from_dict`` (a malformed line raises
     ``ValueError`` naming the line)."""
-    with open(path, "r", encoding="ascii") as fh:
+    with open(path, encoding="ascii") as fh:
         for lineno, raw in enumerate(fh, 1):
             text = raw.strip()
             if not text:
@@ -33,7 +33,7 @@ def find_trace_jsonl(path: Union[str, Path], parent_order_id: int) -> DecisionTr
 
 
 def explain_jsonl(
-    path: Union[str, Path], parent_order_id: int, venue_names: Optional[Mapping[int, str]] = None
+    path: str | Path, parent_order_id: int, venue_names: Mapping[int, str] | None = None
 ) -> str:
     """:func:`explain` of the trace in ``path`` that carries the order."""
     return explain(find_trace_jsonl(path, parent_order_id), venue_names)

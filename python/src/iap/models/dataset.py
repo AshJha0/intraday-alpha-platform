@@ -20,9 +20,9 @@ Design decisions (pinned, documented in ML_REPORT.md):
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -37,7 +37,7 @@ TARGET_MID_COLUMN = "label_mid_5s"
 TARGET_HORIZON_NS = 5_000_000_000
 
 #: Pinned curated predictor set (every family represented).
-FEATURE_SET: Tuple[str, ...] = (
+FEATURE_SET: tuple[str, ...] = (
     # price / returns
     "ret_log_1s_v1",
     "ret_log_5s_v1",
@@ -102,7 +102,7 @@ FEATURE_SET: Tuple[str, ...] = (
 )
 
 #: Extra columns the meta-labeling stage conditions on (spec §14 secondary).
-META_CONTEXT_COLUMNS: Tuple[str, ...] = (
+META_CONTEXT_COLUMNS: tuple[str, ...] = (
     "spread_bps_v1",
     "rvol_w1m_v1",
     "depth_total_l1_v1",
@@ -121,7 +121,7 @@ class Dataset:
     y_mid: np.ndarray  # (n,) mid-to-mid 5s forward return
     ts: np.ndarray  # (n,) int64 exchange_ts
     instrument_id: np.ndarray  # (n,) int32
-    feature_names: List[str]
+    feature_names: list[str]
     meta_context: np.ndarray  # (n, len(META_CONTEXT_COLUMNS))
 
     def __len__(self) -> int:
@@ -129,8 +129,8 @@ class Dataset:
 
 
 def load_dataset(
-    features_dir: Optional[Path] = None,
-    instruments: Optional[Sequence[int]] = None,
+    features_dir: Path | None = None,
+    instruments: Sequence[int] | None = None,
     feature_set: Sequence[str] = FEATURE_SET,
 ) -> Dataset:
     """Load and concatenate per-instrument feature frames into a Dataset.
@@ -185,10 +185,10 @@ class TrainScaler:
     """Train-only impute (mean) + standardize transform (no test leakage)."""
 
     def __init__(self) -> None:
-        self.mean_: Optional[np.ndarray] = None
-        self.std_: Optional[np.ndarray] = None
+        self.mean_: np.ndarray | None = None
+        self.std_: np.ndarray | None = None
 
-    def fit(self, X_train: np.ndarray) -> "TrainScaler":
+    def fit(self, X_train: np.ndarray) -> TrainScaler:
         with np.errstate(invalid="ignore"):
             mean = np.nanmean(X_train, axis=0)
             std = np.nanstd(X_train, axis=0)

@@ -6,9 +6,8 @@ import math
 from bisect import bisect_right
 
 import pytest
-
-from conftest import GOLDEN_DIR
 from bruteforce_features import book_frames
+from conftest import GOLDEN_DIR
 from iap.core.codec import read_jsonl
 from iap.labels.labels import (
     HORIZON_ORDER,

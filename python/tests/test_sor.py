@@ -10,7 +10,6 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-
 from iap.core.events import EventType, MarketEvent, SessionStatus
 from iap.execution import (
     NO_ROUTE,

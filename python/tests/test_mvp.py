@@ -14,10 +14,9 @@ from __future__ import annotations
 import json
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 import pytest
-
 from iap.alpha import load_params_file
 from iap.contracts.protocols import (
     Alpha,
@@ -81,7 +80,7 @@ def tiny_run(tiny_cfg: MvpConfig, tmp_path_factory: pytest.TempPathFactory) -> R
     return run_session(tiny_cfg, feed, out)
 
 
-def _traces(run: RunResult) -> List[DecisionTrace]:
+def _traces(run: RunResult) -> list[DecisionTrace]:
     with open(run.out_dir / TRACES_FILE, encoding="ascii") as fh:
         return [DecisionTrace.from_dict(json.loads(line)) for line in fh if line.strip()]
 
@@ -89,7 +88,7 @@ def _traces(run: RunResult) -> List[DecisionTrace]:
 # ------------------------------------------------------------- config
 
 
-def _doc() -> Dict[str, Any]:
+def _doc() -> dict[str, Any]:
     return json.loads(TINY_CONFIG.read_text())
 
 
@@ -558,7 +557,7 @@ def _research_frame(cfg: MvpConfig, run: RunResult) -> Any:
     eng = FeatureEngine({iid: feature_context(cfg, ref)}, cadence_ns=cfg.decision_cadence_ns)
     series = MidSeries()
     last_seq = 0
-    ts_list: List[int] = []
+    ts_list: list[int] = []
     rows = []
     last_event_ts = 0
     for ev in run.feed.events:
@@ -812,7 +811,7 @@ def test_gap_gate_reopens_only_when_no_venue_is_stale() -> None:
         def best_ask(self) -> None:
             return None
 
-    calls: List[str] = []
+    calls: list[str] = []
     risk = SimpleNamespace(
         on_sequence_gap=lambda iid, ts: calls.append("gap"),
         on_feed_recovered=lambda iid, ts: calls.append("recovered"),

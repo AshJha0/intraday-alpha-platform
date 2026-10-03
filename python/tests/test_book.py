@@ -1,7 +1,6 @@
 """Order-book semantics tests — pinned behavior from conventions section 4."""
 
 import pytest
-
 from conftest import add, mkev
 from iap.core.events import EventType, SessionStatus, Side
 from iap.orderbook.book import ConsolidatedBook, OrderBook

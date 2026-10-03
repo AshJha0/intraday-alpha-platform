@@ -31,8 +31,6 @@ traded volume > 0; ofi_norm needs the 10s depth average to exist.
 
 from __future__ import annotations
 
-from typing import List
-
 from iap.features._famutil import put
 from iap.features.spec import EPS, WINDOW_NS, FeatureSpec, mkspec
 
@@ -46,9 +44,9 @@ EV_WINDOWS = ("1s", "10s", "1m")
 SHORT_WINDOWS = ("1s", "10s")
 
 
-def specs() -> List[FeatureSpec]:
+def specs() -> list[FeatureSpec]:
     """Registry entries for the order-flow family (pinned order)."""
-    out: List[FeatureSpec] = []
+    out: list[FeatureSpec] = []
     for k in OFI_LEVELS:
         for w in OFI_WINDOWS:
             out.append(
@@ -158,7 +156,7 @@ def specs() -> List[FeatureSpec]:
     return out
 
 
-def compute(st, values: List[float], valid: List[bool]) -> None:
+def compute(st, values: list[float], valid: list[bool]) -> None:
     """Append the 47 order-flow values for the current emission."""
     ofi_idx = {1: 0, 3: 1, 5: 2, 10: 3}
     for k in OFI_LEVELS:

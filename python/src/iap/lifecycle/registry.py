@@ -22,9 +22,10 @@ No wall clock anywhere: every timestamp is the event time the caller passed.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any
 
 from iap.contracts.ids import is_generic_id, is_sha256_hex
 from iap.contracts.types import GateResult, LifecycleState, LifecycleTransition
@@ -62,7 +63,7 @@ class Outcome:
     ALL = (TRANSITION, HOLD, NO_EVIDENCE, TERMINAL)
 
 
-def _check_optional_sha(value: Optional[str], name: str) -> Optional[str]:
+def _check_optional_sha(value: str | None, name: str) -> str | None:
     if value is None:
         return None
     if not isinstance(value, str) or not is_sha256_hex(value):
@@ -70,7 +71,7 @@ def _check_optional_sha(value: Optional[str], name: str) -> Optional[str]:
     return value
 
 
-def _check_optional_id(value: Optional[str], name: str) -> Optional[str]:
+def _check_optional_id(value: str | None, name: str) -> str | None:
     if value is None:
         return None
     if not isinstance(value, str) or not is_generic_id(value):
@@ -93,9 +94,9 @@ class GateEvaluation:
     event_ts: int
     state: LifecycleState
     outcome: str
-    gates: Dict[str, GateResult]
+    gates: dict[str, GateResult]
     consecutive_failures: int
-    transition: Optional[LifecycleTransition]
+    transition: LifecycleTransition | None
 
     def __post_init__(self) -> None:
         if self.outcome not in Outcome.ALL:
@@ -110,11 +111,11 @@ class GateEvaluation:
         return all(g.passed for g in self.gates.values())
 
     @property
-    def failed_gates(self) -> List[str]:
+    def failed_gates(self) -> list[str]:
         """Names of the failed gates in evaluation order."""
         return [name for name, g in self.gates.items() if not g.passed]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """JSON-ready.  ``gate_order`` carries the pinned evaluation order,
         which a sorted-key serialisation of ``gates`` would lose."""
         return {
@@ -130,7 +131,7 @@ class GateEvaluation:
         }
 
     @staticmethod
-    def from_dict(data: Mapping[str, Any]) -> "GateEvaluation":
+    def from_dict(data: Mapping[str, Any]) -> GateEvaluation:
         order = list(data["gate_order"])
         if sorted(order) != sorted(data["gates"]) or len(set(order)) != len(order):
             raise ValueError("GateEvaluation: gate_order does not match gates")
@@ -157,12 +158,12 @@ class AlphaRecord:
     alpha_id: str
     state: LifecycleState
     since_ts: int
-    last_transition: Optional[LifecycleTransition]
-    last_evaluation: Optional[GateEvaluation]
-    experiment_id: Optional[str]
-    data_version: Optional[str]
-    feature_version: Optional[str]
-    model_version: Optional[str]
+    last_transition: LifecycleTransition | None
+    last_evaluation: GateEvaluation | None
+    experiment_id: str | None
+    data_version: str | None
+    feature_version: str | None
+    model_version: str | None
     consecutive_failures: int
     breach_count: int
     recovery_count: int
@@ -188,11 +189,11 @@ class AlphaRecord:
         alpha_id: str,
         since_ts: int,
         *,
-        experiment_id: Optional[str] = None,
-        data_version: Optional[str] = None,
-        feature_version: Optional[str] = None,
-        model_version: Optional[str] = None,
-    ) -> "AlphaRecord":
+        experiment_id: str | None = None,
+        data_version: str | None = None,
+        feature_version: str | None = None,
+        model_version: str | None = None,
+    ) -> AlphaRecord:
         """A freshly registered alpha: RESEARCH, no history, zero counters."""
         return AlphaRecord(
             alpha_id=alpha_id,
@@ -209,7 +210,7 @@ class AlphaRecord:
             recovery_count=0,
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "alpha_id": self.alpha_id,
             "state": self.state.name,
@@ -231,7 +232,7 @@ class AlphaRecord:
         }
 
     @staticmethod
-    def from_dict(data: Mapping[str, Any]) -> "AlphaRecord":
+    def from_dict(data: Mapping[str, Any]) -> AlphaRecord:
         state = LifecycleState[data["state"]]
         if int(data["state_index"]) != int(state):
             raise ValueError(f"AlphaRecord {data['alpha_id']}: state_index disagrees with state")
@@ -261,7 +262,7 @@ class AlphaRegistry:
         if not policy:
             raise ValueError("AlphaRegistry: policy name must not be empty")
         self.policy = policy
-        self._records: Dict[str, AlphaRecord] = {}
+        self._records: dict[str, AlphaRecord] = {}
 
     def __contains__(self, alpha_id: str) -> bool:
         return alpha_id in self._records
@@ -269,7 +270,7 @@ class AlphaRegistry:
     def __len__(self) -> int:
         return len(self._records)
 
-    def alpha_ids(self) -> List[str]:
+    def alpha_ids(self) -> list[str]:
         """Sorted alpha ids (the only iteration order the registry offers)."""
         return sorted(self._records)
 
@@ -285,11 +286,11 @@ class AlphaRegistry:
         self._records[record.alpha_id] = record
         return record
 
-    def records(self) -> List[AlphaRecord]:
+    def records(self) -> list[AlphaRecord]:
         """Records in sorted alpha-id order."""
         return [self._records[a] for a in self.alpha_ids()]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "x-version": REGISTRY_VERSION,
             "description": _REGISTRY_DESCRIPTION,
@@ -311,7 +312,7 @@ class AlphaRegistry:
         path.write_text(self.render(), encoding="utf-8")
 
     @staticmethod
-    def from_dict(doc: Mapping[str, Any]) -> "AlphaRegistry":
+    def from_dict(doc: Mapping[str, Any]) -> AlphaRegistry:
         if doc.get("x-version") != REGISTRY_VERSION:
             raise ValueError(
                 f"alpha registry: x-version {doc.get('x-version')!r} != {REGISTRY_VERSION}"
@@ -325,8 +326,8 @@ class AlphaRegistry:
         return registry
 
     @staticmethod
-    def load(path: Path) -> "AlphaRegistry":
-        with open(path, "r", encoding="utf-8") as fh:
+    def load(path: Path) -> AlphaRegistry:
+        with open(path, encoding="utf-8") as fh:
             return AlphaRegistry.from_dict(json.load(fh))
 
 
@@ -345,9 +346,9 @@ class LifecycleTransitionLog:
         with open(self.path, "a", encoding="utf-8") as fh:
             fh.write(line + "\n")
 
-    def read_all(self) -> List[LifecycleTransition]:
+    def read_all(self) -> list[LifecycleTransition]:
         """Every logged transition, in file order, strictly parsed."""
-        out: List[LifecycleTransition] = []
+        out: list[LifecycleTransition] = []
         for line in self.path.read_text(encoding="utf-8").splitlines():
             if line.strip():
                 out.append(LifecycleTransition.from_dict(json.loads(line)))

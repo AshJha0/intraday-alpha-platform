@@ -35,8 +35,6 @@ evaluation therefore exists in two pinned variants:
 
 from __future__ import annotations
 
-from typing import Dict
-
 import numpy as np
 
 
@@ -78,7 +76,7 @@ def signal_economics(
     cost_est: np.ndarray,
     threshold: float = 0.0,
     conservative: bool = True,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """P&L-per-signal summary of a prediction vector through the cost model."""
     d = signal_directions(pred, cost_est, threshold)
     net = realized_net(d, y_mid, y_cost, conservative=conservative)

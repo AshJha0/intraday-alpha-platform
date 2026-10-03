@@ -62,9 +62,10 @@ runner writes it beside the result (``eligibility.json``) and
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Tuple
+from typing import Any
 
 import pandas as pd
 
@@ -99,7 +100,7 @@ __all__ = [
 NS_DAY = 86_400_000_000_000
 
 #: Pinned protocol defaults (= ``run_all.py``'s research execution model).
-DEFAULT_CONFIGURATION: Dict[str, Any] = {
+DEFAULT_CONFIGURATION: dict[str, Any] = {
     "n_folds": 4,
     "embargo_ns": 60_000_000_000,
     "cost_multiplier": 1.0,
@@ -150,7 +151,7 @@ def _require_bool(cfg: Mapping[str, Any], key: str) -> bool:
     return value
 
 
-def normalise_configuration(configuration: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+def normalise_configuration(configuration: Mapping[str, Any] | None) -> dict[str, Any]:
     """Fill the pinned defaults, reject unknown keys, canonicalise types.
 
     ``cost_multiplier=1`` and ``cost_multiplier=1.0`` are the same protocol
@@ -212,7 +213,7 @@ def model_definition_hash(alpha_id: str, horizon: str) -> str:
     )
 
 
-def _version(explicit: Optional[str], source, what: str, repo_root: Optional[Path]) -> str:
+def _version(explicit: str | None, source, what: str, repo_root: Path | None) -> str:
     value = explicit if explicit is not None else source(repo_root)
     if not is_sha256_hex(value):
         raise _invalid(
@@ -226,7 +227,7 @@ def derive_periods(
     frames: Mapping[int, pd.DataFrame],
     horizon: str,
     embargo_ns: int,
-) -> Tuple[Period, Period, Period]:
+) -> tuple[Period, Period, Period]:
     """Walk-forward periods from the dataset's session calendar (pinned).
 
     Sessions are UTC days of ``exchange_ts`` (``iap.alpha.data.session_days``)
@@ -291,7 +292,7 @@ ELIGIBILITY_VERSION = 1
 #: protocol is eligible and any knob turned in the flattering direction
 #: (cheaper, faster, less embargo, fewer folds, staler fills, overnight
 #: carry) is not.
-GATE_ELIGIBILITY_BOUNDS: Dict[str, Tuple[str, Any]] = {
+GATE_ELIGIBILITY_BOUNDS: dict[str, tuple[str, Any]] = {
     "n_folds": ("min", DEFAULT_CONFIGURATION["n_folds"]),
     "embargo_ns": ("min", DEFAULT_CONFIGURATION["embargo_ns"]),
     "cost_multiplier": ("min", DEFAULT_CONFIGURATION["cost_multiplier"]),
@@ -310,10 +311,10 @@ class GateEligibility:
     (a run directory written before the sidecar existed)."""
 
     eligible: bool
-    reasons: Tuple[str, ...]
+    reasons: tuple[str, ...]
     periods_verified: bool
 
-    def to_dict(self, experiment_id: str) -> Dict[str, Any]:
+    def to_dict(self, experiment_id: str) -> dict[str, Any]:
         """The ``eligibility.json`` document for ``experiment_id``."""
         return {
             "x-version": ELIGIBILITY_VERSION,
@@ -324,7 +325,7 @@ class GateEligibility:
         }
 
     @staticmethod
-    def from_dict(doc: Mapping[str, Any], experiment_id: str) -> "GateEligibility":
+    def from_dict(doc: Mapping[str, Any], experiment_id: str) -> GateEligibility:
         """Strict inverse of :meth:`to_dict` for ``experiment_id``."""
         want = {"x-version", "experiment_id", "gate_eligible", "periods_verified", "reasons"}
         if not isinstance(doc, Mapping) or set(doc) != want:
@@ -357,8 +358,8 @@ class GateEligibility:
         )
 
 
-def _configuration_violations(configuration: Mapping[str, Any]) -> List[str]:
-    out: List[str] = []
+def _configuration_violations(configuration: Mapping[str, Any]) -> list[str]:
+    out: list[str] = []
     for key, (kind, bound) in GATE_ELIGIBILITY_BOUNDS.items():
         value = configuration[key]
         if kind == "min" and value < bound:
@@ -378,7 +379,7 @@ def _configuration_violations(configuration: Mapping[str, Any]) -> List[str]:
 
 def gate_eligibility(
     spec: ExperimentSpec,
-    frames: Optional[Mapping[int, pd.DataFrame]] = None,
+    frames: Mapping[int, pd.DataFrame] | None = None,
 ) -> GateEligibility:
     """Is ``spec``'s result admissible as promotion evidence (module docs)?
 
@@ -427,18 +428,18 @@ def verify_experiment_id(spec: ExperimentSpec) -> None:
 
 def build_spec(
     alpha_id: str,
-    horizon: Optional[str] = None,
-    configuration: Optional[Mapping[str, Any]] = None,
+    horizon: str | None = None,
+    configuration: Mapping[str, Any] | None = None,
     *,
-    dataset_version: Optional[str] = None,
-    feature_version: Optional[str] = None,
-    model_version: Optional[str] = None,
+    dataset_version: str | None = None,
+    feature_version: str | None = None,
+    model_version: str | None = None,
     seed: int = DEFAULT_SEED,
-    train_period: Optional[Period] = None,
-    validation_period: Optional[Period] = None,
-    test_period: Optional[Period] = None,
-    frames: Optional[Mapping[int, pd.DataFrame]] = None,
-    repo_root: Optional[Path] = None,
+    train_period: Period | None = None,
+    validation_period: Period | None = None,
+    test_period: Period | None = None,
+    frames: Mapping[int, pd.DataFrame] | None = None,
+    repo_root: Path | None = None,
 ) -> ExperimentSpec:
     """A validated, id-stamped :class:`ExperimentSpec`.
 
@@ -470,7 +471,7 @@ def build_spec(
         train_period, validation_period, test_period = derive_periods(
             frames, horizon, config["embargo_ns"]
         )
-    body: Dict[str, Any] = {
+    body: dict[str, Any] = {
         "alpha_id": alpha_id,
         "dataset_version": _version(
             dataset_version, tracker.data_version, "dataset_version", repo_root

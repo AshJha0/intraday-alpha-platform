@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-
 from iap.portfolio.fx import currency_exposure_matrix
 from iap.portfolio.optimizer import Constraints, solve
 

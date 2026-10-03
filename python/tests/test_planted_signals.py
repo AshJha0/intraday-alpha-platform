@@ -8,7 +8,7 @@ import json
 
 import numpy as np
 import pytest
-
+from conftest import CONFIGS_DIR, REPO_ROOT
 from iap.core.codec import encode_iap1, read_jsonl, sha256_bytes
 from iap.core.events import EventType, Side
 from iap.marketdata.generator import (
@@ -18,8 +18,6 @@ from iap.marketdata.generator import (
 )
 from iap.research import ResearchError, power
 from iap.research.__main__ import main as cli_main
-
-from conftest import CONFIGS_DIR, REPO_ROOT
 
 PLANTED_CONFIG = REPO_ROOT / "research" / "power" / "generator_planted.json"
 

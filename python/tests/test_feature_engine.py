@@ -10,7 +10,6 @@ from __future__ import annotations
 import math
 
 import pytest
-
 from bruteforce_features import (
     approx,
     at_or_before,

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, fields
 from enum import IntEnum
-from typing import Optional
 
 U64_MAX = (1 << 64) - 1
 U32_MAX = (1 << 32) - 1
@@ -96,7 +95,7 @@ class MarketEvent:
 FIELDS = tuple(f.name for f in fields(MarketEvent))
 
 
-def validation_error(ev: MarketEvent) -> Optional[str]:
+def validation_error(ev: MarketEvent) -> str | None:
     """Return a reason string if ``ev`` violates the contract, else None.
 
     Checked: integer domains (u64/u32/u16/u8 enums), receive_ts >= exchange_ts,

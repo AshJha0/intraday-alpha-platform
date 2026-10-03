@@ -25,7 +25,7 @@ import json
 import math
 from dataclasses import dataclass
 from enum import Enum, IntEnum
-from typing import Any, Dict
+from typing import Any
 
 from iap.risk.serialize import json_escape
 
@@ -48,7 +48,7 @@ class Scope(Enum):
     VENUE = "VENUE"
 
     @classmethod
-    def parse(cls, text: str) -> "Scope":
+    def parse(cls, text: str) -> Scope:
         """Wire string -> Scope; ``ValueError`` for anything else."""
         for member in cls:
             if member.value == text:
@@ -214,7 +214,7 @@ class RiskEvent:
         )
 
     @classmethod
-    def from_json_line(cls, line: str) -> "RiskEvent":
+    def from_json_line(cls, line: str) -> RiskEvent:
         """Parse one JSONL audit line back (strict: exact field set, enum
         codes in domain); ``ValueError`` otherwise."""
         try:
@@ -224,7 +224,7 @@ class RiskEvent:
         return cls.from_dict(doc)
 
     @classmethod
-    def from_dict(cls, doc: Any) -> "RiskEvent":
+    def from_dict(cls, doc: Any) -> RiskEvent:
         """Strict deserialisation of a parsed schema-shaped object (every
         schema field required and typed; unknown fields are ignored, as
         serde's derived deserializer does in the Rust reference)."""
@@ -259,7 +259,7 @@ class RiskEvent:
             reason=doc["reason"],
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Schema-shaped plain dict (scope as its wire string)."""
         return {
             "timestamp": self.timestamp,

@@ -38,16 +38,14 @@ import json
 import sys
 import time
 from pathlib import Path
-from typing import Dict
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "python" / "src"))
 
 import numpy as np  # noqa: E402
-
 from iap.alpha import ALPHA_IDS, build, fit_all, save_params  # noqa: E402
 from iap.alpha.data import load_features, session_days, split_by_day  # noqa: E402
-from iap.backtest import Backtester, BacktestConfig, CostModel  # noqa: E402
+from iap.backtest import BacktestConfig, Backtester, CostModel  # noqa: E402
 from iap.backtest.engine import ensemble_scores  # noqa: E402
 from iap.research import LOOKS_PER_EXPERIMENT  # noqa: E402
 from iap.validation import ExperimentLedger, validate_alpha  # noqa: E402
@@ -78,9 +76,9 @@ LOOKS_PER_ALPHA = LOOKS_PER_EXPERIMENT
 DESIGN_SCAN_COUNT = 216
 
 
-def _load_meta() -> Dict[int, dict]:
+def _load_meta() -> dict[int, dict]:
     cfg = json.loads((REPO / "configs" / "instruments" / "instruments.json").read_text())
-    meta: Dict[int, dict] = {}
+    meta: dict[int, dict] = {}
     for row in cfg["instruments"]:
         meta[int(row["instrument_id"])] = {
             "symbol": row["symbol"],
@@ -97,7 +95,7 @@ def _load_meta() -> Dict[int, dict]:
     return meta
 
 
-def _capital_usd(backtester: Backtester, meta: Dict[int, dict], iids) -> float:
+def _capital_usd(backtester: Backtester, meta: dict[int, dict], iids) -> float:
     """max_pos x ref_price x unit per instrument, converted to USD with the
     conversion pair's ref_price (a JPY-quoted capital line is not USD)."""
     total = 0.0
@@ -186,10 +184,10 @@ def data_quality_lines() -> list:
 
 
 def _write_report(
-    reports: Dict[str, dict],
+    reports: dict[str, dict],
     ledger: ExperimentLedger,
-    day2_bt: Dict[str, dict],
-    ensembles: Dict[str, dict],
+    day2_bt: dict[str, dict],
+    ensembles: dict[str, dict],
     runtime_s: float,
 ) -> None:
     lines = []
@@ -435,7 +433,7 @@ def main() -> int:
             count=DESIGN_SCAN_COUNT,
         )
 
-    reports: Dict[str, dict] = {}
+    reports: dict[str, dict] = {}
     for aid in ALPHA_IDS:
         t0 = time.time()
         rep = validate_alpha(
@@ -481,9 +479,9 @@ def main() -> int:
     models = fit_all(train)
     save_params(models, PARAMS_PATH)
 
-    day2_bt: Dict[str, dict] = {}
-    all_scores: Dict[str, Dict[str, dict]] = {"EQUITY": {}, "FX": {}}
-    betas: Dict[str, Dict[str, float]] = {"EQUITY": {}, "FX": {}}
+    day2_bt: dict[str, dict] = {}
+    all_scores: dict[str, dict[str, dict]] = {"EQUITY": {}, "FX": {}}
+    betas: dict[str, dict[str, float]] = {"EQUITY": {}, "FX": {}}
     for aid in ALPHA_IDS:
         model = models[aid]
         scores = model.score(test)
@@ -497,7 +495,7 @@ def main() -> int:
     # An equal-weight basket containing REJECTed and hypothesis-contradicting
     # alphas is not a portfolio anyone would run.
     eligible = {aid: reports[aid]["verdict"] != "REJECT" for aid in ALPHA_IDS}
-    ensembles: Dict[str, dict] = {}
+    ensembles: dict[str, dict] = {}
     for ac in ("EQUITY", "FX"):
         members = [a for a in sorted(all_scores[ac]) if eligible.get(a)]
         try:

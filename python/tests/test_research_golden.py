@@ -16,9 +16,9 @@ import json
 import math
 
 import pytest
-
+from conftest import CONFIGS_DIR, GOLDEN_DIR
 from iap.alpha import build
-from iap.backtest import Backtester, BacktestConfig, CostModel
+from iap.backtest import BacktestConfig, Backtester, CostModel
 from iap.contracts.types import ExperimentResult, ExperimentSpec
 from iap.contracts.validate import validate, validate_typed
 from iap.research import LOOKS_PER_EXPERIMENT, verify_experiment_id
@@ -36,8 +36,6 @@ from iap.research.golden import (
 )
 from iap.research.runner import document_drift, load_instrument_meta, restrict_frames
 from iap.validation import validate_alpha
-
-from conftest import CONFIGS_DIR, GOLDEN_DIR
 
 TOL = 1e-9
 GOLDEN = GOLDEN_DIR / "expected_experiment_golden_frame.json"

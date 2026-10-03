@@ -9,7 +9,6 @@ import json
 import struct
 
 import pytest
-
 from conftest import CONFIGS_DIR, add, mkev
 from iap.core import codec
 from iap.core.events import (
@@ -641,8 +640,8 @@ def test_scenario_generator_halt_with_reopening_auction(refdata):
     }
     gen = MarketDataGenerator(refdata, cfg)
     inst = refdata.instrument("SYN.EQ.001")
-    from iap.marketdata.generator import _EffPrice, _Stream
     from iap.core.rng import SplitMix64
+    from iap.marketdata.generator import _EffPrice, _Stream
 
     date = refdata.trading_days[0]
     open_ns, close_ns = refdata.session_bounds_ns("EQUITY", date)

@@ -90,7 +90,6 @@ import json
 import math
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional, Tuple
 
 import numpy as np
 
@@ -164,8 +163,8 @@ class DriftBaseline:
     alpha_id: str
     source: str
     n: int
-    edges: Tuple[float, ...]  # 9 interior decile edges
-    expected_frac: Tuple[float, ...]  # 10 baseline bucket fractions
+    edges: tuple[float, ...]  # 9 interior decile edges
+    expected_frac: tuple[float, ...]  # 10 baseline bucket fractions
     mean: float
     std: float
     min: float
@@ -212,7 +211,7 @@ class DriftBaseline:
         path.write_text(json.dumps(self.to_dict(), indent=2, sort_keys=True) + "\n")
 
     @staticmethod
-    def from_dict(blob: dict, expected_feature_version="") -> "DriftBaseline":
+    def from_dict(blob: dict, expected_feature_version="") -> DriftBaseline:
         if int(blob.get("x-version", 0)) != BASELINE_VERSION:
             raise ValueError(
                 f"unsupported baseline x-version {blob.get('x-version')!r} "
@@ -241,7 +240,7 @@ class DriftBaseline:
         )
 
     @staticmethod
-    def load(path, expected_feature_version="") -> "DriftBaseline":
+    def load(path, expected_feature_version="") -> DriftBaseline:
         return DriftBaseline.from_dict(json.loads(Path(path).read_text()), expected_feature_version)
 
 
@@ -285,7 +284,7 @@ def capture_baseline(
     )
 
 
-def psi(baseline: DriftBaseline, values, min_samples: int = 1) -> Optional[float]:
+def psi(baseline: DriftBaseline, values, min_samples: int = 1) -> float | None:
     """Population stability index of ``values`` against ``baseline``
     (pinned formula, module docstring).  None with < min_samples finite
     values — a monitor with no data must not report stability."""
@@ -336,7 +335,7 @@ def ks_pvalue(d: float, n_a: int, n_b: int) -> float:
     return float(min(1.0, max(0.0, 2.0 * total)))
 
 
-def ks_test(a, b) -> Tuple[float, float]:
+def ks_test(a, b) -> tuple[float, float]:
     """(D, asymptotic p-value) for two samples."""
     x = _finite(a)
     y = _finite(b)
@@ -388,7 +387,7 @@ class ICBaseline:
         path.write_text(json.dumps(self.to_dict(), indent=2, sort_keys=True) + "\n")
 
     @staticmethod
-    def from_dict(blob: dict, expected_feature_version="") -> "ICBaseline":
+    def from_dict(blob: dict, expected_feature_version="") -> ICBaseline:
         if int(blob.get("x-version", 0)) != BASELINE_VERSION or blob.get("kind") != "ic":
             raise ValueError(
                 f"not a v{BASELINE_VERSION} IC baseline "
@@ -423,7 +422,7 @@ class ICBaseline:
         )
 
     @staticmethod
-    def load(path, expected_feature_version="") -> "ICBaseline":
+    def load(path, expected_feature_version="") -> ICBaseline:
         return ICBaseline.from_dict(json.loads(Path(path).read_text()), expected_feature_version)
 
 
@@ -470,10 +469,10 @@ def capture_ic_baseline(
 class ICWindowResult:
     """One rolling-IC evaluation."""
 
-    rolling_ic: Optional[float]  # mean live bucket IC (None: too little data)
-    z: Optional[float]  # z vs baseline (None: unavailable/degenerate)
+    rolling_ic: float | None  # mean live bucket IC (None: too little data)
+    z: float | None  # z vs baseline (None: unavailable/degenerate)
     n_buckets: int = 0
-    bucket_ics: List[float] = field(default_factory=list)
+    bucket_ics: list[float] = field(default_factory=list)
 
 
 def rolling_ic_z(
@@ -515,7 +514,7 @@ def two_sample_hac_z(
     live_var: float,
     base_mean: float,
     base_var: float,
-) -> Optional[float]:
+) -> float | None:
     """``(live_mean - base_mean) / sqrt(live_var + base_var)``; ``None`` when
     either variance is unavailable or their sum is not positive."""
     if not (
@@ -537,9 +536,9 @@ def rolling_ic_z_hac(
     scores: np.ndarray,
     labels: np.ndarray,
     min_buckets: int = 4,
-    lags: Optional[int] = None,
-    baseline_bucket_ics: Optional[np.ndarray] = None,
-    baseline_bucket_counts: Optional[np.ndarray] = None,
+    lags: int | None = None,
+    baseline_bucket_ics: np.ndarray | None = None,
+    baseline_bucket_counts: np.ndarray | None = None,
 ) -> ICWindowResult:
     """Rolling realized IC vs the baseline as a two-sample HAC z (monitor 4
     of the module docstring).

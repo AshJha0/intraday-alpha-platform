@@ -86,8 +86,9 @@ import json
 import math
 import os
 import shutil
+from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Mapping, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -95,7 +96,7 @@ import pandas as pd
 from iap.alpha import build
 from iap.alpha.base import AlphaModel
 from iap.alpha.data import load_features
-from iap.backtest import Backtester, BacktestConfig, CostModel
+from iap.backtest import BacktestConfig, Backtester, CostModel
 from iap.contracts.types import ExperimentResult, ExperimentSpec, Verdict
 from iap.contracts.validate import validate_typed
 from iap.experiment import tracker
@@ -183,7 +184,7 @@ BPS = 1e4
 
 def document_drift(
     previous: Any, current: Any, *, tol: float = DOCUMENT_TOL, path: str = "$"
-) -> List[str]:
+) -> list[str]:
     """Paths where ``current`` differs from ``previous`` beyond ``tol``.
 
     Floats agree when ``|a - b| <= tol + tol * |b|``; ints, bools, strings,
@@ -204,7 +205,7 @@ def document_drift(
     if isinstance(previous, Mapping) and isinstance(current, Mapping):
         if set(previous) != set(current):
             return [path]
-        drift: List[str] = []
+        drift: list[str] = []
         for key in sorted(previous):
             drift.extend(document_drift(previous[key], current[key], tol=tol, path=f"{path}.{key}"))
         return drift
@@ -260,12 +261,12 @@ def _jsonable(value: Any, path: str) -> Any:
     raise ResearchError(f"{path}: value {value!r} is not JSON-representable")
 
 
-def load_instrument_meta(configs_dir: Path) -> Dict[int, dict]:
+def load_instrument_meta(configs_dir: Path) -> dict[int, dict]:
     """Instrument meta for the backtester / capacity proxy, exactly the
     rows ``run_all.py`` builds from ``configs/instruments/instruments.json``."""
     path = Path(configs_dir) / "instruments" / "instruments.json"
     cfg = json.loads(path.read_text())
-    meta: Dict[int, dict] = {}
+    meta: dict[int, dict] = {}
     for row in cfg["instruments"]:
         meta[int(row["instrument_id"])] = {
             "symbol": row["symbol"],
@@ -281,7 +282,7 @@ def load_instrument_meta(configs_dir: Path) -> Dict[int, dict]:
 
 
 def holdout_capital_usd(
-    backtester: Backtester, meta: Mapping[int, dict], instrument_ids: List[int]
+    backtester: Backtester, meta: Mapping[int, dict], instrument_ids: list[int]
 ) -> float:
     """Research capital line: ``max_pos_qty x ref_price x unit`` per
     instrument, converted to USD at the conversion pair's ``ref_price``
@@ -296,9 +297,9 @@ def holdout_capital_usd(
 
 def restrict_frames(
     frames: Mapping[int, pd.DataFrame], start_ts: int, end_ts: int
-) -> Dict[int, pd.DataFrame]:
+) -> dict[int, pd.DataFrame]:
     """Rows with ``start_ts <= exchange_ts < end_ts`` per instrument."""
-    out: Dict[int, pd.DataFrame] = {}
+    out: dict[int, pd.DataFrame] = {}
     for iid in sorted(frames):
         ts = frames[iid]["exchange_ts"].to_numpy(dtype=np.int64)
         out[iid] = frames[iid][(ts >= start_ts) & (ts < end_ts)].reset_index(drop=True)
@@ -402,14 +403,14 @@ class ExperimentRunner:
 
     def __init__(
         self,
-        feature_store_dir: Optional[Path],
+        feature_store_dir: Path | None,
         ledger_path: Path,
         out_dir: Path,
         configs_dir: Path,
         *,
         dry_run: bool = False,
-        frames: Optional[Mapping[int, pd.DataFrame]] = None,
-        repo_root: Optional[Path] = None,
+        frames: Mapping[int, pd.DataFrame] | None = None,
+        repo_root: Path | None = None,
         tstat_threshold: str = "fixed",
     ) -> None:
         if feature_store_dir is None and frames is None:
@@ -421,14 +422,14 @@ class ExperimentRunner:
             )
         self.tstat_threshold = tstat_threshold
         #: eligibility of the most recent ``run`` (``None`` before any run)
-        self.last_eligibility: Optional[GateEligibility] = None
+        self.last_eligibility: GateEligibility | None = None
         self.feature_store_dir = Path(feature_store_dir) if feature_store_dir else None
         self.ledger_path = Path(ledger_path)
         self.out_dir = Path(out_dir)
         self.configs_dir = Path(configs_dir)
         self.dry_run = bool(dry_run)
         self.repo_root = Path(repo_root) if repo_root is not None else None
-        self._frames: Optional[Dict[int, pd.DataFrame]] = (
+        self._frames: dict[int, pd.DataFrame] | None = (
             {int(k): v for k, v in frames.items()} if frames is not None else None
         )
         self.meta = load_instrument_meta(self.configs_dir)
@@ -439,7 +440,7 @@ class ExperimentRunner:
 
     # -- inputs ---------------------------------------------------------
 
-    def frames(self) -> Dict[int, pd.DataFrame]:
+    def frames(self) -> dict[int, pd.DataFrame]:
         """The full feature store (loaded once)."""
         if self._frames is None:
             self._frames = load_features(self.feature_store_dir)
@@ -487,7 +488,7 @@ class ExperimentRunner:
         spec: ExperimentSpec,
         window: Mapping[int, pd.DataFrame],
         factory: Callable[[], AlphaModel],
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Fit on the (purged, embargoed) train period, backtest the test period."""
         cfg = spec.configuration
         horizon_ns = HORIZONS_NS[spec.horizon]
@@ -497,8 +498,8 @@ class ExperimentRunner:
             test_start=spec.test_period.start_ts,
             test_end=spec.test_period.end_ts,
         )
-        train: Dict[int, pd.DataFrame] = {}
-        test: Dict[int, pd.DataFrame] = {}
+        train: dict[int, pd.DataFrame] = {}
+        test: dict[int, pd.DataFrame] = {}
         for iid, df in window.items():
             ts = df["exchange_ts"].to_numpy(dtype=np.int64)
             in_train = (ts >= spec.train_period.start_ts) & (ts < spec.train_period.end_ts)
@@ -552,7 +553,7 @@ class ExperimentRunner:
         self,
         spec: ExperimentSpec,
         result: ExperimentResult,
-        eligibility: Optional[GateEligibility] = None,
+        eligibility: GateEligibility | None = None,
     ) -> None:
         if eligibility is None:  # no dataset at hand: configuration only
             eligibility = gate_eligibility(spec)

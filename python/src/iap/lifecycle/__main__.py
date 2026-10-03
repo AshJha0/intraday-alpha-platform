@@ -18,7 +18,6 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
-from typing import List, Optional
 
 from iap.contracts.types import Actor
 from iap.lifecycle.bootstrap import (
@@ -76,7 +75,7 @@ def cmd_status(root: Path) -> int:
     return 0
 
 
-def cmd_manual(root: Path, alpha_id: str, reason: str, event_ts: Optional[int], action: str) -> int:
+def cmd_manual(root: Path, alpha_id: str, reason: str, event_ts: int | None, action: str) -> int:
     _, registry, machine = _load(root)
     ts = event_ts if event_ts is not None else _default_event_ts(registry)
     if action == "retire":
@@ -91,7 +90,7 @@ def cmd_manual(root: Path, alpha_id: str, reason: str, event_ts: Optional[int], 
     return 0
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m iap.lifecycle", description=__doc__.splitlines()[0]
     )

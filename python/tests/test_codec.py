@@ -5,7 +5,6 @@ import struct
 import zlib
 
 import pytest
-
 from conftest import mkev
 from iap.core import codec
 from iap.core.events import EventType, MarketEvent

@@ -122,8 +122,8 @@ standard research-scaling caveat.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Dict, List, Mapping, Optional
 
 import numpy as np
 import pandas as pd
@@ -147,9 +147,9 @@ class BacktestConfig:
     latency_rows: int = 1  # rows mode: decision t executes t+latency
     bar_ns: int = BAR_NS
     #: TIME-mode latency (ns); overrides latency_rows when set (pinned)
-    latency_ns: Optional[int] = None
+    latency_ns: int | None = None
     #: drop a target whose execution row is older than this (ns)
-    max_decision_age_ns: Optional[int] = None
+    max_decision_age_ns: int | None = None
     #: force flat before any row gap larger than session_gap_ns
     flatten_at_session_end: bool = False
     #: row gap that marks a session boundary (pinned default: 30 minutes)
@@ -157,14 +157,14 @@ class BacktestConfig:
     #: "sign" (pinned default) or "cost_aware" (module docs, position rule)
     position_policy: str = "sign"
     #: label horizon the expected return is over; required by "cost_aware"
-    horizon_ns: Optional[int] = None
+    horizon_ns: int | None = None
     #: fraction of the entry threshold a same-direction signal must clear to
     #: renew an expired hold ("cost_aware" only)
     hysteresis: float = 0.5
     #: cap each fill at the displayed L1 size on the side it takes
     cap_fills_at_l1: bool = False
     #: boolean frame column; rows where it is False make no decision
-    block_rows_column: Optional[str] = None
+    block_rows_column: str | None = None
 
     def __post_init__(self) -> None:
         if self.position_policy not in POSITION_POLICIES:
@@ -211,7 +211,7 @@ class InstrumentResult:
 
 @dataclass
 class BacktestResult:
-    per_instrument: Dict[int, InstrumentResult]
+    per_instrument: dict[int, InstrumentResult]
     asset_class: str
 
     @property
@@ -220,9 +220,9 @@ class BacktestResult:
         return float(sum(r.total_pnl for r in self.per_instrument.values()))
 
     @property
-    def total_pnl_native_by_ccy(self) -> Dict[str, float]:
+    def total_pnl_native_by_ccy(self) -> dict[str, float]:
         """Unconverted P&L per quote currency (never summed across)."""
-        out: Dict[str, float] = {}
+        out: dict[str, float] = {}
         for r in self.per_instrument.values():
             out[r.quote_currency] = out.get(r.quote_currency, 0.0) + r.total_pnl_native
         return out
@@ -249,13 +249,13 @@ class BacktestResult:
         annualized Sharpe.  A gap longer than ``SESSION_GAP_NS`` is treated
         as a session boundary and is NOT filled (no overnight zero bars).
         """
-        bars: Dict[int, float] = {}
+        bars: dict[int, float] = {}
         for r in self.per_instrument.values():
             for t, p in zip(r.bar_ts, r.bar_pnl):
                 bars[int(t)] = bars.get(int(t), 0.0) + float(p)
         present = np.array(sorted(bars), dtype=np.int64)
         if present.size:
-            filled: List[int] = []
+            filled: list[int] = []
             for i, b in enumerate(present):
                 filled.append(int(b))
                 if i + 1 < present.size:
@@ -341,7 +341,7 @@ def _block_decisions(
     target: np.ndarray,
     allowed: np.ndarray,
     ts: np.ndarray,
-    cfg: "BacktestConfig",
+    cfg: BacktestConfig,
 ) -> np.ndarray:
     """``exec_target`` rebuilt with the decisions of blocked rows removed
     (same latency / decision-age mapping as the engine's own)."""
@@ -421,7 +421,7 @@ class Backtester:
         self,
         cost_model: CostModel,
         instrument_meta: Mapping[int, dict],
-        config: Optional[BacktestConfig] = None,
+        config: BacktestConfig | None = None,
         reporting_ccy: str = "USD",
     ) -> None:
         """``instrument_meta[iid]``: dict with tick_size, lot_size, adv,
@@ -434,7 +434,7 @@ class Backtester:
         self.meta = dict(instrument_meta)
         self.config = config or BacktestConfig()
         self.reporting_ccy = reporting_ccy
-        self.fx_conversion: Dict[str, tuple] = {}
+        self.fx_conversion: dict[str, tuple] = {}
         for pid, m in sorted(self.meta.items()):
             base = m.get("base_currency")
             quote = m.get("quote_currency")
@@ -493,7 +493,7 @@ class Backtester:
         iid: int,
         frame: pd.DataFrame,
         scores: pd.DataFrame,
-        rate: Optional[np.ndarray] = None,
+        rate: np.ndarray | None = None,
     ) -> InstrumentResult:
         """Run one instrument. ``rate`` is the per-row quote->reporting
         conversion (None = identity, i.e. the instrument is quoted in the
@@ -602,7 +602,7 @@ class Backtester:
         trade_rows = trades != 0.0
 
         costs = np.zeros(n)
-        comp: Dict[str, np.ndarray] = {}
+        comp: dict[str, np.ndarray] = {}
         if trade_rows.any():
             comp = self.cost_model.cost_components(
                 trades[trade_rows],
@@ -685,7 +685,7 @@ class Backtester:
         scores: Mapping[int, pd.DataFrame],
         asset_class: str,
     ) -> BacktestResult:
-        per: Dict[int, InstrumentResult] = {}
+        per: dict[int, InstrumentResult] = {}
         for iid in sorted(scores):
             if iid not in frames:
                 raise ValueError(f"scores for unknown instrument {iid}")
@@ -702,8 +702,8 @@ class Backtester:
 def ensemble_scores(
     all_scores: Mapping[str, Mapping[int, pd.DataFrame]],
     betas: Mapping[str, float],
-    eligible: Optional[Mapping[str, bool]] = None,
-) -> Dict[int, pd.DataFrame]:
+    eligible: Mapping[str, bool] | None = None,
+) -> dict[int, pd.DataFrame]:
     """Equal-weight ensemble across alphas (per asset class).
 
     Each alpha contributes its z-score (expected_return / beta when beta is
@@ -730,7 +730,7 @@ def ensemble_scores(
         raise ValueError("no eligible alphas with nonzero beta to ensemble")
     iids = sorted(set.intersection(*(set(all_scores[a]) for a in members)))
     mean_abs_beta = float(np.mean([abs(betas[a]) for a in members]))
-    out: Dict[int, pd.DataFrame] = {}
+    out: dict[int, pd.DataFrame] = {}
     for iid in iids:
         zsum = None
         csum = None

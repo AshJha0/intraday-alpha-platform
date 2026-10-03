@@ -16,18 +16,22 @@ Modules:
 The opt-in corrected methods are indexed in docs/RESEARCH_VALIDITY.md.
 """
 
+from iap.validation.diagnostics import (  # noqa: F401
+    fold_diagnostics,
+    stationary_bootstrap_ci,
+)
 from iap.validation.leakage import LeakageResult, LeakageTester  # noqa: F401
 from iap.validation.ledger import ExperimentLedger  # noqa: F401
 from iap.validation.metrics import (  # noqa: F401
     HORIZON_ORDER,
     HORIZONS_NS,
     bucket_ics,
+    capacity_breakeven,
     capacity_proxy_usd,
     decay_curve,
+    hac_mean_variance,
     hit_rate,
     ic,
-    capacity_breakeven,
-    hac_mean_variance,
     ic_with_blackout_reopen,
     instrument_ics,
     newey_west_tstat,
@@ -50,9 +54,5 @@ from iap.validation.stress import (  # noqa: F401
     latency_stress,
     latency_stress_time,
     regime_split,
-)
-from iap.validation.diagnostics import (  # noqa: F401
-    fold_diagnostics,
-    stationary_bootstrap_ci,
 )
 from iap.validation.validate import GATES, validate_alpha  # noqa: F401

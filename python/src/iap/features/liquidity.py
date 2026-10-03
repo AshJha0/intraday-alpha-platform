@@ -31,7 +31,6 @@ undefined, not "3e13 seconds").
 from __future__ import annotations
 
 from math import log
-from typing import List
 
 from iap.features._famutil import put
 from iap.features.spec import EPS, WINDOW_NS, FeatureSpec, mkspec
@@ -42,9 +41,9 @@ WINDOWS = ("10s", "1m")
 LN2 = log(2.0)
 
 
-def specs() -> List[FeatureSpec]:
+def specs() -> list[FeatureSpec]:
     """Registry entries for the liquidity family (pinned order)."""
-    out: List[FeatureSpec] = []
+    out: list[FeatureSpec] = []
     out.append(
         mkspec(
             "quoted_depth_total_v1",
@@ -116,7 +115,7 @@ def specs() -> List[FeatureSpec]:
     return out
 
 
-def compute(st, values: List[float], valid: List[bool]) -> None:
+def compute(st, values: list[float], valid: list[bool]) -> None:
     """Append the 13 liquidity values for the current emission."""
     ok = st.book_ok
     qd = (st.db10 + st.da10) if ok else None

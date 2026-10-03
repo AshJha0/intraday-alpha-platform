@@ -76,7 +76,7 @@ within-bucket t discards between-bucket signal.
 
 from __future__ import annotations
 
-from typing import Dict, List, Mapping, Optional
+from collections.abc import Mapping
 
 import numpy as np
 import pandas as pd
@@ -126,7 +126,7 @@ TSTAT_THRESHOLD_POLICIES = ("fixed", "ledger")
 
 
 def effective_gates(
-    tstat_threshold: str = "fixed", ledger_t_threshold: Optional[float] = None
+    tstat_threshold: str = "fixed", ledger_t_threshold: float | None = None
 ) -> dict:
     """The gate thresholds under a t-stat policy.
 
@@ -189,7 +189,7 @@ def _pooled_instrument_ids(scores, frames) -> np.ndarray:
     return np.concatenate(ids) if ids else np.empty(0, np.int64)
 
 
-def _fnum(v: float) -> Optional[float]:
+def _fnum(v: float) -> float | None:
     return float(v) if np.isfinite(v) else None
 
 
@@ -202,7 +202,7 @@ def validate_alpha(
     n_folds: int = 4,
     embargo_ns: int = 60_000_000_000,
     tstat_threshold: str = "fixed",
-    ledger_t_threshold: Optional[float] = None,
+    ledger_t_threshold: float | None = None,
     stress_version: int = STRESS_VERSION_LEGACY,
 ) -> dict:
     """Full validation of one alpha.  ``model_factory()`` returns a fresh
@@ -219,13 +219,13 @@ def validate_alpha(
     uframes = {i: frames[i] for i in universe}
     splitter = WalkForwardSplitter(n_folds=n_folds, embargo_ns=embargo_ns)
 
-    fold_rows: List[dict] = []
-    pooled_ts: List[np.ndarray] = []
-    pooled_x: List[np.ndarray] = []  # standardized signal (z), gate input
-    pooled_er: List[np.ndarray] = []  # expected_return (diagnostic)
-    pooled_y: List[np.ndarray] = []
-    pooled_c: List[np.ndarray] = []
-    pooled_i: List[np.ndarray] = []
+    fold_rows: list[dict] = []
+    pooled_ts: list[np.ndarray] = []
+    pooled_x: list[np.ndarray] = []  # standardized signal (z), gate input
+    pooled_er: list[np.ndarray] = []  # expected_return (diagnostic)
+    pooled_y: list[np.ndarray] = []
+    pooled_c: list[np.ndarray] = []
+    pooled_i: list[np.ndarray] = []
     last_model = None
     last_test = None
     for fold, train, test in splitter.split_frames(uframes, horizon_ns):
@@ -316,7 +316,7 @@ def validate_alpha(
     leak = LeakageTester().run(last_model, last_test).to_dict()
     scores_last = last_model.score(last_test)
     beta_last = float(last_model.params().get("beta", 0.0) or 0.0)
-    decay: Dict[str, Optional[float]] = {}
+    decay: dict[str, float | None] = {}
     turnover_vals = []
     turnover_active_hours = 0.0
     turnover_span_hours = 0.0
@@ -406,7 +406,7 @@ def validate_alpha(
     )
     verdict = "PROMOTE" if promote else ("ITERATE" if iterate else "REJECT")
 
-    extras: Dict[str, object] = {}
+    extras: dict[str, object] = {}
     if tstat_threshold != "fixed":
         extras["tstat_threshold_policy"] = tstat_threshold
         extras["ledger_t_threshold"] = float(ledger_t_threshold)

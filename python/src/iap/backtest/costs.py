@@ -41,7 +41,6 @@ from pathlib import Path
 
 import numpy as np
 
-
 #: Pinned impact models (module docs).
 IMPACT_MODELS = ("linear", "sqrt")
 
@@ -64,7 +63,7 @@ class CostModel:
             raise ValueError("sqrt_impact_coeff_bps must be >= 0")
 
     @classmethod
-    def load(cls, execution_config_path, multiplier: float = 1.0) -> "CostModel":
+    def load(cls, execution_config_path, multiplier: float = 1.0) -> CostModel:
         blob = json.loads(Path(execution_config_path).read_text())
         cm = blob.get("cost_model")
         if cm is None:
@@ -78,10 +77,10 @@ class CostModel:
             sqrt_impact_coeff_bps=float(cm.get("sqrt_impact_coeff_bps", 0.0)),
         )
 
-    def with_multiplier(self, multiplier: float) -> "CostModel":
+    def with_multiplier(self, multiplier: float) -> CostModel:
         return replace(self, multiplier=multiplier)
 
-    def with_sqrt_impact(self, coeff_bps: float) -> "CostModel":
+    def with_sqrt_impact(self, coeff_bps: float) -> CostModel:
         """This model with square-root impact of ``coeff_bps`` at one ADV."""
         return replace(self, impact_model="sqrt", sqrt_impact_coeff_bps=float(coeff_bps))
 

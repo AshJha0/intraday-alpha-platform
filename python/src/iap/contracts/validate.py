@@ -10,9 +10,10 @@ JSON path, so the message for a given bad document is deterministic.
 from __future__ import annotations
 
 import json
-from functools import lru_cache
+from collections.abc import Mapping
+from functools import cache
 from pathlib import Path
-from typing import Any, Dict, Mapping, Tuple
+from typing import Any
 
 from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
@@ -33,23 +34,23 @@ __all__ = [
 class ContractValidationError(ValueError):
     """A document does not validate against its schema."""
 
-    def __init__(self, schema_relpath: str, errors: Tuple[str, ...]) -> None:
+    def __init__(self, schema_relpath: str, errors: tuple[str, ...]) -> None:
         self.schema_relpath = schema_relpath
         self.errors = errors
         joined = "; ".join(errors)
         super().__init__(f"{schema_relpath}: {joined}")
 
 
-def _read_schema(path: Path) -> Dict[str, Any]:
-    with open(path, "r", encoding="utf-8") as fh:
+def _read_schema(path: Path) -> dict[str, Any]:
+    with open(path, encoding="utf-8") as fh:
         doc = json.load(fh)
     if not isinstance(doc, dict) or "$id" not in doc:
         raise RuntimeError(f"{path}: schema without $id")
     return doc
 
 
-@lru_cache(maxsize=None)
-def _load_all(root: str) -> Tuple[Tuple[str, Dict[str, Any]], ...]:
+@cache
+def _load_all(root: str) -> tuple[tuple[str, dict[str, Any]], ...]:
     """Every schema under ``root`` as ``(relpath, document)``, sorted."""
     base = Path(root)
     out = []
@@ -65,7 +66,7 @@ def _load_all(root: str) -> Tuple[Tuple[str, Dict[str, Any]], ...]:
     return tuple(out)
 
 
-@lru_cache(maxsize=None)
+@cache
 def _registry(root: str) -> Registry:
     resources = [
         (doc["$id"], Resource(contents=doc, specification=DRAFT202012))
@@ -79,7 +80,7 @@ def schema_registry() -> Registry:
     return _registry(str(schema_dir()))
 
 
-def load_schema(schema_relpath: str) -> Dict[str, Any]:
+def load_schema(schema_relpath: str) -> dict[str, Any]:
     """The parsed schema at ``schema_relpath`` (relative to ``schemas/``)."""
     for rel, doc in _load_all(str(schema_dir())):
         if rel == schema_relpath:
@@ -87,7 +88,7 @@ def load_schema(schema_relpath: str) -> Dict[str, Any]:
     raise KeyError(f"unknown schema {schema_relpath!r}")
 
 
-@lru_cache(maxsize=None)
+@cache
 def _validator(root: str, schema_relpath: str, fragment: str) -> Draft202012Validator:
     doc = load_schema(schema_relpath)
     Draft202012Validator.check_schema(doc)
@@ -96,7 +97,7 @@ def _validator(root: str, schema_relpath: str, fragment: str) -> Draft202012Vali
     return Draft202012Validator(doc, registry=_registry(root))
 
 
-def _split(schema_ref: str) -> Tuple[str, str]:
+def _split(schema_ref: str) -> tuple[str, str]:
     rel, _, fragment = schema_ref.partition("#")
     return rel, fragment
 
@@ -120,7 +121,7 @@ def validate(obj_dict: Mapping[str, Any], schema_relpath: str) -> None:
         )
 
 
-def validate_typed(instance: Contract) -> Dict[str, Any]:
+def validate_typed(instance: Contract) -> dict[str, Any]:
     """``to_dict`` the instance, validate it against ``instance.SCHEMA`` and
     return the dict.  Also asserts the type's ``x_version`` equals the
     schema file's ``x-version`` (a stale type is a contract bug)."""

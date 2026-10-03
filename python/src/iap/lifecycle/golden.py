@@ -23,8 +23,9 @@ Event times are ``T0 + k * STEP_NS`` (15-minute adaptive blocks).
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Dict, List, Mapping, Optional, Tuple
+from typing import Any
 
 from iap.contracts.types import Actor, ExperimentResult, LifecycleState, Verdict
 from iap.lifecycle.config import PolicyConfig
@@ -66,8 +67,8 @@ class ScriptStep:
     ``retire`` / ``reset`` with a reason."""
 
     action: str
-    evidence: Optional[Evidence]
-    reason: Optional[str]
+    evidence: Evidence | None
+    reason: str | None
     note: str
 
     def __post_init__(self) -> None:
@@ -88,7 +89,7 @@ def research(
     fold_consistency: float = 1.0,
     n_folds: int = 4,
     leakage_passed: bool = True,
-    hypothesis: Optional[bool] = True,
+    hypothesis: bool | None = True,
     net_bps: float = 5.0,
     cost_bps: float = 7.0,
     n_ledger: int = 10,
@@ -125,11 +126,11 @@ def research(
 
 
 def _ev(
-    research_result: Optional[ExperimentResult] = None,
-    capacity: Optional[float] = None,
-    validation: Optional[ValidationEvidence] = None,
-    paper: Optional[PaperEvidence] = None,
-    live: Optional[LiveEvidence] = None,
+    research_result: ExperimentResult | None = None,
+    capacity: float | None = None,
+    validation: ValidationEvidence | None = None,
+    paper: PaperEvidence | None = None,
+    live: LiveEvidence | None = None,
 ) -> Evidence:
     return Evidence(
         research=research_result,
@@ -141,7 +142,7 @@ def _ev(
 
 
 def _live(
-    rolling_ic: Optional[float], eval_index: int, informative: bool = True, n_buckets: int = 8
+    rolling_ic: float | None, eval_index: int, informative: bool = True, n_buckets: int = 8
 ) -> LiveEvidence:
     return LiveEvidence(
         rolling_ic=rolling_ic, n_buckets=n_buckets, eval_index=eval_index, informative=informative
@@ -152,7 +153,7 @@ def _adv(evidence: Evidence, note: str) -> ScriptStep:
     return ScriptStep("advance", evidence, None, note)
 
 
-def _lc01() -> Tuple[ScriptStep, ...]:
+def _lc01() -> tuple[ScriptStep, ...]:
     good = research("LC01")
     validation_ok = ValidationEvidence(
         holdout_ic=0.018, research_ic=0.02, replay_hash_match=True, parity=True
@@ -165,7 +166,7 @@ def _lc01() -> Tuple[ScriptStep, ...]:
         n_kill_events=0,
         tracking_error=0.001,
     )
-    steps: List[ScriptStep] = [
+    steps: list[ScriptStep] = [
         _adv(_ev(good), "research result present and clean -> CANDIDATE"),
         _adv(_ev(good, capacity=5_000_000.0), "all nine promotion gates pass -> VALIDATING"),
         _adv(
@@ -202,7 +203,7 @@ def _lc01() -> Tuple[ScriptStep, ...]:
     return tuple(steps)
 
 
-def _lc02() -> Tuple[ScriptStep, ...]:
+def _lc02() -> tuple[ScriptStep, ...]:
     clean = research("LC02", ic=0.015, rank_ic=0.02, t_stat=3.5, verdict=Verdict.PROMOTE)
     leaking = research(
         "LC02", ic=0.15, rank_ic=0.2, t_stat=30.0, leakage_passed=False, verdict=Verdict.REJECT
@@ -218,7 +219,7 @@ def _lc02() -> Tuple[ScriptStep, ...]:
     )
 
 
-def _lc03() -> Tuple[ScriptStep, ...]:
+def _lc03() -> tuple[ScriptStep, ...]:
     good = research("LC03", ic=0.03, rank_ic=0.04, t_stat=5.0, net_bps=8.0, cost_bps=4.0)
     validation_bad = ValidationEvidence(
         holdout_ic=0.028, research_ic=0.03, replay_hash_match=True, parity=False
@@ -253,21 +254,21 @@ def _lc03() -> Tuple[ScriptStep, ...]:
     )
 
 
-def scripts() -> Dict[str, Tuple[ScriptStep, ...]]:
+def scripts() -> dict[str, tuple[ScriptStep, ...]]:
     """The three scenario scripts, keyed by alpha id (sorted)."""
     return {"LC01": _lc01(), "LC02": _lc02(), "LC03": _lc03()}
 
 
 def _run_script(
-    alpha_id: str, steps: Tuple[ScriptStep, ...], config: PolicyConfig
-) -> List[Dict[str, Any]]:
+    alpha_id: str, steps: tuple[ScriptStep, ...], config: PolicyConfig
+) -> list[dict[str, Any]]:
     registry = AlphaRegistry(config.policy)
     machine = AlphaLifecycle(config, registry)
     machine.register(alpha_id, T0)
-    out: List[Dict[str, Any]] = []
+    out: list[dict[str, Any]] = []
     for k, step in enumerate(steps):
         event_ts = T0 + (k + 1) * STEP_NS
-        row: Dict[str, Any] = {
+        row: dict[str, Any] = {
             "step": k,
             "note": step.note,
             "action": step.action,
@@ -309,12 +310,12 @@ def _run_script(
     return out
 
 
-def run_scripts(config: PolicyConfig) -> Dict[str, List[Dict[str, Any]]]:
+def run_scripts(config: PolicyConfig) -> dict[str, list[dict[str, Any]]]:
     """Run every script through a fresh machine; ``{alpha_id: steps}``."""
     return {aid: _run_script(aid, steps, config) for aid, steps in sorted(scripts().items())}
 
 
-def golden_document(config: PolicyConfig) -> Dict[str, Any]:
+def golden_document(config: PolicyConfig) -> dict[str, Any]:
     """The golden document (JSON-ready, key order pinned)."""
     return {
         "x-version": GOLDEN_X_VERSION,

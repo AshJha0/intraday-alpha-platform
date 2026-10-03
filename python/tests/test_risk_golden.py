@@ -18,10 +18,9 @@ from __future__ import annotations
 import copy
 import json
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 import pytest
-
 from iap.risk import (
     Decision,
     Fill,
@@ -57,7 +56,7 @@ def is_notification(rule_id: str, decision: int) -> bool:
 
 
 @pytest.fixture(scope="module")
-def golden(golden_dir: Path) -> Dict[str, Any]:
+def golden(golden_dir: Path) -> dict[str, Any]:
     with open(golden_dir / "expected_risk_decisions.json") as f:
         return json.load(f)
 
@@ -68,12 +67,12 @@ def repo_root(golden_dir: Path) -> Path:
 
 
 @pytest.fixture(scope="module")
-def config(golden: Dict[str, Any], repo_root: Path) -> Dict[str, Any]:
+def config(golden: dict[str, Any], repo_root: Path) -> dict[str, Any]:
     with open(repo_root / golden["config"]) as f:
         return json.load(f)
 
 
-def parse_order(v: Dict[str, Any]) -> OrderRequest:
+def parse_order(v: dict[str, Any]) -> OrderRequest:
     return OrderRequest(
         order_id=v["order_id"],
         instrument_id=v["instrument_id"],
@@ -88,12 +87,12 @@ def parse_order(v: Dict[str, Any]) -> OrderRequest:
     )
 
 
-def build(golden: Dict[str, Any], config: Dict[str, Any]) -> RiskEngine:
+def build(golden: dict[str, Any], config: dict[str, Any]) -> RiskEngine:
     """Build the engine exactly as the reference harness does."""
     return RiskEngine.from_config(config, instrument_refs_from_golden(golden["instruments"]))
 
 
-def apply(eng: RiskEngine, i: int, step: Dict[str, Any], check: bool) -> None:
+def apply(eng: RiskEngine, i: int, step: dict[str, Any], check: bool) -> None:
     """Apply one step (order steps are checked when ``check``)."""
     kind = step["type"]
     ts = step.get("ts")
@@ -151,7 +150,7 @@ def apply(eng: RiskEngine, i: int, step: Dict[str, Any], check: bool) -> None:
         raise AssertionError(f"unknown step type {kind}")
 
 
-def replay(golden: Dict[str, Any], config: Dict[str, Any], check: bool) -> str:
+def replay(golden: dict[str, Any], config: dict[str, Any], check: bool) -> str:
     """Run the golden script once; returns the audit JSONL."""
     eng = build(golden, config)
     for i, step in enumerate(golden["steps"]):
@@ -159,7 +158,7 @@ def replay(golden: Dict[str, Any], config: Dict[str, Any], check: bool) -> str:
     return eng.audit_jsonl()
 
 
-def _n_orders(golden: Dict[str, Any]) -> int:
+def _n_orders(golden: dict[str, Any]) -> int:
     return sum(1 for s in golden["steps"] if s["type"] == "order")
 
 
@@ -220,7 +219,7 @@ def test_golden_snapshot_matches_byte_for_byte(golden, config, golden_dir):
 
 
 def test_golden_snapshot_restore_reproduces_the_audit_tail(golden, config, golden_dir):
-    steps: List[Dict[str, Any]] = golden["steps"]
+    steps: list[dict[str, Any]] = golden["steps"]
     k = golden["snapshot_after_step"]
     # 1. the engine's own snapshot after step k equals the golden snapshot
     eng = build(golden, config)
@@ -250,7 +249,7 @@ def test_golden_snapshot_restore_reproduces_the_audit_tail(golden, config, golde
 def test_golden_restore_from_every_step_is_bit_identical(golden, config):
     """Restoring the snapshot taken after ANY step and replaying the rest
     reproduces the unbroken run's decisions, audit tail and final state."""
-    steps: List[Dict[str, Any]] = golden["steps"]
+    steps: list[dict[str, Any]] = golden["steps"]
     refs = instrument_refs_from_golden(golden["instruments"])
     limits = RiskLimits.from_json(config)
     unbroken = build(golden, config)
@@ -281,7 +280,7 @@ def test_golden_fixed_format_cases(golden):
 # the branches the single-engine script above cannot.
 
 
-def _parse_fill(v: Dict[str, Any]) -> Fill:
+def _parse_fill(v: dict[str, Any]) -> Fill:
     return Fill(
         ts=v["ts"],
         strategy_id=v["strategy_id"],
@@ -302,13 +301,13 @@ def _must_fail(call, *args) -> None:
 
 
 def replay_edge(
-    golden: Dict[str, Any], config: Dict[str, Any], check: bool, fill_expect: bool = False
+    golden: dict[str, Any], config: dict[str, Any], check: bool, fill_expect: bool = False
 ) -> str:
     """Run every scenario of the edge fixture; returns the concatenated
     audit JSONL. ``fill_expect`` (the generator) writes each order step's
     ``expect`` instead of checking it."""
     refs = instrument_refs_from_golden(golden["instruments"])
-    out: List[str] = []
+    out: list[str] = []
     for sc in golden["scenarios"]:
         doc = copy.deepcopy(config)
         if "config_remove" in sc:
@@ -356,7 +355,7 @@ def replay_edge(
 
 
 @pytest.fixture(scope="module")
-def edge(golden_dir: Path) -> Dict[str, Any]:
+def edge(golden_dir: Path) -> dict[str, Any]:
     with open(golden_dir / "expected_risk_edge_decisions.json") as f:
         return json.load(f)
 

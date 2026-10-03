@@ -19,7 +19,7 @@ import math
 
 import numpy as np
 import pytest
-
+from conftest import CONFIGS_DIR, GOLDEN_DIR, REPO_ROOT
 from iap.alpha import load_params_file
 from iap.alpha.data import (
     asof_to_grid,
@@ -30,9 +30,7 @@ from iap.alpha.data import (
 )
 from iap.alpha.fx_exposure import FX05CrossPairRelativeValue, free_exposure_matrix
 from iap.alpha.goldenframes import build_golden_frame
-from iap.backtest import Backtester, BacktestConfig, CostModel
-
-from conftest import CONFIGS_DIR, GOLDEN_DIR, REPO_ROOT
+from iap.backtest import BacktestConfig, Backtester, CostModel
 
 EPS = 1e-12
 TOL = 1e-9

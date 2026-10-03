@@ -7,7 +7,6 @@ import shutil
 
 import pyarrow.parquet as pq
 import pytest
-
 from conftest import GOLDEN_DIR, REPO_ROOT
 from iap.features import __main__ as pipeline
 from iap.features.registry import feature_names, registry_hash

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import re
 
-
 from conftest import REPO_ROOT
 from iap.features.registry import (
     build_registry,

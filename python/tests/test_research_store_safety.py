@@ -10,11 +10,10 @@ import subprocess
 import sys
 import threading
 from pathlib import Path
-from typing import Dict
 
 import pandas as pd
 import pytest
-
+from conftest import CONFIGS_DIR, REPO_ROOT
 from iap.contracts.types import Period
 from iap.experiment.locking import FileLock, LockTimeout, atomic_write_text
 from iap.experiment.tracker import ExperimentTracker
@@ -22,8 +21,8 @@ from iap.lifecycle.config import load_policy_config
 from iap.lifecycle.evidence import Evidence
 from iap.lifecycle.gates import GATE_SPECS, build_gates
 from iap.research import (
-    GATE_ELIGIBILITY_BOUNDS,
     DEFAULT_CONFIGURATION,
+    GATE_ELIGIBILITY_BOUNDS,
     ExperimentRegistry,
     ExperimentRunner,
     GateEligibility,
@@ -38,8 +37,6 @@ from iap.research.runner import ELIGIBILITY_FILE, STAGING_PREFIX, render_documen
 from iap.store.__main__ import main as store_main
 from iap.store.db import Store
 from iap.validation.ledger import ExperimentLedger
-
-from conftest import CONFIGS_DIR, REPO_ROOT
 from test_research_runner import (
     DATA_VERSION,
     FEATURE_VERSION,
@@ -54,9 +51,9 @@ SRC_DIR = REPO_ROOT / "python" / "src"
 
 
 @pytest.fixture(scope="module")
-def frames() -> Dict[int, pd.DataFrame]:
-    from iap.research.golden import golden_frames
+def frames() -> dict[int, pd.DataFrame]:
     from conftest import GOLDEN_DIR
+    from iap.research.golden import golden_frames
 
     return golden_frames(GOLDEN_DIR, CONFIGS_DIR)
 

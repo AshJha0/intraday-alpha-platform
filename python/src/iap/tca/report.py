@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from iap.tca.simulator import SIM_SEED, bundled_order_set
 from iap.tca.tca import impact_regression, order_tca
@@ -26,19 +26,19 @@ def _fmt(x: Any, nd: int = 3) -> str:
     return str(x)
 
 
-def _mean(vals: List[Optional[float]]) -> Optional[float]:
+def _mean(vals: list[float | None]) -> float | None:
     v = [x for x in vals if x is not None]
     return sum(v) / len(v) if v else None
 
 
-def compute_tca_records(golden_dir: Optional[Path] = None) -> Dict[int, dict]:
+def compute_tca_records(golden_dir: Path | None = None) -> dict[int, dict]:
     """Run the bundled simulation and full TCA; {instrument_id: payload}."""
-    out: Dict[int, dict] = {}
+    out: dict[int, dict] = {}
     for iid, (tl, orders, tick) in bundled_order_set(golden_dir).items():
         recs = [order_tca(o, tl) for o in orders]
         # impact regression across ALL child fills of the instrument
-        part: List[float] = []
-        cost_bps: List[float] = []
+        part: list[float] = []
+        cost_bps: list[float] = []
         for o in orders:
             s = o.sign
             for f in o.fills:
@@ -56,9 +56,9 @@ def compute_tca_records(golden_dir: Optional[Path] = None) -> Dict[int, dict]:
     return out
 
 
-def render_report(records: Dict[int, dict]) -> str:
+def render_report(records: dict[int, dict]) -> str:
     """Render the TCA markdown report."""
-    lines: List[str] = []
+    lines: list[str] = []
     lines.append("# TCA Report — Simulated Parent-Order Set (research)")
     lines.append("")
     lines.append(
@@ -191,7 +191,7 @@ def render_report(records: Dict[int, dict]) -> str:
     return "\n".join(lines)
 
 
-def generate_report(out_dir: Optional[Path] = None, golden_dir: Optional[Path] = None) -> Path:
+def generate_report(out_dir: Path | None = None, golden_dir: Path | None = None) -> Path:
     """Write TCA_REPORT.md (+ tca_orders.json); returns the report path."""
     odir = Path(out_dir) if out_dir is not None else _REPO / "research" / "tca"
     odir.mkdir(parents=True, exist_ok=True)

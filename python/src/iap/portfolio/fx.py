@@ -10,14 +10,14 @@ Currency ordering is pinned: sorted alphabetically.
 
 from __future__ import annotations
 
-from typing import List, Sequence, Tuple
+from collections.abc import Sequence
 
 import numpy as np
 
 
 def currency_exposure_matrix(
     pair_symbols: Sequence[str],
-) -> Tuple[List[str], np.ndarray]:
+) -> tuple[list[str], np.ndarray]:
     """Build (currencies, E) for pair symbols like ``"EUR/USD"``.
 
     Returns the sorted currency list and the (n_currencies, n_pairs) matrix

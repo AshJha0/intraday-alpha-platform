@@ -16,8 +16,9 @@ loop emits in ``(event_ts, sequence)`` order and the sinks preserve it.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
-from typing import IO, List, Optional, Sequence, Tuple, Union
+from typing import IO
 
 from iap.contracts.protocols import TraceSink
 from iap.contracts.types import DecisionTrace
@@ -33,11 +34,11 @@ class MemoryTraceSink:
     """Keeps every emitted trace, in order, plus a running digest."""
 
     def __init__(self) -> None:
-        self._traces: List[DecisionTrace] = []
+        self._traces: list[DecisionTrace] = []
         self.digest = TraceDigest()
 
     @property
-    def traces(self) -> Tuple[DecisionTrace, ...]:
+    def traces(self) -> tuple[DecisionTrace, ...]:
         return tuple(self._traces)
 
     def emit(self, trace: DecisionTrace) -> None:
@@ -57,9 +58,9 @@ class JsonlTraceSink:
     resume path).  Use as a context manager or call :meth:`close`.
     """
 
-    def __init__(self, path: Union[str, Path], append: bool = False) -> None:
+    def __init__(self, path: str | Path, append: bool = False) -> None:
         self.path = Path(path)
-        self._fh: Optional[IO[str]] = open(
+        self._fh: IO[str] | None = open(
             self.path, "a" if append else "w", encoding="ascii", newline="\n"
         )
         self.digest = TraceDigest()
@@ -79,7 +80,7 @@ class JsonlTraceSink:
             self._fh.close()
             self._fh = None
 
-    def __enter__(self) -> "JsonlTraceSink":
+    def __enter__(self) -> JsonlTraceSink:
         return self
 
     def __exit__(self, *exc: object) -> None:
@@ -108,7 +109,7 @@ class MultiSink:
         for sink in sinks:
             if not isinstance(sink, TraceSink):
                 raise TypeError(f"MultiSink: {type(sink).__name__} has no emit()")
-        self._sinks: Tuple[TraceSink, ...] = tuple(sinks)
+        self._sinks: tuple[TraceSink, ...] = tuple(sinks)
 
     @property
     def sinks(self) -> Sequence[TraceSink]:
@@ -125,7 +126,7 @@ class MultiSink:
             if callable(close):
                 close()
 
-    def __enter__(self) -> "MultiSink":
+    def __enter__(self) -> MultiSink:
         return self
 
     def __exit__(self, *exc: object) -> None:

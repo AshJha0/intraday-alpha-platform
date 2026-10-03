@@ -20,9 +20,10 @@ Every validation failure is a ``ValueError`` naming the file and the key.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Mapping, Union
+from typing import Union
 
 from iap.execution.types import InstrumentSpec, LatencyConfig, VenueSpec
 
@@ -99,13 +100,13 @@ def _integer(row: dict, key: str, where: str) -> int:
     return v
 
 
-def load_venues(path: PathLike) -> Dict[int, VenueSpec]:
+def load_venues(path: PathLike) -> dict[int, VenueSpec]:
     """Load every venue from ``configs/venues/venues.json`` keyed by venue_id."""
     root = _read_json(path)
     rows = root.get("venues")
     if not isinstance(rows, list):
         raise ValueError(f"{path}: missing 'venues' array")
-    out: Dict[int, VenueSpec] = {}
+    out: dict[int, VenueSpec] = {}
     for row in rows:
         if not isinstance(row, dict):
             raise ValueError(f"{path}: venue entry must be an object")
@@ -145,13 +146,13 @@ def load_venues(path: PathLike) -> Dict[int, VenueSpec]:
     return dict(sorted(out.items()))
 
 
-def load_instruments(path: PathLike) -> Dict[int, InstrumentSpec]:
+def load_instruments(path: PathLike) -> dict[int, InstrumentSpec]:
     """Load instrument reference data from ``configs/instruments/instruments.json``."""
     root = _read_json(path)
     rows = root.get("instruments")
     if not isinstance(rows, list):
         raise ValueError(f"{path}: missing 'instruments' array")
-    out: Dict[int, InstrumentSpec] = {}
+    out: dict[int, InstrumentSpec] = {}
     for row in rows:
         if not isinstance(row, dict):
             raise ValueError(f"{path}: instrument entry must be an object")

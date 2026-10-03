@@ -22,7 +22,6 @@ depth == 0) — an unobserved denominator is undefined, never 1e12-scaled.
 from __future__ import annotations
 
 from math import sqrt
-from typing import List
 
 from iap.features._famutil import put
 from iap.features.spec import EPS, WINDOW_NS, FeatureSpec, mkspec
@@ -32,9 +31,9 @@ FAMILY = "regime"
 WINDOWS = ("10s", "1m", "5m")
 
 
-def specs() -> List[FeatureSpec]:
+def specs() -> list[FeatureSpec]:
     """Registry entries for the regime family (pinned order)."""
-    out: List[FeatureSpec] = []
+    out: list[FeatureSpec] = []
     for w in WINDOWS:
         out.append(
             mkspec(
@@ -89,7 +88,7 @@ def specs() -> List[FeatureSpec]:
     return out
 
 
-def compute(st, values: List[float], valid: List[bool]) -> None:
+def compute(st, values: list[float], valid: list[bool]) -> None:
     """Append the 10 regime values for the current emission."""
     t = st.t
     for w in WINDOWS:

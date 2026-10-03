@@ -43,7 +43,6 @@ import sys
 import time
 from array import array
 from pathlib import Path
-from typing import Dict, List
 
 import numpy as np
 import pyarrow as pa
@@ -71,7 +70,7 @@ class _InstrumentBuffer:
     __slots__ = ("ts", "values", "bits", "series", "last_event_ts", "last_refresh_seq")
 
     def __init__(self) -> None:
-        self.ts: List[int] = []
+        self.ts: list[int] = []
         self.values = array("d")
         self.bits = bytearray()
         self.series = MidSeries()
@@ -86,14 +85,14 @@ def _load_events(path: Path):
 
 
 def _flush_file(
-    writers: Dict[int, pq.ParquetWriter],
+    writers: dict[int, pq.ParquetWriter],
     out_dir: Path,
     schema: pa.Schema,
-    buffers: Dict[int, _InstrumentBuffer],
-    names: List[str],
-    fam_valid: Dict[int, np.ndarray],
-    row_counts: Dict[int, int],
-    label_stats: Dict[int, dict],
+    buffers: dict[int, _InstrumentBuffer],
+    names: list[str],
+    fam_valid: dict[int, np.ndarray],
+    row_counts: dict[int, int],
+    label_stats: dict[int, dict],
 ) -> None:
     """Write one row group per instrument for the just-processed file."""
     nfeat = len(names)
@@ -157,7 +156,7 @@ def _flush_file(
                     for nm in LabelReason.describe(r):
                         hv["reason"][nm] = hv["reason"].get(nm, 0) + 1
 
-        cols: Dict[str, pa.Array] = {
+        cols: dict[str, pa.Array] = {
             "instrument_id": pa.array([iid] * rows, type=pa.uint32()),
             "exchange_ts": pa.array(buf.ts, type=pa.int64()),
         }
@@ -183,7 +182,7 @@ def _flush_file(
         writer.write_table(table)
 
 
-def _build_schema(names: List[str]) -> pa.Schema:
+def _build_schema(names: list[str]) -> pa.Schema:
     nbytes = (len(names) + 7) // 8
     fields = [
         pa.field("instrument_id", pa.uint32()),
@@ -199,7 +198,7 @@ def _build_schema(names: List[str]) -> pa.Schema:
     return pa.schema(fields)
 
 
-def main(argv: List[str] | None = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m iap.features", description=__doc__.splitlines()[0])
     ap.add_argument("--data-dir", default=str(_REPO / "data" / "normalized"))
     ap.add_argument("--out-dir", default=str(_REPO / "data" / "features"))
@@ -238,18 +237,18 @@ def main(argv: List[str] | None = None) -> int:
     names = [s.name for s in registry]
     schema = _build_schema(names)
 
-    writers: Dict[int, pq.ParquetWriter] = {}
-    profiles: Dict[int, object] = {}
-    fam_valid: Dict[int, np.ndarray] = {}
-    row_counts: Dict[int, int] = {}
-    label_stats: Dict[int, dict] = {}
+    writers: dict[int, pq.ParquetWriter] = {}
+    profiles: dict[int, object] = {}
+    fam_valid: dict[int, np.ndarray] = {}
+    row_counts: dict[int, int] = {}
+    label_stats: dict[int, dict] = {}
     total_events = 0
     total_vectors = 0
 
     for path in files:
         events = _load_events(path)
         engine = FeatureEngine(contexts, cadence_ns=args.cadence_ms * 1_000_000, profiles=profiles)
-        buffers: Dict[int, _InstrumentBuffer] = {}
+        buffers: dict[int, _InstrumentBuffer] = {}
         for ev in events:
             vec = engine.apply(ev)
             iid = ev.instrument_id
@@ -282,7 +281,7 @@ def main(argv: List[str] | None = None) -> int:
     for writer in writers.values():
         writer.close()
 
-    fam_slices: Dict[str, List[int]] = {f: [] for f in FAMILY_ORDER}
+    fam_slices: dict[str, list[int]] = {f: [] for f in FAMILY_ORDER}
     for i, s in enumerate(registry):
         fam_slices[s.family].append(i)
     per_instrument = {}

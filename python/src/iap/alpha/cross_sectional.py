@@ -10,7 +10,7 @@ step ever looks forward in time.
 
 from __future__ import annotations
 
-from typing import Dict, Mapping
+from collections.abc import Mapping
 
 import numpy as np
 import pandas as pd
@@ -39,7 +39,7 @@ class CrossSectionalLinearAlpha(LinearAlpha):
         """Cross-sectional transform per grid column (NaN-aware)."""
         raise NotImplementedError
 
-    def signals(self, data: Mapping[int, pd.DataFrame]) -> Dict[int, pd.Series]:
+    def signals(self, data: Mapping[int, pd.DataFrame]) -> dict[int, pd.Series]:
         ids = self.universe(list(data))
         frames = {i: data[i] for i in ids if len(data[i])}
         if not frames:
@@ -58,7 +58,7 @@ class CrossSectionalLinearAlpha(LinearAlpha):
             )
         mat = np.vstack(rows)
         sig = self.grid_signals(mat)
-        out: Dict[int, pd.Series] = {}
+        out: dict[int, pd.Series] = {}
         for k, iid in enumerate(sorted(frames)):
             df = frames[iid]
             out[iid] = pd.Series(

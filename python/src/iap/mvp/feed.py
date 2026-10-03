@@ -24,9 +24,10 @@ in ``[start_ns, end_ns)`` in file order (already event-time ordered).
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Tuple, Union
+from typing import Any
 
 from iap.core.codec import (
     iter_jsonl,
@@ -61,7 +62,7 @@ FEED_MANIFEST = "feed.json"
 _FEED_VERSION = 1
 
 
-def compose_reference_documents(cfg: MvpConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+def compose_reference_documents(cfg: MvpConfig) -> tuple[dict[str, Any], dict[str, Any]]:
     """``(instruments_cfg, venues_cfg)`` for :class:`ReferenceData`.
 
     The instruments document is the MVP instruments file with the session
@@ -132,14 +133,14 @@ def build_reference_data(cfg: MvpConfig) -> ReferenceData:
 class FeedResult:
     """The captured stream and its identity."""
 
-    events: Tuple[MarketEvent, ...]
+    events: tuple[MarketEvent, ...]
     instrument_id: int
     data_version: str  #: sha256 of the IAP1 encoding of the stream
     events_sha256: str  #: sha256 of ``events.jsonl`` bytes
     iap1_sha256: str  #: sha256 of ``events.iap1`` bytes (== data_version)
     n_events_generated: int  #: normalized events before the instrument filter
-    generator_stats: Dict[str, Any]
-    qc_totals: Dict[str, int]
+    generator_stats: dict[str, Any]
+    qc_totals: dict[str, int]
 
     @property
     def first_ts(self) -> int:
@@ -151,13 +152,13 @@ class FeedResult:
 
 
 def stream_versions(
-    events: List[MarketEvent], jsonl_path: Path, iap1_path: Path
-) -> Tuple[str, str, str]:
+    events: list[MarketEvent], jsonl_path: Path, iap1_path: Path
+) -> tuple[str, str, str]:
     """``(data_version, events_sha256, iap1_sha256)`` of a captured stream."""
     return sha256_events_iap1(events), sha256_file(jsonl_path), sha256_file(iap1_path)
 
 
-def generate_feed(cfg: MvpConfig, run_dir: Union[str, Path]) -> FeedResult:
+def generate_feed(cfg: MvpConfig, run_dir: str | Path) -> FeedResult:
     """Generate, normalise and capture the MVP session into ``run_dir``."""
     run_dir = Path(run_dir)
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -172,7 +173,7 @@ def generate_feed(cfg: MvpConfig, run_dir: Union[str, Path]) -> FeedResult:
     qc = normalize_run(raw_dir, normalized_dir)
 
     instrument_id = ref.instrument(cfg.instrument).instrument_id
-    events: List[MarketEvent] = []
+    events: list[MarketEvent] = []
     n_generated = 0
     for path in sorted(normalized_dir.glob("*.normalized.jsonl")):
         for ev in iter_jsonl(path):
@@ -218,7 +219,7 @@ def generate_feed(cfg: MvpConfig, run_dir: Union[str, Path]) -> FeedResult:
     )
 
 
-def load_feed(run_dir: Union[str, Path]) -> FeedResult:
+def load_feed(run_dir: str | Path) -> FeedResult:
     """Load a captured stream (the incident-replay input) and re-derive its
     identity from the bytes on disk — never from the manifest."""
     run_dir = Path(run_dir)
@@ -258,7 +259,7 @@ class JsonlMarketDataSource:
     """:class:`~iap.contracts.protocols.MarketDataSource` over a captured
     ``events.jsonl`` (event-time ordered)."""
 
-    def __init__(self, path: Union[str, Path]) -> None:
+    def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
         if not self.path.is_file():
             raise ValueError(f"market data file not found: {self.path}")

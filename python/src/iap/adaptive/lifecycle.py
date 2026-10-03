@@ -74,7 +74,6 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional
 
 ACTIVE = "ACTIVE"
 WATCH = "WATCH"
@@ -110,7 +109,7 @@ class LifecycleConfig:
             raise ValueError("breach_rule 'cusum' needs cusum_h > 0")
 
     @staticmethod
-    def from_config(block: dict) -> "LifecycleConfig":
+    def from_config(block: dict) -> LifecycleConfig:
         return LifecycleConfig(
             watch_ic_gate=float(block["watch_ic_gate"]),
             reactivate_ic_gate=float(block["reactivate_ic_gate"]),
@@ -130,7 +129,7 @@ class Transition:
     from_state: str
     to_state: str
     reason: str
-    rolling_ic: Optional[float]
+    rolling_ic: float | None
     eval_index: int
 
     def to_dict(self) -> dict:
@@ -159,7 +158,7 @@ class LifecycleLog:
         with open(self.path, "a") as f:
             f.write(json.dumps(transition.to_dict(), sort_keys=True) + "\n")
 
-    def read_all(self) -> List[dict]:
+    def read_all(self) -> list[dict]:
         rows = []
         for line in self.path.read_text().splitlines():
             if line.strip():
@@ -174,16 +173,16 @@ class LifecycleTracker:
     alpha_id: str
     config: LifecycleConfig
     policy: str = ""
-    log: Optional[LifecycleLog] = None
+    log: LifecycleLog | None = None
     state: str = ACTIVE
     breach_count: int = 0
     recovery_count: int = 0
     eval_index: int = 0
-    transitions: List[Transition] = field(default_factory=list)
+    transitions: list[Transition] = field(default_factory=list)
     #: CUSUM statistic (stays 0.0 under the "consecutive" rule)
     cusum: float = 0.0
 
-    def _transition(self, to_state: str, ts: int, reason: str, rolling_ic: Optional[float]) -> None:
+    def _transition(self, to_state: str, ts: int, reason: str, rolling_ic: float | None) -> None:
         tr = Transition(
             alpha_id=self.alpha_id,
             policy=self.policy,
@@ -206,7 +205,7 @@ class LifecycleTracker:
     def update(
         self,
         ts: int,
-        rolling_ic: Optional[float],
+        rolling_ic: float | None,
         informative: bool = True,
         new_fraction: float = 1.0,
     ) -> str:

@@ -19,15 +19,15 @@ meta-labeling stage.
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 
 from iap.experiment.tracker import ExperimentTracker
 from iap.models.dataset import (
-    Dataset,
     TARGET_COLUMN,
     TARGET_HORIZON_NS,
+    Dataset,
     TrainScaler,
 )
 from iap.models.economics import signal_economics
@@ -80,7 +80,7 @@ def rank_ic(pred: np.ndarray, y: np.ndarray) -> float:
     )
 
 
-def ic_tstat(fold_ics: List[float]) -> float:
+def ic_tstat(fold_ics: list[float]) -> float:
     """t-statistic of the per-fold IC series (mean / stderr)."""
     if len(fold_ics) < 2:
         return 0.0
@@ -106,10 +106,10 @@ def _cost_estimate(ds: Dataset, idx: np.ndarray) -> np.ndarray:
 def _evaluate_model(
     name: str,
     ds: Dataset,
-    folds: List[Fold],
-) -> Dict[str, Any]:
+    folds: list[Fold],
+) -> dict[str, Any]:
     """Train/evaluate one model across all folds; returns metrics + preds."""
-    per_fold: List[Dict[str, float]] = []
+    per_fold: list[dict[str, float]] = []
     pooled_pred = np.full(len(ds), np.nan)
     final_model: Any = None
     for fold in folds:
@@ -175,10 +175,10 @@ def _evaluate_model(
 
 def run_model_comparison(
     ds: Dataset,
-    tracker: Optional[ExperimentTracker] = None,
+    tracker: ExperimentTracker | None = None,
     n_folds: int = 4,
     embargo_ns: int = 60_000_000_000,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Full gated comparison. Returns per-model metrics + gate record.
 
     When ``tracker`` is given, each trained model becomes a tracked run with
@@ -199,9 +199,9 @@ def run_model_comparison(
         }
         for f in folds
     ]
-    results: Dict[str, Any] = {"models": {}, "folds": fold_records}
+    results: dict[str, Any] = {"models": {}, "folds": fold_records}
 
-    def _track(res: Dict[str, Any]) -> None:
+    def _track(res: dict[str, Any]) -> None:
         if tracker is None:
             return
         name = res["model"]
@@ -255,7 +255,7 @@ def run_model_comparison(
     }
 
     # ---- Tier 1 + 2: only behind the gate
-    skipped: List[str] = []
+    skipped: list[str] = []
     for tier in (1, 2):
         for name in model_names(tier):
             if not gate_passed:

@@ -24,14 +24,10 @@ violate conventions §1).
 
 from __future__ import annotations
 
+from collections.abc import Iterator, Mapping, Sequence
 from typing import (
     Any,
-    Iterator,
-    Mapping,
-    Optional,
     Protocol,
-    Sequence,
-    Tuple,
     runtime_checkable,
 )
 
@@ -116,13 +112,13 @@ class BookViewLike(Protocol):
     from the integer best levels.
     """
 
-    def best_bid(self) -> Optional[Tuple[int, int]]: ...
+    def best_bid(self) -> tuple[int, int] | None: ...
 
-    def best_ask(self) -> Optional[Tuple[int, int]]: ...
+    def best_ask(self) -> tuple[int, int] | None: ...
 
-    def depth(self, side: int, levels: int = 10) -> Sequence[Tuple[int, int]]: ...
+    def depth(self, side: int, levels: int = 10) -> Sequence[tuple[int, int]]: ...
 
-    def order_count(self, side: int, levels: int = 10) -> Sequence[Tuple[int, int]]: ...
+    def order_count(self, side: int, levels: int = 10) -> Sequence[tuple[int, int]]: ...
 
     def is_crossed(self) -> bool: ...
 
@@ -183,7 +179,7 @@ class Feature(Protocol):
     @property
     def version(self) -> str: ...
 
-    def calculate(self, context: Any) -> Optional[float]: ...
+    def calculate(self, context: Any) -> float | None: ...
 
 
 @runtime_checkable
@@ -196,7 +192,7 @@ class FeatureEngineLike(Protocol):
 
     feature_version: str
 
-    def apply(self, event: Any) -> Optional[FeatureVectorLike]: ...
+    def apply(self, event: Any) -> FeatureVectorLike | None: ...
 
 
 @runtime_checkable
@@ -363,7 +359,7 @@ class AlphaLifecycle(Protocol):
 
     def advance(
         self, alpha_id: str, event_ts: int, evidence: Any
-    ) -> Optional[LifecycleTransition]: ...
+    ) -> LifecycleTransition | None: ...
 
 
 @runtime_checkable

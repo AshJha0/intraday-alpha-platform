@@ -1,7 +1,6 @@
 """MarketEvent contract and validation tests (conventions section 1)."""
 
 import pytest
-
 from conftest import mkev
 from iap.core.events import (
     FIELDS,

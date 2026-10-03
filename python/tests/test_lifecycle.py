@@ -17,7 +17,6 @@ import json
 import math
 
 import pytest
-
 from iap.adaptive.lifecycle import LifecycleConfig, LifecycleTracker
 from iap.contracts.protocols import AlphaLifecycle as AlphaLifecycleProtocol
 from iap.contracts.protocols import LifecycleGate as LifecycleGateProtocol

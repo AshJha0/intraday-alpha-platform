@@ -79,6 +79,6 @@ class SplitMix64:
             u1 = self.uniform()
         return math.sqrt(-2.0 * math.log(u1)) * math.cos(2.0 * math.pi * u2)
 
-    def split(self) -> "SplitMix64":
+    def split(self) -> SplitMix64:
         """Derive an independent child stream (seeded by next_u64)."""
         return SplitMix64(self.next_u64())

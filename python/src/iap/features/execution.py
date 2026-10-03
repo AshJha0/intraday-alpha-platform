@@ -30,7 +30,6 @@ alpha decay and urgency need 1m warmup.
 from __future__ import annotations
 
 from math import exp
-from typing import List
 
 from iap.features._famutil import put
 from iap.features.spec import EPS, WINDOW_NS, FeatureSpec, mkspec
@@ -40,9 +39,9 @@ FAMILY = "exec"
 FILL_HORIZONS = ("1s", "10s")
 
 
-def specs() -> List[FeatureSpec]:
+def specs() -> list[FeatureSpec]:
     """Registry entries for the execution family (pinned order)."""
-    out: List[FeatureSpec] = []
+    out: list[FeatureSpec] = []
     for h in FILL_HORIZONS:
         for side in ("bid", "ask"):
             out.append(
@@ -96,7 +95,7 @@ def specs() -> List[FeatureSpec]:
     return out
 
 
-def compute(st, values: List[float], valid: List[bool]) -> None:
+def compute(st, values: list[float], valid: list[bool]) -> None:
     """Append the 8 execution values for the current emission."""
     warm10 = st.warm(WINDOW_NS["10s"])
     for h in FILL_HORIZONS:

@@ -18,7 +18,8 @@ run manifest.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Tuple
+from collections.abc import Callable
+from typing import Any
 
 from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.linear_model import ElasticNet, LinearRegression, Ridge
@@ -41,7 +42,7 @@ except ImportError:  # pragma: no cover - env dependent
 _SEED = 7  # pinned; model-internal RNG only, never data ordering
 
 #: Pinned hyperparameters (recorded in manifests).
-HYPERPARAMS: Dict[str, Dict[str, Any]] = {
+HYPERPARAMS: dict[str, dict[str, Any]] = {
     "ols": {},
     "ridge": {"alpha": 10.0},
     "elasticnet": {"alpha": 1e-4, "l1_ratio": 0.5, "max_iter": 5000},
@@ -91,7 +92,7 @@ HYPERPARAMS: Dict[str, Dict[str, Any]] = {
 }
 
 #: model name -> (tier, factory)
-_FACTORIES: Dict[str, Tuple[int, Callable[[], Any]]] = {
+_FACTORIES: dict[str, tuple[int, Callable[[], Any]]] = {
     "ols": (0, lambda: LinearRegression()),
     "ridge": (0, lambda: Ridge(**HYPERPARAMS["ridge"])),
     "elasticnet": (0, lambda: ElasticNet(**HYPERPARAMS["elasticnet"])),
@@ -107,7 +108,7 @@ if not (_HAS_XGB and _HAS_LGBM):  # pragma: no cover - env dependent
 TREE_FALLBACK_ACTIVE = not (_HAS_XGB and _HAS_LGBM)
 
 
-def model_names(tier: int) -> List[str]:
+def model_names(tier: int) -> list[str]:
     """Pinned-order model names for a tier (0=linear, 1=trees, 2=mlp)."""
     order = ["ols", "ridge", "elasticnet", "xgboost", "lightgbm", "hist_gbdt", "mlp"]
     return [n for n in order if n in _FACTORIES and _FACTORIES[n][0] == tier]

@@ -23,8 +23,8 @@ reproducible parent-order/fill set so the TCA layer has realistic input:
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple
 
 from iap.core.codec import read_jsonl
 from iap.core.events import EventType, SessionStatus
@@ -47,7 +47,7 @@ QTY_LOTS_MIN = 5
 QTY_LOTS_MAX = 50
 
 #: Golden stream -> (instrument_id, tick_size, lot_size)
-GOLDEN_STREAMS: Dict[str, Tuple[int, float, int]] = {
+GOLDEN_STREAMS: dict[str, tuple[int, float, int]] = {
     "events_eq_mbo.jsonl": (1, 0.01, 100),
     "events_fx_quote.jsonl": (101, 1e-05, 1000),
 }
@@ -86,13 +86,13 @@ def simulate_parent_orders(
     n_orders: int,
     rng: SplitMix64,
     first_order_id: int = 1,
-) -> List[ParentOrder]:
+) -> list[ParentOrder]:
     """Generate + execute parent orders against a timeline (pinned model)."""
     if n_orders < 1:
         raise ValueError("n_orders must be >= 1")
     n_states = len(timeline)
     horizon_ns = N_SLICES * SLICE_NS
-    orders: List[ParentOrder] = []
+    orders: list[ParentOrder] = []
     for k in range(n_orders):
         # pinned draw order per parent order
         u_decision = rng.uniform()
@@ -152,15 +152,15 @@ def simulate_parent_orders(
 
 
 def bundled_order_set(
-    golden_dir: Optional[Path] = None,
+    golden_dir: Path | None = None,
     n_orders: Sequence[int] = (24, 12),
     seed: int = SIM_SEED,
-) -> Dict[int, Tuple[MarketTimeline, List[ParentOrder], float]]:
+) -> dict[int, tuple[MarketTimeline, list[ParentOrder], float]]:
     """The pinned bundled parent-order set: {instrument_id: (timeline, orders,
     tick_size)} built from the golden vectors (EQ then FX, pinned order)."""
     gdir = Path(golden_dir) if golden_dir is not None else _REPO / "tests" / "golden"
     rng = SplitMix64(seed)
-    out: Dict[int, Tuple[MarketTimeline, List[ParentOrder], float]] = {}
+    out: dict[int, tuple[MarketTimeline, list[ParentOrder], float]] = {}
     next_id = 1
     for (fname, (iid, tick, lot)), n in zip(GOLDEN_STREAMS.items(), n_orders):
         tl = build_timeline(gdir / fname, iid, tick)

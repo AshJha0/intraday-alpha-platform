@@ -47,9 +47,9 @@ log reproduces the registry.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Mapping, Optional, Tuple
 
 from iap.adaptive.lifecycle import LifecycleTracker
 from iap.adaptive.lifecycle import Transition as TrackerTransition
@@ -105,13 +105,13 @@ class Edge:
     to_state: LifecycleState
     kind: EdgeKind
     actor: Actor
-    gates: Tuple[str, ...]
+    gates: tuple[str, ...]
 
     def __post_init__(self) -> None:
         if self.from_state is self.to_state:
             raise ValueError("Edge: from_state == to_state")
 
-    def to_dict(self) -> Dict[str, object]:
+    def to_dict(self) -> dict[str, object]:
         return {
             "from_state": self.from_state.name,
             "to_state": self.to_state.name,
@@ -121,13 +121,13 @@ class Edge:
         }
 
 
-_LIVE_GATES: Tuple[str, ...] = ("rolling_ic",)
+_LIVE_GATES: tuple[str, ...] = ("rolling_ic",)
 
 #: The transition table (pinned order).  SYSTEM promotion edges carry the
 #: gate list evaluated by ``advance``; the two SYSTEM demotion edges out of
 #: VALIDATING / PAPER are taken on the ``max_consecutive_failures``-th failed
 #: promotion evaluation; CANDIDATE -> RESEARCH on a failed ``leakage_clean``.
-ALLOWED_TRANSITIONS: Tuple[Edge, ...] = (
+ALLOWED_TRANSITIONS: tuple[Edge, ...] = (
     Edge(
         S.RESEARCH,
         S.CANDIDATE,
@@ -181,7 +181,7 @@ ALLOWED_TRANSITIONS: Tuple[Edge, ...] = (
     Edge(S.RETIRED, S.RESEARCH, EdgeKind.MANUAL, Actor.HUMAN, ()),
 )
 
-_EDGE_INDEX: Mapping[Tuple[LifecycleState, LifecycleState, EdgeKind], Edge] = {
+_EDGE_INDEX: Mapping[tuple[LifecycleState, LifecycleState, EdgeKind], Edge] = {
     (e.from_state, e.to_state, e.kind): e for e in ALLOWED_TRANSITIONS
 }
 if len(_EDGE_INDEX) != len(ALLOWED_TRANSITIONS):
@@ -194,7 +194,7 @@ PROMOTION_EDGES: Mapping[LifecycleState, Edge] = {
 
 #: The evidence block a promotion edge needs before its gates are evaluated
 #: (RESEARCH has none: its presence gate does the checking).
-_REQUIRED_BLOCK: Mapping[LifecycleState, Optional[str]] = {
+_REQUIRED_BLOCK: Mapping[LifecycleState, str | None] = {
     S.RESEARCH: None,
     S.CANDIDATE: "research",
     S.VALIDATING: "validation",
@@ -210,7 +210,7 @@ def edge_for(from_state: LifecycleState, to_state: LifecycleState, kind: EdgeKin
         raise KeyError(f"no {kind.value} edge {from_state.name} -> {to_state.name}") from None
 
 
-def transition_table() -> List[Dict[str, object]]:
+def transition_table() -> list[dict[str, object]]:
     """JSON-ready copy of :data:`ALLOWED_TRANSITIONS` (embedded in the golden)."""
     return [e.to_dict() for e in ALLOWED_TRANSITIONS]
 
@@ -238,7 +238,7 @@ class AlphaLifecycle:
         self,
         config: PolicyConfig,
         registry: AlphaRegistry,
-        transition_log: Optional[LifecycleTransitionLog] = None,
+        transition_log: LifecycleTransitionLog | None = None,
     ) -> None:
         if registry.policy != config.policy:
             raise ValueError(
@@ -247,10 +247,10 @@ class AlphaLifecycle:
         self.config = config
         self.registry = registry
         self.log = transition_log
-        self.gates: Dict[str, Gate] = build_gates(config)
-        self.evaluations: List[GateEvaluation] = []
-        self.transitions: List[LifecycleTransition] = []
-        self._trackers: Dict[str, LifecycleTracker] = {}
+        self.gates: dict[str, Gate] = build_gates(config)
+        self.evaluations: list[GateEvaluation] = []
+        self.transitions: list[LifecycleTransition] = []
+        self._trackers: dict[str, LifecycleTracker] = {}
         for edge in ALLOWED_TRANSITIONS:
             for name in edge.gates:
                 if name not in self.gates:
@@ -263,10 +263,10 @@ class AlphaLifecycle:
         alpha_id: str,
         event_ts: int,
         *,
-        experiment_id: Optional[str] = None,
-        data_version: Optional[str] = None,
-        feature_version: Optional[str] = None,
-        model_version: Optional[str] = None,
+        experiment_id: str | None = None,
+        data_version: str | None = None,
+        feature_version: str | None = None,
+        model_version: str | None = None,
     ) -> AlphaRecord:
         """Enter ``alpha_id`` at RESEARCH as of ``event_ts``."""
         return self.registry.add(
@@ -313,7 +313,7 @@ class AlphaLifecycle:
         reason: str,
         gates: Mapping[str, GateResult],
         actor: Actor,
-        policy: Optional[str] = None,
+        policy: str | None = None,
     ) -> LifecycleTransition:
         return LifecycleTransition(
             alpha_id=rec.alpha_id,
@@ -328,7 +328,7 @@ class AlphaLifecycle:
 
     def advance(
         self, alpha_id: str, event_ts: int, evidence: Evidence
-    ) -> Optional[LifecycleTransition]:
+    ) -> LifecycleTransition | None:
         """Evaluate the SYSTEM edge leaving the alpha's current state.
 
         Returns the transition made, or ``None`` (a :class:`GateEvaluation`
@@ -352,7 +352,7 @@ class AlphaLifecycle:
 
     def _advance_promotion(
         self, rec: AlphaRecord, event_ts: int, evidence: Evidence
-    ) -> Optional[LifecycleTransition]:
+    ) -> LifecycleTransition | None:
         state = rec.state
         edge = PROMOTION_EDGES[state]
         block = _REQUIRED_BLOCK[state]
@@ -371,7 +371,7 @@ class AlphaLifecycle:
             )
             return None
 
-        results: Dict[str, GateResult] = {
+        results: dict[str, GateResult] = {
             name: self.gates[name].evaluate(rec.alpha_id, evidence) for name in edge.gates
         }
         failed = [name for name in edge.gates if not results[name].passed]
@@ -461,7 +461,7 @@ class AlphaLifecycle:
 
     def _advance_live(
         self, rec: AlphaRecord, event_ts: int, evidence: Evidence
-    ) -> Optional[LifecycleTransition]:
+    ) -> LifecycleTransition | None:
         state = rec.state
         live = evidence.live
         if live is None or live.rolling_ic is None or not live.informative:

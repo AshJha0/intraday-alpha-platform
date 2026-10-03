@@ -13,11 +13,10 @@ module names, and every guarded package is scanned in full.
 from __future__ import annotations
 
 import ast
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator, List, Tuple
 
 import pytest
-
 from conftest import REPO_ROOT
 
 IAP_DIR = REPO_ROOT / "python" / "src" / "iap"
@@ -110,7 +109,7 @@ def _literal(node: ast.AST) -> str:
     return node.value if isinstance(node, ast.Constant) and isinstance(node.value, str) else ""
 
 
-def imported_modules(tree: ast.AST) -> Iterator[Tuple[int, str]]:
+def imported_modules(tree: ast.AST) -> Iterator[tuple[int, str]]:
     """``(line, dotted module name)`` of every absolute import in ``tree``,
     including dynamic imports with a literal name."""
     for node in ast.walk(tree):
@@ -133,7 +132,7 @@ def imported_modules(tree: ast.AST) -> Iterator[Tuple[int, str]]:
                 yield node.lineno, _literal(node.args[0])
 
 
-def violations(source: str) -> List[Tuple[int, str]]:
+def violations(source: str) -> list[tuple[int, str]]:
     return [
         (line, module)
         for line, module in imported_modules(ast.parse(source))
@@ -141,7 +140,7 @@ def violations(source: str) -> List[Tuple[int, str]]:
     ]
 
 
-def _modules(package: str) -> List[Path]:
+def _modules(package: str) -> list[Path]:
     return sorted((IAP_DIR / package).rglob("*.py"))
 
 

@@ -58,7 +58,6 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -79,13 +78,13 @@ class Constraints:
 
     w_min: np.ndarray
     w_max: np.ndarray
-    gross_cap: Optional[float] = None
-    net_cap: Optional[float] = None
-    participation: Optional[np.ndarray] = None  # per-asset |trade| cap
-    turnover_cap: Optional[float] = None  # total L1 trade cap
-    vol_target: Optional[float] = None  # sqrt(w'Sigma w) cap
-    currency_matrix: Optional[np.ndarray] = None  # (C, N)
-    currency_bounds: Optional[np.ndarray] = None  # (C,)
+    gross_cap: float | None = None
+    net_cap: float | None = None
+    participation: np.ndarray | None = None  # per-asset |trade| cap
+    turnover_cap: float | None = None  # total L1 trade cap
+    vol_target: float | None = None  # sqrt(w'Sigma w) cap
+    currency_matrix: np.ndarray | None = None  # (C, N)
+    currency_bounds: np.ndarray | None = None  # (C,)
 
     def validate(self, n: int) -> None:
         self.w_min = np.asarray(self.w_min, dtype=np.float64)
@@ -148,11 +147,11 @@ class PGDResult:
     #: -1 = ``w_prev`` itself was held (INFEASIBLE only).
     best_iteration: int
     max_violation: float
-    trajectory: List[float] = field(default_factory=list)
+    trajectory: list[float] = field(default_factory=list)
     feasible: bool = True
     #: Names of the constraints ``weights`` still violates, pinned order
     #: (empty when feasible) — what a caller names in its alarm.
-    violations: Tuple[str, ...] = ()
+    violations: tuple[str, ...] = ()
     #: Largest RISK-constraint violation of ``weights`` (0 when none): live
     #: book exposure, as opposed to a trade over one bar's trading cap.
     risk_violation: float = 0.0
@@ -214,7 +213,7 @@ def project(
     v: np.ndarray,
     cons: Constraints,
     w_prev: np.ndarray,
-    Sigma: Optional[np.ndarray],
+    Sigma: np.ndarray | None,
     passes: int = 8,
 ) -> np.ndarray:
     """Cyclic projection onto the constraint set (pinned order, fixed passes)."""
@@ -262,14 +261,14 @@ def project(
 
 
 def violation_breakdown(
-    w: np.ndarray, cons: Constraints, w_prev: np.ndarray, Sigma: Optional[np.ndarray]
-) -> Dict[str, float]:
+    w: np.ndarray, cons: Constraints, w_prev: np.ndarray, Sigma: np.ndarray | None
+) -> dict[str, float]:
     """Per-constraint violation of w, keyed by the names in
     :data:`RISK_CONSTRAINTS` / :data:`TRADING_CONSTRAINTS`, in the pinned
     projection order. An inactive constraint is absent; an active one that
     holds maps to a value <= 0. ``max_violation`` is the maximum of these
     (floored at 0), so the two can never disagree."""
-    out: Dict[str, float] = {}
+    out: dict[str, float] = {}
     out["BOX"] = max(
         float(np.max(cons.w_min - w, initial=0.0)), float(np.max(w - cons.w_max, initial=0.0))
     )
@@ -290,7 +289,7 @@ def violation_breakdown(
 
 
 def max_violation(
-    w: np.ndarray, cons: Constraints, w_prev: np.ndarray, Sigma: Optional[np.ndarray]
+    w: np.ndarray, cons: Constraints, w_prev: np.ndarray, Sigma: np.ndarray | None
 ) -> float:
     """Largest constraint violation of w (0 when feasible)."""
     v = 0.0
@@ -299,7 +298,7 @@ def max_violation(
     return max(v, 0.0)
 
 
-def _risk_violation(breakdown: Dict[str, float]) -> float:
+def _risk_violation(breakdown: dict[str, float]) -> float:
     """Largest violation among the RISK constraints only (0 when none).
     This is the figure a caller alarms on: it is live book exposure, not a
     trade that merely exceeds one bar's participation/turnover cap."""
@@ -311,7 +310,7 @@ def _risk_violation(breakdown: Dict[str, float]) -> float:
     return max(v, 0.0)
 
 
-def _violated(breakdown: Dict[str, float], tol: float) -> Tuple[str, ...]:
+def _violated(breakdown: dict[str, float], tol: float) -> tuple[str, ...]:
     """Names of the constraints violated by more than ``tol``, in the
     pinned projection order (deterministic, never unordered)."""
     order = ("BOX", "PARTICIPATION", "NET", "CURRENCY", "GROSS", "TURNOVER", "VOL")
@@ -327,7 +326,7 @@ def solve(
     risk_aversion: float,
     tc_linear: np.ndarray,
     constraints: Constraints,
-    eta0: Optional[float] = None,
+    eta0: float | None = None,
     step_decay: float = 0.01,
     iters: int = 500,
     proj_passes: int = 8,
@@ -376,7 +375,7 @@ def solve(
     def f(w: np.ndarray) -> float:
         return objective(w, alpha, Sigma, w_prev, risk_aversion, tc_linear)
 
-    def rank(cand: np.ndarray) -> Tuple[float, float]:
+    def rank(cand: np.ndarray) -> tuple[float, float]:
         b = violation_breakdown(cand, constraints, w_prev, Sigma)
         total = 0.0
         for value in b.values():
@@ -408,7 +407,7 @@ def solve(
     best_k = 0
     if rank(w) < least_rank:
         least_w, least_rank, least_k = w.copy(), rank(w), 0
-    trajectory: List[float] = []
+    trajectory: list[float] = []
     for k in range(iters):
         eta = eta0 / (1.0 + step_decay * k)
         grad = alpha - 2.0 * risk_aversion * (Sigma @ w)

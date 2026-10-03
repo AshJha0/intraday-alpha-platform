@@ -11,8 +11,6 @@ function of what was added, so the same loop replays to the same trace.
 
 from __future__ import annotations
 
-from typing import List, Optional
-
 from iap.contracts.ids import make_trace_id
 from iap.contracts.types import (
     AlphaSignal,
@@ -65,15 +63,15 @@ class TraceBuilder:
         self.feature_version = feature_version
         self.model_version = model_version
         self.config_version = config_version
-        self._signal: List[AlphaSignal] = []
-        self._portfolio: Optional[PortfolioTarget] = None
-        self._risk: List[RiskDecision] = []
-        self._parent_orders: List[ParentOrder] = []
-        self._child_orders: List[ChildOrder] = []
-        self._routing: List[VenueDecision] = []
-        self._fills: List[ExecutionReport] = []
-        self._tca: List[TCAResult] = []
-        self._attribution: Optional[Attribution] = None
+        self._signal: list[AlphaSignal] = []
+        self._portfolio: PortfolioTarget | None = None
+        self._risk: list[RiskDecision] = []
+        self._parent_orders: list[ParentOrder] = []
+        self._child_orders: list[ChildOrder] = []
+        self._routing: list[VenueDecision] = []
+        self._fills: list[ExecutionReport] = []
+        self._tca: list[TCAResult] = []
+        self._attribution: Attribution | None = None
 
     @property
     def trace_id(self) -> str:
@@ -82,28 +80,28 @@ class TraceBuilder:
 
     # -- stages -------------------------------------------------------------
 
-    def add_signal(self, signal: AlphaSignal) -> "TraceBuilder":
+    def add_signal(self, signal: AlphaSignal) -> TraceBuilder:
         _expect(signal, AlphaSignal, "add_signal")
         self._signal.append(signal)
         return self
 
-    def set_portfolio(self, target: Optional[PortfolioTarget]) -> "TraceBuilder":
+    def set_portfolio(self, target: PortfolioTarget | None) -> TraceBuilder:
         if target is not None:
             _expect(target, PortfolioTarget, "set_portfolio")
         self._portfolio = target
         return self
 
-    def add_risk(self, decision: RiskDecision) -> "TraceBuilder":
+    def add_risk(self, decision: RiskDecision) -> TraceBuilder:
         _expect(decision, RiskDecision, "add_risk")
         self._risk.append(decision)
         return self
 
-    def add_parent_order(self, order: ParentOrder) -> "TraceBuilder":
+    def add_parent_order(self, order: ParentOrder) -> TraceBuilder:
         _expect(order, ParentOrder, "add_parent_order")
         self._parent_orders.append(order)
         return self
 
-    def replace_parent_order(self, order: ParentOrder) -> "TraceBuilder":
+    def replace_parent_order(self, order: ParentOrder) -> TraceBuilder:
         """Replace the recorded parent with the same ``parent_order_id``
         (e.g. to fill in ``params`` counters known only at the end of the
         order's window).  Raises ``KeyError`` when no such parent was added."""
@@ -114,27 +112,27 @@ class TraceBuilder:
                 return self
         raise KeyError(f"replace_parent_order: no parent {order.parent_order_id} in the trace")
 
-    def add_child_order(self, order: ChildOrder) -> "TraceBuilder":
+    def add_child_order(self, order: ChildOrder) -> TraceBuilder:
         _expect(order, ChildOrder, "add_child_order")
         self._child_orders.append(order)
         return self
 
-    def add_routing(self, decision: VenueDecision) -> "TraceBuilder":
+    def add_routing(self, decision: VenueDecision) -> TraceBuilder:
         _expect(decision, VenueDecision, "add_routing")
         self._routing.append(decision)
         return self
 
-    def add_fill(self, report: ExecutionReport) -> "TraceBuilder":
+    def add_fill(self, report: ExecutionReport) -> TraceBuilder:
         _expect(report, ExecutionReport, "add_fill")
         self._fills.append(report)
         return self
 
-    def add_tca(self, result: TCAResult) -> "TraceBuilder":
+    def add_tca(self, result: TCAResult) -> TraceBuilder:
         _expect(result, TCAResult, "add_tca")
         self._tca.append(result)
         return self
 
-    def set_attribution(self, attribution: Optional[Attribution]) -> "TraceBuilder":
+    def set_attribution(self, attribution: Attribution | None) -> TraceBuilder:
         if attribution is not None:
             _expect(attribution, Attribution, "set_attribution")
         self._attribution = attribution

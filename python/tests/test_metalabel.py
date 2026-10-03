@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-
 from iap.core.rng import SplitMix64
 from iap.models.dataset import Dataset
 from iap.models.metalabel import (
@@ -191,12 +190,11 @@ def test_isotonic_falls_back_to_platt_on_a_thin_calibration_segment():
     """Isotonic on a few dozen positives interpolates noise into a step
     function; the platform falls back to Platt and says which it used."""
     import numpy as np
-    from sklearn.ensemble import HistGradientBoostingClassifier
-
     from iap.models.metalabel import (
         MIN_ISOTONIC_POSITIVES,
         _fit_isotonic_calibrated,
     )
+    from sklearn.ensemble import HistGradientBoostingClassifier
 
     rng = np.random.default_rng(3)
     n = 800

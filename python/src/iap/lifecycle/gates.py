@@ -67,8 +67,9 @@ scale-free, and with a threshold a port can state in one line.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Mapping, Optional, Tuple, Union
+from typing import Any, Union
 
 from iap.contracts.types import GateResult
 from iap.lifecycle.config import PolicyConfig
@@ -145,18 +146,18 @@ def _rolling_ic(ev: Evidence, cfg: PolicyConfig) -> Metric:
     return ev.live.rolling_ic
 
 
-def _threshold_from_gates(key: str) -> Callable[[PolicyConfig], Optional[float]]:
-    def read(cfg: PolicyConfig) -> Optional[float]:
+def _threshold_from_gates(key: str) -> Callable[[PolicyConfig], float | None]:
+    def read(cfg: PolicyConfig) -> float | None:
         return float(getattr(cfg.gates, key))
 
     return read
 
 
-def _threshold_none(cfg: PolicyConfig) -> Optional[float]:
+def _threshold_none(cfg: PolicyConfig) -> float | None:
     return None
 
 
-def _threshold_watch_gate(cfg: PolicyConfig) -> Optional[float]:
+def _threshold_watch_gate(cfg: PolicyConfig) -> float | None:
     return cfg.live.watch_ic_gate
 
 
@@ -167,9 +168,9 @@ class GateSpec:
     name: str
     block: str
     kind: str
-    threshold_key: Optional[str]
+    threshold_key: str | None
     metric: Callable[[Evidence, PolicyConfig], Metric]
-    threshold: Callable[[PolicyConfig], Optional[float]]
+    threshold: Callable[[PolicyConfig], float | None]
 
     def __post_init__(self) -> None:
         if self.kind not in ("min", "max", "gt", "bool"):
@@ -182,7 +183,7 @@ def _spec(
     name: str,
     block: str,
     kind: str,
-    key: Optional[str],
+    key: str | None,
     metric: Callable[[Evidence, PolicyConfig], Metric],
 ) -> GateSpec:
     if key is None:
@@ -198,7 +199,7 @@ def _spec(
 
 #: The complete gate table, in a fixed order (the machine evaluates the
 #: subset of an edge in the edge's own pinned order).
-GATE_SPECS: Tuple[GateSpec, ...] = (
+GATE_SPECS: tuple[GateSpec, ...] = (
     _spec(
         "ledger_entry_exists",
         "research",
@@ -257,7 +258,7 @@ class Gate:
         return self._spec
 
     @property
-    def threshold(self) -> Optional[float]:
+    def threshold(self) -> float | None:
         """The bound threshold (``None`` for a boolean gate)."""
         return self._spec.threshold(self._config)
 
@@ -290,7 +291,7 @@ class Gate:
         return f"Gate({self.name!r}, {self._spec.kind}, threshold={self.threshold!r})"
 
 
-def build_gates(config: PolicyConfig) -> Dict[str, Gate]:
+def build_gates(config: PolicyConfig) -> dict[str, Gate]:
     """Every gate of the table bound to ``config``, keyed by name (insertion
     order = table order)."""
     return {spec.name: Gate(spec, config) for spec in GATE_SPECS}

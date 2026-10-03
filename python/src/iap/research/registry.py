@@ -23,8 +23,9 @@ experiments and are ignored.
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator, List, NamedTuple, Optional, Tuple
+from typing import NamedTuple
 
 from iap.contracts.types import ExperimentResult, ExperimentSpec, Verdict
 from iap.contracts.validate import validate_typed
@@ -53,9 +54,9 @@ class ExperimentRegistry:
         self.root = Path(root)
         #: directories the most recent ``records()`` / ``find()`` pass could
         #: not load: ``(directory name, reason)`` in name order
-        self.skipped: List[Tuple[str, str]] = []
+        self.skipped: list[tuple[str, str]] = []
 
-    def _directories(self) -> List[str]:
+    def _directories(self) -> list[str]:
         """Every candidate experiment directory (sorted; dot-directories —
         staging areas — excluded)."""
         if not self.root.is_dir():
@@ -64,7 +65,7 @@ class ExperimentRegistry:
             p.name for p in self.root.iterdir() if p.is_dir() and not p.name.startswith(".")
         )
 
-    def experiment_ids(self) -> List[str]:
+    def experiment_ids(self) -> list[str]:
         """Ids of every experiment directory (sorted; a directory is an
         experiment iff it holds a ``spec.json``)."""
         return [name for name in self._directories() if (self.root / name / SPEC_FILE).is_file()]
@@ -173,10 +174,10 @@ class ExperimentRegistry:
 
     def find(
         self,
-        alpha_id: Optional[str] = None,
-        horizon: Optional[str] = None,
-        verdict: Optional[Verdict] = None,
-    ) -> List[ExperimentRecord]:
+        alpha_id: str | None = None,
+        horizon: str | None = None,
+        verdict: Verdict | None = None,
+    ) -> list[ExperimentRecord]:
         """Records matching every given filter (``None`` = any), in id order.
         Unloadable directories are in :attr:`skipped` afterwards."""
         want_verdict = Verdict(verdict) if verdict is not None else None

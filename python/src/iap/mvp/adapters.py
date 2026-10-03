@@ -24,8 +24,8 @@ end to end while every rule stays where it is pinned:
 from __future__ import annotations
 
 import math
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Mapping, Sequence, Tuple
 
 from iap.contracts.ids import NO_ROUTE
 from iap.contracts.types import (
@@ -47,9 +47,8 @@ from iap.execution.simulator import ExecutionSimulator
 from iap.execution.sor import SmartOrderRouter
 from iap.execution.types import ChildOrder as SimChild
 from iap.execution.types import Fill as SimFill
-from iap.execution.types import Liquidity, OrderState
+from iap.execution.types import Liquidity, OrderState, VenueSpec
 from iap.execution.types import OrderType as SimOrderType
-from iap.execution.types import VenueSpec
 from iap.orderbook.book import ConsolidatedBook
 from iap.risk.engine import RiskEngine
 from iap.risk.events import Rules
@@ -71,7 +70,7 @@ __all__ = [
 ]
 
 #: Pinned check index of every rule id (``NOT_BOOTSTRAPPED`` shares check 0).
-_RULE_INDEX: Dict[str, int] = {rid: i for i, rid in enumerate(Rules.CHECK_ORDER)}
+_RULE_INDEX: dict[str, int] = {rid: i for i, rid in enumerate(Rules.CHECK_ORDER)}
 _RULE_INDEX[Rules.NOT_BOOTSTRAPPED] = 0
 
 _SIM_ORDER_TYPE = {
@@ -155,8 +154,8 @@ class MarketView:
 @dataclass
 class _ParentSchedule:
     parent: ParentOrder
-    slice_qty: List[int] = field(default_factory=list)
-    slice_due: List[int] = field(default_factory=list)
+    slice_qty: list[int] = field(default_factory=list)
+    slice_due: list[int] = field(default_factory=list)
     next_slice: int = 0
     next_child: int = 0
     pov_volume: int = 0
@@ -192,7 +191,7 @@ class AlgoScheduler:
         self._pov_participation = pov_participation
         self._next_id = next_id
         self._committed = committed
-        self._schedules: Dict[int, _ParentSchedule] = {}
+        self._schedules: dict[int, _ParentSchedule] = {}
 
     def open(self, parent: ParentOrder) -> None:
         """Register a parent (computes its slice schedule)."""
@@ -220,7 +219,7 @@ class AlgoScheduler:
     def close(self, parent_order_id: int) -> None:
         del self._schedules[parent_order_id]
 
-    def params_for(self, algo: Algo) -> Dict[str, float]:
+    def params_for(self, algo: Algo) -> dict[str, float]:
         """The ``ParentOrder.params`` block of an algo."""
         if algo is Algo.TWAP:
             return {"slices": float(self._twap_slices)}
@@ -250,8 +249,8 @@ class AlgoScheduler:
 
     def _split(
         self, ps: _ParentSchedule, slice_qty: int, decision_ts: int, order_type: OrderType
-    ) -> List[ChildOrder]:
-        out: List[ChildOrder] = []
+    ) -> list[ChildOrder]:
+        out: list[ChildOrder] = []
         left = slice_qty
         while left > 0:
             q = min(left, self._max_child_qty)
@@ -280,7 +279,7 @@ class AlgoScheduler:
             if deficit <= 0:
                 return ()
             return (self._child(ps, min(deficit, self._max_child_qty), t, OrderType.MARKET),)
-        out: List[ChildOrder] = []
+        out: list[ChildOrder] = []
         passive = parent.algo is Algo.TWAP
         while ps.next_slice < len(ps.slice_due) and t >= ps.slice_due[ps.next_slice]:
             q = ps.slice_qty[ps.next_slice]
@@ -323,7 +322,7 @@ class SorAdapter:
         side = int(order.side)
         # Ranking by repeated routing over the remaining candidates reuses the
         # router's own tie-break ladder for every rank, not just the winner.
-        ranks: Dict[int, int] = {}
+        ranks: dict[int, int] = {}
         remaining = list(self._candidates)
         rank = 1
         while remaining:
@@ -389,13 +388,13 @@ class SimulatorAdapter:
 
     def __init__(self, simulator: ExecutionSimulator) -> None:
         self.simulator = simulator
-        self._sim_id_of: Dict[int, int] = {}  #: child_order_id -> sim order id
-        self._child_id_of: Dict[int, int] = {}  #: sim order id -> child_order_id
-        self._live: List[int] = []  #: sim ids not yet reported terminal
-        self._filled_qty: Dict[int, int] = {}  #: sim order id -> cumulative fill qty
+        self._sim_id_of: dict[int, int] = {}  #: child_order_id -> sim order id
+        self._child_id_of: dict[int, int] = {}  #: sim order id -> child_order_id
+        self._live: list[int] = []  #: sim ids not yet reported terminal
+        self._filled_qty: dict[int, int] = {}  #: sim order id -> cumulative fill qty
         self._fills_reported = 0
         self._next_execution_id = 1
-        self.fills_by_execution: Dict[int, SimFill] = {}
+        self.fills_by_execution: dict[int, SimFill] = {}
 
     def _report(
         self,
@@ -462,8 +461,8 @@ class SimulatorAdapter:
             ),
         )
 
-    def _drain(self, terminal_ts: int) -> List[ExecutionReport]:
-        reports: List[ExecutionReport] = []
+    def _drain(self, terminal_ts: int) -> list[ExecutionReport]:
+        reports: list[ExecutionReport] = []
         fills = self.simulator.fills
         orders = self.simulator.orders
         while self._fills_reported < len(fills):
@@ -567,7 +566,7 @@ class TcaAdapter:
             end_ts=parent_order.end_ts,
         )
         fees_total = 0.0
-        venue_fills: Dict[int, List[Tuple[float, int]]] = {}
+        venue_fills: dict[int, list[tuple[float, int]]] = {}
         for rep in executions:
             if rep.status not in (ExecStatus.PARTIAL, ExecStatus.FILLED):
                 continue

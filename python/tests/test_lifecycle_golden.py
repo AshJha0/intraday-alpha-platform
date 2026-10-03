@@ -17,7 +17,6 @@ from __future__ import annotations
 import json
 
 import pytest
-
 from iap.contracts.types import Actor, LifecycleState, LifecycleTransition
 from iap.contracts.validate import validate_typed
 from iap.lifecycle import (

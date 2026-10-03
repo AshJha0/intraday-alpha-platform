@@ -19,9 +19,10 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional, Tuple, Union
+from typing import Any
 
 from iap.contracts.types import Algo
 from iap.contracts.versions import content_hash
@@ -74,7 +75,7 @@ class _Doc:
             raise ValueError(f"{self.where}: missing key {key!r}")
         return self.obj[key]
 
-    def sub(self, key: str) -> "_Doc":
+    def sub(self, key: str) -> _Doc:
         return _Doc(self._get(key), f"{self.where}.{key}")
 
     def integer(self, key: str, lo: int, hi: int) -> int:
@@ -106,7 +107,7 @@ class _Doc:
             raise ValueError(f"{self.where}.{key}: must be a boolean")
         return v
 
-    def string_list(self, key: str, n: Optional[int] = None) -> Tuple[str, ...]:
+    def string_list(self, key: str, n: int | None = None) -> tuple[str, ...]:
         v = self._get(key)
         if not isinstance(v, list) or not v or not all(isinstance(s, str) and s for s in v):
             raise ValueError(f"{self.where}.{key}: must be a non-empty list of strings")
@@ -116,14 +117,14 @@ class _Doc:
             raise ValueError(f"{self.where}.{key}: entries must be unique")
         return tuple(v)
 
-    def list_of_objects(self, key: str) -> Tuple["_Doc", ...]:
+    def list_of_objects(self, key: str) -> tuple[_Doc, ...]:
         v = self._get(key)
         if not isinstance(v, list) or not v:
             raise ValueError(f"{self.where}.{key}: must be a non-empty list")
         return tuple(_Doc(item, f"{self.where}.{key}[{i}]") for i, item in enumerate(v))
 
 
-def _hms(text: str, where: str) -> Tuple[int, int, int]:
+def _hms(text: str, where: str) -> tuple[int, int, int]:
     parts = text.split(":")
     if len(parts) != 3 or not all(p.isdigit() and len(p) == 2 for p in parts):
         raise ValueError(f"{where}: time must be HH:MM:SS, got {text!r}")
@@ -199,7 +200,7 @@ class ExecutionSpec:
     """Algo selection and child scheduling parameters."""
 
     parent_window_ns: int
-    urgency_bands: Tuple[UrgencyBand, ...]
+    urgency_bands: tuple[UrgencyBand, ...]
     twap_slices: int
     is_slices: int
     is_risk_aversion: float
@@ -228,28 +229,28 @@ class SorSpec:
 class MvpConfig:
     """The validated MVP configuration (see module docstring)."""
 
-    document: Dict[str, Any]
+    document: dict[str, Any]
     seed: int
     instrument: str
     strategy_id: str
-    venues: Tuple[str, ...]
-    alphas: Tuple[str, ...]
+    venues: tuple[str, ...]
+    alphas: tuple[str, ...]
     horizon_ns: int
     decision_cadence_ns: int
     session: SessionSpec
     portfolio: PortfolioSpec
     execution: ExecutionSpec
     sor: SorSpec
-    reference: Dict[str, str]
-    notes: Tuple[str, ...]
+    reference: dict[str, str]
+    notes: tuple[str, ...]
     repo_root: Path
 
     # ------------------------------------------------------------ loading
 
     @classmethod
     def from_document(
-        cls, doc: Mapping[str, Any], *, where: str = "mvp.json", repo_root: Optional[Path] = None
-    ) -> "MvpConfig":
+        cls, doc: Mapping[str, Any], *, where: str = "mvp.json", repo_root: Path | None = None
+    ) -> MvpConfig:
         """Validate a parsed ``mvp.json`` document."""
         root = Path(repo_root) if repo_root is not None else REPO_ROOT
         d = _Doc(doc, where)
@@ -364,7 +365,7 @@ class MvpConfig:
         )
 
     @classmethod
-    def load(cls, path: Union[str, Path], *, repo_root: Optional[Path] = None) -> "MvpConfig":
+    def load(cls, path: str | Path, *, repo_root: Path | None = None) -> MvpConfig:
         """Load + validate ``path``; errors name the file."""
         p = Path(path)
         if not p.is_file():
@@ -377,8 +378,8 @@ class MvpConfig:
         return cls.from_document(doc, where=str(p), repo_root=repo_root)
 
     def with_overrides(
-        self, *, seed: Optional[int] = None, instrument: Optional[str] = None
-    ) -> "MvpConfig":
+        self, *, seed: int | None = None, instrument: str | None = None
+    ) -> MvpConfig:
         """A new config with ``seed`` / ``instrument`` replaced (re-validated)."""
         doc = json.loads(json.dumps(self.document))
         if seed is not None:
@@ -393,9 +394,9 @@ class MvpConfig:
         """Absolute path of a ``reference`` document."""
         return self.repo_root / self.reference[key]
 
-    def reference_documents(self) -> Dict[str, Any]:
+    def reference_documents(self) -> dict[str, Any]:
         """Every referenced JSON document, keyed by its repository-relative path."""
-        out: Dict[str, Any] = {}
+        out: dict[str, Any] = {}
         for key in _REFERENCE_KEYS:
             rel = self.reference[key]
             with open(self.repo_root / rel, encoding="utf-8") as fh:
@@ -426,11 +427,11 @@ def config_version_of(cfg: MvpConfig) -> str:
 
 
 def load_config(
-    path: Optional[Union[str, Path]] = None,
+    path: str | Path | None = None,
     *,
-    seed: Optional[int] = None,
-    instrument: Optional[str] = None,
-    repo_root: Optional[Path] = None,
+    seed: int | None = None,
+    instrument: str | None = None,
+    repo_root: Path | None = None,
 ) -> MvpConfig:
     """Load ``configs/mvp/mvp.json`` (or ``path``) and apply CLI overrides.
     ``repo_root`` is the directory the ``reference`` paths resolve against

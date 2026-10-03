@@ -13,10 +13,8 @@ from __future__ import annotations
 import copy
 import json
 import math
-from typing import Dict, List
 
 import pytest
-
 from iap.core.rng import SplitMix64
 from iap.reference.refdata import ReferenceData
 from iap.risk import (
@@ -58,7 +56,7 @@ def config(config_doc: dict) -> dict:
     return copy.deepcopy(config_doc)
 
 
-def ticks() -> Dict[int, float]:
+def ticks() -> dict[int, float]:
     return {1: 0.01, 2: 0.01}
 
 
@@ -70,7 +68,7 @@ def engine(cfg: dict) -> RiskEngine:
     return eng
 
 
-def fx_refs() -> Dict[int, InstrumentRef]:
+def fx_refs() -> dict[int, InstrumentRef]:
     """Instruments 1/2 (USD equities) plus USD/JPY (103, qty_unit 1000,
     JPY) and EUR/GBP (108, GBP) with GBP/USD (102) as the GBP pair."""
     return {
@@ -126,7 +124,7 @@ def fill(
     return Fill(ts, strategy, iid, order_id, side, qty, price)
 
 
-def kills(eng: RiskEngine) -> List[str]:
+def kills(eng: RiskEngine) -> list[str]:
     return [e.rule_id for e in eng.audit() if e.decision == int(Decision.KILL)]
 
 
@@ -1474,7 +1472,7 @@ def test_risk_snapshot_restore_roundtrip(config_doc):
     decisions and audit lines to the unbroken run; a fresh engine that
     requires a bootstrap rejects everything until positions arrive."""
 
-    def script(eng: RiskEngine, start: int, n: int) -> List[str]:
+    def script(eng: RiskEngine, start: int, n: int) -> list[str]:
         lines = []
         for k in range(start, start + n):
             t = T0 + 100_000_000 + k * 20_000_000
@@ -1769,9 +1767,9 @@ def _exposure_state(eng: RiskEngine) -> dict:
     return snap
 
 
-def _random_script(seed: int, n: int) -> List[dict]:
+def _random_script(seed: int, n: int) -> list[dict]:
     rng = SplitMix64(seed)
-    steps: List[dict] = []
+    steps: list[dict] = []
     t = T0 + 100_000_000
     for k in range(n):
         t += rng.randint(0, 4_000_000)

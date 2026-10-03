@@ -11,7 +11,6 @@ feature engine's merged depth and rolling windows.
 from __future__ import annotations
 
 import pytest
-
 from iap.core.events import EventType, MarketEvent
 from iap.orderbook.book import OrderBook
 

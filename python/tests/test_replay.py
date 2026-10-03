@@ -3,7 +3,6 @@
 import json
 
 import pytest
-
 from iap.core.codec import read_jsonl
 from iap.replay.replay import ReplayEngine
 

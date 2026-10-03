@@ -35,8 +35,6 @@ after cross-validation against ``tests/bruteforce_book.py``.
 
 from __future__ import annotations
 
-from typing import List, Optional
-
 from iap.core.events import (
     I64_MAX,
     SYNTHETIC_ID_BASE,
@@ -76,7 +74,7 @@ class _Script:
         self.stream = stream
         self.rng = rng
         self.t = t
-        self.out: List[MarketEvent] = []
+        self.out: list[MarketEvent] = []
 
     def emit(self, event_type, side=0, price=0, qty=0, order_id=0, trade_id=0) -> MarketEvent:
         self.t += 1_000_000
@@ -352,7 +350,7 @@ def _eq_scripted(script: _Script, venue_index: int) -> None:
     script.emit(EventType.HEARTBEAT)
 
 
-def _fx_scripted(scripts: List[_Script]) -> None:
+def _fx_scripted(scripts: list[_Script]) -> None:
     """Scenario blocks for the FX pair across LP1/LP2/PRI (venue order)."""
     BID, ASK = int(Side.BID), int(Side.ASK)
     lp1, lp2, pri = scripts
@@ -394,7 +392,7 @@ def _fx_scripted(scripts: List[_Script]) -> None:
     lp2.emit(EventType.QUOTE, side=ASK, price=mid + 5, qty=14, order_id=0)
 
 
-def _merge_arrival(parts: List[List[MarketEvent]]) -> List[MarketEvent]:
+def _merge_arrival(parts: list[list[MarketEvent]]) -> list[MarketEvent]:
     """Concatenate scripted blocks (already in per-stream time order) by receive_ts."""
     out = [ev for part in parts for ev in part]
     out.sort(key=lambda e: (e.receive_ts, e.venue_id, e.sequence, e.event_type))
@@ -403,7 +401,7 @@ def _merge_arrival(parts: List[List[MarketEvent]]) -> List[MarketEvent]:
 
 def generate_golden_eq_anomalies(
     refdata: ReferenceData, seed: int = GOLDEN_EQ_ANOMALY_SEED, natural: int = 600
-) -> List[MarketEvent]:
+) -> list[MarketEvent]:
     """SYN.EQ.001 @ XV1+XV2 anomaly vector (arrival order, event_id 1..N)."""
     gen = MarketDataGenerator(
         refdata,
@@ -421,7 +419,7 @@ def generate_golden_eq_anomalies(
     halt_at = open_ns + 20 * NS
     halt_window = (halt_at, halt_at + gen.cfg["equities"]["halt"]["duration_s"] * NS)
     streams = []
-    natural_events: List[MarketEvent] = []
+    natural_events: list[MarketEvent] = []
     for vi, vname in enumerate(("XV1", "XV2")):
         stream = _Stream(inst, refdata.venue(vname))
         if vi == 1:
@@ -456,7 +454,7 @@ def generate_golden_eq_anomalies(
 
 def generate_golden_fx_anomalies(
     refdata: ReferenceData, seed: int = GOLDEN_FX_ANOMALY_SEED, natural: int = 500
-) -> List[MarketEvent]:
+) -> list[MarketEvent]:
     """EUR/USD @ LP1/LP2/PRI anomaly vector (arrival order, event_id 1..N)."""
     gen = MarketDataGenerator(refdata, {"seed": seed, "anomalies": _ANOMALIES})
     inst = refdata.instrument("EUR/USD")
@@ -486,7 +484,7 @@ def generate_golden_fx_anomalies(
     return events
 
 
-def anomaly_vector(refdata: ReferenceData, name: str) -> Optional[List[MarketEvent]]:
+def anomaly_vector(refdata: ReferenceData, name: str) -> list[MarketEvent] | None:
     """Regenerate a pinned anomaly vector by golden file name."""
     if name == "events_eq_anomalies.jsonl":
         return generate_golden_eq_anomalies(refdata)

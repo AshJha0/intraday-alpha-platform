@@ -24,8 +24,9 @@ import hashlib
 import re
 import struct
 import zlib
+from collections.abc import Iterable, Iterator, Sequence
 from pathlib import Path
-from typing import Iterable, Iterator, List, NamedTuple, Sequence, Tuple, Union
+from typing import NamedTuple
 
 from iap.core.events import (
     FIELDS,
@@ -42,7 +43,7 @@ from iap.core.events import (
 _KEYS = FIELDS  # canonical key order
 
 #: Domain of every field: (min, max). Unsigned fields reject a leading '-'.
-_DOMAIN: Tuple[Tuple[int, int], ...] = (
+_DOMAIN: tuple[tuple[int, int], ...] = (
     (0, U64_MAX),  # event_id
     (0, U32_MAX),  # instrument_id
     (0, U16_MAX),  # venue_id
@@ -140,7 +141,7 @@ def encode_jsonl(events: Iterable[MarketEvent]) -> bytes:
     return "".join(encode_jsonl_line(ev) + "\n" for ev in events).encode("utf-8")
 
 
-def write_jsonl(path: Union[str, Path], events: Iterable[MarketEvent]) -> int:
+def write_jsonl(path: str | Path, events: Iterable[MarketEvent]) -> int:
     """Write canonical JSONL file; return number of events written."""
     n = 0
     with open(path, "wb") as f:
@@ -150,9 +151,9 @@ def write_jsonl(path: Union[str, Path], events: Iterable[MarketEvent]) -> int:
     return n
 
 
-def iter_jsonl(path: Union[str, Path]) -> Iterator[MarketEvent]:
+def iter_jsonl(path: str | Path) -> Iterator[MarketEvent]:
     """Iterate events from a canonical JSONL file (blank lines skipped)."""
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         for lineno, line in enumerate(f, start=1):
             # Only the pinned ASCII whitespace set (schemas/FORMAT.md §1), not
             # str.strip()'s Unicode set: a bare strip() also removed VT, FF and
@@ -167,7 +168,7 @@ def iter_jsonl(path: Union[str, Path]) -> Iterator[MarketEvent]:
                     raise ValueError(f"{path}:{lineno}: {exc}") from None
 
 
-def read_jsonl(path: Union[str, Path]) -> List[MarketEvent]:
+def read_jsonl(path: str | Path) -> list[MarketEvent]:
     """Read all events from a canonical JSONL file."""
     return list(iter_jsonl(path))
 
@@ -238,7 +239,7 @@ def encode_iap1(events: Sequence[MarketEvent]) -> bytes:
 class Iap1Decoded(NamedTuple):
     """Result of ``decode_iap1_ex``: events plus the file's format version."""
 
-    events: List[MarketEvent]
+    events: list[MarketEvent]
     version: int
     #: True iff the file carried (and passed) the CRC-32 integrity trailer.
     integrity_checked: bool
@@ -270,7 +271,7 @@ def decode_iap1_ex(data: bytes) -> Iap1Decoded:
         actual = crc32(data[:body_size])
         if actual != crc:
             raise ValueError(f"IAP1 CRC-32 mismatch: trailer 0x{crc:08X}, computed 0x{actual:08X}")
-    events: List[MarketEvent] = []
+    events: list[MarketEvent] = []
     unpack = _RECORD.unpack_from
     off = IAP1_HEADER_SIZE
     for _ in range(count):
@@ -308,19 +309,19 @@ def decode_iap1_ex(data: bytes) -> Iap1Decoded:
     return Iap1Decoded(events, version, with_trailer)
 
 
-def decode_iap1(data: bytes) -> List[MarketEvent]:
+def decode_iap1(data: bytes) -> list[MarketEvent]:
     """Decode IAP1 bytes. Rejects bad magic/version, truncation, count/CRC mismatch."""
     return decode_iap1_ex(data).events
 
 
-def write_iap1(path: Union[str, Path], events: Sequence[MarketEvent]) -> int:
+def write_iap1(path: str | Path, events: Sequence[MarketEvent]) -> int:
     """Write an IAP1 file; return number of events written."""
     with open(path, "wb") as f:
         f.write(encode_iap1(events))
     return len(events)
 
 
-def read_iap1(path: Union[str, Path]) -> List[MarketEvent]:
+def read_iap1(path: str | Path) -> list[MarketEvent]:
     """Read an IAP1 file."""
     with open(path, "rb") as f:
         return decode_iap1(f.read())
@@ -334,7 +335,7 @@ def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def sha256_file(path: Union[str, Path]) -> str:
+def sha256_file(path: str | Path) -> str:
     """Hex SHA-256 of a file's contents."""
     h = hashlib.sha256()
     with open(path, "rb") as f:

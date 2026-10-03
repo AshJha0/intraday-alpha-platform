@@ -30,8 +30,6 @@ in the window" — an undefined denominator, so ``ret_vol_adj`` is INVALID, not
 
 from __future__ import annotations
 
-from typing import List
-
 from iap.features._famutil import put
 from iap.features.spec import EPS, WINDOW_NS, FeatureSpec, mkspec
 
@@ -40,9 +38,9 @@ FAMILY = "price"
 HORIZONS = ("1s", "5s", "10s", "30s", "1m")
 
 
-def specs() -> List[FeatureSpec]:
+def specs() -> list[FeatureSpec]:
     """Registry entries for the price family (pinned order)."""
-    out: List[FeatureSpec] = []
+    out: list[FeatureSpec] = []
     for h in HORIZONS:
         out.append(
             mkspec(
@@ -105,7 +103,7 @@ def specs() -> List[FeatureSpec]:
     return out
 
 
-def compute(st, values: List[float], valid: List[bool]) -> None:
+def compute(st, values: list[float], valid: list[bool]) -> None:
     """Append the 30 price-family values for the current emission."""
     t = st.t
     ok = st.book_ok

@@ -17,7 +17,6 @@ Splits are computed from timestamps only — random shuffling never occurs.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Tuple
 
 import numpy as np
 
@@ -29,8 +28,8 @@ class Fold:
     fold: int
     train_idx: np.ndarray
     test_idx: np.ndarray
-    train_window: Tuple[int, int]  # [start_ts, end_ts) actually used by train
-    test_window: Tuple[int, int]  # [start_ts, end_ts) actually used by test
+    train_window: tuple[int, int]  # [start_ts, end_ts) actually used by train
+    test_window: tuple[int, int]  # [start_ts, end_ts) actually used by test
 
 
 class WalkForwardSplitter:
@@ -56,7 +55,7 @@ class WalkForwardSplitter:
         self.embargo_ns = embargo_ns
         self.label_horizon_ns = label_horizon_ns
 
-    def split(self, ts: np.ndarray) -> List[Fold]:
+    def split(self, ts: np.ndarray) -> list[Fold]:
         """Build folds from a (not necessarily sorted) int64 ns timestamp array.
 
         Returned index arrays index into ``ts`` as given.  Every fold
@@ -83,8 +82,8 @@ class WalkForwardSplitter:
             bounds.append(int(order[min(int(round(i * n / n_seg)), n - 1)]))
         bounds.append(t1 + 1)
 
-        folds: List[Fold] = []
-        self.degenerate_folds: List[int] = []
+        folds: list[Fold] = []
+        self.degenerate_folds: list[int] = []
         for k in range(self.n_folds):
             train_end = bounds[k + 1]  # exclusive train boundary
             test_start = train_end + self.embargo_ns

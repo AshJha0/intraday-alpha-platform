@@ -79,7 +79,6 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from enum import IntEnum
-from typing import Dict, List, Optional, Tuple
 
 from iap.core.events import (
     FIELDS,
@@ -180,7 +179,7 @@ class _Level:
 
     def __init__(self, price: int) -> None:
         self.price = price
-        self.orders: "OrderedDict[int, int]" = OrderedDict()  # FIFO by insertion
+        self.orders: OrderedDict[int, int] = OrderedDict()  # FIFO by insertion
         self.total_qty = 0
 
     @property
@@ -232,8 +231,8 @@ class OrderBook:
         self.instrument_id = instrument_id
         self.venue_id = venue_id
         self.reorder_window = reorder_window
-        self._levels: Dict[Tuple[int, int], _Level] = {}
-        self._orders: Dict[int, Tuple[int, int]] = {}
+        self._levels: dict[tuple[int, int], _Level] = {}
+        self._orders: dict[int, tuple[int, int]] = {}
         self.last_sequence = 0
         self.has_sequence = False
         self.sequence_epoch = 0
@@ -246,7 +245,7 @@ class OrderBook:
         self._snapshot_broken = False
         self._snapshot_countdown = 0
         self._snapshot_synthetic_next = [0, 0]
-        self._pending: Dict[int, MarketEvent] = {}
+        self._pending: dict[int, MarketEvent] = {}
         for name in COUNTER_NAMES:
             setattr(self, name, 0)
 
@@ -284,7 +283,7 @@ class OrderBook:
             self._drain_pending()
         return status
 
-    def _flush_pending(self, target_seq: Optional[int] = None) -> ApplyStatus:
+    def _flush_pending(self, target_seq: int | None = None) -> ApplyStatus:
         """Apply every held-back event in sequence order (gap declared).
 
         Returns the verdict of ``target_seq`` (the event that triggered the
@@ -595,7 +594,7 @@ class OrderBook:
 
     # ---------------------------------------------------------- derived state
 
-    def resting_orders(self, side: Optional[int] = None) -> List[Tuple[int, int, int, int]]:
+    def resting_orders(self, side: int | None = None) -> list[tuple[int, int, int, int]]:
         """[(order_id, side, price_ticks, qty)] in deterministic insertion order."""
         out = []
         for oid, (s, price) in self._orders.items():
@@ -611,7 +610,7 @@ class OrderBook:
         """Number of events currently held back in the reorder buffer."""
         return len(self._pending)
 
-    def _best_level(self, side: int) -> Optional[_Level]:
+    def _best_level(self, side: int) -> _Level | None:
         best_key = None
         for key in self._levels:
             if key[0] != side:
@@ -624,12 +623,12 @@ class OrderBook:
                 best_key = key
         return self._levels[best_key] if best_key is not None else None
 
-    def best_bid(self) -> Optional[Tuple[int, int]]:
+    def best_bid(self) -> tuple[int, int] | None:
         """(price_ticks, total_size) of the best bid, or None."""
         level = self._best_level(Side.BID)
         return (level.price, level.total_qty) if level else None
 
-    def best_ask(self) -> Optional[Tuple[int, int]]:
+    def best_ask(self) -> tuple[int, int] | None:
         """(price_ticks, total_size) of the best ask, or None."""
         level = self._best_level(Side.ASK)
         return (level.price, level.total_qty) if level else None
@@ -648,16 +647,16 @@ class OrderBook:
         """True if not stale and the last event was received within max_age_ns."""
         return not self.stale and self.has_sequence and now_ns - self.receive_ts <= max_age_ns
 
-    def _sorted_levels(self, side: int) -> List[_Level]:
+    def _sorted_levels(self, side: int) -> list[_Level]:
         levels = [lvl for (s, _), lvl in self._levels.items() if s == side]
         levels.sort(key=lambda l: -l.price if side == Side.BID else l.price)
         return levels
 
-    def depth(self, side: int, levels: int = DEPTH_LEVELS) -> List[Tuple[int, int]]:
+    def depth(self, side: int, levels: int = DEPTH_LEVELS) -> list[tuple[int, int]]:
         """Top-N [(price_ticks, total_size)] best-first."""
         return [(l.price, l.total_qty) for l in self._sorted_levels(side)[:levels]]
 
-    def order_count(self, side: int, levels: int = DEPTH_LEVELS) -> List[Tuple[int, int]]:
+    def order_count(self, side: int, levels: int = DEPTH_LEVELS) -> list[tuple[int, int]]:
         """Top-N [(price_ticks, order_count)] best-first."""
         return [(l.price, l.order_count) for l in self._sorted_levels(side)[:levels]]
 
@@ -724,7 +723,7 @@ class OrderBook:
         }
 
     @classmethod
-    def restore(cls, cp: dict) -> "OrderBook":
+    def restore(cls, cp: dict) -> OrderBook:
         """Rebuild an identical book from ``checkpoint()`` output."""
         if cp.get("x-version") != CHECKPOINT_VERSION:
             raise ValueError(f"unsupported book checkpoint x-version: {cp.get('x-version')!r}")
@@ -802,7 +801,7 @@ class ConsolidatedBook:
     def __init__(self, instrument_id: int, reorder_window: int = 0) -> None:
         self.instrument_id = instrument_id
         self.reorder_window = reorder_window
-        self.books: Dict[int, OrderBook] = {}
+        self.books: dict[int, OrderBook] = {}
 
     def venue_book(self, venue_id: int) -> OrderBook:
         """Get (or lazily create) the per-venue book."""
@@ -821,21 +820,21 @@ class ConsolidatedBook:
         for vid in sorted(self.books):
             self.books[vid].reset_sequence()
 
-    def active_venues(self) -> List[int]:
+    def active_venues(self) -> list[int]:
         """Sorted venue ids whose books are not stale (merged into the view)."""
         return [vid for vid in sorted(self.books) if not self.books[vid].stale]
 
-    def stale_venues(self) -> List[int]:
+    def stale_venues(self) -> list[int]:
         """Sorted venue ids whose books are stale (excluded from the view)."""
         return [vid for vid in sorted(self.books) if self.books[vid].stale]
 
-    def venue_status(self, venue_id: int) -> Optional[int]:
+    def venue_status(self, venue_id: int) -> int | None:
         """SessionStatus code of one venue's book (None if the venue is unknown)."""
         book = self.books.get(venue_id)
         return book.status if book is not None else None
 
-    def _merged(self, side: int) -> List[Tuple[int, int, int]]:
-        agg: Dict[int, List[int]] = {}
+    def _merged(self, side: int) -> list[tuple[int, int, int]]:
+        agg: dict[int, list[int]] = {}
         for vid in sorted(self.books):
             book = self.books[vid]
             if book.stale:
@@ -848,11 +847,11 @@ class ConsolidatedBook:
         out.sort(key=lambda t: -t[0] if side == Side.BID else t[0])
         return out
 
-    def best_bid(self) -> Optional[Tuple[int, int]]:
+    def best_bid(self) -> tuple[int, int] | None:
         m = self._merged(Side.BID)
         return (m[0][0], m[0][1]) if m else None
 
-    def best_ask(self) -> Optional[Tuple[int, int]]:
+    def best_ask(self) -> tuple[int, int] | None:
         m = self._merged(Side.ASK)
         return (m[0][0], m[0][1]) if m else None
 
@@ -866,10 +865,10 @@ class ConsolidatedBook:
         bb, ba = self.best_bid(), self.best_ask()
         return bb is not None and ba is not None and bb[0] == ba[0]
 
-    def depth(self, side: int, levels: int = DEPTH_LEVELS) -> List[Tuple[int, int]]:
+    def depth(self, side: int, levels: int = DEPTH_LEVELS) -> list[tuple[int, int]]:
         return [(p, sq) for p, sq, _ in self._merged(side)[:levels]]
 
-    def order_count(self, side: int, levels: int = DEPTH_LEVELS) -> List[Tuple[int, int]]:
+    def order_count(self, side: int, levels: int = DEPTH_LEVELS) -> list[tuple[int, int]]:
         return [(p, oc) for p, _, oc in self._merged(side)[:levels]]
 
     def trade_flow(self) -> int:
@@ -899,7 +898,7 @@ class ConsolidatedBook:
         }
 
     @classmethod
-    def restore(cls, cp: dict) -> "ConsolidatedBook":
+    def restore(cls, cp: dict) -> ConsolidatedBook:
         cons = cls(cp["instrument_id"], cp["reorder_window"])
         for vid, bcp in cp["venues"].items():
             cons.books[int(vid)] = OrderBook.restore(bcp)

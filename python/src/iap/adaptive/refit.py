@@ -33,7 +33,6 @@ import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional
 
 
 @dataclass(frozen=True)
@@ -42,15 +41,15 @@ class RefitContext:
 
     now_ns: int  # decision event time (block boundary)
     last_fit_ns: int  # event time of the last (re)fit
-    psi_by_series: Dict[str, Optional[float]] = field(default_factory=dict)
-    ic_z: Optional[float] = None  # rolling realized-IC z vs research
+    psi_by_series: dict[str, float | None] = field(default_factory=dict)
+    ic_z: float | None = None  # rolling realized-IC z vs research
 
     @property
     def elapsed_ns(self) -> int:
         return self.now_ns - self.last_fit_ns
 
     @property
-    def psi_max(self) -> Optional[float]:
+    def psi_max(self) -> float | None:
         vals = [v for v in self.psi_by_series.values() if v is not None]
         return max(vals) if vals else None
 
@@ -58,7 +57,7 @@ class RefitContext:
 @dataclass(frozen=True)
 class RefitDecision:
     refit: bool
-    reasons: List[str] = field(default_factory=list)
+    reasons: list[str] = field(default_factory=list)
 
 
 class RefitPolicy(ABC):
@@ -135,7 +134,7 @@ class DriftTriggeredPolicy(RefitPolicy):
     def should_refit(self, ctx: RefitContext) -> RefitDecision:
         if ctx.elapsed_ns < self.min_refit_gap_ns:
             return RefitDecision(refit=False)
-        reasons: List[str] = []
+        reasons: list[str] = []
         for series in sorted(ctx.psi_by_series):
             v = ctx.psi_by_series[series]
             if v is not None and v > self.psi_threshold:

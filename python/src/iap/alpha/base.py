@@ -38,7 +38,7 @@ contradicts its rationale can at best be ITERATE, never PROMOTE.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Mapping, Optional, Sequence, Tuple
+from collections.abc import Mapping, Sequence
 
 import numpy as np
 import pandas as pd
@@ -61,10 +61,10 @@ VALID_HORIZONS = (
 )
 
 #: pinned universes (configs/instruments/instruments.json)
-EQ_IDS: Tuple[int, ...] = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
-EQ_CONSTITUENT_IDS: Tuple[int, ...] = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+EQ_IDS: tuple[int, ...] = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
+EQ_CONSTITUENT_IDS: tuple[int, ...] = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
 ETF_ID = 11
-FX_IDS: Tuple[int, ...] = (101, 102, 103, 104, 105, 106, 107, 108)
+FX_IDS: tuple[int, ...] = (101, 102, 103, 104, 105, 106, 107, 108)
 FX_REF_ID = 101  # EUR/USD — cross-asset reference pair (features/context.py)
 
 
@@ -76,7 +76,7 @@ class AlphaModel(ABC):
     name: str = ""
     asset_class: str = ""  # "EQUITY" | "FX"
     horizon: str = ""  # pinned label horizon
-    features: Tuple[str, ...] = ()  # registry feature names read by score()
+    features: tuple[str, ...] = ()  # registry feature names read by score()
     cross_sectional: bool = False  # True: score needs the whole universe
 
     def __init_subclass__(cls, **kwargs) -> None:
@@ -103,7 +103,7 @@ class AlphaModel(ABC):
         idx = doc.find("Economic rationale:")
         return doc[idx:] if idx >= 0 else doc
 
-    def universe(self, instrument_ids: Sequence[int]) -> List[int]:
+    def universe(self, instrument_ids: Sequence[int]) -> list[int]:
         """The subset of ``instrument_ids`` this alpha trades (sorted)."""
         base = EQ_IDS if self.asset_class == "EQUITY" else FX_IDS
         return sorted(i for i in instrument_ids if i in base)
@@ -115,7 +115,7 @@ class AlphaModel(ABC):
         """Fit parameters on training frames (labels may be read here only)."""
 
     @abstractmethod
-    def score(self, data: Mapping[int, pd.DataFrame]) -> Dict[int, pd.DataFrame]:
+    def score(self, data: Mapping[int, pd.DataFrame]) -> dict[int, pd.DataFrame]:
         """Score frames -> per-instrument (exchange_ts, expected_return, confidence)."""
 
     # -- parameter serialization (configs/strategies/alpha_params.json) ---
@@ -178,7 +178,7 @@ class LinearAlpha(AlphaModel):
         self.n_train: int = 0
         self.z_clip: float = self.Z_CLIP
         self.conf_scale: float = self.CONF_SCALE
-        self.train_window: Optional[Dict[str, int]] = None
+        self.train_window: dict[str, int] | None = None
         self._fitted = False
 
     @property
@@ -192,10 +192,10 @@ class LinearAlpha(AlphaModel):
     def raw_signal(self, df: pd.DataFrame) -> pd.Series:
         """Oriented causal raw signal for one instrument frame (NaN = invalid)."""
 
-    def signals(self, data: Mapping[int, pd.DataFrame]) -> Dict[int, pd.Series]:
+    def signals(self, data: Mapping[int, pd.DataFrame]) -> dict[int, pd.Series]:
         """Raw signals for every universe instrument (cross-sectional alphas
         override this to compute jointly)."""
-        out: Dict[int, pd.Series] = {}
+        out: dict[int, pd.Series] = {}
         for iid in self.universe(list(data)):
             out[iid] = self.raw_signal(data[iid])
         return out
@@ -206,8 +206,8 @@ class LinearAlpha(AlphaModel):
         label_col = f"label_mid_{self.horizon}"
         valid_col = f"label_valid_{self.horizon}"
         sigs = self.signals(train)
-        xs: List[np.ndarray] = []
-        ys: List[np.ndarray] = []
+        xs: list[np.ndarray] = []
+        ys: list[np.ndarray] = []
         for iid, sig in sigs.items():
             df = train[iid]
             if label_col not in df.columns:
@@ -247,10 +247,10 @@ class LinearAlpha(AlphaModel):
         self.beta = self.beta_fit  # free-signed; hypothesis check via sign
         self._fitted = True
 
-    def score(self, data: Mapping[int, pd.DataFrame]) -> Dict[int, pd.DataFrame]:
+    def score(self, data: Mapping[int, pd.DataFrame]) -> dict[int, pd.DataFrame]:
         if not self._fitted:
             raise RuntimeError(f"{self.alpha_id}: score() before fit()/load_params()")
-        out: Dict[int, pd.DataFrame] = {}
+        out: dict[int, pd.DataFrame] = {}
         dead = self.is_dead
         for iid, sig in self.signals(data).items():
             df = data[iid]

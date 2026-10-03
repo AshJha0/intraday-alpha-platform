@@ -90,14 +90,15 @@ import json
 import math
 import shutil
 import tempfile
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence
+from typing import Any
 
 import pandas as pd
 
 from iap.alpha import build
 from iap.alpha.data import load_features
-from iap.backtest import Backtester, BacktestConfig, CostModel
+from iap.backtest import BacktestConfig, Backtester, CostModel
 from iap.core.rng import SplitMix64
 from iap.experiment.locking import atomic_write_text
 from iap.marketdata.generator import MarketDataGenerator, load_generator_config
@@ -145,10 +146,10 @@ DEFAULT_LEVELS = (0.0, 0.5, 1.0, 2.0)
 DEFAULT_SEEDS = 3
 
 #: planted effect -> the flagship alpha expected to detect it.
-DETECTORS: Dict[str, str] = {"order_flow": "EQ04", "lead_lag": "EQ10"}
+DETECTORS: dict[str, str] = {"order_flow": "EQ04", "lead_lag": "EQ10"}
 
 #: scenario -> the ``planted.break`` block it runs under.
-SCENARIOS: Dict[str, Dict[str, Any]] = {
+SCENARIOS: dict[str, dict[str, Any]] = {
     "stable": {"at_fraction": None, "post_multiplier": 1.0},
     "break": {"at_fraction": 0.5, "post_multiplier": -1.0},
 }
@@ -160,7 +161,7 @@ def _fail(message: str) -> ResearchError:
     return ResearchError(message, code="power_study_error")
 
 
-def study_seeds(base_seed: int, n_seeds: int) -> List[int]:
+def study_seeds(base_seed: int, n_seeds: int) -> list[int]:
     """``n_seeds`` generator seeds from SplitMix64(``base_seed``) (31-bit, so
     they stay exact through JSON and every port's integer type)."""
     if n_seeds < 1:
@@ -169,7 +170,7 @@ def study_seeds(base_seed: int, n_seeds: int) -> List[int]:
     return [int(rng.next_u64() >> 33) for _ in range(n_seeds)]
 
 
-def cell_config(base: Mapping[str, Any], level: float, scenario: str, seed: int) -> Dict[str, Any]:
+def cell_config(base: Mapping[str, Any], level: float, scenario: str, seed: int) -> dict[str, Any]:
     """The generator config of one run: ``base`` with both reference planted
     strengths scaled by ``level``, the scenario's break block and ``seed``."""
     if scenario not in SCENARIOS:
@@ -215,7 +216,7 @@ def build_planted_frames(
     configs_dir: Path,
     work_dir: Path,
     universe: Sequence[str] = DEFAULT_UNIVERSE,
-) -> Dict[int, pd.DataFrame]:
+) -> dict[int, pd.DataFrame]:
     """Generator -> normalise -> features + labels for one planted config,
     entirely inside ``work_dir``; returns the per-instrument feature frames."""
     from iap.features.__main__ import main as features_main
@@ -262,9 +263,9 @@ def _backtester(configs_dir: Path) -> Backtester:
 def evaluate_run(
     frames: Mapping[int, pd.DataFrame],
     configs_dir: Path,
-    ledger_t_threshold: Optional[float] = None,
+    ledger_t_threshold: float | None = None,
     seed: int = 0,
-) -> Dict[str, dict]:
+) -> dict[str, dict]:
     """``validate_alpha`` (and the per-fold diagnostics) for every detector
     on one planted dataset.
 
@@ -280,7 +281,7 @@ def evaluate_run(
         (configs_dir / "execution" / "execution.json").read_text(encoding="utf-8")
     )
     max_participation = float(exec_cfg["defaults"]["max_participation"])
-    out: Dict[str, dict] = {}
+    out: dict[str, dict] = {}
     for effect in sorted(DETECTORS):
         alpha_id = DETECTORS[effect]
 
@@ -318,8 +319,8 @@ def _run_row(
     alpha_id: str,
     report: Mapping[str, Any],
     diagnostics: Mapping[str, Any],
-    ledger_t_threshold: Optional[float] = None,
-) -> Dict[str, Any]:
+    ledger_t_threshold: float | None = None,
+) -> dict[str, Any]:
     gate_ic = report["gate_ic"]
     t_within = report["nw_tstat_uncrossed"]
     if t_within is None:
@@ -357,23 +358,23 @@ def _run_row(
     }
 
 
-def _frame_rows(frames: Mapping[int, pd.DataFrame]) -> Dict[str, int]:
+def _frame_rows(frames: Mapping[int, pd.DataFrame]) -> dict[str, int]:
     """Feature rows per instrument of one planted dataset (for the record)."""
     return {str(i): int(len(frames[i])) for i in sorted(frames)}
 
 
-def _mean(values: Sequence[Optional[float]]) -> Optional[float]:
+def _mean(values: Sequence[float | None]) -> float | None:
     finite = [float(v) for v in values if v is not None and math.isfinite(float(v))]
     return round(sum(finite) / len(finite), _ROUND) if finite else None
 
 
-def summarise(runs: Sequence[Mapping[str, Any]]) -> List[Dict[str, Any]]:
+def summarise(runs: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     """One row per (effect, scenario, level): rates and means over seeds."""
-    cells: Dict[tuple, List[Mapping[str, Any]]] = {}
+    cells: dict[tuple, list[Mapping[str, Any]]] = {}
     for run in runs:
         for effect, row in run["detectors"].items():
             cells.setdefault((effect, run["scenario"], float(run["level"])), []).append(row)
-    out: List[Dict[str, Any]] = []
+    out: list[dict[str, Any]] = []
     for effect, scenario, level in sorted(cells):
         rows = cells[(effect, scenario, level)]
         ok = [r for r in rows if "error" not in r]
@@ -428,9 +429,9 @@ def run_power_study(
     n_seeds: int = DEFAULT_SEEDS,
     scenarios: Sequence[str] = tuple(SCENARIOS),
     universe: Sequence[str] = DEFAULT_UNIVERSE,
-    scratch_dir: Optional[Path] = None,
-    progress: Optional[Callable[[str], None]] = None,
-) -> Dict[str, Any]:
+    scratch_dir: Path | None = None,
+    progress: Callable[[str], None] | None = None,
+) -> dict[str, Any]:
     """Run the grid and return the ``POWER_REPORT.json`` document.
 
     ``scratch_dir`` (default: a fresh temporary directory) holds one
@@ -469,7 +470,7 @@ def run_power_study(
     owned = scratch_dir is None
     scratch = Path(tempfile.mkdtemp(prefix="iap-power-")) if owned else Path(scratch_dir)
     scratch.mkdir(parents=True, exist_ok=True)
-    runs: List[Dict[str, Any]] = []
+    runs: list[dict[str, Any]] = []
     try:
         for scenario, level in grid:
             for seed in seeds:
@@ -653,7 +654,7 @@ def render_markdown(doc: Mapping[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def write_reports(doc: Mapping[str, Any], out_dir: Path) -> Dict[str, Path]:
+def write_reports(doc: Mapping[str, Any], out_dir: Path) -> dict[str, Path]:
     """Write ``POWER_REPORT.json`` and ``POWER_REPORT.md`` under ``out_dir``."""
     out_dir = Path(out_dir)
     paths = {"json": out_dir / "POWER_REPORT.json", "md": out_dir / "POWER_REPORT.md"}

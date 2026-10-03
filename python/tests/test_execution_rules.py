@@ -11,7 +11,6 @@ import math
 from dataclasses import replace
 
 import pytest
-
 from iap.core.events import EventType, MarketEvent, SessionStatus
 from iap.core.rng import SplitMix64
 from iap.execution import (

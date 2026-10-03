@@ -13,7 +13,8 @@ points of the relevant notional (see each key's docstring below).
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, List, Mapping, Optional, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 from iap.contracts.types import Algo
 from iap.contracts.versions import canonical_json
@@ -50,18 +51,18 @@ def check_finite(obj: Any, path: str = "$") -> None:
             check_finite(v, f"{path}[{i}]")
 
 
-def _mean(values: Sequence[float]) -> Optional[float]:
+def _mean(values: Sequence[float]) -> float | None:
     return sum(values) / len(values) if values else None
 
 
-def _weighted(values: Sequence[float], weights: Sequence[float]) -> Optional[float]:
+def _weighted(values: Sequence[float], weights: Sequence[float]) -> float | None:
     total = sum(weights)
     if total <= 0.0:
         return None
     return sum(v * w for v, w in zip(values, weights)) / total
 
 
-def _latency_block(values: Sequence[int]) -> Dict[str, Any]:
+def _latency_block(values: Sequence[int]) -> dict[str, Any]:
     if not values:
         return {"count": 0, "min": 0, "mean": 0.0, "max": 0, "p50": 0, "p99": 0}
     s = sorted(values)
@@ -92,7 +93,7 @@ IC_DEFINITION = (
 )
 
 
-def _ic_block(ic: IcResult) -> Dict[str, Any]:
+def _ic_block(ic: IcResult) -> dict[str, Any]:
     """The report keys of one :class:`IcResult`."""
     return {
         "horizon": ic.horizon,
@@ -104,7 +105,7 @@ def _ic_block(ic: IcResult) -> Dict[str, Any]:
     }
 
 
-def research_ic_of(registry: AlphaRegistry, alpha_id: str) -> Optional[float]:
+def research_ic_of(registry: AlphaRegistry, alpha_id: str) -> float | None:
     """The research IC the lifecycle registry evaluated for ``alpha_id`` (the
     ``oos_ic`` gate value of its last evaluation), ``None`` when absent."""
     if alpha_id not in registry:
@@ -116,19 +117,19 @@ def research_ic_of(registry: AlphaRegistry, alpha_id: str) -> Optional[float]:
     return ev.gates["oos_ic"].value
 
 
-def _execution_block(outcomes: Sequence[OrderOutcome]) -> Dict[str, Any]:
+def _execution_block(outcomes: Sequence[OrderOutcome]) -> dict[str, Any]:
     with_tca = [o for o in outcomes if o.tca is not None]
     qty = [float(o.tca.qty) for o in with_tca]
     filled = [float(o.tca.filled_qty) for o in with_tca]
     is_bps = [o.tca.implementation_shortfall_bps for o in with_tca]
 
-    def qw(attr: str) -> Optional[float]:
+    def qw(attr: str) -> float | None:
         return _weighted([getattr(o.tca, attr) for o in with_tca], qty)
 
-    def fw(attr: str) -> Optional[float]:
+    def fw(attr: str) -> float | None:
         return _weighted([getattr(o.tca, attr) for o in with_tca], filled)
 
-    per_algo: Dict[str, Any] = {}
+    per_algo: dict[str, Any] = {}
     for algo in Algo:
         group = [o for o in with_tca if o.parent.algo is algo]
         if not group:
@@ -182,7 +183,7 @@ def _execution_block(outcomes: Sequence[OrderOutcome]) -> Dict[str, Any]:
 
 def build_report(
     engine: MvpEngine, feed: FeedResult, trace_digest: str, registry: AlphaRegistry
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """The report document (see module docstring).  Raises on a non-finite number."""
     if not engine.counters.events:
         raise ValueError("report: the engine processed no events")
@@ -206,7 +207,7 @@ def build_report(
         ],
         notional,
     )
-    venue_fill_qty: Dict[str, int] = {name: 0 for name in engine.venue_names.values()}
+    venue_fill_qty: dict[str, int] = {name: 0 for name in engine.venue_names.values()}
     for o in outcomes:
         for vid, q in o.venue_qty.items():
             venue_fill_qty[engine.venue_names[vid]] += q
@@ -215,7 +216,7 @@ def build_report(
         name: (q / total_filled if total_filled else 0.0) for name, q in venue_fill_qty.items()
     }
     by_rule = engine.risk_decisions_by_rule()
-    per_alpha: Dict[str, Any] = {}
+    per_alpha: dict[str, Any] = {}
     for alpha in engine.alphas:
         at_mvp = engine.realized_ic(alpha.alpha_id)
         at_fit = engine.realized_ic(alpha.alpha_id, alpha.model.horizon)
@@ -237,7 +238,7 @@ def build_report(
             "params_version": alpha.version,
         }
     ens = engine.realized_ic(engine.ensemble.alpha_id)
-    report: Dict[str, Any] = {
+    report: dict[str, Any] = {
         "x-version": REPORT_VERSION,
         "run": {
             "run_id": cfg.run_id,
@@ -399,7 +400,7 @@ def _fmt(v: Any, digits: int = 4) -> str:
 
 def _table(
     headers: Sequence[str], rows: Sequence[Sequence[str]], align: str = "right"
-) -> List[str]:
+) -> list[str]:
     """A Markdown table: header row, alignment row, one line per row."""
     sep = "---:" if align == "right" else "---"
     lines = ["| " + " | ".join(headers) + " |", "|" + "|".join([sep] * len(headers)) + "|"]
@@ -423,7 +424,7 @@ def render_markdown(report: Mapping[str, Any]) -> str:
     is_ = e["implementation_shortfall_bps"]
     ens = a["ensemble"]
     verdict = "COST-NEGATIVE" if a["cost_negative"] else "net positive"
-    out: List[str] = []
+    out: list[str] = []
     out += [f"# MVP run `{r['run_id']}` — {r['instrument']} (instrument {r['instrument_id']})", ""]
     out += [
         f"Session `{r['session_id']}`, seed {r['seed']}, alphas {', '.join(r['alphas'])}, "

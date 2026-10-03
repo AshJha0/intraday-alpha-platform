@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from bisect import bisect_right
 from collections import deque
-from typing import Deque, Dict, List, Optional, Sequence, Tuple
+from collections.abc import Sequence
 
 
 class RollingSum:
@@ -32,8 +32,8 @@ class RollingSum:
             raise ValueError("window_ns and nvals must be positive")
         self.window = window_ns
         self.nvals = nvals
-        self.buf: Deque[Tuple] = deque()
-        self.sums: List = [0] * nvals
+        self.buf: deque[tuple] = deque()
+        self.sums: list = [0] * nvals
         self.count = 0
 
     def add(self, ts: int, vals: Sequence) -> None:
@@ -68,8 +68,8 @@ class RollingExtrema:
 
     def __init__(self, window_ns: int) -> None:
         self.window = window_ns
-        self._maxq: Deque[Tuple[int, float]] = deque()
-        self._minq: Deque[Tuple[int, float]] = deque()
+        self._maxq: deque[tuple[int, float]] = deque()
+        self._minq: deque[tuple[int, float]] = deque()
 
     def add(self, ts: int, val) -> None:
         maxq, minq = self._maxq, self._minq
@@ -108,8 +108,8 @@ class TimeSeries:
     _COMPACT_AT = 4096
 
     def __init__(self) -> None:
-        self._ts: List[int] = []
-        self._vals: List = []
+        self._ts: list[int] = []
+        self._vals: list = []
         self._start = 0
 
     def append(self, ts: int, val) -> None:
@@ -123,7 +123,7 @@ class TimeSeries:
         i = bisect_right(self._ts, t, self._start)
         return self._vals[i - 1] if i > self._start else None
 
-    def first_ts(self) -> Optional[int]:
+    def first_ts(self) -> int | None:
         return self._ts[self._start] if self._start < len(self._ts) else None
 
     def last(self):
@@ -150,8 +150,8 @@ class RollingKeyCount:
 
     def __init__(self, window_ns: int) -> None:
         self.window = window_ns
-        self.buf: Deque[Tuple[int, int]] = deque()
-        self.counts: Dict[int, int] = {}
+        self.buf: deque[tuple[int, int]] = deque()
+        self.counts: dict[int, int] = {}
         self.total = 0
 
     def add(self, ts: int, key: int) -> None:
@@ -171,7 +171,7 @@ class RollingKeyCount:
                 del self.counts[key]
             self.total -= 1
 
-    def shares(self) -> List[float]:
+    def shares(self) -> list[float]:
         """Per-key count shares, iterated in sorted key order."""
         if not self.total:
             return []
@@ -209,8 +209,8 @@ class SessionProfile:
         if not 0.0 < decay <= 1.0:
             raise ValueError("decay must be in (0, 1]")
         self.decay = float(decay)
-        self._count: Dict[str, List[float]] = {m: [0.0] * self.BUCKETS for m in metrics}
-        self._sum: Dict[str, List[float]] = {m: [0.0] * self.BUCKETS for m in metrics}
+        self._count: dict[str, list[float]] = {m: [0.0] * self.BUCKETS for m in metrics}
+        self._sum: dict[str, list[float]] = {m: [0.0] * self.BUCKETS for m in metrics}
 
     @staticmethod
     def bucket_of(ts_ns: int, utc_offset_s: int = 0) -> int:
@@ -224,7 +224,7 @@ class SessionProfile:
         sec_of_day = (ts_ns // 1_000_000_000 + utc_offset_s) % 86_400
         return int(sec_of_day // 300)
 
-    def prior(self, metric: str, bucket: int) -> Tuple[float, float]:
+    def prior(self, metric: str, bucket: int) -> tuple[float, float]:
         """(count, mean) accumulated so far for (metric, bucket); mean=0 if empty."""
         c = self._count[metric][bucket]
         s = self._sum[metric][bucket]

@@ -33,7 +33,6 @@ need window warmup, >= 4 pairs, and var > 1e-18 in every denominator.
 from __future__ import annotations
 
 from math import sqrt
-from typing import List, Optional
 
 from iap.features._famutil import put
 from iap.features.spec import WINDOW_NS, FeatureSpec, mkspec
@@ -46,9 +45,9 @@ MIN_PAIRS = 4
 MIN_VAR = 1e-18
 
 
-def specs() -> List[FeatureSpec]:
+def specs() -> list[FeatureSpec]:
     """Registry entries for the cross-asset family (pinned order)."""
-    out: List[FeatureSpec] = []
+    out: list[FeatureSpec] = []
     for h in REF_HORIZONS:
         out.append(
             mkspec(
@@ -102,7 +101,7 @@ def specs() -> List[FeatureSpec]:
     return out
 
 
-def _moments(win) -> Optional[tuple]:
+def _moments(win) -> tuple | None:
     """(var_x, var_y, cov) population moments from a pair window, or None."""
     n = win.count
     if n < MIN_PAIRS:
@@ -115,7 +114,7 @@ def _moments(win) -> Optional[tuple]:
     return var_x, var_y, cov
 
 
-def compute(st, values: List[float], valid: List[bool]) -> None:
+def compute(st, values: list[float], valid: list[bool]) -> None:
     """Append the 11 cross-asset values for the current emission."""
     for h in REF_HORIZONS:
         put(values, valid, st.ref_ret_log(WINDOW_NS[h]), st.ref_ret_log(WINDOW_NS[h]) is not None)

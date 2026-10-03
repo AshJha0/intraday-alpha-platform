@@ -5,7 +5,6 @@ from __future__ import annotations
 import math
 
 import pytest
-
 from conftest import GOLDEN_DIR, REPO_ROOT, mkev
 from iap.core.codec import read_jsonl
 from iap.core.events import EventType

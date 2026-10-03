@@ -13,14 +13,13 @@ import dataclasses
 import json
 import math
 from pathlib import Path
-from typing import Dict
 
 import numpy as np
 import pandas as pd
 import pytest
-
+from conftest import CONFIGS_DIR, GOLDEN_DIR, REPO_ROOT
 from iap.alpha.equity import EQ03OfiMultiLevel
-from iap.backtest import Backtester, BacktestConfig, CostModel
+from iap.backtest import BacktestConfig, Backtester, CostModel
 from iap.contracts import protocols
 from iap.contracts.types import ExperimentSpec, Period, Verdict
 from iap.contracts.validate import validate
@@ -52,8 +51,6 @@ from iap.validation.ledger import ExperimentLedger
 from iap.validation.metrics import HORIZONS_NS
 from iap.validation.splits import Fold
 
-from conftest import CONFIGS_DIR, GOLDEN_DIR, REPO_ROOT
-
 TOL = 1e-9
 FEATURES_DIR = REPO_ROOT / "data" / "features"
 REPORTS_DIR = REPO_ROOT / "research" / "alpha_reports"
@@ -69,7 +66,7 @@ NS_S = 1_000_000_000
 
 
 @pytest.fixture(scope="module")
-def frames() -> Dict[int, pd.DataFrame]:
+def frames() -> dict[int, pd.DataFrame]:
     return golden_frames(GOLDEN_DIR, CONFIGS_DIR)
 
 
@@ -120,9 +117,9 @@ def _runner(frames, tmp_path: Path, **kwargs) -> ExperimentRunner:
 
 def _two_day_frames(
     rows_per_day: int = 200, step_ns: int = 30 * NS_S, day0: int = 20_000
-) -> Dict[int, pd.DataFrame]:
+) -> dict[int, pd.DataFrame]:
     """Timestamp-only frames covering two UTC sessions (derivation input)."""
-    out: Dict[int, pd.DataFrame] = {}
+    out: dict[int, pd.DataFrame] = {}
     for iid, offset in ((1, 0), (2, 7 * NS_S)):
         ts = []
         for day in (day0, day0 + 1):

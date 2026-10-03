@@ -21,7 +21,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Union
+from typing import Any
 
 from iap.alpha import ALPHA_CLASSES
 from iap.contracts.versions import canonical_json
@@ -66,7 +66,7 @@ class RunResult:
     out_dir: Path
     config: MvpConfig
     feed: FeedResult
-    report: Dict[str, Any]
+    report: dict[str, Any]
     trace_digest: str
     engine: MvpEngine
 
@@ -139,8 +139,8 @@ def _import_reference(
 
 
 def _paper_evidence(
-    engine: MvpEngine, report: Dict[str, Any], registry: AlphaRegistry
-) -> Dict[str, Any]:
+    engine: MvpEngine, report: dict[str, Any], registry: AlphaRegistry
+) -> dict[str, Any]:
     """``PaperEvidence`` per alpha from this one paper session (n_sessions=1).
 
     ``net_pnl`` is the session's total P&L (the alphas share one book: an
@@ -159,7 +159,7 @@ def _paper_evidence(
     conventions section 13.4).  ``ic_defined`` / ``research_ic_defined`` /
     ``n_ic_samples`` next to the block say why.
     """
-    alphas: Dict[str, Any] = {}
+    alphas: dict[str, Any] = {}
     kills = engine.n_kill_events()
     for alpha in engine.alphas:
         at_fit = engine.realized_ic(alpha.alpha_id, alpha.model.horizon)
@@ -208,7 +208,7 @@ def _write(path: Path, text: str) -> None:
         fh.write(text)
 
 
-def run_session(cfg: MvpConfig, feed: FeedResult, out_dir: Union[str, Path]) -> RunResult:
+def run_session(cfg: MvpConfig, feed: FeedResult, out_dir: str | Path) -> RunResult:
     """Run one session (see module docstring) and write every artefact."""
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -279,13 +279,13 @@ def run_session(cfg: MvpConfig, feed: FeedResult, out_dir: Union[str, Path]) -> 
     )
 
 
-def load_report(run_dir: Union[str, Path]) -> Dict[str, Any]:
+def load_report(run_dir: str | Path) -> dict[str, Any]:
     """``report.json`` of a run directory."""
     with open(Path(run_dir) / REPORT_JSON, encoding="utf-8") as fh:
         return json.load(fh)
 
 
-def _flatten(obj: Any, prefix: str, out: Dict[str, Any]) -> None:
+def _flatten(obj: Any, prefix: str, out: dict[str, Any]) -> None:
     if isinstance(obj, dict):
         for k, v in obj.items():
             _flatten(v, f"{prefix}.{k}" if prefix else str(k), out)
@@ -297,16 +297,16 @@ def _flatten(obj: Any, prefix: str, out: Dict[str, Any]) -> None:
 
 
 def compare_runs(
-    expected: Dict[str, Any], actual: Dict[str, Any], *, tolerance: float = 0.0
-) -> List[str]:
+    expected: dict[str, Any], actual: dict[str, Any], *, tolerance: float = 0.0
+) -> list[str]:
     """Differences between two report documents as ``key: expected != actual``
     lines (empty = identical).  Floats compare within ``tolerance`` (absolute
     and relative), everything else exactly."""
-    a: Dict[str, Any] = {}
-    b: Dict[str, Any] = {}
+    a: dict[str, Any] = {}
+    b: dict[str, Any] = {}
     _flatten(expected, "", a)
     _flatten(actual, "", b)
-    diffs: List[str] = []
+    diffs: list[str] = []
     for key in sorted(set(a) | set(b)):
         if key not in a:
             diffs.append(f"{key}: <absent> != {b[key]!r}")

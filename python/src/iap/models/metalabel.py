@@ -31,7 +31,7 @@ Pinned methodology:
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 import numpy as np
 from sklearn.calibration import CalibratedClassifierCV
@@ -39,7 +39,7 @@ from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.metrics import brier_score_loss, roc_auc_score
 
 from iap.experiment.tracker import ExperimentTracker
-from iap.models.dataset import Dataset, META_CONTEXT_COLUMNS, TARGET_HORIZON_NS
+from iap.models.dataset import META_CONTEXT_COLUMNS, TARGET_HORIZON_NS, Dataset
 from iap.models.economics import realized_net, signal_directions
 
 _EMBARGO_NS = 60_000_000_000
@@ -53,7 +53,7 @@ assert TARGET_HORIZON_NS < _EMBARGO_NS, (
 )
 
 #: Pinned meta-classifier hyperparameters (recorded in the run manifest).
-META_HYPERPARAMS: Dict[str, Any] = {
+META_HYPERPARAMS: dict[str, Any] = {
     "max_iter": 80,
     "max_depth": 3,
     "learning_rate": 0.1,
@@ -146,7 +146,7 @@ def _fit_isotonic_calibrated(base: Any, X_cal: np.ndarray, y_cal: np.ndarray) ->
 
 def _economics_from_mask(
     direction: np.ndarray, y_mid: np.ndarray, y_cost: np.ndarray, take: np.ndarray
-) -> Dict[str, float]:
+) -> dict[str, float]:
     d = np.where(take, direction, 0)
     net = realized_net(d, y_mid, y_cost)
     traded = d != 0
@@ -163,11 +163,11 @@ def _economics_from_mask(
 def run_meta_labeling(
     ds: Dataset,
     primary_pred: np.ndarray,
-    tracker: Optional[ExperimentTracker] = None,
+    tracker: ExperimentTracker | None = None,
     primary_name: str = "primary",
     tau: float = 0.5,
     impute_nan: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Train + calibrate + economically evaluate the meta-label gate.
 
     ``primary_pred`` is the pooled OOS prediction vector (NaN where a sample
@@ -278,10 +278,10 @@ def run_meta_labeling(
     # ``None`` (JSON null), never as a fabricated 0.5: 0.5 reads as "the
     # model was evaluated and has no skill", which is a different statement
     # from "the segment could not rank anything".
-    auc: Optional[float] = (
+    auc: float | None = (
         float(roc_auc_score(y_meta[te], p_test)) if len(np.unique(y_meta[te])) > 1 else None
     )
-    result: Dict[str, Any] = {
+    result: dict[str, Any] = {
         "primary_model": primary_name,
         "n_meta_samples": int(len(idx)),
         "segments": {"train": int(tr.sum()), "calibration": int(ca.sum()), "test": int(te.sum())},

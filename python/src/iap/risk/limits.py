@@ -17,9 +17,10 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Mapping
+from typing import Any
 
 from iap.risk.serialize import rust_display_f64
 
@@ -89,7 +90,7 @@ class RiskLimits:
     fx_conversion: Mapping[str, FxConversion]
 
     @classmethod
-    def from_json(cls, doc: Any) -> "RiskLimits":
+    def from_json(cls, doc: Any) -> RiskLimits:
         """Strict parse of a ``configs/risk/risk.json`` document (a parsed
         JSON value); ``ValueError`` names the first offending key."""
         dup = _as_i64(_lookup(doc, "per_order", "duplicate_order_window_ns"))
@@ -140,7 +141,7 @@ class RiskLimits:
         )
 
     @classmethod
-    def load(cls, path: "str | Path") -> "RiskLimits":
+    def load(cls, path: str | Path) -> RiskLimits:
         """Load and strictly parse a risk.json file (``ValueError`` on an
         unreadable file, malformed JSON or an invalid limit set)."""
         try:
@@ -169,17 +170,17 @@ def _is_number(v: Any) -> bool:
     return isinstance(v, (int, float)) and not isinstance(v, bool)
 
 
-def _as_f64(v: Any) -> "float | None":
+def _as_f64(v: Any) -> float | None:
     return float(v) if _is_number(v) else None
 
 
-def _as_i64(v: Any) -> "int | None":
+def _as_i64(v: Any) -> int | None:
     if isinstance(v, int) and not isinstance(v, bool) and _I64_MIN <= v <= _I64_MAX:
         return v
     return None
 
 
-def _as_u64(v: Any) -> "int | None":
+def _as_u64(v: Any) -> int | None:
     if isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= _U64_MAX:
         return v
     return None
@@ -217,11 +218,11 @@ def _need_bool(doc: Any, section: str, key: str) -> bool:
     return v
 
 
-def _parse_conversion(doc: Any) -> Dict[str, FxConversion]:
+def _parse_conversion(doc: Any) -> dict[str, FxConversion]:
     table = _lookup(doc, "currency", "conversion")
     if not isinstance(table, dict):
         raise ValueError("risk.json: missing currency.conversion object")
-    out: Dict[str, FxConversion] = {}
+    out: dict[str, FxConversion] = {}
     for ccy in sorted(table):
         spec = table[ccy]
         iid = _as_u64(spec.get("instrument_id")) if isinstance(spec, dict) else None

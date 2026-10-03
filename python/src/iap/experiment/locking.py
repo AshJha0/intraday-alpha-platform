@@ -27,7 +27,6 @@ from __future__ import annotations
 import os
 import time
 from pathlib import Path
-from typing import Optional
 
 __all__ = ["FileLock", "LockTimeout", "atomic_write_text"]
 
@@ -113,7 +112,7 @@ class FileLock:
                     raise
                 time.sleep(self.retry_interval_s)
 
-    def __enter__(self) -> "FileLock":
+    def __enter__(self) -> FileLock:
         self.acquire()
         return self
 
@@ -122,7 +121,7 @@ class FileLock:
 
 
 def atomic_write_text(
-    path, text: str, encoding: Optional[str] = None, newline: Optional[str] = None
+    path, text: str, encoding: str | None = None, newline: str | None = None
 ) -> None:
     """Replace ``path`` with ``text`` atomically (temp file + ``os.replace``).
 

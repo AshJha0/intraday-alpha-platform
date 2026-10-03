@@ -11,8 +11,8 @@
 
 from iap.backtest.costs import CostModel  # noqa: F401
 from iap.backtest.engine import (  # noqa: F401
-    Backtester,
     BacktestConfig,
+    Backtester,
     BacktestResult,
     InstrumentResult,
     ensemble_scores,
