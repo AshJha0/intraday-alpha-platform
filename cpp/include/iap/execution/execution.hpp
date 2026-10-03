@@ -33,8 +33,9 @@
 //    limit before any fill).
 // 3b. Displayed-liquidity consumption (mutating within a decision, pinned):
 //    the simulator keeps a per-(instrument, venue, side, price) overlay of
-//    the displayed size OUR aggressive fills already consumed. Aggressive
-//    walks see `displayed - consumed` at each level and debit the overlay;
+//    the displayed size OUR aggressive fills and the rule-4 / rule-8
+//    crossing check already consumed. Aggressive walks and crossing pools
+//    see `displayed - consumed` at each level and debit the overlay;
 //    whenever an applied market event changes the displayed size at a
 //    level (compared before/after the event) its overlay entry becomes
 //    min(consumed, new displayed size) — new liquidity added on top of a
@@ -67,9 +68,16 @@
 //        bounded by the observed volume and by ahead_qty exactly like a
 //        trade at our own level; it is NOT a free fill of the whole
 //        residual.
-//      - an observed CANCEL at (side, P) reduces ahead_qty by its full qty
-//        (deterministic full amount — no probabilistic split), floored at
-//        0; a CANCEL never fills us;
+//      - only events the book reports APPLIED are tracked: a
+//        retransmitted duplicate the book drops trades nothing;
+//      - an applied CANCEL reduces ahead_qty by the displayed size it
+//        removed from our level (floored at 0) only when the cancelled
+//        order is KNOWN to be ahead of us: a real (non-synthetic) order id
+//        that did not join the level after we did (an ADD at our level, or
+//        a MODIFY that grew it and so moved to the tail, after our rest is
+//        behind us). Synthetic QUOTE/SNAPSHOT ids never reduce it (non-MBO
+//        levels: cancels are assumed to come from behind). A CANCEL never
+//        fills us;
 //      - a MARKETABLE incoming ADD (its limit crosses the pre-event opposite
 //        best; the replayed book matches it internally with NO EXECUTE
 //        events, per conventions section 4) is expanded into the per-level
@@ -79,7 +87,9 @@
 //      - after the event is applied, if the venue's opposite best crosses P
 //        (ask <= our bid / bid >= our ask, e.g. after an FX QUOTE replaced
 //        L1), the order fills at P — but no trade was observed here, so the
-//        pool is the DISPLAYED size of that crossing opposite best (the
+//        pool is the DISPLAYED size of that crossing opposite best net of
+//        the rule-3b overlay, which the check debits so an unchanged
+//        display is never consumed twice (the
 //        most an incoming aggressor could have brought), one pool per side
 //        shared by every order of ours resting against it, in the same
 //        queue order, each paying down its ahead_qty from the pool first.
@@ -132,14 +142,16 @@
 //    rule-4 crossing check, so an uncross cannot print more than the
 //    displayed size that uncrossed it.
 // 9. Event processing order (pinned): expiries, then activations and
-//    cancel arrivals merged by time, then passive queue tracking on the raw
-//    event, then the book update, then the overlay reset, then the
-//    post-apply crossing check.
+//    cancel arrivals merged by time, then the book update, then passive
+//    queue tracking of the event if the book APPLIED it (against the
+//    pre-event depth), then the overlay reset, then the post-apply crossing
+//    check.
 
 #pragma once
 
 #include <cstdint>
 #include <map>
+#include <set>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -324,6 +336,9 @@ private:
     // Rule 3b overlay: (instrument, venue, side, price) -> consumed qty.
     std::map<std::tuple<std::uint32_t, std::uint16_t, std::uint8_t,
                         std::int64_t>, std::int64_t> consumed_;
+    // Rule 4: per resting order, the market order ids that joined its level
+    // after it did (membership only, never iterated).
+    std::map<std::uint64_t, std::set<std::uint64_t>> behind_;
     ExecCounters counters_;
     std::vector<Fill> fills_;
     std::uint64_t next_order_id_ = 1;

@@ -640,3 +640,34 @@ P&L moved (−22.68 -> −22.65 USD); nothing was promoted, before or after.
   disagreed — C++ rejected LF while Rust and Python accepted VT, FF and
   NBSP, so one port refused files the others ingested.
 - No stored data needs migrating: every regenerated artefact is derived.
+
+## 2026-10-03 — execution simulator rules 3b / 4 / 9 tightened (crossing pool, applied-only tracking, cancels from behind); no golden regenerated, no schema changed
+
+- **Rule 3b / rule 4 crossing.** The post-apply crossing check (and the
+  rule-8 reopen) rebuilt its pool from the displayed opposite best on every
+  event, so a resting buy 1000@100 against a static ask 50@100 filled 50 on
+  each unrelated event. The pool is now `displayed - consumed` from the
+  rule-3b overlay and the check debits the overlay (queue pay-down and fills),
+  with the existing refresh rule `min(consumed, new displayed)`.
+- **Rule 4 / rule 9 tracking.** Passive queue tracking now runs after the book
+  update and only for an event the book reports `APPLIED` (pre-event depth is
+  captured first, so fill order is unchanged): a retransmitted duplicate or
+  unknown-order EXECUTE no longer fills us.
+- **Rule 4 cancels.** A CANCEL reduces `ahead_qty` by the displayed size the
+  book removed from our level, and only when the cancelled order is known to
+  be ahead (a real order id not ADDed at, or re-queued by a size-increase
+  MODIFY to the tail of, our level after we rested). Synthetic QUOTE/SNAPSHOT
+  ids never reduce it. Before, any CANCEL at `(side, P)` reduced it by the
+  event's quoted qty, even for an order that joined behind us.
+- Identical edits in `cpp/src/execution/execution.cpp` (reference),
+  `python/src/iap/execution/simulator.py` and
+  `java/.../execution/ExecutionSimulator.java`; three regression tests per
+  language (`test_execution_rules.py`, `test_execution.cpp`,
+  `ExecutionSimTest.java`).
+- **Goldens:** `expected_replay_fills.json`, `expected_mvp.json` and
+  `expected_tca.json` are reproduced unchanged by the new rules (the golden
+  sessions contain none of the three patterns), so nothing was regenerated
+  and no `x-version` moved. The README parity-table test counts move
+  python 1388 -> 1391, cpp 285 -> 288, java 482 -> 485.
+- Migration path for stored data: none (simulated fills of other sessions may
+  shrink; re-run to refresh).

@@ -78,10 +78,11 @@ content of the simulator:
 - **Depletion:** an observed EXECUTE at (side, P) reduces `ahead_qty` by
   its full quantity; leftover execute volume after `ahead_qty` hits zero
   fills our order at P (partials supported).
-- **Cancels:** an observed CANCEL at (side, P) reduces `ahead_qty` by its
-  full amount (deterministic — no probabilistic split), floored at zero.
-  This is optimistic for us (real cancels may come from behind us); the
-  choice is pinned and disclosed rather than tuned.
+- **Cancels:** a CANCEL the book applied reduces `ahead_qty` by the
+  displayed size it removed from our level (floored at zero) only when the
+  cancelled order is known to be ahead of us — a real order id that did
+  not join the level after we did. Cancels from behind us, and synthetic
+  QUOTE/SNAPSHOT ids, never advance us (deterministic, conservative).
 - **Trade-through:** an EXECUTE on our side at a price worse than P fills
   us completely at P — the market traded through our level.
 - **Marketable ADD expansion:** an incoming ADD whose limit crosses the

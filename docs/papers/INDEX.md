@@ -141,7 +141,7 @@ The Perold IS decomposition is enforced as an exact identity to 1e-9.
 An engineering case study of four parallel ports of one pinned semantics,
 held identical by golden tests (byte-exact IAP1 SHA-256 digests; 443/175/
 181/291 tests green in the paper's recorded 2026-08-29 harness run; the
-2026-09-20 harness records 1388/285/313/482 py/cpp/rs/java tests and
+2026-09-20 harness records 1391/288/313/485 py/cpp/rs/java tests and
 164/68/62/102 golden after the contracts / lifecycle / trace / MVP release). Measured on the
 stated 2-CPU
 Xeon container (g++ 13.3.0, rustc 1.95.0, OpenJDK 21.0.10): C++ decodes at

@@ -152,7 +152,7 @@ TEST(ExecQueue, ExecuteDepletesAheadThenFills) {
     EXPECT_EQ(sim.orders().at(id).remaining, 20);  // partial fill
     EXPECT_EQ(sim.orders().at(id).state, OrderState::ACTIVE);
     // Next EXECUTE fills the remainder (leftover capped at our remaining).
-    sim.on_event(f.exec(T0 + 4'000'000, 0, 100, 500, 13));
+    sim.on_event(f.exec(T0 + 4'000'000, 0, 100, 500, 12));
     ASSERT_EQ(sim.fills().size(), 2u);
     EXPECT_EQ(sim.fills()[1].qty, 20);
     EXPECT_EQ(sim.orders().at(id).state, OrderState::FILLED);
@@ -162,21 +162,23 @@ TEST(ExecQueue, CancelAheadReducesPositionDeterministically) {
     ExecutionSimulator sim(test_config());
     EventFeeder f;
     seed_book(sim, f);
+    sim.on_event(f.add(T0 + 4, 0, 100, 60, 13));  // bid 100 now displays 360
     const auto id = sim.submit(child(0, OrderType::LIMIT, 100, 50, T0 + 10));
     sim.on_event(f.heartbeat(T0 + 10 + LAT + 1));
-    ASSERT_EQ(sim.orders().at(id).ahead_qty, 300);
-    // Pinned rule: an observed CANCEL at our level reduces ahead by its
-    // FULL qty (deterministic, no probabilistic split).
+    ASSERT_EQ(sim.orders().at(id).ahead_qty, 360);
+    // Pinned rule: an applied CANCEL of an order ahead of us reduces ahead
+    // by the displayed size it removed (order 11 = 300), whatever qty it
+    // quotes.
     sim.on_event(f.cancel(T0 + 2'000'000, 0, 100, 250, 11));
-    EXPECT_EQ(sim.orders().at(id).ahead_qty, 50);
+    EXPECT_EQ(sim.orders().at(id).ahead_qty, 60);
     // A cancel at another level does nothing.
     sim.on_event(f.cancel(T0 + 2'100'000, 0, 99, 400, 12));
-    EXPECT_EQ(sim.orders().at(id).ahead_qty, 50);
+    EXPECT_EQ(sim.orders().at(id).ahead_qty, 60);
     // MODIFY events never change queue position (pinned).
-    sim.on_event(f.modify(T0 + 2'200'000, 0, 100, 10, 11));
-    EXPECT_EQ(sim.orders().at(id).ahead_qty, 50);
-    // Now a 60-EXECUTE: 50 ahead, 10 to us.
-    sim.on_event(f.exec(T0 + 3'000'000, 0, 100, 60, 11));
+    sim.on_event(f.modify(T0 + 2'200'000, 0, 100, 10, 13));
+    EXPECT_EQ(sim.orders().at(id).ahead_qty, 60);
+    // Now a 70-EXECUTE: 60 ahead, 10 to us.
+    sim.on_event(f.exec(T0 + 3'000'000, 0, 100, 70, 13));
     ASSERT_EQ(sim.fills().size(), 1u);
     EXPECT_EQ(sim.fills()[0].qty, 10);
 }
@@ -213,6 +215,7 @@ TEST(ExecQueue, SingleShareTradeThroughCannotFillAMillion) {
     // Bid 100 x 500 only, so ahead_qty is exactly the 500 displayed.
     sim.on_event(f.add(T0, 0, 100, 500, 11));
     sim.on_event(f.add(T0 + 1, 1, 101, 200, 21));
+    sim.on_event(f.add(T0 + 2, 0, 99, 1'000, 12));  // the order printing at 99
     const auto id =
         sim.submit(child(0, OrderType::LIMIT, 100, 1'000'000, T0 + 10));
     sim.on_event(f.heartbeat(T0 + 10 + LAT + 1));
@@ -309,6 +312,76 @@ TEST(ExecQueue, MarketableAddTradingThroughFillsInFull) {
     EXPECT_EQ(sim.fills()[0].price_ticks, 101);
     EXPECT_EQ(sim.fills()[0].qty, 50);
     EXPECT_EQ(sim.orders().at(id).state, OrderState::FILLED);
+}
+
+// A static crossing display fills us once, not once per event.
+TEST(ExecQueue, CrossedDisplayIsConsumedOnceUntilItChanges) {
+    ExecutionSimulator sim(test_config());
+    EventFeeder f;
+    sim.on_event(f.add(T0, 0, 99, 400, 12));
+    sim.on_event(f.add(T0 + 1, 1, 101, 200, 21));
+    const auto id = sim.submit(child(0, OrderType::LIMIT, 100, 1'000, T0 + 10));
+    sim.on_event(f.heartbeat(T0 + 10 + LAT + 1));  // rests alone at 100
+    ASSERT_EQ(sim.orders().at(id).ahead_qty, 0);
+    // An ask of 50 posts at our bid: the crossed display fills us 50.
+    sim.on_event(f.add(T0 + 2'000'000, 1, 100, 50, 31));
+    ASSERT_EQ(sim.fills().size(), 1u);
+    EXPECT_EQ(sim.fills()[0].qty, 50);
+    // Unrelated events on the unchanged display: nothing more to take.
+    for (int k = 0; k < 3; ++k) {
+        sim.on_event(f.heartbeat(T0 + 3'000'000 + k));
+    }
+    EXPECT_EQ(sim.fills().size(), 1u);
+    // 30 more post on top: exactly the NEW 30 is available.
+    sim.on_event(f.add(T0 + 4'000'000, 1, 100, 30, 32));
+    ASSERT_EQ(sim.fills().size(), 2u);
+    EXPECT_EQ(sim.fills()[1].qty, 30);
+    // The first ask cancels (display 80 -> 30): nothing is resurrected.
+    sim.on_event(f.cancel(T0 + 5'000'000, 1, 100, 50, 31));
+    sim.on_event(f.heartbeat(T0 + 6'000'000));
+    EXPECT_EQ(sim.fills().size(), 2u);
+    EXPECT_EQ(sim.orders().at(id).remaining, 920);
+}
+
+// A retransmitted duplicate / unknown-order EXECUTE trades nothing.
+TEST(ExecQueue, EventsDroppedByTheBookAreNotTracked) {
+    ExecutionSimulator sim(test_config());
+    EventFeeder f;
+    seed_book(sim, f);
+    const auto id = sim.submit(child(0, OrderType::LIMIT, 100, 50, T0 + 10));
+    sim.on_event(f.heartbeat(T0 + 10 + LAT + 1));
+    const MarketEvent execute = f.exec(T0 + 2'000'000, 0, 100, 200, 11);
+    sim.on_event(execute);
+    EXPECT_EQ(sim.orders().at(id).ahead_qty, 100);
+    sim.on_event(execute);  // same sequence again: the book drops it
+    EXPECT_EQ(sim.orders().at(id).ahead_qty, 100);
+    EXPECT_TRUE(sim.fills().empty());
+    sim.on_event(f.exec(T0 + 3'000'000, 0, 100, 500, 77));  // unknown order
+    EXPECT_EQ(sim.orders().at(id).ahead_qty, 100);
+    EXPECT_TRUE(sim.fills().empty());
+}
+
+TEST(ExecQueue, CancelFromBehindDoesNotAdvanceUs) {
+    ExecutionSimulator sim(test_config());
+    EventFeeder f;
+    seed_book(sim, f);
+    sim.on_event(f.add(T0 + 4, 0, 100, 80, 14));  // bid 100 now displays 380
+    const auto id = sim.submit(child(0, OrderType::LIMIT, 100, 50, T0 + 10));
+    sim.on_event(f.heartbeat(T0 + 10 + LAT + 1));
+    ASSERT_EQ(sim.orders().at(id).ahead_qty, 380);
+    // An order joins the level after us and cancels: it was never ahead.
+    sim.on_event(f.add(T0 + 2'000'000, 0, 100, 400, 13));
+    sim.on_event(f.cancel(T0 + 2'100'000, 0, 100, 400, 13));
+    EXPECT_EQ(sim.orders().at(id).ahead_qty, 380);
+    // An order that was ahead at join time cancels: we advance by its size.
+    sim.on_event(f.cancel(T0 + 2'200'000, 0, 100, 80, 14));
+    EXPECT_EQ(sim.orders().at(id).ahead_qty, 300);
+    // A size increase re-queues order 11 at the tail (behind us); its later
+    // cancel does not advance us (MODIFY itself never changes ahead).
+    sim.on_event(f.modify(T0 + 2'300'000, 0, 100, 500, 11));
+    sim.on_event(f.cancel(T0 + 2'400'000, 0, 100, 500, 11));
+    EXPECT_EQ(sim.orders().at(id).ahead_qty, 300);
+    EXPECT_TRUE(sim.fills().empty());
 }
 
 TEST(ExecQueue, CrossingQuoteFillsBoundedByTheCrossingDisplay) {
