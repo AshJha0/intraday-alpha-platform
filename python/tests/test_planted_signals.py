@@ -122,11 +122,11 @@ def test_lead_lag_plant_leaves_the_leader_untouched(refdata, tmp_path):
 # ---------------------------------------------------------------------------
 
 
-#: Fraction of the (single) session the flow tests split at.  The equity
-#: flow's slots are spent in the first ~40 % of a session (self-excitation
-#: raises the event rate above the slot budget's), so the split sits at the
-#: median trade, not at the middle of the clock.
-FLOW_SPLIT = 0.2
+#: Fraction of the (single) session the flow tests split at.  Since v1.4.0
+#: the equity flow spans the whole session, so the middle of the clock is
+#: also the median trade (up to v1.3.0 the slots were spent in the first
+#: ~40 % of a session and the split sat at 0.2).
+FLOW_SPLIT = 0.5
 
 
 def _flow_alignment(gen, events, refdata, horizon_steps=10):

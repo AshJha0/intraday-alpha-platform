@@ -37,8 +37,10 @@ ALL of:
 
 ``max_age_ns`` is pinned as ``max(LABEL_MAX_AGE_FLOOR_NS, 2 x median
 inter-sample gap of that instrument's series)`` (:func:`max_sample_age`):
-a fixed floor of 5 s for dense equity books, scaled up for sparse FX
-streams where a 15 s gap between LP quotes is normal, not a data outage.
+a fixed floor of 5 s for equity books, scaled up for sparse FX streams
+where a 15 s gap between LP quotes is normal, not a data outage.  On the
+bundled equities the median gap is about 2 s, so the floor binds and a
+forward mid older than 5 s invalidates the label (``forward_stale``).
 
 Per-anchor reasons are returned as a bitmask (:class:`LabelReason`) so a
 research report can say WHY a horizon has few usable rows.
