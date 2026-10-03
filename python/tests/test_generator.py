@@ -274,3 +274,54 @@ def test_equity_venues_share_one_efficient_price(refdata, tmp_path):
         assert len(venues) == 2
         a, b = venues.values()
         assert a == b, f"instrument {iid} close prints differ across venues"
+
+
+def _last_continuous_fractions(refdata, events, date):
+    """Per equity stream: how far into the session its last pre-close event is."""
+    open_ns, close_ns = refdata.session_bounds_ns("EQUITY", date)
+    last = {}
+    for e in events:
+        if e.exchange_ts < close_ns:
+            key = (e.instrument_id, e.venue_id)
+            last[key] = max(last.get(key, open_ns), e.exchange_ts)
+    return [(t - open_ns) / (close_ns - open_ns) for t in last.values()]
+
+
+def test_fill_session_is_opt_in_and_carries_equity_flow_to_the_close(refdata, tmp_path):
+    """Known limitation, pinned: the slot budget ends continuous equity flow
+    well before the close (rate margin 1.30 and the uncalibrated excitation
+    multiplier). ``equities.fill_session`` removes the budget; left off — the
+    default — the output is byte-identical to a config without the key."""
+    quiet = {
+        "gap_prob": 0,
+        "gap_max_events": 1,
+        "dup_prob": 0,
+        "ooo_prob": 0,
+        "invalid_prob": 0,
+        "ts_violation_prob": 0,
+    }
+    base = {
+        "seed": 31,
+        "sessions": 1,
+        "anomalies": quiet,
+        "equities": {"slots_per_stream": 400},
+        "fx": {"slots_per_pair": 10},
+    }
+    off = dict(base, equities={"slots_per_stream": 400, "fill_session": False})
+    on = dict(base, equities={"slots_per_stream": 400, "fill_session": True})
+    date = refdata.trading_days[0]
+    name = f"eq_{date.replace('-', '')}.jsonl"
+
+    runs = {}
+    for tag, cfg in (("absent", base), ("off", off), ("on", on)):
+        MarketDataGenerator(refdata, cfg).generate_run(tmp_path / tag)
+        runs[tag] = read_jsonl(tmp_path / tag / name)
+    assert (tmp_path / "absent" / name).read_bytes() == (tmp_path / "off" / name).read_bytes()
+
+    budgeted = _last_continuous_fractions(refdata, runs["off"], date)
+    filled = _last_continuous_fractions(refdata, runs["on"], date)
+    assert len(budgeted) == len(filled) == 22  # 11 instruments x 2 venues
+    assert max(budgeted) < 0.6, max(budgeted)  # the limitation
+    assert min(filled) > 0.98, min(filled)  # flow reaches the close
+    assert len(runs["on"]) > 2 * len(runs["off"])  # ... with more events
+    assert all(validation_error(e) is None for e in runs["on"])

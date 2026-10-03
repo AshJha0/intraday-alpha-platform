@@ -120,6 +120,13 @@ EXPORTED_METRICS = {
     "platform_session_state",
     "risk_session_restarts_total",
     "admin_requests_total",
+    # safety counters of the 2026-10-03 paper-platform review (§12.6); every
+    # one is created on first use, so a rule must not rely on a zero sample
+    "risk_routed_venue_mismatch_total",
+    "risk_resume_open_orders_released_total",
+    "exec_orders_blocked_kill_pending_total",
+    "admin_auth_rate_limited_total",
+    "admin_audit_suppressed_total",
     # latency histograms
     "decode_latency_ns",
     "book_update_latency_ns",
@@ -375,6 +382,7 @@ PROMQL_KEYWORDS = {
     "time",
     "vector",
     "absent",
+    "last_over_time",
     "topk",
     "bottomk",
     "delta",

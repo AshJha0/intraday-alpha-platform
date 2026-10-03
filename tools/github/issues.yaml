@@ -1058,6 +1058,32 @@ issues:
       - "python/src/iap/reference/refdata.py; configs/instruments/instruments.json; configs/venues/venues.json"
       - "python/tests/test_refdata.py"
 
+  - key: M08
+    epic: E03
+    title: "Bundled dataset: equity continuous flow that reaches the close"
+    labels: [type:bug, area:marketdata, phase:w1, priority:p2, lang:python]
+    milestone: "Backlog"
+    status: backlog
+    estimate_days: 3
+    context: >
+      In the pinned dataset every equity stream stops its continuous flow
+      38-43% of the way through the 6.5 h session (mean 40.5%) and prints
+      nothing until the close auction: slots_per_stream is a hard slot
+      budget, the base rate is slots / duration * 1.30 (the margin multiplies
+      the rate, so the budget would run out at 77% even without clustering)
+      and the self-exciting multiplier (1 + excitation) is not calibrated
+      for. equities.fill_session (opt-in since v1.3.0, default off) removes
+      the budget. Turning it on by default moves every artefact derived from
+      the dataset: qc_report.json, the feature files, the alpha and ML
+      reports, the baselines, the experiment ledger and the headline
+      numbers.
+    acceptance:
+      - "The default generator config produces equity flow up to the close in every session, with the event count chosen deliberately (rate calibrated, or the budget sized for the full session)"
+      - "Every dataset-derived artefact is regenerated in one change, with the before/after of each headline number recorded (golden regeneration protocol, CONTRIBUTING.md §4)"
+      - "A test pins the session coverage of the default config"
+    evidence:
+      - "python/src/iap/marketdata/generator.py (_eq_session_stream); python/tests/test_generator.py (test_fill_session_is_opt_in_and_carries_equity_flow_to_the_close pins the opt-in today)"
+
   # ---------------------------------------------------------------- E04 ----
   - key: RP01
     epic: E04
@@ -2336,7 +2362,7 @@ issues:
 
   - key: O02
     epic: E16
-    title: "16 alerts with promtool unit tests, recording rules and two Grafana dashboards"
+    title: "22 alerts with promtool unit tests, recording rules and two Grafana dashboards"
     labels: [type:feature, area:observability, area:deployment, phase:w6, priority:p1]
     milestone: "Week 6"
     status: done
@@ -2345,7 +2371,9 @@ issues:
       SequenceGapDetected, BookStale, StaleFeed, KillSwitchEngaged,
       LiveVsBacktestDrift, AlphaLifecycleRetired, FillRateDrop, ... with
       alerts_test.yml; dashboards whose every metric has a producer (checked
-      by check_deployment.py).
+      by check_deployment.py). 16 alerts at Week 6; v1.3.0 added the Watchdog
+      heartbeat and six rules on the STOPPED session state and the five
+      safety counters (22 alerts and the heartbeat).
     acceptance:
       - "promtool check/test rules pass in CI; dashboard metric provenance check passes"
     evidence:

@@ -279,11 +279,11 @@ python3 tools/github/create_issues.py --dry-run   # the epics/issues plan (docs/
 ===================== cross-language parity table =====================
 language | tests passed | golden passed  | time   | status
 ---------+--------------+----------------+--------+-------
-python   | 1562         | 166            |    -s | PASS
+python   | 1565         | 166            |    -s | PASS
 cpp      | 289          | 68             |    -s | PASS
 rust     | 323          | 64             |    -s | PASS
 java     | 510          | 104            |    -s | PASS
-integration | 15           | -              |    -s | PASS
+integration | 17           | -              |    -s | PASS
 replay   | 4            | -              |    -s | PASS
 deployment | -            | -              |    -s | PASS
 numbers  | -            | -              |    -s | PASS
@@ -404,6 +404,21 @@ data, symbols, or fee schedules are included — instruments are `SYN.EQ.*` /
 `SYN.ETF.IDX` / eight synthetic G10 pairs on venues `XV1`, `XV2`, `LP1`,
 `LP2`, `PRI`. Every number in the reports is a statement about this
 generator and this pipeline, not about any market.
+
+**The equity sessions are morning-only in effect (known limitation).** In
+the bundled dataset each equity stream's continuous flow stops 38–43% of
+the way through the 6.5-hour session (mean 40.5%, about 2 h 38 min after
+the open); the next events are the close-auction prints. FX flow runs to
+92–100% of its 21-hour session. The cause is a slot budget in the generator
+that is spent early — the base rate carries a 1.30 margin and the
+self-exciting flow multiplier is not calibrated for
+(`generator.py` `_eq_session_stream`; CHANGELOG.md "Known limitations").
+So the equity research covers about 5.3 hours of continuous flow across the
+two sessions, not 13; the row-mass walk-forward folds partition that
+window, and nothing is learned or tested on afternoon flow. The default is
+kept because every pinned number derives from it;
+`equities.fill_session: true` in the generator config produces flow up to
+the close (backlog issue M08, docs/EPICS.md).
 
 **Units and conventions (binding, `PLATFORM_CONVENTIONS.md` §1).**
 

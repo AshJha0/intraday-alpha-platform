@@ -231,6 +231,13 @@ calendar, fx_week), `configs/venues/venues.json` (ids, fees, latency profiles),
 `configs/marketdata/generator.json` (seeds — conventions §3). Prices convert via
 `price_ticks * tick_size`; never floats on contracts.
 
+Generator keys that change the dataset are opt-in and off by default, so the
+pinned files stay byte-identical: `planted.*` (effects of known size),
+`equities.halt.reopen_auction`, and `equities.fill_session` — with the
+default `false`, an equity stream's continuous flow stops when its
+`slots_per_stream` budget is spent, 38–43% of the way through the session;
+`true` continues it to the close (LEARN.md §2.3).
+
 `ReferenceData` (Python reference) validates fail-fast at load: `tick_size >
 0` finite, integer `lot_size >= 1`, `ref_price > 0`, `adv >= 0`, at least one
 venue, every venue present in `venues.json` with a matching asset class,

@@ -280,6 +280,71 @@ groups:
             check. Runbook: docs/runbooks/RUNBOOK_paper_trading.md#exposure
           runbook: docs/runbooks/RUNBOOK_paper_trading.md
 
+      # A child order left for a venue other than the one the pre-trade check
+      # approved (PaperTrading.RiskWiring.onOrderSubmitted). The platform
+      # cancels the child and counts it; the counter is created on the first
+      # occurrence and never decreases, so `> 0` holds for the rest of the
+      # process — a wiring defect stays visible until someone restarts.
+      - alert: RoutedVenueMismatch
+        expr: risk_routed_venue_mismatch_total > 0
+        for: 0m
+        labels:
+          severity: page
+          domain: risk
+        annotations:
+          summary: "{{ $value | printf \"%.0f\" }} child order(s) routed to a venue the risk check did not approve on {{ $labels.service }}"
+          description: >-
+            A child order was submitted to a venue other than the one named
+            in its pre-trade risk request, so a venue kill or disconnect was
+            checked against the wrong venue. The child was cancelled
+            (fail-closed), but this is a routing/risk wiring defect, not a
+            market event: engage the kill switch and investigate. Runbook:
+            docs/runbooks/RUNBOOK_paper_trading.md#routed-venue-mismatch
+          runbook: docs/runbooks/RUNBOOK_paper_trading.md
+
+      # An admin kill is accepted (latched in AdminService) before the risk
+      # engine records it; the order path withholds every order meanwhile and
+      # counts each one. One or two withheld orders are the normal race. A
+      # counter that keeps climbing for minutes means the kill is still not
+      # in the risk engine — so not in the snapshot a restart would restore.
+      - alert: KillPendingNotRecorded
+        expr: increase(exec_orders_blocked_kill_pending_total[2m]) > 0
+        for: 3m
+        labels:
+          severity: critical
+          domain: risk
+        annotations:
+          summary: "Orders withheld for a pending admin kill for over 3m on {{ $labels.service }}"
+          description: >-
+            Orders have been withheld for more than 3m because an admin kill
+            was accepted (202) but the risk engine has not recorded it. No
+            new order is being sent, but the latch is not yet in the risk
+            snapshot and would not survive a restart. Do NOT restart; verify
+            the halt and the admin audit first. Runbook:
+            docs/runbooks/RUNBOOK_incident_kill_switch.md#kill-pending
+          runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+
+      # --resume released open orders the restored risk snapshot still
+      # tracked (the simulator that held them is gone). The counter is set
+      # once at resume, so the alert stays up for the life of that process.
+      - alert: ResumeReleasedOpenOrders
+        expr: risk_resume_open_orders_released_total > 0
+        for: 0m
+        labels:
+          severity: warning
+          domain: risk
+        annotations:
+          summary: "Resume released {{ $value | printf \"%.0f\" }} orphaned open order(s) on {{ $labels.service }}"
+          description: >-
+            The session resumed from a checkpoint whose risk snapshot tracked
+            open child orders; they no longer exist in the execution
+            simulator and were released so they do not inflate position
+            projections. Positions and realized P&L are restored, the
+            working orders are not: reconcile before trusting the session.
+            The alert stays up until the process ends. Runbook:
+            docs/runbooks/RUNBOOK_paper_trading.md#resume-released-orders
+          runbook: docs/runbooks/RUNBOOK_paper_trading.md
+
   - name: iap-infrastructure
     rules:
       # GC pause: p99 pause above 10ms breaks the order-path latency budget.
@@ -316,6 +381,31 @@ groups:
             docs/runbooks/RUNBOOK_paper_trading.md#failed-session
           runbook: docs/runbooks/RUNBOOK_paper_trading.md
 
+      # A STOPPED session (value 4: a stop was requested, the session
+      # checkpointed mid-stream and exited 0) that nobody resumed. The gauge
+      # goes stale when the process exits, so the rule reads the LAST value
+      # scraped in the past hour: a resumed process reports 0/1 and clears
+      # it. The process usually exits within one scrape interval of setting
+      # 4; when the value was never scraped this rule cannot fire and
+      # TargetDown is the signal (RUNBOOK_paper_trading.md#stopped-session).
+      - alert: SessionStoppedNotResumed
+        expr: last_over_time(platform_session_state[1h]) == 4
+        for: 10m
+        labels:
+          severity: warning
+          domain: infrastructure
+        annotations:
+          summary: "Paper-trading session STOPPED and not resumed on {{ $labels.service }}"
+          description: >-
+            The last scraped platform_session_state is 4 (STOPPED) and no
+            resumed session has reported for 10m. The session checkpointed
+            mid-stream and exited 0, so nothing restarts it; positions are
+            as the checkpoint left them. Resume it with --resume or record
+            why it stays down. The alert clears on resume, or one hour after
+            the stop. Runbook:
+            docs/runbooks/RUNBOOK_paper_trading.md#stopped-session
+          runbook: docs/runbooks/RUNBOOK_paper_trading.md
+
       # An unexpected restart re-reads the checkpoint; a burst of restarts is
       # a crash loop (and each one re-warms the book from the stream).
       - alert: SessionRestartsClimbing
@@ -348,6 +438,52 @@ groups:
             Prometheus cannot scrape {{ $labels.instance }}. If this is
             java-platform during a trading session, treat as a platform
             incident. Runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+          runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+
+  # The admin (kill-switch) API. Both counters are created on their first
+  # increment, so `increase()` alone misses the first occurrence: the second
+  # arm fires while the series is younger than the window.
+  - name: iap-admin-api
+    rules:
+      - alert: AdminAuthRateLimited
+        expr: >
+          increase(admin_auth_rate_limited_total[10m]) > 0
+          or (admin_auth_rate_limited_total > 0
+              unless admin_auth_rate_limited_total offset 10m)
+        for: 0m
+        labels:
+          severity: critical
+          domain: admin
+        annotations:
+          summary: "Admin API is rate-limiting failed authentications on {{ $labels.service }}"
+          description: >-
+            More than 10 failed authentications reached the admin API within
+            one 60s window, so further failures answer 429. Either a client
+            holds a wrong or rotated token, or the port is being probed. A
+            request with a valid token is never rate-limited, so the kill
+            switch stays usable. Read <state-dir>/admin_audit.jsonl for the
+            remote addresses. Runbook:
+            docs/runbooks/RUNBOOK_incident_kill_switch.md#admin-auth-abuse
+          runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+
+      - alert: AdminAuditSuppressed
+        expr: >
+          increase(admin_audit_suppressed_total[10m]) > 0
+          or (admin_audit_suppressed_total > 0
+              unless admin_audit_suppressed_total offset 10m)
+        for: 0m
+        labels:
+          severity: warning
+          domain: admin
+        annotations:
+          summary: "Rejected admin requests are no longer individually audited on {{ $labels.service }}"
+          description: >-
+            Rejected admin requests exceeded the per-window audit cap, so
+            the remainder were counted and summarised (one audit_summary
+            line per window) instead of audited one by one. Accepted
+            requests are always audited. Find the source of the rejected
+            traffic in <state-dir>/admin_audit.jsonl. Runbook:
+            docs/runbooks/RUNBOOK_incident_kill_switch.md#admin-auth-abuse
           runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
 
   # Heartbeat: fires permanently by design. Alertmanager routes it to the

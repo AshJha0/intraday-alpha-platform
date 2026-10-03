@@ -565,10 +565,25 @@ def _strip_epic(title: str) -> str:
     return title[len("Epic: ") :] if title.startswith("Epic: ") else title
 
 
+def github_slug(heading: str, seen: dict[str, int] | None = None) -> str:
+    """The anchor GitHub gives a Markdown heading.
+
+    Lowercase; drop every character that is not a letter, digit, space,
+    hyphen or underscore; turn each space into a hyphen WITHOUT collapsing
+    runs (so "a — b" is "a--b": the dash goes, both spaces stay). A repeated
+    slug gets "-1", "-2", ... in document order; pass the same ``seen`` dict
+    for every heading of one document to get that numbering.
+    """
+    slug = re.sub(r"[^\w \-]", "", heading.strip().lower()).replace(" ", "-")
+    if seen is None:
+        return slug
+    n = seen.get(slug, 0)
+    seen[slug] = n + 1
+    return slug if n == 0 else f"{slug}-{n}"
+
+
 def _anchor(e: dict) -> str:
-    text = f"{e['key']} — {_strip_epic(e['title'])}".lower()
-    text = re.sub(r"[^\w\s-]", "", text)
-    return re.sub(r"\s+", "-", text.strip())
+    return github_slug(f"{e['key']} — {_strip_epic(e['title'])}")
 
 
 def _md_escape(s: str) -> str:

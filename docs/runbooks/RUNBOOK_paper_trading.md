@@ -7,8 +7,9 @@ observability — no capital at risk.
 `LiveVsBacktestDrift`, `AlphaLifecycleRetired`, `FillRateDrop`,
 `PreTradeRejectRatioHigh`, `LossLimitUtilizationHigh`,
 `GrossNotionalUtilizationHigh`, `KillSwitchEngaged`,
-`PlatformSessionFailed`, `SessionRestartsClimbing`, `FeedWallClockStall`,
-and the `Watchdog` heartbeat. Delivery is through Alertmanager
+`PlatformSessionFailed`, `SessionStoppedNotResumed`,
+`SessionRestartsClimbing`, `FeedWallClockStall`, `RoutedVenueMismatch`,
+`ResumeReleasedOpenOrders`, and the `Watchdog` heartbeat. Delivery is through Alertmanager
 (`deployment/alertmanager/`, since v1.3.0); until an operator supplies the
 webhook URL the alerts are routed and visible in the Alertmanager UI but
 delivered nowhere (`docs/governance/REPO_SETTINGS.md` §6).
@@ -200,21 +201,43 @@ Watch the **Trading & Risk** dashboard:
   200 — but the process exits 0 right after the checkpoint and takes the
   listener with it, so a scrape will usually not see the value. The durable
   evidence is the final stdout line (`status=STOPPED`) and the checkpoint;
-  **no session report is written**. No alert rule fires on this value and
-  the dashboard's session-state panel does not name it yet. It is the
-  expected result of a deliberate stop; continue the session with
-  `--resume` (§5).
+  **no session report is written**. The dashboard's session-state panel
+  does not name the value yet. It is the expected result of a deliberate
+  stop; continue the session with `--resume` (§5).
+  `SessionStoppedNotResumed` (warning) fires when the last value scraped in
+  the past hour is 4 and no resumed session has reported for 10 m. When it
+  fires: confirm the stop was intended (`status=STOPPED` on stdout, a fresh
+  `session_state.json`), then either resume (§5) or record why the session
+  stays down — positions are as the checkpoint left them and nothing
+  restarts the container (exit 0). The alert clears on resume, or by itself
+  one hour after the stop. If no scrape caught the value 4 the rule cannot
+  fire; `TargetDown` is then the only alert, and the same two checks tell a
+  stop from a crash.
 - **Safety counters** (since v1.3.0). {#safety-counters}
-  `risk_routed_venue_mismatch_total` — a child left for a venue other than
-  the one the pre-trade check approved and was cancelled; any non-zero value
-  is a wiring defect, not a market event.
-  `exec_orders_blocked_kill_pending_total` — orders withheld because an
-  admin kill was accepted but not yet recorded by the risk engine.
-  `risk_resume_open_orders_released_total` — open orders of a restored
-  snapshot released at resume (their simulator no longer exists).
-  `admin_auth_rate_limited_total` / `admin_audit_suppressed_total` — someone
-  is hammering the admin port with bad credentials. None of these has an
-  alert rule today.
+  Five counters, each with an alert rule. Two are handled here, three in
+  `RUNBOOK_incident_kill_switch.md`:
+  `exec_orders_blocked_kill_pending_total` (`KillPendingNotRecorded`,
+  §3 there) and `admin_auth_rate_limited_total` /
+  `admin_audit_suppressed_total` (`AdminAuthRateLimited`,
+  `AdminAuditSuppressed`, §0 there).
+- **Routed venue mismatch**. {#routed-venue-mismatch}
+  `RoutedVenueMismatch` (page) — `risk_routed_venue_mismatch_total > 0`: a
+  child left for a venue other than the one the pre-trade check approved
+  and was cancelled. Any non-zero value is a wiring defect between the SOR
+  and the risk request, not a market event, and a venue kill or disconnect
+  may have been checked against the wrong venue. Engage the GLOBAL kill
+  (`RUNBOOK_incident_kill_switch.md` §2), keep the state directory, and
+  compare `venue_id` of the child in `decision_traces.jsonl` with the venue
+  of its decision in `risk_audit.jsonl`. The alert stays up until the
+  process ends: the counter never decreases.
+- **Resume released open orders**. {#resume-released-orders}
+  `ResumeReleasedOpenOrders` (warning) —
+  `risk_resume_open_orders_released_total > 0` after a `--resume`: the
+  restored risk snapshot tracked open children whose simulator no longer
+  exists, and they were released (§5). Positions and realized P&L are
+  restored; the working orders are gone. Reconcile with §5's commands
+  before resuming size. The alert stays up for the life of the resumed
+  process — silence it once the reconciliation is recorded.
 - **Exposure**. {#exposure}
   `GrossNotionalUtilizationHigh` at 90% of `risk_limit{limit="max_gross_notional"}`
   — the alert divides by the LIVE limit gauge, so it follows a GOVERNANCE §3

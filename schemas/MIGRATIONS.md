@@ -802,7 +802,7 @@ and the seeded dataset are byte-identical. Index: docs/RESEARCH_VALIDITY.md.
   `deployment/k8s/cronjob-data-pipeline.yaml` move `v1.2.0` -> `v1.3.0`, by
   tag only; the digests are pinned from `release-manifest.json` after the
   release workflow has run for the tag.
-- README parity table: python 1392 -> 1562, rust 313 -> 323, java 486 -> 510
+- README parity table: python 1392 -> 1565, rust 313 -> 323, java 486 -> 510
   (cpp 289 unchanged); golden groups 164/68/62/102 -> 166/68/64/104.
 - No schema, golden or stored data changed by this entry.
 
