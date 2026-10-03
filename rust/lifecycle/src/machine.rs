@@ -18,8 +18,12 @@
 //!   moves nothing — not even the failure counter (`NO_EVIDENCE`). RESEARCH is
 //!   the exception by construction: `ledger_entry_exists` IS the presence check;
 //! * **live** (ACTIVE / WATCH): delegated unchanged to the
-//!   [`LiveTracker`] rules; its transition is wrapped into a
-//!   [`LifecycleTransition`] with `gates = {"rolling_ic": …}`;
+//!   [`LiveTracker`] rules (the CUSUM retirement rule by default since
+//!   v1.5.0, each reading weighted by `live.new_fraction`; the legacy
+//!   consecutive-breach rule when the config names it); its transition is
+//!   wrapped into a [`LifecycleTransition`] with `gates = {"rolling_ic": …}`.
+//!   The tracker's counters and CUSUM statistic are mirrored on the record
+//!   after every live evaluation, so a reloaded registry resumes exactly;
 //! * **RETIRED is terminal for SYSTEM**: `advance` records `TERMINAL` and
 //!   moves nothing; re-entry is the HUMAN [`AlphaLifecycle::reset_to_research`].
 //!
@@ -710,6 +714,7 @@ impl AlphaLifecycle {
         rec.consecutive_failures = 0;
         rec.breach_count = 0;
         rec.recovery_count = 0;
+        rec.cusum = 0.0;
         self.trackers.remove(alpha_id);
         self.transitions.push(transition.clone());
         Ok(transition)
@@ -906,6 +911,7 @@ impl AlphaLifecycle {
                 rec.state,
                 rec.breach_count,
                 rec.recovery_count,
+                rec.cusum,
             )?;
             self.trackers.insert(alpha_id.to_string(), tracker);
         }
@@ -942,8 +948,10 @@ impl AlphaLifecycle {
         let rec = self.registry.get(alpha_id)?;
         let state = rec.state;
         let failures = rec.consecutive_failures;
-        let (rolling_ic, informative) = match &evidence.live {
-            Some(l) if l.informative && l.rolling_ic.is_some() => (l.rolling_ic, l.informative),
+        let (rolling_ic, informative, new_fraction) = match &evidence.live {
+            Some(l) if l.informative && l.rolling_ic.is_some() => {
+                (l.rolling_ic, l.informative, l.new_fraction)
+            }
             _ => {
                 self.record_evaluation(
                     alpha_id,
@@ -966,9 +974,10 @@ impl AlphaLifecycle {
 
         let tracker = self.tracker(alpha_id)?;
         let n_before = tracker.transitions().len();
-        tracker.update(event_ts, rolling_ic, informative);
+        tracker.update(event_ts, rolling_ic, informative, new_fraction)?;
         let breach = tracker.breach_count();
         let recovery = tracker.recovery_count();
+        let cusum = tracker.cusum();
         let made = tracker.transitions().get(n_before).cloned();
         let policy = tracker.policy().to_string();
 
@@ -977,6 +986,7 @@ impl AlphaLifecycle {
                 let rec = self.registry.get_mut(alpha_id)?;
                 rec.breach_count = breach;
                 rec.recovery_count = recovery;
+                rec.cusum = cusum;
                 self.record_evaluation(
                     alpha_id,
                     GateEvaluation {
@@ -1008,9 +1018,11 @@ impl AlphaLifecycle {
                     &policy,
                 );
                 // `apply` drops the tracker; keep it — the tracker keeps
-                // counting across its own transition (the breach that
-                // enters WATCH is breach #1, pinned) — and mirror its
-                // counters on the record so a reload resumes exactly.
+                // counting across its own transition (under the legacy
+                // rule the breach that enters WATCH is breach #1; under
+                // the CUSUM rule S survives the entry) — and mirror its
+                // counters and statistic on the record so a reload resumes
+                // exactly.
                 let kept = self.trackers.remove(alpha_id);
                 let applied = self.apply(alpha_id, transition)?;
                 if let Some(t) = kept {
@@ -1019,6 +1031,7 @@ impl AlphaLifecycle {
                 let rec = self.registry.get_mut(alpha_id)?;
                 rec.breach_count = breach;
                 rec.recovery_count = recovery;
+                rec.cusum = cusum;
                 self.record_evaluation(
                     alpha_id,
                     GateEvaluation {

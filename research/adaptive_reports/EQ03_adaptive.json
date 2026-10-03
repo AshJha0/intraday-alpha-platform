@@ -8,8 +8,8 @@
     "bucket_ns": 300000000000,
     "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
     "horizon": "5s",
-    "ic_mean": 0.016115993649744077,
-    "ic_std": 0.06040963874124378,
+    "ic_mean": 0.016115993649744063,
+    "ic_std": 0.06040963874124382,
     "kind": "ic",
     "n_buckets_baseline": 10,
     "name": "run_eq03_ic",
@@ -19,10 +19,10 @@
   "n_blocks": 112,
   "policies": {
     "drift_triggered": {
-      "deployed_ic": 0.018881234036902235,
+      "deployed_ic": 0.018881234036902242,
       "drift_event_count": 0,
       "final_state": "ACTIVE",
-      "gross_pnl": 3854.9999999999786,
+      "gross_pnl": 0.0,
       "ic_baseline_kind": "oos",
       "ic_baseline_rows": 9755,
       "lifecycle_transitions": [
@@ -32,8 +32,8 @@
           "event_ts": 1787666400000000000,
           "from": "ACTIVE",
           "policy": "drift_triggered",
-          "reason": "rolling_ic -0.017258 < watch gate 0.0",
-          "rolling_ic": -0.017257784763201337,
+          "reason": "rolling_ic -0.016510 < watch gate 0.0",
+          "rolling_ic": -0.01650992888415746,
           "to": "WATCH"
         },
         {
@@ -43,14 +43,14 @@
           "from": "WATCH",
           "policy": "drift_triggered",
           "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
-          "rolling_ic": 0.011305126905017778,
+          "rolling_ic": 0.01240445460449655,
           "to": "ACTIVE"
         }
       ],
       "n_evals": 112,
       "n_ic_evals": 46,
       "n_informative_evals": 42,
-      "net_pnl": -638153.0739694849,
+      "net_pnl": 0.0,
       "policy": {
         "ic_z_threshold": -2.0,
         "min_refit_gap_ns": 3600000000000,
@@ -68,16 +68,16 @@
           "ts": 1787587200000000000
         }
       ],
-      "rolling_ic_mean": 0.019440647213731822,
-      "rolling_ic_std": 0.01020325264339239,
-      "total_costs": 642008.0739694827,
-      "trade_count": 29213
+      "rolling_ic_mean": 0.01969235984763671,
+      "rolling_ic_std": 0.010218443854958228,
+      "total_costs": 0.0,
+      "trade_count": 0
     },
     "scheduled_daily": {
-      "deployed_ic": 0.017534222242458493,
+      "deployed_ic": 0.017534222242458507,
       "drift_event_count": 0,
       "final_state": "ACTIVE",
-      "gross_pnl": 3810.0000000000414,
+      "gross_pnl": 0.0,
       "ic_baseline_kind": "oos",
       "ic_baseline_rows": 9755,
       "lifecycle_transitions": [
@@ -87,8 +87,8 @@
           "event_ts": 1787666400000000000,
           "from": "ACTIVE",
           "policy": "scheduled_daily",
-          "reason": "rolling_ic -0.017247 < watch gate 0.0",
-          "rolling_ic": -0.017247400103297037,
+          "reason": "rolling_ic -0.016511 < watch gate 0.0",
+          "rolling_ic": -0.016510759202316212,
           "to": "WATCH"
         },
         {
@@ -98,14 +98,14 @@
           "from": "WATCH",
           "policy": "scheduled_daily",
           "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
-          "rolling_ic": 0.011299847327315106,
+          "rolling_ic": 0.012393873788646023,
           "to": "ACTIVE"
         }
       ],
       "n_evals": 112,
       "n_ic_evals": 46,
       "n_informative_evals": 42,
-      "net_pnl": -628214.2369163963,
+      "net_pnl": 0.0,
       "policy": {
         "period_ns": 86400000000000,
         "policy": "scheduled"
@@ -129,16 +129,16 @@
           "ts": 1787616000000000000
         }
       ],
-      "rolling_ic_mean": 0.019448673995340327,
-      "rolling_ic_std": 0.010195348850983266,
-      "total_costs": 632024.2369163942,
-      "trade_count": 28782
+      "rolling_ic_mean": 0.01969932831916496,
+      "rolling_ic_std": 0.010212016509568492,
+      "total_costs": 0.0,
+      "trade_count": 0
     },
     "scheduled_weekly": {
-      "deployed_ic": 0.018881234036902235,
+      "deployed_ic": 0.018881234036902242,
       "drift_event_count": 0,
       "final_state": "ACTIVE",
-      "gross_pnl": 3854.9999999999786,
+      "gross_pnl": 0.0,
       "ic_baseline_kind": "oos",
       "ic_baseline_rows": 9755,
       "lifecycle_transitions": [
@@ -148,8 +148,8 @@
           "event_ts": 1787666400000000000,
           "from": "ACTIVE",
           "policy": "scheduled_weekly",
-          "reason": "rolling_ic -0.017258 < watch gate 0.0",
-          "rolling_ic": -0.017257784763201337,
+          "reason": "rolling_ic -0.016510 < watch gate 0.0",
+          "rolling_ic": -0.01650992888415746,
           "to": "WATCH"
         },
         {
@@ -159,14 +159,14 @@
           "from": "WATCH",
           "policy": "scheduled_weekly",
           "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
-          "rolling_ic": 0.011305126905017778,
+          "rolling_ic": 0.01240445460449655,
           "to": "ACTIVE"
         }
       ],
       "n_evals": 112,
       "n_ic_evals": 46,
       "n_informative_evals": 42,
-      "net_pnl": -638153.0739694849,
+      "net_pnl": 0.0,
       "policy": {
         "period_ns": 604800000000000,
         "policy": "scheduled"
@@ -182,16 +182,16 @@
           "ts": 1787587200000000000
         }
       ],
-      "rolling_ic_mean": 0.019440647213731822,
-      "rolling_ic_std": 0.01020325264339239,
-      "total_costs": 642008.0739694827,
-      "trade_count": 29213
+      "rolling_ic_mean": 0.01969235984763671,
+      "rolling_ic_std": 0.010218443854958228,
+      "total_costs": 0.0,
+      "trade_count": 0
     },
     "static": {
-      "deployed_ic": 0.018881234036902235,
+      "deployed_ic": 0.018881234036902242,
       "drift_event_count": 0,
       "final_state": "ACTIVE",
-      "gross_pnl": 3854.9999999999786,
+      "gross_pnl": 0.0,
       "ic_baseline_kind": "oos",
       "ic_baseline_rows": 9755,
       "lifecycle_transitions": [
@@ -201,8 +201,8 @@
           "event_ts": 1787666400000000000,
           "from": "ACTIVE",
           "policy": "static",
-          "reason": "rolling_ic -0.017258 < watch gate 0.0",
-          "rolling_ic": -0.017257784763201337,
+          "reason": "rolling_ic -0.016510 < watch gate 0.0",
+          "rolling_ic": -0.01650992888415746,
           "to": "WATCH"
         },
         {
@@ -212,14 +212,14 @@
           "from": "WATCH",
           "policy": "static",
           "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
-          "rolling_ic": 0.011305126905017778,
+          "rolling_ic": 0.01240445460449655,
           "to": "ACTIVE"
         }
       ],
       "n_evals": 112,
       "n_ic_evals": 46,
       "n_informative_evals": 42,
-      "net_pnl": -638153.0739694849,
+      "net_pnl": 0.0,
       "policy": {
         "policy": "static"
       },
@@ -234,10 +234,10 @@
           "ts": 1787587200000000000
         }
       ],
-      "rolling_ic_mean": 0.019440647213731822,
-      "rolling_ic_std": 0.01020325264339239,
-      "total_costs": 642008.0739694827,
-      "trade_count": 29213
+      "rolling_ic_mean": 0.01969235984763671,
+      "rolling_ic_std": 0.010218443854958228,
+      "total_costs": 0.0,
+      "trade_count": 0
     }
   },
   "universe": [

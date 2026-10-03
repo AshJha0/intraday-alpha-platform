@@ -7,6 +7,15 @@
 //! (NaN / ±Inf are rejected by [`Evidence::validate`], which every strict
 //! constructor runs); an absent block is `None` and, except for the RESEARCH
 //! presence gate, moves nothing (silence is not evidence).
+//!
+//! `significance_threshold` (v1.5.0) is the PROMOTE t threshold the research
+//! result was judged at; it sits beside `research` as `capacity_usd` does and
+//! is what the `statistical_significance` gate reads under the default
+//! `tstat_threshold = "ledger"` policy (`crate::gates`). The key is required
+//! and may be `null`. `live.new_fraction` (v1.5.0) is the share of a live
+//! reading's window that is new since the last counted reading, in `(0, 1]` —
+//! the weight of the reading under the CUSUM retirement rule
+//! (`crate::tracker`); the key is required whichever rule is configured.
 
 use marketdata::IapError;
 use serde::de::Deserializer;
@@ -178,6 +187,9 @@ pub struct LiveEvidence {
     /// False when the matured set gained no new rows since the last
     /// counted evaluation (a re-read moves nothing).
     pub informative: bool,
+    /// Share of the reading's window that is new since the last counted
+    /// one, in `(0, 1]`.
+    pub new_fraction: f64,
 }
 
 /// Everything the gates may read for one `advance` call.
@@ -190,6 +202,9 @@ pub struct Evidence {
     /// Aggregate deployable notional proxy, USD (>= 0).
     #[serde(deserialize_with = "required_option")]
     pub capacity_usd: Option<f64>,
+    /// The t threshold the research result was judged at (> 0), or null.
+    #[serde(deserialize_with = "required_option")]
+    pub significance_threshold: Option<f64>,
     /// Held-out replay evidence.
     #[serde(deserialize_with = "required_option")]
     pub validation: Option<ValidationEvidence>,
@@ -215,6 +230,7 @@ impl Evidence {
         Evidence {
             research: None,
             capacity_usd: None,
+            significance_threshold: None,
             validation: None,
             paper: None,
             live: None,
@@ -231,6 +247,14 @@ impl Evidence {
             if c < 0.0 {
                 return Err(IapError::Validation(
                     "evidence.capacity_usd must be >= 0".to_string(),
+                ));
+            }
+        }
+        if let Some(t) = self.significance_threshold {
+            check_finite("evidence.significance_threshold", t)?;
+            if t <= 0.0 {
+                return Err(IapError::Validation(
+                    "evidence.significance_threshold must be > 0".to_string(),
                 ));
             }
         }
@@ -252,6 +276,12 @@ impl Evidence {
         if let Some(l) = &self.live {
             if let Some(ic) = l.rolling_ic {
                 check_finite("live.rolling_ic", ic)?;
+            }
+            check_finite("live.new_fraction", l.new_fraction)?;
+            if !(l.new_fraction > 0.0 && l.new_fraction <= 1.0) {
+                return Err(IapError::Validation(
+                    "live.new_fraction must be in (0, 1]".to_string(),
+                ));
             }
         }
         Ok(())
@@ -280,7 +310,8 @@ mod tests {
 
     #[test]
     fn empty_document_round_trips() {
-        let doc = json!({"research": null, "capacity_usd": null, "validation": null, "paper": null, "live": null});
+        let doc = json!({"research": null, "capacity_usd": null, "significance_threshold": null,
+                         "validation": null, "paper": null, "live": null});
         let ev = Evidence::from_value(&doc).expect("strict parse");
         assert_eq!(ev, Evidence::empty());
         assert_eq!(ev.to_value().expect("finite"), doc);
@@ -288,20 +319,50 @@ mod tests {
 
     #[test]
     fn strictness() {
-        let missing =
-            json!({"research": null, "capacity_usd": null, "validation": null, "paper": null});
+        let base = json!({"research": null, "capacity_usd": null, "significance_threshold": null,
+                          "validation": null, "paper": null, "live": null});
+        let mut missing = base.clone();
+        missing.as_object_mut().expect("object").remove("live");
         assert!(Evidence::from_value(&missing).is_err(), "missing key");
-        let unknown = json!({"research": null, "capacity_usd": null, "validation": null, "paper": null, "live": null, "x": 1});
+        // a v1.4.0 document (no significance_threshold) is rejected, not defaulted
+        let mut old = base.clone();
+        old.as_object_mut()
+            .expect("object")
+            .remove("significance_threshold");
+        assert!(Evidence::from_value(&old).is_err(), "v1.4.0 document");
+        let mut unknown = base.clone();
+        unknown["x"] = json!(1);
         assert!(Evidence::from_value(&unknown).is_err(), "unknown key");
-        let negative = json!({"research": null, "capacity_usd": -1.0, "validation": null, "paper": null, "live": null});
+        let mut negative = base.clone();
+        negative["capacity_usd"] = json!(-1.0);
         assert!(
             Evidence::from_value(&negative).is_err(),
             "negative capacity"
         );
-        let live = json!({"research": null, "capacity_usd": null, "validation": null, "paper": null,
-                          "live": {"rolling_ic": null, "n_buckets": 2, "eval_index": 1, "informative": true}});
+        let mut threshold = base.clone();
+        threshold["significance_threshold"] = json!(4.365);
+        assert_eq!(
+            Evidence::from_value(&threshold)
+                .expect("a positive threshold")
+                .significance_threshold,
+            Some(4.365)
+        );
+        threshold["significance_threshold"] = json!(0.0);
+        assert!(Evidence::from_value(&threshold).is_err(), "threshold <= 0");
+        let mut live = base.clone();
+        live["live"] = json!({"rolling_ic": null, "n_buckets": 2, "eval_index": 1,
+                              "informative": true, "new_fraction": 0.125});
         let ev = Evidence::from_value(&live).expect("null rolling ic is allowed");
         assert_eq!(ev.live.as_ref().and_then(|l| l.rolling_ic), None);
+        for bad in [0.0, 1.5, -0.1] {
+            live["live"]["new_fraction"] = json!(bad);
+            assert!(Evidence::from_value(&live).is_err(), "new_fraction {bad}");
+        }
+        live["live"]
+            .as_object_mut()
+            .expect("object")
+            .remove("new_fraction");
+        assert!(Evidence::from_value(&live).is_err(), "missing new_fraction");
         let mut nan = Evidence::empty();
         nan.capacity_usd = Some(f64::NAN);
         assert!(nan.validate().is_err());

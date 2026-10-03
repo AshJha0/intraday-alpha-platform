@@ -1,12 +1,39 @@
 {
   "alpha_id": "EQ01",
   "config": {
+    "block_rows_column": null,
+    "cap_fills_at_l1": false,
     "conf_min": 0.2,
     "cost_multiplier": 1.0,
+    "impact_model": "linear",
     "latency_rows": 1,
-    "max_pos_qty": 1000
+    "max_pos_qty": 1000,
+    "position_policy": "sign"
   },
-  "description": "Research-backtester golden: EQ01 (day-1-fitted params from expected_alpha.json) on the golden EQ frame. total_pnl / total_costs at 1e-9 abs/rel; counts exact.",
+  "default_rules": {
+    "alpha_id": "EQ06",
+    "config": {
+      "block_rows_column": "auto",
+      "cap_fills_at_l1": true,
+      "conf_min": 0.2,
+      "cost_multiplier": 0.01,
+      "impact_model": "sqrt",
+      "latency_rows": 1,
+      "max_pos_qty": 1000,
+      "position_policy": "cost_aware"
+    },
+    "fee_cost": 1.1760000000000002,
+    "gross_pnl": -5.6843418860808015e-12,
+    "horizon": "10s",
+    "impact_cost": 0.3716887005691925,
+    "n_rows": 2000,
+    "spread_cost": 5.55,
+    "total_costs": 7.0976887005691935,
+    "total_pnl": -7.097688700583603,
+    "trade_count": 96,
+    "traded_qty": 39200
+  },
+  "description": "Research-backtester golden on the golden EQ frame (day-1-fitted params from expected_alpha.json). The top-level numbers are the CROSS-LANGUAGE vector: EQ01 under the LEGACY research rules that `config` names (sign position policy, fills not capped, every row traded, linear impact \u2014 the defaults up to v1.4.0), which is the only rule set the Java ResearchBacktester / CostModel implement. `default_rules` is the Python-only vector under the v1.5.0 defaults (cost-aware positions, L1 fill cap, scored rows only, square-root impact) at the cost multiplier its config names. total_pnl / total_costs at 1e-9 abs/rel; counts exact.",
   "fee_cost": 1512.0,
   "gross_pnl": -85.00000000002217,
   "impact_cost": 9.492118421052634,
@@ -18,5 +45,5 @@
   "total_pnl": -14431.492118421105,
   "trade_count": 385,
   "traded_qty": 504000,
-  "x-version": 1
+  "x-version": 2
 }

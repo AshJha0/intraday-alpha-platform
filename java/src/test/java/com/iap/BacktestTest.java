@@ -81,9 +81,10 @@ public class BacktestTest {
             er[i] = sig.expectedReturn();
             conf[i] = sig.confidence();
         }
-        CostModel cm = CostModel.load(
+        CostModel cm = CostModel.loadLegacyLinear(
                 Paths.get("..", "configs", "execution", "execution.json"), 1.0);
-        // Pinned golden config: max_pos 1000, conf_min 0.2, latency 1 row.
+        // Pinned golden config: max_pos 1000, conf_min 0.2, latency 1 row,
+        // under the legacy rules the golden names (sign policy, linear impact).
         ResearchBacktester bt = new ResearchBacktester(cm, 1000, 0.2, 1);
         return bt.run(1, ts, mid, hs, er, conf, "EQUITY", ADV, 100.0);
     }
@@ -97,6 +98,16 @@ public class BacktestTest {
     public void eq01GoldenBacktestReproduced() {
         Map<String, Object> g = Golden.json("expected_backtest.json");
         assertEquals("EQ01", g.get("alpha_id"));
+        // The cross-language vector is the LEGACY rule set, by name: this
+        // port implements exactly what the golden's config says and nothing
+        // else (the v1.5.0 defaults are pinned for Python in `default_rules`).
+        assertEquals(2L, Json.asLong(g.get("x-version")));
+        Map<String, Object> cfg = Json.object(g.get("config"));
+        assertEquals(ResearchBacktester.POSITION_POLICY, cfg.get("position_policy"));
+        assertEquals(ResearchBacktester.CAP_FILLS_AT_L1, cfg.get("cap_fills_at_l1"));
+        assertEquals("no row block", !ResearchBacktester.BLOCKS_ROWS,
+                cfg.get("block_rows_column") == null);
+        assertEquals(CostModel.IMPACT_MODEL, cfg.get("impact_model"));
         ResearchBacktester.Result r = goldenEq01Run();
         assertEquals(Json.asLong(g.get("n_rows")), r.nRows);
         assertEquals(Json.asLong(g.get("trade_count")), r.tradeCount);

@@ -8,8 +8,8 @@
     "bucket_ns": 300000000000,
     "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
     "horizon": "10s",
-    "ic_mean": 0.007832494206295306,
-    "ic_std": 0.06714637080586654,
+    "ic_mean": 0.007832494206295289,
+    "ic_std": 0.0671463708058665,
     "kind": "ic",
     "n_buckets_baseline": 10,
     "name": "run_eq06_ic",
@@ -19,17 +19,17 @@
   "n_blocks": 112,
   "policies": {
     "drift_triggered": {
-      "deployed_ic": 0.027771061126998522,
+      "deployed_ic": 0.027771061126998505,
       "drift_event_count": 0,
       "final_state": "ACTIVE",
-      "gross_pnl": 6499.999999998679,
+      "gross_pnl": -10.000000000019327,
       "ic_baseline_kind": "oos",
       "ic_baseline_rows": 6860,
       "lifecycle_transitions": [],
       "n_evals": 112,
       "n_ic_evals": 46,
       "n_informative_evals": 42,
-      "net_pnl": -330282.9920558385,
+      "net_pnl": -69.93150106619578,
       "policy": {
         "ic_z_threshold": -2.0,
         "min_refit_gap_ns": 3600000000000,
@@ -47,23 +47,23 @@
           "ts": 1787587200000000000
         }
       ],
-      "rolling_ic_mean": 0.02753844115223989,
-      "rolling_ic_std": 0.015845553265192356,
-      "total_costs": 336782.99205583613,
-      "trade_count": 16661
+      "rolling_ic_mean": 0.0272945648999806,
+      "rolling_ic_std": 0.016719011716804035,
+      "total_costs": 59.93150106623876,
+      "trade_count": 7
     },
     "scheduled_daily": {
-      "deployed_ic": 0.026932838845342123,
+      "deployed_ic": 0.026932838845342078,
       "drift_event_count": 0,
       "final_state": "ACTIVE",
-      "gross_pnl": 6474.999999998743,
+      "gross_pnl": -1.5000000000270575,
       "ic_baseline_kind": "oos",
       "ic_baseline_rows": 6860,
       "lifecycle_transitions": [],
       "n_evals": 112,
       "n_ic_evals": 46,
       "n_informative_evals": 42,
-      "net_pnl": -330073.07084618893,
+      "net_pnl": -178.70339640363818,
       "policy": {
         "period_ns": 86400000000000,
         "policy": "scheduled"
@@ -87,23 +87,23 @@
           "ts": 1787616000000000000
         }
       ],
-      "rolling_ic_mean": 0.02754061698674383,
-      "rolling_ic_std": 0.01584434022465884,
-      "total_costs": 336548.07084618654,
-      "trade_count": 16639
+      "rolling_ic_mean": 0.027296716542371247,
+      "rolling_ic_std": 0.01671780140325657,
+      "total_costs": 177.2033964037456,
+      "trade_count": 17
     },
     "scheduled_weekly": {
-      "deployed_ic": 0.027771061126998522,
+      "deployed_ic": 0.027771061126998505,
       "drift_event_count": 0,
       "final_state": "ACTIVE",
-      "gross_pnl": 6499.999999998679,
+      "gross_pnl": -10.000000000019327,
       "ic_baseline_kind": "oos",
       "ic_baseline_rows": 6860,
       "lifecycle_transitions": [],
       "n_evals": 112,
       "n_ic_evals": 46,
       "n_informative_evals": 42,
-      "net_pnl": -330282.9920558385,
+      "net_pnl": -69.93150106619578,
       "policy": {
         "period_ns": 604800000000000,
         "policy": "scheduled"
@@ -119,23 +119,23 @@
           "ts": 1787587200000000000
         }
       ],
-      "rolling_ic_mean": 0.02753844115223989,
-      "rolling_ic_std": 0.015845553265192356,
-      "total_costs": 336782.99205583613,
-      "trade_count": 16661
+      "rolling_ic_mean": 0.0272945648999806,
+      "rolling_ic_std": 0.016719011716804035,
+      "total_costs": 59.93150106623876,
+      "trade_count": 7
     },
     "static": {
-      "deployed_ic": 0.027771061126998522,
+      "deployed_ic": 0.027771061126998505,
       "drift_event_count": 0,
       "final_state": "ACTIVE",
-      "gross_pnl": 6499.999999998679,
+      "gross_pnl": -10.000000000019327,
       "ic_baseline_kind": "oos",
       "ic_baseline_rows": 6860,
       "lifecycle_transitions": [],
       "n_evals": 112,
       "n_ic_evals": 46,
       "n_informative_evals": 42,
-      "net_pnl": -330282.9920558385,
+      "net_pnl": -69.93150106619578,
       "policy": {
         "policy": "static"
       },
@@ -150,10 +150,10 @@
           "ts": 1787587200000000000
         }
       ],
-      "rolling_ic_mean": 0.02753844115223989,
-      "rolling_ic_std": 0.015845553265192356,
-      "total_costs": 336782.99205583613,
-      "trade_count": 16661
+      "rolling_ic_mean": 0.0272945648999806,
+      "rolling_ic_std": 0.016719011716804035,
+      "total_costs": 59.93150106623876,
+      "trade_count": 7
     }
   },
   "universe": [

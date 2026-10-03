@@ -291,6 +291,15 @@ def main() -> None:
         f"{meta['n_meta_samples']}; test base rate of profitable "
         f"signals: {_fmt(meta['base_rate_test'], 3)}."
     )
+    if meta.get("impute_nan"):
+        L.append("- Missing meta-feature values are imputed to 0 (`impute_nan: true`, legacy).")
+    else:
+        L.append(
+            f"- Missing meta-feature values are kept as NaN for the tree model "
+            f"(`impute_nan: false`, the default since v1.5.0): "
+            f"{meta.get('n_missing_meta_values', 0)} of "
+            f"{meta['n_meta_samples'] * 8} entries."
+        )
     L.append(
         f"- Test AUC {_fmt(meta['auc_test'], 3)}, Brier "
         f"{_fmt(meta['brier_test'], 4)} (calibration curve data: "

@@ -386,8 +386,10 @@ def test_ledger_is_dataset_scoped(tmp_path):
     new.save()
 
     blob = json.loads(path.read_text())
-    assert blob["x-version"] == 2
+    assert blob["x-version"] == 3  # v1.5.0: entries may carry gate_looks
     first, second = blob["entries"]
+    # recorded without a gate look count: the v1.5.0 field is absent, not null
+    assert "gate_looks" not in first and "gate_looks" not in second
     assert first["dataset_version"] == "a" * 64 and first["result"] == {"oos_ic": 0.03}
     assert second["dataset_version"] == "b" * 64 and second["result"] == {"oos_ic": 0.011}
     assert first["key"] != second["key"]
@@ -411,9 +413,9 @@ def test_committed_ledger_names_a_dataset_on_every_entry():
     """research/experiments.json after the v1.4.0 migration
     (research/migrate_ledger_dataset_scope.py): no entry without a dataset,
     the retired v1.3.0 dataset's 1068 looks still counted, the total equal to
-    the sum over datasets."""
+    the sum over datasets.  The document is x-version 3 since v1.5.0."""
     blob = json.loads((REPO_ROOT / "research" / "experiments.json").read_text())
-    assert blob["x-version"] == 2
+    assert blob["x-version"] == 3
     assert all(ExperimentLedger.entry_dataset_version(e) for e in blob["entries"])
     by_dataset = {d["dataset_version"]: d for d in blob["datasets"]}
     legacy = by_dataset["203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b"]
@@ -424,6 +426,68 @@ def test_committed_ledger_names_a_dataset_on_every_entry():
     }
     assert blob["total_experiments"] == sum(d["looks"] for d in blob["datasets"])
     assert blob["distinct_experiments"] == sum(d["entries"] for d in blob["datasets"])
+    # v1.5.0: an entry judged under the ledger t-stat policy carries the look
+    # count its threshold was derived from — at least the running total its
+    # own looks brought the ledger to, at most the ledger total
+    judged = [e for e in blob["entries"] if "gate_looks" in e]
+    assert judged, "the committed ledger holds runs judged under the ledger policy"
+    for e in judged:
+        assert isinstance(e["gate_looks"], int)
+        assert e["n"] <= e["gate_looks"] <= blob["total_experiments"]
+    assert not any("gate_looks" in e for e in blob["entries"] if _on_retired_dataset(e))
+
+
+def _on_retired_dataset(entry) -> bool:
+    """Recorded on the retired v1.3.0 dataset (before the ledger policy)."""
+    return ExperimentLedger.entry_dataset_version(entry) == (
+        "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b"
+    )
+
+
+def test_ledger_gate_looks_are_recorded_once_and_reused(tmp_path):
+    """Gate look count (v1.5.0): a new identity is judged at the batch total
+    and stores it; a rerun is judged at the stored count, which a later
+    record never replaces."""
+    path = tmp_path / "experiments.json"
+    led = ExperimentLedger(path)
+    led.record("OLD", "promotion_pipeline", config={"n": 1}, count=10)
+    batch = [
+        ("A", "promotion_pipeline", {"n": 1}, 84),
+        ("B", "promotion_pipeline", {"n": 1}, 84),
+        ("A", "promotion_pipeline", {"n": 1}, 84),  # repeated: counted once
+        ("OLD", "promotion_pipeline", {"n": 1}, 10),  # already recorded
+    ]
+    # 10 recorded + 84 + 84 new
+    total = led.batch_total(batch)
+    assert total == 178
+    assert led.gate_looks_for("A", "promotion_pipeline", {"n": 1}, total) == 178
+    led.record("A", "promotion_pipeline", config={"n": 1}, count=84, gate_looks=total)
+    led.record("B", "promotion_pipeline", config={"n": 1}, count=84, gate_looks=total)
+    assert led.total_experiments == 178
+    led.record("C", "promotion_pipeline", config={"n": 1}, count=84)
+    # a rerun of A is judged at ITS recorded count, not at the later total
+    assert led.total_experiments == 262
+    assert led.gate_looks_for("A", "promotion_pipeline", {"n": 1}, 262) == 178
+    led.record("A", "promotion_pipeline", config={"n": 1}, count=84, gate_looks=262)
+    led.save()
+    blob = json.loads(path.read_text())
+    assert blob["total_experiments"] == 262
+    by_alpha = {e["alpha_id"]: e for e in blob["entries"]}
+    assert by_alpha["A"]["gate_looks"] == 178 and by_alpha["A"]["reruns"] == 1
+    assert by_alpha["B"]["gate_looks"] == 178
+    assert "gate_looks" not in by_alpha["OLD"] and "gate_looks" not in by_alpha["C"]
+    # an entry without a recorded count falls back to the caller's batch total
+    assert led.gate_looks_for("C", "promotion_pipeline", {"n": 1}, 262) == 262
+    with pytest.raises(ValueError, match="gate_looks"):
+        led.record("D", "promotion_pipeline", gate_looks=0)
+    # the threshold a count implies is the instance formula at that total:
+    # 50 looks -> two-sided p = 0.001 -> |z| ~ 3.2905 (as in the test above)
+    assert abs(ExperimentLedger.bonferroni_t_threshold_at(50) - 3.2905) < 5e-3
+    fifty = ExperimentLedger(tmp_path / "e50.json")
+    fifty.record("X", "t", count=50)
+    assert ExperimentLedger.bonferroni_t_threshold_at(50) == fifty.bonferroni_t_threshold()
+    # more looks, a higher bar
+    assert ExperimentLedger.bonferroni_t_threshold_at(178) > 3.2905
 
 
 def test_ledger_file_is_deterministic(tmp_path):
@@ -591,6 +655,10 @@ def _backwards_frames(n=3000, seed=17):
     carries the opposite sign to the standardized signal ``z`` the gate is
     computed on — the exact configuration that made EQ09 report
     ``fold_sign_consistency = 1.00`` beside a negative gate IC.
+
+    The displayed L1 sizes are deep (10 000 against the 100 the fixture
+    trades), so the default fill cap of the research backtester (v1.5.0)
+    never binds and the legacy uncapped rule fills the same quantities.
     """
     rng = np.random.default_rng(seed)
     ts = np.arange(n, dtype=np.int64) * NS_S + NS_S
@@ -603,6 +671,8 @@ def _backwards_frames(n=3000, seed=17):
         "mid_price_v1": 25.0 + np.cumsum(future) * 25.0,
         "spread_ticks_v1": np.ones(n),
         "vol_regime_flag_v1": np.tile([0.0, 1.0], n // 2),
+        "depth_bid_l1_v1": np.full(n, 10_000.0),
+        "depth_ask_l1_v1": np.full(n, 10_000.0),
     }
     for h in _H:
         cols[f"label_mid_{h}"] = future
@@ -631,10 +701,26 @@ class _BackwardsAlpha(LinearAlpha):
         return df["sig_feature"]
 
 
-def _validate_backwards():
-    from iap.backtest import BacktestConfig, Backtester, CostModel
+#: Looks one default four-fold validation plus its out-of-sample backtest
+#: debits (``methods("v2").looks(4)``): 19 + 16 * 4 + 1.
+_BACKWARDS_LOOKS = 84
+
+
+def _validate_backwards(bundle_name="v2"):
+    """Validate the backwards fixture under a method bundle: ``"v2"`` is the
+    default chain (v1.5.0), ``"legacy_v1"`` every rule up to v1.4.0."""
+    from iap.backtest import Backtester, CostModel
+    from iap.validation.methods import methods
     from iap.validation.validate import validate_alpha
 
+    bundle = methods(bundle_name)
+    assert bundle.looks(4) == (_BACKWARDS_LOOKS if bundle_name == "v2" else 28)
+    kwargs = bundle.validate_kwargs()
+    if bundle.tstat_threshold == "ledger":
+        # the caller's part of the ledger policy: the Bonferroni |t| at the
+        # look count of a ledger holding exactly this run
+        kwargs["ledger_t_threshold"] = ExperimentLedger.bonferroni_t_threshold_at(_BACKWARDS_LOOKS)
+        kwargs["ledger_looks"] = _BACKWARDS_LOOKS
     frames = _backwards_frames()
     meta = {
         1: {
@@ -646,13 +732,15 @@ def _validate_backwards():
         }
     }
     bt = Backtester(
-        CostModel(
-            impact_coeff_bps_per_pct_adv=2.0,
-            equity_taker_fee_per_share=0.003,
-            fx_commission_per_million=2.5,
+        bundle.cost_model(
+            CostModel(
+                impact_coeff_bps_per_pct_adv=2.0,
+                equity_taker_fee_per_share=0.003,
+                fx_commission_per_million=2.5,
+            )
         ),
         meta,
-        BacktestConfig(max_pos_qty=100, latency_rows=1),
+        bundle.backtest_config(max_pos_qty=100, latency_rows=1),
     )
     return validate_alpha(
         _BackwardsAlpha,
@@ -662,12 +750,95 @@ def _validate_backwards():
         0.1,
         n_folds=4,
         embargo_ns=NS_S,
+        **kwargs,
     )
 
 
-@pytest.fixture(scope="module")
-def backwards_report():
-    return _validate_backwards()
+@pytest.fixture(scope="module", params=["v2", "legacy_v1"])
+def backwards_report(request):
+    """The backwards fixture's report under the default bundle AND under the
+    legacy one: the round-4 honesty rules hold whichever methods are named."""
+    return _validate_backwards(request.param)
+
+
+def test_validate_alpha_defaults_are_the_v2_methods_and_legacy_is_named():
+    """v1.5.0: the default chain is the ``v2`` bundle — and its t-stat policy
+    has no silent fall-back; ``legacy_v1`` names every rule up to v1.4.0."""
+    from iap.backtest import BacktestConfig, Backtester, CostModel
+    from iap.validation.validate import GATES, validate_alpha
+
+    default = _validate_backwards("v2")
+    assert default["methods"] == {
+        "ic_rows": "blackout_reopen",
+        "significance": "pooled_slope",
+        "tstat_threshold": "ledger",
+        "stress_version": 2,
+        "capacity": "breakeven",
+        "fold_diagnostics": True,
+        "recompute_probe": False,  # no raw events were handed in
+        "position_policy": "cost_aware",
+        "cap_fills_at_l1": True,
+        "block_rows": "scored_rows:1s",
+        "impact_model": "sqrt",
+    }
+    # ledger policy: max(3.0, Bonferroni |t| at 84 looks); two-sided
+    # 0.05 / 84 -> one tail 2.976e-4 -> |z| ~ 3.4335, which is above 3.0
+    threshold = ExperimentLedger.bonferroni_t_threshold_at(_BACKWARDS_LOOKS)
+    assert abs(threshold - 3.4335) < 5e-3
+    assert default["gates"]["min_nw_tstat"] == threshold
+    assert default["tstat_threshold_policy"] == "ledger"
+    assert default["ledger_t_threshold"] == threshold
+    assert default["ledger_looks"] == _BACKWARDS_LOOKS
+    # the gate t is the pooled-slope HAC t of the uncrossed book
+    assert default["gate_tstat"] == default["nw_tstat_pooled_uncrossed"]
+    assert len(default["fold_diagnostics"]) == 4
+    assert default["leakage"]["recompute_ok"] is None
+
+    legacy = _validate_backwards("legacy_v1")
+    assert legacy["methods"] == {
+        "ic_rows": "valid_only",
+        "significance": "within_bucket",
+        "tstat_threshold": "fixed",
+        "stress_version": 1,
+        "capacity": "participation",
+        "fold_diagnostics": False,
+        "recompute_probe": False,
+        "position_policy": "sign",
+        "cap_fills_at_l1": False,
+        "block_rows": None,
+        "impact_model": "linear",
+    }
+    assert legacy["gates"] == GATES and legacy["gates"]["min_nw_tstat"] == 3.0
+    assert legacy["gate_tstat"] == legacy["nw_tstat_uncrossed"]
+    for key in ("tstat_threshold_policy", "ledger_t_threshold", "fold_diagnostics"):
+        assert key not in legacy
+    # the statistics that do not depend on the bundle are the same numbers
+    # (the frames carry no reopen column, so both row policies score the
+    # same rows)
+    for key in ("oos_ic", "gate_ic", "nw_tstat_uncrossed", "nw_tstat_pooled_uncrossed"):
+        assert legacy[key] == default[key]
+    assert legacy["folds"] == default["folds"]
+    # the legacy sign rule trades every row of a forecast that never clears
+    # the round-trip cost; the cost-aware default trades less and loses less
+    assert legacy["trade_count_1x_cost"] > default["trade_count_1x_cost"]
+    assert legacy["net_pnl_1x_cost"] < default["net_pnl_1x_cost"] <= 0.0
+
+    # the default policy without its threshold is an error, never a 3.0 gate
+    bt = Backtester(
+        CostModel(
+            impact_coeff_bps_per_pct_adv=2.0,
+            equity_taker_fee_per_share=0.003,
+            fx_commission_per_million=2.5,
+        ),
+        {1: {"tick_size": 0.01, "lot_size": 1, "adv": 1e6, "asset_class": "EQUITY"}},
+        BacktestConfig(max_pos_qty=100, latency_rows=1),
+    )
+    with pytest.raises(ValueError, match="needs a finite positive ledger_t_threshold"):
+        validate_alpha(_BackwardsAlpha, _backwards_frames(), bt, {}, 0.1, n_folds=4)
+    with pytest.raises(ValueError, match="unknown tstat_threshold"):
+        validate_alpha(
+            _BackwardsAlpha, _backwards_frames(), bt, {}, 0.1, tstat_threshold="bonferroni"
+        )
 
 
 def test_fold_sign_consistency_is_scored_on_z_not_expected_return(backwards_report):

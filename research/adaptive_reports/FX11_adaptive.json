@@ -8,8 +8,8 @@
     "bucket_ns": 300000000000,
     "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
     "horizon": "5m",
-    "ic_mean": -0.06721571165635352,
-    "ic_std": 0.3162528013226001,
+    "ic_mean": -0.0672157116563536,
+    "ic_std": 0.31625280132260014,
     "kind": "ic",
     "n_buckets_baseline": 9,
     "name": "run_fx11_ic",
@@ -19,10 +19,10 @@
   "n_blocks": 169,
   "policies": {
     "drift_triggered": {
-      "deployed_ic": 0.06266604338102416,
+      "deployed_ic": 0.06654629027260749,
       "drift_event_count": 31,
       "final_state": "ACTIVE",
-      "gross_pnl": 140650.00000024622,
+      "gross_pnl": 289.1819026663968,
       "ic_baseline_kind": "oos",
       "ic_baseline_rows": 582,
       "lifecycle_transitions": [
@@ -32,18 +32,18 @@
           "event_ts": 1787552102028520532,
           "from": "ACTIVE",
           "policy": "drift_triggered",
-          "reason": "rolling_ic -0.020682 < watch gate 0.0",
-          "rolling_ic": -0.020681606188162244,
+          "reason": "rolling_ic -0.014693 < watch gate 0.0",
+          "rolling_ic": -0.014693375184755237,
           "to": "WATCH"
         },
         {
           "alpha_id": "FX11",
-          "eval_index": 20,
-          "event_ts": 1787556602028520532,
+          "eval_index": 17,
+          "event_ts": 1787553902028520532,
           "from": "WATCH",
           "policy": "drift_triggered",
-          "reason": "persistent breach: 6 consecutive evals below watch gate 0.0",
-          "rolling_ic": -0.03144252199427992,
+          "reason": "persistent breach: CUSUM 0.012380 >= 0.01 (slack 0.0025) below watch gate 0.0",
+          "rolling_ic": -0.04332683299955791,
           "to": "RETIRED"
         },
         {
@@ -53,7 +53,7 @@
           "from": "RETIRED",
           "policy": "drift_triggered",
           "reason": "recovery from retirement: 3 consecutive evals >= reactivate gate 0.005; probation before ACTIVE",
-          "rolling_ic": 0.03290508747348154,
+          "rolling_ic": 0.028425621013647356,
           "to": "WATCH"
         },
         {
@@ -63,7 +63,7 @@
           "from": "WATCH",
           "policy": "drift_triggered",
           "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
-          "rolling_ic": 0.011186829096174718,
+          "rolling_ic": 0.014847386379564708,
           "to": "ACTIVE"
         },
         {
@@ -72,8 +72,8 @@
           "event_ts": 1787574602028520532,
           "from": "ACTIVE",
           "policy": "drift_triggered",
-          "reason": "rolling_ic -0.007938 < watch gate 0.0",
-          "rolling_ic": -0.007938013457516355,
+          "reason": "rolling_ic -0.000601 < watch gate 0.0",
+          "rolling_ic": -0.000601064692133209,
           "to": "WATCH"
         },
         {
@@ -83,47 +83,27 @@
           "from": "WATCH",
           "policy": "drift_triggered",
           "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
-          "rolling_ic": 0.05335724911595863,
+          "rolling_ic": 0.06462101876239598,
           "to": "ACTIVE"
         },
         {
           "alpha_id": "FX11",
-          "eval_index": 64,
-          "event_ts": 1787596202028520532,
+          "eval_index": 98,
+          "event_ts": 1787626802028520532,
           "from": "ACTIVE",
           "policy": "drift_triggered",
-          "reason": "rolling_ic -0.000679 < watch gate 0.0",
-          "rolling_ic": -0.0006791994778013974,
+          "reason": "rolling_ic -0.009336 < watch gate 0.0",
+          "rolling_ic": -0.009336468948840498,
           "to": "WATCH"
         },
         {
           "alpha_id": "FX11",
-          "eval_index": 67,
-          "event_ts": 1787598902028520532,
+          "eval_index": 100,
+          "event_ts": 1787628602028520532,
           "from": "WATCH",
           "policy": "drift_triggered",
-          "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
-          "rolling_ic": 0.01982948368173714,
-          "to": "ACTIVE"
-        },
-        {
-          "alpha_id": "FX11",
-          "eval_index": 99,
-          "event_ts": 1787627702028520532,
-          "from": "ACTIVE",
-          "policy": "drift_triggered",
-          "reason": "rolling_ic -0.050221 < watch gate 0.0",
-          "rolling_ic": -0.050221190785178144,
-          "to": "WATCH"
-        },
-        {
-          "alpha_id": "FX11",
-          "eval_index": 104,
-          "event_ts": 1787632202028520532,
-          "from": "WATCH",
-          "policy": "drift_triggered",
-          "reason": "persistent breach: 6 consecutive evals below watch gate 0.0",
-          "rolling_ic": -0.044489865510825274,
+          "reason": "persistent breach: CUSUM 0.016188 >= 0.01 (slack 0.0025) below watch gate 0.0",
+          "rolling_ic": -0.05887704566190717,
           "to": "RETIRED"
         },
         {
@@ -133,7 +113,7 @@
           "from": "RETIRED",
           "policy": "drift_triggered",
           "reason": "recovery from retirement: 3 consecutive evals >= reactivate gate 0.005; probation before ACTIVE",
-          "rolling_ic": 0.050995471232102234,
+          "rolling_ic": 0.03604541239648863,
           "to": "WATCH"
         },
         {
@@ -143,17 +123,17 @@
           "from": "WATCH",
           "policy": "drift_triggered",
           "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
-          "rolling_ic": 0.11093058143795315,
+          "rolling_ic": 0.10079239492628272,
           "to": "ACTIVE"
         },
         {
           "alpha_id": "FX11",
-          "eval_index": 145,
-          "event_ts": 1787669102028520532,
+          "eval_index": 146,
+          "event_ts": 1787670002028520532,
           "from": "ACTIVE",
           "policy": "drift_triggered",
-          "reason": "rolling_ic -0.002290 < watch gate 0.0",
-          "rolling_ic": -0.002290353533302302,
+          "reason": "rolling_ic -0.014771 < watch gate 0.0",
+          "rolling_ic": -0.014770606984980903,
           "to": "WATCH"
         },
         {
@@ -163,14 +143,14 @@
           "from": "WATCH",
           "policy": "drift_triggered",
           "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
-          "rolling_ic": 0.015671765894889514,
+          "rolling_ic": 0.02102638344300448,
           "to": "ACTIVE"
         }
       ],
       "n_evals": 169,
       "n_ic_evals": 158,
       "n_informative_evals": 155,
-      "net_pnl": -1486665.7829243096,
+      "net_pnl": -2129.821467876496,
       "policy": {
         "ic_z_threshold": -2.0,
         "min_refit_gap_ns": 3600000000000,
@@ -268,16 +248,16 @@
           "ts": 1787662802028520532
         }
       ],
-      "rolling_ic_mean": 0.049107671126554196,
-      "rolling_ic_std": 0.07176239801178598,
-      "total_costs": 1627315.782925,
-      "trade_count": 5608
+      "rolling_ic_mean": 0.048049829454869596,
+      "rolling_ic_std": 0.07381352148762546,
+      "total_costs": 2419.003370543539,
+      "trade_count": 5828
     },
     "scheduled_daily": {
-      "deployed_ic": 0.06836857973574223,
+      "deployed_ic": 0.07425074524887113,
       "drift_event_count": 31,
       "final_state": "ACTIVE",
-      "gross_pnl": 134765.00000027523,
+      "gross_pnl": -23.564174743153806,
       "ic_baseline_kind": "oos",
       "ic_baseline_rows": 582,
       "lifecycle_transitions": [
@@ -287,18 +267,18 @@
           "event_ts": 1787552102028520532,
           "from": "ACTIVE",
           "policy": "scheduled_daily",
-          "reason": "rolling_ic -0.020682 < watch gate 0.0",
-          "rolling_ic": -0.020681606188162244,
+          "reason": "rolling_ic -0.014693 < watch gate 0.0",
+          "rolling_ic": -0.014693375184755237,
           "to": "WATCH"
         },
         {
           "alpha_id": "FX11",
-          "eval_index": 20,
-          "event_ts": 1787556602028520532,
+          "eval_index": 17,
+          "event_ts": 1787553902028520532,
           "from": "WATCH",
           "policy": "scheduled_daily",
-          "reason": "persistent breach: 6 consecutive evals below watch gate 0.0",
-          "rolling_ic": -0.03144252199427992,
+          "reason": "persistent breach: CUSUM 0.012380 >= 0.01 (slack 0.0025) below watch gate 0.0",
+          "rolling_ic": -0.04332683299955791,
           "to": "RETIRED"
         },
         {
@@ -308,7 +288,7 @@
           "from": "RETIRED",
           "policy": "scheduled_daily",
           "reason": "recovery from retirement: 3 consecutive evals >= reactivate gate 0.005; probation before ACTIVE",
-          "rolling_ic": 0.033116572520835004,
+          "rolling_ic": 0.028643884427903173,
           "to": "WATCH"
         },
         {
@@ -318,7 +298,7 @@
           "from": "WATCH",
           "policy": "scheduled_daily",
           "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
-          "rolling_ic": 0.011398314143528172,
+          "rolling_ic": 0.015072215311050508,
           "to": "ACTIVE"
         },
         {
@@ -327,8 +307,8 @@
           "event_ts": 1787574602028520532,
           "from": "ACTIVE",
           "policy": "scheduled_daily",
-          "reason": "rolling_ic -0.007938 < watch gate 0.0",
-          "rolling_ic": -0.007938013457516381,
+          "reason": "rolling_ic -0.000601 < watch gate 0.0",
+          "rolling_ic": -0.0006010646921332236,
           "to": "WATCH"
         },
         {
@@ -338,47 +318,27 @@
           "from": "WATCH",
           "policy": "scheduled_daily",
           "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
-          "rolling_ic": 0.05335724911595862,
+          "rolling_ic": 0.06462101876239598,
           "to": "ACTIVE"
         },
         {
           "alpha_id": "FX11",
-          "eval_index": 64,
-          "event_ts": 1787596202028520532,
+          "eval_index": 98,
+          "event_ts": 1787626802028520532,
           "from": "ACTIVE",
           "policy": "scheduled_daily",
-          "reason": "rolling_ic -0.000679 < watch gate 0.0",
-          "rolling_ic": -0.0006791994778013925,
+          "reason": "rolling_ic -0.009336 < watch gate 0.0",
+          "rolling_ic": -0.009336468948840514,
           "to": "WATCH"
         },
         {
           "alpha_id": "FX11",
-          "eval_index": 67,
-          "event_ts": 1787598902028520532,
+          "eval_index": 100,
+          "event_ts": 1787628602028520532,
           "from": "WATCH",
           "policy": "scheduled_daily",
-          "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
-          "rolling_ic": 0.01982572513474302,
-          "to": "ACTIVE"
-        },
-        {
-          "alpha_id": "FX11",
-          "eval_index": 99,
-          "event_ts": 1787627702028520532,
-          "from": "ACTIVE",
-          "policy": "scheduled_daily",
-          "reason": "rolling_ic -0.050221 < watch gate 0.0",
-          "rolling_ic": -0.050221190785178164,
-          "to": "WATCH"
-        },
-        {
-          "alpha_id": "FX11",
-          "eval_index": 104,
-          "event_ts": 1787632202028520532,
-          "from": "WATCH",
-          "policy": "scheduled_daily",
-          "reason": "persistent breach: 6 consecutive evals below watch gate 0.0",
-          "rolling_ic": -0.044489865510825274,
+          "reason": "persistent breach: CUSUM 0.016188 >= 0.01 (slack 0.0025) below watch gate 0.0",
+          "rolling_ic": -0.058877045661907164,
           "to": "RETIRED"
         },
         {
@@ -388,7 +348,7 @@
           "from": "RETIRED",
           "policy": "scheduled_daily",
           "reason": "recovery from retirement: 3 consecutive evals >= reactivate gate 0.005; probation before ACTIVE",
-          "rolling_ic": 0.050995471232102206,
+          "rolling_ic": 0.03604541239648861,
           "to": "WATCH"
         },
         {
@@ -398,17 +358,17 @@
           "from": "WATCH",
           "policy": "scheduled_daily",
           "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
-          "rolling_ic": 0.11093058143795313,
+          "rolling_ic": 0.10079239492628271,
           "to": "ACTIVE"
         },
         {
           "alpha_id": "FX11",
-          "eval_index": 145,
-          "event_ts": 1787669102028520532,
+          "eval_index": 146,
+          "event_ts": 1787670002028520532,
           "from": "ACTIVE",
           "policy": "scheduled_daily",
-          "reason": "rolling_ic -0.002290 < watch gate 0.0",
-          "rolling_ic": -0.0022903535333022628,
+          "reason": "rolling_ic -0.014771 < watch gate 0.0",
+          "rolling_ic": -0.014770606984980903,
           "to": "WATCH"
         },
         {
@@ -418,14 +378,14 @@
           "from": "WATCH",
           "policy": "scheduled_daily",
           "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
-          "rolling_ic": 0.01567176589488951,
+          "rolling_ic": 0.021026383443004476,
           "to": "ACTIVE"
         }
       ],
       "n_evals": 169,
       "n_ic_evals": 158,
       "n_informative_evals": 155,
-      "net_pnl": -1490196.8807617668,
+      "net_pnl": -1683.9029925871262,
       "policy": {
         "period_ns": 86400000000000,
         "policy": "scheduled"
@@ -449,16 +409,16 @@
           "ts": 1787616002028520532
         }
       ],
-      "rolling_ic_mean": 0.04911909917706378,
-      "rolling_ic_std": 0.07175850521217715,
-      "total_costs": 1624961.8807625002,
-      "trade_count": 5614
+      "rolling_ic_mean": 0.04806184230130185,
+      "rolling_ic_std": 0.07380943179016482,
+      "total_costs": 1660.3388178444548,
+      "trade_count": 4098
     },
     "scheduled_weekly": {
-      "deployed_ic": 0.06760307597569155,
+      "deployed_ic": 0.0732913132060455,
       "drift_event_count": 31,
       "final_state": "ACTIVE",
-      "gross_pnl": 135900.00000033496,
+      "gross_pnl": -7.841657997067053,
       "ic_baseline_kind": "oos",
       "ic_baseline_rows": 582,
       "lifecycle_transitions": [
@@ -468,18 +428,18 @@
           "event_ts": 1787552102028520532,
           "from": "ACTIVE",
           "policy": "scheduled_weekly",
-          "reason": "rolling_ic -0.020682 < watch gate 0.0",
-          "rolling_ic": -0.020681606188162244,
+          "reason": "rolling_ic -0.014693 < watch gate 0.0",
+          "rolling_ic": -0.014693375184755237,
           "to": "WATCH"
         },
         {
           "alpha_id": "FX11",
-          "eval_index": 20,
-          "event_ts": 1787556602028520532,
+          "eval_index": 17,
+          "event_ts": 1787553902028520532,
           "from": "WATCH",
           "policy": "scheduled_weekly",
-          "reason": "persistent breach: 6 consecutive evals below watch gate 0.0",
-          "rolling_ic": -0.03144252199427992,
+          "reason": "persistent breach: CUSUM 0.012380 >= 0.01 (slack 0.0025) below watch gate 0.0",
+          "rolling_ic": -0.04332683299955791,
           "to": "RETIRED"
         },
         {
@@ -489,7 +449,7 @@
           "from": "RETIRED",
           "policy": "scheduled_weekly",
           "reason": "recovery from retirement: 3 consecutive evals >= reactivate gate 0.005; probation before ACTIVE",
-          "rolling_ic": 0.033116572520835004,
+          "rolling_ic": 0.028643884427903173,
           "to": "WATCH"
         },
         {
@@ -499,7 +459,7 @@
           "from": "WATCH",
           "policy": "scheduled_weekly",
           "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
-          "rolling_ic": 0.011398314143528172,
+          "rolling_ic": 0.015072215311050508,
           "to": "ACTIVE"
         },
         {
@@ -508,8 +468,8 @@
           "event_ts": 1787574602028520532,
           "from": "ACTIVE",
           "policy": "scheduled_weekly",
-          "reason": "rolling_ic -0.007938 < watch gate 0.0",
-          "rolling_ic": -0.007938013457516381,
+          "reason": "rolling_ic -0.000601 < watch gate 0.0",
+          "rolling_ic": -0.0006010646921332236,
           "to": "WATCH"
         },
         {
@@ -519,47 +479,27 @@
           "from": "WATCH",
           "policy": "scheduled_weekly",
           "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
-          "rolling_ic": 0.05335724911595862,
+          "rolling_ic": 0.06462101876239598,
           "to": "ACTIVE"
         },
         {
           "alpha_id": "FX11",
-          "eval_index": 64,
-          "event_ts": 1787596202028520532,
+          "eval_index": 98,
+          "event_ts": 1787626802028520532,
           "from": "ACTIVE",
           "policy": "scheduled_weekly",
-          "reason": "rolling_ic -0.000679 < watch gate 0.0",
-          "rolling_ic": -0.0006791994778013925,
+          "reason": "rolling_ic -0.009336 < watch gate 0.0",
+          "rolling_ic": -0.009336468948840514,
           "to": "WATCH"
         },
         {
           "alpha_id": "FX11",
-          "eval_index": 67,
-          "event_ts": 1787598902028520532,
+          "eval_index": 100,
+          "event_ts": 1787628602028520532,
           "from": "WATCH",
           "policy": "scheduled_weekly",
-          "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
-          "rolling_ic": 0.01982572513474302,
-          "to": "ACTIVE"
-        },
-        {
-          "alpha_id": "FX11",
-          "eval_index": 99,
-          "event_ts": 1787627702028520532,
-          "from": "ACTIVE",
-          "policy": "scheduled_weekly",
-          "reason": "rolling_ic -0.050221 < watch gate 0.0",
-          "rolling_ic": -0.050221190785178164,
-          "to": "WATCH"
-        },
-        {
-          "alpha_id": "FX11",
-          "eval_index": 104,
-          "event_ts": 1787632202028520532,
-          "from": "WATCH",
-          "policy": "scheduled_weekly",
-          "reason": "persistent breach: 6 consecutive evals below watch gate 0.0",
-          "rolling_ic": -0.0444898655108253,
+          "reason": "persistent breach: CUSUM 0.016188 >= 0.01 (slack 0.0025) below watch gate 0.0",
+          "rolling_ic": -0.05887704566190719,
           "to": "RETIRED"
         },
         {
@@ -569,7 +509,7 @@
           "from": "RETIRED",
           "policy": "scheduled_weekly",
           "reason": "recovery from retirement: 3 consecutive evals >= reactivate gate 0.005; probation before ACTIVE",
-          "rolling_ic": 0.050995471232102234,
+          "rolling_ic": 0.03604541239648864,
           "to": "WATCH"
         },
         {
@@ -579,17 +519,17 @@
           "from": "WATCH",
           "policy": "scheduled_weekly",
           "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
-          "rolling_ic": 0.11093058143795313,
+          "rolling_ic": 0.10079239492628271,
           "to": "ACTIVE"
         },
         {
           "alpha_id": "FX11",
-          "eval_index": 145,
-          "event_ts": 1787669102028520532,
+          "eval_index": 146,
+          "event_ts": 1787670002028520532,
           "from": "ACTIVE",
           "policy": "scheduled_weekly",
-          "reason": "rolling_ic -0.002290 < watch gate 0.0",
-          "rolling_ic": -0.002290353533302259,
+          "reason": "rolling_ic -0.014771 < watch gate 0.0",
+          "rolling_ic": -0.014770606984980903,
           "to": "WATCH"
         },
         {
@@ -599,14 +539,14 @@
           "from": "WATCH",
           "policy": "scheduled_weekly",
           "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
-          "rolling_ic": 0.015671765894889528,
+          "rolling_ic": 0.02102638344300448,
           "to": "ACTIVE"
         }
       ],
       "n_evals": 169,
       "n_ic_evals": 158,
       "n_informative_evals": 155,
-      "net_pnl": -1501008.1041993676,
+      "net_pnl": -19.182273987414742,
       "policy": {
         "period_ns": 604800000000000,
         "policy": "scheduled"
@@ -622,16 +562,16 @@
           "ts": 1787538602028520532
         }
       ],
-      "rolling_ic_mean": 0.04911909917706378,
-      "rolling_ic_std": 0.07175850521217715,
-      "total_costs": 1636908.1042000002,
-      "trade_count": 5620
+      "rolling_ic_mean": 0.048061842301301845,
+      "rolling_ic_std": 0.07380943179016482,
+      "total_costs": 11.34061599033084,
+      "trade_count": 35
     },
     "static": {
-      "deployed_ic": 0.06760307597569155,
+      "deployed_ic": 0.0732913132060455,
       "drift_event_count": 31,
       "final_state": "ACTIVE",
-      "gross_pnl": 135900.00000033496,
+      "gross_pnl": -7.841657997067053,
       "ic_baseline_kind": "oos",
       "ic_baseline_rows": 582,
       "lifecycle_transitions": [
@@ -641,18 +581,18 @@
           "event_ts": 1787552102028520532,
           "from": "ACTIVE",
           "policy": "static",
-          "reason": "rolling_ic -0.020682 < watch gate 0.0",
-          "rolling_ic": -0.020681606188162244,
+          "reason": "rolling_ic -0.014693 < watch gate 0.0",
+          "rolling_ic": -0.014693375184755237,
           "to": "WATCH"
         },
         {
           "alpha_id": "FX11",
-          "eval_index": 20,
-          "event_ts": 1787556602028520532,
+          "eval_index": 17,
+          "event_ts": 1787553902028520532,
           "from": "WATCH",
           "policy": "static",
-          "reason": "persistent breach: 6 consecutive evals below watch gate 0.0",
-          "rolling_ic": -0.03144252199427992,
+          "reason": "persistent breach: CUSUM 0.012380 >= 0.01 (slack 0.0025) below watch gate 0.0",
+          "rolling_ic": -0.04332683299955791,
           "to": "RETIRED"
         },
         {
@@ -662,7 +602,7 @@
           "from": "RETIRED",
           "policy": "static",
           "reason": "recovery from retirement: 3 consecutive evals >= reactivate gate 0.005; probation before ACTIVE",
-          "rolling_ic": 0.033116572520835004,
+          "rolling_ic": 0.028643884427903173,
           "to": "WATCH"
         },
         {
@@ -672,7 +612,7 @@
           "from": "WATCH",
           "policy": "static",
           "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
-          "rolling_ic": 0.011398314143528172,
+          "rolling_ic": 0.015072215311050508,
           "to": "ACTIVE"
         },
         {
@@ -681,8 +621,8 @@
           "event_ts": 1787574602028520532,
           "from": "ACTIVE",
           "policy": "static",
-          "reason": "rolling_ic -0.007938 < watch gate 0.0",
-          "rolling_ic": -0.007938013457516381,
+          "reason": "rolling_ic -0.000601 < watch gate 0.0",
+          "rolling_ic": -0.0006010646921332236,
           "to": "WATCH"
         },
         {
@@ -692,47 +632,27 @@
           "from": "WATCH",
           "policy": "static",
           "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
-          "rolling_ic": 0.05335724911595862,
+          "rolling_ic": 0.06462101876239598,
           "to": "ACTIVE"
         },
         {
           "alpha_id": "FX11",
-          "eval_index": 64,
-          "event_ts": 1787596202028520532,
+          "eval_index": 98,
+          "event_ts": 1787626802028520532,
           "from": "ACTIVE",
           "policy": "static",
-          "reason": "rolling_ic -0.000679 < watch gate 0.0",
-          "rolling_ic": -0.0006791994778013925,
+          "reason": "rolling_ic -0.009336 < watch gate 0.0",
+          "rolling_ic": -0.009336468948840514,
           "to": "WATCH"
         },
         {
           "alpha_id": "FX11",
-          "eval_index": 67,
-          "event_ts": 1787598902028520532,
+          "eval_index": 100,
+          "event_ts": 1787628602028520532,
           "from": "WATCH",
           "policy": "static",
-          "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
-          "rolling_ic": 0.01982572513474302,
-          "to": "ACTIVE"
-        },
-        {
-          "alpha_id": "FX11",
-          "eval_index": 99,
-          "event_ts": 1787627702028520532,
-          "from": "ACTIVE",
-          "policy": "static",
-          "reason": "rolling_ic -0.050221 < watch gate 0.0",
-          "rolling_ic": -0.050221190785178164,
-          "to": "WATCH"
-        },
-        {
-          "alpha_id": "FX11",
-          "eval_index": 104,
-          "event_ts": 1787632202028520532,
-          "from": "WATCH",
-          "policy": "static",
-          "reason": "persistent breach: 6 consecutive evals below watch gate 0.0",
-          "rolling_ic": -0.0444898655108253,
+          "reason": "persistent breach: CUSUM 0.016188 >= 0.01 (slack 0.0025) below watch gate 0.0",
+          "rolling_ic": -0.05887704566190719,
           "to": "RETIRED"
         },
         {
@@ -742,7 +662,7 @@
           "from": "RETIRED",
           "policy": "static",
           "reason": "recovery from retirement: 3 consecutive evals >= reactivate gate 0.005; probation before ACTIVE",
-          "rolling_ic": 0.050995471232102234,
+          "rolling_ic": 0.03604541239648864,
           "to": "WATCH"
         },
         {
@@ -752,17 +672,17 @@
           "from": "WATCH",
           "policy": "static",
           "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
-          "rolling_ic": 0.11093058143795313,
+          "rolling_ic": 0.10079239492628271,
           "to": "ACTIVE"
         },
         {
           "alpha_id": "FX11",
-          "eval_index": 145,
-          "event_ts": 1787669102028520532,
+          "eval_index": 146,
+          "event_ts": 1787670002028520532,
           "from": "ACTIVE",
           "policy": "static",
-          "reason": "rolling_ic -0.002290 < watch gate 0.0",
-          "rolling_ic": -0.002290353533302259,
+          "reason": "rolling_ic -0.014771 < watch gate 0.0",
+          "rolling_ic": -0.014770606984980903,
           "to": "WATCH"
         },
         {
@@ -772,14 +692,14 @@
           "from": "WATCH",
           "policy": "static",
           "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
-          "rolling_ic": 0.015671765894889528,
+          "rolling_ic": 0.02102638344300448,
           "to": "ACTIVE"
         }
       ],
       "n_evals": 169,
       "n_ic_evals": 158,
       "n_informative_evals": 155,
-      "net_pnl": -1501008.1041993676,
+      "net_pnl": -19.182273987414742,
       "policy": {
         "policy": "static"
       },
@@ -794,10 +714,10 @@
           "ts": 1787538602028520532
         }
       ],
-      "rolling_ic_mean": 0.04911909917706378,
-      "rolling_ic_std": 0.07175850521217715,
-      "total_costs": 1636908.1042000002,
-      "trade_count": 5620
+      "rolling_ic_mean": 0.048061842301301845,
+      "rolling_ic_std": 0.07380943179016482,
+      "total_costs": 11.34061599033084,
+      "trade_count": 35
     }
   },
   "universe": [

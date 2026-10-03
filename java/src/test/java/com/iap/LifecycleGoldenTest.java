@@ -30,10 +30,13 @@ import com.iap.lifecycle.PolicyConfig;
 /**
  * Alpha promotion lifecycle parity with the Python reference
  * ({@code iap.lifecycle}) against tests/golden/expected_lifecycle.json:
- * every step of LC01 / LC02 / LC03 replayed from the embedded config —
- * state, outcome, every gate result (value and order), the counters and the
- * canonical transition JSON, all exact — plus the transition table, the
- * pinned config and a byte-identical load/save of research/alpha_registry.json.
+ * every step of LC01 .. LC04 replayed from the embedded default config
+ * (ledger significance threshold, CUSUM retirement) and of LG01 from the
+ * embedded legacy config (fixed threshold, consecutive breaches) — state,
+ * outcome, every gate result (value and order), the counters, the CUSUM
+ * statistic and the canonical transition JSON, all exact — plus the
+ * transition table, the pinned config and a byte-identical load/save of
+ * research/alpha_registry.json.
  */
 public class LifecycleGoldenTest {
     private static Map<String, Object> golden() {
@@ -51,7 +54,7 @@ public class LifecycleGoldenTest {
     @Test
     public void statesTransitionTableAndConfigArePinned() {
         Map<String, Object> g = golden();
-        assertEquals(1L, Json.asLong(g.get("x-version")));
+        assertEquals(2L, Json.asLong(g.get("x-version")));
         Map<String, Object> states = Json.object(g.get("states"));
         assertEquals(7, states.size());
         for (LifecycleState s : LifecycleState.values()) {
@@ -68,17 +71,47 @@ public class LifecycleGoldenTest {
                 .lifecyclePolicy();
         assertEquals(CanonicalJson.serialize(cfg.toTree()),
                 CanonicalJson.serialize(fromFiles.toTree()));
+        // the committed policy is the v1.5.0 default; the legacy section
+        // names the rules up to v1.4.0 and round-trips too
+        assertEquals(PolicyConfig.TSTAT_LEDGER, cfg.tstatThreshold());
+        assertEquals(com.iap.adaptive.LifecycleGauge.BreachRule.CUSUM,
+                cfg.live().breachRule());
+        Object legacyTree = obj(g.get("legacy")).get("config");
+        PolicyConfig legacy = PolicyConfig.fromTree(obj(legacyTree));
+        assertEquals(CanonicalJson.serialize(legacyTree),
+                CanonicalJson.serialize(legacy.toTree()));
+        assertEquals(PolicyConfig.TSTAT_FIXED, legacy.tstatThreshold());
+        assertEquals(com.iap.adaptive.LifecycleGauge.BreachRule.CONSECUTIVE,
+                legacy.live().breachRule());
+        assertEquals(CanonicalJson.serialize(cfg.gates().toTree()),
+                CanonicalJson.serialize(legacy.gates().toTree()));
     }
 
     @Test
     public void everyScenarioStepReplaysExactly() {
         Map<String, Object> g = golden();
+        Map<String, Object> scenarios = Json.object(g.get("scenarios"));
+        assertEquals(new TreeSet<>(List.of("LC01", "LC02", "LC03", "LC04")),
+                new TreeSet<>(scenarios.keySet()));
+        assertEquals("the four default scripts carry 36 transitions", 36,
+                replay(g, config(), scenarios));
+    }
+
+    @Test
+    public void everyLegacyScenarioStepReplaysExactly() {
+        Map<String, Object> g = golden();
+        Map<String, Object> legacy = obj(g.get("legacy"));
+        Map<String, Object> scenarios = Json.object(legacy.get("scenarios"));
+        assertEquals(new TreeSet<>(List.of("LG01")), new TreeSet<>(scenarios.keySet()));
+        assertEquals("the legacy script carries 9 transitions", 9,
+                replay(g, PolicyConfig.fromTree(obj(legacy.get("config"))), scenarios));
+    }
+
+    /** Replay {@code scenarios} under {@code cfg}; returns the transitions seen. */
+    private static int replay(Map<String, Object> g, PolicyConfig cfg,
+            Map<String, Object> scenarios) {
         long t0 = Json.asLong(g.get("t0"));
         long stepNs = Json.asLong(g.get("step_ns"));
-        PolicyConfig cfg = config();
-        Map<String, Object> scenarios = Json.object(g.get("scenarios"));
-        assertEquals(new TreeSet<>(List.of("LC01", "LC02", "LC03")),
-                new TreeSet<>(scenarios.keySet()));
         int transitionsSeen = 0;
         for (String alphaId : new TreeSet<>(scenarios.keySet())) {
             AlphaRegistry registry = new AlphaRegistry(cfg.policy());
@@ -144,6 +177,7 @@ public class LifecycleGoldenTest {
                         rec.breachCount());
                 assertEquals(where, Json.asLong(expected.get("recovery_count")),
                         rec.recoveryCount());
+                assertEquals(where, Json.asDouble(expected.get("cusum")), rec.cusum(), 0.0);
                 Object want = expected.get("transition");
                 if (want == null) {
                     assertNull(where, transition);
@@ -161,7 +195,7 @@ public class LifecycleGoldenTest {
                 }
             }
         }
-        assertEquals("the three scripts carry 16 transitions", 16, transitionsSeen);
+        return transitionsSeen;
     }
 
     @Test

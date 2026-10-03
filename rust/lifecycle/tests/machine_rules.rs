@@ -2,6 +2,12 @@
 //! SplitMix64-driven property test: the system never moves a RETIRED alpha,
 //! an evaluation never advances more than one state, only a HUMAN retires
 //! or resets, and the same seed replays to the same transitions.
+//!
+//! The rule tests written for v1.4.0 run under [`legacy_config`], which names
+//! the rules they were written for (`tstat_threshold = "fixed"`,
+//! `breach_rule = "consecutive"`); the v1.5.0 defaults (ledger significance
+//! threshold, CUSUM retirement) have their own tests under
+//! [`default_config`], and the property test runs under both.
 
 use std::collections::BTreeMap;
 
@@ -13,9 +19,10 @@ use lifecycle::{
 use marketdata::SplitMix64;
 use serde_json::json;
 
-fn config() -> PolicyConfig {
+fn policy(tstat_threshold: &str, live: serde_json::Value) -> PolicyConfig {
     PolicyConfig::from_value(&json!({
         "policy": "lifecycle_v1",
+        "tstat_threshold": tstat_threshold,
         "gates": {
             "min_experiments_in_ledger": 1, "min_oos_ic": 0.01, "min_nw_tstat": 3.0,
             "min_fold_sign_consistency": 0.7, "min_folds": 3, "min_net_return_bps": 0.0,
@@ -24,17 +31,41 @@ fn config() -> PolicyConfig {
             "min_paper_net_pnl": 0.0, "max_kill_events": 0
         },
         "demotion": {"max_consecutive_failures": 3},
-        "live": {"watch_ic_gate": 0.0, "reactivate_ic_gate": 0.005, "retire_breach_evals": 6, "reactivate_evals": 3}
+        "live": live
     }))
     .expect("valid config")
 }
 
-fn machine(alpha: &str) -> AlphaLifecycle {
-    let cfg = config();
+/// The LEGACY policy, by name: the fixed 3.0 significance threshold and the
+/// consecutive-breach retirement rule (the rules up to v1.4.0).
+fn legacy_config() -> PolicyConfig {
+    policy(
+        "fixed",
+        json!({"watch_ic_gate": 0.0, "reactivate_ic_gate": 0.005, "retire_breach_evals": 6,
+               "reactivate_evals": 3, "breach_rule": "consecutive"}),
+    )
+}
+
+/// The default policy since v1.5.0: the ledger significance threshold and
+/// the CUSUM retirement rule with the pinned parameters.
+fn default_config() -> PolicyConfig {
+    policy(
+        "ledger",
+        json!({"watch_ic_gate": 0.0, "reactivate_ic_gate": 0.005, "retire_breach_evals": 6,
+               "reactivate_evals": 3, "breach_rule": "cusum", "cusum_k": 0.0025, "cusum_h": 0.01}),
+    )
+}
+
+fn machine_with(cfg: PolicyConfig, alpha: &str) -> AlphaLifecycle {
     let reg = AlphaRegistry::new(&cfg.policy).expect("policy");
     let mut m = AlphaLifecycle::new(cfg, reg).expect("machine");
     m.register(alpha, 0).expect("register");
     m
+}
+
+/// A machine under the legacy policy.
+fn machine(alpha: &str) -> AlphaLifecycle {
+    machine_with(legacy_config(), alpha)
 }
 
 fn research(
@@ -83,20 +114,27 @@ fn good(alpha: &str) -> ExperimentResult {
     research(alpha, 0.02, 0.03, 4.0, true, Some(true), 5.0)
 }
 
-fn ev_research(r: ExperimentResult, capacity: Option<f64>) -> Evidence {
+fn ev_research_at(r: ExperimentResult, capacity: Option<f64>, threshold: Option<f64>) -> Evidence {
     Evidence {
         research: Some(r),
         capacity_usd: capacity,
+        significance_threshold: threshold,
         validation: None,
         paper: None,
         live: None,
     }
 }
 
+/// Research evidence that carries no significance threshold.
+fn ev_research(r: ExperimentResult, capacity: Option<f64>) -> Evidence {
+    ev_research_at(r, capacity, None)
+}
+
 fn ev_validation(parity: bool) -> Evidence {
     Evidence {
         research: None,
         capacity_usd: None,
+        significance_threshold: None,
         validation: Some(ValidationEvidence {
             holdout_ic: 0.02,
             research_ic: 0.02,
@@ -112,6 +150,7 @@ fn ev_paper(ok: bool) -> Evidence {
     Evidence {
         research: None,
         capacity_usd: None,
+        significance_threshold: None,
         validation: None,
         paper: Some(PaperEvidence {
             n_sessions: if ok { 5 } else { 2 },
@@ -125,10 +164,11 @@ fn ev_paper(ok: bool) -> Evidence {
     }
 }
 
-fn ev_live(ic: Option<f64>, informative: bool) -> Evidence {
+fn ev_live_at(ic: Option<f64>, informative: bool, new_fraction: f64) -> Evidence {
     Evidence {
         research: None,
         capacity_usd: None,
+        significance_threshold: None,
         validation: None,
         paper: None,
         live: Some(LiveEvidence {
@@ -136,16 +176,27 @@ fn ev_live(ic: Option<f64>, informative: bool) -> Evidence {
             n_buckets: 8,
             eval_index: 1,
             informative,
+            new_fraction,
         }),
     }
 }
 
-/// Walk an alpha to ACTIVE.
+/// A live reading one 15-minute block after the last (1/8 of the window new).
+fn ev_live(ic: Option<f64>, informative: bool) -> Evidence {
+    ev_live_at(ic, informative, 0.125)
+}
+
+/// Walk an alpha to ACTIVE (the research evidence carries the threshold 3.5,
+/// which the fixed policy does not read and the ledger policy passes at t 4.0).
 fn to_active(m: &mut AlphaLifecycle, alpha: &str) {
     m.advance(alpha, 1, &ev_research(good(alpha), None))
         .expect("ok");
-    m.advance(alpha, 2, &ev_research(good(alpha), Some(5e6)))
-        .expect("ok");
+    m.advance(
+        alpha,
+        2,
+        &ev_research_at(good(alpha), Some(5e6), Some(3.5)),
+    )
+    .expect("ok");
     m.advance(alpha, 3, &ev_validation(true)).expect("ok");
     m.advance(alpha, 4, &ev_paper(true)).expect("ok");
     assert_eq!(m.state(alpha).expect("known"), LifecycleState::Active);
@@ -261,7 +312,115 @@ fn validating_demotes_on_third_consecutive_failure_and_silence_does_not_count() 
 }
 
 #[test]
-fn live_edges_and_terminal_retirement() {
+fn default_policy_reads_the_significance_threshold_from_the_evidence() {
+    let mut m = machine_with(default_config(), "A");
+    m.advance("A", 1, &ev_research(good("A"), None))
+        .expect("ok");
+    assert_eq!(m.state("A").expect("known"), LifecycleState::Candidate);
+    // No threshold in the evidence: the gate fails with a null threshold.
+    assert!(m
+        .advance("A", 2, &ev_research(good("A"), Some(5e6)))
+        .expect("ok")
+        .is_none());
+    let ev = m.evaluations().last().expect("recorded");
+    assert_eq!(ev.failed_gates(), vec!["statistical_significance"]);
+    let gate = &ev.gates[2];
+    assert_eq!(gate.0, "statistical_significance");
+    assert_eq!((gate.1.value, gate.1.threshold), (Some(4.0), None));
+    // t 4.0 under a ledger threshold of 4.5: fails at that threshold.
+    assert!(m
+        .advance("A", 3, &ev_research_at(good("A"), Some(5e6), Some(4.5)))
+        .expect("ok")
+        .is_none());
+    let ev = m.evaluations().last().expect("recorded");
+    assert_eq!(ev.failed_gates(), vec!["statistical_significance"]);
+    assert_eq!(ev.gates[2].1.threshold, Some(4.5));
+    // A threshold under the floor is replaced by the floor; t 4.0 passes.
+    let t = m
+        .advance("A", 4, &ev_research_at(good("A"), Some(5e6), Some(2.0)))
+        .expect("ok")
+        .expect("promoted");
+    assert_eq!(t.to_state, LifecycleState::Validating);
+    assert_eq!(t.gates["statistical_significance"].threshold, Some(3.0));
+    // The same thresholdless evidence passes the LEGACY fixed gate.
+    let mut legacy = machine("A");
+    legacy
+        .advance("A", 1, &ev_research(good("A"), None))
+        .expect("ok");
+    let t = legacy
+        .advance("A", 2, &ev_research(good("A"), Some(5e6)))
+        .expect("ok")
+        .expect("promoted");
+    assert_eq!(t.gates["statistical_significance"].threshold, Some(3.0));
+}
+
+#[test]
+fn default_policy_retires_by_cusum_and_resumes_from_the_registry() {
+    let mut m = machine_with(default_config(), "A");
+    to_active(&mut m, "A");
+    // Eight breaches inside the slack: WATCH on the first, never RETIRED
+    // (the legacy rule retires at the sixth), CUSUM stays 0.
+    let t = m
+        .advance("A", 5, &ev_live(Some(-0.001), true))
+        .expect("ok")
+        .expect("watch");
+    assert_eq!(t.to_state, LifecycleState::Watch);
+    for k in 0..7 {
+        assert_eq!(
+            m.advance("A", 6 + k, &ev_live(Some(-0.001), true))
+                .expect("ok"),
+            None
+        );
+    }
+    let rec = m.record("A").expect("rec");
+    assert_eq!((rec.breach_count, rec.cusum), (0, 0.0));
+    // One deep breach in a disjoint window retires: S = 0.0135 - 0.0025.
+    let t = m
+        .advance("A", 13, &ev_live_at(Some(-0.0135), true, 1.0))
+        .expect("ok")
+        .expect("retired");
+    assert_eq!(t.to_state, LifecycleState::Retired);
+    assert_eq!(
+        t.reason,
+        "persistent breach: CUSUM 0.011000 >= 0.01 (slack 0.0025) below watch gate 0.0"
+    );
+    assert!(!t.gates["rolling_ic"].passed);
+    assert_eq!(m.record("A").expect("rec").cusum, 0.0);
+
+    // The statistic is persisted: a machine rebuilt from the rendered
+    // registry retires on the same reading as the one that kept running.
+    let mut a = machine_with(default_config(), "B");
+    to_active(&mut a, "B");
+    a.advance("B", 5, &ev_live(Some(-0.06), true))
+        .expect("ok")
+        .expect("watch");
+    let stat = a.record("B").expect("rec").cusum;
+    assert!((stat - 0.0071875).abs() < 1e-15, "S = {stat}");
+    let text = a.registry().render().expect("finite");
+    let doc: serde_json::Value = serde_json::from_str(&text).expect("json");
+    let reloaded = AlphaRegistry::from_value(&doc).expect("strict");
+    assert_eq!(reloaded.get("B").expect("rec").cusum, stat);
+    let mut b = AlphaLifecycle::new(default_config(), reloaded).expect("machine");
+    let ta = a
+        .advance("B", 6, &ev_live(Some(-0.06), true))
+        .expect("ok")
+        .expect("retired");
+    let tb = b
+        .advance("B", 6, &ev_live(Some(-0.06), true))
+        .expect("ok")
+        .expect("retired");
+    assert_eq!(ta, tb);
+    assert_eq!(ta.to_state, LifecycleState::Retired);
+    // A reading outside (0, 1] is rejected before it reaches the machine.
+    let mut c = machine_with(default_config(), "C");
+    to_active(&mut c, "C");
+    assert!(c
+        .advance("C", 5, &ev_live_at(Some(-0.01), true, 0.0))
+        .is_err());
+}
+
+#[test]
+fn legacy_live_edges_and_terminal_retirement() {
     let mut m = machine("A");
     to_active(&mut m, "A");
     assert_eq!(m.advance("A", 5, &ev_live(None, true)).expect("ok"), None);
@@ -383,6 +542,9 @@ fn random_evidence(rng: &mut SplitMix64, alpha: &str) -> Evidence {
     if rng.uniform() < 0.7 {
         ev.capacity_usd = Some(rng.uniform() * 3e6);
     }
+    if rng.uniform() < 0.7 {
+        ev.significance_threshold = Some(2.5 + rng.uniform() * 2.0);
+    }
     if rng.uniform() < 0.5 {
         ev.validation = Some(ValidationEvidence {
             holdout_ic: 0.02 + rng.uniform() * 0.02 - 0.01,
@@ -412,15 +574,15 @@ fn random_evidence(rng: &mut SplitMix64, alpha: &str) -> Evidence {
             n_buckets: 8,
             eval_index: 1,
             informative: rng.uniform() < 0.9,
+            new_fraction: if rng.uniform() < 0.8 { 0.125 } else { 1.0 },
         });
     }
     ev
 }
 
-fn run_property(seed: u64) -> Vec<lifecycle::LifecycleTransition> {
+fn run_property(seed: u64, cfg: PolicyConfig) -> Vec<lifecycle::LifecycleTransition> {
     let mut rng = SplitMix64::new(seed);
     let alphas = ["P1", "P2", "P3"];
-    let cfg = config();
     let reg = AlphaRegistry::new(&cfg.policy).expect("policy");
     let mut m = AlphaLifecycle::new(cfg, reg).expect("machine");
     for a in alphas {
@@ -490,7 +652,9 @@ fn run_property(seed: u64) -> Vec<lifecycle::LifecycleTransition> {
         let rec = m.record(alpha).expect("rec");
         if !rec.state.is_live() {
             assert_eq!((rec.breach_count, rec.recovery_count), (0, 0));
+            assert_eq!(rec.cusum, 0.0);
         }
+        assert!(rec.cusum.is_finite() && rec.cusum >= 0.0);
         if !matches!(
             rec.state,
             LifecycleState::Validating | LifecycleState::Paper
@@ -527,9 +691,11 @@ fn run_property(seed: u64) -> Vec<lifecycle::LifecycleTransition> {
 
 #[test]
 fn property_system_never_moves_retired_and_never_skips_states() {
-    let a = run_property(0x5EED_2026_0919);
-    let b = run_property(0x5EED_2026_0919);
-    assert_eq!(a, b, "same seed, same transitions");
-    let c = run_property(7);
-    assert_ne!(a, c, "a different seed walks differently");
+    for cfg in [default_config(), legacy_config()] {
+        let a = run_property(0x5EED_2026_0919, cfg.clone());
+        let b = run_property(0x5EED_2026_0919, cfg.clone());
+        assert_eq!(a, b, "same seed, same transitions");
+        let c = run_property(7, cfg);
+        assert_ne!(a, c, "a different seed walks differently");
+    }
 }

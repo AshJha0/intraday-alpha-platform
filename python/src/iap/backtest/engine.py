@@ -5,7 +5,7 @@ Pinned semantics (mirrored by the accounting-identity tests):
 - **Decision at t, execution at t + latency**: the signal at row ``i``
   produces a target position; the trade toward that target executes at
   ``t + latency`` at that row's ``mid ± half_spread`` (sign of the trade),
-  plus fees and linear impact (:mod:`iap.backtest.costs`).  Rows whose
+  plus fees and impact (:mod:`iap.backtest.costs`).  Rows whose
   mid/half-spread are invalid cannot execute; the previous position carries
   (the stale target is NOT queued — a real router would re-evaluate).
 
@@ -36,18 +36,10 @@ Pinned semantics (mirrored by the accounting-identity tests):
   forward fill carries the position across the gap anyway.  A gap in the row
   stream IS the session boundary here: it needs no calendar and works for FX
   and equities alike.
-- **Position rule** (pinned, deliberately simple): target =
-  ``sign(expected_return) * max_pos_qty`` when ``confidence >= conf_min``,
-  else flat.  No pyramiding, no hysteresis — a research backtester
-  measures signal economics, not execution tuning.
-
-  That default (``position_policy="sign"``) ignores two things the alpha
-  itself states: the HORIZON its expected return is over and the COST of
-  acting on it.  It re-decides on every row, so a 5-second forecast is
-  traded as if it were a one-row forecast, and it trades a forecast of a
-  tenth of a basis point through a spread of two.  The opt-in
-  ``position_policy="cost_aware"`` (pinned; the default is unchanged and
-  every committed report uses it) is the rule the forecast implies:
+- **Position rule** (pinned; the default changed in v1.5.0).  The default
+  ``position_policy="cost_aware"`` is the rule the forecast implies — it
+  uses the two things the alpha itself states, the HORIZON its expected
+  return is over and the COST of acting on it:
 
   * *entry threshold* at a decision row = the round-trip cost of a position
     as a return, ``(2 * half_spread + round_trip_fee) / mid`` scaled by the
@@ -69,29 +61,44 @@ Pinned semantics (mirrored by the accounting-identity tests):
     the spread again, so the bar to stay is lower than the bar to enter.
 
   Latency, decision age, executability and session flattening apply to the
-  resulting target exactly as they do to the default rule.
+  resulting target exactly as they do to the legacy rule.  The policy needs
+  the label horizon: ``horizon_ns`` must be set before a run
+  (:meth:`Backtester.for_horizon` does it from the alpha's horizon), and a
+  run without it is an error, never a silent fall-back.
 
-- **Fill cap at displayed size** (opt-in, ``cap_fills_at_l1``; default off):
-  by default a trade toward the target fills in full at ``mid +- half
-  spread`` whatever its size — a 1 000-share order "fills" at the touch of
-  a book showing 100.  With the flag, the quantity traded at a row is capped
-  at the displayed L1 size on the side it takes (``depth_ask_l1_v1`` for a
-  buy, ``depth_bid_l1_v1`` for a sell; a missing or non-finite size is 0,
-  i.e. nothing fills).  The unfilled remainder is NOT queued: the next row
-  that carries a decision trades toward that row's target, again capped —
-  the same "a real router would re-evaluate" rule as for unexecutable rows.
-  The session-end flatten is exempt (it models the closing auction, and a
-  capped flatten would carry inventory overnight).
-- **Blocked rows** (opt-in, ``block_rows_column``; default ``None``): rows
-  where the named boolean frame column is False produce NO decision (the
-  position carries).  With ``block_rows_column="label_valid_<h>"`` the
-  backtest trades exactly the rows the IC is measured on.  The IC drops
-  every row whose label is invalid — halts, auctions, stale books, the end
-  of the session — while the default backtest keeps trading through them,
-  so the two statistics describe different row populations; the flag
-  removes that selection difference (at the price of using label validity,
-  which is only known after the fact, as a row filter — it is a diagnostic
-  of the bias, not a tradable rule).
+  ``position_policy="sign"`` is the LEGACY rule, the default up to v1.4.0:
+  target = ``sign(expected_return) * max_pos_qty`` when ``confidence >=
+  conf_min``, else flat, re-decided on every row.  It trades a 5-second
+  forecast as if it were a one-row forecast, and a forecast of a tenth of a
+  basis point through a spread of two.  It stays selectable by name
+  (:meth:`BacktestConfig.legacy`); the Java ``ResearchBacktester``
+  implements this rule only.
+
+- **Fill cap at displayed size** (``cap_fills_at_l1``; default ON since
+  v1.5.0): the quantity traded at a row is capped at the displayed L1 size
+  on the side it takes (``depth_ask_l1_v1`` for a buy, ``depth_bid_l1_v1``
+  for a sell; a missing or non-finite size is 0, i.e. nothing fills).  The
+  unfilled remainder is NOT queued: the next row that carries a decision
+  trades toward that row's target, again capped — the same "a real router
+  would re-evaluate" rule as for unexecutable rows.  The session-end flatten
+  is exempt (it models the closing auction, and a capped flatten would carry
+  inventory overnight).  With the flag off — the legacy behaviour — a trade
+  fills in full at ``mid +- half spread`` whatever its size: a 1 000-share
+  order "fills" at the touch of a book showing 100.
+- **Blocked rows** (``block_rows_column``; default ``"auto"`` since v1.5.0):
+  rows where the row mask is False produce NO decision (the position
+  carries).  ``"auto"`` is the mask of the rows the IC scores at the
+  configured horizon (:func:`iap.labels.frames.scored_rows`: a valid label,
+  or one invalid for BLACKOUT alone that is scored at its reopen return),
+  so the backtest trades exactly the rows the IC is measured on.  The IC
+  leaves out every row it has no price for — a stale forward mid, a
+  non-tradable anchor, the end of the session — and a backtest that keeps
+  trading through them describes a different row population.  The mask is
+  built from labels, which are only known after the fact: it removes a
+  selection difference between two research statistics and is not a
+  tradable rule (the live path has no such column and does not use it).
+  A column name blocks on that boolean column; ``None`` — the legacy
+  behaviour — trades every row.
 - **Accounting identity** (tested exactly): with cash updated only by
   executions and equity marked at the last valid mid,
 
@@ -125,12 +132,14 @@ standard research-scaling caveat.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 import pandas as pd
 
 from iap.backtest.costs import CostModel
+from iap.labels.frames import scored_rows
+from iap.labels.labels import HORIZONS_NS
 
 NS_S = 1_000_000_000
 BAR_NS = 60 * NS_S
@@ -138,12 +147,25 @@ SESSION_HOURS = {"EQUITY": 6.5, "ETF": 6.5, "FX": 21.0}
 #: Bar gap above which the Sharpe series is NOT zero-filled (session break).
 SESSION_GAP_NS = 30 * 60 * NS_S
 TRADING_DAYS_PER_YEAR = 252
-#: Pinned position policies (module docs, position rule).
-POSITION_POLICIES = ("sign", "cost_aware")
+#: Pinned position policies (module docs): the default, then the legacy rule.
+POSITION_POLICIES = ("cost_aware", "sign")
+#: The default position policy.
+DEFAULT_POSITION_POLICY = "cost_aware"
+#: The rule that was the default up to v1.4.0.
+LEGACY_POSITION_POLICY = "sign"
+#: ``block_rows_column`` value meaning "the rows the IC scores at the
+#: configured horizon" (:func:`iap.labels.frames.scored_rows`).
+BLOCK_ROWS_AUTO = "auto"
+
+_HORIZON_NAME_BY_NS = {ns: name for name, ns in HORIZONS_NS.items()}
 
 
 @dataclass(frozen=True)
 class BacktestConfig:
+    """Research backtest configuration.  The defaults are the v1.5.0 rules
+    (cost-aware positions, fills capped at displayed size, invalid-label rows
+    blocked); :meth:`legacy` names the v1.4.0 rules."""
+
     max_pos_qty: int = 1000  # matches execution defaults max_child_qty
     conf_min: float = 0.5
     latency_rows: int = 1  # rows mode: decision t executes t+latency
@@ -156,17 +178,20 @@ class BacktestConfig:
     flatten_at_session_end: bool = False
     #: row gap that marks a session boundary (pinned default: 30 minutes)
     session_gap_ns: int = 30 * 60 * NS_S
-    #: "sign" (pinned default) or "cost_aware" (module docs, position rule)
-    position_policy: str = "sign"
-    #: label horizon the expected return is over; required by "cost_aware"
+    #: "cost_aware" (default) or "sign" (legacy) — module docs, position rule
+    position_policy: str = DEFAULT_POSITION_POLICY
+    #: label horizon the expected return is over; "cost_aware" and the
+    #: "auto" row block need it at run time (:meth:`Backtester.for_horizon`)
     horizon_ns: int | None = None
     #: fraction of the entry threshold a same-direction signal must clear to
     #: renew an expired hold ("cost_aware" only)
     hysteresis: float = 0.5
     #: cap each fill at the displayed L1 size on the side it takes
-    cap_fills_at_l1: bool = False
-    #: boolean frame column; rows where it is False make no decision
-    block_rows_column: str | None = None
+    cap_fills_at_l1: bool = True
+    #: rows where the mask is False make no decision: "auto" = the rows
+    #: the IC scores at the horizon; a name = that boolean frame column;
+    #: ``None`` = trade every row (legacy)
+    block_rows_column: str | None = BLOCK_ROWS_AUTO
 
     def __post_init__(self) -> None:
         if self.position_policy not in POSITION_POLICIES:
@@ -175,8 +200,6 @@ class BacktestConfig:
             )
         if self.horizon_ns is not None and self.horizon_ns <= 0:
             raise ValueError("horizon_ns must be positive")
-        if self.position_policy == "cost_aware" and self.horizon_ns is None:
-            raise ValueError("position_policy 'cost_aware' needs horizon_ns")
         if not 0.0 <= self.hysteresis <= 1.0:
             raise ValueError("hysteresis must be in [0, 1]")
         if self.latency_rows < 0:
@@ -189,6 +212,65 @@ class BacktestConfig:
             raise ValueError("max_decision_age_ns must be positive")
         if self.session_gap_ns <= 0:
             raise ValueError("session_gap_ns must be positive")
+
+    @classmethod
+    def legacy(cls, **overrides) -> BacktestConfig:
+        """The v1.4.0 rules, named: ``position_policy="sign"``, fills not
+        capped at displayed size, every row traded.  ``overrides`` are the
+        other fields (latency, decision age, ...)."""
+        fields = {
+            "position_policy": LEGACY_POSITION_POLICY,
+            "cap_fills_at_l1": False,
+            "block_rows_column": None,
+        }
+        fields.update(overrides)
+        return cls(**fields)
+
+    def for_horizon(self, horizon: str) -> BacktestConfig:
+        """This configuration with the label horizon set from its name."""
+        if horizon not in HORIZONS_NS:
+            raise ValueError(f"unknown horizon {horizon!r}; pinned: {list(HORIZONS_NS)}")
+        return replace(self, horizon_ns=HORIZONS_NS[horizon])
+
+    def horizon_name(self) -> str:
+        """The pinned label horizon ``horizon_ns`` names (``ValueError`` when
+        it is unset or not one of the pinned horizons)."""
+        if self.horizon_ns is None:
+            raise ValueError(
+                "block_rows_column='auto' needs horizon_ns (Backtester.for_horizon); "
+                "pass block_rows_column=None to trade every row"
+            )
+        name = _HORIZON_NAME_BY_NS.get(int(self.horizon_ns))
+        if name is None:
+            raise ValueError(
+                f"block_rows_column='auto': horizon_ns {self.horizon_ns} is not a pinned "
+                "label horizon; name the column or pass None"
+            )
+        return name
+
+    def block_rows_label(self) -> str | None:
+        """What blocks rows, for a report: ``None``, a column name, or
+        ``"scored_rows:<horizon>"`` for the ``"auto"`` mask."""
+        if self.block_rows_column != BLOCK_ROWS_AUTO:
+            return self.block_rows_column
+        return f"scored_rows:{self.horizon_name()}"
+
+    def allowed_rows(self, frame: pd.DataFrame, where: str = "frame") -> np.ndarray | None:
+        """The row mask of the block (``None`` = every row may decide)."""
+        column = self.block_rows_column
+        if column is None:
+            return None
+        if column == BLOCK_ROWS_AUTO:
+            name = self.horizon_name()
+            for needed in (f"label_mid_{name}", f"label_valid_{name}"):
+                if needed not in frame.columns:
+                    raise ValueError(
+                        f"{where}: block_rows_column='auto' needs frame column {needed!r}"
+                    )
+            return scored_rows(frame, name)
+        if column not in frame.columns:
+            raise ValueError(f"{where}: frame lacks block_rows_column {column!r}")
+        return frame[column].to_numpy(dtype=bool)
 
 
 @dataclass
@@ -447,6 +529,16 @@ class Backtester:
             elif base == reporting_ccy and quote not in self.fx_conversion:
                 self.fx_conversion[quote] = (pid, True)
 
+    def for_horizon(self, horizon: str) -> Backtester:
+        """This backtester with the label horizon of ``horizon`` set — what
+        the default position policy and the default row block need."""
+        return Backtester(
+            self.cost_model,
+            self.meta,
+            self.config.for_horizon(horizon),
+            reporting_ccy=self.reporting_ccy,
+        )
+
     def quote_currency(self, iid: int) -> str:
         """Quote currency of an instrument (reporting ccy when unspecified)."""
         m = self.meta[iid]
@@ -516,6 +608,12 @@ class Backtester:
 
         # decision at i -> desired target at its execution row
         if cfg.position_policy == "cost_aware":
+            if cfg.horizon_ns is None:
+                raise ValueError(
+                    "position_policy 'cost_aware' needs horizon_ns: use "
+                    "Backtester.for_horizon(<label horizon>), or name the legacy rule "
+                    "with BacktestConfig.legacy()"
+                )
             threshold = self.cost_model.round_trip_cost_return(mid, hs, meta["asset_class"])
             target = (
                 cost_aware_targets(
@@ -548,12 +646,8 @@ class Backtester:
                 age[cfg.latency_rows :] = ts[cfg.latency_rows :] - ts[: n - cfg.latency_rows]
                 exec_target[age > cfg.max_decision_age_ns] = np.nan
 
-        if cfg.block_rows_column is not None:
-            if cfg.block_rows_column not in frame.columns:
-                raise ValueError(
-                    f"instrument {iid}: frame lacks block_rows_column {cfg.block_rows_column!r}"
-                )
-            allowed = frame[cfg.block_rows_column].to_numpy(dtype=bool)
+        allowed = cfg.allowed_rows(frame, f"instrument {iid}")
+        if allowed is not None:
             # Blocked at the DECISION row: no target is produced there, so
             # nothing is aged in from it (set before the latency mapping
             # would have been equivalent only in rows mode).

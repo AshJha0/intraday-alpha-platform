@@ -5,15 +5,23 @@ The policy has two parts, loaded from two files and merged into one
 
 * the **promotion gates** (RESEARCH -> CANDIDATE -> VALIDATING -> PAPER ->
   ACTIVE) and the demotion counter, from ``configs/strategies/lifecycle.json``
-  (``x-version`` 1).  Its defaults equal the spec section 20 gates pinned in
-  ``iap.validation.validate.GATES`` (OOS IC >= 0.01, NW t >= 3.0, fold sign
-  consistency >= 0.70, >= 3 folds, positive net P&L at 1x cost) so the
-  lifecycle can never disagree with a REPORT.md verdict about *which* gate an
-  alpha fails;
+  (``x-version`` 2).  Its defaults equal the spec section 20 gates pinned in
+  ``iap.validation.validate.GATES`` (OOS IC >= 0.01, t >= 3.0 as the floor,
+  fold sign consistency >= 0.70, >= 3 folds, positive net P&L at 1x cost) so
+  the lifecycle can never disagree with a REPORT.md verdict about *which*
+  gate an alpha fails.  ``tstat_threshold`` (new in ``x-version`` 2) names
+  how the ``statistical_significance`` gate gets its threshold:
+  ``"ledger"`` — the default — reads the multiple-testing threshold the
+  research result was judged at from the evidence
+  (``Evidence.significance_threshold``) and applies
+  ``max(min_nw_tstat, that)``; evidence that carries no such threshold
+  FAILS the gate.  ``"fixed"`` — the legacy rule — applies ``min_nw_tstat``
+  alone and ignores the evidence field;
 * the **live sub-machine** (ACTIVE <-> WATCH -> RETIRED), from
   ``configs/strategies/strategies.json`` ``adaptive.lifecycle`` — the existing
-  :class:`iap.adaptive.lifecycle.LifecycleConfig`, reused unchanged and
-  deliberately not duplicated (one pin, one file).
+  :class:`iap.adaptive.lifecycle.LifecycleConfig` (gates, the retirement
+  rule and its CUSUM parameters), reused unchanged and deliberately not
+  duplicated (one pin, one file).
 
 Loading is fail-fast: a wrong ``x-version``, a missing or unknown key, a
 non-finite number, a negative count or an inconsistent threshold raises
@@ -37,14 +45,21 @@ __all__ = [
     "DEFAULT_LIFECYCLE_PATH",
     "DEFAULT_STRATEGIES_PATH",
     "LIFECYCLE_CONFIG_VERSION",
+    "TSTAT_THRESHOLD_POLICIES",
     "GateThresholds",
     "PolicyConfig",
     "load_policy_config",
     "repo_root",
 ]
 
-#: ``x-version`` of ``configs/strategies/lifecycle.json``.
-LIFECYCLE_CONFIG_VERSION = 1
+#: ``x-version`` of ``configs/strategies/lifecycle.json``: 2 since v1.5.0
+#: (``tstat_threshold``).
+LIFECYCLE_CONFIG_VERSION = 2
+
+#: How ``statistical_significance`` gets its threshold (module docs): the
+#: default, then the legacy rule.  The names are those of
+#: ``iap.validation.validate.TSTAT_THRESHOLD_POLICIES``.
+TSTAT_THRESHOLD_POLICIES = ("ledger", "fixed")
 
 
 def repo_root() -> Path:
@@ -73,6 +88,28 @@ _GATE_KEYS_INT = (
     "min_paper_sessions",
     "max_kill_events",
 )
+
+
+#: Keys of the merged view's ``live`` block (``LifecycleConfig.to_dict``).
+_LIVE_KEYS = (
+    "watch_ic_gate",
+    "reactivate_ic_gate",
+    "retire_breach_evals",
+    "reactivate_evals",
+    "breach_rule",
+    "cusum_k",
+    "cusum_h",
+)
+
+
+def _as_policy(doc: Mapping[str, Any], where: str) -> str:
+    value = doc["tstat_threshold"]
+    if not isinstance(value, str) or value not in TSTAT_THRESHOLD_POLICIES:
+        raise ValueError(
+            f"{where}.tstat_threshold: expected one of {list(TSTAT_THRESHOLD_POLICIES)}, "
+            f"got {value!r}"
+        )
+    return value
 
 
 def _require_keys(block: Mapping[str, Any], expected: tuple, where: str) -> None:
@@ -174,33 +211,37 @@ class PolicyConfig:
     gates: GateThresholds
     max_consecutive_failures: int
     live: LifecycleConfig
+    #: "ledger" (default) or "fixed" (legacy) — module docs
+    tstat_threshold: str = "ledger"
 
     def __post_init__(self) -> None:
         if not self.policy:
             raise ValueError("policy name must not be empty")
         if self.max_consecutive_failures < 1:
             raise ValueError("demotion.max_consecutive_failures must be >= 1")
+        if self.tstat_threshold not in TSTAT_THRESHOLD_POLICIES:
+            raise ValueError(
+                f"tstat_threshold {self.tstat_threshold!r} unknown; "
+                f"known: {TSTAT_THRESHOLD_POLICIES}"
+            )
 
     def to_dict(self) -> dict[str, Any]:
         """JSON-ready merged view (embedded in the lifecycle golden)."""
         return {
             "policy": self.policy,
+            "tstat_threshold": self.tstat_threshold,
             "gates": self.gates.to_dict(),
             "demotion": {"max_consecutive_failures": self.max_consecutive_failures},
-            "live": {
-                "watch_ic_gate": self.live.watch_ic_gate,
-                "reactivate_ic_gate": self.live.reactivate_ic_gate,
-                "retire_breach_evals": self.live.retire_breach_evals,
-                "reactivate_evals": self.live.reactivate_evals,
-            },
+            "live": self.live.to_dict(),
         }
 
     @staticmethod
     def from_dict(doc: Mapping[str, Any]) -> PolicyConfig:
         """Inverse of :meth:`to_dict` (used to run a golden from its own
         embedded config)."""
-        _require_keys(doc, ("policy", "gates", "demotion", "live"), "config")
+        _require_keys(doc, ("policy", "tstat_threshold", "gates", "demotion", "live"), "config")
         _require_keys(doc["demotion"], ("max_consecutive_failures",), "config.demotion")
+        _require_keys(doc["live"], _LIVE_KEYS, "config.live")
         return PolicyConfig(
             policy=str(doc["policy"]),
             gates=GateThresholds.from_block(doc["gates"], "config.gates"),
@@ -208,6 +249,7 @@ class PolicyConfig:
                 doc["demotion"], "max_consecutive_failures", "config.demotion", 1
             ),
             live=LifecycleConfig.from_config(doc["live"]),
+            tstat_threshold=_as_policy(doc, "config"),
         )
 
 
@@ -232,9 +274,16 @@ def load_policy_config(
     st_path = Path(strategies_path) if strategies_path is not None else DEFAULT_STRATEGIES_PATH
     doc = _read_json(lc_path)
     where = str(lc_path)
-    _require_keys(doc, ("x-version", "description", "policy", "gates", "demotion"), where)
-    if doc["x-version"] != LIFECYCLE_CONFIG_VERSION:
-        raise ValueError(f"{where}: x-version {doc['x-version']!r} != {LIFECYCLE_CONFIG_VERSION}")
+    if doc.get("x-version") != LIFECYCLE_CONFIG_VERSION:
+        raise ValueError(
+            f"{where}: x-version {doc.get('x-version')!r} != {LIFECYCLE_CONFIG_VERSION} "
+            "(a v1.4.0 document must be upgraded: name 'tstat_threshold' — 'ledger', or "
+            "'fixed' to keep its 3.0 gate)"
+        )
+    _require_keys(
+        doc, ("x-version", "description", "policy", "tstat_threshold", "gates", "demotion"), where
+    )
+    tstat_threshold = _as_policy(doc, where)
     policy = doc["policy"]
     if not isinstance(policy, str) or not policy:
         raise ValueError(f"{where}.policy: expected a non-empty string")
@@ -252,5 +301,9 @@ def load_policy_config(
     except (KeyError, TypeError, ValueError) as exc:
         raise ValueError(f"{st_path}: adaptive.lifecycle: {exc}") from None
     return PolicyConfig(
-        policy=policy, gates=gates, max_consecutive_failures=max_failures, live=live
+        policy=policy,
+        gates=gates,
+        max_consecutive_failures=max_failures,
+        live=live,
+        tstat_threshold=tstat_threshold,
     )

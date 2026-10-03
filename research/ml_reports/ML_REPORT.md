@@ -2,7 +2,7 @@
 
 Dataset: 210745 valid rows across 19 instruments (2 synthetic days), target `label_cost_5s` (5s cost-adjusted forward return), 51 curated predictors (all 10 registry families represented). Walk-forward: 4 expanding folds whose boundaries are quantiles of the ROW INDEX (not of the wall span — the equity session is 6.5 h of each 24 h day, so equal wall segments produce wildly unequal folds), 60s embargo, 5s label-horizon purge at every train boundary.
 
-Model fits recorded in the MODEL ledger (`research/models/ledger.json`) so far: **40** — every tracked fit, across all rounds, each with a manifest under `research/models/run_NNNN_*/`. This is a different counter from the alpha multiple-testing ledger (`research/experiments.json`), which is de-duplicated by (alpha, kind, config) and carries the Bonferroni / expected-max-|t| yardstick quoted in `research/alpha_reports/REPORT.md`; neither number is a substitute for the other. Multiple-testing note: with this many looks at one dataset, isolated significance is meaningless — decisions below rest on signs and stability, not on any single t-stat.
+Model fits recorded in the MODEL ledger (`research/models/ledger.json`) so far: **47** — every tracked fit, across all rounds, each with a manifest under `research/models/run_NNNN_*/`. This is a different counter from the alpha multiple-testing ledger (`research/experiments.json`), which is de-duplicated by (alpha, kind, config) and carries the Bonferroni / expected-max-|t| yardstick quoted in `research/alpha_reports/REPORT.md`; neither number is a substitute for the other. Multiple-testing note: with this many looks at one dataset, isolated significance is meaningless — decisions below rest on signs and stability, not on any single t-stat.
 
 ## Fold composition
 
@@ -64,7 +64,8 @@ Winner by mean OOS IC on the pinned target: **ridge**.
 Primary: `ridge` pooled OOS predictions; meta features: alpha strength/sign, spread, 1m vol, L1 depth, direction-aligned queue imbalance, half-spread cost, expected impact. Chronological 50/25/25 train/calibration/test split with 60s embargo; probability calibration on the calibration segment by **Platt scaling (a 2-parameter sigmoid)** (`calibration_method: sigmoid` — only 255 positive samples in the calibration segment, below the pinned isotonic minimum of 500, so the isotonic path was NOT taken). Economic meta-label: realized net P&L > 0 under the conservative cost model.
 
 - Meta samples (primary would trade): 16485; test base rate of profitable signals: 0.062.
-- Test AUC 0.655, Brier 0.0568 (calibration curve data: `calibration_curve.json`).
+- Missing meta-feature values are kept as NaN for the tree model (`impute_nan: false`, the default since v1.5.0): 275 of 131880 entries.
+- Test AUC 0.670, Brier 0.0567 (calibration curve data: `calibration_curve.json`).
 - `calibration_method`: **sigmoid** (255 calibration positives); `gate_degenerate`: **true**.
 
 | evaluation (test segment) | trades | total net bps | mean net bps/trade | hit rate |
@@ -80,4 +81,4 @@ Meta-gate effect: the calibrated gate declined **every** test signal at both thr
 1. The gate mechanism works and is exercised for real: the best linear baseline (`ridge`) reached a POSITIVE pooled OOS IC vs the mid-to-mid label (0.0081), so the gate **PASSED** and the advanced models (lightgbm, mlp, xgboost) ran on the same folds. Their numbers are in the table above; the gate did not have to block anything on this dataset.
 2. No model here earns its costs. The largest pooled OOS IC vs the mid-to-mid label is 0.0081 (`ridge`), and the conservative net is negative for every fitted model (-2.612 to -0.110 bps/signal). The headline IC is spread-component prediction, not direction. Nothing here should be promoted.
 3. The meta-labeling machinery ran end to end, but its gate is **degenerate on this dataset** (`gate_degenerate: true`): calibrated by Platt scaling (a 2-parameter sigmoid) on 255 positives, every test probability fell below both thresholds, so the gate took zero trades. A gate that never fires demonstrates neither skill nor the value of abstaining — it only shows the calibrated probabilities sit under tau at a 0.062 base rate. The trade-off between P&L capture and trade count must be re-judged on data with real signal.
-4. Runtime 23s; every fit is a tracked run under `research/models/` with manifest (git commit, data/feature/model versions, windows, hardware), metrics and pickled model.
+4. Runtime 36s; every fit is a tracked run under `research/models/` with manifest (git commit, data/feature/model versions, windows, hardware), metrics and pickled model.

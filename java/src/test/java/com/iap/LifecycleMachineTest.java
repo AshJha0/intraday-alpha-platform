@@ -52,16 +52,40 @@ public class LifecycleMachineTest {
                 1700000000000000000L);
     }
 
+    /** The ledger threshold the helper evidence carries (t 4.0 clears it). */
+    private static final double THRESHOLD = 3.5;
+    /** One 15-minute block of a 2-hour rolling-IC window. */
+    private static final double BLOCK_FRACTION = 0.125;
+
     private static Evidence ev(ExperimentResultRec r, Double capacity) {
-        return new Evidence(r, capacity, null, null, null);
+        return ev(r, capacity, THRESHOLD);
+    }
+
+    private static Evidence ev(ExperimentResultRec r, Double capacity, Double threshold) {
+        return new Evidence(r, capacity, threshold, null, null, null);
     }
 
     private static Evidence live(Double ic, boolean informative) {
-        return new Evidence(null, null, null, null, new Evidence.Live(ic, 8, 1, informative));
+        return new Evidence(null, null, null, null, null,
+                new Evidence.Live(ic, 8, 1, informative, BLOCK_FRACTION));
+    }
+
+    /** {@code cfg} under the rules up to v1.4.0 (fixed threshold, consecutive breaches). */
+    private static PolicyConfig legacy(PolicyConfig cfg) {
+        PolicyConfig.Live live = cfg.live();
+        return new PolicyConfig(cfg.policy(), cfg.gates(), cfg.maxConsecutiveFailures(),
+                PolicyConfig.Live.legacyConsecutive(live.watchIcGate(),
+                        live.reactivateIcGate(), live.retireBreachEvals(),
+                        live.reactivateEvals()),
+                PolicyConfig.TSTAT_FIXED);
     }
 
     private static AlphaLifecycle machineAt(LifecycleState target, String id) {
-        PolicyConfig cfg = config();
+        return machineAt(target, id, config());
+    }
+
+    private static AlphaLifecycle machineAt(LifecycleState target, String id,
+            PolicyConfig cfg) {
         AlphaLifecycle m = new AlphaLifecycle(cfg, new AlphaRegistry(cfg.policy()));
         m.register(id, 1L);
         ExperimentResultRec good = research(id, 0.02, 0.03, 4.0, 5.0, true, true);
@@ -72,11 +96,11 @@ public class LifecycleMachineTest {
             assertNotNull(m.advance(id, 3L, ev(good, 5e6)));
         }
         if (target.index() >= LifecycleState.PAPER.index()) {
-            assertNotNull(m.advance(id, 4L, new Evidence(null, null,
+            assertNotNull(m.advance(id, 4L, new Evidence(null, null, null,
                     new Evidence.Validation(0.018, 0.02, true, true), null, null)));
         }
         if (target.index() >= LifecycleState.ACTIVE.index()) {
-            assertNotNull(m.advance(id, 5L, new Evidence(null, null, null,
+            assertNotNull(m.advance(id, 5L, new Evidence(null, null, null, null,
                     new Evidence.Paper(5, 0.015, 0.02, 100.0, 0, 0.001), null)));
         }
         assertEquals(target, m.state(id));
@@ -139,7 +163,42 @@ public class LifecycleMachineTest {
         ExperimentResultRec atGate = research("G1", cfg.gates().minOosIc(), 0.01,
                 cfg.gates().minNwTstat(), 0.0, true, true);
         assertTrue(Gates.OOS_IC.evaluate(ev(atGate, null), cfg).passed());
-        assertTrue(Gates.STATISTICAL_SIGNIFICANCE.evaluate(ev(atGate, null), cfg).passed());
+        // significance (v1.5.0, ledger policy): the threshold is
+        // max(min_nw_tstat, the evidence's), inclusive ...
+        double floor = cfg.gates().minNwTstat();
+        assertEquals(PolicyConfig.TSTAT_LEDGER, cfg.tstatThreshold());
+        GateResult atFloor = Gates.STATISTICAL_SIGNIFICANCE.evaluate(
+                ev(atGate, null, floor), cfg);
+        assertTrue(atFloor.passed());
+        assertEquals(floor, atFloor.threshold(), 0.0);
+        // ... an evidence threshold below the floor is replaced by the floor ...
+        assertEquals(floor, Gates.STATISTICAL_SIGNIFICANCE.evaluate(
+                ev(atGate, null, floor - 1.0), cfg).threshold(), 0.0);
+        // ... one above it applies and fails a t at the floor ...
+        GateResult above = Gates.STATISTICAL_SIGNIFICANCE.evaluate(
+                ev(atGate, null, floor + 0.5), cfg);
+        assertFalse(above.passed());
+        assertEquals(floor + 0.5, above.threshold(), 0.0);
+        assertEquals(floor, above.value(), 0.0);
+        // ... and evidence without one fails with threshold null, value kept
+        GateResult none = Gates.STATISTICAL_SIGNIFICANCE.evaluate(
+                ev(atGate, null, null), cfg);
+        assertFalse(none.passed());
+        assertNull(none.threshold());
+        assertEquals(floor, none.value(), 0.0);
+        // the legacy fixed policy reads the config alone
+        GateResult fixed = Gates.STATISTICAL_SIGNIFICANCE.evaluate(
+                ev(atGate, null, null), legacy(cfg));
+        assertTrue(fixed.passed());
+        assertEquals(floor, fixed.threshold(), 0.0);
+        assertEquals(floor, Gates.STATISTICAL_SIGNIFICANCE.evaluate(
+                ev(atGate, null, floor + 5.0), legacy(cfg)).threshold(), 0.0);
+        // no research block: value null; the threshold is what the evidence gives
+        GateResult noResearch = Gates.STATISTICAL_SIGNIFICANCE.evaluate(
+                Evidence.empty(), cfg);
+        assertFalse(noResearch.passed());
+        assertNull(noResearch.value());
+        assertNull(noResearch.threshold());
         // gt (strict): net_pnl == 0.0 fails
         GateResult net = Gates.NET_PNL_AFTER_COSTS.evaluate(ev(atGate, null), cfg);
         assertFalse(net.passed());
@@ -222,7 +281,7 @@ public class LifecycleMachineTest {
     public void demotionCountersAndSilence() {
         AlphaLifecycle m = machineAt(LifecycleState.VALIDATING, "DM");
         PolicyConfig cfg = m.config();
-        Evidence bad = new Evidence(null, null,
+        Evidence bad = new Evidence(null, null, null,
                 new Evidence.Validation(0.018, 0.02, true, false), null, null);
         for (int i = 1; i < cfg.maxConsecutiveFailures(); i++) {
             assertNull(m.advance("DM", 10L + i, bad));
@@ -257,11 +316,26 @@ public class LifecycleMachineTest {
         LifecycleTransition toWatch = m.advance("LV", 10L, live(breach, true));
         assertNotNull(toWatch);
         assertEquals(LifecycleState.WATCH, toWatch.toState());
-        assertEquals(1, m.record("LV").breachCount());
+        // the default rule is the CUSUM: no breach counter, the statistic is
+        // new_fraction * (gate - ic - k) and survives the entry into WATCH
+        assertEquals(com.iap.adaptive.LifecycleGauge.BreachRule.CUSUM,
+                cfg.live().breachRule());
+        assertEquals(0, m.record("LV").breachCount());
+        double first = BLOCK_FRACTION
+                * (cfg.live().watchIcGate() - breach - cfg.live().cusumK());
+        assertEquals(first, m.record("LV").cusum(), 0.0);
+        assertTrue(first > 0.0 && first < cfg.live().cusumH());
         assertFalse(toWatch.gates().get("rolling_ic").passed());
         assertEquals(cfg.live().watchIcGate(),
                 toWatch.gates().get("rolling_ic").threshold(), 0.0);
-        // resume: a new machine over the same registry continues the counters
+        // resume: a new machine over the same registry continues the
+        // statistic exactly — a second breach adds to the stored value
+        AlphaLifecycle resumedOnce = new AlphaLifecycle(cfg, m.registry());
+        assertNull(resumedOnce.advance("LV", 11L, live(breach, true)));
+        assertEquals(first + BLOCK_FRACTION
+                * (cfg.live().watchIcGate() - breach - cfg.live().cusumK()),
+                m.record("LV").cusum(), 0.0);
+        // ... and the counters
         AlphaLifecycle resumed = new AlphaLifecycle(cfg, m.registry());
         int needed = cfg.live().reactivateEvals();
         LifecycleTransition toActive = null;
@@ -280,6 +354,59 @@ public class LifecycleMachineTest {
         assertNull(resumed.advance("LV", 41L, live(breach, false)));
         assertEquals(LifecycleState.ACTIVE, resumed.state("LV"));
         assertEquals(0, resumed.record("LV").breachCount());
+        assertEquals("re-activation resets the statistic", 0.0,
+                resumed.record("LV").cusum(), 0.0);
+    }
+
+    @Test
+    public void cusumRetiresOnABreachOnceTheStatisticReachesItsThreshold() {
+        AlphaLifecycle m = machineAt(LifecycleState.ACTIVE, "CU");
+        PolicyConfig cfg = m.config();
+        // deep enough to pass the threshold in ONE reading: still only WATCH
+        double deep = cfg.live().watchIcGate() - 0.09;
+        LifecycleTransition toWatch = m.advance("CU", 10L, live(deep, true));
+        assertNotNull(toWatch);
+        assertEquals(LifecycleState.WATCH, toWatch.toState());
+        assertTrue(m.record("CU").cusum() >= cfg.live().cusumH());
+        // a reading above the gate does not retire, whatever the statistic
+        assertNull(m.advance("CU", 11L, live(cfg.live().watchIcGate() + 0.004, true)));
+        assertEquals(LifecycleState.WATCH, m.state("CU"));
+        assertTrue(m.record("CU").cusum() >= cfg.live().cusumH());
+        // the next breach does, and says why
+        LifecycleTransition retired = m.advance("CU", 12L,
+                live(cfg.live().watchIcGate() - 0.003, true));
+        assertNotNull(retired);
+        assertEquals(LifecycleState.RETIRED, retired.toState());
+        assertEquals("persistent breach: CUSUM 0.010187 >= 0.01 (slack 0.0025) "
+                + "below watch gate 0.0", retired.reason());
+        assertFalse(retired.gates().get("rolling_ic").passed());
+        assertEquals(0.0, m.record("CU").cusum(), 0.0);
+    }
+
+    @Test
+    public void theLegacyConsecutiveRuleStaysSelectableByName() {
+        PolicyConfig cfg = legacy(config());
+        AlphaLifecycle m = machineAt(LifecycleState.ACTIVE, "LG", cfg);
+        double breach = cfg.live().watchIcGate() - 0.001;
+        LifecycleTransition toWatch = m.advance("LG", 10L, live(breach, true));
+        assertNotNull(toWatch);
+        assertEquals(1, m.record("LG").breachCount());
+        assertEquals(0.0, m.record("LG").cusum(), 0.0);
+        LifecycleTransition retired = null;
+        for (int i = 2; i <= cfg.live().retireBreachEvals(); i++) {
+            assertNull("breach " + (i - 1) + " does not retire yet", retired);
+            retired = m.advance("LG", 10L + i, live(breach, true));
+        }
+        assertNotNull(retired);
+        assertEquals(LifecycleState.RETIRED, retired.toState());
+        assertEquals("persistent breach: " + cfg.live().retireBreachEvals()
+                + " consecutive evals below watch gate 0.0", retired.reason());
+        // the same shallow breaches never retire under the default rule
+        AlphaLifecycle d = machineAt(LifecycleState.ACTIVE, "LG");
+        for (int i = 1; i <= 2 * cfg.live().retireBreachEvals(); i++) {
+            d.advance("LG", 10L + i, live(breach, true));
+        }
+        assertEquals(LifecycleState.WATCH, d.state("LG"));
     }
 
     @Test

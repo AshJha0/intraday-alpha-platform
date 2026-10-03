@@ -7,7 +7,20 @@ import com.iap.config.Json;
 
 /**
  * Research-backtester cost model (spec section 18; configs/execution/execution.json
- * {@code cost_model}), mirroring {@code iap.backtest.costs} exactly.
+ * {@code cost_model}) — the LEGACY LINEAR-IMPACT rule of
+ * {@code iap.backtest.costs} ({@code impact_model = "linear"}), and only
+ * that rule.
+ *
+ * <p><b>Legacy (v1.5.0).</b> Since v1.5.0 the default impact model of the
+ * Python research cost model is the square root
+ * ({@code impact_model = "sqrt"}, the value {@code execution.json} names).
+ * This class was not given that rule: it exists for the cross-language
+ * backtest vector {@code tests/golden/expected_backtest.json}, whose
+ * {@code config} names {@code "impact_model": "linear"}, and nothing on the
+ * paper path prices a research backtest. {@link #IMPACT_MODEL} states what
+ * it computes and {@link #loadLegacyLinear} reads the linear coefficient
+ * whatever model the config names — a caller that wants the default research
+ * costs must use the Python reference.
  *
  * <p>Pinned per-execution cost of trading {@code q} units at a row with mid
  * {@code m} and half-spread {@code hs} (price units of the instrument):
@@ -29,8 +42,16 @@ public record CostModel(
         double fxCommissionPerMillion,
         double multiplier) {
 
-    /** Load the cost_model block of configs/execution/execution.json. */
-    public static CostModel load(Path executionConfigPath, double multiplier) {
+    /** The one impact model this class implements ({@code iap.backtest.costs}). */
+    public static final String IMPACT_MODEL = "linear";
+
+    /**
+     * The LEGACY linear model from the cost_model block of
+     * configs/execution/execution.json: the linear coefficient and the fees.
+     * The block's {@code impact_model} ("sqrt" since v1.5.0) is not applied.
+     */
+    public static CostModel loadLegacyLinear(Path executionConfigPath,
+            double multiplier) {
         Map<String, Object> root = Json.object(Json.parseFile(executionConfigPath));
         Object cm = root.get("cost_model");
         if (cm == null) {

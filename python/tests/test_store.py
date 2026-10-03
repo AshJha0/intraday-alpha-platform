@@ -5,6 +5,8 @@ Other components append to those artefacts (the experiments ledger, the
 lifecycle transitions), so counts are asserted exactly against the files
 and as lower bounds against the pinned values of the Phase 0 snapshot
 (65 ledger entries, 24 alphas, 33 model runs, 260 lifecycle-log rows).
+The lifecycle log of the v1.5.0 bundle (CUSUM retirement rule, HAC drift z)
+has 300 rows.
 """
 
 from __future__ import annotations
@@ -31,7 +33,7 @@ from iap.contracts.types import (
     VenueDecision,
 )
 from iap.contracts.versions import content_hash
-from iap.research import LOOKS_PER_EXPERIMENT
+from iap.research import LEGACY_LOOKS_PER_EXPERIMENT, LOOKS_PER_EXPERIMENT
 from iap.store import (
     DDL_X_VERSION,
     STAGE_TABLES,
@@ -675,7 +677,7 @@ def test_import_all_counts(built: Store) -> None:
     log_rows = sum(
         1 for line in (RESEARCH / "lifecycle_log.jsonl").read_text().splitlines() if line.strip()
     )
-    assert counts["lifecycle_transitions"] >= log_rows == 260
+    assert counts["lifecycle_transitions"] >= log_rows == 300
     assert counts["experiments"] == counts["experiment_results"] >= 24
     # every warning is an "absent optional artefact", never a skipped record
     for step, rep in reports.items():
@@ -717,10 +719,19 @@ def test_alpha_scorecard_view(built: Store) -> None:
 def test_alpha_report_mapping_is_pinned(built: Store) -> None:
     """The store's alpha-report rows come from THE pinned mapping — the one
     the lifecycle registry is built from (``iap.lifecycle.bootstrap``):
-    ``ic`` = ``gate_ic``, ``t_stat`` = ``nw_tstat_uncrossed``, P&L in bps of
-    the 1e6 USD reference notional, ``experiment_id`` = the ledger key[:16],
-    versions / commit / model hash from ``alpha_params.json``."""
-    from iap.lifecycle.bootstrap import REFERENCE_NOTIONAL_USD, load_ledger_entries
+    ``ic`` = ``gate_ic``, ``t_stat`` = ``gate_tstat`` (the t the PROMOTE gate
+    read: the pooled-slope HAC t on uncrossed rows under the default
+    methods), P&L in bps of the 1e6 USD reference notional,
+    ``experiment_id`` = the ledger key[:16], versions / commit / model hash
+    from ``alpha_params.json``.  A report written before v1.5.0 has no
+    ``gate_tstat`` and keeps the legacy mapping (``nw_tstat_uncrossed``)."""
+    from dataclasses import replace
+
+    from iap.lifecycle.bootstrap import (
+        REFERENCE_NOTIONAL_USD,
+        load_ledger_entries,
+        research_evidence,
+    )
 
     report = json.loads((RESEARCH / "alpha_reports" / "EQ03.json").read_text())
     entry = load_ledger_entries(REPO)["EQ03"]
@@ -733,7 +744,19 @@ def test_alpha_report_mapping_is_pinned(built: Store) -> None:
     assert len(rows) == 1
     row = rows[0]
     params_doc = json.loads((REPO / "configs" / "strategies" / "alpha_params.json").read_text())
-    assert row["ic"] == report["gate_ic"] and row["t_stat"] == report["nw_tstat_uncrossed"]
+    assert row["ic"] == report["gate_ic"] and row["t_stat"] == report["gate_tstat"]
+    # under the default methods the gate's t is the pooled-slope one, which
+    # is not the within-bucket t the mapping read up to v1.4.0
+    assert report["methods"]["significance"] == "pooled_slope"
+    assert report["gate_tstat"] == report["nw_tstat_pooled_uncrossed"]
+    assert report["gate_tstat"] != report["nw_tstat_uncrossed"]
+    # the legacy mapping, by name: the same report without the v1.5.0 key
+    legacy_report = {k: v for k, v in report.items() if k != "gate_tstat"}
+    legacy, missing = research_evidence("EQ03", legacy_report, entry, params_doc)
+    current, _ = research_evidence("EQ03", report, entry, params_doc)
+    assert legacy is not None and current is not None and not missing
+    assert legacy.t_stat == report["nw_tstat_uncrossed"]
+    assert legacy == replace(current, t_stat=report["nw_tstat_uncrossed"])
     assert row["hit_rate"] == report["oos_hit_rate"] and row["n_folds"] == report["n_folds_run"]
     assert row["leakage_passed"] == 1 and row["verdict"] == report["verdict"]
     x1 = report["stress"]["cost"]["x1"]
@@ -755,6 +778,10 @@ def test_alpha_report_mapping_is_pinned(built: Store) -> None:
     cfg = json.loads(row["configuration_json"])
     assert cfg["source"] == "research/alpha_reports/EQ03.json"
     assert "1000000 USD" in cfg["pnl_basis"] and cfg["ic_source"].startswith("gate_ic")
+    assert cfg["t_stat_source"].startswith("gate_tstat")
+    assert cfg["methods"] == report["methods"]
+    assert cfg["significance_threshold"] == report["gates"]["min_nw_tstat"]
+    assert report["gates"]["min_nw_tstat"] == report["ledger_t_threshold"] > 3.0
     assert cfg["experiment_id_source"].endswith("key[:16]")
     assert "sharpe" in cfg["unrecorded"] and row["sharpe"] == 0.0
     assert row["created_ts"] == max(f["test_end"] for f in report["folds"])
@@ -825,23 +852,42 @@ def test_import_alpha_reports_skips_nan_with_warning(tmp_path: Path) -> None:
 
 def test_import_experiments_ledger(store: Store) -> None:
     rep = import_experiments_ledger(store, RESEARCH / "experiments.json")
+    from iap.lifecycle.bootstrap import load_ledger_entries
+
     assert rep.inserted["ledger_entries"] == _n_ledger_entries() >= 65
-    row = store.query(
+    rows = store.query(
         "SELECT * FROM ledger_entries WHERE alpha_id='EQ03' AND kind='promotion_pipeline'"
-    )[0]
-    # 28, not 21: the look count now includes the time-latency grid, the
-    # crossed/uncrossed split and the leakage shift IC. Asserted against the
-    # constant rather than a literal so the two cannot drift apart again.
+    )
+    # The ledger keeps one entry per alpha, dataset AND method bundle: the
+    # entries recorded up to v1.4.0 name no bundle, the v1.5.0 run names v2.
+    by_bundle: dict = {}
+    for r in rows:
+        by_bundle.setdefault(json.loads(r["config_json"]).get("methods"), []).append(r)
+    assert set(by_bundle) == {None, "v2"}
+    # The entry in force (the one behind the current report) is the v2 one.
+    in_force = load_ledger_entries(REPO)["EQ03"]["key"]
+    (row,) = [r for r in by_bundle["v2"] if r["ledger_key"] == in_force]
+    # 84 under v2 (decay / cost / regime in every fold, and the statistics
+    # reported beside the gate are debited). Asserted against the constant
+    # rather than a literal so the two cannot drift apart again.
     assert row["count"] == LOOKS_PER_EXPERIMENT and row["verdict"] == "ITERATE"
+    assert all(r["count"] == LOOKS_PER_EXPERIMENT for r in by_bundle["v2"])
     # `looks` is no longer part of the experiment identity — it is the size
     # of the recording (`count`), not what was looked at.
     config = json.loads(row["config_json"])
     assert config["horizon"] == "5s" and "looks" not in config
+    # Legacy entries keep what the legacy chain debited — 28, not 21: the
+    # look count includes the time-latency grid, the crossed/uncrossed split
+    # and the leakage shift IC.
+    for legacy in by_bundle[None]:
+        assert legacy["count"] == LEGACY_LOOKS_PER_EXPERIMENT and legacy["verdict"] == "ITERATE"
+        config = json.loads(legacy["config_json"])
+        assert config["horizon"] == "5s" and "looks" not in config
 
 
 def test_import_lifecycle_log_gate_mapping(store: Store) -> None:
     rep = import_lifecycle_log(store, RESEARCH / "lifecycle_log.jsonl")
-    assert rep.inserted["lifecycle_transitions"] == 260 and not rep.warnings
+    assert rep.inserted["lifecycle_transitions"] == 300 and not rep.warnings
     rows = store.fetch(LifecycleTransition, alpha_id="EQ03", policy="static")
     assert rows and all(t.actor.value == "SYSTEM" for t in rows)
     first = rows[0]

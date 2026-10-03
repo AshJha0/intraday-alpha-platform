@@ -21,6 +21,26 @@ golden's evidence without float drift.  A missing block means "no evidence
 for that stage" and, except for the RESEARCH -> CANDIDATE presence gate, an
 absent block moves nothing (silence is not evidence — API_ADAPTIVE.md §6).
 
+**The significance threshold travels with the evidence (pinned, v1.5.0).**
+``significance_threshold`` is the PROMOTE t threshold the research result
+was judged at — under the default research methods the multiple-testing
+ledger's Bonferroni |t| at the run's gate look count
+(``iap.validation.ledger``, "Gate look count").  It sits beside
+``research`` for the same reason ``capacity_usd`` does: an
+``ExperimentResult`` has no field for it.  Under the default lifecycle
+policy (``tstat_threshold = "ledger"``) the ``statistical_significance``
+gate compares ``research.t_stat`` — the gate's own statistic, the
+pooled-slope HAC t under the default methods — with
+``max(min_nw_tstat, significance_threshold)``, and FAILS when the evidence
+carries none: a result nobody recorded a multiple-testing threshold for is
+not significant evidence.  The key is always serialised (``null`` when
+absent) and every port reads it.
+
+**``live.new_fraction``** (v1.5.0) is the share of a live reading's window
+that is new since the last counted reading, in (0, 1] — what the CUSUM
+retirement rule weights a reading by (``iap.adaptive.lifecycle``).  The
+legacy consecutive rule does not read it; the key is required either way.
+
 **Gate eligibility of the research block (pinned, Python reference).**
 ``research_gate_eligible`` says whether the ``research`` result may be used
 as promotion evidence at all (``iap.research.specs.gate_eligibility``: the
@@ -188,13 +208,16 @@ class LiveEvidence:
     ``n_buckets`` the bucket count behind it; ``eval_index`` the adaptive
     block index of the evaluation; ``informative`` is False when the matured
     set gained no new rows since the last counted evaluation (a re-read of a
-    frozen window moves nothing — pinned, round-3).
+    frozen window moves nothing — pinned, round-3); ``new_fraction`` the
+    share of the reading's window that is new since the last counted one,
+    in (0, 1] (module docs).
     """
 
     rolling_ic: float | None
     n_buckets: int
     eval_index: int
     informative: bool
+    new_fraction: float
 
     def __post_init__(self) -> None:
         if self.rolling_ic is not None:
@@ -202,6 +225,10 @@ class LiveEvidence:
         object.__setattr__(self, "n_buckets", _check_int(self.n_buckets, "live.n_buckets"))
         object.__setattr__(self, "eval_index", _check_int(self.eval_index, "live.eval_index"))
         object.__setattr__(self, "informative", _check_bool(self.informative, "live.informative"))
+        fraction = _check_float(self.new_fraction, "live.new_fraction")
+        if not 0.0 < fraction <= 1.0:
+            raise ValueError("live.new_fraction must be in (0, 1]")
+        object.__setattr__(self, "new_fraction", fraction)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -209,6 +236,7 @@ class LiveEvidence:
             "n_buckets": self.n_buckets,
             "eval_index": self.eval_index,
             "informative": self.informative,
+            "new_fraction": self.new_fraction,
         }
 
     @staticmethod
@@ -222,7 +250,9 @@ class Evidence:
     docstring).  ``capacity_usd`` is the alpha's aggregate deployable
     notional proxy (``iap.validation.metrics.capacity_proxy_usd`` summed over
     its universe); it sits beside ``research`` because
-    :class:`ExperimentResult` carries no capacity field."""
+    :class:`ExperimentResult` carries no capacity field, and so does
+    ``significance_threshold``, the PROMOTE t threshold the research result
+    was judged at (module docs)."""
 
     research: ExperimentResult | None
     capacity_usd: float | None
@@ -231,8 +261,15 @@ class Evidence:
     live: LiveEvidence | None
     #: False = the research result is recorded but is NOT promotion evidence
     research_gate_eligible: bool = True
+    #: the t threshold the research result was judged at (``None``: none)
+    significance_threshold: float | None = None
 
     def __post_init__(self) -> None:
+        if self.significance_threshold is not None:
+            threshold = _check_float(self.significance_threshold, "evidence.significance_threshold")
+            if threshold <= 0.0:
+                raise ValueError("evidence.significance_threshold must be > 0")
+            object.__setattr__(self, "significance_threshold", threshold)
         object.__setattr__(
             self,
             "research_gate_eligible",
@@ -265,6 +302,7 @@ class Evidence:
         doc: dict[str, Any] = {
             "research": None if self.research is None else self.research.to_dict(),
             "capacity_usd": self.capacity_usd,
+            "significance_threshold": self.significance_threshold,
             "validation": None if self.validation is None else self.validation.to_dict(),
             "paper": None if self.paper is None else self.paper.to_dict(),
             "live": None if self.live is None else self.live.to_dict(),
@@ -276,7 +314,14 @@ class Evidence:
     @staticmethod
     def from_dict(data: Mapping[str, Any]) -> Evidence:
         """Strict inverse of :meth:`to_dict`."""
-        names = ("research", "capacity_usd", "validation", "paper", "live")
+        names = (
+            "research",
+            "capacity_usd",
+            "significance_threshold",
+            "validation",
+            "paper",
+            "live",
+        )
         unknown = sorted(set(data) - set(names) - {"research_gate_eligible"})
         missing = [n for n in names if n not in data]
         if unknown:
@@ -294,4 +339,5 @@ class Evidence:
             paper=None if paper is None else PaperEvidence.from_dict(paper),
             live=None if live is None else LiveEvidence.from_dict(live),
             research_gate_eligible=data.get("research_gate_eligible", True),
+            significance_threshold=data["significance_threshold"],
         )

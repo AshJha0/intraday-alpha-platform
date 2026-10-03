@@ -173,9 +173,9 @@ class LabelResult:
     cost: list[float]  # NaN where invalid
     valid: list[bool]
     reason: list[int] = field(default_factory=list)  # LabelReason bitmask
-    #: realised reopen return per anchor (``blackout_reopen=True`` only;
-    #: empty otherwise): NaN except where the label is invalid for BLACKOUT
-    #: alone and a tradable sample exists at or after t + h
+    #: realised reopen return per anchor (empty with
+    #: ``blackout_reopen=False``): NaN except where the label is invalid for
+    #: BLACKOUT alone and a tradable sample exists at or after t + h
     reopen_mid: list[float] = field(default_factory=list)
 
 
@@ -185,7 +185,7 @@ def compute_labels(
     last_event_ts: int,
     horizons: Sequence[str] = HORIZON_ORDER,
     max_age_ns: int | None = None,
-    blackout_reopen: bool = False,
+    blackout_reopen: bool = True,
 ) -> dict[str, LabelResult]:
     """Two-pointer forward-label sweep (see module docstring for semantics).
 
@@ -193,14 +193,17 @@ def compute_labels(
     timestamp of the last event observed for the instrument's stream.
     ``max_age_ns`` defaults to :func:`max_sample_age` of the series.
 
-    ``blackout_reopen`` (opt-in; the labels themselves are unchanged) also
-    fills :attr:`LabelResult.reopen_mid`: for an anchor whose label is
-    invalid for ``BLACKOUT`` and nothing else, the return from the anchor
-    mid to the FIRST tradable mid at or after ``t + h`` — what the position
-    was actually worth once the market could be traded again.  It is not a
+    ``blackout_reopen`` (default ``True`` since v1.5.0; the labels
+    themselves are the same either way) also fills
+    :attr:`LabelResult.reopen_mid`: for an anchor whose label is invalid for
+    ``BLACKOUT`` and nothing else, the return from the anchor mid to the
+    FIRST tradable mid at or after ``t + h`` — what the position was
+    actually worth once the market could be traded again.  It is not a
     tradable ``h``-horizon return (which is why the label stays invalid);
-    it exists so the selection the BLACKOUT rule makes can be measured
-    (:func:`iap.validation.metrics.ic_with_blackout_reopen`).
+    it exists so the selection the BLACKOUT rule makes is measured in every
+    validation (:func:`iap.validation.metrics.ic_with_blackout_reopen`, the
+    ``label_reopen_<h>`` frame column).  ``False`` skips the computation
+    and leaves ``reopen_mid`` empty (the pre-v1.5.0 behaviour).
     """
     n = len(anchors_ts)
     for i in range(1, n):

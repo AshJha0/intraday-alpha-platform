@@ -18,7 +18,7 @@ import math
 import pytest
 from conftest import CONFIGS_DIR, GOLDEN_DIR
 from iap.alpha import build
-from iap.backtest import BacktestConfig, Backtester, CostModel
+from iap.backtest import Backtester, CostModel
 from iap.contracts.types import ExperimentResult, ExperimentSpec
 from iap.contracts.validate import validate, validate_typed
 from iap.research import LOOKS_PER_EXPERIMENT, verify_experiment_id
@@ -36,6 +36,8 @@ from iap.research.golden import (
 )
 from iap.research.runner import document_drift, load_instrument_meta, restrict_frames
 from iap.validation import validate_alpha
+from iap.validation.ledger import ExperimentLedger
+from iap.validation.methods import METHODS_V2, methods
 
 TOL = 1e-9
 GOLDEN = GOLDEN_DIR / "expected_experiment_golden_frame.json"
@@ -141,18 +143,29 @@ def test_golden_walk_forward_metrics_match_validate_alpha(golden, spec, frames):
     declared periods on 2026-09-20, because doing so trained the later folds
     inside the very holdout the result reports separately. Passing the full
     frames here would test the runner against a protocol it no longer uses.
+
+    "The same protocol" is the spec's method bundle — ``v2``, the default
+    since v1.5.0: the bundle's backtest and cost rules, its validation
+    keywords, the spec's seed, and the ledger threshold of a fresh ledger
+    (the Bonferroni |t| at this one experiment's looks).  The golden frames
+    are in memory, so there are no normalized events and the recompute
+    probe does not run — in the runner or here.  Under ``v2`` the result's
+    ``ic`` / ``t_stat`` are the gate's (``gate_ic`` / ``gate_tstat``).
     """
     meta = load_instrument_meta(CONFIGS_DIR)
     cfg = spec.configuration
+    assert cfg["methods"] == METHODS_V2
+    bundle = methods(cfg["methods"])
     backtester = Backtester(
-        CostModel.load(CONFIGS_DIR / "execution" / "execution.json"),
+        bundle.cost_model(CostModel.load(CONFIGS_DIR / "execution" / "execution.json")),
         meta,
-        BacktestConfig(
+        bundle.backtest_config(
             latency_ns=cfg["latency_ns"],
             max_decision_age_ns=cfg["max_decision_age_ns"],
             flatten_at_session_end=cfg["flatten_at_session_end"],
         ),
-    )
+    ).for_horizon(spec.horizon)
+    ledger_t = ExperimentLedger.bonferroni_t_threshold_at(LOOKS_PER_EXPERIMENT)
     exec_cfg = json.loads((CONFIGS_DIR / "execution" / "execution.json").read_text())
 
     def factory():
@@ -169,11 +182,16 @@ def test_golden_walk_forward_metrics_match_validate_alpha(golden, spec, frames):
         float(exec_cfg["defaults"]["max_participation"]),
         n_folds=cfg["n_folds"],
         embargo_ns=cfg["embargo_ns"],
+        ledger_t_threshold=ledger_t,
+        ledger_looks=LOOKS_PER_EXPERIMENT,
+        seed=spec.seed,
+        recompute=None,
+        **bundle.validate_kwargs(),
     )
     want = golden["result"]
-    _close(report["oos_ic"], want["ic"])
+    _close(report["gate_ic"], want["ic"])
     _close(report["oos_rank_ic"], want["rank_ic"])
-    _close(report["nw_tstat"], want["t_stat"])
+    _close(report["gate_tstat"], want["t_stat"])
     _close(report["oos_hit_rate"], want["hit_rate"])
     _close(report["turnover_flips_per_hour"], want["turnover"])
     _close(report["fold_sign_consistency"], want["fold_consistency"])
@@ -181,3 +199,6 @@ def test_golden_walk_forward_metrics_match_validate_alpha(golden, spec, frames):
     assert report["n_folds_run"] == want["n_folds"]
     assert report["verdict"] == want["verdict"]
     assert report["leakage"]["passed"] == want["leakage_passed"]
+    assert document_drift(want["leakage_detail"], report["leakage"], tol=TOL) == []
+    assert report["leakage"]["recompute_ok"] is None  # no events: the probe did not run
+    assert report["gates"]["min_nw_tstat"] == max(3.0, ledger_t)

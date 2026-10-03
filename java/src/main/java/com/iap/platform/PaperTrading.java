@@ -562,6 +562,13 @@ public final class PaperTrading {
                 LifecycleGauge.fromStrategiesConfig(strategiesJson);
         long blockNs =
                 com.iap.config.Json.asLong(adaptiveCfg.get("block_ns"));
+        // Share of the rolling-IC window that one block renews: what the
+        // CUSUM retirement rule weights a reading by (the same
+        // min(1, block / window) iap.backtest.adaptive passes; the legacy
+        // consecutive rule does not read it).
+        final double newFraction = Math.min(1.0, (double) blockNs
+                / (double) com.iap.config.Json.asLong(
+                        adaptiveCfg.get("ic_window_ns")));
         long[] lifecycleBlock = {Long.MIN_VALUE};
         long[] lastSignalTs = {Long.MIN_VALUE};
         String driftGauge = MetricsRegistry.labeled(
@@ -606,7 +613,8 @@ public final class PaperTrading {
                 lifecycleBlock[0] = block;
                 // evaluate at the block boundary the event just crossed
                 reg.gauge(lifecycleGauge).set(lifecycle
-                        .update(rollingIc.ic(block * blockNs)).code());
+                        .update(rollingIc.ic(block * blockNs), true, newFraction)
+                        .code());
             }
             // 1-minute bar roll: last-observation mid per pinned bucket
             if (vec.valid[Features.MID_PRICE]) {
@@ -905,7 +913,7 @@ public final class PaperTrading {
                     : rollingIc.ic(lastSignalTs[0]);
             // session end closes the last partial adaptive block: one
             // final lifecycle evaluation so the report reflects it
-            res.lifecycle = lifecycle.update(res.rollingIc);
+            res.lifecycle = lifecycle.update(res.rollingIc, true, newFraction);
             reg.gauge(lifecycleGauge).set(res.lifecycle.code());
             if (!Double.isNaN(res.rollingIc)) {
                 reg.gauge(icGauge).set(res.rollingIc);

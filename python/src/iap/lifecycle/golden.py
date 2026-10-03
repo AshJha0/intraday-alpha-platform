@@ -1,32 +1,53 @@
 """Scripted lifecycle scenarios behind ``tests/golden/expected_lifecycle.json``.
 
-Three synthetic alphas walk the machine with hand-written evidence whose
-numbers are short decimals (a port replicates them without float drift):
+Synthetic alphas walk the machine with hand-written evidence whose numbers
+are short decimals (a port replicates them without float drift).  Under the
+DEFAULT policy (``tstat_threshold = "ledger"``, the CUSUM retirement rule —
+``configs/strategies/lifecycle.json`` + ``strategies.json``):
 
 * **LC01** — the full happy path RESEARCH -> CANDIDATE -> VALIDATING ->
   PAPER -> ACTIVE, a null and an uninformative live reading (no movement),
-  ACTIVE -> WATCH on a breach, a neutral-zone reset, three recoveries ->
-  ACTIVE, then six consecutive breaches -> RETIRED, a SYSTEM ``advance`` on
-  the retired alpha (TERMINAL, no movement) and the HUMAN reset to RESEARCH;
+  ACTIVE -> WATCH on a breach, a reading in the neutral zone, three
+  recoveries -> ACTIVE, a relapse and then breaches until the CUSUM
+  statistic reaches its threshold -> RETIRED, a SYSTEM ``advance`` on the
+  retired alpha (TERMINAL, no movement) and the HUMAN reset to RESEARCH;
 * **LC02** — CANDIDATE, then a re-run showing leakage: demoted to RESEARCH;
   the leaking result and an empty evidence document both hold at RESEARCH;
-* **LC03** — reaches VALIDATING, fails parity once (counter 1), an absent
-  validation block is silence (counter unchanged), passes -> PAPER, fails the
-  paper gates ``max_consecutive_failures`` (3) times -> CANDIDATE, is retired
-  by a HUMAN and then ignores a SYSTEM ``advance``.
+* **LC03** — the significance threshold: at CANDIDATE a t below the
+  evidence's ledger threshold fails ``statistical_significance``, evidence
+  WITHOUT a threshold fails it with ``threshold = null``, and a threshold
+  below the configured floor is replaced by the floor; then VALIDATING,
+  a parity failure (counter 1), an absent validation block (silence),
+  -> PAPER, three failed paper evaluations -> CANDIDATE, a HUMAN retirement
+  and a SYSTEM ``advance`` that it ignores;
+* **LC04** — what the CUSUM rule changes: eight consecutive readings just
+  under the watch gate but inside the slack never retire the alpha (the
+  consecutive rule would at the sixth), a reading above the gate while
+  ``S`` is over the threshold does not retire it either, and two deep
+  breaches in disjoint windows (``new_fraction`` 1.0) do.
+
+Under the LEGACY policy (``tstat_threshold = "fixed"``,
+``breach_rule = "consecutive"`` — the rules up to v1.4.0, which every port
+keeps selectable):
+
+* **LG01** — the v1.4.0 LC01 script: research evidence with no
+  significance threshold passes the fixed 3.0 gate, and six consecutive
+  breaches retire the alpha.
 
 Each golden step records the action, the input evidence document and the
-expected state / outcome / gate results / counters / transition after it.
-Event times are ``T0 + k * STEP_NS`` (15-minute adaptive blocks).
+expected state / outcome / gate results / counters / CUSUM statistic /
+transition after it.  Event times are ``T0 + k * STEP_NS`` (15-minute
+adaptive blocks).
 """
 
 from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
+from iap.adaptive.lifecycle import LifecycleConfig
 from iap.contracts.types import Actor, ExperimentResult, LifecycleState, Verdict
 from iap.lifecycle.config import PolicyConfig
 from iap.lifecycle.evidence import Evidence, LiveEvidence, PaperEvidence, ValidationEvidence
@@ -39,12 +60,21 @@ __all__ = [
     "T0",
     "ScriptStep",
     "golden_document",
+    "legacy_config",
+    "legacy_scripts",
     "render_golden",
     "run_scripts",
     "scripts",
 ]
 
-GOLDEN_X_VERSION = 1
+#: 2 since v1.5.0: the evidence carries ``significance_threshold`` and
+#: ``live.new_fraction``, the config ``tstat_threshold`` and the retirement
+#: rule, every expected row ``cusum``; a ``legacy`` section pins the rules
+#: up to v1.4.0.
+GOLDEN_X_VERSION = 2
+#: Share of a 2 h rolling-IC window that one 15-minute block renews — the
+#: ``new_fraction`` of a live reading in the scripts.
+BLOCK_FRACTION = 0.125
 T0 = 1_700_000_000_000_000_000
 STEP_NS = 900_000_000_000
 
@@ -58,6 +88,8 @@ EXPECTED_FINAL_STATES: Mapping[str, LifecycleState] = {
     "LC01": LifecycleState.RESEARCH,
     "LC02": LifecycleState.RESEARCH,
     "LC03": LifecycleState.RETIRED,
+    "LC04": LifecycleState.RETIRED,
+    "LG01": LifecycleState.RESEARCH,
 }
 
 
@@ -131,6 +163,7 @@ def _ev(
     validation: ValidationEvidence | None = None,
     paper: PaperEvidence | None = None,
     live: LiveEvidence | None = None,
+    threshold: float | None = None,
 ) -> Evidence:
     return Evidence(
         research=research_result,
@@ -138,14 +171,23 @@ def _ev(
         validation=validation,
         paper=paper,
         live=live,
+        significance_threshold=threshold,
     )
 
 
 def _live(
-    rolling_ic: float | None, eval_index: int, informative: bool = True, n_buckets: int = 8
+    rolling_ic: float | None,
+    eval_index: int,
+    informative: bool = True,
+    n_buckets: int = 8,
+    new_fraction: float = BLOCK_FRACTION,
 ) -> LiveEvidence:
     return LiveEvidence(
-        rolling_ic=rolling_ic, n_buckets=n_buckets, eval_index=eval_index, informative=informative
+        rolling_ic=rolling_ic,
+        n_buckets=n_buckets,
+        eval_index=eval_index,
+        informative=informative,
+        new_fraction=new_fraction,
     )
 
 
@@ -168,11 +210,180 @@ def _lc01() -> tuple[ScriptStep, ...]:
     )
     steps: list[ScriptStep] = [
         _adv(_ev(good), "research result present and clean -> CANDIDATE"),
-        _adv(_ev(good, capacity=5_000_000.0), "all nine promotion gates pass -> VALIDATING"),
+        _adv(
+            _ev(good, capacity=5_000_000.0, threshold=3.5),
+            "all nine promotion gates pass (t 4.0 >= ledger threshold 3.5) -> VALIDATING",
+        ),
         _adv(
             _ev(validation=validation_ok), "held-out replay tracks research, hash + parity -> PAPER"
         ),
         _adv(_ev(paper=paper_ok), "five clean paper sessions -> ACTIVE"),
+        _adv(_ev(live=_live(0.02, 1)), "healthy rolling IC: hold ACTIVE, CUSUM stays 0"),
+        _adv(
+            _ev(live=_live(None, 2, n_buckets=2)), "null rolling IC (too few buckets): no evidence"
+        ),
+        _adv(
+            _ev(live=_live(-0.01, 3, informative=False)),
+            "uninformative re-read of a breach: no evidence",
+        ),
+        _adv(_ev(live=_live(-0.01, 4)), "breach -> WATCH; CUSUM starts accumulating"),
+        _adv(_ev(live=_live(-0.01, 5)), "second breach: CUSUM grows, still under its threshold"),
+        _adv(_ev(live=_live(0.002, 6)), "neutral zone [0.0, 0.005): CUSUM drains, no recovery"),
+        _adv(_ev(live=_live(0.01, 7)), "recovery 1"),
+        _adv(_ev(live=_live(0.01, 8)), "recovery 2"),
+        _adv(_ev(live=_live(0.01, 9)), "recovery 3 -> ACTIVE (re-activation); CUSUM reset"),
+        _adv(_ev(live=_live(-0.02, 10)), "relapse -> WATCH"),
+    ]
+    for k, idx in enumerate(range(11, 15), start=2):
+        note = f"breach {k} since the relapse" + (
+            ": CUSUM reaches its threshold on a breach -> RETIRED" if k == 5 else ""
+        )
+        steps.append(_adv(_ev(live=_live(-0.02, idx)), note))
+    steps.append(
+        _adv(_ev(live=_live(0.05, 15)), "SYSTEM advance on a RETIRED alpha: terminal, no movement")
+    )
+    steps.append(
+        ScriptStep(
+            "reset", None, "re-research after regime change", "HUMAN reset RETIRED -> RESEARCH"
+        )
+    )
+    return tuple(steps)
+
+
+def _lc02() -> tuple[ScriptStep, ...]:
+    clean = research("LC02", ic=0.015, rank_ic=0.02, t_stat=3.5, verdict=Verdict.PROMOTE)
+    leaking = research(
+        "LC02", ic=0.15, rank_ic=0.2, t_stat=30.0, leakage_passed=False, verdict=Verdict.REJECT
+    )
+    return (
+        _adv(_ev(clean), "clean research -> CANDIDATE"),
+        _adv(
+            _ev(leaking, capacity=5_000_000.0, threshold=3.25),
+            "re-run shows leakage: leakage_clean fails -> demoted to RESEARCH",
+        ),
+        _adv(_ev(leaking), "leaking result at RESEARCH: ledger passes, leakage fails, hold"),
+        _adv(Evidence.empty(), "no evidence at RESEARCH: presence gate fails (value null), hold"),
+    )
+
+
+def _lc03() -> tuple[ScriptStep, ...]:
+    good = research("LC03", ic=0.03, rank_ic=0.04, t_stat=5.0, net_bps=8.0, cost_bps=4.0)
+    validation_bad = ValidationEvidence(
+        holdout_ic=0.028, research_ic=0.03, replay_hash_match=True, parity=False
+    )
+    validation_ok = ValidationEvidence(
+        holdout_ic=0.028, research_ic=0.03, replay_hash_match=True, parity=True
+    )
+    paper_bad = PaperEvidence(
+        n_sessions=2,
+        realized_ic=0.01,
+        research_ic=0.03,
+        net_pnl=-50.0,
+        n_kill_events=1,
+        tracking_error=0.002,
+    )
+    return (
+        _adv(_ev(good), "research present and clean -> CANDIDATE"),
+        _adv(
+            _ev(good, capacity=2_000_000.0, threshold=5.5),
+            "t 5.0 below the evidence's ledger threshold 5.5: significance fails, hold",
+        ),
+        _adv(
+            _ev(good, capacity=2_000_000.0),
+            "no significance threshold in the evidence: the gate fails, threshold null",
+        ),
+        _adv(
+            _ev(good, capacity=2_000_000.0, threshold=2.0),
+            "a threshold below the floor: max(3.0, 2.0) = 3.0 applies -> VALIDATING",
+        ),
+        _adv(_ev(validation=validation_bad), "parity fails: consecutive_failures 1"),
+        _adv(_ev(good), "validation block absent: silence, counter unchanged"),
+        _adv(_ev(validation=validation_ok), "validation passes -> PAPER, counter reset"),
+        _adv(_ev(paper=paper_bad), "paper gates fail: consecutive_failures 1"),
+        _adv(_ev(paper=paper_bad), "paper gates fail: consecutive_failures 2"),
+        _adv(_ev(paper=paper_bad), "third failure = max_consecutive_failures -> CANDIDATE"),
+        ScriptStep(
+            "retire",
+            None,
+            "manual retirement: hypothesis withdrawn by the desk",
+            "HUMAN retire CANDIDATE -> RETIRED",
+        ),
+        _adv(_ev(good, capacity=2_000_000.0, threshold=4.5), "SYSTEM advance on RETIRED: terminal"),
+    )
+
+
+def _to_active(alpha_id: str, threshold: float | None) -> list[ScriptStep]:
+    """The four promotion steps RESEARCH -> ACTIVE with clean evidence."""
+    good = research(alpha_id)
+    validation_ok = ValidationEvidence(
+        holdout_ic=0.018, research_ic=0.02, replay_hash_match=True, parity=True
+    )
+    paper_ok = PaperEvidence(
+        n_sessions=5,
+        realized_ic=0.015,
+        research_ic=0.02,
+        net_pnl=100.0,
+        n_kill_events=0,
+        tracking_error=0.001,
+    )
+    return [
+        _adv(_ev(good), "research result present and clean -> CANDIDATE"),
+        _adv(_ev(good, capacity=5_000_000.0, threshold=threshold), "promotion gates -> VALIDATING"),
+        _adv(_ev(validation=validation_ok), "validation -> PAPER"),
+        _adv(_ev(paper=paper_ok), "paper -> ACTIVE"),
+    ]
+
+
+def _lc04() -> tuple[ScriptStep, ...]:
+    steps = _to_active("LC04", 3.5)
+    steps.append(_adv(_ev(live=_live(-0.001, 1)), "a breach inside the slack -> WATCH, CUSUM 0"))
+    for idx in range(2, 9):
+        steps.append(
+            _adv(
+                _ev(live=_live(-0.001, idx)),
+                f"breach {idx} inside the slack: CUSUM stays 0, no retirement"
+                + (" (the consecutive rule retires here)" if idx == 6 else ""),
+            )
+        )
+    steps += [
+        _adv(
+            _ev(live=_live(-0.0135, 9, new_fraction=1.0)),
+            "a deep breach in a disjoint window: CUSUM 0.011 >= 0.01 on a breach -> RETIRED",
+        ),
+        ScriptStep("reset", None, "second look after the retirement", "HUMAN reset -> RESEARCH"),
+    ]
+    steps += _to_active("LC04", 3.5)
+    steps += [
+        _adv(_ev(live=_live(-0.06, 10)), "deep breach -> WATCH, CUSUM 0.0071875"),
+        _adv(
+            _ev(live=_live(-0.06, 11)),
+            "second deep breach: CUSUM 0.014375 >= 0.01 on a breach -> RETIRED",
+        ),
+        ScriptStep("reset", None, "third look", "HUMAN reset -> RESEARCH"),
+    ]
+    steps += _to_active("LC04", 3.5)
+    steps += [
+        _adv(
+            _ev(live=_live(-0.09, 12)),
+            "a breach deep enough to put CUSUM over its threshold at once -> WATCH only: "
+            "the entering reading never retires",
+        ),
+        _adv(
+            _ev(live=_live(0.004, 13)),
+            "a reading ABOVE the gate with CUSUM still over its threshold: no retirement",
+        ),
+        _adv(
+            _ev(live=_live(-0.003, 14)),
+            "the next breach, with CUSUM over its threshold -> RETIRED",
+        ),
+    ]
+    return tuple(steps)
+
+
+def _lg01() -> tuple[ScriptStep, ...]:
+    """The v1.4.0 LC01 script (run under :func:`legacy_config`)."""
+    steps: list[ScriptStep] = _to_active("LG01", None)
+    steps += [
         _adv(_ev(live=_live(0.02, 1)), "healthy rolling IC: hold ACTIVE"),
         _adv(
             _ev(live=_live(None, 2, n_buckets=2)), "null rolling IC (too few buckets): no evidence"
@@ -203,60 +414,30 @@ def _lc01() -> tuple[ScriptStep, ...]:
     return tuple(steps)
 
 
-def _lc02() -> tuple[ScriptStep, ...]:
-    clean = research("LC02", ic=0.015, rank_ic=0.02, t_stat=3.5, verdict=Verdict.PROMOTE)
-    leaking = research(
-        "LC02", ic=0.15, rank_ic=0.2, t_stat=30.0, leakage_passed=False, verdict=Verdict.REJECT
-    )
-    return (
-        _adv(_ev(clean), "clean research -> CANDIDATE"),
-        _adv(
-            _ev(leaking, capacity=5_000_000.0),
-            "re-run shows leakage: leakage_clean fails -> demoted to RESEARCH",
-        ),
-        _adv(_ev(leaking), "leaking result at RESEARCH: ledger passes, leakage fails, hold"),
-        _adv(Evidence.empty(), "no evidence at RESEARCH: presence gate fails (value null), hold"),
-    )
-
-
-def _lc03() -> tuple[ScriptStep, ...]:
-    good = research("LC03", ic=0.03, rank_ic=0.04, t_stat=5.0, net_bps=8.0, cost_bps=4.0)
-    validation_bad = ValidationEvidence(
-        holdout_ic=0.028, research_ic=0.03, replay_hash_match=True, parity=False
-    )
-    validation_ok = ValidationEvidence(
-        holdout_ic=0.028, research_ic=0.03, replay_hash_match=True, parity=True
-    )
-    paper_bad = PaperEvidence(
-        n_sessions=2,
-        realized_ic=0.01,
-        research_ic=0.03,
-        net_pnl=-50.0,
-        n_kill_events=1,
-        tracking_error=0.002,
-    )
-    return (
-        _adv(_ev(good), "research present and clean -> CANDIDATE"),
-        _adv(_ev(good, capacity=2_000_000.0), "promotion gates pass -> VALIDATING"),
-        _adv(_ev(validation=validation_bad), "parity fails: consecutive_failures 1"),
-        _adv(_ev(good), "validation block absent: silence, counter unchanged"),
-        _adv(_ev(validation=validation_ok), "validation passes -> PAPER, counter reset"),
-        _adv(_ev(paper=paper_bad), "paper gates fail: consecutive_failures 1"),
-        _adv(_ev(paper=paper_bad), "paper gates fail: consecutive_failures 2"),
-        _adv(_ev(paper=paper_bad), "third failure = max_consecutive_failures -> CANDIDATE"),
-        ScriptStep(
-            "retire",
-            None,
-            "manual retirement: hypothesis withdrawn by the desk",
-            "HUMAN retire CANDIDATE -> RETIRED",
-        ),
-        _adv(_ev(good, capacity=2_000_000.0), "SYSTEM advance on RETIRED: terminal"),
-    )
-
-
 def scripts() -> dict[str, tuple[ScriptStep, ...]]:
-    """The three scenario scripts, keyed by alpha id (sorted)."""
-    return {"LC01": _lc01(), "LC02": _lc02(), "LC03": _lc03()}
+    """The scenario scripts of the default policy, keyed by alpha id (sorted)."""
+    return {"LC01": _lc01(), "LC02": _lc02(), "LC03": _lc03(), "LC04": _lc04()}
+
+
+def legacy_scripts() -> dict[str, tuple[ScriptStep, ...]]:
+    """The scenario scripts run under :func:`legacy_config`."""
+    return {"LG01": _lg01()}
+
+
+def legacy_config(config: PolicyConfig) -> PolicyConfig:
+    """``config`` under the rules up to v1.4.0: the fixed significance
+    threshold and the consecutive-breach retirement rule (same gates)."""
+    live = config.live
+    return replace(
+        config,
+        tstat_threshold="fixed",
+        live=LifecycleConfig.legacy(
+            live.watch_ic_gate,
+            live.reactivate_ic_gate,
+            live.retire_breach_evals,
+            live.reactivate_evals,
+        ),
+    )
 
 
 def _run_script(
@@ -298,6 +479,7 @@ def _run_script(
             "consecutive_failures": rec.consecutive_failures,
             "breach_count": rec.breach_count,
             "recovery_count": rec.recovery_count,
+            "cusum": rec.cusum,
             "transition": None if transition is None else transition.to_dict(),
         }
         out.append(row)
@@ -310,9 +492,13 @@ def _run_script(
     return out
 
 
-def run_scripts(config: PolicyConfig) -> dict[str, list[dict[str, Any]]]:
-    """Run every script through a fresh machine; ``{alpha_id: steps}``."""
-    return {aid: _run_script(aid, steps, config) for aid, steps in sorted(scripts().items())}
+def run_scripts(
+    config: PolicyConfig, which: Mapping[str, tuple[ScriptStep, ...]] | None = None
+) -> dict[str, list[dict[str, Any]]]:
+    """Run every script (default: :func:`scripts`) through a fresh machine
+    under ``config``; ``{alpha_id: steps}``."""
+    todo = scripts() if which is None else which
+    return {aid: _run_script(aid, steps, config) for aid, steps in sorted(todo.items())}
 
 
 def golden_document(config: PolicyConfig) -> dict[str, Any]:
@@ -325,7 +511,9 @@ def golden_document(config: PolicyConfig) -> dict[str, Any]:
             "lifecycle); `transition_table` the allowed edges with their gates in "
             "evaluation order; `states` the integer ids; each scenario lists per step "
             "the action, the input evidence, and the expected state / outcome / gate "
-            "results / counters / transition after it. Generated by "
+            "results / counters / CUSUM statistic / transition after it. `legacy` holds "
+            "the same machine under the rules up to v1.4.0 (tstat_threshold fixed, "
+            "breach_rule consecutive) with its own config and scenarios. Generated by "
             "python/tools/make_golden_lifecycle.py; every port reproduces every step "
             "exactly (states, booleans and decimals are exact; no tolerance)."
         ),
@@ -335,6 +523,10 @@ def golden_document(config: PolicyConfig) -> dict[str, Any]:
         "states": {s.name: int(s) for s in LifecycleState},
         "transition_table": transition_table(),
         "scenarios": run_scripts(config),
+        "legacy": {
+            "config": legacy_config(config).to_dict(),
+            "scenarios": run_scripts(legacy_config(config), legacy_scripts()),
+        },
     }
 
 

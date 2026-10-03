@@ -15,7 +15,8 @@ import com.iap.contracts.Trees;
 
 /**
  * The set of {@link AlphaRecord}s keyed by alpha id, persisted to
- * {@code research/alpha_registry.json} ({@code x-version} 1) with a
+ * {@code research/alpha_registry.json} ({@code x-version} 2: each record
+ * carries {@code cusum} since v1.5.0) with a
  * byte-deterministic layout: Python's {@code json.dumps(sort_keys=True,
  * indent=2, ensure_ascii=True)} plus one trailing newline — identical state
  * ⇒ identical bytes, and a load-then-save of the Python-written file is
@@ -24,7 +25,7 @@ import com.iap.contracts.Trees;
  */
 public final class AlphaRegistry {
     /** {@code x-version} of {@code research/alpha_registry.json}. */
-    public static final long REGISTRY_VERSION = 1;
+    public static final long REGISTRY_VERSION = 2;
 
     /** The pinned description line of the registry document. */
     public static final String DESCRIPTION =

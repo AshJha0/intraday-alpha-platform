@@ -50,10 +50,12 @@ from iap.adaptive import (  # noqa: E402
 )
 from iap.alpha import build  # noqa: E402
 from iap.alpha.data import load_features  # noqa: E402
-from iap.backtest import BacktestConfig, Backtester, CostModel  # noqa: E402
+from iap.backtest import Backtester, CostModel  # noqa: E402
 from iap.backtest.adaptive import AdaptiveDeployment  # noqa: E402
 from iap.experiment.tracker import data_version  # noqa: E402
+from iap.research.runner import load_instrument_meta  # noqa: E402
 from iap.validation import ExperimentLedger  # noqa: E402
+from iap.validation.methods import DEFAULT_METHODS, methods  # noqa: E402
 
 REPORTS_DIR = REPO / "research" / "adaptive_reports"
 ALPHA_REPORTS_DIR = REPO / "research" / "alpha_reports"
@@ -80,18 +82,11 @@ def select_alphas() -> list[str]:
 
 
 def _load_meta() -> dict[int, dict]:
-    cfg = json.loads((REPO / "configs" / "instruments" / "instruments.json").read_text())
-    out: dict[int, dict] = {}
-    for row in cfg["instruments"]:
-        out[int(row["instrument_id"])] = {
-            "symbol": row["symbol"],
-            "asset_class": row["asset_class"],
-            "tick_size": float(row["tick_size"]),
-            "lot_size": int(row["lot_size"]),
-            "adv": float(row["adv"]),
-            "ref_price": float(row.get("ref_price", 1.0)),
-        }
-    return out
+    """Instrument meta WITH the currencies (``iap.research.runner``): up to
+    v1.4.0 this script built its own rows without ``quote_currency``, so the
+    backtester took every FX pair for a USD-quoted instrument and summed
+    JPY / CAD / CHF / GBP P&L as USD (PLATFORM_CONVENTIONS.md §11.6)."""
+    return load_instrument_meta(REPO / "configs")
 
 
 def _fmt(v, spec=".4f", none="   -  "):
@@ -161,7 +156,16 @@ def run_alpha(aid: str, frames, cfg, backtester, lc_cfg, log, ledger) -> dict:
         ledger.record(
             aid,
             "adaptive_deployment",
-            config={"policy": pname, **res.policy},
+            # The identity names the rules the deployment was replayed under
+            # (v1.5.0): the same policy under another drift z, retirement
+            # rule or backtest bundle is another look, not a rerun.
+            config={
+                "policy": pname,
+                **res.policy,
+                "ic_z_method": str(cfg["ic_z_method"]),
+                "breach_rule": lc_cfg.breach_rule,
+                "methods": DEFAULT_METHODS,
+            },
             result={
                 "net_pnl": m.total_pnl,
                 "refits": res.refit_count,
@@ -202,21 +206,36 @@ def _write_report(results: dict[str, dict], cfg, ledger, log, runtime_s: float) 
         f"- Drift baselines come from a {cfg['warmup_ns'] / NS_H:.1f}-hour warmup of the "
         "same generator —"
     )
-    a("  real regime shifts are not in the data, so PSI stays mostly below")
-    a("  threshold and most drift-triggered refits come from the rolling-IC")
-    a("  z-score, which is noisy at this sample size.")
-    a("- P&L differences between policies below are **within noise**; do not")
-    n_pos = sum(
-        1 for r in results.values() for pol in r["policies"].values() if pol["net_pnl"] > 0.0
+    a("  real regime shifts are not in the data, so a drift trigger that")
+    a("  fires here is reacting to sampling noise or to a monitor that drifts")
+    a("  by construction (see the drift monitor readout).")
+    # Which trigger fired, counted from the refit log (a refit can name both).
+    drift_refits = [
+        ev
+        for r in results.values()
+        for ev in r["policies"]["drift_triggered"]["refit_events"]
+        if not any(reason.startswith("initial") for reason in ev["reasons"])
+    ]
+    n_psi = sum(1 for ev in drift_refits if any(x.startswith("psi[") for x in ev["reasons"]))
+    n_icz = sum(1 for ev in drift_refits if any(x.startswith("ic_z") for x in ev["reasons"]))
+    a(
+        f"  Of the {len(drift_refits)} drift-triggered refits, {n_psi} name a PSI breach "
+        f"and {n_icz} the rolling-IC z"
     )
-    n_all = sum(len(r["policies"]) for r in results.values())
+    a("  (a refit can name both).")
+    all_pols = [pol for r in results.values() for pol in r["policies"].values()]
+    n_all = len(all_pols)
+    n_pos = sum(1 for pol in all_pols if pol["net_pnl"] > 0.0)
+    n_idle = sum(1 for pol in all_pols if pol["trade_count"] == 0)
+    n_neg = sum(1 for pol in all_pols if pol["net_pnl"] < 0.0)
+    a("- Do not read a ranking of the policies into the P&L below.")
     if n_pos == 0:
-        a("  read a ranking into them. Every alpha is net-negative after costs")
-        a(f"  under every policy on this data (0 of {n_all} deployments positive),")
-        a("  as the promotion report shows.")
+        a(f"  No deployment ends above zero after costs (0 of {n_all}): {n_neg} trade and")
+        a(f"  lose, {n_idle} make no trade at all — the forecast never clears the")
+        a("  round-trip cost — as the promotion report shows.")
     else:
-        a(f"  read a ranking into them. {n_pos} of {n_all} deployments end with a")
-        a("  positive net P&L; with two sessions that is not evidence of an edge.")
+        a(f"  {n_pos} of {n_all} deployments end with a positive net P&L ({n_neg} lose,")
+        a(f"  {n_idle} make no trade); with two sessions that is not evidence of an edge.")
     a("")
     a("What the study DOES establish: the adaptability machinery is")
     a("deterministic and leak-free (asserted + shift-tested), refits trigger")
@@ -236,10 +255,29 @@ def _write_report(results: dict[str, dict], cfg, ledger, log, runtime_s: float) 
         f" OR rolling-IC z < {dt['ic_z_threshold']}; min refit gap "
         f"{dt['min_refit_gap_ns'] / NS_H:.0f}h"
     )
+    if lc["breach_rule"] == "cusum":
+        retire = (
+            f"RETIRE on a breach once the CUSUM of the shortfall below the gate "
+            f"(slack {lc['cusum_k']}, each reading weighted by the "
+            f"{cfg['block_ns'] / cfg['ic_window_ns']:.3f} of its window that is new) "
+            f"reaches {lc['cusum_h']}"
+        )
+    else:
+        retire = f"RETIRE after {lc['retire_breach_evals']} consecutive breaches"
     a(
-        f"- lifecycle: WATCH below IC {lc['watch_ic_gate']}, RETIRE after "
-        f"{lc['retire_breach_evals']} consecutive breaches, re-activate at IC >= "
+        f"- lifecycle: WATCH below IC {lc['watch_ic_gate']}, {retire}, re-activate at IC >= "
         f"{lc['reactivate_ic_gate']} for {lc['reactivate_evals']} consecutive evals"
+    )
+    z_text = (
+        "two-sample HAC z of the pair-weighted rolling IC against the baseline"
+        if cfg["ic_z_method"] == "hac"
+        else "legacy z (baseline mean taken as known, buckets as independent)"
+    )
+    a(f"- rolling-IC z: {z_text} (`ic_z_method = {cfg['ic_z_method']}`)")
+    a(
+        f"- backtest: the `{DEFAULT_METHODS}` research rules (cost-aware positions, fills "
+        "capped at displayed size, only the rows the IC scores, square-root impact); "
+        "every P&L figure is in USD"
     )
     a("")
     a("## Master table (per alpha x policy)")
@@ -306,10 +344,29 @@ def _write_report(results: dict[str, dict], cfg, ledger, log, runtime_s: float) 
     a("scheduled_weekly are bitwise identical here (weekly never fires), so")
     a("wins credited to `static` are shared with `scheduled_weekly` by")
     a("construction. With one synthetic day of true out-of-warmup data these")
-    a("win counts are coin flips, not evidence. The honest headline: **on")
-    a("this sample, refitting neither rescues nor ruins any alpha — the")
-    a("differences are one to two orders of magnitude smaller than the cost")
-    a("drag.** A real ranking needs months of sessions.")
+    a("win counts are coin flips, not evidence.")
+    # The headline is derived: does any policy make an alpha profitable, and
+    # how far apart do the policies land on one alpha.
+    spreads = {
+        aid: max(p["net_pnl"] for p in r["policies"].values())
+        - min(p["net_pnl"] for p in r["policies"].values())
+        for aid, r in results.items()
+    }
+    widest = max(sorted(spreads), key=lambda aid: spreads[aid])
+    n_same = sum(1 for v in spreads.values() if v == 0.0)
+    rescued = (
+        "no refit policy makes any alpha profitable"
+        if n_pos == 0
+        else (f"{n_pos} of {n_all} deployments end above zero")
+    )
+    a(
+        f"The honest headline: **on this sample {rescued}.** The policies are not "
+        "interchangeable, though: a refit changes how often an alpha's forecast clears "
+        f"its costs, and so how much it trades. On {n_same} of {len(spreads)} alphas "
+        "every policy ends at the same net P&L; the widest gap between two policies on "
+        f"one alpha is {spreads[widest]:,.0f} USD ({widest}), and it is a difference in "
+        "costs paid, not in edge found. A real ranking needs months of sessions."
+    )
     a("")
     a("## Lifecycle activity")
     a("")
@@ -386,10 +443,11 @@ def _write_report(results: dict[str, dict], cfg, ledger, log, runtime_s: float) 
     a("rather than of the research design.")
     a("")
     a(
-        f"`ledger_n_at_report` = **{ledger.total_experiments}** "
-        f"({ledger.distinct_experiments} distinct configurations), read at"
+        f"The ledger held **{ledger.total_experiments}** recorded evaluations in "
+        f"{ledger.distinct_experiments} distinct configurations when this report was "
+        "rendered. Pipelines that run after it add theirs: the current total is in "
+        "`research/experiments.json`."
     )
-    a("render time.")
     a("")
     (REPORTS_DIR / "ADAPTIVE_REPORT.md").write_text("\n".join(lines) + "\n")
 
@@ -404,10 +462,11 @@ def main() -> int:
     frames = load_features(REPO / "data" / "features")
     # Same pinned research execution model as run_all.py (round-3): latency
     # in EVENT TIME, a bounded decision age and no overnight carry.
+    bundle = methods(DEFAULT_METHODS)
     backtester = Backtester(
-        CostModel.load(REPO / "configs" / "execution" / "execution.json"),
+        bundle.cost_model(CostModel.load(REPO / "configs" / "execution" / "execution.json")),
         meta,
-        BacktestConfig(
+        bundle.backtest_config(
             latency_ns=1_000_000_000,
             max_decision_age_ns=60_000_000_000,
             flatten_at_session_end=True,

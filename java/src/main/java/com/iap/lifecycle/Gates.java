@@ -15,6 +15,17 @@ import java.util.function.Function;
  * never passes); the machine decides separately whether an absent block
  * counts as a failure or as silence.
  *
+ * <p><b>The significance threshold</b> (v1.5.0). {@code statistical_significance}
+ * is the one gate whose threshold is not a config constant. Under the default
+ * policy ({@code PolicyConfig.tstatThreshold = "ledger"}) it is
+ * {@code max(min_nw_tstat, evidence.significance_threshold)} — the
+ * multiple-testing threshold the research result was judged at, never below
+ * the configured floor — and when the evidence carries no threshold the gate
+ * FAILS with {@code threshold = null} (the value is still reported). Under
+ * {@code "fixed"} — the rule up to v1.4.0 — the threshold is
+ * {@code min_nw_tstat} and the evidence field is not read. The gate table
+ * (names, blocks, kinds, edges) is unchanged.
+ *
  * <p>The stability rule {@code |ic - rank_ic| / max(|ic|, eps) <= max_ic_rank_gap}
  * requires the rank IC to lie in {@code [0, 2 * ic]} for a positive IC: same
  * sign, at most twice the linear IC — the one pair of numbers in an
@@ -144,9 +155,31 @@ public enum Gates {
         return thresholdKey;
     }
 
-    /** The bound threshold ({@code null} for a BOOL gate). */
+    /**
+     * The configured threshold ({@code null} for a BOOL gate). For
+     * {@code statistical_significance} this is the floor {@code min_nw_tstat};
+     * {@link #thresholdFor} gives the threshold applied to an evidence.
+     */
     public Double threshold(PolicyConfig config) {
         return threshold == null ? null : threshold.apply(config);
+    }
+
+    /**
+     * The threshold this gate applies to {@code evidence} (class docs, "The
+     * significance threshold"); {@code null} for a BOOL gate and for the
+     * ledger policy when the evidence carries no significance threshold.
+     */
+    public Double thresholdFor(Evidence evidence, PolicyConfig config) {
+        Double configured = threshold(config);
+        if (this != STATISTICAL_SIGNIFICANCE
+                || PolicyConfig.TSTAT_FIXED.equals(config.tstatThreshold())) {
+            return configured;
+        }
+        Double carried = evidence.significanceThreshold();
+        if (carried == null) {
+            return null;
+        }
+        return Math.max(configured, carried);
     }
 
     /** Pure: the same evidence always yields the same result. */
@@ -155,11 +188,14 @@ public enum Gates {
         if (kind == Kind.BOOL) {
             return new GateResult(m != null && m == BOOL_TRUE, null, null);
         }
-        Double th = threshold(config);
+        Double th = thresholdFor(evidence, config);
         if (m == null) {
             return new GateResult(false, null, th);
         }
         double value = m;
+        if (th == null) { // the ledger policy with no threshold in the evidence
+            return new GateResult(false, value, null);
+        }
         boolean passed = switch (kind) {
             case MIN -> value >= th;
             case MAX -> value <= th;

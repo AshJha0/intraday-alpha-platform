@@ -137,13 +137,16 @@ class ExperimentRegistry:
     def gate_eligibility(self, experiment_id: str) -> GateEligibility:
         """Whether the experiment's result may be used as gate evidence.
 
-        The configuration bounds are always re-derived from the spec (they
-        need nothing but the spec, so the sidecar cannot overrule them).
-        The period check needs the dataset, so it is read from the
-        ``eligibility.json`` the runner wrote; a directory without one (a
-        run that predates the sidecar) is judged on its configuration alone
-        and says so (``periods_verified`` false).  A malformed sidecar
-        raises — an unreadable eligibility record is not an eligible one.
+        The configuration bounds — and since v1.5.0 the method bundle — are
+        always re-derived from the spec (they need nothing but the spec, so
+        the sidecar cannot overrule them).  The period check and the facts
+        of the run need the dataset, so they are read from the
+        ``eligibility.json`` the runner wrote, together with the
+        significance threshold the result was judged at; a directory
+        without one (a run that predates the sidecar) is judged on its
+        configuration alone and says so (``periods_verified`` false).  A
+        malformed sidecar raises — an unreadable eligibility record is not
+        an eligible one.
         """
         spec = self.load_spec(experiment_id)
         from_spec = gate_eligibility(spec)
@@ -156,7 +159,12 @@ class ExperimentRegistry:
         reasons = list(from_spec.reasons)
         reasons += [r for r in recorded.reasons if r not in reasons]
         return GateEligibility(
-            eligible=not reasons, reasons=tuple(reasons), periods_verified=recorded.periods_verified
+            eligible=not reasons,
+            reasons=tuple(reasons),
+            periods_verified=recorded.periods_verified,
+            methods=from_spec.methods,
+            significance_threshold=recorded.significance_threshold,
+            threshold_looks=recorded.threshold_looks,
         )
 
     def records(self) -> Iterator[ExperimentRecord]:

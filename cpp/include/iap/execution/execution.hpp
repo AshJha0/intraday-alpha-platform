@@ -113,7 +113,8 @@
 //    notional = qty * qty_unit * price_ticks * tick_size (qty_unit =
 //    lot_size for FX, 1 for EQUITY/ETF; conventions section 1).
 // 6. Linear impact (aggressive fills only, configs/execution/execution.json
-//    cost_model, IDENTICAL to the research cost model iap.backtest.costs):
+//    cost_model; the impact_model = "linear" rule of the research cost model
+//    iap.backtest.costs, whose default is the square root since v1.5.0):
 //    impact_bps = impact_coeff_bps_per_pct_adv *
 //    (child_order_qty * qty_unit / adv * 100); each taker fill is charged
 //    impact_bps * 1e-4 * its own notional. Passive fills carry zero impact.

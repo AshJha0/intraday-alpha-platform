@@ -18,6 +18,7 @@ from iap.marketdata.generator import (
 )
 from iap.research import ResearchError, power
 from iap.research.__main__ import main as cli_main
+from iap.validation.methods import methods
 
 PLANTED_CONFIG = REPO_ROOT / "research" / "power" / "generator_planted.json"
 
@@ -306,9 +307,14 @@ def test_cell_config_scales_both_reference_effects():
 
 
 def _fake_row(alpha_id, t, ledger_t=None):
+    """A detector row whose within-bucket t is ``t`` and whose pooled-slope
+    t is ``t + 0.5``; ``sig_ledger`` reads the pooled one (POWER_VERSION 2)."""
     return {
         "alpha_id": alpha_id,
         "gate_ic": 0.01 * t,
+        "ic_valid_only": 0.01 * t,
+        "trade_count_1x": 12 if t >= 3.0 else 0,
+        "recompute_ok": True,
         "t_within": t,
         "t_pooled": t + 0.5,
         "ic_vol_scaled": 0.02 * t,
@@ -317,7 +323,7 @@ def _fake_row(alpha_id, t, ledger_t=None):
         "net_pnl_1x_pooled": t,
         "net_pnl_ci_low": t - 3.5,
         "net_pnl_ci_high": t + 3.5,
-        "sig_ledger": ledger_t is not None and t >= ledger_t,
+        "sig_ledger": ledger_t is not None and t + 0.5 >= ledger_t,
         "pnl_ci_positive": t - 3.5 > 0.0,
         "fold_sign_consistency": 1.0 if t > 0 else 0.5,
         "hypothesis_confirmed": t > 0,
@@ -345,11 +351,22 @@ def fake_pipeline(monkeypatch):
                 cfg["planted"]["break"]["post_multiplier"],
             )
         )
-        return {1: cfg}
+        return {1: dict(cfg, work_dir=work_dir)}
 
-    def fake_evaluate(frames, configs_dir, ledger_t_threshold=None, seed=0):
+    def fake_evaluate(
+        frames,
+        configs_dir,
+        ledger_t_threshold,
+        seed=0,
+        normalized_dir=None,
+        engine_configs_dir=None,
+    ):
         cfg = frames[1]
         assert seed == cfg["seed"]
+        # the recompute probe is pointed at the run's OWN events and at the
+        # reduced configs tree its features were built with
+        assert normalized_dir == cfg["work_dir"] / "normalized"
+        assert engine_configs_dir == cfg["work_dir"] / "configs"
         sign = cfg["planted"]["break"]["post_multiplier"]
         flow = 10.0 * cfg["planted"]["order_flow"]["strength"] * (1.0 if sign > 0 else 0.0)
         lead = 5.0 * cfg["planted"]["lead_lag"]["beta"] * (1.0 if sign > 0 else 0.0)
@@ -405,15 +422,20 @@ def test_power_study_grid_layout_and_rates(fake_pipeline, tmp_path):
         ExperimentLedger.bonferroni_t_threshold_at(20), abs=1e-6
     )
     assert 3.0 < doc["protocol"]["ledger_t_threshold"] < 4.0
-    assert strong["rate_sig_ledger"] == 1.0  # t = 4 clears ~3.02
+    assert doc["protocol"]["promote_t_threshold"] == doc["protocol"]["ledger_t_threshold"]
+    assert strong["rate_sig_ledger"] == 1.0  # pooled t = 4.5 clears ~3.02
     assert cells[("lead_lag", "stable", 2.0)]["rate_sig_within"] == 1.0  # t = 4
-    assert weak["rate_sig_ledger"] == 0.0
+    assert weak["rate_sig_ledger"] == 0.0  # pooled t = 2.5
+    assert strong["mean_trades_1x"] == 12.0 and weak["mean_trades_1x"] == 0.0
+    assert strong["n_recompute_failed"] == 0
     assert strong["rate_pnl_ci_positive"] == 1.0 and weak["rate_pnl_ci_positive"] == 0.0
     assert strong["mean_ic_vol_scaled"] == 0.08
     assert strong["mean_folds_survive_1x_cost"] == 4.0
     assert doc["cells"] == power.summarise(doc["runs"])
-    assert doc["x-version"] == power.POWER_VERSION
-    assert doc["protocol"]["stress_version"] == 2
+    assert doc["x-version"] == power.POWER_VERSION == 2
+    # the protocol names the method bundle; the bundle pins the stress grid
+    assert doc["protocol"]["methods"] == "v2"
+    assert methods(doc["protocol"]["methods"]).stress_version == 2
     assert not (tmp_path / "scratch").exists() or not list((tmp_path / "scratch").iterdir())
 
 
@@ -455,6 +477,46 @@ def test_power_study_counts_an_unvalidatable_run_as_a_miss():
     assert cell["n_runs"] == 2 and cell["n_failed"] == 1
     assert cell["rate_sig_within"] == 0.5 and cell["mean_t_within"] == 4.0
     assert cell["rate_sig_ledger"] == 0.5 and cell["rate_pnl_ci_positive"] == 0.5
+
+
+def _report(t_within, t_pooled, min_nw_tstat, gate_ic=0.02):
+    """The keys of a ``validate_alpha`` report a detector row is built from."""
+    return {
+        "gate_ic": gate_ic,
+        "nw_tstat": t_within,
+        "nw_tstat_uncrossed": t_within,
+        "nw_tstat_pooled": t_pooled,
+        "nw_tstat_pooled_uncrossed": t_pooled,
+        "gates": {"min_nw_tstat": min_nw_tstat},
+        "net_pnl_bootstrap": {"ci_low": -1.0, "ci_high": 2.0},
+        "oos_ic_vol_scaled": 0.03,
+        "oos_ic_instrument_mean": 0.03,
+        "gate_ic_valid_only": 0.021,
+        "trade_count_1x_cost": 0,
+        "leakage": {"recompute_ok": True, "passed": True},
+        "n_folds_survive_1x_cost": 0,
+        "net_pnl_1x_pooled": 0.0,
+        "fold_sign_consistency": 1.0,
+        "hypothesis_confirmed": True,
+        "verdict": "ITERATE",
+    }
+
+
+def test_sig_ledger_reads_the_pooled_slope_t():
+    """POWER_VERSION 2: ``sig_ledger`` compares the POOLED-slope t with the
+    study threshold (version 1 compared the within-bucket t).  Threshold
+    3.5: within 5.0 / pooled 3.2 is not ledger-significant; within 2.0 /
+    pooled 4.0 is; a non-positive gate IC never is."""
+    row = power._run_row("EQ04", _report(t_within=5.0, t_pooled=3.2, min_nw_tstat=3.5))
+    assert (row["sig_within"], row["sig_pooled"], row["sig_ledger"]) == (True, True, False)
+    row = power._run_row("EQ04", _report(t_within=2.0, t_pooled=4.0, min_nw_tstat=3.5))
+    assert (row["sig_within"], row["sig_pooled"], row["sig_ledger"]) == (False, True, True)
+    assert (row["t_within"], row["t_pooled"]) == (2.0, 4.0)
+    assert (row["ic_valid_only"], row["trade_count_1x"], row["recompute_ok"]) == (0.021, 0, True)
+    row = power._run_row(
+        "EQ04", _report(t_within=2.0, t_pooled=4.0, min_nw_tstat=3.5, gate_ic=-0.02)
+    )
+    assert not row["sig_ledger"] and not row["sig_pooled"]
 
 
 def test_power_study_rejects_bad_inputs(tmp_path, fake_pipeline):
@@ -516,6 +578,23 @@ def test_planted_pipeline_end_to_end_on_a_tiny_universe(tmp_path):
         frames, CONFIGS_DIR, ledger_t_threshold=3.3, seed=31337
     )  # seeded
     json.dumps(rows, allow_nan=False)
+    # the recompute leakage probe runs on the run's OWN events (as the study
+    # calls it) and passes; without them it does not run, and nothing else
+    # in the row depends on it
+    probed = power.evaluate_run(
+        frames,
+        CONFIGS_DIR,
+        ledger_t_threshold=3.3,
+        seed=31337,
+        normalized_dir=tmp_path / "work" / "normalized",
+        engine_configs_dir=tmp_path / "work" / "configs",
+    )
+    for effect, row in rows.items():
+        if "error" in row:
+            assert "error" in probed[effect]
+            continue
+        assert row["recompute_ok"] is None and probed[effect]["recompute_ok"] is True
+        assert {**probed[effect], "recompute_ok": None} == row
     # nothing leaked outside the work directory's own tree
     assert sorted(p.name for p in (tmp_path / "work").iterdir()) == [
         "configs",

@@ -94,8 +94,9 @@ import com.iap.orderbook.OrderBook;
  *       fills (fee &lt; 0 = rebate). FX venues charge
  *       commission_per_million * notional / 1e6 on every fill, notional =
  *       qty * qty_unit * price_ticks * tick_size.</li>
- *   <li><b>Linear impact</b> (aggressive fills only, identical to the
- *       research cost model): impact_bps = impact_coeff_bps_per_pct_adv *
+ *   <li><b>Linear impact</b> (aggressive fills only; the linear rule of
+ *       the research cost model, whose default is the square root since
+ *       v1.5.0): impact_bps = impact_coeff_bps_per_pct_adv *
  *       (child_qty * qty_unit / adv * 100); each taker fill is charged
  *       impact_bps * 1e-4 * its own notional.</li>
  *   <li><b>Cancels and time-in-force</b>: {@link #cancel(long, long)}

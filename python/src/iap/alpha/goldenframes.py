@@ -75,4 +75,5 @@ def build_golden_frame(events_path, configs_dir, instrument_id: int) -> pd.DataF
         frame[f"label_cost_{h}"] = np.asarray(lab.cost, dtype=float)
         frame[f"label_valid_{h}"] = np.asarray(lab.valid, dtype=bool)
         frame[f"label_reason_{h}"] = np.asarray(lab.reason, dtype=np.uint8)
+        frame[f"label_reopen_{h}"] = np.asarray(lab.reopen_mid, dtype=float)
     return frame

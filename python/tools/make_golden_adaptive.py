@@ -24,18 +24,25 @@ Pins (see /API_ADAPTIVE.md for the normative formulas):
    through DriftTriggeredPolicy (thresholds from configs/strategies/strategies.json)
    with exact expected booleans, covering both threshold edges, the
    min-refit-gap and None (silent monitor) inputs.
-4. **Lifecycle transition sequence** — a constructed rolling-IC path
-   through the pinned lifecycle gates with exact expected states,
-   covering WATCH entry, neutral-zone counter reset, retirement,
-   post-retirement recovery to WATCH, re-activation, relapse and a block of
-   UNINFORMATIVE evaluations (a frozen IC window re-read six times, which
-   must move nothing).
+4. **Lifecycle transition sequences** — one constructed rolling-IC path
+   run through the pinned lifecycle gates under BOTH retirement rules, with
+   exact expected states: ``lifecycle`` is the default rule of
+   ``configs/strategies/strategies.json`` (CUSUM since v1.5.0, with the
+   expected statistic after every reading at 1e-12) and
+   ``lifecycle_legacy_consecutive`` the rule up to v1.4.0.  The path covers
+   WATCH entry, the neutral zone, retirement, post-retirement recovery to
+   WATCH, re-activation, relapse and a block of UNINFORMATIVE evaluations
+   (a frozen IC window re-read six times, which must move nothing).  The
+   Java ``LifecycleGauge`` reproduces both.
 5. **Rolling realized IC** — EQ01 on the golden EQ frame: the mid series
    (one sample per book_ok refresh) and the confident signal rows are
    embedded, together with the rolling IC at pinned evaluation times.
    A live port (Java ``com.iap.adaptive.RollingIc``) must reproduce the
    research label — prevailing mid at-or-before ``t + horizon`` — and the
-   mean bucket IC at 1e-10 from the embedded series alone.
+   PAIR-COUNT-WEIGHTED mean bucket IC (the rolling IC of the default drift
+   z since v1.5.0, ``rolling_ic_z_hac``) at 1e-10 from the embedded series
+   alone.  ``rolling_ic_unweighted`` — the legacy mean — is pinned beside
+   it for the Python reference.
 
 BEFORE writing, every PSI and KS value is re-derived by an independent
 brute-force implementation (explicit loops, no iap.adaptive code) and
@@ -123,10 +130,12 @@ def _rolling_ic_case(frame, model, cfg) -> dict:
 
     The mid series is exactly the one the label layer uses (one sample per
     book_ok refresh); the signal rows are EQ01's confident emissions.  The
-    expected values come from the reference ``rolling_ic_z`` over the
-    matured rows of each window — the same code path research uses.
+    expected values come from the reference ``rolling_ic_z_hac`` (the
+    default: pair-count-weighted mean) and ``rolling_ic_z`` (the legacy
+    unweighted mean) over the matured rows of each window — the same code
+    paths research uses.
     """
-    from iap.adaptive.drift import ICBaseline, rolling_ic_z  # noqa: E402
+    from iap.adaptive.drift import ICBaseline, rolling_ic_z, rolling_ic_z_hac  # noqa: E402
     from iap.validation.metrics import HORIZONS_NS  # noqa: E402
 
     horizon = model.horizon
@@ -169,21 +178,28 @@ def _rolling_ic_case(frame, model, cfg) -> dict:
     for k in range(1, 6):
         t_eval = t_lo + (t_hi - t_lo) * k // 5
         m = (sig_ts >= t_eval - window_ns) & (sig_ts + h_ns <= t_eval)
-        res = rolling_ic_z(base, sig_ts[m], sig_v[m], ret[m], min_buckets)
+        res = rolling_ic_z_hac(base, sig_ts[m], sig_v[m], ret[m], min_buckets)
+        legacy = rolling_ic_z(base, sig_ts[m], sig_v[m], ret[m], min_buckets)
+        if legacy.n_buckets != res.n_buckets:
+            raise RuntimeError("the two rolling-IC forms disagree on the bucket count")
         evals.append(
             {
                 "t": int(t_eval),
                 "n_matured": int(np.sum(m & np.isfinite(ret))),
                 "n_buckets": int(res.n_buckets),
                 "rolling_ic": res.rolling_ic,
+                "rolling_ic_unweighted": legacy.rolling_ic,
             }
         )
     return {
         "description": (
             "EQ01 on the golden EQ frame. Feed mid_series through onMid (one "
             "sample per book_ok refresh) and signals through onSignal, then "
-            "read ic(t) at each evaluation time; tolerance 1e-10, null = NaN."
+            "read ic(t) at each evaluation time; tolerance 1e-10, null = NaN. "
+            "rolling_ic is the PAIR-COUNT-WEIGHTED mean of the bucket ICs (the "
+            "default since v1.5.0); rolling_ic_unweighted is the legacy mean."
         ),
+        "weighting": "pair_count",
         "alpha_id": "EQ01",
         "instrument_id": 1,
         "horizon": horizon,
@@ -329,12 +345,61 @@ def main() -> int:
         -0.02,
         -0.02,
         -0.02,
+        # v1.5.0: two deep informative breaches, then three recoveries.  The
+        # CUSUM rule retires on the second (S 0.0090625, then 0.015 >= 0.01)
+        # and the recoveries bring the alpha back to WATCH; the consecutive
+        # rule only reaches breach 4 of 6 and the recoveries re-activate it.
+        -0.05,
+        -0.05,
+        0.01,
+        0.01,
+        0.01,
     ]
-    ic_informative = [True] * 20 + [True] + [False] * 6
-    tracker = LifecycleTracker(alpha_id="GOLDEN", config=lc, policy="golden")
-    states = []
-    for k, (v, inf) in enumerate(zip(ic_path, ic_informative, strict=False)):
-        states.append(tracker.update((k + 1) * NS_15M, v, informative=inf))
+    ic_informative = [True] * 20 + [True] + [False] * 6 + [True] * 5
+    new_fraction = int(cfg["block_ns"]) / int(cfg["ic_window_ns"])
+
+    def lifecycle_case(config: LifecycleConfig, expected: list[str]) -> dict:
+        """Run the path under ``config`` and pin states, transitions and the
+        CUSUM statistic after every reading."""
+        tracker = LifecycleTracker(alpha_id="GOLDEN", config=config, policy="golden")
+        states, cusum = [], []
+        for k, (v, inf) in enumerate(zip(ic_path, ic_informative, strict=False)):
+            states.append(
+                tracker.update((k + 1) * NS_15M, v, informative=inf, new_fraction=new_fraction)
+            )
+            cusum.append(tracker.cusum)
+        if states != expected:
+            raise RuntimeError(f"lifecycle sequence ({config.breach_rule}) changed: {states}")
+        print(
+            f"lifecycle sequence ok ({config.breach_rule}: {len(tracker.transitions)} transitions)"
+        )
+        return {
+            "config": config.to_dict(),
+            "ts_step_ns": NS_15M,
+            "new_fraction": new_fraction,
+            "ic_path": ic_path,
+            "ic_informative": ic_informative,
+            "expected_states": states,
+            "expected_cusum": cusum,
+            "expected_transition_count": len(tracker.transitions),
+            "expected_transitions": [
+                {"from": t.from_state, "to": t.to_state, "eval_index": t.eval_index}
+                for t in tracker.transitions
+            ],
+        }
+
+    if lc.breach_rule != "cusum":
+        raise RuntimeError("strategies.json adaptive.lifecycle no longer names the CUSUM rule")
+    # Hand-derived for cusum_k 0.0025, cusum_h 0.01, new_fraction 0.125: the
+    # first stretch of shallow breaches never takes S past 0.00725, the three
+    # recoveries at readings 14-16 re-activate, the frozen window moves
+    # nothing, and the two deep breaches at readings 28-29 retire.
+    expected_cusum_states = (
+        ["ACTIVE"] + ["WATCH"] * 14 + ["ACTIVE"] * 4 + ["WATCH"] * 9 + ["RETIRED"] * 3 + ["WATCH"]
+    )
+    legacy_lc = LifecycleConfig.legacy(
+        lc.watch_ic_gate, lc.reactivate_ic_gate, lc.retire_breach_evals, lc.reactivate_evals
+    )
     expected_states = [
         "ACTIVE",
         "WATCH",
@@ -363,10 +428,15 @@ def main() -> int:
         "WATCH",
         "WATCH",
         "WATCH",
+        # the five readings added in v1.5.0 (breaches 3 and 4, then recovery)
+        "WATCH",
+        "WATCH",
+        "WATCH",
+        "WATCH",
+        "ACTIVE",
     ]
-    if states != expected_states:
-        raise RuntimeError(f"lifecycle sequence changed: {states}")
-    print(f"lifecycle sequence ok ({len(tracker.transitions)} transitions)")
+    lifecycle_default = lifecycle_case(lc, expected_cusum_states)
+    lifecycle_legacy = lifecycle_case(legacy_lc, expected_states)
 
     # -- 5. rolling realized IC on the golden EQ frame ----------------------
     rolling = _rolling_ic_case(frame, models["EQ01"], cfg)
@@ -377,13 +447,16 @@ def main() -> int:
     )
 
     blob = {
-        "x-version": 1,
+        "x-version": 2,
         "description": (
             "Adaptability-layer goldens (iap.adaptive; normative contract "
             "/API_ADAPTIVE.md). PSI/KS float tolerance 1e-10; trigger "
-            "booleans and lifecycle states exact. Regenerate with "
-            "python/tools/make_golden_adaptive.py (brute-force validated "
-            "at 1e-12 before writing)."
+            "booleans and lifecycle states exact; the CUSUM statistic at "
+            "1e-12. `lifecycle` runs the default retirement rule (CUSUM, "
+            "v1.5.0), `lifecycle_legacy_consecutive` the rule up to v1.4.0 on "
+            "the same path; `rolling_ic` pins the pair-count-weighted mean "
+            "bucket IC. Regenerate with python/tools/make_golden_adaptive.py "
+            "(brute-force validated at 1e-12 before writing)."
         ),
         "psi_ks": {
             "recipe": {
@@ -415,23 +488,8 @@ def main() -> int:
             "expected": expected_bools,
         },
         "rolling_ic": rolling,
-        "lifecycle": {
-            "config": {
-                "watch_ic_gate": lc.watch_ic_gate,
-                "reactivate_ic_gate": lc.reactivate_ic_gate,
-                "retire_breach_evals": lc.retire_breach_evals,
-                "reactivate_evals": lc.reactivate_evals,
-            },
-            "ts_step_ns": NS_15M,
-            "ic_path": ic_path,
-            "ic_informative": ic_informative,
-            "expected_states": expected_states,
-            "expected_transition_count": len(tracker.transitions),
-            "expected_transitions": [
-                {"from": t.from_state, "to": t.to_state, "eval_index": t.eval_index}
-                for t in tracker.transitions
-            ],
-        },
+        "lifecycle": lifecycle_default,
+        "lifecycle_legacy_consecutive": lifecycle_legacy,
     }
     out = GOLDEN_DIR / "expected_adaptive.json"
     out.write_text(json.dumps(blob, indent=2, sort_keys=True) + "\n")

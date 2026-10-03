@@ -34,6 +34,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from iap.adaptive.drift import IC_Z_METHODS
+from iap.adaptive.lifecycle import LifecycleConfig
+
 
 @dataclass(frozen=True)
 class RefitContext:
@@ -172,7 +175,12 @@ _REQ_LIFECYCLE = (
     "reactivate_ic_gate",
     "retire_breach_evals",
     "reactivate_evals",
+    "breach_rule",
 )
+
+#: ``x-version`` of the ``adaptive`` block: 2 since v1.5.0 (the block names
+#: ``ic_z_method`` and ``lifecycle.breach_rule``).
+ADAPTIVE_CONFIG_VERSION = 2
 
 
 def validate_adaptive_config(block: dict) -> dict:
@@ -184,8 +192,19 @@ def validate_adaptive_config(block: dict) -> dict:
     """
     if not isinstance(block, dict):
         raise ValueError("adaptive config block must be an object")
-    if int(block.get("x-version", 0)) != 1:
-        raise ValueError("adaptive config: x-version must be 1")
+    version = int(block.get("x-version", 0))
+    if version != ADAPTIVE_CONFIG_VERSION:
+        raise ValueError(
+            f"adaptive config: x-version must be {ADAPTIVE_CONFIG_VERSION}, got {version} "
+            "(a v1.4.0 block must be upgraded: name 'ic_z_method' — 'hac', or 'legacy' to "
+            "keep its z — and 'lifecycle.breach_rule' — 'cusum' with 'cusum_k' / 'cusum_h', "
+            "or 'consecutive' to keep its rule)"
+        )
+    if block.get("ic_z_method") not in IC_Z_METHODS:
+        raise ValueError(
+            f"adaptive config: ic_z_method must be one of {IC_Z_METHODS}, "
+            f"got {block.get('ic_z_method')!r}"
+        )
     for f in _REQ_INT_FIELDS:
         if f not in block:
             raise ValueError(f"adaptive config: missing field {f!r}")
@@ -220,6 +239,10 @@ def validate_adaptive_config(block: dict) -> dict:
     for f in ("retire_breach_evals", "reactivate_evals"):
         if not isinstance(lc[f], int) or isinstance(lc[f], bool) or lc[f] < 1:
             raise ValueError(f"adaptive config: lifecycle.{f} must be an integer >= 1")
+    try:
+        LifecycleConfig.from_config(lc)
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError(f"adaptive config: lifecycle: {exc}") from None
     if float(lc["reactivate_ic_gate"]) < float(lc["watch_ic_gate"]):
         raise ValueError(
             "adaptive config: reactivate_ic_gate must be >= watch_ic_gate "

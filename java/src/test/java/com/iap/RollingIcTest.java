@@ -12,8 +12,9 @@ import com.iap.adaptive.RollingIc;
  * Rolling realized IC — the pinned bucket-IC semantics (API_ADAPTIVE.md
  * section 4): event-time, lookahead-free maturation of (signal, forward
  * mid return) pairs, one Pearson IC per fixed event-time bucket
- * ({@code >= 8} pairs, nondegenerate variance), mean over buckets within
- * the rolling window, NaN below {@code min_ic_buckets}.
+ * ({@code >= 8} pairs, nondegenerate variance), pair-count-weighted mean
+ * over buckets within the rolling window (v1.5.0), NaN below
+ * {@code min_ic_buckets}.
  */
 public class RollingIcTest {
     @Test
@@ -57,6 +58,23 @@ public class RollingIcTest {
         assertTrue("both buckets count (min_ic_buckets=2 met)",
                 !Double.isNaN(ic.ic(301)));
         assertEquals(0.0, ic.ic(301), 1e-12);
+    }
+
+    @Test
+    public void bucketIcsAreWeightedByTheirPairCount() {
+        // an 8-pair bucket at +1 and a 16-pair bucket at -1: the
+        // pair-count-weighted mean is (8 - 16) / 24, where the unweighted
+        // mean of the legacy reading would be exactly 0 (v1.5.0).
+        RollingIc ic = new RollingIc(50, 100_000, 100, 2);
+        for (int i = 0; i < 8; i++) { // bucket 0: ts 0..7
+            ic.onObservation(i, i, 100.0 / (1.0 + 0.001 * i));
+        }
+        for (int i = 0; i < 16; i++) { // bucket 1: ts 100..115, inverted
+            ic.onObservation(100 + i, -i, 100.0 / (1.0 + 0.001 * i));
+        }
+        ic.onMid(300, 100.0);
+        assertEquals(24, ic.pairs());
+        assertEquals(-1.0 / 3.0, ic.ic(301), 1e-12);
     }
 
     @Test

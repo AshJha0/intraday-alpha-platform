@@ -6,9 +6,9 @@ the rolling OOS IC of the *deployed* scores over matured rows only):
 
 - **ACTIVE**  — allocated.  ``rolling_ic < watch_ic_gate`` -> WATCH.
 - **WATCH**   — allocated, on probation.
-  - ``rolling_ic < watch_ic_gate`` for ``retire_breach_evals``
-    CONSECUTIVE evaluations (counting the one that entered WATCH)
-    -> RETIRED (persistent breach).
+  - persistent breach -> RETIRED, by the retirement rule below (the
+    default CUSUM, or the legacy count of ``retire_breach_evals``
+    CONSECUTIVE breaches, the entering one included).
   - ``rolling_ic >= reactivate_ic_gate`` for ``reactivate_evals``
     consecutive evaluations -> ACTIVE (re-activation rule).
   - ``watch_ic_gate <= rolling_ic < reactivate_ic_gate``: neutral zone —
@@ -26,16 +26,18 @@ the rolling OOS IC of the *deployed* scores over matured rows only):
   breaches; without this rule an alpha was retired on one bad window plus
   silence, and stayed retired through the next session's open.
 
-**Opt-in CUSUM retirement rule** (``breach_rule = "cusum"``; the pinned
-default ``"consecutive"`` is unchanged and is what the Java port mirrors).
-The consecutive-count rule treats ``retire_breach_evals`` breaches in a row
-as that many independent pieces of evidence.  They are not: each evaluation
-reads a rolling window (2 h) that advances by one block (20 min), so
-successive readings share most of their rows, and N consecutive breaches
-can be ONE bad stretch seen N times.  The CUSUM rule accumulates evidence
-in proportion to the NEW information of each reading instead:
+**Retirement rule** (``breach_rule``; the default changed in v1.5.0).
 
-    S <- max(0, S + new_fraction * (watch_ic_gate - rolling_ic - cusum_k))
+*``"cusum"`` — the default.*  The consecutive-count rule treats
+``retire_breach_evals`` breaches in a row as that many independent pieces
+of evidence.  They are not: each evaluation reads a rolling window (2 h)
+that advances by one block (15 min), so successive readings share most of
+their rows, and N consecutive breaches can be ONE bad stretch seen N times.
+The CUSUM rule accumulates evidence in proportion to the NEW information of
+each reading instead:
+
+    s = S + new_fraction * (watch_ic_gate - rolling_ic - cusum_k)
+    S <- s if s > 0 else 0
 
 - ``new_fraction`` in (0, 1] is the share of the evaluation's window that is
   new since the last counted evaluation (the caller passes it; 1.0 = a
@@ -43,18 +45,49 @@ in proportion to the NEW information of each reading instead:
 - ``cusum_k`` (>= 0) is the slack: a reading has to be more than ``k`` below
   the watch gate to add evidence, and anything above ``gate - k`` drains it;
 - ``S`` accumulates in ACTIVE and WATCH alike (a slow bleed is evidence
-  before the first reading under the gate), and ``S >= cusum_h`` in WATCH
-  retires the alpha.  Entering WATCH is unchanged (the first reading under
-  the gate); recovery and re-activation are unchanged and reset ``S``.
+  before the first reading under the gate).  In WATCH, a reading that is
+  itself a BREACH and leaves ``S >= cusum_h`` retires the alpha.  A
+  retirement therefore always happens on a reading under the watch gate —
+  the ``rolling_ic`` gate result recorded with it is a genuine failure —
+  and never on the reading that entered WATCH: probation lasts at least one
+  further reading.  (The v1.3.0 opt-in form retired on ANY WATCH reading
+  with ``S >= cusum_h``, including one above the gate; that was tightened
+  when the rule became the default and was ported.)
+- Entering WATCH is the first reading under the gate, as before; ``S`` is
+  kept across that transition and reset by every other one.  Recovery and
+  re-activation are unchanged: ``reactivate_evals`` consecutive readings
+  ``>= reactivate_ic_gate``; a reading that is not a recovery resets the
+  recovery count.  ``breach_count`` is not used and stays 0.
 - uninformative / missing readings move nothing, as before.
 
-With the rule off no code path differs and ``S`` stays 0.
+Pinned parameters (``adaptive.lifecycle`` in
+``configs/strategies/strategies.json``): ``cusum_k = 0.0025`` — half the
+re-activation gate, the usual half-the-shift-to-detect slack — and
+``cusum_h = 0.01`` — the PROMOTE IC gate: an alpha is retired when its
+shortfall below the watch gate, beyond the slack and weighted by new
+information, adds up to the IC it needed to be promoted.  Both were fixed
+before any result was computed with them; they are conventions, not
+calibrations to this dataset.
+
+The three implementations (this module, Java ``LifecycleGauge``, Rust
+``lifecycle::tracker``) compute ``S`` with exactly the two expressions
+above — one multiplication, left-to-right subtraction, an explicit
+comparison instead of ``max`` — so the statistic is bit-identical across
+languages.
+
+*``"consecutive"`` — the legacy rule*, the default up to v1.4.0: in WATCH,
+``retire_breach_evals`` consecutive breaches (the entering one counts)
+retire the alpha, and the neutral zone
+``watch_ic_gate <= rolling_ic < reactivate_ic_gate`` resets both counters.
+It stays selectable by name in all three implementations.
 
 Gates (``watch_ic_gate``, ``reactivate_ic_gate``,
-``retire_breach_evals``, ``reactivate_evals``) are pinned in
+``retire_breach_evals``, ``reactivate_evals``) and the rule are pinned in
 ``configs/strategies/strategies.json`` ``adaptive.lifecycle`` with
-``reactivate_ic_gate >= watch_ic_gate`` enforced.  Comparisons are strict
-``<`` for breach and inclusive ``>=`` for recovery (pinned).
+``reactivate_ic_gate >= watch_ic_gate`` enforced; the block must NAME its
+``breach_rule`` (a block written for v1.4.0 is rejected, not read under the
+other rule).  Comparisons are strict ``<`` for breach and inclusive ``>=``
+for recovery (pinned).
 
 Every transition is appended to ``research/lifecycle_log.jsonl`` — one
 sorted-key JSON object per line:
@@ -79,8 +112,13 @@ ACTIVE = "ACTIVE"
 WATCH = "WATCH"
 RETIRED = "RETIRED"
 STATES = (ACTIVE, WATCH, RETIRED)
-#: Pinned retirement rules (module docs).
-BREACH_RULES = ("consecutive", "cusum")
+#: Retirement rules (module docs): the default, then the legacy rule.
+BREACH_RULES = ("cusum", "consecutive")
+DEFAULT_BREACH_RULE = "cusum"
+LEGACY_BREACH_RULE = "consecutive"
+#: Pinned CUSUM parameters (module docs).
+DEFAULT_CUSUM_K = 0.0025
+DEFAULT_CUSUM_H = 0.01
 
 
 @dataclass(frozen=True)
@@ -89,12 +127,12 @@ class LifecycleConfig:
     reactivate_ic_gate: float
     retire_breach_evals: int
     reactivate_evals: int
-    #: "consecutive" (pinned default) or "cusum" (module docs)
-    breach_rule: str = "consecutive"
+    #: "cusum" (default) or "consecutive" (legacy) — module docs
+    breach_rule: str = DEFAULT_BREACH_RULE
     #: CUSUM slack below the watch gate (>= 0; "cusum" only)
-    cusum_k: float = 0.0
+    cusum_k: float = DEFAULT_CUSUM_K
     #: CUSUM decision threshold (> 0; "cusum" only)
-    cusum_h: float = 0.0
+    cusum_h: float = DEFAULT_CUSUM_H
 
     def __post_init__(self) -> None:
         if self.retire_breach_evals < 1 or self.reactivate_evals < 1:
@@ -110,15 +148,58 @@ class LifecycleConfig:
 
     @staticmethod
     def from_config(block: dict) -> LifecycleConfig:
+        """From an ``adaptive.lifecycle`` block.  The block must name its
+        ``breach_rule``; ``"cusum"`` must also give ``cusum_k`` and
+        ``cusum_h`` (a ``"consecutive"`` block may omit them)."""
+        if "breach_rule" not in block:
+            raise ValueError(
+                "adaptive.lifecycle names no 'breach_rule'. Since v1.5.0 the default is "
+                f"{DEFAULT_BREACH_RULE!r} (with 'cusum_k' and 'cusum_h'); a block written "
+                f"for v1.4.0 must say {LEGACY_BREACH_RULE!r} to keep the rule it was "
+                "written for"
+            )
+        rule = str(block["breach_rule"])
+        if rule == "cusum":
+            for key in ("cusum_k", "cusum_h"):
+                if key not in block:
+                    raise ValueError(f"adaptive.lifecycle: breach_rule 'cusum' needs {key!r}")
         return LifecycleConfig(
             watch_ic_gate=float(block["watch_ic_gate"]),
             reactivate_ic_gate=float(block["reactivate_ic_gate"]),
             retire_breach_evals=int(block["retire_breach_evals"]),
             reactivate_evals=int(block["reactivate_evals"]),
-            breach_rule=str(block.get("breach_rule", "consecutive")),
-            cusum_k=float(block.get("cusum_k", 0.0)),
-            cusum_h=float(block.get("cusum_h", 0.0)),
+            breach_rule=rule,
+            cusum_k=float(block.get("cusum_k", DEFAULT_CUSUM_K)),
+            cusum_h=float(block.get("cusum_h", DEFAULT_CUSUM_H)),
         )
+
+    @staticmethod
+    def legacy(
+        watch_ic_gate: float,
+        reactivate_ic_gate: float,
+        retire_breach_evals: int,
+        reactivate_evals: int,
+    ) -> LifecycleConfig:
+        """The gates under the LEGACY consecutive-breach rule, named."""
+        return LifecycleConfig(
+            watch_ic_gate,
+            reactivate_ic_gate,
+            retire_breach_evals,
+            reactivate_evals,
+            breach_rule=LEGACY_BREACH_RULE,
+        )
+
+    def to_dict(self) -> dict:
+        """The block :meth:`from_config` reads (every key, in pinned order)."""
+        return {
+            "watch_ic_gate": self.watch_ic_gate,
+            "reactivate_ic_gate": self.reactivate_ic_gate,
+            "retire_breach_evals": self.retire_breach_evals,
+            "reactivate_evals": self.reactivate_evals,
+            "breach_rule": self.breach_rule,
+            "cusum_k": self.cusum_k,
+            "cusum_h": self.cusum_h,
+        }
 
 
 @dataclass(frozen=True)
@@ -179,7 +260,7 @@ class LifecycleTracker:
     recovery_count: int = 0
     eval_index: int = 0
     transitions: list[Transition] = field(default_factory=list)
-    #: CUSUM statistic (stays 0.0 under the "consecutive" rule)
+    #: CUSUM statistic ``S`` (stays 0.0 under the "consecutive" rule)
     cusum: float = 0.0
 
     def _transition(self, to_state: str, ts: int, reason: str, rolling_ic: float | None) -> None:
@@ -214,8 +295,9 @@ class LifecycleTracker:
         ``informative`` is False when the evaluation's matured set gained no
         new rows since the last counted evaluation (pinned, API_ADAPTIVE §6):
         the reading carries no new evidence and moves nothing.
-        ``new_fraction`` (CUSUM rule only) is the share of this reading's
-        window that is new since the last counted one.
+        ``new_fraction`` is the share of this reading's window that is new
+        since the last counted one; the CUSUM rule weights the reading by
+        it, the consecutive rule does not read it.
         """
         self.eval_index += 1
         cfg = self.config
@@ -289,9 +371,9 @@ class LifecycleTracker:
         if not 0.0 < new_fraction <= 1.0:
             raise ValueError("new_fraction must be in (0, 1]")
         if self.state != RETIRED:
-            self.cusum = max(
-                0.0, self.cusum + new_fraction * (cfg.watch_ic_gate - rolling_ic - cfg.cusum_k)
-            )
+            # Exactly these two expressions in every port (module docs).
+            s = self.cusum + new_fraction * (cfg.watch_ic_gate - rolling_ic - cfg.cusum_k)
+            self.cusum = s if s > 0.0 else 0.0
 
         if self.state == ACTIVE:
             if breach:
@@ -304,7 +386,7 @@ class LifecycleTracker:
             return self.state
 
         if self.state == WATCH:
-            if self.cusum >= cfg.cusum_h:
+            if breach and self.cusum >= cfg.cusum_h:
                 stat = self.cusum
                 self._transition(
                     RETIRED,

@@ -50,7 +50,7 @@
       ],
       "ic_window": {
         "horizon": "1s",
-        "ic": -0.0003050016729740142,
+        "ic": -0.0003050016729739346,
         "rows_0based": [
           100,
           1900
@@ -119,7 +119,7 @@
       ],
       "ic_window": {
         "horizon": "5s",
-        "ic": 0.02844381684211371,
+        "ic": 0.028443816842113653,
         "rows_0based": [
           100,
           1900
@@ -178,7 +178,7 @@
       ],
       "ic_window": {
         "horizon": "10s",
-        "ic": -0.03153121455387007,
+        "ic": -0.03153121455387004,
         "rows_0based": [
           100,
           1900
@@ -237,7 +237,7 @@
       ],
       "ic_window": {
         "horizon": "1m",
-        "ic": 0.07448228341847496,
+        "ic": 0.07448228341847513,
         "rows_0based": [
           100,
           760
@@ -249,8 +249,8 @@
     "FX05": {
       "cases": [
         {
-          "confidence": 0.6520223321708073,
-          "expected_return": -1.059794932318479e-06,
+          "confidence": 0.6520223321708072,
+          "expected_return": -1.0597949323184766e-06,
           "grid_index_0based": 208,
           "grid_ts": 1787622275708237294,
           "inputs": {
@@ -269,8 +269,8 @@
           "target_pair": 102
         },
         {
-          "confidence": 0.5417073248895847,
-          "expected_return": 8.804892860132705e-07,
+          "confidence": 0.5417073248895844,
+          "expected_return": 8.804892860132683e-07,
           "grid_index_0based": 596,
           "grid_ts": 1787633915708237294,
           "inputs": {
@@ -285,12 +285,12 @@
           },
           "native_exchange_ts": 1787633923013062955,
           "native_row_0based": 800,
-          "raw_residual_signal": -1.6853859422146417e-05,
+          "raw_residual_signal": -1.685385942214641e-05,
           "target_pair": 102
         },
         {
-          "confidence": 0.20335672000516825,
-          "expected_return": 3.3053533702880486e-07,
+          "confidence": 0.20335672000516816,
+          "expected_return": 3.3053533702880406e-07,
           "grid_index_0based": 1033,
           "grid_ts": 1787647025708237294,
           "inputs": {
@@ -305,12 +305,12 @@
           },
           "native_exchange_ts": 1787647027055613626,
           "native_row_0based": 1400,
-          "raw_residual_signal": -6.13792570192118e-06,
+          "raw_residual_signal": -6.137925701921178e-06,
           "target_pair": 102
         },
         {
-          "confidence": 0.22607617545460126,
-          "expected_return": 3.674634644292586e-07,
+          "confidence": 0.2260761754546011,
+          "expected_return": 3.674634644292576e-07,
           "grid_index_0based": 1523,
           "grid_ts": 1787661725708237294,
           "inputs": {
@@ -325,12 +325,12 @@
           },
           "native_exchange_ts": 1787661727280491167,
           "native_row_0based": 2000,
-          "raw_residual_signal": -6.857475704909655e-06,
+          "raw_residual_signal": -6.8574757049096515e-06,
           "target_pair": 102
         },
         {
-          "confidence": 0.11472598088059699,
-          "expected_return": -1.864752281378486e-07,
+          "confidence": 0.11472598088059696,
+          "expected_return": -1.8647522813784817e-07,
           "grid_index_0based": 1961,
           "grid_ts": 1787674865708237294,
           "inputs": {
@@ -356,7 +356,7 @@
           2500
         ],
         "horizon": "5m",
-        "ic": 0.0017772505052698314,
+        "ic": 0.0017772505052698355,
         "source": "bundled day-2 features (golden vector has a single pair)",
         "target_pair": 102
       },
@@ -418,7 +418,7 @@
       ],
       "ic_window": {
         "horizon": "1m",
-        "ic": 0.030415221570679312,
+        "ic": 0.03041522157067936,
         "rows_0based": [
           100,
           760
@@ -522,8 +522,8 @@
     },
     "FX05": {
       "alpha_id": "FX05",
-      "beta": -8.126983387133811e-07,
-      "beta_fit": -8.126983387133811e-07,
+      "beta": -8.126983387133795e-07,
+      "beta_fit": -8.126983387133795e-07,
       "conf_scale": 2.0,
       "dead": false,
       "features": [
@@ -533,9 +533,9 @@
       "horizon": "5m",
       "hypothesis_confirmed": false,
       "model": "linear_z_v1",
-      "mu": 3.026040375843961e-07,
+      "mu": 3.0260403758439625e-07,
       "n_train": 7056,
-      "sigma": 1.5835545864007966e-05,
+      "sigma": 1.583554586400797e-05,
       "train_window": {
         "end_ts": 1787603100184527543,
         "start_ts": 1787529602028520532

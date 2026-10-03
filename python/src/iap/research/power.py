@@ -38,31 +38,40 @@ REJECT is uninterpretable (no signal, or no power?) and so is a PROMOTE.
    generator, raw->normalized QC, the feature engine and label sweep, the
    alpha's own fit, and ``validate_alpha`` with the pinned research
    execution model (4 folds, 60 s embargo, 1 s latency, 60 s decision age,
-   session flattening, 1x costs) — into a scratch directory that is removed
+   session flattening, 1x costs) under the default method bundle
+   (``iap.validation.methods`` ``"v2"``: reopen-scored rows, the pooled-slope
+   t, cost-aware positions, the recompute leakage probe on the run's own
+   events, per-fold diagnostics) — into a scratch directory that is removed
    afterwards.  Nothing under ``data/`` or the ledger is touched: a planted
    dataset is not the research dataset, and its looks are not looks at it.
+   The PROMOTE t threshold of every run is the study's own multiple-testing
+   threshold (item 5), which is how the ledger policy applies to a study
+   that keeps no ledger.
 4. *Replication.*  Each (scenario, level) cell is generated under
    ``n_seeds`` generator seeds drawn from SplitMix64 seeded with the base
    config's seed, so the whole study is a pure function of the config, the
    grid and the code.
 5. *Detection.*  Per run and detector, from the validation report:
 
-   * ``sig_within``  — gate IC > 0 and the gate's Newey-West t (mean of
-     WITHIN-bucket ICs, the statistic the PROMOTE gate reads) >= 3.0;
    * ``sig_pooled``  — gate IC > 0 and the POOLED-slope HAC t
-     (:func:`iap.validation.metrics.pooled_slope_hac_tstat`) >= 3.0;
-   * ``sig_ledger``  — gate IC > 0 and the within-bucket t >= the
+     (:func:`iap.validation.metrics.pooled_slope_hac_tstat`, the statistic
+     the PROMOTE gate reads since v1.5.0) >= 3.0;
+   * ``sig_within``  — gate IC > 0 and the Newey-West t of the mean of
+     WITHIN-bucket ICs (the legacy gate statistic) >= 3.0;
+   * ``sig_ledger``  — gate IC > 0 and the pooled-slope t >= the
      multiple-testing threshold of THIS study: the Bonferroni |t| at
      ``n_tests`` = runs x detectors
-     (``ExperimentLedger.bonferroni_t_threshold_at``), i.e. the opt-in
-     ``tstat_threshold="ledger"`` policy applied to the study's own number
-     of looks;
+     (``ExperimentLedger.bonferroni_t_threshold_at``) — the significance
+     gate exactly as PROMOTE applies it;
    * ``evidence``    — verdict ITERATE or PROMOTE;
    * ``promote``     — verdict PROMOTE (needs cost survival too);
    * ``pnl_ci_positive`` — the lower end of the 95 % stationary-bootstrap
      interval of the pooled walk-forward net P&L at 1x costs is above zero
-     (:func:`iap.validation.diagnostics.fold_diagnostics`, seeded with the
-     run's generator seed).
+     (the report's ``net_pnl_bootstrap``, seeded with the run's generator
+     seed).
+
+   Up to report version 1 (v1.3.0 / v1.4.0) the study ran the legacy chain
+   and ``sig_ledger`` compared the within-bucket t.
 
    A cell reports each as a rate over its seeds, with the mean gate IC, the
    mean vol-scaled IC (:func:`iap.validation.metrics.instrument_ics` — each
@@ -98,7 +107,7 @@ import pandas as pd
 
 from iap.alpha import build
 from iap.alpha.data import load_features
-from iap.backtest import BacktestConfig, Backtester, CostModel
+from iap.backtest import Backtester, CostModel
 from iap.core.rng import SplitMix64
 from iap.experiment.locking import atomic_write_text
 from iap.marketdata.generator import MarketDataGenerator, load_generator_config
@@ -107,9 +116,9 @@ from iap.reference.refdata import ReferenceData
 from iap.research.errors import ResearchError
 from iap.research.runner import load_instrument_meta
 from iap.research.specs import DEFAULT_CONFIGURATION
-from iap.validation.diagnostics import fold_diagnostics
+from iap.validation.leakage import RecomputeSources
 from iap.validation.ledger import ExperimentLedger
-from iap.validation.stress import STRESS_VERSION_CARRY
+from iap.validation.methods import methods
 from iap.validation.validate import GATES, validate_alpha
 
 __all__ = [
@@ -129,8 +138,10 @@ __all__ = [
     "write_reports",
 ]
 
-#: ``x-version`` of ``POWER_REPORT.json``.
-POWER_VERSION = 1
+#: ``x-version`` of ``POWER_REPORT.json``: 2 since v1.5.0 (the study runs
+#: the default method bundle; ``sig_ledger`` reads the pooled-slope t;
+#: ``protocol`` names the bundle).
+POWER_VERSION = 2
 
 #: Bootstrap resamples per run for the net-P&L interval (kept small: the
 #: study runs it once per run and detector).
@@ -249,10 +260,11 @@ def build_planted_frames(
 
 def _backtester(configs_dir: Path) -> Backtester:
     cfg = DEFAULT_CONFIGURATION
+    bundle = methods(str(cfg["methods"]))
     return Backtester(
-        CostModel.load(Path(configs_dir) / "execution" / "execution.json"),
+        bundle.cost_model(CostModel.load(Path(configs_dir) / "execution" / "execution.json")),
         load_instrument_meta(Path(configs_dir)),
-        BacktestConfig(
+        bundle.backtest_config(
             latency_ns=int(cfg["latency_ns"]),
             max_decision_age_ns=int(cfg["max_decision_age_ns"]),
             flatten_at_session_end=bool(cfg["flatten_at_session_end"]),
@@ -263,19 +275,31 @@ def _backtester(configs_dir: Path) -> Backtester:
 def evaluate_run(
     frames: Mapping[int, pd.DataFrame],
     configs_dir: Path,
-    ledger_t_threshold: float | None = None,
+    ledger_t_threshold: float,
     seed: int = 0,
+    normalized_dir: Path | None = None,
+    engine_configs_dir: Path | None = None,
 ) -> dict[str, dict]:
-    """``validate_alpha`` (and the per-fold diagnostics) for every detector
+    """``validate_alpha`` under the default method bundle for every detector
     on one planted dataset.
 
-    ``ledger_t_threshold`` is the study's multiple-testing |t| (``None``:
-    the fixed gate); ``seed`` seeds the P&L bootstrap.  Returns
-    ``{effect: row}``; a detector whose validation cannot run at all (too
-    few rows for the splitter) yields ``{"error": ...}`` and counts as not
-    detected — an under-powered sample is a miss, not a crash."""
+    ``ledger_t_threshold`` is the study's multiple-testing |t| (the PROMOTE
+    threshold of the run, never below 3.0); ``seed`` seeds the P&L
+    bootstrap.  ``normalized_dir`` holds the run's normalized events for the
+    recompute leakage probe and ``engine_configs_dir`` the configs tree the
+    features were built with (the reduced universe); without them the probe
+    does not run.  Returns ``{effect: row}``; a detector whose validation
+    cannot run at all (too few rows for the splitter) yields
+    ``{"error": ...}`` and counts as not detected — an under-powered sample
+    is a miss, not a crash."""
     configs_dir = Path(configs_dir)
+    bundle = methods(str(DEFAULT_CONFIGURATION["methods"]))
     backtester = _backtester(configs_dir)
+    recompute = (
+        RecomputeSources(normalized_dir, engine_configs_dir or configs_dir)
+        if normalized_dir is not None and bundle.recompute_probe
+        else None
+    )
     meta = load_instrument_meta(configs_dir)
     exec_cfg = json.loads(
         (configs_dir / "execution" / "execution.json").read_text(encoding="utf-8")
@@ -297,30 +321,22 @@ def evaluate_run(
                 max_participation,
                 n_folds=int(DEFAULT_CONFIGURATION["n_folds"]),
                 embargo_ns=int(DEFAULT_CONFIGURATION["embargo_ns"]),
-                stress_version=STRESS_VERSION_CARRY,
-            )
-            diagnostics = fold_diagnostics(
-                factory,
-                frames,
-                backtester,
-                n_folds=int(DEFAULT_CONFIGURATION["n_folds"]),
-                embargo_ns=int(DEFAULT_CONFIGURATION["embargo_ns"]),
+                ledger_t_threshold=float(ledger_t_threshold),
                 seed=seed,
                 n_boot=BOOTSTRAP_RESAMPLES,
+                recompute=recompute.get("EQUITY") if recompute is not None else None,
+                **bundle.validate_kwargs(),
             )
         except ValueError as exc:
             out[effect] = {"alpha_id": alpha_id, "error": str(exc)}
             continue
-        out[effect] = _run_row(alpha_id, report, diagnostics, ledger_t_threshold)
+        out[effect] = _run_row(alpha_id, report)
     return out
 
 
-def _run_row(
-    alpha_id: str,
-    report: Mapping[str, Any],
-    diagnostics: Mapping[str, Any],
-    ledger_t_threshold: float | None = None,
-) -> dict[str, Any]:
+def _run_row(alpha_id: str, report: Mapping[str, Any]) -> dict[str, Any]:
+    """One detector's row from its validation report (the report's
+    ``gates["min_nw_tstat"]`` is the study threshold the verdict used)."""
     gate_ic = report["gate_ic"]
     t_within = report["nw_tstat_uncrossed"]
     if t_within is None:
@@ -330,20 +346,21 @@ def _run_row(
         t_pooled = report["nw_tstat_pooled"]
     positive = gate_ic is not None and gate_ic > 0.0
     threshold = float(GATES["min_nw_tstat"])
-    ledger_threshold = (
-        max(threshold, float(ledger_t_threshold)) if ledger_t_threshold is not None else threshold
-    )
-    boot = diagnostics["net_pnl_bootstrap"]
+    ledger_threshold = float(report["gates"]["min_nw_tstat"])
+    boot = report["net_pnl_bootstrap"]
     return {
         "alpha_id": alpha_id,
         "gate_ic": gate_ic,
         "ic_vol_scaled": report["oos_ic_vol_scaled"],
         "ic_instrument_mean": report["oos_ic_instrument_mean"],
-        "n_folds_survive_1x_cost": int(diagnostics["n_folds_survive_1x_cost"]),
-        "net_pnl_1x_pooled": diagnostics["net_pnl_1x_pooled"],
+        "ic_valid_only": report["gate_ic_valid_only"],
+        "trade_count_1x": int(report["trade_count_1x_cost"]),
+        "recompute_ok": report["leakage"]["recompute_ok"],
+        "n_folds_survive_1x_cost": int(report["n_folds_survive_1x_cost"]),
+        "net_pnl_1x_pooled": report["net_pnl_1x_pooled"],
         "net_pnl_ci_low": boot["ci_low"],
         "net_pnl_ci_high": boot["ci_high"],
-        "sig_ledger": bool(positive and t_within is not None and t_within >= ledger_threshold),
+        "sig_ledger": bool(positive and t_pooled is not None and t_pooled >= ledger_threshold),
         "pnl_ci_positive": bool(boot["ci_low"] is not None and boot["ci_low"] > 0.0),
         "t_within": t_within,
         "t_pooled": t_pooled,
@@ -399,6 +416,8 @@ def summarise(runs: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
                 "mean_folds_survive_1x_cost": _mean(
                     [float(r["n_folds_survive_1x_cost"]) for r in ok]
                 ),
+                "mean_trades_1x": _mean([float(r["trade_count_1x"]) for r in ok]),
+                "n_recompute_failed": sum(1 for r in ok if r["recompute_ok"] is False),
                 "rate_evidence": rate("evidence"),
                 "rate_promote": rate("promote"),
                 "mean_gate_ic": _mean([r["gate_ic"] for r in ok]),
@@ -482,7 +501,12 @@ def run_power_study(
                         cell_config(base, level, scenario, seed), Path(configs_dir), work, universe
                     )
                     detectors = evaluate_run(
-                        frames, Path(configs_dir), ledger_t_threshold=ledger_t, seed=seed
+                        frames,
+                        Path(configs_dir),
+                        ledger_t_threshold=ledger_t,
+                        seed=seed,
+                        normalized_dir=work / "normalized",
+                        engine_configs_dir=work / "configs",
                     )
                 finally:
                     shutil.rmtree(work, ignore_errors=True)
@@ -531,10 +555,10 @@ def run_power_study(
             },
             "protocol": {
                 **DEFAULT_CONFIGURATION,
-                "stress_version": STRESS_VERSION_CARRY,
                 "min_nw_tstat": float(GATES["min_nw_tstat"]),
                 "n_tests": n_tests,
                 "ledger_t_threshold": ledger_t,
+                "promote_t_threshold": max(float(GATES["min_nw_tstat"]), float(ledger_t)),
                 "bootstrap_resamples": BOOTSTRAP_RESAMPLES,
             },
             "cells": summarise(runs),
@@ -557,8 +581,9 @@ def render_markdown(doc: Mapping[str, Any]) -> str:
         f"report version {doc['x-version']}). Do not edit by hand.",
         "",
         "How often does the validation chain (`iap.validation.validate_alpha`, "
-        "the pinned research execution model) detect an effect of known size "
-        "planted into the synthetic generator, and how often does it report "
+        "the pinned research execution model under the "
+        f"`{doc['protocol']['methods']}` method bundle) detect an effect of known "
+        "size planted into the synthetic generator, and how often does it report "
         "one that is not there?",
         "",
         "## Design",
@@ -580,25 +605,27 @@ def render_markdown(doc: Mapping[str, Any]) -> str:
         + ", ".join(f"{effect} -> {alpha}" for effect, alpha in sorted(doc["detectors"].items()))
         + ".",
         f"- Significance: gate IC > 0 and t >= {doc['protocol']['min_nw_tstat']:g}. "
-        "`within` is the Newey-West t of within-bucket ICs (what the PROMOTE "
-        "gate reads); `pooled` is the pooled-slope HAC t; `ledger` is the "
-        "within-bucket t against the multiple-testing threshold of this "
-        f"study's own {doc['protocol']['n_tests']} tests "
-        f"(t >= {doc['protocol']['ledger_t_threshold']:.2f}).",
+        "`pooled` is the pooled-slope HAC t (what the PROMOTE gate reads); "
+        "`within` is the Newey-West t of within-bucket ICs (the legacy gate "
+        "statistic); `ledger` is the pooled-slope t against the "
+        f"multiple-testing threshold of this study's own "
+        f"{doc['protocol']['n_tests']} tests "
+        f"(t >= {doc['protocol']['promote_t_threshold']:.2f}) — the significance "
+        "gate as PROMOTE applies it.",
         "- `P&L CI > 0`: the 95 % stationary-bootstrap interval "
         f"({doc['protocol']['bootstrap_resamples']} resamples) of the pooled "
         "walk-forward net P&L at 1x costs lies above zero.",
         "",
         "## Detection rates",
         "",
-        "| effect | alpha | scenario | level | runs | sig (within) | sig (pooled) "
+        "| effect | alpha | scenario | level | runs | sig (pooled) | sig (within) "
         "| sig (ledger) | evidence | promote | P&L CI > 0 |",
         "|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for c in doc["cells"]:
         lines.append(
             f"| {c['effect']} | {c['alpha_id']} | {c['scenario']} | {c['level']:g} "
-            f"| {c['n_runs']} | {c['rate_sig_within']:.2f} | {c['rate_sig_pooled']:.2f} "
+            f"| {c['n_runs']} | {c['rate_sig_pooled']:.2f} | {c['rate_sig_within']:.2f} "
             f"| {c['rate_sig_ledger']:.2f} | {c['rate_evidence']:.2f} "
             f"| {c['rate_promote']:.2f} | {c['rate_pnl_ci_positive']:.2f} |"
         )
@@ -607,29 +634,39 @@ def render_markdown(doc: Mapping[str, Any]) -> str:
         "## Statistics behind the rates (means over the seeds of a cell)",
         "",
         "| effect | alpha | scenario | level | gate IC (pooled) | IC (vol-scaled) "
-        "| t within | t pooled | fold consistency | folds surviving 1x cost |",
-        "|---|---|---|---:|---:|---:|---:|---:|---:|---:|",
+        "| t pooled | t within | fold consistency | trades at 1x | folds surviving 1x cost |",
+        "|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for c in doc["cells"]:
         lines.append(
             f"| {c['effect']} | {c['alpha_id']} | {c['scenario']} | {c['level']:g} "
             f"| {_cell(c['mean_gate_ic'], '+.4f')} "
             f"| {_cell(c['mean_ic_vol_scaled'], '+.4f')} "
-            f"| {_cell(c['mean_t_within'], '+.2f')} "
             f"| {_cell(c['mean_t_pooled'], '+.2f')} "
+            f"| {_cell(c['mean_t_within'], '+.2f')} "
             f"| {_cell(c['mean_fold_sign_consistency'], '.2f')} "
+            f"| {_cell(c['mean_trades_1x'], '.1f')} "
             f"| {_cell(c['mean_folds_survive_1x_cost'], '.2f')} |"
         )
     failed = sum(c["n_failed"] for c in doc["cells"])
+    leaks = sum(c["n_recompute_failed"] for c in doc["cells"])
     lines += [
         "",
         "`evidence` = verdict ITERATE or PROMOTE; `promote` additionally needs "
-        "fold consistency, a confirmed hypothesis sign and net P&L > 0 at 1x "
-        "costs. Rates are over the seeds of the cell"
+        "the ledger significance, fold consistency, a confirmed hypothesis sign "
+        "and net P&L > 0 at 1x costs. `trades at 1x` is the mean number of "
+        "trades the cost-aware backtest makes on the last fold: an alpha whose "
+        "forecast never clears its round-trip cost makes none, and its net P&L "
+        "of 0 does not pass the cost gate. Rates are over the seeds of the cell"
         + (
             f"; {failed} detector run(s) could not be validated and count as misses."
             if failed
             else "."
+        )
+        + (
+            f" The recompute leakage probe failed in {leaks} run(s)."
+            if leaks
+            else " The recompute leakage probe passed in every run."
         ),
         "",
         "## Reading it",
@@ -637,10 +674,10 @@ def render_markdown(doc: Mapping[str, Any]) -> str:
         "- Level 0 is the false-positive row: nothing is planted, so every "
         "non-zero rate there is a false detection.",
         "- The `stable` rows are the power of the chain at each effect size.",
-        "- `sig (pooled)` and `sig (ledger)` against `sig (within)` show what "
-        "the corrected statistics change: the pooled t keeps between-bucket "
-        "signal the within-bucket t discards, and the ledger threshold "
-        "charges the study for the number of things it tried.",
+        "- `sig (pooled)` against `sig (within)` shows what the gate statistic "
+        "changes: the pooled t keeps between-bucket signal the within-bucket t "
+        "discards. `sig (ledger)` charges the study for the number of things "
+        "it tried.",
         "- The `break` rows plant an effect that reverses mid-sample. A chain "
         "that reports `evidence` there is averaging over a regime change; "
         "fold sign consistency is the statistic that should fall.",

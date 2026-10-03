@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Regenerate every committed artefact that derives from the bundled dataset.
+"""Regenerate every committed artefact that derives from the bundled dataset
+or from the research method defaults.
 
     python3 tools/regenerate_dataset_artifacts.py            # the whole chain
     python3 tools/regenerate_dataset_artifacts.py --list     # the steps, in order
@@ -8,10 +9,12 @@
 The seeded dataset (``data/raw``, ``data/normalized``, ``data/features``) is
 never committed, but a long chain of committed files is computed from it.
 When the dataset changes — a generator fix, a new seed, a feature-engine
-change — all of them have to be regenerated together and in dependency
-order, or the repository quotes numbers from two different datasets. This
-script is that order, written down once (schemas/MIGRATIONS.md, 2026-10-03,
-v1.4.0 has the first use):
+change — or when the research method defaults change (v1.5.0), all of them
+have to be regenerated together and in dependency order, or the repository
+quotes numbers from two different datasets or two different rule sets. This
+script is that order, written down once (schemas/MIGRATIONS.md: v1.4.0 has
+the first use, for a dataset change; v1.5.0 the second, for the method
+defaults on an unchanged dataset):
 
 ==============  ============================================================
 step            writes
@@ -40,15 +43,17 @@ configmaps      deployment/k8s/configmap-*.yaml (alpha_params.json is a
 
 Rules the script enforces rather than documents:
 
-* It starts from a ledger that has not seen this dataset. The report
-  pipelines are ledgered per dataset (``iap.validation.ledger``, "Dataset
-  scope"); running them twice on one dataset would be recorded as reruns and
-  would append a second set of model runs. ``--allow-rerun`` overrides.
+* It starts from a ledger that has not seen this dataset under the default
+  research methods. The report pipelines are ledgered per dataset and method
+  bundle (``iap.validation.ledger``, "Dataset scope";
+  ``iap.validation.methods``); running them twice on one dataset under one
+  bundle would be recorded as reruns and would append a second set of model
+  runs. ``--allow-rerun`` overrides.
 * A step that fails stops the chain; nothing after it runs.
 * Wall-clock time of every step is printed and written to ``--timings-out``.
 
-The environment decides the last digits: the artefacts committed for v1.4.0
-were produced by the ``regenerate`` job of ``.github/workflows/ci.yml``
+The environment decides the last digits: the committed artefacts (v1.4.0,
+v1.5.0) were produced by the ``regenerate`` job of ``.github/workflows/ci.yml``
 (Ubuntu, Python 3.11, ``python/requirements-ci.txt`` plus the ``ml`` extra),
 which is the environment the test suites then verify them in. A run on
 another platform reproduces them to the documented tolerances, not to the
@@ -126,17 +131,24 @@ def _env() -> dict[str, str]:
     return env
 
 
-def _ledger_has_seen_current_dataset() -> tuple[bool, str]:
-    """``(seen, data_version)`` — is there a ledger entry for the dataset
-    currently under ``data/normalized``?"""
+def _ledger_has_seen_current_dataset() -> tuple[bool, str, str]:
+    """``(seen, data_version, methods)`` — has the promotion pipeline already
+    been ledgered for the dataset currently under ``data/normalized`` under
+    the default method bundle?"""
     sys.path.insert(0, str(REPO / "python" / "src"))
     from iap.experiment.tracker import data_version
     from iap.validation.ledger import ExperimentLedger
+    from iap.validation.methods import DEFAULT_METHODS
 
     version = data_version(REPO)
     ledger = ExperimentLedger(REPO / "research" / "experiments.json")
-    seen = any(ExperimentLedger.entry_dataset_version(e) == version for e in ledger.entries)
-    return seen, version
+    seen = any(
+        ExperimentLedger.entry_dataset_version(e) == version
+        and e.get("kind") == "promotion_pipeline"
+        and (e.get("config") or {}).get("methods") == DEFAULT_METHODS
+        for e in ledger.entries
+    )
+    return seen, version, DEFAULT_METHODS
 
 
 def _normalise_line_endings() -> int:
@@ -201,12 +213,13 @@ def main() -> int:
     t_all = time.perf_counter()
     for name, commands in selected:
         if name == "alpha_reports" and not args.allow_rerun:
-            seen, version = _ledger_has_seen_current_dataset()
+            seen, version, bundle = _ledger_has_seen_current_dataset()
             if seen:
                 raise SystemExit(
-                    f"research/experiments.json already holds entries for dataset {version}: "
-                    "the report pipelines have run on it. Start from the ledger as it was "
-                    "before the regeneration, or pass --allow-rerun."
+                    f"research/experiments.json already holds promotion-pipeline entries "
+                    f"for dataset {version} under the {bundle!r} methods: the report "
+                    "pipelines have run on it. Start from the ledger as it was before the "
+                    "regeneration, or pass --allow-rerun."
                 )
         t0 = time.perf_counter()
         for cwd, argv in commands:
