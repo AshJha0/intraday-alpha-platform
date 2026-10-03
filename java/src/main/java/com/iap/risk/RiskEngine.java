@@ -176,8 +176,11 @@ public final class RiskEngine {
         try {
             return new RiskEngine(RiskLimits.fromJson(doc), instruments, metrics);
         } catch (RuntimeException e) {
-            return failClosed(e.getMessage() == null
-                    ? e.getClass().getSimpleName() : e.getMessage(), metrics);
+            // "invalid argument: " is the Rust reference's rendering of the
+            // parse error (IapError::InvalidArgument), so the CONFIG_MISSING
+            // reason is byte-identical in the audit log.
+            return failClosed("invalid argument: " + (e.getMessage() == null
+                    ? e.getClass().getSimpleName() : e.getMessage()), metrics);
         }
     }
 
@@ -248,6 +251,60 @@ public final class RiskEngine {
             sb.append('0');
         }
         return sb.append(frac).toString();
+    }
+
+    // ------------------------------------------------- checked arithmetic
+
+    /**
+     * {@code a + b} inside the SYMMETRIC i64 domain
+     * {@code [-Long.MAX_VALUE, Long.MAX_VALUE]}: {@code null} on overflow
+     * and on {@code Long.MIN_VALUE}, so a later negation / {@code abs} of
+     * the result can never overflow either ({@code risk::engine::pos_add}).
+     */
+    static Long posAdd(long a, long b) {
+        try {
+            long r = Math.addExact(a, b);
+            return r == Long.MIN_VALUE ? null : r;
+        } catch (ArithmeticException ex) {
+            return null;
+        }
+    }
+
+    /** {@code a - b} inside the symmetric i64 domain (see {@link #posAdd}). */
+    static Long posSub(long a, long b) {
+        try {
+            long r = Math.subtractExact(a, b);
+            return r == Long.MIN_VALUE ? null : r;
+        } catch (ArithmeticException ex) {
+            return null;
+        }
+    }
+
+    /** {@code bid + ask} as an i64, {@code null} on overflow. */
+    static Long sumTicks(long bidTicks, long askTicks) {
+        try {
+            return Math.addExact(bidTicks, askTicks);
+        } catch (ArithmeticException ex) {
+            return null;
+        }
+    }
+
+    /** {@code a - b} as an i64, {@code null} on overflow ({@code checked_sub}). */
+    static Long tsSub(long a, long b) {
+        try {
+            return Math.subtractExact(a, b);
+        } catch (ArithmeticException ex) {
+            return null;
+        }
+    }
+
+    /** Saturating i64 add (Rust {@code i64::saturating_add}). */
+    static long satAdd(long a, long b) {
+        try {
+            return Math.addExact(a, b);
+        } catch (ArithmeticException ex) {
+            return b < 0 ? Long.MIN_VALUE : Long.MAX_VALUE;
+        }
     }
 
     // -------------------------------------------------------------- state in
@@ -421,6 +478,23 @@ public final class RiskEngine {
                             + " rejected: " + invalid));
             return false;
         }
+        // Checked position accounting, BEFORE anything is applied: a fill
+        // that would take the strategy lot or the aggregate position out of
+        // the symmetric i64 domain cannot be booked, and an engine that
+        // cannot book a fill no longer knows its exposure. Latch the GLOBAL
+        // kill (long arithmetic used to wrap silently here).
+        long signed = fill.side() == 0 ? fill.qty() : -fill.qty();
+        TreeMap<Long, Lot> heldLots = lots.get(fill.strategyId());
+        Lot held = heldLots == null ? null : heldLots.get(fill.instrumentId());
+        long lotPos = held == null ? 0 : held.pos;
+        if (lotPos == Long.MIN_VALUE
+                || posAdd(lotPos, signed) == null
+                || posAdd(position(fill.instrumentId()), signed) == null) {
+            engageKill(Scope.GLOBAL, "", fill.ts(), "fill for order "
+                    + Long.toUnsignedString(fill.orderId())
+                    + " overflows i64 position accounting (fail-closed)");
+            return false;
+        }
         InstrumentRef ins = instruments.get(fill.instrumentId());
         double unit = ins.qtyUnit();
         double price = (double) fill.priceTicks() * ins.tickSize();
@@ -457,7 +531,6 @@ public final class RiskEngine {
             }
         }
         realizedPnl *= unit;
-        long signed = fill.side() == 0 ? fill.qty() : -fill.qty();
         positions.merge(fill.instrumentId(), signed, Long::sum);
         realized.computeIfAbsent(fill.strategyId(), k -> new TreeMap<>())
                 .merge(ins.quoteCcy(), realizedPnl, Double::sum);
@@ -465,8 +538,10 @@ public final class RiskEngine {
         if (fill.orderId() != 0) {
             OpenOrder r = open.get(fill.orderId());
             if (r != null) {
-                r.qty -= fill.qty();
-                if (r.qty <= 0) {
+                Long left = posSub(r.qty, fill.qty());
+                if (left != null && left > 0) {
+                    r.qty = left;
+                } else {
                     open.remove(fill.orderId());
                 }
             }
@@ -497,7 +572,11 @@ public final class RiskEngine {
         if (pair == null) {
             return null;
         }
-        double mid = (double) (md.bidTicks + md.askTicks) * pair.tickSize() / 2.0;
+        Long sumTicks = sumTicks(md.bidTicks, md.askTicks);
+        if (sumTicks == null) {
+            return null;
+        }
+        double mid = (double) sumTicks.longValue() * pair.tickSize() / 2.0;
         if (mid <= 0.0) {
             return null;
         }
@@ -515,7 +594,10 @@ public final class RiskEngine {
         return market.get(conv.instrumentId()).ts;
     }
 
-    /** Last consolidated mid as a real price (quote ccy), if two-sided. */
+    /**
+     * Last consolidated mid as a real price (quote ccy), if two-sided
+     * ({@code null} too when {@code bid + ask} leaves i64: no usable mark).
+     */
     Double markPrice(long instrumentId) {
         MarketState md = market.get(instrumentId);
         if (md == null || md.bidTicks <= 0 || md.askTicks <= 0) {
@@ -525,7 +607,11 @@ public final class RiskEngine {
         if (ins == null) {
             return null;
         }
-        return (double) (md.bidTicks + md.askTicks) * ins.tickSize() / 2.0;
+        Long sumTicks = sumTicks(md.bidTicks, md.askTicks);
+        if (sumTicks == null) {
+            return null;
+        }
+        return (double) sumTicks.longValue() * ins.tickSize() / 2.0;
     }
 
     /** Sum of realized (converted) + unrealized of marked lots for the given

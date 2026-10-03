@@ -296,9 +296,12 @@ def test_kill_switch_scopes_and_precedence(config_doc):
     assert eng.check_order(order(9, 0, 100, 2450)).rule_id == Rules.KILL_VENUE
     eng.clear_kill(Scope.VENUE, "1", T0, "clear")
     assert eng.check_order(order(7, 0, 100, 2450)).allowed()
-    # venue 0 (SOR-routed) skips the venue kill switch entirely
-    eng.engage_kill(Scope.VENUE, "1", T0, "test")
+    # venue 0 (SOR-routed) has no venue of its own to be killed ...
     assert eng.check_order(order(10, 0, 100, 2450, venue_id=0)).allowed()
+    eng.on_order_done(10)
+    # ... but is rejected while ANY venue kill is engaged (fail-closed)
+    eng.engage_kill(Scope.VENUE, "1", T0, "test")
+    assert eng.check_order(order(11, 0, 100, 2450, venue_id=0)).rule_id == Rules.KILL_VENUE
 
 
 def test_strategy_kill_only_hits_that_strategy(config_doc):
@@ -518,11 +521,12 @@ def test_venue_disconnect_rejects_until_reconnect(config_doc):
     d = eng.check_order(order(1, 0, 100, 2450))
     assert d.rule_id == Rules.VENUE_DISCONNECTED
     assert d.reason == "venue 1 is disconnected"
-    # a different venue still works, and venue 0 (SOR) skips the check
+    # a different venue still works; venue 0 (SOR) has nowhere to route
+    # while every known venue is down
     assert eng.check_order(order(2, 0, 100, 2450, venue_id=2)).allowed()
     eng.on_order_done(2)
-    assert eng.check_order(order(4, 0, 100, 2450, venue_id=0)).allowed()
-    eng.on_order_done(4)
+    assert eng.check_order(order(4, 0, 100, 2450, venue_id=0)).rule_id \
+        == Rules.VENUE_DISCONNECTED
     eng.on_venue_reconnect(1, T0 + NS)
     assert eng.check_order(order(3, 0, 100, 2450)).allowed()
     ids = [e.rule_id for e in eng.audit()]
@@ -1526,26 +1530,28 @@ def test_duplicate_window_expires_and_prunes(config_doc):
 # ------------------------------------------------------- integer domain
 
 
-def test_i64_overflow_raises_like_rust_checked_arithmetic(config_doc):
-    """Where the Rust engine's overflow-checked i64 arithmetic would panic
-    (a mark whose bid + ask leaves i64, a position pushed past i64), the
-    port raises ``OverflowError`` — never a wrapped or bigint result."""
+def test_i64_overflow_fails_closed_like_rust_checked_arithmetic(config_doc):
+    """Position / mark arithmetic that would leave i64 fails closed exactly
+    like the Rust engine's checked arithmetic (an unusable mark, a REJECT, a
+    GLOBAL kill) — never a wrapped or bigint result, and never an
+    exception; timestamp arithmetic rejects ``MALFORMED_ORDER``."""
     i64_max = (1 << 63) - 1
     eng = engine(config_doc)
     eng.on_market(1, i64_max, i64_max, T0 + 1)
-    with pytest.raises(OverflowError):
-        eng.check_order(order(1, 0, 100, 2450, timestamp=T0 + 2))
-    with pytest.raises(OverflowError):
-        eng.on_fill(fill("S1", 1, 0, 1, 1))  # the mark of the new lot overflows
+    d = eng.check_order(order(1, 0, 100, 2450, timestamp=T0 + 2))
+    assert d.rule_id == Rules.STALE_PRICE
+    assert d.reason == "no reference price for instrument 1"
+    assert eng.on_fill(fill("S1", 1, 0, 1, 1))  # booked; the lot has no usable mark
+    assert eng.global_daily_pnl() is None
     eng2 = engine(config_doc)
-    eng2.on_fill(fill("S1", 1, 0, i64_max, 2452))
-    with pytest.raises(OverflowError):
-        eng2.on_fill(fill("S1", 1, 0, 1, 2452))
-    # timestamps: an age computation that leaves i64 raises too
+    eng2.on_fill(fill("S1", 1, 0, i64_max, 2451))
+    assert not eng2.on_fill(fill("S1", 1, 0, 1, 2451))
+    assert eng2.kill_switch_engaged() and eng2.position(1) == i64_max
+    # timestamps: an age computation that leaves i64 rejects
     eng3 = RiskEngine.from_config_ticks(config_doc, ticks())
     eng3.on_market(1, 2450, 2452, -(1 << 63))
-    with pytest.raises(OverflowError):
-        eng3.check_order(order(1, 0, 100, 2450, timestamp=1))
+    assert eng3.check_order(order(1, 0, 100, 2450, timestamp=1)).rule_id \
+        == Rules.MALFORMED_ORDER
     # and typed arguments are domain-checked at the boundary
     with pytest.raises(ValueError):
         eng.on_market(1 << 32, 1, 1, 0)
@@ -1989,3 +1995,216 @@ def test_unmarked_held_lot_makes_daily_pnl_undeterminable(config_doc):
     d = eng.check_order(order(9, 0, 100, 2450))
     assert d.rule_id == Rules.FX_RATE_MISSING, d.reason
     assert d.reason == "global daily pnl undeterminable: conversion rate missing"
+
+
+# ------------------------------------------------ fail-closed review fixes
+
+
+def test_future_stamped_market_data_fails_closed(config_doc):
+    """FAIL-OPEN regression: a mark stamped AFTER the order had a negative
+    age and was never stale (and every genuine update behind it is dropped
+    as a regression). Beyond the stale window ahead of the engine's event
+    clock it rejects with STALE_PRICE."""
+    eng = engine(config_doc)
+    t = T0 + 100_000_000
+    eng.on_market(1, 2450, 2452, T0 + 3600 * NS)
+    d = eng.check_order(order(1, 0, 100, 2450))
+    assert d.decision == Decision.REJECT and d.rule_id == Rules.STALE_PRICE
+    assert d.reason == (
+        f"reference price timestamp {T0 + 3600 * NS} is more than 5000000000ns "
+        f"ahead of the latest order event time {t}"
+    )
+    # the genuine update is behind the poisoned state: dropped, still closed
+    eng.on_market(1, 2450, 2452, t)
+    assert eng.metrics.counter_value("risk_market_regressions_dropped_total") == 1
+    assert eng.check_order(order(2, 0, 100, 2450)).rule_id == Rules.STALE_PRICE
+    # boundary: exactly the window ahead is trusted, one ns more is not
+    eng.on_market(2, 3119, 3121, t + 5 * NS)
+    assert eng.check_order(order(3, 0, 100, 3120, instrument_id=2)).allowed()
+    eng.on_market(2, 3119, 3121, t + 5 * NS + 1)
+    assert eng.check_order(order(4, 0, 100, 3120, instrument_id=2)).rule_id \
+        == Rules.STALE_PRICE
+    # the engine clock, not the order's own (regressed) timestamp, decides:
+    # an order stamped 10s behind an order already seen is not "future data"
+    eng2 = engine(config_doc)
+    assert eng2.check_order(order(5, 0, 10, 2450)).allowed()
+    assert eng2.check_order(order(6, 0, 10, 2450, timestamp=t - 10 * NS)).allowed()
+
+
+def test_future_stamped_conversion_rate_fails_closed(config_doc):
+    eng = fx_engine(config_doc)
+    t = T0 + 100_000_000
+    eng.on_market(108, 85_315, 85_325, t)
+    eng.on_market(102, 127_335, 127_345, t + 3600 * NS)
+    d = eng.check_order(typed(1, 108, 0, 100, 0, OrderType.MARKET, t))
+    assert d.rule_id == Rules.FX_RATE_MISSING
+    assert d.reason == (
+        f"conversion rate GBP -> USD timestamp {t + 3600 * NS} is more than "
+        f"5000000000ns ahead of the latest order event time {t}"
+    )
+
+
+def test_nan_limit_or_reference_data_never_passes_a_check(config_doc):
+    """``x > NaN`` is false: a NaN limit used to ALLOW. Every float limit
+    comparison is ``not (x <= limit)``, so NaN rejects."""
+    import dataclasses
+
+    base = RiskLimits.from_json(config_doc)
+    for field, rule in (
+        ("max_order_notional", Rules.FAT_FINGER_NOTIONAL),
+        ("price_band_bps", Rules.PRICE_BAND),
+        ("max_instrument_notional", Rules.INSTRUMENT_NOTIONAL),
+        ("max_gross_notional", Rules.GROSS_NOTIONAL),
+        ("max_net_notional", Rules.NET_NOTIONAL),
+        ("max_daily_loss", Rules.DAILY_LOSS),
+        ("strategy_max_daily_loss", Rules.STRATEGY_LOSS),
+        ("order_rate_burst", Rules.RATE_THROTTLE),
+    ):
+        eng = RiskEngine.with_ticks(
+            dataclasses.replace(base, **{field: float("nan")}), ticks())
+        eng.on_market(1, 2450, 2452, T0)
+        d = eng.check_order(order(1, 0, 100, 2450))
+        assert d.decision == Decision.REJECT and d.rule_id == rule, field
+    # reference data: non-finite values never construct
+    for bad in (float("nan"), float("inf"), 0.0, -1.0):
+        with pytest.raises(ValueError):
+            InstrumentRef(bad, 1.0, "USD")
+        with pytest.raises(ValueError):
+            InstrumentRef(0.01, bad, "USD")
+
+
+def test_position_overflow_rejects_orders_and_kills_on_fills(config_doc):
+    i64_max = (1 << 63) - 1
+    # check_order: the projection leaves i64 -> MALFORMED_ORDER reject
+    eng = engine(config_doc)
+    assert eng.on_fill(fill("S1", 1, 0, i64_max, 2451))
+    assert not eng.kill_switch_engaged()
+    d = eng.check_order(order(1, 0, 100, 2450))
+    assert d.decision == Decision.REJECT and d.rule_id == Rules.MALFORMED_ORDER
+    assert d.severity == Severity.WARN
+    assert d.reason == "projected position overflows i64 (fail-closed)"
+    # on_fill: nothing applied, GLOBAL kill latched through the kill path
+    snap = eng.snapshot_json()
+    n = eng.audit_len()
+    assert not eng.on_fill(fill("S1", 1, 0, 1, 2451, order_id=7))
+    assert eng.kill_switch_engaged()
+    assert eng.position(1) == i64_max
+    ev = eng.audit()[-1]
+    assert eng.audit_len() == n + 1
+    assert ev.rule_id == Rules.KILL_SWITCH_ENGAGED and ev.scope == Scope.GLOBAL
+    assert ev.decision == Decision.KILL
+    assert ev.reason == "fill for order 7 overflows i64 position accounting (fail-closed)"
+    restored = json.loads(snap)
+    restored["kill_global"] = True
+    assert json.loads(eng.snapshot_json()) == restored
+    assert eng.check_order(order(2, 1, 100, 2452)).rule_id == Rules.KILL_GLOBAL
+    # the short side: -i64::MAX is the floor of the symmetric domain
+    eng2 = engine(config_doc)
+    assert eng2.on_fill(fill("S1", 1, 1, i64_max, 2451))
+    assert eng2.check_order(order(3, 1, 100, 2452)).rule_id == Rules.MALFORMED_ORDER
+    assert not eng2.on_fill(fill("S1", 1, 1, 1, 2451))
+    assert eng2.kill_switch_engaged() and eng2.position(1) == -i64_max
+    # another strategy's lot is fine, the AGGREGATE position overflows
+    eng3 = engine(config_doc)
+    assert eng3.on_fill(fill("S1", 1, 0, i64_max, 2451))
+    assert not eng3.on_fill(fill("S2", 1, 0, 1, 2451))
+    assert eng3.kill_switch_engaged()
+
+
+def test_sor_order_rejected_while_any_venue_kill_is_engaged(config_doc):
+    eng = engine(config_doc)
+    eng.engage_kill(Scope.VENUE, "7", T0, "halt")
+    eng.engage_kill(Scope.VENUE, "3", T0, "halt")
+    assert eng.check_order(order(1, 0, 100, 2450)).allowed()  # venue 1 untouched
+    eng.on_order_done(1)
+    d = eng.check_order(order(2, 0, 100, 2450, venue_id=0))
+    assert d.rule_id == Rules.KILL_VENUE and d.severity == Severity.BREACH
+    assert d.reason == "venue 0 (SOR) order rejected: venue 3 kill switch engaged"
+    assert eng.audit()[-1].scope == Scope.VENUE and eng.audit()[-1].scope_id == "0"
+    eng.clear_kill(Scope.VENUE, "3", T0, "clear")
+    d = eng.check_order(order(3, 0, 100, 2450, venue_id=0))
+    assert d.reason == "venue 0 (SOR) order rejected: venue 7 kill switch engaged"
+    eng.clear_kill(Scope.VENUE, "7", T0, "clear")
+    assert eng.check_order(order(4, 0, 100, 2450, venue_id=0)).allowed()
+    # disconnects: the router stays open while any known venue is up and
+    # closes when EVERY known venue is down
+    eng.on_order_done(4)
+    eng.on_venue_disconnect(3, T0)
+    d = eng.check_order(order(5, 0, 100, 2450, venue_id=0))
+    assert d.rule_id == Rules.VENUE_DISCONNECTED and d.severity == Severity.WARN
+    assert d.reason == "venue 0 (SOR) order rejected: every known venue is disconnected"
+    assert eng.audit()[-1].scope_id == "0"
+    eng.on_venue_reconnect(5, T0)
+    assert eng.check_order(order(6, 0, 100, 2450, venue_id=0)).allowed()
+    eng.on_order_done(6)
+    eng.on_venue_disconnect(5, T0)
+    assert eng.check_order(order(7, 0, 100, 2450, venue_id=0)).rule_id \
+        == Rules.VENUE_DISCONNECTED
+    eng.on_venue_reconnect(3, T0)
+    assert eng.check_order(order(8, 0, 100, 2450, venue_id=0)).allowed()
+
+
+def test_kill_scope_id_grammar_is_rust_from_str(config_doc):
+    """``u16::from_str``: optional single ``+``, ASCII digits only."""
+    eng = engine(config_doc)
+    eng.engage_kill(Scope.VENUE, "+1", T0, "plus form")
+    assert eng.check_order(order(1, 0, 100, 2450)).rule_id == Rules.KILL_VENUE
+    eng.clear_kill(Scope.VENUE, "01", T0, "leading zero")
+    assert eng.check_order(order(2, 0, 100, 2450)).allowed()
+    for bad in ("-0", "+", "", "++1", " 1", "\u0661", "\uff11", "65536"):
+        with pytest.raises(ValueError, match="escalated to GLOBAL"):
+            eng.engage_kill(Scope.VENUE, bad, T0, "ops")
+        eng.clear_kill(Scope.GLOBAL, "", T0, "escalation reviewed")
+    assert order_validation_error(order(3, 0, 100, 2450, urgency=2.0)) \
+        == "urgency must be in [0, 1]: 2"
+    assert order_validation_error(order(3, 0, 100, 2450, urgency=float("inf"))) \
+        == "urgency must be in [0, 1]: inf"
+
+
+def test_extreme_timestamps_fail_closed_without_overflow(config_doc):
+    """i64::MIN / i64::MAX timestamps on orders, market updates and fills:
+    every timestamp difference is checked, an overflow is a MALFORMED_ORDER
+    reject (never a wrap, never an exception) and state-in paths apply
+    cleanly."""
+    why = "timestamp arithmetic overflows i64 (fail-closed)"
+    i64_min, i64_max = -(1 << 63), (1 << 63) - 1
+
+    def at(oid: int, iid: int, ts: int) -> OrderRequest:
+        return order(oid, 0, 100, 2450 if iid == 1 else 3120,
+                     instrument_id=iid, timestamp=ts)
+
+    # orders: age vs a mark at T0
+    eng = engine(config_doc)
+    d = eng.check_order(at(1, 1, i64_min))
+    assert d.decision == Decision.REJECT and d.rule_id == Rules.MALFORMED_ORDER
+    assert d.severity == Severity.WARN and d.reason == why
+    assert eng.check_order(at(2, 1, i64_max)).rule_id == Rules.STALE_PRICE
+    # market updates: stored as given, the checks reject
+    eng = RiskEngine.from_config_ticks(config_doc, ticks())
+    eng.on_market(1, 2450, 2452, i64_min)
+    d = eng.check_order(at(3, 1, T0))
+    assert d.rule_id == Rules.MALFORMED_ORDER and d.reason == why
+    assert eng.check_order(at(4, 1, i64_min)).allowed()  # age 0
+    eng.on_market(2, 3119, 3121, i64_max)
+    assert eng.check_order(at(5, 2, T0)).rule_id == Rules.STALE_PRICE
+    # fills: the timestamp only stamps the audit
+    for ts in (i64_min, i64_max):
+        assert eng.on_fill(fill("S1", 1, 0, 1, 2451, ts=ts))
+    assert eng.position(1) == 2 and not eng.kill_switch_engaged()
+    # throttle elapsed: the bucket clock is at T0, the order at i64::MIN + 10
+    eng = RiskEngine.from_config_ticks(config_doc, ticks())
+    eng.on_market(1, 2450, 2452, T0)
+    assert eng.check_order(at(6, 1, T0)).allowed()
+    eng.on_market(2, 3119, 3121, i64_min + 10)
+    before = eng.snapshot()["buckets"]
+    d = eng.check_order(at(7, 2, i64_min + 10))
+    assert d.rule_id == Rules.MALFORMED_ORDER and d.reason == why
+    assert eng.snapshot()["buckets"] == before
+    # duplicate window: the id's age and the prune cutoff
+    doc = config(config_doc)
+    doc["per_order"]["duplicate_order_window_ns"] = 10
+    eng = RiskEngine.from_config_ticks(doc, ticks())
+    eng.on_market(1, 2450, 2452, T0)
+    assert eng.check_order(at(8, 1, T0)).allowed()
+    assert eng.check_order(at(8, 1, i64_min)).reason == why
+    assert eng.check_order(at(9, 1, i64_min)).reason == why

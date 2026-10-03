@@ -128,6 +128,37 @@ def _i64(v: int) -> int:
     return v
 
 
+def _pos_add(a: int, b: int) -> Optional[int]:
+    """``a + b`` inside the SYMMETRIC i64 domain ``[-i64::MAX, i64::MAX]``:
+    ``None`` on overflow and on ``i64::MIN``, so a later negation / ``abs``
+    of the result can never overflow either (``risk::engine::pos_add``)."""
+    v = a + b
+    return v if -_I64_MAX <= v <= _I64_MAX else None
+
+
+def _pos_sub(a: int, b: int) -> Optional[int]:
+    """``a - b`` inside the symmetric i64 domain (see :func:`_pos_add`)."""
+    v = a - b
+    return v if -_I64_MAX <= v <= _I64_MAX else None
+
+
+def _sum_ticks(bid_ticks: int, ask_ticks: int) -> Optional[int]:
+    """``bid + ask`` as an i64, ``None`` on overflow (``checked_add``)."""
+    v = bid_ticks + ask_ticks
+    return v if _I64_MIN <= v <= _I64_MAX else None
+
+
+def _ts_sub(a: int, b: int) -> Optional[int]:
+    """``a - b`` as an i64, ``None`` on overflow (``i64::checked_sub``)."""
+    v = a - b
+    return v if _I64_MIN <= v <= _I64_MAX else None
+
+
+#: Reason of the ``MALFORMED_ORDER`` reject when a timestamp difference
+#: (order age, duplicate window, throttle elapsed) leaves i64.
+_TS_OVERFLOW = "timestamp arithmetic overflows i64 (fail-closed)"
+
+
 def _u64(v: int) -> int:
     if v < 0 or v > _U64_MAX:
         raise OverflowError(f"u64 overflow: {v}")
@@ -651,6 +682,24 @@ class RiskEngine:
                 reason=f"fill for order {fill.order_id} rejected: {why}",
             ))
             return False
+        # Checked position accounting, BEFORE anything is applied: a fill
+        # that would take the strategy lot or the aggregate position out of
+        # the symmetric i64 domain cannot be booked, and an engine that
+        # cannot book a fill no longer knows its exposure. Latch the GLOBAL
+        # kill (this port used to raise OverflowError here, the Rust release
+        # build and Java wrapped silently).
+        signed = fill.qty if fill.side == 0 else -fill.qty
+        held = self._lots.get((fill.strategy_id, fill.instrument_id))
+        lot_pos = held.pos if held is not None else 0
+        if lot_pos == _I64_MIN \
+                or _pos_add(lot_pos, signed) is None \
+                or _pos_add(self.position(fill.instrument_id), signed) is None:
+            self.engage_kill(
+                Scope.GLOBAL, "", fill.ts,
+                f"fill for order {fill.order_id} overflows i64 position accounting "
+                f"(fail-closed)",
+            )
+            return False
         ins = self._instruments[fill.instrument_id]
         ccy = ins.quote_ccy
         unit = ins.qty_unit
@@ -690,7 +739,6 @@ class RiskEngine:
                 if lot.pos < 0:
                     lot.avg_price = price
         realized *= unit
-        signed = fill.qty if fill.side == 0 else -fill.qty
         self._positions[fill.instrument_id] = _i64(
             self._positions.get(fill.instrument_id, 0) + signed
         )
@@ -700,8 +748,10 @@ class RiskEngine:
         if fill.order_id != 0:
             r = self._open.get(fill.order_id)
             if r is not None:
-                r.qty = _i64(r.qty - fill.qty)
-                if r.qty <= 0:
+                left = _pos_sub(r.qty, fill.qty)
+                if left is not None and left > 0:
+                    r.qty = left
+                else:
                     del self._open[fill.order_id]
         self._evaluate_loss_limits(fill.ts, [fill.strategy_id])
         return True
@@ -726,13 +776,17 @@ class RiskEngine:
         pair = self._instruments.get(conv.instrument_id)
         if pair is None:
             return None
-        mid = float(_i64(md.bid_ticks + md.ask_ticks)) * pair.tick_size / 2.0
+        sum_ticks = _sum_ticks(md.bid_ticks, md.ask_ticks)
+        if sum_ticks is None:
+            return None
+        mid = float(sum_ticks) * pair.tick_size / 2.0
         if mid <= 0.0:
             return None
         return (1.0 / mid if conv.invert else mid), md.ts
 
     def _mark_price(self, instrument_id: int) -> Optional[float]:
-        """Last consolidated mid as a real price (quote ccy), if two-sided."""
+        """Last consolidated mid as a real price (quote ccy), if two-sided
+        (``None`` too when ``bid + ask`` leaves i64: no usable mark)."""
         md = self._market.get(instrument_id)
         if md is None:
             return None
@@ -741,7 +795,10 @@ class RiskEngine:
         ins = self._instruments.get(instrument_id)
         if ins is None:
             return None
-        return float(_i64(md.bid_ticks + md.ask_ticks)) * ins.tick_size / 2.0
+        sum_ticks = _sum_ticks(md.bid_ticks, md.ask_ticks)
+        if sum_ticks is None:
+            return None
+        return float(sum_ticks) * ins.tick_size / 2.0
 
     def _daily_pnl(self, sid: Optional[str]) -> Optional[float]:
         """Realized + unrealized of every held lot in the reporting
@@ -963,19 +1020,46 @@ class RiskEngine:
     def _reject(rule_id: str, severity: Severity, reason: str) -> RiskDecision:
         return RiskDecision(Decision.REJECT, rule_id, severity, reason)
 
-    def _pretrade_rate(self, limits: RiskLimits, ccy: str, ts: int) -> Tuple[Optional[float], str]:
+    def _event_clock(self, order_ts: int) -> int:
+        """The latest order event time the engine knows: this order's
+        timestamp or the newest throttle-bucket time, whichever is later.
+        A market state stamped beyond this clock by more than the stale
+        timeout is future-stamped (see check 10). Using the engine's clock
+        rather than the order's own timestamp keeps an order whose clock
+        merely REGRESSED (pinned: it still reaches the throttle) apart from
+        market data that is genuinely ahead of everything seen."""
+        clock = order_ts
+        for b in self._buckets.values():
+            if b.primed and b.last_ts > clock:
+                clock = b.last_ts
+        return clock
+
+    def _pretrade_rate(
+        self, limits: RiskLimits, ccy: str, ts: int, clock: int
+    ) -> Tuple[Optional[float], str]:
         """Pre-trade conversion rate: present and fresh (age within the
-        stale timeout) as ``(rate, "")``, else ``(None, reason)``."""
+        stale timeout, and not stamped beyond the engine's event clock by
+        more than the timeout — a future-stamped rate is as untrusted as an
+        old one) as
+        ``(rate, "")``, else ``(None, reason)``."""
         found = self._fx_rate(ccy)
         if found is None:
             return None, f"no conversion rate for {ccy} -> {limits.reporting_ccy}"
         rate, mark_ts = found
         if mark_ts != _I64_MAX and limits.stale_book_reject:
-            age = _i64(ts - mark_ts)
+            age = _ts_sub(ts, mark_ts)
+            if age is None:
+                return None, _TS_OVERFLOW
             if age > limits.stale_feed_timeout_ns:
                 return None, (
                     f"conversion rate {ccy} -> {limits.reporting_ccy} age {age}ns "
                     f"exceeds {limits.stale_feed_timeout_ns}ns"
+                )
+            if mark_ts > min(clock + limits.stale_feed_timeout_ns, _I64_MAX):
+                return None, (
+                    f"conversion rate {ccy} -> {limits.reporting_ccy} timestamp "
+                    f"{mark_ts} is more than {limits.stale_feed_timeout_ns}ns ahead of "
+                    f"the latest order event time {clock}"
                 )
         return rate, ""
 
@@ -1001,6 +1085,15 @@ class RiskEngine:
         if order.venue_id != 0 and self._kill_venues.get(order.venue_id, False):
             return reject(Rules.KILL_VENUE, breach,
                           f"venue {order.venue_id} kill switch engaged")
+        # venue 0 = "route via SOR": the destination is not known here, so
+        # ANY engaged venue kill rejects (lowest killed venue id named) —
+        # the router must not be a way around a venue halt.
+        if order.venue_id == 0:
+            for vid in sorted(self._kill_venues):
+                if self._kill_venues[vid]:
+                    return reject(Rules.KILL_VENUE, breach,
+                                  f"venue 0 (SOR) order rejected: venue {vid} "
+                                  f"kill switch engaged")
         # 5. schema-level validation
         malformed = order_validation_error(order)
         if malformed is not None:
@@ -1015,12 +1108,20 @@ class RiskEngine:
         prev_ts = self._seen_orders.get(order.order_id)
         if prev_ts is not None:
             window = limits.duplicate_order_window_ns
-            if window == 0 or _i64(order.timestamp - prev_ts) <= window:
+            within = True
+            if window != 0:
+                since = _ts_sub(order.timestamp, prev_ts)
+                if since is None:
+                    return reject(Rules.MALFORMED_ORDER, warn, _TS_OVERFLOW)
+                within = since <= window
+            if within:
                 return reject(Rules.DUPLICATE_ORDER_ID, warn,
                               f"order_id {order.order_id} already used at ts {prev_ts}")
         if limits.duplicate_order_window_ns > 0:
             # prune ids that fell out of the window (bounded growth)
-            cutoff = _i64(order.timestamp - limits.duplicate_order_window_ns)
+            cutoff = _ts_sub(order.timestamp, limits.duplicate_order_window_ns)
+            if cutoff is None:
+                return reject(Rules.MALFORMED_ORDER, warn, _TS_OVERFLOW)
             self._seen_orders = {
                 oid: ts for oid, ts in self._seen_orders.items() if ts >= cutoff
             }
@@ -1029,18 +1130,45 @@ class RiskEngine:
         if order.venue_id != 0 and self._venues_down.get(order.venue_id, False):
             return reject(Rules.VENUE_DISCONNECTED, warn,
                           f"venue {order.venue_id} is disconnected")
+        # venue 0 = "route via SOR": while at least one known venue is up the
+        # router has somewhere to go, but when EVERY known venue is
+        # disconnected no venue could take the order.
+        if order.venue_id == 0 and self._venues_down \
+                and all(self._venues_down.values()):
+            return reject(Rules.VENUE_DISCONNECTED, warn,
+                          "venue 0 (SOR) order rejected: every known venue is disconnected")
         # 9-10. market-data gate
         md = self._market.get(order.instrument_id)
         if md is not None and md.gated:
             return reject(Rules.SEQUENCE_GAP, warn,
                           f"instrument {order.instrument_id} feed has an unrecovered gap")
+        clock = self._event_clock(order.timestamp)
         if md is not None and md.bid_ticks > 0 and md.ask_ticks > 0:
-            age = _i64(order.timestamp - md.ts)
+            age = _ts_sub(order.timestamp, md.ts)
+            if age is None:
+                return reject(Rules.MALFORMED_ORDER, warn, _TS_OVERFLOW)
             if limits.stale_book_reject and age > limits.stale_feed_timeout_ns:
                 return reject(Rules.STALE_PRICE, warn,
                               f"reference price age {age}ns exceeds "
                               f"{limits.stale_feed_timeout_ns}ns")
-            mid = float(_i64(md.bid_ticks + md.ask_ticks)) * tick / 2.0
+            # FAIL-OPEN defect: a market state stamped AFTER the order has a
+            # negative age, which never exceeded the timeout, so a
+            # future-stamped (corrupt / mis-clocked) mark was trusted for as
+            # long as it stayed ahead — and every genuine update behind it
+            # was dropped as a regression. Stamped beyond the engine's event
+            # clock by more than the same window, it is exactly as untrusted
+            # as a stale one.
+            if limits.stale_book_reject \
+                    and md.ts > min(clock + limits.stale_feed_timeout_ns, _I64_MAX):
+                return reject(Rules.STALE_PRICE, warn,
+                              f"reference price timestamp {md.ts} is more than "
+                              f"{limits.stale_feed_timeout_ns}ns ahead of the latest "
+                              f"order event time {clock}")
+            sum_ticks = _sum_ticks(md.bid_ticks, md.ask_ticks)
+            if sum_ticks is None:
+                return reject(Rules.STALE_PRICE, warn,
+                              f"no reference price for instrument {order.instrument_id}")
+            mid = float(sum_ticks) * tick / 2.0
         else:
             return reject(Rules.STALE_PRICE, warn,
                           f"no reference price for instrument {order.instrument_id}")
@@ -1049,14 +1177,15 @@ class RiskEngine:
             return reject(Rules.FAT_FINGER_QTY, warn,
                           f"qty {order.qty} exceeds max_order_qty {limits.max_order_qty}")
         # 12. conversion rate to the reporting currency
-        fx, why = self._pretrade_rate(limits, ins.quote_ccy, order.timestamp)
+        fx, why = self._pretrade_rate(limits, ins.quote_ccy, order.timestamp, clock)
         if fx is None:
-            return reject(Rules.FX_RATE_MISSING, warn, why)
+            rule = Rules.MALFORMED_ORDER if why == _TS_OVERFLOW else Rules.FX_RATE_MISSING
+            return reject(rule, warn, why)
         # 13. fat-finger notional (priced orders use the limit price,
         # unpriced the mid); notional in the reporting currency
         ref_price = float(order.price_ticks) * tick if order.price_ticks > 0 else mid
         order_notional = float(order.qty) * ins.qty_unit * ref_price * fx
-        if order_notional > limits.max_order_notional:
+        if not (order_notional <= limits.max_order_notional):
             return reject(Rules.FAT_FINGER_NOTIONAL, warn,
                           f"notional {fmt_fixed(order_notional, 2)} {limits.reporting_ccy} "
                           f"exceeds max_order_notional "
@@ -1064,7 +1193,7 @@ class RiskEngine:
         # 14. price band (priced orders only)
         if order.price_ticks > 0:
             dev_bps = abs(float(order.price_ticks) * tick - mid) / mid * 1e4
-            if dev_bps > limits.price_band_bps:
+            if not (dev_bps <= limits.price_band_bps):
                 return reject(Rules.PRICE_BAND, warn,
                               f"price deviates {fmt_fixed(dev_bps, 1)}bps from mid, "
                               f"band {fmt_fixed(limits.price_band_bps, 1)}bps")
@@ -1077,13 +1206,16 @@ class RiskEngine:
             bucket.tokens = limits.order_rate_burst
             bucket.primed = True
             bucket.last_ts = order.timestamp
-        elapsed = max(_i64(order.timestamp - bucket.last_ts), 0)
+        gap = _ts_sub(order.timestamp, bucket.last_ts)
+        if gap is None:
+            return reject(Rules.MALFORMED_ORDER, warn, _TS_OVERFLOW)
+        elapsed = max(gap, 0)
         bucket.tokens = min(
             bucket.tokens + float(elapsed) * limits.max_order_rate_per_sec / _NS_PER_SEC,
             limits.order_rate_burst,
         )
         bucket.last_ts = max(bucket.last_ts, order.timestamp)
-        if bucket.tokens < 1.0:
+        if not (bucket.tokens >= 1.0):
             return reject(Rules.RATE_THROTTLE, warn,
                           f"strategy {order.strategy_id} exceeded "
                           f"{fmt_fixed(limits.max_order_rate_per_sec, 2)} orders/s "
@@ -1105,22 +1237,29 @@ class RiskEngine:
                               f"would cross own open order {oid} at {r.price_ticks}")
         # 17. position limit (worst-case projection incl. open orders)
         pos = self.position(order.instrument_id)
-        open_same = 0
+        # Checked (symmetric i64 domain): a projection that overflows is
+        # not a number the limit can be compared with — reject, never raise.
+        open_same: Optional[int] = 0
         for oid in sorted(self._open):
             r = self._open[oid]
             if r.instrument_id == order.instrument_id and r.side == order.side:
-                open_same = _i64(open_same + r.qty)
-        if order.side == 0:
-            projected = _i64(_i64(pos + open_same) + order.qty)
-        else:
-            projected = _i64(_i64(pos - open_same) - order.qty)
-        if _i64(abs(projected)) > limits.max_position_qty:
+                open_same = _pos_add(open_same, r.qty)
+                if open_same is None:
+                    break
+        step = _pos_add if order.side == 0 else _pos_sub
+        projected = step(pos, open_same) if open_same is not None else None
+        if projected is not None:
+            projected = step(projected, order.qty)
+        if projected is None:
+            return reject(Rules.MALFORMED_ORDER, warn,
+                          "projected position overflows i64 (fail-closed)")
+        if abs(projected) > limits.max_position_qty:
             return reject(Rules.POSITION_LIMIT, warn,
                           f"projected position {projected} exceeds max_position_qty "
                           f"{limits.max_position_qty}")
         # 18. per-instrument notional (projection marked at the mid)
         projected_notional = float(abs(projected)) * ins.qty_unit * mid * fx
-        if projected_notional > limits.max_instrument_notional:
+        if not (projected_notional <= limits.max_instrument_notional):
             return reject(Rules.INSTRUMENT_NOTIONAL, warn,
                           f"projected notional {fmt_fixed(projected_notional, 2)} exceeds "
                           f"max_instrument_notional "
@@ -1177,12 +1316,12 @@ class RiskEngine:
             gross += v
             net += v if r.side == 0 else -v
         gross += order_notional
-        if gross > limits.max_gross_notional:
+        if not (gross <= limits.max_gross_notional):
             return reject(Rules.GROSS_NOTIONAL, warn,
                           f"projected gross notional {fmt_fixed(gross, 2)} exceeds "
                           f"max_gross_notional {fmt_fixed(limits.max_gross_notional, 2)}")
         net += order_notional if order.side == 0 else -order_notional
-        if abs(net) > limits.max_net_notional:
+        if not (abs(net) <= limits.max_net_notional):
             return reject(Rules.NET_NOTIONAL, warn,
                           f"projected net notional {fmt_fixed(net, 2)} exceeds "
                           f"max_net_notional {fmt_fixed(limits.max_net_notional, 2)}")
@@ -1193,7 +1332,7 @@ class RiskEngine:
             return reject(Rules.FX_RATE_MISSING, warn,
                           "global daily pnl undeterminable: conversion rate missing")
         global_limit = self._effective_global_loss(limits)
-        if global_pnl <= -global_limit:
+        if not (global_pnl > -global_limit):
             return reject(Rules.DAILY_LOSS, breach,
                           f"global daily pnl {fmt_fixed(global_pnl, 2)} at daily loss "
                           f"limit {fmt_fixed(global_limit, 2)}")
@@ -1202,7 +1341,7 @@ class RiskEngine:
             return reject(Rules.FX_RATE_MISSING, warn,
                           "strategy daily pnl undeterminable: conversion rate missing")
         strat_limit = self._effective_strategy_loss(limits, order.strategy_id)
-        if strat_pnl <= -strat_limit:
+        if not (strat_pnl > -strat_limit):
             return reject(Rules.STRATEGY_LOSS, breach,
                           f"strategy daily pnl {fmt_fixed(strat_pnl, 2)} at loss limit "
                           f"{fmt_fixed(strat_limit, 2)}")
