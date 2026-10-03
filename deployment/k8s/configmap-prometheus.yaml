@@ -182,7 +182,15 @@ data:
     \ {{ $labels.job }}/{{ $labels.instance }} down\"\n          description: >-\n            Prometheus\
     \ cannot scrape {{ $labels.instance }}. If this is\n            java-platform during a trading session,\
     \ treat as a platform\n            incident. Runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md\n\
-    \          runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md\n"
+    \          runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md\n\n  # Heartbeat: fires permanently\
+    \ by design. Alertmanager routes it to the\n  # `watchdog` receiver (deployment/alertmanager/alertmanager.yml);\
+    \ an external\n  # dead-man's-switch on that receiver turns \"this stopped arriving\" into the\n \
+    \ # page, which proves rule evaluation, Alertmanager and delivery are alive.\n  - name: iap-meta\n\
+    \    rules:\n      - alert: Watchdog\n        expr: vector(1)\n        labels:\n          severity:\
+    \ none\n          domain: meta\n        annotations:\n          summary: \"Alerting pipeline heartbeat\
+    \ (always firing)\"\n          description: >-\n            This alert is always firing. If it stops\
+    \ arriving at the\n            heartbeat receiver, Prometheus rule evaluation or Alertmanager is\n\
+    \            down and no other alert can be trusted.\n          runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md\n"
   prometheus.yml: "# =============================================================================\n#\
     \ prometheus.yml \u2014 Intraday Alpha Platform scrape configuration (spec \xA725)\n#\n# ONE source\
     \ of metrics today: the Java platform (com.iap.monitoring registry\n# served by com.iap.api.MetricsServer)\
@@ -197,11 +205,14 @@ data:
     \ _bucket{le=\"2^i - 1\"}, powers of two in nanoseconds).\n# =============================================================================\n\
     \nglobal:\n  scrape_interval: 15s\n  evaluation_interval: 15s\n  external_labels:\n    platform: intraday-alpha\n\
     \    env: local\n\nrule_files:\n  - /etc/prometheus/recording.yml\n  - /etc/prometheus/alerts.yml\n\
-    \nscrape_configs:\n  # Java platform monitoring API (port 8080, /metrics \u2014 LIVE, served by\n\
-    \  # com.iap.api.MetricsServer).\n  - job_name: java-platform\n    metrics_path: /metrics\n    static_configs:\n\
-    \      - targets: [\"java-platform:8080\"]\n        labels:\n          service: java-platform\n  \
-    \        language: java\n\n  # Prometheus self-scrape (rule/alert health).\n  - job_name: prometheus\n\
-    \    static_configs:\n      - targets: [\"localhost:9090\"]\n        labels:\n          service: prometheus\n"
+    \n# Alert delivery: Alertmanager (deployment/alertmanager/). The same hostname\n# resolves in docker-compose\
+    \ (service name) and Kubernetes (Service name).\nalerting:\n  alertmanagers:\n    - static_configs:\n\
+    \        - targets: [\"alertmanager:9093\"]\n\nscrape_configs:\n  # Java platform monitoring API (port\
+    \ 8080, /metrics \u2014 LIVE, served by\n  # com.iap.api.MetricsServer).\n  - job_name: java-platform\n\
+    \    metrics_path: /metrics\n    static_configs:\n      - targets: [\"java-platform:8080\"]\n    \
+    \    labels:\n          service: java-platform\n          language: java\n\n  # Prometheus self-scrape\
+    \ (rule/alert health).\n  - job_name: prometheus\n    static_configs:\n      - targets: [\"localhost:9090\"\
+    ]\n        labels:\n          service: prometheus\n"
   recording.yml: "# =============================================================================\n# recording.yml\
     \ \u2014 precomputed rates and tail-latency quantiles (spec \xA722/\xA725)\n#\n# Histogram note: the\
     \ live Java monitoring endpoint (com.iap.api.MetricsServer)\n# exposes fixed log2 histograms \u2014\

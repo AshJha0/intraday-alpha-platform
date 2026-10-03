@@ -1,0 +1,9 @@
+# Pinned to the stable release CI resolved when this file was added (rustc
+# 1.98.1, last green main run). ci.yml and deployment/docker/Dockerfile.rust
+# name the same version; tests/harness/check_deployment.py fails if they drift.
+# Bump all three together. Components (clippy, llvm-tools-preview) are requested by
+# the CI toolchain step, not here, so a bare rustup in the Docker image needs none.
+# The workspace MSRV stays rust-version = "1.75".
+[toolchain]
+channel = "1.98.1"
+profile = "minimal"

@@ -57,8 +57,8 @@ def test_plan_validates_with_the_scripts_own_validator(tool, plan):
 
 def test_plan_shape_and_coverage(tool, plan):
     epics, issues = plan["epics"], plan["issues"]
-    assert 18 <= len(epics) <= 30
-    assert 90 <= len(issues) <= 140
+    assert 18 <= len(epics) <= 40
+    assert 90 <= len(issues) <= 200
     keys = {e["key"] for e in epics}
     assert all(i["epic"] in keys for i in issues)
     # every epic has at least one issue and every milestone is used

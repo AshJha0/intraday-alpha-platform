@@ -32,12 +32,12 @@
 # kill-switch admin API. A session is FINITE: it exits 0 when the vector ends
 # (PLATFORM_CONVENTIONS.md §12.3), so compose uses `restart: on-failure` and
 # k8s a single-replica Recreate Deployment — not a restart loop.
-# Digest pinning policy: see Dockerfile.python header / SECURITY.md.
+# Digest pinning policy: see Dockerfile.python header / SECURITY.md (base images are
+# pinned by digest below; Dependabot's docker ecosystem proposes bumps).
 # =============================================================================
 
 # ---------------------------------------------------------------- build stage
-FROM eclipse-temurin:21 AS build
-# digest-pin at release: eclipse-temurin:21@sha256:<record-me>
+FROM eclipse-temurin:21@sha256:3e3c176ffed168beb42c607be9bc1639b466cf00261a0fb04425562c9d0c5c2b AS build
 
 WORKDIR /build
 COPY java java
@@ -49,8 +49,7 @@ COPY research/baselines research/baselines
 RUN cd java && bash build.sh
 
 # -------------------------------------------------------------- runtime stage
-FROM eclipse-temurin:21-jre
-# digest-pin at release: eclipse-temurin:21-jre@sha256:<record-me>
+FROM eclipse-temurin:21-jre@sha256:cff19e6215689161eb6162c11b86b0c60ddf802164f2eaf48d570f8fb79a36c5
 
 RUN groupadd --gid 10001 iap && \
     useradd --uid 10001 --gid iap --create-home --shell /usr/sbin/nologin iap
@@ -86,7 +85,7 @@ HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD ["bash", "-c", \
 
 # Low-latency-conscious JVM defaults (spec §23): predictable GC, GC pause
 # visibility for the GcPauseHigh alert.
-ENV JAVA_OPTS="-XX:+UseZGC -Xms256m -Xmx1g -Xlog:gc*:stdout:time,level,tags"
+ENV JAVA_OPTS="-XX:+UseZGC -XX:-UsePerfData -Xms256m -Xmx1g -Xlog:gc*:stdout:time,level,tags"
 
 # Configuration directory (PLATFORM_CONVENTIONS.md §12.2): the entrypoint
 # honours IAP_CONFIG_DIR, so mounting an edited configs/ (compose bind mount)
@@ -97,6 +96,11 @@ ENV IAP_CONFIG_DIR=/app/configs
 # Durable state directory (§12.3). Add --resume to the entrypoint arguments
 # (or override the command) to restart INTO the checkpoint instead of flat.
 ENV IAP_STATE_DIR=/data/state
+# The monitoring server defaults to 127.0.0.1; a container must listen on all
+# interfaces for Prometheus and published ports to reach it. Exposure is
+# controlled outside the image: compose publishes 127.0.0.1 only, k8s uses
+# NetworkPolicies (deployment/k8s/networkpolicy.yaml).
+ENV IAP_BIND_ADDR=0.0.0.0
 # Kill-switch admin API (§12.5): unset here on purpose — with no token the
 # /admin/* routes are not registered at all. Provide IAP_ADMIN_TOKEN or
 # IAP_ADMIN_TOKEN_FILE from a secret to enable the runbook's manual halt.

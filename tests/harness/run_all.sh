@@ -126,7 +126,7 @@ run_rust() {
     local t0=$SECONDS ok=1 full="-" gold="-"
     if [ "$GOLDEN_ONLY" -eq 0 ]; then
         note "rust: cargo test (workspace)"
-        if run_logged "$LOG_DIR/rust_full.log" env -C "$ROOT/rust" cargo test; then
+        if run_logged "$LOG_DIR/rust_full.log" env -C "$ROOT/rust" cargo test --locked; then
             full=$(grep -Eo 'test result: ok\. [0-9]+ passed' "$LOG_DIR/rust_full.log" \
                    | grep -Eo '[0-9]+' | paste -sd+ | bc)
             [ -n "$full" ] || { full="?"; ok=0; }
@@ -136,7 +136,7 @@ run_rust() {
     for pair in $RUST_GOLDEN_TARGETS; do
         local crate="${pair%%:*}" target="${pair##*:}"
         note "rust: cargo test -p $crate --test $target"
-        if ! ( cd "$ROOT/rust" && cargo test -p "$crate" --test "$target" ) \
+        if ! ( cd "$ROOT/rust" && cargo test --locked -p "$crate" --test "$target" ) \
              >>"$LOG_DIR/rust_golden.log" 2>&1; then
             ok=0
         fi

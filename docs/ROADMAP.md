@@ -1,8 +1,8 @@
 # ROADMAP — the six-week build plan against what exists
 
 The plan behind `tools/github/issues.yaml` (rendered as
-[EPICS.md](EPICS.md): 24 epics, 123 issues — 96 done, 0 in progress, 27
-backlog as of 2026-09-20), mapped phase by phase to the code, the tests and
+[EPICS.md](EPICS.md): 31 epics, 154 issues — 96 done, 0 in progress, 58
+backlog as of 2026-10-03), mapped phase by phase to the code, the tests and
 the artefacts that prove each step, and stated the same way the research
 is: what is done cites evidence; what is not done says what would prove it.
 Every count in this file is re-derived by `tests/harness/check_headline_numbers.py`
@@ -63,7 +63,7 @@ E18, each with its evidence:
 - "done" means the code, the test and the artefact exist on this branch and
   are named; it does not mean the result is good. The platform's central
   findings are negative and stay in the headline: 0 PROMOTE, 24 CANDIDATE
-  held by `net_pnl_after_costs`, an MVP session that loses 22.68 USD, an
+  held by `net_pnl_after_costs`, an MVP session that loses 22.65 USD, an
   ML gate that fails, and a refit study that cannot rank its policies.
 - The `partial` epic status in EPICS.md is derived: every issue of the epic
   is either done or backlog, and at least one is backlog.

@@ -14,6 +14,7 @@ Outputs (do not hand-edit):
                                 The Deployment/CronJob mount it with
                                 items[].path so the pod sees the nested tree.
   configmap-prometheus.yaml  <- deployment/prometheus/{prometheus,recording,alerts}.yml
+  configmap-alertmanager.yaml <- deployment/alertmanager/alertmanager.yml
   configmap-grafana.yaml     <- deployment/grafana/provisioning + dashboards
 
 Equivalent to `kubectl create configmap ... --from-file=... --dry-run=client
@@ -153,7 +154,19 @@ def main() -> int:
         ),
     )
 
-    # 3. Grafana provisioning + dashboards.
+    # 3. Alertmanager routing (mounted at /etc/alertmanager). The webhook URL
+    #    is NOT here: alertmanager.yml reads it from the Secret-backed file
+    #    /etc/alertmanager/secrets/webhook_url.
+    write(
+        out_dir / "configmap-alertmanager.yaml",
+        "deployment/alertmanager/alertmanager.yml",
+        configmap(
+            "iap-alertmanager-config",
+            {"alertmanager.yml": REPO / "deployment" / "alertmanager" / "alertmanager.yml"},
+        ),
+    )
+
+    # 4. Grafana provisioning + dashboards.
     graf = REPO / "deployment" / "grafana"
     write(
         out_dir / "configmap-grafana.yaml",

@@ -29,6 +29,13 @@ rule_files:
   - /etc/prometheus/recording.yml
   - /etc/prometheus/alerts.yml
 
+# Alert delivery: Alertmanager (deployment/alertmanager/). The same hostname
+# resolves in docker-compose (service name) and Kubernetes (Service name).
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
 scrape_configs:
   # Java platform monitoring API (port 8080, /metrics — LIVE, served by
   # com.iap.api.MetricsServer).

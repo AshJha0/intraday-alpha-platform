@@ -102,7 +102,7 @@ same thing from two more directions: the promotion lifecycle
 ([docs/LIFECYCLE.md](docs/LIFECYCLE.md)) bootstraps all 24 alphas to
 CANDIDATE and advances none, because the `net_pnl_after_costs` gate fails
 for every one; and the executable MVP ([docs/MVP.md](docs/MVP.md)) runs the
-full loop on one synthetic equity and loses 22.68 USD on 3,176 shares — an
+full loop on one synthetic equity and loses 22.65 USD on 3,176 shares — an
 alpha contribution of +0.039 bps against −0.40 bps of modelled execution
 cost. Its realized mid-to-mid IC (0.28 for EQ01 at 1 s) is an order of
 magnitude above the research IC (0.027); that gap was audited on

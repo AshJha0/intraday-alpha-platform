@@ -22,6 +22,25 @@ tests:
   # consecutive events, which is small on a healthy replay.
   # ---------------------------------------------------------------------------
   - interval: 15s
+    name: Watchdog fires permanently (heartbeat, no input series needed)
+    input_series: []
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: Watchdog
+        exp_alerts:
+          - exp_labels:
+              alertname: Watchdog
+              severity: none
+              domain: meta
+            exp_annotations:
+              summary: "Alerting pipeline heartbeat (always firing)"
+              runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+              description: >-
+                This alert is always firing. If it stops arriving at the
+                heartbeat receiver, Prometheus rule evaluation or Alertmanager is
+                down and no other alert can be trusted.
+
+  - interval: 15s
     name: StaleFeed does not fire on a replayed session with 10-day-old data
     input_series:
       # event time ~ 2026-08-22, i.e. ~10 days behind wall clock
