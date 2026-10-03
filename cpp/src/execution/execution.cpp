@@ -216,7 +216,8 @@ void ExecutionSimulator::emit_fill(ChildOrder& o, std::int64_t price_ticks,
     f.fee = fill_fee(o, price_ticks, qty, liq);
     if (liq == Liquidity::TAKER) {
         // Pinned rule 6: linear impact from the child's total size in base
-        // units (qty * qty_unit), identical to the research cost model.
+        // units (qty * qty_unit) — the linear rule of the research cost
+        // model (whose default is the square root since v1.5.0).
         const InstrumentSpec& ins = instrument(o.instrument_id);
         const double impact_bps =
             config_.impact_coeff_bps_per_pct_adv *

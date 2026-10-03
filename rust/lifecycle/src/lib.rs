@@ -8,7 +8,9 @@
 //!   (`configs/strategies/lifecycle.json` + `strategies.json`
 //!   `adaptive.lifecycle`) and gate evaluation;
 //! - [`tracker`] — the live ACTIVE / WATCH / RETIRED rolling-IC rules
-//!   (exact port of `iap.adaptive.lifecycle.LifecycleTracker`);
+//!   (exact port of `iap.adaptive.lifecycle.LifecycleTracker`): the CUSUM
+//!   retirement rule (default since v1.5.0) and the legacy
+//!   consecutive-breach rule, selected by name in the config;
 //! - [`machine`] — the 17-edge transition table as data, `advance` /
 //!   `retire` / `reset_to_research`, `LifecycleTransition`, `GateEvaluation`;
 //! - [`registry`] — `research/alpha_registry.json` read / written
@@ -27,9 +29,9 @@ pub use evidence::{
     Evidence, ExperimentResult, LiveEvidence, PaperEvidence, ValidationEvidence, Verdict,
 };
 pub use gates::{
-    evaluate, evaluate_named, ic_rank_gap, metric, spec_by_name, Block, GateKind, GateResult,
-    GateSpec, GateThresholds, LiveConfig, Metric, PolicyConfig, GATE_SPECS,
-    LIFECYCLE_CONFIG_VERSION,
+    evaluate, evaluate_named, ic_rank_gap, metric, spec_by_name, Block, BreachRule, GateKind,
+    GateResult, GateSpec, GateThresholds, LiveConfig, Metric, PolicyConfig, TstatThreshold,
+    GATE_SPECS, LIFECYCLE_CONFIG_VERSION, SIGNIFICANCE_GATE,
 };
 pub use machine::{
     edge_for, promotion_edge, transition_table, Actor, AlphaLifecycle, Edge, EdgeKind,

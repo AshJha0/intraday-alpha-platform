@@ -1,7 +1,10 @@
 //! Golden replay of `tests/golden/expected_lifecycle.json`: every step of
-//! LC01 / LC02 / LC03 is driven through a fresh machine built from the
-//! golden's embedded config, asserting after each step the state, the
-//! outcome, every gate result (in evaluation order), the counters and the
+//! LC01 .. LC04 is driven through a fresh machine built from the golden's
+//! embedded default config (ledger significance threshold, CUSUM retirement)
+//! and every step of LG01 through one built from the embedded `legacy`
+//! config (fixed threshold, consecutive breaches — the rules up to v1.4.0),
+//! asserting after each step the state, the outcome, every gate result (in
+//! evaluation order), the counters, the CUSUM statistic and the
 //! transition's canonical JSON — exactly, no tolerance. Also: the embedded
 //! transition table equals [`lifecycle::ALLOWED_TRANSITIONS`], the state ids,
 //! the policy loaded from `configs/` equals the embedded one, and
@@ -9,8 +12,8 @@
 
 use contracts::canonical_json;
 use lifecycle::{
-    promotion_edge, transition_table, Actor, AlphaLifecycle, AlphaRegistry, Evidence, GateResult,
-    LifecycleState, Outcome, PolicyConfig,
+    promotion_edge, transition_table, Actor, AlphaLifecycle, AlphaRegistry, BreachRule, Evidence,
+    GateResult, LifecycleState, Outcome, PolicyConfig, TstatThreshold,
 };
 use serde_json::Value;
 
@@ -30,9 +33,15 @@ fn gate_result(v: &Value) -> GateResult {
     GateResult::from_value(v).expect("gate result parses")
 }
 
-/// Run one scenario, asserting every step.
+/// Run one scenario of the default section, asserting every step.
 fn replay(golden: &Value, alpha_id: &str) -> AlphaLifecycle {
-    let config = PolicyConfig::from_value(&golden["config"]).expect("embedded config parses");
+    replay_section(golden, golden, alpha_id)
+}
+
+/// Run one scenario of `section` (the golden itself, or its `legacy` block:
+/// an object with `config` and `scenarios`), asserting every step.
+fn replay_section(golden: &Value, section: &Value, alpha_id: &str) -> AlphaLifecycle {
+    let config = PolicyConfig::from_value(&section["config"]).expect("embedded config parses");
     let t0 = golden["t0"].as_i64().expect("t0");
     let step_ns = golden["step_ns"].as_i64().expect("step_ns");
     let registry = AlphaRegistry::new(&config.policy).expect("policy");
@@ -43,7 +52,7 @@ fn replay(golden: &Value, alpha_id: &str) -> AlphaLifecycle {
         LifecycleState::Research
     );
 
-    let steps = golden["scenarios"][alpha_id]
+    let steps = section["scenarios"][alpha_id]
         .as_array()
         .expect("scenario steps");
     for (k, step) in steps.iter().enumerate() {
@@ -131,6 +140,11 @@ fn replay(golden: &Value, alpha_id: &str) -> AlphaLifecycle {
             expected["recovery_count"].as_u64().expect("rc"),
             "{where_}: recovery_count"
         );
+        assert_eq!(
+            Some(rec.cusum),
+            expected["cusum"].as_f64(),
+            "{where_}: cusum"
+        );
 
         // Gate results: same set, same values (exact), evaluation order = edge order.
         let expected_gates = expected["gates"].as_object().expect("gates object");
@@ -143,7 +157,7 @@ fn replay(golden: &Value, alpha_id: &str) -> AlphaLifecycle {
         }
         if !gates.is_empty() {
             let before =
-                LifecycleState::from_name(step_state_before(golden, alpha_id, k)).expect("state");
+                LifecycleState::from_name(step_state_before(section, alpha_id, k)).expect("state");
             let expected_order: Vec<&str> = if before.is_live() {
                 vec!["rolling_ic"]
             } else {
@@ -180,11 +194,11 @@ fn replay(golden: &Value, alpha_id: &str) -> AlphaLifecycle {
 
 /// The state the alpha was in before step `k` (from the previous step's
 /// expectation, RESEARCH for the first).
-fn step_state_before<'a>(golden: &'a Value, alpha_id: &str, k: usize) -> &'a str {
+fn step_state_before<'a>(section: &'a Value, alpha_id: &str, k: usize) -> &'a str {
     if k == 0 {
         "RESEARCH"
     } else {
-        golden["scenarios"][alpha_id][k - 1]["expected"]["state"]
+        section["scenarios"][alpha_id][k - 1]["expected"]["state"]
             .as_str()
             .expect("state")
     }
@@ -193,7 +207,7 @@ fn step_state_before<'a>(golden: &'a Value, alpha_id: &str, k: usize) -> &'a str
 #[test]
 fn golden_header_and_tables() {
     let g = golden();
-    assert_eq!(g["x-version"], 1);
+    assert_eq!(g["x-version"], 2);
     assert_eq!(
         transition_table(),
         g["transition_table"],
@@ -218,6 +232,30 @@ fn golden_header_and_tables() {
         loaded, embedded,
         "configs/ equals the embedded golden config"
     );
+    // The committed policy is the v1.5.0 default; the legacy section names
+    // the rules up to v1.4.0, round-trips too and shares every gate.
+    assert_eq!(embedded.tstat_threshold, TstatThreshold::Ledger);
+    assert_eq!(embedded.live.breach_rule, BreachRule::Cusum);
+    let legacy = PolicyConfig::from_value(&g["legacy"]["config"]).expect("legacy config");
+    assert_eq!(
+        legacy.to_value(),
+        g["legacy"]["config"],
+        "legacy round trip"
+    );
+    assert_eq!(legacy.tstat_threshold, TstatThreshold::Fixed);
+    assert_eq!(legacy.live.breach_rule, BreachRule::Consecutive);
+    assert_eq!(legacy.gates, embedded.gates);
+    let names = |v: &Value| -> Vec<String> {
+        v.as_object()
+            .expect("scenarios object")
+            .keys()
+            .cloned()
+            .collect()
+    };
+    let mut default_names = names(&g["scenarios"]);
+    default_names.sort_unstable();
+    assert_eq!(default_names, ["LC01", "LC02", "LC03", "LC04"]);
+    assert_eq!(names(&g["legacy"]["scenarios"]), ["LG01"]);
 }
 
 #[test]
@@ -244,7 +282,7 @@ fn scenario_lc03_demotion_counter_and_manual_retire() {
     // demotion (exercised by the unit tests) is covered by the scenarios —
     // the same pinned set as the Python golden test.
     let mut covered: Vec<(String, String)> = Vec::new();
-    for alpha in ["LC01", "LC02", "LC03"] {
+    for alpha in ["LC01", "LC02", "LC03", "LC04"] {
         for step in g["scenarios"][alpha].as_array().expect("steps") {
             let t = &step["expected"]["transition"];
             if t["actor"] == "SYSTEM" {
@@ -270,6 +308,37 @@ fn scenario_lc03_demotion_counter_and_manual_retire() {
             e.to_state.name()
         );
     }
+}
+
+#[test]
+fn scenario_lc04_cusum_retirement() {
+    let g = golden();
+    let m = replay(&g, "LC04");
+    assert_eq!(m.state("LC04").expect("known"), LifecycleState::Retired);
+    let retirements = m
+        .transitions()
+        .iter()
+        .filter(|t| t.to_state == LifecycleState::Retired)
+        .count();
+    assert_eq!(retirements, 3, "three CUSUM retirements");
+    // The four default scripts carry 36 transitions between them.
+    let total: usize = ["LC01", "LC02", "LC03", "LC04"]
+        .iter()
+        .map(|a| replay(&g, a).transitions().len())
+        .sum();
+    assert_eq!(total, 36);
+}
+
+#[test]
+fn scenario_lg01_legacy_rules() {
+    let g = golden();
+    let m = replay_section(&g, &g["legacy"], "LG01");
+    assert_eq!(m.state("LG01").expect("known"), LifecycleState::Research);
+    assert_eq!(m.transitions().len(), 9);
+    assert!(m
+        .transitions()
+        .iter()
+        .any(|t| t.reason == "persistent breach: 6 consecutive evals below watch gate 0.0"));
 }
 
 #[test]
