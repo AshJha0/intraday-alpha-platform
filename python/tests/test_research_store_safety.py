@@ -414,20 +414,53 @@ def test_caller_chosen_periods_are_not_gate_eligible():
 
 def test_eligibility_never_changes_an_experiment_id():
     """The committed experiments must keep their ids: eligibility is not in
-    the spec, and the pinned configuration normalises exactly as before."""
-    reg = ExperimentRegistry(REPO_ROOT / "research" / "experiments")
-    ids = reg.experiment_ids()
-    assert ids == [
+    the spec, and the pinned configuration normalises exactly as before.
+
+    Two generations are committed: the five run on the v1.3.0 dataset, which
+    predate the sidecar (judged on their configuration alone), and the same
+    five alpha x horizon pairs run on the v1.4.0 dataset — new ids, because
+    ``dataset_version`` is part of the spec — each with its
+    ``eligibility.json`` and periods verified against the dataset."""
+    legacy_dataset = "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b"
+    legacy_ids = [
         "217fa0cb1d89a9c8",
         "4a2900e4a6705542",
         "c73bb6294d226163",
         "d0dd1ab0711d33a1",
         "d7b554d0a3fa3b26",
     ]
+    current_ids = [
+        "20f1b9093e7d0d04",
+        "695e7b1e2bd2253e",
+        "852863faa44b7b07",
+        "876b08e20c46e6fd",
+        "f0f6c49b553f6b59",
+    ]
+    reg = ExperimentRegistry(REPO_ROOT / "research" / "experiments")
+    assert reg.experiment_ids() == sorted(legacy_ids + current_ids)
+    current_datasets = set()
     for rec in reg.records():
         assert rec.spec.configuration == DEFAULT_CONFIGURATION
-        got = reg.gate_eligibility(rec.experiment_id)  # no sidecar: config only
-        assert got.eligible and not got.periods_verified
+        got = reg.gate_eligibility(rec.experiment_id)
+        assert got.eligible
+        if rec.experiment_id in legacy_ids:
+            assert rec.spec.dataset_version == legacy_dataset
+            assert not got.periods_verified  # no sidecar: config only
+        else:
+            assert rec.spec.dataset_version != legacy_dataset
+            assert got.periods_verified  # the sidecar the runner wrote
+            current_datasets.add(rec.spec.dataset_version)
+    assert len(current_datasets) == 1
+    # the same five alpha x horizon pairs in both generations
+    pairs = {
+        ids_name: sorted(
+            (rec.spec.alpha_id, rec.spec.horizon)
+            for rec in reg.records()
+            if rec.experiment_id in ids
+        )
+        for ids_name, ids in (("legacy", legacy_ids), ("current", current_ids))
+    }
+    assert pairs["legacy"] == pairs["current"]
     assert reg.skipped == []
 
 
