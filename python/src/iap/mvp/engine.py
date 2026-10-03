@@ -620,6 +620,11 @@ class MvpEngine:
         best_bid: Optional[int] = None
         best_ask: Optional[int] = None
         books = self.book.books
+        # The gap gate is per INSTRUMENT but staleness is per venue: one
+        # venue's recovery must not reopen the gate while another venue of
+        # the same instrument is still stale, so the recovery is reported
+        # only once no venue is stale.
+        venue_recovered = False
         for vid in sorted(books):
             vb = books[vid]
             stale = vb.stale
@@ -629,9 +634,13 @@ class MvpEngine:
                 self.counters.sequence_gaps += 1
                 self.risk_engine.on_sequence_gap(self.iid, ev.exchange_ts)
             elif was and not stale:
-                self.counters.feed_recoveries += 1
-                self.risk_engine.on_feed_recovered(self.iid, ev.exchange_ts)
-            if stale:
+                venue_recovered = True
+        if venue_recovered and not any(books[vid].stale for vid in books):
+            self.counters.feed_recoveries += 1
+            self.risk_engine.on_feed_recovered(self.iid, ev.exchange_ts)
+        for vid in sorted(books):
+            vb = books[vid]
+            if vb.stale:
                 continue
             bb = vb.best_bid()
             ba = vb.best_ask()

@@ -711,3 +711,45 @@ def test_helpers() -> None:
     assert pearson([1.0, 2.0], [1.0, 2.0]) is None
     assert Side.BID.value == 0
     assert isinstance(SingleStockPortfolio("MVP", "x", "a" * 64, "b" * 64), PortfolioConstructor)
+
+
+def test_gap_gate_reopens_only_when_no_venue_is_stale() -> None:
+    """One venue's recovery must not clear the instrument gate while another is stale."""
+    from types import SimpleNamespace
+
+    from iap.core.events import EventType
+
+    class _Book:
+        def __init__(self) -> None:
+            self.stale = False
+
+        def best_bid(self) -> None:
+            return None
+
+        def best_ask(self) -> None:
+            return None
+
+    calls: List[str] = []
+    risk = SimpleNamespace(
+        on_sequence_gap=lambda iid, ts: calls.append("gap"),
+        on_feed_recovered=lambda iid, ts: calls.append("recovered"),
+        on_market=lambda *a: calls.append("market"))
+    books = {1: _Book(), 2: _Book()}
+    eng = SimpleNamespace(
+        _last_data_ts={}, _venue_stale={}, book=SimpleNamespace(books=books),
+        counters=SimpleNamespace(sequence_gaps=0, feed_recoveries=0),
+        risk_engine=risk, iid=1)
+    ev = SimpleNamespace(event_type=EventType.HEARTBEAT, venue_id=1, exchange_ts=10)
+
+    books[1].stale = True
+    MvpEngine._on_market(eng, ev)  # type: ignore[arg-type]
+    books[2].stale = True
+    MvpEngine._on_market(eng, ev)  # type: ignore[arg-type]
+    assert calls == ["gap", "gap"]
+    books[1].stale = False          # venue 1 recovers, venue 2 is still stale
+    MvpEngine._on_market(eng, ev)  # type: ignore[arg-type]
+    assert calls == ["gap", "gap"] and eng.counters.feed_recoveries == 0
+    books[2].stale = False          # the last stale venue recovers: gate reopens
+    MvpEngine._on_market(eng, ev)  # type: ignore[arg-type]
+    assert calls == ["gap", "gap", "recovered"]
+    assert eng.counters.feed_recoveries == 1 and eng.counters.sequence_gaps == 2
