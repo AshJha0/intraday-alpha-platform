@@ -879,7 +879,9 @@ flowchart TD
 ## 17. CI and release pipeline
 
 The three workflows and Dependabot as they stand at v1.3.0: which jobs gate
-the image build, which are advisory, and what the tag-triggered release does.
+the image build, which steps are blocking (clippy and ruff are, since the
+tree was made lint-clean; `pip-audit` and `cargo audit` report without
+failing the run), and what the tag-triggered release does.
 Two boxes say what is not true yet: the release workflow has not been
 exercised by a tag, and branch protection is not configured
 (`docs/governance/REPO_SETTINGS.md`, LEARN.md §26).
@@ -902,12 +904,12 @@ flowchart LR
         PY["python<br/>pytest with coverage<br/>seeded dataset restored or regenerated"]
         INT["integration<br/>tests/integration + tests/replay"]
         CPP["cpp<br/>build, ctest, gcov report"]
-        RS["rust<br/>cargo test --locked<br/>clippy (advisory), llvm-cov"]
+        RS["rust<br/>cargo test --locked<br/>clippy -D warnings (blocking), llvm-cov"]
         JV["java<br/>javac -Xlint:all -Werror, JUnit4"]
         GOLD["golden<br/>run_golden.sh — promotion gate 10"]
         DEP["deployment<br/>check_deployment.py<br/>check_headline_numbers.py"]
         ASAN["cpp-sanitizers<br/>ASan + UBSan over ctest — blocking"]
-        ADV["advisory — non-blocking<br/>ruff, pip-audit, cargo audit"]
+        ADV["advisory<br/>ruff check (blocking)<br/>pip-audit, cargo audit (non-blocking)"]
         CHG["changes<br/>does the change touch image inputs?"]
         IMG["images<br/>build the four images, run the C++ and Rust containers<br/>on push to main, and on PRs that touch image inputs"]
     end

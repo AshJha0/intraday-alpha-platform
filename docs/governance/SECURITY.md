@@ -23,14 +23,18 @@ it is a stopgap.
 
 ## 2. Vulnerability scanning
 
-What runs today (all **non-blocking**: a finding is reported in the CI log, it
-does not fail the run, because none of these have been triaged yet):
+What runs today. The two dependency audits are **non-blocking** (a finding
+is reported in the CI log and does not fail the run, because none has been
+triaged yet); the lint and sanitizer steps are **blocking**:
 
 - Python: `pip-audit` against `python/requirements-ci.txt` (the `advisory` job
-  in `ci.yml`), plus `ruff check`.
+  in `ci.yml`, non-blocking), plus `ruff check` (blocking; the rule set is
+  correctness-only — `ruff.toml`).
 - Rust: `cargo audit` against `Cargo.lock` (RustSec advisory DB, `advisory`
-  job) and `cargo clippy -D warnings` (a non-blocking step of the `rust` job).
-- C++: an ASan+UBSan build of the full ctest suite (`cpp-sanitizers` job).
+  job, non-blocking) and `cargo clippy -D warnings` (a blocking step of the
+  `rust` job).
+- C++: an ASan+UBSan build of the full ctest suite (`cpp-sanitizers` job,
+  blocking).
 - Source code: CodeQL for python, java-kotlin, c-cpp and the workflows
   (`codeql.yml`).
 

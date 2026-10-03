@@ -795,7 +795,8 @@ Admin endpoints (`RUNBOOK_incident_kill_switch.md` §2 — the manual ENGAGE pat
   jobs (all four languages plus the `integration` and `replay` rows), `tests/harness/run_golden.sh`,
   and `tests/harness/check_deployment.py` (YAML/compose/promtool/Dockerfile/configmap checks, and
   since 2026-10-03 image pinning, workflow supply-chain shape, the Rust toolchain pin, network
-  policy and exposure checks), plus a blocking C++ ASan+UBSan job and non-blocking clippy, ruff,
+  policy and exposure checks), plus a blocking C++ ASan+UBSan job, blocking lint (`cargo clippy
+  -D warnings`, `ruff check` with the correctness-only rule set of `ruff.toml`) and non-blocking
   `pip-audit` and `cargo audit`. Every `uses:` is pinned to a commit SHA, runners are
   `ubuntu-24.04`, cargo runs `--locked`, and the workflow token is `contents: read`. CodeQL
   (`codeql.yml`), Dependabot (`dependabot.yml`) and a tag-triggered release workflow

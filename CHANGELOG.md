@@ -149,7 +149,9 @@ API_TRADING.md §2.4)**
   `exec_orders_blocked_kill_pending_total`, `admin_auth_rate_limited_total`,
   `admin_audit_suppressed_total`).
 - **CI and release**: CodeQL, Dependabot configuration, a blocking C++
-  ASan+UBSan job, non-blocking clippy / ruff / `pip-audit` / `cargo audit`, a
+  ASan+UBSan job, blocking `cargo clippy -D warnings` and `ruff check`
+  (correctness-only rule set, `ruff.toml`; the tree was made lint-clean for
+  the release), non-blocking `pip-audit` / `cargo audit`, a
   tag-triggered release workflow (images to GHCR, build-provenance
   attestation, `release-manifest.json`).
 - **Deployment**: Alertmanager (compose and Kubernetes) with a `Watchdog`
