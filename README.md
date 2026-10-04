@@ -410,7 +410,7 @@ language | tests passed | golden passed  | time   | status
 python   | 1672         | 173            |    -s | PASS
 cpp      | 289          | 68             |    -s | PASS
 rust     | 330          | 66             |    -s | PASS
-java     | 517          | 106            |    -s | PASS
+java     | 520          | 106            |    -s | PASS
 integration | 35           | -              |    -s | PASS
 replay   | 6            | -              |    -s | PASS
 deployment | -            | -              |    -s | PASS

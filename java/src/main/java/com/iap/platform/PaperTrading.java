@@ -779,6 +779,7 @@ public final class PaperTrading {
             Runtime.getRuntime().addShutdownHook(hook0);
             res.state = SessionState.RUNNING;
             gSessionState.set(SessionState.RUNNING.code());
+            markSessionExit(store, SessionState.RUNNING, progress[0]);
             // Between pacing slices the idle loop still applies admin
             // commands, so a kill is recorded while the feed is quiet.
             Runnable idle = () -> {
@@ -879,6 +880,7 @@ public final class PaperTrading {
                 res.traceCount = traceSink.count();
                 res.state = SessionState.STOPPED;
                 gSessionState.set(SessionState.STOPPED.code());
+                markSessionExit(store, SessionState.STOPPED, progress[0]);
                 return res;
             }
             BacktestEngine.Summary summary = engine.finish();
@@ -936,6 +938,7 @@ public final class PaperTrading {
             res.traceCount = traceSink.count();
             res.state = SessionState.FINISHED;
             gSessionState.set(SessionState.FINISHED.code());
+            markSessionExit(store, SessionState.FINISHED, progress[0]);
             res.reportJson = reportJson(res, opts, reg, store);
             if (opts.reportPath != null) {
                 Files.createDirectories(
@@ -947,6 +950,7 @@ public final class PaperTrading {
             res.state = SessionState.FAILED;
             res.failureReason = String.valueOf(e.getMessage());
             gSessionState.set(SessionState.FAILED.code());
+            markSessionExit(store, SessionState.FAILED, progress[0]);
             throw e;
         } finally {
             loopExited.countDown();
@@ -963,6 +967,25 @@ public final class PaperTrading {
             }
         }
         return res;
+    }
+
+    /**
+     * Record how the session left the state directory
+     * ({@link SessionStore#SESSION_EXIT}) for an exporter that outlives this
+     * process (PLATFORM_CONVENTIONS.md §12.3). Called on the trading thread
+     * AFTER the checkpoint it describes is committed, so it can never weaken
+     * the checkpoint. Best effort: a failure to write the marker is reported
+     * on stderr and never changes the session's outcome.
+     */
+    private static void markSessionExit(SessionStore store, SessionState state,
+            long eventCursor) {
+        try {
+            store.writeSessionExit(state.label().toUpperCase(Locale.ROOT),
+                    state.code(), eventCursor,
+                    System.currentTimeMillis() / 1000L);
+        } catch (RuntimeException e) {
+            System.err.println("session marker not written: " + e.getMessage());
+        }
     }
 
     /**

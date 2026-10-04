@@ -54,6 +54,7 @@ import org.junit.runners.Suite;
     PaperObservabilityTest.class,
     PaperStateRecoveryTest.class,
     PlatformSafetyTest.class,
+    SessionMarkerTest.class,
     CanonicalJsonGoldenTest.class,
     TraceGoldenTest.class,
     LifecycleGoldenTest.class,

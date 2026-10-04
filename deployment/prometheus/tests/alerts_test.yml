@@ -273,15 +273,22 @@ tests:
                 docs/runbooks/RUNBOOK_paper_trading.md#failed-session
 
   # ---------------------------------------------------------------------------
-  # v1.3.0 safety rules. platform_session_state 4 (STOPPED): the process
-  # exits right after setting it, so the series goes stale; the rule reads the
-  # last scraped value and clears when a resumed session reports.
+  # v1.3.0 safety rules. platform_session_state 4 (STOPPED): the trading
+  # process exits right after setting it, so its own series goes stale and is
+  # almost never scraped at 4. The rule therefore reads the PERSISTED state
+  # (platform_persisted_session_state, served by the java-platform-state
+  # exporter from session_exit.json) and is suppressed while a live trading
+  # process reports RUNNING.
   # ---------------------------------------------------------------------------
   - interval: 15s
-    name: SessionStoppedNotResumed fires 10m after a scraped STOPPED that nobody resumed
+    name: SessionStoppedNotResumed fires 10m after a persisted STOPPED that nobody resumed
     input_series:
+      # the trading process was scraped RUNNING, then went away (no 4 scraped)
       - series: 'platform_session_state{job="java-platform",service="java-platform"}'
-        values: '1 1 1 4 stale'
+        values: '1 1 1 stale'
+      # the exporter keeps serving the persisted 4 from the stop on
+      - series: 'platform_persisted_session_state{job="java-platform-state",service="java-platform"}'
+        values: '1 1 1 4+0x80'
     alert_rule_test:
       - eval_time: 5m
         alertname: SessionStoppedNotResumed
@@ -293,18 +300,18 @@ tests:
               alertname: SessionStoppedNotResumed
               severity: warning
               domain: infrastructure
-              job: java-platform
+              job: java-platform-state
               service: java-platform
             exp_annotations:
               summary: "Paper-trading session STOPPED and not resumed on java-platform"
               runbook: docs/runbooks/RUNBOOK_paper_trading.md
               description: >-
-                The last scraped platform_session_state is 4 (STOPPED) and no
-                resumed session has reported for 10m. The session checkpointed
+                The persisted session state is 4 (STOPPED) and no running
+                session has reported for 10m. The session checkpointed
                 mid-stream and exited 0, so nothing restarts it; positions are
                 as the checkpoint left them. Resume it with --resume or record
-                why it stays down. The alert clears on resume, or one hour after
-                the stop. Runbook:
+                why it stays down. The alert clears when a resumed session
+                starts (the persisted state becomes 1) or finishes (2). Runbook:
                 docs/runbooks/RUNBOOK_paper_trading.md#stopped-session
       - eval_time: 12m
         alertname: PlatformSessionFailed
@@ -313,12 +320,86 @@ tests:
   - interval: 15s
     name: SessionStoppedNotResumed stays silent once the session is resumed
     input_series:
+      # stopped at 45s, resumed at 14m45s: the trading process reports
+      # RUNNING again and the persisted marker becomes 1
       - series: 'platform_session_state{job="java-platform",service="java-platform"}'
-        values: '1 1 1 4 stale _ _ _ 0 1+0x60'
+        values: '1 1 1 stale _x55 1+0x60'
+      - series: 'platform_persisted_session_state{job="java-platform-state",service="java-platform"}'
+        values: '1 1 1 4+0x55 1+0x60'
+    alert_rule_test:
+      - eval_time: 13m
+        alertname: SessionStoppedNotResumed
+        exp_alerts:
+          - exp_labels:
+              alertname: SessionStoppedNotResumed
+              severity: warning
+              domain: infrastructure
+              job: java-platform-state
+              service: java-platform
+            exp_annotations:
+              summary: "Paper-trading session STOPPED and not resumed on java-platform"
+              runbook: docs/runbooks/RUNBOOK_paper_trading.md
+              description: >-
+                The persisted session state is 4 (STOPPED) and no running
+                session has reported for 10m. The session checkpointed
+                mid-stream and exited 0, so nothing restarts it; positions are
+                as the checkpoint left them. Resume it with --resume or record
+                why it stays down. The alert clears when a resumed session
+                starts (the persisted state becomes 1) or finishes (2). Runbook:
+                docs/runbooks/RUNBOOK_paper_trading.md#stopped-session
+      - eval_time: 20m
+        alertname: SessionStoppedNotResumed
+        exp_alerts: []
+
+  - interval: 15s
+    name: SessionStoppedNotResumed is suppressed while a live process reports RUNNING over a not-yet-rewritten marker
+    input_series:
+      - series: 'platform_session_state{job="java-platform",service="java-platform"}'
+        values: '1+0x80'
+      - series: 'platform_persisted_session_state{job="java-platform-state",service="java-platform"}'
+        values: '4+0x80'
     alert_rule_test:
       - eval_time: 12m
         alertname: SessionStoppedNotResumed
         exp_alerts: []
+
+  - interval: 15s
+    name: SessionStoppedNotResumed stays silent after a FINISHED session and after a crash
+    input_series:
+      # FINISHED persists 2; the trading target is gone
+      - series: 'platform_persisted_session_state{job="java-platform-state",service="finished"}'
+        values: '1 1 2+0x80'
+      # a crash leaves the RUNNING marker (1) behind
+      - series: 'platform_persisted_session_state{job="java-platform-state",service="crashed"}'
+        values: '1 1 1+0x80'
+      # no session has ever run here (-1) / unreadable marker (-2)
+      - series: 'platform_persisted_session_state{job="java-platform-state",service="fresh"}'
+        values: '-1+0x80'
+      - series: 'platform_persisted_session_state{job="java-platform-state",service="garbled"}'
+        values: '-2+0x80'
+      # the crashed trading target is down: TargetDown, not this alert
+      - series: 'up{job="java-platform",service="crashed"}'
+        values: '1 1 0+0x80'
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: SessionStoppedNotResumed
+        exp_alerts: []
+      - eval_time: 12m
+        alertname: TargetDown
+        exp_alerts:
+          - exp_labels:
+              alertname: TargetDown
+              severity: critical
+              domain: infrastructure
+              job: java-platform
+              service: crashed
+            exp_annotations:
+              summary: "Scrape target java-platform/ down"
+              runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+              description: >-
+                Prometheus cannot scrape . If this is
+                java-platform during a trading session, treat as a platform
+                incident. Runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
 
   - interval: 15s
     name: RoutedVenueMismatch pages on the first mismatched child

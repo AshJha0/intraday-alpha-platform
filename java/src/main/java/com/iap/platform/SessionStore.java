@@ -128,7 +128,7 @@ public final class SessionStore {
             return Double.toString(v);
         }
 
-        private static String esc(String s) {
+        static String esc(String s) {
             return s.replace("\\", "\\\\").replace("\"", "\\\"");
         }
 
@@ -205,6 +205,16 @@ public final class SessionStore {
     public static final String RISK_SNAPSHOT_NEXT = "risk_snapshot.json.next";
     /** Platform accounting document. */
     public static final String SESSION_STATE = "session_state.json";
+    /**
+     * How the last session left the state directory: a small document written
+     * by the trading thread when a session starts ({@code RUNNING}) and when
+     * it ends ({@code STOPPED}, {@code FINISHED}, {@code FAILED}). A crash
+     * leaves {@code RUNNING}. It is deliberately not part of
+     * {@code session_state.json}, whose strict schema and single commit point
+     * are untouched; an exporter that outlives the JVM reads it
+     * ({@link SessionStateExporter}).
+     */
+    public static final String SESSION_EXIT = "session_exit.json";
     /** Per-session risk audit log. */
     public static final String RISK_AUDIT = "risk_audit.jsonl";
     /** Config load/change audit log. */
@@ -229,6 +239,60 @@ public final class SessionStore {
     /** The state directory. */
     public Path dir() {
         return dir;
+    }
+
+    /**
+     * The persisted session marker ({@link #SESSION_EXIT}).
+     *
+     * @param state      {@code RUNNING}, {@code STOPPED}, {@code FINISHED} or
+     *                   {@code FAILED}
+     * @param code       the {@code platform_session_state} code of {@code state}
+     * @param eventCursor events processed when the marker was written
+     * @param unixSeconds wall-clock time of the write
+     */
+    public record SessionExit(String state, long code, long eventCursor,
+            long unixSeconds) { }
+
+    /** Atomically persist the session marker. */
+    public void writeSessionExit(String state, int code, long eventCursor,
+            long unixSeconds) {
+        writeAtomic(SESSION_EXIT, "{\"code\":" + code
+                + ",\"event_cursor\":" + eventCursor
+                + ",\"state\":\"" + State.esc(state)
+                + "\",\"unix_time\":" + unixSeconds + "}");
+    }
+
+    /**
+     * Read the session marker of {@code dir} without creating anything (the
+     * exporter mounts the state read-only).
+     *
+     * @return the marker, or {@code null} when the file does not exist
+     * @throws IllegalStateException when it exists but is malformed
+     */
+    public static SessionExit readSessionExit(Path dir) {
+        Path p = dir.resolve(SESSION_EXIT);
+        if (!Files.exists(p)) {
+            return null;
+        }
+        try {
+            Object parsed = Json.parse(
+                    new String(Files.readAllBytes(p), StandardCharsets.UTF_8));
+            if (!(parsed instanceof Map)) {
+                throw bad(p, "top level must be an object");
+            }
+            Map<String, Object> doc = Json.object(parsed);
+            return new SessionExit(asStr(doc, "state", p),
+                    asLong(doc, "code", p), asLong(doc, "event_cursor", p),
+                    asLong(doc, "unix_time", p));
+        } catch (IOException e) {
+            throw new IllegalStateException("cannot read " + p, e);
+        } catch (RuntimeException e) {
+            if (e instanceof IllegalStateException) {
+                throw e;
+            }
+            throw new IllegalStateException(
+                    "corrupt platform state " + p + ": malformed JSON", e);
+        }
     }
 
     /** Absolute path of one state file. */

@@ -203,20 +203,24 @@ data:
     \ the container exits non-zero. Check the pod logs and\n            <state-dir>/config_audit.jsonl.\
     \ Runbook:\n            docs/runbooks/RUNBOOK_paper_trading.md#failed-session\n          runbook:\
     \ docs/runbooks/RUNBOOK_paper_trading.md\n\n      # A STOPPED session (value 4: a stop was requested,\
-    \ the session\n      # checkpointed mid-stream and exited 0) that nobody resumed. The gauge\n    \
-    \  # goes stale when the process exits, so the rule reads the LAST value\n      # scraped in the past\
-    \ hour: a resumed process reports 0/1 and clears\n      # it. The process usually exits within one\
-    \ scrape interval of setting\n      # 4; when the value was never scraped this rule cannot fire and\n\
-    \      # TargetDown is the signal (RUNBOOK_paper_trading.md#stopped-session).\n      - alert: SessionStoppedNotResumed\n\
-    \        expr: last_over_time(platform_session_state[1h]) == 4\n        for: 10m\n        labels:\n\
+    \ the session\n      # checkpointed mid-stream and exited 0) that nobody resumed. The\n      # trading\
+    \ process exits right after the checkpoint, so its own gauge is\n      # almost never scraped at 4.\
+    \ The trading thread therefore also persists\n      # how the session ended (session_exit.json) and\
+    \ the java-platform-state\n      # exporter (a sidecar / second compose service, same image) serves\
+    \ it as\n      # platform_persisted_session_state for as long as the state volume\n      # exists.\
+    \ The alert fires on a persisted 4 unless a live trading process\n      # reports RUNNING again (the\
+    \ resume window before the marker is\n      # rewritten). A FINISHED session persists 2 and a crash\
+    \ leaves 1, so\n      # neither fires this; a crash is TargetDown on java-platform\n      # (RUNBOOK_paper_trading.md#stopped-session).\n\
+    \      - alert: SessionStoppedNotResumed\n        expr: >-\n          platform_persisted_session_state\
+    \ == 4\n          unless on(service) (platform_session_state == 1)\n        for: 10m\n        labels:\n\
     \          severity: warning\n          domain: infrastructure\n        annotations:\n          summary:\
     \ \"Paper-trading session STOPPED and not resumed on {{ $labels.service }}\"\n          description:\
-    \ >-\n            The last scraped platform_session_state is 4 (STOPPED) and no\n            resumed\
-    \ session has reported for 10m. The session checkpointed\n            mid-stream and exited 0, so\
-    \ nothing restarts it; positions are\n            as the checkpoint left them. Resume it with --resume\
-    \ or record\n            why it stays down. The alert clears on resume, or one hour after\n      \
-    \      the stop. Runbook:\n            docs/runbooks/RUNBOOK_paper_trading.md#stopped-session\n  \
-    \        runbook: docs/runbooks/RUNBOOK_paper_trading.md\n\n      # An unexpected restart re-reads\
+    \ >-\n            The persisted session state is 4 (STOPPED) and no running\n            session has\
+    \ reported for 10m. The session checkpointed\n            mid-stream and exited 0, so nothing restarts\
+    \ it; positions are\n            as the checkpoint left them. Resume it with --resume or record\n\
+    \            why it stays down. The alert clears when a resumed session\n            starts (the persisted\
+    \ state becomes 1) or finishes (2). Runbook:\n            docs/runbooks/RUNBOOK_paper_trading.md#stopped-session\n\
+    \          runbook: docs/runbooks/RUNBOOK_paper_trading.md\n\n      # An unexpected restart re-reads\
     \ the checkpoint; a burst of restarts is\n      # a crash loop (and each one re-warms the book from\
     \ the stream).\n      - alert: SessionRestartsClimbing\n        expr: increase(risk_session_restarts_total[15m])\
     \ > 2\n        for: 0m\n        labels:\n          severity: warning\n          domain: infrastructure\n\
@@ -282,9 +286,15 @@ data:
     \        - targets: [\"alertmanager:9093\"]\n\nscrape_configs:\n  # Java platform monitoring API (port\
     \ 8080, /metrics \u2014 LIVE, served by\n  # com.iap.api.MetricsServer).\n  - job_name: java-platform\n\
     \    metrics_path: /metrics\n    static_configs:\n      - targets: [\"java-platform:8080\"]\n    \
-    \    labels:\n          service: java-platform\n          language: java\n\n  # Prometheus self-scrape\
-    \ (rule/alert health).\n  - job_name: prometheus\n    static_configs:\n      - targets: [\"localhost:9090\"\
-    ]\n        labels:\n          service: prometheus\n"
+    \    labels:\n          service: java-platform\n          language: java\n\n  # Last persisted session\
+    \ state (session_exit.json), served by a process\n  # that outlives the trading JVM (com.iap.platform.SessionStateExporter,\
+    \ same\n  # image): compose service / k8s sidecar + Service `java-platform-state`.\n  # This is what\
+    \ makes a clean STOPPED observable after the JVM has exited\n  # (alerts.yml SessionStoppedNotResumed).\
+    \ It carries the same `service`\n  # label as the trading target so the alert can tell \"stopped\"\
+    \ from\n  # \"resumed\".\n  - job_name: java-platform-state\n    metrics_path: /metrics\n    static_configs:\n\
+    \      - targets: [\"java-platform-state:9102\"]\n        labels:\n          service: java-platform\n\
+    \          language: java\n\n  # Prometheus self-scrape (rule/alert health).\n  - job_name: prometheus\n\
+    \    static_configs:\n      - targets: [\"localhost:9090\"]\n        labels:\n          service: prometheus\n"
   recording.yml: "# =============================================================================\n# recording.yml\
     \ \u2014 precomputed rates and tail-latency quantiles (spec \xA722/\xA725)\n#\n# Histogram note: the\
     \ live Java monitoring endpoint (com.iap.api.MetricsServer)\n# exposes fixed log2 histograms \u2014\

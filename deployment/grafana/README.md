@@ -84,7 +84,9 @@ metrics (verified against a running `/metrics` scrape and the sources):
 | `md_event_time_gap_seconds` | gauge | event-time gap between the last two consecutive processed events — the staleness signal `StaleFeed` alerts on, correct in replay AND live (risk.json `stale_feed_timeout_ns` = 5 s) |
 | `book_stale{instrument=...}` | gauge | 0/1: any venue book of the instrument is stale (fail-closed trading until a SNAPSHOT) |
 | `platform_mode{mode="asap"\|"realtime"}` | gauge | 1 for the running mode, 0 for the other — the label rules use to scope wall-clock budgets |
-| `platform_session_state` | gauge | 0 STARTING, 1 RUNNING, 2 FINISHED, 3 FAILED, 4 STOPPED (since v1.3.0: a stop was requested and the session checkpointed mid-stream; resumable). See "The STOPPED state" below — the dashboard does not know the value 4 yet; `SessionStoppedNotResumed` is the rule that reads it |
+| `platform_session_state` | gauge | 0 STARTING, 1 RUNNING, 2 FINISHED, 3 FAILED, 4 STOPPED (since v1.3.0: a stop was requested and the session checkpointed mid-stream; resumable). See "The STOPPED state" below — the process exits right after setting 4, so the value that survives is `platform_persisted_session_state` |
+| `platform_persisted_session_state` | gauge | the code the LAST session left in `<state-dir>/session_exit.json`: 1 RUNNING (also what a crash leaves), 2 FINISHED, 3 FAILED, 4 STOPPED; -1 no marker, -2 unreadable. Served by `com.iap.platform.SessionStateExporter` (job `java-platform-state`, port 9102), not by the trading JVM |
+| `platform_persisted_session_unixtime` / `platform_persisted_session_event_cursor` | gauge | wall-clock time and event cursor at which that marker was written |
 | `risk_session_restarts_total` | counter | `--resume` restarts of this session (state recovered from the checkpoint) |
 | `admin_requests_total{action=...}` | counter | kill-switch admin API calls, accepted or refused |
 | `admin_auth_rate_limited_total` | counter | failed authentications answered `429` (more than 10 in a 60 s window). Registered on first use; `AdminAuthRateLimited` alerts on it, no panel uses it |
@@ -143,12 +145,41 @@ compose then publishes the port on the host's loopback only, and in
 Kubernetes the NetworkPolicies admit Prometheus and pods labelled
 `iap.role=operator`.
 
-### The STOPPED state (value 4) — what does and does not know about it
+### The STOPPED state (value 4) — how it is observed
 
-`platform_session_state` gained the value `4` in v1.3.0. The producer exports
-it, the dashboard maps it and one alert rule reads it; what limits all three
-is that the value is rarely there to be scraped. Stated so that nobody reads
-a blank panel as a healthy one:
+`platform_session_state` gained the value `4` in v1.3.0, but the trading
+process exits right after setting it, so a scrape almost never sees it.
+Since v1.5.0 the trading thread also writes `<state-dir>/session_exit.json`
+when a session starts (`RUNNING`) and when it ends (`STOPPED`, `FINISHED`,
+`FAILED`), after the checkpoint it describes. A small exporter that does not
+exit with the trading process serves it as `platform_persisted_session_state`
+(compose service and k8s sidecar `java-platform-state`, same image, state
+mounted read-only, port 9102; Prometheus job `java-platform-state`). In
+Kubernetes the exporter has its own Service with
+`publishNotReadyAddresses: true`, because the `java-platform` Service has no
+endpoints while the trading container is not Ready (stopped, finished). A
+crash leaves the `RUNNING` marker, so it reads 1 and not 4.
+
+| artefact | behaviour |
+|---|---|
+| `dashboards/market_data_latency.json`, panel **Session state** (and its generated copy in `deployment/k8s/configmap-grafana.yaml`) | `max(platform_session_state) or max(platform_persisted_session_state >= 2)`: the live value while a process runs, else the persisted FINISHED/FAILED/STOPPED. A crashed session shows no data (its marker is 1) |
+| `alerts.yml` `PlatformSessionFailed` (`platform_session_state == 3`) | does not fire on 4 — correct, a stop is not a failure |
+| `alerts.yml` `FeedWallClockStall` (`... and platform_session_state == 1`) | does not fire on 4 — correct |
+| `alerts.yml` `SessionStoppedNotResumed` (`platform_persisted_session_state == 4 unless on(service) (platform_session_state == 1)`, `for: 10m`, warning) | fires 10 m after a clean stop that nobody resumed, however briefly the trading process lived; clears when a resumed session starts (marker 1) or finishes (2); silent for a FINISHED session and for a crash (`TargetDown` covers the crash) |
+
+| situation | `platform_session_state` | persisted | alerts |
+|---|---|---|---|
+| running | 1 | 1 | none |
+| clean stop | gone | 4 | `SessionStoppedNotResumed` after 10 m, plus `TargetDown` on `java-platform` |
+| resume | 1 | 1 (immediately) | `SessionStoppedNotResumed` clears; `TargetDown` clears |
+| finished | gone | 2 | `TargetDown` only while the process is gone |
+| crash | gone | 1 | `TargetDown` |
+
+The marker is promtool-tested (`deployment/prometheus/tests/alerts_test.yml`)
+and the writer and exporter are covered by `SessionMarkerTest`. The durable
+evidence of a stop is still the process's last stdout line (`status=STOPPED`)
+and the checkpoint in the state directory
+(`docs/runbooks/RUNBOOK_paper_trading.md` §5–§6).
 
 | artefact | today | what it needs |
 |---|---|---|
@@ -156,11 +187,6 @@ a blank panel as a healthy one:
 | `alerts.yml` `PlatformSessionFailed` (`platform_session_state == 3`) | does not fire on 4 — correct, a stop is not a failure | nothing |
 | `alerts.yml` `FeedWallClockStall` (`... and platform_session_state == 1`) | does not fire on 4 — correct | nothing |
 | `alerts.yml` `SessionStoppedNotResumed` (`last_over_time(platform_session_state[1h]) == 4`, `for: 10m`, warning) | fires when the LAST value scraped in the past hour is 4 and no resumed session has reported since; clears on resume or one hour after the stop | the process to stay scrapeable after a stop: it exits 0 right after its checkpoint, so the value 4 is scraped only when a scrape (every 15 s) lands in that instant. When it does not, this rule cannot fire and `TargetDown` is the only signal |
-
-In practice the value is visible for only an instant: the process
-checkpoints, sets the gauge and exits. The durable evidence of a stop is the
-process's last stdout line (`status=STOPPED`) and the checkpoint in the state
-directory (`docs/runbooks/RUNBOOK_paper_trading.md` §5–§6).
 
 ### Alerts on the v1.3.0 safety signals
 
@@ -170,7 +196,7 @@ platform gained in v1.3.0:
 
 | alert | expression | severity | meaning |
 |---|---|---|---|
-| `SessionStoppedNotResumed` | `last_over_time(platform_session_state[1h]) == 4` for 10 m | warning | a stop was scraped and nobody resumed (see the table above for when it cannot fire) |
+| `SessionStoppedNotResumed` | `platform_persisted_session_state == 4 unless on(service) (platform_session_state == 1)` for 10 m | warning | a clean stop that nobody resumed (the persisted marker survives the process; see the table above) |
 | `RoutedVenueMismatch` | `risk_routed_venue_mismatch_total > 0` | page | a child left for a venue the risk check did not approve; stays up until the process ends |
 | `KillPendingNotRecorded` | `increase(exec_orders_blocked_kill_pending_total[2m]) > 0` for 3 m | critical | an accepted kill is still not in the risk engine while orders keep being withheld |
 | `ResumeReleasedOpenOrders` | `risk_resume_open_orders_released_total > 0` | warning | `--resume` released orphaned open orders; stays up until the process ends |

@@ -1312,7 +1312,7 @@ match**.
   regenerated only deliberately, with a MIGRATIONS.md entry.
 - **One command proves parity**: `tests/harness/run_all.sh` runs all four
   suites and prints the table (the v1.5.0 counts from CI, 2026-10-04: python 1672,
-  cpp 289, rust 330, java 517 tests passed; golden groups 173/68/66/106; all
+  cpp 289, rust 330, java 520 tests passed; golden groups 173/68/66/106; all
   PASS, plus `integration` (35) and `replay` (6) rows for the repo-level
   pytest suites, a `deployment` row — 25 structural checks passed in CI,
   where promtool and kubeconform are installed — and a `numbers` row that re-derives every headline

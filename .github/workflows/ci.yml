@@ -112,12 +112,21 @@ jobs:
             echo "::error::test_eq03_report_reproduces_through_the_runner skipped — the dataset is missing"
             exit 1
           fi
+      # xdist: every test writes under tmp_path / tmp_path_factory (a
+      # per-worker basetemp) and only READS the repo's data/, configs/ and
+      # research/; `--dist loadfile` keeps a file's tests on one worker so the
+      # module-scoped fixtures that build the golden runs and frames are built
+      # once, not once per worker. The seeded dataset is the cache step above,
+      # shared read-only. Same 1672 tests, same outcomes as the serial run
+      # (compared test by test on the PR that introduced this). pytest-cov
+      # combines the workers' data into one coverage-python.xml.
       - name: pytest
         working-directory: python
         env:
           PYTHONPATH: src
         run: >
-          python -m pytest -q --cov=iap --cov-report=term-missing
+          python -m pytest -q -n auto --dist loadfile --durations=25
+          --cov=iap --cov-report=term-missing
           --cov-report=xml:../coverage-python.xml
       - name: upload python coverage report
         if: always()
