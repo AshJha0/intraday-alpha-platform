@@ -409,10 +409,10 @@ python3 tools/github/create_issues.py --dry-run   # the epics/issues plan (docs/
 ===================== cross-language parity table =====================
 language | tests passed | golden passed  | time   | status
 ---------+--------------+----------------+--------+-------
-python   | 1680         | 175            |    -s | PASS
+python   | 1701         | 179            |    -s | PASS
 cpp      | 289          | 68             |    -s | PASS
-rust     | 330          | 66             |    -s | PASS
-java     | 525          | 110            |    -s | PASS
+rust     | 333          | 69             |    -s | PASS
+java     | 522          | 109            |    -s | PASS
 integration | 35           | -              |    -s | PASS
 replay   | 6            | -              |    -s | PASS
 deployment | -            | -              |    -s | PASS

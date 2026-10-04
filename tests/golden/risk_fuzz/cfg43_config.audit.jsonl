@@ -1,0 +1,15 @@
+{"decision":3,"reason":"ops halt","rule_id":"KILL_SWITCH_ENGAGED","scope":"INSTRUMENT","scope_id":"99","severity":3,"timestamp":1700000000000109000}
+{"decision":1,"reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"INSTRUMENT","scope_id":"99","severity":1,"timestamp":1700000000059109000}
+{"decision":2,"reason":"position in instrument 2 has no mark price (fail-closed)","rule_id":"GROSS_NOTIONAL","scope":"GLOBAL","scope_id":"","severity":2,"timestamp":1700000000107109000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000000162109000}
+{"decision":2,"reason":"urgency must be in [0, 1]: 123456789.125","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000000162348000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000000167348000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000000183348000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000000183348000}
+{"decision":2,"reason":"order_id 5 already used at ts 1700000000167348000","rule_id":"DUPLICATE_ORDER_ID","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000005183348001}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000006183348001}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000006183348001}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000006183348001}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000006183348001}
+{"decision":2,"reason":"strategy S3 exceeded 500.00 orders/s (burst 4.00)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700000006183348001}
+{"decision":2,"reason":"strategy S3 exceeded 500.00 orders/s (burst 4.00)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700000006183348001}

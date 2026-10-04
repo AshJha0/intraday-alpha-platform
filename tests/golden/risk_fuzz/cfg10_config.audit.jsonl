@@ -1,0 +1,10 @@
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-bool per_order.stale_book_reject","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":-9223372036854775808}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-bool per_order.stale_book_reject","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000056000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-bool per_order.stale_book_reject","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000056316000}
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 1","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000000130316000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-bool per_order.stale_book_reject","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000001130316000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-bool per_order.stale_book_reject","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000001130316000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-bool per_order.stale_book_reject","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000001130316000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-bool per_order.stale_book_reject","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000001138316000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-bool per_order.stale_book_reject","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000001138316000}
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 2","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000002138317000}

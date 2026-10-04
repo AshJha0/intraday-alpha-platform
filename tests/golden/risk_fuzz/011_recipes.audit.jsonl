@@ -1,0 +1,68 @@
+{"decision":3,"reason":"rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr","rule_id":"KILL_SWITCH_ENGAGED","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000001000000000}
+{"decision":1,"reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000001043000000}
+{"decision":3,"reason":"ops halt","rule_id":"KILL_SWITCH_ENGAGED","scope":"VENUE","scope_id":"2","severity":3,"timestamp":1700000001043000000}
+{"decision":2,"reason":"venue 0 (SOR) order rejected: venue 2 kill switch engaged","rule_id":"KILL_VENUE","scope":"VENUE","scope_id":"0","severity":3,"timestamp":1700000001043000000}
+{"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"VENUE","scope_id":"2","severity":1,"timestamp":1700000001043000000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000001043000000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000001089000000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000001156000000}
+{"decision":2,"reason":"timestamp arithmetic overflows i64 (fail-closed)","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":-7523372035698775809}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":-7523372035698775808}
+{"decision":3,"reason":"desk request #42","rule_id":"KILL_SWITCH_ENGAGED","scope":"INSTRUMENT","scope_id":"+1","severity":3,"timestamp":1700000001180000000}
+{"decision":2,"reason":"notional 1093137.50 USD exceeds max_order_notional 1000000.00","rule_id":"FAT_FINGER_NOTIONAL","scope":"INSTRUMENT","scope_id":"3","severity":2,"timestamp":1700000001190000000}
+{"decision":3,"reason":"venue 1 disconnected","rule_id":"VENUE_DISCONNECT","scope":"VENUE","scope_id":"1","severity":2,"timestamp":1700000002231000000}
+{"decision":2,"reason":"venue 0 (SOR) order rejected: every known venue is disconnected","rule_id":"VENUE_DISCONNECTED","scope":"VENUE","scope_id":"0","severity":2,"timestamp":1700000002231000000}
+{"decision":1,"reason":"venue 1 reconnected","rule_id":"VENUE_RECONNECT","scope":"VENUE","scope_id":"1","severity":1,"timestamp":1700000002231000000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000002231000000}
+{"decision":2,"reason":"would cross own open order 5 at 406","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"3","severity":2,"timestamp":1700000003231000000}
+{"decision":2,"reason":"reference price timestamp 1700000008279000001 is more than 5000000000ns ahead of the latest order event time 1700000003279000000","rule_id":"STALE_PRICE","scope":"INSTRUMENT","scope_id":"3","severity":2,"timestamp":1700000003279000000}
+{"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"INSTRUMENT","scope_id":"1","severity":1,"timestamp":1700000003361000000}
+{"decision":2,"reason":"timestamp arithmetic overflows i64 (fail-closed)","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000003361000000}
+{"decision":2,"reason":"timestamp arithmetic overflows i64 (fail-closed)","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000003361000000}
+{"decision":2,"reason":"timestamp arithmetic overflows i64 (fail-closed)","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000003361000000}
+{"decision":3,"reason":"fill for order 15 overflows i64 position accounting (fail-closed)","rule_id":"KILL_SWITCH_ENGAGED","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000003361000000}
+{"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000003361000000}
+{"decision":2,"reason":"timestamp arithmetic overflows i64 (fail-closed)","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000005361000000}
+{"decision":2,"reason":"conversion rate EUR -> USD age 5171000000ns exceeds 5000000000ns","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"3","severity":2,"timestamp":1700000007361000000}
+{"decision":2,"reason":"order_id 17 already used at ts 1700000007361000000","rule_id":"DUPLICATE_ORDER_ID","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000009457445000}
+{"decision":2,"reason":"timestamp arithmetic overflows i64 (fail-closed)","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000009457445000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000009457539000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000009457570000}
+{"decision":2,"reason":"would cross own open order 19 at 2440","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000009457570000}
+{"decision":1,"reason":"venue 2 reconnected","rule_id":"VENUE_RECONNECT","scope":"VENUE","scope_id":"2","severity":1,"timestamp":1700000009457570000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000009457570000}
+{"decision":2,"reason":"fill for order 0 rejected: qty must be > 0: -9223372036854775808","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000009464570000}
+{"decision":2,"reason":"notional 92233720368547758.07 USD exceeds max_order_notional 1000000.00","rule_id":"FAT_FINGER_NOTIONAL","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000011508316000}
+{"decision":2,"reason":"would cross own open order 19 at 2440","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000011509175000}
+{"decision":2,"reason":"timestamp arithmetic overflows i64 (fail-closed)","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000016509175001}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000016516175001}
+{"decision":3,"reason":"strategy daily pnl -255451.32 breaches loss limit 50000.00","rule_id":"STRATEGY_LOSS","scope":"STRATEGY","scope_id":"S1","severity":3,"timestamp":1700000016585175001}
+{"decision":3,"reason":"global daily pnl -265024.12 breaches daily loss limit 250000.00","rule_id":"DAILY_LOSS","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000016585175001}
+{"decision":1,"reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000016585175001}
+{"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000016585175001}
+{"decision":2,"reason":"would cross own open order 19 at 2440","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000016585175001}
+{"decision":2,"reason":"reference price age 5000000001ns exceeds 5000000000ns","rule_id":"STALE_PRICE","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000021509175002}
+{"decision":3,"reason":"global daily pnl -265024.12 breaches daily loss limit 250000.00","rule_id":"DAILY_LOSS","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000016633932001}
+{"decision":1,"reason":"desk request #42","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000016633932001}
+{"decision":2,"reason":"projected net notional 3250263.58 exceeds max_net_notional 2500000.00","rule_id":"NET_NOTIONAL","scope":"GLOBAL","scope_id":"","severity":2,"timestamp":1700000016633932001}
+{"decision":2,"reason":"projected position 143395 exceeds max_position_qty 100000","rule_id":"POSITION_LIMIT","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000016633932001}
+{"decision":3,"reason":"global daily pnl -265024.12 breaches daily loss limit 250000.00","rule_id":"DAILY_LOSS","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000016633932001}
+{"decision":1,"reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000016662932001}
+{"decision":3,"reason":"global daily pnl -265024.12 breaches daily loss limit 250000.00","rule_id":"DAILY_LOSS","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000016662932001}
+{"decision":2,"reason":"global kill switch engaged","rule_id":"KILL_GLOBAL","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000016662932001}
+{"decision":2,"reason":"global kill switch engaged","rule_id":"KILL_GLOBAL","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000016662932001}
+{"decision":2,"reason":"global kill switch engaged","rule_id":"KILL_GLOBAL","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000016662932001}
+{"decision":3,"reason":"fill for order 34 overflows i64 position accounting (fail-closed)","rule_id":"KILL_SWITCH_ENGAGED","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000016662932001}
+{"decision":1,"reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000016662932001}
+{"decision":3,"reason":"global daily pnl -265024.12 breaches daily loss limit 250000.00","rule_id":"DAILY_LOSS","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000016662932001}
+{"decision":2,"reason":"global kill switch engaged","rule_id":"KILL_GLOBAL","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000016663638001}
+{"decision":1,"reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000021663638000}
+{"decision":1,"reason":"desk request #42","rule_id":"SESSION_ROLLED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000021663638000}
+{"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000021663638000}
+{"decision":2,"reason":"projected position overflows i64 (fail-closed)","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000021663638000}
+{"decision":2,"reason":"projected position 9223372036854775807 exceeds max_position_qty 100000","rule_id":"POSITION_LIMIT","scope":"INSTRUMENT","scope_id":"3","severity":2,"timestamp":1700000021663638000}
+{"decision":2,"reason":"projected position 9223372036854775803 exceeds max_position_qty 100000","rule_id":"POSITION_LIMIT","scope":"INSTRUMENT","scope_id":"3","severity":2,"timestamp":1700000021663638000}
+{"decision":3,"reason":"fill for order 39 overflows i64 position accounting (fail-closed)","rule_id":"KILL_SWITCH_ENGAGED","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000021663638000}
+{"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000021663638000}
+{"decision":2,"reason":"conversion rate EUR -> USD timestamp 9223372036854775806 is more than 5000000000ns ahead of the latest order event time 1700000022663638000","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"3","severity":2,"timestamp":1700000022663638000}
+{"decision":2,"reason":"conversion rate EUR -> USD timestamp 9223372036854775807 is more than 5000000000ns ahead of the latest order event time 1700000022663638000","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"3","severity":2,"timestamp":1700000022663638000}

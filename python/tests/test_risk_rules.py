@@ -2250,6 +2250,20 @@ def test_future_stamped_conversion_rate_fails_closed(config_doc):
         f"conversion rate GBP -> USD timestamp {t + 3600 * NS} is more than "
         f"5000000000ns ahead of the latest order event time {t}"
     )
+    # Found by the differential fuzzer: a pair stamped exactly i64::MAX is the
+    # extreme future-stamped mark, not "the reporting currency" (whose rate
+    # carries i64::MAX as a no-timestamp placeholder). It used to skip both
+    # the age and the future-stamp check and price the order.
+    i64_max = (1 << 63) - 1
+    eng = fx_engine(config_doc)
+    eng.on_market(108, 85_315, 85_325, t)
+    eng.on_market(102, 127_335, 127_345, i64_max)
+    d = eng.check_order(typed(2, 108, 0, 100, 0, OrderType.MARKET, t))
+    assert d.rule_id == Rules.FX_RATE_MISSING
+    assert d.reason == (
+        f"conversion rate GBP -> USD timestamp {i64_max} is more than "
+        f"5000000000ns ahead of the latest order event time {t}"
+    )
 
 
 def test_nan_limit_or_reference_data_never_passes_a_check(config_doc):

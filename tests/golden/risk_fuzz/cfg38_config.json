@@ -1,0 +1,18 @@
+{"x-version":1,"name":"cfg38_config","profile":"config","seed":38,"config":"configs/risk/risk.json","config_set":[["global","max_gross_notional",5000000]],"instruments":{"1":{"tick_size":0.01,"qty_unit":1.0,"quote_ccy":"USD"},"2":{"tick_size":0.01,"qty_unit":1.0,"quote_ccy":"USD"},"3":{"tick_size":0.05,"qty_unit":1.0,"quote_ccy":"EUR"},"4":{"tick_size":1.0,"qty_unit":100.0,"quote_ccy":"JPY"},"5":{"tick_size":0.0001,"qty_unit":1.0,"quote_ccy":"XXX"},"101":{"tick_size":1e-05,"qty_unit":100000.0,"quote_ccy":"USD"},"103":{"tick_size":0.001,"qty_unit":100000.0,"quote_ccy":"JPY"}},"require_bootstrap":false,"cuts":[5],"steps":[
+{"type":"market","instrument_id":1,"bid_ticks":2450,"ask_ticks":2452,"ts":1700000000000000000},
+{"type":"order","order":{"order_id":2,"instrument_id":1,"side":1,"qty":1049,"price_ticks":2483,"order_type":2,"venue_id":1,"strategy_id":"S2","urgency":0.5,"timestamp":1700000000000000000},"expect":{"decision":1,"rule_id":"ALLOW","severity":1,"scope":"STRATEGY","scope_id":"S2","reason":""}},
+{"type":"market","instrument_id":1,"bid_ticks":2455,"ask_ticks":2457,"ts":1700000000000443000},
+{"type":"market","instrument_id":1,"bid_ticks":2449,"ask_ticks":2451,"ts":1700000005000442999},
+{"type":"cancel","order_id":2},
+{"type":"market","instrument_id":2,"bid_ticks":499,"ask_ticks":501,"ts":1700000005039442999},
+{"type":"order","order":{"order_id":3,"instrument_id":2,"side":1,"qty":26,"price_ticks":-9223372036854775808,"order_type":2,"venue_id":1,"strategy_id":"S3","urgency":0.5,"timestamp":1700000005039442999},"expect":{"decision":2,"rule_id":"MALFORMED_ORDER","severity":2,"scope":"STRATEGY","scope_id":"S3","reason":"LIMIT order needs price_ticks > 0: -9223372036854775808"}},
+{"type":"order","order":{"order_id":4,"instrument_id":1,"side":0,"qty":2270,"price_ticks":2427,"order_type":2,"venue_id":0,"strategy_id":"S1","urgency":0.5,"timestamp":1700000005047442999},"expect":{"decision":1,"rule_id":"ALLOW","severity":1,"scope":"STRATEGY","scope_id":"S1","reason":""}},
+{"type":"market","instrument_id":2,"bid_ticks":499,"ask_ticks":501,"ts":1700000005047442999},
+{"type":"market","instrument_id":1,"bid_ticks":2453,"ask_ticks":2457,"ts":1700000005080442999},
+{"type":"market","instrument_id":1,"bid_ticks":2450,"ask_ticks":2454,"ts":1700000005125442999},
+{"type":"cancel","order_id":18446744073709551614},
+{"type":"fill","strategy_id":"S1","instrument_id":1,"order_id":4,"side":0,"qty":2271,"price_ticks":2427,"ts":1700000007164442999},
+{"type":"fill","strategy_id":"S2","instrument_id":2,"order_id":0,"side":0,"qty":814,"price_ticks":502,"ts":1700000007164442999},
+{"type":"fill","strategy_id":"\ud83d\ude00","instrument_id":2,"order_id":0,"side":1,"qty":343,"price_ticks":499,"ts":1700000007223442999},
+{"type":"fill","strategy_id":"S2","instrument_id":1,"order_id":0,"side":1,"qty":365,"price_ticks":2432,"ts":1700000007223442999}
+]}

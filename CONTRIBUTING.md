@@ -63,8 +63,8 @@ abs and rel 1e-9; adaptive PSI/KS at 1e-10 with exact refit booleans and
 lifecycle state sequences; canonical-JSON lines, trace digests, the risk
 audit / snapshot and the lifecycle registry are byte-identical; the 7-state
 lifecycle golden is compared exactly, field by field. The v1.5.0 table
-(2026-10-04, counts from CI) reads python 1680 / cpp 289 / rust 330 /
-java 525 (golden 175/68/66/110), `integration` 35, `replay` 6.
+(2026-10-04, counts from CI) reads python 1701 / cpp 289 / rust 333 /
+java 522 (golden 179/68/69/109), `integration` 35, `replay` 6.
 
 ## 4. Golden regeneration protocol
 
@@ -77,6 +77,7 @@ it (`docs/ARCHITECTURE.md` §6):
 | codec SHA-256, book states, anomaly states, checkpoint, features, alpha, portfolio, TCA, backtest, adaptive | Python — `python/tools/make_golden.py`, `make_golden_features.py`, `make_golden_alpha.py`, `make_golden_anomalies.py`, `make_golden_tca.py`, `make_golden_adaptive.py` | C++, Rust, Java (each its own subset) |
 | replay fills (`expected_replay_fills.json`) | C++ — `cpp/tools/make_replay_fills_golden.cpp` (refuses to overwrite) | Java `ReplayFillsGoldenTest`, Python `test_execution_golden.py` (`iap.execution`) |
 | risk decisions, snapshot, audit (`expected_risk_*.json`, `expected_risk_audit.jsonl`) | Rust — `rust/risk/src/bin/make_risk_golden.rs` | Java `RiskGoldenTest`, Python `test_risk_golden.py` (`iap.risk`) |
+| risk differential-fuzz corpus (`tests/golden/risk_fuzz/`: step scripts, audit logs, snapshots, `COVERAGE.txt`) | Python — `python/tools/make_risk_fuzz_corpus.py` (`--force`; `--check` runs in CI), the Python engine as the oracle | Rust `golden_risk_fuzz.rs`, Java `RiskFuzzGoldenTest`, Python `test_risk_fuzz_golden.py` |
 | contract examples + pinned `explain` block (`expected_contracts_examples.json`) | Python — `python/tools/make_golden_contracts.py` (`--force`) | Java `TraceGoldenTest`, Rust `golden_trace.rs`, C++ `TraceGolden` |
 | canonical JSON rules, float reprs, escapes, documents, trace id, trace digests (`expected_canonical_json.json`) | Python — `python/tools/make_golden_canonical_json.py` (`--force`) | Java `CanonicalJsonGoldenTest`, Rust `golden_canonical_json.rs`, C++ `CanonicalJsonGolden` |
 | 7-state lifecycle scenarios + transition table (`expected_lifecycle.json`) | Python — `python/tools/make_golden_lifecycle.py` (`--force`) | Java `LifecycleGoldenTest`, Rust `golden_lifecycle.rs` |

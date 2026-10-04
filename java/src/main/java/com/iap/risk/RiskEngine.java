@@ -1,6 +1,7 @@
 package com.iap.risk;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -89,12 +90,38 @@ public final class RiskEngine {
         double avgPrice; // real price per base unit (quote ccy)
     }
 
+    /**
+     * The reference's {@code String} ordering: by Unicode code point (which
+     * is also the order of the UTF-8 bytes a Rust {@code BTreeMap<String, _>}
+     * compares, and of Python's {@code sorted}). {@link String#compareTo}
+     * orders by UTF-16 code unit instead, which puts every astral character
+     * (U+10000 and up, encoded as surrogates 0xD800-0xDFFF) BEFORE
+     * U+E000-U+FFFF. Every map keyed by a strategy id or a currency uses
+     * this comparator: the iteration order decides the order of the
+     * loss-limit latches a mark emits, the order floats are summed in, and
+     * the order of the snapshot's lots.
+     */
+    static final Comparator<String> CODE_POINT_ORDER = (a, b) -> {
+        int i = 0;
+        int j = 0;
+        while (i < a.length() && j < b.length()) {
+            int ca = a.codePointAt(i);
+            int cb = b.codePointAt(j);
+            if (ca != cb) {
+                return Integer.compare(ca, cb);
+            }
+            i += Character.charCount(ca);
+            j += Character.charCount(cb);
+        }
+        return Integer.compare(a.length() - i, b.length() - j);
+    };
+
     RiskLimits limits; // null = fail-closed
     String configError = "";
     final TreeMap<Long, InstrumentRef> instruments;
     boolean bootstrapped = true;
     boolean killGlobal;
-    final TreeMap<String, Boolean> killStrategies = new TreeMap<>();
+    final TreeMap<String, Boolean> killStrategies = new TreeMap<>(CODE_POINT_ORDER);
     final TreeMap<Long, Boolean> killInstruments = new TreeMap<>();
     final TreeMap<Integer, Boolean> killVenues = new TreeMap<>();
     final TreeMap<Integer, Boolean> venuesDown = new TreeMap<>();
@@ -103,16 +130,18 @@ public final class RiskEngine {
     // named order in SELF_MATCH reasons) matches the Rust BTreeMap<u64>.
     final TreeMap<Long, Long> seenOrders =
             new TreeMap<>(Long::compareUnsigned);
-    final TreeMap<String, Bucket> buckets = new TreeMap<>();
+    final TreeMap<String, Bucket> buckets = new TreeMap<>(CODE_POINT_ORDER);
     final TreeMap<Long, OpenOrder> open =
             new TreeMap<>(Long::compareUnsigned);
     final TreeMap<Long, Long> positions = new TreeMap<>();
     /** (strategy, instrument) lots — key order = Rust (String, u32) tuple order. */
-    final TreeMap<String, TreeMap<Long, Lot>> lots = new TreeMap<>();
+    final TreeMap<String, TreeMap<Long, Lot>> lots = new TreeMap<>(CODE_POINT_ORDER);
     /** Realized P&amp;L per (strategy, quote ccy) in the quote currency. */
-    final TreeMap<String, TreeMap<String, Double>> realized = new TreeMap<>();
+    final TreeMap<String, TreeMap<String, Double>> realized =
+            new TreeMap<>(CODE_POINT_ORDER);
     Double lossOverrideGlobal;
-    final TreeMap<String, Double> lossOverrideStrategy = new TreeMap<>();
+    final TreeMap<String, Double> lossOverrideStrategy =
+            new TreeMap<>(CODE_POINT_ORDER);
     final List<RiskEvent> audit = new ArrayList<>();
     /** Engine metrics (decision counters, PnL + kill-switch gauges). */
     public final MetricsRegistry metrics;
@@ -532,7 +561,8 @@ public final class RiskEngine {
         }
         realizedPnl *= unit;
         positions.merge(fill.instrumentId(), signed, Long::sum);
-        realized.computeIfAbsent(fill.strategyId(), k -> new TreeMap<>())
+        realized.computeIfAbsent(fill.strategyId(),
+                k -> new TreeMap<>(CODE_POINT_ORDER))
                 .merge(ins.quoteCcy(), realizedPnl, Double::sum);
         // open order reduction
         if (fill.orderId() != 0) {

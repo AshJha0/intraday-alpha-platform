@@ -1,0 +1,8 @@
+{"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000000000000000}
+{"decision":2,"reason":"strategy S1 exceeded 500.00 orders/s (burst 0.50)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000000103118000}
+{"decision":2,"reason":"no reference price for instrument 2","rule_id":"STALE_PRICE","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000000137118000}
+{"decision":2,"reason":"no reference price for instrument 2","rule_id":"STALE_PRICE","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000000163118000}
+{"decision":2,"reason":"strategy S3 exceeded 500.00 orders/s (burst 0.50)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700000000209118000}
+{"decision":1,"reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"VENUE","scope_id":"3","severity":1,"timestamp":1700000000209118000}
+{"decision":1,"reason":"daily loss limit 50000.00 -> 1000000000000000.00 approved by ops halt","rule_id":"LOSS_LIMIT_OVERRIDE","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700000000209841000}
+{"decision":2,"reason":"order_id 3 already used at ts 1700000000137118000","rule_id":"DUPLICATE_ORDER_ID","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000000227315000}

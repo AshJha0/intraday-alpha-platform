@@ -39,6 +39,14 @@
 #                                from it — and uploads the changed files, so
 #                                the artefacts are produced in the environment
 #                                that verifies them
+#   risk-fuzz                    manual only (workflow_dispatch with
+#                                risk_fuzz=true): the large differential-fuzz
+#                                run of the Rust, Java and Python risk engines
+#                                on freshly generated step scripts
+#                                (.github/workflows/risk-fuzz.yml, which also
+#                                runs nightly). The PR path replays the
+#                                committed corpus instead (golden group) and
+#                                the python job fails on a stale corpus
 #
 # Local equivalent of the whole thing:  bash tests/harness/run_all.sh
 # =============================================================================
@@ -54,6 +62,18 @@ on:
         description: "Also run the dataset-artefact regeneration and upload the changed files"
         type: boolean
         default: false
+      risk_fuzz:
+        description: "Also run the large risk differential-fuzz job (fresh scripts, three engines)"
+        type: boolean
+        default: false
+      risk_fuzz_seed:
+        description: "risk-fuzz master seed (integer); empty = the run id"
+        type: string
+        default: ""
+      risk_fuzz_count:
+        description: "risk-fuzz number of fresh scripts"
+        type: string
+        default: "400"
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -112,6 +132,13 @@ jobs:
             echo "::error::test_eq03_report_reproduces_through_the_runner skipped — the dataset is missing"
             exit 1
           fi
+      # The risk differential-fuzz corpus (tests/golden/risk_fuzz) is written
+      # by the Python engine. Regenerate it here (Linux, Python 3.11) and diff
+      # it against the committed bytes: a corpus that is stale, or that depends
+      # on the platform it was generated on, fails before the Rust and Java
+      # replays trust it.
+      - name: risk fuzz corpus is current (regenerate + diff)
+        run: python3 python/tools/make_risk_fuzz_corpus.py --check
       # xdist: every test writes under tmp_path / tmp_path_factory (a
       # per-worker basetemp) and only READS the repo's data/, configs/ and
       # research/; `--dist loadfile` keeps a file's tests on one worker so the
@@ -470,6 +497,16 @@ jobs:
           name: regenerated-artefacts
           path: regenerated.tar.gz
           if-no-files-found: error
+
+  # The large differential-fuzz run of the three risk engines on fresh
+  # scripts (see risk-fuzz.yml). Manual here, nightly there; never on the PR
+  # path, which replays the committed corpus in the language jobs instead.
+  risk-fuzz:
+    if: github.event_name == 'workflow_dispatch' && inputs.risk_fuzz
+    uses: ./.github/workflows/risk-fuzz.yml
+    with:
+      seed: ${{ inputs.risk_fuzz_seed }}
+      count: ${{ inputs.risk_fuzz_count }}
 
   # Which PRs touch image inputs: the image build runs on those, not on every PR.
   changes:

@@ -90,7 +90,15 @@ impl RiskEngine {
         match self.fx_rate(ccy) {
             None => Err(format!("no conversion rate for {ccy} -> {}", limits.reporting_ccy)),
             Some((rate, mark_ts)) => {
-                if mark_ts != i64::MAX && limits.stale_book_reject {
+                // FAIL-OPEN defect (found by the differential fuzzer): the
+                // reporting currency was recognised by `fx_rate`'s
+                // `mark_ts == i64::MAX` placeholder, so a conversion pair
+                // whose mark was stamped exactly `i64::MAX` — the extreme
+                // future-stamped mark — looked like the reporting currency
+                // and skipped both checks below: the rate was trusted for the
+                // rest of the session (every later update is a regression).
+                // Only the reporting currency itself has no mark to age.
+                if ccy != limits.reporting_ccy && limits.stale_book_reject {
                     let Some(age) = ts.checked_sub(mark_ts) else {
                         return Err(TS_OVERFLOW.to_string());
                     };

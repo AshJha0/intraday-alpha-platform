@@ -30,6 +30,7 @@ import org.junit.runners.Suite;
     PortfolioGoldenTest.class,
     PortfolioSolverTest.class,
     RiskGoldenTest.class,
+    RiskFuzzGoldenTest.class,
     RiskRuleTest.class,
     RiskScenarioTest.class,
     ExecutionScenarioTest.class,

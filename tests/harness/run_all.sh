@@ -22,11 +22,13 @@
 #                                        CanonicalJsonGolden, TraceGolden, ReplayTraceGolden)
 #   rust    cargo test -p <crate> --test <golden target> for each golden
 #           integration-test file (golden_marketdata, golden_book,
-#           golden_features, golden_alpha, golden_risk, golden_replay,
-#           golden_canonical_json, golden_trace, golden_lifecycle)
+#           golden_features, golden_alpha, golden_risk, golden_risk_fuzz,
+#           golden_replay, golden_canonical_json, golden_trace, golden_lifecycle)
 #   java    JUnitCore on the *GoldenTest classes (CodecGoldenTest, BookGoldenTest,
-#           AnomalyGoldenTest, RiskGoldenTest, ReplayFillsGoldenTest,
-#           TcaGoldenTest, PortfolioGoldenTest)
+#           AnomalyGoldenTest, RiskGoldenTest, RiskFuzzGoldenTest,
+#           ReplayFillsGoldenTest, TcaGoldenTest, PortfolioGoldenTest)
+#   The risk differential-fuzz corpus (tests/golden/risk_fuzz) is replayed by
+#   golden_risk_fuzz / RiskFuzzGoldenTest / test_risk_fuzz_golden.py.
 #
 # Repo-level rows (full mode only; skipped by --golden-only, which stays the
 # four-language golden parity check):
@@ -48,10 +50,10 @@ GOLDEN_ONLY=0
 [ "${1:-}" = "--golden-only" ] && GOLDEN_ONLY=1
 
 # Rust golden integration-test targets: "<crate>:<test file>" pairs.
-RUST_GOLDEN_TARGETS="marketdata:golden_marketdata orderbook:golden_book features:golden_features alpha:golden_alpha risk:golden_risk replay:golden_replay contracts:golden_canonical_json contracts:golden_trace lifecycle:golden_lifecycle"
+RUST_GOLDEN_TARGETS="marketdata:golden_marketdata orderbook:golden_book features:golden_features alpha:golden_alpha risk:golden_risk risk:golden_risk_fuzz replay:golden_replay contracts:golden_canonical_json contracts:golden_trace lifecycle:golden_lifecycle"
 # Java golden test classes (JUnit4) — ALL of them (round-3 PLATFORM SEV-2:
 # the gate used to run 2 of the 10 classes while README claimed otherwise).
-JAVA_GOLDEN_CLASSES="com.iap.AdaptiveGoldenTest com.iap.AlphaGoldenTest com.iap.AnomalyGoldenTest com.iap.BacktestGoldenTest com.iap.BookGoldenTest com.iap.CanonicalJsonGoldenTest com.iap.CodecGoldenTest com.iap.FeatureGoldenTest com.iap.LifecycleGoldenTest com.iap.PortfolioGoldenTest com.iap.ReplayFillsGoldenTest com.iap.RiskGoldenTest com.iap.TcaGoldenTest com.iap.TraceGoldenTest"
+JAVA_GOLDEN_CLASSES="com.iap.AdaptiveGoldenTest com.iap.AlphaGoldenTest com.iap.AnomalyGoldenTest com.iap.BacktestGoldenTest com.iap.BookGoldenTest com.iap.CanonicalJsonGoldenTest com.iap.CodecGoldenTest com.iap.FeatureGoldenTest com.iap.LifecycleGoldenTest com.iap.PortfolioGoldenTest com.iap.ReplayFillsGoldenTest com.iap.RiskFuzzGoldenTest com.iap.RiskGoldenTest com.iap.TcaGoldenTest com.iap.TraceGoldenTest"
 
 # Per-language results. TESTS/GOLDEN hold a NUMBER when the suite ran and the
 # count could be parsed, and "-" when it did not run or could not be parsed —

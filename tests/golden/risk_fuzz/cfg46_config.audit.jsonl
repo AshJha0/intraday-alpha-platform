@@ -1,0 +1,8 @@
+{"decision":2,"reason":"no conversion rate for USD -> EUR","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000000000000000}
+{"decision":1,"reason":"daily loss limit 50000.00 -> 0.01 approved by ops halt","rule_id":"LOSS_LIMIT_OVERRIDE","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000000000729000}
+{"decision":2,"reason":"no conversion rate for USD -> EUR","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000000001237000}
+{"decision":2,"reason":"no conversion rate for USD -> EUR","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000000015237000}
+{"decision":2,"reason":"reference price age 5000000001ns exceeds 5000000000ns","rule_id":"STALE_PRICE","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000005000000001}
+{"decision":2,"reason":"no conversion rate for USD -> EUR","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000000035670000}
+{"decision":2,"reason":"no conversion rate for USD -> EUR","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000005000000000}
+{"decision":2,"reason":"no conversion rate for USD -> EUR","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000000174399000}

@@ -1,0 +1,63 @@
+{"decision":1,"reason":"desk request #42","rule_id":"KILL_SWITCH_CLEARED","scope":"INSTRUMENT","scope_id":"99","severity":1,"timestamp":1700000000000000000}
+{"decision":2,"reason":"no reference price for instrument 2","rule_id":"STALE_PRICE","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000001004000000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000001027000000}
+{"decision":1,"reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000001027000000}
+{"decision":1,"reason":"venue 1 reconnected","rule_id":"VENUE_RECONNECT","scope":"VENUE","scope_id":"1","severity":1,"timestamp":1700000006050999999}
+{"decision":2,"reason":"side must be 0 or 1: 255","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000006108999999}
+{"decision":3,"reason":"desk request #42","rule_id":"KILL_SWITCH_ENGAGED","scope":"STRATEGY","scope_id":"S2","severity":3,"timestamp":1700000006116999999}
+{"decision":2,"reason":"instrument 1 feed has an unrecovered gap","rule_id":"SEQUENCE_GAP","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700003606117041999}
+{"decision":1,"reason":"desk request #42","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000009159041999}
+{"decision":2,"reason":"instrument 1 feed has an unrecovered gap","rule_id":"SEQUENCE_GAP","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000009159041999}
+{"decision":1,"reason":"restored snapshot v1: 1 positions, 1 open orders","rule_id":"STATE_RESTORED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000014159041999}
+{"decision":2,"reason":"instrument 1 feed has an unrecovered gap","rule_id":"SEQUENCE_GAP","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000014159041999}
+{"decision":2,"reason":"kill scope id \" 1\" is not a valid INSTRUMENT id: nothing cleared (fail-closed): desk request #42","rule_id":"MALFORMED_KILL","scope":"INSTRUMENT","scope_id":" 1","severity":3,"timestamp":1700000014159041999}
+{"decision":2,"reason":"instrument 1 feed has an unrecovered gap","rule_id":"SEQUENCE_GAP","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000014210041999}
+{"decision":3,"reason":"ops halt","rule_id":"KILL_SWITCH_ENGAGED","scope":"STRATEGY","scope_id":"S2","severity":3,"timestamp":1700000014246041999}
+{"decision":2,"reason":"kill scope id \"-0\" is not a valid VENUE id: nothing cleared (fail-closed): desk request #42","rule_id":"MALFORMED_KILL","scope":"VENUE","scope_id":"-0","severity":3,"timestamp":1700000014267041999}
+{"decision":1,"reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000014305561999}
+{"decision":2,"reason":"notional 1231475.37 USD exceeds max_order_notional 1000000.00","rule_id":"FAT_FINGER_NOTIONAL","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000014305561999}
+{"decision":2,"reason":"kill scope id \"1\n\" is not a valid INSTRUMENT id: nothing cleared (fail-closed): desk request #42","rule_id":"MALFORMED_KILL","scope":"INSTRUMENT","scope_id":"1\n","severity":3,"timestamp":1700000014365561999}
+{"decision":3,"reason":"desk request #42","rule_id":"KILL_SWITCH_ENGAGED","scope":"STRATEGY","scope_id":"S2","severity":3,"timestamp":1700000019365562000}
+{"decision":2,"reason":"fill for order 18446744073709551615 rejected: qty must be > 0: 0","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"tab\there","severity":2,"timestamp":1700000021365562000}
+{"decision":2,"reason":"strategy S2 kill switch engaged","rule_id":"KILL_STRATEGY","scope":"STRATEGY","scope_id":"S2","severity":3,"timestamp":1700000021398403000}
+{"decision":2,"reason":"strategy S2 kill switch engaged","rule_id":"KILL_STRATEGY","scope":"STRATEGY","scope_id":"S2","severity":3,"timestamp":1700000021453450000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000021454175000}
+{"decision":1,"reason":"cr\rlf\n\u001f ","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000021454457000}
+{"decision":2,"reason":"no reference data for instrument 102","rule_id":"UNKNOWN_INSTRUMENT","scope":"INSTRUMENT","scope_id":"102","severity":2,"timestamp":1700000022454457000}
+{"decision":3,"reason":"venue 3 disconnected","rule_id":"VENUE_DISCONNECT","scope":"VENUE","scope_id":"3","severity":2,"timestamp":1700000023483457000}
+{"decision":2,"reason":"order_id 9 already used at ts 1700000014305561999","rule_id":"DUPLICATE_ORDER_ID","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000023484838000}
+{"decision":1,"reason":"venue 3 reconnected","rule_id":"VENUE_RECONNECT","scope":"VENUE","scope_id":"3","severity":1,"timestamp":1700000023485362000}
+{"decision":2,"reason":"order_id 9 already used at ts 1700000014305561999","rule_id":"DUPLICATE_ORDER_ID","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000023485362000}
+{"decision":2,"reason":"qty 9223372036854775807 exceeds max_order_qty 50000","rule_id":"FAT_FINGER_QTY","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000023485362000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000023509362000}
+{"decision":3,"reason":"rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr","rule_id":"KILL_SWITCH_ENGAGED","scope":"STRATEGY","scope_id":"S3","severity":3,"timestamp":1700000023523362000}
+{"decision":2,"reason":"notional 1000005.40 USD exceeds max_order_notional 1000000.00","rule_id":"FAT_FINGER_NOTIONAL","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000024582362000}
+{"decision":1,"reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000029582927999}
+{"decision":2,"reason":"would cross own open order 12 at 513","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000029582961999}
+{"decision":2,"reason":"notional 1211000.00 USD exceeds max_order_notional 1000000.00","rule_id":"FAT_FINGER_NOTIONAL","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000029630961999}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000029668961999}
+{"decision":2,"reason":"reference price timestamp 1700000034771962000 is more than 5000000000ns ahead of the latest order event time 1700000029771961999","rule_id":"STALE_PRICE","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000029771961999}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000029780961999}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000034780962000}
+{"decision":2,"reason":"instrument 2 feed has an unrecovered gap","rule_id":"SEQUENCE_GAP","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000034829962000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000034865962000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000034890962000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000034916962000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000034931962000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000034931962000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000034931962000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000034931962000}
+{"decision":2,"reason":"strategy S3 exceeded 500.00 orders/s (burst 4.00)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700000034931962000}
+{"decision":3,"reason":"venue 3 disconnected","rule_id":"VENUE_DISCONNECT","scope":"VENUE","scope_id":"3","severity":2,"timestamp":1700000034931962000}
+{"decision":2,"reason":"strategy S3 exceeded 500.00 orders/s (burst 4.00)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700000034932744000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000034933531000}
+{"decision":1,"reason":"venue 3 reconnected","rule_id":"VENUE_RECONNECT","scope":"VENUE","scope_id":"3","severity":1,"timestamp":1700000034939531000}
+{"decision":2,"reason":"would cross own open order 21 at 519","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000034964531000}
+{"decision":2,"reason":"would cross own open order 24 at 2417","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000035021531000}
+{"decision":2,"reason":"would cross own open order 24 at 2417","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000035021531000}
+{"decision":2,"reason":"would cross own open order 24 at 2417","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000035021531000}
+{"decision":2,"reason":"would cross own open order 24 at 2417","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000035021531000}
+{"decision":2,"reason":"strategy S1 exceeded 500.00 orders/s (burst 4.00)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000035021531000}
+{"decision":1,"reason":"ops halt","rule_id":"SESSION_ROLLED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000035068531000}
+{"decision":1,"reason":"restored snapshot v1: 2 positions, 10 open orders","rule_id":"STATE_RESTORED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000035107531000}
+{"decision":3,"reason":"ops halt","rule_id":"KILL_SWITCH_ENGAGED","scope":"VENUE","scope_id":"2","severity":3,"timestamp":1700000037107531000}

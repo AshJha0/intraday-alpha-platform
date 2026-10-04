@@ -1,0 +1,19 @@
+{"x-version":1,"name":"cfg06_config","profile":"config","seed":6,"config":"configs/risk/risk.json","config_set":[["per_order","max_order_qty",0]],"instruments":{"1":{"tick_size":0.01,"qty_unit":1.0,"quote_ccy":"USD"},"2":{"tick_size":0.01,"qty_unit":1.0,"quote_ccy":"USD"},"3":{"tick_size":0.05,"qty_unit":1.0,"quote_ccy":"EUR"},"4":{"tick_size":1.0,"qty_unit":100.0,"quote_ccy":"JPY"},"5":{"tick_size":0.0001,"qty_unit":1.0,"quote_ccy":"XXX"},"101":{"tick_size":1e-05,"qty_unit":100000.0,"quote_ccy":"USD"},"103":{"tick_size":0.001,"qty_unit":100000.0,"quote_ccy":"JPY"}},"require_bootstrap":false,"cuts":[],"steps":[
+{"type":"market","instrument_id":1,"bid_ticks":2444,"ask_ticks":2448,"ts":1700000000000000000},
+{"type":"order","order":{"order_id":2,"instrument_id":1,"side":1,"qty":557,"price_ticks":2466,"order_type":2,"venue_id":1,"strategy_id":"S2","urgency":0.5,"timestamp":1700000000000174000},"expect":{"decision":2,"rule_id":"CONFIG_MISSING","severity":3,"scope":"GLOBAL","scope_id":"","reason":"fail-closed: invalid argument: risk.json: per_order.max_order_qty must be > 0, got 0"}},
+{"type":"fill","strategy_id":"S3","instrument_id":1,"order_id":0,"side":0,"qty":85,"price_ticks":2451,"ts":1700000005000174000},
+{"type":"venue_down","venue_id":1,"ts":1700000005001030000},
+{"type":"market","instrument_id":1,"bid_ticks":2440,"ask_ticks":2444,"ts":1700000005001030000},
+{"type":"gap","instrument_id":2,"ts":1700000005001185000},
+{"type":"venue_up","venue_id":1,"ts":1700000005057185000},
+{"type":"kill","scope":"GLOBAL","scope_id":"","ts":1700000005057185000,"reason":"ops halt"},
+{"type":"unkill","scope":"GLOBAL","scope_id":"","ts":1700000005072185000,"reason":"desk request #42"},
+{"type":"market","instrument_id":1,"bid_ticks":2438,"ask_ticks":2442,"ts":1700000005072185000},
+{"type":"market","instrument_id":2,"bid_ticks":498,"ask_ticks":502,"ts":1700000005072213000},
+{"type":"order","order":{"order_id":3,"instrument_id":2,"side":1,"qty":4,"price_ticks":503,"order_type":2,"venue_id":1,"strategy_id":"S1","urgency":0.5,"timestamp":1700000005072213000},"expect":{"decision":2,"rule_id":"CONFIG_MISSING","severity":3,"scope":"GLOBAL","scope_id":"","reason":"fail-closed: invalid argument: risk.json: per_order.max_order_qty must be > 0, got 0"}},
+{"type":"order","order":{"order_id":4,"instrument_id":2,"side":1,"qty":4,"price_ticks":503,"order_type":2,"venue_id":2,"strategy_id":"S1","urgency":0.5,"timestamp":1700000005072213000},"expect":{"decision":2,"rule_id":"CONFIG_MISSING","severity":3,"scope":"GLOBAL","scope_id":"","reason":"fail-closed: invalid argument: risk.json: per_order.max_order_qty must be > 0, got 0"}},
+{"type":"order","order":{"order_id":5,"instrument_id":2,"side":1,"qty":3,"price_ticks":503,"order_type":2,"venue_id":1,"strategy_id":"S1","urgency":0.5,"timestamp":1700000005072213000},"expect":{"decision":2,"rule_id":"CONFIG_MISSING","severity":3,"scope":"GLOBAL","scope_id":"","reason":"fail-closed: invalid argument: risk.json: per_order.max_order_qty must be > 0, got 0"}},
+{"type":"order","order":{"order_id":6,"instrument_id":2,"side":1,"qty":4,"price_ticks":503,"order_type":2,"venue_id":1,"strategy_id":"S1","urgency":0.5,"timestamp":1700000005072213000},"expect":{"decision":2,"rule_id":"CONFIG_MISSING","severity":3,"scope":"GLOBAL","scope_id":"","reason":"fail-closed: invalid argument: risk.json: per_order.max_order_qty must be > 0, got 0"}},
+{"type":"recover","instrument_id":2,"ts":1700000005100213000},
+{"type":"market","instrument_id":1,"bid_ticks":2435,"ask_ticks":2439,"ts":1700000005100213000}
+]}

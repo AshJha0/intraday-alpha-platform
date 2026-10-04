@@ -1,0 +1,11 @@
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 2","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000000000000000}
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 4294967295","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000000037000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: global.max_net_notional must be > 0, got -5.5","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000097638000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: global.max_net_notional must be > 0, got -5.5","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000134638000}
+{"decision":1,"reason":"venue 2 reconnected","rule_id":"VENUE_RECONNECT","scope":"VENUE","scope_id":"2","severity":1,"timestamp":1700000000184638000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: global.max_net_notional must be > 0, got -5.5","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000223638000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: global.max_net_notional must be > 0, got -5.5","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000002223638000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: global.max_net_notional must be > 0, got -5.5","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000002224457000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: global.max_net_notional must be > 0, got -5.5","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000002230457000}
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 2","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000002230457000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: global.max_net_notional must be > 0, got -5.5","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000002261457000}

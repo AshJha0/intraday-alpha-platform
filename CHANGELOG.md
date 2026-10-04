@@ -218,6 +218,76 @@ Also changed:
   archived lifecycle ledgers under the scope their name states;
   `StoreVersionError`.
 
+### Added — differential fuzzing of the risk engines
+
+The hard risk engine exists three times (Rust, normative; Java; Python) and
+was held byte-identical by hand-written step scripts only. The v1.3.0 review
+found fail-open bugs none of them exercised. Backlog issues FZ01, FZ03 and
+FZ05 of epic E31 are done.
+
+- **Generator** (`python/tools/risk_fuzz.py`): deterministic (SplitMix64 only,
+  no wall clock, no hash-ordered iteration) and state-aware — it drives a live
+  Python engine while generating, so quantities land at the remaining headroom
+  of every limit, prices at the band edge, timestamps at the staleness and
+  future-stamp boundaries, and an engaged kill is cleared instead of blocking
+  the rest of the script. Every step type of the two risk goldens plus
+  `bad_override`; i64 / u64 extremes, clock regressions and jumps, venue 0,
+  unknown ids, duplicate and >= 2^63 order ids, empty / oversized / non-ASCII
+  ids; thirteen profiles, one of them a set of 50 configuration mutations.
+- **Corpus** (`tests/golden/risk_fuzz/`, `make_risk_fuzz_corpus.py`): 89
+  scripts, 4,607 steps, 2,741 audit lines, 1.5 MB. The Python engine is the
+  oracle. `COVERAGE.txt` names the script that reaches each reason-string
+  branch of the engine: 63 of 64 (`strategy daily pnl undeterminable` cannot
+  be reached, check 21 rejects first). CI regenerates the corpus on Linux and
+  fails on a stale one; the tool refuses to change files without `--force`.
+- **Replays**: Rust `rust/risk/tests/golden_risk_fuzz.rs`, Java
+  `RiskFuzzGoldenTest`, Python `python/tests/test_risk_fuzz_golden.py` — every
+  order's decision, rule, severity, scope, scope id and reason, the audit JSONL
+  byte for byte, the final snapshot, a snapshot -> JSON text -> restore ->
+  continue check at each cut point, and refusal of corrupt and truncated
+  snapshots. In the golden group of `run_golden.sh`.
+- **Nightly / manual job** (`.github/workflows/risk-fuzz.yml`, or `ci.yml`
+  `workflow_dispatch` with `risk_fuzz=true`; driver
+  `python/tools/risk_fuzz_nightly.py`): fresh scripts from a fresh seed on the
+  runner, Rust and Java driven through their own golden tests
+  (`IAP_RISK_FUZZ_DIR`, `IAP_RISK_FUZZ_OUT`), the first divergence minimised by
+  a delta-debugging shrinker and uploaded as an artifact. Not on the pull
+  request path.
+- **Properties and mutation tests** (`python/tests/test_risk_fuzz_properties.py`):
+  kill precedence derived from the audit log alone, no ALLOW under the GLOBAL
+  kill, positions equal the sum of applied fills, determinism, canonical
+  append-only audit lines, snapshot identity; nine planted bugs and a
+  UTF-16-ordered port are each noticed by the committed corpus. NaN and
+  Infinity cannot be written in JSON: they are pinned by a unit test in each
+  language, not by the corpus.
+
+Divergences found, all fixed (PLATFORM_CONVENTIONS.md §11.1 "Pinned by the
+fuzzer"; no existing golden changed):
+
+1. **A conversion rate stamped `i64::MAX` was trusted — Rust and Python
+   (fail-open), found by the first nightly run** (ci run 37186349594: seed
+   20261004, 400 scripts, 38,666 steps; Rust 400 OK, Java 2 diverged; reduced
+   from 120 steps to 3: mark USD/JPY at `ts = i64::MAX`, mark a JPY
+   instrument, send an order in it). The pre-trade rate check recognised the
+   reporting currency by a `mark_ts == i64::MAX` placeholder, so a pair really
+   stamped `i64::MAX` skipped the age and the future-stamp check and stayed
+   trusted for the session. §11.1 says such a rate rejects `FX_RATE_MISSING`;
+   Java did. The normative engine was the wrong one.
+2. **Order of strategy ids — Java.** `TreeMap<String, _>` orders by UTF-16
+   code unit, the reference's `BTreeMap<String, _>` by code point; they
+   disagree between U+E000..U+FFFF and the astral planes. Two strategies
+   breached by one mark latched in the opposite order, and the snapshot's
+   lots were listed in the opposite order.
+3. **A subnormal float in a reason — Java.** `urgency = -5e-324` printed
+   `…049` (from `Double.toString`'s two-digit `4.9E-324`) where Rust prints
+   `…05`.
+4. **`CONFIG_MISSING` reason — Java.** The parser read the sequence-gap
+   threshold before every other key, reported a missing section as such,
+   printed a non-positive float as `0.0`, walked the conversion table in
+   document order and had one message for three conversion errors. A
+   fail-closed engine now names the same first offending key, in the same
+   words, as the reference.
+
 ### Results
 
 Same dataset, new rules. Nothing is promoted, before or after.

@@ -3454,15 +3454,33 @@ issues:
     epic: E31
     title: "Differential fuzzing of the Rust, Java and Python risk engines"
     labels: [type:feature, area:testing, area:risk, lang:rust, lang:java, lang:python, priority:p1]
-    milestone: "Backlog"
-    status: backlog
+    milestone: "Phase 2"
+    status: done
     estimate_days: 6
-    context: "The three engines are held byte-identical by fixed golden vectors only. A generator of order, fill and market sequences, with the three engines run on each and decisions and audit logs compared byte for byte, finds divergences the fixtures do not cover."
+    context: >
+      The three engines were held byte-identical by fixed golden vectors only.
+      Done 2026-10-04: a deterministic, state-aware generator of step scripts
+      (SplitMix64 only; every step type; boundary values at every limit, the
+      i64 / u64 extremes, clock regressions and jumps, non-ASCII ids, one
+      script per configuration mutation) with the Python engine as the oracle.
+      The committed corpus (89 scripts, 4,607 steps) is replayed by Rust, Java
+      and Python on every pull request; the risk-fuzz job generates fresh
+      scripts nightly and on demand, runs the three engines on the runner and
+      uploads the first divergence minimised by a delta-debugging shrinker.
+      First results: the Java port diverged in three ways (strategy ids
+      ordered by UTF-16 code unit, a subnormal float in a reason, the
+      CONFIG_MISSING reason), and the first nightly run (400 scripts, 38,666
+      steps, reduced from 120 steps to 3) found a fail-open in the Rust and
+      the Python engine that Java did not have: a conversion rate stamped
+      i64::MAX was trusted. All four are fixed and pinned.
     acceptance:
       - "A fuzz run of a stated number of sequences gives identical decisions and audit logs across the engines, or a minimised reproducer"
       - "The fuzz harness runs in CI at a small fixed budget and nightly at a large one"
     evidence:
-      - "rust/risk/; java/src/main/java/com/iap/risk/; python/src/iap/risk/; tests/golden/expected_risk_decisions.json"
+      - "python/tools/risk_fuzz.py; python/tools/make_risk_fuzz_corpus.py; python/tools/risk_fuzz_nightly.py"
+      - "tests/golden/risk_fuzz/ (COVERAGE.txt); .github/workflows/risk-fuzz.yml"
+      - "rust/risk/tests/golden_risk_fuzz.rs; java/src/test/java/com/iap/RiskFuzzGoldenTest.java; python/tests/test_risk_fuzz_golden.py"
+      - "python/tests/test_risk_fuzz_properties.py; python/tests/test_risk_fuzz_nightly.py; PLATFORM_CONVENTIONS.md section 11.1"
 
   - key: FZ02
     epic: E31
@@ -3482,15 +3500,26 @@ issues:
     epic: E31
     title: "Snapshot/restore fuzzing across the three risk engines"
     labels: [type:feature, area:testing, area:risk, lang:rust, lang:java, lang:python, priority:p1]
-    milestone: "Backlog"
-    status: backlog
+    milestone: "Phase 2"
+    status: done
     estimate_days: 4
-    context: "Restore must continue exactly as an uninterrupted run would. Taking a snapshot at a random point, restoring, and comparing the continuation with the uninterrupted run tests every state the engine can be in."
+    context: >
+      Restore must continue exactly as an uninterrupted run would. Done
+      2026-10-04 as part of the differential fuzzing (FZ01): every script of
+      the corpus carries random cut points; each replay snapshots the engine
+      after the cut, restores it through the JSON text and must produce the
+      unbroken run's remaining audit lines and final state, and scripts also
+      contain restore steps of their own. Each language additionally checks
+      that a snapshot with any field missing or of the wrong type is refused
+      and that a truncated document does not parse; the Python property suite
+      checks restore(snapshot()) == snapshot() at every fifth step of fresh
+      sequences.
     acceptance:
       - "For every sampled cut point the restored continuation equals the uninterrupted run, byte for byte"
       - "Corrupt and truncated snapshots fail closed"
     evidence:
-      - "rust/risk/src/audit.rs; java/src/main/java/com/iap/risk/RiskAudit.java; tests/golden/expected_risk_snapshot.json"
+      - "rust/risk/tests/golden_risk_fuzz.rs; java/src/test/java/com/iap/RiskFuzzGoldenTest.java; python/tests/test_risk_fuzz_golden.py"
+      - "python/tests/test_risk_fuzz_properties.py; tests/golden/risk_fuzz/"
 
   - key: FZ04
     epic: E31
@@ -3510,12 +3539,24 @@ issues:
     epic: E31
     title: "Risk golden coverage for KILL_VENUE, bootstrap, restore and fail-closed branches"
     labels: [type:feature, area:testing, area:risk, lang:rust, lang:java, lang:python, priority:p1]
-    milestone: "Backlog"
-    status: backlog
+    milestone: "Phase 2"
+    status: done
     estimate_days: 4
-    context: "The risk goldens exercise the main rule set; the branches that matter most after something has gone wrong (venue-scoped kill, first-start bootstrap, restore from a snapshot, every fail-closed default) need their own golden cases in all three engines."
+    context: >
+      The risk goldens exercised the main rule set; the branches that matter
+      most after something has gone wrong (venue-scoped kill, first-start
+      bootstrap, restore from a snapshot, every fail-closed default) needed
+      their own golden cases in all three engines. The v1.3.0 edge golden
+      added eight scenarios; since 2026-10-04 the generated corpus reaches 63
+      of the engine's 64 reason-string branches (the one left is unreachable:
+      check 21 rejects before the strategy-level undeterminable-P&L reject can)
+      and tests/golden/risk_fuzz/COVERAGE.txt, regenerated with the corpus and
+      checked in CI, names the script that reaches each. A Python test fails
+      if a branch stops being reached.
     acceptance:
       - "A coverage report lists each branch and the golden case that reaches it"
       - "Every fail-closed branch has a case whose expected decision is a rejection"
     evidence:
-      - "rust/risk/tests/golden_risk.rs; tests/golden/expected_risk_decisions.json; java/src/test/java/com/iap/RiskGoldenTest.java"
+      - "tests/golden/risk_fuzz/COVERAGE.txt; python/tools/risk_fuzz.py (BRANCHES, coverage_report)"
+      - "python/tests/test_risk_fuzz_golden.py; tests/golden/expected_risk_edge_decisions.json"
+      - "rust/risk/tests/golden_risk_fuzz.rs; java/src/test/java/com/iap/RiskFuzzGoldenTest.java"

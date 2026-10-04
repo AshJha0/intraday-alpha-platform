@@ -1,0 +1,6 @@
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 2","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000000009000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing per_order.duplicate_order_window_ns","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000045000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing per_order.duplicate_order_window_ns","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000045000000}
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 2","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000002121000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing per_order.duplicate_order_window_ns","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000005178000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing per_order.duplicate_order_window_ns","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000010178000000}

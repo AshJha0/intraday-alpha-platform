@@ -1262,3 +1262,42 @@ rules for Python alone; the port closes that.
 - Migration path for stored data: none — the golden is a test vector. A Java
   caller constructs `Config.legacy(...)` and `withLinearImpact()` to keep the
   old numbers.
+## 2026-10-04 — tests/golden/risk_fuzz/ (new generated golden family, script x-version 1); four risk-engine corrections found by it
+
+- **New fixture family, nothing regenerated**: `expected_risk_decisions.json`,
+  `expected_risk_audit.jsonl`, `expected_risk_snapshot.json` and
+  `expected_risk_edge_{decisions.json,audit.jsonl}` are byte-for-byte
+  unchanged.
+- `tests/golden/risk_fuzz/` holds 89 generated step scripts (`"x-version": 1`),
+  each `<name>.json` with `<name>.audit.jsonl` and `<name>.snapshot.json`, and
+  `COVERAGE.txt`. Owner: `python/tools/make_risk_fuzz_corpus.py` (`--force` to
+  rewrite, `--check` in CI), generator `python/tools/risk_fuzz.py`, oracle the
+  Python engine. Consumers: `rust/risk/tests/golden_risk_fuzz.rs`, Java
+  `RiskFuzzGoldenTest`, `python/tests/test_risk_fuzz_golden.py`. Step types are
+  those of the two hand-written risk goldens plus `bad_override`; a script may
+  carry `config_set` / `config_remove` (the committed `configs/risk/risk.json`
+  with keys replaced or removed) and `cuts` (restore check points).
+- The corpus is regenerated whenever an engine's behaviour, the generator or
+  `configs/risk/risk.json` changes; that is a deliberate act (`--force`) and
+  the diff of the audit files is the review surface.
+- Behaviour changes carried by the same change (no schema change, `risk_event`
+  still v1, snapshot still `x-version` 1; found by the fuzzer, PLATFORM_CONVENTIONS
+  §11.1 "Pinned by the fuzzer"):
+  1. Rust and Python: a conversion rate whose pair is stamped exactly
+     `i64::MAX` is now future-stamped (`FX_RATE_MISSING`) instead of trusted
+     for the rest of the session. Java already rejected it.
+  2. Java: maps keyed by strategy id or currency iterate in code-point order
+     (was UTF-16 code-unit order). Only ids containing characters at or above
+     U+E000 together with astral characters are affected: the order of
+     simultaneous `STRATEGY_LOSS` latches and of the snapshot's `lots` /
+     `realized` entries changes for them. A snapshot written before the change
+     restores unchanged (the lists are re-sorted on load).
+  3. Java: a subnormal `urgency` in a `MALFORMED_ORDER` reason prints the
+     shortest round-trip digits (`…05`, was `…049`).
+  4. Java: the `CONFIG_MISSING` reason names the first offending key in the
+     reference's parse order with the reference's text (was: the sequence-gap
+     threshold first, `missing section <name>`, `got 0.0`, `must be an object`,
+     one message for three conversion errors). An alert or runbook that greps
+     the Java engine's fail-closed reason for `missing section` must match the
+     key-level message instead.
+- Migration path for stored data: none needed.

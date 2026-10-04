@@ -17,9 +17,9 @@ planned paths of the current release, **backlog** says what would prove it done.
 |---|---:|---:|
 | epics | 31 | |
 | issues | 161 | 540 |
-| issues `done` | 103 | 257.5 |
+| issues `done` | 106 | 271.5 |
 | issues `in-progress` | 0 | 0 |
-| issues `backlog` | 58 | 282.5 |
+| issues `backlog` | 55 | 268.5 |
 
 ### By milestone
 
@@ -32,9 +32,9 @@ planned paths of the current release, **backlog** says what would prove it done.
 | Week 4 | 2 | 10 | 10 | 0 | 0 |
 | Week 5 | 2 | 10 | 10 | 0 | 0 |
 | Week 6 | 7 | 24 | 24 | 0 | 0 |
-| Phase 2 | 3 | 9 | 7 | 0 | 2 |
+| Phase 2 | 3 | 12 | 10 | 0 | 2 |
 | Phase 3 | 2 | 15 | 6 | 0 | 9 |
-| Backlog | 7 | 48 | 1 | 0 | 47 |
+| Backlog | 7 | 45 | 1 | 0 | 44 |
 
 Issues are listed under their epic; an issue's own milestone can differ from
 the epic's (a backlog item under a finished epic sits in **Backlog**).
@@ -71,7 +71,7 @@ the epic's (a backlog item under a finished epic sits in **Backlog**).
 - [E28 — Book-level risk — factors, stress scenarios, regulatory pre-trade controls, drop-copy reconciliation](#e28--book-level-risk--factors-stress-scenarios-regulatory-pre-trade-controls-drop-copy-reconciliation) · Backlog · backlog · 4 issues
 - [E29 — Research throughput — feature store, distributed runs, marginal-contribution allocation](#e29--research-throughput--feature-store-distributed-runs-marginal-contribution-allocation) · Backlog · backlog · 3 issues
 - [E30 — Agent layer — write broker, blackboard, pre-registration, hidden-seed reserve, human approvals, evals](#e30--agent-layer--write-broker-blackboard-pre-registration-hidden-seed-reserve-human-approvals-evals) · Backlog · backlog · 7 issues
-- [E31 — Differential fuzzing, property tests, crash injection and risk golden coverage](#e31--differential-fuzzing-property-tests-crash-injection-and-risk-golden-coverage) · Backlog · backlog · 5 issues
+- [E31 — Differential fuzzing, property tests, crash injection and risk golden coverage](#e31--differential-fuzzing-property-tests-crash-injection-and-risk-golden-coverage) · Backlog · partial · 5 issues
 
 ## Phase 0
 
@@ -826,7 +826,7 @@ Specify and build the controls that let several research agents work against the
 
 ### E31 — Differential fuzzing, property tests, crash injection and risk golden coverage
 
-**Status:** backlog · **Milestone:** Backlog · **Issues:** 5 (done 0, in-progress 0, backlog 5) · **Estimate:** 23 days · **Labels:** `type:epic`, `area:testing`, `phase:phase2`, `priority:p1`, `status:backlog`
+**Status:** partial · **Milestone:** Backlog · **Issues:** 5 (done 3, in-progress 0, backlog 2) · **Estimate:** 23 days · **Labels:** `type:epic`, `area:testing`, `phase:phase2`, `priority:p1`, `status:partial`
 
 Find the defects the hand-written goldens cannot: fuzz the three risk engines against each other, state invariants of the execution simulator as properties, fuzz snapshot and restore, inject crashes into the Java paper-trading loop, and close the gaps in risk golden coverage for the branches that matter most when something has already gone wrong.
 
@@ -841,11 +841,11 @@ Find the defects the hand-written goldens cannot: fuzz the three risk engines ag
 
 | key | title | status | est. (d) | milestone | evidence |
 |---|---|---|---:|---|---|
-| FZ01 | Differential fuzzing of the Rust, Java and Python risk engines | backlog | 6 | Backlog | `rust/risk/; java/src/main/java/com/iap/risk/; python/src/iap/risk/; tests/golden/expected_risk_decisions.json` |
+| FZ01 | Differential fuzzing of the Rust, Java and Python risk engines | done | 6 | Phase 2 | `python/tools/risk_fuzz.py; python/tools/make_risk_fuzz_corpus.py; python/tools/risk_fuzz_nightly.py`<br>`tests/golden/risk_fuzz/ (COVERAGE.txt); .github/workflows/risk-fuzz.yml`<br>`rust/risk/tests/golden_risk_fuzz.rs; java/src/test/java/com/iap/RiskFuzzGoldenTest.java; python/tests/test_risk_fuzz_golden.py`<br>`python/tests/test_risk_fuzz_properties.py; python/tests/test_risk_fuzz_nightly.py; PLATFORM_CONVENTIONS.md section 11.1` |
 | FZ02 | Property-based tests of execution simulator invariants | backlog | 4 | Backlog | `python/src/iap/execution/; cpp/src/execution/; tests/` |
-| FZ03 | Snapshot/restore fuzzing across the three risk engines | backlog | 4 | Backlog | `rust/risk/src/audit.rs; java/src/main/java/com/iap/risk/RiskAudit.java; tests/golden/expected_risk_snapshot.json` |
+| FZ03 | Snapshot/restore fuzzing across the three risk engines | done | 4 | Phase 2 | `rust/risk/tests/golden_risk_fuzz.rs; java/src/test/java/com/iap/RiskFuzzGoldenTest.java; python/tests/test_risk_fuzz_golden.py`<br>`python/tests/test_risk_fuzz_properties.py; tests/golden/risk_fuzz/` |
 | FZ04 | Crash injection on the Java paper-trading path | backlog | 5 | Backlog | `java/src/main/java/com/iap/platform/PaperTrading.java; docs/runbooks/RUNBOOK_paper_trading.md` |
-| FZ05 | Risk golden coverage for KILL_VENUE, bootstrap, restore and fail-closed branches | backlog | 4 | Backlog | `rust/risk/tests/golden_risk.rs; tests/golden/expected_risk_decisions.json; java/src/test/java/com/iap/RiskGoldenTest.java` |
+| FZ05 | Risk golden coverage for KILL_VENUE, bootstrap, restore and fail-closed branches | done | 4 | Phase 2 | `tests/golden/risk_fuzz/COVERAGE.txt; python/tools/risk_fuzz.py (BRANCHES, coverage_report)`<br>`python/tests/test_risk_fuzz_golden.py; tests/golden/expected_risk_edge_decisions.json`<br>`rust/risk/tests/golden_risk_fuzz.rs; java/src/test/java/com/iap/RiskFuzzGoldenTest.java` |
 
 ## Labels
 
