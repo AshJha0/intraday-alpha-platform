@@ -13,7 +13,7 @@
     "XV3": 5836
   },
   "config_path": "configs/mvp/mvp.json",
-  "config_version": "a099bdbd413913ac30ef30e9dae44d97519ff41dd5c0bddfac5d53e044d52c71",
+  "config_version": "bf8cc608b47fc8546ebba315a1df627ce158faf3ec41ee9e7aa2bd57c39251b1",
   "data_version": "0e0fe161016eea4327083e697510885768fe33620f95b814fa5703f6ac3d4a7b",
   "description": "MVP golden (python -m iap.mvp run on configs/mvp/mvp.json): the seeded feed, the full loop (book -> features -> EQ01/EQ03/EQ06 ensemble -> portfolio -> hard risk -> TWAP/POV/IS -> SOR -> simulator -> TCA -> attribution -> trace) and its report. Ports reproduce every value: integers and hashes exactly, floats at abs/rel 1e-9. Regenerate only on a deliberate, versioned change: PYTHONPATH=src python3 tools/make_golden_mvp.py --force.",
   "events_iap1_sha256": "0e0fe161016eea4327083e697510885768fe33620f95b814fa5703f6ac3d4a7b",
@@ -310,7 +310,7 @@
         "EQ03",
         "EQ06"
       ],
-      "config_version": "a099bdbd413913ac30ef30e9dae44d97519ff41dd5c0bddfac5d53e044d52c71",
+      "config_version": "bf8cc608b47fc8546ebba315a1df627ce158faf3ec41ee9e7aa2bd57c39251b1",
       "data_version": "0e0fe161016eea4327083e697510885768fe33620f95b814fa5703f6ac3d4a7b",
       "decision_cadence_ns": 1000000000,
       "events_sha256": "7e57c1afd1763c22f71f3e0a2523edaae052360546fe47a58907f3d2ddae1056",
@@ -326,7 +326,7 @@
       "seed": 12345,
       "session_id": "mvp-58a10f2194a3c81c",
       "strategy_id": "MVP",
-      "trace_digest": "76c4c51c34149dd0ec73953dbf76e170ff41083ec638e4990e558f26dba8d60b",
+      "trace_digest": "e534ac1f06c505370daf6fa3dae4c3927cb08d2dbec75b1a506118da85598a99",
       "venues": [
         "XV1",
         "XV2",
@@ -334,7 +334,7 @@
       ]
     },
     "trace": {
-      "digest": "76c4c51c34149dd0ec73953dbf76e170ff41083ec638e4990e558f26dba8d60b",
+      "digest": "e534ac1f06c505370daf6fa3dae4c3927cb08d2dbec75b1a506118da85598a99",
       "first_trace_ids": [
         "403020d9da592210fad79613f87ffa19",
         "79968f20da6647bb7a4fd9325850a2f1",
@@ -352,6 +352,6 @@
   "run_id": "58a10f2194a3c81c",
   "seed": 12345,
   "session_id": "mvp-58a10f2194a3c81c",
-  "trace_digest": "76c4c51c34149dd0ec73953dbf76e170ff41083ec638e4990e558f26dba8d60b",
+  "trace_digest": "e534ac1f06c505370daf6fa3dae4c3927cb08d2dbec75b1a506118da85598a99",
   "x-version": 1
 }

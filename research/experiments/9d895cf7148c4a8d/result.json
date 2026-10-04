@@ -5,7 +5,7 @@
   "experiment_id": "9d895cf7148c4a8d",
   "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
   "fold_consistency": 0.5,
-  "git_commit": "59c81d27a0dbc2ad1cd7eaede92f43ed25bddca3",
+  "git_commit": "75fd4f7901025d172a18e62c93252ca1770aeb4c",
   "gross_return_bps": 0.0,
   "hit_rate": 0.5425742574257426,
   "hypothesis_sign_confirmed": true,
