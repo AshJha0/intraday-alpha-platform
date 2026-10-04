@@ -17,9 +17,9 @@ planned paths of the current release, **backlog** says what would prove it done.
 |---|---:|---:|
 | epics | 31 | |
 | issues | 155 | 511 |
-| issues `done` | 98 | 232.5 |
+| issues `done` | 99 | 234.5 |
 | issues `in-progress` | 0 | 0 |
-| issues `backlog` | 57 | 278.5 |
+| issues `backlog` | 56 | 276.5 |
 
 ### By milestone
 
@@ -32,7 +32,7 @@ planned paths of the current release, **backlog** says what would prove it done.
 | Week 4 | 2 | 10 | 10 | 0 | 0 |
 | Week 5 | 2 | 10 | 10 | 0 | 0 |
 | Week 6 | 7 | 24 | 24 | 0 | 0 |
-| Phase 2 | 3 | 9 | 7 | 0 | 2 |
+| Phase 2 | 3 | 9 | 8 | 0 | 1 |
 | Phase 3 | 2 | 9 | 1 | 0 | 8 |
 | Backlog | 7 | 48 | 1 | 0 | 47 |
 
@@ -613,7 +613,7 @@ Treat decay as first-class: PSI/KS feature drift, rolling realized-vs- research 
 
 ### E22 — Research platform — alpha factory
 
-**Status:** partial · **Milestone:** Phase 2 · **Issues:** 4 (done 1, in-progress 0, backlog 3) · **Estimate:** 10 days · **Labels:** `type:epic`, `area:research`, `phase:phase2`, `priority:p2`, `lang:python`, `status:partial`
+**Status:** partial · **Milestone:** Phase 2 · **Issues:** 4 (done 2, in-progress 0, backlog 2) · **Estimate:** 10 days · **Labels:** `type:epic`, `area:research`, `phase:phase2`, `priority:p2`, `lang:python`, `status:partial`
 
 Turn the research framework into a factory: spec-driven batches through the ExperimentRunner, automatic ledger entries, cross-alpha correlation and incremental-contribution gates, and scheduled regeneration of every report so published numbers never go stale silently.
 
@@ -630,7 +630,7 @@ Turn the research framework into a factory: spec-driven batches through the Expe
 |---|---|---|---:|---|---|
 | AF01 | Six flagship research papers with dated errata | done | 3 | Phase 2 | `docs/papers/INDEX.md; docs/papers/01_ofi_predictability_equities.md .. docs/papers/06_cpp_vs_rust_vs_java_event_driven.md` |
 | AF02 | Alpha factory: spec-driven batches through the ExperimentRunner with automatic ledger entries | backlog | 4 | Phase 2 | `python/src/iap/research (V08); research/experiments/README.md` |
-| AF03 | Gate 8: cross-alpha correlation and incremental contribution | backlog | 2 | Phase 2 | `docs/governance/GOVERNANCE.md §2 (gate 8); python/src/iap/validation/metrics.py` |
+| AF03 | Gate 8: cross-alpha correlation and incremental contribution | done | 2 | Phase 2 | `python/src/iap/lifecycle/gates.py; python/src/iap/lifecycle/evidence.py; python/tests/test_lifecycle.py`<br>`python/src/iap/combine; python/tests/test_combine.py; research/combination/REPORT.md; research/combination/signal_correlation.json`<br>`java/src/main/java/com/iap/lifecycle/Gates.java; rust/lifecycle/src/gates.rs; tests/golden/expected_lifecycle.json`<br>`docs/LIFECYCLE.md section 3; PLATFORM_CONVENTIONS.md section 13.4 and 13.8` |
 | AF04 | Scheduled report regeneration in CI with a stale-number diff | backlog | 1 | Backlog | `.github/workflows/ci.yml; tests/harness/check_headline_numbers.py (exit 2 semantics)` |
 
 ## Phase 3

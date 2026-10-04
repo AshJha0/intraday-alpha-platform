@@ -2,7 +2,7 @@
 
 Every gate is one row of :data:`GATE_SPECS`: a name, the evidence block it
 reads, the metric it extracts, the comparison and the config key holding its
-threshold.  A port implements the table, not eighteen classes.
+threshold.  A port implements the table, not twenty classes.
 
 Comparison kinds (pinned):
 

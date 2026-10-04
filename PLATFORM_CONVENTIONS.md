@@ -225,8 +225,8 @@ instance per contract, the pinned `explain()` block, the trace id; `make_golden_
 `expected_canonical_json.json` (the canonical-JSON rules, 2663 float reprs incl. 612 rounding-tie and 17-digit cases, 24 string escapes,
 9 documents, 5 rejects, the trace id, the trace-digest known answers;
 `make_golden_canonical_json.py`), `expected_lifecycle.json` (the 7-state machine: config,
-17-edge transition table, four scripted scenarios step by step under the default policy and one
-under the legacy policy, x-version 2; `make_golden_lifecycle.py`),
+17-edge transition table, six scripted scenarios step by step under the default policy and one
+under the legacy policy, x-version 3; `make_golden_lifecycle.py`),
 `expected_experiment_golden_frame.json` (one `ExperimentSpec` + `ExperimentResult` over the golden
 equity vector, floats 1e-9; `make_golden_research.py`) and `expected_mvp.json` (a whole MVP session:
 stream hashes, counts, P&L, per-alpha realized IC, trace digest; integers/hashes exact, floats 1e-9;
@@ -905,8 +905,8 @@ RETIRED=6 (names on the wire). The transition table is data, pinned as `transiti
 | # | from → to | kind | actor | gates (evaluated in this order) / trigger |
 |---|---|---|---|---|
 | 0 | RESEARCH → CANDIDATE | PROMOTION | SYSTEM | `ledger_entry_exists`, `leakage_clean` |
-| 1 | CANDIDATE → VALIDATING | PROMOTION | SYSTEM | `leakage_clean`, `oos_ic`, `statistical_significance`, `fold_consistency`, `fold_count`, `hypothesis_sign`, `net_pnl_after_costs`, `capacity`, `stability` |
-| 2 | CANDIDATE → RESEARCH | DEMOTION | SYSTEM | taken at once when edge 1's `leakage_clean` fails (carries all nine results) |
+| 1 | CANDIDATE → VALIDATING | PROMOTION | SYSTEM | `leakage_clean`, `oos_ic`, `statistical_significance`, `fold_consistency`, `fold_count`, `hypothesis_sign`, `net_pnl_after_costs`, `net_pnl_bootstrap_ci`, `capacity`, `stability`, `cross_alpha_correlation` |
+| 2 | CANDIDATE → RESEARCH | DEMOTION | SYSTEM | taken at once when edge 1's `leakage_clean` fails (carries every evaluated gate's result) |
 | 3 | VALIDATING → PAPER | PROMOTION | SYSTEM | `holdout_ic_tracks_research`, `replay_reproducible`, `cross_language_parity` |
 | 4 | VALIDATING → CANDIDATE | DEMOTION | SYSTEM | the `max_consecutive_failures`-th (3) consecutive failed evaluation of edge 3 |
 | 5 | PAPER → ACTIVE | PROMOTION | SYSTEM | `paper_min_sessions`, `paper_ic_tracking`, `paper_net_pnl`, `no_kill_events` |
@@ -925,21 +925,63 @@ SYSTEM** (outcome `TERMINAL`; re-entry is the HUMAN reset to RESEARCH — the ad
 RETIRED → WATCH recovery models shadow scoring inside one backtest and is never reached on the
 platform); manual transitions carry `gates = {}`; policy `lifecycle_v1`; no wall clock, no RNG,
 sorted registry iteration. Gate thresholds live in `configs/strategies/lifecycle.json`
-(x-version 2; the promotion defaults equal `iap.validation.validate.GATES`) and the live gates and
+(x-version 3; the promotion defaults equal `iap.validation.validate.GATES`) and the live gates and
 retirement rule in `configs/strategies/strategies.json` `adaptive.lifecycle` — never duplicated.
 **The significance threshold travels with the evidence** (v1.5.0): under `tstat_threshold =
 "ledger"` (default) the `statistical_significance` gate compares `research.t_stat` with
 `max(min_nw_tstat, evidence.significance_threshold)` — the multiple-testing threshold the result
 was judged at — and fails, with `threshold = null`, when the evidence carries none; `"fixed"` is
-the legacy rule (`min_nw_tstat` alone). The gate table and the edges are unchanged. Python, Java
+the legacy rule (`min_nw_tstat` alone). Python, Java
 and Rust implement both significance policies and both retirement rules, selected by name.
+
+**Two gates added to edge 1 in v1.5.0** (the table has 20 gates; the edges are still 17). Both are
+evaluated from the evidence document alone — no port recomputes a signal or resamples.
+
+- **`net_pnl_bootstrap_ci`** (`gt`, directly after `net_pnl_after_costs`): the lower bound of the
+  bootstrap interval of net P&L must be `> gates.min_net_pnl_ci_low` (0.0; strict).
+  *Interval:* the percentile interval of the SUM of the 1-minute bar net P&L by the stationary
+  bootstrap (Politis & Romano 1994; `iap.validation.diagnostics.stationary_bootstrap_ci`): 1 000
+  resamples, mean block `max(1, round(n^(1/3)))` bars, SplitMix64 from the recorded seed
+  (20260829 in the report pipelines), lower empirical quantiles, level `gates.net_pnl_ci_level`
+  (0.95). *Series:* the research backtest at 1x costs — the backtest `net_pnl_after_costs` reads —
+  pooled over ALL walk-forward test folds (`net_pnl_1x_pooled`), where `net_pnl_after_costs` reads
+  the last fold's point estimate. *Evidence:* `pnl_bootstrap = {ci_low, ci_high, level,
+  n_resamples, seed, mean_block, n_bars, n_trades}` (required key; `null` = none). *Fail closed:*
+  a missing block, `n_trades == 0` (no trade in any fold: the degenerate [0, 0] interval is not
+  evidence, and the gate does not pass vacuously), null bounds (fewer than 8 bars) and a level
+  other than the configured one all give `value = null`, failed;
+  `iap.lifecycle.gates.bootstrap_gate_reason` states which. *Not redundant:*
+  `net_pnl_after_costs` is a point estimate on one fold, this is a noise-aware bound on all of
+  them, and an alpha can pass either alone; `stability` reads the Pearson / rank IC gap and nothing
+  of the P&L. The per-fold diagnostics stay report-only: fold-to-fold consistency of the signal is
+  `fold_consistency`, and every fold's P&L is in this gate's pooled series. *Legacy:*
+  `net_pnl_ci_gate = "absent"` (the legacy policy; `"required"` is the default) leaves the gate
+  out of the evaluation and of every result, by name.
+- **`cross_alpha_correlation`** (`max`, last on the edge; backlog AF03): `max |rho|` over the
+  eligible peers must be `<= gates.max_cross_alpha_correlation` (0.7; inclusive, so a tie passes).
+  *Series:* `rho` is the Pearson correlation of two alphas' out-of-sample standardised signals `z`
+  on the rows both score (same instrument, same feature row, both confidences > 0), pooled over
+  instruments and walk-forward test folds (`research/combination/signal_correlation.json`); two
+  alphas with fewer than 32 common rows — an equity and an FX alpha have none — are 0.0 by
+  definition. The signal is gated, not the P&L: under the cost-aware policy most alphas make no
+  trade, so a P&L correlation is undefined exactly where the gate is needed (it is reported).
+  *Peers:* every other registered alpha at or beyond `cross_alpha_min_state` (`VALIDATING`;
+  `PAPER` and `ACTIVE` are the other legal values) and not RETIRED. *Evidence:* `cross_alpha =
+  {peers: [{alpha_id, state, correlation}]}`, sorted by id, never containing the alpha itself
+  (required key; `null` = unmeasured). *Vacuous pass:* no eligible peer gives value 0.0 and passes
+  — the first alpha through is never blocked. *Fail closed:* a `null` block fails with
+  `value = null`. *Order:* the bootstrap evaluates alphas in ascending id at one instant, so of two
+  correlated candidates the smaller id goes first and the larger meets it as a peer; when several
+  peers tie on `|rho|` a report names the smallest id (`binding_peer`).
 Artefacts:
 `research/alpha_registry.json` (x-version 2: each record carries the CUSUM statistic;
 byte-deterministic, re-rendered byte-identically by
 the Rust and Java ports) and `research/lifecycle_transitions.jsonl` (canonical `LifecycleTransition`
 lines, schema-validated on write); `research/lifecycle_log.jsonl` is the adaptive study's policy
 comparison and never sets a state. The bundled result: 24 CANDIDATE / 0 beyond
-(`net_pnl_after_costs` fails for all 24). In the live Java loop the state is **observational**
+(`net_pnl_after_costs` and `net_pnl_bootstrap_ci` fail for all 24 — 17 alphas make no trade, 7
+have a negative lower bound; `cross_alpha_correlation` passes vacuously for all 24, nobody being
+at VALIDATING). In the live Java loop the state is **observational**
 (API_ADAPTIVE.md §6; GOVERNANCE gate 11): the machine decides state, not size.
 
 ### 13.5 The store is a derived, rebuildable index
@@ -1099,6 +1141,45 @@ codes (`iap.research.errors`), and `python -m iap.store sql`, which opens the st
 and takes exactly one statement. The agent layer itself — a write broker and blackboard,
 pre-registration, reserve sessions on a hidden seed, authenticated human approvals, a read-only
 MCP server, agent evaluations — is backlog (EPICS E24 and E30).
+
+### 13.8 Signal combination (research rules)
+
+`iap.combine` (`python -m iap.research combine`; `research/combination/`). A combination is an
+alpha whose inputs are alphas (`CombinedAlpha`, an `AlphaModel`) and is judged by the chain a
+single alpha is judged by: `validate_alpha`, the research cost model and backtester, the ledger
+threshold, the PROMOTE gates. Pinned:
+
+- **Out of sample, twice.** The weights of an outer fold are fitted inside that fold's training
+  window on the members' out-of-sample predictions from 3 inner walk-forward folds (the same
+  `WalkForwardSplitter`: expanding, purged at the combination horizon, 60 s embargo, row-mass
+  folds). Standardisation (per-member mean and scale), weights, the ridge penalty, the shrinkage
+  intensity and the output scale are all functions of training rows only; a member with a longer
+  label horizon is fitted on the training rows minus the last `member horizon − combination
+  horizon`. `python/tests/test_combine.py` proves it per fold and per method: truncating the data
+  at the test start, garbling or shifting every later label, or rescaling every later feature
+  leaves the fitted parameters bit-identical, and a combiner that does read test rows fails the
+  same test.
+- **Methods** by name: `equal_weight` (default; the baseline every other method must beat),
+  `ic_weighted` (IC over residual variance; a member whose in-window IC contradicts its hypothesis
+  gets 0, not a short), `ridge` (penalty from {0.01, 0.1, 1, 10, 100} by forward-chained CV over
+  the inner folds, never on a test fold; the larger penalty on a tie), `shrinkage_mv`
+  (Ledoit–Wolf shrinkage towards a scaled identity, numpy only). `ridge` and `shrinkage_mv`
+  account for member correlation explicitly through the (shrunk) signal covariance;
+  `equal_weight` and `ic_weighted` do not, and nothing is orthogonalised.
+- **Members** are every alpha of the asset class whatever its verdict (no survivorship in member
+  selection); the horizon is the members' lower-median label horizon (EQUITY 5s, FX 1m).
+- **Looks.** One combination experiment (a member list under one method) debits
+  `looks_per_validation(n_folds) + K` = 83 + K: its validation chain plus one look per member
+  scored against the combination label. A report over `M` methods declares `M × (83 + K)` looks
+  before the first is evaluated, so every method — the default included — is judged at a
+  threshold that has paid for the alternatives. The ridge grid is not debited separately: it is
+  searched inside the training window. The identity (`experiment_id`, ledger key) includes the
+  sorted member list, the method, the horizon and the protocol.
+- **The blend is accumulated member by member**, not as a BLAS product: a matrix–vector product
+  can round one row differently depending on how many rows follow it, which the truncation and
+  recompute leakage probes (rightly) reject.
+- A combination is not registered in `research/alpha_registry.json`; the registry holds the 24
+  flagship alphas.
 
 ## 14. Pinned semantics corrected on 2026-09-20 (correctness review)
 

@@ -223,6 +223,11 @@ class CombinedAlpha(AlphaModel):
         """True when the fit found nothing to trade on (module docs)."""
         return not (self.sigma > 0.0) or self.beta == 0.0 or not np.any(self.weights != 0.0)
 
+    @property
+    def members(self) -> dict[str, AlphaModel]:
+        """The fitted member models, by alpha id (empty before ``fit``)."""
+        return dict(self._members)
+
     def _fit_members(self, train: Mapping[int, pd.DataFrame]) -> dict[str, AlphaModel]:
         members: dict[str, AlphaModel] = {}
         for aid in self.member_ids:

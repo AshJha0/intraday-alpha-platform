@@ -1133,3 +1133,125 @@ PLATFORM_CONVENTIONS.md §13.6 has the table of defaults and legacy names.
 - Migration path for stored data: none can be migrated — regenerate
   (`python3 tools/regenerate_dataset_artifacts.py`, CONTRIBUTING.md §4.1).
   To keep a v1.4.0 number, select the legacy rule by name.
+
+## 2026-10-04 — v1.5.0: signal combination and two lifecycle gates; `lifecycle.json` 2 -> 3, golden `expected_lifecycle.json` 2 -> 3, the evidence document gains `pnl_bootstrap` and `cross_alpha`; new non-wire documents `COMBINATION.json` and `signal_correlation.json` (x-version 1)
+
+No wire schema under `schemas/` changed and no golden event vector moved.
+The dataset did not change (`data_version` `116b7787…`) and no alpha report
+was re-run. Pull request #25, on top of the default-methods change above.
+
+- **Why.** Twenty-four alphas were judged one at a time. Nothing measured
+  what they add to each other (backlog AF03, "gate 8"), nothing combined
+  them, and the bootstrap interval of net P&L that the default methods
+  report gated nothing.
+- **`configs/strategies/lifecycle.json` `x-version` 2 -> 3.** New required
+  keys: `cross_alpha_min_state` (`"VALIDATING"`; `"PAPER"` and `"ACTIVE"`
+  are the other legal values), `net_pnl_ci_gate` (`"required"`; `"absent"`
+  is the legacy policy), and in `gates`: `max_cross_alpha_correlation`
+  (0.7, in [0, 1]), `min_net_pnl_ci_low` (0.0), `net_pnl_ci_level` (0.95, in
+  (0, 1)). The Python, Java and Rust loaders reject a version-2 document.
+  The merged view (`PolicyConfig.to_dict`, the golden's `config`) carries
+  the same keys, `gates` now 17 of them.
+  `deployment/k8s/configmap-configs.yaml` was regenerated for it.
+- **The gate table: 18 -> 20 rows; the 17 edges are unchanged.** Edge 1
+  (CANDIDATE -> VALIDATING) evaluates eleven gates:
+  `net_pnl_bootstrap_ci` directly after `net_pnl_after_costs`, and
+  `cross_alpha_correlation` last. Definitions: PLATFORM_CONVENTIONS.md
+  §13.4, docs/LIFECYCLE.md §3. Under `net_pnl_ci_gate = "absent"` the
+  bootstrap gate is not evaluated and is in no result (ten gates); the
+  correlation gate is a row under either policy.
+- **Evidence document** (`iap.lifecycle.Evidence`, read by Python, Java and
+  Rust): two new REQUIRED keys, each `null` or an object.
+  `pnl_bootstrap = {ci_low, ci_high, level, n_resamples, seed, mean_block,
+  n_bars, n_trades}` (bounds both `null` or both numbers).
+  `cross_alpha = {peers: [{alpha_id, state, correlation}]}` (peers strictly
+  increasing by `alpha_id`; `state` a lifecycle state name; `correlation` in
+  [-1, 1]). An evidence document written before this change is rejected by
+  every reader. Key order: `research, capacity_usd,
+  significance_threshold, pnl_bootstrap, cross_alpha, validation, paper,
+  live`.
+- **Decisions pinned here.**
+  - *Which series the correlation gate reads.* The out-of-sample
+    standardised SIGNAL on common rows, pooled across instruments and folds
+    — not realised P&L, which does not exist for the 17 alphas that make no
+    trade. P&L correlation is reported, not gated.
+  - *Vacuous pass.* No peer at or beyond `cross_alpha_min_state` gives the
+    value 0.0 and passes. *Missing evidence* (`cross_alpha: null`) fails
+    closed with `value = null`.
+  - *Order.* The bootstrap registers and evaluates alphas in ascending
+    `alpha_id` at one instant; an alpha's peers are the alphas registered
+    before it. Ties on `|correlation|` name the smallest id.
+  - *The bootstrap gate reads the pooled interval, the cost gate the last
+    fold.* `net_pnl_after_costs` is unchanged (last fold, point estimate);
+    `net_pnl_bootstrap_ci` reads the interval of the P&L pooled over all
+    folds: stationary bootstrap, 1 000 resamples, mean block
+    `max(1, round(n^(1/3)))`, seed 20260829, level 0.95, all recorded in the
+    evidence. An alpha with `n_trades = 0` FAILS (no interval; the gate does
+    not pass vacuously). `stability` is unrelated (Pearson / rank IC gap);
+    the per-fold diagnostics stay report-only, because the signal's
+    fold-to-fold consistency is `fold_consistency` and every fold's P&L is
+    already in the pooled series.
+  - *Looks of a combination.* `looks_per_validation(4) + K` = 83 + K per
+    (member list, method) experiment; a report over M methods declares all
+    of them before evaluating the first.
+- **Research documents.**
+  - `research/combination/COMBINATION.json` (new, `x-version` 1): the
+    report document. `research/combination/reports/<COMB_EQ|COMB_FX>.<method>.json`:
+    the full `validate_alpha` report of each of the eight experiments, with
+    `experiment_id` and `combination` (the identity) added.
+  - `research/combination/signal_correlation.json` (new, `x-version` 1):
+    `correlation[a][b]` and `n_common[a][b]` for the 24 alphas; pairs with
+    fewer than 32 common rows are 0.0. Read by `iap.lifecycle.bootstrap`.
+  - `research/experiments.json` (`x-version` 3, shape unchanged): eight new
+    entries of kind `combination` (`alpha_id` `COMB_EQ` / `COMB_FX`, 95 looks
+    each, one `gate_looks`). Total 4,396 -> 5,156.
+  - `research/alpha_registry.json` (`x-version` 2, shape unchanged): the
+    last evaluation of each alpha carries the two new gate results.
+    `research/lifecycle_transitions.jsonl` is unchanged (the same 24
+    RESEARCH -> CANDIDATE lines).
+- **Golden.** `tests/golden/expected_lifecycle.json` `x-version` 2 -> 3,
+  route (a) (the rule is ported, the vector follows it): the config and the
+  evidence carry the new keys; scenarios LC05 (correlation gate: missing
+  evidence, fail, absolute value and ineligible states, vacuous pass, tie,
+  empty peer list, additive pass) and LC06 (bootstrap gate: missing block,
+  negative bound, no trade, no bounds, wrong level, zero bound, pass); the
+  earlier scripts carry an empty `cross_alpha` block and a passing
+  `pnl_bootstrap` block; LG01 carries no `pnl_bootstrap` and is promoted on
+  ten gates. 52 default and 9 legacy transitions. Replayed by Python, Java
+  (`LifecycleGoldenTest`) and Rust (`golden_lifecycle.rs`).
+  `tests/golden/expected_mvp.json` (`x-version` 1): `mvp.config_version`
+  hashes `research/alpha_registry.json`, whose evaluations gained two gate
+  results, so it moves (`bf8cc608…` -> `439bbad5…`) and with it the trace
+  digest (`e534ac1f…` -> `20d4ff76…`: every trace carries
+  `config_version`). Events, decisions, parents, fills, P&L and the run id
+  are identical. Every other golden was regenerated and came out
+  byte-identical.
+- **Ports.** Java: `Evidence.PnlBootstrap`, `Evidence.Peer`,
+  `Evidence.CrossAlpha`, `Gates.NET_PNL_BOOTSTRAP_CI`,
+  `Gates.CROSS_ALPHA_CORRELATION`, `PolicyConfig` (version 3,
+  `crossAlphaMinState`, `netPnlCiGate`, three `Gates` fields),
+  `AlphaLifecycle.edgeGates`. Rust `lifecycle`: `PnlBootstrapEvidence`,
+  `PeerCorrelation`, `CrossAlphaEvidence`, `GATE_SPECS` (20), `NetPnlCiGate`,
+  `PolicyConfig::evaluated_gates`, `LIFECYCLE_CONFIG_VERSION` 3. Neither
+  port computes a correlation or resamples. C++ has no lifecycle port.
+- **Regeneration.** Only what the change touches was regenerated, on the CI
+  runner: `tools/regenerate_dataset_artifacts.py --only
+  dataset,features,combination,lifecycle,goldens` through the manual
+  `regenerate` job (new input `regenerate_only`; run 37185148194). The
+  report pipelines were not re-run: their results do not depend on this
+  change, and a re-run would be recorded as one. The combination was
+  therefore judged on the ledger as it stood (4,396 looks + its own 760);
+  in a whole-chain regeneration the `combination` step runs after
+  `experiments` and before `lifecycle`, and its look count would be the
+  ledger's at that point.
+- **API changes a caller must make.** `Evidence(...)` for a CANDIDATE
+  evaluation needs `pnl_bootstrap=` and `cross_alpha=` to pass (both default
+  to `None`, which fails closed); `PolicyConfig` and `GateThresholds` have
+  the new fields. `AlphaLifecycle.edge_gates(edge)` is the list a policy
+  evaluates.
+- **Not done.** The combination is not registered in the lifecycle
+  registry. The correlation gate's result is in the registry evaluation,
+  not in `research/alpha_reports/<ID>.json`.
+- Migration path for stored data: an evidence document or `lifecycle.json`
+  written before this change must be rewritten with the new keys; there is
+  nothing to convert in the research store.

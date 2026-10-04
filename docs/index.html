@@ -65,15 +65,15 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
 <div class="wrap">
   <h2>Measured, not claimed</h2>
   <div class="numbers">
-    Cross-language parity&nbsp;&nbsp;&nbsp; python 1672&nbsp; · cpp 289&nbsp; · rust 330&nbsp; · java 517 tests — 2,808 green, one command; golden groups 173/68/66/106<br>
+    Cross-language parity&nbsp;&nbsp;&nbsp; python 1764&nbsp; · cpp 289&nbsp; · rust 355&nbsp; · java 537 tests — 2,945 green, one command; golden groups 177/68/68/108<br>
     Golden suites&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; identical book states, byte-identical IAP1 SHA-256, features/alphas to 1e-9, byte-identical canonical JSON, trace digests, risk audit and lifecycle registry in all four languages<br>
     C++ hot path&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; IAP1 decode 184.1 ns/event (CRC-32 verified) · book update 26.4 ns · replay 27.2M events/s · 48-feature engine 514.1 ns/event · one decision trace 31.7 µs/trace off the event loop<br>
     Determinism&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; full dataset regeneration is byte-identical (sha256-verified); replays reproduce fills exactly; the MVP run twice and replayed from its capture reproduces its trace digest<br>
     Contracts&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 17 JSON Schemas · 22 typed contracts · 18 Protocols; Python risk and execution ports proven by the Rust and C++ goldens (audit + snapshot byte-identical, fills bit-identical)<br>
     Feature factory&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 205 registered, versioned features across 10 families; validity-bitset semantics, no NaN ever valid<br>
     Alpha research&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 24 flagship alphas · walk-forward + purging/embargo · 4,396-look multiple-testing ledger over 208 distinct configurations, both datasets and both method bundles counted (expected max |t| 4.096, Bonferroni |t| ≥ 4.389)<br>
-    Promotion lifecycle&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 7 states · 17 pinned edges · 18 gates; bundled data: 24 alphas at CANDIDATE, 0 beyond — every one fails net P&amp;L after costs and capacity<br>
-    MVP golden run&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 15,805 events · 800 decisions · 235 parent orders · 169 fills · P&amp;L −81.53 USD (cost-negative, stated) · digest e534ac1f…<br>
+    Promotion lifecycle&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 7 states · 17 pinned edges · 20 gates; bundled data: 24 alphas at CANDIDATE, 0 beyond — every one fails net P&amp;L after costs and capacity<br>
+    MVP golden run&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 15,805 events · 800 decisions · 235 parent orders · 169 fills · P&amp;L −81.53 USD (cost-negative, stated) · digest 20d4ff76…<br>
     Adaptive lifecycle&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; PSI/KS drift monitors · 88 drift-triggered refits in the study · CUSUM retirement rule · RETIRED halts allocation in the backtest, pages a human live<br>
     Verdicts (honest)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0 PROMOTE · 11 ITERATE · 13 REJECT — 3 alphas clear the multiple-testing threshold (t ≥ 4.365), 18 never forecast a move larger than their cost and make no trade, the 6 that trade lose; nothing survives costs, and we say so<br>
     Power study&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; planted order-flow effect reaches t ≥ 3 in 1 of 3 seeds at the reference size and 3 of 3 at twice that size, where the cost-aware backtest makes 14 trades on average and no fold survives costs · planted lead-lag never significant (ITERATE-level in 1 or 2 of 3 seeds) · nothing promoted at any size — 3 seeds per cell, a calibration, not a power curve
@@ -250,7 +250,7 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
          (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/API_CONTRACTS.md">API_CONTRACTS</a>,
          <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/API_TRADING.md">API_TRADING</a>).</p></div>
     <div class="card"><h3>Promotion lifecycle</h3>
-      <p>RESEARCH → CANDIDATE → VALIDATING → PAPER → ACTIVE ⇄ WATCH → RETIRED: 17 pinned edges, 18 gates
+      <p>RESEARCH → CANDIDATE → VALIDATING → PAPER → ACTIVE ⇄ WATCH → RETIRED: 17 pinned edges, 20 gates
          reading typed evidence, a byte-deterministic registry and transition log, ports in Java and
          Rust from one golden. Bootstrapped on the bundled research: 24 CANDIDATE, 0 beyond.</p></div>
     <div class="card"><h3>Decision trace &amp; data model</h3>

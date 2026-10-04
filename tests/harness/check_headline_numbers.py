@@ -391,7 +391,7 @@ def check_contract_counts(docs: dict[str, str]) -> None:
 
 
 def check_lifecycle_numbers(docs: dict[str, str]) -> None:
-    """24 alphas / 24 CANDIDATE (registry), 7 states / 17 edges (golden), 18 gates."""
+    """24 alphas / 24 CANDIDATE (registry), 7 states / 17 edges (golden), 20 gates."""
     reg_path = ROOT / "research" / "alpha_registry.json"
     gold_path = ROOT / "tests" / "golden" / "expected_lifecycle.json"
     if not reg_path.exists() or not gold_path.exists():

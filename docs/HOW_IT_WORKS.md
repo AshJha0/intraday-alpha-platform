@@ -352,16 +352,24 @@ promotion needs every gate of its edge to pass:
 | edge | gates |
 |---|---|
 | RESEARCH → CANDIDATE | a ledger entry exists; leakage clean |
-| CANDIDATE → VALIDATING | leakage clean; out-of-sample IC; statistical significance; fold consistency; fold count; hypothesis sign; **net P&L after costs**; capacity; stability |
+| CANDIDATE → VALIDATING | leakage clean; out-of-sample IC; statistical significance; fold consistency; fold count; hypothesis sign; **net P&L after costs**; **the bootstrap lower bound of net P&L**; capacity; stability; **correlation with alphas already through** |
 | VALIDATING → PAPER | holdout IC tracks research; replay reproducible; cross-language parity |
 | PAPER → ACTIVE | minimum paper sessions; paper IC tracking; paper net P&L; no kill events |
 | ACTIVE ⇄ WATCH → RETIRED | rolling live IC |
 
 On the bundled data all 24 alphas reach CANDIDATE and stop there. Every
-one fails the same two gates: net P&L after costs, and capacity (an alpha
+one fails the same three gates: net P&L after costs, the bootstrap bound
+on it, and capacity (an alpha
 that does not trade, or trades at a loss, has an edge-breakeven capacity
 below the 1,000,000 USD the gate asks for). For three of them (EQ02, EQ03,
-EQ12) those are the only gates that fail. Statistical significance fails
+EQ12) those are the only gates that fail.
+The bootstrap gate asks for more than a positive number: the lower end of
+a 95 % interval around the net P&L of all four folds has to be above zero,
+and an alpha that never trades has no interval and fails (17 of the 24;
+the 7 that trade lose). The correlation gate asks whether a candidate is
+more than 0.7 correlated with an alpha that is already at VALIDATING or
+beyond; nobody is, so it passes for all 24 without having been tested —
+§2.13 shows what it would do. Statistical significance fails
 for 21, stability for 14, the IC gate for 12. Under the v1.4.0 rules the
 cost gate failed for all 24 and was the only failure for four (the three
 above and FX04, whose t of 4.24 is now below the threshold).
@@ -465,6 +473,71 @@ PYTHONPATH=src python3 -m pytest -q tests/test_validation_framework.py tests/tes
 ```
 
 ---
+
+### 2.13 Combining weak signals, and breadth
+
+One weak signal is a small edge on a noisy forecast. The standard answer
+is to combine many: if the errors of the signals are not perfectly
+correlated they average down faster than the common forecast does. For
+`K` standardised signals with mean IC `ic` and mean pairwise correlation
+`rho`, the equal-weight blend has
+
+    IC_blend = ic × sqrt( K / (1 + (K − 1) × rho) )
+
+The square-root term is the **breadth** you actually have. With `rho = 0`
+it is `sqrt(K)`: twelve independent signals triple the IC (√12 ≈ 3.5).
+With `rho = 1` it is 1: twelve copies of one signal are one signal. This is
+the "fundamental law" — information ratio ≈ IC × √breadth — and its fine
+print: breadth counts *independent* bets.
+
+`iap.combine` builds the blend as an alpha whose inputs are alphas and
+sends it through the same validation as any single alpha (§2.5–§2.11).
+Three things are specific to it.
+
+**The weights are fitted out of sample.** In each walk-forward fold the
+weights are estimated inside the training window, on predictions the
+members made for rows they were not fitted on (three inner folds, same
+purge and embargo). A weight never sees a test row; a test corrupts every
+row from the test start onwards and checks that not one fitted number
+moves. Four methods are available — equal weights (the default, and the
+baseline: it estimates nothing), IC weights, ridge regression with the
+penalty chosen inside the training window, and a mean-variance blend on a
+shrunk covariance matrix. The last two account for correlation between
+members; the first two do not.
+
+**Combining is a search, and is charged as one.** Each (member list,
+method) pair costs 83 + K looks — its validation plus one per member — and
+a report that tries four methods declares all four before it evaluates the
+first. The committed report was charged 760 of them and was judged at a t threshold
+of 4.42.
+
+**The result, on this data.** `research/combination/REPORT.md`:
+
+| | members | mean member IC | effective bets | expected blend IC | measured IC | gate t | net P&L (all folds) | verdict |
+|---|---|---|---|---|---|---|---|---|
+| equities, equal weight | 12 | 0.0038 | 6.5 of 12 | 0.0099 | 0.0105 | 1.98 | 0 (no trade) | ITERATE |
+| equities, ridge | 12 | | | | 0.0429 | 7.06 | −73 USD | ITERATE |
+| FX, equal weight | 12 | 0.0109 | 9.9 of 12 | 0.0348 | 0.0315 | 3.22 | −13 USD | ITERATE |
+| FX, ridge | 12 | | | | 0.0482 | 4.73 | −1 627 USD | ITERATE |
+
+The arithmetic works: the measured equal-weight IC is what mean IC × √breadth
+predicts, to within a few parts in ten thousand. The fitted methods do
+better statistically — the equity ridge blend has an IC of 0.043 and a t of
+7. And none of the eight combinations is promotable, for the reason no
+member is: the forecast, in return units, is smaller than the cost of
+acting on it. The equity blends make between 0 and 6 trades in four folds;
+the FX blends that trade lose. Breadth multiplies IC. It does not multiply
+the size of the move being forecast, and that — not statistical
+significance — is what this dataset lacks.
+
+**Why a correlation gate follows.** Of the twelve equity alphas, three
+(EQ02, EQ03, EQ12 — three ways of measuring order-flow imbalance) are
+correlated 0.95 to 1.00. They look like three alphas that each pass the
+significance gate; they are one bet counted three times, and the twelve
+equity signals hold about 6.5 independent bets. Allocating to all three
+would triple the position in one idea. The lifecycle's correlation gate
+(§2.11) refuses that: once one of them is at VALIDATING, the other two are
+held at CANDIDATE.
 
 ## 3. Algo and execution: how an order becomes fills
 

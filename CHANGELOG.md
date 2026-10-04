@@ -146,6 +146,72 @@ Also changed:
 - Lifecycle golden scenarios LC04 (what the CUSUM rule changes) and LG01
   (the legacy policy); the backtest golden's `default_rules` block.
 
+### Added — signal combination and the correlation gate
+
+Pull request [#25](https://github.com/AshJha0/intraday-alpha-platform/pull/25).
+
+- **`iap.combine`** — many weak signals into one forecast per instrument
+  and timestamp. `CombinedAlpha` is an `AlphaModel` whose inputs are
+  alphas; its weights for a walk-forward fold are fitted inside that fold's
+  training window, on the members' out-of-sample predictions from three
+  inner purged and embargoed walk-forward folds (stacking). Four methods by
+  name: `equal_weight` (the default and the baseline), `ic_weighted`,
+  `ridge` (penalty chosen by forward-chained CV inside the training
+  window) and `shrinkage_mv` (Ledoit–Wolf shrinkage, numpy only). `ridge`
+  and `shrinkage_mv` account for member correlation explicitly; the other
+  two do not, and nothing is orthogonalised (API_ALPHA.md §8,
+  PLATFORM_CONVENTIONS.md §13.8).
+- **Leakage tests** (`python/tests/test_combine.py`): for every fold and
+  method the fitted parameters are bit-identical when the data is
+  truncated at the test start and when every later label is garbled or
+  shifted or every later feature rescaled; a combiner that reads test rows
+  fails the same test. The platform's truncation and recompute probes
+  found one real defect during development — a BLAS matrix product
+  rounding a row differently depending on the rows after it — and the
+  blend is now accumulated member by member.
+- **The combination as a research object**: `python -m iap.research
+  combine` validates each (asset class, method) combination with
+  `validate_alpha` under the `v2` bundle, debits `83 + K` looks per
+  experiment (760 for 12 members, 4 methods, 2 asset classes — all
+  declared before the first is evaluated), and writes
+  `research/combination/{REPORT.md, COMBINATION.json, reports/,
+  signal_correlation.json}`: IC and gate t of each member against the
+  combination, the signal and P&L correlation matrices, the effective
+  number of independent bets, weights per fold and their stability, net
+  P&L after costs, and the breadth arithmetic next to the measurement.
+- **`cross_alpha_correlation`** (lifecycle gate; backlog AF03, closed):
+  on CANDIDATE → VALIDATING, the largest absolute out-of-sample signal
+  correlation with any alpha at or beyond `cross_alpha_min_state`
+  (`VALIDATING`) must be at most `max_cross_alpha_correlation` (0.7).
+  No such alpha: vacuous pass at 0.0. No evidence: fail closed.
+- **`net_pnl_bootstrap_ci`** (lifecycle gate): on the same edge, the lower
+  bound of the 95 % stationary-bootstrap interval of the pooled 1×-cost
+  net P&L must be above zero. An alpha that makes no trade has no
+  interval and fails. This closes the item the release first shipped as
+  report-only. Absent, by name, under the legacy policy
+  (`net_pnl_ci_gate = "absent"`).
+- Both gates are rows of the gate table in **Python, Java and Rust** (20
+  gates, 17 edges) and are evaluated from the evidence document alone
+  (`cross_alpha`, `pnl_bootstrap`); `lifecycle.json` and the lifecycle
+  golden move to `x-version` 3, with scenarios LC05 and LC06. C++ has no
+  lifecycle port.
+- `tools/regenerate_dataset_artifacts.py` gains the `combination` step;
+  the manual `regenerate` CI job takes `regenerate_only` (a subset of
+  steps).
+
+**Result.** 0 PROMOTE / 8 ITERATE / 0 REJECT over the eight combinations.
+The equal-weight blends measure what the breadth arithmetic predicts
+(equities: gate IC 0.0105 against an expected 0.0099, 6.5 effective bets
+of 12; FX: 0.0315 against 0.0348, 9.9 of 12). The fitted equity blends
+clear the significance threshold of 4.42 (ridge: gate IC 0.0429, t 7.06)
+and every combination fails the cost gate: the equity blends make 0 to 6
+trades in four folds, the FX blends that trade lose (ridge −1 627 USD).
+In the registry all 24 alphas stay at CANDIDATE; all 24 fail
+`net_pnl_bootstrap_ci` (17 make no trade, 7 have a negative lower bound)
+and pass `cross_alpha_correlation` vacuously. No verdict changed. The
+correlation document shows EQ02 / EQ03 / EQ12 correlated 0.95–1.00: with
+one of them at VALIDATING the gate would hold the other two.
+
 ### Results
 
 Same dataset, new rules. Nothing is promoted, before or after.
@@ -175,7 +241,7 @@ Same dataset, new rules. Nothing is promoted, before or after.
 | power study, planted lead-lag: significant at any size; evidence at 0.5× / 1× / 2× | 0; 0 / 0 / 0 | 0; 1 / 1 / 2 of 3 seeds |
 | power study, PROMOTE on any planted effect; any detection at level 0 | 0; 0 | 0; 0 |
 | MVP session: events, decisions, parents, fills, P&L | 15,805, 800, 235, 169, −81.53 USD | unchanged |
-| MVP `config_version`; trace digest | `f293e7e7…`; `f51890da…` | `bf8cc608…`; `e534ac1f…` |
+| MVP `config_version`; trace digest | `f293e7e7…`; `f51890da…` | `439bbad5…`; `20d4ff76…` |
 
 - **What the cost-aware policy shows.** Under the sign policy every alpha
   traded every row and lost five or six figures; that loss measured the

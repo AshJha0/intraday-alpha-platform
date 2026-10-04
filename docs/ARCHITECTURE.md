@@ -126,7 +126,7 @@ flowchart TD
     TCA --> TRACE["Decision trace — one DecisionTrace per decision<br/>signal · portfolio · risk · orders · routing · fills · TCA · attribution<br/>canonical JSONL + stream digest + SQLite index (iap.store); explain()"]
     LBL --> RESEARCH
     TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (4,396 looks / 208 configs, two datasets, two method bundles)<br/>REPORT.md, ML_REPORT.md, model manifests"]
-    RESEARCH --> LIFE["Alpha promotion lifecycle (iap.lifecycle)<br/>RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE <-> WATCH -> RETIRED<br/>18 gates, 17 edges; bundled data: 24 CANDIDATE / 0 beyond"]
+    RESEARCH --> LIFE["Alpha promotion lifecycle (iap.lifecycle)<br/>RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE <-> WATCH -> RETIRED<br/>20 gates, 17 edges; bundled data: 24 CANDIDATE / 0 beyond"]
     LIFE -. "gated, ledgered transitions<br/>(research/alpha_registry.json)" .-> ALPHA
 ```
 
@@ -248,10 +248,10 @@ flowchart LR
     MG --> EXP[("expected_*.json<br/>codec sha256 | book states | features<br/>alpha | backtest | risk decisions + audit + snapshot<br/>replay fills | portfolio | tca (+ timeline cases) | adaptive<br/>contracts examples | canonical json + trace digest<br/>lifecycle | experiment golden frame | mvp")]
     CPPTOOL["cpp/tools/make_replay_fills_golden<br/>(C++ is the fills reference;<br/>Python iap.execution consumes it too)"] --> EXP
     RSTOOL["rust/risk/src/bin/make_risk_golden<br/>(Rust is the risk reference;<br/>Python iap.risk consumes it too)"] --> EXP
-    GV --> PY["python: pytest -k golden<br/>173 tests"]
+    GV --> PY["python: pytest -k golden<br/>177 tests"]
     GV --> CPP["cpp: ctest -R Golden<br/>68 tests"]
-    GV --> RS["rust: 9 golden test targets<br/>66 tests"]
-    GV --> JV["java: all thirteen *GoldenTest (JUnitCore)<br/>106 golden-group tests"]
+    GV --> RS["rust: 9 golden test targets<br/>68 tests"]
+    GV --> JV["java: all thirteen *GoldenTest (JUnitCore)<br/>108 golden-group tests"]
     EXP --> PY
     EXP --> CPP
     EXP --> RS
@@ -282,7 +282,7 @@ and are matched by Java, Rust and C++ (the trace and canonical-JSON ports)
 and by Java and Rust (the lifecycle ports). The harness
 (`tests/harness/run_all.sh`, with `run_golden.sh` as the golden-only alias)
 runs every suite with the canonical commands and prints the parity table; a
-v1.5.0 CI run (2026-10-04) passes 1672/289/330/517 tests (173/68/66/106
+v1.5.0 CI run (2026-10-04) passes 1764/289/355/537 tests (177/68/68/108
 golden) across python/cpp/rust/java, plus the repo-level `integration` (35)
 and `replay` (6) rows — the same counts the README parity table records.
 
@@ -595,7 +595,7 @@ book → `FeatureEngine` → three fitted `linear_z_v1` alphas ensembled →
 and compares bytes; `replay` re-runs it from the captured stream and must
 reproduce the trace digest; `tests/golden/expected_mvp.json` pins the golden
 run (seed 12345: 15,805 events, 800 decisions, 235 parents, 169 fills,
-−81.53 USD, digest `e534ac1f…`) as the cross-language pin for any port of
+−81.53 USD, digest `20d4ff76…`) as the cross-language pin for any port of
 the loop (docs/MVP.md §9 lists what a port must reproduce). The result is
 cost-negative and the realized-IC audit (docs/MVP.md §7.1) is part of the
 document: the MVP's mid-to-mid IC is 0.13–0.21 away from the research IC

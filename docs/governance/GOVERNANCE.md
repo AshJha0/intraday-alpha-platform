@@ -121,8 +121,14 @@ multiple-testing threshold the evidence carries (never below 3.0;
 `tstat_threshold = "fixed"` is the legacy rule), and the live sub-machine
 retires by the CUSUM rule (`breach_rule = "consecutive"` is the legacy
 rule). Bundled result: 24 CANDIDATE, 0
-beyond — every alpha fails `net_pnl_after_costs` and `capacity`. Gate 8 (cross-alpha
-correlation) is not yet a lifecycle gate (backlog AF03).
+beyond — every alpha fails `net_pnl_after_costs`, `net_pnl_bootstrap_ci` and
+`capacity`. Gate 8 (cross-alpha correlation) is the lifecycle gate
+`cross_alpha_correlation` on CANDIDATE → VALIDATING since v1.5.0 (AF03): the
+largest absolute signal correlation with an alpha at or beyond VALIDATING
+must not exceed 0.7. It passes vacuously for all 24 today, nobody being that
+far. The same release made the bootstrap interval of net P&L a gate
+(`net_pnl_bootstrap_ci`: lower bound above zero, and an alpha that makes no
+trade fails it).
 
 **The ledger-id rule (CONTRIBUTING.md §6).** A change to a verdict in
 `research/alpha_reports/*.json`, to a lifecycle state, or to an alpha's
