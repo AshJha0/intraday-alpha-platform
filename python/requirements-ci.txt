@@ -10,6 +10,7 @@
 attrs==26.1.0
 cloudpickle==3.1.2
 coverage==7.16.2
+execnet==2.1.2
 iniconfig==2.3.0
 joblib==1.6.0
 jsonschema-specifications==2025.9.1
@@ -22,6 +23,7 @@ pluggy==1.6.0
 pyarrow==25.0.1
 pygments==2.21.0
 pytest-cov==7.1.0
+pytest-xdist==3.8.0
 pytest==9.1.1
 python-dateutil==2.9.0.post0
 pyyaml==6.0.3

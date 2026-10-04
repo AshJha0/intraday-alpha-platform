@@ -5,7 +5,7 @@ The policy has two parts, loaded from two files and merged into one
 
 * the **promotion gates** (RESEARCH -> CANDIDATE -> VALIDATING -> PAPER ->
   ACTIVE) and the demotion counter, from ``configs/strategies/lifecycle.json``
-  (``x-version`` 2).  Its defaults equal the spec section 20 gates pinned in
+  (``x-version`` 3).  Its defaults equal the spec section 20 gates pinned in
   ``iap.validation.validate.GATES`` (OOS IC >= 0.01, t >= 3.0 as the floor,
   fold sign consistency >= 0.70, >= 3 folds, positive net P&L at 1x cost) so
   the lifecycle can never disagree with a REPORT.md verdict about *which*
@@ -16,7 +16,21 @@ The policy has two parts, loaded from two files and merged into one
   (``Evidence.significance_threshold``) and applies
   ``max(min_nw_tstat, that)``; evidence that carries no such threshold
   FAILS the gate.  ``"fixed"`` — the legacy rule — applies ``min_nw_tstat``
-  alone and ignores the evidence field;
+  alone and ignores the evidence field.  ``cross_alpha_min_state`` and
+  ``gates.max_cross_alpha_correlation`` (new in ``x-version`` 3) configure
+  the ``cross_alpha_correlation`` gate (``iap.lifecycle.gates``, "The
+  cross-alpha correlation gate"): a peer counts when its lifecycle state is
+  at or beyond ``cross_alpha_min_state`` (one of ``VALIDATING`` / ``PAPER``
+  / ``ACTIVE``) and it is not RETIRED, and the candidate's largest absolute
+  signal correlation with such a peer must not exceed the threshold.
+  ``net_pnl_ci_gate`` (``x-version`` 3) says whether the
+  ``net_pnl_bootstrap_ci`` gate is part of the CANDIDATE -> VALIDATING edge:
+  ``"required"`` — the default — evaluates it, ``"absent"`` — the legacy
+  policy, which had no such gate — leaves it out of the evaluation, by
+  name.  ``gates.net_pnl_ci_level`` is the confidence level the interval in
+  the evidence must have been taken at and ``gates.min_net_pnl_ci_low`` the
+  value its lower bound must exceed (``iap.lifecycle.gates``, "The net P&L
+  bootstrap gate");
 * the **live sub-machine** (ACTIVE <-> WATCH -> RETIRED), from
   ``configs/strategies/strategies.json`` ``adaptive.lifecycle`` — the existing
   :class:`iap.adaptive.lifecycle.LifecycleConfig` (gates, the retirement
@@ -42,6 +56,8 @@ from typing import Any
 from iap.adaptive.lifecycle import LifecycleConfig
 
 __all__ = [
+    "CROSS_ALPHA_MIN_STATES",
+    "NET_PNL_CI_GATE_POLICIES",
     "DEFAULT_LIFECYCLE_PATH",
     "DEFAULT_STRATEGIES_PATH",
     "LIFECYCLE_CONFIG_VERSION",
@@ -53,13 +69,27 @@ __all__ = [
 ]
 
 #: ``x-version`` of ``configs/strategies/lifecycle.json``: 2 since v1.5.0
-#: (``tstat_threshold``).
-LIFECYCLE_CONFIG_VERSION = 2
+#: (``tstat_threshold``), 3 with the cross-alpha correlation gate
+#: (``cross_alpha_min_state``, ``gates.max_cross_alpha_correlation``) and the
+#: net P&L bootstrap gate (``net_pnl_ci_gate``, ``gates.net_pnl_ci_level``,
+#: ``gates.min_net_pnl_ci_low``).
+LIFECYCLE_CONFIG_VERSION = 3
 
 #: How ``statistical_significance`` gets its threshold (module docs): the
 #: default, then the legacy rule.  The names are those of
 #: ``iap.validation.validate.TSTAT_THRESHOLD_POLICIES``.
 TSTAT_THRESHOLD_POLICIES = ("ledger", "fixed")
+
+#: Lifecycle states ``cross_alpha_min_state`` may name: the first state an
+#: alpha holds AFTER passing the gate, and the two beyond it before the live
+#: sub-machine.  CANDIDATE and below are excluded by construction — the gate
+#: asks whether a candidate adds to what was already let through, and two
+#: candidates gating each other would block both.
+CROSS_ALPHA_MIN_STATES = ("VALIDATING", "PAPER", "ACTIVE")
+
+#: Whether ``net_pnl_bootstrap_ci`` is evaluated (module docs): the default,
+#: then the legacy policy under which the gate does not exist.
+NET_PNL_CI_GATE_POLICIES = ("required", "absent")
 
 
 def repo_root() -> Path:
@@ -81,6 +111,9 @@ _GATE_KEYS_FLOAT = (
     "max_holdout_ic_gap",
     "max_paper_ic_gap",
     "min_paper_net_pnl",
+    "max_cross_alpha_correlation",
+    "min_net_pnl_ci_low",
+    "net_pnl_ci_level",
 )
 _GATE_KEYS_INT = (
     "min_experiments_in_ledger",
@@ -107,6 +140,26 @@ def _as_policy(doc: Mapping[str, Any], where: str) -> str:
     if not isinstance(value, str) or value not in TSTAT_THRESHOLD_POLICIES:
         raise ValueError(
             f"{where}.tstat_threshold: expected one of {list(TSTAT_THRESHOLD_POLICIES)}, "
+            f"got {value!r}"
+        )
+    return value
+
+
+def _as_min_state(doc: Mapping[str, Any], where: str) -> str:
+    value = doc["cross_alpha_min_state"]
+    if not isinstance(value, str) or value not in CROSS_ALPHA_MIN_STATES:
+        raise ValueError(
+            f"{where}.cross_alpha_min_state: expected one of {list(CROSS_ALPHA_MIN_STATES)}, "
+            f"got {value!r}"
+        )
+    return value
+
+
+def _as_ci_gate(doc: Mapping[str, Any], where: str) -> str:
+    value = doc["net_pnl_ci_gate"]
+    if not isinstance(value, str) or value not in NET_PNL_CI_GATE_POLICIES:
+        raise ValueError(
+            f"{where}.net_pnl_ci_gate: expected one of {list(NET_PNL_CI_GATE_POLICIES)}, "
             f"got {value!r}"
         )
     return value
@@ -159,8 +212,15 @@ class GateThresholds:
     max_paper_ic_gap: float
     min_paper_net_pnl: float
     max_kill_events: int
+    max_cross_alpha_correlation: float
+    min_net_pnl_ci_low: float
+    net_pnl_ci_level: float
 
     def __post_init__(self) -> None:
+        if not (0.0 < self.net_pnl_ci_level < 1.0):
+            raise ValueError("gates.net_pnl_ci_level must lie in (0, 1)")
+        if not (0.0 <= self.max_cross_alpha_correlation <= 1.0):
+            raise ValueError("gates.max_cross_alpha_correlation must lie in [0, 1]")
         if not (0.0 <= self.min_fold_sign_consistency <= 1.0):
             raise ValueError("gates.min_fold_sign_consistency must lie in [0, 1]")
         if self.ic_rank_gap_eps <= 0.0:
@@ -199,6 +259,9 @@ class GateThresholds:
             "max_paper_ic_gap": self.max_paper_ic_gap,
             "min_paper_net_pnl": self.min_paper_net_pnl,
             "max_kill_events": self.max_kill_events,
+            "max_cross_alpha_correlation": self.max_cross_alpha_correlation,
+            "min_net_pnl_ci_low": self.min_net_pnl_ci_low,
+            "net_pnl_ci_level": self.net_pnl_ci_level,
         }
 
 
@@ -213,8 +276,22 @@ class PolicyConfig:
     live: LifecycleConfig
     #: "ledger" (default) or "fixed" (legacy) — module docs
     tstat_threshold: str = "ledger"
+    #: lowest lifecycle state of a peer the correlation gate counts
+    cross_alpha_min_state: str = "VALIDATING"
+    #: "required" (default) or "absent" (legacy) — module docs
+    net_pnl_ci_gate: str = "required"
 
     def __post_init__(self) -> None:
+        if self.net_pnl_ci_gate not in NET_PNL_CI_GATE_POLICIES:
+            raise ValueError(
+                f"net_pnl_ci_gate {self.net_pnl_ci_gate!r} unknown; "
+                f"known: {NET_PNL_CI_GATE_POLICIES}"
+            )
+        if self.cross_alpha_min_state not in CROSS_ALPHA_MIN_STATES:
+            raise ValueError(
+                f"cross_alpha_min_state {self.cross_alpha_min_state!r} unknown; "
+                f"known: {CROSS_ALPHA_MIN_STATES}"
+            )
         if not self.policy:
             raise ValueError("policy name must not be empty")
         if self.max_consecutive_failures < 1:
@@ -230,6 +307,8 @@ class PolicyConfig:
         return {
             "policy": self.policy,
             "tstat_threshold": self.tstat_threshold,
+            "cross_alpha_min_state": self.cross_alpha_min_state,
+            "net_pnl_ci_gate": self.net_pnl_ci_gate,
             "gates": self.gates.to_dict(),
             "demotion": {"max_consecutive_failures": self.max_consecutive_failures},
             "live": self.live.to_dict(),
@@ -239,7 +318,19 @@ class PolicyConfig:
     def from_dict(doc: Mapping[str, Any]) -> PolicyConfig:
         """Inverse of :meth:`to_dict` (used to run a golden from its own
         embedded config)."""
-        _require_keys(doc, ("policy", "tstat_threshold", "gates", "demotion", "live"), "config")
+        _require_keys(
+            doc,
+            (
+                "policy",
+                "tstat_threshold",
+                "cross_alpha_min_state",
+                "net_pnl_ci_gate",
+                "gates",
+                "demotion",
+                "live",
+            ),
+            "config",
+        )
         _require_keys(doc["demotion"], ("max_consecutive_failures",), "config.demotion")
         _require_keys(doc["live"], _LIVE_KEYS, "config.live")
         return PolicyConfig(
@@ -250,6 +341,8 @@ class PolicyConfig:
             ),
             live=LifecycleConfig.from_config(doc["live"]),
             tstat_threshold=_as_policy(doc, "config"),
+            cross_alpha_min_state=_as_min_state(doc, "config"),
+            net_pnl_ci_gate=_as_ci_gate(doc, "config"),
         )
 
 
@@ -277,13 +370,29 @@ def load_policy_config(
     if doc.get("x-version") != LIFECYCLE_CONFIG_VERSION:
         raise ValueError(
             f"{where}: x-version {doc.get('x-version')!r} != {LIFECYCLE_CONFIG_VERSION} "
-            "(a v1.4.0 document must be upgraded: name 'tstat_threshold' — 'ledger', or "
-            "'fixed' to keep its 3.0 gate)"
+            "(an older document must be upgraded: name 'tstat_threshold' — 'ledger', or "
+            "'fixed' to keep the 3.0 gate of v1.4.0 — and the correlation gate's "
+            "'cross_alpha_min_state' and 'gates.max_cross_alpha_correlation', and the "
+            "bootstrap gate's 'net_pnl_ci_gate', 'gates.net_pnl_ci_level' and "
+            "'gates.min_net_pnl_ci_low')"
         )
     _require_keys(
-        doc, ("x-version", "description", "policy", "tstat_threshold", "gates", "demotion"), where
+        doc,
+        (
+            "x-version",
+            "description",
+            "policy",
+            "tstat_threshold",
+            "cross_alpha_min_state",
+            "net_pnl_ci_gate",
+            "gates",
+            "demotion",
+        ),
+        where,
     )
     tstat_threshold = _as_policy(doc, where)
+    cross_alpha_min_state = _as_min_state(doc, where)
+    net_pnl_ci_gate = _as_ci_gate(doc, where)
     policy = doc["policy"]
     if not isinstance(policy, str) or not policy:
         raise ValueError(f"{where}.policy: expected a non-empty string")
@@ -306,4 +415,6 @@ def load_policy_config(
         max_consecutive_failures=max_failures,
         live=live,
         tstat_threshold=tstat_threshold,
+        cross_alpha_min_state=cross_alpha_min_state,
+        net_pnl_ci_gate=net_pnl_ci_gate,
     )

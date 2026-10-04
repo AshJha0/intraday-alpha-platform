@@ -1,0 +1,53 @@
+{"decision":3,"reason":"desk request #42","rule_id":"KILL_SWITCH_ENGAGED","scope":"INSTRUMENT","scope_id":"1","severity":3,"timestamp":1700000000000000000}
+{"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"INSTRUMENT","scope_id":"1","severity":1,"timestamp":1700000000018788000}
+{"decision":2,"reason":"position in instrument 1 has no mark price (fail-closed)","rule_id":"GROSS_NOTIONAL","scope":"GLOBAL","scope_id":"","severity":2,"timestamp":1700000000018788000}
+{"decision":2,"reason":"no reference price for instrument 101","rule_id":"STALE_PRICE","scope":"INSTRUMENT","scope_id":"101","severity":2,"timestamp":1700000000019086000}
+{"decision":2,"reason":"no conversion rate for EUR -> USD","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"3","severity":2,"timestamp":1700000005019086001}
+{"decision":2,"reason":"reference price age 5041086001ns exceeds 5000000000ns","rule_id":"STALE_PRICE","scope":"INSTRUMENT","scope_id":"4","severity":2,"timestamp":1700000005041086001}
+{"decision":2,"reason":"no reference price for instrument 101","rule_id":"STALE_PRICE","scope":"INSTRUMENT","scope_id":"101","severity":2,"timestamp":1700000005041086001}
+{"decision":1,"reason":"daily loss limit 50000.00 -> 0.01 approved by ops halt","rule_id":"LOSS_LIMIT_OVERRIDE","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000010189086002}
+{"decision":2,"reason":"notional 84920448.00 USD exceeds max_order_notional 1000000.00","rule_id":"FAT_FINGER_NOTIONAL","scope":"INSTRUMENT","scope_id":"101","severity":2,"timestamp":1700000015274086002}
+{"decision":2,"reason":"position in instrument 5 has no XXX conversion rate (fail-closed)","rule_id":"GROSS_NOTIONAL","scope":"GLOBAL","scope_id":"","severity":2,"timestamp":1700000010278086002}
+{"decision":1,"reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000010278088002}
+{"decision":2,"reason":"reference price age 5032806001ns exceeds 5000000000ns","rule_id":"STALE_PRICE","scope":"INSTRUMENT","scope_id":"5","severity":2,"timestamp":1700000015310892003}
+{"decision":2,"reason":"reference price age 10329806002ns exceeds 5000000000ns","rule_id":"STALE_PRICE","scope":"INSTRUMENT","scope_id":"103","severity":2,"timestamp":1700000015370892003}
+{"decision":2,"reason":"no conversion rate for XXX -> USD","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"5","severity":2,"timestamp":1700000015442892003}
+{"decision":2,"reason":"no conversion rate for XXX -> USD","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"5","severity":2,"timestamp":1700000015445892003}
+{"decision":2,"reason":"no conversion rate for XXX -> USD","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"5","severity":2,"timestamp":1700000015448892003}
+{"decision":2,"reason":"no conversion rate for XXX -> USD","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"5","severity":2,"timestamp":1700000015451892003}
+{"decision":2,"reason":"no conversion rate for XXX -> USD","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"5","severity":2,"timestamp":1700000015474892003}
+{"decision":2,"reason":"fill for order 18446744073709551615 rejected: qty must be > 0: 0","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"tab\there","severity":2,"timestamp":1700000015492892003}
+{"decision":2,"reason":"notional 131300000.00 USD exceeds max_order_notional 1000000.00","rule_id":"FAT_FINGER_NOTIONAL","scope":"INSTRUMENT","scope_id":"103","severity":2,"timestamp":1700000015518892003}
+{"decision":2,"reason":"conversion rate EUR -> USD timestamp 1700000020616892004 is more than 5000000000ns ahead of the latest order event time 1700000015616892003","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"3","severity":2,"timestamp":1700000015616892003}
+{"decision":2,"reason":"notional 4991000.00 USD exceeds max_order_notional 1000000.00","rule_id":"FAT_FINGER_NOTIONAL","scope":"INSTRUMENT","scope_id":"101","severity":2,"timestamp":1700000015658348003}
+{"decision":2,"reason":"notional 29058166.82 USD exceeds max_order_notional 1000000.00","rule_id":"FAT_FINGER_NOTIONAL","scope":"INSTRUMENT","scope_id":"4","severity":2,"timestamp":1700000020617892004}
+{"decision":3,"reason":"strategy daily pnl -60720.62 breaches loss limit 50000.00","rule_id":"STRATEGY_LOSS","scope":"STRATEGY","scope_id":"S2","severity":3,"timestamp":1700000020619240004}
+{"decision":2,"reason":"strategy S2 kill switch engaged","rule_id":"KILL_STRATEGY","scope":"STRATEGY","scope_id":"S2","severity":3,"timestamp":1700000020619240004}
+{"decision":1,"reason":"desk request #42","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000020619240004}
+{"decision":2,"reason":"projected notional 3587703366.00 exceeds max_instrument_notional 2400000.00","rule_id":"INSTRUMENT_NOTIONAL","scope":"INSTRUMENT","scope_id":"101","severity":2,"timestamp":1700000020619240004}
+{"decision":2,"reason":"no conversion rate for XXX -> USD","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"5","severity":2,"timestamp":1700000020665240004}
+{"decision":2,"reason":"no conversion rate for XXX -> USD","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"5","severity":2,"timestamp":1700000020668240004}
+{"decision":2,"reason":"no conversion rate for XXX -> USD","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"5","severity":2,"timestamp":1700000020671240004}
+{"decision":2,"reason":"no conversion rate for XXX -> USD","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"5","severity":2,"timestamp":1700000020674240004}
+{"decision":3,"reason":"strategy daily pnl -640099.41 breaches loss limit 50000.00","rule_id":"STRATEGY_LOSS","scope":"STRATEGY","scope_id":"S2","severity":3,"timestamp":1700000020677240004}
+{"decision":1,"reason":"ops halt","rule_id":"SESSION_ROLLED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000020677240004}
+{"decision":1,"reason":"desk request #42","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000020677240004}
+{"decision":2,"reason":"no conversion rate for XXX -> USD","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"5","severity":2,"timestamp":1700000020677240004}
+{"decision":2,"reason":"position in instrument 5 has no XXX conversion rate (fail-closed)","rule_id":"GROSS_NOTIONAL","scope":"GLOBAL","scope_id":"","severity":2,"timestamp":1700000020761240004}
+{"decision":2,"reason":"notional 1482999795.00 USD exceeds max_order_notional 1000000.00","rule_id":"FAT_FINGER_NOTIONAL","scope":"INSTRUMENT","scope_id":"101","severity":2,"timestamp":1700000020788240004}
+{"decision":2,"reason":"notional 185235890.99 USD exceeds max_order_notional 1000000.00","rule_id":"FAT_FINGER_NOTIONAL","scope":"INSTRUMENT","scope_id":"103","severity":2,"timestamp":1700000023856240004}
+{"decision":3,"reason":"kill scope id \"4294967296\" is not a valid VENUE id: escalated to GLOBAL (fail-closed): desk request #42","rule_id":"MALFORMED_KILL","scope":"VENUE","scope_id":"4294967296","severity":3,"timestamp":1700000023916240004}
+{"decision":2,"reason":"global kill switch engaged","rule_id":"KILL_GLOBAL","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000025916240004}
+{"decision":1,"reason":"desk request #42","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000025953240004}
+{"decision":2,"reason":"no conversion rate for XXX -> USD","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"5","severity":2,"timestamp":1700000025972240004}
+{"decision":2,"reason":"position in instrument 5 has no XXX conversion rate (fail-closed)","rule_id":"GROSS_NOTIONAL","scope":"GLOBAL","scope_id":"","severity":2,"timestamp":1700000026024798004}
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 4294967295","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"tab\there","severity":2,"timestamp":1700000026056798004}
+{"decision":2,"reason":"urgency must be in [0, 1]: -0.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"�","severity":2,"timestamp":1700000026059798004}
+{"decision":2,"reason":"timestamp arithmetic overflows i64 (fail-closed)","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":-7523372010794977805}
+{"decision":2,"reason":"projected notional 22774118.63 exceeds max_instrument_notional 2400000.00","rule_id":"INSTRUMENT_NOTIONAL","scope":"INSTRUMENT","scope_id":"4","severity":2,"timestamp":-7523372010794977804}
+{"decision":2,"reason":"no conversion rate for XXX -> USD","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"5","severity":2,"timestamp":1700000026170159004}
+{"decision":2,"reason":"position in instrument 5 has no XXX conversion rate (fail-closed)","rule_id":"GROSS_NOTIONAL","scope":"GLOBAL","scope_id":"","severity":2,"timestamp":1700000026211159004}
+{"decision":2,"reason":"position in instrument 5 has no XXX conversion rate (fail-closed)","rule_id":"GROSS_NOTIONAL","scope":"GLOBAL","scope_id":"","severity":2,"timestamp":1700000026211159004}
+{"decision":2,"reason":"qty 9223372036854775807 exceeds max_order_qty 50000","rule_id":"FAT_FINGER_QTY","scope":"INSTRUMENT","scope_id":"101","severity":2,"timestamp":1700000028211159004}
+{"decision":2,"reason":"conversion rate JPY -> USD timestamp 9223372036854775806 is more than 5000000000ns ahead of the latest order event time 1700000028239625004","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"4","severity":2,"timestamp":1700000028239625004}
+{"decision":2,"reason":"conversion rate JPY -> USD timestamp 9223372036854775807 is more than 5000000000ns ahead of the latest order event time 1700000028239625004","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"4","severity":2,"timestamp":1700000028239625004}

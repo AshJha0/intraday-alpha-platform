@@ -26,6 +26,15 @@ a RuntimeError.
 
 Parent accounting identity (tested): ``total_cost = fees - rebates +
 impact`` where fees/rebates/impact are exact sums over the parent's fills.
+
+Execution policies (``ParentOrder.policy``, ``iap.execution.passive``): the
+steps above describe ``NATIVE``. ``AGGRESSIVE`` sends every child as a
+MARKET order. ``PASSIVE`` evaluates, per parent and per event, in pinned
+order: (a) the schedule state at the event (slices come due / POV volume),
+(b) the state machine of every posted child in posting order — cancel
+remainders that took effect are re-posted or crossed, deadlines and the
+BEHIND test are checked — and (c) the new schedule steps are posted. The
+pinned output is ``tests/golden/expected_replay_fills_passive.json``.
 """
 
 from __future__ import annotations
@@ -37,9 +46,23 @@ from dataclasses import dataclass, field
 from iap.core.events import EventType, MarketEvent
 from iap.execution.algos import AlgoType, ParentOrder, slice_quantities, slice_times
 from iap.execution.config import ExecConfig, SorOptions
+from iap.execution.passive import (
+    ExecPolicy,
+    PassiveStats,
+    max_behind_qty,
+    patience_ns,
+    post_price,
+)
 from iap.execution.simulator import ExecutionSimulator
 from iap.execution.sor import NO_ROUTE, SmartOrderRouter
-from iap.execution.types import ChildOrder, Fill, OrderState, OrderType
+from iap.execution.types import CancelReason, ChildOrder, Fill, OrderState, OrderType
+
+#: States of a posted child in the PASSIVE state machine.
+_REST = 0
+_CANCEL_REPRICE = 1
+_CANCEL_CROSS_TIMEOUT = 2
+_CANCEL_CROSS_BEHIND = 3
+_DONE = 4
 
 
 @dataclass(slots=True)
@@ -80,6 +103,20 @@ class ExecReplayResult:
     parents: dict[int, ParentReport] = field(default_factory=dict)
     events_processed: int = 0
     sor_no_route: int = 0  #: children not submitted: no eligible venue
+    #: PASSIVE transition counters, one row per PASSIVE parent (parent_id order).
+    passive: dict[int, PassiveStats] = field(default_factory=dict)
+    #: every submitted child in its final state, by parent_id, submission order.
+    children: dict[int, list[ChildOrder]] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class _Working:
+    """One posted child of a PASSIVE parent."""
+
+    order_id: int
+    deadline: int
+    reprices: int
+    state: int = _REST
 
 
 @dataclass(slots=True)
@@ -91,6 +128,13 @@ class _ParentState:
     filled_qty: int = 0  #: fills booked so far
     pov_volume: int = 0  #: window TRADE volume (POV)
     child_ids: list[int] = field(default_factory=list)
+    # ---- PASSIVE policy state ----
+    scheduled_qty: int = 0  #: qty the schedule has called for so far
+    current_step_qty: int = 0  #: q_cur: the most recent slice (0 for POV)
+    patience_ns: int = 0
+    behind_qty: int = 0  #: BEHIND tolerance in qty
+    working: list[_Working] = field(default_factory=list)
+    stats: PassiveStats = field(default_factory=PassiveStats)
 
 
 class ExecutionReplay:
@@ -121,6 +165,11 @@ class ExecutionReplay:
             if p.algo != AlgoType.POV:
                 ps.slice_qty = slice_quantities(p)
                 ps.slice_due = slice_times(p)
+            if p.policy == ExecPolicy.PASSIVE:
+                ps.patience_ns = patience_ns(
+                    p.passive, p.urgency, p.algo == AlgoType.IS, p.risk_aversion
+                )
+                ps.behind_qty = max_behind_qty(p.passive, p.qty)
             self._parents.append(ps)
 
     @property
@@ -128,9 +177,18 @@ class ExecutionReplay:
         return self._sim
 
     def _issue_child(
-        self, ps: _ParentState, child_qty: int, decision_ts: int, passive: bool
+        self,
+        ps: _ParentState,
+        child_qty: int,
+        decision_ts: int,
+        passive: bool,
+        post: bool = False,
     ) -> bool:
-        """Issue one child of at most ``max_child_qty``; False when unroutable."""
+        """Issue one child of at most ``max_child_qty``; False when unroutable.
+
+        ``passive`` joins the same-side best; with ``post`` the limit is the
+        PASSIVE policy's ``post_price`` instead (MARKET fallback either way).
+        """
         if child_qty <= 0:
             return True
         p = ps.order
@@ -149,12 +207,17 @@ class ExecutionReplay:
         if passive:
             # Join the same-side best on the routed venue; MARKET fallback.
             vb = self._sim.venue_book(p.instrument_id, venue_id)
-            best = None
-            if vb is not None:
+            price = None
+            if vb is not None and post:
+                price = post_price(
+                    p.side, vb.best_bid(), vb.best_ask(), p.passive.improve_min_spread_ticks
+                )
+            elif vb is not None:
                 best = vb.best_bid() if p.side == 0 else vb.best_ask()
-            if best is not None:
+                price = None if best is None else best[0]
+            if price is not None:
                 order_type = OrderType.LIMIT
-                limit_ticks = best[0]
+                limit_ticks = price
         child = ChildOrder(
             parent_id=p.parent_id,
             instrument_id=p.instrument_id,
@@ -199,9 +262,136 @@ class ExecutionReplay:
                 if ps.order.parent_id == f.parent_id:
                     ps.filled_qty += f.qty
 
+    # ------------------------------------------------------ PASSIVE policy
+
+    def _post(self, ps: _ParentState, qty: int, t: int, reprices: int) -> None:
+        """POST one child of ``qty`` (or CROSS it when it cannot rest)."""
+        p = ps.order
+        cap = p.end_ts - p.passive.end_margin_ns
+        if ps.patience_ns <= 0 or t >= cap:
+            ps.stats.crosses_immediate += 1
+            self._issue_child(ps, qty, t, False)
+            return
+        if not self._issue_child(ps, qty, t, True, post=True):
+            return
+        oid = ps.child_ids[-1]
+        if self._sim.orders[oid].type != OrderType.LIMIT:
+            ps.stats.crosses_immediate += 1  # no same-side quote: MARKET fallback
+            return
+        ps.stats.posts += 1
+        ps.working.append(_Working(oid, min(t + ps.patience_ns, cap), reprices))
+
+    def _post_step(self, ps: _ParentState, step_qty: int, t: int) -> None:
+        """POST a schedule step, split at ``max_child_qty`` (pinned)."""
+        cap = ps.order.max_child_qty
+        left = step_qty
+        while left > 0:
+            q = min(left, cap)
+            self._post(ps, q, t, 0)
+            left -= q
+
+    def _work_passive(self, ps: _ParentState, t: int) -> None:
+        """Advance the state machine of every posted child (posting order)."""
+        p = ps.order
+        orders = self._sim.orders
+        behind = ps.scheduled_qty - ps.filled_qty - ps.current_step_qty > ps.behind_qty
+        n = len(ps.working)  # children posted below are evaluated next event
+        for k in range(n):
+            w = ps.working[k]
+            if w.state == _DONE:
+                continue
+            o = orders[w.order_id]
+            if w.state == _REST:
+                if o.is_terminal:
+                    w.state = _DONE
+                elif t >= p.end_ts:
+                    continue  # expires with the window (rule 7)
+                elif behind:
+                    self._sim.cancel(o.order_id, t)
+                    w.state = _CANCEL_CROSS_BEHIND
+                elif t >= w.deadline:
+                    if w.reprices >= p.passive.max_reprices:
+                        self._sim.cancel(o.order_id, t)
+                        w.state = _CANCEL_CROSS_TIMEOUT
+                        continue
+                    vb = self._sim.venue_book(p.instrument_id, o.venue_id)
+                    price = None
+                    if vb is not None:
+                        price = post_price(
+                            p.side,
+                            vb.best_bid(),
+                            vb.best_ask(),
+                            p.passive.improve_min_spread_ticks,
+                        )
+                    if price == o.limit_ticks:
+                        # Still at the target price: keep the queue position.
+                        w.reprices += 1
+                        w.deadline = min(t + ps.patience_ns, p.end_ts - p.passive.end_margin_ns)
+                        ps.stats.rest_extensions += 1
+                    else:
+                        self._sim.cancel(o.order_id, t)
+                        w.state = _CANCEL_REPRICE
+                continue
+            # A cancel is in flight: act once it has taken effect.
+            if not o.is_terminal:
+                continue
+            state = w.state
+            w.state = _DONE
+            if (
+                o.state != OrderState.CANCELLED
+                or o.cancel_reason != CancelReason.USER
+                or o.remaining <= 0
+                or t >= p.end_ts
+            ):
+                continue  # filled, expired or the window closed: nothing to re-send
+            if state == _CANCEL_REPRICE:
+                ps.stats.reprices += 1
+                self._post(ps, o.remaining, t, w.reprices + 1)
+            else:
+                if state == _CANCEL_CROSS_BEHIND:
+                    ps.stats.crosses_behind += 1
+                else:
+                    ps.stats.crosses_timeout += 1
+                self._issue_child(ps, o.remaining, t, False)
+
+    def _schedule_passive(self, ps: _ParentState, ev: MarketEvent) -> None:
+        p = ps.order
+        t = ev.exchange_ts
+        steps: list[int] = []
+        if p.algo == AlgoType.POV:
+            in_window = (
+                ev.instrument_id == p.instrument_id
+                and ev.event_type == EventType.TRADE
+                and p.start_ts <= t < p.end_ts
+            )
+            if in_window:
+                ps.pov_volume += ev.qty
+                target = int(math.floor(p.participation * float(ps.pov_volume)))
+                ps.scheduled_qty = min(target, p.qty)
+            self._work_passive(ps, t)
+            if in_window:
+                deficit = ps.scheduled_qty - self._committed_qty(ps)
+                if deficit > 0:
+                    self._post(ps, min(deficit, p.max_child_qty), t, 0)
+            return
+        while ps.next_slice < len(ps.slice_due) and t >= ps.slice_due[ps.next_slice]:
+            q = ps.slice_qty[ps.next_slice]
+            ps.next_slice += 1
+            ps.scheduled_qty += q
+            ps.current_step_qty = q
+            if t >= p.end_ts:
+                continue
+            steps.append(q)
+        self._work_passive(ps, t)
+        for q in steps:
+            self._post_step(ps, q, t)
+
     def _schedule(self, ps: _ParentState, ev: MarketEvent) -> None:
         p = ps.order
         t = ev.exchange_ts
+        if p.policy == ExecPolicy.PASSIVE:
+            self._schedule_passive(ps, ev)
+            return
         if p.algo == AlgoType.POV:
             if (
                 ev.instrument_id != p.instrument_id
@@ -224,7 +414,10 @@ class ExecutionReplay:
             ps.next_slice += 1
             if t >= p.end_ts:
                 continue
-            passive = p.algo in (AlgoType.TWAP, AlgoType.VWAP)
+            passive = p.policy != ExecPolicy.AGGRESSIVE and p.algo in (
+                AlgoType.TWAP,
+                AlgoType.VWAP,
+            )
             self._issue_slice(ps, q, t, passive)
 
     def run(self, events: Iterable[MarketEvent]) -> ExecReplayResult:
@@ -267,4 +460,7 @@ class ExecutionReplay:
             r.avg_price = r.notional / (float(r.filled_qty) * lot) if r.filled_qty > 0 else 0.0
             r.total_cost = r.fees - r.rebates + r.impact
             res.parents[r.parent_id] = r
+            if p.policy == ExecPolicy.PASSIVE:
+                res.passive[p.parent_id] = ps.stats
+            res.children[p.parent_id] = [self._sim.orders[oid] for oid in ps.child_ids]
         return res

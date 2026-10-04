@@ -24,7 +24,29 @@ DEFAULT policy (``tstat_threshold = "ledger"``, the CUSUM retirement rule —
   under the watch gate but inside the slack never retire the alpha (the
   consecutive rule would at the sixth), a reading above the gate while
   ``S`` is over the threshold does not retire it either, and two deep
-  breaches in disjoint windows (``new_fraction`` 1.0) do.
+  breaches in disjoint windows (``new_fraction`` 1.0) do;
+* **LC05** — the cross-alpha correlation gate, at CANDIDATE with every other
+  gate passing: evidence WITHOUT a ``cross_alpha`` block fails it with
+  ``value = null`` (fail closed), a peer at ACTIVE correlated 0.82 fails it,
+  so does one correlated -0.9 (the absolute value is taken) while peers at
+  CANDIDATE and RETIRED are ignored whatever their correlation, and peers
+  that are all ineligible pass with value 0.0; after a HUMAN retire / reset
+  two peers at exactly +0.7 and -0.7 pass (``max`` is inclusive: the tie);
+  then an EMPTY peer list passes vacuously; then eligible peers at 0.25 and
+  -0.4 pass with value 0.4.
+
+* **LC06** — the net P&L bootstrap gate, at CANDIDATE with every other
+  gate passing: evidence WITHOUT a ``pnl_bootstrap`` block fails it with
+  ``value = null``; an interval whose lower bound is negative fails it at
+  that value; an alpha that made no trade fails it with ``value = null``
+  (the degenerate [0, 0] interval is not evidence); so do an interval
+  without bounds and one taken at another level than the policy's; a lower
+  bound of exactly 0.0 fails (strict); a positive lower bound passes.
+
+Every other script that walks CANDIDATE -> VALIDATING carries an empty
+``cross_alpha`` block (no other alpha: the vacuous pass) and a passing
+``pnl_bootstrap`` block, so each of them still tests the one rule it was
+written for.
 
 Under the LEGACY policy (``tstat_threshold = "fixed"``,
 ``breach_rule = "consecutive"`` — the rules up to v1.4.0, which every port
@@ -32,7 +54,11 @@ keeps selectable):
 
 * **LG01** — the v1.4.0 LC01 script: research evidence with no
   significance threshold passes the fixed 3.0 gate, and six consecutive
-  breaches retire the alpha.
+  breaches retire the alpha.  The correlation gate is a row of the table
+  under either policy, so the script carries the empty ``cross_alpha``
+  block too; ``net_pnl_bootstrap_ci`` is ABSENT under the legacy policy
+  (``net_pnl_ci_gate = "absent"``), so the script carries no
+  ``pnl_bootstrap`` block and is promoted on ten gates.
 
 Each golden step records the action, the input evidence document and the
 expected state / outcome / gate results / counters / CUSUM statistic /
@@ -50,7 +76,15 @@ from typing import Any
 from iap.adaptive.lifecycle import LifecycleConfig
 from iap.contracts.types import Actor, ExperimentResult, LifecycleState, Verdict
 from iap.lifecycle.config import PolicyConfig
-from iap.lifecycle.evidence import Evidence, LiveEvidence, PaperEvidence, ValidationEvidence
+from iap.lifecycle.evidence import (
+    CrossAlphaEvidence,
+    CrossAlphaPeer,
+    Evidence,
+    LiveEvidence,
+    PaperEvidence,
+    PnlBootstrapEvidence,
+    ValidationEvidence,
+)
 from iap.lifecycle.machine import AlphaLifecycle, transition_table
 from iap.lifecycle.registry import AlphaRegistry, Outcome
 
@@ -70,8 +104,13 @@ __all__ = [
 #: 2 since v1.5.0: the evidence carries ``significance_threshold`` and
 #: ``live.new_fraction``, the config ``tstat_threshold`` and the retirement
 #: rule, every expected row ``cusum``; a ``legacy`` section pins the rules
-#: up to v1.4.0.
-GOLDEN_X_VERSION = 2
+#: up to v1.4.0.  3: the evidence carries ``cross_alpha``, the config
+#: ``cross_alpha_min_state`` and ``gates.max_cross_alpha_correlation``, the
+#: CANDIDATE -> VALIDATING edge the ``cross_alpha_correlation`` gate, and
+#: scenario LC05 pins it; likewise ``pnl_bootstrap``, ``net_pnl_ci_gate``,
+#: ``gates.net_pnl_ci_level`` / ``min_net_pnl_ci_low``, the
+#: ``net_pnl_bootstrap_ci`` gate and LC06.
+GOLDEN_X_VERSION = 3
 #: Share of a 2 h rolling-IC window that one 15-minute block renews — the
 #: ``new_fraction`` of a live reading in the scripts.
 BLOCK_FRACTION = 0.125
@@ -89,8 +128,41 @@ EXPECTED_FINAL_STATES: Mapping[str, LifecycleState] = {
     "LC02": LifecycleState.RESEARCH,
     "LC03": LifecycleState.RETIRED,
     "LC04": LifecycleState.RETIRED,
+    "LC05": LifecycleState.VALIDATING,
+    "LC06": LifecycleState.VALIDATING,
     "LG01": LifecycleState.RESEARCH,
 }
+
+#: "There is no other alpha": the vacuous pass of the correlation gate.
+NO_PEERS = CrossAlphaEvidence(())
+
+
+def bootstrap(
+    ci_low: float | None = 12.5,
+    ci_high: float | None = 90.0,
+    *,
+    level: float = 0.95,
+    n_trades: int = 40,
+    n_bars: int = 626,
+) -> PnlBootstrapEvidence:
+    """A P&L bootstrap block; the defaults are an interval above zero."""
+    return PnlBootstrapEvidence(
+        ci_low=ci_low,
+        ci_high=ci_high,
+        level=level,
+        n_resamples=1000,
+        seed=20260829,
+        mean_block=9.0,
+        n_bars=n_bars,
+        n_trades=n_trades,
+    )
+
+
+#: An interval whose lower bound is above zero: the gate passes.
+GOOD_BOOTSTRAP = bootstrap()
+#: "absent" in a script call: the evidence carries no ``pnl_bootstrap`` block.
+NO_BOOTSTRAP = None
+_DEFAULT = object()
 
 
 @dataclass(frozen=True)
@@ -164,7 +236,15 @@ def _ev(
     paper: PaperEvidence | None = None,
     live: LiveEvidence | None = None,
     threshold: float | None = None,
+    cross_alpha: CrossAlphaEvidence | None = None,
+    pnl_bootstrap: Any = _DEFAULT,
 ) -> Evidence:
+    """Evidence with the named blocks.  Candidate evidence (a research
+    result WITH a capacity) carries :data:`GOOD_BOOTSTRAP` unless the caller
+    says otherwise; everything else carries no bootstrap block."""
+    if pnl_bootstrap is _DEFAULT:
+        candidate = research_result is not None and capacity is not None
+        pnl_bootstrap = GOOD_BOOTSTRAP if candidate else None
     return Evidence(
         research=research_result,
         capacity_usd=capacity,
@@ -172,7 +252,14 @@ def _ev(
         paper=paper,
         live=live,
         significance_threshold=threshold,
+        cross_alpha=cross_alpha,
+        pnl_bootstrap=pnl_bootstrap,
     )
+
+
+def _peers(*rows: tuple[str, str, float]) -> CrossAlphaEvidence:
+    """A cross-alpha block from ``(alpha_id, state name, correlation)`` rows."""
+    return CrossAlphaEvidence(tuple(CrossAlphaPeer(a, s, rho) for a, s, rho in rows))
 
 
 def _live(
@@ -211,8 +298,8 @@ def _lc01() -> tuple[ScriptStep, ...]:
     steps: list[ScriptStep] = [
         _adv(_ev(good), "research result present and clean -> CANDIDATE"),
         _adv(
-            _ev(good, capacity=5_000_000.0, threshold=3.5),
-            "all nine promotion gates pass (t 4.0 >= ledger threshold 3.5) -> VALIDATING",
+            _ev(good, capacity=5_000_000.0, threshold=3.5, cross_alpha=NO_PEERS),
+            "all eleven promotion gates pass (t 4.0 >= ledger threshold 3.5) -> VALIDATING",
         ),
         _adv(
             _ev(validation=validation_ok), "held-out replay tracks research, hash + parity -> PAPER"
@@ -258,7 +345,7 @@ def _lc02() -> tuple[ScriptStep, ...]:
     return (
         _adv(_ev(clean), "clean research -> CANDIDATE"),
         _adv(
-            _ev(leaking, capacity=5_000_000.0, threshold=3.25),
+            _ev(leaking, capacity=5_000_000.0, threshold=3.25, cross_alpha=NO_PEERS),
             "re-run shows leakage: leakage_clean fails -> demoted to RESEARCH",
         ),
         _adv(_ev(leaking), "leaking result at RESEARCH: ledger passes, leakage fails, hold"),
@@ -285,15 +372,15 @@ def _lc03() -> tuple[ScriptStep, ...]:
     return (
         _adv(_ev(good), "research present and clean -> CANDIDATE"),
         _adv(
-            _ev(good, capacity=2_000_000.0, threshold=5.5),
+            _ev(good, capacity=2_000_000.0, threshold=5.5, cross_alpha=NO_PEERS),
             "t 5.0 below the evidence's ledger threshold 5.5: significance fails, hold",
         ),
         _adv(
-            _ev(good, capacity=2_000_000.0),
+            _ev(good, capacity=2_000_000.0, cross_alpha=NO_PEERS),
             "no significance threshold in the evidence: the gate fails, threshold null",
         ),
         _adv(
-            _ev(good, capacity=2_000_000.0, threshold=2.0),
+            _ev(good, capacity=2_000_000.0, threshold=2.0, cross_alpha=NO_PEERS),
             "a threshold below the floor: max(3.0, 2.0) = 3.0 applies -> VALIDATING",
         ),
         _adv(_ev(validation=validation_bad), "parity fails: consecutive_failures 1"),
@@ -312,7 +399,9 @@ def _lc03() -> tuple[ScriptStep, ...]:
     )
 
 
-def _to_active(alpha_id: str, threshold: float | None) -> list[ScriptStep]:
+def _to_active(
+    alpha_id: str, threshold: float | None, pnl_bootstrap: Any = _DEFAULT
+) -> list[ScriptStep]:
     """The four promotion steps RESEARCH -> ACTIVE with clean evidence."""
     good = research(alpha_id)
     validation_ok = ValidationEvidence(
@@ -328,7 +417,16 @@ def _to_active(alpha_id: str, threshold: float | None) -> list[ScriptStep]:
     )
     return [
         _adv(_ev(good), "research result present and clean -> CANDIDATE"),
-        _adv(_ev(good, capacity=5_000_000.0, threshold=threshold), "promotion gates -> VALIDATING"),
+        _adv(
+            _ev(
+                good,
+                capacity=5_000_000.0,
+                threshold=threshold,
+                cross_alpha=NO_PEERS,
+                pnl_bootstrap=pnl_bootstrap,
+            ),
+            "promotion gates -> VALIDATING",
+        ),
         _adv(_ev(validation=validation_ok), "validation -> PAPER"),
         _adv(_ev(paper=paper_ok), "paper -> ACTIVE"),
     ]
@@ -380,9 +478,111 @@ def _lc04() -> tuple[ScriptStep, ...]:
     return tuple(steps)
 
 
+def _lc05() -> tuple[ScriptStep, ...]:
+    """The cross-alpha correlation gate (module docs)."""
+    good = research("LC05")
+
+    def candidate(cross_alpha: CrossAlphaEvidence | None) -> Evidence:
+        return _ev(good, capacity=5_000_000.0, threshold=3.5, cross_alpha=cross_alpha)
+
+    def again(reason: str) -> list[ScriptStep]:
+        return [
+            ScriptStep("retire", None, reason, "HUMAN retire VALIDATING -> RETIRED"),
+            ScriptStep("reset", None, reason, "HUMAN reset RETIRED -> RESEARCH"),
+            _adv(_ev(good), "research result present and clean -> CANDIDATE"),
+        ]
+
+    steps: list[ScriptStep] = [
+        _adv(_ev(good), "research result present and clean -> CANDIDATE"),
+        _adv(
+            candidate(None),
+            "no cross_alpha block: the correlation gate fails closed (value null), hold",
+        ),
+        _adv(
+            candidate(_peers(("LC01", "ACTIVE", 0.82))),
+            "correlated 0.82 with an ACTIVE alpha: above 0.7, the gate fails, hold",
+        ),
+        _adv(
+            candidate(
+                _peers(
+                    ("LC01", "ACTIVE", -0.9),
+                    ("LC02", "CANDIDATE", 0.95),
+                    ("LC03", "RETIRED", 0.99),
+                )
+            ),
+            "the mirror image of an ACTIVE alpha (-0.9): |correlation| is gated; "
+            "the CANDIDATE and RETIRED peers are not counted, hold",
+        ),
+        _adv(
+            candidate(_peers(("LC02", "CANDIDATE", 0.95), ("LC03", "RETIRED", 0.99))),
+            "no peer at or beyond VALIDATING: value 0.0, vacuous pass -> VALIDATING",
+        ),
+    ]
+    steps += again("second candidate evaluation of the correlation gate")
+    steps.append(
+        _adv(
+            candidate(_peers(("LC01", "PAPER", 0.7), ("LC04", "WATCH", -0.7))),
+            "two eligible peers at exactly the threshold (0.7, -0.7): max is inclusive, "
+            "the tie passes -> VALIDATING",
+        )
+    )
+    steps += again("third candidate evaluation of the correlation gate")
+    steps.append(
+        _adv(candidate(NO_PEERS), "an empty peer list: value 0.0, vacuous pass -> VALIDATING")
+    )
+    steps += again("fourth candidate evaluation of the correlation gate")
+    steps.append(
+        _adv(
+            candidate(_peers(("LC01", "ACTIVE", 0.25), ("LC04", "VALIDATING", -0.4))),
+            "additive: the largest |correlation| with an eligible peer is 0.4 -> VALIDATING",
+        )
+    )
+    return tuple(steps)
+
+
+def _lc06() -> tuple[ScriptStep, ...]:
+    """The net P&L bootstrap gate (module docs)."""
+    good = research("LC06")
+
+    def candidate(boot: PnlBootstrapEvidence | None) -> Evidence:
+        return _ev(
+            good, capacity=5_000_000.0, threshold=3.5, cross_alpha=NO_PEERS, pnl_bootstrap=boot
+        )
+
+    return (
+        _adv(_ev(good), "research result present and clean -> CANDIDATE"),
+        _adv(candidate(None), "no pnl_bootstrap block: the gate fails closed (value null), hold"),
+        _adv(
+            candidate(bootstrap(-35.5, 60.25)),
+            "the interval spans zero (lower bound -35.5): the gate fails at that value, hold",
+        ),
+        _adv(
+            candidate(bootstrap(0.0, 0.0, n_trades=0)),
+            "no trade in any fold: the degenerate [0, 0] interval is not evidence "
+            "(value null), hold",
+        ),
+        _adv(
+            candidate(bootstrap(None, None, n_bars=5)),
+            "five bars: no interval exists (bounds null), value null, hold",
+        ),
+        _adv(
+            candidate(bootstrap(12.5, 90.0, level=0.9)),
+            "an interval at level 0.9 under a policy that requires 0.95: value null, hold",
+        ),
+        _adv(
+            candidate(bootstrap(0.0, 45.0)),
+            "a lower bound of exactly 0.0: the comparison is strict, the gate fails, hold",
+        ),
+        _adv(
+            candidate(bootstrap(12.5, 90.0)),
+            "lower bound 12.5 > 0.0 at level 0.95 with 40 trades: all gates pass -> VALIDATING",
+        ),
+    )
+
+
 def _lg01() -> tuple[ScriptStep, ...]:
     """The v1.4.0 LC01 script (run under :func:`legacy_config`)."""
-    steps: list[ScriptStep] = _to_active("LG01", None)
+    steps: list[ScriptStep] = _to_active("LG01", None, NO_BOOTSTRAP)
     steps += [
         _adv(_ev(live=_live(0.02, 1)), "healthy rolling IC: hold ACTIVE"),
         _adv(
@@ -416,7 +616,14 @@ def _lg01() -> tuple[ScriptStep, ...]:
 
 def scripts() -> dict[str, tuple[ScriptStep, ...]]:
     """The scenario scripts of the default policy, keyed by alpha id (sorted)."""
-    return {"LC01": _lc01(), "LC02": _lc02(), "LC03": _lc03(), "LC04": _lc04()}
+    return {
+        "LC01": _lc01(),
+        "LC02": _lc02(),
+        "LC03": _lc03(),
+        "LC04": _lc04(),
+        "LC05": _lc05(),
+        "LC06": _lc06(),
+    }
 
 
 def legacy_scripts() -> dict[str, tuple[ScriptStep, ...]]:
@@ -426,11 +633,13 @@ def legacy_scripts() -> dict[str, tuple[ScriptStep, ...]]:
 
 def legacy_config(config: PolicyConfig) -> PolicyConfig:
     """``config`` under the rules up to v1.4.0: the fixed significance
-    threshold and the consecutive-breach retirement rule (same gates)."""
+    threshold, the consecutive-breach retirement rule and no net P&L
+    bootstrap gate (same thresholds)."""
     live = config.live
     return replace(
         config,
         tstat_threshold="fixed",
+        net_pnl_ci_gate="absent",
         live=LifecycleConfig.legacy(
             live.watch_ic_gate,
             live.reactivate_ic_gate,
@@ -513,7 +722,8 @@ def golden_document(config: PolicyConfig) -> dict[str, Any]:
             "the action, the input evidence, and the expected state / outcome / gate "
             "results / counters / CUSUM statistic / transition after it. `legacy` holds "
             "the same machine under the rules up to v1.4.0 (tstat_threshold fixed, "
-            "breach_rule consecutive) with its own config and scenarios. Generated by "
+            "breach_rule consecutive, net_pnl_ci_gate absent) with its own config and "
+            "scenarios. Generated by "
             "python/tools/make_golden_lifecycle.py; every port reproduces every step "
             "exactly (states, booleans and decimals are exact; no tolerance)."
         ),

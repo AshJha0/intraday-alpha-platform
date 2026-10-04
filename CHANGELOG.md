@@ -25,6 +25,16 @@ a v1.4.0 conclusion. The release guard that failed the v1.4.0 release once
 on an API error now retries. Pull request
 [#21](https://github.com/AshJha0/intraday-alpha-platform/pull/21).
 
+The same release carries six further pieces of work, each developed on its
+own branch and merged into the release branch: real historical data
+ingestion (ITCH 5.0, LOBSTER; #20), a passive execution policy and markout
+analysis (#22), a faster Python CI job and an observable STOPPED session
+state (#23), the dataset- and bundle-aware store schema `iap_v2.sql` and
+the Java research backtester on the default rules (#24), signal combination
+with two new lifecycle gates (#25), and differential fuzzing of the three
+risk engines (#26). Their sections are below; none of them changes a
+default of the research methods, and none of them promotes an alpha.
+
 ### Changed
 
 The eleven methods, default first, legacy name second
@@ -85,16 +95,29 @@ Also changed:
   rule and the pair-weighted rolling IC (Java `LifecycleGauge`, `RollingIc`;
   Rust `lifecycle::tracker`), the ledger significance threshold (Java
   `PolicyConfig` / `Gates`, Rust `PolicyConfig::threshold_for`). The
-  research-only backtest vector `expected_backtest.json` stays on the old
-  rules, which its `config` now names; the Java `ResearchBacktester` and
-  `CostModel` say in their API which rules they implement.
+  research backtest rules are ported to Java as well: `ResearchBacktester`
+  and `CostModel` default to the v1.5.0 rules and keep the old ones under
+  the same names as Python (`Config.legacy`, `withLinearImpact`), and
+  `expected_backtest.json` pins both rule sets for both languages. Rust and
+  C++ have no research backtester.
+- **The store is dataset- and bundle-aware** (`schemas/sql/iap_v2.sql`,
+  data-model x-version 2). `experiments`, `experiment_results`,
+  `ledger_entries` and `lifecycle_transitions` carry `dataset_version` and
+  `methods`; `v_alpha_scorecard` and `v_experiment_ledger_summary` are one
+  row per scope with the looks of that scope and the \|t\| threshold each
+  result was judged at; `v_alpha_scorecard_current` /
+  `v_experiment_ledger_summary_current` are the current dataset under the
+  default bundle. A store built by an earlier release is refused untouched
+  (exit code 2) and rebuilt with `python -m iap.store build --rebuild` —
+  the store is derived, so the rebuild is the migration.
 - **`x-version` bumps**: `configs/execution/execution.json` 1 → 2,
   `configs/strategies/lifecycle.json` 1 → 2, `strategies.json` `adaptive`
   1 → 2, `research/experiments.json` 2 → 3, `research/alpha_registry.json`
   1 → 2, `eligibility.json` 1 → 2, `POWER_REPORT.json` 1 → 2, goldens
-  `expected_lifecycle.json`, `expected_backtest.json`,
-  `expected_adaptive.json` 1 → 2. Every loader rejects the older document
-  instead of reading it under a new default.
+  `expected_lifecycle.json` and `expected_adaptive.json` 1 → 2,
+  `expected_backtest.json` 1 → 3, the SQL data model `iap_v1.sql` →
+  `iap_v2.sql` (1 → 2). Every loader rejects the older document instead of
+  reading it under a new default.
 - **Evidence document**: required keys `significance_threshold` (number or
   null) and `live.new_fraction`.
 - **`python -m iap.research run`**: `--methods {v2,legacy_v1}` and
@@ -108,6 +131,42 @@ Also changed:
 
 ### Fixed
 
+- **The Python CI job is 3.5 times faster.** The `pytest` step ran the
+  1672 tests serially under coverage in 524 s on the `ubuntu-24.04` runner
+  (319 s and 358 s on the v1.3.0 suite); it now runs
+  `pytest -n auto --dist loadfile` with `pytest-xdist` 3.8.0 (pinned in
+  `python/requirements-ci.txt`, declared in the `dev` extra) and takes 149 s,
+  coverage still produced and uploaded. Every test already wrote under
+  `tmp_path` or `tmp_path_factory` and only read the repository's `data/`,
+  `configs/` and `research/`, so none had to change and none is serial;
+  `--dist loadfile` keeps each module's fixtures on one worker. The PR run
+  executed both ways and compared them test by test: 1672 collected, the
+  same outcome for every one. **The 120 s target is still not met by the
+  instrumented run (149 s); the uninstrumented serial run takes 110 s**
+  (`docs/BUILD_NOTES.md` has the table and where the time goes). Those are
+  the numbers of the 1672-test suite. The tests of the work merged into the
+  release afterwards bring it to 1988 tests and the same step to 306 s and
+  359 s in two runs of the release pull request: faster than serial, and
+  further from the target than before.
+- **A clean stop is observable after the process is gone.** The paper
+  platform sets `platform_session_state` 4 (`STOPPED`) and exits right after
+  its checkpoint, so Prometheus almost never scraped the 4 and
+  `SessionStoppedNotResumed` rarely fired (a known limitation of v1.3.0 and
+  v1.4.0). The trading thread now also writes `<state-dir>/session_exit.json`
+  (`RUNNING` at start, then `STOPPED`, `FINISHED` or `FAILED`) after the
+  checkpoint it describes, and a small exporter that outlives the JVM
+  (`com.iap.platform.SessionStateExporter`; compose service and k8s sidecar
+  `java-platform-state`, port 9102, state mounted read-only, its own k8s
+  Service with `publishNotReadyAddresses`) serves it as
+  `platform_persisted_session_state`. The alert is now
+  `platform_persisted_session_state == 4 unless on(service)
+  (platform_session_state == 1)` for 10 m: it fires for a stop nobody
+  resumed, clears on resume, and stays silent after `FINISHED` and after a
+  crash (which leaves the `RUNNING` marker; `TargetDown` covers it). The
+  Session-state panel falls back to the persisted value. The shutdown hook
+  is unchanged and `session_state.json` keeps its schema and single commit
+  point. Covered by `SessionMarkerTest` and promtool tests in
+  `deployment/prometheus/tests/alerts_test.yml`.
 - **Release guard (`release.yml`, `verify-ci`).** The guard asked the API
   once and read an empty or failed answer as "no successful run": the
   v1.4.0 release failed on it although CI was green. It is now
@@ -145,6 +204,243 @@ Also changed:
   field with `tests/golden/alpha_report_{EQ03,FX01}_v1.4.0.json`.
 - Lifecycle golden scenarios LC04 (what the CUSUM rule changes) and LG01
   (the legacy policy); the backtest golden's `default_rules` block.
+- **Java research backtester on the default rules.**
+  `ResearchBacktester.Config.defaults(...).forHorizon(ns)` is the cost-aware
+  position policy (enter only above the round-trip spread and fee, hold for
+  the label horizon, hysteresis on renewal), fills capped at the displayed
+  L1 size and decisions only on scored rows; `CostModel` is square-root
+  impact by default with `roundTripCostReturn`, `breakevenSize` and
+  `capacityBreakeven`, and `CostModel.load` rejects a config block that
+  names no `impact_model`. `Config.legacy(...)` and `withLinearImpact()`
+  name the v1.4.0 rules. Java has no label engine, so the scored-row mask
+  is an input of `run(...)`. `expected_backtest.json` (x-version 3) adds the
+  mask and every position change to `default_rules`, the no-trade run at
+  full costs (`default_rules_1x`) and scalar `cost_model_cases` for both
+  impact rules; the legacy vector is unchanged. Replayed by
+  `python/tests/test_alpha_golden.py` and the new Java `BacktestGoldenTest`
+  at 1e-9, counts and positions exact.
+- **`schemas/sql/iap_v2.sql`** and the scope-aware store: tables
+  `store_scope` (the current scope) and `ledger_scopes` (looks and
+  Bonferroni \|t\| per scope), ledger columns `experiment_id`, `gate_looks`
+  and `promote_t_threshold`, views `v_alpha_scopes`,
+  `v_alpha_scorecard_current` and `v_experiment_ledger_summary_current`;
+  `python -m iap.store scorecard [--dataset-version V] [--methods M]
+  [--all-scopes]`, `build --rebuild / --dataset-version / --methods /
+  --ledger PATH` (the ledger an ingested dataset keeps in its own
+  directory is indexed under its own scopes), `sql` binding
+  `:dataset_version` / `:methods`; `import_lifecycle_archive` files the
+  archived lifecycle ledgers under the scope their name states;
+  `StoreVersionError`.
+
+### Added — real historical data ingestion
+
+The only dataset is a seeded synthetic generator with no real signal in it,
+so the research results say nothing about markets. This release adds the
+path by which files the owner obtains flow through the existing pipeline —
+normalisation and QC, canonical events, order book, features, research
+runner — exactly as the synthetic data does. No market data is downloaded
+or committed; Python only (backlog epic E25: XD01 and XD03–XD06 done).
+
+- `iap.marketdata.itch50`: a streaming Nasdaq TotalView-ITCH 5.0 reader
+  (length framing, gzip by magic, symbol filter, typed errors with byte
+  offsets; unknown message types skipped by length and counted) and its
+  mapper to canonical events. `iap.marketdata.lobster`: the LOBSTER message
+  reader, pre-open seeding and a level-by-level check of the real
+  `OrderBook` against the vendor's orderbook file.
+- `python -m iap.marketdata ingest --format {itch50,lobster} --input …
+  --date … --symbols … --out …` writes the generator's layout (raw →
+  normalized → QC), the dataset configs and a `dataset.json` manifest
+  (source, input sha256, counts per message type, skipped counts). The
+  `dataset_version` is disjoint from the synthetic one and the output is
+  byte-deterministic.
+- `iap.reference.secmaster` / `corpactions`: a point-in-time security
+  master (`as_of`, never a later date) and an owner-supplied
+  corporate-actions table with a point-in-time adjustment API.
+- `python -m iap.research run --dataset-dir DIR`: the spec, the experiment
+  id and the ledger entries carry the ingested dataset's version, and the
+  ledger and experiments default to the dataset's own directory, so
+  `research/experiments.json` does not move. `python -m iap.store build
+  --ledger PATH` indexes such a ledger under its own scopes.
+- Tests run on bytes they synthesise from the published layouts
+  (`python/tests/itch50_encoder.py`, `python/tests/lobster_fixture.py`);
+  two tests are skipped unless environment variables point at real files.
+- Docs: `docs/REAL_DATA.md` (sources, commands, the mapping table, how to
+  read a first study, limitations), COOKBOOK.md recipe 36.
+
+### Added — differential fuzzing of the risk engines
+
+The hard risk engine exists three times (Rust, normative; Java; Python) and
+was held byte-identical by hand-written step scripts only. The v1.3.0 review
+found fail-open bugs none of them exercised. Backlog issues FZ01, FZ03 and
+FZ05 of epic E31 are done.
+
+- **Generator** (`python/tools/risk_fuzz.py`): deterministic (SplitMix64 only,
+  no wall clock, no hash-ordered iteration) and state-aware — it drives a live
+  Python engine while generating, so quantities land at the remaining headroom
+  of every limit, prices at the band edge, timestamps at the staleness and
+  future-stamp boundaries, and an engaged kill is cleared instead of blocking
+  the rest of the script. Every step type of the two risk goldens plus
+  `bad_override`; i64 / u64 extremes, clock regressions and jumps, venue 0,
+  unknown ids, duplicate and >= 2^63 order ids, empty / oversized / non-ASCII
+  ids; thirteen profiles, one of them a set of 50 configuration mutations.
+- **Corpus** (`tests/golden/risk_fuzz/`, `make_risk_fuzz_corpus.py`): 89
+  scripts, 4,607 steps, 2,741 audit lines, 1.5 MB. The Python engine is the
+  oracle. `COVERAGE.txt` names the script that reaches each reason-string
+  branch of the engine: 63 of 64 (`strategy daily pnl undeterminable` cannot
+  be reached, check 21 rejects first). CI regenerates the corpus on Linux and
+  fails on a stale one; the tool refuses to change files without `--force`.
+- **Replays**: Rust `rust/risk/tests/golden_risk_fuzz.rs`, Java
+  `RiskFuzzGoldenTest`, Python `python/tests/test_risk_fuzz_golden.py` — every
+  order's decision, rule, severity, scope, scope id and reason, the audit JSONL
+  byte for byte, the final snapshot, a snapshot -> JSON text -> restore ->
+  continue check at each cut point, and refusal of corrupt and truncated
+  snapshots. In the golden group of `run_golden.sh`.
+- **Nightly / manual job** (`.github/workflows/risk-fuzz.yml`, or `ci.yml`
+  `workflow_dispatch` with `risk_fuzz=true`; driver
+  `python/tools/risk_fuzz_nightly.py`): fresh scripts from a fresh seed on the
+  runner, Rust and Java driven through their own golden tests
+  (`IAP_RISK_FUZZ_DIR`, `IAP_RISK_FUZZ_OUT`), the first divergence minimised by
+  a delta-debugging shrinker and uploaded as an artifact. Not on the pull
+  request path.
+- **Properties and mutation tests** (`python/tests/test_risk_fuzz_properties.py`):
+  kill precedence derived from the audit log alone, no ALLOW under the GLOBAL
+  kill, positions equal the sum of applied fills, determinism, canonical
+  append-only audit lines, snapshot identity; nine planted bugs and a
+  UTF-16-ordered port are each noticed by the committed corpus. NaN and
+  Infinity cannot be written in JSON: they are pinned by a unit test in each
+  language, not by the corpus.
+
+Divergences found, all fixed (PLATFORM_CONVENTIONS.md §11.1 "Pinned by the
+fuzzer"; no existing golden changed):
+
+1. **A conversion rate stamped `i64::MAX` was trusted — Rust and Python
+   (fail-open), found by the first nightly run** (ci run 37186349594: seed
+   20261004, 400 scripts, 38,666 steps; Rust 400 OK, Java 2 diverged; reduced
+   from 120 steps to 3: mark USD/JPY at `ts = i64::MAX`, mark a JPY
+   instrument, send an order in it). The pre-trade rate check recognised the
+   reporting currency by a `mark_ts == i64::MAX` placeholder, so a pair really
+   stamped `i64::MAX` skipped the age and the future-stamp check and stayed
+   trusted for the session. §11.1 says such a rate rejects `FX_RATE_MISSING`;
+   Java did. The normative engine was the wrong one.
+2. **Order of strategy ids — Java.** `TreeMap<String, _>` orders by UTF-16
+   code unit, the reference's `BTreeMap<String, _>` by code point; they
+   disagree between U+E000..U+FFFF and the astral planes. Two strategies
+   breached by one mark latched in the opposite order, and the snapshot's
+   lots were listed in the opposite order.
+3. **A subnormal float in a reason — Java.** `urgency = -5e-324` printed
+   `…049` (from `Double.toString`'s two-digit `4.9E-324`) where Rust prints
+   `…05`.
+4. **`CONFIG_MISSING` reason — Java.** The parser read the sequence-gap
+   threshold before every other key, reported a missing section as such,
+   printed a non-positive float as `0.0`, walked the conversion table in
+   document order and had one message for three conversion errors. A
+   fail-closed engine now names the same first offending key, in the same
+   words, as the reference.
+
+### Added — execution quality
+
+Costs are what kill every alpha here, so this release adds a way to pay
+fewer of them and a way to measure whether it worked. No default changed.
+
+- **Execution policies** (C++ reference, Java and Python ports, identical
+  fills): `ParentOrder.policy` = `NATIVE` (default, the existing child
+  styles under an explicit name), `AGGRESSIVE` (every child MARKET) or
+  `PASSIVE` — POST at the near touch (one tick inside when the spread is at
+  least three ticks, never at or through the opposite touch) → REST for
+  `floor(max_rest_ns × (1 − urgency) × (e^−risk_aversion for IS))` ns or
+  until the schedule is more than `max_behind_fraction` of the order behind
+  → REPRICE once → CROSS the cancelled remainder. The simulator's nine rules
+  are untouched. New golden `tests/golden/expected_replay_fills_passive.json`
+  (written by the Python port in the bytes of the C++ generator; the C++ test
+  re-renders both replay goldens byte for byte);
+  `expected_replay_fills.json` is byte-identical.
+- **Markout analysis** (`iap.tca.markout`, Java `com.iap.tca.Markout`):
+  per fill, the signed move of the mid at or before `fill_ts + h` for
+  100 ms / 1 s / 5 s / 30 s / 60 s / 5 min (configurable), in bps and
+  currency; `effective half-spread = realised half-spread + price impact`;
+  adverse selection on passive fills; splits by liquidity, venue, algo, side
+  and time bucket with counts and standard errors; `null` — never zero — past
+  the end of the data, before the first quote, across a halt / auction /
+  quote gap, and for a cell with too few fills. Passive-order fill rate and
+  time to fill, overall and by queue position at entry
+  (`ChildOrder.entry_ahead_qty`, now recorded by all three simulators).
+  Golden `tests/golden/expected_markout.json`.
+- **Evidence** (`research/execution/EXECUTION_REPORT.md`, step `execution`
+  of `tools/regenerate_dataset_artifacts.py`): the same 836 parent orders on
+  the bundled equities under each policy, with the unfilled quantity priced
+  at the arrival-to-end move plus the cost of completing it; and the MVP
+  session per child policy (`execution.child_policy`, an optional key of
+  `mvp.json`; the pinned run is unchanged). The report's last section says
+  which part of the result is a simulator assumption.
+- Docs: API_TRADING.md §2.5, API_PORTFOLIO_TCA.md §2.9,
+  PLATFORM_CONVENTIONS.md §11.3 / §14.5, docs/HOW_IT_WORKS.md §3.5,
+  LEARN.md §30, COOKBOOK.md recipe 37.
+
+### Added — signal combination and the correlation gate
+
+Pull request [#25](https://github.com/AshJha0/intraday-alpha-platform/pull/25).
+
+- **`iap.combine`** — many weak signals into one forecast per instrument
+  and timestamp. `CombinedAlpha` is an `AlphaModel` whose inputs are
+  alphas; its weights for a walk-forward fold are fitted inside that fold's
+  training window, on the members' out-of-sample predictions from three
+  inner purged and embargoed walk-forward folds (stacking). Four methods by
+  name: `equal_weight` (the default and the baseline), `ic_weighted`,
+  `ridge` (penalty chosen by forward-chained CV inside the training
+  window) and `shrinkage_mv` (Ledoit–Wolf shrinkage, numpy only). `ridge`
+  and `shrinkage_mv` account for member correlation explicitly; the other
+  two do not, and nothing is orthogonalised (API_ALPHA.md §8,
+  PLATFORM_CONVENTIONS.md §13.8).
+- **Leakage tests** (`python/tests/test_combine.py`): for every fold and
+  method the fitted parameters are bit-identical when the data is
+  truncated at the test start and when every later label is garbled or
+  shifted or every later feature rescaled; a combiner that reads test rows
+  fails the same test. The platform's truncation and recompute probes
+  found one real defect during development — a BLAS matrix product
+  rounding a row differently depending on the rows after it — and the
+  blend is now accumulated member by member.
+- **The combination as a research object**: `python -m iap.research
+  combine` validates each (asset class, method) combination with
+  `validate_alpha` under the `v2` bundle, debits `83 + K` looks per
+  experiment (760 for 12 members, 4 methods, 2 asset classes — all
+  declared before the first is evaluated), and writes
+  `research/combination/{REPORT.md, COMBINATION.json, reports/,
+  signal_correlation.json}`: IC and gate t of each member against the
+  combination, the signal and P&L correlation matrices, the effective
+  number of independent bets, weights per fold and their stability, net
+  P&L after costs, and the breadth arithmetic next to the measurement.
+- **`cross_alpha_correlation`** (lifecycle gate; backlog AF03, closed):
+  on CANDIDATE → VALIDATING, the largest absolute out-of-sample signal
+  correlation with any alpha at or beyond `cross_alpha_min_state`
+  (`VALIDATING`) must be at most `max_cross_alpha_correlation` (0.7).
+  No such alpha: vacuous pass at 0.0. No evidence: fail closed.
+- **`net_pnl_bootstrap_ci`** (lifecycle gate): on the same edge, the lower
+  bound of the 95 % stationary-bootstrap interval of the pooled 1×-cost
+  net P&L must be above zero. An alpha that makes no trade has no
+  interval and fails. This closes the item the release first shipped as
+  report-only. Absent, by name, under the legacy policy
+  (`net_pnl_ci_gate = "absent"`).
+- Both gates are rows of the gate table in **Python, Java and Rust** (20
+  gates, 17 edges) and are evaluated from the evidence document alone
+  (`cross_alpha`, `pnl_bootstrap`); `lifecycle.json` and the lifecycle
+  golden move to `x-version` 3, with scenarios LC05 and LC06. C++ has no
+  lifecycle port.
+- `tools/regenerate_dataset_artifacts.py` gains the `combination` step;
+  the manual `regenerate` CI job takes `regenerate_only` (a subset of
+  steps).
+
+**Result.** 0 PROMOTE / 8 ITERATE / 0 REJECT over the eight combinations.
+The equal-weight blends measure what the breadth arithmetic predicts
+(equities: gate IC 0.0105 against an expected 0.0099, 6.5 effective bets
+of 12; FX: 0.0315 against 0.0348, 9.9 of 12). The fitted equity blends
+clear the significance threshold of 4.42 (ridge: gate IC 0.0429, t 7.06)
+and every combination fails the cost gate: the equity blends make 0 to 6
+trades in four folds, the FX blends that trade lose (ridge −1 627 USD).
+In the registry all 24 alphas stay at CANDIDATE; all 24 fail
+`net_pnl_bootstrap_ci` (17 make no trade, 7 have a negative lower bound)
+and pass `cross_alpha_correlation` vacuously. No verdict changed. The
+correlation document shows EQ02 / EQ03 / EQ12 correlated 0.95–1.00: with
+one of them at VALIDATING the gate would hold the other two.
 
 ### Added — detection power
 
@@ -190,7 +486,8 @@ to 0.79. It now measures a rate. `POWER_REPORT.json` `x-version` 2 → 3.
   runs) took 994.5 s in the CI `regenerate` job; the extended grid (4 sizes,
   8 sessions; 100 runs) 2,461.1 s and is the opt-in `power_extended` step of
   `tools/regenerate_dataset_artifacts.py`, written to
-  `research/power/extended/`. The job takes `regenerate_only=<steps>`.
+  `research/power/extended/`
+  (`-f regenerate_only=power,power_extended` on the `regenerate` job).
 
 Result at the reference size, gate threshold (detections of 20):
 
@@ -240,7 +537,7 @@ Same dataset, new rules. Nothing is promoted, before or after.
 | power study, planted lead-lag: significant at any size; evidence at 0.5× / 1× / 2× | 0; 0 / 0 / 0 | 0; 1 / 1 / 2 of 3 seeds |
 | power study, PROMOTE on any planted effect; any detection at level 0 | 0; 0 | 0; 0 |
 | MVP session: events, decisions, parents, fills, P&L | 15,805, 800, 235, 169, −81.53 USD | unchanged |
-| MVP `config_version`; trace digest | `f293e7e7…`; `f51890da…` | `bf8cc608…`; `e534ac1f…` |
+| MVP `config_version`; trace digest | `f293e7e7…`; `f51890da…` | `439bbad5…`; `20d4ff76…` |
 
 - **What the cost-aware policy shows.** Under the sign policy every alpha
   traded every row and lost five or six figures; that loss measured the
@@ -319,6 +616,19 @@ Same dataset, new rules. Nothing is promoted, before or after.
   hashed files). Its lifecycle gauge follows the CUSUM rule and its rolling
   IC is pair-weighted; the state stays observational. State directories
   written by v1.4.0 resume as before.
+- A store file built before v1.5.0 (data-model x-version 1) is refused by
+  `Store.init()` and by every `python -m iap.store` command; rebuild it with
+  `python -m iap.store build --rebuild`. A query against
+  `v_alpha_scorecard` now returns one row per alpha and scope: use
+  `v_alpha_scorecard_current` for the old one-row-per-alpha shape.
+  `Store.insert_experiment_result` needs the experiment's spec in the store
+  (or `methods=`).
+- Java callers: `new ResearchBacktester(costModel, maxPos, confMin, latency)`
+  is `new ResearchBacktester(costModel, Config.legacy(maxPos, confMin,
+  latency))`; `new CostModel(a, b, c, multiplier)` is square-root impact now
+  — add `.withLinearImpact()` for the old rule. The constants
+  `POSITION_POLICY`, `CAP_FILLS_AT_L1`, `BLOCKS_ROWS` and `IMPACT_MODEL` are
+  gone (the configuration says which rules run).
 - Feature frames written by v1.4.0 have no `label_reopen_<h>` columns:
   the default row policy then falls back to valid labels and the report
   says `label_reopen_available: false`. Regenerate with
@@ -333,14 +643,60 @@ Those of v1.4.0 stand. New or restated:
   statement about the spread of the synthetic book relative to the
   predicted move; it says nothing about what a passive execution policy
   would earn, which the research backtester does not model.
-- **The bootstrap interval and the per-fold diagnostics gate nothing.**
-- **`v_alpha_scorecard` is not dataset- or bundle-aware**, and the store
-  keeps `gate_looks` and the gate statistics of a v2 ledger entry only
-  inside `result_json`. Fixing either needs `iap_v2.sql`.
-- **The Java research backtester implements the legacy rules only.** A
-  default-rules research backtest exists in Python alone.
+- **The per-fold diagnostics gate nothing, and the bootstrap interval gates
+  the lifecycle only.** `net_pnl_bootstrap_ci` holds an alpha at CANDIDATE
+  when the interval's lower bound is not positive; the report verdict
+  (PROMOTE / ITERATE / REJECT) does not read the interval.
+- **The store's scorecard row is the latest result of a scope, not a
+  judgement.** `v_alpha_scorecard` shows the threshold each result was
+  judged at (`promote_t_threshold`) and the scope's own Bonferroni \|t\|
+  beside it; it re-judges nothing, and the gate statistics other than the
+  t-stat stay inside `ledger_entries.result_json`.
+- **The Java research backtester takes the scored-row mask as an input**
+  (there is no Java label engine) and runs rows-mode latency only; TIME-mode
+  latency, the decision-age bound, the session flatten and the per-row
+  currency conversion exist in Python alone. None is a default.
 - **The ledger threshold is not retroactive.** Results recorded before
   v1.5.0 were judged at 3.0 and are not re-judged.
+- **Real data: ingestion only.** One real ITCH day has been ingested by the
+  owner; the LOBSTER path has not been run on a vendor file and no study on
+  real data is recorded (XD10). The batch runners (`run_all.py`, the
+  adaptive study, `research combine`, the power study) read the bundled
+  dataset only; `research run --dataset-dir` is the one research entry
+  point that takes an ingested dataset. Single venue per file, no
+  auctions, no hidden liquidity until it trades, corporate actions not
+  applied by the feature pipeline (docs/REAL_DATA.md §11). XD02 and
+  XD07–XD10 stay backlog.
+- **The passive-execution result is a simulator result.** Our quote never
+  changes the replayed book, nothing reacts to it, there is no hidden
+  liquidity and cancels are frictionless
+  (`research/execution/EXECUTION_REPORT.md`, last section). The `TCAResult`
+  wire contract was not extended with markouts; the Java `BacktestEngine`
+  and `PaperTrading` keep the NATIVE child style (the passive MVP run is
+  Python only); there are no PEG / MID / post-only order types (X08); FX
+  is excluded from the execution study. T05 stays backlog.
+- **A combination is a research object, not a registered alpha.** The
+  registry holds the 24 flagship alphas (PLATFORM_CONVENTIONS.md §13.8); the
+  eight combination experiments are in the ledger — their 760 looks count
+  in the scope and in every later threshold — and in
+  `research/combination/`, and the store's `v_alpha_scorecard`, which is
+  one row per registered alpha, does not list them
+  (`v_experiment_ledger_summary` does, as kind `combination`). The alpha
+  reports were not re-run for the two new gates: a report renders the
+  validation gates of its verdict, and lifecycle gate results live in the
+  registry, which was rebuilt. `cross_alpha_correlation` passes vacuously
+  while no alpha is at or beyond VALIDATING. C++ has no lifecycle port.
+- **Risk fuzzing does not cover NaN and Infinity**, which JSON cannot
+  carry: one unit test per language does. One of 64 reason-string branches
+  is unreachable from a script. FZ02 (simulator properties) and FZ04
+  (crash injection on the Java paper path) stay backlog.
+- **The Python CI job misses the 120 s target under coverage by more than
+  before**: 306-359 s for the merged 1988-test suite under xdist (149 s for
+  the 1672 tests it was measured on). The slowest additions are the
+  combination report test, the MVP child-policy fixture and the ingest
+  end-to-end test; nothing was removed or marked slow.
+- **Rust and C++ have no research backtester** and do not read
+  `expected_backtest.json`.
 
 ## v1.4.0 — 2026-10-03
 
@@ -753,7 +1109,9 @@ API_TRADING.md §2.4)**
 - **Alerts are routed but not delivered** until an operator supplies a
   webhook URL; audit logs are not shipped off-host; no image vulnerability
   scan is wired in.
-- **The `STOPPED` state is rarely observed downstream.** The session-state
+- **The `STOPPED` state is rarely observed downstream.** (Fixed in v1.5.0:
+  the persisted `platform_persisted_session_state` outlives the process.)
+  The session-state
   dashboard panel maps all five values, 0–4, and `SessionStoppedNotResumed`
   reads the value 4, but a stopped process exits right after its
   checkpoint, so the value is scraped only when a scrape lands in that
@@ -790,7 +1148,7 @@ API_TRADING.md §2.4)**
 - **The power study is three seeds per cell.** A rate moves in steps of
   0.33; it calibrates the chain and is not a power curve.
 - **The Python suite exceeds its 120 s target** (1565 tests, five to six minutes in
-  CI under coverage).
+  CI under coverage). (v1.5.0: 149 s under xdist with coverage for 1672 tests, 306-359 s for the 1988 of the merged release; see above.)
 - **`iap.__version__` still reads 1.0.0**; the package metadata says 1.3.0.
 - **There is no LLM, agent or MCP code.** The agent layer is a backlog epic
   (E24, E30); what exists is the foundation it would need.

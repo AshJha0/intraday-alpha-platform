@@ -74,6 +74,17 @@ iap/
                    re-ordering, JSONL + IAP1 + Parquet outputs, qc_report.json.
     __main__.py    `python3 -m iap.marketdata` — end-to-end: generate data/raw,
                    normalize into data/normalized, print stats JSON.
+                   `python3 -m iap.marketdata ingest ...` dispatches to ingest.py.
+    itch50.py      REAL data (docs/REAL_DATA.md): streaming Nasdaq TotalView-ITCH 5.0
+                   file reader (gzip by magic, symbol filter, typed errors with
+                   byte offsets) and the mapper to canonical proto events.
+    lobster.py     LOBSTER message-file reader; with the orderbook file it seeds
+                   pre-open orders and verifies the real OrderBook level by level.
+    ingest.py      `ingest --format {itch50,lobster}`: owner-supplied files -> a
+                   dataset directory (raw, normalized, QC, configs, point-in-time
+                   security master, dataset.json with its own dataset_version).
+    feederrors.py  FeedFormatError / FeedTruncatedError / IngestError /
+                   BookDivergenceError.
   orderbook/
     book.py        OrderBook: L1/L2/MBO per venue+instrument (conventions §4 —
                    FIFO, pinned modify semantics, marketable crossing ADDs,
@@ -214,6 +225,10 @@ iap/
                    configs/venues/venues.json: tick/lot sizes, price<->ticks, venues,
                    fees, latency profiles, sessions, trading calendar;
                    corporate-action stub API (out of scope for synthetic data).
+    secmaster.py   Point-in-time security master: one record per (symbol,
+                   effective_date), read only through as_of() — never a later date.
+    corpactions.py Corporate-actions CSV table (SPLIT / DIVIDEND / SYMBOL_CHANGE,
+                   owner-supplied) and the point-in-time adjustment API.
   risk/            Python reference port of the fail-closed hard risk engine
                    (rust/risk stays normative for the rule text; this package is
                    proven equivalent by the same goldens: exact decisions,
@@ -297,11 +312,19 @@ iap/
                    eligibility and the ledger's expected-max-|t| note; `list`
                    prints a `dataset` column (the folder keeps the
                    experiments of every dataset the ledger has seen).
+  combine/         Signal combination (API_ALPHA.md §8): weights.py (equal_weight,
+                   ic_weighted, ridge with a nested penalty search, Ledoit-Wolf
+                   shrinkage mean-variance; signal correlation, effective bets),
+                   model.py (CombinedAlpha: an AlphaModel whose inputs are alphas,
+                   weights fitted on the members' out-of-sample stack inside each
+                   training window), report.py (the combination validated, ledgered
+                   and reported: research/combination/; `python -m iap.research
+                   combine`).
   lifecycle/       Alpha promotion lifecycle RESEARCH -> CANDIDATE -> VALIDATING
                    -> PAPER -> ACTIVE -> WATCH -> RETIRED (LifecycleState 0..6)
                    with a gate at every edge; extends (never alters) the
                    ACTIVE/WATCH/RETIRED tracker of iap.adaptive.lifecycle.
-    config.py      PolicyConfig = configs/strategies/lifecycle.json (x-version 2:
+    config.py      PolicyConfig = configs/strategies/lifecycle.json (x-version 3:
                    promotion-gate thresholds equal to validate.GATES, demotion
                    max_consecutive_failures, tstat_threshold "ledger" by
                    default or the legacy "fixed") + strategies.json
@@ -347,7 +370,7 @@ iap/
                    retire <ID> --reason ... | reset <ID> --reason ...` (bootstrap
                    refuses to truncate a non-empty lifecycle_transitions.jsonl —
                    an append-only audit — without --force; exit code 3).
-  store/           The platform data model (schemas/sql/iap_v1.sql, x-version 1:
+  store/           The platform data model (schemas/sql/iap_v2.sql, x-version 2:
                    portable DDL for SQLite 3 + PostgreSQL >= 13) over sqlite3 —
                    a derived, rebuildable INDEX of the flat-file artefacts,
                    never their replacement (docs/DATA_MODEL.md).

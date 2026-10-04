@@ -167,6 +167,44 @@ services:
       timeout: 5s
       retries: 3
 
+  # The last persisted session state, served by a process that outlives the
+  # trading JVM (PLATFORM_CONVENTIONS.md §12.3). java-platform sets
+  # platform_session_state=4 on a clean stop and exits right after the
+  # checkpoint, so Prometheus almost never scrapes the 4; this service reads
+  # the session_exit.json marker the trading thread writes and serves it as
+  # platform_persisted_session_state on :9102 (scraped as job
+  # java-platform-state; alerts.yml SessionStoppedNotResumed). Same image,
+  # different entrypoint, state mounted READ-ONLY, no published port.
+  java-platform-state:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile.java
+    image: ghcr.io/ashjha0/intraday-alpha-platform-java:v1.5.0
+    container_name: iap-java-platform-state
+    entrypoint: ["java", "-Xmx64m", "-XX:-UsePerfData", "-cp", "/app/classes", "com.iap.platform.SessionStateExporter", "--state-dir", "/data/state", "--port", "9102"]
+    restart: unless-stopped
+    networks: [iap-net]
+    environment:
+      IAP_BIND_ADDR: 0.0.0.0
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - iap-data:/data:ro
+    depends_on:
+      data-generator:
+        condition: service_completed_successfully
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/9102 && printf 'GET /health HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q ok <&3"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
   # ----------------------------------------------------------- observability
   prometheus:
     image: prom/prometheus:v2.53.0@sha256:075b1ba2c4ebb04bc3a6ab86c06ec8d8099f8fda1c96ef6d104d9bb1def1d8bc

@@ -113,13 +113,15 @@ are ported, each with its legacy rule selectable by name: the CUSUM
 retirement rule and the pair-count-weighted rolling IC (Java
 `LifecycleGauge`, `RollingIc`; Rust `lifecycle::tracker`) and the ledger
 significance threshold (Java `PolicyConfig` / `Gates`, Rust
-`PolicyConfig::threshold_for`). Research-only statistics are not ported: the
+`PolicyConfig::threshold_for`). The research backtest rules are ported to
+Java: `ResearchBacktester.Config.defaults` / `CostModel` are the v1.5.0
+rules (cost-aware positions, L1 fill cap, scored-row block, square-root
+impact, breakeven capacity) and `Config.legacy` / `withLinearImpact` the old
+ones, and `tests/golden/expected_backtest.json` (x-version 3) pins both rule
+sets for Python and Java; the scored-row mask is an input of the Java run
+(no Java label engine), and Rust and C++ have no research backtester. The
 drift z exists in the Python reference alone (no port evaluates a refit
-trigger), and the Java `ResearchBacktester` and `CostModel` keep the LEGACY
-research rules and say so in their API (`POSITION_POLICY`, `CAP_FILLS_AT_L1`,
-`BLOCKS_ROWS`, `IMPACT_MODEL`, `loadLegacyLinear`); the cross-language vector
-`tests/golden/expected_backtest.json` names those rules in its `config`. The
-gate-eligibility flag is read by the Python reference alone.
+trigger). The gate-eligibility flag is read by the Python reference alone.
 
 What the defaults changed on the bundled data is in CHANGELOG.md, v1.5.0,
 "Results". In short: nothing is promoted before or after (0 PROMOTE / 11
@@ -248,10 +250,11 @@ for the lead-lag.
   the configuration and an entry carries `gate_looks`, the look count its run
   was judged at. At v1.4.0 the committed ledger held 1,920 looks over 139
   entries — 1,068 on the v1.3.0 dataset and 852 on the v1.4.0 one (Bonferroni
-  |t| 4.206, was 4.071). The v1.5.0 ledger carries those and adds 2,476 under
-  the `v2` bundle on the same dataset: 4,396 looks over 208 entries (1,068 on
-  the v1.3.0 dataset, 3,328 on the v1.4.0 one), Bonferroni |t| 4.389,
-  expected largest |t| under the null 4.096. The thresholds derived from it
+  |t| 4.206, was 4.071). The v1.5.0 ledger carries those and adds 3,236 under
+  the `v2` bundle on the same dataset (2,476 by the report pipelines, 760 by
+  the signal-combination experiments): 5,156 looks over 216 entries (1,068 on
+  the v1.3.0 dataset, 4,088 on the v1.4.0 one), Bonferroni |t| 4.424,
+  expected largest |t| under the null 4.135. The thresholds derived from it
   only tighten.
 
 ## 4. Gate eligibility

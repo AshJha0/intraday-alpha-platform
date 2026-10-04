@@ -237,10 +237,11 @@ buckets gain (FX08 2.18 → 3.84). The threshold the t is compared with is
 Try enough things and something will look significant. So every look at
 the data is recorded in a ledger (`research/experiments.json`), identified
 by alpha, kind, configuration and — since v1.4.0 — dataset, so that
-re-running a script does not inflate the count. Today it holds 4,396 looks
-over 208 entries: 1,068 were taken on the v1.3.0 dataset, 852 on the
-v1.4.0 dataset under the old rules, and 2,476 were added when v1.5.0
-re-ran everything under the new ones. A statistic computed on a different
+re-running a script does not inflate the count. Today it holds 5,156 looks
+over 216 entries: 1,068 were taken on the v1.3.0 dataset, 852 on the
+v1.4.0 dataset under the old rules, 2,476 were added when v1.5.0
+re-ran everything under the new ones, and 760 by the signal-combination
+experiments of the same release (§2.13). A statistic computed on a different
 dataset, or under a different method bundle, is a different look, and the
 denominator only grows: regenerating the data or changing the rules does
 not reset it. From that count come two yardsticks: the largest t expected
@@ -352,16 +353,24 @@ promotion needs every gate of its edge to pass:
 | edge | gates |
 |---|---|
 | RESEARCH → CANDIDATE | a ledger entry exists; leakage clean |
-| CANDIDATE → VALIDATING | leakage clean; out-of-sample IC; statistical significance; fold consistency; fold count; hypothesis sign; **net P&L after costs**; capacity; stability |
+| CANDIDATE → VALIDATING | leakage clean; out-of-sample IC; statistical significance; fold consistency; fold count; hypothesis sign; **net P&L after costs**; **the bootstrap lower bound of net P&L**; capacity; stability; **correlation with alphas already through** |
 | VALIDATING → PAPER | holdout IC tracks research; replay reproducible; cross-language parity |
 | PAPER → ACTIVE | minimum paper sessions; paper IC tracking; paper net P&L; no kill events |
 | ACTIVE ⇄ WATCH → RETIRED | rolling live IC |
 
 On the bundled data all 24 alphas reach CANDIDATE and stop there. Every
-one fails the same two gates: net P&L after costs, and capacity (an alpha
+one fails the same three gates: net P&L after costs, the bootstrap bound
+on it, and capacity (an alpha
 that does not trade, or trades at a loss, has an edge-breakeven capacity
 below the 1,000,000 USD the gate asks for). For three of them (EQ02, EQ03,
-EQ12) those are the only gates that fail. Statistical significance fails
+EQ12) those are the only gates that fail.
+The bootstrap gate asks for more than a positive number: the lower end of
+a 95 % interval around the net P&L of all four folds has to be above zero,
+and an alpha that never trades has no interval and fails (17 of the 24;
+the 7 that trade lose). The correlation gate asks whether a candidate is
+more than 0.7 correlated with an alpha that is already at VALIDATING or
+beyond; nobody is, so it passes for all 24 without having been tested —
+§2.13 shows what it would do. Statistical significance fails
 for 21, stability for 14, the IC gate for 12. Under the v1.4.0 rules the
 cost gate failed for all 24 and was the only failure for four (the three
 above and FX04, whose t of 4.24 is now below the threshold).
@@ -474,6 +483,71 @@ PYTHONPATH=src python3 -m pytest -q tests/test_validation_framework.py tests/tes
 ```
 
 ---
+
+### 2.13 Combining weak signals, and breadth
+
+One weak signal is a small edge on a noisy forecast. The standard answer
+is to combine many: if the errors of the signals are not perfectly
+correlated they average down faster than the common forecast does. For
+`K` standardised signals with mean IC `ic` and mean pairwise correlation
+`rho`, the equal-weight blend has
+
+    IC_blend = ic × sqrt( K / (1 + (K − 1) × rho) )
+
+The square-root term is the **breadth** you actually have. With `rho = 0`
+it is `sqrt(K)`: twelve independent signals triple the IC (√12 ≈ 3.5).
+With `rho = 1` it is 1: twelve copies of one signal are one signal. This is
+the "fundamental law" — information ratio ≈ IC × √breadth — and its fine
+print: breadth counts *independent* bets.
+
+`iap.combine` builds the blend as an alpha whose inputs are alphas and
+sends it through the same validation as any single alpha (§2.5–§2.11).
+Three things are specific to it.
+
+**The weights are fitted out of sample.** In each walk-forward fold the
+weights are estimated inside the training window, on predictions the
+members made for rows they were not fitted on (three inner folds, same
+purge and embargo). A weight never sees a test row; a test corrupts every
+row from the test start onwards and checks that not one fitted number
+moves. Four methods are available — equal weights (the default, and the
+baseline: it estimates nothing), IC weights, ridge regression with the
+penalty chosen inside the training window, and a mean-variance blend on a
+shrunk covariance matrix. The last two account for correlation between
+members; the first two do not.
+
+**Combining is a search, and is charged as one.** Each (member list,
+method) pair costs 83 + K looks — its validation plus one per member — and
+a report that tries four methods declares all four before it evaluates the
+first. The committed report was charged 760 of them and was judged at a t threshold
+of 4.42.
+
+**The result, on this data.** `research/combination/REPORT.md`:
+
+| | members | mean member IC | effective bets | expected blend IC | measured IC | gate t | net P&L (all folds) | verdict |
+|---|---|---|---|---|---|---|---|---|
+| equities, equal weight | 12 | 0.0038 | 6.5 of 12 | 0.0099 | 0.0105 | 1.98 | 0 (no trade) | ITERATE |
+| equities, ridge | 12 | | | | 0.0429 | 7.06 | −73 USD | ITERATE |
+| FX, equal weight | 12 | 0.0109 | 9.9 of 12 | 0.0348 | 0.0315 | 3.22 | −13 USD | ITERATE |
+| FX, ridge | 12 | | | | 0.0482 | 4.73 | −1 627 USD | ITERATE |
+
+The arithmetic works: the measured equal-weight IC is what mean IC × √breadth
+predicts, to within a few parts in ten thousand. The fitted methods do
+better statistically — the equity ridge blend has an IC of 0.043 and a t of
+7. And none of the eight combinations is promotable, for the reason no
+member is: the forecast, in return units, is smaller than the cost of
+acting on it. The equity blends make between 0 and 6 trades in four folds;
+the FX blends that trade lose. Breadth multiplies IC. It does not multiply
+the size of the move being forecast, and that — not statistical
+significance — is what this dataset lacks.
+
+**Why a correlation gate follows.** Of the twelve equity alphas, three
+(EQ02, EQ03, EQ12 — three ways of measuring order-flow imbalance) are
+correlated 0.95 to 1.00. They look like three alphas that each pass the
+significance gate; they are one bet counted three times, and the twelve
+equity signals hold about 6.5 independent bets. Allocating to all three
+would triple the position in one idea. The lifecycle's correlation gate
+(§2.11) refuses that: once one of them is at VALIDATING, the other two are
+held at CANDIDATE.
 
 ## 3. Algo and execution: how an order becomes fills
 
@@ -589,6 +663,54 @@ cannot be measured.
 cd python
 PYTHONPATH=src python3 -m pytest -q tests/test_exec_algos.py tests/test_sor.py \
   tests/test_execution_rules.py tests/test_execution_golden.py tests/test_tca_golden.py
+```
+
+### 3.5 Posting instead of crossing, and measuring what it buys
+
+Every alpha here loses after costs, and most of the cost is the half-spread
+a MARKET child pays. The execution policy of a parent order
+(`ParentOrder.policy`) decides whether its children cross or post:
+
+- `NATIVE`, the default, is what §3.1 describes.
+- `AGGRESSIVE` crosses with every child.
+- `PASSIVE` posts each schedule step at the near touch — one tick inside
+  when the spread is three ticks or more, never at or through the other
+  side — and lets it rest. How long is the parent's patience:
+  `30 s × (1 − urgency)`, times `e^(−risk_aversion)` for IS. When the rest
+  time is up the child is repriced once (or simply left in the queue if the
+  touch has not moved), and after that the remainder is cancelled and
+  crossed. If the schedule falls more than 10 % of the order behind, the
+  resting children are cancelled and crossed at once.
+
+The simulator did not change for this. A posted child is an ordinary LIMIT
+order under the queue rules of §3.3; a cancel takes the same latency path as
+an order and can lose the race to a fill, in which case only what was
+actually cancelled is sent again. C++, Java and Python produce the same
+fills (`tests/golden/expected_replay_fills_passive.json`).
+
+Whether posting helped is a measurement, not an assumption. The **markout**
+of a fill is the signed move of the mid after it,
+`s × (mid(t_fill + h) − fill price)`, at 100 ms, 1 s, 5 s, 30 s, 60 s and
+5 min. A passive buy at the bid starts half a spread ahead; if the mid then
+falls, the fill was *adversely selected* — it happened because someone
+better informed wanted to sell. The decomposition is exact:
+*effective half-spread = realised half-spread + price impact*. A markout
+window that runs past the end of the data, or across a halt or a gap in the
+quotes, is reported as `null`, never as zero. The same module reports the
+fill rate of resting orders, their time to fill, and both against the queue
+position they started from (`iap.tca.markout`, Java `com.iap.tca.Markout`,
+golden `expected_markout.json`).
+
+`research/execution/EXECUTION_REPORT.md` runs the same parent orders under
+each policy on the bundled equities and prices the quantity a passive order
+failed to fill — at the move of the mid over the window plus the cost of
+crossing it at the end — so that not trading cannot pass for cheap trading.
+It also says which part of the result is the simulator: our resting order
+never changes the replayed book, so nobody reacts to it.
+
+```bash
+cd python
+PYTHONPATH=src python3 -m pytest -q tests/test_passive_policy.py tests/test_markout.py
 ```
 
 ---
@@ -904,14 +1026,15 @@ reason for each:
   trading path in any case.
 - **Agent debate.** Several agents arguing about 24 alphas on the same two
   sessions add no data. Evidence comes from sessions, and the ledger
-  already holds 4,396 looks at them (1,068 on the v1.3.0 dataset, the rest
+  already holds 5,156 looks at them (1,068 on the v1.3.0 dataset, the rest
   on the regenerated one). Debate multiplies looks; it does not add a
   holdout. Without pre-registration and a hidden reserve seed — both
   backlog — there is also no way to score who was right.
 
 What would not be theatre is the unglamorous list: real exchange data,
 measured latency, a simulator calibrated to live fills, book-level risk
-(EPICS E25–E28).
+(EPICS E25–E28). The ingestion path for the first of these exists
+([REAL_DATA.md](REAL_DATA.md)); no real file has been run through it yet.
 
 **Where to look**
 
@@ -927,7 +1050,7 @@ cd python
 PYTHONPATH=src python3 -m pytest -q tests/test_import_policy.py                         # the boundary, as a test
 PYTHONPATH=src python3 -m iap.research --json-errors show 0000000000000000; echo "exit=$?"   # one JSON error object on stderr, exit 1
 PYTHONPATH=src python3 -m iap.store build > /dev/null
-PYTHONPATH=src python3 -m iap.store sql "SELECT verdict, COUNT(*) AS n FROM v_alpha_scorecard GROUP BY verdict ORDER BY verdict"
+PYTHONPATH=src python3 -m iap.store sql "SELECT pipeline_verdict, COUNT(*) AS n FROM v_alpha_scorecard_current GROUP BY pipeline_verdict ORDER BY pipeline_verdict"
 ```
 
 ---
@@ -999,4 +1122,5 @@ PYTHONPATH=src python3 -m iap.mvp replay --run ../data/mvp/58a10f2194a3c81c     
 | the pictures | [DIAGRAMS.md](DIAGRAMS.md) |
 | every pinned rule | [../PLATFORM_CONVENTIONS.md](../PLATFORM_CONVENTIONS.md) |
 | what is done and what is backlog | [ROADMAP.md](ROADMAP.md), [EPICS.md](EPICS.md) |
+| to run the pipeline on real historical files you obtained (ITCH 5.0, LOBSTER) | [REAL_DATA.md](REAL_DATA.md) |
 | what changed in v1.3.0, v1.4.0 and v1.5.0 | [../CHANGELOG.md](../CHANGELOG.md) |

@@ -75,10 +75,13 @@ data:
     \     \"type\": \"stat\",\n      \"title\": \"Session state\",\n      \"description\": \"platform_session_state:\
     \ 0 STARTING, 1 RUNNING, 2 FINISHED, 3 FAILED, 4 STOPPED (PLATFORM_CONVENTIONS.md \xA712.6). A paper\
     \ session is finite: FINISHED is the normal terminal state; STOPPED is an operator or signal stop\
-    \ that checkpointed and can be resumed.\",\n      \"datasource\": {\n        \"type\": \"prometheus\"\
-    ,\n        \"uid\": \"prometheus\"\n      },\n      \"gridPos\": {\n        \"h\": 4,\n        \"\
-    w\": 6,\n        \"x\": 12,\n        \"y\": 0\n      },\n      \"fieldConfig\": {\n        \"defaults\"\
-    : {\n          \"unit\": \"short\",\n          \"mappings\": [\n            {\n              \"type\"\
+    \ that checkpointed and can be resumed. While no trading process is running the panel falls back to\
+    \ the last persisted state (platform_persisted_session_state, served by the java-platform-state exporter),\
+    \ so a clean stop, a finished session or a failed one stays visible; a crashed session shows no data\
+    \ (see the TargetDown alert).\",\n      \"datasource\": {\n        \"type\": \"prometheus\",\n   \
+    \     \"uid\": \"prometheus\"\n      },\n      \"gridPos\": {\n        \"h\": 4,\n        \"w\": 6,\n\
+    \        \"x\": 12,\n        \"y\": 0\n      },\n      \"fieldConfig\": {\n        \"defaults\": {\n\
+    \          \"unit\": \"short\",\n          \"mappings\": [\n            {\n              \"type\"\
     : \"value\",\n              \"options\": {\n                \"0\": {\n                  \"text\":\
     \ \"STARTING\",\n                  \"index\": 0\n                },\n                \"1\": {\n  \
     \                \"text\": \"RUNNING\",\n                  \"index\": 1\n                },\n    \
@@ -98,37 +101,37 @@ data:
     \     ],\n          \"fields\": \"\",\n          \"values\": false\n        },\n        \"textMode\"\
     : \"auto\"\n      },\n      \"targets\": [\n        {\n          \"datasource\": {\n            \"\
     type\": \"prometheus\",\n            \"uid\": \"prometheus\"\n          },\n          \"expr\": \"\
-    max(platform_session_state)\",\n          \"legendFormat\": \"state\",\n          \"refId\": \"A\"\
-    \n        }\n      ]\n    },\n    {\n      \"id\": 4,\n      \"type\": \"stat\",\n      \"title\"\
-    : \"Event-time gap (last event)\",\n      \"description\": \"md_event_time_gap_seconds \u2014 the\
-    \ gap between the last two consecutive processed events. This is the staleness signal StaleFeed alerts\
-    \ on; it is correct in replay AND live (PLATFORM_CONVENTIONS.md \xA712.6).\",\n      \"datasource\"\
-    : {\n        \"type\": \"prometheus\",\n        \"uid\": \"prometheus\"\n      },\n      \"gridPos\"\
-    : {\n        \"h\": 4,\n        \"w\": 6,\n        \"x\": 18,\n        \"y\": 0\n      },\n      \"\
-    fieldConfig\": {\n        \"defaults\": {\n          \"unit\": \"s\",\n          \"mappings\": [],\n\
-    \          \"thresholds\": {\n            \"mode\": \"absolute\",\n            \"steps\": [\n    \
-    \          {\n                \"color\": \"green\",\n                \"value\": null\n           \
-    \   },\n              {\n                \"color\": \"red\",\n                \"value\": 5\n     \
-    \         }\n            ]\n          }\n        },\n        \"overrides\": []\n      },\n      \"\
-    options\": {\n        \"colorMode\": \"background\",\n        \"graphMode\": \"area\",\n        \"\
-    reduceOptions\": {\n          \"calcs\": [\n            \"lastNotNull\"\n          ],\n          \"\
-    fields\": \"\",\n          \"values\": false\n        },\n        \"textMode\": \"auto\"\n      },\n\
-    \      \"targets\": [\n        {\n          \"datasource\": {\n            \"type\": \"prometheus\"\
-    ,\n            \"uid\": \"prometheus\"\n          },\n          \"expr\": \"max(md_event_time_gap_seconds)\"\
-    ,\n          \"legendFormat\": \"gap s\",\n          \"refId\": \"A\"\n        }\n      ]\n    },\n\
-    \    {\n      \"id\": 10,\n      \"type\": \"timeseries\",\n      \"title\": \"Market-data events/sec\"\
-    ,\n      \"description\": \"Normalized event throughput per service (spec \xA725 market-data health).\"\
-    ,\n      \"datasource\": {\n        \"type\": \"prometheus\",\n        \"uid\": \"prometheus\"\n \
-    \     },\n      \"gridPos\": {\n        \"h\": 8,\n        \"w\": 12,\n        \"x\": 0,\n       \
-    \ \"y\": 4\n      },\n      \"fieldConfig\": {\n        \"defaults\": {\n          \"unit\": \"ops\"\
-    ,\n          \"custom\": {\n            \"drawStyle\": \"line\",\n            \"lineWidth\": 1,\n\
-    \            \"fillOpacity\": 8,\n            \"showPoints\": \"never\",\n            \"spanNulls\"\
-    : true\n          }\n        },\n        \"overrides\": []\n      },\n      \"options\": {\n     \
-    \   \"legend\": {\n          \"displayMode\": \"list\",\n          \"placement\": \"bottom\",\n  \
-    \        \"showLegend\": true\n        },\n        \"tooltip\": {\n          \"mode\": \"multi\",\n\
-    \          \"sort\": \"desc\"\n        }\n      },\n      \"targets\": [\n        {\n          \"\
-    datasource\": {\n            \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\n    \
-    \      },\n          \"expr\": \"job:md_events:rate5m\",\n          \"legendFormat\": \"md {{service}}\"\
+    max(platform_session_state) or max(platform_persisted_session_state >= 2)\",\n          \"legendFormat\"\
+    : \"state\",\n          \"refId\": \"A\"\n        }\n      ]\n    },\n    {\n      \"id\": 4,\n  \
+    \    \"type\": \"stat\",\n      \"title\": \"Event-time gap (last event)\",\n      \"description\"\
+    : \"md_event_time_gap_seconds \u2014 the gap between the last two consecutive processed events. This\
+    \ is the staleness signal StaleFeed alerts on; it is correct in replay AND live (PLATFORM_CONVENTIONS.md\
+    \ \xA712.6).\",\n      \"datasource\": {\n        \"type\": \"prometheus\",\n        \"uid\": \"prometheus\"\
+    \n      },\n      \"gridPos\": {\n        \"h\": 4,\n        \"w\": 6,\n        \"x\": 18,\n     \
+    \   \"y\": 0\n      },\n      \"fieldConfig\": {\n        \"defaults\": {\n          \"unit\": \"\
+    s\",\n          \"mappings\": [],\n          \"thresholds\": {\n            \"mode\": \"absolute\"\
+    ,\n            \"steps\": [\n              {\n                \"color\": \"green\",\n            \
+    \    \"value\": null\n              },\n              {\n                \"color\": \"red\",\n   \
+    \             \"value\": 5\n              }\n            ]\n          }\n        },\n        \"overrides\"\
+    : []\n      },\n      \"options\": {\n        \"colorMode\": \"background\",\n        \"graphMode\"\
+    : \"area\",\n        \"reduceOptions\": {\n          \"calcs\": [\n            \"lastNotNull\"\n \
+    \         ],\n          \"fields\": \"\",\n          \"values\": false\n        },\n        \"textMode\"\
+    : \"auto\"\n      },\n      \"targets\": [\n        {\n          \"datasource\": {\n            \"\
+    type\": \"prometheus\",\n            \"uid\": \"prometheus\"\n          },\n          \"expr\": \"\
+    max(md_event_time_gap_seconds)\",\n          \"legendFormat\": \"gap s\",\n          \"refId\": \"\
+    A\"\n        }\n      ]\n    },\n    {\n      \"id\": 10,\n      \"type\": \"timeseries\",\n     \
+    \ \"title\": \"Market-data events/sec\",\n      \"description\": \"Normalized event throughput per\
+    \ service (spec \xA725 market-data health).\",\n      \"datasource\": {\n        \"type\": \"prometheus\"\
+    ,\n        \"uid\": \"prometheus\"\n      },\n      \"gridPos\": {\n        \"h\": 8,\n        \"\
+    w\": 12,\n        \"x\": 0,\n        \"y\": 4\n      },\n      \"fieldConfig\": {\n        \"defaults\"\
+    : {\n          \"unit\": \"ops\",\n          \"custom\": {\n            \"drawStyle\": \"line\",\n\
+    \            \"lineWidth\": 1,\n            \"fillOpacity\": 8,\n            \"showPoints\": \"never\"\
+    ,\n            \"spanNulls\": true\n          }\n        },\n        \"overrides\": []\n      },\n\
+    \      \"options\": {\n        \"legend\": {\n          \"displayMode\": \"list\",\n          \"placement\"\
+    : \"bottom\",\n          \"showLegend\": true\n        },\n        \"tooltip\": {\n          \"mode\"\
+    : \"multi\",\n          \"sort\": \"desc\"\n        }\n      },\n      \"targets\": [\n        {\n\
+    \          \"datasource\": {\n            \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\
+    \n          },\n          \"expr\": \"job:md_events:rate5m\",\n          \"legendFormat\": \"md {{service}}\"\
     ,\n          \"refId\": \"A\"\n        }\n      ]\n    },\n    {\n      \"id\": 11,\n      \"type\"\
     : \"timeseries\",\n      \"title\": \"Stream QC: sequence gaps / duplicates (per sec)\",\n      \"\
     description\": \"Gap and duplicate counters, LIVE from the java platform and updated on EVERY event\

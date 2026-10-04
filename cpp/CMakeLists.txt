@@ -81,13 +81,15 @@ iap_add_test(test_alpha_golden)
 iap_add_test(test_execution)
 iap_add_test(test_exec_algos)
 iap_add_test(test_replay_fills)
+iap_add_test(test_replay_fills_passive)
 iap_add_test(test_canonical_json_golden)
 iap_add_test(test_trace_golden)
 iap_add_test(test_replay_trace)
 iap_add_test(test_hardening)
 
 # -------------------------------------------------------------------- tools
-# One-shot golden generator (expected_replay_fills.json; refuses overwrite).
+# One-shot golden generator (expected_replay_fills.json, or
+# expected_replay_fills_passive.json in `passive` mode; refuses overwrite).
 add_executable(make_replay_fills_golden tools/make_replay_fills_golden.cpp)
 target_link_libraries(make_replay_fills_golden PRIVATE iap_core)
 

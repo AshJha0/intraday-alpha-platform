@@ -64,9 +64,9 @@ are statements about this dataset and pipeline, not about real markets).
 > REJECT (FX03 moved from ITERATE to REJECT; FX10 and FX11 from REJECT to
 > ITERATE). At 1x costs on the last fold 18 alphas make no trade, 6 trade
 > and lose, none ends above zero; under the legacy methods all 24 traded
-> and lost. The ledger holds **4396 looks over 208 distinct configurations**
-> (Bonferroni per-test |t| ≥ 4.389, expected max |t| under the global null
-> ≈ 4.096). Papers 1-4 carry a dated `Erratum / Update — 2026-10-04` section
+> and lost. The ledger holds **5156 looks over 216 distinct configurations**
+> (Bonferroni per-test |t| ≥ 4.424, expected max |t| under the global null
+> ≈ 4.135). Papers 1-4 carry a dated `Erratum / Update — 2026-10-04` section
 > that restates their figures under the default methods and says of each
 > conclusion whether it is weaker, stronger or unchanged; papers 5 and 6
 > carry a short note. The summaries below are true of the current
@@ -146,7 +146,7 @@ differently once crossed rows are excluded: gate IC 0.0298 at a gate t of
 legacy methods (within-bucket t 4.82 against a fixed 3.0) that cleared
 every *statistical* promotion gate and FX04 was held at ITERATE by the cost
 gate alone. Under the default methods it does not: 4.24 is above the
-selection yardstick (expected max |t| 4.096 over 208 distinct configurations)
+selection yardstick (expected max |t| 4.135 over 216 distinct configurations)
 and below the PROMOTE t threshold of 4.365, so FX04 now fails the
 significance gate, narrowly, as well as the cost gate. It makes no trade
 under the cost-aware backtest (the legacy policy lost 32,566 USD at 1x).
@@ -235,8 +235,8 @@ The Perold IS decomposition is enforced as an exact identity to 1e-9.
 An engineering case study of four parallel ports of one pinned semantics,
 held identical by golden tests (byte-exact IAP1 SHA-256 digests; 443/175/
 181/291 tests green in the paper's recorded 2026-08-29 harness run; the
-v1.5.0 CI run of 2026-10-04 records 1672/289/330/517 py/cpp/rs/java tests and
-173/68/66/106 golden after the contracts / lifecycle / trace / MVP release, the v1.3.0 fixes, the v1.4.0 dataset regeneration and the v1.5.0 method defaults). Measured on the
+v1.5.0 CI run of 2026-10-04 records 1988/302/358/571 py/cpp/rs/java tests and
+192/72/71/124 golden after the contracts / lifecycle / trace / MVP release, the v1.3.0 fixes, the v1.4.0 dataset regeneration and the v1.5.0 method defaults). Measured on the
 stated 2-CPU
 Xeon container (g++ 13.3.0, rustc 1.95.0, OpenJDK 21.0.10): C++ decodes at
 3.5 ns/event and replays at 37.1M events/s; demo-scale replay is ≈ 6.9M

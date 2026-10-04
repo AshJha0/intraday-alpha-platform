@@ -43,6 +43,7 @@ from iap.contracts.types import (
 )
 from iap.core.events import EventType, MarketEvent
 from iap.execution import algos as _algos
+from iap.execution.passive import ExecPolicy, PassiveParams, patience_ns
 from iap.execution.simulator import ExecutionSimulator
 from iap.execution.sor import SmartOrderRouter
 from iap.execution.types import ChildOrder as SimChild
@@ -159,6 +160,9 @@ class _ParentSchedule:
     next_slice: int = 0
     next_child: int = 0
     pov_volume: int = 0
+    scheduled_qty: int = 0  #: qty the schedule has called for so far
+    current_step_qty: int = 0  #: the most recent slice (0 for POV)
+    patience_ns: int = 0  #: PASSIVE rest time of one posted child
 
 
 class AlgoScheduler:
@@ -170,6 +174,15 @@ class AlgoScheduler:
     The POV deficit is measured against filled + open qty, which the engine
     supplies through ``committed(parent_order_id)`` (pinned: never sent qty).
     Child ids are drawn from the engine's order-id sequence (``next_id``).
+
+    ``policy`` is the child execution policy (``iap.execution.passive``):
+    NATIVE = TWAP children LIMIT, POV / IS children MARKET (the default);
+    AGGRESSIVE = every child MARKET; PASSIVE = every child LIMIT (posted by
+    the engine at ``post_price``) while it may still rest, MARKET otherwise.
+    The PASSIVE state machine itself runs in the engine, which is where the
+    routing, the controls and the risk check of every child live;
+    ``before_issue`` is its hook between "the schedule state is known" and
+    "the new children are generated".
     """
 
     def __init__(
@@ -181,6 +194,8 @@ class AlgoScheduler:
         pov_participation: float,
         next_id: Callable[[], int],
         committed: Callable[[int], int],
+        policy: ExecPolicy = ExecPolicy.NATIVE,
+        passive: PassiveParams = PassiveParams(),  # noqa: B008 (frozen dataclass default)
     ) -> None:
         if max_child_qty <= 0:
             raise ValueError("max_child_qty must be > 0")
@@ -191,6 +206,8 @@ class AlgoScheduler:
         self._pov_participation = pov_participation
         self._next_id = next_id
         self._committed = committed
+        self._policy = policy
+        self._passive = passive
         self._schedules: dict[int, _ParentSchedule] = {}
 
     def open(self, parent: ParentOrder) -> None:
@@ -214,7 +231,33 @@ class AlgoScheduler:
             )
             ps.slice_qty = _algos.slice_quantities(po)
             ps.slice_due = _algos.slice_times(po)
+        if self._policy is ExecPolicy.PASSIVE:
+            ps.patience_ns = patience_ns(
+                self._passive, parent.urgency, parent.algo is Algo.IS, self._is_risk_aversion
+            )
         self._schedules[parent.parent_order_id] = ps
+
+    def schedule_state(self, parent_order_id: int) -> _ParentSchedule:
+        """The live schedule of a parent (scheduled qty, current step, patience)."""
+        return self._schedules[parent_order_id]
+
+    def can_rest(self, ps: _ParentSchedule, t: int) -> bool:
+        """PASSIVE: may a child decided at ``t`` still be posted?"""
+        return ps.patience_ns > 0 and t < ps.parent.end_ts - self._passive.end_margin_ns
+
+    def _style(self, ps: _ParentSchedule, t: int, native: OrderType) -> OrderType:
+        if self._policy is ExecPolicy.NATIVE:
+            return native
+        if self._policy is ExecPolicy.AGGRESSIVE:
+            return OrderType.MARKET
+        return OrderType.LIMIT if self.can_rest(ps, t) else OrderType.MARKET
+
+    def replacement(self, parent: ParentOrder, qty: int, t: int, rest: bool) -> ChildOrder:
+        """PASSIVE: the child that re-sends a cancelled remainder — posted
+        again (``rest``) while it may still rest, MARKET otherwise."""
+        ps = self._schedules[parent.parent_order_id]
+        order_type = OrderType.LIMIT if rest and self.can_rest(ps, t) else OrderType.MARKET
+        return self._child(ps, qty, t, order_type)
 
     def close(self, parent_order_id: int) -> None:
         del self._schedules[parent_order_id]
@@ -259,34 +302,52 @@ class AlgoScheduler:
         return out
 
     def generate_child_orders(
-        self, parent: ParentOrder, market: MarketView
+        self,
+        parent: ParentOrder,
+        market: MarketView,
+        before_issue: Callable[[], None] | None = None,
     ) -> Sequence[ChildOrder]:
-        """Children due at ``market.event`` for ``parent`` (possibly none)."""
+        """Children due at ``market.event`` for ``parent`` (possibly none).
+
+        ``before_issue`` runs once the schedule state at the event is known
+        and before any new child is generated (class docstring)."""
         ps = self._schedules[parent.parent_order_id]
         ev = market.event
         t = ev.exchange_ts
         if parent.algo is Algo.POV:
-            if (
-                ev.instrument_id != parent.instrument_id
-                or ev.event_type != EventType.TRADE
-                or t < parent.decision_ts
-                or t >= parent.end_ts
-            ):
+            in_window = (
+                ev.instrument_id == parent.instrument_id
+                and ev.event_type == EventType.TRADE
+                and parent.decision_ts <= t < parent.end_ts
+            )
+            if in_window:
+                ps.pov_volume += ev.qty
+                target = int(math.floor(self._pov_participation * float(ps.pov_volume)))
+                ps.scheduled_qty = min(target, parent.qty)
+            if before_issue is not None:
+                before_issue()
+            if not in_window:
                 return ()
-            ps.pov_volume += ev.qty
-            target = int(math.floor(self._pov_participation * float(ps.pov_volume)))
-            deficit = min(target, parent.qty) - self._committed(parent.parent_order_id)
+            deficit = ps.scheduled_qty - self._committed(parent.parent_order_id)
             if deficit <= 0:
                 return ()
-            return (self._child(ps, min(deficit, self._max_child_qty), t, OrderType.MARKET),)
-        out: list[ChildOrder] = []
-        passive = parent.algo is Algo.TWAP
+            style = self._style(ps, t, OrderType.MARKET)
+            return (self._child(ps, min(deficit, self._max_child_qty), t, style),)
+        due: list[int] = []
         while ps.next_slice < len(ps.slice_due) and t >= ps.slice_due[ps.next_slice]:
             q = ps.slice_qty[ps.next_slice]
             ps.next_slice += 1
+            ps.scheduled_qty += q
+            ps.current_step_qty = q
             if t >= parent.end_ts:
                 continue
-            out.extend(self._split(ps, q, t, OrderType.LIMIT if passive else OrderType.MARKET))
+            due.append(q)
+        if before_issue is not None:
+            before_issue()
+        out: list[ChildOrder] = []
+        native = OrderType.LIMIT if parent.algo is Algo.TWAP else OrderType.MARKET
+        for q in due:
+            out.extend(self._split(ps, q, t, self._style(ps, t, native)))
         return tuple(out)
 
 
@@ -431,6 +492,15 @@ class SimulatorAdapter:
         """Remaining qty of a PENDING / ACTIVE child (0 once terminal)."""
         o = self.simulator.orders[self._sim_id_of[child_order_id]]
         return o.remaining if o.state in (OrderState.PENDING, OrderState.ACTIVE) else 0
+
+    def cancel(self, child_order_id: int, cancel_ts: int) -> None:
+        """Request a cancel (simulator rule 7: it travels the latency path);
+        the CANCELED report comes out of ``on_market_event`` once it lands."""
+        self.simulator.cancel(self._sim_id_of[child_order_id], cancel_ts)
+
+    def sim_order(self, child_order_id: int) -> SimChild:
+        """The simulator's record of a submitted child (read-only use)."""
+        return self.simulator.orders[self._sim_id_of[child_order_id]]
 
     def arrival_ts(self, child_order_id: int) -> int:
         return self.simulator.orders[self._sim_id_of[child_order_id]].arrival_ts

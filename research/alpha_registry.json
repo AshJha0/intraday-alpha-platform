@@ -15,6 +15,7 @@
         "failed_gates": [
           "statistical_significance",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
           "stability"
         ],
@@ -26,13 +27,20 @@
           "fold_count",
           "hypothesis_sign",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
-          "stability"
+          "stability",
+          "cross_alpha_correlation"
         ],
         "gates": {
           "capacity": {
             "passed": false,
             "threshold": 1000000.0,
+            "value": 0.0
+          },
+          "cross_alpha_correlation": {
+            "passed": true,
+            "threshold": 0.7,
             "value": 0.0
           },
           "fold_consistency": {
@@ -59,6 +67,11 @@
             "passed": false,
             "threshold": 0.0,
             "value": 0.0
+          },
+          "net_pnl_bootstrap_ci": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": null
           },
           "oos_ic": {
             "passed": true,
@@ -121,6 +134,7 @@
         "event_ts": 1787691480577291027,
         "failed_gates": [
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity"
         ],
         "gate_order": [
@@ -131,13 +145,20 @@
           "fold_count",
           "hypothesis_sign",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
-          "stability"
+          "stability",
+          "cross_alpha_correlation"
         ],
         "gates": {
           "capacity": {
             "passed": false,
             "threshold": 1000000.0,
+            "value": 0.0
+          },
+          "cross_alpha_correlation": {
+            "passed": true,
+            "threshold": 0.7,
             "value": 0.0
           },
           "fold_consistency": {
@@ -164,6 +185,11 @@
             "passed": false,
             "threshold": 0.0,
             "value": 0.0
+          },
+          "net_pnl_bootstrap_ci": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": null
           },
           "oos_ic": {
             "passed": true,
@@ -226,6 +252,7 @@
         "event_ts": 1787691480577291027,
         "failed_gates": [
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity"
         ],
         "gate_order": [
@@ -236,13 +263,20 @@
           "fold_count",
           "hypothesis_sign",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
-          "stability"
+          "stability",
+          "cross_alpha_correlation"
         ],
         "gates": {
           "capacity": {
             "passed": false,
             "threshold": 1000000.0,
+            "value": 0.0
+          },
+          "cross_alpha_correlation": {
+            "passed": true,
+            "threshold": 0.7,
             "value": 0.0
           },
           "fold_consistency": {
@@ -269,6 +303,11 @@
             "passed": false,
             "threshold": 0.0,
             "value": 0.0
+          },
+          "net_pnl_bootstrap_ci": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": null
           },
           "oos_ic": {
             "passed": true,
@@ -335,6 +374,7 @@
           "fold_consistency",
           "hypothesis_sign",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
           "stability"
         ],
@@ -346,13 +386,20 @@
           "fold_count",
           "hypothesis_sign",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
-          "stability"
+          "stability",
+          "cross_alpha_correlation"
         ],
         "gates": {
           "capacity": {
             "passed": false,
             "threshold": 1000000.0,
+            "value": 0.0
+          },
+          "cross_alpha_correlation": {
+            "passed": true,
+            "threshold": 0.7,
             "value": 0.0
           },
           "fold_consistency": {
@@ -379,6 +426,11 @@
             "passed": false,
             "threshold": 0.0,
             "value": 0.0
+          },
+          "net_pnl_bootstrap_ci": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": null
           },
           "oos_ic": {
             "passed": false,
@@ -443,6 +495,7 @@
           "oos_ic",
           "statistical_significance",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
           "stability"
         ],
@@ -454,13 +507,20 @@
           "fold_count",
           "hypothesis_sign",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
-          "stability"
+          "stability",
+          "cross_alpha_correlation"
         ],
         "gates": {
           "capacity": {
             "passed": false,
             "threshold": 1000000.0,
+            "value": 0.0
+          },
+          "cross_alpha_correlation": {
+            "passed": true,
+            "threshold": 0.7,
             "value": 0.0
           },
           "fold_consistency": {
@@ -487,6 +547,11 @@
             "passed": false,
             "threshold": 0.0,
             "value": 0.0
+          },
+          "net_pnl_bootstrap_ci": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": null
           },
           "oos_ic": {
             "passed": false,
@@ -550,6 +615,7 @@
         "failed_gates": [
           "statistical_significance",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
           "stability"
         ],
@@ -561,13 +627,20 @@
           "fold_count",
           "hypothesis_sign",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
-          "stability"
+          "stability",
+          "cross_alpha_correlation"
         ],
         "gates": {
           "capacity": {
             "passed": false,
             "threshold": 1000000.0,
+            "value": 0.0
+          },
+          "cross_alpha_correlation": {
+            "passed": true,
+            "threshold": 0.7,
             "value": 0.0
           },
           "fold_consistency": {
@@ -594,6 +667,11 @@
             "passed": false,
             "threshold": 0.0,
             "value": 0.0
+          },
+          "net_pnl_bootstrap_ci": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": -1301.5037706689036
           },
           "oos_ic": {
             "passed": true,
@@ -660,6 +738,7 @@
           "fold_consistency",
           "hypothesis_sign",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
           "stability"
         ],
@@ -671,13 +750,20 @@
           "fold_count",
           "hypothesis_sign",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
-          "stability"
+          "stability",
+          "cross_alpha_correlation"
         ],
         "gates": {
           "capacity": {
             "passed": false,
             "threshold": 1000000.0,
+            "value": 0.0
+          },
+          "cross_alpha_correlation": {
+            "passed": true,
+            "threshold": 0.7,
             "value": 0.0
           },
           "fold_consistency": {
@@ -704,6 +790,11 @@
             "passed": false,
             "threshold": 0.0,
             "value": 0.0
+          },
+          "net_pnl_bootstrap_ci": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": null
           },
           "oos_ic": {
             "passed": false,
@@ -770,6 +861,7 @@
           "fold_consistency",
           "hypothesis_sign",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity"
         ],
         "gate_order": [
@@ -780,13 +872,20 @@
           "fold_count",
           "hypothesis_sign",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
-          "stability"
+          "stability",
+          "cross_alpha_correlation"
         ],
         "gates": {
           "capacity": {
             "passed": false,
             "threshold": 1000000.0,
+            "value": 0.0
+          },
+          "cross_alpha_correlation": {
+            "passed": true,
+            "threshold": 0.7,
             "value": 0.0
           },
           "fold_consistency": {
@@ -813,6 +912,11 @@
             "passed": false,
             "threshold": 0.0,
             "value": 0.0
+          },
+          "net_pnl_bootstrap_ci": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": null
           },
           "oos_ic": {
             "passed": false,
@@ -879,6 +983,7 @@
           "fold_consistency",
           "hypothesis_sign",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
           "stability"
         ],
@@ -890,13 +995,20 @@
           "fold_count",
           "hypothesis_sign",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
-          "stability"
+          "stability",
+          "cross_alpha_correlation"
         ],
         "gates": {
           "capacity": {
             "passed": false,
             "threshold": 1000000.0,
+            "value": 0.0
+          },
+          "cross_alpha_correlation": {
+            "passed": true,
+            "threshold": 0.7,
             "value": 0.0
           },
           "fold_consistency": {
@@ -923,6 +1035,11 @@
             "passed": false,
             "threshold": 0.0,
             "value": 0.0
+          },
+          "net_pnl_bootstrap_ci": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": null
           },
           "oos_ic": {
             "passed": false,
@@ -987,6 +1104,7 @@
           "oos_ic",
           "statistical_significance",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity"
         ],
         "gate_order": [
@@ -997,13 +1115,20 @@
           "fold_count",
           "hypothesis_sign",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
-          "stability"
+          "stability",
+          "cross_alpha_correlation"
         ],
         "gates": {
           "capacity": {
             "passed": false,
             "threshold": 1000000.0,
+            "value": 0.0
+          },
+          "cross_alpha_correlation": {
+            "passed": true,
+            "threshold": 0.7,
             "value": 0.0
           },
           "fold_consistency": {
@@ -1030,6 +1155,11 @@
             "passed": false,
             "threshold": 0.0,
             "value": 0.0
+          },
+          "net_pnl_bootstrap_ci": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": null
           },
           "oos_ic": {
             "passed": false,
@@ -1094,6 +1224,7 @@
           "oos_ic",
           "statistical_significance",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
           "stability"
         ],
@@ -1105,14 +1236,21 @@
           "fold_count",
           "hypothesis_sign",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
-          "stability"
+          "stability",
+          "cross_alpha_correlation"
         ],
         "gates": {
           "capacity": {
             "passed": false,
             "threshold": 1000000.0,
             "value": 38248.2782977495
+          },
+          "cross_alpha_correlation": {
+            "passed": true,
+            "threshold": 0.7,
+            "value": 0.0
           },
           "fold_consistency": {
             "passed": true,
@@ -1138,6 +1276,11 @@
             "passed": false,
             "threshold": 0.0,
             "value": -5.017158492121816
+          },
+          "net_pnl_bootstrap_ci": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": -5142.375055486925
           },
           "oos_ic": {
             "passed": false,
@@ -1200,6 +1343,7 @@
         "event_ts": 1787691480577291027,
         "failed_gates": [
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity"
         ],
         "gate_order": [
@@ -1210,13 +1354,20 @@
           "fold_count",
           "hypothesis_sign",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
-          "stability"
+          "stability",
+          "cross_alpha_correlation"
         ],
         "gates": {
           "capacity": {
             "passed": false,
             "threshold": 1000000.0,
+            "value": 0.0
+          },
+          "cross_alpha_correlation": {
+            "passed": true,
+            "threshold": 0.7,
             "value": 0.0
           },
           "fold_consistency": {
@@ -1243,6 +1394,11 @@
             "passed": false,
             "threshold": 0.0,
             "value": 0.0
+          },
+          "net_pnl_bootstrap_ci": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": null
           },
           "oos_ic": {
             "passed": true,
@@ -1307,6 +1463,7 @@
           "statistical_significance",
           "fold_consistency",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity"
         ],
         "gate_order": [
@@ -1317,13 +1474,20 @@
           "fold_count",
           "hypothesis_sign",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
-          "stability"
+          "stability",
+          "cross_alpha_correlation"
         ],
         "gates": {
           "capacity": {
             "passed": false,
             "threshold": 1000000.0,
+            "value": 0.0
+          },
+          "cross_alpha_correlation": {
+            "passed": true,
+            "threshold": 0.7,
             "value": 0.0
           },
           "fold_consistency": {
@@ -1350,6 +1514,11 @@
             "passed": false,
             "threshold": 0.0,
             "value": 0.0
+          },
+          "net_pnl_bootstrap_ci": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": null
           },
           "oos_ic": {
             "passed": true,
@@ -1415,6 +1584,7 @@
           "statistical_significance",
           "hypothesis_sign",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity"
         ],
         "gate_order": [
@@ -1425,13 +1595,20 @@
           "fold_count",
           "hypothesis_sign",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
-          "stability"
+          "stability",
+          "cross_alpha_correlation"
         ],
         "gates": {
           "capacity": {
             "passed": false,
             "threshold": 1000000.0,
+            "value": 0.0
+          },
+          "cross_alpha_correlation": {
+            "passed": true,
+            "threshold": 0.7,
             "value": 0.0
           },
           "fold_consistency": {
@@ -1458,6 +1635,11 @@
             "passed": false,
             "threshold": 0.0,
             "value": 0.0
+          },
+          "net_pnl_bootstrap_ci": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": null
           },
           "oos_ic": {
             "passed": false,
@@ -1523,6 +1705,7 @@
           "fold_consistency",
           "hypothesis_sign",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
           "stability"
         ],
@@ -1534,13 +1717,20 @@
           "fold_count",
           "hypothesis_sign",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
-          "stability"
+          "stability",
+          "cross_alpha_correlation"
         ],
         "gates": {
           "capacity": {
             "passed": false,
             "threshold": 1000000.0,
+            "value": 0.0
+          },
+          "cross_alpha_correlation": {
+            "passed": true,
+            "threshold": 0.7,
             "value": 0.0
           },
           "fold_consistency": {
@@ -1567,6 +1757,11 @@
             "passed": false,
             "threshold": 0.0,
             "value": 0.0
+          },
+          "net_pnl_bootstrap_ci": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": null
           },
           "oos_ic": {
             "passed": true,
@@ -1630,6 +1825,7 @@
         "failed_gates": [
           "statistical_significance",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity"
         ],
         "gate_order": [
@@ -1640,13 +1836,20 @@
           "fold_count",
           "hypothesis_sign",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
-          "stability"
+          "stability",
+          "cross_alpha_correlation"
         ],
         "gates": {
           "capacity": {
             "passed": false,
             "threshold": 1000000.0,
+            "value": 0.0
+          },
+          "cross_alpha_correlation": {
+            "passed": true,
+            "threshold": 0.7,
             "value": 0.0
           },
           "fold_consistency": {
@@ -1673,6 +1876,11 @@
             "passed": false,
             "threshold": 0.0,
             "value": 0.0
+          },
+          "net_pnl_bootstrap_ci": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": null
           },
           "oos_ic": {
             "passed": true,
@@ -1739,6 +1947,7 @@
           "fold_consistency",
           "hypothesis_sign",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
           "stability"
         ],
@@ -1750,13 +1959,20 @@
           "fold_count",
           "hypothesis_sign",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
-          "stability"
+          "stability",
+          "cross_alpha_correlation"
         ],
         "gates": {
           "capacity": {
             "passed": false,
             "threshold": 1000000.0,
+            "value": 0.0
+          },
+          "cross_alpha_correlation": {
+            "passed": true,
+            "threshold": 0.7,
             "value": 0.0
           },
           "fold_consistency": {
@@ -1783,6 +1999,11 @@
             "passed": false,
             "threshold": 0.0,
             "value": -0.6360575348499578
+          },
+          "net_pnl_bootstrap_ci": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": -131.29841638981225
           },
           "oos_ic": {
             "passed": false,
@@ -1846,6 +2067,7 @@
         "failed_gates": [
           "statistical_significance",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity"
         ],
         "gate_order": [
@@ -1856,13 +2078,20 @@
           "fold_count",
           "hypothesis_sign",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
-          "stability"
+          "stability",
+          "cross_alpha_correlation"
         ],
         "gates": {
           "capacity": {
             "passed": false,
             "threshold": 1000000.0,
+            "value": 0.0
+          },
+          "cross_alpha_correlation": {
+            "passed": true,
+            "threshold": 0.7,
             "value": 0.0
           },
           "fold_consistency": {
@@ -1889,6 +2118,11 @@
             "passed": false,
             "threshold": 0.0,
             "value": 0.0
+          },
+          "net_pnl_bootstrap_ci": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": null
           },
           "oos_ic": {
             "passed": true,
@@ -1955,6 +2189,7 @@
           "fold_consistency",
           "hypothesis_sign",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity"
         ],
         "gate_order": [
@@ -1965,13 +2200,20 @@
           "fold_count",
           "hypothesis_sign",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
-          "stability"
+          "stability",
+          "cross_alpha_correlation"
         ],
         "gates": {
           "capacity": {
             "passed": false,
             "threshold": 1000000.0,
+            "value": 0.0
+          },
+          "cross_alpha_correlation": {
+            "passed": true,
+            "threshold": 0.7,
             "value": 0.0
           },
           "fold_consistency": {
@@ -1998,6 +2240,11 @@
             "passed": false,
             "threshold": 0.0,
             "value": 0.0
+          },
+          "net_pnl_bootstrap_ci": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": null
           },
           "oos_ic": {
             "passed": false,
@@ -2061,6 +2308,7 @@
         "failed_gates": [
           "statistical_significance",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
           "stability"
         ],
@@ -2072,14 +2320,21 @@
           "fold_count",
           "hypothesis_sign",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
-          "stability"
+          "stability",
+          "cross_alpha_correlation"
         ],
         "gates": {
           "capacity": {
             "passed": false,
             "threshold": 1000000.0,
             "value": 1560.7813690045955
+          },
+          "cross_alpha_correlation": {
+            "passed": true,
+            "threshold": 0.7,
+            "value": 0.0
           },
           "fold_consistency": {
             "passed": true,
@@ -2105,6 +2360,11 @@
             "passed": false,
             "threshold": 0.0,
             "value": -3.280089828956179
+          },
+          "net_pnl_bootstrap_ci": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": -1630.4609116505342
           },
           "oos_ic": {
             "passed": true,
@@ -2171,6 +2431,7 @@
           "fold_consistency",
           "hypothesis_sign",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
           "stability"
         ],
@@ -2182,13 +2443,20 @@
           "fold_count",
           "hypothesis_sign",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
-          "stability"
+          "stability",
+          "cross_alpha_correlation"
         ],
         "gates": {
           "capacity": {
             "passed": false,
             "threshold": 1000000.0,
+            "value": 0.0
+          },
+          "cross_alpha_correlation": {
+            "passed": true,
+            "threshold": 0.7,
             "value": 0.0
           },
           "fold_consistency": {
@@ -2215,6 +2483,11 @@
             "passed": false,
             "threshold": 0.0,
             "value": -2.554079897748809
+          },
+          "net_pnl_bootstrap_ci": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": -1660.723717647129
           },
           "oos_ic": {
             "passed": false,
@@ -2278,6 +2551,7 @@
         "failed_gates": [
           "statistical_significance",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
           "stability"
         ],
@@ -2289,14 +2563,21 @@
           "fold_count",
           "hypothesis_sign",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
-          "stability"
+          "stability",
+          "cross_alpha_correlation"
         ],
         "gates": {
           "capacity": {
             "passed": false,
             "threshold": 1000000.0,
             "value": 61134.929356750545
+          },
+          "cross_alpha_correlation": {
+            "passed": true,
+            "threshold": 0.7,
+            "value": 0.0
           },
           "fold_consistency": {
             "passed": true,
@@ -2322,6 +2603,11 @@
             "passed": false,
             "threshold": 0.0,
             "value": -0.2239150090956759
+          },
+          "net_pnl_bootstrap_ci": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": -575.8385395065645
           },
           "oos_ic": {
             "passed": true,
@@ -2385,6 +2671,7 @@
         "failed_gates": [
           "statistical_significance",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
           "stability"
         ],
@@ -2396,13 +2683,20 @@
           "fold_count",
           "hypothesis_sign",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
-          "stability"
+          "stability",
+          "cross_alpha_correlation"
         ],
         "gates": {
           "capacity": {
             "passed": false,
             "threshold": 1000000.0,
+            "value": 0.0
+          },
+          "cross_alpha_correlation": {
+            "passed": true,
+            "threshold": 0.7,
             "value": 0.0
           },
           "fold_consistency": {
@@ -2429,6 +2723,11 @@
             "passed": false,
             "threshold": 0.0,
             "value": -7.331641148278877
+          },
+          "net_pnl_bootstrap_ci": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": -2510.367165608912
           },
           "oos_ic": {
             "passed": true,
@@ -2494,6 +2793,7 @@
           "statistical_significance",
           "fold_consistency",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
           "stability"
         ],
@@ -2505,13 +2805,20 @@
           "fold_count",
           "hypothesis_sign",
           "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
           "capacity",
-          "stability"
+          "stability",
+          "cross_alpha_correlation"
         ],
         "gates": {
           "capacity": {
             "passed": false,
             "threshold": 1000000.0,
+            "value": 0.0
+          },
+          "cross_alpha_correlation": {
+            "passed": true,
+            "threshold": 0.7,
             "value": 0.0
           },
           "fold_consistency": {
@@ -2538,6 +2845,11 @@
             "passed": false,
             "threshold": 0.0,
             "value": 0.0
+          },
+          "net_pnl_bootstrap_ci": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": null
           },
           "oos_ic": {
             "passed": false,

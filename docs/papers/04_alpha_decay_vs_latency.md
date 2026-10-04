@@ -671,10 +671,10 @@ row policy (labels invalid for BLACKOUT alone are now scored). The caveat
 of the 2026-10-03 update about which rows carry a label at 10 s and beyond
 still applies.
 
-**Ledger.** `research/experiments.json` holds 4396 looks over 208 entries
+**Ledger.** `research/experiments.json` holds 5156 looks over 216 entries
 (1068 on the v1.3.0 dataset, 852 on the v1.4.0 dataset under the legacy
-methods, 2,476 under the default methods); expected max |t| under the
-global null 4.096, Bonferroni per-test threshold 4.389. The alpha report
+methods, 3,236 under the default methods); expected max |t| under the
+global null 4.135, Bonferroni per-test threshold 4.424. The alpha report
 was judged at its own recorded count of 3,936, which gives the PROMOTE t
 threshold of 4.365. Verdicts: 0 PROMOTE / 11 ITERATE / 13 REJECT (FX03
 moved from ITERATE to REJECT; FX10 and FX11 from REJECT to ITERATE).

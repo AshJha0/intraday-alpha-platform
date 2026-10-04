@@ -1,0 +1,15 @@
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing per_order.duplicate_order_window_ns","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000000000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing per_order.duplicate_order_window_ns","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000000000000}
+{"decision":2,"reason":"fill for order 0 rejected: price_ticks must be > 0: 0","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000000016000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing per_order.duplicate_order_window_ns","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000016000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing per_order.duplicate_order_window_ns","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000046000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing per_order.duplicate_order_window_ns","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":9223372036854775807}
+{"decision":1,"reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000000096000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing per_order.duplicate_order_window_ns","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000096000000}
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 1","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000000119839000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing per_order.duplicate_order_window_ns","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000152839000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing per_order.duplicate_order_window_ns","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000153221000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing per_order.duplicate_order_window_ns","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000153221000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing per_order.duplicate_order_window_ns","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000153221000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing per_order.duplicate_order_window_ns","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000153221000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing per_order.duplicate_order_window_ns","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000153221000}

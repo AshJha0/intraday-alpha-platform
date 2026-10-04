@@ -37,7 +37,7 @@ blast radius:
 | **Alpha / signal logic** | `python/src/iap/alpha/`, `cpp/src/alpha/`, `rust/alpha/`, `java/.../alpha/`, `configs/strategies/` | 1 quant reviewer **+ 1 owner of each production language touched**; golden vectors regenerated only with an explicit "golden change" note explaining why (`python/tools/make_golden.py` runs are deliberate acts, never side effects). |
 | **Risk engine / limits** | `rust/risk/`, `java/.../risk/`, `python/src/iap/risk/`, `configs/risk/risk.json`, risk contracts in `schemas/` | 2 reviewers, one of whom is the risk owner. The three engines are held byte-identical by `expected_risk_*` (`API_TRADING.md` §1); a rule change is a Rust change first, then a golden regeneration, then both ports. Fail-closed semantics may never be weakened in the same PR that adds a feature. Limit changes (`configs/risk/risk.json`) additionally require the audit-log entry of §3 *before* deploy. |
 | **Execution / SOR** | `cpp/src/execution/`, `cpp/src/sor/`, `java/.../execution/`, `python/src/iap/execution/`, `rust/venue/`, `configs/execution/execution.json` | 1 execution owner + 1 second reviewer; determinism proof: `tests/harness/run_golden.sh` parity table attached to the PR. |
-| **Contracts & schemas** | `schemas/` (17 JSON Schemas + `sql/iap_v1.sql`), `python/src/iap/contracts/`, `PLATFORM_CONVENTIONS.md` §1–§2, §13 | 2 reviewers + version bump + `MIGRATIONS.md` entry + regenerated `expected_contracts_examples.json`; all four languages updated in the same PR or the PR is blocked. |
+| **Contracts & schemas** | `schemas/` (17 JSON Schemas + `sql/iap_v2.sql`), `python/src/iap/contracts/`, `PLATFORM_CONVENTIONS.md` §1–§2, §13 | 2 reviewers + version bump + `MIGRATIONS.md` entry + regenerated `expected_contracts_examples.json`; all four languages updated in the same PR or the PR is blocked. |
 | **Lifecycle policy / registry** | `configs/strategies/lifecycle.json`, `python/src/iap/lifecycle/`, `java/.../lifecycle/`, `rust/lifecycle/`, `research/alpha_registry.json`, `research/lifecycle_transitions.jsonl` | 1 quant reviewer + 1 risk reviewer; a threshold change is a `lifecycle.json` x-version bump + `expected_lifecycle.json` regeneration; a state change needs its ledger entry id (§2). The registry and the log are never hand-edited. |
 | **Deployment / observability** | `deployment/`, `docs/runbooks/`, `tests/harness/`, `.github/` | 1 platform reviewer (`CODEOWNERS`); the deployment validation used in CI must pass — `python3 tests/harness/check_deployment.py`, i.e. `promtool check rules` + `check config` + `promtool test rules`, `docker compose config -q`, every Dockerfile `COPY` source resolving in a clean build context, k8s manifests parsing and dry-running, the generated ConfigMaps matching `configs/`, every rule and dashboard expression naming a metric a producer exports, and the Java golden gate covering every `*GoldenTest` class. |
 | Everything else | docs, research scripts, benchmarks | 1 reviewer. |
@@ -96,7 +96,7 @@ order; each gate's evidence is linked from the experiment's manifest
 No gate may be skipped; "backtest Sharpe alone is never sufficient" (spec §1).
 Honest reporting is a hard requirement (conventions §7): costs and OOS
 degradation are always shown, and the experiment ledger
-(`research/experiments.json`: 4,396 looks over 208 distinct configurations as of
+(`research/experiments.json`: 5,156 looks over 216 distinct configurations as of
 2026-10-04, v1.5.0 — it held 865 over 70 on 2026-09-20; the model ledger `research/models/ledger.json` counts fits)
 makes the multiple-testing denominator public.
 
@@ -121,8 +121,14 @@ multiple-testing threshold the evidence carries (never below 3.0;
 `tstat_threshold = "fixed"` is the legacy rule), and the live sub-machine
 retires by the CUSUM rule (`breach_rule = "consecutive"` is the legacy
 rule). Bundled result: 24 CANDIDATE, 0
-beyond — every alpha fails `net_pnl_after_costs` and `capacity`. Gate 8 (cross-alpha
-correlation) is not yet a lifecycle gate (backlog AF03).
+beyond — every alpha fails `net_pnl_after_costs`, `net_pnl_bootstrap_ci` and
+`capacity`. Gate 8 (cross-alpha correlation) is the lifecycle gate
+`cross_alpha_correlation` on CANDIDATE → VALIDATING since v1.5.0 (AF03): the
+largest absolute signal correlation with an alpha at or beyond VALIDATING
+must not exceed 0.7. It passes vacuously for all 24 today, nobody being that
+far. The same release made the bootstrap interval of net P&L a gate
+(`net_pnl_bootstrap_ci`: lower bound above zero, and an alpha that makes no
+trade fails it).
 
 **The ledger-id rule (CONTRIBUTING.md §6).** A change to a verdict in
 `research/alpha_reports/*.json`, to a lifecycle state, or to an alpha's

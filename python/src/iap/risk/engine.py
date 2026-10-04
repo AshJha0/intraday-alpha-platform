@@ -1096,7 +1096,14 @@ class RiskEngine:
         if found is None:
             return None, f"no conversion rate for {ccy} -> {limits.reporting_ccy}"
         rate, mark_ts = found
-        if mark_ts != _I64_MAX and limits.stale_book_reject:
+        # FAIL-OPEN defect (found by the differential fuzzer): the reporting
+        # currency was recognised by ``_fx_rate``'s ``mark_ts == i64::MAX``
+        # placeholder, so a conversion pair whose mark was stamped exactly
+        # ``i64::MAX`` — the extreme future-stamped mark — looked like the
+        # reporting currency and skipped both checks below: the rate was
+        # trusted for the rest of the session (every later update is a
+        # regression). Only the reporting currency itself has no mark to age.
+        if ccy != limits.reporting_ccy and limits.stale_book_reject:
             age = _ts_sub(ts, mark_ts)
             if age is None:
                 return None, _TS_OVERFLOW

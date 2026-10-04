@@ -1,0 +1,11 @@
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-bool global.kill_switch_engaged","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000000000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-bool global.kill_switch_engaged","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000000000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-bool global.kill_switch_engaged","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000000000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-bool global.kill_switch_engaged","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000000000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-bool global.kill_switch_engaged","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000000000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-bool global.kill_switch_engaged","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000000000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-bool global.kill_switch_engaged","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000002000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-bool global.kill_switch_engaged","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000002000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-bool global.kill_switch_engaged","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000002000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-bool global.kill_switch_engaged","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000002000000}
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 1","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000000037000000}

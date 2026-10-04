@@ -23,6 +23,14 @@
 //   total_cost = fees - rebates + impact
 // and fees/rebates/impact are exact sums over the parent's fills.
 //
+// EXECUTION POLICIES (ParentOrder::policy, algos.hpp): step 2 above is the
+// NATIVE policy. AGGRESSIVE issues every child as a MARKET order. PASSIVE
+// runs, per parent and per event: (a) the schedule state at the event,
+// (b) the state machine of every posted child in posting order — cancelled
+// remainders are re-posted or crossed, deadlines and the BEHIND test are
+// checked — and (c) the new schedule steps are posted. Its transition
+// counters are reported per parent in ExecReplayResult::passive.
+//
 // DECISION TRACE (optional; contracts/trace.hpp). With a sink attached via
 // set_trace_sink(), run() emits ONE DecisionTrace per parent order it
 // drove, after the stream has been replayed (the trace is built from the
@@ -97,6 +105,8 @@ struct ExecReplayResult {
     std::map<std::uint64_t, ParentReport> parents;
     std::uint64_t events_processed = 0;
     std::uint64_t sor_no_route = 0;  // children not submitted: no eligible venue
+    // PASSIVE transition counters, one row per PASSIVE parent.
+    std::map<std::uint64_t, PassiveStats> passive;
 };
 
 // Identity and versions stamped on every emitted trace (header comment).
@@ -133,6 +143,21 @@ public:
     const ExecutionSimulator& simulator() const { return sim_; }
 
 private:
+    // One posted child of a PASSIVE parent.
+    enum class WorkState : std::uint8_t {
+        REST = 0,
+        CANCEL_REPRICE = 1,
+        CANCEL_CROSS_TIMEOUT = 2,
+        CANCEL_CROSS_BEHIND = 3,
+        DONE = 4,
+    };
+    struct Working {
+        std::uint64_t order_id = 0;
+        std::int64_t deadline = 0;
+        int reprices = 0;
+        WorkState state = WorkState::REST;
+    };
+
     struct ParentState {
         ParentOrder order;
         std::vector<std::int64_t> slice_qty;   // TWAP/VWAP/IS
@@ -146,12 +171,28 @@ private:
         std::int64_t trigger_ts = 0;
         std::uint64_t trigger_seq = 0;
         std::vector<contracts::VenueDecision> routing;  // tracing only
+        // PASSIVE policy state.
+        std::int64_t scheduled_qty = 0;     // qty the schedule has called for
+        std::int64_t current_step_qty = 0;  // q_cur: most recent slice (0: POV)
+        std::int64_t patience_ns = 0;
+        std::int64_t behind_qty = 0;        // BEHIND tolerance in qty
+        std::vector<Working> working;
+        PassiveStats stats;
     };
 
     void schedule(ParentState& ps, const MarketEvent& ev);
     // Issue one child of at most max_child_qty; returns false when unroutable.
+    // `passive` joins the same-side best; with `post` the limit is the
+    // PASSIVE policy's post_price() instead (MARKET fallback either way).
     bool issue_child(ParentState& ps, std::int64_t child_qty,
-                     std::int64_t decision_ts, bool passive);
+                     std::int64_t decision_ts, bool passive, bool post = false);
+    // PASSIVE policy (algos.hpp): POST one child (or CROSS it when it cannot
+    // rest), POST a schedule step split at max_child_qty, advance the state
+    // machine of every posted child, and the per-event scheduler.
+    void post(ParentState& ps, std::int64_t qty, std::int64_t t, int reprices);
+    void post_step(ParentState& ps, std::int64_t step_qty, std::int64_t t);
+    void work_passive(ParentState& ps, std::int64_t t);
+    void schedule_passive(ParentState& ps, const MarketEvent& ev);
     // Split a slice into children of at most max_child_qty (pinned).
     void issue_slice(ParentState& ps, std::int64_t slice_qty,
                      std::int64_t decision_ts, bool passive);

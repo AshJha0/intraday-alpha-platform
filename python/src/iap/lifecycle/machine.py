@@ -18,6 +18,11 @@ the outcome:
   failed evaluation increments ``consecutive_failures`` and the
   ``max_consecutive_failures``-th one demotes to CANDIDATE (counter reset);
   a passing evaluation resets the counter;
+* **a gate the policy leaves out**: under ``net_pnl_ci_gate = "absent"``
+  (the legacy policy) ``net_pnl_bootstrap_ci`` is not evaluated on the
+  CANDIDATE -> VALIDATING edge and appears in no result
+  (:meth:`AlphaLifecycle.edge_gates`); the transition table itself is the
+  same under either policy;
 * **silence**: an evaluation whose evidence block for the edge is absent
   (``research`` at CANDIDATE, ``validation`` at VALIDATING, ``paper`` at
   PAPER, ``live`` / a null or uninformative rolling IC at ACTIVE / WATCH)
@@ -65,7 +70,7 @@ from iap.contracts.types import (
 )
 from iap.lifecycle.config import PolicyConfig
 from iap.lifecycle.evidence import Evidence
-from iap.lifecycle.gates import Gate, build_gates
+from iap.lifecycle.gates import BOOTSTRAP_GATE, Gate, build_gates
 from iap.lifecycle.registry import (
     AlphaRecord,
     AlphaRegistry,
@@ -152,8 +157,10 @@ ALLOWED_TRANSITIONS: tuple[Edge, ...] = (
             "fold_count",
             "hypothesis_sign",
             "net_pnl_after_costs",
+            "net_pnl_bootstrap_ci",
             "capacity",
             "stability",
+            "cross_alpha_correlation",
         ),
     ),
     Edge(S.CANDIDATE, S.RESEARCH, EdgeKind.DEMOTION, Actor.SYSTEM, ("leakage_clean",)),
@@ -331,6 +338,14 @@ class AlphaLifecycle:
             actor=actor,
         )
 
+    def edge_gates(self, edge: Edge) -> tuple[str, ...]:
+        """The gates this policy evaluates on ``edge``, in order: the edge's
+        list, without ``net_pnl_bootstrap_ci`` when the policy says the gate
+        is absent (``net_pnl_ci_gate = "absent"``, the legacy policy)."""
+        if self.config.net_pnl_ci_gate == "absent":
+            return tuple(name for name in edge.gates if name != BOOTSTRAP_GATE)
+        return edge.gates
+
     def advance(
         self, alpha_id: str, event_ts: int, evidence: Evidence
     ) -> LifecycleTransition | None:
@@ -376,17 +391,18 @@ class AlphaLifecycle:
             )
             return None
 
+        names = self.edge_gates(edge)
         results: dict[str, GateResult] = {
-            name: self.gates[name].evaluate(rec.alpha_id, evidence) for name in edge.gates
+            name: self.gates[name].evaluate(rec.alpha_id, evidence) for name in names
         }
-        failed = [name for name in edge.gates if not results[name].passed]
+        failed = [name for name in names if not results[name].passed]
 
         if not failed:
             transition = self._transition(
                 rec,
                 edge,
                 event_ts,
-                f"all {len(edge.gates)} gates passed: {state.name} -> {edge.to_state.name}",
+                f"all {len(names)} gates passed: {state.name} -> {edge.to_state.name}",
                 results,
                 Actor.SYSTEM,
             )

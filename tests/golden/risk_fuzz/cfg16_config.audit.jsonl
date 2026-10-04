@@ -1,0 +1,8 @@
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing market_data.max_sequence_gap_before_halt","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000000000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing market_data.max_sequence_gap_before_halt","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000000000000}
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 1","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000000000000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing market_data.max_sequence_gap_before_halt","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000049000000}
+{"decision":1,"reason":"desk request #42","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000000095660000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing market_data.max_sequence_gap_before_halt","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000095757000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing market_data.max_sequence_gap_before_halt","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000095757000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing market_data.max_sequence_gap_before_halt","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000005095756999}

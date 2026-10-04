@@ -123,6 +123,11 @@ EXPORTED_METRICS = {
     # platform lifecycle
     "platform_mode",
     "platform_session_state",
+    # last persisted session state, served by com.iap.platform.SessionStateExporter
+    # (the java-platform-state sidecar / compose service) — outlives the JVM
+    "platform_persisted_session_state",
+    "platform_persisted_session_unixtime",
+    "platform_persisted_session_event_cursor",
     "risk_session_restarts_total",
     "admin_requests_total",
     # safety counters of the 2026-10-03 paper-platform review (§12.6); every

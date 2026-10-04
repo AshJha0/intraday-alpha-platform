@@ -400,7 +400,7 @@ States and transitions are exact; `expected_cusum` is pinned at 1e-12.
 **Promotion lifecycle (pointer).** The ACTIVE/WATCH/RETIRED rules above are
 the live sub-machine of the full seven-state promotion lifecycle
 (RESEARCH → CANDIDATE → VALIDATING → PAPER → ACTIVE ⇄ WATCH → RETIRED —
-seven states, seventeen pinned edges, eighteen gates; `docs/LIFECYCLE.md`;
+seven states, seventeen pinned edges, twenty gates; `docs/LIFECYCLE.md`;
 Python `iap.lifecycle` (reference), Java `com.iap.lifecycle`, Rust
 `rust/lifecycle` (`LiveTracker` is an exact port of `LifecycleTracker`,
 reason strings byte-identical); policy `configs/strategies/lifecycle.json`

@@ -13,12 +13,12 @@ evidence carries, and retirement follows a CUSUM of the rolling-IC shortfall
 |---|---|
 | Reference | `python/src/iap/lifecycle/{config,evidence,gates,machine,registry,bootstrap,golden,__main__}.py` |
 | Ports | Java `java/src/main/java/com/iap/lifecycle/` (`AlphaLifecycle`, `Gates`, `AlphaRegistry`, …; `LifecycleGoldenTest`, `LifecycleMachineTest`); Rust `rust/lifecycle/src/{state,evidence,gates,tracker,machine,registry}.rs` (`golden_lifecycle.rs`, `machine_rules.rs`). C++ has no lifecycle port by design (the lifecycle is a research/platform concern — ARCHITECTURE.md §2). |
-| Policy config | `configs/strategies/lifecycle.json` (x-version 2: `tstat_threshold`, promotion-gate thresholds + demotion counter); the live gates and the retirement rule (`breach_rule`, `cusum_k`, `cusum_h`) stay in `configs/strategies/strategies.json` `adaptive.lifecycle` (block x-version 2) and are **not** duplicated. A version-1 document of either is rejected, not read under the new default |
+| Policy config | `configs/strategies/lifecycle.json` (x-version 3: `tstat_threshold`, `cross_alpha_min_state`, `net_pnl_ci_gate`, promotion-gate thresholds + demotion counter); the live gates and the retirement rule (`breach_rule`, `cusum_k`, `cusum_h`) stay in `configs/strategies/strategies.json` `adaptive.lifecycle` (block x-version 2) and are **not** duplicated. An older document of either is rejected, not read under the new default |
 | Contract | `schemas/alpha/lifecycle_transition.schema.json` (`LifecycleTransition`, `GateResult`; states as names on the wire); `iap.contracts.types.LifecycleState` RESEARCH=0, CANDIDATE=1, VALIDATING=2, PAPER=3, ACTIVE=4, WATCH=5, RETIRED=6 |
 | Registry | `research/alpha_registry.json` (x-version 2 since v1.5.0: each record carries the CUSUM statistic `cusum`; sorted keys, 2-space indent, ASCII, trailing newline — byte-deterministic, re-rendered byte-identically by the Rust and Java ports) |
 | Transition log | `research/lifecycle_transitions.jsonl` — one canonical-JSON `LifecycleTransition` per line, schema-validated on write (24 lines on the bundled tree: the 24 RESEARCH → CANDIDATE bootstrap transitions). `research/lifecycle_log.jsonl` is the adaptive study's own policy-comparison log and never sets a state |
-| Golden | `tests/golden/expected_lifecycle.json` (x-version 2: scenarios LC01–LC04 under the default policy, `legacy` with LG01 under the rules up to v1.4.0; generator `python/tools/make_golden_lifecycle.py --force`) |
-| Tests | `python/tests/test_lifecycle.py` (70), `python/tests/test_lifecycle_golden.py` (12); Java `LifecycleGoldenTest`, `LifecycleMachineTest`; Rust `golden_lifecycle.rs` (7), `machine_rules.rs` (8, incl. a SplitMix64 property test) |
+| Golden | `tests/golden/expected_lifecycle.json` (x-version 3: scenarios LC01–LC06 under the default policy, `legacy` with LG01 under the rules up to v1.4.0; generator `python/tools/make_golden_lifecycle.py --force`) |
+| Tests | `python/tests/test_lifecycle.py` (109), `python/tests/test_lifecycle_golden.py` (16); Java `LifecycleGoldenTest` (6), `LifecycleMachineTest` (26); Rust `golden_lifecycle.rs` (9), `machine_rules.rs` (22, incl. a SplitMix64 property test) |
 | CLI | `python -m iap.lifecycle bootstrap [--dry-run] [--force] \| status \| retire <ID> --reason "…" [--event-ts NS] \| reset <ID> --reason "…" [--event-ts NS]` (`--root` = repository root); console script `iap-lifecycle` |
 
 Design rule: **the lifecycle never sits on the trading path and never
@@ -47,8 +47,8 @@ to the golden's `transition_table`. Gates are evaluated in the order listed.
 | # | from → to | kind | actor | gates / trigger |
 |---|---|---|---|---|
 | 0 | RESEARCH → CANDIDATE | PROMOTION | SYSTEM | `ledger_entry_exists`, `leakage_clean` |
-| 1 | CANDIDATE → VALIDATING | PROMOTION | SYSTEM | `leakage_clean`, `oos_ic`, `statistical_significance`, `fold_consistency`, `fold_count`, `hypothesis_sign`, `net_pnl_after_costs`, `capacity`, `stability` |
-| 2 | CANDIDATE → RESEARCH | DEMOTION | SYSTEM | taken at once when edge 1's `leakage_clean` fails (the transition carries all nine results) |
+| 1 | CANDIDATE → VALIDATING | PROMOTION | SYSTEM | `leakage_clean`, `oos_ic`, `statistical_significance`, `fold_consistency`, `fold_count`, `hypothesis_sign`, `net_pnl_after_costs`, `net_pnl_bootstrap_ci`, `capacity`, `stability`, `cross_alpha_correlation` |
+| 2 | CANDIDATE → RESEARCH | DEMOTION | SYSTEM | taken at once when edge 1's `leakage_clean` fails (the transition carries the result of every gate evaluated: eleven, ten under the legacy policy) |
 | 3 | VALIDATING → PAPER | PROMOTION | SYSTEM | `holdout_ic_tracks_research`, `replay_reproducible`, `cross_language_parity` |
 | 4 | VALIDATING → CANDIDATE | DEMOTION | SYSTEM | the `max_consecutive_failures`-th (3) consecutive failed evaluation of edge 3 |
 | 5 | PAPER → ACTIVE | PROMOTION | SYSTEM | `paper_min_sessions`, `paper_ic_tracking`, `paper_net_pnl`, `no_kill_events` |
@@ -137,7 +137,7 @@ Comparison kinds: `min` ⇒ `value >= threshold`; `max` ⇒ `value <= threshold`
 `gt` ⇒ `value > threshold` (strict); `bool` ⇒ the metric itself with
 `value = threshold = null`. A gate whose block is absent or whose metric is
 `None` fails with `value = null`. Table = `gates.GATE_SPECS` (Python),
-`GATE_SPECS: [GateSpec; 18]` (Rust), `Gates` enum (Java).
+`GATE_SPECS: [GateSpec; 20]` (Rust), `Gates` enum (Java).
 
 | gate | block | metric | kind | config key (`lifecycle.json` `gates` unless noted) | default |
 |---|---|---|---|---|---|
@@ -149,8 +149,10 @@ Comparison kinds: `min` ⇒ `value >= threshold`; `max` ⇒ `value <= threshold`
 | `fold_count` | research | `n_folds` | min | `min_folds` | 3 |
 | `hypothesis_sign` | research | `hypothesis_sign_confirmed is True` | bool | — | — |
 | `net_pnl_after_costs` | research | `net_return_bps` | gt | `min_net_return_bps` | 0.0 |
+| `net_pnl_bootstrap_ci` | evidence.pnl_bootstrap | `ci_low` of a traded interval at the configured level | gt | `min_net_pnl_ci_low` (`net_pnl_ci_level` 0.95; `net_pnl_ci_gate` `"required"` / `"absent"`) | 0.0 |
 | `capacity` | evidence.capacity_usd | `capacity_usd` | min | `min_capacity_usd` | 1 000 000.0 |
 | `stability` | research | `\|ic − rank_ic\| / max(\|ic\|, eps)` | max | `max_ic_rank_gap` (`ic_rank_gap_eps` 1e-12) | 1.0 |
+| `cross_alpha_correlation` | evidence.cross_alpha | max `\|correlation\|` over eligible peers (0.0 when none) | max | `max_cross_alpha_correlation` (`cross_alpha_min_state` `"VALIDATING"`) | 0.7 |
 | `holdout_ic_tracks_research` | validation | `\|holdout_ic − research_ic\|` | max | `max_holdout_ic_gap` | 0.01 |
 | `replay_reproducible` | validation | `replay_hash_match` | bool | — | — |
 | `cross_language_parity` | validation | `parity` | bool | — | — |
@@ -188,6 +190,92 @@ implement both policies, selected by name. The threshold is not
 retroactive: a result is judged at the look count recorded with it, not at
 the ledger total of a later day.
 
+**The net P&L bootstrap gate (v1.5.0).** `net_pnl_bootstrap_ci` closes what
+v1.5.0 first shipped as report-only: the bootstrap interval of net P&L now
+gates CANDIDATE → VALIDATING.
+
+- *Rule.* `evidence.pnl_bootstrap.ci_low > min_net_pnl_ci_low` (0.0),
+  strict: a lower bound of exactly zero fails.
+- *The interval.* The percentile interval of the SUM of the 1-minute bar net
+  P&L by the stationary bootstrap (Politis & Romano 1994;
+  `iap.validation.diagnostics.stationary_bootstrap_ci`): 1 000 resamples,
+  blocks of geometric length with mean `max(1, round(n^(1/3)))` bars wrapped
+  circularly, SplitMix64 from the recorded seed (20260829 in the report
+  pipelines), lower empirical quantiles (no interpolation), level
+  `net_pnl_ci_level` = 0.95. Deterministic; level, resamples, seed, mean
+  block and series length are fields of the evidence.
+- *The series.* The research backtest at 1× costs under the method bundle
+  in force — the backtest `net_pnl_after_costs` reads — pooled over ALL
+  walk-forward test folds (the report's `net_pnl_1x_pooled` and
+  `net_pnl_bootstrap`). `net_pnl_after_costs` reads the LAST fold's point
+  estimate.
+- *No trade.* `n_trades == 0` — the alpha made no trade in any fold — has no
+  P&L to resample; its interval is the degenerate [0, 0]. The gate FAILS with
+  `value = null`; it does not pass vacuously. The same for bounds that are
+  `null` (fewer than 8 bars), for an interval taken at a level other than
+  the configured one (exact comparison) and for a missing block.
+  `iap.lifecycle.gates.bootstrap_gate_reason(evidence, config)` returns the
+  explicit reason a report prints ("no trade at 1x costs in any fold: no
+  P&L to resample, no interval").
+- *Why it is not redundant.* `net_pnl_after_costs` is a point estimate on
+  one fold (a fifth of the sample): it can be positive by luck. This gate
+  asks whether the P&L of every fold together is positive beyond its own
+  sampling noise; an alpha can pass either one alone, and LC06 walks an
+  alpha that passes `net_pnl_after_costs` and fails this. `stability` reads
+  the Pearson / rank IC gap and nothing of the P&L or the folds. The
+  per-fold diagnostics (`fold_diagnostics`: cost survival, decay, regime per
+  fold) stay report-only: fold-to-fold consistency of the signal is already
+  `fold_consistency`, and each fold's P&L is in this gate's pooled series —
+  a per-fold P&L count would gate the same evidence again at four
+  observations.
+- *Legacy.* `net_pnl_ci_gate = "absent"` — the legacy policy
+  (`iap.lifecycle.golden.legacy_config`) — leaves the gate out: it is not
+  evaluated and appears in no gate result, and a promotion reason reads
+  that ten gates passed. The transition table is the same under both
+  policies; `AlphaLifecycle.edge_gates(edge)` (Python), `edgeGates` (Java)
+  and `PolicyConfig::evaluated_gates` (Rust) give the list a policy
+  evaluates.
+
+**The cross-alpha correlation gate (v1.5.0, backlog AF03).** A new alpha
+must be additive.
+
+- *Rule.* `max |correlation| over eligible peers <=
+  max_cross_alpha_correlation` (0.7). `max` is inclusive: a correlation
+  exactly at the threshold passes (the tie).
+- *The series.* The Pearson correlation of the two alphas' out-of-sample
+  standardised signals `z` on the rows BOTH score — same instrument, same
+  feature row, both confidences > 0 — pooled across instruments and
+  walk-forward test folds, as measured by the combination report's member
+  pass (`research/combination/signal_correlation.json`, §6). A pair with
+  fewer than 32 common rows has correlation 0.0 by definition: an equity and
+  an FX alpha share none and cannot be the same bet in the sense of this
+  gate. The absolute value is gated — the mirror image of an allocated alpha
+  adds nothing either. The SIGNAL is gated and not the realised P&L: under
+  the cost-aware policy most alphas make no trade, so the P&L correlation is
+  undefined exactly where the gate is needed; it is reported
+  (`research/combination/REPORT.md`), not gated.
+- *The peers.* Every other registered alpha whose state is at or beyond
+  `cross_alpha_min_state` (`"VALIDATING"`; `"PAPER"` and `"ACTIVE"` are the
+  other legal values) and is not RETIRED. CANDIDATE is not a legal value:
+  two candidates gating each other would block both.
+- *Vacuous pass.* With no eligible peer the statistic is 0.0 and the gate
+  passes; the result says so by its value. The first alpha through the gate
+  is never blocked by it.
+- *Missing evidence.* `evidence.cross_alpha = null` — nobody measured the
+  correlations — fails with `value = null`: fail closed. An EMPTY peer list
+  is a different statement (there is no other alpha) and passes.
+- *Order and ties.* The gate compares a candidate with what is already
+  through, so the order of evaluation decides which of two correlated
+  candidates passes: the bootstrap evaluates alphas in ascending `alpha_id`
+  at one instant, the smaller id first, and the larger one then meets it as
+  a peer. When several peers share the largest `|correlation|` the binding
+  peer a report names is the one with the smallest id
+  (`CrossAlphaEvidence.binding_peer`); the gate result is the same.
+- *Ports.* The evidence carries each peer's id, state and correlation, and
+  the gate filters by state itself, so Java and Rust evaluate it from the
+  document alone and the same document can be re-judged under another
+  `cross_alpha_min_state`.
+
 **Why the Pearson/rank gap is the stability rule.** It is the one pair of
 numbers in an `ExperimentResult` that measures the *shape* of the
 signal–label relation rather than its strength. `gap ≤ 1.0` ⇔ `rank_ic ∈
@@ -212,18 +300,25 @@ BLACKOUT rows at their reopen return (0.0038, where the valid-only IC is
 ```
 Evidence(research: ExperimentResult | None, capacity_usd: float | None,
          significance_threshold: float | None,   # > 0; always serialised, null when absent
+         pnl_bootstrap: PnlBootstrapEvidence | None,   # always serialised, null when absent
+         cross_alpha: CrossAlphaEvidence | None,       # always serialised, null when absent
          validation: ValidationEvidence | None, paper: PaperEvidence | None,
          live: LiveEvidence | None)
 ValidationEvidence(holdout_ic, research_ic, replay_hash_match: bool, parity: bool)
 PaperEvidence(n_sessions >= 0, realized_ic, research_ic, net_pnl, n_kill_events >= 0,
               tracking_error >= 0)          # tracking_error: diagnostic, no gate yet
+PnlBootstrapEvidence(ci_low: float | None, ci_high: float | None,   # both null or both numbers
+                     level in (0, 1), n_resamples >= 1, seed >= 0, mean_block >= 1,
+                     n_bars >= 0, n_trades >= 0)
+CrossAlphaEvidence(peers: [CrossAlphaPeer(alpha_id, state: <state name>, correlation in [-1, 1])])
+                                            # sorted by alpha_id, unique, never the alpha itself
 LiveEvidence(rolling_ic: float | None, n_buckets >= 0, eval_index >= 0, informative: bool,
              new_fraction in (0, 1])        # read by the CUSUM rule; required under either rule
 ```
 
-`significance_threshold` and `live.new_fraction` are required keys since
-v1.5.0: an evidence document without them is rejected by the Python, Java
-and Rust readers. `significance_threshold` sits beside `research` for the
+`significance_threshold`, `pnl_bootstrap`, `cross_alpha` and
+`live.new_fraction` are required keys since v1.5.0: an evidence document
+without them is rejected by the Python, Java and Rust readers. `significance_threshold` sits beside `research` for the
 same reason `capacity_usd` does — an `ExperimentResult` has no field for it.
 
 All scalars finite (NaN / ±inf raise); `Evidence.empty()` is the all-absent
@@ -288,8 +383,14 @@ per line. Replaying the log from RESEARCH reproduces each alpha's state
 ## 6. Bootstrap — the honest result on the bundled research
 
 `python -m iap.lifecycle bootstrap` reads `research/alpha_reports/<ID>.json`,
-the `promotion_pipeline` entries of `research/experiments.json` and
-`configs/strategies/alpha_params.json`. Since v1.4.0 the ledger is
+the `promotion_pipeline` entries of `research/experiments.json`,
+`configs/strategies/alpha_params.json` and — for the correlation gate —
+`research/combination/signal_correlation.json`. Each alpha's `pnl_bootstrap`
+block is its report's `net_pnl_bootstrap` plus the trades of its four folds
+(`pnl_bootstrap_from_report`); its `cross_alpha` block lists the alphas
+registered before it — those with a smaller id — in the state the machine
+left them in (`cross_alpha_evidence`). Without the correlation document the
+block is absent and the gate fails closed for every alpha but the first. Since v1.4.0 the ledger is
 dataset-scoped (x-version 2; 3 since v1.5.0, entries carry `gate_looks`)
 and keeps the looks of every dataset it has seen, and since v1.5.0 the
 method bundle is part of an entry's identity, so an alpha has one
@@ -404,11 +505,24 @@ What the default methods changed in this table, alpha by alpha:
   the ITERATE bar of 1.5; their within-bucket t was 0.38 and 1.27) and FX03
   is REJECT (pooled t 1.13, within-bucket 1.95).
 
+- **`net_pnl_bootstrap_ci` fails for all 24** (new gate). 17 alphas make no
+  trade in any fold under the cost-aware policy and have no interval
+  (`value = null`); the 7 that trade have a negative lower bound — EQ06
+  (−1 302 USD), EQ11 (−5 142), FX05 (−131), FX08 (−1 630), FX09 (−1 661),
+  FX10 (−576), FX11 (−2 510) — and a negative upper bound too. No state and
+  no verdict moved: every alpha already failed `net_pnl_after_costs`.
+- **`cross_alpha_correlation` passes for all 24, vacuously** (new gate; value
+  0.0): no alpha is at VALIDATING or beyond, so nobody has a peer. The
+  correlation document shows what the gate would do once one is: the three
+  order-flow alphas EQ02 / EQ03 / EQ12 are one bet (pairwise correlation
+  0.95 to 1.00), so with EQ02 at VALIDATING the gate would hold EQ03 and
+  EQ12 at CANDIDATE; no FX pair is above 0.7.
+
 `python -m iap.lifecycle status` prints this table from the committed
 registry. `test_bootstrap_failed_gates_agree_with_report_verdicts` recomputes
 the expected failed set from each report's raw numbers and the threshold the
-report was judged at and asserts equality (excluding `capacity` and
-`stability`, which the report's PROMOTE gates do not include), plus the
+report was judged at and asserts equality (excluding `capacity`,
+`stability` and the two gates added in v1.5.0, which the report's PROMOTE gates do not include), plus the
 ITERATE rule and hand
 pins for EQ01 / EQ03 / EQ05 / FX01 / EQ07. FX01 is ITERATE despite a negative
 *pooled* IC because the gate reads the uncrossed IC (README, "Two
@@ -438,13 +552,16 @@ the point of pinning both.
 ## 7. Golden — `tests/golden/expected_lifecycle.json`
 
 ```
-{"x-version": 2, "description", "t0": 1700000000000000000, "step_ns": 900000000000,
- "config": {"policy", "tstat_threshold": "ledger", "gates": {<all 14 keys>}, "demotion": {...},
+{"x-version": 3, "description", "t0": 1700000000000000000, "step_ns": 900000000000,
+ "config": {"policy", "tstat_threshold": "ledger", "cross_alpha_min_state": "VALIDATING",
+            "net_pnl_ci_gate": "required", "gates": {<all 17 keys>}, "demotion": {...},
             "live": {..., "breach_rule": "cusum", "cusum_k": 0.0025, "cusum_h": 0.01}},
  "states": {"RESEARCH": 0, ..., "RETIRED": 6},
  "transition_table": [{"from_state", "to_state", "kind", "actor", "gates": [...]}, ... 17 edges],
- "scenarios": {"LC01": [step...], "LC02": [...], "LC03": [...], "LC04": [...]},
- "legacy": {"config": {..., "tstat_threshold": "fixed", "live": {..., "breach_rule": "consecutive"}},
+ "scenarios": {"LC01": [step...], "LC02": [...], "LC03": [...], "LC04": [...], "LC05": [...],
+               "LC06": [...]},
+ "legacy": {"config": {..., "tstat_threshold": "fixed", "net_pnl_ci_gate": "absent",
+                       "live": {..., "breach_rule": "consecutive"}},
             "scenarios": {"LG01": [step...]}}}
 ```
 
@@ -455,8 +572,11 @@ Each step: `{"step", "note", "action": "advance" | "retire" | "reset",
 "transition" | null}}`. States, booleans and values are compared **exactly**
 (no tolerance), the CUSUM statistic included.
 
-Default policy (`scenarios`, 36 transitions over 64 steps; ledger
-significance threshold, CUSUM retirement):
+Default policy (`scenarios`, 52 transitions over 89 steps; ledger
+significance threshold, CUSUM retirement, both gates added in v1.5.0). Every script
+that walks CANDIDATE → VALIDATING carries an empty `cross_alpha` block and a
+passing `pnl_bootstrap` block, so each still tests the one rule it was
+written for:
 
 - **LC01** (20 steps) = the whole ladder RESEARCH → … → ACTIVE (t 4.0
   against a carried threshold of 3.5), hold, null IC, uninformative IC,
@@ -484,14 +604,32 @@ significance threshold, CUSUM retirement):
   does not retire although `S` is still over the threshold; the next breach
   does.
 
+- **LC05** (17 steps) = the correlation gate, every other gate passing. No
+  `cross_alpha` block: fails with `value = null`, hold. A peer at ACTIVE
+  correlated 0.82: fails. A peer at ACTIVE correlated −0.9 beside peers at
+  CANDIDATE (0.95) and RETIRED (0.99): the absolute value 0.9 fails and the
+  two ineligible peers are not counted. Only the CANDIDATE and RETIRED
+  peers: value 0.0, vacuous pass → VALIDATING. Then, each after a HUMAN
+  retire and reset: peers at exactly 0.7 (PAPER) and −0.7 (WATCH) pass —
+  the tie; an empty peer list passes at 0.0; peers at 0.25 and −0.4 pass at
+  0.4.
+- **LC06** (8 steps) = the bootstrap gate, every other gate passing. No
+  `pnl_bootstrap` block: `value = null`, hold. Lower bound −35.5: fails at
+  that value. `n_trades` 0 with the degenerate [0, 0] interval: `value =
+  null`. Null bounds (5 bars): `null`. An interval at level 0.9: `null`. A
+  lower bound of exactly 0.0 with 40 trades: fails (strict). Lower bound
+  12.5: all eleven gates pass → VALIDATING.
+
 Legacy policy (`legacy.scenarios`, 9 transitions; `tstat_threshold`
-`"fixed"`, `breach_rule` `"consecutive"`):
+`"fixed"`, `breach_rule` `"consecutive"`, `net_pnl_ci_gate` `"absent"`):
 
 - **LG01** (21 steps) = the LC01 script under the rules up to v1.4.0:
   evidence with no significance threshold passes the fixed 3.0 gate (t 4.0);
   → WATCH with the entering breach counted (`breach_count` 1), a
   neutral-zone reading resets both counters, 3 recoveries → ACTIVE, relapse,
   and the sixth consecutive breach → RETIRED; `cusum` is 0.0 on every step.
+  Its candidate evidence carries no `pnl_bootstrap` block and is promoted
+  on ten gates: the bootstrap gate is absent under this policy.
 
 `test_golden_scenarios_cover_every_system_edge`
 pins the covered edge set (VALIDATING → CANDIDATE is covered by the rule
@@ -499,7 +637,7 @@ tests, not the scenarios — same in all three languages), and
 `test_golden_pins_what_the_default_policy_changes` checks the steps above
 against a hand calculation. The embedded
 `config` must equal the policy loaded from `configs/strategies/` in every
-language; the legacy `config` is the same policy with the two rule names
+language; the legacy `config` is the same policy with the three rule names
 changed.
 
 ## 8. What the ports add, and the caveat that is still pinned
@@ -524,6 +662,15 @@ changed.
   pair-count-weighted. Both replay LC01–LC04 and LG01 exactly, read the
   required evidence keys `significance_threshold` and `live.new_fraction`,
   and re-render the x-version 2 registry byte-identically.
+- **Both ports, the two gates added in v1.5.0:** `net_pnl_bootstrap_ci` and
+  `cross_alpha_correlation` as rows of the table (Java `Gates`, Rust
+  `GATE_SPECS`), the evidence blocks `pnl_bootstrap` and `cross_alpha` with
+  the reference's strictness (Java `Evidence.PnlBootstrap` /
+  `Evidence.CrossAlpha`, Rust `PnlBootstrapEvidence` / `CrossAlphaEvidence`),
+  `lifecycle.json` x-version 3, and the `"absent"` policy that leaves the
+  bootstrap gate out. Both replay LC05 and LC06 exactly. Neither port
+  computes a correlation or resamples: they evaluate the gates from the
+  evidence document.
 - **Caveat, unchanged (API_ADAPTIVE.md §6, README, GOVERNANCE gate 11):** in
   the live Java paper loop the lifecycle gauge is **observational** — a
   RETIRED alpha keeps trading at full size and `AlphaLifecycleRetired` pages
@@ -536,7 +683,7 @@ changed.
 |---|---|
 | ACTIVE / WATCH / RETIRED rules, informative evaluations, `lifecycle_log.jsonl` | [../API_ADAPTIVE.md](../API_ADAPTIVE.md) §6 |
 | the `LifecycleTransition` / `GateResult` contract | [../API_CONTRACTS.md](../API_CONTRACTS.md), `schemas/alpha/lifecycle_transition.schema.json` |
-| the `lifecycle_transitions` table and `v_alpha_scorecard` | [DATA_MODEL.md](DATA_MODEL.md) §3.2, §4 |
+| the `lifecycle_transitions` table (live ledger under the current scope, archived ledgers under their own) and `v_alpha_scorecard` | [DATA_MODEL.md](DATA_MODEL.md) §3.2, §4 |
 | the promotion-gate rule (no verdict / state change without a ledger entry id) | [../CONTRIBUTING.md](../CONTRIBUTING.md) §6, [governance/GOVERNANCE.md](governance/GOVERNANCE.md) §2 |
 | the diagram | [DIAGRAMS.md](DIAGRAMS.md) §8, `diagrams/lifecycle_state_machine.mmd` |
 | scenarios (demotion, manual retire, silence) | [SCENARIOS.md](SCENARIOS.md), RESEARCH section |

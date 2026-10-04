@@ -1,0 +1,8 @@
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 2","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"del","severity":2,"timestamp":1700000004999999999}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/empty currency.reporting_ccy","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000005059999999}
+{"decision":1,"reason":"停止","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000005118999999}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/empty currency.reporting_ccy","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000005198999999}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/empty currency.reporting_ccy","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000005262999999}
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 1","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000005303999999}
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 2","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000005303999999}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/empty currency.reporting_ccy","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000005341999999}

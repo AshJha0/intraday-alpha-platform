@@ -836,6 +836,7 @@ public class ExecutionSimTest {
         Fill fl = sim.fills().get(0);
         double price = 108660 * 1e-05;
         double[] research = new com.iap.backtest.CostModel(2.0, 0.003, 2.5, 1.0)
+                .withLinearImpact()
                 .costComponents(1000, price, 0.0, "FX", 4e9, 1000.0);
         assertEquals(research[2], fl.impactCost(), 1e-12);
         assertEquals(research[1], fl.fee(), 1e-12);

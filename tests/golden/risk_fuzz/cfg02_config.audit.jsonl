@@ -1,0 +1,11 @@
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 2","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700000000000000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: global.max_daily_loss must be > 0, got -0","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000049000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: global.max_daily_loss must be > 0, got -0","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000049000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: global.max_daily_loss must be > 0, got -0","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000108000000}
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 4294967295","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000000108000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: global.max_daily_loss must be > 0, got -0","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000108333000}
+{"decision":3,"reason":"venue 2 disconnected","rule_id":"VENUE_DISCONNECT","scope":"VENUE","scope_id":"2","severity":2,"timestamp":1700000000143333000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: global.max_daily_loss must be > 0, got -0","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000002143333000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: global.max_daily_loss must be > 0, got -0","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000007143332999}
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 2","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700000007176193999}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: global.max_daily_loss must be > 0, got -0","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000008176193999}

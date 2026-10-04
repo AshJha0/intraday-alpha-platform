@@ -24,6 +24,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import math
+import re
 
 import pytest
 from iap.adaptive.lifecycle import LifecycleConfig, LifecycleTracker
@@ -41,12 +42,15 @@ from iap.contracts.validate import validate_typed
 from iap.core.rng import SplitMix64
 from iap.lifecycle import (
     ALLOWED_TRANSITIONS,
+    BOOTSTRAP_GATE,
     GATE_SPECS,
     PROMOTION_EDGES,
     STATE_COUNT,
     AlphaLifecycle,
     AlphaRecord,
     AlphaRegistry,
+    CrossAlphaEvidence,
+    CrossAlphaPeer,
     EdgeKind,
     Evidence,
     GateEvaluation,
@@ -54,8 +58,10 @@ from iap.lifecycle import (
     LiveEvidence,
     Outcome,
     PaperEvidence,
+    PnlBootstrapEvidence,
     PolicyConfig,
     ValidationEvidence,
+    bootstrap_gate_reason,
     build_gates,
     edge_for,
     ic_rank_gap,
@@ -64,16 +70,20 @@ from iap.lifecycle import (
 from iap.lifecycle.bootstrap import (
     REFERENCE_NOTIONAL_USD,
     capacity_from_report,
+    cross_alpha_evidence,
     load_ledger_entries,
     load_params_document,
     load_report,
+    load_signal_correlations,
+    pnl_bootstrap_from_report,
     render_status,
     research_evidence,
     run_bootstrap,
     significance_threshold_from_report,
 )
 from iap.lifecycle.config import repo_root
-from iap.lifecycle.golden import legacy_config
+from iap.lifecycle.golden import GOOD_BOOTSTRAP, NO_PEERS, legacy_config
+from iap.lifecycle.golden import bootstrap as golden_bootstrap
 from iap.lifecycle.golden import research as golden_research
 from iap.validation.ledger import ExperimentLedger
 from iap.validation.validate import GATES as VALIDATE_GATES
@@ -112,7 +122,19 @@ def _machine(config: PolicyConfig, alpha_id: str = "LCX", log=None) -> AlphaLife
 
 
 def _ev(**kw) -> Evidence:
-    base = dict(research=None, capacity_usd=None, validation=None, paper=None, live=None)
+    """Evidence with the named blocks.  It carries the EMPTY cross-alpha
+    block (no other alpha: the correlation gate passes vacuously) and a
+    P&L bootstrap interval above zero unless a test passes its own, so
+    every test below keeps testing its one rule."""
+    base = dict(
+        research=None,
+        capacity_usd=None,
+        validation=None,
+        paper=None,
+        live=None,
+        cross_alpha=NO_PEERS,
+        pnl_bootstrap=GOOD_BOOTSTRAP,
+    )
     base.update(kw)
     return Evidence(**base)
 
@@ -231,7 +253,21 @@ def test_config_round_trip(config):
     "mutate, message",
     [
         (lambda d: d.__setitem__("x-version", 1), "x-version"),  # a v1.4.0 document
-        (lambda d: d.__setitem__("x-version", 3), "x-version"),
+        (lambda d: d.__setitem__("x-version", 2), "x-version"),  # v1.5.0 before the gates
+        (lambda d: d.__setitem__("x-version", 4), "x-version"),
+        (lambda d: d.pop("cross_alpha_min_state"), "missing keys"),
+        (lambda d: d.__setitem__("cross_alpha_min_state", "CANDIDATE"), "cross_alpha_min_state"),
+        (lambda d: d.__setitem__("cross_alpha_min_state", "RETIRED"), "cross_alpha_min_state"),
+        (lambda d: d.__setitem__("cross_alpha_min_state", 2), "cross_alpha_min_state"),
+        (lambda d: d["gates"].pop("max_cross_alpha_correlation"), "missing keys"),
+        (lambda d: d["gates"].__setitem__("max_cross_alpha_correlation", 1.5), "[0, 1]"),
+        (lambda d: d["gates"].__setitem__("max_cross_alpha_correlation", -0.1), "[0, 1]"),
+        (lambda d: d.pop("net_pnl_ci_gate"), "missing keys"),
+        (lambda d: d.__setitem__("net_pnl_ci_gate", "optional"), "net_pnl_ci_gate"),
+        (lambda d: d["gates"].pop("net_pnl_ci_level"), "missing keys"),
+        (lambda d: d["gates"].__setitem__("net_pnl_ci_level", 1.0), "(0, 1)"),
+        (lambda d: d["gates"].__setitem__("net_pnl_ci_level", 0.0), "(0, 1)"),
+        (lambda d: d["gates"].pop("min_net_pnl_ci_low"), "missing keys"),
         (lambda d: d.pop("tstat_threshold"), "missing keys"),
         (lambda d: d.__setitem__("tstat_threshold", "bonferroni"), "tstat_threshold"),
         (lambda d: d.__setitem__("tstat_threshold", 3.0), "tstat_threshold"),
@@ -252,7 +288,7 @@ def test_config_fail_fast(tmp_path, mutate, message):
     mutate(doc)
     path = tmp_path / "lifecycle.json"
     path.write_text(json.dumps(doc))
-    with pytest.raises(ValueError, match=message.replace("[", r"\[")):
+    with pytest.raises(ValueError, match=re.escape(message)):
         load_policy_config(path)
 
 
@@ -365,10 +401,17 @@ def test_evidence_round_trip_and_strict_keys():
         "research",
         "capacity_usd",
         "significance_threshold",
+        "pnl_bootstrap",
+        "cross_alpha",
         "validation",
         "paper",
         "live",
     ]
+    # so are the two blocks of the v1.5.0 gates
+    for key in ("pnl_bootstrap", "cross_alpha"):
+        assert Evidence.empty().to_dict()[key] is None
+        with pytest.raises(ValueError, match=rf"missing keys \['{key}'\]"):
+            Evidence.from_dict({k: v for k, v in doc.items() if k != key})
     assert Evidence.empty().to_dict()["significance_threshold"] is None
     unjudged = {**doc, "significance_threshold": None}
     assert Evidence.from_dict(unjudged).significance_threshold is None
@@ -1267,7 +1310,10 @@ def test_bootstrap_failed_gates_agree_with_report_verdicts(bootstrap):
             expected_failed.append("hypothesis_sign")
         if not rep["net_pnl_1x_cost"] > 0.0:
             expected_failed.append("net_pnl_after_costs")
-        report_gates = [g for g in ev.failed_gates if g not in ("capacity", "stability")]
+        # gates the report has no row for: capacity and stability, and the
+        # two the lifecycle added in v1.5.0 (tested on their own below)
+        not_in_report = ("capacity", "stability", "net_pnl_bootstrap_ci", "cross_alpha_correlation")
+        report_gates = [g for g in ev.failed_gates if g not in not_in_report]
         assert report_gates == expected_failed, row.alpha_id
         # ... which is exactly the set of PROMOTE gates the report itself
         # records as failed
@@ -1310,17 +1356,22 @@ def test_bootstrap_failed_gates_agree_with_report_verdicts(bootstrap):
     # cost-aware position policy no alpha clears its round-trip cost, so every
     # alpha fails the cost gate and — the capacity now being the breakeven
     # capacity — the capacity gate with it: EQ03 fails those two alone.
+    # Updated with the v1.5.0 gates: every alpha also fails
+    # net_pnl_bootstrap_ci (no trade, or a negative lower bound); the
+    # correlation gate passes vacuously for all 24 (nobody is at VALIDATING).
     assert by_id["EQ01"] == (
         "statistical_significance",
         "net_pnl_after_costs",
+        "net_pnl_bootstrap_ci",
         "capacity",
         "stability",
     )
-    assert by_id["EQ03"] == ("net_pnl_after_costs", "capacity")
+    assert by_id["EQ03"] == ("net_pnl_after_costs", "net_pnl_bootstrap_ci", "capacity")
     assert by_id["EQ05"] == (
         "oos_ic",
         "statistical_significance",
         "net_pnl_after_costs",
+        "net_pnl_bootstrap_ci",
         "capacity",
         "stability",
     )
@@ -1328,6 +1379,7 @@ def test_bootstrap_failed_gates_agree_with_report_verdicts(bootstrap):
         "statistical_significance",
         "fold_consistency",
         "net_pnl_after_costs",
+        "net_pnl_bootstrap_ci",
         "capacity",
     )
     assert by_id["EQ07"] == (
@@ -1336,6 +1388,7 @@ def test_bootstrap_failed_gates_agree_with_report_verdicts(bootstrap):
         "fold_consistency",
         "hypothesis_sign",
         "net_pnl_after_costs",
+        "net_pnl_bootstrap_ci",
         "capacity",
         "stability",
     )
@@ -1718,3 +1771,248 @@ def test_property_transition_log_replays_to_registry(config, tmp_path, policy):
     assert not any(
         math.isnan(g.value) for t in m.transitions for g in t.gates.values() if g.value is not None
     )
+
+
+# --------------------------------------------------------------------------
+# The cross-alpha correlation gate (AF03) and the net P&L bootstrap gate
+# --------------------------------------------------------------------------
+
+
+def _peers(*rows) -> CrossAlphaEvidence:
+    return CrossAlphaEvidence(tuple(CrossAlphaPeer(a, s, rho) for a, s, rho in rows))
+
+
+def _candidate(config) -> AlphaLifecycle:
+    """A machine whose alpha LCX is at CANDIDATE."""
+    m = _machine(config)
+    m.advance("LCX", T0 + STEP, _ev(research=golden_research("LCX")))
+    assert m.state("LCX") is S.CANDIDATE
+    return m
+
+
+def _full(**kw) -> Evidence:
+    """Candidate evidence that passes every gate unless ``kw`` changes it."""
+    base = dict(research=golden_research("LCX"), capacity_usd=5e6, significance_threshold=THRESHOLD)
+    base.update(kw)
+    return _ev(**base)
+
+
+def test_gate_table_has_twenty_rows_and_the_candidate_edge_eleven(config, legacy):
+    names = [s.name for s in GATE_SPECS]
+    assert len(names) == 20 and len(ALLOWED_TRANSITIONS) == 17
+    assert names[names.index("net_pnl_after_costs") + 1] == "net_pnl_bootstrap_ci"
+    assert names[names.index("stability") + 1] == "cross_alpha_correlation"
+    edge = PROMOTION_EDGES[S.CANDIDATE]
+    assert len(edge.gates) == 11 and edge.gates[-1] == "cross_alpha_correlation"
+    assert AlphaLifecycle(config, AlphaRegistry(config.policy)).edge_gates(edge) == edge.gates
+    # the legacy policy evaluates the same edge without the bootstrap gate
+    legacy_gates = AlphaLifecycle(legacy, AlphaRegistry(legacy.policy)).edge_gates(edge)
+    assert legacy_gates == tuple(g for g in edge.gates if g != BOOTSTRAP_GATE)
+    assert legacy.net_pnl_ci_gate == "absent" and config.net_pnl_ci_gate == "required"
+
+
+@pytest.mark.parametrize(
+    "peers, passed, value",
+    [
+        (None, False, None),  # nobody measured: fail closed
+        ((), True, 0.0),  # no other alpha: vacuous pass
+        ((("A", "ACTIVE", 0.82),), False, 0.82),
+        ((("A", "ACTIVE", -0.9),), False, 0.9),  # |correlation|
+        ((("A", "VALIDATING", 0.7),), True, 0.7),  # the tie: max is inclusive
+        ((("A", "PAPER", 0.7), ("B", "WATCH", -0.7)), True, 0.7),
+        ((("A", "RESEARCH", 1.0), ("B", "CANDIDATE", 1.0), ("C", "RETIRED", 1.0)), True, 0.0),
+        ((("A", "ACTIVE", 0.25), ("B", "VALIDATING", -0.4)), True, 0.4),
+        ((("A", "WATCH", 0.71), ("B", "RETIRED", 0.1)), False, 0.71),
+    ],
+)
+def test_cross_alpha_correlation_gate(config, peers, passed, value):
+    gate = build_gates(config)["cross_alpha_correlation"]
+    block = None if peers is None else _peers(*peers)
+    got = gate.evaluate("LCX", _full(cross_alpha=block))
+    assert (got.passed, got.value, got.threshold) == (passed, value, 0.7)
+    # ... and through the machine: pass -> VALIDATING, fail -> HOLD on this gate alone
+    m = _candidate(config)
+    tr = m.advance("LCX", T0 + 2 * STEP, _full(cross_alpha=block))
+    if passed:
+        assert tr is not None and tr.to_state is S.VALIDATING
+        assert tr.gates["cross_alpha_correlation"].value == value
+    else:
+        assert tr is None and m.evaluations[-1].outcome == Outcome.HOLD
+        assert m.evaluations[-1].failed_gates == ["cross_alpha_correlation"]
+        assert m.record("LCX").consecutive_failures == 0
+
+
+def test_cross_alpha_min_state_is_configurable(config):
+    paper_only = dataclasses.replace(config, cross_alpha_min_state="PAPER")
+    block = _peers(("A", "VALIDATING", 0.99), ("B", "PAPER", 0.3))
+    got = build_gates(paper_only)["cross_alpha_correlation"].evaluate("X", _full(cross_alpha=block))
+    assert (got.passed, got.value) == (True, 0.3)
+    assert (
+        not build_gates(config)["cross_alpha_correlation"]
+        .evaluate("X", _full(cross_alpha=block))
+        .passed
+    )
+    for bad in ("CANDIDATE", "WATCH", "RETIRED", "research"):
+        with pytest.raises(ValueError, match="cross_alpha_min_state"):
+            dataclasses.replace(config, cross_alpha_min_state=bad)
+
+
+def test_cross_alpha_evidence_is_strict_and_names_the_binding_peer():
+    block = _peers(("B", "ACTIVE", -0.6), ("C", "PAPER", 0.6), ("D", "RETIRED", 0.9))
+    assert block.max_abs_correlation("VALIDATING") == 0.6
+    # the tie between B and C: the smaller id is the binding peer
+    assert block.binding_peer("VALIDATING").alpha_id == "B"
+    assert block.binding_peer("ACTIVE").alpha_id == "B"
+    assert _peers(("D", "RETIRED", 0.9)).binding_peer("VALIDATING") is None
+    assert CrossAlphaEvidence.from_dict(block.to_dict()) == block
+    assert block.to_dict()["peers"][0] == {"alpha_id": "B", "state": "ACTIVE", "correlation": -0.6}
+    with pytest.raises(ValueError, match="sorted by alpha_id"):
+        _peers(("B", "ACTIVE", 0.1), ("A", "ACTIVE", 0.1))
+    with pytest.raises(ValueError, match="sorted by alpha_id"):
+        _peers(("A", "ACTIVE", 0.1), ("A", "PAPER", 0.2))
+    with pytest.raises(ValueError, match=r"\[-1, 1\]"):
+        CrossAlphaPeer("A", "ACTIVE", 1.01)
+    with pytest.raises(ValueError, match="non-finite"):
+        CrossAlphaPeer("A", "ACTIVE", float("nan"))
+    with pytest.raises(ValueError, match="unknown lifecycle state"):
+        CrossAlphaPeer("A", "LIVE", 0.1)
+    with pytest.raises(ValueError, match="non-empty"):
+        CrossAlphaPeer("", "ACTIVE", 0.1)
+    with pytest.raises(ValueError, match="exactly the key 'peers'"):
+        CrossAlphaEvidence.from_dict({"peers": [], "extra": 1})
+    with pytest.raises(ValueError, match="unknown keys"):
+        CrossAlphaEvidence.from_dict(
+            {"peers": [{"alpha_id": "A", "state": "ACTIVE", "correlation": 0.1, "n": 3}]}
+        )
+    with pytest.raises(ValueError, match="CrossAlphaEvidence or None"):
+        _ev(cross_alpha={"peers": []})
+
+
+@pytest.mark.parametrize(
+    "block, passed, value, reason",
+    [
+        (None, False, None, "no bootstrap interval"),
+        (golden_bootstrap(12.5, 90.0), True, 12.5, "lower bound 12.50 > 0.0"),
+        (golden_bootstrap(-35.5, 60.25), False, -35.5, "lower bound -35.50 <= 0.0"),
+        (golden_bootstrap(0.0, 45.0), False, 0.0, "lower bound 0.00 <= 0.0"),  # strict
+        (golden_bootstrap(0.0, 0.0, n_trades=0), False, None, "no trade"),
+        (golden_bootstrap(50.0, 90.0, n_trades=0), False, None, "no trade"),
+        (golden_bootstrap(None, None, n_bars=5), False, None, "too few"),
+        (golden_bootstrap(12.5, 90.0, level=0.9), False, None, "requires 0.95"),
+        (golden_bootstrap(12.5, 90.0, level=0.99), False, None, "requires 0.95"),
+    ],
+)
+def test_net_pnl_bootstrap_gate(config, block, passed, value, reason):
+    gate = build_gates(config)[BOOTSTRAP_GATE]
+    evidence = _full(pnl_bootstrap=block)
+    got = gate.evaluate("LCX", evidence)
+    assert (got.passed, got.value, got.threshold) == (passed, value, 0.0)
+    assert reason in bootstrap_gate_reason(evidence, config)
+    m = _candidate(config)
+    tr = m.advance("LCX", T0 + 2 * STEP, evidence)
+    if passed:
+        assert tr is not None and tr.to_state is S.VALIDATING and len(tr.gates) == 11
+    else:
+        assert tr is None and m.evaluations[-1].failed_gates == [BOOTSTRAP_GATE]
+
+
+def test_net_pnl_bootstrap_gate_is_absent_under_the_legacy_policy(legacy):
+    """``net_pnl_ci_gate = "absent"``: evidence with no interval at all is
+    promoted on ten gates and the gate is in no result."""
+    m = _candidate(legacy)
+    tr = m.advance("LCX", T0 + 2 * STEP, _full(pnl_bootstrap=None, significance_threshold=None))
+    assert tr is not None and tr.to_state is S.VALIDATING
+    assert BOOTSTRAP_GATE not in tr.gates and len(tr.gates) == 10
+    assert tr.reason == "all 10 gates passed: CANDIDATE -> VALIDATING"
+    assert BOOTSTRAP_GATE not in m.evaluations[-1].gates
+    # a failing evaluation under the legacy policy does not list it either
+    m2 = _candidate(legacy)
+    assert m2.advance("LCX", T0 + 2 * STEP, _full(pnl_bootstrap=None, capacity_usd=1.0)) is None
+    assert m2.evaluations[-1].failed_gates == ["capacity"]
+
+
+def test_pnl_bootstrap_evidence_is_strict():
+    block = golden_bootstrap()
+    assert PnlBootstrapEvidence.from_dict(block.to_dict()) == block
+    assert list(block.to_dict()) == [
+        "ci_low",
+        "ci_high",
+        "level",
+        "n_resamples",
+        "seed",
+        "mean_block",
+        "n_bars",
+        "n_trades",
+    ]
+    good = block.to_dict()
+    for change, message in [
+        ({"ci_low": None}, "both numbers or both null"),
+        ({"ci_high": 1.0}, "ci_high < ci_low"),
+        ({"level": 1.0}, r"\(0, 1\)"),
+        ({"n_resamples": 0}, "< 1"),
+        ({"seed": -1}, "< 0"),
+        ({"mean_block": 0.5}, ">= 1"),
+        ({"n_trades": 1.5}, "expected an integer"),
+        ({"ci_low": float("inf")}, "non-finite"),
+    ]:
+        with pytest.raises(ValueError, match=message):
+            PnlBootstrapEvidence.from_dict({**good, **change})
+    with pytest.raises(ValueError, match="missing keys"):
+        PnlBootstrapEvidence.from_dict({k: v for k, v in good.items() if k != "seed"})
+    with pytest.raises(ValueError, match="PnlBootstrapEvidence or None"):
+        _ev(pnl_bootstrap=good)
+
+
+def test_bootstrap_builds_both_blocks_from_the_artefacts(bootstrap, config):
+    """On the committed artefacts: every alpha's evidence carries the
+    report's interval and trade count, nobody is at or beyond VALIDATING so
+    the correlation gate passes vacuously for all 24, and the bootstrap gate
+    fails for all 24 — 17 for making no trade, 7 on a negative lower bound."""
+    correlations = load_signal_correlations(ROOT)
+    assert correlations is not None and sorted(correlations) == sorted(ALPHA_IDS)
+    no_trade, negative = [], []
+    for row in bootstrap.rows:
+        rep = load_report(ROOT, row.alpha_id)
+        block = pnl_bootstrap_from_report(rep)
+        assert block is not None and block.level == config.gates.net_pnl_ci_level
+        assert (block.n_resamples, block.seed) == (1000, 20260829)
+        assert block.n_trades == sum(f["trade_count_1x"] for f in rep["fold_diagnostics"])
+        gates = bootstrap.registry.get(row.alpha_id).last_evaluation.gates
+        corr = gates["cross_alpha_correlation"]
+        assert (corr.passed, corr.value, corr.threshold) == (True, 0.0, 0.7), row.alpha_id
+        boot = gates[BOOTSTRAP_GATE]
+        assert not boot.passed and boot.threshold == 0.0
+        if block.n_trades == 0:
+            assert boot.value is None
+            no_trade.append(row.alpha_id)
+        else:
+            assert boot.value == block.ci_low < 0.0
+            negative.append(row.alpha_id)
+    assert (len(no_trade), len(negative)) == (17, 7)
+    assert negative == ["EQ06", "EQ11", "FX05", "FX08", "FX09", "FX10", "FX11"]
+    # no verdict or state moved because of the two gates: every alpha
+    # already failed net_pnl_after_costs
+    for row in bootstrap.rows:
+        assert row.state is S.CANDIDATE and "net_pnl_after_costs" in row.failed_gates
+
+
+def test_cross_alpha_evidence_follows_registration_order(config):
+    """Peers are the alphas registered before, in their current state; an
+    unmeasured pair leaves the block out (fail closed) — except for the
+    first alpha, whose empty block is a fact."""
+    registry = AlphaRegistry(config.policy)
+    assert cross_alpha_evidence("A1", registry, None) == NO_PEERS
+    registry.add(AlphaRecord.new("A1", T0))
+    registry.add(AlphaRecord.new("A0", T0))
+    corr = {"A2": {"A0": -0.25, "A1": 0.5}}
+    block = cross_alpha_evidence("A2", registry, corr)
+    assert [(p.alpha_id, p.state, p.correlation) for p in block.peers] == [
+        ("A0", S.RESEARCH, -0.25),
+        ("A1", S.RESEARCH, 0.5),
+    ]
+    assert cross_alpha_evidence("A2", registry, None) is None
+    assert cross_alpha_evidence("A2", registry, {"A2": {"A0": 0.1}}) is None
+    # the alpha itself is never its own peer
+    assert [
+        p.alpha_id for p in cross_alpha_evidence("A1", registry, {"A1": {"A0": 0.3}}).peers
+    ] == ["A0"]

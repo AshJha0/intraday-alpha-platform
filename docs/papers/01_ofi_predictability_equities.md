@@ -464,8 +464,8 @@ index ETF.
 
 **Multiple testing (§3.3).** `research/experiments.json` is now scoped by
 dataset: the 1068 looks of the v1.3.0 dataset are kept and the regenerated
-pipelines added 852, for 1920 looks over 139 entries at v1.4.0 (4396 over
-208 since v1.5.0; see the 2026-10-04 update). At that count the expected
+pipelines added 852, for 1920 looks over 139 entries at v1.4.0 (5156 over
+216 since v1.5.0; see the 2026-10-04 update). At that count the expected
 max |t| under the global null was 3.888 and the Bonferroni per-test
 threshold 4.206
 (REPORT.md was rendered mid-regeneration at 1740 looks and prints 3.86 /
@@ -616,13 +616,13 @@ they do not trade. The participation line the body quoted is unchanged and
 is still reported (`capacity_proxy_usd_by_instrument`: $34.3-46.6M per
 single stock, $1.31B for the index ETF).
 
-**Multiple testing (§3.3).** `research/experiments.json` holds 4396 looks
-over 208 entries: the 1068 looks of the v1.3.0 dataset, the 852 recorded on
-the v1.4.0 dataset under the legacy methods, and 2,476 recorded under the
-default methods (a validation with its backtest debits 84 per alpha under
+**Multiple testing (§3.3).** `research/experiments.json` holds 5156 looks
+over 216 entries: the 1068 looks of the v1.3.0 dataset, the 852 recorded on
+the v1.4.0 dataset under the legacy methods, and 3,236 recorded under the
+default methods, 760 of them by the signal-combination report (a validation with its backtest debits 84 per alpha under
 the defaults and 28 under the legacy methods).
-Expected max |t| under the global null is 4.096 and the Bonferroni per-test
-threshold 4.389. The alpha report was judged at the count recorded when it
+Expected max |t| under the global null is 4.135 and the Bonferroni per-test
+threshold 4.424. The alpha report was judged at the count recorded when it
 ran, 3,936: threshold 4.365, selection yardstick 4.07. EQ02, EQ03 and EQ12
 clear all four numbers. On equities they are the only alphas with a
 positive gate t that clears the threshold; EQ06 is at 4.36, above the

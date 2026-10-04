@@ -105,6 +105,7 @@ std::uint64_t ExecutionSimulator::submit(const ChildOrder& child) {
                    v.latency_mean_ns + jitter;
     o.state = OrderState::PENDING;
     o.remaining = o.qty;
+    o.entry_ahead_qty = 0;
     o.cancel_reason = CancelReason::NONE;
     o.cancel_arrival_ts = 0;
     const std::uint64_t id = o.order_id;
@@ -308,6 +309,7 @@ void ExecutionSimulator::activate(ChildOrder& o) {
                     o.ahead_qty += ahead.remaining;
                 }
             }
+            o.entry_ahead_qty = o.ahead_qty;
             // Crossing exemption: the display may still show the liquidity
             // our aggressive leg just consumed (pinned rule 4). While the
             // venue is gated (rule 8) nothing was consumed: no exemption.

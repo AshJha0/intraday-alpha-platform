@@ -145,6 +145,49 @@ spec:
             readOnlyRootFilesystem: true   # writes only to /tmp (emptyDir) and /data (PVC)
             capabilities:
               drop: ["ALL"]
+        # Last persisted session state (PLATFORM_CONVENTIONS.md §12.3). The
+        # trading JVM exits right after a clean stop, so its own
+        # platform_session_state=4 is almost never scraped; the trading thread
+        # writes session_exit.json and this sidecar, which outlives it, serves
+        # it as platform_persisted_session_state on :9102 (Service
+        # java-platform-state; alerts.yml SessionStoppedNotResumed). It reads
+        # the state READ-ONLY and is not part of trading: the pod's /ready
+        # (and so the java-platform Service) is still driven by the trading
+        # container alone, which stays not-Ready while stopped.
+        - name: session-state
+          image: ghcr.io/ashjha0/intraday-alpha-platform-java:v1.5.0
+          imagePullPolicy: IfNotPresent
+          command: ["java", "-Xmx64m", "-XX:-UsePerfData", "-cp", "/app/classes", "com.iap.platform.SessionStateExporter", "--state-dir", "/data/state", "--port", "9102"]
+          ports:
+            - name: state
+              containerPort: 9102
+              protocol: TCP
+          env:
+            - name: IAP_BIND_ADDR
+              value: 0.0.0.0
+          volumeMounts:
+            - name: data
+              mountPath: /data
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          livenessProbe:
+            httpGet: { path: /health, port: state }
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
       volumes:
         - name: configs
           configMap:
@@ -207,6 +250,32 @@ spec:
     - name: metrics
       port: 8080
       targetPort: metrics
+      protocol: TCP
+---
+---
+# The session-state sidecar's own Service. publishNotReadyAddresses is the
+# point: java-platform is NOT Ready while a session is stopped or finished
+# (/ready is 503), so the java-platform Service has no endpoints then — but
+# "stopped and not resumed" must stay scrapeable. Only the read-only exporter
+# port is published this way; the trading and admin port is not.
+apiVersion: v1
+kind: Service
+metadata:
+  name: java-platform-state
+  namespace: intraday-alpha
+  labels:
+    app.kubernetes.io/part-of: intraday-alpha-platform
+    app.kubernetes.io/name: java-platform
+    app.kubernetes.io/component: strategy-platform
+spec:
+  type: ClusterIP
+  publishNotReadyAddresses: true
+  selector:
+    app.kubernetes.io/name: java-platform
+  ports:
+    - name: state
+      port: 9102
+      targetPort: state
       protocol: TCP
 ---
 # NOTE: no PodDisruptionBudget. This is a single-replica singleton; a PDB with

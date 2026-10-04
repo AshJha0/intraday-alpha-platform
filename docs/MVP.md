@@ -107,6 +107,25 @@ order (the Java `BacktestEngine.onEvent` + `PaperTrading.RiskWiring` chain):
 `session.run_session` wraps this: feed → engine → sinks → store (with the
 MVP reference data imported) → report → paper evidence.
 
+**Child execution policy (optional, v1.5.0).** `mvp.json` accepts
+`execution.child_policy` (`"native"` | `"aggressive"` | `"passive"`) and
+`execution.passive` (`max_rest_ns`, `max_reprices`, `max_behind_fraction`,
+`improve_min_spread_ticks`, `end_margin_ns`). The committed document carries
+neither, which means NATIVE — the run this page and the golden describe.
+With `"passive"`, step 8 posts each child at the PASSIVE policy's price
+(API_TRADING.md §2.5) and `MvpEngine._work_passive` runs the same POST →
+REST → REPRICE / CROSS machine as `ExecutionReplay`, before the scheduler
+issues new children. A replacement child (the re-post or the cross of a
+cancelled remainder) goes through routing, the latency-budget and
+participation controls and the risk check like any other child; it is
+exempt from the slice-interval control, because it re-sends quantity that
+control already admitted, and it does not move the slice clock. The
+override changes the document, so `run_id`, `config_version` and the trace
+digest are those of a different run
+(`MvpConfig.with_overrides(child_policy=..., passive=...)`;
+`research/execution/EXECUTION_REPORT.md` §5 has the three sessions side by
+side).
+
 ## 4. Wiring rules honoured (PLATFORM_CONVENTIONS.md §11.4, §12.1)
 
 Reviewed line by line against `PaperTrading.RiskWiring.onMarket` /
@@ -235,8 +254,8 @@ possible.
 
 Run id `58a10f2194a3c81c`, 15,805 events, 800 decisions, 235 parent orders,
 507 children generated / 348 submitted, 169 fills, fill rate 15.1 %.
-Trace digest `e534ac1f06c505370daf6fa3dae4c3927cb08d2dbec75b1a506118da85598a99`
-(`config_version` `bf8cc608…`).
+Trace digest `20d4ff76af0b631c53c488a1cc504c1bbf8d8488dd5c210a947f96d63e734a45`
+(`config_version` `439bbad5…`).
 Wall time: about 2.2× the v1.3.0 session on the same machine (27 s → 59 s on
 the laptop this was measured on; 0.8 s of that is feed generation and
 normalisation) — there are 800 decisions to make instead of 355.
@@ -250,8 +269,8 @@ fill or cent. What v1.5.0 changed is the identity of the run:
 all of which changed (the cost model now names its `impact_model`; the
 header of `alpha_params.json` names the regeneration commit; the registry is
 x-version 2), so it went from
-`f293e7e7…` to `bf8cc608…`, and the trace digest, which covers
-`config_version`, from `f51890da…` to `e534ac1f…`. The research IC the
+`f293e7e7…` to `439bbad5…`, and the trace digest, which covers
+`config_version`, from `f51890da…` to `20d4ff76…`. The research IC the
 realized IC is compared with (§7.1, last two columns) is now the gate IC of
 the v2 report. The run id is the
 one of v1.3.0 because `mvp.json` and the seed did not change; the stream did:

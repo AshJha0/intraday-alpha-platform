@@ -16,10 +16,10 @@ planned paths of the current release, **backlog** says what would prove it done.
 | | count | estimate (days) |
 |---|---:|---:|
 | epics | 31 | |
-| issues | 155 | 511 |
-| issues `done` | 98 | 232.5 |
+| issues | 163 | 547 |
+| issues `done` | 109 | 280.5 |
 | issues `in-progress` | 0 | 0 |
-| issues `backlog` | 57 | 278.5 |
+| issues `backlog` | 54 | 266.5 |
 
 ### By milestone
 
@@ -30,11 +30,11 @@ planned paths of the current release, **backlog** says what would prove it done.
 | Week 2 | 2 | 10 | 10 | 0 | 0 |
 | Week 3 | 2 | 14 | 14 | 0 | 0 |
 | Week 4 | 2 | 10 | 10 | 0 | 0 |
-| Week 5 | 2 | 10 | 10 | 0 | 0 |
-| Week 6 | 7 | 24 | 24 | 0 | 0 |
-| Phase 2 | 3 | 9 | 7 | 0 | 2 |
-| Phase 3 | 2 | 9 | 1 | 0 | 8 |
-| Backlog | 7 | 48 | 1 | 0 | 47 |
+| Week 5 | 2 | 11 | 11 | 0 | 0 |
+| Week 6 | 7 | 25 | 25 | 0 | 0 |
+| Phase 2 | 3 | 12 | 11 | 0 | 1 |
+| Phase 3 | 2 | 15 | 6 | 0 | 9 |
+| Backlog | 7 | 45 | 1 | 0 | 44 |
 
 Issues are listed under their epic; an issue's own milestone can differ from
 the epic's (a backlog item under a finished epic sits in **Backlog**).
@@ -51,9 +51,9 @@ the epic's (a backlog item under a finished epic sits in **Backlog**).
 - [E08 — Research framework — validation, ledger, ExperimentRunner](#e08--research-framework--validation-ledger-experimentrunner) · Week 3 · partial · 9 issues
 - [E09 — Portfolio construction](#e09--portfolio-construction) · Week 4 · done · 4 issues
 - [E10 — Hard risk engine (fail-closed)](#e10--hard-risk-engine-fail-closed) · Week 4 · done · 6 issues
-- [E11 — Execution algorithms, SOR and execution simulator](#e11--execution-algorithms-sor-and-execution-simulator) · Week 5 · partial · 9 issues
+- [E11 — Execution algorithms, SOR and execution simulator](#e11--execution-algorithms-sor-and-execution-simulator) · Week 5 · partial · 10 issues
 - [E12 — Performance architecture](#e12--performance-architecture) · Week 5 · partial · 4 issues
-- [E13 — Transaction-cost analysis](#e13--transaction-cost-analysis) · Week 6 · partial · 5 issues
+- [E13 — Transaction-cost analysis](#e13--transaction-cost-analysis) · Week 6 · partial · 6 issues
 - [E14 — Cross-language parity (golden tests Python == C++ == Rust == Java)](#e14--cross-language-parity-golden-tests-python--c--rust--java) · Week 6 · done · 4 issues
 - [E15 — Alpha promotion lifecycle](#e15--alpha-promotion-lifecycle) · Week 6 · partial · 5 issues
 - [E16 — Observability and the decision trace](#e16--observability-and-the-decision-trace) · Week 6 · partial · 6 issues
@@ -65,13 +65,13 @@ the epic's (a backlog item under a finished epic sits in **Backlog**).
 - [E22 — Research platform — alpha factory](#e22--research-platform--alpha-factory) · Phase 2 · partial · 4 issues
 - [E23 — Production engineering (documented out of scope)](#e23--production-engineering-documented-out-of-scope) · Phase 3 · partial · 5 issues
 - [E24 — Agentic AI / MCP research layer (read-only)](#e24--agentic-ai--mcp-research-layer-read-only) · Backlog · partial · 2 issues
-- [E25 — Real historical exchange data (ITCH/PITCH, FX ECN) with a point-in-time master](#e25--real-historical-exchange-data-itchpitch-fx-ecn-with-a-point-in-time-master) · Phase 3 · backlog · 4 issues
+- [E25 — Real historical exchange data (ITCH/PITCH, FX ECN) with a point-in-time master](#e25--real-historical-exchange-data-itchpitch-fx-ecn-with-a-point-in-time-master) · Phase 3 · partial · 10 issues
 - [E26 — Latency engineering — measured, gated, allocation-free hot path](#e26--latency-engineering--measured-gated-allocation-free-hot-path) · Backlog · backlog · 4 issues
 - [E27 — Simulator calibration to live fills, multi-horizon markouts, venue/algo TCA](#e27--simulator-calibration-to-live-fills-multi-horizon-markouts-venuealgo-tca) · Backlog · backlog · 4 issues
 - [E28 — Book-level risk — factors, stress scenarios, regulatory pre-trade controls, drop-copy reconciliation](#e28--book-level-risk--factors-stress-scenarios-regulatory-pre-trade-controls-drop-copy-reconciliation) · Backlog · backlog · 4 issues
 - [E29 — Research throughput — feature store, distributed runs, marginal-contribution allocation](#e29--research-throughput--feature-store-distributed-runs-marginal-contribution-allocation) · Backlog · backlog · 3 issues
 - [E30 — Agent layer — write broker, blackboard, pre-registration, hidden-seed reserve, human approvals, evals](#e30--agent-layer--write-broker-blackboard-pre-registration-hidden-seed-reserve-human-approvals-evals) · Backlog · backlog · 7 issues
-- [E31 — Differential fuzzing, property tests, crash injection and risk golden coverage](#e31--differential-fuzzing-property-tests-crash-injection-and-risk-golden-coverage) · Backlog · backlog · 5 issues
+- [E31 — Differential fuzzing, property tests, crash injection and risk golden coverage](#e31--differential-fuzzing-property-tests-crash-injection-and-risk-golden-coverage) · Backlog · partial · 5 issues
 
 ## Phase 0
 
@@ -291,7 +291,7 @@ Honest research machinery: walk-forward with purging and embargo, automatic leak
 | V04 | Multiple-testing ledger with Bonferroni threshold and expected max \|t\| under the null, plus experiment tracker manifests | done | 2 | Week 3 | `python/src/iap/validation/ledger.py; research/experiments.json`<br>`python/src/iap/experiment/tracker.py; research/models/ledger.json; python/tests/test_experiment_tracker.py` |
 | V05 | Promotion gates PROMOTE / ITERATE / REJECT with the hypothesis-sign rule and cost survival | done | 1 | Week 3 | `python/src/iap/validation/validate.py; research/alpha_reports/REPORT.md (Pinned promotion gates); docs/governance/GOVERNANCE.md §2` |
 | V06 | Cost, latency and regime stress tests | done | 1 | Week 3 | `python/src/iap/validation/stress.py; research/alpha_reports/*.json (stress)` |
-| V07 | Research backtester with the pinned cost model and ensemble scoring | done | 3 | Week 3 | `python/src/iap/backtest/{engine,costs}.py; python/tests/test_backtester.py; tests/golden/expected_backtest.json`<br>`java/src/main/java/com/iap/backtest/{BacktestEngine,ResearchBacktester,CostModel}.java; java BacktestTest` |
+| V07 | Research backtester with the pinned cost model and ensemble scoring | done | 3 | Week 3 | `python/src/iap/backtest/{engine,costs}.py; python/tests/test_backtester.py; tests/golden/expected_backtest.json`<br>`java/src/main/java/com/iap/backtest/{BacktestEngine,ResearchBacktester,CostModel}.java; java BacktestTest, BacktestGoldenTest (legacy and v1.5.0 default rules)` |
 | V08 | ExperimentRunner: spec -> deterministic id -> result document -> ledger entry | done | 3 | Week 3 | `python/src/iap/research/{specs,runner,registry,golden,__main__}.py (ExperimentRunner satisfies iap.contracts.protocols.ExperimentRunner)`<br>`research/experiments/README.md; research/experiments/{217fa0cb1d89a9c8,4a2900e4a6705542,c73bb6294d226163,d0dd1ab0711d33a1,d7b554d0a3fa3b26}/{spec,result}.json`<br>`python/tests/test_research_runner.py; python/tests/test_research_golden.py; tests/golden/expected_experiment_golden_frame.json (python/tools/make_golden_research.py)` |
 | V09 | Full deflated Sharpe ratio (skew/kurtosis) and Harvey-Liu-Zhu adjusted p-values | backlog | 2 | Backlog | `python/src/iap/validation/ledger.py; README.md References [10], [13]` |
 
@@ -352,7 +352,7 @@ Execution algorithms (TWAP/VWAP/POV/IS), smart order routing with venue scoring,
 
 ### E11 — Execution algorithms, SOR and execution simulator
 
-**Status:** partial · **Milestone:** Week 5 · **Issues:** 9 (done 7, in-progress 0, backlog 2) · **Estimate:** 28 days · **Labels:** `type:epic`, `area:execution`, `phase:w5`, `priority:p0`, `status:partial`
+**Status:** partial · **Milestone:** Week 5 · **Issues:** 10 (done 8, in-progress 0, backlog 2) · **Estimate:** 32 days · **Labels:** `type:epic`, `area:execution`, `phase:w5`, `priority:p0`, `status:partial`
 
 Parent-order algorithms (TWAP/VWAP/POV/IS) sliced into children with time-in-force, a deterministic smart order router with a pinned venue scoring ladder, and an event-driven execution simulator with seeded latency, queue position, partial fills, cancels and a venue trading-state gate — C++ is the reference, Java the port, Python the port in progress.
 
@@ -375,6 +375,7 @@ Parent-order algorithms (TWAP/VWAP/POV/IS) sliced into children with time-in-for
 | X05 | Java execution simulator and SOR port with the C++-generated fills golden, plus enforced execution controls | done | 4 | Week 5 | `java/src/main/java/com/iap/execution/ExecutionSimulator.java; java ReplayFillsGoldenTest; tests/golden/expected_replay_fills.json`<br>`java/src/main/java/com/iap/platform/PaperTrading.java (controls); java PaperTradingSmokeTest; PLATFORM_CONVENTIONS.md §11.4` |
 | X06 | Rust venue layer: IAPV1 order/report framing and the simulated venue endpoint | done | 2 | Week 5 | `rust/venue/src/{codec,messages,sim}.rs; rust/venue/tests/{codec_roundtrip,sim_venue,scenario_venue_gating}.rs` |
 | X07 | Python execution port (iap.execution): simulator, algos and SOR against the same goldens | done | 5 | Week 5 | `python/src/iap/execution/{types,config,simulator,algos,sor,replay}.py`<br>`python/tests/test_execution_golden.py (expected_replay_fills.json bit-identical); python/tests/test_execution_rules.py; python/tests/test_exec_algos.py; python/tests/test_sor.py`<br>`API_TRADING.md` |
+| X10 | Execution policies: NATIVE / AGGRESSIVE / PASSIVE (post, rest, reprice, cross) in C++, Java and Python | done | 4 | Week 5 | `cpp/include/iap/execution/algos.hpp; cpp/src/replay/exec_replay.cpp; cpp/tests/test_replay_fills_passive.cpp`<br>`java/src/main/java/com/iap/execution/PassivePolicy.java; java/src/test/java/com/iap/ReplayFillsPassiveGoldenTest.java; java/src/test/java/com/iap/PassivePolicyTest.java`<br>`python/src/iap/execution/passive.py; python/tests/test_passive_policy.py; tests/golden/expected_replay_fills_passive.json`<br>`research/execution/run_execution_study.py; research/execution/EXECUTION_REPORT.md` |
 | X08 | PEG and MID order types in the execution simulator | backlog | 3 | Backlog | `schemas/order/order_request.schema.json (order_type enum); cpp/include/iap/execution/execution.hpp (rule 9 note)` |
 | X09 | Closed-form Almgren-Chriss IS trajectory as an alternative to the front-loaded exponential | backlog | 2 | Backlog | `cpp/include/iap/execution/algos.hpp; README.md References [6]` |
 
@@ -406,7 +407,7 @@ TCA, cross-language parity, the alpha promotion lifecycle, decision trace, the S
 
 ### E13 — Transaction-cost analysis
 
-**Status:** partial · **Milestone:** Week 6 · **Issues:** 5 (done 4, in-progress 0, backlog 1) · **Estimate:** 9 days · **Labels:** `type:epic`, `area:tca`, `phase:w6`, `priority:p1`, `status:partial`
+**Status:** partial · **Milestone:** Week 6 · **Issues:** 6 (done 5, in-progress 0, backlog 1) · **Estimate:** 12 days · **Labels:** `type:epic`, `area:tca`, `phase:w6`, `priority:p1`, `status:partial`
 
 Parent-order TCA against arrival, interval VWAP and TWAP; Perold implementation shortfall decomposed exactly into delay, trading and opportunity; spread, impact, fees, fill rate and adverse-selection markouts; a Java service matched at 1e-9 and a deterministic report.
 
@@ -426,6 +427,7 @@ Parent-order TCA against arrival, interval VWAP and TWAP; Perold implementation 
 | T02 | Spread and impact cost, fees, fill rate, adverse-selection markouts and impact regression | done | 2 | Week 6 | `python/src/iap/tca/tca.py (spread_and_impact_cost, adverse_selection_with_counts, impact_regression); API_PORTFOLIO_TCA.md §2.4-2.5` |
 | T03 | Java TcaService port with expected_tca.json golden (incl. timeline cases) | done | 2 | Week 6 | `java/src/main/java/com/iap/tca/{Tca,TcaService,TcaParentOrder,TcaFill,MarketTimeline}.java; java TcaGoldenTest, TcaMetricsTest`<br>`tests/golden/expected_tca.json; python/tools/make_golden_tca.py; python/tests/test_tca_golden.py` |
 | T04 | Simulated parent-order TCA report (research/tca/TCA_REPORT.md) | done | 1 | Week 6 | `python/src/iap/tca/{simulator,report,__main__}.py; research/tca/TCA_REPORT.md; research/tca/tca_orders.json` |
+| T06 | Markout analysis: multi-horizon markouts, realised vs effective spread, adverse selection, passive fill rates | done | 3 | Week 6 | `python/src/iap/tca/markout.py; python/tests/test_markout.py; python/tools/make_golden_markout.py`<br>`java/src/main/java/com/iap/tca/Markout.java; java/src/test/java/com/iap/MarkoutGoldenTest.java`<br>`tests/golden/expected_markout.json; API_PORTFOLIO_TCA.md section 2.9` |
 | T05 | Venue and algorithm contribution attribution in TCA | backlog | 2 | Backlog | `research/tca/TCA_REPORT.md (no venue/algo tables today); python/src/iap/tca/report.py` |
 
 ### E14 — Cross-language parity (golden tests Python == C++ == Rust == Java)
@@ -517,7 +519,7 @@ The platform's persistent records — experiments, lifecycle transitions, orders
 | key | title | status | est. (d) | milestone | evidence |
 |---|---|---|---:|---|---|
 | D01 | File tiers: immutable raw JSONL -> normalized JSONL/IAP1/Parquet -> feature Parquet -> research JSON | done | 1 | Week 6 | `python/src/iap/marketdata/normalize.py; python/src/iap/features/__main__.py; python/src/iap/models/dataset.py; docs/ARCHITECTURE.md §3` |
-| D02 | SQLite/Postgres-portable DDL and the iap.store module (experiments, lifecycle, orders, executions, TCA, traces) | done | 3 | Week 6 | `schemas/sql/iap_v1.sql (24 tables, 3 views, x-version 1); python/src/iap/store/{ddl,db,importers,__main__}.py`<br>`python/tests/test_store.py (round trips per table, DDL portability whitelist); docs/DATA_MODEL.md`<br>`python/src/iap/mvp/session.py (StoreTraceSink writes every MVP trace + reference data into <run>/iap.sqlite)` |
+| D02 | SQLite/Postgres-portable DDL and the iap.store module (experiments, lifecycle, orders, executions, TCA, traces) | done | 3 | Week 6 | `schemas/sql/iap_v2.sql (26 tables, 6 views, x-version 2: dataset- and method-bundle-scoped scorecard, v1.5.0); python/src/iap/store/{ddl,db,importers,__main__}.py`<br>`python/tests/test_store.py (round trips per table, DDL portability whitelist); docs/DATA_MODEL.md`<br>`python/src/iap/mvp/session.py (StoreTraceSink writes every MVP trace + reference data into <run>/iap.sqlite)` |
 | D03 | Postgres backend and schema-migration tooling for the store | backlog | 3 | Backlog | `schemas/sql/ (planned by D02)` |
 
 ### E18 — End-to-end MVP loop
@@ -613,7 +615,7 @@ Treat decay as first-class: PSI/KS feature drift, rolling realized-vs- research 
 
 ### E22 — Research platform — alpha factory
 
-**Status:** partial · **Milestone:** Phase 2 · **Issues:** 4 (done 1, in-progress 0, backlog 3) · **Estimate:** 10 days · **Labels:** `type:epic`, `area:research`, `phase:phase2`, `priority:p2`, `lang:python`, `status:partial`
+**Status:** partial · **Milestone:** Phase 2 · **Issues:** 4 (done 2, in-progress 0, backlog 2) · **Estimate:** 10 days · **Labels:** `type:epic`, `area:research`, `phase:phase2`, `priority:p2`, `lang:python`, `status:partial`
 
 Turn the research framework into a factory: spec-driven batches through the ExperimentRunner, automatic ledger entries, cross-alpha correlation and incremental-contribution gates, and scheduled regeneration of every report so published numbers never go stale silently.
 
@@ -630,7 +632,7 @@ Turn the research framework into a factory: spec-driven batches through the Expe
 |---|---|---|---:|---|---|
 | AF01 | Six flagship research papers with dated errata | done | 3 | Phase 2 | `docs/papers/INDEX.md; docs/papers/01_ofi_predictability_equities.md .. docs/papers/06_cpp_vs_rust_vs_java_event_driven.md` |
 | AF02 | Alpha factory: spec-driven batches through the ExperimentRunner with automatic ledger entries | backlog | 4 | Phase 2 | `python/src/iap/research (V08); research/experiments/README.md` |
-| AF03 | Gate 8: cross-alpha correlation and incremental contribution | backlog | 2 | Phase 2 | `docs/governance/GOVERNANCE.md §2 (gate 8); python/src/iap/validation/metrics.py` |
+| AF03 | Gate 8: cross-alpha correlation and incremental contribution | done | 2 | Phase 2 | `python/src/iap/lifecycle/gates.py; python/src/iap/lifecycle/evidence.py; python/tests/test_lifecycle.py`<br>`python/src/iap/combine; python/tests/test_combine.py; research/combination/REPORT.md; research/combination/signal_correlation.json`<br>`java/src/main/java/com/iap/lifecycle/Gates.java; rust/lifecycle/src/gates.rs; tests/golden/expected_lifecycle.json`<br>`docs/LIFECYCLE.md section 3; PLATFORM_CONVENTIONS.md section 13.4 and 13.8` |
 | AF04 | Scheduled report regeneration in CI with a stale-number diff | backlog | 1 | Backlog | `.github/workflows/ci.yml; tests/harness/check_headline_numbers.py (exit 2 semantics)` |
 
 ## Phase 3
@@ -662,7 +664,7 @@ Name what a live deployment would need beyond this repository — real feed hand
 
 ### E25 — Real historical exchange data (ITCH/PITCH, FX ECN) with a point-in-time master
 
-**Status:** backlog · **Milestone:** Phase 3 · **Issues:** 4 (done 0, in-progress 0, backlog 4) · **Estimate:** 27 days · **Labels:** `type:epic`, `area:marketdata`, `phase:phase3`, `priority:p2`, `status:backlog`
+**Status:** partial · **Milestone:** Phase 3 · **Issues:** 10 (done 5, in-progress 0, backlog 5) · **Estimate:** 56 days · **Labels:** `type:epic`, `area:marketdata`, `phase:phase3`, `priority:p2`, `status:partial`
 
 Replace the seeded synthetic generator as the only data source with decoders for real historical feeds (equity ITCH/PITCH-style order-by-order feeds and FX ECN streams) that emit the same canonical MarketEvents, and back them with a point-in-time security master and corporate-action history so a study run today sees exactly the universe, symbology and prices that were knowable on each historical date.
 
@@ -677,10 +679,16 @@ Replace the seeded synthetic generator as the only data source with decoders for
 
 | key | title | status | est. (d) | milestone | evidence |
 |---|---|---|---:|---|---|
-| XD01 | ITCH/PITCH order-by-order decoder into canonical MarketEvents | backlog | 8 | Phase 3 | `python/src/iap/marketdata/ (decoder proposed); rust/marketdata/ (decoder proposed); schemas/FORMAT.md` |
+| XD01 | Nasdaq TotalView-ITCH 5.0 reader and mapping into canonical MarketEvents (Python) | done | 8 | Phase 3 | `python/src/iap/marketdata/itch50.py; python/src/iap/marketdata/feederrors.py`<br>`python/tests/test_itch50_reader.py; python/tests/test_itch50_mapping.py; python/tests/itch50_encoder.py`<br>`docs/REAL_DATA.md` |
 | XD02 | FX ECN feed normalisation (per-venue conventions, last-look, firm vs indicative) | backlog | 6 | Phase 3 | `python/src/iap/marketdata/ (proposed); configs/venues/venues.json` |
-| XD03 | Point-in-time security master with as-of queries | backlog | 7 | Phase 3 | `configs/instruments/instruments.json; schemas/sql/iap_v1.sql; python/src/iap/store/ (security master proposed)` |
-| XD04 | Corporate-action adjustment engine (splits, dividends, mergers) applied point-in-time | backlog | 6 | Phase 3 | `PLATFORM_CONVENTIONS.md section 1 (price_ticks); python/src/iap/marketdata/ (proposed)` |
+| XD03 | Point-in-time security master with as-of queries, built from the session's directory | done | 4 | Phase 3 | `python/src/iap/reference/secmaster.py; python/tests/test_reference_pit.py`<br>`python/tests/test_real_data_ingest.py; docs/REAL_DATA.md` |
+| XD04 | Corporate-action table (owner-supplied CSV) and point-in-time adjustment API | done | 4 | Phase 3 | `python/src/iap/reference/corpactions.py; python/tests/test_reference_pit.py`<br>`docs/REAL_DATA.md` |
+| XD05 | LOBSTER reader with level-by-level verification against the orderbook file | done | 4 | Phase 3 | `python/src/iap/marketdata/lobster.py; python/tests/test_lobster.py; python/tests/lobster_fixture.py`<br>`docs/REAL_DATA.md` |
+| XD06 | Real-data ingest CLI, dataset manifest and the research hook (--dataset-dir) | done | 5 | Phase 3 | `python/src/iap/marketdata/ingest.py; python/src/iap/marketdata/__main__.py; python/src/iap/research/__main__.py`<br>`python/tests/test_real_data_ingest.py; docs/REAL_DATA.md; COOKBOOK.md` |
+| XD07 | CBOE PITCH decoder and Rust port of the ITCH 5.0 decoder | backlog | 8 | Phase 3 | `python/src/iap/marketdata/itch50.py; rust/marketdata/ (decoder proposed)` |
+| XD08 | Route every study reference read through the as-of security master (multi-day universes) | backlog | 6 | Phase 3 | `python/src/iap/reference/secmaster.py; python/src/iap/features/context.py; configs/instruments/instruments.json` |
+| XD09 | Multi-day corporate-action-adjusted panels in the feature and label pipeline | backlog | 6 | Phase 3 | `python/src/iap/reference/corpactions.py; python/src/iap/features/ (application proposed)` |
+| XD10 | Verify the decoders against vendor sample files and record a first real-data study | backlog | 5 | Phase 3 | `python/tests/test_real_data_ingest.py; docs/REAL_DATA.md; research/ (report proposed)` |
 
 ## Backlog
 
@@ -820,7 +828,7 @@ Specify and build the controls that let several research agents work against the
 
 ### E31 — Differential fuzzing, property tests, crash injection and risk golden coverage
 
-**Status:** backlog · **Milestone:** Backlog · **Issues:** 5 (done 0, in-progress 0, backlog 5) · **Estimate:** 23 days · **Labels:** `type:epic`, `area:testing`, `phase:phase2`, `priority:p1`, `status:backlog`
+**Status:** partial · **Milestone:** Backlog · **Issues:** 5 (done 3, in-progress 0, backlog 2) · **Estimate:** 23 days · **Labels:** `type:epic`, `area:testing`, `phase:phase2`, `priority:p1`, `status:partial`
 
 Find the defects the hand-written goldens cannot: fuzz the three risk engines against each other, state invariants of the execution simulator as properties, fuzz snapshot and restore, inject crashes into the Java paper-trading loop, and close the gaps in risk golden coverage for the branches that matter most when something has already gone wrong.
 
@@ -835,11 +843,11 @@ Find the defects the hand-written goldens cannot: fuzz the three risk engines ag
 
 | key | title | status | est. (d) | milestone | evidence |
 |---|---|---|---:|---|---|
-| FZ01 | Differential fuzzing of the Rust, Java and Python risk engines | backlog | 6 | Backlog | `rust/risk/; java/src/main/java/com/iap/risk/; python/src/iap/risk/; tests/golden/expected_risk_decisions.json` |
+| FZ01 | Differential fuzzing of the Rust, Java and Python risk engines | done | 6 | Phase 2 | `python/tools/risk_fuzz.py; python/tools/make_risk_fuzz_corpus.py; python/tools/risk_fuzz_nightly.py`<br>`tests/golden/risk_fuzz/ (COVERAGE.txt); .github/workflows/risk-fuzz.yml`<br>`rust/risk/tests/golden_risk_fuzz.rs; java/src/test/java/com/iap/RiskFuzzGoldenTest.java; python/tests/test_risk_fuzz_golden.py`<br>`python/tests/test_risk_fuzz_properties.py; python/tests/test_risk_fuzz_nightly.py; PLATFORM_CONVENTIONS.md section 11.1` |
 | FZ02 | Property-based tests of execution simulator invariants | backlog | 4 | Backlog | `python/src/iap/execution/; cpp/src/execution/; tests/` |
-| FZ03 | Snapshot/restore fuzzing across the three risk engines | backlog | 4 | Backlog | `rust/risk/src/audit.rs; java/src/main/java/com/iap/risk/RiskAudit.java; tests/golden/expected_risk_snapshot.json` |
+| FZ03 | Snapshot/restore fuzzing across the three risk engines | done | 4 | Phase 2 | `rust/risk/tests/golden_risk_fuzz.rs; java/src/test/java/com/iap/RiskFuzzGoldenTest.java; python/tests/test_risk_fuzz_golden.py`<br>`python/tests/test_risk_fuzz_properties.py; tests/golden/risk_fuzz/` |
 | FZ04 | Crash injection on the Java paper-trading path | backlog | 5 | Backlog | `java/src/main/java/com/iap/platform/PaperTrading.java; docs/runbooks/RUNBOOK_paper_trading.md` |
-| FZ05 | Risk golden coverage for KILL_VENUE, bootstrap, restore and fail-closed branches | backlog | 4 | Backlog | `rust/risk/tests/golden_risk.rs; tests/golden/expected_risk_decisions.json; java/src/test/java/com/iap/RiskGoldenTest.java` |
+| FZ05 | Risk golden coverage for KILL_VENUE, bootstrap, restore and fail-closed branches | done | 4 | Phase 2 | `tests/golden/risk_fuzz/COVERAGE.txt; python/tools/risk_fuzz.py (BRANCHES, coverage_report)`<br>`python/tests/test_risk_fuzz_golden.py; tests/golden/expected_risk_edge_decisions.json`<br>`rust/risk/tests/golden_risk_fuzz.rs; java/src/test/java/com/iap/RiskFuzzGoldenTest.java` |
 
 ## Labels
 

@@ -1,0 +1,16 @@
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing currency.conversion object","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000000000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing currency.conversion object","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000033000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing currency.conversion object","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000051615000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing currency.conversion object","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000001093615000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing currency.conversion object","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000001093615000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing currency.conversion object","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000001093615000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing currency.conversion object","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000001121615000}
+{"decision":3,"reason":"venue 1 disconnected","rule_id":"VENUE_DISCONNECT","scope":"VENUE","scope_id":"1","severity":2,"timestamp":1700000001122430000}
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 1","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000001169430000}
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 1","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000001179430000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing currency.conversion object","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000001208430000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing currency.conversion object","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000001208430000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing currency.conversion object","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000001208430000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing currency.conversion object","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000001208430000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing currency.conversion object","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000001208430000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing currency.conversion object","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000001208430000}

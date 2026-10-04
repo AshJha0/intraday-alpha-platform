@@ -25,8 +25,12 @@ alpha_reports   research/alpha_reports/{<ID>.json,REPORT.md},
                 configs/strategies/alpha_params.json, research/experiments.json
 experiments     research/experiments/<id>/ (the five pinned runner
                 experiments), research/experiments.json
+combination     research/combination/{REPORT.md,COMBINATION.json,
+                signal_correlation.json,reports/*.json},
+                research/experiments.json
 lifecycle       research/alpha_registry.json,
-                research/lifecycle_transitions.jsonl
+                research/lifecycle_transitions.jsonl (reads the alpha
+                reports and research/combination/signal_correlation.json)
 ml              research/ml_reports/*, research/models/run_NNNN_*/,
                 research/models/ledger.json
 adaptive        research/adaptive_reports/*, research/baselines/run_*.json,
@@ -38,6 +42,10 @@ goldens         tests/golden/expected_*.json (every Python-owned generator;
                 alpha_params.json must come out byte-identical — that is
                 the proof they are independent)
 tca             research/tca/* (golden vectors only: must be unchanged)
+execution       research/execution/{EXECUTION_REPORT.md,execution_study.json}
+                (aggressive vs passive execution of the same parents on the
+                bundled equities + the MVP session per child policy; needs
+                only the `dataset` step)
 configmaps      deployment/k8s/configmap-*.yaml (alpha_params.json is a
                 projected config)
 ==============  ============================================================
@@ -59,6 +67,10 @@ Rules the script enforces rather than documents:
   bundle would be recorded as reruns and would append a second set of model
   runs. ``--allow-rerun`` overrides.
 * A step that fails stops the chain; nothing after it runs.
+* ``--only`` runs a subset in the chain's order — how a change that touches
+  only some artefacts regenerates them without re-running (and re-ledgering)
+  the report pipelines: the signal-combination change of v1.5.0 ran
+  ``--only combination,lifecycle,goldens`` (schemas/MIGRATIONS.md).
 * Wall-clock time of every step is printed and written to ``--timings-out``.
 
 The environment decides the last digits: the committed artefacts (v1.4.0,
@@ -102,6 +114,8 @@ GOLDEN_TOOLS = (
     "make_golden_alpha.py",
     "make_golden_adaptive.py",
     "make_golden_tca.py",
+    "make_golden_markout.py",
+    "make_golden_replay_passive.py",
     "make_golden_contracts.py",
     "make_golden_canonical_json.py",
     "make_golden_lifecycle.py",
@@ -126,6 +140,7 @@ def _steps() -> list[tuple[str, list[tuple[Path, list[str]]]]]:
                 for alpha, horizon in RUNNER_EXPERIMENTS
             ],
         ),
+        ("combination", [(py_dir, [PY, "-m", "iap.research", "combine"])]),
         ("lifecycle", [(py_dir, [PY, "-m", "iap.lifecycle", "bootstrap", "--force"])]),
         ("ml", [(REPO, [PY, "research/ml_reports/run_ml.py"])]),
         ("adaptive", [(REPO, [PY, "research/adaptive_reports/run_adaptive.py"])]),
@@ -152,6 +167,7 @@ def _steps() -> list[tuple[str, list[tuple[Path, list[str]]]]]:
         ),
         ("goldens", [(REPO, [PY, str(tools / name), "--force"]) for name in GOLDEN_TOOLS]),
         ("tca", [(py_dir, [PY, "-m", "iap.tca"])]),
+        ("execution", [(REPO, [PY, "research/execution/run_execution_study.py"])]),
         ("configmaps", [(REPO, [PY, "deployment/k8s/generate_configmaps.py"])]),
     ]
 

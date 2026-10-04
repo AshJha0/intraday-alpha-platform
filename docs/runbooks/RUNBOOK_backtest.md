@@ -37,7 +37,10 @@ round-trip cost makes no trade under this policy and its net P&L is exactly
 (`"sign"`, uncapped, every row) and `CostModel.with_linear_impact()`;
 `research/alpha_reports/run_all.py --methods legacy_v1 --out-dir <dir>`
 reproduces the v1.4.0 alpha report with them. The Java `ResearchBacktester`
-and `CostModel` implement the legacy rules only and say so in their API.
+and `CostModel` implement both rule sets under the same names
+(`Config.defaults(...).forHorizon(ns)` / `Config.legacy(...)`,
+`CostModel.load` / `withLinearImpact()`); the Java run takes the scored-row
+mask and the displayed L1 sizes as inputs.
 
 Currency (conventions §11.6): `Backtester(..., reporting_ccy="USD")`
 converts every instrument's P&L increment to USD at the prevailing mid of

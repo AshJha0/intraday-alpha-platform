@@ -223,6 +223,7 @@ class ExecutionSimulator:
             state=OrderState.PENDING,
             remaining=child.qty,
             ahead_qty=0,
+            entry_ahead_qty=0,
             resting=False,
             cross_exempt=False,
             cancel_reason=CancelReason.NONE,
@@ -381,6 +382,7 @@ class ExecutionSimulator:
                     and ahead.limit_ticks == o.limit_ticks
                 ):
                     o.ahead_qty += ahead.remaining
+            o.entry_ahead_qty = o.ahead_qty
             # Crossing exemption: the display may still show the liquidity
             # our aggressive leg just consumed (rule 4). While the venue is
             # gated (rule 8) nothing was consumed: no exemption.

@@ -391,7 +391,7 @@ def check_contract_counts(docs: dict[str, str]) -> None:
 
 
 def check_lifecycle_numbers(docs: dict[str, str]) -> None:
-    """24 alphas / 24 CANDIDATE (registry), 7 states / 17 edges (golden), 18 gates."""
+    """24 alphas / 24 CANDIDATE (registry), 7 states / 17 edges (golden), 20 gates."""
     reg_path = ROOT / "research" / "alpha_registry.json"
     gold_path = ROOT / "tests" / "golden" / "expected_lifecycle.json"
     if not reg_path.exists() or not gold_path.exists():
@@ -787,9 +787,9 @@ def check_parity_table_vs_tree(tests: dict[str, int], golden: dict[str, int]) ->
 
     java: `@Test` annotations under java/src/test (JUnit4, and the harness
     asserts zero `@Ignore`); the golden column is the same count restricted to
-    the ten `*GoldenTest` classes.
+    the `*GoldenTest` classes.
     rust: `#[test]` under rust/; the golden column is the same restricted to
-    the six golden integration-test targets run_all.sh names.
+    the golden integration-test targets run_all.sh names.
     python and cpp are deliberately NOT derived: pytest parametrization and the
     gtest TEST_P/TEST_F macros both expand at collection time, so a static
     count would be wrong in a way that trains people to ignore this check.

@@ -150,7 +150,7 @@
       "id": 3,
       "type": "stat",
       "title": "Session state",
-      "description": "platform_session_state: 0 STARTING, 1 RUNNING, 2 FINISHED, 3 FAILED, 4 STOPPED (PLATFORM_CONVENTIONS.md §12.6). A paper session is finite: FINISHED is the normal terminal state; STOPPED is an operator or signal stop that checkpointed and can be resumed.",
+      "description": "platform_session_state: 0 STARTING, 1 RUNNING, 2 FINISHED, 3 FAILED, 4 STOPPED (PLATFORM_CONVENTIONS.md §12.6). A paper session is finite: FINISHED is the normal terminal state; STOPPED is an operator or signal stop that checkpointed and can be resumed. While no trading process is running the panel falls back to the last persisted state (platform_persisted_session_state, served by the java-platform-state exporter), so a clean stop, a finished session or a failed one stays visible; a crashed session shows no data (see the TargetDown alert).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -237,7 +237,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "max(platform_session_state)",
+          "expr": "max(platform_session_state) or max(platform_persisted_session_state >= 2)",
           "legendFormat": "state",
           "refId": "A"
         }

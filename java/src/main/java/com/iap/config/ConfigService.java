@@ -75,7 +75,7 @@ public final class ConfigService {
     public static final String ALPHA_PARAMS = "strategies/alpha_params.json";
     /**
      * {@code strategies/lifecycle.json} — alpha promotion lifecycle policy
-     * (x-version 2): promotion gates, demotion counter and the
+     * (x-version 3): promotion gates, demotion counter and the
      * significance-threshold policy; the live gates and the retirement rule
      * stay in {@link #STRATEGIES} {@code adaptive.lifecycle}.
      */

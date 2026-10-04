@@ -36,19 +36,28 @@ canonical instance per type.
 | `research/` | `experiment_spec.schema.json` | 1 | What an `ExperimentRunner` was asked to run: alpha, dataset / feature / model versions, free-form configuration, train / validation / test periods, seed, horizon. | `iap.contracts.types.ExperimentSpec` (`iap.research.build_spec`; `research/experiments/<id>/spec.json`) / — / — / — |
 | `research/` | `experiment_result.schema.json` | 1 | What it produced: IC / RankIC / NW t-stat / hit rate / turnover / returns / drawdown / Sharpe / fold consistency / leakage / verdict (PROMOTE/ITERATE/REJECT), ledger count, git commit, event-time `created_ts`. | `iap.contracts.types.ExperimentResult` (`iap.research.build_result` from `iap.validation.validate.validate_alpha`; `research/experiments/<id>/result.json`) / — / `lifecycle::ExperimentResult` (read as evidence) / `com.iap.lifecycle.ExperimentResultRec` (read as evidence) |
 | `alpha/` | `lifecycle_transition.schema.json` | 1 | An alpha moving between lifecycle states RESEARCH → CANDIDATE → VALIDATING → PAPER → ACTIVE → WATCH → RETIRED (names on the wire), with the gate results, policy and actor (SYSTEM/HUMAN). | `iap.contracts.types.LifecycleTransition` (written by `iap.lifecycle` to `research/lifecycle_transitions.jsonl`; `iap.adaptive.lifecycle` is the ACTIVE/WATCH/RETIRED sub-machine) / — (no C++ lifecycle by design) / `lifecycle::LifecycleTransition` (`rust/lifecycle`) / `com.iap.lifecycle.LifecycleTransition` |
-| `sql/` | `iap_v1.sql` | 1 | Not a wire schema: the portable relational DDL (SQLite 3 / PostgreSQL ≥ 13, 24 tables + 3 views) into which every contract above and every research artefact maps — the derived, rebuildable index of the flat files ([`../docs/DATA_MODEL.md`](../docs/DATA_MODEL.md)). | `iap.store` (`python -m iap.store build`) / — / — / — |
+| `sql/` | `iap_v2.sql` | 2 | Not a wire schema: the portable relational DDL (SQLite 3 / PostgreSQL ≥ 13, 26 tables + 6 views) into which every contract above and every research artefact maps, each research row under the `(dataset_version, methods)` scope it was computed in — the derived, rebuildable index of the flat files. `iap_v1.sql` (x-version 1) is kept as the record of the previous layout; nothing reads it ([`../docs/DATA_MODEL.md`](../docs/DATA_MODEL.md)). | `iap.store` (`python -m iap.store build`) / — / — / — |
 | `trace/` | `decision_trace.schema.json` | 1 | The auditable chain for one decision: `trace_id` (first 128 bits of sha256 over `session|instrument|event_ts|sequence`), the four version hashes, and every stage output by `$ref` to the schemas above; `$defs` carry `MarketEventRef`, `BookSnapshotRef`, `FeatureVectorRef`, `Attribution`. Rendered by `iap.contracts.explain`. | `iap.contracts.types.DecisionTrace` (`iap.trace.TraceBuilder`, sinks, `TraceDigest`) / `iap::contracts::DecisionTrace` (`cpp/include/iap/contracts/trace.hpp`; `ExecutionReplay` emits) / `contracts::trace::DecisionTrace` (`rust/contracts`; `telemetry::trace`) / `com.iap.trace.DecisionTrace` (`PaperTrading` emits `decision_traces.jsonl`) |
 
-## Relational data model — `sql/iap_v1.sql`
+## Relational data model — `sql/iap_v2.sql`
 
-`schemas/sql/iap_v1.sql` (x-version 1) is the portable DDL (SQLite 3 and
+`schemas/sql/iap_v2.sql` (x-version 2) is the portable DDL (SQLite 3 and
 PostgreSQL ≥ 13, unchanged) that every contract above maps into: one table
 per contract (nested `$defs` records are embedded), the research artefacts
 (`research/experiments.json`, alpha reports, model manifests, baselines) and
-three views over the decision chain. It is applied and populated by
-`python -m iap.store build` and documented in
+six views — the decision chain, and the alpha scorecard and ledger summary
+per `(dataset_version, methods)` scope with a `*_current` form of each. It
+is applied and populated by `python -m iap.store build` and documented in
 [`docs/DATA_MODEL.md`](../docs/DATA_MODEL.md). The store is a derived index
 of the flat files, never their replacement.
+
+**How a SQL schema version is introduced.** A column or view change is a new
+file `sql/iap_vN.sql` (the published file is never edited in place), a bump
+of `iap.store.ddl.DDL_X_VERSION`, and a `MIGRATIONS.md` entry. Because the
+store is derived, the migration path for stored data is always the same: a
+database of another version is refused untouched and rebuilt from the flat
+files (`python -m iap.store build --rebuild`). The previous file stays in
+the tree as the record of that layout.
 
 Where a language column says "research reference", the Python code produces
 the same fields in pandas frames and JSON reports but is not a wire-level

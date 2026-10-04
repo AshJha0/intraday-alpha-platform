@@ -1482,7 +1482,7 @@ issues:
       11 ITERATE / 13 REJECT; EQ03 gate IC 0.0189 with a pooled-slope HAC t
       of 5.16 against a ledger threshold of 4.365; under the cost-aware
       position policy 18 alphas make no trade at 1x and the 6 that trade
-      lose, so none is net-positive; the ledger holds 4,396 looks over 208
+      lose, so none is net-positive; the ledger holds 5,156 looks over 216
       configurations. run_all.py --methods legacy_v1 reproduces the v1.4.0
       report (0 / 10 / 14).
     acceptance:
@@ -1650,7 +1650,7 @@ issues:
       - "expected_backtest.json matches in Java; total_pnl is in USD with per-ccy natives"
     evidence:
       - "python/src/iap/backtest/{engine,costs}.py; python/tests/test_backtester.py; tests/golden/expected_backtest.json"
-      - "java/src/main/java/com/iap/backtest/{BacktestEngine,ResearchBacktester,CostModel}.java; java BacktestTest"
+      - "java/src/main/java/com/iap/backtest/{BacktestEngine,ResearchBacktester,CostModel}.java; java BacktestTest, BacktestGoldenTest (legacy and v1.5.0 default rules)"
 
   - key: V08
     epic: E08
@@ -2001,6 +2001,33 @@ issues:
       - "python/tests/test_execution_golden.py (expected_replay_fills.json bit-identical); python/tests/test_execution_rules.py; python/tests/test_exec_algos.py; python/tests/test_sor.py"
       - "API_TRADING.md"
 
+  - key: X10
+    epic: E11
+    title: "Execution policies: NATIVE / AGGRESSIVE / PASSIVE (post, rest, reprice, cross) in C++, Java and Python"
+    labels: [type:feature, area:execution, phase:w5, priority:p1, lang:cpp, lang:java, lang:python]
+    milestone: "Week 5"
+    status: done
+    estimate_days: 4
+    context: >
+      Every alpha loses after costs and most of the cost is the half-spread a
+      MARKET child pays. ParentOrder.policy selects the child style: NATIVE
+      (default, the pre-existing behaviour), AGGRESSIVE (every child MARKET)
+      or PASSIVE — post at the near touch (one tick inside when the spread
+      allows, never at or through the opposite touch), rest for a patience set
+      by the parent's urgency and the IS risk aversion or until the schedule is
+      behind, reprice once, cross the cancelled remainder. The simulator rules
+      are untouched; the policy stays opt-in because part of its measured
+      saving is queue-model optimism (research/execution/EXECUTION_REPORT.md).
+    acceptance:
+      - "C++, Java and Python produce identical fills for the policy golden; expected_replay_fills.json is byte-identical"
+      - "A posted limit is never at or through the opposite touch; a cancelled remainder is never sent twice"
+      - "The same parents are compared under each policy with unfilled quantity priced, and the simulator assumptions are stated"
+    evidence:
+      - "cpp/include/iap/execution/algos.hpp; cpp/src/replay/exec_replay.cpp; cpp/tests/test_replay_fills_passive.cpp"
+      - "java/src/main/java/com/iap/execution/PassivePolicy.java; java/src/test/java/com/iap/ReplayFillsPassiveGoldenTest.java; java/src/test/java/com/iap/PassivePolicyTest.java"
+      - "python/src/iap/execution/passive.py; python/tests/test_passive_policy.py; tests/golden/expected_replay_fills_passive.json"
+      - "research/execution/run_execution_study.py; research/execution/EXECUTION_REPORT.md"
+
   - key: X08
     epic: E11
     title: "PEG and MID order types in the execution simulator"
@@ -2172,6 +2199,31 @@ issues:
       - "python -m iap.tca regenerates the report byte-for-byte"
     evidence:
       - "python/src/iap/tca/{simulator,report,__main__}.py; research/tca/TCA_REPORT.md; research/tca/tca_orders.json"
+
+  - key: T06
+    epic: E13
+    title: "Markout analysis: multi-horizon markouts, realised vs effective spread, adverse selection, passive fill rates"
+    labels: [type:feature, area:tca, phase:w6, priority:p1, lang:python, lang:java]
+    milestone: "Week 6"
+    status: done
+    estimate_days: 3
+    context: >
+      iap.tca.markout (Java com.iap.tca.Markout): per fill, the signed move of
+      the mid at or before fill_ts + h for a configurable horizon set (default
+      100 ms .. 5 min), in bps and currency; effective half-spread = realised
+      half-spread + price impact; adverse selection on passive fills; splits
+      by liquidity, venue, algo, side and time bucket with counts and standard
+      errors; fill rate and time to fill of passive orders by queue position
+      at entry. The markout cells are split by venue and algo; the Perold
+      IS / spread / impact tables per venue and algo of T05 are not part of it.
+    acceptance:
+      - "A markout past the end of the data, before the first quote or across a halt / auction / quote gap is null, never zero"
+      - "A cell with too few defined fills reports its count and null statistics"
+      - "Java reproduces expected_markout.json at 1e-9 with exact nulls"
+    evidence:
+      - "python/src/iap/tca/markout.py; python/tests/test_markout.py; python/tools/make_golden_markout.py"
+      - "java/src/main/java/com/iap/tca/Markout.java; java/src/test/java/com/iap/MarkoutGoldenTest.java"
+      - "tests/golden/expected_markout.json; API_PORTFOLIO_TCA.md section 2.9"
 
   - key: T05
     epic: E13
@@ -2510,7 +2562,7 @@ issues:
       - "Round-trip tests: contract document -> row -> document for every table"
       - "The MVP loop writes its experiment, orders, executions, TCA result and trace into the store"
     evidence:
-      - "schemas/sql/iap_v1.sql (24 tables, 3 views, x-version 1); python/src/iap/store/{ddl,db,importers,__main__}.py"
+      - "schemas/sql/iap_v2.sql (26 tables, 6 views, x-version 2: dataset- and method-bundle-scoped scorecard, v1.5.0); python/src/iap/store/{ddl,db,importers,__main__}.py"
       - "python/tests/test_store.py (round trips per table, DDL portability whitelist); docs/DATA_MODEL.md"
       - "python/src/iap/mvp/session.py (StoreTraceSink writes every MVP trace + reference data into <run>/iap.sqlite)"
 
@@ -2839,19 +2891,31 @@ issues:
   - key: AF03
     epic: E22
     title: "Gate 8: cross-alpha correlation and incremental contribution"
-    labels: [type:feature, area:research, phase:phase2, priority:p1, lang:python]
+    labels: [type:feature, area:research, phase:phase2, priority:p1, lang:python, lang:java, lang:rust]
     milestone: "Phase 2"
-    status: backlog
+    status: done
     estimate_days: 2
     context: >
-      GOVERNANCE.md lists gate 8 but no code computes signal correlations
-      across the 24 alphas or the marginal IC of adding one to the ensemble;
-      a grep for "correlation" in the validation package finds only RankIC.
+      Gate 8 is the lifecycle gate cross_alpha_correlation on CANDIDATE ->
+      VALIDATING (v1.5.0): the largest absolute out-of-sample signal
+      correlation with any alpha at or beyond VALIDATING must not exceed 0.7;
+      it passes vacuously while no alpha is that far, and fails closed without
+      the evidence. Python, Java and Rust evaluate it from the evidence
+      document. The correlations and the incremental contribution of each
+      alpha (its weight under four combination methods, the effective number
+      of independent bets, the combination against its members) come from the
+      signal-combination report. The gate result is recorded in the registry
+      evaluation of each alpha rather than in the alpha report JSON, which the
+      change did not regenerate.
     acceptance:
-      - "A correlation matrix over uncrossed cross-sections and a marginal-IC table in REPORT.md"
-      - "Gate 8 recorded in each alpha's report JSON and in the promotion template"
+      - "A signal correlation matrix per asset class and the member-versus-combination table in research/combination/REPORT.md"
+      - "The gate is a row of the lifecycle gate table in Python, Java and Rust, with golden scenario LC05 (pass, fail, vacuous pass, tie, missing evidence)"
+      - "Each alpha's registry evaluation carries the cross_alpha_correlation result"
     evidence:
-      - "docs/governance/GOVERNANCE.md §2 (gate 8); python/src/iap/validation/metrics.py"
+      - "python/src/iap/lifecycle/gates.py; python/src/iap/lifecycle/evidence.py; python/tests/test_lifecycle.py"
+      - "python/src/iap/combine; python/tests/test_combine.py; research/combination/REPORT.md; research/combination/signal_correlation.json"
+      - "java/src/main/java/com/iap/lifecycle/Gates.java; rust/lifecycle/src/gates.rs; tests/golden/expected_lifecycle.json"
+      - "docs/LIFECYCLE.md section 3; PLATFORM_CONVENTIONS.md section 13.4 and 13.8"
 
   - key: AF04
     epic: E22
@@ -2991,20 +3055,25 @@ issues:
       - "python/tests/test_import_policy.py; PLATFORM_CONVENTIONS.md section 13.7; docs/RESEARCH_VALIDITY.md"
 
   # ---------------------------------------------------------------- E25-E31 ----
-  # Backlog epics added 2026-10-03 (all status: backlog; paths marked (proposed) do not exist yet).
+  # Backlog epics added 2026-10-03 (paths marked (proposed) do not exist yet). E25 was
+  # re-cut when its Python ingestion path landed (feat/real-data-ingest): XD01, XD03, XD04,
+  # XD05 and XD06 are done on bytes the tests synthesise; XD02 and XD07-XD10 are backlog.
+  # No vendor data is in the repository, so nothing here claims a result on a real file.
   - key: XD01
     epic: E25
-    title: "ITCH/PITCH order-by-order decoder into canonical MarketEvents"
-    labels: [type:feature, area:marketdata, lang:python, lang:rust, priority:p2, phase:phase3]
+    title: "Nasdaq TotalView-ITCH 5.0 reader and mapping into canonical MarketEvents (Python)"
+    labels: [type:feature, area:marketdata, lang:python, priority:p2, phase:phase3]
     milestone: "Phase 3"
-    status: backlog
+    status: done
     estimate_days: 8
-    context: "The only data source is the seeded generator. A decoder for an ITCH/PITCH-style historical feed (add, modify, execute, cancel, delete, trade messages with nanosecond timestamps) emitting the canonical MBO events lets the existing book, feature and replay stack run on real order flow."
+    context: "The only data source was the seeded generator. iap.marketdata.itch50 is a streaming parser for the length-prefixed ITCH 5.0 file format (gzip detected by magic, a symbol filter that reduces a full-day file to a universe in one pass) and a mapper to the canonical MBO events: A/F to ADD, E/C to EXECUTE plus a TRADE print, X to MODIFY, D to CANCEL, U to CANCEL plus ADD (the replacement loses queue priority), P to a TRADE that does not touch the book, S/H to STATUS. Every mapping decision is a row of the table in docs/REAL_DATA.md. Tested on bytes written by a test-only encoder; verification on a vendor file is XD10."
     acceptance:
-      - "Decoding a vendor sample file yields canonical events and a book reconstruction equal to the vendor's end-of-day book"
-      - "Unknown or malformed messages are counted and rejected by the QC stage, never silently dropped"
+      - "Every supported message type round-trips through the reader, unknown types are skipped by length and counted, and truncated or malformed input raises a typed error carrying the byte offset"
+      - "A seeded valid session replayed through the real order book ends on the generator's own book per level in FIFO order, with no dropped event and no crossed book in continuous trading"
     evidence:
-      - "python/src/iap/marketdata/ (decoder proposed); rust/marketdata/ (decoder proposed); schemas/FORMAT.md"
+      - "python/src/iap/marketdata/itch50.py; python/src/iap/marketdata/feederrors.py"
+      - "python/tests/test_itch50_reader.py; python/tests/test_itch50_mapping.py; python/tests/itch50_encoder.py"
+      - "docs/REAL_DATA.md"
 
   - key: XD02
     epic: E25
@@ -3022,31 +3091,119 @@ issues:
 
   - key: XD03
     epic: E25
-    title: "Point-in-time security master with as-of queries"
+    title: "Point-in-time security master with as-of queries, built from the session's directory"
     labels: [type:feature, area:marketdata, area:store, lang:python, priority:p2, phase:phase3]
     milestone: "Phase 3"
-    status: backlog
-    estimate_days: 7
-    context: "Instrument attributes (symbol, listing venue, lot size, tick size, status) change over time. Studies must read them as of the event date or survivorship and lookahead bias enter through reference data."
+    status: done
+    estimate_days: 4
+    context: "Instrument attributes (symbol, locate, listing market, lot size, tick size, ETP flag) change over time. iap.reference.secmaster keeps one record per (symbol, effective_date) - for ITCH the day's Stock Directory message - and is read only through as_of(symbol, date), which returns the latest record on or before the date and raises when there is none. The ingest writes it to the dataset's reference/security_master.json. Routing every study read through it is XD08."
     acceptance:
-      - "An as-of query API returns the instrument record valid on a given date, including delisted names"
-      - "A test fails any study code path that reads an instrument attribute not valid at the study date"
+      - "as_of returns the record valid on a given date and raises rather than returning a record from a later date"
+      - "The file form is byte-identical for the same records whatever their insertion order"
     evidence:
-      - "configs/instruments/instruments.json; schemas/sql/iap_v1.sql; python/src/iap/store/ (security master proposed)"
+      - "python/src/iap/reference/secmaster.py; python/tests/test_reference_pit.py"
+      - "python/tests/test_real_data_ingest.py; docs/REAL_DATA.md"
 
   - key: XD04
     epic: E25
-    title: "Corporate-action adjustment engine (splits, dividends, mergers) applied point-in-time"
+    title: "Corporate-action table (owner-supplied CSV) and point-in-time adjustment API"
     labels: [type:feature, area:marketdata, lang:python, priority:p2, phase:phase3]
+    milestone: "Phase 3"
+    status: done
+    estimate_days: 4
+    context: "Prices and sizes are integer ticks and shares; a split or dividend changes their meaning. iap.reference.corpactions reads a documented CSV schema (SPLIT, DIVIDEND, SYMBOL_CHANGE) the owner supplies - nothing is downloaded - and answers adjustment queries with an observation date and an as-of date: only actions that went ex in between apply, so an action after the as-of date is never used. Split factors are exact fractions; ticks round half up and quantities round down. Applying it inside the feature and label pipeline is XD09."
+    acceptance:
+      - "A split and a cash dividend fixture adjust history exactly, with the documented rounding rule on ticks and quantities"
+      - "An action with an ex-date after the as-of date is never applied, and a malformed table is rejected with its line number"
+    evidence:
+      - "python/src/iap/reference/corpactions.py; python/tests/test_reference_pit.py"
+      - "docs/REAL_DATA.md"
+
+  - key: XD05
+    epic: E25
+    title: "LOBSTER reader with level-by-level verification against the orderbook file"
+    labels: [type:feature, area:marketdata, lang:python, priority:p2, phase:phase3]
+    milestone: "Phase 3"
+    status: done
+    estimate_days: 4
+    context: "LOBSTER ships a message file and an orderbook file per symbol-day. iap.marketdata.lobster maps event types 1-7 to canonical events, parses the decimal-seconds timestamps as strings into integer nanoseconds, seeds the orders that rested before the file starts from the orderbook file, back-fills depth that only becomes visible later, and compares the real order book with the reference row after every message, reporting the first divergence. Fixtures are synthesised by the tests."
+    acceptance:
+      - "A synthesised message file with its matching orderbook file verifies on every row; a deliberately wrong orderbook file reports the message index, side and level of the first divergence"
+      - "Timestamps convert exactly: no value passes through a binary float"
+    evidence:
+      - "python/src/iap/marketdata/lobster.py; python/tests/test_lobster.py; python/tests/lobster_fixture.py"
+      - "docs/REAL_DATA.md"
+
+  - key: XD06
+    epic: E25
+    title: "Real-data ingest CLI, dataset manifest and the research hook (--dataset-dir)"
+    labels: [type:feature, area:marketdata, area:research, lang:python, priority:p2, phase:phase3]
+    milestone: "Phase 3"
+    status: done
+    estimate_days: 5
+    context: "python -m iap.marketdata ingest turns owner-supplied ITCH 5.0 or LOBSTER files into a dataset directory with the generator's layout (raw, normalized, QC report) plus its own configs, a point-in-time security master and dataset.json (source, input sha256, message counts per type, skipped counts, a dataset_version that no synthetic dataset can share). python -m iap.features runs on it unchanged, and python -m iap.research run --dataset-dir records the dataset_version in the spec and the ledger, so real and synthetic looks are never pooled. Output is byte-deterministic for the same input."
+    acceptance:
+      - "The same input produces byte-identical output files, in any output directory and in either order of ingesting two sessions"
+      - "An experiment run with --dataset-dir carries the manifest's dataset_version in its spec and its ledger entries and writes nothing into the checkout's own ledger"
+    evidence:
+      - "python/src/iap/marketdata/ingest.py; python/src/iap/marketdata/__main__.py; python/src/iap/research/__main__.py"
+      - "python/tests/test_real_data_ingest.py; docs/REAL_DATA.md; COOKBOOK.md"
+
+  - key: XD07
+    epic: E25
+    title: "CBOE PITCH decoder and Rust port of the ITCH 5.0 decoder"
+    labels: [type:feature, area:marketdata, lang:python, lang:rust, priority:p2, phase:phase3]
+    milestone: "Phase 3"
+    status: backlog
+    estimate_days: 8
+    context: "Only Nasdaq ITCH 5.0 is decoded, and only in Python (a few hundred thousand messages a second, so a full day is tens of minutes). A PITCH decoder adds a second venue for cross-venue studies, and a Rust decoder with a shared golden makes full-day, full-universe ingestion practical."
+    acceptance:
+      - "A PITCH file synthesised by a test encoder maps to canonical events with a documented mapping table"
+      - "The Rust decoder produces byte-identical raw files to the Python decoder on a shared golden input"
+    evidence:
+      - "python/src/iap/marketdata/itch50.py; rust/marketdata/ (decoder proposed)"
+
+  - key: XD08
+    epic: E25
+    title: "Route every study reference read through the as-of security master (multi-day universes)"
+    labels: [type:feature, area:marketdata, area:research, lang:python, priority:p2, phase:phase3]
     milestone: "Phase 3"
     status: backlog
     estimate_days: 6
-    context: "Prices and sizes are integer ticks and shares; a split or dividend changes their meaning. Adjustments must be applied as of the date they became known, never retroactively, and must keep the integer-tick contract."
+    context: "The feature engine, backtester and risk reference data still read configs/instruments/instruments.json, which holds one value per instrument for the whole dataset. An ingested dataset therefore requires a fixed universe and one tick size per symbol across its sessions. Reading attributes as of each session date would allow listings, delistings, lot-size and symbol changes inside one dataset and remove survivorship from the symbol filter."
     acceptance:
-      - "A split and a cash dividend fixture adjust history exactly, with a documented rounding rule on ticks"
-      - "Features and labels computed on adjusted data equal those computed on contemporaneous unadjusted data after re-basing"
+      - "Every instrument attribute used by a study is read through an as-of query; a test fails a code path that reads an attribute not valid at the study date"
+      - "A dataset whose universe changes between sessions ingests and runs, including a delisted name"
     evidence:
-      - "PLATFORM_CONVENTIONS.md section 1 (price_ticks); python/src/iap/marketdata/ (proposed)"
+      - "python/src/iap/reference/secmaster.py; python/src/iap/features/context.py; configs/instruments/instruments.json"
+
+  - key: XD09
+    epic: E25
+    title: "Multi-day corporate-action-adjusted panels in the feature and label pipeline"
+    labels: [type:feature, area:marketdata, area:features, lang:python, priority:p2, phase:phase3]
+    milestone: "Phase 3"
+    status: backlog
+    estimate_days: 6
+    context: "The adjustment API exists (XD04) but nothing applies it: features and labels are computed per session on unadjusted integer ticks, which is correct inside a day and wrong for any quantity carried across an ex-date (session profiles, overnight returns, multi-day rolling statistics)."
+    acceptance:
+      - "Features and labels computed on adjusted data equal those computed on contemporaneous unadjusted data after re-basing"
+      - "A study spanning a split fixture carries no discontinuity in any cross-session feature"
+    evidence:
+      - "python/src/iap/reference/corpactions.py; python/src/iap/features/ (application proposed)"
+
+  - key: XD10
+    epic: E25
+    title: "Verify the decoders against vendor sample files and record a first real-data study"
+    labels: [type:feature, area:marketdata, area:research, lang:python, priority:p1, phase:phase3]
+    milestone: "Phase 3"
+    status: backlog
+    estimate_days: 5
+    context: "The readers are tested on bytes the tests synthesise from the published layouts. No vendor file has been read, because none may be stored in the repository. Two tests in python/tests/test_real_data_ingest.py are skipped unless environment variables point at files the owner obtained; they run the full ingest and the book checks. A first study then needs at least two sessions and the reading rules of docs/REAL_DATA.md section 8."
+    acceptance:
+      - "A day of real vendor sample data decodes to canonical events with a clean book check, and a LOBSTER sample reconstructs the vendor's orderbook file on every row"
+      - "A report states, for the first real dataset, the dataset_version, the looks spent and the verdict of each alpha - whatever the verdict is"
+    evidence:
+      - "python/tests/test_real_data_ingest.py; docs/REAL_DATA.md; research/ (report proposed)"
 
   - key: LT01
     epic: E26
@@ -3251,7 +3408,7 @@ issues:
     milestone: "Backlog"
     status: backlog
     estimate_days: 6
-    context: "Alphas are judged stand-alone; gate 8 (cross-alpha correlation and incremental contribution) is not yet a lifecycle gate (see AF03). Allocation should follow marginal contribution to portfolio net P&L after costs."
+    context: "Gate 8 (cross-alpha correlation, AF03) keeps a redundant alpha out of the allocated set, and the signal-combination report measures each alpha's weight in a blend; neither sizes capital. Allocation should follow marginal contribution to portfolio net P&L after costs."
     acceptance:
       - "Weights are a deterministic function of the ledgered evidence and reproduce from the manifest"
       - "An alpha that adds nothing after correlation gets zero weight in a fixture"
@@ -3361,15 +3518,33 @@ issues:
     epic: E31
     title: "Differential fuzzing of the Rust, Java and Python risk engines"
     labels: [type:feature, area:testing, area:risk, lang:rust, lang:java, lang:python, priority:p1]
-    milestone: "Backlog"
-    status: backlog
+    milestone: "Phase 2"
+    status: done
     estimate_days: 6
-    context: "The three engines are held byte-identical by fixed golden vectors only. A generator of order, fill and market sequences, with the three engines run on each and decisions and audit logs compared byte for byte, finds divergences the fixtures do not cover."
+    context: >
+      The three engines were held byte-identical by fixed golden vectors only.
+      Done 2026-10-04: a deterministic, state-aware generator of step scripts
+      (SplitMix64 only; every step type; boundary values at every limit, the
+      i64 / u64 extremes, clock regressions and jumps, non-ASCII ids, one
+      script per configuration mutation) with the Python engine as the oracle.
+      The committed corpus (89 scripts, 4,607 steps) is replayed by Rust, Java
+      and Python on every pull request; the risk-fuzz job generates fresh
+      scripts nightly and on demand, runs the three engines on the runner and
+      uploads the first divergence minimised by a delta-debugging shrinker.
+      First results: the Java port diverged in three ways (strategy ids
+      ordered by UTF-16 code unit, a subnormal float in a reason, the
+      CONFIG_MISSING reason), and the first nightly run (400 scripts, 38,666
+      steps, reduced from 120 steps to 3) found a fail-open in the Rust and
+      the Python engine that Java did not have: a conversion rate stamped
+      i64::MAX was trusted. All four are fixed and pinned.
     acceptance:
       - "A fuzz run of a stated number of sequences gives identical decisions and audit logs across the engines, or a minimised reproducer"
       - "The fuzz harness runs in CI at a small fixed budget and nightly at a large one"
     evidence:
-      - "rust/risk/; java/src/main/java/com/iap/risk/; python/src/iap/risk/; tests/golden/expected_risk_decisions.json"
+      - "python/tools/risk_fuzz.py; python/tools/make_risk_fuzz_corpus.py; python/tools/risk_fuzz_nightly.py"
+      - "tests/golden/risk_fuzz/ (COVERAGE.txt); .github/workflows/risk-fuzz.yml"
+      - "rust/risk/tests/golden_risk_fuzz.rs; java/src/test/java/com/iap/RiskFuzzGoldenTest.java; python/tests/test_risk_fuzz_golden.py"
+      - "python/tests/test_risk_fuzz_properties.py; python/tests/test_risk_fuzz_nightly.py; PLATFORM_CONVENTIONS.md section 11.1"
 
   - key: FZ02
     epic: E31
@@ -3389,15 +3564,26 @@ issues:
     epic: E31
     title: "Snapshot/restore fuzzing across the three risk engines"
     labels: [type:feature, area:testing, area:risk, lang:rust, lang:java, lang:python, priority:p1]
-    milestone: "Backlog"
-    status: backlog
+    milestone: "Phase 2"
+    status: done
     estimate_days: 4
-    context: "Restore must continue exactly as an uninterrupted run would. Taking a snapshot at a random point, restoring, and comparing the continuation with the uninterrupted run tests every state the engine can be in."
+    context: >
+      Restore must continue exactly as an uninterrupted run would. Done
+      2026-10-04 as part of the differential fuzzing (FZ01): every script of
+      the corpus carries random cut points; each replay snapshots the engine
+      after the cut, restores it through the JSON text and must produce the
+      unbroken run's remaining audit lines and final state, and scripts also
+      contain restore steps of their own. Each language additionally checks
+      that a snapshot with any field missing or of the wrong type is refused
+      and that a truncated document does not parse; the Python property suite
+      checks restore(snapshot()) == snapshot() at every fifth step of fresh
+      sequences.
     acceptance:
       - "For every sampled cut point the restored continuation equals the uninterrupted run, byte for byte"
       - "Corrupt and truncated snapshots fail closed"
     evidence:
-      - "rust/risk/src/audit.rs; java/src/main/java/com/iap/risk/RiskAudit.java; tests/golden/expected_risk_snapshot.json"
+      - "rust/risk/tests/golden_risk_fuzz.rs; java/src/test/java/com/iap/RiskFuzzGoldenTest.java; python/tests/test_risk_fuzz_golden.py"
+      - "python/tests/test_risk_fuzz_properties.py; tests/golden/risk_fuzz/"
 
   - key: FZ04
     epic: E31
@@ -3417,12 +3603,24 @@ issues:
     epic: E31
     title: "Risk golden coverage for KILL_VENUE, bootstrap, restore and fail-closed branches"
     labels: [type:feature, area:testing, area:risk, lang:rust, lang:java, lang:python, priority:p1]
-    milestone: "Backlog"
-    status: backlog
+    milestone: "Phase 2"
+    status: done
     estimate_days: 4
-    context: "The risk goldens exercise the main rule set; the branches that matter most after something has gone wrong (venue-scoped kill, first-start bootstrap, restore from a snapshot, every fail-closed default) need their own golden cases in all three engines."
+    context: >
+      The risk goldens exercised the main rule set; the branches that matter
+      most after something has gone wrong (venue-scoped kill, first-start
+      bootstrap, restore from a snapshot, every fail-closed default) needed
+      their own golden cases in all three engines. The v1.3.0 edge golden
+      added eight scenarios; since 2026-10-04 the generated corpus reaches 63
+      of the engine's 64 reason-string branches (the one left is unreachable:
+      check 21 rejects before the strategy-level undeterminable-P&L reject can)
+      and tests/golden/risk_fuzz/COVERAGE.txt, regenerated with the corpus and
+      checked in CI, names the script that reaches each. A Python test fails
+      if a branch stops being reached.
     acceptance:
       - "A coverage report lists each branch and the golden case that reaches it"
       - "Every fail-closed branch has a case whose expected decision is a rejection"
     evidence:
-      - "rust/risk/tests/golden_risk.rs; tests/golden/expected_risk_decisions.json; java/src/test/java/com/iap/RiskGoldenTest.java"
+      - "tests/golden/risk_fuzz/COVERAGE.txt; python/tools/risk_fuzz.py (BRANCHES, coverage_report)"
+      - "python/tests/test_risk_fuzz_golden.py; tests/golden/expected_risk_edge_decisions.json"
+      - "rust/risk/tests/golden_risk_fuzz.rs; java/src/test/java/com/iap/RiskFuzzGoldenTest.java"

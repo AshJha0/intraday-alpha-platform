@@ -6,7 +6,7 @@ test run < 120 s.
 **CI** is `.github/workflows/ci.yml`, and it is the local
 `tests/harness/run_all.sh` split into parallel jobs: one per language, plus
 `tests/harness/run_golden.sh` (the GOVERNANCE promotion-gate-10 artefact: every
-language's golden group, including ALL thirteen Java `*GoldenTest` classes),
+language's golden group, including ALL fifteen Java `*GoldenTest` classes),
 `tests/harness/check_deployment.py` (promtool rules/config/unit tests, compose
 and Dockerfile checks, k8s manifests, ConfigMap sync, dashboard metric
 provenance) and an `images` job that builds the four container images and is
@@ -17,24 +17,43 @@ gated on all of them. Run the whole thing locally with
 ## Python (reference implementation)
 
 ```bash
-cd python && PYTHONPATH=src python3 -m pytest -q          # full suite (1672 tests; about six minutes in the CI job, with coverage)
-cd python && PYTHONPATH=src python3 -m pytest -q -k golden # the golden group (173)
+cd python && PYTHONPATH=src python3 -m pytest -q          # full suite (1988 tests; CI runs it as `-n auto --dist loadfile` with coverage, 306-359 s on a 4-vCPU runner)
+cd python && PYTHONPATH=src python3 -m pytest -q -k golden # the golden group (192)
 cd python && PYTHONPATH=src python3 -m iap.marketdata      # end-to-end pipeline
 cd python && PYTHONPATH=src python3 -m iap.mvp run         # the traced MVP loop (under a minute)
 cd python && PYTHONPATH=src python3 tools/make_golden.py   # regen goldens (deliberate only; every
                                                            # make_golden_*.py refuses to overwrite without --force)
 ```
 
-- **Timing.** The suite is 1672 tests at v1.5.0 (173 in the `-k golden` group; 1573 and 166 at v1.4.0); the timings that follow are those of the v1.3.0 suite (1565 tests). The CI
-  `python` job ran it in 319 s and in 358 s in two runs on GitHub-hosted runners
-  on 2026-10-03, under `--cov` instrumentation. The last harness capture on the 2-CPU container baseline
-  (2026-09-20, 1362 tests) read 83 s for the `python` row — the full suite, 71 s,
-  plus the `-k golden` re-run. The growth since then is the v1.3.0 regression
-  suites (fail-closed risk rules and the edge golden, simulator fill rules, research
-  validity, the research store under two processes, the planted-signal tests). **The
-  Python suite therefore no longer meets the 120 s target stated at the top of this
-  file on CI hardware**; no uninstrumented baseline timing has been re-captured for
-  v1.3.0, and nothing was removed to make the number fit.
+- **Timing.** The suite is 1988 tests at v1.5.0 (192 in the `-k golden` group; 1573 and 166 at v1.4.0).
+  Measured in CI on the `ubuntu-24.04` runner (4 vCPU), Python 3.11, on one
+  tree, 2026-10-04 (pull request #23, when the suite was 1672 tests — before
+  the other v1.5.0 branches were merged):
+
+  | run | wall time |
+  |---|---|
+  | serial, with `--cov` (how CI ran it until v1.4.0) | 524 s |
+  | `-n auto --dist loadfile`, with `--cov` (how CI runs it now) | **149 s** |
+  | serial, without coverage | 110 s |
+  | `-n auto --dist loadfile`, with `--cov`, the merged v1.5.0 suite (1988 tests; two runs on pull request #21) | 306 s, 359 s |
+
+  Earlier CI runs of the 1565-test v1.3.0 suite read 319 s and 358 s serial under
+  `--cov`; the 524 s above is the same job on this tree and day. Coverage
+  tracing, not the tests, is most of the serial time. Where the time goes (serial,
+  per-test `--durations`): `test_eq03_report_reproduces_through_the_runner` 61 s,
+  the MVP golden run and its replay 40 + 37 s (module fixtures), the planted-signal
+  tests about 110 s in total, `test_mvp.py` about 60 s, `test_generator.py` about 65 s;
+  few other tests exceed 10 s. The tests merged afterwards — signal combination
+  (`test_report_pipeline_on_the_bundled_data` alone is 88 s), the MVP child-policy
+  runs (68 s of fixture), the real-data ingest path and the risk-fuzz corpus —
+  doubled the instrumented parallel run; it was not re-measured serially or
+  without coverage. **The 120 s target is therefore not met by the
+  instrumented CI run (149 s on the 1672-test suite, 306-359 s on the merged one) and
+  was met by the uninstrumented serial run of the 1672-test suite (110 s)**;
+  the harness capture on the 2-CPU container baseline
+  (2026-09-20, 1362 tests) read 83 s. Nothing was removed or skipped to make
+  a number fit; the parallel run collected the same 1672 tests and reported the same
+  outcome for every one of them as the serial run.
 - Python 3.11, src layout (`python/src/iap`), packaging via `python/pyproject.toml`
   (1.4.0; installable with `pip install -e python` if preferred over PYTHONPATH;
   console scripts `iap-marketdata`, `iap-features`, `iap-tca`, `iap-research`,
@@ -57,7 +76,7 @@ cd cpp && bash build.sh && ctest --test-dir build --output-on-failure
 ```
 
 C++17, g++13/CMake/GoogleTest/Eigen available; `-Wall -Wextra -Werror` clean; build
-with `-j2` (2-CPU environment); 289 tests, 68 in the golden group. Layout: `include/iap/{marketdata,orderbook,features,
+with `-j2` (2-CPU environment); 302 tests, 72 in the golden group. Layout: `include/iap/{marketdata,orderbook,features,
 alpha,execution,sor,replay,contracts,util}` + `src/` mirrors; `contracts/` is the
 canonical-JSON / decision-trace contract (`canonical_json.hpp`, `trace.hpp`),
 `util/sha256.hpp` the SHA-256 the codec goldens and the trace digest share. The
@@ -67,7 +86,7 @@ golden group is `ctest --test-dir build -R Golden` (suites `*Golden`, including
 ## Rust
 
 ```bash
-cd rust && cargo test        # workspace (eleven crates, 323 tests, ~55 s after a full rebuild)
+cd rust && cargo test        # workspace (eleven crates, 358 tests, ~55 s after a full rebuild)
 ```
 
 Crates: `marketdata`, `orderbook`, `replay`, `eventbus`, `telemetry`, `features`,
@@ -94,7 +113,7 @@ canonical-JSON byte parity the contracts / lifecycle goldens pin.
 ## Java — why there is NO Maven build
 
 ```bash
-cd java && bash build.sh && bash test.sh    # 510 tests; the thirteen *GoldenTest classes are 104 of them
+cd java && bash build.sh && bash test.sh    # 571 tests; the seventeen *GoldenTest classes are 124 of them
 ```
 
 **Maven/Gradle are deliberately not used: Maven Central is unreachable from

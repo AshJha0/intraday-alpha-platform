@@ -11,13 +11,14 @@ carries no statement about its own noise.
 Since v1.5.0 these views are REPORTED FIELDS of every validation result
 (``fold_diagnostics``, ``n_folds_survive_1x_cost``, ``net_pnl_1x_pooled``,
 ``net_pnl_bootstrap``): ``validate_alpha`` builds one :func:`fold_row` per
-fold inside its own walk-forward loop.  They are report-only — no gate
-reads them.  The cost gate still reads the last fold's net P&L at 1x, and a
-gate on the bootstrap interval was NOT added: the lifecycle gate table
-(``iap.lifecycle.gates``) reads one scalar, ``net_return_bps > 0``, from an
-``ExperimentResult``, so gating on an interval needs a new evidence field
-and a new gate row in the 17-edge table that Python, Java and Rust pin —
-a redesign, not a default change.
+fold inside its own walk-forward loop.  No gate of ``validate_alpha`` reads
+them: its cost gate reads the last fold's net P&L at 1x.  The LIFECYCLE
+does read the interval: the gate ``net_pnl_bootstrap_ci``
+(``iap.lifecycle.gates``) requires the lower bound of ``net_pnl_bootstrap``
+to be above zero, from an evidence block that carries the bounds, the
+level, the resample count, the seed and the trade count, so that the Java
+and Rust ports evaluate it without resampling.  The per-fold rows stay
+report-only.
 
 * :func:`fold_row` — one fold's diagnostics: net P&L across the pinned cost
   grid and whether it survives 1x costs, the decay curve of the

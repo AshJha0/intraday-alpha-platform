@@ -233,8 +233,10 @@ are read from the documents, which have not changed since v1.3.0.)
   the total to 1920 (139 configurations). The v1.5.0 regeneration kept all
   of those and added, under the default methods, the promotion pipeline
   (24 × 84), the five `v2` runs (5 × 84) and the adaptive study (40), for
-  **4,396 looks over 208 distinct configurations** (Bonferroni |t| ≥ 4.389,
-  expected max |t| ≈ 4.096). Entries are never de-duplicated across kinds or
+  4,396; the signal-combination report (`research/combination/`) added eight
+  experiments at 95 looks each, for
+  **5,156 looks over 216 distinct configurations** (Bonferroni |t| ≥ 4.424,
+  expected max |t| ≈ 4.135). Entries are never de-duplicated across kinds or
   datasets — the denominator only grows.
 
 `seed` is recorded and hashed but consumed by nothing: the whole chain

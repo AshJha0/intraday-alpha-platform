@@ -16,11 +16,30 @@
 //! reading's window that is new since the last counted reading, in `(0, 1]` —
 //! the weight of the reading under the CUSUM retirement rule
 //! (`crate::tracker`); the key is required whichever rule is configured.
+//!
+//! `cross_alpha` (v1.5.0) carries what the `cross_alpha_correlation` gate
+//! needs: one [`PeerCorrelation`] per OTHER registered alpha — its id, its
+//! lifecycle state when the evidence was built and the correlation of the two
+//! alphas' out-of-sample signals, in `[-1, 1]`. The peers are strictly
+//! increasing by `alpha_id` (sorted, unique). The gate filters them by state
+//! itself, so one document can be judged under another
+//! `cross_alpha_min_state`. The key is required and may be `null` — nobody
+//! measured the correlations, and the gate fails; an empty peer list is a
+//! statement (there is no other alpha) and passes vacuously.
+//!
+//! `pnl_bootstrap` (v1.5.0) carries the confidence interval the
+//! `net_pnl_bootstrap_ci` gate reads, with everything that pins it, so that no
+//! port resamples: `ci_low` / `ci_high` (both `null` when the series was too
+//! short for an interval), `level`, `n_resamples`, `seed`, `mean_block`,
+//! `n_bars` and `n_trades`. The key is required and may be `null` — no
+//! interval was computed, and the gate fails.
 
 use marketdata::IapError;
 use serde::de::Deserializer;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+
+use crate::state::LifecycleState;
 
 /// Research verdict (`experiment_result.schema.json`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -192,6 +211,161 @@ pub struct LiveEvidence {
     pub new_fraction: f64,
 }
 
+/// The bootstrap interval of the pooled net P&L at 1x costs, with what pins
+/// it (module docs).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PnlBootstrapEvidence {
+    /// Lower bound, or null when no interval exists.
+    #[serde(deserialize_with = "required_option")]
+    pub ci_low: Option<f64>,
+    /// Upper bound (>= `ci_low`), null exactly when `ci_low` is.
+    #[serde(deserialize_with = "required_option")]
+    pub ci_high: Option<f64>,
+    /// Confidence level the interval was taken at, in `(0, 1)`.
+    pub level: f64,
+    /// Bootstrap resamples (>= 1).
+    pub n_resamples: u64,
+    /// Seed of the resampling RNG.
+    pub seed: u64,
+    /// Mean block length of the stationary bootstrap (>= 1).
+    pub mean_block: f64,
+    /// Length of the resampled bar series.
+    pub n_bars: u64,
+    /// Trades at 1x costs over the same folds.
+    pub n_trades: u64,
+}
+
+impl PnlBootstrapEvidence {
+    /// What the gate compares: `ci_low` — or `None` (no usable interval: the
+    /// gate fails closed) when the alpha made no trade, when the interval was
+    /// not taken at exactly `level`, or when it has no bounds.
+    pub fn gate_value(&self, level: f64) -> Option<f64> {
+        if self.n_trades == 0 || self.level != level {
+            return None;
+        }
+        self.ci_low
+    }
+
+    /// Bounds both present or both null and ordered, finite numbers, level in
+    /// `(0, 1)`, at least one resample, mean block >= 1.
+    pub fn validate(&self) -> Result<(), IapError> {
+        match (self.ci_low, self.ci_high) {
+            (None, None) => {}
+            (Some(low), Some(high)) => {
+                check_finite("pnl_bootstrap.ci_low", low)?;
+                check_finite("pnl_bootstrap.ci_high", high)?;
+                if high < low {
+                    return Err(IapError::Validation(
+                        "pnl_bootstrap: ci_high < ci_low".to_string(),
+                    ));
+                }
+            }
+            _ => {
+                return Err(IapError::Validation(
+                    "pnl_bootstrap: ci_low and ci_high are both numbers or both null".to_string(),
+                ))
+            }
+        }
+        check_finite("pnl_bootstrap.level", self.level)?;
+        if !(self.level > 0.0 && self.level < 1.0) {
+            return Err(IapError::Validation(
+                "pnl_bootstrap.level must lie in (0, 1)".to_string(),
+            ));
+        }
+        if self.n_resamples < 1 {
+            return Err(IapError::Validation(
+                "pnl_bootstrap.n_resamples must be >= 1".to_string(),
+            ));
+        }
+        check_finite("pnl_bootstrap.mean_block", self.mean_block)?;
+        if self.mean_block < 1.0 {
+            return Err(IapError::Validation(
+                "pnl_bootstrap.mean_block must be >= 1".to_string(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// One other alpha as the correlation gate sees it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PeerCorrelation {
+    /// The peer's alpha id (non-empty).
+    pub alpha_id: String,
+    /// The peer's lifecycle state when the evidence was built.
+    pub state: LifecycleState,
+    /// Signal correlation with the alpha under evaluation, in `[-1, 1]`.
+    pub correlation: f64,
+}
+
+impl PeerCorrelation {
+    /// True when the gate counts this peer under `min_state`: its state is at
+    /// or beyond `min_state` and it is not RETIRED.
+    pub fn is_eligible(&self, min_state: LifecycleState) -> bool {
+        min_state.index() <= self.state.index()
+            && self.state.index() < LifecycleState::Retired.index()
+    }
+}
+
+/// The signal correlation of one alpha with every other registered alpha
+/// (module docs).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CrossAlphaEvidence {
+    /// One entry per other alpha, strictly increasing by `alpha_id`.
+    pub peers: Vec<PeerCorrelation>,
+}
+
+impl CrossAlphaEvidence {
+    /// The peers the gate counts under `min_state`, in `alpha_id` order.
+    pub fn eligible(&self, min_state: LifecycleState) -> Vec<&PeerCorrelation> {
+        self.peers
+            .iter()
+            .filter(|p| p.is_eligible(min_state))
+            .collect()
+    }
+
+    /// The gate statistic: the largest `|correlation|` over the eligible
+    /// peers, `0.0` when there is none (the vacuous case).
+    pub fn max_abs_correlation(&self, min_state: LifecycleState) -> f64 {
+        self.peers
+            .iter()
+            .filter(|p| p.is_eligible(min_state))
+            .map(|p| p.correlation.abs())
+            .fold(0.0, f64::max)
+    }
+
+    /// Non-empty ids, finite correlations in `[-1, 1]`, peers strictly
+    /// increasing by `alpha_id` (no duplicates).
+    pub fn validate(&self) -> Result<(), IapError> {
+        for p in &self.peers {
+            if p.alpha_id.is_empty() {
+                return Err(IapError::Validation(
+                    "cross_alpha.peers[].alpha_id: expected a non-empty string".to_string(),
+                ));
+            }
+            check_finite("cross_alpha.peers[].correlation", p.correlation)?;
+            if !(-1.0..=1.0).contains(&p.correlation) {
+                return Err(IapError::Validation(
+                    "cross_alpha.peers[].correlation must lie in [-1, 1]".to_string(),
+                ));
+            }
+        }
+        if self
+            .peers
+            .windows(2)
+            .any(|w| w[1].alpha_id <= w[0].alpha_id)
+        {
+            return Err(IapError::Validation(
+                "cross_alpha.peers: must be sorted by alpha_id, without duplicates".to_string(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// Everything the gates may read for one `advance` call.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -205,6 +379,14 @@ pub struct Evidence {
     /// The t threshold the research result was judged at (> 0), or null.
     #[serde(deserialize_with = "required_option")]
     pub significance_threshold: Option<f64>,
+    /// Bootstrap interval of the pooled net P&L at 1x costs, or null when
+    /// none was computed.
+    #[serde(deserialize_with = "required_option")]
+    pub pnl_bootstrap: Option<PnlBootstrapEvidence>,
+    /// Signal correlation with every other registered alpha, or null when
+    /// nobody measured it.
+    #[serde(deserialize_with = "required_option")]
+    pub cross_alpha: Option<CrossAlphaEvidence>,
     /// Held-out replay evidence.
     #[serde(deserialize_with = "required_option")]
     pub validation: Option<ValidationEvidence>,
@@ -231,6 +413,8 @@ impl Evidence {
             research: None,
             capacity_usd: None,
             significance_threshold: None,
+            pnl_bootstrap: None,
+            cross_alpha: None,
             validation: None,
             paper: None,
             live: None,
@@ -257,6 +441,12 @@ impl Evidence {
                     "evidence.significance_threshold must be > 0".to_string(),
                 ));
             }
+        }
+        if let Some(b) = &self.pnl_bootstrap {
+            b.validate()?;
+        }
+        if let Some(c) = &self.cross_alpha {
+            c.validate()?;
         }
         if let Some(v) = &self.validation {
             check_finite("validation.holdout_ic", v.holdout_ic)?;
@@ -311,7 +501,7 @@ mod tests {
     #[test]
     fn empty_document_round_trips() {
         let doc = json!({"research": null, "capacity_usd": null, "significance_threshold": null,
-                         "validation": null, "paper": null, "live": null});
+                         "pnl_bootstrap": null, "cross_alpha": null, "validation": null, "paper": null, "live": null});
         let ev = Evidence::from_value(&doc).expect("strict parse");
         assert_eq!(ev, Evidence::empty());
         assert_eq!(ev.to_value().expect("finite"), doc);
@@ -320,7 +510,7 @@ mod tests {
     #[test]
     fn strictness() {
         let base = json!({"research": null, "capacity_usd": null, "significance_threshold": null,
-                          "validation": null, "paper": null, "live": null});
+                          "pnl_bootstrap": null, "cross_alpha": null, "validation": null, "paper": null, "live": null});
         let mut missing = base.clone();
         missing.as_object_mut().expect("object").remove("live");
         assert!(Evidence::from_value(&missing).is_err(), "missing key");
@@ -367,5 +557,273 @@ mod tests {
         nan.capacity_usd = Some(f64::NAN);
         assert!(nan.validate().is_err());
         assert!(nan.to_value().is_err());
+    }
+
+    fn base_doc() -> Value {
+        json!({"research": null, "capacity_usd": null, "significance_threshold": null,
+               "pnl_bootstrap": null, "cross_alpha": null, "validation": null, "paper": null, "live": null})
+    }
+
+    fn peer(alpha_id: &str, state: LifecycleState, correlation: f64) -> PeerCorrelation {
+        PeerCorrelation {
+            alpha_id: alpha_id.to_string(),
+            state,
+            correlation,
+        }
+    }
+
+    #[test]
+    fn cross_alpha_round_trips_and_is_strict() {
+        let mut doc = base_doc();
+        doc["cross_alpha"] = json!({"peers": [
+            {"alpha_id": "A1", "state": "ACTIVE", "correlation": -0.9},
+            {"alpha_id": "A2", "state": "CANDIDATE", "correlation": 0.95}
+        ]});
+        let ev = Evidence::from_value(&doc).expect("strict parse");
+        let cross = ev.cross_alpha.as_ref().expect("present");
+        assert_eq!(
+            cross.peers,
+            vec![
+                peer("A1", LifecycleState::Active, -0.9),
+                peer("A2", LifecycleState::Candidate, 0.95)
+            ]
+        );
+        assert_eq!(ev.to_value().expect("finite"), doc);
+        // an empty peer list is a statement and round-trips as such
+        let mut empty = base_doc();
+        empty["cross_alpha"] = json!({"peers": []});
+        let ev = Evidence::from_value(&empty).expect("empty peers");
+        assert_eq!(ev.cross_alpha, Some(CrossAlphaEvidence { peers: vec![] }));
+        assert_eq!(ev.to_value().expect("finite"), empty);
+        // a document without the key is rejected, not defaulted
+        let mut old = base_doc();
+        old.as_object_mut().expect("object").remove("cross_alpha");
+        assert!(Evidence::from_value(&old).is_err(), "missing cross_alpha");
+        let rejected: Vec<(&str, Value)> = vec![
+            ("not an object", json!([])),
+            ("missing peers", json!({})),
+            ("unknown key", json!({"peers": [], "x": 1})),
+            ("peers not an array", json!({"peers": {}})),
+            (
+                "missing peer key",
+                json!({"peers": [{"alpha_id": "A1", "state": "ACTIVE"}]}),
+            ),
+            (
+                "unknown peer key",
+                json!({"peers": [
+                    {"alpha_id": "A1", "state": "ACTIVE", "correlation": 0.1, "x": 1}
+                ]}),
+            ),
+            (
+                "unknown state",
+                json!({"peers": [{"alpha_id": "A1", "state": "LIVE", "correlation": 0.1}]}),
+            ),
+            (
+                "state by index",
+                json!({"peers": [{"alpha_id": "A1", "state": 4, "correlation": 0.1}]}),
+            ),
+            (
+                "empty id",
+                json!({"peers": [{"alpha_id": "", "state": "ACTIVE", "correlation": 0.1}]}),
+            ),
+            (
+                "correlation above 1",
+                json!({"peers": [{"alpha_id": "A1", "state": "ACTIVE", "correlation": 1.5}]}),
+            ),
+            (
+                "correlation below -1",
+                json!({"peers": [{"alpha_id": "A1", "state": "ACTIVE", "correlation": -1.01}]}),
+            ),
+            (
+                "correlation not a number",
+                json!({"peers": [{"alpha_id": "A1", "state": "ACTIVE", "correlation": "0.1"}]}),
+            ),
+            (
+                "unsorted",
+                json!({"peers": [
+                    {"alpha_id": "B", "state": "ACTIVE", "correlation": 0.1},
+                    {"alpha_id": "A", "state": "ACTIVE", "correlation": 0.1}
+                ]}),
+            ),
+            (
+                "duplicate",
+                json!({"peers": [
+                    {"alpha_id": "A", "state": "ACTIVE", "correlation": 0.1},
+                    {"alpha_id": "A", "state": "PAPER", "correlation": 0.2}
+                ]}),
+            ),
+        ];
+        for (what, bad) in rejected {
+            let mut doc = base_doc();
+            doc["cross_alpha"] = bad;
+            assert!(Evidence::from_value(&doc).is_err(), "{what}");
+        }
+        // the bounds themselves are allowed
+        let mut bounds = base_doc();
+        bounds["cross_alpha"] = json!({"peers": [
+            {"alpha_id": "A", "state": "ACTIVE", "correlation": -1.0},
+            {"alpha_id": "B", "state": "ACTIVE", "correlation": 1.0}
+        ]});
+        assert!(Evidence::from_value(&bounds).is_ok());
+        let mut nan = Evidence::empty();
+        nan.cross_alpha = Some(CrossAlphaEvidence {
+            peers: vec![peer("A", LifecycleState::Active, f64::NAN)],
+        });
+        assert!(nan.validate().is_err());
+        assert!(nan.to_value().is_err());
+    }
+
+    fn boot_doc() -> Value {
+        json!({"ci_low": 12.5, "ci_high": 90.0, "level": 0.95, "n_resamples": 1000,
+               "seed": 20260829, "mean_block": 9.0, "n_bars": 626, "n_trades": 40})
+    }
+
+    #[test]
+    fn pnl_bootstrap_round_trips_and_is_strict() {
+        let mut doc = base_doc();
+        doc["pnl_bootstrap"] = boot_doc();
+        let ev = Evidence::from_value(&doc).expect("strict parse");
+        let boot = ev.pnl_bootstrap.clone().expect("present");
+        assert_eq!(
+            boot,
+            PnlBootstrapEvidence {
+                ci_low: Some(12.5),
+                ci_high: Some(90.0),
+                level: 0.95,
+                n_resamples: 1000,
+                seed: 20260829,
+                mean_block: 9.0,
+                n_bars: 626,
+                n_trades: 40,
+            }
+        );
+        assert_eq!(ev.to_value().expect("finite"), doc);
+        // an interval without bounds is a valid document
+        let mut unbounded = base_doc();
+        unbounded["pnl_bootstrap"] = boot_doc();
+        unbounded["pnl_bootstrap"]["ci_low"] = Value::Null;
+        unbounded["pnl_bootstrap"]["ci_high"] = Value::Null;
+        let ev = Evidence::from_value(&unbounded).expect("null bounds");
+        assert_eq!(ev.to_value().expect("finite"), unbounded);
+        // a document without the key is rejected, not defaulted
+        let mut old = base_doc();
+        old.as_object_mut().expect("object").remove("pnl_bootstrap");
+        assert!(Evidence::from_value(&old).is_err(), "missing pnl_bootstrap");
+        let rejected: Vec<(&str, &str, Value)> = vec![
+            ("one bound null", "ci_low", Value::Null),
+            ("the other bound null", "ci_high", Value::Null),
+            ("ci_high < ci_low", "ci_high", json!(12.0)),
+            ("level 1.0", "level", json!(1.0)),
+            ("level 0.0", "level", json!(0.0)),
+            ("no resample", "n_resamples", json!(0)),
+            ("fractional resamples", "n_resamples", json!(1000.5)),
+            ("negative seed", "seed", json!(-1)),
+            ("mean block below 1", "mean_block", json!(0.5)),
+            ("negative bars", "n_bars", json!(-1)),
+            ("negative trades", "n_trades", json!(-1)),
+            ("bound not a number", "ci_low", json!("12.5")),
+        ];
+        for (what, key, bad) in rejected {
+            let mut doc = base_doc();
+            doc["pnl_bootstrap"] = boot_doc();
+            doc["pnl_bootstrap"][key] = bad;
+            assert!(Evidence::from_value(&doc).is_err(), "{what}");
+        }
+        for key in [
+            "ci_low",
+            "ci_high",
+            "level",
+            "n_resamples",
+            "seed",
+            "mean_block",
+            "n_bars",
+            "n_trades",
+        ] {
+            let mut doc = base_doc();
+            doc["pnl_bootstrap"] = boot_doc();
+            doc["pnl_bootstrap"]
+                .as_object_mut()
+                .expect("object")
+                .remove(key);
+            assert!(Evidence::from_value(&doc).is_err(), "missing {key}");
+        }
+        let mut unknown = base_doc();
+        unknown["pnl_bootstrap"] = boot_doc();
+        unknown["pnl_bootstrap"]["x"] = json!(1);
+        assert!(Evidence::from_value(&unknown).is_err(), "unknown key");
+        let mut nan = Evidence::empty();
+        nan.pnl_bootstrap = Some(PnlBootstrapEvidence {
+            ci_low: Some(f64::NAN),
+            ..boot
+        });
+        assert!(nan.validate().is_err());
+        assert!(nan.to_value().is_err());
+    }
+
+    #[test]
+    fn pnl_bootstrap_gate_value_needs_a_traded_right_level_interval() {
+        let boot = PnlBootstrapEvidence {
+            ci_low: Some(12.5),
+            ci_high: Some(90.0),
+            level: 0.95,
+            n_resamples: 1000,
+            seed: 20260829,
+            mean_block: 9.0,
+            n_bars: 626,
+            n_trades: 40,
+        };
+        assert_eq!(boot.gate_value(0.95), Some(12.5));
+        assert_eq!(boot.gate_value(0.9), None, "another level");
+        let untraded = PnlBootstrapEvidence {
+            n_trades: 0,
+            ..boot.clone()
+        };
+        assert_eq!(untraded.gate_value(0.95), None, "no trade");
+        let unbounded = PnlBootstrapEvidence {
+            ci_low: None,
+            ci_high: None,
+            ..boot
+        };
+        assert_eq!(unbounded.gate_value(0.95), None, "no bounds");
+        assert!(unbounded.validate().is_ok());
+    }
+
+    #[test]
+    fn cross_alpha_statistic_counts_eligible_peers_only() {
+        let cross = CrossAlphaEvidence {
+            peers: vec![
+                peer("A", LifecycleState::Research, 0.99),
+                peer("B", LifecycleState::Candidate, 0.98),
+                peer("C", LifecycleState::Validating, 0.3),
+                peer("D", LifecycleState::Paper, -0.5),
+                peer("E", LifecycleState::Active, 0.2),
+                peer("F", LifecycleState::Watch, -0.1),
+                peer("G", LifecycleState::Retired, 0.97),
+            ],
+        };
+        let ids = |min_state: LifecycleState| -> Vec<String> {
+            cross
+                .eligible(min_state)
+                .into_iter()
+                .map(|p| p.alpha_id.clone())
+                .collect()
+        };
+        assert_eq!(ids(LifecycleState::Validating), ["C", "D", "E", "F"]);
+        assert_eq!(ids(LifecycleState::Paper), ["D", "E", "F"]);
+        assert_eq!(ids(LifecycleState::Active), ["E", "F"]);
+        assert_eq!(cross.max_abs_correlation(LifecycleState::Validating), 0.5);
+        assert_eq!(cross.max_abs_correlation(LifecycleState::Paper), 0.5);
+        assert_eq!(cross.max_abs_correlation(LifecycleState::Active), 0.2);
+        // no eligible peer, or no peer at all: 0.0
+        let none = CrossAlphaEvidence {
+            peers: vec![
+                peer("A", LifecycleState::Candidate, 0.9),
+                peer("B", LifecycleState::Retired, -0.9),
+            ],
+        };
+        assert_eq!(none.max_abs_correlation(LifecycleState::Validating), 0.0);
+        assert!(none.eligible(LifecycleState::Validating).is_empty());
+        let empty = CrossAlphaEvidence { peers: vec![] };
+        assert_eq!(empty.max_abs_correlation(LifecycleState::Validating), 0.0);
     }
 }

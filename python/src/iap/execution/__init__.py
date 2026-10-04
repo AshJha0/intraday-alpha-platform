@@ -25,6 +25,15 @@ from iap.execution.config import (
     load_sor_options,
     load_venues,
 )
+from iap.execution.passive import (
+    POLICY_NAMES,
+    ExecPolicy,
+    PassiveParams,
+    PassiveStats,
+    max_behind_qty,
+    patience_ns,
+    post_price,
+)
 from iap.execution.replay import ExecReplayResult, ExecutionReplay, ParentReport
 from iap.execution.simulator import ExecutionSimulator
 from iap.execution.sor import NO_ROUTE, SmartOrderRouter
@@ -48,6 +57,7 @@ __all__ = [
     "EXECUTION_FILE",
     "ExecConfig",
     "ExecCounters",
+    "ExecPolicy",
     "ExecReplayResult",
     "ExecutionReplay",
     "ExecutionSimulator",
@@ -61,6 +71,9 @@ __all__ = [
     "OrderType",
     "ParentOrder",
     "ParentReport",
+    "PassiveParams",
+    "PassiveStats",
+    "POLICY_NAMES",
     "SmartOrderRouter",
     "SorOptions",
     "VENUES_FILE",
@@ -69,6 +82,9 @@ __all__ = [
     "load_instruments",
     "load_sor_options",
     "load_venues",
+    "max_behind_qty",
+    "patience_ns",
+    "post_price",
     "slice_quantities",
     "slice_times",
     "slice_weights",

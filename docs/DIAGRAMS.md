@@ -35,17 +35,17 @@ flowchart TD
     FILLS --> TCA["TCA + attribution<br/>Perold IS = delay + trading + opportunity (exact)<br/>Python reference, Java service"]
     TCA --> TRACE["Decision trace — one DecisionTrace per decision<br/>signal · portfolio · risk · orders · routing · fills · TCA · attribution<br/>canonical JSONL + stream digest + SQLite index (iap.store); explain()"]
     LBL --> RESEARCH
-    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (4,396 looks / 208 configs, two datasets, two method bundles)<br/>REPORT.md, ML_REPORT.md, model manifests"]
-    RESEARCH --> LIFE["Alpha promotion lifecycle (iap.lifecycle)<br/>RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE <-> WATCH -> RETIRED<br/>18 gates, 17 edges; bundled data: 24 CANDIDATE / 0 beyond"]
+    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (5,156 looks / 216 configs, two datasets, two method bundles)<br/>REPORT.md, ML_REPORT.md, model manifests"]
+    RESEARCH --> LIFE["Alpha promotion lifecycle (iap.lifecycle)<br/>RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE <-> WATCH -> RETIRED<br/>20 gates, 17 edges; bundled data: 24 CANDIDATE / 0 beyond"]
     LIFE -. "gated, ledgered transitions<br/>(research/alpha_registry.json)" .-> ALPHA
 ```
 
 ## 2. Cross-language golden-test topology
 
 How one validated Python reference pins four implementations. The parity table is
-printed by `tests/harness/run_all.sh` (python 1672 · cpp 289 · rust 330 · java 517
-tests; 173/68/66/106 in the golden groups — the Java gate runs all thirteen
-`*GoldenTest` classes, the Rust gate nine golden targets). Two goldens are
+printed by `tests/harness/run_all.sh` (python 1988 · cpp 302 · rust 358 · java 571
+tests; 192/72/71/124 in the golden groups — the Java gate runs all seventeen
+`*GoldenTest` classes, the Rust gate ten golden targets). Two goldens are
 owned by a port language and consumed by Python as well: the fills golden
 (C++) by `iap.execution`, the risk goldens (Rust) by `iap.risk`.
 
@@ -60,10 +60,10 @@ flowchart LR
     MG --> EXP[("expected_*.json<br/>codec sha256 | book states | features<br/>alpha | backtest | risk decisions + audit + snapshot<br/>replay fills | portfolio | tca (+ timeline cases) | adaptive<br/>contracts examples | canonical json + trace digest<br/>lifecycle | experiment golden frame | mvp")]
     CPPTOOL["cpp/tools/make_replay_fills_golden<br/>(C++ is the fills reference;<br/>Python iap.execution consumes it too)"] --> EXP
     RSTOOL["rust/risk/src/bin/make_risk_golden<br/>(Rust is the risk reference;<br/>Python iap.risk consumes it too)"] --> EXP
-    GV --> PY["python: pytest -k golden<br/>173 tests"]
-    GV --> CPP["cpp: ctest -R Golden<br/>68 tests"]
-    GV --> RS["rust: 9 golden test targets<br/>66 tests"]
-    GV --> JV["java: all thirteen *GoldenTest (JUnitCore)<br/>106 golden-group tests"]
+    GV --> PY["python: pytest -k golden<br/>192 tests"]
+    GV --> CPP["cpp: ctest -R Golden<br/>72 tests"]
+    GV --> RS["rust: 10 golden test targets<br/>71 tests"]
+    GV --> JV["java: all seventeen *GoldenTest (JUnitCore)<br/>124 golden-group tests"]
     EXP --> PY
     EXP --> CPP
     EXP --> RS
@@ -240,7 +240,7 @@ flowchart TD
     BEHIND["a cancel from an order that joined after us, or with a<br/>synthetic QUOTE / SNAPSHOT id, does not advance us;<br/>an event the book dropped moves nobody (diagram 12)"] -.-> OBS
 ```
 
-## 7. Platform data model (`schemas/sql/iap_v1.sql`)
+## 7. Platform data model (`schemas/sql/iap_v2.sql`)
 
 The relational index over every contract and research artefact, as built by
 `python -m iap.store build` (SQLite; the same DDL runs on PostgreSQL). Solid
@@ -251,9 +251,10 @@ the views and the query cookbook are in [DATA_MODEL.md](DATA_MODEL.md).
 
 ```mermaid
 erDiagram
-    %% schemas/sql/iap_v1.sql — x-version 1. Solid lines are declared foreign
+    %% schemas/sql/iap_v2.sql — x-version 2. Solid lines are declared foreign
     %% keys (every stage row of a decision trace); dotted lines are logical
-    %% references between independently imported artefacts.
+    %% references between independently imported artefacts. The research
+    %% tables carry the scope (dataset_version, methods) a number was computed in.
 
     instruments {
         BIGINT instrument_id PK
@@ -310,10 +311,13 @@ erDiagram
         BIGINT test_end_ts
         BIGINT seed
         TEXT horizon
+        TEXT methods
     }
     experiment_results {
         TEXT experiment_id PK
         TEXT alpha_id
+        TEXT dataset_version
+        TEXT methods
         DOUBLE_PRECISION ic
         DOUBLE_PRECISION t_stat
         DOUBLE_PRECISION net_return_bps
@@ -326,12 +330,29 @@ erDiagram
         TEXT ledger_key PK
         TEXT alpha_id
         TEXT kind
+        TEXT dataset_version
+        TEXT methods
+        TEXT experiment_id
+        BIGINT gate_looks
+        DOUBLE_PRECISION promote_t_threshold
         TEXT config_json
         BIGINT count
         BIGINT n
         DOUBLE_PRECISION oos_ic
         DOUBLE_PRECISION nw_tstat
         TEXT verdict
+    }
+    ledger_scopes {
+        TEXT dataset_version PK
+        TEXT methods PK
+        BIGINT n_entries
+        BIGINT looks
+        DOUBLE_PRECISION bonferroni_t_threshold
+    }
+    store_scope {
+        TEXT scope PK
+        TEXT dataset_version
+        TEXT methods
     }
     lifecycle_transitions {
         TEXT alpha_id PK
@@ -343,6 +364,8 @@ erDiagram
         TEXT reason
         TEXT gates_json
         TEXT actor
+        TEXT dataset_version
+        TEXT methods
     }
     decision_traces {
         TEXT trace_id PK
@@ -506,6 +529,9 @@ erDiagram
     alphas ||..o{ ledger_entries : "alpha_id"
     alphas ||..o{ lifecycle_transitions : "alpha_id"
     experiments ||..o| experiment_results : "experiment_id"
+    experiments ||..o| ledger_entries : "experiment_id"
+    ledger_scopes ||..o{ ledger_entries : "dataset_version, methods"
+    store_scope ||..o| ledger_scopes : "current scope"
     feature_versions ||..o{ experiments : "feature_version"
     feature_versions ||..o{ model_runs : "feature_version"
     feature_versions ||..o{ drift_baselines : "feature_version"
@@ -609,7 +635,7 @@ flowchart TD
     FEAT --> CHILD["8. per child: AlgoScheduler → SorAdapter.route (3 venues)<br/>→ controls (slice interval, latency budget, participation)<br/>→ RiskEngineAdapter.evaluate (RiskDecision) → submit<br/>a REJECT is never submitted"]
     CHILD --> TRACE["9. TraceBuilder per decision → JsonlTraceSink + StoreTraceSink + TraceDigest"]
     TRACE --> OUT["data/mvp/RUN_ID/: traces.jsonl · iap.sqlite · risk_audit.jsonl<br/>report.json / report.md · paper_evidence.json · config.json"]
-    OUT --> VERIFY["python -m iap.mvp verify — run twice, identical bytes<br/>python -m iap.mvp replay --run … — same digest from the captured stream<br/>golden: tests/golden/expected_mvp.json (15,805 events, 800 decisions,<br/>235 parents, 169 fills, P&L −81.53 USD, digest e534ac1f…)"]
+    OUT --> VERIFY["python -m iap.mvp verify — run twice, identical bytes<br/>python -m iap.mvp replay --run … — same digest from the captured stream<br/>golden: tests/golden/expected_mvp.json (15,805 events, 800 decisions,<br/>235 parents, 169 fills, P&L −81.53 USD, digest 20d4ff76…)"]
     SIM -. "next event" .-> SIM
 ```
 
@@ -1053,7 +1079,7 @@ flowchart TD
 | Governing institutional specification (verbatim) | [SPECIFICATION.md](SPECIFICATION.md) |
 | Teaching walkthrough of every subsystem | [../LEARN.md](../LEARN.md) |
 | How the quant, algo and AI sides work, top-down | [HOW_IT_WORKS.md](HOW_IT_WORKS.md) |
-| 35 runnable recipes | [../COOKBOOK.md](../COOKBOOK.md) |
+| 38 runnable recipes | [../COOKBOOK.md](../COOKBOOK.md) |
 | Data model, views, SQLite/PostgreSQL portability, query cookbook | [DATA_MODEL.md](DATA_MODEL.md) |
 | The 7-state promotion lifecycle: gates, evidence, registry, bootstrap result | [LIFECYCLE.md](LIFECYCLE.md) |
 | The decision trace: record, ids, canonical JSON, digest, sinks, replay | [DECISION_TRACE.md](DECISION_TRACE.md) |

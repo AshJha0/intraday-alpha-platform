@@ -44,12 +44,23 @@ Contents:
 33. [Query the store read-only, and see what a refused statement looks like](#33-query-the-store-read-only-and-see-what-a-refused-statement-looks-like)
 34. [Replay the risk edge golden in Python](#34-replay-the-risk-edge-golden-in-python)
 35. [Check whether a result is gate-eligible](#35-check-whether-a-result-is-gate-eligible)
+36. [Ingest an ITCH 5.0 file and run an alpha on it (no real data needed)](#36-ingest-an-itch-50-file-and-run-an-alpha-on-it-no-real-data-needed)
+37. [Work a parent order passively and read its markouts](#37-work-a-parent-order-passively-and-read-its-markouts)
+38. [Combine alphas out of sample and count the independent bets](#38-combine-alphas-out-of-sample-and-count-the-independent-bets)
 
 Recipes 27–35 were added with v1.3.0. Every command block in them was run
 as printed, from a clean checkout of the release, before it was written
 down; the quoted outputs are what those runs printed. Recipes that write
 anything write under `data/store/` (git-ignored), never into the committed
 ledger or `research/experiments/`.
+
+Recipe 36 was added with the real-data ingestion path ([docs/REAL_DATA.md](docs/REAL_DATA.md)). It writes under `data/vendor/` and
+`data/real/` (both git-ignored); its block was run as printed.
+
+Recipes 37 and 38 were added with the execution-quality and the
+signal-combination work of v1.5.0. Their Python blocks only read the
+repository; the `research combine` command that closes recipe 38 is the one
+that writes (`research/combination/` and the ledger).
 
 v1.4.0 (2026-10-03) regenerated the seeded dataset (`data_version`
 `116b7787…`, was `203c8f54…`; recipe 1). Every quoted output below that
@@ -726,10 +737,10 @@ bash tests/harness/run_all.sh --golden-only   # golden groups only (fast)
 ```
 
 Exit code 0 iff every language passed; logs land in a temp dir printed on
-the first line. The v1.5.0 counts (CI): python 1672 / cpp 289 /
-rust 330 / java 517 tests passed (golden groups 173/68/66/106), plus
+the first line. The v1.5.0 counts (CI): python 1988 / cpp 302 /
+rust 358 / java 571 tests passed (golden groups 192/72/71/124), plus
 `integration` (35) and `replay` (6) rows for the repo-level pytest suites, a
-`deployment` row (25 structural checks passed in CI, where `promtool` and
+`deployment` row (26 structural checks passed in CI, where `promtool` and
 `kubeconform` are installed; a machine without them reports those checks as
 skipped) and a `numbers` row (every headline figure re-derived from its
 artefact), all PASS.
@@ -949,7 +960,7 @@ the summary line stays bit-for-bit reproducible (recipe 12).
 
 ## 20. Build the platform store and query it
 
-The store (`schemas/sql/iap_v1.sql`, [docs/DATA_MODEL.md](docs/DATA_MODEL.md))
+The store (`schemas/sql/iap_v2.sql`, [docs/DATA_MODEL.md](docs/DATA_MODEL.md))
 is a derived, rebuildable SQLite index over the research artefacts and the
 decision traces; the JSON / JSONL / Parquet files stay the source of truth.
 Building it takes about a second and prints one row per table:
@@ -964,9 +975,11 @@ PYTHONPATH=src python3 -m iap.store build            # -> data/store/iap.sqlite 
 # experiment_results       39
 # experiments              39
 # instruments              19
-# ledger_entries          208
-# lifecycle_transitions   324
+# ledger_entries          216
+# ledger_scopes             3
+# lifecycle_transitions   372
 # model_runs               47
+# store_scope               1
 # tca_orders               36
 # venues                    5
 # ...
@@ -975,47 +988,80 @@ PYTHONPATH=src python3 -m iap.store build            # -> data/store/iap.sqlite 
 Every importer is idempotent — run `build` again and the counts do not
 move — and total over its input: a record it cannot map (a NaN metric, a
 malformed line, an absent optional artefact) is a warning on stderr, never
-a crash. Query with `sql` (one canonical JSON line per row; add `ORDER BY`
-for deterministic output) or with the views:
+a crash. A database built by an earlier release (data-model x-version 1) is
+refused with exit code 2 and left untouched; `build --rebuild` deletes it
+and builds it again, which is the whole migration.
+
+Every research row is filed under the **scope** it was computed in — the
+dataset (`dataset_version`) and the method bundle (`methods`: `v2` or
+`legacy_v1`) — and the scorecard is one row per alpha and scope. The
+`*_current` views are the current dataset under the default bundle. Query
+with `sql` (one canonical JSON line per row; add `ORDER BY` for
+deterministic output), or print a scope's scorecard with `scorecard`:
 
 ```bash
-PYTHONPATH=src python3 -m iap.store sql "SELECT alpha_id, current_state, verdict, ROUND(ic,4) AS ic, ledger_count FROM v_alpha_scorecard ORDER BY alpha_id"
-# {"alpha_id":"EQ01","current_state":"CANDIDATE","ic":0.0276,"ledger_count":292,"verdict":"ITERATE"}
-# {"alpha_id":"EQ02","current_state":"CANDIDATE","ic":0.0251,"ledger_count":140,"verdict":"ITERATE"}
+PYTHONPATH=src python3 -m iap.store sql "SELECT alpha_id, current_state, verdict, ROUND(ic,4) AS ic, ledger_count FROM v_alpha_scorecard_current ORDER BY alpha_id"
+# {"alpha_id":"EQ01","current_state":"CANDIDATE","ic":-0.0019,"ledger_count":172,"verdict":"REJECT"}
+# {"alpha_id":"EQ02","current_state":"CANDIDATE","ic":0.0251,"ledger_count":84,"verdict":"ITERATE"}
 # ...  (24 rows)
+PYTHONPATH=src python3 -m iap.store sql "SELECT alpha_id, substr(dataset_version, 1, 8) AS dataset, methods, is_current, verdict, ROUND(ic, 4) AS ic, ROUND(t_stat, 2) AS t_stat, ROUND(promote_t_threshold, 3) AS t_threshold, ledger_count, scope_looks FROM v_alpha_scorecard WHERE alpha_id = 'EQ03' ORDER BY dataset_version, methods"
+# {"alpha_id":"EQ03","dataset":"116b7787","ic":0.0271,"is_current":0,"ledger_count":88,"methods":"legacy_v1","scope_looks":852,"t_stat":4.84,"t_threshold":3.0,"verdict":"ITERATE"}
+# {"alpha_id":"EQ03","dataset":"116b7787","ic":0.0132,"is_current":1,"ledger_count":256,"methods":"v2","scope_looks":3236,"t_stat":2.41,"t_threshold":4.37,"verdict":"ITERATE"}
+# {"alpha_id":"EQ03","dataset":"203c8f54","ic":0.0165,"is_current":0,"ledger_count":88,"methods":"legacy_v1","scope_looks":1068,"t_stat":4.25,"t_threshold":3.0,"verdict":"ITERATE"}
+PYTHONPATH=src python3 -m iap.store sql "SELECT substr(dataset_version, 1, 8) AS dataset, methods, n_entries, looks, ROUND(bonferroni_t_threshold, 3) AS bonferroni_t FROM ledger_scopes ORDER BY dataset_version, methods"
+# {"bonferroni_t":4.018,"dataset":"116b7787","looks":852,"methods":"legacy_v1","n_entries":69}
+# {"bonferroni_t":4.322,"dataset":"116b7787","looks":3236,"methods":"v2","n_entries":77}
+# {"bonferroni_t":4.071,"dataset":"203c8f54","looks":1068,"methods":"legacy_v1","n_entries":70}
 PYTHONPATH=src python3 -m iap.store sql "SELECT COUNT(*) AS distinct_experiments, SUM(count) AS total_experiments FROM ledger_entries"
-# {"distinct_experiments":208,"total_experiments":4396}     -- the Bonferroni denominator
+# {"distinct_experiments":216,"total_experiments":5156}     -- the Bonferroni denominator of the whole ledger
+PYTHONPATH=src python3 -m iap.store scorecard | wc -l                                   # 24: the current scope
+PYTHONPATH=src python3 -m iap.store scorecard --methods legacy_v1 | wc -l               # 24: same dataset, legacy bundle
+PYTHONPATH=src python3 -m iap.store scorecard --dataset-version 203c8f54 --methods legacy_v1 | wc -l   # 24: the earlier dataset
+PYTHONPATH=src python3 -m iap.store scorecard --all-scopes | wc -l                      # 72: three scopes x 24 alphas
 ```
 
 (Re-run on the v1.5.0 tree, with `--db` pointing at a scratch file.)
 
-Read the scorecard's `ic` and `verdict` with care. The view
-shows each alpha's *latest* experiment result, chosen by `created_ts` and
-then by the largest experiment id, and it knows about neither datasets nor
-method bundles. The runner experiments of both datasets and both bundles
-share one `created_ts`, so for the three alphas that have them the
-tie-break decides, and it decides differently for each: EQ01's row above
-is `c73bb6294d226163`, a v1.3.0-dataset experiment (IC 0.0276, ITERATE),
-not the current one (`6e4a3431a3acf8a5`, IC −0.0019, REJECT); EQ03's row
-is `f0f6c49b553f6b59`, the current dataset under the v1.4.0 rules; EQ06's
-is `d87e34a9c67c1891`, the current dataset under the default rules. EQ02
-has no runner experiment and shows the v1.5.0 alpha report (gate IC
-0.0251). For a reading per dataset use
-`python -m iap.research list` (recipe 26), which prints the dataset of each
-experiment, and `show <id>` for the method bundle. The store also keeps
-`gate_looks` and the gate statistics of a v1.5.0 ledger entry only inside
-`result_json`. Both are known limitations; fixing either needs a second
-schema version. The ledger counts (4,396 looks over 208 entries) cover
-both datasets and both bundles on purpose: 1,068 were taken on the v1.3.0
-dataset, 852 on the v1.4.0 dataset under the old rules, and v1.5.0 added
-2,476 under the default rules (24 × 84 for the promotion report, 5 × 84
-for the runner experiments, 40 adaptive deployments).
+How to read a scorecard row. Each row is one scope and every number in it
+is of that scope alone: `ic`, `t_stat` and `verdict` are the latest
+experiment result recorded in the scope (by `created_ts`, then the largest
+experiment id), `gate_looks` and `promote_t_threshold` the ledger look count
+and \|t\| threshold that result was judged at, `ledger_count` the alpha's
+looks in the scope and `scope_looks` every look made in it. EQ03's three
+rows above add up to the count of 432 the version-1 view printed on a single
+row next to a legacy-rules IC; nothing is pooled any more. Two things to
+keep in mind. First, EQ01, EQ03 and EQ06 also have `ExperimentRunner`
+experiments, and their latest result in a scope is one of those (EQ01's
+current row is `6e4a3431a3acf8a5`, IC −0.0019, REJECT); the alpha-report
+pipeline's verdict is in `pipeline_verdict` / `pipeline_nw_tstat` /
+`pipeline_t_threshold`, and that is the column the headline "11 ITERATE /
+13 REJECT" counts (recipe 33). Second, the threshold is the one the result
+was judged at, not a re-judgement: `legacy_v1` rows read the fixed 3.0,
+`v2` rows `max(3.0, Bonferroni |t| at gate_looks)`, where `gate_looks`
+counts every look the ledger held at the time, across datasets;
+`scope_bonferroni_t` is what the scope alone would demand. The ledger total
+(5,156 looks over 216 entries) is the sum of the three scopes: 1,068 on the
+v1.3.0 dataset, 852 on the current dataset under the old rules, and 3,236
+under the default rules (24 × 84 for the promotion report, 5 × 84 for the
+runner experiments, 40 adaptive deployments, 8 × 95 for the signal-combination
+experiments of recipe 38).
+
+`sql` binds `:dataset_version` and `:methods` to the scope the command line
+selects (the current one by default), and `build --ledger <path>` indexes
+the ledger an ingested dataset keeps in its own directory — its rows form
+their own scopes and are never added to the synthetic dataset's counts:
+
+```bash
+PYTHONPATH=src python3 -m iap.store sql --methods legacy_v1 "SELECT pipeline_verdict, COUNT(*) AS n FROM v_alpha_scorecard WHERE dataset_version = :dataset_version AND methods = :methods GROUP BY pipeline_verdict ORDER BY pipeline_verdict"
+# {"n":10,"pipeline_verdict":"ITERATE"}
+# {"n":14,"pipeline_verdict":"REJECT"}
+```
 
 From Python the same store is `iap.store.Store` (`open`, `init`,
 `insert_<type>` for every contract, `fetch(T, **where)`, `query`,
 `export_jsonl`); `Store.export_jsonl(table, path)` writes canonical lines in
 primary-key order, so two builds from the same files are byte-identical.
-The DDL runs unchanged on PostgreSQL ≥ 13 (`psql -f schemas/sql/iap_v1.sql`).
+The DDL runs unchanged on PostgreSQL ≥ 13 (`psql -f schemas/sql/iap_v2.sql`).
 
 ## 21. Explain an order (the decision trace)
 
@@ -1075,7 +1121,7 @@ synthetic equity `SYN.EQ.AAPL` and writes every artefact under
 ```bash
 cd python
 PYTHONPATH=src python3 -m iap.mvp run                       # configs/mvp/mvp.json, seed 12345
-# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=235 children=348 fills=169 pnl=-81.531396 USD digest=e534ac1f06c50537... out=.../data/mvp/58a10f2194a3c81c
+# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=235 children=348 fills=169 pnl=-81.531396 USD digest=20d4ff76af0b631c... out=.../data/mvp/58a10f2194a3c81c
 PYTHONPATH=src python3 -m iap.mvp run --seed 7 --out /tmp/mvp7          # another seed, explicit directory
 PYTHONPATH=src python3 -m iap.mvp verify                                  # run twice from scratch, compare digest/report/stream
 cat ../data/mvp/58a10f2194a3c81c/report.md                                # the honest numbers (cost-negative)
@@ -1099,7 +1145,7 @@ and the loop makes 800 decisions (355 before) and loses 81.53 USD (22.65
 before): +0.022 bps of alpha against −0.41 bps of cost on filled notional.
 v1.5.0 changed none of that. The loop does not use the research
 backtester, so its events, decisions, parents, children, fills and P&L are
-identical to v1.4.0; what moved is `config_version` (`bf8cc608…`, was
+identical to v1.4.0; what moved is `config_version` (`439bbad5…`, was
 `f293e7e7…`), which hashes `execution.json` and `alpha_params.json`, and
 with it the trace digest printed above (`f51890da…` in v1.4.0), because
 every trace carries `config_version`. The summary line was re-run for this
@@ -1175,7 +1221,8 @@ The seven-state machine ([docs/LIFECYCLE.md](docs/LIFECYCLE.md)) reads the
 at RESEARCH at the pinned bootstrap event time (the latest fold `test_end`)
 and advances it until it stops moving. On the bundled data that is one
 step: every alpha reaches CANDIDATE and holds there. All 24 fail
-`net_pnl_after_costs` and `capacity`; for three of them (EQ02, EQ03, EQ12)
+`net_pnl_after_costs`, its bootstrap bound `net_pnl_bootstrap_ci` and
+`capacity`; for three of them (EQ02, EQ03, EQ12)
 those are the only failed gates.
 
 ```bash
@@ -1186,10 +1233,10 @@ PYTHONPATH=src python3 -m iap.lifecycle bootstrap --force        # rewrite resea
 PYTHONPATH=src python3 -m iap.lifecycle status
 # alpha | state | since_ts | failed gates
 # ----- | ----- | -------- | ------------
-# EQ01 | CANDIDATE | 1787691480577291027 | statistical_significance, net_pnl_after_costs, capacity, stability
-# EQ03 | CANDIDATE | 1787691480577291027 | net_pnl_after_costs, capacity
-# EQ04 | CANDIDATE | 1787691480577291027 | oos_ic, statistical_significance, fold_consistency, hypothesis_sign, net_pnl_after_costs, capacity, stability
-# FX09 | CANDIDATE | 1787691480577291027 | oos_ic, statistical_significance, fold_consistency, hypothesis_sign, net_pnl_after_costs, capacity, stability
+# EQ01 | CANDIDATE | 1787691480577291027 | statistical_significance, net_pnl_after_costs, net_pnl_bootstrap_ci, capacity, stability
+# EQ03 | CANDIDATE | 1787691480577291027 | net_pnl_after_costs, net_pnl_bootstrap_ci, capacity
+# EQ04 | CANDIDATE | 1787691480577291027 | oos_ic, statistical_significance, fold_consistency, hypothesis_sign, net_pnl_after_costs, net_pnl_bootstrap_ci, capacity, stability
+# FX09 | CANDIDATE | 1787691480577291027 | oos_ic, statistical_significance, fold_consistency, hypothesis_sign, net_pnl_after_costs, net_pnl_bootstrap_ci, capacity, stability
 # ...  (24 rows, all CANDIDATE)
 PYTHONPATH=src python3 -m iap.lifecycle retire FX09 --reason "desk decision: rationale contradicted by the fitted sign"   # HUMAN edge -> RETIRED
 PYTHONPATH=src python3 -m iap.lifecycle reset FX09 --reason "re-run the evidence chain after the refit"                # HUMAN edge RETIRED -> RESEARCH
@@ -1513,9 +1560,9 @@ PYTHONPATH=src python3 -m iap.research --out-dir ../data/store/scratch/experimen
 # VERDICT: ITERATE
 # PROMOTE t threshold: 4.3830 (ledger ...)
 # gate eligible: yes
-# looks: 4396 bonferroni |t|: 4.389
+# looks: 5156 bonferroni |t|: 4.424
 # this run's count, 4272: 4.383
-# ledger min_nw_tstat: 4.389
+# ledger min_nw_tstat: 4.424
 # fixed  min_nw_tstat: 3.0
 # experiment         47e6cdacc73e85fe
 # ... t-stat (the gate's)             +4.8405 ... holdout net return (bps)        -2174.7262 ...
@@ -1617,9 +1664,10 @@ stationary-bootstrap interval (Politis & Romano; SplitMix64, seeded) around
 the pooled net P&L. Since v1.5.0 `validate_alpha` reports that block itself
 (`fold_diagnostics`, `net_pnl_bootstrap`; the "Every fold" table of
 `REPORT.md`), and its looks are counted — it is most of why a validation
-is 83 looks and not 27. It stays report-only: no gate reads it, because a
-new gate would add a row to the lifecycle gate table that three languages
-pin. The standalone form below is for a caller that wants the diagnostics
+is 83 looks and not 27. The interval is also what the lifecycle gate
+`net_pnl_bootstrap_ci` reads (docs/LIFECYCLE.md §3: its lower bound must be
+above zero, and an alpha that makes no trade fails); the per-fold rows stay
+report-only. The standalone form below is for a caller that wants the diagnostics
 without the rest of the validation; it is run once under the default rules
 and once under the legacy ones:
 
@@ -1745,14 +1793,14 @@ through `build`:
 ```bash
 cd python
 PYTHONPATH=src python3 -m iap.store build > /dev/null
-PYTHONPATH=src python3 -m iap.store sql "SELECT current_state, COUNT(*) AS n FROM v_alpha_scorecard GROUP BY current_state ORDER BY current_state"
-PYTHONPATH=src python3 -m iap.store sql "SELECT verdict, COUNT(*) AS n FROM v_alpha_scorecard GROUP BY verdict ORDER BY verdict"
+PYTHONPATH=src python3 -m iap.store sql "SELECT current_state, COUNT(*) AS n FROM v_alpha_scorecard_current GROUP BY current_state ORDER BY current_state"
+PYTHONPATH=src python3 -m iap.store sql "SELECT pipeline_verdict, COUNT(*) AS n FROM v_alpha_scorecard_current GROUP BY pipeline_verdict ORDER BY pipeline_verdict"
 PYTHONPATH=src python3 -m iap.store sql "DELETE FROM alphas"; echo "exit=$?"
 PYTHONPATH=src python3 -m iap.store sql "SELECT 1; SELECT 2"; echo "exit=$?"
 PYTHONPATH=src python3 -m iap.store sql "SELECT * FROM no_such_table"; echo "exit=$?"
 # {"current_state":"CANDIDATE","n":24}
-# {"n":11,"verdict":"ITERATE"}
-# {"n":13,"verdict":"REJECT"}
+# {"n":11,"pipeline_verdict":"ITERATE"}
+# {"n":13,"pipeline_verdict":"REJECT"}
 # error: attempt to write a readonly database (the store is opened read-only; use `build` to rebuild it)
 # exit=1
 # error: `sql` runs exactly one statement; several were given (You can only execute one statement at a time.)
@@ -1763,13 +1811,12 @@ PYTHONPATH=src python3 -m iap.store sql "SELECT * FROM no_such_table"; echo "exi
 
 The first two rows are the platform's headline result as a query: every
 alpha at CANDIDATE, none promoted. (Re-run on the v1.5.0 tree against a
-scratch `--db`. The 11 / 13 split equals the v1.5.0
-promotion report's, but the view takes each verdict from the alpha's latest
-experiment result, which for EQ01, EQ03 and EQ06 is a runner experiment —
-for EQ01 one on the v1.3.0 dataset — recipe 20. The counts agree because
-those three runner verdicts happen to equal the report's. Quote verdict
-counts from
-`research/alpha_reports/REPORT.md`.) The three failures are the three ways a
+scratch `--db`. The 11 / 13 split is the v1.5.0 promotion report's:
+`pipeline_verdict` is the alpha-report pipeline's verdict in the current
+scope — the current dataset under the default methods. The view's `verdict`
+column is the alpha's latest experiment result in that scope, which for
+EQ01, EQ03 and EQ06 is a runner experiment and reads 10 / 14 — recipe 20.)
+The three failures are the three ways a
 statement is refused: a write (with the rebuild hint, which is printed only
 for a write), several statements (refused rather than half-run), and a
 plain SQL error (the engine's own message, no hint). Add `--db <file>` to
@@ -1903,3 +1950,212 @@ v1.5.0, `significance_threshold` and `live.new_fraction`, which all three
 readers require.) LEARN.md §24 explains which ways of gaming the gate this
 closes.
 
+
+## 36. Ingest an ITCH 5.0 file and run an alpha on it (no real data needed)
+
+`python -m iap.marketdata ingest` ([docs/REAL_DATA.md](docs/REAL_DATA.md))
+turns a Nasdaq TotalView-ITCH 5.0 file — or LOBSTER files — that **you
+obtained** into a dataset directory with the generator's layout, so the
+feature pipeline and the research runner consume it unchanged. No vendor
+data is in this repository, so this recipe writes two days of valid ITCH 5.0
+bytes with the test-only encoder and runs the whole chain on them. Replace
+the first block with your own files and the rest is the real procedure.
+
+```bash
+mkdir -p data/vendor
+cd python
+PYTHONPATH=src python3 - <<'EOF'
+import sys
+sys.path.insert(0, "tests")                      # the test-only encoder lives beside the tests
+from itch50_encoder import build_session
+
+for seed, date in ((7, "2019-12-30"), (8, "2019-12-31")):
+    enc, _ = build_session(seed, symbols=("AAPL", "MSFT", "QQQ"), etp_symbols=("QQQ",),
+                           n_actions=6000, spacing_ns=10**9)
+    path = enc.write(f"../data/vendor/demo_{date}.itch.gz", compress=True)
+    print(path, enc.messages, "messages")
+EOF
+# ../data/vendor/demo_2019-12-30.itch.gz 6082 messages
+# ../data/vendor/demo_2019-12-31.itch.gz 6082 messages
+
+for d in 2019-12-30 2019-12-31; do
+  PYTHONPATH=src python3 -m iap.marketdata ingest --format itch50 \
+    --input ../data/vendor/demo_$d.itch.gz --date $d \
+    --symbols AAPL,MSFT,QQQ --out ../data/real/demo > /dev/null
+done
+PYTHONPATH=src python3 - <<'EOF'
+import json
+m = json.load(open("../data/real/demo/dataset.json"))
+print(m["dataset_version"][:16], list(m["sessions"]), [u["symbol"] for u in m["universe"]])
+s = m["sessions"]["2019-12-30"]
+print(s["messages"]["by_type"])
+print("events", s["raw"]["events"], "book check clean:", s["book_check"]["clean"],
+      "qc:", {k: v for k, v in m["normalized"]["qc_totals"].items() if v})
+EOF
+# 70ddb405e78c2356 ['2019-12-30', '2019-12-31'] ['AAPL', 'MSFT', 'QQQ']
+# {'A': 3061, 'C': 220, 'D': 886, 'E': 820, 'F': 10, 'H': 4, 'I': 4, 'P': 164, 'Q': 8, 'R': 4, 'S': 6, 'U': 419, 'X': 472, 'Y': 4}
+# events 5576 book check clean: True qc: {'events_in': 11255, 'events_out': 11255, 'sequence_resets': 3}
+
+PYTHONPATH=src python3 -m iap.features --data-dir ../data/real/demo/normalized \
+  --out-dir ../data/real/demo/features --configs ../data/real/demo/configs \
+  --registry-out ../data/real/demo/reference/feature_registry.json 2> /dev/null
+PYTHONPATH=src python3 -m iap.research run --alpha EQ03 --dataset-dir ../data/real/demo \
+  | sed -n '1,5p;/VERDICT/p'
+# experiment         240bdd3b53899e7f
+# alpha              EQ03
+# horizon            5s
+# dataset_version    70ddb405e78c2356c2a6f15a85f8dfe520cc27bf427ec2532d4257c480e8e29e
+# feature_version    585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac
+# VERDICT: REJECT
+```
+
+What to read in the output. The message counts are per ITCH type, counted
+over the whole file before the symbol filter (the file also carries a
+fourth symbol the universe does not ask for). `sequence_resets: 3` is one
+per instrument: sequences restart at 1 every session, and the normaliser
+counts that; gaps, duplicates and invalid events are absent because they
+are 0. `book check clean` means the mapped stream replayed through the
+real order book without a dropped event or a crossing displayed order.
+
+The `dataset_version` in the experiment is the manifest's, not the bundled
+dataset's `116b7787…`: the spec, the experiment id and the ledger
+entries of its 28 looks carry it, and the ledger they went into is
+`data/real/demo/research/experiments.json` — `research/experiments.json`
+in the checkout did not move. Ingesting the same bytes again gives the
+same `dataset_version` and byte-identical files.
+
+The REJECT means nothing: the encoder's order flow is uniform random, so
+there is nothing to find. With real files the verdict is about that
+dataset, under the reading rules of docs/REAL_DATA.md §8 — two sessions
+are two sessions. `rm -rf data/vendor/demo_* data/real/demo` removes
+everything this recipe wrote.
+
+## 37. Work a parent order passively and read its markouts
+
+`ParentOrder.policy` selects the child execution policy (API_TRADING.md
+§2.5): `NATIVE` (default), `AGGRESSIVE`, or `PASSIVE` — post at the near
+touch, rest for a patience set by `urgency`, reprice once, cross the rest.
+`iap.tca.markout` then tells you what each fill was worth afterwards
+(API_PORTFOLIO_TCA.md §2.9). One TWAP parent on the golden equity vector
+under each policy:
+
+```bash
+PYTHONPATH=python/src python3 - <<'EOF'
+from dataclasses import replace
+from pathlib import Path
+from iap.core.codec import read_jsonl
+from iap.execution import (AlgoType, ExecConfig, ExecPolicy, ExecutionReplay,
+                           InstrumentSpec, Liquidity, ParentOrder, load_venues)
+from iap.tca.markout import MarkoutFill, build_gated_timeline, markout_report
+
+SEC = 1_000_000_000
+events = read_jsonl(Path("tests/golden/events_eq_mbo.jsonl"))
+t0 = events[0].exchange_ts
+cfg = ExecConfig(seed=20260829, venues=load_venues("configs/venues/venues.json"),
+                 instruments={1: InstrumentSpec(1, 0.01, 1.0, 38_000_000.0)})
+parent = ParentOrder(parent_id=1, instrument_id=1, venue_id=1, side=0, qty=1200,
+                     algo=AlgoType.TWAP, start_ts=t0 + 60 * SEC, end_ts=t0 + 660 * SEC,
+                     slices=12)
+timeline = build_gated_timeline(events, 1, 0.01)
+for policy in (ExecPolicy.AGGRESSIVE, ExecPolicy.NATIVE, ExecPolicy.PASSIVE):
+    res = ExecutionReplay(cfg, [replace(parent, policy=policy, urgency=0.5)]).run(events)
+    r = res.parents[1]
+    fills = [MarkoutFill(f.ts, f.price_ticks * 0.01, f.qty, f.side,
+                         "MAKER" if f.liquidity == Liquidity.MAKER else "TAKER",
+                         f.venue_id, "TWAP") for f in res.fills]
+    rep = markout_report(fills, timeline, min_fills=3)
+    print(f"{policy.name:10s} filled {r.filled_qty:4d}/{parent.qty} avg {r.avg_price:.4f} "
+          f"fees {r.fees:.3f} rebates {r.rebates:.3f}")
+    for liq, cell in rep["by_liquidity"].items():
+        row = cell["horizons"]
+        print(f"   {liq} n={cell['n_fills']:2d} markout bps:",
+              {h: None if row[h]["markout_bps"] is None else round(row[h]["markout_bps"], 2)
+               for h in ("1s", "30s", "5min")})
+    if res.passive:
+        print("  ", res.passive[1].to_dict())
+EOF
+```
+
+```
+AGGRESSIVE filled 1200/1200 avg 24.5242 fees 3.600 rebates 0.000
+   TAKER n=12 markout bps: {'1s': -5.27, '30s': -5.27, '5min': -2.89}
+NATIVE     filled  600/1200 avg 24.5033 fees 0.000 rebates 1.200
+   MAKER n= 6 markout bps: {'1s': -0.34, '30s': 1.02, '5min': 7.14}
+PASSIVE    filled 1100/1200 avg 24.5191 fees 2.100 rebates 0.800
+   MAKER n= 4 markout bps: {'1s': -1.02, '30s': -2.55, '5min': 4.08}
+   TAKER n= 7 markout bps: {'1s': -4.37, '30s': -4.66, '5min': -3.49}
+   {'posts': 15, 'reprices': 3, 'rest_extensions': 6, 'crosses_timeout': 7, 'crosses_behind': 0, 'crosses_immediate': 0}
+```
+
+`markout = s × (mid(t + h) − price)`: positive = the fill looks good `h`
+later. A markout whose window runs past the data, or across a halt or a
+quote gap, is `None`, and so is a cell with fewer than `min_fills` defined
+fills. NATIVE has the best average price and half the quantity: the unfilled
+600 shares are a cost the average does not show.
+`python3 research/execution/run_execution_study.py` prices it (bundled
+dataset required: `cd python && PYTHONPATH=src python3 -m iap.marketdata`),
+and writes `research/execution/EXECUTION_REPORT.md`. The same policy for the
+MVP: `MvpConfig.with_overrides(child_policy="passive", passive={...})`.
+LEARN.md §30 explains adverse selection and how to read the table.
+
+## 38. Combine alphas out of sample and count the independent bets
+
+A combination is an alpha whose inputs are alphas (`iap.combine`,
+API_ALPHA.md §8). `fit` estimates the weights inside the training rows it
+is given — on the members' out-of-sample predictions from three inner
+walk-forward folds — so fitting on day 1 and scoring day 2 is honest. Four
+equity members, three of which are order-flow alphas:
+
+```bash
+PYTHONPATH=python/src python3 - <<'EOF'
+import numpy as np
+from iap.alpha.data import load_features, session_days, split_by_day
+from iap.combine import CombinedAlpha, correlation_matrix, effective_bets, member_signal
+from iap.validation.metrics import ic
+
+frames = load_features("data/features")
+train, test = split_by_day(frames, session_days(frames)[1])
+members = ["EQ02", "EQ03", "EQ06", "EQ12"]
+for method in ("equal_weight", "ridge"):
+    model = CombinedAlpha(members, method)
+    model.fit(train)  # weights from the members' out-of-sample stack inside day 1
+    p = model.params()
+    scores = model.score(test)
+    z = np.concatenate([s["expected_return"].to_numpy() / p["beta"] for s in scores.values()])
+    y = np.concatenate([test[i][f"label_mid_{model.horizon}"].to_numpy() for i in scores])
+    w = " ".join(f"{a} {v:+.3f}" for a, v in p["weights"].items())
+    print(f"{method:<13} horizon {model.horizon}  weights: {w}  day-2 IC {ic(z, y):+.4f}")
+universe = model.universe(list(test))
+signals = [member_signal(model.members[a], test, universe) for a in members]
+stack = np.column_stack([np.concatenate([s[i] for i in universe]) for s in signals])
+corr, _ = correlation_matrix(stack)
+bets = effective_bets(corr)
+print("signal correlation EQ02/EQ03 %.2f  EQ02/EQ12 %.2f  EQ02/EQ06 %.2f" % (corr[0, 1], corr[0, 3], corr[0, 2]))
+print("effective independent bets: %.2f of %d" % (bets["n_effective"], bets["n_members"]))
+EOF
+```
+
+```
+equal_weight  horizon 5s  weights: EQ02 +0.250 EQ03 +0.250 EQ06 +0.250 EQ12 +0.250  day-2 IC +0.0255
+ridge         horizon 5s  weights: EQ02 +0.418 EQ03 -0.228 EQ06 +0.265 EQ12 +0.090  day-2 IC +0.0338
+signal correlation EQ02/EQ03 0.95  EQ02/EQ12 1.00  EQ02/EQ06 -0.16
+effective independent bets: 1.64 of 4
+```
+
+Four members, 1.64 bets: EQ02, EQ03 and EQ12 are one signal three times.
+Equal weights give that one signal three quarters of the blend; ridge sees
+the correlation and spreads one weight across the cluster (one of the three
+even goes negative) and gives EQ06 its own. This is an illustration on one
+split, not a result — the judged version, through the whole validation
+chain and with its looks debited, is
+
+```bash
+cd python && PYTHONPATH=src python3 -m iap.research combine     # writes research/combination/
+```
+
+which costs 95 looks per (asset class, method) experiment the first time
+and nothing on a rerun. `--dry-run` writes no report and still debits the
+looks; `--members` and `--method` narrow the run, and a narrower member
+list is a different experiment with its own identity. The committed
+verdict: 0 PROMOTE, 8 ITERATE — every combination fails the cost gate
+(`research/combination/REPORT.md`).
