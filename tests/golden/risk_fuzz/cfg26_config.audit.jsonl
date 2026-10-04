@@ -1,0 +1,15 @@
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-numeric global.max_gross_notional","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000006000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-numeric global.max_gross_notional","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000039000000}
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 2","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000000039030000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-numeric global.max_gross_notional","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000001039030000}
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 2","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000001059030000}
+{"decision":1,"reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"VENUE","scope_id":"001","severity":1,"timestamp":1700000001170030000}
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 1","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700000001214030000}
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 1","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700000001214030000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-numeric global.max_gross_notional","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000003214030000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-numeric global.max_gross_notional","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000003214030000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-numeric global.max_gross_notional","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000003214030000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-numeric global.max_gross_notional","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000003214030000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-numeric global.max_gross_notional","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000003214030000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-numeric global.max_gross_notional","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000003214030000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-numeric global.max_gross_notional","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000003214030000}

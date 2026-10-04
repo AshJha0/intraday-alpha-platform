@@ -1,0 +1,10 @@
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-numeric per_order.max_order_notional","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000002000000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-numeric per_order.max_order_notional","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000002060000000}
+{"decision":3,"reason":"venue 1 disconnected","rule_id":"VENUE_DISCONNECT","scope":"VENUE","scope_id":"1","severity":2,"timestamp":1700000002098000000}
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 1","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000002115000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-numeric per_order.max_order_notional","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000002130000000}
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 2","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000004130000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-numeric per_order.max_order_notional","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000004130583000}
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 2","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000004186583000}
+{"decision":1,"reason":"venue 1 reconnected","rule_id":"VENUE_RECONNECT","scope":"VENUE","scope_id":"1","severity":1,"timestamp":1700000007186583000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-numeric per_order.max_order_notional","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000007186583000}

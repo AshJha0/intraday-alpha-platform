@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TreeMap;
 import java.util.stream.Stream;
 
@@ -326,13 +327,26 @@ public class RiskFuzzGoldenTest {
      * Snapshots are compared as documents: the Java engine prints doubles
      * with {@code Double.toString} (exact on round trip), the oracle with
      * the {@code serde_json} layout, so the bytes differ where the values
-     * do not.
+     * do not. Returns {@code null} when equal, else the first field that
+     * differs.
      */
-    private static boolean sameSnapshot(String got, String want) {
+    private static String snapshotDiff(String got, String want) {
         if (got.isEmpty() || want.isEmpty()) {
-            return got.equals(want);
+            return got.equals(want) ? null : "one side has no snapshot";
         }
-        return Json.parse(got).equals(Json.parse(want));
+        Map<String, Object> g = Json.object(Json.parse(got));
+        Map<String, Object> w = Json.object(Json.parse(want));
+        if (g.equals(w)) {
+            return null;
+        }
+        for (Map.Entry<String, Object> e : w.entrySet()) {
+            if (!Objects.equals(e.getValue(), g.get(e.getKey()))) {
+                String text = e.getKey() + ": got " + g.get(e.getKey()) + " want "
+                        + e.getValue();
+                return text.length() > 600 ? text.substring(0, 600) : text;
+            }
+        }
+        return "unexpected fields " + g.keySet();
     }
 
     /** The full check of one script. */
@@ -342,8 +356,9 @@ public class RiskFuzzGoldenTest {
         if (!main.audit().equals(c.audit())) {
             throw new Divergence("audit differs: " + firstDiff(full, lines(c.audit())));
         }
-        if (!sameSnapshot(main.snapshot(), c.snapshot())) {
-            throw new Divergence("final snapshot differs");
+        String diff = snapshotDiff(main.snapshot(), c.snapshot());
+        if (diff != null) {
+            throw new Divergence("final snapshot differs at " + diff);
         }
         for (Object cutValue : Json.array(c.script().get("cuts"))) {
             int cut = (int) Json.asLong(cutValue);
@@ -359,9 +374,10 @@ public class RiskFuzzGoldenTest {
                 throw new Divergence("cut " + cut
                         + ": the restored engine's audit tail differs");
             }
-            if (!sameSnapshot(r.snapshot(), c.snapshot())) {
+            diff = snapshotDiff(r.snapshot(), c.snapshot());
+            if (diff != null) {
                 throw new Divergence("cut " + cut
-                        + ": the restored engine's final state differs");
+                        + ": the restored engine's final state differs at " + diff);
             }
         }
     }

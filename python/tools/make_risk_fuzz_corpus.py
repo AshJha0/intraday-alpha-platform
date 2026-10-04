@@ -42,7 +42,8 @@ import risk_fuzz as rf  # noqa: E402
 
 CORPUS_DIR = rf.ROOT / "tests" / "golden" / "risk_fuzz"
 
-#: The committed corpus: ``SEEDS_PER_PROFILE`` scripts of every profile.
+#: The committed corpus: ``SEEDS_PER_PROFILE`` scripts of every profile, then
+#: one short ``config`` script per configuration mutation.
 SEEDS_PER_PROFILE = 3
 CORPUS_MASTER_SEED = 31
 
@@ -54,6 +55,8 @@ def corpus_plan() -> list[tuple[str, str, int]]:
         rf.seeds_from(CORPUS_MASTER_SEED, SEEDS_PER_PROFILE * len(rf.PROFILES))
     ):
         plan.append((f"{k:03d}_{profile}", profile, seed))
+    for m in range(len(rf.CONFIG_MUTATIONS)):
+        plan.append((f"cfg{m:02d}_config", "config", m))
     return plan
 
 

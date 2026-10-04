@@ -1,0 +1,14 @@
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 1","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700000000000000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-bool per_order.stale_book_reject","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000000000000}
+{"decision":1,"reason":"desk request #42","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000000000000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-bool per_order.stale_book_reject","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000024000000}
+{"decision":3,"reason":"venue 3 disconnected","rule_id":"VENUE_DISCONNECT","scope":"VENUE","scope_id":"3","severity":2,"timestamp":1700000000030000000}
+{"decision":1,"reason":"venue 3 reconnected","rule_id":"VENUE_RECONNECT","scope":"VENUE","scope_id":"3","severity":1,"timestamp":1700000001049000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-bool per_order.stale_book_reject","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000001049000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-bool per_order.stale_book_reject","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000001049531000}
+{"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"VENUE","scope_id":"3","severity":1,"timestamp":1700000001049531000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-bool per_order.stale_book_reject","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000008049530999}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-bool per_order.stale_book_reject","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000008081530999}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-bool per_order.stale_book_reject","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000008081530999}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-bool per_order.stale_book_reject","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000008081530999}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-bool per_order.stale_book_reject","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000008081530999}

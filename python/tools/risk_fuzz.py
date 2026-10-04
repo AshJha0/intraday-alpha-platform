@@ -680,12 +680,16 @@ PROFILES: dict[str, Profile] = {
             config_set=(("global", "kill_switch_engaged", True),),
         ),
         Profile("recipes", 110, _weights(recipe=30), instruments=(1, 2, 3)),
-        Profile("badconfig", 30, _weights(restore=0, recipe=0), cuts=0),
+        Profile("config", 16, _weights(recipe=0), cuts=1),
     )
 }
 
-#: Single mutations that make ``configs/risk/risk.json`` invalid; the
-#: ``badconfig`` profile draws one or two per script.
+#: Single mutations of ``configs/risk/risk.json``; a ``config`` script applies
+#: the one its seed selects (``seed % len``), so a run of consecutive seeds
+#: covers them all, and sometimes a second one on top. Most make the document
+#: INVALID: the engine must land fail-closed and the ``CONFIG_MISSING`` reason
+#: (the first offending key, in the reference's parse order) is audit output
+#: like any other. The rest are valid but unusual limit sets.
 BAD_CONFIG_SETS: tuple[tuple[str, str, Any], ...] = (
     ("global", "max_gross_notional", 0),
     ("global", "max_net_notional", -5.5),
@@ -709,6 +713,7 @@ BAD_CONFIG_SETS: tuple[tuple[str, str, Any], ...] = (
     ("currency", "conversion", []),
     ("currency", "conversion", {"EUR": {"instrument_id": 0, "invert": False}}),
     ("currency", "conversion", {"EUR": {"instrument_id": 4294967296, "invert": False}}),
+    ("currency", "conversion", {"EUR": {"instrument_id": -3, "invert": False}}),
     ("currency", "conversion", {"EUR": {"instrument_id": 101}}),
     ("currency", "conversion", {"EUR": 101}),
     ("currency", "conversion", {"ZZZ": {"invert": True}, "AAA": {"instrument_id": 101}}),
@@ -716,14 +721,36 @@ BAD_CONFIG_SETS: tuple[tuple[str, str, Any], ...] = (
 BAD_CONFIG_REMOVES: tuple[tuple[str, ...], ...] = (
     ("global", "max_gross_notional"),
     ("per_order", "duplicate_order_window_ns"),
+    ("per_order", "stale_book_reject"),
     ("market_data", "max_sequence_gap_before_halt"),
     ("currency", "reporting_ccy"),
+    ("currency", "conversion"),
     ("global",),
     ("per_order",),
     ("per_instrument",),
     ("per_strategy",),
     ("market_data",),
     ("currency",),
+)
+ODD_CONFIG_SETS: tuple[tuple[str, str, Any], ...] = (
+    ("global", "max_gross_notional", 5000000),
+    ("global", "order_rate_burst", 0.5),
+    ("global", "max_order_rate_per_sec", 1e-9),
+    ("per_order", "max_order_qty", I64_MAX),
+    ("per_order", "price_band_bps", 1e-9),
+    ("per_order", "duplicate_order_window_ns", I64_MAX),
+    ("market_data", "max_sequence_gap_before_halt", 0),
+    ("market_data", "stale_feed_timeout_ns", I64_MAX),
+    ("currency", "reporting_ccy", "EUR"),
+    ("currency", "conversion", {}),
+    ("currency", "conversion", {"JPY": {"instrument_id": 103, "invert": False}}),
+    ("currency", "conversion", {"EUR": {"instrument_id": 102, "invert": False}}),
+)
+#: Every single mutation, in the order a ``config`` script's seed indexes.
+CONFIG_MUTATIONS: tuple[tuple[str, tuple[Any, ...]], ...] = (
+    tuple(("set", m) for m in BAD_CONFIG_SETS)
+    + tuple(("remove", m) for m in BAD_CONFIG_REMOVES)
+    + tuple(("set", m) for m in ODD_CONFIG_SETS)
 )
 
 
@@ -749,17 +776,16 @@ class Generator:
         }
         config_set = [list(t) for t in p.config_set]
         config_remove: list[str] = list(p.config_remove)
-        if p.name == "badconfig":
+        if p.name == "config":
+            kind, mutation = CONFIG_MUTATIONS[self.seed % len(CONFIG_MUTATIONS)]
+            if kind == "remove":
+                config_remove = list(mutation)
+            else:
+                config_set.append(list(mutation))
             if self.rng.pct(30):
-                config_remove = list(self.rng.pick(BAD_CONFIG_REMOVES))
-            for _ in range(self.rng.between(0 if config_remove else 1, 2)):
-                cand = list(self.rng.pick(BAD_CONFIG_SETS))
-                same_section = bool(config_remove) and cand[0] == config_remove[0]
-                if same_section or any(c[:2] == cand[:2] for c in config_set):
-                    continue
-                config_set.append(cand)
-            if not config_set and not config_remove:
-                config_set.append(list(BAD_CONFIG_SETS[self.seed % len(BAD_CONFIG_SETS)]))
+                extra = list(self.rng.pick(BAD_CONFIG_SETS))
+                if extra[0] != mutation[0]:
+                    config_set.append(extra)
         if config_set:
             self.script["config_set"] = config_set
         if config_remove:
@@ -804,7 +830,7 @@ class Generator:
         elif r < 97:
             self.now += self.rng.between(1, 3) * SEC
         else:
-            self.now += self.timeout() + self.rng.between(-1, 1)
+            self.now += min(self.timeout(), 10 * SEC) + self.rng.between(-1, 1)
 
     def weird_ts(self) -> int:
         t = self.timeout()
@@ -1492,6 +1518,8 @@ class Generator:
         iid = self.rng.pick(fx)
         pair = FX_PAIR[INSTRUMENTS[str(iid)]["quote_ccy"]]
         t = self.timeout()
+        if t > 3600 * SEC:
+            return self.do_market()
         d = self.rng.between(-1, 1)
         sid = self.rng.pick(self.profile.strategies)
         self.clear_path(sid, iid)
