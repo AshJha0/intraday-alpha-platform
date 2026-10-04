@@ -238,6 +238,11 @@ def _dataset_versions(args: argparse.Namespace) -> tuple[str | None, str | None]
         if getattr(args, name) == default:
             setattr(args, name, target)
     args.ledger.parent.mkdir(parents=True, exist_ok=True)
+    # A real dataset numbers its own instruments (QQQ may be id 3): the
+    # alphas' constituent / ETF universe must come from its config.
+    from iap.alpha import configure_universe
+
+    configure_universe(args.configs_dir / "instruments" / "instruments.json")
     return dataset_version, feature_version
 
 
@@ -374,6 +379,25 @@ def _power(args: argparse.Namespace) -> int:
     return 0
 
 
+def _power_real(args: argparse.Namespace) -> int:
+    from iap.research import power_real
+
+    doc = power_real.run_real_power_study(
+        args.dataset_dir,
+        levels=_numbers(args.levels, "--levels", float),
+        break_levels=_numbers(args.break_levels, "--break-levels", float),
+        n_seeds=args.seeds,
+        sessions=_numbers(args.sessions, "--sessions", int) if args.sessions else None,
+        gate_looks=args.gate_looks,
+        progress=lambda line: print(line, file=sys.stderr, flush=True),
+    )
+    out_dir = args.power_out_dir or args.dataset_dir / "research" / "power"
+    paths = power_real.write_reports(doc, out_dir)
+    print(power_real.render_markdown(doc))
+    print(f"wrote {paths['md']} and {paths['json']}", file=sys.stderr)
+    return 0
+
+
 def _combine(args: argparse.Namespace) -> int:
     from iap.combine import report as combine_report
     from iap.combine.weights import METHODS as COMBINATION_METHODS
@@ -389,6 +413,12 @@ def _combine(args: argparse.Namespace) -> int:
             raise ResearchError("--members needs one --asset-class", code="invalid_spec")
         members = {classes[0]: [m for m in args.members.split(",") if m]}
     repo = args.repo_root if args.repo_root is not None else REPO
+    dataset_version, feature_version = _dataset_versions(args)
+    if args.dataset_dir is not None:
+        if args.normalized_dir is None:
+            args.normalized_dir = args.dataset_dir / "normalized"
+        if args.combine_out_dir == REPO / "research" / "combination":
+            args.combine_out_dir = args.dataset_dir / "research" / "combination"
     try:
         result = combine_report.run_combination(
             repo,
@@ -401,6 +431,8 @@ def _combine(args: argparse.Namespace) -> int:
             configs_dir=args.configs_dir,
             ledger_path=args.ledger,
             progress=lambda line: print(line, file=sys.stderr),
+            dataset_version=dataset_version,
+            feature_version=feature_version,
         )
     except ValueError as exc:
         raise ResearchError(str(exc), code="invalid_spec") from exc
@@ -561,6 +593,25 @@ def _parser() -> argparse.ArgumentParser:
     )
     power.set_defaults(func=_power)
 
+    preal = sub.add_parser(
+        "power-real", help="planted-signal power study on an ingested real dataset"
+    )
+    preal.add_argument("--dataset-dir", type=Path, required=True)
+    preal.add_argument(
+        "--levels", default="0,0.005,0.01,0.02,0.04", help="planted ICs (comma-separated)"
+    )
+    preal.add_argument("--break-levels", default="0.02", help="planted ICs of the break scenario")
+    preal.add_argument("--seeds", type=int, default=20, help="shifted-background seeds")
+    preal.add_argument("--sessions", default=None, help="session grid (default 2,4,..,all)")
+    preal.add_argument("--gate-looks", type=int, default=None)
+    preal.add_argument(
+        "--power-out-dir",
+        type=Path,
+        default=None,
+        help="default <dataset-dir>/research/power (git-ignored with the data)",
+    )
+    preal.set_defaults(func=_power_real)
+
     combine = sub.add_parser("combine", help="signal combination report")
     combine.add_argument(
         "--asset-class", choices=("all", "EQUITY", "FX"), default="all", help="default: both"
@@ -588,6 +639,12 @@ def _parser() -> argparse.ArgumentParser:
     combine.add_argument("--ledger", type=Path, default=REPO / "research" / "experiments.json")
     combine.add_argument("--configs-dir", type=Path, default=REPO / "configs")
     combine.add_argument("--repo-root", type=Path, default=None)
+    combine.add_argument(
+        "--dataset-dir",
+        type=Path,
+        default=None,
+        help="run on an ingested dataset (docs/REAL_DATA.md); reports go under it",
+    )
     combine.add_argument(
         "--combine-out-dir",
         type=Path,

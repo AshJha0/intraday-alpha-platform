@@ -1,6 +1,6 @@
 # Changelog
 
-Release notes for tagged versions, newest first. The v1.3.0, v1.4.0 and v1.5.0
+Release notes for tagged versions, newest first. The v1.3.0 to v1.6.0
 entries are written in the repository; notes for v1.1.1 and v1.2.0 are copied from their GitHub
 releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
@@ -8,7 +8,77 @@ that tag.
 
 ## Unreleased
 
-Nothing yet.
+Moved from v1.6.0 to v1.7.0 (the code ships here, the runs do not): the
+real-data power study RUN (`power-real` on the 7-day dataset, ~6–20 h), the
+signal-combination report on real data, the 2026-05-18 ingest (2026 days kept
+as an out-of-time holdout), latency benchmarks in CI. v1.7.0 also carries the
+agent layer and read-only MCP server.
+
+## v1.6.0 — 2026-10-04
+
+Real data first. v1.5.0 could ingest real Nasdaq ITCH files but no alpha had
+ever run on them: the feature engine did not finish one real day in an hour,
+the batch report read only the synthetic dataset, and one dataset held one
+ingest at a time. This release fixes all three and runs the 24-alpha batch on
+seven real sessions. Pull request
+[#28](https://github.com/AshJha0/intraday-alpha-platform/pull/28).
+
+**Result on real data** (7 Nasdaq sessions, 2019-01-30 … 2020-01-30, AAPL,
+MSFT, QQQ; 3,100,181 feature rows; the data stays outside git):
+**0 PROMOTE / 8 ITERATE / 4 REJECT, and not one trade survives costs in any
+alpha.** The order-book signals are real — pooled HAC t from 3.3 (EQ06) to
+26.2 (EQ12), EQ01 microprice IC 0.105 at 1 s, EQ10 ETF lead-lag t 13.2 — but
+every predicted 1–10 s move is smaller than half-spread plus fee, so the
+cost-aware policy never trades and the equal-weight ensemble makes no trade
+either. EQ07 has the wrong sign; EQ11 (cross-sectional) cannot be judged with
+two constituents; the twelve FX alphas have nothing to trade on an equity feed.
+The t statistics count heavily overlapping 1 s rows; how much power seven days
+really have is what the real-data power study (shipped, not yet run) measures.
+This is a pipeline check on a thin sample, not a research conclusion.
+
+**Changes**
+
+- **Feature engine ~6× faster on real books.** The reference order book had no
+  price index: every depth / best-price query sorted or scanned all resting
+  levels (~700 on a real Nasdaq book, ~80 % of feature time). A sorted price
+  list per side now serves the top N; the consolidated book merges each
+  venue's top N, which is exact for the merged top N. A full 3-symbol day
+  (5.4 M events) builds in 11 minutes (previously unfinished after an hour);
+  identical output on the golden and feature tests.
+- **`python -m iap.marketdata merge`** combines ingested single-day datasets
+  into one multi-day dataset without re-parsing the source files. Its output
+  is byte-identical to ingesting the sessions into one directory (tested);
+  configs are rewritten from the current execution template.
+- **24-alpha batch on an ingested dataset:** `research/alpha_reports/run_all.py
+  --dataset-dir DIR --out-dir OUT` (`--out-dir` required — the committed
+  reports stay synthetic). Alphas with nothing to trade are skipped and
+  listed; the report describes the real dataset.
+- **Fix: the alphas hard-coded the synthetic universe** (index ETF = instrument
+  11). An ingested dataset numbers its own instruments (QQQ is 3), so the
+  ETF-relative alphas would have traded QQQ as a constituent — including in
+  v1.5.0's `research run --dataset-dir`. The universe now comes from the
+  dataset's `instruments.json` (`iap.alpha.configure_universe`); the synthetic
+  default is unchanged.
+- **`research combine --dataset-dir`.**
+- **`python -m iap.research power-real`** (`iap.research.power_real`): the
+  planted-signal power study on real data. Effects of known information
+  coefficient are planted in the stored labels, on a real-noise null (labels
+  circularly shifted within each session, seeded) and on the labels as they
+  are, and judged by the same chain and thresholds as the synthetic study.
+  Statistical detection only — fills are priced at real mids. Not yet run.
+- **Docs:** `docs/REAL_DATA.md` §3.1 (merge, batch, combine, power-real),
+  §10 (feature-engine and 2026-session performance), §11; an audit of the docs
+  against the committed artefacts fixed the landing page and ROADMAP, which
+  still quoted the v1.4.0 three-seed power calibration, and real-data status
+  in ARCHITECTURE / ROADMAP / the landing page.
+
+**Known limitations.** Seven sessions of one venue's book, three symbols;
+indicative fees; no corporate actions applied (none fall in the window); the
+batch peaks at ~9.5 GB and loads every feature column; a 2026 session is
+~8× a 2019 one (40.5 M events, ~2 h of features); the real-data power study
+has not been run, so the real-data REJECTs are not yet interpretable.
+
+**Versions:** package 1.6.0; image tags v1.6.0. No schema or golden change.
 
 ## v1.5.0 — 2026-10-04
 
@@ -114,7 +184,7 @@ Also changed:
   `configs/strategies/lifecycle.json` 1 → 2, `strategies.json` `adaptive`
   1 → 2, `research/experiments.json` 2 → 3, `research/alpha_registry.json`
   1 → 2, `eligibility.json` 1 → 2, `POWER_REPORT.json` 1 → 2, goldens
-  `expected_lifecycle.json` and `expected_adaptive.json` 1 → 2,
+  `expected_lifecycle.json` 1 → 3, `expected_adaptive.json` 1 → 2,
   `expected_backtest.json` 1 → 3, the SQL data model `iap_v1.sql` →
   `iap_v2.sql` (1 → 2). Every loader rejects the older document instead of
   reading it under a new default.

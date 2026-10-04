@@ -77,6 +77,7 @@ Semantics (all languages must mirror exactly; see API_CORE.md section 4):
 
 from __future__ import annotations
 
+from bisect import bisect_left, insort
 from collections import OrderedDict
 from enum import IntEnum
 
@@ -195,6 +196,7 @@ class OrderBook:
         "venue_id",
         "reorder_window",
         "_levels",  # (side, price) -> _Level
+        "_prices",  # per side: ascending list of prices that have a level
         "_orders",  # order_id -> (side, price)
         "last_sequence",
         "has_sequence",
@@ -232,6 +234,7 @@ class OrderBook:
         self.venue_id = venue_id
         self.reorder_window = reorder_window
         self._levels: dict[tuple[int, int], _Level] = {}
+        self._prices: tuple[list[int], list[int]] = ([], [])
         self._orders: dict[int, tuple[int, int]] = {}
         self.last_sequence = 0
         self.has_sequence = False
@@ -431,6 +434,7 @@ class OrderBook:
         if level is None:
             level = _Level(price)
             self._levels[key] = level
+            insort(self._prices[side], price)
         level.orders[order_id] = qty
         level.total_qty += qty
         self._orders[order_id] = key
@@ -449,6 +453,8 @@ class OrderBook:
         level.total_qty -= level.orders.pop(order_id)
         if not level.orders:
             del self._levels[key]
+            prices = self._prices[key[0]]
+            del prices[bisect_left(prices, key[1])]
 
     def _apply_add(self, ev: MarketEvent) -> bool:
         if ev.order_id in self._orders:
@@ -565,6 +571,8 @@ class OrderBook:
         if not self._snapshot_active:
             # Burst start: clear the whole book state (levels + orders).
             self._levels.clear()
+            self._prices[0].clear()
+            self._prices[1].clear()
             self._orders.clear()
             self._snapshot_active = True
             self._snapshot_broken = False
@@ -611,17 +619,10 @@ class OrderBook:
         return len(self._pending)
 
     def _best_level(self, side: int) -> _Level | None:
-        best_key = None
-        for key in self._levels:
-            if key[0] != side:
-                continue
-            if best_key is None:
-                best_key = key
-            elif side == Side.BID and key[1] > best_key[1]:
-                best_key = key
-            elif side == Side.ASK and key[1] < best_key[1]:
-                best_key = key
-        return self._levels[best_key] if best_key is not None else None
+        prices = self._prices[side]
+        if not prices:
+            return None
+        return self._levels[(side, prices[-1] if side == Side.BID else prices[0])]
 
     def best_bid(self) -> tuple[int, int] | None:
         """(price_ticks, total_size) of the best bid, or None."""
@@ -647,18 +648,27 @@ class OrderBook:
         """True if not stale and the last event was received within max_age_ns."""
         return not self.stale and self.has_sequence and now_ns - self.receive_ts <= max_age_ns
 
-    def _sorted_levels(self, side: int) -> list[_Level]:
-        levels = [lvl for (s, _), lvl in self._levels.items() if s == side]
-        levels.sort(key=lambda l: -l.price if side == Side.BID else l.price)
-        return levels
+    def _sorted_levels(self, side: int, limit: int | None = None) -> list[_Level]:
+        """Levels of one side best-first; at most ``limit`` when given.
+
+        Reads the per-side sorted price index, so the top N costs O(N)
+        rather than a sort of every resting level.
+        """
+        prices = self._prices[side]
+        if side == Side.BID:
+            top = prices[::-1] if limit is None else prices[: -limit - 1 : -1] if limit else []
+        else:
+            top = prices if limit is None else prices[:limit]
+        levels = self._levels
+        return [levels[(side, p)] for p in top]
 
     def depth(self, side: int, levels: int = DEPTH_LEVELS) -> list[tuple[int, int]]:
         """Top-N [(price_ticks, total_size)] best-first."""
-        return [(l.price, l.total_qty) for l in self._sorted_levels(side)[:levels]]
+        return [(l.price, l.total_qty) for l in self._sorted_levels(side, max(levels, 0))]
 
     def order_count(self, side: int, levels: int = DEPTH_LEVELS) -> list[tuple[int, int]]:
         """Top-N [(price_ticks, order_count)] best-first."""
-        return [(l.price, l.order_count) for l in self._sorted_levels(side)[:levels]]
+        return [(l.price, l.order_count) for l in self._sorted_levels(side, max(levels, 0))]
 
     def state_summary(self) -> dict:
         """Golden-comparable exact-integer state (see tests/golden/)."""
@@ -833,13 +843,15 @@ class ConsolidatedBook:
         book = self.books.get(venue_id)
         return book.status if book is not None else None
 
-    def _merged(self, side: int) -> list[tuple[int, int, int]]:
+    def _merged(self, side: int, limit: int | None = None) -> list[tuple[int, int, int]]:
+        # The merged top-N prices are all within some venue's own top-N, so
+        # ``limit`` per venue is exact for the first ``limit`` merged rows.
         agg: dict[int, list[int]] = {}
         for vid in sorted(self.books):
             book = self.books[vid]
             if book.stale:
                 continue
-            for level in book._sorted_levels(side):
+            for level in book._sorted_levels(side, limit):
                 slot = agg.setdefault(level.price, [0, 0])
                 slot[0] += level.total_qty
                 slot[1] += level.order_count
@@ -848,11 +860,11 @@ class ConsolidatedBook:
         return out
 
     def best_bid(self) -> tuple[int, int] | None:
-        m = self._merged(Side.BID)
+        m = self._merged(Side.BID, 1)
         return (m[0][0], m[0][1]) if m else None
 
     def best_ask(self) -> tuple[int, int] | None:
-        m = self._merged(Side.ASK)
+        m = self._merged(Side.ASK, 1)
         return (m[0][0], m[0][1]) if m else None
 
     def is_crossed(self) -> bool:
@@ -866,10 +878,12 @@ class ConsolidatedBook:
         return bb is not None and ba is not None and bb[0] == ba[0]
 
     def depth(self, side: int, levels: int = DEPTH_LEVELS) -> list[tuple[int, int]]:
-        return [(p, sq) for p, sq, _ in self._merged(side)[:levels]]
+        n = max(levels, 0)
+        return [(p, sq) for p, sq, _ in self._merged(side, n)[:n]]
 
     def order_count(self, side: int, levels: int = DEPTH_LEVELS) -> list[tuple[int, int]]:
-        return [(p, oc) for p, _, oc in self._merged(side)[:levels]]
+        n = max(levels, 0)
+        return [(p, oc) for p, _, oc in self._merged(side, n)[:n]]
 
     def trade_flow(self) -> int:
         """Sum of per-venue cumulative signed trade flow (all venues), saturated to i64."""

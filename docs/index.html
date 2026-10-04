@@ -76,7 +76,7 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
     MVP golden run&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 15,805 events · 800 decisions · 235 parent orders · 169 fills · P&amp;L −81.53 USD (cost-negative, stated) · digest 20d4ff76…<br>
     Adaptive lifecycle&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; PSI/KS drift monitors · 88 drift-triggered refits in the study · CUSUM retirement rule · RETIRED halts allocation in the backtest, pages a human live<br>
     Verdicts (honest)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0 PROMOTE · 11 ITERATE · 13 REJECT — 3 alphas clear the multiple-testing threshold (t ≥ 4.365), 18 never forecast a move larger than their cost and make no trade, the 6 that trade lose; nothing survives costs, and we say so<br>
-    Power study&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; planted order-flow effect reaches t ≥ 3 in 1 of 3 seeds at the reference size and 3 of 3 at twice that size, where the cost-aware backtest makes 14 trades on average and no fold survives costs · planted lead-lag never significant (ITERATE-level in 1 or 2 of 3 seeds) · nothing promoted at any size — 3 seeds per cell, a calibration, not a power curve
+    Power study&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; planted order flow detected at the PROMOTE threshold (t ≥ 4.365) in 2 of 20 runs on 2 sessions, 10 of 20 on 4 and 20 of 20 on 8 (EQ04, declared 5 s label) · planted lead-lag 0 of 20 at EQ10's declared 1 s label, 16 of 20 at a 5 s label on 8 sessions · null 0 of 20 throughout · nothing promoted at any size — 20 seeds per cell, Wilson 95 % intervals
   </div>
 
   <div class="honest">
@@ -160,7 +160,9 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
          <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/RESEARCH_VALIDITY.md">RESEARCH_VALIDITY</a>,
          <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/research/power/POWER_REPORT.md">POWER_REPORT</a></p></div>
     <div class="card"><h3>Distance to production</h3>
-      <p>Stated plainly, with a backlog epic for each gap: real exchange data, measured
+      <p>Stated plainly, with a backlog epic for each gap: real exchange data at scale
+         (ITCH 5.0 / LOBSTER ingestion exists; v1.6.0 ran all alphas on 7 real Nasdaq
+         days — real but untradable signals, no trade survives costs), measured
          tick-to-trade latency, a simulator calibrated to live fills, book-level risk,
          research throughput. Nothing here is a claim about a market.
          <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/ARCHITECTURE.md#14-distance-to-production-at-a-top-tier-firm">ARCHITECTURE §14</a></p></div>
@@ -317,7 +319,7 @@ PYTHONPATH=python/src python3 research/ml_reports/run_ml.py
 cd java && bash paper.sh</pre>
 
   <footer>intraday-alpha-platform — a polyglot, golden-tested, honestly-validated trading
-    platform built on fully synthetic data for education and demonstration.
+    platform built on a bundled seeded synthetic dataset, with an ingestion path for owner-supplied ITCH/LOBSTER files, for education and demonstration.
     See <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/SPECIFICATION.md">the
     governing specification</a> and
     <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/README.md">README</a>.</footer>

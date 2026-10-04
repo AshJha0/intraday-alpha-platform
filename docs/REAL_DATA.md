@@ -128,6 +128,47 @@ unless `--symbols` / `--orderbook` say otherwise).
 uses the directory's `features/` and `configs/`, and writes
 `research/experiments.json` (the ledger) and `research/experiments/<id>/`
 **inside the dataset directory**. The checkout's own ledger is not touched.
+The alphas' universe (constituents, the index ETF) is read from the
+dataset's `configs/instruments/instruments.json`: an ingested dataset numbers
+its instruments 1..N, so the ETF is wherever the feed put it (QQQ is id 3 in
+the example), not the synthetic id 11. Up to v1.5.0 the alphas assumed id 11
+and treated an ingested ETF as a constituent.
+
+### 3.1 Many sessions, the whole batch, and power (v1.6.0)
+
+```bash
+# single-day datasets ingested separately (in parallel processes if you like)
+# -> one multi-day dataset, without parsing the source files again
+PYTHONPATH=src python3 -m iap.marketdata merge     ../data/real/ds_20190130 ../data/real/ds_20190327 ../data/real/ds_20191230     --out ../data/real/multi
+
+# all 24 alphas, the day-1-fit / day-2 backtest and the ensembles
+# (--out-dir is required: research/alpha_reports stays the synthetic record)
+PYTHONUTF8=1 python3 ../research/alpha_reports/run_all.py     --dataset-dir ../data/real/multi --out-dir ../data/real/multi/research/alpha_reports
+
+# signal combination on the same dataset
+PYTHONPATH=src python3 -m iap.research combine --dataset-dir ../data/real/multi
+
+# how much power do these sessions have? (planted effects on real noise)
+PYTHONPATH=src python3 -m iap.research power-real --dataset-dir ../data/real/multi
+```
+
+`merge` refuses inputs whose universe or source differ, or whose sessions
+overlap. Its output is byte-identical to ingesting the sessions into one
+directory (raw, normalized, configs, reference; tested), and its configs are
+written from the CURRENT `configs/execution/execution.json`, so a dataset
+ingested under an older cost model is brought up to date. `events.parquet`
+is not merged. Alphas of an asset class the dataset does not hold (FX on an
+equity feed) have nothing to trade.
+
+`power-real` (`iap.research.power_real`) is the real-data counterpart of the
+synthetic power study. Real prices cannot be regenerated, so an effect of
+known information coefficient is planted in the stored labels — on a
+real-noise null (each session's labels circularly shifted against the
+features, 20 seeds) and on the labels as they are — and the same validation
+chain and thresholds are asked to find it. It measures **statistical
+detection only**: fills are priced at the real mids, which the planted
+labels do not move, so P&L gates and verdicts still describe the real
+market; the recompute leakage probe is off. See the module docstring.
 [COOKBOOK.md](../COOKBOOK.md) recipe 36 runs this whole chain on bytes
 written by the test encoder, so it works without a real file.
 
@@ -460,7 +501,21 @@ hashes recorded before this work.
 pass `--defer-normalize` on all but the last: those ingests write the raw
 file and the manifest only (no `dataset_version` yet), and the last one
 normalises everything once. The result is byte-identical to the
-date-by-date load.
+date-by-date load. Since v1.6.0, `merge` (§3.1) is the faster route: ingest
+each date into its own directory (in parallel if memory allows) and merge.
+
+**Feature engine (v1.6.0).** The reference order book sorted every resting
+price level on every depth query — ~700 levels on a real Nasdaq book, ~80 %
+of feature time. It now keeps a sorted price index per side. A full
+3-symbol 2019 day (5.4 million events) builds features in about 11 minutes;
+before, it had not finished after an hour. Mid-session the engine runs at
+~6,000 events/s under the profiler.
+
+**Busy recent days.** A 2026 session is far heavier: 40.5 million events
+for AAPL, MSFT and QQQ (QQQ alone 31.7 million), 52 minutes to ingest at
+~8 GB peak, and roughly two hours of features. The memory is the session's
+event objects held for normalisation; storing them as packed records is the
+next step if a larger universe is needed.
 
 **Next steps, not done.** The parse pass is now the dominant cost
 (pure-Python framing of every message, plus gzip): files can be ingested in
@@ -514,7 +569,11 @@ that, not the reader, bounds the size of a universe.
   computed from the same sessions the study runs on — it is not a
   consolidated, point-in-time ADV, and the capacity proxy that uses it
   inherits that.
-- **Corporate actions are not applied** by the feature pipeline (§5).
+- **Corporate actions are not applied** by the feature pipeline (§5). The
+  feature engine starts fresh every session, so a split between sessions
+  does not corrupt rolling state; a split inside a multi-day dataset still
+  shifts price LEVELS across sessions (`merge` refuses inputs carrying
+  corporate-action tables rather than merge them wrongly).
 - **One real ITCH day has been ingested; LOBSTER has not been run on a
   vendor file** (see Status).
 - **Not supported:** CBOE PITCH, NYSE feeds, FX ECN feeds (backlog XD02,

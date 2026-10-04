@@ -993,6 +993,130 @@ def ingest(
     return manifest
 
 
+# ---------------------------------------------------------------- merging
+
+
+def merge_datasets(inputs: Iterable[str | Path], out: str | Path, configs_dir: Path) -> dict:
+    """Combine single- or multi-day ingested datasets into one dataset.
+
+    The result is what ingesting every session into ``out`` one by one would
+    give — sessions are normalised file by file, so their raw and normalized
+    files are copied as they are — without parsing the source files again.
+    The inputs must share the universe (symbol, id, class, tick, lot) and
+    the source venue, and hold disjoint sessions; normalised inputs only
+    (no ``--defer-normalize`` leftovers).  Configs are rewritten from the
+    merged manifest and the CURRENT execution template in ``configs_dir``,
+    so a dataset ingested under an older cost model is brought up to date.
+    ``events.parquet`` is not merged (nothing downstream reads it).
+    """
+    inputs = [Path(p) for p in inputs]
+    out = Path(out)
+    if len(inputs) < 2:
+        raise IngestError("merge needs at least two input datasets")
+    if out.exists() and any(out.iterdir()):
+        raise IngestError(f"{out} exists and is not empty")
+    manifests = [load_manifest(p) for p in inputs]
+    first = manifests[0]
+    merged: dict = {
+        "x-version": first["x-version"],
+        "kind": "real",
+        "source": first["source"],
+        "universe": first["universe"],
+        "sessions": {},
+    }
+    qc_files: dict = {}
+    qc_totals: dict[str, int] = {}
+    for path, m in zip(inputs, manifests, strict=True):
+        if m.get("normalized") is None or "dataset_version" not in m:
+            raise IngestError(f"{path}: not normalised (finish its ingest first)")
+        for key in ("source", "universe", "x-version"):
+            if m[key] != first[key]:
+                raise IngestError(f"{path}: {key} differs from {inputs[0]}")
+        if "corporate_actions" in m:
+            raise IngestError(f"{path}: merging corporate-action tables is not supported")
+        for date, session in m["sessions"].items():
+            if date in merged["sessions"]:
+                raise IngestError(f"session {date} is in more than one input")
+            merged["sessions"][date] = session
+        qc = json.loads((path / "normalized" / "qc_report.json").read_text(encoding="utf-8"))
+        qc_files.update(qc["files"])
+        for k, v in m["normalized"]["qc_totals"].items():
+            qc_totals[k] = qc_totals.get(k, 0) + int(v)
+    merged["sessions"] = {d: merged["sessions"][d] for d in sorted(merged["sessions"])}
+
+    staging = out.with_name(out.name + ".partial")
+    if staging.exists():
+        shutil.rmtree(staging)
+    for sub in ("raw", "normalized", "reference"):
+        (staging / sub).mkdir(parents=True)
+    master = SecurityMaster()
+    for path in inputs:
+        for f in sorted((path / "raw").glob("*.jsonl")):
+            shutil.copyfile(f, staging / "raw" / f.name)
+        for f in sorted((path / "normalized").glob("*.normalized.*")):
+            shutil.copyfile(f, staging / "normalized" / f.name)
+        for rec in SecurityMaster.load(path / "reference" / "security_master.json").records():
+            master.upsert(rec)
+    master.save(staging / "reference" / "security_master.json")
+    _write_configs(staging, merged, configs_dir)
+    normalized_dir = staging / "normalized"
+    _write_json(
+        normalized_dir / "qc_report.json",
+        {
+            "x-version": 2,
+            "raw_dir": "raw",
+            "files": dict(sorted(qc_files.items())),
+            "totals": qc_totals,
+            "merged_from": [m["dataset_version"] for m in manifests],
+        },
+        sort_keys=False,
+    )
+    merged["normalized"] = {
+        "files": {
+            f.name: sha256_file(f)
+            for f in sorted(normalized_dir.glob("*.normalized.*"), key=lambda p: p.name)
+        },
+        "qc_totals": qc_totals,
+    }
+    merged["dataset_version"] = real_dataset_version(normalized_dir)
+    _write_json(staging / MANIFEST_NAME, merged)
+    if out.exists():
+        out.rmdir()
+    os.replace(staging, out)
+    return merged
+
+
+def merge_main(argv: list[str] | None = None) -> int:
+    p = argparse.ArgumentParser(
+        prog="python -m iap.marketdata merge",
+        description="Combine ingested datasets (disjoint sessions, same universe) into one.",
+    )
+    p.add_argument("inputs", nargs="+", help="ingested dataset directories")
+    p.add_argument("--out", required=True, help="new dataset directory")
+    p.add_argument(
+        "--configs-dir",
+        default=str(_REPO_ROOT / "configs"),
+        help="configs/ tree holding the execution/execution.json template",
+    )
+    args = p.parse_args(argv)
+    try:
+        m = merge_datasets(args.inputs, args.out, Path(args.configs_dir))
+    except IngestError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    print(
+        json.dumps(
+            {
+                "dataset_dir": str(Path(args.out)),
+                "dataset_version": m["dataset_version"],
+                "sessions": list(m["sessions"]),
+            },
+            indent=2,
+        )
+    )
+    return 0
+
+
 # ------------------------------------------------------------------------ CLI
 
 
