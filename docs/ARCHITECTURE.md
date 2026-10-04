@@ -125,7 +125,7 @@ flowchart TD
     FILLS --> TCA["TCA + attribution<br/>Perold IS = delay + trading + opportunity (exact)<br/>Python reference, Java service"]
     TCA --> TRACE["Decision trace — one DecisionTrace per decision<br/>signal · portfolio · risk · orders · routing · fills · TCA · attribution<br/>canonical JSONL + stream digest + SQLite index (iap.store); explain()"]
     LBL --> RESEARCH
-    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (4,396 looks / 208 configs, two datasets, two method bundles)<br/>REPORT.md, ML_REPORT.md, model manifests"]
+    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (5,156 looks / 216 configs, two datasets, two method bundles)<br/>REPORT.md, ML_REPORT.md, model manifests"]
     RESEARCH --> LIFE["Alpha promotion lifecycle (iap.lifecycle)<br/>RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE <-> WATCH -> RETIRED<br/>20 gates, 17 edges; bundled data: 24 CANDIDATE / 0 beyond"]
     LIFE -. "gated, ledgered transitions<br/>(research/alpha_registry.json)" .-> ALPHA
 ```
@@ -249,10 +249,10 @@ flowchart LR
     MG --> EXP[("expected_*.json<br/>codec sha256 | book states | features<br/>alpha | backtest | risk decisions + audit + snapshot<br/>replay fills | portfolio | tca (+ timeline cases) | adaptive<br/>contracts examples | canonical json + trace digest<br/>lifecycle | experiment golden frame | mvp")]
     CPPTOOL["cpp/tools/make_replay_fills_golden<br/>(C++ is the fills reference;<br/>Python iap.execution consumes it too)"] --> EXP
     RSTOOL["rust/risk/src/bin/make_risk_golden<br/>(Rust is the risk reference;<br/>Python iap.risk consumes it too)"] --> EXP
-    GV --> PY["python: pytest -k golden<br/>177 tests"]
-    GV --> CPP["cpp: ctest -R Golden<br/>68 tests"]
-    GV --> RS["rust: 9 golden test targets<br/>68 tests"]
-    GV --> JV["java: all thirteen *GoldenTest (JUnitCore)<br/>108 golden-group tests"]
+    GV --> PY["python: pytest -k golden<br/>192 tests"]
+    GV --> CPP["cpp: ctest -R Golden<br/>72 tests"]
+    GV --> RS["rust: 10 golden test targets<br/>71 tests"]
+    GV --> JV["java: all seventeen *GoldenTest (JUnitCore)<br/>124 golden-group tests"]
     EXP --> PY
     EXP --> CPP
     EXP --> RS
@@ -283,7 +283,7 @@ and are matched by Java, Rust and C++ (the trace and canonical-JSON ports)
 and by Java and Rust (the lifecycle ports). The harness
 (`tests/harness/run_all.sh`, with `run_golden.sh` as the golden-only alias)
 runs every suite with the canonical commands and prints the parity table; a
-v1.5.0 CI run (2026-10-04) passes 1764/289/355/537 tests (177/68/68/108
+v1.5.0 CI run (2026-10-04) passes 1988/302/358/571 tests (192/72/71/124
 golden) across python/cpp/rust/java, plus the repo-level `integration` (35)
 and `replay` (6) rows — the same counts the README parity table records.
 
@@ -715,8 +715,8 @@ will find the cheapest path to a pass faster than a person: cheaper costs, a
 chosen holdout, uncounted looks. v1.3.0 closed those three in the tooling
 (LEARN.md §24) and measured what the validation chain can detect at all
 (the planted-signal power study, LEARN.md §23). It did not build the agents,
-and on two synthetic sessions whose ledger now holds 4,396 looks (1068 on
-the v1.3.0 dataset, 852 on the regenerated v1.4.0 one, 2,476 on that same
+and on two synthetic sessions whose ledger now holds 5,156 looks (1068 on
+the v1.3.0 dataset, 852 on the regenerated v1.4.0 one, 3,236 on that same
 dataset under the v1.5.0 default methods), more searching is not what the platform lacks (HOW_IT_WORKS.md §6.4
 lists what would be theatre on this data, and why). DIAGRAMS.md §19 draws
 the planned layer and labels it as planned.

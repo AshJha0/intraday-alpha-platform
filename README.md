@@ -55,7 +55,7 @@ the full design, data flow, and diagrams.
 | Flagship alphas | **24** (EQ01–EQ12, FX01–FX12), each with an enforced `Economic rationale:` docstring | `python/src/iap/alpha/`, `research/alpha_reports/` |
 | Promotion verdicts | **0 PROMOTE / 11 ITERATE / 13 REJECT** (gated on the pooled *uncrossed* IC and its HAC t against the ledger threshold, 4.365; the v1.5.0 default methods) | `research/alpha_reports/REPORT.md` |
 | Lifecycle registry | **24 alphas at CANDIDATE, 0 beyond** — every one fails `net_pnl_after_costs` at 1× costs, its bootstrap bound `net_pnl_bootstrap_ci` and `capacity`; the cross-alpha correlation gate passes vacuously (7 states, 17 pinned edges, 20 gates) | `research/alpha_registry.json`, `research/lifecycle_transitions.jsonl`, `tests/golden/expected_lifecycle.json` |
-| Experiments ledger | 4,396 recorded looks over **208 distinct configurations** (de-duplicated by alpha × kind × config × dataset: 70 configurations of the v1.3.0 dataset are kept as history, 138 are on the current one — 69 under the rules up to v1.4.0, 69 under the v1.5.0 defaults); expected max \|t\| under the global null ≈ 4.096, Bonferroni per-test \|t\| ≥ 4.389 | `research/experiments.json` |
+| Experiments ledger | 5,156 recorded looks over **216 distinct configurations** (de-duplicated by alpha × kind × config × dataset: 70 configurations of the v1.3.0 dataset are kept as history, 146 are on the current one — 69 under the rules up to v1.4.0, 77 under the v1.5.0 defaults, eight of those signal combinations); expected max \|t\| under the global null ≈ 4.135, Bonferroni per-test \|t\| ≥ 4.424 | `research/experiments.json` |
 | Contracts | **17** JSON Schemas (all `x-version` 1) mirrored by **22** typed Python contracts and **18** runtime-checkable Protocols; one pinned instance each | `schemas/`, `python/src/iap/contracts/`, `tests/golden/expected_contracts_examples.json` |
 | Python reference ports proven by the ports' own goldens | risk: `expected_risk_decisions.json` exact, audit JSONL + snapshot **byte-identical**; execution: `expected_replay_fills.json` **bit-identical** | `python/tests/test_risk_golden.py`, `python/tests/test_execution_golden.py` |
 | MVP golden run (`python -m iap.mvp run`, seed 12345) | **15,805** events · **800** decisions · **235** parent orders · **169** fills · P&L **−81.53 USD** (cost-negative: +0.022 bps alpha vs −0.41 bps execution cost) · trace digest `20d4ff76…` reproduced by run-twice and replay-from-capture | `tests/golden/expected_mvp.json` |
@@ -216,7 +216,8 @@ conclusion. What moved:
   hashed configuration documents.
 - **Ledger.** The 1920 already recorded are kept; the regenerated pipelines
   added 2,476 (84 per alpha per run under the default methods, 28 under the
-  legacy ones), for 4,396.
+  legacy ones), for 4,396; the eight signal-combination experiments added
+  760, for 5,156.
 - **Ports.** Java and Rust implement the CUSUM and the consecutive
   retirement rule and the ledger and the fixed significance threshold, by
   name; the Java `ResearchBacktester` and `CostModel` default to the v1.5.0
@@ -409,16 +410,16 @@ python3 tools/github/create_issues.py --dry-run   # the epics/issues plan (docs/
 ===================== cross-language parity table =====================
 language | tests passed | golden passed  | time   | status
 ---------+--------------+----------------+--------+-------
-python   | 1764         | 177            |    -s | PASS
-cpp      | 289          | 68             |    -s | PASS
-rust     | 355          | 68             |    -s | PASS
-java     | 537          | 108            |    -s | PASS
+python   | 1988         | 192            |    -s | PASS
+cpp      | 302          | 72             |    -s | PASS
+rust     | 358          | 71             |    -s | PASS
+java     | 571          | 124            |    -s | PASS
 integration | 35           | -              |    -s | PASS
 replay   | 6            | -              |    -s | PASS
 deployment | -            | -              |    -s | PASS
 numbers  | -            | -              |    -s | PASS
 =======================================================================
-deployment checks: 25 passed, 0 failed, 0 skipped
+deployment checks: 26 passed, 0 failed, 0 skipped
 headline numbers: all headline numbers match their artefacts
 (a '-' count means the suite did not run in this mode, or has no golden
  group (integration/replay); '?' means it ran but its count could not be
@@ -441,8 +442,14 @@ edge golden in three languages, the simulator fill rules, the Java
 in Python. The v1.5.0 growth is the tests of the default and legacy
 research methods in Python (among them the comparison of `legacy_v1` with
 two v1.4.0 reports), the CUSUM and ledger-threshold rules with the
-lifecycle scenarios LC04 and LG01 in Python, Java and Rust, and the
-release-guard tests in `integration`. The `golden passed`
+lifecycle scenarios LC04 and LG01 in Python, Java and Rust, the
+release-guard tests in `integration`, and the tests of the work merged into
+the release: the ITCH 5.0 / LOBSTER readers and the ingest path, the
+passive execution policy and markouts (Python, Java, C++), signal
+combination and the two lifecycle gates with scenarios LC05 and LC06
+(Python, Java, Rust), the scope-aware store, the Java research backtester
+golden, the session-exit marker, and the risk differential-fuzz corpus
+replayed by Rust, Java and Python. The `golden passed`
 column counts each language's golden-group tests: byte-exact IAP1 SHA-256
 codec parity, exact-integer book states, 1e-9-tolerance
 feature/alpha/portfolio/TCA/fill comparisons, exact risk decisions with
@@ -453,7 +460,7 @@ float reprs incl. 612 rounding-tie and 17-digit cases, 24 escapes, 9 documents),
 pinned instance per contract with the `explain()` block, the 7-state
 lifecycle scenarios and the registry bytes, the experiment golden frame and
 the MVP session — all against `tests/golden/`. The Java golden column runs
-**all fifteen** `com.iap.*GoldenTest` classes and the Rust column nine
+**all seventeen** `com.iap.*GoldenTest` classes and the Rust column ten
 golden targets; a harness case fails if either gate list ever drifts from
 the files on disk. Python's golden group now includes the risk and fills
 goldens that Rust and C++ generate, consumed by `iap.risk` and
@@ -491,7 +498,7 @@ golden tests — the engineering discipline this repo is built around
 |---|---|
 | [LEARN.md](LEARN.md) | textbook walkthrough: microstructure, generator, book, features, honest alpha research, ML/meta-labeling, portfolio, risk, execution, TCA, parity, latency economics, adaptability, contracts & Protocols, the Python risk/execution reference, the 7-state lifecycle, the decision trace, the data model, the MVP walkthrough with its honest numbers, the v1.3.0 review as six case-study chapters (fail-closed risk bugs, simulator realism, statistical power, gate gaming, crash consistency, supply-chain hygiene), pitfalls, interview Q&A |
 | [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) | how the quant, algo and AI sides work — a guided explanation for a newcomer: the pipeline on one page, the research statistics and gates, the execution algorithms and simulator rules, the fail-closed risk engine, the ML layer with its negative results, the LLM/agent boundary (what exists, what is backlog, what would be theatre on this data), determinism and replay; every section ends with where to look and a command that runs |
-| [COOKBOOK.md](COOKBOOK.md) | 37 task-oriented recipes with runnable commands |
+| [COOKBOOK.md](COOKBOOK.md) | 38 task-oriented recipes with runnable commands |
 | [docs/REAL_DATA.md](docs/REAL_DATA.md) | real historical data: what `python -m iap.marketdata ingest` reads (Nasdaq TotalView-ITCH 5.0, LOBSTER), how to obtain files yourself (nothing is bundled), the commands from a downloaded file to an alpha report, the mapping table to canonical events, the point-in-time security master and corporate-actions table, known limitations, and what a first real-data study can and cannot conclude |
 | [docs/RESEARCH_VALIDITY.md](docs/RESEARCH_VALIDITY.md) + [research/power/POWER_REPORT.md](research/power/POWER_REPORT.md) | the corrected research methods (the defaults since v1.5.0, each with its named legacy rule), the research store under parallel writers, gate eligibility; the planted-signal power study of the validation chain |
 | [CHANGELOG.md](CHANGELOG.md) | release notes, newest first (v1.5.0: the corrected research methods become the defaults, every old rule keeps a legacy name, every dataset-derived artefact regenerated; v1.4.0: the generator's equity flow calibration fixed so flow reaches the close, and every dataset-derived artefact regenerated; v1.3.0: fail-closed risk, simulator fill rules, paper-platform safety, governance and deployment hardening, research validity) |

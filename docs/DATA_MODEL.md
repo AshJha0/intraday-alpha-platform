@@ -188,7 +188,7 @@ datasets and two bundles. From x-version 2 the same alpha is three rows:
 
 | scope | `ic` | `t_stat` | judged at | `ledger_count` | `scope_looks` |
 |---|---|---|---|---|---|
-| `116b7787…` / `v2` (**current**) | 0.0132 | 2.41 | \|t\| ≥ 4.370 at a look count of 4,020 | 256 | 2,476 |
+| `116b7787…` / `v2` (**current**) | 0.0132 | 2.41 | \|t\| ≥ 4.370 at a look count of 4,020 | 256 | 3,236 |
 | `116b7787…` / `legacy_v1` | 0.0271 | 4.84 | the fixed 3.0 | 88 | 852 |
 | `203c8f54…` / `legacy_v1` | 0.0165 | 4.25 | the fixed 3.0 | 88 | 1,068 |
 
@@ -327,9 +327,9 @@ SELECT alpha_id, current_state, verdict, ROUND(ic, 4) AS ic,
        gate_looks, leakage_passed, ledger_count, scope_looks
 FROM v_alpha_scorecard_current
 ORDER BY alpha_id;
--- {"alpha_id":"EQ01","current_state":"CANDIDATE","gate_looks":4104,"ic":-0.0019,"leakage_passed":1,"ledger_count":172,"scope_looks":2476,"t_stat":-0.22,"t_threshold":4.374,"verdict":"REJECT"}
--- {"alpha_id":"EQ02","current_state":"CANDIDATE","gate_looks":3936,"ic":0.0251,"leakage_passed":1,"ledger_count":84,"scope_looks":2476,"t_stat":7.17,"t_threshold":4.365,"verdict":"ITERATE"}
--- {"alpha_id":"EQ03","current_state":"CANDIDATE","gate_looks":4020,"ic":0.0132,"leakage_passed":1,"ledger_count":256,"scope_looks":2476,"t_stat":2.41,"t_threshold":4.37,"verdict":"ITERATE"}
+-- {"alpha_id":"EQ01","current_state":"CANDIDATE","gate_looks":4104,"ic":-0.0019,"leakage_passed":1,"ledger_count":172,"scope_looks":3236,"t_stat":-0.22,"t_threshold":4.374,"verdict":"REJECT"}
+-- {"alpha_id":"EQ02","current_state":"CANDIDATE","gate_looks":3936,"ic":0.0251,"leakage_passed":1,"ledger_count":84,"scope_looks":3236,"t_stat":7.17,"t_threshold":4.365,"verdict":"ITERATE"}
+-- {"alpha_id":"EQ03","current_state":"CANDIDATE","gate_looks":4020,"ic":0.0132,"leakage_passed":1,"ledger_count":256,"scope_looks":3236,"t_stat":2.41,"t_threshold":4.37,"verdict":"ITERATE"}
 -- ...  (24 rows; v1.5.0 snapshot)
 
 SELECT alpha_id, substr(dataset_version, 1, 8) AS dataset, methods, is_current, verdict,
@@ -339,7 +339,7 @@ FROM v_alpha_scorecard
 WHERE alpha_id = 'EQ03'
 ORDER BY dataset_version, methods;
 -- {"alpha_id":"EQ03","dataset":"116b7787","ic":0.0271,"is_current":0,"ledger_count":88,"methods":"legacy_v1","scope_looks":852,"t_stat":4.84,"t_threshold":3.0,"verdict":"ITERATE"}
--- {"alpha_id":"EQ03","dataset":"116b7787","ic":0.0132,"is_current":1,"ledger_count":256,"methods":"v2","scope_looks":2476,"t_stat":2.41,"t_threshold":4.37,"verdict":"ITERATE"}
+-- {"alpha_id":"EQ03","dataset":"116b7787","ic":0.0132,"is_current":1,"ledger_count":256,"methods":"v2","scope_looks":3236,"t_stat":2.41,"t_threshold":4.37,"verdict":"ITERATE"}
 -- {"alpha_id":"EQ03","dataset":"203c8f54","ic":0.0165,"is_current":0,"ledger_count":88,"methods":"legacy_v1","scope_looks":1068,"t_stat":4.25,"t_threshold":3.0,"verdict":"ITERATE"}
 -- (v1.5.0 snapshot. Each row is one scope: the result, the threshold it was judged at and the looks of that
 --  scope alone. EQ01, EQ03 and EQ06 also have ExperimentRunner experiments, and their "latest result" in
@@ -410,20 +410,21 @@ Bonferroni-corrected against (`research/experiments.json` `total_experiments`
 SELECT COUNT(*) AS distinct_experiments, SUM(count) AS total_experiments,
        ROUND(0.05 / SUM(count), 8) AS bonferroni_p
 FROM ledger_entries;
--- {"bonferroni_p":1.137e-05,"distinct_experiments":208,"total_experiments":4396}   (v1.5.0 snapshot; the ledger only grows: v1.4.0 read 139 / 1920)
+-- {"bonferroni_p":9.7e-06,"distinct_experiments":216,"total_experiments":5156}   (v1.5.0 snapshot; the ledger only grows: v1.4.0 read 139 / 1920)
 
 SELECT substr(dataset_version, 1, 8) AS dataset, methods, n_entries, looks,
        ROUND(bonferroni_t_threshold, 3) AS bonferroni_t
 FROM ledger_scopes ORDER BY dataset_version, methods;
 -- {"bonferroni_t":4.018,"dataset":"116b7787","looks":852,"methods":"legacy_v1","n_entries":69}
--- {"bonferroni_t":4.263,"dataset":"116b7787","looks":2476,"methods":"v2","n_entries":69}
+-- {"bonferroni_t":4.322,"dataset":"116b7787","looks":3236,"methods":"v2","n_entries":77}
 -- {"bonferroni_t":4.071,"dataset":"203c8f54","looks":1068,"methods":"legacy_v1","n_entries":70}
--- (v1.5.0 snapshot: the 4,396 looks, by scope. bonferroni_t is the |t| each scope alone would demand.)
+-- (v1.5.0 snapshot: the 5,156 looks, by scope. bonferroni_t is the |t| each scope alone would demand.)
 
 SELECT kind, n_entries, n_alphas, total_count, n_promote, n_iterate, n_reject,
        max_gate_looks, ROUND(max_promote_t_threshold, 3) AS max_t_threshold
 FROM v_experiment_ledger_summary_current ORDER BY kind;
 -- {"kind":"adaptive_deployment","max_gate_looks":null,"max_t_threshold":null,"n_alphas":10,"n_entries":40,"n_iterate":0,"n_promote":0,"n_reject":0,"total_count":40}
+-- {"kind":"combination","max_gate_looks":5156,"max_t_threshold":4.424,"n_alphas":2,"n_entries":8,"n_iterate":8,"n_promote":0,"n_reject":0,"total_count":760}
 -- {"kind":"experiment_runner","max_gate_looks":4356,"max_t_threshold":4.387,"n_alphas":3,"n_entries":5,"n_iterate":3,"n_promote":0,"n_reject":2,"total_count":420}
 -- {"kind":"promotion_pipeline","max_gate_looks":3936,"max_t_threshold":4.365,"n_alphas":24,"n_entries":24,"n_iterate":11,"n_promote":0,"n_reject":13,"total_count":2016}
 -- (v1.5.0 snapshot, the current scope: 24 alphas x 84 looks judged at |t| >= 4.365, 11 ITERATE / 13 REJECT —

@@ -19,6 +19,6 @@ flowchart TD
     FILLS --> TCA["TCA + attribution<br/>Perold IS = delay + trading + opportunity (exact)<br/>Python reference, Java service"]
     TCA --> TRACE["Decision trace — one DecisionTrace per decision<br/>signal · portfolio · risk · orders · routing · fills · TCA · attribution<br/>canonical JSONL + stream digest + SQLite index (iap.store); explain()"]
     LBL --> RESEARCH
-    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (4,396 looks / 208 configs, two datasets, two method bundles)<br/>REPORT.md, ML_REPORT.md, model manifests"]
+    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (5,156 looks / 216 configs, two datasets, two method bundles)<br/>REPORT.md, ML_REPORT.md, model manifests"]
     RESEARCH --> LIFE["Alpha promotion lifecycle (iap.lifecycle)<br/>RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE <-> WATCH -> RETIRED<br/>20 gates, 17 edges; bundled data: 24 CANDIDATE / 0 beyond"]
     LIFE -. "gated, ledgered transitions<br/>(research/alpha_registry.json)" .-> ALPHA

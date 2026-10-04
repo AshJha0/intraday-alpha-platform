@@ -35,7 +35,7 @@ flowchart TD
     FILLS --> TCA["TCA + attribution<br/>Perold IS = delay + trading + opportunity (exact)<br/>Python reference, Java service"]
     TCA --> TRACE["Decision trace — one DecisionTrace per decision<br/>signal · portfolio · risk · orders · routing · fills · TCA · attribution<br/>canonical JSONL + stream digest + SQLite index (iap.store); explain()"]
     LBL --> RESEARCH
-    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (4,396 looks / 208 configs, two datasets, two method bundles)<br/>REPORT.md, ML_REPORT.md, model manifests"]
+    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (5,156 looks / 216 configs, two datasets, two method bundles)<br/>REPORT.md, ML_REPORT.md, model manifests"]
     RESEARCH --> LIFE["Alpha promotion lifecycle (iap.lifecycle)<br/>RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE <-> WATCH -> RETIRED<br/>20 gates, 17 edges; bundled data: 24 CANDIDATE / 0 beyond"]
     LIFE -. "gated, ledgered transitions<br/>(research/alpha_registry.json)" .-> ALPHA
 ```
@@ -43,9 +43,9 @@ flowchart TD
 ## 2. Cross-language golden-test topology
 
 How one validated Python reference pins four implementations. The parity table is
-printed by `tests/harness/run_all.sh` (python 1764 · cpp 289 · rust 355 · java 537
-tests; 177/68/68/108 in the golden groups — the Java gate runs all thirteen
-`*GoldenTest` classes, the Rust gate nine golden targets). Two goldens are
+printed by `tests/harness/run_all.sh` (python 1988 · cpp 302 · rust 358 · java 571
+tests; 192/72/71/124 in the golden groups — the Java gate runs all seventeen
+`*GoldenTest` classes, the Rust gate ten golden targets). Two goldens are
 owned by a port language and consumed by Python as well: the fills golden
 (C++) by `iap.execution`, the risk goldens (Rust) by `iap.risk`.
 
@@ -60,10 +60,10 @@ flowchart LR
     MG --> EXP[("expected_*.json<br/>codec sha256 | book states | features<br/>alpha | backtest | risk decisions + audit + snapshot<br/>replay fills | portfolio | tca (+ timeline cases) | adaptive<br/>contracts examples | canonical json + trace digest<br/>lifecycle | experiment golden frame | mvp")]
     CPPTOOL["cpp/tools/make_replay_fills_golden<br/>(C++ is the fills reference;<br/>Python iap.execution consumes it too)"] --> EXP
     RSTOOL["rust/risk/src/bin/make_risk_golden<br/>(Rust is the risk reference;<br/>Python iap.risk consumes it too)"] --> EXP
-    GV --> PY["python: pytest -k golden<br/>177 tests"]
-    GV --> CPP["cpp: ctest -R Golden<br/>68 tests"]
-    GV --> RS["rust: 9 golden test targets<br/>68 tests"]
-    GV --> JV["java: all thirteen *GoldenTest (JUnitCore)<br/>108 golden-group tests"]
+    GV --> PY["python: pytest -k golden<br/>192 tests"]
+    GV --> CPP["cpp: ctest -R Golden<br/>72 tests"]
+    GV --> RS["rust: 10 golden test targets<br/>71 tests"]
+    GV --> JV["java: all seventeen *GoldenTest (JUnitCore)<br/>124 golden-group tests"]
     EXP --> PY
     EXP --> CPP
     EXP --> RS
@@ -1076,7 +1076,7 @@ flowchart TD
 | Governing institutional specification (verbatim) | [SPECIFICATION.md](SPECIFICATION.md) |
 | Teaching walkthrough of every subsystem | [../LEARN.md](../LEARN.md) |
 | How the quant, algo and AI sides work, top-down | [HOW_IT_WORKS.md](HOW_IT_WORKS.md) |
-| 36 runnable recipes | [../COOKBOOK.md](../COOKBOOK.md) |
+| 38 runnable recipes | [../COOKBOOK.md](../COOKBOOK.md) |
 | Data model, views, SQLite/PostgreSQL portability, query cookbook | [DATA_MODEL.md](DATA_MODEL.md) |
 | The 7-state promotion lifecycle: gates, evidence, registry, bootstrap result | [LIFECYCLE.md](LIFECYCLE.md) |
 | The decision trace: record, ids, canonical JSON, digest, sinks, replay | [DECISION_TRACE.md](DECISION_TRACE.md) |

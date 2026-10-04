@@ -17,17 +17,18 @@ gated on all of them. Run the whole thing locally with
 ## Python (reference implementation)
 
 ```bash
-cd python && PYTHONPATH=src python3 -m pytest -q          # full suite (1672 tests; CI runs it as `-n auto --dist loadfile` with coverage, 149 s on a 4-vCPU runner)
-cd python && PYTHONPATH=src python3 -m pytest -q -k golden # the golden group (173)
+cd python && PYTHONPATH=src python3 -m pytest -q          # full suite (1988 tests; CI runs it as `-n auto --dist loadfile` with coverage, 149 s on a 4-vCPU runner)
+cd python && PYTHONPATH=src python3 -m pytest -q -k golden # the golden group (192)
 cd python && PYTHONPATH=src python3 -m iap.marketdata      # end-to-end pipeline
 cd python && PYTHONPATH=src python3 -m iap.mvp run         # the traced MVP loop (under a minute)
 cd python && PYTHONPATH=src python3 tools/make_golden.py   # regen goldens (deliberate only; every
                                                            # make_golden_*.py refuses to overwrite without --force)
 ```
 
-- **Timing.** The suite is 1672 tests at v1.5.0 (173 in the `-k golden` group; 1573 and 166 at v1.4.0).
-  Measured in CI on the `ubuntu-24.04` runner (4 vCPU), Python 3.11, on the
-  same tree, 2026-10-04 (pull request #23):
+- **Timing.** The suite is 1988 tests at v1.5.0 (192 in the `-k golden` group; 1573 and 166 at v1.4.0).
+  Measured in CI on the `ubuntu-24.04` runner (4 vCPU), Python 3.11, on one
+  tree, 2026-10-04 (pull request #23, when the suite was 1672 tests — before
+  the other v1.5.0 branches were merged):
 
   | run | wall time |
   |---|---|
@@ -45,7 +46,7 @@ cd python && PYTHONPATH=src python3 tools/make_golden.py   # regen goldens (deli
   instrumented CI run (149 s) and is met by the uninstrumented serial run (110 s)**;
   the harness capture on the 2-CPU container baseline
   (2026-09-20, 1362 tests) read 83 s. Nothing was removed or skipped to make
-  a number fit; the parallel run collects the same 1672 tests and reports the same
+  a number fit; the parallel run collected the same 1672 tests and reported the same
   outcome for every one of them as the serial run.
 - Python 3.11, src layout (`python/src/iap`), packaging via `python/pyproject.toml`
   (1.4.0; installable with `pip install -e python` if preferred over PYTHONPATH;
@@ -69,7 +70,7 @@ cd cpp && bash build.sh && ctest --test-dir build --output-on-failure
 ```
 
 C++17, g++13/CMake/GoogleTest/Eigen available; `-Wall -Wextra -Werror` clean; build
-with `-j2` (2-CPU environment); 289 tests, 68 in the golden group. Layout: `include/iap/{marketdata,orderbook,features,
+with `-j2` (2-CPU environment); 302 tests, 72 in the golden group. Layout: `include/iap/{marketdata,orderbook,features,
 alpha,execution,sor,replay,contracts,util}` + `src/` mirrors; `contracts/` is the
 canonical-JSON / decision-trace contract (`canonical_json.hpp`, `trace.hpp`),
 `util/sha256.hpp` the SHA-256 the codec goldens and the trace digest share. The
@@ -79,7 +80,7 @@ golden group is `ctest --test-dir build -R Golden` (suites `*Golden`, including
 ## Rust
 
 ```bash
-cd rust && cargo test        # workspace (eleven crates, 323 tests, ~55 s after a full rebuild)
+cd rust && cargo test        # workspace (eleven crates, 358 tests, ~55 s after a full rebuild)
 ```
 
 Crates: `marketdata`, `orderbook`, `replay`, `eventbus`, `telemetry`, `features`,
@@ -106,7 +107,7 @@ canonical-JSON byte parity the contracts / lifecycle goldens pin.
 ## Java — why there is NO Maven build
 
 ```bash
-cd java && bash build.sh && bash test.sh    # 525 tests; the fourteen *GoldenTest classes are 110 of them
+cd java && bash build.sh && bash test.sh    # 571 tests; the seventeen *GoldenTest classes are 124 of them
 ```
 
 **Maven/Gradle are deliberately not used: Maven Central is unreachable from

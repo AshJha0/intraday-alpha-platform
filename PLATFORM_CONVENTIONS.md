@@ -236,8 +236,8 @@ independent brute-force book / feature recomputation / SLSQP optimum); every oth
 load and match; the contract goldens are matched by Java, Rust and C++ (`CanonicalJsonGoldenTest`,
 `TraceGoldenTest`, `LifecycleGoldenTest`; `golden_canonical_json.rs`, `golden_trace.rs`,
 `golden_lifecycle.rs`; `CanonicalJsonGolden`, `TraceGolden`, `ReplayTraceGolden`). Each language's
-test suite has a `golden` test group (python `-k golden`, cpp `-R Golden`, rust the nine
-`golden_*` targets, java the fourteen `*GoldenTest` classes); `tests/harness/run_golden.sh` runs
+test suite has a `golden` test group (python `-k golden`, cpp `-R Golden`, rust the ten
+`golden_*` targets, java the seventeen `*GoldenTest` classes); `tests/harness/run_golden.sh` runs
 all four and prints a parity table. Regeneration is a deliberate, versioned act
 (CONTRIBUTING.md §4): every generator refuses to overwrite without `--force`.
 
@@ -1285,7 +1285,14 @@ threshold, the PROMOTE gates. Pinned:
   can round one row differently depending on how many rows follow it, which the truncation and
   recompute leakage probes (rightly) reject.
 - A combination is not registered in `research/alpha_registry.json`; the registry holds the 24
-  flagship alphas.
+  flagship alphas. The registry is the lifecycle's state: an entry is something the machine can
+  move towards an allocation, and it is created by the bootstrap from an alpha report. A
+  combination experiment is evidence about a search — its looks are debited in the ledger, its
+  reports are under `research/combination/` — and none has a PROMOTE verdict. One that earned
+  one would enter as an alpha of its own (its own id, report and bootstrap evidence), not as a
+  row written by the combination report. The store follows the registry: `v_alpha_scorecard` is
+  one row per registered alpha and scope and does not list a combination, while its looks count
+  in `scope_looks` and `v_experiment_ledger_summary` shows them as kind `combination`.
 
 ## 14. Pinned semantics corrected on 2026-09-20 (correctness review)
 

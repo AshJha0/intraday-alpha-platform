@@ -446,7 +446,7 @@ release; its cause was not re-derived here.
 
 **Ledger.** At v1.4.0 `research/experiments.json` held 1920 looks over 139
 entries (the 1068 looks of the v1.3.0 dataset are kept; the regenerated
-pipelines added 852); it holds 4396 over 208 since v1.5.0 (see the
+pipelines added 852); it holds 5156 over 216 since v1.5.0 (see the
 2026-10-04 update). At the v1.4.0 count the expected max |t| under the
 global null was 3.888 and the Bonferroni per-test threshold 4.206. FX01 (3.27) is below the yardstick,
 as before. FX09's |t| of 3.76 was just above the v1.3.0 yardstick (3.735)
@@ -555,10 +555,10 @@ pooled rows): FX01 -0.0522 high-vol / +0.0039 low-vol; FX09 -0.1919 /
 -0.1283. Edge-breakeven capacity is 0 for both. The v1.4.0 losses (FX01
 -9,867, FX09 -27,477 at 1x) are those of the legacy `"sign"` policy.
 
-**Ledger.** `research/experiments.json` holds 4396 looks over 208 entries
+**Ledger.** `research/experiments.json` holds 5156 looks over 216 entries
 (1068 on the v1.3.0 dataset, 852 on the v1.4.0 dataset under the legacy
-methods, 2,476 under the default methods). Expected max |t| under the
-global null is 4.096 and the Bonferroni per-test threshold 4.389; the alpha
+methods, 3,236 under the default methods). Expected max |t| under the
+global null is 4.135 and the Bonferroni per-test threshold 4.424; the alpha
 report was judged at its own recorded count of 3,936 (threshold 4.365,
 selection yardstick 4.07). FX01's gate t of 2.26 is below all of them.
 FX09's is -5.75, and its magnitude is above all of them: the sentence of

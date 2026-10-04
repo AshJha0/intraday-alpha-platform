@@ -45,6 +45,8 @@ Contents:
 34. [Replay the risk edge golden in Python](#34-replay-the-risk-edge-golden-in-python)
 35. [Check whether a result is gate-eligible](#35-check-whether-a-result-is-gate-eligible)
 36. [Ingest an ITCH 5.0 file and run an alpha on it (no real data needed)](#36-ingest-an-itch-50-file-and-run-an-alpha-on-it-no-real-data-needed)
+37. [Work a parent order passively and read its markouts](#37-work-a-parent-order-passively-and-read-its-markouts)
+38. [Combine alphas out of sample and count the independent bets](#38-combine-alphas-out-of-sample-and-count-the-independent-bets)
 
 Recipes 27–35 were added with v1.3.0. Every command block in them was run
 as printed, from a clean checkout of the release, before it was written
@@ -54,6 +56,11 @@ ledger or `research/experiments/`.
 
 Recipe 36 was added with the real-data ingestion path ([docs/REAL_DATA.md](docs/REAL_DATA.md)). It writes under `data/vendor/` and
 `data/real/` (both git-ignored); its block was run as printed.
+
+Recipes 37 and 38 were added with the execution-quality and the
+signal-combination work of v1.5.0. Their Python blocks only read the
+repository; the `research combine` command that closes recipe 38 is the one
+that writes (`research/combination/` and the ledger).
 
 v1.4.0 (2026-10-03) regenerated the seeded dataset (`data_version`
 `116b7787…`, was `203c8f54…`; recipe 1). Every quoted output below that
@@ -730,10 +737,10 @@ bash tests/harness/run_all.sh --golden-only   # golden groups only (fast)
 ```
 
 Exit code 0 iff every language passed; logs land in a temp dir printed on
-the first line. The v1.5.0 counts (CI): python 1764 / cpp 289 /
-rust 355 / java 537 tests passed (golden groups 177/68/68/108), plus
+the first line. The v1.5.0 counts (CI): python 1988 / cpp 302 /
+rust 358 / java 571 tests passed (golden groups 192/72/71/124), plus
 `integration` (35) and `replay` (6) rows for the repo-level pytest suites, a
-`deployment` row (25 structural checks passed in CI, where `promtool` and
+`deployment` row (26 structural checks passed in CI, where `promtool` and
 `kubeconform` are installed; a machine without them reports those checks as
 skipped) and a `numbers` row (every headline figure re-derived from its
 artefact), all PASS.
@@ -968,7 +975,7 @@ PYTHONPATH=src python3 -m iap.store build            # -> data/store/iap.sqlite 
 # experiment_results       39
 # experiments              39
 # instruments              19
-# ledger_entries          208
+# ledger_entries          216
 # ledger_scopes             3
 # lifecycle_transitions   372
 # model_runs               47
@@ -999,14 +1006,14 @@ PYTHONPATH=src python3 -m iap.store sql "SELECT alpha_id, current_state, verdict
 # ...  (24 rows)
 PYTHONPATH=src python3 -m iap.store sql "SELECT alpha_id, substr(dataset_version, 1, 8) AS dataset, methods, is_current, verdict, ROUND(ic, 4) AS ic, ROUND(t_stat, 2) AS t_stat, ROUND(promote_t_threshold, 3) AS t_threshold, ledger_count, scope_looks FROM v_alpha_scorecard WHERE alpha_id = 'EQ03' ORDER BY dataset_version, methods"
 # {"alpha_id":"EQ03","dataset":"116b7787","ic":0.0271,"is_current":0,"ledger_count":88,"methods":"legacy_v1","scope_looks":852,"t_stat":4.84,"t_threshold":3.0,"verdict":"ITERATE"}
-# {"alpha_id":"EQ03","dataset":"116b7787","ic":0.0132,"is_current":1,"ledger_count":256,"methods":"v2","scope_looks":2476,"t_stat":2.41,"t_threshold":4.37,"verdict":"ITERATE"}
+# {"alpha_id":"EQ03","dataset":"116b7787","ic":0.0132,"is_current":1,"ledger_count":256,"methods":"v2","scope_looks":3236,"t_stat":2.41,"t_threshold":4.37,"verdict":"ITERATE"}
 # {"alpha_id":"EQ03","dataset":"203c8f54","ic":0.0165,"is_current":0,"ledger_count":88,"methods":"legacy_v1","scope_looks":1068,"t_stat":4.25,"t_threshold":3.0,"verdict":"ITERATE"}
 PYTHONPATH=src python3 -m iap.store sql "SELECT substr(dataset_version, 1, 8) AS dataset, methods, n_entries, looks, ROUND(bonferroni_t_threshold, 3) AS bonferroni_t FROM ledger_scopes ORDER BY dataset_version, methods"
 # {"bonferroni_t":4.018,"dataset":"116b7787","looks":852,"methods":"legacy_v1","n_entries":69}
-# {"bonferroni_t":4.263,"dataset":"116b7787","looks":2476,"methods":"v2","n_entries":69}
+# {"bonferroni_t":4.322,"dataset":"116b7787","looks":3236,"methods":"v2","n_entries":77}
 # {"bonferroni_t":4.071,"dataset":"203c8f54","looks":1068,"methods":"legacy_v1","n_entries":70}
 PYTHONPATH=src python3 -m iap.store sql "SELECT COUNT(*) AS distinct_experiments, SUM(count) AS total_experiments FROM ledger_entries"
-# {"distinct_experiments":208,"total_experiments":4396}     -- the Bonferroni denominator of the whole ledger
+# {"distinct_experiments":216,"total_experiments":5156}     -- the Bonferroni denominator of the whole ledger
 PYTHONPATH=src python3 -m iap.store scorecard | wc -l                                   # 24: the current scope
 PYTHONPATH=src python3 -m iap.store scorecard --methods legacy_v1 | wc -l               # 24: same dataset, legacy bundle
 PYTHONPATH=src python3 -m iap.store scorecard --dataset-version 203c8f54 --methods legacy_v1 | wc -l   # 24: the earlier dataset
@@ -1033,10 +1040,11 @@ was judged at, not a re-judgement: `legacy_v1` rows read the fixed 3.0,
 `v2` rows `max(3.0, Bonferroni |t| at gate_looks)`, where `gate_looks`
 counts every look the ledger held at the time, across datasets;
 `scope_bonferroni_t` is what the scope alone would demand. The ledger total
-(4,396 looks over 208 entries) is the sum of the three scopes: 1,068 on the
-v1.3.0 dataset, 852 on the current dataset under the old rules, and 2,476
+(5,156 looks over 216 entries) is the sum of the three scopes: 1,068 on the
+v1.3.0 dataset, 852 on the current dataset under the old rules, and 3,236
 under the default rules (24 × 84 for the promotion report, 5 × 84 for the
-runner experiments, 40 adaptive deployments).
+runner experiments, 40 adaptive deployments, 8 × 95 for the signal-combination
+experiments of recipe 38).
 
 `sql` binds `:dataset_version` and `:methods` to the scope the command line
 selects (the current one by default), and `build --ledger <path>` indexes
@@ -1547,9 +1555,9 @@ PYTHONPATH=src python3 -m iap.research --out-dir ../data/store/scratch/experimen
 # VERDICT: ITERATE
 # PROMOTE t threshold: 4.3830 (ledger ...)
 # gate eligible: yes
-# looks: 4396 bonferroni |t|: 4.389
+# looks: 5156 bonferroni |t|: 4.424
 # this run's count, 4272: 4.383
-# ledger min_nw_tstat: 4.389
+# ledger min_nw_tstat: 4.424
 # fixed  min_nw_tstat: 3.0
 # experiment         47e6cdacc73e85fe
 # ... t-stat (the gate's)             +4.8405 ... holdout net return (bps)        -2174.7262 ...

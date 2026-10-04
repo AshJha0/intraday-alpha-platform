@@ -1482,7 +1482,7 @@ issues:
       11 ITERATE / 13 REJECT; EQ03 gate IC 0.0189 with a pooled-slope HAC t
       of 5.16 against a ledger threshold of 4.365; under the cost-aware
       position policy 18 alphas make no trade at 1x and the 6 that trade
-      lose, so none is net-positive; the ledger holds 4,396 looks over 208
+      lose, so none is net-positive; the ledger holds 5,156 looks over 216
       configurations. run_all.py --methods legacy_v1 reproduces the v1.4.0
       report (0 / 10 / 14).
     acceptance:

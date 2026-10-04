@@ -148,8 +148,8 @@ jobs:
       # research/; `--dist loadfile` keeps a file's tests on one worker so the
       # module-scoped fixtures that build the golden runs and frames are built
       # once, not once per worker. The seeded dataset is the cache step above,
-      # shared read-only. Same 1672 tests, same outcomes as the serial run
-      # (compared test by test on the PR that introduced this). pytest-cov
+      # shared read-only. Same tests, same outcomes as the serial run
+      # (compared test by test on the PR that introduced this, #23). pytest-cov
       # combines the workers' data into one coverage-python.xml.
       - name: pytest
         working-directory: python

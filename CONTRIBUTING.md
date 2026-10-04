@@ -63,8 +63,8 @@ abs and rel 1e-9; adaptive PSI/KS at 1e-10 with exact refit booleans and
 lifecycle state sequences; canonical-JSON lines, trace digests, the risk
 audit / snapshot and the lifecycle registry are byte-identical; the 7-state
 lifecycle golden is compared exactly, field by field. The v1.5.0 table
-(2026-10-04, counts from CI) reads python 1764 / cpp 289 / rust 355 /
-java 537 (golden 177/68/68/108), `integration` 35, `replay` 6.
+(2026-10-04, counts from CI) reads python 1988 / cpp 302 / rust 358 /
+java 571 (golden 192/72/71/124), `integration` 35, `replay` 6.
 
 ## 4. Golden regeneration protocol
 
@@ -166,10 +166,11 @@ Research truth is the product (spec §32). Two rules are mechanical:
    the SHA-256 of the canonical spec and writes
    `research/experiments/<id>/{spec,result}.json`) *before* its result is
    read, and every report prints the denominator and the expected max |t|
-   under the global null (4,396 looks / 208 configurations, max |t| ≈ 4.096 as
+   under the global null (5,156 looks / 216 configurations, max |t| ≈ 4.135 as
    of 2026-10-04: the 1068 made on the v1.3.0 dataset, the 852 made on
-   the current one under the rules up to v1.4.0 and the 2,476 made on it
-   under the v1.5.0 default methods). An experiment runs under the default
+   the current one under the rules up to v1.4.0 and the 3,236 made on it
+   under the v1.5.0 default methods, 760 of them by the signal-combination
+   report). An experiment runs under the default
    method bundle (`v2`) unless it names `--methods legacy_v1`; the bundle
    is part of the experiment id, a `v2` validation costs 84 looks (28
    under `legacy_v1`), and its PROMOTE t threshold is the ledger's

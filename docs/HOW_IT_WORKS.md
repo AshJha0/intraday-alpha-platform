@@ -237,10 +237,11 @@ buckets gain (FX08 2.18 → 3.84). The threshold the t is compared with is
 Try enough things and something will look significant. So every look at
 the data is recorded in a ledger (`research/experiments.json`), identified
 by alpha, kind, configuration and — since v1.4.0 — dataset, so that
-re-running a script does not inflate the count. Today it holds 4,396 looks
-over 208 entries: 1,068 were taken on the v1.3.0 dataset, 852 on the
-v1.4.0 dataset under the old rules, and 2,476 were added when v1.5.0
-re-ran everything under the new ones. A statistic computed on a different
+re-running a script does not inflate the count. Today it holds 5,156 looks
+over 216 entries: 1,068 were taken on the v1.3.0 dataset, 852 on the
+v1.4.0 dataset under the old rules, 2,476 were added when v1.5.0
+re-ran everything under the new ones, and 760 by the signal-combination
+experiments of the same release (§2.13). A statistic computed on a different
 dataset, or under a different method bundle, is a different look, and the
 denominator only grows: regenerating the data or changing the rules does
 not reset it. From that count come two yardsticks: the largest t expected
@@ -1016,7 +1017,7 @@ reason for each:
   trading path in any case.
 - **Agent debate.** Several agents arguing about 24 alphas on the same two
   sessions add no data. Evidence comes from sessions, and the ledger
-  already holds 4,396 looks at them (1,068 on the v1.3.0 dataset, the rest
+  already holds 5,156 looks at them (1,068 on the v1.3.0 dataset, the rest
   on the regenerated one). Debate multiplies looks; it does not add a
   holdout. Without pre-registration and a hidden reserve seed — both
   backlog — there is also no way to score who was right.

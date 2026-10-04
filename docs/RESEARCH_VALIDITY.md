@@ -216,10 +216,11 @@ planted in is about 2.5 times sparser in time.
   the configuration and an entry carries `gate_looks`, the look count its run
   was judged at. At v1.4.0 the committed ledger held 1,920 looks over 139
   entries — 1,068 on the v1.3.0 dataset and 852 on the v1.4.0 one (Bonferroni
-  |t| 4.206, was 4.071). The v1.5.0 ledger carries those and adds 2,476 under
-  the `v2` bundle on the same dataset: 4,396 looks over 208 entries (1,068 on
-  the v1.3.0 dataset, 3,328 on the v1.4.0 one), Bonferroni |t| 4.389,
-  expected largest |t| under the null 4.096. The thresholds derived from it
+  |t| 4.206, was 4.071). The v1.5.0 ledger carries those and adds 3,236 under
+  the `v2` bundle on the same dataset (2,476 by the report pipelines, 760 by
+  the signal-combination experiments): 5,156 looks over 216 entries (1,068 on
+  the v1.3.0 dataset, 4,088 on the v1.4.0 one), Bonferroni |t| 4.424,
+  expected largest |t| under the null 4.135. The thresholds derived from it
   only tighten.
 
 ## 4. Gate eligibility

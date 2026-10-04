@@ -25,6 +25,16 @@ a v1.4.0 conclusion. The release guard that failed the v1.4.0 release once
 on an API error now retries. Pull request
 [#21](https://github.com/AshJha0/intraday-alpha-platform/pull/21).
 
+The same release carries six further pieces of work, each developed on its
+own branch and merged into the release branch: real historical data
+ingestion (ITCH 5.0, LOBSTER; #20), a passive execution policy and markout
+analysis (#22), a faster Python CI job and an observable STOPPED session
+state (#23), the dataset- and bundle-aware store schema `iap_v2.sql` and
+the Java research backtester on the default rules (#24), signal combination
+with two new lifecycle gates (#25), and differential fuzzing of the three
+risk engines (#26). Their sections are below; none of them changes a
+default of the research methods, and none of them promotes an alpha.
+
 ### Changed
 
 The eleven methods, default first, legacy name second
@@ -217,6 +227,41 @@ Also changed:
   `:dataset_version` / `:methods`; `import_lifecycle_archive` files the
   archived lifecycle ledgers under the scope their name states;
   `StoreVersionError`.
+
+### Added — real historical data ingestion
+
+The only dataset is a seeded synthetic generator with no real signal in it,
+so the research results say nothing about markets. This release adds the
+path by which files the owner obtains flow through the existing pipeline —
+normalisation and QC, canonical events, order book, features, research
+runner — exactly as the synthetic data does. No market data is downloaded
+or committed; Python only (backlog epic E25: XD01 and XD03–XD06 done).
+
+- `iap.marketdata.itch50`: a streaming Nasdaq TotalView-ITCH 5.0 reader
+  (length framing, gzip by magic, symbol filter, typed errors with byte
+  offsets; unknown message types skipped by length and counted) and its
+  mapper to canonical events. `iap.marketdata.lobster`: the LOBSTER message
+  reader, pre-open seeding and a level-by-level check of the real
+  `OrderBook` against the vendor's orderbook file.
+- `python -m iap.marketdata ingest --format {itch50,lobster} --input …
+  --date … --symbols … --out …` writes the generator's layout (raw →
+  normalized → QC), the dataset configs and a `dataset.json` manifest
+  (source, input sha256, counts per message type, skipped counts). The
+  `dataset_version` is disjoint from the synthetic one and the output is
+  byte-deterministic.
+- `iap.reference.secmaster` / `corpactions`: a point-in-time security
+  master (`as_of`, never a later date) and an owner-supplied
+  corporate-actions table with a point-in-time adjustment API.
+- `python -m iap.research run --dataset-dir DIR`: the spec, the experiment
+  id and the ledger entries carry the ingested dataset's version, and the
+  ledger and experiments default to the dataset's own directory, so
+  `research/experiments.json` does not move. `python -m iap.store build
+  --ledger PATH` indexes such a ledger under its own scopes.
+- Tests run on bytes they synthesise from the published layouts
+  (`python/tests/itch50_encoder.py`, `python/tests/lobster_fixture.py`);
+  two tests are skipped unless environment variables point at real files.
+- Docs: `docs/REAL_DATA.md` (sources, commands, the mapping table, how to
+  read a first study, limitations), COOKBOOK.md recipe 36.
 
 ### Added — differential fuzzing of the risk engines
 
@@ -528,7 +573,10 @@ Those of v1.4.0 stand. New or restated:
   statement about the spread of the synthetic book relative to the
   predicted move; it says nothing about what a passive execution policy
   would earn, which the research backtester does not model.
-- **The bootstrap interval and the per-fold diagnostics gate nothing.**
+- **The per-fold diagnostics gate nothing, and the bootstrap interval gates
+  the lifecycle only.** `net_pnl_bootstrap_ci` holds an alpha at CANDIDATE
+  when the interval's lower bound is not positive; the report verdict
+  (PROMOTE / ITERATE / REJECT) does not read the interval.
 - **The store's scorecard row is the latest result of a scope, not a
   judgement.** `v_alpha_scorecard` shows the threshold each result was
   judged at (`promote_t_threshold`) and the scope's own Bonferroni \|t\|
@@ -540,6 +588,41 @@ Those of v1.4.0 stand. New or restated:
   currency conversion exist in Python alone. None is a default.
 - **The ledger threshold is not retroactive.** Results recorded before
   v1.5.0 were judged at 3.0 and are not re-judged.
+- **Real data: ingestion only.** One real ITCH day has been ingested by the
+  owner; the LOBSTER path has not been run on a vendor file and no study on
+  real data is recorded (XD10). The batch runners (`run_all.py`, the
+  adaptive study, `research combine`, the power study) read the bundled
+  dataset only; `research run --dataset-dir` is the one research entry
+  point that takes an ingested dataset. Single venue per file, no
+  auctions, no hidden liquidity until it trades, corporate actions not
+  applied by the feature pipeline (docs/REAL_DATA.md §11). XD02 and
+  XD07–XD10 stay backlog.
+- **The passive-execution result is a simulator result.** Our quote never
+  changes the replayed book, nothing reacts to it, there is no hidden
+  liquidity and cancels are frictionless
+  (`research/execution/EXECUTION_REPORT.md`, last section). The `TCAResult`
+  wire contract was not extended with markouts; the Java `BacktestEngine`
+  and `PaperTrading` keep the NATIVE child style (the passive MVP run is
+  Python only); there are no PEG / MID / post-only order types (X08); FX
+  is excluded from the execution study. T05 stays backlog.
+- **A combination is a research object, not a registered alpha.** The
+  registry holds the 24 flagship alphas (PLATFORM_CONVENTIONS.md §13.8); the
+  eight combination experiments are in the ledger — their 760 looks count
+  in the scope and in every later threshold — and in
+  `research/combination/`, and the store's `v_alpha_scorecard`, which is
+  one row per registered alpha, does not list them
+  (`v_experiment_ledger_summary` does, as kind `combination`). The alpha
+  reports were not re-run for the two new gates: a report renders the
+  validation gates of its verdict, and lifecycle gate results live in the
+  registry, which was rebuilt. `cross_alpha_correlation` passes vacuously
+  while no alpha is at or beyond VALIDATING. C++ has no lifecycle port.
+- **Risk fuzzing does not cover NaN and Infinity**, which JSON cannot
+  carry: one unit test per language does. One of 64 reason-string branches
+  is unreachable from a script. FZ02 (simulator properties) and FZ04
+  (crash injection on the Java paper path) stay backlog.
+- **The Python CI job still misses the 120 s target under coverage.**
+- **Rust and C++ have no research backtester** and do not read
+  `expected_backtest.json`.
 
 ## v1.4.0 — 2026-10-03
 

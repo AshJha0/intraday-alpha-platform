@@ -383,7 +383,7 @@ median staleness spread 81,014 ms; median top-venue update share 1.00).
 
 **Ledger.** At v1.4.0 `research/experiments.json` held 1920 looks over 139
 entries (the 1068 looks of the v1.3.0 dataset are kept; the regenerated
-pipelines added 852); it holds 4396 over 208 since v1.5.0 (see the
+pipelines added 852); it holds 5156 over 216 since v1.5.0 (see the
 2026-10-04 update). At the v1.4.0 count the expected max |t| under the
 global null was 3.888 and the Bonferroni per-test threshold 4.206. FX04's t of 4.79 is above both.
 FX03 (1.86), FX12 (1.22), FX07 (0.22) and FX05 (0.53) are below the
@@ -480,10 +480,10 @@ per pair, $29.5B for instrument 103, `capacity_proxy_usd_by_instrument`).
 The venue diagnostics of §4.5 derive from the feature frames, which this
 release did not change; they were not recomputed here.
 
-**Ledger.** `research/experiments.json` holds 4396 looks over 208 entries
+**Ledger.** `research/experiments.json` holds 5156 looks over 216 entries
 (1068 on the v1.3.0 dataset, 852 on the v1.4.0 dataset under the legacy
-methods, 2,476 under the default methods). Expected max |t| under the
-global null is 4.096 and the Bonferroni per-test threshold 4.389; the alpha
+methods, 3,236 under the default methods). Expected max |t| under the
+global null is 4.135 and the Bonferroni per-test threshold 4.424; the alpha
 report was judged at its own recorded count of 3,936 (threshold 4.365,
 selection yardstick 4.07). FX04's gate t of 4.24 is above both yardsticks
 and below both thresholds. FX03, FX12, FX07 and FX05 are below all four.

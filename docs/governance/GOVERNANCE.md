@@ -96,7 +96,7 @@ order; each gate's evidence is linked from the experiment's manifest
 No gate may be skipped; "backtest Sharpe alone is never sufficient" (spec §1).
 Honest reporting is a hard requirement (conventions §7): costs and OOS
 degradation are always shown, and the experiment ledger
-(`research/experiments.json`: 4,396 looks over 208 distinct configurations as of
+(`research/experiments.json`: 5,156 looks over 216 distinct configurations as of
 2026-10-04, v1.5.0 — it held 865 over 70 on 2026-09-20; the model ledger `research/models/ledger.json` counts fits)
 makes the multiple-testing denominator public.
 

@@ -732,20 +732,21 @@ looks of the v1.3.0 dataset are kept and the new ones are added. v1.5.0
 did the same thing along a different axis: the method bundle is part of
 the canonical config, so the same 24 pipelines run under the new default
 rules are new looks at the same sample, added beside the v1.4.0 ones
-(ledger `x-version` 3). The current ledger holds **208 distinct
-configurations / 4396 looks**:
+(ledger `x-version` 3). The current ledger holds **216 distinct
+configurations / 5156 looks**:
 
 - on the v1.3.0 dataset (`203c8f54…`), 70 entries carrying 1,068 of the
   looks: a one-time design scan (216: 24 alphas × 9 horizons), 24
   promotion pipelines at 28 looks each (672), 40 adaptive deployments (10
   alphas × 4 refit policies) and five `ExperimentRunner` runs at 28 each
   (140; §6.8);
-- on the v1.4.0 dataset (`116b7787…`), 138 entries carrying the other
-  3,328. Under the legacy rules, as recorded at v1.4.0 (852): the 24
+- on the v1.4.0 dataset (`116b7787…`), 146 entries carrying the other
+  4,088. Under the legacy rules, as recorded at v1.4.0 (852): the 24
   pipelines at 28 looks (672), five runner experiments (140) and 40
   adaptive deployments (40). Under the default rules, added by v1.5.0
-  (2,476): the 24 pipelines at **84** looks each (2,016), five runner
-  experiments at 84 (420) and the 40 adaptive deployments again (40). The
+  (3,236): the 24 pipelines at **84** looks each (2,016), five runner
+  experiments at 84 (420), the 40 adaptive deployments again (40) and the
+  eight signal-combination experiments at 95 looks each (760; §29). The
   design scan was not repeated.
 
 A validation costs 84 looks under the default methods where it cost 28
@@ -755,7 +756,7 @@ evaluations at four folds (itemised in
 and every one of them is a look.
 
 That translates into a selection yardstick: Bonferroni per-test threshold
-|t| ≥ **4.389**, and an expected **max |t| ≈ 4.096 under the global null**
+|t| ≥ **4.424**, and an expected **max |t| ≈ 4.135 under the global null**
 (4.206 and 3.888 at the v1.4.0 count of 1920, 4.071 and 3.735 before the
 dataset regeneration: looking again raised the bar each time). Up to
 v1.4.0 this yardstick was printed beside a fixed gate of t ≥ 3.0 and read
@@ -767,7 +768,8 @@ run itself adds, declared before the first alpha is evaluated and stored
 on each entry as `gate_looks`. The committed report was judged at **3,936
 looks** (the 1,920 already recorded plus its own 2,016), which gives the
 threshold of **4.365** and a yardstick of 4.07; the runner and adaptive
-runs that followed brought the ledger to 4,396. The threshold is not
+runs that followed brought the ledger to 4,396, and the combination
+experiments of §29 to 5,156. The threshold is not
 retroactive — later looks tighten later runs and do not re-judge a
 recorded one.
 
@@ -778,7 +780,7 @@ EQ03 (5.16) clear the threshold; EQ06 (4.36) and FX04 (4.24) are above the
 yardstick and below the threshold, so they fail the significance gate
 that, at a fixed 3.0, they used to pass; EQ08 (−4.57) and FX09 (−5.75)
 are beyond it with the wrong sign. The lists are the same at 3,936 and at
-4,396 looks. Most quant shops track this informally at best;
+5,156 looks. Most quant shops track this informally at best;
 here it is a serialized, deterministic artifact — and the runner's entries
 were deliberately *not* de-duplicated against the pipeline entries for the
 same alpha and horizon: the denominator may only grow.
@@ -1313,13 +1315,13 @@ match**.
   the portfolio golden is checked against an SLSQP optimum. Golden files are
   regenerated only deliberately, with a MIGRATIONS.md entry.
 - **One command proves parity**: `tests/harness/run_all.sh` runs all four
-  suites and prints the table (the v1.5.0 counts from CI, 2026-10-04: python 1764,
-  cpp 289, rust 355, java 537 tests passed; golden groups 177/68/68/108; all
+  suites and prints the table (the v1.5.0 counts from CI, 2026-10-04: python 1988,
+  cpp 302, rust 358, java 571 tests passed; golden groups 192/72/71/124; all
   PASS, plus `integration` (35) and `replay` (6) rows for the repo-level
-  pytest suites, a `deployment` row — 25 structural checks passed in CI,
+  pytest suites, a `deployment` row — 26 structural checks passed in CI,
   where promtool and kubeconform are installed — and a `numbers` row that re-derives every headline
   figure in the docs from its artefact). The Java golden group runs all
-  thirteen `*GoldenTest` classes (it once ran two of them and reported 18),
+  seventeen `*GoldenTest` classes (it once ran two of them and reported 18),
   the Rust group ten golden targets. The 2026-09-19/20 release added a new
   kind of golden: not a number to reproduce within a tolerance but a
   **byte sequence** — canonical JSON lines, a stream digest, the registry
@@ -3057,8 +3059,8 @@ Dependabot bump is being asked to do.
 3. **Random splits on overlapping labels.** Walk-forward only, purge at the
    label horizon, 60 s embargo (§6.2).
 4. **Uncounted multiple testing.** A ledger de-duplicated by (alpha, kind,
-   config, dataset) — 208 distinct configurations, 4396 looks — with a printed
-   expected-max-|t| yardstick of 4.096; FX08's t = 3.84 is called what it is.
+   config, dataset) — 216 distinct configurations, 5156 looks — with a printed
+   expected-max-|t| yardstick of 4.135; FX08's t = 3.84 is called what it is.
    Regenerating the dataset did not reset the count, and neither did
    changing the default methods: the looks already taken are kept and the
    new ones added (§6.6). Since v1.5.0 the count is not only printed: the
