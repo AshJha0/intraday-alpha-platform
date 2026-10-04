@@ -7,8 +7,8 @@
                                [--methods v2|legacy_v1]
     python -m iap.research list [--alpha EQ03] [--horizon 1s] [--json]
     python -m iap.research show <experiment_id> [--json]
-    python -m iap.research power [--levels 0,0.5,1,2] [--seeds 20]
-                               [--sessions 1,2,4,8] [--break-levels 1]
+    python -m iap.research power [--levels 0,0.5,1] [--seeds 20]
+                               [--sessions 1,2,4] [--break-levels 1]
                                [--gate-looks N] [--jobs N]
                                [--generator-config PATH] [--power-out-dir research/power]
 
@@ -429,7 +429,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     power.add_argument(
         "--levels",
-        default="0,0.5,1,2",
+        default="0,0.5,1",
         help="comma-separated multipliers of the reference effect (0 = null)",
     )
     power.add_argument("--seeds", type=int, default=20, help="generator seeds per cell")

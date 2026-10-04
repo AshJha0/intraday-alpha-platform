@@ -78,7 +78,7 @@ REJECT is uninterpretable (no signal, or no power?) and so is a PROMOTE.
 A cell is (detector, scenario, level, sessions); every rate carries its
 Wilson 95 % interval.  ``diagnosis`` sets the analytical IC of each
 mechanism beside the measured one and accounts for the t; ``power_model``
-fits ``t ~ N(kappa * level * sqrt(sessions), sd)`` and derives the minimum
+fits ``t ~ N((kappa0 + kappa * level) * sqrt(sessions), sd)`` and derives the minimum
 detectable effect at 80 % power and the sessions the reference effect needs.
 
 Outputs: ``research/power/POWER_REPORT.md`` and ``POWER_REPORT.json`` —
@@ -170,7 +170,7 @@ BOOTSTRAP_RESAMPLES = 300
 DEFAULT_UNIVERSE = ("SYN.EQ.001", "SYN.EQ.002", "SYN.ETF.IDX")
 
 #: Multipliers of the reference planted effect; 0 is the null row.
-DEFAULT_LEVELS = (0.0, 0.5, 1.0, 2.0)
+DEFAULT_LEVELS = (0.0, 0.5, 1.0)
 
 #: Levels the ``break`` scenario runs at.
 DEFAULT_BREAK_LEVELS = (1.0,)
@@ -871,17 +871,18 @@ def power_model(
     thresholds: Mapping[str, float],
     session_grid: Sequence[int],
 ) -> list[dict[str, Any]]:
-    """Per detector: the fit of ``t ~ N(kappa * level * sqrt(sessions), sd)``
-    to the chain's pooled-slope t of every stable run with an effect, the
-    null's mean and sd of t, the minimum detectable level at
+    """Per detector: the fit of ``t ~ N((kappa0 + kappa * level) *
+    sqrt(sessions), sd)`` to the chain's pooled-slope t of every stable run
+    (the null included: ``kappa0`` is what the detector reads with nothing
+    planted), the null's mean and sd of t, the minimum detectable level at
     :data:`TARGET_POWER` for each session count, the sessions the reference
     effect needs — and the same for the break z of the ``break`` runs
-    (``E[z] = kappa_break * level * sqrt(sessions)``).
+    (``E[z] = kappa * level * sqrt(sessions)``, no intercept).
 
     The session prefixes of one run are nested, so the points are not
-    independent: ``kappa`` is a consistent point estimate, not a quantity
-    with a quoted error.  Session counts beyond the grid are extrapolation
-    under the sqrt law and are labelled so by the report."""
+    independent: the coefficients are consistent point estimates, not
+    quantities with a quoted error.  Session counts beyond the grid are
+    extrapolation under the sqrt law and are labelled so by the report."""
     out = []
     for det in detectors:
         stable, null, brk = [], [], []
@@ -891,32 +892,31 @@ def power_model(
                 if row is None or "error" in row:
                     continue
                 point = (float(run["level"]), float(evaluation["sessions"]))
-                if run["scenario"] == "stable" and run["level"] > 0.0:
+                if run["scenario"] == "stable":
                     stable.append((*point, row["t_pooled"]))
-                elif run["scenario"] == "stable":
-                    null.append(row["t_pooled"])
+                    if run["level"] == 0.0:
+                        null.append(row["t_pooled"])
                 elif run["scenario"] == "break":
                     brk.append((*point, row["break_z"]))
         entry: dict[str, Any] = {"detector": det["id"]}
-        for name, points in (("chain", stable), ("break", brk)):
-            fit = power_stats.fit_t_model(points)
+        for name, points, intercept in (("chain", stable, True), ("break", brk, False)):
+            fit = power_stats.fit_t_model(points, intercept=intercept)
             block: dict[str, Any] = {**fit, "by_threshold": {}}
+            usable = fit["kappa"] is not None and fit["sd"] is not None and fit["sd"] > 0.0
             for label in ("fixed", "gate"):
                 thr = float(thresholds[label])
-                usable = fit["kappa"] is not None and fit["sd"] is not None and fit["sd"] > 0.0
+                args = (fit["kappa"], fit["sd"], thr)
                 block["by_threshold"][label] = {
                     "threshold": thr,
                     "sessions_needed_at_reference": (
-                        power_stats.sessions_needed(
-                            fit["kappa"], fit["sd"], thr, power=TARGET_POWER
-                        )
+                        power_stats.sessions_needed(*args, power=TARGET_POWER, kappa0=fit["kappa0"])
                         if usable
                         else None
                     ),
                     "mde_level_by_sessions": {
                         str(n): (
                             power_stats.minimum_detectable_level(
-                                fit["kappa"], fit["sd"], thr, n, TARGET_POWER
+                                *args, n, TARGET_POWER, kappa0=fit["kappa0"]
                             )
                             if usable
                             else None
@@ -925,7 +925,9 @@ def power_model(
                     },
                     "power_at_reference_by_sessions": {
                         str(n): (
-                            power_stats.normal_power(fit["kappa"] * math.sqrt(n), fit["sd"], thr)
+                            power_stats.normal_power(
+                                (fit["kappa0"] + fit["kappa"]) * math.sqrt(n), fit["sd"], thr
+                            )
                             if usable
                             else None
                         )
@@ -1254,7 +1256,11 @@ def render_markdown(doc: Mapping[str, Any]) -> str:
         "",
         "## False positives on the null",
         "",
-        "Level 0: nothing is planted, so every detection is false.",
+        "Level 0: nothing is planted, so every detection is false. A detection "
+        "needs a POSITIVE gate IC: a null whose mean t is below zero is the "
+        "generator's own microstructure (its trade imbalance mean-reverts a "
+        "little), not a false positive — but the planted effect has to overcome "
+        "it, which the power model's `kappa0` accounts for.",
         "",
         "| detector | sessions | at gate | at fixed 3.0 | mean t | sd t | evidence "
         "| break z at fixed 3.0 |",
@@ -1365,24 +1371,31 @@ def render_markdown(doc: Mapping[str, Any]) -> str:
         "",
         "## Minimum detectable effect and sessions needed",
         "",
-        "Fit of `t ~ N(kappa * level * sqrt(sessions), sd)` to the chain's t of "
-        "every stable run with an effect (`kappa` = expected t of the reference "
-        f"effect on one session). MDE = the level detected with "
+        "Fit of `t ~ N((kappa0 + kappa * level) * sqrt(sessions), sd)` to the "
+        "chain's t of every stable run, the null included (`kappa` = the t the "
+        "reference effect adds on one session; `kappa0` = the t of the null on one "
+        "session — where it is negative the generator's own microstructure works "
+        "against the planted effect, which has to overcome it first). MDE = the "
+        "level detected with "
         f"{protocol['target_power']:.0%} probability; `sessions for reference` = "
         f"sessions at which level 1 reaches {protocol['target_power']:.0%}. A session "
         f"count above {full} is an extrapolation under the sqrt law, not a "
-        "measurement.",
+        "measurement. The model is linear in the level; a mechanism whose "
+        "response flattens with size (the lead-lag correlation is "
+        "`beta / sqrt(1 + beta^2)`) is understated at level 1 when larger levels "
+        "are in the fit, and the measured rate above is then the better number.",
         "",
-        "| detector | kappa | sd | null mean t | null sd t | threshold "
+        "| detector | kappa0 | kappa | sd | null mean t | null sd t | threshold "
         f"| MDE at {full} sessions | sessions for reference | modelled power at {full} |",
-        "|---|---:|---:|---:|---:|---|---:|---:|---:|",
+        "|---|---:|---:|---:|---:|---:|---|---:|---:|---:|",
     ]
     for det in detectors:
         m = models[det["id"]]
         for label in ("gate", "fixed"):
             b = m["chain"]["by_threshold"][label]
             lines.append(
-                f"| {det['id']} | {_cell(m['chain']['kappa'], '+.3f')} "
+                f"| {det['id']} | {_cell(m['chain']['kappa0'], '+.3f')} "
+                f"| {_cell(m['chain']['kappa'], '+.3f')} "
                 f"| {_cell(m['chain']['sd'], '.2f')} | {_cell(m['null']['mean_t'], '+.2f')} "
                 f"| {_cell(m['null']['sd_t'], '.2f')} | {label} {b['threshold']:.3f} "
                 f"| {_cell(b['mde_level_by_sessions'][str(full)], '.2f')} "
@@ -1439,10 +1452,12 @@ def render_markdown(doc: Mapping[str, Any]) -> str:
             else " The recompute leakage probe (first seed of every cell, full "
             "session count) passed wherever it ran."
         ),
-        "- The committed grid is sized for the CI `regenerate` job. A larger one "
-        "runs offline, e.g. `python -m iap.research power --seeds 40 --sessions "
-        "1,2,4,8,16 --levels 0,0.25,0.5,1,2 --break-levels 0.5,1,2 --power-out-dir "
-        "<dir>`.",
+        "- `research/power/POWER_REPORT.md` is the default grid, sized for the CI "
+        "`regenerate` job; `research/power/extended/POWER_REPORT.md` is the larger "
+        "one (`python -m iap.research power --sessions 1,2,4,8 --levels 0,0.5,1,2 "
+        "--power-out-dir ../research/power/extended`, the opt-in `power_extended` "
+        "step of `tools/regenerate_dataset_artifacts.py`). Any other grid runs the "
+        "same way: `--seeds`, `--sessions`, `--levels`, `--break-levels`, `--jobs`.",
         "",
         "Per-run numbers are in `POWER_REPORT.json`.",
         "",

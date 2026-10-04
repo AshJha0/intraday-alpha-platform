@@ -31,7 +31,8 @@ ml              research/ml_reports/*, research/models/run_NNNN_*/,
                 research/models/ledger.json
 adaptive        research/adaptive_reports/*, research/baselines/run_*.json,
                 research/lifecycle_log.jsonl, research/experiments.json
-power           research/power/POWER_REPORT.{md,json}
+power           research/power/POWER_REPORT.{md,json} (the default grid:
+                three sizes, 20 seeds, 4 sessions; needs no dataset)
 goldens         tests/golden/expected_*.json (every Python-owned generator;
                 the ones that do not depend on the dataset or on
                 alpha_params.json must come out byte-identical — that is
@@ -39,6 +40,14 @@ goldens         tests/golden/expected_*.json (every Python-owned generator;
 tca             research/tca/* (golden vectors only: must be unchanged)
 configmaps      deployment/k8s/configmap-*.yaml (alpha_params.json is a
                 projected config)
+==============  ============================================================
+
+One step is opt-in — it runs only when ``--only`` names it — because it
+costs more than the rest of the chain together:
+
+==============  ============================================================
+power_extended  research/power/extended/POWER_REPORT.{md,json} (four sizes,
+                20 seeds, 8 sessions; about three times the default grid)
 ==============  ============================================================
 
 Rules the script enforces rather than documents:
@@ -83,6 +92,9 @@ RUNNER_EXPERIMENTS = (
     ("EQ06", "10s"),
 )
 
+#: Steps that run only when ``--only`` names them.
+OPT_IN_STEPS = ("power_extended",)
+
 GOLDEN_TOOLS = (
     "make_golden.py",
     "make_golden_features.py",
@@ -118,6 +130,26 @@ def _steps() -> list[tuple[str, list[tuple[Path, list[str]]]]]:
         ("ml", [(REPO, [PY, "research/ml_reports/run_ml.py"])]),
         ("adaptive", [(REPO, [PY, "research/adaptive_reports/run_adaptive.py"])]),
         ("power", [(py_dir, [PY, "-m", "iap.research", "power"])]),
+        (
+            "power_extended",
+            [
+                (
+                    py_dir,
+                    [
+                        PY,
+                        "-m",
+                        "iap.research",
+                        "power",
+                        "--sessions",
+                        "1,2,4,8",
+                        "--levels",
+                        "0,0.5,1,2",
+                        "--power-out-dir",
+                        str(REPO / "research" / "power" / "extended"),
+                    ],
+                )
+            ],
+        ),
         ("goldens", [(REPO, [PY, str(tools / name), "--force"]) for name in GOLDEN_TOOLS]),
         ("tca", [(py_dir, [PY, "-m", "iap.tca"])]),
         ("configmaps", [(REPO, [PY, "deployment/k8s/generate_configmaps.py"])]),
@@ -195,7 +227,8 @@ def main() -> int:
     names = [name for name, _ in steps]
     if args.list:
         for name, commands in steps:
-            print(f"{name}: {len(commands)} command(s)")
+            opt_in = " (opt-in: --only)" if name in OPT_IN_STEPS else ""
+            print(f"{name}: {len(commands)} command(s){opt_in}")
         return 0
     only = [s for s in args.only.split(",") if s]
     for name in only + ([args.start] if args.start else []):
@@ -204,7 +237,7 @@ def main() -> int:
     selected = [
         (name, commands)
         for name, commands in steps
-        if (not only or name in only)
+        if (name in only if only or name in OPT_IN_STEPS else True)
         and (not args.start or names.index(name) >= names.index(args.start))
     ]
 

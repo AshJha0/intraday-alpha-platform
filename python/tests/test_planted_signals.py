@@ -524,12 +524,14 @@ def test_power_model_and_diagnosis_from_the_fake_grid(fake_pipeline):
     )
     models = {m["detector"]: m for m in doc["power_model"]}
     flow = models["order_flow:EQ04@5s"]
-    # t = 5 * 0.4 * level * sqrt(sessions) exactly: kappa 2, no residual
+    # t = 5 * 0.4 * level * sqrt(sessions) exactly: kappa 2, no null offset, no residual
     assert flow["chain"]["kappa"] == pytest.approx(2.0) and flow["chain"]["sd"] == 0.0
-    assert flow["chain"]["n"] == 3 * 2 * 2
+    assert flow["chain"]["kappa0"] == pytest.approx(0.0, abs=1e-6)
+    assert flow["chain"]["n"] == 4 * 2 * 2  # the null rows are fitted too
     assert flow["chain"]["by_threshold"]["gate"]["sessions_needed_at_reference"] is None  # sd 0
     assert flow["null"] == {"mean_t": 0.0, "sd_t": 0.0, "n": 4}
     assert flow["break"]["kappa"] == pytest.approx(1.0) and flow["break"]["n"] == 4
+    assert flow["break"]["kappa0"] == 0.0  # the break model has no intercept
     assert models["lead_lag:EQ10@5s"]["chain"]["kappa"] == pytest.approx(1.0)
 
     diag = {(d["detector"], d["sessions"]): d for d in doc["diagnosis"]}
@@ -790,22 +792,33 @@ def test_planted_pipeline_end_to_end_on_a_tiny_universe(tmp_path):
     ]
 
 
-def test_committed_power_report_matches_its_json():
+@pytest.mark.parametrize("sub", ["", "extended"])
+def test_committed_power_report_matches_its_json(sub):
     """If the study has been run and committed, the markdown is exactly the
-    rendering of the JSON (no hand edits) and the document is well-formed."""
-    json_path = REPO_ROOT / "research" / "power" / "POWER_REPORT.json"
-    md_path = REPO_ROOT / "research" / "power" / "POWER_REPORT.md"
+    rendering of the JSON (no hand edits) and the document is well-formed —
+    the default grid and the extended one alike."""
+    out_dir = REPO_ROOT / "research" / "power" / sub
+    json_path = out_dir / "POWER_REPORT.json"
+    md_path = out_dir / "POWER_REPORT.md"
     if not json_path.is_file():
-        pytest.skip("research/power/POWER_REPORT.json not generated")
+        pytest.skip(f"{json_path} not generated")
     doc = json.loads(json_path.read_text(encoding="ascii"))
     assert doc["x-version"] == power.POWER_VERSION
     assert doc["generator_config"] == PLANTED_CONFIG.name
     assert doc["seeds"] == power.study_seeds(doc["base_seed"], len(doc["seeds"]))
     assert len(doc["seeds"]) >= 20  # a rate needs enough seeds to mean something
-    assert doc["cells"] == power.summarise(doc["runs"], doc["protocol"]["thresholds"])
+    reference = load_generator_config(PLANTED_CONFIG)
+    assert doc["reference_planted"]["order_flow"] == reference["planted"]["order_flow"]
+    assert doc["reference_planted"]["lead_lag"] == reference["planted"]["lead_lag"]
+    if sub == "":
+        assert doc["sessions"] == power.default_session_grid(reference["sessions"])
+        assert doc["levels"] == list(power.DEFAULT_LEVELS)
+    else:
+        assert doc["sessions"][-1] > reference["sessions"]
+    thresholds = doc["protocol"]["thresholds"]
+    assert doc["protocol"]["promote_t_threshold"] == max(thresholds.values())
+    assert doc["cells"] == power.summarise(doc["runs"], thresholds)
     assert doc["power_model"] == power._rounded(
-        power.power_model(
-            doc["runs"], doc["detectors"], doc["protocol"]["thresholds"], doc["sessions"]
-        )
+        power.power_model(doc["runs"], doc["detectors"], thresholds, doc["sessions"])
     )
     assert md_path.read_text(encoding="utf-8").replace("\r\n", "\n") == power.render_markdown(doc)

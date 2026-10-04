@@ -2,7 +2,7 @@
   "x-version": 2,
   "description": "Generator config of the planted-signal power study (iap.research.power; python -m iap.research power). Merged over the generator's built-in defaults exactly like configs/marketdata/generator.json, with the opt-in `planted` block switched ON: this is the REFERENCE effect (grid level 1.0) that the study scales. It deliberately lives outside configs/ — it is a research instrument, not a deployable dataset definition, and the pinned dataset (configs/marketdata/generator.json) has no planted block. order_flow: informed aggressor sign, P(buy) = 0.5 + 0.5*strength*tanh(kernel-weighted efficient-price move over the next kernel_steps seconds / its low-vol sd). lead_lag: every other equity's efficient-price move at step k (ticks) gains beta * the leader's move at step k - lag_steps (ticks). break: off here; the study's `break` scenario sets it. sessions: the number of sessions each run of the study generates (the study evaluates the first 1, 2, 4, ... of them; `--sessions` overrides) — more than the five trading days configs/ lists, so the study extends the calendar in its own scratch reference tree (iap.research.power.extended_trading_days).",
   "seed": 20261003,
-  "sessions": 8,
+  "sessions": 4,
   "equities": {
     "slots_per_stream": 3850,
     "flow": {

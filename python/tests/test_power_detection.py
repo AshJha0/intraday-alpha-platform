@@ -320,24 +320,37 @@ def test_ideal_ic_lead_lag_formula_and_simulation():
 # ---------------------------------------------------------------------------
 
 
-def test_fit_t_model_recovers_kappa_and_sd():
-    noise = _normals(9, 400)
+def test_fit_t_model_recovers_the_null_offset_kappa_and_sd():
+    noise = _normals(9, 480)
     points = []
     for i, e in enumerate(noise):
-        level = (0.5, 1.0, 2.0)[i % 3]
-        sessions = (1, 2, 4, 8)[i % 4]
-        points.append((level, sessions, 2.0 * level * math.sqrt(sessions) + e))
+        level = (0.0, 0.5, 1.0, 2.0)[i % 4]
+        sessions = (1, 2, 4, 8)[(i // 4) % 4]
+        points.append((level, sessions, (-0.5 + 2.0 * level) * math.sqrt(sessions) + e))
     fit = power_stats.fit_t_model(points)
-    assert fit["n"] == 400
-    assert fit["kappa"] == pytest.approx(2.0, abs=0.05)
+    assert fit["n"] == 480
+    assert fit["kappa0"] == pytest.approx(-0.5, abs=0.08)
+    assert fit["kappa"] == pytest.approx(2.0, abs=0.08)
     assert fit["sd"] == pytest.approx(1.0, abs=0.1)
-    exact = power_stats.fit_t_model([(1.0, 4, 6.0), (2.0, 1, 6.0), (0.5, 16, 6.0)])
-    assert exact["kappa"] == pytest.approx(3.0) and exact["sd"] == pytest.approx(0.0, abs=1e-12)
-    # null rows, missing t and too few points are not fitted
+    # without an intercept the null's drift is pushed into the slope
+    origin = power_stats.fit_t_model(points, intercept=False)
+    assert origin["kappa0"] == 0.0 and origin["kappa"] < fit["kappa"]
+    exact = power_stats.fit_t_model([(0.0, 4, -2.0), (1.0, 4, 4.0), (2.0, 1, 5.0), (0.5, 16, 2.0)])
+    assert exact["kappa0"] == pytest.approx(-1.0) and exact["kappa"] == pytest.approx(3.0)
+    assert exact["sd"] == pytest.approx(0.0, abs=1e-9)
+    through = power_stats.fit_t_model(
+        [(1.0, 4, 6.0), (2.0, 1, 6.0), (0.5, 16, 6.0)], intercept=False
+    )
+    assert through["kappa"] == pytest.approx(3.0) and through["sd"] == pytest.approx(0.0, abs=1e-9)
+    # missing t, too few points and a single level are not fitted
+    none = {"kappa0": None, "kappa": None, "sd": None}
     assert power_stats.fit_t_model([(0.0, 2, 1.0), (1.0, 2, None), (1.0, 2, 3.0)]) == {
-        "kappa": None,
-        "sd": None,
-        "n": 1,
+        **none,
+        "n": 2,
+    }
+    assert power_stats.fit_t_model([(1.0, 1, 1.0), (1.0, 2, 2.0), (1.0, 4, 3.0)]) == {
+        **none,
+        "n": 3,
     }
 
 
@@ -355,8 +368,20 @@ def test_power_mde_and_sessions_needed_are_consistent():
     # a stricter threshold needs more sessions; half the effect needs four times as many
     assert power_stats.sessions_needed(kappa, sd, 3.0) < need
     assert power_stats.sessions_needed(kappa, sd, thr, level=0.5) == pytest.approx(4.0 * need)
+    # a null that reads below zero has to be overcome first
+    drift = power_stats.sessions_needed(kappa, sd, thr, kappa0=-0.5)
+    assert drift == pytest.approx(((thr + 0.8416) / 1.5) ** 2, rel=1e-4) and drift > need
+    mde0 = power_stats.minimum_detectable_level(kappa, sd, thr, 8, kappa0=-0.5)
+    assert mde0 == pytest.approx(mde + 0.25)
+    assert power_stats.normal_power((-0.5 + kappa * mde0) * math.sqrt(8), sd, thr) == pytest.approx(
+        0.8
+    )
+    assert power_stats.minimum_detectable_level(
+        kappa, sd, thr, drift, kappa0=-0.5
+    ) == pytest.approx(1.0)
     # a detector that does not respond has no MDE
     assert power_stats.sessions_needed(0.0, sd, thr) is None
+    assert power_stats.sessions_needed(kappa, sd, thr, kappa0=-2.0) is None
     assert power_stats.minimum_detectable_level(-0.3, sd, thr, 8) is None
     for call in (
         lambda: power_stats.normal_power(1.0, 0.0, 3.0),
@@ -536,6 +561,7 @@ def test_reference_config_generates_enough_sessions_for_the_committed_grid():
     base = load_generator_config(PLANTED_CONFIG)
     assert base["sessions"] >= 4
     assert power.default_session_grid(base["sessions"])[-1] == base["sessions"]
+    assert power.DEFAULT_LEVELS[0] == 0.0 and 1.0 in power.DEFAULT_LEVELS  # null and reference
     # the reference effect itself is the one v1.3.0 defined
     assert base["planted"]["order_flow"] == {
         "strength": 0.4,
@@ -547,25 +573,25 @@ def test_reference_config_generates_enough_sessions_for_the_committed_grid():
 
 @pytest.fixture(scope="module")
 def tiny_study(tmp_path_factory):
-    """A real (tiny) study: 3 sessions beyond... of a 400-slot dataset, one
-    seed per cell, run in-process and through the worker pool."""
+    """A real (tiny) study: three sessions of a 400-slot dataset, two seeds
+    per cell, run in-process and through the worker pool."""
     tmp = tmp_path_factory.mktemp("power")
     cfg = json.loads(PLANTED_CONFIG.read_text(encoding="utf-8"))
     cfg["equities"]["slots_per_stream"] = 400
-    cfg["sessions"] = 6
+    cfg["sessions"] = 3
     path = tmp / "generator_planted.json"
     path.write_text(json.dumps(cfg), encoding="utf-8")
-    kwargs = dict(levels=(1.0,), n_seeds=2, sessions=[3, 6], break_levels=(1.0,), gate_looks=3936)
+    kwargs = dict(levels=(1.0,), n_seeds=2, sessions=[2, 3], break_levels=(1.0,), gate_looks=3936)
     serial = power.run_power_study(path, CONFIGS_DIR, jobs=1, scratch_dir=tmp / "s1", **kwargs)
     pooled = power.run_power_study(path, CONFIGS_DIR, jobs=2, scratch_dir=tmp / "s2", **kwargs)
     return serial, pooled, tmp
 
 
-def test_study_end_to_end_on_six_tiny_sessions(tiny_study):
+def test_study_end_to_end_on_three_tiny_sessions(tiny_study):
     doc, pooled, tmp = tiny_study
     assert doc == pooled  # the document does not depend on the number of workers
     assert doc["x-version"] == power.POWER_VERSION == 3
-    assert doc["sessions"] == [3, 6]
+    assert doc["sessions"] == [2, 3]
     assert [(r["scenario"], r["level"]) for r in doc["runs"]] == [
         ("stable", 1.0),
         ("stable", 1.0),
@@ -573,24 +599,24 @@ def test_study_end_to_end_on_six_tiny_sessions(tiny_study):
         ("break", 1.0),
     ]
     stable, brk = doc["runs"][0], doc["runs"][2]
-    assert [e["sessions"] for e in stable["evaluations"]] == [3, 6]
-    assert [e["sessions"] for e in brk["evaluations"]] == [6]  # break: full run only
+    assert [e["sessions"] for e in stable["evaluations"]] == [2, 3]
+    assert [e["sessions"] for e in brk["evaluations"]] == [3]  # break: full run only
     assert sorted(stable["rows"]) == ["1", "11", "2"]
     ids = [d["id"] for d in doc["detectors"]]
     for run in doc["runs"]:
         for evaluation in run["evaluations"]:
             assert sorted(evaluation["detectors"]) == sorted(ids)
-    three, six = (e["detectors"]["order_flow:EQ04@5s"] for e in stable["evaluations"])
-    for row in (three, six):
+    two, three = (e["detectors"]["order_flow:EQ04@5s"] for e in stable["evaluations"])
+    for row in (two, three):
         assert "error" in row or row["verdict"] in ("REJECT", "ITERATE", "PROMOTE")
-    if "error" not in three and "error" not in six:
-        # six sessions hold about twice the pairs of the first three
-        assert six["n_pairs"] == pytest.approx(2.0 * three["n_pairs"], rel=0.2)
-        assert 0.0 < six["signal_coverage"] < 1.0
-        assert 0.9 < six["label_scored_frac"] <= 1.0
-        assert 0.0 <= six["label_zero_frac"] <= 1.0
+    if "error" not in two and "error" not in three:
+        # three sessions hold about one and a half times the pairs of the first two
+        assert three["n_pairs"] == pytest.approx(1.5 * two["n_pairs"], rel=0.2)
+        assert 0.0 < three["signal_coverage"] < 1.0
+        assert 0.9 < three["label_scored_frac"] <= 1.0
+        assert 0.0 <= three["label_zero_frac"] <= 1.0
         # the recompute probe ran on the first seed at the full session count only
-        assert six["recompute_ok"] is True and three["recompute_ok"] is None
+        assert three["recompute_ok"] is True and two["recompute_ok"] is None
         second = doc["runs"][1]["evaluations"][1]["detectors"]["order_flow:EQ04@5s"]
         assert second.get("recompute_ok") is None
     # the study charges itself: every chain t and every break z is a test

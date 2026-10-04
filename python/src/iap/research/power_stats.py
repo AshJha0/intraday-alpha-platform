@@ -21,9 +21,10 @@ functions exist to say *how much power the gate has and where it goes*.
   itself (no tick grid, no quote staleness): the analytical ceiling the
   measured IC is compared with.
 * :func:`fit_t_model`, :func:`normal_power`, :func:`minimum_detectable_level`,
-  :func:`sessions_needed` — the power model ``t ~ N(kappa * level *
-  sqrt(sessions), sd)`` fitted to the study's own t-statistics, and what it
-  implies for the minimum detectable effect and the sessions it needs.
+  :func:`sessions_needed` — the power model ``t ~ N((kappa0 + kappa *
+  level) * sqrt(sessions), sd)`` fitted to the study's own t-statistics, and
+  what it implies for the minimum detectable effect and the sessions it
+  needs.
 """
 
 from __future__ import annotations
@@ -317,27 +318,47 @@ def ideal_ic_lead_lag(beta: float, lag_steps: int, horizon_steps: int) -> float:
     return beta / math.sqrt(1.0 + beta * beta) / math.sqrt(horizon_steps)
 
 
-def fit_t_model(points: Sequence[tuple[float, float, float]]) -> dict:
-    """Fit ``t = kappa * level * sqrt(sessions) + e`` through the origin.
+def fit_t_model(points: Sequence[tuple[float, float, float]], intercept: bool = True) -> dict:
+    """Fit ``t = (kappa0 + kappa * level) * sqrt(sessions) + e``.
 
-    ``points`` are ``(level, sessions, t)`` of individual runs.  ``kappa``
-    is the expected t of the reference effect on one session; ``sd`` the
-    standard deviation of the residuals (about 1 when the t-statistic is
-    well calibrated).  Returns ``{"kappa", "sd", "n"}`` — ``None`` values
-    with fewer than 3 usable points.
+    ``points`` are ``(level, sessions, t)`` of individual runs, the null
+    (level 0) included.  ``kappa`` is the expected t one unit of the
+    reference effect adds on one session; ``kappa0`` the expected t of the
+    NULL on one session — not zero when the data has a relation of its own
+    between the signal and the label (the synthetic trade imbalance
+    mean-reverts a little, so the order-flow detectors start below zero and
+    the planted effect has to overcome that first).  ``intercept=False``
+    forces ``kappa0 = 0``.  ``sd`` is the standard deviation of the
+    residuals (about 1 when the t-statistic is well calibrated).  Returns
+    ``{"kappa0", "kappa", "sd", "n"}`` — ``None`` values with fewer than 3
+    usable points or no variation in level.
     """
     rows = [
-        (float(level) * math.sqrt(float(sessions)), float(t))
+        (math.sqrt(float(sessions)), float(level) * math.sqrt(float(sessions)), float(t))
         for level, sessions, t in points
-        if t is not None and math.isfinite(float(t)) and level > 0.0 and sessions > 0.0
+        if t is not None and math.isfinite(float(t)) and level >= 0.0 and sessions > 0.0
     ]
+    none = {"kappa0": None, "kappa": None, "sd": None, "n": len(rows)}
     if len(rows) < 3:
-        return {"kappa": None, "sd": None, "n": len(rows)}
-    sxx = sum(u * u for u, _ in rows)
-    kappa = sum(u * t for u, t in rows) / sxx
-    resid = [t - kappa * u for u, t in rows]
-    sd = math.sqrt(sum(r * r for r in resid) / (len(rows) - 1))
-    return {"kappa": kappa, "sd": sd, "n": len(rows)}
+        return none
+    suu = sum(u * u for u, _, _ in rows)
+    svv = sum(v * v for _, v, _ in rows)
+    suv = sum(u * v for u, v, _ in rows)
+    sut = sum(u * t for u, _, t in rows)
+    svt = sum(v * t for _, v, t in rows)
+    if intercept:
+        det = suu * svv - suv * suv
+        if not det > EPS * max(suu * svv, 1.0):
+            return none
+        kappa0 = (sut * svv - svt * suv) / det
+        kappa = (svt * suu - sut * suv) / det
+        dof = len(rows) - 2
+    else:
+        if not svv > 0.0:
+            return none
+        kappa0, kappa, dof = 0.0, svt / svv, len(rows) - 1
+    rss = sum((t - kappa0 * u - kappa * v) ** 2 for u, v, t in rows)
+    return {"kappa0": kappa0, "kappa": kappa, "sd": math.sqrt(rss / max(dof, 1)), "n": len(rows)}
 
 
 def normal_power(mean_t: float, sd: float, threshold: float) -> float:
@@ -356,7 +377,12 @@ def _required_mean(sd: float, threshold: float, power: float) -> float:
 
 
 def minimum_detectable_level(
-    kappa: float, sd: float, threshold: float, sessions: float, power: float = 0.8
+    kappa: float,
+    sd: float,
+    threshold: float,
+    sessions: float,
+    power: float = 0.8,
+    kappa0: float = 0.0,
 ) -> float | None:
     """Smallest multiple of the reference effect detected with probability
     ``power`` at ``threshold`` on ``sessions`` sessions under the fitted
@@ -366,17 +392,26 @@ def minimum_detectable_level(
         raise ValueError("sessions must be positive")
     if kappa is None or not kappa > 0.0:
         return None
-    return _required_mean(sd, threshold, power) / (kappa * math.sqrt(sessions))
+    return (_required_mean(sd, threshold, power) / math.sqrt(sessions) - kappa0) / kappa
 
 
 def sessions_needed(
-    kappa: float, sd: float, threshold: float, level: float = 1.0, power: float = 0.8
+    kappa: float,
+    sd: float,
+    threshold: float,
+    level: float = 1.0,
+    power: float = 0.8,
+    kappa0: float = 0.0,
 ) -> float | None:
     """Sessions at which an effect of ``level`` times the reference is
     detected with probability ``power`` at ``threshold`` under the fitted
-    model (not rounded); ``None`` when ``kappa`` is not positive."""
+    model (not rounded); ``None`` when the expected t per root-session,
+    ``kappa0 + kappa * level``, is not positive."""
     if level <= 0.0:
         raise ValueError("level must be positive")
-    if kappa is None or not kappa > 0.0:
+    if kappa is None:
         return None
-    return (_required_mean(sd, threshold, power) / (kappa * level)) ** 2
+    per_root_session = kappa0 + kappa * level
+    if not per_root_session > 0.0:
+        return None
+    return (_required_mean(sd, threshold, power) / per_root_session) ** 2
