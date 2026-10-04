@@ -1,6 +1,6 @@
 {
-  "bonferroni_p_threshold": 1.1373976342129209e-05,
-  "bonferroni_t_threshold": 4.389254761408977,
+  "bonferroni_p_threshold": 9.69743987587277e-06,
+  "bonferroni_t_threshold": 4.423812040443981,
   "datasets": [
     {
       "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
@@ -9,12 +9,12 @@
     },
     {
       "dataset_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "entries": 138,
-      "looks": 3328
+      "entries": 146,
+      "looks": 4088
     }
   ],
   "description": "Multiple-testing ledger (spec \u00a713). Deterministic: no wall-clock; identical rerun => identical file. Experiments are de-duplicated by (alpha_id, kind, canonical config, dataset_version): re-running the same script on the same dataset does not inflate the Bonferroni denominator; the same configuration on a new dataset is a new look, and the looks of earlier datasets are kept (`datasets`). An entry judged under the ledger t-stat policy carries `gate_looks`, the look count its threshold was derived from.",
-  "distinct_experiments": 208,
+  "distinct_experiments": 216,
   "entries": [
     {
       "alpha_id": "ALL",
@@ -4689,10 +4689,378 @@
         "net_pnl": 0.0,
         "refits": 5
       }
+    },
+    {
+      "alpha_id": "COMB_EQ",
+      "config": {
+        "asset_class": "EQUITY",
+        "embargo_s": 60,
+        "horizon": "5s",
+        "inner_folds": 3,
+        "members": [
+          "EQ01",
+          "EQ02",
+          "EQ03",
+          "EQ04",
+          "EQ05",
+          "EQ06",
+          "EQ07",
+          "EQ08",
+          "EQ09",
+          "EQ10",
+          "EQ11",
+          "EQ12"
+        ],
+        "method": "equal_weight",
+        "methods": "v2",
+        "n_folds": 4,
+        "ridge_penalties": [
+          0.01,
+          0.1,
+          1.0,
+          10.0,
+          100.0
+        ]
+      },
+      "count": 95,
+      "dataset_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
+      "gate_looks": 5156,
+      "key": "3e087e39a56f490284f26fd83717c0681b8f38eafd861627d6387a04a8e2a0e2",
+      "kind": "combination",
+      "n": 4491,
+      "result": {
+        "experiment_id": "b346f9dc8c1ec773",
+        "gate_ic": 0.010518093429434012,
+        "gate_tstat": 1.9788348516214693,
+        "oos_ic": 0.010250674496662324,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "COMB_EQ",
+      "config": {
+        "asset_class": "EQUITY",
+        "embargo_s": 60,
+        "horizon": "5s",
+        "inner_folds": 3,
+        "members": [
+          "EQ01",
+          "EQ02",
+          "EQ03",
+          "EQ04",
+          "EQ05",
+          "EQ06",
+          "EQ07",
+          "EQ08",
+          "EQ09",
+          "EQ10",
+          "EQ11",
+          "EQ12"
+        ],
+        "method": "ic_weighted",
+        "methods": "v2",
+        "n_folds": 4,
+        "ridge_penalties": [
+          0.01,
+          0.1,
+          1.0,
+          10.0,
+          100.0
+        ]
+      },
+      "count": 95,
+      "dataset_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
+      "gate_looks": 5156,
+      "key": "99243fe1f23e4327bf57a58af359087d7c9d7ca48290d2fa155c44e6c44de817",
+      "kind": "combination",
+      "n": 4586,
+      "result": {
+        "experiment_id": "ae5d5b50061ccd3e",
+        "gate_ic": 0.026157395426313238,
+        "gate_tstat": 6.289484945087371,
+        "oos_ic": 0.026421035558913144,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "COMB_EQ",
+      "config": {
+        "asset_class": "EQUITY",
+        "embargo_s": 60,
+        "horizon": "5s",
+        "inner_folds": 3,
+        "members": [
+          "EQ01",
+          "EQ02",
+          "EQ03",
+          "EQ04",
+          "EQ05",
+          "EQ06",
+          "EQ07",
+          "EQ08",
+          "EQ09",
+          "EQ10",
+          "EQ11",
+          "EQ12"
+        ],
+        "method": "ridge",
+        "methods": "v2",
+        "n_folds": 4,
+        "ridge_penalties": [
+          0.01,
+          0.1,
+          1.0,
+          10.0,
+          100.0
+        ]
+      },
+      "count": 95,
+      "dataset_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
+      "gate_looks": 5156,
+      "key": "b39db8258d21856d68685dce83610ddafd505b70beb1231f569f76bf77a8bb69",
+      "kind": "combination",
+      "n": 4681,
+      "result": {
+        "experiment_id": "dc1081c127aad53f",
+        "gate_ic": 0.042871370591507904,
+        "gate_tstat": 7.055798964406287,
+        "oos_ic": 0.04332550110689498,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "COMB_EQ",
+      "config": {
+        "asset_class": "EQUITY",
+        "embargo_s": 60,
+        "horizon": "5s",
+        "inner_folds": 3,
+        "members": [
+          "EQ01",
+          "EQ02",
+          "EQ03",
+          "EQ04",
+          "EQ05",
+          "EQ06",
+          "EQ07",
+          "EQ08",
+          "EQ09",
+          "EQ10",
+          "EQ11",
+          "EQ12"
+        ],
+        "method": "shrinkage_mv",
+        "methods": "v2",
+        "n_folds": 4,
+        "ridge_penalties": [
+          0.01,
+          0.1,
+          1.0,
+          10.0,
+          100.0
+        ]
+      },
+      "count": 95,
+      "dataset_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
+      "gate_looks": 5156,
+      "key": "10f10d70260e551cee07058eb4919eb12838f0ce7cc84d6e568e3533baf7be84",
+      "kind": "combination",
+      "n": 4776,
+      "result": {
+        "experiment_id": "62914e8ea128a247",
+        "gate_ic": 0.041269681155369865,
+        "gate_tstat": 6.378132753845155,
+        "oos_ic": 0.041677227303020495,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "COMB_FX",
+      "config": {
+        "asset_class": "FX",
+        "embargo_s": 60,
+        "horizon": "1m",
+        "inner_folds": 3,
+        "members": [
+          "FX01",
+          "FX02",
+          "FX03",
+          "FX04",
+          "FX05",
+          "FX06",
+          "FX07",
+          "FX08",
+          "FX09",
+          "FX10",
+          "FX11",
+          "FX12"
+        ],
+        "method": "equal_weight",
+        "methods": "v2",
+        "n_folds": 4,
+        "ridge_penalties": [
+          0.01,
+          0.1,
+          1.0,
+          10.0,
+          100.0
+        ]
+      },
+      "count": 95,
+      "dataset_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
+      "gate_looks": 5156,
+      "key": "59d2b9c99faac06123c83c84c1a9d481c6f65d3769a2f230db2b3681135b41b0",
+      "kind": "combination",
+      "n": 4871,
+      "result": {
+        "experiment_id": "056b02cd139eea15",
+        "gate_ic": 0.03152990759818907,
+        "gate_tstat": 3.2207867698126975,
+        "oos_ic": 0.04898904393746584,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "COMB_FX",
+      "config": {
+        "asset_class": "FX",
+        "embargo_s": 60,
+        "horizon": "1m",
+        "inner_folds": 3,
+        "members": [
+          "FX01",
+          "FX02",
+          "FX03",
+          "FX04",
+          "FX05",
+          "FX06",
+          "FX07",
+          "FX08",
+          "FX09",
+          "FX10",
+          "FX11",
+          "FX12"
+        ],
+        "method": "ic_weighted",
+        "methods": "v2",
+        "n_folds": 4,
+        "ridge_penalties": [
+          0.01,
+          0.1,
+          1.0,
+          10.0,
+          100.0
+        ]
+      },
+      "count": 95,
+      "dataset_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
+      "gate_looks": 5156,
+      "key": "d8dd21b9e6831cd00223e4c6570b2f1de6f5f0c13de193cc4c291e516e330681",
+      "kind": "combination",
+      "n": 4966,
+      "result": {
+        "experiment_id": "9220b5896d7cff3a",
+        "gate_ic": 0.04284644193001087,
+        "gate_tstat": 3.736114936869005,
+        "oos_ic": 0.12496852475103369,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "COMB_FX",
+      "config": {
+        "asset_class": "FX",
+        "embargo_s": 60,
+        "horizon": "1m",
+        "inner_folds": 3,
+        "members": [
+          "FX01",
+          "FX02",
+          "FX03",
+          "FX04",
+          "FX05",
+          "FX06",
+          "FX07",
+          "FX08",
+          "FX09",
+          "FX10",
+          "FX11",
+          "FX12"
+        ],
+        "method": "ridge",
+        "methods": "v2",
+        "n_folds": 4,
+        "ridge_penalties": [
+          0.01,
+          0.1,
+          1.0,
+          10.0,
+          100.0
+        ]
+      },
+      "count": 95,
+      "dataset_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
+      "gate_looks": 5156,
+      "key": "25b28082870c915dd1d09a357ae793eae2e07eb59d818c3b65bf87b2ab66ffd9",
+      "kind": "combination",
+      "n": 5061,
+      "result": {
+        "experiment_id": "70379e937bd00405",
+        "gate_ic": 0.04818421619579539,
+        "gate_tstat": 4.729953408200634,
+        "oos_ic": 0.14214914307023166,
+        "verdict": "ITERATE"
+      }
+    },
+    {
+      "alpha_id": "COMB_FX",
+      "config": {
+        "asset_class": "FX",
+        "embargo_s": 60,
+        "horizon": "1m",
+        "inner_folds": 3,
+        "members": [
+          "FX01",
+          "FX02",
+          "FX03",
+          "FX04",
+          "FX05",
+          "FX06",
+          "FX07",
+          "FX08",
+          "FX09",
+          "FX10",
+          "FX11",
+          "FX12"
+        ],
+        "method": "shrinkage_mv",
+        "methods": "v2",
+        "n_folds": 4,
+        "ridge_penalties": [
+          0.01,
+          0.1,
+          1.0,
+          10.0,
+          100.0
+        ]
+      },
+      "count": 95,
+      "dataset_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
+      "gate_looks": 5156,
+      "key": "1bc8fae102efcad8c19b863f103aa655ea601e297077a0c9578548bc929bf244",
+      "kind": "combination",
+      "n": 5156,
+      "result": {
+        "experiment_id": "328a76c95164fb51",
+        "gate_ic": 0.047799451117207556,
+        "gate_tstat": 4.760882675820025,
+        "oos_ic": 0.14020530168439968,
+        "verdict": "ITERATE"
+      }
     }
   ],
-  "expected_max_null_t": 4.095961502632443,
+  "expected_max_null_t": 4.134710718794987,
   "pinned_alpha": 0.05,
-  "total_experiments": 4396,
+  "total_experiments": 5156,
   "x-version": 3
 }
