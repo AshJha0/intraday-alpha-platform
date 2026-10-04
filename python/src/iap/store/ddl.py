@@ -1,4 +1,4 @@
-"""The platform DDL (``schemas/sql/iap_v1.sql``): load, split, apply.
+"""The platform DDL (``schemas/sql/iap_v2.sql``): load, split, apply.
 
 The DDL is written to run unchanged on SQLite 3 and PostgreSQL >= 13 (the
 rules are listed at the top of the file and in ``docs/DATA_MODEL.md``
@@ -26,16 +26,20 @@ __all__ = [
     "apply",
 ]
 
-#: ``x-version`` of the data model this package reads and writes.
-DDL_X_VERSION = 1
+#: ``x-version`` of the data model this package reads and writes: 2 since
+#: v1.5.0 (``dataset_version`` + ``methods`` scope on the research tables and
+#: views).  A file written under another version is refused, not migrated:
+#: the store is derived and ``python -m iap.store build --rebuild`` recreates
+#: it (schemas/MIGRATIONS.md).
+DDL_X_VERSION = 2
 
-_DDL_NAME = "iap_v1.sql"
+_DDL_NAME = f"iap_v{DDL_X_VERSION}.sql"
 _CREATE_TABLE = re.compile(r"^\s*CREATE TABLE IF NOT EXISTS\s+(\w+)", re.IGNORECASE)
 _CREATE_VIEW = re.compile(r"^\s*CREATE VIEW\s+(\w+)", re.IGNORECASE)
 
 
 def ddl_path() -> Path:
-    """``<repo>/schemas/sql/iap_v1.sql`` (honours ``$IAP_SCHEMA_DIR``)."""
+    """``<repo>/schemas/sql/iap_v2.sql`` (honours ``$IAP_SCHEMA_DIR``)."""
     return schema_dir() / "sql" / _DDL_NAME
 
 

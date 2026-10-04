@@ -104,9 +104,10 @@ def test_wheel_ships_the_repository_schemas_byte_for_byte(repo_root, installed):
     packaged = installed["site"] / "_schemas"
     assert packaged.is_dir(), "python/setup.py did not copy schemas/ into the wheel"
     assert _schema_tree(packaged) == _schema_tree(repo_root / "schemas")
-    assert (packaged / "sql" / "iap_v1.sql").read_bytes() == (
-        repo_root / "schemas" / "sql" / "iap_v1.sql"
-    ).read_bytes()
+    for name in ("iap_v1.sql", "iap_v2.sql"):  # the store reads v2; v1 is the record
+        assert (packaged / "sql" / name).read_bytes() == (
+            repo_root / "schemas" / "sql" / name
+        ).read_bytes()
     resolved = subprocess.run(
         [
             str(installed["python"]),

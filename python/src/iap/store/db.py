@@ -45,7 +45,15 @@ from iap.contracts.validate import validate_typed
 from iap.contracts.versions import canonical_json
 from iap.store import ddl
 
-__all__ = ["Store", "STAGE_TABLES", "LIFECYCLE_STATES"]
+__all__ = [
+    "CURRENT_SCOPE",
+    "LEGACY_METHODS",
+    "LIFECYCLE_STATES",
+    "STAGE_TABLES",
+    "Store",
+    "StoreVersionError",
+    "methods_of",
+]
 
 C = TypeVar("C", bound=Contract)
 Row = dict[str, Any]
@@ -64,6 +72,38 @@ STAGE_TABLES: tuple[str, ...] = (
     "tca_results",
     "attribution",
 )
+
+#: The method bundle of a record that names none: everything written
+#: before v1.5.0 was computed under the rules ``iap.validation.methods``
+#: calls ``legacy_v1`` (kept as a literal here so the store does not import
+#: the research stack; a test pins it to ``METHODS_LEGACY``).
+LEGACY_METHODS = "legacy_v1"
+
+#: ``store_scope.scope`` of the one row naming the current research scope.
+CURRENT_SCOPE = "current"
+
+
+class StoreVersionError(RuntimeError):
+    """The database was written under another data-model ``x-version``.
+
+    The store is a derived index, so there is no in-place migration: delete
+    the file and rebuild it (``python -m iap.store build --rebuild``)."""
+
+
+def methods_of(configuration: Mapping[str, Any] | None) -> str:
+    """The method bundle an ``ExperimentSpec.configuration`` names
+    (:data:`LEGACY_METHODS` when it names none).  A ``methods`` value that is
+    not a bundle NAME (an alpha report records the individual choices) is an
+    error here: the caller knows the bundle and passes it explicitly."""
+    name = (configuration or {}).get("methods")
+    if name is None:
+        return LEGACY_METHODS
+    if not isinstance(name, str):
+        raise ValueError(
+            "store: configuration['methods'] is not a bundle name; pass methods= explicitly"
+        )
+    return name
+
 
 #: The lifecycle state names accepted by ``alphas.current_state``.
 LIFECYCLE_STATES: tuple[str, ...] = (
@@ -337,15 +377,63 @@ class Store:
         conn.execute("PRAGMA foreign_keys = ON")
         return cls(conn)
 
-    def init(self) -> None:
-        """Apply the DDL (idempotent) and check the data-model version."""
-        ddl.apply(self._conn)
+    def schema_versions(self) -> list[int] | None:
+        """The ``schema_version`` rows of the file (``None``: no such table,
+        i.e. a database the DDL has not been applied to)."""
+        exists = self.query(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'schema_version'"
+        )
+        if not exists:
+            return None
         rows = self.query("SELECT x_version FROM schema_version ORDER BY x_version")
-        versions = [r["x_version"] for r in rows]
+        return [int(r["x_version"]) for r in rows]
+
+    def check_version(self) -> None:
+        """Raise :class:`StoreVersionError` unless the file is at
+        :data:`iap.store.ddl.DDL_X_VERSION`.  Nothing is written."""
+        versions = self.schema_versions()
         if versions != [ddl.DDL_X_VERSION]:
-            raise RuntimeError(f"store: schema_version rows {versions} != [{ddl.DDL_X_VERSION}]")
+            found = "no schema_version table" if versions is None else f"x-version {versions}"
+            raise StoreVersionError(
+                f"store: the database is at {found}, this package reads and writes "
+                f"x-version {ddl.DDL_X_VERSION}. The store is a derived index and is not "
+                "migrated in place: rebuild it with `python -m iap.store build --rebuild` "
+                "(schemas/MIGRATIONS.md)"
+            )
+
+    def init(self) -> None:
+        """Apply the DDL (idempotent) and check the data-model version.
+
+        A database that already carries another ``x-version`` (a file built
+        before v1.5.0) is refused BEFORE any statement runs, so it is left
+        exactly as it was (:class:`StoreVersionError`)."""
+        if self.schema_versions() is not None:
+            self.check_version()
+        ddl.apply(self._conn)
+        self.check_version()
         self._columns_cache.clear()
         self._pk_cache.clear()
+
+    # -- research scope -----------------------------------------------------
+
+    def set_current_scope(self, dataset_version: str, methods: str) -> None:
+        """Name the current research scope (the one row of ``store_scope``
+        the ``*_current`` views filter to)."""
+        self.upsert(
+            "store_scope",
+            {
+                "scope": CURRENT_SCOPE,
+                "dataset_version": str(dataset_version),
+                "methods": str(methods),
+            },
+        )
+
+    def current_scope(self) -> tuple[str, str] | None:
+        """``(dataset_version, methods)`` of the current scope, or ``None``."""
+        rows = self.query(
+            "SELECT dataset_version, methods FROM store_scope WHERE scope = ?", (CURRENT_SCOPE,)
+        )
+        return (rows[0]["dataset_version"], rows[0]["methods"]) if rows else None
 
     def close(self) -> None:
         self._conn.close()
@@ -415,11 +503,13 @@ class Store:
 
     # -- generic access -----------------------------------------------------
 
-    def query(self, sql: str, params: Sequence[Any] = ()) -> list[Row]:
+    def query(self, sql: str, params: Sequence[Any] | Mapping[str, Any] = ()) -> list[Row]:
         """Run ``sql`` and return every row as a dict (column order of the
         SELECT).  Row order is whatever the statement's ``ORDER BY`` says —
-        pass one for deterministic output."""
-        cur = self._conn.execute(sql, tuple(params))
+        pass one for deterministic output.  ``params`` is a sequence for
+        ``?`` placeholders or a mapping for named (``:name``) ones."""
+        bound = dict(params) if isinstance(params, Mapping) else tuple(params)
+        cur = self._conn.execute(sql, bound)
         try:
             names = [d[0] for d in cur.description] if cur.description else []
             return [dict(zip(names, row, strict=False)) for row in cur.fetchall()]
@@ -442,6 +532,15 @@ class Store:
             f"({', '.join(cols)}) VALUES ({', '.join('?' for _ in cols)})"
         )
         cur.execute(sql, tuple(row[c] for c in cols))
+
+    def replace_rows(self, table: str, rows: Sequence[Mapping[str, Any]]) -> None:
+        """Replace the whole content of ``table`` by ``rows`` in one
+        transaction (for a table that is a summary of another, rewritten
+        whenever its source changes)."""
+        with self._tx() as cur:
+            cur.execute(f"DELETE FROM {self._ident(table)}")
+            for row in rows:
+                self._upsert(cur, table, row)
 
     def counts(self) -> dict[str, int]:
         """``{table: row count}`` for every table, sorted by name."""
@@ -605,15 +704,38 @@ class Store:
 
     # -- typed writes: research / lifecycle ---------------------------------
 
-    def insert_experiment_spec(self, spec: ExperimentSpec) -> None:
+    def insert_experiment_spec(self, spec: ExperimentSpec, *, methods: str | None = None) -> None:
+        """Write a spec under its method bundle: ``methods`` when given, else
+        the bundle name in ``spec.configuration`` (:func:`methods_of`)."""
         validate_typed(spec)
+        row = _enc_experiment_spec(spec)
+        row["methods"] = methods_of(spec.configuration) if methods is None else str(methods)
         with self._tx() as cur:
-            self._upsert(cur, "experiments", _enc_experiment_spec(spec))
+            self._upsert(cur, "experiments", row)
 
-    def insert_experiment_result(self, result: ExperimentResult) -> None:
+    def insert_experiment_result(
+        self, result: ExperimentResult, *, methods: str | None = None
+    ) -> None:
+        """Write a result under its method bundle.  The ``ExperimentResult``
+        contract does not carry the bundle (its spec does), so ``methods`` is
+        taken from the argument, else from the stored spec of the same
+        ``experiment_id``; a result with neither is an error rather than a
+        row filed under a guessed scope."""
         validate_typed(result)
+        if methods is None:
+            rows = self.query(
+                "SELECT methods FROM experiments WHERE experiment_id = ?", (result.experiment_id,)
+            )
+            if not rows:
+                raise ValueError(
+                    f"store: experiment result {result.experiment_id!r} has no stored spec "
+                    "to take its method bundle from; insert the spec first or pass methods="
+                )
+            methods = rows[0]["methods"]
+        row = _enc_experiment_result(result)
+        row["methods"] = str(methods)
         with self._tx() as cur:
-            self._upsert(cur, "experiment_results", _enc_experiment_result(result))
+            self._upsert(cur, "experiment_results", row)
 
     def insert_lifecycle_transition(
         self,
@@ -621,12 +743,18 @@ class Store:
         *,
         source: str = "api",
         eval_index: int | None = None,
+        dataset_version: str | None = None,
+        methods: str | None = None,
     ) -> None:
         """``source`` names the artefact (``lifecycle_log``,
-        ``lifecycle_transitions``) or ``api`` for a live write."""
+        ``lifecycle_transitions``, ``archive/<file>``) or ``api`` for a live
+        write; ``dataset_version`` / ``methods`` are the research scope the
+        transition was decided in (``None``: not recorded)."""
         validate_typed(transition)
         with self._tx() as cur:
-            self._write_lifecycle_transition(cur, transition, source, eval_index)
+            self._write_lifecycle_transition(
+                cur, transition, source, eval_index, dataset_version, methods
+            )
 
     def _write_lifecycle_transition(
         self,
@@ -634,9 +762,13 @@ class Store:
         transition: LifecycleTransition,
         source: str,
         eval_index: int | None,
+        dataset_version: str | None = None,
+        methods: str | None = None,
     ) -> None:
         row = _enc_lifecycle_transition(transition)
-        row.update(source=source, eval_index=eval_index)
+        row.update(
+            source=source, eval_index=eval_index, dataset_version=dataset_version, methods=methods
+        )
         self._upsert(cur, "lifecycle_transitions", row)
 
     # -- reference rows (no contract type) ----------------------------------

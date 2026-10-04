@@ -412,11 +412,12 @@ ports held to one pinned semantics, is this (CHANGELOG.md, v1.5.0):
    `LifecycleGauge`, `RollingIc`; Rust `lifecycle::tracker`), and the
    ledger significance threshold beside the fixed one (Java `PolicyConfig`
    / `Gates`, Rust `PolicyConfig::threshold_for`).
-2. The research-only rules are not ported. The Java `ResearchBacktester`
-   and `CostModel` stay on the legacy research rules and say so in their
-   API, and the backtest golden `expected_backtest.json` stays on those
-   rules, which its `config` now names.
-3. The goldens `expected_lifecycle.json`, `expected_backtest.json` and
-   `expected_adaptive.json` moved to x-version 2, and the lifecycle golden
+2. The research backtest rules are ported to Java as well. The Java
+   `ResearchBacktester` and `CostModel` default to the v1.5.0 rules and
+   keep the legacy ones under the same names as Python, and the backtest
+   golden `expected_backtest.json` (x-version 3) pins both rule sets for
+   both languages; Rust and C++ have no research backtester.
+3. The goldens `expected_lifecycle.json` and `expected_adaptive.json` moved
+   to x-version 2 (`expected_backtest.json` to 3), and the lifecycle golden
    gained scenarios LC04 and LG01. The test counts in §4.3 are the paper's
    own dated record and are not restated here.

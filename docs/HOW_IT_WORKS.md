@@ -918,7 +918,7 @@ cd python
 PYTHONPATH=src python3 -m pytest -q tests/test_import_policy.py                         # the boundary, as a test
 PYTHONPATH=src python3 -m iap.research --json-errors show 0000000000000000; echo "exit=$?"   # one JSON error object on stderr, exit 1
 PYTHONPATH=src python3 -m iap.store build > /dev/null
-PYTHONPATH=src python3 -m iap.store sql "SELECT verdict, COUNT(*) AS n FROM v_alpha_scorecard GROUP BY verdict ORDER BY verdict"
+PYTHONPATH=src python3 -m iap.store sql "SELECT pipeline_verdict, COUNT(*) AS n FROM v_alpha_scorecard_current GROUP BY pipeline_verdict ORDER BY pipeline_verdict"
 ```
 
 ---

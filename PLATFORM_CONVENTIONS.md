@@ -19,8 +19,8 @@ intraday-alpha-platform/
                             governance/, diagrams/ (*.mmd, embedded byte-identically in the docs)
   schemas/                  canonical contracts, versioned JSON Schema by domain
                             (market/ features/ alpha/ order/ execution/ risk/ portfolio/ tca/
-                            research/ trace/ — 17 files, README.md is the index) + sql/iap_v1.sql
-                            (the portable relational DDL, x-version 1) + FORMAT.md (binary layout)
+                            research/ trace/ — 17 files, README.md is the index) + sql/iap_v2.sql
+                            (the portable relational DDL, x-version 2) + FORMAT.md (binary layout)
                             + MIGRATIONS.md at the root
   configs/                  instruments/ venues/ marketdata/ strategies/ risk/ execution/ mvp/  (JSON;
                             one domain folder per file: configs/<domain>/<file>.json, e.g.
@@ -128,8 +128,9 @@ validated Python type in `iap.contracts.types` (`SCHEMA`, `x_version`); `SCHEMA_
 `tests/golden/expected_contracts_examples.json` and adds a MIGRATIONS.md entry. A move of a schema
 or config file within the tree is a MIGRATIONS.md entry too (old → new path table) but bumps
 nothing. Book / engine checkpoints carry `"x-version": 2` and are cross-language JSON (API_CORE
-§4-§5). `schemas/sql/iap_v1.sql` is the relational projection of every contract (x-version 1;
-docs/DATA_MODEL.md §9: a column change is a new `iap_vN.sql`, never an in-place edit).
+§4-§5). `schemas/sql/iap_v2.sql` is the relational projection of every contract (x-version 2;
+docs/DATA_MODEL.md §9: a column change is a new `iap_vN.sql`, never an in-place edit, and a
+store of another version is rebuilt, never migrated in place).
 
 ## 3. Determinism rules
 
@@ -200,10 +201,10 @@ docs/DATA_MODEL.md §9: a column change is a new `iap_vN.sql`, never an in-place
 indices, for reorder_window 0 and 4), `expected_checkpoint_eq_1000.json` (cross-language
 checkpoint), `jsonl_reject_cases.txt`, `expected_features.json` and
 `expected_features_anomalies.json` (float, abs tol 1e-9 / rel 1e-9), `expected_codec_sha256.json`,
-`expected_alpha.json`, `expected_backtest.json` (x-version 2 since v1.5.0: the cross-language
-vector is the research backtest under the LEGACY rules its `config` names — sign policy, uncapped
-fills, no row block, linear impact — which is what the Java port implements; the v1.5.0 defaults
-are pinned in its Python-only `default_rules` block), `expected_portfolio.json`, `expected_tca.json`
+`expected_alpha.json`, `expected_backtest.json` (x-version 3 since v1.5.0, 1e-9 abs/rel with
+counts and positions exact: the research backtest under the LEGACY rules its `config` names — sign
+policy, uncapped fills, no row block, linear impact — and, in `default_rules`, under the v1.5.0
+defaults, both replayed by Python and Java), `expected_portfolio.json`, `expected_tca.json`
 (1e-9), `expected_adaptive.json` (x-version 2: PSI/KS 1e-10, exact refit booleans, the CUSUM
 lifecycle sequence and the legacy consecutive one, the pair-weighted rolling IC and the unweighted one),
 `splitmix64.json`; the trading goldens `expected_risk_decisions.json` (exact decisions, rule ids,
@@ -236,7 +237,7 @@ load and match; the contract goldens are matched by Java, Rust and C++ (`Canonic
 `TraceGoldenTest`, `LifecycleGoldenTest`; `golden_canonical_json.rs`, `golden_trace.rs`,
 `golden_lifecycle.rs`; `CanonicalJsonGolden`, `TraceGolden`, `ReplayTraceGolden`). Each language's
 test suite has a `golden` test group (python `-k golden`, cpp `-R Golden`, rust the nine
-`golden_*` targets, java the thirteen `*GoldenTest` classes); `tests/harness/run_golden.sh` runs
+`golden_*` targets, java the fourteen `*GoldenTest` classes); `tests/harness/run_golden.sh` runs
 all four and prints a parity table. Regeneration is a deliberate, versioned act
 (CONTRIBUTING.md §4): every generator refuses to overwrite without `--force`.
 
@@ -956,7 +957,7 @@ comparison and never sets a state. The bundled result: 24 CANDIDATE / 0 beyond
 
 ### 13.5 The store is a derived, rebuildable index
 
-`schemas/sql/iap_v1.sql` (x-version 1; 24 tables, 3 views; `BIGINT` / `DOUBLE PRECISION` / `TEXT`
+`schemas/sql/iap_v2.sql` (x-version 2; 26 tables, 6 views; `BIGINT` / `DOUBLE PRECISION` / `TEXT`
 only; JSON columns hold `canonical_json` text; enums as wire values) runs unchanged on SQLite 3 and
 PostgreSQL ≥ 13, enforced in CI by a portability whitelist (docs/DATA_MODEL.md §5), not by a
 PostgreSQL run. The flat files — Parquet feature store, goldens, research JSON, the JSONL audits
@@ -965,15 +966,31 @@ from them in about a second and a rebuild from unchanged files is byte-identical
 (`Store.export_jsonl`). Every typed write is `validate_typed` first; every typed read is
 `T.from_dict`; inserts are upserts by primary key in one transaction; a trace is rewritten as a
 unit. No wall clock anywhere in the DDL or the Store. A column change is a new `iap_vN.sql` +
-`DDL_X_VERSION` bump + MIGRATIONS entry, never an in-place edit.
+`DDL_X_VERSION` bump + MIGRATIONS entry, never an in-place edit. **Migration is a rebuild**: the
+store holds nothing the files do not, so `Store.init()` and every `python -m iap.store` command
+refuse a database of another x-version untouched (`StoreVersionError`, exit code 2) and
+`build --rebuild` recreates it; there is no `ALTER TABLE` path.
+
+**Scope (x-version 2, v1.5.0).** A research number belongs to the dataset it was computed on and
+the method bundle it was computed under. `experiments`, `experiment_results`, `ledger_entries`
+and `lifecycle_transitions` carry `dataset_version` and `methods`; `v_alpha_scorecard` and
+`v_experiment_ledger_summary` are one row per scope, with the looks of that scope and the \|t\|
+threshold each result was judged at; `store_scope` names the current scope (the dataset of
+`alpha_params.json`, the default bundle) and `v_alpha_scorecard_current` /
+`v_experiment_ledger_summary_current` filter to it. An entry that names no bundle is `legacy_v1`.
+Earlier datasets, the legacy bundle, the archived lifecycle ledgers and the ledger of an
+ingested dataset (`build --ledger`) import under their own scope and are never pooled with the
+current one.
 
 ### 13.6 x-version discipline for the new artefacts
 
 Wire schemas: §2 (all 17 at 1). Non-wire documents carry their own `x-version` and the same rule
 (bump + MIGRATIONS entry on any field change): `configs/strategies/lifecycle.json` 2,
-`configs/mvp/mvp.json` 1, `research/alpha_registry.json` 2, `schemas/sql/iap_v1.sql` 1,
+`configs/mvp/mvp.json` 1, `research/alpha_registry.json` 2, `schemas/sql/iap_v2.sql` 2 (v1.5.0;
+`iap_v1.sql` is kept as the record of version 1),
 `tests/golden/expected_{contracts_examples,canonical_json,experiment_golden_frame,mvp}.json`
-1, `tests/golden/expected_{lifecycle,backtest,adaptive}.json` 2, the MVP `report.json` 2 and
+1, `tests/golden/expected_{lifecycle,adaptive}.json` 2, `tests/golden/expected_backtest.json` 3
+(the default-rules vector became cross-language), the MVP `report.json` 2 and
 `paper_evidence.json` 3 (2026-09-20), the Java `session_state.json`
 2 and paper session report 3 (2026-09-19); and, added 2026-10-03, each at 1:
 `tests/golden/expected_risk_edge_decisions.json`, the research gate-eligibility sidecar
@@ -1041,11 +1058,22 @@ Pinned with the change:
 - **Ports.** Rules on the paper path or in the lifecycle evaluation are ported: the CUSUM
   retirement rule and the pair-weighted rolling IC (Java `LifecycleGauge`, `RollingIc`; Rust
   `lifecycle::tracker`) and the ledger significance threshold (Java, Rust), each with its
-  legacy rule selectable by name. Research-only statistics are not ported: the Java
-  `ResearchBacktester` and `CostModel` keep the legacy rules, say so in their API
-  (`POSITION_POLICY`, `CAP_FILLS_AT_L1`, `BLOCKS_ROWS`, `IMPACT_MODEL`, `loadLegacyLinear`) and
-  are checked against a golden whose `config` names those rules. The execution simulator's
-  impact rule (§11.2 rule 6) is linear in all three languages and did not change.
+  legacy rule selectable by name. The research backtest rules are ported to Java under the
+  same names — `ResearchBacktester.Config.defaults` / `Config.legacy`, `CostModel` (square root
+  by default) / `withLinearImpact()` — and `expected_backtest.json` pins both rule sets for both
+  languages; the scored-row mask is an input of the Java run because Java has no label engine.
+  The execution simulator's impact rule (§11.2 rule 6) is linear in all three languages and did
+  not change.
+
+  | rule | Python | Java | Rust | C++ |
+  |---|---|---|---|---|
+  | research backtest: cost-aware positions, L1 fill cap, scored-row block (default) and sign / uncapped / every row (legacy) | `BacktestConfig()` / `.legacy()` | `ResearchBacktester.Config.defaults` / `.legacy` (mask and L1 sizes are inputs) | no research backtester | no research backtester |
+  | research impact: square root (default), linear (legacy); round-trip cost, breakeven capacity | `CostModel` / `.with_linear_impact()` | `CostModel` / `.withLinearImpact()` | — | — |
+  | TIME-mode latency, decision age, session flatten, per-row currency conversion | yes | not ported (no default uses them) | — | — |
+  | retirement: CUSUM (default), consecutive (legacy); pair-weighted rolling IC | yes | `LifecycleGauge`, `RollingIc` | `lifecycle::tracker` | no lifecycle |
+  | PROMOTE t threshold: ledger (default), fixed (legacy) | yes | `PolicyConfig` / `Gates` | `PolicyConfig::threshold_for` | no lifecycle |
+  | drift z (HAC), stress grid v2, gate statistic, IC row policy, fold diagnostics, leakage probe | yes | not ported (research statistics) | not ported | not ported |
+  | execution simulator impact (rule 6, linear, unchanged) | yes | yes | — | reference |
 
 **The research store under parallel writers** (2026-10-03). `research/experiments.json` and
 `research/models/ledger.json` are updated by a locked read-modify-write: an exclusive lock file

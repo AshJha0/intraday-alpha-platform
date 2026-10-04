@@ -26,6 +26,7 @@ import org.junit.runners.Suite;
     AlgosTest.class,
     ReplayFillsGoldenTest.class,
     BacktestTest.class,
+    BacktestGoldenTest.class,
     PortfolioGoldenTest.class,
     PortfolioSolverTest.class,
     RiskGoldenTest.class,

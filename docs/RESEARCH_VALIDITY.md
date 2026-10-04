@@ -113,13 +113,15 @@ are ported, each with its legacy rule selectable by name: the CUSUM
 retirement rule and the pair-count-weighted rolling IC (Java
 `LifecycleGauge`, `RollingIc`; Rust `lifecycle::tracker`) and the ledger
 significance threshold (Java `PolicyConfig` / `Gates`, Rust
-`PolicyConfig::threshold_for`). Research-only statistics are not ported: the
+`PolicyConfig::threshold_for`). The research backtest rules are ported to
+Java: `ResearchBacktester.Config.defaults` / `CostModel` are the v1.5.0
+rules (cost-aware positions, L1 fill cap, scored-row block, square-root
+impact, breakeven capacity) and `Config.legacy` / `withLinearImpact` the old
+ones, and `tests/golden/expected_backtest.json` (x-version 3) pins both rule
+sets for Python and Java; the scored-row mask is an input of the Java run
+(no Java label engine), and Rust and C++ have no research backtester. The
 drift z exists in the Python reference alone (no port evaluates a refit
-trigger), and the Java `ResearchBacktester` and `CostModel` keep the LEGACY
-research rules and say so in their API (`POSITION_POLICY`, `CAP_FILLS_AT_L1`,
-`BLOCKS_ROWS`, `IMPACT_MODEL`, `loadLegacyLinear`); the cross-language vector
-`tests/golden/expected_backtest.json` names those rules in its `config`. The
-gate-eligibility flag is read by the Python reference alone.
+trigger). The gate-eligibility flag is read by the Python reference alone.
 
 What the defaults changed on the bundled data is in CHANGELOG.md, v1.5.0,
 "Results". In short: nothing is promoted before or after (0 PROMOTE / 11

@@ -85,16 +85,29 @@ Also changed:
   rule and the pair-weighted rolling IC (Java `LifecycleGauge`, `RollingIc`;
   Rust `lifecycle::tracker`), the ledger significance threshold (Java
   `PolicyConfig` / `Gates`, Rust `PolicyConfig::threshold_for`). The
-  research-only backtest vector `expected_backtest.json` stays on the old
-  rules, which its `config` now names; the Java `ResearchBacktester` and
-  `CostModel` say in their API which rules they implement.
+  research backtest rules are ported to Java as well: `ResearchBacktester`
+  and `CostModel` default to the v1.5.0 rules and keep the old ones under
+  the same names as Python (`Config.legacy`, `withLinearImpact`), and
+  `expected_backtest.json` pins both rule sets for both languages. Rust and
+  C++ have no research backtester.
+- **The store is dataset- and bundle-aware** (`schemas/sql/iap_v2.sql`,
+  data-model x-version 2). `experiments`, `experiment_results`,
+  `ledger_entries` and `lifecycle_transitions` carry `dataset_version` and
+  `methods`; `v_alpha_scorecard` and `v_experiment_ledger_summary` are one
+  row per scope with the looks of that scope and the \|t\| threshold each
+  result was judged at; `v_alpha_scorecard_current` /
+  `v_experiment_ledger_summary_current` are the current dataset under the
+  default bundle. A store built by an earlier release is refused untouched
+  (exit code 2) and rebuilt with `python -m iap.store build --rebuild` —
+  the store is derived, so the rebuild is the migration.
 - **`x-version` bumps**: `configs/execution/execution.json` 1 → 2,
   `configs/strategies/lifecycle.json` 1 → 2, `strategies.json` `adaptive`
   1 → 2, `research/experiments.json` 2 → 3, `research/alpha_registry.json`
   1 → 2, `eligibility.json` 1 → 2, `POWER_REPORT.json` 1 → 2, goldens
-  `expected_lifecycle.json`, `expected_backtest.json`,
-  `expected_adaptive.json` 1 → 2. Every loader rejects the older document
-  instead of reading it under a new default.
+  `expected_lifecycle.json` and `expected_adaptive.json` 1 → 2,
+  `expected_backtest.json` 1 → 3, the SQL data model `iap_v1.sql` →
+  `iap_v2.sql` (1 → 2). Every loader rejects the older document instead of
+  reading it under a new default.
 - **Evidence document**: required keys `significance_threshold` (number or
   null) and `live.new_fraction`.
 - **`python -m iap.research run`**: `--methods {v2,legacy_v1}` and
@@ -177,6 +190,33 @@ Also changed:
   field with `tests/golden/alpha_report_{EQ03,FX01}_v1.4.0.json`.
 - Lifecycle golden scenarios LC04 (what the CUSUM rule changes) and LG01
   (the legacy policy); the backtest golden's `default_rules` block.
+- **Java research backtester on the default rules.**
+  `ResearchBacktester.Config.defaults(...).forHorizon(ns)` is the cost-aware
+  position policy (enter only above the round-trip spread and fee, hold for
+  the label horizon, hysteresis on renewal), fills capped at the displayed
+  L1 size and decisions only on scored rows; `CostModel` is square-root
+  impact by default with `roundTripCostReturn`, `breakevenSize` and
+  `capacityBreakeven`, and `CostModel.load` rejects a config block that
+  names no `impact_model`. `Config.legacy(...)` and `withLinearImpact()`
+  name the v1.4.0 rules. Java has no label engine, so the scored-row mask
+  is an input of `run(...)`. `expected_backtest.json` (x-version 3) adds the
+  mask and every position change to `default_rules`, the no-trade run at
+  full costs (`default_rules_1x`) and scalar `cost_model_cases` for both
+  impact rules; the legacy vector is unchanged. Replayed by
+  `python/tests/test_alpha_golden.py` and the new Java `BacktestGoldenTest`
+  at 1e-9, counts and positions exact.
+- **`schemas/sql/iap_v2.sql`** and the scope-aware store: tables
+  `store_scope` (the current scope) and `ledger_scopes` (looks and
+  Bonferroni \|t\| per scope), ledger columns `experiment_id`, `gate_looks`
+  and `promote_t_threshold`, views `v_alpha_scopes`,
+  `v_alpha_scorecard_current` and `v_experiment_ledger_summary_current`;
+  `python -m iap.store scorecard [--dataset-version V] [--methods M]
+  [--all-scopes]`, `build --rebuild / --dataset-version / --methods /
+  --ledger PATH` (the ledger an ingested dataset keeps in its own
+  directory is indexed under its own scopes), `sql` binding
+  `:dataset_version` / `:methods`; `import_lifecycle_archive` files the
+  archived lifecycle ledgers under the scope their name states;
+  `StoreVersionError`.
 
 ### Results
 
@@ -286,6 +326,19 @@ Same dataset, new rules. Nothing is promoted, before or after.
   hashed files). Its lifecycle gauge follows the CUSUM rule and its rolling
   IC is pair-weighted; the state stays observational. State directories
   written by v1.4.0 resume as before.
+- A store file built before v1.5.0 (data-model x-version 1) is refused by
+  `Store.init()` and by every `python -m iap.store` command; rebuild it with
+  `python -m iap.store build --rebuild`. A query against
+  `v_alpha_scorecard` now returns one row per alpha and scope: use
+  `v_alpha_scorecard_current` for the old one-row-per-alpha shape.
+  `Store.insert_experiment_result` needs the experiment's spec in the store
+  (or `methods=`).
+- Java callers: `new ResearchBacktester(costModel, maxPos, confMin, latency)`
+  is `new ResearchBacktester(costModel, Config.legacy(maxPos, confMin,
+  latency))`; `new CostModel(a, b, c, multiplier)` is square-root impact now
+  — add `.withLinearImpact()` for the old rule. The constants
+  `POSITION_POLICY`, `CAP_FILLS_AT_L1`, `BLOCKS_ROWS` and `IMPACT_MODEL` are
+  gone (the configuration says which rules run).
 - Feature frames written by v1.4.0 have no `label_reopen_<h>` columns:
   the default row policy then falls back to valid labels and the report
   says `label_reopen_available: false`. Regenerate with
@@ -301,11 +354,15 @@ Those of v1.4.0 stand. New or restated:
   predicted move; it says nothing about what a passive execution policy
   would earn, which the research backtester does not model.
 - **The bootstrap interval and the per-fold diagnostics gate nothing.**
-- **`v_alpha_scorecard` is not dataset- or bundle-aware**, and the store
-  keeps `gate_looks` and the gate statistics of a v2 ledger entry only
-  inside `result_json`. Fixing either needs `iap_v2.sql`.
-- **The Java research backtester implements the legacy rules only.** A
-  default-rules research backtest exists in Python alone.
+- **The store's scorecard row is the latest result of a scope, not a
+  judgement.** `v_alpha_scorecard` shows the threshold each result was
+  judged at (`promote_t_threshold`) and the scope's own Bonferroni \|t\|
+  beside it; it re-judges nothing, and the gate statistics other than the
+  t-stat stay inside `ledger_entries.result_json`.
+- **The Java research backtester takes the scored-row mask as an input**
+  (there is no Java label engine) and runs rows-mode latency only; TIME-mode
+  latency, the decision-age bound, the session flatten and the per-row
+  currency conversion exist in Python alone. None is a default.
 - **The ledger threshold is not retroactive.** Results recorded before
   v1.5.0 were judged at 3.0 and are not re-judged.
 

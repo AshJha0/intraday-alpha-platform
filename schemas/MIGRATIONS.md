@@ -1123,8 +1123,9 @@ PLATFORM_CONVENTIONS.md §13.6 has the table of defaults and legacy names.
   been fixed for this on 2026-09-06, the adaptive runner had not). It now
   loads the meta the alpha reports use; the FX P&L columns of
   `ADAPTIVE_REPORT.md` are in USD.
-- **Not done.** `v_alpha_scorecard` (`schemas/sql/iap_v1.sql`) is still not
-  dataset-aware: it would need `iap_v2.sql` and a `DDL_X_VERSION` bump.
+- The two items this entry first listed as not done — a dataset-aware
+  `v_alpha_scorecard` and a Java research backtester on the default rules —
+  are in the release: the two entries below.
 - Versions and bookkeeping: `python/pyproject.toml` and `iap.__version__`
   1.4.0 -> 1.5.0; image references `v1.4.0` -> `v1.5.0` (by tag; digests are
   pinned from `release-manifest.json` after the release workflow has run);
@@ -1133,3 +1134,131 @@ PLATFORM_CONVENTIONS.md §13.6 has the table of defaults and legacy names.
 - Migration path for stored data: none can be migrated — regenerate
   (`python3 tools/regenerate_dataset_artifacts.py`, CONTRIBUTING.md §4.1).
   To keep a v1.4.0 number, select the legacy rule by name.
+
+## 2026-10-04 — v1.5.0: `schemas/sql/iap_v1.sql` -> `iap_v2.sql` (data model x-version 1 -> 2)
+
+The store's research tables and views become dataset- and method-bundle-aware.
+Since v1.4.0 the multiple-testing ledger is dataset-scoped and since v1.5.0 the
+method bundle is part of an experiment's identity, but `v_alpha_scorecard`
+still chose "the latest result" over every dataset and bundle in the file and
+summed every look ever recorded for the alpha (EQ03: a legacy-rules IC of
+0.0271 next to 432 looks pooled over two datasets and two bundles). A real
+ingested dataset, which keeps its own ledger, would have been pooled with the
+synthetic one in the same way.
+
+- **New file, not an edit.** `schemas/sql/iap_v2.sql`,
+  `schema_version.x_version = 2`, `iap.store.ddl.DDL_X_VERSION = 2`.
+  `iap_v1.sql` is unchanged and stays in the tree as the record of version 1;
+  `iap.store` no longer reads it.
+- **Columns.** `experiments.methods`, `experiment_results.methods` (both
+  `NOT NULL`; `dataset_version` was already there); `ledger_entries` gains
+  `dataset_version`, `methods` (both `NOT NULL`), `experiment_id`,
+  `gate_looks`, `promote_t_threshold`; `lifecycle_transitions` gains
+  `dataset_version`, `methods` (nullable: a live `api` write may not know its
+  scope). New indexes on the scope columns.
+- **Tables.** `store_scope` (one row, `scope = 'current'`: the dataset of
+  `configs/strategies/alpha_params.json` and the default bundle of
+  `iap.validation.methods`, or what `build --dataset-version / --methods`
+  name) and `ledger_scopes` (per `(dataset_version, methods)`: entries, looks
+  and the Bonferroni \|t\| at that look count — stored because the inverse
+  normal is not portable SQL; rewritten whole by the ledger importer).
+- **Views.** `v_alpha_scopes` (new); `v_alpha_scorecard` is one row per alpha
+  AND scope — the latest result of the scope, the `gate_looks` /
+  `promote_t_threshold` it was judged at, the alpha's looks in the scope,
+  `scope_looks`, `scope_bonferroni_t`, the scope's latest `promotion_pipeline`
+  ledger verdict (`pipeline_*`), `is_current`, and `current_state` on the
+  current scope only; `v_experiment_ledger_summary` is per scope and kind;
+  `v_alpha_scorecard_current` and `v_experiment_ledger_summary_current` filter
+  to the `store_scope` row. `UNION` joins the portable subset; a view that
+  reads another is dropped before it and created after it.
+- **Scope rules** (`iap.store.importers`). A ledger entry's dataset is its
+  stamp, else the one in its config (`experiment_runner`), else `unstamped`;
+  its bundle is `config.methods`, else `config.configuration.methods`, else
+  `legacy_v1` (an entry recorded before v1.5.0 names none). An alpha report's
+  experiment takes the bundle of its ledger entry (the entry of that dataset
+  under the default bundle is preferred, as the registry does). An entry's
+  `promote_t_threshold` is `max(3.0, Bonferroni |t| at gate_looks)`, or the
+  fixed 3.0 for a pipeline / runner entry of a fixed-threshold bundle. The
+  archived lifecycle ledgers (`research/archive/lifecycle_transitions.dataset-
+  <prefix>[.methods-<bundle>].jsonl`) import with `source = archive/<file>`
+  under the scope their name states and never set `alphas.current_state`.
+- **CLI.** `python -m iap.store build [--rebuild] [--dataset-version V]
+  [--methods M] [--ledger PATH ...]`; new `scorecard [--dataset-version V]
+  [--methods M] [--all-scopes]`; `sql` binds `:dataset_version` / `:methods`
+  to the selected scope.
+- **Migration path for stored data: rebuild.** The store is a derived index of
+  the flat files, so there is no in-place migration and no `ALTER TABLE`
+  script. `Store.init()` checks the version before it runs any DDL statement
+  and raises `StoreVersionError` on a version-1 file, leaving it byte for byte
+  as it was; `build`, `sql`, `scorecard` and `explain` exit 2 with a message
+  naming the fix; `python -m iap.store build --rebuild` deletes the file and
+  builds it again (about a second). A version-1 file remains readable by any
+  SQLite client; the package does not read it. The MVP's per-run store is
+  created fresh on every run and needs nothing.
+- **API changes a caller must make.** A query that expects one row per alpha
+  reads `v_alpha_scorecard_current`. `Store.insert_experiment_result` needs
+  the experiment's spec in the store or `methods=`;
+  `Store.insert_experiment_spec` takes the bundle from
+  `configuration["methods"]` (a name) or `methods=`.
+- No wire schema, golden or research artefact changed. Tests:
+  `python/tests/test_store.py` (two datasets and two bundles in one store give
+  four scorecard rows with their own look counts and thresholds; the built
+  store keeps the legacy and archived scopes out of the current numbers; a
+  version-1 file is refused untouched and rebuilt).
+
+## 2026-10-04 — v1.5.0: `tests/golden/expected_backtest.json` x-version 2 -> 3; Java research backtester on the default rules
+
+The second cross-language vector. The v1.5.0 entry above kept the Java
+`ResearchBacktester` / `CostModel` on the legacy rules and pinned the default
+rules for Python alone; the port closes that.
+
+- **Golden** (`python/tools/make_golden_alpha.py`; route (a): the new rule is
+  ported and the legacy vector kept beside it, in the same file). Unchanged:
+  the top-level EQ01 legacy vector and its `config`, and every number of
+  `default_rules` (EQ06, cost multiplier 0.01). Added: `default_rules`
+  `horizon_ns`, `hysteresis`, `scored_rows` (`n_rows`, `n_scored`,
+  `blocked_rows` — the rows Python's `block_rows_column="auto"` removes) and
+  `position_changes` (`[row, position after the row]` for every trade);
+  `default_rules_1x` (the same run at full costs: no trade, every number 0);
+  `cost_model_cases` (ten scalar cases, both impact rules: spread, fee,
+  impact, impact bps, round-trip cost return, breakeven size, capacity).
+  Tolerance unchanged: money at 1e-9 abs/rel, counts exact; positions exact.
+  The file was generated on the development machine and replayed on the CI
+  runner by both languages; the numbers that existed before are byte-identical
+  to the committed ones, so no `regenerate` run was needed.
+- **Java** (`com.iap.backtest`). `ResearchBacktester(CostModel, Config)`:
+  `Config.defaults(maxPosQty, confMin, latencyRows)` is the Python default
+  (`position_policy = "cost_aware"`, `cap_fills_at_l1`, row block),
+  `.forHorizon(ns)` supplies the label horizon (a cost-aware run without it
+  throws, as in Python), `Config.legacy(...)` names the v1.4.0 rules;
+  `costAwareTargets` mirrors `iap.backtest.engine.cost_aware_targets`
+  statement for statement. `CostModel` gains `impactModel` and
+  `sqrtImpactCoeffBps` (square root by default), `load` (rejects a block that
+  names no `impact_model`), `withLinearImpact`, `withSqrtImpact`,
+  `withMultiplier`, `impactBps`, `roundTripCostReturn`, `breakevenSize`,
+  `capacityBreakeven`. Removed: the four-argument `ResearchBacktester`
+  constructor and the constants `POSITION_POLICY`, `CAP_FILLS_AT_L1`,
+  `BLOCKS_ROWS`, `IMPACT_MODEL`.
+- **What Java does not derive.** The scored-row mask comes from the labels
+  (`iap.labels.frames.scored_rows`) and Java has no label engine: `run(...)`
+  takes the mask (and the displayed L1 sizes) as inputs, and the golden embeds
+  the mask the reference computed. Rows-mode latency only: TIME-mode latency,
+  `max_decision_age_ns`, `flatten_at_session_end` and the per-row currency
+  conversion remain Python-only, and none is a default.
+- **Float parity.** Every expression keeps the operand order of the Python
+  reference (`multiplier * (2 * hs + 2 * fee) / mid`; `coeff * sqrt(|q| * unit
+  / adv)` then `* 1e-4 * |q| * unit * mid`). The remaining differences are
+  summation order (numpy sums cost arrays pairwise, Java sequentially) and
+  the equity increments, both far inside 1e-9; the decisions themselves —
+  the position changes — are compared exactly.
+- **Rust, C++.** Neither has a research backtester and neither reads this
+  golden (checked: no reference to `expected_backtest.json` or a research
+  backtest under `rust/` or `cpp/`; C++ `ExecutionReplay` and the Rust venue
+  simulator are execution components with their own goldens). Nothing to
+  port; PLATFORM_CONVENTIONS.md §13.6 has the table.
+- Tests: `python/tests/test_alpha_golden.py` (4 backtest-golden tests),
+  Java `BacktestGoldenTest` (4, registered in `AllTests` and in the golden
+  gate of `tests/harness/run_all.sh`), `BacktestTest` (the rule unit tests).
+- Migration path for stored data: none — the golden is a test vector. A Java
+  caller constructs `Config.legacy(...)` and `withLinearImpact()` to keep the
+  old numbers.

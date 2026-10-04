@@ -6,7 +6,7 @@ test run < 120 s.
 **CI** is `.github/workflows/ci.yml`, and it is the local
 `tests/harness/run_all.sh` split into parallel jobs: one per language, plus
 `tests/harness/run_golden.sh` (the GOVERNANCE promotion-gate-10 artefact: every
-language's golden group, including ALL thirteen Java `*GoldenTest` classes),
+language's golden group, including ALL fourteen Java `*GoldenTest` classes),
 `tests/harness/check_deployment.py` (promtool rules/config/unit tests, compose
 and Dockerfile checks, k8s manifests, ConfigMap sync, dashboard metric
 provenance) and an `images` job that builds the four container images and is
@@ -106,7 +106,7 @@ canonical-JSON byte parity the contracts / lifecycle goldens pin.
 ## Java — why there is NO Maven build
 
 ```bash
-cd java && bash build.sh && bash test.sh    # 510 tests; the thirteen *GoldenTest classes are 104 of them
+cd java && bash build.sh && bash test.sh    # 525 tests; the fourteen *GoldenTest classes are 110 of them
 ```
 
 **Maven/Gradle are deliberately not used: Maven Central is unreachable from

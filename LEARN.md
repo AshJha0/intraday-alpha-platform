@@ -1311,13 +1311,13 @@ match**.
   the portfolio golden is checked against an SLSQP optimum. Golden files are
   regenerated only deliberately, with a MIGRATIONS.md entry.
 - **One command proves parity**: `tests/harness/run_all.sh` runs all four
-  suites and prints the table (the v1.5.0 counts from CI, 2026-10-04: python 1672,
-  cpp 289, rust 330, java 520 tests passed; golden groups 173/68/66/106; all
+  suites and prints the table (the v1.5.0 counts from CI, 2026-10-04: python 1680,
+  cpp 289, rust 330, java 525 tests passed; golden groups 175/68/66/110; all
   PASS, plus `integration` (35) and `replay` (6) rows for the repo-level
   pytest suites, a `deployment` row — 25 structural checks passed in CI,
   where promtool and kubeconform are installed — and a `numbers` row that re-derives every headline
   figure in the docs from its artefact). The Java golden group runs all
-  thirteen `*GoldenTest` classes (it once ran two of them and reported 18),
+  fourteen `*GoldenTest` classes (it once ran two of them and reported 18),
   the Rust group nine golden targets. The 2026-09-19/20 release added a new
   kind of golden: not a number to reproduce within a tolerance but a
   **byte sequence** — canonical JSON lines, a stream digest, the registry
@@ -1965,9 +1965,9 @@ test to write.
 
 The platform's records live in flat files — Parquet feature frames, JSON
 goldens, research documents, JSONL audits and traces — that are
-deterministic, checksummed and archived. `schemas/sql/iap_v1.sql`
+deterministic, checksummed and archived. `schemas/sql/iap_v2.sql`
 ([docs/DATA_MODEL.md](docs/DATA_MODEL.md)) is a relational *index* over
-them: 24 tables and 3 views into which every contract maps, built by
+them: 26 tables and 6 views into which every contract maps, built by
 `python -m iap.store build` in about a second, byte-identical on a rebuild
 from unchanged files, and never committed. Dropping it loses nothing. That
 framing decides the design: the DDL is portable (SQLite 3 and PostgreSQL ≥
@@ -1980,10 +1980,14 @@ there is no `NOW()` anywhere.
 
 `v_order_chain` is one row per parent order — signal → portfolio leg → last
 risk decision → child/venue counts → fills/fees → TCA → attribution — the
-same chain `explain()` prints as text. `v_alpha_scorecard` joins each
-alpha's latest experiment result, verdict, lifecycle state and ledger count;
-`v_experiment_ledger_summary` gives the multiple-testing denominator per
-kind. The questions the spec's observability section asks — why did we
+same chain `explain()` prints as text. `v_alpha_scorecard` has one row per
+alpha and scope — the dataset and the method bundle a number was computed
+in — with the latest experiment result of that scope, its verdict, the look
+count and threshold it was judged at and the scope's ledger count;
+`v_alpha_scorecard_current` is the current dataset and bundle only, so a
+legacy-rules result or another dataset's looks never leak into today's
+numbers. `v_experiment_ledger_summary` gives the multiple-testing
+denominator per scope and kind. The questions the spec's observability section asks — why did we
 trade, why was X rejected, what is the denominator, is live IC drifting
 from research — are one query each, and COOKBOOK recipes 20, 21 and 24 run
 them.

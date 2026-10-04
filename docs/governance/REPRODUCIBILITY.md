@@ -232,7 +232,9 @@ python3 tools/regenerate_dataset_artifacts.py --only goldens,tca
   did not change and the rules did: `expected_lifecycle.json`,
   `expected_backtest.json` and `expected_adaptive.json` went to x-version 2
   (the backtest golden keeps its legacy vector, identical to v1.4.0 in
-  every value, and names the rules in its `config`), `expected_mvp.json`
+  every value, and names the rules in its `config`; it then went to
+  x-version 3 when its default-rules vector became cross-language — the
+  legacy values and the default-rules numbers did not move), `expected_mvp.json`
   changed in `config_version`, the trace digest and the per-alpha `ic_gap`
   only, and `expected_alpha.json` follows `alpha_params.json`, which
   differs from v1.4.0 by at most 2.3e-15 relative.

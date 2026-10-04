@@ -43,8 +43,8 @@ flowchart TD
 ## 2. Cross-language golden-test topology
 
 How one validated Python reference pins four implementations. The parity table is
-printed by `tests/harness/run_all.sh` (python 1672 · cpp 289 · rust 330 · java 520
-tests; 173/68/66/106 in the golden groups — the Java gate runs all thirteen
+printed by `tests/harness/run_all.sh` (python 1680 · cpp 289 · rust 330 · java 525
+tests; 175/68/66/110 in the golden groups — the Java gate runs all fourteen
 `*GoldenTest` classes, the Rust gate nine golden targets). Two goldens are
 owned by a port language and consumed by Python as well: the fills golden
 (C++) by `iap.execution`, the risk goldens (Rust) by `iap.risk`.
@@ -60,10 +60,10 @@ flowchart LR
     MG --> EXP[("expected_*.json<br/>codec sha256 | book states | features<br/>alpha | backtest | risk decisions + audit + snapshot<br/>replay fills | portfolio | tca (+ timeline cases) | adaptive<br/>contracts examples | canonical json + trace digest<br/>lifecycle | experiment golden frame | mvp")]
     CPPTOOL["cpp/tools/make_replay_fills_golden<br/>(C++ is the fills reference;<br/>Python iap.execution consumes it too)"] --> EXP
     RSTOOL["rust/risk/src/bin/make_risk_golden<br/>(Rust is the risk reference;<br/>Python iap.risk consumes it too)"] --> EXP
-    GV --> PY["python: pytest -k golden<br/>173 tests"]
+    GV --> PY["python: pytest -k golden<br/>175 tests"]
     GV --> CPP["cpp: ctest -R Golden<br/>68 tests"]
     GV --> RS["rust: 9 golden test targets<br/>66 tests"]
-    GV --> JV["java: all thirteen *GoldenTest (JUnitCore)<br/>106 golden-group tests"]
+    GV --> JV["java: all fourteen *GoldenTest (JUnitCore)<br/>110 golden-group tests"]
     EXP --> PY
     EXP --> CPP
     EXP --> RS
@@ -240,7 +240,7 @@ flowchart TD
     BEHIND["a cancel from an order that joined after us, or with a<br/>synthetic QUOTE / SNAPSHOT id, does not advance us;<br/>an event the book dropped moves nobody (diagram 12)"] -.-> OBS
 ```
 
-## 7. Platform data model (`schemas/sql/iap_v1.sql`)
+## 7. Platform data model (`schemas/sql/iap_v2.sql`)
 
 The relational index over every contract and research artefact, as built by
 `python -m iap.store build` (SQLite; the same DDL runs on PostgreSQL). Solid
@@ -251,9 +251,10 @@ the views and the query cookbook are in [DATA_MODEL.md](DATA_MODEL.md).
 
 ```mermaid
 erDiagram
-    %% schemas/sql/iap_v1.sql — x-version 1. Solid lines are declared foreign
+    %% schemas/sql/iap_v2.sql — x-version 2. Solid lines are declared foreign
     %% keys (every stage row of a decision trace); dotted lines are logical
-    %% references between independently imported artefacts.
+    %% references between independently imported artefacts. The research
+    %% tables carry the scope (dataset_version, methods) a number was computed in.
 
     instruments {
         BIGINT instrument_id PK
@@ -310,10 +311,13 @@ erDiagram
         BIGINT test_end_ts
         BIGINT seed
         TEXT horizon
+        TEXT methods
     }
     experiment_results {
         TEXT experiment_id PK
         TEXT alpha_id
+        TEXT dataset_version
+        TEXT methods
         DOUBLE_PRECISION ic
         DOUBLE_PRECISION t_stat
         DOUBLE_PRECISION net_return_bps
@@ -326,12 +330,29 @@ erDiagram
         TEXT ledger_key PK
         TEXT alpha_id
         TEXT kind
+        TEXT dataset_version
+        TEXT methods
+        TEXT experiment_id
+        BIGINT gate_looks
+        DOUBLE_PRECISION promote_t_threshold
         TEXT config_json
         BIGINT count
         BIGINT n
         DOUBLE_PRECISION oos_ic
         DOUBLE_PRECISION nw_tstat
         TEXT verdict
+    }
+    ledger_scopes {
+        TEXT dataset_version PK
+        TEXT methods PK
+        BIGINT n_entries
+        BIGINT looks
+        DOUBLE_PRECISION bonferroni_t_threshold
+    }
+    store_scope {
+        TEXT scope PK
+        TEXT dataset_version
+        TEXT methods
     }
     lifecycle_transitions {
         TEXT alpha_id PK
@@ -343,6 +364,8 @@ erDiagram
         TEXT reason
         TEXT gates_json
         TEXT actor
+        TEXT dataset_version
+        TEXT methods
     }
     decision_traces {
         TEXT trace_id PK
@@ -506,6 +529,9 @@ erDiagram
     alphas ||..o{ ledger_entries : "alpha_id"
     alphas ||..o{ lifecycle_transitions : "alpha_id"
     experiments ||..o| experiment_results : "experiment_id"
+    experiments ||..o| ledger_entries : "experiment_id"
+    ledger_scopes ||..o{ ledger_entries : "dataset_version, methods"
+    store_scope ||..o| ledger_scopes : "current scope"
     feature_versions ||..o{ experiments : "feature_version"
     feature_versions ||..o{ model_runs : "feature_version"
     feature_versions ||..o{ drift_baselines : "feature_version"
