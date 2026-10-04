@@ -124,8 +124,29 @@ def decode_jsonl_line(line: str) -> MarketEvent:
             "JSONL field values must be integers (no floats, exponents, leading "
             f"zeros, '+', bools or strings; no trailing content): {_preview(line)}"
         )
+    tokens = m.groups()
+    if "-" not in line:
+        # Fast path, same verdicts: without a '-' every token is a
+        # non-negative integer, so only the upper bounds can fail; anything
+        # out of range falls through to the per-field loop for its message.
+        vals = [int(tok) for tok in tokens]
+        if (
+            vals[0] <= U64_MAX
+            and vals[1] <= U32_MAX
+            and vals[2] <= U16_MAX
+            and vals[3] <= I64_MAX
+            and vals[4] <= I64_MAX
+            and vals[5] <= U64_MAX
+            and vals[6] <= 0xFF
+            and vals[7] <= 0xFF
+            and vals[8] <= I64_MAX
+            and vals[9] <= I64_MAX
+            and vals[10] <= U64_MAX
+            and vals[11] <= U64_MAX
+        ):
+            return MarketEvent(*vals)
     vals = []
-    for i, tok in enumerate(m.groups()):
+    for i, tok in enumerate(tokens):
         if tok[0] == "-" and not _SIGNED[i]:
             raise ValueError(f"JSONL field {_KEYS[i]!r} must be a non-negative integer: {tok}")
         v = int(tok)
@@ -144,10 +165,16 @@ def encode_jsonl(events: Iterable[MarketEvent]) -> bytes:
 def write_jsonl(path: str | Path, events: Iterable[MarketEvent]) -> int:
     """Write canonical JSONL file; return number of events written."""
     n = 0
+    lines: list[str] = []
     with open(path, "wb") as f:
         for ev in events:
-            f.write((encode_jsonl_line(ev) + "\n").encode("utf-8"))
+            lines.append(encode_jsonl_line(ev))
             n += 1
+            if len(lines) >= 8192:  # one write per batch; the bytes are unchanged
+                f.write(("\n".join(lines) + "\n").encode("utf-8"))
+                lines.clear()
+        if lines:
+            f.write(("\n".join(lines) + "\n").encode("utf-8"))
     return n
 
 

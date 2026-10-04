@@ -19,15 +19,22 @@ from pathlib import Path
 
 import pytest
 from conftest import CONFIGS_DIR, REPO_ROOT
-from iap.core.codec import read_iap1, read_jsonl, sha256_file
-from iap.core.events import EventType, validation_error
+from iap.core.codec import encode_jsonl, read_iap1, read_jsonl, sha256_file, write_jsonl
+from iap.core.events import EventType, MarketEvent, validation_error
 from iap.experiment import tracker
 from iap.features.__main__ import main as features_main
 from iap.features.context import build_contexts
 from iap.marketdata.__main__ import main as marketdata_main
 from iap.marketdata.feederrors import BookDivergenceError, IngestError
-from iap.marketdata.ingest import ingest, load_manifest, real_dataset_version
+from iap.marketdata.ingest import (
+    _BookCheck,
+    ingest,
+    load_manifest,
+    real_dataset_version,
+    sequence_events,
+)
 from iap.marketdata.itch50 import Itch50Mapper, Itch50Reader
+from iap.orderbook.book import ApplyStatus, OrderBook
 from iap.reference.refdata import ReferenceData
 from iap.reference.secmaster import SecurityMaster, SecurityMasterError
 from iap.research.__main__ import main as research_main
@@ -143,6 +150,32 @@ def test_same_input_gives_identical_output_bytes(tmp_path, capsys):
     assert load_manifest(c)["dataset_version"] == load_manifest(a)["dataset_version"]
 
 
+def test_output_bytes_of_a_seeded_dataset_are_pinned(tmp_path, capsys):
+    """Known-answer pin (the dataset of COOKBOOK recipe 36): the hashes were
+    recorded BEFORE the pass-2 / normaliser performance work, so any change
+    to the output bytes — by an optimisation or by a platform — fails here."""
+    out = tmp_path / "ds"
+    for seed, date in ((7, D1), (8, D2)):
+        src = _day(
+            tmp_path, seed, f"{date}.itch.gz", compress=True, n_actions=6000, spacing_ns=10**9
+        )
+        assert _ingest_cli(src, date, out) == 0
+    capsys.readouterr()
+    manifest = load_manifest(out)
+    assert manifest["dataset_version"] == (
+        "70ddb405e78c2356c2a6f15a85f8dfe520cc27bf427ec2532d4257c480e8e29e"
+    )
+    assert manifest["sessions"][D1]["raw"]["sha256"] == (
+        "104ceb7f631d8356133eb486152547d6929c8a628caadc550d2f62fed9abdab2"
+    )
+    assert manifest["normalized"]["files"] == {
+        "eq_20191230.normalized.iap1": "a1c8a4f4b293913b19b3947a3ec32a7d235b061b90249cadf4d814bcba24611a",
+        "eq_20191230.normalized.jsonl": "104ceb7f631d8356133eb486152547d6929c8a628caadc550d2f62fed9abdab2",
+        "eq_20191231.normalized.iap1": "27b440e07cc1ca984fe819cefd7b50b7c548c02d4aea4c219316fbaa8c3a6f53",
+        "eq_20191231.normalized.jsonl": "30933784970dd485f31a0863b533c38ee7354073946a77995c1b2d7045f5e09f",
+    }
+
+
 def test_dataset_version_is_content_pinned_and_disjoint_from_synthetic(tmp_path, capsys):
     a, b = tmp_path / "a", tmp_path / "b"
     assert _ingest_cli(_day(tmp_path, 7, "d7.itch"), D1, a) == 0
@@ -219,6 +252,25 @@ def test_a_second_session_extends_the_dataset(tmp_path, capsys):
     assert _ingest_cli(tmp_path / "d2.itch", D2, other) == 0
     capsys.readouterr()
     assert _tree(other) == _tree(out)
+
+
+def test_deferred_normalisation_gives_the_same_dataset(tmp_path, capsys):
+    """A many-day load normalises once, at the end: `--defer-normalize` on all
+    but the last date produces the bytes of the session-by-session load."""
+    d1, d2 = _day(tmp_path, 7, "d1.itch"), _day(tmp_path, 8, "d2.itch")
+    stepwise = tmp_path / "stepwise"
+    assert _ingest_cli(d1, D1, stepwise) == 0 and _ingest_cli(d2, D2, stepwise) == 0
+    deferred = tmp_path / "deferred"
+    assert _ingest_cli(d1, D1, deferred, "--defer-normalize") == 0
+    summary = json.loads(capsys.readouterr().out.rsplit("\n{\n", 1)[-1].join(["{\n", ""]))
+    assert summary["dataset_version"] is None and summary["qc_totals"] is None
+    pending = load_manifest(deferred)
+    assert pending["normalized"] is None and "dataset_version" not in pending
+    assert not (deferred / "normalized").exists()
+    assert research_main(["run", "--alpha", "EQ03", "--dataset-dir", str(deferred)]) == 1
+    assert _ingest_cli(d2, D2, deferred) == 0
+    capsys.readouterr()
+    assert _tree(deferred) == _tree(stepwise)
 
 
 def test_ingest_refuses_inconsistent_requests(tmp_path, capsys):
@@ -308,18 +360,219 @@ def test_tick_size_follows_the_displayed_prices(tmp_path):
     assert prices[(2, int(EventType.EXECUTE))] == 4_321  # exact: one tick is 1/10000 dollar
     assert manifest["sessions"][D1]["raw"]["trade_prices_rounded_to_tick"] == 1
     assert manifest["sessions"][D1]["per_symbol"]["PENNY"]["ref_price_source"] == "first_trade"
-    with pytest.raises(
-        IngestError, match="not a\n?.*multiple of the 0.01 tick|multiple of the 0.01"
-    ):
-        ingest(
-            "itch50", [src], D1, ["BIGCO", "PENNY"], tmp_path / "forced",
-            configs_dir=CONFIGS_DIR, tick_size="0.01",
-        )  # fmt: skip
+    # forcing the cent grid on the sub-dollar name rejects its off-grid orders, counted
+    forced = ingest(
+        "itch50", [src], D1, ["BIGCO", "PENNY"], tmp_path / "forced",
+        configs_dir=CONFIGS_DIR, tick_size="0.01",
+    )  # fmt: skip
+    assert forced["sessions"][D1]["per_symbol"]["PENNY"]["off_tick_orders_rejected"] == 1
     fine = ingest(
         "itch50", [src], D1, ["BIGCO", "PENNY"], tmp_path / "fine",
         configs_dir=CONFIGS_DIR, tick_size="0.0001",
     )  # fmt: skip
     assert {u["tick_size_e4"] for u in fine["universe"]} == {1}
+    with pytest.raises(IngestError, match="one\n?.*tick size per instrument|differs from the"):
+        ingest(
+            "itch50", [src], D2, ["BIGCO", "PENNY"], tmp_path / "fine",
+            configs_dir=CONFIGS_DIR, tick_size="0.01",
+        )  # fmt: skip
+
+
+def _stub_quote_day(tmp_path: Path) -> Path:
+    """The pattern of a real Nasdaq file (2019-12-30): a stock trading at
+    hundreds of dollars carries a few far-from-market BIDS priced under
+    $1.00 — legally sub-penny under Rule 612 — entered before the real
+    quotes arrive."""
+    enc = Itch50Encoder()
+    enc.system_event(hms_ns(3), "O")
+    enc.stock_directory(1, hms_ns(3, 0, 1), "BIGCO")
+    enc.system_event(hms_ns(4), "S")
+    t = hms_ns(8, 59)
+    enc.add(1, t, 1, "B", 1, "BIGCO", 2_600)  # $0.26: under a dollar but on the cent grid
+    enc.add(1, t + 1, 2, "B", 1, "BIGCO", 1)  # $0.0001
+    enc.add(1, t + 2, 3, "B", 100, "BIGCO", 8_769)  # $0.8769
+    enc.add(1, t + 3, 4, "B", 100, "BIGCO", 12)  # $0.0012
+    enc.system_event(hms_ns(9, 30), "Q")
+    t = hms_ns(9, 30, 1)
+    enc.add(1, t, 11, "B", 100, "BIGCO", 2_894_300)
+    enc.add(1, t + 1, 12, "S", 100, "BIGCO", 2_894_500)
+    enc.cancel(1, t + 2, 3, 40)  # partial cancel of a rejected order
+    enc.delete(1, t + 3, 2)  # delete of a rejected order
+    enc.replace(1, t + 4, 3, 5, 100, 9_000)  # rejected order replaced ONTO the grid ($0.90)
+    enc.replace(1, t + 5, 11, 13, 100, 2_894_350)  # on-grid order replaced OFF the grid
+    enc.executed(1, t + 6, 13, 100, 77)  # ... and executed: the print survives, rounded
+    enc.delete(1, t + 7, 4)
+    return enc.write(tmp_path / "stubs.itch")
+
+
+def test_sub_dollar_stub_bids_do_not_make_a_stock_sub_penny(tmp_path):
+    """Regression (first real run): a handful of sub-dollar, sub-penny stub
+    bids set every instrument's tick to 0.0001.  The tick is the increment
+    of the price range the instrument is quoted in; orders off that grid
+    are rejected and counted, never rounded."""
+    out = tmp_path / "ds"
+    manifest = ingest(
+        "itch50", [_stub_quote_day(tmp_path)], D1, ["BIGCO"], out, configs_dir=CONFIGS_DIR
+    )
+    (entry,) = manifest["universe"]
+    assert (entry["tick_size"], entry["tick_size_e4"]) == (0.01, 100)
+    session = manifest["sessions"][D1]
+    per = session["per_symbol"]["BIGCO"]
+    assert per["displayed_orders_below_one_dollar"] == 5  # four stubs + the replacement at $0.90
+    assert per["off_tick_orders_rejected"] == 4  # $0.0001, $0.8769, $0.0012 and the 289.435 replace
+    assert per["ref_price_e4"] == 2_894_350 and per["ref_price_source"] == "first_trade"
+    raw_info = session["raw"]
+    assert raw_info["off_tick_orders_rejected"] == 4
+    # cancel + delete + the CANCEL half of the replace of #3, the execute of #13, the delete of #4
+    assert raw_info["events_on_rejected_orders"] == 5
+    assert raw_info["trade_prices_rounded_to_tick"] == 1
+    assert session["book_check"]["clean"] is True
+    assert session["book_check"]["per_symbol"]["BIGCO"]["resting_orders_at_end"] == 3
+    raw = read_jsonl(out / "raw" / "eq_20191230.jsonl")
+    assert [ev.sequence for ev in raw] == list(range(1, len(raw) + 1))  # gap-free after rejections
+    book_events = [
+        (ev.event_type, ev.side, ev.price_ticks, ev.qty, ev.order_id)
+        for ev in raw
+        if ev.event_type != int(EventType.STATUS)
+    ]
+    add, cancel, trade = int(EventType.ADD), int(EventType.CANCEL), int(EventType.TRADE)
+    assert book_events == [
+        (add, 0, 26, 1, 1),  # the on-grid stub rests at 26 ticks
+        (add, 0, 28_943, 100, 11),
+        (add, 1, 28_945, 100, 12),
+        (add, 0, 90, 100, 5),  # the replacement of a rejected order: ADD only
+        (cancel, 0, 28_943, 0, 11),  # the original leaves; its off-grid replacement is rejected
+        (trade, 1, 28_944, 100, 0),  # 289.435 rounds half up; no EXECUTE of a rejected order
+    ]
+    # the real order book accepts every emitted event and agrees with the check
+    book = OrderBook(1, 101)
+    assert all(book.apply(ev) == ApplyStatus.APPLIED for ev in raw)
+    assert book.order_count_total() == 3 and book.best_bid() == (90, 100)
+    assert (out / "configs" / "instruments" / "instruments.json").read_text().count(
+        '"tick_size": 0.01'
+    ) == 1
+
+
+def test_a_stock_quoted_below_a_dollar_is_a_sub_penny_instrument(tmp_path):
+    enc = Itch50Encoder()
+    enc.stock_directory(1, hms_ns(3), "PENNY")
+    enc.system_event(hms_ns(9, 30), "Q")
+    t = hms_ns(9, 30, 1)
+    enc.add(1, t, 1, "S", 100, "PENNY", 10_200)  # one offer above a dollar
+    enc.add(1, t + 1, 2, "B", 100, "PENNY", 9_911)
+    enc.add(1, t + 2, 3, "S", 100, "PENNY", 9_950)
+    manifest = ingest(
+        "itch50",
+        [enc.write(tmp_path / "p.itch")],
+        D1,
+        ["PENNY"],
+        tmp_path / "ds",
+        configs_dir=CONFIGS_DIR,
+    )
+    assert manifest["universe"][0]["tick_size_e4"] == 1
+    assert manifest["sessions"][D1]["raw"]["off_tick_orders_rejected"] == 0
+
+
+def _reference_book_report(events) -> dict:
+    """What the real ``OrderBook`` says about a stream (the check's oracle)."""
+    book = OrderBook(1, 101)
+    dropped = sum(book.apply(ev) != ApplyStatus.APPLIED for ev in events)
+    counters = book.counters()
+    return {
+        "dropped": dropped,
+        "events_applied": counters["events_applied"],
+        "drop_counters": {k: v for k, v in counters.items() if v and k != "events_applied"},
+        "resting_orders_at_end": book.order_count_total(),
+        "crossed_at_end": book.is_crossed(),
+    }
+
+
+def _check_report(events) -> dict:
+    check = _BookCheck(1)
+    for ev in events:
+        check.apply(0, ev.event_type, ev.side, ev.price_ticks, ev.qty, ev.order_id)
+    report = check.report(("X",))
+    return {
+        "dropped": report["dropped"],
+        "crossing_adds": report["crossing_adds"],
+        **report["per_symbol"]["X"],
+    }
+
+
+@pytest.mark.parametrize("seed", [1, 2, 3])
+def test_book_check_agrees_with_the_real_order_book_on_clean_streams(tmp_path, seed):
+    enc, _ = build_session(seed, symbols=("AAPL",), n_actions=2500)
+    path = enc.write(tmp_path / "d.itch")
+    protos = list(Itch50Mapper(D1, ("AAPL",)).events(Itch50Reader(path, symbols=("AAPL",))))
+    events = list(sequence_events(protos, [100], 101))
+    ours = _check_report(events)
+    assert ours.pop("crossing_adds") == 0
+    assert ours == _reference_book_report(events) and ours["dropped"] == 0
+
+
+def test_book_check_agrees_with_the_real_order_book_on_inconsistent_streams():
+    add, modify, cancel, execute, status = (
+        int(EventType.ADD), int(EventType.MODIFY), int(EventType.CANCEL),
+        int(EventType.EXECUTE), int(EventType.STATUS),
+    )  # fmt: skip
+    rows = [
+        (add, 0, 100, 50, 1),
+        (add, 0, 100, 50, 1),  # duplicate id
+        (add, 1, 105, 30, 2),
+        (modify, 0, 100, 20, 1),
+        (modify, 0, 101, 10, 1),  # price mismatch
+        (modify, 0, 100, 60, 1),  # increase
+        (execute, 0, 100, 500, 1),  # more than rests: removes the order
+        (execute, 0, 100, 10, 1),  # unknown now
+        (cancel, 0, 0, 0, 9),  # unknown
+        (modify, 0, 0, 5, 9),  # unknown
+        (add, 0, 0, 10, 3),  # non-positive price
+        (cancel, 1, 105, 0, 2),
+        (status, 0, 0, 3, 0),
+        (add, 0, 110, 10, 4),  # crossing is allowed outside continuous trading
+        (add, 1, 108, 10, 5),
+    ]
+    events = [
+        MarketEvent(i + 1, 1, 101, 1000 + i, 1000 + i, i + 1, et, side, price, qty, oid, 0)
+        for i, (et, side, price, qty, oid) in enumerate(rows)
+    ]
+    ours = _check_report(events)
+    assert ours.pop("crossing_adds") == 0
+    reference = _reference_book_report(events)
+    assert ours == reference
+    assert ours["drop_counters"] == {
+        "invalid_payload_dropped": 1, "modify_price_mismatch": 1, "unknown_order_events": 4,
+    }  # fmt: skip
+    assert ours["crossed_at_end"] is True and ours["resting_orders_at_end"] == 2
+
+
+def test_book_check_counts_a_crossing_displayed_add_in_continuous_trading():
+    check = _BookCheck(1)
+    add = int(EventType.ADD)
+    check.apply(0, add, 1, 105, 10, 1)
+    check.apply(0, add, 0, 104, 10, 2)
+    assert check.crossing_adds == 0
+    check.apply(0, add, 0, 105, 10, 3)  # locks / crosses the offer
+    check.apply(0, int(EventType.CANCEL), 0, 0, 0, 3)
+    check.apply(0, int(EventType.STATUS), 0, 0, 2, 0)
+    check.apply(0, add, 0, 106, 10, 4)  # halted: rests crossed, not counted as an add
+    check.apply(0, int(EventType.STATUS), 0, 0, 1, 0)  # trading resumes on a crossed book
+    report = check.report(("X",))
+    assert (report["crossing_adds"], report["crossed_on_resume"], report["clean"]) == (1, 1, False)
+
+
+def test_raw_file_bytes_equal_the_canonical_codec(tmp_path):
+    """The batched writer of pass 2 produces exactly ``write_jsonl``'s bytes."""
+    out = tmp_path / "ds"
+    src = _day(tmp_path, 7, "d.itch")
+    ingest("itch50", [src], D1, SYMBOLS, out, configs_dir=CONFIGS_DIR)
+    raw = out / "raw" / "eq_20191230.jsonl"
+    again = tmp_path / "again.jsonl"
+    write_jsonl(again, read_jsonl(raw))
+    assert again.read_bytes() == raw.read_bytes()
+    mapper = Itch50Mapper(D1, SYMBOLS)
+    protos = mapper.events(Itch50Reader(src, symbols=SYMBOLS))
+    assert encode_jsonl(sequence_events(protos, [100, 100, 100], 101)) == raw.read_bytes()
 
 
 def test_corporate_actions_table_is_validated_and_copied(tmp_path):

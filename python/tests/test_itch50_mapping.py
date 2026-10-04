@@ -151,7 +151,8 @@ def test_hidden_execution_is_a_trade_that_does_not_touch_the_book(tmp_path):
     counters: dict = {}
     events = list(sequence_events(protos, [100], 101, counters))
     assert events[-1].price_ticks == 15_001  # 150.005 rounds half up to a whole cent tick
-    assert counters == {"events": 5, "trade_prices_rounded_to_tick": 1}
+    assert (counters["events"], counters["trade_prices_rounded_to_tick"]) == (5, 1)
+    assert counters["off_tick_orders_rejected"] == 0
     book = OrderBook(1, 101)
     for ev in events:
         assert book.apply(ev) == ApplyStatus.APPLIED

@@ -42,9 +42,10 @@ import struct
 import sys
 import time
 from collections.abc import Iterable, Iterator
+from heapq import heappop, heappush
 from pathlib import Path
 
-from iap.core.codec import sha256_file, write_jsonl
+from iap.core.codec import sha256_file
 from iap.core.events import EventType, MarketEvent, SessionStatus
 from iap.marketdata.feederrors import BookDivergenceError, IngestError
 from iap.marketdata.itch50 import (
@@ -56,7 +57,6 @@ from iap.marketdata.itch50 import (
 )
 from iap.marketdata.lobster import LobsterConverter, sibling_orderbook, symbol_from_filename
 from iap.marketdata.normalize import normalize_run
-from iap.orderbook.book import ApplyStatus, OrderBook
 from iap.reference.corpactions import CorporateActions
 from iap.reference.secmaster import SecurityMaster, SecurityRecord
 
@@ -83,6 +83,9 @@ _SPOOL = struct.Struct("<HqBBqqQQ")
 _SPOOL_BATCH = 4096
 
 _ADD = int(EventType.ADD)
+_MODIFY = int(EventType.MODIFY)
+_CANCEL = int(EventType.CANCEL)
+_EXECUTE = int(EventType.EXECUTE)
 _TRADE = int(EventType.TRADE)
 _STATUS = int(EventType.STATUS)
 _TRADING = int(SessionStatus.TRADING)
@@ -285,15 +288,37 @@ class _LobsterSource:
 
 # -------------------------------------------------------------------- passes
 
+#: One dollar in feed price units: Rule 612 allows sub-penny quoting below it.
+ONE_DOLLAR_E4 = PRICE_SCALE
+
+#: Canonical JSONL line of one row (keys and order of ``iap.core.codec``).
+_ROW_LINE = (
+    '{"event_id":%d,"instrument_id":%d,"venue_id":%d,"exchange_ts":%d,'  # noqa: UP031 (byte-pinned output format, kept as-is)
+    '"receive_ts":%d,"sequence":%d,"event_type":%d,"side":%d,'
+    '"price_ticks":%d,"qty":%d,"order_id":%d,"trade_id":%d}\n'
+)
+_RAW_BATCH = 8192
+
 
 class _InstrumentStats:
-    __slots__ = ("events", "cent_only", "off_cent_price", "first_add", "first_trade", "volume")
+    __slots__ = (
+        "events",
+        "adds_dollar",
+        "adds_subdollar",
+        "prints_dollar",
+        "prints_subdollar",
+        "first_add",
+        "first_trade",
+        "volume",
+    )
 
     def __init__(self) -> None:
         self.events = 0
-        self.cent_only = True
-        self.off_cent_price = 0
-        self.first_add = 0
+        self.adds_dollar = 0  # displayed orders priced at or above $1.00
+        self.adds_subdollar = 0  # displayed orders priced below $1.00
+        self.prints_dollar = 0  # trade prints at or above $1.00
+        self.prints_subdollar = 0  # trade prints below $1.00
+        self.first_add = 0  # first displayed price at or above $1.00, else the first one
         self.first_trade = 0
         self.volume = 0
 
@@ -303,22 +328,30 @@ def _spool_pass(protos: Iterable[ProtoEvent], spool: Path, n_inst: int) -> list[
     stats = [_InstrumentStats() for _ in range(n_inst)]
     pack = _SPOOL.pack
     batch: list[bytes] = []
+    append = batch.append
     with open(spool, "wb") as f:
         for ev in protos:
             st = stats[ev[0]]
             st.events += 1
-            etype, price = ev[2], ev[4]
+            etype = ev[2]
             if etype == _ADD:
-                if st.first_add == 0:
-                    st.first_add = price
-                if st.cent_only and price % TICK_CENT_E4:
-                    st.cent_only = False
-                    st.off_cent_price = price
+                if ev[4] >= ONE_DOLLAR_E4:
+                    if st.adds_dollar == 0:
+                        st.first_add = ev[4]
+                    st.adds_dollar += 1
+                else:
+                    if st.adds_dollar == 0 and st.adds_subdollar == 0:
+                        st.first_add = ev[4]
+                    st.adds_subdollar += 1
             elif etype == _TRADE:
                 if st.first_trade == 0:
-                    st.first_trade = price
+                    st.first_trade = ev[4]
+                if ev[4] >= ONE_DOLLAR_E4:
+                    st.prints_dollar += 1
+                else:
+                    st.prints_subdollar += 1
                 st.volume += ev[5]
-            batch.append(pack(*ev))
+            append(pack(*ev))
             if len(batch) >= _SPOOL_BATCH:
                 f.write(b"".join(batch))
                 batch.clear()
@@ -336,41 +369,127 @@ def _iter_spool(spool: Path) -> Iterator[ProtoEvent]:
             yield from _SPOOL.iter_unpack(chunk)
 
 
-class _BookCheck:
-    """Replays the mapped stream through the real order book (pass 2)."""
+class _CheckState:
+    """Order state of one instrument for the consistency check."""
 
-    def __init__(self, n_inst: int, venue_id: int) -> None:
-        self.books = [OrderBook(i + 1, venue_id) for i in range(n_inst)]
+    __slots__ = ("orders", "totals", "heaps", "status", "applied", "drops")
+
+    def __init__(self) -> None:
+        #: order_id -> [side, price_ticks, qty]
+        self.orders: dict[int, list[int]] = {}
+        #: per side: price_ticks -> resting quantity
+        self.totals: tuple[dict[int, int], dict[int, int]] = ({}, {})
+        #: per side: lazy heap of prices, best first (bids negated)
+        self.heaps: tuple[list[int], list[int]] = ([], [])
+        self.status = _TRADING
+        self.applied = 0
+        self.drops: dict[str, int] = {}
+
+    def best(self, side: int) -> int | None:
+        """Best resting price of a side (lazy deletion of emptied levels)."""
+        heap, totals = self.heaps[side], self.totals[side]
+        sign = -1 if side == 0 else 1
+        while heap:
+            price = sign * heap[0]
+            if price in totals:
+                return price
+            heappop(heap)
+        return None
+
+    def crossed(self) -> bool:
+        bid, ask = self.best(0), self.best(1)
+        return bid is not None and ask is not None and bid > ask
+
+
+class _BookCheck:
+    """Replays the mapped stream against the order book's accept/reject rules.
+
+    A dedicated order-state replay rather than ``iap.orderbook.OrderBook``:
+    the reference book finds its best level by scanning every level, which
+    on a real book (thousands of levels) made this check the dominant cost
+    of an ingest.  It applies the same rules to the event types an ingest
+    emits — a duplicate ADD and a MODIFY / CANCEL / EXECUTE of an unknown
+    order are drops (``unknown_order_events``), a MODIFY at another price is
+    ``modify_price_mismatch``, a non-positive ADD is
+    ``invalid_payload_dropped`` — and additionally counts displayed adds
+    that cross the opposite best price in continuous trading.  A crossing
+    add is counted and rested, not matched.
+    ``python/tests/test_real_data_ingest.py`` pins the report against the
+    real ``OrderBook`` on clean and on inconsistent streams.
+    """
+
+    def __init__(self, n_inst: int) -> None:
+        self.states = [_CheckState() for _ in range(n_inst)]
         self.dropped = 0
         self.crossing_adds = 0
         self.crossed_on_resume = 0
 
-    def apply(self, ev: MarketEvent) -> None:
-        book = self.books[ev.instrument_id - 1]
-        if ev.event_type == _ADD and book.status == _TRADING:
-            before = book.level_qty(ev.side, ev.price_ticks)
-            status = book.apply(ev)
-            if (
-                status == ApplyStatus.APPLIED
-                and book.level_qty(ev.side, ev.price_ticks) - before != ev.qty
-            ):
-                self.crossing_adds += 1
-        else:
-            status = book.apply(ev)
-            if ev.event_type == _STATUS and ev.qty == _TRADING and book.is_crossed():
+    def _drop(self, st: _CheckState, counter: str) -> None:
+        st.drops[counter] = st.drops.get(counter, 0) + 1
+        self.dropped += 1
+
+    def apply(self, inst: int, etype: int, side: int, price: int, qty: int, oid: int) -> None:
+        st = self.states[inst]
+        orders = st.orders
+        if etype == _ADD:
+            if price <= 0 or qty <= 0:
+                self._drop(st, "invalid_payload_dropped")
+                return
+            if oid in orders:
+                self._drop(st, "unknown_order_events")
+                return
+            if st.status == _TRADING:
+                opposite = st.best(1 - side)
+                if opposite is not None and (price >= opposite if side == 0 else price <= opposite):
+                    self.crossing_adds += 1
+            orders[oid] = [side, price, qty]
+            totals = st.totals[side]
+            have = totals.get(price)
+            if have is None:
+                totals[price] = qty
+                heappush(st.heaps[side], -price if side == 0 else price)
+            else:
+                totals[price] = have + qty
+        elif etype == _MODIFY or etype == _CANCEL or etype == _EXECUTE:
+            order = orders.get(oid)
+            if order is None:
+                self._drop(st, "unknown_order_events")
+                return
+            if etype == _MODIFY:
+                if price != 0 and price != order[1]:
+                    self._drop(st, "modify_price_mismatch")
+                    return
+                removed = order[2] - qty if qty > 0 else order[2]
+            elif etype == _CANCEL:
+                removed = order[2]
+            else:
+                if qty <= 0:
+                    self._drop(st, "invalid_payload_dropped")
+                    return
+                removed = min(qty, order[2])
+            order[2] -= removed
+            if order[2] <= 0:
+                del orders[oid]
+            totals = st.totals[order[0]]
+            left = totals[order[1]] - removed
+            if left > 0:
+                totals[order[1]] = left
+            else:
+                del totals[order[1]]
+        elif etype == _STATUS:
+            st.status = qty
+            if qty == _TRADING and st.crossed():
                 self.crossed_on_resume += 1
-        if status != ApplyStatus.APPLIED:
-            self.dropped += 1
+        st.applied += 1
 
     def report(self, symbols: tuple[str, ...]) -> dict:
         per_symbol = {}
-        for symbol, book in zip(symbols, self.books, strict=True):
-            counters = book.counters()
+        for symbol, st in zip(symbols, self.states, strict=True):
             per_symbol[symbol] = {
-                "events_applied": counters["events_applied"],
-                "drop_counters": {k: v for k, v in counters.items() if v and k != "events_applied"},
-                "resting_orders_at_end": book.order_count_total(),
-                "crossed_at_end": book.is_crossed(),
+                "events_applied": st.applied,
+                "drop_counters": dict(sorted(st.drops.items())),
+                "resting_orders_at_end": len(st.orders),
+                "crossed_at_end": st.crossed(),
             }
         return {
             "dropped": self.dropped,
@@ -381,22 +500,37 @@ class _BookCheck:
         }
 
 
-def sequence_events(
+def sequence_rows(
     protos: Iterable[ProtoEvent],
     ticks_e4: list[int],
     venue_id: int,
-    counters: dict[str, int] | None = None,
-) -> Iterator[MarketEvent]:
-    """Proto events -> canonical MarketEvents.
+    counters: dict | None = None,
+) -> Iterator[tuple]:
+    """Proto events -> canonical event rows (the 12 ``MarketEvent`` fields).
 
     Prices become integer ticks (``ticks_e4[instrument]`` 1/10000 dollars
-    per tick): book events divide exactly, a TRADE print that is off the
-    tick grid (a non-displayed midpoint execution) is rounded half up and
-    counted in ``counters["trade_prices_rounded_to_tick"]``.  ``sequence``
-    counts from 1 per instrument, ``event_id`` from 1 over the stream,
-    ``receive_ts == exchange_ts`` (the feed has no capture time).
+    per tick).  The canonical price is a whole number of ticks, so a price
+    off the instrument's grid cannot be carried exactly, and a resting
+    order's price is never rounded:
+
+    * a displayed order (ADD) whose price is not a multiple of the tick is
+      **rejected and counted** (``off_tick_orders_rejected``), and every
+      later MODIFY / CANCEL / EXECUTE of that order is dropped and counted
+      (``events_on_rejected_orders``);
+    * a TRADE print off the grid (a non-displayed midpoint execution, or
+      the print of a rejected order's execution) is rounded half up and
+      counted (``trade_prices_rounded_to_tick``) — a print rests nowhere.
+
+    ``sequence`` counts from 1 per instrument over the EMITTED events,
+    ``event_id`` from 1 over the stream, ``receive_ts == exchange_ts``.
+    ``counters`` also receives the per-instrument rejection counts
+    (``off_tick_orders_rejected_by_instrument``).
     """
-    seqs = [0] * len(ticks_e4)
+    n_inst = len(ticks_e4)
+    seqs = [0] * n_inst
+    rejected: list[set[int]] = [set() for _ in range(n_inst)]
+    off_tick = [0] * n_inst
+    followers = 0
     n = 0
     rounded = 0
     for inst, ts, etype, side, price, qty, oid, tid in protos:
@@ -404,17 +538,40 @@ def sequence_events(
         if etype == _TRADE:
             if price % tick:
                 rounded += 1
-            ticks = max(1, (2 * price + tick) // (2 * tick))
-        else:
-            ticks = price // tick
-        seqs[inst] += 1
+            price = max(1, (2 * price + tick) // (2 * tick))
+        elif tick != 1 and etype != _STATUS:
+            if etype == _ADD:
+                if price % tick:
+                    rejected[inst].add(oid)
+                    off_tick[inst] += 1
+                    continue
+            elif rejected[inst] and oid in rejected[inst]:
+                followers += 1
+                if etype == _CANCEL:
+                    rejected[inst].discard(oid)
+                continue
+            price //= tick
+        seq = seqs[inst] + 1
+        seqs[inst] = seq
         n += 1
-        yield MarketEvent(
-            n, inst + 1, venue_id, ts, ts, seqs[inst], etype, side, ticks, qty, oid, tid
-        )
+        yield (n, inst + 1, venue_id, ts, ts, seq, etype, side, price, qty, oid, tid)
     if counters is not None:
         counters["events"] = n
         counters["trade_prices_rounded_to_tick"] = rounded
+        counters["off_tick_orders_rejected"] = sum(off_tick)
+        counters["events_on_rejected_orders"] = followers
+        counters["off_tick_orders_rejected_by_instrument"] = off_tick
+
+
+def sequence_events(
+    protos: Iterable[ProtoEvent],
+    ticks_e4: list[int],
+    venue_id: int,
+    counters: dict | None = None,
+) -> Iterator[MarketEvent]:
+    """:func:`sequence_rows` as ``MarketEvent`` objects."""
+    for row in sequence_rows(protos, ticks_e4, venue_id, counters):
+        yield MarketEvent(*row)
 
 
 def _raw_pass(
@@ -423,18 +580,31 @@ def _raw_pass(
     ticks_e4: list[int],
     venue_id: int,
     check: _BookCheck | None,
+    keep: list[MarketEvent] | None = None,
 ) -> dict:
-    """Pass 2: spool -> canonical raw JSONL (ticks, sequences, event ids)."""
-    info: dict[str, int] = {}
+    """Pass 2: spool -> canonical raw JSONL (ticks, sequences, event ids).
 
-    def events() -> Iterator[MarketEvent]:
-        for ev in sequence_events(_iter_spool(spool), ticks_e4, venue_id, info):
-            if check is not None:
-                check.apply(ev)
-            yield ev
-
+    Rows are formatted straight into the canonical line and written in
+    batches; the bytes are those of ``write_jsonl``.  ``keep`` collects the
+    events for the normaliser, so it does not decode the file just written.
+    """
+    info: dict = {}
+    keep_event = keep.append if keep is not None else None
     tmp = raw_path.with_name(raw_path.name + ".partial")
-    write_jsonl(tmp, events())
+    lines: list[str] = []
+    append = lines.append
+    apply = check.apply if check is not None else None
+    with open(tmp, "wb") as f:
+        for row in sequence_rows(_iter_spool(spool), ticks_e4, venue_id, info):
+            if apply is not None:
+                apply(row[1] - 1, row[6], row[7], row[8], row[9], row[10])
+            append(_ROW_LINE % row)
+            if keep_event is not None:
+                keep_event(MarketEvent(*row))
+            if len(lines) >= _RAW_BATCH:
+                f.write("".join(lines).encode("ascii"))
+                lines.clear()
+        f.write("".join(lines).encode("ascii"))
     os.replace(tmp, raw_path)
     return info
 
@@ -566,20 +736,30 @@ def _decide_ticks(
     forced_e4: int | None,
     previous: dict[str, int],
 ) -> list[int]:
+    """The quoting increment of each instrument (Reg NMS Rule 612).
+
+    The rule is about the PRICE of a quotation: one cent at or above $1.00,
+    $0.0001 below.  An instrument has one tick, so it is the increment of
+    the price range the instrument trades in: 0.0001 when more of its trade
+    prints are below $1.00 than at or above it, else 0.01; an instrument
+    with no print in the session is judged by its displayed orders the same
+    way.  (Real feeds carry far-from-market bids priced under a dollar —
+    legally sub-penny — for stocks trading at hundreds of dollars; they do
+    not make the stock a sub-penny instrument.)
+    """
     ticks = []
     for symbol, st in zip(symbols, stats, strict=True):
-        observed = TICK_CENT_E4 if st.cent_only else TICK_SUBPENNY_E4
+        if st.prints_dollar or st.prints_subdollar:
+            sub_dollar = st.prints_subdollar > st.prints_dollar
+        else:
+            sub_dollar = st.adds_subdollar > st.adds_dollar
+        observed = TICK_SUBPENNY_E4 if sub_dollar else TICK_CENT_E4
         tick = forced_e4 if forced_e4 is not None else previous.get(symbol, observed)
-        if tick == TICK_CENT_E4 and not st.cent_only:
-            raise IngestError(
-                f"{symbol}: displayed price {st.off_cent_price / PRICE_SCALE:.4f} is not a "
-                "multiple of the 0.01 tick this dataset uses for it; re-ingest every session "
-                "of the dataset with --tick-size 0.0001"
-            )
         if symbol in previous and previous[symbol] != tick:
             raise IngestError(
                 f"{symbol}: tick size {tick / PRICE_SCALE} differs from the "
-                f"{previous[symbol] / PRICE_SCALE} already in the dataset"
+                f"{previous[symbol] / PRICE_SCALE} already in the dataset; a dataset has one "
+                "tick size per instrument (re-ingest every session with one --tick-size)"
             )
         ticks.append(tick)
     return ticks
@@ -600,6 +780,8 @@ def ingest(
     corporate_actions: str | Path | None = None,
     allow_book_divergence: bool = False,
     book_check: bool = True,
+    timings: dict[str, float] | None = None,
+    defer_normalize: bool = False,
 ) -> dict:
     """Ingest one session into ``out_dir``; returns the manifest document."""
     if source_format not in FORMATS:
@@ -675,12 +857,16 @@ def ingest(
     else:
         source = _LobsterSource(paths, date, universe, limit_messages, book_paths, input_symbols)
 
+    # wall-clock stage timings go to the caller (stdout), never into a file
+    stage: dict[str, float] = timings if timings is not None else {}
     raw_dir = out / "raw"
     raw_dir.mkdir(parents=True, exist_ok=True)
     stem = f"eq_{date.replace('-', '')}"
     spool = raw_dir / f"{stem}.spool"
     try:
+        clock = time.perf_counter()
         stats = _spool_pass(source.events(), spool, len(universe))
+        stage["parse_map_spool"] = time.perf_counter() - clock
         source.finish()
         verification = source.verification()
         if verification is not None and not allow_book_divergence:
@@ -692,8 +878,11 @@ def ingest(
                         report,
                     )
         ticks = _decide_ticks(universe, stats, TICK_CHOICES[tick_size], previous_ticks)
-        check = _BookCheck(len(universe), venue_id) if book_check else None
-        raw_info = _raw_pass(spool, raw_dir / f"{stem}.jsonl", ticks, venue_id, check)
+        check = _BookCheck(len(universe)) if book_check else None
+        clock = time.perf_counter()
+        fresh: list[MarketEvent] | None = None if defer_normalize else []
+        raw_info = _raw_pass(spool, raw_dir / f"{stem}.jsonl", ticks, venue_id, check, fresh)
+        stage["raw_and_book_check"] = time.perf_counter() - clock
     except BaseException:
         # a refused / failed session leaves no half-written file behind
         (raw_dir / f"{stem}.jsonl.partial").unlink(missing_ok=True)
@@ -720,11 +909,14 @@ def ingest(
             for i, s in enumerate(universe)
         ]
     per_symbol = {}
+    off_tick = raw_info.pop("off_tick_orders_rejected_by_instrument")
     for i, s in enumerate(universe):
         st, fact = stats[i], facts[s]
         ref = fact["open_price_e4"] or st.first_trade or st.first_add or None
         per_symbol[s] = {
             "events": st.events,
+            "displayed_orders_below_one_dollar": st.adds_subdollar,
+            "off_tick_orders_rejected": off_tick[i],
             "volume": st.volume + fact["extra_volume"],
             "ref_price_e4": ref,
             "ref_price_source": (
@@ -777,7 +969,16 @@ def ingest(
         }
 
     normalized_dir = out / "normalized"
-    qc = normalize_run(raw_dir, normalized_dir)
+    if defer_normalize:
+        # the session is on disk; the next ingest without the flag normalises
+        # every session once and stamps the dataset version
+        manifest["normalized"] = None
+        manifest.pop("dataset_version", None)
+        _write_json(manifest_path, manifest)
+        return manifest
+    clock = time.perf_counter()
+    qc = normalize_run(raw_dir, normalized_dir, {raw_file.name: fresh})
+    stage["normalize"] = time.perf_counter() - clock
     qc["raw_dir"] = "raw"
     _write_json(normalized_dir / "qc_report.json", qc, sort_keys=False)
     manifest["normalized"] = {
@@ -837,7 +1038,7 @@ def _parser() -> argparse.ArgumentParser:
         "--tick-size",
         choices=sorted(TICK_CHOICES),
         default="auto",
-        help="auto: 0.01 unless a displayed price of the symbol is sub-penny",
+        help="auto: 0.01 unless most displayed orders of the symbol are priced below $1.00",
     )
     p.add_argument(
         "--corporate-actions", default=None, help="CSV table to validate and copy in (optional)"
@@ -853,6 +1054,12 @@ def _parser() -> argparse.ArgumentParser:
         help="skip the replay of the mapped stream through the order book",
     )
     p.add_argument(
+        "--defer-normalize",
+        action="store_true",
+        help="write the session's raw file only; the next ingest without this flag normalises "
+        "every session once (use it for all but the last date of a many-day load)",
+    )
+    p.add_argument(
         "--configs-dir",
         default=str(_REPO_ROOT / "configs"),
         help="configs/ tree holding the execution/execution.json template",
@@ -864,6 +1071,7 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     symbols = [s.strip() for s in args.symbols.split(",") if s.strip()] if args.symbols else None
     t0 = time.perf_counter()
+    stages: dict[str, float] = {}
     try:
         manifest = ingest(
             args.source_format,
@@ -879,6 +1087,8 @@ def main(argv: list[str] | None = None) -> int:
             corporate_actions=args.corporate_actions,
             allow_book_divergence=args.allow_book_divergence,
             book_check=not args.no_book_check,
+            timings=stages,
+            defer_normalize=args.defer_normalize,
         )
     except BookDivergenceError as exc:
         print(f"error: {exc}", file=sys.stderr)
@@ -892,13 +1102,13 @@ def main(argv: list[str] | None = None) -> int:
     total = session["messages"]["total"]
     summary = {
         "dataset_dir": str(Path(args.out)),
-        "dataset_version": manifest["dataset_version"],
+        "dataset_version": manifest.get("dataset_version"),
         "date": date,
         "sessions": sorted(manifest["sessions"]),
         "symbols": session["symbols"],
         "messages": session["messages"],
         "events": session["raw"]["events"],
-        "qc_totals": manifest["normalized"]["qc_totals"],
+        "qc_totals": manifest["normalized"]["qc_totals"] if manifest["normalized"] else None,
         "book_check_clean": session["book_check"]["clean"] if session["book_check"] else None,
         "book_verification": (
             {s: r["status"] for s, r in session["book_verification"].items()}
@@ -906,6 +1116,7 @@ def main(argv: list[str] | None = None) -> int:
             else None
         ),
         "timing_s": round(elapsed, 3),
+        "stage_timing_s": {k: round(v, 3) for k, v in stages.items()},
         "messages_per_second": round(total / elapsed) if elapsed > 0 else None,
     }
     json.dump(summary, sys.stdout, indent=2)

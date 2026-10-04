@@ -10,11 +10,16 @@ data.
 
 **Status, stated plainly.** The readers are written from the published
 message layouts and tested on bytes the tests synthesise
-(`python/tests/itch50_encoder.py`, `python/tests/lobster_fixture.py`). No
-vendor file has been read in this repository, because none may be stored in
-it. The first run on a real file is yours; §9 gives the two tests that
-perform it and what they check. Backlog issue XD10 ([EPICS.md](EPICS.md),
-E25) stays open until that has happened.
+(`python/tests/itch50_encoder.py`, `python/tests/lobster_fixture.py`); no
+vendor file is stored in this repository. The owner has run the ITCH path
+on one real Nasdaq file (2019-12-30: 268,744,780 messages, a 20-symbol
+universe, 15,323,126 events, no unknown order reference, no over-fill, no
+sequence gap, every book check clean). That run exposed a wrong tick-size
+rule and a slow second pass; both are fixed (§4.1, §10) and the fix was
+re-run on that file for AAPL, MSFT and QQQ. The LOBSTER path has not been
+run on a vendor file, and no study on real data has been recorded: backlog
+issue XD10 ([EPICS.md](EPICS.md), E25) stays open. §9 gives the two opt-in
+tests.
 
 Contents: [1 What is supported](#1-what-is-supported) ·
 [2 Obtaining data](#2-obtaining-data) ·
@@ -43,7 +48,7 @@ python -m iap.marketdata ingest --format {itch50,lobster} --input FILE... \
     --date YYYY-MM-DD --symbols AAPL,MSFT,... --out DATASET_DIR
     [--limit-messages N] [--extended-hours] [--tick-size {auto,0.01,0.0001}]
     [--orderbook FILE...] [--corporate-actions CSV]
-    [--allow-book-divergence] [--no-book-check] [--configs-dir DIR]
+    [--allow-book-divergence] [--no-book-check] [--defer-normalize] [--configs-dir DIR]
 ```
 
 Malformed or truncated input is never read silently: the ITCH reader raises
@@ -86,7 +91,7 @@ dataset directory.
 ```bash
 cd python
 
-# 1. two ITCH 5.0 days -> one dataset (one pass per file; ~10 minutes per full-day file)
+# 1. two ITCH 5.0 days -> one dataset (one pass per file; ~5-8 minutes per full-day file)
 PYTHONPATH=src python3 -m iap.marketdata ingest --format itch50 \
     --input ../data/vendor/12302019.NASDAQ_ITCH50.gz --date 2019-12-30 \
     --symbols AAPL,MSFT,QQQ --out ../data/real/nasdaq_2019
@@ -142,12 +147,12 @@ AUCTION=3 CLOSE=4).
 | `instrument_id` | 1..N over the **sorted** `--symbols` universe; fixed for the dataset. A later session must have the same universe |
 | `venue_id` | 101, venue `XNAS`, for both sources (LOBSTER is built from Nasdaq ITCH). Every synthetic venue id is below 100; real venues start at 101 |
 | `price_ticks` | the feed's integer 1/10000-dollar price divided by the instrument's tick. No float touches a price |
-| tick size | `--tick-size auto` (default): **0.01** unless any *displayed* order price of the symbol in the session is not a whole cent, in which case **0.0001** (Reg NMS Rule 612: sub-penny quoting is only allowed below $1.00). One tick size per instrument for the whole dataset — `configs/instruments/instruments.json` holds one value — so a symbol that crosses $1.00 between sessions must be ingested with `--tick-size 0.0001` throughout; a mismatch is refused |
-| off-tick trade prices | a non-displayed execution can print at a sub-tick price (a midpoint). The `TRADE` price is rounded **half up** to a whole tick and counted (`raw.trade_prices_rounded_to_tick`); book events are always on the tick grid |
+| tick size | Reg NMS Rule 612 sets the quoting increment by the **price of the quotation**: one cent at or above $1.00, $0.0001 below. The platform has one tick per instrument, so `--tick-size auto` (default) takes the increment of the price range the instrument **trades** in: **0.0001** when more of its trade prints in the session are below $1.00 than at or above it, otherwise **0.01**; an instrument with no print is judged by its displayed orders the same way. It is *not* "0.0001 if any displayed price is sub-penny": a real file carries far-from-market bids priced under a dollar (`$0.0001`, `$0.0010`, `$0.8769` — legally sub-penny) for stocks trading at hundreds of dollars, about one displayed order in 100,000, and under that rule they turned every instrument of the first real run into a sub-penny instrument with spreads of hundreds of ticks. One tick size per instrument for the whole dataset (`configs/instruments/instruments.json` holds one value); a later session that disagrees is refused. `--tick-size 0.01` / `0.0001` force it |
+| prices off the tick grid | The canonical price is a whole number of ticks — there is no finer price unit — so an off-grid price cannot be carried exactly, and **a resting order's price is never rounded** (a rounded stub bid would rest at a price nobody quoted). A displayed order (`ADD`, including the new side of a replace) whose price is not a multiple of the tick is **rejected and counted** (`raw.off_tick_orders_rejected`, per symbol `off_tick_orders_rejected`; `displayed_orders_below_one_dollar` shows how many sub-dollar orders the symbol had), and every later cancel, delete or execution of that order is dropped and counted (`raw.events_on_rejected_orders`) instead of being reported as an unknown order. A `TRADE` print off the grid — a non-displayed midpoint execution, or the print of an execution against a rejected order — rests nowhere: it is rounded **half up** to a whole tick and counted (`raw.trade_prices_rounded_to_tick`). On the real file, for AAPL, MSFT and QQQ: 30 displayed orders rejected, all of them sub-dollar bids, out of 5.4 million events; 4,423 midpoint prints rounded; spreads of 1–4 ticks through the regular session (median 2 for AAPL, 1 for MSFT and QQQ). A stock that really quotes below $1.00 gets tick 0.0001 and loses nothing |
 | `qty` | shares, as in the feed. `lot_size` is the round lot from the stock directory (100 for LOBSTER); odd lots are ordinary quantities |
 | `exchange_ts` | midnight of `--date` in `America/New_York` (through `zoneinfo`, so DST is honoured) plus the feed's nanoseconds since midnight. LOBSTER's decimal seconds are parsed as a string — `"34200.004241176"` → 34 200 004 241 176 ns — never through a binary float |
 | `receive_ts` | equal to `exchange_ts`: the feeds carry exchange time only |
-| `sequence` | 1, 2, 3… per instrument and session, over the events emitted for it — gap-free by construction, since a historical file is the complete stream. A second session restarts at 1, which the normaliser counts as one `sequence_resets` per stream; gaps, duplicates and out-of-order counts must be 0 |
+| `sequence` | 1, 2, 3… per instrument and session, over the events **emitted** for it (after the rejections above) — gap-free by construction, since a historical file is the complete stream. A second session restarts at 1, which the normaliser counts as one `sequence_resets` per stream; gaps, duplicates and out-of-order counts must be 0 |
 | `event_id` | 1..N in file order (reassigned in event-time order by the normaliser, as for synthetic data) |
 | `order_id` | the feed's order reference number |
 | `trade_id` | the ITCH match number (a zero match number is replaced by `2^62 + ordinal` and counted); a per-symbol ordinal for LOBSTER, which has none |
@@ -290,12 +295,20 @@ reconstructed book is missing the pre-open orders until they have drained.
 Supply the orderbook file for anything that reads depth.
 
 For ITCH there is no vendor book to compare with. The ingest instead
-replays the mapped stream through the real order book and records
-`book_check`: events the book rejected (`dropped`, with the book's own drop
-counters), displayed adds that crossed the book in continuous trading
-(`crossing_adds` — a displayed order never crosses on a real venue, so a
-non-zero count means a mapping or data problem) and a book that is crossed
-when trading resumes. `clean` is true when all are 0.
+replays the emitted stream against the order book's accept/reject rules and
+records `book_check`: events the book would reject (`dropped`, with the
+book's counter names — a duplicate add or an event on an unknown order is
+`unknown_order_events`), displayed adds that cross the opposite best price
+in continuous trading (`crossing_adds` — a displayed order never crosses on
+a real venue, so a non-zero count means a mapping or data problem) and a
+book that is crossed when trading resumes. `clean` is true when all are 0.
+The replay is a dedicated order-state check, not `iap.orderbook.OrderBook`
+itself: the reference book finds its best level by scanning every level,
+which on a real book of thousands of levels made the check the dominant
+cost of the first real ingest (§10). The tests pin its report against the
+real `OrderBook` on clean and on inconsistent streams; a crossing add is
+counted and rested, not matched, so after one the two can differ — which is
+why `clean` is the only verdict to rely on.
 
 ## 7. The dataset directory and its version
 
@@ -416,30 +429,63 @@ the first divergence say where to look.
 
 ## 10. Performance and memory
 
-Measured on synthesised input, Python 3.12, one core of a laptop
-(`test_parser_throughput_smoke_and_bounded_memory` prints the figures of
-its own run; it asserts only a generous lower bound):
+**On the real file** (2019-12-30, 268.7 million messages, 3.5 GB gzip;
+Python 3.12, one core of a laptop). The first run, 20 symbols and 15.3
+million events, took 44 minutes: about 4 for the parse-filter-map pass, 34
+for pass 2 (raw file + book check) and 6 for normalisation. Measured again
+on the spool of a 3-symbol universe (AAPL, MSFT, QQQ; 5.4 million events),
+before and after the changes below, with byte-identical raw, IAP1, JSONL
+and Parquet output:
+
+| Stage | Before | After |
+|---|---|---|
+| parse + filter + map + spool (whole file) | ~4–7 min | unchanged (~1 million messages/s including gzip) |
+| pass 2: ticks, sequences, raw JSONL, book check | 41 min (2,200 events/s) | 22 s (245,000 events/s) |
+| normalisation + Parquet | 90 s | 39 s |
+
+What changed. Pass 2 replayed every event through the reference
+`OrderBook`, whose best-level lookup scans every price level — thousands on
+a real book, on every displayed add; the check is now a dedicated
+order-state replay with a lazy heap for the best price (§6). The raw file
+is formatted row by row straight into the canonical line and written in
+batches, with no event object in between. The normaliser takes the events
+of the file just written from memory instead of decoding it again, decodes
+older files through a fast path of the strict decoder, writes JSONL in
+batches, and builds the Parquet columns from the IAP1 record bytes through
+one numpy view. `test_output_bytes_of_a_seeded_dataset_are_pinned` holds
+hashes recorded before this work.
+
+**Many days.** Every ingest re-normalises all sessions of the dataset
+(the QC state and `events.parquet` span them). For a load of many dates
+pass `--defer-normalize` on all but the last: those ingests write the raw
+file and the manifest only (no `dataset_version` yet), and the last one
+normalises everything once. The result is byte-identical to the
+date-by-date load.
+
+**Next steps, not done.** The parse pass is now the dominant cost
+(pure-Python framing of every message, plus gzip): files can be ingested in
+parallel processes into separate directories today, but one dataset
+directory takes one ingest at a time. Writing IAP1 directly in pass 2 and
+deriving the JSONL lazily would roughly halve what is left of pass 2 and
+normalisation; per-symbol parallelism of pass 2 and a Rust decoder (backlog
+XD07) are the larger steps. The Python feature engine still uses the
+reference book and is the slow stage on a liquid name.
+
+**On synthesised input** (`test_parser_throughput_smoke_and_bounded_memory`
+prints the figures of its own run; it asserts only a generous lower bound):
 
 | Stage | Rate |
 |---|---|
 | ITCH parse, messages of other symbols (skipped after three bytes) | ~660,000 messages/s |
 | ITCH parse, every message decoded | ~410,000 messages/s |
 | ITCH parse + filter + map to canonical events (1 symbol of 4) | ~540,000 messages/s |
-| whole ingest when every message belongs to the universe (spool, raw JSONL, book check, normalisation, Parquet) | ~40,000 messages/s (~20,000 events/s) |
-| `python -m iap.features` on the result (shallow synthetic book) | ~14,000 events/s |
-
-A full-day ITCH file is a few hundred million messages: expect roughly ten
-minutes of parsing plus gzip decompression per file, then time proportional
-to the events of *your universe*. The Python feature engine is the slow
-stage on a liquid name (millions of events a day, and a deep real book
-costs more per event than the synthetic one); start with two or three
-symbols. A Rust decoder is backlog (XD07).
 
 **Memory.** The parse-and-map pass holds a 1 MiB read buffer and the live
 orders of the universe; mapped events go to a fixed-width spool file, not a
 list (3.2 MB peak traced while streaming an 8.4 MB file, independent of
-file size). The normaliser then holds one session's universe events in
-memory, as it does for synthetic data, and so does the feature pipeline —
+file size). Pass 2 and the normaliser then hold one session's universe
+events in memory (about 2.7 GB for the 5.4 million events above), as the
+normaliser does for synthetic data, and so does the feature pipeline —
 that, not the reader, bounds the size of a universe.
 
 ## 11. Known limitations
@@ -469,7 +515,8 @@ that, not the reader, bounds the size of a universe.
   consolidated, point-in-time ADV, and the capacity proxy that uses it
   inherits that.
 - **Corporate actions are not applied** by the feature pipeline (§5).
-- **Not read on a vendor file yet** (see Status).
+- **One real ITCH day has been ingested; LOBSTER has not been run on a
+  vendor file** (see Status).
 - **Not supported:** CBOE PITCH, NYSE feeds, FX ECN feeds (backlog XD02,
   XD07); ITCH versions other than 5.0; the Rust, C++ and Java ports do not
   have these readers — they consume the canonical files the ingest writes.
