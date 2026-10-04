@@ -792,6 +792,33 @@ def test_planted_pipeline_end_to_end_on_a_tiny_universe(tmp_path):
     ]
 
 
+def _assert_same(committed, recomputed, path="cells"):
+    """Equal, with floats to one unit of the sixth decimal the report rounds
+    to: the committed means were summed by Python 3.11 (the CI runner) and
+    ``sum`` of floats is compensated from 3.12 on, which can move the last
+    rounded digit of a mean.  Counts, intervals' counts and strings are
+    compared exactly."""
+    if isinstance(committed, dict):
+        assert committed.keys() == recomputed.keys(), path
+        for key in committed:
+            _assert_same(committed[key], recomputed[key], f"{path}.{key}")
+    elif isinstance(committed, list):
+        assert len(committed) == len(recomputed), path
+        for i, (a, b) in enumerate(zip(committed, recomputed, strict=True)):
+            _assert_same(a, b, f"{path}[{i}]")
+    elif isinstance(committed, float) and isinstance(recomputed, float):
+        assert committed == pytest.approx(recomputed, abs=1.5e-6), path
+    else:
+        assert committed == recomputed, path
+
+
+def test_assert_same_is_exact_except_for_the_last_rounded_digit():
+    _assert_same([{"k": 3, "mean": 1.234567, "id": "a"}], [{"k": 3, "mean": 1.234568, "id": "a"}])
+    for other in ({"k": 4, "mean": 1.234567}, {"k": 3, "mean": 1.234570}, {"k": 3}):
+        with pytest.raises(AssertionError):
+            _assert_same({"k": 3, "mean": 1.234567}, other)
+
+
 @pytest.mark.parametrize("sub", ["", "extended"])
 def test_committed_power_report_matches_its_json(sub):
     """If the study has been run and committed, the markdown is exactly the
@@ -817,7 +844,7 @@ def test_committed_power_report_matches_its_json(sub):
         assert doc["sessions"][-1] > reference["sessions"]
     thresholds = doc["protocol"]["thresholds"]
     assert doc["protocol"]["promote_t_threshold"] == max(thresholds.values())
-    assert doc["cells"] == power.summarise(doc["runs"], thresholds)
+    _assert_same(doc["cells"], power.summarise(doc["runs"], thresholds))
     assert doc["power_model"] == power._rounded(
         power.power_model(doc["runs"], doc["detectors"], thresholds, doc["sessions"])
     )

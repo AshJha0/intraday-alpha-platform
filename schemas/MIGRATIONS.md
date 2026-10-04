@@ -1133,3 +1133,70 @@ PLATFORM_CONVENTIONS.md §13.6 has the table of defaults and legacy names.
 - Migration path for stored data: none can be migrated — regenerate
   (`python3 tools/regenerate_dataset_artifacts.py`, CONTRIBUTING.md §4.1).
   To keep a v1.4.0 number, select the legacy rule by name.
+
+## 2026-10-04 — v1.5.0 detection power: `POWER_REPORT.json` 2 -> 3, new `research/power/extended/`, `generator_planted.json` `sessions` 2 -> 4, `regenerate_only` input of the `regenerate` job
+
+No wire schema, no golden vector, no config under `configs/` and no
+promotion gate changed. The pinned dataset is byte-identical: the
+`regenerate` job was run with `regenerate_only=dataset,power,power_extended`
+(run 37186937013, Ubuntu, Python 3.11) and its `regeneration_dataset_sha256.json`
+equals the one of the v1.5.0 regeneration (run 37162724308) for all eight
+raw and normalized files; `git status` of that run lists the power reports
+and nothing else. `python/src/iap/marketdata`, `iap/features`,
+`iap/validation` and `iap/labels` are not touched.
+
+- **Why.** Report version 2 was three seeds on two sessions. A rate of one
+  in three has a 95 % interval of 0.06 to 0.79, so the report could not say
+  whether the validation chain detects a planted effect.
+- **`research/power/POWER_REPORT.json` `x-version` 2 -> 3** (and its
+  rendering). Shape changes:
+  - a run holds `evaluations`, one per session prefix
+    (`{"sessions": n, "detectors": {...}}`), where it held `detectors`;
+  - detector keys are `<effect>:<alpha>@<horizon>` (`order_flow:EQ04@5s`,
+    `order_flow:EQ04@10s`, `lead_lag:EQ10@1s`, `lead_lag:EQ10@5s`) and the
+    top-level `detectors` is a list with `role` `declared` / `matched`;
+  - a row carries `horizon`, `ic_direct`, `t_direct`, `n_pairs`, `break_z`,
+    `signal_coverage`, `label_scored_frac`, `label_zero_frac`; the per-run
+    booleans `sig_*`, `evidence`, `promote` and the fields
+    `ic_instrument_mean`, `ic_valid_only`, `net_pnl_*` are gone (the rates
+    are derived from `t_pooled`, `gate_ic`, `verdict` and the protocol's
+    thresholds);
+  - a cell is keyed by detector, scenario, level and `sessions`; each rate
+    is `{"k", "rate", "lo", "hi"}` (Wilson 95 %): `sig_fixed`, `sig_gate`,
+    `sig_study`, `sig_direct_gate`, `evidence`, `promote`,
+    `pnl_ci_positive`, `break_fixed`, `break_gate`; `rate_sig_within` is
+    gone (`mean_t_within` stays);
+  - `protocol.thresholds` (`fixed`, `gate`, `study`), `protocol.gate_looks`,
+    `protocol.target_power`, `protocol.interval` replace `min_nw_tstat` and
+    `ledger_t_threshold`; `promote_t_threshold` is the largest threshold;
+  - new top-level `sessions`, `break_levels`, `diagnosis`, `power_model`.
+- **New directory `research/power/extended/`** with the same two files for
+  the larger grid (levels 0, 0.5, 1, 2; sessions 1, 2, 4, 8).
+- **`research/power/generator_planted.json`**: `sessions` 2 -> 4 (the number
+  of sessions a run of the study generates). The document's `x-version`
+  stays 2: no key changed meaning, and the `planted` block — the reference
+  effect — is unchanged.
+- **CLI.** `python -m iap.research power` gains `--sessions`,
+  `--break-levels`, `--gate-looks`, `--jobs`; `--seeds` defaults to 20 (was
+  3) and `--levels` to `0,0.5,1` (was `0,0.5,1,2`). The break scenario runs
+  at `--break-levels` (default `1`), not at every non-zero level.
+- **API.** `iap.research.power`: `run_power_study(..., sessions,
+  break_levels, gate_looks, jobs)`; `evaluate_run(frames, configs_dir,
+  promote_t_threshold, detectors, ...)` returns rows keyed by detector id;
+  `summarise(runs, thresholds)`; `DETECTORS` is replaced by `EFFECT_ALPHAS`
+  and `detectors_for(planted)`; `cell_config(..., sessions=None)`. New
+  module `iap.research.power_stats`.
+- **Regeneration.** `tools/regenerate_dataset_artifacts.py` has an opt-in
+  step `power_extended` (runs only when `--only` names it). The `regenerate`
+  job of `ci.yml` takes `regenerate_only` (comma-separated steps, empty =
+  the whole chain) and no longer requires a dataset to have been built.
+  Timings of run 37186937013: `power` 994.5 s, `power_extended` 2,461.1 s.
+- **Docs that quote report version 2** as a dated statement (the errata of
+  `docs/papers/01` and `03`, the v1.4.0 / v1.5.0 result tables of
+  CHANGELOG.md and docs/ROADMAP.md) were left as written; the current
+  figures are in CHANGELOG.md ("Added — detection power") and
+  docs/RESEARCH_VALIDITY.md §2.
+- Migration path: regenerate
+  (`python3 tools/regenerate_dataset_artifacts.py --only power,power_extended`,
+  on the CI runner for the committed files). A version-2 report cannot be
+  converted.

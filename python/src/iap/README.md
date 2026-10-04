@@ -280,8 +280,12 @@ iap/
     power.py       The planted-signal power study: generate data with effects
                    of known size (generator `planted` block), run the real
                    feature pipeline and validate_alpha on it, tabulate
-                   detection rates per effect / scenario / level
+                   detection rates per detector / scenario / level / number
+                   of sessions with binomial intervals
                    (`python -m iap.research power`; research/power/).
+    power_stats.py The study's statistics: Wilson interval, session-clustered
+                   pooled-slope HAC t, break z, analytical ICs of the planted
+                   mechanisms, the fitted power model (MDE, sessions needed).
     golden.py      The pinned golden experiment (EQ03 @ 5s on the golden equity
                    vector) shared by tools/make_golden_research.py and
                    tests/test_research_golden.py.

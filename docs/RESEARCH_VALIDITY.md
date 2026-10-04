@@ -147,51 +147,85 @@ not a dataset definition. The study never touches `data/` or the research
 ledger. Like the bundled dataset it uses the v1.4.0 flow calibration
 (`equities.flow.calibration = "session"`).
 
-Findings (`research/power/POWER_REPORT.md`: levels 0, 0.5, 1 and 2 times the
-reference effect, three generator seeds per cell, so a rate moves in steps of
-a third):
+Design since the detection-power rework (report version 3). Each run is
+generated once at the largest session count and scored on its first 1, 2, 4
+(extended grid: 8) sessions — exact, because without a break session k does
+not depend on what follows it. 20 generator seeds per cell; every rate has a
+Wilson 95 % interval. A detection is a positive gate IC and a pooled-slope t
+at or above a threshold, and three are reported: 3.0 (`fixed`), the PROMOTE
+threshold in force (`gate`, 4.365 at the 3,936 looks the committed promotion
+reports were judged at) and the Bonferroni threshold of the study's own tests
+(`study`). Verdicts are computed at the largest of the three. Each effect is
+scored by its flagship alpha at the declared label horizon and at the horizon
+matched to the planted block (the shortest label that covers the mechanism: a
+rule on the planted config, counted in the study's Bonferroni denominator). The
+reference effect sizes are the ones v1.3.0 defined. The planted config and the
+study's own calendar (`extended_trading_days`) live outside `configs/`; the
+pinned dataset is byte-identical.
 
-| planted effect | level | significant (t >= 3) | evidence (ITERATE or better) | PROMOTE | mean gate IC | mean t (within / pooled) |
-|---|---:|---:|---:|---:|---:|---:|
-| order flow (EQ04) | 0 | 0 of 3 | 0 of 3 | 0 of 3 | -0.0054 | -0.50 / -0.51 |
-| order flow (EQ04) | 0.5 | 0 of 3 | 0 of 3 | 0 of 3 | +0.0032 | +0.20 / +0.22 |
-| order flow (EQ04) | 1 | 1 of 3 | 3 of 3 | 0 of 3 | +0.0327 | +2.93 / +2.93 |
-| order flow (EQ04) | 2 | 3 of 3 | 3 of 3 | 0 of 3 | +0.0823 | +6.39 / +6.20 |
-| lead-lag (EQ10) | 0 | 0 of 3 | 0 of 3 | 0 of 3 | -0.0018 | -0.41 / -0.23 |
-| lead-lag (EQ10) | 0.5 | 0 of 3 | 1 of 3 | 0 of 3 | +0.0047 | +0.58 / +0.68 |
-| lead-lag (EQ10) | 1 | 0 of 3 | 1 of 3 | 0 of 3 | +0.0117 | +0.68 / +1.23 |
-| lead-lag (EQ10) | 2 | 0 of 3 | 2 of 3 | 0 of 3 | +0.0137 | +0.87 / +1.75 |
-| either, reversed mid-sample | 0.5, 1, 2 | 0 of 3 | 0 of 3 | 0 of 3 | negative | negative, except lead-lag at 0.5 (+0.43 / +0.12) |
+Findings at the reference size, `gate` threshold
+(`research/power/POWER_REPORT.md` for 1–4 sessions, three sizes;
+`research/power/extended/POWER_REPORT.md` for 8 sessions, four sizes):
 
-- The order-flow effect is detected reliably only at twice the reference size.
-  At the reference size it is evidence in every seed and significant in one;
-  at half the reference it is not seen.
-- The lead-lag effect is not significant at any size tested. Under the pooled
-  t, which the gate now reads, it reaches ITERATE in one seed of three at half
-  and at the reference size and in two of three at twice the reference; under
-  the v1.4.0 rules it was evidence in no cell.
-- Nothing is reported at level 0, and nothing when the effect reverses
-  mid-sample.
-- The three significance columns of the report (pooled-slope t, within-bucket
-  t, the study's own ledger threshold of 3.24) agree in every cell, so on this
-  study the choice of gate statistic changes no detection of significance.
-- PROMOTE is reached in no cell, and the bootstrap interval of the net P&L is
-  above zero in no cell. Under the cost-aware backtest the planted effect is
-  not traded at all up to the reference size (0 trades at 1x costs on the
-  last fold in every such cell); at twice the reference the order-flow alpha
-  makes 14 trades on average and no fold survives 1x costs, although its mean
-  t is above 6. The chain can see an effect it cannot monetise. "0 PROMOTE"
-  on the bundled data is therefore not evidence that the chain can tell a
-  real, tradable effect from none.
-- The recompute leakage probe passed in every run.
+| planted effect | detector | 1 session | 2 sessions | 4 sessions | 8 sessions | mean t at 8 |
+|---|---|---:|---:|---:|---:|---:|
+| order flow | EQ04 @ 5 s (declared) | 1 of 20 | 2 of 20 | 10 of 20 | 20 of 20 | +6.75 |
+| order flow | EQ04 @ 10 s (matched) | 3 of 20 | 11 of 20 | 20 of 20 | 20 of 20 | +9.04 |
+| lead-lag | EQ10 @ 1 s (declared) | 0 of 20 | 0 of 20 | 0 of 20 | 0 of 20 | +2.27 |
+| lead-lag | EQ10 @ 5 s (matched) | 0 of 20 | 1 of 20 | 6 of 20 | 16 of 20 | +5.03 |
 
-On the v1.3.0 generator (equity flow compressed into the first 40% of each
-session) the same study was more sensitive: the order-flow effect was
-significant in 3 of 3 seeds at the reference size and in 1 of 3 at half of it;
-the lead-lag was significant in 1 of 3 (pooled t: 2 of 3) at twice the
-reference; and one level-0 lead-lag run was reported as evidence, a false
-positive. The planted effects and seeds are unchanged; the flow they are
-planted in is about 2.5 times sparser in time.
+- **Null.** With nothing planted no detector is flagged at 3.0 or at 4.365 at
+  any session count: 0 of 20 in each cell, interval 0.00–0.16. The order-flow
+  detectors read a negative t on the null (mean −1.51 on 8 sessions): the
+  synthetic trade imbalance mean-reverts a little, and the planted effect has
+  to overcome that first.
+- **Minimum detectable effect at 80 % power, `gate` threshold, 8 sessions**
+  (fitted `t ~ N((kappa0 + kappa·level)·sqrt(sessions), sd)`): 0.84 of the
+  reference for EQ04 @ 5 s, 0.66 for EQ04 @ 10 s, 1.18 for EQ10 @ 5 s, 2.51 for
+  EQ10 @ 1 s. Sessions the reference effect needs for 80 %: about 5, 3, 11 and
+  50. The lead-lag response flattens with size, so the linear model
+  understates level 1 for EQ10 @ 5 s — the measured rate on 8 sessions is
+  already 16 of 20.
+- **Where the power is lost** (diagnosis table of the report, 4 sessions).
+  Order flow at 5 s: ideal IC 0.128 on the efficient price (R² 1.6 %) against
+  a measured 0.037; 45 % of rows carry a signal; 2.0 rows per independent
+  observation; expected t 38.0 → 25.5 → 7.29 → 5.12 → 4.58 as each
+  idealisation is removed, measured chain t 4.54. Lead-lag at 5 s: ideal IC
+  0.166 (R² 2.8 %) against 0.019, expected t 40.1 → 4.51 → 3.75 → 3.36,
+  measured 3.59. At 1 s the ideal IC is zero — the label ends before the
+  two-second lag has played out — and the measured 0.009 comes from quote
+  staleness. The tick grid is the largest single loss (78 % of 5 s labels and
+  95 % of 1 s labels are exactly zero). Label validity is not a loss at these
+  horizons (99.8 % scored at 5 s; 80 % at 10 s, which the matched order-flow
+  detector pays).
+- **Break.** An effect reversed mid-sample is reported as evidence in no run.
+  The break z (`slope_break_z`, split at the planted point: the best case)
+  flags it at 4.365 in 20 of 20 runs for both order-flow detectors on 4 and on
+  8 sessions, and for EQ10 @ 5 s in 5 of 20 on 4 sessions and 15 of 20 on 8; for
+  EQ10 @ 1 s in none. On stable runs it fires at 3.0 at most once in 20.
+- **PROMOTE is reached in no cell** and the bootstrap interval of the net P&L
+  is above zero in no cell. The cost-aware backtest makes no trade on the 5 s
+  order-flow forecast at the reference size; on the 10 s label it makes 38
+  trades on the last fold on average (4 sessions) and no fold survives 1x
+  costs. The chain can see an effect it cannot monetise. "0 PROMOTE" on the
+  bundled data is therefore not evidence that the chain can tell a real,
+  tradable effect from none.
+- The recompute leakage probe (first seed of every cell, full session count)
+  passed wherever it ran.
+
+What the platform can and cannot detect, plainly: informed order flow of the
+reference size — yes, given about five sessions; on the bundled two sessions,
+one run in ten. A two-second ETF lead — not with EQ10 as declared, at any
+practical session count; yes at a 5 s label on eight sessions. A mid-sample
+reversal — yes for order flow from four sessions on. A tradable effect — not
+shown: nothing planted clears the cost gate.
+
+History. Report version 2 (v1.5.0 before this rework; 3 seeds, 2 sessions,
+t ≥ 3) read 1 of 3 for the order-flow effect at the reference size and 0 of 3
+for the lead-lag; the same cells with 20 seeds are 12 of 20 and 0 of 20. On
+the v1.3.0 generator (equity flow compressed into the first 40 % of each
+session) the three-seed study read 3 of 3 and, at twice the reference, 1 of 3
+for the lead-lag.
 
 ## 3. The research store under parallel writers
 

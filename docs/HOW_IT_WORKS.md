@@ -385,58 +385,67 @@ Halving the costs is a legitimate experiment and is not promotion evidence.
 something real. So the generator has an opt-in mode that plants effects of
 known size — informed order flow, and one instrument leading another — and
 the unmodified pipeline is run on the result (`python -m iap.research
-power`). From `research/power/POWER_REPORT.md`, three seeds per cell:
+power`). Each run is generated once and scored on its first 1, 2, 4 (and
+in the extended grid 8) sessions, 20 generator seeds per cell, so a rate
+comes with a binomial interval. A detection is the gate statistic of §2.6,
+the pooled-slope t, at or above the PROMOTE threshold in force (4.365), with
+a positive IC. From `research/power/POWER_REPORT.md` (4 sessions) and
+`research/power/extended/POWER_REPORT.md` (8 sessions), at the reference
+size:
 
-| planted effect | size | flagged significant | verdict ITERATE or better | PROMOTE |
+| planted effect | detector | 2 sessions | 4 sessions | 8 sessions |
 |---|---|---:|---:|---:|
-| order flow | none (null) | 0 of 3 | 0 of 3 | 0 of 3 |
-| order flow | half the reference | 0 of 3 | 0 of 3 | 0 of 3 |
-| order flow | reference | 1 of 3 | 3 of 3 | 0 of 3 |
-| order flow | twice the reference | 3 of 3 | 3 of 3 | 0 of 3 |
-| lead-lag | none (null) | 0 of 3 | 0 of 3 | 0 of 3 |
-| lead-lag | half the reference | 0 of 3 | 1 of 3 | 0 of 3 |
-| lead-lag | reference | 0 of 3 | 1 of 3 | 0 of 3 |
-| lead-lag | twice the reference | 0 of 3 | 2 of 3 | 0 of 3 |
-| either, reversed mid-sample | any | 0 of 3 | 0 of 3 | 0 of 3 |
+| order flow | EQ04 at its declared 5 s label | 2 of 20 | 10 of 20 | 20 of 20 |
+| order flow | EQ04 at the kernel-matched 10 s label | 11 of 20 | 20 of 20 | 20 of 20 |
+| lead-lag | EQ10 at its declared 1 s label | 0 of 20 | 0 of 20 | 0 of 20 |
+| lead-lag | EQ10 at the lag-matched 5 s label | 1 of 20 | 6 of 20 | 16 of 20 |
+| nothing planted (null) | each of the four | 0 of 20 | 0 of 20 | 0 of 20 |
 
-"Flagged significant" is the gate statistic of §2.6, the pooled-slope t,
-at 3 or more. The report also scores the within-bucket t and the pooled t
-against the study's own multiple-testing threshold (42 tests, t ≥ 3.24);
-the three give the same rate in every cell.
+The 95 % intervals: 20 of 20 is 0.84–1.00, 16 of 20 is 0.58–0.92, 10 of 20
+is 0.30–0.70, 0 of 20 is 0.00–0.16. At the fixed threshold of 3.0 the 5 s
+order-flow row reads 12, 19 and 20 of 20.
 
 What it means:
 
-- The chain **can detect** a planted order-flow effect, reliably only at
-  twice the reference size (mean gate IC 0.082, mean t 6.20). At the
-  reference size it reports evidence in every seed and significance in one
-  of three (mean IC 0.033, mean t 2.93). At half the reference it sees
-  nothing.
-- It has **no measured power to call the planted lead-lag significant** at
-  any size tested (mean t 1.75 at twice the reference). Under the pooled t
-  it now reaches ITERATE in one or two seeds of three — under the v1.4.0
-  rules it never did — which is evidence to keep looking, not a detection.
-- It is **not fooled** by an effect that reverses half-way through.
-- The null rows are clean: no seed produced a detection with nothing
-  planted. Three seeds per cell cannot bound a false-positive rate.
-- It **promotes nothing, at any size** — not even an effect with a mean t
-  above 6. At the reference size the cost-aware backtest makes no trade at
-  all on the planted effect; at twice that size it makes 14 on average, and
-  no fold survives 1× costs in any cell.
+- The chain **detects the planted order flow** at the reference size once
+  it has enough sessions: every run on 8, half of them on 4, one in ten on
+  the 2 sessions the bundled dataset has. The earlier report's "1 of 3" was
+  3 seeds on 2 sessions at t ≥ 3; the same cell with 20 seeds is 12 of 20.
+- It **detects the planted lead-lag only at a label long enough to contain
+  it**. The lead is two one-second steps; EQ10's declared label is one
+  second and ends before the follower has moved, so at that horizon the
+  effect is not detected at any session count tested (the fitted model puts
+  80 % power near 50 sessions). Against the 5 s label the same signal is
+  detected in 16 of 20 runs on 8 sessions.
+- **Where the power goes** (the report's diagnosis table): the observed mid
+  moves on a tick grid, so 78 % of 5 s labels and 95 % of 1 s labels are
+  exactly zero and the measured IC is 0.29 (order flow) and 0.11 (lead-lag)
+  of the IC the mechanism has on the efficient price; 55 % of rows have no
+  trade in the last 10 s and carry no order-flow signal; rows overlap, so
+  1.4 to 3 rows make one independent observation; the walk-forward
+  chain scores four fifths of the sample. The product of those reproduces
+  the measured t (4.58 expected against 4.54 measured for EQ04 on 4
+  sessions). Label validity is not the loss: 99.8 % of 5 s labels are
+  scored.
+- The **ledger threshold costs sessions, not detections**: 80 % power at
+  4.365 needs about 5 sessions for the order-flow effect and at 3.0 about 3.
+- It is **not fooled** by an effect that reverses half-way through (no
+  evidence in any of 20 runs), and the break test — the difference between
+  the slope before and after mid-sample — flags the reversal in 20 of 20
+  runs for order flow and 15 of 20 for lead-lag on 8 sessions, with at most
+  one false alarm in 20 on a stable run.
+- It **promotes nothing, at any size or session count** — not even an
+  effect with a mean t of 18. At the reference size the cost-aware backtest
+  makes no trade on the 5 s forecast; where it trades (the 10 s label, or
+  twice the reference size) no fold survives 1× costs and no bootstrap
+  interval of the net P&L lies above zero.
 
 The last point limits what the headline can claim. "0 PROMOTE" is not
 proof that the chain is a strict judge of alpha; PROMOTE has not been shown
 to be reachable in this generator's cost structure: the chain can see an
-effect it cannot monetise. With three seeds per
-cell a rate moves in steps of a third: this calibrates the chain, it is
-not a power curve.
-
-Two comparisons with earlier runs. The detection rates of the order-flow
-effect are the same under the v1.5.0 rules as under the v1.4.0 rules on
-the same generator. And the chain is less sensitive on the v1.4.0
-generator than it was on the v1.3.0 one, where the order-flow effect was
-significant in 3 of 3 seeds at the reference size and in 1 of 3 at half of
-it; the planted effects and the seeds are the same, and the flow they are
-planted in is about 2.5 times sparser in time.
+effect it cannot monetise. And the first point limits what a REJECT on the
+bundled two sessions can claim: an effect of the reference size would be
+missed there nine times in ten.
 
 **Where to look**
 

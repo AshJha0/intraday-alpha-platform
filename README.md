@@ -208,7 +208,13 @@ conclusion. What moved:
   surviving costs: the chain can see an effect it cannot monetise. The
   planted lead-lag reaches ITERATE in one or two seeds of three and is
   never significant. Nothing is promoted and nothing is flagged at the null
-  level.
+  level. Those are three seeds on two sessions; the detection-power rework
+  (20 seeds, a session grid, the gate threshold of 4.365) measures the
+  order-flow effect at 2 of 20 runs on two sessions, 10 of 20 on four and
+  20 of 20 on eight, and the lead-lag at 0 of 20 at EQ10's declared 1 s
+  label and 16 of 20 at a 5 s label on eight sessions, with 0 of 20 on the
+  null throughout and still nothing promoted
+  ([extended report](research/power/extended/POWER_REPORT.md)).
 - **MVP.** Events, decisions, fills and P&L are identical (the loop does
   not use the research backtester). `config_version` and the trace digest
   changed (`f293e7e7…` → `bf8cc608…`, `f51890da…` → `e534ac1f…`) because
