@@ -248,10 +248,10 @@ flowchart LR
     MG --> EXP[("expected_*.json<br/>codec sha256 | book states | features<br/>alpha | backtest | risk decisions + audit + snapshot<br/>replay fills | portfolio | tca (+ timeline cases) | adaptive<br/>contracts examples | canonical json + trace digest<br/>lifecycle | experiment golden frame | mvp")]
     CPPTOOL["cpp/tools/make_replay_fills_golden<br/>(C++ is the fills reference;<br/>Python iap.execution consumes it too)"] --> EXP
     RSTOOL["rust/risk/src/bin/make_risk_golden<br/>(Rust is the risk reference;<br/>Python iap.risk consumes it too)"] --> EXP
-    GV --> PY["python: pytest -k golden<br/>173 tests"]
+    GV --> PY["python: pytest -k golden<br/>179 tests"]
     GV --> CPP["cpp: ctest -R Golden<br/>68 tests"]
-    GV --> RS["rust: 9 golden test targets<br/>66 tests"]
-    GV --> JV["java: all thirteen *GoldenTest (JUnitCore)<br/>106 golden-group tests"]
+    GV --> RS["rust: 10 golden test targets<br/>69 tests"]
+    GV --> JV["java: all thirteen *GoldenTest (JUnitCore)<br/>109 golden-group tests"]
     EXP --> PY
     EXP --> CPP
     EXP --> RS
@@ -282,7 +282,7 @@ and are matched by Java, Rust and C++ (the trace and canonical-JSON ports)
 and by Java and Rust (the lifecycle ports). The harness
 (`tests/harness/run_all.sh`, with `run_golden.sh` as the golden-only alias)
 runs every suite with the canonical commands and prints the parity table; a
-v1.5.0 CI run (2026-10-04) passes 1672/289/330/517 tests (173/68/66/106
+v1.5.0 CI run (2026-10-04) passes 1701/289/333/520 tests (179/68/69/109
 golden) across python/cpp/rust/java, plus the repo-level `integration` (35)
 and `replay` (6) rows — the same counts the README parity table records.
 

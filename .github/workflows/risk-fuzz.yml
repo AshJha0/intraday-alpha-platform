@@ -1,0 +1,103 @@
+# =============================================================================
+# risk-fuzz — the large differential-fuzz run of the three hard-risk engines
+# (backlog epic E31; PLATFORM_CONVENTIONS.md §11.1 "How parity is tested").
+#
+# Every pull request already replays the committed corpus
+# (tests/golden/risk_fuzz, ~3,800 steps) in Rust, Java and Python. This job is
+# the big one: it generates N FRESH step scripts from a fresh seed on the
+# runner (python/tools/risk_fuzz.py; the Python engine is the oracle), runs
+# the Rust and the Java engine over them through their own golden-test
+# binaries/classes (IAP_RISK_FUZZ_DIR / IAP_RISK_FUZZ_OUT — no extra binary is
+# built), and compares every decision, audit byte and final snapshot,
+# including a snapshot -> restore -> continue check at random cut points.
+#
+# On a divergence the first diverging script is minimised by a delta-debugging
+# shrinker and uploaded, with what each engine produced, as the
+# `risk-fuzz-divergence` artifact; the job fails. A divergence is a real bug in
+# one of the engines: reduce, decide from §11.1 which engine is right (Rust is
+# normative), fix, and add the reduced case to the corpus or the edge golden.
+#
+# Triggers: nightly (seed = the run id, printed in the job summary so any run
+# can be reproduced with `--seed`), manually, and from ci.yml's
+# workflow_dispatch (risk_fuzz=true). It is NOT on the pull-request path.
+# =============================================================================
+name: risk-fuzz
+
+on:
+  schedule:
+    - cron: "23 3 * * *"
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: "Master seed (integer); empty = this run's id"
+        type: string
+        default: ""
+      count:
+        description: "Number of fresh scripts (about 100 steps each)"
+        type: string
+        default: "400"
+  workflow_call:
+    inputs:
+      seed:
+        type: string
+        default: ""
+      count:
+        type: string
+        default: "400"
+
+permissions:
+  contents: read
+
+jobs:
+  differential:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # v1 (toolchain pinned by input)
+        with:
+          toolchain: "1.98.1"      # == rust/rust-toolchain.toml
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: rust
+      - name: Toolchain (JUnit4 jars, the pinned Python requirements)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends junit4
+          python -m pip install --upgrade pip
+          pip install -r python/requirements-ci.txt
+      - name: Build the Rust engine driver (the golden_risk_fuzz test binary)
+        working-directory: rust
+        run: cargo test --locked -p risk --test golden_risk_fuzz --no-run
+      - name: Build the Java engine driver (RiskFuzzGoldenTest)
+        working-directory: java
+        run: |
+          bash build.sh
+          rm -rf out/test && mkdir -p out/test
+          find src/test/java -name '*.java' | sort > out/test-sources.txt
+          javac -Xlint:all -Werror \
+            -cp "out/main:/usr/share/java/junit4.jar:/usr/share/java/hamcrest-core.jar" \
+            -d out/test @out/test-sources.txt
+      - name: Differential fuzz (generate, run the three engines, diff, minimise)
+        env:
+          FUZZ_SEED: ${{ inputs.seed || github.run_id }}
+          FUZZ_COUNT: ${{ inputs.count || '400' }}
+        run: >
+          python3 python/tools/risk_fuzz_nightly.py
+          --seed "$FUZZ_SEED" --count "$FUZZ_COUNT"
+          --work "$RUNNER_TEMP/risk_fuzz_work"
+          --artifacts risk_fuzz_artifacts
+      - name: Upload the minimised diverging script
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: risk-fuzz-divergence
+          path: risk_fuzz_artifacts
+          if-no-files-found: ignore
