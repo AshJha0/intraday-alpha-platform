@@ -66,7 +66,7 @@ are the gaps the review named (ARCHITECTURE.md §14, §11.3).
 settings rather than code: branch protection, required checks and required
 reviews are not configured; the release workflow has not been exercised by a
 tag; alert delivery needs an operator-supplied webhook; the Python suite
-takes 149 s in CI under coverage and xdist, over its 120 s target (110 s uninstrumented); `iap.__version__` still read 1.0.0 at v1.3.0
+takes 306-359 s in CI under coverage and xdist for the 1988 tests of the merged v1.5.0 (149 s for the 1672 before the feature branches), over its 120 s target; `iap.__version__` still read 1.0.0 at v1.3.0
 (it is 1.5.0 since v1.5.0)
 (docs/governance/REPO_SETTINGS.md, CHANGELOG.md "Known limitations").
 

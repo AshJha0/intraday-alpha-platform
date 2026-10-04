@@ -143,7 +143,11 @@ Also changed:
   executed both ways and compared them test by test: 1672 collected, the
   same outcome for every one. **The 120 s target is still not met by the
   instrumented run (149 s); the uninstrumented serial run takes 110 s**
-  (`docs/BUILD_NOTES.md` has the table and where the time goes).
+  (`docs/BUILD_NOTES.md` has the table and where the time goes). Those are
+  the numbers of the 1672-test suite. The tests of the work merged into the
+  release afterwards bring it to 1988 tests and the same step to 306 s and
+  359 s in two runs of the release pull request: faster than serial, and
+  further from the target than before.
 - **A clean stop is observable after the process is gone.** The paper
   platform sets `platform_session_state` 4 (`STOPPED`) and exits right after
   its checkpoint, so Prometheus almost never scraped the 4 and
@@ -620,7 +624,11 @@ Those of v1.4.0 stand. New or restated:
   carry: one unit test per language does. One of 64 reason-string branches
   is unreachable from a script. FZ02 (simulator properties) and FZ04
   (crash injection on the Java paper path) stay backlog.
-- **The Python CI job still misses the 120 s target under coverage.**
+- **The Python CI job misses the 120 s target under coverage by more than
+  before**: 306-359 s for the merged 1988-test suite under xdist (149 s for
+  the 1672 tests it was measured on). The slowest additions are the
+  combination report test, the MVP child-policy fixture and the ingest
+  end-to-end test; nothing was removed or marked slow.
 - **Rust and C++ have no research backtester** and do not read
   `expected_backtest.json`.
 
@@ -1074,7 +1082,7 @@ API_TRADING.md §2.4)**
 - **The power study is three seeds per cell.** A rate moves in steps of
   0.33; it calibrates the chain and is not a power curve.
 - **The Python suite exceeds its 120 s target** (1565 tests, five to six minutes in
-  CI under coverage). (v1.5.0: 149 s under xdist with coverage; see below.)
+  CI under coverage). (v1.5.0: 149 s under xdist with coverage for 1672 tests, 306-359 s for the 1988 of the merged release; see above.)
 - **`iap.__version__` still reads 1.0.0**; the package metadata says 1.3.0.
 - **There is no LLM, agent or MCP code.** The agent layer is a backlog epic
   (E24, E30); what exists is the foundation it would need.

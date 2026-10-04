@@ -298,7 +298,8 @@ hot paths allocation-conscious (primitive arrays, no boxing). All: no dead code,
 - Keep each language's full test run < 120s (python 83 s, cpp 1 s, rust 2 s, java 20 s on the
   2-CPU baseline, 2026-09-20). **With coverage on CI the Python suite does not meet this**: 1672 tests
   took 524 s serial and 149 s under `pytest -n auto --dist loadfile` on a 4-vCPU runner (2026-10-04);
-  110 s serial without coverage (docs/BUILD_NOTES.md). CI is `.github/workflows/ci.yml`, which runs exactly these commands
+  110 s serial without coverage; the merged v1.5.0 suite of 1988 tests takes 306-359 s under
+  xdist with coverage (docs/BUILD_NOTES.md). CI is `.github/workflows/ci.yml`, which runs exactly these commands
   plus `tests/harness/run_golden.sh` and the deployment validation (§12.7).
 
 ## 10. Environment facts

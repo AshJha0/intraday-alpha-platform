@@ -17,7 +17,7 @@ gated on all of them. Run the whole thing locally with
 ## Python (reference implementation)
 
 ```bash
-cd python && PYTHONPATH=src python3 -m pytest -q          # full suite (1988 tests; CI runs it as `-n auto --dist loadfile` with coverage, 149 s on a 4-vCPU runner)
+cd python && PYTHONPATH=src python3 -m pytest -q          # full suite (1988 tests; CI runs it as `-n auto --dist loadfile` with coverage, 306-359 s on a 4-vCPU runner)
 cd python && PYTHONPATH=src python3 -m pytest -q -k golden # the golden group (192)
 cd python && PYTHONPATH=src python3 -m iap.marketdata      # end-to-end pipeline
 cd python && PYTHONPATH=src python3 -m iap.mvp run         # the traced MVP loop (under a minute)
@@ -35,6 +35,7 @@ cd python && PYTHONPATH=src python3 tools/make_golden.py   # regen goldens (deli
   | serial, with `--cov` (how CI ran it until v1.4.0) | 524 s |
   | `-n auto --dist loadfile`, with `--cov` (how CI runs it now) | **149 s** |
   | serial, without coverage | 110 s |
+  | `-n auto --dist loadfile`, with `--cov`, the merged v1.5.0 suite (1988 tests; two runs on pull request #21) | 306 s, 359 s |
 
   Earlier CI runs of the 1565-test v1.3.0 suite read 319 s and 358 s serial under
   `--cov`; the 524 s above is the same job on this tree and day. Coverage
@@ -42,8 +43,13 @@ cd python && PYTHONPATH=src python3 tools/make_golden.py   # regen goldens (deli
   per-test `--durations`): `test_eq03_report_reproduces_through_the_runner` 61 s,
   the MVP golden run and its replay 40 + 37 s (module fixtures), the planted-signal
   tests about 110 s in total, `test_mvp.py` about 60 s, `test_generator.py` about 65 s;
-  few other tests exceed 10 s. **The 120 s target is therefore not met by the
-  instrumented CI run (149 s) and is met by the uninstrumented serial run (110 s)**;
+  few other tests exceed 10 s. The tests merged afterwards — signal combination
+  (`test_report_pipeline_on_the_bundled_data` alone is 88 s), the MVP child-policy
+  runs (68 s of fixture), the real-data ingest path and the risk-fuzz corpus —
+  doubled the instrumented parallel run; it was not re-measured serially or
+  without coverage. **The 120 s target is therefore not met by the
+  instrumented CI run (149 s on the 1672-test suite, 306-359 s on the merged one) and
+  was met by the uninstrumented serial run of the 1672-test suite (110 s)**;
   the harness capture on the 2-CPU container baseline
   (2026-09-20, 1362 tests) read 83 s. Nothing was removed or skipped to make
   a number fit; the parallel run collected the same 1672 tests and reported the same
