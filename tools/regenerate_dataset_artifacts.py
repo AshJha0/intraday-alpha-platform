@@ -90,6 +90,8 @@ GOLDEN_TOOLS = (
     "make_golden_alpha.py",
     "make_golden_adaptive.py",
     "make_golden_tca.py",
+    "make_golden_markout.py",
+    "make_golden_replay_passive.py",
     "make_golden_contracts.py",
     "make_golden_canonical_json.py",
     "make_golden_lifecycle.py",

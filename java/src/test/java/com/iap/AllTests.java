@@ -37,6 +37,7 @@ import org.junit.runners.Suite;
     PaperRiskWiringTest.class,
     TcaGoldenTest.class,
     TcaMetricsTest.class,
+    MarkoutGoldenTest.class,
     MetricsTest.class,
     MetricsExpositionTest.class,
     MetricsConcurrencyTest.class,
