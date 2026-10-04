@@ -108,6 +108,19 @@ Also changed:
 
 ### Fixed
 
+- **The Python CI job is 3.5 times faster.** The `pytest` step ran the
+  1672 tests serially under coverage in 524 s on the `ubuntu-24.04` runner
+  (319 s and 358 s on the v1.3.0 suite); it now runs
+  `pytest -n auto --dist loadfile` with `pytest-xdist` 3.8.0 (pinned in
+  `python/requirements-ci.txt`, declared in the `dev` extra) and takes 149 s,
+  coverage still produced and uploaded. Every test already wrote under
+  `tmp_path` or `tmp_path_factory` and only read the repository's `data/`,
+  `configs/` and `research/`, so none had to change and none is serial;
+  `--dist loadfile` keeps each module's fixtures on one worker. The PR run
+  executed both ways and compared them test by test: 1672 collected, the
+  same outcome for every one. **The 120 s target is still not met by the
+  instrumented run (149 s); the uninstrumented serial run takes 110 s**
+  (`docs/BUILD_NOTES.md` has the table and where the time goes).
 - **A clean stop is observable after the process is gone.** The paper
   platform sets `platform_session_state` 4 (`STOPPED`) and exits right after
   its checkpoint, so Prometheus almost never scraped the 4 and
@@ -746,7 +759,7 @@ API_TRADING.md §2.4)**
 - **The power study is three seeds per cell.** A rate moves in steps of
   0.33; it calibrates the chain and is not a power curve.
 - **The Python suite exceeds its 120 s target** (1565 tests, five to six minutes in
-  CI under coverage).
+  CI under coverage). (v1.5.0: 149 s under xdist with coverage; see below.)
 - **`iap.__version__` still reads 1.0.0**; the package metadata says 1.3.0.
 - **There is no LLM, agent or MCP code.** The agent layer is a backlog epic
   (E24, E30); what exists is the foundation it would need.

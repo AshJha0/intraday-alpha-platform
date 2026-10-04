@@ -41,7 +41,8 @@ ruff format --check python tests tools research deployment   # formatting (drop 
 ```
 
 Each language's full run must stay under 120 s; the repo-level suites well
-under a minute.
+under a minute. (The Python run is the exception under CI's coverage
+instrumentation: 149 s with `-n auto`; see `docs/BUILD_NOTES.md`.)
 
 ## 3. The parity harness
 
