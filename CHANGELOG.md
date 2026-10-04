@@ -1,6 +1,6 @@
 # Changelog
 
-Release notes for tagged versions, newest first. The v1.3.0 and v1.4.0
+Release notes for tagged versions, newest first. The v1.3.0, v1.4.0 and v1.5.0
 entries are written in the repository; notes for v1.1.1 and v1.2.0 are copied from their GitHub
 releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
@@ -9,6 +9,273 @@ that tag.
 ## Unreleased
 
 Nothing yet.
+
+## v1.5.0 — 2026-10-04
+
+The corrected research methods are the defaults. v1.3.0 added eleven of
+them as opt-ins and v1.4.0 kept them opt-in, so every committed research
+number was still computed under rules the repository itself described as
+deficient. From this release the corrected rule is what runs when nothing
+is named, each old rule stays selectable under an explicit legacy name, and
+`legacy_v1` is tested against two alpha reports pinned from the v1.4.0 tag.
+The dataset did not change. Every artefact that derives from it was
+regenerated in one pass on the CI runner and every document that quotes a
+number was re-derived from the new artefacts. Nothing was tuned to recover
+a v1.4.0 conclusion. The release guard that failed the v1.4.0 release once
+on an API error now retries. Pull request
+[#21](https://github.com/AshJha0/intraday-alpha-platform/pull/21).
+
+### Changed
+
+The eleven methods, default first, legacy name second
+(PLATFORM_CONVENTIONS.md §13.6 is the normative table;
+`iap.validation.methods` bundles them as `"v2"` and `"legacy_v1"`):
+
+1. **Row-latency stress grid**: `stress_version=2` (the base backtest
+   config is carried into every stressed run) — `stress_version=1`.
+2. **Position policy**: `BacktestConfig(position_policy="cost_aware")` —
+   enter only when the expected return exceeds the round-trip spread and
+   fee, hold for the label horizon — `"sign"`, `BacktestConfig.legacy()`.
+3. **Gate statistic**: the HAC t of the pooled slope
+   (`significance="pooled_slope"`) — `"within_bucket"`.
+4. **PROMOTE t threshold**: `tstat_threshold="ledger"`,
+   `max(3.0, Bonferroni |t| at the run's gate look count)` — `"fixed"`. The
+   look count is deterministic: the ledger total before the run plus the
+   looks the run adds, declared before the first alpha is evaluated and
+   recorded on the ledger entries (`gate_looks`); a rerun is judged at the
+   recorded count. One validation is 83 looks at four folds
+   (`looks_per_validation`), 84 with the day-2 backtest; `legacy_v1` debits
+   28 as before.
+5. **Costs and capacity**: square-root impact (`impact_model="sqrt"`, named
+   by `execution.json`), fills capped at the displayed L1 size
+   (`cap_fills_at_l1`), edge-breakeven capacity (`capacity="breakeven"`) —
+   `"linear"` / `CostModel.with_linear_impact()`, uncapped,
+   `"participation"`.
+6. **Drift and retirement**: the two-sample HAC z of the pair-weighted
+   rolling IC (`adaptive.ic_z_method="hac"`) and the CUSUM retirement rule
+   (`adaptive.lifecycle.breach_rule="cusum"`, slack 0.0025, threshold 0.01)
+   — `"legacy"` and `"consecutive"`. The CUSUM rule was tightened when it
+   became the default: it retires only on a reading that is itself a
+   breach, never on the reading that entered WATCH.
+7. **Leakage**: the recompute-from-raw-events probe runs in the standard
+   `LeakageTester.run()` when the raw events are available (three anchors on
+   the first 12,000 events of the first normalized file per asset class,
+   memoised per run). A report without events says `recompute_ok: null`
+   and the runner marks the result not gate-eligible.
+8. **Per-fold diagnostics and the bootstrap interval** of the net P&L are
+   reported fields of every validation. They are **report-only**: making
+   either a gate would add a row to the lifecycle gate table, which is
+   pinned across Python, Java and Rust.
+9. **Rows**: a label invalid for BLACKOUT alone is scored at its realised
+   reopen return (`ic_rows="blackout_reopen"`, columns `label_reopen_<h>`),
+   and the backtest trades only the rows the IC scores
+   (`block_rows_column="auto"`) — `"valid_only"`, `None`.
+10. **Headline ICs**: the per-instrument mean IC and the vol-scaled IC are
+    columns beside the pooled IC. **The gate reads the pooled uncrossed
+    IC**: the gate t is the significance of that slope and of no other, and
+    the lifecycle's holdout and paper gates compare a pooled IC
+    (schemas/MIGRATIONS.md has the argument).
+11. **Meta-labels**: `build_meta_features(impute_nan=False)` — missing
+    values stay missing for the tree model — `impute_nan=True`.
+
+Also changed:
+
+- **Cross-language.** Rules on the paper path or in the lifecycle
+  evaluation are ported, with the old rule selectable by name: the CUSUM
+  rule and the pair-weighted rolling IC (Java `LifecycleGauge`, `RollingIc`;
+  Rust `lifecycle::tracker`), the ledger significance threshold (Java
+  `PolicyConfig` / `Gates`, Rust `PolicyConfig::threshold_for`). The
+  research-only backtest vector `expected_backtest.json` stays on the old
+  rules, which its `config` now names; the Java `ResearchBacktester` and
+  `CostModel` say in their API which rules they implement.
+- **`x-version` bumps**: `configs/execution/execution.json` 1 → 2,
+  `configs/strategies/lifecycle.json` 1 → 2, `strategies.json` `adaptive`
+  1 → 2, `research/experiments.json` 2 → 3, `research/alpha_registry.json`
+  1 → 2, `eligibility.json` 1 → 2, `POWER_REPORT.json` 1 → 2, goldens
+  `expected_lifecycle.json`, `expected_backtest.json`,
+  `expected_adaptive.json` 1 → 2. Every loader rejects the older document
+  instead of reading it under a new default.
+- **Evidence document**: required keys `significance_threshold` (number or
+  null) and `live.new_fraction`.
+- **`python -m iap.research run`**: `--methods {v2,legacy_v1}` and
+  `--normalized-dir`; `--tstat-threshold` is removed (the policy is part of
+  the method bundle, and the bundle is part of the experiment id).
+- **Lifecycle transition log** rebuilt by `bootstrap --force`; the log of
+  the legacy methods is archived as
+  `research/archive/lifecycle_transitions.dataset-116b7787.methods-legacy_v1.jsonl`.
+- Versions: `python/pyproject.toml` and `iap.__version__` 1.5.0; image
+  references `v1.5.0`.
+
+### Fixed
+
+- **Release guard (`release.yml`, `verify-ci`).** The guard asked the API
+  once and read an empty or failed answer as "no successful run": the
+  v1.4.0 release failed on it although CI was green. It is now
+  `tests/harness/verify_ci_green.py`, which separates three cases: an API
+  error is retried with backoff (10 attempts, 15 s steps capped at 120 s,
+  about 11 minutes) and ends as "undetermined" (exit 2); a CI run that
+  completed without success fails at once with the run URL (exit 1); a run
+  in progress is polled every 30 s for at most 40 minutes, then fails with
+  a message that says so; a commit with no CI run at all fails after a
+  120 s grace. Every attempt is printed. `workflow_dispatch` with `dry_run`
+  runs only this step against a given SHA. Both outcomes were exercised on
+  the real API: the v1.4.0 commit passes (run 37163663508) and a commit
+  with no CI run fails with "no ci run exists for …; do not release an
+  untested tree" (run 37163665262). 18 tests pin the decision table.
+- **Adaptive study P&L was not in USD.** `run_adaptive.py` built its
+  instrument meta without currencies, so the FX rows summed quote-currency
+  P&L (JPY for USD/JPY) as if it were USD. The alpha reports were corrected
+  for this on 2026-09-06; the adaptive runner was not. The policy totals of
+  v1.4.0 (−8.69 million) were therefore wrong in scale.
+- **Three fixed sentences of `ADAPTIVE_REPORT.md`** are now derived from
+  the results: which trigger fired the drift refits, how many deployments
+  lose and how many do not trade, and how far apart the policies land.
+- **`REPORT.md` quotes the look count the run was judged at**, not the
+  ledger total at render time.
+
+### Added
+
+- `iap.validation.methods` (`ResearchMethods`, `methods("v2" | "legacy_v1")`),
+  `iap.labels.frames` (`scored_labels`, `scored_rows`),
+  `BacktestConfig.legacy()` / `.for_horizon()`, `CostModel.with_linear_impact()`,
+  `LifecycleConfig.legacy()`, `ExperimentLedger.batch_total` /
+  `gate_looks_for`, `RecomputeSources`.
+- `run_all.py --methods legacy_v1 --out-dir <dir>`: the v1.4.0 report,
+  reproduced. `python/tests/test_legacy_methods.py` compares it field by
+  field with `tests/golden/alpha_report_{EQ03,FX01}_v1.4.0.json`.
+- Lifecycle golden scenarios LC04 (what the CUSUM rule changes) and LG01
+  (the legacy policy); the backtest golden's `default_rules` block.
+
+### Results
+
+Same dataset, new rules. Nothing is promoted, before or after.
+
+| | v1.4.0 | v1.5.0 |
+|---|---|---|
+| promotion verdicts | 0 PROMOTE / 10 ITERATE / 14 REJECT | 0 PROMOTE / 11 ITERATE / 13 REJECT |
+| verdicts that moved | | FX03 ITERATE → REJECT; FX10, FX11 REJECT → ITERATE |
+| PROMOTE t threshold; looks it is derived at | 3.0 (fixed); — | 4.365; 3,936 |
+| alphas with gate t above the threshold | 6 (EQ02, EQ03, EQ06, EQ12, FX01, FX04) | 3 (EQ02, EQ03, EQ12) |
+| alphas failing the cost gate alone | 4 (EQ02, EQ03, EQ12, FX04) | 3 (EQ02, EQ03, EQ12) |
+| net P&L at 1× costs, last fold | 24 of 24 lose | 18 make no trade, 6 trade and lose, 0 above zero |
+| largest loss at 1× costs | −300,873 USD (EQ05) | −733 USD (FX11) |
+| edge-breakeven capacity above zero | not computed | 3 of 24 (EQ11 38,248, FX08 1,561, FX10 61,135 USD) |
+| recompute leakage probe | not run | 24 of 24 pass |
+| lifecycle registry | 24 CANDIDATE, 0 beyond | 24 CANDIDATE, 0 beyond |
+| registry gates failed (alphas) | cost 24, significance 18, stability 13, IC 11 | cost 24, capacity 24, significance 21, stability 14, IC 12 |
+| ledger | 1920 looks, 139 entries | 4396 looks, 208 entries (1920 carried + 2476) |
+| expected max \|t\| under the null; Bonferroni \|t\| (whole ledger) | 3.888; 4.206 | 4.096; 4.389 |
+| ML gate (best linear pooled OOS IC vs the mid label) | PASSED (ridge +0.0081) | PASSED (ridge +0.0081); unchanged |
+| meta-labeling gate | degenerate (0 trades) | degenerate (0 trades); 275 of 131,880 meta-feature values missing, not imputed |
+| adaptive study, drift-triggered refits; retired under every policy | 122; FX01 | 88; FX01 |
+| adaptive study, deployments above zero; that make no trade | 0 of 40; 0 | 0 of 40; 19 |
+| adaptive study, total net P&L of the static policy | −8,693,703 (not USD, see Fixed) | −3,921 USD |
+| power study, planted order flow at the reference size: significant / evidence | 1 of 3 / 3 of 3 seeds | 1 of 3 / 3 of 3 seeds |
+| power study, planted order flow at twice the reference size: significant; mean trades at 1× | 3 of 3; — | 3 of 3; 14 |
+| power study, planted lead-lag: significant at any size; evidence at 0.5× / 1× / 2× | 0; 0 / 0 / 0 | 0; 1 / 1 / 2 of 3 seeds |
+| power study, PROMOTE on any planted effect; any detection at level 0 | 0; 0 | 0; 0 |
+| MVP session: events, decisions, parents, fills, P&L | 15,805, 800, 235, 169, −81.53 USD | unchanged |
+| MVP `config_version`; trace digest | `f293e7e7…`; `f51890da…` | `bf8cc608…`; `e534ac1f…` |
+
+- **What the cost-aware policy shows.** Under the sign policy every alpha
+  traded every row and lost five or six figures; that loss measured the
+  policy. Under the default, 18 of the 24 forecasts never exceed their own
+  round-trip cost and make no trade, which is the same finding stated
+  directly: the predicted move is smaller than the spread. A net P&L of
+  exactly 0 does not pass `net P&L > 0`, so the cost gate still fails for
+  all 24. The six that trade (EQ11 and five FX alphas) lose between 22 and
+  733 USD on the last fold.
+- **Significance.** The gate t is now the significance of the gated IC.
+  It is lower than the within-bucket t for the equity ITERATE alphas (EQ03
+  5.85 → 5.16, EQ01 2.72 → 1.59) and higher for several FX alphas whose
+  signal is between buckets (FX08 2.18 → 3.84). Against the ledger
+  threshold of 4.365, three alphas are significant where six cleared 3.0.
+  EQ06 misses it at 4.36 and FX04 at 4.24; the threshold was not moved.
+  FX10 and FX11 become ITERATE on a pooled t of 1.55 and 2.22 (ITERATE
+  needs 1.5); FX03 drops to REJECT at 1.13. Seventeen alphas have a gate t
+  below 4.07, the expected largest |t| under the null at 3,936 looks.
+- **Blackout rows.** Scoring BLACKOUT rows at their reopen return changes
+  one alpha materially: EQ11 (15-minute horizon), 23,413 such rows, gate IC
+  0.0261 → 0.0038. The valid-only IC had dropped exactly the rows on which
+  a 15-minute forecast is wrong, a selection effect; it is reported beside
+  the gate IC (`gate_ic_valid_only`). For the other 23 alphas the two ICs
+  agree to within 0.003.
+- **Hypothesis signs.** Two alphas are now significantly wrong-signed at
+  the ledger threshold (EQ08 t −4.57, FX09 t −5.75). They were REJECT
+  before and are REJECT now.
+- **Adaptive study.** With the CUSUM rule and the HAC z the drift policy
+  refits 78 times after the initial fits instead of 112, and 65 of those
+  refits name a PSI breach against 14 that name the IC z — the report
+  used to say the opposite in a fixed sentence. FX01 is retired under
+  every policy, as before. 19 of the 40 deployments make no trade.
+- **Power study.** The detection rates of the planted order flow are the
+  same under the pooled t as under the within-bucket t. The cost-aware
+  backtest does not trade the planted effect at the reference size at all
+  and trades it 14 times on average at twice that size, where no fold survives costs: the chain can see
+  an effect it cannot monetise. The planted lead-lag now reaches ITERATE in
+  one or two seeds of three; it is never significant.
+- **MVP.** The loop does not use the research backtester; its counts and
+  P&L are identical. `config_version` hashes `execution.json`, which
+  changed, and `alpha_params.json`, whose header names the regeneration
+  commit; the trace digest covers `config_version`. The per-alpha
+  `ic_gap` moves in the fourth decimal because the research IC it is
+  measured against is now the gate IC of the v2 report.
+- **Fitted parameters.** `alpha_params.json` differs from v1.4.0 by at most
+  2.3e-15 relative (the frames carry more columns and numpy sums a strided
+  column in a different order). `expected_alpha.json` follows at 2.6e-13.
+  The legacy backtest vector of `expected_backtest.json` is identical to
+  the v1.4.0 vector in every value.
+
+### Migration notes
+
+- Code that constructs `BacktestConfig()`, `CostModel(...)`,
+  `LifecycleConfig(...)`, calls `validate_alpha(...)` or
+  `build_meta_features(...)` without naming a rule now gets the corrected
+  rule. To keep a v1.4.0 number, name the legacy rule or use
+  `methods("legacy_v1")`. The cost-aware policy needs the label horizon
+  (`config.for_horizon(h)`); the ledger threshold needs
+  `ledger_t_threshold`.
+- `execution.json`, `lifecycle.json` and the `adaptive` block of
+  `strategies.json` written for v1.4.0 are rejected until they name
+  `impact_model`, `tstat_threshold`, `ic_z_method` and
+  `lifecycle.breach_rule` and carry the new `x-version`.
+- An evidence document without `significance_threshold` or
+  `live.new_fraction` is rejected by the Python, Java and Rust readers. A
+  registry written by v1.4.0 (`x-version` 1) is rejected; rebuild it with
+  `python -m iap.lifecycle bootstrap --force` after archiving the log.
+- A reader of `research/experiments.json` must accept `x-version` 3 and the
+  entry field `gate_looks`; an alpha has one `promotion_pipeline` entry per
+  dataset and method bundle. Experiments recorded before v1.5.0 name no
+  method bundle and are history, not gate evidence.
+- The five runner experiments have new ids (`methods` is hashed into the
+  id); the directories of the earlier ids are kept.
+- A Java paper session's `config_sha256` changes (`execution.json`,
+  `lifecycle.json`, `strategies.json` and `alpha_params.json` are among the
+  hashed files). Its lifecycle gauge follows the CUSUM rule and its rolling
+  IC is pair-weighted; the state stays observational. State directories
+  written by v1.4.0 resume as before.
+- Feature frames written by v1.4.0 have no `label_reopen_<h>` columns:
+  the default row policy then falls back to valid labels and the report
+  says `label_reopen_available: false`. Regenerate with
+  `python -m iap.features`.
+
+### Known limitations
+
+Those of v1.4.0 stand. New or restated:
+
+- **"0 PROMOTE" is now mostly "no trade".** The cost gate is failed by
+  forecasts that never clear their costs, not by measured losses. That is a
+  statement about the spread of the synthetic book relative to the
+  predicted move; it says nothing about what a passive execution policy
+  would earn, which the research backtester does not model.
+- **The bootstrap interval and the per-fold diagnostics gate nothing.**
+- **`v_alpha_scorecard` is not dataset- or bundle-aware**, and the store
+  keeps `gate_looks` and the gate statistics of a v2 ledger entry only
+  inside `result_json`. Fixing either needs `iap_v2.sql`.
+- **The Java research backtester implements the legacy rules only.** A
+  default-rules research backtest exists in Python alone.
+- **The ledger threshold is not retroactive.** Results recorded before
+  v1.5.0 were judged at 3.0 and are not re-judged.
 
 ## v1.4.0 — 2026-10-03
 

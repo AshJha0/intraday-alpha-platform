@@ -946,3 +946,190 @@ CHANGELOG.md (v1.4.0, "Results") has old → new for every headline number.
   `python3 tools/regenerate_dataset_artifacts.py` for everything committed
   (CONTRIBUTING.md §4.1). To keep working on the v1.3.0 dataset set
   `equities.flow.calibration` to `"legacy_budget"`.
+
+## 2026-10-04 — v1.5.0: the corrected research methods become the defaults; `execution.json` 1 -> 2, `lifecycle.json` 1 -> 2, `strategies.json` `adaptive` 1 -> 2, `research/experiments.json` 2 -> 3, `alpha_registry.json` 1 -> 2, `eligibility.json` 1 -> 2, `POWER_REPORT.json` 1 -> 2, goldens `expected_{lifecycle,backtest,adaptive}.json` 1 -> 2; every dataset-derived artefact regenerated
+
+No wire schema under `schemas/` changed shape and no golden event vector
+moved. The dataset did not change (`data_version` `116b7787…`,
+`feature_version` `585dd7b9…`). What changed is which rule each research
+statistic is computed under by default, and therefore every artefact
+computed from the dataset. One change, one regeneration
+(`tools/regenerate_dataset_artifacts.py`, manual `regenerate` job of
+`ci.yml`: run 37162724308 at commit `75fd4f7`, Ubuntu, Python 3.11,
+904.8 s; a first pass, run 37161258467, produced the same numbers before
+three sentences of the adaptive report were made data-derived). CHANGELOG.md
+(v1.5.0, "Results") has old → new for every headline number;
+PLATFORM_CONVENTIONS.md §13.6 has the table of defaults and legacy names.
+
+- **Why.** v1.3.0 added eleven corrected methods as opt-ins and v1.4.0 kept
+  them opt-in, so every committed number was still computed under rules the
+  repository itself documented as deficient: a sign policy that trades every
+  row whatever the cost, a t-statistic that is not the significance of the
+  gated IC, a fixed 3.0 threshold beside a ledger of thousands of looks, a
+  retirement rule that counts one bad stretch six times. The defaults now
+  are the corrected rules. Nothing was tuned to recover an earlier
+  conclusion.
+- **How an old number is reproduced.** Each old rule has a legacy name
+  (table in PLATFORM_CONVENTIONS.md §13.6) and `iap.validation.methods`
+  bundles them: `methods("legacy_v1")`,
+  `python -m iap.research run --methods legacy_v1`,
+  `research/alpha_reports/run_all.py --methods legacy_v1 --out-dir <dir>`.
+  `python/tests/test_legacy_methods.py` runs the pipeline's own entry points
+  under `legacy_v1` and compares every field with
+  `tests/golden/alpha_report_{EQ03,FX01}_v1.4.0.json` — the two reports
+  exactly as tagged `v1.4.0`, new files, never regenerated.
+- **Config documents.** Each loader rejects the older document instead of
+  reading it under a new default:
+  - `configs/execution/execution.json` `x-version` 1 -> 2: `cost_model`
+    names `impact_model` (`"sqrt"`; `"linear"` is the legacy rule) and
+    carries `sqrt_impact_coeff_bps` (100.0). `CostModel.load` requires
+    `impact_model`. The execution simulator and the MVP read
+    `impact_coeff_bps_per_pct_adv` as before: simulator rule 6 (linear
+    impact per child order) is not one of the methods and did not change in
+    any language. `mvp.config_version` hashes the document, so it moves
+    (`f293e7e7…` -> `bf8cc608…`); see the MVP golden below.
+  - `configs/strategies/lifecycle.json` `x-version` 1 -> 2: new key
+    `tstat_threshold` (`"ledger"`; `"fixed"` is the legacy rule).
+  - `configs/strategies/strategies.json` `adaptive.x-version` 1 -> 2: names
+    `ic_z_method` (`"hac"`; `"legacy"`, spelled `"pinned"` up to v1.4.0) and
+    `lifecycle.breach_rule` (`"cusum"` with `cusum_k` 0.0025 and `cusum_h`
+    0.01; `"consecutive"` is the legacy rule and the only reader of
+    `retire_breach_evals`). The document's top-level `x-version` stays 1.
+- **Research documents.**
+  - `research/experiments.json` `x-version` 2 -> 3: an entry may carry
+    `gate_looks`, the look count its PROMOTE t threshold was derived at
+    (`N` = ledger total before the run + the looks the run adds, declared
+    before the first alpha is evaluated). A rerun is judged at the recorded
+    count. Entries written before v1.5.0 have none and are not re-judged.
+    The report pipelines put the bundle name in the entry's `config`
+    (`"methods": "v2"`), so the v2 pass is 24 new entries beside the 24
+    `legacy_v1` ones of the same dataset — the old results stay in the file
+    and in the denominator. Looks per alpha per run: 84 under `v2`
+    (`looks_per_validation(4)` = 83, plus the day-2 backtest), 28 under
+    `legacy_v1`.
+  - `research/experiments/<id>/eligibility.json` `x-version` 1 -> 2: adds
+    `methods`, `significance_threshold`, `threshold_looks`. Readers accept
+    1 and 2. `ExperimentSpec.configuration` gains `methods` (default
+    `"v2"`), which is hashed into `experiment_id`: the five runner
+    experiments have new ids under `v2`; the directories of the earlier ids
+    are kept.
+  - `ExperimentResult` (`schemas/research/experiment_result.schema.json`,
+    `x-version` 1, shape unchanged): under `methods = "v2"` `ic` is the gate
+    IC and `t_stat` the pooled-slope HAC t; under `"legacy_v1"` they are the
+    pooled IC over valid labels and the Newey–West t of the bucketed IC, as
+    before. The two `description` strings say so. A zero-trade holdout
+    reports `sharpe` 0.0.
+  - `research/power/POWER_REPORT.json` `x-version` 1 -> 2: the study runs
+    the `v2` bundle; columns `sig (pooled)`, `sig (within)`, `sig (ledger)`,
+    `P&L CI > 0`, trades at 1x.
+  - `research/alpha_registry.json` `x-version` 1 -> 2: each record carries
+    `cusum` (the statistic of the live retirement rule; 0.0 outside
+    ACTIVE / WATCH and under the consecutive rule).
+  - `research/lifecycle_transitions.jsonl` was rebuilt by `bootstrap
+    --force` for the new method bundle after the old log was archived
+    unchanged as
+    `research/archive/lifecycle_transitions.dataset-116b7787.methods-legacy_v1.jsonl`.
+  - Alpha reports (`research/alpha_reports/<ID>.json`): new keys `methods`,
+    `gate_tstat`, `promote_gates`, `trade_count_1x_cost`, `fold_diagnostics`,
+    `net_pnl_bootstrap`, `net_pnl_1x_pooled`, `n_folds_survive_1x_cost`,
+    `oos_ic_{instrument_mean,vol_scaled}_uncrossed`, `oos_ic_valid_only`,
+    `gate_ic_valid_only`, `oos_ic_blackout_reopen`, `gate_ic_blackout_reopen`,
+    `label_reopen_available`, `n_blackout_rows_scored`, `ic_scale_consistent`,
+    `capacity_proxy_usd_by_instrument`, `capacity_breakeven_by_instrument`,
+    the `recompute_*` fields of the leakage block. No key was removed.
+  - Feature frames (`data/features/*.parquet`, not committed) gain one
+    column per horizon, `label_reopen_<h>`; `feature_version` is the
+    registry hash and is unchanged.
+- **Evidence document** (`iap.lifecycle.Evidence`, read by Python, Java and
+  Rust): new required key `significance_threshold` (number > 0 or `null`)
+  and, in `live`, new required key `new_fraction` in (0, 1]. A v1.4.0
+  evidence document is rejected by every reader.
+- **Which IC the gate reads** (decided here, pinned in
+  PLATFORM_CONVENTIONS.md §13.6). The per-instrument mean IC and the
+  vol-scaled IC are reported beside the pooled IC as headline columns; the
+  gate keeps reading the POOLED IC of the uncrossed book. Reason: the gate
+  t is the HAC t of the pooled slope — the significance of that IC and of
+  no other — and the lifecycle's holdout and paper gates compare a pooled
+  IC with the research IC. `ic_scale_consistent` flags an alpha whose pooled
+  and vol-scaled ICs disagree in sign.
+- **Report-only, and why.** The bootstrap interval of the net P&L and the
+  per-fold diagnostics are reported fields. They are not a CI gate or a
+  promotion gate: either would add a row to the lifecycle gate table, which
+  is pinned across Python, Java and Rust (17 edges, 18 gates) and would have
+  to be redesigned.
+- **Goldens.** Route (a) = the new rule is ported and the vector follows
+  it; route (b) = the cross-language vector stays on the old rule, named as
+  legacy in the golden and in the port.
+  - `tests/golden/expected_lifecycle.json` `x-version` 1 -> 2, route (a):
+    scenarios LC01–LC04 under the default policy (ledger threshold, CUSUM),
+    a `legacy` section (`config` + LG01, the v1.4.0 LC01 script) under
+    `tstat_threshold = "fixed"` / `breach_rule = "consecutive"`; every
+    expected row carries `cusum`. 36 default and 9 legacy transitions.
+    Replayed by Python, Java (`LifecycleGoldenTest`) and Rust
+    (`golden_lifecycle.rs`).
+  - `tests/golden/expected_adaptive.json` `x-version` 1 -> 2, route (a):
+    `lifecycle` is the CUSUM sequence and `lifecycle_legacy_consecutive` the
+    old one; `rolling_ic` is the pair-count-weighted reading and
+    `rolling_ic_unweighted` the old one. Java `LifecycleGauge` (factories
+    `cusum` / `legacyConsecutive`) and `RollingIc` follow; the paper loop
+    passes `new_fraction = min(1, block / window)`.
+  - `tests/golden/expected_backtest.json` `x-version` 1 -> 2, route (b):
+    the EQ01 vector is the research backtest under the legacy rules its
+    `config` now names (`position_policy: "sign"`, `cap_fills_at_l1: false`,
+    `block_rows_column: null`, `impact_model: "linear"`) — research-only
+    statistics, on no paper path. Java `ResearchBacktester`
+    (`POSITION_POLICY`, `CAP_FILLS_AT_L1`, `BLOCKS_ROWS`) and `CostModel`
+    (`IMPACT_MODEL`, `loadLegacyLinear`) name the rules they implement and
+    the test asserts they equal the golden's. A Python-only `default_rules`
+    block (EQ06, cost multiplier 0.01) pins the v1.5.0 defaults.
+  - `tests/golden/expected_alpha.json` (`x-version` 1): the same vectors
+    scored with the refitted parameters, which differ from v1.4.0 by at most
+    2.3e-15 relative (the frames carry more columns and numpy sums a strided
+    column in a different order); the golden moves by at most 2.6e-13
+    relative, inside every port's tolerance. No port changed.
+  - `tests/golden/expected_experiment_golden_frame.json` (`x-version` 1):
+    the golden experiment runs under `v2` — new `experiment_id`, the result
+    carries the gate statistics, the holdout makes no trade (Sharpe 0.0).
+  - `tests/golden/expected_mvp.json` (`x-version` 1): `config_version`
+    moves (it also hashes `alpha_params.json`, whose header names the
+    regeneration commit), and with it the trace digest (`f51890da…` ->
+    `e534ac1f…`: every trace carries `config_version`); the per-alpha `research_ic` / `ic_gap`
+    move because the research IC is now the gate IC of the v2 report.
+    Events, decisions, parents, fills and P&L are identical.
+  - New, never regenerated: `tests/golden/alpha_report_EQ03_v1.4.0.json`,
+    `alpha_report_FX01_v1.4.0.json`.
+- **Ports.** Java: `LifecycleGauge` (breach rule by name),
+  `RollingIc` (weighted), `PolicyConfig` (version 2, `tstatThreshold`,
+  `Live.legacyConsecutive`), `Evidence` (`significanceThreshold`,
+  `Live.newFraction`), `Gates.thresholdFor`, `AlphaRecord.cusum`,
+  `AlphaRegistry` version 2. Rust `lifecycle`: `BreachRule`,
+  `TstatThreshold`, `LiveConfig::legacy_consecutive`,
+  `PolicyConfig::threshold_for`, `LiveTracker::update(.., new_fraction)`
+  returning `Result`, `AlphaRecord.cusum`, `REGISTRY_VERSION` 2,
+  `LIFECYCLE_CONFIG_VERSION` 2. C++: comments only.
+- **API changes a caller must make.** `BacktestConfig()` is the cost-aware
+  policy and needs the label horizon at run time (`config.for_horizon(h)` /
+  `Backtester.for_horizon(h)`); `BacktestConfig.legacy(...)` is the old
+  constructor. `LifecycleConfig.from_config` and the adaptive config need
+  the rule names. `ExperimentRunner(tstat_threshold=...)` and the CLI flag
+  `--tstat-threshold` are gone: the policy is part of the method bundle
+  (`--methods`). `validate_alpha(tstat_threshold="ledger")` needs
+  `ledger_t_threshold`. `build_meta_features` does not impute by default
+  (`impute_nan=True` is the legacy rule). `compute_labels` scores BLACKOUT
+  rows at the reopen return by default (`blackout_reopen=False` is legacy).
+- **Found on the way.** `research/adaptive_reports/run_adaptive.py` built
+  its instrument meta without currencies, so the FX rows of the adaptive
+  study summed quote-currency P&L as if it were USD (the alpha reports had
+  been fixed for this on 2026-09-06, the adaptive runner had not). It now
+  loads the meta the alpha reports use; the FX P&L columns of
+  `ADAPTIVE_REPORT.md` are in USD.
+- **Not done.** `v_alpha_scorecard` (`schemas/sql/iap_v1.sql`) is still not
+  dataset-aware: it would need `iap_v2.sql` and a `DDL_X_VERSION` bump.
+- Versions and bookkeeping: `python/pyproject.toml` and `iap.__version__`
+  1.4.0 -> 1.5.0; image references `v1.4.0` -> `v1.5.0` (by tag; digests are
+  pinned from `release-manifest.json` after the release workflow has run);
+  `deployment/k8s/configmap-configs.yaml` regenerated for the changed config
+  documents.
+- Migration path for stored data: none can be migrated — regenerate
+  (`python3 tools/regenerate_dataset_artifacts.py`, CONTRIBUTING.md §4.1).
+  To keep a v1.4.0 number, select the legacy rule by name.

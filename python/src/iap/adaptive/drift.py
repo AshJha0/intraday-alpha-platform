@@ -40,11 +40,13 @@ agent — see /API_ADAPTIVE.md, the normative contract):
    yields z = None (monitors never fabricate confidence).
 
 Baseline serialization (research/baselines/<name>.json) — normative
-schema, ``x-version`` 1:
+schema, ``x-version`` 2 (each file names the ``feature_version`` it was
+captured against; a loader rejects any other version):
 
 ```
 {
-  "x-version": 1,
+  "x-version": 2,
+  "feature_version": str,           # feature-registry hash
   "kind": "signal" | "feature",     # distribution baselines
   "name": str,                      # file stem, unique
   "alpha_id": str,                  # "" when not alpha-specific

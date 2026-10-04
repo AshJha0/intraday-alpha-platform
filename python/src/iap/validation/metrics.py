@@ -568,7 +568,9 @@ def capacity_breakeven(
     Returns ``{"units", "notional", "participation"}``: the breakeven size
     in qty units, in quote currency and as a fraction of ADV.  All three are
     0 for an edge that does not cover spread + fee, and ``inf`` when the
-    cost model charges no impact.  Additive: no gate reads it.
+    cost model charges no impact.  Since v1.5.0 this is the default
+    capacity of a validation report (``capacity="breakeven"``), and the
+    lifecycle ``capacity`` gate reads the report's capacity.
     """
     units = cost_model.breakeven_size(edge_return, mid, half_spread, asset_class, adv, lot_size)
     unit = float(lot_size) if asset_class == "FX" else 1.0
