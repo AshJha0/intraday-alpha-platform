@@ -26,6 +26,33 @@ import java.util.function.Function;
  * {@code min_nw_tstat} and the evidence field is not read. The gate table
  * (names, blocks, kinds, edges) is unchanged.
  *
+ * <p><b>The net P&amp;L bootstrap gate</b> (v1.5.0). {@code net_pnl_bootstrap_ci}
+ * sits on the CANDIDATE -> VALIDATING edge directly after
+ * {@code net_pnl_after_costs} and requires
+ * {@code ci_low > min_net_pnl_ci_low} (strict: a lower bound of exactly 0.0
+ * fails) for the interval in {@code evidence.pnl_bootstrap}. The metric is
+ * ABSENT — the gate FAILS with {@code value = null}, it does not pass
+ * vacuously — when the block is null, when the alpha made no trade
+ * ({@code n_trades = 0}), when the interval was taken at another level than
+ * {@code gates.net_pnl_ci_level} (exact comparison) or when it has no bounds.
+ * Under {@code PolicyConfig.netPnlCiGate = "absent"} — the legacy policy —
+ * the machine does not evaluate the gate and it is part of no result
+ * ({@link AlphaLifecycle#edgeGates}).
+ *
+ * <p><b>The cross-alpha correlation gate</b> (v1.5.0). A new alpha must be
+ * additive: {@code cross_alpha_correlation} sits on the CANDIDATE -> VALIDATING
+ * edge (last) and requires
+ * {@code max |correlation| <= max_cross_alpha_correlation} over the ELIGIBLE
+ * peers of {@code evidence.cross_alpha} — every other registered alpha whose
+ * lifecycle state is at or beyond {@code PolicyConfig.crossAlphaMinState}
+ * (VALIDATING by default) and is not RETIRED. The absolute value is taken:
+ * the mirror image of an allocated alpha adds nothing either. With no
+ * eligible peer the statistic is 0.0 and the gate passes — vacuously, and
+ * the result says so by its value. {@code MAX} is inclusive: a correlation
+ * exactly at the threshold passes. An absent {@code cross_alpha} block —
+ * nobody measured the correlations — FAILS with {@code value = null} (fail
+ * closed).
+ *
  * <p>The stability rule {@code |ic - rank_ic| / max(|ic|, eps) <= max_ic_rank_gap}
  * requires the rank IC to lie in {@code [0, 2 * ic]} for a positive IC: same
  * sign, at most twice the linear IC — the one pair of numbers in an
@@ -63,6 +90,11 @@ public enum Gates {
             "min_net_return_bps",
             (ev, c) -> ev.research() == null ? null : ev.research().netReturnBps(),
             c -> c.gates().minNetReturnBps()),
+    NET_PNL_BOOTSTRAP_CI("net_pnl_bootstrap_ci", "pnl_bootstrap", Kind.GT,
+            "min_net_pnl_ci_low",
+            (ev, c) -> ev.pnlBootstrap() == null ? null
+                    : ev.pnlBootstrap().gateValue(c.gates().netPnlCiLevel()),
+            c -> c.gates().minNetPnlCiLow()),
     CAPACITY("capacity", "capacity", Kind.MIN, "min_capacity_usd",
             (ev, c) -> ev.capacityUsd(), c -> c.gates().minCapacityUsd()),
     STABILITY("stability", "research", Kind.MAX, "max_ic_rank_gap",
@@ -70,6 +102,11 @@ public enum Gates {
                     : icRankGap(ev.research().ic(), ev.research().rankIc(),
                             c.gates().icRankGapEps()),
             c -> c.gates().maxIcRankGap()),
+    CROSS_ALPHA_CORRELATION("cross_alpha_correlation", "cross_alpha", Kind.MAX,
+            "max_cross_alpha_correlation",
+            (ev, c) -> ev.crossAlpha() == null ? null
+                    : ev.crossAlpha().maxAbsCorrelation(c.crossAlphaMinState()),
+            c -> c.gates().maxCrossAlphaCorrelation()),
     HOLDOUT_IC_TRACKS_RESEARCH("holdout_ic_tracks_research", "validation", Kind.MAX,
             "max_holdout_ic_gap",
             (ev, c) -> ev.validation() == null ? null

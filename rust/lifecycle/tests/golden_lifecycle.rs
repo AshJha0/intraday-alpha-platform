@@ -1,5 +1,5 @@
 //! Golden replay of `tests/golden/expected_lifecycle.json`: every step of
-//! LC01 .. LC04 is driven through a fresh machine built from the golden's
+//! LC01 .. LC06 is driven through a fresh machine built from the golden's
 //! embedded default config (ledger significance threshold, CUSUM retirement)
 //! and every step of LG01 through one built from the embedded `legacy`
 //! config (fixed threshold, consecutive breaches — the rules up to v1.4.0),
@@ -13,7 +13,7 @@
 use contracts::canonical_json;
 use lifecycle::{
     promotion_edge, transition_table, Actor, AlphaLifecycle, AlphaRegistry, BreachRule, Evidence,
-    GateResult, LifecycleState, Outcome, PolicyConfig, TstatThreshold,
+    GateResult, LifecycleState, NetPnlCiGate, Outcome, PolicyConfig, TstatThreshold,
 };
 use serde_json::Value;
 
@@ -161,10 +161,10 @@ fn replay_section(golden: &Value, section: &Value, alpha_id: &str) -> AlphaLifec
             let expected_order: Vec<&str> = if before.is_live() {
                 vec!["rolling_ic"]
             } else {
-                promotion_edge(before)
-                    .expect("promotion edge")
-                    .gates
-                    .to_vec()
+                // the edge's gates the section's policy evaluates
+                machine
+                    .config()
+                    .evaluated_gates(promotion_edge(before).expect("promotion edge").gates)
             };
             let got_order: Vec<&str> = gates.iter().map(|(n, _)| n.as_str()).collect();
             assert_eq!(got_order, expected_order, "{where_}: gate evaluation order");
@@ -207,7 +207,7 @@ fn step_state_before<'a>(section: &'a Value, alpha_id: &str, k: usize) -> &'a st
 #[test]
 fn golden_header_and_tables() {
     let g = golden();
-    assert_eq!(g["x-version"], 2);
+    assert_eq!(g["x-version"], 3);
     assert_eq!(
         transition_table(),
         g["transition_table"],
@@ -245,6 +245,31 @@ fn golden_header_and_tables() {
     assert_eq!(legacy.tstat_threshold, TstatThreshold::Fixed);
     assert_eq!(legacy.live.breach_rule, BreachRule::Consecutive);
     assert_eq!(legacy.gates, embedded.gates);
+    // The bootstrap gate is evaluated by the default policy and left out by
+    // the legacy one; the edge lists it under either.
+    assert_eq!(embedded.net_pnl_ci_gate, NetPnlCiGate::Required);
+    assert_eq!(legacy.net_pnl_ci_gate, NetPnlCiGate::Absent);
+    assert_eq!(embedded.gates.min_net_pnl_ci_low, 0.0);
+    assert_eq!(embedded.gates.net_pnl_ci_level, 0.95);
+    assert_eq!(
+        promotion_edge(LifecycleState::Candidate)
+            .expect("promotion edge")
+            .gates
+            .len(),
+        11
+    );
+    // The correlation gate is configured the same under either policy.
+    assert_eq!(embedded.cross_alpha_min_state, LifecycleState::Validating);
+    assert_eq!(legacy.cross_alpha_min_state, LifecycleState::Validating);
+    assert_eq!(embedded.gates.max_cross_alpha_correlation, 0.7);
+    assert_eq!(
+        promotion_edge(LifecycleState::Candidate)
+            .expect("promotion edge")
+            .gates
+            .last()
+            .copied(),
+        Some("cross_alpha_correlation")
+    );
     let names = |v: &Value| -> Vec<String> {
         v.as_object()
             .expect("scenarios object")
@@ -254,7 +279,7 @@ fn golden_header_and_tables() {
     };
     let mut default_names = names(&g["scenarios"]);
     default_names.sort_unstable();
-    assert_eq!(default_names, ["LC01", "LC02", "LC03", "LC04"]);
+    assert_eq!(default_names, ["LC01", "LC02", "LC03", "LC04", "LC05", "LC06"]);
     assert_eq!(names(&g["legacy"]["scenarios"]), ["LG01"]);
 }
 
@@ -282,7 +307,7 @@ fn scenario_lc03_demotion_counter_and_manual_retire() {
     // demotion (exercised by the unit tests) is covered by the scenarios —
     // the same pinned set as the Python golden test.
     let mut covered: Vec<(String, String)> = Vec::new();
-    for alpha in ["LC01", "LC02", "LC03", "LC04"] {
+    for alpha in ["LC01", "LC02", "LC03", "LC04", "LC05", "LC06"] {
         for step in g["scenarios"][alpha].as_array().expect("steps") {
             let t = &step["expected"]["transition"];
             if t["actor"] == "SYSTEM" {
@@ -321,12 +346,79 @@ fn scenario_lc04_cusum_retirement() {
         .filter(|t| t.to_state == LifecycleState::Retired)
         .count();
     assert_eq!(retirements, 3, "three CUSUM retirements");
-    // The four default scripts carry 36 transitions between them.
-    let total: usize = ["LC01", "LC02", "LC03", "LC04"]
+    // The six default scripts carry 52 transitions between them.
+    let total: usize = ["LC01", "LC02", "LC03", "LC04", "LC05", "LC06"]
         .iter()
         .map(|a| replay(&g, a).transitions().len())
         .sum();
-    assert_eq!(total, 36);
+    assert_eq!(total, 52);
+}
+
+#[test]
+fn scenario_lc05_cross_alpha_correlation_gate() {
+    let g = golden();
+    let m = replay(&g, "LC05");
+    assert_eq!(m.state("LC05").expect("known"), LifecycleState::Validating);
+    assert_eq!(m.transitions().len(), 14);
+    // The alpha passes the gate four times; each time it is the last of the
+    // eleven results the transition carries.
+    let promotions: Vec<_> = m
+        .transitions()
+        .iter()
+        .filter(|t| t.to_state == LifecycleState::Validating)
+        .collect();
+    assert_eq!(promotions.len(), 4);
+    for t in &promotions {
+        assert_eq!(t.gates.len(), 11);
+        assert!(t.gates["cross_alpha_correlation"].passed);
+    }
+    // The golden pins the fail-closed case and the tie.
+    let steps = g["scenarios"]["LC05"].as_array().expect("steps");
+    let gate = |k: usize| &steps[k]["expected"]["gates"]["cross_alpha_correlation"];
+    assert!(steps[1]["evidence"]["cross_alpha"].is_null());
+    assert_eq!(steps[1]["expected"]["outcome"], "HOLD");
+    assert!(gate(1)["value"].is_null(), "no block: value null");
+    assert_eq!(gate(1)["passed"].as_bool(), Some(false));
+    assert_eq!(gate(1)["threshold"], 0.7);
+    assert_eq!(steps[8]["expected"]["state"], "VALIDATING");
+    assert_eq!(gate(8)["value"], 0.7, "the tie");
+    assert_eq!(gate(8)["passed"].as_bool(), Some(true));
+    assert_eq!(gate(8)["threshold"], 0.7);
+}
+
+#[test]
+fn scenario_lc06_net_pnl_bootstrap_gate() {
+    let g = golden();
+    let m = replay(&g, "LC06");
+    assert_eq!(m.state("LC06").expect("known"), LifecycleState::Validating);
+    assert_eq!(m.transitions().len(), 2);
+    let promoted = m.transitions().last().expect("promotion");
+    assert_eq!(promoted.reason, "all 11 gates passed: CANDIDATE -> VALIDATING");
+    assert_eq!(promoted.gates["net_pnl_bootstrap_ci"].value, Some(12.5));
+    // The golden pins every way the gate decides.
+    let steps = g["scenarios"]["LC06"].as_array().expect("steps");
+    assert_eq!(steps.len(), 8);
+    let gate = |k: usize| &steps[k]["expected"]["gates"]["net_pnl_bootstrap_ci"];
+    assert!(steps[1]["evidence"]["pnl_bootstrap"].is_null());
+    let expected = |k: usize| &steps[k]["expected"];
+    for k in 1..=6 {
+        assert_eq!(expected(k)["outcome"], "HOLD", "step {k}");
+        assert_eq!(gate(k)["passed"].as_bool(), Some(false), "step {k}");
+        assert_eq!(gate(k)["threshold"], 0.0, "step {k}");
+    }
+    // no block, no trade, no bounds, another level: value null
+    for k in [1, 3, 4, 5] {
+        assert!(gate(k)["value"].is_null(), "step {k}");
+    }
+    assert_eq!(steps[3]["evidence"]["pnl_bootstrap"]["n_trades"], 0);
+    assert!(steps[4]["evidence"]["pnl_bootstrap"]["ci_low"].is_null());
+    assert_eq!(steps[5]["evidence"]["pnl_bootstrap"]["level"], 0.9);
+    // an interval spanning zero fails at its lower bound; exactly 0.0 fails (strict)
+    assert_eq!(gate(2)["value"], -35.5);
+    assert_eq!(gate(6)["value"], 0.0);
+    assert_eq!(gate(7)["value"], 12.5);
+    assert_eq!(gate(7)["passed"].as_bool(), Some(true));
+    assert_eq!(steps[7]["expected"]["state"], "VALIDATING");
 }
 
 #[test]
@@ -335,6 +427,14 @@ fn scenario_lg01_legacy_rules() {
     let m = replay_section(&g, &g["legacy"], "LG01");
     assert_eq!(m.state("LG01").expect("known"), LifecycleState::Research);
     assert_eq!(m.transitions().len(), 9);
+    // The legacy policy leaves the bootstrap gate out: ten gates, by name.
+    let promoted = m
+        .transitions()
+        .iter()
+        .find(|t| t.to_state == LifecycleState::Validating)
+        .expect("promotion");
+    assert_eq!(promoted.reason, "all 10 gates passed: CANDIDATE -> VALIDATING");
+    assert!(!promoted.gates.contains_key("net_pnl_bootstrap_ci"));
     assert!(m
         .transitions()
         .iter()

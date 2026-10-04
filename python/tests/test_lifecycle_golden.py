@@ -1,9 +1,9 @@
 """Golden group: tests/golden/expected_lifecycle.json and the committed
 bootstrap artefacts.
 
-Pins: the golden document (``x-version`` 2) is reproduced byte-for-byte by
+Pins: the golden document (``x-version`` 3) is reproduced byte-for-byte by
 ``iap.lifecycle.golden`` under the pinned config; every scenario step of
-BOTH sections — ``scenarios`` (LC01..LC04, the default policy: ledger
+BOTH sections — ``scenarios`` (LC01..LC06, the default policy: ledger
 significance threshold, CUSUM retirement) and ``legacy.scenarios`` (LG01,
 the rules up to v1.4.0: fixed threshold, consecutive breaches) — is
 reproduced by an independent replay of the golden's own inputs through a
@@ -64,9 +64,18 @@ def test_golden_header_and_config(golden):
     assert golden["t0"] == T0 and golden["step_ns"] == STEP_NS
     assert golden["states"] == {s.name: int(s) for s in LifecycleState}
     assert golden["transition_table"] == transition_table()
-    assert GOLDEN_X_VERSION == 2
+    assert GOLDEN_X_VERSION == 3
     assert PolicyConfig.from_dict(golden["config"]) == load_policy_config()
-    assert sorted(golden["scenarios"]) == ["LC01", "LC02", "LC03", "LC04"] == sorted(scripts())
+    assert (
+        sorted(golden["scenarios"])
+        == ["LC01", "LC02", "LC03", "LC04", "LC05", "LC06"]
+        == sorted(scripts())
+    )
+    assert golden["config"]["cross_alpha_min_state"] == "VALIDATING"
+    assert golden["config"]["net_pnl_ci_gate"] == "required"
+    assert golden["config"]["gates"]["max_cross_alpha_correlation"] == 0.7
+    assert golden["config"]["gates"]["net_pnl_ci_level"] == 0.95
+    assert golden["config"]["gates"]["min_net_pnl_ci_low"] == 0.0
     # the default policy, by name
     assert golden["config"]["tstat_threshold"] == "ledger"
     assert golden["config"]["live"]["breach_rule"] == "cusum"
@@ -86,6 +95,11 @@ def test_golden_legacy_section_header(golden):
     assert sorted(legacy["scenarios"]) == ["LG01"] == sorted(legacy_scripts())
     assert legacy["config"]["tstat_threshold"] == "fixed"
     assert legacy["config"]["live"]["breach_rule"] == "consecutive"
+    # the bootstrap gate did not exist up to v1.4.0: absent, by name
+    assert legacy["config"]["net_pnl_ci_gate"] == "absent"
+    promoted = legacy["scenarios"]["LG01"][1]["expected"]
+    assert "net_pnl_bootstrap_ci" not in promoted["gates"] and len(promoted["gates"]) == 10
+    assert promoted["transition"]["reason"] == "all 10 gates passed: CANDIDATE -> VALIDATING"
     for key in ("policy", "gates", "demotion"):
         assert legacy["config"][key] == golden["config"][key], key
     for key in ("watch_ic_gate", "reactivate_ic_gate", "retire_breach_evals", "reactivate_evals"):
@@ -103,7 +117,7 @@ def _transition_count(scenarios) -> int:
 
 
 def test_golden_transition_counts(golden):
-    assert _transition_count(golden["scenarios"]) == 36
+    assert _transition_count(golden["scenarios"]) == 52
     assert _transition_count(golden["legacy"]["scenarios"]) == 9
 
 
@@ -118,6 +132,8 @@ def test_golden_reproduced_byte_for_byte(golden_text):
         ("default", "LC02"),
         ("default", "LC03"),
         ("default", "LC04"),
+        ("default", "LC05"),
+        ("default", "LC06"),
         ("legacy", "LG01"),
     ],
 )
@@ -185,6 +201,7 @@ def test_golden_scenarios_cover_every_system_edge(golden):
         ("CANDIDATE", "RESEARCH", "SYSTEM"),
         ("PAPER", "CANDIDATE", "SYSTEM"),
         ("CANDIDATE", "RETIRED", "HUMAN"),
+        ("VALIDATING", "RETIRED", "HUMAN"),  # LC05 walks the candidate edge four times
         ("RETIRED", "RESEARCH", "HUMAN"),
     }
     assert seen == expected
@@ -199,6 +216,7 @@ def test_golden_scenarios_cover_every_system_edge(golden):
         ("CANDIDATE", "RESEARCH", "SYSTEM"),
         ("PAPER", "CANDIDATE", "SYSTEM"),
         ("CANDIDATE", "RETIRED", "HUMAN"),
+        ("VALIDATING", "RETIRED", "HUMAN"),
     }
 
 
@@ -267,3 +285,62 @@ def test_bootstrap_matches_committed_artefacts(tmp_path):
     assert loaded.render() == committed_registry
     assert all(loaded.get(a).state is LifecycleState.CANDIDATE for a in loaded.alpha_ids())
     assert len(loaded) == 24
+
+
+def _gate(golden, alpha_id: str, step: int, name: str) -> dict:
+    return golden["scenarios"][alpha_id][step]["expected"]["gates"][name]
+
+
+def test_golden_lc05_pins_the_cross_alpha_correlation_gate(golden):
+    """Missing evidence fails closed, |correlation| above 0.7 with an
+    eligible peer fails, ineligible peers are ignored, the tie at 0.7 and
+    the empty peer list pass."""
+    name = "cross_alpha_correlation"
+    steps = golden["scenarios"]["LC05"]
+    assert steps[1]["evidence"]["cross_alpha"] is None
+    assert _gate(golden, "LC05", 1, name) == {"passed": False, "value": None, "threshold": 0.7}
+    assert _gate(golden, "LC05", 2, name) == {"passed": False, "value": 0.82, "threshold": 0.7}
+    assert _gate(golden, "LC05", 3, name) == {"passed": False, "value": 0.9, "threshold": 0.7}
+    for step in (1, 2, 3):
+        assert steps[step]["expected"]["outcome"] == "HOLD"
+        failed = [g for g, r in steps[step]["expected"]["gates"].items() if not r["passed"]]
+        assert failed == [name]
+    # only CANDIDATE / RETIRED peers: nobody counts -> 0.0, vacuous pass
+    assert {p["state"] for p in steps[4]["evidence"]["cross_alpha"]["peers"]} == {
+        "CANDIDATE",
+        "RETIRED",
+    }
+    assert _gate(golden, "LC05", 4, name) == {"passed": True, "value": 0.0, "threshold": 0.7}
+    assert _gate(golden, "LC05", 8, name) == {"passed": True, "value": 0.7, "threshold": 0.7}
+    assert steps[12]["evidence"]["cross_alpha"] == {"peers": []}
+    assert _gate(golden, "LC05", 12, name) == {"passed": True, "value": 0.0, "threshold": 0.7}
+    assert _gate(golden, "LC05", 16, name) == {"passed": True, "value": 0.4, "threshold": 0.7}
+    for step in (4, 8, 12, 16):
+        assert steps[step]["expected"]["state"] == "VALIDATING"
+
+
+def test_golden_lc06_pins_the_net_pnl_bootstrap_gate(golden):
+    """Missing block, no trade, no bounds and the wrong level fail with a
+    null value; a negative and a zero lower bound fail at their value; a
+    positive lower bound passes."""
+    name = "net_pnl_bootstrap_ci"
+    steps = golden["scenarios"]["LC06"]
+    null = {"passed": False, "value": None, "threshold": 0.0}
+    assert steps[1]["evidence"]["pnl_bootstrap"] is None
+    assert _gate(golden, "LC06", 1, name) == null
+    assert _gate(golden, "LC06", 2, name) == {"passed": False, "value": -35.5, "threshold": 0.0}
+    assert steps[3]["evidence"]["pnl_bootstrap"]["n_trades"] == 0
+    assert _gate(golden, "LC06", 3, name) == null
+    assert steps[4]["evidence"]["pnl_bootstrap"]["ci_low"] is None
+    assert _gate(golden, "LC06", 4, name) == null
+    assert steps[5]["evidence"]["pnl_bootstrap"]["level"] == 0.9
+    assert _gate(golden, "LC06", 5, name) == null
+    assert _gate(golden, "LC06", 6, name) == {"passed": False, "value": 0.0, "threshold": 0.0}
+    for step in range(1, 7):
+        assert steps[step]["expected"]["outcome"] == "HOLD"
+        failed = [g for g, r in steps[step]["expected"]["gates"].items() if not r["passed"]]
+        assert failed == [name]
+    assert _gate(golden, "LC06", 7, name) == {"passed": True, "value": 12.5, "threshold": 0.0}
+    assert steps[7]["expected"]["transition"]["reason"] == (
+        "all 11 gates passed: CANDIDATE -> VALIDATING"
+    )

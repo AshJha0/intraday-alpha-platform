@@ -12,6 +12,11 @@
 //!   at once; at VALIDATING / PAPER each failed evaluation increments
 //!   `consecutive_failures` and the `max_consecutive_failures`-th one demotes
 //!   to CANDIDATE; a passing evaluation resets the counter;
+//! * **a gate the policy leaves out**: under `net_pnl_ci_gate = "absent"` (the
+//!   legacy policy) `net_pnl_bootstrap_ci` is not evaluated on the CANDIDATE ->
+//!   VALIDATING edge and appears in no result
+//!   ([`PolicyConfig::evaluated_gates`]); the transition table itself is the
+//!   same under either policy;
 //! * **silence**: an absent evidence block for the edge (`research` at
 //!   CANDIDATE, `validation` at VALIDATING, `paper` at PAPER, `live` / a null
 //!   or uninformative rolling IC at ACTIVE / WATCH) evaluates nothing and
@@ -145,8 +150,10 @@ pub const ALLOWED_TRANSITIONS: [Edge; 17] = [
             "fold_count",
             "hypothesis_sign",
             "net_pnl_after_costs",
+            "net_pnl_bootstrap_ci",
             "capacity",
             "stability",
+            "cross_alpha_correlation",
         ],
     ),
     edge(
@@ -798,8 +805,9 @@ impl AlphaLifecycle {
             return Ok(None);
         }
 
-        let mut results: Vec<(String, GateResult)> = Vec::with_capacity(edge.gates.len());
-        for name in edge.gates {
+        let names = self.config.evaluated_gates(edge.gates);
+        let mut results: Vec<(String, GateResult)> = Vec::with_capacity(names.len());
+        for name in &names {
             let r = evaluate_named(name, &self.config, evidence)
                 .ok_or_else(|| IapError::InvalidArgument(format!("unknown gate {name:?}")))?;
             results.push((name.to_string(), r));
@@ -818,7 +826,7 @@ impl AlphaLifecycle {
                 event_ts,
                 format!(
                     "all {} gates passed: {} -> {}",
-                    edge.gates.len(),
+                    names.len(),
                     state.name(),
                     edge.to_state.name()
                 ),

@@ -42,6 +42,83 @@ the number were missing: a result that may not be used as evidence is not a
 number a gate can pass on.  This is a property of the evidence, not a new
 row of the gate table, so the table, the edges and the golden are unchanged.
 
+**The net P&L bootstrap gate (pinned, v1.5.0).**  ``net_pnl_bootstrap_ci``
+sits on the CANDIDATE -> VALIDATING edge directly after
+``net_pnl_after_costs`` and requires
+
+    lower bound of the bootstrap interval of net P&L  >  min_net_pnl_ci_low  (0.0)
+
+* *The interval.*  ``Evidence.pnl_bootstrap``: the percentile interval of the
+  SUM of the 1-minute bar net P&L by the stationary bootstrap
+  (``iap.validation.diagnostics.stationary_bootstrap_ci``; Politis & Romano
+  1994) — 1 000 resamples, mean block ``max(1, round(n ** (1/3)))`` bars,
+  SplitMix64 from the recorded seed, lower empirical quantiles — taken at
+  the level ``gates.net_pnl_ci_level`` (0.95).  Level, resamples, seed,
+  block and series length travel in the evidence; a gate never resamples.
+* *The series.*  The same backtest the ``net_pnl_after_costs`` gate reads
+  — the research backtester at 1x costs under the method bundle in force —
+  but over ALL walk-forward test folds pooled (``net_pnl_1x_pooled``),
+  where ``net_pnl_after_costs`` reads the point estimate of the LAST fold.
+* *No trade.*  An alpha that made no trade in any fold (``n_trades = 0``)
+  has no P&L to resample: its interval is the degenerate [0, 0] and is not
+  evidence.  The gate FAILS with ``value = null`` — it does not pass
+  vacuously, and the evidence's ``n_trades = 0`` is the stated reason
+  (:func:`bootstrap_gate_reason`).  The same holds for an interval without
+  bounds (fewer than 8 bars), one taken at another level than the
+  configured one, and a missing block.
+* *Strict.*  ``gt``: a lower bound of exactly 0.0 fails.
+* *Not redundant with its neighbours.*  ``net_pnl_after_costs`` asks whether
+  the last fold's net P&L is positive — a point estimate on one fifth of
+  the sample; this gate asks whether the pooled P&L of every fold is
+  positive beyond its own sampling noise.  An alpha can pass either one
+  alone.  ``stability`` reads the Pearson / rank IC gap and nothing of the
+  P&L or of the folds.  The per-fold diagnostics (cost survival, decay and
+  regime per fold) stay report-only: how consistently the SIGNAL holds
+  across folds is already gated by ``fold_consistency``, and the P&L of
+  every fold enters this gate's pooled series, so a per-fold P&L count
+  would gate the same evidence a third time at four observations.
+* *Legacy.*  Under ``net_pnl_ci_gate = "absent"`` — the legacy policy — the
+  gate is not evaluated and is not part of any result: the rules up to
+  v1.4.0 had no such gate.
+
+**The cross-alpha correlation gate (pinned, v1.5.0; backlog AF03).**  A new
+alpha must be additive: ``cross_alpha_correlation`` sits on the CANDIDATE ->
+VALIDATING edge and requires
+
+    max over eligible peers of |signal correlation|  <=  max_cross_alpha_correlation
+
+* *The series.*  The Pearson correlation of the two alphas' out-of-sample
+  standardised signals ``z`` on the rows BOTH score — same instrument, same
+  feature row, both confidences > 0 — pooled across instruments and
+  walk-forward test folds (``iap.combine.correlation``).  Two alphas that
+  never score a common row (an equity and an FX alpha) have correlation 0.0
+  by definition: they cannot be the same bet in the sense of this gate.
+  The SIGNAL is gated rather than the realised P&L because P&L exists only
+  where the alpha trades, and under the cost-aware policy most alphas here
+  make no trade — a P&L correlation would be undefined exactly where the
+  gate is needed.  The P&L correlation is reported beside it
+  (``research/combination``), not gated.
+* *The peers.*  Every other registered alpha whose lifecycle state is at or
+  beyond ``cross_alpha_min_state`` (config; VALIDATING by default) and is
+  not RETIRED.  The absolute value is taken: an alpha that is the mirror
+  image of an allocated one adds nothing either.
+* *No eligible peer.*  The statistic is 0.0 and the gate passes — vacuously,
+  and the result says so by its value.  The first alpha through the gate is
+  never blocked by it.
+* *Ties.*  ``max`` is inclusive: a correlation exactly at the threshold
+  passes.  When several peers share the largest ``|correlation|`` the
+  binding peer a report names is the one with the smallest ``alpha_id``
+  (``CrossAlphaEvidence.binding_peer``); the gate result is the same.
+* *Order.*  The gate compares a candidate with what is already through, so
+  the order candidates are evaluated in decides which of two correlated
+  candidates passes.  The bootstrap evaluates alphas in ascending
+  ``alpha_id`` order at one instant: the smaller id is evaluated first and
+  the larger one then meets it as a peer.
+* *Missing evidence.*  ``Evidence.cross_alpha`` absent — nobody measured the
+  correlations — FAILS the gate with ``value = null``: fail closed.
+* *Ports.*  The evidence carries the peers with their states and
+  correlations, so Java and Rust evaluate the gate from the document alone.
+
 Gate inventory (config key in ``configs/strategies/lifecycle.json``):
 
 ==========================  ==========  =========================================  ==========================
@@ -55,8 +132,10 @@ fold_consistency            research    fold_consistency (min)                  
 fold_count                  research    n_folds (min)                              min_folds
 hypothesis_sign             research    hypothesis_sign_confirmed is True (bool)   —
 net_pnl_after_costs         research    net_return_bps (gt)                        min_net_return_bps
+net_pnl_bootstrap_ci        pnl_bootstrap ci_low of a traded, right-level interval (gt) min_net_pnl_ci_low
 capacity                    capacity    capacity_usd (min)                         min_capacity_usd
 stability                   research    |ic - rank_ic| / max(|ic|, eps) (max)      max_ic_rank_gap
+cross_alpha_correlation     cross_alpha max eligible-peer |correlation| (max)      max_cross_alpha_correlation
 holdout_ic_tracks_research  validation  |holdout_ic - research_ic| (max)           max_holdout_ic_gap
 replay_reproducible         validation  replay_hash_match (bool)                   —
 cross_language_parity       validation  parity (bool)                              —
@@ -95,7 +174,9 @@ __all__ = [
     "GATE_SPECS",
     "Gate",
     "GateSpec",
+    "BOOTSTRAP_GATE",
     "SIGNIFICANCE_GATE",
+    "bootstrap_gate_reason",
     "build_gates",
     "ic_rank_gap",
 ]
@@ -104,6 +185,26 @@ Metric = float | int | bool | None
 
 #: The gate whose threshold comes from the evidence under the ledger policy.
 SIGNIFICANCE_GATE = "statistical_significance"
+#: The gate the legacy policy leaves out (``net_pnl_ci_gate = "absent"``).
+BOOTSTRAP_GATE = "net_pnl_bootstrap_ci"
+
+
+def bootstrap_gate_reason(evidence: Evidence, config: PolicyConfig) -> str:
+    """Why ``net_pnl_bootstrap_ci`` decides as it does on ``evidence`` —
+    the explicit reason a report prints beside the gate result."""
+    boot = evidence.pnl_bootstrap
+    level = config.gates.net_pnl_ci_level
+    if boot is None:
+        return "no bootstrap interval in the evidence"
+    if boot.n_trades == 0:
+        return "no trade at 1x costs in any fold: no P&L to resample, no interval"
+    if boot.level != level:
+        return f"interval taken at level {boot.level}, the policy requires {level}"
+    if boot.ci_low is None:
+        return f"only {boot.n_bars} bars: too few for an interval"
+    bound = config.gates.min_net_pnl_ci_low
+    relation = ">" if boot.ci_low > bound else "<="
+    return f"lower bound {boot.ci_low:.2f} {relation} {bound} at level {level}"
 
 
 def ic_rank_gap(ic: float, rank_ic: float, eps: float) -> float:
@@ -132,6 +233,18 @@ def _stability(ev: Evidence, cfg: PolicyConfig) -> Metric:
     if ev.research is None:
         return None
     return ic_rank_gap(ev.research.ic, ev.research.rank_ic, cfg.gates.ic_rank_gap_eps)
+
+
+def _pnl_bootstrap(ev: Evidence, cfg: PolicyConfig) -> Metric:
+    if ev.pnl_bootstrap is None:
+        return None
+    return ev.pnl_bootstrap.gate_value(cfg.gates.net_pnl_ci_level)
+
+
+def _cross_alpha(ev: Evidence, cfg: PolicyConfig) -> Metric:
+    if ev.cross_alpha is None:
+        return None
+    return ev.cross_alpha.max_abs_correlation(cfg.cross_alpha_min_state)
 
 
 def _validation(field: str) -> Callable[[Evidence, PolicyConfig], Metric]:
@@ -242,8 +355,16 @@ GATE_SPECS: tuple[GateSpec, ...] = (
     _spec(
         "net_pnl_after_costs", "research", "gt", "min_net_return_bps", _research("net_return_bps")
     ),
+    _spec("net_pnl_bootstrap_ci", "pnl_bootstrap", "gt", "min_net_pnl_ci_low", _pnl_bootstrap),
     _spec("capacity", "capacity", "min", "min_capacity_usd", _capacity),
     _spec("stability", "research", "max", "max_ic_rank_gap", _stability),
+    _spec(
+        "cross_alpha_correlation",
+        "cross_alpha",
+        "max",
+        "max_cross_alpha_correlation",
+        _cross_alpha,
+    ),
     _spec("holdout_ic_tracks_research", "validation", "max", "max_holdout_ic_gap", _holdout_gap),
     _spec("replay_reproducible", "validation", "bool", None, _validation("replay_hash_match")),
     _spec("cross_language_parity", "validation", "bool", None, _validation("parity")),

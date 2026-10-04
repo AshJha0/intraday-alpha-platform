@@ -27,6 +27,12 @@ configuration and therefore part of the experiment id.  (The v1.3.0 /
 v1.4.0 flag ``--tstat-threshold`` is gone: the ledger threshold is part of
 ``v2`` and the fixed 3.0 part of ``legacy_v1``.)
 
+``combine`` evaluates the signal combinations (:mod:`iap.combine.report`):
+``python -m iap.research combine [--asset-class EQUITY|FX|all] [--method
+equal_weight,ridge,...] [--members EQ01,EQ03,...] [--horizon 5s]
+[--dry-run]`` validates each (asset class, method) combination as an alpha,
+debits its looks and writes ``research/combination/``.
+
 ``power`` runs the planted-signal power study (:mod:`iap.research.power`)
 and writes ``POWER_REPORT.md`` / ``POWER_REPORT.json``.
 
@@ -321,6 +327,50 @@ def _power(args: argparse.Namespace) -> int:
     return 0
 
 
+def _combine(args: argparse.Namespace) -> int:
+    from iap.combine import report as combine_report
+    from iap.combine.weights import METHODS as COMBINATION_METHODS
+    from iap.lifecycle.config import load_policy_config
+
+    names = [m for m in args.method.split(",") if m] if args.method else list(COMBINATION_METHODS)
+    classes = (
+        list(combine_report.ASSET_CLASSES) if args.asset_class == "all" else [args.asset_class]
+    )
+    members = None
+    if args.members:
+        if len(classes) != 1:
+            raise ResearchError("--members needs one --asset-class", code="invalid_spec")
+        members = {classes[0]: [m for m in args.members.split(",") if m]}
+    repo = args.repo_root if args.repo_root is not None else REPO
+    try:
+        result = combine_report.run_combination(
+            repo,
+            asset_classes=classes,
+            method_names=names,
+            members=members,
+            horizon=args.horizon,
+            features_dir=args.features_dir,
+            normalized_dir=args.normalized_dir,
+            configs_dir=args.configs_dir,
+            ledger_path=args.ledger,
+            progress=lambda line: print(line, file=sys.stderr),
+        )
+    except ValueError as exc:
+        raise ResearchError(str(exc), code="invalid_spec") from exc
+    policy = load_policy_config(
+        args.configs_dir / "strategies" / "lifecycle.json",
+        args.configs_dir / "strategies" / "strategies.json",
+    )
+    threshold = policy.gates.max_cross_alpha_correlation
+    print(combine_report.render_markdown(result["document"], threshold))
+    if args.dry_run:
+        print("dry run: no report written (the looks are debited)", file=sys.stderr)
+        return 0
+    paths = combine_report.write_reports(result, args.combine_out_dir, threshold)
+    print("wrote " + ", ".join(str(p) for p in paths.values()), file=sys.stderr)
+    return 0
+
+
 class _Parser(argparse.ArgumentParser):
     """argparse with an optional machine-readable usage error."""
 
@@ -432,6 +482,41 @@ def _parser() -> argparse.ArgumentParser:
         help="where POWER_REPORT.{md,json} are written",
     )
     power.set_defaults(func=_power)
+
+    combine = sub.add_parser("combine", help="signal combination report")
+    combine.add_argument(
+        "--asset-class", choices=("all", "EQUITY", "FX"), default="all", help="default: both"
+    )
+    combine.add_argument(
+        "--method",
+        default=None,
+        help="comma-separated combination methods (default: all four; each is an experiment)",
+    )
+    combine.add_argument(
+        "--members",
+        default=None,
+        help="comma-separated member alpha ids (default: every alpha of the asset class)",
+    )
+    combine.add_argument(
+        "--horizon", default=None, help="label horizon (default: the members' median horizon)"
+    )
+    combine.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="compute and print; write no report (the looks are still debited)",
+    )
+    combine.add_argument("--features-dir", type=Path, default=REPO / "data" / "features")
+    combine.add_argument("--normalized-dir", type=Path, default=None)
+    combine.add_argument("--ledger", type=Path, default=REPO / "research" / "experiments.json")
+    combine.add_argument("--configs-dir", type=Path, default=REPO / "configs")
+    combine.add_argument("--repo-root", type=Path, default=None)
+    combine.add_argument(
+        "--combine-out-dir",
+        type=Path,
+        default=REPO / "research" / "combination",
+        help="where REPORT.md, COMBINATION.json, reports/ and signal_correlation.json go",
+    )
+    combine.set_defaults(func=_combine)
     return parser
 
 

@@ -13,10 +13,17 @@ Bootstrap reads, for each of the 24 flagship alphas (``iap.alpha.ALPHA_IDS``):
   ``data_version`` / ``feature_version`` / ``git_commit`` provenance, and the
   alpha's parameter block whose content hash is the ``model_version``);
 
+* ``research/combination/signal_correlation.json`` — the pairwise signal
+  correlations of the alphas (``iap.combine.correlation``; optional);
+
 builds ``Evidence.research`` (an ``ExperimentResult``),
-``Evidence.capacity_usd`` and ``Evidence.significance_threshold`` (the
+``Evidence.capacity_usd``, ``Evidence.significance_threshold`` (the
 PROMOTE t threshold the report was judged at, ``gates.min_nw_tstat`` of the
 report — the ledger-derived threshold under the default methods),
+``Evidence.pnl_bootstrap`` (:func:`pnl_bootstrap_from_report`: the report's
+``net_pnl_bootstrap`` interval plus the trades its folds made at 1x costs;
+absent for a report without one) and ``Evidence.cross_alpha``
+(:func:`cross_alpha_evidence`),
 registers every alpha at RESEARCH, advances each
 one at the pinned bootstrap event time until it stops moving (at most
 ``STATE_COUNT`` steps; on the bundled data: RESEARCH -> CANDIDATE, then the
@@ -77,6 +84,17 @@ A report metric that is ``null`` / non-finite cannot enter an
 alpha is then bootstrapped with ``research = None`` and stays at RESEARCH
 with the presence gates failed (``value = null``) — reported, never a crash.
 
+**Order and the correlation gate (pinned).**  Alphas are registered and
+evaluated in ascending ``alpha_id`` order at one instant.  The cross-alpha
+evidence of an alpha lists every alpha registered BEFORE it — those with a
+smaller id — in the state the machine left it in, with the correlation read
+from the correlation document.  So of two correlated candidates the smaller
+id is evaluated first, and the larger one meets it as a peer.  When the
+document is missing, or lacks a pair, the correlations were not measured:
+the evidence carries no ``cross_alpha`` block and the gate fails closed —
+except for the first alpha, which has no peer and whose empty block is a
+fact, not a measurement.
+
 **Bootstrap event time** (pinned, wall-clock free): the latest fold
 ``test_end`` across all reports, i.e. the last event timestamp the research
 consumed (``1787691480577291027`` on the bundled data).  Every alpha is
@@ -96,7 +114,12 @@ from iap.alpha import ALPHA_IDS
 from iap.contracts.types import ExperimentResult, ExperimentSpec, LifecycleState, Period, Verdict
 from iap.contracts.versions import content_hash
 from iap.lifecycle.config import PolicyConfig, load_policy_config, repo_root
-from iap.lifecycle.evidence import Evidence
+from iap.lifecycle.evidence import (
+    CrossAlphaEvidence,
+    CrossAlphaPeer,
+    Evidence,
+    PnlBootstrapEvidence,
+)
 from iap.lifecycle.machine import STATE_COUNT, AlphaLifecycle
 from iap.lifecycle.registry import AlphaRegistry, LifecycleTransitionLog
 from iap.validation.methods import DEFAULT_METHODS, METHODS_LEGACY
@@ -110,6 +133,9 @@ __all__ = [
     "TransitionLogExists",
     "bootstrap_event_ts",
     "capacity_from_report",
+    "cross_alpha_evidence",
+    "load_signal_correlations",
+    "pnl_bootstrap_from_report",
     "latest_event_ts",
     "load_ledger_entries",
     "load_params_document",
@@ -130,6 +156,9 @@ LEDGER_RELPATH = Path("research") / "experiments.json"
 PARAMS_RELPATH = Path("configs") / "strategies" / "alpha_params.json"
 REGISTRY_RELPATH = Path("research") / "alpha_registry.json"
 TRANSITIONS_RELPATH = Path("research") / "lifecycle_transitions.jsonl"
+CORRELATIONS_RELPATH = Path("research") / "combination" / "signal_correlation.json"
+#: ``x-version`` of the correlation document this module reads.
+CORRELATIONS_X_VERSION = 1
 
 _LEDGER_KIND = "promotion_pipeline"
 
@@ -338,6 +367,66 @@ def significance_threshold_from_report(report: Mapping[str, Any]) -> float | Non
     return value if value is not None and value > 0.0 else None
 
 
+def pnl_bootstrap_from_report(report: Mapping[str, Any]) -> PnlBootstrapEvidence | None:
+    """The P&L bootstrap block of a report: its ``net_pnl_bootstrap``
+    interval (pooled 1x-cost net P&L of every walk-forward test fold) with
+    the number of trades those folds made (``fold_diagnostics[].
+    trade_count_1x``).  ``None`` for a report that carries no interval or no
+    per-fold diagnostics (the legacy method bundle): no interval, no
+    evidence."""
+    boot = report.get("net_pnl_bootstrap")
+    folds = report.get("fold_diagnostics")
+    if not isinstance(boot, Mapping) or not isinstance(folds, list) or not folds:
+        return None
+    return PnlBootstrapEvidence(
+        ci_low=_finite(boot.get("ci_low")),
+        ci_high=_finite(boot.get("ci_high")),
+        level=float(boot["level"]),
+        n_resamples=int(boot["n_boot"]),
+        seed=int(boot["seed"]),
+        mean_block=float(boot["mean_block"]),
+        n_bars=int(boot["n"]),
+        n_trades=sum(int(f["trade_count_1x"]) for f in folds),
+    )
+
+
+def load_signal_correlations(root: Path) -> dict[str, dict[str, float]] | None:
+    """``{alpha_id: {other_id: correlation}}`` from
+    ``research/combination/signal_correlation.json``, or ``None`` when the
+    file does not exist (nobody measured the correlations)."""
+    path = root / CORRELATIONS_RELPATH
+    if not path.is_file():
+        return None
+    with open(path, encoding="utf-8") as fh:
+        doc = json.load(fh)
+    if doc.get("x-version") != CORRELATIONS_X_VERSION:
+        raise ValueError(f"{path}: x-version {doc.get('x-version')!r} != {CORRELATIONS_X_VERSION}")
+    return {
+        str(a): {str(b): float(rho) for b, rho in row.items()}
+        for a, row in doc["correlation"].items()
+    }
+
+
+def cross_alpha_evidence(
+    alpha_id: str,
+    registry: AlphaRegistry,
+    correlations: Mapping[str, Mapping[str, float]] | None,
+) -> CrossAlphaEvidence | None:
+    """The cross-alpha block of ``alpha_id``: every OTHER alpha in
+    ``registry`` with its current state and its signal correlation with
+    ``alpha_id`` (module docs, "Order and the correlation gate").  ``None``
+    when a registered peer's correlation is not in ``correlations``."""
+    peers: list[CrossAlphaPeer] = []
+    for rec in registry.records():
+        if rec.alpha_id == alpha_id:
+            continue
+        rho = None if correlations is None else correlations.get(alpha_id, {}).get(rec.alpha_id)
+        if rho is None:
+            return None
+        peers.append(CrossAlphaPeer(rec.alpha_id, rec.state, rho))
+    return CrossAlphaEvidence(tuple(sorted(peers, key=lambda p: p.alpha_id)))
+
+
 #: What the alpha-report format does not record and the mapping cannot know.
 UNRECORDED_BY_REPORT = ("seed", "max_drawdown_bps", "sharpe", "train_period", "validation_period")
 
@@ -485,6 +574,7 @@ def run_bootstrap(
     params_doc = load_params_document(root)
     ledger = load_ledger_entries(root, str(params_doc["data_version"]))
     event_ts = bootstrap_event_ts(reports)
+    correlations = load_signal_correlations(root)
 
     registry = AlphaRegistry(cfg.policy)
     log = LifecycleTransitionLog(log_path, truncate=True) if write else None
@@ -500,6 +590,8 @@ def run_bootstrap(
             paper=None,
             live=None,
             significance_threshold=significance_threshold_from_report(report),
+            pnl_bootstrap=pnl_bootstrap_from_report(report),
+            cross_alpha=cross_alpha_evidence(aid, registry, correlations),
         )
         machine.register(
             aid,

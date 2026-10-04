@@ -611,7 +611,7 @@ def test_lifecycle_gates_refuse_non_eligible_research_evidence(frames):
         assert not got.passed and got.value is None, name
     # the capacity gate reads its own block and is unaffected
     assert gates["capacity"].evaluate("EQ03", refused).passed
-    assert len(GATE_SPECS) == 18  # no new row: the table is pinned
+    assert len(GATE_SPECS) == 20  # eligibility is no row of the table
 
 
 def test_significance_gate_needs_the_threshold_the_result_was_judged_at(frames):
@@ -650,8 +650,10 @@ def test_evidence_document_gains_the_eligibility_key_only_when_flagged(frames):
     ok = Evidence(research=result, capacity_usd=1.0, validation=None, paper=None, live=None)
     assert sorted(ok.to_dict()) == [
         "capacity_usd",
+        "cross_alpha",
         "live",
         "paper",
+        "pnl_bootstrap",
         "research",
         "significance_threshold",
         "validation",
