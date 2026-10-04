@@ -16,10 +16,10 @@ planned paths of the current release, **backlog** says what would prove it done.
 | | count | estimate (days) |
 |---|---:|---:|
 | epics | 31 | |
-| issues | 155 | 511 |
-| issues `done` | 98 | 232.5 |
+| issues | 161 | 540 |
+| issues `done` | 103 | 257.5 |
 | issues `in-progress` | 0 | 0 |
-| issues `backlog` | 57 | 278.5 |
+| issues `backlog` | 58 | 282.5 |
 
 ### By milestone
 
@@ -33,7 +33,7 @@ planned paths of the current release, **backlog** says what would prove it done.
 | Week 5 | 2 | 10 | 10 | 0 | 0 |
 | Week 6 | 7 | 24 | 24 | 0 | 0 |
 | Phase 2 | 3 | 9 | 7 | 0 | 2 |
-| Phase 3 | 2 | 9 | 1 | 0 | 8 |
+| Phase 3 | 2 | 15 | 6 | 0 | 9 |
 | Backlog | 7 | 48 | 1 | 0 | 47 |
 
 Issues are listed under their epic; an issue's own milestone can differ from
@@ -65,7 +65,7 @@ the epic's (a backlog item under a finished epic sits in **Backlog**).
 - [E22 — Research platform — alpha factory](#e22--research-platform--alpha-factory) · Phase 2 · partial · 4 issues
 - [E23 — Production engineering (documented out of scope)](#e23--production-engineering-documented-out-of-scope) · Phase 3 · partial · 5 issues
 - [E24 — Agentic AI / MCP research layer (read-only)](#e24--agentic-ai--mcp-research-layer-read-only) · Backlog · partial · 2 issues
-- [E25 — Real historical exchange data (ITCH/PITCH, FX ECN) with a point-in-time master](#e25--real-historical-exchange-data-itchpitch-fx-ecn-with-a-point-in-time-master) · Phase 3 · backlog · 4 issues
+- [E25 — Real historical exchange data (ITCH/PITCH, FX ECN) with a point-in-time master](#e25--real-historical-exchange-data-itchpitch-fx-ecn-with-a-point-in-time-master) · Phase 3 · partial · 10 issues
 - [E26 — Latency engineering — measured, gated, allocation-free hot path](#e26--latency-engineering--measured-gated-allocation-free-hot-path) · Backlog · backlog · 4 issues
 - [E27 — Simulator calibration to live fills, multi-horizon markouts, venue/algo TCA](#e27--simulator-calibration-to-live-fills-multi-horizon-markouts-venuealgo-tca) · Backlog · backlog · 4 issues
 - [E28 — Book-level risk — factors, stress scenarios, regulatory pre-trade controls, drop-copy reconciliation](#e28--book-level-risk--factors-stress-scenarios-regulatory-pre-trade-controls-drop-copy-reconciliation) · Backlog · backlog · 4 issues
@@ -662,7 +662,7 @@ Name what a live deployment would need beyond this repository — real feed hand
 
 ### E25 — Real historical exchange data (ITCH/PITCH, FX ECN) with a point-in-time master
 
-**Status:** backlog · **Milestone:** Phase 3 · **Issues:** 4 (done 0, in-progress 0, backlog 4) · **Estimate:** 27 days · **Labels:** `type:epic`, `area:marketdata`, `phase:phase3`, `priority:p2`, `status:backlog`
+**Status:** partial · **Milestone:** Phase 3 · **Issues:** 10 (done 5, in-progress 0, backlog 5) · **Estimate:** 56 days · **Labels:** `type:epic`, `area:marketdata`, `phase:phase3`, `priority:p2`, `status:partial`
 
 Replace the seeded synthetic generator as the only data source with decoders for real historical feeds (equity ITCH/PITCH-style order-by-order feeds and FX ECN streams) that emit the same canonical MarketEvents, and back them with a point-in-time security master and corporate-action history so a study run today sees exactly the universe, symbology and prices that were knowable on each historical date.
 
@@ -677,10 +677,16 @@ Replace the seeded synthetic generator as the only data source with decoders for
 
 | key | title | status | est. (d) | milestone | evidence |
 |---|---|---|---:|---|---|
-| XD01 | ITCH/PITCH order-by-order decoder into canonical MarketEvents | backlog | 8 | Phase 3 | `python/src/iap/marketdata/ (decoder proposed); rust/marketdata/ (decoder proposed); schemas/FORMAT.md` |
+| XD01 | Nasdaq TotalView-ITCH 5.0 reader and mapping into canonical MarketEvents (Python) | done | 8 | Phase 3 | `python/src/iap/marketdata/itch50.py; python/src/iap/marketdata/feederrors.py`<br>`python/tests/test_itch50_reader.py; python/tests/test_itch50_mapping.py; python/tests/itch50_encoder.py`<br>`docs/REAL_DATA.md` |
 | XD02 | FX ECN feed normalisation (per-venue conventions, last-look, firm vs indicative) | backlog | 6 | Phase 3 | `python/src/iap/marketdata/ (proposed); configs/venues/venues.json` |
-| XD03 | Point-in-time security master with as-of queries | backlog | 7 | Phase 3 | `configs/instruments/instruments.json; schemas/sql/iap_v1.sql; python/src/iap/store/ (security master proposed)` |
-| XD04 | Corporate-action adjustment engine (splits, dividends, mergers) applied point-in-time | backlog | 6 | Phase 3 | `PLATFORM_CONVENTIONS.md section 1 (price_ticks); python/src/iap/marketdata/ (proposed)` |
+| XD03 | Point-in-time security master with as-of queries, built from the session's directory | done | 4 | Phase 3 | `python/src/iap/reference/secmaster.py; python/tests/test_reference_pit.py`<br>`python/tests/test_real_data_ingest.py; docs/REAL_DATA.md` |
+| XD04 | Corporate-action table (owner-supplied CSV) and point-in-time adjustment API | done | 4 | Phase 3 | `python/src/iap/reference/corpactions.py; python/tests/test_reference_pit.py`<br>`docs/REAL_DATA.md` |
+| XD05 | LOBSTER reader with level-by-level verification against the orderbook file | done | 4 | Phase 3 | `python/src/iap/marketdata/lobster.py; python/tests/test_lobster.py; python/tests/lobster_fixture.py`<br>`docs/REAL_DATA.md` |
+| XD06 | Real-data ingest CLI, dataset manifest and the research hook (--dataset-dir) | done | 5 | Phase 3 | `python/src/iap/marketdata/ingest.py; python/src/iap/marketdata/__main__.py; python/src/iap/research/__main__.py`<br>`python/tests/test_real_data_ingest.py; docs/REAL_DATA.md; COOKBOOK.md` |
+| XD07 | CBOE PITCH decoder and Rust port of the ITCH 5.0 decoder | backlog | 8 | Phase 3 | `python/src/iap/marketdata/itch50.py; rust/marketdata/ (decoder proposed)` |
+| XD08 | Route every study reference read through the as-of security master (multi-day universes) | backlog | 6 | Phase 3 | `python/src/iap/reference/secmaster.py; python/src/iap/features/context.py; configs/instruments/instruments.json` |
+| XD09 | Multi-day corporate-action-adjusted panels in the feature and label pipeline | backlog | 6 | Phase 3 | `python/src/iap/reference/corpactions.py; python/src/iap/features/ (application proposed)` |
+| XD10 | Verify the decoders against vendor sample files and record a first real-data study | backlog | 5 | Phase 3 | `python/tests/test_real_data_ingest.py; docs/REAL_DATA.md; research/ (report proposed)` |
 
 ## Backlog
 

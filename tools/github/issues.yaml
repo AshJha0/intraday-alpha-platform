@@ -2991,20 +2991,25 @@ issues:
       - "python/tests/test_import_policy.py; PLATFORM_CONVENTIONS.md section 13.7; docs/RESEARCH_VALIDITY.md"
 
   # ---------------------------------------------------------------- E25-E31 ----
-  # Backlog epics added 2026-10-03 (all status: backlog; paths marked (proposed) do not exist yet).
+  # Backlog epics added 2026-10-03 (paths marked (proposed) do not exist yet). E25 was
+  # re-cut when its Python ingestion path landed (feat/real-data-ingest): XD01, XD03, XD04,
+  # XD05 and XD06 are done on bytes the tests synthesise; XD02 and XD07-XD10 are backlog.
+  # No vendor data is in the repository, so nothing here claims a result on a real file.
   - key: XD01
     epic: E25
-    title: "ITCH/PITCH order-by-order decoder into canonical MarketEvents"
-    labels: [type:feature, area:marketdata, lang:python, lang:rust, priority:p2, phase:phase3]
+    title: "Nasdaq TotalView-ITCH 5.0 reader and mapping into canonical MarketEvents (Python)"
+    labels: [type:feature, area:marketdata, lang:python, priority:p2, phase:phase3]
     milestone: "Phase 3"
-    status: backlog
+    status: done
     estimate_days: 8
-    context: "The only data source is the seeded generator. A decoder for an ITCH/PITCH-style historical feed (add, modify, execute, cancel, delete, trade messages with nanosecond timestamps) emitting the canonical MBO events lets the existing book, feature and replay stack run on real order flow."
+    context: "The only data source was the seeded generator. iap.marketdata.itch50 is a streaming parser for the length-prefixed ITCH 5.0 file format (gzip detected by magic, a symbol filter that reduces a full-day file to a universe in one pass) and a mapper to the canonical MBO events: A/F to ADD, E/C to EXECUTE plus a TRADE print, X to MODIFY, D to CANCEL, U to CANCEL plus ADD (the replacement loses queue priority), P to a TRADE that does not touch the book, S/H to STATUS. Every mapping decision is a row of the table in docs/REAL_DATA.md. Tested on bytes written by a test-only encoder; verification on a vendor file is XD10."
     acceptance:
-      - "Decoding a vendor sample file yields canonical events and a book reconstruction equal to the vendor's end-of-day book"
-      - "Unknown or malformed messages are counted and rejected by the QC stage, never silently dropped"
+      - "Every supported message type round-trips through the reader, unknown types are skipped by length and counted, and truncated or malformed input raises a typed error carrying the byte offset"
+      - "A seeded valid session replayed through the real order book ends on the generator's own book per level in FIFO order, with no dropped event and no crossed book in continuous trading"
     evidence:
-      - "python/src/iap/marketdata/ (decoder proposed); rust/marketdata/ (decoder proposed); schemas/FORMAT.md"
+      - "python/src/iap/marketdata/itch50.py; python/src/iap/marketdata/feederrors.py"
+      - "python/tests/test_itch50_reader.py; python/tests/test_itch50_mapping.py; python/tests/itch50_encoder.py"
+      - "docs/REAL_DATA.md"
 
   - key: XD02
     epic: E25
@@ -3022,31 +3027,119 @@ issues:
 
   - key: XD03
     epic: E25
-    title: "Point-in-time security master with as-of queries"
+    title: "Point-in-time security master with as-of queries, built from the session's directory"
     labels: [type:feature, area:marketdata, area:store, lang:python, priority:p2, phase:phase3]
     milestone: "Phase 3"
-    status: backlog
-    estimate_days: 7
-    context: "Instrument attributes (symbol, listing venue, lot size, tick size, status) change over time. Studies must read them as of the event date or survivorship and lookahead bias enter through reference data."
+    status: done
+    estimate_days: 4
+    context: "Instrument attributes (symbol, locate, listing market, lot size, tick size, ETP flag) change over time. iap.reference.secmaster keeps one record per (symbol, effective_date) - for ITCH the day's Stock Directory message - and is read only through as_of(symbol, date), which returns the latest record on or before the date and raises when there is none. The ingest writes it to the dataset's reference/security_master.json. Routing every study read through it is XD08."
     acceptance:
-      - "An as-of query API returns the instrument record valid on a given date, including delisted names"
-      - "A test fails any study code path that reads an instrument attribute not valid at the study date"
+      - "as_of returns the record valid on a given date and raises rather than returning a record from a later date"
+      - "The file form is byte-identical for the same records whatever their insertion order"
     evidence:
-      - "configs/instruments/instruments.json; schemas/sql/iap_v1.sql; python/src/iap/store/ (security master proposed)"
+      - "python/src/iap/reference/secmaster.py; python/tests/test_reference_pit.py"
+      - "python/tests/test_real_data_ingest.py; docs/REAL_DATA.md"
 
   - key: XD04
     epic: E25
-    title: "Corporate-action adjustment engine (splits, dividends, mergers) applied point-in-time"
+    title: "Corporate-action table (owner-supplied CSV) and point-in-time adjustment API"
     labels: [type:feature, area:marketdata, lang:python, priority:p2, phase:phase3]
+    milestone: "Phase 3"
+    status: done
+    estimate_days: 4
+    context: "Prices and sizes are integer ticks and shares; a split or dividend changes their meaning. iap.reference.corpactions reads a documented CSV schema (SPLIT, DIVIDEND, SYMBOL_CHANGE) the owner supplies - nothing is downloaded - and answers adjustment queries with an observation date and an as-of date: only actions that went ex in between apply, so an action after the as-of date is never used. Split factors are exact fractions; ticks round half up and quantities round down. Applying it inside the feature and label pipeline is XD09."
+    acceptance:
+      - "A split and a cash dividend fixture adjust history exactly, with the documented rounding rule on ticks and quantities"
+      - "An action with an ex-date after the as-of date is never applied, and a malformed table is rejected with its line number"
+    evidence:
+      - "python/src/iap/reference/corpactions.py; python/tests/test_reference_pit.py"
+      - "docs/REAL_DATA.md"
+
+  - key: XD05
+    epic: E25
+    title: "LOBSTER reader with level-by-level verification against the orderbook file"
+    labels: [type:feature, area:marketdata, lang:python, priority:p2, phase:phase3]
+    milestone: "Phase 3"
+    status: done
+    estimate_days: 4
+    context: "LOBSTER ships a message file and an orderbook file per symbol-day. iap.marketdata.lobster maps event types 1-7 to canonical events, parses the decimal-seconds timestamps as strings into integer nanoseconds, seeds the orders that rested before the file starts from the orderbook file, back-fills depth that only becomes visible later, and compares the real order book with the reference row after every message, reporting the first divergence. Fixtures are synthesised by the tests."
+    acceptance:
+      - "A synthesised message file with its matching orderbook file verifies on every row; a deliberately wrong orderbook file reports the message index, side and level of the first divergence"
+      - "Timestamps convert exactly: no value passes through a binary float"
+    evidence:
+      - "python/src/iap/marketdata/lobster.py; python/tests/test_lobster.py; python/tests/lobster_fixture.py"
+      - "docs/REAL_DATA.md"
+
+  - key: XD06
+    epic: E25
+    title: "Real-data ingest CLI, dataset manifest and the research hook (--dataset-dir)"
+    labels: [type:feature, area:marketdata, area:research, lang:python, priority:p2, phase:phase3]
+    milestone: "Phase 3"
+    status: done
+    estimate_days: 5
+    context: "python -m iap.marketdata ingest turns owner-supplied ITCH 5.0 or LOBSTER files into a dataset directory with the generator's layout (raw, normalized, QC report) plus its own configs, a point-in-time security master and dataset.json (source, input sha256, message counts per type, skipped counts, a dataset_version that no synthetic dataset can share). python -m iap.features runs on it unchanged, and python -m iap.research run --dataset-dir records the dataset_version in the spec and the ledger, so real and synthetic looks are never pooled. Output is byte-deterministic for the same input."
+    acceptance:
+      - "The same input produces byte-identical output files, in any output directory and in either order of ingesting two sessions"
+      - "An experiment run with --dataset-dir carries the manifest's dataset_version in its spec and its ledger entries and writes nothing into the checkout's own ledger"
+    evidence:
+      - "python/src/iap/marketdata/ingest.py; python/src/iap/marketdata/__main__.py; python/src/iap/research/__main__.py"
+      - "python/tests/test_real_data_ingest.py; docs/REAL_DATA.md; COOKBOOK.md"
+
+  - key: XD07
+    epic: E25
+    title: "CBOE PITCH decoder and Rust port of the ITCH 5.0 decoder"
+    labels: [type:feature, area:marketdata, lang:python, lang:rust, priority:p2, phase:phase3]
+    milestone: "Phase 3"
+    status: backlog
+    estimate_days: 8
+    context: "Only Nasdaq ITCH 5.0 is decoded, and only in Python (a few hundred thousand messages a second, so a full day is tens of minutes). A PITCH decoder adds a second venue for cross-venue studies, and a Rust decoder with a shared golden makes full-day, full-universe ingestion practical."
+    acceptance:
+      - "A PITCH file synthesised by a test encoder maps to canonical events with a documented mapping table"
+      - "The Rust decoder produces byte-identical raw files to the Python decoder on a shared golden input"
+    evidence:
+      - "python/src/iap/marketdata/itch50.py; rust/marketdata/ (decoder proposed)"
+
+  - key: XD08
+    epic: E25
+    title: "Route every study reference read through the as-of security master (multi-day universes)"
+    labels: [type:feature, area:marketdata, area:research, lang:python, priority:p2, phase:phase3]
     milestone: "Phase 3"
     status: backlog
     estimate_days: 6
-    context: "Prices and sizes are integer ticks and shares; a split or dividend changes their meaning. Adjustments must be applied as of the date they became known, never retroactively, and must keep the integer-tick contract."
+    context: "The feature engine, backtester and risk reference data still read configs/instruments/instruments.json, which holds one value per instrument for the whole dataset. An ingested dataset therefore requires a fixed universe and one tick size per symbol across its sessions. Reading attributes as of each session date would allow listings, delistings, lot-size and symbol changes inside one dataset and remove survivorship from the symbol filter."
     acceptance:
-      - "A split and a cash dividend fixture adjust history exactly, with a documented rounding rule on ticks"
-      - "Features and labels computed on adjusted data equal those computed on contemporaneous unadjusted data after re-basing"
+      - "Every instrument attribute used by a study is read through an as-of query; a test fails a code path that reads an attribute not valid at the study date"
+      - "A dataset whose universe changes between sessions ingests and runs, including a delisted name"
     evidence:
-      - "PLATFORM_CONVENTIONS.md section 1 (price_ticks); python/src/iap/marketdata/ (proposed)"
+      - "python/src/iap/reference/secmaster.py; python/src/iap/features/context.py; configs/instruments/instruments.json"
+
+  - key: XD09
+    epic: E25
+    title: "Multi-day corporate-action-adjusted panels in the feature and label pipeline"
+    labels: [type:feature, area:marketdata, area:features, lang:python, priority:p2, phase:phase3]
+    milestone: "Phase 3"
+    status: backlog
+    estimate_days: 6
+    context: "The adjustment API exists (XD04) but nothing applies it: features and labels are computed per session on unadjusted integer ticks, which is correct inside a day and wrong for any quantity carried across an ex-date (session profiles, overnight returns, multi-day rolling statistics)."
+    acceptance:
+      - "Features and labels computed on adjusted data equal those computed on contemporaneous unadjusted data after re-basing"
+      - "A study spanning a split fixture carries no discontinuity in any cross-session feature"
+    evidence:
+      - "python/src/iap/reference/corpactions.py; python/src/iap/features/ (application proposed)"
+
+  - key: XD10
+    epic: E25
+    title: "Verify the decoders against vendor sample files and record a first real-data study"
+    labels: [type:feature, area:marketdata, area:research, lang:python, priority:p1, phase:phase3]
+    milestone: "Phase 3"
+    status: backlog
+    estimate_days: 5
+    context: "The readers are tested on bytes the tests synthesise from the published layouts. No vendor file has been read, because none may be stored in the repository. Two tests in python/tests/test_real_data_ingest.py are skipped unless environment variables point at files the owner obtained; they run the full ingest and the book checks. A first study then needs at least two sessions and the reading rules of docs/REAL_DATA.md section 8."
+    acceptance:
+      - "A day of real vendor sample data decodes to canonical events with a clean book check, and a LOBSTER sample reconstructs the vendor's orderbook file on every row"
+      - "A report states, for the first real dataset, the dataset_version, the looks spent and the verdict of each alpha - whatever the verdict is"
+    evidence:
+      - "python/tests/test_real_data_ingest.py; docs/REAL_DATA.md; research/ (report proposed)"
 
   - key: LT01
     epic: E26

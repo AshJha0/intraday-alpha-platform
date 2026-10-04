@@ -44,12 +44,16 @@ Contents:
 33. [Query the store read-only, and see what a refused statement looks like](#33-query-the-store-read-only-and-see-what-a-refused-statement-looks-like)
 34. [Replay the risk edge golden in Python](#34-replay-the-risk-edge-golden-in-python)
 35. [Check whether a result is gate-eligible](#35-check-whether-a-result-is-gate-eligible)
+36. [Ingest an ITCH 5.0 file and run an alpha on it (no real data needed)](#36-ingest-an-itch-50-file-and-run-an-alpha-on-it-no-real-data-needed)
 
 Recipes 27–35 were added with v1.3.0. Every command block in them was run
 as printed, from a clean checkout of the release, before it was written
 down; the quoted outputs are what those runs printed. Recipes that write
 anything write under `data/store/` (git-ignored), never into the committed
 ledger or `research/experiments/`.
+
+Recipe 36 was added with the real-data ingestion path ([docs/REAL_DATA.md](docs/REAL_DATA.md)). It writes under `data/vendor/` and
+`data/real/` (both git-ignored); its block was run as printed.
 
 v1.4.0 (2026-10-03) regenerated the seeded dataset (`data_version`
 `116b7787…`, was `203c8f54…`; recipe 1). Every quoted output below that
@@ -1931,3 +1935,82 @@ v1.5.0, `significance_threshold` and `live.new_fraction`, which all three
 readers require.) LEARN.md §24 explains which ways of gaming the gate this
 closes.
 
+
+## 36. Ingest an ITCH 5.0 file and run an alpha on it (no real data needed)
+
+`python -m iap.marketdata ingest` ([docs/REAL_DATA.md](docs/REAL_DATA.md))
+turns a Nasdaq TotalView-ITCH 5.0 file — or LOBSTER files — that **you
+obtained** into a dataset directory with the generator's layout, so the
+feature pipeline and the research runner consume it unchanged. No vendor
+data is in this repository, so this recipe writes two days of valid ITCH 5.0
+bytes with the test-only encoder and runs the whole chain on them. Replace
+the first block with your own files and the rest is the real procedure.
+
+```bash
+mkdir -p data/vendor
+cd python
+PYTHONPATH=src python3 - <<'EOF'
+import sys
+sys.path.insert(0, "tests")                      # the test-only encoder lives beside the tests
+from itch50_encoder import build_session
+
+for seed, date in ((7, "2019-12-30"), (8, "2019-12-31")):
+    enc, _ = build_session(seed, symbols=("AAPL", "MSFT", "QQQ"), etp_symbols=("QQQ",),
+                           n_actions=6000, spacing_ns=10**9)
+    path = enc.write(f"../data/vendor/demo_{date}.itch.gz", compress=True)
+    print(path, enc.messages, "messages")
+EOF
+# ../data/vendor/demo_2019-12-30.itch.gz 6082 messages
+# ../data/vendor/demo_2019-12-31.itch.gz 6082 messages
+
+for d in 2019-12-30 2019-12-31; do
+  PYTHONPATH=src python3 -m iap.marketdata ingest --format itch50 \
+    --input ../data/vendor/demo_$d.itch.gz --date $d \
+    --symbols AAPL,MSFT,QQQ --out ../data/real/demo > /dev/null
+done
+PYTHONPATH=src python3 - <<'EOF'
+import json
+m = json.load(open("../data/real/demo/dataset.json"))
+print(m["dataset_version"][:16], list(m["sessions"]), [u["symbol"] for u in m["universe"]])
+s = m["sessions"]["2019-12-30"]
+print(s["messages"]["by_type"])
+print("events", s["raw"]["events"], "book check clean:", s["book_check"]["clean"],
+      "qc:", {k: v for k, v in m["normalized"]["qc_totals"].items() if v})
+EOF
+# 70ddb405e78c2356 ['2019-12-30', '2019-12-31'] ['AAPL', 'MSFT', 'QQQ']
+# {'A': 3061, 'C': 220, 'D': 886, 'E': 820, 'F': 10, 'H': 4, 'I': 4, 'P': 164, 'Q': 8, 'R': 4, 'S': 6, 'U': 419, 'X': 472, 'Y': 4}
+# events 5576 book check clean: True qc: {'events_in': 11255, 'events_out': 11255, 'sequence_resets': 3}
+
+PYTHONPATH=src python3 -m iap.features --data-dir ../data/real/demo/normalized \
+  --out-dir ../data/real/demo/features --configs ../data/real/demo/configs \
+  --registry-out ../data/real/demo/reference/feature_registry.json 2> /dev/null
+PYTHONPATH=src python3 -m iap.research run --alpha EQ03 --dataset-dir ../data/real/demo \
+  | sed -n '1,5p;/VERDICT/p'
+# experiment         240bdd3b53899e7f
+# alpha              EQ03
+# horizon            5s
+# dataset_version    70ddb405e78c2356c2a6f15a85f8dfe520cc27bf427ec2532d4257c480e8e29e
+# feature_version    585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac
+# VERDICT: REJECT
+```
+
+What to read in the output. The message counts are per ITCH type, counted
+over the whole file before the symbol filter (the file also carries a
+fourth symbol the universe does not ask for). `sequence_resets: 3` is one
+per instrument: sequences restart at 1 every session, and the normaliser
+counts that; gaps, duplicates and invalid events are absent because they
+are 0. `book check clean` means the mapped stream replayed through the
+real order book without a dropped event or a crossing displayed order.
+
+The `dataset_version` in the experiment is the manifest's, not the bundled
+dataset's `116b7787…`: the spec, the experiment id and the ledger
+entries of its 28 looks carry it, and the ledger they went into is
+`data/real/demo/research/experiments.json` — `research/experiments.json`
+in the checkout did not move. Ingesting the same bytes again gives the
+same `dataset_version` and byte-identical files.
+
+The REJECT means nothing: the encoder's order flow is uniform random, so
+there is nothing to find. With real files the verdict is about that
+dataset, under the reading rules of docs/REAL_DATA.md §8 — two sessions
+are two sessions. `rm -rf data/vendor/demo_* data/real/demo` removes
+everything this recipe wrote.

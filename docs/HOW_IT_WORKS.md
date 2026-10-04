@@ -902,7 +902,8 @@ reason for each:
 
 What would not be theatre is the unglamorous list: real exchange data,
 measured latency, a simulator calibrated to live fills, book-level risk
-(EPICS E25–E28).
+(EPICS E25–E28). The ingestion path for the first of these exists
+([REAL_DATA.md](REAL_DATA.md)); no real file has been run through it yet.
 
 **Where to look**
 
@@ -990,4 +991,5 @@ PYTHONPATH=src python3 -m iap.mvp replay --run ../data/mvp/58a10f2194a3c81c     
 | the pictures | [DIAGRAMS.md](DIAGRAMS.md) |
 | every pinned rule | [../PLATFORM_CONVENTIONS.md](../PLATFORM_CONVENTIONS.md) |
 | what is done and what is backlog | [ROADMAP.md](ROADMAP.md), [EPICS.md](EPICS.md) |
+| to run the pipeline on real historical files you obtained (ITCH 5.0, LOBSTER) | [REAL_DATA.md](REAL_DATA.md) |
 | what changed in v1.3.0, v1.4.0 and v1.5.0 | [../CHANGELOG.md](../CHANGELOG.md) |
