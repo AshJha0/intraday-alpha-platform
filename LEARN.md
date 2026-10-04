@@ -2528,111 +2528,124 @@ before and after: byte-identical. Two effects:
 
 A *level* scales both (0 is the null, 1 the reference effect of
 `research/power/generator_planted.json`), and a *break* scenario reverses
-both effects from the middle of the sample. Each cell is run on three
+both effects from the middle of the sample. Each cell is run on twenty
 generator seeds through the real feature pipeline and `validate_alpha`.
+
+Two things about the design matter for reading the result.
+
+- **Sessions.** A run is generated once, at the largest session count, and
+  scored on its first 1, 2, 4 (and, in the extended grid, 8) sessions. That
+  is exact: without a break, session *k* does not depend on what follows it,
+  so the first *n* sessions of a run are the *n*-session run of the same
+  seed (a test compares the bytes). The bundled calendar has five trading
+  days; the study writes its own reference tree with as many weekdays as it
+  needs and leaves `configs/` alone.
+- **Detectors.** Each effect is scored by its alpha at the alpha's declared
+  label horizon and at the *matched* horizon — the shortest label that
+  covers the planted mechanism (order flow: when half the impact kernel has
+  arrived, 10 s; lead-lag: the lag plus the one-second signal window, 5 s).
+  The matched horizon is a rule on the planted config, not a choice made
+  after seeing rates, and every detector, session count and break test is
+  counted in the study's own Bonferroni denominator.
 
 ### 23.2 What came back
 
-From the committed report (rates are over the three seeds of a cell):
+A detection is a positive gate IC and a pooled-slope t at or above the
+PROMOTE threshold in force — 4.365, the threshold the committed promotion
+reports were judged at (a gate look count of 3,936). The report also gives every
+rate at the fixed 3.0 and at the study's own threshold. Reference size,
+stable scenario; each cell is detections of 20 runs with its Wilson 95 %
+interval (`research/power/POWER_REPORT.md` up to 4 sessions,
+`research/power/extended/POWER_REPORT.md` for 8):
 
-| effect | scenario | level | mean gate IC | mean gate t (pooled slope) | significant | verdict ITERATE or better | PROMOTE | mean trades at 1× |
-|---|---|---:|---:|---:|---:|---:|---:|---:|
-| order flow (EQ04) | stable | 0 | −0.0054 | −0.51 | 0.00 | 0.00 | 0.00 | 0 |
-| order flow (EQ04) | stable | 0.5 | +0.0032 | +0.22 | 0.00 | 0.00 | 0.00 | 0 |
-| order flow (EQ04) | stable | 1 | +0.0327 | +2.93 | 0.33 | 1.00 | 0.00 | 0 |
-| order flow (EQ04) | stable | 2 | +0.0823 | +6.20 | 1.00 | 1.00 | 0.00 | 14 |
-| lead-lag (EQ10) | stable | 0 | −0.0018 | −0.23 | 0.00 | 0.00 | 0.00 | 0 |
-| lead-lag (EQ10) | stable | 0.5 | +0.0047 | +0.68 | 0.00 | 0.33 | 0.00 | 0 |
-| lead-lag (EQ10) | stable | 1 | +0.0117 | +1.23 | 0.00 | 0.33 | 0.00 | 0 |
-| lead-lag (EQ10) | stable | 2 | +0.0137 | +1.75 | 0.00 | 0.67 | 0.00 | 0 |
-| both | break | 0.5 – 2 | −0.036 to −0.0001 | −2.28 to +0.12 | 0.00 | 0.00 | 0.00 | 0 |
+| effect | detector | 2 sessions | 4 sessions | 8 sessions | mean t at 8 |
+|---|---|---:|---:|---:|---:|
+| order flow | EQ04 @ 5 s (declared) | 2 [0.03, 0.30] | 10 [0.30, 0.70] | 20 [0.84, 1.00] | +6.75 |
+| order flow | EQ04 @ 10 s (matched) | 11 [0.34, 0.74] | 20 [0.84, 1.00] | 20 [0.84, 1.00] | +9.04 |
+| lead-lag | EQ10 @ 1 s (declared) | 0 [0.00, 0.16] | 0 [0.00, 0.16] | 0 [0.00, 0.16] | +2.27 |
+| lead-lag | EQ10 @ 5 s (matched) | 1 [0.01, 0.24] | 6 [0.15, 0.52] | 16 [0.58, 0.92] | +5.03 |
+| null (level 0) | each of the four | 0 [0.00, 0.16] | 0 [0.00, 0.16] | 0 [0.00, 0.16] | −1.51 to −0.26 |
 
-The study has been run three times. It was re-run for v1.4.0 because its
-generator configuration then took the flow calibration of §2.3
-(`research/power/generator_planted.json`,
-`calibration: "session"`, the same `slots_per_stream`): the planted
-sessions have flow to the close, and the table moved with them. It was
-re-run for v1.5.0 under the default methods (report version 2), on the
-same planted sessions: the t in the table is now the pooled-slope t the
-gate reads, the ICs score the reopen rows, and the backtest behind the
-PROMOTE column is the cost-aware one. Read it row by row.
+Read it row by row.
 
-- **The chain has power, for one effect, at a large enough size.** At
-  twice the reference size the order-flow effect is flagged significant in
-  three seeds of three. At the reference size it is flagged in one of
-  three — all three come out ITERATE, but two have a t below 3. At half
-  size it is not detected at all, not even as ITERATE. The new methods
-  changed none of these rates.
-- **That is less power than the same study showed on the compressed
-  flow.** On the v1.3.0 generator the reference size was flagged in three
-  of three and half size in one of three. The same planted strength
-  produced about half the IC after the recalibration (+0.0313 against
-  +0.0726 at the reference size, +0.0813 against +0.1579 at twice it, both
-  runs under the rules of the time; the v1.5.0 run reads +0.0327 and
-  +0.0823). The two configurations
-  differ only in the flow calibration — the same expected number
-  of slots spread over 2.5 times as much clock time; the study does not
-  isolate which consequence of that (sparser rows, staler labels, fewer
-  executions per kernel window) costs the power.
-- **For the other effect it has almost none.** The lead-lag effect is
-  flagged significant in no seed at any size, by any of the three
-  statistics. Under the pooled-slope t it now reaches ITERATE in one, one
-  and two seeds of three at half, one and two times the reference size —
-  ITERATE needs a t of 1.5, and the mean pooled t at twice the size is
-  1.75 where the within-bucket t was 0.87. In the v1.4.0 run it never
-  reached ITERATE. The mean IC rises with the planted size (0.0047,
-  0.0117, 0.0137) and so does fold consistency, so the effect is in the
-  data; the chain sees a hint of it and does not establish it. A real
-  effect of that size would be reported as "not found". (On the v1.3.0
-  generator twice the reference size was flagged in one seed of three.)
-- **The null rows are clean, for what three seeds are worth.** With
-  nothing planted no seed is flagged and none comes out ITERATE. On the
-  v1.3.0 generator one lead-lag seed of three did — a false "evidence".
-  Zero of three now and one of three then are both compatible with the
-  same small false-positive rate; neither measures it.
-- **The break rows behave.** An effect that reverses mid-sample is
-  flagged in no cell, and fold sign consistency falls to between 0.08 and
-  0.50, against 0.75 to 1.00 in the stable cells at the reference size and
-  above.
-- **Nothing is promoted, at any size.** Not even the planted effect with
-  a t of 6.20. Zero folds survive 1× costs in every cell, and no bootstrap
-  interval for net P&L lies above zero. The last column says how: at the
-  reference size the cost-aware backtest does not trade the planted
-  effect at all — the forecast never exceeds the round-trip cost — and at
-  twice that size it trades 14 times on the last fold, on average, and
-  loses.
+- **Order flow is detected, given sessions.** On eight sessions every run
+  detects the reference effect at the declared horizon. On four, half do; on
+  the two sessions the bundled dataset has, one in ten. The previous report
+  said "one seed of three" for this cell at t ≥ 3 — with twenty seeds the
+  same cell is 12 of 20 at 3.0 and 2 of 20 at the threshold the gate
+  actually applies.
+- **The t grows as the square root of the sessions**, as it should: +2.76,
+  +3.28, +4.54, +6.75 on 1, 2, 4 and 8. The report fits
+  `t ~ N((κ₀ + κ·level)·√sessions, sd)` and reads off the *minimum
+  detectable effect* — the size detected 80 % of the time: on eight sessions
+  0.84 of the reference at 5 s and 0.66 at 10 s — and the sessions the
+  reference needs for 80 %: about five at 4.365, about three at 3.0. The
+  ledger threshold costs sessions, not detections.
+- **Lead-lag is invisible at the declared horizon.** The planted lead is two
+  one-second steps and EQ10's label is one second: the label ends before the
+  follower has moved. On the efficient price the IC at that horizon is
+  exactly zero; the +0.009 the chain measures comes from quotes going stale.
+  No run of 20 detects it at any session count, and the model puts 80 %
+  power near 50 sessions. At a 5 s label the same signal is detected in 16
+  of 20 runs on eight sessions. A detector's horizon has to match the
+  mechanism; the alpha as declared is the wrong instrument for this effect.
+- **Where the rest of the power goes.** The report's diagnosis table sets
+  the IC the mechanism has on the efficient price beside the measured one
+  and removes one idealisation at a time. For order flow on four sessions:
+  expected t 38.0 if every row carried a signal and rows were independent;
+  25.5 because only 45 % of rows have a trade in the last ten seconds; 7.29
+  because the observed mid sits on a tick grid (78 % of 5 s labels are
+  exactly zero) and reads 0.037 where the efficient price would give 0.128;
+  5.12 because overlapping rows make two rows one observation; 4.58 because
+  walk-forward scores four fifths of the sample. Measured: 4.54. Invalid
+  labels are not on the list — 99.8 % of 5 s labels are scored.
+- **The null rows are clean, and now that says something.** No detector is
+  flagged with nothing planted, at 3.0 or at 4.365, at any session count:
+  the false-positive rate is below 16 % with 95 % confidence, per cell. At
+  most 2 of 20 null runs reach ITERATE.
+- **The break rows behave, and the break is detectable.** An effect that
+  reverses mid-sample is reported as evidence in no run. The break z — the
+  HAC z of the slope before against the slope after mid-sample — flags it in
+  20 of 20 runs for order flow from four sessions on, and in 15 of 20 for
+  lead-lag at 5 s on eight; on stable runs it fires at 3.0 at most once in
+  twenty.
+- **Nothing is promoted, at any size or session count.** Not even twice the
+  reference on eight sessions, mean t 18.5. No fold survives 1× costs in any
+  cell and no bootstrap interval for net P&L lies above zero. At the
+  reference size the cost-aware backtest does not trade the 5 s forecast at
+  all; at the 10 s label it trades and no fold survives its costs.
 
 That last row is the one that changes how to read the headline. PROMOTE
 requires positive net P&L after costs under the research execution model,
 and in this generator's cost structure even a large, real, stable, planted
 effect does not clear it. So "0 PROMOTE on the bundled data" is not
-evidence that the chain is a strict judge of alpha. It is at least partly
-a statement about the generator's spreads relative to the size of any
-signal in it. Up to v1.4.0 this paragraph could add "traded with a
-sign-following policy that pays the spread on every flip", and the policy
-was a candidate explanation. It no longer is: a policy that trades only
-when the forecast clears its costs finds nothing to trade at the
-reference size and loses at twice it. The chain can see an effect it
-cannot monetise. The significance half of the chain is informative. The
-promotion half has not been shown to be reachable.
+evidence that the chain is a strict judge of alpha. The significance half
+of the chain is informative — and measurably so, now. The promotion half
+has not been shown to be reachable.
+
+And the first row changes how to read a REJECT. On two sessions the chain
+misses a real effect of the reference size nine times in ten. A null on the
+bundled dataset is weak evidence of absence.
+
+The study has been run four times: on the v1.3.0 generator, after the
+v1.4.0 flow recalibration (the same planted strength gave about half the
+IC on the sparser flow), under the v1.5.0 default methods (report version
+2; three seeds, two sessions), and in the form above (report version 3).
+The planted effect sizes have not changed since v1.3.0.
 
 ### 23.3 What the corrected statistics change
 
-The report scores each run three ways: the **pooled-slope HAC t**, which
-tests the pooled IC directly and keeps signal that lives between buckets —
-the statistic the gate reads since v1.5.0; the within-bucket Newey–West t,
-the legacy gate statistic; and the pooled t against a **ledger-derived
-threshold** — the multiple-testing threshold
-of the study's own 42 tests, t ≥ 3.24 rather than 3, the significance
-gate as PROMOTE now applies it. In this grid the
-three give the same detection rate in every cell. The v1.3.0 run had one
-cell where they differed — lead-lag at twice the reference size, where the
-pooled t flagged two seeds of three and the within-bucket t one — and this
-section read that as weak evidence that the pooled statistic has more
-power for a between-bucket effect. The re-runs do not repeat it: the mean
-pooled t in that cell is still the larger of the two (+1.75 against
-+0.87), but neither flags a seed; the difference shows only at the lower
-ITERATE bar, where two seeds of three now pass.
+The gate statistic is the **pooled-slope HAC t**, which tests the pooled
+IC directly and keeps signal that lives between buckets; the within-bucket
+Newey–West t, the legacy statistic, is still recorded per run. Beside the
+chain the study computes one more: the pooled slope of the label on the
+alpha's raw signal over every scored row, with **session-clustered** HAC
+errors — the Bartlett cross-products stop at the session boundary, because
+the last bucket of one day and the first of the next are not neighbours.
+It needs no walk-forward split, so it sees five fifths of the sample where
+the chain sees four; its t is the `t direct` column of the diagnosis, and
+the chain's t sits where √(4/5) of it should (4.58 against 4.54). It
+explains the chain's number; it is not a second chance to detect.
 
 So the pooled-slope t did not become the default because this study
 showed it to be more powerful — the evidence for that is thin, and was
@@ -2647,37 +2660,49 @@ printed as `t other` in every report.
 
 ### 23.4 What this study is not
 
-Three seeds per cell: a rate moves in steps of 0.33, and the report says
-"this calibrates the chain, it is not a precise power curve". The planted
-effects are the generator's own construction, detected by the two alphas
-written for exactly those effects; power against an effect of a different
-shape is unknown. And it is synthetic end to end. A power statement about
-real markets needs real data (EPICS E25).
+Twenty seeds per cell bound a rate to within about ±0.2; they do not
+measure a false-positive rate of one in a thousand. The session prefixes of
+one run share data, so a detector's rows at different session counts are
+not independent of each other. Session counts beyond eight are the fitted
+√-law, not measurements. The planted effects are the generator's own
+construction, detected by the two alphas written for exactly those effects;
+power against an effect of a different shape is unknown. The reference
+sizes are stated as what they are — an IC of 0.13 (R² 1.6 %) at 5 s for
+order flow and 0.17 (R² 2.8 %) for lead-lag on the efficient price, 0.037
+and 0.019 on the observed mid — and no claim is made that real markets
+carry effects of that size. And it is synthetic end to end. A power
+statement about real markets needs real data (EPICS E25).
 
 **Check yourself.**
 
-*Q. The order-flow detector reports a mean IC of −0.005 with t −0.51 on the
-null. Is that a problem?* It is a reminder that "nothing planted" is not
+*Q. The order-flow detector reports a mean IC of −0.007 with t −0.89 on the
+null (four sessions), and the t falls further with more sessions. Is that a
+problem?* It is a reminder that "nothing planted" is not
 "nothing there": the generator's microstructure produces small correlations
-of its own (§2.3). The row is not significant and produced no evidence; a
-level-0 row that *was* significant would be the problem.
+of its own (§2.3). A detection needs a positive IC, so the row produces none; a
+level-0 row that *was* detected would be the problem. What it does cost is
+power: the planted effect has to overcome that negative offset first, which
+is why the fitted model of §23.2 has an intercept.
 
-*Q. Why is a study with three seeds worth committing?* Because the
-alternative was no positive control at all, and because its limits are
-printed in the report. A wider grid is compute, not design.
+*Q. Why were three seeds not enough?* One detection in three has a 95 %
+interval of 0.06 to 0.79: it is compatible with a chain that almost never
+detects and with one that usually does. Twenty seeds give 16 of 20 an
+interval of 0.58 to 0.92, which excludes one in three. The first report was
+worth committing — the alternative was no positive control at all — but its
+rates could not carry a conclusion.
 
 *Q. What single result here most limits the claims the rest of the
 repository can make?* PROMOTE is zero in every cell. The chain has been
 shown to detect; it has not been shown to promote.
 
 **Exercise.** Run the tiny grid of COOKBOOK recipe 27 and compare its
-`stable` level-1 rows with the three-seed report: which cells agree, and
-which could not possibly agree with one seed? Then run the tests that pin
+`stable` level-1 rows with the committed twenty-seed report: which cells
+agree, and which could not possibly agree with one seed? Then run the tests that pin
 the planted generator:
 
 ```bash
 cd python && PYTHONPATH=src python3 -m pytest -q tests/test_planted_signals.py
-# 29 passed (about a minute)
+# 35 passed (about a minute)
 ```
 
 ---

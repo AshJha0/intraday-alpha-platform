@@ -1103,8 +1103,9 @@ Wire schemas: §2 (all 17 at 1). Non-wire documents carry their own `x-version` 
 `paper_evidence.json` 3 (2026-09-20), the Java `session_state.json`
 2 and paper session report 3 (2026-09-19); and, added 2026-10-03, each at 1:
 `tests/golden/expected_risk_edge_decisions.json`, the research gate-eligibility sidecar
-`research/experiments/<id>/eligibility.json` and `research/power/POWER_REPORT.json` (both 2
-since v1.5.0); and,
+`research/experiments/<id>/eligibility.json` (2 since v1.5.0) and
+`research/power/POWER_REPORT.json` (3 since the v1.5.0 detection-power rework; the same document
+under `research/power/extended/`); and,
 since v1.4.0, at 2: the generator config documents (`configs/marketdata/generator.json`,
 `configs/mvp/generator{,_tiny}.json`, `research/power/generator_planted.json` — the default
 equity flow calibration changed, `load_generator_config` rejects a version-1 document that does

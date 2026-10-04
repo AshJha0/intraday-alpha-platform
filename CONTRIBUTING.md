@@ -126,7 +126,8 @@ change with one regeneration, never a partial one
    `x-version` if the meaning of the document moved.
 2. Run the whole chain with `tools/regenerate_dataset_artifacts.py` — on the
    CI runner, through the manual `regenerate` job
-   (`gh workflow run ci.yml --ref <branch> -f regenerate=true`, then
+   (`gh workflow run ci.yml --ref <branch> -f regenerate=true`, or with
+   `-f regenerate_only=<steps>` for a subset such as `power`, then
    `gh run download <run-id> -n regenerated-artefacts`). The last digits of
    the float artefacts depend on the platform and the library versions, and
    some suites compare them exactly, so they are produced where they are

@@ -442,6 +442,72 @@ and pass `cross_alpha_correlation` vacuously. No verdict changed. The
 correlation document shows EQ02 / EQ03 / EQ12 correlated 0.95–1.00: with
 one of them at VALIDATING the gate would hold the other two.
 
+### Added — detection power
+
+The planted-signal power study (`python -m iap.research power`) was three
+seeds on two sessions: one detection in three has a 95 % interval of 0.06
+to 0.79. It now measures a rate. `POWER_REPORT.json` `x-version` 2 → 3.
+
+- **Sessions.** Each run is generated once at the largest session count and
+  scored on its first 1, 2, 4 (extended grid: 8) sessions — exact, because
+  without a break session *k* does not depend on what follows it (tested on
+  the bytes). The study writes its own reference tree with as many weekdays
+  as it needs (`extended_trading_days`); `configs/` lists five and is
+  untouched. `research/power/generator_planted.json` `sessions` 2 → 4;
+  `--sessions` overrides.
+- **Seeds and intervals.** 20 seeds per cell; every rate is
+  `detections/runs [Wilson 95 % interval]`.
+- **Thresholds.** The pooled-slope t against 3.0, against the PROMOTE
+  threshold in force (4.365, Bonferroni at the 3,936 looks the committed
+  promotion reports were judged at; `--gate-looks` overrides) and against
+  the Bonferroni threshold of the study's own tests. Verdicts are computed
+  at the largest of the three. No threshold was lowered and no promotion
+  gate changed.
+- **Detectors.** Each effect is scored by its alpha at the declared label
+  horizon and at the horizon matched to the planted block
+  (`matched_horizon`: EQ04 at 10 s, EQ10 at 5 s) — a rule on the planted
+  config, counted in the study's Bonferroni denominator. The reference
+  effect sizes are unchanged.
+- **New statistics** (`iap.research.power_stats`; none is read by a gate):
+  `wilson_interval`; `pooled_slope_session_hac` (the gate estimator with the
+  Bartlett cross-products restricted to buckets of the same session, and
+  the effective sample beside it); `slope_break_z` (HAC z of the slope
+  before against after a split); `ideal_ic_order_flow` /
+  `ideal_ic_lead_lag` (the IC of each planted mechanism on the efficient
+  price); `fit_t_model`, `minimum_detectable_level`, `sessions_needed`
+  (`t ~ N((κ₀ + κ·level)·√sessions, sd)`).
+- **Report.** Detection by sessions and by effect size, the null, the
+  break, a diagnosis table (ideal against measured IC, expected against
+  measured t, one idealisation at a time), the minimum detectable effect at
+  80 % power and the sessions the reference needs, and a plain statement
+  per detector.
+- **Runtime.** Runs are worker processes (`--jobs`; the document does not
+  depend on it). The default grid (3 sizes, 4 sessions, one break level; 80
+  runs) took 994.5 s in the CI `regenerate` job; the extended grid (4 sizes,
+  8 sessions; 100 runs) 2,461.1 s and is the opt-in `power_extended` step of
+  `tools/regenerate_dataset_artifacts.py`, written to
+  `research/power/extended/`
+  (`-f regenerate_only=power,power_extended` on the `regenerate` job).
+
+Result at the reference size, gate threshold (detections of 20):
+
+| detector | 2 sessions | 4 sessions | 8 sessions |
+|---|---:|---:|---:|
+| order flow, EQ04 @ 5 s (declared) | 2 | 10 | 20 |
+| order flow, EQ04 @ 10 s (matched) | 11 | 20 | 20 |
+| lead-lag, EQ10 @ 1 s (declared) | 0 | 0 | 0 |
+| lead-lag, EQ10 @ 5 s (matched) | 1 | 6 | 16 |
+| null, each detector | 0 | 0 | 0 |
+
+At t ≥ 3 the first row reads 12, 19 and 20. Minimum detectable effect at
+80 % power on eight sessions: 0.84 of the reference (EQ04 @ 5 s), 0.66
+(EQ04 @ 10 s), 1.18 (EQ10 @ 5 s), 2.51 (EQ10 @ 1 s). EQ10 as declared cannot
+detect the planted two-second lead at a practical session count: its
+one-second label ends before the follower moves. The mid-sample reversal is
+never reported as evidence and the break z flags it in 20 of 20 runs for
+order flow. PROMOTE is still reached in no cell. The two power rows of the
+Results table below are the version-2 report (3 seeds, 2 sessions, t ≥ 3).
+
 ### Results
 
 Same dataset, new rules. Nothing is promoted, before or after.

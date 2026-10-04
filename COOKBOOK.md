@@ -1389,66 +1389,71 @@ informative if the chain can find an effect when one exists. The power
 study ([research/power/POWER_REPORT.md](research/power/POWER_REPORT.md),
 LEARN.md §23) plants effects of known size in the generator — informed
 order flow and an ETF lead-lag — and runs the real feature pipeline and
-`validate_alpha` on the result. The committed report is 4 levels × 3 seeds;
-this is the smallest grid that still has a null row, a planted row and a
-break row (three generator runs, a few minutes):
+`validate_alpha` on the result. The committed report is 3 levels × 20 seeds
+on 4 sessions (about 17 minutes on four cores); this is the smallest grid
+that still has a null row, a planted row, a break row and a session curve
+(three generator runs of two sessions, a few minutes):
 
 ```bash
 cd python
 PYTHONPATH=src python3 -m iap.research power --levels 0,1 --seeds 1 \
-  --power-out-dir ../data/store/power-tiny
+  --sessions 1,2 --power-out-dir ../data/store/power-tiny
 # (progress on stderr)
-# stable level 0 seed 850875211: lead_lag=REJECT, order_flow=REJECT
-# stable level 1 seed 850875211: lead_lag=ITERATE, order_flow=ITERATE
-# break level 1 seed 850875211: lead_lag=REJECT, order_flow=REJECT
+# stable level 0 seed 850875211 (2 sessions): lead_lag:EQ10@1s=REJECT, lead_lag:EQ10@5s=REJECT, order_flow:EQ04@10s=REJECT, order_flow:EQ04@5s=REJECT
+# stable level 1 seed 850875211 (2 sessions): lead_lag:EQ10@1s=ITERATE, lead_lag:EQ10@5s=ITERATE, order_flow:EQ04@10s=ITERATE, order_flow:EQ04@5s=ITERATE
+# break level 1 seed 850875211 (2 sessions): lead_lag:EQ10@1s=REJECT, lead_lag:EQ10@5s=REJECT, order_flow:EQ04@10s=REJECT, order_flow:EQ04@5s=REJECT
 # wrote ../data/store/power-tiny/POWER_REPORT.md and .../POWER_REPORT.json
 ```
 
-The detection table it prints for this grid (re-run on the v1.5.0 tree):
+The first table it prints for this grid (re-run on the detection-power
+tree) — the reference effect by number of sessions:
 
 ```
-| effect | alpha | scenario | level | runs | sig (pooled) | sig (within) | sig (ledger) | evidence | promote | P&L CI > 0 |
-| lead_lag | EQ10 | break | 1 | 1 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
-| lead_lag | EQ10 | stable | 0 | 1 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
-| lead_lag | EQ10 | stable | 1 | 1 | 0.00 | 0.00 | 0.00 | 1.00 | 0.00 | 0.00 |
-| order_flow | EQ04 | break | 1 | 1 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
-| order_flow | EQ04 | stable | 0 | 1 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
-| order_flow | EQ04 | stable | 1 | 1 | 0.00 | 0.00 | 0.00 | 1.00 | 0.00 | 0.00 |
+| detector | sessions | at gate | at fixed 3.0 | at study | mean t | sd t | evidence | promote |
+| lead_lag:EQ10@1s | 1 | 0/1 [0.00, 0.79] | 0/1 [0.00, 0.79] | 0/1 [0.00, 0.79] | +1.87 | n/a | 1/1 [0.21, 1.00] | 0/1 [0.00, 0.79] |
+| lead_lag:EQ10@1s | 2 | 0/1 [0.00, 0.79] | 0/1 [0.00, 0.79] | 0/1 [0.00, 0.79] | +2.30 | n/a | 1/1 [0.21, 1.00] | 0/1 [0.00, 0.79] |
+| lead_lag:EQ10@5s | 1 | 0/1 [0.00, 0.79] | 1/1 [0.21, 1.00] | 1/1 [0.21, 1.00] | +3.34 | n/a | 1/1 [0.21, 1.00] | 0/1 [0.00, 0.79] |
+| lead_lag:EQ10@5s | 2 | 0/1 [0.00, 0.79] | 1/1 [0.21, 1.00] | 1/1 [0.21, 1.00] | +3.88 | n/a | 1/1 [0.21, 1.00] | 0/1 [0.00, 0.79] |
+| order_flow:EQ04@5s | 1 | 0/1 [0.00, 0.79] | 0/1 [0.00, 0.79] | 0/1 [0.00, 0.79] | +2.80 | n/a | 1/1 [0.21, 1.00] | 0/1 [0.00, 0.79] |
+| order_flow:EQ04@5s | 2 | 0/1 [0.00, 0.79] | 0/1 [0.00, 0.79] | 0/1 [0.00, 0.79] | +2.12 | n/a | 1/1 [0.21, 1.00] | 0/1 [0.00, 0.79] |
+| order_flow:EQ04@10s | 1 | 0/1 [0.00, 0.79] | 0/1 [0.00, 0.79] | 0/1 [0.00, 0.79] | +2.33 | n/a | 1/1 [0.21, 1.00] | 0/1 [0.00, 0.79] |
+| order_flow:EQ04@10s | 2 | 0/1 [0.00, 0.79] | 1/1 [0.21, 1.00] | 1/1 [0.21, 1.00] | +3.33 | n/a | 1/1 [0.21, 1.00] | 0/1 [0.00, 0.79] |
 ```
 
-`sig (pooled)` comes first since v1.5.0 because the pooled-slope HAC t is
-what the gate reads; `sig (within)` is the legacy gate statistic, and
-`sig (ledger)` is the pooled t against the multiple-testing threshold of
-the study's own tests (six here, which leaves the threshold at 3.00).
+A detector is `effect:alpha@label horizon`: each planted effect is scored
+by its alpha at the declared horizon and at the horizon matched to the
+planted mechanism. Every rate is `detections/runs [Wilson 95 % interval]`;
+with one seed the interval is 0.00–0.79 or 0.21–1.00, which is the report
+telling you that one run settles nothing. `at gate` is the pooled-slope t
+against the PROMOTE threshold in force (4.365), `at fixed 3.0` the same t
+against 3, `at study` against the Bonferroni threshold of this study's own
+40 tests (3.227).
 
-On this seed the planted order-flow effect at the reference size is
-reported as evidence (ITERATE) and is not significant: the pooled t is
-2.12 and the within-bucket t 1.98, against a gate of 3. The planted
-lead-lag is ITERATE too, on a pooled t of 2.30 (within-bucket 1.39; under
-the v1.4.0 rules this row was REJECT), and is not significant either. The
-second table of the report has a column the v1.4.0 one did not, `trades at
-1x`: it is 0.0 in all six rows. The cost-aware backtest makes no trade on
-either planted effect at the reference size, so no fold survives costs and
-nothing can be promoted. With the v1.3.0 generator the same command
-flagged the order-flow row significant on every statistic. The seed and
-the planted effect are the same in all three runs; between v1.3.0 and
-v1.4.0 the flow calibration changed (recipe 1), which spreads about the
-same number of equity events over the whole session instead of its first
-40%, and the chain detects the same effect less often on the sparser
-flow. The committed three-seed report says the same thing
-with more runs: at the reference size the order-flow effect is significant
-in 1 of 3 seeds (evidence in 3 of 3), at twice the reference in 3 of 3, at
-half the reference in none; the lead-lag is significant at no size and
-reaches ITERATE in 1, 1 and 2 seeds of 3 at half, once and twice the
-reference; nothing is promoted anywhere.
+On this seed nothing reaches the gate threshold on two sessions. The
+order-flow effect at its declared 5 s label has a pooled t of 2.12 — the
+number the previous report had for this seed — and 3.33 at the matched
+10 s label; the lead-lag has 2.30 at 1 s and 3.88 at 5 s. The report then
+prints the null rows (no detection; the order-flow t is negative with
+nothing planted), the break rows (no evidence from the chain; the break z
+of the order-flow detector at 5 s is +4.64, above the gate threshold), a
+diagnosis table that accounts for the t, and a power model that a
+three-run grid cannot fit meaningfully. The committed reports say what
+more runs and more sessions do: at the reference size the order-flow
+effect is detected at the gate threshold in 2 of 20 runs on two sessions,
+10 of 20 on four and 20 of 20 on eight
+([research/power/extended/POWER_REPORT.md](research/power/extended/POWER_REPORT.md));
+the lead-lag in none at its declared 1 s label and in 16 of 20 at 5 s on
+eight sessions; nothing is detected on the null and nothing is promoted
+anywhere.
 
 Read it the way the report tells you to: level 0 is the false-positive row;
 `stable` rows are power; `break` rows plant an effect that reverses
-mid-sample. With one seed a rate is 0 or 1 — this run shows the mechanics,
-the committed three-seed report is the one to quote, and even that moves in
-steps of 0.33. Never pass `--power-out-dir research/power` unless you mean
-to replace the committed report; the study itself never touches `data/` or
-the research ledger. The reference effect is
+mid-sample. This run shows the mechanics; the committed twenty-seed reports
+are the ones to quote. `--jobs N` sets the number of worker processes (the
+report does not depend on it), `--sessions`, `--levels`, `--break-levels`
+and `--seeds` the grid. Never pass `--power-out-dir research/power` unless
+you mean to replace the committed report; the study itself never touches
+`data/` or the research ledger. The reference effect is
 `research/power/generator_planted.json` (deliberately outside `configs/`,
 which is shipped to the pods).
 
