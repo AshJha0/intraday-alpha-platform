@@ -81,9 +81,9 @@ because its fitted expected return clears its own round-trip cost on no
 row, so the open question is the horizon and the threshold, not the
 policy) and AD05 (data with
 enough sessions to rank refit policies), because both attack the two honest
-negatives the platform currently reports. The power study adds a third: a
-wider seed grid, since three seeds per cell cannot give a rate finer than a
-third.
+negatives the platform currently reports. The power study's seed grid is
+done (v1.5.0: 20 seeds per cell, 1 to 8 sessions); what it lacks now is more
+sessions of data, not more seeds.
 
 ## 3.2 v1.4.0 (2026-10-03): what the dataset fix moved
 
@@ -148,7 +148,7 @@ artefact on the same dataset (`data_version` `116b7787…`).
 | E08 ledger | 139 configurations | 216 configurations: the earlier entries are kept, the regenerated pipelines added 69 at 84 looks per alpha per run and the signal-combination report 8 at 95 looks each |
 | E20 ML | linear gate passes (ridge +0.0081), no model earns its costs | unchanged; 275 of 131,880 meta-feature values are missing and no longer imputed |
 | E21 adaptive | 122 drift-triggered refits; policy totals not in USD (a currency defect in the runner) | 88; FX01 still retired under every policy; 19 of 40 deployments make no trade, 0 above zero; static policy total −3,921 USD; still no ranking of the policies |
-| E08 power study | planted order flow significant in 1 of 3 seeds at the reference size, 3 of 3 at twice that size | the same rates under the pooled t; the cost-aware backtest makes no trade at the reference size and 14 on average at twice that size, with no fold surviving costs; planted lead-lag at ITERATE level in 1 or 2 of 3 seeds, never significant; nothing promoted |
+| E08 power study | planted order flow significant in 1 of 3 seeds at the reference size, 3 of 3 at twice that size | rate rework (20 seeds, 1 to 8 sessions): planted order flow detected at t ≥ 4.365 in 10 of 20 runs on 4 sessions and 20 of 20 on 8; planted lead-lag 0 of 20 at its declared 1 s label, 16 of 20 at a 5 s label on 8 sessions; null 0 of 20; nothing promoted |
 | E18 MVP | 800 decisions, 169 fills, a loss of 81.53 USD | identical; `config_version` and the trace digest changed because `execution.json` is hashed |
 | E15 lifecycle | 24 CANDIDATE, 0 beyond; gates failed: cost 24, significance 18, stability 13, IC 11 | 24 CANDIDATE, 0 beyond; gates failed: cost 24, capacity 24, significance 21, stability 14, IC 12 (registry x-version 2; the legacy-methods log is in `research/archive/`) |
 

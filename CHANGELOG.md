@@ -114,7 +114,7 @@ Also changed:
   `configs/strategies/lifecycle.json` 1 → 2, `strategies.json` `adaptive`
   1 → 2, `research/experiments.json` 2 → 3, `research/alpha_registry.json`
   1 → 2, `eligibility.json` 1 → 2, `POWER_REPORT.json` 1 → 2, goldens
-  `expected_lifecycle.json` and `expected_adaptive.json` 1 → 2,
+  `expected_lifecycle.json` 1 → 3, `expected_adaptive.json` 1 → 2,
   `expected_backtest.json` 1 → 3, the SQL data model `iap_v1.sql` →
   `iap_v2.sql` (1 → 2). Every loader rejects the older document instead of
   reading it under a new default.
