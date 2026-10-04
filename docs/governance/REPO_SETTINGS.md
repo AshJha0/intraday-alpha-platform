@@ -148,7 +148,7 @@ JSON
    `deployment/docker/docker-compose.yml`,
    `deployment/k8s/java-platform.yaml`, `deployment/k8s/cronjob-data-pipeline.yaml`)
    and bump the version tag in the same files. The repository references
-   `v1.4.0` by tag only: those images exist once the `v1.4.0` tag has been
+   `v1.5.0` by tag only: those images exist once the `v1.5.0` tag has been
    pushed and `release.yml` has run for it (it ran for the first time for
    `v1.3.0`; no image was ever published for `v1.2.0`, which was tagged
    before the release workflow existed), and the digests are pinned from
@@ -158,8 +158,13 @@ JSON
 5. Make the GHCR packages public (or grant the cluster a pull secret):
    packages are created private by default.
 
-`release.yml` has not been run: it can only be exercised by pushing a tag, so
-its first real run is its test.
+`release.yml` can only be exercised in full by pushing a tag, so a release is
+its own test. Its `verify-ci` guard failed the v1.4.0 release once on an API
+error although CI was green; since v1.5.0 the guard is
+`tests/harness/verify_ci_green.py`, which retries an API error, polls a run
+in progress and fails on a failed or missing run, and it can be run alone
+against a given commit:
+`gh workflow run release.yml --ref <branch> -f dry_run=true -f sha=<40 hex>`.
 
 ## 6. Operational settings the platform needs but the repository cannot hold
 

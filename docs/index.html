@@ -65,18 +65,18 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
 <div class="wrap">
   <h2>Measured, not claimed</h2>
   <div class="numbers">
-    Cross-language parity&nbsp;&nbsp;&nbsp; python 1573&nbsp; · cpp 289&nbsp; · rust 323&nbsp; · java 510 tests — 2,695 green, one command; golden groups 166/68/64/104<br>
+    Cross-language parity&nbsp;&nbsp;&nbsp; python 1672&nbsp; · cpp 289&nbsp; · rust 330&nbsp; · java 517 tests — 2,808 green, one command; golden groups 173/68/66/106<br>
     Golden suites&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; identical book states, byte-identical IAP1 SHA-256, features/alphas to 1e-9, byte-identical canonical JSON, trace digests, risk audit and lifecycle registry in all four languages<br>
     C++ hot path&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; IAP1 decode 184.1 ns/event (CRC-32 verified) · book update 26.4 ns · replay 27.2M events/s · 48-feature engine 514.1 ns/event · one decision trace 31.7 µs/trace off the event loop<br>
     Determinism&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; full dataset regeneration is byte-identical (sha256-verified); replays reproduce fills exactly; the MVP run twice and replayed from its capture reproduces its trace digest<br>
     Contracts&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 17 JSON Schemas · 22 typed contracts · 18 Protocols; Python risk and execution ports proven by the Rust and C++ goldens (audit + snapshot byte-identical, fills bit-identical)<br>
     Feature factory&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 205 registered, versioned features across 10 families; validity-bitset semantics, no NaN ever valid<br>
-    Alpha research&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 24 flagship alphas · walk-forward + purging/embargo · 1920-look multiple-testing ledger over 139 distinct configurations, both datasets counted (expected max |t| 3.888, Bonferroni |t| ≥ 4.206)<br>
-    Promotion lifecycle&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 7 states · 17 pinned edges · 18 gates; bundled data: 24 alphas at CANDIDATE, 0 beyond — every one fails net P&amp;L after costs<br>
-    MVP golden run&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 15,805 events · 800 decisions · 235 parent orders · 169 fills · P&amp;L −81.53 USD (cost-negative, stated) · digest f51890da…<br>
-    Adaptive lifecycle&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; PSI/KS drift monitors · 122 drift-triggered refits in the study · RETIRED halts allocation in the backtest, pages a human live<br>
-    Verdicts (honest)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0 PROMOTE · 10 ITERATE · 14 REJECT — on clean synthetic data, nothing survives costs, and we say so<br>
-    Power study&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; planted order-flow effect reaches t ≥ 3 in 1 of 3 seeds at the reference size and 3 of 3 at twice that size · planted lead-lag not detected at any size · nothing promoted at any size — 3 seeds per cell, a calibration, not a power curve
+    Alpha research&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 24 flagship alphas · walk-forward + purging/embargo · 4,396-look multiple-testing ledger over 208 distinct configurations, both datasets and both method bundles counted (expected max |t| 4.096, Bonferroni |t| ≥ 4.389)<br>
+    Promotion lifecycle&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 7 states · 17 pinned edges · 18 gates; bundled data: 24 alphas at CANDIDATE, 0 beyond — every one fails net P&amp;L after costs and capacity<br>
+    MVP golden run&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 15,805 events · 800 decisions · 235 parent orders · 169 fills · P&amp;L −81.53 USD (cost-negative, stated) · digest e534ac1f…<br>
+    Adaptive lifecycle&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; PSI/KS drift monitors · 88 drift-triggered refits in the study · CUSUM retirement rule · RETIRED halts allocation in the backtest, pages a human live<br>
+    Verdicts (honest)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0 PROMOTE · 11 ITERATE · 13 REJECT — 3 alphas clear the multiple-testing threshold (t ≥ 4.365), 18 never forecast a move larger than their cost and make no trade, the 6 that trade lose; nothing survives costs, and we say so<br>
+    Power study&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; planted order-flow effect reaches t ≥ 3 in 1 of 3 seeds at the reference size and 3 of 3 at twice that size, where the cost-aware backtest makes 14 trades on average and no fold survives costs · planted lead-lag never significant (ITERATE-level in 1 or 2 of 3 seeds) · nothing promoted at any size — 3 seeds per cell, a calibration, not a power curve
   </div>
 
   <div class="honest">
@@ -118,6 +118,24 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
     <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/CHANGELOG.md">changelog</a>.
   </div>
 
+  <div class="honest">
+    <strong>v1.5.0 (2026-10-04): the corrected research methods are the defaults.</strong>
+    v1.3.0 added eleven corrected methods as opt-ins and v1.4.0 kept them opt-in, so every
+    committed research number was still computed under rules the repository itself described
+    as deficient. They are now what runs when nothing is named, and each old rule stays
+    selectable under a legacy name (<code>--methods legacy_v1</code> reproduces the v1.4.0
+    report). Same dataset, new rules: the gate t is the HAC t of the pooled slope and the
+    PROMOTE threshold is the ledger's multiple-testing threshold (4.365 instead of 3.0), so
+    three alphas are significant where six were; the cost-aware backtest shows 18 of the 24
+    alphas never forecasting a move larger than their round-trip cost, so they make no trade,
+    and the six that trade lose 22 to 733 USD where the old sign policy lost five or six
+    figures; verdicts are 0 PROMOTE / 11 ITERATE / 13 REJECT (FX03 down, FX10 and FX11 up);
+    EQ11's gate IC falls from 0.0261 to 0.0038 once blackout rows are scored. The MVP's
+    events, fills and P&amp;L are identical. Nothing was tuned to recover a v1.4.0 conclusion.
+    Still 0 PROMOTE; details in the
+    <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/CHANGELOG.md">changelog</a>.
+  </div>
+
   <h2>Start here</h2>
   <div class="grid">
     <div class="card"><h3>How the quant, algo and AI sides work</h3>
@@ -134,9 +152,10 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
          backlog epic, and the page says what would be theatre on this data.
          <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/HOW_IT_WORKS.md#6-ai-llms-and-agents-the-boundary-what-exists-what-is-planned">HOW_IT_WORKS §6</a></p></div>
     <div class="card"><h3>Research validity &amp; the power study</h3>
-      <p>Corrected statistics and policies added opt-in beside every pinned default, so they
-         move no committed number: a pooled-slope HAC t, a ledger-derived threshold, a cost-aware
-         position policy, a recompute leakage probe, per-fold diagnostics. A planted-signal
+      <p>Corrected statistics and policies, added opt-in in v1.3.0 and the defaults since
+         v1.5.0, each with its old rule selectable under a legacy name: a pooled-slope HAC t, a
+         ledger-derived threshold, a cost-aware position policy, a recompute leakage probe,
+         per-fold diagnostics (report-only). A planted-signal
          study measures what the validation chain can detect — and shows it promotes nothing.
          <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/RESEARCH_VALIDITY.md">RESEARCH_VALIDITY</a>,
          <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/research/power/POWER_REPORT.md">POWER_REPORT</a></p></div>
@@ -171,7 +190,7 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
          and declared feature dependencies.</p></div>
     <div class="card"><h3>Validation framework</h3>
       <p>Event-time labels at 11 horizons (10ms–15m), walk-forward with purging + embargo,
-         automatic leakage tests, IC/RankIC/Newey-West t/hit/decay/turnover/capacity,
+         automatic leakage tests incl. a recompute-from-raw-events probe, IC/RankIC/pooled-slope HAC t/hit/decay/turnover/edge-breakeven capacity,
          a persistent multiple-testing ledger, and cost/latency/regime stress — the §20
          promotion gates, enforced literally.</p></div>
     <div class="card"><h3>ML &amp; meta-labeling</h3>
@@ -214,7 +233,7 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
       <p>Models decay, so the platform measures it: pinned PSI/KS drift monitors against
          serialized research baselines, rolling realized-vs-research IC, drift-triggered
          refits on purged/embargoed windows, and an IC-gated ACTIVE&rarr;WATCH&rarr;RETIRED state
-         machine with hysteresis. In the adaptive <em>backtest</em> RETIRED verifiably halts the
+         machine with hysteresis and a CUSUM retirement rule (the legacy consecutive-breach rule stays selectable). In the adaptive <em>backtest</em> RETIRED verifiably halts the
          allocation; in the live paper loop the gauge is deliberately <em>observational</em> —
          the <code>AlphaLifecycleRetired</code> alert pages a human, nothing reduces the position
          automatically (API_ADAPTIVE &sect;6, PLATFORM_CONVENTIONS &sect;12.6). Live PSI,

@@ -243,7 +243,7 @@ Alpha engine (EQ01..EQ12, FX01..FX12) and the research framework (walk-forward w
 
 **Status:** partial · **Milestone:** Week 3 · **Issues:** 8 (done 6, in-progress 0, backlog 2) · **Estimate:** 25 days · **Labels:** `type:epic`, `area:alpha`, `phase:w3`, `priority:p0`, `status:partial`
 
-EQ01..EQ12 and FX01..FX12 as an alpha library with an enforced economic rationale per alpha, linear_z_v1 fitting with provenance, six golden production alphas ported to C++/Rust/Java, and an honest promotion report — currently 0 PROMOTE / 10 ITERATE / 14 REJECT on uncrossed IC.
+EQ01..EQ12 and FX01..FX12 as an alpha library with an enforced economic rationale per alpha, linear_z_v1 fitting with provenance, six golden production alphas ported to C++/Rust/Java, and an honest promotion report — currently 0 PROMOTE / 11 ITERATE / 13 REJECT on the pooled uncrossed IC under the v1.5.0 default research methods.
 
 **Scope:** python/src/iap/alpha/{base,equity,fx,cross_sectional,fx_exposure,data}.py; configs/strategies/alpha_params.json (x-version 2), API_ALPHA.md, research/alpha_reports/.
 
@@ -262,7 +262,7 @@ EQ01..EQ12 and FX01..FX12 as an alpha library with an enforced economic rational
 | A03 | FX alphas FX01..FX12 with currency-exposure machinery (FX05/FX06) | done | 4 | Week 3 | `python/src/iap/alpha/fx.py; python/src/iap/alpha/fx_exposure.py; research/alpha_reports/FX01.json .. FX12.json` |
 | A04 | Six golden production alphas ported to C++/Rust/Java (linear_z_v1 scoring) | done | 3 | Week 3 | `cpp/include/iap/alpha/alpha.hpp; cpp/tests/test_alpha_golden.cpp`<br>`rust/alpha/src/{scoring,fx_exposure}.rs; rust/alpha/tests/golden_alpha.rs`<br>`java/src/main/java/com/iap/alpha/{Alphas,Fx05}.java; java AlphaGoldenTest; tests/golden/expected_alpha.json; API_ALPHA.md` |
 | A05 | Fitted alpha parameters with provenance (configs/strategies/alpha_params.json, x-version 2) | done | 1 | Week 3 | `configs/strategies/alpha_params.json; python/src/iap/alpha/__init__.py (fit_all, params_provenance, save_params)`<br>`java/src/main/java/com/iap/alpha/LinearZParams.java; rust/alpha/src/params.rs` |
-| A06 | 24-alpha promotion report: 0 PROMOTE / 10 ITERATE / 14 REJECT, all cost-negative at 1x | done | 3 | Week 3 | `research/alpha_reports/REPORT.md; research/alpha_reports/run_all.py; research/alpha_reports/EQ01.json .. FX12.json (24 per-alpha files)`<br>`research/experiments.json; docs/papers/01_ofi_predictability_equities.md (with errata); python/src/iap/validation/validate.py (GATES)` |
+| A06 | 24-alpha promotion report: 0 PROMOTE / 11 ITERATE / 13 REJECT, none net-positive at 1x | done | 3 | Week 3 | `research/alpha_reports/REPORT.md; research/alpha_reports/run_all.py; research/alpha_reports/EQ01.json .. FX12.json (24 per-alpha files)`<br>`research/experiments.json; docs/papers/01_ofi_predictability_equities.md (with errata); python/src/iap/validation/validate.py (GATES)` |
 | A07 | Research: EQ03 iteration — can cost-aware horizon/threshold selection make net P&L positive? | backlog | 2 | Backlog | `research/alpha_reports/EQ03.json (current: ITERATE); research/experiments.json` |
 | A08 | Port the remaining 18 alphas to the production languages when one reaches CANDIDATE | backlog | 6 | Backlog | `python/tools/make_golden_alpha.py; API_ALPHA.md` |
 

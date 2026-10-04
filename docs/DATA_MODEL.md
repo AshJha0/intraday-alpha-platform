@@ -214,16 +214,16 @@ asserts it for all 24; docs/LIFECYCLE.md §6):
 
 | result field | from the report |
 |---|---|
-| `ic` | `gate_ic` — the uncrossed IC the PROMOTE gate reads (`oos_ic_uncrossed` when finite, else `oos_ic`) |
-| `t_stat` | `nw_tstat_uncrossed` when finite, else `nw_tstat` |
+| `ic` | `gate_ic` — the pooled uncrossed IC the PROMOTE gate reads (`oos_ic_uncrossed` when finite, else `oos_ic`) |
+| `t_stat` | `gate_tstat` — the t the PROMOTE gate read: the HAC t of the pooled slope under the default methods (v1.5.0). A report written before v1.5.0 has no such key: `nw_tstat_uncrossed` when finite, else `nw_tstat` |
 | `rank_ic`, `nw_lags`, `hit_rate`, `turnover` | `oos_rank_ic`, `nw_lags`, `oos_hit_rate`, `turnover_flips_per_hour` |
 | `fold_consistency`, `n_folds`, `leakage_passed`, `leakage_detail`, `hypothesis_sign_confirmed`, `verdict` | `fold_sign_consistency`, `n_folds_run`, `leakage.passed`, `leakage`, `hypothesis_confirmed`, `verdict` |
 | `net_return_bps`, `transaction_cost_bps`, `gross_return_bps` | `stress.cost.x1.total_pnl` and `total_costs` in USD, expressed in **bps of the 1e6 USD reference notional** (`REFERENCE_NOTIONAL_USD`; `gross = net + cost`; only the sign is gated; the basis is recorded as `configuration.pnl_basis`) |
 | `max_drawdown_bps`, `sharpe` | **not recorded** by the report: stored as `0.0` and listed in `configuration.unrecorded` |
-| `experiment_id`, `n_experiments_in_ledger` | the alpha's `promotion_pipeline` ledger entry: `key[:16]` and `n` (`<ID>-unledgered` / `0` without one) |
+| `experiment_id`, `n_experiments_in_ledger` | the alpha's `promotion_pipeline` ledger entry on the dataset `alpha_params.json` names, under the default methods: `key[:16]` and `n` (`<ID>-unledgered` / `0` without one) |
 | `dataset_version`, `feature_version`, `git_commit`, `model_version` | `configs/strategies/alpha_params.json`: `data_version`, `feature_version`, `git_commit`, `content_hash(params[ID])` (explicit `dataset_version` / `feature_version` arguments to `import_alpha_reports` override the document, for a tree without it) |
 | `created_ts` | the last fold's `test_end` |
-| spec `configuration` | `source`, `protocol`, `gates`, `n_folds`, `folds` (the per-fold windows), `universe`, `capacity_usd` (Σ `capacity_usd_by_instrument`), `pnl_basis`, `ic_source`, `t_stat_source`, `experiment_id_source`, `version_sources`, `unrecorded` |
+| spec `configuration` | `source`, `protocol`, `gates`, `n_folds`, `folds` (the per-fold windows), `universe`, `capacity_usd` (Σ `capacity_usd_by_instrument`: the edge-breakeven capacity under the default methods), `pnl_basis`, `ic_source`, `t_stat_source`, `experiment_id_source`, `version_sources`, `unrecorded` |
 | spec `seed`, periods | `0` and empty train/validation periods; `test_period` spans the first fold's `test_start` to the last fold's `test_end` |
 
 An `ExperimentRunner` document (`research/experiments/<id>/`) keeps its own
@@ -254,10 +254,16 @@ SELECT alpha_id, current_state, verdict, ROUND(ic, 4) AS ic,
        ROUND(t_stat, 2) AS t_stat, leakage_passed, ledger_count
 FROM v_alpha_scorecard
 ORDER BY alpha_id;
--- {"alpha_id":"EQ03","current_state":"CANDIDATE","ic":0.0271,"leakage_passed":1,"ledger_count":176,"t_stat":4.84,"verdict":"ITERATE"}
--- (v1.4.0 snapshot. The "latest result" is chosen by created_ts and then by the greatest experiment_id; every
---  committed result carries the same created_ts, and the store holds the results of two datasets, so check
---  experiment_results.dataset_version before reading a row as a statement about the current dataset.)
+-- {"alpha_id":"EQ03","current_state":"CANDIDATE","ic":0.0271,"leakage_passed":1,"ledger_count":432,"t_stat":4.84,"verdict":"ITERATE"}
+-- (v1.5.0 snapshot. The "latest result" is chosen by created_ts and then by the greatest experiment_id. The
+--  store holds the results of two datasets and, since v1.5.0, of two method bundles, and the ExperimentRunner
+--  results of an alpha share one created_ts: for EQ03 the tie-break picks f0f6c49b553f6b59, a 5 s experiment
+--  recorded under the v1.4.0 rules (now `legacy_v1`), which is why ic and t_stat read as they did in v1.4.0.
+--  The row the lifecycle registry is built from is 70421bc02273a6ab: ic 0.0189, t_stat 5.16 under the default
+--  methods. Check experiment_results.dataset_version and the `methods` key of experiments.configuration_json
+--  before reading a row as a statement about the current dataset and rules. ledger_count is the alpha's share
+--  of every look ever recorded: 176 in v1.4.0, plus 84 for the v2 report and 2 x 84 for its v2 runner experiments,
+--  plus 4 adaptive deployments.)
 ```
 
 **2. Why was order X rejected?** — the risk verdict of a parent order
@@ -309,7 +315,7 @@ FROM drift_baselines b
 JOIN v_alpha_scorecard s ON s.alpha_id = b.alpha_id
 WHERE b.kind = 'ic'
 ORDER BY b.alpha_id;
--- {"alpha_id":"EQ03","baseline_ic":0.0161,"baseline_ic_std":0.0604,"gap":0.011,"horizon":"5s","research_ic":0.0271}   (v1.4.0 snapshot)
+-- {"alpha_id":"EQ03","baseline_ic":0.0161,"baseline_ic_std":0.0604,"gap":0.011,"horizon":"5s","research_ic":0.0271}   (v1.5.0 snapshot; research_ic is the scorecard row described under query 1)
 ```
 
 **5. The multiple-testing denominator** — what every promotion claim is
@@ -320,10 +326,17 @@ Bonferroni-corrected against (`research/experiments.json` `total_experiments`
 SELECT COUNT(*) AS distinct_experiments, SUM(count) AS total_experiments,
        ROUND(0.05 / SUM(count), 8) AS bonferroni_p
 FROM ledger_entries;
--- {"bonferroni_p":2.604e-05,"distinct_experiments":139,"total_experiments":1920}   (v1.4.0 snapshot; the ledger only grows)
+-- {"bonferroni_p":1.137e-05,"distinct_experiments":208,"total_experiments":4396}   (v1.5.0 snapshot; the ledger only grows: v1.4.0 read 139 / 1920)
 
 SELECT kind, n_entries, n_alphas, total_count, n_promote, n_iterate, n_reject
 FROM v_experiment_ledger_summary ORDER BY kind;
+-- {"kind":"adaptive_deployment","n_alphas":10,"n_entries":120,"n_iterate":0,"n_promote":0,"n_reject":0,"total_count":120}
+-- {"kind":"design_horizon_scan","n_alphas":1,"n_entries":1,"n_iterate":0,"n_promote":0,"n_reject":0,"total_count":216}
+-- {"kind":"experiment_runner","n_alphas":3,"n_entries":15,"n_iterate":11,"n_promote":0,"n_reject":4,"total_count":700}
+-- {"kind":"promotion_pipeline","n_alphas":24,"n_entries":72,"n_iterate":32,"n_promote":0,"n_reject":40,"total_count":3360}
+-- (v1.5.0 snapshot. The promotion_pipeline rows are three runs of the 24 alphas: the v1.3.0 dataset, the
+--  current dataset under the rules up to v1.4.0 (28 looks each) and the current dataset under the default
+--  methods (84 looks each), so n_iterate / n_reject count verdicts of all three, not the current 11 / 13.)
 ```
 
 ## 8. Python API and CLI

@@ -233,7 +233,8 @@ epics:
       EQ01..EQ12 and FX01..FX12 as an alpha library with an enforced economic
       rationale per alpha, linear_z_v1 fitting with provenance, six golden
       production alphas ported to C++/Rust/Java, and an honest promotion report
-      — currently 0 PROMOTE / 10 ITERATE / 14 REJECT on uncrossed IC.
+      — currently 0 PROMOTE / 11 ITERATE / 13 REJECT on the pooled uncrossed IC
+      under the v1.5.0 default research methods.
     scope:
       - "python/src/iap/alpha/{base,equity,fx,cross_sectional,fx_exposure,data}.py"
       - "configs/strategies/alpha_params.json (x-version 2), API_ALPHA.md, research/alpha_reports/"
@@ -1461,7 +1462,7 @@ issues:
 
   - key: A06
     epic: E07
-    title: "24-alpha promotion report: 0 PROMOTE / 10 ITERATE / 14 REJECT, all cost-negative at 1x"
+    title: "24-alpha promotion report: 0 PROMOTE / 11 ITERATE / 13 REJECT, none net-positive at 1x"
     labels: [type:research, area:alpha, area:research, phase:w3, priority:p0, lang:python]
     milestone: "Week 3"
     status: done
@@ -1475,7 +1476,15 @@ issues:
       the uncrossed-IC conditioning (FX08 0.117 -> 0.041, FX09 -0.128 ->
       -0.047) and row-mass fold cuts (0 of 96 degenerate folds). Ledger:
       760 looks over 65 configurations, expected max |t| under the null 3.64.
-      This is the platform's central, truthfully reported finding.
+      This is the platform's central, truthfully reported finding. Those are
+      the figures of the report as first closed. Current state (v1.5.0, the
+      corrected research methods as defaults, dataset 116b7787): 0 PROMOTE /
+      11 ITERATE / 13 REJECT; EQ03 gate IC 0.0189 with a pooled-slope HAC t
+      of 5.16 against a ledger threshold of 4.365; under the cost-aware
+      position policy 18 alphas make no trade at 1x and the 6 that trade
+      lose, so none is net-positive; the ledger holds 4,396 looks over 208
+      configurations. run_all.py --methods legacy_v1 reproduces the v1.4.0
+      report (0 / 10 / 14).
     acceptance:
       - "REPORT.md prints the gates, hyp sign, uncrossed/crossed IC, degenerate folds and the multiple-testing denominator for all 24"
       - "Every headline number is re-derived by check_headline_numbers.py"
@@ -1600,7 +1609,11 @@ issues:
       PROMOTE requires leakage passed, uncrossed OOS IC >= 0.010, NW t >= 3.0,
       fold sign consistency >= 0.70, >= 3 non-degenerate folds, the fitted sign
       agreeing with the rationale, and net P&L > 0 at 1x costs; ITERATE is
-      evidence of signal that fails a PROMOTE gate; REJECT otherwise.
+      evidence of signal that fails a PROMOTE gate; REJECT otherwise. Since
+      v1.5.0 the gate t is the HAC t of the pooled slope and its threshold is
+      max(3.0, the ledger's multiple-testing threshold at the run's look
+      count) by default (tstat_threshold "ledger"); the within-bucket t
+      against a fixed 3.0 is the legacy rule (methods legacy_v1).
     acceptance:
       - "GATES are pinned in code and echoed in every report"
     evidence:
@@ -1901,7 +1914,9 @@ issues:
       depth one fill per level; a consumed-liquidity overlay across children;
       deterministic queue position (cancel decrement, trade-through,
       marketable-ADD expansion, crossing with the double-count exemption);
-      fees; linear impact identical to the research cost model. Simulated
+      fees; linear impact identical to the research cost model's legacy
+      linear rule (the research default is square-root impact since v1.5.0;
+      the simulator stays linear). Simulated
       fills never mutate the replayed book.
     acceptance:
       - "Each rule has a scenario test; the queue-position model is diagrammed and documented in paper 5"
@@ -2259,7 +2274,9 @@ issues:
     estimate_days: 2
     context: >
       Pinned IC gates, a neutral hysteresis zone, consecutive-breach
-      counters, the uninformative-evaluation rule, re-activation WATCH ->
+      counters (the legacy retirement rule since v1.5.0, when the CUSUM rule
+      became the default in Python, Java and Rust; both are selected by
+      name), the uninformative-evaluation rule, re-activation WATCH ->
       ACTIVE and RETIRED -> WATCH; state sequences pinned in the adaptive
       golden; every transition appended to research/lifecycle_log.jsonl
       without wall-clock fields.
@@ -2285,7 +2302,7 @@ issues:
       alpha_id, and lifecycle_transition documents.
     acceptance:
       - "Illegal transitions raise; every legal transition requires its gate evidence object"
-      - "The registry seeds all 24 alphas at RESEARCH (ten ITERATE alphas may be CANDIDATE only via a ledgered verdict)"
+      - "The registry seeds all 24 alphas at RESEARCH (the ITERATE alphas may be CANDIDATE only via a ledgered verdict)"
       - "A golden state-sequence file pins the machine"
     evidence:
       - "python/src/iap/lifecycle/{config,evidence,gates,machine,registry,bootstrap,golden,__main__}.py; configs/strategies/lifecycle.json"

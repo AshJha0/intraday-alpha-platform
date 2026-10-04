@@ -96,8 +96,8 @@ order; each gate's evidence is linked from the experiment's manifest
 No gate may be skipped; "backtest Sharpe alone is never sufficient" (spec §1).
 Honest reporting is a hard requirement (conventions §7): costs and OOS
 degradation are always shown, and the experiment ledger
-(`research/experiments.json`: 865 looks over 70 distinct configurations as of
-2026-09-20; the model ledger `research/models/ledger.json` counts fits)
+(`research/experiments.json`: 4,396 looks over 208 distinct configurations as of
+2026-10-04, v1.5.0 — it held 865 over 70 on 2026-09-20; the model ledger `research/models/ledger.json` counts fits)
 makes the multiple-testing denominator public.
 
 **The gates are executable.** Since 2026-09-19 the promotion path is the
@@ -115,8 +115,13 @@ approval) and every retirement or reset by decision are HUMAN edges: they
 carry `actor = HUMAN` and a non-empty reason, and the approval reference is
 that reason. Every transition is one `LifecycleTransition` line in
 `research/lifecycle_transitions.jsonl` with the gate results, and the state
-lives in `research/alpha_registry.json`. Bundled result: 24 CANDIDATE, 0
-beyond — every alpha fails `net_pnl_after_costs`. Gate 8 (cross-alpha
+lives in `research/alpha_registry.json`. Since v1.5.0 the
+`statistical_significance` gate compares the gate t with the
+multiple-testing threshold the evidence carries (never below 3.0;
+`tstat_threshold = "fixed"` is the legacy rule), and the live sub-machine
+retires by the CUSUM rule (`breach_rule = "consecutive"` is the legacy
+rule). Bundled result: 24 CANDIDATE, 0
+beyond — every alpha fails `net_pnl_after_costs` and `capacity`. Gate 8 (cross-alpha
 correlation) is not yet a lifecycle gate (backlog AF03).
 
 **The ledger-id rule (CONTRIBUTING.md §6).** A change to a verdict in

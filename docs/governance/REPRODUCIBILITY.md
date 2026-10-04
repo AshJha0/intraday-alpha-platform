@@ -110,12 +110,24 @@ Recipe: `cd python && PYTHONPATH=src python3 -m iap.research run --alpha EQ03
 **refuses** a rerun that reproduces different evidence under the same id
 (`ResearchError`) — remove the directory deliberately if the evidence chain
 changed. `git_commit = unversioned-workspace` marks a scratch run exactly as
-for manifests. Ten experiments are committed, the same five alpha × horizon
-pairs on two datasets. The five of the current dataset (`876b08e20c46e6fd`,
+for manifests. Fifteen experiments are committed, the same five alpha × horizon
+pairs on two datasets and, on the current one, under two method bundles.
+The five under the default methods of v1.5.0 (`838e0c2d75de4db6`,
+`6e4a3431a3acf8a5`, `9d895cf7148c4a8d`, `00ebeb2b537b5155`,
+`d87e34a9c67c1891`) pin dataset `116b7787…`, features `585dd7b9…`, commit
+`75fd4f79…`, `configuration.methods = "v2"` and `n_experiments_in_ledger`
+4020, 4104, 4188, 4272 and 4356 in that order (each run adds 84 looks), and
+carry an `eligibility.json` (x-version 2) that records the significance
+threshold each was judged at and the look count it was derived from. The
+five run by v1.4.0 on the same dataset under the rules now called
+`legacy_v1` (`876b08e20c46e6fd`,
 `695e7b1e2bd2253e`, `852863faa44b7b07`, `f0f6c49b553f6b59`,
-`20f1b9093e7d0d04`) pin dataset `116b7787…`, features `585dd7b9…`, commit
+`20f1b9093e7d0d04`) pin the same dataset and features, commit
 `29f08225…` and `n_experiments_in_ledger` 1768, 1796, 1824, 1852 and 1880
-in that order (each run adds 28 looks), and carry an `eligibility.json`. The
+in that order (each run adds 28 looks), and carry an `eligibility.json`
+(x-version 1); their specs name no method bundle, so a `--methods
+legacy_v1` run on the current tree reproduces their numbers under a
+different id. The
 five of the v1.3.0 dataset (`c73bb6294d226163`, `d7b554d0a3fa3b26`,
 `217fa0cb1d89a9c8`, `4a2900e4a6705542`, `d0dd1ab0711d33a1`) pin dataset
 `203c8f54…`, the same features, commit `fc41ac6f…` and
@@ -124,7 +136,10 @@ above reproduces them only on a dataset generated with
 `equities.flow.calibration = "legacy_budget"` (§3.3). `dataset_version` is
 part of the spec, so the same alpha × horizon has a different
 `experiment_id` on each dataset, and the ledger identity is (alpha, kind,
-config, dataset). The pinned-horizon runs
+config, dataset). Since v1.5.0 the method bundle is part of
+`configuration`, hence of the id: reproducing a number means naming the
+bundle it was computed under (`v2` by default, `--methods legacy_v1` for a
+v1.4.0 number). The pinned-horizon runs
 are the contract-driven runner's own numbers: since 2026-09-20 the
 walk-forward stops where the declared holdout starts, so they no longer
 equal `research/alpha_reports/{EQ01,EQ03,EQ06}.json`, whose walk-forward
@@ -144,10 +159,14 @@ still spans the whole window (a weaker, disclosed protocol).
   §13.2), `report.json` and the stream sha256, refusing first if a
   reference document changed (`config_version`). The golden run is
   `tests/golden/expected_mvp.json`: seed 12345, run `58a10f2194a3c81c`,
-  digest `f51890da0c3c66cd488073fd7149099729767f5f65d03a7656e59f2da9c6a708`
-  (v1.4.0; the run id is unchanged from v1.3.0 because `mvp.json` and the
-  seed are, while the stream, the fitted parameters and therefore the
-  digest moved with the generator fix).
+  digest `e534ac1f06c505370daf6fa3dae4c3927cb08d2dbec75b1a506118da85598a99`
+  (v1.5.0; the run id is unchanged from v1.3.0 because `mvp.json` and the
+  seed are. In v1.4.0 the stream, the fitted parameters and therefore the
+  digest moved with the generator fix. In v1.5.0 the stream, every count
+  and the P&L are identical to v1.4.0, and the digest moved only because
+  `config_version`, which every trace carries, hashes `execution.json`,
+  `alpha_params.json` and the registry: `f293e7e7…` became `bf8cc608…`.
+  A run captured by v1.4.0 therefore replays only from the v1.4.0 tag).
 - **A Java paper session** is reproduced by re-running `java/paper.sh` on
   the same vector and configuration: `decision_traces.jsonl` and the
   report's `trace.digest` are a pure function of the event stream
@@ -169,14 +188,19 @@ still spans the whole window (a weaker, disclosed protocol).
   loaders re-render the file byte-identically. For v1.4.0 the registry and
   `research/lifecycle_transitions.jsonl` were rebuilt with
   `bootstrap --force`; the transition log of the v1.3.0 dataset is archived
-  as `research/archive/lifecycle_transitions.dataset-203c8f54.jsonl`.
+  as `research/archive/lifecycle_transitions.dataset-203c8f54.jsonl`. For
+  v1.5.0 they were rebuilt again, on the same dataset, from the reports of
+  the default methods (registry x-version 2); the log of the legacy methods
+  is archived as
+  `research/archive/lifecycle_transitions.dataset-116b7787.methods-legacy_v1.jsonl`.
 
 ## 3.3 Regenerating everything that derives from the dataset
 
 The seeded dataset is never committed, but the alpha reports,
 `alpha_params.json`, the runner experiments, the lifecycle registry, the ML
 and adaptive reports, the power study and four goldens are computed from
-it. When the dataset changes they are regenerated together, in dependency
+it. When the dataset changes — or, as in v1.5.0, the default research
+methods do — they are regenerated together, in dependency
 order, by one script:
 
 ```bash
@@ -185,8 +209,10 @@ python3 tools/regenerate_dataset_artifacts.py            # the whole chain
 python3 tools/regenerate_dataset_artifacts.py --only goldens,tca
 ```
 
-- The script starts from a ledger that has not seen the dataset (the
-  pipelines are ledgered per dataset; a second run on the same dataset
+- The script starts from a ledger that has not seen the dataset under the
+  default method bundle (the
+  pipelines are ledgered per dataset and method bundle; a second run on the
+  same dataset under the same bundle
   would be recorded as reruns and append a second set of model runs —
   `--allow-rerun` overrides), stops at the first failing step, and prints
   the wall-clock time of every step.
@@ -196,11 +222,25 @@ python3 tools/regenerate_dataset_artifacts.py --only goldens,tca
   the environment the test suites then verify them in. A run on another
   platform reproduces them to the tolerances of this document (integer and
   byte paths exactly, float paths to 1e-9, tree-model fits only under the
-  recorded `library_versions`), not necessarily to the byte.
+  recorded `library_versions`), not necessarily to the byte. The artefacts
+  committed for v1.5.0 were produced the same way at commit `75fd4f79…`,
+  on the unchanged dataset `116b7787…`.
 - Goldens that do not depend on the dataset must come out byte-identical;
   that is the proof they are independent. For v1.4.0 four changed
   (`expected_alpha.json`, `expected_backtest.json`,
-  `expected_adaptive.json`, `expected_mvp.json`).
+  `expected_adaptive.json`, `expected_mvp.json`). For v1.5.0 the dataset
+  did not change and the rules did: `expected_lifecycle.json`,
+  `expected_backtest.json` and `expected_adaptive.json` went to x-version 2
+  (the backtest golden keeps its legacy vector, identical to v1.4.0 in
+  every value, and names the rules in its `config`), `expected_mvp.json`
+  changed in `config_version`, the trace digest and the per-alpha `ic_gap`
+  only, and `expected_alpha.json` follows `alpha_params.json`, which
+  differs from v1.4.0 by at most 2.3e-15 relative.
+- **The way back to a v1.4.0 research number** is the method bundle, not
+  the dataset: `research/alpha_reports/run_all.py --methods legacy_v1
+  --out-dir <dir>` writes the v1.4.0 report to a directory of its own, and
+  `python/tests/test_legacy_methods.py` compares it field by field with
+  `tests/golden/alpha_report_{EQ03,FX01}_v1.4.0.json`.
 - **The way back to the v1.3.0 dataset.** The generator's default flow
   calibration is `equities.flow.calibration = "session"` (config
   `x-version` 2), which gives `data_version` `116b7787…`. Setting it to
@@ -240,6 +280,7 @@ snapshot and its default configuration:
 | `run_0008…run_0021` | `unversioned-workspace` | `9ac06659…` (round 2) | no |
 | `run_0022…run_0033` | real 40-hex commits (`3fff88d7…`, `a87ca00f…`, `0768cbe4…`; `git_dirty` true) | `203c8f54…` (round 3 to v1.3.0; equity flow stopped about 40% into each session) | not with the default configuration; yes with `equities.flow.calibration = "legacy_budget"` (§3.3) |
 | `run_0034…run_0040` | `29f08225…` (`git_dirty` true; written by the CI `regenerate` job) | `116b7787…` (current, v1.4.0) | yes |
+| `run_0041…run_0047` | `75fd4f79…` (`git_dirty` true; written by the CI `regenerate` job for v1.5.0) | `116b7787…` (current; meta-label features not imputed) | yes |
 
 The rule, not the run numbers, is what to check: a run is replayable from
 this snapshot iff its `data_version` equals the value
@@ -268,7 +309,7 @@ The v1.4.0 regeneration is what retired `203c8f54…`: the equity flow
 calibration was fixed so that flow reaches the close, which changes every
 equity file (the FX files are byte-identical).
 Only runs pinning the current `data_version` back any number in the current
-`research/ml_reports/ML_REPORT.md`; the `unversioned-workspace` runs back
+`research/ml_reports/ML_REPORT.md` (the latest set, `run_0041…run_0047`); the `unversioned-workspace` runs back
 the round-1 and round-2 reports preserved in the papers' dated bodies.
 
 A manifest with `git_commit = unversioned-workspace` or

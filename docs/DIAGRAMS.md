@@ -35,7 +35,7 @@ flowchart TD
     FILLS --> TCA["TCA + attribution<br/>Perold IS = delay + trading + opportunity (exact)<br/>Python reference, Java service"]
     TCA --> TRACE["Decision trace — one DecisionTrace per decision<br/>signal · portfolio · risk · orders · routing · fills · TCA · attribution<br/>canonical JSONL + stream digest + SQLite index (iap.store); explain()"]
     LBL --> RESEARCH
-    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (1920 looks / 139 configs, two datasets)<br/>REPORT.md, ML_REPORT.md, model manifests"]
+    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (4,396 looks / 208 configs, two datasets, two method bundles)<br/>REPORT.md, ML_REPORT.md, model manifests"]
     RESEARCH --> LIFE["Alpha promotion lifecycle (iap.lifecycle)<br/>RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE <-> WATCH -> RETIRED<br/>18 gates, 17 edges; bundled data: 24 CANDIDATE / 0 beyond"]
     LIFE -. "gated, ledgered transitions<br/>(research/alpha_registry.json)" .-> ALPHA
 ```
@@ -43,8 +43,8 @@ flowchart TD
 ## 2. Cross-language golden-test topology
 
 How one validated Python reference pins four implementations. The parity table is
-printed by `tests/harness/run_all.sh` (python 1573 · cpp 289 · rust 323 · java 510
-tests; 166/68/64/104 in the golden groups — the Java gate runs all thirteen
+printed by `tests/harness/run_all.sh` (python 1672 · cpp 289 · rust 330 · java 517
+tests; 173/68/66/106 in the golden groups — the Java gate runs all thirteen
 `*GoldenTest` classes, the Rust gate nine golden targets). Two goldens are
 owned by a port language and consumed by Python as well: the fills golden
 (C++) by `iap.execution`, the risk goldens (Rust) by `iap.risk`.
@@ -60,10 +60,10 @@ flowchart LR
     MG --> EXP[("expected_*.json<br/>codec sha256 | book states | features<br/>alpha | backtest | risk decisions + audit + snapshot<br/>replay fills | portfolio | tca (+ timeline cases) | adaptive<br/>contracts examples | canonical json + trace digest<br/>lifecycle | experiment golden frame | mvp")]
     CPPTOOL["cpp/tools/make_replay_fills_golden<br/>(C++ is the fills reference;<br/>Python iap.execution consumes it too)"] --> EXP
     RSTOOL["rust/risk/src/bin/make_risk_golden<br/>(Rust is the risk reference;<br/>Python iap.risk consumes it too)"] --> EXP
-    GV --> PY["python: pytest -k golden<br/>166 tests"]
+    GV --> PY["python: pytest -k golden<br/>173 tests"]
     GV --> CPP["cpp: ctest -R Golden<br/>68 tests"]
-    GV --> RS["rust: 9 golden test targets<br/>64 tests"]
-    GV --> JV["java: all thirteen *GoldenTest (JUnitCore)<br/>104 golden-group tests"]
+    GV --> RS["rust: 9 golden test targets<br/>66 tests"]
+    GV --> JV["java: all thirteen *GoldenTest (JUnitCore)<br/>106 golden-group tests"]
     EXP --> PY
     EXP --> CPP
     EXP --> RS
@@ -518,8 +518,9 @@ The full promotion machine RESEARCH → CANDIDATE → VALIDATING → PAPER → A
 WATCH → RETIRED, table-driven (`machine.ALLOWED_TRANSITIONS`, pinned as
 `transition_table` in `tests/golden/expected_lifecycle.json`), with the gate
 names of every SYSTEM edge and the HUMAN-only manual edges. The ACTIVE/WATCH/
-RETIRED sub-machine is the unchanged `iap.adaptive.lifecycle.LifecycleTracker`
-(API_ADAPTIVE.md §6); the full table, thresholds and evidence blocks are in
+RETIRED sub-machine is `iap.adaptive.lifecycle.LifecycleTracker`
+(API_ADAPTIVE.md §6), whose retirement rule is the CUSUM rule by default
+since v1.5.0, with the consecutive-breach rule selectable by name; the full table, thresholds and evidence blocks are in
 [LIFECYCLE.md](LIFECYCLE.md). Ports: `com.iap.lifecycle`, `rust/lifecycle`.
 
 ```mermaid
@@ -537,7 +538,7 @@ flowchart TD
     PAPER -->|"DEMOTION: 3rd consecutive failed evaluation"| CANDIDATE
     ACTIVE -->|"LIVE: rolling_ic < watch_ic_gate (0.0)"| WATCH["WATCH (5)"]
     WATCH -->|"LIVE: 3 consecutive rolling_ic >= reactivate_ic_gate (0.005)"| ACTIVE
-    WATCH -->|"LIVE: 6 consecutive breaches (entering breach counts)"| RETIRED["RETIRED (6) — terminal for SYSTEM"]
+    WATCH -->|"LIVE: breach_rule cusum (default): a breach with S >= cusum_h (0.01)<br/>legacy consecutive: 6 breaches in a row (entering breach counts)"| RETIRED["RETIRED (6) — terminal for SYSTEM"]
     RESEARCH -. "MANUAL retire (HUMAN)" .-> RETIRED
     CANDIDATE -. "MANUAL retire (HUMAN)" .-> RETIRED
     VALIDATING -. "MANUAL retire (HUMAN)" .-> RETIRED
@@ -546,7 +547,7 @@ flowchart TD
     WATCH -. "MANUAL retire (HUMAN)" .-> RETIRED
     RETIRED -. "MANUAL reset_to_research (HUMAN):<br/>the whole evidence chain again" .-> RESEARCH
     SILENCE["Silence is not evidence: an absent evidence block<br/>(or rolling_ic null / uninformative) evaluates nothing<br/>and moves nothing — outcome NO_EVIDENCE"] -.-> CANDIDATE
-    RESULT["Bundled data (bootstrap 2026-09-19):<br/>24 alphas CANDIDATE, 0 VALIDATING —<br/>every alpha fails net_pnl_after_costs at 1x costs"] -.-> CANDIDATE
+    RESULT["Bundled data (bootstrap rebuilt 2026-10-04, v1.5.0 default methods):<br/>24 alphas CANDIDATE, 0 VALIDATING —<br/>every alpha fails net_pnl_after_costs at 1x costs and capacity"] -.-> CANDIDATE
     OBS["Live Java loop: the state is OBSERVATIONAL —<br/>RETIRED pages a human, does not cut size (API_ADAPTIVE §6)"] -.-> RETIRED
 ```
 
@@ -608,7 +609,7 @@ flowchart TD
     FEAT --> CHILD["8. per child: AlgoScheduler → SorAdapter.route (3 venues)<br/>→ controls (slice interval, latency budget, participation)<br/>→ RiskEngineAdapter.evaluate (RiskDecision) → submit<br/>a REJECT is never submitted"]
     CHILD --> TRACE["9. TraceBuilder per decision → JsonlTraceSink + StoreTraceSink + TraceDigest"]
     TRACE --> OUT["data/mvp/RUN_ID/: traces.jsonl · iap.sqlite · risk_audit.jsonl<br/>report.json / report.md · paper_evidence.json · config.json"]
-    OUT --> VERIFY["python -m iap.mvp verify — run twice, identical bytes<br/>python -m iap.mvp replay --run … — same digest from the captured stream<br/>golden: tests/golden/expected_mvp.json (15,805 events, 800 decisions,<br/>235 parents, 169 fills, P&L −81.53 USD, digest f51890da…)"]
+    OUT --> VERIFY["python -m iap.mvp verify — run twice, identical bytes<br/>python -m iap.mvp replay --run … — same digest from the captured stream<br/>golden: tests/golden/expected_mvp.json (15,805 events, 800 decisions,<br/>235 parents, 169 fills, P&L −81.53 USD, digest e534ac1f…)"]
     SIM -. "next event" .-> SIM
 ```
 
@@ -801,10 +802,12 @@ sequenceDiagram
     Note over Op,AD: clear, override and roll are withdrawn on timeout (503)<br/>only a kill stays queued
 ```
 
-## 15. A research run: ledger lock, staged directory, eligibility (v1.3.0)
+## 15. A research run: ledger lock, staged directory, eligibility (v1.3.0; default methods since v1.5.0)
 
 One `python -m iap.research run`, from the request to the persisted evidence:
-where the ledger-derived threshold (opt-in) is read, where the looks are
+where the ledger-derived threshold (the default since v1.5.0; `--methods
+legacy_v1` selects the fixed 3.0, and the `--tstat-threshold` flag is gone)
+is read, where the looks are
 debited — a dry run included — how the experiment directory appears in one
 rename, and where gate eligibility is decided (PLATFORM_CONVENTIONS.md §13.6,
 docs/RESEARCH_VALIDITY.md §3–§4, LEARN.md §24).
@@ -820,17 +823,17 @@ sequenceDiagram
     participant LED as ExperimentLedger<br/>(research/experiments.json)
     participant FS as research/experiments/
 
-    R->>CLI: run --alpha EQ03, optionally --config k=v, --dry-run, --tstat-threshold ledger
+    R->>CLI: run --alpha EQ03, optionally --config k=v, --dry-run, --methods legacy_v1
     CLI->>RUN: build_spec — the experiment id is the hash of the request
     RUN->>RUN: the walk-forward window ends where the holdout begins (asserted)
-    opt tstat_threshold is ledger (opt-in, default fixed 3.0)
-        RUN->>LED: the Bonferroni threshold once this run's looks are counted
+    opt tstat_threshold is ledger (the v2 default, legacy_v1 is the fixed 3.0)
+        RUN->>LED: declare the gate look count, read the Bonferroni threshold at it
     end
     RUN->>VAL: fresh model per fold, leakage probes, stress grids, verdict
-    VAL-->>RUN: report — pinned statistics plus the additive ones no gate reads
+    VAL-->>RUN: report — the gate statistics plus the report-only ones no gate reads
     RUN->>RUN: holdout backtest on the test period
     RUN->>RUN: gate_eligibility(spec, frames) — protocol bounds and derived periods
-    RUN->>LED: record 28 looks for a new configuration, none for a rerun
+    RUN->>LED: record 84 looks for a new configuration (28 under legacy_v1), none for a rerun
     alt --dry-run
         RUN->>LED: save — the looks are debited, no directory is written
     else persist
@@ -848,7 +851,9 @@ sequenceDiagram
 
 `python -m iap.research power`: plant an effect of known size in the
 generator, run the unmodified pipeline and validation chain on it, and count
-how often each statistic flags it. The last node quotes the committed
+how often each statistic flags it. Since v1.5.0 the chain runs under the
+default method bundle, so the PROMOTE gate reads the pooled-slope t and the
+backtest is cost-aware. The last node quotes the committed
 three-seed report, `research/power/POWER_REPORT.md` (LEARN.md §23, COOKBOOK
 recipe 27).
 Source: [`diagrams/power_study_flow.mmd`](diagrams/power_study_flow.mmd).
@@ -860,10 +865,10 @@ flowchart TD
     CFG["research/power/generator_planted.json<br/>the reference effect, level 1.0:<br/>order_flow strength 0.4 · lead_lag beta 0.4 at a lag of 2 steps"] --> GRID["grid: levels 0, 0.5, 1, 2 · scenarios stable and break · 3 seeds per cell<br/>level 0 is the null; break reverses both effects mid-sample"]
     GRID --> GEN["seeded generator with the planted block ON<br/>reduced universe: SYN.EQ.001, SYN.EQ.002, SYN.ETF.IDX"]
     GEN --> PIPE["the real pipeline, unmodified:<br/>normalise, books, feature engine, labels"]
-    PIPE --> VAL["validate_alpha under the pinned research execution model<br/>detectors: EQ04 for order flow, EQ10 for lead-lag"]
-    VAL --> S1["sig within: gate IC > 0 and Newey-West t of<br/>within-bucket ICs >= 3 (what the PROMOTE gate reads)"]
-    VAL --> S2["sig pooled: pooled-slope HAC t >= 3"]
-    VAL --> S3["sig ledger: within-bucket t against the threshold<br/>of the study's own 42 tests (t >= 3.24)"]
+    PIPE --> VAL["validate_alpha under the default method bundle v2<br/>detectors: EQ04 for order flow, EQ10 for lead-lag"]
+    VAL --> S1["sig within: gate IC > 0 and Newey-West t of<br/>within-bucket ICs >= 3 (the legacy gate statistic)"]
+    VAL --> S2["sig pooled: pooled-slope HAC t >= 3<br/>(what the PROMOTE gate reads)"]
+    VAL --> S3["sig ledger: pooled-slope t against the threshold<br/>of the study's own 42 tests (t >= 3.24)"]
     VAL --> S4["evidence: verdict ITERATE or PROMOTE"]
     VAL --> S5["promote; and 95% stationary-bootstrap interval<br/>of net P&L at 1x costs above zero"]
     S1 --> REP["POWER_REPORT.md + POWER_REPORT.json<br/>detection rate per effect, scenario and level"]
@@ -871,14 +876,14 @@ flowchart TD
     S3 --> REP
     S4 --> REP
     S5 --> REP
-    REP --> READ["committed result:<br/>order flow flagged in 3 of 3 seeds at level 2, 1 of 3 at level 1, 0 of 3 at level 0.5<br/>lead-lag flagged in 0 of 3 at every level<br/>break rows: 0 everywhere · PROMOTE: 0 in every cell<br/>no P&L interval above zero in any cell"]
+    REP --> READ["committed result:<br/>order flow significant in 3 of 3 seeds at level 2, 1 of 3 at level 1, 0 of 3 at level 0.5<br/>lead-lag significant in 0 of 3 at every level, ITERATE-level evidence in 1, 1 and 2 of 3<br/>the cost-aware backtest trades only at level 2 (14 trades on average), no fold survives costs<br/>break rows: 0 everywhere · PROMOTE: 0 in every cell<br/>no P&L interval above zero in any cell"]
     OFF["the planted block is OFF by default: the pinned dataset is<br/>byte-identical with or without it; the study never touches<br/>data/ or the research ledger"] -.-> GEN
     LIM["3 seeds per cell: a rate moves in steps of 0.33 —<br/>this calibrates the chain, it is not a power curve"] -.-> READ
 ```
 
 ## 17. CI and release pipeline
 
-The three workflows and Dependabot as they stand at v1.4.0: which jobs gate
+The three workflows and Dependabot as they stand at v1.5.0: which jobs gate
 the image build, which steps are blocking (clippy and ruff are, since the
 tree was made lint-clean; `pip-audit` and `cargo audit` report without
 failing the run), and what the tag-triggered release does.
@@ -887,14 +892,18 @@ runs `tools/regenerate_dataset_artifacts.py` (the dataset and every
 committed artefact derived from it) and uploads the changed files, so the
 artefacts are produced in the environment that verifies them. It gates
 nothing and commits nothing.
-Two boxes say what is not true yet: the release workflow has not been
-exercised by a tag, and branch protection is not configured
+v1.5.0 replaced the release guard: `verify-ci` is now
+`tests/harness/verify_ci_green.py`, which retries an API error instead of
+reading it as "no successful run" (the v1.4.0 release failed on that once
+although CI was green), polls a run in progress and stops on a failed or
+missing run.
+One box says what is not true yet: branch protection is not configured
 (`docs/governance/REPO_SETTINGS.md`, LEARN.md §26).
 Source: [`diagrams/ci_release_pipeline.mmd`](diagrams/ci_release_pipeline.mmd).
 
 ```mermaid
 flowchart LR
-    %% .github/workflows/{ci,codeql,release}.yml and dependabot.yml as of v1.4.0.
+    %% .github/workflows/{ci,codeql,release}.yml and dependabot.yml as of v1.5.0.
     PR["pull request<br/>or push to main"] --> PY
     PR --> INT
     PR --> CPP
@@ -930,8 +939,8 @@ flowchart LR
     PR --> CQL["codeql.yml<br/>python, java-kotlin, c-cpp, actions<br/>also weekly"]
     DB["dependabot.yml<br/>weekly: github-actions, pip, cargo, docker"] -.->|"bump PRs through the same gate"| PR
     TAG["git tag v*"] --> VER
-    subgraph REL["release.yml — not yet exercised by a tag"]
-        VER["verify-ci<br/>the tagged commit has a green ci run"]
+    subgraph REL["release.yml — the guard failed the v1.4.0 release once on an API error and now retries"]
+        VER["verify-ci (tests/harness/verify_ci_green.py)<br/>the tagged commit has a green ci run<br/>API errors retried, a run in progress polled,<br/>a failed or missing run stops the release"]
         BLD["images<br/>build and push to GHCR, one per language"]
         ATT["attest build provenance<br/>per image digest"]
         MAN["manifest<br/>release-manifest.json attached to the release"]
@@ -1049,7 +1058,7 @@ flowchart TD
 | Typed contracts, Protocols, schema index, validation | [../API_CONTRACTS.md](../API_CONTRACTS.md) |
 | Python risk / execution reference ports and their golden parity | [../API_TRADING.md](../API_TRADING.md) |
 | Roadmap: what exists, with evidence; what is backlog | [ROADMAP.md](ROADMAP.md) |
-| Opt-in research methods, the safe research store, gate eligibility | [RESEARCH_VALIDITY.md](RESEARCH_VALIDITY.md) |
+| The research methods (defaults since v1.5.0, with their legacy rules), the safe research store, gate eligibility | [RESEARCH_VALIDITY.md](RESEARCH_VALIDITY.md) |
 | Release notes | [../CHANGELOG.md](../CHANGELOG.md) |
 | Six research papers from the platform's own numbers | [papers/INDEX.md](papers/INDEX.md) |
 | Benchmark methodology + results | [../benchmarks/RESULTS.md](../benchmarks/RESULTS.md) |

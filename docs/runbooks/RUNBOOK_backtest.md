@@ -24,6 +24,21 @@ PYTHONPATH=src python3 -m pytest -q tests/test_backtester.py          # engine i
 PYTHONPATH=src python3 -m pytest -q tests/test_model_economics.py     # cost-adjusted economics
 ```
 
+Defaults since v1.5.0 (PLATFORM_CONVENTIONS.md §13.6): `BacktestConfig()`
+is the cost-aware position policy (`position_policy="cost_aware"`: enter
+only when the expected return exceeds the round-trip spread and fee, hold
+for the label horizon — it needs the horizon, `config.for_horizon(h)`),
+fills capped at the displayed L1 size (`cap_fills_at_l1=True`), only the
+rows the IC scores traded (`block_rows_column="auto"`), and the cost model
+loaded from `configs/execution/execution.json` uses square-root impact
+(`impact_model="sqrt"`). An alpha whose forecast never clears its
+round-trip cost makes no trade under this policy and its net P&L is exactly
+0. The rules up to v1.4.0 are selected by name: `BacktestConfig.legacy()`
+(`"sign"`, uncapped, every row) and `CostModel.with_linear_impact()`;
+`research/alpha_reports/run_all.py --methods legacy_v1 --out-dir <dir>`
+reproduces the v1.4.0 alpha report with them. The Java `ResearchBacktester`
+and `CostModel` implement the legacy rules only and say so in their API.
+
 Currency (conventions §11.6): `Backtester(..., reporting_ccy="USD")`
 converts every instrument's P&L increment to USD at the prevailing mid of
 the conversion pair (`configs/risk/risk.json` `currency.conversion`) before it

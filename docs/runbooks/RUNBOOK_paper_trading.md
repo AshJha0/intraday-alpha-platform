@@ -145,10 +145,22 @@ Watch the **Trading & Risk** dashboard:
   strategies (gate 13) — both human decisions, not automatic ones.
 - **Alpha lifecycle**. {#lifecycle}
   `alpha_lifecycle_state{alpha=...}` is **IC-gated, not PSI-gated**: WATCH when
-  the rolling realized IC (`alpha_rolling_ic`) drops below `watch_ic_gate`,
-  RETIRED after `retire_breach_evals` consecutive breaches, re-activation only
+  the rolling realized IC (`alpha_rolling_ic`, the pair-count-weighted mean
+  of the bucket ICs since v1.5.0) drops below `watch_ic_gate`; RETIRED by the
+  retirement rule the config names — `breach_rule` `"cusum"`, the default
+  since v1.5.0: a breach reading in WATCH once the CUSUM of the shortfall
+  below the gate (slack `cusum_k` 0.0025, each reading weighted by the new
+  share of its window) has reached `cusum_h` 0.01, never on the reading that
+  entered WATCH; or the legacy `"consecutive"`: `retire_breach_evals`
+  consecutive breaches — and re-activation only
   back to WATCH (`configs/strategies/strategies.json` `adaptive.lifecycle`,
-  API_ADAPTIVE.md §6). PSI never moves it.
+  API_ADAPTIVE.md §6; docs/LIFECYCLE.md §2). PSI never moves it. Under the
+  default rule a run of shallow breaches inside the slack does not retire
+  and one or two deep ones can, so do not read the gauge by counting
+  breaches. A session's `config_sha256` differs from a v1.4.0 session's
+  because `execution.json`, `lifecycle.json`, `strategies.json` and
+  `alpha_params.json` changed; state directories written by v1.4.0 resume
+  as before.
   **And in the live loop it is OBSERVATIONAL** — a RETIRED alpha keeps trading
   at full size; nothing in `PaperTrading` reduces the target on this signal
   (pinned and tested: `PaperObservabilityTest.lifecycleGaugeIsIcGatedAndObservational`).

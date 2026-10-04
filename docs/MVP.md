@@ -235,12 +235,25 @@ possible.
 
 Run id `58a10f2194a3c81c`, 15,805 events, 800 decisions, 235 parent orders,
 507 children generated / 348 submitted, 169 fills, fill rate 15.1 %.
-Trace digest `f51890da0c3c66cd488073fd7149099729767f5f65d03a7656e59f2da9c6a708`.
+Trace digest `e534ac1f06c505370daf6fa3dae4c3927cb08d2dbec75b1a506118da85598a99`
+(`config_version` `bf8cc608…`).
 Wall time: about 2.2× the v1.3.0 session on the same machine (27 s → 59 s on
 the laptop this was measured on; 0.8 s of that is feed generation and
 normalisation) — there are 800 decisions to make instead of 355.
 
-These are the numbers of the v1.4.0 golden (2026-10-03). The run id is the
+These are the numbers of the v1.4.0 golden (2026-10-03), and v1.5.0
+(2026-10-04) did not move one of them: the loop does not use the research
+backtester, so the new default research methods change no event, decision,
+fill or cent. What v1.5.0 changed is the identity of the run:
+`config_version` hashes `configs/execution/execution.json`,
+`configs/strategies/alpha_params.json` and `research/alpha_registry.json`,
+all of which changed (the cost model now names its `impact_model`; the
+header of `alpha_params.json` names the regeneration commit; the registry is
+x-version 2), so it went from
+`f293e7e7…` to `bf8cc608…`, and the trace digest, which covers
+`config_version`, from `f51890da…` to `e534ac1f…`. The research IC the
+realized IC is compared with (§7.1, last two columns) is now the gate IC of
+the v2 report. The run id is the
 one of v1.3.0 because `mvp.json` and the seed did not change; the stream did:
 the generator now spreads each venue's flow over the whole 15 minutes
 instead of spending it in the first 45 % (the last continuous event of the
@@ -273,15 +286,15 @@ This is the same picture the research reports give (every alpha fails
 
 | alpha | IC@1s mid | IC@1s cost | IC@1s shift-1 | n | fitted h | IC@h mid | IC@h cost | IC@h shift-1 | n@h | research IC@h | gap |
 |---|---:|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|
-| EQ01 | +0.217 | −0.024 | +0.149 | 790 | 1s | +0.217 | −0.024 | +0.149 | 790 | +0.010 | 0.207 |
+| EQ01 | +0.217 | −0.024 | +0.149 | 790 | 1s | +0.217 | −0.024 | +0.149 | 790 | +0.011 | 0.206 |
 | EQ03 | +0.110 | −0.029 | +0.116 | 707 | 5s | +0.147 | +0.067 | +0.070 | 677 | +0.019 | 0.128 |
-| EQ06 | −0.079 | +0.079 | −0.047 | 354 | 10s | −0.130 | +0.033 | −0.098 | 301 | +0.027 | 0.157 |
+| EQ06 | −0.079 | +0.079 | −0.047 | 354 | 10s | −0.130 | +0.033 | −0.098 | 301 | +0.028 | 0.158 |
 | ensemble | +0.104 | −0.003 | +0.111 | 790 | — | — | — | — | — | — | — |
 
 The realized ICs are several times the research ICs. That gap was audited
 on 2026-09-20, on the v1.3.0 session; the audit's conclusions are restated
-here on the v1.4.0 session, and one of its observations no longer holds
-(item 3).
+here on the v1.4.0 session (unchanged in v1.5.0), and one of its
+observations no longer holds (item 3).
 
 1. **Definition, pinned.** `MvpEngine.realized_ic` IS the research
    definition: `iap.labels.compute_labels` (event-time labels, mid-to-mid
@@ -341,7 +354,7 @@ here on the v1.4.0 session, and one of its observations no longer holds
    efficient price and the mid converges to it over a few seconds.
    Microprice deviation (EQ01) and OFI (EQ03) measure precisely that lean,
    so mid-to-mid IC at 1 s is large; the same alphas fitted on the
-   bundled two-day dataset (registry `oos_ic` 0.010 / 0.019 / 0.027) sit
+   bundled two-day dataset (registry `oos_ic` 0.011 / 0.019 / 0.028) sit
    an order of magnitude lower, on flow that is some thirty times sparser
    (a slot every 6 s per venue stream against 0.2 s here). A real feed
    would not be this kind. EQ06 (10 s momentum) has the wrong sign at both
@@ -352,8 +365,9 @@ here on the v1.4.0 session, and one of its observations no longer holds
    move is smaller than the spread, which is the −81.53 USD above and the
    research verdicts.
 6. **The gap the lifecycle sees.** `ic_gap` is measured at the alpha's
-   FITTED horizon (like for like with the registry's `oos_ic`): 0.207 /
-   0.128 / 0.157. `paper_evidence.json` carries that IC, so the
+   FITTED horizon (like for like with the registry's `oos_ic`): 0.206 /
+   0.128 / 0.158 (0.207 / 0.128 / 0.157 against the v1.4.0 registry; the
+   realized ICs are the same, the registry IC is now the v2 gate IC). `paper_evidence.json` carries that IC, so the
    `paper_ic_tracking` gate (max gap 0.01) fails all three alphas on this
    data (EQ01 and EQ03 on the v1.3.0 session; EQ06's gap was 0.021 there)
    — correctly: paper behaviour that differs this much from research is a
