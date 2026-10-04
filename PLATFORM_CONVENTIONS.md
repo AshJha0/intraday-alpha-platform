@@ -424,6 +424,50 @@ implements it (`docs/SCENARIOS.md`, TRADING section).
     (`InstrumentRef::try_new` / `validation_error`) re-validates in `RiskEngine::new` and lands
     the engine fail-closed — `CONFIG_MISSING` on every order, `invalid reference data for
     instrument <id>: ...`.
+- **How parity is tested** (since 2026-10-04). Three layers, each replayed by Rust, Java and
+  Python. (1) The hand-written goldens above (`expected_risk_{decisions,audit,snapshot}`, the edge
+  scenarios) pin the documented cases. (2) A **generated corpus**, `tests/golden/risk_fuzz/` — 89
+  step scripts, about 4,600 steps, written by `python/tools/make_risk_fuzz_corpus.py` from the
+  state-aware generator `python/tools/risk_fuzz.py` (SplitMix64 only; boundary values at every
+  limit, the i64 / u64 extremes, clock regressions and jumps, non-ASCII ids, one script per
+  configuration mutation). The Python engine is the **oracle** that records the expectations;
+  `rust/risk/tests/golden_risk_fuzz.rs`, Java `RiskFuzzGoldenTest` and
+  `python/tests/test_risk_fuzz_golden.py` must reproduce every order's decision, rule, severity,
+  scope, scope id and reason, the audit JSONL byte for byte, the final snapshot (bytes in Rust and
+  Python; the same document in Java, whose `Double.toString` layout differs), and — after a
+  snapshot -> JSON text -> restore at each cut point — the unbroken run's remaining audit lines and
+  final state. `COVERAGE.txt` lists every reason-string branch with the script that reaches it
+  (63 of 64; `strategy daily pnl undeterminable` is unreachable because check 21 rejects first).
+  CI regenerates the corpus and fails if the committed bytes are stale. (3) The **`risk-fuzz`
+  job** (`.github/workflows/risk-fuzz.yml`: nightly, on demand, and from `ci.yml`
+  `workflow_dispatch` with `risk_fuzz=true`) generates fresh scripts from a fresh seed, runs the
+  three engines on the runner and uploads the first diverging script minimised by a
+  delta-debugging shrinker. A divergence is a bug in an engine, never a reason to relax the test:
+  it is reduced, decided from this section (Rust is normative; where the text is silent the
+  fail-closed behaviour wins), fixed, and its reduced case stays in the corpus. Oracle and
+  normative are different roles: the 2026-10-04 run found a fail-open in the Rust and the Python
+  engine that the Java port did not have. Not carried by the corpus: NaN and Infinity (not JSON —
+  pinned by per-language unit tests) and values outside the wire domains.
+- **Pinned by the fuzzer on 2026-10-04** — existing rule ids and reason texts, no schema change.
+  *Ordering*: every map keyed by a strategy id or a currency iterates in **Unicode code-point
+  order** (the UTF-8 byte order of Rust's `BTreeMap<String, _>`, Python's `sorted`), never in
+  UTF-16 code-unit order — the two differ between U+E000..U+FFFF and the astral planes, and the
+  order decides which loss-limit latch a mark emits first, the order floats are summed in and the
+  order of the snapshot's `lots` / `realized`. *Floats in a reason* (`urgency`, a non-positive
+  limit in a `CONFIG_MISSING` reason) are the shortest decimal that round-trips, in plain
+  notation, **including subnormals** (`5e-324` prints as `0.000…05`, never the two-digit
+  `4.9E-324`). *`CONFIG_MISSING`* names the **first offending key in the reference's parse
+  order** — `per_order.duplicate_order_window_ns`, then `global.{kill_switch_engaged,
+  max_gross_notional, max_net_notional, max_daily_loss, max_order_rate_per_sec, order_rate_burst}`,
+  `per_order.{max_order_qty, max_order_notional, price_band_bps, stale_book_reject}`,
+  `per_instrument.{max_position_qty, max_instrument_notional}`, `per_strategy.max_daily_loss`,
+  `market_data.{max_sequence_gap_before_halt, stale_feed_timeout_ns}`, `currency.reporting_ccy`,
+  then `currency.conversion` in sorted key order — with the reference's text: a missing section
+  is reported as its first missing key, a non-positive float prints like Rust's `{}` (`0`, not
+  `0.0`), a conversion id that is absent, negative or not an integer is `missing/invalid`, and 0
+  or above `u32::MAX` is `out of u32 range`. *A conversion rate stamped exactly `i64::MAX`* is
+  future-stamped like any other (`FX_RATE_MISSING`, check 12): only the reporting currency itself
+  has no mark to age.
 
 ### 11.2 Execution simulator (C++ reference; Java and Python ports)
 

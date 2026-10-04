@@ -28,6 +28,9 @@ tests/
   golden/              cross-language golden vectors + expected outputs (level 2):
                        4 event vectors, splitmix64.json, jsonl_reject_cases.txt
                        and 22 expected_*.json/.jsonl files
+    risk_fuzz/         the generated differential-fuzz corpus of the three risk
+                       engines: 89 step scripts with their expected audit log
+                       and final snapshot, plus COVERAGE.txt (see below)
   harness/             run_all.sh, run_golden.sh, check_deployment.py,
                        check_docker_build.py, check_headline_numbers.py
                        (every documented number vs its artefact: parity
@@ -36,6 +39,37 @@ tests/
   integration/         level 4 (README.md + tests)
   replay/              level 3 (README.md + tests)
 ```
+
+## Differential fuzzing of the risk engines (level 2, generated)
+
+The hard risk engine exists three times (Rust `rust/risk` — normative —,
+Java `com.iap.risk`, Python `iap.risk`) and must produce byte-identical
+decisions and audit output. Hand-written goldens pin the documented cases; a
+generated corpus and a nightly job look for the cases nobody wrote down
+(PLATFORM_CONVENTIONS.md §11.1 "How parity is tested").
+
+| Piece | Where | What it does |
+|---|---|---|
+| generator, Python replay driver, shrinker | `python/tools/risk_fuzz.py` | deterministic (SplitMix64 only), state-aware: it drives a live Python engine while generating, so quantities sit at the remaining headroom of every limit, prices at the band edge, timestamps at the staleness boundary, and an engaged kill gets cleared instead of blocking the rest of the script. Thirteen profiles (default limits, tight limits, kills, clock chaos, overflow, FX, non-ASCII ids, loss latches, bootstrap, a config started halted, targeted recipes, config mutations) |
+| committed corpus | `tests/golden/risk_fuzz/` (`make_risk_fuzz_corpus.py`; `--check` in CI, `--force` to rewrite) | 89 scripts, 4,607 steps, 1.5 MB: per script `<name>.json` (steps, each order with its expected decision, rule, severity, scope, scope id and reason), `<name>.audit.jsonl` and `<name>.snapshot.json`. `COVERAGE.txt` maps every reason-string branch of the engine to the first script that reaches it (63 of 64; one is unreachable) |
+| replays | Rust `rust/risk/tests/golden_risk_fuzz.rs`, Java `RiskFuzzGoldenTest`, Python `python/tests/test_risk_fuzz_golden.py` | every decision, the audit JSONL byte for byte, the final snapshot, and a snapshot -> JSON text -> restore -> continue check at each cut point; a corrupt or truncated snapshot must be refused. Part of the golden group (`run_golden.sh`) |
+| properties | `python/tests/test_risk_fuzz_properties.py` | over fresh sequences, with no other engine: kill precedence (derived from the audit log alone), no ALLOW under the GLOBAL kill, positions equal the sum of applied fills, determinism, canonical append-only audit lines, snapshot identity. Mutation tests re-plant nine bugs (the v1.3.0 fail-open classes among them) plus a UTF-16-ordered port and require the committed corpus to notice each |
+| nightly / manual run | `.github/workflows/risk-fuzz.yml`, `python/tools/risk_fuzz_nightly.py` (tested end to end with a stand-in engine by `python/tests/test_risk_fuzz_nightly.py`) | fresh scripts from a fresh seed on the runner (400 scripts, about 38,000 steps by default), Rust and Java driven through their own golden tests (`IAP_RISK_FUZZ_DIR`, `IAP_RISK_FUZZ_OUT`), the first divergence minimised by delta debugging and uploaded as the `risk-fuzz-divergence` artifact |
+
+```
+python3 python/tools/make_risk_fuzz_corpus.py --check          # is the corpus current?
+( cd rust && cargo test --locked -p risk --test golden_risk_fuzz )
+python3 python/tools/risk_fuzz_nightly.py --seed 7 --count 400 # the large run (needs cargo + javac)
+gh workflow run ci.yml --ref <branch> -f risk_fuzz=true        # the same, on a runner
+```
+
+When the fuzzer reports a divergence it is a bug in an engine. Reduce it (the
+job already has), decide from PLATFORM_CONVENTIONS.md §11.1 which engine is
+right, fix the wrong one with mirrored edits, and keep the reduced case — in
+the corpus through the generator, or in the edge golden. NaN and Infinity
+cannot be written in JSON: they are covered by the per-language unit tests
+(`non_finite_inputs_are_rejected_like_the_other_ports` in each language),
+not by the corpus.
 
 Rules that apply to every level (PLATFORM_CONVENTIONS.md §5, §9):
 

@@ -1,7 +1,7 @@
 # ROADMAP — the six-week build plan against what exists
 
 The plan behind `tools/github/issues.yaml` (rendered as
-[EPICS.md](EPICS.md): 31 epics, 155 issues — 98 done, 0 in progress, 57
+[EPICS.md](EPICS.md): 31 epics, 155 issues — 101 done, 0 in progress, 54
 backlog as of 2026-10-04, the v1.5.0 release), mapped phase by phase to the code, the tests and
 the artefacts that prove each step, and stated the same way the research
 is: what is done cites evidence; what is not done says what would prove it.
@@ -28,7 +28,7 @@ the YAML, every `done` evidence path on disk).
 | **Phase 2** — research platform | E20 gated ML zoo + meta-labeling, E21 adaptive drift / refit / lifecycle sub-machine, E22 alpha factory on the `ExperimentRunner` | partial: E20 and E21 delivered with honest negative results (since the v1.4.0 dataset the ML gate **passes** — best linear +0.0081 mid-to-mid IC, so xgboost, lightgbm and the MLP are fitted — and no model earns its costs, with the meta-label gate still degenerate; no refit policy demonstrably beats static on two sessions); E22 has the runner and the registry, not the batch driver | `research/ml_reports/ML_REPORT.md`, `research/adaptive_reports/ADAPTIVE_REPORT.md`, `expected_adaptive.json`; backlog: AF02 spec-driven batches (`python -m iap.research run` is the per-spec building block), AF03 gate 8 cross-alpha correlation, AF04 scheduled report regeneration with a stale-number diff, ML04 non-linear model_versions in the production languages, AD05 a multi-week synthetic dataset with power to rank refit policies |
 | **Phase 3** — production engineering | E23: real feed handlers and venue protocols, HA / failover / kernel bypass, regulatory pre-trade controls and best-execution reporting, authenticated read endpoints and external secrets | documented out of scope (README "Real-world usage notes"); PR01 (the container / k8s stack with a singleton trading vertical and durable state) done, PR02–PR05 backlog | `README.md` out-of-scope list, `docs/governance/SECURITY.md` §3–§4, `deployment/` (singleton, NetworkPolicy, token-authenticated admin API only) |
 | **Backlog** — agentic AI / MCP (E24, E30) | E24: AG01 a read-only MCP server over the ledger, reports, lifecycle log and decision traces; AG03 a policy test that no trading-path module imports a network or LLM client. E30: write broker and blackboard, pre-registration, reserve sessions on a hidden seed, authenticated human approvals, agent evaluations, untrusted-text handling (AL01–AL07) | **no LLM, agent or MCP code exists.** AG03 is done since v1.3.0 (`python/tests/test_import_policy.py`, Python packages only — its gaps are recorded in the issue); AG01 and all of E30 are backlog. The design rule is pinned (ARCHITECTURE.md §11, PLATFORM_CONVENTIONS.md §13.7): LLM reasoning is never on the critical path, can only read the store / ledger / TCA / drift, cannot override risk or send orders | what exists to read today: `python -m iap.store sql` (read-only, one statement) and `v_order_chain` / `v_alpha_scorecard`, `python -m iap.store explain`, `python -m iap.lifecycle status`, `python -m iap.research list/show --json`; and the foundation an agent layer would need — a research store safe for parallel writers, gate eligibility, looks that a dry run cannot avoid (ARCHITECTURE.md §11.2) |
-| **Backlog** — the distance to production (E25–E29, E31) | E25 real historical exchange data with a point-in-time master; E26 measured, gated latency; E27 simulator calibration to live fills; E28 book-level risk; E29 research throughput; E31 differential fuzzing, property tests, crash injection and risk golden coverage | backlog — every issue of these six epics. Added 2026-10-03 with the v1.3.0 review, which is where the gaps were written down | ARCHITECTURE.md §14 states each gap against what exists; E31 FZ05 (risk golden coverage of the fail-closed branches) is partly met by the edge golden added in v1.3.0 and stays backlog until every branch has a case in it |
+| **Backlog** — the distance to production (E25–E29, E31) | E25 real historical exchange data with a point-in-time master; E26 measured, gated latency; E27 simulator calibration to live fills; E28 book-level risk; E29 research throughput; E31 differential fuzzing, property tests, crash injection and risk golden coverage | backlog — every issue of E25–E29; E31 is partial since 2026-10-04: FZ01 (differential fuzzing of the three risk engines), FZ03 (snapshot/restore fuzzing) and FZ05 (risk golden coverage) are done, FZ02 (simulator properties) and FZ04 (crash injection on the Java paper path) stay backlog. Added 2026-10-03 with the v1.3.0 review, which is where the gaps were written down | ARCHITECTURE.md §14 states each gap against what exists; for E31: `tests/golden/risk_fuzz/` (89 scripts; `COVERAGE.txt` names the script reaching each of the 63 reachable reason branches), `.github/workflows/risk-fuzz.yml`, `tests/README.md` |
 
 ## 3. v1.3.0 (2026-10-03): what the review moved to done, and what it added to the backlog
 
@@ -125,7 +125,9 @@ shift-by-one probe collapses the realized IC (§4).
 
 ## 3.3 v1.5.0 (2026-10-04): what the default methods moved
 
-The release changes no issue's status (98 done, 57 backlog, as before). It
+The method change moves no issue's status; the differential fuzzing of the
+risk engines that ships in the same release closes FZ01, FZ03 and FZ05
+(101 done, 54 backlog; `tests/README.md`). The release
 makes the eleven corrected research methods of v1.3.0 the defaults, keeps
 every old rule selectable under a legacy name (`iap.validation.methods`:
 `"v2"` default, `"legacy_v1"`; PLATFORM_CONVENTIONS.md §13.6), ports the
