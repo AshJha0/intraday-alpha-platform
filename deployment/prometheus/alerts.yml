@@ -382,14 +382,21 @@ groups:
           runbook: docs/runbooks/RUNBOOK_paper_trading.md
 
       # A STOPPED session (value 4: a stop was requested, the session
-      # checkpointed mid-stream and exited 0) that nobody resumed. The gauge
-      # goes stale when the process exits, so the rule reads the LAST value
-      # scraped in the past hour: a resumed process reports 0/1 and clears
-      # it. The process usually exits within one scrape interval of setting
-      # 4; when the value was never scraped this rule cannot fire and
-      # TargetDown is the signal (RUNBOOK_paper_trading.md#stopped-session).
+      # checkpointed mid-stream and exited 0) that nobody resumed. The
+      # trading process exits right after the checkpoint, so its own gauge is
+      # almost never scraped at 4. The trading thread therefore also persists
+      # how the session ended (session_exit.json) and the java-platform-state
+      # exporter (a sidecar / second compose service, same image) serves it as
+      # platform_persisted_session_state for as long as the state volume
+      # exists. The alert fires on a persisted 4 unless a live trading process
+      # reports RUNNING again (the resume window before the marker is
+      # rewritten). A FINISHED session persists 2 and a crash leaves 1, so
+      # neither fires this; a crash is TargetDown on java-platform
+      # (RUNBOOK_paper_trading.md#stopped-session).
       - alert: SessionStoppedNotResumed
-        expr: last_over_time(platform_session_state[1h]) == 4
+        expr: >-
+          platform_persisted_session_state == 4
+          unless on(service) (platform_session_state == 1)
         for: 10m
         labels:
           severity: warning
@@ -397,12 +404,12 @@ groups:
         annotations:
           summary: "Paper-trading session STOPPED and not resumed on {{ $labels.service }}"
           description: >-
-            The last scraped platform_session_state is 4 (STOPPED) and no
-            resumed session has reported for 10m. The session checkpointed
+            The persisted session state is 4 (STOPPED) and no running
+            session has reported for 10m. The session checkpointed
             mid-stream and exited 0, so nothing restarts it; positions are
             as the checkpoint left them. Resume it with --resume or record
-            why it stays down. The alert clears on resume, or one hour after
-            the stop. Runbook:
+            why it stays down. The alert clears when a resumed session
+            starts (the persisted state becomes 1) or finishes (2). Runbook:
             docs/runbooks/RUNBOOK_paper_trading.md#stopped-session
           runbook: docs/runbooks/RUNBOOK_paper_trading.md
 

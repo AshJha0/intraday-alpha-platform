@@ -282,7 +282,7 @@ and are matched by Java, Rust and C++ (the trace and canonical-JSON ports)
 and by Java and Rust (the lifecycle ports). The harness
 (`tests/harness/run_all.sh`, with `run_golden.sh` as the golden-only alias)
 runs every suite with the canonical commands and prints the parity table; a
-v1.5.0 CI run (2026-10-04) passes 1672/289/330/517 tests (173/68/66/106
+v1.5.0 CI run (2026-10-04) passes 1672/289/330/520 tests (173/68/66/106
 golden) across python/cpp/rust/java, plus the repo-level `integration` (35)
 and `replay` (6) rows — the same counts the README parity table records.
 
@@ -407,7 +407,8 @@ histograms end `_ns` with fixed log2 buckets, gauges are bare nouns.
   latched kill switch. Since v1.3.0 the shutdown hook only raises a stop
   flag: the trading thread writes the checkpoint and the session ends in a
   fifth state, `STOPPED` (`platform_session_state` 4), which the dashboard
-  and the rules have not been taught yet (`deployment/grafana/README.md`). A session is FINITE and exits 0 (`restart: on-failure`
+  and the rules read through the persisted `platform_persisted_session_state`
+  (the process exits right after the checkpoint; `deployment/grafana/README.md`). A session is FINITE and exits 0 (`restart: on-failure`
   in compose, a single-replica `Recreate` Deployment in k8s), so "daily"
   limits are daily rather than per-restart.
 - **What is watched** maps 1:1 to spec §25: market-data health (gap/dup

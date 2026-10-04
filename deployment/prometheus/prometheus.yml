@@ -47,6 +47,21 @@ scrape_configs:
           service: java-platform
           language: java
 
+  # Last persisted session state (session_exit.json), served by a process
+  # that outlives the trading JVM (com.iap.platform.SessionStateExporter, same
+  # image): compose service / k8s sidecar + Service `java-platform-state`.
+  # This is what makes a clean STOPPED observable after the JVM has exited
+  # (alerts.yml SessionStoppedNotResumed). It carries the same `service`
+  # label as the trading target so the alert can tell "stopped" from
+  # "resumed".
+  - job_name: java-platform-state
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["java-platform-state:9102"]
+        labels:
+          service: java-platform
+          language: java
+
   # Prometheus self-scrape (rule/alert health).
   - job_name: prometheus
     static_configs:

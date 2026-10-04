@@ -117,8 +117,29 @@ jobs:
         env:
           PYTHONPATH: src
         run: >
-          python -m pytest -q --durations=40 --cov=iap --cov-report=term-missing
+          python -m pytest -q -n auto --dist loadfile --durations=25
+          --junitxml=/tmp/xdist.xml
+          --cov=iap --cov-report=term-missing
           --cov-report=xml:../coverage-python.xml
+      - name: TEMP serial comparison
+        working-directory: python
+        env:
+          PYTHONPATH: src
+        run: |
+          nproc
+          python -m pytest -q -p no:cacheprovider --junitxml=/tmp/serial.xml
+          python - <<'PY'
+          import xml.etree.ElementTree as ET
+          def load(p):
+              out = {}
+              for tc in ET.parse(p).getroot().iter("testcase"):
+                  k = tc.get("classname") + "::" + tc.get("name")
+                  out[k] = "fail" if tc.find("failure") is not None or tc.find("error") is not None else "skip" if tc.find("skipped") is not None else "pass"
+              return out
+          a, b = load("/tmp/serial.xml"), load("/tmp/xdist.xml")
+          print("serial", len(a), "xdist", len(b), "identical outcome map:", a == b)
+          assert a == b
+          PY
       - name: upload python coverage report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

@@ -63,7 +63,7 @@ lifecycle state sequences; canonical-JSON lines, trace digests, the risk
 audit / snapshot and the lifecycle registry are byte-identical; the 7-state
 lifecycle golden is compared exactly, field by field. The v1.5.0 table
 (2026-10-04, counts from CI) reads python 1672 / cpp 289 / rust 330 /
-java 517 (golden 173/68/66/106), `integration` 35, `replay` 6.
+java 520 (golden 173/68/66/106), `integration` 35, `replay` 6.
 
 ## 4. Golden regeneration protocol
 

@@ -108,6 +108,25 @@ Also changed:
 
 ### Fixed
 
+- **A clean stop is observable after the process is gone.** The paper
+  platform sets `platform_session_state` 4 (`STOPPED`) and exits right after
+  its checkpoint, so Prometheus almost never scraped the 4 and
+  `SessionStoppedNotResumed` rarely fired (a known limitation of v1.3.0 and
+  v1.4.0). The trading thread now also writes `<state-dir>/session_exit.json`
+  (`RUNNING` at start, then `STOPPED`, `FINISHED` or `FAILED`) after the
+  checkpoint it describes, and a small exporter that outlives the JVM
+  (`com.iap.platform.SessionStateExporter`; compose service and k8s sidecar
+  `java-platform-state`, port 9102, state mounted read-only, its own k8s
+  Service with `publishNotReadyAddresses`) serves it as
+  `platform_persisted_session_state`. The alert is now
+  `platform_persisted_session_state == 4 unless on(service)
+  (platform_session_state == 1)` for 10 m: it fires for a stop nobody
+  resumed, clears on resume, and stays silent after `FINISHED` and after a
+  crash (which leaves the `RUNNING` marker; `TargetDown` covers it). The
+  Session-state panel falls back to the persisted value. The shutdown hook
+  is unchanged and `session_state.json` keeps its schema and single commit
+  point. Covered by `SessionMarkerTest` and promtool tests in
+  `deployment/prometheus/tests/alerts_test.yml`.
 - **Release guard (`release.yml`, `verify-ci`).** The guard asked the API
   once and read an empty or failed answer as "no successful run": the
   v1.4.0 release failed on it although CI was green. It is now
@@ -688,7 +707,9 @@ API_TRADING.md §2.4)**
 - **Alerts are routed but not delivered** until an operator supplies a
   webhook URL; audit logs are not shipped off-host; no image vulnerability
   scan is wired in.
-- **The `STOPPED` state is rarely observed downstream.** The session-state
+- **The `STOPPED` state is rarely observed downstream.** (Fixed in v1.5.0:
+  the persisted `platform_persisted_session_state` outlives the process.)
+  The session-state
   dashboard panel maps all five values, 0–4, and `SessionStoppedNotResumed`
   reads the value 4, but a stopped process exits right after its
   checkpoint, so the value is scraped only when a scrape lands in that
