@@ -1,6 +1,6 @@
 # Alpha Decay versus Latency and Infrastructure Investment: What One Event of Lag Costs
 
-> Dated record. The figures below are those of the dataset in force when the paper was written; the 2026-10-03 update at the end restates them on the v1.4.0 dataset and re-checks each conclusion.
+> Dated record. The figures below are those of the dataset in force when the paper was written; the 2026-10-03 update restates them on the v1.4.0 dataset and re-checks each conclusion, and the 2026-10-04 update at the end restates them under the v1.5.0 default research methods (same dataset) and re-checks each conclusion again.
 
 *Intraday Alpha Platform research series, paper 4 of 6 (spec §28). Generated 2026-08-29 from the repository's committed research artifacts.*
 
@@ -504,7 +504,8 @@ close print describes the v1.3.0 data; there is no such gap now, and the
 60 s decision-age bound and session flattening remain in force. Item 3's
 15 m equity label validity of 47 % is now 44.7-63.4 %.
 
-**Ledger.** 1920 looks over 139 entries (the 1068 looks of the v1.3.0
+**Ledger (at v1.4.0; the 2026-10-04 update has the current figures).** 1920
+looks over 139 entries (the 1068 looks of the v1.3.0
 dataset are kept); expected max |t| under the global null 3.888, Bonferroni
 per-test threshold 4.206. Verdicts: 0 PROMOTE / 10 ITERATE / 14 REJECT
 (EQ11 moved from ITERATE to REJECT); all 24 alphas are net-negative at 1x.
@@ -548,3 +549,167 @@ per-test threshold 4.206. Verdicts: 0 PROMOTE / 10 ITERATE / 14 REJECT
 7. *Latency spend belongs on reacting to the next event, not on shaving
    nanoseconds.* **Holds**, and the equity figures now make it sharper:
    being one row late costs the OFI alphas more than half their IC.
+
+## Erratum / Update — 2026-10-04 (v1.5.0: the corrected research methods are the defaults)
+
+**What changed.** Not the data: the dataset is the v1.4.0 one, and the
+benchmarks do not depend on it. The eleven corrected research methods that
+v1.3.0 added and v1.4.0 kept as selectable alternatives are the defaults
+since v1.5.0 (`iap.validation.methods`, bundle `"v2"`;
+PLATFORM_CONVENTIONS.md §13.6; paper 01's update of the same date lists
+them), and every old rule stays selectable under a legacy name (bundle
+`"legacy_v1"`; `run_all.py --methods legacy_v1 --out-dir <dir>` reproduces
+the v1.4.0 report). Three of them decide what this paper can still measure.
+The stress grid is version 2: the base backtest configuration is carried
+into every stressed run (`stress_version=1` is the legacy grid). The
+backtest is cost-aware: it takes a position only when the expected return
+exceeds the round-trip spread and fee, and holds it for the label horizon
+(legacy: a position on every signal sign). And the IC is scored on rows
+with a valid label or a label invalid for BLACKOUT alone, at its realised
+reopen return (legacy: valid rows only). The figures of the 2026-10-03
+update are the `legacy_v1` figures of the current dataset; this section
+supersedes them as the current ones.
+
+**The consequence for the P&L evidence.** At 1x costs on the last fold 18
+of the 24 alphas make no trade, 6 trade and lose, none ends above zero
+(`research/alpha_reports/REPORT.md`). For the 18 the latency-stressed net
+P&L is 0 at every point of both grids. That zero is not a finding about
+latency: there is no P&L for a delay to act on. Every equity row of the
+2026-10-03 time-grid table except EQ11 is in that group (EQ01, EQ02, EQ03,
+EQ05, EQ06, EQ08, EQ09, EQ12). The IC columns do not depend on the
+backtest and are still measured for all 24.
+
+**The event-lag grid (§3.1), current** (REPORT.md, cost and latency stress
+table; `stress.latency` in the per-alpha JSONs; retention shown where the
++0 IC exceeds 0.01):
+
+| alpha | +0ev IC | +1ev IC | +5ev IC | retained at +1 | retained at +5 |
+|---|---|---|---|---|---|
+| EQ01 | +0.0062 | -0.0049 | +0.0022 | — | — |
+| EQ02 | +0.0218 | +0.0091 | +0.0097 | 42% | 45% |
+| EQ03 | +0.0157 | +0.0042 | +0.0099 | 27% | 63% |
+| EQ04 | +0.0174 | +0.0141 | +0.0002 | 81% | 1% |
+| EQ05 | +0.0075 | +0.0040 | -0.0080 | — | — |
+| EQ06 | +0.0194 | +0.0146 | +0.0330 | 75% | 170% |
+| EQ07 | -0.0008 | -0.0104 | -0.0065 | — | — |
+| EQ08 | -0.0401 | -0.0449 | -0.0441 | — | — |
+| EQ09 | -0.0211 | -0.0254 | -0.0261 | — | — |
+| EQ10 | +0.0031 | +0.0020 | -0.0111 | — | — |
+| EQ11 | +0.0166 | +0.0158 | +0.0198 | 95% | 119% |
+| EQ12 | +0.0231 | +0.0090 | +0.0105 | 39% | 46% |
+| FX01 | -0.0189 | -0.0076 | -0.0005 | — | — |
+| FX02 | +0.0299 | +0.0243 | -0.0156 | 81% | — |
+| FX03 | -0.0025 | +0.0027 | -0.0107 | — | — |
+| FX04 | +0.0076 | -0.0098 | -0.0040 | — | — |
+| FX05 | -0.0018 | +0.0138 | +0.0550 | — | — |
+| FX06 | +0.0798 | +0.0614 | +0.0188 | 77% | 24% |
+| FX07 | +0.0086 | +0.0369 | +0.0437 | — | — |
+| FX08 | +0.1398 | +0.1158 | +0.0573 | 83% | 41% |
+| FX09 | -0.1617 | -0.1337 | -0.0472 | — | — |
+| FX10 | +0.1166 | +0.0901 | +0.0088 | 77% | 8% |
+| FX11 | +0.1081 | +0.0881 | +0.0431 | 81% | 40% |
+| FX12 | -0.0006 | -0.0057 | -0.0160 | — | — |
+
+FX09's IC is negative (it is a REJECT, paper 2); its magnitude falls to 83 %
+at one row and 29 % at five. Every cell is within 0.002 of the 2026-10-03
+table except in two rows. Those are EQ11 (+0 IC 0.0124 to 0.0166) and FX05 (+0
+IC +0.0121 to -0.0018, so it no longer has a retention figure): both have
+long horizons, where the default row policy changes which labels are
+scored (EQ11 at 15 m scores 23,413 BLACKOUT rows at their reopen return).
+
+**The time grid** (net P&L in USD at 1x costs, last fold, stress grid
+version 2; `stress.latency_time` and `stress.latency`). Only the six alphas
+that trade have a row; the other 18 are 0 throughout:
+
+| alpha | 100 ms | 500 ms | 1 s | 5 s | trades at 100 ms / 5 s | event grid +0 / +1 / +5 rows |
+|---|---|---|---|---|---|---|
+| EQ11 | -504 | -505 | -502 | -508 | 31 / 32 | -504 / -491 / -549 |
+| FX05 | -66 | -66 | -64 | -67 | 140 / 126 | -66 / -57 / +13 |
+| FX08 | -340 | -333 | -328 | -282 | 950 / 799 | -340 / -283 / +15 |
+| FX09 | -265 | -261 | -255 | -223 | 809 / 686 | -265 / -228 / -14 |
+| FX10 | -23 | -23 | -22 | -20 | 101 / 88 | -23 / -29 / 0 |
+| FX11 | -788 | -771 | -733 | -610 | 2,004 / 1,642 | -788 / -636 / -31 |
+
+On the time grid every one of the six loses at every latency. For FX08,
+FX09, FX10 and FX11 the loss is 14-23 % smaller at 5 s than at 100 ms, and
+the trade count is 13-18 % smaller; the loss per trade changes by 5 % or
+less (FX08: 0.36 USD at 100 ms, 0.35 at 5 s). EQ11 and FX05 move by about
+1 %. On the event
+grid, five rows of lag (about 110 s on FX) take the FX losses to between
+-31 and +15 USD. Two cells are above zero, FX05 +13 and FX08 +15. They are
+last-fold figures of a few USD with no interval, the event grid records no
+trade count, and FX10's cell is exactly 0; they are read here as the
+position count collapsing under a stale signal, not as an edge recovered by
+waiting. The v1.4.0 statements about equity P&L under latency (EQ02 losing
+21.7 per trade at 100 ms and 21.2 at 5 s; losses 10-39 % smaller at 5 s;
+the §3.3 event-grid rows for EQ06, EQ08 and EQ09) are those of the legacy
+policy and have no counterpart under the defaults.
+
+**Decay by horizon, equity alphas** (last-fold OOS IC,
+`decay_ic_by_horizon`):
+
+| alpha | 100ms | 500ms | 1s | 5s | 10s | 30s | 1m | 5m | 15m |
+|---|---|---|---|---|---|---|---|---|---|
+| EQ01 | +0.012 | +0.021 | +0.023 | +0.036 | +0.043 | +0.038 | +0.042 | +0.034 | +0.002 |
+| EQ02 | +0.006 | +0.020 | +0.021 | +0.037 | +0.044 | +0.031 | +0.027 | +0.014 | +0.010 |
+| EQ03 | +0.004 | +0.015 | +0.017 | +0.033 | +0.040 | +0.027 | +0.023 | +0.015 | +0.005 |
+| EQ05 | -0.000 | +0.007 | +0.015 | +0.033 | +0.053 | +0.050 | +0.051 | +0.017 | +0.011 |
+| EQ06 | +0.013 | +0.016 | +0.022 | +0.042 | +0.045 | +0.075 | +0.077 | +0.008 | +0.018 |
+| EQ08 | -0.001 | -0.012 | -0.013 | -0.034 | -0.061 | -0.053 | -0.041 | +0.055 | +0.065 |
+| EQ11 | +0.001 | -0.003 | -0.012 | -0.030 | -0.048 | -0.063 | -0.063 | -0.010 | -0.002 |
+| EQ12 | +0.005 | +0.022 | +0.023 | +0.040 | +0.046 | +0.032 | +0.028 | +0.014 | +0.010 |
+
+Up to 10 s the curves are those of the 2026-10-03 update to within 0.002,
+and the OFI rows (EQ02, EQ03, EQ12: near zero at 100 ms, peak at 10 s, slow
+decline) are within 0.003 at every horizon. From 30 s on the other rows
+moved, by up to 0.065. EQ01 was +0.044 / +0.050 / +0.053 / +0.033 at 30 s /
+1 m / 5 m / 15 m and is +0.038 / +0.042 / +0.034 / +0.002: its curve no
+longer rises to 5 m and is flat at about 0.04 from 5 s to 1 m. EQ08 moved
+from +0.019 to +0.055 at 5 m and from +0.130 to +0.065 at 15 m; EQ11 from
++0.012 to -0.002 at 15 m. The method that changed for these columns is the
+row policy (labels invalid for BLACKOUT alone are now scored). The caveat
+of the 2026-10-03 update about which rows carry a label at 10 s and beyond
+still applies.
+
+**Ledger.** `research/experiments.json` holds 4396 looks over 208 entries
+(1068 on the v1.3.0 dataset, 852 on the v1.4.0 dataset under the legacy
+methods, 2,476 under the default methods); expected max |t| under the
+global null 4.096, Bonferroni per-test threshold 4.389. The alpha report
+was judged at its own recorded count of 3,936, which gives the PROMOTE t
+threshold of 4.365. Verdicts: 0 PROMOTE / 11 ITERATE / 13 REJECT (FX03
+moved from ITERATE to REJECT; FX10 and FX11 from REJECT to ITERATE).
+
+**Conclusions, re-checked under the default methods.**
+
+1. *Fast flow alphas shed a fifth to a third of their IC per event.*
+   **Still does not hold as stated**, exactly as on 2026-10-03: EQ02, EQ03
+   and EQ12 lose 58 %, 73 % and 61 % at the first row and are no lower at
+   five. This is IC evidence and the method change does not touch it.
+2. *Slow equity alphas are indifferent to five events of lag.* **Holds,
+   weaker**, unchanged in kind: EQ08 and EQ09 are flat at a negative IC,
+   EQ11 is flat at 0.016-0.020, EQ06 moves from 0.019 to 0.015 to 0.033.
+3. *FX regime alphas keep about 80 % at one event and lose most by five.*
+   **Holds**, unchanged (77-83 % at +1, 8-41 % at +5), with the
+   crossed-book caveat of the round-3 erratum.
+4. *Latency has no money value when costs dominate gross.* The conclusion
+   **holds; its evidence is thinner**. For 18 alphas there is no stressed
+   P&L to read. For the six that trade, the loss is a few hundred USD at
+   every point of the time grid and shrinks only as the trade count
+   shrinks. The per-trade and percentage figures of the 2026-10-03 update
+   are legacy figures. The sentence "no alpha is positive at any latency"
+   holds on the time grid and has the two event-grid exceptions described
+   above.
+5. *The software stack contributes none of the staleness: about 0.76 µs per
+   event against a 2.1 s median inter-event gap.* **Holds**, unchanged;
+   `benchmarks/results_cpp.md` was not regenerated by this release.
+6. *Every alpha is cost-negative at 1x, so the latency budget is not where
+   the P&L is.* **Holds in a different form.** No alpha ends above zero at
+   1x: 18 because their forecast never exceeds one round trip of spread and
+   fee, 6 because they trade and lose (the largest loss is 733 USD, FX11).
+   The six-figure losses of the earlier sections came from the legacy
+   policy's turnover.
+7. *Latency spend belongs on reacting to the next event, not on shaving
+   nanoseconds.* **Holds on the IC evidence alone**: being one row late
+   costs the OFI alphas more than half their IC. Under the default methods
+   this paper has no P&L evidence for or against it, because the alphas
+   that are latency-sensitive in IC do not trade.

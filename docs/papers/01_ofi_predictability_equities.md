@@ -1,6 +1,6 @@
 # Predictability of Order-Flow Imbalance in Liquid Equity Markets: Significant, Stable, and Still Not Worth Trading
 
-> Dated record. The figures below are those of the dataset in force when the paper was written; the 2026-10-03 update at the end restates them on the v1.4.0 dataset and re-checks each conclusion.
+> Dated record. The figures below are those of the dataset in force when the paper was written; the 2026-10-03 update restates them on the v1.4.0 dataset and re-checks each conclusion, and the 2026-10-04 update at the end restates them under the v1.5.0 default research methods (same dataset) and re-checks each conclusion again.
 
 *Intraday Alpha Platform research series, paper 1 of 6 (spec §28). Generated 2026-08-29 from the repository's committed research artifacts.*
 
@@ -464,8 +464,10 @@ index ETF.
 
 **Multiple testing (§3.3).** `research/experiments.json` is now scoped by
 dataset: the 1068 looks of the v1.3.0 dataset are kept and the regenerated
-pipelines added 852, for 1920 looks over 139 entries. Expected max |t| under
-the global null is 3.888 and the Bonferroni per-test threshold 4.206
+pipelines added 852, for 1920 looks over 139 entries at v1.4.0 (4396 over
+208 since v1.5.0; see the 2026-10-04 update). At that count the expected
+max |t| under the global null was 3.888 and the Bonferroni per-test
+threshold 4.206
 (REPORT.md was rendered mid-regeneration at 1740 looks and prints 3.86 /
 4.18). EQ02, EQ03 and EQ12 clear both. On equities they are now the only
 alphas that do: EQ01 (2.67), EQ05 (2.45) and EQ06 (3.68) cleared the v1.3.0
@@ -522,3 +524,152 @@ a planted informed-order-flow effect of the reference size is detected at
 t >= 3 in 1 of 3 seeds, and one of half that size in none (on v1.3.0: 3 of 3
 and 1 of 3). The validation chain has less power on the sparser flow, which
 is consistent with the lower t-statistics above.
+
+## Erratum / Update — 2026-10-04 (v1.5.0: the corrected research methods are the defaults)
+
+**What changed.** Not the data: the dataset is the v1.4.0 one
+(`data_version` 116b7787…). What changed is how it is scored. The eleven
+corrected research methods that v1.3.0 added and v1.4.0 kept as selectable
+alternatives are the defaults since v1.5.0 (`iap.validation.methods`, bundle
+`"v2"`; PLATFORM_CONVENTIONS.md §13.6), and every old rule stays selectable
+under a legacy name (bundle `"legacy_v1"`). The ones that bear on this
+paper: the gate IC is the pooled uncrossed IC on rows with a valid label or
+a label invalid for BLACKOUT alone, scored at its realised reopen return
+(legacy: valid rows only); the gate t is the HAC t of the pooled slope
+(legacy: the Newey-West t of within-bucket ICs); the PROMOTE t threshold is
+the Bonferroni |t| at the run's recorded gate look count, never below 3.0
+(legacy: 3.0 fixed); the backtest takes a position only when the expected
+return exceeds the round-trip spread and fee, holds it for the label
+horizon, caps fills at the displayed L1 size, trades only the rows the IC
+scores and charges square-root impact (legacy: a position on every signal
+sign, uncapped, linear impact); capacity is the edge breakeven (legacy: the
+participation line); per-fold diagnostics and a bootstrap interval of the
+net P&L are reported, and the recompute-from-raw-events leakage probe is in
+the standard suite. `research/alpha_reports/run_all.py --methods legacy_v1
+--out-dir <dir>` reproduces the v1.4.0 report, and
+`python/tests/test_legacy_methods.py` compares that reproduction field by
+field with the pinned v1.4.0 report of EQ03
+(`tests/golden/alpha_report_EQ03_v1.4.0.json`). The figures of the
+2026-10-03 update are therefore the `legacy_v1` figures of the current
+dataset; this section supersedes them as the current ones.
+
+**Headline statistics (§4.1), current** (`research/alpha_reports/REPORT.md`,
+`EQ02.json`, `EQ03.json`, `EQ12.json`; keys `gate_ic`, `gate_tstat`,
+`nw_tstat_uncrossed`, `trade_count_1x_cost`, `net_pnl_1x_cost`):
+
+| alpha | horizon | IC | gate IC | gate t | t within-bucket | Rank IC | hit | folds+ | leak | trades 1x | net P&L 1x | flips/h | verdict |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| EQ02 | 5s | 0.0251 | 0.0251 | 7.17 | 7.61 | 0.0331 | 0.524 | 4/4 | pass | 0 | 0 | 378 | ITERATE |
+| EQ03 | 5s | 0.0189 | 0.0189 | 5.16 | 5.85 | 0.0211 | 0.513 | 4/4 | pass | 0 | 0 | 423 | ITERATE |
+| EQ12 | 5s | 0.0261 | 0.0261 | 7.20 | 7.62 | 0.0335 | 0.524 | 4/4 | pass | 0 | 0 | 371 | ITERATE |
+
+The PROMOTE t threshold is 4.365 (`gates.min_nw_tstat`), the Bonferroni |t|
+at the run's gate look count of 3,936 (`ledger_looks`). The headline ICs
+the gate does not read: vol-scaled 0.0336 / 0.0266 / 0.0351, per-instrument
+mean 0.0335 / 0.0265 / 0.0350 (`oos_ic_vol_scaled_uncrossed`,
+`oos_ic_instrument_mean_uncrossed`). The gate IC on valid rows only
+(`gate_ic_valid_only`) is 0.0253 / 0.0190 / 0.0263, the v1.4.0 gate IC; the
+default row policy adds 275 / 275 / 268 BLACKOUT rows scored at the reopen
+return (`n_blackout_rows_scored`). Fold ICs: EQ02 0.0317 / 0.0228 / 0.0247 /
+0.0218; EQ03 0.0308 / 0.0121 / 0.0181 / 0.0157; EQ12 0.0313 / 0.0230 /
+0.0276 / 0.0231. Leakage (last fold, unshifted vs shifted by one row): EQ02
+0.0218 vs 0.0091, EQ03 0.0157 vs 0.0042, EQ12 0.0231 vs 0.0090; the
+recompute probe passes on its three anchors for all three. `promote_gates`
+has one false entry for each of the three, `cost`. In the lifecycle
+registry (`research/alpha_registry.json`) each now fails two gates,
+`net_pnl_after_costs` (value 0, which is not above 0) and `capacity` (0
+against a threshold of 1,000,000 USD); on v1.4.0 it was the cost gate
+alone.
+
+**Decay (§4.2), last fold** (`decay_ic_by_horizon`):
+
+| alpha | 10ms | 50ms | 100ms | 500ms | 1s | 5s | 10s | 30s | 1m | 5m | 15m |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| EQ02 | +0.004 | -0.003 | +0.006 | +0.020 | +0.021 | +0.037 | +0.044 | +0.031 | +0.027 | +0.014 | +0.010 |
+| EQ03 | +0.003 | -0.002 | +0.004 | +0.015 | +0.017 | +0.033 | +0.040 | +0.027 | +0.023 | +0.015 | +0.005 |
+| EQ12 | +0.004 | -0.004 | +0.005 | +0.022 | +0.023 | +0.040 | +0.046 | +0.032 | +0.028 | +0.014 | +0.010 |
+
+**Costs (§4.3).** Under the cost-aware policy none of the three alphas
+makes a trade at 1x costs on any of the four folds, or at 2x on the last:
+the forecast never exceeds the round-trip spread and fee. Net P&L at 1x is 0 on the last
+fold and 0 pooled over the four test segments, with a bootstrap interval of
+[0, 0] (`net_pnl_bootstrap`); 0 of 4 folds survive 1x costs
+(`fold_diagnostics`). A net of 0 does not pass the cost gate, which needs
+net P&L above zero. At 0.5x costs EQ02 and EQ12 make 16 trades each and
+lose 197 USD; EQ03 makes none. Held-out day 2: no trade, 0 gross, 0 costs
+for all three. The v1.4.0 figures (EQ02 -139,468 over 6,437 trades at 1x;
+costs 152-176 times gross on day 2) are what the legacy `"sign"` policy
+produces: it holds a position on every signal sign and pays the spread on
+every flip.
+
+**Latency (§4.4).** Event grid, last-fold IC at +0 / +1 / +5 rows: EQ02
+0.0218 / 0.0091 / 0.0097; EQ03 0.0157 / 0.0042 / 0.0099; EQ12 0.0231 /
+0.0090 / 0.0105. Time grid (stress grid version 2), net P&L at 100 ms /
+500 ms / 1 s / 5 s: 0 at every point for all three, with no trade. Regime
+split: EQ02 +0.0301 high-vol / +0.0147 low-vol; EQ03 +0.0204 / +0.0139;
+EQ12 +0.0317 / +0.0151.
+
+**Capacity (§4.5).** The default capacity is the edge breakeven: the size
+at which the realised gross edge per round trip of the 1x backtest equals
+its cost, capped at the participation line. It is 0 for all three, because
+they do not trade. The participation line the body quoted is unchanged and
+is still reported (`capacity_proxy_usd_by_instrument`: $34.3-46.6M per
+single stock, $1.31B for the index ETF).
+
+**Multiple testing (§3.3).** `research/experiments.json` holds 4396 looks
+over 208 entries: the 1068 looks of the v1.3.0 dataset, the 852 recorded on
+the v1.4.0 dataset under the legacy methods, and 2,476 recorded under the
+default methods (a validation with its backtest debits 84 per alpha under
+the defaults and 28 under the legacy methods).
+Expected max |t| under the global null is 4.096 and the Bonferroni per-test
+threshold 4.389. The alpha report was judged at the count recorded when it
+ran, 3,936: threshold 4.365, selection yardstick 4.07. EQ02, EQ03 and EQ12
+clear all four numbers. On equities they are the only alphas with a
+positive gate t that clears the threshold; EQ06 is at 4.36, above the
+yardstick and 0.005 below the threshold.
+
+**Conclusions, re-checked under the default methods.**
+
+1. *OFI is a statistically real predictor at 5 s.* **Holds, and against a
+   stricter test.** Gate t 7.17 / 5.16 / 7.20 against a threshold of 4.365
+   (v1.4.0: 7.52 / 5.78 / 7.52 against 3.0). The pooled-slope t is 6-12 %
+   lower than the within-bucket t it replaces as the gate statistic. The
+   vol-scaled and per-instrument ICs are larger than the pooled one and
+   have its sign.
+2. *Positive IC from 500 ms to 15 m, nothing below 100 ms, peak near 10 s.*
+   **Unchanged**, with the caveat of the 2026-10-03 update (the 10 s point
+   is measured on about 80 % of rows).
+3. *Multi-level OFI (EQ03) earns the strongest statistics.* **Still does
+   not hold**: EQ03 has the lowest gate IC and gate t of the three.
+4. *Liquidity conditioning (EQ12) adds nothing material.* **Unchanged**:
+   7.20 against 7.17.
+5. *Cost-negative at every multiplier; costs are about two orders of
+   magnitude above gross.* The economic conclusion **holds and is
+   stronger**; the figures behind it **do not carry over**. The corrected
+   backtest does not show a loss of that size, because it does not take the
+   trades: the expected return of the signal never exceeds one round trip
+   of spread and fee at 1x. The alphas are unharvestable because there is
+   no trade worth making, and the six-figure losses measured what trading
+   every sign flip costs. No fold and no cost multiplier shows a positive
+   net P&L.
+6. *The size of the loss is a turnover problem (EQ08 contrast).* **Not
+   measurable under the defaults**: EQ02 and EQ08 both make no trade at 1x.
+   It remains true of the legacy policy, and it is the reason that policy
+   was replaced.
+7. *One row of extra lag costs about a fifth of the IC.* **Still does not
+   hold**, as on v1.4.0: one row costs 58 % (EQ02) and 73 % (EQ03) of the
+   last-fold IC. The time grid has no P&L to read.
+8. *The edge is present in both volatility regimes.* **Unchanged** from the
+   2026-10-03 update (about twice as large in high-vol for EQ02 and EQ12).
+9. *Capacity is not the constraint.* **No longer holds as stated.** By the
+   participation line it is unchanged. By the default edge-breakeven
+   measure the capacity is 0, and the registry's capacity gate fails.
+10. *ITERATE, not PROMOTE; net-of-cost economics is the gate that fails.*
+    **Holds.** `cost` is the only PROMOTE gate the three alphas fail.
+
+The planted-signal study (`research/power/POWER_REPORT.md`, report version
+2, scored under the default methods) gives the same rates as before for
+informed order flow: detected at t >= 3 in 1 of 3 seeds at the reference
+size, in none at half of it and in 3 of 3 at twice it, by the pooled-slope
+t and by the within-bucket t alike. No cell has a bootstrap interval of the
+net P&L above zero.

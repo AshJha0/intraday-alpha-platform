@@ -1,6 +1,6 @@
 # C++ vs Rust vs Java for Event-Driven Low-Latency Trading: Evidence from Four Parallel Ports of One Platform
 
-> Dated record. The paper does not depend on the bundled dataset; the 2026-10-03 note at the end says which two references to it are affected by v1.4.0.
+> Dated record. The paper does not depend on the bundled dataset; the 2026-10-03 note says which two references to it are affected by v1.4.0, and the 2026-10-04 note at the end says what v1.5.0 changed in the ports.
 
 *Intraday Alpha Platform research series, paper 6 of 6 (spec §28). Generated 2026-08-29 from this repository's code, tests and benchmark artifacts. This is an engineering case study of THIS codebase, not a language shoot-out with general claims.*
 
@@ -395,3 +395,28 @@ feed's peak needs was not re-derived on the new data. The average equity
 rate is lower than before (105,282 events over a 6.5 h session is about 4.5
 events/s), so the remark is not weakened. The test counts in §4.3 are the
 paper's own dated record and are not restated here.
+
+## Erratum / Update — 2026-10-04 (v1.5.0: the corrected research methods are the defaults)
+
+v1.5.0 changed no dataset and no benchmark: `benchmarks/results_cpp.md` and
+the golden event vectors are as they were. It made the corrected research
+methods the defaults of the Python validation chain
+(`iap.validation.methods`, bundle `"v2"`; PLATFORM_CONVENTIONS.md §13.6),
+with every old rule selectable under a legacy name. The paper's
+measurements and conclusions stand. What the release adds to its subject,
+ports held to one pinned semantics, is this (CHANGELOG.md, v1.5.0):
+
+1. Rules on the paper path or in the lifecycle evaluation are ported with
+   the old rule selectable by name: the CUSUM retirement rule beside the
+   consecutive-breach rule, the pair-count-weighted rolling IC (Java
+   `LifecycleGauge`, `RollingIc`; Rust `lifecycle::tracker`), and the
+   ledger significance threshold beside the fixed one (Java `PolicyConfig`
+   / `Gates`, Rust `PolicyConfig::threshold_for`).
+2. The research-only rules are not ported. The Java `ResearchBacktester`
+   and `CostModel` stay on the legacy research rules and say so in their
+   API, and the backtest golden `expected_backtest.json` stays on those
+   rules, which its `config` now names.
+3. The goldens `expected_lifecycle.json`, `expected_backtest.json` and
+   `expected_adaptive.json` moved to x-version 2, and the lifecycle golden
+   gained scenarios LC04 and LG01. The test counts in §4.3 are the paper's
+   own dated record and are not restated here.
