@@ -75,8 +75,8 @@ path exists on disk, and that each of the eight modules of the 2026-09-19/20
 release — contracts, risk, execution, lifecycle, trace, store, research, mvp
 — is named by a done issue), `in-progress` lists the planned paths of the
 current release (0 issues as of 2026-09-20: the release closed all 15),
-`backlog` says what would prove it done. Current counts: 31 epics, 155
-issues — 98 done, 0 in progress, 57 backlog (`docs/EPICS.md` summary;
+`backlog` says what would prove it done. Current counts: 31 epics, 163
+issues — 109 done, 0 in progress, 54 backlog (`docs/EPICS.md` summary;
 `docs/ROADMAP.md` maps them to the phases).
 
 ## Keeping it in sync

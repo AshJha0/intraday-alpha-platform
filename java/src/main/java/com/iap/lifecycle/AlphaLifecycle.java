@@ -30,6 +30,11 @@ import com.iap.lifecycle.LifecycleTransition.Actor;
  *       to RESEARCH at once; at VALIDATING / PAPER each failed evaluation
  *       increments {@code consecutive_failures} and the
  *       {@code max_consecutive_failures}-th one demotes to CANDIDATE;</li>
+ *   <li><b>a gate the policy leaves out</b>: under
+ *       {@code net_pnl_ci_gate = "absent"} (the legacy policy)
+ *       {@code net_pnl_bootstrap_ci} is not evaluated on the CANDIDATE ->
+ *       VALIDATING edge and appears in no result ({@link #edgeGates}); the
+ *       transition table itself is the same under either policy;</li>
  *   <li><b>silence is not evidence</b>: an evaluation whose evidence block
  *       for the edge is absent ({@code research} at CANDIDATE,
  *       {@code validation} at VALIDATING, {@code paper} at PAPER,
@@ -38,9 +43,13 @@ import com.iap.lifecycle.LifecycleTransition.Actor;
  *       ({@code NO_EVIDENCE}). RESEARCH is the exception by construction:
  *       its {@code ledger_entry_exists} gate IS the presence check;</li>
  *   <li><b>live</b> (ACTIVE / WATCH): delegated unchanged to the pinned
- *       {@link LifecycleGauge} rules (hysteresis, entering breach counts);
- *       its transition is wrapped into a {@link LifecycleTransition} with
- *       {@code gates = {"rolling_ic": ...}} and the policy name;</li>
+ *       {@link LifecycleGauge} rules — hysteresis and the retirement rule the
+ *       config names (the CUSUM rule by default since v1.5.0, each reading
+ *       weighted by {@code live.new_fraction}; the legacy consecutive-breach
+ *       rule when the config says so); its transition is wrapped into a
+ *       {@link LifecycleTransition} with {@code gates = {"rolling_ic": ...}}
+ *       and the policy name. The gauge's counters and its CUSUM statistic are
+ *       mirrored on the record after every live evaluation;</li>
  *   <li><b>RETIRED is terminal for SYSTEM</b>: a SYSTEM {@code advance} on a
  *       RETIRED alpha records {@code TERMINAL} and returns {@code null};
  *       re-entry is the HUMAN {@link #resetToResearch}, which re-runs the
@@ -96,7 +105,8 @@ public final class AlphaLifecycle {
                     Actor.SYSTEM, Gates.LEAKAGE_CLEAN, Gates.OOS_IC,
                     Gates.STATISTICAL_SIGNIFICANCE, Gates.FOLD_CONSISTENCY,
                     Gates.FOLD_COUNT, Gates.HYPOTHESIS_SIGN, Gates.NET_PNL_AFTER_COSTS,
-                    Gates.CAPACITY, Gates.STABILITY),
+                    Gates.NET_PNL_BOOTSTRAP_CI, Gates.CAPACITY, Gates.STABILITY,
+                    Gates.CROSS_ALPHA_CORRELATION),
             edge(LifecycleState.CANDIDATE, LifecycleState.RESEARCH, EdgeKind.DEMOTION,
                     Actor.SYSTEM, Gates.LEAKAGE_CLEAN),
             edge(LifecycleState.VALIDATING, LifecycleState.PAPER, EdgeKind.PROMOTION,
@@ -229,6 +239,7 @@ public final class AlphaLifecycle {
         rec.consecutiveFailures = 0;
         rec.breachCount = 0;
         rec.recoveryCount = 0;
+        rec.cusum = 0.0;
         gauges.remove(rec.alphaId());
         return transition;
     }
@@ -276,6 +287,24 @@ public final class AlphaLifecycle {
         };
     }
 
+    /**
+     * The gates this policy evaluates on {@code edge}, in order: the edge's
+     * list, without {@code net_pnl_bootstrap_ci} when the policy says the gate
+     * is absent ({@code net_pnl_ci_gate = "absent"}, the legacy policy).
+     */
+    public List<Gates> edgeGates(Edge edge) {
+        if (config.netPnlCiRequired()) {
+            return edge.gates();
+        }
+        List<Gates> out = new ArrayList<>(edge.gates().size());
+        for (Gates g : edge.gates()) {
+            if (g != Gates.NET_PNL_BOOTSTRAP_CI) {
+                out.add(g);
+            }
+        }
+        return List.copyOf(out);
+    }
+
     private LifecycleTransition advancePromotion(AlphaRecord rec, long eventTs,
             Evidence evidence) {
         LifecycleState state = rec.state();
@@ -285,9 +314,10 @@ public final class AlphaLifecycle {
                     Outcome.NO_EVIDENCE, Map.of(), rec.consecutiveFailures, null));
             return null;
         }
+        List<Gates> evaluated = edgeGates(edge);
         Map<String, GateResult> results = new LinkedHashMap<>();
         List<String> failed = new ArrayList<>();
-        for (Gates g : edge.gates()) {
+        for (Gates g : evaluated) {
             GateResult r = g.evaluate(evidence, config);
             results.put(g.gateName(), r);
             if (!r.passed()) {
@@ -296,7 +326,7 @@ public final class AlphaLifecycle {
         }
         if (failed.isEmpty()) {
             LifecycleTransition t = transition(rec, edge, eventTs,
-                    "all " + edge.gates().size() + " gates passed: " + state.name()
+                    "all " + evaluated.size() + " gates passed: " + state.name()
                             + " -> " + edge.toState().name(), results, Actor.SYSTEM);
             apply(rec, t);
             recordEvaluation(rec, new GateEvaluation(rec.alphaId(), eventTs, state,
@@ -355,9 +385,11 @@ public final class AlphaLifecycle {
         LifecycleGauge g = gauges.get(rec.alphaId());
         if (g == null) {
             PolicyConfig.Live live = config.live();
-            g = LifecycleGauge.restore(live.watchIcGate(), live.reactivateIcGate(),
-                    live.retireBreachEvals(), live.reactivateEvals(),
-                    gaugeState(rec.state()), rec.breachCount, rec.recoveryCount);
+            g = LifecycleGauge.restore(live.breachRule(), live.watchIcGate(),
+                    live.reactivateIcGate(), live.retireBreachEvals(),
+                    live.reactivateEvals(), live.cusumK(), live.cusumH(),
+                    gaugeState(rec.state()), rec.breachCount, rec.recoveryCount,
+                    rec.cusum);
             gauges.put(rec.alphaId(), g);
         }
         return g;
@@ -365,16 +397,24 @@ public final class AlphaLifecycle {
 
     /**
      * The tracker's transition reason, verbatim
-     * ({@code iap.adaptive.lifecycle.LifecycleTracker}).
+     * ({@code iap.adaptive.lifecycle.LifecycleTracker}). {@code cusum} is the
+     * statistic as the deciding reading left it (quoted by a CUSUM
+     * retirement).
      */
-    private String liveReason(LifecycleState to, double rollingIc) {
+    private String liveReason(LifecycleState to, double rollingIc, double cusum) {
         PolicyConfig.Live live = config.live();
         return switch (to) {
             case WATCH -> "rolling_ic " + PyFormat.fixed(rollingIc, 6) + " < watch gate "
                     + CanonicalJson.floatRepr(live.watchIcGate());
-            case RETIRED -> "persistent breach: " + live.retireBreachEvals()
-                    + " consecutive evals below watch gate "
-                    + CanonicalJson.floatRepr(live.watchIcGate());
+            case RETIRED -> live.breachRule() == LifecycleGauge.BreachRule.CUSUM
+                    ? "persistent breach: CUSUM " + PyFormat.fixed(cusum, 6) + " >= "
+                            + CanonicalJson.floatRepr(live.cusumH()) + " (slack "
+                            + CanonicalJson.floatRepr(live.cusumK())
+                            + ") below watch gate "
+                            + CanonicalJson.floatRepr(live.watchIcGate())
+                    : "persistent breach: " + live.retireBreachEvals()
+                            + " consecutive evals below watch gate "
+                            + CanonicalJson.floatRepr(live.watchIcGate());
             case ACTIVE -> "re-activation: " + live.reactivateEvals()
                     + " consecutive evals >= reactivate gate "
                     + CanonicalJson.floatRepr(live.reactivateIcGate());
@@ -406,12 +446,14 @@ public final class AlphaLifecycle {
         LifecycleGauge gauge = gauge(rec);
         double rollingIc = live.rollingIc();
         LifecycleGauge.State before = gauge.state();
-        LifecycleGauge.State after = gauge.update(rollingIc, live.informative());
+        LifecycleGauge.State after = gauge.update(rollingIc, live.informative(),
+                live.newFraction());
         Map<String, GateResult> gate = new LinkedHashMap<>();
         gate.put(Gates.ROLLING_IC.gateName(), Gates.ROLLING_IC.evaluate(evidence, config));
         if (after == before) {
             rec.breachCount = gauge.breachCount();
             rec.recoveryCount = gauge.recoveryCount();
+            rec.cusum = gauge.cusum();
             recordEvaluation(rec, new GateEvaluation(rec.alphaId(), eventTs, state,
                     Outcome.HOLD, gate, rec.consecutiveFailures, null));
             return null;
@@ -420,8 +462,9 @@ public final class AlphaLifecycle {
         Edge edge = edgeFor(state, to, EdgeKind.LIVE);
         Map<String, GateResult> decided = new LinkedHashMap<>();
         decided.put(Gates.ROLLING_IC.gateName(), liveGateResult(to, rollingIc));
-        LifecycleTransition t = transition(rec, edge, eventTs, liveReason(to, rollingIc),
-                decided, Actor.SYSTEM);
+        LifecycleTransition t = transition(rec, edge, eventTs,
+                liveReason(to, rollingIc, gauge.cusumAtLastUpdate()), decided,
+                Actor.SYSTEM);
         apply(rec, t);
         // The gauge keeps counting across its own transition (the breach that
         // enters WATCH counts as breach #1 — pinned): keep it, and mirror its
@@ -429,6 +472,7 @@ public final class AlphaLifecycle {
         gauges.put(rec.alphaId(), gauge);
         rec.breachCount = gauge.breachCount();
         rec.recoveryCount = gauge.recoveryCount();
+        rec.cusum = gauge.cusum();
         recordEvaluation(rec, new GateEvaluation(rec.alphaId(), eventTs, state,
                 Outcome.TRANSITION, gate, 0, t));
         return t;

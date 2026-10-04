@@ -94,8 +94,9 @@ import com.iap.orderbook.OrderBook;
  *       fills (fee &lt; 0 = rebate). FX venues charge
  *       commission_per_million * notional / 1e6 on every fill, notional =
  *       qty * qty_unit * price_ticks * tick_size.</li>
- *   <li><b>Linear impact</b> (aggressive fills only, identical to the
- *       research cost model): impact_bps = impact_coeff_bps_per_pct_adv *
+ *   <li><b>Linear impact</b> (aggressive fills only; the linear rule of
+ *       the research cost model, whose default is the square root since
+ *       v1.5.0): impact_bps = impact_coeff_bps_per_pct_adv *
  *       (child_qty * qty_unit / adv * 100); each taker fill is charged
  *       impact_bps * 1e-4 * its own notional.</li>
  *   <li><b>Cancels and time-in-force</b>: {@link #cancel(long, long)}
@@ -258,6 +259,7 @@ public final class ExecutionSimulator {
                 + v.latencyMeanNs() + jitter;
         o.state = OrderState.PENDING;
         o.remaining = o.qty;
+        o.entryAheadQty = 0;
         o.cancelReason = CancelReason.NONE;
         o.cancelArrivalTs = 0;
         long id = o.orderId;
@@ -469,6 +471,7 @@ public final class ExecutionSimulator {
                         o.aheadQty += ahead.remaining;
                     }
                 }
+                o.entryAheadQty = o.aheadQty;
                 // Crossing exemption: the display may still show the
                 // liquidity our aggressive leg just consumed (rule 4). While
                 // gated (rule 8) nothing was consumed: no exemption.

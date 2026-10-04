@@ -1,0 +1,76 @@
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000000000000000}
+{"decision":3,"reason":"strategy daily pnl -92233720368547758.07 breaches loss limit 50000.00","rule_id":"STRATEGY_LOSS","scope":"STRATEGY","scope_id":"S1","severity":3,"timestamp":1700000005024999999}
+{"decision":3,"reason":"global daily pnl -92233720368547758.07 breaches daily loss limit 250000.00","rule_id":"DAILY_LOSS","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000005024999999}
+{"decision":2,"reason":"global kill switch engaged","rule_id":"KILL_GLOBAL","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000005024999999}
+{"decision":1,"reason":"daily loss limit 50000.00 -> 92233720368547758.07 approved by ","rule_id":"LOSS_LIMIT_OVERRIDE","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000005077999999}
+{"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000005077999999}
+{"decision":2,"reason":"global kill switch engaged","rule_id":"KILL_GLOBAL","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000005077999999}
+{"decision":2,"reason":"global kill switch engaged","rule_id":"KILL_GLOBAL","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000005126999999}
+{"decision":1,"reason":"ops halt","rule_id":"SESSION_ROLLED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000008126999999}
+{"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000008126999999}
+{"decision":3,"reason":"","rule_id":"KILL_SWITCH_ENGAGED","scope":"INSTRUMENT","scope_id":"+1","severity":3,"timestamp":1700000008126999999}
+{"decision":2,"reason":"projected position -4611686018427341545 exceeds max_position_qty 100000","rule_id":"POSITION_LIMIT","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000008195999999}
+{"decision":2,"reason":"projected position -4611686018427343952 exceeds max_position_qty 100000","rule_id":"POSITION_LIMIT","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000008240999999}
+{"decision":1,"reason":"desk request #42","rule_id":"KILL_SWITCH_CLEARED","scope":"INSTRUMENT","scope_id":"1","severity":1,"timestamp":1700000008240999999}
+{"decision":2,"reason":"no reference data for instrument 4294967295","rule_id":"UNKNOWN_INSTRUMENT","scope":"INSTRUMENT","scope_id":"4294967295","severity":2,"timestamp":1700000008266999999}
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 0","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000009266999999}
+{"decision":2,"reason":"qty must be > 0: -1","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700000009288804999}
+{"decision":2,"reason":"projected gross notional 92233720368547758.07 exceeds max_gross_notional 5000000.00","rule_id":"GROSS_NOTIONAL","scope":"GLOBAL","scope_id":"","severity":2,"timestamp":1700000009288804999}
+{"decision":2,"reason":"order_id 9223372036854775809 already used at ts 1700000008195999999","rule_id":"DUPLICATE_ORDER_ID","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000010288804999}
+{"decision":3,"reason":"strategy daily pnl -46116860184272896.00 breaches loss limit 50000.00","rule_id":"STRATEGY_LOSS","scope":"STRATEGY","scope_id":"S1","severity":3,"timestamp":1700000018298804999}
+{"decision":3,"reason":"global daily pnl -46116860184272824.32 breaches daily loss limit 250000.00","rule_id":"DAILY_LOSS","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000018298804999}
+{"decision":2,"reason":"global kill switch engaged","rule_id":"KILL_GLOBAL","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000018318804999}
+{"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000018364804999}
+{"decision":3,"reason":"global daily pnl -46116860184272824.32 breaches daily loss limit 250000.00","rule_id":"DAILY_LOSS","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000018364804999}
+{"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000018365002999}
+{"decision":3,"reason":"strategy daily pnl -46116860184272896.00 breaches loss limit 50000.00","rule_id":"STRATEGY_LOSS","scope":"STRATEGY","scope_id":"S1","severity":3,"timestamp":1700000018365002999}
+{"decision":1,"reason":"daily loss limit 250000.00 -> 92233720368546652.16 approved by ","rule_id":"LOSS_LIMIT_OVERRIDE","scope":"GLOBAL","scope_id":"","severity":2,"timestamp":1700000018391002999}
+{"decision":1,"reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000018391002999}
+{"decision":3,"reason":"desk request #42","rule_id":"KILL_SWITCH_ENGAGED","scope":"VENUE","scope_id":"3","severity":3,"timestamp":1700000018391002999}
+{"decision":1,"reason":"daily loss limit 50000.00 -> 92233720368546283.52 approved by ","rule_id":"LOSS_LIMIT_OVERRIDE","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000018419002999}
+{"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000018419002999}
+{"decision":1,"reason":"desk request #42","rule_id":"KILL_SWITCH_CLEARED","scope":"VENUE","scope_id":"3","severity":1,"timestamp":1700000018419002999}
+{"decision":2,"reason":"reference price age 5160198000ns exceeds 5000000000ns","rule_id":"STALE_PRICE","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000023479002999}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000028530003000}
+{"decision":3,"reason":"strategy daily pnl -46116860184268881.92 breaches loss limit 50000.00","rule_id":"STRATEGY_LOSS","scope":"STRATEGY","scope_id":"S3","severity":3,"timestamp":1700000028581003000}
+{"decision":2,"reason":"strategy S3 kill switch engaged","rule_id":"KILL_STRATEGY","scope":"STRATEGY","scope_id":"S3","severity":3,"timestamp":1700000028581419000}
+{"decision":2,"reason":"projected position 4611686018427432150 exceeds max_position_qty 100000","rule_id":"POSITION_LIMIT","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000028598419000}
+{"decision":1,"reason":"daily loss limit 50000.00 -> 92233720368538255.36 approved by line1\nline2","rule_id":"LOSS_LIMIT_OVERRIDE","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700000028645870000}
+{"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000028645870000}
+{"decision":2,"reason":"notional 1225500.00 USD exceeds max_order_notional 1000000.00","rule_id":"FAT_FINGER_NOTIONAL","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000028691870000}
+{"decision":2,"reason":"qty 98377 exceeds max_order_qty 50000","rule_id":"FAT_FINGER_QTY","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000028692489000}
+{"decision":3,"reason":"strategy daily pnl -92233720368547758.07 breaches loss limit 92233720368538255.36","rule_id":"STRATEGY_LOSS","scope":"STRATEGY","scope_id":"S3","severity":3,"timestamp":1700000029692489000}
+{"decision":3,"reason":"global daily pnl -92233720368547758.07 breaches daily loss limit 92233720368546652.16","rule_id":"DAILY_LOSS","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000029692489000}
+{"decision":1,"reason":"daily loss limit 92233720368546652.16 -> 92233720368547758.07 approved by ops halt","rule_id":"LOSS_LIMIT_OVERRIDE","scope":"GLOBAL","scope_id":"","severity":2,"timestamp":1700000029693584000}
+{"decision":1,"reason":"desk request #42","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000029693584000}
+{"decision":2,"reason":"qty must be > 0: 0","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000029693584000}
+{"decision":2,"reason":"strategy S3 kill switch engaged","rule_id":"KILL_STRATEGY","scope":"STRATEGY","scope_id":"S3","severity":3,"timestamp":1700000034705584001}
+{"decision":1,"reason":"desk request #42","rule_id":"SESSION_ROLLED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000029705669000}
+{"decision":1,"reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000029705669000}
+{"decision":2,"reason":"projected position 4611686018427395436 exceeds max_position_qty 100000","rule_id":"POSITION_LIMIT","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000029739242000}
+{"decision":3,"reason":"strategy daily pnl -92233720368547758.07 breaches loss limit 50000.00","rule_id":"STRATEGY_LOSS","scope":"STRATEGY","scope_id":"S 1","severity":3,"timestamp":1700000029739242000}
+{"decision":3,"reason":"global daily pnl -92233720368547758.07 breaches daily loss limit 250000.00","rule_id":"DAILY_LOSS","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000029739242000}
+{"decision":2,"reason":"global kill switch engaged","rule_id":"KILL_GLOBAL","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000029739242000}
+{"decision":3,"reason":"fill for order 0 overflows i64 position accounting (fail-closed)","rule_id":"KILL_SWITCH_ENGAGED","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000029739749000}
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 0","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700000029740051000}
+{"decision":2,"reason":"global kill switch engaged","rule_id":"KILL_GLOBAL","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":-9223372036854775807}
+{"decision":1,"reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000029774676000}
+{"decision":3,"reason":"global daily pnl -92233720368547758.07 breaches daily loss limit 250000.00","rule_id":"DAILY_LOSS","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000029774676000}
+{"decision":2,"reason":"global kill switch engaged","rule_id":"KILL_GLOBAL","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000029775020000}
+{"decision":2,"reason":"global kill switch engaged","rule_id":"KILL_GLOBAL","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000029775823000}
+{"decision":1,"reason":"desk request #42","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000029776071000}
+{"decision":3,"reason":"global daily pnl -92233720368547758.07 breaches daily loss limit 250000.00","rule_id":"DAILY_LOSS","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000029776071000}
+{"decision":2,"reason":"global kill switch engaged","rule_id":"KILL_GLOBAL","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":9223372036854775806}
+{"decision":3,"reason":"strategy daily pnl -50167.50 breaches loss limit 50000.00","rule_id":"STRATEGY_LOSS","scope":"STRATEGY","scope_id":"S1","severity":3,"timestamp":1700000029808071000}
+{"decision":2,"reason":"global kill switch engaged","rule_id":"KILL_GLOBAL","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000029808071000}
+{"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000029808071000}
+{"decision":2,"reason":"global kill switch engaged","rule_id":"KILL_GLOBAL","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000029808071000}
+{"decision":3,"reason":"fill for order 0 overflows i64 position accounting (fail-closed)","rule_id":"KILL_SWITCH_ENGAGED","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000029847071000}
+{"decision":1,"reason":"rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000029847071000}
+{"decision":3,"reason":"strategy daily pnl -50368.17 breaches loss limit 50000.00","rule_id":"STRATEGY_LOSS","scope":"STRATEGY","scope_id":"S1","severity":3,"timestamp":1700000029847071000}
+{"decision":2,"reason":"projected position 4611686018427388429 exceeds max_position_qty 100000","rule_id":"POSITION_LIMIT","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000029847071000}
+{"decision":2,"reason":"strategy S1 kill switch engaged","rule_id":"KILL_STRATEGY","scope":"STRATEGY","scope_id":"S1","severity":3,"timestamp":1700000029853071000}
+{"decision":2,"reason":"projected position 4611686018427388538 exceeds max_position_qty 100000","rule_id":"POSITION_LIMIT","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000029853071000}
+{"decision":2,"reason":"strategy S1 kill switch engaged","rule_id":"KILL_STRATEGY","scope":"STRATEGY","scope_id":"S1","severity":3,"timestamp":1700000029905071000}
+{"decision":2,"reason":"projected position 4611686018427389651 exceeds max_position_qty 100000","rule_id":"POSITION_LIMIT","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000029905071000}
+{"decision":2,"reason":"projected position 4611686018427388086 exceeds max_position_qty 100000","rule_id":"POSITION_LIMIT","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000029905071000}

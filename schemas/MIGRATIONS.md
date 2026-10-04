@@ -946,3 +946,628 @@ CHANGELOG.md (v1.4.0, "Results") has old → new for every headline number.
   `python3 tools/regenerate_dataset_artifacts.py` for everything committed
   (CONTRIBUTING.md §4.1). To keep working on the v1.3.0 dataset set
   `equities.flow.calibration` to `"legacy_budget"`.
+
+## 2026-10-04 — v1.5.0: the corrected research methods become the defaults; `execution.json` 1 -> 2, `lifecycle.json` 1 -> 2, `strategies.json` `adaptive` 1 -> 2, `research/experiments.json` 2 -> 3, `alpha_registry.json` 1 -> 2, `eligibility.json` 1 -> 2, `POWER_REPORT.json` 1 -> 2, goldens `expected_{lifecycle,backtest,adaptive}.json` 1 -> 2; every dataset-derived artefact regenerated
+
+No wire schema under `schemas/` changed shape and no golden event vector
+moved. The dataset did not change (`data_version` `116b7787…`,
+`feature_version` `585dd7b9…`). What changed is which rule each research
+statistic is computed under by default, and therefore every artefact
+computed from the dataset. One change, one regeneration
+(`tools/regenerate_dataset_artifacts.py`, manual `regenerate` job of
+`ci.yml`: run 37162724308 at commit `75fd4f7`, Ubuntu, Python 3.11,
+904.8 s; a first pass, run 37161258467, produced the same numbers before
+three sentences of the adaptive report were made data-derived). CHANGELOG.md
+(v1.5.0, "Results") has old → new for every headline number;
+PLATFORM_CONVENTIONS.md §13.6 has the table of defaults and legacy names.
+
+- **Why.** v1.3.0 added eleven corrected methods as opt-ins and v1.4.0 kept
+  them opt-in, so every committed number was still computed under rules the
+  repository itself documented as deficient: a sign policy that trades every
+  row whatever the cost, a t-statistic that is not the significance of the
+  gated IC, a fixed 3.0 threshold beside a ledger of thousands of looks, a
+  retirement rule that counts one bad stretch six times. The defaults now
+  are the corrected rules. Nothing was tuned to recover an earlier
+  conclusion.
+- **How an old number is reproduced.** Each old rule has a legacy name
+  (table in PLATFORM_CONVENTIONS.md §13.6) and `iap.validation.methods`
+  bundles them: `methods("legacy_v1")`,
+  `python -m iap.research run --methods legacy_v1`,
+  `research/alpha_reports/run_all.py --methods legacy_v1 --out-dir <dir>`.
+  `python/tests/test_legacy_methods.py` runs the pipeline's own entry points
+  under `legacy_v1` and compares every field with
+  `tests/golden/alpha_report_{EQ03,FX01}_v1.4.0.json` — the two reports
+  exactly as tagged `v1.4.0`, new files, never regenerated.
+- **Config documents.** Each loader rejects the older document instead of
+  reading it under a new default:
+  - `configs/execution/execution.json` `x-version` 1 -> 2: `cost_model`
+    names `impact_model` (`"sqrt"`; `"linear"` is the legacy rule) and
+    carries `sqrt_impact_coeff_bps` (100.0). `CostModel.load` requires
+    `impact_model`. The execution simulator and the MVP read
+    `impact_coeff_bps_per_pct_adv` as before: simulator rule 6 (linear
+    impact per child order) is not one of the methods and did not change in
+    any language. `mvp.config_version` hashes the document, so it moves
+    (`f293e7e7…` -> `bf8cc608…`); see the MVP golden below.
+  - `configs/strategies/lifecycle.json` `x-version` 1 -> 2: new key
+    `tstat_threshold` (`"ledger"`; `"fixed"` is the legacy rule).
+  - `configs/strategies/strategies.json` `adaptive.x-version` 1 -> 2: names
+    `ic_z_method` (`"hac"`; `"legacy"`, spelled `"pinned"` up to v1.4.0) and
+    `lifecycle.breach_rule` (`"cusum"` with `cusum_k` 0.0025 and `cusum_h`
+    0.01; `"consecutive"` is the legacy rule and the only reader of
+    `retire_breach_evals`). The document's top-level `x-version` stays 1.
+- **Research documents.**
+  - `research/experiments.json` `x-version` 2 -> 3: an entry may carry
+    `gate_looks`, the look count its PROMOTE t threshold was derived at
+    (`N` = ledger total before the run + the looks the run adds, declared
+    before the first alpha is evaluated). A rerun is judged at the recorded
+    count. Entries written before v1.5.0 have none and are not re-judged.
+    The report pipelines put the bundle name in the entry's `config`
+    (`"methods": "v2"`), so the v2 pass is 24 new entries beside the 24
+    `legacy_v1` ones of the same dataset — the old results stay in the file
+    and in the denominator. Looks per alpha per run: 84 under `v2`
+    (`looks_per_validation(4)` = 83, plus the day-2 backtest), 28 under
+    `legacy_v1`.
+  - `research/experiments/<id>/eligibility.json` `x-version` 1 -> 2: adds
+    `methods`, `significance_threshold`, `threshold_looks`. Readers accept
+    1 and 2. `ExperimentSpec.configuration` gains `methods` (default
+    `"v2"`), which is hashed into `experiment_id`: the five runner
+    experiments have new ids under `v2`; the directories of the earlier ids
+    are kept.
+  - `ExperimentResult` (`schemas/research/experiment_result.schema.json`,
+    `x-version` 1, shape unchanged): under `methods = "v2"` `ic` is the gate
+    IC and `t_stat` the pooled-slope HAC t; under `"legacy_v1"` they are the
+    pooled IC over valid labels and the Newey–West t of the bucketed IC, as
+    before. The two `description` strings say so. A zero-trade holdout
+    reports `sharpe` 0.0.
+  - `research/power/POWER_REPORT.json` `x-version` 1 -> 2: the study runs
+    the `v2` bundle; columns `sig (pooled)`, `sig (within)`, `sig (ledger)`,
+    `P&L CI > 0`, trades at 1x.
+  - `research/alpha_registry.json` `x-version` 1 -> 2: each record carries
+    `cusum` (the statistic of the live retirement rule; 0.0 outside
+    ACTIVE / WATCH and under the consecutive rule).
+  - `research/lifecycle_transitions.jsonl` was rebuilt by `bootstrap
+    --force` for the new method bundle after the old log was archived
+    unchanged as
+    `research/archive/lifecycle_transitions.dataset-116b7787.methods-legacy_v1.jsonl`.
+  - Alpha reports (`research/alpha_reports/<ID>.json`): new keys `methods`,
+    `gate_tstat`, `promote_gates`, `trade_count_1x_cost`, `fold_diagnostics`,
+    `net_pnl_bootstrap`, `net_pnl_1x_pooled`, `n_folds_survive_1x_cost`,
+    `oos_ic_{instrument_mean,vol_scaled}_uncrossed`, `oos_ic_valid_only`,
+    `gate_ic_valid_only`, `oos_ic_blackout_reopen`, `gate_ic_blackout_reopen`,
+    `label_reopen_available`, `n_blackout_rows_scored`, `ic_scale_consistent`,
+    `capacity_proxy_usd_by_instrument`, `capacity_breakeven_by_instrument`,
+    the `recompute_*` fields of the leakage block. No key was removed.
+  - Feature frames (`data/features/*.parquet`, not committed) gain one
+    column per horizon, `label_reopen_<h>`; `feature_version` is the
+    registry hash and is unchanged.
+- **Evidence document** (`iap.lifecycle.Evidence`, read by Python, Java and
+  Rust): new required key `significance_threshold` (number > 0 or `null`)
+  and, in `live`, new required key `new_fraction` in (0, 1]. A v1.4.0
+  evidence document is rejected by every reader.
+- **Which IC the gate reads** (decided here, pinned in
+  PLATFORM_CONVENTIONS.md §13.6). The per-instrument mean IC and the
+  vol-scaled IC are reported beside the pooled IC as headline columns; the
+  gate keeps reading the POOLED IC of the uncrossed book. Reason: the gate
+  t is the HAC t of the pooled slope — the significance of that IC and of
+  no other — and the lifecycle's holdout and paper gates compare a pooled
+  IC with the research IC. `ic_scale_consistent` flags an alpha whose pooled
+  and vol-scaled ICs disagree in sign.
+- **Report-only, and why.** The bootstrap interval of the net P&L and the
+  per-fold diagnostics are reported fields. They are not a CI gate or a
+  promotion gate: either would add a row to the lifecycle gate table, which
+  is pinned across Python, Java and Rust (17 edges, 18 gates) and would have
+  to be redesigned.
+- **Goldens.** Route (a) = the new rule is ported and the vector follows
+  it; route (b) = the cross-language vector stays on the old rule, named as
+  legacy in the golden and in the port.
+  - `tests/golden/expected_lifecycle.json` `x-version` 1 -> 2, route (a):
+    scenarios LC01–LC04 under the default policy (ledger threshold, CUSUM),
+    a `legacy` section (`config` + LG01, the v1.4.0 LC01 script) under
+    `tstat_threshold = "fixed"` / `breach_rule = "consecutive"`; every
+    expected row carries `cusum`. 36 default and 9 legacy transitions.
+    Replayed by Python, Java (`LifecycleGoldenTest`) and Rust
+    (`golden_lifecycle.rs`).
+  - `tests/golden/expected_adaptive.json` `x-version` 1 -> 2, route (a):
+    `lifecycle` is the CUSUM sequence and `lifecycle_legacy_consecutive` the
+    old one; `rolling_ic` is the pair-count-weighted reading and
+    `rolling_ic_unweighted` the old one. Java `LifecycleGauge` (factories
+    `cusum` / `legacyConsecutive`) and `RollingIc` follow; the paper loop
+    passes `new_fraction = min(1, block / window)`.
+  - `tests/golden/expected_backtest.json` `x-version` 1 -> 2, route (b):
+    the EQ01 vector is the research backtest under the legacy rules its
+    `config` now names (`position_policy: "sign"`, `cap_fills_at_l1: false`,
+    `block_rows_column: null`, `impact_model: "linear"`) — research-only
+    statistics, on no paper path. Java `ResearchBacktester`
+    (`POSITION_POLICY`, `CAP_FILLS_AT_L1`, `BLOCKS_ROWS`) and `CostModel`
+    (`IMPACT_MODEL`, `loadLegacyLinear`) name the rules they implement and
+    the test asserts they equal the golden's. A Python-only `default_rules`
+    block (EQ06, cost multiplier 0.01) pins the v1.5.0 defaults.
+  - `tests/golden/expected_alpha.json` (`x-version` 1): the same vectors
+    scored with the refitted parameters, which differ from v1.4.0 by at most
+    2.3e-15 relative (the frames carry more columns and numpy sums a strided
+    column in a different order); the golden moves by at most 2.6e-13
+    relative, inside every port's tolerance. No port changed.
+  - `tests/golden/expected_experiment_golden_frame.json` (`x-version` 1):
+    the golden experiment runs under `v2` — new `experiment_id`, the result
+    carries the gate statistics, the holdout makes no trade (Sharpe 0.0).
+  - `tests/golden/expected_mvp.json` (`x-version` 1): `config_version`
+    moves (it also hashes `alpha_params.json`, whose header names the
+    regeneration commit), and with it the trace digest (`f51890da…` ->
+    `e534ac1f…`: every trace carries `config_version`); the per-alpha `research_ic` / `ic_gap`
+    move because the research IC is now the gate IC of the v2 report.
+    Events, decisions, parents, fills and P&L are identical.
+  - New, never regenerated: `tests/golden/alpha_report_EQ03_v1.4.0.json`,
+    `alpha_report_FX01_v1.4.0.json`.
+- **Ports.** Java: `LifecycleGauge` (breach rule by name),
+  `RollingIc` (weighted), `PolicyConfig` (version 2, `tstatThreshold`,
+  `Live.legacyConsecutive`), `Evidence` (`significanceThreshold`,
+  `Live.newFraction`), `Gates.thresholdFor`, `AlphaRecord.cusum`,
+  `AlphaRegistry` version 2. Rust `lifecycle`: `BreachRule`,
+  `TstatThreshold`, `LiveConfig::legacy_consecutive`,
+  `PolicyConfig::threshold_for`, `LiveTracker::update(.., new_fraction)`
+  returning `Result`, `AlphaRecord.cusum`, `REGISTRY_VERSION` 2,
+  `LIFECYCLE_CONFIG_VERSION` 2. C++: comments only.
+- **API changes a caller must make.** `BacktestConfig()` is the cost-aware
+  policy and needs the label horizon at run time (`config.for_horizon(h)` /
+  `Backtester.for_horizon(h)`); `BacktestConfig.legacy(...)` is the old
+  constructor. `LifecycleConfig.from_config` and the adaptive config need
+  the rule names. `ExperimentRunner(tstat_threshold=...)` and the CLI flag
+  `--tstat-threshold` are gone: the policy is part of the method bundle
+  (`--methods`). `validate_alpha(tstat_threshold="ledger")` needs
+  `ledger_t_threshold`. `build_meta_features` does not impute by default
+  (`impute_nan=True` is the legacy rule). `compute_labels` scores BLACKOUT
+  rows at the reopen return by default (`blackout_reopen=False` is legacy).
+- **Found on the way.** `research/adaptive_reports/run_adaptive.py` built
+  its instrument meta without currencies, so the FX rows of the adaptive
+  study summed quote-currency P&L as if it were USD (the alpha reports had
+  been fixed for this on 2026-09-06, the adaptive runner had not). It now
+  loads the meta the alpha reports use; the FX P&L columns of
+  `ADAPTIVE_REPORT.md` are in USD.
+- The two items this entry first listed as not done — a dataset-aware
+  `v_alpha_scorecard` and a Java research backtester on the default rules —
+  are in the release: the two entries below.
+- Versions and bookkeeping: `python/pyproject.toml` and `iap.__version__`
+  1.4.0 -> 1.5.0; image references `v1.4.0` -> `v1.5.0` (by tag; digests are
+  pinned from `release-manifest.json` after the release workflow has run);
+  `deployment/k8s/configmap-configs.yaml` regenerated for the changed config
+  documents.
+- Migration path for stored data: none can be migrated — regenerate
+  (`python3 tools/regenerate_dataset_artifacts.py`, CONTRIBUTING.md §4.1).
+  To keep a v1.4.0 number, select the legacy rule by name.
+
+## 2026-10-04 — v1.5.0: `schemas/sql/iap_v1.sql` -> `iap_v2.sql` (data model x-version 1 -> 2)
+
+The store's research tables and views become dataset- and method-bundle-aware.
+Since v1.4.0 the multiple-testing ledger is dataset-scoped and since v1.5.0 the
+method bundle is part of an experiment's identity, but `v_alpha_scorecard`
+still chose "the latest result" over every dataset and bundle in the file and
+summed every look ever recorded for the alpha (EQ03: a legacy-rules IC of
+0.0271 next to 432 looks pooled over two datasets and two bundles). A real
+ingested dataset, which keeps its own ledger, would have been pooled with the
+synthetic one in the same way.
+
+- **New file, not an edit.** `schemas/sql/iap_v2.sql`,
+  `schema_version.x_version = 2`, `iap.store.ddl.DDL_X_VERSION = 2`.
+  `iap_v1.sql` is unchanged and stays in the tree as the record of version 1;
+  `iap.store` no longer reads it.
+- **Columns.** `experiments.methods`, `experiment_results.methods` (both
+  `NOT NULL`; `dataset_version` was already there); `ledger_entries` gains
+  `dataset_version`, `methods` (both `NOT NULL`), `experiment_id`,
+  `gate_looks`, `promote_t_threshold`; `lifecycle_transitions` gains
+  `dataset_version`, `methods` (nullable: a live `api` write may not know its
+  scope). New indexes on the scope columns.
+- **Tables.** `store_scope` (one row, `scope = 'current'`: the dataset of
+  `configs/strategies/alpha_params.json` and the default bundle of
+  `iap.validation.methods`, or what `build --dataset-version / --methods`
+  name) and `ledger_scopes` (per `(dataset_version, methods)`: entries, looks
+  and the Bonferroni \|t\| at that look count — stored because the inverse
+  normal is not portable SQL; rewritten whole by the ledger importer).
+- **Views.** `v_alpha_scopes` (new); `v_alpha_scorecard` is one row per alpha
+  AND scope — the latest result of the scope, the `gate_looks` /
+  `promote_t_threshold` it was judged at, the alpha's looks in the scope,
+  `scope_looks`, `scope_bonferroni_t`, the scope's latest `promotion_pipeline`
+  ledger verdict (`pipeline_*`), `is_current`, and `current_state` on the
+  current scope only; `v_experiment_ledger_summary` is per scope and kind;
+  `v_alpha_scorecard_current` and `v_experiment_ledger_summary_current` filter
+  to the `store_scope` row. `UNION` joins the portable subset; a view that
+  reads another is dropped before it and created after it.
+- **Scope rules** (`iap.store.importers`). A ledger entry's dataset is its
+  stamp, else the one in its config (`experiment_runner`), else `unstamped`;
+  its bundle is `config.methods`, else `config.configuration.methods`, else
+  `legacy_v1` (an entry recorded before v1.5.0 names none). An alpha report's
+  experiment takes the bundle of its ledger entry (the entry of that dataset
+  under the default bundle is preferred, as the registry does). An entry's
+  `promote_t_threshold` is `max(3.0, Bonferroni |t| at gate_looks)`, or the
+  fixed 3.0 for a pipeline / runner entry of a fixed-threshold bundle. The
+  archived lifecycle ledgers (`research/archive/lifecycle_transitions.dataset-
+  <prefix>[.methods-<bundle>].jsonl`) import with `source = archive/<file>`
+  under the scope their name states and never set `alphas.current_state`.
+- **CLI.** `python -m iap.store build [--rebuild] [--dataset-version V]
+  [--methods M] [--ledger PATH ...]`; new `scorecard [--dataset-version V]
+  [--methods M] [--all-scopes]`; `sql` binds `:dataset_version` / `:methods`
+  to the selected scope.
+- **Migration path for stored data: rebuild.** The store is a derived index of
+  the flat files, so there is no in-place migration and no `ALTER TABLE`
+  script. `Store.init()` checks the version before it runs any DDL statement
+  and raises `StoreVersionError` on a version-1 file, leaving it byte for byte
+  as it was; `build`, `sql`, `scorecard` and `explain` exit 2 with a message
+  naming the fix; `python -m iap.store build --rebuild` deletes the file and
+  builds it again (about a second). A version-1 file remains readable by any
+  SQLite client; the package does not read it. The MVP's per-run store is
+  created fresh on every run and needs nothing.
+- **API changes a caller must make.** A query that expects one row per alpha
+  reads `v_alpha_scorecard_current`. `Store.insert_experiment_result` needs
+  the experiment's spec in the store or `methods=`;
+  `Store.insert_experiment_spec` takes the bundle from
+  `configuration["methods"]` (a name) or `methods=`.
+- No wire schema, golden or research artefact changed. Tests:
+  `python/tests/test_store.py` (two datasets and two bundles in one store give
+  four scorecard rows with their own look counts and thresholds; the built
+  store keeps the legacy and archived scopes out of the current numbers; a
+  version-1 file is refused untouched and rebuilt).
+
+## 2026-10-04 — v1.5.0: `tests/golden/expected_backtest.json` x-version 2 -> 3; Java research backtester on the default rules
+
+The second cross-language vector. The v1.5.0 entry above kept the Java
+`ResearchBacktester` / `CostModel` on the legacy rules and pinned the default
+rules for Python alone; the port closes that.
+
+- **Golden** (`python/tools/make_golden_alpha.py`; route (a): the new rule is
+  ported and the legacy vector kept beside it, in the same file). Unchanged:
+  the top-level EQ01 legacy vector and its `config`, and every number of
+  `default_rules` (EQ06, cost multiplier 0.01). Added: `default_rules`
+  `horizon_ns`, `hysteresis`, `scored_rows` (`n_rows`, `n_scored`,
+  `blocked_rows` — the rows Python's `block_rows_column="auto"` removes) and
+  `position_changes` (`[row, position after the row]` for every trade);
+  `default_rules_1x` (the same run at full costs: no trade, every number 0);
+  `cost_model_cases` (ten scalar cases, both impact rules: spread, fee,
+  impact, impact bps, round-trip cost return, breakeven size, capacity).
+  Tolerance unchanged: money at 1e-9 abs/rel, counts exact; positions exact.
+  The file was generated on the development machine and replayed on the CI
+  runner by both languages; the numbers that existed before are byte-identical
+  to the committed ones, so no `regenerate` run was needed.
+- **Java** (`com.iap.backtest`). `ResearchBacktester(CostModel, Config)`:
+  `Config.defaults(maxPosQty, confMin, latencyRows)` is the Python default
+  (`position_policy = "cost_aware"`, `cap_fills_at_l1`, row block),
+  `.forHorizon(ns)` supplies the label horizon (a cost-aware run without it
+  throws, as in Python), `Config.legacy(...)` names the v1.4.0 rules;
+  `costAwareTargets` mirrors `iap.backtest.engine.cost_aware_targets`
+  statement for statement. `CostModel` gains `impactModel` and
+  `sqrtImpactCoeffBps` (square root by default), `load` (rejects a block that
+  names no `impact_model`), `withLinearImpact`, `withSqrtImpact`,
+  `withMultiplier`, `impactBps`, `roundTripCostReturn`, `breakevenSize`,
+  `capacityBreakeven`. Removed: the four-argument `ResearchBacktester`
+  constructor and the constants `POSITION_POLICY`, `CAP_FILLS_AT_L1`,
+  `BLOCKS_ROWS`, `IMPACT_MODEL`.
+- **What Java does not derive.** The scored-row mask comes from the labels
+  (`iap.labels.frames.scored_rows`) and Java has no label engine: `run(...)`
+  takes the mask (and the displayed L1 sizes) as inputs, and the golden embeds
+  the mask the reference computed. Rows-mode latency only: TIME-mode latency,
+  `max_decision_age_ns`, `flatten_at_session_end` and the per-row currency
+  conversion remain Python-only, and none is a default.
+- **Float parity.** Every expression keeps the operand order of the Python
+  reference (`multiplier * (2 * hs + 2 * fee) / mid`; `coeff * sqrt(|q| * unit
+  / adv)` then `* 1e-4 * |q| * unit * mid`). The remaining differences are
+  summation order (numpy sums cost arrays pairwise, Java sequentially) and
+  the equity increments, both far inside 1e-9; the decisions themselves —
+  the position changes — are compared exactly.
+- **Rust, C++.** Neither has a research backtester and neither reads this
+  golden (checked: no reference to `expected_backtest.json` or a research
+  backtest under `rust/` or `cpp/`; C++ `ExecutionReplay` and the Rust venue
+  simulator are execution components with their own goldens). Nothing to
+  port; PLATFORM_CONVENTIONS.md §13.6 has the table.
+- Tests: `python/tests/test_alpha_golden.py` (4 backtest-golden tests),
+  Java `BacktestGoldenTest` (4, registered in `AllTests` and in the golden
+  gate of `tests/harness/run_all.sh`), `BacktestTest` (the rule unit tests).
+- Migration path for stored data: none — the golden is a test vector. A Java
+  caller constructs `Config.legacy(...)` and `withLinearImpact()` to keep the
+  old numbers.
+## 2026-10-04 — tests/golden/risk_fuzz/ (new generated golden family, script x-version 1); four risk-engine corrections found by it
+
+- **New fixture family, nothing regenerated**: `expected_risk_decisions.json`,
+  `expected_risk_audit.jsonl`, `expected_risk_snapshot.json` and
+  `expected_risk_edge_{decisions.json,audit.jsonl}` are byte-for-byte
+  unchanged.
+- `tests/golden/risk_fuzz/` holds 89 generated step scripts (`"x-version": 1`),
+  each `<name>.json` with `<name>.audit.jsonl` and `<name>.snapshot.json`, and
+  `COVERAGE.txt`. Owner: `python/tools/make_risk_fuzz_corpus.py` (`--force` to
+  rewrite, `--check` in CI), generator `python/tools/risk_fuzz.py`, oracle the
+  Python engine. Consumers: `rust/risk/tests/golden_risk_fuzz.rs`, Java
+  `RiskFuzzGoldenTest`, `python/tests/test_risk_fuzz_golden.py`. Step types are
+  those of the two hand-written risk goldens plus `bad_override`; a script may
+  carry `config_set` / `config_remove` (the committed `configs/risk/risk.json`
+  with keys replaced or removed) and `cuts` (restore check points).
+- The corpus is regenerated whenever an engine's behaviour, the generator or
+  `configs/risk/risk.json` changes; that is a deliberate act (`--force`) and
+  the diff of the audit files is the review surface.
+- Behaviour changes carried by the same change (no schema change, `risk_event`
+  still v1, snapshot still `x-version` 1; found by the fuzzer, PLATFORM_CONVENTIONS
+  §11.1 "Pinned by the fuzzer"):
+  1. Rust and Python: a conversion rate whose pair is stamped exactly
+     `i64::MAX` is now future-stamped (`FX_RATE_MISSING`) instead of trusted
+     for the rest of the session. Java already rejected it.
+  2. Java: maps keyed by strategy id or currency iterate in code-point order
+     (was UTF-16 code-unit order). Only ids containing characters at or above
+     U+E000 together with astral characters are affected: the order of
+     simultaneous `STRATEGY_LOSS` latches and of the snapshot's `lots` /
+     `realized` entries changes for them. A snapshot written before the change
+     restores unchanged (the lists are re-sorted on load).
+  3. Java: a subnormal `urgency` in a `MALFORMED_ORDER` reason prints the
+     shortest round-trip digits (`…05`, was `…049`).
+  4. Java: the `CONFIG_MISSING` reason names the first offending key in the
+     reference's parse order with the reference's text (was: the sequence-gap
+     threshold first, `missing section <name>`, `got 0.0`, `must be an object`,
+     one message for three conversion errors). An alert or runbook that greps
+     the Java engine's fail-closed reason for `missing section` must match the
+     key-level message instead.
+- Migration path for stored data: none needed.
+## 2026-10-04 — execution quality: two new goldens, no schema changed (v1.5.0)
+
+- **New golden** `tests/golden/expected_replay_fills_passive.json`
+  (`x-version` 1): the execution-policy scenario (PASSIVE VWAP / IS / POV
+  parents and an AGGRESSIVE TWAP parent on `events_eq_mbo.jsonl`), 30 fills,
+  the parent reports and the PASSIVE transition counters. Generated by
+  `python/tools/make_golden_replay_passive.py`; the bytes are those of the
+  C++ generator (`cpp/tools/make_replay_fills_golden.cpp`, mode `passive`),
+  which the C++ test `ReplayFillsPassiveGolden` verifies together with the
+  bytes of `expected_replay_fills.json`. Reproduced by C++, Java and Python.
+- **New golden** `tests/golden/expected_markout.json` (`x-version` 1):
+  markout inputs (states, gates, fills, passive orders) and the expected
+  per-fill measures, report and passive-order statistics. Generated by
+  `python/tools/make_golden_markout.py`; Java `MarkoutGoldenTest` consumes.
+- **Unchanged**: `tests/golden/expected_replay_fills.json` (`x-version` 2,
+  byte-identical — NATIVE is the default policy and the existing scenario
+  does not name another), `expected_tca.json` (`x-version` 2),
+  `expected_mvp.json`.
+- **`schemas/tca/tca_result.schema.json` stays at `x-version` 1.** The
+  markout analysis is a separate, non-wire document (the report of
+  `iap.tca.markout.markout_report`, versioned by its golden). `TCAResult` is
+  embedded in every `DecisionTrace`; a new field would change the canonical
+  JSON of every trace, the trace digests, `expected_mvp.json`, the SQL
+  projection and the contract ports in C++, Rust and Java. Carrying markouts
+  on the wire record is left for the change that also carries venue / algo
+  attribution (backlog T05).
+- **Additive API**: `ParentOrder` gains `policy` (default NATIVE), `urgency`
+  (0.5) and `passive` (`PassiveParams` defaults) in C++, Java and Python;
+  `ChildOrder` gains the read-only `entry_ahead_qty`; `ExecReplayResult`
+  gains `passive`. `configs/mvp/mvp.json` accepts the optional keys
+  `execution.child_policy` and `execution.passive`; the committed document
+  does not carry them, so its `config_version` is unchanged.
+- **Regeneration**: `tools/regenerate_dataset_artifacts.py` gains the step
+  `execution` (`research/execution/*`) and the two golden generators.
+- Migration path for stored data: none needed.
+
+## 2026-10-04 — v1.5.0: signal combination and two lifecycle gates; `lifecycle.json` 2 -> 3, golden `expected_lifecycle.json` 2 -> 3, the evidence document gains `pnl_bootstrap` and `cross_alpha`; new non-wire documents `COMBINATION.json` and `signal_correlation.json` (x-version 1)
+
+No wire schema under `schemas/` changed and no golden event vector moved.
+The dataset did not change (`data_version` `116b7787…`) and no alpha report
+was re-run. Pull request #25, on top of the default-methods change above.
+
+- **Why.** Twenty-four alphas were judged one at a time. Nothing measured
+  what they add to each other (backlog AF03, "gate 8"), nothing combined
+  them, and the bootstrap interval of net P&L that the default methods
+  report gated nothing.
+- **`configs/strategies/lifecycle.json` `x-version` 2 -> 3.** New required
+  keys: `cross_alpha_min_state` (`"VALIDATING"`; `"PAPER"` and `"ACTIVE"`
+  are the other legal values), `net_pnl_ci_gate` (`"required"`; `"absent"`
+  is the legacy policy), and in `gates`: `max_cross_alpha_correlation`
+  (0.7, in [0, 1]), `min_net_pnl_ci_low` (0.0), `net_pnl_ci_level` (0.95, in
+  (0, 1)). The Python, Java and Rust loaders reject a version-2 document.
+  The merged view (`PolicyConfig.to_dict`, the golden's `config`) carries
+  the same keys, `gates` now 17 of them.
+  `deployment/k8s/configmap-configs.yaml` was regenerated for it.
+- **The gate table: 18 -> 20 rows; the 17 edges are unchanged.** Edge 1
+  (CANDIDATE -> VALIDATING) evaluates eleven gates:
+  `net_pnl_bootstrap_ci` directly after `net_pnl_after_costs`, and
+  `cross_alpha_correlation` last. Definitions: PLATFORM_CONVENTIONS.md
+  §13.4, docs/LIFECYCLE.md §3. Under `net_pnl_ci_gate = "absent"` the
+  bootstrap gate is not evaluated and is in no result (ten gates); the
+  correlation gate is a row under either policy.
+- **Evidence document** (`iap.lifecycle.Evidence`, read by Python, Java and
+  Rust): two new REQUIRED keys, each `null` or an object.
+  `pnl_bootstrap = {ci_low, ci_high, level, n_resamples, seed, mean_block,
+  n_bars, n_trades}` (bounds both `null` or both numbers).
+  `cross_alpha = {peers: [{alpha_id, state, correlation}]}` (peers strictly
+  increasing by `alpha_id`; `state` a lifecycle state name; `correlation` in
+  [-1, 1]). An evidence document written before this change is rejected by
+  every reader. Key order: `research, capacity_usd,
+  significance_threshold, pnl_bootstrap, cross_alpha, validation, paper,
+  live`.
+- **Decisions pinned here.**
+  - *Which series the correlation gate reads.* The out-of-sample
+    standardised SIGNAL on common rows, pooled across instruments and folds
+    — not realised P&L, which does not exist for the 17 alphas that make no
+    trade. P&L correlation is reported, not gated.
+  - *Vacuous pass.* No peer at or beyond `cross_alpha_min_state` gives the
+    value 0.0 and passes. *Missing evidence* (`cross_alpha: null`) fails
+    closed with `value = null`.
+  - *Order.* The bootstrap registers and evaluates alphas in ascending
+    `alpha_id` at one instant; an alpha's peers are the alphas registered
+    before it. Ties on `|correlation|` name the smallest id.
+  - *The bootstrap gate reads the pooled interval, the cost gate the last
+    fold.* `net_pnl_after_costs` is unchanged (last fold, point estimate);
+    `net_pnl_bootstrap_ci` reads the interval of the P&L pooled over all
+    folds: stationary bootstrap, 1 000 resamples, mean block
+    `max(1, round(n^(1/3)))`, seed 20260829, level 0.95, all recorded in the
+    evidence. An alpha with `n_trades = 0` FAILS (no interval; the gate does
+    not pass vacuously). `stability` is unrelated (Pearson / rank IC gap);
+    the per-fold diagnostics stay report-only, because the signal's
+    fold-to-fold consistency is `fold_consistency` and every fold's P&L is
+    already in the pooled series.
+  - *Looks of a combination.* `looks_per_validation(4) + K` = 83 + K per
+    (member list, method) experiment; a report over M methods declares all
+    of them before evaluating the first.
+- **Research documents.**
+  - `research/combination/COMBINATION.json` (new, `x-version` 1): the
+    report document. `research/combination/reports/<COMB_EQ|COMB_FX>.<method>.json`:
+    the full `validate_alpha` report of each of the eight experiments, with
+    `experiment_id` and `combination` (the identity) added.
+  - `research/combination/signal_correlation.json` (new, `x-version` 1):
+    `correlation[a][b]` and `n_common[a][b]` for the 24 alphas; pairs with
+    fewer than 32 common rows are 0.0. Read by `iap.lifecycle.bootstrap`.
+  - `research/experiments.json` (`x-version` 3, shape unchanged): eight new
+    entries of kind `combination` (`alpha_id` `COMB_EQ` / `COMB_FX`, 95 looks
+    each, one `gate_looks`). Total 4,396 -> 5,156.
+  - `research/alpha_registry.json` (`x-version` 2, shape unchanged): the
+    last evaluation of each alpha carries the two new gate results.
+    `research/lifecycle_transitions.jsonl` is unchanged (the same 24
+    RESEARCH -> CANDIDATE lines).
+- **Golden.** `tests/golden/expected_lifecycle.json` `x-version` 2 -> 3,
+  route (a) (the rule is ported, the vector follows it): the config and the
+  evidence carry the new keys; scenarios LC05 (correlation gate: missing
+  evidence, fail, absolute value and ineligible states, vacuous pass, tie,
+  empty peer list, additive pass) and LC06 (bootstrap gate: missing block,
+  negative bound, no trade, no bounds, wrong level, zero bound, pass); the
+  earlier scripts carry an empty `cross_alpha` block and a passing
+  `pnl_bootstrap` block; LG01 carries no `pnl_bootstrap` and is promoted on
+  ten gates. 52 default and 9 legacy transitions. Replayed by Python, Java
+  (`LifecycleGoldenTest`) and Rust (`golden_lifecycle.rs`).
+  `tests/golden/expected_mvp.json` (`x-version` 1): `mvp.config_version`
+  hashes `research/alpha_registry.json`, whose evaluations gained two gate
+  results, so it moves (`bf8cc608…` -> `439bbad5…`) and with it the trace
+  digest (`e534ac1f…` -> `20d4ff76…`: every trace carries
+  `config_version`). Events, decisions, parents, fills, P&L and the run id
+  are identical. Every other golden was regenerated and came out
+  byte-identical.
+- **Ports.** Java: `Evidence.PnlBootstrap`, `Evidence.Peer`,
+  `Evidence.CrossAlpha`, `Gates.NET_PNL_BOOTSTRAP_CI`,
+  `Gates.CROSS_ALPHA_CORRELATION`, `PolicyConfig` (version 3,
+  `crossAlphaMinState`, `netPnlCiGate`, three `Gates` fields),
+  `AlphaLifecycle.edgeGates`. Rust `lifecycle`: `PnlBootstrapEvidence`,
+  `PeerCorrelation`, `CrossAlphaEvidence`, `GATE_SPECS` (20), `NetPnlCiGate`,
+  `PolicyConfig::evaluated_gates`, `LIFECYCLE_CONFIG_VERSION` 3. Neither
+  port computes a correlation or resamples. C++ has no lifecycle port.
+- **Regeneration.** Only what the change touches was regenerated, on the CI
+  runner: `tools/regenerate_dataset_artifacts.py --only
+  dataset,features,combination,lifecycle,goldens` through the manual
+  `regenerate` job (new input `regenerate_only`; run 37185148194). The
+  report pipelines were not re-run: their results do not depend on this
+  change, and a re-run would be recorded as one. The combination was
+  therefore judged on the ledger as it stood (4,396 looks + its own 760);
+  in a whole-chain regeneration the `combination` step runs after
+  `experiments` and before `lifecycle`, and its look count would be the
+  ledger's at that point.
+- **API changes a caller must make.** `Evidence(...)` for a CANDIDATE
+  evaluation needs `pnl_bootstrap=` and `cross_alpha=` to pass (both default
+  to `None`, which fails closed); `PolicyConfig` and `GateThresholds` have
+  the new fields. `AlphaLifecycle.edge_gates(edge)` is the list a policy
+  evaluates.
+- **Not done.** The combination is not registered in the lifecycle
+  registry. The correlation gate's result is in the registry evaluation,
+  not in `research/alpha_reports/<ID>.json`.
+- Migration path for stored data: an evidence document or `lifecycle.json`
+  written before this change must be rewritten with the new keys; there is
+  nothing to convert in the research store.
+
+## 2026-10-04 — v1.5.0 integration: the six branches merged; no schema, golden or research artefact changed by the merge
+
+The entries above were written on six branches (pull requests #20, #22–#26)
+and merged into `release/v1.5.0` in the order #23, #24, #20, #26, #22, #25.
+The merge itself changes no wire schema, no configuration document and no
+golden; this entry records what was checked and what moved in the documents.
+
+- **Artefacts reproduce on the merged tree.** The manual `regenerate` job
+  ran `combination,lifecycle,goldens,tca,execution,configmaps` on the merged
+  tree (run 37188942997; `regenerate_only` always builds the dataset and the
+  features first). Byte-identical: `research/alpha_registry.json`, the
+  lifecycle transition log, `expected_lifecycle.json`, `expected_mvp.json`,
+  `expected_backtest.json`, `expected_markout.json`,
+  `expected_replay_fills_passive.json` and every other Python-generated
+  golden except the two named next, `research/execution/*`,
+  `research/tca/*` and the generated ConfigMaps. (The Rust- and C++-owned
+  risk and fills goldens are not regenerated by this job; the suites of all
+  three engines replay them unchanged.)
+  `research/combination/*`, `expected_alpha.json` and
+  `expected_experiment_golden_frame.json` came out equal to the committed
+  files within float noise (largest relative difference 1.5e-6, on one
+  rank IC; 1e-12 or less elsewhere), and the ledger gained only `reruns`
+  counters on the eight combination entries. Nothing from that run was
+  committed: the committed files are the ones each branch produced on the
+  same runner image, and the suites compare them at their documented
+  tolerances.
+- **`expected_mvp.json` is #25's.** `config_version` hashes the registry and
+  `lifecycle.json`, which only #25 changed; the passive policy (#22) and the
+  risk corrections (#26) leave the pinned NATIVE session unchanged.
+- **The store on the merged artefacts.** The ledger importer files the eight
+  `combination` entries under the current scope (`116b7787…` / `v2`), whose
+  look count is therefore 3,236 (2,476 + 760) and whose own Bonferroni
+  \|t\| is 4.322; `v_experiment_ledger_summary` gains a `combination` row.
+  `v_alpha_scorecard` is unchanged in shape (24 alphas × 3 scopes): a
+  combination is not a registered alpha (PLATFORM_CONVENTIONS.md §13.8).
+  The gate results of `cross_alpha_correlation` and `net_pnl_bootstrap_ci`
+  are in the registry; the bootstrap moved no state, so the transition log
+  and the store's `lifecycle_transitions` rows did not change.
+- **Documents.** Ledger rows read 5,156 looks over 216 configurations
+  (expected max \|t\| 4.135, Bonferroni \|t\| 4.424); the parity table reads
+  python 1988 / cpp 302 / rust 358 / java 571, golden 192 / 72 / 71 / 124
+  (17 Java `*GoldenTest` classes, 10 Rust golden targets); COOKBOOK recipes
+  are 36 (ITCH ingest), 37 (passive execution and markouts), 38
+  (combination); LEARN chapters 29 (combination), 30 (markouts), 31
+  (further reading); `docs/EPICS.md` is re-rendered from the merged plan
+  (163 issues, 109 done).
+
+## 2026-10-04 — v1.5.0 detection power: `POWER_REPORT.json` 2 -> 3, new `research/power/extended/`, `generator_planted.json` `sessions` 2 -> 4, opt-in `power_extended` regeneration step
+
+No wire schema, no golden vector, no config under `configs/` and no
+promotion gate changed. The pinned dataset is byte-identical: the
+`regenerate` job was run with `regenerate_only=dataset,power,power_extended`
+(run 37186937013, Ubuntu, Python 3.11) and its `regeneration_dataset_sha256.json`
+equals the one of the v1.5.0 regeneration (run 37162724308) for all eight
+raw and normalized files; `git status` of that run lists the power reports
+and nothing else. `python/src/iap/marketdata`, `iap/features`,
+`iap/validation` and `iap/labels` are not touched.
+
+- **Why.** Report version 2 was three seeds on two sessions. A rate of one
+  in three has a 95 % interval of 0.06 to 0.79, so the report could not say
+  whether the validation chain detects a planted effect.
+- **`research/power/POWER_REPORT.json` `x-version` 2 -> 3** (and its
+  rendering). Shape changes:
+  - a run holds `evaluations`, one per session prefix
+    (`{"sessions": n, "detectors": {...}}`), where it held `detectors`;
+  - detector keys are `<effect>:<alpha>@<horizon>` (`order_flow:EQ04@5s`,
+    `order_flow:EQ04@10s`, `lead_lag:EQ10@1s`, `lead_lag:EQ10@5s`) and the
+    top-level `detectors` is a list with `role` `declared` / `matched`;
+  - a row carries `horizon`, `ic_direct`, `t_direct`, `n_pairs`, `break_z`,
+    `signal_coverage`, `label_scored_frac`, `label_zero_frac`; the per-run
+    booleans `sig_*`, `evidence`, `promote` and the fields
+    `ic_instrument_mean`, `ic_valid_only`, `net_pnl_*` are gone (the rates
+    are derived from `t_pooled`, `gate_ic`, `verdict` and the protocol's
+    thresholds);
+  - a cell is keyed by detector, scenario, level and `sessions`; each rate
+    is `{"k", "rate", "lo", "hi"}` (Wilson 95 %): `sig_fixed`, `sig_gate`,
+    `sig_study`, `sig_direct_gate`, `evidence`, `promote`,
+    `pnl_ci_positive`, `break_fixed`, `break_gate`; `rate_sig_within` is
+    gone (`mean_t_within` stays);
+  - `protocol.thresholds` (`fixed`, `gate`, `study`), `protocol.gate_looks`,
+    `protocol.target_power`, `protocol.interval` replace `min_nw_tstat` and
+    `ledger_t_threshold`; `promote_t_threshold` is the largest threshold;
+  - new top-level `sessions`, `break_levels`, `diagnosis`, `power_model`.
+- **New directory `research/power/extended/`** with the same two files for
+  the larger grid (levels 0, 0.5, 1, 2; sessions 1, 2, 4, 8).
+- **`research/power/generator_planted.json`**: `sessions` 2 -> 4 (the number
+  of sessions a run of the study generates). The document's `x-version`
+  stays 2: no key changed meaning, and the `planted` block — the reference
+  effect — is unchanged.
+- **CLI.** `python -m iap.research power` gains `--sessions`,
+  `--break-levels`, `--gate-looks`, `--jobs`; `--seeds` defaults to 20 (was
+  3) and `--levels` to `0,0.5,1` (was `0,0.5,1,2`). The break scenario runs
+  at `--break-levels` (default `1`), not at every non-zero level.
+- **API.** `iap.research.power`: `run_power_study(..., sessions,
+  break_levels, gate_looks, jobs)`; `evaluate_run(frames, configs_dir,
+  promote_t_threshold, detectors, ...)` returns rows keyed by detector id;
+  `summarise(runs, thresholds)`; `DETECTORS` is replaced by `EFFECT_ALPHAS`
+  and `detectors_for(planted)`; `cell_config(..., sessions=None)`. New
+  module `iap.research.power_stats`.
+- **Regeneration.** `tools/regenerate_dataset_artifacts.py` has an opt-in
+  step `power_extended` (runs only when `--only` names it; through the
+  `regenerate` job: `-f regenerate_only=power,power_extended`).
+  Timings of run 37186937013: `power` 994.5 s, `power_extended` 2,461.1 s.
+- **Docs that quote report version 2** as a dated statement (the errata of
+  `docs/papers/01` and `03`, the v1.4.0 / v1.5.0 result tables of
+  CHANGELOG.md and docs/ROADMAP.md) were left as written; the current
+  figures are in CHANGELOG.md ("Added — detection power") and
+  docs/RESEARCH_VALIDITY.md §2.
+- Migration path: regenerate
+  (`python3 tools/regenerate_dataset_artifacts.py --only power,power_extended`,
+  on the CI runner for the committed files). A version-2 report cannot be
+  converted.

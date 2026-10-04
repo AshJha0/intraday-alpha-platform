@@ -4,11 +4,13 @@
 
     python -m iap.research [--json-errors] run --alpha EQ03 [--horizon 1s]
                                [--config n_folds=3 ...] [--seed N] [--dry-run]
-                               [--tstat-threshold fixed|ledger]
+                               [--methods v2|legacy_v1]
     python -m iap.research list [--alpha EQ03] [--horizon 1s] [--json]
     python -m iap.research show <experiment_id> [--json]
-    python -m iap.research power [--levels 0,0.5,1,2] [--seeds 3]
-                               [--generator-config PATH] [--out-dir research/power]
+    python -m iap.research power [--levels 0,0.5,1] [--seeds 20]
+                               [--sessions 1,2,4] [--break-levels 1]
+                               [--gate-looks N] [--jobs N]
+                               [--generator-config PATH] [--power-out-dir research/power]
 
 ``run`` builds the spec (:func:`iap.research.build_spec`), runs it through
 :class:`iap.research.ExperimentRunner`, prints the result table, the
@@ -20,7 +22,18 @@ the ledger.  ``--dry-run`` writes no experiment directory but STILL debits
 the looks in the ledger (a dry run is a look).  Paths default to the
 checkout; every one can be overridden for a scratch store.  ``--config``
 values are parsed as JSON (``n_folds=3``, ``cost_multiplier=2.0``,
-``flatten_at_session_end=false``).
+``flatten_at_session_end=false``).  ``--methods`` names the research method
+bundle (:mod:`iap.validation.methods`): ``v2``, the default, or
+``legacy_v1``, the rules up to v1.4.0 — it is the ``methods`` key of the
+configuration and therefore part of the experiment id.  (The v1.3.0 /
+v1.4.0 flag ``--tstat-threshold`` is gone: the ledger threshold is part of
+``v2`` and the fixed 3.0 part of ``legacy_v1``.)
+
+``combine`` evaluates the signal combinations (:mod:`iap.combine.report`):
+``python -m iap.research combine [--asset-class EQUITY|FX|all] [--method
+equal_weight,ridge,...] [--members EQ01,EQ03,...] [--horizon 5s]
+[--dry-run]`` validates each (asset class, method) combination as an alpha,
+debits its looks and writes ``research/combination/``.
 
 ``power`` runs the planted-signal power study (:mod:`iap.research.power`)
 and writes ``POWER_REPORT.md`` / ``POWER_REPORT.json``.
@@ -52,15 +65,15 @@ from iap.research.registry import ExperimentRecord, ExperimentRegistry
 from iap.research.runner import ExperimentRunner
 from iap.research.specs import DEFAULT_SEED, GateEligibility, build_spec
 from iap.validation.ledger import ExperimentLedger
-from iap.validation.validate import TSTAT_THRESHOLD_POLICIES
+from iap.validation.methods import METHODS
 
 REPO = Path(__file__).resolve().parents[4]
 
 #: (label, field, format) rows of the result table, in reading order.
 _RESULT_ROWS = (
-    ("IC (pooled OOS, z)", "ic", "+.6f"),
+    ("IC (the gate's: pooled OOS, z)", "ic", "+.6f"),
     ("rank IC", "rank_ic", "+.6f"),
-    ("NW t-stat", "t_stat", "+.4f"),
+    ("t-stat (the gate's)", "t_stat", "+.4f"),
     ("NW lags", "nw_lags", "d"),
     ("hit rate", "hit_rate", ".4f"),
     ("turnover (flips/h)", "turnover", ".2f"),
@@ -145,15 +158,25 @@ def render_ledger_note(ledger: ExperimentLedger) -> str:
 
 
 def render_eligibility(eligibility: GateEligibility) -> str:
-    """One line (plus one per reason) on whether the result is gate evidence."""
+    """One line (plus one per reason) on whether the result is gate evidence,
+    and the significance threshold the result was judged at when recorded."""
+    lines: list[str] = []
+    if eligibility.significance_threshold is not None:
+        source = (
+            f"ledger Bonferroni |t| at {eligibility.threshold_looks} looks"
+            if eligibility.threshold_looks is not None
+            else "fixed"
+        )
+        lines.append(f"PROMOTE t threshold: {eligibility.significance_threshold:.4f} ({source})")
     if eligibility.eligible:
         note = (
             ""
             if eligibility.periods_verified
             else " (configuration only; periods not verified against a dataset)"
         )
-        return f"gate eligible: yes{note}"
-    lines = ["gate eligible: NO — recorded and ledgered, but not promotion evidence"]
+        lines.append(f"gate eligible: yes{note}")
+        return "\n".join(lines)
+    lines.append("gate eligible: NO — recorded and ledgered, but not promotion evidence")
     lines += [f"  - {reason}" for reason in eligibility.reasons]
     return "\n".join(lines)
 
@@ -163,6 +186,9 @@ def _eligibility_doc(eligibility: GateEligibility) -> dict[str, Any]:
         "gate_eligible": eligibility.eligible,
         "periods_verified": eligibility.periods_verified,
         "reasons": list(eligibility.reasons),
+        "methods": eligibility.methods,
+        "significance_threshold": eligibility.significance_threshold,
+        "threshold_looks": eligibility.threshold_looks,
     }
 
 
@@ -180,7 +206,43 @@ def _print_json(doc: Any) -> None:
     print(json.dumps(doc, indent=2, sort_keys=True, ensure_ascii=True, allow_nan=False))
 
 
+def _dataset_versions(args: argparse.Namespace) -> tuple[str | None, str | None]:
+    """``--dataset-dir``: run on an ingested dataset (docs/REAL_DATA.md).
+
+    Points every path that was left at its checkout default into the
+    dataset directory and returns its ``(dataset_version, feature_version)``
+    — read from ``dataset.json`` and ``features/features_summary.json`` — so
+    the spec, the experiment id and the ledger entries carry the REAL
+    dataset's version and its looks are never pooled with synthetic ones.
+    """
+    if args.dataset_dir is None:
+        return None, None
+    root = Path(args.dataset_dir)
+    try:
+        dataset_version = json.loads((root / "dataset.json").read_text())["dataset_version"]
+        feature_version = json.loads((root / "features" / "features_summary.json").read_text())[
+            "registry_hash"
+        ]
+    except (OSError, ValueError, KeyError) as exc:
+        raise ResearchError(
+            f"--dataset-dir {root}: needs dataset.json (python -m iap.marketdata ingest) and "
+            f"features/features_summary.json (python -m iap.features): {exc!r}",
+            code="invalid_spec",
+        ) from exc
+    for name, default, target in (
+        ("features_dir", REPO / "data" / "features", root / "features"),
+        ("configs_dir", REPO / "configs", root / "configs"),
+        ("ledger", REPO / "research" / "experiments.json", root / "research" / "experiments.json"),
+        ("out_dir", REPO / "research" / "experiments", root / "research" / "experiments"),
+    ):
+        if getattr(args, name) == default:
+            setattr(args, name, target)
+    args.ledger.parent.mkdir(parents=True, exist_ok=True)
+    return dataset_version, feature_version
+
+
 def _run(args: argparse.Namespace) -> int:
+    dataset_version, feature_version = _dataset_versions(args)
     runner = ExperimentRunner(
         args.features_dir,
         args.ledger,
@@ -188,15 +250,25 @@ def _run(args: argparse.Namespace) -> int:
         args.configs_dir,
         dry_run=args.dry_run,
         repo_root=args.repo_root,
-        tstat_threshold=args.tstat_threshold,
+        normalized_dir=args.normalized_dir,
     )
+    configuration = _parse_config(args.config)
+    if args.methods is not None:
+        if configuration.get("methods", args.methods) != args.methods:
+            raise ResearchError(
+                f"--methods {args.methods} contradicts --config methods={configuration['methods']}",
+                code="invalid_spec",
+            )
+        configuration["methods"] = args.methods
     spec = build_spec(
         args.alpha,
         args.horizon,
-        _parse_config(args.config),
+        configuration,
         seed=args.seed,
         frames=runner.frames(),
         repo_root=args.repo_root,
+        dataset_version=dataset_version,
+        feature_version=feature_version,
     )
     print(render_spec(spec))
     print()
@@ -272,26 +344,77 @@ def _show(args: argparse.Namespace) -> int:
     return 0
 
 
+def _numbers(text: str, flag: str, cast) -> list:
+    try:
+        return [cast(v) for v in text.split(",") if v.strip()]
+    except ValueError:
+        raise ResearchError(
+            f"{flag} expects comma-separated numbers, got {text!r}",
+            code="power_study_error",
+        ) from None
+
+
 def _power(args: argparse.Namespace) -> int:
     from iap.research import power
 
-    try:
-        levels = [float(v) for v in args.levels.split(",") if v.strip()]
-    except ValueError:
-        raise ResearchError(
-            f"--levels expects comma-separated numbers, got {args.levels!r}",
-            code="power_study_error",
-        ) from None
     doc = power.run_power_study(
         args.generator_config,
         args.configs_dir,
-        levels=levels,
+        levels=_numbers(args.levels, "--levels", float),
         n_seeds=args.seeds,
-        progress=lambda line: print(line, file=sys.stderr),
+        sessions=_numbers(args.sessions, "--sessions", int) if args.sessions else None,
+        break_levels=_numbers(args.break_levels, "--break-levels", float),
+        gate_looks=args.gate_looks,
+        jobs=args.jobs if args.jobs else power.default_jobs(),
+        progress=lambda line: print(line, file=sys.stderr, flush=True),
     )
     paths = power.write_reports(doc, args.power_out_dir)
     print(power.render_markdown(doc))
     print(f"wrote {paths['md']} and {paths['json']}", file=sys.stderr)
+    return 0
+
+
+def _combine(args: argparse.Namespace) -> int:
+    from iap.combine import report as combine_report
+    from iap.combine.weights import METHODS as COMBINATION_METHODS
+    from iap.lifecycle.config import load_policy_config
+
+    names = [m for m in args.method.split(",") if m] if args.method else list(COMBINATION_METHODS)
+    classes = (
+        list(combine_report.ASSET_CLASSES) if args.asset_class == "all" else [args.asset_class]
+    )
+    members = None
+    if args.members:
+        if len(classes) != 1:
+            raise ResearchError("--members needs one --asset-class", code="invalid_spec")
+        members = {classes[0]: [m for m in args.members.split(",") if m]}
+    repo = args.repo_root if args.repo_root is not None else REPO
+    try:
+        result = combine_report.run_combination(
+            repo,
+            asset_classes=classes,
+            method_names=names,
+            members=members,
+            horizon=args.horizon,
+            features_dir=args.features_dir,
+            normalized_dir=args.normalized_dir,
+            configs_dir=args.configs_dir,
+            ledger_path=args.ledger,
+            progress=lambda line: print(line, file=sys.stderr),
+        )
+    except ValueError as exc:
+        raise ResearchError(str(exc), code="invalid_spec") from exc
+    policy = load_policy_config(
+        args.configs_dir / "strategies" / "lifecycle.json",
+        args.configs_dir / "strategies" / "strategies.json",
+    )
+    threshold = policy.gates.max_cross_alpha_correlation
+    print(combine_report.render_markdown(result["document"], threshold))
+    if args.dry_run:
+        print("dry run: no report written (the looks are debited)", file=sys.stderr)
+        return 0
+    paths = combine_report.write_reports(result, args.combine_out_dir, threshold)
+    print("wrote " + ", ".join(str(p) for p in paths.values()), file=sys.stderr)
     return 0
 
 
@@ -354,12 +477,26 @@ def _parser() -> argparse.ArgumentParser:
         "written, the looks are still debited in the ledger",
     )
     run.add_argument(
-        "--tstat-threshold",
-        choices=TSTAT_THRESHOLD_POLICIES,
-        default="fixed",
-        help="PROMOTE t-stat gate: the fixed 3.0 (default) or the ledger's Bonferroni |t|",
+        "--methods",
+        choices=sorted(METHODS),
+        default=None,
+        help="research method bundle: v2 (default) or legacy_v1 (the rules up to v1.4.0)",
+    )
+    run.add_argument(
+        "--dataset-dir",
+        type=Path,
+        default=None,
+        help="an ingested real dataset (python -m iap.marketdata ingest): features, configs, "
+        "ledger and experiments default to that directory and its dataset_version is recorded",
     )
     run.add_argument("--features-dir", type=Path, default=REPO / "data" / "features")
+    run.add_argument(
+        "--normalized-dir",
+        type=Path,
+        default=None,
+        help="normalized events for the recompute leakage probe "
+        "(default: <features-dir>/../normalized)",
+    )
     run.add_argument("--ledger", type=Path, default=REPO / "research" / "experiments.json")
     run.add_argument("--configs-dir", type=Path, default=REPO / "configs")
     run.add_argument(
@@ -387,10 +524,34 @@ def _parser() -> argparse.ArgumentParser:
     )
     power.add_argument(
         "--levels",
-        default="0,0.5,1,2",
+        default="0,0.5,1",
         help="comma-separated multipliers of the reference effect (0 = null)",
     )
-    power.add_argument("--seeds", type=int, default=3, help="generator seeds per cell")
+    power.add_argument("--seeds", type=int, default=20, help="generator seeds per cell")
+    power.add_argument(
+        "--sessions",
+        default="",
+        help="comma-separated session counts to evaluate; the largest is generated "
+        "(default: 1,2,4,... up to the generator config's sessions)",
+    )
+    power.add_argument(
+        "--break-levels",
+        default="1",
+        help="comma-separated non-zero levels of the mid-sample break scenario",
+    )
+    power.add_argument(
+        "--gate-looks",
+        type=int,
+        default=None,
+        help="look count of the PROMOTE t threshold in force (default: ledger_looks "
+        "of the committed promotion reports under research/alpha_reports)",
+    )
+    power.add_argument(
+        "--jobs",
+        type=int,
+        default=0,
+        help="worker processes (0 = one per core, at most 8); the report does not depend on it",
+    )
     power.add_argument("--configs-dir", type=Path, default=REPO / "configs")
     power.add_argument(
         "--power-out-dir",
@@ -399,6 +560,41 @@ def _parser() -> argparse.ArgumentParser:
         help="where POWER_REPORT.{md,json} are written",
     )
     power.set_defaults(func=_power)
+
+    combine = sub.add_parser("combine", help="signal combination report")
+    combine.add_argument(
+        "--asset-class", choices=("all", "EQUITY", "FX"), default="all", help="default: both"
+    )
+    combine.add_argument(
+        "--method",
+        default=None,
+        help="comma-separated combination methods (default: all four; each is an experiment)",
+    )
+    combine.add_argument(
+        "--members",
+        default=None,
+        help="comma-separated member alpha ids (default: every alpha of the asset class)",
+    )
+    combine.add_argument(
+        "--horizon", default=None, help="label horizon (default: the members' median horizon)"
+    )
+    combine.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="compute and print; write no report (the looks are still debited)",
+    )
+    combine.add_argument("--features-dir", type=Path, default=REPO / "data" / "features")
+    combine.add_argument("--normalized-dir", type=Path, default=None)
+    combine.add_argument("--ledger", type=Path, default=REPO / "research" / "experiments.json")
+    combine.add_argument("--configs-dir", type=Path, default=REPO / "configs")
+    combine.add_argument("--repo-root", type=Path, default=None)
+    combine.add_argument(
+        "--combine-out-dir",
+        type=Path,
+        default=REPO / "research" / "combination",
+        help="where REPORT.md, COMBINATION.json, reports/ and signal_correlation.json go",
+    )
+    combine.set_defaults(func=_combine)
     return parser
 
 

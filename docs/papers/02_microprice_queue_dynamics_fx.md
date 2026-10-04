@@ -1,6 +1,6 @@
 # Microprice and Queue Dynamics as Short-Horizon FX Predictors: A Negative Result with a Regime-Conditioned Exception
 
-> Dated record. The figures below are those of the dataset in force when the paper was written; the 2026-10-03 update at the end restates them on the v1.4.0 dataset and re-checks each conclusion.
+> Dated record. The figures below are those of the dataset in force when the paper was written; the 2026-10-03 update restates them on the v1.4.0 dataset and re-checks each conclusion, and the 2026-10-04 update at the end restates them under the v1.5.0 default research methods (same dataset) and re-checks each conclusion again.
 
 *Intraday Alpha Platform research series, paper 2 of 6 (spec §28). Generated 2026-08-29 from the repository's committed research artifacts.*
 
@@ -444,10 +444,11 @@ errata" above (FX01 t 2.65, FX09 t -3.81, FX09 -27,386 at 1x, day-2
 -68,183) the difference arose between that erratum and v1.3.0, not in this
 release; its cause was not re-derived here.
 
-**Ledger.** `research/experiments.json` now holds 1920 looks over 139
+**Ledger.** At v1.4.0 `research/experiments.json` held 1920 looks over 139
 entries (the 1068 looks of the v1.3.0 dataset are kept; the regenerated
-pipelines added 852). Expected max |t| under the global null is 3.888 and
-the Bonferroni per-test threshold 4.206. FX01 (3.27) is below the yardstick,
+pipelines added 852); it holds 5156 over 216 since v1.5.0 (see the
+2026-10-04 update). At the v1.4.0 count the expected max |t| under the
+global null was 3.888 and the Bonferroni per-test threshold 4.206. FX01 (3.27) is below the yardstick,
 as before. FX09's |t| of 3.76 was just above the v1.3.0 yardstick (3.735)
 and is now below it: on the current ledger even its negative uncrossed IC is
 within what selection alone produces. Of the twelve FX alphas only FX04
@@ -508,3 +509,113 @@ failed and they were not). Their IC against the mid-to-mid label is 0.0046,
    that were fitted rather than on a gate that stopped them.
 9. *Neither alpha is promotable and both lose money at every cost
    multiplier.* **Holds.**
+
+## Erratum / Update — 2026-10-04 (v1.5.0: the corrected research methods are the defaults)
+
+**What changed.** Not the data: the dataset is the v1.4.0 one. The eleven
+corrected research methods that v1.3.0 added and v1.4.0 kept as selectable
+alternatives are the defaults since v1.5.0 (`iap.validation.methods`, bundle
+`"v2"`; PLATFORM_CONVENTIONS.md §13.6; paper 01's update of the same date
+lists them), and every old rule stays selectable under a legacy name
+(bundle `"legacy_v1"`). For this paper three matter most. The gate t is the
+HAC t of the pooled slope, where it was the Newey-West t of within-bucket
+ICs. The PROMOTE t threshold is the Bonferroni |t| at the run's recorded
+gate look count, 4.365 at 3,936 looks, where it was 3.0. The backtest takes
+a position only when the expected return exceeds the round-trip spread and
+fee, where it held one on every signal sign. `run_all.py --methods
+legacy_v1 --out-dir <dir>` reproduces the v1.4.0 report, and
+`python/tests/test_legacy_methods.py` compares that reproduction field by
+field with the pinned v1.4.0 report of FX01
+(`tests/golden/alpha_report_FX01_v1.4.0.json`). The figures of the
+2026-10-03 update are the `legacy_v1` figures of the current dataset; this
+section supersedes them as the current ones.
+
+**FX figures, current** (`research/alpha_reports/REPORT.md`, `FX01.json`,
+`FX09.json`; keys `gate_ic`, `gate_tstat`, `nw_tstat_uncrossed`,
+`trade_count_1x_cost`, `net_pnl_1x_cost`):
+
+| alpha | horizon | IC | gate IC | IC crs | crs% | gate t | t within-bucket | folds+ | hyp | trades 1x | net P&L 1x | verdict |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| FX01 | 500ms | -0.0153 | 0.0183 | -0.0302 | 0.287 | 2.26 | 3.27 | 0/4 | yes | 0 | 0 | ITERATE |
+| FX09 | 1m | -0.1284 | -0.0471 | -0.2099 | 0.317 | -5.75 | -3.76 | 0/4 | no | 788 | -255 | REJECT |
+
+FX01 fails the PROMOTE gates `significance`, `fold_consistency` and `cost`;
+FX09 fails `ic`, `significance`, `fold_consistency`, `hypothesis` and
+`cost` (`promote_gates`). Headline ICs the gate does not read: FX01
+vol-scaled 0.0140, per-instrument mean 0.0150; FX09 -0.0570 / -0.0549. The
+valid-only gate IC is 0.0183 and -0.0472, the v1.4.0 values; the default
+row policy scores 0 and 74 BLACKOUT rows at their reopen return.
+
+Cost stress at 0.5x / 1x / 2x: FX01 makes no trade at any multiplier; FX09
+-321 / -255 / -136 USD over 1,713 / 788 / 218 trades. Pooled over the four
+test segments FX09 nets -1,441 at 1x (95 % bootstrap interval -1,661 to
+-1,247), and 0 of 4 folds survive 1x costs. Day 2: FX01 no trade; FX09
+gross -32, costs 750, net -782 over 2,279 trades. Regime split (last fold,
+pooled rows): FX01 -0.0522 high-vol / +0.0039 low-vol; FX09 -0.1919 /
+-0.1283. Edge-breakeven capacity is 0 for both. The v1.4.0 losses (FX01
+-9,867, FX09 -27,477 at 1x) are those of the legacy `"sign"` policy.
+
+**Ledger.** `research/experiments.json` holds 5156 looks over 216 entries
+(1068 on the v1.3.0 dataset, 852 on the v1.4.0 dataset under the legacy
+methods, 3,236 under the default methods). Expected max |t| under the
+global null is 4.135 and the Bonferroni per-test threshold 4.424; the alpha
+report was judged at its own recorded count of 3,936 (threshold 4.365,
+selection yardstick 4.07). FX01's gate t of 2.26 is below all of them.
+FX09's is -5.75, and its magnitude is above all of them: the sentence of
+the 2026-10-03 update that its negative uncrossed IC "is within what
+selection alone produces" was true of the within-bucket t (3.76) and is not
+true of the gate statistic. Among the FX alphas FX04 (4.24, paper 3) is
+above the yardstick and below the threshold.
+
+**Equity contrast, current.** EQ01 (microprice, 1 s): gate IC 0.0105 at
+gate t 1.59 (within-bucket 2.72), fold ICs -0.0114 / +0.0206 / +0.0244 /
++0.0062, hypothesis sign confirmed, no trade at any cost multiplier;
+ITERATE, 0.09 above the ITERATE floor of t 1.5. Its vol-scaled and
+per-instrument ICs are 0.0231 and 0.0230, more than twice the pooled gate
+IC. In the lifecycle registry it fails `statistical_significance`,
+`net_pnl_after_costs`, `capacity` and `stability`. Regime split +0.0012
+high-vol / +0.0134 low-vol. Last-fold decay: +0.023 at 1 s, +0.036 at 5 s,
++0.043 at 10 s, +0.042 at 1 m, +0.034 at 5 m, +0.002 at 15 m (the 5 m and
+15 m points were +0.053 and +0.033 in the 2026-10-03 update; the default
+row policy also scores the labels invalid for BLACKOUT alone). EQ05 (queue
+dynamics, 1 s): gate IC 0.0055 at gate t 1.64 (within-bucket 2.29),
+ITERATE by the lenient gate, no trade.
+
+**ML study (§4.7).** The figures of `research/ml_reports/ML_REPORT.md`
+quoted in the 2026-10-03 update are unchanged: ridge +0.0081 against the
+mid-to-mid label, xgboost 0.0046, lightgbm 0.0078, MLP -0.0024,
+conservative net -0.110 to -2.612 bps per signal. The meta-label features
+now keep missing values as NaN for the tree model (`impute_nan=False`, the
+default since v1.5.0); the calibrated meta-gate declines every test signal
+and is flagged degenerate in the report.
+
+**Conclusions, re-checked under the default methods.**
+
+1. *The microprice carries no stable signal on the synthetic FX quote book
+   (FX01).* **Holds, stronger.** The gate statistic is 2.26, not 3.27, no
+   fold is positive on pooled rows, and the forecast never clears its
+   costs.
+2. *The same feature on the equity MBO book is significant and
+   sign-stable.* **Still does not hold, and by more**: EQ01's gate t is
+   1.59.
+3. *"A property of the book mechanism, not of the formula".* **Still not
+   supported by the numbers**: both alphas are ITERATE, neither is
+   significant, neither trades.
+4. *EQ01 is not regime-dependent.* **Still does not hold** (+0.0134
+   low-vol, +0.0012 high-vol).
+5. *FX09 cannot be promoted.* **Holds.** One thing is new and runs against
+   the 2026-10-03 reading: the negative relation on uncrossed rows is
+   significant under the gate statistic (t -5.75). It contradicts the
+   stated rationale, so the alpha stays a REJECT, and it loses at every
+   cost multiplier.
+6. *Regime concentration is the one structural positive.* **Unchanged**, as
+   a description of pooled-row ICs.
+7. *Queue dynamics are unobservable on an L1 quote book; the queue
+   conclusions belong to equities (EQ05).* The first part **holds**. The
+   equity part is **weaker again**: EQ05's gate IC of 0.0055 is below the
+   PROMOTE IC gate of 0.01 and its gate t is 1.64.
+8. *A tree or MLP does not rescue the result.* **Holds**, unchanged.
+9. *Neither alpha is promotable and both lose money at every cost
+   multiplier.* The first half **holds**. The second **holds for FX09
+   only**. FX01 does not lose money under the default backtest because it
+   does not trade; a net of 0 fails the cost gate all the same.

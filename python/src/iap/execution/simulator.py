@@ -65,7 +65,9 @@ this module is self-contained:
    maker_rebate_per_share * qty`` (maker). FX: ``commission_per_million *
    notional / 1e6`` on every fill, ``notional = qty * qty_unit *
    price_ticks * tick_size``.
-6. **Linear impact** (taker fills only, identical to ``iap.backtest.costs``):
+6. **Linear impact** (taker fills only; the ``impact_model = "linear"`` rule
+   of ``iap.backtest.costs``, whose research default is the square root
+   since v1.5.0 — this simulator rule did not change):
    ``impact_bps = coeff * (child_qty * qty_unit / adv * 100)``; each taker
    fill is charged ``impact_bps * 1e-4 * its own notional``.
 7. **Cancels** travel the same latency path (one jitter draw) and take
@@ -221,6 +223,7 @@ class ExecutionSimulator:
             state=OrderState.PENDING,
             remaining=child.qty,
             ahead_qty=0,
+            entry_ahead_qty=0,
             resting=False,
             cross_exempt=False,
             cancel_reason=CancelReason.NONE,
@@ -379,6 +382,7 @@ class ExecutionSimulator:
                     and ahead.limit_ticks == o.limit_ticks
                 ):
                     o.ahead_qty += ahead.remaining
+            o.entry_ahead_qty = o.ahead_qty
             # Crossing exemption: the display may still show the liquidity
             # our aggressive leg just consumed (rule 4). While the venue is
             # gated (rule 8) nothing was consumed: no exemption.

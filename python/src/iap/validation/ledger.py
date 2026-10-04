@@ -41,6 +41,31 @@ Multiple-testing math reported with every batch:
   maximum |t| under the global null grows like sqrt(2 ln n); any observed
   t-stat below that is consistent with pure selection.
 
+**Gate look count (pinned, v1.5.0).**  Since v1.5.0 the PROMOTE t-stat gate
+is derived from this ledger (``iap.validation.validate``,
+``tstat_threshold="ledger"``): the threshold of a run is
+``max(3.0, Bonferroni |t| at N looks)``.  ``N`` has to be a deterministic
+function of the ledger state, and it must not depend on the order a pipeline
+happens to loop over its alphas, nor change when the same run is repeated:
+
+* for a NEW identity, ``N`` = the looks recorded before the run plus the
+  looks the run itself adds — :meth:`ExperimentLedger.batch_total` of the
+  identities the run is about to record.  A pipeline that validates 24
+  alphas in one pass declares all 24 up front, so every alpha of the pass
+  is judged at the same ``N``; the experiment runner declares its one
+  experiment;
+* the ``N`` a run was judged at is stored on its entry as ``gate_looks``;
+* a RERUN of a recorded identity is judged at the recorded ``gate_looks``
+  (:meth:`ExperimentLedger.gate_looks_for`), not at the ledger's later
+  total — so repeating a run reproduces its verdict, and one experiment id
+  holds one verdict.
+
+The consequence is stated rather than hidden: the threshold is not
+retroactive.  Looks made after a run tighten every later run; they do not
+re-judge a recorded one.  A reader who wants the verdict under today's
+denominator compares the recorded t with
+:meth:`ExperimentLedger.bonferroni_t_threshold`.
+
 **Concurrent writers (pinned).**  ``save`` is a locked read-modify-write:
 under an exclusive lock file (``<ledger>.lock``, :mod:`iap.experiment.locking`)
 it re-reads the file, replays every ``record`` call this instance made since
@@ -59,6 +84,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from collections.abc import Sequence
 from pathlib import Path
 
 from iap.experiment.locking import FileLock, atomic_write_text
@@ -66,8 +92,10 @@ from iap.experiment.locking import FileLock, atomic_write_text
 PINNED_ALPHA = 0.05
 
 #: ``x-version`` of ``research/experiments.json``: 2 since v1.4.0 (entries
-#: carry ``dataset_version``; the document lists ``datasets``).
-LEDGER_X_VERSION = 2
+#: carry ``dataset_version``; the document lists ``datasets``); 3 since
+#: v1.5.0 (entries recorded under the ledger t-stat policy carry
+#: ``gate_looks``, the look count their threshold was derived from).
+LEDGER_X_VERSION = 3
 
 
 def _norm_ppf(p: float) -> float:
@@ -132,7 +160,7 @@ class ExperimentLedger:
         self._index: dict[str, int] = {}
         #: ``record`` calls since the last load / save, replayed by ``save``
         #: onto the file's then-current content (see the module docs).
-        self._pending: list[tuple[str, str, dict | None, dict | None, int]] = []
+        self._pending: list[tuple[str, str, dict | None, dict | None, int, int | None]] = []
         self._load()
 
     def _load(self) -> None:
@@ -184,13 +212,19 @@ class ExperimentLedger:
         config: dict | None = None,
         result: dict | None = None,
         count: int = 1,
+        gate_looks: int | None = None,
     ) -> int:
         """Record ``count`` experiments (count > 1 = a declared batch, e.g. a
-        horizon scan) and return the running total."""
+        horizon scan) and return the running total.  ``gate_looks`` is the
+        look count the run's t-stat threshold was derived from (module docs,
+        "Gate look count"); it is stored on a new entry and never replaces
+        the value an existing entry already carries."""
         if count < 1:
             raise ValueError("count must be >= 1")
-        self._pending.append((alpha_id, kind, config, result, count))
-        return self._apply(alpha_id, kind, config, result, count)
+        if gate_looks is not None and int(gate_looks) < 1:
+            raise ValueError("gate_looks must be >= 1")
+        self._pending.append((alpha_id, kind, config, result, count, gate_looks))
+        return self._apply(alpha_id, kind, config, result, count, gate_looks)
 
     def _apply(
         self,
@@ -199,6 +233,7 @@ class ExperimentLedger:
         config: dict | None,
         result: dict | None,
         count: int,
+        gate_looks: int | None = None,
     ) -> int:
         key = self.experiment_key(alpha_id, kind, config, self.dataset_version)
         prev = self._index.get(key)
@@ -207,6 +242,8 @@ class ExperimentLedger:
             entry = self.entries[prev]
             entry["result"] = result or {}
             entry["reruns"] = int(entry.get("reruns", 0)) + 1
+            if gate_looks is not None and "gate_looks" not in entry:
+                entry["gate_looks"] = int(gate_looks)
             return self.total_experiments
         self.total_experiments += count
         self._index[key] = len(self.entries)
@@ -221,6 +258,8 @@ class ExperimentLedger:
         }
         if self.dataset_version is not None:
             entry["dataset_version"] = self.dataset_version
+        if gate_looks is not None:
+            entry["gate_looks"] = int(gate_looks)
         self.entries.append(entry)
         return self.total_experiments
 
@@ -249,6 +288,33 @@ class ExperimentLedger:
         for a new identity, 0 for a rerun (de-duplicated)."""
         key = self.experiment_key(alpha_id, kind, config, self.dataset_version)
         return 0 if key in self._index else int(count)
+
+    def batch_total(self, identities: Sequence[tuple[str, str, dict | None, int]]) -> int:
+        """The ledger total once a run has recorded ``identities`` —
+        ``(alpha_id, kind, config, count)`` each: the looks recorded now plus
+        the looks of every identity that is not in the ledger yet (a repeated
+        identity inside the batch is counted once)."""
+        total = self.total_experiments
+        seen: set[str] = set()
+        for alpha_id, kind, config, count in identities:
+            key = self.experiment_key(alpha_id, kind, config, self.dataset_version)
+            if key in self._index or key in seen:
+                continue
+            seen.add(key)
+            total += int(count)
+        return total
+
+    def gate_looks_for(
+        self, alpha_id: str, kind: str, config: dict | None, batch_total: int
+    ) -> int:
+        """The look count an identity's t-stat threshold is derived from
+        (module docs, "Gate look count"): the ``gate_looks`` recorded on its
+        entry when it has been run before, else ``batch_total``."""
+        key = self.experiment_key(alpha_id, kind, config, self.dataset_version)
+        prev = self._index.get(key)
+        if prev is not None and self.entries[prev].get("gate_looks") is not None:
+            return int(self.entries[prev]["gate_looks"])
+        return int(batch_total)
 
     def expected_max_null_t(self) -> float:
         """Deflated-Sharpe-style yardstick: E[max |t|] under the global null
@@ -292,7 +358,9 @@ class ExperimentLedger:
                 "dataset_version): re-running the same script on the same "
                 "dataset does not inflate the Bonferroni denominator; the "
                 "same configuration on a new dataset is a new look, and the "
-                "looks of earlier datasets are kept (`datasets`)."
+                "looks of earlier datasets are kept (`datasets`). An entry "
+                "judged under the ledger t-stat policy carries `gate_looks`, "
+                "the look count its threshold was derived from."
             ),
             "datasets": self.datasets(),
             "distinct_experiments": self.distinct_experiments,

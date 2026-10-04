@@ -19,6 +19,7 @@ from iap.research.errors import ResearchError  # noqa: F401
 from iap.research.registry import ExperimentRecord, ExperimentRegistry  # noqa: F401
 from iap.research.runner import (  # noqa: F401
     LEDGER_KIND,
+    LEGACY_LOOKS_PER_EXPERIMENT,
     LOOKS_PER_EXPERIMENT,
     ExperimentRunner,
     build_result,
@@ -44,6 +45,7 @@ __all__ = [
     "GATE_ELIGIBILITY_BOUNDS",
     "GateEligibility",
     "LEDGER_KIND",
+    "LEGACY_LOOKS_PER_EXPERIMENT",
     "LOOKS_PER_EXPERIMENT",
     "ExperimentRecord",
     "ExperimentRegistry",

@@ -29,7 +29,7 @@ are below.
 
 ```bash
 cd python && PYTHONPATH=src python3 -m iap.mvp run                 # -> ../data/mvp/<run_id>/
-# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=235 children=348 fills=169 pnl=-81.531396 USD digest=f51890da0c3c66cd... out=.../data/mvp/58a10f2194a3c81c
+# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=235 children=348 fills=169 pnl=-81.531396 USD digest=20d4ff76af0b631c... out=.../data/mvp/58a10f2194a3c81c
 ```
 
 **Java paper vertical** (`java/paper.sh`, state directory `--state-dir` /
@@ -66,7 +66,10 @@ since the run (`configs/risk/risk.json`, `configs/execution/execution.json`,
 `configs/mvp/*`) is reported as a `config_version` mismatch **before**
 anything runs: the incident must be replayed under the configuration that
 produced it (`git checkout` the commit the report names, or the archived
-`configs/` tree). Outside the checkout — the Python image bakes `configs/`
+`configs/` tree). A run captured by v1.4.0 is such a case under v1.5.0:
+`execution.json`, `alpha_params.json` and the registry changed, so its `config_version`
+(`f293e7e7…`) no longer matches the tree's (`439bbad5…`) and it replays only
+from the v1.4.0 tag. Outside the checkout — the Python image bakes `configs/`
 and `research/alpha_registry.json` under `/app` — add `--repo-root /app`.
 
 For a Java session the equivalent is a second run over the same input and

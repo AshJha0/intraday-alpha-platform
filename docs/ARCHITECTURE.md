@@ -62,7 +62,7 @@ repository:
 | TCA | `tca` (reference + report) | — | — | `tca` (service) |
 | Contracts / canonical JSON / decision trace | `contracts`, `trace` (reference: 22 typed contracts, 18 Protocols, `canonical_json`, `TraceDigest`, `explain`, attribution) | `contracts` (`iap::contracts::{Value, DecisionTrace, TraceDigest}` — byte-identical canonical lines; `ExecutionReplay` emits one trace per parent order) | `contracts` crate (canonical JSON + SHA-256 + `DecisionTrace` + JSONL sink / digest + `explain`; `telemetry::trace` re-exports the sink with `trace_records_total`) | `contracts`, `trace` (`PaperTrading` emits `decision_traces.jsonl`) |
 | Alpha promotion lifecycle (7 states) | `lifecycle` (reference; wraps `adaptive.lifecycle`) | — (by design) | `lifecycle` crate (gate table, 17-edge machine, live rolling-IC rules, byte-identical `alpha_registry.json`) | `lifecycle` (+ `ConfigService.LIFECYCLE`) |
-| Data model / store | `store` (SQLite over `schemas/sql/iap_v1.sql`; importers for every research artefact) | — | — | — |
+| Data model / store | `store` (SQLite over `schemas/sql/iap_v2.sql`; importers for every research artefact) | — | — | — |
 | The traced end-to-end loop (MVP) | `mvp` (`python -m iap.mvp run / replay / verify / explain`) | — | — | `platform` (the paper vertical) |
 | Event bus / threading | — | — | `eventbus` crate (SPSC ring) | — |
 | Telemetry / metrics | — | — | `telemetry` crate (sets the metric-name contract) | `monitoring` + `api` (MetricsServer) |
@@ -125,8 +125,8 @@ flowchart TD
     FILLS --> TCA["TCA + attribution<br/>Perold IS = delay + trading + opportunity (exact)<br/>Python reference, Java service"]
     TCA --> TRACE["Decision trace — one DecisionTrace per decision<br/>signal · portfolio · risk · orders · routing · fills · TCA · attribution<br/>canonical JSONL + stream digest + SQLite index (iap.store); explain()"]
     LBL --> RESEARCH
-    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (1920 looks / 139 configs, two datasets)<br/>REPORT.md, ML_REPORT.md, model manifests"]
-    RESEARCH --> LIFE["Alpha promotion lifecycle (iap.lifecycle)<br/>RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE <-> WATCH -> RETIRED<br/>18 gates, 17 edges; bundled data: 24 CANDIDATE / 0 beyond"]
+    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (5,156 looks / 216 configs, two datasets, two method bundles)<br/>REPORT.md, ML_REPORT.md, model manifests"]
+    RESEARCH --> LIFE["Alpha promotion lifecycle (iap.lifecycle)<br/>RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE <-> WATCH -> RETIRED<br/>20 gates, 17 edges; bundled data: 24 CANDIDATE / 0 beyond"]
     LIFE -. "gated, ledgered transitions<br/>(research/alpha_registry.json)" .-> ALPHA
 ```
 
@@ -145,7 +145,8 @@ reports, research documents and golden files.
 **The loop closes twice.** Research → trading: an alpha reaches the trading
 path only through the promotion lifecycle (`iap.lifecycle`,
 `docs/LIFECYCLE.md`) — RESEARCH → CANDIDATE needs a ledger entry and a clean
-leakage test, CANDIDATE → VALIDATING the nine research gates (IC, NW t, fold
+leakage test, CANDIDATE → VALIDATING the nine research gates (IC, the gate
+t against the multiple-testing threshold the evidence carries, fold
 consistency, hypothesis sign, net P&L after costs, capacity, stability),
 VALIDATING → PAPER a reproducible replay and cross-language parity, PAPER →
 ACTIVE paper sessions whose realized IC tracks research, and ACTIVE ⇄ WATCH
@@ -207,9 +208,10 @@ offline against the schema set (`API_CONTRACTS.md`). The rules
   `qty`; conventions §1). Floats appear only in research quantities
   (expected returns, P&L, bps) with pinned 1e-9 tolerances.
 - **The relational projection** of all of the above is
-  `schemas/sql/iap_v1.sql` (24 tables, 3 views, SQLite + PostgreSQL), applied
+  `schemas/sql/iap_v2.sql` (26 tables, 6 views, SQLite + PostgreSQL), applied
   by `iap.store`: a derived, rebuildable index of the flat-file artefacts,
-  never their replacement (`docs/DATA_MODEL.md`).
+  never their replacement, in which every research row carries the dataset
+  and method bundle it was computed in (`docs/DATA_MODEL.md`).
 
 ## 5. Determinism strategy
 
@@ -247,10 +249,10 @@ flowchart LR
     MG --> EXP[("expected_*.json<br/>codec sha256 | book states | features<br/>alpha | backtest | risk decisions + audit + snapshot<br/>replay fills | portfolio | tca (+ timeline cases) | adaptive<br/>contracts examples | canonical json + trace digest<br/>lifecycle | experiment golden frame | mvp")]
     CPPTOOL["cpp/tools/make_replay_fills_golden<br/>(C++ is the fills reference;<br/>Python iap.execution consumes it too)"] --> EXP
     RSTOOL["rust/risk/src/bin/make_risk_golden<br/>(Rust is the risk reference;<br/>Python iap.risk consumes it too)"] --> EXP
-    GV --> PY["python: pytest -k golden<br/>166 tests"]
-    GV --> CPP["cpp: ctest -R Golden<br/>68 tests"]
-    GV --> RS["rust: 9 golden test targets<br/>64 tests"]
-    GV --> JV["java: all thirteen *GoldenTest (JUnitCore)<br/>104 golden-group tests"]
+    GV --> PY["python: pytest -k golden<br/>192 tests"]
+    GV --> CPP["cpp: ctest -R Golden<br/>72 tests"]
+    GV --> RS["rust: 10 golden test targets<br/>71 tests"]
+    GV --> JV["java: all seventeen *GoldenTest (JUnitCore)<br/>124 golden-group tests"]
     EXP --> PY
     EXP --> CPP
     EXP --> RS
@@ -281,8 +283,8 @@ and are matched by Java, Rust and C++ (the trace and canonical-JSON ports)
 and by Java and Rust (the lifecycle ports). The harness
 (`tests/harness/run_all.sh`, with `run_golden.sh` as the golden-only alias)
 runs every suite with the canonical commands and prints the parity table; a
-v1.4.0 CI run (2026-10-03) passes 1573/289/323/510 tests (166/68/64/104
-golden) across python/cpp/rust/java, plus the repo-level `integration` (17)
+v1.5.0 CI run (2026-10-04) passes 1988/302/358/571 tests (192/72/71/124
+golden) across python/cpp/rust/java, plus the repo-level `integration` (35)
 and `replay` (6) rows — the same counts the README parity table records.
 
 ## 7. Hot-path engineering notes per language
@@ -406,7 +408,8 @@ histograms end `_ns` with fixed log2 buckets, gauges are bare nouns.
   latched kill switch. Since v1.3.0 the shutdown hook only raises a stop
   flag: the trading thread writes the checkpoint and the session ends in a
   fifth state, `STOPPED` (`platform_session_state` 4), which the dashboard
-  and the rules have not been taught yet (`deployment/grafana/README.md`). A session is FINITE and exits 0 (`restart: on-failure`
+  and the rules read through the persisted `platform_persisted_session_state`
+  (the process exits right after the checkpoint; `deployment/grafana/README.md`). A session is FINITE and exits 0 (`restart: on-failure`
   in compose, a single-replica `Recreate` Deployment in k8s), so "daily"
   limits are daily rather than per-restart.
 - **What is watched** maps 1:1 to spec §25: market-data health (gap/dup
@@ -437,7 +440,9 @@ in [/API_ADAPTIVE.md](../API_ADAPTIVE.md):
   formula + diagnostic two-sample KS), `refit.py` (static / scheduled /
   drift-triggered refit policies as pure functions of event time and
   monitor values), `lifecycle.py` (the IC-gated ACTIVE → WATCH → RETIRED
-  state machine with consecutive-breach hysteresis).
+  state machine with hysteresis; retirement by a CUSUM of the shortfall
+  below the watch gate since v1.5.0, the consecutive-breach rule being the
+  named legacy alternative).
   `iap.backtest.adaptive` replays a deployment: warmup fit + baseline
   capture, block-wise evaluation, refits on trailing purged/embargoed
   windows (no-lookahead asserted at runtime and shift-tested), retirement
@@ -592,7 +597,7 @@ book → `FeatureEngine` → three fitted `linear_z_v1` alphas ensembled →
 and compares bytes; `replay` re-runs it from the captured stream and must
 reproduce the trace digest; `tests/golden/expected_mvp.json` pins the golden
 run (seed 12345: 15,805 events, 800 decisions, 235 parents, 169 fills,
-−81.53 USD, digest `f51890da…`) as the cross-language pin for any port of
+−81.53 USD, digest `20d4ff76…`) as the cross-language pin for any port of
 the loop (docs/MVP.md §9 lists what a port must reproduce). The result is
 cost-negative and the realized-IC audit (docs/MVP.md §7.1) is part of the
 document: the MVP's mid-to-mid IC is 0.13–0.21 away from the research IC
@@ -657,7 +662,8 @@ order, and kept apart.
   lifecycle state or a model output can reduce what is sent, never weaken
   what is rejected.
 - **What an agent may do**: read. Query the store (`python -m iap.store sql`,
-  `v_order_chain`, `v_alpha_scorecard`, `v_experiment_ledger_summary`), the
+  `v_order_chain`, `v_alpha_scorecard` / `v_alpha_scorecard_current`,
+  `v_experiment_ledger_summary`), the
   ledger (`research/experiments.json`, `python -m iap.research list / show`),
   TCA (`research/tca/`, `tca_results`), drift and rolling IC (the
   `research/baselines/*.json` the live gauges read, `drift_baselines`), the
@@ -709,8 +715,9 @@ will find the cheapest path to a pass faster than a person: cheaper costs, a
 chosen holdout, uncounted looks. v1.3.0 closed those three in the tooling
 (LEARN.md §24) and measured what the validation chain can detect at all
 (the planted-signal power study, LEARN.md §23). It did not build the agents,
-and on two synthetic sessions whose ledger now holds 1920 looks (1068 on
-the v1.3.0 dataset, 852 on the regenerated v1.4.0 one), more searching is not what the platform lacks (HOW_IT_WORKS.md §6.4
+and on two synthetic sessions whose ledger now holds 5,156 looks (1068 on
+the v1.3.0 dataset, 852 on the regenerated v1.4.0 one, 3,236 on that same
+dataset under the v1.5.0 default methods), more searching is not what the platform lacks (HOW_IT_WORKS.md §6.4
 lists what would be theatre on this data, and why). DIAGRAMS.md §19 draws
 the planned layer and labels it as planned.
 
@@ -772,7 +779,7 @@ does, and — where it applies — what it did before v1.3.0.
 
 | failure | behaviour | where pinned |
 |---|---|---|
-| look-ahead in scoring or in a feature | label guard, shift-by-one and truncation probes on every validation; the opt-in recompute probe rebuilds features from truncated raw events | `iap.validation.leakage` |
+| look-ahead in scoring or in a feature | label guard, shift-by-one and truncation probes on every validation; the recompute probe (in the standard suite since v1.5.0, when the raw events are available) rebuilds features from truncated raw events, and a report without events says `recompute_ok: null` and is not gate-eligible | `iap.validation.leakage` |
 | a leaking fold | purge at the label horizon plus a 60 s embargo; the walk-forward window ends where the declared holdout begins, asserted on every run | conventions §14.2 |
 | a metric that cannot be computed | a `ResearchError`, or `null` in a report — never a number | `iap.research.runner`, RESEARCH_VALIDITY §1 |
 | a result that would look better under kinder assumptions | runs, is ledgered, and is not gate-eligible | conventions §13.6 |
@@ -832,8 +839,9 @@ staging directories.
 
 **Identity under concurrency.** The ledger de-duplicates by (alpha, kind,
 canonical configuration, dataset — the dataset since v1.4.0, ledger
-x-version 2). A rerun adds no looks whichever writer lands
-first; a new configuration adds its 28 exactly once. With a single writer
+x-version 2; the method bundle is part of the configuration since v1.5.0,
+x-version 3). A rerun adds no looks whichever writer lands
+first; a new configuration adds its 84 (28 under `legacy_v1`) exactly once. With a single writer
 the locked path writes exactly the bytes the unlocked implementation wrote,
 so the committed ledger did not change.
 
@@ -852,7 +860,7 @@ what would prove it done.
 
 | gap | what exists | what a production system has | epic |
 |---|---|---|---|
-| **Real exchange data** | a seeded generator; instruments named `SYN.EQ.*`; no vendor data, no symbology, no corporate actions | decoders for real order-by-order feeds, a point-in-time security master, corporate actions applied without look-ahead | E25 |
+| **Real exchange data** | a seeded generator; instruments named `SYN.EQ.*`; no vendor data in the repository. A Python ingestion path for owner-supplied Nasdaq ITCH 5.0 and LOBSTER files, a point-in-time security master and a corporate-actions adjustment API exist ([REAL_DATA.md](REAL_DATA.md)), tested on synthesised bytes only; no real file has been read, and studies do not yet read reference data as-of or apply adjustments | decoders for real order-by-order feeds, a point-in-time security master, corporate actions applied without look-ahead | E25 |
 | **Latency measurement** | throughput and mean-only stage timings from a 2-CPU container without pinning; in-memory, single-threaded | tick-to-trade percentiles (p50 / p99 / p99.9 / max) measured without coordinated omission, gated in CI, with hardware timestamps and an audited allocation-free hot path | E26 |
 | **Simulator calibration to live fills** | a pinned, deterministic, conservative rule set; impact as a formula; a tape that never reacts to our orders; markouts at three fixed horizons | fill, queue and impact models fitted to observed fills with held-out error, multi-horizon markouts, cost attribution by venue and by algorithm | E27 |
 | **Book-level risk** | a per-order, per-instrument engine with position, notional and loss limits and four kill scopes | factor exposures, stress scenarios on the live book, the regulatory pre-trade control set, drop-copy reconciliation that halts on a break | E28 |

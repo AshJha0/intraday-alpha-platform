@@ -4,7 +4,7 @@
   "bucket_ns": 300000000000,
   "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
   "horizon": "30s",
-  "ic_mean": 0.036624788868432234,
+  "ic_mean": 0.03662478886843222,
   "ic_std": 0.2380325259440524,
   "kind": "ic",
   "n_buckets_baseline": 10,

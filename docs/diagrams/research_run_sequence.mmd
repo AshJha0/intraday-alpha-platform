@@ -7,17 +7,17 @@ sequenceDiagram
     participant LED as ExperimentLedger<br/>(research/experiments.json)
     participant FS as research/experiments/
 
-    R->>CLI: run --alpha EQ03, optionally --config k=v, --dry-run, --tstat-threshold ledger
+    R->>CLI: run --alpha EQ03, optionally --config k=v, --dry-run, --methods legacy_v1
     CLI->>RUN: build_spec — the experiment id is the hash of the request
     RUN->>RUN: the walk-forward window ends where the holdout begins (asserted)
-    opt tstat_threshold is ledger (opt-in, default fixed 3.0)
-        RUN->>LED: the Bonferroni threshold once this run's looks are counted
+    opt tstat_threshold is ledger (the v2 default, legacy_v1 is the fixed 3.0)
+        RUN->>LED: declare the gate look count, read the Bonferroni threshold at it
     end
     RUN->>VAL: fresh model per fold, leakage probes, stress grids, verdict
-    VAL-->>RUN: report — pinned statistics plus the additive ones no gate reads
+    VAL-->>RUN: report — the gate statistics plus the report-only ones no gate reads
     RUN->>RUN: holdout backtest on the test period
     RUN->>RUN: gate_eligibility(spec, frames) — protocol bounds and derived periods
-    RUN->>LED: record 28 looks for a new configuration, none for a rerun
+    RUN->>LED: record 84 looks for a new configuration (28 under legacy_v1), none for a rerun
     alt --dry-run
         RUN->>LED: save — the looks are debited, no directory is written
     else persist

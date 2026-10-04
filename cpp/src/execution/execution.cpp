@@ -105,6 +105,7 @@ std::uint64_t ExecutionSimulator::submit(const ChildOrder& child) {
                    v.latency_mean_ns + jitter;
     o.state = OrderState::PENDING;
     o.remaining = o.qty;
+    o.entry_ahead_qty = 0;
     o.cancel_reason = CancelReason::NONE;
     o.cancel_arrival_ts = 0;
     const std::uint64_t id = o.order_id;
@@ -216,7 +217,8 @@ void ExecutionSimulator::emit_fill(ChildOrder& o, std::int64_t price_ticks,
     f.fee = fill_fee(o, price_ticks, qty, liq);
     if (liq == Liquidity::TAKER) {
         // Pinned rule 6: linear impact from the child's total size in base
-        // units (qty * qty_unit), identical to the research cost model.
+        // units (qty * qty_unit) — the linear rule of the research cost
+        // model (whose default is the square root since v1.5.0).
         const InstrumentSpec& ins = instrument(o.instrument_id);
         const double impact_bps =
             config_.impact_coeff_bps_per_pct_adv *
@@ -307,6 +309,7 @@ void ExecutionSimulator::activate(ChildOrder& o) {
                     o.ahead_qty += ahead.remaining;
                 }
             }
+            o.entry_ahead_qty = o.ahead_qty;
             // Crossing exemption: the display may still show the liquidity
             // our aggressive leg just consumed (pinned rule 4). While the
             // venue is gated (rule 8) nothing was consumed: no exemption.

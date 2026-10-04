@@ -562,6 +562,13 @@ public final class PaperTrading {
                 LifecycleGauge.fromStrategiesConfig(strategiesJson);
         long blockNs =
                 com.iap.config.Json.asLong(adaptiveCfg.get("block_ns"));
+        // Share of the rolling-IC window that one block renews: what the
+        // CUSUM retirement rule weights a reading by (the same
+        // min(1, block / window) iap.backtest.adaptive passes; the legacy
+        // consecutive rule does not read it).
+        final double newFraction = Math.min(1.0, (double) blockNs
+                / (double) com.iap.config.Json.asLong(
+                        adaptiveCfg.get("ic_window_ns")));
         long[] lifecycleBlock = {Long.MIN_VALUE};
         long[] lastSignalTs = {Long.MIN_VALUE};
         String driftGauge = MetricsRegistry.labeled(
@@ -606,7 +613,8 @@ public final class PaperTrading {
                 lifecycleBlock[0] = block;
                 // evaluate at the block boundary the event just crossed
                 reg.gauge(lifecycleGauge).set(lifecycle
-                        .update(rollingIc.ic(block * blockNs)).code());
+                        .update(rollingIc.ic(block * blockNs), true, newFraction)
+                        .code());
             }
             // 1-minute bar roll: last-observation mid per pinned bucket
             if (vec.valid[Features.MID_PRICE]) {
@@ -771,6 +779,7 @@ public final class PaperTrading {
             Runtime.getRuntime().addShutdownHook(hook0);
             res.state = SessionState.RUNNING;
             gSessionState.set(SessionState.RUNNING.code());
+            markSessionExit(store, SessionState.RUNNING, progress[0]);
             // Between pacing slices the idle loop still applies admin
             // commands, so a kill is recorded while the feed is quiet.
             Runnable idle = () -> {
@@ -871,6 +880,7 @@ public final class PaperTrading {
                 res.traceCount = traceSink.count();
                 res.state = SessionState.STOPPED;
                 gSessionState.set(SessionState.STOPPED.code());
+                markSessionExit(store, SessionState.STOPPED, progress[0]);
                 return res;
             }
             BacktestEngine.Summary summary = engine.finish();
@@ -905,7 +915,7 @@ public final class PaperTrading {
                     : rollingIc.ic(lastSignalTs[0]);
             // session end closes the last partial adaptive block: one
             // final lifecycle evaluation so the report reflects it
-            res.lifecycle = lifecycle.update(res.rollingIc);
+            res.lifecycle = lifecycle.update(res.rollingIc, true, newFraction);
             reg.gauge(lifecycleGauge).set(res.lifecycle.code());
             if (!Double.isNaN(res.rollingIc)) {
                 reg.gauge(icGauge).set(res.rollingIc);
@@ -928,6 +938,7 @@ public final class PaperTrading {
             res.traceCount = traceSink.count();
             res.state = SessionState.FINISHED;
             gSessionState.set(SessionState.FINISHED.code());
+            markSessionExit(store, SessionState.FINISHED, progress[0]);
             res.reportJson = reportJson(res, opts, reg, store);
             if (opts.reportPath != null) {
                 Files.createDirectories(
@@ -939,6 +950,7 @@ public final class PaperTrading {
             res.state = SessionState.FAILED;
             res.failureReason = String.valueOf(e.getMessage());
             gSessionState.set(SessionState.FAILED.code());
+            markSessionExit(store, SessionState.FAILED, progress[0]);
             throw e;
         } finally {
             loopExited.countDown();
@@ -955,6 +967,25 @@ public final class PaperTrading {
             }
         }
         return res;
+    }
+
+    /**
+     * Record how the session left the state directory
+     * ({@link SessionStore#SESSION_EXIT}) for an exporter that outlives this
+     * process (PLATFORM_CONVENTIONS.md §12.3). Called on the trading thread
+     * AFTER the checkpoint it describes is committed, so it can never weaken
+     * the checkpoint. Best effort: a failure to write the marker is reported
+     * on stderr and never changes the session's outcome.
+     */
+    private static void markSessionExit(SessionStore store, SessionState state,
+            long eventCursor) {
+        try {
+            store.writeSessionExit(state.label().toUpperCase(Locale.ROOT),
+                    state.code(), eventCursor,
+                    System.currentTimeMillis() / 1000L);
+        } catch (RuntimeException e) {
+            System.err.println("session marker not written: " + e.getMessage());
+        }
     }
 
     /**

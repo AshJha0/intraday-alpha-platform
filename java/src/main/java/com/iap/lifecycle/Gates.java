@@ -15,6 +15,44 @@ import java.util.function.Function;
  * never passes); the machine decides separately whether an absent block
  * counts as a failure or as silence.
  *
+ * <p><b>The significance threshold</b> (v1.5.0). {@code statistical_significance}
+ * is the one gate whose threshold is not a config constant. Under the default
+ * policy ({@code PolicyConfig.tstatThreshold = "ledger"}) it is
+ * {@code max(min_nw_tstat, evidence.significance_threshold)} — the
+ * multiple-testing threshold the research result was judged at, never below
+ * the configured floor — and when the evidence carries no threshold the gate
+ * FAILS with {@code threshold = null} (the value is still reported). Under
+ * {@code "fixed"} — the rule up to v1.4.0 — the threshold is
+ * {@code min_nw_tstat} and the evidence field is not read. The gate table
+ * (names, blocks, kinds, edges) is unchanged.
+ *
+ * <p><b>The net P&amp;L bootstrap gate</b> (v1.5.0). {@code net_pnl_bootstrap_ci}
+ * sits on the CANDIDATE -> VALIDATING edge directly after
+ * {@code net_pnl_after_costs} and requires
+ * {@code ci_low > min_net_pnl_ci_low} (strict: a lower bound of exactly 0.0
+ * fails) for the interval in {@code evidence.pnl_bootstrap}. The metric is
+ * ABSENT — the gate FAILS with {@code value = null}, it does not pass
+ * vacuously — when the block is null, when the alpha made no trade
+ * ({@code n_trades = 0}), when the interval was taken at another level than
+ * {@code gates.net_pnl_ci_level} (exact comparison) or when it has no bounds.
+ * Under {@code PolicyConfig.netPnlCiGate = "absent"} — the legacy policy —
+ * the machine does not evaluate the gate and it is part of no result
+ * ({@link AlphaLifecycle#edgeGates}).
+ *
+ * <p><b>The cross-alpha correlation gate</b> (v1.5.0). A new alpha must be
+ * additive: {@code cross_alpha_correlation} sits on the CANDIDATE -> VALIDATING
+ * edge (last) and requires
+ * {@code max |correlation| <= max_cross_alpha_correlation} over the ELIGIBLE
+ * peers of {@code evidence.cross_alpha} — every other registered alpha whose
+ * lifecycle state is at or beyond {@code PolicyConfig.crossAlphaMinState}
+ * (VALIDATING by default) and is not RETIRED. The absolute value is taken:
+ * the mirror image of an allocated alpha adds nothing either. With no
+ * eligible peer the statistic is 0.0 and the gate passes — vacuously, and
+ * the result says so by its value. {@code MAX} is inclusive: a correlation
+ * exactly at the threshold passes. An absent {@code cross_alpha} block —
+ * nobody measured the correlations — FAILS with {@code value = null} (fail
+ * closed).
+ *
  * <p>The stability rule {@code |ic - rank_ic| / max(|ic|, eps) <= max_ic_rank_gap}
  * requires the rank IC to lie in {@code [0, 2 * ic]} for a positive IC: same
  * sign, at most twice the linear IC — the one pair of numbers in an
@@ -52,6 +90,11 @@ public enum Gates {
             "min_net_return_bps",
             (ev, c) -> ev.research() == null ? null : ev.research().netReturnBps(),
             c -> c.gates().minNetReturnBps()),
+    NET_PNL_BOOTSTRAP_CI("net_pnl_bootstrap_ci", "pnl_bootstrap", Kind.GT,
+            "min_net_pnl_ci_low",
+            (ev, c) -> ev.pnlBootstrap() == null ? null
+                    : ev.pnlBootstrap().gateValue(c.gates().netPnlCiLevel()),
+            c -> c.gates().minNetPnlCiLow()),
     CAPACITY("capacity", "capacity", Kind.MIN, "min_capacity_usd",
             (ev, c) -> ev.capacityUsd(), c -> c.gates().minCapacityUsd()),
     STABILITY("stability", "research", Kind.MAX, "max_ic_rank_gap",
@@ -59,6 +102,11 @@ public enum Gates {
                     : icRankGap(ev.research().ic(), ev.research().rankIc(),
                             c.gates().icRankGapEps()),
             c -> c.gates().maxIcRankGap()),
+    CROSS_ALPHA_CORRELATION("cross_alpha_correlation", "cross_alpha", Kind.MAX,
+            "max_cross_alpha_correlation",
+            (ev, c) -> ev.crossAlpha() == null ? null
+                    : ev.crossAlpha().maxAbsCorrelation(c.crossAlphaMinState()),
+            c -> c.gates().maxCrossAlphaCorrelation()),
     HOLDOUT_IC_TRACKS_RESEARCH("holdout_ic_tracks_research", "validation", Kind.MAX,
             "max_holdout_ic_gap",
             (ev, c) -> ev.validation() == null ? null
@@ -144,9 +192,31 @@ public enum Gates {
         return thresholdKey;
     }
 
-    /** The bound threshold ({@code null} for a BOOL gate). */
+    /**
+     * The configured threshold ({@code null} for a BOOL gate). For
+     * {@code statistical_significance} this is the floor {@code min_nw_tstat};
+     * {@link #thresholdFor} gives the threshold applied to an evidence.
+     */
     public Double threshold(PolicyConfig config) {
         return threshold == null ? null : threshold.apply(config);
+    }
+
+    /**
+     * The threshold this gate applies to {@code evidence} (class docs, "The
+     * significance threshold"); {@code null} for a BOOL gate and for the
+     * ledger policy when the evidence carries no significance threshold.
+     */
+    public Double thresholdFor(Evidence evidence, PolicyConfig config) {
+        Double configured = threshold(config);
+        if (this != STATISTICAL_SIGNIFICANCE
+                || PolicyConfig.TSTAT_FIXED.equals(config.tstatThreshold())) {
+            return configured;
+        }
+        Double carried = evidence.significanceThreshold();
+        if (carried == null) {
+            return null;
+        }
+        return Math.max(configured, carried);
     }
 
     /** Pure: the same evidence always yields the same result. */
@@ -155,11 +225,14 @@ public enum Gates {
         if (kind == Kind.BOOL) {
             return new GateResult(m != null && m == BOOL_TRUE, null, null);
         }
-        Double th = threshold(config);
+        Double th = thresholdFor(evidence, config);
         if (m == null) {
             return new GateResult(false, null, th);
         }
         double value = m;
+        if (th == null) { // the ledger policy with no threshold in the evidence
+            return new GateResult(false, value, null);
+        }
         boolean passed = switch (kind) {
             case MIN -> value >= th;
             case MAX -> value <= th;

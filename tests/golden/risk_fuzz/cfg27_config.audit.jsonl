@@ -1,0 +1,10 @@
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 1","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000000000000000}
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 1","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000000000342000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing per_order.duplicate_order_window_ns","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000018342000}
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 2","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000000019636000}
+{"decision":1,"reason":"desk request #42","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000000062636000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing per_order.duplicate_order_window_ns","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000091636000}
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 2","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000000141636000}
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 1","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700000003177636000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing per_order.duplicate_order_window_ns","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000003252636000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing per_order.duplicate_order_window_ns","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000003252636000}

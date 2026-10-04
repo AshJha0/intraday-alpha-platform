@@ -26,6 +26,7 @@ from typing import Any
 
 from iap.contracts.types import Algo
 from iap.contracts.versions import content_hash
+from iap.execution.passive import POLICY_NAMES, ExecPolicy, PassiveParams
 
 __all__ = [
     "MVP_CONFIG_VERSION",
@@ -208,6 +209,11 @@ class ExecutionSpec:
     latency_decision_ns: int
     latency_risk_ns: int
     latency_wire_ns: int
+    #: Child execution policy (``iap.execution.passive``). ``execution.child_policy``
+    #: and ``execution.passive`` are OPTIONAL keys of mvp.json: absent means
+    #: NATIVE with the default parameters, which is the pinned golden run.
+    child_policy: ExecPolicy = ExecPolicy.NATIVE
+    passive: PassiveParams = PassiveParams()
 
     def algo_for(self, urgency: float) -> Algo:
         """The algo of the first band whose ``max_urgency`` covers ``urgency``."""
@@ -315,6 +321,28 @@ class MvpConfig:
                 "curve the MVP does not carry; use TWAP / POV / IS"
             )
         lat = e.sub("latency")
+        child_policy = ExecPolicy.NATIVE
+        if "child_policy" in e.obj:
+            name = e.string("child_policy")
+            if name not in POLICY_NAMES:
+                raise ValueError(
+                    f"{where}.execution.child_policy: unknown policy {name!r}; "
+                    f"have {sorted(POLICY_NAMES)}"
+                )
+            child_policy = POLICY_NAMES[name]
+        passive = PassiveParams()
+        if "passive" in e.obj:
+            pp = e.sub("passive")
+            try:
+                passive = PassiveParams(
+                    max_rest_ns=pp.integer("max_rest_ns", 0, (1 << 62)),
+                    max_reprices=pp.integer("max_reprices", 0, 1_000_000),
+                    max_behind_fraction=pp.number("max_behind_fraction", 0.0, 1.0),
+                    improve_min_spread_ticks=pp.integer("improve_min_spread_ticks", 0, (1 << 62)),
+                    end_margin_ns=pp.integer("end_margin_ns", 0, (1 << 62)),
+                )
+            except ValueError as exc:
+                raise ValueError(f"{where}.execution.passive: {exc}") from None
         execution = ExecutionSpec(
             parent_window_ns=e.integer("parent_window_ns", 1, (1 << 62)),
             urgency_bands=tuple(bands),
@@ -325,6 +353,8 @@ class MvpConfig:
             latency_decision_ns=lat.integer("decision_ns", 0, (1 << 62)),
             latency_risk_ns=lat.integer("risk_ns", 0, (1 << 62)),
             latency_wire_ns=lat.integer("wire_ns", 0, (1 << 62)),
+            child_policy=child_policy,
+            passive=passive,
         )
         if execution.parent_window_ns > cadence:
             raise ValueError(
@@ -378,14 +408,26 @@ class MvpConfig:
         return cls.from_document(doc, where=str(p), repo_root=repo_root)
 
     def with_overrides(
-        self, *, seed: int | None = None, instrument: str | None = None
+        self,
+        *,
+        seed: int | None = None,
+        instrument: str | None = None,
+        child_policy: str | None = None,
+        passive: Mapping[str, Any] | None = None,
     ) -> MvpConfig:
-        """A new config with ``seed`` / ``instrument`` replaced (re-validated)."""
+        """A new config with ``seed`` / ``instrument`` / the child execution
+        policy replaced (re-validated). The overridden document is what
+        ``run_id`` and ``config_version`` hash, so a policy run is a
+        different run from the pinned NATIVE one."""
         doc = json.loads(json.dumps(self.document))
         if seed is not None:
             doc["seed"] = seed
         if instrument is not None:
             doc["instrument"] = instrument
+        if child_policy is not None:
+            doc["execution"]["child_policy"] = child_policy
+        if passive is not None:
+            doc["execution"]["passive"] = dict(passive)
         return MvpConfig.from_document(doc, where="mvp.json (overridden)", repo_root=self.repo_root)
 
     # ---------------------------------------------------------- documents

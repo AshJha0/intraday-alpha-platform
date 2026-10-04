@@ -45,9 +45,10 @@ from __future__ import annotations
 
 import json
 from collections import deque
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 
-from iap.core.codec import iter_jsonl, write_iap1, write_jsonl
+from iap.core.codec import IAP1_HEADER_SIZE, encode_iap1, iter_jsonl, write_iap1, write_jsonl
 from iap.core.events import FIELDS, MarketEvent, validation_error
 
 #: Per-stream duplicate-detection window (sequences remembered), pinned.
@@ -135,15 +136,20 @@ def normalize_file(
     out_dir: Path,
     stream_qc: dict[str, _StreamQC],
     per_stream: dict[str, dict[str, int]],
+    events: Iterable[MarketEvent] | None = None,
 ) -> list[MarketEvent]:
     """Normalize one raw JSONL file; returns the kept, event-time-ordered events.
+
+    ``events``, when given, are the events of ``raw_path`` already in memory
+    (the caller has just written that file): they are used instead of
+    decoding it again.  They are modified in place, like decoded ones.
 
     ``stream_qc``/``per_stream`` are shared across files of a run so sequences
     that continue across sessions are checked continuously (and resets that
     happen at a session boundary are detected as resets, not duplicates).
     """
     kept: list[tuple[MarketEvent, int]] = []  # (event, stream epoch)
-    for ev in iter_jsonl(raw_path):
+    for ev in iter_jsonl(raw_path) if events is None else events:
         key = f"{ev.venue_id}:{ev.instrument_id}"
         counters = per_stream.get(key)
         if counters is None:
@@ -221,6 +227,22 @@ def normalize_file(
     return out
 
 
+#: One IAP1 record (schemas/FORMAT.md §2) as numpy structured-type fields.
+_IAP1_RECORD = [
+    ("event_id", "<u8"),
+    ("instrument_id", "<u4"),
+    ("venue_id", "<u2"),
+    ("event_type", "u1"),
+    ("side", "u1"),
+    ("exchange_ts", "<i8"),
+    ("receive_ts", "<i8"),
+    ("sequence", "<u8"),
+    ("price_ticks", "<i8"),
+    ("qty", "<i8"),
+    ("order_id", "<u8"),
+    ("trade_id", "<u8"),
+]
+
 _SCHEMA_TYPES = {
     "event_id": "uint64",
     "instrument_id": "uint32",
@@ -241,10 +263,13 @@ class _ParquetSink:
     """Streaming Parquet writer: one row group per normalized file."""
 
     def __init__(self, path: Path) -> None:
+        import numpy as np
         import pyarrow as pa
         import pyarrow.parquet as pq
 
         self._pa = pa
+        self._np = np
+        self._record = np.dtype(_IAP1_RECORD)
         fields = [pa.field(n, getattr(pa, t)()) for n, t in _SCHEMA_TYPES.items()]
         fields.append(pa.field("source", pa.string()))
         self.schema = pa.schema(fields)
@@ -255,8 +280,17 @@ class _ParquetSink:
         if not events:
             return
         pa = self._pa
-        cols = {name: [getattr(ev, name) for ev in events] for name in FIELDS}
-        arrays = [pa.array(cols[n], type=self.schema.field(n).type) for n in FIELDS]
+        # Columns come from the IAP1 record bytes through one structured
+        # numpy view (the same values as reading the 12 attributes of every
+        # event, without 12 Python passes over the list).
+        np = self._np
+        records = np.frombuffer(
+            encode_iap1(events), dtype=self._record, count=len(events), offset=IAP1_HEADER_SIZE
+        )
+        arrays = [
+            pa.array(np.ascontiguousarray(records[n]), type=self.schema.field(n).type)
+            for n in FIELDS
+        ]
         arrays.append(pa.array([stem] * len(events), type=pa.string()))
         self._writer.write_table(pa.table(arrays, schema=self.schema))
         self.rows += len(events)
@@ -265,8 +299,13 @@ class _ParquetSink:
         self._writer.close()
 
 
-def normalize_run(raw_dir, normalized_dir) -> dict:
+def normalize_run(
+    raw_dir, normalized_dir, preloaded: Mapping[str, Iterable[MarketEvent]] | None = None
+) -> dict:
     """Normalize every raw JSONL file in ``raw_dir``; write outputs + QC report.
+
+    ``preloaded`` maps a raw file NAME to the events of that file already in
+    memory; such a file is not decoded again (see :func:`normalize_file`).
 
     Returns the QC report dict (also written to
     ``normalized_dir/qc_report.json``).
@@ -284,7 +323,13 @@ def normalize_run(raw_dir, normalized_dir) -> dict:
     sink = _ParquetSink(normalized_dir / "events.parquet")
     try:
         for raw_path in raw_files:
-            kept = normalize_file(raw_path, normalized_dir, stream_qc, per_stream)
+            kept = normalize_file(
+                raw_path,
+                normalized_dir,
+                stream_qc,
+                per_stream,
+                preloaded.get(raw_path.name) if preloaded else None,
+            )
             sink.write(raw_path.stem, kept)
             file_counts[raw_path.name] = {
                 "events_out": len(kept),

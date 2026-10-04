@@ -2,7 +2,7 @@
   "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
   "description": "Fitted flagship-alpha parameters (iap.alpha). model linear_z_v1: er = beta * clip((raw - mu)/(sigma + 1e-12), +-z_clip); conf = min(1, |z|/conf_scale); a dead alpha (sigma <= 0 or beta == 0) scores (0, 0) on every row. The provenance header identifies the feature registry, the data and the commit these numbers were fitted with; every loader rejects a feature_version that differs from its engine's registry hash. See /API_ALPHA.md section 2.",
   "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
-  "git_commit": "29f0822534e3c6d74e09cbe393d5d58e6edf4919",
+  "git_commit": "75fd4f7901025d172a18e62c93252ca1770aeb4c",
   "git_dirty": true,
   "git_dirty_hash": "a1cb60d7b06295999e581ea66f375d920881be62214f127fa2cb5c684632ebe9",
   "params": {
@@ -369,8 +369,8 @@
     },
     "FX05": {
       "alpha_id": "FX05",
-      "beta": -8.126983387133811e-07,
-      "beta_fit": -8.126983387133811e-07,
+      "beta": -8.126983387133795e-07,
+      "beta_fit": -8.126983387133795e-07,
       "conf_scale": 2.0,
       "dead": false,
       "features": [
@@ -380,9 +380,9 @@
       "horizon": "5m",
       "hypothesis_confirmed": false,
       "model": "linear_z_v1",
-      "mu": 3.026040375843961e-07,
+      "mu": 3.0260403758439625e-07,
       "n_train": 7056,
-      "sigma": 1.5835545864007966e-05,
+      "sigma": 1.583554586400797e-05,
       "train_window": {
         "end_ts": 1787603100184527543,
         "start_ts": 1787529602028520532
@@ -391,8 +391,8 @@
     },
     "FX06": {
       "alpha_id": "FX06",
-      "beta": 5.291869550376537e-07,
-      "beta_fit": 5.291869550376537e-07,
+      "beta": 5.291869550376535e-07,
+      "beta_fit": 5.291869550376535e-07,
       "conf_scale": 2.0,
       "dead": false,
       "features": [
@@ -402,7 +402,7 @@
       "horizon": "30s",
       "hypothesis_confirmed": true,
       "model": "linear_z_v1",
-      "mu": 5.07054657305775e-07,
+      "mu": 5.070546573057738e-07,
       "n_train": 25249,
       "sigma": 1.926742617563642e-05,
       "train_window": {
@@ -516,7 +516,7 @@
       "horizon": "5m",
       "hypothesis_confirmed": true,
       "model": "linear_z_v1",
-      "mu": -0.11312898400897888,
+      "mu": -0.11312898400897889,
       "n_train": 15814,
       "sigma": 6.616610180243762,
       "train_window": {

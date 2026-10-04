@@ -48,20 +48,28 @@ public record RiskLimits(
             throw new IllegalArgumentException(
                     "risk.json: missing currency.conversion object");
         }
-        TreeMap<String, FxConversion> out = new TreeMap<>();
-        for (Map.Entry<String, Object> e : Json.object(table).entrySet()) {
-            if (!(e.getValue() instanceof Map)) {
-                throw new IllegalArgumentException(
-                        "risk.json: currency.conversion." + e.getKey()
-                                + " must be an object");
-            }
-            Map<String, Object> spec = Json.object(e.getValue());
+        // Entries are validated in the reference's order (its JSON object
+        // is a sorted map) and with its messages, so the first offending
+        // entry — and therefore the CONFIG_MISSING reason — is the same: a
+        // spec that is not an object has no instrument_id; a negative or
+        // non-integer id is "missing/invalid"; 0 and anything above
+        // u32::MAX is "out of u32 range".
+        TreeMap<String, Object> sorted = new TreeMap<>(RiskEngine.CODE_POINT_ORDER);
+        sorted.putAll(Json.object(table));
+        TreeMap<String, FxConversion> out = new TreeMap<>(RiskEngine.CODE_POINT_ORDER);
+        for (Map.Entry<String, Object> e : sorted.entrySet()) {
+            Map<String, Object> spec = e.getValue() instanceof Map
+                    ? Json.object(e.getValue()) : Map.of();
             Object iid = spec.get("instrument_id");
-            if (!(iid instanceof Long) || (Long) iid <= 0
-                    || (Long) iid > 0xFFFFFFFFL) {
+            if (!(iid instanceof Long) || (Long) iid < 0) {
                 throw new IllegalArgumentException(
                         "risk.json: currency.conversion." + e.getKey()
                                 + ".instrument_id missing/invalid");
+            }
+            if ((Long) iid == 0 || (Long) iid > 0xFFFFFFFFL) {
+                throw new IllegalArgumentException(
+                        "risk.json: currency.conversion." + e.getKey()
+                                + ".instrument_id out of u32 range");
             }
             Object inv = spec.get("invert");
             if (!(inv instanceof Boolean)) {
@@ -74,12 +82,15 @@ public record RiskLimits(
         return out;
     }
 
+    /**
+     * {@code doc[section]} with the reference's indexing semantics: a
+     * missing or non-object section has no keys, so the error names the
+     * first KEY that is then missing (never the section), exactly as
+     * {@code serde_json}'s {@code doc[section][key]} yields Null.
+     */
     private static Map<String, Object> section(Map<String, Object> doc, String name) {
         Object s = doc.get(name);
-        if (!(s instanceof Map)) {
-            throw new IllegalArgumentException("risk.json: missing section " + name);
-        }
-        return Json.object(s);
+        return s instanceof Map ? Json.object(s) : Map.of();
     }
 
     private static double needF64(Map<String, Object> doc, String section, String key) {
@@ -100,7 +111,8 @@ public record RiskLimits(
         double v = needF64(doc, section, key);
         if (v <= 0.0) {
             throw new IllegalArgumentException(
-                    "risk.json: " + section + "." + key + " must be > 0, got " + v);
+                    "risk.json: " + section + "." + key + " must be > 0, got "
+                            + OrderRequest.rustDisplay(v));
         }
         return v;
     }
@@ -140,11 +152,9 @@ public record RiskLimits(
             throw new IllegalArgumentException(
                     "risk.json: duplicate_order_window_ns must be >= 0");
         }
-        Object gapRaw = section(doc, "market_data").get("max_sequence_gap_before_halt");
-        if (!(gapRaw instanceof Long) || (Long) gapRaw < 0) {
-            throw new IllegalArgumentException(
-                    "risk.json: missing market_data.max_sequence_gap_before_halt");
-        }
+        // Arguments are evaluated left to right, i.e. in the reference's
+        // field order: the FIRST offending key decides the error, and that
+        // text is the CONFIG_MISSING reason every order is then audited with.
         return new RiskLimits(
                 needBool(doc, "global", "kill_switch_engaged"),
                 needPosF64(doc, "global", "max_gross_notional"),
@@ -160,10 +170,19 @@ public record RiskLimits(
                 needPosI64(doc, "per_instrument", "max_position_qty"),
                 needPosF64(doc, "per_instrument", "max_instrument_notional"),
                 needPosF64(doc, "per_strategy", "max_daily_loss"),
-                (Long) gapRaw,
+                sequenceGaps(doc),
                 needPosI64(doc, "market_data", "stale_feed_timeout_ns"),
                 reportingCcy(doc),
                 parseConversion(doc));
+    }
+
+    private static long sequenceGaps(Map<String, Object> doc) {
+        Object v = section(doc, "market_data").get("max_sequence_gap_before_halt");
+        if (!(v instanceof Long) || (Long) v < 0) {
+            throw new IllegalArgumentException(
+                    "risk.json: missing market_data.max_sequence_gap_before_halt");
+        }
+        return (Long) v;
     }
 
     private static String reportingCcy(Map<String, Object> doc) {

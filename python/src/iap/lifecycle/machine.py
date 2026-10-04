@@ -18,6 +18,11 @@ the outcome:
   failed evaluation increments ``consecutive_failures`` and the
   ``max_consecutive_failures``-th one demotes to CANDIDATE (counter reset);
   a passing evaluation resets the counter;
+* **a gate the policy leaves out**: under ``net_pnl_ci_gate = "absent"``
+  (the legacy policy) ``net_pnl_bootstrap_ci`` is not evaluated on the
+  CANDIDATE -> VALIDATING edge and appears in no result
+  (:meth:`AlphaLifecycle.edge_gates`); the transition table itself is the
+  same under either policy;
 * **silence**: an evaluation whose evidence block for the edge is absent
   (``research`` at CANDIDATE, ``validation`` at VALIDATING, ``paper`` at
   PAPER, ``live`` / a null or uninformative rolling IC at ACTIVE / WATCH)
@@ -26,9 +31,13 @@ the outcome:
   by construction: its ``ledger_entry_exists`` gate IS the presence check;
 * **live** (ACTIVE / WATCH): delegated unchanged to
   :class:`iap.adaptive.lifecycle.LifecycleTracker` with the pinned
-  ``adaptive.lifecycle`` gates and hysteresis; its ``Transition`` is wrapped
-  into a ``LifecycleTransition`` with ``gates = {"rolling_ic": ...}`` and the
-  tracker's policy name;
+  ``adaptive.lifecycle`` gates, hysteresis and retirement rule (the CUSUM
+  rule by default since v1.5.0, each reading weighted by
+  ``live.new_fraction``; the consecutive-breach rule when the config names
+  it); its ``Transition`` is wrapped into a ``LifecycleTransition`` with
+  ``gates = {"rolling_ic": ...}`` and the tracker's policy name.  The
+  tracker's counters and its CUSUM statistic are mirrored on the record
+  after every live evaluation, so a reloaded registry resumes exactly;
 * **RETIRED is terminal for SYSTEM**: the adaptive study lets a retired
   alpha recover to WATCH because shadow scoring continues inside one
   backtest; on the platform a retirement is final and re-entry is the HUMAN
@@ -61,7 +70,7 @@ from iap.contracts.types import (
 )
 from iap.lifecycle.config import PolicyConfig
 from iap.lifecycle.evidence import Evidence
-from iap.lifecycle.gates import Gate, build_gates
+from iap.lifecycle.gates import BOOTSTRAP_GATE, Gate, build_gates
 from iap.lifecycle.registry import (
     AlphaRecord,
     AlphaRegistry,
@@ -148,8 +157,10 @@ ALLOWED_TRANSITIONS: tuple[Edge, ...] = (
             "fold_count",
             "hypothesis_sign",
             "net_pnl_after_costs",
+            "net_pnl_bootstrap_ci",
             "capacity",
             "stability",
+            "cross_alpha_correlation",
         ),
     ),
     Edge(S.CANDIDATE, S.RESEARCH, EdgeKind.DEMOTION, Actor.SYSTEM, ("leakage_clean",)),
@@ -298,6 +309,7 @@ class AlphaLifecycle:
         rec.consecutive_failures = 0
         rec.breach_count = 0
         rec.recovery_count = 0
+        rec.cusum = 0.0
         self._trackers.pop(rec.alpha_id, None)
         return transition
 
@@ -325,6 +337,14 @@ class AlphaLifecycle:
             policy=self.config.policy if policy is None else policy,
             actor=actor,
         )
+
+    def edge_gates(self, edge: Edge) -> tuple[str, ...]:
+        """The gates this policy evaluates on ``edge``, in order: the edge's
+        list, without ``net_pnl_bootstrap_ci`` when the policy says the gate
+        is absent (``net_pnl_ci_gate = "absent"``, the legacy policy)."""
+        if self.config.net_pnl_ci_gate == "absent":
+            return tuple(name for name in edge.gates if name != BOOTSTRAP_GATE)
+        return edge.gates
 
     def advance(
         self, alpha_id: str, event_ts: int, evidence: Evidence
@@ -371,17 +391,18 @@ class AlphaLifecycle:
             )
             return None
 
+        names = self.edge_gates(edge)
         results: dict[str, GateResult] = {
-            name: self.gates[name].evaluate(rec.alpha_id, evidence) for name in edge.gates
+            name: self.gates[name].evaluate(rec.alpha_id, evidence) for name in names
         }
-        failed = [name for name in edge.gates if not results[name].passed]
+        failed = [name for name in names if not results[name].passed]
 
         if not failed:
             transition = self._transition(
                 rec,
                 edge,
                 event_ts,
-                f"all {len(edge.gates)} gates passed: {state.name} -> {edge.to_state.name}",
+                f"all {len(names)} gates passed: {state.name} -> {edge.to_state.name}",
                 results,
                 Actor.SYSTEM,
             )
@@ -455,6 +476,7 @@ class AlphaLifecycle:
                 state=rec.state.name,
                 breach_count=rec.breach_count,
                 recovery_count=rec.recovery_count,
+                cusum=rec.cusum,
             )
             self._trackers[rec.alpha_id] = tracker
         return tracker
@@ -480,11 +502,12 @@ class AlphaLifecycle:
             return None
         tracker = self._tracker(rec)
         n_before = len(tracker.transitions)
-        tracker.update(event_ts, live.rolling_ic, live.informative)
+        tracker.update(event_ts, live.rolling_ic, live.informative, new_fraction=live.new_fraction)
         gate = {"rolling_ic": self.gates["rolling_ic"].evaluate(rec.alpha_id, evidence)}
         if len(tracker.transitions) == n_before:
             rec.breach_count = tracker.breach_count
             rec.recovery_count = tracker.recovery_count
+            rec.cusum = tracker.cusum
             self._record_evaluation(
                 rec,
                 GateEvaluation(
@@ -517,6 +540,7 @@ class AlphaLifecycle:
         self._trackers[rec.alpha_id] = tracker
         rec.breach_count = tracker.breach_count
         rec.recovery_count = tracker.recovery_count
+        rec.cusum = tracker.cusum
         self._record_evaluation(
             rec,
             GateEvaluation(rec.alpha_id, event_ts, state, Outcome.TRANSITION, gate, 0, transition),

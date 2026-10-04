@@ -1,0 +1,11 @@
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: market_data.stale_feed_timeout_ns must be > 0, got 0","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000000000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: market_data.stale_feed_timeout_ns must be > 0, got 0","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000005000000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: market_data.stale_feed_timeout_ns must be > 0, got 0","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000005000830000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: market_data.stale_feed_timeout_ns must be > 0, got 0","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000005032830000}
+{"decision":1,"reason":"venue 1 reconnected","rule_id":"VENUE_RECONNECT","scope":"VENUE","scope_id":"1","severity":1,"timestamp":1700000005060830000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: market_data.stale_feed_timeout_ns must be > 0, got 0","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000005060830000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: market_data.stale_feed_timeout_ns must be > 0, got 0","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000005060841000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: market_data.stale_feed_timeout_ns must be > 0, got 0","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000005107841000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: market_data.stale_feed_timeout_ns must be > 0, got 0","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000006107841000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: market_data.stale_feed_timeout_ns must be > 0, got 0","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000006108397000}
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 2","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000006117397000}

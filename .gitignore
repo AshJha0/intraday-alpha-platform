@@ -5,6 +5,10 @@ data/normalized/
 data/orderbooks/
 data/features/
 # data/reference/feature_registry.json is tracked (the feature_version source)
+# --- real historical data (docs/REAL_DATA.md): files the owner obtained and
+# the datasets ingested from them. Vendor data is licensed - never commit it.
+/data/vendor/
+/data/real/
 # wall-clock timings of tools/regenerate_dataset_artifacts.py (not an artefact)
 data/regeneration_timings.json
 
@@ -54,3 +58,8 @@ python/.coverage
 # schemas/ is the source of truth; python/setup.py copies it into the wheel
 # at build time (iap/_schemas) — never into the source tree
 python/src/iap/_schemas/
+
+# --- risk differential-fuzz run (python/tools/risk_fuzz_nightly.py): fresh
+# scripts, engine reports and the minimised divergence - regenerate, never commit
+/risk_fuzz_work/
+/risk_fuzz_artifacts/

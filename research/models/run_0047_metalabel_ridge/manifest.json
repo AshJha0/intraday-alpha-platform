@@ -1,0 +1,77 @@
+{
+  "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
+  "experiment_id": "run_0047_metalabel_ridge",
+  "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
+  "features": [
+    "alpha_strength",
+    "alpha_signed",
+    "spread_bps",
+    "rvol_1m",
+    "log_depth_l1",
+    "queue_imbalance_signed",
+    "half_spread_cost_bps",
+    "expected_impact_bps"
+  ],
+  "folds": [
+    {
+      "n": 8240,
+      "segment": "train",
+      "window": [
+        1787584795519436153,
+        1787645596375338687
+      ]
+    },
+    {
+      "n": 4104,
+      "segment": "calibration",
+      "window": [
+        1787645680344878882,
+        1787669849618959780
+      ]
+    },
+    {
+      "n": 4100,
+      "segment": "test",
+      "window": [
+        1787669921367386257,
+        1787691459285005656
+      ]
+    }
+  ],
+  "git_commit": "75fd4f7901025d172a18e62c93252ca1770aeb4c",
+  "git_dirty": true,
+  "git_dirty_hash": "cde690e137600f458593cab7cba29f7adc85b2e99742fbb7cdfd98f5ca7c314c",
+  "hardware": {
+    "cpu_count": 4,
+    "cpu_model": "AMD EPYC 7763 64-Core Processor",
+    "machine": "x86_64",
+    "python": "3.11.16",
+    "system": "Linux"
+  },
+  "hyperparams": {
+    "impute_nan": false,
+    "learning_rate": 0.1,
+    "max_depth": 3,
+    "max_iter": 80,
+    "min_samples_leaf": 50,
+    "random_state": 7
+  },
+  "library_versions": {
+    "lightgbm": "4.7.0",
+    "numpy": "2.4.6",
+    "pandas": "3.0.6",
+    "pyarrow": "25.0.1",
+    "sklearn": "1.9.1",
+    "xgboost": "3.2.0"
+  },
+  "model_version": "metalabel_isotonic_v1",
+  "target": "meta_label_net_pnl_positive (1 iff the primary signal's realized net P&L > 0 under the conservative cost model; primary = ridge)",
+  "test_window": {
+    "end_ts": 1787691459285005656,
+    "start_ts": 1787669921367386257
+  },
+  "train_window": {
+    "end_ts": 1787645596375338687,
+    "start_ts": 1787584795519436153
+  }
+}

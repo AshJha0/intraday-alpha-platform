@@ -3,7 +3,9 @@
 Frames are the parquet files written by ``python3 -m iap.features``
 (``data/features/features_<instrument_id>.parquet``): one row per emission,
 sorted by ``exchange_ts``, feature columns NaN where invalid, plus label
-columns ``label_mid_<h> / label_cost_<h> / label_valid_<h>``.
+columns ``label_mid_<h> / label_cost_<h> / label_valid_<h> /
+label_reason_<h> / label_reopen_<h>``.  Every ``label_*`` column looks
+ahead by construction; none of them may enter a score.
 
 Grid helpers give cross-sectional alphas a shared causal clock: an
 event-time grid at fixed step; each instrument contributes its latest
@@ -21,7 +23,13 @@ import pandas as pd
 
 NS_DAY = 86_400_000_000_000
 
-LABEL_PREFIXES = ("label_mid_", "label_cost_", "label_valid_")
+LABEL_PREFIXES = (
+    "label_mid_",
+    "label_cost_",
+    "label_valid_",
+    "label_reason_",
+    "label_reopen_",
+)
 
 
 def label_columns(df: pd.DataFrame) -> list[str]:

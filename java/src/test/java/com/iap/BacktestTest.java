@@ -6,13 +6,10 @@ import static org.junit.Assert.assertTrue;
 
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.Map;
 import java.util.TreeMap;
 
 import org.junit.Test;
 
-import com.iap.alpha.Alphas;
-import com.iap.alpha.LinearZParams;
 import com.iap.backtest.BacktestEngine;
 import com.iap.backtest.CostModel;
 import com.iap.backtest.ResearchBacktester;
@@ -24,19 +21,17 @@ import com.iap.execution.InstrumentSpec;
 import com.iap.execution.LatencyConfig;
 import com.iap.execution.OrderState;
 import com.iap.execution.VenueSpec;
-import com.iap.features.FeatureEngine;
-import com.iap.features.FeatureVector;
 import com.iap.features.Features;
 
 /**
  * Backtest-engine tests (spec section 18), two layers:
  *
  * <ul>
- *   <li>{@link ResearchBacktester} golden parity — the EQ01 run of
- *       tests/golden/expected_backtest.json reproduced END-TO-END through
- *       the native Java feature engine + alpha scorer (1e-9; counts exact),
- *       plus the accounting identity and the pinned latency/carry rules on
- *       synthetic frames;</li>
+ *   <li>{@link ResearchBacktester} / {@link CostModel} rules on hand-built
+ *       frames — the pinned latency/carry rules, the cost-aware position
+ *       policy, the L1 fill cap, the row block, both impact rules and the
+ *       breakeven capacity (the golden replay of both rule sets is
+ *       {@link BacktestGoldenTest});</li>
  *   <li>the production event-driven {@link BacktestEngine} — accounting
  *       identity, determinism, checkpoint/restart equivalence, risk-hook
  *       clamping and child-order capping on the golden EQ vector.</li>
@@ -46,46 +41,14 @@ public class BacktestTest {
     private static final double TICK = 0.01;
     private static final double ADV = 38_000_000.0;
 
-    // -- shared golden EQ frame (engine rows + EQ01 scores), cached --------
+    /** No fee, no impact under either rule: only the spread is charged. */
+    private static final CostModel ZERO_COST =
+            new CostModel(0.0, 0.0, 0.0, 1.0, CostModel.LEGACY_IMPACT_MODEL, 0.0);
 
-    private static List<FeatureVector> rows;
-
-    private static synchronized List<FeatureVector> eqRows() {
-        if (rows == null) {
-            TreeMap<Long, Double> ticks = new TreeMap<>();
-            ticks.put(1L, TICK);
-            rows = new FeatureEngine(ticks, 0).run(Golden.eq());
-        }
-        return rows;
-    }
-
-    private static ResearchBacktester.Result goldenEq01Run() {
-        List<FeatureVector> r = eqRows();
-        int n = r.size();
-        long[] ts = new long[n];
-        double[] mid = new double[n];
-        double[] hs = new double[n];
-        double[] er = new double[n];
-        double[] conf = new double[n];
-        LinearZParams p = Alphas.loadParams(
-                Paths.get("..", "configs", "strategies", "alpha_params.json"))
-                .get("EQ01");
-        for (int i = 0; i < n; i++) {
-            FeatureVector v = r.get(i);
-            ts[i] = v.timestamp;
-            mid[i] = v.valid[Features.MID_PRICE]
-                    ? v.values[Features.MID_PRICE] : Double.NaN;
-            hs[i] = v.valid[Features.SPREAD_TICKS]
-                    ? v.values[Features.SPREAD_TICKS] * TICK / 2.0 : Double.NaN;
-            var sig = Alphas.scoreRow(p, v);
-            er[i] = sig.expectedReturn();
-            conf[i] = sig.confidence();
-        }
-        CostModel cm = CostModel.load(
-                Paths.get("..", "configs", "execution", "execution.json"), 1.0);
-        // Pinned golden config: max_pos 1000, conf_min 0.2, latency 1 row.
-        ResearchBacktester bt = new ResearchBacktester(cm, 1000, 0.2, 1);
-        return bt.run(1, ts, mid, hs, er, conf, "EQUITY", ADV, 100.0);
+    private static ResearchBacktester legacyBacktester(long maxPosQty,
+            double confMin, int latencyRows) {
+        return new ResearchBacktester(ZERO_COST,
+                ResearchBacktester.Config.legacy(maxPosQty, confMin, latencyRows));
     }
 
     private static void near(double got, double want, String what) {
@@ -94,40 +57,11 @@ public class BacktestTest {
     }
 
     @Test
-    public void eq01GoldenBacktestReproduced() {
-        Map<String, Object> g = Golden.json("expected_backtest.json");
-        assertEquals("EQ01", g.get("alpha_id"));
-        ResearchBacktester.Result r = goldenEq01Run();
-        assertEquals(Json.asLong(g.get("n_rows")), r.nRows);
-        assertEquals(Json.asLong(g.get("trade_count")), r.tradeCount);
-        assertEquals(Json.asLong(g.get("traded_qty")), r.tradedQty);
-        near(r.totalPnl, Json.asDouble(g.get("total_pnl")), "total_pnl");
-        near(r.grossPnl, Json.asDouble(g.get("gross_pnl")), "gross_pnl");
-        near(r.totalCosts, Json.asDouble(g.get("total_costs")), "total_costs");
-        near(r.spreadCost, Json.asDouble(g.get("spread_cost")), "spread_cost");
-        near(r.feeCost, Json.asDouble(g.get("fee_cost")), "fee_cost");
-        near(r.impactCost, Json.asDouble(g.get("impact_cost")), "impact_cost");
-    }
-
-    @Test
-    public void researchAccountingIdentity() {
-        // total_pnl = gross_pnl - total_costs, and the cost components sum.
-        ResearchBacktester.Result r = goldenEq01Run();
-        near(r.totalCosts, r.spreadCost + r.feeCost + r.impactCost,
-                "cost components");
-        near(r.totalPnl, r.grossPnl - r.totalCosts, "identity");
-        // The equity curve ends at total_pnl.
-        assertEquals(r.nRows, r.equity.length);
-        assertEquals(r.totalPnl, r.equity[r.nRows - 1], 0.0);
-    }
-
-    @Test
     public void researchInvalidRowCarriesPosition() {
         // Decision at row 0 (latency 1) targets row 1; row 1 is untradeable
         // (NaN mid) so the flat position CARRIES (stale target not queued);
         // the row-1 decision then executes at row 2.
-        CostModel cm = new CostModel(0.0, 0.0, 0.0, 1.0);
-        ResearchBacktester bt = new ResearchBacktester(cm, 10, 0.5, 1);
+        ResearchBacktester bt = legacyBacktester(10, 0.5, 1);
         long[] ts = {0, 1, 2, 3};
         double[] mid = {100.0, Double.NaN, 100.0, 101.0};
         double[] hs = {0.0, Double.NaN, 0.0, 0.0};
@@ -147,8 +81,7 @@ public class BacktestTest {
 
     @Test
     public void researchZeroLatencyExecutesSameRow() {
-        CostModel cm = new CostModel(0.0, 0.0, 0.0, 1.0);
-        ResearchBacktester bt = new ResearchBacktester(cm, 5, 0.5, 0);
+        ResearchBacktester bt = legacyBacktester(5, 0.5, 0);
         long[] ts = {0, 1};
         double[] mid = {100.0, 102.0};
         double[] hs = {0.0, 0.0};
@@ -162,24 +95,242 @@ public class BacktestTest {
 
     @Test
     public void researchValidationThrows() {
-        CostModel cm = new CostModel(0.0, 0.0, 0.0, 1.0);
         try {
-            new ResearchBacktester(cm, 0, 0.5, 1);
+            ResearchBacktester.Config.legacy(0, 0.5, 1);
             throw new AssertionError("max_pos 0 must throw");
         } catch (IllegalArgumentException expected) {
             // pinned
         }
         try {
-            new ResearchBacktester(cm, 10, 0.5, -1);
+            ResearchBacktester.Config.legacy(10, 0.5, -1);
             throw new AssertionError("negative latency must throw");
         } catch (IllegalArgumentException expected) {
             // pinned
         }
         try {
-            new ResearchBacktester(cm, 10, 0.5, 1).run(1, new long[2],
+            new ResearchBacktester.Config(10, 0.5, 1, "momentum", 0L, 0.5, false,
+                    false);
+            throw new AssertionError("unknown position policy must throw");
+        } catch (IllegalArgumentException expected) {
+            // pinned
+        }
+        try {
+            ResearchBacktester.Config.defaults(10, 0.5, 1).withHysteresis(1.5);
+            throw new AssertionError("hysteresis above 1 must throw");
+        } catch (IllegalArgumentException expected) {
+            // pinned
+        }
+        try {
+            ResearchBacktester.Config.defaults(10, 0.5, 1).forHorizon(0L);
+            throw new AssertionError("horizon 0 must throw");
+        } catch (IllegalArgumentException expected) {
+            // pinned
+        }
+        try {
+            legacyBacktester(10, 0.5, 1).run(1, new long[2],
                     new double[1], new double[2], new double[2], new double[2],
                     "EQUITY", ADV, 1.0);
             throw new AssertionError("misaligned arrays must throw");
+        } catch (IllegalArgumentException expected) {
+            // pinned
+        }
+    }
+
+    @Test
+    public void researchDefaultsAreTheV2RulesAndLegacyIsNamed() {
+        ResearchBacktester.Config d = ResearchBacktester.Config.defaults(1000, 0.5, 1);
+        assertEquals("cost_aware", d.positionPolicy());
+        assertEquals(ResearchBacktester.DEFAULT_POSITION_POLICY, d.positionPolicy());
+        assertTrue(d.capFillsAtL1());
+        assertTrue(d.blockRows());
+        assertEquals(0.5, d.hysteresis(), 0.0);
+        assertEquals(ResearchBacktester.NO_HORIZON, d.horizonNs());
+        assertEquals(10_000_000_000L, d.forHorizon(10_000_000_000L).horizonNs());
+        ResearchBacktester.Config l = ResearchBacktester.Config.legacy(1000, 0.5, 1);
+        assertEquals("sign", l.positionPolicy());
+        assertFalse(l.capFillsAtL1());
+        assertFalse(l.blockRows());
+        // the cost model: square root by default, linear by name
+        CostModel cm = new CostModel(2.0, 0.003, 2.5, 1.0);
+        assertEquals("sqrt", cm.impactModel());
+        assertEquals(CostModel.DEFAULT_SQRT_IMPACT_COEFF_BPS, cm.sqrtImpactCoeffBps(), 0.0);
+        assertEquals("linear", cm.withLinearImpact().impactModel());
+        assertEquals("sqrt", cm.withLinearImpact().withSqrtImpact(50.0).impactModel());
+        assertEquals(2.0, cm.withMultiplier(2.0).multiplier(), 0.0);
+        CostModel loaded = CostModel.load(
+                Paths.get("..", "configs", "execution", "execution.json"), 1.0);
+        assertEquals("sqrt", loaded.impactModel());
+        assertEquals("linear", CostModel.loadLegacyLinear(
+                Paths.get("..", "configs", "execution", "execution.json"), 1.0)
+                .impactModel());
+    }
+
+    @Test
+    public void researchCostAwareNeedsHorizon() {
+        // The default policy without the label horizon is an error, never a
+        // silent fall-back to the legacy rule.
+        ResearchBacktester bt = new ResearchBacktester(ZERO_COST,
+                new ResearchBacktester.Config(10, 0.5, 0, "cost_aware",
+                        ResearchBacktester.NO_HORIZON, 0.5, false, false));
+        try {
+            bt.run(1, new long[] {0}, new double[] {100.0}, new double[] {0.01},
+                    new double[] {1e-3}, new double[] {1.0}, "EQUITY", ADV, 1.0);
+            throw new AssertionError("cost_aware without horizon_ns must throw");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("needs horizon_ns"));
+        }
+    }
+
+    @Test
+    public void researchCostAwareEntersHoldsFlipsRenewsAndCloses() {
+        // mid 100, half-spread 0.01, no fee: the round-trip cost is
+        // 2 * 0.01 / 100 = 2e-4 as a return; horizon 5 ns, hysteresis 0.5.
+        ResearchBacktester bt = new ResearchBacktester(ZERO_COST,
+                new ResearchBacktester.Config(10, 0.5, 0, "cost_aware", 5L, 0.5,
+                        false, false));
+        long[] ts = {0, 1, 2, 3, 8, 13, 14};
+        double[] mid = {100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0};
+        double[] hs = {0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01};
+        double[] er = {
+            1e-4,     // below the round-trip cost: stay flat
+            3e-4,     // clears it: enter long at ts 1
+            -1e-4,    // opposite but below the cost: the hold continues
+            -3e-4,    // opposite and clears it: flip short, clock restarts at 3
+            -1.5e-4,  // horizon elapsed; same side clears 0.5 * cost: renew
+            -0.5e-4,  // horizon elapsed; does not clear the hysteresis: close
+            3e-4,     // clears the cost but confidence is below conf_min
+        };
+        double[] conf = {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.1};
+        ResearchBacktester.Result r =
+                bt.run(1, ts, mid, hs, er, conf, "EQUITY", ADV, 1.0);
+        double[] want = {0.0, 10.0, 10.0, -10.0, -10.0, 0.0, 0.0};
+        for (int i = 0; i < want.length; i++) {
+            assertEquals("position at row " + i, want[i], r.positions[i], 0.0);
+        }
+        assertEquals(3, r.tradeCount);
+        assertEquals(40, r.tradedQty);
+        // flat mid: the run pays exactly the spread on 40 units
+        near(r.spreadCost, 40 * 0.01, "spread");
+        near(r.totalPnl, -40 * 0.01, "total");
+        // an invalid half-spread has no threshold: the row cannot open
+        double[] signs = ResearchBacktester.costAwareTargets(new long[] {0, 1},
+                new double[] {1e-3, 1e-3}, new double[] {1.0, 1.0},
+                new double[] {Double.NaN, 2e-4}, 0.5, 5L, 0.5);
+        assertEquals(0.0, signs[0], 0.0);
+        assertEquals(1.0, signs[1], 0.0);
+    }
+
+    @Test
+    public void researchFillsAreCappedAtDisplayedSize() {
+        // sign policy, latency 0, cap ON: a buy takes the ask size, a sell
+        // the bid size; a missing or zero size fills nothing; the unfilled
+        // remainder is not queued (the next row trades toward ITS target).
+        ResearchBacktester bt = new ResearchBacktester(ZERO_COST,
+                new ResearchBacktester.Config(1000, 0.5, 0, "sign", 0L, 0.5, true,
+                        false));
+        long[] ts = {0, 1, 2, 3, 4, 5};
+        double[] mid = {100.0, 100.0, 100.0, 100.0, 100.0, 100.0};
+        double[] hs = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        double[] er = {1e-4, 1e-4, 1e-4, 1e-4, -1e-4, -1e-4};
+        double[] conf = {1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
+        double[] ask = {300.0, Double.NaN, 500.0, 400.0, 9000.0, 9000.0};
+        double[] bid = {9000.0, 9000.0, 9000.0, 9000.0, 0.0, 2500.0};
+        ResearchBacktester.Result r = bt.run(1, ts, mid, hs, er, conf, bid, ask,
+                null, "EQUITY", ADV, 1.0);
+        double[] want = {300.0, 300.0, 800.0, 1000.0, 1000.0, -1000.0};
+        for (int i = 0; i < want.length; i++) {
+            assertEquals("position at row " + i, want[i], r.positions[i], 0.0);
+        }
+        assertEquals(4, r.tradeCount);
+        assertEquals(3000, r.tradedQty);
+        try {
+            bt.run(1, ts, mid, hs, er, conf, "EQUITY", ADV, 1.0);
+            throw new AssertionError("cap_fills_at_l1 without sizes must throw");
+        } catch (IllegalArgumentException expected) {
+            // pinned
+        }
+    }
+
+    @Test
+    public void researchBlockedRowsMakeNoDecision() {
+        // sign policy, latency 1, row block ON: the blocked row 1 produces
+        // no target, so row 2 carries the position instead of flipping.
+        ResearchBacktester bt = new ResearchBacktester(ZERO_COST,
+                new ResearchBacktester.Config(10, 0.5, 1, "sign", 0L, 0.5, false,
+                        true));
+        long[] ts = {0, 1, 2, 3};
+        double[] mid = {100.0, 100.0, 100.0, 100.0};
+        double[] hs = {0.0, 0.0, 0.0, 0.0};
+        double[] er = {1e-4, -1e-4, -1e-4, -1e-4};
+        double[] conf = {1.0, 1.0, 1.0, 1.0};
+        boolean[] allowed = {true, false, true, true};
+        ResearchBacktester.Result r = bt.run(1, ts, mid, hs, er, conf, null, null,
+                allowed, "EQUITY", ADV, 1.0);
+        double[] want = {0.0, 10.0, 10.0, -10.0};
+        for (int i = 0; i < want.length; i++) {
+            assertEquals("position at row " + i, want[i], r.positions[i], 0.0);
+        }
+        try {
+            bt.run(1, ts, mid, hs, er, conf, "EQUITY", ADV, 1.0);
+            throw new AssertionError("block_rows without a mask must throw");
+        } catch (IllegalArgumentException expected) {
+            // pinned
+        }
+    }
+
+    @Test
+    public void costModelImpactRulesAndBreakeven() {
+        CostModel sqrt = new CostModel(2.0, 0.003, 2.5, 1.0);
+        CostModel linear = sqrt.withLinearImpact();
+        // 1 000 shares in a 5 M-share ADV at 50: participation 2e-4
+        double[] s = sqrt.costComponents(-1000, 50.0, 0.01, "EQUITY", 5e6, 100.0);
+        double[] l = linear.costComponents(-1000, 50.0, 0.01, "EQUITY", 5e6, 100.0);
+        assertEquals(1000 * 0.01, s[0], 1e-12);
+        assertEquals(1000 * 0.003, s[1], 1e-12);
+        assertEquals(100.0 * Math.sqrt(2e-4) * 1e-4 * 1000 * 50.0, s[2], 1e-9);
+        assertEquals(2.0 * (2e-4 * 100.0) * 1e-4 * 1000 * 50.0, l[2], 1e-12);
+        assertEquals(s[0], l[0], 0.0);
+        assertEquals(s[1], l[1], 0.0);
+        assertEquals(100.0 * Math.sqrt(2e-4), sqrt.impactBps(2e-4), 1e-12);
+        assertEquals(0.04, linear.impactBps(2e-4), 1e-12);
+        // round trip: (2 * 0.01 + 2 * 0.003) / 50 = 5.2e-4
+        assertEquals(5.2e-4, sqrt.roundTripCostReturn(50.0, 0.01, "EQUITY"), 1e-15);
+        assertEquals(2 * 5.2e-4,
+                sqrt.withMultiplier(2.0).roundTripCostReturn(50.0, 0.01, "EQUITY"),
+                1e-15);
+        assertTrue(Double.isNaN(sqrt.roundTripCostReturn(Double.NaN, 0.01, "EQUITY")));
+        assertTrue(Double.isNaN(sqrt.roundTripCostReturn(50.0, -0.01, "EQUITY")));
+        assertTrue(Double.isNaN(sqrt.roundTripCostReturn(0.0, 0.01, "EQUITY")));
+        // breakeven: an edge below spread + fee has no capacity
+        assertEquals(0.0, sqrt.breakevenSize(5e-4, 50.0, 0.01, "EQUITY", 5e6, 100.0),
+                0.0);
+        // edge 7.2e-4 leaves 2e-4: 1 bp per leg; sqrt -> (1/100)^2 of ADV,
+        // linear -> 1 / (2 * 100) of ADV
+        near(sqrt.breakevenSize(7.2e-4, 50.0, 0.01, "EQUITY", 5e6, 100.0),
+                1e-4 * 5e6, "sqrt breakeven");
+        near(linear.breakevenSize(7.2e-4, 50.0, 0.01, "EQUITY", 5e6, 100.0),
+                5e6 / 200.0, "linear breakeven");
+        // no impact charged: nothing bounds the size
+        assertTrue(Double.isInfinite(sqrt.withSqrtImpact(0.0)
+                .breakevenSize(7.2e-4, 50.0, 0.01, "EQUITY", 5e6, 100.0)));
+        double[] cap = sqrt.capacityBreakeven(7.2e-4, 50.0, 0.01, "EQUITY", 5e6, 100.0);
+        near(cap[1], cap[0] * 50.0, "notional");
+        near(cap[2], cap[0] / 5e6, "participation");
+        try {
+            new CostModel(2.0, 0.003, 2.5, 1.0, "quadratic", 100.0);
+            throw new AssertionError("unknown impact model must throw");
+        } catch (IllegalArgumentException expected) {
+            // pinned
+        }
+        try {
+            sqrt.withSqrtImpact(-1.0);
+            throw new AssertionError("negative sqrt coefficient must throw");
+        } catch (IllegalArgumentException expected) {
+            // pinned
+        }
+        try {
+            sqrt.costComponents(1, 50.0, 0.01, "BOND", 5e6, 1.0);
+            throw new AssertionError("unknown asset class must throw");
         } catch (IllegalArgumentException expected) {
             // pinned
         }

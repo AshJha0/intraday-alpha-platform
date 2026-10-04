@@ -1,0 +1,7 @@
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: market_data.stale_feed_timeout_ns must be > 0, got 0","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000024378000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: market_data.stale_feed_timeout_ns must be > 0, got 0","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000153378000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: market_data.stale_feed_timeout_ns must be > 0, got 0","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000153880000}
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 2","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700000000158697000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: market_data.stale_feed_timeout_ns must be > 0, got 0","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000200978000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: market_data.stale_feed_timeout_ns must be > 0, got 0","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000240978000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: market_data.stale_feed_timeout_ns must be > 0, got 0","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000293978000}

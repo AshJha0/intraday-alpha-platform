@@ -1,5 +1,6 @@
 //! Persistent lifecycle state (`iap.lifecycle.registry`): the alpha registry
-//! (`research/alpha_registry.json`, `x-version` 1) and the append-only
+//! (`research/alpha_registry.json`, `x-version` 2 — each record carries the
+//! `cusum` statistic of the live retirement rule) and the append-only
 //! transition log (`research/lifecycle_transitions.jsonl`).
 //!
 //! The registry file is Python `json.dumps(sort_keys=True, indent=2,
@@ -18,8 +19,8 @@ use serde_json::{json, Map, Value};
 use crate::machine::{GateEvaluation, LifecycleTransition};
 use crate::state::LifecycleState;
 
-/// `x-version` of `research/alpha_registry.json`.
-pub const REGISTRY_VERSION: u64 = 1;
+/// `x-version` of `research/alpha_registry.json` (2 since v1.5.0: `cusum`).
+pub const REGISTRY_VERSION: u64 = 2;
 
 const REGISTRY_DESCRIPTION: &str =
     "Alpha promotion lifecycle registry (iap.lifecycle). One record per alpha: \
@@ -56,6 +57,9 @@ pub struct AlphaRecord {
     pub breach_count: u64,
     /// Live recovery counter (mirrors the tracker).
     pub recovery_count: u64,
+    /// CUSUM statistic of the live retirement rule (finite, >= 0; 0.0
+    /// outside ACTIVE / WATCH and under the consecutive rule).
+    pub cusum: f64,
 }
 
 fn check_optional_sha(value: &Option<String>, name: &str) -> Result<(), IapError> {
@@ -83,13 +87,19 @@ impl AlphaRecord {
             consecutive_failures: 0,
             breach_count: 0,
             recovery_count: 0,
+            cusum: 0.0,
         };
         rec.validate()?;
         Ok(rec)
     }
 
-    /// Id alphabet and hash patterns.
+    /// Id alphabet, hash patterns and a finite non-negative statistic.
     pub fn validate(&self) -> Result<(), IapError> {
+        if !(self.cusum.is_finite() && self.cusum >= 0.0) {
+            return Err(IapError::Validation(
+                "AlphaRecord.cusum: expected a finite number >= 0".to_string(),
+            ));
+        }
         if !is_generic_id(&self.alpha_id) {
             return Err(IapError::Validation(format!(
                 "AlphaRecord: {:?} is not a valid alpha id",
@@ -134,6 +144,7 @@ impl AlphaRecord {
             "consecutive_failures": self.consecutive_failures,
             "breach_count": self.breach_count,
             "recovery_count": self.recovery_count,
+            "cusum": self.cusum,
         }))
     }
 
@@ -157,6 +168,7 @@ impl AlphaRecord {
             "consecutive_failures",
             "breach_count",
             "recovery_count",
+            "cusum",
         ];
         for key in expected {
             if !doc.contains_key(key) {
@@ -212,6 +224,9 @@ impl AlphaRecord {
             consecutive_failures: count("consecutive_failures")?,
             breach_count: count("breach_count")?,
             recovery_count: count("recovery_count")?,
+            cusum: doc["cusum"]
+                .as_f64()
+                .ok_or_else(|| err("cusum: expected a number".to_string()))?,
         };
         rec.validate()?;
         Ok(rec)
@@ -445,8 +460,22 @@ mod tests {
         let mut wrong = doc.clone();
         wrong["alphas"]["EQ01"]["state_index"] = json!(3);
         assert!(AlphaRegistry::from_value(&wrong).is_err());
+        let mut wrong = doc.clone();
+        wrong["x-version"] = json!(1);
+        assert!(
+            AlphaRegistry::from_value(&wrong).is_err(),
+            "a v1.4.0 registry"
+        );
+        // the statistic is required, finite and non-negative
+        assert_eq!(doc["alphas"]["EQ01"]["cusum"], json!(0.0));
+        let mut wrong = doc.clone();
+        wrong["alphas"]["EQ01"]["cusum"] = json!(-0.5);
+        assert!(AlphaRegistry::from_value(&wrong).is_err());
         let mut wrong = doc;
-        wrong["x-version"] = json!(2);
+        wrong["alphas"]["EQ01"]
+            .as_object_mut()
+            .expect("object")
+            .remove("cusum");
         assert!(AlphaRegistry::from_value(&wrong).is_err());
     }
 }

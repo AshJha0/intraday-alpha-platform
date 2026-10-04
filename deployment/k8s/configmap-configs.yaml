@@ -13,7 +13,7 @@ metadata:
 data:
   execution__execution.json: |
     {
-      "x-version": 1,
+      "x-version": 2,
       "description": "Execution/SOR controls consumed by the Java BacktestEngine/PaperTrading (ConfigService.executionLimits/sorOptions) and the research cost model. ENFORCED (PLATFORM_CONVENTIONS.md section 11.3-11.4): defaults.max_participation (share of session volume a child may take), defaults.min_slice_interval_ns (per-instrument child spacing), defaults.latency_budget_ns (decision-to-arrival budget; a venue path slower than it blocks the child), defaults.max_child_qty (algo slices above it are split), sor.prefer_rebate and sor.max_venue_latency_ns (venues with a slower latency_mean_ns are ineligible; a stale/halted venue is never eligible). Violations block the order and are counted (BacktestEngine.Counters).",
       "defaults": {
         "algo": "TWAP",
@@ -38,7 +38,9 @@ data:
         }
       },
       "cost_model": {
-        "description": "Research-backtester cost model (iap.backtest.costs): cost = half_spread + fee + impact; impact_bps = impact_coeff_bps_per_pct_adv * (|child_qty| * qty_unit / adv * 100) with qty_unit = lot_size for FX and 1 for equities (base units, identical to the C++/Java simulator rule 6). Fees mirror configs/venues/venues.json primary venues (XV1 equities taker, PRI FX).",
+        "description": "Research-backtester cost model (iap.backtest.costs): cost = half_spread + fee + impact, with qty_unit = lot_size for FX and 1 for equities (base units). impact_model names the research impact rule (x-version 2, v1.5.0): 'sqrt' (default) is impact_bps = sqrt_impact_coeff_bps * sqrt(|child_qty| * qty_unit / adv), the coefficient being the impact in bps of trading one full ADV; 'linear' is the legacy rule impact_bps = impact_coeff_bps_per_pct_adv * (|child_qty| * qty_unit / adv * 100). The execution simulator (C++/Java/Python rule 6) reads impact_coeff_bps_per_pct_adv only and stays linear. Fees mirror configs/venues/venues.json primary venues (XV1 equities taker, PRI FX).",
+        "impact_model": "sqrt",
+        "sqrt_impact_coeff_bps": 100.0,
         "impact_coeff_bps_per_pct_adv": 2.0,
         "equity_taker_fee_per_share": 0.003,
         "fx_commission_per_million": 2.5,
@@ -749,7 +751,7 @@ data:
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
       "description": "Fitted flagship-alpha parameters (iap.alpha). model linear_z_v1: er = beta * clip((raw - mu)/(sigma + 1e-12), +-z_clip); conf = min(1, |z|/conf_scale); a dead alpha (sigma <= 0 or beta == 0) scores (0, 0) on every row. The provenance header identifies the feature registry, the data and the commit these numbers were fitted with; every loader rejects a feature_version that differs from its engine's registry hash. See /API_ALPHA.md section 2.",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
-      "git_commit": "29f0822534e3c6d74e09cbe393d5d58e6edf4919",
+      "git_commit": "75fd4f7901025d172a18e62c93252ca1770aeb4c",
       "git_dirty": true,
       "git_dirty_hash": "a1cb60d7b06295999e581ea66f375d920881be62214f127fa2cb5c684632ebe9",
       "params": {
@@ -1116,8 +1118,8 @@ data:
         },
         "FX05": {
           "alpha_id": "FX05",
-          "beta": -8.126983387133811e-07,
-          "beta_fit": -8.126983387133811e-07,
+          "beta": -8.126983387133795e-07,
+          "beta_fit": -8.126983387133795e-07,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -1127,9 +1129,9 @@ data:
           "horizon": "5m",
           "hypothesis_confirmed": false,
           "model": "linear_z_v1",
-          "mu": 3.026040375843961e-07,
+          "mu": 3.0260403758439625e-07,
           "n_train": 7056,
-          "sigma": 1.5835545864007966e-05,
+          "sigma": 1.583554586400797e-05,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -1138,8 +1140,8 @@ data:
         },
         "FX06": {
           "alpha_id": "FX06",
-          "beta": 5.291869550376537e-07,
-          "beta_fit": 5.291869550376537e-07,
+          "beta": 5.291869550376535e-07,
+          "beta_fit": 5.291869550376535e-07,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -1149,7 +1151,7 @@ data:
           "horizon": "30s",
           "hypothesis_confirmed": true,
           "model": "linear_z_v1",
-          "mu": 5.07054657305775e-07,
+          "mu": 5.070546573057738e-07,
           "n_train": 25249,
           "sigma": 1.926742617563642e-05,
           "train_window": {
@@ -1263,7 +1265,7 @@ data:
           "horizon": "5m",
           "hypothesis_confirmed": true,
           "model": "linear_z_v1",
-          "mu": -0.11312898400897888,
+          "mu": -0.11312898400897889,
           "n_train": 15814,
           "sigma": 6.616610180243762,
           "train_window": {
@@ -1302,31 +1304,51 @@ data:
       },
       "x-version": 2
     }
-  strategies__lifecycle.json: "{\n  \"x-version\": 1,\n  \"description\": \"Pinned alpha promotion lifecycle\
+  strategies__lifecycle.json: "{\n  \"x-version\": 3,\n  \"description\": \"Pinned alpha promotion lifecycle\
     \ policy (iap.lifecycle; RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE -> WATCH -> RETIRED).\
     \ The promotion gate thresholds equal the spec section 20 gates pinned in iap.validation.validate.GATES;\
     \ the ACTIVE/WATCH/RETIRED rules are NOT duplicated here \u2014 they stay in strategies.json adaptive.lifecycle\
     \ and are reused unchanged. Every number is a threshold a port must reproduce exactly; tests/golden/expected_lifecycle.json\
-    \ embeds the merged config.\",\n  \"policy\": \"lifecycle_v1\",\n  \"gates\": {\n    \"min_experiments_in_ledger\"\
+    \ embeds the merged config. x-version 2 (v1.5.0): tstat_threshold names how statistical_significance\
+    \ gets its threshold \u2014 'ledger' (default) is max(gates.min_nw_tstat, the significance_threshold\
+    \ carried by the evidence), and evidence without one fails the gate; 'fixed' (the rule up to v1.4.0)\
+    \ is gates.min_nw_tstat alone. x-version 3 (v1.5.0): the cross_alpha_correlation gate on CANDIDATE\
+    \ -> VALIDATING \u2014 the largest absolute signal correlation with any peer at or beyond cross_alpha_min_state\
+    \ (VALIDATING, PAPER or ACTIVE; RETIRED peers never count) must be <= gates.max_cross_alpha_correlation;\
+    \ no such peer passes vacuously with value 0.0, and evidence without a cross_alpha block fails the\
+    \ gate; and the net_pnl_bootstrap_ci gate on the same edge \u2014 net_pnl_ci_gate 'required' (default)\
+    \ evaluates it, 'absent' (the legacy policy, which had no such gate) leaves it out: the lower bound\
+    \ of the stationary-bootstrap interval of the pooled 1x-cost net P&L carried by the evidence (pnl_bootstrap),\
+    \ taken at exactly gates.net_pnl_ci_level, must be > gates.min_net_pnl_ci_low; an alpha that made\
+    \ no trade, an interval at another level, a missing bound or a missing block fails the gate with value\
+    \ null.\",\n  \"policy\": \"lifecycle_v1\",\n  \"tstat_threshold\": \"ledger\",\n  \"cross_alpha_min_state\"\
+    : \"VALIDATING\",\n  \"net_pnl_ci_gate\": \"required\",\n  \"gates\": {\n    \"min_experiments_in_ledger\"\
     : 1,\n    \"min_oos_ic\": 0.01,\n    \"min_nw_tstat\": 3.0,\n    \"min_fold_sign_consistency\": 0.7,\n\
     \    \"min_folds\": 3,\n    \"min_net_return_bps\": 0.0,\n    \"min_capacity_usd\": 1000000.0,\n \
     \   \"max_ic_rank_gap\": 1.0,\n    \"ic_rank_gap_eps\": 1e-12,\n    \"max_holdout_ic_gap\": 0.01,\n\
     \    \"min_paper_sessions\": 5,\n    \"max_paper_ic_gap\": 0.01,\n    \"min_paper_net_pnl\": 0.0,\n\
-    \    \"max_kill_events\": 0\n  },\n  \"demotion\": {\n    \"max_consecutive_failures\": 3\n  }\n}\n"
+    \    \"max_kill_events\": 0,\n    \"max_cross_alpha_correlation\": 0.7,\n    \"min_net_pnl_ci_low\"\
+    : 0.0,\n    \"net_pnl_ci_level\": 0.95\n  },\n  \"demotion\": {\n    \"max_consecutive_failures\"\
+    : 3\n  }\n}\n"
   strategies__strategies.json: "{\n  \"x-version\": 1,\n  \"description\": \"Strategy registry skeleton;\
     \ alpha waves extend. All disabled by default. The 'adaptive' block pins the adaptability layer (drift\
     \ thresholds, refit policies, lifecycle gates) \u2014 see /API_ADAPTIVE.md.\",\n  \"adaptive\": {\n\
-    \    \"x-version\": 1,\n    \"description\": \"Pinned adaptability parameters (iap.adaptive / iap.backtest.adaptive;\
-    \ normative contract /API_ADAPTIVE.md). All durations are event-time nanoseconds; no wall-clock anywhere.\"\
-    ,\n    \"block_ns\": 900000000000,\n    \"warmup_ns\": 9000000000000,\n    \"train_window_ns\": 86400000000000,\n\
-    \    \"embargo_ns\": 60000000000,\n    \"monitor_window_ns\": 3600000000000,\n    \"ic_window_ns\"\
-    : 7200000000000,\n    \"ic_bucket_ns\": 300000000000,\n    \"min_psi_samples\": 200,\n    \"min_ic_buckets\"\
-    : 4,\n    \"policies\": {\n      \"static\": {},\n      \"scheduled_weekly\": {\n        \"period_ns\"\
-    : 604800000000000\n      },\n      \"scheduled_daily\": {\n        \"period_ns\": 86400000000000\n\
-    \      },\n      \"drift_triggered\": {\n        \"psi_threshold\": 0.25,\n        \"ic_z_threshold\"\
-    : -2.0,\n        \"min_refit_gap_ns\": 3600000000000\n      }\n    },\n    \"lifecycle\": {\n    \
-    \  \"watch_ic_gate\": 0.0,\n      \"reactivate_ic_gate\": 0.005,\n      \"retire_breach_evals\": 6,\n\
-    \      \"reactivate_evals\": 3\n    }\n  },\n  \"defaults\": {\n    \"enabled\": false,\n    \"max_position_qty\"\
+    \    \"x-version\": 2,\n    \"description\": \"Pinned adaptability parameters (iap.adaptive / iap.backtest.adaptive;\
+    \ normative contract /API_ADAPTIVE.md). All durations are event-time nanoseconds; no wall-clock anywhere.\
+    \ x-version 2 (v1.5.0): the block names ic_z_method ('hac' = the two-sample HAC z with the pair-weighted\
+    \ rolling IC, the default; 'legacy' = the z up to v1.4.0) and lifecycle.breach_rule ('cusum' with\
+    \ cusum_k / cusum_h, the default; 'consecutive' = retire_breach_evals consecutive breaches, the rule\
+    \ up to v1.4.0, which is the only reader of retire_breach_evals).\",\n    \"block_ns\": 900000000000,\n\
+    \    \"warmup_ns\": 9000000000000,\n    \"train_window_ns\": 86400000000000,\n    \"embargo_ns\":\
+    \ 60000000000,\n    \"monitor_window_ns\": 3600000000000,\n    \"ic_window_ns\": 7200000000000,\n\
+    \    \"ic_bucket_ns\": 300000000000,\n    \"min_psi_samples\": 200,\n    \"min_ic_buckets\": 4,\n\
+    \    \"ic_z_method\": \"hac\",\n    \"policies\": {\n      \"static\": {},\n      \"scheduled_weekly\"\
+    : {\n        \"period_ns\": 604800000000000\n      },\n      \"scheduled_daily\": {\n        \"period_ns\"\
+    : 86400000000000\n      },\n      \"drift_triggered\": {\n        \"psi_threshold\": 0.25,\n     \
+    \   \"ic_z_threshold\": -2.0,\n        \"min_refit_gap_ns\": 3600000000000\n      }\n    },\n    \"\
+    lifecycle\": {\n      \"watch_ic_gate\": 0.0,\n      \"reactivate_ic_gate\": 0.005,\n      \"retire_breach_evals\"\
+    : 6,\n      \"reactivate_evals\": 3,\n      \"breach_rule\": \"cusum\",\n      \"cusum_k\": 0.0025,\n\
+    \      \"cusum_h\": 0.01\n    }\n  },\n  \"defaults\": {\n    \"enabled\": false,\n    \"max_position_qty\"\
     : 10000,\n    \"signal_threshold\": 0.0,\n    \"horizon_ns\": 1000000000,\n    \"seed\": 20260829\n\
     \  },\n  \"strategies\": [\n    {\n      \"strategy_id\": \"EQ01_microprice\",\n      \"asset_class\"\
     : \"EQUITY\",\n      \"model_version\": \"unset\"\n    },\n    {\n      \"strategy_id\": \"EQ02_ofi_l1\"\

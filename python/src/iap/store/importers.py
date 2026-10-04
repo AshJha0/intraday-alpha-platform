@@ -6,11 +6,33 @@ every write is an upsert, so importing twice leaves the counts unchanged.
 The artefacts stay the source of truth; the store is the index.
 
 Import order used by :func:`import_all` (and ``python -m iap.store build``):
-reference -> experiments ledger -> alpha reports -> experiment documents ->
-lifecycle log -> lifecycle transitions -> alpha registry -> TCA orders ->
-model runs -> drift baselines.  Only the lifecycle-transitions and
-alpha-registry steps write ``alphas.current_state``, so the alpha rows must
-exist before they run.
+current scope -> reference -> experiments ledger (plus any extra ledgers) ->
+alpha reports -> experiment documents -> lifecycle log -> lifecycle
+transitions -> lifecycle archive -> alpha registry -> TCA orders -> model
+runs -> drift baselines.  Only the lifecycle-transitions and alpha-registry
+steps write ``alphas.current_state``, so the alpha rows must exist before
+they run.
+
+**Scope (data model x-version 2).**  Every experiment, result, ledger entry
+and lifecycle transition is filed under the ``(dataset_version, methods)``
+it was computed in, and the scorecard views never pool two scopes:
+
+* a ledger entry's dataset is its stamp, else the one inside its config
+  (``experiment_runner``), else ``"unstamped"``; its bundle is the one its
+  config names, else ``legacy_v1`` (an entry recorded before v1.5.0 names
+  none) — :func:`ledger_entry_scope`;
+* an alpha report's experiment takes the bundle of the ledger entry it is
+  the record of, else the bundle its ``methods`` block matches;
+* a runner experiment takes ``configuration["methods"]``;
+* the live lifecycle artefacts are filed under the current scope, an
+  archived ledger (``research/archive``) under the scope its file name
+  states, and neither the archive nor an earlier scope's ledger entries
+  touch ``alphas.current_state``.
+
+The CURRENT scope (:func:`resolve_current_scope`) is the dataset of
+``configs/strategies/alpha_params.json`` and the default bundle of
+``iap.validation.methods``; ``store_scope`` records it and the ``*_current``
+views filter to it.
 """
 
 from __future__ import annotations
@@ -34,10 +56,12 @@ from iap.contracts.types import (
 )
 from iap.contracts.validate import ContractValidationError
 from iap.contracts.versions import canonical_json
-from iap.store.db import Store
+from iap.store.db import LEGACY_METHODS, Store, methods_of
 
 __all__ = [
     "ImportReport",
+    "LIFECYCLE_ARCHIVE_GLOB",
+    "UNSTAMPED",
     "UNVERSIONED",
     "default_repo_root",
     "import_all",
@@ -46,11 +70,14 @@ __all__ = [
     "import_baselines",
     "import_experiment_documents",
     "import_experiments_ledger",
+    "import_lifecycle_archive",
     "import_lifecycle_log",
     "import_lifecycle_transitions",
     "import_model_runs",
     "import_reference",
     "import_tca_orders",
+    "ledger_entry_scope",
+    "resolve_current_scope",
 ]
 
 PathLike = str | Path
@@ -58,6 +85,16 @@ PathLike = str | Path
 #: The platform's pinned sentinel for "no git commit recorded"
 #: (docs/governance/REPRODUCIBILITY.md).
 UNVERSIONED = "unversioned-workspace"
+
+#: ``dataset_version`` of a ledger entry that carries no dataset at all.
+UNSTAMPED = "unstamped"
+
+#: Archived lifecycle ledgers: ``lifecycle_transitions.dataset-<hash
+#: prefix>[.methods-<bundle>].jsonl`` under ``research/archive``.
+LIFECYCLE_ARCHIVE_GLOB = "lifecycle_transitions.dataset-*.jsonl"
+
+#: Ledger kinds whose entries carry a PROMOTE verdict judged at a t threshold.
+_GATED_KINDS = ("promotion_pipeline", "experiment_runner")
 
 #: Pinned lifecycle gates of ``configs/strategies/strategies.json``
 #: ``adaptive.lifecycle`` (API_ADAPTIVE): the thresholds the research
@@ -222,9 +259,88 @@ def import_reference(
 # --------------------------------------------------------------------------
 
 
+def ledger_entry_scope(entry: Mapping[str, Any]) -> tuple[str, str]:
+    """``(dataset_version, methods)`` of a ledger entry (module docs, Scope)."""
+    from iap.validation.ledger import ExperimentLedger
+
+    config = entry.get("config") or {}
+    dataset = ExperimentLedger.entry_dataset_version(dict(entry))
+    bundle = config.get("methods")
+    if bundle is None:
+        bundle = (config.get("configuration") or {}).get("methods")
+    return (
+        UNSTAMPED if dataset is None else dataset,
+        LEGACY_METHODS if bundle is None else str(bundle),
+    )
+
+
+def _entry_experiment_id(entry: Mapping[str, Any]) -> str | None:
+    """The ``experiments`` row a ledger entry is the record of."""
+    if entry["kind"] == "promotion_pipeline":
+        return str(entry["key"])[:16]
+    if entry["kind"] == "experiment_runner":
+        experiment_id = (entry.get("config") or {}).get("experiment_id")
+        return None if experiment_id is None else str(experiment_id)
+    return None
+
+
+def _entry_promote_threshold(entry: Mapping[str, Any], bundle: str) -> float | None:
+    """The PROMOTE |t| an entry was judged at: ``max(3.0, Bonferroni |t| at
+    gate_looks)`` when it records its look count; the fixed gate for a gated
+    entry of a fixed-threshold bundle; ``None`` otherwise."""
+    from iap.validation.ledger import ExperimentLedger
+    from iap.validation.methods import METHODS
+    from iap.validation.validate import LEGACY_TSTAT_THRESHOLD, effective_gates
+
+    if entry.get("gate_looks") is not None:
+        at = ExperimentLedger.bonferroni_t_threshold_at(int(entry["gate_looks"]))
+        return float(effective_gates("ledger", at)["min_nw_tstat"])
+    known = METHODS.get(bundle)
+    if (
+        entry["kind"] in _GATED_KINDS
+        and known is not None
+        and known.tstat_threshold == LEGACY_TSTAT_THRESHOLD
+    ):
+        return float(effective_gates(LEGACY_TSTAT_THRESHOLD)["min_nw_tstat"])
+    return None
+
+
+def _rebuild_ledger_scopes(store: Store, col: _Collector) -> None:
+    """``ledger_scopes`` := one row per (dataset_version, methods) of
+    ``ledger_entries`` with its looks and the Bonferroni |t| at that count
+    (rewritten whole, so it always describes every ledger imported)."""
+    from iap.validation.ledger import ExperimentLedger
+
+    rows = store.query(
+        "SELECT dataset_version, methods, COUNT(*) AS n_entries, SUM(count) AS looks "
+        "FROM ledger_entries GROUP BY dataset_version, methods "
+        "ORDER BY dataset_version, methods"
+    )
+    store.replace_rows(
+        "ledger_scopes",
+        [
+            {
+                "dataset_version": row["dataset_version"],
+                "methods": row["methods"],
+                "n_entries": int(row["n_entries"]),
+                "looks": int(row["looks"]),
+                "bonferroni_t_threshold": float(
+                    ExperimentLedger.bonferroni_t_threshold_at(int(row["looks"]))
+                ),
+            }
+            for row in rows
+        ],
+    )
+    col.wrote("ledger_scopes", len(rows))
+
+
 def import_experiments_ledger(store: Store, path: PathLike) -> ImportReport:
-    """``research/experiments.json`` entries -> ledger_entries (one row per
-    distinct key; ``count`` looks each)."""
+    """A multiple-testing ledger (``research/experiments.json``, or the
+    ledger kept beside an ingested dataset) -> ledger_entries, one row per
+    distinct key (``count`` looks each) filed under its scope
+    (:func:`ledger_entry_scope`), then ``ledger_scopes`` rebuilt over every
+    entry in the store.  Importing a second ledger adds its scopes; it never
+    merges them into another dataset's."""
     col = _Collector()
     doc = _load_json(Path(path))
     for entry in sorted(doc["entries"], key=lambda e: e["key"]):
@@ -236,12 +352,21 @@ def import_experiments_ledger(store: Store, path: PathLike) -> ImportReport:
         for name in ("oos_ic", "nw_tstat"):
             if name in result and not _finite(result[name]):
                 col.warn(f"ledger {entry['key'][:12]}: {name} non-finite, stored NULL")
+        dataset, bundle = ledger_entry_scope(entry)
+        if dataset == UNSTAMPED:
+            col.warn(f"ledger {entry['key'][:12]}: no dataset_version, filed as {UNSTAMPED!r}")
+        gate_looks = entry.get("gate_looks")
         store.upsert(
             "ledger_entries",
             {
                 "ledger_key": entry["key"],
                 "alpha_id": entry["alpha_id"],
                 "kind": entry["kind"],
+                "dataset_version": dataset,
+                "methods": bundle,
+                "experiment_id": _entry_experiment_id(entry),
+                "gate_looks": None if gate_looks is None else int(gate_looks),
+                "promote_t_threshold": _entry_promote_threshold(entry, bundle),
                 "config_json": canonical_json(entry["config"]),
                 "count": int(entry["count"]),
                 "n": int(entry["n"]),
@@ -253,6 +378,7 @@ def import_experiments_ledger(store: Store, path: PathLike) -> ImportReport:
             },
         )
         col.wrote("ledger_entries")
+    _rebuild_ledger_scopes(store, col)
     return col.report()
 
 
@@ -266,20 +392,63 @@ def _ledger_entries(
 ) -> dict[str, dict[str, Any]]:
     """``{alpha_id: promotion_pipeline ledger entry}`` (empty without a ledger).
 
-    The ledger keeps one entry per alpha AND dataset (``iap.validation.ledger``,
-    "Dataset scope"): the entry stamped with ``dataset_version`` wins, so the
-    row agrees with the registry (``iap.lifecycle.bootstrap``); an alpha with
-    no entry on that dataset falls back to its latest entry."""
+    The ledger keeps one entry per alpha, dataset AND method bundle
+    (``iap.validation.ledger``, "Dataset scope"): the entry stamped with
+    ``dataset_version`` under the default bundle wins, then one of that
+    dataset under another bundle, so the row agrees with the registry
+    (``iap.lifecycle.bootstrap.select_pipeline_entries``); an alpha with no
+    entry on that dataset falls back to its latest entry."""
+    from iap.validation.methods import DEFAULT_METHODS
+
     if ledger_path is None or not Path(ledger_path).is_file():
         return {}
     latest: dict[str, dict[str, Any]] = {}
     exact: dict[str, dict[str, Any]] = {}
+    default: dict[str, dict[str, Any]] = {}
     for entry in _load_json(Path(ledger_path))["entries"]:
         if entry["kind"] == "promotion_pipeline":
             latest[entry["alpha_id"]] = entry
             if dataset_version is not None and entry.get("dataset_version") == dataset_version:
                 exact[entry["alpha_id"]] = entry
-    return {**latest, **exact}
+                if ledger_entry_scope(entry)[1] == DEFAULT_METHODS:
+                    default[entry["alpha_id"]] = entry
+    return {**latest, **exact, **default}
+
+
+#: The report ``methods`` keys that identify a bundle (``block_rows`` is the
+#: horizon-specific label of ``block_invalid_label_rows``).
+_REPORT_METHOD_FIELDS = (
+    "ic_rows",
+    "stress_version",
+    "position_policy",
+    "cap_fills_at_l1",
+    "impact_model",
+    "significance",
+    "tstat_threshold",
+    "capacity",
+    "fold_diagnostics",
+    "recompute_probe",
+)
+
+
+def _report_methods(report: Mapping[str, Any], ledger_entry: Mapping[str, Any] | None) -> str:
+    """The bundle an alpha report was produced under: that of the ledger
+    entry it is the record of; without one, the bundle whose choices its
+    ``methods`` block states (``legacy_v1`` for a report written before the
+    block existed).  A block that matches no bundle raises ``ValueError``."""
+    from iap.validation.methods import METHODS
+
+    if ledger_entry is not None:
+        return ledger_entry_scope(ledger_entry)[1]
+    block = report.get("methods")
+    if block is None:
+        return LEGACY_METHODS
+    if isinstance(block, str):
+        return block
+    for name, bundle in sorted(METHODS.items()):
+        if all(block.get(key) == getattr(bundle, key) for key in _REPORT_METHOD_FIELDS):
+            return name
+    raise ValueError("the report's methods block matches no known bundle")
 
 
 def _rationales() -> dict[str, str]:
@@ -373,8 +542,10 @@ def import_alpha_reports(
     the 1e6 USD reference notional).  A report with a non-finite metric
     still registers its alpha but contributes no experiment rows (warning).
     ``ledger_path`` supplies the ledger entry (``<ID>-unledgered`` and
-    ``n_experiments_in_ledger = 0`` without it).  An existing alpha row
-    keeps its ``current_state``."""
+    ``n_experiments_in_ledger = 0`` without it).  Both rows are filed under
+    the report's method bundle (:func:`_report_methods`) and the dataset of
+    the parameter document.  An existing alpha row keeps its
+    ``current_state``."""
     reports = Path(reports_dir)
     root = Path(repo_root) if repo_root is not None else default_repo_root()
     col = _Collector()
@@ -409,11 +580,12 @@ def import_alpha_reports(
             spec, result = _report_to_contracts(
                 report, f"research/alpha_reports/{path.name}", ledger.get(alpha_id), params_doc
             )
+            bundle = _report_methods(report, ledger.get(alpha_id))
         except (ValueError, KeyError, TypeError) as exc:
             col.warn(f"{path.name}: experiment rows skipped ({exc})")
             continue
-        store.insert_experiment_spec(spec)
-        store.insert_experiment_result(result)
+        store.insert_experiment_spec(spec, methods=bundle)
+        store.insert_experiment_result(result, methods=bundle)
         col.wrote("experiments")
         col.wrote("experiment_results")
     return col.report()
@@ -429,7 +601,9 @@ def import_experiment_documents(store: Store, experiments_dir: PathLike) -> Impo
     ``result.json`` (ExperimentResult), the ExperimentRunner's own
     documents -> experiments + experiment_results.  A directory whose id
     does not match its spec, or a document that fails its contract, is
-    skipped with a warning; a spec without a result imports alone."""
+    skipped with a warning; a spec without a result imports alone.  Both
+    rows are filed under the bundle ``configuration["methods"]`` names
+    (``legacy_v1`` for a spec written before the bundles existed)."""
     col = _Collector()
     base = Path(experiments_dir)
     for spec_path in sorted(base.glob("*/spec.json")):
@@ -438,6 +612,7 @@ def import_experiment_documents(store: Store, experiments_dir: PathLike) -> Impo
         run_dir = spec_path.parent
         try:
             spec = ExperimentSpec.from_dict(_load_json(spec_path))
+            bundle = methods_of(spec.configuration)
         except (ContractError, ValueError, TypeError) as exc:
             col.warn(f"{run_dir.name}/spec.json: skipped ({exc})")
             continue
@@ -447,7 +622,7 @@ def import_experiment_documents(store: Store, experiments_dir: PathLike) -> Impo
                 "does not match its directory, skipped"
             )
             continue
-        store.insert_experiment_spec(spec)
+        store.insert_experiment_spec(spec, methods=bundle)
         col.wrote("experiments")
         result_path = run_dir / "result.json"
         if not result_path.is_file():
@@ -461,7 +636,7 @@ def import_experiment_documents(store: Store, experiments_dir: PathLike) -> Impo
         if result.experiment_id != spec.experiment_id:
             col.warn(f"{run_dir.name}/result.json: experiment_id mismatch, skipped")
             continue
-        store.insert_experiment_result(result)
+        store.insert_experiment_result(result, methods=bundle)
         col.wrote("experiment_results")
     return col.report()
 
@@ -477,6 +652,7 @@ def import_lifecycle_log(
     *,
     watch_ic_gate: float = WATCH_IC_GATE,
     reactivate_ic_gate: float = REACTIVATE_IC_GATE,
+    scope: tuple[str, str] | None = None,
 ) -> ImportReport:
     """``research/lifecycle_log.jsonl`` (the ACTIVE/WATCH/RETIRED
     sub-machine of ``iap.adaptive.lifecycle``, one simulated deployment
@@ -488,8 +664,11 @@ def import_lifecycle_log(
     gate value is the row's ``rolling_ic`` and the thresholds are the
     pinned config gates.  ``actor`` is SYSTEM (the tracker is automatic).
     This artefact never changes ``alphas.current_state``: it is a policy
-    comparison, not the alpha's ledger.
+    comparison, not the alpha's ledger.  ``scope`` is the
+    ``(dataset_version, methods)`` the log was produced in (the current
+    scope for the live file; ``None`` leaves the columns NULL).
     """
+    dataset_version, bundle = scope if scope is not None else (None, None)
     col = _Collector()
     src = Path(path)
     if not src.is_file():
@@ -526,6 +705,8 @@ def import_lifecycle_log(
                 transition,
                 source="lifecycle_log",
                 eval_index=int(doc["eval_index"]) if "eval_index" in doc else None,
+                dataset_version=dataset_version,
+                methods=bundle,
             )
         except (KeyError, ValueError, TypeError, ContractValidationError) as exc:
             col.warn(f"{src.name}:{lineno}: skipped ({exc})")
@@ -534,22 +715,37 @@ def import_lifecycle_log(
     return col.report()
 
 
-def import_lifecycle_transitions(store: Store, path: PathLike) -> ImportReport:
+def import_lifecycle_transitions(
+    store: Store,
+    path: PathLike,
+    *,
+    scope: tuple[str, str] | None = None,
+    source: str = "lifecycle_transitions",
+    apply_state: bool = True,
+) -> ImportReport:
     """``research/lifecycle_transitions.jsonl`` (LifecycleTransition
     documents written by the lifecycle service) -> lifecycle_transitions
     with ``source = 'lifecycle_transitions'``, then ``alphas.current_state``
     := the latest ``to_state`` per alpha (by ``event_ts``, then file
-    order).  An absent file is a warning, not an error."""
+    order).  An absent file is a warning, not an error.
+
+    ``scope`` is the ``(dataset_version, methods)`` the transitions were
+    decided in.  ``apply_state=False`` imports the rows only — what an
+    archived ledger of an earlier scope gets (:func:`import_lifecycle_archive`):
+    its transitions are history and must not set today's state."""
     col = _Collector()
     src = Path(path)
     if not src.is_file():
         col.warn(f"absent: {src}")
         return col.report()
+    dataset_version, bundle = scope if scope is not None else (None, None)
     latest: dict[str, tuple[int, int, str]] = {}
     for lineno, doc in _read_jsonl(src, col):
         try:
             transition = LifecycleTransition.from_dict(doc)
-            store.insert_lifecycle_transition(transition, source="lifecycle_transitions")
+            store.insert_lifecycle_transition(
+                transition, source=source, dataset_version=dataset_version, methods=bundle
+            )
         except (ContractError, ContractValidationError) as exc:
             col.warn(f"{src.name}:{lineno}: skipped ({exc})")
             continue
@@ -557,11 +753,60 @@ def import_lifecycle_transitions(store: Store, path: PathLike) -> ImportReport:
         key = (transition.event_ts, lineno, transition.to_state.name)
         if transition.alpha_id not in latest or key > latest[transition.alpha_id]:
             latest[transition.alpha_id] = key
+    if not apply_state:
+        return col.report()
     for alpha_id in sorted(latest):
         if store.set_alpha_state(alpha_id, latest[alpha_id][2]):
             col.wrote("alphas.current_state")
         else:
             col.warn(f"{src.name}: alpha {alpha_id} not registered; state not applied")
+    return col.report()
+
+
+def _archive_scope(name: str, datasets: Sequence[str]) -> tuple[str, str]:
+    """``(dataset_version, methods)`` an archive file name states:
+    ``lifecycle_transitions.dataset-<prefix>[.methods-<bundle>].jsonl``.  The
+    prefix is resolved to the one known dataset it starts (the ledger's);
+    an unknown prefix stays as written, an ambiguous one is an error.  A
+    name without a ``methods`` part predates the bundles: ``legacy_v1``."""
+    parts = name[: -len(".jsonl")].split(".")[1:]
+    fields = dict(part.split("-", 1) for part in parts if "-" in part)
+    prefix = fields.get("dataset")
+    if not prefix:
+        raise ValueError("the file name states no dataset")
+    matches = sorted({d for d in datasets if d.startswith(prefix)})
+    if len(matches) > 1:
+        raise ValueError(f"dataset prefix {prefix!r} is ambiguous: {matches}")
+    return (matches[0] if matches else prefix, fields.get("methods", LEGACY_METHODS))
+
+
+def import_lifecycle_archive(store: Store, archive_dir: PathLike) -> ImportReport:
+    """``research/archive/lifecycle_transitions.dataset-*.jsonl`` — the
+    lifecycle ledgers of earlier datasets and bundles, kept when the ledger
+    was regenerated -> lifecycle_transitions with ``source =
+    'archive/<file>'`` under the scope the file name states
+    (:func:`_archive_scope`; the dataset prefix is resolved against the
+    datasets of ``ledger_entries``).  ``alphas.current_state`` is never
+    touched."""
+    col = _Collector()
+    base = Path(archive_dir)
+    datasets = [
+        r["dataset_version"]
+        for r in store.query("SELECT DISTINCT dataset_version FROM ledger_entries")
+    ]
+    for path in sorted(base.glob(LIFECYCLE_ARCHIVE_GLOB)):
+        try:
+            scope = _archive_scope(path.name, datasets)
+        except ValueError as exc:
+            col.warn(f"{path.name}: skipped ({exc})")
+            continue
+        report = import_lifecycle_transitions(
+            store, path, scope=scope, source=f"archive/{path.name}", apply_state=False
+        )
+        for table, n in report.inserted.items():
+            col.wrote(table, n)
+        for warning in report.warnings:
+            col.warn(warning)
     return col.report()
 
 
@@ -797,15 +1042,72 @@ def import_baselines(store: Store, baselines_dir: PathLike) -> ImportReport:
 # --------------------------------------------------------------------------
 
 
-def import_all(store: Store, repo_root: PathLike | None = None) -> dict[str, ImportReport]:
+def resolve_current_scope(
+    repo_root: PathLike | None = None,
+    *,
+    dataset_version: str | None = None,
+    methods: str | None = None,
+) -> tuple[str, str] | None:
+    """The CURRENT research scope ``(dataset_version, methods)``: the
+    ``data_version`` of ``configs/strategies/alpha_params.json`` (the dataset
+    the deployed parameters were fitted on) and the default method bundle.
+    Either part can be named explicitly (``python -m iap.store build
+    --dataset-version / --methods``); ``None`` when no dataset is named and
+    the parameter document is absent."""
+    from iap.lifecycle.bootstrap import PARAMS_RELPATH, load_params_document
+    from iap.validation.methods import DEFAULT_METHODS
+
+    root = Path(repo_root) if repo_root is not None else default_repo_root()
+    if dataset_version is None:
+        if not (root / PARAMS_RELPATH).is_file():
+            return None
+        dataset_version = str(load_params_document(root)["data_version"])
+    return (str(dataset_version), DEFAULT_METHODS if methods is None else str(methods))
+
+
+def import_all(
+    store: Store,
+    repo_root: PathLike | None = None,
+    *,
+    dataset_version: str | None = None,
+    methods: str | None = None,
+    extra_ledgers: Sequence[PathLike] = (),
+) -> dict[str, ImportReport]:
     """Run every importer over the repository artefacts that exist, in the
-    pinned order; ``{step: report}`` in that order."""
+    pinned order; ``{step: report}`` in that order.
+
+    ``dataset_version`` / ``methods`` name the current scope
+    (:func:`resolve_current_scope` supplies what is not given);
+    ``extra_ledgers`` are further multiple-testing ledgers to index beside
+    ``research/experiments.json`` — the ledger an ingested dataset keeps in
+    its own directory — each under the scopes its entries state."""
     root = Path(repo_root) if repo_root is not None else default_repo_root()
     research = root / "research"
     ledger = research / "experiments.json"
+    scope = resolve_current_scope(root, dataset_version=dataset_version, methods=methods)
+
+    def set_scope() -> ImportReport:
+        col = _Collector()
+        if scope is None:
+            col.warn("absent: no current scope (no alpha_params.json and no --dataset-version)")
+        else:
+            store.set_current_scope(*scope)
+            col.wrote("store_scope")
+        return col.report()
+
+    extra_steps = tuple(
+        (
+            f"extra_ledger:{Path(extra).as_posix()}",
+            Path(extra),
+            lambda extra=extra: import_experiments_ledger(store, extra),
+        )
+        for extra in extra_ledgers
+    )
     steps: Sequence[tuple[str, Path, Any]] = (
+        ("current_scope", root, set_scope),
         ("reference", root / "configs", lambda: import_reference(store, root / "configs")),
         ("experiments_ledger", ledger, lambda: import_experiments_ledger(store, ledger)),
+        *extra_steps,
         (
             "alpha_reports",
             research / "alpha_reports",
@@ -821,12 +1123,19 @@ def import_all(store: Store, repo_root: PathLike | None = None) -> dict[str, Imp
         (
             "lifecycle_log",
             research / "lifecycle_log.jsonl",
-            lambda: import_lifecycle_log(store, research / "lifecycle_log.jsonl"),
+            lambda: import_lifecycle_log(store, research / "lifecycle_log.jsonl", scope=scope),
         ),
         (
             "lifecycle_transitions",
             research / "lifecycle_transitions.jsonl",
-            lambda: import_lifecycle_transitions(store, research / "lifecycle_transitions.jsonl"),
+            lambda: import_lifecycle_transitions(
+                store, research / "lifecycle_transitions.jsonl", scope=scope
+            ),
+        ),
+        (
+            "lifecycle_archive",
+            research / "archive",
+            lambda: import_lifecycle_archive(store, research / "archive"),
         ),
         (
             "alpha_registry",

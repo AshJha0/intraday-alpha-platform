@@ -1,13 +1,16 @@
 """Golden group: tests/golden/expected_lifecycle.json and the committed
 bootstrap artefacts.
 
-Pins: the golden document is reproduced byte-for-byte by
-``iap.lifecycle.golden`` under the pinned config; every scenario step is
+Pins: the golden document (``x-version`` 3) is reproduced byte-for-byte by
+``iap.lifecycle.golden`` under the pinned config; every scenario step of
+BOTH sections — ``scenarios`` (LC01..LC06, the default policy: ledger
+significance threshold, CUSUM retirement) and ``legacy.scenarios`` (LG01,
+the rules up to v1.4.0: fixed threshold, consecutive breaches) — is
 reproduced by an independent replay of the golden's own inputs through a
-fresh machine built from the golden's embedded config (states, outcomes,
-gate results, counters and transitions exact); every logged transition
-validates against its schema; the transition table in the golden equals the
-code's; and ``python -m iap.lifecycle bootstrap`` reproduces the committed
+fresh machine built from that section's embedded config (states, outcomes,
+gate results, counters, the CUSUM statistic and transitions exact); every
+logged transition validates against its schema; the transition table in the
+golden equals the code's; and ``python -m iap.lifecycle bootstrap`` reproduces the committed
 ``research/alpha_registry.json`` / ``research/lifecycle_transitions.jsonl``
 byte-for-byte.
 """
@@ -36,7 +39,10 @@ from iap.lifecycle.golden import (
     STEP_NS,
     T0,
     golden_document,
+    legacy_config,
+    legacy_scripts,
     render_golden,
+    scripts,
 )
 
 GOLDEN_NAME = "expected_lifecycle.json"
@@ -58,23 +64,89 @@ def test_golden_header_and_config(golden):
     assert golden["t0"] == T0 and golden["step_ns"] == STEP_NS
     assert golden["states"] == {s.name: int(s) for s in LifecycleState}
     assert golden["transition_table"] == transition_table()
+    assert GOLDEN_X_VERSION == 3
     assert PolicyConfig.from_dict(golden["config"]) == load_policy_config()
-    assert sorted(golden["scenarios"]) == ["LC01", "LC02", "LC03"]
+    assert (
+        sorted(golden["scenarios"])
+        == ["LC01", "LC02", "LC03", "LC04", "LC05", "LC06"]
+        == sorted(scripts())
+    )
+    assert golden["config"]["cross_alpha_min_state"] == "VALIDATING"
+    assert golden["config"]["net_pnl_ci_gate"] == "required"
+    assert golden["config"]["gates"]["max_cross_alpha_correlation"] == 0.7
+    assert golden["config"]["gates"]["net_pnl_ci_level"] == 0.95
+    assert golden["config"]["gates"]["min_net_pnl_ci_low"] == 0.0
+    # the default policy, by name
+    assert golden["config"]["tstat_threshold"] == "ledger"
+    assert golden["config"]["live"]["breach_rule"] == "cusum"
+    assert (golden["config"]["live"]["cusum_k"], golden["config"]["live"]["cusum_h"]) == (
+        0.0025,
+        0.01,
+    )
+
+
+def test_golden_legacy_section_header(golden):
+    """``legacy`` holds the same machine under the rules up to v1.4.0, with
+    its own embedded config: the default gates, the fixed threshold and the
+    consecutive-breach rule."""
+    legacy = golden["legacy"]
+    assert sorted(legacy) == ["config", "scenarios"]
+    assert PolicyConfig.from_dict(legacy["config"]) == legacy_config(load_policy_config())
+    assert sorted(legacy["scenarios"]) == ["LG01"] == sorted(legacy_scripts())
+    assert legacy["config"]["tstat_threshold"] == "fixed"
+    assert legacy["config"]["live"]["breach_rule"] == "consecutive"
+    # the bootstrap gate did not exist up to v1.4.0: absent, by name
+    assert legacy["config"]["net_pnl_ci_gate"] == "absent"
+    promoted = legacy["scenarios"]["LG01"][1]["expected"]
+    assert "net_pnl_bootstrap_ci" not in promoted["gates"] and len(promoted["gates"]) == 10
+    assert promoted["transition"]["reason"] == "all 10 gates passed: CANDIDATE -> VALIDATING"
+    for key in ("policy", "gates", "demotion"):
+        assert legacy["config"][key] == golden["config"][key], key
+    for key in ("watch_ic_gate", "reactivate_ic_gate", "retire_breach_evals", "reactivate_evals"):
+        assert legacy["config"]["live"][key] == golden["config"]["live"][key], key
+
+
+def _section(golden, name: str) -> dict:
+    return golden if name == "default" else golden["legacy"]
+
+
+def _transition_count(scenarios) -> int:
+    return sum(
+        1 for steps in scenarios.values() for s in steps if s["expected"]["transition"] is not None
+    )
+
+
+def test_golden_transition_counts(golden):
+    assert _transition_count(golden["scenarios"]) == 52
+    assert _transition_count(golden["legacy"]["scenarios"]) == 9
 
 
 def test_golden_reproduced_byte_for_byte(golden_text):
     assert render_golden(golden_document(load_policy_config())) == golden_text
 
 
-@pytest.mark.parametrize("alpha_id", ["LC01", "LC02", "LC03"])
-def test_golden_scenario_replays_exactly(golden, alpha_id):
+@pytest.mark.parametrize(
+    "section, alpha_id",
+    [
+        ("default", "LC01"),
+        ("default", "LC02"),
+        ("default", "LC03"),
+        ("default", "LC04"),
+        ("default", "LC05"),
+        ("default", "LC06"),
+        ("legacy", "LG01"),
+    ],
+)
+def test_golden_scenario_replays_exactly(golden, section, alpha_id):
     """Independent replay: the golden's inputs through a machine built only
-    from the golden's embedded config."""
-    config = PolicyConfig.from_dict(golden["config"])
+    from the embedded config of the scenario's own section (the default
+    policy, or the legacy one), step by step."""
+    doc = _section(golden, section)
+    config = PolicyConfig.from_dict(doc["config"])
     registry = AlphaRegistry(config.policy)
     machine = AlphaLifecycle(config, registry)
     machine.register(alpha_id, golden["t0"])
-    steps = golden["scenarios"][alpha_id]
+    steps = doc["scenarios"][alpha_id]
     assert [s["step"] for s in steps] == list(range(len(steps)))
     for step in steps:
         ts = step["event_ts"]
@@ -98,6 +170,11 @@ def test_golden_scenario_replays_exactly(golden, alpha_id):
         assert rec.consecutive_failures == expected["consecutive_failures"]
         assert rec.breach_count == expected["breach_count"]
         assert rec.recovery_count == expected["recovery_count"]
+        assert rec.cusum == expected["cusum"]  # exact: no tolerance
+        if section == "legacy":
+            assert rec.cusum == 0.0, "the consecutive rule never moves the statistic"
+        else:
+            assert rec.breach_count == 0, "the CUSUM rule does not count breaches"
         if transition is None:
             assert expected["transition"] is None
         else:
@@ -124,9 +201,74 @@ def test_golden_scenarios_cover_every_system_edge(golden):
         ("CANDIDATE", "RESEARCH", "SYSTEM"),
         ("PAPER", "CANDIDATE", "SYSTEM"),
         ("CANDIDATE", "RETIRED", "HUMAN"),
+        ("VALIDATING", "RETIRED", "HUMAN"),  # LC05 walks the candidate edge four times
         ("RETIRED", "RESEARCH", "HUMAN"),
     }
     assert seen == expected
+    # LG01 is the happy path plus every live edge under the consecutive rule
+    legacy_seen = set()
+    for steps in golden["legacy"]["scenarios"].values():
+        for step in steps:
+            tr = step["expected"]["transition"]
+            if tr is not None:
+                legacy_seen.add((tr["from_state"], tr["to_state"], tr["actor"]))
+    assert legacy_seen == expected - {
+        ("CANDIDATE", "RESEARCH", "SYSTEM"),
+        ("PAPER", "CANDIDATE", "SYSTEM"),
+        ("CANDIDATE", "RETIRED", "HUMAN"),
+        ("VALIDATING", "RETIRED", "HUMAN"),
+    }
+
+
+def test_golden_pins_what_the_default_policy_changes(golden):
+    """The scenario steps that exist because of v1.5.0, read off the golden
+    and checked against a hand calculation."""
+    lc03 = golden["scenarios"]["LC03"]
+    # step 1: t 5.0 against the evidence's ledger threshold 5.5 -> fails
+    sig = lc03[1]["expected"]["gates"]["statistical_significance"]
+    assert lc03[1]["evidence"]["significance_threshold"] == 5.5
+    assert sig == {"passed": False, "value": 5.0, "threshold": 5.5}
+    # step 2: no threshold in the evidence -> fails, threshold null, value kept
+    sig = lc03[2]["expected"]["gates"]["statistical_significance"]
+    assert lc03[2]["evidence"]["significance_threshold"] is None
+    assert sig == {"passed": False, "value": 5.0, "threshold": None}
+    assert lc03[2]["expected"]["state"] == "CANDIDATE"
+    # step 3: a threshold below the floor: max(3.0, 2.0) = 3.0 -> VALIDATING
+    sig = lc03[3]["expected"]["gates"]["statistical_significance"]
+    assert lc03[3]["evidence"]["significance_threshold"] == 2.0
+    assert sig == {"passed": True, "value": 5.0, "threshold": 3.0}
+    assert lc03[3]["expected"]["state"] == "VALIDATING"
+    # LG01, legacy: no threshold in the evidence passes the fixed 3.0 gate
+    lg01 = golden["legacy"]["scenarios"]["LG01"]
+    assert lg01[1]["evidence"]["significance_threshold"] is None
+    assert lg01[1]["expected"]["gates"]["statistical_significance"] == {
+        "passed": True,
+        "value": 4.0,
+        "threshold": 3.0,
+    }
+    # ... and the sixth consecutive breach retires (breach_count 1..5 before)
+    live = [s for s in lg01 if s["evidence"] and s["evidence"]["live"] is not None]
+    assert [s["expected"]["breach_count"] for s in live[-7:-1]] == [1, 2, 3, 4, 5, 0]
+    assert live[-2]["expected"]["state"] == "RETIRED"
+    # LC04: eight breaches of -0.001 are inside the slack k = 0.0025
+    # (0.125 * (0.0 - (-0.001) - 0.0025) < 0): S stays 0 and nothing retires
+    lc04 = golden["scenarios"]["LC04"]
+    slack = [s for s in lc04 if s["evidence"] and (s["evidence"]["live"] or {}).get("eval_index")]
+    slack = [s for s in slack if s["evidence"]["live"]["rolling_ic"] == -0.001]
+    assert len(slack) == 8
+    assert [s["expected"]["state"] for s in slack] == ["WATCH"] * 8
+    assert [s["expected"]["cusum"] for s in slack] == [0.0] * 8
+    # LC01: the first breach of -0.01 adds 0.125 * (0.0 + 0.01 - 0.0025) = 0.0009375
+    lc01 = golden["scenarios"]["LC01"]
+    assert lc01[7]["evidence"]["live"] == {
+        "rolling_ic": -0.01,
+        "n_buckets": 8,
+        "eval_index": 4,
+        "informative": True,
+        "new_fraction": 0.125,
+    }
+    assert lc01[7]["expected"]["state"] == "WATCH"
+    assert lc01[7]["expected"]["cusum"] == 0.125 * (0.0 - (-0.01) - 0.0025) == 0.0009375
 
 
 def test_bootstrap_matches_committed_artefacts(tmp_path):
@@ -143,3 +285,62 @@ def test_bootstrap_matches_committed_artefacts(tmp_path):
     assert loaded.render() == committed_registry
     assert all(loaded.get(a).state is LifecycleState.CANDIDATE for a in loaded.alpha_ids())
     assert len(loaded) == 24
+
+
+def _gate(golden, alpha_id: str, step: int, name: str) -> dict:
+    return golden["scenarios"][alpha_id][step]["expected"]["gates"][name]
+
+
+def test_golden_lc05_pins_the_cross_alpha_correlation_gate(golden):
+    """Missing evidence fails closed, |correlation| above 0.7 with an
+    eligible peer fails, ineligible peers are ignored, the tie at 0.7 and
+    the empty peer list pass."""
+    name = "cross_alpha_correlation"
+    steps = golden["scenarios"]["LC05"]
+    assert steps[1]["evidence"]["cross_alpha"] is None
+    assert _gate(golden, "LC05", 1, name) == {"passed": False, "value": None, "threshold": 0.7}
+    assert _gate(golden, "LC05", 2, name) == {"passed": False, "value": 0.82, "threshold": 0.7}
+    assert _gate(golden, "LC05", 3, name) == {"passed": False, "value": 0.9, "threshold": 0.7}
+    for step in (1, 2, 3):
+        assert steps[step]["expected"]["outcome"] == "HOLD"
+        failed = [g for g, r in steps[step]["expected"]["gates"].items() if not r["passed"]]
+        assert failed == [name]
+    # only CANDIDATE / RETIRED peers: nobody counts -> 0.0, vacuous pass
+    assert {p["state"] for p in steps[4]["evidence"]["cross_alpha"]["peers"]} == {
+        "CANDIDATE",
+        "RETIRED",
+    }
+    assert _gate(golden, "LC05", 4, name) == {"passed": True, "value": 0.0, "threshold": 0.7}
+    assert _gate(golden, "LC05", 8, name) == {"passed": True, "value": 0.7, "threshold": 0.7}
+    assert steps[12]["evidence"]["cross_alpha"] == {"peers": []}
+    assert _gate(golden, "LC05", 12, name) == {"passed": True, "value": 0.0, "threshold": 0.7}
+    assert _gate(golden, "LC05", 16, name) == {"passed": True, "value": 0.4, "threshold": 0.7}
+    for step in (4, 8, 12, 16):
+        assert steps[step]["expected"]["state"] == "VALIDATING"
+
+
+def test_golden_lc06_pins_the_net_pnl_bootstrap_gate(golden):
+    """Missing block, no trade, no bounds and the wrong level fail with a
+    null value; a negative and a zero lower bound fail at their value; a
+    positive lower bound passes."""
+    name = "net_pnl_bootstrap_ci"
+    steps = golden["scenarios"]["LC06"]
+    null = {"passed": False, "value": None, "threshold": 0.0}
+    assert steps[1]["evidence"]["pnl_bootstrap"] is None
+    assert _gate(golden, "LC06", 1, name) == null
+    assert _gate(golden, "LC06", 2, name) == {"passed": False, "value": -35.5, "threshold": 0.0}
+    assert steps[3]["evidence"]["pnl_bootstrap"]["n_trades"] == 0
+    assert _gate(golden, "LC06", 3, name) == null
+    assert steps[4]["evidence"]["pnl_bootstrap"]["ci_low"] is None
+    assert _gate(golden, "LC06", 4, name) == null
+    assert steps[5]["evidence"]["pnl_bootstrap"]["level"] == 0.9
+    assert _gate(golden, "LC06", 5, name) == null
+    assert _gate(golden, "LC06", 6, name) == {"passed": False, "value": 0.0, "threshold": 0.0}
+    for step in range(1, 7):
+        assert steps[step]["expected"]["outcome"] == "HOLD"
+        failed = [g for g, r in steps[step]["expected"]["gates"].items() if not r["passed"]]
+        assert failed == [name]
+    assert _gate(golden, "LC06", 7, name) == {"passed": True, "value": 12.5, "threshold": 0.0}
+    assert steps[7]["expected"]["transition"]["reason"] == (
+        "all 11 gates passed: CANDIDATE -> VALIDATING"
+    )

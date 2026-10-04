@@ -34,7 +34,7 @@
     },
     "ic": {
       "type": "number",
-      "description": "Pooled OOS Pearson IC."
+      "description": "Pooled OOS Pearson IC. Under the method bundle the spec names (configuration.methods): v2 (default) = the gate IC, uncrossed book, BLACKOUT rows scored at the reopen return; legacy_v1 = the IC over valid labels."
     },
     "rank_ic": {
       "type": "number",
@@ -42,7 +42,7 @@
     },
     "t_stat": {
       "type": "number",
-      "description": "Newey-West t-statistic of the bucketed IC."
+      "description": "The t-statistic the significance gate reads. Under configuration.methods v2 (default): the HAC t of the pooled slope (uncrossed book); under legacy_v1: the Newey-West t of the bucketed IC."
     },
     "nw_lags": {
       "type": "integer",

@@ -4,23 +4,25 @@
 set and returns a JSON-serializable report:
 
 1. expanding walk-forward (purged + embargoed) — per-fold OOS IC/RankIC/
-   hit rate, pooled Newey-West-lite t-stat over 5-minute bucket ICs;
-2. leakage tests (label-column guard + shift-by-one);
+   hit rate, the pooled IC and its HAC t-statistic;
+2. leakage tests (label-column guard, shift-by-one, frame truncation and —
+   when the raw events are at hand — the recompute probe);
 3. decay curve across the 11 pinned horizons (fit at the pinned horizon,
    scored OOS, correlated against every horizon's label);
-4. turnover and capacity proxies;
-5. cost / latency / regime stress (via the research backtester);
+4. turnover and capacity;
+5. cost / latency / regime stress (via the research backtester), per-fold
+   diagnostics and a bootstrap interval for the pooled net P&L;
 6. verdict per the pinned §20 gates (see GATES below).
 
 Pinned promotion gates (spec §20 steps 4-7 distilled; thresholds pinned
 here and echoed in every report):
 
 - PROMOTE requires ALL of:
-    leakage passed; OOS pooled IC >= 0.010; NW t-stat >= 3.0;
+    leakage passed; gate IC >= 0.010; gate t >= the significance threshold;
     fold sign consistency >= 0.70; at least 3 NON-DEGENERATE folds;
     hypothesis_confirmed (fitted beta agrees with the stated rationale);
-    cost survival (net backtest P&L > 0 at 1.0x costs).
-- ITERATE: leakage passed, OOS IC >= 0.005 and NW t-stat >= 1.5 (evidence
+    cost survival (net backtest P&L > 0 at 1.0x costs on the last fold).
+- ITERATE: leakage passed, gate IC >= 0.005 and gate t >= 1.5 (evidence
   of signal, fails at least one PROMOTE gate).
 - REJECT: everything else, and ALWAYS when leakage fails.
 
@@ -53,25 +55,81 @@ Round-3 honesty rules baked into the report (all pinned):
 - **Newey-West lag count** follows the horizon (``metrics.nw_lags``) and is
   reported as ``nw_lags``.
 
-Opt-in policies (defaults reproduce every committed report bit-for-bit):
+**Method defaults (v1.5.0).**  The corrected methods that v1.3.0 added as
+opt-in are the defaults; each legacy rule stays selectable by name and
+``iap.validation.methods`` bundles them (``"v2"`` / ``"legacy_v1"``).
 
-- **``tstat_threshold``** — ``"fixed"`` (default) gates PROMOTE at the pinned
-  ``min_nw_tstat`` of 3.0 regardless of how many things were tried.
-  ``"ledger"`` gates at ``max(3.0, ledger_t_threshold)`` where
-  ``ledger_t_threshold`` is the multiple-testing ledger's Bonferroni |t|
-  (``ExperimentLedger.bonferroni_t_threshold``) — the threshold the ledger
-  has always computed and no gate ever read.  It can only tighten the gate.
-  The report then carries ``tstat_threshold_policy`` and the effective
-  threshold in ``gates["min_nw_tstat"]``.
-- **``stress_version``** — which row-latency stress grid to compute
-  (:mod:`iap.validation.stress`; 1 = historic, 2 = base config carried).
-  Reported as ``stress_version`` when it is not 1.
+- **``significance``** — which t-statistic the gate reads.
+  ``"pooled_slope"`` (default): the HAC t of the POOLED slope
+  (:func:`iap.validation.metrics.pooled_slope_hac_tstat`), uncrossed rows
+  when that is finite.  The gate IC is a pooled correlation, and this is the
+  significance of exactly that number.  ``"within_bucket"`` (legacy): the
+  Newey-West t of the mean of WITHIN-bucket ICs, which demeans score and
+  label inside each 5-minute bucket and therefore discards whatever signal
+  lives between buckets.  Both are always reported (``nw_tstat*`` and
+  ``nw_tstat_pooled*``); ``gate_tstat`` is the one the gate read and
+  ``methods.significance`` names it.
+- **``tstat_threshold``** — the PROMOTE threshold of that t.  ``"ledger"``
+  (default): ``max(3.0, ledger_t_threshold)``, where the caller passes the
+  multiple-testing ledger's Bonferroni |t| at the run's gate look count
+  (``iap.validation.ledger``, "Gate look count") and the count itself as
+  ``ledger_looks``.  It can only tighten the gate, and it has no silent
+  fall-back: the default policy without a threshold is an error.
+  ``"fixed"`` (legacy): 3.0 whatever was tried.  The ITERATE threshold
+  (1.5) is not ledger-derived: ITERATE means "evidence worth another look",
+  not a multiple-testing claim.
+- **``ic_rows``** — which rows every IC of the chain scores
+  (:mod:`iap.labels.frames`).  ``"blackout_reopen"`` (default): a row whose
+  label is invalid for BLACKOUT alone is scored at its realised reopen
+  return instead of being dropped — dropping it is a selection on the
+  outcome.  ``"valid_only"`` (legacy): valid labels only.  The pooled IC,
+  the fold ICs, both t-statistics, rank IC, hit rate, the decay curve, the
+  regime split, the row-latency IC and the leakage shift test all read the
+  same rows; the IC under the OTHER policy is reported beside the gate IC
+  (``oos_ic_valid_only`` / ``gate_ic_valid_only``,
+  ``oos_ic_blackout_reopen`` / ``gate_ic_blackout_reopen``) with the number
+  of rescued rows (``n_blackout_rows_scored``), so the size of the
+  selection is on the page.
+- **Which IC the gate reads** — the POOLED IC of the standardized signal on
+  uncrossed rows (``gate_ic``), as before; what changed is the row policy
+  above and the t that goes with it.  The scale-free ICs
+  (``oos_ic_vol_scaled[_uncrossed]``, ``oos_ic_instrument_mean[_uncrossed]``,
+  ``oos_ic_by_instrument``) are HEADLINE REPORT fields beside it, not gate
+  inputs: the gate t is the significance of the pooled slope, and the
+  lifecycle's validation and paper gates compare the research IC with a
+  realised pooled IC (``holdout_ic_tracks_research``,
+  ``paper_ic_tracking``), so a gate on a per-instrument-scaled IC would be
+  tested by one statistic and tracked against a third.  A report whose
+  vol-scaled IC disagrees in sign with the gate IC on the same rows says so
+  (``ic_scale_consistent``).
+- **``stress_version``** — the row-latency stress grid
+  (:mod:`iap.validation.stress`): 2 (default) carries the whole base
+  config, 1 (legacy) is the historic four-field rebuild.
+- **``capacity``** — ``"breakeven"`` (default): per instrument, the size at
+  which the edge per round trip equals its cost
+  (:func:`iap.validation.metrics.capacity_breakeven` under the cost model
+  in force), capped at the participation proxy; the edge is the REALISED
+  gross return per round trip of the 1x backtest on the last fold, so an
+  alpha that does not trade, or whose trades lose before costs, has
+  capacity 0.  ``"participation"`` (legacy): ``max_participation x ADV x
+  price``, the same for an alpha with a 5 bp edge and one with none.
+- **``fold_diagnostics``** — ``True`` (default): cost survival, decay and
+  regime for EVERY fold, the pooled net P&L and its stationary-bootstrap
+  interval are fields of the report (:mod:`iap.validation.diagnostics`;
+  report-only — no gate reads them, see that module for why).  ``False``
+  (legacy) leaves them out.
+- **``recompute``** — the raw-event source of the recompute leakage probe
+  (:class:`iap.validation.leakage.RecomputeSource`); part of the standard
+  run whenever it is given.  Without one the probe does not run and the
+  report says so (``leakage.recompute_ok`` is ``null``).
+- The research backtester's own defaults (cost-aware positions, fills
+  capped at displayed size, invalid-label rows blocked, square-root impact)
+  live in :mod:`iap.backtest`; ``validate_alpha`` sets the label horizon on
+  the backtester it is handed and reports the rules in force under
+  ``methods``.
 
-Additive statistics (no gate reads them): ``nw_tstat_pooled`` /
-``nw_tstat_pooled_uncrossed`` — the HAC t of the POOLED slope
-(:func:`iap.validation.metrics.pooled_slope_hac_tstat`), reported beside the
-within-bucket ``nw_tstat`` because the gate IC is pooled and the
-within-bucket t discards between-bucket signal.
+**Looks.**  :func:`looks_per_validation` itemises what one call evaluates;
+the ledger debits exactly that.
 """
 
 from __future__ import annotations
@@ -81,12 +139,21 @@ from collections.abc import Mapping
 import numpy as np
 import pandas as pd
 
-from iap.backtest.engine import Backtester
-from iap.validation.leakage import LeakageTester
+from iap.backtest.engine import Backtester, BacktestResult
+from iap.labels.frames import DEFAULT_IC_ROWS, IC_ROWS, LEGACY_IC_ROWS, scored_labels
+from iap.validation.diagnostics import (
+    BOOTSTRAP_RESAMPLES,
+    bar_series,
+    fold_row,
+    stationary_bootstrap_ci,
+)
+from iap.validation.leakage import LeakageTester, RecomputeSource
 from iap.validation.metrics import (
+    HORIZON_ORDER,
     HORIZONS_NS,
     bucket_ics_with_counts,
     bucket_size_summary,
+    capacity_breakeven,
     capacity_proxy_usd,
     decay_curve,
     hit_rate,
@@ -104,8 +171,11 @@ from iap.validation.splits import (
     WalkForwardSplitter,
 )
 from iap.validation.stress import (
-    STRESS_VERSION_LEGACY,
-    cost_stress,
+    COST_MULTIPLIERS,
+    DEFAULT_STRESS_VERSION,
+    LATENCY_SHIFTS,
+    LATENCY_TIMES_NS,
+    cost_stress_results,
     latency_stress,
     latency_stress_time,
     regime_split,
@@ -121,20 +191,76 @@ GATES = {
     "iterate_min_tstat": 1.5,
 }
 
-#: PROMOTE t-stat threshold policies (module docs).
-TSTAT_THRESHOLD_POLICIES = ("fixed", "ledger")
+#: PROMOTE t-stat threshold policies (module docs): default, then legacy.
+TSTAT_THRESHOLD_POLICIES = ("ledger", "fixed")
+DEFAULT_TSTAT_THRESHOLD = "ledger"
+LEGACY_TSTAT_THRESHOLD = "fixed"
+
+#: Which t-statistic the gate reads (module docs): default, then legacy.
+SIGNIFICANCE_STATISTICS = ("pooled_slope", "within_bucket")
+DEFAULT_SIGNIFICANCE = "pooled_slope"
+LEGACY_SIGNIFICANCE = "within_bucket"
+
+#: Capacity definitions (module docs): default, then legacy.
+CAPACITY_DEFINITIONS = ("breakeven", "participation")
+DEFAULT_CAPACITY = "breakeven"
+LEGACY_CAPACITY = "participation"
+
+_KEY_1X = f"x{1.0:g}"
+
+
+def looks_per_validation(n_folds: int, fold_diagnostics: bool = True) -> int:
+    """Looks at the data ONE ``validate_alpha`` call makes — the ledger is
+    the denominator of every multiple-testing correction, so it counts what
+    the chain actually evaluates:
+
+    =====  ==========================================================
+    looks  statistic
+    =====  ==========================================================
+    1      pooled walk-forward OOS IC with the t the gate reads
+    1      the other t-statistic (within-bucket and pooled-slope are
+           both computed and reported; one of them is the gate's)
+    2      crossed / uncrossed conditional IC
+    4      instrument-mean and vol-scaled IC, on all rows and on the
+           uncrossed rows the gate reads
+    2      the IC under the other row policy (valid-only against
+           reopen-scored), on all rows and on uncrossed rows
+    3      latency stress, ROW grid (``stress.LATENCY_SHIFTS``)
+    4      latency stress, TIME grid (``stress.LATENCY_TIMES_NS``)
+    1      leakage shift-by-one IC
+    1      bootstrap interval of the pooled net P&L
+    11 x F decay curve, one IC per pinned horizon, in each of F folds
+    3 x F  cost stress, one backtest per multiplier, in each fold
+    2 x F  regime split (high / low vol), in each fold
+    =====  ==========================================================
+
+    = ``19 + 16 * n_folds`` (83 at the pinned four folds).  With
+    ``fold_diagnostics=False`` — the legacy chain — decay, cost stress and
+    regime exist for the last fold only and the statistics added since
+    v1.3.0 (the second t, the scale-free ICs, the other-row-policy IC, the
+    bootstrap) are not debited, which is the 27 the chain counted up to
+    v1.4.0 (28 with the caller's one backtest).
+    """
+    if n_folds < 1:
+        raise ValueError("n_folds must be >= 1")
+    if not fold_diagnostics:
+        per_fold = len(HORIZON_ORDER) + len(COST_MULTIPLIERS) + 2
+        return 1 + per_fold + len(LATENCY_SHIFTS) + len(LATENCY_TIMES_NS) + 2 + 1
+    per_fold = len(HORIZON_ORDER) + len(COST_MULTIPLIERS) + 2
+    fixed = 1 + 1 + 2 + 4 + 2 + len(LATENCY_SHIFTS) + len(LATENCY_TIMES_NS) + 1 + 1
+    return fixed + per_fold * int(n_folds)
 
 
 def effective_gates(
-    tstat_threshold: str = "fixed", ledger_t_threshold: float | None = None
+    tstat_threshold: str = DEFAULT_TSTAT_THRESHOLD, ledger_t_threshold: float | None = None
 ) -> dict:
     """The gate thresholds under a t-stat policy.
 
-    ``"fixed"`` returns :data:`GATES` itself.  ``"ledger"`` returns a copy
-    whose ``min_nw_tstat`` is ``max(GATES["min_nw_tstat"],
-    ledger_t_threshold)`` — the ledger-derived Bonferroni |t|, never looser
-    than the fixed gate — and requires a finite positive
-    ``ledger_t_threshold``.
+    ``"ledger"`` (default) returns a copy whose ``min_nw_tstat`` is
+    ``max(GATES["min_nw_tstat"], ledger_t_threshold)`` — the ledger-derived
+    Bonferroni |t|, never looser than the fixed gate — and requires a finite
+    positive ``ledger_t_threshold``.  ``"fixed"`` (legacy) returns
+    :data:`GATES` itself.
     """
     if tstat_threshold not in TSTAT_THRESHOLD_POLICIES:
         raise ValueError(
@@ -148,17 +274,19 @@ def effective_gates(
         or ledger_t_threshold <= 0.0
     ):
         raise ValueError(
-            "tstat_threshold='ledger' needs a finite positive "
-            "ledger_t_threshold (ExperimentLedger.bonferroni_t_threshold())"
+            "tstat_threshold='ledger' (the default) needs a finite positive "
+            "ledger_t_threshold — ExperimentLedger.bonferroni_t_threshold_at(the run's "
+            "gate look count); pass tstat_threshold='fixed' to name the legacy 3.0 gate"
         )
     gates = dict(GATES)
     gates["min_nw_tstat"] = max(float(GATES["min_nw_tstat"]), float(ledger_t_threshold))
     return gates
 
 
-def _pooled_arrays(scores, frames, horizon):
+def _pooled_arrays(scores, frames, horizon, ic_rows: str = DEFAULT_IC_ROWS):
     """(ts, expected_return, label, crossed) pooled over the universe.
 
+    ``label`` is the series ``ic_rows`` scores (:mod:`iap.labels.frames`);
     ``crossed`` marks rows whose consolidated book was crossed
     (``spread_ticks_v1 < 0``, i.e. at least one venue quote was stale).
     """
@@ -167,8 +295,7 @@ def _pooled_arrays(scores, frames, horizon):
         df = frames[iid]
         er = sc["expected_return"].to_numpy(dtype=float).copy()
         er[sc["confidence"].to_numpy(dtype=float) <= 0.0] = np.nan
-        lab = df[f"label_mid_{horizon}"].to_numpy(dtype=float).copy()
-        lab[~df[f"label_valid_{horizon}"].to_numpy(dtype=bool)] = np.nan
+        lab, _ = scored_labels(df, horizon, ic_rows)
         if "spread_ticks_v1" in df.columns:
             sp = df["spread_ticks_v1"].to_numpy(dtype=float)
             crossed = np.isfinite(sp) & (sp < 0.0)
@@ -189,8 +316,110 @@ def _pooled_instrument_ids(scores, frames) -> np.ndarray:
     return np.concatenate(ids) if ids else np.empty(0, np.int64)
 
 
+def _pooled_row_policies(scores, frames, horizon):
+    """``(valid-only labels, reopen-scored labels, reopen available)`` in the
+    row order of :func:`_pooled_arrays` — the label series under BOTH row
+    policies, so the IC under the policy the gate does not use can be
+    reported beside it.  ``reopen available`` is False when any frame lacks
+    ``label_reopen_<h>`` (a feature store written before v1.5.0): the two
+    series are then the same."""
+    valid, reopen = [], []
+    available = True
+    for iid in scores:
+        df = frames[iid]
+        valid.append(scored_labels(df, horizon, LEGACY_IC_ROWS)[0])
+        reopen.append(scored_labels(df, horizon, DEFAULT_IC_ROWS)[0])
+        available = available and f"label_reopen_{horizon}" in df.columns
+    if not valid:
+        return np.empty(0), np.empty(0), False
+    return np.concatenate(valid), np.concatenate(reopen), available
+
+
 def _fnum(v: float) -> float | None:
     return float(v) if np.isfinite(v) else None
+
+
+def _capacity(
+    definition: str,
+    backtester: Backtester,
+    result_1x: BacktestResult,
+    test: Mapping[int, pd.DataFrame],
+    universe,
+    capacity_meta: Mapping[int, dict],
+    max_participation: float,
+) -> tuple[dict[str, float], dict[str, float], dict[str, dict]]:
+    """``(capacity, participation proxy, breakeven detail)`` per instrument.
+
+    The proxy is the historic ``max_participation x ADV x ref_price`` figure
+    (:func:`capacity_proxy_usd`), unchanged.  The breakeven detail carries,
+    per instrument, the realised gross edge per round trip of the 1x
+    backtest (``gross P&L / (traded notional / 2)``, both in the reporting
+    currency, the notional at the median executable mid and the conversion
+    pair's reference rate), the breakeven size in units and in the
+    reporting currency, and that size capped at the participation line
+    converted the same way.  ``capacity`` is the capped breakeven figure
+    under ``"breakeven"`` and the proxy under ``"participation"``."""
+    proxy = {
+        str(iid): capacity_proxy_usd(
+            float(capacity_meta[iid]["adv"]),
+            float(capacity_meta[iid]["ref_price"]),
+            max_participation,
+            float(capacity_meta[iid].get("lot_value_multiplier", 1.0)),
+        )
+        for iid in universe
+    }
+    detail: dict[str, dict] = {}
+    cfg = backtester.config
+    for iid in universe:
+        meta = backtester.meta[iid]
+        asset_class = str(meta["asset_class"])
+        unit = float(meta["lot_size"]) if asset_class == "FX" else 1.0
+        adv = float(capacity_meta[iid]["adv"])
+        rate = backtester.reference_rate(backtester.quote_currency(iid))
+        # ADV is in base units (shares, or base currency for FX), so ADV x
+        # price is quote-currency notional; ``rate`` takes it to USD.
+        cap_line = float(max_participation * adv * float(capacity_meta[iid]["ref_price"]) * rate)
+        row = {
+            "edge_return": 0.0,
+            "round_trips": 0.0,
+            "breakeven_units": 0.0,
+            "breakeven_usd": 0.0,
+            "participation_cap_usd": cap_line,
+            "capacity_usd": 0.0,
+        }
+        res = result_1x.per_instrument.get(iid)
+        frame = test.get(iid)
+        if res is not None and frame is not None and res.traded_qty > 0:
+            mid = frame["mid_price_v1"].to_numpy(dtype=float)
+            hs = frame["spread_ticks_v1"].to_numpy(dtype=float) * float(meta["tick_size"]) / 2.0
+            ok = np.isfinite(mid) & (mid > 0.0) & np.isfinite(hs) & (hs >= 0.0)
+            if ok.any():
+                mid_med = float(np.median(mid[ok]))
+                hs_med = float(np.median(hs[ok]))
+                notional = 0.5 * float(res.traded_qty) * unit * mid_med * rate
+                edge = float(res.gross_pnl) / notional if notional > 0.0 else 0.0
+                be = capacity_breakeven(
+                    backtester.cost_model,
+                    edge,
+                    mid_med,
+                    hs_med,
+                    asset_class,
+                    adv,
+                    int(meta["lot_size"]),
+                )
+                be_usd = float(be["notional"]) * rate
+                row.update(
+                    edge_return=edge,
+                    round_trips=float(res.traded_qty) / (2.0 * float(cfg.max_pos_qty)),
+                    breakeven_units=float(be["units"]),
+                    breakeven_usd=be_usd,
+                    capacity_usd=float(min(be_usd, cap_line)),
+                )
+        detail[str(iid)] = {k: _fnum(v) for k, v in row.items()}
+    if definition == "participation":
+        return proxy, proxy, detail
+    capacity = {k: float(v["capacity_usd"] or 0.0) for k, v in detail.items()}
+    return capacity, proxy, detail
 
 
 def validate_alpha(
@@ -201,38 +430,65 @@ def validate_alpha(
     max_participation: float,
     n_folds: int = 4,
     embargo_ns: int = 60_000_000_000,
-    tstat_threshold: str = "fixed",
+    tstat_threshold: str = DEFAULT_TSTAT_THRESHOLD,
     ledger_t_threshold: float | None = None,
-    stress_version: int = STRESS_VERSION_LEGACY,
+    stress_version: int = DEFAULT_STRESS_VERSION,
+    significance: str = DEFAULT_SIGNIFICANCE,
+    capacity: str = DEFAULT_CAPACITY,
+    fold_diagnostics: bool = True,
+    seed: int = 0,
+    n_boot: int = BOOTSTRAP_RESAMPLES,
+    recompute: RecomputeSource | None = None,
+    ledger_looks: int | None = None,
+    ic_rows: str = DEFAULT_IC_ROWS,
 ) -> dict:
     """Full validation of one alpha.  ``model_factory()`` returns a fresh
     unfitted model (a fresh instance per fold — no state bleeds across).
 
-    ``tstat_threshold`` / ``ledger_t_threshold`` / ``stress_version`` are the
-    opt-in policies of the module docs; the defaults are the pinned
-    behaviour."""
+    The keyword arguments from ``tstat_threshold`` on are the method choices
+    of the module docs; every default is the v1.5.0 rule and every legacy
+    rule is named.  ``backtester`` is used with the alpha's label horizon set
+    (:meth:`Backtester.for_horizon`).  ``seed`` seeds the P&L bootstrap
+    (pass ``ExperimentSpec.seed``); ``ledger_looks`` is recorded beside the
+    threshold it produced."""
     gates = effective_gates(tstat_threshold, ledger_t_threshold)
+    if significance not in SIGNIFICANCE_STATISTICS:
+        raise ValueError(f"unknown significance {significance!r}; known: {SIGNIFICANCE_STATISTICS}")
+    if capacity not in CAPACITY_DEFINITIONS:
+        raise ValueError(f"unknown capacity {capacity!r}; known: {CAPACITY_DEFINITIONS}")
+    if ic_rows not in IC_ROWS:
+        raise ValueError(f"unknown ic_rows {ic_rows!r}; known: {IC_ROWS}")
     probe = model_factory()
     horizon = probe.horizon
     horizon_ns = HORIZONS_NS[horizon]
     universe = probe.universe(list(frames))
     uframes = {i: frames[i] for i in universe}
     splitter = WalkForwardSplitter(n_folds=n_folds, embargo_ns=embargo_ns)
+    asset_class = "FX" if probe.asset_class == "FX" else "EQUITY"
+    bt = backtester.for_horizon(horizon)
 
     fold_rows: list[dict] = []
+    diag_rows: list[dict] = []
+    results_1x: list[BacktestResult] = []
     pooled_ts: list[np.ndarray] = []
     pooled_x: list[np.ndarray] = []  # standardized signal (z), gate input
     pooled_er: list[np.ndarray] = []  # expected_return (diagnostic)
     pooled_y: list[np.ndarray] = []
     pooled_c: list[np.ndarray] = []
     pooled_i: list[np.ndarray] = []
+    pooled_valid: list[np.ndarray] = []
+    pooled_reopen: list[np.ndarray] = []
+    reopen_available = True
     last_model = None
     last_test = None
+    last_scores = None
+    last_cost: dict[str, dict] | None = None
+    last_result_1x: BacktestResult | None = None
     for fold, train, test in splitter.split_frames(uframes, horizon_ns):
         model = model_factory()
         model.fit(train)
         scores = model.score(test)
-        ts, er, y, crossed = _pooled_arrays(scores, test, horizon)
+        ts, er, y, crossed = _pooled_arrays(scores, test, horizon, ic_rows)
         iids = _pooled_instrument_ids(scores, test)
         # Pool the standardized signal: folds fit different betas, so pooling
         # expected_return weights each fold by |beta_k| (pinned, round-3).
@@ -268,7 +524,18 @@ def validate_alpha(
         pooled_y.append(y)
         pooled_c.append(crossed)
         pooled_i.append(iids)
-        last_model, last_test = model, test
+        y_valid, y_reopen, available = _pooled_row_policies(scores, test, horizon)
+        pooled_valid.append(y_valid)
+        pooled_reopen.append(y_reopen)
+        reopen_available = reopen_available and available
+        if fold_diagnostics:
+            row, cost, results = fold_row(
+                fold.index, scores, test, horizon, beta, bt, asset_class, ic_rows=ic_rows
+            )
+            diag_rows.append(row)
+            results_1x.append(results[_KEY_1X])
+            last_cost, last_result_1x = cost, results[_KEY_1X]
+        last_model, last_test, last_scores = model, test, scores
 
     ts = np.concatenate(pooled_ts)
     x = np.concatenate(pooled_x)
@@ -285,12 +552,19 @@ def validate_alpha(
     # swing EQ03's headline t between 4.89 and 11.46 (metrics module docs).
     bics, bcounts = bucket_ics_with_counts(ts, x, y)
     nw_t = newey_west_tstat(bics, lags=lags, weights=bcounts)
-    # Additive: the HAC t of the POOLED slope (keeps between-bucket signal,
-    # which the within-bucket Pearson above removes).  No gate reads it.
+    # The HAC t of the POOLED slope keeps between-bucket signal, which the
+    # within-bucket Pearson above removes; it is the gate's t by default.
     nw_t_pooled = pooled_slope_hac_tstat(ts, x, y, lags=lags)
-    # Additive: scale-free ICs (the pooled IC lets the most volatile
-    # instrument dominate; metrics.instrument_ics).  No gate reads them.
-    by_instrument = instrument_ics(np.concatenate(pooled_i), x, y)
+    # Scale-free ICs (the pooled IC lets the most volatile instrument
+    # dominate; metrics.instrument_ics).  Headline report fields.
+    instrument_ids = np.concatenate(pooled_i)
+    by_instrument = instrument_ics(instrument_ids, x, y)
+    # The same IC under BOTH row policies (the gate reads ``ic_rows``).
+    y_valid_only = np.concatenate(pooled_valid)
+    y_reopen = np.concatenate(pooled_reopen)
+    n_blackout_scored = int(
+        np.sum(np.isfinite(x) & ~np.isfinite(y_valid_only) & np.isfinite(y_reopen))
+    )
 
     # Crossed-book conditioning (pinned): a crossed consolidated book means a
     # stale venue quote; its mid reverts when that venue refreshes.
@@ -303,6 +577,17 @@ def validate_alpha(
     bics_unc, bcounts_unc = bucket_ics_with_counts(ts[unc], x[unc], y[unc])
     nw_t_uncrossed = newey_west_tstat(bics_unc, lags=lags, weights=bcounts_unc)
     nw_t_pooled_uncrossed = pooled_slope_hac_tstat(ts[unc], x[unc], y[unc], lags=lags)
+    by_instrument_unc = instrument_ics(instrument_ids[unc], x[unc], y[unc])
+
+    def _ic_pair(labels: np.ndarray) -> tuple[float | None, float | None]:
+        """(all rows, uncrossed rows) pooled IC against ``labels``."""
+        return _fnum(ic(x, labels)), _fnum(ic(x[unc], labels[unc]))
+
+    ic_valid_only, ic_valid_only_unc = _ic_pair(y_valid_only)
+    if reopen_available:
+        ic_reopen, ic_reopen_unc = _ic_pair(y_reopen)
+    else:
+        ic_reopen, ic_reopen_unc = None, None
 
     # Degenerate folds count as FAILED folds, never as missing data.
     n_folds_run = len(fold_rows)
@@ -313,8 +598,8 @@ def validate_alpha(
     sign_consistency = float(positive / n_folds_run) if n_folds_run else float("nan")
 
     # leakage + decay + turnover on the last (largest-train) fold
-    leak = LeakageTester().run(last_model, last_test).to_dict()
-    scores_last = last_model.score(last_test)
+    leak = LeakageTester(ic_rows=ic_rows).run(last_model, last_test, recompute=recompute).to_dict()
+    scores_last = last_scores
     beta_last = float(last_model.params().get("beta", 0.0) or 0.0)
     decay: dict[str, float | None] = {}
     turnover_vals = []
@@ -329,7 +614,7 @@ def validate_alpha(
         # column of zeros shrinks the IC toward 0 rather than dropping out.
         er_last[sc["confidence"].to_numpy(dtype=float) <= 0.0] = np.nan
         z_last = er_last / beta_last if beta_last != 0.0 else er_last
-        d = decay_curve(z_last, last_test[iid])
+        d = decay_curve(z_last, last_test[iid], ic_rows=ic_rows)
         for h, v in d.items():
             decay.setdefault(h, [])
             if np.isfinite(v):
@@ -346,56 +631,56 @@ def validate_alpha(
     decay_out = {h: (_fnum(float(np.mean(v))) if v else None) for h, v in decay.items()}
     turnover = float(np.mean(turnover_vals)) if turnover_vals else float("nan")
 
-    capacity = {
-        str(iid): capacity_proxy_usd(
-            float(capacity_meta[iid]["adv"]),
-            float(capacity_meta[iid]["ref_price"]),
-            max_participation,
-            float(capacity_meta[iid].get("lot_value_multiplier", 1.0)),
-        )
-        for iid in universe
-    }
-
     # stress (fit on all-but-last-segment model, applied to its test set)
-    asset_class = "FX" if probe.asset_class == "FX" else "EQUITY"
+    if last_cost is None or last_result_1x is None:
+        last_cost, last_results = cost_stress_results(bt, last_test, scores_last, asset_class)
+        last_result_1x = last_results[_KEY_1X]
     stress = {
-        "cost": cost_stress(backtester, last_test, scores_last, asset_class),
+        "cost": last_cost,
         "latency": latency_stress(
-            backtester,
+            bt,
             last_test,
             scores_last,
             asset_class,
             horizon,
             beta=beta_last,
             version=stress_version,
+            ic_rows=ic_rows,
         ),
-        "latency_time": latency_stress_time(
-            backtester, last_test, scores_last, asset_class, horizon
-        ),
+        "latency_time": latency_stress_time(bt, last_test, scores_last, asset_class, horizon),
         "regime": {
             k: _fnum(v)
-            for k, v in regime_split(scores_last, last_test, horizon, beta=beta_last).items()
+            for k, v in regime_split(
+                scores_last, last_test, horizon, beta=beta_last, ic_rows=ic_rows
+            ).items()
         },
     }
     net_pnl_1x = stress["cost"]["x1"]["total_pnl"]
+
+    capacity_by, capacity_proxy_by, capacity_detail = _capacity(
+        capacity, bt, last_result_1x, last_test, universe, capacity_meta, max_participation
+    )
 
     hypothesis_confirmed = bool(last_model.params().get("hypothesis_confirmed", False))
     # The PROMOTE gate reads the UNCROSSED IC: a crossed consolidated book is
     # a stale-quote artefact, not a tradable state (pinned, round-3).
     gate_ic = oos_ic_uncrossed if np.isfinite(oos_ic_uncrossed) else oos_ic
-    gate_t = nw_t_uncrossed if np.isfinite(nw_t_uncrossed) else nw_t
-    promote = (
-        leak["passed"]
-        and np.isfinite(gate_ic)
-        and gate_ic >= gates["min_oos_ic"]
-        and np.isfinite(gate_t)
-        and gate_t >= gates["min_nw_tstat"]
-        and np.isfinite(sign_consistency)
-        and sign_consistency >= gates["min_fold_sign_consistency"]
-        and n_nondegenerate >= gates["min_nondegenerate_folds"]
-        and hypothesis_confirmed
-        and net_pnl_1x > 0.0
-    )
+    if significance == "pooled_slope":
+        gate_t = nw_t_pooled_uncrossed if np.isfinite(nw_t_pooled_uncrossed) else nw_t_pooled
+    else:
+        gate_t = nw_t_uncrossed if np.isfinite(nw_t_uncrossed) else nw_t
+    promote_gates = {
+        "leakage": bool(leak["passed"]),
+        "ic": bool(np.isfinite(gate_ic) and gate_ic >= gates["min_oos_ic"]),
+        "significance": bool(np.isfinite(gate_t) and gate_t >= gates["min_nw_tstat"]),
+        "fold_consistency": bool(
+            np.isfinite(sign_consistency) and sign_consistency >= gates["min_fold_sign_consistency"]
+        ),
+        "folds": bool(n_nondegenerate >= gates["min_nondegenerate_folds"]),
+        "hypothesis": bool(hypothesis_confirmed),
+        "cost": bool(net_pnl_1x > 0.0),
+    }
+    promote = all(promote_gates.values())
     iterate = (
         not promote
         and leak["passed"]
@@ -406,15 +691,45 @@ def validate_alpha(
     )
     verdict = "PROMOTE" if promote else ("ITERATE" if iterate else "REJECT")
 
+    # Scale-free IC on the rows the gate reads (uncrossed when that IC is).
+    vol_scaled_gate = (
+        by_instrument_unc["vol_scaled"]
+        if np.isfinite(oos_ic_uncrossed)
+        else by_instrument["vol_scaled"]
+    )
+    scale_consistent = (
+        bool(np.sign(vol_scaled_gate) == np.sign(gate_ic))
+        if np.isfinite(vol_scaled_gate) and np.isfinite(gate_ic)
+        else None
+    )
+
     extras: dict[str, object] = {}
     if tstat_threshold != "fixed":
         extras["tstat_threshold_policy"] = tstat_threshold
         extras["ledger_t_threshold"] = float(ledger_t_threshold)
-    if stress_version != STRESS_VERSION_LEGACY:
-        extras["stress_version"] = int(stress_version)
+        extras["ledger_looks"] = None if ledger_looks is None else int(ledger_looks)
+    if fold_diagnostics:
+        series = bar_series(results_1x)
+        extras["fold_diagnostics"] = diag_rows
+        extras["n_folds_survive_1x_cost"] = sum(1 for r in diag_rows if r["survives_1x_cost"])
+        extras["net_pnl_1x_pooled"] = float(sum(series))
+        extras["net_pnl_bootstrap"] = stationary_bootstrap_ci(series, seed, n_boot=n_boot)
 
     return {
         **extras,
+        "methods": {
+            "ic_rows": ic_rows,
+            "significance": significance,
+            "tstat_threshold": tstat_threshold,
+            "stress_version": int(stress_version),
+            "capacity": capacity,
+            "fold_diagnostics": bool(fold_diagnostics),
+            "recompute_probe": recompute is not None,
+            "position_policy": bt.config.position_policy,
+            "cap_fills_at_l1": bool(bt.config.cap_fills_at_l1),
+            "block_rows": bt.config.block_rows_label(),
+            "impact_model": bt.cost_model.impact_model,
+        },
         "alpha_id": probe.alpha_id,
         "name": probe.name,
         "asset_class": probe.asset_class,
@@ -430,10 +745,20 @@ def validate_alpha(
         "oos_ic_instrument_mean": _fnum(by_instrument["instrument_mean"]),
         "oos_ic_vol_scaled": _fnum(by_instrument["vol_scaled"]),
         "oos_ic_by_instrument": by_instrument["by_instrument"],
+        "oos_ic_instrument_mean_uncrossed": _fnum(by_instrument_unc["instrument_mean"]),
+        "oos_ic_vol_scaled_uncrossed": _fnum(by_instrument_unc["vol_scaled"]),
+        "ic_scale_consistent": scale_consistent,
+        "oos_ic_valid_only": ic_valid_only,
+        "gate_ic_valid_only": ic_valid_only_unc if ic_valid_only_unc is not None else ic_valid_only,
+        "oos_ic_blackout_reopen": ic_reopen,
+        "gate_ic_blackout_reopen": ic_reopen_unc if ic_reopen_unc is not None else ic_reopen,
+        "label_reopen_available": bool(reopen_available),
+        "n_blackout_rows_scored": n_blackout_scored if reopen_available else None,
         "oos_ic_uncrossed": _fnum(oos_ic_uncrossed),
         "oos_ic_crossed": _fnum(oos_ic_crossed),
         "crossed_frac": _fnum(crossed_frac),
         "gate_ic": _fnum(gate_ic),
+        "gate_tstat": _fnum(gate_t),
         "oos_rank_ic": _fnum(oos_rank_ic),
         "oos_hit_rate": _fnum(oos_hit),
         "nw_tstat": _fnum(nw_t),
@@ -455,8 +780,14 @@ def validate_alpha(
         # hours the market was shut (see metrics.signal_turnover_detail).
         "turnover_active_hours": _fnum(turnover_active_hours),
         "turnover_span_hours": _fnum(turnover_span_hours),
-        "capacity_usd_by_instrument": capacity,
+        "capacity_usd_by_instrument": capacity_by,
+        "capacity_proxy_usd_by_instrument": capacity_proxy_by,
+        "capacity_breakeven_by_instrument": capacity_detail,
         "stress": stress,
         "net_pnl_1x_cost": _fnum(net_pnl_1x),
+        "trade_count_1x_cost": int(stress["cost"]["x1"]["trade_count"]),
+        # Each PROMOTE gate on its own, so a report can say WHICH gates an
+        # alpha fails (the verdict is PROMOTE iff all are true).
+        "promote_gates": promote_gates,
         "verdict": verdict,
     }

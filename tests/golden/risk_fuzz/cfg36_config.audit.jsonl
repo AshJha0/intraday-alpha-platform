@@ -1,0 +1,11 @@
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing market_data.max_sequence_gap_before_halt","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000000000000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing market_data.max_sequence_gap_before_halt","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000008025000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing market_data.max_sequence_gap_before_halt","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000068025000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing market_data.max_sequence_gap_before_halt","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000119025000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing market_data.max_sequence_gap_before_halt","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000160303000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing market_data.max_sequence_gap_before_halt","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000160303000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing market_data.max_sequence_gap_before_halt","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000203303000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing market_data.max_sequence_gap_before_halt","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000002203303000}
+{"decision":3,"reason":"desk request #42","rule_id":"KILL_SWITCH_ENGAGED","scope":"STRATEGY","scope_id":"S1","severity":3,"timestamp":1700000002203524000}
+{"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000002215524000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing market_data.max_sequence_gap_before_halt","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000002215524000}

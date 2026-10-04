@@ -1,0 +1,9 @@
+{"decision":2,"reason":"fill for order 0 rejected: side must be 0 or 1: 255","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000000000000000}
+{"decision":2,"reason":"strategy S2 exceeded 500.00 orders/s (burst 0.50)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000000024000000}
+{"decision":2,"reason":"strategy S2 exceeded 500.00 orders/s (burst 0.50)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000000041000000}
+{"decision":2,"reason":"strategy S3 exceeded 500.00 orders/s (burst 0.50)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700000000174000000}
+{"decision":2,"reason":"strategy S1 exceeded 500.00 orders/s (burst 0.50)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000000174169000}
+{"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000000198258000}
+{"decision":2,"reason":"strategy S3 exceeded 500.00 orders/s (burst 0.50)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700000000198258000}
+{"decision":2,"reason":"qty 809630 exceeds max_order_qty 50000","rule_id":"FAT_FINGER_QTY","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000000249258000}
+{"decision":1,"reason":"daily loss limit 50000.00 -> 0.01 approved by ops halt","rule_id":"LOSS_LIMIT_OVERRIDE","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000000249634000}

@@ -4,11 +4,13 @@
 //!
 //! - [`state`] — the seven ordered states RESEARCH(0) … RETIRED(6);
 //! - [`evidence`] — the typed, finite-checked evidence blocks;
-//! - [`gates`] — the 18-row gate table, the policy config
+//! - [`gates`] — the 20-row gate table, the policy config
 //!   (`configs/strategies/lifecycle.json` + `strategies.json`
 //!   `adaptive.lifecycle`) and gate evaluation;
 //! - [`tracker`] — the live ACTIVE / WATCH / RETIRED rolling-IC rules
-//!   (exact port of `iap.adaptive.lifecycle.LifecycleTracker`);
+//!   (exact port of `iap.adaptive.lifecycle.LifecycleTracker`): the CUSUM
+//!   retirement rule (default since v1.5.0) and the legacy
+//!   consecutive-breach rule, selected by name in the config;
 //! - [`machine`] — the 17-edge transition table as data, `advance` /
 //!   `retire` / `reset_to_research`, `LifecycleTransition`, `GateEvaluation`;
 //! - [`registry`] — `research/alpha_registry.json` read / written
@@ -24,12 +26,14 @@ pub mod state;
 pub mod tracker;
 
 pub use evidence::{
-    Evidence, ExperimentResult, LiveEvidence, PaperEvidence, ValidationEvidence, Verdict,
+    CrossAlphaEvidence, Evidence, ExperimentResult, LiveEvidence, PaperEvidence, PeerCorrelation,
+    PnlBootstrapEvidence, ValidationEvidence, Verdict,
 };
 pub use gates::{
-    evaluate, evaluate_named, ic_rank_gap, metric, spec_by_name, Block, GateKind, GateResult,
-    GateSpec, GateThresholds, LiveConfig, Metric, PolicyConfig, GATE_SPECS,
-    LIFECYCLE_CONFIG_VERSION,
+    evaluate, evaluate_named, ic_rank_gap, metric, spec_by_name, Block, BreachRule, GateKind,
+    GateResult, GateSpec, GateThresholds, LiveConfig, Metric, NetPnlCiGate, PolicyConfig,
+    TstatThreshold, BOOTSTRAP_GATE, CROSS_ALPHA_MIN_STATES, GATE_SPECS, LIFECYCLE_CONFIG_VERSION,
+    SIGNIFICANCE_GATE,
 };
 pub use machine::{
     edge_for, promotion_edge, transition_table, Actor, AlphaLifecycle, Edge, EdgeKind,

@@ -145,10 +145,22 @@ Watch the **Trading & Risk** dashboard:
   strategies (gate 13) — both human decisions, not automatic ones.
 - **Alpha lifecycle**. {#lifecycle}
   `alpha_lifecycle_state{alpha=...}` is **IC-gated, not PSI-gated**: WATCH when
-  the rolling realized IC (`alpha_rolling_ic`) drops below `watch_ic_gate`,
-  RETIRED after `retire_breach_evals` consecutive breaches, re-activation only
+  the rolling realized IC (`alpha_rolling_ic`, the pair-count-weighted mean
+  of the bucket ICs since v1.5.0) drops below `watch_ic_gate`; RETIRED by the
+  retirement rule the config names — `breach_rule` `"cusum"`, the default
+  since v1.5.0: a breach reading in WATCH once the CUSUM of the shortfall
+  below the gate (slack `cusum_k` 0.0025, each reading weighted by the new
+  share of its window) has reached `cusum_h` 0.01, never on the reading that
+  entered WATCH; or the legacy `"consecutive"`: `retire_breach_evals`
+  consecutive breaches — and re-activation only
   back to WATCH (`configs/strategies/strategies.json` `adaptive.lifecycle`,
-  API_ADAPTIVE.md §6). PSI never moves it.
+  API_ADAPTIVE.md §6; docs/LIFECYCLE.md §2). PSI never moves it. Under the
+  default rule a run of shallow breaches inside the slack does not retire
+  and one or two deep ones can, so do not read the gauge by counting
+  breaches. A session's `config_sha256` differs from a v1.4.0 session's
+  because `execution.json`, `lifecycle.json`, `strategies.json` and
+  `alpha_params.json` changed; state directories written by v1.4.0 resume
+  as before.
   **And in the live loop it is OBSERVATIONAL** — a RETIRED alpha keeps trading
   at full size; nothing in `PaperTrading` reduces the target on this signal
   (pinned and tested: `PaperObservabilityTest.lifecycleGaugeIsIcGatedAndObservational`).
@@ -199,20 +211,29 @@ Watch the **Trading & Risk** dashboard:
   and the session checkpointed mid-stream. `/status` reads
   `"status":"stopped"`, `/ready` is 503 (`session stopped`), `/health` stays
   200 — but the process exits 0 right after the checkpoint and takes the
-  listener with it, so a scrape will usually not see the value. The durable
-  evidence is the final stdout line (`status=STOPPED`) and the checkpoint;
-  **no session report is written**. The dashboard's session-state panel
-  does not name the value yet. It is the expected result of a deliberate
-  stop; continue the session with `--resume` (§5).
-  `SessionStoppedNotResumed` (warning) fires when the last value scraped in
-  the past hour is 4 and no resumed session has reported for 10 m. When it
-  fires: confirm the stop was intended (`status=STOPPED` on stdout, a fresh
+  listener with it, so a scrape will usually not see the value. What does
+  outlive it (since v1.5.0) is `<state-dir>/session_exit.json`, written by the
+  trading thread after the checkpoint (`"state":"STOPPED","code":4`), and the
+  `java-platform-state` exporter (compose service, k8s sidecar and Service;
+  port 9102) that serves it as `platform_persisted_session_state`. The
+  other evidence is the final stdout line (`status=STOPPED`) and the
+  checkpoint; **no session report is written**. The dashboard's session-state
+  panel falls back to the persisted value while no trading process runs. It
+  is the expected result of a deliberate stop; continue the session with
+  `--resume` (§5).
+  `SessionStoppedNotResumed` (warning) fires when
+  `platform_persisted_session_state == 4` for 10 m and no live trading
+  process reports `platform_session_state == 1`. When it fires: confirm the
+  stop was intended (`status=STOPPED` on stdout, a fresh
   `session_state.json`), then either resume (§5) or record why the session
   stays down — positions are as the checkpoint left them and nothing
-  restarts the container (exit 0). The alert clears on resume, or by itself
-  one hour after the stop. If no scrape caught the value 4 the rule cannot
-  fire; `TargetDown` is then the only alert, and the same two checks tell a
-  stop from a crash.
+  restarts the container (exit 0). It clears when the resumed session starts
+  (the marker becomes `RUNNING`, 1) or finishes (`FINISHED`, 2). It stays
+  silent for a FINISHED session (2) and for a crash, which leaves the
+  `RUNNING` marker (1) behind: a crash is `TargetDown` on `java-platform`
+  (critical), with the persisted value 1 and no stdout `status=` line. To
+  read the marker by hand: `cat <state-dir>/session_exit.json`, or
+  `curl -s java-platform-state:9102/metrics` from inside the network.
 - **Safety counters** (since v1.3.0). {#safety-counters}
   Five counters, each with an alert rule. Two are handled here, three in
   `RUNBOOK_incident_kill_switch.md`:

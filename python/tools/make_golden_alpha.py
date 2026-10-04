@@ -21,9 +21,13 @@ research/alpha_reports/run_all.py first):
   a feature engine;
 - the IC over a pinned row window at the alpha's pinned horizon (tol 1e-9).
 
-expected_backtest.json pins the EQ01 research backtest on the golden EQ
-frame (pinned config): total P&L and cost total at 1e-9, trade count /
-traded qty exact.
+expected_backtest.json (x-version 3) pins the research backtest on the
+golden EQ frame under BOTH rule sets, each replayed by Python and Java:
+EQ01 under the legacy rules (top level), EQ06 under the v1.5.0 defaults
+(``default_rules``, with the scored-row mask and every position change
+embedded; ``default_rules_1x`` is the same run at full costs, which makes
+no trade) and scalar cost-model cases for both impact rules
+(``cost_model_cases``).  Money at 1e-9, counts and positions exact.
 
 BEFORE writing, every score is re-derived by an independent brute-force
 recomputation (straight formulas on the frame columns, no AlphaModel code)
@@ -37,6 +41,7 @@ from __future__ import annotations
 import json
 import math
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -54,7 +59,7 @@ from iap.alpha.data import (  # noqa: E402
 from iap.alpha.fx_exposure import FX05CrossPairRelativeValue, solve_factor_returns  # noqa: E402
 from iap.alpha.goldenframes import build_golden_frame  # noqa: E402
 from iap.backtest import BacktestConfig, Backtester, CostModel  # noqa: E402
-from iap.validation.metrics import ic  # noqa: E402
+from iap.validation.metrics import capacity_breakeven, ic  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[2]
 GOLDEN = REPO / "tests" / "golden"
@@ -76,7 +81,38 @@ FX05_IC_GRID_WINDOW = (100, 2500)
 
 #: pinned golden-backtest config (conf_min lower than the research default
 #: so the golden vector's tamer microprice deviations still produce trades)
-BT_CONFIG = {"max_pos_qty": 1000, "conf_min": 0.2, "latency_rows": 1, "cost_multiplier": 1.0}
+#: The first cross-language backtest vector keeps the LEGACY research rules
+#: (the v1.4.0 defaults), named: ``BacktestConfig.legacy()`` and
+#: ``CostModel.with_linear_impact()`` in Python, ``Config.legacy`` and
+#: ``CostModel.withLinearImpact`` in Java.
+BT_CONFIG = {
+    "max_pos_qty": 1000,
+    "conf_min": 0.2,
+    "latency_rows": 1,
+    "cost_multiplier": 1.0,
+    "position_policy": "sign",
+    "cap_fills_at_l1": False,
+    "block_rows_column": None,
+    "impact_model": "linear",
+}
+#: The cross-language vector under the DEFAULT rules (v1.5.0; Python and
+#: Java since x-version 3).  EQ06 at 1 % of the pinned costs: the golden
+#: frame's spread is about 19 bps round trip and no flagship alpha forecasts
+#: that much, so at 1x costs the cost-aware policy makes no trade here
+#: (pinned as ``default_rules_1x``); the vector exists to pin the policy,
+#: the fill cap, the row block and the square-root impact on a run that
+#: trades.
+BT_DEFAULT_ALPHA = "EQ06"
+BT_DEFAULT_CONFIG = {
+    "max_pos_qty": 1000,
+    "conf_min": 0.2,
+    "latency_rows": 1,
+    "cost_multiplier": 0.01,
+    "position_policy": "cost_aware",
+    "cap_fills_at_l1": True,
+    "block_rows_column": "auto",
+    "impact_model": "sqrt",
+}
 
 
 def brute_force_z(raw: float, p: dict) -> tuple:
@@ -306,50 +342,173 @@ def main() -> int:
         }
         for r in inst
     }
-    cm = CostModel.load(
-        CONFIGS / "execution" / "execution.json", multiplier=BT_CONFIG["cost_multiplier"]
-    )
-    bt = Backtester(
-        cm,
-        meta,
-        BacktestConfig(
-            max_pos_qty=BT_CONFIG["max_pos_qty"],
-            conf_min=BT_CONFIG["conf_min"],
-            latency_rows=BT_CONFIG["latency_rows"],
-        ),
-    )
-    scores = models["EQ01"].score({1: eq_frame})
-    res = bt.run({1: eq_frame}, scores, "EQUITY")
-    r1 = res.per_instrument[1]
+
+    def golden_run(alpha_id: str, cfg: dict):
+        """One instrument-1 backtest of ``alpha_id`` under ``cfg`` (every
+        rule named: nothing is left to a default)."""
+        cm = CostModel.load(
+            CONFIGS / "execution" / "execution.json", multiplier=cfg["cost_multiplier"]
+        )
+        cm = replace(cm, impact_model=cfg["impact_model"])
+        bt = Backtester(
+            cm,
+            meta,
+            BacktestConfig(
+                max_pos_qty=cfg["max_pos_qty"],
+                conf_min=cfg["conf_min"],
+                latency_rows=cfg["latency_rows"],
+                position_policy=cfg["position_policy"],
+                cap_fills_at_l1=cfg["cap_fills_at_l1"],
+                block_rows_column=cfg["block_rows_column"],
+            ),
+        ).for_horizon(models[alpha_id].horizon)
+        scores = models[alpha_id].score({1: eq_frame})
+        return bt.run({1: eq_frame}, scores, "EQUITY").per_instrument[1], bt.config
+
+    def default_block(cfg: dict) -> tuple[dict, int]:
+        """One default-rules block: the numbers, the scored-row mask the
+        ``"auto"`` row block used (a port without a label engine takes it as
+        an input) and every position change (row, position after the row)."""
+        res, bt_cfg = golden_run(BT_DEFAULT_ALPHA, cfg)
+        allowed = bt_cfg.allowed_rows(eq_frame)
+        pos = res.positions
+        changed = np.flatnonzero(np.diff(pos, prepend=0.0) != 0.0)
+        block = {
+            "alpha_id": BT_DEFAULT_ALPHA,
+            "horizon": models[BT_DEFAULT_ALPHA].horizon,
+            "horizon_ns": int(bt_cfg.horizon_ns),
+            "hysteresis": bt_cfg.hysteresis,
+            "config": cfg,
+            **numbers(res),
+            "scored_rows": {
+                "source": bt_cfg.block_rows_label(),
+                "n_rows": len(allowed),
+                "n_scored": int(allowed.sum()),
+                "blocked_rows": [int(i) for i in np.flatnonzero(~allowed)],
+            },
+            "position_changes": [[int(i), float(pos[i])] for i in changed],
+        }
+        return block, res.trade_count
+
+    def cost_model_cases() -> dict:
+        """Scalar cost-model vectors under both impact rules: the cost
+        components of one execution, the round-trip hurdle and the breakeven
+        capacity (finite cases only: JSON has no infinity)."""
+        base = CostModel.load(CONFIGS / "execution" / "execution.json")
+        cases = []
+        for model in ("sqrt", "linear"):
+            for asset_class, qty, mid, hs, adv, lot, edge, mult in (
+                ("EQUITY", 300.0, 187.37, 0.005, 38_000_000.0, 100, 4.0e-4, 1.0),
+                ("EQUITY", -1000.0, 52.115, 0.015, 5_000_000.0, 100, 9.0e-4, 2.0),
+                ("ETF", 40.0, 431.02, 0.01, 60_000_000.0, 1, 1.0e-5, 0.5),
+                ("FX", 3.0, 1.08655, 0.00001, 4.0e9, 1000, 6.0e-5, 1.0),
+                ("FX", -25.0, 149.432, 0.0015, 2.5e9, 1000, 8.0e-5, 0.5),
+            ):
+                cm = replace(base, impact_model=model, multiplier=mult)
+                comp = cm.cost_components(
+                    np.array([qty]), np.array([mid]), np.array([hs]), asset_class, adv, lot
+                )
+                unit = float(lot) if asset_class == "FX" else 1.0
+                threshold = cm.round_trip_cost_return(np.array([mid]), np.array([hs]), asset_class)
+                cases.append(
+                    {
+                        "impact_model": model,
+                        "asset_class": asset_class,
+                        "multiplier": mult,
+                        "qty": qty,
+                        "mid": mid,
+                        "half_spread": hs,
+                        "adv": adv,
+                        "lot_size": lot,
+                        "edge_return": edge,
+                        "spread": float(comp["spread"][0]),
+                        "fee": float(comp["fee"][0]),
+                        "impact": float(comp["impact"][0]),
+                        "impact_bps": float(cm.impact_bps(np.array([abs(qty) * unit / adv]))[0]),
+                        "round_trip_cost_return": float(threshold[0]),
+                        "breakeven_size": float(
+                            cm.breakeven_size(edge, mid, hs, asset_class, adv, lot)
+                        ),
+                        "capacity": capacity_breakeven(cm, edge, mid, hs, asset_class, adv, lot),
+                    }
+                )
+        if not any(c["breakeven_size"] > 0 for c in cases):
+            raise SystemExit("cost-model cases pin no positive breakeven size")
+        if not any(c["breakeven_size"] == 0 for c in cases):
+            raise SystemExit("cost-model cases pin no zero breakeven size")
+        return {
+            "impact_coeff_bps_per_pct_adv": base.impact_coeff_bps_per_pct_adv,
+            "equity_taker_fee_per_share": base.equity_taker_fee_per_share,
+            "fx_commission_per_million": base.fx_commission_per_million,
+            "sqrt_impact_coeff_bps": base.sqrt_impact_coeff_bps,
+            "cases": cases,
+        }
+
+    def numbers(r) -> dict:
+        return {
+            "total_pnl": r.total_pnl,
+            "gross_pnl": r.gross_pnl,
+            "total_costs": r.total_costs,
+            "spread_cost": r.spread_cost,
+            "fee_cost": r.fee_cost,
+            "impact_cost": r.impact_cost,
+            "trade_count": r.trade_count,
+            "traded_qty": r.traded_qty,
+            "n_rows": r.n_rows,
+        }
+
+    r1, _ = golden_run("EQ01", BT_CONFIG)
+    default_rules, default_trades = default_block(BT_DEFAULT_CONFIG)
+    default_rules_1x, trades_1x = default_block({**BT_DEFAULT_CONFIG, "cost_multiplier": 1.0})
+    # one mask serves both default-rules runs (same alpha, same horizon)
+    if default_rules_1x.pop("scored_rows") != default_rules["scored_rows"]:
+        raise SystemExit("the two default-rules runs disagree on the scored rows")
     bt_out = {
-        "x-version": 1,
+        "x-version": 3,
         "description": (
-            "Research-backtester golden: EQ01 (day-1-fitted params from "
-            "expected_alpha.json) on the golden EQ frame. total_pnl / "
-            "total_costs at 1e-9 abs/rel; counts exact."
+            "Research-backtester golden on the golden EQ frame (day-1-fitted "
+            "params from expected_alpha.json), replayed by Python and Java. "
+            "The top-level numbers are EQ01 under the LEGACY research rules "
+            "that `config` names (sign position policy, fills not capped, "
+            "every row traded, linear impact — the defaults up to v1.4.0). "
+            "`default_rules` is the run under the v1.5.0 defaults "
+            "(cost-aware positions, L1 fill cap, scored rows only, "
+            "square-root impact) at the cost multiplier its config names: "
+            "`scored_rows.blocked_rows` are the rows the 'auto' row block "
+            "removes (a port without a label engine takes the mask as an "
+            "input) and `position_changes` lists [row, position after the "
+            "row] for every trade. `default_rules_1x` is the same run at "
+            "full costs (same mask), where no forecast clears the round-trip "
+            "cost. `cost_model_cases` are scalar cost-model vectors under "
+            "both impact rules (cost components, round-trip cost return, "
+            "breakeven size and capacity). Money at 1e-9 abs/rel; counts and "
+            "positions exact."
         ),
         "alpha_id": "EQ01",
         "source": "events_eq_mbo.jsonl",
         "instrument_id": 1,
         "config": BT_CONFIG,
-        "total_pnl": r1.total_pnl,
-        "gross_pnl": r1.gross_pnl,
-        "total_costs": r1.total_costs,
-        "spread_cost": r1.spread_cost,
-        "fee_cost": r1.fee_cost,
-        "impact_cost": r1.impact_cost,
-        "trade_count": r1.trade_count,
-        "traded_qty": r1.traded_qty,
-        "n_rows": r1.n_rows,
+        **numbers(r1),
+        "default_rules": default_rules,
+        "default_rules_1x": default_rules_1x,
+        "cost_model_cases": cost_model_cases(),
     }
     if r1.trade_count < 5:
         raise SystemExit(f"EQ01 golden backtest nearly empty: {r1.trade_count}")
+    if default_trades < 5:
+        raise SystemExit(
+            f"{BT_DEFAULT_ALPHA} default-rules golden backtest nearly empty: {default_trades}"
+        )
+    if not default_rules["scored_rows"]["blocked_rows"]:
+        raise SystemExit("the default-rules vector blocks no row: the row block is not pinned")
     (GOLDEN / "expected_backtest.json").write_text(
         json.dumps(bt_out, indent=2, sort_keys=True) + "\n"
     )
     print(
-        f"backtest golden: pnl={r1.total_pnl:+.4f} trades={r1.trade_count} "
-        f"costs={r1.total_costs:.4f}"
+        f"backtest golden: legacy EQ01 pnl={r1.total_pnl:+.4f} trades={r1.trade_count} "
+        f"costs={r1.total_costs:.4f}; default {BT_DEFAULT_ALPHA} "
+        f"pnl={default_rules['total_pnl']:+.4f} trades={default_trades} "
+        f"(1x: {trades_1x} trades)"
     )
     return 0
 

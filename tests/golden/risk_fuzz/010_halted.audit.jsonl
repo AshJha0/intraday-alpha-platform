@@ -1,0 +1,40 @@
+{"decision":2,"reason":"global kill switch engaged","rule_id":"KILL_GLOBAL","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000000000000}
+{"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000000000000000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000000000000000}
+{"decision":2,"reason":"qty 92377 exceeds max_order_qty 50000","rule_id":"FAT_FINGER_QTY","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000000010084000}
+{"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000000065084000}
+{"decision":2,"reason":"reference price age 5000000001ns exceeds 5000000000ns","rule_id":"STALE_PRICE","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000005030084001}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000000145266000}
+{"decision":2,"reason":"qty must be > 0: -9223372036854775807","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000000145652000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000000190652000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000000191185000}
+{"decision":3,"reason":"venue 65535 disconnected","rule_id":"VENUE_DISCONNECT","scope":"VENUE","scope_id":"65535","severity":2,"timestamp":1700000000192082000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000001204082000}
+{"decision":1,"reason":"venue 65535 reconnected","rule_id":"VENUE_RECONNECT","scope":"VENUE","scope_id":"65535","severity":1,"timestamp":1700000001255656000}
+{"decision":1,"reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000001301656000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000001347093000}
+{"decision":2,"reason":"order_id 4 already used at ts 1700000000010084000","rule_id":"DUPLICATE_ORDER_ID","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700000001372093000}
+{"decision":2,"reason":"price_ticks must be >= 0: -9223372036854775808","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000001372599000}
+{"decision":2,"reason":"order_id 6 already used at ts 1700000000145266000","rule_id":"DUPLICATE_ORDER_ID","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000001431245000}
+{"decision":2,"reason":"would cross own open order 8 at 0","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000001431245000}
+{"decision":2,"reason":"would cross own open order 10 at 2663","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000001458245000}
+{"decision":3,"reason":"ops halt","rule_id":"KILL_SWITCH_ENGAGED","scope":"INSTRUMENT","scope_id":"0002","severity":3,"timestamp":1700000001469245000}
+{"decision":1,"reason":"desk request #42","rule_id":"KILL_SWITCH_CLEARED","scope":"INSTRUMENT","scope_id":"99","severity":1,"timestamp":1700000003492245000}
+{"decision":2,"reason":"instrument 2 kill switch engaged","rule_id":"KILL_INSTRUMENT","scope":"INSTRUMENT","scope_id":"2","severity":3,"timestamp":1700000003493143000}
+{"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"INSTRUMENT","scope_id":"2","severity":1,"timestamp":1700000003493143000}
+{"decision":2,"reason":"would cross own open order 8 at 0","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000003493143000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"𐀀z","severity":1,"timestamp":1700000003493143000}
+{"decision":2,"reason":"order_id 10 already used at ts 1700000001204082000","rule_id":"DUPLICATE_ORDER_ID","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000003526143000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000003576143000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000003630143000}
+{"decision":2,"reason":"would cross own open order 10 at 2663","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000003630143000}
+{"decision":2,"reason":"order_id 14 already used at ts 1700000001458245000","rule_id":"DUPLICATE_ORDER_ID","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000003630425000}
+{"decision":3,"reason":"ops halt","rule_id":"KILL_SWITCH_ENGAGED","scope":"STRATEGY","scope_id":"S1","severity":3,"timestamp":1700000003711425000}
+{"decision":1,"reason":"naïve café","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000006712120000}
+{"decision":2,"reason":"qty 113481 exceeds max_order_qty 50000","rule_id":"FAT_FINGER_QTY","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000006712120000}
+{"decision":2,"reason":"would cross own open order 8 at 0","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000006712120000}
+{"decision":2,"reason":"would cross own open order 8 at 0","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000006712120000}
+{"decision":2,"reason":"would cross own open order 8 at 0","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000006712120000}
+{"decision":2,"reason":"would cross own open order 8 at 0","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000006712120000}
+{"decision":2,"reason":"strategy S3 exceeded 500.00 orders/s (burst 4.00)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700000006712120000}
+{"decision":2,"reason":"strategy S3 exceeded 500.00 orders/s (burst 4.00)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700000006712120000}

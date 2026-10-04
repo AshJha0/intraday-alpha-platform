@@ -1,5 +1,5 @@
 flowchart LR
-    %% .github/workflows/{ci,codeql,release}.yml and dependabot.yml as of v1.4.0.
+    %% .github/workflows/{ci,codeql,release}.yml and dependabot.yml as of v1.5.0.
     PR["pull request<br/>or push to main"] --> PY
     PR --> INT
     PR --> CPP
@@ -35,8 +35,8 @@ flowchart LR
     PR --> CQL["codeql.yml<br/>python, java-kotlin, c-cpp, actions<br/>also weekly"]
     DB["dependabot.yml<br/>weekly: github-actions, pip, cargo, docker"] -.->|"bump PRs through the same gate"| PR
     TAG["git tag v*"] --> VER
-    subgraph REL["release.yml — not yet exercised by a tag"]
-        VER["verify-ci<br/>the tagged commit has a green ci run"]
+    subgraph REL["release.yml — the guard failed the v1.4.0 release once on an API error and now retries"]
+        VER["verify-ci (tests/harness/verify_ci_green.py)<br/>the tagged commit has a green ci run<br/>API errors retried, a run in progress polled,<br/>a failed or missing run stops the release"]
         BLD["images<br/>build and push to GHCR, one per language"]
         ATT["attest build provenance<br/>per image digest"]
         MAN["manifest<br/>release-manifest.json attached to the release"]

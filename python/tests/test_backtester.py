@@ -1,5 +1,13 @@
 """Research backtester tests: accounting identity, no-lookahead execution,
-cost-model hand calculations, determinism (spec §18)."""
+cost-model hand calculations, determinism (spec §18).
+
+The execution-mechanics tests (latency, decision age, session flattening,
+currency conversion, accounting identity) pin their hand calculations under
+the LEGACY rules, named explicitly: ``BacktestConfig.legacy(...)`` (sign
+position policy, uncapped fills, every row traded) and
+``_legacy_cost_model()`` (linear impact).  The v1.5.0 defaults (cost-aware
+positions, L1 fill cap, scored-rows block, square-root impact) have their
+own hand calculations here and in test_research_validity.py."""
 
 from __future__ import annotations
 
@@ -30,12 +38,18 @@ META = {
 
 
 def _cost_model(multiplier=1.0):
+    """The cost model under the DEFAULT impact rule (square root, v1.5.0)."""
     return CostModel(
         impact_coeff_bps_per_pct_adv=2.0,
         equity_taker_fee_per_share=0.003,
         fx_commission_per_million=2.5,
         multiplier=multiplier,
     )
+
+
+def _legacy_cost_model(multiplier=1.0):
+    """The same model under the LEGACY linear impact rule, named."""
+    return _cost_model(multiplier).with_linear_impact()
 
 
 def _frame(mids, spreads_ticks=2.0, iid=1, step_ns=NS_S):
@@ -66,10 +80,52 @@ def test_cost_model_loads_from_execution_config():
     assert cm.equity_taker_fee_per_share == 0.003
     assert cm.fx_commission_per_million == 2.5
     assert cm.multiplier == 1.0
+    # v1.5.0: the document names its impact model, and it is the default one
+    assert cm.impact_model == "sqrt"
+    assert cm.sqrt_impact_coeff_bps == 100.0
 
 
-def test_cost_components_hand_calc_equity():
+def test_impact_model_default_is_sqrt_and_linear_is_the_named_legacy():
+    assert _cost_model().impact_model == "sqrt"
+    assert _cost_model().sqrt_impact_coeff_bps == 100.0
+    assert _legacy_cost_model().impact_model == "linear"
+    assert _legacy_cost_model(3.0).multiplier == 3.0  # nothing else changes
+    with pytest.raises(ValueError, match="unknown impact_model"):
+        CostModel(2.0, 0.003, 2.5, impact_model="quadratic")
+
+
+def test_cost_components_hand_calc_equity_default_sqrt_impact():
+    """Default rule: impact_bps = 100 * sqrt(size / ADV)."""
     cm = _cost_model()
+    q = np.array([1000.0])
+    mid = np.array([25.0])
+    hs = np.array([0.01])
+    c = cm.cost_components(q, mid, hs, "EQUITY", adv=1_000_000.0, lot_size=100)
+    assert abs(c["spread"][0] - 1000 * 0.01) < 1e-12
+    assert abs(c["fee"][0] - 1000 * 0.003) < 1e-12
+    # 1000 / 1e6 = 1e-3 of ADV -> 100 * sqrt(1e-3) = 3.16227766 bps on 25000
+    # notional = 3.16227766e-4 * 25000 = 7.90569415
+    assert abs(c["impact"][0] - 100.0 * np.sqrt(1e-3) * 1e-4 * 1000 * 25.0) < 1e-12
+    assert abs(c["impact"][0] - 7.905694150420949) < 1e-9
+
+
+def test_cost_components_hand_calc_fx_and_multiplier_default_sqrt_impact():
+    cm = _cost_model(multiplier=2.0)
+    q = np.array([-500.0])
+    mid = np.array([1.1])
+    hs = np.array([2e-5])
+    c = cm.cost_components(q, mid, hs, "FX", adv=4e9, lot_size=1000)
+    # 500 * 1000 / 4e9 = 1.25e-4 of ADV -> 100 * sqrt(1.25e-4) = 1.11803399 bps
+    # on 550 000 notional = 61.4918694 at x1, doubled by the multiplier
+    impact1 = 100.0 * np.sqrt(500 * 1000 / 4e9) * 1e-4 * 500 * 1000 * 1.1
+    assert abs(impact1 - 61.49186938124422) < 1e-9
+    assert abs(c["spread"][0] - 2 * 500 * 1000 * 2e-5) < 1e-12
+    assert abs(c["fee"][0] - 2 * 500 * 1000 * 1.1 * 2.5 / 1e6) < 1e-12
+    assert abs(c["impact"][0] - 2 * impact1) < 1e-12
+
+
+def test_cost_components_hand_calc_equity_legacy_linear_impact():
+    cm = _legacy_cost_model()
     q = np.array([1000.0])
     mid = np.array([25.0])
     hs = np.array([0.01])
@@ -80,8 +136,8 @@ def test_cost_components_hand_calc_equity():
     assert abs(c["impact"][0] - (2.0 * 0.1) * 1e-4 * 1000 * 25.0) < 1e-12
 
 
-def test_cost_components_hand_calc_fx_and_multiplier():
-    cm = _cost_model(multiplier=2.0)
+def test_cost_components_hand_calc_fx_and_multiplier_legacy_linear_impact():
+    cm = _legacy_cost_model(multiplier=2.0)
     q = np.array([-500.0])
     mid = np.array([1.1])
     hs = np.array([2e-5])
@@ -101,7 +157,7 @@ def test_fx_unit_scaling_and_identity():
     er = [1e-4, 1e-4, -1e-4, -1e-4, 1e-4, 0.0]
     f = _frame(mids, spreads_ticks=2.0, iid=101)
     s = _scores(er)
-    bt = Backtester(_cost_model(), META, BacktestConfig(max_pos_qty=100))
+    bt = Backtester(_legacy_cost_model(), META, BacktestConfig.legacy(max_pos_qty=100))
     res = bt.run_instrument(101, f, s)
     # long 100 units from row 1 (mid 1.1002) -> real notional 100*1000*mid
     # first marked move: 1.1002 -> 1.1001 on 100 units*1000 = -10 currency
@@ -114,7 +170,7 @@ def test_fx_unit_scaling_and_identity():
 
 
 def test_cost_model_rejects_bad_inputs():
-    cm = _cost_model()
+    cm = _legacy_cost_model()
     with pytest.raises(ValueError):
         cm.cost_components(np.ones(1), np.ones(1), np.ones(1), "BOND", 1e6, 100)
     with pytest.raises(ValueError):
@@ -126,7 +182,7 @@ def test_decision_t_executes_t_plus_one():
     mids = [10.0, 10.0, 10.0, 10.0, 12.0, 12.0, 12.0]
     conf = [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]
     er = [0.0, 0.0, 0.0, 1e-3, 0.0, 0.0, 0.0]
-    bt = Backtester(_cost_model(), META, BacktestConfig(max_pos_qty=100))
+    bt = Backtester(_legacy_cost_model(), META, BacktestConfig.legacy(max_pos_qty=100))
     res = bt.run_instrument(1, _frame(mids), _scores(er, conf))
     pos = res.positions
     assert pos[3] == 0.0, "decision row must NOT hold the new position yet"
@@ -141,8 +197,12 @@ def test_latency_zero_captures_what_latency_one_misses():
     mids = [10.0, 11.0, 12.0, 13.0, 14.0]
     er = [1e-3] * 5
     f, s = _frame(mids), _scores(er)
-    bt0 = Backtester(_cost_model(), META, BacktestConfig(max_pos_qty=10, latency_rows=0))
-    bt1 = Backtester(_cost_model(), META, BacktestConfig(max_pos_qty=10, latency_rows=1))
+    bt0 = Backtester(
+        _legacy_cost_model(), META, BacktestConfig.legacy(max_pos_qty=10, latency_rows=0)
+    )
+    bt1 = Backtester(
+        _legacy_cost_model(), META, BacktestConfig.legacy(max_pos_qty=10, latency_rows=1)
+    )
     g0 = bt0.run_instrument(1, f, s).gross_pnl
     g1 = bt1.run_instrument(1, f, s).gross_pnl
     assert abs(g0 - 10 * 4.0) < 1e-9  # rides 10 -> 14 from row 0
@@ -156,7 +216,9 @@ def test_accounting_identity_exact():
     mids = 20.0 + 0.01 * np.round(10 * np.sin(np.arange(n) * 0.7))
     er = 1e-3 * np.sin(np.arange(n) * 1.3)
     conf = np.abs(np.cos(np.arange(n) * 0.9))
-    bt = Backtester(_cost_model(), META, BacktestConfig(max_pos_qty=700, conf_min=0.4))
+    bt = Backtester(
+        _legacy_cost_model(), META, BacktestConfig.legacy(max_pos_qty=700, conf_min=0.4)
+    )
     res = bt.run_instrument(1, _frame(mids), _scores(er, conf))
     assert res.trade_count > 20
     ident = res.gross_pnl - res.total_costs
@@ -169,7 +231,7 @@ def test_accounting_identity_exact():
 def test_invalid_mid_rows_carry_position():
     mids = [10.0, 10.0, np.nan, np.nan, 10.0, 10.0]
     er = [1e-3, 1e-3, -1e-3, -1e-3, -1e-3, 0.0]
-    bt = Backtester(_cost_model(), META, BacktestConfig(max_pos_qty=50))
+    bt = Backtester(_legacy_cost_model(), META, BacktestConfig.legacy(max_pos_qty=50))
     res = bt.run_instrument(1, _frame(mids), _scores(er))
     pos = res.positions
     assert pos[1] == 50.0  # first decision executed at row 1
@@ -183,9 +245,9 @@ def test_cost_multiplier_scales_costs_linearly():
     mids = 20.0 + 0.01 * np.round(5 * np.sin(np.arange(200) * 0.8))
     er = 1e-3 * np.sin(np.arange(200) * 1.1)
     f, s = _frame(mids), _scores(er)
-    cfg = BacktestConfig(max_pos_qty=100, conf_min=0.0)
-    r1 = Backtester(_cost_model(1.0), META, cfg).run_instrument(1, f, s)
-    r2 = Backtester(_cost_model(2.0), META, cfg).run_instrument(1, f, s)
+    cfg = BacktestConfig.legacy(max_pos_qty=100, conf_min=0.0)
+    r1 = Backtester(_legacy_cost_model(1.0), META, cfg).run_instrument(1, f, s)
+    r2 = Backtester(_legacy_cost_model(2.0), META, cfg).run_instrument(1, f, s)
     assert r1.trade_count == r2.trade_count
     assert abs(r2.total_costs - 2.0 * r1.total_costs) < 1e-9
     assert abs(r2.gross_pnl - r1.gross_pnl) < 1e-12
@@ -195,7 +257,9 @@ def test_backtester_deterministic():
     mids = 20.0 + 0.01 * np.round(7 * np.sin(np.arange(300) * 0.6))
     er = 1e-3 * np.cos(np.arange(300) * 0.9)
     f, s = _frame(mids), _scores(er)
-    bt = Backtester(_cost_model(), META, BacktestConfig(max_pos_qty=300, conf_min=0.0))
+    bt = Backtester(
+        _legacy_cost_model(), META, BacktestConfig.legacy(max_pos_qty=300, conf_min=0.0)
+    )
     a = bt.run_instrument(1, f, s)
     b = bt.run_instrument(1, f, s)
     assert a.total_pnl == b.total_pnl
@@ -208,7 +272,9 @@ def test_run_aggregates_and_metrics():
     er = 1e-3 * np.sin(np.arange(600) * 0.7)
     frames = {1: _frame(mids)}
     scores = {1: _scores(er)}
-    bt = Backtester(_cost_model(), META, BacktestConfig(max_pos_qty=100, conf_min=0.0))
+    bt = Backtester(
+        _legacy_cost_model(), META, BacktestConfig.legacy(max_pos_qty=100, conf_min=0.0)
+    )
     res = bt.run(frames, scores, "EQUITY")
     assert abs(res.total_pnl - res.per_instrument[1].total_pnl) < 1e-12
     m = res.metrics(capital=100 * 20.0)
@@ -226,6 +292,114 @@ def test_config_validation():
         BacktestConfig(latency_rows=-1)
     with pytest.raises(ValueError):
         BacktestConfig(max_pos_qty=0)
+    with pytest.raises(ValueError):
+        BacktestConfig.legacy(latency_rows=-1)
+    with pytest.raises(ValueError):
+        BacktestConfig.legacy(max_pos_qty=0)
+
+
+def test_config_defaults_are_the_v150_rules_and_legacy_names_the_old_ones():
+    cfg = BacktestConfig()
+    assert cfg.position_policy == "cost_aware"
+    assert cfg.cap_fills_at_l1 is True
+    assert cfg.block_rows_column == "auto"
+    assert cfg.horizon_ns is None and cfg.hysteresis == 0.5
+    old = BacktestConfig.legacy(max_pos_qty=7)
+    assert old.position_policy == "sign"
+    assert old.cap_fills_at_l1 is False
+    assert old.block_rows_column is None
+    assert old.max_pos_qty == 7
+    assert BacktestConfig().for_horizon("1s").horizon_ns == NS_S
+    with pytest.raises(ValueError, match="unknown horizon"):
+        BacktestConfig().for_horizon("7s")
+
+
+def _default_rules_inputs():
+    """Eight 1 s rows for the default-rules hand calculation.
+
+    Round-trip hurdle at mid 25.00, half-spread 0.01, fee 0.003:
+    (2 * 0.01 + 2 * 0.003) / 25 = 1.04e-3.
+    """
+    mids = [25.0, 25.0, 25.0, 25.1, 25.2, 25.2, 25.2, 25.2]
+    frame = _frame(mids)
+    frame["depth_bid_l1_v1"] = 500.0
+    frame["depth_ask_l1_v1"] = [500.0, 500.0, 60.0, 500.0, 500.0, 500.0, 500.0, 500.0]
+    frame["label_mid_1s"] = 0.0
+    frame["label_valid_1s"] = [True, True, True, True, False, True, True, True]
+    #       below   enter  renew   none  blocked row
+    er = [0.5e-3, 2e-3, 0.6e-3, 0.0, 2e-3, 0.0, 0.0, 0.0]
+    return frame, _scores(er), mids
+
+
+def test_default_rules_hand_calc():
+    """Cost-aware positions + L1 fill cap + scored-rows block + sqrt impact,
+    every number derived by hand.
+
+    Desired sign per decision row (horizon 1 s, hysteresis 0.5):
+      row 0: 0.5e-3 < hurdle 1.04e-3              -> flat
+      row 1: 2e-3 clears the hurdle               -> long, clock starts
+      row 2: horizon elapsed; 0.6e-3 > 0.52e-3    -> renewed, no trade
+      row 3: horizon elapsed; no signal           -> flat
+      row 4: 2e-3 clears, but the row is NOT scored (invalid label): blocked
+      rows 5-7: no signal                         -> flat
+    Latency 1 row -> targets at execution rows 2..4 are 100, 100, 0; the
+    blocked row's decision never reaches row 5.
+    Fills: row 2 buys min(100, ask 60) = 60; row 3 buys the remaining 40
+    toward the still-standing target; row 4 sells 100 (bid 500).
+    """
+    frame, scores, mids = _default_rules_inputs()
+    bt = Backtester(_cost_model(), META, BacktestConfig(max_pos_qty=100)).for_horizon("1s")
+    res = bt.run_instrument(1, frame, scores)
+    assert res.positions.tolist() == [0.0, 0.0, 60.0, 100.0, 0.0, 0.0, 0.0, 0.0]
+    assert res.trade_count == 3
+    assert res.traded_qty == 200
+    # gross: 60 * (25.1 - 25.0) + 100 * (25.2 - 25.1) = 6 + 10
+    assert abs(res.gross_pnl - 16.0) < 1e-9
+    assert abs(res.spread_cost - 200 * 0.01) < 1e-12
+    assert abs(res.fee_cost - 200 * 0.003) < 1e-12
+    # sqrt impact per fill: 100 bps * sqrt(q / 1e6) * 1e-4 * q * mid
+    impact = 1e-2 * (
+        np.sqrt(60 / 1e6) * 60 * 25.0
+        + np.sqrt(40 / 1e6) * 40 * 25.1
+        + np.sqrt(100 / 1e6) * 100 * 25.2
+    )
+    # = 0.1161895004 + 0.0634985354 + 0.252
+    assert abs(impact - 0.4316880358) < 1e-9
+    assert abs(res.impact_cost - impact) < 1e-12
+    assert abs(res.total_costs - (2.0 + 0.6 + impact)) < 1e-12
+    assert abs(res.total_pnl - (16.0 - 2.0 - 0.6 - impact)) < 1e-9
+
+
+def test_default_rules_differ_from_legacy_on_the_same_inputs():
+    """The legacy rules on the default-rules fixture: the sign policy trades
+    the sub-cost forecast and the unscored row, in full size."""
+    frame, scores, mids = _default_rules_inputs()
+    old = Backtester(_legacy_cost_model(), META, BacktestConfig.legacy(max_pos_qty=100))
+    res = old.run_instrument(1, frame, scores)
+    # sign(er) * 100 one row later, re-decided every row, never capped
+    assert res.positions.tolist() == [0.0, 100.0, 100.0, 100.0, 0.0, 100.0, 0.0, 0.0]
+    assert res.trade_count == 4 and res.traded_qty == 400
+    # 100 * (25.1 - 25.0) + 100 * (25.2 - 25.1); the row-5 round trip is flat
+    assert abs(res.gross_pnl - 20.0) < 1e-9
+    # linear impact: 2 bps per 1 % ADV; 100 / 1e6 = 0.01 % -> 0.02 bps per fill
+    impact = 0.02e-4 * 100 * (25.0 + 25.2 + 25.2 + 25.2)
+    assert abs(res.impact_cost - impact) < 1e-12
+
+
+def test_default_policy_without_a_horizon_is_an_error_not_a_fallback():
+    frame, scores, _ = _default_rules_inputs()
+    bt = Backtester(_cost_model(), META, BacktestConfig(max_pos_qty=100))
+    with pytest.raises(ValueError, match="needs horizon_ns"):
+        bt.run_instrument(1, frame, scores)
+
+
+def test_default_fill_cap_and_row_block_need_their_columns():
+    frame, scores, _ = _default_rules_inputs()
+    bt = Backtester(_cost_model(), META, BacktestConfig(max_pos_qty=100)).for_horizon("1s")
+    with pytest.raises(ValueError, match="cap_fills_at_l1 needs frame column"):
+        bt.run_instrument(1, frame.drop(columns=["depth_ask_l1_v1"]), scores)
+    with pytest.raises(ValueError, match="block_rows_column='auto' needs frame column"):
+        bt.run_instrument(1, frame.drop(columns=["label_valid_1s"]), scores)
 
 
 def test_ensemble_scores_cancels_opposite_members():
@@ -271,8 +445,9 @@ def test_backtest_multi_currency_pnl_converted():
             "quote_currency": "JPY",
         },
     }
-    cm = CostModel(0.0, 0.003, 0.0, 1.0)  # zero impact/commission: exact numbers
-    bt = Backtester(cm, meta, BacktestConfig(max_pos_qty=1000, conf_min=0.5))
+    # zero (legacy linear) impact/commission: exact numbers
+    cm = CostModel(0.0, 0.003, 0.0, 1.0, impact_model="linear")
+    bt = Backtester(cm, meta, BacktestConfig.legacy(max_pos_qty=1000, conf_min=0.5))
     assert bt.fx_conversion == {"EUR": (101, False), "JPY": (103, True)}
     # EUR/USD: buy 1000 lots at row 1 (1.00000), mid rises by 0.001 -> +1,000 USD
     eur_mids = [1.0, 1.0, 1.001, 1.001]
@@ -322,7 +497,7 @@ def test_backtest_multi_currency_pnl_converted():
         "base_currency": "EUR",
         "quote_currency": "GBP",
     }
-    bt2 = Backtester(cm, meta2, BacktestConfig(max_pos_qty=1000, conf_min=0.5))
+    bt2 = Backtester(cm, meta2, BacktestConfig.legacy(max_pos_qty=1000, conf_min=0.5))
     with pytest.raises(ValueError, match="conversion pair"):
         bt2.run(
             {108: _frame([0.85, 0.85, 0.851, 0.851], 0.0, 108)}, {108: _scores([1e-4] * 4)}, "FX"
@@ -362,8 +537,8 @@ def test_backtester_time_latency_mode_executes_at_the_first_aged_row():
     ts = np.arange(6, dtype=np.int64) * 3 * NS_S + NS_S
     frame = _frame_at(ts, [20.0, 20.1, 20.2, 20.3, 20.4, 20.5])
     scores = _scores_at(frame, [1e-4, 0, 0, 0, 0, 0])
-    cfg = BacktestConfig(max_pos_qty=100, conf_min=0.5, latency_ns=500_000_000)
-    bt = Backtester(_cost_model(), META, cfg)
+    cfg = BacktestConfig.legacy(max_pos_qty=100, conf_min=0.5, latency_ns=500_000_000)
+    bt = Backtester(_legacy_cost_model(), META, cfg)
     res = bt.run_instrument(1, frame, scores)
     assert res.positions[0] == 0.0
     assert res.positions[1] == 100.0
@@ -383,8 +558,12 @@ def test_time_latency_matches_rows_mode_when_spacing_equals_latency():
     frame = _frame_at(ts, 20.0 + np.arange(12) * 0.01)
     er = np.where(np.arange(12) % 3 == 0, 1e-4, -1e-4)
     scores = _scores_at(frame, er)
-    rows = Backtester(_cost_model(), META, BacktestConfig(max_pos_qty=100, latency_rows=1))
-    timed = Backtester(_cost_model(), META, BacktestConfig(max_pos_qty=100, latency_ns=NS_S))
+    rows = Backtester(
+        _legacy_cost_model(), META, BacktestConfig.legacy(max_pos_qty=100, latency_rows=1)
+    )
+    timed = Backtester(
+        _legacy_cost_model(), META, BacktestConfig.legacy(max_pos_qty=100, latency_ns=NS_S)
+    )
     a = rows.run_instrument(1, frame, scores)
     b = timed.run_instrument(1, frame, scores)
     assert np.array_equal(a.positions, b.positions)
@@ -408,13 +587,13 @@ def test_backtester_drops_stale_decisions_and_flattens_at_session_end():
     frame = _frame_at(ts, mids)
     er = np.full(len(ts), 1e-4)
     scores = _scores_at(frame, er)
-    cfg = BacktestConfig(
+    cfg = BacktestConfig.legacy(
         max_pos_qty=100,
         latency_ns=NS_S,
         max_decision_age_ns=5 * NS_S,
         flatten_at_session_end=True,
     )
-    bt = Backtester(_cost_model(), META, cfg)
+    bt = Backtester(_legacy_cost_model(), META, cfg)
     res = bt.run_instrument(1, frame, scores)
     pos = res.positions
     # the 4-hour-old decision cannot fill at the close print
@@ -444,7 +623,9 @@ def test_unbounded_decision_age_still_fills_at_the_print():
     )
     frame = _frame_at(ts, [20.0, 20.1, 21.0, 21.5])
     scores = _scores_at(frame, [1e-4, 1e-4, 1e-4, 1e-4])
-    bt = Backtester(_cost_model(), META, BacktestConfig(max_pos_qty=100, latency_rows=1))
+    bt = Backtester(
+        _legacy_cost_model(), META, BacktestConfig.legacy(max_pos_qty=100, latency_rows=1)
+    )
     res = bt.run_instrument(1, frame, scores)
     assert res.positions[2] == 100.0  # fills at the 20:00 print (legacy)
 
@@ -454,7 +635,9 @@ def test_sharpe_bars_are_zero_filled_inside_a_session():
     ts = np.array([0, 60, 600, 660], dtype=np.int64) * NS_S + NS_S
     frame = _frame_at(ts, [20.0, 20.5, 20.5, 21.0])
     scores = _scores_at(frame, [1e-4, 1e-4, 1e-4, 1e-4])
-    bt = Backtester(_cost_model(), META, BacktestConfig(max_pos_qty=100, latency_rows=1))
+    bt = Backtester(
+        _legacy_cost_model(), META, BacktestConfig.legacy(max_pos_qty=100, latency_rows=1)
+    )
     res = bt.run(frames={1: frame}, scores={1: scores}, asset_class="EQUITY")
     m = res.metrics(capital=1000.0)
     assert m["n_bars_with_rows"] == 4
@@ -485,8 +668,8 @@ def test_flatten_at_session_end_retreats_to_the_last_executable_row():
     exists to close.  The flatten now lands on the last EXECUTABLE row at or
     before the boundary.
     """
-    cfg = BacktestConfig(max_pos_qty=100, latency_rows=1, flatten_at_session_end=True)
-    bt = Backtester(_cost_model(), META, cfg)
+    cfg = BacktestConfig.legacy(max_pos_qty=100, latency_rows=1, flatten_at_session_end=True)
+    bt = Backtester(_legacy_cost_model(), META, cfg)
 
     frame, scores = _session_gap_frame(boundary_mid_valid=True)
     ok = bt.run_instrument(1, frame, scores)

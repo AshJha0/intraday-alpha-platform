@@ -1,20 +1,21 @@
 flowchart TD
     %% python -m iap.research power (iap.research.power) — research/power/POWER_REPORT.md.
-    %% The figures in the last node are the committed three-seed report.
-    CFG["research/power/generator_planted.json<br/>the reference effect, level 1.0:<br/>order_flow strength 0.4 · lead_lag beta 0.4 at a lag of 2 steps"] --> GRID["grid: levels 0, 0.5, 1, 2 · scenarios stable and break · 3 seeds per cell<br/>level 0 is the null; break reverses both effects mid-sample"]
-    GRID --> GEN["seeded generator with the planted block ON<br/>reduced universe: SYN.EQ.001, SYN.EQ.002, SYN.ETF.IDX"]
+    %% The figures in the last node are the committed twenty-seed reports (default and extended grid).
+    CFG["research/power/generator_planted.json<br/>the reference effect, level 1.0:<br/>order_flow strength 0.4 · lead_lag beta 0.4 at a lag of 2 steps"] --> GRID["grid: levels 0, 0.5, 1 · scenarios stable and break · 20 seeds per cell<br/>level 0 is the null; break reverses both effects mid-sample<br/>extended grid: levels 0, 0.5, 1, 2 on 8 sessions"]
+    GRID --> GEN["seeded generator with the planted block ON, run once at the largest session count<br/>reduced universe: SYN.EQ.001, SYN.EQ.002, SYN.ETF.IDX<br/>own calendar: as many weekdays as the grid needs"]
     GEN --> PIPE["the real pipeline, unmodified:<br/>normalise, books, feature engine, labels"]
-    PIPE --> VAL["validate_alpha under the pinned research execution model<br/>detectors: EQ04 for order flow, EQ10 for lead-lag"]
-    VAL --> S1["sig within: gate IC > 0 and Newey-West t of<br/>within-bucket ICs >= 3 (what the PROMOTE gate reads)"]
-    VAL --> S2["sig pooled: pooled-slope HAC t >= 3"]
-    VAL --> S3["sig ledger: within-bucket t against the threshold<br/>of the study's own 42 tests (t >= 3.24)"]
-    VAL --> S4["evidence: verdict ITERATE or PROMOTE"]
-    VAL --> S5["promote; and 95% stationary-bootstrap interval<br/>of net P&L at 1x costs above zero"]
-    S1 --> REP["POWER_REPORT.md + POWER_REPORT.json<br/>detection rate per effect, scenario and level"]
+    PIPE --> PRE["first 1, 2, 4 (8) sessions of the run<br/>= the n-session run of the same seed"]
+    PRE --> VAL["validate_alpha under the default method bundle v2<br/>detectors: EQ04 at 5 s (declared) and 10 s (matched) for order flow,<br/>EQ10 at 1 s (declared) and 5 s (matched) for lead-lag"]
+    VAL --> S1["at fixed: gate IC > 0 and pooled-slope HAC t >= 3"]
+    VAL --> S2["at gate: the same t >= 4.365, the PROMOTE threshold in force<br/>(the committed reports' gate look count of 3,936)"]
+    VAL --> S3["at study: the same t against the Bonferroni threshold<br/>of the study's own tests"]
+    VAL --> S4["evidence: verdict ITERATE or PROMOTE; promote;<br/>bootstrap interval of net P&L at 1x costs above zero"]
+    PRE --> S5["beside the chain: session-clustered pooled-slope t of the raw signal,<br/>effective sample, break z (slope before vs after mid-sample)"]
+    S1 --> REP["POWER_REPORT.md + POWER_REPORT.json<br/>detections of 20 with Wilson 95% intervals per detector, scenario, level and session count<br/>diagnosis (ideal vs measured IC, expected vs measured t) · power model (MDE at 80%, sessions needed)"]
     S2 --> REP
     S3 --> REP
     S4 --> REP
     S5 --> REP
-    REP --> READ["committed result:<br/>order flow flagged in 3 of 3 seeds at level 2, 1 of 3 at level 1, 0 of 3 at level 0.5<br/>lead-lag flagged in 0 of 3 at every level<br/>break rows: 0 everywhere · PROMOTE: 0 in every cell<br/>no P&L interval above zero in any cell"]
-    OFF["the planted block is OFF by default: the pinned dataset is<br/>byte-identical with or without it; the study never touches<br/>data/ or the research ledger"] -.-> GEN
-    LIM["3 seeds per cell: a rate moves in steps of 0.33 —<br/>this calibrates the chain, it is not a power curve"] -.-> READ
+    REP --> READ["committed result at the reference size, gate threshold:<br/>order flow at 5 s: 2 of 20 on 2 sessions, 10 of 20 on 4, 20 of 20 on 8 · at 10 s: 11, 20, 20<br/>lead-lag at 1 s: 0 of 20 at every session count · at 5 s: 1, 6 and 16 of 20<br/>null: 0 of 20 in every cell · break: no evidence, break z flags order flow in 20 of 20<br/>PROMOTE: 0 in every cell · no P&L interval above zero in any cell"]
+    OFF["the planted block is OFF by default: the pinned dataset is<br/>byte-identical with or without it; the study never touches<br/>data/, configs/ or the research ledger"] -.-> GEN
+    LIM["20 seeds per cell: 16 of 20 is 0.58 to 0.92, 0 of 20 is 0.00 to 0.16 —<br/>session counts beyond the grid are the fitted sqrt law, not measurements"] -.-> READ

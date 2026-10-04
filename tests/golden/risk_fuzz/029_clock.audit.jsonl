@@ -1,0 +1,70 @@
+{"decision":3,"reason":"venue 2 disconnected","rule_id":"VENUE_DISCONNECT","scope":"VENUE","scope_id":"2","severity":2,"timestamp":1700000000000000000}
+{"decision":2,"reason":"venue 0 (SOR) order rejected: every known venue is disconnected","rule_id":"VENUE_DISCONNECTED","scope":"VENUE","scope_id":"0","severity":2,"timestamp":1700000000000429000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000000056429000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000000056429000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000000056429000}
+{"decision":2,"reason":"venue 2 is disconnected","rule_id":"VENUE_DISCONNECTED","scope":"VENUE","scope_id":"2","severity":2,"timestamp":1700000000056429000}
+{"decision":2,"reason":"venue 2 is disconnected","rule_id":"VENUE_DISCONNECTED","scope":"VENUE","scope_id":"2","severity":2,"timestamp":1700000000056429000}
+{"decision":2,"reason":"venue 0 (SOR) order rejected: every known venue is disconnected","rule_id":"VENUE_DISCONNECTED","scope":"VENUE","scope_id":"0","severity":2,"timestamp":1700000000056429000}
+{"decision":2,"reason":"side must be 0 or 1: 2","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700003600056429000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000000056429000}
+{"decision":1,"reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"VENUE","scope_id":"+2","severity":1,"timestamp":1700000000056958000}
+{"decision":2,"reason":"venue 2 is disconnected","rule_id":"VENUE_DISCONNECTED","scope":"VENUE","scope_id":"2","severity":2,"timestamp":1700000002056958000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000002057388000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000002057388000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000002057388000}
+{"decision":2,"reason":"order_id 13 already used at ts 1700000002057388000","rule_id":"DUPLICATE_ORDER_ID","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000004057387999}
+{"decision":1,"reason":"venue 2 reconnected","rule_id":"VENUE_RECONNECT","scope":"VENUE","scope_id":"2","severity":1,"timestamp":1700000005126388000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000010126388000}
+{"decision":2,"reason":"would cross own open order 10 at 501","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000009148388000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000009148388000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000014148388001}
+{"decision":3,"reason":"","rule_id":"KILL_SWITCH_ENGAGED","scope":"STRATEGY","scope_id":"S1","severity":3,"timestamp":0}
+{"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000014284388001}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000016284388001}
+{"decision":3,"reason":"kill scope id \"٣\" is not a valid INSTRUMENT id: escalated to GLOBAL (fail-closed): ops halt","rule_id":"MALFORMED_KILL","scope":"INSTRUMENT","scope_id":"٣","severity":3,"timestamp":1700000017341426001}
+{"decision":1,"reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000017384426001}
+{"decision":3,"reason":"","rule_id":"KILL_SWITCH_ENGAGED","scope":"STRATEGY","scope_id":"S3","severity":3,"timestamp":1700000017384426001}
+{"decision":2,"reason":"strategy S3 kill switch engaged","rule_id":"KILL_STRATEGY","scope":"STRATEGY","scope_id":"S3","severity":3,"timestamp":1700000025384426002}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S 1","severity":1,"timestamp":1700000020385255001}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S 1","severity":1,"timestamp":1700000020385255001}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S 1","severity":1,"timestamp":1700000020385255001}
+{"decision":2,"reason":"strategy S 1 exceeded 40.00 orders/s (burst 3.00)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S 1","severity":2,"timestamp":1700000020385255001}
+{"decision":2,"reason":"strategy S 1 exceeded 40.00 orders/s (burst 3.00)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S 1","severity":2,"timestamp":1700000020385255001}
+{"decision":2,"reason":"reference price age 10048829000ns exceeds 5000000000ns","rule_id":"STALE_PRICE","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000030433255001}
+{"decision":2,"reason":"would cross own open order 10 at 501","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000033439255001}
+{"decision":2,"reason":"qty 87635 exceeds max_order_qty 50000","rule_id":"FAT_FINGER_QTY","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000035477255001}
+{"decision":1,"reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000035478498001}
+{"decision":1,"reason":"restored snapshot v1: 2 positions, 6 open orders","rule_id":"STATE_RESTORED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000040478255001}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000040501255001}
+{"decision":2,"reason":"would cross own open order 15 at 503","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000040509146001}
+{"decision":2,"reason":"would cross own open order 22 at 2454","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000040509437001}
+{"decision":2,"reason":"qty 191205 exceeds max_order_qty 50000","rule_id":"FAT_FINGER_QTY","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000040546437001}
+{"decision":2,"reason":"would cross own open order 15 at 503","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000040601437001}
+{"decision":2,"reason":"would cross own open order 15 at 503","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000040601437001}
+{"decision":2,"reason":"would cross own open order 15 at 503","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000040601437001}
+{"decision":2,"reason":"strategy S2 exceeded 40.00 orders/s (burst 3.00)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000040601437001}
+{"decision":2,"reason":"strategy S2 exceeded 40.00 orders/s (burst 3.00)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000040601437001}
+{"decision":2,"reason":"strategy S2 exceeded 40.00 orders/s (burst 3.00)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000040601437001}
+{"decision":2,"reason":"strategy S2 exceeded 40.00 orders/s (burst 3.00)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000040601437001}
+{"decision":2,"reason":"notional 1023984.03 USD exceeds max_order_notional 1000000.00","rule_id":"FAT_FINGER_NOTIONAL","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000045509437001}
+{"decision":3,"reason":"strategy daily pnl -92233720368547758.07 breaches loss limit 50000.00","rule_id":"STRATEGY_LOSS","scope":"STRATEGY","scope_id":"S 1","severity":3,"timestamp":1700000042706437001}
+{"decision":3,"reason":"strategy daily pnl -92233720368547758.07 breaches loss limit 50000.00","rule_id":"STRATEGY_LOSS","scope":"STRATEGY","scope_id":"S2","severity":3,"timestamp":1700000042706437001}
+{"decision":3,"reason":"strategy daily pnl -92233720368547758.07 breaches loss limit 50000.00","rule_id":"STRATEGY_LOSS","scope":"STRATEGY","scope_id":"S3","severity":3,"timestamp":1700000042706437001}
+{"decision":3,"reason":"global daily pnl -92233720368547758.07 breaches daily loss limit 250000.00","rule_id":"DAILY_LOSS","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000042706437001}
+{"decision":1,"reason":"daily loss limit 50000.00 -> 92233720368547758.07 approved by ops halt","rule_id":"LOSS_LIMIT_OVERRIDE","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700000047706437002}
+{"decision":1,"reason":"desk request #42","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000042706437001}
+{"decision":2,"reason":"global kill switch engaged","rule_id":"KILL_GLOBAL","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000042706437001}
+{"decision":2,"reason":"global kill switch engaged","rule_id":"KILL_GLOBAL","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000047509437000}
+{"decision":1,"reason":"desk request #42","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000042784437001}
+{"decision":2,"reason":"would cross own open order 15 at 503","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000042784437001}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000044810437001}
+{"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000044819437001}
+{"decision":2,"reason":"side must be 0 or 1: 255","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":0}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000054851437002}
+{"decision":2,"reason":"instrument 1 feed has an unrecovered gap","rule_id":"SEQUENCE_GAP","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000049857643002}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000049857643003}
+{"decision":2,"reason":"instrument 1 feed has an unrecovered gap","rule_id":"SEQUENCE_GAP","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":-1}
+{"decision":2,"reason":"would cross own open order 15 at 503","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000058857643003}
+{"decision":2,"reason":"would cross own open order 15 at 503","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000058857643003}
+{"decision":2,"reason":"would cross own open order 15 at 503","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000058857643003}

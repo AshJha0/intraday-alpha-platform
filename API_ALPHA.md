@@ -181,14 +181,31 @@ USD.  Pairs (instrument_id -> base/quote): 101 EUR/USD, 102 GBP/USD,
 - Tolerances: expected_return / confidence / ic at abs 1e-9 + rel 1e-9;
   indices, timestamps and counts exact.
 
-`tests/golden/expected_backtest.json` pins the research backtest of EQ01
-on the golden EQ frame: config {max_pos_qty 1000, conf_min 0.2,
-latency_rows 1, cost multiplier 1}; semantics of `iap/backtest/engine.py`
-(decision at row i executes at row i+1 at that row's mid, spread/fee/impact
-charged as explicit costs per `configs/execution/execution.json cost_model`;
-accounting identity `total_pnl = gross_pnl - total_costs`).  `total_pnl`,
-`gross_pnl`, `total_costs` (and components) at 1e-9; `trade_count`,
-`traded_qty`, `n_rows` exact.
+`tests/golden/expected_backtest.json` (`x-version` 2) pins the research
+backtest of EQ01 on the golden EQ frame: config {max_pos_qty 1000,
+conf_min 0.2, latency_rows 1, cost multiplier 1}; semantics of
+`iap/backtest/engine.py` (decision at row i executes at row i+1 at that
+row's mid, spread/fee/impact charged as explicit costs per
+`configs/execution/execution.json cost_model`; accounting identity
+`total_pnl = gross_pnl - total_costs`).  `total_pnl`, `gross_pnl`,
+`total_costs` (and components) at 1e-9; `trade_count`, `traded_qty`,
+`n_rows` exact.  The file (`x-version` 3) holds **two cross-language
+vectors, both replayed by Python and Java** (`BacktestGoldenTest`).  The
+top-level one is computed under the LEGACY research rules its `config` names
+(`position_policy "sign"`, `cap_fills_at_l1 false`, `block_rows_column
+null`, `impact_model "linear"` — the defaults up to v1.4.0; Java
+`Config.legacy` + `CostModel.withLinearImpact`) and is identical to the
+v1.4.0 one in every value.  `default_rules` is the run under the v1.5.0
+defaults (cost-aware positions, fills capped at the displayed L1 size, only
+the rows the IC scores, square-root impact — API_PORTFOLIO_TCA.md §4; EQ06,
+10 s horizon, at the cost multiplier its own `config` names; Java
+`Config.defaults` + `CostModel.load`): it embeds the scored-row mask
+(`scored_rows.blocked_rows` — Java has no label engine and takes the mask as
+an input) and every position change (`position_changes`, exact).
+`default_rules_1x` is the same run at full costs, which makes no trade, and
+`cost_model_cases` are scalar cost-model vectors under both impact rules
+(components, round-trip cost return, breakeven size and capacity).  Each
+port asserts that the block's `config` equals the rule set it constructs.
 
 Regeneration (deliberate, versioned changes only — schemas/MIGRATIONS.md):
 `research/alpha_reports/run_all.py` (refits `alpha_params.json`), then
@@ -202,7 +219,11 @@ parameters, `expected_alpha.json` and `expected_backtest.json` in this tree
 are fitted on dataset `116b7787…` (the `data_version` in the header of
 `alpha_params.json`). The equity parameters moved (EQ01 `beta` 1.26e-06 →
 5.84e-08, EQ03 4.06e-06 → 2.38e-06, EQ06 7.47e-06 → 6.08e-06); the FX
-parameters did not, because the FX data is byte-identical.
+parameters did not, because the FX data is byte-identical. v1.5.0 was its
+second use, on the same dataset under the new default methods: the fitted
+parameters differ from v1.4.0 by at most 2.3e-15 relative (a summation
+order, not a refit on other rows), `expected_alpha.json` follows at
+2.6e-13, and the values quoted above are unchanged.
 
 ## 7. Validation expectations for ports
 
@@ -212,3 +233,71 @@ is ported (EQ01/EQ03/EQ06/FX01/FX09), reproduce the 5 cases and the IC, and
 (EQ01) reproduce the golden backtest.  Honest-reporting rule (spec §32)
 carries over: `hypothesis_confirmed=false` params ship with the sign the
 fit produced — ports must not "fix" signs, thresholds or coefficients.
+
+## 8. Signal combination — `iap.combine` (Python research; not a port contract)
+
+`CombinedAlpha(member_ids, method="equal_weight", *, asset_class=None,
+horizon=None, alpha_id=None, inner_folds=3, embargo_ns=60e9,
+member_factory=iap.alpha.build)` is an `AlphaModel` whose inputs are alphas:
+`fit(train)` / `score(frames)` / `params()` / `load_params(blob)` with the
+§1 output contract (`exchange_ts, expected_return, confidence`, row-aligned,
+`(0.0, 0.0)` where it has no opinion). It is validated, ledgered and gated
+like any alpha (`iap.validation.validate_alpha`); it is NOT serialised to
+`alpha_params.json` and no port scores it.
+
+**Member signal.** `z_k = expected_return_k / beta_k` on rows where member
+`k` has confidence > 0, NaN elsewhere; a dead member (`beta == 0`) has no
+signal.
+
+**Fit** (training rows only — PLATFORM_CONVENTIONS.md §13.8):
+
+1. split the training window with `WalkForwardSplitter(n_folds=inner_folds,
+   embargo_ns)` at the combination horizon;
+2. per inner fold, fit every member on the inner training rows (minus the
+   last `member horizon − combination horizon` of them) and score the inner
+   test rows: the stack `Z` (rows × K), with labels `y`, inner-fold ids and
+   timestamps;
+3. standardise each column of `Z` by its own mean and standard deviation
+   over its finite rows (missing → 0.0; fewer than 32 finite rows or no
+   variance → inactive, weight 0); fit the weights; then `mu`, `sigma` of the
+   blend and the OLS slope `beta` of `y` on the clipped blend;
+4. refit every member on the whole training window.
+
+**Weights** (`iap.combine.weights.fit_weights`; normalised to `sum |w| = 1`):
+
+| method | weights | reads the label | accounts for member correlation |
+|---|---|---|---|
+| `equal_weight` (default) | `1 / K_active` | no | no |
+| `ic_weighted` | `max(IC_k, 0) / (1 − IC_k²)` | yes | no |
+| `ridge` | `(Z'Z/n + λI)⁻¹ Z'y/n`, `λ ∈ {0.01, 0.1, 1, 10, 100}` by forward-chained CV over the inner folds (purged, embargoed; larger `λ` on a tie; the largest when no split is possible) | yes | yes |
+| `shrinkage_mv` | `S*⁻¹ cov(z, y)`, `S*` the Ledoit–Wolf shrinkage of the signal covariance towards `mu·I` | yes | yes |
+
+Nothing is orthogonalised: under `equal_weight` and `ic_weighted` a block of
+near-duplicate members is over-weighted by them, which
+`effective_bets(correlation_matrix(Z))` (`N_eff = (Σλ)² / Σλ²` over the
+eigenvalues of the signal correlation matrix) reports.
+
+**Score.**
+
+```
+c    = Σ_k w_k · (z_k − mean_k) / scale_k        (missing z_k → 0; accumulated in member order)
+zc   = clip((c − mu) / (sigma + 1e-12), −4, +4)
+er   = beta · zc
+conf = min(1, |zc| / 2)          rows where no weighted member has an opinion → (0.0, 0.0)
+```
+
+`hypothesis_confirmed = beta > 0 and Σ w_k > 0`. The blend is summed column
+by column rather than as a matrix product so that a row's score is
+bit-identical whatever rows follow it (the truncation and recompute probes).
+
+**Defaults.** Members: every flagship alpha of the asset class. Horizon:
+the members' lower-median label horizon (`combination_horizon`): EQUITY
+`5s`, FX `1m`. Ids `COMB_EQ` / `COMB_FX`.
+
+**Report and CLI.** `python -m iap.research combine [--asset-class
+EQUITY|FX|all] [--method m1,m2] [--members A,B,...] [--horizon H]
+[--dry-run]` → `research/combination/{REPORT.md, COMBINATION.json,
+signal_correlation.json, reports/<id>.<method>.json}`. Each (asset class,
+method) pair is one experiment costing `83 + K` looks (§13.8).
+`signal_correlation.json` (`x-version` 1) is the input of the lifecycle's
+`cross_alpha_correlation` gate (docs/LIFECYCLE.md §3).

@@ -251,6 +251,64 @@ iap.tca` from a pinned SplitMix64(seed=20260829) parent-order simulation
 over the golden event vectors. The simulation is a Python research harness;
 Java implements §2.1–§2.7 against production fills instead.
 
+### 2.9 Markout analysis (v1.5.0; `iap.tca.markout`, Java `com.iap.tca.Markout`)
+
+Additive to §2.5 (whose three pinned deltas and per-order record are
+unchanged). With side sign `s`, fill price `p`, fill time `t_f`, horizon `h`,
+`m_f` the fill's §2.4 reference mid and `m_h` the mid **at or before**
+`t_f + h` in event time (`timeline.prevailing(t_f + h)`; no interpolation):
+
+| measure (per unit) | definition | sign |
+|---|---|---|
+| `markout(h)` | `s * (m_h - p)` | positive = the fill looks good after `h` |
+| `effective_half_spread` | `s * (p - m_f)` | `+hs` taker at the touch, `-hs` maker (earned) |
+| `realised_half_spread(h)` | `s * (p - m_h)` | `= -markout(h)` |
+| `price_impact(h)` | `s * (m_h - m_f)` | mid moved in the direction of our trade |
+| `adverse_selection(h)` | `-price_impact(h)` over MAKER fills | positive = the mid moved against the resting order |
+
+`effective_half_spread = realised_half_spread(h) + price_impact(h)` exactly,
+per fill and per cell. Bps are per fill `1e4 * x / p`; currency is
+`x * qty * qty_unit`. Default horizons `{100ms, 1s, 5s, 30s, 60s, 5min}`
+(`DEFAULT_HORIZONS_NS`; any mapping can be passed).
+
+**Undefined ⇒ `null`, never zero, never a stale carry.** A markout is
+undefined when (1) no two-sided state exists at or before `t_f + h`; (2) the
+timeline ends before `t_f + h` (session end); (3) a gate started inside
+`(min(t_f, ts(m_h)), t_f + h]`. A gate is a timestamp in `timeline.halts`;
+`build_gated_timeline` records one at every non-TRADING status (HALT,
+AUCTION, CLOSE) of any venue and whenever the consolidated book stops being
+two-sided, and appends no state while either lasts — so halts, auctions and
+no-quote gaps all make the windows that touch them undefined. The reference
+mid is undefined when no state prevails or the prevailing one predates a
+gate; such a fill has no measure at any horizon.
+
+**Cells** (`markout_report`): `all`, `by_liquidity` (MAKER = passive, TAKER =
+aggressive), `by_venue`, `by_algo`, `by_side`, `by_time_bucket`
+(`floor((t_f - session_start_ts) / bucket_ns)`). Per cell and horizon, over
+the fills defined at that horizon: `n`, the equal-weight mean of each measure
+in bps, its standard error (sample standard deviation, `ddof = 1`, over
+`sqrt(n)`) and the currency sum. Fewer than `min_fills` (default 5) defined
+fills ⇒ `n` is reported and every statistic is `null`. The standard error
+treats fills as independent; fills of one parent are not, so it is a lower
+bound.
+
+**Passive orders** (`passive_order_stats`; a passive order = a LIMIT child
+that came to rest): `fill_rate_qty`, `fill_rate_orders`, `full_fill_rate`,
+`time_to_first_fill_ns` / `time_to_full_fill_ns` (from arrival at the venue;
+mean and standard error), overall and per queue-position bucket at entry
+(`ChildOrder.entry_ahead_qty`, default edges 0 / 500 / 2000).
+
+This is a separate, non-wire document: the `TCAResult` wire contract
+(`schemas/tca/tca_result.schema.json`, x-version 1) did **not** gain fields —
+it is embedded in every decision trace, so a new field would move the trace
+digests and the MVP golden in four languages (schemas/MIGRATIONS.md,
+2026-10-04 execution quality). Golden: `tests/golden/expected_markout.json`
+(x-version 1; 400 s timeline with a HALT and a 20 s quote gap, 40 fills
+including one before the first quote, one at the session end, one just
+before the halt and one inside the gap; per-fill measures, the report and the
+passive-order statistics; 1e-9, nulls exact). Python generates
+(`python/tools/make_golden_markout.py`), Java consumes (`MarkoutGoldenTest`).
+
 ## 3. Training-artifact manifest (for any service persisting fits)
 
 Every model fit directory `research/models/<run_id>/` contains
@@ -287,33 +345,104 @@ cpu_count, machine, system, python}` — plus `metrics.json` and `model.pkl`.
   the risk engine rejects with `FX_RATE_MISSING`). Capital for the day-2
   backtest is converted with the pair's `ref_price`.
 - **Cost-model units** (research `iap.backtest.costs.CostModel` and the
-  simulator rule 6 are identical): commission bps × notional, half-spread
-  in price units × qty × qty_unit, and impact
-  `impact_coeff_bps_per_pct_adv × (qty × qty_unit / adv × 100)` bps of the
+  simulator rule 6 use the same units): commission bps × notional,
+  half-spread in price units × qty × qty_unit, and impact in bps of the
   fill notional, with `adv` in base units (shares, or currency units of the
   base for FX — `configs/instruments/instruments.json` `adv`). Both sides pass
   `qty_unit = lot_size` for FX and `1` for EQUITY/ETF; passing lot counts
   against a base-unit ADV understates FX impact by `lot_size` and is a
-  contract violation.
-- **Opt-in research cost and fill options (Python `iap.backtest`, v1.3.0;
-  every default is the pinned behaviour above, and the simulator, the Java
-  services and every committed report use the defaults).**
-  `CostModel(impact_model="sqrt", sqrt_impact_coeff_bps=...)` replaces the
-  linear impact with `sqrt_impact_coeff_bps × sqrt(|q| × unit / adv)` bps
-  (the coefficient is the impact of trading one full ADV); both keys are
-  read from the `cost_model` config block when present and the committed
-  config does not carry them. `CostModel.breakeven_size` /
-  `iap.validation.metrics.capacity_breakeven` give the order size at which
-  the edge per round trip equals spread + fee + impact — 0 when the edge
-  does not cover spread + fee, `inf` when the model charges no impact —
-  beside the pinned capacity proxy `max_participation × ADV × price`, which
-  no gate stopped reading. `BacktestConfig(cap_fills_at_l1=True)` caps
-  each fill at the displayed L1 size on the side it takes (default: any
-  size at the touch); `BacktestConfig(position_policy="cost_aware",
-  horizon_ns=..., hysteresis=0.5)` enters only when `|expected_return|`
-  exceeds the row's round-trip cost, holds to the label horizon or an
-  opposite signal that itself clears the cost, and renews an expired hold
-  only above `hysteresis ×` that cost (default policy `"sign"`: the sign of
-  the expected return, re-decided every row);
-  `BacktestConfig(block_rows_column="label_valid_<h>")` makes no decision
-  on rows where that column is false (default: every row trades).
+  contract violation. A `multiplier` scales the total cost.
+- **Research impact model** (`CostModel.impact_model`; pinned, the default
+  changed in v1.5.0 — the square root was an opt-in from v1.3.0).
+  `"sqrt"`, the default:
+  `impact_bps = sqrt_impact_coeff_bps × sqrt(|q| × qty_unit / adv)`, the
+  coefficient being the impact in bps of trading one full ADV; pinned
+  `sqrt_impact_coeff_bps = 100.0` (`DEFAULT_SQRT_IMPACT_COEFF_BPS`), a
+  convention fixed before any result was computed with it, not a
+  calibration to this dataset. `"linear"`, the legacy rule and the default
+  up to v1.4.0:
+  `impact_bps = impact_coeff_bps_per_pct_adv × (|q| × qty_unit / adv × 100)`
+  (pinned coefficient 2.0); selected by name with
+  `CostModel.with_linear_impact()`. In both,
+  `impact_cost = impact_bps × 1e-4 × |q| × qty_unit × mid`. The
+  `cost_model` block of `configs/execution/execution.json` (`x-version` 2)
+  must NAME its `impact_model`, and `"sqrt"` must give
+  `sqrt_impact_coeff_bps`: `CostModel.load` rejects a block written for
+  v1.4.0 instead of pricing it under the other rule. **The execution
+  simulator's rule 6 did not change**: it reads
+  `impact_coeff_bps_per_pct_adv` and is linear in Python, C++ and Java. The
+  Java `com.iap.backtest.CostModel` is a port of both rules under the same
+  names: square root by default (`DEFAULT_IMPACT_MODEL`, `load` — which
+  rejects a block that names no `impact_model`, as Python does),
+  `withLinearImpact()` / `loadLegacyLinear` for the legacy rule, plus
+  `roundTripCostReturn`, `breakevenSize` and `capacityBreakeven`.
+- **Research backtest rules** (`iap.backtest.engine.BacktestConfig`;
+  pinned, the defaults changed in v1.5.0 — each was an opt-in from v1.3.0).
+  Default first, legacy second; `BacktestConfig.legacy(**overrides)` names
+  the three legacy values together, and `iap.validation.methods` bundles
+  them with the impact model as `"v2"` / `"legacy_v1"`.
+  - *Positions*: `position_policy="cost_aware"` — enter from flat only when
+    `confidence >= conf_min` and `|expected_return|` exceeds the row's
+    round-trip cost as a return,
+    `multiplier × (2 × half_spread + 2 × fee_per_unit) / mid`
+    (`CostModel.round_trip_cost_return`; impact is excluded, the hurdle is
+    size-free); hold until `horizon_ns` of event time has elapsed since
+    entry or an opposite signal that itself clears the cost flips the
+    position; when the horizon has elapsed, a same-direction signal above
+    `hysteresis ×` that cost (default 0.5) renews the hold without trading,
+    otherwise the position is closed. A row with an invalid mid or
+    half-spread cannot open or flip a position. **The policy needs the
+    label horizon**: `horizon_ns` must be set before a run —
+    `BacktestConfig.for_horizon(h)` / `Backtester.for_horizon(h)` set it
+    from a pinned horizon name — and a run without it is an error, never a
+    fall-back to the other rule. Legacy `"sign"`: target =
+    `sign(expected_return) × max_pos_qty` when `confidence >= conf_min`,
+    re-decided on every row.
+  - *Fills*: `cap_fills_at_l1=True` — the quantity traded at a row is
+    capped at the displayed L1 size on the side it takes
+    (`depth_ask_l1_v1` for a buy, `depth_bid_l1_v1` for a sell; a missing
+    or non-finite size fills nothing). The remainder is not queued; the
+    session-end flatten is exempt. Legacy `False`: any size at the touch.
+  - *Rows traded*: `block_rows_column="auto"` — a row outside the mask
+    makes no decision (the position carries); `"auto"` is the mask of the
+    rows the IC scores at the configured horizon
+    (`iap.labels.frames.scored_rows`, API_FEATURES.md §6), so it needs
+    `horizon_ns` and the frame's `label_mid_<h>` / `label_valid_<h>`
+    columns. The mask is built from labels, which are known only after
+    the fact: it removes a selection difference between two research
+    statistics and is not a tradable rule. A column name blocks on that
+    boolean column; legacy `None` trades every row.
+  - *A strategy that does not trade does not pass*: an alpha whose
+    forecast never clears its round-trip cost makes no trade under the
+    default policy; its net P&L is exactly 0, which fails `net P&L > 0`.
+  - *Ports*: the Java `com.iap.backtest.ResearchBacktester` implements
+    both rule sets (v1.5.0): `ResearchBacktester.Config.defaults(...)` is
+    the cost-aware policy with the L1 fill cap and the row block —
+    `.forHorizon(ns)` supplies the label horizon, and a run without it is
+    an error as in Python — and `Config.legacy(...)` is the sign policy,
+    uncapped, every row. One difference is stated in its API: Java has no
+    label engine, so the scored-row mask that Python derives for
+    `block_rows_column="auto"` is an INPUT of `run(...)` (`allowed`), as
+    are the displayed L1 sizes. Rows-mode latency only: `latency_ns`,
+    `max_decision_age_ns`, `flatten_at_session_end` and the per-row
+    currency conversion are Python-only (none is a default).
+    `tests/golden/expected_backtest.json` (`x-version` 3) pins both rule
+    sets for both languages: the legacy EQ01 vector at the top level, the
+    default-rules EQ06 vector in `default_rules` (with the mask and every
+    position change), the no-trade run at full costs in
+    `default_rules_1x`, and `cost_model_cases` for both impact rules —
+    money at 1e-9 abs/rel, counts and positions exact. There is no Rust or
+    C++ research backtester: `rust/` and `cpp/` hold no code that reads
+    this golden (C++ `ExecutionReplay` and the Rust venue simulator are
+    execution components with their own goldens).
+- **Capacity** (`validate_alpha(capacity=...)`; the default changed in
+  v1.5.0). `"breakeven"`, the default: per instrument, the order size at
+  which the edge per round trip equals spread + fee + impact
+  (`CostModel.breakeven_size` / `iap.validation.metrics.capacity_breakeven`
+  under the impact model in force) — 0 when the edge does not cover
+  spread + fee, `inf` when the model charges no impact — capped at the
+  participation line; the edge is the realised gross return per round trip
+  of the 1× backtest on the last fold, so an alpha that does not trade, or
+  whose trades lose before costs, has capacity 0. `"participation"`, the
+  legacy rule: `max_participation × ADV × price`, the same for an alpha
+  with a 5 bp edge and one with none.

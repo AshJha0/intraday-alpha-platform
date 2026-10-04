@@ -30,12 +30,24 @@ key                          default meaning
 ``latency_ns``               1 s     event-time decision-to-fill latency
 ``max_decision_age_ns``      60 s    a decision older than this never fills
 ``flatten_at_session_end``   true    no overnight carry in the backtest
+``methods``                  "v2"    the research method bundle
+                                     (:mod:`iap.validation.methods`):
+                                     ``"v2"`` or ``"legacy_v1"``
 ============================ ======= =====================================
 
 The defaults are exactly the pinned research execution model of
 ``research/alpha_reports/run_all.py`` (4 folds, 60 s embargo, 1 s latency,
-60 s decision age, session flattening, 1x costs), so a spec with an empty
-configuration reproduces the flagship promotion report's protocol.
+60 s decision age, session flattening, 1x costs, the ``v2`` methods), so a
+spec with an empty configuration reproduces the flagship promotion report's
+protocol.
+
+``methods`` is part of the configuration — and therefore of the experiment
+id — since v1.5.0: the same alpha on the same data under the legacy rules
+is a different experiment from the one under the default rules.  A spec
+written before v1.5.0 carries no ``methods`` key; it stays a readable
+document (its result was computed under what is now ``"legacy_v1"``), it is
+not gate-eligible, and it cannot be re-run under its old id: build it again
+with ``methods="legacy_v1"`` to reproduce it under a new one.
 
 **Period derivation (pinned)** — see :func:`derive_periods`.
 
@@ -50,19 +62,29 @@ turn until the gates pass.  A result is *gate-eligible* only when
   :data:`DEFAULT_CONFIGURATION` (:data:`GATE_ELIGIBILITY_BOUNDS`:
   ``cost_multiplier >= 1.0``, ``latency_ns >= 1 s``, ``embargo_ns >= 60 s``,
   ``n_folds >= 4``, ``max_decision_age_ns <= 60 s``,
-  ``flatten_at_session_end`` true), and
+  ``flatten_at_session_end`` true),
+* it was computed under the default method bundle (``methods == "v2"``; a
+  legacy-methods result, or a spec that predates the key, is history),
 * its three periods are exactly the ones :func:`derive_periods` derives from
-  the dataset it ran on — i.e. the caller did not choose the holdout.
+  the dataset it ran on — i.e. the caller did not choose the holdout, and
+* the run could apply the whole default chain: the recompute leakage probe
+  ran (the normalized events were beside the feature store) and the frames
+  carried the ``label_reopen_<h>`` column the default row policy scores
+  (the runner passes these as ``run_reasons``).
 
 Eligibility is not part of the spec and never changes an experiment id; the
-runner writes it beside the result (``eligibility.json``) and
-``iap.lifecycle.gates`` refuses research evidence flagged not eligible.
+runner writes it beside the result (``eligibility.json``, ``x-version`` 2)
+together with the significance threshold the result was judged at and the
+ledger look count it was derived from — an ``ExperimentResult`` has no field
+for either, and ``iap.lifecycle`` needs the threshold to evaluate its
+``statistical_significance`` gate.  ``iap.lifecycle.gates`` refuses research
+evidence flagged not eligible.
 """
 
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -78,6 +100,7 @@ from iap.contracts.validate import validate_typed
 from iap.contracts.versions import content_hash
 from iap.experiment import tracker
 from iap.research.errors import ResearchError
+from iap.validation.methods import DEFAULT_METHODS, METHODS
 from iap.validation.metrics import HORIZONS_NS
 
 __all__ = [
@@ -107,6 +130,7 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
     "latency_ns": 1_000_000_000,
     "max_decision_age_ns": 60_000_000_000,
     "flatten_at_session_end": True,
+    "methods": DEFAULT_METHODS,
 }
 
 #: Seed recorded when the caller gives none (the contract example's value).
@@ -166,6 +190,9 @@ def normalise_configuration(configuration: Mapping[str, Any] | None) -> dict[str
             f"unknown configuration keys {unknown}; pinned keys are {sorted(DEFAULT_CONFIGURATION)}"
         )
     merged = {**DEFAULT_CONFIGURATION, **given}
+    bundle = merged["methods"]
+    if not isinstance(bundle, str) or bundle not in METHODS:
+        raise _invalid(f"configuration.methods: expected one of {sorted(METHODS)}, got {bundle!r}")
     return {
         "n_folds": _require_int(merged, "n_folds", 1),
         "embargo_ns": _require_int(merged, "embargo_ns", 0),
@@ -173,6 +200,7 @@ def normalise_configuration(configuration: Mapping[str, Any] | None) -> dict[str
         "latency_ns": _require_int(merged, "latency_ns", 0),
         "max_decision_age_ns": _require_int(merged, "max_decision_age_ns", 1),
         "flatten_at_session_end": _require_bool(merged, "flatten_at_session_end"),
+        "methods": bundle,
     }
 
 
@@ -283,8 +311,11 @@ def derive_periods(
     )
 
 
-#: ``x-version`` of the ``eligibility.json`` sidecar document.
-ELIGIBILITY_VERSION = 1
+#: ``x-version`` of the ``eligibility.json`` sidecar document: 2 since
+#: v1.5.0 (``methods``, ``significance_threshold``, ``threshold_looks``).
+ELIGIBILITY_VERSION = 2
+#: Versions a reader accepts (1 = written by v1.3.0 / v1.4.0).
+ELIGIBILITY_VERSIONS_READ = (1, 2)
 
 #: Configuration bounds of a gate-eligible result: ``(kind, bound)`` per key,
 #: ``min`` = the value must be >= bound, ``max`` = <= bound, ``is`` = equal.
@@ -299,6 +330,7 @@ GATE_ELIGIBILITY_BOUNDS: dict[str, tuple[str, Any]] = {
     "latency_ns": ("min", DEFAULT_CONFIGURATION["latency_ns"]),
     "max_decision_age_ns": ("max", DEFAULT_CONFIGURATION["max_decision_age_ns"]),
     "flatten_at_session_end": ("is", DEFAULT_CONFIGURATION["flatten_at_session_end"]),
+    "methods": ("equals", DEFAULT_CONFIGURATION["methods"]),
 }
 
 
@@ -308,11 +340,21 @@ class GateEligibility:
 
     ``periods_verified`` says the period check was actually made against a
     dataset; ``False`` means only the configuration bounds were checked
-    (a run directory written before the sidecar existed)."""
+    (a run directory written before the sidecar existed).
+
+    ``methods`` is the bundle the result was computed under,
+    ``significance_threshold`` the PROMOTE t threshold it was judged at and
+    ``threshold_looks`` the ledger look count that threshold was derived
+    from (``None`` under the fixed legacy threshold).  All three are
+    ``None`` for a determination made from a spec alone, and for a sidecar
+    written before v1.5.0."""
 
     eligible: bool
     reasons: tuple[str, ...]
     periods_verified: bool
+    methods: str | None = None
+    significance_threshold: float | None = None
+    threshold_looks: int | None = None
 
     def to_dict(self, experiment_id: str) -> dict[str, Any]:
         """The ``eligibility.json`` document for ``experiment_id``."""
@@ -322,20 +364,28 @@ class GateEligibility:
             "gate_eligible": self.eligible,
             "periods_verified": self.periods_verified,
             "reasons": list(self.reasons),
+            "methods": self.methods,
+            "significance_threshold": self.significance_threshold,
+            "threshold_looks": self.threshold_looks,
         }
 
     @staticmethod
     def from_dict(doc: Mapping[str, Any], experiment_id: str) -> GateEligibility:
-        """Strict inverse of :meth:`to_dict` for ``experiment_id``."""
-        want = {"x-version", "experiment_id", "gate_eligible", "periods_verified", "reasons"}
-        if not isinstance(doc, Mapping) or set(doc) != want:
-            raise _corrupt(
-                f"eligibility document for {experiment_id}: expected keys {sorted(want)}"
-            )
-        if doc["x-version"] != ELIGIBILITY_VERSION:
+        """Strict inverse of :meth:`to_dict` for ``experiment_id`` (an
+        ``x-version`` 1 document has no method / threshold fields)."""
+        base = {"x-version", "experiment_id", "gate_eligible", "periods_verified", "reasons"}
+        added = {"methods", "significance_threshold", "threshold_looks"}
+        if not isinstance(doc, Mapping) or "x-version" not in doc:
+            raise _corrupt(f"eligibility document for {experiment_id}: not a versioned object")
+        if doc["x-version"] not in ELIGIBILITY_VERSIONS_READ:
             raise _corrupt(
                 f"eligibility document for {experiment_id}: x-version "
-                f"{doc['x-version']!r}, this build reads {ELIGIBILITY_VERSION}"
+                f"{doc['x-version']!r}, this build reads {list(ELIGIBILITY_VERSIONS_READ)}"
+            )
+        want = base if doc["x-version"] == 1 else base | added
+        if set(doc) != want:
+            raise _corrupt(
+                f"eligibility document for {experiment_id}: expected keys {sorted(want)}"
             )
         if doc["experiment_id"] != experiment_id:
             raise _corrupt(
@@ -351,18 +401,49 @@ class GateEligibility:
             raise _corrupt(f"eligibility document for {experiment_id}: malformed fields")
         if doc["gate_eligible"] and reasons:
             raise _corrupt(f"eligibility document for {experiment_id}: eligible with reasons")
+        bundle = doc.get("methods")
+        threshold = doc.get("significance_threshold")
+        looks = doc.get("threshold_looks")
+        if (
+            (bundle is not None and not isinstance(bundle, str))
+            or (
+                threshold is not None
+                and (
+                    isinstance(threshold, bool)
+                    or not isinstance(threshold, (int, float))
+                    or not math.isfinite(threshold)
+                    or threshold <= 0.0
+                )
+            )
+            or (looks is not None and (isinstance(looks, bool) or not isinstance(looks, int)))
+        ):
+            raise _corrupt(f"eligibility document for {experiment_id}: malformed fields")
         return GateEligibility(
             eligible=doc["gate_eligible"],
             reasons=tuple(reasons),
             periods_verified=doc["periods_verified"],
+            methods=bundle,
+            significance_threshold=None if threshold is None else float(threshold),
+            threshold_looks=looks,
         )
 
 
 def _configuration_violations(configuration: Mapping[str, Any]) -> list[str]:
     out: list[str] = []
     for key, (kind, bound) in GATE_ELIGIBILITY_BOUNDS.items():
+        if key == "methods" and key not in configuration:
+            out.append(
+                "the spec predates the v1.5.0 method bundles (no configuration.methods): "
+                "its result was computed under the legacy methods"
+            )
+            continue
         value = configuration[key]
-        if kind == "min" and value < bound:
+        if kind == "equals":
+            if value != bound:
+                out.append(
+                    f"configuration.{key}={value!r} must be {bound!r} for a gate-eligible result"
+                )
+        elif kind == "min" and value < bound:
             out.append(
                 f"configuration.{key}={value!r} is below the gate-eligible minimum {bound!r}"
             )
@@ -380,6 +461,10 @@ def _configuration_violations(configuration: Mapping[str, Any]) -> list[str]:
 def gate_eligibility(
     spec: ExperimentSpec,
     frames: Mapping[int, pd.DataFrame] | None = None,
+    *,
+    run_reasons: Sequence[str] = (),
+    significance_threshold: float | None = None,
+    threshold_looks: int | None = None,
 ) -> GateEligibility:
     """Is ``spec``'s result admissible as promotion evidence (module docs)?
 
@@ -388,9 +473,13 @@ def gate_eligibility(
     :func:`derive_periods` of that dataset; a dataset the periods cannot be
     derived from (fewer than two sessions) makes every period set
     caller-chosen.  Without ``frames`` only the configuration bounds are
-    checked and ``periods_verified`` is ``False``.
+    checked and ``periods_verified`` is ``False``.  ``run_reasons`` are the
+    facts of a run that make its result inadmissible (the recompute probe
+    did not run, the frames carry no reopen labels); the threshold and its
+    look count are recorded as given.
     """
     reasons = _configuration_violations(spec.configuration)
+    reasons += [str(r) for r in run_reasons]
     verified = frames is not None
     if frames is not None:
         try:
@@ -404,7 +493,14 @@ def gate_eligibility(
                     "periods are caller-chosen: they differ from the periods "
                     "derived from the dataset's session calendar"
                 )
-    return GateEligibility(eligible=not reasons, reasons=tuple(reasons), periods_verified=verified)
+    return GateEligibility(
+        eligible=not reasons,
+        reasons=tuple(reasons),
+        periods_verified=verified,
+        methods=spec.configuration.get("methods"),
+        significance_threshold=significance_threshold,
+        threshold_looks=threshold_looks,
+    )
 
 
 def experiment_id_of(body: Mapping[str, Any]) -> str:

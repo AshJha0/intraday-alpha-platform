@@ -204,5 +204,15 @@ the checkout). `Dockerfile.python` sets `IAP_SCHEMA_DIR=/app/schemas`.
 | `research/` | `experiment_result.schema.json` | `ExperimentResult` | Java `ExperimentResultRec`, Rust `lifecycle::ExperimentResult` |
 | `trace/` | `decision_trace.schema.json` | `DecisionTrace`, `TraceStages`, `Attribution`, the three refs | Java `DecisionTrace`, Rust `contracts::trace::DecisionTrace`, C++ `iap::contracts::DecisionTrace` |
 
-`schemas/sql/iap_v1.sql` is not a wire schema but the relational projection
-of all of the above (docs/DATA_MODEL.md).
+`schemas/sql/iap_v2.sql` is not a wire schema but the relational projection
+of all of the above (docs/DATA_MODEL.md). Its research tables carry two
+columns the contracts do not: the method bundle (`methods`, taken from
+`ExperimentSpec.configuration["methods"]`; `ExperimentResult` has no such
+field, so the store files a result under its spec's bundle) and, on the
+ledger rows, the look count and \|t\| threshold an entry was judged at. The
+scorecard view is one row per alpha and `(dataset_version, methods)` scope:
+
+```sql
+SELECT alpha_id, methods, verdict, t_stat, promote_t_threshold, gate_looks, ledger_count, scope_looks
+FROM v_alpha_scorecard_current ORDER BY alpha_id;   -- the current dataset and bundle only
+```

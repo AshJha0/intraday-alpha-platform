@@ -42,9 +42,9 @@ Two independent detectors, both mandatory in the promotion pipeline:
    anchor is bit-identical to the score computed with the full frame.  A
    scoring path that peeks at a later row changes; a causal one cannot.
 
-4. **Recompute probe** (``recompute_probe``, opt-in — it needs the raw
-   events and a feature builder, so it is not part of :meth:`LeakageTester.run`
-   and adds nothing to :class:`LeakageResult`).  Detector 3 truncates
+4. **Recompute probe** (``recompute_probe``; part of
+   :meth:`LeakageTester.run` since v1.5.0 whenever the caller hands it the
+   raw events — a :class:`RecomputeSource`).  Detector 3 truncates
    PRECOMPUTED feature frames, so it can only see look-ahead in the scoring
    path.  A feature that was itself built with look-ahead — a centred
    window, a full-sample normalisation, a join on a later timestamp — is
@@ -55,18 +55,42 @@ Two independent detectors, both mandatory in the promotion pipeline:
    requires, for every instrument, the last row of the rebuilt frame to be
    bit-identical (feature columns and the model's score) to the same row of
    the frame built from all events.  A causal pipeline cannot differ; any
-   column that does is named in the result.  Cost: one feature rebuild per
-   anchor, hence the small default.
+   column that does is named in the result.
+
+   *What the standard run probes (pinned).*  The first
+   :data:`RECOMPUTE_MAX_EVENTS` (12 000) events of the first normalized file
+   of the alpha's asset class, at :data:`RECOMPUTE_PROBES` (3) anchors, built
+   at the feature store's own cadence: one feature rebuild of the window
+   plus one of each prefix, about 2.5 window builds.  The rebuilt frames are
+   shared by every alpha of a pipeline run (they do not depend on the
+   model), so the cost is paid once per asset class and process — measured
+   in ``docs/RESEARCH_VALIDITY.md``.  The window is a sample of the stream,
+   not the whole of it: the probe proves the PIPELINE CODE causal on that
+   window, which is what a look-ahead bug in a feature definition would
+   break everywhere.
+
+   *Result fields.*  ``recompute_ok`` is ``True`` / ``False``, or ``None``
+   when no source was given (frames built in memory with no event file
+   behind them: the probe did not run, and the result says so rather than
+   reporting a pass); ``recompute_n_anchors`` and ``recompute_mismatches``
+   (at most :data:`RECOMPUTE_MISMATCHES_KEPT`) come with it.  A failed
+   probe fails ``passed``; a probe that did not run leaves ``passed`` to
+   the other detectors, and the research runner then flags the result not
+   gate-eligible (``iap.research.specs.gate_eligibility``).  A scoring path
+   that raises on a truncated prefix counts as a mismatch: the probe could
+   not establish that the score at the anchor is causal.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
+from iap.labels.frames import DEFAULT_IC_ROWS, scored_labels
 from iap.validation.metrics import HORIZONS_NS, ic
 
 _GARBAGE = 0.12345
@@ -83,6 +107,10 @@ class LeakageResult:
     suspicious_ic: float = 0.0  # threshold actually applied
     required_shift_ratio: float = 0.0  # |ic_shifted|/|ic_unshifted| required
     median_row_gap_ns: int = 0
+    #: detector 4: True / False, or None when no raw events were available
+    recompute_ok: bool | None = None
+    recompute_n_anchors: int = 0
+    recompute_mismatches: list[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -105,6 +133,130 @@ class RecomputeProbeResult:
     def leaky_columns(self) -> list[str]:
         """Distinct offending columns (sorted)."""
         return sorted({m["column"] for m in self.mismatches})
+
+
+#: Events of the probed window (module docs, detector 4).
+RECOMPUTE_MAX_EVENTS = 12_000
+#: Anchors of the standard recompute probe.
+RECOMPUTE_PROBES = 3
+#: Cadence of the rebuilt frames: the feature store's (``python -m
+#: iap.features --cadence-ms 100``).
+RECOMPUTE_CADENCE_NS = 100_000_000
+#: Mismatches kept in a :class:`LeakageResult` (the count is exact).
+RECOMPUTE_MISMATCHES_KEPT = 20
+#: Normalized-file prefix per asset class (``python -m iap.marketdata``).
+_EVENT_FILE_PREFIX = {"EQUITY": "eq_", "ETF": "eq_", "FX": "fx_"}
+
+
+class _PrefixMemo:
+    """``build_frames`` memoised by prefix length.  Valid because a
+    :class:`RecomputeSource` only ever passes prefixes of its own event
+    list; it is what lets every alpha of a run share the rebuilt frames."""
+
+    def __init__(self, build: Callable[[Sequence], Mapping[int, pd.DataFrame]]) -> None:
+        self._build = build
+        self._cache: dict[int, Mapping[int, pd.DataFrame]] = {}
+
+    def __call__(self, events: Sequence) -> Mapping[int, pd.DataFrame]:
+        key = len(events)
+        if key not in self._cache:
+            self._cache[key] = self._build(events)
+        return self._cache[key]
+
+
+@dataclass
+class RecomputeSource:
+    """What detector 4 needs: the raw events of the probed window, the
+    feature pipeline under test and the anchor count.  ``build_frames`` is
+    wrapped so that each prefix is rebuilt once per source."""
+
+    events: Sequence
+    build_frames: Callable[[Sequence], Mapping[int, pd.DataFrame]]
+    n_probes: int = RECOMPUTE_PROBES
+    description: str = ""
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.build_frames, _PrefixMemo):
+            self.build_frames = _PrefixMemo(self.build_frames)
+
+
+def engine_recompute_source(
+    events_path,
+    configs_dir,
+    max_events: int = RECOMPUTE_MAX_EVENTS,
+    n_probes: int = RECOMPUTE_PROBES,
+    cadence_ns: int = RECOMPUTE_CADENCE_NS,
+) -> RecomputeSource:
+    """The standard source: the first ``max_events`` events of a normalized
+    file, rebuilt by the reference feature engine at the store's cadence."""
+    from iap.core.codec import read_iap1, read_jsonl
+
+    path = Path(events_path)
+    events = read_iap1(path) if path.suffix == ".iap1" else read_jsonl(path)
+    window = list(events[: int(max_events)])
+    if len(window) < 2:
+        raise ValueError(f"{path}: fewer than 2 events, nothing to probe")
+    return RecomputeSource(
+        events=window,
+        build_frames=engine_frame_builder(configs_dir, cadence_ns=cadence_ns),
+        n_probes=n_probes,
+        description=f"{path.name}[:{len(window)}] @ {cadence_ns} ns, {n_probes} anchors",
+    )
+
+
+def find_event_file(normalized_dir, asset_class: str):
+    """The first normalized file of ``asset_class`` under ``normalized_dir``
+    (sorted by name = trading-day order), or ``None`` when there is none."""
+    prefix = _EVENT_FILE_PREFIX.get(asset_class)
+    if prefix is None:
+        raise ValueError(f"unknown asset class {asset_class!r}")
+    base = Path(normalized_dir)
+    for pattern in (f"{prefix}*.normalized.iap1", f"{prefix}*.normalized.jsonl"):
+        files = sorted(base.glob(pattern))
+        if files:
+            return files[0]
+    return None
+
+
+class RecomputeSources:
+    """Lazily built, per-asset-class :class:`RecomputeSource` objects over one
+    normalized directory — one per pipeline run, so the frames are rebuilt
+    once however many alphas are validated.  ``get`` returns ``None`` when
+    the directory holds no event file for the asset class."""
+
+    def __init__(
+        self,
+        normalized_dir,
+        configs_dir,
+        max_events: int = RECOMPUTE_MAX_EVENTS,
+        n_probes: int = RECOMPUTE_PROBES,
+        cadence_ns: int = RECOMPUTE_CADENCE_NS,
+    ) -> None:
+        self.normalized_dir = normalized_dir
+        self.configs_dir = configs_dir
+        self.max_events = int(max_events)
+        self.n_probes = int(n_probes)
+        self.cadence_ns = int(cadence_ns)
+        self._sources: dict[str, RecomputeSource | None] = {}
+
+    def get(self, asset_class: str) -> RecomputeSource | None:
+        key = _EVENT_FILE_PREFIX.get(asset_class)
+        if key is None:
+            raise ValueError(f"unknown asset class {asset_class!r}")
+        if key not in self._sources:
+            path = (
+                find_event_file(self.normalized_dir, asset_class)
+                if self.normalized_dir is not None
+                else None
+            )
+            self._sources[key] = (
+                None
+                if path is None
+                else engine_recompute_source(
+                    path, self.configs_dir, self.max_events, self.n_probes, self.cadence_ns
+                )
+            )
+        return self._sources[key]
 
 
 def engine_frame_builder(
@@ -155,10 +307,12 @@ def _obfuscate_labels(frames: Mapping[int, pd.DataFrame]) -> dict[int, pd.DataFr
     for iid, df in frames.items():
         df2 = df.copy()
         for c in df2.columns:
-            if c.startswith(("label_mid_", "label_cost_")):
+            if c.startswith(("label_mid_", "label_cost_", "label_reopen_")):
                 df2[c] = _GARBAGE
             elif c.startswith("label_valid_"):
                 df2[c] = True
+            elif c.startswith("label_reason_"):
+                df2[c] = 0
         out[iid] = df2
     return out
 
@@ -186,9 +340,12 @@ class LeakageTester:
         self,
         suspicious_ic: float = LEAK_IC_MULTIPLE * MIN_OOS_IC_GATE,
         collapse_ratio: float = 0.5,
+        ic_rows: str = DEFAULT_IC_ROWS,
     ) -> None:
         self.suspicious_ic = suspicious_ic
         self.collapse_ratio = collapse_ratio
+        #: rows the shift test scores (:mod:`iap.labels.frames`)
+        self.ic_rows = ic_rows
 
     def label_guard(self, model, frames: Mapping[int, pd.DataFrame]) -> bool:
         """True when score() is invariant to label-column contents."""
@@ -217,8 +374,7 @@ class LeakageTester:
             df = frames[iid]
             er = sc["expected_return"].to_numpy(dtype=float).copy()
             er[sc["confidence"].to_numpy(dtype=float) <= 0.0] = np.nan
-            lab = df[f"label_mid_{h}"].to_numpy(dtype=float).copy()
-            lab[~df[f"label_valid_{h}"].to_numpy(dtype=bool)] = np.nan
+            lab, _ = scored_labels(df, h, self.ic_rows)
             xs.append(er)
             ys.append(lab)
             xs_lag.append(er[:-1])  # score_{t-1}
@@ -303,7 +459,18 @@ class LeakageTester:
         mismatches: list[dict] = []
         for p in positions:
             part = build_frames(events[: p + 1])
-            part_scores = model.score(part) if model is not None and part else {}
+            try:
+                part_scores = model.score(part) if model is not None and part else {}
+            except Exception as exc:  # the score at the anchor could not be established
+                mismatches.append(
+                    {
+                        "instrument_id": -1,
+                        "event_index": int(p),
+                        "row": -1,
+                        "column": f"<score raised on the truncated prefix: {type(exc).__name__}>",
+                    }
+                )
+                part_scores = {}
             for iid in sorted(part):
                 rows = len(part[iid])
                 if rows == 0:
@@ -331,8 +498,15 @@ class LeakageTester:
         )
 
     def run(
-        self, model, frames: Mapping[int, pd.DataFrame], probe_truncation: bool = True
+        self,
+        model,
+        frames: Mapping[int, pd.DataFrame],
+        probe_truncation: bool = True,
+        recompute: RecomputeSource | None = None,
     ) -> LeakageResult:
+        """Every detector of the module docs.  ``recompute`` is the raw-event
+        source of detector 4; without one that detector does not run and
+        ``recompute_ok`` is ``None``."""
         guard = self.label_guard(model, frames)
         shifts = self.shift_test(model, frames)
         ic0, ic1 = shifts["ic_unshifted"], shifts["ic_shifted"]
@@ -347,14 +521,27 @@ class LeakageTester:
             survived = np.isfinite(ic1) and abs(ic1) >= required * abs(ic0)
             shift_ok = bool(survived)
         trunc_ok = self.truncation_probe(model, frames) if probe_truncation else True
+        recompute_ok: bool | None = None
+        n_anchors = 0
+        mismatches: list[dict] = []
+        if recompute is not None:
+            probe = self.recompute_probe(
+                model, recompute.events, recompute.build_frames, recompute.n_probes
+            )
+            recompute_ok = bool(probe.ok)
+            n_anchors = int(probe.n_anchors)
+            mismatches = list(probe.mismatches[:RECOMPUTE_MISMATCHES_KEPT])
         return LeakageResult(
             label_guard_ok=guard,
             ic_unshifted=float(ic0) if np.isfinite(ic0) else float("nan"),
             ic_shifted=float(ic1) if np.isfinite(ic1) else float("nan"),
             shift_ok=shift_ok,
-            passed=guard and shift_ok and trunc_ok,
+            passed=guard and shift_ok and trunc_ok and recompute_ok is not False,
             truncation_ok=trunc_ok,
             suspicious_ic=float(self.suspicious_ic),
             required_shift_ratio=float(required),
             median_row_gap_ns=int(gap),
+            recompute_ok=recompute_ok,
+            recompute_n_anchors=n_anchors,
+            recompute_mismatches=mismatches,
         )

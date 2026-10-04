@@ -1,7 +1,10 @@
 {
-  "x-version": 1,
-  "description": "Pinned alpha promotion lifecycle policy (iap.lifecycle; RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE -> WATCH -> RETIRED). The promotion gate thresholds equal the spec section 20 gates pinned in iap.validation.validate.GATES; the ACTIVE/WATCH/RETIRED rules are NOT duplicated here — they stay in strategies.json adaptive.lifecycle and are reused unchanged. Every number is a threshold a port must reproduce exactly; tests/golden/expected_lifecycle.json embeds the merged config.",
+  "x-version": 3,
+  "description": "Pinned alpha promotion lifecycle policy (iap.lifecycle; RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE -> WATCH -> RETIRED). The promotion gate thresholds equal the spec section 20 gates pinned in iap.validation.validate.GATES; the ACTIVE/WATCH/RETIRED rules are NOT duplicated here — they stay in strategies.json adaptive.lifecycle and are reused unchanged. Every number is a threshold a port must reproduce exactly; tests/golden/expected_lifecycle.json embeds the merged config. x-version 2 (v1.5.0): tstat_threshold names how statistical_significance gets its threshold — 'ledger' (default) is max(gates.min_nw_tstat, the significance_threshold carried by the evidence), and evidence without one fails the gate; 'fixed' (the rule up to v1.4.0) is gates.min_nw_tstat alone. x-version 3 (v1.5.0): the cross_alpha_correlation gate on CANDIDATE -> VALIDATING — the largest absolute signal correlation with any peer at or beyond cross_alpha_min_state (VALIDATING, PAPER or ACTIVE; RETIRED peers never count) must be <= gates.max_cross_alpha_correlation; no such peer passes vacuously with value 0.0, and evidence without a cross_alpha block fails the gate; and the net_pnl_bootstrap_ci gate on the same edge — net_pnl_ci_gate 'required' (default) evaluates it, 'absent' (the legacy policy, which had no such gate) leaves it out: the lower bound of the stationary-bootstrap interval of the pooled 1x-cost net P&L carried by the evidence (pnl_bootstrap), taken at exactly gates.net_pnl_ci_level, must be > gates.min_net_pnl_ci_low; an alpha that made no trade, an interval at another level, a missing bound or a missing block fails the gate with value null.",
   "policy": "lifecycle_v1",
+  "tstat_threshold": "ledger",
+  "cross_alpha_min_state": "VALIDATING",
+  "net_pnl_ci_gate": "required",
   "gates": {
     "min_experiments_in_ledger": 1,
     "min_oos_ic": 0.01,
@@ -16,7 +19,10 @@
     "min_paper_sessions": 5,
     "max_paper_ic_gap": 0.01,
     "min_paper_net_pnl": 0.0,
-    "max_kill_events": 0
+    "max_kill_events": 0,
+    "max_cross_alpha_correlation": 0.7,
+    "min_net_pnl_ci_low": 0.0,
+    "net_pnl_ci_level": 0.95
   },
   "demotion": {
     "max_consecutive_failures": 3

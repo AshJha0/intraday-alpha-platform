@@ -9,13 +9,14 @@ import com.iap.contracts.Trees;
  * state, when it entered it, the last transition and gate evaluation, the
  * versions of the research it was registered from, and the counters the
  * machine needs to resume exactly (demotion failures, live breach /
- * recovery counts). Mutated only by {@link AlphaLifecycle}.
+ * recovery counts and — since v1.5.0 — the CUSUM statistic of the live
+ * retirement rule). Mutated only by {@link AlphaLifecycle}.
  */
 public final class AlphaRecord {
     private static final String[] KEYS = {"alpha_id", "state", "state_index",
         "since_ts", "last_transition", "last_evaluation", "experiment_id",
         "data_version", "feature_version", "model_version",
-        "consecutive_failures", "breach_count", "recovery_count"};
+        "consecutive_failures", "breach_count", "recovery_count", "cusum"};
 
     private final String alphaId;
     LifecycleState state;
@@ -29,13 +30,14 @@ public final class AlphaRecord {
     int consecutiveFailures;
     int breachCount;
     int recoveryCount;
+    double cusum;
 
     /** Full constructor (loading); see {@link #fresh} for a new registration. */
     public AlphaRecord(String alphaId, LifecycleState state, long sinceTs,
             LifecycleTransition lastTransition, GateEvaluation lastEvaluation,
             String experimentId, String dataVersion, String featureVersion,
             String modelVersion, int consecutiveFailures, int breachCount,
-            int recoveryCount) {
+            int recoveryCount, double cusum) {
         this.alphaId = Trees.ident(alphaId, "AlphaRecord.alpha_id");
         if (state == null) {
             throw new IllegalArgumentException("AlphaRecord.state is null");
@@ -56,16 +58,21 @@ public final class AlphaRecord {
             throw new IllegalArgumentException(
                     "AlphaRecord " + alphaId + ": counters must be >= 0");
         }
+        if (!(cusum >= 0.0) || Double.isInfinite(cusum)) {
+            throw new IllegalArgumentException(
+                    "AlphaRecord " + alphaId + ": cusum must be a finite number >= 0");
+        }
         this.consecutiveFailures = consecutiveFailures;
         this.breachCount = breachCount;
         this.recoveryCount = recoveryCount;
+        this.cusum = cusum;
     }
 
     /** A freshly registered alpha: RESEARCH, no history, zero counters. */
     public static AlphaRecord fresh(String alphaId, long sinceTs, String experimentId,
             String dataVersion, String featureVersion, String modelVersion) {
         return new AlphaRecord(alphaId, LifecycleState.RESEARCH, sinceTs, null, null,
-                experimentId, dataVersion, featureVersion, modelVersion, 0, 0, 0);
+                experimentId, dataVersion, featureVersion, modelVersion, 0, 0, 0, 0.0);
     }
 
     public String alphaId() {
@@ -116,6 +123,11 @@ public final class AlphaRecord {
         return recoveryCount;
     }
 
+    /** CUSUM statistic of the live retirement rule (0 outside ACTIVE / WATCH). */
+    public double cusum() {
+        return cusum;
+    }
+
     /** JSON-ready tree (registry record layout). */
     public Map<String, Object> toTree() {
         Map<String, Object> t = Trees.ordered();
@@ -132,6 +144,7 @@ public final class AlphaRecord {
         t.put("consecutive_failures", (long) consecutiveFailures);
         t.put("breach_count", (long) breachCount);
         t.put("recovery_count", (long) recoveryCount);
+        t.put("cusum", cusum);
         return t;
     }
 
@@ -157,6 +170,7 @@ public final class AlphaRecord {
                 Trees.optStr(t, "feature_version", p), Trees.optStr(t, "model_version", p),
                 (int) Trees.ranged(t, "consecutive_failures", p, 0, Integer.MAX_VALUE),
                 (int) Trees.ranged(t, "breach_count", p, 0, Integer.MAX_VALUE),
-                (int) Trees.ranged(t, "recovery_count", p, 0, Integer.MAX_VALUE));
+                (int) Trees.ranged(t, "recovery_count", p, 0, Integer.MAX_VALUE),
+                Trees.num(t, "cusum", p));
     }
 }

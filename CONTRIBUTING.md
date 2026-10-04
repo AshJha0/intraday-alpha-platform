@@ -41,7 +41,9 @@ ruff format --check python tests tools research deployment   # formatting (drop 
 ```
 
 Each language's full run must stay under 120 s; the repo-level suites well
-under a minute.
+under a minute. (The Python run is the exception under CI's coverage
+instrumentation: 306-359 s with `-n auto` for the 1988 tests of v1.5.0; see
+`docs/BUILD_NOTES.md`.)
 
 ## 3. The parity harness
 
@@ -61,9 +63,9 @@ fills are exact integers; features, alphas, portfolio and TCA compare at
 abs and rel 1e-9; adaptive PSI/KS at 1e-10 with exact refit booleans and
 lifecycle state sequences; canonical-JSON lines, trace digests, the risk
 audit / snapshot and the lifecycle registry are byte-identical; the 7-state
-lifecycle golden is compared exactly, field by field. The v1.4.0 table
-(2026-10-03, counts from CI) reads python 1573 / cpp 289 / rust 323 /
-java 510 (golden 166/68/64/104), `integration` 17, `replay` 6.
+lifecycle golden is compared exactly, field by field. The v1.5.0 table
+(2026-10-04, counts from CI) reads python 1988 / cpp 302 / rust 358 /
+java 571 (golden 192/72/71/124), `integration` 35, `replay` 6.
 
 ## 4. Golden regeneration protocol
 
@@ -76,6 +78,7 @@ it (`docs/ARCHITECTURE.md` §6):
 | codec SHA-256, book states, anomaly states, checkpoint, features, alpha, portfolio, TCA, backtest, adaptive | Python — `python/tools/make_golden.py`, `make_golden_features.py`, `make_golden_alpha.py`, `make_golden_anomalies.py`, `make_golden_tca.py`, `make_golden_adaptive.py` | C++, Rust, Java (each its own subset) |
 | replay fills (`expected_replay_fills.json`) | C++ — `cpp/tools/make_replay_fills_golden.cpp` (refuses to overwrite) | Java `ReplayFillsGoldenTest`, Python `test_execution_golden.py` (`iap.execution`) |
 | risk decisions, snapshot, audit (`expected_risk_*.json`, `expected_risk_audit.jsonl`) | Rust — `rust/risk/src/bin/make_risk_golden.rs` | Java `RiskGoldenTest`, Python `test_risk_golden.py` (`iap.risk`) |
+| risk differential-fuzz corpus (`tests/golden/risk_fuzz/`: step scripts, audit logs, snapshots, `COVERAGE.txt`) | Python — `python/tools/make_risk_fuzz_corpus.py` (`--force`; `--check` runs in CI), the Python engine as the oracle | Rust `golden_risk_fuzz.rs`, Java `RiskFuzzGoldenTest`, Python `test_risk_fuzz_golden.py` |
 | contract examples + pinned `explain` block (`expected_contracts_examples.json`) | Python — `python/tools/make_golden_contracts.py` (`--force`) | Java `TraceGoldenTest`, Rust `golden_trace.rs`, C++ `TraceGolden` |
 | canonical JSON rules, float reprs, escapes, documents, trace id, trace digests (`expected_canonical_json.json`) | Python — `python/tools/make_golden_canonical_json.py` (`--force`) | Java `CanonicalJsonGoldenTest`, Rust `golden_canonical_json.rs`, C++ `CanonicalJsonGolden` |
 | 7-state lifecycle scenarios + transition table (`expected_lifecycle.json`) | Python — `python/tools/make_golden_lifecycle.py` (`--force`) | Java `LifecycleGoldenTest`, Rust `golden_lifecycle.rs` |
@@ -123,7 +126,8 @@ change with one regeneration, never a partial one
    `x-version` if the meaning of the document moved.
 2. Run the whole chain with `tools/regenerate_dataset_artifacts.py` — on the
    CI runner, through the manual `regenerate` job
-   (`gh workflow run ci.yml --ref <branch> -f regenerate=true`, then
+   (`gh workflow run ci.yml --ref <branch> -f regenerate=true`, or with
+   `-f regenerate_only=<steps>` for a subset such as `power`, then
    `gh run download <run-id> -n regenerated-artefacts`). The last digits of
    the float artefacts depend on the platform and the library versions, and
    some suites compare them exactly, so they are produced where they are
@@ -164,9 +168,16 @@ Research truth is the product (spec §32). Two rules are mechanical:
    the SHA-256 of the canonical spec and writes
    `research/experiments/<id>/{spec,result}.json`) *before* its result is
    read, and every report prints the denominator and the expected max |t|
-   under the global null (1920 looks / 139 configurations, max |t| ≈ 3.888 as
-   of 2026-10-03: the looks made on the v1.3.0 dataset plus the 852
-   made on the v1.4.0 one). Runner entries are never de-duplicated against
+   under the global null (5,156 looks / 216 configurations, max |t| ≈ 4.135 as
+   of 2026-10-04: the 1068 made on the v1.3.0 dataset, the 852 made on
+   the current one under the rules up to v1.4.0 and the 3,236 made on it
+   under the v1.5.0 default methods, 760 of them by the signal-combination
+   report). An experiment runs under the default
+   method bundle (`v2`) unless it names `--methods legacy_v1`; the bundle
+   is part of the experiment id, a `v2` validation costs 84 looks (28
+   under `legacy_v1`), and its PROMOTE t threshold is the ledger's
+   multiple-testing threshold at the look count declared before the run,
+   never below 3.0. A number quoted under a legacy rule says so. Runner entries are never de-duplicated against
    the report pipeline's entries even when the computation coincides, and a
    dataset change adds its looks beside the old ones: the denominator only
    grows.

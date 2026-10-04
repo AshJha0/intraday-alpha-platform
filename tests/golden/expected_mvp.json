@@ -13,7 +13,7 @@
     "XV3": 5836
   },
   "config_path": "configs/mvp/mvp.json",
-  "config_version": "f293e7e70463ca5b463bbabe0e195e93842206200057c3e987c87be6064e6db0",
+  "config_version": "439bbad5e4aacd0996649e571ee9aca73410777417e272bce1026705264bb191",
   "data_version": "0e0fe161016eea4327083e697510885768fe33620f95b814fa5703f6ac3d4a7b",
   "description": "MVP golden (python -m iap.mvp run on configs/mvp/mvp.json): the seeded feed, the full loop (book -> features -> EQ01/EQ03/EQ06 ensemble -> portfolio -> hard risk -> TWAP/POV/IS -> SOR -> simulator -> TCA -> attribution -> trace) and its report. Ports reproduce every value: integers and hashes exactly, floats at abs/rel 1e-9. Regenerate only on a deliberate, versioned change: PYTHONPATH=src python3 tools/make_golden_mvp.py --force.",
   "events_iap1_sha256": "0e0fe161016eea4327083e697510885768fe33620f95b814fa5703f6ac3d4a7b",
@@ -65,7 +65,7 @@
           },
           "beta": 5.84449379264817e-08,
           "horizon": "1s",
-          "ic_gap": 0.2068086060148895,
+          "ic_gap": 0.20648640820730263,
           "lifecycle_state": "CANDIDATE",
           "n_ic_samples": 790,
           "n_signals": 799,
@@ -74,7 +74,7 @@
           "realized_ic_cost": -0.023643067352093042,
           "realized_ic_shifted": 0.14874228379923876,
           "research_horizon": "1s",
-          "research_ic": 0.010197617649992484
+          "research_ic": 0.010519815457579376
         },
         "EQ03": {
           "at_research_horizon": {
@@ -87,7 +87,7 @@
           },
           "beta": 2.3843836063294293e-06,
           "horizon": "1s",
-          "ic_gap": 0.12795498436264705,
+          "ic_gap": 0.12810423239733687,
           "lifecycle_state": "CANDIDATE",
           "n_ic_samples": 707,
           "n_signals": 715,
@@ -96,7 +96,7 @@
           "realized_ic_cost": -0.029374956272870734,
           "realized_ic_shifted": 0.11574778193926108,
           "research_horizon": "5s",
-          "research_ic": 0.018999722049471347
+          "research_ic": 0.018850474014781526
         },
         "EQ06": {
           "at_research_horizon": {
@@ -109,7 +109,7 @@
           },
           "beta": 6.08312181431125e-06,
           "horizon": "1s",
-          "ic_gap": 0.1571381065948254,
+          "ic_gap": 0.15753492476969083,
           "lifecycle_state": "CANDIDATE",
           "n_ic_samples": 354,
           "n_signals": 360,
@@ -118,7 +118,7 @@
           "realized_ic_cost": 0.07937864351368037,
           "realized_ic_shifted": -0.047367420692846336,
           "research_horizon": "10s",
-          "research_ic": 0.02731623779649883
+          "research_ic": 0.027713055971364267
         }
       }
     },
@@ -310,7 +310,7 @@
         "EQ03",
         "EQ06"
       ],
-      "config_version": "f293e7e70463ca5b463bbabe0e195e93842206200057c3e987c87be6064e6db0",
+      "config_version": "439bbad5e4aacd0996649e571ee9aca73410777417e272bce1026705264bb191",
       "data_version": "0e0fe161016eea4327083e697510885768fe33620f95b814fa5703f6ac3d4a7b",
       "decision_cadence_ns": 1000000000,
       "events_sha256": "7e57c1afd1763c22f71f3e0a2523edaae052360546fe47a58907f3d2ddae1056",
@@ -326,7 +326,7 @@
       "seed": 12345,
       "session_id": "mvp-58a10f2194a3c81c",
       "strategy_id": "MVP",
-      "trace_digest": "f51890da0c3c66cd488073fd7149099729767f5f65d03a7656e59f2da9c6a708",
+      "trace_digest": "20d4ff76af0b631c53c488a1cc504c1bbf8d8488dd5c210a947f96d63e734a45",
       "venues": [
         "XV1",
         "XV2",
@@ -334,7 +334,7 @@
       ]
     },
     "trace": {
-      "digest": "f51890da0c3c66cd488073fd7149099729767f5f65d03a7656e59f2da9c6a708",
+      "digest": "20d4ff76af0b631c53c488a1cc504c1bbf8d8488dd5c210a947f96d63e734a45",
       "first_trace_ids": [
         "403020d9da592210fad79613f87ffa19",
         "79968f20da6647bb7a4fd9325850a2f1",
@@ -352,6 +352,6 @@
   "run_id": "58a10f2194a3c81c",
   "seed": 12345,
   "session_id": "mvp-58a10f2194a3c81c",
-  "trace_digest": "f51890da0c3c66cd488073fd7149099729767f5f65d03a7656e59f2da9c6a708",
+  "trace_digest": "20d4ff76af0b631c53c488a1cc504c1bbf8d8488dd5c210a947f96d63e734a45",
   "x-version": 1
 }

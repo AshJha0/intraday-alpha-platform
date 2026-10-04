@@ -1147,6 +1147,22 @@ fn future_stamped_conversion_rate_fails_closed() {
             t + 3600 * NS
         )
     );
+    // Found by the differential fuzzer: a pair stamped exactly i64::MAX is
+    // the extreme future-stamped mark, not "the reporting currency" (whose
+    // rate carries i64::MAX as a no-timestamp placeholder). It used to skip
+    // both the age and the future-stamp check and price the order.
+    let mut eng = fx_engine();
+    eng.on_market(108, 85_315, 85_325, t);
+    eng.on_market(102, 127_335, 127_345, i64::MAX);
+    let d = eng.check_order(&typed(2, 108, 0, 100, 0, OrderType::Market, t));
+    assert_eq!(d.rule_id, rules::FX_RATE_MISSING, "{}", d.reason);
+    assert_eq!(
+        d.reason,
+        format!(
+            "conversion rate GBP -> USD timestamp {} is more than 5000000000ns ahead of the latest order event time {t}",
+            i64::MAX
+        )
+    );
 }
 
 /// `x > NaN` is false: a NaN limit used to ALLOW. Every float limit

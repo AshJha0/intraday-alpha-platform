@@ -29,20 +29,24 @@ agent — see /API_ADAPTIVE.md, the normative contract):
    ``lam = (en + 0.12 + 0.11/en) * D``, ``en = sqrt(n_a n_b/(n_a+n_b))``
    (Numerical Recipes form, 100 terms pinned, clamped to [0, 1]).
 
-3. **Rolling realized-vs-research IC**: the research window pins a
-   baseline (mean, std over 5-minute-bucket ICs, metrics.bucket_ics
-   semantics); live evaluation computes bucket ICs over a rolling window
-   of MATURED rows and reports
+3. **Rolling realized-vs-research IC** — the LEGACY z
+   (:func:`rolling_ic_z`, ``adaptive.ic_z_method = "legacy"``; the default
+   up to v1.4.0): the research window pins a baseline (mean, std over
+   5-minute-bucket ICs, metrics.bucket_ics semantics); live evaluation
+   computes bucket ICs over a rolling window of MATURED rows and reports
+   the unweighted mean bucket IC and
    ``z = (mean(live) - ic_mean) / (ic_std / sqrt(n_live_buckets))``.
    Fewer than ``min_buckets`` live buckets, or ``ic_std <= 1e-12``,
    yields z = None (monitors never fabricate confidence).
 
 Baseline serialization (research/baselines/<name>.json) — normative
-schema, ``x-version`` 1:
+schema, ``x-version`` 2 (each file names the ``feature_version`` it was
+captured against; a loader rejects any other version):
 
 ```
 {
-  "x-version": 1,
+  "x-version": 2,
+  "feature_version": str,           # feature-registry hash
   "kind": "signal" | "feature",     # distribution baselines
   "name": str,                      # file stem, unique
   "alpha_id": str,                  # "" when not alpha-specific
@@ -59,11 +63,10 @@ schema, ``x-version`` 1:
 IC baselines use ``"kind": "ic"`` and replace edges/expected_frac with
 ``{"ic_mean", "ic_std", "n_buckets_baseline", "bucket_ns", "horizon"}``.
 
-4. **Two-sample HAC z** (opt-in alternative to monitor 3;
-   :func:`rolling_ic_z_hac`, selected with ``adaptive.ic_z_method = "hac"``
-   — the pinned z of monitor 3 stays the default and the cross-language
-   contract).  The pinned z treats the baseline mean as a known constant
-   and the live bucket ICs as independent and equally informative.  None of
+4. **Two-sample HAC z** — the DEFAULT since v1.5.0
+   (:func:`rolling_ic_z_hac`, ``adaptive.ic_z_method = "hac"``).  The
+   legacy z of monitor 3 treats the baseline mean as a known constant and
+   the live bucket ICs as independent and equally informative.  None of
    the three holds: the baseline mean is itself an estimate from
    ``n_buckets_baseline`` buckets; bucket ICs of overlapping-label signals
    are autocorrelated; and fixed time buckets carry very different pair
@@ -78,8 +81,15 @@ IC baselines use ``"kind": "ic"`` and replace edges/expected_frac with
    of the baseline mean: HAC from the baseline's own bucket series when the
    caller has it, otherwise ``ic_std^2 / n_buckets_baseline`` (all the
    serialized baseline can support).  It is never larger in magnitude than
-   the pinned z on independent equal buckets, and it does not fire on the
+   the legacy z on independent equal buckets, and it does not fire on the
    baseline's own sampling error.
+
+   The rolling IC it reports — the number the lifecycle rule reads — is the
+   PAIR-COUNT-WEIGHTED mean of the live bucket ICs (``mean_w``); the legacy
+   monitor reports the unweighted mean.  The Java live gauge
+   (``com.iap.adaptive.RollingIc``) computes the weighted mean since v1.5.0
+   and the golden ``rolling_ic`` vector pins it.  The z itself is computed
+   by the Python reference only: no port evaluates a refit trigger.
 
 Everything here is deterministic and wall-clock-free (conventions §3).
 """
@@ -482,9 +492,9 @@ def rolling_ic_z(
     labels: np.ndarray,
     min_buckets: int = 4,
 ) -> ICWindowResult:
-    """Rolling realized IC vs the research baseline (pinned z formula,
-    module docstring).  Inputs are the MATURED rows of the live window —
-    the caller is responsible for maturity/no-lookahead filtering."""
+    """Rolling realized IC vs the research baseline — the LEGACY z formula
+    (module docstring, monitor 3).  Inputs are the MATURED rows of the live
+    window — the caller is responsible for maturity/no-lookahead filtering."""
     bics = bucket_ics(ts, scores, labels, bucket_ns=baseline.bucket_ns)
     if bics.size < max(min_buckets, 1):
         return ICWindowResult(rolling_ic=None, z=None, n_buckets=int(bics.size))
@@ -505,8 +515,11 @@ def rolling_ic_z(
     )
 
 
-#: Pinned IC z methods: the cross-language contract and the opt-in HAC form.
-IC_Z_METHODS = ("pinned", "hac")
+#: IC z methods (module docs, monitors 4 and 3): the default, then the
+#: legacy rule.  Up to v1.4.0 the legacy method was spelled ``"pinned"``.
+IC_Z_METHODS = ("hac", "legacy")
+DEFAULT_IC_Z_METHOD = "hac"
+LEGACY_IC_Z_METHOD = "legacy"
 
 
 def two_sample_hac_z(

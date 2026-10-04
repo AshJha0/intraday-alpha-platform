@@ -1,0 +1,85 @@
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000000000000000}
+{"decision":1,"reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000000000730000}
+{"decision":2,"reason":"would cross own open order 2 at 502","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000000000730000}
+{"decision":1,"reason":"ops halt","rule_id":"SESSION_ROLLED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000000023138000}
+{"decision":2,"reason":"price deviates 200.0bps from mid, band 200.0bps","rule_id":"PRICE_BAND","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000001023138000}
+{"decision":2,"reason":"no reference data for instrument 0","rule_id":"UNKNOWN_INSTRUMENT","scope":"INSTRUMENT","scope_id":"0","severity":2,"timestamp":1700000003089138000}
+{"decision":2,"reason":"LIMIT order needs price_ticks > 0: 0","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000004089138000}
+{"decision":1,"reason":"daily loss limit 2500.00 -> 0.01 approved by desk request #42","rule_id":"LOSS_LIMIT_OVERRIDE","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700000004100697000}
+{"decision":1,"reason":"daily loss limit 2500.00 -> 50000.00 approved by ","rule_id":"LOSS_LIMIT_OVERRIDE","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000004148697000}
+{"decision":3,"reason":"strategy daily pnl -449.95 breaches loss limit 0.01","rule_id":"STRATEGY_LOSS","scope":"STRATEGY","scope_id":"S3","severity":3,"timestamp":1700000004178697000}
+{"decision":1,"reason":"ops halt","rule_id":"SESSION_ROLLED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000004178697000}
+{"decision":1,"reason":"desk request #42","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000004178697000}
+{"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000004178697000}
+{"decision":2,"reason":"price_ticks must be >= 0: -9223372036854775808","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000005189697000}
+{"decision":2,"reason":"reference price timestamp 1700000010244697001 is more than 5000000000ns ahead of the latest order event time 1700000005244697000","rule_id":"STALE_PRICE","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000005244697000}
+{"decision":1,"reason":"停止","rule_id":"KILL_SWITCH_CLEARED","scope":"INSTRUMENT","scope_id":"4294967295","severity":1,"timestamp":1700000005258697000}
+{"decision":2,"reason":"order_id 2 already used at ts 1700000000000000000","rule_id":"DUPLICATE_ORDER_ID","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000007298697000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000010245697001}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000012248697001}
+{"decision":2,"reason":"no reference data for instrument 0","rule_id":"UNKNOWN_INSTRUMENT","scope":"INSTRUMENT","scope_id":"0","severity":2,"timestamp":1700000012294697001}
+{"decision":2,"reason":"would cross own open order 9 at 494","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000015244697000}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000012321604001}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000012321604001}
+{"decision":1,"reason":"desk request #42","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000012380604001}
+{"decision":2,"reason":"would cross own open order 2 at 502","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000012473604001}
+{"decision":2,"reason":"instrument 2 feed has an unrecovered gap","rule_id":"SEQUENCE_GAP","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000012520604001}
+{"decision":3,"reason":"strategy daily pnl -2830.18 breaches loss limit 2500.00","rule_id":"STRATEGY_LOSS","scope":"STRATEGY","scope_id":"S2","severity":3,"timestamp":1700000012570604001}
+{"decision":1,"reason":"\u0000nul","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000012585604001}
+{"decision":3,"reason":"strategy daily pnl -2830.43 breaches loss limit 2500.00","rule_id":"STRATEGY_LOSS","scope":"STRATEGY","scope_id":"S2","severity":3,"timestamp":1700000012600604001}
+{"decision":1,"reason":"daily loss limit 2500.00 -> 6329.56 approved by desk request #42","rule_id":"LOSS_LIMIT_OVERRIDE","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000012617604001}
+{"decision":1,"reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000012617604001}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000012617604001}
+{"decision":1,"reason":"daily loss limit 6000.00 -> 10000000.00 approved by desk request #42","rule_id":"LOSS_LIMIT_OVERRIDE","scope":"GLOBAL","scope_id":"","severity":2,"timestamp":1700000012636604001}
+{"decision":2,"reason":"timestamp arithmetic overflows i64 (fail-closed)","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":-7523372024218171808}
+{"decision":2,"reason":"would cross own open order 10 at 508","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":-7523372024218171807}
+{"decision":2,"reason":"timestamp arithmetic overflows i64 (fail-closed)","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000012712604001}
+{"decision":2,"reason":"would cross own open order 10 at 508","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000014712604001}
+{"decision":2,"reason":"strategy S2 exceeded 500.00 orders/s (burst 4.00)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000014712604001}
+{"decision":2,"reason":"strategy S2 exceeded 500.00 orders/s (burst 4.00)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000014712604001}
+{"decision":2,"reason":"strategy S2 exceeded 500.00 orders/s (burst 4.00)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000014712604001}
+{"decision":2,"reason":"strategy S2 exceeded 500.00 orders/s (burst 4.00)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000014712604001}
+{"decision":2,"reason":"strategy S2 exceeded 500.00 orders/s (burst 4.00)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000014712604001}
+{"decision":2,"reason":"strategy S2 exceeded 500.00 orders/s (burst 4.00)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000014712604001}
+{"decision":3,"reason":"strategy daily pnl -10679.56 breaches loss limit 2500.00","rule_id":"STRATEGY_LOSS","scope":"STRATEGY","scope_id":"S1","severity":3,"timestamp":1700000014822604001}
+{"decision":3,"reason":"strategy daily pnl -60442.05 breaches loss limit 6329.56","rule_id":"STRATEGY_LOSS","scope":"STRATEGY","scope_id":"S2","severity":3,"timestamp":1700000014822604001}
+{"decision":1,"reason":"","rule_id":"SESSION_ROLLED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000019858604002}
+{"decision":1,"reason":"line1\nline2","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000019858604002}
+{"decision":2,"reason":"reference price age 7165000001ns exceeds 5000000000ns","rule_id":"STALE_PRICE","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000019858604002}
+{"decision":3,"reason":"strategy daily pnl -70786.90 breaches loss limit 2500.00","rule_id":"STRATEGY_LOSS","scope":"STRATEGY","scope_id":"S3","severity":3,"timestamp":1700000019910604002}
+{"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000019911384002}
+{"decision":1,"reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000019911384002}
+{"decision":2,"reason":"strategy daily pnl -70786.90 at loss limit 2500.00","rule_id":"STRATEGY_LOSS","scope":"STRATEGY","scope_id":"S3","severity":3,"timestamp":1700000019911384002}
+{"decision":2,"reason":"qty 9223372036854775807 exceeds max_order_qty 50000","rule_id":"FAT_FINGER_QTY","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000019930384002}
+{"decision":1,"reason":"ops halt","rule_id":"SESSION_ROLLED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000019986384002}
+{"decision":2,"reason":"qty 77439 exceeds max_order_qty 50000","rule_id":"FAT_FINGER_QTY","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000020019384002}
+{"decision":2,"reason":"reference price age 7357780001ns exceeds 5000000000ns","rule_id":"STALE_PRICE","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000020051384002}
+{"decision":2,"reason":"reference price age 7357780001ns exceeds 5000000000ns","rule_id":"STALE_PRICE","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000020051384002}
+{"decision":2,"reason":"reference price age 7357780001ns exceeds 5000000000ns","rule_id":"STALE_PRICE","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000020051384002}
+{"decision":2,"reason":"reference price age 7357780001ns exceeds 5000000000ns","rule_id":"STALE_PRICE","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000020051384002}
+{"decision":2,"reason":"reference price age 7357780001ns exceeds 5000000000ns","rule_id":"STALE_PRICE","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000020051384002}
+{"decision":2,"reason":"reference price age 7357780001ns exceeds 5000000000ns","rule_id":"STALE_PRICE","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000020051384002}
+{"decision":2,"reason":"price deviates 1162.8bps from mid, band 200.0bps","rule_id":"PRICE_BAND","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000020051384002}
+{"decision":3,"reason":"strategy daily pnl -12312.72 breaches loss limit 2500.00","rule_id":"STRATEGY_LOSS","scope":"STRATEGY","scope_id":"S1","severity":3,"timestamp":1700000020093384002}
+{"decision":3,"reason":"strategy daily pnl -63637.56 breaches loss limit 2500.00","rule_id":"STRATEGY_LOSS","scope":"STRATEGY","scope_id":"S2","severity":3,"timestamp":1700000020093384002}
+{"decision":3,"reason":"global daily pnl -13834.80 breaches daily loss limit 6000.00","rule_id":"DAILY_LOSS","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000020093384002}
+{"decision":1,"reason":"desk request #42","rule_id":"SESSION_ROLLED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000020114384002}
+{"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000020114384002}
+{"decision":2,"reason":"global kill switch engaged","rule_id":"KILL_GLOBAL","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000020114384002}
+{"decision":1,"reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000022147384002}
+{"decision":2,"reason":"strategy S2 kill switch engaged","rule_id":"KILL_STRATEGY","scope":"STRATEGY","scope_id":"S2","severity":3,"timestamp":1700000022147384002}
+{"decision":3,"reason":"strategy daily pnl -4424.80 breaches loss limit 2500.00","rule_id":"STRATEGY_LOSS","scope":"STRATEGY","scope_id":"S3","severity":3,"timestamp":1700000022147992002}
+{"decision":3,"reason":"global daily pnl -7207.06 breaches daily loss limit 6000.00","rule_id":"DAILY_LOSS","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000022147992002}
+{"decision":1,"reason":"desk request #42","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000022152992002}
+{"decision":1,"reason":"daily loss limit 6000.00 -> 15516.24 approved by ","rule_id":"LOSS_LIMIT_OVERRIDE","scope":"GLOBAL","scope_id":"","severity":2,"timestamp":1700000022153341002}
+{"decision":1,"reason":"desk request #42","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000022153341002}
+{"decision":3,"reason":"strategy daily pnl -4916.68 breaches loss limit 2500.00","rule_id":"STRATEGY_LOSS","scope":"STRATEGY","scope_id":"S2","severity":3,"timestamp":1700000022153341002}
+{"decision":2,"reason":"timestamp arithmetic overflows i64 (fail-closed)","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000022153622002}
+{"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000022153622002}
+{"decision":1,"reason":"\u0000nul","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000022153622002}
+{"decision":1,"reason":"daily loss limit 2500.00 -> 1.00 approved by ","rule_id":"LOSS_LIMIT_OVERRIDE","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700000022153622002}
+{"decision":1,"reason":"desk request #42","rule_id":"KILL_SWITCH_CLEARED","scope":"INSTRUMENT","scope_id":"99","severity":1,"timestamp":1700000022159622002}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000022208673002}
+{"decision":2,"reason":"would cross own open order 13 at 498","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000022223673002}
+{"decision":2,"reason":"would cross own open order 40 at 592","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000022223673002}
+{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000022242673002}

@@ -1,6 +1,8 @@
 package com.iap.risk;
 
 import java.math.BigDecimal;
+import java.math.MathContext;
+import java.math.RoundingMode;
 
 /**
  * Strategy order request (schemas/order/order_request.schema.json), mirroring the
@@ -32,6 +34,14 @@ public record OrderRequest(long orderId, long instrumentId, int side,
      * {@code -0} for negative zero, {@code NaN} / {@code inf} /
      * {@code -inf}. {@link Double#toString} (shortest round-trip digits
      * since JDK 19) supplies the digits; only the layout differs.
+     *
+     * <p>One exception: {@code Double.toString} never prints fewer than two
+     * significant digits, and when ONE digit already round-trips it prints
+     * the two-digit decimal closest to the exact value instead — which for
+     * the smallest subnormals is not the shortest one followed by a zero
+     * ({@code Double.MIN_VALUE} is {@code 4.9E-324}, the reference prints
+     * {@code 5e-324}). So the one-digit decimal nearest the exact value is
+     * tried first and used whenever it round-trips.
      */
     public static String rustDisplay(double v) {
         if (Double.isNaN(v)) {
@@ -43,7 +53,10 @@ public record OrderRequest(long orderId, long instrumentId, int side,
         if (v == 0.0) {
             return Double.doubleToRawLongBits(v) < 0 ? "-0" : "0";
         }
-        String plain = new BigDecimal(Double.toString(v)).toPlainString();
+        BigDecimal oneDigit = new BigDecimal(v)
+                .round(new MathContext(1, RoundingMode.HALF_EVEN));
+        String plain = (oneDigit.doubleValue() == v
+                ? oneDigit : new BigDecimal(Double.toString(v))).toPlainString();
         if (plain.indexOf('.') >= 0) {
             int end = plain.length();
             while (plain.charAt(end - 1) == '0') {

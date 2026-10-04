@@ -5,6 +5,8 @@ Other components append to those artefacts (the experiments ledger, the
 lifecycle transitions), so counts are asserted exactly against the files
 and as lower bounds against the pinned values of the Phase 0 snapshot
 (65 ledger entries, 24 alphas, 33 model runs, 260 lifecycle-log rows).
+The lifecycle log of the v1.5.0 bundle (CUSUM retirement rule, HAC drift z)
+has 300 rows.
 """
 
 from __future__ import annotations
@@ -31,27 +33,35 @@ from iap.contracts.types import (
     VenueDecision,
 )
 from iap.contracts.versions import content_hash
-from iap.research import LOOKS_PER_EXPERIMENT
+from iap.research import LEGACY_LOOKS_PER_EXPERIMENT, LOOKS_PER_EXPERIMENT
 from iap.store import (
     DDL_X_VERSION,
+    LEGACY_METHODS,
     STAGE_TABLES,
     Store,
+    StoreVersionError,
     ddl_path,
     import_all,
     import_alpha_reports,
     import_baselines,
     import_experiment_documents,
     import_experiments_ledger,
+    import_lifecycle_archive,
     import_lifecycle_log,
     import_lifecycle_transitions,
     import_model_runs,
     import_reference,
     import_tca_orders,
+    ledger_entry_scope,
     load_ddl,
+    methods_of,
+    resolve_current_scope,
     split_statements,
 )
 from iap.store.__main__ import main as store_main
 from iap.store.ddl import apply, table_names, view_names
+from iap.validation.ledger import ExperimentLedger
+from iap.validation.methods import DEFAULT_METHODS, METHODS_LEGACY
 
 REPO = Path(__file__).resolve().parents[2]
 CONFIGS = REPO / "configs"
@@ -60,6 +70,8 @@ GOLDEN = json.loads((REPO / "tests" / "golden" / "expected_contracts_examples.js
 
 EXPECTED_TABLES = {
     "schema_version",
+    "store_scope",
+    "ledger_scopes",
     "instruments",
     "venues",
     "sessions",
@@ -84,7 +96,14 @@ EXPECTED_TABLES = {
     "model_runs",
     "drift_baselines",
 }
-EXPECTED_VIEWS = {"v_order_chain", "v_alpha_scorecard", "v_experiment_ledger_summary"}
+EXPECTED_VIEWS = {
+    "v_order_chain",
+    "v_alpha_scopes",
+    "v_alpha_scorecard",
+    "v_alpha_scorecard_current",
+    "v_experiment_ledger_summary",
+    "v_experiment_ledger_summary_current",
+}
 
 #: Stage tuple lengths of the example trace -> rows in the decomposition.
 EXAMPLE_DECOMPOSITION = {
@@ -154,7 +173,7 @@ def test_ddl_names_match_expectations() -> None:
     sql = load_ddl()
     assert set(table_names(sql)) == EXPECTED_TABLES
     assert set(view_names(sql)) == EXPECTED_VIEWS
-    assert ddl_path().name == "iap_v1.sql"
+    assert ddl_path().name == "iap_v2.sql"
 
 
 _ALLOWED_TYPES = {"BIGINT", "TEXT", "DOUBLE PRECISION"}
@@ -675,7 +694,7 @@ def test_import_all_counts(built: Store) -> None:
     log_rows = sum(
         1 for line in (RESEARCH / "lifecycle_log.jsonl").read_text().splitlines() if line.strip()
     )
-    assert counts["lifecycle_transitions"] >= log_rows == 260
+    assert counts["lifecycle_transitions"] >= log_rows == 300
     assert counts["experiments"] == counts["experiment_results"] >= 24
     # every warning is an "absent optional artefact", never a skipped record
     for step, rep in reports.items():
@@ -690,13 +709,19 @@ def test_ledger_denominator_and_summary_view(built: Store) -> None:
     assert total["n"] == doc["distinct_experiments"] == len(doc["entries"])
     view = built.query("SELECT * FROM v_experiment_ledger_summary ORDER BY kind")
     assert sum(r["total_count"] for r in view) == doc["total_experiments"]
-    kinds = {r["kind"]: r for r in view}
-    assert kinds["promotion_pipeline"]["n_alphas"] == 24
-    assert kinds["promotion_pipeline"]["n_promote"] == 0
+    # one row per scope AND kind: the pipeline was run in every scope
+    pipeline = [r for r in view if r["kind"] == "promotion_pipeline"]
+    assert len(pipeline) == len({(r["dataset_version"], r["methods"]) for r in view}) >= 3
+    assert all(r["n_alphas"] == 24 and r["n_promote"] == 0 for r in pipeline)
+    (current,) = built.query(
+        "SELECT * FROM v_experiment_ledger_summary_current WHERE kind = 'promotion_pipeline'"
+    )
+    assert current["methods"] == "v2" and current["total_count"] == 24 * LOOKS_PER_EXPERIMENT
+    assert current["scope_looks"] < doc["total_experiments"]
 
 
 def test_alpha_scorecard_view(built: Store) -> None:
-    rows = built.query("SELECT * FROM v_alpha_scorecard ORDER BY alpha_id")
+    rows = built.query("SELECT * FROM v_alpha_scorecard_current ORDER BY alpha_id")
     assert [r["alpha_id"] for r in rows] == sorted(r["alpha_id"] for r in rows)
     assert len(rows) == 24
     by_id = {r["alpha_id"]: r for r in rows}
@@ -717,10 +742,19 @@ def test_alpha_scorecard_view(built: Store) -> None:
 def test_alpha_report_mapping_is_pinned(built: Store) -> None:
     """The store's alpha-report rows come from THE pinned mapping — the one
     the lifecycle registry is built from (``iap.lifecycle.bootstrap``):
-    ``ic`` = ``gate_ic``, ``t_stat`` = ``nw_tstat_uncrossed``, P&L in bps of
-    the 1e6 USD reference notional, ``experiment_id`` = the ledger key[:16],
-    versions / commit / model hash from ``alpha_params.json``."""
-    from iap.lifecycle.bootstrap import REFERENCE_NOTIONAL_USD, load_ledger_entries
+    ``ic`` = ``gate_ic``, ``t_stat`` = ``gate_tstat`` (the t the PROMOTE gate
+    read: the pooled-slope HAC t on uncrossed rows under the default
+    methods), P&L in bps of the 1e6 USD reference notional,
+    ``experiment_id`` = the ledger key[:16], versions / commit / model hash
+    from ``alpha_params.json``.  A report written before v1.5.0 has no
+    ``gate_tstat`` and keeps the legacy mapping (``nw_tstat_uncrossed``)."""
+    from dataclasses import replace
+
+    from iap.lifecycle.bootstrap import (
+        REFERENCE_NOTIONAL_USD,
+        load_ledger_entries,
+        research_evidence,
+    )
 
     report = json.loads((RESEARCH / "alpha_reports" / "EQ03.json").read_text())
     entry = load_ledger_entries(REPO)["EQ03"]
@@ -733,7 +767,19 @@ def test_alpha_report_mapping_is_pinned(built: Store) -> None:
     assert len(rows) == 1
     row = rows[0]
     params_doc = json.loads((REPO / "configs" / "strategies" / "alpha_params.json").read_text())
-    assert row["ic"] == report["gate_ic"] and row["t_stat"] == report["nw_tstat_uncrossed"]
+    assert row["ic"] == report["gate_ic"] and row["t_stat"] == report["gate_tstat"]
+    # under the default methods the gate's t is the pooled-slope one, which
+    # is not the within-bucket t the mapping read up to v1.4.0
+    assert report["methods"]["significance"] == "pooled_slope"
+    assert report["gate_tstat"] == report["nw_tstat_pooled_uncrossed"]
+    assert report["gate_tstat"] != report["nw_tstat_uncrossed"]
+    # the legacy mapping, by name: the same report without the v1.5.0 key
+    legacy_report = {k: v for k, v in report.items() if k != "gate_tstat"}
+    legacy, missing = research_evidence("EQ03", legacy_report, entry, params_doc)
+    current, _ = research_evidence("EQ03", report, entry, params_doc)
+    assert legacy is not None and current is not None and not missing
+    assert legacy.t_stat == report["nw_tstat_uncrossed"]
+    assert legacy == replace(current, t_stat=report["nw_tstat_uncrossed"])
     assert row["hit_rate"] == report["oos_hit_rate"] and row["n_folds"] == report["n_folds_run"]
     assert row["leakage_passed"] == 1 and row["verdict"] == report["verdict"]
     x1 = report["stress"]["cost"]["x1"]
@@ -755,6 +801,10 @@ def test_alpha_report_mapping_is_pinned(built: Store) -> None:
     cfg = json.loads(row["configuration_json"])
     assert cfg["source"] == "research/alpha_reports/EQ03.json"
     assert "1000000 USD" in cfg["pnl_basis"] and cfg["ic_source"].startswith("gate_ic")
+    assert cfg["t_stat_source"].startswith("gate_tstat")
+    assert cfg["methods"] == report["methods"]
+    assert cfg["significance_threshold"] == report["gates"]["min_nw_tstat"]
+    assert report["gates"]["min_nw_tstat"] == report["ledger_t_threshold"] > 3.0
     assert cfg["experiment_id_source"].endswith("key[:16]")
     assert "sharpe" in cfg["unrecorded"] and row["sharpe"] == 0.0
     assert row["created_ts"] == max(f["test_end"] for f in report["folds"])
@@ -825,23 +875,42 @@ def test_import_alpha_reports_skips_nan_with_warning(tmp_path: Path) -> None:
 
 def test_import_experiments_ledger(store: Store) -> None:
     rep = import_experiments_ledger(store, RESEARCH / "experiments.json")
+    from iap.lifecycle.bootstrap import load_ledger_entries
+
     assert rep.inserted["ledger_entries"] == _n_ledger_entries() >= 65
-    row = store.query(
+    rows = store.query(
         "SELECT * FROM ledger_entries WHERE alpha_id='EQ03' AND kind='promotion_pipeline'"
-    )[0]
-    # 28, not 21: the look count now includes the time-latency grid, the
-    # crossed/uncrossed split and the leakage shift IC. Asserted against the
-    # constant rather than a literal so the two cannot drift apart again.
+    )
+    # The ledger keeps one entry per alpha, dataset AND method bundle: the
+    # entries recorded up to v1.4.0 name no bundle, the v1.5.0 run names v2.
+    by_bundle: dict = {}
+    for r in rows:
+        by_bundle.setdefault(json.loads(r["config_json"]).get("methods"), []).append(r)
+    assert set(by_bundle) == {None, "v2"}
+    # The entry in force (the one behind the current report) is the v2 one.
+    in_force = load_ledger_entries(REPO)["EQ03"]["key"]
+    (row,) = [r for r in by_bundle["v2"] if r["ledger_key"] == in_force]
+    # 84 under v2 (decay / cost / regime in every fold, and the statistics
+    # reported beside the gate are debited). Asserted against the constant
+    # rather than a literal so the two cannot drift apart again.
     assert row["count"] == LOOKS_PER_EXPERIMENT and row["verdict"] == "ITERATE"
+    assert all(r["count"] == LOOKS_PER_EXPERIMENT for r in by_bundle["v2"])
     # `looks` is no longer part of the experiment identity — it is the size
     # of the recording (`count`), not what was looked at.
     config = json.loads(row["config_json"])
     assert config["horizon"] == "5s" and "looks" not in config
+    # Legacy entries keep what the legacy chain debited — 28, not 21: the
+    # look count includes the time-latency grid, the crossed/uncrossed split
+    # and the leakage shift IC.
+    for legacy in by_bundle[None]:
+        assert legacy["count"] == LEGACY_LOOKS_PER_EXPERIMENT and legacy["verdict"] == "ITERATE"
+        config = json.loads(legacy["config_json"])
+        assert config["horizon"] == "5s" and "looks" not in config
 
 
 def test_import_lifecycle_log_gate_mapping(store: Store) -> None:
     rep = import_lifecycle_log(store, RESEARCH / "lifecycle_log.jsonl")
-    assert rep.inserted["lifecycle_transitions"] == 260 and not rep.warnings
+    assert rep.inserted["lifecycle_transitions"] == 300 and not rep.warnings
     rows = store.fetch(LifecycleTransition, alpha_id="EQ03", policy="static")
     assert rows and all(t.actor.value == "SYSTEM" for t in rows)
     first = rows[0]
@@ -954,6 +1023,470 @@ def test_built_store_exports_deterministically(built: Store, tmp_path: Path) -> 
     assert a.read_bytes() == b.read_bytes()
     keys = [json.loads(line)["ledger_key"] for line in a.read_text().splitlines()]
     assert keys == sorted(keys)
+
+
+# --------------------------------------------------------------------------
+# Scope: dataset_version + methods (data model x-version 2)
+# --------------------------------------------------------------------------
+
+DATASET_A = "a" * 64
+DATASET_B = "b" * 64
+
+
+def _ledger_entry(
+    alpha_id: str,
+    kind: str,
+    config: dict,
+    count: int,
+    n: int,
+    dataset: str,
+    *,
+    gate_looks: int | None = None,
+    result: dict | None = None,
+) -> dict:
+    entry = {
+        "alpha_id": alpha_id,
+        "kind": kind,
+        "config": config,
+        "count": count,
+        "n": n,
+        "reruns": 0,
+        "dataset_version": dataset,
+        "key": ExperimentLedger.experiment_key(alpha_id, kind, config, dataset),
+        "result": result or {},
+    }
+    if gate_looks is not None:
+        entry["gate_looks"] = gate_looks
+    return entry
+
+
+def _scope_ledger(dataset: str, start: int) -> tuple[dict, dict[str, dict]]:
+    """A ledger of one dataset with EQ03 looked at under both bundles:
+    ``promotion_pipeline`` under v2 (84 looks, judged at its own running
+    total) and under the legacy rules (28 looks, no bundle named), plus one
+    v2 ``adaptive_deployment`` look."""
+    verdict = {"oos_ic": 0.02, "nw_tstat": 5.0, "verdict": "ITERATE"}
+    legacy = _ledger_entry(
+        "EQ03", "promotion_pipeline", {"horizon": "5s"}, 28, start + 28, dataset, result=verdict
+    )
+    v2 = _ledger_entry(
+        "EQ03",
+        "promotion_pipeline",
+        {"horizon": "5s", "methods": "v2"},
+        84,
+        start + 112,
+        dataset,
+        gate_looks=start + 112,
+        result=verdict,
+    )
+    adaptive = _ledger_entry(
+        "EQ03",
+        "adaptive_deployment",
+        {"policy": "drift_triggered", "methods": "v2"},
+        1,
+        start + 113,
+        dataset,
+    )
+    doc = {"x-version": 3, "entries": [legacy, v2, adaptive]}
+    return doc, {"legacy_v1": legacy, "v2": v2}
+
+
+def _scoped_experiment(dataset: str, bundle: str, entry: dict, t_stat: float):
+    ex = all_examples()
+    experiment_id = entry["key"][:16]
+    spec_doc = dict(
+        ex["ExperimentSpec"].to_dict(), experiment_id=experiment_id, dataset_version=dataset
+    )
+    configuration = dict(spec_doc["configuration"])
+    configuration.pop("methods", None)
+    if bundle != LEGACY_METHODS:
+        configuration["methods"] = bundle
+    spec_doc["configuration"] = configuration
+    result_doc = dict(
+        ex["ExperimentResult"].to_dict(),
+        experiment_id=experiment_id,
+        dataset_version=dataset,
+        t_stat=t_stat,
+    )
+    return ExperimentSpec.from_dict(spec_doc), ExperimentResult.from_dict(result_doc)
+
+
+def test_two_datasets_and_two_bundles_give_separate_scorecard_rows(
+    store: Store, tmp_path: Path
+) -> None:
+    """One store, two datasets (the second an ingested one with its own
+    ledger file) and two method bundles: four scorecard rows for the alpha,
+    each with the looks and thresholds of its own scope, none pooled."""
+    store.insert_alpha(
+        "EQ03",
+        asset_class="EQUITY",
+        family="ofi_multilevel",
+        horizon="5s",
+        economic_rationale="r",
+        current_state="CANDIDATE",
+    )
+    t_stats = {
+        (DATASET_A, "v2"): 4.5,
+        (DATASET_A, "legacy_v1"): 3.5,
+        (DATASET_B, "v2"): 1.5,
+        (DATASET_B, "legacy_v1"): 2.5,
+    }
+    gate_looks = {}
+    for i, (dataset, start) in enumerate(((DATASET_A, 0), (DATASET_B, 113))):
+        doc, entries = _scope_ledger(dataset, start)
+        path = tmp_path / f"ledger_{i}.json"
+        path.write_text(json.dumps(doc))
+        rep = import_experiments_ledger(store, path)
+        assert rep.inserted["ledger_entries"] == 3 and not rep.warnings
+        gate_looks[dataset] = start + 112
+        for bundle, entry in entries.items():
+            assert ledger_entry_scope(entry) == (dataset, bundle)
+            spec, result = _scoped_experiment(dataset, bundle, entry, t_stats[(dataset, bundle)])
+            store.insert_experiment_spec(spec)
+            store.insert_experiment_result(result)  # the bundle comes from its spec
+    store.set_current_scope(DATASET_A, "v2")
+
+    scopes = store.query("SELECT * FROM ledger_scopes ORDER BY dataset_version, methods")
+    assert [(r["dataset_version"], r["methods"], r["n_entries"], r["looks"]) for r in scopes] == [
+        (DATASET_A, "legacy_v1", 1, 28),
+        (DATASET_A, "v2", 2, 85),
+        (DATASET_B, "legacy_v1", 1, 28),
+        (DATASET_B, "v2", 2, 85),
+    ]
+    for r in scopes:
+        assert r["bonferroni_t_threshold"] == pytest.approx(
+            ExperimentLedger.bonferroni_t_threshold_at(r["looks"]), abs=1e-12
+        )
+
+    rows = store.query("SELECT * FROM v_alpha_scorecard ORDER BY dataset_version, methods")
+    assert [(r["dataset_version"], r["methods"]) for r in rows] == sorted(t_stats)
+    pooled_looks = store.query("SELECT SUM(count) AS n FROM ledger_entries")[0]["n"]
+    assert pooled_looks == 226
+    for r in rows:
+        scope = (r["dataset_version"], r["methods"])
+        v2 = r["methods"] == "v2"
+        assert r["t_stat"] == t_stats[scope]  # the result of THIS scope
+        assert r["n_results"] == 1
+        assert r["ledger_entries"] == (2 if v2 else 1)
+        assert r["ledger_count"] == r["scope_looks"] == (85 if v2 else 28)
+        assert r["ledger_count"] != pooled_looks
+        assert r["scope_bonferroni_t"] == pytest.approx(
+            ExperimentLedger.bonferroni_t_threshold_at(r["scope_looks"]), abs=1e-12
+        )
+        assert r["pipeline_verdict"] == "ITERATE" and r["pipeline_nw_tstat"] == 5.0
+        if v2:
+            looks = gate_looks[r["dataset_version"]]
+            want = max(3.0, ExperimentLedger.bonferroni_t_threshold_at(looks))
+            assert r["gate_looks"] == r["pipeline_gate_looks"] == looks
+            assert r["promote_t_threshold"] == pytest.approx(want, abs=1e-12)
+            assert r["pipeline_t_threshold"] == pytest.approx(want, abs=1e-12)
+        else:
+            assert r["gate_looks"] is None and r["pipeline_gate_looks"] is None
+            assert r["promote_t_threshold"] == r["pipeline_t_threshold"] == 3.0  # the fixed gate
+        current = scope == (DATASET_A, "v2")
+        assert r["is_current"] == (1 if current else 0)
+        assert r["current_state"] == ("CANDIDATE" if current else None)
+    # the two v2 scopes were judged at different look counts
+    by_scope = {(r["dataset_version"], r["methods"]): r for r in rows}
+    assert (
+        by_scope[(DATASET_B, "v2")]["promote_t_threshold"]
+        > by_scope[(DATASET_A, "v2")]["promote_t_threshold"]
+        > 3.0
+    )
+
+    (current,) = store.query("SELECT * FROM v_alpha_scorecard_current")
+    assert (current["dataset_version"], current["methods"]) == (DATASET_A, "v2")
+    assert current["t_stat"] == 4.5 and current["ledger_count"] == 85
+
+    summary = store.query("SELECT * FROM v_experiment_ledger_summary")
+    assert len(summary) == 6 and sum(r["total_count"] for r in summary) == pooled_looks
+    current_kinds = store.query(
+        "SELECT kind, total_count FROM v_experiment_ledger_summary_current ORDER BY kind"
+    )
+    assert [(r["kind"], r["total_count"]) for r in current_kinds] == [
+        ("adaptive_deployment", 1),
+        ("promotion_pipeline", 84),
+    ]
+    # moving the current scope moves the convenience view, nothing else
+    store.set_current_scope(DATASET_B, "legacy_v1")
+    (current,) = store.query("SELECT * FROM v_alpha_scorecard_current")
+    assert (current["dataset_version"], current["methods"]) == (DATASET_B, "legacy_v1")
+    assert current["t_stat"] == 2.5 and current["ledger_count"] == 28
+    assert len(store.query("SELECT * FROM v_alpha_scorecard")) == 4
+
+
+def test_scope_helpers_and_bundle_resolution(store: Store) -> None:
+    assert LEGACY_METHODS == METHODS_LEGACY
+    assert methods_of({}) == methods_of(None) == LEGACY_METHODS
+    assert methods_of({"methods": "v2"}) == "v2"
+    with pytest.raises(ValueError, match="not a bundle name"):
+        methods_of({"methods": {"position_policy": "cost_aware"}})
+    # experiment_runner entries carry the dataset and the bundle in the spec
+    runner = {
+        "alpha_id": "EQ03",
+        "kind": "experiment_runner",
+        "key": "k" * 64,
+        "config": {
+            "dataset_version": DATASET_A,
+            "experiment_id": "0123456789abcdef",
+            "configuration": {"methods": "v2"},
+        },
+    }
+    assert ledger_entry_scope(runner) == (DATASET_A, "v2")
+    assert ledger_entry_scope({"kind": "x", "config": {}}) == ("unstamped", LEGACY_METHODS)
+    # a result is never filed under a guessed bundle
+    ex = all_examples()
+    with pytest.raises(ValueError, match="no stored spec"):
+        store.insert_experiment_result(ex["ExperimentResult"])
+    store.insert_experiment_result(ex["ExperimentResult"], methods="v2")
+    assert store.query("SELECT methods FROM experiment_results")[0]["methods"] == "v2"
+    assert store.current_scope() is None
+    assert store.query("SELECT * FROM v_alpha_scorecard_current") == []
+    scope = resolve_current_scope(REPO)
+    params = json.loads((CONFIGS / "strategies" / "alpha_params.json").read_text())
+    assert scope == (params["data_version"], DEFAULT_METHODS)
+    assert resolve_current_scope(REPO, dataset_version="d", methods="legacy_v1") == (
+        "d",
+        "legacy_v1",
+    )
+
+
+def test_built_store_keeps_legacy_and_archived_scopes_out_of_the_current_numbers(
+    built: Store,
+) -> None:
+    doc = json.loads((RESEARCH / "experiments.json").read_text())
+    params = json.loads((CONFIGS / "strategies" / "alpha_params.json").read_text())
+    current_scope = (params["data_version"], DEFAULT_METHODS)
+    assert built.current_scope() == current_scope
+
+    # every look of the ledger is in exactly one scope
+    scopes = built.query("SELECT * FROM ledger_scopes")
+    assert sum(r["looks"] for r in scopes) == doc["total_experiments"]
+    assert {r["dataset_version"] for r in scopes} == {d["dataset_version"] for d in doc["datasets"]}
+    assert {(r["dataset_version"], r["methods"]) for r in scopes} >= {
+        current_scope,
+        (params["data_version"], LEGACY_METHODS),
+    }
+    by_dataset: dict = {}
+    for r in scopes:
+        by_dataset[r["dataset_version"]] = by_dataset.get(r["dataset_version"], 0) + r["looks"]
+    assert by_dataset == {d["dataset_version"]: d["looks"] for d in doc["datasets"]}
+
+    current = built.query("SELECT * FROM v_alpha_scorecard_current ORDER BY alpha_id")
+    assert len(current) == 24
+    scope_looks = {r["scope_looks"] for r in current}
+    assert len(scope_looks) == 1 and scope_looks.pop() < doc["total_experiments"]
+    for r in current:
+        assert (r["dataset_version"], r["methods"]) == current_scope and r["is_current"] == 1
+        # the report pipeline's v2 entry: 84 looks, judged at its recorded count
+        assert r["pipeline_gate_looks"] is not None
+        assert r["pipeline_t_threshold"] == pytest.approx(
+            max(3.0, ExperimentLedger.bonferroni_t_threshold_at(r["pipeline_gate_looks"])),
+            abs=1e-12,
+        )
+        pooled = built.query(
+            "SELECT SUM(count) AS n FROM ledger_entries WHERE alpha_id = ?", (r["alpha_id"],)
+        )[0]["n"]
+        assert LOOKS_PER_EXPERIMENT <= r["ledger_count"] < pooled
+
+    # the same alphas under the other scopes are separate rows, never current
+    everything = built.query("SELECT * FROM v_alpha_scorecard")
+    others = [r for r in everything if r["is_current"] == 0]
+    assert len(everything) == len(current) + len(others) and len(others) >= 48
+    for r in others:
+        assert r["current_state"] is None
+        assert (r["dataset_version"], r["methods"]) != current_scope
+        if r["methods"] == LEGACY_METHODS and r["pipeline_verdict"] is not None:
+            assert r["pipeline_t_threshold"] == 3.0 and r["pipeline_gate_looks"] is None
+
+    # the archived lifecycle ledgers are filed under the scope their name
+    # states and did not set any state: the registry's is the one in force
+    archived = built.query(
+        "SELECT source, dataset_version, methods, COUNT(*) AS n FROM lifecycle_transitions "
+        "WHERE source LIKE 'archive/%' GROUP BY source, dataset_version, methods ORDER BY source"
+    )
+    files = sorted((RESEARCH / "archive").glob("lifecycle_transitions.dataset-*.jsonl"))
+    assert [r["source"] for r in archived] == [f"archive/{f.name}" for f in files]
+    assert len(archived) >= 2
+    for r in archived:
+        assert r["dataset_version"] in by_dataset and r["methods"] == LEGACY_METHODS
+        assert (r["dataset_version"], r["methods"]) != current_scope
+        assert r["dataset_version"][:8] in r["source"]
+    live = built.query(
+        "SELECT DISTINCT dataset_version, methods FROM lifecycle_transitions "
+        "WHERE source IN ('lifecycle_transitions', 'lifecycle_log')"
+    )
+    assert [(r["dataset_version"], r["methods"]) for r in live] == [current_scope]
+    registry = json.loads((RESEARCH / "alpha_registry.json").read_text())["alphas"]
+    assert {r["alpha_id"]: r["current_state"] for r in current} == {
+        aid: entry["state"] for aid, entry in registry.items()
+    }
+
+
+def test_import_lifecycle_archive_resolves_scope_from_the_file_name(
+    store: Store, tmp_path: Path
+) -> None:
+    ex = all_examples()
+    line = json.dumps(ex["LifecycleTransition"].to_dict())
+    doc, _ = _scope_ledger(DATASET_A, 0)
+    (tmp_path / "ledger.json").write_text(json.dumps(doc))
+    import_experiments_ledger(store, tmp_path / "ledger.json")
+    store.insert_alpha(
+        "EQ03", asset_class="EQUITY", family="f", horizon="5s", economic_rationale="r"
+    )
+    archive = tmp_path / "archive"
+    archive.mkdir()
+    (archive / "lifecycle_transitions.dataset-aaaaaaaa.jsonl").write_text(line + "\n")
+    (archive / "lifecycle_transitions.dataset-aaaaaaaa.methods-v2.jsonl").write_text(line + "\n")
+    (archive / "lifecycle_transitions.dataset-ffffffff.methods-v2.jsonl").write_text(line + "\n")
+    (archive / "lifecycle_transitions.dataset-.jsonl").write_text(line + "\n")
+    rep = import_lifecycle_archive(store, archive)
+    assert rep.inserted == {"lifecycle_transitions": 3}
+    assert len(rep.warnings) == 1 and "states no dataset" in rep.warnings[0]
+    rows = store.query(
+        "SELECT source, dataset_version, methods FROM lifecycle_transitions ORDER BY source"
+    )
+    assert [(r["dataset_version"], r["methods"]) for r in rows] == [
+        (DATASET_A, LEGACY_METHODS),  # prefix resolved against the ledger's datasets
+        (DATASET_A, "v2"),
+        ("ffffffff", "v2"),  # unknown to the ledger: kept as written
+    ]
+    assert all(r["source"].startswith("archive/lifecycle_transitions.dataset-") for r in rows)
+    # an archive never sets the alpha's state
+    assert store.query("SELECT current_state FROM alphas")[0]["current_state"] == "RESEARCH"
+
+
+def _v1_store(path: Path) -> None:
+    """A database exactly as ``schemas/sql/iap_v1.sql`` creates it."""
+    sql = (REPO / "schemas" / "sql" / "iap_v1.sql").read_text(encoding="utf-8")
+    conn = sqlite3.connect(str(path), isolation_level=None)
+    try:
+        for stmt in split_statements(sql):
+            conn.execute(stmt)
+        conn.execute(
+            "INSERT INTO alphas (alpha_id, asset_class, family, horizon, economic_rationale, "
+            "current_state) VALUES ('EQ03', 'EQUITY', 'f', '5s', 'r', 'RESEARCH')"
+        )
+    finally:
+        conn.close()
+
+
+def test_v1_store_is_rejected_and_rebuild_is_the_migration(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The documented rule (schemas/MIGRATIONS.md): a version-1 file is
+    refused untouched — by the API, by ``build`` and by every read command —
+    and ``build --rebuild`` recreates it at version 2."""
+    assert DDL_X_VERSION == 2
+    db = tmp_path / "iap.sqlite"
+    _v1_store(db)
+    before = db.read_bytes()
+
+    with Store.open(db) as s:
+        assert s.schema_versions() == [1]
+        with pytest.raises(StoreVersionError, match="--rebuild"):
+            s.init()
+        # refused before any statement ran: still a version-1 layout
+        assert s.schema_versions() == [1]
+        assert "v_alpha_scorecard_current" not in s.views()
+        assert "methods" not in s.columns("experiments")
+    assert db.read_bytes() == before
+
+    for argv in (
+        ["build", "--db", str(db), "--repo-root", str(REPO)],
+        ["sql", "--db", str(db), "SELECT * FROM v_alpha_scorecard"],
+        ["scorecard", "--db", str(db)],
+        ["explain", "--db", str(db), "12345"],
+    ):
+        assert store_main(argv) == 2, argv
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert "x-version [1]" in captured.err and "build --rebuild" in captured.err
+    assert db.read_bytes() == before
+
+    assert store_main(["build", "--db", str(db), "--repo-root", str(REPO), "--rebuild"]) == 0
+    capsys.readouterr()
+    with Store.open(db, read_only=True) as s:
+        s.check_version()
+        assert s.schema_versions() == [DDL_X_VERSION]
+        assert len(s.query("SELECT * FROM v_alpha_scorecard_current")) == 24
+
+    # a database the DDL was never applied to is refused by the read path too
+    empty = tmp_path / "empty.sqlite"
+    sqlite3.connect(str(empty)).close()
+    with Store.open(empty) as s, pytest.raises(StoreVersionError, match="no schema_version"):
+        s.check_version()
+
+
+def test_cli_selects_the_scope(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    db = tmp_path / "iap.sqlite"
+    real = "c" * 64  # an ingested dataset keeps its ledger in its own directory
+    doc, _ = _scope_ledger(real, 0)
+    ingested = tmp_path / "dataset" / "experiments.json"
+    ingested.parent.mkdir()
+    ingested.write_text(json.dumps(doc))
+    assert (
+        store_main(["build", "--db", str(db), "--repo-root", str(REPO), "--ledger", str(ingested)])
+        == 0
+    )
+    capsys.readouterr()
+    params = json.loads((CONFIGS / "strategies" / "alpha_params.json").read_text())
+    dataset = params["data_version"]
+
+    def lines(argv: list[str]) -> list[dict]:
+        assert store_main(argv) == 0, argv
+        return [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+
+    current = lines(["scorecard", "--db", str(db)])
+    assert len(current) == 24
+    assert {(r["dataset_version"], r["methods"], r["is_current"]) for r in current} == {
+        (dataset, "v2", 1)
+    }
+    legacy = lines(["scorecard", "--db", str(db), "--methods", "legacy_v1"])
+    assert len(legacy) == 24
+    assert {(r["dataset_version"], r["methods"], r["is_current"]) for r in legacy} == {
+        (dataset, "legacy_v1", 0)
+    }
+    # the ingested dataset is its own scope: selected by prefix, never pooled
+    ingested_rows = lines(["scorecard", "--db", str(db), "--dataset-version", "cccc"])
+    assert [(r["alpha_id"], r["dataset_version"], r["ledger_count"]) for r in ingested_rows] == [
+        ("EQ03", real, 85)
+    ]
+    eq03 = next(r for r in current if r["alpha_id"] == "EQ03")
+    assert eq03["scope_looks"] == next(
+        r["looks"]
+        for r in lines(["sql", "--db", str(db), "SELECT * FROM ledger_scopes"])
+        if (r["dataset_version"], r["methods"]) == (dataset, "v2")
+    )
+    everything = lines(["scorecard", "--db", str(db), "--all-scopes"])
+    assert len(everything) == 24 * 3 + 2  # three repository scopes + the ingested dataset's two
+    # sql binds :dataset_version / :methods to the selected scope
+    query = (
+        "SELECT COUNT(*) AS n, SUM(count) AS looks FROM ledger_entries "
+        "WHERE dataset_version = :dataset_version AND methods = :methods"
+    )
+    (bound,) = lines(["sql", "--db", str(db), query])
+    assert bound["looks"] == eq03["scope_looks"]
+    (bound,) = lines(["sql", "--db", str(db), "--dataset-version", "cccc", query])
+    assert bound == {"looks": 85, "n": 2}
+    (bound,) = lines(
+        ["sql", "--db", str(db), "--dataset-version", "cccc", "--methods", "legacy_v1", query]
+    )
+    assert bound == {"looks": 28, "n": 1}
+    # a prefix that selects no dataset, or several, is an error
+    assert store_main(["scorecard", "--db", str(db), "--dataset-version", "zz"]) == 1
+    assert "selects no dataset" in capsys.readouterr().err
+    assert store_main(["scorecard", "--db", str(db), "--dataset-version", ""]) == 1
+    assert "datasets" in capsys.readouterr().err
+
+    # build can name the current scope: the convenience views follow it
+    assert (
+        store_main(["build", "--db", str(db), "--repo-root", str(REPO), "--methods", "legacy_v1"])
+        == 0
+    )
+    capsys.readouterr()
+    moved = lines(["scorecard", "--db", str(db)])
+    assert {(r["methods"], r["is_current"]) for r in moved} == {("legacy_v1", 1)}
 
 
 # --------------------------------------------------------------------------

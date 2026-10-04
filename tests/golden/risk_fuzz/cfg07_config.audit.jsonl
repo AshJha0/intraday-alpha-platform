@@ -1,0 +1,13 @@
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-integer per_order.max_order_qty","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000000000000}
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 2","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700000000000294000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-integer per_order.max_order_qty","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000055294000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-integer per_order.max_order_qty","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000055294000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-integer per_order.max_order_qty","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000055294000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-integer per_order.max_order_qty","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000055294000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-integer per_order.max_order_qty","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000055294000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-integer per_order.max_order_qty","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000055294000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-integer per_order.max_order_qty","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000095995000}
+{"decision":1,"reason":"desk request #42","rule_id":"SESSION_ROLLED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000000145995000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-integer per_order.max_order_qty","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000145995000}
+{"decision":2,"reason":"fill for order 0 rejected: no reference data for instrument 1","rule_id":"MALFORMED_FILL","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000000146668000}
+{"decision":2,"reason":"fail-closed: invalid argument: risk.json: missing/non-integer per_order.max_order_qty","rule_id":"CONFIG_MISSING","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000179668000}

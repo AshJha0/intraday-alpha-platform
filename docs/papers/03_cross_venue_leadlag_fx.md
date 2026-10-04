@@ -1,6 +1,6 @@
 # Cross-Venue Lead-Lag Effects in FX: A Carefully Measured Null
 
-> Dated record. The figures below are those of the dataset in force when the paper was written; the 2026-10-03 update at the end restates them on the v1.4.0 dataset and re-checks each conclusion.
+> Dated record. The figures below are those of the dataset in force when the paper was written; the 2026-10-03 update restates them on the v1.4.0 dataset and re-checks each conclusion, and the 2026-10-04 update at the end restates them under the v1.5.0 default research methods (same dataset) and re-checks each conclusion again.
 
 *Intraday Alpha Platform research series, paper 3 of 6 (spec §28). Generated 2026-08-29 from the repository's committed research artifacts.*
 
@@ -381,10 +381,11 @@ per pair, $29.5B for instrument 103. The venue diagnostics of §4.5 were
 recomputed from the current feature frames and are the same (52,568 rows;
 median staleness spread 81,014 ms; median top-venue update share 1.00).
 
-**Ledger.** `research/experiments.json` now holds 1920 looks over 139
+**Ledger.** At v1.4.0 `research/experiments.json` held 1920 looks over 139
 entries (the 1068 looks of the v1.3.0 dataset are kept; the regenerated
-pipelines added 852). Expected max |t| under the global null is 3.888 and
-the Bonferroni per-test threshold 4.206. FX04's t of 4.79 is above both.
+pipelines added 852); it holds 5156 over 216 since v1.5.0 (see the
+2026-10-04 update). At the v1.4.0 count the expected max |t| under the
+global null was 3.888 and the Bonferroni per-test threshold 4.206. FX04's t of 4.79 is above both.
 FX03 (1.86), FX12 (1.22), FX07 (0.22) and FX05 (0.53) are below the
 yardstick, as are all other FX alphas.
 
@@ -429,3 +430,106 @@ confirmed, -29,541 at 1x; REJECT (v1.3.0: -0.0034 / -0.58).
 7. *A lead-lag study should publish its staleness and update-share
    diagnostics next to its IC table.* **Holds**, and item 5 adds the same
    point for power: publish whether the test can detect a planted effect.
+
+## Erratum / Update — 2026-10-04 (v1.5.0: the corrected research methods are the defaults)
+
+**What changed.** Not the data: the dataset is the v1.4.0 one. The eleven
+corrected research methods that v1.3.0 added and v1.4.0 kept as selectable
+alternatives are the defaults since v1.5.0 (`iap.validation.methods`, bundle
+`"v2"`; PLATFORM_CONVENTIONS.md §13.6; paper 01's update of the same date
+lists them), and every old rule stays selectable under a legacy name
+(bundle `"legacy_v1"`). For this paper three matter most. The gate t is the
+HAC t of the pooled slope, where it was the Newey-West t of within-bucket
+ICs. The PROMOTE t threshold is the Bonferroni |t| at the run's recorded
+gate look count, 4.365 at 3,936 looks, where it was 3.0. The backtest takes
+a position only when the expected return exceeds the round-trip spread and
+fee, where it held one on every signal sign. `run_all.py --methods
+legacy_v1 --out-dir <dir>` reproduces the v1.4.0 report
+(`python/tests/test_legacy_methods.py` pins that against the v1.4.0 reports
+of EQ03 and FX01). The figures of the 2026-10-03 update are the `legacy_v1`
+figures of the current dataset; this section supersedes them as the current
+ones.
+
+**FX figures, current** (`research/alpha_reports/REPORT.md` and the
+per-alpha JSONs; keys `gate_ic`, `gate_tstat`, `nw_tstat_uncrossed`,
+`trade_count_1x_cost`, `net_pnl_1x_cost`):
+
+| alpha | horizon | IC | gate IC | IC crs | crs% | gate t | t within-bucket | folds+ | hyp | trades 1x | net P&L 1x | flips/h | verdict |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| FX03 | 1m | -0.0062 | 0.0112 | -0.0283 | 0.291 | 1.13 | 1.95 | 1/4 | no | 0 | 0 | 74 | REJECT |
+| FX04 | 30s | 0.0097 | 0.0298 | -0.0082 | 0.287 | 4.24 | 4.82 | 4/4 | yes | 0 | 0 | 63 | ITERATE |
+| FX12 | 1m | 0.0036 | 0.0086 | -0.0006 | 0.291 | 1.05 | 1.29 | 2/4 | yes | 0 | 0 | 52 | REJECT |
+| FX07 | 1m | -0.0052 | -0.0119 | -0.0011 | 0.296 | -1.37 | 0.25 | 2/4 | no | 0 | 0 | 35 | REJECT |
+| FX05 | 5m | -0.0396 | -0.0072 | -0.0712 | 0.331 | -0.42 | 0.35 | 0/4 | no | 137 | -64 | 11 | REJECT |
+
+FX03 moved from ITERATE to REJECT: its gate t of 1.13 is below the ITERATE
+floor of 1.5 that its within-bucket t (1.95) cleared. FX04 stays ITERATE
+and now fails two PROMOTE gates, `significance` and `cost`
+(`promote_gates`): 4.24 is below the threshold of 4.365. Headline ICs the
+gate does not read, FX04: vol-scaled 0.0323, per-instrument mean 0.0317;
+valid-only gate IC 0.0297 (the v1.4.0 value), 53 BLACKOUT rows scored at
+the reopen return.
+
+Cost stress at 0.5x / 1x / 2x: FX03, FX04, FX07 and FX12 make no trade at
+any multiplier; FX05 -151 / -64 / 0 USD over 511 / 137 / 0 trades. Day 2:
+no trade for any of the five. Latency probe, last-fold IC at +0 / +1 / +5
+rows: FX04 +0.0076 / -0.0098 / -0.0040; FX03 -0.0025 / +0.0027 / -0.0107.
+Regime split: FX04 +0.0055 high-vol / +0.0129 low-vol. Edge-breakeven
+capacity is 0 for all five; the participation line is unchanged ($122-271M
+per pair, $29.5B for instrument 103, `capacity_proxy_usd_by_instrument`).
+The venue diagnostics of §4.5 derive from the feature frames, which this
+release did not change; they were not recomputed here.
+
+**Ledger.** `research/experiments.json` holds 5156 looks over 216 entries
+(1068 on the v1.3.0 dataset, 852 on the v1.4.0 dataset under the legacy
+methods, 3,236 under the default methods). Expected max |t| under the
+global null is 4.135 and the Bonferroni per-test threshold 4.424; the alpha
+report was judged at its own recorded count of 3,936 (threshold 4.365,
+selection yardstick 4.07). FX04's gate t of 4.24 is above both yardsticks
+and below both thresholds. FX03, FX12, FX07 and FX05 are below all four.
+
+**EQ10 (§4.7), current.** Gate IC 0.0040 at gate t 0.91 (within-bucket
+0.77), 3 of 4 folds positive, hypothesis sign confirmed, no trade; REJECT.
+
+**Conclusions, re-checked under the default methods.**
+
+1. *Cross-venue lead-lag in FX has no economic content on this dataset;
+   FX03, FX04 and FX12 are cost-negative at every multiplier.* The first
+   half **holds**. The second **does not carry over as worded**: none of
+   the three makes a trade at any cost multiplier, so none shows a loss.
+   Their forecasts never exceed one round trip of spread and fee, which is
+   the same finding without the six-figure number. The v1.4.0 losses
+   (FX04 -32,566 at 1x) are those of the legacy `"sign"` policy.
+2. *FX04 passes the statistical gates and is held at ITERATE by the cost
+   gate; a significant t appears on rows whose true lead-lag is zero, so
+   the gates are necessary and not sufficient.* **Weaker.** Under the
+   default methods FX04 does not pass the significance gate: 4.24 against
+   4.365. The margin is 0.12, the statistic is above what selection alone
+   is expected to produce (4.07), and under the legacy rule it is 4.82
+   against 3.0. So the corrected gate stops this false positive, narrowly,
+   and the legacy gate did not. The diagnostics of §4.5 remain what
+   explains why the effect is not there; the paper's lesson stands as a
+   statement about a fixed threshold of 3.0. In the lifecycle registry FX04
+   now fails `statistical_significance`, `net_pnl_after_costs` and
+   `capacity`.
+3. *FX04's IC changes sign under one row of lag and is larger in the
+   low-volatility regime.* **Unchanged.**
+4. *The venue diagnostics explain why no effect should be identifiable.*
+   **Unchanged**; not recomputed.
+5. *Every lead-lag construct lands within noise of zero, and the agreement
+   of four differently built signals makes the null informative.* The first
+   part is **closer to holding than on 2026-10-03**: FX03 (1.13), FX07
+   (-1.37) and EQ10 (0.91) are within noise and FX04 no longer clears the
+   significance gate, though it is above the selection yardstick. The
+   second part **still does not hold for the equity leg**. The
+   planted-signal study (`research/power/POWER_REPORT.md`, report version
+   2, default methods) detects a planted ETF lead-lag in 0 of 3 seeds at
+   every level by the pooled-slope t, the within-bucket t and the ledger
+   threshold alike; at twice the reference size the mean pooled-slope t is
+   1.75 and the mean within-bucket t 0.87. EQ10 reaches ITERATE in 2 of 3
+   seeds at that level and in 1 of 3 at the reference size.
+6. *Capacity is not the constraint.* **No longer holds as stated.** By the
+   participation line it is unchanged; by the default edge-breakeven
+   measure the capacity of every alpha in this paper is 0.
+7. *A lead-lag study should publish its staleness and update-share
+   diagnostics next to its IC table.* **Holds.**
