@@ -5,7 +5,6 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import pytest
-
 from iap.alpha import configure_universe, universe_ids
 from iap.research import power_real
 from iap.research.power_stats import DAY_NS
