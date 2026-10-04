@@ -379,6 +379,25 @@ def _power(args: argparse.Namespace) -> int:
     return 0
 
 
+def _power_real(args: argparse.Namespace) -> int:
+    from iap.research import power_real
+
+    doc = power_real.run_real_power_study(
+        args.dataset_dir,
+        levels=_numbers(args.levels, "--levels", float),
+        break_levels=_numbers(args.break_levels, "--break-levels", float),
+        n_seeds=args.seeds,
+        sessions=_numbers(args.sessions, "--sessions", int) if args.sessions else None,
+        gate_looks=args.gate_looks,
+        progress=lambda line: print(line, file=sys.stderr, flush=True),
+    )
+    out_dir = args.power_out_dir or args.dataset_dir / "research" / "power"
+    paths = power_real.write_reports(doc, out_dir)
+    print(power_real.render_markdown(doc))
+    print(f"wrote {paths['md']} and {paths['json']}", file=sys.stderr)
+    return 0
+
+
 def _combine(args: argparse.Namespace) -> int:
     from iap.combine import report as combine_report
     from iap.combine.weights import METHODS as COMBINATION_METHODS
@@ -565,6 +584,25 @@ def _parser() -> argparse.ArgumentParser:
         help="where POWER_REPORT.{md,json} are written",
     )
     power.set_defaults(func=_power)
+
+    preal = sub.add_parser(
+        "power-real", help="planted-signal power study on an ingested real dataset"
+    )
+    preal.add_argument("--dataset-dir", type=Path, required=True)
+    preal.add_argument(
+        "--levels", default="0,0.005,0.01,0.02,0.04", help="planted ICs (comma-separated)"
+    )
+    preal.add_argument("--break-levels", default="0.02", help="planted ICs of the break scenario")
+    preal.add_argument("--seeds", type=int, default=20, help="shifted-background seeds")
+    preal.add_argument("--sessions", default=None, help="session grid (default 2,4,..,all)")
+    preal.add_argument("--gate-looks", type=int, default=None)
+    preal.add_argument(
+        "--power-out-dir",
+        type=Path,
+        default=None,
+        help="default <dataset-dir>/research/power (git-ignored with the data)",
+    )
+    preal.set_defaults(func=_power_real)
 
     combine = sub.add_parser("combine", help="signal combination report")
     combine.add_argument(
