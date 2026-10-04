@@ -217,6 +217,8 @@ python/src/iap/execution/
   config.py     SorOptions, ExecConfig, load_venues / load_instruments / load_sor_options / load_exec_config
   simulator.py  ExecutionSimulator — the nine pinned rules
   algos.py      AlgoType, ParentOrder, slice_weights / slice_quantities / slice_times
+  passive.py    ExecPolicy (NATIVE=0 PASSIVE=1 AGGRESSIVE=2), PassiveParams, PassiveStats,
+                patience_ns / post_price / max_behind_qty — the execution policies of §2.5
   sor.py        NO_ROUTE = 0, SmartOrderRouter.route_aggressive / route_passive
   replay.py     ParentReport, ExecReplayResult, ExecutionReplay
 ```
@@ -372,6 +374,87 @@ event if the book applied it, the overlay reset, the post-apply crossing
 check.
 
 ---
+
+### 2.5 Execution policies: NATIVE, PASSIVE, AGGRESSIVE (v1.5.0)
+
+`ParentOrder.policy` (C++ `ExecPolicy`, Java `ExecPolicy`, Python
+`iap.execution.ExecPolicy`) selects how a parent's children are sent. The
+schedules (§11.3: slice times, quantities, POV target) never change; the
+simulator rules (§2.3, the nine rules) are untouched — a policy only decides
+which LIMIT / MARKET orders the replay scheduler submits and cancels.
+
+| policy | children |
+|---|---|
+| `NATIVE` (`"native"`, **default**) | the behaviour before v1.5.0, unchanged: TWAP / VWAP join the same-side best as a LIMIT and wait until they fill or expire with the window; POV / IS send MARKET orders |
+| `AGGRESSIVE` (`"aggressive"`) | every child is a MARKET order, whatever the algo |
+| `PASSIVE` (`"passive"`) | every schedule step runs the state machine below |
+
+PASSIVE state machine, per posted child, evaluated after every market event
+against the post-event books (C++ reference: `algos.hpp` "EXECUTION
+POLICIES", `ExecutionReplay::work_passive`):
+
+- **POST** — the step's quantity (split at `max_child_qty`) is posted as a
+  LIMIT at `post_price`: the same-side best of the routed venue, improved by
+  ONE tick when the venue's spread is `>= improve_min_spread_ticks`, then
+  clamped so it never reaches the opposite touch (buy `<= best_ask - 1`, sell
+  `>= best_bid + 1`). No same-side quote, zero patience, or `t >= end_ts -
+  end_margin_ns` ⇒ the child is a MARKET order instead (`crosses_immediate`).
+  The rule is evaluated at decision time; there is no post-only order type,
+  so a limit the market moved through while the order was in flight executes
+  as a taker up to its limit (rule 3).
+- **REST** — until `deadline = min(decision_ts + patience_ns, end_ts -
+  end_margin_ns)` or until the schedule is BEHIND.
+  `patience_ns = floor(max_rest_ns * (1 - urgency) * k)`, `urgency` clamped to
+  `[0, 1]`, `k = exp(-risk_aversion)` for IS and 1 otherwise — the parent's
+  urgency and the IS risk aversion decide the patience.
+  `backlog(t) = scheduled(t) - filled(t) - q_cur`, `scheduled` = the slice
+  quantities that have come due (`q_cur` = the most recent of them) or
+  `min(floor(participation * V(t)), qty)` for POV (`q_cur = 0`); BEHIND when
+  `backlog(t) > floor(max_behind_fraction * qty)`.
+- **REPRICE** — at the deadline while `reprices < max_reprices` and not
+  behind: an unchanged `post_price` keeps the queue position and renews the
+  deadline (`rest_extensions`); otherwise cancel and, once the cancel has
+  taken effect, post the unfilled remainder at the new price (`reprices`).
+- **CROSS** — at the deadline with no reprice left (`crosses_timeout`) or as
+  soon as the schedule is behind (`crosses_behind`): cancel and, once the
+  cancel has taken effect, send the unfilled remainder as a MARKET order.
+
+A cancel travels the latency path (rule 7), so a child can fill while its
+cancel is in flight; only the quantity actually cancelled is re-sent, and
+nothing is re-sent at or after `end_ts`. Maker fills receive the venue's
+rebate and taker fills pay its fee exactly as rule 5 defines; no rule of the
+simulator was changed, so the v1.3.0 over-fill fixes hold for posted orders
+as they do for any LIMIT. `PassiveParams` defaults: `max_rest_ns` 30 s,
+`max_reprices` 1, `max_behind_fraction` 0.1, `improve_min_spread_ticks` 3,
+`end_margin_ns` 1 s; `ParentOrder.urgency` defaults to 0.5.
+`ExecReplayResult.passive` reports the six transition counters per PASSIVE
+parent; the Python result also carries every child in its final state
+(`children`), including `ChildOrder.entry_ahead_qty` — the queue ahead of the
+order when it came to rest, recorded by all three simulators.
+
+**No default changed.** NATIVE stays the default for every algo: the
+measured saving of PASSIVE (`research/execution/EXECUTION_REPORT.md`) rests
+partly on queue-model assumptions a real venue would not honour, and a
+default change would move `expected_replay_fills.json` and the MVP golden for
+a result that has not been checked against real fills.
+
+Golden: `tests/golden/expected_replay_fills_passive.json` (x-version 1) —
+`events_eq_mbo.jsonl` worked by VWAP BUY 400 PASSIVE (urgency 0.5), IS SELL
+600 PASSIVE (urgency 0.2), POV BUY 300 PASSIVE (urgency 0, SOR-routed) and
+TWAP SELL 200 AGGRESSIVE: a fill list of 30 rows and every transition counter. Generated by
+`python/tools/make_golden_replay_passive.py` in the bytes of the C++
+generator (`make_replay_fills_golden <dir> passive`); the C++ test
+`ReplayFillsPassiveGolden.GeneratorReproducesBothFilesByteForByte` renders
+that file AND `expected_replay_fills.json` and compares bytes; Java
+`ReplayFillsPassiveGoldenTest` and Python `test_passive_policy.py` reproduce
+every fill (ticks / qty / ts exact, fee / impact at 1e-9).
+
+The MVP takes the policy as the optional keys `execution.child_policy` /
+`execution.passive` of `mvp.json` (absent = NATIVE: the pinned golden run);
+there every replacement child passes routing, the latency-budget and
+participation controls and the risk check, and is exempt only from the
+slice-interval control (docs/MVP.md §3). The Java `BacktestEngine` /
+`PaperTrading` loop keeps its NATIVE child style.
 
 ## 3. Where the rules live
 

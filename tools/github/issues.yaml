@@ -2001,6 +2001,33 @@ issues:
       - "python/tests/test_execution_golden.py (expected_replay_fills.json bit-identical); python/tests/test_execution_rules.py; python/tests/test_exec_algos.py; python/tests/test_sor.py"
       - "API_TRADING.md"
 
+  - key: X10
+    epic: E11
+    title: "Execution policies: NATIVE / AGGRESSIVE / PASSIVE (post, rest, reprice, cross) in C++, Java and Python"
+    labels: [type:feature, area:execution, phase:w5, priority:p1, lang:cpp, lang:java, lang:python]
+    milestone: "Week 5"
+    status: done
+    estimate_days: 4
+    context: >
+      Every alpha loses after costs and most of the cost is the half-spread a
+      MARKET child pays. ParentOrder.policy selects the child style: NATIVE
+      (default, the pre-existing behaviour), AGGRESSIVE (every child MARKET)
+      or PASSIVE — post at the near touch (one tick inside when the spread
+      allows, never at or through the opposite touch), rest for a patience set
+      by the parent's urgency and the IS risk aversion or until the schedule is
+      behind, reprice once, cross the cancelled remainder. The simulator rules
+      are untouched; the policy stays opt-in because part of its measured
+      saving is queue-model optimism (research/execution/EXECUTION_REPORT.md).
+    acceptance:
+      - "C++, Java and Python produce identical fills for the policy golden; expected_replay_fills.json is byte-identical"
+      - "A posted limit is never at or through the opposite touch; a cancelled remainder is never sent twice"
+      - "The same parents are compared under each policy with unfilled quantity priced, and the simulator assumptions are stated"
+    evidence:
+      - "cpp/include/iap/execution/algos.hpp; cpp/src/replay/exec_replay.cpp; cpp/tests/test_replay_fills_passive.cpp"
+      - "java/src/main/java/com/iap/execution/PassivePolicy.java; java/src/test/java/com/iap/ReplayFillsPassiveGoldenTest.java; java/src/test/java/com/iap/PassivePolicyTest.java"
+      - "python/src/iap/execution/passive.py; python/tests/test_passive_policy.py; tests/golden/expected_replay_fills_passive.json"
+      - "research/execution/run_execution_study.py; research/execution/EXECUTION_REPORT.md"
+
   - key: X08
     epic: E11
     title: "PEG and MID order types in the execution simulator"
@@ -2172,6 +2199,31 @@ issues:
       - "python -m iap.tca regenerates the report byte-for-byte"
     evidence:
       - "python/src/iap/tca/{simulator,report,__main__}.py; research/tca/TCA_REPORT.md; research/tca/tca_orders.json"
+
+  - key: T06
+    epic: E13
+    title: "Markout analysis: multi-horizon markouts, realised vs effective spread, adverse selection, passive fill rates"
+    labels: [type:feature, area:tca, phase:w6, priority:p1, lang:python, lang:java]
+    milestone: "Week 6"
+    status: done
+    estimate_days: 3
+    context: >
+      iap.tca.markout (Java com.iap.tca.Markout): per fill, the signed move of
+      the mid at or before fill_ts + h for a configurable horizon set (default
+      100 ms .. 5 min), in bps and currency; effective half-spread = realised
+      half-spread + price impact; adverse selection on passive fills; splits
+      by liquidity, venue, algo, side and time bucket with counts and standard
+      errors; fill rate and time to fill of passive orders by queue position
+      at entry. The markout cells are split by venue and algo; the Perold
+      IS / spread / impact tables per venue and algo of T05 are not part of it.
+    acceptance:
+      - "A markout past the end of the data, before the first quote or across a halt / auction / quote gap is null, never zero"
+      - "A cell with too few defined fills reports its count and null statistics"
+      - "Java reproduces expected_markout.json at 1e-9 with exact nulls"
+    evidence:
+      - "python/src/iap/tca/markout.py; python/tests/test_markout.py; python/tools/make_golden_markout.py"
+      - "java/src/main/java/com/iap/tca/Markout.java; java/src/test/java/com/iap/MarkoutGoldenTest.java"
+      - "tests/golden/expected_markout.json; API_PORTFOLIO_TCA.md section 2.9"
 
   - key: T05
     epic: E13

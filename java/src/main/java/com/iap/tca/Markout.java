@@ -9,7 +9,7 @@ import java.util.function.Function;
 
 /**
  * Markout analysis — what the mid did after each fill (API_PORTFOLIO_TCA.md
- * §2.7). Port of the Python reference {@code iap.tca.markout};
+ * §2.9). Port of the Python reference {@code iap.tca.markout};
  * {@code tests/golden/expected_markout.json} pins both (1e-9, nulls exact).
  *
  * <p>With side sign {@code s} (+1 buy / -1 sell), fill price {@code p},

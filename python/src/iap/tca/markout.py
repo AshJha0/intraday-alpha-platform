@@ -1,4 +1,4 @@
-"""Markout analysis: what the mid did after each fill (API_PORTFOLIO_TCA.md §2.7).
+"""Markout analysis: what the mid did after each fill (API_PORTFOLIO_TCA.md §2.9).
 
 Reference implementation; ``com.iap.tca.Markout`` is the Java port and
 ``tests/golden/expected_markout.json`` pins both (1e-9, nulls exact).

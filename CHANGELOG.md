@@ -146,6 +146,45 @@ Also changed:
 - Lifecycle golden scenarios LC04 (what the CUSUM rule changes) and LG01
   (the legacy policy); the backtest golden's `default_rules` block.
 
+### Added — execution quality
+
+Costs are what kill every alpha here, so this release adds a way to pay
+fewer of them and a way to measure whether it worked. No default changed.
+
+- **Execution policies** (C++ reference, Java and Python ports, identical
+  fills): `ParentOrder.policy` = `NATIVE` (default, the existing child
+  styles under an explicit name), `AGGRESSIVE` (every child MARKET) or
+  `PASSIVE` — POST at the near touch (one tick inside when the spread is at
+  least three ticks, never at or through the opposite touch) → REST for
+  `floor(max_rest_ns × (1 − urgency) × (e^−risk_aversion for IS))` ns or
+  until the schedule is more than `max_behind_fraction` of the order behind
+  → REPRICE once → CROSS the cancelled remainder. The simulator's nine rules
+  are untouched. New golden `tests/golden/expected_replay_fills_passive.json`
+  (written by the Python port in the bytes of the C++ generator; the C++ test
+  re-renders both replay goldens byte for byte);
+  `expected_replay_fills.json` is byte-identical.
+- **Markout analysis** (`iap.tca.markout`, Java `com.iap.tca.Markout`):
+  per fill, the signed move of the mid at or before `fill_ts + h` for
+  100 ms / 1 s / 5 s / 30 s / 60 s / 5 min (configurable), in bps and
+  currency; `effective half-spread = realised half-spread + price impact`;
+  adverse selection on passive fills; splits by liquidity, venue, algo, side
+  and time bucket with counts and standard errors; `null` — never zero — past
+  the end of the data, before the first quote, across a halt / auction /
+  quote gap, and for a cell with too few fills. Passive-order fill rate and
+  time to fill, overall and by queue position at entry
+  (`ChildOrder.entry_ahead_qty`, now recorded by all three simulators).
+  Golden `tests/golden/expected_markout.json`.
+- **Evidence** (`research/execution/EXECUTION_REPORT.md`, step `execution`
+  of `tools/regenerate_dataset_artifacts.py`): the same 836 parent orders on
+  the bundled equities under each policy, with the unfilled quantity priced
+  at the arrival-to-end move plus the cost of completing it; and the MVP
+  session per child policy (`execution.child_policy`, an optional key of
+  `mvp.json`; the pinned run is unchanged). The report's last section says
+  which part of the result is a simulator assumption.
+- Docs: API_TRADING.md §2.5, API_PORTFOLIO_TCA.md §2.9,
+  PLATFORM_CONVENTIONS.md §11.3 / §14.5, docs/HOW_IT_WORKS.md §3.5,
+  LEARN.md §30, COOKBOOK.md recipe 36.
+
 ### Results
 
 Same dataset, new rules. Nothing is promoted, before or after.

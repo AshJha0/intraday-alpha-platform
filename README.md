@@ -407,10 +407,10 @@ python3 tools/github/create_issues.py --dry-run   # the epics/issues plan (docs/
 ===================== cross-language parity table =====================
 language | tests passed | golden passed  | time   | status
 ---------+--------------+----------------+--------+-------
-python   | 1672         | 173            |    -s | PASS
-cpp      | 289          | 68             |    -s | PASS
+python   | 1752         | 180            |    -s | PASS
+cpp      | 302          | 72             |    -s | PASS
 rust     | 330          | 66             |    -s | PASS
-java     | 517          | 106            |    -s | PASS
+java     | 535          | 115            |    -s | PASS
 integration | 35           | -              |    -s | PASS
 replay   | 6            | -              |    -s | PASS
 deployment | -            | -              |    -s | PASS
@@ -451,7 +451,7 @@ float reprs incl. 612 rounding-tie and 17-digit cases, 24 escapes, 9 documents),
 pinned instance per contract with the `explain()` block, the 7-state
 lifecycle scenarios and the registry bytes, the experiment golden frame and
 the MVP session — all against `tests/golden/`. The Java golden column runs
-**all thirteen** `com.iap.*GoldenTest` classes and the Rust column nine
+**all fifteen** `com.iap.*GoldenTest` classes and the Rust column nine
 golden targets; a harness case fails if either gate list ever drifts from
 the files on disk. Python's golden group now includes the risk and fills
 goldens that Rust and C++ generate, consumed by `iap.risk` and
@@ -489,7 +489,7 @@ golden tests — the engineering discipline this repo is built around
 |---|---|
 | [LEARN.md](LEARN.md) | textbook walkthrough: microstructure, generator, book, features, honest alpha research, ML/meta-labeling, portfolio, risk, execution, TCA, parity, latency economics, adaptability, contracts & Protocols, the Python risk/execution reference, the 7-state lifecycle, the decision trace, the data model, the MVP walkthrough with its honest numbers, the v1.3.0 review as six case-study chapters (fail-closed risk bugs, simulator realism, statistical power, gate gaming, crash consistency, supply-chain hygiene), pitfalls, interview Q&A |
 | [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) | how the quant, algo and AI sides work — a guided explanation for a newcomer: the pipeline on one page, the research statistics and gates, the execution algorithms and simulator rules, the fail-closed risk engine, the ML layer with its negative results, the LLM/agent boundary (what exists, what is backlog, what would be theatre on this data), determinism and replay; every section ends with where to look and a command that runs |
-| [COOKBOOK.md](COOKBOOK.md) | 35 task-oriented recipes with runnable commands |
+| [COOKBOOK.md](COOKBOOK.md) | 36 task-oriented recipes with runnable commands |
 | [docs/RESEARCH_VALIDITY.md](docs/RESEARCH_VALIDITY.md) + [research/power/POWER_REPORT.md](research/power/POWER_REPORT.md) | the corrected research methods (the defaults since v1.5.0, each with its named legacy rule), the research store under parallel writers, gate eligibility; the planted-signal power study of the validation chain |
 | [CHANGELOG.md](CHANGELOG.md) | release notes, newest first (v1.5.0: the corrected research methods become the defaults, every old rule keeps a legacy name, every dataset-derived artefact regenerated; v1.4.0: the generator's equity flow calibration fixed so flow reaches the close, and every dataset-derived artefact regenerated; v1.3.0: fail-closed risk, simulator fill rules, paper-platform safety, governance and deployment hardening, research validity) |
 | [docs/MVP.md](docs/MVP.md) | the executable MVP (`python -m iap.mvp run / replay / verify / explain`): one deterministic, fully traced trading loop on a synthetic equity — the loop module by module, the §11.4 wiring rules with code references, the determinism contract, the incident replay flow, the honest golden-run results (cost-negative) with the realized-IC audit, and the success-criteria table |

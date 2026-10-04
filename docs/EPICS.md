@@ -16,8 +16,8 @@ planned paths of the current release, **backlog** says what would prove it done.
 | | count | estimate (days) |
 |---|---:|---:|
 | epics | 31 | |
-| issues | 155 | 511 |
-| issues `done` | 98 | 232.5 |
+| issues | 157 | 518 |
+| issues `done` | 100 | 239.5 |
 | issues `in-progress` | 0 | 0 |
 | issues `backlog` | 57 | 278.5 |
 
@@ -30,8 +30,8 @@ planned paths of the current release, **backlog** says what would prove it done.
 | Week 2 | 2 | 10 | 10 | 0 | 0 |
 | Week 3 | 2 | 14 | 14 | 0 | 0 |
 | Week 4 | 2 | 10 | 10 | 0 | 0 |
-| Week 5 | 2 | 10 | 10 | 0 | 0 |
-| Week 6 | 7 | 24 | 24 | 0 | 0 |
+| Week 5 | 2 | 11 | 11 | 0 | 0 |
+| Week 6 | 7 | 25 | 25 | 0 | 0 |
 | Phase 2 | 3 | 9 | 7 | 0 | 2 |
 | Phase 3 | 2 | 9 | 1 | 0 | 8 |
 | Backlog | 7 | 48 | 1 | 0 | 47 |
@@ -51,9 +51,9 @@ the epic's (a backlog item under a finished epic sits in **Backlog**).
 - [E08 — Research framework — validation, ledger, ExperimentRunner](#e08--research-framework--validation-ledger-experimentrunner) · Week 3 · partial · 9 issues
 - [E09 — Portfolio construction](#e09--portfolio-construction) · Week 4 · done · 4 issues
 - [E10 — Hard risk engine (fail-closed)](#e10--hard-risk-engine-fail-closed) · Week 4 · done · 6 issues
-- [E11 — Execution algorithms, SOR and execution simulator](#e11--execution-algorithms-sor-and-execution-simulator) · Week 5 · partial · 9 issues
+- [E11 — Execution algorithms, SOR and execution simulator](#e11--execution-algorithms-sor-and-execution-simulator) · Week 5 · partial · 10 issues
 - [E12 — Performance architecture](#e12--performance-architecture) · Week 5 · partial · 4 issues
-- [E13 — Transaction-cost analysis](#e13--transaction-cost-analysis) · Week 6 · partial · 5 issues
+- [E13 — Transaction-cost analysis](#e13--transaction-cost-analysis) · Week 6 · partial · 6 issues
 - [E14 — Cross-language parity (golden tests Python == C++ == Rust == Java)](#e14--cross-language-parity-golden-tests-python--c--rust--java) · Week 6 · done · 4 issues
 - [E15 — Alpha promotion lifecycle](#e15--alpha-promotion-lifecycle) · Week 6 · partial · 5 issues
 - [E16 — Observability and the decision trace](#e16--observability-and-the-decision-trace) · Week 6 · partial · 6 issues
@@ -352,7 +352,7 @@ Execution algorithms (TWAP/VWAP/POV/IS), smart order routing with venue scoring,
 
 ### E11 — Execution algorithms, SOR and execution simulator
 
-**Status:** partial · **Milestone:** Week 5 · **Issues:** 9 (done 7, in-progress 0, backlog 2) · **Estimate:** 28 days · **Labels:** `type:epic`, `area:execution`, `phase:w5`, `priority:p0`, `status:partial`
+**Status:** partial · **Milestone:** Week 5 · **Issues:** 10 (done 8, in-progress 0, backlog 2) · **Estimate:** 32 days · **Labels:** `type:epic`, `area:execution`, `phase:w5`, `priority:p0`, `status:partial`
 
 Parent-order algorithms (TWAP/VWAP/POV/IS) sliced into children with time-in-force, a deterministic smart order router with a pinned venue scoring ladder, and an event-driven execution simulator with seeded latency, queue position, partial fills, cancels and a venue trading-state gate — C++ is the reference, Java the port, Python the port in progress.
 
@@ -375,6 +375,7 @@ Parent-order algorithms (TWAP/VWAP/POV/IS) sliced into children with time-in-for
 | X05 | Java execution simulator and SOR port with the C++-generated fills golden, plus enforced execution controls | done | 4 | Week 5 | `java/src/main/java/com/iap/execution/ExecutionSimulator.java; java ReplayFillsGoldenTest; tests/golden/expected_replay_fills.json`<br>`java/src/main/java/com/iap/platform/PaperTrading.java (controls); java PaperTradingSmokeTest; PLATFORM_CONVENTIONS.md §11.4` |
 | X06 | Rust venue layer: IAPV1 order/report framing and the simulated venue endpoint | done | 2 | Week 5 | `rust/venue/src/{codec,messages,sim}.rs; rust/venue/tests/{codec_roundtrip,sim_venue,scenario_venue_gating}.rs` |
 | X07 | Python execution port (iap.execution): simulator, algos and SOR against the same goldens | done | 5 | Week 5 | `python/src/iap/execution/{types,config,simulator,algos,sor,replay}.py`<br>`python/tests/test_execution_golden.py (expected_replay_fills.json bit-identical); python/tests/test_execution_rules.py; python/tests/test_exec_algos.py; python/tests/test_sor.py`<br>`API_TRADING.md` |
+| X10 | Execution policies: NATIVE / AGGRESSIVE / PASSIVE (post, rest, reprice, cross) in C++, Java and Python | done | 4 | Week 5 | `cpp/include/iap/execution/algos.hpp; cpp/src/replay/exec_replay.cpp; cpp/tests/test_replay_fills_passive.cpp`<br>`java/src/main/java/com/iap/execution/PassivePolicy.java; java/src/test/java/com/iap/ReplayFillsPassiveGoldenTest.java; java/src/test/java/com/iap/PassivePolicyTest.java`<br>`python/src/iap/execution/passive.py; python/tests/test_passive_policy.py; tests/golden/expected_replay_fills_passive.json`<br>`research/execution/run_execution_study.py; research/execution/EXECUTION_REPORT.md` |
 | X08 | PEG and MID order types in the execution simulator | backlog | 3 | Backlog | `schemas/order/order_request.schema.json (order_type enum); cpp/include/iap/execution/execution.hpp (rule 9 note)` |
 | X09 | Closed-form Almgren-Chriss IS trajectory as an alternative to the front-loaded exponential | backlog | 2 | Backlog | `cpp/include/iap/execution/algos.hpp; README.md References [6]` |
 
@@ -406,7 +407,7 @@ TCA, cross-language parity, the alpha promotion lifecycle, decision trace, the S
 
 ### E13 — Transaction-cost analysis
 
-**Status:** partial · **Milestone:** Week 6 · **Issues:** 5 (done 4, in-progress 0, backlog 1) · **Estimate:** 9 days · **Labels:** `type:epic`, `area:tca`, `phase:w6`, `priority:p1`, `status:partial`
+**Status:** partial · **Milestone:** Week 6 · **Issues:** 6 (done 5, in-progress 0, backlog 1) · **Estimate:** 12 days · **Labels:** `type:epic`, `area:tca`, `phase:w6`, `priority:p1`, `status:partial`
 
 Parent-order TCA against arrival, interval VWAP and TWAP; Perold implementation shortfall decomposed exactly into delay, trading and opportunity; spread, impact, fees, fill rate and adverse-selection markouts; a Java service matched at 1e-9 and a deterministic report.
 
@@ -426,6 +427,7 @@ Parent-order TCA against arrival, interval VWAP and TWAP; Perold implementation 
 | T02 | Spread and impact cost, fees, fill rate, adverse-selection markouts and impact regression | done | 2 | Week 6 | `python/src/iap/tca/tca.py (spread_and_impact_cost, adverse_selection_with_counts, impact_regression); API_PORTFOLIO_TCA.md §2.4-2.5` |
 | T03 | Java TcaService port with expected_tca.json golden (incl. timeline cases) | done | 2 | Week 6 | `java/src/main/java/com/iap/tca/{Tca,TcaService,TcaParentOrder,TcaFill,MarketTimeline}.java; java TcaGoldenTest, TcaMetricsTest`<br>`tests/golden/expected_tca.json; python/tools/make_golden_tca.py; python/tests/test_tca_golden.py` |
 | T04 | Simulated parent-order TCA report (research/tca/TCA_REPORT.md) | done | 1 | Week 6 | `python/src/iap/tca/{simulator,report,__main__}.py; research/tca/TCA_REPORT.md; research/tca/tca_orders.json` |
+| T06 | Markout analysis: multi-horizon markouts, realised vs effective spread, adverse selection, passive fill rates | done | 3 | Week 6 | `python/src/iap/tca/markout.py; python/tests/test_markout.py; python/tools/make_golden_markout.py`<br>`java/src/main/java/com/iap/tca/Markout.java; java/src/test/java/com/iap/MarkoutGoldenTest.java`<br>`tests/golden/expected_markout.json; API_PORTFOLIO_TCA.md section 2.9` |
 | T05 | Venue and algorithm contribution attribution in TCA | backlog | 2 | Backlog | `research/tca/TCA_REPORT.md (no venue/algo tables today); python/src/iap/tca/report.py` |
 
 ### E14 — Cross-language parity (golden tests Python == C++ == Rust == Java)

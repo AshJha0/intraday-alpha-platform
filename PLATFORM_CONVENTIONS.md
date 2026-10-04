@@ -240,6 +240,14 @@ test suite has a `golden` test group (python `-k golden`, cpp `-R Golden`, rust 
 all four and prints a parity table. Regeneration is a deliberate, versioned act
 (CONTRIBUTING.md §4): every generator refuses to overwrite without `--force`.
 
+Added with the execution-quality work (v1.5.0): `expected_replay_fills_passive.json` (x-version 1: the
+execution-policy golden — PASSIVE and AGGRESSIVE parents on the EQ vector, a fill list of 30 rows and the
+state-machine transition counters; written by `python/tools/make_golden_replay_passive.py` in the
+bytes of the C++ generator, reproduced by C++, Java and Python) and `expected_markout.json`
+(x-version 1: markouts, the effective = realised + impact decomposition and the passive-order
+statistics, 1e-9 with exact nulls; Python generates, Java consumes). `expected_replay_fills.json`
+is byte-identical to v1.4.0.
+
 ## 6. Feature factory rules
 
 - Registry `data/reference/feature_registry.json`: every feature has `name`, `family`, `version`,
@@ -443,7 +451,9 @@ while the venue book is missing, stale or not TRADING (MARKET/IOC/FOK → `VENUE
 LIMIT rests), reopen fills crossed resting orders at the touch; (9) processing order: expiries,
 activations+cancel arrivals by time, passive tracking, book update, overlay reset, crossing
 check. The simulator has no PEG/MID order types (documented optimism) in any of the three
-languages; the risk engine tracks them, simulator callers must not submit them.
+languages; the risk engine tracks them, simulator callers must not submit them. Since v1.5.0
+every `ChildOrder` also records `entry_ahead_qty` — `ahead_qty` at the moment it came to rest,
+never updated afterwards — a read-only diagnostic for the markout analysis (no rule reads it).
 
 ### 11.3 SOR and algos
 
@@ -457,6 +467,18 @@ languages; the risk engine tracks them, simulator callers must not submit them.
 - TWAP/VWAP/IS/POV: a slice larger than `max_child_qty` is split into ⌈slice / max⌉ children;
   every child carries `expire_ts = parent.end_ts`, so no child outlives its window; POV deficit
   is measured against filled + in-flight qty; a fill outside `[arrival_ts, end_ts]` is an error.
+
+- Execution policy (v1.5.0, `ParentOrder.policy`; API_TRADING.md §2.5): `NATIVE` (default) is
+  the child style above and is the only one the pre-existing goldens exercise; `AGGRESSIVE`
+  sends every child as MARKET; `PASSIVE` runs POST → REST → REPRICE / CROSS — post at the near
+  touch (one tick inside when the spread is `>= improve_min_spread_ticks`, never at or through
+  the opposite touch), rest for `floor(max_rest_ns × (1 − urgency) × (e^−risk_aversion for IS))`
+  ns or until `scheduled − filled − q_cur > floor(max_behind_fraction × qty)`, reprice at most
+  `max_reprices` times, then cancel and send the cancelled remainder as MARKET. Per event and
+  PASSIVE parent the scheduler runs schedule state → state machine of the posted children in
+  posting order → new steps. The policy submits and cancels ordinary LIMIT / MARKET orders:
+  rules 1–9 are unchanged and apply to them as to any other child. Pinned by
+  `tests/golden/expected_replay_fills_passive.json` in C++, Java and Python.
 
 ### 11.4 Backtest / paper-trading wiring (Java `BacktestEngine`, `PaperTrading.RiskWiring`)
 
@@ -1201,6 +1223,20 @@ a reminder that parity proves agreement, not correctness.
   (`cpp/include/iap/util/data_paths.hpp`). A build-tree path used at runtime
   inside a container that carries the data but not the build tree is how the
   `images` CI job crashed on startup.
+
+### 14.5 Execution policies sit above the simulator rules (v1.5.0)
+
+The PASSIVE policy (§11.3) was added without touching §14.1: it lives in the replay scheduler
+and can only do what any caller of the simulator can do — submit a LIMIT, request a cancel that
+travels the latency path, submit a MARKET. Three consequences are pinned and tested in all
+three languages: a posted order's fills are bounded by the observed traded volume and its own
+queue position exactly as §14.1 states (an order posted one tick inside the spread starts with
+`ahead_qty` 0 and is still filled only by volume that traded at or through its limit); the
+remainder that is re-sent after a cancel is the quantity the simulator actually cancelled, so
+a fill that beat the cancel is never sent again; and a posting price is never at or through
+the opposite touch of the book it was decided on. What §14.1 cannot give a resting order is
+the market's reaction to it — the replayed book never sees our quote — and
+`research/execution/EXECUTION_REPORT.md` §6 says which part of the measured saving that is.
 
 ## 15. Pinned semantics corrected on 2026-10-03 (v1.3.0 review)
 
