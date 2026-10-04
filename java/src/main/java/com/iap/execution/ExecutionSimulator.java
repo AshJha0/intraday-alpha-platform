@@ -259,6 +259,7 @@ public final class ExecutionSimulator {
                 + v.latencyMeanNs() + jitter;
         o.state = OrderState.PENDING;
         o.remaining = o.qty;
+        o.entryAheadQty = 0;
         o.cancelReason = CancelReason.NONE;
         o.cancelArrivalTs = 0;
         long id = o.orderId;
@@ -470,6 +471,7 @@ public final class ExecutionSimulator {
                         o.aheadQty += ahead.remaining;
                     }
                 }
+                o.entryAheadQty = o.aheadQty;
                 // Crossing exemption: the display may still show the
                 // liquidity our aggressive leg just consumed (rule 4). While
                 // gated (rule 8) nothing was consumed: no exemption.

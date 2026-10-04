@@ -25,6 +25,8 @@ import org.junit.runners.Suite;
     ExecutionSimTest.class,
     AlgosTest.class,
     ReplayFillsGoldenTest.class,
+    ReplayFillsPassiveGoldenTest.class,
+    PassivePolicyTest.class,
     BacktestTest.class,
     PortfolioGoldenTest.class,
     PortfolioSolverTest.class,

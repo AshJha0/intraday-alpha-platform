@@ -24,6 +24,9 @@ public final class ChildOrder {
     // Qty ahead of us in the FIFO queue at our level: the displayed size at
     // rest time plus our own earlier children resting there (rule 4).
     public long aheadQty;
+    // aheadQty at the moment the order came to rest (never updated
+    // afterwards; 0 for an order that never rested).
+    public long entryAheadQty;
     public boolean resting;
     public boolean crossExempt; // see the crossing-rule exemption (rule 4)
     public CancelReason cancelReason = CancelReason.NONE;
@@ -46,6 +49,7 @@ public final class ChildOrder {
         o.state = state;
         o.remaining = remaining;
         o.aheadQty = aheadQty;
+        o.entryAheadQty = entryAheadQty;
         o.resting = resting;
         o.crossExempt = crossExempt;
         o.cancelReason = cancelReason;

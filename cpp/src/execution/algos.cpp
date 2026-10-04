@@ -78,4 +78,59 @@ std::vector<std::int64_t> slice_times(const ParentOrder& parent) {
     return out;
 }
 
+void validate_passive_params(const PassiveParams& params) {
+    if (params.max_rest_ns < 0 || params.end_margin_ns < 0) {
+        throw std::invalid_argument(
+            "max_rest_ns and end_margin_ns must be >= 0");
+    }
+    if (params.max_reprices < 0) {
+        throw std::invalid_argument("max_reprices must be >= 0");
+    }
+    if (!(params.max_behind_fraction >= 0.0 &&
+          params.max_behind_fraction <= 1.0)) {
+        throw std::invalid_argument("max_behind_fraction must be in [0, 1]");
+    }
+    if (params.improve_min_spread_ticks < 0) {
+        throw std::invalid_argument("improve_min_spread_ticks must be >= 0");
+    }
+}
+
+std::int64_t patience_ns(const PassiveParams& params, double urgency,
+                         bool is_algo, double risk_aversion) {
+    const double u = std::min(std::max(urgency, 0.0), 1.0);
+    double x = static_cast<double>(params.max_rest_ns) * (1.0 - u);
+    if (is_algo) x *= std::exp(-risk_aversion);
+    return static_cast<std::int64_t>(std::floor(x));
+}
+
+std::optional<std::int64_t> post_price(
+    std::uint8_t side, const std::optional<LevelEntry>& best_bid,
+    const std::optional<LevelEntry>& best_ask,
+    std::int64_t improve_min_spread_ticks) {
+    const std::optional<LevelEntry>& own = side == 0 ? best_bid : best_ask;
+    if (!own.has_value()) return std::nullopt;
+    const std::optional<LevelEntry>& opp = side == 0 ? best_ask : best_bid;
+    std::int64_t price = own->first;
+    if (opp.has_value()) {
+        const std::int64_t spread =
+            side == 0 ? opp->first - own->first : own->first - opp->first;
+        if (improve_min_spread_ticks > 0 && spread >= improve_min_spread_ticks) {
+            price += side == 0 ? 1 : -1;
+        }
+        // Never post at or through the opposite touch.
+        if (side == 0 && price >= opp->first) {
+            price = opp->first - 1;
+        } else if (side == 1 && price <= opp->first) {
+            price = opp->first + 1;
+        }
+    }
+    if (price <= 0) return std::nullopt;
+    return price;
+}
+
+std::int64_t max_behind_qty(const PassiveParams& params, std::int64_t parent_qty) {
+    return static_cast<std::int64_t>(std::floor(
+        params.max_behind_fraction * static_cast<double>(parent_qty)));
+}
+
 }  // namespace iap
