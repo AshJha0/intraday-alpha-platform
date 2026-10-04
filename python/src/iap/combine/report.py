@@ -505,6 +505,8 @@ def run_combination(
     ledger_path: Path | None = None,
     frames: Mapping[int, pd.DataFrame] | None = None,
     progress: Callable[[str], None] | None = None,
+    dataset_version: str | None = None,
+    feature_version: str | None = None,
 ) -> dict[str, Any]:
     """Evaluate the combinations (module docs) and return the report
     document together with the full validation reports
@@ -532,8 +534,9 @@ def run_combination(
     exec_cfg = json.loads((configs_dir / "execution" / "execution.json").read_text())
     max_participation = float(exec_cfg["defaults"]["max_participation"])
     recompute = RecomputeSources(normalized_dir, configs_dir)
-    dataset_version = tracker.data_version(repo)
-    feature_version = tracker.feature_version(repo)
+    # an ingested dataset passes its own versions (research --dataset-dir)
+    dataset_version = dataset_version or tracker.data_version(repo)
+    feature_version = feature_version or tracker.feature_version(repo)
     embargo_ns = EMBARGO_S * 1_000_000_000
 
     plan: list[dict[str, Any]] = []

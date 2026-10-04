@@ -413,6 +413,12 @@ def _combine(args: argparse.Namespace) -> int:
             raise ResearchError("--members needs one --asset-class", code="invalid_spec")
         members = {classes[0]: [m for m in args.members.split(",") if m]}
     repo = args.repo_root if args.repo_root is not None else REPO
+    dataset_version, feature_version = _dataset_versions(args)
+    if args.dataset_dir is not None:
+        if args.normalized_dir is None:
+            args.normalized_dir = args.dataset_dir / "normalized"
+        if args.combine_out_dir == REPO / "research" / "combination":
+            args.combine_out_dir = args.dataset_dir / "research" / "combination"
     try:
         result = combine_report.run_combination(
             repo,
@@ -425,6 +431,8 @@ def _combine(args: argparse.Namespace) -> int:
             configs_dir=args.configs_dir,
             ledger_path=args.ledger,
             progress=lambda line: print(line, file=sys.stderr),
+            dataset_version=dataset_version,
+            feature_version=feature_version,
         )
     except ValueError as exc:
         raise ResearchError(str(exc), code="invalid_spec") from exc
@@ -631,6 +639,12 @@ def _parser() -> argparse.ArgumentParser:
     combine.add_argument("--ledger", type=Path, default=REPO / "research" / "experiments.json")
     combine.add_argument("--configs-dir", type=Path, default=REPO / "configs")
     combine.add_argument("--repo-root", type=Path, default=None)
+    combine.add_argument(
+        "--dataset-dir",
+        type=Path,
+        default=None,
+        help="run on an ingested dataset (docs/REAL_DATA.md); reports go under it",
+    )
     combine.add_argument(
         "--combine-out-dir",
         type=Path,

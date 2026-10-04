@@ -803,3 +803,30 @@ def test_real_lobster_sample_reconstructs_the_vendor_book(tmp_path):
     (report,) = session["book_verification"].values()
     assert report["status"] == "match" and report["rows_verified"] == session["messages"]["total"]
     assert session["book_check"]["dropped"] == 0
+
+
+def test_merging_single_day_datasets_equals_ingesting_them_together(tmp_path, capsys):
+    """``python -m iap.marketdata merge``: two one-session datasets merge into
+    the dataset that ingesting both sessions into one directory produces."""
+    d1, d2 = _day(tmp_path, 7, "d1.itch"), _day(tmp_path, 8, "d2.itch")
+    assert _ingest_cli(d1, D1, tmp_path / "a") == 0
+    assert _ingest_cli(d2, D2, tmp_path / "b") == 0
+    assert _ingest_cli(d1, D1, tmp_path / "seq") == 0
+    assert _ingest_cli(d2, D2, tmp_path / "seq") == 0
+    merged = tmp_path / "merged"
+    args = ["merge", str(tmp_path / "b"), str(tmp_path / "a"), "--out", str(merged)]
+    assert marketdata_main(args) == 0
+    capsys.readouterr()
+    skip = {"dataset.json", "normalized/qc_report.json", "normalized/events.parquet"}
+    seq = {k: v for k, v in _tree(tmp_path / "seq").items() if k not in skip}
+    got = {k: v for k, v in _tree(merged).items() if k not in skip}
+    assert got == seq
+    m, s = load_manifest(merged), load_manifest(tmp_path / "seq")
+    assert m["dataset_version"] == s["dataset_version"]
+    assert m["sessions"] == s["sessions"]
+    assert ReferenceData.load(merged / "configs").trading_days == [D1, D2]
+    # refusals: overlapping sessions, an occupied output
+    assert marketdata_main(["merge", str(tmp_path / "a"), str(tmp_path / "seq"), "--out",
+                            str(tmp_path / "x")]) == 1  # fmt: skip
+    assert marketdata_main(args) == 1
+    assert "session 2019-12-30 is in more than one input" in capsys.readouterr().err

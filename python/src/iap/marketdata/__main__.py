@@ -15,6 +15,10 @@ a given seed/config.
 
 ingests REAL historical files the owner obtained (``iap.marketdata.ingest``,
 docs/REAL_DATA.md) into a dataset directory of the same layout.
+
+    python3 -m iap.marketdata merge DATASET DATASET... --out DATASET
+
+combines ingested datasets of disjoint sessions into one multi-day dataset.
 """
 
 from __future__ import annotations
@@ -38,6 +42,10 @@ def main(argv=None) -> int:
         from iap.marketdata.ingest import main as ingest_main
 
         return ingest_main(args_in[1:])
+    if args_in[:1] == ["merge"]:
+        from iap.marketdata.ingest import merge_main
+
+        return merge_main(args_in[1:])
     parser = argparse.ArgumentParser(
         prog="python3 -m iap.marketdata",
         description="Generate synthetic raw market data and normalize it.",
