@@ -7,8 +7,10 @@
                                [--methods v2|legacy_v1]
     python -m iap.research list [--alpha EQ03] [--horizon 1s] [--json]
     python -m iap.research show <experiment_id> [--json]
-    python -m iap.research power [--levels 0,0.5,1,2] [--seeds 3]
-                               [--generator-config PATH] [--out-dir research/power]
+    python -m iap.research power [--levels 0,0.5,1,2] [--seeds 20]
+                               [--sessions 1,2,4,8] [--break-levels 1]
+                               [--gate-looks N] [--jobs N]
+                               [--generator-config PATH] [--power-out-dir research/power]
 
 ``run`` builds the spec (:func:`iap.research.build_spec`), runs it through
 :class:`iap.research.ExperimentRunner`, prints the result table, the
@@ -298,22 +300,29 @@ def _show(args: argparse.Namespace) -> int:
     return 0
 
 
+def _numbers(text: str, flag: str, cast) -> list:
+    try:
+        return [cast(v) for v in text.split(",") if v.strip()]
+    except ValueError:
+        raise ResearchError(
+            f"{flag} expects comma-separated numbers, got {text!r}",
+            code="power_study_error",
+        ) from None
+
+
 def _power(args: argparse.Namespace) -> int:
     from iap.research import power
 
-    try:
-        levels = [float(v) for v in args.levels.split(",") if v.strip()]
-    except ValueError:
-        raise ResearchError(
-            f"--levels expects comma-separated numbers, got {args.levels!r}",
-            code="power_study_error",
-        ) from None
     doc = power.run_power_study(
         args.generator_config,
         args.configs_dir,
-        levels=levels,
+        levels=_numbers(args.levels, "--levels", float),
         n_seeds=args.seeds,
-        progress=lambda line: print(line, file=sys.stderr),
+        sessions=_numbers(args.sessions, "--sessions", int) if args.sessions else None,
+        break_levels=_numbers(args.break_levels, "--break-levels", float),
+        gate_looks=args.gate_looks,
+        jobs=args.jobs if args.jobs else power.default_jobs(),
+        progress=lambda line: print(line, file=sys.stderr, flush=True),
     )
     paths = power.write_reports(doc, args.power_out_dir)
     print(power.render_markdown(doc))
@@ -423,7 +432,31 @@ def _parser() -> argparse.ArgumentParser:
         default="0,0.5,1,2",
         help="comma-separated multipliers of the reference effect (0 = null)",
     )
-    power.add_argument("--seeds", type=int, default=3, help="generator seeds per cell")
+    power.add_argument("--seeds", type=int, default=20, help="generator seeds per cell")
+    power.add_argument(
+        "--sessions",
+        default="",
+        help="comma-separated session counts to evaluate; the largest is generated "
+        "(default: 1,2,4,... up to the generator config's sessions)",
+    )
+    power.add_argument(
+        "--break-levels",
+        default="1",
+        help="comma-separated non-zero levels of the mid-sample break scenario",
+    )
+    power.add_argument(
+        "--gate-looks",
+        type=int,
+        default=None,
+        help="look count of the PROMOTE t threshold in force (default: ledger_looks "
+        "of the committed promotion reports under research/alpha_reports)",
+    )
+    power.add_argument(
+        "--jobs",
+        type=int,
+        default=0,
+        help="worker processes (0 = one per core, at most 8); the report does not depend on it",
+    )
     power.add_argument("--configs-dir", type=Path, default=REPO / "configs")
     power.add_argument(
         "--power-out-dir",

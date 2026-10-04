@@ -36,7 +36,10 @@
 #                                regenerate=true): runs
 #                                tools/regenerate_dataset_artifacts.py — the
 #                                dataset and every committed artefact derived
-#                                from it — and uploads the changed files, so
+#                                from it, or the steps named by the
+#                                regenerate_only input (e.g. power, which
+#                                needs no dataset) — and uploads the changed
+#                                files, so
 #                                the artefacts are produced in the environment
 #                                that verifies them
 #
@@ -54,6 +57,10 @@ on:
         description: "Also run the dataset-artefact regeneration and upload the changed files"
         type: boolean
         default: false
+      regenerate_only:
+        description: "Comma-separated steps of tools/regenerate_dataset_artifacts.py to run (empty = the whole chain), e.g. power"
+        type: string
+        default: ""
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -436,7 +443,15 @@ jobs:
           pip install -r python/requirements-ci.txt
           pip install xgboost==3.2.0 lightgbm==4.7.0
       - name: regenerate (dataset -> features -> research -> goldens)
-        run: python3 tools/regenerate_dataset_artifacts.py --timings-out regeneration_timings.json
+        env:
+          REGENERATE_ONLY: ${{ inputs.regenerate_only }}
+        run: |
+          if [ -n "$REGENERATE_ONLY" ]; then
+            python3 tools/regenerate_dataset_artifacts.py --only "$REGENERATE_ONLY" \
+              --timings-out regeneration_timings.json
+          else
+            python3 tools/regenerate_dataset_artifacts.py --timings-out regeneration_timings.json
+          fi
       - name: collect what changed
         run: |
           git status --short | tee regeneration_status.txt
@@ -448,8 +463,13 @@ jobs:
                  for p in sorted(list(pathlib.Path("data/raw").glob("*.jsonl")) + list(norm.glob("*.iap1")))}
           pathlib.Path("regeneration_dataset_sha256.json").write_text(json.dumps(out, indent=2) + "\n")
           PY
-          cp data/normalized/qc_report.json regeneration_qc_report.json
-          cp data/features/features_summary.json regeneration_features_summary.json
+          # a partial run (regenerate_only) may not have built the dataset
+          if [ -f data/normalized/qc_report.json ]; then
+            cp data/normalized/qc_report.json regeneration_qc_report.json
+          fi
+          if [ -f data/features/features_summary.json ]; then
+            cp data/features/features_summary.json regeneration_features_summary.json
+          fi
           # A regenerated step may also REMOVE a file (a baseline of an alpha
           # that left the adaptive subset): list those, do not tar them.
           git ls-files --deleted | tee regeneration_deleted.txt
