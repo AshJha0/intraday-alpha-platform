@@ -21,9 +21,34 @@
 //! `min_nw_tstat` and the evidence field is not read. The gate table (names,
 //! blocks, kinds, edges) is unchanged.
 //!
+//! **The net P&L bootstrap gate (v1.5.0).** `net_pnl_bootstrap_ci` sits on the
+//! CANDIDATE -> VALIDATING edge directly after `net_pnl_after_costs` and
+//! requires `ci_low > min_net_pnl_ci_low` (strict) for the interval in
+//! `evidence.pnl_bootstrap`. The metric is ABSENT — the gate fails with
+//! `value = null` — when the block is null, when the alpha made no trade
+//! (`n_trades == 0`), when the interval was taken at another level than
+//! `gates.net_pnl_ci_level` (exact comparison) or when it has no bounds.
+//! Under [`NetPnlCiGate::Absent`] — the legacy policy, which had no such gate
+//! — the machine does not evaluate it and it appears in no result
+//! ([`PolicyConfig::evaluated_gates`]); the transition table is the same
+//! under either policy.
+//!
+//! **The cross-alpha correlation gate (v1.5.0).** A new alpha must be
+//! additive: `cross_alpha_correlation` sits on the CANDIDATE -> VALIDATING
+//! edge (last) and requires `max |correlation| <= max_cross_alpha_correlation`
+//! over the ELIGIBLE peers of `evidence.cross_alpha` — those whose lifecycle
+//! state is at or beyond `cross_alpha_min_state` (config; one of VALIDATING /
+//! PAPER / ACTIVE) and is not RETIRED. The absolute value is taken (a mirror
+//! image adds nothing either); with no eligible peer the statistic is `0.0`
+//! and the gate passes vacuously; `max` is inclusive, so a correlation
+//! exactly at the threshold passes; an absent `cross_alpha` block — nobody
+//! measured the correlations — FAILS with `value = null` (fail closed).
+//!
 //! The policy is loaded from two files, fail-fast with file + key in every
 //! error: `configs/strategies/lifecycle.json` (promotion gates, demotion
-//! counter and `tstat_threshold`, `x-version` 2) and the `adaptive.lifecycle`
+//! counter, `tstat_threshold`, `cross_alpha_min_state` and `net_pnl_ci_gate`,
+//! `x-version` 3) and
+//! the `adaptive.lifecycle`
 //! block of `configs/strategies/strategies.json` (the live sub-machine: gates
 //! and the retirement rule, reused unchanged). [`PolicyConfig::from_value`]
 //! reads the merged view embedded in `tests/golden/expected_lifecycle.json`.
@@ -36,13 +61,59 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 
 use crate::evidence::Evidence;
+use crate::state::LifecycleState;
 
 /// `x-version` of `configs/strategies/lifecycle.json` (2 since v1.5.0:
-/// `tstat_threshold`).
-pub const LIFECYCLE_CONFIG_VERSION: u64 = 2;
+/// `tstat_threshold`; 3 with the cross-alpha correlation gate —
+/// `cross_alpha_min_state`, `gates.max_cross_alpha_correlation` — and the net
+/// P&L bootstrap gate — `net_pnl_ci_gate`, `gates.net_pnl_ci_level`,
+/// `gates.min_net_pnl_ci_low`).
+pub const LIFECYCLE_CONFIG_VERSION: u64 = 3;
+
+/// The lifecycle states `cross_alpha_min_state` may name: the first state an
+/// alpha holds after passing the correlation gate and the two beyond it
+/// before the live sub-machine.
+pub const CROSS_ALPHA_MIN_STATES: [LifecycleState; 3] = [
+    LifecycleState::Validating,
+    LifecycleState::Paper,
+    LifecycleState::Active,
+];
 
 /// The gate whose threshold comes from the evidence under the ledger policy.
 pub const SIGNIFICANCE_GATE: &str = "statistical_significance";
+
+/// The gate the legacy policy leaves out (`net_pnl_ci_gate = "absent"`).
+pub const BOOTSTRAP_GATE: &str = "net_pnl_bootstrap_ci";
+
+/// Whether `net_pnl_bootstrap_ci` is evaluated (module docs).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NetPnlCiGate {
+    /// The default: the gate is part of the CANDIDATE -> VALIDATING evaluation.
+    Required,
+    /// The legacy policy: the gate is not evaluated and is in no result.
+    Absent,
+}
+
+impl NetPnlCiGate {
+    /// Config value (`required` / `absent`).
+    pub fn name(self) -> &'static str {
+        match self {
+            NetPnlCiGate::Required => "required",
+            NetPnlCiGate::Absent => "absent",
+        }
+    }
+
+    /// Parse a config value.
+    pub fn from_name(name: &str, where_: &str) -> Result<NetPnlCiGate, IapError> {
+        match name {
+            "required" => Ok(NetPnlCiGate::Required),
+            "absent" => Ok(NetPnlCiGate::Absent),
+            other => Err(cfg_err(format!(
+                "{where_}.net_pnl_ci_gate: expected one of [\"required\", \"absent\"], got {other:?}"
+            ))),
+        }
+    }
+}
 
 /// How `statistical_significance` gets its threshold (module docs).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -139,6 +210,10 @@ pub enum Block {
     Research,
     /// `evidence.capacity_usd`.
     Capacity,
+    /// `evidence.cross_alpha`.
+    CrossAlpha,
+    /// `evidence.pnl_bootstrap`.
+    PnlBootstrap,
     /// `evidence.validation`.
     Validation,
     /// `evidence.paper`.
@@ -153,6 +228,8 @@ impl Block {
         match self {
             Block::Research => "research",
             Block::Capacity => "capacity",
+            Block::CrossAlpha => "cross_alpha",
+            Block::PnlBootstrap => "pnl_bootstrap",
             Block::Validation => "validation",
             Block::Paper => "paper",
             Block::Live => "live",
@@ -190,7 +267,7 @@ const fn spec(
 }
 
 /// The complete gate table, in the pinned order (lifecycle.md §3).
-pub const GATE_SPECS: [GateSpec; 18] = [
+pub const GATE_SPECS: [GateSpec; 20] = [
     spec(
         "ledger_entry_exists",
         Block::Research,
@@ -225,6 +302,12 @@ pub const GATE_SPECS: [GateSpec; 18] = [
         Some("min_net_return_bps"),
     ),
     spec(
+        "net_pnl_bootstrap_ci",
+        Block::PnlBootstrap,
+        GateKind::Gt,
+        Some("min_net_pnl_ci_low"),
+    ),
+    spec(
         "capacity",
         Block::Capacity,
         GateKind::Min,
@@ -235,6 +318,12 @@ pub const GATE_SPECS: [GateSpec; 18] = [
         Block::Research,
         GateKind::Max,
         Some("max_ic_rank_gap"),
+    ),
+    spec(
+        "cross_alpha_correlation",
+        Block::CrossAlpha,
+        GateKind::Max,
+        Some("max_cross_alpha_correlation"),
     ),
     spec(
         "holdout_ic_tracks_research",
@@ -329,9 +418,16 @@ pub struct GateThresholds {
     pub min_paper_net_pnl: f64,
     /// `no_kill_events` (>= 0).
     pub max_kill_events: u64,
+    /// `cross_alpha_correlation` (in `[0, 1]`).
+    pub max_cross_alpha_correlation: f64,
+    /// `net_pnl_bootstrap_ci` (strict).
+    pub min_net_pnl_ci_low: f64,
+    /// Confidence level the bootstrap interval must have been taken at, in
+    /// `(0, 1)`.
+    pub net_pnl_ci_level: f64,
 }
 
-const GATE_KEYS_FLOAT: [&str; 10] = [
+const GATE_KEYS_FLOAT: [&str; 13] = [
     "min_oos_ic",
     "min_nw_tstat",
     "min_fold_sign_consistency",
@@ -342,6 +438,9 @@ const GATE_KEYS_FLOAT: [&str; 10] = [
     "max_holdout_ic_gap",
     "max_paper_ic_gap",
     "min_paper_net_pnl",
+    "max_cross_alpha_correlation",
+    "min_net_pnl_ci_low",
+    "net_pnl_ci_level",
 ];
 const GATE_KEYS_INT: [&str; 4] = [
     "min_experiments_in_ledger",
@@ -457,7 +556,20 @@ impl GateThresholds {
             max_paper_ic_gap: as_float(block, "max_paper_ic_gap", where_)?,
             min_paper_net_pnl: as_float(block, "min_paper_net_pnl", where_)?,
             max_kill_events: as_int(block, "max_kill_events", where_, 0)?,
+            max_cross_alpha_correlation: as_float(block, "max_cross_alpha_correlation", where_)?,
+            min_net_pnl_ci_low: as_float(block, "min_net_pnl_ci_low", where_)?,
+            net_pnl_ci_level: as_float(block, "net_pnl_ci_level", where_)?,
         };
+        if !(t.net_pnl_ci_level > 0.0 && t.net_pnl_ci_level < 1.0) {
+            return Err(cfg_err(format!(
+                "{where_}.net_pnl_ci_level must lie in (0, 1)"
+            )));
+        }
+        if !(0.0..=1.0).contains(&t.max_cross_alpha_correlation) {
+            return Err(cfg_err(format!(
+                "{where_}.max_cross_alpha_correlation must lie in [0, 1]"
+            )));
+        }
         if !(0.0..=1.0).contains(&t.min_fold_sign_consistency) {
             return Err(cfg_err(format!(
                 "{where_}.min_fold_sign_consistency must lie in [0, 1]"
@@ -495,6 +607,9 @@ impl GateThresholds {
             "max_paper_ic_gap": self.max_paper_ic_gap,
             "min_paper_net_pnl": self.min_paper_net_pnl,
             "max_kill_events": self.max_kill_events,
+            "max_cross_alpha_correlation": self.max_cross_alpha_correlation,
+            "min_net_pnl_ci_low": self.min_net_pnl_ci_low,
+            "net_pnl_ci_level": self.net_pnl_ci_level,
         })
     }
 
@@ -516,6 +631,9 @@ impl GateThresholds {
             "max_paper_ic_gap" => self.max_paper_ic_gap,
             "min_paper_net_pnl" => self.min_paper_net_pnl,
             "max_kill_events" => self.max_kill_events as f64,
+            "max_cross_alpha_correlation" => self.max_cross_alpha_correlation,
+            "min_net_pnl_ci_low" => self.min_net_pnl_ci_low,
+            "net_pnl_ci_level" => self.net_pnl_ci_level,
             _ => return None,
         })
     }
@@ -667,6 +785,11 @@ pub struct PolicyConfig {
     pub live: LiveConfig,
     /// How `statistical_significance` gets its threshold.
     pub tstat_threshold: TstatThreshold,
+    /// Lowest lifecycle state of a peer the `cross_alpha_correlation` gate
+    /// counts (one of [`CROSS_ALPHA_MIN_STATES`]).
+    pub cross_alpha_min_state: LifecycleState,
+    /// Whether `net_pnl_bootstrap_ci` is evaluated.
+    pub net_pnl_ci_gate: NetPnlCiGate,
 }
 
 fn tstat_policy(doc: &Map<String, Value>, where_: &str) -> Result<TstatThreshold, IapError> {
@@ -682,15 +805,57 @@ fn tstat_policy(doc: &Map<String, Value>, where_: &str) -> Result<TstatThreshold
     }
 }
 
+fn min_state_policy(doc: &Map<String, Value>, where_: &str) -> Result<LifecycleState, IapError> {
+    match doc.get("cross_alpha_min_state") {
+        Some(Value::String(s)) => CROSS_ALPHA_MIN_STATES
+            .into_iter()
+            .find(|state| state.name() == s.as_str())
+            .ok_or_else(|| {
+                cfg_err(format!(
+                    "{where_}.cross_alpha_min_state: expected one of \
+                     [\"VALIDATING\", \"PAPER\", \"ACTIVE\"], got {s:?}"
+                ))
+            }),
+        Some(other) => Err(cfg_err(format!(
+            "{where_}.cross_alpha_min_state: expected a string, got {}",
+            type_name(other)
+        ))),
+        None => Err(cfg_err(format!(
+            "{where_}: missing keys [\"cross_alpha_min_state\"]"
+        ))),
+    }
+}
+
+fn ci_gate_policy(doc: &Map<String, Value>, where_: &str) -> Result<NetPnlCiGate, IapError> {
+    match doc.get("net_pnl_ci_gate") {
+        Some(Value::String(s)) => NetPnlCiGate::from_name(s, where_),
+        Some(other) => Err(cfg_err(format!(
+            "{where_}.net_pnl_ci_gate: expected a string, got {}",
+            type_name(other)
+        ))),
+        None => Err(cfg_err(format!(
+            "{where_}: missing keys [\"net_pnl_ci_gate\"]"
+        ))),
+    }
+}
+
 impl PolicyConfig {
-    /// Parse the merged view (`{"policy", "tstat_threshold", "gates",
-    /// "demotion", "live"}`), the form embedded in
-    /// `tests/golden/expected_lifecycle.json`.
+    /// Parse the merged view (`{"policy", "tstat_threshold",
+    /// "cross_alpha_min_state", "net_pnl_ci_gate", "gates", "demotion",
+    /// "live"}`), the form embedded in `tests/golden/expected_lifecycle.json`.
     pub fn from_value(v: &Value) -> Result<PolicyConfig, IapError> {
         let doc = object(v, "config")?;
         require_keys(
             doc,
-            &["policy", "tstat_threshold", "gates", "demotion", "live"],
+            &[
+                "policy",
+                "tstat_threshold",
+                "cross_alpha_min_state",
+                "net_pnl_ci_gate",
+                "gates",
+                "demotion",
+                "live",
+            ],
             "config",
         )?;
         let policy = doc["policy"]
@@ -710,6 +875,8 @@ impl PolicyConfig {
             )?,
             live: LiveConfig::from_block(&doc["live"], "config.live")?,
             tstat_threshold: tstat_policy(doc, "config")?,
+            cross_alpha_min_state: min_state_policy(doc, "config")?,
+            net_pnl_ci_gate: ci_gate_policy(doc, "config")?,
         })
     }
 
@@ -718,6 +885,8 @@ impl PolicyConfig {
         json!({
             "policy": self.policy,
             "tstat_threshold": self.tstat_threshold.name(),
+            "cross_alpha_min_state": self.cross_alpha_min_state.name(),
+            "net_pnl_ci_gate": self.net_pnl_ci_gate.name(),
             "gates": self.gates.to_value(),
             "demotion": {"max_consecutive_failures": self.max_consecutive_failures},
             "live": self.live.to_value(),
@@ -743,12 +912,16 @@ impl PolicyConfig {
                 "description",
                 "policy",
                 "tstat_threshold",
+                "cross_alpha_min_state",
+                "net_pnl_ci_gate",
                 "gates",
                 "demotion",
             ],
             &where_,
         )?;
         let tstat_threshold = tstat_policy(doc, &where_)?;
+        let cross_alpha_min_state = min_state_policy(doc, &where_)?;
+        let net_pnl_ci_gate = ci_gate_policy(doc, &where_)?;
         let policy = doc["policy"]
             .as_str()
             .filter(|s| !s.is_empty())
@@ -780,7 +953,20 @@ impl PolicyConfig {
             max_consecutive_failures: max_failures,
             live,
             tstat_threshold,
+            cross_alpha_min_state,
+            net_pnl_ci_gate,
         })
+    }
+
+    /// The gates this policy evaluates out of an edge's list, in order: the
+    /// list itself, without `net_pnl_bootstrap_ci` when the policy says the
+    /// gate is absent ([`NetPnlCiGate::Absent`], the legacy policy).
+    pub fn evaluated_gates(&self, gates: &[&'static str]) -> Vec<&'static str> {
+        gates
+            .iter()
+            .copied()
+            .filter(|name| self.net_pnl_ci_gate == NetPnlCiGate::Required || *name != BOOTSTRAP_GATE)
+            .collect()
     }
 
     /// The configured threshold of a gate (`None` for `bool` gates). For
@@ -891,9 +1077,17 @@ pub fn metric(spec: &GateSpec, config: &PolicyConfig, ev: &Evidence) -> Metric {
         "net_pnl_after_costs" => {
             research.map_or(Metric::Absent, |r| Metric::Number(r.net_return_bps))
         }
+        "net_pnl_bootstrap_ci" => ev
+            .pnl_bootstrap
+            .as_ref()
+            .and_then(|b| b.gate_value(config.gates.net_pnl_ci_level))
+            .map_or(Metric::Absent, Metric::Number),
         "capacity" => ev.capacity_usd.map_or(Metric::Absent, Metric::Number),
         "stability" => research.map_or(Metric::Absent, |r| {
             Metric::Number(ic_rank_gap(r.ic, r.rank_ic, config.gates.ic_rank_gap_eps))
+        }),
+        "cross_alpha_correlation" => ev.cross_alpha.as_ref().map_or(Metric::Absent, |c| {
+            Metric::Number(c.max_abs_correlation(config.cross_alpha_min_state))
         }),
         "holdout_ic_tracks_research" => ev.validation.as_ref().map_or(Metric::Absent, |v| {
             Metric::Number((v.holdout_ic - v.research_ic).abs())
@@ -985,12 +1179,16 @@ mod tests {
         PolicyConfig::from_value(&json!({
             "policy": "lifecycle_v1",
             "tstat_threshold": "ledger",
+            "cross_alpha_min_state": "VALIDATING",
+            "net_pnl_ci_gate": "required",
             "gates": {
                 "min_experiments_in_ledger": 1, "min_oos_ic": 0.01, "min_nw_tstat": 3.0,
                 "min_fold_sign_consistency": 0.7, "min_folds": 3, "min_net_return_bps": 0.0,
                 "min_capacity_usd": 1000000.0, "max_ic_rank_gap": 1.0, "ic_rank_gap_eps": 1e-12,
                 "max_holdout_ic_gap": 0.01, "min_paper_sessions": 5, "max_paper_ic_gap": 0.01,
-                "min_paper_net_pnl": 0.0, "max_kill_events": 0
+                "min_paper_net_pnl": 0.0, "max_kill_events": 0,
+                "max_cross_alpha_correlation": 0.7, "min_net_pnl_ci_low": 0.0,
+                "net_pnl_ci_level": 0.95
             },
             "demotion": {"max_consecutive_failures": 3},
             "live": {"watch_ic_gate": 0.0, "reactivate_ic_gate": 0.005, "retire_breach_evals": 6,
@@ -1065,6 +1263,252 @@ mod tests {
         // every other gate keeps its configured threshold
         let oos = spec_by_name("oos_ic").expect("known");
         assert_eq!(cfg.threshold_for(oos, &ev), cfg.threshold(oos));
+    }
+
+    fn cross(peers: &[(&str, LifecycleState, f64)]) -> crate::evidence::CrossAlphaEvidence {
+        crate::evidence::CrossAlphaEvidence {
+            peers: peers
+                .iter()
+                .map(|(alpha_id, state, correlation)| crate::evidence::PeerCorrelation {
+                    alpha_id: (*alpha_id).to_string(),
+                    state: *state,
+                    correlation: *correlation,
+                })
+                .collect(),
+        }
+    }
+
+    fn boot(ci_low: Option<f64>, level: f64, n_trades: u64) -> crate::evidence::PnlBootstrapEvidence {
+        crate::evidence::PnlBootstrapEvidence {
+            ci_low,
+            ci_high: ci_low.map(|low| low + 50.0),
+            level,
+            n_resamples: 1000,
+            seed: 20260829,
+            mean_block: 9.0,
+            n_bars: 626,
+            n_trades,
+        }
+    }
+
+    #[test]
+    fn bootstrap_gate_row_and_evaluation() {
+        let at = GATE_SPECS
+            .iter()
+            .position(|s| s.name == BOOTSTRAP_GATE)
+            .expect("in the table");
+        assert_eq!(GATE_SPECS[at - 1].name, "net_pnl_after_costs");
+        assert_eq!(GATE_SPECS[at + 1].name, "capacity");
+        let gate = &GATE_SPECS[at];
+        assert_eq!(gate.block, Block::PnlBootstrap);
+        assert_eq!(gate.block.name(), "pnl_bootstrap");
+        assert_eq!(gate.kind, GateKind::Gt);
+        assert_eq!(gate.threshold_key, Some("min_net_pnl_ci_low"));
+        let cfg = config();
+        assert_eq!(cfg.threshold(gate), Some(0.0));
+        let mut ev = Evidence::empty();
+        // no block, no trade, another level, no bounds: value null
+        let r = evaluate(gate, &cfg, &ev);
+        assert_eq!((r.passed, r.value, r.threshold), (false, None, Some(0.0)));
+        for unusable in [
+            boot(Some(0.0), 0.95, 0),
+            boot(Some(12.5), 0.9, 40),
+            boot(None, 0.95, 40),
+        ] {
+            ev.pnl_bootstrap = Some(unusable);
+            let r = evaluate(gate, &cfg, &ev);
+            assert_eq!((r.passed, r.value, r.threshold), (false, None, Some(0.0)));
+        }
+        // a usable interval: the lower bound, compared strictly
+        ev.pnl_bootstrap = Some(boot(Some(-35.5), 0.95, 40));
+        let r = evaluate(gate, &cfg, &ev);
+        assert_eq!((r.passed, r.value), (false, Some(-35.5)));
+        ev.pnl_bootstrap = Some(boot(Some(0.0), 0.95, 40));
+        let r = evaluate(gate, &cfg, &ev);
+        assert_eq!((r.passed, r.value), (false, Some(0.0)));
+        ev.pnl_bootstrap = Some(boot(Some(12.5), 0.95, 40));
+        let r = evaluate(gate, &cfg, &ev);
+        assert_eq!((r.passed, r.value, r.threshold), (true, Some(12.5), Some(0.0)));
+        // the policy decides which gates of an edge are evaluated
+        let edge = ["net_pnl_after_costs", BOOTSTRAP_GATE, "capacity"];
+        assert_eq!(cfg.evaluated_gates(&edge), edge);
+        let mut absent = cfg.clone();
+        absent.net_pnl_ci_gate = NetPnlCiGate::Absent;
+        assert_eq!(
+            absent.evaluated_gates(&edge),
+            ["net_pnl_after_costs", "capacity"]
+        );
+    }
+
+    #[test]
+    fn bootstrap_config_errors_name_the_key() {
+        for name in ["required", "absent"] {
+            let mut doc = config().to_value();
+            doc["net_pnl_ci_gate"] = json!(name);
+            let cfg = PolicyConfig::from_value(&doc).expect("a known policy");
+            assert_eq!(cfg.net_pnl_ci_gate.name(), name);
+            assert_eq!(cfg.to_value(), doc, "round trip");
+        }
+        for bad in [json!("optional"), json!("Required"), json!(true), json!(null)] {
+            let mut doc = config().to_value();
+            doc["net_pnl_ci_gate"] = bad.clone();
+            let err = PolicyConfig::from_value(&doc).expect_err("not a known policy");
+            assert!(err.to_string().contains("net_pnl_ci_gate"), "{bad}: {err}");
+        }
+        let mut doc = config().to_value();
+        doc.as_object_mut()
+            .expect("object")
+            .remove("net_pnl_ci_gate");
+        assert!(PolicyConfig::from_value(&doc)
+            .expect_err("missing key")
+            .to_string()
+            .contains("net_pnl_ci_gate"));
+        for bad in [1.0, 0.0, 1.5, -0.1] {
+            let mut doc = config().to_value();
+            doc["gates"]["net_pnl_ci_level"] = json!(bad);
+            assert!(PolicyConfig::from_value(&doc)
+                .expect_err("outside (0, 1)")
+                .to_string()
+                .contains("net_pnl_ci_level"));
+        }
+        let mut doc = config().to_value();
+        doc["gates"]["min_net_pnl_ci_low"] = json!(-250.0);
+        assert!(PolicyConfig::from_value(&doc).is_ok(), "any finite bound");
+        for key in ["min_net_pnl_ci_low", "net_pnl_ci_level"] {
+            let mut doc = config().to_value();
+            doc["gates"].as_object_mut().expect("object").remove(key);
+            assert!(PolicyConfig::from_value(&doc)
+                .expect_err("missing threshold")
+                .to_string()
+                .contains(key));
+        }
+    }
+
+    #[test]
+    fn cross_alpha_gate_row_and_position() {
+        assert_eq!(GATE_SPECS.len(), 20);
+        let at = GATE_SPECS
+            .iter()
+            .position(|s| s.name == "cross_alpha_correlation")
+            .expect("in the table");
+        assert_eq!(GATE_SPECS[at - 1].name, "stability");
+        assert_eq!(GATE_SPECS[at + 1].name, "holdout_ic_tracks_research");
+        let gate = &GATE_SPECS[at];
+        assert_eq!(gate.block, Block::CrossAlpha);
+        assert_eq!(gate.block.name(), "cross_alpha");
+        assert_eq!(gate.kind, GateKind::Max);
+        assert_eq!(gate.threshold_key, Some("max_cross_alpha_correlation"));
+        assert_eq!(config().threshold(gate), Some(0.7));
+        assert_eq!(LIFECYCLE_CONFIG_VERSION, 3);
+    }
+
+    #[test]
+    fn cross_alpha_gate_counts_eligible_peers_by_absolute_value() {
+        let cfg = config();
+        let gate = spec_by_name("cross_alpha_correlation").expect("known");
+        let mut ev = Evidence::empty();
+        // no block: fail closed, value null, the configured threshold
+        let r = evaluate(gate, &cfg, &ev);
+        assert_eq!(
+            (r.passed, r.value, r.threshold),
+            (false, None, Some(0.7))
+        );
+        // an empty peer list: the vacuous pass
+        ev.cross_alpha = Some(cross(&[]));
+        let r = evaluate(gate, &cfg, &ev);
+        assert_eq!((r.passed, r.value, r.threshold), (true, Some(0.0), Some(0.7)));
+        // an eligible peer above the threshold fails
+        ev.cross_alpha = Some(cross(&[("P", LifecycleState::Active, 0.82)]));
+        let r = evaluate(gate, &cfg, &ev);
+        assert_eq!((r.passed, r.value), (false, Some(0.82)));
+        // the absolute value is taken
+        ev.cross_alpha = Some(cross(&[("P", LifecycleState::Paper, -0.9)]));
+        let r = evaluate(gate, &cfg, &ev);
+        assert_eq!((r.passed, r.value), (false, Some(0.9)));
+        // RESEARCH / CANDIDATE / RETIRED peers are not counted
+        ev.cross_alpha = Some(cross(&[
+            ("P", LifecycleState::Research, 0.99),
+            ("Q", LifecycleState::Candidate, 0.95),
+            ("R", LifecycleState::Retired, -0.99),
+        ]));
+        let r = evaluate(gate, &cfg, &ev);
+        assert_eq!((r.passed, r.value), (true, Some(0.0)));
+        // exactly at the threshold: max is inclusive
+        ev.cross_alpha = Some(cross(&[
+            ("P", LifecycleState::Validating, 0.7),
+            ("Q", LifecycleState::Watch, -0.7),
+        ]));
+        let r = evaluate(gate, &cfg, &ev);
+        assert_eq!((r.passed, r.value), (true, Some(0.7)));
+        // the same document under cross_alpha_min_state = ACTIVE
+        ev.cross_alpha = Some(cross(&[
+            ("P", LifecycleState::Validating, 0.9),
+            ("Q", LifecycleState::Paper, -0.95),
+            ("R", LifecycleState::Active, 0.3),
+        ]));
+        assert!(!evaluate(gate, &cfg, &ev).passed);
+        let mut active = cfg.clone();
+        active.cross_alpha_min_state = LifecycleState::Active;
+        let r = evaluate(gate, &active, &ev);
+        assert_eq!((r.passed, r.value), (true, Some(0.3)));
+    }
+
+    #[test]
+    fn cross_alpha_config_errors_name_the_key() {
+        for name in ["VALIDATING", "PAPER", "ACTIVE"] {
+            let mut doc = config().to_value();
+            doc["cross_alpha_min_state"] = json!(name);
+            let cfg = PolicyConfig::from_value(&doc).expect("an allowed state");
+            assert_eq!(cfg.cross_alpha_min_state.name(), name);
+            assert_eq!(cfg.to_value(), doc, "round trip");
+        }
+        for bad in [
+            json!("CANDIDATE"),
+            json!("RESEARCH"),
+            json!("WATCH"),
+            json!("RETIRED"),
+            json!("validating"),
+            json!(2),
+            json!(null),
+        ] {
+            let mut doc = config().to_value();
+            doc["cross_alpha_min_state"] = bad.clone();
+            let err = PolicyConfig::from_value(&doc).expect_err("not an allowed state");
+            assert!(
+                err.to_string().contains("cross_alpha_min_state"),
+                "{bad}: {err}"
+            );
+        }
+        let mut doc = config().to_value();
+        doc.as_object_mut()
+            .expect("object")
+            .remove("cross_alpha_min_state");
+        assert!(PolicyConfig::from_value(&doc)
+            .expect_err("missing key")
+            .to_string()
+            .contains("cross_alpha_min_state"));
+        for bad in [1.5, -0.1] {
+            let mut doc = config().to_value();
+            doc["gates"]["max_cross_alpha_correlation"] = json!(bad);
+            assert!(PolicyConfig::from_value(&doc)
+                .expect_err("outside [0, 1]")
+                .to_string()
+                .contains("max_cross_alpha_correlation"));
+        }
+        for ok in [0.0, 1.0] {
+            let mut doc = config().to_value();
+            doc["gates"]["max_cross_alpha_correlation"] = json!(ok);
+            assert!(PolicyConfig::from_value(&doc).is_ok(), "{ok}");
+        }
+        let mut doc = config().to_value();
+        doc["gates"]
+            .as_object_mut()
+            .expect("object")
+            .remove("max_cross_alpha_correlation");
+        assert!(PolicyConfig::from_value(&doc)
+            .expect_err("missing threshold")
+            .to_string()
+            .contains("max_cross_alpha_correlation"));
     }
 
     #[test]

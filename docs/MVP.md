@@ -254,8 +254,8 @@ possible.
 
 Run id `58a10f2194a3c81c`, 15,805 events, 800 decisions, 235 parent orders,
 507 children generated / 348 submitted, 169 fills, fill rate 15.1 %.
-Trace digest `e534ac1f06c505370daf6fa3dae4c3927cb08d2dbec75b1a506118da85598a99`
-(`config_version` `bf8cc608…`).
+Trace digest `20d4ff76af0b631c53c488a1cc504c1bbf8d8488dd5c210a947f96d63e734a45`
+(`config_version` `439bbad5…`).
 Wall time: about 2.2× the v1.3.0 session on the same machine (27 s → 59 s on
 the laptop this was measured on; 0.8 s of that is feed generation and
 normalisation) — there are 800 decisions to make instead of 355.
@@ -269,8 +269,8 @@ fill or cent. What v1.5.0 changed is the identity of the run:
 all of which changed (the cost model now names its `impact_model`; the
 header of `alpha_params.json` names the regeneration commit; the registry is
 x-version 2), so it went from
-`f293e7e7…` to `bf8cc608…`, and the trace digest, which covers
-`config_version`, from `f51890da…` to `e534ac1f…`. The research IC the
+`f293e7e7…` to `439bbad5…`, and the trace digest, which covers
+`config_version`, from `f51890da…` to `20d4ff76…`. The research IC the
 realized IC is compared with (§7.1, last two columns) is now the gate IC of
 the v2 report. The run id is the
 one of v1.3.0 because `mvp.json` and the seed did not change; the stream did:

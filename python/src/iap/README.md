@@ -308,11 +308,19 @@ iap/
                    eligibility and the ledger's expected-max-|t| note; `list`
                    prints a `dataset` column (the folder keeps the
                    experiments of every dataset the ledger has seen).
+  combine/         Signal combination (API_ALPHA.md §8): weights.py (equal_weight,
+                   ic_weighted, ridge with a nested penalty search, Ledoit-Wolf
+                   shrinkage mean-variance; signal correlation, effective bets),
+                   model.py (CombinedAlpha: an AlphaModel whose inputs are alphas,
+                   weights fitted on the members' out-of-sample stack inside each
+                   training window), report.py (the combination validated, ledgered
+                   and reported: research/combination/; `python -m iap.research
+                   combine`).
   lifecycle/       Alpha promotion lifecycle RESEARCH -> CANDIDATE -> VALIDATING
                    -> PAPER -> ACTIVE -> WATCH -> RETIRED (LifecycleState 0..6)
                    with a gate at every edge; extends (never alters) the
                    ACTIVE/WATCH/RETIRED tracker of iap.adaptive.lifecycle.
-    config.py      PolicyConfig = configs/strategies/lifecycle.json (x-version 2:
+    config.py      PolicyConfig = configs/strategies/lifecycle.json (x-version 3:
                    promotion-gate thresholds equal to validate.GATES, demotion
                    max_consecutive_failures, tstat_threshold "ledger" by
                    default or the legacy "fixed") + strategies.json

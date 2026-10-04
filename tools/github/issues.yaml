@@ -2891,19 +2891,31 @@ issues:
   - key: AF03
     epic: E22
     title: "Gate 8: cross-alpha correlation and incremental contribution"
-    labels: [type:feature, area:research, phase:phase2, priority:p1, lang:python]
+    labels: [type:feature, area:research, phase:phase2, priority:p1, lang:python, lang:java, lang:rust]
     milestone: "Phase 2"
-    status: backlog
+    status: done
     estimate_days: 2
     context: >
-      GOVERNANCE.md lists gate 8 but no code computes signal correlations
-      across the 24 alphas or the marginal IC of adding one to the ensemble;
-      a grep for "correlation" in the validation package finds only RankIC.
+      Gate 8 is the lifecycle gate cross_alpha_correlation on CANDIDATE ->
+      VALIDATING (v1.5.0): the largest absolute out-of-sample signal
+      correlation with any alpha at or beyond VALIDATING must not exceed 0.7;
+      it passes vacuously while no alpha is that far, and fails closed without
+      the evidence. Python, Java and Rust evaluate it from the evidence
+      document. The correlations and the incremental contribution of each
+      alpha (its weight under four combination methods, the effective number
+      of independent bets, the combination against its members) come from the
+      signal-combination report. The gate result is recorded in the registry
+      evaluation of each alpha rather than in the alpha report JSON, which the
+      change did not regenerate.
     acceptance:
-      - "A correlation matrix over uncrossed cross-sections and a marginal-IC table in REPORT.md"
-      - "Gate 8 recorded in each alpha's report JSON and in the promotion template"
+      - "A signal correlation matrix per asset class and the member-versus-combination table in research/combination/REPORT.md"
+      - "The gate is a row of the lifecycle gate table in Python, Java and Rust, with golden scenario LC05 (pass, fail, vacuous pass, tie, missing evidence)"
+      - "Each alpha's registry evaluation carries the cross_alpha_correlation result"
     evidence:
-      - "docs/governance/GOVERNANCE.md §2 (gate 8); python/src/iap/validation/metrics.py"
+      - "python/src/iap/lifecycle/gates.py; python/src/iap/lifecycle/evidence.py; python/tests/test_lifecycle.py"
+      - "python/src/iap/combine; python/tests/test_combine.py; research/combination/REPORT.md; research/combination/signal_correlation.json"
+      - "java/src/main/java/com/iap/lifecycle/Gates.java; rust/lifecycle/src/gates.rs; tests/golden/expected_lifecycle.json"
+      - "docs/LIFECYCLE.md section 3; PLATFORM_CONVENTIONS.md section 13.4 and 13.8"
 
   - key: AF04
     epic: E22
@@ -3396,7 +3408,7 @@ issues:
     milestone: "Backlog"
     status: backlog
     estimate_days: 6
-    context: "Alphas are judged stand-alone; gate 8 (cross-alpha correlation and incremental contribution) is not yet a lifecycle gate (see AF03). Allocation should follow marginal contribution to portfolio net P&L after costs."
+    context: "Gate 8 (cross-alpha correlation, AF03) keeps a redundant alpha out of the allocated set, and the signal-combination report measures each alpha's weight in a blend; neither sizes capital. Allocation should follow marginal contribution to portfolio net P&L after costs."
     acceptance:
       - "Weights are a deterministic function of the ledgered evidence and reproduce from the manifest"
       - "An alpha that adds nothing after correlation gets zero weight in a fixture"

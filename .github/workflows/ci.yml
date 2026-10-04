@@ -63,7 +63,7 @@ on:
         type: boolean
         default: false
       regenerate_only:
-        description: "Comma-separated regeneration steps (--only); empty = the whole chain"
+        description: "With regenerate: comma-separated steps of tools/regenerate_dataset_artifacts.py to run (empty = the whole chain; the dataset and features are always built first)"
         type: string
         default: ""
       risk_fuzz:
@@ -479,11 +479,13 @@ jobs:
         env:
           REGENERATE_ONLY: ${{ inputs.regenerate_only }}
         run: |
-          if [ -n "$REGENERATE_ONLY" ]; then
-            python3 tools/regenerate_dataset_artifacts.py --only "$REGENERATE_ONLY" \
-              --timings-out regeneration_timings.json
-          else
+          if [ -z "$REGENERATE_ONLY" ]; then
             python3 tools/regenerate_dataset_artifacts.py --timings-out regeneration_timings.json
+          else
+            # A subset still needs the (git-ignored) dataset and features.
+            python3 tools/regenerate_dataset_artifacts.py \
+              --only "dataset,features,$REGENERATE_ONLY" \
+              --timings-out regeneration_timings.json
           fi
       - name: collect what changed
         run: |

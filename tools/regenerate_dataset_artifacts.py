@@ -25,8 +25,12 @@ alpha_reports   research/alpha_reports/{<ID>.json,REPORT.md},
                 configs/strategies/alpha_params.json, research/experiments.json
 experiments     research/experiments/<id>/ (the five pinned runner
                 experiments), research/experiments.json
+combination     research/combination/{REPORT.md,COMBINATION.json,
+                signal_correlation.json,reports/*.json},
+                research/experiments.json
 lifecycle       research/alpha_registry.json,
-                research/lifecycle_transitions.jsonl
+                research/lifecycle_transitions.jsonl (reads the alpha
+                reports and research/combination/signal_correlation.json)
 ml              research/ml_reports/*, research/models/run_NNNN_*/,
                 research/models/ledger.json
 adaptive        research/adaptive_reports/*, research/baselines/run_*.json,
@@ -54,6 +58,10 @@ Rules the script enforces rather than documents:
   bundle would be recorded as reruns and would append a second set of model
   runs. ``--allow-rerun`` overrides.
 * A step that fails stops the chain; nothing after it runs.
+* ``--only`` runs a subset in the chain's order — how a change that touches
+  only some artefacts regenerates them without re-running (and re-ledgering)
+  the report pipelines: the signal-combination change of v1.5.0 ran
+  ``--only combination,lifecycle,goldens`` (schemas/MIGRATIONS.md).
 * Wall-clock time of every step is printed and written to ``--timings-out``.
 
 The environment decides the last digits: the committed artefacts (v1.4.0,
@@ -120,6 +128,7 @@ def _steps() -> list[tuple[str, list[tuple[Path, list[str]]]]]:
                 for alpha, horizon in RUNNER_EXPERIMENTS
             ],
         ),
+        ("combination", [(py_dir, [PY, "-m", "iap.research", "combine"])]),
         ("lifecycle", [(py_dir, [PY, "-m", "iap.lifecycle", "bootstrap", "--force"])]),
         ("ml", [(REPO, [PY, "research/ml_reports/run_ml.py"])]),
         ("adaptive", [(REPO, [PY, "research/adaptive_reports/run_adaptive.py"])]),

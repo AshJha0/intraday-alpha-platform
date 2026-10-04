@@ -4,7 +4,7 @@
 //!
 //! - [`state`] — the seven ordered states RESEARCH(0) … RETIRED(6);
 //! - [`evidence`] — the typed, finite-checked evidence blocks;
-//! - [`gates`] — the 18-row gate table, the policy config
+//! - [`gates`] — the 20-row gate table, the policy config
 //!   (`configs/strategies/lifecycle.json` + `strategies.json`
 //!   `adaptive.lifecycle`) and gate evaluation;
 //! - [`tracker`] — the live ACTIVE / WATCH / RETIRED rolling-IC rules
@@ -26,12 +26,14 @@ pub mod state;
 pub mod tracker;
 
 pub use evidence::{
-    Evidence, ExperimentResult, LiveEvidence, PaperEvidence, ValidationEvidence, Verdict,
+    CrossAlphaEvidence, Evidence, ExperimentResult, LiveEvidence, PaperEvidence, PeerCorrelation,
+    PnlBootstrapEvidence, ValidationEvidence, Verdict,
 };
 pub use gates::{
     evaluate, evaluate_named, ic_rank_gap, metric, spec_by_name, Block, BreachRule, GateKind,
-    GateResult, GateSpec, GateThresholds, LiveConfig, Metric, PolicyConfig, TstatThreshold,
-    GATE_SPECS, LIFECYCLE_CONFIG_VERSION, SIGNIFICANCE_GATE,
+    GateResult, GateSpec, GateThresholds, LiveConfig, Metric, NetPnlCiGate, PolicyConfig,
+    TstatThreshold, BOOTSTRAP_GATE, CROSS_ALPHA_MIN_STATES, GATE_SPECS, LIFECYCLE_CONFIG_VERSION,
+    SIGNIFICANCE_GATE,
 };
 pub use machine::{
     edge_for, promotion_edge, transition_table, Actor, AlphaLifecycle, Edge, EdgeKind,

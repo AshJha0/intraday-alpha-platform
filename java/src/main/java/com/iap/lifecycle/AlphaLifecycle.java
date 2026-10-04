@@ -30,6 +30,11 @@ import com.iap.lifecycle.LifecycleTransition.Actor;
  *       to RESEARCH at once; at VALIDATING / PAPER each failed evaluation
  *       increments {@code consecutive_failures} and the
  *       {@code max_consecutive_failures}-th one demotes to CANDIDATE;</li>
+ *   <li><b>a gate the policy leaves out</b>: under
+ *       {@code net_pnl_ci_gate = "absent"} (the legacy policy)
+ *       {@code net_pnl_bootstrap_ci} is not evaluated on the CANDIDATE ->
+ *       VALIDATING edge and appears in no result ({@link #edgeGates}); the
+ *       transition table itself is the same under either policy;</li>
  *   <li><b>silence is not evidence</b>: an evaluation whose evidence block
  *       for the edge is absent ({@code research} at CANDIDATE,
  *       {@code validation} at VALIDATING, {@code paper} at PAPER,
@@ -100,7 +105,8 @@ public final class AlphaLifecycle {
                     Actor.SYSTEM, Gates.LEAKAGE_CLEAN, Gates.OOS_IC,
                     Gates.STATISTICAL_SIGNIFICANCE, Gates.FOLD_CONSISTENCY,
                     Gates.FOLD_COUNT, Gates.HYPOTHESIS_SIGN, Gates.NET_PNL_AFTER_COSTS,
-                    Gates.CAPACITY, Gates.STABILITY),
+                    Gates.NET_PNL_BOOTSTRAP_CI, Gates.CAPACITY, Gates.STABILITY,
+                    Gates.CROSS_ALPHA_CORRELATION),
             edge(LifecycleState.CANDIDATE, LifecycleState.RESEARCH, EdgeKind.DEMOTION,
                     Actor.SYSTEM, Gates.LEAKAGE_CLEAN),
             edge(LifecycleState.VALIDATING, LifecycleState.PAPER, EdgeKind.PROMOTION,
@@ -281,6 +287,24 @@ public final class AlphaLifecycle {
         };
     }
 
+    /**
+     * The gates this policy evaluates on {@code edge}, in order: the edge's
+     * list, without {@code net_pnl_bootstrap_ci} when the policy says the gate
+     * is absent ({@code net_pnl_ci_gate = "absent"}, the legacy policy).
+     */
+    public List<Gates> edgeGates(Edge edge) {
+        if (config.netPnlCiRequired()) {
+            return edge.gates();
+        }
+        List<Gates> out = new ArrayList<>(edge.gates().size());
+        for (Gates g : edge.gates()) {
+            if (g != Gates.NET_PNL_BOOTSTRAP_CI) {
+                out.add(g);
+            }
+        }
+        return List.copyOf(out);
+    }
+
     private LifecycleTransition advancePromotion(AlphaRecord rec, long eventTs,
             Evidence evidence) {
         LifecycleState state = rec.state();
@@ -290,9 +314,10 @@ public final class AlphaLifecycle {
                     Outcome.NO_EVIDENCE, Map.of(), rec.consecutiveFailures, null));
             return null;
         }
+        List<Gates> evaluated = edgeGates(edge);
         Map<String, GateResult> results = new LinkedHashMap<>();
         List<String> failed = new ArrayList<>();
-        for (Gates g : edge.gates()) {
+        for (Gates g : evaluated) {
             GateResult r = g.evaluate(evidence, config);
             results.put(g.gateName(), r);
             if (!r.passed()) {
@@ -301,7 +326,7 @@ public final class AlphaLifecycle {
         }
         if (failed.isEmpty()) {
             LifecycleTransition t = transition(rec, edge, eventTs,
-                    "all " + edge.gates().size() + " gates passed: " + state.name()
+                    "all " + evaluated.size() + " gates passed: " + state.name()
                             + " -> " + edge.toState().name(), results, Actor.SYSTEM);
             apply(rec, t);
             recordEvaluation(rec, new GateEvaluation(rec.alphaId(), eventTs, state,

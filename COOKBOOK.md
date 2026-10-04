@@ -730,8 +730,8 @@ bash tests/harness/run_all.sh --golden-only   # golden groups only (fast)
 ```
 
 Exit code 0 iff every language passed; logs land in a temp dir printed on
-the first line. The v1.5.0 counts (CI): python 1752 / cpp 302 /
-rust 330 / java 535 tests passed (golden groups 180/72/66/115), plus
+the first line. The v1.5.0 counts (CI): python 1764 / cpp 289 /
+rust 355 / java 537 tests passed (golden groups 177/68/68/108), plus
 `integration` (35) and `replay` (6) rows for the repo-level pytest suites, a
 `deployment` row (25 structural checks passed in CI, where `promtool` and
 `kubeconform` are installed; a machine without them reports those checks as
@@ -1113,7 +1113,7 @@ synthetic equity `SYN.EQ.AAPL` and writes every artefact under
 ```bash
 cd python
 PYTHONPATH=src python3 -m iap.mvp run                       # configs/mvp/mvp.json, seed 12345
-# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=235 children=348 fills=169 pnl=-81.531396 USD digest=e534ac1f06c50537... out=.../data/mvp/58a10f2194a3c81c
+# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=235 children=348 fills=169 pnl=-81.531396 USD digest=20d4ff76af0b631c... out=.../data/mvp/58a10f2194a3c81c
 PYTHONPATH=src python3 -m iap.mvp run --seed 7 --out /tmp/mvp7          # another seed, explicit directory
 PYTHONPATH=src python3 -m iap.mvp verify                                  # run twice from scratch, compare digest/report/stream
 cat ../data/mvp/58a10f2194a3c81c/report.md                                # the honest numbers (cost-negative)
@@ -1137,7 +1137,7 @@ and the loop makes 800 decisions (355 before) and loses 81.53 USD (22.65
 before): +0.022 bps of alpha against −0.41 bps of cost on filled notional.
 v1.5.0 changed none of that. The loop does not use the research
 backtester, so its events, decisions, parents, children, fills and P&L are
-identical to v1.4.0; what moved is `config_version` (`bf8cc608…`, was
+identical to v1.4.0; what moved is `config_version` (`439bbad5…`, was
 `f293e7e7…`), which hashes `execution.json` and `alpha_params.json`, and
 with it the trace digest printed above (`f51890da…` in v1.4.0), because
 every trace carries `config_version`. The summary line was re-run for this
@@ -1213,7 +1213,8 @@ The seven-state machine ([docs/LIFECYCLE.md](docs/LIFECYCLE.md)) reads the
 at RESEARCH at the pinned bootstrap event time (the latest fold `test_end`)
 and advances it until it stops moving. On the bundled data that is one
 step: every alpha reaches CANDIDATE and holds there. All 24 fail
-`net_pnl_after_costs` and `capacity`; for three of them (EQ02, EQ03, EQ12)
+`net_pnl_after_costs`, its bootstrap bound `net_pnl_bootstrap_ci` and
+`capacity`; for three of them (EQ02, EQ03, EQ12)
 those are the only failed gates.
 
 ```bash
@@ -1224,10 +1225,10 @@ PYTHONPATH=src python3 -m iap.lifecycle bootstrap --force        # rewrite resea
 PYTHONPATH=src python3 -m iap.lifecycle status
 # alpha | state | since_ts | failed gates
 # ----- | ----- | -------- | ------------
-# EQ01 | CANDIDATE | 1787691480577291027 | statistical_significance, net_pnl_after_costs, capacity, stability
-# EQ03 | CANDIDATE | 1787691480577291027 | net_pnl_after_costs, capacity
-# EQ04 | CANDIDATE | 1787691480577291027 | oos_ic, statistical_significance, fold_consistency, hypothesis_sign, net_pnl_after_costs, capacity, stability
-# FX09 | CANDIDATE | 1787691480577291027 | oos_ic, statistical_significance, fold_consistency, hypothesis_sign, net_pnl_after_costs, capacity, stability
+# EQ01 | CANDIDATE | 1787691480577291027 | statistical_significance, net_pnl_after_costs, net_pnl_bootstrap_ci, capacity, stability
+# EQ03 | CANDIDATE | 1787691480577291027 | net_pnl_after_costs, net_pnl_bootstrap_ci, capacity
+# EQ04 | CANDIDATE | 1787691480577291027 | oos_ic, statistical_significance, fold_consistency, hypothesis_sign, net_pnl_after_costs, net_pnl_bootstrap_ci, capacity, stability
+# FX09 | CANDIDATE | 1787691480577291027 | oos_ic, statistical_significance, fold_consistency, hypothesis_sign, net_pnl_after_costs, net_pnl_bootstrap_ci, capacity, stability
 # ...  (24 rows, all CANDIDATE)
 PYTHONPATH=src python3 -m iap.lifecycle retire FX09 --reason "desk decision: rationale contradicted by the fitted sign"   # HUMAN edge -> RETIRED
 PYTHONPATH=src python3 -m iap.lifecycle reset FX09 --reason "re-run the evidence chain after the refit"                # HUMAN edge RETIRED -> RESEARCH
@@ -1650,9 +1651,10 @@ stationary-bootstrap interval (Politis & Romano; SplitMix64, seeded) around
 the pooled net P&L. Since v1.5.0 `validate_alpha` reports that block itself
 (`fold_diagnostics`, `net_pnl_bootstrap`; the "Every fold" table of
 `REPORT.md`), and its looks are counted — it is most of why a validation
-is 83 looks and not 27. It stays report-only: no gate reads it, because a
-new gate would add a row to the lifecycle gate table that three languages
-pin. The standalone form below is for a caller that wants the diagnostics
+is 83 looks and not 27. The interval is also what the lifecycle gate
+`net_pnl_bootstrap_ci` reads (docs/LIFECYCLE.md §3: its lower bound must be
+above zero, and an alpha that makes no trade fails); the per-fold rows stay
+report-only. The standalone form below is for a caller that wants the diagnostics
 without the rest of the validation; it is run once under the default rules
 and once under the legacy ones:
 
@@ -2083,3 +2085,64 @@ and writes `research/execution/EXECUTION_REPORT.md`. The same policy for the
 MVP: `MvpConfig.with_overrides(child_policy="passive", passive={...})`.
 LEARN.md §30 explains adverse selection and how to read the table.
 
+## 38. Combine alphas out of sample and count the independent bets
+
+A combination is an alpha whose inputs are alphas (`iap.combine`,
+API_ALPHA.md §8). `fit` estimates the weights inside the training rows it
+is given — on the members' out-of-sample predictions from three inner
+walk-forward folds — so fitting on day 1 and scoring day 2 is honest. Four
+equity members, three of which are order-flow alphas:
+
+```bash
+PYTHONPATH=python/src python3 - <<'EOF'
+import numpy as np
+from iap.alpha.data import load_features, session_days, split_by_day
+from iap.combine import CombinedAlpha, correlation_matrix, effective_bets, member_signal
+from iap.validation.metrics import ic
+
+frames = load_features("data/features")
+train, test = split_by_day(frames, session_days(frames)[1])
+members = ["EQ02", "EQ03", "EQ06", "EQ12"]
+for method in ("equal_weight", "ridge"):
+    model = CombinedAlpha(members, method)
+    model.fit(train)  # weights from the members' out-of-sample stack inside day 1
+    p = model.params()
+    scores = model.score(test)
+    z = np.concatenate([s["expected_return"].to_numpy() / p["beta"] for s in scores.values()])
+    y = np.concatenate([test[i][f"label_mid_{model.horizon}"].to_numpy() for i in scores])
+    w = " ".join(f"{a} {v:+.3f}" for a, v in p["weights"].items())
+    print(f"{method:<13} horizon {model.horizon}  weights: {w}  day-2 IC {ic(z, y):+.4f}")
+universe = model.universe(list(test))
+signals = [member_signal(model.members[a], test, universe) for a in members]
+stack = np.column_stack([np.concatenate([s[i] for i in universe]) for s in signals])
+corr, _ = correlation_matrix(stack)
+bets = effective_bets(corr)
+print("signal correlation EQ02/EQ03 %.2f  EQ02/EQ12 %.2f  EQ02/EQ06 %.2f" % (corr[0, 1], corr[0, 3], corr[0, 2]))
+print("effective independent bets: %.2f of %d" % (bets["n_effective"], bets["n_members"]))
+EOF
+```
+
+```
+equal_weight  horizon 5s  weights: EQ02 +0.250 EQ03 +0.250 EQ06 +0.250 EQ12 +0.250  day-2 IC +0.0255
+ridge         horizon 5s  weights: EQ02 +0.418 EQ03 -0.228 EQ06 +0.265 EQ12 +0.090  day-2 IC +0.0338
+signal correlation EQ02/EQ03 0.95  EQ02/EQ12 1.00  EQ02/EQ06 -0.16
+effective independent bets: 1.64 of 4
+```
+
+Four members, 1.64 bets: EQ02, EQ03 and EQ12 are one signal three times.
+Equal weights give that one signal three quarters of the blend; ridge sees
+the correlation and spreads one weight across the cluster (one of the three
+even goes negative) and gives EQ06 its own. This is an illustration on one
+split, not a result — the judged version, through the whole validation
+chain and with its looks debited, is
+
+```bash
+cd python && PYTHONPATH=src python3 -m iap.research combine     # writes research/combination/
+```
+
+which costs 95 looks per (asset class, method) experiment the first time
+and nothing on a rerun. `--dry-run` writes no report and still debits the
+looks; `--members` and `--method` narrow the run, and a narrower member
+list is a different experiment with its own identity. The committed
+verdict: 0 PROMOTE, 8 ITERATE — every combination fails the cost gate
+(`research/combination/REPORT.md`).

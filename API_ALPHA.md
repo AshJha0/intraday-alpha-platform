@@ -233,3 +233,71 @@ is ported (EQ01/EQ03/EQ06/FX01/FX09), reproduce the 5 cases and the IC, and
 (EQ01) reproduce the golden backtest.  Honest-reporting rule (spec §32)
 carries over: `hypothesis_confirmed=false` params ship with the sign the
 fit produced — ports must not "fix" signs, thresholds or coefficients.
+
+## 8. Signal combination — `iap.combine` (Python research; not a port contract)
+
+`CombinedAlpha(member_ids, method="equal_weight", *, asset_class=None,
+horizon=None, alpha_id=None, inner_folds=3, embargo_ns=60e9,
+member_factory=iap.alpha.build)` is an `AlphaModel` whose inputs are alphas:
+`fit(train)` / `score(frames)` / `params()` / `load_params(blob)` with the
+§1 output contract (`exchange_ts, expected_return, confidence`, row-aligned,
+`(0.0, 0.0)` where it has no opinion). It is validated, ledgered and gated
+like any alpha (`iap.validation.validate_alpha`); it is NOT serialised to
+`alpha_params.json` and no port scores it.
+
+**Member signal.** `z_k = expected_return_k / beta_k` on rows where member
+`k` has confidence > 0, NaN elsewhere; a dead member (`beta == 0`) has no
+signal.
+
+**Fit** (training rows only — PLATFORM_CONVENTIONS.md §13.8):
+
+1. split the training window with `WalkForwardSplitter(n_folds=inner_folds,
+   embargo_ns)` at the combination horizon;
+2. per inner fold, fit every member on the inner training rows (minus the
+   last `member horizon − combination horizon` of them) and score the inner
+   test rows: the stack `Z` (rows × K), with labels `y`, inner-fold ids and
+   timestamps;
+3. standardise each column of `Z` by its own mean and standard deviation
+   over its finite rows (missing → 0.0; fewer than 32 finite rows or no
+   variance → inactive, weight 0); fit the weights; then `mu`, `sigma` of the
+   blend and the OLS slope `beta` of `y` on the clipped blend;
+4. refit every member on the whole training window.
+
+**Weights** (`iap.combine.weights.fit_weights`; normalised to `sum |w| = 1`):
+
+| method | weights | reads the label | accounts for member correlation |
+|---|---|---|---|
+| `equal_weight` (default) | `1 / K_active` | no | no |
+| `ic_weighted` | `max(IC_k, 0) / (1 − IC_k²)` | yes | no |
+| `ridge` | `(Z'Z/n + λI)⁻¹ Z'y/n`, `λ ∈ {0.01, 0.1, 1, 10, 100}` by forward-chained CV over the inner folds (purged, embargoed; larger `λ` on a tie; the largest when no split is possible) | yes | yes |
+| `shrinkage_mv` | `S*⁻¹ cov(z, y)`, `S*` the Ledoit–Wolf shrinkage of the signal covariance towards `mu·I` | yes | yes |
+
+Nothing is orthogonalised: under `equal_weight` and `ic_weighted` a block of
+near-duplicate members is over-weighted by them, which
+`effective_bets(correlation_matrix(Z))` (`N_eff = (Σλ)² / Σλ²` over the
+eigenvalues of the signal correlation matrix) reports.
+
+**Score.**
+
+```
+c    = Σ_k w_k · (z_k − mean_k) / scale_k        (missing z_k → 0; accumulated in member order)
+zc   = clip((c − mu) / (sigma + 1e-12), −4, +4)
+er   = beta · zc
+conf = min(1, |zc| / 2)          rows where no weighted member has an opinion → (0.0, 0.0)
+```
+
+`hypothesis_confirmed = beta > 0 and Σ w_k > 0`. The blend is summed column
+by column rather than as a matrix product so that a row's score is
+bit-identical whatever rows follow it (the truncation and recompute probes).
+
+**Defaults.** Members: every flagship alpha of the asset class. Horizon:
+the members' lower-median label horizon (`combination_horizon`): EQUITY
+`5s`, FX `1m`. Ids `COMB_EQ` / `COMB_FX`.
+
+**Report and CLI.** `python -m iap.research combine [--asset-class
+EQUITY|FX|all] [--method m1,m2] [--members A,B,...] [--horizon H]
+[--dry-run]` → `research/combination/{REPORT.md, COMBINATION.json,
+signal_correlation.json, reports/<id>.<method>.json}`. Each (asset class,
+method) pair is one experiment costing `83 + K` looks (§13.8).
+`signal_correlation.json` (`x-version` 1) is the input of the lifecycle's
+`cross_alpha_correlation` gate (docs/LIFECYCLE.md §3).

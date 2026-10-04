@@ -23,12 +23,23 @@ from iap.lifecycle.config import (
     load_policy_config,
 )
 from iap.lifecycle.evidence import (
+    CrossAlphaEvidence,
+    CrossAlphaPeer,
     Evidence,
     LiveEvidence,
     PaperEvidence,
+    PnlBootstrapEvidence,
     ValidationEvidence,
 )
-from iap.lifecycle.gates import GATE_SPECS, Gate, GateSpec, build_gates, ic_rank_gap
+from iap.lifecycle.gates import (
+    BOOTSTRAP_GATE,
+    GATE_SPECS,
+    Gate,
+    GateSpec,
+    bootstrap_gate_reason,
+    build_gates,
+    ic_rank_gap,
+)
 from iap.lifecycle.machine import (
     ALLOWED_TRANSITIONS,
     PROMOTION_EDGES,
@@ -50,6 +61,7 @@ from iap.lifecycle.registry import (
 
 __all__ = [
     "ALLOWED_TRANSITIONS",
+    "BOOTSTRAP_GATE",
     "DEFAULT_LIFECYCLE_PATH",
     "DEFAULT_STRATEGIES_PATH",
     "GATE_SPECS",
@@ -60,6 +72,8 @@ __all__ = [
     "AlphaLifecycle",
     "AlphaRecord",
     "AlphaRegistry",
+    "CrossAlphaEvidence",
+    "CrossAlphaPeer",
     "Edge",
     "EdgeKind",
     "Evidence",
@@ -71,8 +85,10 @@ __all__ = [
     "LiveEvidence",
     "Outcome",
     "PaperEvidence",
+    "PnlBootstrapEvidence",
     "PolicyConfig",
     "ValidationEvidence",
+    "bootstrap_gate_reason",
     "build_gates",
     "edge_for",
     "ic_rank_gap",

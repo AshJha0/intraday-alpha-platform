@@ -63,8 +63,8 @@ abs and rel 1e-9; adaptive PSI/KS at 1e-10 with exact refit booleans and
 lifecycle state sequences; canonical-JSON lines, trace digests, the risk
 audit / snapshot and the lifecycle registry are byte-identical; the 7-state
 lifecycle golden is compared exactly, field by field. The v1.5.0 table
-(2026-10-04, counts from CI) reads python 1752 / cpp 302 / rust 330 /
-java 535 (golden 180/72/66/115), `integration` 35, `replay` 6.
+(2026-10-04, counts from CI) reads python 1764 / cpp 289 / rust 355 /
+java 537 (golden 177/68/68/108), `integration` 35, `replay` 6.
 
 ## 4. Golden regeneration protocol
 

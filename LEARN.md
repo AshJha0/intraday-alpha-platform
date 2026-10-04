@@ -59,8 +59,9 @@ Contents:
 26. [Supply-chain hygiene](#26-supply-chain-hygiene)
 27. [Twelve pitfalls this platform is built to avoid](#27-twelve-pitfalls-this-platform-is-built-to-avoid)
 28. [Twelve interview questions (with answers from this repo)](#28-twelve-interview-questions-with-answers-from-this-repo)
-29. [Further reading](#29-further-reading)
+29. [Combining weak signals, and why correlation gates matter](#29-combining-weak-signals-and-why-correlation-gates-matter)
 30. [Adverse selection and markouts](#30-adverse-selection-and-markouts)
+31. [Further reading](#31-further-reading)
 
 ---
 
@@ -1312,8 +1313,8 @@ match**.
   the portfolio golden is checked against an SLSQP optimum. Golden files are
   regenerated only deliberately, with a MIGRATIONS.md entry.
 - **One command proves parity**: `tests/harness/run_all.sh` runs all four
-  suites and prints the table (the v1.5.0 counts from CI, 2026-10-04: python 1752,
-  cpp 302, rust 330, java 535 tests passed; golden groups 180/72/66/115; all
+  suites and prints the table (the v1.5.0 counts from CI, 2026-10-04: python 1764,
+  cpp 289, rust 355, java 537 tests passed; golden groups 177/68/68/108; all
   PASS, plus `integration` (35) and `replay` (6) rows for the repo-level
   pytest suites, a `deployment` row — 25 structural checks passed in CI,
   where promtool and kubeconform are installed — and a `numbers` row that re-derives every headline
@@ -1787,7 +1788,7 @@ adaptive layer starts at ACTIVE (§14.4). Between them there was nothing: no
 record of *where* an alpha stood, what evidence it had cleared, or who
 decided. `iap.lifecycle` ([docs/LIFECYCLE.md](docs/LIFECYCLE.md)) fills that
 gap with a table-driven machine — RESEARCH → CANDIDATE → VALIDATING → PAPER
-→ ACTIVE ⇄ WATCH → RETIRED, seven states, seventeen edges, eighteen gates —
+→ ACTIVE ⇄ WATCH → RETIRED, seven states, seventeen edges, twenty gates —
 in which every SYSTEM edge names the gates it evaluates in order, every
 gate reads one field of a typed evidence document, and every transition is
 one `LifecycleTransition` line with the gate results, the policy and the
@@ -1803,8 +1804,8 @@ PYTHONPATH=src python3 -m iap.lifecycle status                # the registry tab
 ```
 
 The `status` table reads, for all 24 alphas, `CANDIDATE` — and in the
-"failed gates" column, for every one of them, `net_pnl_after_costs` and
-`capacity`. That is
+"failed gates" column, for every one of them, `net_pnl_after_costs`,
+`net_pnl_bootstrap_ci` and `capacity` (§29.7). That is
 the promotion report's finding restated by a state machine that reads the
 same numbers through a different gate table, which is the reason for
 pinning both: two independent readings of one artefact agree.
@@ -1862,13 +1863,13 @@ to "has this idea been ledgered?".
 
 ### 17.4 One alpha's life: the LC01 golden
 
-`tests/golden/expected_lifecycle.json` (`x-version` 2 since v1.5.0) scripts
-four lives under the default policy and one under the legacy policy,
+`tests/golden/expected_lifecycle.json` (`x-version` 3) scripts
+six lives under the default policy and one under the legacy policy,
 compared exactly, step by step, in Python, Java and Rust. LC01 is the
 whole ladder:
 RESEARCH → CANDIDATE on a ledger entry and a clean leakage test; →
-VALIDATING on the nine research gates (a t of 4.0 against a ledger
-threshold of 3.5); → PAPER on a reproducible replay and
+VALIDATING on the eleven gates of that edge (a t of 4.0 against a ledger
+threshold of 3.5, a bootstrap interval above zero, no correlated peer); → PAPER on a reproducible replay and
 parity; → ACTIVE on five paper sessions with a tracking IC; then a hold, a
 null IC (nothing moves), an uninformative IC (nothing moves), a breach →
 WATCH, where the CUSUM starts accumulating, a second breach, a
@@ -1926,7 +1927,7 @@ reproduces them with string concatenation and one hash (pinned:
 digest is sha256 over every canonical line + newline in emission order;
 same seed ⇒ same digest; one changed field or one swapped line changes it.
 Known answers are pinned for one trace, the same trace twice, and the empty
-stream; the MVP golden pins a whole session's digest (`e534ac1f…`, 800
+stream; the MVP golden pins a whole session's digest (`20d4ff76…`, 800
 traces).
 
 ### 18.3 Four languages, one line
@@ -2013,7 +2014,7 @@ index that lied about what its sources contain would be worse than none.
 
 ```bash
 cd python && PYTHONPATH=src python3 -m iap.mvp run
-# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=235 children=348 fills=169 pnl=-81.531396 USD digest=e534ac1f06c50537...
+# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=235 children=348 fills=169 pnl=-81.531396 USD digest=20d4ff76af0b631c...
 ```
 
 Seven seconds later `data/mvp/58a10f2194a3c81c/` holds the captured stream,
@@ -2039,8 +2040,8 @@ regenerated.
 v1.5.0 regenerated it once more and changed nothing a trader would see.
 The loop does not use the research backtester, so the new default methods
 do not touch it: the events, decisions, parents, fills and P&L are
-identical to v1.4.0. What moved is the digest (`f51890da…` → `e534ac1f…`)
-and the `config_version` it covers (`f293e7e7…` → `bf8cc608…`), because
+identical to v1.4.0. What moved is the digest (`f51890da…` → `20d4ff76…`)
+and the `config_version` it covers (`f293e7e7…` → `439bbad5…`), because
 `config_version` hashes `configs/execution/execution.json`, which now
 names its impact model, and `alpha_params.json`, whose header names the
 regeneration commit. A digest that changes when a hashed configuration
@@ -3228,67 +3229,188 @@ the path does not have is 64 zeros, not a made-up hash.
 
 ---
 
-## 29. Further reading
+## 29. Combining weak signals, and why correlation gates matter
 
-Inside this repository, in suggested order:
+### 29.1 The idea, and its fine print
 
-1. `docs/SPECIFICATION.md` — the governing spec; §32 is one paragraph and
-   worth memorizing.
-2. `PLATFORM_CONVENTIONS.md` + `schemas/FORMAT.md` — how contracts get pinned.
-3. `API_CORE.md` → `API_FEATURES.md` → `API_ALPHA.md` →
-   `API_PORTFOLIO_TCA.md` → `API_ADAPTIVE.md` → `API_CONTRACTS.md` →
-   `API_TRADING.md` — the seven port contracts, increasingly rich.
-4. `research/alpha_reports/REPORT.md` — read the master table cold, then
-   re-read §6 above.
-5. `research/ml_reports/ML_REPORT.md` — the crossed-book artifact, in the
-   authors' own numbers.
-6. `research/adaptive_reports/ADAPTIVE_REPORT.md` — the adaptive study;
-   start with "READ THIS FIRST", then §14 above.
-7. `docs/papers/INDEX.md` — all six papers; paper 4 (latency) and paper 6
-   (C++/Rust/Java case study) especially.
-8. `cpp/include/iap/execution/execution.hpp` — the header comment is the
-   best short document on deterministic fill modeling in the repo.
-0. `docs/HOW_IT_WORKS.md` — the whole platform top-down in one sitting,
-   before any of the below.
-9. `docs/MVP.md` — the loop end to end, the wiring review, the IC audit and
-   the success-criteria table; then `docs/LIFECYCLE.md`,
-   `docs/DECISION_TRACE.md` and `docs/DATA_MODEL.md` for the three
-   subsystems it exercises, and `docs/ROADMAP.md` for what is done with
-   evidence and what is backlog.
-10. `docs/RESEARCH_VALIDITY.md` and `research/power/POWER_REPORT.md` — the
-    corrected methods (opt-in in v1.3.0 and v1.4.0, the defaults since
-    v1.5.0, each with its legacy name) and the planted-signal study behind
-    §23–§24;
-    `CHANGELOG.md` for what v1.3.0 fixed and what it leaves open, for
-    the v1.4.0 dataset regeneration (§2.3), and for the v1.5.0 table of
-    what each new default moved.
+No single signal in this repository is strong. The best equity alpha has an
+out-of-sample IC of 0.026. The textbook response is the fundamental law of
+active management: `IR ≈ IC × sqrt(breadth)`. Small skill, applied to many
+independent bets, adds up.
 
-Classic external literature these designs draw on (find current editions):
+The word that carries the weight is *independent*. Take `K` standardised
+signals, each with information coefficient `ic` against the same label, with
+mean pairwise correlation `rho`. Their equal-weight average has variance
+`(1 + (K − 1) rho) / K` and covariance `ic` with the label, so
 
-- Harris, *Trading and Exchanges* — the standard microstructure-institutions text.
-- O'Hara, *Market Microstructure Theory*; Hasbrouck, *Empirical Market
-  Microstructure* — the theory and econometrics foundations.
-- Cont, Kukanov & Stoikov, "The Price Impact of Order Book Events" — the OFI
-  construction used by EQ02/EQ03.
-- Stoikov, "The Micro-Price" — the microprice estimator behind EQ01/FX01.
-- Avellaneda & Stoikov, "High-Frequency Trading in a Limit Order Book" —
-  inventory-aware quoting, background for execution thinking.
-- Almgren & Chriss, "Optimal Execution of Portfolio Transactions" — the
-  impact/urgency tradeoff behind the IS algorithm.
-- Perold, "The Implementation Shortfall: Paper vs. Reality" — §11's
-  decomposition, from the source.
-- López de Prado, *Advances in Financial Machine Learning* — purging,
-  embargo, meta-labeling, deflated Sharpe/multiple testing.
-- Bailey & López de Prado, "The Deflated Sharpe Ratio" — the selection-
-  under-multiple-testing yardstick behind §6.6.
-- Grinold & Kahn, *Active Portfolio Management* — alpha, IC and the
-  fundamental law, context for §8.
+    IC_blend = ic × sqrt( K / (1 + (K − 1) × rho) )
 
-Everything else is in the code — which, in this repository, is the point:
-every claim above is a test, a golden file, or a committed report you can
-rerun.
+Work it by hand for twelve signals with `ic = 0.01`:
 
----
+| `rho` | `K / (1 + (K − 1) rho)` | blend IC |
+|---|---|---|
+| 0.0 | 12.0 | 0.0346 |
+| 0.1 | 5.7 | 0.0239 |
+| 0.3 | 2.8 | 0.0167 |
+| 0.7 | 1.4 | 0.0117 |
+| 1.0 | 1.0 | 0.0100 |
+
+At a correlation of 0.3 — unremarkable for signals built from the same
+order book — twelve signals are worth fewer than three. Breadth is not the
+number of signals you have. It is the number of independent things they
+say.
+
+### 29.2 Measure the breadth you have
+
+`iap.combine.effective_bets` turns a correlation matrix into one number,
+the participation ratio of its eigenvalues: `N_eff = (Σλ)² / Σλ²`. Twelve
+uncorrelated signals give 12; twelve copies give 1. On the bundled data
+(`research/combination/REPORT.md`):
+
+- the twelve equity alphas hold **6.5** effective bets. The reason is one
+  cluster: EQ02, EQ03 and EQ12 are three measurements of order-flow
+  imbalance, correlated 0.95 to 1.00;
+- the twelve FX alphas hold **9.9**: no pair is above 0.7.
+
+The arithmetic then says what an equal-weight blend should achieve, and
+the measurement agrees with it:
+
+| | mean member IC | breadth `K/(1+(K−1)rho)` | expected blend IC | measured |
+|---|---|---|---|---|
+| equities | 0.0038 | 6.8 | 0.0099 | 0.0105 |
+| FX | 0.0109 | 10.1 | 0.0348 | 0.0315 |
+
+### 29.3 Fitting weights without fooling yourself
+
+Equal weights estimate nothing, which is their virtue. Anything smarter —
+weighting by IC, ridge regression, a mean-variance blend — estimates `K`
+numbers from the same short sample the result will be judged on, and the
+way this goes wrong is always the same: the weights see the rows they are
+then scored on.
+
+`CombinedAlpha` is built so that they cannot (PLATFORM_CONVENTIONS.md
+§13.8). In each walk-forward fold it is handed the training window only.
+Inside that window it runs a second, inner walk-forward: each member is
+fitted on the early part and predicts the later part, and those
+out-of-sample predictions — the *stack* — are what the weights are fitted
+on. The ridge penalty is chosen by cross-validation inside the stack. The
+standardisation of each member uses the stack's mean and scale. Then the
+whole thing is applied, frozen, to the test rows.
+
+The tests do not take this on trust. For every fold and every method,
+`test_fold_parameters_ignore_everything_from_the_test_start_on` replaces
+every label from the test start onwards with garbage (or shifts them by a
+row, or multiplies every later feature by 1 000) and requires the fitted
+parameters to be identical to the last bit. A second test fits a combiner
+the wrong way — on train and test together — and checks that the same
+corruption *does* move it: a leakage test that cannot fail is not a test.
+
+One real bug was caught this way, by the platform's own truncation probe
+(`iap.validation.leakage`). The blend was first computed as a matrix product. A BLAS routine may
+round the dot product of row 500 differently depending on whether the
+matrix has 501 rows or 5 000, so the score of a row depended, in the last
+bit, on rows after it. No information leaked; the probe failed anyway, and
+it was right to: "bit-identical when the future is removed" is the
+property, and "the difference is tiny" is how real look-ahead gets waved
+through. The blend is now accumulated member by member.
+
+### 29.4 Combining is a search
+
+Four methods on one member list is four tries at a significant result, and
+each is charged: 83 looks for its validation chain plus one per member,
+declared to the ledger before the first is evaluated (§24). The committed
+report was charged 760 of them and every combination in it — the default included —
+was judged at a t threshold of 4.42, not 3.0. Selecting members by their
+past verdicts would be a further, hidden search (survivorship in member
+selection), which is why the default member list is all twelve alphas of
+an asset class, the rejected ones too.
+
+### 29.5 The honest result
+
+| combination | gate IC | gate t | trades, four folds | net P&L 1× | verdict |
+|---|---|---|---|---|---|
+| equities, equal weight | 0.0105 | 1.98 | 0 | 0 | ITERATE |
+| equities, IC-weighted | 0.0262 | 6.29 | 3 | −44 | ITERATE |
+| equities, ridge | 0.0429 | 7.06 | 6 | −73 | ITERATE |
+| equities, shrinkage MV | 0.0413 | 6.38 | 6 | −73 | ITERATE |
+| FX, equal weight | 0.0315 | 3.22 | 15 | −13 | ITERATE |
+| FX, IC-weighted | 0.0428 | 3.74 | 2 713 | −929 | ITERATE |
+| FX, ridge | 0.0482 | 4.73 | 4 444 | −1 627 | ITERATE |
+| FX, shrinkage MV | 0.0478 | 4.76 | 4 419 | −1 631 | ITERATE |
+
+Nothing is promotable. Read the columns in order and the reason is plain.
+The combination works *statistically*: the fitted equity blends have a t of
+6 to 7, well over the 4.42 they needed. It does not work *economically*:
+an IC of 0.04 on a five-second label is a forecast of a fraction of a tick,
+the cost-aware backtest enters only when the forecast exceeds the spread
+and fee, and on equities that happens six times in four folds. Breadth
+raised the correlation between forecast and outcome. It did nothing for the
+size of the outcome relative to the cost of trading it. A PROMOTE here
+would have been the surprise, and the first thing to check would have been
+the leakage tests of §29.3.
+
+### 29.6 Why a correlation gate
+
+Suppose the costs were lower and EQ02, EQ03 and EQ12 each cleared every
+gate. A lifecycle that judges alphas one at a time would promote all
+three and the book would hold three allocations to one idea — three times
+the position, one bet's worth of diversification. That is the failure a
+correlation gate exists for: each alpha is fine on its own evidence, and
+the *set* is wrong.
+
+`cross_alpha_correlation` (docs/LIFECYCLE.md §3) sits on CANDIDATE →
+VALIDATING: the candidate's largest absolute signal correlation with any
+alpha already at VALIDATING or beyond must be at most 0.7. Four details
+are worth knowing because each closes a loophole:
+
+- **Absolute value.** An alpha correlated −0.9 with an allocated one is its
+  mirror image; it adds no information either.
+- **Vacuous pass, stated.** With nobody to compare against, the value is 0.0
+  and the gate passes. Today that is all 24 alphas. The gate has decided
+  nothing yet, and the registry says so by the value.
+- **Fail closed.** If nobody measured the correlations, the evidence block
+  is absent and the gate fails. An empty list of peers ("there is no other
+  alpha") and a missing block ("nobody looked") are different statements.
+- **Order is part of the rule.** The gate compares a candidate with what is
+  already through, so whoever goes first wins. The bootstrap goes in
+  ascending id: EQ02 would pass, EQ03 and EQ12 would be held.
+
+The signal is gated rather than the P&L because most alphas here never
+trade — a P&L correlation would be undefined exactly where the gate is
+needed. Where P&L exists it is reported (FX08 and FX09: 0.41).
+
+### 29.7 The bootstrap gate, in the same change
+
+The same release turned a reported number into a gate. Up to then the
+lifecycle asked "is net P&L after costs positive on the last fold?" — a
+point estimate on a fifth of the data. `net_pnl_bootstrap_ci` asks for the
+lower end of a 95 % stationary-bootstrap interval around the pooled P&L of
+all four folds to be above zero (COOKBOOK §31 runs the bootstrap). Two rules in it
+matter more than the level:
+
+- an alpha that makes **no trade** has a P&L of exactly zero in every
+  resample, an interval of [0, 0], and no evidence. The gate fails it and
+  says why. Seventeen of the 24 alphas are in that position;
+- the comparison is **strict**: a lower bound of exactly zero fails.
+
+All 24 alphas fail it today and no verdict moved, because all 24 already
+failed the point-estimate gate. Its job is the case that has not happened
+yet: an alpha whose last fold was lucky.
+
+### 29.8 Exercises
+
+1. In `python/tests/test_combine.py`, `make_frames` makes feature `f3` a
+   noisy copy of `f1`. Predict the effective number of bets of the four toy
+   members, then check it against `test_member_pass_on_toy_members_...`.
+2. Change `_garble_from(..., "labels")` to corrupt labels from one row
+   *before* the test start. Which methods' parameters move, and why not
+   `equal_weight`'s weights?
+3. Using the formula of §29.1: how many independent signals with IC 0.004
+   would it take to reach the equity blend's measured 0.0105? How many at
+   `rho = 0.07`?
+4. EQ08 has a gate IC of −0.040 at the combination horizon — a strong
+   signal with the wrong sign. `ridge` gives it a negative weight;
+   `ic_weighted` gives it zero. Argue for each.
 
 ## 30. Adverse selection and markouts
 
@@ -3441,3 +3563,62 @@ same markout table, and see what the passive fills actually kept.
    you ask for next? *(The fill rate, and the cost of the quantity it did not
    fill.)*
 
+## 31. Further reading
+
+Inside this repository, in suggested order:
+
+1. `docs/SPECIFICATION.md` — the governing spec; §32 is one paragraph and
+   worth memorizing.
+2. `PLATFORM_CONVENTIONS.md` + `schemas/FORMAT.md` — how contracts get pinned.
+3. `API_CORE.md` → `API_FEATURES.md` → `API_ALPHA.md` →
+   `API_PORTFOLIO_TCA.md` → `API_ADAPTIVE.md` → `API_CONTRACTS.md` →
+   `API_TRADING.md` — the seven port contracts, increasingly rich.
+4. `research/alpha_reports/REPORT.md` — read the master table cold, then
+   re-read §6 above.
+5. `research/ml_reports/ML_REPORT.md` — the crossed-book artifact, in the
+   authors' own numbers.
+6. `research/adaptive_reports/ADAPTIVE_REPORT.md` — the adaptive study;
+   start with "READ THIS FIRST", then §14 above.
+7. `docs/papers/INDEX.md` — all six papers; paper 4 (latency) and paper 6
+   (C++/Rust/Java case study) especially.
+8. `cpp/include/iap/execution/execution.hpp` — the header comment is the
+   best short document on deterministic fill modeling in the repo.
+0. `docs/HOW_IT_WORKS.md` — the whole platform top-down in one sitting,
+   before any of the below.
+9. `docs/MVP.md` — the loop end to end, the wiring review, the IC audit and
+   the success-criteria table; then `docs/LIFECYCLE.md`,
+   `docs/DECISION_TRACE.md` and `docs/DATA_MODEL.md` for the three
+   subsystems it exercises, and `docs/ROADMAP.md` for what is done with
+   evidence and what is backlog.
+10. `docs/RESEARCH_VALIDITY.md` and `research/power/POWER_REPORT.md` — the
+    corrected methods (opt-in in v1.3.0 and v1.4.0, the defaults since
+    v1.5.0, each with its legacy name) and the planted-signal study behind
+    §23–§24;
+    `CHANGELOG.md` for what v1.3.0 fixed and what it leaves open, for
+    the v1.4.0 dataset regeneration (§2.3), and for the v1.5.0 table of
+    what each new default moved.
+
+Classic external literature these designs draw on (find current editions):
+
+- Harris, *Trading and Exchanges* — the standard microstructure-institutions text.
+- O'Hara, *Market Microstructure Theory*; Hasbrouck, *Empirical Market
+  Microstructure* — the theory and econometrics foundations.
+- Cont, Kukanov & Stoikov, "The Price Impact of Order Book Events" — the OFI
+  construction used by EQ02/EQ03.
+- Stoikov, "The Micro-Price" — the microprice estimator behind EQ01/FX01.
+- Avellaneda & Stoikov, "High-Frequency Trading in a Limit Order Book" —
+  inventory-aware quoting, background for execution thinking.
+- Almgren & Chriss, "Optimal Execution of Portfolio Transactions" — the
+  impact/urgency tradeoff behind the IS algorithm.
+- Perold, "The Implementation Shortfall: Paper vs. Reality" — §11's
+  decomposition, from the source.
+- López de Prado, *Advances in Financial Machine Learning* — purging,
+  embargo, meta-labeling, deflated Sharpe/multiple testing.
+- Bailey & López de Prado, "The Deflated Sharpe Ratio" — the selection-
+  under-multiple-testing yardstick behind §6.6.
+- Grinold & Kahn, *Active Portfolio Management* — alpha, IC and the
+  fundamental law, context for §8.
+
+Everything else is in the code — which, in this repository, is the point:
+every claim above is a test, a golden file, or a committed report you can
+rerun.
