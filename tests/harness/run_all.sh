@@ -53,7 +53,7 @@ GOLDEN_ONLY=0
 RUST_GOLDEN_TARGETS="marketdata:golden_marketdata orderbook:golden_book features:golden_features alpha:golden_alpha risk:golden_risk risk:golden_risk_fuzz replay:golden_replay contracts:golden_canonical_json contracts:golden_trace lifecycle:golden_lifecycle"
 # Java golden test classes (JUnit4) — ALL of them (round-3 PLATFORM SEV-2:
 # the gate used to run 2 of the 10 classes while README claimed otherwise).
-JAVA_GOLDEN_CLASSES="com.iap.AdaptiveGoldenTest com.iap.AlphaGoldenTest com.iap.AnomalyGoldenTest com.iap.BacktestGoldenTest com.iap.BookGoldenTest com.iap.CanonicalJsonGoldenTest com.iap.CodecGoldenTest com.iap.FeatureGoldenTest com.iap.LifecycleGoldenTest com.iap.PortfolioGoldenTest com.iap.ReplayFillsGoldenTest com.iap.RiskFuzzGoldenTest com.iap.RiskGoldenTest com.iap.TcaGoldenTest com.iap.TraceGoldenTest"
+JAVA_GOLDEN_CLASSES="com.iap.AdaptiveGoldenTest com.iap.AlphaGoldenTest com.iap.AnomalyGoldenTest com.iap.BacktestGoldenTest com.iap.BookGoldenTest com.iap.CanonicalJsonGoldenTest com.iap.CodecGoldenTest com.iap.FeatureGoldenTest com.iap.LifecycleGoldenTest com.iap.MarkoutGoldenTest com.iap.PortfolioGoldenTest com.iap.ReplayFillsGoldenTest com.iap.ReplayFillsPassiveGoldenTest com.iap.RiskFuzzGoldenTest com.iap.RiskGoldenTest com.iap.TcaGoldenTest com.iap.TraceGoldenTest"
 
 # Per-language results. TESTS/GOLDEN hold a NUMBER when the suite ran and the
 # count could be parsed, and "-" when it did not run or could not be parsed —

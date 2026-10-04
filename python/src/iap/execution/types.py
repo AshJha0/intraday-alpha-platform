@@ -214,6 +214,10 @@ class ChildOrder:
     #: qty ahead of us in the FIFO queue at our level: the displayed size at
     #: rest time plus our own earlier children resting there (rule 4).
     ahead_qty: int = 0
+    #: ``ahead_qty`` at the moment the order came to rest (never updated
+    #: afterwards; 0 for an order that never rested) — the queue position at
+    #: entry the markout analysis reports against the fill outcome.
+    entry_ahead_qty: int = 0
     resting: bool = False
     cross_exempt: bool = False  #: crossing-rule exemption (rule 4)
     cancel_reason: CancelReason = CancelReason.NONE

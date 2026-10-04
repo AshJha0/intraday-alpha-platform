@@ -37,6 +37,10 @@ goldens         tests/golden/expected_*.json (every Python-owned generator;
                 alpha_params.json must come out byte-identical — that is
                 the proof they are independent)
 tca             research/tca/* (golden vectors only: must be unchanged)
+execution       research/execution/{EXECUTION_REPORT.md,execution_study.json}
+                (aggressive vs passive execution of the same parents on the
+                bundled equities + the MVP session per child policy; needs
+                only the `dataset` step)
 configmaps      deployment/k8s/configmap-*.yaml (alpha_params.json is a
                 projected config)
 ==============  ============================================================
@@ -90,6 +94,8 @@ GOLDEN_TOOLS = (
     "make_golden_alpha.py",
     "make_golden_adaptive.py",
     "make_golden_tca.py",
+    "make_golden_markout.py",
+    "make_golden_replay_passive.py",
     "make_golden_contracts.py",
     "make_golden_canonical_json.py",
     "make_golden_lifecycle.py",
@@ -120,6 +126,7 @@ def _steps() -> list[tuple[str, list[tuple[Path, list[str]]]]]:
         ("power", [(py_dir, [PY, "-m", "iap.research", "power"])]),
         ("goldens", [(REPO, [PY, str(tools / name), "--force"]) for name in GOLDEN_TOOLS]),
         ("tca", [(py_dir, [PY, "-m", "iap.tca"])]),
+        ("execution", [(REPO, [PY, "research/execution/run_execution_study.py"])]),
         ("configmaps", [(REPO, [PY, "deployment/k8s/generate_configmaps.py"])]),
     ]
 

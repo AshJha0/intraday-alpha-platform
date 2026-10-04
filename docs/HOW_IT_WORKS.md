@@ -582,6 +582,54 @@ PYTHONPATH=src python3 -m pytest -q tests/test_exec_algos.py tests/test_sor.py \
   tests/test_execution_rules.py tests/test_execution_golden.py tests/test_tca_golden.py
 ```
 
+### 3.5 Posting instead of crossing, and measuring what it buys
+
+Every alpha here loses after costs, and most of the cost is the half-spread
+a MARKET child pays. The execution policy of a parent order
+(`ParentOrder.policy`) decides whether its children cross or post:
+
+- `NATIVE`, the default, is what §3.1 describes.
+- `AGGRESSIVE` crosses with every child.
+- `PASSIVE` posts each schedule step at the near touch — one tick inside
+  when the spread is three ticks or more, never at or through the other
+  side — and lets it rest. How long is the parent's patience:
+  `30 s × (1 − urgency)`, times `e^(−risk_aversion)` for IS. When the rest
+  time is up the child is repriced once (or simply left in the queue if the
+  touch has not moved), and after that the remainder is cancelled and
+  crossed. If the schedule falls more than 10 % of the order behind, the
+  resting children are cancelled and crossed at once.
+
+The simulator did not change for this. A posted child is an ordinary LIMIT
+order under the queue rules of §3.3; a cancel takes the same latency path as
+an order and can lose the race to a fill, in which case only what was
+actually cancelled is sent again. C++, Java and Python produce the same
+fills (`tests/golden/expected_replay_fills_passive.json`).
+
+Whether posting helped is a measurement, not an assumption. The **markout**
+of a fill is the signed move of the mid after it,
+`s × (mid(t_fill + h) − fill price)`, at 100 ms, 1 s, 5 s, 30 s, 60 s and
+5 min. A passive buy at the bid starts half a spread ahead; if the mid then
+falls, the fill was *adversely selected* — it happened because someone
+better informed wanted to sell. The decomposition is exact:
+*effective half-spread = realised half-spread + price impact*. A markout
+window that runs past the end of the data, or across a halt or a gap in the
+quotes, is reported as `null`, never as zero. The same module reports the
+fill rate of resting orders, their time to fill, and both against the queue
+position they started from (`iap.tca.markout`, Java `com.iap.tca.Markout`,
+golden `expected_markout.json`).
+
+`research/execution/EXECUTION_REPORT.md` runs the same parent orders under
+each policy on the bundled equities and prices the quantity a passive order
+failed to fill — at the move of the mid over the window plus the cost of
+crossing it at the end — so that not trading cannot pass for cheap trading.
+It also says which part of the result is the simulator: our resting order
+never changes the replayed book, so nobody reacts to it.
+
+```bash
+cd python
+PYTHONPATH=src python3 -m pytest -q tests/test_passive_policy.py tests/test_markout.py
+```
+
 ---
 
 ## 4. Risk: the engine that says no

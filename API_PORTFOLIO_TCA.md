@@ -251,6 +251,64 @@ iap.tca` from a pinned SplitMix64(seed=20260829) parent-order simulation
 over the golden event vectors. The simulation is a Python research harness;
 Java implements §2.1–§2.7 against production fills instead.
 
+### 2.9 Markout analysis (v1.5.0; `iap.tca.markout`, Java `com.iap.tca.Markout`)
+
+Additive to §2.5 (whose three pinned deltas and per-order record are
+unchanged). With side sign `s`, fill price `p`, fill time `t_f`, horizon `h`,
+`m_f` the fill's §2.4 reference mid and `m_h` the mid **at or before**
+`t_f + h` in event time (`timeline.prevailing(t_f + h)`; no interpolation):
+
+| measure (per unit) | definition | sign |
+|---|---|---|
+| `markout(h)` | `s * (m_h - p)` | positive = the fill looks good after `h` |
+| `effective_half_spread` | `s * (p - m_f)` | `+hs` taker at the touch, `-hs` maker (earned) |
+| `realised_half_spread(h)` | `s * (p - m_h)` | `= -markout(h)` |
+| `price_impact(h)` | `s * (m_h - m_f)` | mid moved in the direction of our trade |
+| `adverse_selection(h)` | `-price_impact(h)` over MAKER fills | positive = the mid moved against the resting order |
+
+`effective_half_spread = realised_half_spread(h) + price_impact(h)` exactly,
+per fill and per cell. Bps are per fill `1e4 * x / p`; currency is
+`x * qty * qty_unit`. Default horizons `{100ms, 1s, 5s, 30s, 60s, 5min}`
+(`DEFAULT_HORIZONS_NS`; any mapping can be passed).
+
+**Undefined ⇒ `null`, never zero, never a stale carry.** A markout is
+undefined when (1) no two-sided state exists at or before `t_f + h`; (2) the
+timeline ends before `t_f + h` (session end); (3) a gate started inside
+`(min(t_f, ts(m_h)), t_f + h]`. A gate is a timestamp in `timeline.halts`;
+`build_gated_timeline` records one at every non-TRADING status (HALT,
+AUCTION, CLOSE) of any venue and whenever the consolidated book stops being
+two-sided, and appends no state while either lasts — so halts, auctions and
+no-quote gaps all make the windows that touch them undefined. The reference
+mid is undefined when no state prevails or the prevailing one predates a
+gate; such a fill has no measure at any horizon.
+
+**Cells** (`markout_report`): `all`, `by_liquidity` (MAKER = passive, TAKER =
+aggressive), `by_venue`, `by_algo`, `by_side`, `by_time_bucket`
+(`floor((t_f - session_start_ts) / bucket_ns)`). Per cell and horizon, over
+the fills defined at that horizon: `n`, the equal-weight mean of each measure
+in bps, its standard error (sample standard deviation, `ddof = 1`, over
+`sqrt(n)`) and the currency sum. Fewer than `min_fills` (default 5) defined
+fills ⇒ `n` is reported and every statistic is `null`. The standard error
+treats fills as independent; fills of one parent are not, so it is a lower
+bound.
+
+**Passive orders** (`passive_order_stats`; a passive order = a LIMIT child
+that came to rest): `fill_rate_qty`, `fill_rate_orders`, `full_fill_rate`,
+`time_to_first_fill_ns` / `time_to_full_fill_ns` (from arrival at the venue;
+mean and standard error), overall and per queue-position bucket at entry
+(`ChildOrder.entry_ahead_qty`, default edges 0 / 500 / 2000).
+
+This is a separate, non-wire document: the `TCAResult` wire contract
+(`schemas/tca/tca_result.schema.json`, x-version 1) did **not** gain fields —
+it is embedded in every decision trace, so a new field would move the trace
+digests and the MVP golden in four languages (schemas/MIGRATIONS.md,
+2026-10-04 execution quality). Golden: `tests/golden/expected_markout.json`
+(x-version 1; 400 s timeline with a HALT and a 20 s quote gap, 40 fills
+including one before the first quote, one at the session end, one just
+before the halt and one inside the gap; per-fill measures, the report and the
+passive-order statistics; 1e-9, nulls exact). Python generates
+(`python/tools/make_golden_markout.py`), Java consumes (`MarkoutGoldenTest`).
+
 ## 3. Training-artifact manifest (for any service persisting fits)
 
 Every model fit directory `research/models/<run_id>/` contains

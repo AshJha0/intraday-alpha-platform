@@ -1,0 +1,2219 @@
+{
+ "x-version": 1,
+ "description": "Execution-quality study (research/execution/run_execution_study.py): the same parent orders worked under each child execution policy on the bundled equities, and the MVP session per policy. Costs in bps of qty * arrival mid, positive = worse; markouts in bps of the fill price, null = undefined or too few fills.",
+ "dataset": {
+  "sessions": [
+   "eq_20260824.normalized.jsonl",
+   "eq_20260825.normalized.jsonl"
+  ],
+  "n_events": 209750,
+  "n_parents": 836,
+  "window_ns": 600000000000,
+  "slices": 5,
+  "pov_participation": 0.1,
+  "seed": 20260829,
+  "min_fills": 30,
+  "passive_params": {
+   "max_rest_ns": 30000000000,
+   "max_reprices": 1,
+   "max_behind_fraction": 0.1,
+   "improve_min_spread_ticks": 3,
+   "end_margin_ns": 1000000000
+  },
+  "policies": {
+   "aggressive": {
+    "costs": {
+     "n_parents": 836,
+     "notional": 118489212.0,
+     "qty": 741600,
+     "filled_qty": 670912,
+     "fill_rate": 0.9046817691477885,
+     "maker_share_of_filled": 0.0,
+     "shortfall_ccy": 11948.980000000452,
+     "shortfall_bps": 1.0084445493654268,
+     "trading_ccy": 12270.865000000302,
+     "trading_bps": 1.035610313620813,
+     "opportunity_ccy": -321.8849999998346,
+     "opportunity_bps": -0.02716576425538509,
+     "spread_ccy": 10080.425000000054,
+     "spread_bps": 0.8507462265847505,
+     "price_vs_mid_residual_ccy": 917.9300000001475,
+     "price_vs_mid_residual_bps": 0.07746949992376923,
+     "timing_ccy": 1272.5100000000953,
+     "timing_bps": 0.107394587112293,
+     "fees_net_ccy": 1929.2011999999982,
+     "fees_net_bps": 0.16281661152409369,
+     "sim_impact_ccy": 98.73934884334096,
+     "sim_impact_bps": 0.008333193138573744,
+     "completion_ccy": 1339.0840000000378,
+     "completion_bps": 0.11301315768730387,
+     "all_in_ccy": 15316.004548843834,
+     "all_in_bps": 1.2926075117153986,
+     "all_in_bps_per_parent": {
+      "n": 836,
+      "mean": 2.6420371549348562,
+      "se": 0.2443496628534625,
+      "t": 10.812526295644194
+     }
+    },
+    "by_algo": {
+     "TWAP": {
+      "n_parents": 220,
+      "notional": 31456258.0,
+      "qty": 196100,
+      "filled_qty": 194436,
+      "fill_rate": 0.9915145334013259,
+      "maker_share_of_filled": 0.0,
+      "shortfall_ccy": 3401.620000000387,
+      "shortfall_bps": 1.0813810085104167,
+      "trading_ccy": 3385.2200000003863,
+      "trading_bps": 1.0761674195323507,
+      "opportunity_ccy": 16.400000000001455,
+      "opportunity_bps": 0.005213588978066449,
+      "spread_ccy": 2863.6999999999666,
+      "spread_bps": 0.9103752900297188,
+      "price_vs_mid_residual_ccy": 367.2000000000525,
+      "price_vs_mid_residual_bps": 0.11673352882598195,
+      "timing_ccy": 154.3200000003684,
+      "timing_bps": 0.049058600676650216,
+      "fees_net_ccy": 559.1967999999999,
+      "fees_net_bps": 0.17776965079571763,
+      "sim_impact_ccy": 30.811260290752216,
+      "sim_impact_bps": 0.009794954088548045,
+      "completion_ccy": 35.17200000000266,
+      "completion_bps": 0.011181240947350655,
+      "all_in_ccy": 4026.80006029114,
+      "all_in_bps": 1.2801268543420328,
+      "all_in_bps_per_parent": {
+       "n": 220,
+       "mean": 2.470210698691914,
+       "se": 0.45028708930100697,
+       "t": 5.485857261700508
+      }
+     },
+     "VWAP": {
+      "n_parents": 220,
+      "notional": 33116457.5,
+      "qty": 203600,
+      "filled_qty": 202340,
+      "fill_rate": 0.993811394891945,
+      "maker_share_of_filled": 0.0,
+      "shortfall_ccy": 4206.284999999841,
+      "shortfall_bps": 1.2701494415578238,
+      "trading_ccy": 4126.399999999848,
+      "trading_bps": 1.2460269942821778,
+      "opportunity_ccy": 79.88499999999338,
+      "opportunity_bps": 0.024122447275646372,
+      "spread_ccy": 3036.980000000005,
+      "spread_bps": 0.9170606487725944,
+      "price_vs_mid_residual_ccy": 294.4000000000463,
+      "price_vs_mid_residual_bps": 0.0888983974206922,
+      "timing_ccy": 795.0199999997965,
+      "timing_bps": 0.240067948088891,
+      "fees_net_ccy": 581.8367999999999,
+      "fees_net_bps": 0.1756941544849717,
+      "sim_impact_ccy": 38.89176165920634,
+      "sim_impact_bps": 0.011743937786584311,
+      "completion_ccy": 23.384999999999287,
+      "completion_bps": 0.007061443694573699,
+      "all_in_ccy": 4850.398561659044,
+      "all_in_bps": 1.4646489775239528,
+      "all_in_bps_per_parent": {
+       "n": 220,
+       "mean": 3.2255062541979327,
+       "se": 0.4522612167212282,
+       "t": 7.131954133900719
+      }
+     },
+     "POV": {
+      "n_parents": 198,
+      "notional": 26013677.0,
+      "qty": 166100,
+      "filled_qty": 99550,
+      "fill_rate": 0.5993377483443708,
+      "maker_share_of_filled": 0.0,
+      "shortfall_ccy": 971.0000000002174,
+      "shortfall_bps": 0.3732651866171081,
+      "trading_ccy": 1484.4000000000694,
+      "trading_bps": 0.5706229073268149,
+      "opportunity_ccy": -513.3999999998521,
+      "opportunity_bps": -0.1973577207097067,
+      "spread_ccy": 1531.2500000000664,
+      "spread_bps": 0.5886326642712086,
+      "price_vs_mid_residual_ccy": 25.000000000054747,
+      "price_vs_mid_residual_bps": 0.009610329212611792,
+      "timing_ccy": -71.85000000005164,
+      "timing_bps": -0.027620086157005657,
+      "fees_net_ccy": 286.4459999999999,
+      "fees_net_bps": 0.11011361446519072,
+      "sim_impact_ccy": 1.6467925903501412,
+      "sim_impact_bps": 0.0006330487575247979,
+      "completion_ccy": 1256.4500000000428,
+      "completion_bps": 0.4829959255664022,
+      "all_in_ccy": 2515.54279259061,
+      "all_in_bps": 0.9670077754062258,
+      "all_in_bps_per_parent": {
+       "n": 198,
+       "mean": 2.0742855785424186,
+       "se": 0.6350975107832475,
+       "t": 3.2660899205608
+      }
+     },
+     "IS": {
+      "n_parents": 198,
+      "notional": 27902819.5,
+      "qty": 175800,
+      "filled_qty": 174586,
+      "fill_rate": 0.993094425483504,
+      "maker_share_of_filled": 0.0,
+      "shortfall_ccy": 3370.0750000000244,
+      "shortfall_bps": 1.2077901303128253,
+      "trading_ccy": 3274.845000000003,
+      "trading_bps": 1.1736609628285066,
+      "opportunity_ccy": 95.23000000002259,
+      "opportunity_bps": 0.034129167484319135,
+      "spread_ccy": 2648.4950000000254,
+      "spread_bps": 0.9491854398441797,
+      "price_vs_mid_residual_ccy": 231.32999999999265,
+      "price_vs_mid_residual_bps": 0.08290560027455027,
+      "timing_ccy": 395.0199999999826,
+      "timing_bps": 0.14156992270977584,
+      "fees_net_ccy": 501.72159999999997,
+      "fees_net_bps": 0.17981035930795453,
+      "sim_impact_ccy": 27.389534303032256,
+      "sim_impact_bps": 0.009816045401086531,
+      "completion_ccy": 24.07699999999332,
+      "completion_bps": 0.008628877092507916,
+      "all_in_ccy": 3923.2631343030484,
+      "all_in_bps": 1.4060454121143737,
+      "all_in_bps_per_parent": {
+       "n": 198,
+       "mean": 2.752408016860499,
+       "se": 0.3978676300744336,
+       "t": 6.917898840741517
+      }
+     }
+    },
+    "markouts": {
+     "passive_fills": {
+      "100ms": {
+       "n": 0,
+       "markout_bps": null,
+       "markout_se_bps": null,
+       "effective_half_spread_bps": null,
+       "effective_half_spread_se_bps": null,
+       "realised_half_spread_bps": null,
+       "realised_half_spread_se_bps": null,
+       "price_impact_bps": null,
+       "price_impact_se_bps": null
+      },
+      "1s": {
+       "n": 0,
+       "markout_bps": null,
+       "markout_se_bps": null,
+       "effective_half_spread_bps": null,
+       "effective_half_spread_se_bps": null,
+       "realised_half_spread_bps": null,
+       "realised_half_spread_se_bps": null,
+       "price_impact_bps": null,
+       "price_impact_se_bps": null
+      },
+      "5s": {
+       "n": 0,
+       "markout_bps": null,
+       "markout_se_bps": null,
+       "effective_half_spread_bps": null,
+       "effective_half_spread_se_bps": null,
+       "realised_half_spread_bps": null,
+       "realised_half_spread_se_bps": null,
+       "price_impact_bps": null,
+       "price_impact_se_bps": null
+      },
+      "30s": {
+       "n": 0,
+       "markout_bps": null,
+       "markout_se_bps": null,
+       "effective_half_spread_bps": null,
+       "effective_half_spread_se_bps": null,
+       "realised_half_spread_bps": null,
+       "realised_half_spread_se_bps": null,
+       "price_impact_bps": null,
+       "price_impact_se_bps": null
+      },
+      "60s": {
+       "n": 0,
+       "markout_bps": null,
+       "markout_se_bps": null,
+       "effective_half_spread_bps": null,
+       "effective_half_spread_se_bps": null,
+       "realised_half_spread_bps": null,
+       "realised_half_spread_se_bps": null,
+       "price_impact_bps": null,
+       "price_impact_se_bps": null
+      },
+      "5min": {
+       "n": 0,
+       "markout_bps": null,
+       "markout_se_bps": null,
+       "effective_half_spread_bps": null,
+       "effective_half_spread_se_bps": null,
+       "realised_half_spread_bps": null,
+       "realised_half_spread_se_bps": null,
+       "price_impact_bps": null,
+       "price_impact_se_bps": null
+      }
+     },
+     "aggressive_fills": {
+      "100ms": {
+       "n": 8953,
+       "markout_bps": -2.2917147069933583,
+       "markout_se_bps": 0.028988857256482852,
+       "effective_half_spread_bps": 2.293614606955033,
+       "effective_half_spread_se_bps": 0.028983623717773643,
+       "realised_half_spread_bps": 2.2917147069933583,
+       "realised_half_spread_se_bps": 0.028988857256482852,
+       "price_impact_bps": 0.0018998999616737712,
+       "price_impact_se_bps": 0.002017889807058065
+      },
+      "1s": {
+       "n": 8952,
+       "markout_bps": -2.293238119632021,
+       "markout_se_bps": 0.029478371074757297,
+       "effective_half_spread_bps": 2.2933990843493564,
+       "effective_half_spread_se_bps": 0.028986060153783168,
+       "realised_half_spread_bps": 2.293238119632021,
+       "realised_half_spread_se_bps": 0.029478371074757297,
+       "price_impact_bps": 0.00016096471733633276,
+       "price_impact_se_bps": 0.0050696841800744775
+      },
+      "5s": {
+       "n": 8941,
+       "markout_bps": -2.2891312345280292,
+       "markout_se_bps": 0.03074118766563516,
+       "effective_half_spread_bps": 2.2939235248055834,
+       "effective_half_spread_se_bps": 0.02901250349786072,
+       "realised_half_spread_bps": 2.2891312345280292,
+       "realised_half_spread_se_bps": 0.03074118766563516,
+       "price_impact_bps": 0.00479229027754578,
+       "price_impact_se_bps": 0.01094376618293174
+      },
+      "30s": {
+       "n": 8903,
+       "markout_bps": -2.315734275036775,
+       "markout_se_bps": 0.03857289261266069,
+       "effective_half_spread_bps": 2.294021225307721,
+       "effective_half_spread_se_bps": 0.02908037810283209,
+       "realised_half_spread_bps": 2.315734275036775,
+       "realised_half_spread_se_bps": 0.03857289261266069,
+       "price_impact_bps": -0.0217130497290646,
+       "price_impact_se_bps": 0.025941789577965696
+      },
+      "60s": {
+       "n": 8857,
+       "markout_bps": -2.3207960082884465,
+       "markout_se_bps": 0.0475338611734145,
+       "effective_half_spread_bps": 2.2942021269843664,
+       "effective_half_spread_se_bps": 0.029204171424606736,
+       "realised_half_spread_bps": 2.3207960082884465,
+       "realised_half_spread_se_bps": 0.0475338611734145,
+       "price_impact_bps": -0.02659388130408123,
+       "price_impact_se_bps": 0.038067791348389154
+      },
+      "5min": {
+       "n": 8510,
+       "markout_bps": -2.081391916649472,
+       "markout_se_bps": 0.09974686068132549,
+       "effective_half_spread_bps": 2.30242832596001,
+       "effective_half_spread_se_bps": 0.02998084387670884,
+       "realised_half_spread_bps": 2.081391916649472,
+       "realised_half_spread_se_bps": 0.09974686068132549,
+       "price_impact_bps": 0.22103640931053056,
+       "price_impact_se_bps": 0.09707392960680142
+      }
+     }
+    },
+    "passive_orders": null,
+    "transitions": null
+   },
+   "native": {
+    "costs": {
+     "n_parents": 836,
+     "notional": 118489212.0,
+     "qty": 741600,
+     "filled_qty": 482321,
+     "fill_rate": 0.6503789104638619,
+     "maker_share_of_filled": 0.43132063501278195,
+     "shortfall_ccy": 5319.355000000555,
+     "shortfall_bps": 0.44893158712208797,
+     "trading_ccy": 1041.1250000002788,
+     "trading_bps": 0.08786664899081942,
+     "opportunity_ccy": 4278.230000000275,
+     "opportunity_bps": 0.36106493813126844,
+     "spread_ccy": 632.065000000146,
+     "spread_bps": 0.0533436748655351,
+     "price_vs_mid_residual_ccy": 2349.2600000000093,
+     "price_vs_mid_residual_bps": 0.1982678389320379,
+     "timing_ccy": -1940.1999999998698,
+     "timing_bps": -0.16374486480675302,
+     "fees_net_ccy": 373.5465999999998,
+     "fees_net_bps": 0.031525789875284156,
+     "sim_impact_ccy": 29.110693033792558,
+     "sim_impact_bps": 0.002456822232372729,
+     "completion_ccy": 4544.172000000062,
+     "completion_bps": 0.38350934429372885,
+     "all_in_ccy": 10266.184293034405,
+     "all_in_bps": 0.8664235435234732,
+     "all_in_bps_per_parent": {
+      "n": 836,
+      "mean": 1.664023127217401,
+      "se": 0.29838330028079996,
+      "t": 5.576797111806983
+     }
+    },
+    "by_algo": {
+     "TWAP": {
+      "n_parents": 220,
+      "notional": 31456258.0,
+      "qty": 196100,
+      "filled_qty": 106280,
+      "fill_rate": 0.5419683834778174,
+      "maker_share_of_filled": 1.0,
+      "shortfall_ccy": -241.39999999957683,
+      "shortfall_bps": -0.07674148654286116,
+      "trading_ccy": -1907.3999999997275,
+      "trading_bps": -0.606365830290344,
+      "opportunity_ccy": 1666.0000000001494,
+      "opportunity_bps": 0.5296243437474825,
+      "spread_ccy": -1809.7999999999597,
+      "spread_bps": -0.575338617835586,
+      "price_vs_mid_residual_ccy": 1184.599999999928,
+      "price_vs_mid_residual_bps": 0.37658643313515805,
+      "timing_ccy": -1282.1999999996935,
+      "timing_bps": -0.40761364558991525,
+      "fees_net_ccy": -211.82999999999987,
+      "fees_net_bps": -0.0673411312941291,
+      "sim_impact_ccy": 0.0,
+      "sim_impact_bps": 0.0,
+      "completion_ccy": 1585.260000000072,
+      "completion_bps": 0.5039569550834915,
+      "all_in_ccy": 1132.0300000004954,
+      "all_in_bps": 0.3598743372465013,
+      "all_in_bps_per_parent": {
+       "n": 220,
+       "mean": 0.3122323097211866,
+       "se": 0.6219617136834318,
+       "t": 0.5020121059736286
+      }
+     },
+     "VWAP": {
+      "n_parents": 220,
+      "notional": 33116457.5,
+      "qty": 203600,
+      "filled_qty": 101805,
+      "fill_rate": 0.500024557956778,
+      "maker_share_of_filled": 0.9995088649869849,
+      "shortfall_ccy": 1224.0799999998942,
+      "shortfall_bps": 0.3696289073189348,
+      "trading_ccy": -1812.3200000000684,
+      "trading_bps": -0.5472566019478589,
+      "opportunity_ccy": 3036.3999999999623,
+      "opportunity_bps": 0.9168855092667936,
+      "spread_ccy": -1740.6799999999866,
+      "spread_bps": -0.525623853336362,
+      "price_vs_mid_residual_ccy": 908.230000000026,
+      "price_vs_mid_residual_bps": 0.27425336783079113,
+      "timing_ccy": -979.8700000001074,
+      "timing_bps": -0.2958861164422878,
+      "fees_net_ccy": -203.0850000000001,
+      "fees_net_bps": -0.061324494022345265,
+      "sim_impact_ccy": 7.020454545454546e-05,
+      "sim_impact_bps": 2.1199292060313352e-08,
+      "completion_ccy": 1680.6849999999508,
+      "completion_bps": 0.5075074832505714,
+      "all_in_ccy": 2701.68007020439,
+      "all_in_bps": 0.8158119177464529,
+      "all_in_bps_per_parent": {
+       "n": 220,
+       "mean": 1.6689793767334875,
+       "se": 0.6593604949641678,
+       "t": 2.5312092390736667
+      }
+     },
+     "POV": {
+      "n_parents": 198,
+      "notional": 26013677.0,
+      "qty": 166100,
+      "filled_qty": 99550,
+      "fill_rate": 0.5993377483443708,
+      "maker_share_of_filled": 0.0,
+      "shortfall_ccy": 969.6000000002174,
+      "shortfall_bps": 0.3727270081812031,
+      "trading_ccy": 1483.0000000000698,
+      "trading_bps": 0.5700847288909099,
+      "opportunity_ccy": -513.3999999998521,
+      "opportunity_bps": -0.1973577207097067,
+      "spread_ccy": 1531.050000000067,
+      "spread_bps": 0.5885557816375082,
+      "price_vs_mid_residual_ccy": 25.100000000056752,
+      "price_vs_mid_residual_bps": 0.009648770529462926,
+      "timing_ccy": -73.15000000005358,
+      "timing_bps": -0.02811982327606112,
+      "fees_net_ccy": 286.4399999999999,
+      "fees_net_bps": 0.1101113079861797,
+      "sim_impact_ccy": 1.647010512881528,
+      "sim_impact_bps": 0.0006331325298155767,
+      "completion_ccy": 1256.4500000000428,
+      "completion_bps": 0.4829959255664022,
+      "all_in_ccy": 2514.137010513142,
+      "all_in_bps": 0.9664673742636005,
+      "all_in_bps_per_parent": {
+       "n": 198,
+       "mean": 2.072815079846629,
+       "se": 0.6348742111294398,
+       "t": 3.264922473633156
+      }
+     },
+     "IS": {
+      "n_parents": 198,
+      "notional": 27902819.5,
+      "qty": 175800,
+      "filled_qty": 174686,
+      "fill_rate": 0.9936632536973834,
+      "maker_share_of_filled": 0.0,
+      "shortfall_ccy": 3367.0750000000216,
+      "shortfall_bps": 1.2067149701484545,
+      "trading_ccy": 3277.8450000000057,
+      "trading_bps": 1.1747361229928772,
+      "opportunity_ccy": 89.23000000001667,
+      "opportunity_bps": 0.03197884715557747,
+      "spread_ccy": 2651.4950000000254,
+      "spread_bps": 0.9502606000085494,
+      "price_vs_mid_residual_ccy": 231.3299999999955,
+      "price_vs_mid_residual_bps": 0.08290560027455128,
+      "timing_ccy": 395.0199999999826,
+      "timing_bps": 0.14156992270977584,
+      "fees_net_ccy": 502.0216,
+      "fees_net_bps": 0.1799178753243915,
+      "sim_impact_ccy": 27.46361231636559,
+      "sim_impact_bps": 0.009842593977417081,
+      "completion_ccy": 21.77699999999514,
+      "completion_bps": 0.007804587633158413,
+      "all_in_ccy": 3918.337212316381,
+      "all_in_bps": 1.4042800270834213,
+      "all_in_bps_per_parent": {
+       "n": 198,
+       "mean": 2.7517140278994274,
+       "se": 0.3978625548473912,
+       "t": 6.9162427938334305
+      }
+     }
+    },
+    "markouts": {
+     "passive_fills": {
+      "100ms": {
+       "n": 1726,
+       "markout_bps": 0.5674158905137674,
+       "markout_se_bps": 0.10626212633075172,
+       "effective_half_spread_bps": -0.9505197223701569,
+       "effective_half_spread_se_bps": 0.09952086973201482,
+       "realised_half_spread_bps": -0.5674158905137674,
+       "realised_half_spread_se_bps": 0.10626212633075172,
+       "price_impact_bps": -0.3831038318563905,
+       "price_impact_se_bps": 0.03311134983710078
+      },
+      "1s": {
+       "n": 1727,
+       "markout_bps": 0.558281251618704,
+       "markout_se_bps": 0.1069513333368082,
+       "effective_half_spread_bps": -0.9523941201511334,
+       "effective_half_spread_se_bps": 0.09948088666420489,
+       "realised_half_spread_bps": -0.558281251618704,
+       "realised_half_spread_se_bps": 0.1069513333368082,
+       "price_impact_bps": -0.39411286853243016,
+       "price_impact_se_bps": 0.035560048766610265
+      },
+      "5s": {
+       "n": 1728,
+       "markout_bps": 0.5430661243790639,
+       "markout_se_bps": 0.10892499500124302,
+       "effective_half_spread_bps": -0.9487941083217302,
+       "effective_half_spread_se_bps": 0.09948845498760901,
+       "realised_half_spread_bps": -0.5430661243790639,
+       "realised_half_spread_se_bps": 0.10892499500124302,
+       "price_impact_bps": -0.4057279839426671,
+       "price_impact_se_bps": 0.041368376409919715
+      },
+      "30s": {
+       "n": 1719,
+       "markout_bps": 0.30397884772144107,
+       "markout_se_bps": 0.12347146099876881,
+       "effective_half_spread_bps": -0.9570697250973303,
+       "effective_half_spread_se_bps": 0.09989667152369106,
+       "realised_half_spread_bps": -0.30397884772144107,
+       "realised_half_spread_se_bps": 0.12347146099876881,
+       "price_impact_bps": -0.6530908773758906,
+       "price_impact_se_bps": 0.07493896618510408
+      },
+      "60s": {
+       "n": 1712,
+       "markout_bps": 0.2777497074302222,
+       "markout_se_bps": 0.13397151434821652,
+       "effective_half_spread_bps": -0.955100424504045,
+       "effective_half_spread_se_bps": 0.10020930414583425,
+       "realised_half_spread_bps": -0.2777497074302222,
+       "realised_half_spread_se_bps": 0.13397151434821652,
+       "price_impact_bps": -0.6773507170738252,
+       "price_impact_se_bps": 0.09054064029388335
+      },
+      "5min": {
+       "n": 1624,
+       "markout_bps": -0.174039218610591,
+       "markout_se_bps": 0.24908593551360786,
+       "effective_half_spread_bps": -0.9752395637530828,
+       "effective_half_spread_se_bps": 0.10460533342161803,
+       "realised_half_spread_bps": 0.174039218610591,
+       "realised_half_spread_se_bps": 0.24908593551360786,
+       "price_impact_bps": -1.1492787823636765,
+       "price_impact_se_bps": 0.2193944023888934
+      }
+     },
+     "aggressive_fills": {
+      "100ms": {
+       "n": 6525,
+       "markout_bps": -2.2582136600657625,
+       "markout_se_bps": 0.032190715494004714,
+       "effective_half_spread_bps": 2.259479403836075,
+       "effective_half_spread_se_bps": 0.03217339436091777,
+       "realised_half_spread_bps": 2.2582136600657625,
+       "realised_half_spread_se_bps": 0.032190715494004714,
+       "price_impact_bps": 0.0012657437703131032,
+       "price_impact_se_bps": 0.0023909944548617616
+      },
+      "1s": {
+       "n": 6525,
+       "markout_bps": -2.2637954064732733,
+       "markout_se_bps": 0.03296934162098315,
+       "effective_half_spread_bps": 2.259479403836075,
+       "effective_half_spread_se_bps": 0.03217339436091777,
+       "realised_half_spread_bps": 2.2637954064732733,
+       "realised_half_spread_se_bps": 0.03296934162098315,
+       "price_impact_bps": -0.004316002637198622,
+       "price_impact_se_bps": 0.006219987957187822
+      },
+      "5s": {
+       "n": 6518,
+       "markout_bps": -2.260388154782228,
+       "markout_se_bps": 0.03466432677083783,
+       "effective_half_spread_bps": 2.260456216499509,
+       "effective_half_spread_se_bps": 0.0322004487214229,
+       "realised_half_spread_bps": 2.260388154782228,
+       "realised_half_spread_se_bps": 0.03466432677083783,
+       "price_impact_bps": 6.806171728675972e-05,
+       "price_impact_se_bps": 0.012940286008574806
+      },
+      "30s": {
+       "n": 6490,
+       "markout_bps": -2.2988904079925696,
+       "markout_se_bps": 0.04430990320869275,
+       "effective_half_spread_bps": 2.2613959284346334,
+       "effective_half_spread_se_bps": 0.03229656284017164,
+       "realised_half_spread_bps": 2.2988904079925696,
+       "realised_half_spread_se_bps": 0.04430990320869275,
+       "price_impact_bps": -0.03749447955791756,
+       "price_impact_se_bps": 0.02997467442368245
+      },
+      "60s": {
+       "n": 6452,
+       "markout_bps": -2.2983148852637805,
+       "markout_se_bps": 0.054642478640087006,
+       "effective_half_spread_bps": 2.2615833225947726,
+       "effective_half_spread_se_bps": 0.032447625298857696,
+       "realised_half_spread_bps": 2.2983148852637805,
+       "realised_half_spread_se_bps": 0.054642478640087006,
+       "price_impact_bps": -0.036731562668986105,
+       "price_impact_se_bps": 0.044148068622548886
+      },
+      "5min": {
+       "n": 6216,
+       "markout_bps": -1.9353772006568408,
+       "markout_se_bps": 0.11639228720351005,
+       "effective_half_spread_bps": 2.2738196967549573,
+       "effective_half_spread_se_bps": 0.03328943382784918,
+       "realised_half_spread_bps": 1.9353772006568408,
+       "realised_half_spread_se_bps": 0.11639228720351005,
+       "price_impact_bps": 0.3384424960981223,
+       "price_impact_se_bps": 0.11450738202213667
+      }
+     }
+    },
+    "passive_orders": {
+     "min_orders": 30,
+     "queue_edges": [
+      0,
+      500,
+      2000
+     ],
+     "all": {
+      "n_orders": 2198,
+      "posted_qty": 399320,
+      "filled_qty": 208085,
+      "fill_rate_qty": 0.5210983672242813,
+      "fill_rate_orders": 0.5618744313011829,
+      "full_fill_rate": 0.5145586897179254,
+      "time_to_first_fill_ns": {
+       "n": 1235,
+       "mean": 147026017709.04776,
+       "se": 3283003747.9177337
+      },
+      "time_to_full_fill_ns": {
+       "n": 1131,
+       "mean": 160482287091.79132,
+       "se": 3557961656.965318
+      }
+     },
+     "by_queue_ahead_at_entry": {
+      "0": {
+       "n_orders": 14,
+       "posted_qty": 2610,
+       "filled_qty": 2097,
+       "fill_rate_qty": null,
+       "fill_rate_orders": null,
+       "full_fill_rate": null,
+       "time_to_first_fill_ns": {
+        "n": 12,
+        "mean": null,
+        "se": null
+       },
+       "time_to_full_fill_ns": {
+        "n": 11,
+        "mean": null,
+        "se": null
+       }
+      },
+      "1-500": {
+       "n_orders": 848,
+       "posted_qty": 150288,
+       "filled_qty": 88756,
+       "fill_rate_qty": 0.5905727669541148,
+       "fill_rate_orders": 0.6403301886792453,
+       "full_fill_rate": 0.5790094339622641,
+       "time_to_first_fill_ns": {
+        "n": 543,
+        "mean": 132066509083.52303,
+        "se": 4727535885.821285
+       },
+       "time_to_full_fill_ns": {
+        "n": 491,
+        "mean": 146094817797.63748,
+        "se": 5285080417.238363
+       }
+      },
+      "501-2000": {
+       "n_orders": 1229,
+       "posted_qty": 227629,
+       "filled_qty": 111087,
+       "fill_rate_qty": 0.48801778332286305,
+       "fill_rate_orders": 0.5207485760781123,
+       "full_fill_rate": 0.4816924328722539,
+       "time_to_first_fill_ns": {
+        "n": 640,
+        "mean": 158680535115.26093,
+        "se": 4604002301.058643
+       },
+       "time_to_full_fill_ns": {
+        "n": 592,
+        "mean": 172235518761.65033,
+        "se": 4890195775.302217
+       }
+      },
+      ">2000": {
+       "n_orders": 107,
+       "posted_qty": 18793,
+       "filled_qty": 6145,
+       "fill_rate_qty": 0.32698345128505296,
+       "fill_rate_orders": 0.37383177570093457,
+       "full_fill_rate": 0.34579439252336447,
+       "time_to_first_fill_ns": {
+        "n": 40,
+        "mean": 193336530556.75,
+        "se": 21312321255.02155
+       },
+       "time_to_full_fill_ns": {
+        "n": 37,
+        "mean": 198796491264.3784,
+        "se": 22699548451.130352
+       }
+      }
+     }
+    },
+    "transitions": null
+   },
+   "passive_u0.2": {
+    "costs": {
+     "n_parents": 836,
+     "notional": 118489212.0,
+     "qty": 741600,
+     "filled_qty": 668962,
+     "fill_rate": 0.9020523193096008,
+     "maker_share_of_filled": 0.37963591354964854,
+     "shortfall_ccy": 4794.985000000306,
+     "shortfall_bps": 0.40467692535589705,
+     "trading_ccy": 5271.610000000137,
+     "trading_bps": 0.44490210636223465,
+     "opportunity_ccy": -476.62499999983737,
+     "opportunity_bps": -0.040225181006338144,
+     "spread_ccy": 2115.869999999982,
+     "spread_bps": 0.17857068709343615,
+     "price_vs_mid_residual_ccy": 1124.1000000000986,
+     "price_vs_mid_residual_bps": 0.09486939621136974,
+     "timing_ccy": 2031.6400000000551,
+     "timing_bps": 0.17146202305742864,
+     "fees_net_ccy": 685.7445999999994,
+     "fees_net_bps": 0.05787401134881372,
+     "sim_impact_ccy": 61.869595224405366,
+     "sim_impact_bps": 0.0052215382464021595,
+     "completion_ccy": 1376.409000000037,
+     "completion_bps": 0.11616323349336113,
+     "all_in_ccy": 6919.008195224742,
+     "all_in_bps": 0.5839357084444736,
+     "all_in_bps_per_parent": {
+      "n": 836,
+      "mean": 0.9068430000179116,
+      "se": 0.2518114723091434,
+      "t": 3.60127754189293
+     }
+    },
+    "by_algo": {
+     "TWAP": {
+      "n_parents": 220,
+      "notional": 31456258.0,
+      "qty": 196100,
+      "filled_qty": 195200,
+      "fill_rate": 0.9954105048444671,
+      "maker_share_of_filled": 0.4486680327868853,
+      "shortfall_ccy": 1059.1300000003932,
+      "shortfall_bps": 0.33669929843543156,
+      "trading_ccy": 1104.3300000003921,
+      "trading_bps": 0.3510684583018082,
+      "opportunity_ccy": -45.199999999998965,
+      "opportunity_bps": -0.014369159866376657,
+      "spread_ccy": 180.4000000000881,
+      "spread_bps": 0.057349478758753854,
+      "price_vs_mid_residual_ccy": 427.1299999999392,
+      "price_vs_mid_residual_bps": 0.13578538171957363,
+      "timing_ccy": 496.8000000003651,
+      "timing_bps": 0.15793359782348082,
+      "fees_net_ccy": 134.29199999999994,
+      "fees_net_bps": 0.04269166408795349,
+      "sim_impact_ccy": 15.645167955887292,
+      "sim_impact_bps": 0.004973626537488118,
+      "completion_ccy": 18.899999999997842,
+      "completion_bps": 0.006008343395453408,
+      "all_in_ccy": 1227.9671679562784,
+      "all_in_bps": 0.39037293245632665,
+      "all_in_bps_per_parent": {
+       "n": 220,
+       "mean": 0.4234867429595228,
+       "se": 0.48534364150764364,
+       "t": 0.8725503060965791
+      }
+     },
+     "VWAP": {
+      "n_parents": 220,
+      "notional": 33116457.5,
+      "qty": 203600,
+      "filled_qty": 202593,
+      "fill_rate": 0.9950540275049116,
+      "maker_share_of_filled": 0.44531153593658224,
+      "shortfall_ccy": 1675.8999999997993,
+      "shortfall_bps": 0.5060625823277745,
+      "trading_ccy": 1638.569999999799,
+      "trading_bps": 0.49479024137765915,
+      "opportunity_ccy": 37.33000000000004,
+      "opportunity_bps": 0.011272340950115223,
+      "spread_ccy": 233.96499999995694,
+      "spread_bps": 0.07064916288221859,
+      "price_vs_mid_residual_ccy": 331.87000000012193,
+      "price_vs_mid_residual_bps": 0.1002130134239515,
+      "timing_ccy": 1072.7349999997205,
+      "timing_bps": 0.32392806507148914,
+      "fees_net_ccy": 142.463,
+      "fees_net_bps": 0.043018792091515226,
+      "sim_impact_ccy": 22.96654109041518,
+      "sim_impact_bps": 0.006935083890061363,
+      "completion_ccy": 23.94099999999454,
+      "completion_bps": 0.007229336048396643,
+      "all_in_ccy": 1865.270541090209,
+      "all_in_bps": 0.5632457943577477,
+      "all_in_bps_per_parent": {
+       "n": 220,
+       "mean": 0.9886650808176196,
+       "se": 0.4647581472719926,
+       "t": 2.1272678846424147
+      }
+     },
+     "POV": {
+      "n_parents": 198,
+      "notional": 26013677.0,
+      "qty": 166100,
+      "filled_qty": 95930,
+      "fill_rate": 0.5775436484045755,
+      "maker_share_of_filled": 0.3926821640779735,
+      "shortfall_ccy": -126.99999999981839,
+      "shortfall_bps": -0.04882047239989118,
+      "trading_ccy": 366.7500000000208,
+      "trading_bps": 0.14098352954871424,
+      "opportunity_ccy": -493.74999999983925,
+      "opportunity_bps": -0.18980400194860544,
+      "spread_ccy": 289.65000000001015,
+      "spread_bps": 0.11134527425708028,
+      "price_vs_mid_residual_ccy": 120.20000000006071,
+      "price_vs_mid_residual_bps": 0.04620646285415965,
+      "timing_ccy": -43.10000000005016,
+      "timing_bps": -0.01656820756252573,
+      "fees_net_ccy": 92.41700000000003,
+      "fees_net_bps": 0.035526311793599975,
+      "sim_impact_ccy": 1.0065413851488165,
+      "sim_impact_bps": 0.000386927763095089,
+      "completion_ccy": 1323.4100000000456,
+      "completion_bps": 0.5087362313294063,
+      "all_in_ccy": 1289.8335413853765,
+      "all_in_bps": 0.4958289984862103,
+      "all_in_bps_per_parent": {
+       "n": 198,
+       "mean": 0.9563863763815105,
+       "se": 0.6519380136438543,
+       "t": 1.466989738849578
+      }
+     },
+     "IS": {
+      "n_parents": 198,
+      "notional": 27902819.5,
+      "qty": 175800,
+      "filled_qty": 175239,
+      "fill_rate": 0.9968088737201365,
+      "maker_share_of_filled": 0.2196714201747328,
+      "shortfall_ccy": 2186.9549999999263,
+      "shortfall_bps": 0.7837756324230697,
+      "trading_ccy": 2161.9599999999255,
+      "trading_bps": 0.774817756320262,
+      "opportunity_ccy": 24.995000000000758,
+      "opportunity_bps": 0.008957876102807731,
+      "spread_ccy": 1411.854999999929,
+      "spread_bps": 0.5059900846220681,
+      "price_vs_mid_residual_ccy": 244.89999999997633,
+      "price_vs_mid_residual_bps": 0.08776890808471034,
+      "timing_ccy": 505.2050000000213,
+      "timing_bps": 0.18105876361348405,
+      "fees_net_ccy": 316.5726000000001,
+      "fees_net_bps": 0.11345541621698843,
+      "sim_impact_ccy": 22.251344792954043,
+      "sim_impact_bps": 0.007974586508346959,
+      "completion_ccy": 10.157999999998989,
+      "completion_bps": 0.0036404923165556757,
+      "all_in_ccy": 2535.936944792881,
+      "all_in_bps": 0.9088461274649615,
+      "all_in_bps_per_parent": {
+       "n": 198,
+       "mean": 1.30344870838618,
+       "se": 0.3870781558797358,
+       "t": 3.3674044597627932
+      }
+     }
+    },
+    "markouts": {
+     "passive_fills": {
+      "100ms": {
+       "n": 3786,
+       "markout_bps": 1.6240419113252786,
+       "markout_se_bps": 0.05533261217709086,
+       "effective_half_spread_bps": -1.8121885757577343,
+       "effective_half_spread_se_bps": 0.051728872591998806,
+       "realised_half_spread_bps": -1.6240419113252786,
+       "realised_half_spread_se_bps": 0.05533261217709086,
+       "price_impact_bps": -0.1881466644324604,
+       "price_impact_se_bps": 0.016442019396714105
+      },
+      "1s": {
+       "n": 3786,
+       "markout_bps": 1.6246389392824834,
+       "markout_se_bps": 0.05575039665971382,
+       "effective_half_spread_bps": -1.8121885757577343,
+       "effective_half_spread_se_bps": 0.051728872591998806,
+       "realised_half_spread_bps": -1.6246389392824834,
+       "realised_half_spread_se_bps": 0.05575039665971382,
+       "price_impact_bps": -0.18754963647525627,
+       "price_impact_se_bps": 0.01779391628256522
+      },
+      "5s": {
+       "n": 3781,
+       "markout_bps": 1.6240821987794054,
+       "markout_se_bps": 0.0590346743734313,
+       "effective_half_spread_bps": -1.8126010821527991,
+       "effective_half_spread_se_bps": 0.0517893206524565,
+       "realised_half_spread_bps": -1.6240821987794054,
+       "realised_half_spread_se_bps": 0.0590346743734313,
+       "price_impact_bps": -0.18851888337340092,
+       "price_impact_se_bps": 0.025744770613045538
+      },
+      "30s": {
+       "n": 3769,
+       "markout_bps": 1.5341217360491508,
+       "markout_se_bps": 0.0695948207281238,
+       "effective_half_spread_bps": -1.8134522042360837,
+       "effective_half_spread_se_bps": 0.051857671369813216,
+       "realised_half_spread_bps": -1.5341217360491508,
+       "realised_half_spread_se_bps": 0.0695948207281238,
+       "price_impact_bps": -0.279330468186938,
+       "price_impact_se_bps": 0.04603732858773246
+      },
+      "60s": {
+       "n": 3751,
+       "markout_bps": 1.4192370028257142,
+       "markout_se_bps": 0.08542439390718294,
+       "effective_half_spread_bps": -1.8089770668157212,
+       "effective_half_spread_se_bps": 0.05195539492110287,
+       "realised_half_spread_bps": -1.4192370028257142,
+       "realised_half_spread_se_bps": 0.08542439390718294,
+       "price_impact_bps": -0.38974006399001027,
+       "price_impact_se_bps": 0.06676313146000121
+      },
+      "5min": {
+       "n": 3600,
+       "markout_bps": 1.5551342260089382,
+       "markout_se_bps": 0.1657824590486113,
+       "effective_half_spread_bps": -1.8049881378307338,
+       "effective_half_spread_se_bps": 0.0532111678382701,
+       "realised_half_spread_bps": -1.5551342260089382,
+       "realised_half_spread_se_bps": 0.1657824590486113,
+       "price_impact_bps": -0.24985391182179145,
+       "price_impact_se_bps": 0.15708900001853085
+      }
+     },
+     "aggressive_fills": {
+      "100ms": {
+       "n": 5448,
+       "markout_bps": -2.1892486057635523,
+       "markout_se_bps": 0.0364210432002857,
+       "effective_half_spread_bps": 2.1849048851796153,
+       "effective_half_spread_se_bps": 0.03578355535303619,
+       "realised_half_spread_bps": 2.1892486057635523,
+       "realised_half_spread_se_bps": 0.0364210432002857,
+       "price_impact_bps": -0.0043437205839370755,
+       "price_impact_se_bps": 0.004079454307216019
+      },
+      "1s": {
+       "n": 5440,
+       "markout_bps": -2.1909131311704546,
+       "markout_se_bps": 0.03744754180019977,
+       "effective_half_spread_bps": 2.185023469998786,
+       "effective_half_spread_se_bps": 0.035835427347698165,
+       "realised_half_spread_bps": 2.1909131311704546,
+       "realised_half_spread_se_bps": 0.03744754180019977,
+       "price_impact_bps": -0.005889661171668017,
+       "price_impact_se_bps": 0.008021451499435847
+      },
+      "5s": {
+       "n": 5439,
+       "markout_bps": -2.1950442981653655,
+       "markout_se_bps": 0.04015668158547386,
+       "effective_half_spread_bps": 2.1853582934578206,
+       "effective_half_spread_se_bps": 0.035840452048798335,
+       "realised_half_spread_bps": 2.1950442981653655,
+       "realised_half_spread_se_bps": 0.04015668158547386,
+       "price_impact_bps": -0.00968600470753736,
+       "price_impact_se_bps": 0.015454733912799348
+      },
+      "30s": {
+       "n": 5418,
+       "markout_bps": -2.20177587215356,
+       "markout_se_bps": 0.04949940545513634,
+       "effective_half_spread_bps": 2.1834273654802963,
+       "effective_half_spread_se_bps": 0.0358105699375211,
+       "realised_half_spread_bps": 2.20177587215356,
+       "realised_half_spread_se_bps": 0.04949940545513634,
+       "price_impact_bps": -0.018348506673253877,
+       "price_impact_se_bps": 0.0344448970884497
+      },
+      "60s": {
+       "n": 5378,
+       "markout_bps": -2.160278049865291,
+       "markout_se_bps": 0.060363668835616544,
+       "effective_half_spread_bps": 2.1845986929508725,
+       "effective_half_spread_se_bps": 0.03595244870144152,
+       "realised_half_spread_bps": 2.160278049865291,
+       "realised_half_spread_se_bps": 0.060363668835616544,
+       "price_impact_bps": 0.024320643085584962,
+       "price_impact_se_bps": 0.049914435300290085
+      },
+      "5min": {
+       "n": 5181,
+       "markout_bps": -1.8095341600325965,
+       "markout_se_bps": 0.12082091991090803,
+       "effective_half_spread_bps": 2.191800087877572,
+       "effective_half_spread_se_bps": 0.036861654055503686,
+       "realised_half_spread_bps": 1.8095341600325965,
+       "realised_half_spread_se_bps": 0.12082091991090803,
+       "price_impact_bps": 0.3822659278449801,
+       "price_impact_se_bps": 0.11996402680500988
+      }
+     }
+    },
+    "passive_orders": {
+     "min_orders": 30,
+     "queue_edges": [
+      0,
+      500,
+      2000
+     ],
+     "all": {
+      "n_orders": 10518,
+      "posted_qty": 841367,
+      "filled_qty": 254613,
+      "fill_rate_qty": 0.3026182391275151,
+      "fill_rate_orders": 0.33951321544019775,
+      "full_fill_rate": 0.29796539266020156,
+      "time_to_first_fill_ns": {
+       "n": 3571,
+       "mean": 16801241358.25203,
+       "se": 229501462.46578208
+      },
+      "time_to_full_fill_ns": {
+       "n": 3134,
+       "mean": 17354099751.931717,
+       "se": 248072285.27987975
+      }
+     },
+     "by_queue_ahead_at_entry": {
+      "0": {
+       "n_orders": 5740,
+       "posted_qty": 619466,
+       "filled_qty": 222302,
+       "fill_rate_qty": 0.3588606961479726,
+       "fill_rate_orders": 0.42770034843205573,
+       "full_fill_rate": 0.3578397212543554,
+       "time_to_first_fill_ns": {
+        "n": 2455,
+        "mean": 16491077390.726273,
+        "se": 278334075.5063567
+       },
+       "time_to_full_fill_ns": {
+        "n": 2054,
+        "mean": 17306446134.070595,
+        "se": 310620647.27576786
+       }
+      },
+      "1-500": {
+       "n_orders": 3458,
+       "posted_qty": 122047,
+       "filled_qty": 23547,
+       "fill_rate_qty": 0.19293386973870721,
+       "fill_rate_orders": 0.28629265471370735,
+       "full_fill_rate": 0.28050896471949105,
+       "time_to_first_fill_ns": {
+        "n": 990,
+        "mean": 16403579242.88687,
+        "se": 413280822.0252623
+       },
+       "time_to_full_fill_ns": {
+        "n": 970,
+        "mean": 16498045485.524742,
+        "se": 420885626.2264311
+       }
+      },
+      "501-2000": {
+       "n_orders": 1231,
+       "posted_qty": 93680,
+       "filled_qty": 8457,
+       "fill_rate_qty": 0.09027540563620837,
+       "fill_rate_orders": 0.09748172217709179,
+       "full_fill_rate": 0.08448415922014622,
+       "time_to_first_fill_ns": {
+        "n": 120,
+        "mean": 25831937794.816666,
+        "se": 1305214613.9573617
+       },
+       "time_to_full_fill_ns": {
+        "n": 104,
+        "mean": 25624444538.125,
+        "se": 1370398577.2839062
+       }
+      },
+      ">2000": {
+       "n_orders": 89,
+       "posted_qty": 6174,
+       "filled_qty": 307,
+       "fill_rate_qty": 0.04972465176546809,
+       "fill_rate_orders": 0.06741573033707865,
+       "full_fill_rate": 0.06741573033707865,
+       "time_to_first_fill_ns": {
+        "n": 6,
+        "mean": null,
+        "se": null
+       },
+       "time_to_full_fill_ns": {
+        "n": 6,
+        "mean": null,
+        "se": null
+       }
+      }
+     }
+    },
+    "transitions": {
+     "posts": 10518,
+     "reprices": 1911,
+     "rest_extensions": 3333,
+     "crosses_timeout": 3607,
+     "crosses_behind": 1663,
+     "crosses_immediate": 11
+    }
+   },
+   "passive_u0.5": {
+    "costs": {
+     "n_parents": 836,
+     "notional": 118489212.0,
+     "qty": 741600,
+     "filled_qty": 669421,
+     "fill_rate": 0.9026712513484358,
+     "maker_share_of_filled": 0.29067208826732355,
+     "shortfall_ccy": 6293.510000000306,
+     "shortfall_bps": 0.5311462447737694,
+     "trading_ccy": 6750.910000000145,
+     "trading_bps": 0.5697489152008325,
+     "opportunity_ccy": -457.39999999984377,
+     "opportunity_bps": -0.038602670427063335,
+     "spread_ccy": 3898.580000000008,
+     "spread_bps": 0.32902404650982137,
+     "price_vs_mid_residual_ccy": 1075.1400000000442,
+     "price_vs_mid_residual_bps": 0.09073737447085428,
+     "timing_ccy": 1777.1900000000926,
+     "timing_bps": 0.14998749422015675,
+     "fees_net_ccy": 976.6476000000004,
+     "fees_net_bps": 0.08242502279448026,
+     "sim_impact_ccy": 69.9337956432116,
+     "sim_impact_bps": 0.005902123447593828,
+     "completion_ccy": 1367.9770000000462,
+     "completion_bps": 0.11545160752694061,
+     "all_in_ccy": 8708.068395643566,
+     "all_in_bps": 0.7349249985427844,
+     "all_in_bps_per_parent": {
+      "n": 836,
+      "mean": 1.2480437964432216,
+      "se": 0.2457372565659931,
+      "t": 5.0787732144639515
+     }
+    },
+    "by_algo": {
+     "TWAP": {
+      "n_parents": 220,
+      "notional": 31456258.0,
+      "qty": 196100,
+      "filled_qty": 194556,
+      "fill_rate": 0.9921264660887302,
+      "maker_share_of_filled": 0.3304961039495055,
+      "shortfall_ccy": 1634.7800000004436,
+      "shortfall_bps": 0.5196994505832332,
+      "trading_ccy": 1677.8800000004344,
+      "trading_bps": 0.5334010167390013,
+      "opportunity_ccy": -43.099999999991184,
+      "opportunity_bps": -0.013701566155768173,
+      "spread_ccy": 862.5400000000604,
+      "spread_bps": 0.2742029900695946,
+      "price_vs_mid_residual_ccy": 398.0599999999539,
+      "price_vs_mid_residual_bps": 0.1265439773541894,
+      "timing_ccy": 417.28000000042016,
+      "timing_bps": 0.1326540493152174,
+      "fees_net_ccy": 246.2508000000001,
+      "fees_net_bps": 0.0782835644341422,
+      "sim_impact_ccy": 19.424225699308717,
+      "sim_impact_bps": 0.006174995671547683,
+      "completion_ccy": 28.71199999999979,
+      "completion_bps": 0.009127595532818871,
+      "all_in_ccy": 1929.167025699753,
+      "all_in_bps": 0.6132856062217422,
+      "all_in_bps_per_parent": {
+       "n": 220,
+       "mean": 0.8902309631322848,
+       "se": 0.469138631831933,
+       "t": 1.8975861349470073
+      }
+     },
+     "VWAP": {
+      "n_parents": 220,
+      "notional": 33116457.5,
+      "qty": 203600,
+      "filled_qty": 202816,
+      "fill_rate": 0.9961493123772102,
+      "maker_share_of_filled": 0.3329766882297255,
+      "shortfall_ccy": 2191.639999999749,
+      "shortfall_bps": 0.661797838733128,
+      "trading_ccy": 2111.1399999997557,
+      "trading_bps": 0.6374896831884134,
+      "opportunity_ccy": 80.49999999999226,
+      "opportunity_bps": 0.024308155544714365,
+      "spread_ccy": 890.1199999999612,
+      "spread_bps": 0.26878478774487313,
+      "price_vs_mid_residual_ccy": 313.09000000005807,
+      "price_vs_mid_residual_bps": 0.09454211701238216,
+      "timing_ccy": 907.9299999997365,
+      "timing_bps": 0.27416277843115816,
+      "fees_net_ccy": 254.17510000000004,
+      "fees_net_bps": 0.0767518989614152,
+      "sim_impact_ccy": 25.890184379722083,
+      "sim_impact_bps": 0.007817920856940113,
+      "completion_ccy": 17.2920000000022,
+      "completion_bps": 0.005221572989804903,
+      "all_in_ccy": 2488.9972843794712,
+      "all_in_bps": 0.7515892315412877,
+      "all_in_bps_per_parent": {
+       "n": 220,
+       "mean": 1.4306876407503464,
+       "se": 0.4419288738360102,
+       "t": 3.2373708201769187
+      }
+     },
+     "POV": {
+      "n_parents": 198,
+      "notional": 26013677.0,
+      "qty": 166100,
+      "filled_qty": 96620,
+      "fill_rate": 0.5816977724262492,
+      "maker_share_of_filled": 0.3423721796729456,
+      "shortfall_ccy": -59.87999999983208,
+      "shortfall_bps": -0.023018660529932806,
+      "trading_ccy": 436.8700000000115,
+      "trading_bps": 0.16793858092418518,
+      "opportunity_ccy": -496.74999999984357,
+      "opportunity_bps": -0.19095724145411797,
+      "spread_ccy": 417.60000000000167,
+      "spread_bps": 0.16053093916711647,
+      "price_vs_mid_residual_ccy": 77.67000000007116,
+      "price_vs_mid_residual_bps": 0.029857370797704282,
+      "timing_ccy": -58.4000000000612,
+      "timing_bps": -0.022449729040635507,
+      "fees_net_ccy": 116.75999999999996,
+      "fees_net_bps": 0.044884081554483805,
+      "sim_impact_ccy": 1.0877363854511106,
+      "sim_impact_bps": 0.00041814019042794707,
+      "completion_ccy": 1311.190000000043,
+      "completion_bps": 0.5040387024102909,
+      "all_in_ccy": 1369.1577363856622,
+      "all_in_bps": 0.52632226362527,
+      "all_in_bps_per_parent": {
+       "n": 198,
+       "mean": 1.0474594343606305,
+       "se": 0.6458966616911418,
+       "t": 1.621713652487509
+      }
+     },
+     "IS": {
+      "n_parents": 198,
+      "notional": 27902819.5,
+      "qty": 175800,
+      "filled_qty": 175429,
+      "fill_rate": 0.9978896473265074,
+      "maker_share_of_filled": 0.1691225510035399,
+      "shortfall_ccy": 2526.9699999999466,
+      "shortfall_bps": 0.9056324935191394,
+      "trading_ccy": 2525.019999999947,
+      "trading_bps": 0.9049336394122991,
+      "opportunity_ccy": 1.9499999999988589,
+      "opportunity_bps": 0.0006988541068399409,
+      "spread_ccy": 1728.319999999986,
+      "spread_bps": 0.6194069384278482,
+      "price_vs_mid_residual_ccy": 286.31999999996316,
+      "price_vs_mid_residual_bps": 0.10261328608743757,
+      "timing_ccy": 510.3799999999988,
+      "timing_bps": 0.18291341489701382,
+      "fees_net_ccy": 359.4617000000002,
+      "fees_net_bps": 0.12882630015221228,
+      "sim_impact_ccy": 23.53164917872968,
+      "sim_impact_bps": 0.008433430599631583,
+      "completion_ccy": 10.783000000000964,
+      "completion_bps": 0.003864484017466752,
+      "all_in_ccy": 2920.7463491786775,
+      "all_in_bps": 1.04675670828845,
+      "all_in_bps_per_parent": {
+       "n": 198,
+       "mean": 1.6432603685300524,
+       "se": 0.38537704774145426,
+       "t": 4.264032791160152
+      }
+     }
+    },
+    "markouts": {
+     "passive_fills": {
+      "100ms": {
+       "n": 3086,
+       "markout_bps": 1.736371147737941,
+       "markout_se_bps": 0.06127713612087552,
+       "effective_half_spread_bps": -1.911274921225575,
+       "effective_half_spread_se_bps": 0.05763465104136755,
+       "realised_half_spread_bps": -1.736371147737941,
+       "realised_half_spread_se_bps": 0.06127713612087552,
+       "price_impact_bps": -0.17490377348764116,
+       "price_impact_se_bps": 0.01789912061604793
+      },
+      "1s": {
+       "n": 3086,
+       "markout_bps": 1.7303589053791553,
+       "markout_se_bps": 0.06166399643708945,
+       "effective_half_spread_bps": -1.911274921225575,
+       "effective_half_spread_se_bps": 0.05763465104136755,
+       "realised_half_spread_bps": -1.7303589053791553,
+       "realised_half_spread_se_bps": 0.06166399643708945,
+       "price_impact_bps": -0.1809160158464271,
+       "price_impact_se_bps": 0.019791778555622384
+      },
+      "5s": {
+       "n": 3084,
+       "markout_bps": 1.7204469829692177,
+       "markout_se_bps": 0.06421645731960791,
+       "effective_half_spread_bps": -1.9114719149838109,
+       "effective_half_spread_se_bps": 0.05766669201073166,
+       "realised_half_spread_bps": -1.7204469829692177,
+       "realised_half_spread_se_bps": 0.06421645731960791,
+       "price_impact_bps": -0.19102493201460435,
+       "price_impact_se_bps": 0.02871472182334715
+      },
+      "30s": {
+       "n": 3073,
+       "markout_bps": 1.6000631999790274,
+       "markout_se_bps": 0.07376126147033535,
+       "effective_half_spread_bps": -1.911706364669585,
+       "effective_half_spread_se_bps": 0.05774659049354836,
+       "realised_half_spread_bps": -1.6000631999790274,
+       "realised_half_spread_se_bps": 0.07376126147033535,
+       "price_impact_bps": -0.3116431646905602,
+       "price_impact_se_bps": 0.04946082805234837
+      },
+      "60s": {
+       "n": 3058,
+       "markout_bps": 1.520462815202912,
+       "markout_se_bps": 0.09148527627670723,
+       "effective_half_spread_bps": -1.904109503862708,
+       "effective_half_spread_se_bps": 0.05767856918449755,
+       "realised_half_spread_bps": -1.520462815202912,
+       "realised_half_spread_se_bps": 0.09148527627670723,
+       "price_impact_bps": -0.38364668865979257,
+       "price_impact_se_bps": 0.07242639738497156
+      },
+      "5min": {
+       "n": 2928,
+       "markout_bps": 1.777808772849534,
+       "markout_se_bps": 0.17951215847331917,
+       "effective_half_spread_bps": -1.9026378329317635,
+       "effective_half_spread_se_bps": 0.05909252709064025,
+       "realised_half_spread_bps": -1.777808772849534,
+       "realised_half_spread_se_bps": 0.17951215847331917,
+       "price_impact_bps": -0.12482906008222244,
+       "price_impact_se_bps": 0.16947679848346012
+      }
+     },
+     "aggressive_fills": {
+      "100ms": {
+       "n": 6053,
+       "markout_bps": -2.17336163900664,
+       "markout_se_bps": 0.03416634811706664,
+       "effective_half_spread_bps": 2.1753231689113597,
+       "effective_half_spread_se_bps": 0.03423826096760099,
+       "realised_half_spread_bps": 2.17336163900664,
+       "realised_half_spread_se_bps": 0.03416634811706664,
+       "price_impact_bps": 0.001961529904719351,
+       "price_impact_se_bps": 0.001384697484111705
+      },
+      "1s": {
+       "n": 6052,
+       "markout_bps": -2.168789146901734,
+       "markout_se_bps": 0.034511545930308085,
+       "effective_half_spread_bps": 2.175527370289251,
+       "effective_half_spread_se_bps": 0.03424330973392339,
+       "realised_half_spread_bps": 2.168789146901734,
+       "realised_half_spread_se_bps": 0.034511545930308085,
+       "price_impact_bps": 0.006738223387518088,
+       "price_impact_se_bps": 0.0051543601825793555
+      },
+      "5s": {
+       "n": 6047,
+       "markout_bps": -2.1425298877176204,
+       "markout_se_bps": 0.03601923954281229,
+       "effective_half_spread_bps": 2.174720289491703,
+       "effective_half_spread_se_bps": 0.034254360764252575,
+       "realised_half_spread_bps": 2.1425298877176204,
+       "realised_half_spread_se_bps": 0.03601923954281229,
+       "price_impact_bps": 0.03219040177408626,
+       "price_impact_se_bps": 0.012199978841300432
+      },
+      "30s": {
+       "n": 6026,
+       "markout_bps": -2.1330402564596906,
+       "markout_se_bps": 0.045653704648246834,
+       "effective_half_spread_bps": 2.173213779371072,
+       "effective_half_spread_se_bps": 0.03423500086466743,
+       "realised_half_spread_bps": 2.1330402564596906,
+       "realised_half_spread_se_bps": 0.045653704648246834,
+       "price_impact_bps": 0.04017352291137982,
+       "price_impact_se_bps": 0.031339627003362076
+      },
+      "60s": {
+       "n": 5989,
+       "markout_bps": -2.1128049770892137,
+       "markout_se_bps": 0.05731454322463849,
+       "effective_half_spread_bps": 2.174055623265739,
+       "effective_half_spread_se_bps": 0.034398812402921204,
+       "realised_half_spread_bps": 2.1128049770892137,
+       "realised_half_spread_se_bps": 0.05731454322463849,
+       "price_impact_bps": 0.061250646176526057,
+       "price_impact_se_bps": 0.04781058346856502
+      },
+      "5min": {
+       "n": 5765,
+       "markout_bps": -1.840952970585619,
+       "markout_se_bps": 0.11834662521100255,
+       "effective_half_spread_bps": 2.174391982443792,
+       "effective_half_spread_se_bps": 0.03507457628017305,
+       "realised_half_spread_bps": 1.840952970585619,
+       "realised_half_spread_se_bps": 0.11834662521100255,
+       "price_impact_bps": 0.33343901185817354,
+       "price_impact_se_bps": 0.11672056747681692
+      }
+     }
+    },
+    "passive_orders": {
+     "min_orders": 30,
+     "queue_edges": [
+      0,
+      500,
+      2000
+     ],
+     "all": {
+      "n_orders": 10329,
+      "posted_qty": 816880,
+      "filled_qty": 195153,
+      "fill_rate_qty": 0.23890045049456468,
+      "fill_rate_orders": 0.28666860296253266,
+      "full_fill_rate": 0.25220253654758445,
+      "time_to_first_fill_ns": {
+       "n": 2961,
+       "mean": 12819174204.359001,
+       "se": 183370896.93527803
+      },
+      "time_to_full_fill_ns": {
+       "n": 2605,
+       "mean": 13168348457.271017,
+       "se": 197816596.25406814
+      }
+     },
+     "by_queue_ahead_at_entry": {
+      "0": {
+       "n_orders": 5735,
+       "posted_qty": 604501,
+       "filled_qty": 171564,
+       "fill_rate_qty": 0.28381094489504566,
+       "fill_rate_orders": 0.35571054925893636,
+       "full_fill_rate": 0.2972972972972973,
+       "time_to_first_fill_ns": {
+        "n": 2040,
+        "mean": 12660948449.42794,
+        "se": 222631187.57041398
+       },
+       "time_to_full_fill_ns": {
+        "n": 1705,
+        "mean": 13155911032.719648,
+        "se": 247282152.23582107
+       }
+      },
+      "1-500": {
+       "n_orders": 3311,
+       "posted_qty": 118153,
+       "filled_qty": 18956,
+       "fill_rate_qty": 0.16043604478938325,
+       "fill_rate_orders": 0.25490788281485954,
+       "full_fill_rate": 0.2506795530051344,
+       "time_to_first_fill_ns": {
+        "n": 844,
+        "mean": 12800121257.93602,
+        "se": 336541831.23057246
+       },
+       "time_to_full_fill_ns": {
+        "n": 830,
+        "mean": 12797577613.76506,
+        "se": 340343136.3749682
+       }
+      },
+      "501-2000": {
+       "n_orders": 1197,
+       "posted_qty": 88132,
+       "filled_qty": 4613,
+       "fill_rate_qty": 0.05234194163300504,
+       "fill_rate_orders": 0.06349206349206349,
+       "full_fill_rate": 0.05764411027568922,
+       "time_to_first_fill_ns": {
+        "n": 76,
+        "mean": 17421727535.736843,
+        "se": 1040874239.8490043
+       },
+       "time_to_full_fill_ns": {
+        "n": 69,
+        "mean": 18099183378.536232,
+        "se": 1146562726.6260517
+       }
+      },
+      ">2000": {
+       "n_orders": 86,
+       "posted_qty": 6094,
+       "filled_qty": 20,
+       "fill_rate_qty": 0.0032819166393173614,
+       "fill_rate_orders": 0.011627906976744186,
+       "full_fill_rate": 0.011627906976744186,
+       "time_to_first_fill_ns": {
+        "n": 1,
+        "mean": null,
+        "se": null
+       },
+       "time_to_full_fill_ns": {
+        "n": 1,
+        "mean": null,
+        "se": null
+       }
+      }
+     }
+    },
+    "transitions": {
+     "posts": 10329,
+     "reprices": 1722,
+     "rest_extensions": 4370,
+     "crosses_timeout": 4665,
+     "crosses_behind": 1176,
+     "crosses_immediate": 11
+    }
+   },
+   "passive_u0.8": {
+    "costs": {
+     "n_parents": 836,
+     "notional": 118489212.0,
+     "qty": 741600,
+     "filled_qty": 669277,
+     "fill_rate": 0.9024770765911543,
+     "maker_share_of_filled": 0.17111599532032326,
+     "shortfall_ccy": 8387.690000000377,
+     "shortfall_bps": 0.7078863854711412,
+     "trading_ccy": 8832.130000000197,
+     "trading_bps": 0.7453952854374791,
+     "opportunity_ccy": -444.4399999998216,
+     "opportunity_bps": -0.037508899966338,
+     "spread_ccy": 6421.735000000037,
+     "spread_bps": 0.5419679050612672,
+     "price_vs_mid_residual_ccy": 777.3200000000963,
+     "price_vs_mid_residual_bps": 0.06560259680012863,
+     "timing_ccy": 1633.075000000066,
+     "timing_bps": 0.13782478357608335,
+     "fees_net_ccy": 1367.2118000000023,
+     "fees_net_bps": 0.11538702780806764,
+     "sim_impact_ccy": 81.99534788825592,
+     "sim_impact_bps": 0.0069200686293918404,
+     "completion_ccy": 1377.4690000000326,
+     "completion_bps": 0.11625269311437675,
+     "all_in_ccy": 11214.366147888668,
+     "all_in_bps": 0.9464461750229775,
+     "all_in_bps_per_parent": {
+      "n": 836,
+      "mean": 1.7454916538677197,
+      "se": 0.24056235397366793,
+      "t": 7.2558803363671025
+     }
+    },
+    "by_algo": {
+     "TWAP": {
+      "n_parents": 220,
+      "notional": 31456258.0,
+      "qty": 196100,
+      "filled_qty": 194460,
+      "fill_rate": 0.9916369199388068,
+      "maker_share_of_filled": 0.1748431554047105,
+      "shortfall_ccy": 2417.730000000428,
+      "shortfall_bps": 0.7686006390208359,
+      "trading_ccy": 2475.4300000004177,
+      "trading_bps": 0.78694357097415,
+      "opportunity_ccy": -57.699999999989586,
+      "opportunity_bps": -0.018342931953314212,
+      "spread_ccy": 1830.8000000000436,
+      "spread_bps": 0.5820145549416729,
+      "price_vs_mid_residual_ccy": 291.7300000000288,
+      "price_vs_mid_residual_bps": 0.0927414824738622,
+      "timing_ccy": 352.90000000034405,
+      "timing_bps": 0.11218753355861465,
+      "fees_net_ccy": 393.5059999999997,
+      "fees_net_bps": 0.12509625270748978,
+      "sim_impact_ccy": 24.838500402522396,
+      "sim_impact_bps": 0.007896203166480386,
+      "completion_ccy": 36.51999999999684,
+      "completion_bps": 0.011609772529204471,
+      "all_in_ccy": 2872.5945004029477,
+      "all_in_bps": 0.9132028674240107,
+      "all_in_bps_per_parent": {
+       "n": 220,
+       "mean": 1.5714491444812813,
+       "se": 0.4525656230723898,
+       "t": 3.4723122225081626
+      }
+     },
+     "VWAP": {
+      "n_parents": 220,
+      "notional": 33116457.5,
+      "qty": 203600,
+      "filled_qty": 202360,
+      "fill_rate": 0.993909626719057,
+      "maker_share_of_filled": 0.1818392963036173,
+      "shortfall_ccy": 2969.3949999998,
+      "shortfall_bps": 0.8966523668782508,
+      "trading_ccy": 2895.8399999998096,
+      "trading_bps": 0.874441355933016,
+      "opportunity_ccy": 73.55499999998949,
+      "opportunity_bps": 0.022211010945234554,
+      "spread_ccy": 1859.3100000000065,
+      "spread_bps": 0.5614459215633214,
+      "price_vs_mid_residual_ccy": 199.30000000003164,
+      "price_vs_mid_residual_bps": 0.060181557764755374,
+      "timing_ccy": 837.2299999997713,
+      "timing_bps": 0.2528138766049392,
+      "fees_net_ccy": 403.52929999999975,
+      "fees_net_bps": 0.12185158995342414,
+      "sim_impact_ccy": 31.665024296378068,
+      "sim_impact_bps": 0.009561718458678157,
+      "completion_ccy": 24.184999999999857,
+      "completion_bps": 0.007303015426695279,
+      "all_in_ccy": 3428.774324296175,
+      "all_in_bps": 1.0353686907170476,
+      "all_in_bps_per_parent": {
+       "n": 220,
+       "mean": 2.1276234972363546,
+       "se": 0.42806535723707795,
+       "t": 4.970323949989722
+      }
+     },
+     "POV": {
+      "n_parents": 198,
+      "notional": 26013677.0,
+      "qty": 166100,
+      "filled_qty": 97620,
+      "fill_rate": 0.5877182420228778,
+      "maker_share_of_filled": 0.24308543331284574,
+      "shortfall_ccy": 208.25000000019088,
+      "shortfall_bps": 0.08005404234095428,
+      "trading_ccy": 701.2500000000359,
+      "trading_bps": 0.26956973441318427,
+      "opportunity_ccy": -492.99999999984516,
+      "opportunity_bps": -0.18951569207222999,
+      "spread_ccy": 716.1000000000238,
+      "spread_bps": 0.27527826996545846,
+      "price_vs_mid_residual_ccy": 60.90000000007021,
+      "price_vs_mid_residual_bps": 0.023410761961898046,
+      "timing_ccy": -75.7500000000575,
+      "timing_bps": -0.029119297514172065,
+      "fees_net_ccy": 165.323,
+      "fees_net_bps": 0.06355233825652559,
+      "sim_impact_ccy": 1.2533493326803669,
+      "sim_impact_bps": 0.0004818039882175699,
+      "completion_ccy": 1293.190000000043,
+      "completion_bps": 0.4971192653772256,
+      "all_in_ccy": 1668.0163493329153,
+      "all_in_bps": 0.6412074499629234,
+      "all_in_bps_per_parent": {
+       "n": 198,
+       "mean": 1.2722476540658638,
+       "se": 0.6391073897960661,
+       "t": 1.9906633444996273
+      }
+     },
+     "IS": {
+      "n_parents": 198,
+      "notional": 27902819.5,
+      "qty": 175800,
+      "filled_qty": 174837,
+      "fill_rate": 0.9945221843003413,
+      "maker_share_of_filled": 0.11437510366798789,
+      "shortfall_ccy": 2792.314999999964,
+      "shortfall_bps": 1.0007286181240445,
+      "trading_ccy": 2759.6099999999415,
+      "trading_bps": 0.9890075803987985,
+      "opportunity_ccy": 32.70500000002362,
+      "opportunity_bps": 0.01172103772524623,
+      "spread_ccy": 2015.5249999999687,
+      "spread_bps": 0.7223373967637817,
+      "price_vs_mid_residual_ccy": 225.3899999999648,
+      "price_vs_mid_residual_bps": 0.08077678314908814,
+      "timing_ccy": 518.6950000000093,
+      "timing_bps": 0.18589340048592912,
+      "fees_net_ccy": 404.85350000000017,
+      "fees_net_bps": 0.14509411853522552,
+      "sim_impact_ccy": 24.238473856675206,
+      "sim_impact_bps": 0.008686747178605089,
+      "completion_ccy": 23.573999999993237,
+      "completion_bps": 0.008448608571615222,
+      "all_in_ccy": 3244.980973856634,
+      "all_in_bps": 1.1629580924094909,
+      "all_in_bps_per_parent": {
+       "n": 198,
+       "mean": 1.9875252825782457,
+       "se": 0.38137597593956757,
+       "t": 5.211459053449101
+      }
+     }
+    },
+    "markouts": {
+     "passive_fills": {
+      "100ms": {
+       "n": 1997,
+       "markout_bps": 1.8723891408816753,
+       "markout_se_bps": 0.08422921267276183,
+       "effective_half_spread_bps": -2.0519692841713786,
+       "effective_half_spread_se_bps": 0.08063771353183945,
+       "realised_half_spread_bps": -1.8723891408816753,
+       "realised_half_spread_se_bps": 0.08422921267276183,
+       "price_impact_bps": -0.17958014328970512,
+       "price_impact_se_bps": 0.023009322361712436
+      },
+      "1s": {
+       "n": 1997,
+       "markout_bps": 1.88714090201277,
+       "markout_se_bps": 0.08696343869080447,
+       "effective_half_spread_bps": -2.0519692841713786,
+       "effective_half_spread_se_bps": 0.08063771353183945,
+       "realised_half_spread_bps": -1.88714090201277,
+       "realised_half_spread_se_bps": 0.08696343869080447,
+       "price_impact_bps": -0.16482838215860923,
+       "price_impact_se_bps": 0.026185745611267554
+      },
+      "5s": {
+       "n": 1994,
+       "markout_bps": 1.881078973027917,
+       "markout_se_bps": 0.0886142484051041,
+       "effective_half_spread_bps": -2.053207302947317,
+       "effective_half_spread_se_bps": 0.08074571704064128,
+       "realised_half_spread_bps": -1.881078973027917,
+       "realised_half_spread_se_bps": 0.0886142484051041,
+       "price_impact_bps": -0.1721283299194006,
+       "price_impact_se_bps": 0.03258791809314708
+      },
+      "30s": {
+       "n": 1986,
+       "markout_bps": 1.7847000943522144,
+       "markout_se_bps": 0.0983047479816731,
+       "effective_half_spread_bps": -2.053320774647071,
+       "effective_half_spread_se_bps": 0.0808585736214776,
+       "realised_half_spread_bps": -1.7847000943522144,
+       "realised_half_spread_se_bps": 0.0983047479816731,
+       "price_impact_bps": -0.26862068029485425,
+       "price_impact_se_bps": 0.059736367535774645
+      },
+      "60s": {
+       "n": 1976,
+       "markout_bps": 1.6764591470085435,
+       "markout_se_bps": 0.11876393423903324,
+       "effective_half_spread_bps": -2.0506905913946696,
+       "effective_half_spread_se_bps": 0.080973406962137,
+       "realised_half_spread_bps": -1.6764591470085435,
+       "realised_half_spread_se_bps": 0.11876393423903324,
+       "price_impact_bps": -0.3742314443861178,
+       "price_impact_se_bps": 0.08866328809008679
+      },
+      "5min": {
+       "n": 1891,
+       "markout_bps": 2.131157666045514,
+       "markout_se_bps": 0.23606329553709798,
+       "effective_half_spread_bps": -2.0551008856545794,
+       "effective_half_spread_se_bps": 0.08365069932001483,
+       "realised_half_spread_bps": -2.131157666045514,
+       "realised_half_spread_se_bps": 0.23606329553709798,
+       "price_impact_bps": 0.0760567803909386,
+       "price_impact_se_bps": 0.21816481271549473
+      }
+     },
+     "aggressive_fills": {
+      "100ms": {
+       "n": 7020,
+       "markout_bps": -2.1842802743256655,
+       "markout_se_bps": 0.03131412349332549,
+       "effective_half_spread_bps": 2.185933231136506,
+       "effective_half_spread_se_bps": 0.03134716281091566,
+       "realised_half_spread_bps": 2.1842802743256655,
+       "realised_half_spread_se_bps": 0.03131412349332549,
+       "price_impact_bps": 0.001652956810840741,
+       "price_impact_se_bps": 0.0013000418087154406
+      },
+      "1s": {
+       "n": 7020,
+       "markout_bps": -2.1924521188183235,
+       "markout_se_bps": 0.0320939509853552,
+       "effective_half_spread_bps": 2.185933231136506,
+       "effective_half_spread_se_bps": 0.03134716281091566,
+       "realised_half_spread_bps": 2.1924521188183235,
+       "realised_half_spread_se_bps": 0.0320939509853552,
+       "price_impact_bps": -0.006518887681815008,
+       "price_impact_se_bps": 0.005433977134628101
+      },
+      "5s": {
+       "n": 7018,
+       "markout_bps": -2.179387927822372,
+       "markout_se_bps": 0.033974612217272826,
+       "effective_half_spread_bps": 2.18552621770096,
+       "effective_half_spread_se_bps": 0.03134944476419796,
+       "realised_half_spread_bps": 2.179387927822372,
+       "realised_half_spread_se_bps": 0.033974612217272826,
+       "price_impact_bps": 0.006138289878590612,
+       "price_impact_se_bps": 0.012040484528818157
+      },
+      "30s": {
+       "n": 6980,
+       "markout_bps": -2.18443477983682,
+       "markout_se_bps": 0.04278300175560626,
+       "effective_half_spread_bps": 2.1862495702285316,
+       "effective_half_spread_se_bps": 0.03147799771055792,
+       "realised_half_spread_bps": 2.18443477983682,
+       "realised_half_spread_se_bps": 0.04278300175560626,
+       "price_impact_bps": 0.0018147903917113118,
+       "price_impact_se_bps": 0.028322691305847893
+      },
+      "60s": {
+       "n": 6942,
+       "markout_bps": -2.162148815351304,
+       "markout_se_bps": 0.05454607494457939,
+       "effective_half_spread_bps": 2.183867471829903,
+       "effective_half_spread_se_bps": 0.03156450065924187,
+       "realised_half_spread_bps": 2.162148815351304,
+       "realised_half_spread_se_bps": 0.05454607494457939,
+       "price_impact_bps": 0.021718656478606664,
+       "price_impact_se_bps": 0.04446840382900255
+      },
+      "5min": {
+       "n": 6686,
+       "markout_bps": -1.9735143939669844,
+       "markout_se_bps": 0.11167956312047414,
+       "effective_half_spread_bps": 2.1876684346148045,
+       "effective_half_spread_se_bps": 0.03227070706484862,
+       "realised_half_spread_bps": 1.9735143939669844,
+       "realised_half_spread_se_bps": 0.11167956312047414,
+       "price_impact_bps": 0.21415404064782248,
+       "price_impact_se_bps": 0.10847906330416406
+      }
+     }
+    },
+    "passive_orders": {
+     "min_orders": 30,
+     "queue_edges": [
+      0,
+      500,
+      2000
+     ],
+     "all": {
+      "n_orders": 9876,
+      "posted_qty": 776497,
+      "filled_qty": 115075,
+      "fill_rate_qty": 0.14819761055097444,
+      "fill_rate_orders": 0.19906844876468205,
+      "full_fill_rate": 0.17375455650060753,
+      "time_to_first_fill_ns": {
+       "n": 1966,
+       "mean": 7653999293.3423195,
+       "se": 131387653.2043595
+      },
+      "time_to_full_fill_ns": {
+       "n": 1716,
+       "mean": 7704240530.3741255,
+       "se": 140864779.702227
+      }
+     },
+     "by_queue_ahead_at_entry": {
+      "0": {
+       "n_orders": 5912,
+       "posted_qty": 580631,
+       "filled_qty": 103436,
+       "fill_rate_qty": 0.178144122514988,
+       "fill_rate_orders": 0.2425575101488498,
+       "full_fill_rate": 0.20246955345060894,
+       "time_to_first_fill_ns": {
+        "n": 1434,
+        "mean": 7689850037.109484,
+        "se": 156785295.96573675
+       },
+       "time_to_full_fill_ns": {
+        "n": 1197,
+        "mean": 7792620111.49457,
+        "se": 172410527.98954615
+       }
+      },
+      "1-500": {
+       "n_orders": 2738,
+       "posted_qty": 104014,
+       "filled_qty": 9284,
+       "fill_rate_qty": 0.08925721537485339,
+       "fill_rate_orders": 0.18115412710007306,
+       "full_fill_rate": 0.17823228634039445,
+       "time_to_first_fill_ns": {
+        "n": 496,
+        "mean": 7273325667.0161295,
+        "se": 243229653.07552922
+       },
+       "time_to_full_fill_ns": {
+        "n": 488,
+        "mean": 7237625461.510246,
+        "se": 245556961.71293998
+       }
+      },
+      "501-2000": {
+       "n_orders": 1146,
+       "posted_qty": 85998,
+       "filled_qty": 2325,
+       "fill_rate_qty": 0.027035512453777995,
+       "fill_rate_orders": 0.029668411867364748,
+       "full_fill_rate": 0.02530541012216405,
+       "time_to_first_fill_ns": {
+        "n": 34,
+        "mean": 11543117419.117647,
+        "se": 900448841.7698451
+       },
+       "time_to_full_fill_ns": {
+        "n": 29,
+        "mean": null,
+        "se": null
+       }
+      },
+      ">2000": {
+       "n_orders": 80,
+       "posted_qty": 5854,
+       "filled_qty": 30,
+       "fill_rate_qty": 0.005124701059104886,
+       "fill_rate_orders": 0.025,
+       "full_fill_rate": 0.025,
+       "time_to_first_fill_ns": {
+        "n": 2,
+        "mean": null,
+        "se": null
+       },
+       "time_to_full_fill_ns": {
+        "n": 2,
+        "mean": null,
+        "se": null
+       }
+      }
+     }
+    },
+    "transitions": {
+     "posts": 9876,
+     "reprices": 1266,
+     "rest_extensions": 5918,
+     "crosses_timeout": 6179,
+     "crosses_behind": 618,
+     "crosses_immediate": 9
+    }
+   }
+  },
+  "paired_vs_aggressive": {
+   "native": {
+    "all_in_bps": {
+     "n": 836,
+     "mean": -0.9780140277174593,
+     "se": 0.13570920011171078,
+     "t": -7.206689206865816
+    },
+    "shortfall_bps": {
+     "n": 836,
+     "mean": -1.271337869010919,
+     "se": 0.12759262273524524,
+     "t": -9.964038999722936
+    },
+    "spread_bps": {
+     "n": 836,
+     "mean": -1.8124203392567357,
+     "se": 0.10708291294679834,
+     "t": -16.925392570868844
+    },
+    "fees_net_bps": {
+     "n": 836,
+     "mean": -0.28859605664137855,
+     "se": 0.015833568021772673,
+     "t": -18.22684920066856
+    },
+    "opportunity_bps": {
+     "n": 836,
+     "mean": 0.761171635105708,
+     "se": 0.1455726568590666,
+     "t": 5.228809115180345
+    }
+   },
+   "passive_u0.2": {
+    "all_in_bps": {
+     "n": 836,
+     "mean": -1.7351941549169476,
+     "se": 0.08982105426642706,
+     "t": -19.31834544905271
+    },
+    "shortfall_bps": {
+     "n": 836,
+     "mean": -1.4889511555987924,
+     "se": 0.08082322439658114,
+     "t": -18.42231817296534
+    },
+    "spread_bps": {
+     "n": 836,
+     "mean": -1.6687332912149841,
+     "se": 0.07809843195577104,
+     "t": -21.367052441719018
+    },
+    "fees_net_bps": {
+     "n": 836,
+     "mean": -0.25345099841604773,
+     "se": 0.010714423138570519,
+     "t": -23.655123111916065
+    },
+    "opportunity_bps": {
+     "n": 836,
+     "mean": -0.03692728488064342,
+     "se": 0.023034900997094116,
+     "t": -1.6031015234361912
+    }
+   },
+   "passive_u0.5": {
+    "all_in_bps": {
+     "n": 836,
+     "mean": -1.3939933584916375,
+     "se": 0.07184317496441549,
+     "t": -19.403281650373803
+    },
+    "shortfall_bps": {
+     "n": 836,
+     "mean": -1.2032186670792624,
+     "se": 0.06498791691349262,
+     "t": -18.514498144030423
+    },
+    "spread_bps": {
+     "n": 836,
+     "mean": -1.3073158256969752,
+     "se": 0.06445273992358809,
+     "t": -20.283324296947853
+    },
+    "fees_net_bps": {
+     "n": 836,
+     "mean": -0.19694838313638133,
+     "se": 0.008815154056176562,
+     "t": -22.34202396024882
+    },
+    "opportunity_bps": {
+     "n": 836,
+     "mean": -0.033594536789690814,
+     "se": 0.019405489387844622,
+     "t": -1.731187300575581
+    }
+   },
+   "passive_u0.8": {
+    "all_in_bps": {
+     "n": 836,
+     "mean": -0.8965455010671429,
+     "se": 0.06051886924488492,
+     "t": -14.814313490216431
+    },
+    "shortfall_bps": {
+     "n": 836,
+     "mean": -0.7828517444326022,
+     "se": 0.05663180237838209,
+     "t": -13.823535744139376
+    },
+    "spread_bps": {
+     "n": 836,
+     "mean": -0.8028984976005649,
+     "se": 0.04989143814721687,
+     "t": -16.092911477745275
+    },
+    "fees_net_bps": {
+     "n": 836,
+     "mean": -0.11971325435072695,
+     "se": 0.006281515260315212,
+     "t": -19.058021733552174
+    },
+    "opportunity_bps": {
+     "n": 836,
+     "mean": -0.02682987664045586,
+     "se": 0.01898124822928833,
+     "t": -1.413493797476237
+    }
+   }
+  }
+ },
+ "mvp": {
+  "passive_params": {
+   "max_rest_ns": 400000000,
+   "max_reprices": 1,
+   "max_behind_fraction": 0.1,
+   "improve_min_spread_ticks": 3,
+   "end_margin_ns": 100000000
+  },
+  "runs": {
+   "native": {
+    "run_id": "58a10f2194a3c81c",
+    "pnl_total": -81.53139624750266,
+    "gross": 1.430000000016662,
+    "spread_cost": 61.78500000004411,
+    "fees": 21.315999999999995,
+    "rebates": 0.2,
+    "fees_net": 21.115999999999996,
+    "impact": 0.060396247543333295,
+    "execution_cost": 82.96139624758744,
+    "traded_qty": 8229,
+    "maker_qty": 100,
+    "n_parent_orders": 235,
+    "fills": 169,
+    "child_orders_submitted": 348,
+    "user_cancels": 0,
+    "expired_orders": 184,
+    "transitions": null
+   },
+   "aggressive": {
+    "run_id": "addba5041a72acd6",
+    "pnl_total": -195.4544444923763,
+    "gross": 1.5700000000030059,
+    "spread_cost": 146.9500000000427,
+    "fees": 49.93880000000005,
+    "rebates": 0.0,
+    "fees_net": 49.93880000000005,
+    "impact": 0.13564449235000003,
+    "execution_cost": 197.02444449239275,
+    "traded_qty": 19144,
+    "maker_qty": 0,
+    "n_parent_orders": 223,
+    "fills": 314,
+    "child_orders_submitted": 307,
+    "user_cancels": 0,
+    "expired_orders": 3,
+    "transitions": null
+   },
+   "passive": {
+    "run_id": "99f331332a18cec8",
+    "pnl_total": -182.70702610828187,
+    "gross": -2.7849999999874058,
+    "spread_cost": 134.91000000004172,
+    "fees": 46.76660000000005,
+    "rebates": 1.886,
+    "fees_net": 44.880600000000044,
+    "impact": 0.13142610826666662,
+    "execution_cost": 179.92202610830844,
+    "traded_qty": 18845,
+    "maker_qty": 943,
+    "n_parent_orders": 223,
+    "fills": 269,
+    "child_orders_submitted": 576,
+    "user_cancels": 266,
+    "expired_orders": 59,
+    "transitions": {
+     "posts": 307,
+     "reprices": 6,
+     "rest_extensions": 151,
+     "crosses_timeout": 70,
+     "crosses_behind": 190,
+     "crosses_immediate": 29
+    }
+   }
+  }
+ },
+ "verdict_md": "## 6. Verdict and what is a simulator assumption\n\n**On this simulator, `passive_u0.5` costs 0.73 bps all-in against 1.29 bps for `aggressive`** \u2014 a paired difference of -1.39 \u00b1 0.07 bps per parent (t = -19.4, n = 836): passive execution is cheaper, and the difference is larger than its noise.\n\nWhere it comes from: the spread line moves from 0.85 bps paid to 0.33 bps, fees net from 0.16 to 0.08 bps (maker rebates on 29.1% of the filled quantity), while opportunity + completion for the unfilled quantity is 0.08 bps (fill rate 90.3% against 90.5%).\n\nMVP session: P&L -81.53 USD (native, the pinned run), -195.45 (aggressive), -182.71 (passive); execution cost 82.96 / 197.02 / 179.92 USD. The session still loses money under every policy: the alpha does not cover even the cheapest execution.\n\n`native` loses least because it trades least (8,229 shares against 19,144 and 18,845): its TWAP children join the touch and mostly expire unfilled, and the position it never took costs nothing in a session whose alpha is worth a fraction of a basis point. Per traded share the three policies cost about the same; passive is the cheapest of the two that actually complete their orders.\n\nWhat part of the passive result is the simulator rather than the market:\n\n1. **Queue model optimism.** Our resting order never changes the replayed book: nobody sees it, nobody cancels in front of it, joins behind it or fades when it improves the touch. Posting one tick inside a wide spread puts us first in a queue of one, and the next aggressor that would have hit the old touch is assumed to hit us instead (rule 4 trade-through). On a real venue the improved quote changes what others do, and the flow that reaches it is more informed than the average print.\n2. **No hidden liquidity and no reaction.** Aggressive children walk displayed depth only and pay the pinned linear impact; passive fills carry no impact charge at all. Synthetic order flow is not conditioned on our orders, so the adverse selection measured above is the generator's, not a market's: real passive fills are selected by the counterparty, and markouts after them are typically worse than these.\n3. **Cancels and reprices.** A cancel travels the latency path (rule 7) and can lose the race to a fill \u2014 that part is modelled \u2014 but there are no cancel rejects, no exchange throttles, no minimum resting time and no fee for message traffic.\n4. **Fees.** Maker rebates and taker fees are the configured venue schedule; a real rebate tier depends on volume and is not guaranteed.\n5. **Sample.** Two seeded sessions of one generator. The standard errors treat parents as independent; they share a market, so the t statistics are upper bounds.\n\nWhat would hold on a real venue: the accounting (a maker fill earns the half-spread and the rebate; unfilled quantity must be priced), the decomposition (effective = realised + price impact) and the fact that queue position at entry drives the fill rate. What would not transfer without re-measurement: the size of the saving. The policy therefore stays opt-in (`native` remains the default) and the markout tables are the tool for checking it against real fills."
+}

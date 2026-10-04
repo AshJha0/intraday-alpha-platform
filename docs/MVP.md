@@ -107,6 +107,25 @@ order (the Java `BacktestEngine.onEvent` + `PaperTrading.RiskWiring` chain):
 `session.run_session` wraps this: feed → engine → sinks → store (with the
 MVP reference data imported) → report → paper evidence.
 
+**Child execution policy (optional, v1.5.0).** `mvp.json` accepts
+`execution.child_policy` (`"native"` | `"aggressive"` | `"passive"`) and
+`execution.passive` (`max_rest_ns`, `max_reprices`, `max_behind_fraction`,
+`improve_min_spread_ticks`, `end_margin_ns`). The committed document carries
+neither, which means NATIVE — the run this page and the golden describe.
+With `"passive"`, step 8 posts each child at the PASSIVE policy's price
+(API_TRADING.md §2.5) and `MvpEngine._work_passive` runs the same POST →
+REST → REPRICE / CROSS machine as `ExecutionReplay`, before the scheduler
+issues new children. A replacement child (the re-post or the cross of a
+cancelled remainder) goes through routing, the latency-budget and
+participation controls and the risk check like any other child; it is
+exempt from the slice-interval control, because it re-sends quantity that
+control already admitted, and it does not move the slice clock. The
+override changes the document, so `run_id`, `config_version` and the trace
+digest are those of a different run
+(`MvpConfig.with_overrides(child_policy=..., passive=...)`;
+`research/execution/EXECUTION_REPORT.md` §5 has the three sessions side by
+side).
+
 ## 4. Wiring rules honoured (PLATFORM_CONVENTIONS.md §11.4, §12.1)
 
 Reviewed line by line against `PaperTrading.RiskWiring.onMarket` /

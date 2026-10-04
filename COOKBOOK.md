@@ -730,8 +730,8 @@ bash tests/harness/run_all.sh --golden-only   # golden groups only (fast)
 ```
 
 Exit code 0 iff every language passed; logs land in a temp dir printed on
-the first line. The v1.5.0 counts (CI): python 1701 / cpp 289 /
-rust 333 / java 522 tests passed (golden groups 179/68/69/109), plus
+the first line. The v1.5.0 counts (CI): python 1752 / cpp 302 /
+rust 330 / java 535 tests passed (golden groups 180/72/66/115), plus
 `integration` (35) and `replay` (6) rows for the repo-level pytest suites, a
 `deployment` row (25 structural checks passed in CI, where `promtool` and
 `kubeconform` are installed; a machine without them reports those checks as
@@ -2014,3 +2014,72 @@ there is nothing to find. With real files the verdict is about that
 dataset, under the reading rules of docs/REAL_DATA.md §8 — two sessions
 are two sessions. `rm -rf data/vendor/demo_* data/real/demo` removes
 everything this recipe wrote.
+
+## 37. Work a parent order passively and read its markouts
+
+`ParentOrder.policy` selects the child execution policy (API_TRADING.md
+§2.5): `NATIVE` (default), `AGGRESSIVE`, or `PASSIVE` — post at the near
+touch, rest for a patience set by `urgency`, reprice once, cross the rest.
+`iap.tca.markout` then tells you what each fill was worth afterwards
+(API_PORTFOLIO_TCA.md §2.9). One TWAP parent on the golden equity vector
+under each policy:
+
+```bash
+PYTHONPATH=python/src python3 - <<'EOF'
+from dataclasses import replace
+from pathlib import Path
+from iap.core.codec import read_jsonl
+from iap.execution import (AlgoType, ExecConfig, ExecPolicy, ExecutionReplay,
+                           InstrumentSpec, Liquidity, ParentOrder, load_venues)
+from iap.tca.markout import MarkoutFill, build_gated_timeline, markout_report
+
+SEC = 1_000_000_000
+events = read_jsonl(Path("tests/golden/events_eq_mbo.jsonl"))
+t0 = events[0].exchange_ts
+cfg = ExecConfig(seed=20260829, venues=load_venues("configs/venues/venues.json"),
+                 instruments={1: InstrumentSpec(1, 0.01, 1.0, 38_000_000.0)})
+parent = ParentOrder(parent_id=1, instrument_id=1, venue_id=1, side=0, qty=1200,
+                     algo=AlgoType.TWAP, start_ts=t0 + 60 * SEC, end_ts=t0 + 660 * SEC,
+                     slices=12)
+timeline = build_gated_timeline(events, 1, 0.01)
+for policy in (ExecPolicy.AGGRESSIVE, ExecPolicy.NATIVE, ExecPolicy.PASSIVE):
+    res = ExecutionReplay(cfg, [replace(parent, policy=policy, urgency=0.5)]).run(events)
+    r = res.parents[1]
+    fills = [MarkoutFill(f.ts, f.price_ticks * 0.01, f.qty, f.side,
+                         "MAKER" if f.liquidity == Liquidity.MAKER else "TAKER",
+                         f.venue_id, "TWAP") for f in res.fills]
+    rep = markout_report(fills, timeline, min_fills=3)
+    print(f"{policy.name:10s} filled {r.filled_qty:4d}/{parent.qty} avg {r.avg_price:.4f} "
+          f"fees {r.fees:.3f} rebates {r.rebates:.3f}")
+    for liq, cell in rep["by_liquidity"].items():
+        row = cell["horizons"]
+        print(f"   {liq} n={cell['n_fills']:2d} markout bps:",
+              {h: None if row[h]["markout_bps"] is None else round(row[h]["markout_bps"], 2)
+               for h in ("1s", "30s", "5min")})
+    if res.passive:
+        print("  ", res.passive[1].to_dict())
+EOF
+```
+
+```
+AGGRESSIVE filled 1200/1200 avg 24.5242 fees 3.600 rebates 0.000
+   TAKER n=12 markout bps: {'1s': -5.27, '30s': -5.27, '5min': -2.89}
+NATIVE     filled  600/1200 avg 24.5033 fees 0.000 rebates 1.200
+   MAKER n= 6 markout bps: {'1s': -0.34, '30s': 1.02, '5min': 7.14}
+PASSIVE    filled 1100/1200 avg 24.5191 fees 2.100 rebates 0.800
+   MAKER n= 4 markout bps: {'1s': -1.02, '30s': -2.55, '5min': 4.08}
+   TAKER n= 7 markout bps: {'1s': -4.37, '30s': -4.66, '5min': -3.49}
+   {'posts': 15, 'reprices': 3, 'rest_extensions': 6, 'crosses_timeout': 7, 'crosses_behind': 0, 'crosses_immediate': 0}
+```
+
+`markout = s × (mid(t + h) − price)`: positive = the fill looks good `h`
+later. A markout whose window runs past the data, or across a halt or a
+quote gap, is `None`, and so is a cell with fewer than `min_fills` defined
+fills. NATIVE has the best average price and half the quantity: the unfilled
+600 shares are a cost the average does not show.
+`python3 research/execution/run_execution_study.py` prices it (bundled
+dataset required: `cd python && PYTHONPATH=src python3 -m iap.marketdata`),
+and writes `research/execution/EXECUTION_REPORT.md`. The same policy for the
+MVP: `MvpConfig.with_overrides(child_policy="passive", passive={...})`.
+LEARN.md §30 explains adverse selection and how to read the table.
+

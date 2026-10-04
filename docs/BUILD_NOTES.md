@@ -6,7 +6,7 @@ test run < 120 s.
 **CI** is `.github/workflows/ci.yml`, and it is the local
 `tests/harness/run_all.sh` split into parallel jobs: one per language, plus
 `tests/harness/run_golden.sh` (the GOVERNANCE promotion-gate-10 artefact: every
-language's golden group, including ALL fourteen Java `*GoldenTest` classes),
+language's golden group, including ALL fifteen Java `*GoldenTest` classes),
 `tests/harness/check_deployment.py` (promtool rules/config/unit tests, compose
 and Dockerfile checks, k8s manifests, ConfigMap sync, dashboard metric
 provenance) and an `images` job that builds the four container images and is

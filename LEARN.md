@@ -60,6 +60,7 @@ Contents:
 27. [Twelve pitfalls this platform is built to avoid](#27-twelve-pitfalls-this-platform-is-built-to-avoid)
 28. [Twelve interview questions (with answers from this repo)](#28-twelve-interview-questions-with-answers-from-this-repo)
 29. [Further reading](#29-further-reading)
+30. [Adverse selection and markouts](#30-adverse-selection-and-markouts)
 
 ---
 
@@ -1311,8 +1312,8 @@ match**.
   the portfolio golden is checked against an SLSQP optimum. Golden files are
   regenerated only deliberately, with a MIGRATIONS.md entry.
 - **One command proves parity**: `tests/harness/run_all.sh` runs all four
-  suites and prints the table (the v1.5.0 counts from CI, 2026-10-04: python 1701,
-  cpp 289, rust 333, java 522 tests passed; golden groups 179/68/69/109; all
+  suites and prints the table (the v1.5.0 counts from CI, 2026-10-04: python 1752,
+  cpp 302, rust 330, java 535 tests passed; golden groups 180/72/66/115; all
   PASS, plus `integration` (35) and `replay` (6) rows for the repo-level
   pytest suites, a `deployment` row — 25 structural checks passed in CI,
   where promtool and kubeconform are installed — and a `numbers` row that re-derives every headline
@@ -3286,3 +3287,157 @@ Classic external literature these designs draw on (find current editions):
 Everything else is in the code — which, in this repository, is the point:
 every claim above is a test, a golden file, or a committed report you can
 rerun.
+
+---
+
+## 30. Adverse selection and markouts
+
+**The question.** Chapter 22 made the simulator stop inventing fills. This
+chapter is about the fills it does give you, and one number that tells you
+whether a fill was worth having: the *markout*.
+
+**Why crossing is expensive and posting is not free.** A MARKET buy pays the
+ask: half a spread above the mid, plus the taker fee. A LIMIT buy resting at
+the bid gets half a spread *below* the mid, plus a rebate — if it fills. But
+a resting order does not choose its counterparty. It fills when somebody
+decides to sell at the bid, and the sellers who are most eager to hit a bid
+are the ones who expect the price to fall. So the fills a passive order
+collects are a biased sample of moments: more of the ones where the price
+was about to move against it. That bias is **adverse selection**, and it is
+why "earn the spread instead of paying it" is not a free lunch.
+
+**The markout.** For a fill at price `p` and time `t`, on side `s` (+1 buy,
+−1 sell), the markout at horizon `h` is
+
+```
+markout(h) = s × (mid(t + h) − p)
+```
+
+Positive means the fill looks good `h` later; negative means you would
+rather not have traded. Three more quantities, all per unit:
+
+```
+effective half-spread   = s × (p − mid_at_fill)        what you paid against the mid you traded on
+realised half-spread(h) = s × (p − mid(t + h))         = −markout(h)
+price impact(h)         = s × (mid(t + h) − mid_at_fill)
+
+effective half-spread = realised half-spread(h) + price impact(h)      (exactly)
+```
+
+For a taker the effective half-spread is positive (it paid). For a maker it
+is negative (it earned), and its price impact is negative when the mid moved
+against it: `adverse selection(h) = −price impact(h)`. What a passive fill
+*keeps* is the half-spread it earned minus the adverse selection — which is
+its markout.
+
+**Three details that decide whether the number is honest.**
+
+1. *Which mid is "at fill"?* A passive fill is caused by the event stamped
+   with its timestamp, and the book after that event already shows the
+   trade that hit you. The platform uses the state strictly *before* a
+   MAKER fill and the state *at* a TAKER fill (API_PORTFOLIO_TCA.md §2.4).
+   Use the post-event mid for a maker and the adverse move disappears into
+   the reference price.
+2. *Which mid is "at t + h"?* The last one at or before `t + h`. No
+   interpolation, no peeking at the next quote.
+3. *What if there is no such mid?* Then there is no markout. A fill ten
+   seconds before the close has no five-minute markout; a window that
+   contains a halt, an auction or a stretch with a one-sided book has none
+   either. The platform reports `null` and counts the fills that were
+   defined. Reporting zero instead would pull every late-session average
+   toward "nothing happened".
+
+**Run it.** One parent order, three policies, on the golden equity vector:
+
+```bash
+PYTHONPATH=python/src python3 - <<'EOF'
+from dataclasses import replace
+from pathlib import Path
+from iap.core.codec import read_jsonl
+from iap.execution import (AlgoType, ExecConfig, ExecPolicy, ExecutionReplay,
+                           InstrumentSpec, Liquidity, ParentOrder, load_venues)
+from iap.tca.markout import MarkoutFill, build_gated_timeline, markout_report
+
+SEC = 1_000_000_000
+events = read_jsonl(Path("tests/golden/events_eq_mbo.jsonl"))
+t0 = events[0].exchange_ts
+cfg = ExecConfig(seed=20260829, venues=load_venues("configs/venues/venues.json"),
+                 instruments={1: InstrumentSpec(1, 0.01, 1.0, 38_000_000.0)})
+parent = ParentOrder(parent_id=1, instrument_id=1, venue_id=1, side=0, qty=1200,
+                     algo=AlgoType.TWAP, start_ts=t0 + 60 * SEC, end_ts=t0 + 660 * SEC,
+                     slices=12)
+timeline = build_gated_timeline(events, 1, 0.01)
+for policy in (ExecPolicy.AGGRESSIVE, ExecPolicy.NATIVE, ExecPolicy.PASSIVE):
+    res = ExecutionReplay(cfg, [replace(parent, policy=policy, urgency=0.5)]).run(events)
+    r = res.parents[1]
+    fills = [MarkoutFill(f.ts, f.price_ticks * 0.01, f.qty, f.side,
+                         "MAKER" if f.liquidity == Liquidity.MAKER else "TAKER",
+                         f.venue_id, "TWAP") for f in res.fills]
+    rep = markout_report(fills, timeline, min_fills=3)
+    print(f"{policy.name:10s} filled {r.filled_qty:4d}/{parent.qty} avg {r.avg_price:.4f} "
+          f"fees {r.fees:.3f} rebates {r.rebates:.3f}")
+    for liq, cell in rep["by_liquidity"].items():
+        row = cell["horizons"]
+        print(f"   {liq} n={cell['n_fills']:2d} markout bps:",
+              {h: None if row[h]["markout_bps"] is None else round(row[h]["markout_bps"], 2)
+               for h in ("1s", "30s", "5min")})
+EOF
+# AGGRESSIVE filled 1200/1200 avg 24.5242 fees 3.600 rebates 0.000
+#    TAKER n=12 markout bps: {'1s': -5.27, '30s': -5.27, '5min': -2.89}
+# NATIVE     filled  600/1200 avg 24.5033 fees 0.000 rebates 1.200
+#    MAKER n= 6 markout bps: {'1s': -0.34, '30s': 1.02, '5min': 7.14}
+# PASSIVE    filled 1100/1200 avg 24.5191 fees 2.100 rebates 0.800
+#    MAKER n= 4 markout bps: {'1s': -1.02, '30s': -2.55, '5min': 4.08}
+#    TAKER n= 7 markout bps: {'1s': -4.37, '30s': -4.66, '5min': -3.49}
+```
+
+Read it carefully. The aggressive order bought everything and every fill is
+about five basis points under water a second later — that is the half-spread
+of this instrument, paid twelve times. The native order bought at better
+prices and collected rebates, but only **half** of what it was asked to buy;
+the other 600 shares are not in its average price. The passive policy posted
+first and crossed what did not fill: 1,100 of 1,200, a better average than
+crossing everything. And the one-second markout of its passive fills is
+*negative* (−1.02 bps): on these few fills, the mid had already moved
+through the order by the time it was filled. Four fills are an anecdote, not
+a measurement — which is why every cell carries its count and a standard
+error, and why a cell with too few fills prints `null`.
+
+**The trap: the order you did not fill.** Compare the three average prices
+and the native order wins. It wins by not buying when the price was going
+up. An execution report that stops at "average price of what filled" will
+always prefer the policy that trades least. The study in
+`research/execution/EXECUTION_REPORT.md` therefore charges the unfilled
+quantity twice: the move of the mid from arrival to the end of the window
+(Perold's opportunity cost), and the half-spread plus fee it would take to
+finish the order there. Under that accounting, on 836 parent orders, the
+passive policy costs less than crossing — and the native policy, cheapest
+per filled share, ends up behind it once its unfilled third is paid for.
+
+**How much of that would survive a real market?** Less than the table says,
+and the report says why. In the replay our resting order does not exist for
+anybody else: no one cancels in front of it, joins behind it, or backs away
+when it improves the touch. The adverse selection measured there is whatever
+the synthetic order flow happens to contain, not the selection a real
+counterparty applies. The mechanics are real — a maker earns the half-spread
+and the rebate, queue position at entry decides the fill rate, the cancel
+can lose the race — and the magnitudes are the simulator's. The honest use
+of this chapter's tool is the other direction: take real fills, compute the
+same markout table, and see what the passive fills actually kept.
+
+**Check yourself.**
+
+1. A sell order rests at the ask of a 100.00 / 100.04 market and fills. One
+   second later the market is 100.03 / 100.07. Effective half-spread,
+   price impact, markout? *(−0.02, −0.03, −0.01: it earned two cents of
+   half-spread, the mid then moved three cents against it — adverse
+   selection — and the fill is one cent under water; the realised
+   half-spread is +0.01.)*
+2. Why does the markout of a fill made 20 s before the close have no 30 s
+   value instead of the value of the last quote? *(The last quote is not the
+   price 30 s later; carrying it forward reports "no move" for exactly the
+   fills that have no evidence.)*
+3. The native policy shows the lowest cost per filled share. What number do
+   you ask for next? *(The fill rate, and the cost of the quantity it did not
+   fill.)*
+

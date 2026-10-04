@@ -17,4 +17,7 @@ public final class ParentOrder {
     public double participation = 0.05;  // POV
     public double riskAversion = 1.0;    // IS
     public long maxChildQty = 1000;
+    public ExecPolicy policy = ExecPolicy.NATIVE;
+    public double urgency = 0.5;         // PASSIVE patience, [0, 1]; 1 = cross at once
+    public PassiveParams passive = PassiveParams.DEFAULT;
 }

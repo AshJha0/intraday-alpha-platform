@@ -75,12 +75,19 @@ ExecutionReplay::ExecutionReplay(const ExecConfig& config,
             ps.slice_qty = slice_quantities(p);
             ps.slice_due = slice_times(p);
         }
+        if (p.policy == ExecPolicy::PASSIVE) {
+            validate_passive_params(p.passive);
+            ps.patience_ns = patience_ns(p.passive, p.urgency,
+                                         p.algo == AlgoType::IS, p.risk_aversion);
+            ps.behind_qty = max_behind_qty(p.passive, p.qty);
+        }
         parents_.push_back(std::move(ps));
     }
 }
 
 bool ExecutionReplay::issue_child(ParentState& ps, std::int64_t child_qty,
-                                  std::int64_t decision_ts, bool passive) {
+                                  std::int64_t decision_ts, bool passive,
+                                  bool post) {
     if (child_qty <= 0) return true;
     const ParentOrder& p = ps.order;
     ChildOrder c;
@@ -105,13 +112,18 @@ bool ExecutionReplay::issue_child(ParentState& ps, std::int64_t child_qty,
     if (passive) {
         // Join the same-side best on the routed venue; MARKET fallback.
         const OrderBook* vb = sim_.venue_book(p.instrument_id, c.venue_id);
-        std::optional<LevelEntry> best;
-        if (vb != nullptr) {
-            best = p.side == 0 ? vb->best_bid() : vb->best_ask();
+        std::optional<std::int64_t> price;
+        if (vb != nullptr && post) {
+            price = post_price(p.side, vb->best_bid(), vb->best_ask(),
+                               p.passive.improve_min_spread_ticks);
+        } else if (vb != nullptr) {
+            const std::optional<LevelEntry> best =
+                p.side == 0 ? vb->best_bid() : vb->best_ask();
+            if (best.has_value()) price = best->first;
         }
-        if (best.has_value()) {
+        if (price.has_value()) {
             c.type = OrderType::LIMIT;
-            c.limit_ticks = best->first;
+            c.limit_ticks = *price;
         } else {
             c.type = OrderType::MARKET;
         }
@@ -201,6 +213,149 @@ void ExecutionReplay::book_new_fills() {
     }
 }
 
+void ExecutionReplay::post(ParentState& ps, std::int64_t qty, std::int64_t t,
+                           int reprices) {
+    const ParentOrder& p = ps.order;
+    const std::int64_t cap = p.end_ts - p.passive.end_margin_ns;
+    if (ps.patience_ns <= 0 || t >= cap) {
+        ++ps.stats.crosses_immediate;
+        issue_child(ps, qty, t, false);
+        return;
+    }
+    if (!issue_child(ps, qty, t, true, true)) return;
+    const std::uint64_t oid = ps.child_ids.back();
+    if (sim_.orders().at(oid).type != OrderType::LIMIT) {
+        ++ps.stats.crosses_immediate;  // no same-side quote: MARKET fallback
+        return;
+    }
+    ++ps.stats.posts;
+    Working w;
+    w.order_id = oid;
+    w.deadline = std::min(t + ps.patience_ns, cap);
+    w.reprices = reprices;
+    ps.working.push_back(w);
+}
+
+void ExecutionReplay::post_step(ParentState& ps, std::int64_t step_qty,
+                                std::int64_t t) {
+    const std::int64_t cap = ps.order.max_child_qty;
+    std::int64_t left = step_qty;
+    while (left > 0) {
+        const std::int64_t q = std::min(left, cap);
+        post(ps, q, t, 0);
+        left -= q;
+    }
+}
+
+void ExecutionReplay::work_passive(ParentState& ps, std::int64_t t) {
+    const ParentOrder& p = ps.order;
+    const auto& orders = sim_.orders();
+    const bool behind =
+        ps.scheduled_qty - ps.filled_qty - ps.current_step_qty > ps.behind_qty;
+    // Children posted below are evaluated from the next event on. post()
+    // appends to ps.working, so entries are addressed by index and never
+    // touched again after a call that may reallocate the vector.
+    const std::size_t n = ps.working.size();
+    for (std::size_t k = 0; k < n; ++k) {
+        const WorkState state = ps.working[k].state;
+        if (state == WorkState::DONE) continue;
+        const std::uint64_t oid = ps.working[k].order_id;
+        const ChildOrder& o = orders.at(oid);
+        const bool terminal = o.state == OrderState::FILLED ||
+                              o.state == OrderState::CANCELLED;
+        if (state == WorkState::REST) {
+            if (terminal) {
+                ps.working[k].state = WorkState::DONE;
+            } else if (t >= p.end_ts) {
+                continue;  // expires with the window (rule 7)
+            } else if (behind) {
+                sim_.cancel(oid, t);
+                ps.working[k].state = WorkState::CANCEL_CROSS_BEHIND;
+            } else if (t >= ps.working[k].deadline) {
+                if (ps.working[k].reprices >= p.passive.max_reprices) {
+                    sim_.cancel(oid, t);
+                    ps.working[k].state = WorkState::CANCEL_CROSS_TIMEOUT;
+                    continue;
+                }
+                const OrderBook* vb = sim_.venue_book(p.instrument_id, o.venue_id);
+                std::optional<std::int64_t> price;
+                if (vb != nullptr) {
+                    price = post_price(p.side, vb->best_bid(), vb->best_ask(),
+                                       p.passive.improve_min_spread_ticks);
+                }
+                if (price.has_value() && *price == o.limit_ticks) {
+                    // Still at the target price: keep the queue position.
+                    ++ps.working[k].reprices;
+                    ps.working[k].deadline =
+                        std::min(t + ps.patience_ns,
+                                 p.end_ts - p.passive.end_margin_ns);
+                    ++ps.stats.rest_extensions;
+                } else {
+                    sim_.cancel(oid, t);
+                    ps.working[k].state = WorkState::CANCEL_REPRICE;
+                }
+            }
+            continue;
+        }
+        // A cancel is in flight: act once it has taken effect.
+        if (!terminal) continue;
+        const int reprices = ps.working[k].reprices;
+        const std::int64_t remaining = o.remaining;
+        ps.working[k].state = WorkState::DONE;
+        if (o.state != OrderState::CANCELLED ||
+            o.cancel_reason != CancelReason::USER || remaining <= 0 ||
+            t >= p.end_ts) {
+            continue;  // filled, expired or the window closed: nothing to re-send
+        }
+        if (state == WorkState::CANCEL_REPRICE) {
+            ++ps.stats.reprices;
+            post(ps, remaining, t, reprices + 1);
+        } else {
+            if (state == WorkState::CANCEL_CROSS_BEHIND) {
+                ++ps.stats.crosses_behind;
+            } else {
+                ++ps.stats.crosses_timeout;
+            }
+            issue_child(ps, remaining, t, false);
+        }
+    }
+}
+
+void ExecutionReplay::schedule_passive(ParentState& ps, const MarketEvent& ev) {
+    const ParentOrder& p = ps.order;
+    const std::int64_t t = ev.exchange_ts;
+    if (p.algo == AlgoType::POV) {
+        const bool in_window =
+            ev.instrument_id == p.instrument_id &&
+            static_cast<EventType>(ev.event_type) == EventType::TRADE &&
+            t >= p.start_ts && t < p.end_ts;
+        if (in_window) {
+            ps.pov_volume += ev.qty;
+            const auto target = static_cast<std::int64_t>(
+                std::floor(p.participation * static_cast<double>(ps.pov_volume)));
+            ps.scheduled_qty = std::min(target, p.qty);
+        }
+        work_passive(ps, t);
+        if (in_window) {
+            const std::int64_t deficit = ps.scheduled_qty - committed_qty(ps);
+            if (deficit > 0) post(ps, std::min(deficit, p.max_child_qty), t, 0);
+        }
+        return;
+    }
+    std::vector<std::int64_t> steps;
+    while (ps.next_slice < ps.slice_due.size() &&
+           t >= ps.slice_due[ps.next_slice]) {
+        const std::int64_t q = ps.slice_qty[ps.next_slice];
+        ++ps.next_slice;
+        ps.scheduled_qty += q;
+        ps.current_step_qty = q;
+        if (t >= p.end_ts) continue;
+        steps.push_back(q);
+    }
+    work_passive(ps, t);
+    for (const std::int64_t q : steps) post_step(ps, q, t);
+}
+
 void ExecutionReplay::schedule(ParentState& ps, const MarketEvent& ev) {
     const ParentOrder& p = ps.order;
     const std::int64_t t = ev.exchange_ts;
@@ -208,6 +363,10 @@ void ExecutionReplay::schedule(ParentState& ps, const MarketEvent& ev) {
         ps.triggered = true;
         ps.trigger_ts = t;
         ps.trigger_seq = ev.sequence;
+    }
+    if (p.policy == ExecPolicy::PASSIVE) {
+        schedule_passive(ps, ev);
+        return;
     }
     if (p.algo == AlgoType::POV) {
         if (ev.instrument_id != p.instrument_id ||
@@ -233,7 +392,8 @@ void ExecutionReplay::schedule(ParentState& ps, const MarketEvent& ev) {
         ++ps.next_slice;
         if (t >= p.end_ts) continue;
         const bool passive =
-            p.algo == AlgoType::TWAP || p.algo == AlgoType::VWAP;
+            p.policy != ExecPolicy::AGGRESSIVE &&
+            (p.algo == AlgoType::TWAP || p.algo == AlgoType::VWAP);
         issue_slice(ps, q, t, passive);
     }
 }
@@ -295,6 +455,9 @@ ExecReplayResult ExecutionReplay::run(const std::vector<MarketEvent>& events) {
                           : 0.0;
         r.total_cost = r.fees - r.rebates + r.impact;
         res.parents[r.parent_id] = r;
+        if (ps.order.policy == ExecPolicy::PASSIVE) {
+            res.passive[r.parent_id] = ps.stats;
+        }
     }
     if (trace_sink_ != nullptr) {
         for (const auto& ps : parents_) trace_sink_->emit(build_trace(ps, res));
@@ -406,8 +569,17 @@ contracts::DecisionTrace ExecutionReplay::build_trace(
     po.end_ts = p.end_ts;
     const bool passive_algo = p.algo == AlgoType::TWAP || p.algo == AlgoType::VWAP;
     po.urgency = passive_algo ? 0.0 : 1.0;
+    if (p.policy == ExecPolicy::AGGRESSIVE) {
+        po.urgency = 1.0;
+    } else if (p.policy == ExecPolicy::PASSIVE) {
+        po.urgency = std::min(std::max(p.urgency, 0.0), 1.0);
+    }
     po.limit_price_ticks = 0;
     po.params["max_child_qty"] = static_cast<double>(p.max_child_qty);
+    if (p.policy != ExecPolicy::NATIVE) {
+        // 1 = PASSIVE, 2 = AGGRESSIVE; a NATIVE parent's params are unchanged.
+        po.params["exec_policy"] = static_cast<double>(static_cast<int>(p.policy));
+    }
     if (p.algo == AlgoType::POV) {
         po.params["participation"] = p.participation;
     } else {

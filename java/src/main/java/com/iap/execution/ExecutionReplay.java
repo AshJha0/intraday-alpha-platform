@@ -40,6 +40,15 @@ import com.iap.sor.SorOptions;
  * eligible venue the child is NOT submitted and counted in
  * {@link Result#sorNoRoute}.
  *
+ * <p>Execution policies ({@link ParentOrder#policy}): the styles above are
+ * {@link ExecPolicy#NATIVE}. {@link ExecPolicy#AGGRESSIVE} issues every
+ * child as a MARKET order. {@link ExecPolicy#PASSIVE} runs, per parent and
+ * per event: (a) the schedule state at the event, (b) the
+ * {@link PassivePolicy} state machine of every posted child in posting
+ * order, (c) the new schedule steps; its transition counters are reported
+ * in {@link Result#passive}
+ * ({@code tests/golden/expected_replay_fills_passive.json}).
+ *
  * <p>Parent accounting identity (tested):
  * {@code total_cost = fees - rebates + impact} with fees/rebates/impact
  * exact sums over the parent's fills.
@@ -66,14 +75,31 @@ public final class ExecutionReplay {
         public final long eventsProcessed;
         /** Children not submitted because the SOR found no eligible venue. */
         public final long sorNoRoute;
+        /** PASSIVE transition counters, one row per PASSIVE parent. */
+        public final TreeMap<Long, PassiveStats> passive;
 
         Result(List<Fill> fills, TreeMap<Long, ParentReport> parents,
-                long eventsProcessed, long sorNoRoute) {
+                long eventsProcessed, long sorNoRoute,
+                TreeMap<Long, PassiveStats> passive) {
             this.fills = fills;
             this.parents = parents;
             this.eventsProcessed = eventsProcessed;
             this.sorNoRoute = sorNoRoute;
+            this.passive = passive;
         }
+    }
+
+    /** States of a posted child in the PASSIVE state machine. */
+    private enum WorkState {
+        REST, CANCEL_REPRICE, CANCEL_CROSS_TIMEOUT, CANCEL_CROSS_BEHIND, DONE
+    }
+
+    /** One posted child of a PASSIVE parent. */
+    private static final class Working {
+        long orderId;
+        long deadline;
+        int reprices;
+        WorkState state = WorkState.REST;
     }
 
     private static final class ParentState {
@@ -84,6 +110,13 @@ public final class ExecutionReplay {
         long filledQty;                 // fills booked so far
         long povVolume;                 // window TRADE volume (POV)
         final List<Long> childIds = new ArrayList<>();
+        // PASSIVE policy state.
+        long scheduledQty;              // qty the schedule has called for
+        long currentStepQty;            // q_cur: most recent slice (0: POV)
+        long patienceNs;
+        long behindQty;                 // BEHIND tolerance in qty
+        final List<Working> working = new ArrayList<>();
+        final PassiveStats stats = new PassiveStats();
     }
 
     private final ExecConfig config;
@@ -124,6 +157,11 @@ public final class ExecutionReplay {
                 ps.sliceQty = Algos.sliceQuantities(p);
                 ps.sliceDue = Algos.sliceTimes(p);
             }
+            if (p.policy == ExecPolicy.PASSIVE) {
+                ps.patienceNs = PassivePolicy.patienceNs(p.passive, p.urgency,
+                        p.algo == AlgoType.IS, p.riskAversion);
+                ps.behindQty = PassivePolicy.maxBehindQty(p.passive, p.qty);
+            }
             parents.add(ps);
         }
     }
@@ -132,9 +170,13 @@ public final class ExecutionReplay {
         return sim;
     }
 
-    /** Issue one child of at most max_child_qty; false when unroutable. */
+    /**
+     * Issue one child of at most max_child_qty; false when unroutable.
+     * {@code passive} joins the same-side best; with {@code post} the limit
+     * is the PASSIVE policy's post price instead (MARKET fallback either way).
+     */
     private boolean issueChild(ParentState ps, long childQty, long decisionTs,
-            boolean passive) {
+            boolean passive, boolean post) {
         if (childQty <= 0) {
             return true;
         }
@@ -161,13 +203,19 @@ public final class ExecutionReplay {
         if (passive) {
             // Join the same-side best on the routed venue; MARKET fallback.
             OrderBook vb = sim.venueBook(p.instrumentId, c.venueId);
-            long[] best = null;
-            if (vb != null) {
-                best = p.side == 0 ? vb.bestBid() : vb.bestAsk();
+            long price = 0; // 0 = no price: MARKET fallback
+            if (vb != null && post) {
+                price = PassivePolicy.postPrice(p.side, vb.bestBid(), vb.bestAsk(),
+                        p.passive.improveMinSpreadTicks());
+            } else if (vb != null) {
+                long[] best = p.side == 0 ? vb.bestBid() : vb.bestAsk();
+                if (best != null) {
+                    price = best[0];
+                }
             }
-            if (best != null) {
+            if (price > 0) {
                 c.type = OrderType.LIMIT;
-                c.limitTicks = best[0];
+                c.limitTicks = price;
             } else {
                 c.type = OrderType.MARKET;
             }
@@ -185,8 +233,156 @@ public final class ExecutionReplay {
         long left = sliceQty;
         while (left > 0) {
             long q = Math.min(left, cap);
-            issueChild(ps, q, decisionTs, passive);
+            issueChild(ps, q, decisionTs, passive, false);
             left -= q;
+        }
+    }
+
+    /** PASSIVE: POST one child (or CROSS it when it cannot rest). */
+    private void post(ParentState ps, long qty, long t, int reprices) {
+        ParentOrder p = ps.order;
+        long cap = p.endTs - p.passive.endMarginNs();
+        if (ps.patienceNs <= 0 || t >= cap) {
+            ps.stats.crossesImmediate++;
+            issueChild(ps, qty, t, false, false);
+            return;
+        }
+        if (!issueChild(ps, qty, t, true, true)) {
+            return;
+        }
+        long oid = ps.childIds.get(ps.childIds.size() - 1);
+        if (sim.orders().get(oid).type != OrderType.LIMIT) {
+            ps.stats.crossesImmediate++; // no same-side quote: MARKET fallback
+            return;
+        }
+        ps.stats.posts++;
+        Working w = new Working();
+        w.orderId = oid;
+        w.deadline = Math.min(t + ps.patienceNs, cap);
+        w.reprices = reprices;
+        ps.working.add(w);
+    }
+
+    /** PASSIVE: POST a schedule step, split at max_child_qty (pinned). */
+    private void postStep(ParentState ps, long stepQty, long t) {
+        long cap = ps.order.maxChildQty;
+        long left = stepQty;
+        while (left > 0) {
+            long q = Math.min(left, cap);
+            post(ps, q, t, 0);
+            left -= q;
+        }
+    }
+
+    /** PASSIVE: advance the state machine of every posted child. */
+    private void workPassive(ParentState ps, long t) {
+        ParentOrder p = ps.order;
+        boolean behind =
+                ps.scheduledQty - ps.filledQty - ps.currentStepQty > ps.behindQty;
+        int n = ps.working.size(); // children posted below: next event
+        for (int k = 0; k < n; k++) {
+            Working w = ps.working.get(k);
+            if (w.state == WorkState.DONE) {
+                continue;
+            }
+            ChildOrder o = sim.orders().get(w.orderId);
+            boolean terminal = o.state == OrderState.FILLED
+                    || o.state == OrderState.CANCELLED;
+            if (w.state == WorkState.REST) {
+                if (terminal) {
+                    w.state = WorkState.DONE;
+                } else if (t >= p.endTs) {
+                    continue; // expires with the window (rule 7)
+                } else if (behind) {
+                    sim.cancel(w.orderId, t);
+                    w.state = WorkState.CANCEL_CROSS_BEHIND;
+                } else if (t >= w.deadline) {
+                    if (w.reprices >= p.passive.maxReprices()) {
+                        sim.cancel(w.orderId, t);
+                        w.state = WorkState.CANCEL_CROSS_TIMEOUT;
+                        continue;
+                    }
+                    OrderBook vb = sim.venueBook(p.instrumentId, o.venueId);
+                    long price = 0;
+                    if (vb != null) {
+                        price = PassivePolicy.postPrice(p.side, vb.bestBid(),
+                                vb.bestAsk(), p.passive.improveMinSpreadTicks());
+                    }
+                    if (price > 0 && price == o.limitTicks) {
+                        // Still at the target price: keep the queue position.
+                        w.reprices++;
+                        w.deadline = Math.min(t + ps.patienceNs,
+                                p.endTs - p.passive.endMarginNs());
+                        ps.stats.restExtensions++;
+                    } else {
+                        sim.cancel(w.orderId, t);
+                        w.state = WorkState.CANCEL_REPRICE;
+                    }
+                }
+                continue;
+            }
+            // A cancel is in flight: act once it has taken effect.
+            if (!terminal) {
+                continue;
+            }
+            WorkState state = w.state;
+            w.state = WorkState.DONE;
+            if (o.state != OrderState.CANCELLED
+                    || o.cancelReason != CancelReason.USER
+                    || o.remaining <= 0 || t >= p.endTs) {
+                continue; // filled, expired or window closed: nothing to re-send
+            }
+            if (state == WorkState.CANCEL_REPRICE) {
+                ps.stats.reprices++;
+                post(ps, o.remaining, t, w.reprices + 1);
+            } else {
+                if (state == WorkState.CANCEL_CROSS_BEHIND) {
+                    ps.stats.crossesBehind++;
+                } else {
+                    ps.stats.crossesTimeout++;
+                }
+                issueChild(ps, o.remaining, t, false, false);
+            }
+        }
+    }
+
+    /** PASSIVE: the per-event scheduler (schedule state, work, new steps). */
+    private void schedulePassive(ParentState ps, MarketEvent ev) {
+        ParentOrder p = ps.order;
+        long t = ev.exchangeTs;
+        if (p.algo == AlgoType.POV) {
+            boolean inWindow = ev.instrumentId == p.instrumentId
+                    && ev.eventType == EventType.TRADE
+                    && t >= p.startTs && t < p.endTs;
+            if (inWindow) {
+                ps.povVolume += ev.qty;
+                long target = (long) Math.floor(
+                        p.participation * (double) ps.povVolume);
+                ps.scheduledQty = Math.min(target, p.qty);
+            }
+            workPassive(ps, t);
+            if (inWindow) {
+                long deficit = ps.scheduledQty - committedQty(ps);
+                if (deficit > 0) {
+                    post(ps, Math.min(deficit, p.maxChildQty), t, 0);
+                }
+            }
+            return;
+        }
+        List<Long> steps = new ArrayList<>();
+        while (ps.nextSlice < ps.sliceDue.length && t >= ps.sliceDue[ps.nextSlice]) {
+            long q = ps.sliceQty[ps.nextSlice];
+            ps.nextSlice++;
+            ps.scheduledQty += q;
+            ps.currentStepQty = q;
+            if (t >= p.endTs) {
+                continue;
+            }
+            steps.add(q);
+        }
+        workPassive(ps, t);
+        for (long q : steps) {
+            postStep(ps, q, t);
         }
     }
 
@@ -217,6 +413,10 @@ public final class ExecutionReplay {
     private void schedule(ParentState ps, MarketEvent ev) {
         ParentOrder p = ps.order;
         long t = ev.exchangeTs;
+        if (p.policy == ExecPolicy.PASSIVE) {
+            schedulePassive(ps, ev);
+            return;
+        }
         if (p.algo == AlgoType.POV) {
             if (ev.instrumentId != p.instrumentId
                     || ev.eventType != EventType.TRADE
@@ -228,7 +428,7 @@ public final class ExecutionReplay {
             // Deficit against FILLED + in-flight qty, never sent qty (pinned).
             long deficit = Math.min(target, p.qty) - committedQty(ps);
             if (deficit > 0) {
-                issueChild(ps, Math.min(deficit, p.maxChildQty), t, false);
+                issueChild(ps, Math.min(deficit, p.maxChildQty), t, false, false);
             }
             return;
         }
@@ -240,7 +440,8 @@ public final class ExecutionReplay {
             if (t >= p.endTs) {
                 continue;
             }
-            boolean passive = p.algo == AlgoType.TWAP || p.algo == AlgoType.VWAP;
+            boolean passive = p.policy != ExecPolicy.AGGRESSIVE
+                    && (p.algo == AlgoType.TWAP || p.algo == AlgoType.VWAP);
             issueSlice(ps, q, t, passive);
         }
     }
@@ -265,6 +466,7 @@ public final class ExecutionReplay {
 
         List<Fill> fills = new ArrayList<>(sim.fills());
         TreeMap<Long, ParentReport> reports = new TreeMap<>();
+        TreeMap<Long, PassiveStats> passiveStats = new TreeMap<>();
         for (ParentState ps : parents) {
             ParentReport r = new ParentReport();
             r.parentId = ps.order.parentId;
@@ -295,7 +497,10 @@ public final class ExecutionReplay {
                     : 0.0;
             r.totalCost = r.fees - r.rebates + r.impact;
             reports.put(r.parentId, r);
+            if (ps.order.policy == ExecPolicy.PASSIVE) {
+                passiveStats.put(r.parentId, ps.stats);
+            }
         }
-        return new Result(fills, reports, processed, sorNoRoute);
+        return new Result(fills, reports, processed, sorNoRoute, passiveStats);
     }
 }

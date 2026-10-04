@@ -35,6 +35,11 @@ joining the same-side best at decision time (MARKET when that side is
 empty); POV and IS children are MARKET orders. Venue: ``parent.venue_id``
 or SOR-routed when ``venue_id == 0``. The scheduling itself lives in
 ``iap.execution.replay``.
+
+These child styles are the ``NATIVE`` execution policy, the default.
+``ParentOrder.policy`` selects ``AGGRESSIVE`` (every child MARKET) or
+``PASSIVE`` (the POST -> REST -> REPRICE / CROSS state machine of
+``iap.execution.passive``) per parent; the schedules above do not change.
 """
 
 from __future__ import annotations
@@ -42,6 +47,8 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from enum import IntEnum
+
+from iap.execution.passive import ExecPolicy, PassiveParams
 
 
 class AlgoType(IntEnum):
@@ -69,6 +76,9 @@ class ParentOrder:
     participation: float = 0.05  #: POV
     risk_aversion: float = 1.0  #: IS
     max_child_qty: int = 1000
+    policy: ExecPolicy = ExecPolicy.NATIVE  #: child style (iap.execution.passive)
+    urgency: float = 0.5  #: PASSIVE patience, in [0, 1]; 1 = cross at once
+    passive: PassiveParams = PassiveParams()  #: PASSIVE parameters
 
 
 def slice_weights(parent: ParentOrder) -> list[float]:

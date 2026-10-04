@@ -257,6 +257,10 @@ struct ChildOrder {
     // Qty ahead of us in the FIFO queue at our level: the displayed size at
     // rest time plus our own earlier children resting there (rule 4).
     std::int64_t ahead_qty = 0;
+    // ahead_qty at the moment the order came to rest (never updated
+    // afterwards; 0 for an order that never rested): the queue position at
+    // entry that markout analysis reports against the fill outcome.
+    std::int64_t entry_ahead_qty = 0;
     bool resting = false;
     bool cross_exempt = false;   // see the crossing-rule exemption above
     CancelReason cancel_reason = CancelReason::NONE;

@@ -64,6 +64,7 @@ import json
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
+from functools import partial
 
 from iap.contracts.ids import NO_ROUTE
 from iap.contracts.protocols import TraceSink
@@ -84,9 +85,17 @@ from iap.contracts.types import (
 )
 from iap.core.events import EventType, MarketEvent, SessionStatus
 from iap.execution.config import ExecConfig, SorOptions, load_sor_options
+from iap.execution.passive import ExecPolicy, PassiveStats, max_behind_qty, post_price
 from iap.execution.simulator import ExecutionSimulator
 from iap.execution.sor import SmartOrderRouter
-from iap.execution.types import InstrumentSpec, LatencyConfig, Liquidity, VenueSpec
+from iap.execution.types import (
+    CancelReason,
+    InstrumentSpec,
+    LatencyConfig,
+    Liquidity,
+    OrderState,
+    VenueSpec,
+)
 from iap.features.context import InstrumentContext, SessionClock
 from iap.features.engine import FeatureEngine, FeatureVector
 from iap.labels.labels import HORIZONS_NS, LabelResult, MidSeries, compute_labels, max_sample_age
@@ -342,6 +351,23 @@ class OrderOutcome:
 BLOCK_CONTROLS = ("slice_interval", "latency_budget", "participation")
 
 
+#: States of a posted child in the PASSIVE state machine
+#: (``iap.execution.passive``; the same machine as ``ExecutionReplay``).
+_REST = 0
+_CANCEL_REPRICE = 1
+_CANCEL_CROSS_TIMEOUT = 2
+_CANCEL_CROSS_BEHIND = 3
+_DONE = 4
+
+
+@dataclass
+class _Working:
+    child_order_id: int
+    deadline: int
+    reprices: int
+    state: int = _REST
+
+
 @dataclass
 class _LiveParent:
     parent: ParentOrder
@@ -355,6 +381,8 @@ class _LiveParent:
     blocked: dict[str, int] = field(default_factory=lambda: dict.fromkeys(BLOCK_CONTROLS, 0))
     fill_impact: float = 0.0
     fill_fees: float = 0.0
+    #: PASSIVE policy: the posted children being worked (posting order).
+    working: list[_Working] = field(default_factory=list)
 
     def all_terminal(self, sim: SimulatorAdapter) -> bool:
         return all(sim.open_qty(cid) == 0 for cid in self.children)
@@ -464,7 +492,14 @@ class MvpEngine:
             cfg.execution.pov_participation,
             self._new_child_id,
             self._committed,
+            policy=cfg.execution.child_policy,
+            passive=cfg.execution.passive,
         )
+        #: Child execution policy and its transition counters. Not part of
+        #: the report: the pinned NATIVE run never touches them.
+        self.child_policy = cfg.execution.child_policy
+        self.passive_params = cfg.execution.passive
+        self.passive_stats = PassiveStats()
         self.min_venue_latency_ns = min(v.latency_mean_ns for v in self.venues.values())
 
         # ---- risk ---------------------------------------------------------
@@ -880,90 +915,200 @@ class MvpEngine:
         live = self._live
         if live is None:
             return
+        work = None
+        if self.child_policy is ExecPolicy.PASSIVE:
+            work = partial(self._work_passive, live, ev)
+        for child in self.scheduler.generate_child_orders(
+            live.parent, MarketView(ev, self.book), work
+        ):
+            self._submit_child(live, child, ev, replacement=False, reprices=0)
+
+    def _work_passive(self, live: _LiveParent, ev: MarketEvent) -> None:
+        """PASSIVE policy: advance POST -> REST -> REPRICE / CROSS for every
+        posted child of the live parent (``iap.execution.passive``; the
+        machine of ``ExecutionReplay._work_passive``). A replacement child
+        goes through routing, the latency-budget and participation controls
+        and the risk check like any other child; it is exempt from the
+        slice-interval control, because it re-sends quantity of a slice that
+        control already admitted, and it does not move the slice clock."""
+        parent = live.parent
+        t = ev.exchange_ts
+        params = self.passive_params
+        ps = self.scheduler.schedule_state(parent.parent_order_id)
+        filled = sum(r.filled_qty for r in live.reports)
+        behind = ps.scheduled_qty - filled - ps.current_step_qty > max_behind_qty(
+            params, parent.qty
+        )
+        stats = self.passive_stats
+        for k in range(len(live.working)):  # children posted below: next event
+            w = live.working[k]
+            if w.state == _DONE:
+                continue
+            o = self.sim.sim_order(w.child_order_id)
+            if w.state == _REST:
+                if o.is_terminal:
+                    w.state = _DONE
+                elif t >= parent.end_ts:
+                    continue  # expires with the window (rule 7)
+                elif behind:
+                    self.sim.cancel(w.child_order_id, t)
+                    w.state = _CANCEL_CROSS_BEHIND
+                elif t >= w.deadline:
+                    if w.reprices >= params.max_reprices:
+                        self.sim.cancel(w.child_order_id, t)
+                        w.state = _CANCEL_CROSS_TIMEOUT
+                        continue
+                    vb = self.book.books.get(o.venue_id)
+                    price = None
+                    if vb is not None:
+                        price = post_price(
+                            o.side, vb.best_bid(), vb.best_ask(), params.improve_min_spread_ticks
+                        )
+                    if price == o.limit_ticks:
+                        w.reprices += 1  # still at the target price: keep the queue position
+                        w.deadline = min(t + ps.patience_ns, parent.end_ts - params.end_margin_ns)
+                        stats.rest_extensions += 1
+                    else:
+                        self.sim.cancel(w.child_order_id, t)
+                        w.state = _CANCEL_REPRICE
+                continue
+            if not o.is_terminal:
+                continue  # the cancel is still in flight
+            state = w.state
+            w.state = _DONE
+            if (
+                o.state != OrderState.CANCELLED
+                or o.cancel_reason != CancelReason.USER
+                or o.remaining <= 0
+                or t >= parent.end_ts
+            ):
+                continue  # filled, expired or the window closed: nothing to re-send
+            rest = state == _CANCEL_REPRICE
+            if rest:
+                stats.reprices += 1
+            elif state == _CANCEL_CROSS_BEHIND:
+                stats.crosses_behind += 1
+            else:
+                stats.crosses_timeout += 1
+            child = self.scheduler.replacement(parent, o.remaining, t, rest)
+            self._submit_child(live, child, ev, replacement=True, reprices=w.reprices + 1)
+
+    def _submit_child(
+        self,
+        live: _LiveParent,
+        child: ChildOrder,
+        ev: MarketEvent,
+        *,
+        replacement: bool,
+        reprices: int,
+    ) -> None:
+        """Route, control, risk-check and submit one generated child."""
         parent = live.parent
         t = ev.exchange_ts
         builder = live.decision.builder
-        for child in self.scheduler.generate_child_orders(parent, MarketView(ev, self.book)):
-            self.counters.child_orders_generated += 1
-            passive = child.order_type is OrderType.LIMIT
-            vd: VenueDecision = self.sor.route(child, SorMarket(self.book, passive))
-            if vd.venue_id == NO_ROUTE:
-                # A routing verdict: traced (routing + child) with venue 0.
-                self.counters.sor_no_route += 1
-                builder.add_routing(vd)
-                builder.add_child_order(child)
-                live.rejected += 1
-                continue
-            venue_book = self.book.books.get(vd.venue_id)
-            order_type = child.order_type
-            price = 0
-            if passive:
-                best = None
-                if venue_book is not None:
-                    best = (
-                        venue_book.best_bid() if child.side is Side.BID else venue_book.best_ask()
-                    )
-                if best is not None:
-                    price = best[0]
-                else:
-                    order_type = OrderType.MARKET
-            routed = replace(child, venue_id=vd.venue_id, price_ticks=price, order_type=order_type)
-            # Declared controls (Java BacktestEngine.decide, pinned order).
-            ctl = self.controls
-            acct = self.account
-            # A control-blocked child never leaves the strategy (BLOCK_CONTROLS):
-            # counted, not traced.
-            if (
-                ctl.min_slice_interval_ns > 0
-                and acct.last_child_decision_ts is not None
-                and t - acct.last_child_decision_ts < ctl.min_slice_interval_ns
-            ):
-                self.counters.slice_interval_blocked += 1
-                live.blocked["slice_interval"] += 1
-                live.rejected += 1
-                continue
-            venue_latency = (
-                self.exec_config.latency.internal_ns + self.venues[vd.venue_id].latency_mean_ns
-            )
-            if venue_latency > ctl.latency_budget_ns:
-                self.counters.latency_budget_blocked += 1
-                live.blocked["latency_budget"] += 1
-                live.rejected += 1
-                continue
-            if ctl.max_participation < 1.0:
-                depth = self._contra_depth(venue_book, child.side)
-                cap_depth = int(math.floor(ctl.max_participation * depth))
-                cap_volume = (
-                    int(math.floor(ctl.max_participation * acct.session_volume)) - acct.filled_qty
-                )
-                cap = max(min(cap_depth, cap_volume), 0)
-                if cap == 0:
-                    self.counters.participation_blocked += 1
-                    live.blocked["participation"] += 1
-                    live.rejected += 1
-                    continue
-                if routed.qty > cap:
-                    self.counters.participation_capped += 1
-                    routed = replace(routed, qty=cap)
+        posting = self.child_policy is ExecPolicy.PASSIVE
+        self.counters.child_orders_generated += 1
+        passive = child.order_type is OrderType.LIMIT
+        if posting and not passive and not replacement:
+            self.passive_stats.crosses_immediate += 1
+        vd: VenueDecision = self.sor.route(child, SorMarket(self.book, passive))
+        if vd.venue_id == NO_ROUTE:
+            # A routing verdict: traced (routing + child) with venue 0.
+            self.counters.sor_no_route += 1
             builder.add_routing(vd)
-            builder.add_child_order(routed)
-            rd: RiskDecision = self.risk.evaluate(
-                routed, RiskContext(self.strategy_id, parent.urgency, t)
+            builder.add_child_order(child)
+            live.rejected += 1
+            return
+        venue_book = self.book.books.get(vd.venue_id)
+        order_type = child.order_type
+        price = 0
+        if passive:
+            limit = None
+            if venue_book is not None and posting:
+                # PASSIVE: near touch, one tick inside when the spread
+                # allows, never at or through the opposite touch.
+                limit = post_price(
+                    int(child.side),
+                    venue_book.best_bid(),
+                    venue_book.best_ask(),
+                    self.passive_params.improve_min_spread_ticks,
+                )
+            elif venue_book is not None:
+                best = venue_book.best_bid() if child.side is Side.BID else venue_book.best_ask()
+                limit = None if best is None else best[0]
+            if limit is not None:
+                price = limit
+            else:
+                order_type = OrderType.MARKET
+        routed = replace(child, venue_id=vd.venue_id, price_ticks=price, order_type=order_type)
+        # Declared controls (Java BacktestEngine.decide, pinned order).
+        ctl = self.controls
+        acct = self.account
+        # A control-blocked child never leaves the strategy (BLOCK_CONTROLS):
+        # counted, not traced.
+        if (
+            not replacement
+            and ctl.min_slice_interval_ns > 0
+            and acct.last_child_decision_ts is not None
+            and t - acct.last_child_decision_ts < ctl.min_slice_interval_ns
+        ):
+            self.counters.slice_interval_blocked += 1
+            live.blocked["slice_interval"] += 1
+            live.rejected += 1
+            return
+        venue_latency = (
+            self.exec_config.latency.internal_ns + self.venues[vd.venue_id].latency_mean_ns
+        )
+        if venue_latency > ctl.latency_budget_ns:
+            self.counters.latency_budget_blocked += 1
+            live.blocked["latency_budget"] += 1
+            live.rejected += 1
+            return
+        if ctl.max_participation < 1.0:
+            depth = self._contra_depth(venue_book, child.side)
+            cap_depth = int(math.floor(ctl.max_participation * depth))
+            cap_volume = (
+                int(math.floor(ctl.max_participation * acct.session_volume)) - acct.filled_qty
             )
-            builder.add_risk(rd)
-            if rd.decision is not Decision.ALLOW:
-                self.counters.risk_rejected += 1
+            cap = max(min(cap_depth, cap_volume), 0)
+            if cap == 0:
+                self.counters.participation_blocked += 1
+                live.blocked["participation"] += 1
                 live.rejected += 1
-                continue
-            self.counters.risk_allowed += 1
-            reports = self.sim.submit(routed)
-            live.children[routed.child_order_id] = routed
-            acct.orders_submitted += 1
+                return
+            if routed.qty > cap:
+                self.counters.participation_capped += 1
+                routed = replace(routed, qty=cap)
+        builder.add_routing(vd)
+        builder.add_child_order(routed)
+        rd: RiskDecision = self.risk.evaluate(
+            routed, RiskContext(self.strategy_id, parent.urgency, t)
+        )
+        builder.add_risk(rd)
+        if rd.decision is not Decision.ALLOW:
+            self.counters.risk_rejected += 1
+            live.rejected += 1
+            return
+        self.counters.risk_allowed += 1
+        reports = self.sim.submit(routed)
+        live.children[routed.child_order_id] = routed
+        acct.orders_submitted += 1
+        if not replacement:
             acct.last_child_decision_ts = t
-            self.counters.child_orders_submitted += 1
-            for rep in reports:
-                live.reports.append(rep)
-                builder.add_fill(rep)
+        self.counters.child_orders_submitted += 1
+        for rep in reports:
+            live.reports.append(rep)
+            builder.add_fill(rep)
+        if posting and routed.order_type is OrderType.LIMIT:
+            ps = self.scheduler.schedule_state(parent.parent_order_id)
+            self.passive_stats.posts += 1
+            live.working.append(
+                _Working(
+                    routed.child_order_id,
+                    min(t + ps.patience_ns, parent.end_ts - self.passive_params.end_margin_ns),
+                    reprices,
+                )
+            )
 
     # ------------------------------------------------------------- finalise
 
