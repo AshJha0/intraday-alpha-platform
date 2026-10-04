@@ -124,8 +124,13 @@ iap/
                    iap.features`, console script iap-features).
   labels/          Event-time labels at the 11 pinned horizons (labels.py:
                    compute_labels — mid-to-mid and cost-adjusted, at-or-before
-                   rule, invalid across halts / stale venues / one-sided books);
+                   rule, invalid across halts / stale venues / one-sided books;
+                   since v1.5.0 also the reopen return of a label invalid for
+                   BLACKOUT alone, the label_reopen_<h> column);
                    the definition the MVP's realized IC is pinned to.
+                   frames.py: which rows a research statistic scores
+                   (scored_labels / scored_rows; ic_rows "blackout_reopen",
+                   the default since v1.5.0, or the legacy "valid_only").
   alpha/           The 24 flagship alphas (API_ALPHA.md): base.py (AlphaModel,
                    linear_z_v1 fit / score, the enforced `Economic rationale:`
                    docstring), equity.py (EQ01..EQ12), fx.py (FX01..FX12),
@@ -133,24 +138,34 @@ iap/
                    frames), goldenframes.py (the golden alpha cases).
   validation/      The research framework (spec §13, §20): splits.py (purged +
                    embargoed row-mass walk-forward), metrics.py (IC, rank IC,
-                   Newey-West-lite t; and, additive since v1.3.0, the
-                   pooled-slope HAC t, per-instrument / vol-scaled IC,
-                   breakeven capacity, the blackout-reopen IC), leakage.py
+                   Newey-West-lite t; and, added in v1.3.0 and the defaults
+                   since v1.5.0, the pooled-slope HAC t the gate reads,
+                   breakeven capacity and the blackout-reopen IC, with the
+                   per-instrument / vol-scaled IC as headline columns no
+                   gate reads), leakage.py
                    (label-column guard, shift-by-one, truncation probe; the
-                   opt-in recompute probe that rebuilds features from
-                   truncated raw events), stress.py (cost / latency / regime
-                   grids; opt-in stress_version=2), diagnostics.py (per-fold
+                   recompute probe that rebuilds features from truncated raw
+                   events, part of the standard run() since v1.5.0 whenever
+                   the events are given), stress.py (cost / latency / regime
+                   grids; stress_version=2 by default, 1 the legacy grid),
+                   diagnostics.py (per-fold
                    cost survival / decay / regime and a seeded
-                   stationary-bootstrap interval for net P&L; read by no
+                   stationary-bootstrap interval for net P&L; reported by
+                   default since v1.5.0, read by no
                    gate), ledger.py (the multiple-testing ledger,
-                   research/experiments.json, x-version 2: de-duplicated by
+                   research/experiments.json, x-version 3: de-duplicated by
                    alpha x kind x config x dataset — a ledger opened with a
                    dataset_version stamps its entries with it, so a rerun on
                    a regenerated dataset adds its looks and the looks of
-                   every earlier dataset stay in the total; locked
+                   every earlier dataset stay in the total; entries carry
+                   gate_looks, the look count the run was judged at; locked
                    read-modify-write), validate.py
-                   (validate_alpha, the pinned GATES, the opt-in ledger-derived
-                   t threshold and the PROMOTE / ITERATE / REJECT verdict).
+                   (validate_alpha, the pinned GATES, the ledger-derived
+                   PROMOTE t threshold — tstat_threshold="ledger", the
+                   default since v1.5.0; "fixed" is the legacy 3.0 — and the
+                   PROMOTE / ITERATE / REJECT verdict), methods.py (the
+                   method bundles "v2", the default, and "legacy_v1", the
+                   rules up to v1.4.0: ResearchMethods, methods(name)).
   experiment/      tracker.py — data_version() (sha256 over the normalized IAP1
                    bytes), feature_version() (registry hash), git_commit(),
                    hardware_summary(), ExperimentTracker.write_manifest()
@@ -162,7 +177,9 @@ iap/
   models/          The gated ML layer (research/ml_reports): dataset.py,
                    splits.py, zoo.py (linear baselines gate the tree models),
                    metalabel.py (isotonic / Platt-calibrated trade / no-trade
-                   gate), economics.py, pipeline.py.
+                   gate; build_meta_features(impute_nan=False) since v1.5.0 —
+                   missing values stay missing for the tree model, True is
+                   the legacy zero imputation), economics.py, pipeline.py.
   portfolio/       The reference optimizer (API_PORTFOLIO_TCA.md §1):
                    optimizer.py (projected-gradient mean-variance with
                    transaction costs under 7 constraint families, INFEASIBLE
@@ -175,14 +192,23 @@ iap/
                    harness), report.py; `python -m iap.tca` writes
                    research/tca/TCA_REPORT.md.
   backtest/        engine.py (the event-driven research backtester: Backtester,
-                   ensemble_scores, the P&L identity), costs.py (half-spread +
-                   fees + linear impact, per-currency natives), adaptive.py
-                   (the adaptive walk-forward deployment replay).
+                   ensemble_scores, the P&L identity; BacktestConfig defaults
+                   since v1.5.0: position_policy="cost_aware" — needs the
+                   label horizon, for_horizon() —, cap_fills_at_l1=True,
+                   block_rows_column="auto"; BacktestConfig.legacy() names
+                   the v1.4.0 rules), costs.py (half-spread + fees + impact:
+                   impact_model="sqrt" by default since v1.5.0, the legacy
+                   "linear" via with_linear_impact(); per-currency natives),
+                   adaptive.py (the adaptive walk-forward deployment replay).
   adaptive/        The adaptability reference (API_ADAPTIVE.md): drift.py (PSI,
-                   two-sample KS), refit.py (static / scheduled /
-                   drift-triggered policies), lifecycle.py (LifecycleTracker:
+                   two-sample KS, the rolling IC and its z: ic_z_method
+                   "hac" by default since v1.5.0, "legacy" the z up to
+                   v1.4.0), refit.py (static / scheduled /
+                   drift-triggered policies; the adaptive block is
+                   x-version 2), lifecycle.py (LifecycleTracker:
                    the ACTIVE -> WATCH -> RETIRED live sub-machine that
-                   iap.lifecycle wraps unchanged).
+                   iap.lifecycle wraps unchanged; breach_rule "cusum" by
+                   default since v1.5.0, "consecutive" the legacy rule).
   reference/
     refdata.py     ReferenceData service over configs/instruments/instruments.json +
                    configs/venues/venues.json: tick/lot sizes, price<->ticks, venues,
@@ -226,14 +252,22 @@ iap/
                    least as conservative as the pinned protocol, periods
                    derived from the dataset)?
     runner.py      ExperimentRunner(feature_store_dir, ledger_path, out_dir,
-                   configs_dir, dry_run=, frames=): validate_alpha over the
+                   configs_dir, dry_run=, frames=, repo_root=,
+                   normalized_dir=): validate_alpha over the
                    experiment window (purged + embargoed walk-forward, leakage,
-                   NW t, fold consistency, hypothesis sign, stress, §20 verdict)
+                   HAC t, fold consistency, hypothesis sign, stress, §20 verdict)
                    + a holdout backtest (fit on train, test period at
-                   cost_multiplier) for the bps economics; 28 looks per run in
-                   the ledger (LOOKS_PER_EXPERIMENT; a --dry-run debits them
-                   too, a rerun of the same spec adds none); opt-in
-                   tstat_threshold="ledger"; build_result maps the report onto the contract
+                   cost_multiplier) for the bps economics; 84 looks per run in
+                   the ledger under the default "v2" bundle
+                   (LOOKS_PER_EXPERIMENT: 83 for the validation at four
+                   folds + the backtest), 28 under "legacy_v1"
+                   (LEGACY_LOOKS_PER_EXPERIMENT); a --dry-run debits them
+                   too, a rerun of the same spec adds none. The bundle is
+                   spec.configuration["methods"], so it is part of the
+                   experiment id; under v2 PROMOTE needs the gate t to reach
+                   max(3.0, Bonferroni |t| at the run's gate look count),
+                   recorded as gate_looks on the ledger entry;
+                   build_result maps the report onto the contract
                    (a NaN metric raises ResearchError, never a value);
                    created_ts = test_period.end_ts; canonical JSON persistence,
                    refuses a rerun that reproduces different numbers.
@@ -253,7 +287,8 @@ iap/
                    tests/test_research_golden.py.
     __main__.py    `python -m iap.research [--json-errors] run --alpha EQ03
                    [--horizon 1s] [--config k=v] [--seed N] [--dry-run]
-                   [--tstat-threshold fixed|ledger] | list [--json] |
+                   [--methods v2|legacy_v1] [--normalized-dir DIR] |
+                   list [--json] |
                    show <id> [--json] | power` — result table, verdict, gate
                    eligibility and the ledger's expected-max-|t| note; `list`
                    prints a `dataset` column (the folder keeps the
@@ -262,13 +297,19 @@ iap/
                    -> PAPER -> ACTIVE -> WATCH -> RETIRED (LifecycleState 0..6)
                    with a gate at every edge; extends (never alters) the
                    ACTIVE/WATCH/RETIRED tracker of iap.adaptive.lifecycle.
-    config.py      PolicyConfig = configs/strategies/lifecycle.json (x-version 1:
+    config.py      PolicyConfig = configs/strategies/lifecycle.json (x-version 2:
                    promotion-gate thresholds equal to validate.GATES, demotion
-                   max_consecutive_failures) + strategies.json adaptive.lifecycle
-                   (the live gates, not duplicated); fail-fast loader.
+                   max_consecutive_failures, tstat_threshold "ledger" by
+                   default or the legacy "fixed") + strategies.json
+                   adaptive.lifecycle (the live gates and the retirement
+                   rule, not duplicated); fail-fast loader.
     evidence.py    Evidence(research: ExperimentResult, capacity_usd,
                    validation: ValidationEvidence, paper: PaperEvidence,
-                   live: LiveEvidence) — finite scalars only, strict to/from_dict.
+                   live: LiveEvidence, significance_threshold) — finite
+                   scalars only, strict to/from_dict; since v1.5.0 the
+                   document requires significance_threshold (number or null:
+                   the PROMOTE t threshold the result was judged at) and
+                   live.new_fraction (the CUSUM weight of a live reading).
     gates.py       GATE_SPECS: the gate table (name, block, metric, min/max/gt/
                    bool comparison, config key) -> Gate objects satisfying
                    LifecycleGate; stability = |ic - rank_ic| / max(|ic|, eps).
@@ -278,17 +319,24 @@ iap/
                    Transition into a LifecycleTransition; RETIRED is terminal for
                    SYSTEM; every advance records a GateEvaluation.
     registry.py    AlphaRecord / AlphaRegistry (research/alpha_registry.json,
-                   x-version 1, byte-deterministic) and LifecycleTransitionLog
+                   x-version 2: each record carries the CUSUM statistic;
+                   byte-deterministic) and LifecycleTransitionLog
                    (research/lifecycle_transitions.jsonl, canonical JSON lines,
                    schema-validated).
-    bootstrap.py   Report -> ExperimentResult mapping (gate_ic / uncrossed t),
+    bootstrap.py   Report -> ExperimentResult mapping (gate_ic / gate_tstat, the
+                   pooled IC and the pooled-slope HAC t the gate read; the
+                   report's ledger-derived threshold travels as
+                   Evidence.significance_threshold),
                    select_pipeline_entries (the promotion_pipeline ledger
                    entry of each alpha for ONE dataset: the data_version
-                   that alpha_params.json names; entries of other datasets
+                   that alpha_params.json names, under the default methods;
+                   entries of other datasets and of the legacy methods
                    are history), run_bootstrap over the 24 flagship alphas at
                    the pinned event time (latest fold test_end),
                    render_status.
-    golden.py      The LC01/LC02/LC03 scripted scenarios behind
+    golden.py      The LC01..LC04 scripted scenarios under the default policy
+                   and LG01 under the legacy one (fixed threshold,
+                   consecutive breaches) behind
                    tests/golden/expected_lifecycle.json
                    (python/tools/make_golden_lifecycle.py).
     __main__.py    `python -m iap.lifecycle bootstrap [--dry-run] [--force] | status |

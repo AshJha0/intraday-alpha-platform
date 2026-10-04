@@ -424,15 +424,43 @@ pinned in one place: the anchor uses events with `ts <= t`, the forward leg
 is determined by the anchor state plus events strictly after `t` — shifting
 either series by one event must break the alignment tests.
 
-**Opt-in: the reopen return of a BLACKOUT label (v1.3.0).**
-`compute_labels(..., blackout_reopen=True)` (default `False`; labels and
-validity are unchanged either way) also fills `LabelResult.reopen_mid`: for
-an anchor whose label is invalid for `blackout` and nothing else, the
-return from the anchor mid to the first tradable mid at or after `t + h`.
-It is not a tradable `h`-horizon return — the label stays invalid — and
-exists so that the selection rule 4 makes can be measured:
-`iap.validation.metrics.ic_with_blackout_reopen` scores those rows at the
-realised reopen return instead of dropping them.
+**The reopen return of a BLACKOUT label** (added as an opt-in in v1.3.0;
+computed and written by default since v1.5.0).
+`compute_labels(..., blackout_reopen=True)` (the default; labels and
+validity are the same either way, and `False` skips the computation and
+leaves the series empty, the pre-v1.5.0 behaviour) also fills
+`LabelResult.reopen_mid`: for an anchor whose label is invalid for
+`blackout` and nothing else, the return from the anchor mid to the first
+tradable mid at or after `t + h`; NaN everywhere else. It is not a
+tradable `h`-horizon return — the label stays invalid. The feature store
+writes it as the per-horizon column **`label_reopen_<h>`** (float64),
+beside `label_mid_<h>` / `label_cost_<h>` / `label_valid_<h>` /
+`label_reason_<h>`.
+
+**Row policy (pinned; `iap.labels.frames`, the default changed in
+v1.5.0).** Rule 4 is a selection on the outcome: whether a halt, an
+auction or a stale-venue gap falls inside the horizon is not known at `t`,
+and the rows it drops are the ones before such a gap. `ic_rows` names
+which rows every research statistic scores:
+
+- `"blackout_reopen"` — the default. A row whose label is invalid for
+  BLACKOUT **alone** is scored at `label_reopen_<h>`; every valid row at
+  `label_mid_<h>` as before. Rows invalid for any other reason (the stream
+  ended, no anchor, a non-tradable anchor, a stale forward mid) have no
+  price to score against and stay out.
+- `"valid_only"` — the legacy rule, the default up to v1.4.0: valid labels
+  only.
+
+`scored_labels(frame, h, ic_rows) -> (labels, n_rescued)` returns the label
+series under the policy (NaN on rows that are not scored) and the number of
+BLACKOUT rows scored at their reopen return; `scored_rows(frame, h,
+ic_rows)` is the mask of the scored rows, and it is the mask the research
+backtester's default row block (`block_rows_column="auto"`,
+API_PORTFOLIO_TCA.md §4) trades on. A frame without the `label_reopen_<h>`
+column (a feature store written before v1.5.0, a hand-built frame) has no
+reopen return, so both policies give the valid-label series on it and
+`n_rescued` is 0. Every alpha report states the IC under the other policy
+beside the gate IC (`gate_ic_valid_only`, `n_blackout_rows_scored`).
 
 ## 7. Performance expectations
 

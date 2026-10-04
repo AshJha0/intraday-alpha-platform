@@ -10,7 +10,9 @@ files and reproduce the applicable parts of
 `tests/golden/expected_adaptive.json` for the monitors it implements:
 
 - PSI values: abs tolerance **1e-10** (all ports);
-- lifecycle state sequences: **exact states** (all ports);
+- lifecycle state sequences: **exact states**, and the CUSUM statistic at
+  abs **1e-12**, under both retirement rules of §6 (all ports);
+- the rolling IC: the pair-count-weighted mean of §4 at abs 1e-10;
 - KS values (abs 1e-10) and refit-trigger decision sequences (exact
   booleans): required only of ports that implement the KS monitor or
   refit policies. These are research-side by design; the Java port
@@ -152,8 +154,10 @@ IS/OOS gap instead of on drift (20-40 "drift" refits per alpha in 1.5 days
 on the bundled data of the time; when the rule was introduced EQ03 fell
 from 25 to 3).  On the v1.4.0 dataset the drift policy fits EQ01, EQ03 and
 EQ06 once each (the initial fit, no refit); an OOS baseline does not make
-refits rare everywhere — FX05, FX08 and FX10 record 34, 20 and 40 fits,
-and the study 122 across its ten alphas
+refits rare everywhere — under the v1.4.0 rules FX05, FX08 and FX10
+recorded 34, 20 and 40 fits and the study 122 across its ten alphas; under
+the v1.5.0 defaults (the HAC z below, the CUSUM rule of §6) the same
+dataset gives 20, 6 and 40, and 88 across the ten
 (`research/adaptive_reports/ADAPTIVE_REPORT.md`).  The reference splits the
 warmup: fit on its first `BASELINE_FIT_FRAC` (2/3) and take the baseline
 bucket ICs from the purged held-out tail.  The serialized baseline carries
@@ -165,9 +169,51 @@ Live, at evaluation time T:
 - take rows in `[T - ic_window_ns, T)` that are **matured**:
   `ts + horizon_ns <= T` (a label is knowable only after its horizon);
 - scores with `confidence <= 0` are excluded (invalid signal rows);
-- compute bucket ICs the same way; with fewer than `min_ic_buckets`
-  (4 pinned) buckets, or `ic_std <= 1e-12`, report **null**;
-- else `z = (mean(live bucket ICs) - ic_mean) / (ic_std / sqrt(n_live))`.
+- compute bucket ICs the same way, each with its pair count `n_k` (the
+  finite pairs of bucket k); with fewer than `min_ic_buckets` (4 pinned)
+  buckets, report **null** for both the rolling IC and `z`;
+- **the rolling IC** — the number the lifecycle of §6 reads — is the
+  **pair-count-weighted mean** of the live bucket ICs,
+  `sum_k(n_k * ic_k) / sum_k(n_k)` (pinned; the default since v1.5.0).
+  Fixed time buckets carry very different numbers of pairs, and an
+  equal-weight mean lets a thin bucket move the gauge as much as a full
+  one. The **unweighted mean** `mean(live bucket ICs)` is the legacy
+  reading, the default up to v1.4.0: it is what the legacy z below
+  reports, and the golden keeps it beside the pinned value as
+  `rolling_ic_unweighted`;
+- **the drift z** is the one `adaptive.ic_z_method` names. The block must
+  name it (`x-version` 2); no value is implied.
+
+**`ic_z_method = "hac"` — the default since v1.5.0**
+(`iap.adaptive.drift.rolling_ic_z_hac`; added as an opt-in in v1.3.0). The
+two-sample HAC z:
+
+```
+z = (mean_w(live) - ic_mean) / sqrt(var_live + var_base)
+```
+
+where `mean_w` / `var_live` are the pair-count-weighted mean of the live
+bucket ICs and its Bartlett (Newey-West) variance
+(`iap.validation.metrics.hac_mean_variance`, lag rule `nw_lags` of the
+baseline's horizon and bucket), and `var_base` is the variance of the
+baseline mean: HAC from the baseline's own bucket series when the caller
+has it, else `ic_std² / n_buckets_baseline` (all the serialized baseline
+supports, and what the adaptive backtest uses). `z` is **null** when
+either variance is not finite or is negative, or their sum is not above
+`1e-24`; the rolling IC is still reported.
+
+**`ic_z_method = "legacy"` — the rule up to v1.4.0**
+(`iap.adaptive.drift.rolling_ic_z`; spelled `"pinned"` before v1.5.0):
+
+```
+z = (mean(live bucket ICs) - ic_mean) / (ic_std / sqrt(n_live))
+```
+
+with the unweighted mean as the rolling IC, and `z` **null** when
+`ic_std <= 1e-12`. It treats the baseline mean as a known constant and the
+live bucket ICs as independent and equally informative; none of the three
+holds, which is why it is no longer the default. It stays selectable by
+name.
 
 **The realized leg is the RESEARCH label** (API_FEATURES §6): a signal at
 `t` with prevailing mid `m0` realizes `m(t + h) / m0 - 1` where `m(x)` is
@@ -180,26 +226,19 @@ feeds: every book refresh (`RollingIc.onMid`) and the confident signal rows
 unconfident, so the live number and `research/baselines/run_*_ic.json` are
 not comparable and the lifecycle gauge compares apples to oranges.
 
-Golden: `expected_adaptive.json` -> `"rolling_ic"` embeds the mid series,
-the signal rows and the rolling IC at 5 pinned evaluation times (EQ01 on
-the golden EQ frame); every port that implements the gauge reproduces them
-at 1e-10.
+Golden: `expected_adaptive.json` (`x-version` 2) -> `"rolling_ic"` embeds
+the mid series, the signal rows and the rolling IC at 5 pinned evaluation
+times (EQ01 on the golden EQ frame), with `"weighting": "pair_count"`.
+Each evaluation carries `rolling_ic` — the pair-count-weighted mean, the
+value every port that implements the gauge reproduces at 1e-10 — and
+`rolling_ic_unweighted`, the legacy mean, beside `n_buckets` and
+`n_matured`.
 
-**Opt-in: two-sample HAC z (Python reference only, v1.3.0).** The pinned
-`z` above treats the baseline mean as a known constant and the live bucket
-ICs as independent and equally informative. `adaptive.ic_z_method = "hac"`
-(default `"pinned"`; `iap.adaptive.drift.rolling_ic_z_hac`) uses
-
-```
-z = (mean_w(live) - ic_mean) / sqrt(var_live + var_base)
-```
-
-where `mean_w` / `var_live` are the pair-count-weighted mean of the live
-bucket ICs and its Bartlett (Newey-West) variance, and `var_base` is the
-variance of the baseline mean (HAC from the baseline's own bucket series
-when the caller has it, else `ic_std² / n_buckets_baseline`). The golden,
-the Java port and the committed adaptive report use the pinned `z`; no
-port implements the HAC form.
+**Ports.** The Java live gauge (`com.iap.adaptive.RollingIc.ic`) computes
+the pair-count-weighted mean since v1.5.0 and does not compute the
+unweighted one. The z itself, in either form, is computed by the Python
+reference only: no port evaluates a refit trigger. The committed adaptive
+report uses the HAC z.
 
 ## 5. Refit policies (configs/strategies/strategies.json `adaptive.policies`)
 
@@ -224,8 +263,10 @@ edge-exact threshold inputs): `expected_adaptive.json` →
 ## 6. Lifecycle (configs/strategies/strategies.json `adaptive.lifecycle`)
 
 States: `ACTIVE -> WATCH -> RETIRED`, evaluated once per adaptive block
-on the rolling OOS IC (section 4's `mean(live bucket ICs)`;
-`null` = no transition, counters unchanged):
+on the rolling OOS IC (section 4's rolling IC: the pair-count-weighted
+mean of the live bucket ICs, or the unweighted mean under
+`ic_z_method = "legacy"`; `null` = no transition, counters and the CUSUM
+statistic unchanged):
 
 **Informative evaluations (pinned, round-3).**  An evaluation counts only
 when its MATURED set gained at least `min_new_rows` (1) new rows since the
@@ -236,25 +277,98 @@ so after a feed goes quiet the window content is frozen — six re-reads of
 one bad reading used to retire an alpha (EQ03 went WATCH -> RETIRED on six
 copies of the identical rolling IC -0.04115436621771814 and stayed retired
 through the next session's open). Silence is not evidence, and neither is
-re-reading. In the v1.4.0 study the equity deployments (EQ01, EQ03, EQ06)
-run 112 evaluations of which 42 are informative — the equity session is
-6.5 h of a 24 h day; the FX deployments run 169 of which 152–155 are.
+re-reading. In the committed study (the v1.4.0 dataset; the counts are the
+same under the v1.4.0 and the v1.5.0 rules) the equity deployments (EQ01,
+EQ03, EQ06) run 112 evaluations of which 42 are informative — the equity
+session is 6.5 h of a 24 h day; the FX deployments run 169 of which
+152–155 are.
 
 Ports take the flag explicitly:
-`LifecycleGauge.update(rollingIc, informative)`; the golden `ic_path`
-carries a parallel `ic_informative` array whose final six entries are
-uninformative breaches that must move nothing.
+`LifecycleGauge.update(rollingIc, informative, newFraction)`; the golden
+`ic_path` carries a parallel `ic_informative` array with a run of six
+uninformative breaches (readings 22–27 of 32) that must move nothing —
+not a state, not a counter, not the CUSUM statistic.
 
-- ACTIVE: `ic < watch_ic_gate` (0.0) -> WATCH (the entering breach
-  counts as breach #1).
+The block names its retirement rule, `breach_rule` (`x-version` 2 of the
+`adaptive` block; a block that does not name it is rejected, not read
+under either rule). A breach is `ic < watch_ic_gate` (0.0, strict); a
+recovery is `ic >= reactivate_ic_gate` (0.005, inclusive).
+
+**`breach_rule = "cusum"` — the default since v1.5.0** (added as an opt-in
+in v1.3.0, tightened when it became the default). Consecutive readings of
+a rolling window share most of their rows (a 2 h window advancing by one
+15 min block), so N breaches in a row can be one bad stretch seen N times.
+The CUSUM rule accumulates evidence in proportion to the new information
+of each reading. Every counted reading in ACTIVE or WATCH updates the
+statistic `S` (initially 0) with exactly these two expressions:
+
+```
+s = S + new_fraction * (watch_ic_gate - rolling_ic - cusum_k)
+S = s if s > 0 else 0
+```
+
+- `new_fraction` in (0, 1] is the share of the reading's window that is
+  new since the last counted evaluation (the caller passes it: 1.0 for a
+  disjoint window, `min(1, block_ns / ic_window_ns)` = 0.125 for the
+  pinned rolling replay; a value outside (0, 1] is an error).
+- `cusum_k` (>= 0; pinned **0.0025**, half the re-activation gate) is the
+  slack: a reading has to be more than `k` below the watch gate to add
+  evidence, and anything above `watch_ic_gate - k` drains it. `cusum_h`
+  (> 0; pinned **0.01**, the PROMOTE IC gate) is the decision threshold.
+  Both were fixed before any result was computed with them.
+- ACTIVE: a breach -> WATCH. `S` is **kept** across this transition (a
+  slow bleed is evidence before the first reading under the gate).
+- WATCH: a reading that **is itself a breach** and leaves `S >= cusum_h`
+  -> RETIRED. A retirement therefore always happens on a reading under the
+  watch gate, and **never on the reading that entered WATCH** (that
+  reading is evaluated in ACTIVE): probation lasts at least one further
+  counted reading. Otherwise `reactivate_evals` (3) consecutive recoveries
+  -> ACTIVE; a reading that is not a recovery resets the recovery count.
+  No zone resets `S`: only the two expressions move it.
+- RETIRED: `S` is not updated. `reactivate_evals` consecutive recoveries
+  -> WATCH (probation — never straight to ACTIVE).
+- `S` is reset to 0 by **every transition other than ACTIVE -> WATCH**
+  (WATCH -> RETIRED, WATCH -> ACTIVE, RETIRED -> WATCH). The breach
+  counter is not used and stays 0.
+- The three implementations (Python `LifecycleTracker`, Java
+  `LifecycleGauge`, Rust `lifecycle::tracker`) write the two expressions
+  identically — one multiplication, left-to-right subtraction, an explicit
+  comparison instead of `max` — so `S` is bit-identical across languages.
+  The v1.3.0 opt-in form retired on ANY WATCH reading with
+  `S >= cusum_h`, including one above the gate; that form no longer
+  exists.
+
+**`breach_rule = "consecutive"` — the legacy rule, the default up to
+v1.4.0** (Python `LifecycleConfig.legacy(...)`, Java
+`LifecycleGauge.legacyConsecutive(...)`; it is the only reader of
+`retire_breach_evals`, and it does not read `new_fraction`):
+
+- ACTIVE: a breach -> WATCH (the entering breach counts as breach #1).
 - WATCH: `retire_breach_evals` (6) CONSECUTIVE breaches -> RETIRED;
-  `reactivate_evals` (3) consecutive evals with
-  `ic >= reactivate_ic_gate` (0.005, inclusive) -> ACTIVE; a reading in
+  `reactivate_evals` (3) consecutive recoveries -> ACTIVE; a reading in
   the neutral zone `[watch_ic_gate, reactivate_ic_gate)` resets BOTH
   counters.
-- RETIRED: allocation halted (adaptive backtest forces flat; shadow
-  scoring continues for monitoring).  `reactivate_evals` consecutive
-  recoveries -> WATCH (probation — never straight to ACTIVE).
+- RETIRED: `reactivate_evals` consecutive recoveries -> WATCH (probation —
+  never straight to ACTIVE).
+- `S` stays 0.
+
+Under either rule RETIRED halts allocation (the adaptive backtest forces
+flat; shadow scoring continues for monitoring).
+
+The pinned keys (`configs/strategies/strategies.json` `adaptive`,
+`x-version` 2; the loader rejects any other version):
+
+```json
+"ic_z_method": "hac",
+"lifecycle": {
+  "watch_ic_gate": 0.0, "reactivate_ic_gate": 0.005,
+  "retire_breach_evals": 6, "reactivate_evals": 3,
+  "breach_rule": "cusum", "cusum_k": 0.0025, "cusum_h": 0.01
+}
+```
+
+A `"cusum"` block must give `cusum_k` and `cusum_h`; a `"consecutive"`
+block may omit them.
 
 Every transition appends one sorted-key JSON line to
 `research/lifecycle_log.jsonl`:
@@ -264,25 +378,24 @@ Every transition appends one sorted-key JSON line to
  "to": "WATCH", "reason": "...", "rolling_ic": 0.0, "eval_index": 0}
 ```
 
-Golden state sequence (breach, neutral-zone reset, retirement, recovery,
-re-activation, relapse): `expected_adaptive.json` → `"lifecycle"` —
-exact states and transitions.
+Golden (`expected_adaptive.json`, `x-version` 2): one 32-reading path
+(breach, drain, re-activation, relapse, uninformative run, retirement,
+recovery) is run under both rules. Each block carries its `config`
+(naming `breach_rule`, `cusum_k`, `cusum_h`), `ic_path`,
+`ic_informative`, `new_fraction` (0.125), `expected_states`,
+`expected_transitions` and — new in version 2 — `expected_cusum`, the
+value of `S` after every reading:
 
-**Opt-in: CUSUM retirement (Python reference only, v1.3.0).** Consecutive
-readings of a rolling window share most of their rows, so N breaches in a
-row can be one bad stretch seen N times. `breach_rule = "cusum"` (default
-`"consecutive"`, the rule above and the one the Java port mirrors) with
-`cusum_k >= 0` and `cusum_h > 0` accumulates
+- `"lifecycle"` — the default CUSUM rule: 5 transitions (WATCH at reading
+  2, ACTIVE at 16, WATCH at 20, RETIRED at 29, WATCH at 32). The first
+  WATCH spell holds eight breaches and never retires (`S` peaks at
+  0.00725); the retirement at reading 29 is the first breach that leaves
+  `S >= 0.01`.
+- `"lifecycle_legacy_consecutive"` — the legacy rule on the same path: 6
+  transitions (WATCH at 2, RETIRED at 11, WATCH at 16, ACTIVE at 19, WATCH
+  at 20, ACTIVE at 32); `expected_cusum` is 0 throughout.
 
-```
-S <- max(0, S + new_fraction * (watch_ic_gate - rolling_ic - cusum_k))
-```
-
-where `new_fraction` in (0, 1] is the share of the reading's window that
-is new since the last counted evaluation. `S` accumulates in ACTIVE and
-WATCH; `S >= cusum_h` in WATCH retires the alpha. Entering WATCH, recovery
-and re-activation are unchanged and reset `S`; uninformative readings move
-nothing. With the rule off no code path differs and `S` stays 0.
+States and transitions are exact; `expected_cusum` is pinned at 1e-12.
 
 **Promotion lifecycle (pointer).** The ACTIVE/WATCH/RETIRED rules above are
 the live sub-machine of the full seven-state promotion lifecycle
@@ -302,7 +415,10 @@ lifecycle_v1`, `actor = SYSTEM`, the tracker's reason verbatim) appended to
 `research/lifecycle_transitions.jsonl`; `research/lifecycle_log.jsonl`
 remains this study's own log and never sets a state.
 `LiveEvidence.informative = false` or `rolling_ic = null` evaluates nothing
-(the flag above, taken explicitly). One difference of scope: on the
+(the flag above, taken explicitly); `LiveEvidence.new_fraction` (a required
+key of the evidence document since v1.5.0) is the CUSUM weight, and each
+record of `research/alpha_registry.json` (`x-version` 2) carries the CUSUM
+statistic. One difference of scope: on the
 platform RETIRED is terminal for the system (re-entry is a HUMAN reset to
 RESEARCH, which re-runs the whole evidence chain); the RETIRED → WATCH
 recovery above models shadow scoring inside one adaptive backtest and is
@@ -324,7 +440,12 @@ no-lookahead property is asserted at runtime and shift-tested in
 `[T_k, T_{k+1})` come from the model fitted at or before `T_k`; the
 assembled series runs through the standard research backtester
 (`iap.backtest.engine`), preserving its exact accounting identity
-`net = gross - costs`.
+`net = gross - costs`.  The deployment takes the backtester it is given
+and binds it to the alpha's label horizon (`Backtester.for_horizon`), which
+the default cost-aware position policy requires; the committed study runs
+the `v2` research rules (cost-aware positions, fills capped at the
+displayed size, only the rows the IC scores, square-root impact) and
+reports every P&L figure in USD.
 
 ## 8. Golden synthetic PSI/KS vectors
 

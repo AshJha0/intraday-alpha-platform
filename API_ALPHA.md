@@ -181,14 +181,26 @@ USD.  Pairs (instrument_id -> base/quote): 101 EUR/USD, 102 GBP/USD,
 - Tolerances: expected_return / confidence / ic at abs 1e-9 + rel 1e-9;
   indices, timestamps and counts exact.
 
-`tests/golden/expected_backtest.json` pins the research backtest of EQ01
-on the golden EQ frame: config {max_pos_qty 1000, conf_min 0.2,
-latency_rows 1, cost multiplier 1}; semantics of `iap/backtest/engine.py`
-(decision at row i executes at row i+1 at that row's mid, spread/fee/impact
-charged as explicit costs per `configs/execution/execution.json cost_model`;
-accounting identity `total_pnl = gross_pnl - total_costs`).  `total_pnl`,
-`gross_pnl`, `total_costs` (and components) at 1e-9; `trade_count`,
-`traded_qty`, `n_rows` exact.
+`tests/golden/expected_backtest.json` (`x-version` 2) pins the research
+backtest of EQ01 on the golden EQ frame: config {max_pos_qty 1000,
+conf_min 0.2, latency_rows 1, cost multiplier 1}; semantics of
+`iap/backtest/engine.py` (decision at row i executes at row i+1 at that
+row's mid, spread/fee/impact charged as explicit costs per
+`configs/execution/execution.json cost_model`; accounting identity
+`total_pnl = gross_pnl - total_costs`).  `total_pnl`, `gross_pnl`,
+`total_costs` (and components) at 1e-9; `trade_count`, `traded_qty`,
+`n_rows` exact.  **The cross-language vector is computed under the LEGACY
+research rules**, which its `config` names since v1.5.0
+(`position_policy "sign"`, `cap_fills_at_l1 false`, `block_rows_column
+null`, `impact_model "linear"` — the defaults up to v1.4.0): they are the
+only rules the Java `ResearchBacktester` / `CostModel` implement, and the
+port asserts that the golden's `config` matches the rules it declares.  The
+vector is identical to the v1.4.0 one in every value.  The v1.5.0 defaults
+(cost-aware positions, fills capped at the displayed L1 size, only the rows
+the IC scores, square-root impact — API_PORTFOLIO_TCA.md §4) are pinned for
+the Python reference alone in the file's `default_rules` block (EQ06, 10 s
+horizon, at the cost multiplier its own `config` names); no port reproduces
+that block.
 
 Regeneration (deliberate, versioned changes only — schemas/MIGRATIONS.md):
 `research/alpha_reports/run_all.py` (refits `alpha_params.json`), then
@@ -202,7 +214,11 @@ parameters, `expected_alpha.json` and `expected_backtest.json` in this tree
 are fitted on dataset `116b7787…` (the `data_version` in the header of
 `alpha_params.json`). The equity parameters moved (EQ01 `beta` 1.26e-06 →
 5.84e-08, EQ03 4.06e-06 → 2.38e-06, EQ06 7.47e-06 → 6.08e-06); the FX
-parameters did not, because the FX data is byte-identical.
+parameters did not, because the FX data is byte-identical. v1.5.0 was its
+second use, on the same dataset under the new default methods: the fitted
+parameters differ from v1.4.0 by at most 2.3e-15 relative (a summation
+order, not a refit on other rows), `expected_alpha.json` follows at
+2.6e-13, and the values quoted above are unchanged.
 
 ## 7. Validation expectations for ports
 
