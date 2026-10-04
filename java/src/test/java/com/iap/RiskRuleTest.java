@@ -791,6 +791,19 @@ public class RiskRuleTest {
         assertEquals("0.0000001", OrderRequest.rustDisplay(1e-7));
         assertEquals("1000000000000000000000", OrderRequest.rustDisplay(1e21));
         assertEquals("123456789.125", OrderRequest.rustDisplay(123456789.125));
+        assertEquals("1.0000000000000002", OrderRequest.rustDisplay(1.0000000000000002));
+        assertEquals("0.00002", OrderRequest.rustDisplay(2e-5));
+        assertEquals("100000000000000000000000", OrderRequest.rustDisplay(1e23));
+        // Found by the differential fuzzer: the smallest subnormals. One
+        // significant digit round-trips; Double.toString prints two
+        // ("4.9E-324", "9.9E-324"), the reference prints "5e-324", "1e-323".
+        String zeros = "0".repeat(323);
+        assertEquals("0." + zeros + "5", OrderRequest.rustDisplay(Double.MIN_VALUE));
+        assertEquals("-0." + zeros + "5", OrderRequest.rustDisplay(-Double.MIN_VALUE));
+        assertEquals("0." + "0".repeat(322) + "1",
+                OrderRequest.rustDisplay(2 * Double.MIN_VALUE));
+        assertEquals("0." + "0".repeat(322) + "15",
+                OrderRequest.rustDisplay(3 * Double.MIN_VALUE));
         assertEquals("NaN", OrderRequest.rustDisplay(Double.NaN));
         assertEquals("inf", OrderRequest.rustDisplay(Double.POSITIVE_INFINITY));
         assertEquals("-inf", OrderRequest.rustDisplay(Double.NEGATIVE_INFINITY));
@@ -866,5 +879,89 @@ public class RiskRuleTest {
         expect(eng, buyOn(8, 1, 2450, 1, TS), Rules.ALLOW);
         assertEquals(why, eng.checkOrder(buyOn(8, 1, 2450, 1, min)).reason());
         assertEquals(why, eng.checkOrder(buyOn(9, 1, 2450, 1, min)).reason());
+    }
+
+    /**
+     * Found by the differential fuzzer (tests/golden/risk_fuzz, the
+     * {@code unicode} scripts): strategy ids are ordered by code point, as
+     * the reference's {@code BTreeMap<String, _>} orders them, not by UTF-16
+     * code unit. U+FFEE sorts BEFORE U+1F600 by code point and AFTER it by
+     * code unit (the astral character is the surrogate pair D83D DE00), so
+     * when one mark breaches both strategies the two latches — and the
+     * snapshot's lots — come out in the reference's order.
+     */
+    @Test
+    public void strategyIdsAreOrderedByCodePointLikeTheReference() {
+        String bmp = String.valueOf((char) 0xFFEE);
+        String astral = new String(Character.toChars(0x1F600));
+        assertTrue("UTF-16 code units order the astral id first",
+                astral.compareTo(bmp) < 0);
+        RiskEngine eng = engine();
+        assertTrue(eng.onFill(new RiskFill(TS, astral, 1, 0, 0, 100_000, 2451)));
+        assertTrue(eng.onFill(new RiskFill(TS, bmp, 1, 0, 0, 100_000, 2451)));
+        int before = eng.audit().size();
+        eng.onMarket(1, 2350, 2352, TS + 1); // -1.00 x 100,000 for each strategy
+        assertEquals("STRATEGY_LOSS", eng.audit().get(before).ruleId());
+        assertEquals(bmp, eng.audit().get(before).scopeId());
+        assertEquals("STRATEGY_LOSS", eng.audit().get(before + 1).ruleId());
+        assertEquals(astral, eng.audit().get(before + 1).scopeId());
+        String snap = eng.snapshot();
+        assertTrue("lots are listed in code-point order",
+                snap.indexOf("\"strategy_id\":\"" + bmp + "\"")
+                        < snap.indexOf("\"strategy_id\":\"" + astral + "\""));
+    }
+
+    /**
+     * Found by the differential fuzzer (tests/golden/risk_fuzz, the
+     * {@code config} scripts): the CONFIG_MISSING reason is audit output, so
+     * a fail-closed engine must name the same first offending key, in the
+     * same words, as the reference parser.
+     */
+    @Test
+    public void configErrorsNameTheFirstOffendingKeyLikeTheReference() {
+        String[][] cases = {
+            // {section, key, JSON value or null to remove the key, reason}
+            {"global", "max_gross_notional", "0",
+                "risk.json: global.max_gross_notional must be > 0, got 0"},
+            {"global", "max_daily_loss", "-0.0",
+                "risk.json: global.max_daily_loss must be > 0, got -0"},
+            {"per_order", "price_band_bps", "-1e21",
+                "risk.json: per_order.price_band_bps must be > 0, got "
+                        + "-1000000000000000000000"},
+            {"global", null, null,
+                "risk.json: missing/non-bool global.kill_switch_engaged"},
+            {"per_order", null, null,
+                "risk.json: missing per_order.duplicate_order_window_ns"},
+            {"currency", null, null,
+                "risk.json: missing/empty currency.reporting_ccy"},
+            {"currency", "conversion", "{\"EUR\":{\"instrument_id\":0,\"invert\":false}}",
+                "risk.json: currency.conversion.EUR.instrument_id out of u32 range"},
+            {"currency", "conversion", "{\"EUR\":101}",
+                "risk.json: currency.conversion.EUR.instrument_id missing/invalid"},
+            {"currency", "conversion",
+                "{\"ZZZ\":{\"invert\":true},\"AAA\":{\"instrument_id\":101}}",
+                "risk.json: currency.conversion.AAA.invert missing/non-bool"},
+        };
+        for (String[] c : cases) {
+            Map<String, Object> doc = configDoc();
+            if (c[1] == null) {
+                doc.remove(c[0]);
+            } else {
+                Json.object(doc.get(c[0])).put(c[1], Json.parse(c[2]));
+            }
+            RiskEngine eng = RiskEngine.fromConfig(doc, new TreeMap<>());
+            RiskDecision d = eng.checkOrder(limitBuy(1, 10, 2450, TS));
+            assertEquals(Rules.CONFIG_MISSING, d.ruleId());
+            assertEquals("fail-closed: invalid argument: " + c[3], d.reason());
+        }
+        // two offending keys: the reference's parse order decides, and the
+        // sequence-gap threshold is read AFTER the per-strategy loss limit
+        Map<String, Object> doc = configDoc();
+        Json.object(doc.get("market_data")).put("max_sequence_gap_before_halt", -1L);
+        Json.object(doc.get("per_strategy")).put("max_daily_loss", -5.5);
+        assertEquals("fail-closed: invalid argument: risk.json: "
+                + "per_strategy.max_daily_loss must be > 0, got -5.5",
+                RiskEngine.fromConfig(doc, new TreeMap<>())
+                        .checkOrder(limitBuy(1, 10, 2450, TS)).reason());
     }
 }

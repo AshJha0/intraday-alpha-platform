@@ -329,7 +329,8 @@ final class RiskAudit {
         for (Object rv : snapArr(snap.get("realized"), "realized")) {
             Map<String, Object> r = snapObj(rv, "realized");
             eng.realized.computeIfAbsent(snapStr(r.get("strategy_id"),
-                    "realized.strategy_id"), k -> new TreeMap<>())
+                    "realized.strategy_id"),
+                    k -> new TreeMap<>(RiskEngine.CODE_POINT_ORDER))
                     .put(snapStr(r.get("ccy"), "realized.ccy"),
                             snapDouble(r.get("pnl"), "realized.pnl"));
         }
