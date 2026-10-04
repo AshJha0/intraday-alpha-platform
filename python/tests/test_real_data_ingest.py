@@ -830,3 +830,62 @@ def test_merging_single_day_datasets_equals_ingesting_them_together(tmp_path, ca
                             str(tmp_path / "x")]) == 1  # fmt: skip
     assert marketdata_main(args) == 1
     assert "session 2019-12-30 is in more than one input" in capsys.readouterr().err
+
+
+def test_batch_and_real_power_run_on_an_ingested_dataset(tmp_path, capsys):
+    """v1.6.0: the 24-alpha batch (run_all.py --dataset-dir) and the real-data
+    power study run end to end on an ingested dataset, with the ETF read from
+    the dataset (QQQ is id 3 here, not the synthetic 11)."""
+    import importlib.util
+
+    from iap.alpha import configure_universe, universe_ids
+    from iap.research import power_real
+
+    out = tmp_path / "ds"
+    for seed, date in ((7, D1), (8, D2)):
+        src = _day(tmp_path, seed, f"{date}.itch", n_actions=6000, spacing_ns=10**9)
+        assert _ingest_cli(src, date, out) == 0
+    assert (
+        features_main(
+            [
+                "--data-dir", str(out / "normalized"),
+                "--out-dir", str(out / "features"),
+                "--configs", str(out / "configs"),
+                "--registry-out", str(out / "reference" / "feature_registry.json"),
+            ]
+        )
+        == 0
+    )  # fmt: skip
+    spec = importlib.util.spec_from_file_location(
+        "run_all", REPO_ROOT / "research" / "alpha_reports" / "run_all.py"
+    )
+    run_all = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(run_all)
+    repo_ledger = REPO_ROOT / "research" / "experiments.json"
+    before = repo_ledger.read_bytes()
+    reports = tmp_path / "reports"
+    try:
+        assert run_all.main(["--dataset-dir", str(out), "--out-dir", str(reports)]) == 0
+        assert universe_ids("etf") == (3,) and universe_ids("constituents") == (1, 2)
+    finally:
+        configure_universe(None)
+    assert repo_ledger.read_bytes() == before
+    assert (reports / "REPORT.md").is_file() and (reports / "EQ10.json").is_file()
+    ledger = json.loads((reports / "experiments.json").read_text())
+    assert [d["dataset_version"] for d in ledger["datasets"]] == [
+        load_manifest(out)["dataset_version"]
+    ]
+    with pytest.raises(SystemExit, match="--out-dir"):
+        run_all.main(["--dataset-dir", str(out)])
+    try:
+        doc = power_real.run_real_power_study(
+            out, levels=(0.0, 0.2), break_levels=(0.2,), n_seeds=2, sessions=[2], gate_looks=100
+        )
+    finally:
+        configure_universe(None)
+    capsys.readouterr()
+    assert doc["dataset_version"] == load_manifest(out)["dataset_version"]
+    scenarios = {c["scenario"] for c in doc["cells"]}
+    assert scenarios == {"shifted:stable", "real:stable", "shifted:break"}
+    assert all(c["n_runs"] == (1 if c["scenario"].startswith("real") else 2) for c in doc["cells"])
+    assert "Planted-signal power on real data" in power_real.render_markdown(doc)
