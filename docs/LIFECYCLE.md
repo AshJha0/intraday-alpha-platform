@@ -536,7 +536,7 @@ changed.
 |---|---|
 | ACTIVE / WATCH / RETIRED rules, informative evaluations, `lifecycle_log.jsonl` | [../API_ADAPTIVE.md](../API_ADAPTIVE.md) §6 |
 | the `LifecycleTransition` / `GateResult` contract | [../API_CONTRACTS.md](../API_CONTRACTS.md), `schemas/alpha/lifecycle_transition.schema.json` |
-| the `lifecycle_transitions` table and `v_alpha_scorecard` | [DATA_MODEL.md](DATA_MODEL.md) §3.2, §4 |
+| the `lifecycle_transitions` table (live ledger under the current scope, archived ledgers under their own) and `v_alpha_scorecard` | [DATA_MODEL.md](DATA_MODEL.md) §3.2, §4 |
 | the promotion-gate rule (no verdict / state change without a ledger entry id) | [../CONTRIBUTING.md](../CONTRIBUTING.md) §6, [governance/GOVERNANCE.md](governance/GOVERNANCE.md) §2 |
 | the diagram | [DIAGRAMS.md](DIAGRAMS.md) §8, `diagrams/lifecycle_state_machine.mmd` |
 | scenarios (demotion, manual retire, silence) | [SCENARIOS.md](SCENARIOS.md), RESEARCH section |

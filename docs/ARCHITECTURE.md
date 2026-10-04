@@ -62,7 +62,7 @@ repository:
 | TCA | `tca` (reference + report) | — | — | `tca` (service) |
 | Contracts / canonical JSON / decision trace | `contracts`, `trace` (reference: 22 typed contracts, 18 Protocols, `canonical_json`, `TraceDigest`, `explain`, attribution) | `contracts` (`iap::contracts::{Value, DecisionTrace, TraceDigest}` — byte-identical canonical lines; `ExecutionReplay` emits one trace per parent order) | `contracts` crate (canonical JSON + SHA-256 + `DecisionTrace` + JSONL sink / digest + `explain`; `telemetry::trace` re-exports the sink with `trace_records_total`) | `contracts`, `trace` (`PaperTrading` emits `decision_traces.jsonl`) |
 | Alpha promotion lifecycle (7 states) | `lifecycle` (reference; wraps `adaptive.lifecycle`) | — (by design) | `lifecycle` crate (gate table, 17-edge machine, live rolling-IC rules, byte-identical `alpha_registry.json`) | `lifecycle` (+ `ConfigService.LIFECYCLE`) |
-| Data model / store | `store` (SQLite over `schemas/sql/iap_v1.sql`; importers for every research artefact) | — | — | — |
+| Data model / store | `store` (SQLite over `schemas/sql/iap_v2.sql`; importers for every research artefact) | — | — | — |
 | The traced end-to-end loop (MVP) | `mvp` (`python -m iap.mvp run / replay / verify / explain`) | — | — | `platform` (the paper vertical) |
 | Event bus / threading | — | — | `eventbus` crate (SPSC ring) | — |
 | Telemetry / metrics | — | — | `telemetry` crate (sets the metric-name contract) | `monitoring` + `api` (MetricsServer) |
@@ -208,9 +208,10 @@ offline against the schema set (`API_CONTRACTS.md`). The rules
   `qty`; conventions §1). Floats appear only in research quantities
   (expected returns, P&L, bps) with pinned 1e-9 tolerances.
 - **The relational projection** of all of the above is
-  `schemas/sql/iap_v1.sql` (24 tables, 3 views, SQLite + PostgreSQL), applied
+  `schemas/sql/iap_v2.sql` (26 tables, 6 views, SQLite + PostgreSQL), applied
   by `iap.store`: a derived, rebuildable index of the flat-file artefacts,
-  never their replacement (`docs/DATA_MODEL.md`).
+  never their replacement, in which every research row carries the dataset
+  and method bundle it was computed in (`docs/DATA_MODEL.md`).
 
 ## 5. Determinism strategy
 
@@ -248,10 +249,10 @@ flowchart LR
     MG --> EXP[("expected_*.json<br/>codec sha256 | book states | features<br/>alpha | backtest | risk decisions + audit + snapshot<br/>replay fills | portfolio | tca (+ timeline cases) | adaptive<br/>contracts examples | canonical json + trace digest<br/>lifecycle | experiment golden frame | mvp")]
     CPPTOOL["cpp/tools/make_replay_fills_golden<br/>(C++ is the fills reference;<br/>Python iap.execution consumes it too)"] --> EXP
     RSTOOL["rust/risk/src/bin/make_risk_golden<br/>(Rust is the risk reference;<br/>Python iap.risk consumes it too)"] --> EXP
-    GV --> PY["python: pytest -k golden<br/>173 tests"]
+    GV --> PY["python: pytest -k golden<br/>175 tests"]
     GV --> CPP["cpp: ctest -R Golden<br/>68 tests"]
     GV --> RS["rust: 9 golden test targets<br/>66 tests"]
-    GV --> JV["java: all thirteen *GoldenTest (JUnitCore)<br/>106 golden-group tests"]
+    GV --> JV["java: all fourteen *GoldenTest (JUnitCore)<br/>110 golden-group tests"]
     EXP --> PY
     EXP --> CPP
     EXP --> RS
@@ -282,7 +283,7 @@ and are matched by Java, Rust and C++ (the trace and canonical-JSON ports)
 and by Java and Rust (the lifecycle ports). The harness
 (`tests/harness/run_all.sh`, with `run_golden.sh` as the golden-only alias)
 runs every suite with the canonical commands and prints the parity table; a
-v1.5.0 CI run (2026-10-04) passes 1672/289/330/517 tests (173/68/66/106
+v1.5.0 CI run (2026-10-04) passes 1680/289/330/525 tests (175/68/66/110
 golden) across python/cpp/rust/java, plus the repo-level `integration` (35)
 and `replay` (6) rows — the same counts the README parity table records.
 
@@ -660,7 +661,8 @@ order, and kept apart.
   lifecycle state or a model output can reduce what is sent, never weaken
   what is rejected.
 - **What an agent may do**: read. Query the store (`python -m iap.store sql`,
-  `v_order_chain`, `v_alpha_scorecard`, `v_experiment_ledger_summary`), the
+  `v_order_chain`, `v_alpha_scorecard` / `v_alpha_scorecard_current`,
+  `v_experiment_ledger_summary`), the
   ledger (`research/experiments.json`, `python -m iap.research list / show`),
   TCA (`research/tca/`, `tca_results`), drift and rolling IC (the
   `research/baselines/*.json` the live gauges read, `drift_baselines`), the

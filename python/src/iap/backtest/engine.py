@@ -71,8 +71,9 @@ Pinned semantics (mirrored by the accounting-identity tests):
   conf_min``, else flat, re-decided on every row.  It trades a 5-second
   forecast as if it were a one-row forecast, and a forecast of a tenth of a
   basis point through a spread of two.  It stays selectable by name
-  (:meth:`BacktestConfig.legacy`); the Java ``ResearchBacktester``
-  implements this rule only.
+  (:meth:`BacktestConfig.legacy`).  The Java ``ResearchBacktester``
+  implements both policies under the same names (``Config.defaults`` /
+  ``Config.legacy``), pinned by ``tests/golden/expected_backtest.json``.
 
 - **Fill cap at displayed size** (``cap_fills_at_l1``; default ON since
   v1.5.0): the quantity traded at a row is capped at the displayed L1 size

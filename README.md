@@ -219,8 +219,8 @@ conclusion. What moved:
   legacy ones), for 4,396.
 - **Ports.** Java and Rust implement the CUSUM and the consecutive
   retirement rule and the ledger and the fixed significance threshold, by
-  name; the Java `ResearchBacktester` and `CostModel` stay on the legacy
-  research rules and are named so.
+  name; the Java `ResearchBacktester` and `CostModel` default to the v1.5.0
+  research backtest rules and keep the legacy ones by name.
 
 The conclusion is the same and is stated more directly: 0 PROMOTE, 24
 alphas held at CANDIDATE, a cost-negative MVP. The predicted moves are
@@ -304,7 +304,7 @@ intraday-alpha-platform/
                             runbooks/ governance/ papers/ diagrams/ index.html
   schemas/                  versioned JSON Schema contracts by domain (market/
                             features/ alpha/ order/ execution/ risk/ portfolio/
-                            tca/ research/ trace/) + sql/iap_v1.sql (portable DDL)
+                            tca/ research/ trace/) + sql/iap_v2.sql (portable DDL)
                             + README.md index, FORMAT.md (wire layout), MIGRATIONS.md
   configs/                  by domain: instruments/ venues/ marketdata/ risk/
                             execution/ strategies/ (strategies.json, alpha_params.json,
@@ -407,10 +407,10 @@ python3 tools/github/create_issues.py --dry-run   # the epics/issues plan (docs/
 ===================== cross-language parity table =====================
 language | tests passed | golden passed  | time   | status
 ---------+--------------+----------------+--------+-------
-python   | 1672         | 173            |    -s | PASS
+python   | 1680         | 175            |    -s | PASS
 cpp      | 289          | 68             |    -s | PASS
 rust     | 330          | 66             |    -s | PASS
-java     | 517          | 106            |    -s | PASS
+java     | 525          | 110            |    -s | PASS
 integration | 35           | -              |    -s | PASS
 replay   | 6            | -              |    -s | PASS
 deployment | -            | -              |    -s | PASS
@@ -451,7 +451,7 @@ float reprs incl. 612 rounding-tie and 17-digit cases, 24 escapes, 9 documents),
 pinned instance per contract with the `explain()` block, the 7-state
 lifecycle scenarios and the registry bytes, the experiment golden frame and
 the MVP session — all against `tests/golden/`. The Java golden column runs
-**all thirteen** `com.iap.*GoldenTest` classes and the Rust column nine
+**all fourteen** `com.iap.*GoldenTest` classes and the Rust column nine
 golden targets; a harness case fails if either gate list ever drifts from
 the files on disk. Python's golden group now includes the risk and fills
 goldens that Rust and C++ generate, consumed by `iap.risk` and
@@ -500,7 +500,7 @@ golden tests — the engineering discipline this repo is built around
 | [docs/ROADMAP.md](docs/ROADMAP.md) | the six-week plan (Phase 0 → Week 6) and Phase 2/3 mapped to what exists with evidence, what is backlog, the MVP success criteria |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | system design, per-language responsibilities, contracts, the research → trading → execution → adaptive loop with lifecycle and trace, determinism, golden topology, hot-path notes, observability, the MVP vertical, deployment, the AI / agent boundary (what is pinned, what exists, what is backlog), failure modes and fail-closed design, the research-store concurrency model, and the distance to a production system |
 | [docs/DIAGRAMS.md](docs/DIAGRAMS.md) | all nineteen architecture diagrams on one page (pipeline, golden topology, paper trading, responsibility matrix, risk decision flow, queue-position model, data model, lifecycle state machine, decision-trace chain, MVP loop; and, since v1.3.0, the fail-closed risk branches, the simulator fill/queue flow, the paper-platform checkpoint commit point and resume, the admin kill latch, the research run with ledger lock and eligibility, the power study, the CI/release pipeline, the deployment topology, and the planned agent layer — labelled as backlog) |
-| [docs/DATA_MODEL.md](docs/DATA_MODEL.md) | the relational data model (`schemas/sql/iap_v1.sql`, SQLite + PostgreSQL): every table, the views, portability rules, how the store indexes the flat-file artefacts, query cookbook |
+| [docs/DATA_MODEL.md](docs/DATA_MODEL.md) | the relational data model (`schemas/sql/iap_v2.sql`, SQLite + PostgreSQL): every table, the dataset- and bundle-scoped views, portability rules, how the store indexes the flat-file artefacts, query cookbook |
 | [docs/index.html](docs/index.html) + [docs/GITHUB_PAGES.md](docs/GITHUB_PAGES.md) | the GitHub Pages landing site and how to publish it (Settings → Pages → main branch, /docs folder) |
 | [docs/SPECIFICATION.md](docs/SPECIFICATION.md) | the governing institutional specification (verbatim) |
 | [PLATFORM_CONVENTIONS.md](PLATFORM_CONVENTIONS.md) | binding conventions: types, serialization, determinism, book semantics, golden rules, trading contracts (§11: risk engine, execution simulator, SOR/algos, paper wiring, currency), platform/deployment (§12), contracts / lifecycle / trace / data model (§13) |

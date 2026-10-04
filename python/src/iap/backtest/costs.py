@@ -34,7 +34,7 @@ config).
   child in a 5 M-share ADV pays 0.04 bps, against 1.4 bps under the square
   root) and makes capacity look unbounded only quadratically.  It stays
   selectable by name; the Java ``com.iap.backtest.CostModel`` implements
-  this rule only, and says so.
+  both rules under the same names (``withLinearImpact`` for this one).
 
 ``CostModel.load`` requires the ``cost_model`` block of
 ``configs/execution/execution.json`` to NAME its ``impact_model`` (the

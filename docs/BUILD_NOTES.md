@@ -6,7 +6,7 @@ test run < 120 s.
 **CI** is `.github/workflows/ci.yml`, and it is the local
 `tests/harness/run_all.sh` split into parallel jobs: one per language, plus
 `tests/harness/run_golden.sh` (the GOVERNANCE promotion-gate-10 artefact: every
-language's golden group, including ALL thirteen Java `*GoldenTest` classes),
+language's golden group, including ALL fourteen Java `*GoldenTest` classes),
 `tests/harness/check_deployment.py` (promtool rules/config/unit tests, compose
 and Dockerfile checks, k8s manifests, ConfigMap sync, dashboard metric
 provenance) and an `images` job that builds the four container images and is
@@ -17,15 +17,15 @@ gated on all of them. Run the whole thing locally with
 ## Python (reference implementation)
 
 ```bash
-cd python && PYTHONPATH=src python3 -m pytest -q          # full suite (1672 tests; about six minutes in the CI job, with coverage)
-cd python && PYTHONPATH=src python3 -m pytest -q -k golden # the golden group (173)
+cd python && PYTHONPATH=src python3 -m pytest -q          # full suite (1680 tests; about six minutes in the CI job, with coverage)
+cd python && PYTHONPATH=src python3 -m pytest -q -k golden # the golden group (175)
 cd python && PYTHONPATH=src python3 -m iap.marketdata      # end-to-end pipeline
 cd python && PYTHONPATH=src python3 -m iap.mvp run         # the traced MVP loop (under a minute)
 cd python && PYTHONPATH=src python3 tools/make_golden.py   # regen goldens (deliberate only; every
                                                            # make_golden_*.py refuses to overwrite without --force)
 ```
 
-- **Timing.** The suite is 1672 tests at v1.5.0 (173 in the `-k golden` group; 1573 and 166 at v1.4.0); the timings that follow are those of the v1.3.0 suite (1565 tests). The CI
+- **Timing.** The suite is 1680 tests at v1.5.0 (175 in the `-k golden` group; 1573 and 166 at v1.4.0); the timings that follow are those of the v1.3.0 suite (1565 tests). The CI
   `python` job ran it in 319 s and in 358 s in two runs on GitHub-hosted runners
   on 2026-10-03, under `--cov` instrumentation. The last harness capture on the 2-CPU container baseline
   (2026-09-20, 1362 tests) read 83 s for the `python` row — the full suite, 71 s,
@@ -94,7 +94,7 @@ canonical-JSON byte parity the contracts / lifecycle goldens pin.
 ## Java — why there is NO Maven build
 
 ```bash
-cd java && bash build.sh && bash test.sh    # 510 tests; the thirteen *GoldenTest classes are 104 of them
+cd java && bash build.sh && bash test.sh    # 525 tests; the fourteen *GoldenTest classes are 110 of them
 ```
 
 **Maven/Gradle are deliberately not used: Maven Central is unreachable from

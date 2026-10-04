@@ -726,8 +726,8 @@ bash tests/harness/run_all.sh --golden-only   # golden groups only (fast)
 ```
 
 Exit code 0 iff every language passed; logs land in a temp dir printed on
-the first line. The v1.5.0 counts (CI): python 1672 / cpp 289 /
-rust 330 / java 517 tests passed (golden groups 173/68/66/106), plus
+the first line. The v1.5.0 counts (CI): python 1680 / cpp 289 /
+rust 330 / java 525 tests passed (golden groups 175/68/66/110), plus
 `integration` (35) and `replay` (6) rows for the repo-level pytest suites, a
 `deployment` row (25 structural checks passed in CI, where `promtool` and
 `kubeconform` are installed; a machine without them reports those checks as
@@ -949,7 +949,7 @@ the summary line stays bit-for-bit reproducible (recipe 12).
 
 ## 20. Build the platform store and query it
 
-The store (`schemas/sql/iap_v1.sql`, [docs/DATA_MODEL.md](docs/DATA_MODEL.md))
+The store (`schemas/sql/iap_v2.sql`, [docs/DATA_MODEL.md](docs/DATA_MODEL.md))
 is a derived, rebuildable SQLite index over the research artefacts and the
 decision traces; the JSON / JSONL / Parquet files stay the source of truth.
 Building it takes about a second and prints one row per table:
@@ -965,8 +965,10 @@ PYTHONPATH=src python3 -m iap.store build            # -> data/store/iap.sqlite 
 # experiments              39
 # instruments              19
 # ledger_entries          208
-# lifecycle_transitions   324
+# ledger_scopes             3
+# lifecycle_transitions   372
 # model_runs               47
+# store_scope               1
 # tca_orders               36
 # venues                    5
 # ...
@@ -975,47 +977,79 @@ PYTHONPATH=src python3 -m iap.store build            # -> data/store/iap.sqlite 
 Every importer is idempotent — run `build` again and the counts do not
 move — and total over its input: a record it cannot map (a NaN metric, a
 malformed line, an absent optional artefact) is a warning on stderr, never
-a crash. Query with `sql` (one canonical JSON line per row; add `ORDER BY`
-for deterministic output) or with the views:
+a crash. A database built by an earlier release (data-model x-version 1) is
+refused with exit code 2 and left untouched; `build --rebuild` deletes it
+and builds it again, which is the whole migration.
+
+Every research row is filed under the **scope** it was computed in — the
+dataset (`dataset_version`) and the method bundle (`methods`: `v2` or
+`legacy_v1`) — and the scorecard is one row per alpha and scope. The
+`*_current` views are the current dataset under the default bundle. Query
+with `sql` (one canonical JSON line per row; add `ORDER BY` for
+deterministic output), or print a scope's scorecard with `scorecard`:
 
 ```bash
-PYTHONPATH=src python3 -m iap.store sql "SELECT alpha_id, current_state, verdict, ROUND(ic,4) AS ic, ledger_count FROM v_alpha_scorecard ORDER BY alpha_id"
-# {"alpha_id":"EQ01","current_state":"CANDIDATE","ic":0.0276,"ledger_count":292,"verdict":"ITERATE"}
-# {"alpha_id":"EQ02","current_state":"CANDIDATE","ic":0.0251,"ledger_count":140,"verdict":"ITERATE"}
+PYTHONPATH=src python3 -m iap.store sql "SELECT alpha_id, current_state, verdict, ROUND(ic,4) AS ic, ledger_count FROM v_alpha_scorecard_current ORDER BY alpha_id"
+# {"alpha_id":"EQ01","current_state":"CANDIDATE","ic":-0.0019,"ledger_count":172,"verdict":"REJECT"}
+# {"alpha_id":"EQ02","current_state":"CANDIDATE","ic":0.0251,"ledger_count":84,"verdict":"ITERATE"}
 # ...  (24 rows)
+PYTHONPATH=src python3 -m iap.store sql "SELECT alpha_id, substr(dataset_version, 1, 8) AS dataset, methods, is_current, verdict, ROUND(ic, 4) AS ic, ROUND(t_stat, 2) AS t_stat, ROUND(promote_t_threshold, 3) AS t_threshold, ledger_count, scope_looks FROM v_alpha_scorecard WHERE alpha_id = 'EQ03' ORDER BY dataset_version, methods"
+# {"alpha_id":"EQ03","dataset":"116b7787","ic":0.0271,"is_current":0,"ledger_count":88,"methods":"legacy_v1","scope_looks":852,"t_stat":4.84,"t_threshold":3.0,"verdict":"ITERATE"}
+# {"alpha_id":"EQ03","dataset":"116b7787","ic":0.0132,"is_current":1,"ledger_count":256,"methods":"v2","scope_looks":2476,"t_stat":2.41,"t_threshold":4.37,"verdict":"ITERATE"}
+# {"alpha_id":"EQ03","dataset":"203c8f54","ic":0.0165,"is_current":0,"ledger_count":88,"methods":"legacy_v1","scope_looks":1068,"t_stat":4.25,"t_threshold":3.0,"verdict":"ITERATE"}
+PYTHONPATH=src python3 -m iap.store sql "SELECT substr(dataset_version, 1, 8) AS dataset, methods, n_entries, looks, ROUND(bonferroni_t_threshold, 3) AS bonferroni_t FROM ledger_scopes ORDER BY dataset_version, methods"
+# {"bonferroni_t":4.018,"dataset":"116b7787","looks":852,"methods":"legacy_v1","n_entries":69}
+# {"bonferroni_t":4.263,"dataset":"116b7787","looks":2476,"methods":"v2","n_entries":69}
+# {"bonferroni_t":4.071,"dataset":"203c8f54","looks":1068,"methods":"legacy_v1","n_entries":70}
 PYTHONPATH=src python3 -m iap.store sql "SELECT COUNT(*) AS distinct_experiments, SUM(count) AS total_experiments FROM ledger_entries"
-# {"distinct_experiments":208,"total_experiments":4396}     -- the Bonferroni denominator
+# {"distinct_experiments":208,"total_experiments":4396}     -- the Bonferroni denominator of the whole ledger
+PYTHONPATH=src python3 -m iap.store scorecard | wc -l                                   # 24: the current scope
+PYTHONPATH=src python3 -m iap.store scorecard --methods legacy_v1 | wc -l               # 24: same dataset, legacy bundle
+PYTHONPATH=src python3 -m iap.store scorecard --dataset-version 203c8f54 --methods legacy_v1 | wc -l   # 24: the earlier dataset
+PYTHONPATH=src python3 -m iap.store scorecard --all-scopes | wc -l                      # 72: three scopes x 24 alphas
 ```
 
 (Re-run on the v1.5.0 tree, with `--db` pointing at a scratch file.)
 
-Read the scorecard's `ic` and `verdict` with care. The view
-shows each alpha's *latest* experiment result, chosen by `created_ts` and
-then by the largest experiment id, and it knows about neither datasets nor
-method bundles. The runner experiments of both datasets and both bundles
-share one `created_ts`, so for the three alphas that have them the
-tie-break decides, and it decides differently for each: EQ01's row above
-is `c73bb6294d226163`, a v1.3.0-dataset experiment (IC 0.0276, ITERATE),
-not the current one (`6e4a3431a3acf8a5`, IC −0.0019, REJECT); EQ03's row
-is `f0f6c49b553f6b59`, the current dataset under the v1.4.0 rules; EQ06's
-is `d87e34a9c67c1891`, the current dataset under the default rules. EQ02
-has no runner experiment and shows the v1.5.0 alpha report (gate IC
-0.0251). For a reading per dataset use
-`python -m iap.research list` (recipe 26), which prints the dataset of each
-experiment, and `show <id>` for the method bundle. The store also keeps
-`gate_looks` and the gate statistics of a v1.5.0 ledger entry only inside
-`result_json`. Both are known limitations; fixing either needs a second
-schema version. The ledger counts (4,396 looks over 208 entries) cover
-both datasets and both bundles on purpose: 1,068 were taken on the v1.3.0
-dataset, 852 on the v1.4.0 dataset under the old rules, and v1.5.0 added
-2,476 under the default rules (24 × 84 for the promotion report, 5 × 84
-for the runner experiments, 40 adaptive deployments).
+How to read a scorecard row. Each row is one scope and every number in it
+is of that scope alone: `ic`, `t_stat` and `verdict` are the latest
+experiment result recorded in the scope (by `created_ts`, then the largest
+experiment id), `gate_looks` and `promote_t_threshold` the ledger look count
+and \|t\| threshold that result was judged at, `ledger_count` the alpha's
+looks in the scope and `scope_looks` every look made in it. EQ03's three
+rows above add up to the count of 432 the version-1 view printed on a single
+row next to a legacy-rules IC; nothing is pooled any more. Two things to
+keep in mind. First, EQ01, EQ03 and EQ06 also have `ExperimentRunner`
+experiments, and their latest result in a scope is one of those (EQ01's
+current row is `6e4a3431a3acf8a5`, IC −0.0019, REJECT); the alpha-report
+pipeline's verdict is in `pipeline_verdict` / `pipeline_nw_tstat` /
+`pipeline_t_threshold`, and that is the column the headline "11 ITERATE /
+13 REJECT" counts (recipe 33). Second, the threshold is the one the result
+was judged at, not a re-judgement: `legacy_v1` rows read the fixed 3.0,
+`v2` rows `max(3.0, Bonferroni |t| at gate_looks)`, where `gate_looks`
+counts every look the ledger held at the time, across datasets;
+`scope_bonferroni_t` is what the scope alone would demand. The ledger total
+(4,396 looks over 208 entries) is the sum of the three scopes: 1,068 on the
+v1.3.0 dataset, 852 on the current dataset under the old rules, and 2,476
+under the default rules (24 × 84 for the promotion report, 5 × 84 for the
+runner experiments, 40 adaptive deployments).
+
+`sql` binds `:dataset_version` and `:methods` to the scope the command line
+selects (the current one by default), and `build --ledger <path>` indexes
+the ledger an ingested dataset keeps in its own directory — its rows form
+their own scopes and are never added to the synthetic dataset's counts:
+
+```bash
+PYTHONPATH=src python3 -m iap.store sql --methods legacy_v1 "SELECT pipeline_verdict, COUNT(*) AS n FROM v_alpha_scorecard WHERE dataset_version = :dataset_version AND methods = :methods GROUP BY pipeline_verdict ORDER BY pipeline_verdict"
+# {"n":10,"pipeline_verdict":"ITERATE"}
+# {"n":14,"pipeline_verdict":"REJECT"}
+```
 
 From Python the same store is `iap.store.Store` (`open`, `init`,
 `insert_<type>` for every contract, `fetch(T, **where)`, `query`,
 `export_jsonl`); `Store.export_jsonl(table, path)` writes canonical lines in
 primary-key order, so two builds from the same files are byte-identical.
-The DDL runs unchanged on PostgreSQL ≥ 13 (`psql -f schemas/sql/iap_v1.sql`).
+The DDL runs unchanged on PostgreSQL ≥ 13 (`psql -f schemas/sql/iap_v2.sql`).
 
 ## 21. Explain an order (the decision trace)
 
@@ -1740,14 +1774,14 @@ through `build`:
 ```bash
 cd python
 PYTHONPATH=src python3 -m iap.store build > /dev/null
-PYTHONPATH=src python3 -m iap.store sql "SELECT current_state, COUNT(*) AS n FROM v_alpha_scorecard GROUP BY current_state ORDER BY current_state"
-PYTHONPATH=src python3 -m iap.store sql "SELECT verdict, COUNT(*) AS n FROM v_alpha_scorecard GROUP BY verdict ORDER BY verdict"
+PYTHONPATH=src python3 -m iap.store sql "SELECT current_state, COUNT(*) AS n FROM v_alpha_scorecard_current GROUP BY current_state ORDER BY current_state"
+PYTHONPATH=src python3 -m iap.store sql "SELECT pipeline_verdict, COUNT(*) AS n FROM v_alpha_scorecard_current GROUP BY pipeline_verdict ORDER BY pipeline_verdict"
 PYTHONPATH=src python3 -m iap.store sql "DELETE FROM alphas"; echo "exit=$?"
 PYTHONPATH=src python3 -m iap.store sql "SELECT 1; SELECT 2"; echo "exit=$?"
 PYTHONPATH=src python3 -m iap.store sql "SELECT * FROM no_such_table"; echo "exit=$?"
 # {"current_state":"CANDIDATE","n":24}
-# {"n":11,"verdict":"ITERATE"}
-# {"n":13,"verdict":"REJECT"}
+# {"n":11,"pipeline_verdict":"ITERATE"}
+# {"n":13,"pipeline_verdict":"REJECT"}
 # error: attempt to write a readonly database (the store is opened read-only; use `build` to rebuild it)
 # exit=1
 # error: `sql` runs exactly one statement; several were given (You can only execute one statement at a time.)
@@ -1758,13 +1792,12 @@ PYTHONPATH=src python3 -m iap.store sql "SELECT * FROM no_such_table"; echo "exi
 
 The first two rows are the platform's headline result as a query: every
 alpha at CANDIDATE, none promoted. (Re-run on the v1.5.0 tree against a
-scratch `--db`. The 11 / 13 split equals the v1.5.0
-promotion report's, but the view takes each verdict from the alpha's latest
-experiment result, which for EQ01, EQ03 and EQ06 is a runner experiment —
-for EQ01 one on the v1.3.0 dataset — recipe 20. The counts agree because
-those three runner verdicts happen to equal the report's. Quote verdict
-counts from
-`research/alpha_reports/REPORT.md`.) The three failures are the three ways a
+scratch `--db`. The 11 / 13 split is the v1.5.0 promotion report's:
+`pipeline_verdict` is the alpha-report pipeline's verdict in the current
+scope — the current dataset under the default methods. The view's `verdict`
+column is the alpha's latest experiment result in that scope, which for
+EQ01, EQ03 and EQ06 is a runner experiment and reads 10 / 14 — recipe 20.)
+The three failures are the three ways a
 statement is refused: a write (with the rebuild hint, which is printed only
 for a write), several statements (refused rather than half-run), and a
 plain SQL error (the engine's own message, no hint). Add `--db <file>` to

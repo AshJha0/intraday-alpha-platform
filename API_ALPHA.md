@@ -189,18 +189,23 @@ row's mid, spread/fee/impact charged as explicit costs per
 `configs/execution/execution.json cost_model`; accounting identity
 `total_pnl = gross_pnl - total_costs`).  `total_pnl`, `gross_pnl`,
 `total_costs` (and components) at 1e-9; `trade_count`, `traded_qty`,
-`n_rows` exact.  **The cross-language vector is computed under the LEGACY
-research rules**, which its `config` names since v1.5.0
+`n_rows` exact.  The file (`x-version` 3) holds **two cross-language
+vectors, both replayed by Python and Java** (`BacktestGoldenTest`).  The
+top-level one is computed under the LEGACY research rules its `config` names
 (`position_policy "sign"`, `cap_fills_at_l1 false`, `block_rows_column
-null`, `impact_model "linear"` — the defaults up to v1.4.0): they are the
-only rules the Java `ResearchBacktester` / `CostModel` implement, and the
-port asserts that the golden's `config` matches the rules it declares.  The
-vector is identical to the v1.4.0 one in every value.  The v1.5.0 defaults
-(cost-aware positions, fills capped at the displayed L1 size, only the rows
-the IC scores, square-root impact — API_PORTFOLIO_TCA.md §4) are pinned for
-the Python reference alone in the file's `default_rules` block (EQ06, 10 s
-horizon, at the cost multiplier its own `config` names); no port reproduces
-that block.
+null`, `impact_model "linear"` — the defaults up to v1.4.0; Java
+`Config.legacy` + `CostModel.withLinearImpact`) and is identical to the
+v1.4.0 one in every value.  `default_rules` is the run under the v1.5.0
+defaults (cost-aware positions, fills capped at the displayed L1 size, only
+the rows the IC scores, square-root impact — API_PORTFOLIO_TCA.md §4; EQ06,
+10 s horizon, at the cost multiplier its own `config` names; Java
+`Config.defaults` + `CostModel.load`): it embeds the scored-row mask
+(`scored_rows.blocked_rows` — Java has no label engine and takes the mask as
+an input) and every position change (`position_changes`, exact).
+`default_rules_1x` is the same run at full costs, which makes no trade, and
+`cost_model_cases` are scalar cost-model vectors under both impact rules
+(components, round-trip cost return, breakeven size and capacity).  Each
+port asserts that the block's `config` equals the rule set it constructs.
 
 Regeneration (deliberate, versioned changes only — schemas/MIGRATIONS.md):
 `research/alpha_reports/run_all.py` (refits `alpha_params.json`), then

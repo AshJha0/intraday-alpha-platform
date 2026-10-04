@@ -343,7 +343,7 @@ iap/
                    retire <ID> --reason ... | reset <ID> --reason ...` (bootstrap
                    refuses to truncate a non-empty lifecycle_transitions.jsonl —
                    an append-only audit — without --force; exit code 3).
-  store/           The platform data model (schemas/sql/iap_v1.sql, x-version 1:
+  store/           The platform data model (schemas/sql/iap_v2.sql, x-version 2:
                    portable DDL for SQLite 3 + PostgreSQL >= 13) over sqlite3 —
                    a derived, rebuildable INDEX of the flat-file artefacts,
                    never their replacement (docs/DATA_MODEL.md).

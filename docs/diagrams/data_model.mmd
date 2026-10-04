@@ -1,7 +1,8 @@
 erDiagram
-    %% schemas/sql/iap_v1.sql — x-version 1. Solid lines are declared foreign
+    %% schemas/sql/iap_v2.sql — x-version 2. Solid lines are declared foreign
     %% keys (every stage row of a decision trace); dotted lines are logical
-    %% references between independently imported artefacts.
+    %% references between independently imported artefacts. The research
+    %% tables carry the scope (dataset_version, methods) a number was computed in.
 
     instruments {
         BIGINT instrument_id PK
@@ -58,10 +59,13 @@ erDiagram
         BIGINT test_end_ts
         BIGINT seed
         TEXT horizon
+        TEXT methods
     }
     experiment_results {
         TEXT experiment_id PK
         TEXT alpha_id
+        TEXT dataset_version
+        TEXT methods
         DOUBLE_PRECISION ic
         DOUBLE_PRECISION t_stat
         DOUBLE_PRECISION net_return_bps
@@ -74,12 +78,29 @@ erDiagram
         TEXT ledger_key PK
         TEXT alpha_id
         TEXT kind
+        TEXT dataset_version
+        TEXT methods
+        TEXT experiment_id
+        BIGINT gate_looks
+        DOUBLE_PRECISION promote_t_threshold
         TEXT config_json
         BIGINT count
         BIGINT n
         DOUBLE_PRECISION oos_ic
         DOUBLE_PRECISION nw_tstat
         TEXT verdict
+    }
+    ledger_scopes {
+        TEXT dataset_version PK
+        TEXT methods PK
+        BIGINT n_entries
+        BIGINT looks
+        DOUBLE_PRECISION bonferroni_t_threshold
+    }
+    store_scope {
+        TEXT scope PK
+        TEXT dataset_version
+        TEXT methods
     }
     lifecycle_transitions {
         TEXT alpha_id PK
@@ -91,6 +112,8 @@ erDiagram
         TEXT reason
         TEXT gates_json
         TEXT actor
+        TEXT dataset_version
+        TEXT methods
     }
     decision_traces {
         TEXT trace_id PK
@@ -254,6 +277,9 @@ erDiagram
     alphas ||..o{ ledger_entries : "alpha_id"
     alphas ||..o{ lifecycle_transitions : "alpha_id"
     experiments ||..o| experiment_results : "experiment_id"
+    experiments ||..o| ledger_entries : "experiment_id"
+    ledger_scopes ||..o{ ledger_entries : "dataset_version, methods"
+    store_scope ||..o| ledger_scopes : "current scope"
     feature_versions ||..o{ experiments : "feature_version"
     feature_versions ||..o{ model_runs : "feature_version"
     feature_versions ||..o{ drift_baselines : "feature_version"

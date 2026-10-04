@@ -1650,7 +1650,7 @@ issues:
       - "expected_backtest.json matches in Java; total_pnl is in USD with per-ccy natives"
     evidence:
       - "python/src/iap/backtest/{engine,costs}.py; python/tests/test_backtester.py; tests/golden/expected_backtest.json"
-      - "java/src/main/java/com/iap/backtest/{BacktestEngine,ResearchBacktester,CostModel}.java; java BacktestTest"
+      - "java/src/main/java/com/iap/backtest/{BacktestEngine,ResearchBacktester,CostModel}.java; java BacktestTest, BacktestGoldenTest (legacy and v1.5.0 default rules)"
 
   - key: V08
     epic: E08
@@ -2510,7 +2510,7 @@ issues:
       - "Round-trip tests: contract document -> row -> document for every table"
       - "The MVP loop writes its experiment, orders, executions, TCA result and trace into the store"
     evidence:
-      - "schemas/sql/iap_v1.sql (24 tables, 3 views, x-version 1); python/src/iap/store/{ddl,db,importers,__main__}.py"
+      - "schemas/sql/iap_v2.sql (26 tables, 6 views, x-version 2: dataset- and method-bundle-scoped scorecard, v1.5.0); python/src/iap/store/{ddl,db,importers,__main__}.py"
       - "python/tests/test_store.py (round trips per table, DDL portability whitelist); docs/DATA_MODEL.md"
       - "python/src/iap/mvp/session.py (StoreTraceSink writes every MVP trace + reference data into <run>/iap.sqlite)"
 

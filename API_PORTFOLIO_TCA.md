@@ -313,8 +313,11 @@ cpu_count, machine, system, python}` — plus `metrics.json` and `model.pkl`.
   v1.4.0 instead of pricing it under the other rule. **The execution
   simulator's rule 6 did not change**: it reads
   `impact_coeff_bps_per_pct_adv` and is linear in Python, C++ and Java. The
-  Java `com.iap.backtest.CostModel` implements the legacy linear rule only
-  and says so (`IMPACT_MODEL = "linear"`, `loadLegacyLinear`).
+  Java `com.iap.backtest.CostModel` is a port of both rules under the same
+  names: square root by default (`DEFAULT_IMPACT_MODEL`, `load` — which
+  rejects a block that names no `impact_model`, as Python does),
+  `withLinearImpact()` / `loadLegacyLinear` for the legacy rule, plus
+  `roundTripCostReturn`, `breakevenSize` and `capacityBreakeven`.
 - **Research backtest rules** (`iap.backtest.engine.BacktestConfig`;
   pinned, the defaults changed in v1.5.0 — each was an opt-in from v1.3.0).
   Default first, legacy second; `BacktestConfig.legacy(**overrides)` names
@@ -354,12 +357,26 @@ cpu_count, machine, system, python}` — plus `metrics.json` and `model.pkl`.
   - *A strategy that does not trade does not pass*: an alpha whose
     forecast never clears its round-trip cost makes no trade under the
     default policy; its net P&L is exactly 0, which fails `net P&L > 0`.
-  - *Ports*: the Java `com.iap.backtest.ResearchBacktester` implements the
-    legacy rules only and says so (`POSITION_POLICY = "sign"`,
-    `CAP_FILLS_AT_L1 = false`, `BLOCKS_ROWS = false`).
-    `tests/golden/expected_backtest.json` (`x-version` 2) is that legacy
-    vector, its `config` naming the rules; its `default_rules` block pins
-    a Python-only run under the defaults.
+  - *Ports*: the Java `com.iap.backtest.ResearchBacktester` implements
+    both rule sets (v1.5.0): `ResearchBacktester.Config.defaults(...)` is
+    the cost-aware policy with the L1 fill cap and the row block —
+    `.forHorizon(ns)` supplies the label horizon, and a run without it is
+    an error as in Python — and `Config.legacy(...)` is the sign policy,
+    uncapped, every row. One difference is stated in its API: Java has no
+    label engine, so the scored-row mask that Python derives for
+    `block_rows_column="auto"` is an INPUT of `run(...)` (`allowed`), as
+    are the displayed L1 sizes. Rows-mode latency only: `latency_ns`,
+    `max_decision_age_ns`, `flatten_at_session_end` and the per-row
+    currency conversion are Python-only (none is a default).
+    `tests/golden/expected_backtest.json` (`x-version` 3) pins both rule
+    sets for both languages: the legacy EQ01 vector at the top level, the
+    default-rules EQ06 vector in `default_rules` (with the mask and every
+    position change), the no-trade run at full costs in
+    `default_rules_1x`, and `cost_model_cases` for both impact rules —
+    money at 1e-9 abs/rel, counts and positions exact. There is no Rust or
+    C++ research backtester: `rust/` and `cpp/` hold no code that reads
+    this golden (C++ `ExecutionReplay` and the Rust venue simulator are
+    execution components with their own goldens).
 - **Capacity** (`validate_alpha(capacity=...)`; the default changed in
   v1.5.0). `"breakeven"`, the default: per instrument, the order size at
   which the edge per round trip equals spread + fee + impact
