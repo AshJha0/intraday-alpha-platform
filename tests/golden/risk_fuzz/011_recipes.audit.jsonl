@@ -64,3 +64,5 @@
 {"decision":2,"reason":"projected position 9223372036854775803 exceeds max_position_qty 100000","rule_id":"POSITION_LIMIT","scope":"INSTRUMENT","scope_id":"3","severity":2,"timestamp":1700000021663638000}
 {"decision":3,"reason":"fill for order 39 overflows i64 position accounting (fail-closed)","rule_id":"KILL_SWITCH_ENGAGED","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000021663638000}
 {"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000021663638000}
+{"decision":2,"reason":"conversion rate EUR -> USD timestamp 9223372036854775806 is more than 5000000000ns ahead of the latest order event time 1700000022663638000","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"3","severity":2,"timestamp":1700000022663638000}
+{"decision":2,"reason":"conversion rate EUR -> USD timestamp 9223372036854775807 is more than 5000000000ns ahead of the latest order event time 1700000022663638000","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"3","severity":2,"timestamp":1700000022663638000}

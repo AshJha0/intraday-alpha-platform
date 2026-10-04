@@ -52,3 +52,5 @@
 {"decision":2,"reason":"would cross own open order 13 at 2486","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000040627177999}
 {"decision":2,"reason":"timestamp arithmetic overflows i64 (fail-closed)","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":-7523371995176597810}
 {"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":-7523371995176597809}
+{"decision":2,"reason":"conversion rate EUR -> USD timestamp 9223372036854775806 is more than 5000000000ns ahead of the latest order event time 1700000041678177999","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"3","severity":2,"timestamp":1700000041678177999}
+{"decision":2,"reason":"conversion rate EUR -> USD timestamp 9223372036854775807 is more than 5000000000ns ahead of the latest order event time 1700000041678177999","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"3","severity":2,"timestamp":1700000041678177999}

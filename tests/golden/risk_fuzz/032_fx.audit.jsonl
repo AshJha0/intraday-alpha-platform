@@ -73,3 +73,5 @@
 {"decision":2,"reason":"no conversion rate for XXX -> USD","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"5","severity":2,"timestamp":1700000024715076000}
 {"decision":1,"reason":"daily loss limit 50000.00 -> 10000000.00 approved by ops halt","rule_id":"LOSS_LIMIT_OVERRIDE","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700000024715759000}
 {"decision":2,"reason":"notional 92233720368547758.07 USD exceeds max_order_notional 1000000.00","rule_id":"FAT_FINGER_NOTIONAL","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000024715759000}
+{"decision":2,"reason":"conversion rate JPY -> USD timestamp 9223372036854775806 is more than 5000000000ns ahead of the latest order event time 1700000024766759000","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"4","severity":2,"timestamp":1700000024766759000}
+{"decision":2,"reason":"conversion rate JPY -> USD timestamp 9223372036854775807 is more than 5000000000ns ahead of the latest order event time 1700000024766759000","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"4","severity":2,"timestamp":1700000024766759000}

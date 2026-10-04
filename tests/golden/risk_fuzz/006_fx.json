@@ -1,4 +1,4 @@
-{"x-version":1,"name":"006_fx","profile":"fx","seed":3546524331313699,"config":"configs/risk/risk.json","instruments":{"1":{"tick_size":0.01,"qty_unit":1.0,"quote_ccy":"USD"},"2":{"tick_size":0.01,"qty_unit":1.0,"quote_ccy":"USD"},"3":{"tick_size":0.05,"qty_unit":1.0,"quote_ccy":"EUR"},"4":{"tick_size":1.0,"qty_unit":100.0,"quote_ccy":"JPY"},"5":{"tick_size":0.0001,"qty_unit":1.0,"quote_ccy":"XXX"},"101":{"tick_size":1e-05,"qty_unit":100000.0,"quote_ccy":"USD"},"103":{"tick_size":0.001,"qty_unit":100000.0,"quote_ccy":"JPY"}},"require_bootstrap":false,"cuts":[43,57,104],"steps":[
+{"x-version":1,"name":"006_fx","profile":"fx","seed":3546524331313699,"config":"configs/risk/risk.json","instruments":{"1":{"tick_size":0.01,"qty_unit":1.0,"quote_ccy":"USD"},"2":{"tick_size":0.01,"qty_unit":1.0,"quote_ccy":"USD"},"3":{"tick_size":0.05,"qty_unit":1.0,"quote_ccy":"EUR"},"4":{"tick_size":1.0,"qty_unit":100.0,"quote_ccy":"JPY"},"5":{"tick_size":0.0001,"qty_unit":1.0,"quote_ccy":"XXX"},"101":{"tick_size":1e-05,"qty_unit":100000.0,"quote_ccy":"USD"},"103":{"tick_size":0.001,"qty_unit":100000.0,"quote_ccy":"JPY"}},"require_bootstrap":false,"cuts":[14,38,96],"steps":[
 {"type":"fill","strategy_id":"S2","instrument_id":1,"order_id":0,"side":0,"qty":42022,"price_ticks":2448,"ts":1700000000000000000},
 {"type":"kill","scope":"INSTRUMENT","scope_id":"1","ts":1700000000000000000,"reason":"desk request #42"},
 {"type":"market","instrument_id":4,"bid_ticks":1498,"ask_ticks":1500,"ts":1700000000000000000},
@@ -118,5 +118,10 @@
 {"type":"cancel","order_id":35},
 {"type":"market","instrument_id":103,"bid_ticks":155332,"ask_ticks":155334,"ts":1700000026211159004},
 {"type":"order","order":{"order_id":37,"instrument_id":101,"side":0,"qty":9223372036854775807,"price_ticks":9223372036854775807,"order_type":3,"venue_id":1,"strategy_id":"S2","urgency":0.5,"timestamp":1700000028211159004},"expect":{"decision":2,"rule_id":"FAT_FINGER_QTY","severity":2,"scope":"INSTRUMENT","scope_id":"101","reason":"qty 9223372036854775807 exceeds max_order_qty 50000"}},
-{"type":"market","instrument_id":1,"bid_ticks":2304,"ask_ticks":2306,"ts":1700000028211625004}
+{"type":"market","instrument_id":1,"bid_ticks":2304,"ask_ticks":2306,"ts":1700000028211625004},
+{"type":"market","instrument_id":4,"bid_ticks":1324,"ask_ticks":1326,"ts":1700000028239625004},
+{"type":"market","instrument_id":103,"bid_ticks":155332,"ask_ticks":155334,"ts":9223372036854775806},
+{"type":"order","order":{"order_id":38,"instrument_id":4,"side":0,"qty":1,"price_ticks":1312,"order_type":2,"venue_id":1,"strategy_id":"S2","urgency":0.5,"timestamp":1700000028239625004},"expect":{"decision":2,"rule_id":"FX_RATE_MISSING","severity":2,"scope":"INSTRUMENT","scope_id":"4","reason":"conversion rate JPY -> USD timestamp 9223372036854775806 is more than 5000000000ns ahead of the latest order event time 1700000028239625004"}},
+{"type":"market","instrument_id":103,"bid_ticks":155332,"ask_ticks":155334,"ts":9223372036854775807},
+{"type":"order","order":{"order_id":39,"instrument_id":4,"side":0,"qty":1,"price_ticks":1327,"order_type":2,"venue_id":1,"strategy_id":"S2","urgency":0.5,"timestamp":1700000028239625004},"expect":{"decision":2,"rule_id":"FX_RATE_MISSING","severity":2,"scope":"INSTRUMENT","scope_id":"4","reason":"conversion rate JPY -> USD timestamp 9223372036854775807 is more than 5000000000ns ahead of the latest order event time 1700000028239625004"}}
 ]}

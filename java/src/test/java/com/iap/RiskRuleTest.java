@@ -615,6 +615,18 @@ public class RiskRuleTest {
         assertEquals("conversion rate GBP -> USD timestamp " + (t + 3600 * SEC)
                 + " is more than 5000000000ns ahead of the latest order event time "
                 + t, d.reason());
+        // Found by the differential fuzzer (as a fail-open in the Rust and
+        // Python engines; this port was right): a pair stamped exactly
+        // i64::MAX is the extreme future-stamped mark and rejects the same.
+        eng = RiskEngine.fromConfig(configDoc(), refs);
+        eng.onMarket(108, 85_315, 85_325, t);
+        eng.onMarket(102, 127_335, 127_345, Long.MAX_VALUE);
+        d = eng.checkOrder(new OrderRequest(2, 108, 0, 100, 0,
+                OrderRequest.MARKET, 1, "S1", 0.5, t));
+        assertEquals(Rules.FX_RATE_MISSING, d.ruleId());
+        assertEquals("conversion rate GBP -> USD timestamp " + Long.MAX_VALUE
+                + " is more than 5000000000ns ahead of the latest order event time "
+                + t, d.reason());
     }
 
     /** The repo limits with one double limit replaced by NaN (0-based slot). */

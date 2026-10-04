@@ -49,3 +49,5 @@
 {"decision":2,"reason":"position in instrument 5 has no XXX conversion rate (fail-closed)","rule_id":"GROSS_NOTIONAL","scope":"GLOBAL","scope_id":"","severity":2,"timestamp":1700000026211159004}
 {"decision":2,"reason":"position in instrument 5 has no XXX conversion rate (fail-closed)","rule_id":"GROSS_NOTIONAL","scope":"GLOBAL","scope_id":"","severity":2,"timestamp":1700000026211159004}
 {"decision":2,"reason":"qty 9223372036854775807 exceeds max_order_qty 50000","rule_id":"FAT_FINGER_QTY","scope":"INSTRUMENT","scope_id":"101","severity":2,"timestamp":1700000028211159004}
+{"decision":2,"reason":"conversion rate JPY -> USD timestamp 9223372036854775806 is more than 5000000000ns ahead of the latest order event time 1700000028239625004","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"4","severity":2,"timestamp":1700000028239625004}
+{"decision":2,"reason":"conversion rate JPY -> USD timestamp 9223372036854775807 is more than 5000000000ns ahead of the latest order event time 1700000028239625004","rule_id":"FX_RATE_MISSING","scope":"INSTRUMENT","scope_id":"4","severity":2,"timestamp":1700000028239625004}
