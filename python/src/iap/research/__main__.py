@@ -238,6 +238,11 @@ def _dataset_versions(args: argparse.Namespace) -> tuple[str | None, str | None]
         if getattr(args, name) == default:
             setattr(args, name, target)
     args.ledger.parent.mkdir(parents=True, exist_ok=True)
+    # A real dataset numbers its own instruments (QQQ may be id 3): the
+    # alphas' constituent / ETF universe must come from its config.
+    from iap.alpha import configure_universe
+
+    configure_universe(args.configs_dir / "instruments" / "instruments.json")
     return dataset_version, feature_version
 
 

@@ -28,6 +28,8 @@ from iap.alpha.base import (  # noqa: F401
     VALID_HORIZONS,
     AlphaModel,
     LinearAlpha,
+    configure_universe,
+    universe_ids,
 )
 from iap.alpha.cross_sectional import EQ11CrossSectionalReversal
 from iap.alpha.equity import (

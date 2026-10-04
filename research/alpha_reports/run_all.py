@@ -53,7 +53,7 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "python" / "src"))
 
 import numpy as np  # noqa: E402
-from iap.alpha import ALPHA_IDS, build, fit_all, save_params  # noqa: E402
+from iap.alpha import ALPHA_IDS, build, configure_universe, fit_all, save_params  # noqa: E402
 from iap.alpha.data import load_features, session_days, split_by_day  # noqa: E402
 from iap.backtest import Backtester, CostModel  # noqa: E402
 from iap.backtest.engine import ensemble_scores  # noqa: E402
@@ -79,6 +79,13 @@ BOOTSTRAP_SEED = 20260829
 RESEARCH_LATENCY_NS = 1_000_000_000
 RESEARCH_MAX_DECISION_AGE_NS = 60_000_000_000
 PARAMS_PATH = REPO / "configs" / "strategies" / "alpha_params.json"
+
+#: Where the inputs are read from. The checkout's synthetic dataset by
+#: default; ``--dataset-dir`` repoints all three at an ingested real
+#: dataset (docs/REAL_DATA.md layout: <dir>/{features,normalized,configs}).
+FEATURES_DIR = REPO / "data" / "features"
+NORMALIZED_DIR = REPO / "data" / "normalized"
+CONFIGS_DIR = REPO / "configs"
 
 #: Looks-at-the-data counted per alpha in one pipeline run. This is the
 #: denominator of every multiple-testing correction in the research, so it
@@ -109,7 +116,7 @@ DESIGN_SCAN_COUNT = 216
 
 
 def _load_meta() -> dict[int, dict]:
-    cfg = json.loads((REPO / "configs" / "instruments" / "instruments.json").read_text())
+    cfg = json.loads((CONFIGS_DIR / "instruments" / "instruments.json").read_text())
     meta: dict[int, dict] = {}
     for row in cfg["instruments"]:
         meta[int(row["instrument_id"])] = {
@@ -133,9 +140,7 @@ def research_backtester(bundle: ResearchMethods, meta: dict[int, dict]) -> Backt
     (a decision made before a long quote gap no longer "fills" at whatever
     row comes next) and no overnight carry — under the position / fill / row
     rules and the cost model of the bundle."""
-    cost_model = bundle.cost_model(
-        CostModel.load(REPO / "configs" / "execution" / "execution.json")
-    )
+    cost_model = bundle.cost_model(CostModel.load(CONFIGS_DIR / "execution" / "execution.json"))
     return Backtester(
         cost_model,
         meta,
@@ -149,7 +154,7 @@ def research_backtester(bundle: ResearchMethods, meta: dict[int, dict]) -> Backt
 
 def max_participation() -> float:
     """``defaults.max_participation`` of ``configs/execution/execution.json``."""
-    exec_cfg = json.loads((REPO / "configs" / "execution" / "execution.json").read_text())
+    exec_cfg = json.loads((CONFIGS_DIR / "execution" / "execution.json").read_text())
     return float(exec_cfg["defaults"]["max_participation"])
 
 
@@ -214,7 +219,7 @@ def data_quality_lines() -> list:
     Read from ``data/features/features_summary.json`` (written by the
     feature pipeline), so the report can never drift from the data.
     """
-    path = REPO / "data" / "features" / "features_summary.json"
+    path = FEATURES_DIR / "features_summary.json"
     if not path.is_file():
         return ["_(features_summary.json not found — regenerate the dataset)_"]
     summary = json.loads(path.read_text())
@@ -284,7 +289,7 @@ def data_quality_lines() -> list:
 def row_gap_ranges() -> tuple[str, str]:
     """``(equity, FX)`` mean-row-gap ranges as prose (``~3.1-3.3 s``), read
     from ``features_summary.json`` so the text cannot drift from the table."""
-    path = REPO / "data" / "features" / "features_summary.json"
+    path = FEATURES_DIR / "features_summary.json"
     if not path.is_file():
         return "an unknown gap", "an unknown gap"
     inst = json.loads(path.read_text()).get("instruments", {})
@@ -701,7 +706,28 @@ def main(argv: list[str] | None = None) -> int:
         "--out-dir, <out-dir>/experiments.json — a run outside the committed "
         "reports keeps its own ledger unless told otherwise)",
     )
+    ap.add_argument(
+        "--dataset-dir",
+        type=Path,
+        default=None,
+        help="run on an ingested real dataset (needs --out-dir; features built with "
+        "python -m iap.features). Alphas of an asset class the dataset does not "
+        "hold are skipped and not recorded in the ledger",
+    )
     args = ap.parse_args(argv)
+    global FEATURES_DIR, NORMALIZED_DIR, CONFIGS_DIR
+    dataset_version = None
+    if args.dataset_dir is not None:
+        if args.out_dir is None:
+            raise SystemExit("--dataset-dir needs --out-dir: the committed reports are synthetic")
+        root = args.dataset_dir
+        FEATURES_DIR, NORMALIZED_DIR, CONFIGS_DIR = (
+            root / "features",
+            root / "normalized",
+            root / "configs",
+        )
+        dataset_version = json.loads((root / "dataset.json").read_text())["dataset_version"]
+        configure_universe(CONFIGS_DIR / "instruments" / "instruments.json")
     bundle = methods(args.methods)
     committed = bundle.name == METHODS_V2 and args.out_dir is None
     if bundle.name != METHODS_V2 and args.out_dir is None:
@@ -716,13 +742,13 @@ def main(argv: list[str] | None = None) -> int:
     t_start = time.time()
     reports_dir.mkdir(parents=True, exist_ok=True)
     meta = _load_meta()
-    frames = load_features(REPO / "data" / "features")
+    frames = load_features(FEATURES_DIR)
     backtester = research_backtester(bundle, meta)
-    recompute = RecomputeSources(REPO / "data" / "normalized", REPO / "configs")
+    recompute = RecomputeSources(NORMALIZED_DIR, CONFIGS_DIR)
 
     # Dataset-scoped (iap.validation.ledger): the same configuration on a
     # regenerated dataset is a new look, recorded beside the old one.
-    ledger = ExperimentLedger(args.ledger, dataset_version=data_version(REPO))
+    ledger = ExperimentLedger(args.ledger, dataset_version=dataset_version or data_version(REPO))
     if ledger.total_experiments == 0:
         ledger.record(
             "ALL",

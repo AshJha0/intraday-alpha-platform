@@ -37,8 +37,10 @@ contradicts its rationale can at best be ITERATE, never PROMOTE.
 
 from __future__ import annotations
 
+import json
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -66,6 +68,46 @@ EQ_CONSTITUENT_IDS: tuple[int, ...] = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
 ETF_ID = 11
 FX_IDS: tuple[int, ...] = (101, 102, 103, 104, 105, 106, 107, 108)
 FX_REF_ID = 101  # EUR/USD — cross-asset reference pair (features/context.py)
+
+#: The universe the alphas trade. Defaults to the pinned synthetic ids above;
+#: ``configure_universe`` re-derives it from another instruments.json (an
+#: ingested real dataset numbers its instruments 1..N, so id 3 may be an ETF).
+_UNIVERSE: dict[str, tuple[int, ...]] = {
+    "equity": EQ_IDS,
+    "constituents": EQ_CONSTITUENT_IDS,
+    "etf": (ETF_ID,),
+    "fx": FX_IDS,
+}
+
+
+def configure_universe(instruments_json: str | Path | None) -> None:
+    """Derive the alpha universe from ``instruments.json`` (``None``: pinned default).
+
+    Constituents are the EQUITY rows, the ETF is the single ETF row (none
+    is allowed: ETF-relative alphas then trade nothing), FX the FX rows.
+    """
+    if instruments_json is None:
+        _UNIVERSE.update(equity=EQ_IDS, constituents=EQ_CONSTITUENT_IDS, etf=(ETF_ID,), fx=FX_IDS)
+        return
+    rows = json.loads(Path(instruments_json).read_text())["instruments"]
+    by_class: dict[str, list[int]] = {}
+    for row in rows:
+        by_class.setdefault(row["asset_class"], []).append(int(row["instrument_id"]))
+    etf = tuple(sorted(by_class.get("ETF", ())))
+    if len(etf) > 1:
+        raise ValueError(f"{instruments_json}: more than one ETF {etf}; the alphas need one")
+    constituents = tuple(sorted(by_class.get("EQUITY", ())))
+    _UNIVERSE.update(
+        equity=tuple(sorted(constituents + etf)),
+        constituents=constituents,
+        etf=etf,
+        fx=tuple(sorted(by_class.get("FX", ()))),
+    )
+
+
+def universe_ids(kind: str) -> tuple[int, ...]:
+    """Current universe: ``equity`` | ``constituents`` | ``etf`` | ``fx``."""
+    return _UNIVERSE[kind]
 
 
 class AlphaModel(ABC):
@@ -105,7 +147,7 @@ class AlphaModel(ABC):
 
     def universe(self, instrument_ids: Sequence[int]) -> list[int]:
         """The subset of ``instrument_ids`` this alpha trades (sorted)."""
-        base = EQ_IDS if self.asset_class == "EQUITY" else FX_IDS
+        base = _UNIVERSE["equity" if self.asset_class == "EQUITY" else "fx"]
         return sorted(i for i in instrument_ids if i in base)
 
     # -- fitting / scoring ------------------------------------------------

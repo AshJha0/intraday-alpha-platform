@@ -17,10 +17,9 @@ import pandas as pd
 
 from iap.alpha.base import (
     EPS,
-    EQ_CONSTITUENT_IDS,
-    ETF_ID,
     LinearAlpha,
     col,
+    universe_ids,
 )
 
 
@@ -237,7 +236,7 @@ class EQ09ResidualReversion(LinearAlpha):
     features = ("ret_resid_10s_v1",)
 
     def universe(self, instrument_ids):
-        return sorted(i for i in instrument_ids if i in EQ_CONSTITUENT_IDS)
+        return sorted(i for i in instrument_ids if i in universe_ids("constituents"))
 
     def raw_signal(self, df: pd.DataFrame) -> pd.Series:
         return -col(df, "ret_resid_10s_v1")
@@ -261,7 +260,8 @@ class EQ10IndexLeadLag(LinearAlpha):
     features = ("ref_ret_1s_v1",)
 
     def universe(self, instrument_ids):
-        return sorted(i for i in instrument_ids if i in EQ_CONSTITUENT_IDS and i != ETF_ID)
+        constituents, etf = universe_ids("constituents"), universe_ids("etf")
+        return sorted(i for i in instrument_ids if i in constituents and i not in etf)
 
     def raw_signal(self, df: pd.DataFrame) -> pd.Series:
         return col(df, "ref_ret_1s_v1")

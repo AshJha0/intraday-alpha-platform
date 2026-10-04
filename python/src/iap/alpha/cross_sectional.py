@@ -15,7 +15,7 @@ from collections.abc import Mapping
 import numpy as np
 import pandas as pd
 
-from iap.alpha.base import EPS, EQ_CONSTITUENT_IDS, LinearAlpha
+from iap.alpha.base import EPS, LinearAlpha, universe_ids
 from iap.alpha.data import asof_to_grid, grid_to_rows, make_grid
 
 
@@ -92,7 +92,7 @@ class EQ11CrossSectionalReversal(CrossSectionalLinearAlpha):
     MIN_NAMES = 4  # need a real cross-section
 
     def universe(self, instrument_ids):
-        return sorted(i for i in instrument_ids if i in EQ_CONSTITUENT_IDS)
+        return sorted(i for i in instrument_ids if i in universe_ids("constituents"))
 
     def grid_signals(self, mat: np.ndarray) -> np.ndarray:
         fin = np.isfinite(mat)
