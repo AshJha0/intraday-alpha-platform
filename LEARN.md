@@ -14,6 +14,16 @@ second hour, read §21–§26: they are the v1.3.0 review written up as case
 studies — what was wrong in the safety code, why the tests had not caught
 it, and what each fix pins.
 
+A note on which numbers these are. v1.3.0 added eleven corrected research
+methods as opt-ins — a cost-aware backtest, a significance test of the
+gated IC itself, a threshold that follows the count of looks, and others —
+and v1.4.0 kept them opt-in. Since v1.5.0 they are the defaults, every
+research artefact was regenerated under them on the unchanged dataset, and
+the numbers below are the v1.5.0 numbers. Each old rule keeps a legacy name
+(the bundle `legacy_v1` of `iap.validation.methods` reproduces the v1.4.0
+report), and where a v1.4.0 figure is still the clearer illustration it is
+quoted as such, with its date.
+
 For a shorter, top-down explanation of how the quant, algo and AI sides fit
 together — one page per subsystem, each ending with where to look and a
 command that runs — start with [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md)
@@ -105,14 +115,15 @@ so a heavy bid pulls the microprice toward the ask. The deviation
 `(microprice − mid)/mid` (registry feature `micro_mid_dev_bps_v1`) is the raw
 signal of alpha **EQ01** and **FX01**. On this repo's data the same formula
 gives two weak results that are weak in different ways. On the equity MBO
-book it is a small positive predictor — uncrossed OOS IC 0.0102, Newey–West
-t = 2.67, three of four folds positive, hypothesis-confirmed, verdict
-ITERATE; the t is below the fixed t ≥ 3 gate, and like every alpha here it
-loses money net of costs. (On the v1.3.0 dataset, whose equity flow was
+book it is a small positive predictor — uncrossed OOS IC 0.0105, gate
+t = 1.59, three of four folds positive, hypothesis-confirmed, verdict
+ITERATE; the t is far below the PROMOTE threshold (4.365, §6.5), and its
+forecast is so small that the backtest never finds a row worth trading.
+(On the v1.3.0 dataset, whose equity flow was
 compressed into the first 40 % of the session, the same alpha read IC
 0.0273, t 4.77 — see §2.3.) On the synthetic FX quote book the answer
 depends on which rows are counted: FX01's pooled IC is −0.0153, its IC on
-rows where the consolidated book is not crossed is +0.0183 (t 3.27), and no
+rows where the consolidated book is not crossed is +0.0183 (t 2.26), and no
 single fold is positive — ITERATE by the letter of the gate, with no stable
 signal behind it (§6.5). Same math, different market structure, different
 failure: a good first lesson in why microstructure context matters.
@@ -132,14 +143,17 @@ ofi_lK_wW = Σ e(K) over the window (t−W, t]
 The repo computes this exactly, in integers, for K ∈ {1,3,5,10} and
 W ∈ {1s,5s,30s} (API_FEATURES.md §3). OFI drives alphas EQ02 (L1) and EQ03
 (multi-level). Paper 1's finding is the honest headline: OFI *is*
-statistically predictive here (uncrossed OOS IC 0.0253/0.0190 with
-Newey-West t of 7.52/5.78, every walk-forward fold positive — the gates
+statistically predictive here (uncrossed OOS IC 0.0251/0.0189 with a
+gate t of 7.17/5.16, every walk-forward fold positive — the gates
 read the UNCROSSED column, and on equities the consolidated book is
 crossed on only ~0.3 % of rows, so pooled and uncrossed agree to four
-decimals) and *still not tradable* — at 378/423 signal flips per hour the
-strategies pay the spread so often that costs exceed gross alpha by
-roughly two orders of magnitude (EQ02 day 2: gross +2,265 against 368,947
-of costs).
+decimals) and *still not tradable*. The two backtest policies say so in
+two ways. Under the default cost-aware policy neither alpha makes a single
+trade: the fitted expected return never exceeds the round-trip spread and
+fee. Under the legacy sign policy, which trades every flip — 378/423
+signal flips per hour — the strategies paid the spread so often that costs
+exceeded gross alpha by roughly two orders of magnitude (EQ02 day 2 in the
+v1.4.0 report: gross +2,265 against 368,947 of costs).
 
 ### 1.5 Queues, and what you can and cannot observe
 
@@ -252,8 +266,12 @@ hidden:
   morning; every equity alpha's IC and t moved, mostly down (EQ03: IC
   0.0298 → 0.0190, t 10.57 → 5.78), EQ11 dropped from ITERATE to REJECT,
   and the count went from 0 PROMOTE / 11 ITERATE / 13 REJECT to
-  0 / 10 / 14 (§6.5). These are the numbers of the corrected dataset; the
-  earlier ones described a market that closed before lunch.
+  0 / 10 / 14 (the v1.4.0 report, under the rules of the time). These were
+  the numbers of the corrected dataset; the
+  earlier ones described a market that closed before lunch. v1.5.0 kept
+  the dataset and changed the default methods, and the same data now reads
+  0 / 11 / 13 with different members (EQ03: gate IC 0.0189, gate t 5.16;
+  §6.5 has the scoreboard).
 
 The generator's mid is **strongly mean-reverting** around its regime
 process. Consequences you will see all over the research reports:
@@ -262,12 +280,14 @@ process. Consequences you will see all over the research reports:
    Several alphas ship with `hypothesis_confirmed = false` — the fitted sign
    contradicts the stated economic rationale — and are therefore barred from
    PROMOTE no matter how large the IC. The clearest case today is FX09:
-   uncrossed IC −0.0472, NW t −3.76, fold sign consistency 0.00 — a |t|
-   above 3, pointing the wrong way: **REJECT**
+   uncrossed IC −0.0471, gate t −5.75, fold sign consistency 0.00 — a |t|
+   beyond even the ledger threshold of 4.365, pointing the wrong way:
+   **REJECT**
    (it used to be quoted at "IC 0.113, t 14.3, capped at ITERATE" before
-   the gates read the crossed-book-conditioned IC — see §6.5). EQ09 was
+   the gates read the crossed-book-conditioned IC — see §6.5). EQ08 is the
+   equity case (IC −0.0481, gate t −4.57). EQ09 was
    the equity example on the v1.3.0 dataset (NW t −5.65); on the v1.4.0
-   dataset its t is −0.84 and there is nothing left to explain.
+   dataset its gate t is −1.32 and there is nothing left to explain.
 2. **The consolidated multi-venue book can still cross occasionally**
    (negative spread). Under the shared-efficient-price design the merged
    *equity* book is crossed at only 0.26% of ML decision rows — but the FX
@@ -467,7 +487,7 @@ cost_label(t, h) = ((m(t+h) − hs(t+h)) − (m(t) + hs(t))) / m(t) # buy at ask
 ```
 
 where `m`/`hs` are the prevailing mid/half-spread *at-or-before* the query
-time. Three details carry most of the integrity:
+time. Four details carry most of the integrity:
 
 1. **At-or-before, never after**: the anchor uses only events with
    `ts ≤ t`. The same rule is reused verbatim by TCA benchmarks (§11) —
@@ -485,6 +505,19 @@ time. Three details carry most of the integrity:
 3. **Both raw and cost-adjusted labels exist** (spec §13). The cost label
    embeds the round-trip spread — which is exactly what makes it dangerous
    as an ML target, as §7 shows.
+4. **A halt does not make a row disappear.** A label whose window contains
+   a blackout (a halt, an auction call, a stale-venue gap) is invalid, and
+   up to v1.4.0 every IC simply dropped the row. But a position entered
+   before the halt is held through it, and dropping the row removes
+   exactly the outcomes a forecast is least likely to get right. So each
+   row that is invalid for BLACKOUT alone also carries its realised return
+   to the first tradable price after the blackout (`label_reopen_<h>`), and
+   since v1.5.0 the default row policy scores it there
+   (`ic_rows="blackout_reopen"`; `"valid_only"` is the legacy rule). For 23
+   of the 24 alphas this moves the gate IC by less than 0.003. For EQ11,
+   at 15 minutes, 23,413 such rows move it from 0.0261 to 0.0038 — a
+   selection effect, now visible. A row whose forward price is merely
+   stale is still dropped under both rules.
 
 The alignment is defended by tests: shifting either series by one event must
 break the feature/label alignment — the "shift-by-one" leakage test that
@@ -544,64 +577,137 @@ relative to labels must destroy the IC. An alpha that survives its own
 shifted version is reading the future somewhere; verdict REJECT, always,
 regardless of any other statistic.
 
+Both test the *model* on frames it is handed, and neither can see
+look-ahead that is already inside a feature — a centred window, a
+full-sample normalisation. Two further probes close that. The truncation
+probe re-scores on a truncated frame and requires the score at the cut to
+be bit-identical. The **recompute probe** truncates the *raw events*,
+rebuilds the features from the prefix and requires the last row to equal
+the same row of the full run. It was an opt-in in v1.3.0 and v1.4.0, when
+no report ran it; since v1.5.0 it is in the standard suite whenever the
+raw events are available (three anchors on the first 12,000 events of the
+first normalized file per asset class), and all 24 alphas pass. A report
+produced without events says `recompute_ok: null` rather than `true`, and
+the runner marks such a result not gate-eligible (COOKBOOK recipe 30).
+
 ### 6.4 What gets measured
 
-Per alpha: OOS IC (Pearson, pooled over folds), Rank IC, a Newey–West
-t-statistic (serial-correlation-robust), hit rate, fold sign consistency,
-**decay curve** across all 11 horizons, turnover (signal flips/hour),
-capacity proxies, cost stress at ×{0.5, 1, 2} modeled costs, latency stress
-at +{0, 1, 5} events of staleness, and a high/low-vol regime split.
+Per alpha: OOS IC (Pearson, pooled over folds), Rank IC, a
+serial-correlation-robust t-statistic of that IC, hit rate, fold sign
+consistency, **decay curve** across all 11 horizons, turnover (signal
+flips/hour), capacity, cost stress at ×{0.5, 1, 2} modeled costs, latency
+stress in event time (100 ms to 5 s) and at +{0, 1, 5} rows of staleness,
+and a high/low-vol regime split. Since v1.5.0 every validation also
+reports the cost survival of *every* fold and a stationary-bootstrap
+interval for the pooled net P&L (report-only: no gate reads them), and
+beside the pooled IC a per-instrument mean IC and a volatility-scaled IC,
+so that one volatile instrument dominating the pool is visible.
+
+Four of those measurements changed definition in v1.5.0, and each change
+replaced a statistic that answered a slightly different question from the
+one the gate was asking:
+
+| measurement | default since v1.5.0 | legacy rule (to v1.4.0) | what was wrong with the old one |
+|---|---|---|---|
+| the t the gate reads | HAC t of the **pooled slope** (`significance="pooled_slope"`) | Newey–West t of within-bucket ICs (`"within_bucket"`) | it tested within-bucket correlation while the gate IC beside it was pooled: signal between buckets was in the IC and not in its t |
+| the rows an IC scores | valid labels, plus BLACKOUT-only rows at their reopen return (`ic_rows="blackout_reopen"`) | valid labels only (`"valid_only"`) | it dropped the rows a held position would have lived through (§5) |
+| net P&L | cost-aware positions, L1-capped fills, only the scored rows, square-root impact | sign of the signal on every row, any size at the touch, linear impact (`BacktestConfig.legacy()`, `CostModel.with_linear_impact()`) | the loss measured a policy that trades every flip, not the alpha |
+| capacity | edge breakeven: the size at which the realised edge equals its cost (`capacity="breakeven"`) | participation cap × volume × price (`"participation"`) | a volume proxy says nothing about whether there is an edge to scale |
 
 ### 6.5 The gates, and the honest scoreboard
 
 Pinned promotion gates (spec §20):
 
-- **PROMOTE**: leakage pass ∧ OOS IC ≥ 0.01 ∧ NW t ≥ 3.0 ∧ fold
-  consistency ≥ 0.7 ∧ hypothesis confirmed ∧ **net P&L > 0 at 1× costs**.
+- **PROMOTE**: leakage pass ∧ gate IC ≥ 0.01 ∧ gate t ≥ the significance
+  threshold ∧ fold consistency ≥ 0.7 ∧ at least 3 non-degenerate folds ∧
+  hypothesis confirmed ∧ **net P&L > 0 at 1× costs**.
 - **ITERATE**: leakage pass ∧ IC ≥ 0.005 ∧ t ≥ 1.5.
 - **REJECT**: otherwise (always, on leakage failure).
 
-Result on the bundled data: **0 PROMOTE / 10 ITERATE / 14 REJECT** — every
-one of the 24 alphas is net-negative at 1× modeled costs, so nothing clears
-the last gate. (On the v1.3.0 dataset it was 0 / 11 / 13; regenerating the
-data with equity flow to the close moved EQ11 from ITERATE to REJECT —
-its uncrossed t fell from 3.04 to 1.40 — and left every FX row unchanged,
-because the FX files are byte-identical.) The ITERATE set is EQ01, EQ02,
-EQ03, EQ05, EQ06, EQ12, FX01, FX03, FX04 and FX08.
+The significance threshold is `max(3.0, the Bonferroni t at the run's look
+count)` (`tstat_threshold="ledger"`, the default since v1.5.0; §6.6 and
+§24.4). For the committed report that is **4.365**. Up to v1.4.0 it was a
+fixed 3.0 (`"fixed"`, the legacy rule).
 
-Since round 3 the gates read the **uncrossed** IC and its Newey–West t —
+Result on the bundled data: **0 PROMOTE / 11 ITERATE / 13 REJECT**. The
+cost gate fails for all 24, in two different ways: **18 alphas make no
+trade at all** on the last fold — their forecast never exceeds the
+round-trip spread and fee, so their net P&L is exactly 0, and 0 does not
+pass `net P&L > 0` — and **6 trade and lose** (EQ11 −502, FX05 −64, FX08
+−328, FX09 −255, FX10 −22, FX11 −733 USD). None ends above zero. The
+ITERATE set is EQ01, EQ02, EQ03, EQ05, EQ06, EQ12, FX01, FX04, FX08, FX10
+and FX11.
+
+The history of that line is worth keeping straight, because it moved twice
+for two unrelated reasons:
+
+- v1.3.0 dataset, old rules: 0 / 11 / 13.
+- v1.4.0 dataset, old rules: 0 / 10 / 14. Regenerating the data with
+  equity flow to the close moved EQ11 from ITERATE to REJECT (its
+  uncrossed t fell from 3.04 to 1.40) and left every FX row unchanged,
+  because the FX files are byte-identical. Under those rules all 24 alphas
+  *lost* money at 1× costs, up to −300,873 (EQ05), and six cleared the
+  fixed t of 3.0 (EQ02, EQ03, EQ06, EQ12, FX01, FX04).
+- v1.4.0 dataset, v1.5.0 rules: 0 / 11 / 13. Three verdicts moved, all on
+  the pooled-slope t: FX10 and FX11 became ITERATE (gate t 1.55 and 2.22
+  against the ITERATE bar of 1.5; their within-bucket t was 0.38 and
+  1.27), and FX03 became REJECT (1.13, from 1.95). Three alphas now clear
+  the significance threshold (EQ02, EQ03, EQ12); EQ06 misses it at 4.36
+  and FX04 at 4.24, and the threshold was not moved for them. The largest
+  loss at 1× costs is 733 USD.
+
+So "24 of 24 lose money" was a statement about the sign policy. What the
+artefacts show now is narrower and, for most alphas, more direct: the
+predicted move is smaller than the cost of trading it. That is not a
+softer result — a strategy that cannot find a trade worth making has not
+passed anything — but it is a different one, and it says nothing about
+what a passive execution policy would earn, which the research backtester
+does not model.
+
+Since round 3 the gates read the **uncrossed** IC and its t —
 the same IC restricted to rows whose consolidated book was not crossed by
-a stale venue quote (`IC unc` in the master table). On the equity book the
+a stale venue quote (`gate IC` in the master table). On the equity book the
 two are the same number to three decimals (≈0.3 % of rows are crossed); on
 FX, where 29–33 % of cross-sections are crossed, they are different alphas
 entirely. Worked examples, straight from the master table:
 
 - **EQ03 (multi-level OFI) — ITERATE, the platform's signature finding.**
-  Uncrossed IC 0.0190, NW t 5.78, all four folds non-degenerate and
-  sign-consistent, leakage-clean… and net **−148,562** at 1× costs, because
-  423 flips/hour means paying the spread constantly. Statistically real,
+  Gate IC 0.0189, gate t 5.16 — above the 4.365 threshold — all four folds
+  non-degenerate and sign-consistent, leakage-clean… and **no trade** at
+  1× costs: 423 signal flips an hour, none of them forecasting more than
+  the spread. Under the legacy sign policy the same alpha traded every
+  flip and lost 148,562 (the v1.4.0 report). Statistically real,
   economically dead on this data (paper 1). The statistic is weaker than
   the t of 10.57 the compressed v1.3.0 dataset gave, and still clear of
   the selection yardstick of §6.6.
-- **EQ08 (VWAP/mid deviation) — REJECT, instructively.** Only 26 signal
-  flips/hour, so it loses the least money of any equity alpha (−7,362 at
-  1×) — but its uncrossed IC is −0.0506 and its fitted sign contradicts the
-  stated rationale (`hyp = no`). Cheap to trade is not the same as real.
+- **EQ08 (VWAP/mid deviation) — REJECT, instructively.** Its gate IC is
+  −0.0481 with a gate t of −4.57: significant beyond the ledger threshold,
+  in the direction its stated rationale forbids (`hyp = no`). The legacy
+  within-bucket t was −1.53 and hid that; the effect lives between
+  buckets. It flips only 26 times an hour and makes no trade. A strong
+  statistic with the wrong sign is a finding about the hypothesis, not an
+  alpha.
 - **FX09 (vol-regime reversion) — REJECT, and the clearest lesson in the
   report.** Round 2 called it "the best FX statistics in the study" at
   IC 0.113, t 14.3. Conditioning on book state dissolves most of that: its
-  IC is **−0.2100 on crossed rows and −0.0472 on uncrossed ones**, i.e. the
+  IC is **−0.2099 on crossed rows and −0.0471 on uncrossed ones**, i.e. the
   signal was largely measuring the mechanical reversion of a stale LP's
   quote, not a vol regime. With `hyp = no` on top, it is a REJECT twice
   over. A number that only exists on untradeable rows is not a number.
 - **FX01 (microprice on the FX quote book) — ITERATE, but on 0/4 folds.**
-  Pooled IC −0.015 flips to +0.018 uncrossed (t 3.27), which clears the
-  lenient ITERATE gate, yet **no individual fold** is positive
+  Pooled IC −0.015 flips to +0.018 uncrossed (gate t 2.26), which clears
+  the lenient ITERATE gate, yet **no individual fold** is positive
   (`folds+ = 0.00`) — so it can never reach PROMOTE. Compare EQ01, the same
-  formula on the MBO book: uncrossed IC 0.0102, t 2.67, three of four folds
-  positive, and pooled and uncrossed agree because the equity book is
-  almost never crossed. Neither is strong; they fail differently, and
+  formula on the MBO book: gate IC 0.0105, gate t 1.59, three of four
+  folds positive, and pooled and uncrossed agree because the equity book
+  is almost never crossed. Neither is strong; they fail differently, and
   market structure decides how (paper 2).
+- **EQ11 (15-minute horizon) — REJECT, and the case for the reopen rows.**
+  Its valid-only IC is 0.0261; scored on the rows a 15-minute position
+  would actually have held through, 0.0038 (gate t 0.20). It is one of the
+  six alphas that trade under the cost-aware policy — 31 trades on the
+  last fold, −502 USD — and its pooled net over all four folds is −3,174
+  with a bootstrap interval of −5,142 to −1,497.
 
 ### 6.6 Multiple testing: counting your looks
 
@@ -620,30 +726,57 @@ the reason is the dataset regeneration itself. Running the same 24
 pipelines on a new dataset is a new set of looks at a new sample; a ledger
 keyed without the dataset would have de-duplicated them away, and a ledger
 that was simply reset would have forgotten the looks already taken. So the
-looks of the v1.3.0 dataset are kept and the new ones are added. The
-current ledger holds **139 distinct configurations / 1920 looks**:
+looks of the v1.3.0 dataset are kept and the new ones are added. v1.5.0
+did the same thing along a different axis: the method bundle is part of
+the canonical config, so the same 24 pipelines run under the new default
+rules are new looks at the same sample, added beside the v1.4.0 ones
+(ledger `x-version` 3). The current ledger holds **208 distinct
+configurations / 4396 looks**:
 
 - on the v1.3.0 dataset (`203c8f54…`), 70 entries carrying 1,068 of the
   looks: a one-time design scan (216: 24 alphas × 9 horizons), 24
   promotion pipelines at 28 looks each (672), 40 adaptive deployments (10
   alphas × 4 refit policies) and five `ExperimentRunner` runs at 28 each
   (140; §6.8);
-- on the v1.4.0 dataset (`116b7787…`), 69 entries carrying the other 852:
-  the 24 pipelines again (672), five runner experiments (140) and the 40
-  adaptive deployments (40). The design scan was not repeated.
+- on the v1.4.0 dataset (`116b7787…`), 138 entries carrying the other
+  3,328. Under the legacy rules, as recorded at v1.4.0 (852): the 24
+  pipelines at 28 looks (672), five runner experiments (140) and 40
+  adaptive deployments (40). Under the default rules, added by v1.5.0
+  (2,476): the 24 pipelines at **84** looks each (2,016), five runner
+  experiments at 84 (420) and the 40 adaptive deployments again (40). The
+  design scan was not repeated.
+
+A validation costs 84 looks under the default methods where it cost 28
+under the legacy ones, because the default validation computes more — 83
+evaluations at four folds (itemised in
+`iap.validation.validate.looks_per_validation`) plus the day-2 backtest —
+and every one of them is a look.
 
 That translates into a selection yardstick: Bonferroni per-test threshold
-|t| ≥ **4.206**, and an expected **max |t| ≈ 3.888 under the global null**
-(4.071 and 3.735 before the regeneration: looking again raised the bar).
-Meaning: FX08's uncrossed t = 2.19 — or FX11's 1.16 — is *consistent with
-pure selection* over this many trials, and the report says so in print.
-EQ02 and EQ12 (t 7.52), EQ03 (5.78) and FX04 (4.79) clear it; EQ06 (3.68)
-passes the fixed t ≥ 3.0 gate but sits *below* the selection-adjusted
-yardstick, which the master table flags. (`REPORT.md` prints the ledger as
-it stood when the report was rendered — a count of 1740, yardstick 3.86 —
-and the runner and adaptive runs that followed in the same regeneration
-pass brought it to 1920; the lists of alphas above and below the yardstick
-are the same at either count.) Most quant shops track this informally at best;
+|t| ≥ **4.389**, and an expected **max |t| ≈ 4.096 under the global null**
+(4.206 and 3.888 at the v1.4.0 count of 1920, 4.071 and 3.735 before the
+dataset regeneration: looking again raised the bar each time). Up to
+v1.4.0 this yardstick was printed beside a fixed gate of t ≥ 3.0 and read
+by nothing. Since v1.5.0 the Bonferroni figure *is* the PROMOTE
+significance gate (`tstat_threshold="ledger"`; `"fixed"` is the legacy
+rule), and the count it is derived from is pinned so that a rerun
+reproduces its verdict: the ledger total before the run plus the looks the
+run itself adds, declared before the first alpha is evaluated and stored
+on each entry as `gate_looks`. The committed report was judged at **3,936
+looks** (the 1,920 already recorded plus its own 2,016), which gives the
+threshold of **4.365** and a yardstick of 4.07; the runner and adaptive
+runs that followed brought the ledger to 4,396. The threshold is not
+retroactive — later looks tighten later runs and do not re-judge a
+recorded one.
+
+Meaning: FX08's gate t = 3.84 — or FX11's 2.22 — is *consistent with
+pure selection* over this many trials, and the report says so in print:
+17 of the 24 alphas sit below the yardstick. EQ12 (7.20), EQ02 (7.17) and
+EQ03 (5.16) clear the threshold; EQ06 (4.36) and FX04 (4.24) are above the
+yardstick and below the threshold, so they fail the significance gate
+that, at a fixed 3.0, they used to pass; EQ08 (−4.57) and FX09 (−5.75)
+are beyond it with the wrong sign. The lists are the same at 3,936 and at
+4,396 looks. Most quant shops track this informally at best;
 here it is a serialized, deterministic artifact — and the runner's entries
 were deliberately *not* de-duplicated against the pipeline entries for the
 same alpha and horizon: the denominator may only grow.
@@ -651,11 +784,23 @@ same alpha and horizon: the denominator may only grow.
 ### 6.7 Cost reality
 
 The cost model (`configs/execution/execution.json`) charges half-spread + fees
-(mirroring venue configs) + linear impact per trade, and the day-2
+(mirroring venue configs) + impact per trade — square-root impact since
+v1.5.0 (`impact_model="sqrt"`, 100 bps for one full ADV, a convention
+pinned before any result was computed with it: impact is empirically
+concave in size, and a linear rule understates the cost of small orders
+relative to large ones); the legacy rule is linear (`"linear"`,
+`CostModel.with_linear_impact()`). The day-2
 out-of-sample backtest uses day-1-fitted parameters — the exact parameters
-serialized for the production ports. The equal-weight ensembles of the
-non-REJECT alphas finish negative (equity, six alphas: −346,576; FX, four
-alphas: −33,950 net). The report's Sharpe column is
+serialized for the production ports. Under the default cost-aware policy
+18 of the 24 alphas make no trade on day 2 and the six that do all lose
+(EQ06 −179, EQ11 −5,948, FX08 −940, FX09 −782, FX10 −252, FX11 −2,397
+USD). EQ11's row shows what such a loss is made of: gross −313, costs
+5,634. The equal-weight
+ensembles of the non-REJECT alphas (equity, six alphas; FX, five) make no
+trade either: averaging forecasts that are each smaller than the spread
+does not produce one that is larger. Under the legacy sign policy the same
+ensembles traded every flip and finished at −346,576 and −33,950 (the
+v1.4.0 report, FX with four alphas). The report's Sharpe column is
 labeled as an event-time research yardstick, not a production claim. Honesty
 in the artifacts, not just the prose.
 
@@ -666,11 +811,12 @@ The walk-forward story now has a typed artefact. `python -m iap.research run
 dataset version (sha256 over the normalized IAP1 bytes), the feature version
 (the registry hash), the model *definition* hash, the pinned protocol
 configuration (`n_folds 4`, `embargo_ns 60e9`, `cost_multiplier 1.0`,
-`latency_ns 1e9`, `max_decision_age_ns 60e9`, `flatten_at_session_end`),
-three periods and a seed — whose id is the first 16 hex of its own content
+`latency_ns 1e9`, `max_decision_age_ns 60e9`, `flatten_at_session_end`,
+and since v1.5.0 `methods`, the name of the method bundle: `v2` unless
+`--methods legacy_v1` asks for the v1.4.0 rules), three periods and a seed — whose id is the first 16 hex of its own content
 hash: the id *is* the request. It runs `validate_alpha` (the same purged,
 embargoed walk-forward the report runs) plus a holdout backtest, and writes
-an `ExperimentResult` (IC, rank IC, NW t, hit rate, turnover, fold
+an `ExperimentResult` (IC, rank IC, t, hit rate, turnover, fold
 consistency, leakage detail, hypothesis sign, the holdout's gross / cost /
 net bps, drawdown, Sharpe, the verdict, the ledger count at run time, the
 commit, and `created_ts` = the test period's end in event time) under
@@ -687,41 +833,60 @@ before it. On the bundled two-day data that tail falls in the overnight gap
 and holds zero rows; on contiguous data it holds precisely the rows a naive
 split would leak.
 
-`research/experiments/` holds ten committed experiments: the same five
-specifications run on each dataset, under different ids because the
-dataset version is part of the spec. `python -m iap.research list` prints
-them with a `dataset` column:
+`research/experiments/` holds fifteen committed experiments: the same five
+specifications run three times, under different ids because the dataset
+version and the method bundle are both part of the spec. `python -m
+iap.research list` prints them with a `dataset` column:
 
 ```
 experiment        alpha   horizon  dataset           IC      NW t     net bps  verdict
+00ebeb2b537b5155  EQ03    5s       116b7787   +0.026570    +4.213     +0.0000  ITERATE
 20f1b9093e7d0d04  EQ06    10s      116b7787   +0.034528    +3.598  -1148.3084  ITERATE
 217fa0cb1d89a9c8  EQ03    5s       203c8f54   +0.036305   +10.449  -1172.9449  ITERATE
 4a2900e4a6705542  EQ06    1s       203c8f54   +0.019676    +3.509   -531.1169  ITERATE
 695e7b1e2bd2253e  EQ01    1s       116b7787   -0.001674    +0.771   -531.3535  REJECT
+6e4a3431a3acf8a5  EQ01    1s       116b7787   -0.001917    -0.221     +0.0000  REJECT
+838e0c2d75de4db6  EQ03    1s       116b7787   +0.013243    +2.414     +0.0000  ITERATE
 852863faa44b7b07  EQ06    1s       116b7787   +0.004702    +0.918  -1148.2478  REJECT
 876b08e20c46e6fd  EQ03    1s       116b7787   +0.013610    +3.488  -2174.7262  ITERATE
+9d895cf7148c4a8d  EQ06    1s       116b7787   +0.003345    +0.690     +0.0000  REJECT
 c73bb6294d226163  EQ01    1s       203c8f54   +0.027590    +3.044   -301.4984  ITERATE
 d0dd1ab0711d33a1  EQ06    10s      203c8f54   +0.050475    +6.755   -531.1169  ITERATE
 d7b554d0a3fa3b26  EQ03    1s       203c8f54   +0.016471    +4.250  -1173.0925  ITERATE
+d87e34a9c67c1891  EQ06    10s      116b7787   +0.034331    +3.711     -1.0134  ITERATE
 f0f6c49b553f6b59  EQ03    5s       116b7787   +0.027114    +4.840  -2174.7262  ITERATE
 ```
 
-The five `203c8f54` rows are the v1.3.0 dataset and are kept as history;
-the five `116b7787` rows are the current dataset and carry an
-`eligibility.json` (§24.4). On the current dataset three are ITERATE
-(EQ03 at 1 s and 5 s, EQ06 at 10 s) and two are REJECT (EQ01 at 1 s, with
-a slightly negative IC and two of four folds positive, and EQ06 at 1 s);
-on the old one all five were ITERATE. All ten are leakage-clean and every
-holdout is net-negative at 1× costs — on the current dataset −531 bps of
-the capital line for EQ01, −2175 bps for EQ03 and −1148 bps for EQ06.
+The five `203c8f54` rows are the v1.3.0 dataset and are kept as history.
+The ten `116b7787` rows are the current dataset, twice: five recorded at
+v1.4.0 under the rules of the time (they name no method bundle and are
+history, not gate evidence), and five recorded at v1.5.0 under `v2` —
+`00ebeb2b…`, `6e4a3431…`, `838e0c2d…`, `9d895cf7…` and `d87e34a9…`, the
+rows whose net is zero or nearly so. The table does not print the bundle;
+each experiment's `spec.json` and `eligibility.json` do (§24.4). For a `v2`
+row the `IC` and `NW t` columns hold the gate IC and the pooled-slope t.
+
+The verdicts did not move between the two bundles: EQ03 at 1 s and 5 s and
+EQ06 at 10 s are ITERATE, EQ01 at 1 s (a slightly negative IC, two of four
+folds positive) and EQ06 at 1 s are REJECT; on the old dataset all five
+were ITERATE. What moved is the t and the holdout. The pooled-slope t is
+lower than the within-bucket t for EQ03 (1 s: 3.49 → 2.41; 5 s: 4.84 →
+4.21) and slightly higher for EQ06 at 10 s (3.60 → 3.71); none reaches the
+threshold its run was judged at (4.37 to 4.39, at look counts of 4,020 to
+4,356).
+And where every legacy holdout lost between 531 and 2,175 bps of the
+capital line by trading every flip, four of the five `v2` holdouts make no
+trade and the fifth, EQ06 at 10 s, loses 1.01 bps. All fifteen are
+leakage-clean, and the five `v2` ones also pass the recompute probe (three
+anchors each). No holdout ends above zero.
 
 These numbers are not the report's, and are not meant to be. The runner
 runs its walk-forward on the *train* period only (session 1) and reports
 session 2 separately as a declared holdout, while `run_all.py` walks
 forward over both sessions and declares no holdout — a weaker protocol,
 disclosed in `REPORT.md`. That is why EQ01 at 1 s is ITERATE in the report
-(uncrossed IC 0.0102 over two sessions) and REJECT in the runner (IC
-−0.0017 on session 1 alone): a result that thin does not survive halving
+(gate IC 0.0105 over two sessions) and REJECT in the runner (gate IC
+−0.0019 on session 1 alone): a result that thin does not survive halving
 the sample. `test_eq03_report_reproduces_through_the_runner` pins the
 relationship that does hold — the runner equals `validate_alpha` called
 directly on the runner's own window — and asserts the divergence from the
@@ -843,7 +1008,8 @@ the conservative cost model — not "was the sign right"). The calibration is
 **Platt scaling**, a two-parameter sigmoid, because the calibration segment
 holds only 255 positives — below the pinned minimum of 500 for the isotonic
 path.
-Results: test AUC 0.655, Brier 0.0568, test base rate of profitable signals
+Results: test AUC 0.670, Brier 0.0567 (0.655 and 0.0568 at v1.4.0, when
+missing meta-features were imputed), test base rate of profitable signals
 0.062 — and at both τ = 0.5 and the calibration-chosen best τ = 0.300 the
 gate keeps **zero** of the 4,100 test signals. The report flags this
 `gate_degenerate: true` and refuses to dress it up: a gate that never fires
@@ -856,8 +1022,13 @@ matter: thresholds must be chosen on a calibration segment in probability
 space and evaluated economically — and a gate that took no trades must be
 reported as untested, not as vindicated. (Since v1.3.0 the reported
 `auc_test` is `null` rather than a fabricated 0.5 when a test segment holds
-a single class, and `impute_nan=False` is an opt-in alternative to imputing
-missing meta-features to zero.)
+a single class. And since v1.5.0 a missing meta-feature stays missing:
+`impute_nan=False` is the default — it was an opt-in in v1.3.0 and v1.4.0
+— because 0 is a legitimate value of several meta-features (a balanced
+queue, a flat alpha), so imputing zero makes "missing" and "balanced"
+indistinguishable to the tree model, which handles NaN natively;
+`impute_nan=True` is the legacy rule. Here 275 of the 131,880 meta-feature values are missing, and
+leaving them so moved the AUC by 0.015 and the gate not at all.)
 
 ### 7.4 Manifests: every fit is an audited experiment
 
@@ -865,7 +1036,7 @@ Every model fit lives under `research/models/run_NNNN_<name>/` with a
 `manifest.json` recording experiment id, git commit, **data version** (hash
 of the QC report), **feature version** (registry hash), model version,
 hyperparameters, train/test windows, and hardware — plus metrics and the
-pickled model. `ledger.json` holds the monotone model-run counter (40 fits
+pickled model. `ledger.json` holds the monotone model-run counter (47 fits
 so far) — a different counter from the alpha multiple-testing ledger of
 §6.6, and neither is a substitute for the other. Reproducibility is not a README
 promise; it is a directory you can diff.
@@ -1140,9 +1311,9 @@ match**.
   the portfolio golden is checked against an SLSQP optimum. Golden files are
   regenerated only deliberately, with a MIGRATIONS.md entry.
 - **One command proves parity**: `tests/harness/run_all.sh` runs all four
-  suites and prints the table (the v1.4.0 counts from CI, 2026-10-03: python 1573,
-  cpp 289, rust 323, java 510 tests passed; golden groups 166/68/64/104; all
-  PASS, plus `integration` (17) and `replay` (6) rows for the repo-level
+  suites and prints the table (the v1.5.0 counts from CI, 2026-10-04: python 1672,
+  cpp 289, rust 330, java 517 tests passed; golden groups 173/68/66/106; all
+  PASS, plus `integration` (35) and `replay` (6) rows for the repo-level
   pytest suites, a `deployment` row — 25 structural checks passed in CI,
   where promtool and kubeconform are installed — and a `numbers` row that re-derives every headline
   figure in the docs from its artefact). The Java golden group runs all
@@ -1177,21 +1348,32 @@ repo can actually make.
 stress rescores every alpha with signals delayed by +1 and +5 events (last
 fold; `+0ev / +1ev / +5ev IC` in the report). The fast equity flow alphas
 (EQ02/EQ03/EQ12) shed 58–73 % of their IC after a single event (EQ02:
-0.0217 → 0.0092; EQ03: 0.0148 → 0.0040; EQ12: 0.0229 → 0.0092), and
+0.0218 → 0.0091; EQ03: 0.0157 → 0.0042; EQ12: 0.0231 → 0.0090), and
 EQ01's microprice signal changes sign after one (0.0062 → −0.0049). What
 is left after that is small and not monotone — the +5 column reads 0.0097,
-0.0099, 0.0105 and 0.0023 for the same four — so the honest summary is
+0.0099, 0.0105 and 0.0022 for the same four — so the honest summary is
 "most of the IC is gone after one event", not a decay curve. One equity
 event is a bigger unit than it used to be: emitted rows are a mean 3.1–3.3 s
 apart since v1.4.0 (about 1.3 s inside the old active window, where the
 same alphas lost 15–21 % per event), so "+1 event" is now more than half
 of a 5 s horizon. EQ06, at a 10 s horizon, is not ordered at all (0.0194 →
-0.0141 → 0.0334), and EQ11 at 15 minutes barely moves (0.0124 → 0.0097 →
-0.0120) on an IC that is not significant to begin with. The FX regime
-family retains ~78-83% at one event (~22 s of FX tape) but only ~7-41% at
-five (FX09: 0.1617 → 0.1342 → 0.0481); those rows did not change. Alpha
+0.0146 → 0.0330), and EQ11 at 15 minutes barely moves (0.0166 → 0.0158 →
+0.0198) on an IC that is not significant to begin with. The FX regime
+family retains ~77-83% at one event (~22 s of FX tape) but only ~8-41% at
+five (FX09: 0.1617 → 0.1337 → 0.0472). These are the v1.5.0 figures; they
+differ from the v1.4.0 ones in the third or fourth decimal, because the
+ICs now score the reopen rows of §5 — except EQ11, whose +0 IC moved from
+0.0124 to 0.0166 for the reason §6.5 gives. Alpha
 decay against *events* is the economically meaningful axis — provided the
 size of an event is stated next to it.
+
+(The same report carries a latency stress of the *P&L*, in clock time and
+on the row grid. Since v1.5.0 the row grid carries the whole base backtest
+configuration into every stressed run — `stress_version=2`; the legacy
+grid, `stress_version=1`, rebuilt the configuration from four fields and
+silently dropped the rest, so a stressed run was not the base run plus a
+delay. Under the cost-aware policy most of those P&L cells are 0: an alpha
+that does not trade on time does not trade late either.)
 
 **Measurement 2 — the speed of the stack.** The measured C++ hot path
 (decode + book + features + alpha = 184.1 + 26.4 + 514.1 + 33.6 ns, the
@@ -1267,10 +1449,28 @@ degrades gracefully. Both are golden-tested to 1e-10 from a
 SplitMix64-seeded recipe (`tests/golden/expected_adaptive.json`), so the
 Java monitor provably computes the same number as the Python reference.
 Alongside distribution drift, a **rolling realized-vs-research IC**
-z-score (`z = (mean live bucket ICs − ic_mean) / (ic_std / √n)`) watches
-the thing you actually care about — is the alpha still predicting? — with
-maturity handled correctly: a row only enters the rolling IC once its
-label horizon has fully elapsed.
+z-score watches the thing you actually care about — is the alpha still
+predicting? — with maturity handled correctly: a row only enters the
+rolling IC once its label horizon has fully elapsed. Since v1.5.0 the z is
+a two-sample HAC statistic (`adaptive.ic_z_method = "hac"`):
+
+```
+z = (mean_w(live bucket ICs) − ic_mean) / √(var_live + var_base)
+```
+
+with `mean_w` the pair-count-weighted mean of the live bucket ICs,
+`var_live` its Newey–West variance and `var_base` the variance of the
+baseline mean. The legacy z (`"legacy"`, the default up to v1.4.0) was
+`(mean live bucket ICs − ic_mean) / (ic_std / √n)`, which assumes three
+things that do not hold: that the baseline mean is a known constant
+rather than an estimate, that bucket ICs of overlapping labels are
+independent, and that a bucket of 40 pairs is as informative as one of
+400. Each assumption makes the z larger than the evidence, and a z that
+is too large is a refit trigger that fires on the baseline's own sampling
+error. The rolling IC the lifecycle reads is the same pair-weighted mean,
+and the Java live gauge (`RollingIc`) computes it that way too; the z
+itself is computed by the Python reference only, because no port
+evaluates a refit trigger.
 
 ### 14.3 Refit policies: static, scheduled, drift-triggered
 
@@ -1292,18 +1492,35 @@ label horizon has fully elapsed.
 
 In the study (`research/adaptive_reports/ADAPTIVE_REPORT.md`), across 10
 alphas the policies performed 10 (static) / 10 (weekly) / 20 (daily) /
-**122 (drift-triggered)** total refits — and none of that activity changed the
-economics: every alpha stays net-negative after costs (0 of 40 deployments
-positive), and the P&L spread between policies is one to two orders of
-magnitude smaller than the cost drag. Refitting neither rescues nor ruins
-any alpha here. On the regenerated dataset the three equity alphas (EQ01,
-EQ03, EQ06) log no drift event and the drift-triggered policy never refits
-them beyond the initial fit; 119 of the 122 are FX fits. One detail for anyone
+**88 (drift-triggered)** total refits — and none of that activity made
+anything profitable: no deployment ends above zero after costs (0 of 40).
+Under the default cost-aware backtest 19 of the 40 make no trade at all
+(EQ01, EQ03 and FX01 under every policy, FX06 under every policy, FX05
+under three of four) and 21 trade and lose. The policies are not
+interchangeable, though: a refit changes how often an alpha's forecast
+clears its costs, and so how much it trades. On 4 of the 10 alphas every
+policy ends at the same net P&L; the widest gap between two policies on
+one alpha is 2,111 USD (FX11: −19 static on 35 trades, −2,130
+drift-triggered on 5,828), and it is a difference in costs paid, not in
+edge found. Refitting rescues no alpha here. The three equity alphas
+(EQ01, EQ03, EQ06) log no drift event and the drift-triggered policy
+never refits them beyond the initial fit; 85 of the 88 are FX fits. Of
+the 78 refits after the initial ones, 65 name a PSI breach and 14 the
+rolling-IC z (a refit can name both).
+
+The v1.4.0 report read 122 drift-triggered refits on the same data, under
+the legacy z and the consecutive-breach rule; the HAC z fires less often
+(FX05: 34 refits then, 20 now; FX08: 20 then, 6 now). Its P&L column is
+not comparable with today's for a second reason besides the backtest
+policy: the adaptive runner summed quote-currency FX P&L as if it were
+USD until v1.5.0 fixed it, so the v1.4.0 policy totals (−8.69 million)
+were wrong in scale. One older detail for anyone
 diffing against v1.3.0: the FX rows moved by about one trade per
-deployment although the FX data is byte-identical. That is not a data
+deployment between v1.3.0 and v1.4.0 although the FX data is
+byte-identical. That was not a data
 effect — the adaptive report committed at v1.3.0 had last been generated
 before the 2026-09-20 backtester corrections, and re-running the v1.3.0
-code on the v1.3.0 dataset reproduces the new FX numbers.
+code on the v1.3.0 dataset reproduced the v1.4.0 FX numbers.
 
 ### 14.4 The lifecycle state machine: hysteresis against flapping
 
@@ -1318,10 +1535,23 @@ around **hysteresis**:
 
 - **ACTIVE** → WATCH on a rolling IC below 0.0 (the entering breach counts
   as breach #1). Still allocated — WATCH is probation, not punishment.
-- **WATCH** → RETIRED only after **6 consecutive** breaches; back to
-  ACTIVE only after **3 consecutive** readings at or above 0.005. A
-  reading in the neutral zone `[0.0, 0.005)` resets *both* counters —
-  ambiguous evidence restarts the clock in both directions.
+- **WATCH** → RETIRED on persistent breach; back to
+  ACTIVE only after **3 consecutive** readings at or above 0.005. Since
+  v1.5.0 "persistent" is a **CUSUM** (`breach_rule="cusum"`): each
+  reading adds `new_fraction × (0.0 − rolling_ic − k)` to a running sum
+  that is floored at zero, with slack `k = 0.0025`, and a WATCH reading
+  that is itself a breach and leaves the sum at or above `h = 0.01`
+  retires the alpha. `new_fraction` is the share of the reading's window
+  that is new — 0.125 here, a 2-hour window advancing by a 15-minute
+  block. That weighting is the reason for the change. The legacy rule
+  (`"consecutive"`, the default up to v1.4.0) retired after **6
+  consecutive** breaches, with a neutral-zone reading in `[0.0, 0.005)`
+  resetting both counters; but six successive readings of a window that
+  moves by an eighth share most of their rows, so six breaches can be one
+  bad stretch counted six times. The CUSUM asks for a shortfall that adds
+  up, in new information, to the IC an alpha needed to be promoted (0.01)
+  — both parameters were fixed before any result was computed with them.
+  It never retires on the reading that entered WATCH.
 - **RETIRED** — allocation verifiably halted (the adaptive backtest forces
   positions flat), but *shadow scoring continues*, so the pinned
   re-activation path stays reachable: 3 consecutive recoveries earn WATCH
@@ -1330,7 +1560,8 @@ around **hysteresis**:
 A null rolling IC (too little matured data) causes no transition at all.
 Every transition appends a JSON line to `research/lifecycle_log.jsonl`
 with the alpha, policy, timestamp, states, reason and the IC that caused
-it — 260 in the committed study — and the asymmetry of the design (fast
+it — 300 in the committed study (260 under the legacy rule at v1.4.0) —
+and the asymmetry of the design (fast
 to suspicion, slow to trust) is the point. Four alphas hit RETIRED under
 at least one policy (FX01, FX05, FX06, FX11); FX01 finishes RETIRED under
 all four, which is the system doing its job: an alpha whose pooled
@@ -1386,9 +1617,12 @@ each) cannot rank refit policies, and the report leads with that instead
 of burying it:
 SCHEDULED(weekly) crosses no week boundary, so it is *identical to
 static by construction*; daily fires exactly once; the generator has no
-real regime shifts, so most drift-triggered refits come from the noisy
-rolling-IC z rather than genuine distribution breaks; and every P&L
-difference between policies is within noise. What the study *does*
+real regime shifts, so a drift trigger that fires here is reacting to
+sampling noise or to a monitor that drifts by construction — 65 of the 78
+drift-triggered refits name a PSI breach, and 39 of those 78 are FX10's
+calendar feature (§14.6); and the P&L differences between policies are
+differences in how much each one trades, on one synthetic day of
+out-of-warmup data, not evidence about any of them. What the study *does*
 establish is the part you can establish at this sample size: the
 machinery is deterministic and leak-free (refits train only on purged,
 embargoed history — asserted at runtime and shift-tested), triggers fire
@@ -1568,25 +1802,43 @@ PYTHONPATH=src python3 -m iap.lifecycle status                # the registry tab
 ```
 
 The `status` table reads, for all 24 alphas, `CANDIDATE` — and in the
-"failed gates" column, for every one of them, `net_pnl_after_costs`. That is
+"failed gates" column, for every one of them, `net_pnl_after_costs` and
+`capacity`. That is
 the promotion report's finding restated by a state machine that reads the
 same numbers through a different gate table, which is the reason for
 pinning both: two independent readings of one artefact agree.
 `test_bootstrap_failed_gates_agree_with_report_verdicts` proves it
 mechanically (it recomputes the failed-gate set from each report's raw
 numbers and the thresholds). Read the table closely and the research story
-of §6 reappears: EQ02, EQ03, EQ12 and FX04 fail *only* the cost gate
-(statistics real, economics not); EQ06 fails cost and `stability`; EQ11
-fails cost and `statistical_significance`; EQ01 fails those two and
-`stability`, and EQ05 `oos_ic` on top of all three;
-EQ04 and EQ07–EQ10 fail the IC and significance gates and, except EQ10,
-`hypothesis_sign`; the FX regime family fails `stability` — the
+of §6 reappears: EQ02, EQ03 and EQ12 fail *only* the two economic gates
+(statistics real, economics not); FX04 and FX06 add
+`statistical_significance`, and EQ01, EQ06 and three of the FX regime
+family (FX08, FX10, FX11) add that and `stability` — the
 Pearson/rank-IC gap, the one pair of numbers in a result that measures the
-*shape* of the signal–label relation rather than its strength. On the
-v1.3.0 dataset eight alphas failed only the cost gate (the four above plus
-EQ01, EQ05, EQ06 and EQ11); the regeneration is why that list halved. The
-transition log was rebuilt with `bootstrap --force` for the new dataset and
-the previous one is archived under `research/archive/`.
+*shape* of the signal–label relation rather than its strength; EQ05 and
+EQ11 fail `oos_ic` on top of all of those, EQ10 `oos_ic` and
+significance; EQ04 and EQ07–EQ09 fail the IC, significance and
+fold-consistency gates and `hypothesis_sign`. Over the 24: cost 24,
+capacity 24, significance 21, stability 14, IC 12, fold consistency 10,
+hypothesis sign 9.
+
+Two of those counts are the v1.5.0 defaults at work. The significance gate
+is read against the ledger threshold (4.365 for this report) instead of a
+fixed 3.0, which is why EQ06 at 4.36 and FX04 at 4.24 now fail it and 21
+alphas do where 18 did. And `capacity` (at least 1,000,000 USD) fails for
+every alpha because the capacity is now the edge-breakeven size — the
+size at which the realised edge per round trip equals its cost — and an
+alpha that makes no trade, or loses before costs, has a capacity of 0;
+the three that have one at all read 38,248 (EQ11), 1,561 (FX08) and
+61,135 USD (FX10). Under the legacy participation proxy the gate passed
+for all 24, edge or no edge. The history of the "cost only" list: on the
+v1.3.0 dataset eight alphas failed only the cost gate (EQ02, EQ03, EQ12,
+FX04, EQ01, EQ05, EQ06 and EQ11); on the v1.4.0 dataset under the old
+rules four did (EQ02, EQ03, EQ12, FX04); under the default rules three
+fail only cost and capacity. The
+transition log was rebuilt with `bootstrap --force` for the new rules and
+the previous one is archived under `research/archive/`
+(`lifecycle_transitions.dataset-116b7787.methods-legacy_v1.jsonl`).
 
 Why is FX01 ITERATE with a negative pooled IC? Because the gate reads the
 **uncrossed** IC (the bootstrap maps `ic ← gate_ic`, exactly what the
@@ -1609,18 +1861,30 @@ to "has this idea been ledgered?".
 
 ### 17.4 One alpha's life: the LC01 golden
 
-`tests/golden/expected_lifecycle.json` scripts three lives, compared
-exactly, step by step, in Python, Java and Rust. LC01 is the whole ladder:
+`tests/golden/expected_lifecycle.json` (`x-version` 2 since v1.5.0) scripts
+four lives under the default policy and one under the legacy policy,
+compared exactly, step by step, in Python, Java and Rust. LC01 is the
+whole ladder:
 RESEARCH → CANDIDATE on a ledger entry and a clean leakage test; →
-VALIDATING on the nine research gates; → PAPER on a reproducible replay and
+VALIDATING on the nine research gates (a t of 4.0 against a ledger
+threshold of 3.5); → PAPER on a reproducible replay and
 parity; → ACTIVE on five paper sessions with a tracking IC; then a hold, a
 null IC (nothing moves), an uninformative IC (nothing moves), a breach →
-WATCH, a second breach, a neutral-zone reading that resets both counters,
-three recoveries → ACTIVE, another breach → WATCH, six consecutive breaches
-→ RETIRED, a SYSTEM advance that records `TERMINAL` and moves nothing, and
+WATCH, where the CUSUM starts accumulating, a second breach, a
+neutral-zone reading that drains it, three recoveries → ACTIVE, a relapse
+→ WATCH, and on the fifth breach since the relapse the CUSUM reaches its
+threshold → RETIRED (five readings of −0.02, each adding 0.125 × 0.0175);
+a SYSTEM advance that records `TERMINAL` and moves nothing, and
 a HUMAN reset → RESEARCH. LC02 is the leaking re-run demoted to RESEARCH at
 once; LC03 the three paper failures demoted to CANDIDATE and a HUMAN
-retire. Everything a port could get subtly wrong — which counter resets
+retire. LC04 is what the CUSUM rule changes: eight breaches inside the
+slack that never retire (the consecutive rule would have at the sixth), a
+deep breach in a disjoint window that does, a breach deep enough to cross
+the threshold at once that only enters WATCH, and a reading above the gate
+that does not retire whatever the sum. LG01, under `legacy`, is the LC01
+script with the rules up to v1.4.0 — a fixed significance threshold, six
+consecutive breaches → RETIRED. Everything a port could get subtly wrong
+— which counter resets
 when, whether entering a breach counts, whether RETIRED can be left by the
 system — is a pinned field of a pinned step.
 
@@ -1661,7 +1925,7 @@ reproduces them with string concatenation and one hash (pinned:
 digest is sha256 over every canonical line + newline in emission order;
 same seed ⇒ same digest; one changed field or one swapped line changes it.
 Known answers are pinned for one trace, the same trace twice, and the empty
-stream; the MVP golden pins a whole session's digest (`f51890da…`, 800
+stream; the MVP golden pins a whole session's digest (`e534ac1f…`, 800
 traces).
 
 ### 18.3 Four languages, one line
@@ -1744,7 +2008,7 @@ index that lied about what its sources contain would be worse than none.
 
 ```bash
 cd python && PYTHONPATH=src python3 -m iap.mvp run
-# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=235 children=348 fills=169 pnl=-81.531396 USD digest=f51890da0c3c66cd...
+# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=235 children=348 fills=169 pnl=-81.531396 USD digest=e534ac1f06c50537...
 ```
 
 Seven seconds later `data/mvp/58a10f2194a3c81c/` holds the captured stream,
@@ -1766,6 +2030,17 @@ did not change — but everything behind it did: the MVP feed comes from the
 same generator, so the v1.4.0 flow calibration (§2.3) changed the stream,
 the fitted parameters changed with the dataset, and the golden was
 regenerated.
+
+v1.5.0 regenerated it once more and changed nothing a trader would see.
+The loop does not use the research backtester, so the new default methods
+do not touch it: the events, decisions, parents, fills and P&L are
+identical to v1.4.0. What moved is the digest (`f51890da…` → `e534ac1f…`)
+and the `config_version` it covers (`f293e7e7…` → `bf8cc608…`), because
+`config_version` hashes `configs/execution/execution.json`, which now
+names its impact model, and `alpha_params.json`, whose header names the
+regeneration commit. A digest that changes when a hashed configuration
+document changes, with every count and every dollar the same, is the
+digest doing its job.
 
 ### 20.2 The numbers, stated as they are
 
@@ -1799,12 +2074,15 @@ The golden session reports realized ICs far from the research ICs:
 
 | alpha | realized IC at 1 s | cost-adjusted | shift-by-one | n | fitted horizon: realized IC | research IC | gap |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| EQ01 | +0.217 | −0.024 | +0.149 | 790 | 1 s: +0.217 | 0.010 | 0.207 |
+| EQ01 | +0.217 | −0.024 | +0.149 | 790 | 1 s: +0.217 | 0.011 | 0.206 |
 | EQ03 | +0.110 | −0.029 | +0.116 | 707 | 5 s: +0.147 | 0.019 | 0.128 |
-| EQ06 | −0.079 | +0.079 | −0.047 | 354 | 10 s: −0.130 | 0.027 | 0.157 |
+| EQ06 | −0.079 | +0.079 | −0.047 | 354 | 10 s: −0.130 | 0.028 | 0.158 |
 | ensemble | +0.104 | −0.003 | +0.111 | 790 | — | — | — |
 
-EQ01's realized IC is twenty times its research IC; EQ06's has the wrong
+(The research IC is the gate IC of the v1.5.0 report — 0.0105, 0.0189 and
+0.0277 — which is why the last two columns differ from the v1.4.0 table in
+the third decimal; the realized columns are unchanged.) EQ01's realized IC
+is twenty times its research IC; EQ06's has the wrong
 sign. The pitfalls of §27 say what to do with numbers like that. The audit
 was first done on 2026-09-20, on the v1.3.0 stream, when the loop reported
 0.285 / 0.338 / −0.102 against research ICs of 0.027 / 0.030 / 0.043
@@ -1864,7 +2142,7 @@ golden, and one of them now reads differently.
    is smaller than the spread; that is the −81.53 USD.
 6. **Let the lifecycle see it.** `paper_evidence.json` carries the realized
    IC at the fitted horizon, so the `paper_ic_tracking` gate (max gap 0.01)
-   fails all three alphas on this data (gaps 0.207 / 0.128 / 0.157; on the
+   fails all three alphas on this data (gaps 0.206 / 0.128 / 0.158; on the
    v1.3.0 stream it failed EQ01 and EQ03) — correctly: paper behaviour
    that differs this much from research is a finding, not a promotion.
 
@@ -2225,7 +2503,8 @@ planted-signal power study (`python -m iap.research power`,
 
 ### 23.1 What is planted
 
-The generator gained an opt-in `planted` block. It is off by default, adds
+The generator gained an opt-in `planted` block (this one stays opt-in: it
+is a test fixture, not a research method). It is off by default, adds
 no random draw when off, and the pinned dataset was regenerated and hashed
 before and after: byte-identical. Two effects:
 
@@ -2248,44 +2527,56 @@ generator seeds through the real feature pipeline and `validate_alpha`.
 
 From the committed report (rates are over the three seeds of a cell):
 
-| effect | scenario | level | mean gate IC | mean t (within-bucket) | significant | verdict ITERATE or better | PROMOTE |
-|---|---|---:|---:|---:|---:|---:|---:|
-| order flow (EQ04) | stable | 0 | −0.0050 | −0.46 | 0.00 | 0.00 | 0.00 |
-| order flow (EQ04) | stable | 0.5 | +0.0041 | +0.29 | 0.00 | 0.00 | 0.00 |
-| order flow (EQ04) | stable | 1 | +0.0313 | +2.90 | 0.33 | 1.00 | 0.00 |
-| order flow (EQ04) | stable | 2 | +0.0813 | +6.35 | 1.00 | 1.00 | 0.00 |
-| lead-lag (EQ10) | stable | 0 | −0.0018 | −0.40 | 0.00 | 0.00 | 0.00 |
-| lead-lag (EQ10) | stable | 1 | +0.0111 | +0.64 | 0.00 | 0.00 | 0.00 |
-| lead-lag (EQ10) | stable | 2 | +0.0130 | +0.88 | 0.00 | 0.00 | 0.00 |
-| both | break | 0.5 – 2 | −0.036 to −0.0001 | −2.36 to +0.43 | 0.00 | 0.00 | 0.00 |
+| effect | scenario | level | mean gate IC | mean gate t (pooled slope) | significant | verdict ITERATE or better | PROMOTE | mean trades at 1× |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| order flow (EQ04) | stable | 0 | −0.0054 | −0.51 | 0.00 | 0.00 | 0.00 | 0 |
+| order flow (EQ04) | stable | 0.5 | +0.0032 | +0.22 | 0.00 | 0.00 | 0.00 | 0 |
+| order flow (EQ04) | stable | 1 | +0.0327 | +2.93 | 0.33 | 1.00 | 0.00 | 0 |
+| order flow (EQ04) | stable | 2 | +0.0823 | +6.20 | 1.00 | 1.00 | 0.00 | 14 |
+| lead-lag (EQ10) | stable | 0 | −0.0018 | −0.23 | 0.00 | 0.00 | 0.00 | 0 |
+| lead-lag (EQ10) | stable | 0.5 | +0.0047 | +0.68 | 0.00 | 0.33 | 0.00 | 0 |
+| lead-lag (EQ10) | stable | 1 | +0.0117 | +1.23 | 0.00 | 0.33 | 0.00 | 0 |
+| lead-lag (EQ10) | stable | 2 | +0.0137 | +1.75 | 0.00 | 0.67 | 0.00 | 0 |
+| both | break | 0.5 – 2 | −0.036 to −0.0001 | −2.28 to +0.12 | 0.00 | 0.00 | 0.00 | 0 |
 
-The study was re-run for v1.4.0 because its generator configuration now
-uses the flow calibration of §2.3 (`research/power/generator_planted.json`,
+The study has been run three times. It was re-run for v1.4.0 because its
+generator configuration then took the flow calibration of §2.3
+(`research/power/generator_planted.json`,
 `calibration: "session"`, the same `slots_per_stream`): the planted
-sessions have flow to the close, and the table moved with them. Read it
-row by row.
+sessions have flow to the close, and the table moved with them. It was
+re-run for v1.5.0 under the default methods (report version 2), on the
+same planted sessions: the t in the table is now the pooled-slope t the
+gate reads, the ICs score the reopen rows, and the backtest behind the
+PROMOTE column is the cost-aware one. Read it row by row.
 
 - **The chain has power, for one effect, at a large enough size.** At
   twice the reference size the order-flow effect is flagged significant in
   three seeds of three. At the reference size it is flagged in one of
   three — all three come out ITERATE, but two have a t below 3. At half
-  size it is not detected at all, not even as ITERATE.
+  size it is not detected at all, not even as ITERATE. The new methods
+  changed none of these rates.
 - **That is less power than the same study showed on the compressed
   flow.** On the v1.3.0 generator the reference size was flagged in three
-  of three and half size in one of three. The same planted strength now
-  produces about half the IC (+0.0313 against +0.0726 at the reference
-  size, +0.0813 against +0.1579 at twice it). The two configurations
+  of three and half size in one of three. The same planted strength
+  produced about half the IC after the recalibration (+0.0313 against
+  +0.0726 at the reference size, +0.0813 against +0.1579 at twice it, both
+  runs under the rules of the time; the v1.5.0 run reads +0.0327 and
+  +0.0823). The two configurations
   differ only in the flow calibration — the same expected number
   of slots spread over 2.5 times as much clock time; the study does not
   isolate which consequence of that (sparser rows, staler labels, fewer
   executions per kernel window) costs the power.
-- **For the other effect it has none.** The lead-lag effect is flagged in
-  no seed at any size, by any of the three statistics, and never reaches
-  ITERATE. The mean IC rises with the planted size (0.0047, 0.0111,
-  0.0130) and so does fold consistency, so the effect is in the data; the
-  chain does not find it. A real effect of that size would be reported as
-  "not found". (On the v1.3.0 generator twice the reference size was
-  flagged in one seed of three.)
+- **For the other effect it has almost none.** The lead-lag effect is
+  flagged significant in no seed at any size, by any of the three
+  statistics. Under the pooled-slope t it now reaches ITERATE in one, one
+  and two seeds of three at half, one and two times the reference size —
+  ITERATE needs a t of 1.5, and the mean pooled t at twice the size is
+  1.75 where the within-bucket t was 0.87. In the v1.4.0 run it never
+  reached ITERATE. The mean IC rises with the planted size (0.0047,
+  0.0117, 0.0137) and so does fold consistency, so the effect is in the
+  data; the chain sees a hint of it and does not establish it. A real
+  effect of that size would be reported as "not found". (On the v1.3.0
+  generator twice the reference size was flagged in one seed of three.)
 - **The null rows are clean, for what three seeds are worth.** With
   nothing planted no seed is flagged and none comes out ITERATE. On the
   v1.3.0 generator one lead-lag seed of three did — a false "evidence".
@@ -2296,8 +2587,12 @@ row by row.
   0.50, against 0.75 to 1.00 in the stable cells at the reference size and
   above.
 - **Nothing is promoted, at any size.** Not even the planted effect with
-  a t of 6.35. Zero folds survive 1× costs in every cell, and no bootstrap
-  interval for net P&L lies above zero.
+  a t of 6.20. Zero folds survive 1× costs in every cell, and no bootstrap
+  interval for net P&L lies above zero. The last column says how: at the
+  reference size the cost-aware backtest does not trade the planted
+  effect at all — the forecast never exceeds the round-trip cost — and at
+  twice that size it trades 14 times on the last fold, on average, and
+  loses.
 
 That last row is the one that changes how to read the headline. PROMOTE
 requires positive net P&L after costs under the research execution model,
@@ -2305,26 +2600,42 @@ and in this generator's cost structure even a large, real, stable, planted
 effect does not clear it. So "0 PROMOTE on the bundled data" is not
 evidence that the chain is a strict judge of alpha. It is at least partly
 a statement about the generator's spreads relative to the size of any
-signal in it, traded with a sign-following policy that pays the spread on
-every flip. The significance half of the chain is informative. The
+signal in it. Up to v1.4.0 this paragraph could add "traded with a
+sign-following policy that pays the spread on every flip", and the policy
+was a candidate explanation. It no longer is: a policy that trades only
+when the forecast clears its costs finds nothing to trade at the
+reference size and loses at twice it. The chain can see an effect it
+cannot monetise. The significance half of the chain is informative. The
 promotion half has not been shown to be reachable.
 
 ### 23.3 What the corrected statistics change
 
-The report scores each run three ways: the within-bucket Newey–West t that
-the gate reads; the **pooled-slope HAC t**, which tests the pooled IC
-directly and keeps signal that lives between buckets; and the within-bucket
-t against a **ledger-derived threshold** — the multiple-testing threshold
-of the study's own 42 tests, t ≥ 3.24 rather than 3. In this grid the
+The report scores each run three ways: the **pooled-slope HAC t**, which
+tests the pooled IC directly and keeps signal that lives between buckets —
+the statistic the gate reads since v1.5.0; the within-bucket Newey–West t,
+the legacy gate statistic; and the pooled t against a **ledger-derived
+threshold** — the multiple-testing threshold
+of the study's own 42 tests, t ≥ 3.24 rather than 3, the significance
+gate as PROMOTE now applies it. In this grid the
 three give the same detection rate in every cell. The v1.3.0 run had one
 cell where they differed — lead-lag at twice the reference size, where the
 pooled t flagged two seeds of three and the within-bucket t one — and this
 section read that as weak evidence that the pooled statistic has more
-power for a between-bucket effect. The re-run does not repeat it: the mean
-pooled t in that cell is still the larger of the two (+1.69 against
-+0.88), but neither flags a seed. Both statistics are still reported, and
-neither replaced the pinned one (§24.4); the evidence for preferring one
-is now thinner than it was.
+power for a between-bucket effect. The re-runs do not repeat it: the mean
+pooled t in that cell is still the larger of the two (+1.75 against
++0.87), but neither flags a seed; the difference shows only at the lower
+ITERATE bar, where two seeds of three now pass.
+
+So the pooled-slope t did not become the default because this study
+showed it to be more powerful — the evidence for that is thin, and was
+thin when the choice was made. It became the default because of what it
+tests. The gate reads a pooled IC; the t beside it should be the
+significance of that slope and not of a different statistic, and the
+within-bucket t discards exactly the between-bucket component the pooled
+IC contains. The cost is visible in §6.5: for the equity ITERATE alphas
+the pooled t is the *lower* of the two (EQ03 5.16 against 5.85). The
+within-bucket t stays selectable (`significance="within_bucket"`) and is
+printed as `t other` in every report.
 
 ### 23.4 What this study is not
 
@@ -2337,7 +2648,7 @@ real markets needs real data (EPICS E25).
 
 **Check yourself.**
 
-*Q. The order-flow detector reports a mean IC of −0.005 with t −0.46 on the
+*Q. The order-flow detector reports a mean IC of −0.005 with t −0.51 on the
 null. Is that a problem?* It is a reminder that "nothing planted" is not
 "nothing there": the generator's microstructure produces small correlations
 of its own (§2.3). The row is not significant and produced no evidence; a
@@ -2377,7 +2688,11 @@ tooling offered.
 `cost_multiplier` is a legitimate research knob: stress an alpha at 2× and
 see whether it survives. It also accepts 0.5. Every alpha in the registry
 is held at CANDIDATE by the same gate, `net_pnl_after_costs`, so halving
-the costs is the shortest path to a pass. The same goes for running with
+the costs was the shortest path to a pass. (Under the cost-aware default
+it happens not to work on this data — at 0.5× costs the alphas that start
+trading lose, and the rest still make no trade — but the knob is the same
+knob, and a control should not depend on the data being unhelpful.) The
+same goes for running with
 fewer folds, a shorter embargo, a faster latency assumption, a longer
 permitted decision age, or without flattening at the session end.
 
@@ -2425,21 +2740,37 @@ the result carries a mark.
   atomic replace. Two processes that both record now both land. A lock
   left by a killed process is never broken automatically — a human removes
   it, because the tool cannot know whether the other writer is dead.
-- **The threshold can follow the count.** The ledger has always computed
-  the Bonferroni threshold its count implies, and no gate read it. With
-  `tstat_threshold="ledger"` the PROMOTE gate becomes the larger of 3.0
-  and that threshold — on today's ledger about 4.21 instead of 3. It is
-  opt-in, like every corrected statistic in this release, so that its
-  effect can be measured before it is adopted and no committed verdict
-  moves silently. On the bundled data it would change no verdict: nothing
-  is promoted under either threshold.
+- **The threshold follows the count.** The ledger has always computed
+  the Bonferroni threshold its count implies, and up to v1.4.0 no gate
+  read it. With `tstat_threshold="ledger"` the PROMOTE gate is the larger
+  of 3.0 and that threshold. It was an opt-in in v1.3.0 and v1.4.0 and is
+  the default since v1.5.0 (`"fixed"`, a flat 3.0, is the legacy rule):
+  the committed report was judged at 4.365, the threshold at its 3,936
+  looks, and the five runner experiments at 4.37 to 4.39. A fixed 3.0 on a
+  ledger of thousands of looks is a gate that selection alone is expected
+  to pass — the expected largest |t| under the null is above 4. The count
+  a run is judged at is recorded with it (`gate_looks`), a rerun is judged
+  at the recorded count, and `eligibility.json` carries the threshold and
+  the looks it came from. On the bundled data the change moved no verdict
+  — nothing is promoted under either threshold — and it halved the list
+  of alphas that pass the significance gate, from six to three (§6.5).
+  The CLI flag `--tstat-threshold` is gone: the policy is part of the
+  method bundle, and the bundle is part of the experiment id.
 
-Why opt-in rather than simply fixed? Because the committed reports, the
+Why were these methods opt-in for two releases rather than simply fixed?
+Because the committed reports, the
 ledger and the goldens were produced under the pinned definitions, and a
 platform whose numbers change when the code is upgraded has lost the
-ability to say what changed. The pinned default stays reproducible; the
-corrected method sits beside it with a name; docs/RESEARCH_VALIDITY.md
-lists every pair.
+ability to say what changed. So v1.3.0 put each corrected method beside
+the pinned one with a name and measured its effect, v1.4.0 changed the
+dataset and nothing else, and v1.5.0 changed the defaults and nothing
+else — on an unchanged dataset, with every artefact regenerated in one
+pass and a results table (CHANGELOG.md) that attributes each moved number
+to a rule. The old rules stay reproducible under their legacy names:
+`python -m iap.research run --methods legacy_v1`, and
+`research/alpha_reports/run_all.py --methods legacy_v1 --out-dir <dir>`,
+which is tested field by field against two reports pinned from the v1.4.0
+tag. docs/RESEARCH_VALIDITY.md lists every pair.
 
 What is *not* closed: the determination is made by the runner, in Python,
 on the researcher's own machine. The reader re-derives the configuration
@@ -2702,7 +3033,7 @@ python3 tests/harness/check_deployment.py --verbose | grep -E "image_pinning|wor
 #   [ok  ] workflow_supply_chain: 3 workflows
 #   [ok  ] rust_toolchain_pinned: 1.98.1
 cd python && PYTHONPATH=src python3 -m pytest -q tests/test_import_policy.py
-# 25 passed
+# 27 passed
 ```
 
 Then open `.github/workflows/ci.yml`, pick one `uses:` line, and find the
@@ -2720,10 +3051,12 @@ Dependabot bump is being asked to do.
 3. **Random splits on overlapping labels.** Walk-forward only, purge at the
    label horizon, 60 s embargo (§6.2).
 4. **Uncounted multiple testing.** A ledger de-duplicated by (alpha, kind,
-   config, dataset) — 139 distinct configurations, 1920 looks — with a printed
-   expected-max-|t| yardstick of 3.888; FX08's t = 2.19 is called what it is.
-   Regenerating the dataset did not reset the count: the looks taken on the
-   old data are kept and the new ones added (§6.6).
+   config, dataset) — 208 distinct configurations, 4396 looks — with a printed
+   expected-max-|t| yardstick of 4.096; FX08's t = 3.84 is called what it is.
+   Regenerating the dataset did not reset the count, and neither did
+   changing the default methods: the looks already taken are kept and the
+   new ones added (§6.6). Since v1.5.0 the count is not only printed: the
+   PROMOTE significance gate is derived from it.
    Round 3 also fixed the denominator itself: it used to grow every time a
    script was rerun, which made the correction a function of how busy the
    researcher had been.
@@ -2758,8 +3091,13 @@ Dependabot bump is being asked to do.
 **Q1. Why can order-flow imbalance be a real predictor and still lose
 money?**
 Because significance and tradability are different tests. EQ03: OOS IC
-0.019, t 5.8 on uncrossed rows, every fold positive — and −148,562 net at 1×
-costs, since 423 signal flips per hour pay the spread continuously.
+0.019, t 5.2 on uncrossed rows, every fold positive — and the move it
+predicts is smaller than the round-trip spread and fee. A backtest that
+trades only when the forecast clears its costs (the default since v1.5.0)
+therefore makes no trade at all, and a net P&L of 0 does not pass
+`net P&L > 0`; one that follows the sign of the signal (the legacy
+policy) pays the spread on 423 flips an hour and lost 148,562 at 1× costs
+in the v1.4.0 report. Two ways of measuring the same fact.
 IC measures correlation; P&L measures correlation × horizon × turnover −
 costs.
 
@@ -2767,8 +3105,9 @@ costs.
 `(Pb·Qa + Pa·Qb)/(Qb+Qa)` — the size-weighted touch price that leans toward
 the heavy side's opposite quote. It adds information when displayed L1 sizes
 are informative about the next move. On this repo's MBO equity book it is
-a weak positive predictor (EQ01 ITERATE — uncrossed IC 0.010, t 2.67,
-hypothesis-confirmed, three of four folds, cost-negative); on its
+a weak positive predictor (EQ01 ITERATE — uncrossed IC 0.0105, gate t
+1.59, hypothesis-confirmed, three of four folds, no trade clears its
+costs); on its
 quote-driven FX book the sign depends on whether rows with a stale,
 crossed consolidated quote are counted, and no fold is positive (FX01,
 ITERATE on the uncrossed rows only). Structure decides what the number
@@ -2840,8 +3179,8 @@ and an unfilled order must be pure opportunity cost.
 Measure alpha decay in *events*, per strategy, and say how long an event
 is: here the fast flow alphas shed 58-73% of IC after one event of
 staleness (one equity row is about 3 s on this data; EQ01's microprice
-signal changes sign outright), and the FX regime family holds ~78-83% at
-one event (about 22 s) but loses most of its IC by five (~7-41%) — and the
+signal changes sign outright), and the FX regime family holds ~77-83% at
+one event (about 22 s) but loses most of its IC by five (~8-41%) — and the
 compute path is six orders of magnitude faster than the feed. So the marginal microsecond of
 compute is worthless, but being events late is existential for flow alphas.
 The budget goes wherever your reaction-to-next-event chain is actually
@@ -2850,7 +3189,7 @@ bottlenecked, weighted per alpha family.
 **Q11. Your paper-trading loop reports a realized IC ten times the research
 IC. What do you do before you celebrate?**
 Pin the definition, then attack the number. Here the MVP's EQ01 reads 0.217
-against a research 0.010 (§20.3). First make the realized IC *be* the
+against a research 0.011 (§20.3). First make the realized IC *be* the
 research label (`iap.labels.compute_labels` on the same book-refresh series,
 asserted to 1e-12 against an independent rebuild); then prove the engine is
 single-pass (truncate the stream, reproduce every earlier signal bit for
@@ -2912,9 +3251,12 @@ Inside this repository, in suggested order:
    subsystems it exercises, and `docs/ROADMAP.md` for what is done with
    evidence and what is backlog.
 10. `docs/RESEARCH_VALIDITY.md` and `research/power/POWER_REPORT.md` — the
-    opt-in corrected methods and the planted-signal study behind §23–§24;
-    `CHANGELOG.md` for what v1.3.0 fixed and what it leaves open, and for
-    the v1.4.0 dataset regeneration (§2.3).
+    corrected methods (opt-in in v1.3.0 and v1.4.0, the defaults since
+    v1.5.0, each with its legacy name) and the planted-signal study behind
+    §23–§24;
+    `CHANGELOG.md` for what v1.3.0 fixed and what it leaves open, for
+    the v1.4.0 dataset regeneration (§2.3), and for the v1.5.0 table of
+    what each new default moved.
 
 Classic external literature these designs draw on (find current editions):
 
