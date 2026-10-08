@@ -457,10 +457,12 @@ def _combine(args: argparse.Namespace) -> int:
         )
     except ValueError as exc:
         raise ResearchError(str(exc), code="invalid_spec") from exc
-    policy = load_policy_config(
-        args.configs_dir / "strategies" / "lifecycle.json",
-        args.configs_dir / "strategies" / "strategies.json",
-    )
+    # an ingested dataset carries no strategy configs: the lifecycle policy
+    # (the correlation threshold) then comes from the checkout
+    strategies = args.configs_dir / "strategies"
+    if not (strategies / "lifecycle.json").is_file():
+        strategies = repo / "configs" / "strategies"
+    policy = load_policy_config(strategies / "lifecycle.json", strategies / "strategies.json")
     threshold = policy.gates.max_cross_alpha_correlation
     print(combine_report.render_markdown(result["document"], threshold))
     if args.dry_run:

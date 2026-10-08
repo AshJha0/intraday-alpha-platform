@@ -51,6 +51,11 @@ package from importing it):
   263 columns on the 7-day real dataset. The first `combine` run on it ran out of
   memory at 15.6 GB.
 
+- `research combine --dataset-dir` took its lifecycle policy from the dataset's configs,
+  which an ingest does not create, and failed after the whole validation had run; it
+  now falls back to the checkout's `configs/strategies`. Known gap: `combine` still
+  tries every asset class, so on an equity-only dataset pass `--asset-class EQUITY`.
+
 Not done: tying the pre-registered direction to the verdict.
 The evals are small synthetic checks, not
 agent-in-the-loop runs.
