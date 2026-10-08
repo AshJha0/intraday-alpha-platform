@@ -808,6 +808,7 @@ def test_cli_run_reports_spec_errors_as_json(tmp_path, capsys):
         str(tmp_path / "experiments.json"),
         "--configs-dir",
         str(CONFIGS_DIR),
+        "--no-prereg",
     ]
     assert cli_main(base + ["--alpha", "EQ99"]) == 1
     assert _error_doc(capsys.readouterr().err)["code"] == "invalid_spec"

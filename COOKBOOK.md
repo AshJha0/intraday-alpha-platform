@@ -1289,6 +1289,7 @@ the promotion report runs plus a holdout backtest, writes a typed
 
 ```bash
 cd python
+# since v1.7.0 `run` needs a pre-registration; add --no-prereg for exploratory runs
 PYTHONPATH=src python3 -m iap.research run --alpha EQ03 --horizon 1s               # spec block, result table, VERDICT, the t threshold, the ledger note
 PYTHONPATH=src python3 -m iap.research run --alpha EQ03 --horizon 1s --dry-run     # no experiment directory is written; the looks ARE debited in the ledger
 PYTHONPATH=src python3 -m iap.research run --alpha EQ06 --config n_folds=3 --config cost_multiplier=2.0   # a different configuration = a different id

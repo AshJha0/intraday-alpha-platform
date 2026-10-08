@@ -267,7 +267,7 @@ def test_deferred_normalisation_gives_the_same_dataset(tmp_path, capsys):
     pending = load_manifest(deferred)
     assert pending["normalized"] is None and "dataset_version" not in pending
     assert not (deferred / "normalized").exists()
-    assert research_main(["run", "--alpha", "EQ03", "--dataset-dir", str(deferred)]) == 1
+    assert research_main(["run", "--no-prereg", "--alpha", "EQ03", "--dataset-dir", str(deferred)]) == 1
     assert _ingest_cli(d2, D2, deferred) == 0
     capsys.readouterr()
     assert _tree(deferred) == _tree(stepwise)
@@ -673,7 +673,7 @@ def test_research_runs_on_an_ingested_dataset_by_path(tmp_path, capsys):
     ledger_before = repo_ledger.read_bytes()
     experiments_before = sorted(p.name for p in (REPO_ROOT / "research" / "experiments").iterdir())
     capsys.readouterr()
-    assert research_main(["run", "--alpha", "EQ03", "--dataset-dir", str(out)]) == 0
+    assert research_main(["run", "--no-prereg", "--alpha", "EQ03", "--dataset-dir", str(out)]) == 0
     printed = capsys.readouterr().out
     version = load_manifest(out)["dataset_version"]
     assert f"dataset_version    {version}" in printed
@@ -688,7 +688,7 @@ def test_research_runs_on_an_ingested_dataset_by_path(tmp_path, capsys):
     assert spec["feature_version"] == summary["registry_hash"]
     ledger = json.loads((out / "research" / "experiments.json").read_text())
     assert [d["dataset_version"] for d in ledger["datasets"]] == [version]
-    assert research_main(["run", "--alpha", "EQ03", "--dataset-dir", str(tmp_path / "nope")]) == 1
+    assert research_main(["run", "--no-prereg", "--alpha", "EQ03", "--dataset-dir", str(tmp_path / "nope")]) == 1
     assert "needs dataset.json" in capsys.readouterr().err
 
 

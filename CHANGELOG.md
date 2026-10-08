@@ -38,7 +38,15 @@ package from importing it):
   line with keys kept outside the repository. A real run takes ~90 s and is
   not in the test suite; the evaluator logic is tested with a stub runner.
 
-Not done: making pre-registration a hard requirement in the research runner.
+- Pre-registration gate (AL02): `python -m iap.research run` now refuses, before
+  reading any data, unless the (alpha, horizon) hypothesis is on the verified
+  blackboard. `--no-prereg` opts out for exploratory runs and says so in the
+  output; `--prereg-board PATH` points at another board. Callers that ran
+  `run` unattended (the dataset-artefact regenerate tool) now pass `--no-prereg`.
+  The gate is on the CLI; code that calls `ExperimentRunner` directly is not
+  gated, and a pre-registration does not yet constrain the run's result.
+
+Not done: tying the pre-registered direction to the verdict.
 The evals are small synthetic checks, not
 agent-in-the-loop runs.
 

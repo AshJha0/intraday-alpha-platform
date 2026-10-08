@@ -346,3 +346,33 @@ def test_cli_keygen_issue_apply_on_real_lifecycle(tmp_path):
     assert cli.main([*base, *apply]) == 0
     assert '"to_state":"RETIRED"' in (repo / "research" / "lifecycle_transitions.jsonl").read_text()
     assert cli.main([*base, *apply]) == 1  # replay refused
+
+
+def test_prereg_gate_blocks_run_before_data_is_read(root, capsys):
+    from iap.agents.prereg_gate import PreregistrationError, require
+    from iap.research.__main__ import main as research_main
+
+    with pytest.raises(PreregistrationError, match="not pre-registered"):
+        require(root, "EQ03", "1s")
+    # the CLI refuses before touching features (the --features-dir does not exist)
+    argv = [
+        "--json-errors",
+        "run",
+        "--alpha",
+        "EQ03",
+        "--horizon",
+        "1s",
+        "--features-dir",
+        str(root / "none"),
+    ]
+    argv += ["--repo-root", str(root)]
+    assert research_main(argv) == 1
+    assert "not_preregistered" in capsys.readouterr().err
+    b = WriteBroker(root, {"alice"}, clock=Clock())
+    b.preregister("alice", "EQ03", "1s", "h", 1)
+    assert require(root, "EQ03", "1s")["kind"] == "prereg"
+    # tampering with the board is refused too
+    p = b.board.path
+    p.write_text(p.read_text(encoding="ascii").replace('"h"', '"x"'), encoding="ascii")
+    with pytest.raises(PreregistrationError):
+        require(root, "EQ03", "1s")
