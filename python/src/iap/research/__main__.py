@@ -246,7 +246,28 @@ def _dataset_versions(args: argparse.Namespace) -> tuple[str | None, str | None]
     return dataset_version, feature_version
 
 
+def _check_prereg(args: argparse.Namespace) -> None:
+    """Pre-registration gate: before any data is read (AL02)."""
+    if args.no_prereg:
+        print("NOT pre-registered (--no-prereg): exploratory, not evidence for a gate")
+        return
+    from iap.agents.prereg_gate import PreregistrationError, board_path, require
+    from iap.research.specs import pinned_horizon
+
+    root = args.repo_root if args.repo_root is not None else REPO
+    horizon = args.horizon or pinned_horizon(args.alpha)
+    try:
+        entry = require(root, args.alpha, horizon, args.prereg_board)
+    except PreregistrationError as exc:
+        raise ResearchError(str(exc), code="not_preregistered") from exc
+    print(
+        f"pre-registered: {args.alpha}/{horizon} on {args.prereg_board or board_path(root)} "
+        f"(entry {entry['seq']})"
+    )
+
+
 def _run(args: argparse.Namespace) -> int:
+    _check_prereg(args)
     dataset_version, feature_version = _dataset_versions(args)
     runner = ExperimentRunner(
         args.features_dir,
@@ -436,10 +457,12 @@ def _combine(args: argparse.Namespace) -> int:
         )
     except ValueError as exc:
         raise ResearchError(str(exc), code="invalid_spec") from exc
-    policy = load_policy_config(
-        args.configs_dir / "strategies" / "lifecycle.json",
-        args.configs_dir / "strategies" / "strategies.json",
-    )
+    # an ingested dataset carries no strategy configs: the lifecycle policy
+    # (the correlation threshold) then comes from the checkout
+    strategies = args.configs_dir / "strategies"
+    if not (strategies / "lifecycle.json").is_file():
+        strategies = repo / "configs" / "strategies"
+    policy = load_policy_config(strategies / "lifecycle.json", strategies / "strategies.json")
     threshold = policy.gates.max_cross_alpha_correlation
     print(combine_report.render_markdown(result["document"], threshold))
     if args.dry_run:
@@ -501,6 +524,17 @@ def _parser() -> argparse.ArgumentParser:
     )
     run.add_argument(
         "--seed", type=int, default=DEFAULT_SEED, help=f"spec seed, u64 (default {DEFAULT_SEED})"
+    )
+    run.add_argument(
+        "--no-prereg",
+        action="store_true",
+        help="skip the pre-registration check (exploratory run; stated in the output)",
+    )
+    run.add_argument(
+        "--prereg-board",
+        type=Path,
+        default=None,
+        help="blackboard holding the pre-registrations (default research/agents/blackboard.jsonl)",
     )
     run.add_argument(
         "--dry-run",

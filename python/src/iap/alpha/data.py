@@ -15,7 +15,8 @@ mapped back to native rows the same way (latest grid point <= row ts).
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+import re
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
 import numpy as np
@@ -36,10 +37,37 @@ def label_columns(df: pd.DataFrame) -> list[str]:
     return [c for c in df.columns if c.startswith(LABEL_PREFIXES)]
 
 
+#: feature columns the backtester / validator read besides the alphas' own
+MARKET_FEATURE_COLUMNS = frozenset(
+    {
+        "mid_price_v1",
+        "spread_ticks_v1",
+        "vol_regime_flag_v1",
+        "depth_bid_l1_v1",
+        "depth_ask_l1_v1",
+    }
+)
+
+_FEATURE_COL = re.compile(r"_v\d+$")
+
+
+def slim_columns(needed: Sequence[str]) -> Callable[[Sequence[str]], list[str]]:
+    """A ``load_features(columns=...)`` selector keeping ids, labels and market
+    columns plus the feature columns in ``needed`` - every other feature column
+    is dropped (memory on multi-day real datasets)."""
+    keep = MARKET_FEATURE_COLUMNS | set(needed)
+    return lambda names: [n for n in names if not _FEATURE_COL.search(n) or n in keep]
+
+
 def load_features(
-    features_dir, instrument_ids: Sequence[int] | None = None
+    features_dir,
+    instrument_ids: Sequence[int] | None = None,
+    columns: Callable[[Sequence[str]], Sequence[str]] | None = None,
 ) -> dict[int, pd.DataFrame]:
-    """Load per-instrument feature frames, sorted by exchange_ts."""
+    """Load per-instrument feature frames, sorted by exchange_ts.
+
+    ``columns``, when given, maps a file's column names to the subset to read
+    (keeps memory bounded on multi-day real datasets)."""
     features_dir = Path(features_dir)
     paths = sorted(features_dir.glob("features_*.parquet"))
     if not paths:
@@ -52,7 +80,12 @@ def load_features(
             continue
         if instrument_ids is not None and iid not in instrument_ids:
             continue
-        df = pd.read_parquet(p)
+        wanted = None
+        if columns is not None:
+            import pyarrow.parquet as pq
+
+            wanted = list(columns(pq.read_schema(p).names))
+        df = pd.read_parquet(p, columns=wanted)
         if not df["exchange_ts"].is_monotonic_increasing:
             df = df.sort_values("exchange_ts", kind="mergesort")
         out[iid] = df.reset_index(drop=True)

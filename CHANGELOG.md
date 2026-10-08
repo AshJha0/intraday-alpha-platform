@@ -8,11 +8,80 @@ that tag.
 
 ## Unreleased
 
-Moved from v1.6.0 to v1.7.0 (the code ships here, the runs do not): the
-real-data power study RUN (`power-real` on the 7-day dataset, ~6–20 h), the
-signal-combination report on real data, the 2026-05-18 ingest (2026 days kept
-as an out-of-time holdout), latency benchmarks in CI. v1.7.0 also carries the
-agent layer and read-only MCP server.
+Still to do (carried over from v1.6.0): the real-data power study (`power-real`,
+reduced grid about 9 h; it started once and was stopped after about 10 of 125 runs
+with null-level statistics only), the 2026-05-18 ITCH ingest (a 75-minute attempt
+was stopped with no output and its partial data deleted; 2026 days stay an
+out-of-time holdout), latency benchmarks in CI, `combine` skipping asset classes
+with no rows, tying a pre-registered direction to the verdict, and wiring direct
+`ExperimentRunner` callers to the pre-registration gate.
+
+## v1.7.0 — 2026-10-08
+
+The agent layer, plus the first signal-combination run on real data. Pull request
+[#29](https://github.com/AshJha0/intraday-alpha-platform/pull/29).
+
+**Result on real data** (`research combine --asset-class EQUITY` on the 7 real
+sessions, 12 equity members, horizon 5 s): **0 PROMOTE / 4 ITERATE / 0 REJECT**.
+Combining raises the gate IC and t — equal weight +0.0635 (t 17.4), IC-weighted
++0.0651 (t 25.0), ridge +0.0715, shrinkage +0.0741 — but every combination fails on
+cost; three make no trades at all, and shrinkage-MV trades 166 times
+for a pooled net loss of 1,057 (CI −1,874 to −371). Measured breadth is below the
+independent-members expectation (IC +0.0635 against +0.0914; t 17.4 against 27.9),
+because EQ02, EQ03 and EQ12 are 0.97–1.00 correlated. The report's boilerplate still
+says "synthetic dataset"; the numbers are the real-data ones.
+
+**Agent layer.** New `iap.agents` package,
+standard library only, off the trading path (a test keeps every trading-path
+package from importing it):
+
+- `blackboard` / `broker` (AL01, AL02): append-only hash-chained JSONL of
+  tasks, claims, findings and pre-registrations; content-hashed task ids,
+  leases, findings need a live lease and citations that resolve; pre-register
+  one hypothesis per (alpha, horizon); a tampered log refuses further writes.
+- `mcp_server` (AG01, AL05 in part): read-only MCP server over stdio
+  (`iap-mcp --root .`), six versioned tools, no write path (AST-tested).
+  Authentication is the local process boundary; there is no network listener.
+- `untrusted` (AL07): free text from artefacts is returned wrapped, sanitised
+  and flagged for injection phrases.
+- `evals` (AL06): planted leak, seeded bug, shuffled-label null, fabricated
+  citation, each run with the control on and off.
+
+- `reserve` (AL03): evaluator derives a hidden session seed per candidate
+  and attempt (HMAC of a secret), returns only pass/fail and attempts left,
+  caps attempts at 3, requires pre-registration, logs every attempt.
+- `approvals` (AL04): HMAC-signed, expiring, single-use HUMAN approvals for
+  the retire and reset lifecycle edges; agents hold no secret and the broker
+  keeps trusted writers (evaluator, approvals) disjoint from agent ids.
+
+- `reserve_runner` + `iap-agents` CLI (`keygen`, `issue`, `apply`, `reserve`): the
+  reserve runner generates a synthetic session at the hidden seed and runs the
+  candidate through `validate_alpha` (pass = leakage clean, pooled t >= 3 in the
+  pre-registered direction); approvals are issued and applied from the command
+  line with keys kept outside the repository. A real run takes ~90 s and is
+  not in the test suite; the evaluator logic is tested with a stub runner.
+
+- Pre-registration gate (AL02): `python -m iap.research run` now refuses, before
+  reading any data, unless the (alpha, horizon) hypothesis is on the verified
+  blackboard. `--no-prereg` opts out for exploratory runs and says so in the
+  output; `--prereg-board PATH` points at another board. Callers that ran
+  `run` unattended (the dataset-artefact regenerate tool) now pass `--no-prereg`.
+  The gate is on the CLI; code that calls `ExperimentRunner` directly is not
+  gated, and a pre-registration does not yet constrain the run's result.
+
+- `research combine` and `power-real` load only the feature columns their alphas
+  read plus the backtester's market columns (`iap.alpha.data.slim_columns`): 79 of
+  263 columns on the 7-day real dataset. The first `combine` run on it ran out of
+  memory at 15.6 GB.
+
+- `research combine --dataset-dir` took its lifecycle policy from the dataset's configs,
+  which an ingest does not create, and failed after the whole validation had run; it
+  now falls back to the checkout's `configs/strategies`. Known gap: `combine` still
+  tries every asset class, so on an equity-only dataset pass `--asset-class EQUITY`.
+
+Not done: tying the pre-registered direction to the verdict.
+The evals are small synthetic checks, not
+agent-in-the-loop runs.
 
 ## v1.6.0 — 2026-10-04
 

@@ -69,7 +69,7 @@ import numpy as np
 import pandas as pd
 
 from iap.alpha import configure_universe
-from iap.alpha.data import load_features
+from iap.alpha.data import load_features, slim_columns
 from iap.core.rng import SplitMix64
 from iap.experiment.locking import atomic_write_text
 from iap.labels.frames import scored_labels
@@ -243,7 +243,9 @@ def run_real_power_study(
     configs_dir = dataset_dir / "configs"
     manifest = json.loads((dataset_dir / "dataset.json").read_text(encoding="utf-8"))
     configure_universe(configs_dir / "instruments" / "instruments.json")
-    frames = load_features(dataset_dir / "features")
+    dets = detectors()
+    needed = {f for d in dets for f in _model(d["alpha_id"], d["horizon"]).features}
+    frames = load_features(dataset_dir / "features", columns=slim_columns(needed))
     days = session_days(frames)
     if len(days) < 2:
         raise _fail(f"{dataset_dir}: needs >= 2 sessions, has {len(days)}")
@@ -260,7 +262,6 @@ def run_real_power_study(
     if gate_looks is None:
         repo = Path(__file__).resolve().parents[4]
         gate_looks = gate_looks_in_force(reports_dir or repo / "research" / "alpha_reports")
-    dets = detectors()
     seeds = study_seeds(base_seed, n_seeds)
     # (background, scenario, level, seeds, session prefixes)
     grid: list[tuple[str, str, float, list[int], list[int]]] = []

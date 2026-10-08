@@ -136,7 +136,20 @@ def _steps() -> list[tuple[str, list[tuple[Path, list[str]]]]]:
         (
             "experiments",
             [
-                (py_dir, [PY, "-m", "iap.research", "run", "--alpha", alpha, "--horizon", horizon])
+                (
+                    py_dir,
+                    [
+                        PY,
+                        "-m",
+                        "iap.research",
+                        "run",
+                        "--no-prereg",
+                        "--alpha",
+                        alpha,
+                        "--horizon",
+                        horizon,
+                    ],
+                )
                 for alpha, horizon in RUNNER_EXPERIMENTS
             ],
         ),
