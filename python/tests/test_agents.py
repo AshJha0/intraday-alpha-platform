@@ -254,10 +254,12 @@ def test_reserve_returns_only_pass_fail_and_caps_attempts(root):
     b = WriteBroker(root, {"alice"}, trusted={"evaluator"}, clock=Clock())
     seen = []
     ev = ReserveEvaluator(b"s" * 32, b, lambda seed, c: seen.append(seed) or len(seen) == 2)
-    cand = {"alpha_id": "EQ01", "horizon": "1s"}
+    cand = {"alpha_id": "EQ01", "horizon": "1s", "expected_sign": 1}
     with pytest.raises(ReserveError):
         ev.evaluate("alice", cand)  # not pre-registered
     b.preregister("alice", "EQ01", "1s", "h", 1)
+    with pytest.raises(ReserveError, match="expected_sign"):
+        ev.evaluate("alice", {**cand, "expected_sign": -1})
     r1 = ev.evaluate("alice", cand)
     assert set(r1) == {"candidate_id", "passed", "attempts_left"} and r1["passed"] is False
     assert ev.evaluate("alice", cand)["passed"] is True
@@ -317,3 +319,30 @@ def test_lifecycle_manual_edges_reject_non_human():
 
     with pytest.raises(ValueError, match="HUMAN"):
         AlphaLifecycle._check_manual(Actor.SYSTEM, "r", "retire")
+
+
+def test_cli_keygen_issue_apply_on_real_lifecycle(tmp_path):
+    import shutil
+
+    from iap.agents import cli
+
+    repo = tmp_path / "repo"
+    shutil.copytree(REPO_ROOT / "configs" / "strategies", repo / "configs" / "strategies")
+    (repo / "research").mkdir()
+    for n in ("alpha_registry.json", "lifecycle_transitions.jsonl"):
+        shutil.copy(REPO_ROOT / "research" / n, repo / "research" / n)
+    keyfile = tmp_path / "keys" / "k.json"
+    base = ["--root", str(repo)]
+    assert cli.main([*base, "keygen", "--approver", "carol", "--keyfile", str(keyfile)]) == 0
+    with pytest.raises(SystemExit):  # secrets may not live inside the repository
+        cli.main([*base, "keygen", "--approver", "x", "--keyfile", str(repo / "k.json")])
+    out = tmp_path / "a.json"
+    args = ["issue", "--approver", "carol", "--keyfile", str(keyfile), "--alpha", "EQ01"]
+    assert (
+        cli.main([*base, *args, "--action", "retire", "--reason", "decayed", "--out", str(out)])
+        == 0
+    )
+    apply = ["apply", "--approval", str(out), "--keyfile", str(keyfile)]
+    assert cli.main([*base, *apply]) == 0
+    assert '"to_state":"RETIRED"' in (repo / "research" / "lifecycle_transitions.jsonl").read_text()
+    assert cli.main([*base, *apply]) == 1  # replay refused

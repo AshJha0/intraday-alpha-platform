@@ -30,6 +30,7 @@ iap-lifecycle = "iap.lifecycle.__main__:main"
 iap-store = "iap.store.__main__:main"
 iap-mvp = "iap.mvp.__main__:main"
 iap-mcp = "iap.agents.mcp_server:main"
+iap-agents = "iap.agents.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

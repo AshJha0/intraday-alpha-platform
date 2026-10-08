@@ -31,9 +31,15 @@ package from importing it):
   the retire and reset lifecycle edges; agents hold no secret and the broker
   keeps trusted writers (evaluator, approvals) disjoint from agent ids.
 
-Not done: wiring the reserve runner to the synthetic generator and research
-runner, a CLI for issuing approvals, and making pre-registration a hard
-requirement in the research runner. The evals are small synthetic checks, not
+- \`reserve_runner\` + \`iap-agents\` CLI (\`keygen\`, \`issue\`, \`apply\`, \`reserve\`): the
+  reserve runner generates a synthetic session at the hidden seed and runs the
+  candidate through \`validate_alpha\` (pass = leakage clean, pooled t >= 3 in the
+  pre-registered direction); approvals are issued and applied from the command
+  line with keys kept outside the repository. A real run takes ~90 s and is
+  not in the test suite; the evaluator logic is tested with a stub runner.
+
+Not done: making pre-registration a hard requirement in the research runner.
+The evals are small synthetic checks, not
 agent-in-the-loop runs.
 
 Moved from v1.6.0 to v1.7.0 (the code ships here, the runs do not): the

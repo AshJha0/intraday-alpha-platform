@@ -62,6 +62,14 @@ class ReserveEvaluator:
         alpha, horizon = candidate.get("alpha_id"), candidate.get("horizon")
         if not self.broker.is_preregistered(str(alpha), str(horizon)):
             raise ReserveError("candidate is not pre-registered")
+        sign = candidate.get("expected_sign")
+        reg = [
+            p
+            for p in self.broker.state()["preregs"].values()
+            if p["alpha_id"] == alpha and p["horizon"] == horizon
+        ]
+        if not reg or reg[0]["expected_sign"] != sign:
+            raise ReserveError("candidate expected_sign does not match its pre-registration")
         cid = digest(dict(candidate))[:16]
         n = self.attempts(cid)
         if n >= self.max_attempts:
