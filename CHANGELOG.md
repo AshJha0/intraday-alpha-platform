@@ -8,7 +8,30 @@ that tag.
 
 ## Unreleased
 
-**Agent layer, first slice (v1.7.0 in progress).** New `iap.agents` package,
+Still to do (carried over from v1.6.0): the real-data power study (`power-real`,
+reduced grid about 9 h; it started once and was stopped after about 10 of 125 runs
+with null-level statistics only), the 2026-05-18 ITCH ingest (a 75-minute attempt
+was stopped with no output and its partial data deleted; 2026 days stay an
+out-of-time holdout), latency benchmarks in CI, `combine` skipping asset classes
+with no rows, tying a pre-registered direction to the verdict, and wiring direct
+`ExperimentRunner` callers to the pre-registration gate.
+
+## v1.7.0 — 2026-10-08
+
+The agent layer, plus the first signal-combination run on real data. Pull request
+[#29](https://github.com/AshJha0/intraday-alpha-platform/pull/29).
+
+**Result on real data** (`research combine --asset-class EQUITY` on the 7 real
+sessions, 12 equity members, horizon 5 s): **0 PROMOTE / 4 ITERATE / 0 REJECT**.
+Combining raises the gate IC and t — equal weight +0.0635 (t 17.4), IC-weighted
++0.0651 (t 25.0), ridge +0.0715, shrinkage +0.0741 — but every combination fails on
+cost; three make no trades at all, and shrinkage-MV trades 166 times
+for a pooled net loss of 1,057 (CI −1,874 to −371). Measured breadth is below the
+independent-members expectation (IC +0.0635 against +0.0914; t 17.4 against 27.9),
+because EQ02, EQ03 and EQ12 are 0.97–1.00 correlated. The report's boilerplate still
+says "synthetic dataset"; the numbers are the real-data ones.
+
+**Agent layer.** New `iap.agents` package,
 standard library only, off the trading path (a test keeps every trading-path
 package from importing it):
 
@@ -59,12 +82,6 @@ package from importing it):
 Not done: tying the pre-registered direction to the verdict.
 The evals are small synthetic checks, not
 agent-in-the-loop runs.
-
-Moved from v1.6.0 to v1.7.0 (the code ships here, the runs do not): the
-real-data power study RUN (`power-real` on the 7-day dataset, ~6–20 h), the
-signal-combination report on real data, the 2026-05-18 ingest (2026 days kept
-as an out-of-time holdout), latency benchmarks in CI. v1.7.0 also carries the
-agent layer and read-only MCP server.
 
 ## v1.6.0 — 2026-10-04
 
