@@ -35,9 +35,14 @@ class WriteBroker:
         clock: Callable[[], int] = time.time_ns,
         lease_ns: int = LEASE_NS,
         board: Path | None = None,
+        trusted: set[str] | None = None,
     ) -> None:
         self.root = Path(root)
         self.agents = frozenset(agents)
+        #: non-agent writers (the evaluator, the approval service); never an agent id
+        self.trusted = frozenset(trusted or ())
+        if self.agents & self.trusted:
+            raise ValueError("an agent cannot also be a trusted writer")
         self.clock = clock
         self.lease_ns = lease_ns
         self.board = Blackboard(board or self.root / "research" / "agents" / "blackboard.jsonl")
@@ -75,6 +80,12 @@ class WriteBroker:
             return self.board.append(kind, agent, self.clock(), body)
         except BlackboardError as exc:
             raise BrokerError(str(exc)) from exc
+
+    def write_trusted(self, writer: str, kind: str, body: dict[str, Any]) -> dict[str, Any]:
+        """Entry for the evaluator and approval service only (reserve / approval kinds)."""
+        if writer not in self.trusted or kind not in ("reserve", "approval"):
+            raise BrokerError(f"{writer!r} may not write {kind!r}")
+        return self._write(kind, writer, body)
 
     def post_task(self, agent: str, title: str, spec: dict[str, Any]) -> str:
         """Content-hashed: the same title+spec is the same task, posted once."""

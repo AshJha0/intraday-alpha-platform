@@ -24,9 +24,16 @@ package from importing it):
 - `evals` (AL06): planted leak, seeded bug, shuffled-label null, fabricated
   citation, each run with the control on and off.
 
-Not done: hidden-seed reserve sessions (AL03), authenticated human approvals
-for lifecycle edges (AL04), and wiring pre-registration into the research
-runner as a hard requirement. The evals are small synthetic checks, not
+- `reserve` (AL03): evaluator derives a hidden session seed per candidate
+  and attempt (HMAC of a secret), returns only pass/fail and attempts left,
+  caps attempts at 3, requires pre-registration, logs every attempt.
+- `approvals` (AL04): HMAC-signed, expiring, single-use HUMAN approvals for
+  the retire and reset lifecycle edges; agents hold no secret and the broker
+  keeps trusted writers (evaluator, approvals) disjoint from agent ids.
+
+Not done: wiring the reserve runner to the synthetic generator and research
+runner, a CLI for issuing approvals, and making pre-registration a hard
+requirement in the research runner. The evals are small synthetic checks, not
 agent-in-the-loop runs.
 
 Moved from v1.6.0 to v1.7.0 (the code ships here, the runs do not): the

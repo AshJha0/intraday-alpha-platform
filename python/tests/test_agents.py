@@ -233,3 +233,87 @@ def test_evals_pass_and_fail_without_control(root):
         "citation_resolution",
     ]
     assert all(r["ok"] for r in rows), rows
+
+
+# -- AL03 / AL04 -------------------------------------------------------------
+
+
+def test_trusted_writers_are_disjoint_and_limited(root):
+    with pytest.raises(ValueError):
+        WriteBroker(root, {"alice"}, trusted={"alice"})
+    b = WriteBroker(root, {"alice"}, trusted={"evaluator"}, clock=Clock())
+    with pytest.raises(BrokerError):
+        b.write_trusted("alice", "reserve", {})
+    with pytest.raises(BrokerError):
+        b.write_trusted("evaluator", "task", {})
+
+
+def test_reserve_returns_only_pass_fail_and_caps_attempts(root):
+    from iap.agents.reserve import ReserveError, ReserveEvaluator
+
+    b = WriteBroker(root, {"alice"}, trusted={"evaluator"}, clock=Clock())
+    seen = []
+    ev = ReserveEvaluator(b"s" * 32, b, lambda seed, c: seen.append(seed) or len(seen) == 2)
+    cand = {"alpha_id": "EQ01", "horizon": "1s"}
+    with pytest.raises(ReserveError):
+        ev.evaluate("alice", cand)  # not pre-registered
+    b.preregister("alice", "EQ01", "1s", "h", 1)
+    r1 = ev.evaluate("alice", cand)
+    assert set(r1) == {"candidate_id", "passed", "attempts_left"} and r1["passed"] is False
+    assert ev.evaluate("alice", cand)["passed"] is True
+    ev.evaluate("alice", cand)
+    with pytest.raises(ReserveError):
+        ev.evaluate("alice", cand)
+    assert len(set(seen)) == 3  # a different hidden session each attempt
+    other = ReserveEvaluator(b"t" * 32, b, lambda s, c: True)
+    assert other._seed("x", 0) != ev._seed("x", 0)
+
+
+class FakeLifecycle:
+    def __init__(self):
+        self.calls = []
+
+    def retire(self, alpha_id, ts, reason, actor):
+        self.calls.append(("retire", alpha_id, actor.value))
+
+    def reset_to_research(self, alpha_id, ts, reason, actor):
+        self.calls.append(("reset", alpha_id, actor.value))
+
+
+def test_human_approval_signed_expiring_single_use(root):
+    from iap.agents import approvals
+
+    clock = Clock()
+    b = WriteBroker(root, {"alice"}, trusted={"approvals"}, clock=clock)
+    key = approvals.new_secret()
+    keys = {"carol": key}
+    lc = FakeLifecycle()
+    ok = approvals.issue("carol", key, "EQ01", "retire", "decayed", clock.t, 100 * SEC)
+    approvals.apply(ok, keys, b, lc, 1)
+    assert lc.calls == [("retire", "EQ01", "HUMAN")]
+    with pytest.raises(approvals.ApprovalError, match="already used"):
+        approvals.apply(ok, keys, b, lc, 1)
+    forged = {
+        **approvals.issue("carol", key, "EQ01", "retire", "x", clock.t, 100 * SEC),
+        "alpha_id": "EQ02",
+    }
+    with pytest.raises(approvals.ApprovalError, match="signature"):
+        approvals.apply(forged, keys, b, lc, 1)
+    by_agent = approvals.issue("carol", approvals.new_secret(), "EQ01", "reset", "x", clock.t, SEC)
+    with pytest.raises(approvals.ApprovalError, match="signature"):
+        approvals.apply(by_agent, keys, b, lc, 1)
+    stale = approvals.issue("carol", key, "EQ01", "reset", "x", clock.t, 1)
+    clock.t += 10 * SEC
+    with pytest.raises(approvals.ApprovalError, match="expired"):
+        approvals.apply(stale, keys, b, lc, 1)
+    with pytest.raises(approvals.ApprovalError):
+        approvals.apply({**ok, "approver": "mallory"}, keys, b, lc, 1)
+    assert len(lc.calls) == 1
+
+
+def test_lifecycle_manual_edges_reject_non_human():
+    from iap.contracts.types import Actor
+    from iap.lifecycle.machine import AlphaLifecycle
+
+    with pytest.raises(ValueError, match="HUMAN"):
+        AlphaLifecycle._check_manual(Actor.SYSTEM, "r", "retire")

@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 GENESIS = "0" * 64
-KINDS = ("task", "claim", "release", "finding", "prereg")
+KINDS = ("task", "claim", "release", "finding", "prereg", "reserve", "approval")
 
 
 def canonical(obj: Any) -> str:
