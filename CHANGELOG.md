@@ -8,6 +8,27 @@ that tag.
 
 ## Unreleased
 
+**Agent layer, first slice (v1.7.0 in progress).** New `iap.agents` package,
+standard library only, off the trading path (a test keeps every trading-path
+package from importing it):
+
+- `blackboard` / `broker` (AL01, AL02): append-only hash-chained JSONL of
+  tasks, claims, findings and pre-registrations; content-hashed task ids,
+  leases, findings need a live lease and citations that resolve; pre-register
+  one hypothesis per (alpha, horizon); a tampered log refuses further writes.
+- `mcp_server` (AG01, AL05 in part): read-only MCP server over stdio
+  (`iap-mcp --root .`), six versioned tools, no write path (AST-tested).
+  Authentication is the local process boundary; there is no network listener.
+- `untrusted` (AL07): free text from artefacts is returned wrapped, sanitised
+  and flagged for injection phrases.
+- `evals` (AL06): planted leak, seeded bug, shuffled-label null, fabricated
+  citation, each run with the control on and off.
+
+Not done: hidden-seed reserve sessions (AL03), authenticated human approvals
+for lifecycle edges (AL04), and wiring pre-registration into the research
+runner as a hard requirement. The evals are small synthetic checks, not
+agent-in-the-loop runs.
+
 Moved from v1.6.0 to v1.7.0 (the code ships here, the runs do not): the
 real-data power study RUN (`power-real` on the 7-day dataset, ~6–20 h), the
 signal-combination report on real data, the 2026-05-18 ingest (2026 days kept
