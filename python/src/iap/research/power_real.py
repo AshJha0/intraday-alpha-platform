@@ -61,6 +61,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -116,6 +117,19 @@ DEFAULT_SEEDS = 20
 BACKGROUNDS = ("shifted", "real")
 
 _ROUND = 6
+
+_FEATURE_COL = re.compile(r"_v\d+$")
+
+#: feature columns the backtester / validator read besides the alphas' own
+_MARKET_COLS = frozenset(
+    {
+        "mid_price_v1",
+        "spread_ticks_v1",
+        "vol_regime_flag_v1",
+        "depth_bid_l1_v1",
+        "depth_ask_l1_v1",
+    }
+)
 
 
 def _fail(message: str) -> ResearchError:
@@ -243,7 +257,14 @@ def run_real_power_study(
     configs_dir = dataset_dir / "configs"
     manifest = json.loads((dataset_dir / "dataset.json").read_text(encoding="utf-8"))
     configure_universe(configs_dir / "instruments" / "instruments.json")
-    frames = load_features(dataset_dir / "features")
+    dets = detectors()
+    needed = _MARKET_COLS | {f for d in dets for f in _model(d["alpha_id"], d["horizon"]).features}
+
+    def _slim(names):
+        # drop feature columns no detector reads; keep ids, labels, market columns
+        return [n for n in names if not _FEATURE_COL.search(n) or n in needed]
+
+    frames = load_features(dataset_dir / "features", columns=_slim)
     days = session_days(frames)
     if len(days) < 2:
         raise _fail(f"{dataset_dir}: needs >= 2 sessions, has {len(days)}")
@@ -260,7 +281,6 @@ def run_real_power_study(
     if gate_looks is None:
         repo = Path(__file__).resolve().parents[4]
         gate_looks = gate_looks_in_force(reports_dir or repo / "research" / "alpha_reports")
-    dets = detectors()
     seeds = study_seeds(base_seed, n_seeds)
     # (background, scenario, level, seeds, session prefixes)
     grid: list[tuple[str, str, float, list[int], list[int]]] = []
