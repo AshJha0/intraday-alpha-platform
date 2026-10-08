@@ -66,7 +66,7 @@ import pandas as pd
 
 from iap.alpha import ALPHA_IDS, build
 from iap.alpha.base import AlphaModel
-from iap.alpha.data import load_features
+from iap.alpha.data import load_features, slim_columns
 from iap.backtest import Backtester, CostModel
 from iap.combine.model import INNER_FOLDS, CombinedAlpha, member_purged_train, member_signal
 from iap.combine.weights import (
@@ -529,7 +529,13 @@ def run_combination(
     bundle = methods(DEFAULT_METHODS)
     meta = _load_meta(configs_dir)
     if frames is None:
-        frames = load_features(features_dir)
+        needed = {
+            f
+            for ac in asset_classes
+            for aid in (sorted(members[ac]) if members and ac in members else default_members(ac))
+            for f in build(aid).features
+        }
+        frames = load_features(features_dir, columns=slim_columns(needed))
     backtester = _backtester(bundle, meta, configs_dir)
     exec_cfg = json.loads((configs_dir / "execution" / "execution.json").read_text())
     max_participation = float(exec_cfg["defaults"]["max_participation"])

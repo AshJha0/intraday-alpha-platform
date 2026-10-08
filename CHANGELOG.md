@@ -46,6 +46,11 @@ package from importing it):
   The gate is on the CLI; code that calls `ExperimentRunner` directly is not
   gated, and a pre-registration does not yet constrain the run's result.
 
+- `research combine` and `power-real` load only the feature columns their alphas
+  read plus the backtester's market columns (`iap.alpha.data.slim_columns`): 79 of
+  263 columns on the 7-day real dataset. The first `combine` run on it ran out of
+  memory at 15.6 GB.
+
 Not done: tying the pre-registered direction to the verdict.
 The evals are small synthetic checks, not
 agent-in-the-loop runs.

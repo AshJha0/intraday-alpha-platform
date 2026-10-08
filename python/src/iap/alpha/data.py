@@ -15,6 +15,7 @@ mapped back to native rows the same way (latest grid point <= row ts).
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
@@ -34,6 +35,28 @@ LABEL_PREFIXES = (
 
 def label_columns(df: pd.DataFrame) -> list[str]:
     return [c for c in df.columns if c.startswith(LABEL_PREFIXES)]
+
+
+#: feature columns the backtester / validator read besides the alphas' own
+MARKET_FEATURE_COLUMNS = frozenset(
+    {
+        "mid_price_v1",
+        "spread_ticks_v1",
+        "vol_regime_flag_v1",
+        "depth_bid_l1_v1",
+        "depth_ask_l1_v1",
+    }
+)
+
+_FEATURE_COL = re.compile(r"_v\d+$")
+
+
+def slim_columns(needed: Sequence[str]) -> Callable[[Sequence[str]], list[str]]:
+    """A ``load_features(columns=...)`` selector keeping ids, labels and market
+    columns plus the feature columns in ``needed`` - every other feature column
+    is dropped (memory on multi-day real datasets)."""
+    keep = MARKET_FEATURE_COLUMNS | set(needed)
+    return lambda names: [n for n in names if not _FEATURE_COL.search(n) or n in keep]
 
 
 def load_features(

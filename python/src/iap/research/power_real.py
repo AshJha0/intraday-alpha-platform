@@ -61,7 +61,6 @@ from __future__ import annotations
 
 import json
 import math
-import re
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -70,7 +69,7 @@ import numpy as np
 import pandas as pd
 
 from iap.alpha import configure_universe
-from iap.alpha.data import load_features
+from iap.alpha.data import load_features, slim_columns
 from iap.core.rng import SplitMix64
 from iap.experiment.locking import atomic_write_text
 from iap.labels.frames import scored_labels
@@ -117,19 +116,6 @@ DEFAULT_SEEDS = 20
 BACKGROUNDS = ("shifted", "real")
 
 _ROUND = 6
-
-_FEATURE_COL = re.compile(r"_v\d+$")
-
-#: feature columns the backtester / validator read besides the alphas' own
-_MARKET_COLS = frozenset(
-    {
-        "mid_price_v1",
-        "spread_ticks_v1",
-        "vol_regime_flag_v1",
-        "depth_bid_l1_v1",
-        "depth_ask_l1_v1",
-    }
-)
 
 
 def _fail(message: str) -> ResearchError:
@@ -258,13 +244,8 @@ def run_real_power_study(
     manifest = json.loads((dataset_dir / "dataset.json").read_text(encoding="utf-8"))
     configure_universe(configs_dir / "instruments" / "instruments.json")
     dets = detectors()
-    needed = _MARKET_COLS | {f for d in dets for f in _model(d["alpha_id"], d["horizon"]).features}
-
-    def _slim(names):
-        # drop feature columns no detector reads; keep ids, labels, market columns
-        return [n for n in names if not _FEATURE_COL.search(n) or n in needed]
-
-    frames = load_features(dataset_dir / "features", columns=_slim)
+    needed = {f for d in dets for f in _model(d["alpha_id"], d["horizon"]).features}
+    frames = load_features(dataset_dir / "features", columns=slim_columns(needed))
     days = session_days(frames)
     if len(days) < 2:
         raise _fail(f"{dataset_dir}: needs >= 2 sessions, has {len(days)}")
