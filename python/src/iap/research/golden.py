@@ -101,6 +101,8 @@ def golden_result(
 ) -> ExperimentResult:
     """Run the golden spec on a fresh ledger under ``scratch_dir`` (nothing
     is written: the runner is a dry run) and pin the provenance."""
+    # ungated on purpose (no ``gate``): a frozen reproduction of a committed result on
+    # the golden vector, a test fixture and not evidence for any hypothesis
     runner = ExperimentRunner(
         None,
         Path(scratch_dir) / "experiments.json",

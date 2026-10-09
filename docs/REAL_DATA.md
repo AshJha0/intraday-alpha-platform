@@ -169,6 +169,9 @@ chain and thresholds are asked to find it. It measures **statistical
 detection only**: fills are priced at the real mids, which the planted
 labels do not move, so P&L gates and verdicts still describe the real
 market; the recompute leakage probe is off. See the module docstring.
+Since v1.7.2 `power` and `power-real` need the declared detectors (EQ04 at 5s
+and EQ10 at 1s) pre-registered on the blackboard, like `run` and `combine`;
+`--no-prereg` opts out and says so in the output.
 [COOKBOOK.md](../COOKBOOK.md) recipe 36 runs this whole chain on bytes
 written by the test encoder, so it works without a real file.
 

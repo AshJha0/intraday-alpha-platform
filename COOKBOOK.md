@@ -1397,7 +1397,7 @@ that still has a null row, a planted row, a break row and a session curve
 
 ```bash
 cd python
-PYTHONPATH=src python3 -m iap.research power --levels 0,1 --seeds 1 \
+PYTHONPATH=src python3 -m iap.research power --no-prereg --levels 0,1 --seeds 1 \
   --sessions 1,2 --power-out-dir ../data/store/power-tiny
 # (progress on stderr)
 # stable level 0 seed 850875211 (2 sessions): lead_lag:EQ10@1s=REJECT, lead_lag:EQ10@5s=REJECT, order_flow:EQ04@10s=REJECT, order_flow:EQ04@5s=REJECT
