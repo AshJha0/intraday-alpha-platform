@@ -11,7 +11,7 @@ that tag.
 Still to do: ingest memory (stream events to disk; a full-day ingest took 260 min
 against 52 min for a similar file because the process outgrew the machine's RAM),
 an out-of-time holdout run on 2026-05-18 (needs a frozen pre-registered
-hypothesis first), latency benchmarks in CI, and gating the `power` /
+hypothesis first), and gating the `power` /
 `power-real` studies and programmatic `ExperimentRunner` callers (golden) on
 pre-registration.
 
@@ -38,6 +38,8 @@ QQQ 711.24) and stays an out-of-time holdout.
 **Added.** `marketdata ingest` prints stage start/end lines and a heartbeat every 60 s (elapsed time and GB written by the running stage) to stderr, so a quiet stage such as `normalize` no longer looks hung; `--quiet` turns it off.
 
 **Added.** Pre-registration gate on the remaining paths that run `validate_alpha` on a hypothesis. `research power` and `research power-real` now refuse unless the declared detectors (EQ04 at 5s and EQ10 at 1s) are on the blackboard; `--no-prereg` opts out, `--prereg-board` and `--repo-root` select the board; the notices go to stderr so stdout stays the report. `ExperimentRunner` takes an optional `gate` callable that `run` calls with the spec before reading any data, and `research run` passes one, so the check travels with the runner and not only with the CLI. The golden reproduction stays ungated on purpose (a frozen fixture, commented in `golden.py`). Not covered: the synthetic `power` study also tests a matched-horizon sibling of each detector, which is not gated separately.
+
+**Added.** Latency regression guard in CI. The `cpp` job runs the Release `bench_all` after `ctest` and `tests/harness/check_bench_regression.py` compares every hot row with `benchmarks/results_cpp.md`, failing when a row is more than 5x slower or fewer than 80% of the committed rows can be matched. It is coarse on purpose: the committed table was measured on one 2-CPU Xeon container and a shared runner is different hardware, so it catches algorithmic regressions (the kind that cost 100x in the ingest's book check), not few-percent drift or tail latency. The table of ratios goes to the job summary and `bench_all`'s output is uploaded as the `bench-cpp` artifact. Not covered: Python, Rust and Java timings, and the cold single-pass rows.
 
 ## v1.7.1 — 2026-10-09
 
