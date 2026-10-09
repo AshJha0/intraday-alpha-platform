@@ -135,3 +135,62 @@ def test_configure_universe_reads_the_etf(tmp_path):
 def test_bad_level_is_refused():
     with pytest.raises(Exception, match="level"):
         power_real.plant(_frames(n_per_day=10), power_real.detectors(), 1.0)
+
+
+def _stub_study(monkeypatch, tmp_path, calls):
+    """A tiny study whose validation chain is a counting stub."""
+    ds = tmp_path / "ds"
+    ds.mkdir(exist_ok=True)
+    (ds / "dataset.json").write_text('{"dataset_version": "v1"}', encoding="ascii")
+    frames = _frames(n_per_day=50, days=2)
+    monkeypatch.setattr(power_real, "configure_universe", lambda *_: None)
+    monkeypatch.setattr(power_real, "load_features", lambda *_a, **_k: frames)
+
+    def stub(fr, configs_dir, t, dets, seed=0, **_):
+        calls.append(seed)
+        return {d["id"]: {"t_pooled": 1.0 + seed % 7} for d in dets}
+
+    monkeypatch.setattr(power_real, "evaluate_run", stub)
+    monkeypatch.setattr(power_real, "summarise", lambda runs, thresholds: {"n": len(runs)})
+    return ds
+
+
+def _study(ds, checkpoint, **kw):
+    return power_real.run_real_power_study(
+        ds, levels=(0.0, 0.02), break_levels=(0.02,), n_seeds=2, gate_looks=100,
+        checkpoint=checkpoint, **kw,
+    )  # fmt: skip
+
+
+def test_checkpoint_resume_reproduces_the_uninterrupted_study(monkeypatch, tmp_path):
+    calls: list[int] = []
+    ds = _stub_study(monkeypatch, tmp_path, calls)
+    ck = tmp_path / "ck.jsonl"
+    full = _study(ds, ck)
+    n_runs = len(calls)
+    assert n_runs == len(full["runs"]) > 0
+
+    # simulate a kill after 3 runs, mid-write of the 4th
+    lines = ck.read_text(encoding="utf-8").splitlines()
+    ck.write_text("\n".join(lines[:4]) + "\n" + lines[4][:20], encoding="utf-8")
+    calls.clear()
+    resumed = _study(ds, ck)
+    assert len(calls) == n_runs - 3
+    assert resumed == full
+
+    calls.clear()
+    assert _study(ds, ck) == full and calls == []  # complete checkpoint: nothing recomputed
+
+
+def test_checkpoint_from_another_study_is_refused_unless_restart(monkeypatch, tmp_path):
+    calls: list[int] = []
+    ds = _stub_study(monkeypatch, tmp_path, calls)
+    ck = tmp_path / "ck.jsonl"
+    _study(ds, ck)
+    with pytest.raises(power_real.ResearchError, match="different study"):
+        power_real.run_real_power_study(
+            ds, levels=(0.0, 0.04), n_seeds=2, gate_looks=100, checkpoint=ck
+        )
+    calls.clear()
+    _study(ds, ck, restart=True)
+    assert calls  # recomputed from scratch
