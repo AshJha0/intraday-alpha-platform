@@ -271,6 +271,36 @@ def _check_prereg(args: argparse.Namespace) -> dict | None:
     return entry
 
 
+def _check_prereg_pairs(args: argparse.Namespace, pairs: list[tuple[str, str]], what: str) -> None:
+    """Pre-registration gate for a study over several (alpha, horizon) pairs."""
+    if args.no_prereg:
+        print(
+            f"NOT pre-registered (--no-prereg): {what} is exploratory, not evidence for a gate",
+            file=sys.stderr,
+        )
+        return
+    from iap.agents.prereg_gate import PreregistrationError, board_path, require
+
+    root = args.repo_root if getattr(args, "repo_root", None) is not None else REPO
+    for alpha_id, horizon in pairs:
+        try:
+            entry = require(root, alpha_id, horizon, args.prereg_board)
+        except PreregistrationError as exc:
+            raise ResearchError(str(exc), code="not_preregistered") from exc
+        print(
+            f"pre-registered: {alpha_id}/{horizon} on "
+            f"{args.prereg_board or board_path(root)} (entry {entry['seq']})",
+            file=sys.stderr,
+        )
+
+
+def _declared_pairs() -> list[tuple[str, str]]:
+    """The (alpha, declared horizon) pairs the power studies test."""
+    from iap.research import power_real
+
+    return [(d["alpha_id"], d["horizon"]) for d in power_real.detectors()]
+
+
 def _direction_check(entry: dict | None, result: Any) -> bool:
     """Whether the result's IC has the pre-registered sign (``True`` without a prereg)."""
     if entry is None:
@@ -288,6 +318,21 @@ def _direction_check(entry: dict | None, result: Any) -> bool:
     return False
 
 
+def _runner_gate(args: argparse.Namespace, entry: dict | None):
+    """The runner's own pre-registration check (the CLI checked once already, before
+    reading data; this one travels with the runner). ``None`` under ``--no-prereg``."""
+    if entry is None:
+        return None
+    from iap.agents.prereg_gate import require
+
+    root = args.repo_root if args.repo_root is not None else REPO
+
+    def gate(spec) -> None:
+        require(root, spec.alpha_id, spec.horizon, args.prereg_board)
+
+    return gate
+
+
 def _run(args: argparse.Namespace) -> int:
     prereg_entry = _check_prereg(args)
     dataset_version, feature_version = _dataset_versions(args)
@@ -299,6 +344,7 @@ def _run(args: argparse.Namespace) -> int:
         dry_run=args.dry_run,
         repo_root=args.repo_root,
         normalized_dir=args.normalized_dir,
+        gate=_runner_gate(args, prereg_entry),
     )
     configuration = _parse_config(args.config)
     if args.methods is not None:
@@ -406,6 +452,8 @@ def _numbers(text: str, flag: str, cast) -> list:
 def _power(args: argparse.Namespace) -> int:
     from iap.research import power
 
+    _check_prereg_pairs(args, _declared_pairs(), "the power study")
+
     doc = power.run_power_study(
         args.generator_config,
         args.configs_dir,
@@ -425,6 +473,8 @@ def _power(args: argparse.Namespace) -> int:
 
 def _power_real(args: argparse.Namespace) -> int:
     from iap.research import power_real
+
+    _check_prereg_pairs(args, _declared_pairs(), "the real-data power study")
 
     out_dir = args.power_out_dir or args.dataset_dir / "research" / "power"
     doc = power_real.run_real_power_study(
@@ -673,6 +723,23 @@ def _parser() -> argparse.ArgumentParser:
         default=REPO / "research" / "power",
         help="where POWER_REPORT.{md,json} are written",
     )
+    power.add_argument(
+        "--repo-root",
+        type=Path,
+        default=None,
+        help="checkout holding the pre-registration board (default: this one)",
+    )
+    power.add_argument(
+        "--no-prereg",
+        action="store_true",
+        help="skip the pre-registration check on the declared detectors (exploratory run)",
+    )
+    power.add_argument(
+        "--prereg-board",
+        type=Path,
+        default=None,
+        help="blackboard holding the pre-registrations (default research/agents/blackboard.jsonl)",
+    )
     power.set_defaults(func=_power)
 
     preal = sub.add_parser(
@@ -696,6 +763,23 @@ def _parser() -> argparse.ArgumentParser:
         "--restart",
         action="store_true",
         help="discard REAL_POWER_CHECKPOINT.jsonl and start over (default: resume from it)",
+    )
+    preal.add_argument(
+        "--repo-root",
+        type=Path,
+        default=None,
+        help="checkout holding the pre-registration board (default: this one)",
+    )
+    preal.add_argument(
+        "--no-prereg",
+        action="store_true",
+        help="skip the pre-registration check on the declared detectors (exploratory run)",
+    )
+    preal.add_argument(
+        "--prereg-board",
+        type=Path,
+        default=None,
+        help="blackboard holding the pre-registrations (default research/agents/blackboard.jsonl)",
     )
     preal.set_defaults(func=_power_real)
 

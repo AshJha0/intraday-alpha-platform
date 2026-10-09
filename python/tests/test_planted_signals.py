@@ -707,7 +707,18 @@ def test_power_study_rejects_bad_inputs(tmp_path, fake_pipeline):
 
 def test_power_cli_writes_the_reports(fake_pipeline, tmp_path, capsys):
     out = tmp_path / "power"
-    argv = ["power", "--levels", "0,1", "--seeds", "1", "--sessions", "1,2", "--jobs", "1"]
+    argv = [
+        "power",
+        "--no-prereg",
+        "--levels",
+        "0,1",
+        "--seeds",
+        "1",
+        "--sessions",
+        "1,2",
+        "--jobs",
+        "1",
+    ]
     assert cli_main([*argv, "--break-levels", "1,2", "--power-out-dir", str(out)]) == 0
     captured = capsys.readouterr()
     assert captured.out.startswith("# Planted-signal power study")
@@ -720,7 +731,17 @@ def test_power_cli_writes_the_reports(fake_pipeline, tmp_path, capsys):
     doc = json.loads((out / "POWER_REPORT.json").read_text(encoding="ascii"))
     assert doc["protocol"]["gate_looks"] == 50
     for flag, value in (("--levels", "a,b"), ("--sessions", "1,x"), ("--break-levels", "?")):
-        bad = ["--json-errors", "power", flag, value, "--jobs", "1", "--power-out-dir", str(out)]
+        bad = [
+            "--json-errors",
+            "power",
+            "--no-prereg",
+            flag,
+            value,
+            "--jobs",
+            "1",
+            "--power-out-dir",
+            str(out),
+        ]
         assert cli_main(bad) == 1
         err = json.loads(capsys.readouterr().err.strip().splitlines()[-1])
         assert err["error"]["code"] == "power_study_error"

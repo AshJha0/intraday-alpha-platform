@@ -453,6 +453,7 @@ class ExperimentRunner:
         frames: Mapping[int, pd.DataFrame] | None = None,
         repo_root: Path | None = None,
         normalized_dir: Path | None = None,
+        gate: Callable[[ExperimentSpec], None] | None = None,
     ) -> None:
         if feature_store_dir is None and frames is None:
             raise ResearchError("ExperimentRunner needs a feature_store_dir or frames")
@@ -468,6 +469,9 @@ class ExperimentRunner:
         self.out_dir = Path(out_dir)
         self.configs_dir = Path(configs_dir)
         self.dry_run = bool(dry_run)
+        #: called with the spec before ``run`` reads any data; raises to refuse
+        #: (the pre-registration check; ``None`` = ungated, e.g. test fixtures)
+        self._gate = gate
         self.repo_root = Path(repo_root) if repo_root is not None else None
         self._frames: dict[int, pd.DataFrame] | None = (
             {int(k): v for k, v in frames.items()} if frames is not None else None
@@ -702,6 +706,8 @@ class ExperimentRunner:
 
     def run(self, spec: ExperimentSpec) -> ExperimentResult:
         """Run ``spec`` (see the module docs for the six steps)."""
+        if self._gate is not None:
+            self._gate(spec)
         self._check_spec(spec)
         factory = self._model_factory(spec)
         probe = factory()
