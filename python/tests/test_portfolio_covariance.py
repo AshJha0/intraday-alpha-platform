@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 from iap.portfolio.covariance import bars_from_features, ewma_covariance
@@ -36,6 +38,14 @@ def test_ewma_validation():
         ewma_covariance(np.zeros(10))  # 1-D
 
 
+needs_features = pytest.mark.skipif(
+    not (Path(__file__).resolve().parents[2] / "data" / "features").is_dir()
+    or not any((Path(__file__).resolve().parents[2] / "data" / "features").glob("*.parquet")),
+    reason="bundled feature store not generated",
+)
+
+
+@needs_features
 def test_bars_from_real_feature_store():
     """1m bars from the repo's bundled feature parquet (FX pairs)."""
     ids, bar_ts, rets = bars_from_features(instruments=[101, 102, 103])
@@ -51,6 +61,7 @@ def test_bars_from_real_feature_store():
     assert np.all(np.diag(S) > 0)
 
 
+@needs_features
 def test_bars_deterministic():
     a = bars_from_features(instruments=[101, 102])
     b = bars_from_features(instruments=[101, 102])
