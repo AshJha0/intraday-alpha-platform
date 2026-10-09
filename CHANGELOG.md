@@ -14,6 +14,15 @@ an out-of-time holdout run on 2026-05-18 (needs a frozen pre-registered
 hypothesis first). The matched-horizon siblings
 of the synthetic `power` detectors are not gated separately.
 
+## v1.7.2 — 2026-10-09
+
+The first real-data power study (with checkpoint and resume), the pre-registration
+gate on the remaining research paths, stage progress lines for the ingest, a coarse
+latency guard in CI, and fixes for tests that failed on Windows. Pull
+requests [#31](https://github.com/AshJha0/intraday-alpha-platform/pull/31) to
+[#36](https://github.com/AshJha0/intraday-alpha-platform/pull/36). No change to
+any committed result.
+
 **Result: `power-real` on the 7 real sessions** (125 runs, about 9 h; table and
 reading in docs/REAL_DATA.md section 3.1). On real-noise nulls neither detector is
 ever flagged (0/20 at every threshold). At the gate threshold (|t| 4.37) EQ10 is
