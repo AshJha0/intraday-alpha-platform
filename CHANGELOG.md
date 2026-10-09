@@ -8,13 +8,28 @@ that tag.
 
 ## Unreleased
 
-Still to do (carried over from v1.6.0): the real-data power study (`power-real`,
-reduced grid about 9 h; it started once and was stopped after about 10 of 125 runs
-with null-level statistics only), the 2026-05-18 ITCH ingest (a 75-minute attempt
-was stopped with no output and its partial data deleted; 2026 days stay an
-out-of-time holdout), latency benchmarks in CI, `combine` skipping asset classes
-with no rows, tying a pre-registered direction to the verdict, and wiring direct
-`ExperimentRunner` callers to the pre-registration gate.
+Still to do: the real-data power study (`power-real`, reduced grid about 9 h; it
+started once and was stopped after about 10 of 125 runs with null-level statistics
+only; it needs checkpointing first), the 2026-05-18 ITCH ingest (a 75-minute
+attempt was stopped with no output and its partial data deleted; 2026 days stay an
+out-of-time holdout), latency benchmarks in CI, and gating the `power` /
+`power-real` studies and programmatic `ExperimentRunner` callers (golden) on
+pre-registration.
+
+## v1.7.1 — 2026-10-09
+
+Closes three v1.7.0 gaps in the research CLI.
+
+- `research combine` skips an asset class with no rows in the dataset (FX on the
+  equity-only real data) with a progress line, instead of failing; it fails only
+  if no requested class has rows. `--asset-class EQUITY` is no longer needed.
+- `research combine` now requires pre-registration of each combination
+  (`COMB_EQ` / `COMB_FX` at its horizon) on the blackboard, checked before any
+  look is debited. `--no-prereg` opts out; `--prereg-board` selects the board.
+- `research run` compares the sign of the result's IC with the pre-registered
+  `expected_sign`. A contradiction prints `PRE-REGISTERED DIRECTION CONTRADICTED`
+  and exits 3; the result is still written. The check is a CLI report, not a
+  field of `result.json`.
 
 ## v1.7.0 — 2026-10-08
 

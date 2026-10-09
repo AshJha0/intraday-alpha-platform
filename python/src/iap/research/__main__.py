@@ -68,6 +68,8 @@ from iap.validation.ledger import ExperimentLedger
 from iap.validation.methods import METHODS
 
 REPO = Path(__file__).resolve().parents[4]
+#: exit status of ``run`` when the result contradicts the pre-registered direction
+DIRECTION_CONTRADICTED_EXIT = 3
 
 #: (label, field, format) rows of the result table, in reading order.
 _RESULT_ROWS = (
@@ -246,11 +248,13 @@ def _dataset_versions(args: argparse.Namespace) -> tuple[str | None, str | None]
     return dataset_version, feature_version
 
 
-def _check_prereg(args: argparse.Namespace) -> None:
-    """Pre-registration gate: before any data is read (AL02)."""
+def _check_prereg(args: argparse.Namespace) -> dict | None:
+    """Pre-registration gate: before any data is read (AL02).
+
+    Returns the blackboard entry, or ``None`` under ``--no-prereg``."""
     if args.no_prereg:
         print("NOT pre-registered (--no-prereg): exploratory, not evidence for a gate")
-        return
+        return None
     from iap.agents.prereg_gate import PreregistrationError, board_path, require
     from iap.research.specs import pinned_horizon
 
@@ -264,10 +268,28 @@ def _check_prereg(args: argparse.Namespace) -> None:
         f"pre-registered: {args.alpha}/{horizon} on {args.prereg_board or board_path(root)} "
         f"(entry {entry['seq']})"
     )
+    return entry
+
+
+def _direction_check(entry: dict | None, result: Any) -> bool:
+    """Whether the result's IC has the pre-registered sign (``True`` without a prereg)."""
+    if entry is None:
+        return True
+    expected = int(entry["body"]["expected_sign"])
+    observed = 1 if result.ic > 0 else -1 if result.ic < 0 else 0
+    if observed == expected:
+        print(f"pre-registered direction {expected:+d} confirmed (IC {result.ic:+.4f})")
+        return True
+    print(
+        f"PRE-REGISTERED DIRECTION CONTRADICTED: expected sign {expected:+d}, observed IC "
+        f"{result.ic:+.4f}; the {result.verdict.value} verdict does not stand as evidence "
+        "for the registered hypothesis"
+    )
+    return False
 
 
 def _run(args: argparse.Namespace) -> int:
-    _check_prereg(args)
+    prereg_entry = _check_prereg(args)
     dataset_version, feature_version = _dataset_versions(args)
     runner = ExperimentRunner(
         args.features_dir,
@@ -299,6 +321,7 @@ def _run(args: argparse.Namespace) -> int:
     print(render_spec(spec))
     print()
     result = runner.run(spec)
+    direction_ok = _direction_check(prereg_entry, result)
     print(render_result(result))
     if runner.last_eligibility is not None:
         print(render_eligibility(runner.last_eligibility))
@@ -314,7 +337,7 @@ def _run(args: argparse.Namespace) -> int:
             f"\nwrote {runner.experiment_dir(spec.experiment_id)}/"
             f"{{spec,result,eligibility}}.json and {runner.ledger_path}"
         )
-    return 0
+    return 0 if direction_ok else DIRECTION_CONTRADICTED_EXIT
 
 
 def _warn_skipped(registry: ExperimentRegistry) -> None:
@@ -419,6 +442,28 @@ def _power_real(args: argparse.Namespace) -> int:
     return 0
 
 
+def _combine_gate(args: argparse.Namespace):
+    """The pre-registration hook for ``combine``: (combination id, horizon) must be on the board."""
+    if args.no_prereg:
+        print("NOT pre-registered (--no-prereg): exploratory, not evidence for a gate")
+        return None
+    from iap.agents.prereg_gate import PreregistrationError, board_path, require
+
+    root = args.repo_root if args.repo_root is not None else REPO
+
+    def gate(combination_id: str, horizon: str) -> None:
+        try:
+            entry = require(root, combination_id, horizon, args.prereg_board)
+        except PreregistrationError as exc:
+            raise ResearchError(str(exc), code="not_preregistered") from exc
+        print(
+            f"pre-registered: {combination_id}/{horizon} on "
+            f"{args.prereg_board or board_path(root)} (entry {entry['seq']})"
+        )
+
+    return gate
+
+
 def _combine(args: argparse.Namespace) -> int:
     from iap.combine import report as combine_report
     from iap.combine.weights import METHODS as COMBINATION_METHODS
@@ -454,6 +499,7 @@ def _combine(args: argparse.Namespace) -> int:
             progress=lambda line: print(line, file=sys.stderr),
             dataset_version=dataset_version,
             feature_version=feature_version,
+            gate=_combine_gate(args),
         )
     except ValueError as exc:
         raise ResearchError(str(exc), code="invalid_spec") from exc
@@ -684,6 +730,17 @@ def _parser() -> argparse.ArgumentParser:
         type=Path,
         default=REPO / "research" / "combination",
         help="where REPORT.md, COMBINATION.json, reports/ and signal_correlation.json go",
+    )
+    combine.add_argument(
+        "--no-prereg",
+        action="store_true",
+        help="skip the pre-registration check (exploratory run; stated in the output)",
+    )
+    combine.add_argument(
+        "--prereg-board",
+        type=Path,
+        default=None,
+        help="blackboard holding the pre-registrations (default research/agents/blackboard.jsonl)",
     )
     combine.set_defaults(func=_combine)
     return parser
