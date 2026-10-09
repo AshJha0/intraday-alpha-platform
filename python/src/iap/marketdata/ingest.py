@@ -40,8 +40,9 @@ import os
 import shutil
 import struct
 import sys
+import threading
 import time
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from heapq import heappop, heappush
 from pathlib import Path
 
@@ -321,6 +322,57 @@ class _InstrumentStats:
         self.first_add = 0  # first displayed price at or above $1.00, else the first one
         self.first_trade = 0
         self.volume = 0
+
+
+#: seconds between "still running" lines of a long stage
+HEARTBEAT_S = 60.0
+
+
+def _path_bytes(path: Path) -> int:
+    """Size of a file, or of everything under a directory; 0 when absent."""
+    try:
+        if path.is_dir():
+            return sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
+        return path.stat().st_size
+    except OSError:
+        return 0
+
+
+class _Stage:
+    """Context manager that reports a stage to ``progress`` (a no-op without one).
+
+    Prints a start line, a "still running" line every ``HEARTBEAT_S`` seconds
+    carrying the elapsed time and the size of ``watch`` (the file or directory
+    the stage is writing), and an end line.  A quiet stage then reads as
+    working, not hung.  Reporting only: it never touches the ingest's data."""
+
+    def __init__(self, progress, name, watch, interval=HEARTBEAT_S):
+        self.progress, self.name, self.watch, self.interval = progress, name, watch, interval
+        self._stop = threading.Event()
+
+    def _beat(self, t0):
+        while not self._stop.wait(self.interval):
+            self.progress(
+                f"[ingest] {self.name}: running {time.perf_counter() - t0:.0f}s, "
+                f"{_path_bytes(self.watch) / 1e9:.2f} GB written"
+            )
+
+    def __enter__(self):
+        if self.progress is not None:
+            self._t0 = time.perf_counter()
+            self.progress(f"[ingest] {self.name}: start")
+            threading.Thread(target=self._beat, args=(self._t0,), daemon=True).start()
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self._stop.set()
+        if self.progress is not None:
+            state = "done" if exc_type is None else "FAILED"
+            self.progress(
+                f"[ingest] {self.name}: {state} in {time.perf_counter() - self._t0:.0f}s, "
+                f"{_path_bytes(self.watch) / 1e9:.2f} GB"
+            )
+        return False
 
 
 def _spool_pass(protos: Iterable[ProtoEvent], spool: Path, n_inst: int) -> list[_InstrumentStats]:
@@ -782,6 +834,7 @@ def ingest(
     book_check: bool = True,
     timings: dict[str, float] | None = None,
     defer_normalize: bool = False,
+    progress: Callable[[str], None] | None = None,
 ) -> dict:
     """Ingest one session into ``out_dir``; returns the manifest document."""
     if source_format not in FORMATS:
@@ -865,7 +918,8 @@ def ingest(
     spool = raw_dir / f"{stem}.spool"
     try:
         clock = time.perf_counter()
-        stats = _spool_pass(source.events(), spool, len(universe))
+        with _Stage(progress, "parse_map_spool", spool):
+            stats = _spool_pass(source.events(), spool, len(universe))
         stage["parse_map_spool"] = time.perf_counter() - clock
         source.finish()
         verification = source.verification()
@@ -881,7 +935,8 @@ def ingest(
         check = _BookCheck(len(universe)) if book_check else None
         clock = time.perf_counter()
         fresh: list[MarketEvent] | None = None if defer_normalize else []
-        raw_info = _raw_pass(spool, raw_dir / f"{stem}.jsonl", ticks, venue_id, check, fresh)
+        with _Stage(progress, "raw_and_book_check", raw_dir / f"{stem}.jsonl.partial"):
+            raw_info = _raw_pass(spool, raw_dir / f"{stem}.jsonl", ticks, venue_id, check, fresh)
         stage["raw_and_book_check"] = time.perf_counter() - clock
     except BaseException:
         # a refused / failed session leaves no half-written file behind
@@ -977,7 +1032,8 @@ def ingest(
         _write_json(manifest_path, manifest)
         return manifest
     clock = time.perf_counter()
-    qc = normalize_run(raw_dir, normalized_dir, {raw_file.name: fresh})
+    with _Stage(progress, "normalize", normalized_dir):
+        qc = normalize_run(raw_dir, normalized_dir, {raw_file.name: fresh})
     stage["normalize"] = time.perf_counter() - clock
     qc["raw_dir"] = "raw"
     _write_json(normalized_dir / "qc_report.json", qc, sort_keys=False)
@@ -1177,6 +1233,7 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="skip the replay of the mapped stream through the order book",
     )
+    p.add_argument("--quiet", action="store_true", help="no stage / heartbeat lines on stderr")
     p.add_argument(
         "--defer-normalize",
         action="store_true",
@@ -1213,6 +1270,7 @@ def main(argv: list[str] | None = None) -> int:
             book_check=not args.no_book_check,
             timings=stages,
             defer_normalize=args.defer_normalize,
+            progress=None if args.quiet else lambda line: print(line, file=sys.stderr, flush=True),
         )
     except BookDivergenceError as exc:
         print(f"error: {exc}", file=sys.stderr)

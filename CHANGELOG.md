@@ -18,6 +18,8 @@ pre-registration.
 
 **Added.** `research power-real` writes `REAL_POWER_CHECKPOINT.jsonl` beside its report (one fsynced line per finished run, keyed by a fingerprint of dataset, grid, thresholds and seeds). Rerunning the same command resumes from it and gives the same document as an uninterrupted run; a checkpoint from a different study is refused; `--restart` discards it.
 
+**Added.** `marketdata ingest` prints stage start/end lines and a heartbeat every 60 s (elapsed time and GB written by the running stage) to stderr, so a quiet stage such as `normalize` no longer looks hung; `--quiet` turns it off.
+
 ## v1.7.1 — 2026-10-09
 
 Closes three v1.7.0 gaps in the research CLI.
