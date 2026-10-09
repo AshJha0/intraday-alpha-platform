@@ -16,6 +16,8 @@ out-of-time holdout), latency benchmarks in CI, and gating the `power` /
 `power-real` studies and programmatic `ExperimentRunner` callers (golden) on
 pre-registration.
 
+**Added.** `marketdata ingest` prints stage start/end lines and a heartbeat every 60 s (elapsed time and GB written by the running stage) to stderr, so a quiet stage such as `normalize` no longer looks hung; `--quiet` turns it off.
+
 ## v1.7.1 — 2026-10-09
 
 Closes three v1.7.0 gaps in the research CLI.

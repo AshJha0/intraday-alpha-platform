@@ -897,3 +897,23 @@ def test_batch_and_real_power_run_on_an_ingested_dataset(tmp_path, capsys):
     assert scenarios == {"shifted:stable", "real:stable", "shifted:break"}
     assert all(c["n_runs"] == (1 if c["scenario"].startswith("real") else 2) for c in doc["cells"])
     assert "Planted-signal power on real data" in power_real.render_markdown(doc)
+
+
+def test_stage_reports_start_heartbeat_and_end(tmp_path):
+    import time
+
+    from iap.marketdata.ingest import _Stage
+
+    watched = tmp_path / "out.bin"
+    watched.write_bytes(b"x" * 10)
+    lines: list[str] = []
+    with _Stage(lines.append, "demo", watched, interval=0.01):
+        time.sleep(0.1)
+    assert lines[0] == "[ingest] demo: start"
+    assert any("demo: running" in ln and "GB written" in ln for ln in lines)
+    assert lines[-1].startswith("[ingest] demo: done in ")
+    with pytest.raises(RuntimeError), _Stage(lines.append, "bad", watched):
+        raise RuntimeError("boom")
+    assert "bad: FAILED" in lines[-1]
+    with _Stage(None, "quiet", watched):  # no progress callback: silent no-op
+        pass
