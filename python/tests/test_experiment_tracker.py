@@ -80,8 +80,9 @@ def test_manifest_versions_are_real(tracker, tmp_path):
     )
     # an empty directory is never a checkout -> pinned fallback string
     assert git_commit(tmp_path) == "unversioned-workspace"
-    # normalized data + feature registry exist in this repo -> sha256 digests
-    assert len(data_version()) == 64
+    # normalized data + feature registry exist in this repo -> sha256 digests; a
+    # checkout without the generated dataset gets the pinned fallback instead
+    assert len(data_version()) == 64 or data_version() == "no-normalized-data"
     assert len(feature_version()) == 64
     hw = hardware_summary()
     assert set(hw) == {"cpu_model", "cpu_count", "machine", "system", "python"}

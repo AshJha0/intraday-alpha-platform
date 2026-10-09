@@ -93,19 +93,19 @@ def test_golden_result_reproduces(golden, spec, result):
     assert got["n_experiments_in_ledger"] == LOOKS_PER_EXPERIMENT
     assert set(got) == set(want)
     for key, expected in want.items():
-        value = got[key]
-        if isinstance(expected, bool) or not isinstance(expected, (int, float)):
-            assert value == expected, key
-        elif isinstance(expected, int):
-            assert value == expected, key
-        else:
-            _close(value, expected)
-    for key, expected in want["leakage_detail"].items():
-        value = got["leakage_detail"][key]
-        if isinstance(expected, float):
-            _close(value, expected)
-        else:
-            assert value == expected, key
+        _match(got[key], expected, key)
+
+
+def _match(value, expected, path: str) -> None:
+    """Floats within TOL (nested too), everything else exactly."""
+    if isinstance(expected, dict):
+        assert isinstance(value, dict) and set(value) == set(expected), path
+        for k, v in expected.items():
+            _match(value[k], v, f"{path}.{k}")
+    elif isinstance(expected, float):
+        _close(value, expected)
+    else:
+        assert value == expected, path
 
 
 def test_golden_document_round_trips(golden, spec, result):
