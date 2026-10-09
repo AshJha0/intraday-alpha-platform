@@ -169,8 +169,54 @@ chain and thresholds are asked to find it. It measures **statistical
 detection only**: fills are priced at the real mids, which the planted
 labels do not move, so P&L gates and verdicts still describe the real
 market; the recompute leakage probe is off. See the module docstring.
+Since v1.7.2 `power` and `power-real` need the declared detectors (EQ04 at 5s
+and EQ10 at 1s) pre-registered on the blackboard, like `run` and `combine`;
+`--no-prereg` opts out and says so in the output.
 [COOKBOOK.md](../COOKBOOK.md) recipe 36 runs this whole chain on bytes
 written by the test encoder, so it works without a real file.
+
+#### Result on the seven real sessions (2026-10-09)
+
+The reduced grid (levels 0 / 0.005 / 0.01 / 0.02 / 0.04, 20 seeds, seven
+sessions 2019-01-30 .. 2020-01-30, detectors EQ10 lead-lag at 1 s and EQ04
+order flow at 5 s) ran 125 times (about 9 h, 4–5 CPU-minutes a run). The
+thresholds are the fixed |t| 3.0, the gate in force 4.37 (3,936 looks) and
+the study's own 3.89 (500 tests). The report and its JSON stay under the
+git-ignored `data/real/multi7/research/power/`; this table is recomputed from
+the 125 raw runs and matches every one of the 22 cells.
+
+| Planted IC | EQ10 detected @gate | EQ10 @fixed | EQ04 detected @gate | EQ04 @fixed |
+|---:|---|---|---|---|
+| 0 (null) | 0/20 | 0/20 | 0/20 | 0/20 |
+| 0.005 | 1/20 | 12/20 | 0/20 | 0/20 |
+| 0.01 | 18/20 | 20/20 | 0/20 | 10/20 |
+| 0.02 | 20/20 | 20/20 | 19/20 | 20/20 |
+| 0.04 | 20/20 | 20/20 | 20/20 | 20/20 |
+
+(shifted-label background; Wilson 95 % intervals are in the report, 0/20 is
+0.00–0.16 and 20/20 is 0.84–1.00.) Reading it:
+
+- **No false positives.** With nothing planted, neither detector was flagged
+  at any threshold; the mean pooled t is 0.08 (EQ10) and −0.07 (EQ04).
+- **Minimum reliably detectable effect at the gate:** an IC of about 0.01
+  for EQ10 and about 0.02 for EQ04. Below that, a REJECT on these sessions
+  cannot tell "no signal" from "no power".
+- **Break scenario** (planted IC 0.02, sign reversed from 2019-08-30): the
+  chain's break test flags it in 20/20 runs for both detectors (mean break z
+  11.9 and 5.9). The pooled t of those runs is negative, which is the
+  reversal, not a miss.
+- **The real labels, nothing planted.** EQ10: pooled t 13.2, gate IC 0.076,
+  detected at all three thresholds — about seven times the smallest effect
+  the chain reliably sees. EQ04: pooled t 3.6, gate IC 0.014 — it passes the
+  fixed 3.0 but **not** the gate (4.37) or the study (3.89) threshold.
+
+What it does not say. This is statistical detection only (see above): it
+does not show that any of this is tradable. On the same sessions
+`research combine` (v1.7.0) found strong gate statistics and **no
+combination profitable after costs**, and no real-label run traded. The
+intervals are optimistic about their own width: seven sessions, and the
+shifted offsets are not fully independent. The real-label rows are single
+runs (1/1, interval 0.21–1.00).
 
 ## 4. Mapping to canonical events
 
@@ -495,6 +541,30 @@ older files through a fast path of the strict decoder, writes JSONL in
 batches, and builds the Parquet columns from the IAP1 record bytes through
 one numpy view. `test_output_bytes_of_a_seeded_dataset_are_pinned` holds
 hashes recorded before this work.
+
+**Full-day 2026 files (AAPL, MSFT, QQQ).** Two measured runs, the second
+one with the v1.7.1 stage lines:
+
+| Session | Source | Events | Total | parse + spool | raw + book check | normalise |
+|---|---|---|---|---|---|---|
+| 2026-05-15 | 13.0 GB gzip, 0.96 bn messages | 40.5 m | 52 min | 20 min | 7 min | 23 min |
+| 2026-05-18 | 16.2 GB gzip, 1.18 bn messages | 46.4 m | 260 min | 77 min | 36 min | 144 min |
+
+The second file is 24 % larger in bytes and 15 % in events, but took five
+times as long, and every stage was slower, not just the largest. The cause
+is memory, not volume (a diagnosis from the run's resource readings, not a
+profile): the ingest holds every event of the session in a Python list from
+the raw pass to the end of normalisation, the process reached 17.6 GB
+committed on a 16 GB machine with a 13 GB pagefile, free RAM fell under
+1 GB, the heartbeat thread was starved for minutes at a time, and CPU use
+dropped to 30–60 % of a core. An earlier attempt on the same file was
+stopped at 75 minutes with no output because normalisation writes nothing
+until it has finished; the clean rerun needed 260 minutes, so that attempt
+was most likely stopped well before it would have finished.
+Run full-day files alone on the machine, give the job 16 GB or more free, and
+read the `[ingest]` heartbeat (elapsed time and GB written by the running
+stage) instead of waiting for output. Streaming the events to disk instead
+of keeping them is the known fix and is not done.
 
 **Many days.** Every ingest re-normalises all sessions of the dataset
 (the QC state and `events.parquet` span them). For a load of many dates

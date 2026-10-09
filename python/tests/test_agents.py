@@ -410,3 +410,42 @@ def test_direction_check_compares_ic_sign_with_the_prereg(expected, ic, ok, caps
     assert _direction_check(entry, result) is ok
     assert ("CONTRADICTED" in capsys.readouterr().out) is (not ok)
     assert _direction_check(None, result) is True  # --no-prereg: nothing to contradict
+
+
+def test_runner_gate_runs_before_any_data_is_read(tmp_path):
+    from iap.agents.prereg_gate import PreregistrationError
+    from iap.research.runner import ExperimentRunner
+
+    seen = []
+
+    def gate(spec):
+        seen.append(spec)
+        raise PreregistrationError("refused")
+
+    runner = ExperimentRunner(
+        None,
+        tmp_path / "l.json",
+        tmp_path / "e",
+        REPO_ROOT / "configs",
+        frames={1: None},
+        gate=gate,
+    )
+    with pytest.raises(PreregistrationError, match="refused"):
+        runner.run("a-spec")  # not a real spec: the gate must act before anything touches it
+    assert seen == ["a-spec"]
+
+
+@pytest.mark.parametrize("command", ["power", "power-real"])
+def test_power_studies_need_the_declared_detectors_preregistered(root, tmp_path, capsys, command):
+    from iap.research.__main__ import main as research_main
+
+    base = ["--json-errors", command, "--repo-root", str(root)]
+    if command == "power-real":
+        base += ["--dataset-dir", str(tmp_path / "none")]
+    # refused before any dataset or generator config is read (neither exists)
+    assert research_main(base) == 1
+    assert "not_preregistered" in capsys.readouterr().err
+    b = WriteBroker(root, {"alice"}, clock=Clock())
+    b.preregister("alice", "EQ04", "5s", "h", 1)
+    assert research_main(base) == 1  # EQ10 is still missing
+    assert "EQ10" in capsys.readouterr().err
