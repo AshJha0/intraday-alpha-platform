@@ -10,11 +10,13 @@ that tag.
 
 Still to do: the real-data power study (`power-real`, reduced grid about 9 h; it
 started once and was stopped after about 10 of 125 runs with null-level statistics
-only; it needs checkpointing first), the 2026-05-18 ITCH ingest (a 75-minute
+only; it now checkpoints and resumes), the 2026-05-18 ITCH ingest (a 75-minute
 attempt was stopped with no output and its partial data deleted; 2026 days stay an
 out-of-time holdout), latency benchmarks in CI, and gating the `power` /
 `power-real` studies and programmatic `ExperimentRunner` callers (golden) on
 pre-registration.
+
+**Added.** `research power-real` writes `REAL_POWER_CHECKPOINT.jsonl` beside its report (one fsynced line per finished run, keyed by a fingerprint of dataset, grid, thresholds and seeds). Rerunning the same command resumes from it and gives the same document as an uninterrupted run; a checkpoint from a different study is refused; `--restart` discards it.
 
 **Added.** `marketdata ingest` prints stage start/end lines and a heartbeat every 60 s (elapsed time and GB written by the running stage) to stderr, so a quiet stage such as `normalize` no longer looks hung; `--quiet` turns it off.
 

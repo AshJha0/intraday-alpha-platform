@@ -61,6 +61,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -70,6 +71,7 @@ import pandas as pd
 
 from iap.alpha import configure_universe
 from iap.alpha.data import load_features, slim_columns
+from iap.contracts.versions import content_hash
 from iap.core.rng import SplitMix64
 from iap.experiment.locking import atomic_write_text
 from iap.labels.frames import scored_labels
@@ -222,6 +224,41 @@ def plant(
     return out
 
 
+def _load_checkpoint(path: Path, fingerprint: str) -> dict[tuple[str, float, int], dict]:
+    """Runs already on the checkpoint, keyed ``(scenario, level, seed)``.
+
+    The first line is ``{"fingerprint": ...}``; a checkpoint written for a
+    different grid, dataset or seed list is refused, not silently reused.  A
+    torn last line (the process died mid-write) is dropped."""
+    done: dict[tuple[str, float, int], dict] = {}
+    lines = path.read_text(encoding="utf-8").splitlines()
+    for n, line in enumerate(lines):
+        try:
+            rec = json.loads(line)
+        except json.JSONDecodeError:
+            if n == len(lines) - 1:
+                # drop the torn line from the file too, or the next append lands behind it
+                path.write_text("".join(f"{ln}\n" for ln in lines[:n]), encoding="utf-8")
+                break
+            raise _fail(f"{path}: line {n + 1} is not JSON; the checkpoint is corrupt") from None
+        if n == 0:
+            if rec.get("fingerprint") != fingerprint:
+                raise _fail(
+                    f"{path} was written for a different study (dataset, grid or seeds); "
+                    "pass --restart to discard it"
+                )
+            continue
+        done[(rec["scenario"], float(rec["level"]), int(rec["seed"]))] = rec
+    return done
+
+
+def _append_checkpoint(path: Path, record: Mapping[str, Any]) -> None:
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(record, sort_keys=True) + "\n")
+        fh.flush()
+        os.fsync(fh.fileno())
+
+
 def run_real_power_study(
     dataset_dir: Path,
     levels: Sequence[float] = DEFAULT_LEVELS,
@@ -232,8 +269,15 @@ def run_real_power_study(
     gate_looks: int | None = None,
     reports_dir: Path | None = None,
     progress: Callable[[str], None] | None = None,
+    checkpoint: Path | None = None,
+    restart: bool = False,
 ) -> dict[str, Any]:
     """Run the grid on ``dataset_dir`` and return the report document.
+
+    With ``checkpoint`` every finished run is appended to that JSONL file
+    (fsynced) and a rerun skips the runs already on it, so a stopped study
+    resumes where it stopped; runs are deterministic, so the document equals
+    an uninterrupted one.  ``restart`` discards an existing checkpoint.
 
     ``sessions`` defaults to 2, 4, ... and the dataset's session count.
     ``gate_looks`` defaults to the count the committed promotion reports
@@ -281,9 +325,36 @@ def run_real_power_study(
     promote_t = max(thresholds.values())
     break_day = days[min(len(days) - 1, int(math.floor(full * BREAK_AT_FRACTION)))]
 
+    done: dict[tuple[str, float, int], dict] = {}
+    if checkpoint is not None:
+        checkpoint = Path(checkpoint)
+        fingerprint = content_hash(
+            {
+                "x-version": REAL_POWER_VERSION,
+                "dataset_version": manifest["dataset_version"],
+                "grid": [[b, sc, lv, sd, pf] for b, sc, lv, sd, pf in grid],
+                "thresholds": thresholds,
+                "detectors": dets,
+                "base_seed": base_seed,
+            }
+        )
+        if restart and checkpoint.exists():
+            checkpoint.unlink()
+        if checkpoint.exists() and checkpoint.stat().st_size:
+            done = _load_checkpoint(checkpoint, fingerprint)
+        if not checkpoint.exists() or not checkpoint.stat().st_size:  # new, or torn header
+            checkpoint.parent.mkdir(parents=True, exist_ok=True)
+            checkpoint.write_text(json.dumps({"fingerprint": fingerprint}) + "\n", encoding="utf-8")
+        if done and progress is not None:
+            progress(f"resuming: {len(done)} runs already on {checkpoint}")
+
     runs: list[dict[str, Any]] = []
     for background, scenario, level, run_seeds, prefixes in grid:
         for seed in run_seeds:
+            prior = done.get((f"{background}:{scenario}", float(level), int(seed)))
+            if prior is not None:
+                runs.append(prior)
+                continue
             base = shift_labels(frames, seed) if background == "shifted" else frames
             planted = plant(
                 base, dets, level, break_from_day=break_day if scenario == "break" else None
@@ -306,6 +377,8 @@ def run_real_power_study(
                 }
             )
             runs.append(run)
+            if checkpoint is not None:
+                _append_checkpoint(checkpoint, run)
             if progress is not None:
                 last = run["evaluations"][-1]
                 progress(
