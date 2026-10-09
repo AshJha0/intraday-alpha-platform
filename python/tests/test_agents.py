@@ -376,3 +376,37 @@ def test_prereg_gate_blocks_run_before_data_is_read(root, capsys):
     p.write_text(p.read_text(encoding="ascii").replace('"h"', '"x"'), encoding="ascii")
     with pytest.raises(PreregistrationError):
         require(root, "EQ03", "1s")
+
+
+def test_combine_gate_needs_a_prereg_for_the_combination(root):
+    import argparse
+
+    from iap.research import ResearchError
+    from iap.research.__main__ import _combine_gate
+
+    args = argparse.Namespace(no_prereg=False, repo_root=root, prereg_board=None)
+    gate = _combine_gate(args)
+    with pytest.raises(ResearchError, match="not pre-registered"):
+        gate("COMB_EQ", "5s")
+    WriteBroker(root, {"alice"}, clock=Clock()).preregister("alice", "COMB_EQ", "5s", "h", 1)
+    gate("COMB_EQ", "5s")
+    with pytest.raises(ResearchError):
+        gate("COMB_EQ", "1s")  # a different horizon is a different hypothesis
+    assert _combine_gate(argparse.Namespace(no_prereg=True, repo_root=root)) is None
+
+
+@pytest.mark.parametrize(
+    ("expected", "ic", "ok"),
+    [(1, 0.05, True), (-1, -0.05, True), (1, -0.05, False), (-1, 0.0, False)],
+)
+def test_direction_check_compares_ic_sign_with_the_prereg(expected, ic, ok, capsys):
+    from types import SimpleNamespace
+
+    from iap.contracts.types import Verdict
+    from iap.research.__main__ import _direction_check
+
+    entry = {"body": {"expected_sign": expected}}
+    result = SimpleNamespace(ic=ic, verdict=Verdict.PROMOTE)
+    assert _direction_check(entry, result) is ok
+    assert ("CONTRADICTED" in capsys.readouterr().out) is (not ok)
+    assert _direction_check(None, result) is True  # --no-prereg: nothing to contradict

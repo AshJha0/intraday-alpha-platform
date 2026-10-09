@@ -706,3 +706,15 @@ def test_report_pipeline_on_the_bundled_data(tmp_path):
     assert paths["md"].read_text(encoding="utf-8").startswith("# Signal combination report")
     assert "correlation" not in paths
     assert (tmp_path / "out" / "reports" / "COMB_EQ.equal_weight.json").is_file()
+
+
+def test_combine_skips_asset_classes_without_rows():
+    from iap.alpha.base import universe_ids
+
+    eq = universe_ids("equity")[0]
+    frames = {eq: pd.DataFrame({"x": [1.0]})}
+    seen: list[str] = []
+    assert combine_report._populated_classes(frames, ["EQUITY", "FX"], seen.append) == ["EQUITY"]
+    assert seen == ["skipping FX: no rows for its universe in this dataset"]
+    with pytest.raises(ValueError, match="no rows for any"):
+        combine_report._populated_classes({}, ["EQUITY", "FX"], seen.append)

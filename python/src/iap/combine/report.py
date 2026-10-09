@@ -65,7 +65,7 @@ import numpy as np
 import pandas as pd
 
 from iap.alpha import ALPHA_IDS, build
-from iap.alpha.base import AlphaModel
+from iap.alpha.base import AlphaModel, universe_ids
 from iap.alpha.data import load_features, slim_columns
 from iap.backtest import Backtester, CostModel
 from iap.combine.model import INNER_FOLDS, CombinedAlpha, member_purged_train, member_signal
@@ -492,6 +492,24 @@ def _own_report(repo: Path, alpha_id: str) -> dict[str, Any]:
     }
 
 
+def _populated_classes(
+    frames: Mapping[int, pd.DataFrame],
+    asset_classes: Sequence[str],
+    say: Callable[[str], None],
+) -> list[str]:
+    """``asset_classes`` without those whose universe has no rows in ``frames``."""
+    keep = []
+    for ac in asset_classes:
+        ids = universe_ids("equity" if ac == "EQUITY" else "fx")
+        if any(len(frames[i]) for i in ids if i in frames):
+            keep.append(ac)
+        else:
+            say(f"skipping {ac}: no rows for its universe in this dataset")
+    if not keep:
+        raise ValueError(f"no rows for any of {list(asset_classes)} in this dataset")
+    return keep
+
+
 def run_combination(
     repo: Path,
     *,
@@ -507,12 +525,19 @@ def run_combination(
     progress: Callable[[str], None] | None = None,
     dataset_version: str | None = None,
     feature_version: str | None = None,
+    gate: Callable[[str, str], None] | None = None,
 ) -> dict[str, Any]:
     """Evaluate the combinations (module docs) and return the report
     document together with the full validation reports
     (``{"document", "reports", "correlation"}``).  The looks are debited in
     the ledger at ``ledger_path``; nothing else is written
-    (:func:`write_reports` does that)."""
+    (:func:`write_reports` does that).
+
+    An asset class with no rows in ``frames`` (FX on an equity-only dataset)
+    is skipped with a progress line; ``ValueError`` if none has rows.  ``gate``
+    is called with ``(combination_id, horizon)`` for every class that will
+    run, before anything is evaluated or any look is debited (the
+    pre-registration check; it raises to refuse)."""
     repo = Path(repo)
     features_dir = Path(features_dir) if features_dir else repo / "data" / "features"
     configs_dir = Path(configs_dir) if configs_dir else repo / "configs"
@@ -536,6 +561,7 @@ def run_combination(
             for f in build(aid).features
         }
         frames = load_features(features_dir, columns=slim_columns(needed))
+    asset_classes = _populated_classes(frames, asset_classes, say)
     backtester = _backtester(bundle, meta, configs_dir)
     exec_cfg = json.loads((configs_dir / "execution" / "execution.json").read_text())
     max_participation = float(exec_cfg["defaults"]["max_participation"])
@@ -570,6 +596,11 @@ def run_combination(
                     )[:16],
                 }
             )
+
+    if gate is not None:
+        for ac in asset_classes:
+            first = next(p for p in plan if p["asset_class"] == ac)
+            gate(first["combination_id"], first["horizon"])
 
     # Declared before the first experiment is evaluated: one gate look count
     # for the whole report (iap.validation.ledger, "Gate look count").
