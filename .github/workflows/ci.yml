@@ -201,6 +201,24 @@ jobs:
       - name: ctest
         working-directory: cpp
         run: ctest --test-dir build --output-on-failure
+      # Coarse latency guard: run the Release bench_all (about 20 s) and fail
+      # only when a hot row is more than 5x slower than the committed table
+      # (benchmarks/results_cpp.md). A shared runner is not the 2-CPU Xeon the
+      # table was measured on, so this catches algorithmic regressions, not
+      # few-percent drift; see the header of the script. The table of ratios
+      # goes to the job summary and the raw output is uploaded.
+      - name: benchmark regression guard (coarse)
+        run: |
+          cpp/build/bench_all "$RUNNER_TEMP/bench_ci.md" > /dev/null
+          python3 tests/harness/check_bench_regression.py \
+            --current "$RUNNER_TEMP/bench_ci.md" --factor 5
+      - name: upload bench_all output
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: bench-cpp
+          path: ${{ runner.temp }}/bench_ci.md
+          if-no-files-found: ignore
       # Coverage: rebuild with --coverage (gcov instrumentation) in a
       # separate build dir so the timed Release build above is unaffected,
       # then summarize with lcov. Report-only — no threshold enforced (no

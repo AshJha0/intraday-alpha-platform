@@ -36,6 +36,21 @@ pre-CRC figure after adding it was the defect. If the CRC ever needs to be
 cheap, the fix is a slice-by-8 or hardware-CRC implementation, not removing
 the check.
 
+## CI regression guard
+
+The `cpp` job of `.github/workflows/ci.yml` runs `bench_all` in Release and
+`tests/harness/check_bench_regression.py` compares each hot row with
+`results_cpp.md`: a row more than 5x slower than the committed figure fails
+the job, and so does a run that matches fewer than 80% of the committed rows
+(a renamed table must not become a silent pass). The factor is large because
+the committed table is one 2-CPU Xeon container and CI runs on shared
+hardware: the guard is there for algorithmic regressions (a lost heap, an
+O(n^2), an allocation per event), not for drift of a few percent and not for
+tail latency. The cold single-pass rows are excluded (one unwarmed run each).
+To regenerate the baseline, run `bench_all results_cpp.md` on the baseline
+machine and update the documents that quote it
+(`tests/harness/check_headline_numbers.py` lists them).
+
 ## Cold-workload reference (hot vs full-day)
 
 Every figure in `results_cpp.md` is **cache-resident**: `bench_all` loops one
