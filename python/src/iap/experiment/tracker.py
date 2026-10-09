@@ -43,6 +43,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 import pickle
 import platform
 import subprocess
@@ -162,6 +163,10 @@ def hardware_summary() -> dict[str, Any]:
                     cpu_count += 1
     except OSError:
         pass
+    if not cpu_count:  # no /proc/cpuinfo (Windows, macOS): ask the interpreter
+        cpu_count = os.cpu_count() or 0
+    if model_name == "unknown":
+        model_name = platform.processor() or "unknown"
     return {
         "cpu_model": model_name,
         "cpu_count": cpu_count,
