@@ -59,7 +59,9 @@ def compare(
     min_coverage: float = DEFAULT_MIN_COVERAGE,
 ) -> tuple[list[tuple[str, float, float, float]], list[str]]:
     """``(rows, problems)``; each row is (name, baseline, current, ratio)."""
-    rows = [(n, b, current[n], current[n] / b) for n, b in baseline.items() if n in current and b > 0]
+    rows = [
+        (n, b, current[n], current[n] / b) for n, b in baseline.items() if n in current and b > 0
+    ]
     problems = [
         f"{n}: {c:.1f} vs committed {b:.1f} ({r:.1f}x slower, limit {factor:g}x)"
         for n, b, c, r in rows
