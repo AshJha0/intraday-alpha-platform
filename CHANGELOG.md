@@ -8,13 +8,30 @@ that tag.
 
 ## Unreleased
 
-Still to do: the real-data power study (`power-real`, reduced grid about 9 h; it
-started once and was stopped after about 10 of 125 runs with null-level statistics
-only; it now checkpoints and resumes), the 2026-05-18 ITCH ingest (a 75-minute
-attempt was stopped with no output and its partial data deleted; 2026 days stay an
-out-of-time holdout), latency benchmarks in CI, and gating the `power` /
+Still to do: ingest memory (stream events to disk; a full-day ingest took 260 min
+against 52 min for a similar file because the process outgrew the machine's RAM),
+an out-of-time holdout run on 2026-05-18 (needs a frozen pre-registered
+hypothesis first), latency benchmarks in CI, and gating the `power` /
 `power-real` studies and programmatic `ExperimentRunner` callers (golden) on
 pre-registration.
+
+**Result: `power-real` on the 7 real sessions** (125 runs, about 9 h; table and
+reading in docs/REAL_DATA.md section 3.1). On real-noise nulls neither detector is
+ever flagged (0/20 at every threshold). At the gate threshold (|t| 4.37) EQ10 is
+detected in 18/20 runs at a planted IC of 0.01 and 20/20 from 0.02; EQ04 in 19/20
+at 0.02 and 20/20 at 0.04, never at 0.01. A reversed-sign break is flagged in
+20/20 runs for both. On the unplanted real labels EQ10 has pooled t 13.2 (gate IC
+0.076) and EQ04 t 3.6 (gate IC 0.014, below the gate and study thresholds). So on
+these sessions an effect of IC about 0.01 (EQ10) or 0.02 (EQ04) is reliably seen,
+and the earlier real-data REJECT/ITERATE verdicts are about costs, not power. This
+is statistical detection only; it does not show anything tradable.
+
+**Measured: full-day 2026 ingests** (docs/REAL_DATA.md section 10). 2026-05-15 took
+52 min; 2026-05-18 (24 % more bytes, 15 % more events) took 260 min, with every
+stage slower, memory-bound at 17.6 GB committed on a 16 GB machine. The 2026-05-18
+dataset is ingested and checked (46,439,912 events, QC clean, first event 07:04 UTC
+and last 20:00 UTC on 2026-05-18, opening-cross prices AAPL 300.23, MSFT 415.76,
+QQQ 711.24) and stays an out-of-time holdout.
 
 **Added.** `research power-real` writes `REAL_POWER_CHECKPOINT.jsonl` beside its report (one fsynced line per finished run, keyed by a fingerprint of dataset, grid, thresholds and seeds). Rerunning the same command resumes from it and gives the same document as an uninterrupted run; a checkpoint from a different study is refused; `--restart` discards it.
 
