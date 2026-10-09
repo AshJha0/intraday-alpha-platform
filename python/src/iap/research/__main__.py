@@ -426,6 +426,7 @@ def _power(args: argparse.Namespace) -> int:
 def _power_real(args: argparse.Namespace) -> int:
     from iap.research import power_real
 
+    out_dir = args.power_out_dir or args.dataset_dir / "research" / "power"
     doc = power_real.run_real_power_study(
         args.dataset_dir,
         levels=_numbers(args.levels, "--levels", float),
@@ -434,8 +435,9 @@ def _power_real(args: argparse.Namespace) -> int:
         sessions=_numbers(args.sessions, "--sessions", int) if args.sessions else None,
         gate_looks=args.gate_looks,
         progress=lambda line: print(line, file=sys.stderr, flush=True),
+        checkpoint=out_dir / "REAL_POWER_CHECKPOINT.jsonl",
+        restart=args.restart,
     )
-    out_dir = args.power_out_dir or args.dataset_dir / "research" / "power"
     paths = power_real.write_reports(doc, out_dir)
     print(power_real.render_markdown(doc))
     print(f"wrote {paths['md']} and {paths['json']}", file=sys.stderr)
@@ -689,6 +691,11 @@ def _parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         help="default <dataset-dir>/research/power (git-ignored with the data)",
+    )
+    preal.add_argument(
+        "--restart",
+        action="store_true",
+        help="discard REAL_POWER_CHECKPOINT.jsonl and start over (default: resume from it)",
     )
     preal.set_defaults(func=_power_real)
 
