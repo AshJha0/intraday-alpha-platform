@@ -28,7 +28,7 @@ from pathlib import Path
 import numpy as np
 from iap.core.codec import encode_iap1, read_iap1, read_jsonl
 from iap.features.context import build_contexts
-from iap.features.native import _from_ext, compute_native, rust_extension
+from iap.features.native import NATIVE_COUNT, _from_ext, compute_native, rust_extension
 
 _REPO = Path(__file__).resolve().parents[2]
 _GOLDEN = _REPO / "tests" / "golden"
@@ -73,7 +73,7 @@ def main(argv: list[str] | None = None) -> int:
     lines = [
         f"### Native features: Python vs Rust (pyo3), cadence {args.cadence_ms} ms",
         "",
-        "| input | events | rows | python ev/s | rust ev/s | speed-up | rows agreeing |",
+        "| input | events | rows | python ev/s | rust ev/s | speed-up | rows agreeing (native 40 / all 45) |",
         "|---|---:|---:|---:|---:|---:|---:|",
     ]
     tot_ev = tot_py = tot_rs = 0.0
@@ -94,7 +94,7 @@ def main(argv: list[str] | None = None) -> int:
             a = np.where(py.validity, py.values, 0.0)
             b = np.where(rs.validity, rs.values, 0.0)
             ok = same_v & (np.abs(a - b) <= 1e-9 + 1e-9 * np.abs(a))
-            agree = f"{ok.all(axis=1).mean():.2%}"
+            agree = f"{ok[:, :NATIVE_COUNT].all(axis=1).mean():.2%} / {ok.all(axis=1).mean():.2%}"
         else:
             agree = "rows differ"
         n = len(events)
@@ -113,8 +113,9 @@ def main(argv: list[str] | None = None) -> int:
         "",
         "python = full reference engine (205 features) + native-slot selection; "
         "rust = IAP1 decode + 45-slot replay + numpy hand-off. Best of "
-        f"{args.repeat}. rows agreeing = all 45 slots equal (validity exact, values "
-        "1e-9); informational, the parity contract is the pytest suite.",
+        f"{args.repeat}. rows agreeing = every slot equal (validity exact, values "
+        "1e-9, no residue allowance); informational, the parity contract is the "
+        "pytest suite.",
         "",
     ]
     text = "\n".join(lines)

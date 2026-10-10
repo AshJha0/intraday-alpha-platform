@@ -2843,3 +2843,46 @@ longer horizon. `gamma` (permanent impact) and `eps` (fixed cost) are 0
 from this constructor; permanent impact does not change the AC trajectory,
 only its expected cost. The default IS schedule (`exp(-ra * i / (N-1))`)
 is unchanged; Almgren-Chriss runs only when a `ParentOrder` asks for it.
+
+## 49. Compute the native features with the Rust engine from Python (v1.11)
+
+Plan item E2. Build the optional pyo3 extension once (needs a Rust
+toolchain; the CI job `rust-pyo3` does the same):
+
+```bash
+pip install maturin==1.7.8
+maturin build --release -m rust/features_py/Cargo.toml -o dist
+pip install dist/iap_features_rs-*.whl
+```
+
+Then replay a golden vector through both backends and compare:
+
+```bash
+cd python
+PYTHONPATH=src python - <<'EOF'
+import numpy as np
+from iap.core.codec import read_jsonl
+from iap.features.context import build_contexts
+from iap.features.native import NATIVE_NAMES, compute_native, resolve_engine
+
+ctx = build_contexts("../configs")
+events = read_jsonl("../tests/golden/events_eq_mbo.jsonl")
+py = compute_native(events, ctx, cadence_ns=0, engine="python")
+rs = compute_native(events, ctx, cadence_ns=0, engine=resolve_engine("rust"))
+print(rs.engine, rs.values.shape, rs.validity.dtype)
+k = NATIVE_NAMES.index("microprice_v1")
+print("validity identical:", np.array_equal(py.validity, rs.validity))
+print("max |d| microprice:", np.nanmax(np.abs(py.values[:, k] - rs.values[:, k])))
+EOF
+```
+
+Expected: `rust (2000, 45) bool`, `validity identical: True` and a
+microprice difference at or below 1e-9. Without the extension
+`resolve_engine` warns and returns `python`, so the snippet still runs.
+For the feature store, `python3 -m iap.features --engine rust` takes the
+45 native columns from Rust and records `"native_engine": "rust"` in
+`features_summary.json`; the other 160 features still come from Python.
+Measure the speed on your machine with
+`python tools/bench_native_features.py` (CI: about 150x on the golden
+vectors). The anomaly vectors show the one known gap, rows inside a
+SNAPSHOT recovery burst (API_FEATURES.md §7.1).

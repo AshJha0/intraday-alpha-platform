@@ -6,6 +6,32 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
+## v1.11.0 — unreleased
+
+**Added (E2, Rust feature engine via pyo3).** `rust/features_py`, a pyo3
+0.22.6 / maturin 1.7.8 extension module (`iap_features_rs`, abi3 wheel)
+that replays IAP1 or JSONL events through the native feature engine and
+returns the 45 native slots (the pinned 40 plus 5 alpha inputs) as numpy
+arrays. It is a standalone package outside the Rust workspace, built only by
+the new `rust-pyo3` CI job (clippy, wheel, parity tests, benchmark).
+`iap.features.native` gives both backends one API (`compute_native`,
+`engine="python"|"rust"`, fallback to Python when the extension is
+missing), and `python -m iap.features --engine rust` takes the 45 native
+columns from Rust; the default output is unchanged. Parity on the golden
+vectors: every row and slot, validity exact, values 1e-9, with a
+documented allowance for `vol_regime_ratio_v1` on zero-volatility residue
+rows. Measured in CI (ubuntu-24.04): Python reference about 5,250 events/s,
+Rust about 790,000 events/s on the golden vectors, **150x**; 123x on the
+first seeded equity day at 100 ms cadence. The Python figure is the full
+205-feature engine; the pipeline itself is not faster, because the other
+160 features still run in Python. COOKBOOK recipe 49, API_FEATURES.md §7.1.
+
+**Known gap found by E2.** On the anomaly vectors, rows emitted inside a
+SNAPSHOT recovery burst differ between the engines: Python keeps the
+pre-burst derived state as API_FEATURES §2 pins, the Rust engine reads the
+half-built book. The golden checkpoints are outside bursts and still match;
+the full-row comparison is a strict xfail until the Rust engine is fixed.
+
 ## v1.10.0 — 2026-10-10
 
 New edge and strategy layer (IAP_Next_Releases_Plan v1.10: A1, M5, X1-X3,

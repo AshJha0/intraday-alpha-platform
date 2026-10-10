@@ -351,6 +351,17 @@ contract; the contract is that Python's semantics are the ones everyone
 else must reproduce — and, for risk and execution, that Python reproduces
 the Rust and C++ goldens statement for statement.
 
+**Python calling Rust** (v1.11.0, plan item E2): the Rust feature engine is
+reachable from Python through the optional pyo3 extension `iap_features_rs`
+(`rust/features_py`, a standalone maturin package outside the workspace).
+`iap.features.native` selects the backend (`engine="python"|"rust"`, Python
+when the extension is absent) and `python -m iap.features --engine rust`
+takes the 45 native feature columns from it. Parity with the Python
+reference is tested on every row of the golden vectors in the `rust-pyo3`
+CI job; measured there, the extension replays about 150x more events per
+second than the Python engine. Details and the one known gap (rows inside a
+SNAPSHOT recovery burst): API_FEATURES.md §7.1.
+
 The honest engineering conclusion (paper 6): at this platform's feed rates
 every port is overprovisioned by orders of magnitude; the languages were
 chosen for correctness leverage and engineering cost, and the golden suite —
