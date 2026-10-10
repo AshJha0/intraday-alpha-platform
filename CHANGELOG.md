@@ -8,6 +8,55 @@ that tag.
 
 ## v1.9.0 — unreleased
 
+Maker economics (plan items M1-M4). The research backtester only takes
+liquidity: at 1 s, an expected move of about 0.07 bp has to pay about 0.7 bp
+round trip. This release adds the maker side as opt-in Python research code.
+Every default path is unchanged: the synthetic simulator config, the taker
+backtest, the clipped alpha scores, every golden and every cross-language
+contract.
+
+**Added.**
+- M1, `iap.execution.calibration`: estimates a versioned calibration document
+  (`iap.exec_calibration` v1) from the normalized event stream. It covers
+  touch fill rates by queue-ahead bucket (open orders are right-censored),
+  touch queue-depletion hazards per side, feed latency quantiles (with
+  `parametric_latency` as an explicit tail for ITCH, which has no receive
+  stamp), maker adverse selection at 100 ms / 1 s / 10 s, and aggressor
+  impact (mean and slope in bps per % ADV). It also has a CLI
+  (`python -m iap.execution.calibration`). `ExecutionSimulator(config,
+  calibration=None)` draws rule-1 venue latency from the calibrated table
+  when one is given (still one SplitMix64 draw per submit or cancel), and
+  `apply_calibration` sets the impact coefficient.
+- M2, `iap.backtest.maker`: `MakerBacktester` posts at the touch on the
+  alpha's side, takes queue-position fills from the FIFO simulator, credits
+  the venue maker rebate and charges the measured markout. The gate is
+  `|er| + half_spread + rebate - exit_cost > adverse_selection + margin`,
+  with the adverse selection taken from the calibration. The exit is a taker
+  exit (the default), a mark to mid, or an opt-in passive exit. The passive
+  exit posts at the far touch, collects the rebate, is reposted up to
+  `exit_reprices` times after `exit_timeout_ns`, and then crosses whatever is
+  left. The result reports the passive-exit fill rate and the timeout-cross
+  rate. The accounting identity (spread earned, rebates, adverse selection
+  and exit slippage on both legs) is tested for every exit mode.
+- M3, `iap.labels.maker_labels` (a new module; `iap.labels.labels` is
+  unchanged): per decision and side, fill / taker flags, queue ahead,
+  markouts at 100 ms / 1 s / 10 s, and "filled and not run over".
+- M4: `MakerConfig` tail conditions (spread, |z|, |er|, queue imbalance,
+  calibrated far-touch depletion probability); `MakerFilter`, which wires the
+  meta-label GBM or any `iap.models.zoo` model into the maker backtest as an
+  `allow` mask; `LinearAlpha.score_uncapped(data, z_cap=None)`, which makes
+  the z clip optional for research. `score()` keeps the pinned clip.
+- Docs: COOKBOOK recipe 39 and API_TRADING.md §2.6. There are 26 new tests
+  (`python/tests/test_maker_economics.py`) on synthetic MBO data.
+
+**Research note.** On the golden synthetic vector, the gate admits no trade
+with a taker exit, because the half-spread earned on entry is paid back on
+exit. With a passive exit the gate admits nearly every row, but only 32% of
+exits fill passively and 68% time out and cross. Trip adverse selection is
++7.1 bp against a calibrated +1.4 bp, and the result is -6.7 bp per trip
+(against -11.4 bp for an ungated taker exit). Quote skew and inventory (M5,
+v1.10) are still needed. No real-data result is claimed in this entry.
+
 **Added: research-validity options (R1-R6), all opt-in.** Every default is
 the v2 rule, so no published number, golden or headline moves; the new
 `v3` method bundle turns the options on together
