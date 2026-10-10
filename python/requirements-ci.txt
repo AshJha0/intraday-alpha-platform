@@ -13,7 +13,7 @@ cloudpickle==3.1.2
 coverage==7.16.2
 cryptography==50.0.1
 execnet==2.1.2
-iniconfig==2.3.0
+iniconfig==2.3.1
 joblib==1.6.0
 jsonschema-specifications==2025.9.1
 jsonschema==4.26.0
