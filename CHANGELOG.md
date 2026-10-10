@@ -6,6 +6,28 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
+## v1.11.0 — unreleased
+
+**Added.**
+
+- `iap.mlops` (plan item AI3; models were research-only with no versioning).
+  `ModelRegistry`: immutable, content-addressed model artefacts (joblib +
+  canonical JSON record) whose id hashes the artefact, params, dataset
+  version and date range, feature set and feature-registry hash, code
+  fingerprint (`iap.agents.fingerprint`) and seed; registration requires a
+  blackboard pre-registration entry (its hash is recorded) unless marked
+  exploratory; tamper detection on load; lineage via a parent id.
+  `monitor`: feature and prediction drift (the `iap.adaptive.drift` PSI and
+  KS), calibration drift (reliability bins, Brier, ECE) for classifiers and
+  IC decay for regressors, each OK/ALERT, as a JSON report;
+  `python -m iap.mlops {list,show,verify,lineage,monitor}`.
+  `ShadowRunner`: a candidate scored beside the champion on the same frames,
+  never affecting the champion's decisions; `compare` (IC, hit rate,
+  calibration, P&L delta) and `promotion_decision`, which also requires the
+  lifecycle PROMOTION gates. `MakerFilter.from_registry` / `.register` and
+  `iap.models.zoo.load_registered` load by id; default behaviour unchanged.
+  API_ADAPTIVE.md section 9, COOKBOOK recipe 49.
+
 ## v1.10.0 — 2026-10-10
 
 New edge and strategy layer (IAP_Next_Releases_Plan v1.10: A1, M5, X1-X3,
