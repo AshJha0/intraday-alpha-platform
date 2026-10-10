@@ -6,6 +6,26 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
+## v1.10.0 — unreleased
+
+**Added.**
+- A1, auction imbalance (NOII), `iap.auction`. `Itch50Reader(noii=True)`
+  decodes ITCH `I` messages (`NetOrderImbalance`: paired and imbalance
+  shares, direction, far / near / current reference price, cross type). This
+  is opt-in: the default reader still only counts them, so the normalized
+  IAP1 bytes and `dataset_version` do not change. Also added:
+  `extract_auction_stream` (writes a separate NOII + cross stream directory),
+  auction features (imbalance ratio, reference-price drift, far-near
+  spread, near-vs-reference, time to the scheduled cross), and targets
+  (cross price vs mid at t, drift into the cross; closing cross primary,
+  opening cross second). Strategy `AUC01` takes at the touch minutes before
+  the cross with the `CostModel` taker cost and exits in the cross or with a
+  taker trade. It comes with a backtest, a purged day-aligned walk-forward
+  on `iap.validation`, and a `python -m iap.auction` CLI that requires a
+  pre-registration (`--no-prereg` to opt out). Synthetic tests are in
+  `tests/test_auction.py`; COOKBOOK recipe 40 and REAL_DATA §3.3 cover usage.
+  No real-data run yet.
+
 ## v1.9.0 — 2026-10-10
 
 Trustworthy evidence, then maker economics (IAP_Next_Releases_Plan v1.9:
