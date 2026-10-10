@@ -46,7 +46,7 @@ that tag.
   is unchanged.
 - `tools/tick_to_trade_py.py`: the same path through the Python reference
   implementation (events/s and percentiles; not run in CI).
-- COOKBOOK recipe 56.
+- COOKBOOK recipe 57.
 
 ### Features (M6): opt-in extended set and event-time sampling
 
