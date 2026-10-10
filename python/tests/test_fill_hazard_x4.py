@@ -35,7 +35,7 @@ from test_maker_economics import INS, T0, VEN, exec_config, make_scores, synth_e
 # sha256 of the default MakerBacktester (taker + passive exit) and
 # QuotingBacktester outputs on synth_events(1500), computed on v1.11.0
 # (origin/main) before any X4 change.
-DEFAULT_FINGERPRINT = "da52ae338bf67b79025370f55b6662c4aa1c304b4665c09a6c8f32629596b2dc"
+DEFAULT_FINGERPRINT = "03acb089cf6d9ffcc1d38ec6580527bdd41432f709ebf673e60ce6beb657ae84"
 
 
 @pytest.fixture(scope="module")
@@ -50,10 +50,10 @@ def test_default_outputs_byte_identical(events):
         r = MakerBacktester(exec_config(), MakerConfig(exit=ex, exit_reprices=1)).run_instrument(
             events, sc, INS
         )
-        h.update(r.trips.to_csv().encode())
+        h.update(r.trips.to_csv(lineterminator="\n").encode())
         h.update(json.dumps(r.summary(), sort_keys=True, default=str).encode())
     q = QuotingBacktester(exec_config()).run_instrument(events, sc, INS)
-    h.update(q.fills.to_csv().encode())
+    h.update(q.fills.to_csv(lineterminator="\n").encode())
     h.update(json.dumps(q.summary(), sort_keys=True, default=str).encode())
     assert h.hexdigest() == DEFAULT_FINGERPRINT
 
