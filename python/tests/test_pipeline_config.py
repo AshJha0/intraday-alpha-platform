@@ -23,11 +23,14 @@ SRC = REPO / "python" / "src"
 
 
 def _run(args: list[str], tmp_path: Path) -> subprocess.CompletedProcess:
-    env = {"PYTHONPATH": str(SRC), "PATH": "/usr/bin:/bin"}
+    # pin the child's stdio to UTF-8 so the help text (em-dashes) decodes the
+    # same on Windows (cp1252 default) as on Linux
+    env = {"PYTHONPATH": str(SRC), "PATH": "/usr/bin:/bin", "PYTHONIOENCODING": "utf-8"}
     return subprocess.run(
         [sys.executable, "-m", "iap.marketdata", *args],
         capture_output=True,
         text=True,
+        encoding="utf-8",
         env=env,
         cwd=str(tmp_path),
         timeout=120,
