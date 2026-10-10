@@ -6,7 +6,26 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
-## v1.10.0 — unreleased
+## v1.10.0 — 2026-10-10
+
+New edge and strategy layer (IAP_Next_Releases_Plan v1.10: A1, M5, X1-X3,
+G1-G4), plus a documentation and GitHub Pages refresh. Every new trading and
+research path is opt-in: no default, golden, published number or
+cross-language contract changes. New runtime dependency: `cryptography`
+(Ed25519 agent signatures). Parity counts from CI: python 2154 / cpp 302 /
+rust 358 / java 571. Pull requests
+[#46](https://github.com/AshJha0/intraday-alpha-platform/pull/46) to
+[#50](https://github.com/AshJha0/intraday-alpha-platform/pull/50).
+
+**Fixed.** `python -m iap.features --workers N` (v1.9.0) with N > 1 failed with
+`BrokenProcessPool` on Windows and macOS: spawn-started workers cannot import a
+package's `__main__`, so the worker is now submitted by its importable module
+name. Output stays byte-identical to the serial build. `test_pipeline_config`
+pins the child process's stdio to UTF-8, so it passes on Windows (cp1252).
+
+**In progress.** An exploratory, pre-registered in-sample maker study on the 7
+real sessions (EQ01/EQ02/EQ05/EQ10, taker and passive exits; branch
+`research/maker-real`) is running; its result will be added in a follow-up.
 
 **Added.**
 - M5, `iap.backtest.quoting`: `QuotingBacktester`, a signal-skewed two-sided

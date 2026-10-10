@@ -63,8 +63,8 @@ fills are exact integers; features, alphas, portfolio and TCA compare at
 abs and rel 1e-9; adaptive PSI/KS at 1e-10 with exact refit booleans and
 lifecycle state sequences; canonical-JSON lines, trace digests, the risk
 audit / snapshot and the lifecycle registry are byte-identical; the 7-state
-lifecycle golden is compared exactly, field by field. The v1.9.0 table
-(2026-10-10, counts from CI) reads python 2114 / cpp 302 / rust 358 /
+lifecycle golden is compared exactly, field by field. The v1.10.0 table
+(2026-10-10, counts from CI) reads python 2154 / cpp 302 / rust 358 /
 java 571 (golden 192/72/71/124), `integration` 35, `replay` 6.
 
 ## 4. Golden regeneration protocol

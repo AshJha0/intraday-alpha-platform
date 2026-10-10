@@ -53,7 +53,7 @@ spec:
           containers:
             - name: pipeline
               # Release step: pin by digest from release-manifest.json.
-              image: ghcr.io/ashjha0/intraday-alpha-platform-python:v1.9.0
+              image: ghcr.io/ashjha0/intraday-alpha-platform-python:v1.10.0
               imagePullPolicy: IfNotPresent
               # Configs from the ConfigMap (not the baked copy) so a config
               # change does not require an image rebuild; every config change
