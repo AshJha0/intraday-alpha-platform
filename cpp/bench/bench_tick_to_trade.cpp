@@ -18,7 +18,7 @@
 //
 // Boundary (stated, not hidden). There is NO canonical C++ risk engine — the
 // pre-trade risk engines are Rust / Java / Python (docs/POLYGLOT.md). The
-// "decision" stage is a BENCH-LOCAL stand-in: confidence-weighted blend of
+// "decision" stage is a BENCH-LOCAL stand-in: confidence-weighted direction vote of
 // the three signals, threshold, side, limit price from the opposite best,
 // plus a minimal pre-trade check (position cap, order-notional cap, price
 // band vs mid, kill switch). It is representative in cost (a handful of
@@ -161,7 +161,14 @@ std::vector<iap::MarketEvent> generate_equity_day(std::uint64_t seed,
         if (live.size() < 20 || u < 0.45) {
             const std::uint8_t side = rng.uniform() < 0.5 ? 0 : 1;
             const std::int64_t off = 1 + rng.below(10);
-            const std::int64_t px = side == 0 ? mid - off : mid + off;
+            std::int64_t px = side == 0 ? mid - off : mid + off;
+            // Never cross the resting opposite side: a crossing ADD executes
+            // on arrival in TRADING, which would orphan later cancels.
+            for (const Live& o : live) {
+                if (side == 0 && o.side == 1 && px >= o.px) px = o.px - 1;
+                if (side == 1 && o.side == 0 && px <= o.px) px = o.px + 1;
+            }
+            if (px < 1) px = 1;
             const std::int64_t qty = 100 * (1 + rng.below(10));
             live.push_back({next_oid, side, px, qty});
             push(static_cast<std::uint8_t>(iap::EventType::ADD), side, px, qty,
@@ -215,7 +222,9 @@ struct Decider {
     static constexpr std::int64_t kMaxPosition = 5'000;
     static constexpr double kMaxNotional = 250'000.0;  // per order, $
     static constexpr double kBandBps = 500.0;
-    static constexpr double kThreshold = 0.05;  // bps of blended signal
+    // The fitted betas are tiny (expected returns ~1e-7), so the vote is on
+    // direction: s = sum(sign(er) * confidence) / 3 in [-1, 1].
+    static constexpr double kThreshold = 0.5;
     static constexpr std::int64_t kClipQty = 100;
 };
 
@@ -249,14 +258,17 @@ void run_pass(const std::vector<std::uint8_t>& frames, std::size_t n_events,
         if (emitted) {
             for (const auto* p : alphas) {
                 const auto sig = iap::score_row(*p, vec);
-                blend += sig.expected_return * sig.confidence;
+                blend += (sig.expected_return > 0.0    ? 1.0
+                          : sig.expected_return < 0.0 ? -1.0
+                                                      : 0.0) *
+                         sig.confidence;
                 wsum += sig.confidence;
             }
         }
         const auto t4 = Clock::now();
         int order = 0;  // 0 none, 1 sent, -1 rejected
         if (emitted && wsum > 0.0) {
-            const double s = blend / wsum;
+            const double s = blend / 3.0;
             if (s > Decider::kThreshold || s < -Decider::kThreshold) {
                 const bool buy = s > 0.0;
                 const auto bid = book.best_bid();
