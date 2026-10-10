@@ -121,6 +121,24 @@ pod will not start until both keys exist. Compose: `ALERT_PAGE_URL_FILE` /
 `ALERT_TICKET_URL_FILE`; `ALERT_WEBHOOK_URL_FILE` is still honoured as the
 page URL. Migration: RUNBOOK_alerting.md §2.
 
+**Added (X4, fill hazard / post-only / reprices / markout feedback; Python
+only, all opt-in).** `iap.execution.fill_hazard.FillHazardModel`: a
+grouped-time (cloglog, Cox-style; or logit) fill hazard on queue ahead,
+queue-depletion rate, spread, imbalance and time of day, fitted by IRLS from
+the M3 maker labels (`samples_from_maker_labels`), persisted as
+`iap.fill_hazard/1` JSON and registrable in the `iap.mlops` registry.
+Simulator rule 10: `ChildOrder(post_only="reject"|"slide")` never takes
+liquidity on arrival (`CancelReason.POST_ONLY_REJECT`).
+`iap.execution.markout_feedback`: a causal EWMA of realised markouts that
+makes the passive policy stand down, widen or reduce size while toxic.
+`MakerConfig` gains `post_only`, `entry_reprices` with
+`reprice_policy="follow"|"hazard"`, `give_up="cancel"|"cross"`,
+`min_fill_prob` and `feedback`; `QuotingConfig` gains `post_only` and
+`feedback`. Defaults are unchanged: the simulator's pinned rules, the
+cross-language fill goldens, the PASSIVE policy's `max_reprices=1`, and the
+default maker / quoting outputs (byte-identical; a fingerprint test pins
+them). API_TRADING.md §2.10, COOKBOOK recipe 61.
+
 ## v1.11.0 — 2026-10-10
 
 Scale and AI (IAP_Next_Releases_Plan v1.11: E2, E3, AI1-AI3; A2, A3 and AI4
