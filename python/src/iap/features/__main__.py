@@ -56,6 +56,7 @@ of files, the CPU count and ``physical RAM / --worker-mem-gb`` (default 5).
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import os
 import sys
@@ -480,11 +481,16 @@ def main(argv: list[str] | None = None) -> int:
     else:
         norm_idx = [names.index(f"norm_{m}_m5_v1") for m in PROFILE_METRICS]
         jobs = [(str(p), str(args.configs), cadence_ns) for p in files]
+        # Under `python -m iap.features` this file runs as `__main__`, and a
+        # spawn-start worker (Windows, macOS) does not re-import a package's
+        # `__main__`, so `__main__._worker` cannot be unpickled there. Submit
+        # the function from the importable module name instead.
+        worker = importlib.import_module("iap.features.__main__")._worker
         with ProcessPoolExecutor(max_workers=workers) as pool:
             # map() yields in submission (= trading-day) order, so the
             # profile carry, labels and parquet row groups stay serial
             for path, (n_events, counts, buffers, logs) in zip(
-                files, pool.map(_worker, jobs), strict=True
+                files, pool.map(worker, jobs), strict=True
             ):
                 _patch_norms(buffers, logs, profiles, norm_idx, len(names))
                 _consume(path, n_events, counts, buffers)
