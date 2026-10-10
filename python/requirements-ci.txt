@@ -31,7 +31,7 @@ pytest==9.1.1
 python-dateutil==2.9.0.post0
 pyyaml==6.0.3
 referencing==0.37.0
-rpds-py==2026.6.3
+rpds-py==2026.9.1
 scikit-learn==1.9.1
 scipy==1.17.1
 six==1.17.0
