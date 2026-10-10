@@ -17,6 +17,14 @@ too noisy.  Rows are matched by name, and the guard also fails when fewer than
 ``--min-coverage`` of the committed rows can be matched, so renaming the
 tables cannot turn it into a silent pass.
 
+v1.12 (X6) adds ``--rows REGEX`` (only rows whose name matches are compared,
+in both tables) and ``--title``, so the same guard covers the tick-to-trade
+percentile table: ``bench_tick_to_trade`` writes ``t2t <workload> p50|p99``
+guard rows and CI compares them with ``benchmarks/results_tick_to_trade.md``
+(a CI-runner baseline) at a generous factor.  Percentiles on a shared runner
+are noisier than means: p99 moves with neighbour load, so the factor stays
+large and only p50/p99 are guarded (never p99.9 or max).
+
 Usage:  bench_all out.md && python3 tests/harness/check_bench_regression.py --current out.md
 Exit status: 0 ok, 1 regression or too little coverage, 2 unreadable input.
 """
@@ -57,8 +65,13 @@ def compare(
     current: dict[str, float],
     factor: float = DEFAULT_FACTOR,
     min_coverage: float = DEFAULT_MIN_COVERAGE,
+    rows_re: str | None = None,
 ) -> tuple[list[tuple[str, float, float, float]], list[str]]:
     """``(rows, problems)``; each row is (name, baseline, current, ratio)."""
+    if rows_re:
+        pat = re.compile(rows_re)
+        baseline = {n: v for n, v in baseline.items() if pat.search(n)}
+        current = {n: v for n, v in current.items() if pat.search(n)}
     rows = [
         (n, b, current[n], current[n] / b) for n, b in baseline.items() if n in current and b > 0
     ]
@@ -95,6 +108,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--baseline", type=Path, default=BASELINE)
     ap.add_argument("--factor", type=float, default=DEFAULT_FACTOR)
     ap.add_argument("--min-coverage", type=float, default=DEFAULT_MIN_COVERAGE)
+    ap.add_argument("--rows", default=None, help="regex: compare only matching row names")
+    ap.add_argument("--title", default="C++ benchmark regression guard (coarse)")
     args = ap.parse_args(argv)
     try:
         baseline = parse(args.baseline.read_text(encoding="utf-8"))
@@ -102,7 +117,7 @@ def main(argv: list[str] | None = None) -> int:
     except OSError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
-    rows, problems = compare(baseline, current, args.factor, args.min_coverage)
+    rows, problems = compare(baseline, current, args.factor, args.min_coverage, args.rows)
     table = render(rows, args.factor)
     print(table)
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
