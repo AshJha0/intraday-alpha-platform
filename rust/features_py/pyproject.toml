@@ -1,0 +1,14 @@
+[build-system]
+requires = ["maturin==1.7.8"]
+build-backend = "maturin"
+
+[project]
+name = "iap-features-rs"
+version = "0.1.0"
+description = "IAP native feature engine (Rust) for Python: the 40 pinned native features + 5 alpha inputs"
+requires-python = ">=3.10"
+dependencies = ["numpy"]
+
+[tool.maturin]
+module-name = "iap_features_rs"
+bindings = "pyo3"
