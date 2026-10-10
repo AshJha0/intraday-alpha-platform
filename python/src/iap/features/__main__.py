@@ -8,6 +8,7 @@ Usage (from python/ with PYTHONPATH=src):
                             [--registry-out ../data/reference/feature_registry.json]
                             [--cadence-ms 100]
                             [--files eq_20260824.normalized.iap1 ...]
+                            [--workers N] [--worker-mem-gb 5]
 
 For every normalized input file (sorted by name = trading-day order; a fresh
 engine per day, session profiles carried across days per instrument), the
@@ -35,15 +36,33 @@ is a sampling artefact, not evidence) and the invalid-label reason counts.
 
 Everything is deterministic: sorted file order, sorted instrument iteration,
 event-time only.
+
+Parallel build (``--workers N``, v1.9.0): the expensive part -- replaying
+each day's events through a fresh FeatureEngine -- runs one process per
+input file.  The only cross-day state is the expanding per-instrument
+SessionProfile, which feeds exactly the four ``norm_*_m5_v1`` features and is
+itself fed by profile-independent metrics.  Each worker therefore replays its
+day against an empty profile and records, per emitted row, the 5-minute
+bucket and the four raw metric values; the parent then walks the days in
+order, folding those observations into the carried profiles and rewriting the
+four norm values + validity bits exactly as the serial engine would have.
+Labels, statistics and parquet writes stay serial and in file order, so the
+output is byte-identical to ``--workers 1`` (tested).  Memory: every worker
+holds one day's events and rows (several GB on a full real ITCH day), so on a
+16 GB machine use 2-3 workers for real data; the CLI clamps N to the number
+of files, the CPU count and ``physical RAM / --worker-mem-gb`` (default 5).
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from array import array
+from concurrent.futures import ProcessPoolExecutor
+from math import isfinite
 from pathlib import Path
 
 import numpy as np
@@ -54,7 +73,9 @@ from iap.core.codec import read_iap1, read_jsonl
 from iap.features.context import build_contexts
 from iap.features.engine import FeatureEngine
 from iap.features.registry import build_registry, registry_hash, write_registry
+from iap.features.rolling import SessionProfile
 from iap.features.spec import FAMILY_ORDER
+from iap.features.timeofday import PROFILE_METRICS, _metric_value
 from iap.labels.labels import (
     HORIZON_ORDER,
     LabelReason,
@@ -64,6 +85,7 @@ from iap.labels.labels import (
 )
 
 _REPO = Path(__file__).resolve().parents[4]
+_NAN = float("nan")
 
 
 class _InstrumentBuffer:
@@ -78,6 +100,154 @@ class _InstrumentBuffer:
         self.series = MidSeries()
         self.last_event_ts = 0
         self.last_refresh_seq = 0
+
+
+class _ProfileLog:
+    """Per-row profile observations recorded by a parallel worker."""
+
+    __slots__ = ("buckets", "curs")
+
+    def __init__(self) -> None:
+        self.buckets: list[int] = []
+        #: one tuple per row: the PROFILE_METRICS values (None = not computable)
+        self.curs: list[tuple] = []
+
+
+def _replay_file(path: Path, contexts, cadence_ns: int, profiles, record: bool):
+    """Replay one input file through a fresh engine.
+
+    Returns ``(n_events, (events_processed, vectors_emitted), buffers, logs)``;
+    ``logs`` is ``{iid: _ProfileLog}`` when ``record`` (parallel mode).
+    """
+    events = _load_events(path)
+    engine = FeatureEngine(contexts, cadence_ns=cadence_ns, profiles=profiles)
+    buffers: dict[int, _InstrumentBuffer] = {}
+    logs: dict[int, _ProfileLog] = {}
+    for ev in events:
+        vec = engine.apply(ev)
+        iid = ev.instrument_id
+        buf = buffers.get(iid)
+        if buf is None:
+            buf = buffers[iid] = _InstrumentBuffer()
+        buf.last_event_ts = ev.exchange_ts
+        st = engine.states[iid]
+        # One mid sample per BOOK REFRESH (API_FEATURES §6): a refresh
+        # that left the merged view one-sided / stale / halted is
+        # recorded as a NON-TRADABLE sample so labels cannot span it.
+        if st.refresh_seq != buf.last_refresh_seq:
+            buf.last_refresh_seq = st.refresh_seq
+            if st.label_tradable:
+                buf.series.append(ev.exchange_ts, st.mid, st.spread_ticks * st.tick / 2.0, True)
+            else:
+                buf.series.append(ev.exchange_ts, float("nan"), float("nan"), False)
+        if vec is not None:
+            buf.ts.append(vec.timestamp)
+            buf.values.extend(vec.values)
+            buf.bits.extend(vec.validity_bits())
+            if record:
+                # _emit is the last thing apply() does, so the state is still
+                # the emission state: these are exactly the values the engine
+                # folded into the (here empty) profile
+                t = vec.timestamp
+                log = logs.get(iid)
+                if log is None:
+                    log = logs[iid] = _ProfileLog()
+                log.buckets.append(SessionProfile.bucket_of(t, st.ctx.clock.offset_seconds(t)))
+                log.curs.append(tuple(_metric_value(st, m) for m in PROFILE_METRICS))
+    counts = (engine.events_processed, engine.vectors_emitted)
+    return len(events), counts, buffers, logs
+
+
+def _worker(job):
+    """Process-pool entry point: replay one day against an empty profile."""
+    path, configs, cadence_ns = job
+    return _replay_file(Path(path), build_contexts(configs), cadence_ns, {}, record=True)
+
+
+def _patch_norms(
+    buffers: dict[int, _InstrumentBuffer],
+    logs: dict[int, _ProfileLog],
+    profiles: dict,
+    norm_idx: list[int],
+    nfeat: int,
+) -> None:
+    """Rewrite one worker day's norm_*_m5_v1 values/bits against the carried
+    profiles, folding the day's observations in serial order (mirrors
+    timeofday.compute + FeatureEngine._emit + _famutil.put exactly)."""
+    nbytes = (nfeat + 7) // 8
+    for iid in sorted(logs):
+        log = logs[iid]
+        buf = buffers[iid]
+        prof = profiles.get(iid)
+        if prof is None:
+            prof = profiles[iid] = SessionProfile(PROFILE_METRICS)
+        for r, (bucket, curs) in enumerate(zip(log.buckets, log.curs, strict=True)):
+            base = r * nfeat
+            for m, cur, j in zip(PROFILE_METRICS, curs, norm_idx, strict=True):
+                v = None
+                if cur is not None:
+                    n, mean = prof.prior(m, bucket)
+                    if n >= SessionProfile.MIN_OBS and mean > 0.0:
+                        v = cur / mean
+                ok = False
+                if v is not None:
+                    fv = float(v)
+                    if isfinite(fv):
+                        buf.values[base + j] = fv
+                        ok = True
+                if not ok:
+                    buf.values[base + j] = _NAN
+                k = r * nbytes + (j >> 3)
+                bit = 1 << (j & 7)
+                if ok:
+                    buf.bits[k] |= bit
+                else:
+                    buf.bits[k] &= ~bit & 0xFF
+            for m, cur in zip(PROFILE_METRICS, curs, strict=True):
+                if cur is not None:
+                    prof.update(m, bucket, float(cur))
+
+
+def _total_ram_bytes() -> int | None:
+    """Physical RAM in bytes, or None when it cannot be determined."""
+    try:
+        if sys.platform == "win32":
+            import ctypes
+
+            class _MemStatus(ctypes.Structure):
+                _fields_ = [
+                    ("dwLength", ctypes.c_ulong),
+                    ("dwMemoryLoad", ctypes.c_ulong),
+                    ("ullTotalPhys", ctypes.c_ulonglong),
+                    ("ullAvailPhys", ctypes.c_ulonglong),
+                    ("ullTotalPageFile", ctypes.c_ulonglong),
+                    ("ullAvailPageFile", ctypes.c_ulonglong),
+                    ("ullTotalVirtual", ctypes.c_ulonglong),
+                    ("ullAvailVirtual", ctypes.c_ulonglong),
+                    ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+                ]
+
+            ms = _MemStatus()
+            ms.dwLength = ctypes.sizeof(_MemStatus)
+            if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(ms)):
+                return int(ms.ullTotalPhys)
+            return None
+        return int(os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES"))
+    except (AttributeError, OSError, ValueError):
+        return None
+
+
+def effective_workers(requested: int, n_files: int, worker_mem_gb: float) -> int:
+    """Clamp a requested worker count to the number of files, the CPU count
+    and ``physical RAM / worker_mem_gb`` (``requested <= 0`` = auto: the
+    largest count the clamps allow; ``worker_mem_gb <= 0`` = no RAM cap)."""
+    if requested == 1:
+        return 1
+    cap = min(max(1, n_files), os.cpu_count() or 1)
+    ram = _total_ram_bytes()
+    if ram is not None and worker_mem_gb > 0:
+        cap = min(cap, max(1, int(ram // int(worker_mem_gb * 2**30))))
+    return cap if requested <= 0 else max(1, min(requested, cap))
 
 
 def _load_events(path: Path):
@@ -219,6 +389,19 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--files", nargs="*", default=None, help="specific input file names inside --data-dir"
     )
+    ap.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="processes replaying days in parallel (1 = serial, 0 = auto); "
+        "output is byte-identical to the serial build",
+    )
+    ap.add_argument(
+        "--worker-mem-gb",
+        type=float,
+        default=5.0,
+        help="per-worker memory budget that caps --workers by physical RAM (0 = no cap)",
+    )
     args = ap.parse_args(argv)
 
     t_start = time.time()
@@ -242,45 +425,42 @@ def main(argv: list[str] | None = None) -> int:
     schema = _build_schema(names)
 
     writers: dict[int, pq.ParquetWriter] = {}
-    profiles: dict[int, object] = {}
+    profiles: dict[int, SessionProfile] = {}
     fam_valid: dict[int, np.ndarray] = {}
     row_counts: dict[int, int] = {}
     label_stats: dict[int, dict] = {}
     total_events = 0
     total_vectors = 0
 
-    for path in files:
-        events = _load_events(path)
-        engine = FeatureEngine(contexts, cadence_ns=args.cadence_ms * 1_000_000, profiles=profiles)
-        buffers: dict[int, _InstrumentBuffer] = {}
-        for ev in events:
-            vec = engine.apply(ev)
-            iid = ev.instrument_id
-            buf = buffers.get(iid)
-            if buf is None:
-                buf = buffers[iid] = _InstrumentBuffer()
-            buf.last_event_ts = ev.exchange_ts
-            st = engine.states[iid]
-            # One mid sample per BOOK REFRESH (API_FEATURES §6): a refresh
-            # that left the merged view one-sided / stale / halted is
-            # recorded as a NON-TRADABLE sample so labels cannot span it.
-            if st.refresh_seq != buf.last_refresh_seq:
-                buf.last_refresh_seq = st.refresh_seq
-                if st.label_tradable:
-                    buf.series.append(ev.exchange_ts, st.mid, st.spread_ticks * st.tick / 2.0, True)
-                else:
-                    buf.series.append(ev.exchange_ts, float("nan"), float("nan"), False)
-            if vec is not None:
-                buf.ts.append(vec.timestamp)
-                buf.values.extend(vec.values)
-                buf.bits.extend(vec.validity_bits())
-        total_events += engine.events_processed
-        total_vectors += engine.vectors_emitted
+    cadence_ns = args.cadence_ms * 1_000_000
+    workers = effective_workers(args.workers, len(files), args.worker_mem_gb)
+    if workers != args.workers:
+        print(f"--workers {args.workers} -> {workers} (files / CPUs / RAM cap)", file=sys.stderr)
+
+    def _consume(path: Path, n_events: int, counts, buffers) -> None:
+        nonlocal total_events, total_vectors
+        total_events += counts[0]
+        total_vectors += counts[1]
         _flush_file(writers, out_dir, schema, buffers, names, fam_valid, row_counts, label_stats)
-        print(
-            f"{path.name}: {len(events)} events -> {engine.vectors_emitted} vectors",
-            file=sys.stderr,
-        )
+        print(f"{path.name}: {n_events} events -> {counts[1]} vectors", file=sys.stderr)
+
+    if workers <= 1:
+        for path in files:
+            n_events, counts, buffers, _ = _replay_file(
+                path, contexts, cadence_ns, profiles, record=False
+            )
+            _consume(path, n_events, counts, buffers)
+    else:
+        norm_idx = [names.index(f"norm_{m}_m5_v1") for m in PROFILE_METRICS]
+        jobs = [(str(p), str(args.configs), cadence_ns) for p in files]
+        with ProcessPoolExecutor(max_workers=workers) as pool:
+            # map() yields in submission (= trading-day) order, so the
+            # profile carry, labels and parquet row groups stay serial
+            for path, (n_events, counts, buffers, logs) in zip(
+                files, pool.map(_worker, jobs), strict=True
+            ):
+                _patch_norms(buffers, logs, profiles, norm_idx, len(names))
+                _consume(path, n_events, counts, buffers)
 
     for writer in writers.values():
         writer.close()

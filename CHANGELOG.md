@@ -6,6 +6,22 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
+## v1.9.0 — unreleased
+
+**Added.** Parallel feature build (plan item E1): `python -m iap.features
+--workers N` replays one normalized file per process (default 1 = the serial
+path, unchanged; 0 = auto). The only cross-day state, the expanding
+per-instrument session profile behind the four `norm_*_m5_v1` features, is
+reconstructed in the parent: each worker records the per-row bucket and raw
+profile metrics, and the parent folds them into the carried profiles in
+trading-day order and rewrites those four values and their validity bits.
+Labels, statistics and Parquet writes stay serial, so the output is
+byte-identical to `--workers 1` (`test_feature_parallel.py`). N is clamped
+to the file count, the CPU count and `physical RAM / --worker-mem-gb`
+(default 5 GB). On a synthetic 5-day dataset (10 files, 12-core machine) the
+build went from 205 s to 101 s with 2 workers and 40 s with 5 (5.1x). On a
+16 GB machine use 2-3 workers for full real ITCH days (REAL_DATA.md).
+
 ## v1.8.0 — 2026-10-10
 
 The first out-of-time holdout (four pre-registered signals confirmed on 2026

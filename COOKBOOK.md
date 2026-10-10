@@ -242,7 +242,15 @@ cd python
 PYTHONPATH=src python3 -m iap.features --cadence-ms 100
 # narrower run: one day's file only
 PYTHONPATH=src python3 -m iap.features --files eq_20260824.normalized.iap1
+# since v1.9.0: one process per day, byte-identical output to the serial run
+PYTHONPATH=src python3 -m iap.features --workers 4
 ```
+
+`--workers N` (default 1 = serial; 0 = auto) replays each input file in its
+own process and stitches the cross-day session profile back together in the
+parent, so the Parquet files are byte-for-byte those of `--workers 1`. N is
+clamped to the file count, the CPU count and `physical RAM / --worker-mem-gb`
+(default 5 GB per worker).
 
 Inspect instrument 1 (columns = registry features, NaN where invalid, plus
 `label_mid_<h>` / `label_cost_<h>` / `label_valid_<h>` and, since v1.5.0,
