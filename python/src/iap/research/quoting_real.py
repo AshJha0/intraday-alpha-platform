@@ -19,7 +19,10 @@ structure of :mod:`iap.research.maker_real`):
    :class:`QuotingBacktester` runs with ``alpha_weight = 1``; the control
    runs with ``expected_return = 0`` and ``alpha_weight = 0``; both use the
    PREVIOUS session's calibration and flatten at 16:00;
-4. write ``units/<session>_<symbol>.json`` atomically (resume skips it).
+4. checkpoint every cell to ``cell_units/<session>_<symbol>_<cell>.json``
+   atomically (a resumed unit reuses finished cells; a heartbeat line is
+   logged every 10 min inside a cell), then assemble
+   ``units/<session>_<symbol>.json`` atomically (resume skips it).
 
 ``summarise`` pools units into session-clustered statistics and the
 pre-registered verdicts.
@@ -56,6 +59,59 @@ TZ = "America/New_York"
 GRID_START, GRID_END, FLATTEN_AT = "09:31:00", "15:59:00", "16:00:00"
 MIN_SESSIONS = 4
 SEC = 1_000_000_000
+
+
+HEARTBEAT_S = 600.0
+
+
+class Heartbeat:
+    """Logs a line every ``interval_s`` while a long cell runs (elapsed time,
+    the unit's event and decision counts, peak memory). The replay itself
+    lives in :class:`QuotingBacktester` and exposes no progress counter, so
+    the line reports the size of the work, not the position inside it."""
+
+    def __init__(self, label: str, interval_s: float = HEARTBEAT_S, **info: Any) -> None:
+        import threading
+
+        self.label, self.interval, self.info = label, interval_s, info
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self.beats = 0
+
+    def _run(self) -> None:
+        t0 = time.time()
+        while not self._stop.wait(self.interval):
+            self.beats += 1
+            extra = " ".join(f"{k}={v}" for k, v in self.info.items())
+            rss = peak_rss_gb()
+            log(
+                f"  heartbeat {self.label}: {time.time() - t0:.0f}s elapsed, {extra}, "
+                f"peak {rss if rss is None else round(rss, 2)} GB"
+            )
+
+    def __enter__(self) -> Heartbeat:
+        self._thread.start()
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self._stop.set()
+        self._thread.join()
+
+
+def load_or_compute(path: Path, compute) -> dict[str, Any]:
+    """Cell checkpoint: return the saved JSON at ``path`` if present, else
+    ``compute()`` and save it atomically (temp + rename) before returning."""
+    from iap.experiment.locking import atomic_write_text
+
+    path = Path(path)
+    if path.is_file():
+        log(f"  reuse cell checkpoint {path.name}")
+        return json.loads(path.read_text(encoding="utf-8"))
+    doc = compute()
+    atomic_write_text(
+        path, json.dumps(doc, indent=2, sort_keys=True, default=str) + "\n", encoding="utf-8"
+    )
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def check_prereg(repo_root: Path, prereg: Mapping[str, Any], sha: str) -> list[dict]:
@@ -199,7 +255,6 @@ class Study:
 
     def backtests(self, day: int, symbol: str, events: list) -> dict[str, Any]:
         from iap.alpha import build
-        from iap.backtest.quoting import QuotingBacktester
         from iap.execution.calibration import load_calibration
 
         iid = SYMBOLS[symbol]
@@ -216,42 +271,56 @@ class Study:
         grid = second_grid(feats, g0, g1)
         del feats
         out: dict[str, Any] = {"calibration_used": str(prev), "n_decisions": len(grid)}
+        cdir = self.out / "cell_units"
+        cdir.mkdir(parents=True, exist_ok=True)
         for cell in self.prereg["cells"]:
-            t0 = time.time()
-            if cell["alpha"]:
-                model = self.alpha(cell["alpha"], cell["horizon"], day)
-                if iid not in model.universe([iid]):
-                    continue
-                sc = model.score({iid: grid})[iid][["exchange_ts", "expected_return"]]
-                fit = {
-                    "mu": model.mu,
-                    "sigma": model.sigma,
-                    "beta": model.beta,
-                    "n_train": model.n_train,
-                    "dead": model.is_dead,
-                }
-            else:
-                sc = pd.DataFrame(
-                    {
-                        "exchange_ts": grid["exchange_ts"].to_numpy(np.int64),
-                        "expected_return": np.zeros(len(grid)),
-                    }
-                )
-                fit = None
-            qc = quoting_config(self.prereg, cell["alpha_weight"], flat)
-            res = QuotingBacktester(self.exec_config, qc, cal).run_instrument(events, sc, iid)
-            s = run_summary(res)
-            s["alpha_fit"] = fit
-            s["er_abs_mean_bps"] = (
-                float(1e4 * np.abs(sc["expected_return"]).mean()) if len(sc) else 0.0
+            cpath = cdir / f"{unit_name(SESSIONS[day], symbol)}_{cell['id']}.json"
+            label = f"{SESSIONS[day]} {symbol} {cell['id']}"
+            s = load_or_compute(
+                cpath,
+                lambda cell=cell, label=label: self.run_cell(
+                    cell, day, iid, grid, flat, cal, events, label
+                ),
             )
-            s["seconds"] = round(time.time() - t0, 1)
+            if s.get("not_in_universe"):
+                continue
             out[cell["id"]] = s
-            log(
-                f"  {SESSIONS[day]} {symbol} {cell['id']}: net {s['net']:+.2f} USD, "
-                f"{s['n_quote_fills']} fills, {s['seconds']}s"
-            )
         return out
+
+    def run_cell(self, cell, day, iid, grid, flat, cal, events, label) -> dict[str, Any]:
+        """One cell of one unit (checkpointed by the caller)."""
+        from iap.backtest.quoting import QuotingBacktester
+
+        t0 = time.time()
+        if cell["alpha"]:
+            model = self.alpha(cell["alpha"], cell["horizon"], day)
+            if iid not in model.universe([iid]):
+                return {"not_in_universe": True}
+            sc = model.score({iid: grid})[iid][["exchange_ts", "expected_return"]]
+            fit = {
+                "mu": model.mu,
+                "sigma": model.sigma,
+                "beta": model.beta,
+                "n_train": model.n_train,
+                "dead": model.is_dead,
+            }
+        else:
+            sc = pd.DataFrame(
+                {
+                    "exchange_ts": grid["exchange_ts"].to_numpy(np.int64),
+                    "expected_return": np.zeros(len(grid)),
+                }
+            )
+            fit = None
+        qc = quoting_config(self.prereg, cell["alpha_weight"], flat)
+        with Heartbeat(label, n_events=len(events), n_decisions=len(sc)):
+            res = QuotingBacktester(self.exec_config, qc, cal).run_instrument(events, sc, iid)
+        s = run_summary(res)
+        s["alpha_fit"] = fit
+        s["er_abs_mean_bps"] = float(1e4 * np.abs(sc["expected_return"]).mean()) if len(sc) else 0.0
+        s["seconds"] = round(time.time() - t0, 1)
+        log(f"  {label}: net {s['net']:+.2f} USD, {s['n_quote_fills']} fills, {s['seconds']}s")
+        return s
 
     def run_unit(self, day: int, symbol: str) -> None:
         path = self.out / "units" / f"{unit_name(SESSIONS[day], symbol)}.json"

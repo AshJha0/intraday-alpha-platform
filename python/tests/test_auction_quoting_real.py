@@ -141,3 +141,61 @@ def test_quoting_run_unit_skips_a_completed_unit(tmp_path, monkeypatch):
     (tmp_path / "units" / "ds3_20190130_AAPL.json").write_text("{}")
     monkeypatch.setattr(qr, "load_events", lambda *a, **k: pytest.fail("reloaded a done unit"))
     study.run_unit(0, "AAPL")
+
+
+def _cell_study(tmp_path, monkeypatch, calls):
+    import types
+
+    import iap.execution.calibration as cal_mod
+
+    study = qr.Study.__new__(qr.Study)
+    study.out = tmp_path
+    study.args = types.SimpleNamespace(slice=None)
+    study.features_dir = tmp_path
+    study.prereg = {
+        "cells": [
+            {"id": "EQ01", "alpha": None, "horizon": "1s", "alpha_weight": 1.0},
+            {"id": "SKIPME", "alpha": None, "horizon": "1s", "alpha_weight": 0.0},
+            {"id": "QNOSKEW", "alpha": None, "horizon": "1s", "alpha_weight": 0.0},
+        ]
+    }
+    monkeypatch.setattr(study, "calib_path", lambda d, s: tmp_path / "c.json", raising=False)
+    monkeypatch.setattr(cal_mod, "load_calibration", lambda p: None)
+    ts = qr.ns_at("ds3_20190327", "10:00:00") + np.arange(3) * qr.SEC
+    monkeypatch.setattr(qr, "load_feature_day", lambda *a, **k: pd.DataFrame({"exchange_ts": ts}))
+
+    def fake_cell(cell, day, iid, grid, flat, cal, events, label):
+        calls.append(cell["id"])
+        if cell["id"] == "SKIPME":
+            return {"not_in_universe": True}
+        return {"net": float(len(cell["id"])), "n": len(grid), "f": 0.1 + 0.2}
+
+    monkeypatch.setattr(study, "run_cell", fake_cell, raising=False)
+    return study
+
+
+def test_cell_checkpoints_resume_reuses_done_cells_and_matches_uninterrupted(tmp_path, monkeypatch):
+    full_calls: list[str] = []
+    a = tmp_path / "a"
+    full = _cell_study(a, monkeypatch, full_calls).backtests(1, "AAPL", [])
+    assert full_calls == ["EQ01", "SKIPME", "QNOSKEW"] and "SKIPME" not in full
+    # interrupted run: only EQ01's checkpoint survived
+    b = tmp_path / "b"
+    (b / "cell_units").mkdir(parents=True)
+    src = a / "cell_units" / "ds3_20190327_AAPL_EQ01.json"
+    (b / "cell_units" / src.name).write_text(src.read_text())
+    resumed_calls: list[str] = []
+    resumed = _cell_study(b, monkeypatch, resumed_calls).backtests(1, "AAPL", [])
+    assert resumed_calls == ["SKIPME", "QNOSKEW"]
+    assert resumed == {**full, "calibration_used": resumed["calibration_used"]}
+    assert sorted(p.name for p in (b / "cell_units").iterdir()) == sorted(
+        p.name for p in (a / "cell_units").iterdir()
+    )
+
+
+def test_heartbeat_logs_while_running():
+    import time as _t
+
+    with qr.Heartbeat("x", interval_s=0.05, n_events=3) as hb:
+        _t.sleep(0.2)
+    assert hb.beats >= 1
