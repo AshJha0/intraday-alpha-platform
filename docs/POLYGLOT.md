@@ -84,7 +84,7 @@ nothing and removing them would lose the evidence.
 |---|---:|---|---|---|
 | Python `python/src/iap/features/` | 3,639 | generates `expected_features.json`, `expected_features_anomalies.json` (validated against brute force) | `python -m iap.features` (the dataset build, CI cache key), research, MVP | **CANONICAL** (Python reference, all 205) |
 | C++ `cpp/src/features/`, `cpp/include/iap/features/` | 1,057 | both feature goldens (`ctest -R Golden`) + brute test | `bench_all` | **CANONICAL** (C++ hot path) |
-| Rust `rust/features/src/` | 1,235 | both feature goldens (`golden_features.rs`) + brute test | `rust/alpha`; plan item **E2** (pyo3 binding) | **CANONICAL** (Rust fast path — E2 is in progress; not frozen so E2 is not blocked) |
+| Rust `rust/features/src/` | 1,235 | both feature goldens (`golden_features.rs`) + brute test | `rust/alpha`; plan item **E2** (pyo3 binding) | **CANONICAL** (Rust fast path, exposed to Python by E2 in v1.11.0 via `rust/features_py`) |
 | Java `java/src/main/java/com/iap/features/` | 1,297 | both feature goldens (`FeatureGoldenTest`) + brute test | Java platform (`PaperTrading`, `PaperTraces`) | **FROZEN** |
 
 Justification: Python owns the 205 registry; only the native 40 are ported.
