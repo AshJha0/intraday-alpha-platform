@@ -12,7 +12,10 @@ and AI sides work — written for a newcomer, with a command to run at the end
 of every section — start with [HOW_IT_WORKS.md](HOW_IT_WORKS.md). Sections
 12–14 below were added with v1.3.0: the failure modes the design defends
 against, the concurrency model of the research store, and the distance
-between this repository and a production system.
+between this repository and a production system. Section 15 was added with
+v1.10.0: the research subsystems of v1.9 and v1.10 (maker economics,
+quoting, auctions, optimal execution, validity options, governance), where
+each sits, what is opt-in, and what is Python-only.
 
 ## 1. Design principles (spec §1, condensed)
 
@@ -645,10 +648,15 @@ one (EPICS E24 and E30, backlog), and the design rule was pinned before any
 of it was built (`PLATFORM_CONVENTIONS.md` §13.7) so that nothing built
 later can cross it.
 
-**State of the repository, said first: there is no LLM, agent or MCP code
-here.** No model is called anywhere. This section describes a boundary that
-is enforced, a foundation that exists, and a plan that is backlog — in that
-order, and kept apart.
+**State of the repository, said first (v1.10.0): no LLM is called
+anywhere.** The governance layer an agent would work through does exist:
+`iap.agents` (v1.7.0) holds a write broker, a hash-chained blackboard,
+pre-registration, a hidden-seed reserve, signed human approvals, agent
+evaluations, untrusted-text handling and a read-only MCP server, and v1.10.0
+made pre-registrations costed, code-bound, git-anchored and Ed25519-signed
+(§15.5). The research agent itself is not built. Sections 11.1-11.2 describe
+the boundary and the v1.3.0 foundation; §11.3 is the v1.3.0 plan, most of
+which has since been built (the status column says which).
 
 ### 11.1 The boundary (pinned)
 
@@ -698,24 +706,25 @@ and not `iap.replay` or `iap.trace`, and nothing scans the Rust, C++ or
 Java trees. Those remain enforced by review (CODEOWNERS: risk, execution,
 core). Plan issue AG03 is closed on that basis, with the gaps recorded in it.
 
-### 11.3 The plan (backlog — not built)
+### 11.3 The v1.3.0 plan, and what has been built since
 
-| planned | epic / issue | why it comes before any agent |
-|---|---|---|
-| read-only MCP server over the ledger, reports, lifecycle log and traces | E24 AG01, E30 AL05 | resources only, no tool with a side effect; versioned schemas and golden outputs |
-| write broker and append-only blackboard | E30 AL01 | one attributable, replayable path to repository, ledger and lifecycle state |
-| hypothesis pre-registration | E30 AL02 | the hypothesis is committed before any data is read |
-| reserve sessions on a hidden seed | E30 AL03 | a final evaluation the agents cannot have tuned to |
-| authenticated HUMAN approvals | E30 AL04 | today a lifecycle edge's `actor = HUMAN` is asserted by the caller, not verified |
-| agent evaluations | E30 AL06 | planted leak, seeded bug, shuffled-label null, citation resolution — each must fail when its control is removed |
-| untrusted free-text handling | E30 AL07 | ledger text, report text and tool output are data, not instructions |
+| planned | epic / issue | why it comes before any agent | status (v1.10.0) |
+|---|---|---|---|
+| read-only MCP server over the ledger, reports, lifecycle log and traces | E24 AG01, E30 AL05 | resources only, no tool with a side effect; versioned schemas and golden outputs | built v1.7.0 (`iap.agents.mcp_server`, six tools, stdio only) |
+| write broker and append-only blackboard | E30 AL01 | one attributable, replayable path to repository, ledger and lifecycle state | built v1.7.0; signed requests and git anchoring v1.10.0 |
+| hypothesis pre-registration | E30 AL02 | the hypothesis is committed before any data is read | built v1.7.0 (CLI gate); look debit and code fingerprint v1.10.0 |
+| reserve sessions on a hidden seed | E30 AL03 | a final evaluation the agents cannot have tuned to | built v1.7.0; cap keyed on (alpha, horizon, code hash) v1.10.0 |
+| authenticated HUMAN approvals | E30 AL04 | a lifecycle edge's `actor = HUMAN` was asserted by the caller, not verified | built v1.7.0 for the retire and reset edges |
+| agent evaluations | E30 AL06 | planted leak, seeded bug, shuffled-label null, citation resolution — each must fail when its control is removed | built v1.7.0 (`iap.agents.evals`) |
+| untrusted free-text handling | E30 AL07 | ledger text, report text and tool output are data, not instructions | built v1.7.0 (`iap.agents.untrusted`) |
+| the research agent itself | AI1-AI4 (plan) | — | not built; planned for v1.11 |
 
 The ordering is the design. An agent given the goal "get an alpha promoted"
 will find the cheapest path to a pass faster than a person: cheaper costs, a
 chosen holdout, uncounted looks. v1.3.0 closed those three in the tooling
 (LEARN.md §24) and measured what the validation chain can detect at all
-(the planted-signal power study, LEARN.md §23). It did not build the agents,
-and on two synthetic sessions whose ledger now holds 5,156 looks (1068 on
+(the planted-signal power study, LEARN.md §23). It did not build the agents
+(v1.7.0 built the controls; the agent is still not built), and on two synthetic sessions whose ledger now holds 5,156 looks (1068 on
 the v1.3.0 dataset, 852 on the regenerated v1.4.0 one, 3,236 on that same
 dataset under the v1.5.0 default methods), more searching is not what the platform lacks (HOW_IT_WORKS.md §6.4
 lists what would be theatre on this data, and why). DIAGRAMS.md §19 draws
@@ -886,3 +895,120 @@ written to be consistent with:
    versions, one semantics proven across implementations, determinism,
    fail-closed defaults with their failure modes written down, a ledger of
    every look, and reports that state a negative result as the result.
+
+## 15. The research subsystems of v1.9 and v1.10
+
+v1.9.0 and v1.10.0 added research code on the Python side only. Every piece
+is opt-in: no default path, golden file, published number or cross-language
+contract changed, and the C++, Rust and Java trees are untouched. The
+diagrams are DIAGRAMS.md §20-§25.
+
+### 15.1 Where each piece sits
+
+```
+events ──► execution.calibration ──► calib.json (iap.exec_calibration v1)
+  │                                     │
+  │                                     ├─► ExecutionSimulator(calibration=...)   latency table
+  │                                     ├─► backtest.maker.MakerBacktester        gate AS, fill model
+  │                                     ├─► backtest.quoting.QuotingBacktester    half-spread floor
+  │                                     └─► execution.optimal                     impact slope (AC)
+  │
+  ├─► labels.maker_labels ──► fill / markout / "not run over" labels ──► MakerFilter (models.zoo, metalabel)
+  │
+  ├─► execution.volume_curve ──► iap.volume_curve v1 JSON ──► ParentOrder(volume_curve=...)
+  │
+raw ITCH ──► Itch50Reader(noii=True) ──► auction stream dir ──► auction.features / targets / strategy (AUC01)
+                                         (separate; dataset bytes unchanged)
+
+validation.methods "v3" ──► validation.sessions (calendar, sampling) + day-aligned splits
+                            + instrument-mean gate IC + validity block (metrics: day-cluster, block bootstrap)
+
+agents.broker ──► agents.fingerprint (code/feature/deps hash) ──► ledger look debit ──► blackboard
+            └──► agents.signing (Ed25519 verify, public keys only)
+agents.anchor ──► git history + research/agents/anchors.json ──► cli verify-board
+```
+
+| module | plan item | role | sits beside |
+|---|---|---|---|
+| `iap.execution.calibration` | M1 | estimate fill rates, depletion hazards, latency, maker markouts, impact; versioned JSON; `apply_calibration` | `iap.execution.simulator` (consumer), `iap.tca.markout` (the same markout definition) |
+| `iap.backtest.maker` | M2, M4 | post-at-touch backtest with queue fills, rebates, measured AS, taker / mid / passive exit; tail conditions; `MakerFilter` | `iap.backtest.engine` (the taker backtester, still the default) |
+| `iap.labels.maker_labels` | M3 | per-decision maker labels | `iap.labels.labels` (unchanged) |
+| `LinearAlpha.score_uncapped` | M4 | the score without the z clip, for research | `score()` keeps the pinned clip |
+| `iap.backtest.quoting` | M5 | two-sided skewed quoter with inventory limit and flatten | `iap.backtest.maker` |
+| `iap.auction` | A1 | NOII decoding, auction stream, features, targets, `AUC01`, walk-forward, CLI | `iap.marketdata` (reader option only), `iap.validation` (splits) |
+| `iap.execution.optimal` | X1 | Almgren-Chriss trajectory, cost / variance, frontier | `iap.execution.algos` (IS schedule selectable by `ISModel`) |
+| `iap.execution.urgency` | X2 | alpha-driven urgency on a `ParentOrder` | `iap.execution.passive` (the policy it switches) |
+| `iap.execution.volume_curve` | X3 | forecast intraday volume curve | `iap.execution.algos` VWAP |
+| `iap.validation.sessions`, `methods` (`v3`), `metrics`, `splits` | R1-R6 | event calendar, day sampling, day-aligned folds, day-clustered inference, validity block | the `v2` default bundle |
+| `iap.features` `--workers`, `--label-freshness` | E1, R5 | parallel day replay; causal label freshness | the serial build (byte-identical) |
+| `iap.agents.fingerprint`, `anchor`, `signing` | G1-G4 | code-bound prereg, git anchoring, Ed25519 identity | `iap.agents.broker`, `blackboard`, `prereg_gate` (v1.7.0) |
+
+### 15.2 Opt-in versus default
+
+| what runs when nothing is named | what you opt into |
+|---|---|
+| taker research backtest (`iap.backtest.engine`) | `MakerBacktester`, `QuotingBacktester` |
+| synthetic simulator config (latency, impact from `configs/execution`) | `ExecutionSimulator(config, calibration=...)`, `apply_calibration` |
+| `score()` with the pinned z clip | `score_uncapped(z_cap=None)` |
+| pinned TWAP / VWAP / IS schedules | `ISModel.ALMGREN_CHRISS`, `apply_alpha_urgency`, `ParentOrder(volume_curve=...)` |
+| ITCH reader counts `I` messages and skips them | `Itch50Reader(noii=True)`, `python -m iap.auction` |
+| `v2` research methods | `--methods v3` |
+| serial feature build, whole-day label freshness | `--workers N`, `--label-freshness trailing` |
+| research `run` requires a prereg (since v1.7.0) | `--no-prereg` (result marked ineligible) |
+| unsigned broker (`WriteBroker(root, agents)`) | `WriteBroker(..., pubkeys=...)`, `cli prereg --keyfile` |
+
+Two things changed for everyone in v1.10.0, both in governance: a new
+pre-registration debits one look on the ledger it names, and `--no-prereg`
+results now carry the ineligibility reason "not pre-registered
+(--no-prereg)", so the registry and lifecycle gates refuse them.
+
+### 15.3 Python only, and why
+
+None of these subsystems is in the cross-language parity table. They are
+research tools: they consume the normalized event stream and the Python
+simulator, and nothing on the Java paper-trading path or the C++ / Rust
+engines calls them. Porting them would add golden files and three more
+copies to keep in step (plan item E3 argues for fewer copies, not more).
+If a maker or quoting strategy ever earned a place on the trading path, its
+order-generation rules would get a contract, a golden file and ports like
+every other pinned rule (PLATFORM_CONVENTIONS.md §11). The execution
+simulator's existing rules, which these tools drive, remain the C++-owned,
+cross-language-pinned ones; a calibration only replaces config values
+(latency table, impact coefficient), never a rule.
+
+### 15.4 Dependencies
+
+One new runtime dependency: `cryptography` (`>=46,<51` in
+`python/pyproject.toml`; pinned `cryptography==50.0.1` with `cffi==2.1.1`
+and `pycparser==3.0` in `python/requirements-ci.txt`, which CI and the
+Docker image use as constraints). It is used only by `iap.agents.signing`
+for Ed25519; the trading-path packages do not import it, and the agents
+package stays off the trading path (an import-policy test keeps trading-path
+packages from importing `iap.agents`). Everything else uses the existing
+numpy / pandas / scipy / pyarrow stack.
+
+### 15.5 Governance in one paragraph
+
+A pre-registration goes through `WriteBroker.preregister`. With public keys
+configured, the request must carry an Ed25519 signature over the agent, the
+operation, a digest of the arguments and a single-use nonce. The broker
+computes the alpha's fingerprint (`iap.agents.fingerprint`, scheme 2: source
+files of the alpha's modules closed over `iap.*` imports, the declared
+features' registry entries and family modules, the numpy / pandas / scipy
+versions), debits one look on the ledger and appends the entry to the
+hash-chained blackboard. The board is committed and pushed, then
+`cli anchor` records the first commit holding each entry. The research gate
+recomputes the fingerprint before a run and refuses changed code. `cli
+verify-board` re-checks the chain, the git prefix property, the anchors and
+every signature. Details and gaps: docs/governance/GOVERNANCE.md §2a.
+
+### 15.6 Real-data status of these subsystems
+
+| subsystem | real-data status (2026-10-10) |
+|---|---|
+| calibration, maker backtest | a pre-registered, in-sample study on the seven 2019-20 sessions is running (branch `research/maker-real`); no result yet |
+| quoting | no real-data run |
+| auction (`AUC01`) | not run on real files; REAL_DATA.md §3.3 has the commands |
+| Almgren-Chriss, urgency, volume curve | no real-data study; the volume curve CLI reads real IAP1 files |
+| `v3` bundle | not yet applied to the published real-data batch (planned for v1.11) |
+| governance | in use: the 2026 holdout preregs are anchored to `6723fd0`; the maker study's preregs are on its branch |

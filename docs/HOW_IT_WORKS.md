@@ -36,6 +36,15 @@ Three things to know before reading:
    a v1.5.0 number. Each old rule stays selectable under a legacy name —
    the bundle `legacy_v1` reproduces the v1.4.0 report — and is named
    below beside the default that replaced it.
+4. **There is now real data too, and a maker side.** Since v1.6.0 the same
+   pipeline has run on seven real Nasdaq ITCH sessions (2019-20; AAPL, MSFT,
+   QQQ), and v1.8.0 confirmed four pre-registered signals on two unseen
+   2026 days (docs/REAL_DATA.md §3). The signals are real and too small to
+   pay a taker at 1-5 s. v1.9.0 and v1.10.0 add the opt-in maker path,
+   auction research, optimal-execution schedules and stronger research
+   governance; §3.6-§3.8 and §6.2 below explain them. Nothing in this
+   document claims a profitable strategy. Sections 1-5 describe the bundled
+   synthetic dataset unless they say otherwise.
 
 The commands assume the seeded dataset exists. If `data/features/` is
 empty, build it once (about two minutes):
@@ -549,6 +558,36 @@ would triple the position in one idea. The lifecycle's correlation gate
 (§2.11) refuses that: once one of them is at VALIDATING, the other two are
 held at CANDIDATE.
 
+### 2.14 Real data, and the `v3` validity bundle (v1.9)
+
+On real sessions the statistics above are strong (EQ01's gate IC +0.105, t
+21 on seven 2019-20 days) and four pre-registered signals held on two unseen
+2026 days. The v1.9 review then found three ways the real-data inference
+was weaker than its t-statistics said: two of the seven days are FOMC days
+and one is a thin holiday session; QQQ supplies about half the rows, so the
+pooled IC mostly describes QQQ; and no statistic treated the day as the
+unit of independence. The opt-in `v3` bundle answers each:
+
+- folds cut at session starts (`split_mode="day_aligned"`), with
+  leave-one-day-out as an option;
+- the gate IC is the equal-weight mean of per-instrument ICs (the pooled IC
+  is kept beside it);
+- a `validity` block reports per-day ICs with event tags, the gate
+  statistics without FOMC and holiday-thin days, a HAC t with no lag product
+  across a day boundary, a day-clustered t and a day-block bootstrap;
+- ITCH-only data is labelled as one Nasdaq book (`book_scope =
+  single_venue`, `price_reference = nasdaq_bbo`), and label freshness can be
+  judged causally (`--label-freshness trailing`).
+
+`v3` is not the default, so no published number moved. The validity block
+costs four more looks per validation (88 instead of 84 at four folds).
+
+**Where to look:** `python/src/iap/validation/methods.py`, `sessions.py`,
+`metrics.py`; docs/RESEARCH_VALIDITY.md §1a; LEARN.md §32.
+
+**How to run it:** COOKBOOK recipe 44 (synthetic fixture), or on an ingested
+dataset `python -m iap.research run --alpha EQ01 --methods v3 --dataset-dir <dataset>`.
+
 ## 3. Algo and execution: how an order becomes fills
 
 ### 3.1 The four algorithms
@@ -712,6 +751,113 @@ never changes the replayed book, so nobody reacts to it.
 cd python
 PYTHONPATH=src python3 -m pytest -q tests/test_passive_policy.py tests/test_markout.py
 ```
+
+### 3.6 The maker path: calibrate, post or quote, decompose (v1.9, v1.10)
+
+§3.5 posts children of a parent order that has to be filled anyway. The
+maker path asks a different question: can an alpha that is too small to pay
+a taker's round trip (about 0.07 bp forecast against about 0.7 bp of cost at
+1 s on the real sessions) be traded by posting instead? It has three steps,
+all opt-in Python research code; the default taker backtest is unchanged.
+
+1. **Calibrate** (`iap.execution.calibration`). From one session's normalized
+   events, estimate touch fill rates by queue-ahead bucket, queue-depletion
+   hazards per side, feed latency quantiles, maker adverse selection at
+   100 ms / 1 s / 10 s, and aggressor impact. The result is a versioned JSON
+   document. The simulator takes it as `ExecutionSimulator(config,
+   calibration=...)` and draws venue latency from it; the gates below read
+   their adverse selection from it. ITCH carries no receive timestamp, so
+   on ITCH the latency table must be an explicit assumption
+   (`parametric_latency`).
+2. **Backtest.** Two engines replay a score series through the FIFO
+   simulator:
+   - `MakerBacktester` (`iap.backtest.maker`) posts one order at the touch
+     on the alpha's side when
+     `|er| + half_spread + rebate − exit_cost > adverse_selection + margin`.
+     A fill comes from queue position, not from the price touching. The exit
+     is a taker cross (default), a mark to mid, or a passive exit: post at
+     the far touch, reprice up to `exit_reprices` times, then cross the rest.
+     Tail conditions on spread, |z|, |er|, queue imbalance and depletion
+     probability, and an `allow` mask from the meta-label model, restrict
+     when it posts.
+   - `QuotingBacktester` (`iap.backtest.quoting`) keeps a bid and an ask
+     resting around an Avellaneda-Stoikov reservation price
+     `r = mid + alpha_weight·er·mid − γ·σ²·q·τ`: the alpha shifts it, the
+     inventory `q` pushes it back toward flat. It enforces a hard inventory
+     limit, refreshes quotes through the latency path, floors the
+     half-spread at the calibrated adverse selection and flattens before
+     the close (cancelling through the latency path and counting fills that
+     land during the cancel).
+3. **Decompose.** A maker trip's gross is `spread earned − adverse selection
+   − exit slippage`; net adds rebates and subtracts fees and impact. A
+   quoting session's gross is `spread captured + markout + inventory P&L +
+   flatten cost`. Both identities are tested in every mode, so every dollar
+   is attributed to a named term.
+
+Labels for the same decisions (`iap.labels.maker_labels`: filled or not,
+queue ahead, markouts, "filled and not run over") train filters and tell
+you which part of the gate failed.
+
+**Results so far are synthetic.** On the golden vector the gate with a taker
+exit admits nothing; with a passive exit it loses 6.7 bp per trip (against
+11.4 bp for an ungated taker exit) because the trips that last are the ones
+the market ran over. The quoter with a toy score nets less skewed than
+unskewed (+86.50 against +120.20 USD). LEARN.md §31 and §34 explain why
+these numbers say nothing about a real alpha. A pre-registered, in-sample
+maker study on the seven real sessions is running; docs/ROADMAP.md §3.5
+describes it.
+
+**Where to look:** API_TRADING.md §2.6-§2.7; `python/src/iap/execution/calibration.py`,
+`backtest/maker.py`, `backtest/quoting.py`, `labels/maker_labels.py`;
+DIAGRAMS.md §20-§21.
+
+**How to run it:** COOKBOOK recipes 39 and 40 (synthetic), 45 and 46 (one
+real session).
+
+### 3.7 Auctions: the closing cross (v1.10)
+
+The continuous-trading signals act over seconds. The Nasdaq closing cross
+is a different market: for the last minutes of the day the exchange
+publishes the Net Order Imbalance Indicator (NOII, ITCH message `I`) with
+the paired and unpaired shares and the price at which the cross would
+currently happen. `iap.auction` reads those messages, and the cross result
+(`Q`), in a separate opt-in pass (`Itch50Reader(noii=True)`), so the
+normalized dataset and its version never change. It builds features
+(imbalance ratio, reference-price drift, far / near spread, time to the
+cross) and targets (the cross price against the mid at decision time), and
+strategy `AUC01` takes the imbalance side at the touch a set time before
+the cross and exits in it. The walk-forward fits the orientation and
+threshold on purged, day-aligned training days only. The CLI refuses to
+backtest without a pre-registration for `AUC01/<cross>-<seconds>s`.
+
+No real-data result exists yet. On synthetic sessions with a planted
+relation the walk-forward recovers the planted sign, which shows the
+plumbing works and nothing else.
+
+**Where to look:** `python/src/iap/auction/`; docs/REAL_DATA.md §3.3;
+DIAGRAMS.md §22. **How to run it:** COOKBOOK recipe 42.
+
+### 3.8 Optimal execution: Almgren-Chriss, urgency, volume curves (v1.10)
+
+Three opt-in upgrades to the parent-order schedules of §3.1. The pinned
+TWAP / VWAP / IS schedules and their goldens are unchanged.
+
+- **Almgren-Chriss** (`iap.execution.optimal`). The closed-form trajectory
+  that minimises expected cost plus `λ` times its variance, given volatility
+  and a temporary impact slope (from a calibration document, or the config
+  default). `efficient_frontier` returns expected cost and variance across
+  `λ`; `ParentOrder(is_model=ISModel.ALMGREN_CHRISS, ac_params=...)` uses it.
+  At `λ = 0` the trajectory is a straight line; higher risk aversion
+  front-loads.
+- **Alpha urgency** (`iap.execution.urgency`). If the alpha agrees with
+  waiting (the price is expected to move in the order's favour), post; if
+  it is adverse, cross and front-load.
+- **Forecast volume curve** (`iap.execution.volume_curve`). An intraday
+  volume profile per instrument from TRADE events, shrunk toward the
+  U-shape by `days / (days + shrinkage)`, used by VWAP.
+
+**Where to look:** API_TRADING.md §2.8. **How to run it:** COOKBOOK recipes
+41 and 48.
 
 ---
 
@@ -963,43 +1109,74 @@ failure mode is a plausible sentence. Hard limits must be code.
 
 ### 6.2 What exists today
 
-**There is no LLM, agent or MCP code in this repository.** No model is
-called anywhere. What exists is the foundation an agent layer would need —
-each piece useful to a human or a script without one:
+**No LLM is called anywhere in this repository.** What exists is the
+machinery that an automated researcher, human or model, would have to go
+through. It was built before any agent on purpose: an agent given the goal
+"get an alpha promoted" will find every shortcut §2.7 and §2.11 describe
+(cheaper costs, a chosen holdout, free looks) faster than a person.
 
-| piece | what it does | where |
-|---|---|---|
-| a research store safe for parallel automated writers | the ledger is updated under a lock by re-read, replay and atomic replace; run ids and experiment directories are claimed atomically | `python/src/iap/experiment/locking.py`, `validation/ledger.py`, `research/runner.py` |
-| gate eligibility | a result produced under a flattering configuration is recorded and counted, and is not promotion evidence | `python/src/iap/research/specs.py`, `eligibility.json` |
-| an import-policy test | fails if a module of the guarded Python packages imports a network client or an LLM SDK | `python/tests/test_import_policy.py` |
-| machine-readable tooling | `list --json`, `show --json`, `--json-errors` with stable error codes; a read-only, one-statement SQL command over the store | `python -m iap.research`, `python -m iap.store sql` |
+| piece | since | what it does | where |
+|---|---|---|---|
+| research store safe for parallel writers | v1.3.0 | ledger updated under a lock; run ids and experiment directories claimed atomically | `iap.experiment.locking`, `validation/ledger.py`, `research/runner.py` |
+| gate eligibility | v1.3.0 | a result from a flattering configuration is ledgered and is not promotion evidence | `iap.research.specs`, `eligibility.json` |
+| import-policy test | v1.3.0 | a guarded trading-path module that imports a network client or an LLM SDK fails CI | `python/tests/test_import_policy.py` |
+| write broker + blackboard | v1.7.0 | the only path for agent writes; append-only, hash-chained JSONL of tasks, claims, findings, pre-registrations | `iap.agents.broker`, `blackboard` |
+| pre-registration gate | v1.7.0 | `research run` refuses before reading data unless the (alpha, horizon) hypothesis is on the verified board | `iap.agents.prereg_gate` |
+| reserve on a hidden seed | v1.7.0 | final evaluation on a synthetic session the agent cannot see; pass/fail only; attempts capped | `iap.agents.reserve`, `reserve_runner` |
+| signed human approvals | v1.7.0 | retire / reset lifecycle edges need an expiring, single-use, signed approval | `iap.agents.approvals` |
+| read-only MCP server | v1.7.0 | six versioned read tools over stdio, no write path (AST-tested), no network listener | `iap.agents.mcp_server` (`iap-mcp --root .`) |
+| agent evaluations, untrusted text | v1.7.0 | planted leak, seeded bug, shuffled-label null, fabricated citation; free text returned wrapped and flagged | `iap.agents.evals`, `untrusted` |
+| governance G1-G4 | v1.10.0 | costed, code-bound, git-anchored, Ed25519-signed pre-registrations (below) | `iap.agents.fingerprint`, `anchor`, `signing` |
 
-The import-policy test has stated gaps: it scans nine Python packages and
-not `iap.replay` or `iap.trace`, and nothing scans the Rust, C++ or Java
-trees — those are enforced in review.
+**The governance chain (v1.10).** One hypothesis, from registration to a
+gated run:
 
-### 6.3 The planned agent layer — backlog
+1. **Register.** The agent sends `preregister(alpha, horizon, sign,
+   hypothesis)` signed with its Ed25519 private key, which lives outside the
+   repository. The request covers the agent id, the operation, a digest of
+   the arguments and a single-use nonce.
+2. **Verify and fingerprint.** The broker holds only public keys
+   (`research/agents/agent_pubkeys.json`), so it can check the signature but
+   cannot forge one. It refuses a reused nonce. It computes the alpha's
+   fingerprint: a hash of the source files of the alpha's modules and every
+   `iap.*` module they import, the declared features' registry entries, and
+   the numpy / pandas / scipy versions.
+3. **Debit a look.** The registration costs one look on the
+   multiple-testing ledger, so registering many hypotheses raises everyone's
+   threshold.
+4. **Append.** The entry, with its signed request, goes onto the
+   hash-chained blackboard.
+5. **Anchor.** The board is committed and pushed before any data is read;
+   `cli anchor` records the first commit that contains each entry.
+6. **Gate.** `python -m iap.research run` checks the registration and
+   recomputes the fingerprint; changed code, features or dependency
+   versions are refused (re-registering with `--supersede` costs another
+   look). A `--no-prereg` run is marked ineligible for promotion.
+7. **Re-verify, offline, by anyone.** `cli verify-board` checks the chain,
+   that every committed version of the board is a prefix of the current one
+   (a rewritten, re-hashed board fails against its own history), the
+   anchors, and every signature.
 
-Everything in this subsection is **planned and not built**. It is the
-content of two backlog epics in [EPICS.md](EPICS.md): E24 (a read-only
-research layer) and E30 (the controls that would let several agents work
-without being able to fool the platform or each other).
+Pre-registrations made before v1.10 (the six 2026 holdout entries) have no
+fingerprint and were not debited; they are anchored to commit `6723fd0`.
+GOVERNANCE.md §2a lists what the fingerprint does not cover. LEARN.md §35
+explains why the first drafts (HMAC keys, class-only code hashes) were
+replaced.
 
-| planned control | issue | what it is for |
-|---|---|---|
-| read-only MCP server | AG01, AL05 | agents read the ledger, reports, lifecycle log and decision traces through resources with no side effects |
-| write broker and blackboard | AL01 | the only path by which an agent changes repository, ledger or lifecycle state; an append-only log of tasks, claims and findings |
-| pre-registration | AL02 | a hypothesis is committed before any data is read, so it cannot be written to fit the result |
-| reserve sessions on a hidden seed | AL03 | final evaluation on data generated from a seed the agents never see |
-| authenticated human approval | AL04 | every lifecycle edge whose actor is HUMAN needs an authenticated approval — today the actor is asserted, not verified |
-| agent evaluations | AL06 | planted leak, seeded bug, shuffled-label null, citation resolution — each must fail when its control is removed |
-| untrusted free-text handling | AL07 | text from ledgers, reports and tool output is data, not instructions |
+**Where to look:** `python/src/iap/agents/`; docs/governance/GOVERNANCE.md
+§2a; DIAGRAMS.md §23. **How to run it:** COOKBOOK recipe 47.
 
-The order matters. The controls come before the agents because an agent
-with a goal ("get an alpha promoted") will find every shortcut §2.7 and
-§2.11 describe — cheaper costs, a chosen holdout, free looks — faster than
-a person would. v1.3.0 closed those three in the tooling. It did not build
-the agents.
+The import-policy test has stated gaps: it scans the guarded trading-path
+packages and not `iap.replay` or `iap.trace`, and nothing scans the Rust,
+C++ or Java trees; those are enforced in review.
+
+### 6.3 What is still planned
+
+The research agent itself (plan items AI1-AI4, v1.11): an LLM that drafts
+hypotheses, registers them and runs experiments only through the signed
+broker, judged by the v1.7 agent evaluations, plus a model registry and
+drift checks for whatever it fits. The boundary in §6.1 does not move: the
+agent would act on the research record, never on the trading path.
 
 ### 6.4 What would be theatre on this data
 
@@ -1123,4 +1300,6 @@ PYTHONPATH=src python3 -m iap.mvp replay --run ../data/mvp/58a10f2194a3c81c     
 | every pinned rule | [../PLATFORM_CONVENTIONS.md](../PLATFORM_CONVENTIONS.md) |
 | what is done and what is backlog | [ROADMAP.md](ROADMAP.md), [EPICS.md](EPICS.md) |
 | to run the pipeline on real historical files you obtained (ITCH 5.0, LOBSTER) | [REAL_DATA.md](REAL_DATA.md) |
-| what changed in v1.3.0, v1.4.0 and v1.5.0 | [../CHANGELOG.md](../CHANGELOG.md) |
+| what changed in each release, v1.1.0 to v1.10.0 | [../CHANGELOG.md](../CHANGELOG.md) |
+| the real-data studies: 7 sessions, power, the 2026 holdout, auctions | [REAL_DATA.md](REAL_DATA.md) §3 |
+| the governance controls, one table | [governance/GOVERNANCE.md](governance/GOVERNANCE.md) §2a |
