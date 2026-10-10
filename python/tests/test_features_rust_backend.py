@@ -60,10 +60,21 @@ def _assert_parity(py, rs, label):
     )
     v = py.validity
     assert np.isnan(rs.values[~v]).all(), f"{label}: invalid slot not NaN"
-    diff = np.abs(rs.values[v] - py.values[v])
-    tol = TOL + TOL * np.abs(py.values[v])
-    worst = int(np.argmax(diff - tol)) if diff.size else 0
-    assert (diff <= tol).all(), f"{label}: max excess {(diff - tol)[worst]!r}"
+    a = np.where(v, py.values, 0.0)
+    b = np.where(v, rs.values, 0.0)
+    over = np.abs(b - a) > TOL + TOL * np.abs(a)
+    if over.any():
+        report = []
+        for k in np.flatnonzero(over.any(axis=0)):
+            rows = np.flatnonzero(over[:, k])
+            r = rows[0]
+            report.append(
+                f"{NATIVE_NAMES[k]}: {len(rows)} rows, first row {r} "
+                f"py={a[r, k]!r} rs={b[r, k]!r}, max |d|={np.abs(b - a)[rows, k].max():.3g}"
+            )
+        pytest.fail(f"{label}: values differ
+  " + "
+  ".join(report))
 
 
 # ---------------------------------------------------- backend-independent
