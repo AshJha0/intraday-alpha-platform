@@ -34,12 +34,25 @@ ANOMALY = ("events_eq_anomalies.jsonl", "events_fx_anomalies.jsonl")
 VECTORS = PRIMARY + ANOMALY
 CADENCES = (0, 100_000_000)
 _VRR = NATIVE_NAMES.index("vol_regime_ratio_v1")
+_RV1 = NATIVE_NAMES.index("rvol_w1m_v1")
 _RV5 = NATIVE_NAMES.index("rvol_w5m_v1")
-#: vol_regime_ratio = rvol_w1m / (rvol_w5m + EPS) with EPS = 1e-12: when
-#: rvol_w5m is float residue of an emptied window (<= EPS) the ratio is
-#: residue / 1e-12 (~1e-8) in either engine, i.e. both are "0" -- compared
-#: at abs 1e-6 on those rows only (the rvols themselves match at 1e-9).
-RESIDUE_ABS = 1e-6
+#: vol_regime_ratio = rvol_w1m / (rvol_w5m + EPS). When every 1m return is 0
+#: the rolling sum of squares leaves float residue (~1e-12) in one engine and
+#: an exact 0 in the other -- inside rvol's own 1e-9 tolerance, but divided by
+#: a small rvol_w5m it becomes ~1e-8 in the ratio. On rows where rvol_w1m is
+#: within 1e-9 of 0 the ratio is compared at the input tolerance propagated
+#: through the division, 1e-9 / (rvol_w5m + EPS); all other rows stay 1e-9.
+RESIDUE_RV = 1e-9
+
+
+def _tolerance(py_values: np.ndarray) -> np.ndarray:
+    """Per-cell tolerance (abs 1e-9 + rel 1e-9; vol_regime_ratio residue rule)."""
+    tol = TOL + TOL * np.abs(py_values)
+    rv1 = np.abs(np.nan_to_num(py_values[:, _RV1]))
+    rv5 = np.abs(np.nan_to_num(py_values[:, _RV5]))
+    residue = rv1 <= RESIDUE_RV
+    tol[residue, _VRR] += RESIDUE_RV / (rv5[residue] + 1e-12)
+    return tol
 
 
 @pytest.fixture(scope="module")
@@ -54,14 +67,6 @@ def python_frames(contexts):
         for v in VECTORS
         for c in CADENCES
     }
-
-
-def _tolerance(py_values: np.ndarray, rv5m: np.ndarray) -> np.ndarray:
-    """Per-cell tolerance (abs 1e-9 + rel 1e-9; vol_regime_ratio residue rule)."""
-    tol = TOL + TOL * np.abs(py_values)
-    residue = np.abs(np.nan_to_num(rv5m)) <= 1e-12
-    tol[residue, _VRR] = np.maximum(tol[residue, _VRR], RESIDUE_ABS)
-    return tol
 
 
 def _assert_parity(py, rs, label):
@@ -79,7 +84,7 @@ def _assert_parity(py, rs, label):
     assert np.isnan(rs.values[~v]).all(), f"{label}: invalid slot not NaN"
     a = np.where(v, py.values, 0.0)
     b = np.where(v, rs.values, 0.0)
-    over = np.abs(b - a) > _tolerance(a, py.values[:, _RV5])
+    over = np.abs(b - a) > _tolerance(a)
     if over.any():
         report = []
         for k in np.flatnonzero(over.any(axis=0)):
@@ -184,7 +189,7 @@ def test_rust_backend_anomaly_golden_checkpoints(ext, contexts, python_frames, s
             assert bool(rs.validity[row, k]) == e["valid"], (side, key, name)
             if e["valid"]:
                 got, want = rs.values[row, k], e["value"]
-                tol = TOL + TOL * abs(want) + (RESIDUE_ABS if k == _VRR else 0.0)
+                tol = TOL + TOL * abs(want)
                 assert abs(got - want) <= tol, (side, key, name, got, want)
 
 
@@ -260,8 +265,10 @@ def test_pipeline_engine_rust_swaps_only_native_columns(ext, tmp_path):
             assert np.array_equal(ok, ~np.isnan(b)), col
             tol = TOL + TOL * np.abs(a)
             if col == "vol_regime_ratio_v1":
-                residue = np.abs(np.nan_to_num(py["rvol_w5m_v1"].to_numpy())) <= 1e-12
-                tol[residue] = np.maximum(tol[residue], RESIDUE_ABS)
+                rv1 = np.abs(np.nan_to_num(py["rvol_w1m_v1"].to_numpy()))
+                rv5 = np.abs(np.nan_to_num(py["rvol_w5m_v1"].to_numpy()))
+                residue = rv1 <= RESIDUE_RV
+                tol[residue] += RESIDUE_RV / (rv5[residue] + 1e-12)
             assert (np.abs(a[ok] - b[ok]) <= tol[ok]).all(), col
         elif a.dtype.kind == "f":
             assert np.array_equal(a, b, equal_nan=True), col
