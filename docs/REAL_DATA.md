@@ -603,6 +603,7 @@ one with the v1.7.1 stage lines:
 |---|---|---|---|---|---|---|
 | 2026-05-15 | 13.0 GB gzip, 0.96 bn messages | 40.5 m | 52 min | 20 min | 7 min | 23 min |
 | 2026-05-18 | 16.2 GB gzip, 1.18 bn messages | 46.4 m | 260 min | 77 min | 36 min | 144 min |
+| 2026-05-18, v1.8.0 | same file | 46.4 m | **59 min** | 32 min | 7 min | 18 min |
 
 The second file is 24 % larger in bytes and 15 % in events, but took five
 times as long, and every stage was slower, not just the largest. The cause
@@ -618,8 +619,17 @@ was most likely stopped well before it would have finished.
 Run full-day files alone on the machine, give the job 16 GB or more free, and
 read the `[ingest]` heartbeat (elapsed time and GB written by the running
 stage) instead of waiting for output (`--quiet` turns the stage and
-heartbeat lines off). Streaming the events to disk instead
-of keeping them is the known fix and is not done.
+heartbeat lines off).
+
+**Fixed in v1.8.0.** The raw pass now keeps each event as its 72-byte IAP1
+record instead of a Python object, and the normaliser packs the kept events
+the same way and sorts them with `np.lexsort` (same keys, stable). The rerun
+of the same 2026-05-18 file (last table row) produced a byte-identical
+dataset (`dataset_version 780916b0…`, every normalized file hash and the QC
+totals equal) in 59 minutes, with a peak of 7.75 GB committed (sampled every
+30 s) instead of 17.6 GB. The parse stage is unchanged code; its 32 minutes
+against 77 reflect the machine no longer paging. One session's kept events
+are still resident while they are sorted (~80 bytes an event).
 
 **Many days.** Every ingest re-normalises all sessions of the dataset
 (the QC state and `events.parquet` span them). For a load of many dates

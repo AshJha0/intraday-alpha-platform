@@ -53,7 +53,7 @@ services:
     build:
       context: ../..
       dockerfile: deployment/docker/Dockerfile.python
-    image: ghcr.io/ashjha0/intraday-alpha-platform-python:v1.7.2
+    image: ghcr.io/ashjha0/intraday-alpha-platform-python:v1.8.0
     container_name: iap-data-generator
     # Deterministic batch job: identical seed => bit-identical /data outputs
     # (configs/marketdata/generator.json pins seed 20260829). Runs to completion; the
@@ -74,7 +74,7 @@ services:
     build:
       context: ../..
       dockerfile: deployment/docker/Dockerfile.cpp
-    image: ghcr.io/ashjha0/intraday-alpha-platform-cpp:v1.7.2
+    image: ghcr.io/ashjha0/intraday-alpha-platform-cpp:v1.8.0
     container_name: iap-cpp-replay
     # Deterministic replay + execution-sim pass over the golden vectors;
     # writes its methodology/results table to the shared volume.
@@ -91,7 +91,7 @@ services:
     build:
       context: ../..
       dockerfile: deployment/docker/Dockerfile.rust
-    image: ghcr.io/ashjha0/intraday-alpha-platform-rust:v1.7.2
+    image: ghcr.io/ashjha0/intraday-alpha-platform-rust:v1.8.0
     container_name: iap-rust-replay
     command: ["/golden"]
     restart: "no"
@@ -107,7 +107,7 @@ services:
     build:
       context: ../..
       dockerfile: deployment/docker/Dockerfile.java
-    image: ghcr.io/ashjha0/intraday-alpha-platform-java:v1.7.2
+    image: ghcr.io/ashjha0/intraday-alpha-platform-java:v1.8.0
     container_name: iap-java-platform
     # The paper-trading vertical (com.iap.platform.PaperTrading) over the
     # golden equity vector, paced 60x realtime, serving GET /metrics
@@ -179,7 +179,7 @@ services:
     build:
       context: ../..
       dockerfile: deployment/docker/Dockerfile.java
-    image: ghcr.io/ashjha0/intraday-alpha-platform-java:v1.7.2
+    image: ghcr.io/ashjha0/intraday-alpha-platform-java:v1.8.0
     container_name: iap-java-platform-state
     entrypoint: ["java", "-Xmx64m", "-XX:-UsePerfData", "-cp", "/app/classes", "com.iap.platform.SessionStateExporter", "--state-dir", "/data/state", "--port", "9102"]
     restart: unless-stopped
