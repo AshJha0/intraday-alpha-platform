@@ -32,7 +32,7 @@ Per raw JSONL file (arrival order):
    invariant.
 
 Memory bound (documented): one raw file's kept events are resident during
-its sort; per-stream QC state is O(DEDUP_WINDOW); the Parquet dataset is
+its sort, as 72-byte IAP1 records rather than Python objects; per-stream QC state is O(DEDUP_WINDOW); the Parquet dataset is
 written file by file through a ``ParquetWriter`` (never all files at once).
 
 Outputs per raw file ``<stem>.jsonl``: ``<stem>.normalized.jsonl`` +
@@ -44,11 +44,14 @@ Parquet research dataset ``events.parquet`` (pyarrow) and
 from __future__ import annotations
 
 import json
+import struct
+import zlib
+from array import array
 from collections import deque
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from pathlib import Path
 
-from iap.core.codec import IAP1_HEADER_SIZE, encode_iap1, iter_jsonl, write_iap1, write_jsonl
+from iap.core.codec import IAP1_MAGIC, IAP1_RECORD_SIZE, IAP1_VERSION, iter_jsonl, write_jsonl
 from iap.core.events import FIELDS, MarketEvent, validation_error
 
 #: Per-stream duplicate-detection window (sequences remembered), pinned.
@@ -97,38 +100,110 @@ class _StreamQC:
         self.epoch += 1
 
 
-def _drop_ts_regressions(
-    kept: list[tuple[MarketEvent, int]], per_stream: dict[str, dict[str, int]]
-) -> list[tuple[MarketEvent, int]]:
-    """Drop in-stream exchange_ts regressions (checked in (epoch, sequence) order)."""
-    order = sorted(
-        range(len(kept)),
-        key=lambda i: (
-            kept[i][0].venue_id,
-            kept[i][0].instrument_id,
-            kept[i][1],
-            kept[i][0].sequence,
-            kept[i][0].event_id,
-        ),
+#: One IAP1 record (schemas/FORMAT.md §2) as numpy structured-type fields.
+_IAP1_RECORD = [
+    ("event_id", "<u8"),
+    ("instrument_id", "<u4"),
+    ("venue_id", "<u2"),
+    ("event_type", "u1"),
+    ("side", "u1"),
+    ("exchange_ts", "<i8"),
+    ("receive_ts", "<i8"),
+    ("sequence", "<u8"),
+    ("price_ticks", "<i8"),
+    ("qty", "<i8"),
+    ("order_id", "<u8"),
+    ("trade_id", "<u8"),
+]
+#: ``struct`` twin of :data:`_IAP1_RECORD` (the codec's record layout).
+RECORD_STRUCT = struct.Struct("<QIHBBqqQqqQQ")
+#: IAP1 header (magic, version, count) and trailer (crc32, 0, count).
+_FRAME = struct.Struct("<IIQ")
+assert RECORD_STRUCT.size == IAP1_RECORD_SIZE
+_CHUNK = 65536
+
+
+def pack_record(ev: MarketEvent) -> bytes:
+    """One event as its 72-byte IAP1 record (``struct.error`` if out of domain)."""
+    return RECORD_STRUCT.pack(
+        ev.event_id,
+        ev.instrument_id,
+        ev.venue_id,
+        ev.event_type,
+        ev.side,
+        ev.exchange_ts,
+        ev.receive_ts,
+        ev.sequence,
+        ev.price_ticks,
+        ev.qty,
+        ev.order_id,
+        ev.trade_id,
     )
-    drop: set[int] = set()
-    last_key = None
-    running_max = 0
-    for i in order:
-        ev, epoch = kept[i]
-        key = (ev.venue_id, ev.instrument_id, epoch)
-        if key != last_key:
-            last_key = key
-            running_max = ev.exchange_ts
+
+
+def _records(buf: bytes | bytearray):
+    import numpy as np
+
+    return np.frombuffer(buf, dtype=np.dtype(_IAP1_RECORD))
+
+
+def iter_record_events(records) -> Iterator[MarketEvent]:
+    """IAP1 records (bytes or a structured array) -> ``MarketEvent``s, a chunk at a time."""
+    if isinstance(records, (bytes, bytearray)):
+        records = _records(records)
+    for lo in range(0, len(records), _CHUNK):
+        for eid, inst, ven, et, side, ex, rc, seq, px, q, oid, tid in records[
+            lo : lo + _CHUNK
+        ].tolist():
+            yield MarketEvent(eid, inst, ven, ex, rc, seq, et, side, px, q, oid, tid)
+
+
+def _ts_regression_keep(rec, epoch, per_stream: dict[str, dict[str, int]]):
+    """Step 4 as a mask: False for an in-stream exchange_ts regression.
+
+    In (venue, instrument, epoch, sequence, event_id) order an event is
+    dropped when its exchange_ts is below the running maximum of its stream
+    epoch.  A dropped event never raises that maximum, so the maximum over
+    every earlier event equals the one over the kept ones."""
+    import numpy as np
+
+    n = len(rec)
+    keep = np.ones(n, dtype=bool)
+    if n < 2:
+        return keep
+    order = np.lexsort(
+        (rec["event_id"], rec["sequence"], epoch, rec["instrument_id"], rec["venue_id"])
+    )
+    ts = rec["exchange_ts"][order]
+    ven = rec["venue_id"][order]
+    ins = rec["instrument_id"][order]
+    ep = epoch[order]
+    cut = np.flatnonzero((ven[1:] != ven[:-1]) | (ins[1:] != ins[:-1]) | (ep[1:] != ep[:-1])) + 1
+    drop = np.zeros(n, dtype=bool)
+    bounds = zip(
+        np.concatenate(([0], cut)).tolist(), np.concatenate((cut, [n])).tolist(), strict=True
+    )
+    for lo, hi in bounds:
+        if hi - lo < 2:
             continue
-        if ev.exchange_ts < running_max:
-            drop.add(i)
-            per_stream[f"{ev.venue_id}:{ev.instrument_id}"]["ts_regression_dropped"] += 1
-        else:
-            running_max = ev.exchange_ts
-    if not drop:
-        return kept
-    return [row for i, row in enumerate(kept) if i not in drop]
+        seg = ts[lo:hi]
+        d = seg[1:] < np.maximum.accumulate(seg)[:-1]
+        if d.any():
+            drop[lo + 1 : hi] = d
+            per_stream[f"{int(ven[lo])}:{int(ins[lo])}"]["ts_regression_dropped"] += int(d.sum())
+    keep[order[drop]] = False
+    return keep
+
+
+def _write_iap1_records(path: Path, rec) -> None:
+    """The bytes of ``write_iap1`` for these records (header, records, CRC trailer)."""
+    header = _FRAME.pack(IAP1_MAGIC, IAP1_VERSION, len(rec))
+    body = rec.tobytes()
+    crc = zlib.crc32(body, zlib.crc32(header)) & 0xFFFFFFFF
+    with open(path, "wb") as f:
+        f.write(header)
+        f.write(body)
+        f.write(_FRAME.pack(crc, 0, len(rec)))
 
 
 def normalize_file(
@@ -137,18 +212,27 @@ def normalize_file(
     stream_qc: dict[str, _StreamQC],
     per_stream: dict[str, dict[str, int]],
     events: Iterable[MarketEvent] | None = None,
-) -> list[MarketEvent]:
-    """Normalize one raw JSONL file; returns the kept, event-time-ordered events.
+):
+    """Normalize one raw JSONL file; returns the kept, event-time-ordered
+    events as a numpy structured array of IAP1 records.
 
-    ``events``, when given, are the events of ``raw_path`` already in memory
+    ``events``, when given, are the events of ``raw_path`` already in hand
     (the caller has just written that file): they are used instead of
     decoding it again.  They are modified in place, like decoded ones.
 
     ``stream_qc``/``per_stream`` are shared across files of a run so sequences
     that continue across sessions are checked continuously (and resets that
     happen at a session boundary are detected as resets, not duplicates).
+
+    Steps 1-3 run event by event and pack each kept event into its 72-byte
+    IAP1 record at once, so a session costs ~80 bytes an event instead of a
+    Python object per event (v1.7.2 needed ~17 GB for a 46 m-event day);
+    steps 4-5 sort the records.
     """
-    kept: list[tuple[MarketEvent, int]] = []  # (event, stream epoch)
+    import numpy as np
+
+    buf = bytearray()
+    epochs = array("q")
     for ev in iter_jsonl(raw_path) if events is None else events:
         key = f"{ev.venue_id}:{ev.instrument_id}"
         counters = per_stream.get(key)
@@ -194,54 +278,49 @@ def normalize_file(
             qc.max_seq = ev.sequence
         if ev.exchange_ts > qc.max_exchange_ts:
             qc.max_exchange_ts = ev.exchange_ts
-        kept.append((ev, qc.epoch))
+        buf += pack_record(ev)  # in domain: validation_error passed
+        epochs.append(qc.epoch)
+
+    rec = _records(buf)
+    epoch = np.frombuffer(epochs, dtype=np.int64)
 
     # 4. In-stream timestamp regression: drop + count, never re-sort.
-    kept = _drop_ts_regressions(kept, per_stream)
-    for ev, _ in kept:
-        per_stream[f"{ev.venue_id}:{ev.instrument_id}"]["events_out"] += 1
+    keep = _ts_regression_keep(rec, epoch, per_stream)
+    if not keep.all():
+        rec, epoch = rec[keep], epoch[keep]
+    del keep
+    if len(rec):
+        streams = rec["venue_id"].astype(np.int64) << 32 | rec["instrument_id"].astype(np.int64)
+        values, counts = np.unique(streams, return_counts=True)
+        for v, c in zip(values.tolist(), counts.tolist(), strict=True):
+            per_stream[f"{v >> 32}:{v & 0xFFFFFFFF}"]["events_out"] += c
+        del streams
 
     # 5. Event-time ordering + event_id reassignment. Within one exchange_ts
     # tick, order by stream then epoch/sequence so late arrivals (e.g. a
     # delayed EXECUTE whose same-timestamp TRADE print arrived first) are
     # restored to correct intra-stream order; event_id (arrival) is the
     # final tiebreak. Step 4 guarantees the sort never inverts sequence
-    # order inside a stream.
-    kept.sort(
-        key=lambda row: (
-            row[0].exchange_ts,
-            row[0].venue_id,
-            row[0].instrument_id,
-            row[1],
-            row[0].sequence,
-            row[0].event_id,
+    # order inside a stream. (np.lexsort is stable; its LAST key is primary.)
+    order = np.lexsort(
+        (
+            rec["event_id"],
+            rec["sequence"],
+            epoch,
+            rec["instrument_id"],
+            rec["venue_id"],
+            rec["exchange_ts"],
         )
     )
-    out = [ev for ev, _ in kept]
-    for i, ev in enumerate(out):
-        ev.event_id = i + 1
+    rec = rec[order]
+    del order, epoch, epochs, buf
+    rec["event_id"] = np.arange(1, len(rec) + 1, dtype=np.uint64)
 
     stem = raw_path.stem
-    write_jsonl(out_dir / f"{stem}.normalized.jsonl", out)
-    write_iap1(out_dir / f"{stem}.normalized.iap1", out)
-    return out
+    write_jsonl(out_dir / f"{stem}.normalized.jsonl", iter_record_events(rec))
+    _write_iap1_records(out_dir / f"{stem}.normalized.iap1", rec)
+    return rec
 
-
-#: One IAP1 record (schemas/FORMAT.md §2) as numpy structured-type fields.
-_IAP1_RECORD = [
-    ("event_id", "<u8"),
-    ("instrument_id", "<u4"),
-    ("venue_id", "<u2"),
-    ("event_type", "u1"),
-    ("side", "u1"),
-    ("exchange_ts", "<i8"),
-    ("receive_ts", "<i8"),
-    ("sequence", "<u8"),
-    ("price_ticks", "<i8"),
-    ("qty", "<i8"),
-    ("order_id", "<u8"),
-    ("trade_id", "<u8"),
-]
 
 _SCHEMA_TYPES = {
     "event_id": "uint64",
@@ -269,31 +348,25 @@ class _ParquetSink:
 
         self._pa = pa
         self._np = np
-        self._record = np.dtype(_IAP1_RECORD)
         fields = [pa.field(n, getattr(pa, t)()) for n, t in _SCHEMA_TYPES.items()]
         fields.append(pa.field("source", pa.string()))
         self.schema = pa.schema(fields)
         self._writer = pq.ParquetWriter(path, self.schema)
         self.rows = 0
 
-    def write(self, stem: str, events: list[MarketEvent]) -> None:
-        if not events:
+    def write(self, stem: str, records) -> None:
+        """One row group from the IAP1 records of a normalized file."""
+        if not len(records):
             return
         pa = self._pa
-        # Columns come from the IAP1 record bytes through one structured
-        # numpy view (the same values as reading the 12 attributes of every
-        # event, without 12 Python passes over the list).
         np = self._np
-        records = np.frombuffer(
-            encode_iap1(events), dtype=self._record, count=len(events), offset=IAP1_HEADER_SIZE
-        )
         arrays = [
             pa.array(np.ascontiguousarray(records[n]), type=self.schema.field(n).type)
             for n in FIELDS
         ]
-        arrays.append(pa.array([stem] * len(events), type=pa.string()))
+        arrays.append(pa.array([stem] * len(records), type=pa.string()))
         self._writer.write_table(pa.table(arrays, schema=self.schema))
-        self.rows += len(events)
+        self.rows += len(records)
 
     def close(self) -> None:
         self._writer.close()
