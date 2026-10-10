@@ -164,7 +164,7 @@ jobs:
           --cov-report=xml:../coverage-python.xml
       - name: upload python coverage report
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-python
           path: coverage-python.xml
@@ -217,7 +217,7 @@ jobs:
             --current "$RUNNER_TEMP/bench_ci.md" --factor 5
       - name: upload bench_all output
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: bench-cpp
           path: ${{ runner.temp }}/bench_ci.md
@@ -240,7 +240,7 @@ jobs:
             --title "C++ tick-to-trade guard (p50/p99, coarse)"
       - name: upload tick-to-trade output
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: bench-tick-to-trade
           path: ${{ runner.temp }}/tick_to_trade_ci.md
@@ -267,7 +267,7 @@ jobs:
           lcov --list ../coverage-cpp.info || true
       - name: upload cpp coverage report
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-cpp
           path: coverage-cpp.info
@@ -305,7 +305,7 @@ jobs:
           cargo llvm-cov --locked -p risk --summary-only --cobertura --output-path ../coverage-rust-risk.xml
       - name: upload rust risk coverage report
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-rust-risk
           path: coverage-rust-risk.xml
@@ -626,7 +626,7 @@ jobs:
           git ls-files --modified --others --exclude-standard \
             | { grep -vxFf regeneration_deleted.txt || true; } > regeneration_files.txt
           tar -czf regenerated.tar.gz --files-from=regeneration_files.txt
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: regenerated-artefacts
           path: regenerated.tar.gz
