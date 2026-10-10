@@ -24,6 +24,8 @@ use pyo3::types::PyDict;
 #[derive(Default)]
 struct Replay {
     instrument_id: Vec<u32>,
+    /// 0-based index (in the input stream) of the event that emitted the row.
+    event_index: Vec<u64>,
     timestamp: Vec<i64>,
     values: Vec<f64>,
     validity: Vec<bool>,
@@ -44,8 +46,9 @@ fn replay(
 ) -> Result<Replay, IapError> {
     let mut eng = FeatureEngine::new(ticks, cadence_ns)?;
     let mut out = Replay::default();
-    for ev in events {
+    for (i, ev) in events.iter().enumerate() {
         if let Some(v) = eng.apply(ev)? {
+            out.event_index.push(i as u64);
             out.instrument_id.push(v.instrument_id);
             out.timestamp.push(v.timestamp);
             out.values.extend_from_slice(&v.values);
@@ -67,6 +70,7 @@ fn to_dict(py: Python<'_>, r: Replay) -> PyResult<Bound<'_, PyDict>> {
     let validity = Array2::from_shape_vec((n, FEATURE_COUNT), r.validity)
         .map_err(|e| PyValueError::new_err(e.to_string()))?;
     d.set_item("instrument_id", r.instrument_id.into_pyarray_bound(py))?;
+    d.set_item("event_index", r.event_index.into_pyarray_bound(py))?;
     d.set_item("timestamp", r.timestamp.into_pyarray_bound(py))?;
     d.set_item("values", values.into_pyarray_bound(py))?;
     d.set_item("validity", validity.into_pyarray_bound(py))?;

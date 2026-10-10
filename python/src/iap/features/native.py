@@ -125,6 +125,7 @@ class NativeFrame:
     """Emitted rows of the 45 native slots (row-major numpy arrays)."""
 
     instrument_id: np.ndarray  # uint32 (n,)
+    event_index: np.ndarray  # uint64 (n,): input position of the emitting event
     timestamp: np.ndarray  # int64 (n,)
     values: np.ndarray  # float64 (n, 45); NaN where invalid
     validity: np.ndarray  # bool (n, 45)
@@ -148,6 +149,7 @@ def _ticks(contexts: dict[int, InstrumentContext]) -> dict[int, float]:
 def _from_ext(d: dict, engine: str = "rust") -> NativeFrame:
     return NativeFrame(
         instrument_id=d["instrument_id"],
+        event_index=d["event_index"],
         timestamp=d["timestamp"],
         values=d["values"],
         validity=d["validity"],
@@ -167,12 +169,14 @@ def _python_frame(
     cols = np.array([idx[n] for n in NATIVE_NAMES], dtype=np.intp)
     eng = FeatureEngine(contexts, cadence_ns=cadence_ns)
     iids: list[int] = []
+    pos: list[int] = []
     ts: list[int] = []
     vals: list[list[float]] = []
     valid: list[list[bool]] = []
-    for ev in events:
+    for i, ev in enumerate(events):
         vec = eng.apply(ev)
         if vec is not None:
+            pos.append(i)
             iids.append(vec.instrument_id)
             ts.append(vec.timestamp)
             vals.append(vec.values)
@@ -184,6 +188,7 @@ def _python_frame(
     validity = np.ascontiguousarray(full_b[:, cols]) if n else np.zeros((0, len(cols)), bool)
     return NativeFrame(
         instrument_id=np.asarray(iids, dtype=np.uint32),
+        event_index=np.asarray(pos, dtype=np.uint64),
         timestamp=np.asarray(ts, dtype=np.int64),
         values=values,
         validity=validity,
