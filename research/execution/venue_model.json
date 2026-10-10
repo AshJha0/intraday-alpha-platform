@@ -1,0 +1,24 @@
+{
+  "schema": "iap.venue_model",
+  "version": 1,
+  "description": "Opt-in per-venue model for the v1.12 cost-aware router (iap.execution.sor_v2). Keyed by venue name from venues.json (which is unchanged). p_fill_touch: P(fill) for an order joining the touch (a calibration document's fill_rates override it); toxicity_bps: maker adverse selection by markout horizon, positive = adverse; fee_tiers: monthly-volume tiers, first tier at 0 shares. Synthetic, indicative values.",
+  "venues": {
+    "XV1": {
+      "p_fill_touch": 0.45,
+      "toxicity_bps": {"100ms": 0.3, "1s": 0.6},
+      "fee_tiers": [
+        {"min_monthly_shares": 0, "taker_fee_per_share": 0.003, "maker_rebate_per_share": 0.002},
+        {"min_monthly_shares": 10000000, "taker_fee_per_share": 0.0029, "maker_rebate_per_share": 0.0025},
+        {"min_monthly_shares": 50000000, "taker_fee_per_share": 0.0028, "maker_rebate_per_share": 0.003}
+      ]
+    },
+    "XV2": {
+      "p_fill_touch": 0.55,
+      "toxicity_bps": {"100ms": 0.2, "1s": 0.4},
+      "fee_tiers": [
+        {"min_monthly_shares": 0, "taker_fee_per_share": 0.0028, "maker_rebate_per_share": 0.0015},
+        {"min_monthly_shares": 20000000, "taker_fee_per_share": 0.0026, "maker_rebate_per_share": 0.002}
+      ]
+    }
+  }
+}

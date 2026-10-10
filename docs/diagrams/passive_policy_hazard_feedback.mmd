@@ -1,0 +1,18 @@
+flowchart TD
+    SIG["score says post"] --> FB{"feedback: EWMA of known markouts<br/>below threshold, min_fills known?"}
+    FB -- "toxic, stand_down" --> SKIP["post nothing for cooldown,<br/>then reset the EWMA"]
+    FB -- "toxic, widen / reduce" --> ADJ["post behind the touch<br/>or a fraction of the size"]
+    FB -- "not toxic" --> POST["post at the touch"]
+    ADJ --> PO
+    POST --> PO{"post-only: would it take<br/>liquidity on arrival?"}
+    PO -- "reject" --> REJ["cancelled: POST_ONLY_REJECT"]
+    PO -- "slide" --> SL["re-priced one tick passive"]
+    PO -- "no" --> REST["rests in the queue"]
+    SL --> REST
+    REST --> FILL{"filled before ttl?"}
+    FILL -- "yes" --> MK["markout known after horizon"]
+    MK --> FB
+    FILL -- "no" --> HZ{"reprices left and hazard<br/>P(fill within ttl) >= give-up prob?"}
+    HZ -- "yes" --> POST
+    HZ -- "no" --> GU["give up: cancel, or cross"]
+    HAZ[("fill hazard iap.fill_hazard/1<br/>cloglog on queue ahead, depletion,<br/>spread, imbalance, time of day")] --> HZ

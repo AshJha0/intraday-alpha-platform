@@ -435,6 +435,9 @@ _REPORT_V19_METHOD_FIELDS = {
     "split_mode": "row_mass",
     "gate_ic_source": "pooled",
     "validity_diagnostics": False,
+    # v1.12 (``v4``): the report-only R7 blocks.
+    "cpcv": False,
+    "deflated_sharpe": False,
 }
 
 

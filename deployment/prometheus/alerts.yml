@@ -48,6 +48,7 @@ groups:
             for the instrument. Runbook:
             docs/runbooks/RUNBOOK_data_pipeline.md#sequence-gaps
           runbook: docs/runbooks/RUNBOOK_data_pipeline.md
+          runbook_url: docs/runbooks/RUNBOOK_data_pipeline.md
 
       # Book stale (the consequence of a gap or a venue drop) is its own
       # signal: it can persist for a whole session with no further gaps.
@@ -65,6 +66,7 @@ groups:
             fail-closed (STALE_PRICE / SEQUENCE_GAP rejects). Runbook:
             docs/runbooks/RUNBOOK_data_pipeline.md#stale-feed
           runbook: docs/runbooks/RUNBOOK_data_pipeline.md
+          runbook_url: docs/runbooks/RUNBOOK_data_pipeline.md
 
       # Stale feed, judged on EVENT time: the gap between the last two
       # consecutive processed events exceeded the configured staleness budget
@@ -87,6 +89,7 @@ groups:
             feed handlers and venue connectivity. Runbook:
             docs/runbooks/RUNBOOK_data_pipeline.md#stale-feed
           runbook: docs/runbooks/RUNBOOK_data_pipeline.md
+          runbook_url: docs/runbooks/RUNBOOK_data_pipeline.md
 
       # Wall-clock liveness of the feed, scoped to a PACED (realtime) session:
       # a wedged decoder thread stops advancing md_last_event_wallclock_unixtime
@@ -109,6 +112,7 @@ groups:
             upstream. /health returns 503 after 30s of no progress. Runbook:
             docs/runbooks/RUNBOOK_paper_trading.md#feed-stall
           runbook: docs/runbooks/RUNBOOK_paper_trading.md
+          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
 
   - name: iap-alpha-health
     rules:
@@ -133,6 +137,7 @@ groups:
             (RUNBOOK_paper_trading.md §1). Runbook:
             docs/runbooks/RUNBOOK_paper_trading.md#signal-rate
           runbook: docs/runbooks/RUNBOOK_paper_trading.md
+          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
 
       # Live-vs-backtest drift (LIVE from java: com.iap.adaptive.DriftMonitor
       # via com.iap.platform.PaperTrading, labeled {alpha="..."}). The
@@ -162,6 +167,7 @@ groups:
             trigger per spec §20 step 13 — raise it with research.
             Runbook: docs/runbooks/RUNBOOK_paper_trading.md#drift
           runbook: docs/runbooks/RUNBOOK_paper_trading.md
+          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
 
       # The lifecycle gauge is observational, so RETIRED must page a human:
       # nothing in the platform stops the allocation on its own.
@@ -181,6 +187,7 @@ groups:
             reduced by a human decision. Runbook:
             docs/runbooks/RUNBOOK_paper_trading.md#lifecycle
           runbook: docs/runbooks/RUNBOOK_paper_trading.md
+          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
 
   - name: iap-execution
     rules:
@@ -204,6 +211,7 @@ groups:
             adverse regime shift. Runbook:
             docs/runbooks/RUNBOOK_paper_trading.md#fill-rate
           runbook: docs/runbooks/RUNBOOK_paper_trading.md
+          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
 
       # Pre-trade rejects are normal in small numbers; a sustained majority
       # means the strategy is fighting a limit (or a stale book).
@@ -221,6 +229,7 @@ groups:
             (<state-dir>/risk_audit.jsonl) before changing any limit.
             Runbook: docs/runbooks/RUNBOOK_paper_trading.md#rejects
           runbook: docs/runbooks/RUNBOOK_paper_trading.md
+          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
 
   - name: iap-risk
     rules:
@@ -244,6 +253,7 @@ groups:
             global kill switch (fail-closed, audit-logged). Runbook:
             docs/runbooks/RUNBOOK_incident_kill_switch.md
           runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+          runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md
 
       # risk_kill_switch_engaged carries no scope label (the gauge is the
       # GLOBAL latch); scope detail lives in the audit JSONL.
@@ -262,6 +272,7 @@ groups:
             approval. Scope and reason are in <state-dir>/risk_audit.jsonl.
             Runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
           runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+          runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md
 
       # Gross exposure against the live limit gauge (§12.6).
       - alert: GrossNotionalUtilizationHigh
@@ -279,6 +290,7 @@ groups:
             5m; the next sizing decision will be rejected by the pre-trade
             check. Runbook: docs/runbooks/RUNBOOK_paper_trading.md#exposure
           runbook: docs/runbooks/RUNBOOK_paper_trading.md
+          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
 
       # A child order left for a venue other than the one the pre-trade check
       # approved (PaperTrading.RiskWiring.onOrderSubmitted). The platform
@@ -301,6 +313,7 @@ groups:
             market event: engage the kill switch and investigate. Runbook:
             docs/runbooks/RUNBOOK_paper_trading.md#routed-venue-mismatch
           runbook: docs/runbooks/RUNBOOK_paper_trading.md
+          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
 
       # An admin kill is accepted (latched in AdminService) before the risk
       # engine records it; the order path withholds every order meanwhile and
@@ -323,6 +336,7 @@ groups:
             the halt and the admin audit first. Runbook:
             docs/runbooks/RUNBOOK_incident_kill_switch.md#kill-pending
           runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+          runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md
 
       # --resume released open orders the restored risk snapshot still
       # tracked (the simulator that held them is gone). The counter is set
@@ -344,6 +358,7 @@ groups:
             The alert stays up until the process ends. Runbook:
             docs/runbooks/RUNBOOK_paper_trading.md#resume-released-orders
           runbook: docs/runbooks/RUNBOOK_paper_trading.md
+          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
 
   - name: iap-infrastructure
     rules:
@@ -363,6 +378,7 @@ groups:
             on hot paths (spec §23: allocation-conscious Java).
             Runbook: docs/runbooks/RUNBOOK_backtest.md#jvm
           runbook: docs/runbooks/RUNBOOK_backtest.md
+          runbook_url: docs/runbooks/RUNBOOK_backtest.md
 
       # The session aborted (config load, decode or accounting failure). The
       # process exits non-zero and `restart: on-failure` retries it.
@@ -380,6 +396,7 @@ groups:
             <state-dir>/config_audit.jsonl. Runbook:
             docs/runbooks/RUNBOOK_paper_trading.md#failed-session
           runbook: docs/runbooks/RUNBOOK_paper_trading.md
+          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
 
       # A STOPPED session (value 4: a stop was requested, the session
       # checkpointed mid-stream and exited 0) that nobody resumed. The
@@ -412,6 +429,7 @@ groups:
             starts (the persisted state becomes 1) or finishes (2). Runbook:
             docs/runbooks/RUNBOOK_paper_trading.md#stopped-session
           runbook: docs/runbooks/RUNBOOK_paper_trading.md
+          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
 
       # An unexpected restart re-reads the checkpoint; a burst of restarts is
       # a crash loop (and each one re-warms the book from the stream).
@@ -429,6 +447,7 @@ groups:
             book and feature warm-up restart from the stream each time.
             Runbook: docs/runbooks/RUNBOOK_paper_trading.md#restart-recovery
           runbook: docs/runbooks/RUNBOOK_paper_trading.md
+          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
 
       # A scrape target disappearing is itself an incident. Every job in
       # prometheus.yml is a target that really exists (§12.7), so this can
@@ -446,6 +465,7 @@ groups:
             java-platform during a trading session, treat as a platform
             incident. Runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
           runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+          runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md
 
   # The admin (kill-switch) API. Both counters are created on their first
   # increment, so `increase()` alone misses the first occurrence: the second
@@ -472,6 +492,7 @@ groups:
             remote addresses. Runbook:
             docs/runbooks/RUNBOOK_incident_kill_switch.md#admin-auth-abuse
           runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+          runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md
 
       - alert: AdminAuditSuppressed
         expr: >
@@ -492,6 +513,7 @@ groups:
             traffic in <state-dir>/admin_audit.jsonl. Runbook:
             docs/runbooks/RUNBOOK_incident_kill_switch.md#admin-auth-abuse
           runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+          runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md
 
   # Heartbeat: fires permanently by design. Alertmanager routes it to the
   # `watchdog` receiver (deployment/alertmanager/alertmanager.yml); an external
@@ -511,3 +533,4 @@ groups:
             heartbeat receiver, Prometheus rule evaluation or Alertmanager is
             down and no other alert can be trusted.
           runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+          runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md

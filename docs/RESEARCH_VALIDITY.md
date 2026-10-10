@@ -150,6 +150,60 @@ labels are built.
 The validity block debits four more looks (`VALIDITY_LOOKS`), so a `v3`
 experiment counts 88 looks at four folds against 84 under `v2`.
 
+### 1b. v1.12 overfitting statistics (opt-in, bundle `v4`)
+
+Plan item R7 (statistics half). With two to seven sessions, one
+walk-forward path and one Sharpe number say little about how much of a
+result is selection. Two report-only blocks address that; `v4` is `v3`
+plus both. No gate reads them, so a `v4` verdict is the `v3` verdict on
+the same data, and no default, golden or published number moves.
+
+| Option | Module | What it reports |
+|---|---|---|
+| `cpcv=True` (`cpcv_groups` N = 6, `cpcv_test_groups` k = 2) | `iap.validation.cpcv` | combinatorial purged CV (López de Prado 2018, ch. 12): the model is refit on all C(N, k) splits (15 at the defaults), trained on the groups before AND after the test groups; the out-of-sample standardized signal is reassembled into phi = k/N C(N, k) = C(N-1, k-1) paths (5) and the `cpcv` block gives each path's pooled IC, their mean, spread, min, max and share positive, and the per-split ICs |
+| `deflated_sharpe=True` + `deflated_sharpe_trials` | `iap.validation.deflated` | on the per-session-day net P&L of the 1x walk-forward backtests: per-day and annualised Sharpe, skewness, kurtosis, PSR against 0 (Bailey & López de Prado 2012), minimum track record length at 5 %, and the deflated Sharpe ratio (Bailey & López de Prado 2014) at `n_trials` and at the ledger look count (`dsr_at_looks`) |
+| `probability_of_backtest_overfitting(matrix)` | `iap.validation.cpcv` | PBO by CSCV (Bailey, Borwein, López de Prado & Zhu 2017) over a T x M matrix of per-period performance of M candidate configurations; it needs a sweep, so it is a function, not a field of one alpha's report |
+| `study_deflated_sharpe(per_day, n_trials)` | `iap.validation.deflated` | the DSR block for a maker, quoting or auction study's per-day P&L table (`QuotingBacktester.run_days`, daily rows or a plain series); beside the study's registered verdict, never inside it |
+
+**CPCV groups and purging.** The groups are whole UTC session days when
+there are at least N days (days dealt into N contiguous groups), and
+row-mass quantiles otherwise (the default walk-forward rule). Purge and
+embargo apply on both sides of every test group, as in
+`leave_one_day_out`: a train row at t is dropped when
+[t, t + horizon + embargo] reaches a test group or t lies within the
+embargo after one; adjacent test groups merge into one interval. Tests pin
+the split and path counts, that every (split, group) cell is used once,
+and that no train row's label window reaches a test interval.
+
+**Which N for the DSR (the documented choice).** The ledger counts looks;
+one validation debits 83 or more, nearly all of them diagnostics of the
+same fitted configuration (decay per horizon, cost multipliers, regimes)
+and almost perfectly correlated. The DSR's N is the number of independent
+trials a selection was made from, so:
+
+- the headline `dsr` uses N = the ledger's **distinct configurations**
+  (`ExperimentLedger.distinct_experiments`: de-duplicated
+  (alpha, kind, config, dataset) identities), counting the run being judged
+  when it is new (`effective_trials`). The research runner passes this
+  under `v4`. Configurations of the same alpha are correlated, so this
+  over-counts independent trials, which makes the DSR conservative;
+- `dsr_at_looks` uses N = the run's ledger look count (the `ledger_looks`
+  the gate was derived from): the most conservative reading, a lower bound;
+- a caller with a better estimate of the effective number of trials (for
+  example the cluster count of a correlation-clustered sweep) passes it.
+
+The cross-trial Sharpe variance V defaults to 1/(T - 1), the sampling
+variance of a Sharpe estimate under the null of no skill, since one
+validation does not see the other trials' Sharpes; a caller that has them
+passes `trials_sr_variance`. With fewer than three days the block reports
+`null` statistics; with a handful, skewness and kurtosis are themselves
+noisy, which is one more reason no gate reads the block.
+
+Looks: the `cpcv` block adds 5 (`CPCV_LOOKS`, one per path at the
+defaults), the `deflated_sharpe` block 1 (`DSR_LOOKS`), so a `v4`
+experiment counts 94 looks at four folds. Recipe 56 in COOKBOOK.md runs
+the pieces, including the paper's worked example (SR0 0.1132, DSR 0.9004).
+
 ## 2. Planted-signal power study
 
 `python -m iap.research power` generates synthetic data with effects of known
@@ -301,8 +355,9 @@ be checked against the configuration bounds only (`periods_verified: false`).
 
 ## 5. Tooling
 
-- `python -m iap.research run --methods {v2,legacy_v1}`: the method bundle
-  (default `v2`); `--normalized-dir` names the events of the recompute
+- `python -m iap.research run --methods {v2,v3,v4,legacy_v1}`: the method
+  bundle (default `v2`; `v3` adds the v1.9 validity block of §1a, `v4` adds
+  the report-only CPCV / PBO / deflated-Sharpe blocks of §1b); `--normalized-dir` names the events of the recompute
   probe (default `<features-dir>/../normalized`).
 - `python research/alpha_reports/run_all.py --methods legacy_v1`
   `--out-dir <dir>`: the v1.4.0 report, reproduced into `<dir>` with its own

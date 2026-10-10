@@ -10,9 +10,11 @@ observability — no capital at risk.
 `PlatformSessionFailed`, `SessionStoppedNotResumed`,
 `SessionRestartsClimbing`, `FeedWallClockStall`, `RoutedVenueMismatch`,
 `ResumeReleasedOpenOrders`, and the `Watchdog` heartbeat. Delivery is through Alertmanager
-(`deployment/alertmanager/`, since v1.3.0); until an operator supplies the
-webhook URL the alerts are routed and visible in the Alertmanager UI but
-delivered nowhere (`docs/governance/REPO_SETTINGS.md` §6).
+(`deployment/alertmanager/`, since v1.3.0; `page` / `ticket` / `Watchdog`
+routing since v1.12). Compose delivers to the local `alert-sink` echo service
+until `ALERT_PAGE_URL_FILE` / `ALERT_TICKET_URL_FILE` name real receivers; on
+Kubernetes the Secret `iap-alertmanager-webhook` must carry both `page_url`
+and `ticket_url` (RUNBOOK_alerting.md §2).
 
 > **Status:** the paper-trading loop is LIVE — `com.iap.platform.PaperTrading`
 > (started by `java/paper.sh` locally, or as the `java-platform` compose
@@ -66,15 +68,14 @@ http://localhost:3000 (dashboards: **Market Data & Latency**, **Trading &
 Risk**). The java-platform, Prometheus and Alertmanager ports are published
 on the host's loopback only (`127.0.0.1:8080`, `:9090`, `:9093`).
 
-To have alerts delivered, give Alertmanager a receiver before starting:
+Out of the box Alertmanager delivers to the local `alert-sink` echo service
+(`docker logs -f iap-alert-sink`). To deliver to real receivers, keep the URL
+files outside the repo (RUNBOOK_alerting.md §2):
 
 ```bash
-printf '%s' 'https://<your webhook receiver>/<token>' > /path/outside/the/repo/webhook_url
-export ALERT_WEBHOOK_URL_FILE=/path/outside/the/repo/webhook_url
+export ALERT_PAGE_URL_FILE=/path/outside/the/repo/page_url
+export ALERT_TICKET_URL_FILE=/path/outside/the/repo/ticket_url
 ```
-
-Without it compose mounts `deployment/alertmanager/webhook_url.placeholder`,
-which points nowhere.
 
 Kubernetes equivalent:
 
@@ -82,9 +83,10 @@ Kubernetes equivalent:
 python3 deployment/k8s/generate_configmaps.py     # if configs changed (reviewed commit only!)
 kubectl apply -f deployment/k8s/
 kubectl -n intraday-alpha get pods -w
-# alert delivery: the webhook URL is a Secret, created out of band
+# alert delivery: receiver URLs are a Secret, created out of band
+# (RUNBOOK_alerting.md §2 — keys page_url and ticket_url)
 kubectl -n intraday-alpha create secret generic iap-alertmanager-webhook \
-  --from-literal=url='https://<your webhook receiver>/<token>'
+  --from-file=page_url=/secure/page_url --from-file=ticket_url=/secure/ticket_url
 ```
 
 The namespace is default-deny for ingress and egress

@@ -6,6 +6,151 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
+## v1.12.0 — 2026-10-10
+
+Honest Sharpe, better passive fills, new features, measured latency and
+production alerting (IAP_Next_Releases_Plan: R7 statistics half, X4, X5, X6,
+M6, P4). Every new path is opt-in: no default, golden, published number,
+ledger or cross-language contract changes. **Operator action (P4):** the
+Kubernetes Secret `iap-alertmanager-webhook` now needs keys `page_url` and
+`ticket_url` (RUNBOOK_alerting.md §2). Parity counts from CI: python 2250 /
+cpp 302 / rust 358 / java 571, golden 193 / 72 / 71 / 124. Real-data study
+status: AUC01 in-sample, no demonstrated edge (underpowered); maker, quoting
+and the AUC01 2026 holdout running (REAL_DATA.md §3.3). Pull requests
+[#57](https://github.com/AshJha0/intraday-alpha-platform/pull/57) to
+[#63](https://github.com/AshJha0/intraday-alpha-platform/pull/63).
+
+- **Combinatorial purged CV and PBO** (plan item R7, statistics half;
+  opt-in): `iap.validation.cpcv` — `CombinatorialPurgedSplitter` (N
+  groups, day-aligned when there are >= N sessions, k test groups, purge
+  and embargo on both sides, all C(N, k) splits, reassembly into
+  C(N-1, k-1) backtest paths) and `probability_of_backtest_overfitting`
+  (CSCV over a T x M candidate performance matrix).
+- **Deflated Sharpe ratio** (opt-in): `iap.validation.deflated` — PSR,
+  minimum track record length, expected maximum Sharpe of N trials and
+  the DSR with skew/kurtosis-adjusted variance; N defaults to the ledger's
+  distinct configurations (`effective_trials`), with `dsr_at_looks` at the
+  raw look count beside it (RESEARCH_VALIDITY.md §1b). The
+  `study_deflated_sharpe` helper puts a DSR block beside a maker, quoting
+  or auction study's per-day P&L without touching its verdict rule.
+- **`v4` method bundle**: `v3` plus the report-only `cpcv` and
+  `deflated_sharpe` blocks of `validate_alpha` (`cpcv=True`,
+  `deflated_sharpe=True`, `deflated_sharpe_trials=`); 94 looks at four
+  folds. The research runner passes the DSR trial count from its ledger.
+  No gate reads either block; defaults, goldens and published numbers are
+  unchanged.
+
+- **Tick-to-trade latency benchmark (plan X6).** New
+  `cpp/bench/bench_tick_to_trade` times every event individually from a raw
+  IAP1 frame through decode, book, native features, alpha scoring and an order
+  decision with a minimal pre-trade check, into an HDR-style log-linear
+  histogram, and reports p50 / p90 / p99 / p99.9 / max end to end and per
+  stage, on the golden `eq_mbo` vector and a generated 100,000-event equity
+  day (pinned seed). Warm-up excluded; timer overhead measured and stated.
+  The boundary is explicit: no network or kernel, and no C++ risk engine (the
+  decision stage is bench-local). CI-runner baseline
+  `benchmarks/results_tick_to_trade.md` (golden: p50 1,279 ns, p99 2,559 ns,
+  p99.9 11,263 ns); method and caveats in `benchmarks/RESULTS.md`.
+- The `cpp` CI job runs it after ctest, writes the table to the job summary
+  and the `bench-tick-to-trade` artifact, and guards the end-to-end p50/p99
+  rows at 8× the baseline. `tests/harness/check_bench_regression.py` gains
+  `--rows` (regex row filter) and `--title`; the existing `bench_all` guard
+  is unchanged.
+- `tools/tick_to_trade_py.py`: the same path through the Python reference
+  implementation (events/s and percentiles; not run in CI).
+- COOKBOOK recipe 57.
+
+### Features (M6): opt-in extended set and event-time sampling
+
+- `iap.features.extended`: four Python-only families behind
+  `python -m iap.features --feature-set extended` (19 features, appended
+  after the default registry, own `feature_version`): queue time-to-depletion
+  at the best bid / ask (`qttd_*`), trade-sign autocorrelation
+  (`sign_acf_l*_n100_v1`), exponential-kernel Hawkes intensities with online
+  recursion (`hawkes_{buy,sell,total,imb}_b{1,0p1}_v1`) plus an offline MLE
+  helper (`fit_hawkes_exp`), and odd-lot / non-displayed execution shares
+  (`oddlot_share_w1m_v1`, `hidden_share_w1m_v1`; invalid when the source has
+  no order-level executions). API_FEATURES §8, COOKBOOK recipe 58.
+- `--sampling events:N|volume:N`: rows on an event or volume clock instead of
+  `--cadence-ms`, for either feature set.
+- Unchanged: the default registry and hash, the golden feature vectors, the
+  native 45 slots (no C++/Rust/Java change), published numbers. `--workers`
+  remains byte-identical with the new options (tested). No real-data run yet;
+  API_FEATURES §8.3 records where the features are meant to feed the maker,
+  quoting and auction code.
+
+- **X5: cost-aware multi-venue router (Python only, opt-in).** New
+  `iap.execution.venues_model` (per-venue fill probability at the touch,
+  maker toxicity from markouts, latency, volume-tiered fee schedules with a
+  deterministic monthly `FeeLedger`) and `iap.execution.sor_v2`
+  (`CostAwareRouter`: argmin expected all-in cost for aggressive and passive
+  routes, a multi-venue sweep with latency-staggered sends, passive
+  allocation by fill probability and toxicity). New versioned config
+  `research/execution/venue_model.json`; `venues.json` unchanged.
+  `MakerBacktester(..., router=)` opts in. The pinned SOR, the fills golden
+  and the C++/Java ports are unchanged. Real data here is Nasdaq only, so
+  this is capability for multi-venue data (docs/REAL_DATA.md, API_TRADING.md
+  §2.9, COOKBOOK recipe 59).
+
+**Added (P4, alerting, SLOs and state HA).**
+
+- *Alertmanager receivers.* `deployment/alertmanager/alertmanager.yml` now
+  routes by severity: `page` → receiver `page`; `critical`/`warning` →
+  `ticket`; `Watchdog` → `watchdog`; unlabelled alerts fall through to
+  `ticket`. Inhibition: `KillSwitchEngaged` mutes its downstream symptoms,
+  feed-health alerts mute `SignalRateCollapse`/`FillRateDrop`, and an SLO page
+  mutes the same SLO's warning, always within one `service`. Receiver URLs are
+  read with `url_file` only. The `webhook_url.placeholder` file is removed.
+  Compose now defaults to a new `alert-sink` echo service
+  (`local-sink.url`, no secret), so `docker compose up` still starts with no
+  secrets and alerts can be watched arriving.
+- *Latency SLOs.* New `deployment/prometheus/slo.yml`, written against the
+  existing log2 histograms (no exporter change): 99% of order-path
+  (`order_path_latency_ns`) and event-path (`book_update_latency_ns`)
+  samples under 1,048,575 ns over 30 days. Multi-window multi-burn-rate
+  alerts: `*LatencySLOFastBurn` (page; 14.4x over 1h and 5m, or 6x over 6h and
+  30m) and `*LatencySLOSlowBurn` (warning; 3x over 1d and 2h, or 1x over 3d and
+  6h). Error ratios are recorded for 7 windows. Promtool unit tests in
+  `deployment/prometheus/tests/slo_test.yml` cover 8 cases.
+- *State backup.* New `state-backup` CronJob (every 30 min, keeps 96) and
+  `iap-java-state-backup` PVC. The job mounts `iap-java-state` read-only, is
+  pinned by required pod affinity to the `java-platform` node (RWO is per
+  node), copies the checkpoint first, and never overlaps itself. HA is
+  restart-and-resume, not active-active. Lease-based leader election is not
+  implemented (it would be a Java change).
+- *Checks.* `tests/harness/check_deployment.py` adds `alerting_secret_free`,
+  `alert_rule_metadata` (severity + `runbook` + `runbook_url` resolving to a
+  file), `alert_rule_tests` (every rule file has a promtool test; every alert
+  is tested by name, except 8 pre-existing alerts on an allowlist that may
+  only shrink) and `k8s_state_backup`. Every existing alert gained a
+  `runbook_url` annotation.
+- *Docs.* New `docs/runbooks/RUNBOOK_alerting.md`; PLATFORM_CONVENTIONS
+  §12.7, ARCHITECTURE §9 ops note, COOKBOOK recipe 60.
+
+**Changed (operator action).** The k8s Secret `iap-alertmanager-webhook`
+now needs the keys `page_url` and `ticket_url` (was `url`); the Alertmanager
+pod will not start until both keys exist. Compose: `ALERT_PAGE_URL_FILE` /
+`ALERT_TICKET_URL_FILE`; `ALERT_WEBHOOK_URL_FILE` is still honoured as the
+page URL. Migration: RUNBOOK_alerting.md §2.
+
+**Added (X4, fill hazard / post-only / reprices / markout feedback; Python
+only, all opt-in).** `iap.execution.fill_hazard.FillHazardModel`: a
+grouped-time (cloglog, Cox-style; or logit) fill hazard on queue ahead,
+queue-depletion rate, spread, imbalance and time of day, fitted by IRLS from
+the M3 maker labels (`samples_from_maker_labels`), persisted as
+`iap.fill_hazard/1` JSON and registrable in the `iap.mlops` registry.
+Simulator rule 10: `ChildOrder(post_only="reject"|"slide")` never takes
+liquidity on arrival (`CancelReason.POST_ONLY_REJECT`).
+`iap.execution.markout_feedback`: a causal EWMA of realised markouts that
+makes the passive policy stand down, widen or reduce size while toxic.
+`MakerConfig` gains `post_only`, `entry_reprices` with
+`reprice_policy="follow"|"hazard"`, `give_up="cancel"|"cross"`,
+`min_fill_prob` and `feedback`; `QuotingConfig` gains `post_only` and
+`feedback`. Defaults are unchanged: the simulator's pinned rules, the
+cross-language fill goldens, the PASSIVE policy's `max_reprices=1`, and the
+default maker / quoting outputs (byte-identical; a fingerprint test pins
+them). API_TRADING.md §2.10, COOKBOOK recipe 61.
+
 ## v1.11.0 — 2026-10-10
 
 Scale and AI (IAP_Next_Releases_Plan v1.11: E2, E3, AI1-AI3; A2, A3 and AI4

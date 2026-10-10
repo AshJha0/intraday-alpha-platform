@@ -49,7 +49,9 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
        git-anchored and Ed25519-signed. Since v1.11 an optional LLM research agent works only
        through that governance, fitted models live in a content-hashed registry with drift
        monitoring and shadow mode, the Rust feature engine is callable from Python, and most
-       duplicated language copies are frozen by policy. Seven real Nasdaq ITCH sessions and a
+       duplicated language copies are frozen by policy. Since v1.12 a study's Sharpe can be
+       deflated by the ledger's trial count, the C++ hot path has per-event tick-to-trade
+       percentiles, and alerts route by severity against latency SLOs. Seven real Nasdaq ITCH sessions and a
        two-day 2026 holdout have been studied; nothing is claimed to be profitable.</p>
     <nav>
       <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/HOW_IT_WORKS.md">How it works</a>
@@ -77,7 +79,7 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
 <div class="wrap">
   <h2>Measured, not claimed</h2>
   <div class="numbers">
-    Cross-language parity&nbsp;&nbsp;&nbsp; python 2185&nbsp; · cpp 302&nbsp; · rust 358&nbsp; · java 571 tests — 3,416 green, one command; golden groups 193/72/71/124<br>
+    Cross-language parity&nbsp;&nbsp;&nbsp; python 2250&nbsp; · cpp 302&nbsp; · rust 358&nbsp; · java 571 tests — 3,481 green, one command; golden groups 193/72/71/124<br>
     Golden suites&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; identical book states, byte-identical IAP1 SHA-256, features/alphas to 1e-9, byte-identical canonical JSON, trace digests, risk audit and lifecycle registry in all four languages<br>
     C++ hot path&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; IAP1 decode 184.1 ns/event (CRC-32 verified) · book update 26.4 ns · replay 27.2M events/s · 48-feature engine 514.1 ns/event · one decision trace 31.7 µs/trace off the event loop<br>
     Determinism&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; full dataset regeneration is byte-identical (sha256-verified); replays reproduce fills exactly; the MVP run twice and replayed from its capture reproduces its trace digest<br>
@@ -97,7 +99,10 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
     Research governance&nbsp;&nbsp;&nbsp; a pre-registration costs one look and records a code + feature + dependency fingerprint · blackboard history checked against git and anchored to the first commit holding each entry · agent writes Ed25519-signed, broker holds public keys only<br>
     Rust engine (pyo3)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; the 45 native feature slots from Python: ~790,000 events/s in Rust vs ~5,250 through the Python reference, 150x on the golden vectors (CI, ubuntu-24.04) · not a pipeline speed-up: 160 features stay in Python · opt-in <code>--engine rust</code><br>
     LLM agent evals&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 4 of 4 mocked in CI (p-hacking, prompt injection, hallucinated citation, task success), each control also shown to fail when removed · live on claude-haiku-5-5 (2026-10-10): 4 of 4, est. $0.0096 — the model behaved, so the live run did not stress the controls<br>
-    Polyglot policy&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 18 canonical / 20 frozen copies (24 paths) · 2 retire candidates kept as parity evidence · nothing deleted · a change to a frozen copy needs <code>POLYGLOT-OVERRIDE:</code>
+    Polyglot policy&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 18 canonical / 20 frozen copies (24 paths) · 2 retire candidates kept as parity evidence · nothing deleted · a change to a frozen copy needs <code>POLYGLOT-OVERRIDE:</code><br>
+    Tick-to-trade (C++)&nbsp;&nbsp;&nbsp;&nbsp; decoded IAP1 frame → book → features → alpha → order decision, per event, CI runner (AMD EPYC): golden eq_mbo p50 1,279 ns · p99 2,559 ns · p99.9 11,263 ns · max 33,112 ns; generated day p50 1,407 · p99 1,727 · p99.9 12,287 ns · in-process only: no network, no kernel bypass, no C++ risk engine<br>
+    Deflated Sharpe&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; CPCV paths, PBO, PSR / DSR / minimum track record with N from the ledger's distinct configurations (DSR at raw looks beside it) · paper's worked example reproduced (DSR 0.9004) · opt-in <code>v4</code> bundle, report-only<br>
+    Auction study (AUC01)&nbsp;&nbsp; exploratory, in-sample, 7 real sessions: closing cross C-300s 3 trades, 2 of 6 test sessions, session-clustered mean +19.4 bp, 95% CI −254 to +293 bp → no demonstrated edge (underpowered: 21 decisions; below the registered 4 active sessions) · opening O-300s 4 trades, +6.1 bp, 95% CI −9.7 to +21.9 → no demonstrated edge · 2026 holdout running; maker and quoting studies running
   </div>
 
   <div class="honest">
@@ -217,6 +222,25 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
     Real-data maker, auction and quoting studies are <strong>running</strong>, pre-registered and
     in-sample; no result is reported yet. Deferred: QQQ vs constituents, futures lead-lag,
     deep order-book baselines.
+  </div>
+
+  <div class="honest">
+    <strong>v1.12.0: deflate the Sharpe, time the hot path, and read the first auction result.</strong>
+    Research statistics gain combinatorial purged cross-validation, the probability of backtest
+    overfitting and the deflated Sharpe ratio, with the number of trials taken from the ledger
+    rather than chosen by the author (opt-in <code>v4</code> bundle, report-only; the paper's
+    worked example reproduces at DSR 0.9004). A C++ tick-to-trade benchmark times every event from
+    a decoded frame to an order decision: p50 1,279 ns and p99 2,559 ns on the golden vector on a
+    CI runner, with the boundary stated (no network, no kernel bypass, no C++ risk engine). Also
+    opt-in and Python-only: 19 extended features with event and volume clocks, a cost-aware
+    multi-venue router (capability only: the real data is one Nasdaq book), and a fill-hazard model
+    with post-only posting, hazard-driven reprices and markout feedback. Ops: page / ticket /
+    watchdog alert routing with receiver URLs from Secret files, latency burn-rate SLOs with
+    promtool tests, and a state-backup job. The first real-data study result is in: the
+    pre-registered closing-cross strategy <code>AUC01</code>, exploratory and in-sample, shows
+    <strong>no demonstrated edge</strong> (session-clustered mean +19.4 bp from 3 trades on 2 sessions, 95% CI −254 to +293 bp): an
+    underpowered result, not a negative one. Its 2026 holdout and the maker and quoting studies
+    are <strong>running</strong>.
   </div>
 
   <h2>Start here</h2>
@@ -348,7 +372,37 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
          dataset and its version do not change. Auction features (imbalance ratio,
          reference-price drift, far/near spread, time to cross), cross targets, and a
          closing-cross strategy with a purged, day-aligned walk-forward. The CLI refuses to
-         backtest without a pre-registration. Since v1.11 it is running on the real sessions, pre-registered and in-sample, with a declared 2026 holdout; no result yet.</p></div>
+         backtest without a pre-registration. First real-data result (v1.12, exploratory, in-sample, 7 sessions): no demonstrated edge on the closing or the opening cross, with only 21 decisions per cell; the declared 2026 holdout is running
+         (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/REAL_DATA.md">REAL_DATA §3.3</a>).</p></div>
+    <div class="card"><h3>Overfitting statistics &amp; the deflated Sharpe</h3>
+      <p>Combinatorial purged cross-validation (all C(N,k) splits, reassembled into backtest paths,
+         day-aligned), the probability of backtest overfitting by CSCV, and the probabilistic and
+         deflated Sharpe ratios with a minimum track record length. The trial count comes from the
+         ledger's distinct configurations, with the DSR at the raw look count printed beside it. A
+         helper puts a DSR block next to any study's per-day P&amp;L without touching its verdict
+         rule. Opt-in <code>v4</code>, report-only
+         (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/RESEARCH_VALIDITY.md">RESEARCH_VALIDITY §1b</a>).</p></div>
+    <div class="card"><h3>Passive execution: hazard, post-only, routing</h3>
+      <p>A discrete-time (cloglog) fill-hazard model fitted on maker labels and versioned as
+         <code>iap.fill_hazard/1</code>; post-only orders that reject or slide instead of taking;
+         entry reprices that give up when the hazard says a repost will not fill; and markout
+         feedback that stands down, widens or shrinks while fills are toxic (synthetic quoting
+         markout −62.75 → −1.75 with a 2 bp threshold). A cost-aware multi-venue router prices fill
+         probability, toxicity, latency and fee tiers. Python, opt-in, synthetic only
+         (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/API_TRADING.md">API_TRADING §2.9–2.10</a>).</p></div>
+    <div class="card"><h3>Extended features &amp; event clocks</h3>
+      <p>Nineteen opt-in features: queue time-to-depletion, trade-sign autocorrelation, Hawkes
+         intensities with online recursion, and odd-lot / non-displayed execution shares, with rows
+         sampled on an event or volume clock. They carry their own feature version; the default
+         registry hash and every golden are unchanged. Not yet run on real data
+         (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/API_FEATURES.md">API_FEATURES §8</a>).</p></div>
+    <div class="card"><h3>Alerting &amp; latency SLOs</h3>
+      <p>Alertmanager routes <code>page</code>, <code>ticket</code> and a <code>Watchdog</code>
+         heartbeat, with receiver URLs read from Secret files (nothing secret committed) and a local
+         echo sink for compose. Multi-window burn-rate SLOs on the existing JVM latency histograms
+         (99% under ~1.05 ms over 30 days) with promtool tests, and a state-backup CronJob. HA is
+         one pod restarting and resuming from its checkpoint, not active-active
+         (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/runbooks/RUNBOOK_alerting.md">RUNBOOK_alerting</a>).</p></div>
     <div class="card"><h3>Research governance</h3>
       <p>Every agent write goes through one broker onto a hash-chained blackboard. A
          pre-registration debits a look on the multiple-testing ledger and records a fingerprint
@@ -405,8 +459,10 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
       <p>Prometheus metrics (rust telemetry + 19 live Java metrics with /metrics, /health),
          recording + alert rules, two Grafana dashboards, structured JSONL logs,
          Dockerfiles + docker-compose + Kubernetes manifests, runbooks, governance and
-         reproducibility docs, and a paper-trading mode. Alertmanager routes the alerts;
-         delivery needs an operator-supplied webhook. NetworkPolicies default-deny ingress
+         reproducibility docs, and a paper-trading mode. Alertmanager routes the alerts
+         by severity (page / ticket / watchdog); real delivery needs operator-supplied
+         <code>page_url</code> and <code>ticket_url</code> Secret files, and compose echoes to a
+         local sink until then. NetworkPolicies default-deny ingress
          and egress.</p></div>
     <div class="card"><h3>Research papers</h3>
       <p>Six case studies written from the platform's own measured outputs: OFI
@@ -417,7 +473,9 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
       <p>Benchmark suite with published methodology (hardware, toolchain, boundaries,
          variance caveats — no isolated numbers): codec, book, replay, feature engine,
          alpha scoring and execution-sim stages, plus demo-scale Rust/Java replay
-         throughput.</p></div>
+         throughput. Since v1.12 a tick-to-trade benchmark reports per-event p50 / p99 / p99.9 /
+         max latency end to end and per stage (decode 271, book 83, features 735, alpha 135,
+         decision 30 ns at p50 on the golden vector), guarded in CI at 8× the baseline.</p></div>
   </div>
 
   <h2>Part of a wider portfolio</h2>

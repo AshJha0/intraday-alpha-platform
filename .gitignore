@@ -69,3 +69,7 @@ python/src/iap/_schemas/
 .env
 *.env
 .iap_keys/
+# --- alert receiver URLs (v1.12 P4): real ones live OUTSIDE the repo; only the
+#     secret-free local compose default local-sink.url is tracked
+deployment/alertmanager/*.url
+!deployment/alertmanager/local-sink.url

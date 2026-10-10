@@ -598,6 +598,116 @@ shrunk to the U-shape with weight `k / (days + k)`), as an
 `load_volume_curve(path, instrument_id)` feeds `ParentOrder(volume_curve=...)`;
 `curve_slice_weights` resamples the bins to the parent's slices.
 
+### 2.9 Cost-aware multi-venue router and venue model (v1.12.0, Python only)
+
+Opt-in (plan item X5). The pinned router (`iap.execution.sor`, C++ hot path,
+fills golden, Java frozen copy) is unchanged and stays the default; the
+cross-language contract and the fills golden do not move.
+
+**Venue model — `iap.execution.venues_model`.** `VenueModel(spec,
+p_fill_touch, toxicity_bps, latency_ns, tiers)`. `build_venue_models(venues,
+config, calibration=, toxicity=, default_p_fill=0.5)` fills it: fill
+probability from the calibration (`fill_rates.by_venue[vid].p_any_fill`,
+then `fill_rates.all`), else the config, else the default; toxicity (maker
+adverse selection, bps, positive = adverse, keyed `"100ms"` / `"1s"`) from
+the config, overridden by `toxicity_from_markouts(fills, timeline)` (which
+runs `iap.tca.markout.markout_report` over MAKER fills and reads
+`-price_impact` per venue; cells below `min_fills` are omitted, never 0).
+Config: `research/execution/venue_model.json` (`schema` `iap.venue_model`,
+`version` 1, keyed by venue name; kept out of `configs/` so the deployment
+ConfigMaps do not carry research-only data); `venues.json` is unchanged.
+
+**Tiered fees.** `FeeTier(min_monthly_shares, taker_fee_per_share,
+maker_rebate_per_share)`; tiers start at 0 and strictly increase. `FeeLedger`
+keeps volume per (venue, UTC month); `record(venue, qty, ts, maker)` prices
+the fill at the tier reached BEFORE it, then credits the volume; a new UTC
+month starts at tier 0. Deterministic. A venue without tiers uses its flat
+`VenueSpec` fee and rebate. The ledger feeds router decisions; the
+simulator's fills keep the flat `VenueSpec` fees.
+
+**Router — `iap.execution.sor_v2.CostAwareRouter(models, RouterOptions,
+sor_options, ledger)`.** Eligibility is the pinned one (book present, not
+stale, TRADING, latency cap); iteration in ascending venue_id; all ties go
+to the lower venue_id. Costs in bps of the consolidated mid, positive = cost:
+
+- `route_aggressive`: argmin of `s (touch - mid)/mid + taker_fee/mid +
+  latency_penalty_bps_per_ms * latency_ms`.
+- `route_passive`: argmin of `p (-rebate/mid - s (mid - touch)/mid +
+  toxicity) + (1 - p) miss_cost_bps` (`miss_cost_bps` default: half spread
+  plus the mean taker fee).
+- `plan_sweep(book, side, qty, ts, limit_ticks=)`: `SweepChild(venue_id,
+  price_ticks, qty, send_offset_ns, arrival_offset_ns)` across displayed
+  depth (`sweep_levels`), best price first, then lower taker fee, then
+  lower venue_id. `stagger="sync_arrival"` (default) sends each child at
+  `max_latency - latency_v` so all arrive together; `"none"` sends all at 0.
+- `allocate_passive(book, side, qty)`: weights `p / (1 + max(tox, 0) /
+  tox_scale_bps)`, venues above `max_toxicity_bps` excluded, integer split
+  by largest remainder in `lot` units.
+
+**Backtest integration.** `MakerBacktester(exec_config, config, calibration,
+router=None)`. With a router each entry decision (taken only while flat)
+picks its venue with `route_passive` among the instrument's venues in the
+event stream; the exit uses the same venue; trips gain a `venue_id` column.
+With `router=None` (the default) the result is unchanged. Real data here is
+Nasdaq only (docs/REAL_DATA.md §3.2), so this is capability for multi-venue
+data. COOKBOOK recipe 56; tests `python/tests/test_sor_v2.py`.
+### 2.10 Fill hazard, post-only, multiple reprices, markout feedback (v1.12.0, Python only)
+
+Plan item X4. Every option is off by default: the FIFO simulator, the
+cross-language fill goldens (C++ `execution` pins Python `iap.execution`) and
+the default `MakerBacktester` / `QuotingBacktester` outputs are byte-identical
+to v1.11 (a fingerprint test pins the latter). C++, Java and Rust are untouched.
+
+**Fill hazard — `iap.execution.fill_hazard`.** `FillHazardModel(edges_ns,
+link="cloglog"|"logit", ridge)` is a grouped-time hazard: per time bucket
+`h_b(x) = 1 - exp(-exp(a_b + beta . z(x)))` (cloglog = the exact discrete form
+of a proportional-hazards / Cox model with a piecewise-constant baseline).
+`z` standardises `log1p(queue_ahead)`, `log1p(depletion_per_s)`,
+`spread_ticks`, `imbalance` and sin/cos of the time of day
+(`hazard_features(...)` builds one row; training and decisions use the same
+function). `fit(samples)` expands survival samples (`duration_ns`, `filled`,
+censored at the ttl) into person-period rows and runs Newton/IRLS (numpy, no
+RNG: same data, same bytes). `p_fill_within(x, t_ns)` = `1 - prod (1 -
+h_b)^(overlap/width)`. `samples_from_maker_labels(labels, ttl_ns=...)` turns
+the v1.9 M3 maker labels into samples (taker rows dropped). Persistence:
+`to_dict` / `save` / `load`, schema `iap.fill_hazard/1`, sorted-key JSON;
+`register(registry, ...)` / `from_registry` use the v1.11 `iap.mlops`
+registry (kind `classifier`, the JSON in `params`).
+
+**Post-only — simulator rule 10.** `ChildOrder(post_only="reject"|"slide")`
+(default `""` = the pinned behaviour). On arrival at an open venue a post-only
+LIMIT that reaches the displayed opposite touch is cancelled
+(`CancelReason.POST_ONLY_REJECT`) or slid to one tick inside it; it never
+takes liquidity. `sim.post_only_rejects` / `sim.post_only_slides` count them
+outside the pinned `ExecCounters`.
+
+**Maker backtest (`MakerConfig`, rule 7).** `post_only` applies to the entry
+and passive-exit posts. `entry_reprices=N` reposts an entry that expired or
+was rejected unfilled at the current touch (`reprice_policy="follow"`), each
+with a fresh `ttl_ns`; `reprice_policy="hazard"` reposts only while
+`P(fill within ttl) >= hazard_give_up_prob` (needs
+`MakerBacktester(..., fill_hazard=model)`). A give-up does nothing
+(`give_up="cancel"`) or sends a MARKET entry (`give_up="cross"`).
+`min_fill_prob` is a tail condition on the hazard probability at decision
+time. `feedback=FeedbackConfig(...)` adapts posting to realised markouts.
+New counters (`entry_reprices`, `hazard_give_ups`, `give_ups`,
+`give_up_crosses`, `fill_prob_out`, `post_only_*`, `feedback_*`) appear only
+when their option is on. The fixed `max_reprices=1` of the PASSIVE execution
+policy (`PassiveParams`, cross-language golden) is unchanged.
+
+**Markout feedback — `iap.execution.markout_feedback`.**
+`MarkoutFeedback(FeedbackConfig(mode="stand_down"|"widen"|"reduce",
+horizon_ns, halflife, threshold_bps, min_fills, cooldown_ns, widen_ticks,
+size_mult))`. Each passive fill's markout `1e4 * s * (m_h - p) / p` (positive
+= good, the `iap.tca.markout` sign) enters an EWMA only once `fill_ts +
+horizon_ns` has passed on the replay clock (causal). Toxic = at least
+`min_fills` known and `ewma < -threshold_bps` (a negative threshold demands a
+minimum earned markout). Then `stand_down` posts nothing for `cooldown_ns`
+(then the EWMA resets), `widen` posts `widen_ticks` behind the wanted price,
+`reduce` posts `size_mult` of the size. `QuotingConfig(post_only=...,
+feedback=...)` applies both to two-sided quoting (stand-down pulls both
+quotes). COOKBOOK recipe 61.
+
 ## 3. Where the rules live
 
 | rule set | normative text | Python port entry |

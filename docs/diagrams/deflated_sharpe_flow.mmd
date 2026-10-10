@@ -1,0 +1,15 @@
+flowchart TD
+    PNL["per-day net P&L of a study<br/>(maker, quoting, auction, alpha)"] --> MOM["Sharpe per day, skew, kurtosis, n days"]
+    MOM --> PSR["PSR against 0"]
+    MOM --> TRL["minimum track record length"]
+    LED[("experiments ledger")] --> EFF["effective_trials:<br/>distinct configurations + 1"]
+    LED --> LOOKS["raw look count"]
+    EFF --> SR0["SR0 = expected max Sharpe of N null trials"]
+    MOM --> SR0
+    SR0 --> DSR["DSR = PSR against SR0<br/>(headline, conservative)"]
+    LOOKS --> DSRL["dsr_at_looks<br/>(harshest reading, printed beside)"]
+    DSR --> BLK["deflated_sharpe block"]
+    DSRL --> BLK
+    PSR --> BLK
+    TRL --> BLK
+    BLK --> RPT["reported beside the registered verdict;<br/>no gate reads it"]

@@ -290,7 +290,7 @@ and are matched by Java, Rust and C++ (the trace and canonical-JSON ports)
 and by Java and Rust (the lifecycle ports). The harness
 (`tests/harness/run_all.sh`, with `run_golden.sh` as the golden-only alias)
 runs every suite with the canonical commands and prints the parity table; a
-v1.11.0 CI run (2026-10-10) passes 2185/302/358/571 tests (193/72/71/124
+v1.12.0 CI run (2026-10-10) passes 2250/302/358/571 tests (193/72/71/124
 golden) across python/cpp/rust/java, plus the repo-level `integration` (35)
 and `replay` (6) rows — the same counts the README parity table records.
 
@@ -311,6 +311,18 @@ regeneration of `benchmarks/results_cpp.md`; the previous table read
 174.4 / 25.7 / 28.1M / 530.4 / 38.5 — within the stated few-percent
 cross-run variance, and the docs follow the table, not the other way round).
 `-Wall -Wextra -Werror`, C++17, Release `-O3`.
+
+**Tick-to-trade (v1.12).** In this repository "tick-to-trade" means the
+in-process software path from one raw IAP1 frame to an order intent: decode
+(CRC verified) → book → 48 native features → alpha scores → order decision
+with a minimal pre-trade check. It excludes the network, the NIC and the
+kernel (no kernel bypass), order encoding and the wire, the venue, and the
+platform risk engine (Rust/Java/Python; the C++ decision stage is a
+bench-local stand-in). `cpp/bench/bench_tick_to_trade` measures it per
+event with percentiles; on a shared GitHub-hosted runner the committed run
+reads p50 ≈ 1.3 µs and p99 ≈ 2.6 µs end to end on the golden vector, with the
+feature engine the largest stage — figures for a shared VM, not for a
+colocated, pinned host (`benchmarks/RESULTS.md`).
 
 **Decision trace (`cpp/include/iap/contracts/`)**: the C++ hot path (book →
 features → alpha → execution → SOR) is explainable through the same
@@ -399,9 +411,11 @@ histograms end `_ns` with fixed log2 buckets, gauges are bare nouns.
   SessionRestartsClimbing, TargetDown, AdminAuthRateLimited,
   AdminAuditSuppressed, and the always-firing `Watchdog` heartbeat — each with a runbook anchor in
   `docs/runbooks/`). Since v1.3.0 Prometheus delivers to Alertmanager
-  (`deployment/alertmanager/`), which routes to a webhook whose URL is an
-  operator-supplied secret; with the in-repo placeholder, alerts are routed
-  and delivered nowhere. Staleness is judged on the
+  (`deployment/alertmanager/`), which routes by severity (page vs ticket,
+  with inhibition) to webhooks whose URLs are operator-supplied secrets;
+  compose defaults to a local echo sink (v1.12.0). Latency SLOs with
+  multi-window burn-rate alerts sit in `deployment/prometheus/slo.yml`.
+  Staleness is judged on the
   EVENT-time gap so a historical replay does not page; limit-utilization rules
   divide by the exported `risk_limit{limit=...}` gauges, never a copied
   constant. `eventbus_queue_depth` and `md_out_of_order_total` remain
@@ -509,6 +523,14 @@ ports on the host's loopback only. The platform's listener itself binds
 `127.0.0.1` unless `IAP_BIND_ADDR` says otherwise — the containers set it to
 `0.0.0.0` and rely on those controls. DIAGRAMS.md §18 draws the topology;
 §17 the CI and release pipeline that would build the images.
+
+**Ops note (v1.12.0).** Availability of the trading vertical is
+restart-and-resume on one `ReadWriteOnce` claim, never active-active: there is
+no leader election, so the fence is RWO plus `Recreate`. A `state-backup`
+CronJob archives `/data/state` every 30 minutes to its own claim, mounting the
+state read-only on the trading pod's node (required pod affinity).
+docs/runbooks/RUNBOOK_alerting.md §4 has the restore procedure and its
+fail-closed outcome.
 
 Three properties of the shape matter more than the box diagram
 (`PLATFORM_CONVENTIONS.md` §12.3/§12.7):
@@ -824,9 +846,10 @@ does, and — where it applies — what it did before v1.3.0.
   instrument until event time catches up or the engine is restored. That is
   the intended trade: a halt costs basis points, a missing halt costs the
   limit.
-- **It is not delivered alerting.** A latched kill switch pages a human
-  only if Alertmanager has somewhere to send the page, and the repository
-  ships a placeholder.
+- **It is not delivered alerting by itself.** A latched kill switch pages a
+  human only if the operator has created the receiver Secret
+  (RUNBOOK_alerting.md §2); out of the box compose delivers to a local echo
+  sink, not a person.
 
 ## 13. The research-store concurrency model
 
@@ -1022,13 +1045,14 @@ every signature. Details and gaps: docs/governance/GOVERNANCE.md §2a.
 
 ### 15.6 Real-data status of these subsystems
 
-| subsystem | real-data status (2026-10-10, v1.11.0) |
+| subsystem | real-data status (2026-10-10, v1.12.0) |
 |---|---|
-| calibration, maker backtest | a pre-registered, exploratory in-sample study on the seven 2019-20 sessions is running (branch `research/maker-real`); no result yet |
-| quoting | M5 on real files is running beside `AUC01` (branch `research/step2`, pre-registered, exploratory in-sample); no result yet |
-| auction (`AUC01`) | running on real files (branch `research/step2`), pre-registered, in-sample, with a declared 2026 holdout; no result yet; REAL_DATA.md §3.3 has the commands |
+| calibration, maker backtest | a pre-registered, exploratory in-sample study on the seven 2019-20 sessions (EQ01 / EQ02 / EQ05 / EQ10, taker and passive exits) is running; no result yet |
+| quoting | M5 on real files is running (branch `research/step2`, pre-registered, exploratory in-sample; the driver checkpoints per cell); no result yet |
+| auction (`AUC01`) | in-sample result, exploratory: NO DEMONSTRATED EDGE on both cells (`C-300s` session-clustered mean +19.4 bp, 95% CI −254 to +293 bp, 3 trades on 2 sessions; `O-300s` +6.1 bp); underpowered. The declared 2026 holdout is running. REAL_DATA.md §3.3 |
 | Almgren-Chriss, urgency, volume curve | no real-data study; the volume curve CLI reads real IAP1 files |
-| `v3` bundle | not yet applied to the published real-data batch (not done in v1.11; ROADMAP.md §3.6) |
+| `v3` / `v4` bundles | not yet applied to the published real-data batch (ROADMAP.md §3.7) |
+| v1.12 extended features, router, fill hazard | no real-data run; the router has one venue on Nasdaq-only data |
 | governance | in use: the 2026 holdout preregs are anchored to `6723fd0`; the maker study's preregs are on its branch |
 
 ## 16. Polyglot policy: canonical and frozen copies (v1.11.0, plan E3)
@@ -1137,3 +1161,27 @@ environment or from `--env-file`; `.env`, `*.env` and `.iap_keys/` are
 git-ignored. The pyo3 wheel is not a Python dependency at all: it is built
 from source with maturin (COOKBOOK recipe 52). No new runtime dependency
 was added to the default install in v1.11.
+
+## 18. The v1.12 subsystems: statistics, tick-to-trade, execution, operations
+
+All opt-in; the default registry hash, the pinned SOR and simulator rules,
+the goldens and every published number are unchanged.
+
+| piece | module / file | language | feeds |
+|---|---|---|---|
+| CPCV, PBO | `iap.validation.cpcv` | Python | `v4` validation report (`cpcv` block, report-only) |
+| PSR / DSR / MinTRL | `iap.validation.deflated` (`effective_trials` reads the ledger) | Python | `v4` report (`deflated_sharpe` block); `study_deflated_sharpe` beside a study's per-day P&L |
+| tick-to-trade benchmark | `cpp/bench/bench_tick_to_trade`, `tools/tick_to_trade_py.py` | C++ (Python reference tool) | `benchmarks/results_tick_to_trade.md`; CI guard at 8x |
+| extended features, event clocks | `iap.features.extended` | Python | own `feature_version`; nothing downstream reads it yet |
+| cost-aware router | `iap.execution.venues_model`, `iap.execution.sor_v2`, `research/execution/venue_model.json` | Python | `MakerBacktester(router=)` |
+| fill hazard, post-only, feedback | `iap.execution.fill_hazard`, `markout_feedback`, simulator rule 10 | Python | `MakerConfig` / `QuotingConfig` options; hazard registrable in `iap.mlops` |
+| alert routing, SLOs, backup | `deployment/alertmanager/`, `deployment/prometheus/slo.yml`, `deployment/k8s/` state-backup CronJob | config | Alertmanager receivers `page` / `ticket` / `watchdog` |
+
+**Boundaries stated once.** Tick-to-trade is in-process (decoded frame to
+order intent): no network, no kernel bypass, no C++ risk engine; CI runner
+variance is about 2x at p99. The router has nothing to choose between on
+the Nasdaq-only real data. HA is a single pod that restarts and resumes
+from its checkpoint; there is no active-active and no leader election.
+Eight pre-v1.12 alerts still have no promtool test, on an allowlist that
+`check_deployment.py` only lets shrink. Diagrams: DIAGRAMS.md §30-§35.
+

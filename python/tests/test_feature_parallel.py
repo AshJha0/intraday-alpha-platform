@@ -119,3 +119,33 @@ def test_trailing_label_freshness_build(normalized):
                 assert np.array_equal(x, y), c
     summary = json.loads((trail / "features_summary.json").read_text())
     assert summary
+
+
+@pytest.mark.parametrize(
+    ("tag", "extra"),
+    [
+        ("ext", ("--feature-set", "extended")),
+        ("ext_vol", ("--feature-set", "extended", "--sampling", "volume:2000")),
+    ],
+)
+def test_extended_feature_set_parallel_byte_identical(normalized, tag, extra):
+    """v1.12 opt-in extended set (and the volume clock): ``--workers`` is
+    still byte-identical, and the default columns are a prefix of the row."""
+    from iap.features.extended import extended_registry, extended_registry_hash
+    from iap.features.registry import feature_names
+
+    root, data = normalized
+    serial = _build(root, data, f"{tag}_serial", 1, *extra)
+    parallel = _build(root, data, f"{tag}_parallel", 2, *extra)
+    names = sorted(p.name for p in serial.glob("*.parquet"))
+    assert names
+    for name in names:
+        assert (serial / name).read_bytes() == (parallel / name).read_bytes(), name
+    cols = pq.read_schema(serial / names[0]).names
+    ext_names = [s.name for s in extended_registry()]
+    assert cols[2 : 2 + len(ext_names)] == ext_names
+    assert ext_names[: len(feature_names())] == feature_names()
+    summary = json.loads((serial / "features_summary.json").read_text())
+    assert summary["registry_hash"] == extended_registry_hash()
+    assert summary["feature_set"] == "extended"
+    assert "xhawkes" in next(iter(summary["instruments"].values()))["valid_fraction_by_family"]

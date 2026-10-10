@@ -281,14 +281,59 @@ the next confirmatory test needs new, unseen sessions. Experiment ids,
 specs and results are under the git-ignored
 `data/real/holdout2026/research/experiments/`.
 
-### 3.3 Auction imbalance (NOII) study (v1.10, plan item A1) - running, no result yet
+**Multi-venue routing on real data (v1.12, X5).** Every real session in
+this repository is Nasdaq TotalView-ITCH (or LOBSTER built from it): one
+venue, `XNAS`. The cost-aware router (`iap.execution.sor_v2`, API_TRADING.md
+§2.9) therefore has a single candidate on real data and always returns it;
+its sweep, passive split, toxicity and tier logic is exercised only on
+synthetic multi-venue books. It is capability for multi-venue data later
+(e.g. a consolidated or second-venue feed), not a measured result.
 
-**Status (v1.11.0, 2026-10-10).** `AUC01` is being run on the real
-sessions, pre-registered, together with the M5 quoter, on branch
-`research/step2`, as a detached job. It is exploratory and in-sample; the
-pre-registration declares a 2026 holdout for any in-sample effect. No
-result is reported here until the run finishes and is read; the commands
-below are the ones it uses.
+### 3.3 Auction imbalance (NOII) study (v1.10, plan item A1): in-sample result, holdout running
+
+**Status (v1.12.0, 2026-10-10).** The in-sample run of `AUC01` is
+finished and read; the 2026 holdout is running. Both are pre-registered
+(branch `research/step2`; prereg sha256 `9ea0915c…`).
+
+**In-sample result: exploratory, in-sample, NO DEMONSTRATED EDGE.**
+Seven 2019-20 sessions, AAPL / MSFT / QQQ, true mids from the normalized
+book (`mid_source = mids`), purged day-aligned walk-forward with six test
+sessions. Source: `data/real/auction/AUC01_insample_summary.json`
+(`final: true`, `status: EXPLORATORY IN-SAMPLE`).
+
+| cell | role | decisions with a mid | trades | sessions with a trade | session-clustered mean net | 95% CI (bp) | Bonferroni CI (bp) | verdict |
+|---|---|---|---|---|---|---|---|---|
+| `C-300s` closing cross, 300 s before | primary | 21 | 3 | 2 of 6 | +19.4 bp | −254 to +293 | −529 to +567 | NO DEMONSTRATED EDGE |
+| `O-300s` opening cross, 300 s before | secondary | 21 | 4 | 2 of 6 | +6.1 bp | −9.7 to +21.9 | −25.6 to +37.8 | NO DEMONSTRATED EDGE |
+
+The registered statistic is the session-clustered mean (the mean of the
+per-session means); both cells also fail the registered minimum of four
+active sessions. The unweighted per-trade averages (+26.5 bp for `C-300s`,
++5.5 bp for `O-300s`) are not the registered statistic and are given only
+so they are not mistaken for it.
+
+How to read it. The strategy decides once per symbol per day, so seven
+sessions give 21 decisions and the walk-forward traded three times on the
+primary cell, on two days. An interval that spans zero by hundreds of basis
+points is not evidence of an edge and not evidence against one: the study
+is underpowered (LEARN.md §42). The opening cell's narrower interval rests
+on two sessions. No look beyond the registered cells was taken.
+
+**2026 holdout: running.** Declared in the pre-registration before any 2026
+auction data was extracted, with the `C-300s` fit frozen from the in-sample
+run. Extraction of 2026-05-15 finished (1,592 two-sided mids); 2026-05-18 was
+being extracted when this was written. No holdout figure exists yet
+(`data/real/auction/AUC01_holdout2026.json` is not written); it will be
+reported here whatever it says.
+
+**Maker and quoting studies: running, no result.** The pre-registered maker
+study (EQ01 / EQ02 / EQ05 / EQ10 with taker and passive exits) and the M5
+quoting study on the same seven sessions are still running as detached jobs.
+Nothing is reported from either. Their pre-registrations charged looks on
+branch `research/step2`; those looks are not on `main` yet, so the ledger
+numbers quoted elsewhere in these docs are unchanged. The step-2 quoting
+driver checkpoints per cell (`research/step2` commit `3d6efbd`), so an
+interrupted run resumes at the next unfinished cell.
 
 `iap.auction` extracts ITCH `I` (NOII, about 6.2M a day) and `Q` (cross)
 messages into a **separate** stream directory: one opt-in pass with

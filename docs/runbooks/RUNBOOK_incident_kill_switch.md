@@ -7,9 +7,9 @@ instrument / venue — spec §16), and the incident procedure around them.
 `SequenceGapDetected`, `PlatformSessionFailed`, `TargetDown`,
 `KillPendingNotRecorded`, `AdminAuthRateLimited`, `AdminAuditSuppressed`,
 and the `Watchdog` heartbeat. Alerts reach a human only through Alertmanager
-(`deployment/alertmanager/alertmanager.yml`), and **only once a webhook URL
-has been supplied** — the in-repo placeholder delivers nowhere
-(`docs/governance/REPO_SETTINGS.md` §6). Check that before relying on a page.
+(`deployment/alertmanager/alertmanager.yml`), and **only once the receiver URLs
+have been supplied** (RUNBOOK_alerting.md §2) — by default compose delivers
+to a local echo sink, not a person. Check that before relying on a page.
 
 **First principle: the risk engine is fail-closed.** When in doubt, engage.
 An unnecessary halt costs basis points; a missing halt costs the loss limit.

@@ -29,7 +29,7 @@ implementation (`iap.risk`, `iap.execution`) proven by the same golden files
 the Java ports are proven by, so the loop the MVP runs is the reference
 loop end to end.
 
-## Current status (v1.11.0, release branch; v1.10.0 released 2026-10-10)
+## Current status (v1.12.0, release branch; v1.11.0 released 2026-10-10)
 
 **Where the research stands.**
 
@@ -60,10 +60,22 @@ loop end to end.
   real sessions is **running**; it has no result yet, and by its own
   verdict rule a positive in-sample result would only justify an
   out-of-sample test ([LEARN.md](LEARN.md) §31, §34).
-- **Auctions and quoting on real files (v1.11), in progress:** `AUC01` (the
-  closing-cross strategy, with a declared 2026 holdout) and the M5 quoter
-  are being run on the real sessions, pre-registered, exploratory and
-  in-sample, on branch `research/step2`. No result is reported yet.
+- **Auction study `AUC01`, first result (v1.12): no demonstrated edge.**
+  Pre-registered, exploratory and in-sample on the seven real sessions
+  (branch `research/step2`). Primary cell, closing cross 300 s before
+  (`C-300s`): 3 trades, 2 of 6 test sessions with a trade,
+  session-clustered mean net +19.4 bp, 95% CI −254 to +293 bp (Bonferroni
+  −529 to +567). Opening cross (`O-300s`, secondary): 4 trades, 2 of 6
+  sessions, +6.1 bp, 95% CI −9.7 to +21.9. Both verdicts are NO
+  DEMONSTRATED EDGE, and both miss the registered minimum of 4 active
+  sessions. The strategy decides once per symbol per day, so each
+  cell has only 21 decisions: the study is underpowered, which is not the
+  same as negative ([docs/REAL_DATA.md](docs/REAL_DATA.md) §3.3,
+  [LEARN.md](LEARN.md) §42). The declared 2026 holdout (frozen `C-300s`
+  fit) is **running**.
+- **Maker and quoting studies on real files, running:** the maker study
+  (EQ01 / EQ02 / EQ05 / EQ10, taker and passive exits) and the M5 quoter
+  on the seven sessions have no result yet.
 
 **New in v1.9.0** (all opt-in; no default, golden or published number moved):
 
@@ -131,10 +143,53 @@ cross-language contract moved; no test or CI job calls a model):
   COOKBOOK 51 and 55, LEARN.md §37). The SDK is the optional `[llm]` extra;
   `.env` files are git-ignored.
 
-**Deferred:** A2 (QQQ against its constituents; needs more symbols), A3
-(futures lead-lag; on hold, the ES/NQ data would cost about $10-25), AI4
-(deep order-book baselines); the real batch is not yet re-run under `v3`
-([docs/ROADMAP.md](docs/ROADMAP.md) §3.6).
+**New in v1.12.0** (all opt-in; no default, golden, published number or
+cross-language contract moved):
+
+- R7 statistics: combinatorial purged CV (all C(N, k) splits reassembled
+  into backtest paths), PBO by CSCV, and PSR / DSR / minimum track record
+  with the trial count taken from the ledger (`effective_trials`, the
+  distinct configurations; `dsr_at_looks` at the raw look count beside it).
+  The `v4` bundle adds both blocks to a validation report, report-only;
+  `study_deflated_sharpe` puts a DSR block beside any study's per-day P&L.
+  The paper's worked example reproduces (DSR 0.9004)
+  ([docs/RESEARCH_VALIDITY.md](docs/RESEARCH_VALIDITY.md) §1b, COOKBOOK 56
+  and 62, LEARN.md §40);
+- X6, a C++ tick-to-trade benchmark: per-event latency from a decoded IAP1
+  frame through book, features, alpha and an order decision. CI runner
+  (AMD EPYC), golden vector: p50 1,279 ns, p99 2,559 ns, p99.9 11,263 ns.
+  In-process only: no network, no kernel bypass, no C++ risk engine. CI
+  fails at 8x the baseline; runner variance is about 2x at p99
+  ([benchmarks/RESULTS.md](benchmarks/RESULTS.md), COOKBOOK 57, LEARN.md §41);
+- M6, 19 extended features (queue time-to-depletion, trade-sign
+  autocorrelation, Hawkes intensities, odd-lot / hidden share) and event /
+  volume clock sampling, under their own feature version; the default
+  registry hash is unchanged. Not run on real data yet
+  ([API_FEATURES.md](API_FEATURES.md) §8, COOKBOOK 58 and 63);
+- X5, a cost-aware multi-venue router (fill probability, toxicity,
+  latency, fee tiers; sweep with synchronised arrival; passive allocation).
+  The real data is Nasdaq only, so this is capability for later
+  ([API_TRADING.md](API_TRADING.md) §2.9, COOKBOOK 59);
+- X4, a cloglog fill-hazard model (`iap.fill_hazard/1`, registrable),
+  post-only posts, hazard-driven entry reprices and markout feedback. On a
+  synthetic toxic regime the feedback cuts the quoter's markout from
+  −62.75 to −1.75 USD with a "earn at least 2 bp" threshold; the run still
+  loses ([API_TRADING.md](API_TRADING.md) §2.10, COOKBOOK 61, 63 and 64,
+  LEARN.md §43);
+- P4 operations: page / ticket / watchdog routing with receiver URLs from
+  Secret files, a local alert sink for compose, latency burn-rate SLOs (99%
+  under about 1.05 ms over 30 days) with promtool tests, and a state-backup
+  CronJob. HA is one pod restarting and resuming, not active-active.
+  **Operator action:** the Secret `iap-alertmanager-webhook` now needs
+  `page_url` and `ticket_url`
+  ([docs/runbooks/RUNBOOK_alerting.md](docs/runbooks/RUNBOOK_alerting.md),
+  COOKBOOK 60 and 65).
+
+**Remaining plan items:** R7 data ingest (more symbols and sessions, which
+also unblocks A2, QQQ against its constituents), A3 (futures lead-lag; on
+hold, the ES/NQ data would cost about $10-25), A4, AI4 (deep order-book
+baselines), E4-E5, P1-P3; the real batch is not yet re-run under `v3`
+([docs/ROADMAP.md](docs/ROADMAP.md) §3.7).
 
 ## Architecture in one line
 
@@ -171,6 +226,8 @@ the full design, data flow, and diagrams.
 | Feature emission | 213,021 vectors at 100 ms cadence | `data/features/features_summary.json` |
 | Rust feature engine from Python (v1.11, CI-measured) | about 5,250 events/s (Python reference, full 205-feature engine) against about 790,000 events/s (Rust, the 45 native slots): **150x** on the golden vectors, 123x on a seeded equity day at 100 ms; not a pipeline speed-up, the other 160 features still run in Python | `API_FEATURES.md` §7.1, `rust-pyo3` CI job summary |
 | LLM agent behaviour evals (v1.11) | 4 of 4 pass mocked in CI, each control-bearing eval also failing with its control removed; live 2026-10-10 on `claude-haiku-5-5`: 4 of 4, estimated $0.0096 (the model behaved well, so the live run did not stress the controls) | `python -m iap.llm.evals`, GOVERNANCE.md §2b |
+| C++ tick-to-trade (v1.12, CI runner AMD EPYC) | golden `eq_mbo`: p50 **1,279 ns**, p99 **2,559 ns**, p99.9 11,263 ns, max 33,112 ns; generated 100,000-event day: p50 1,407, p99 1,727, p99.9 12,287 ns; stage p50s decode 271, book 83, features 735, alpha 135, decision 30 ns. In-process, decoded frame to order intent: no network, no kernel bypass, no C++ risk engine | `benchmarks/results_tick_to_trade.md`, `benchmarks/RESULTS.md` |
+| Deflated Sharpe (v1.12, opt-in `v4`) | PSR / DSR / minimum track record with N = the ledger's distinct configurations (`dsr_at_looks` at the raw looks beside it); CPCV paths and PBO; the published worked example reproduced, DSR **0.9004** (SR0 0.1132) | `iap.validation.deflated`, `iap.validation.cpcv`, COOKBOOK 56 |
 | C++ hot path | IAP1 decode 184.1 ns/event (CRC-32 verified); book update 26.4 ns; replay 27.2M events/s; one 5.6 KB decision trace serialised in 31.7 µs off the event loop | `benchmarks/results_cpp.md` |
 
 The honesty is the point (spec §32): of 24 alphas on the bundled synthetic
@@ -531,7 +588,7 @@ python3 tools/github/create_issues.py --dry-run   # the epics/issues plan (docs/
 ===================== cross-language parity table =====================
 language | tests passed | golden passed  | time   | status
 ---------+--------------+----------------+--------+-------
-python   | 2185         | 193            |    -s | PASS
+python   | 2250         | 193            |    -s | PASS
 cpp      | 302          | 72             |    -s | PASS
 rust     | 358          | 71             |    -s | PASS
 java     | 571          | 124            |    -s | PASS
@@ -620,9 +677,9 @@ golden tests — the engineering discipline this repo is built around
 
 | document | what it covers |
 |---|---|
-| [LEARN.md](LEARN.md) | textbook walkthrough: microstructure, generator, book, features, honest alpha research, ML/meta-labeling, portfolio, risk, execution, TCA, parity, latency economics, adaptability, contracts & Protocols, the Python risk/execution reference, the 7-state lifecycle, the decision trace, the data model, the MVP walkthrough with its honest numbers, the v1.3.0 review as six case-study chapters (fail-closed risk bugs, simulator realism, statistical power, gate gaming, crash consistency, supply-chain hygiene), pitfalls, interview Q&A, combining signals, adverse selection, five v1.9-v1.10 case studies (why taker-only research cannot pay at 1 s, the FOMC sampling flaw and day-clustered inference, the 2026 holdout as pre-registration, what the synthetic maker/quoting results show, governance keys and code hashes), and four from v1.11 (parity proves agreement, not correctness: the snapshot-burst bug; why an LLM must never compute a number; freezing copies instead of deleting them; model registries as evidence) |
+| [LEARN.md](LEARN.md) | textbook walkthrough: microstructure, generator, book, features, honest alpha research, ML/meta-labeling, portfolio, risk, execution, TCA, parity, latency economics, adaptability, contracts & Protocols, the Python risk/execution reference, the 7-state lifecycle, the decision trace, the data model, the MVP walkthrough with its honest numbers, the v1.3.0 review as six case-study chapters (fail-closed risk bugs, simulator realism, statistical power, gate gaming, crash consistency, supply-chain hygiene), pitfalls, interview Q&A, combining signals, adverse selection, five v1.9-v1.10 case studies (why taker-only research cannot pay at 1 s, the FOMC sampling flaw and day-clustered inference, the 2026 holdout as pre-registration, what the synthetic maker/quoting results show, governance keys and code hashes), and four from v1.11 (parity proves agreement, not correctness: the snapshot-burst bug; why an LLM must never compute a number; freezing copies instead of deleting them; model registries as evidence), and four from v1.12 (why a Sharpe must be deflated; what tick-to-trade does and does not measure; an underpowered result is not a negative result, AUC01; feedback loops in passive execution) |
 | [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) | how the quant, algo and AI sides work — a guided explanation for a newcomer: the pipeline on one page, the research statistics and gates, the execution algorithms and simulator rules, the fail-closed risk engine, the ML layer with its negative results, the LLM/agent boundary (what exists, what is backlog, what would be theatre on this data), determinism and replay; since v1.10 also the real-data path and the `v3` validity bundle, the maker path (calibrate, post or quote, decompose), auctions, optimal execution and the governance chain; since v1.11 the LLM research agent and its controls, the Rust feature engine from Python, the model registry and the polyglot policy; every section ends with where to look and a command that runs |
-| [COOKBOOK.md](COOKBOOK.md) | 55 task-oriented recipes with runnable commands (39-55: maker backtest, quoting, optimal execution, auctions, parallel features, the `v3` validity block, calibrating and backtesting a real session, signed pre-registration, the Almgren-Chriss frontier, the Rust feature engine from Python and building its wheel with maturin, the model registry, shadow mode and week-by-week monitoring, the LLM research agent, its evals and a guarded session with the scripted client, the `POLYGLOT-OVERRIDE` workflow) |
+| [COOKBOOK.md](COOKBOOK.md) | 65 task-oriented recipes with runnable commands (39-61: maker backtest, quoting, optimal execution, auctions, parallel features, the `v3` validity block, calibrating and backtesting a real session, signed pre-registration, the Almgren-Chriss frontier, the Rust feature engine from Python and building its wheel with maturin, the model registry, shadow mode and week-by-week monitoring, the LLM research agent, its evals and a guarded session with the scripted client, the `POLYGLOT-OVERRIDE` workflow, combinatorial purged CV, PBO and the deflated Sharpe ratio, tick-to-trade percentiles, extended features and event clocks, the multi-venue router, alert routing and SLOs, the fill hazard with post-only and markout feedback; 62-65: deflating a study's Sharpe, a maker run combining extended features and the hazard, the feedback loop on a toxic regime, reading the SLO burn rates) |
 | [docs/REAL_DATA.md](docs/REAL_DATA.md) | real historical data: what `python -m iap.marketdata ingest` reads (Nasdaq TotalView-ITCH 5.0, LOBSTER), how to obtain files yourself (nothing is bundled), the commands from a downloaded file to an alpha report, the mapping table to canonical events, the point-in-time security master and corporate-actions table, known limitations, and what a first real-data study can and cannot conclude |
 | [docs/RESEARCH_VALIDITY.md](docs/RESEARCH_VALIDITY.md) + [research/power/POWER_REPORT.md](research/power/POWER_REPORT.md) | the corrected research methods (the defaults since v1.5.0, each with its named legacy rule), the research store under parallel writers, gate eligibility; the planted-signal power study of the validation chain |
 | [CHANGELOG.md](CHANGELOG.md) | release notes, newest first (v1.11.0: the Rust feature engine via pyo3, the polyglot policy, the model registry, the LLM research agent and its evals; v1.10.0: skewed quoting, auctions, optimal execution, governance G1-G4; v1.9.0: research validity options, parallel features, maker economics; v1.8.0: the 2026 holdout and the ingest memory fix; v1.6.0-v1.7.2: real data, the agent layer, signal combination, real-data power; v1.5.0: the corrected research methods become the defaults, every old rule keeps a legacy name, every dataset-derived artefact regenerated; v1.4.0: the generator's equity flow calibration fixed so flow reaches the close, and every dataset-derived artefact regenerated; v1.3.0: fail-closed risk, simulator fill rules, paper-platform safety, governance and deployment hardening, research validity) |

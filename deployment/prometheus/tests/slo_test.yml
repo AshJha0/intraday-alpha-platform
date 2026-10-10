@@ -1,0 +1,182 @@
+# =============================================================================
+# promtool unit tests for deployment/prometheus/slo.yml (v1.12.0, plan P4).
+# Run:  cd deployment/prometheus/tests && promtool test rules slo_test.yml
+# (also run by tests/harness/check_deployment.py and the CI deployment job).
+# Series are cumulative histogram counters sampled every minute; the error
+# ratio is (total - good) / total per minute.
+# =============================================================================
+
+rule_files:
+  - ../slo.yml
+
+evaluation_interval: 30s
+
+tests:
+  - interval: 1m
+    name: order-path-latency healthy (0.5% slow) fires nothing
+    input_series:
+      - series: 'order_path_latency_ns_bucket{job="java-platform",service="java-platform",le="1048575"}'
+        values: '0+995x300'
+      - series: 'order_path_latency_ns_count{job="java-platform",service="java-platform"}'
+        values: '0+1000x300'
+    alert_rule_test:
+      - eval_time: 4h
+        alertname: OrderPathLatencySLOFastBurn
+        exp_alerts: []
+      - eval_time: 4h
+        alertname: OrderPathLatencySLOSlowBurn
+        exp_alerts: []
+    promql_expr_test:
+      - expr: (job:order_path_latency_slo_errors:ratio_rate5m > bool 0.0049) * (job:order_path_latency_slo_errors:ratio_rate5m < bool 0.0051)
+        eval_time: 4h
+        exp_samples:
+          - labels: '{job="java-platform",service="java-platform"}'
+            value: 1
+  - interval: 1m
+    name: order-path-latency fast burn (50% slow) pages
+    input_series:
+      - series: 'order_path_latency_ns_bucket{job="java-platform",service="java-platform",le="1048575"}'
+        values: '0+50x60'
+      - series: 'order_path_latency_ns_count{job="java-platform",service="java-platform"}'
+        values: '0+100x60'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: OrderPathLatencySLOFastBurn
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              job: java-platform
+              service: java-platform
+              domain: latency
+              slo: order-path-latency
+            exp_annotations:
+              summary: "order-path-latency SLO fast burn on java-platform"
+              description: "The decision-to-wire order path (incl. the pre-trade risk check) is burning its 30-day error budget (99% under 1.05 ms) at 6x or more: at this rate the budget is gone in days. Check job:order_path_latency_ns:p99, GC pauses (job:jvm_gc_pause_ns:p99) and host contention. Runbook: docs/runbooks/RUNBOOK_alerting.md#latency-slo"
+              runbook: docs/runbooks/RUNBOOK_alerting.md
+              runbook_url: docs/runbooks/RUNBOOK_alerting.md#latency-slo
+      - eval_time: 20m
+        alertname: OrderPathLatencySLOSlowBurn
+        exp_alerts: []
+  - interval: 1m
+    name: order-path-latency slow burn (5% slow) tickets but does not page
+    input_series:
+      - series: 'order_path_latency_ns_bucket{job="java-platform",service="java-platform",le="1048575"}'
+        values: '0+95x200'
+      - series: 'order_path_latency_ns_count{job="java-platform",service="java-platform"}'
+        values: '0+100x200'
+    alert_rule_test:
+      - eval_time: 3h
+        alertname: OrderPathLatencySLOFastBurn
+        exp_alerts: []
+      - eval_time: 3h
+        alertname: OrderPathLatencySLOSlowBurn
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: java-platform
+              service: java-platform
+              domain: latency
+              slo: order-path-latency
+            exp_annotations:
+              summary: "order-path-latency SLO slow burn on java-platform"
+              description: "The decision-to-wire order path (incl. the pre-trade risk check) is consuming its 30-day error budget (99% under 1.05 ms) faster than it accrues. Not urgent; investigate the same day. Runbook: docs/runbooks/RUNBOOK_alerting.md#latency-slo"
+              runbook: docs/runbooks/RUNBOOK_alerting.md
+              runbook_url: docs/runbooks/RUNBOOK_alerting.md#latency-slo
+  - interval: 1m
+    name: order-path-latency no traffic (finished session) fires nothing
+    input_series:
+      - series: 'order_path_latency_ns_bucket{job="java-platform",service="java-platform",le="1048575"}'
+        values: '0+0x120'
+      - series: 'order_path_latency_ns_count{job="java-platform",service="java-platform"}'
+        values: '0+0x120'
+    alert_rule_test:
+      - eval_time: 2h
+        alertname: OrderPathLatencySLOFastBurn
+        exp_alerts: []
+      - eval_time: 2h
+        alertname: OrderPathLatencySLOSlowBurn
+        exp_alerts: []
+  - interval: 1m
+    name: event-path-latency healthy (0.5% slow) fires nothing
+    input_series:
+      - series: 'book_update_latency_ns_bucket{job="java-platform",service="java-platform",le="1048575"}'
+        values: '0+995x300'
+      - series: 'book_update_latency_ns_count{job="java-platform",service="java-platform"}'
+        values: '0+1000x300'
+    alert_rule_test:
+      - eval_time: 4h
+        alertname: EventPathLatencySLOFastBurn
+        exp_alerts: []
+      - eval_time: 4h
+        alertname: EventPathLatencySLOSlowBurn
+        exp_alerts: []
+    promql_expr_test:
+      - expr: (job:event_path_latency_slo_errors:ratio_rate5m > bool 0.0049) * (job:event_path_latency_slo_errors:ratio_rate5m < bool 0.0051)
+        eval_time: 4h
+        exp_samples:
+          - labels: '{job="java-platform",service="java-platform"}'
+            value: 1
+  - interval: 1m
+    name: event-path-latency fast burn (50% slow) pages
+    input_series:
+      - series: 'book_update_latency_ns_bucket{job="java-platform",service="java-platform",le="1048575"}'
+        values: '0+50x60'
+      - series: 'book_update_latency_ns_count{job="java-platform",service="java-platform"}'
+        values: '0+100x60'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: EventPathLatencySLOFastBurn
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              job: java-platform
+              service: java-platform
+              domain: latency
+              slo: event-path-latency
+            exp_annotations:
+              summary: "event-path-latency SLO fast burn on java-platform"
+              description: "The per-event onEvent path (book + features + alpha + risk) is burning its 30-day error budget (99% under 1.05 ms) at 6x or more: at this rate the budget is gone in days. Check job:book_update_latency_ns:p99, GC pauses (job:jvm_gc_pause_ns:p99) and host contention. Runbook: docs/runbooks/RUNBOOK_alerting.md#latency-slo"
+              runbook: docs/runbooks/RUNBOOK_alerting.md
+              runbook_url: docs/runbooks/RUNBOOK_alerting.md#latency-slo
+      - eval_time: 20m
+        alertname: EventPathLatencySLOSlowBurn
+        exp_alerts: []
+  - interval: 1m
+    name: event-path-latency slow burn (5% slow) tickets but does not page
+    input_series:
+      - series: 'book_update_latency_ns_bucket{job="java-platform",service="java-platform",le="1048575"}'
+        values: '0+95x200'
+      - series: 'book_update_latency_ns_count{job="java-platform",service="java-platform"}'
+        values: '0+100x200'
+    alert_rule_test:
+      - eval_time: 3h
+        alertname: EventPathLatencySLOFastBurn
+        exp_alerts: []
+      - eval_time: 3h
+        alertname: EventPathLatencySLOSlowBurn
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: java-platform
+              service: java-platform
+              domain: latency
+              slo: event-path-latency
+            exp_annotations:
+              summary: "event-path-latency SLO slow burn on java-platform"
+              description: "The per-event onEvent path (book + features + alpha + risk) is consuming its 30-day error budget (99% under 1.05 ms) faster than it accrues. Not urgent; investigate the same day. Runbook: docs/runbooks/RUNBOOK_alerting.md#latency-slo"
+              runbook: docs/runbooks/RUNBOOK_alerting.md
+              runbook_url: docs/runbooks/RUNBOOK_alerting.md#latency-slo
+  - interval: 1m
+    name: event-path-latency no traffic (finished session) fires nothing
+    input_series:
+      - series: 'book_update_latency_ns_bucket{job="java-platform",service="java-platform",le="1048575"}'
+        values: '0+0x120'
+      - series: 'book_update_latency_ns_count{job="java-platform",service="java-platform"}'
+        values: '0+0x120'
+    alert_rule_test:
+      - eval_time: 2h
+        alertname: EventPathLatencySLOFastBurn
+        exp_alerts: []
+      - eval_time: 2h
+        alertname: EventPathLatencySLOSlowBurn
+        exp_alerts: []

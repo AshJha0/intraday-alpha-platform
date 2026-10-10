@@ -48,6 +48,7 @@ class CancelReason(IntEnum):
     USER = 3  #: cancel() arrived (rule 7)
     EXPIRED = 4  #: time-in-force (expire_ts)
     END_OF_STREAM = 5  #: cancel_all()
+    POST_ONLY_REJECT = 6  #: v1.12 opt-in: a post-only order would have crossed on arrival
 
 
 @dataclass(frozen=True, slots=True)
@@ -222,6 +223,11 @@ class ChildOrder:
     cross_exempt: bool = False  #: crossing-rule exemption (rule 4)
     cancel_reason: CancelReason = CancelReason.NONE
     cancel_arrival_ts: int = 0  #: 0 = no cancel in flight
+    # ---- v1.12 opt-in request field (last, so positional use is unchanged) ----
+    #: post-only LIMIT (simulator rule 10): ``""`` = off (the pinned
+    #: behaviour), ``"reject"`` = cancelled on arrival when it would cross,
+    #: ``"slide"`` = repriced one tick inside the opposite touch instead.
+    post_only: str = ""
 
     @property
     def is_terminal(self) -> bool:

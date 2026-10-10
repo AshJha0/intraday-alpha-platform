@@ -1,0 +1,12 @@
+flowchart LR
+    NIC["network, kernel, NIC<br/>(not measured)"] -.-> F
+    subgraph T2T["timed in process, per event"]
+        F["raw IAP1 frame in memory"] --> DEC["decode<br/>p50 271 ns"]
+        DEC --> BK["order book apply<br/>p50 83 ns"]
+        BK --> FT["native features<br/>p50 735 ns"]
+        FT --> AL["alpha (score)<br/>p50 135 ns"]
+        AL --> DC["order decision +<br/>minimal pre-trade check<br/>p50 30 ns"]
+    end
+    DC -.-> RISK["platform risk engine (Rust / Java),<br/>gateway, wire (not measured)"]
+    DC --> HIST["histogram: p50 p90 p99 p99.9 max<br/>end to end and per stage"]
+    HIST --> GUARD["CI guard: p50 / p99 within 8x<br/>of the committed baseline"]

@@ -222,6 +222,29 @@ jobs:
           name: bench-cpp
           path: ${{ runner.temp }}/bench_ci.md
           if-no-files-found: ignore
+      # v1.12 (X6): per-event tick-to-trade percentiles (decode -> book ->
+      # features -> alpha -> order decision; about 5 s). The full table goes to
+      # the job summary and an artifact. The guard compares only the p50/p99
+      # end-to-end rows with benchmarks/results_tick_to_trade.md (a CI-runner
+      # baseline) at factor 8: shared-runner percentiles move with neighbour
+      # load, so the guard catches algorithmic regressions only, never p99.9
+      # or max (see benchmarks/RESULTS.md).
+      - name: tick-to-trade benchmark (percentiles) + coarse guard
+        run: |
+          cpp/build/bench_tick_to_trade "$RUNNER_TEMP/tick_to_trade_ci.md" > /dev/null
+          cat "$RUNNER_TEMP/tick_to_trade_ci.md" >> "$GITHUB_STEP_SUMMARY"
+          python3 tests/harness/check_bench_regression.py \
+            --current "$RUNNER_TEMP/tick_to_trade_ci.md" \
+            --baseline benchmarks/results_tick_to_trade.md \
+            --rows '^t2t .* p(50|99)$' --factor 8 \
+            --title "C++ tick-to-trade guard (p50/p99, coarse)"
+      - name: upload tick-to-trade output
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: bench-tick-to-trade
+          path: ${{ runner.temp }}/tick_to_trade_ci.md
+          if-no-files-found: ignore
       # Coverage: rebuild with --coverage (gcov instrumentation) in a
       # separate build dir so the timed Release build above is unaffected,
       # then summarize with lcov. Report-only — no threshold enforced (no

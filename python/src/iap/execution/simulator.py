@@ -88,6 +88,17 @@ this module is self-contained:
    merged by time, then the book update, then passive queue tracking of
    the event if the book APPLIED it (against the pre-event depth), then
    the overlay reset, then the post-apply crossing check.
+10. **Post-only** (v1.12, opt-in per child via ``ChildOrder.post_only``;
+    Python only — the C++ / Java ports have no such flag and every golden
+    leaves it off). On activation at an OPEN venue, a post-only LIMIT whose
+    limit reaches the displayed opposite touch (buy ``limit >= best_ask``,
+    sell ``limit <= best_bid``) never takes liquidity: ``"reject"``
+    cancels it (``CancelReason.POST_ONLY_REJECT``), ``"slide"`` moves its
+    limit to one tick inside the opposite touch (``best_ask - 1`` /
+    ``best_bid + 1``; rejected if that is not a positive price) and rests it
+    there. ``post_only_rejects`` / ``post_only_slides`` count them (not part
+    of the pinned ``ExecCounters``). While the venue is gated the order rests
+    as any LIMIT; it may then fill at the rule-8 reopen like any resting order.
 
 Deterministic: same config + seed => identical fills, bit for bit
 (SplitMix64 only, no wall clock, no unordered iteration).
@@ -127,6 +138,9 @@ if TYPE_CHECKING:  # pragma: no cover
 #: Overlay key: (instrument_id, venue_id, side, price_ticks).
 OverlayKey = tuple[int, int, int, int]
 
+#: Rule 10 post-only modes (``ChildOrder.post_only``; ``""`` = off).
+POST_ONLY_MODES = ("reject", "slide")
+
 
 class ExecutionSimulator:
     """Simulates child-order lifecycles against the replayed market stream."""
@@ -157,6 +171,8 @@ class ExecutionSimulator:
         self._fills: list[Fill] = []
         self._next_order_id = 1
         self._next_fill_id = 1
+        self._post_only_rejects = 0  # rule 10 (v1.12 opt-in)
+        self._post_only_slides = 0
 
     # ------------------------------------------------------------ accessors
 
@@ -228,6 +244,11 @@ class ExecutionSimulator:
             raise ValueError("non-MARKET child needs a limit price")
         if child.expire_ts < 0:
             raise ValueError("expire_ts must be >= 0")
+        if child.post_only:
+            if child.post_only not in POST_ONLY_MODES:
+                raise ValueError(f"post_only must be one of {POST_ONLY_MODES} or ''")
+            if child.type != OrderType.LIMIT:
+                raise ValueError("post_only applies to LIMIT children only")
         venue = self._venue(child.venue_id)
         order_id = self._next_order_id
         self._next_order_id += 1
@@ -370,10 +391,40 @@ class ExecutionSimulator:
             self._consumed[key] = self._consumed.get(key, 0) + take
             self._emit_fill(o, p, take, o.arrival_ts, Liquidity.TAKER)
 
+    def _post_only_admit(self, o: ChildOrder, book: OrderBook) -> bool:
+        """Rule 10: False (order rejected) or True (rests, possibly slid)."""
+        opp = book.best_ask() if o.side == 0 else book.best_bid()
+        if opp is None:
+            return True
+        crosses = o.limit_ticks >= opp[0] if o.side == 0 else o.limit_ticks <= opp[0]
+        if not crosses:
+            return True
+        if o.post_only == "slide":
+            px = opp[0] - 1 if o.side == 0 else opp[0] + 1
+            if px > 0:
+                o.limit_ticks = px
+                self._post_only_slides += 1
+                return True
+        self._post_only_rejects += 1
+        self._terminate(o, CancelReason.POST_ONLY_REJECT)
+        return False
+
+    @property
+    def post_only_rejects(self) -> int:
+        """Rule 10 rejects (v1.12; outside the pinned ``ExecCounters``)."""
+        return self._post_only_rejects
+
+    @property
+    def post_only_slides(self) -> int:
+        """Rule 10 slides (v1.12; outside the pinned ``ExecCounters``)."""
+        return self._post_only_slides
+
     def _activate(self, o: ChildOrder) -> None:
         """Rule 2 (with rules 3 and 8) for one arrived order."""
         book = self.venue_book(o.instrument_id, o.venue_id)
         is_open = self.venue_open(book)
+        if o.post_only and is_open and not self._post_only_admit(o, book):
+            return  # rule 10: rejected rather than crossing
         if is_open:
             self._aggressive_fill(o, book)
         if o.remaining == 0:

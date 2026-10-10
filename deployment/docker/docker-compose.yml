@@ -39,9 +39,18 @@ volumes:
   grafana-data: {}
   alertmanager-data: {}
 
+# Alert receiver URLs are SECRETS (they usually embed a token) and are never
+# committed. Point ALERT_PAGE_URL_FILE / ALERT_TICKET_URL_FILE at files OUTSIDE
+# the repo (docs/runbooks/RUNBOOK_alerting.md). Unset, both use the tracked,
+# secret-free local-sink.url -> the `alert-sink` echo service below, so
+# `docker compose up` works with no secrets and alerts can be watched arriving
+# (`docker logs -f iap-alert-sink`). ALERT_WEBHOOK_URL_FILE (<= v1.11) is still
+# honoured as the page URL.
 secrets:
-  alert_webhook_url:
-    file: ${ALERT_WEBHOOK_URL_FILE:-../alertmanager/webhook_url.placeholder}
+  alert_page_url:
+    file: ${ALERT_PAGE_URL_FILE:-${ALERT_WEBHOOK_URL_FILE:-../alertmanager/local-sink.url}}
+  alert_ticket_url:
+    file: ${ALERT_TICKET_URL_FILE:-../alertmanager/local-sink.url}
 
 networks:
   iap-net:
@@ -53,7 +62,7 @@ services:
     build:
       context: ../..
       dockerfile: deployment/docker/Dockerfile.python
-    image: ghcr.io/ashjha0/intraday-alpha-platform-python:v1.11.0
+    image: ghcr.io/ashjha0/intraday-alpha-platform-python:v1.12.0
     container_name: iap-data-generator
     # Deterministic batch job: identical seed => bit-identical /data outputs
     # (configs/marketdata/generator.json pins seed 20260829). Runs to completion; the
@@ -74,7 +83,7 @@ services:
     build:
       context: ../..
       dockerfile: deployment/docker/Dockerfile.cpp
-    image: ghcr.io/ashjha0/intraday-alpha-platform-cpp:v1.11.0
+    image: ghcr.io/ashjha0/intraday-alpha-platform-cpp:v1.12.0
     container_name: iap-cpp-replay
     # Deterministic replay + execution-sim pass over the golden vectors;
     # writes its methodology/results table to the shared volume.
@@ -91,7 +100,7 @@ services:
     build:
       context: ../..
       dockerfile: deployment/docker/Dockerfile.rust
-    image: ghcr.io/ashjha0/intraday-alpha-platform-rust:v1.11.0
+    image: ghcr.io/ashjha0/intraday-alpha-platform-rust:v1.12.0
     container_name: iap-rust-replay
     command: ["/golden"]
     restart: "no"
@@ -107,7 +116,7 @@ services:
     build:
       context: ../..
       dockerfile: deployment/docker/Dockerfile.java
-    image: ghcr.io/ashjha0/intraday-alpha-platform-java:v1.11.0
+    image: ghcr.io/ashjha0/intraday-alpha-platform-java:v1.12.0
     container_name: iap-java-platform
     # The paper-trading vertical (com.iap.platform.PaperTrading) over the
     # golden equity vector, paced 60x realtime, serving GET /metrics
@@ -179,7 +188,7 @@ services:
     build:
       context: ../..
       dockerfile: deployment/docker/Dockerfile.java
-    image: ghcr.io/ashjha0/intraday-alpha-platform-java:v1.11.0
+    image: ghcr.io/ashjha0/intraday-alpha-platform-java:v1.12.0
     container_name: iap-java-platform-state
     entrypoint: ["java", "-Xmx64m", "-XX:-UsePerfData", "-cp", "/app/classes", "com.iap.platform.SessionStateExporter", "--state-dir", "/data/state", "--port", "9102"]
     restart: unless-stopped
@@ -217,6 +226,7 @@ services:
       - ../prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ../prometheus/recording.yml:/etc/prometheus/recording.yml:ro
       - ../prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - ../prometheus/slo.yml:/etc/prometheus/slo.yml:ro
       - prom-data:/prometheus
     depends_on:
       - alertmanager
@@ -248,13 +258,16 @@ services:
     volumes:
       - ../alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
       - alertmanager-data:/alertmanager
-    # The webhook receiver URL is a secret (it usually embeds a token): it is
-    # read from this file at send time (alertmanager.yml `url_file`), never
-    # written into the config. Point ALERT_WEBHOOK_URL_FILE at a git-ignored
-    # file containing the URL; the default is a placeholder that goes nowhere.
+    # Receiver URLs are secrets (they usually embed a token): read from these
+    # files at send time (alertmanager.yml `url_file`), never written into the
+    # config. Default: the local alert-sink (see top-level `secrets:`).
     secrets:
-      - source: alert_webhook_url
-        target: /etc/alertmanager/secrets/webhook_url
+      - source: alert_page_url
+        target: /etc/alertmanager/secrets/page_url
+      - source: alert_ticket_url
+        target: /etc/alertmanager/secrets/ticket_url
+    depends_on:
+      - alert-sink
     logging:
       driver: json-file
       options:
@@ -265,6 +278,39 @@ services:
       interval: 15s
       timeout: 5s
       retries: 3
+
+  # Local default alert receiver (v1.12 P4): a stdlib-only HTTP echo that logs
+  # every Alertmanager webhook POST to stdout. Internal to iap-net (no host
+  # port). Replaced by setting ALERT_PAGE_URL_FILE / ALERT_TICKET_URL_FILE.
+  alert-sink:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile.python
+    image: ghcr.io/ashjha0/intraday-alpha-platform-python:v1.12.0
+    container_name: iap-alert-sink
+    restart: unless-stopped
+    networks: [iap-net]
+    entrypoint:
+      - python3
+      - -c
+      - |
+        import http.server
+        class H(http.server.BaseHTTPRequestHandler):
+            def do_POST(self):
+                body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+                print(self.path, body.decode("utf-8", "replace"), flush=True)
+                self.send_response(200)
+                self.end_headers()
+            def log_message(self, *args):
+                pass
+        http.server.ThreadingHTTPServer(("0.0.0.0", 8080), H).serve_forever()
+    healthcheck:
+      test: ["NONE"]
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   grafana:
     image: grafana/grafana:11.1.0@sha256:079600c9517b678c10cda6006b4487d3174512fd4c6cface37df7822756ed7a5

@@ -10,6 +10,14 @@ Usage (from python/ with PYTHONPATH=src):
                             [--files eq_20260824.normalized.iap1 ...]
                             [--workers N] [--worker-mem-gb 5]
                             [--engine python|rust]
+                            [--feature-set default|extended]
+                            [--sampling clock|events:N|volume:N]
+
+Opt-in (v1.12.0): ``--feature-set extended`` appends the Python-only
+extended families of :mod:`iap.features.extended` (own feature_version);
+``--sampling events:N|volume:N`` emits rows on an event / volume clock
+instead of ``--cadence-ms``.  Both default off: the default build is
+byte-identical to v1.11.
 
 For every normalized input file (sorted by name = trading-day order; a fresh
 engine per day, session profiles carried across days per instrument), the
@@ -163,8 +171,31 @@ def _overlay_rust(path: Path, contexts, cadence_ns: int, buffers, nfeat: int) ->
     return True
 
 
+def _make_engine(contexts, cadence_ns: int, profiles, opts):
+    """The default FeatureEngine, or the opt-in extended / event-time engine."""
+    if opts is None:
+        return FeatureEngine(contexts, cadence_ns=cadence_ns, profiles=profiles)
+    from iap.features.extended import ExtendedFeatureEngine
+
+    feature_set, sampling, sample_n = opts
+    return ExtendedFeatureEngine(
+        contexts,
+        cadence_ns=cadence_ns,
+        profiles=profiles,
+        feature_set=feature_set,
+        sampling=sampling,
+        sample_n=sample_n,
+    )
+
+
 def _replay_file(
-    path: Path, contexts, cadence_ns: int, profiles, record: bool, engine: str = "python"
+    path: Path,
+    contexts,
+    cadence_ns: int,
+    profiles,
+    record: bool,
+    engine: str = "python",
+    opts=None,
 ):
     """Replay one input file through a fresh engine.
 
@@ -173,7 +204,7 @@ def _replay_file(
     """
     backend = engine
     events = _load_events(path)
-    engine = FeatureEngine(contexts, cadence_ns=cadence_ns, profiles=profiles)
+    engine = _make_engine(contexts, cadence_ns, profiles, opts)
     buffers: dict[int, _InstrumentBuffer] = {}
     logs: dict[int, _ProfileLog] = {}
     for ev in events:
@@ -215,9 +246,9 @@ def _replay_file(
 
 def _worker(job):
     """Process-pool entry point: replay one day against an empty profile."""
-    path, configs, cadence_ns, backend = job
+    path, configs, cadence_ns, backend, opts = job
     return _replay_file(
-        Path(path), build_contexts(configs), cadence_ns, {}, record=True, engine=backend
+        Path(path), build_contexts(configs), cadence_ns, {}, record=True, engine=backend, opts=opts
     )
 
 
@@ -480,7 +511,30 @@ def main(argv: list[str] | None = None) -> int:
         help="backend for the 45 native feature slots: python (default) or rust "
         "(iap_features_rs, falls back to python when not installed)",
     )
+    ap.add_argument(
+        "--feature-set",
+        choices=("default", "extended"),
+        default="default",
+        help="default (the pinned registry) or extended (+ the opt-in v1.12 "
+        "Python-only families, appended; own feature_version)",
+    )
+    ap.add_argument(
+        "--sampling",
+        default="clock",
+        help="row clock: clock (--cadence-ms, default), events:N (every N applied "
+        "events) or volume:N (every N traded shares)",
+    )
     args = ap.parse_args(argv)
+    sampling, _, sample_n = args.sampling.partition(":")
+    if sampling == "clock" and not sample_n:
+        sample_n_i = 0
+    elif sampling in ("events", "volume") and sample_n.isdigit() and int(sample_n) > 0:
+        sample_n_i = int(sample_n)
+    else:
+        ap.error("--sampling must be clock, events:N or volume:N (N > 0)")
+    opts = None
+    if args.feature_set != "default" or sampling != "clock":
+        opts = (args.feature_set, sampling, sample_n_i)
     from iap.features.native import resolve_engine
 
     backend = resolve_engine(args.engine)
@@ -500,8 +554,23 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit(f"no normalized input files in {data_dir}")
 
     contexts = build_contexts(args.configs)
-    write_registry(args.registry_out)
-    registry = build_registry()
+    if args.feature_set == "extended":
+        from iap.features.extended import (
+            EXT_FAMILY_ORDER,
+            extended_registry,
+            extended_registry_hash,
+            write_extended_registry,
+        )
+
+        write_extended_registry(args.registry_out)
+        registry = extended_registry()
+        family_order = FAMILY_ORDER + EXT_FAMILY_ORDER
+        reg_hash = extended_registry_hash()
+    else:
+        write_registry(args.registry_out)
+        registry = build_registry()
+        family_order = FAMILY_ORDER
+        reg_hash = registry_hash()
     names = [s.name for s in registry]
     schema = _build_schema(names)
 
@@ -538,12 +607,12 @@ def main(argv: list[str] | None = None) -> int:
     if workers <= 1:
         for path in files:
             n_events, counts, buffers, _ = _replay_file(
-                path, contexts, cadence_ns, profiles, record=False, engine=backend
+                path, contexts, cadence_ns, profiles, record=False, engine=backend, opts=opts
             )
             _consume(path, n_events, counts, buffers)
     else:
         norm_idx = [names.index(f"norm_{m}_m5_v1") for m in PROFILE_METRICS]
-        jobs = [(str(p), str(args.configs), cadence_ns, backend) for p in files]
+        jobs = [(str(p), str(args.configs), cadence_ns, backend, opts) for p in files]
         # Under `python -m iap.features` this file runs as `__main__`, and a
         # spawn-start worker (Windows, macOS) does not re-import a package's
         # `__main__`, so `__main__._worker` cannot be unpickled there. Submit
@@ -561,7 +630,7 @@ def main(argv: list[str] | None = None) -> int:
     for writer in writers.values():
         writer.close()
 
-    fam_slices: dict[str, list[int]] = {f: [] for f in FAMILY_ORDER}
+    fam_slices: dict[str, list[int]] = {f: [] for f in family_order}
     for i, s in enumerate(registry):
         fam_slices[s.family].append(i)
     per_instrument = {}
@@ -602,7 +671,7 @@ def main(argv: list[str] | None = None) -> int:
             },
         }
     summary = {
-        "registry_hash": registry_hash(),
+        "registry_hash": reg_hash,
         "registered_features": len(registry),
         "cadence_ms": args.cadence_ms,
         "label_horizons": list(HORIZON_ORDER),
@@ -612,6 +681,10 @@ def main(argv: list[str] | None = None) -> int:
         "runtime_seconds": round(time.time() - t_start, 2),
         "instruments": per_instrument,
     }
+    if args.feature_set != "default":  # keys absent on the default path
+        summary["feature_set"] = args.feature_set
+    if sampling != "clock":
+        summary["sampling"] = args.sampling
     if backend != "python":  # key absent on the default path: summary bytes unchanged
         summary["native_engine"] = backend
     with open(out_dir / "features_summary.json", "w") as f:

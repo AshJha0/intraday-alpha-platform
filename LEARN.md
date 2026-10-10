@@ -70,7 +70,11 @@ Contents:
 37. [Why an LLM must never compute a number](#37-why-an-llm-must-never-compute-a-number)
 38. [Freezing copies instead of deleting them](#38-freezing-copies-instead-of-deleting-them)
 39. [Model registries as evidence](#39-model-registries-as-evidence)
-40. [Further reading](#40-further-reading)
+40. [Why a Sharpe must be deflated](#40-why-a-sharpe-must-be-deflated)
+41. [What tick-to-trade does and does not measure](#41-what-tick-to-trade-does-and-does-not-measure)
+42. [An underpowered result is not a negative result (AUC01)](#42-an-underpowered-result-is-not-a-negative-result-auc01)
+43. [Feedback loops in passive execution](#43-feedback-loops-in-passive-execution)
+44. [Further reading](#44-further-reading)
 
 ---
 
@@ -1324,7 +1328,7 @@ match**.
   the portfolio golden is checked against an SLSQP optimum. Golden files are
   regenerated only deliberately, with a MIGRATIONS.md entry.
 - **One command proves parity**: `tests/harness/run_all.sh` runs all four
-  suites and prints the table (the v1.11.0 counts from CI, 2026-10-10: python 2185,
+  suites and prints the table (the v1.12.0 counts from CI, 2026-10-10: python 2250,
   cpp 302, rust 358, java 571 tests passed; golden groups 193/72/71/124; all
   PASS, plus `integration` (35) and `replay` (6) rows for the repo-level
   pytest suites, a `deployment` row — 26 structural checks passed in CI,
@@ -4138,7 +4142,185 @@ not make a model good. It makes a claim about a model checkable.
 3. A shadow candidate beats the champion on P&L delta. Is it promoted?
    *(No: `promotion_decision` also requires the lifecycle gates.)*
 
-## 40. Further reading
+## 40. Why a Sharpe must be deflated
+
+**The question.** A study reports a per-day Sharpe of 0.12 over 40 days and
+a probabilistic Sharpe ratio (PSR) of 0.78 against zero. Is that evidence
+of skill? It depends on a number the study does not show: how many things
+were tried before this one was reported.
+
+**Selection inflates the maximum.** Take `N` strategies with no skill at
+all. Each one's measured Sharpe is noise around zero, but the best of them
+is not: its expected value grows roughly like the square root of `2 ln N`
+times the spread of the trial Sharpes. Report the best of 100 worthless
+backtests and you report a Sharpe that looks real. The PSR cannot see
+this, because it compares one track record with zero; it was never told
+there were 99 others.
+
+**What the DSR does.** The deflated Sharpe ratio (Bailey and López de Prado,
+2014) replaces zero by `SR0`, the Sharpe the best of `N` null trials would
+be expected to reach, and asks the PSR question against that bar, with the
+variance of the estimate corrected for skew and fat tails. The published
+worked example (annualised Sharpe 2.5 over five years of daily data, 100
+trials, skew −3, kurtosis 10) gives `SR0` 0.1132 per day and DSR 0.9004;
+`iap.validation.deflated` reproduces both (COOKBOOK recipe 56).
+
+**Which N.** The DSR is only as honest as its `N`, and `N` is exactly what
+an author is tempted to choose. Here it is not chosen: `effective_trials`
+reads the experiment ledger (§6.6) and counts distinct configurations,
+plus one for the run being judged. That is the conservative headline. The
+raw look count is larger (one configuration can be looked at many times)
+and is printed beside it as `dsr_at_looks`, the harshest reading. Recipe 62
+shows the same 40 synthetic days move from DSR 0.78 with one trial, to
+0.17 with twelve, to 0.02 with the ledger's count.
+
+**What it does not do.** The DSR is a report, not a gate: the `v4` bundle
+adds the block to validation reports and nothing reads it to promote or
+reject. A study's registered verdict rule stays the rule; the DSR sits
+beside it so a reader can see how much of a Sharpe survives the search
+that produced it. CPCV and PBO (recipe 56) answer the related question of
+whether the selection procedure overfits: PBO is the probability that the
+configuration best in-sample falls below the median out of sample.
+
+**Check yourself.**
+
+1. Two studies report the same PSR. One was the only configuration tried,
+   the other the best of 50. Which has the higher DSR? *(The first: the
+   second is judged against a higher SR0.)*
+2. Why is the minimum track record length independent of `N`? *(It answers
+   how long one track record must be to beat a benchmark at a confidence
+   level; deflation changes the benchmark, not that question.)*
+3. Why not always use the raw look count? *(Repeated looks at one
+   configuration are correlated, so counting each as an independent trial
+   overstates `N`; it is reported, but as the bound, not the headline.)*
+
+## 41. What tick-to-trade does and does not measure
+
+**The question.** The C++ benchmark reports a tick-to-trade p50 of 1,279 ns
+and p99 of 2,559 ns on the golden vector. Is that how fast this platform
+would trade?
+
+**What is inside the number.** `bench_tick_to_trade` times each event
+individually from a raw IAP1 frame already in memory through five stages:
+decode (p50 271 ns), book update (83), the native features (735), alpha
+scoring (135) and an order decision with a minimal pre-trade check (30).
+The clock starts when the frame is handed to the decoder and stops when an
+order intent exists. Warm-up is excluded and the timer's own overhead is
+measured and stated. The distribution, not a mean, is the result: p99.9 is
+11,263 ns and the maximum 33,112 ns, an order of magnitude above the
+median, which is where cache misses, allocation and the operating system
+show up.
+
+**What is outside it.** No network card, no kernel, no kernel bypass: the
+frame does not arrive from a wire and the order does not leave on one. No
+platform risk engine: the hard risk engine is Rust and Java, and the
+decision stage here is a bench-local check. No exchange gateway and no
+venue protocol encoding. A wire-to-wire figure adds all of those, and on
+commodity hardware the network path alone is usually larger than
+everything measured here.
+
+**Why the machine matters.** The committed baseline was measured on a CI
+runner (AMD EPYC), a shared virtual machine. Runner-to-runner variance at
+p99 is about 2x, which is why the CI guard fails only at 8x the baseline:
+it catches a regression of kind (an allocation per event, a lock), not of
+degree. A laptop number is not comparable to the baseline. The Python
+reference implementation of the same path manages about 4,600 events per
+second with a p50 of 176 µs on a laptop: the price of a readable
+reference, not a competing measurement.
+
+**Check yourself.**
+
+1. The p50 is 1.3 µs and the p99.9 11 µs. Which matters more for a maker
+   strategy? *(Often the tail: events arriving in a burst are the ones
+   where being late costs queue position.)*
+2. Could this be quoted as "sub-2 µs tick-to-trade"? *(Only with the
+   boundary stated: in-process, decoded frame to order intent, no network
+   and no risk engine.)*
+
+## 42. An underpowered result is not a negative result (AUC01)
+
+**The question.** The pre-registered closing-cross study `AUC01` finished
+its in-sample run on seven real sessions. Primary cell `C-300s`: 3 trades,
+2 of 6 test sessions with a trade, session-clustered mean +19.4 bp, 95%
+interval −254 to +293 bp (Bonferroni −529 to +567). Verdict: NO
+DEMONSTRATED EDGE. Does that mean auction imbalance does not predict the
+cross?
+
+**No, and it does not mean it does.** The strategy decides once per symbol
+per day. Three symbols over seven sessions is 21 decisions, of which the
+walk-forward traded three, on two days; the registration also asked for at
+least four active sessions, and the study had two. With so few
+observations the interval is hundreds of basis points wide on either side
+of zero: a true edge of +20 bp and a true edge of zero would both produce
+data like this. The study could not have demonstrated an edge of any
+plausible size, so failing to demonstrate one carries almost no
+information. That is what "underpowered" means.
+
+**The opposite mistake.** The secondary cell (opening cross, `O-300s`) has
+a narrower interval (+6.1 bp, −9.7 to +21.9) and a large t, from 4 trades
+on two sessions. It is tempting to call that the finding. A statistic
+clustered on two sessions is not reliable, the cell was registered as
+secondary, and it also misses the four-session minimum. Same verdict. Nor
+should the unweighted per-trade averages (+26.5 bp and +5.5 bp) be quoted
+as the result: the registered statistic is the mean of per-session means.
+
+**What to do with it.** Report it as it is: exploratory, in-sample, no
+demonstrated edge, underpowered. Do not re-cut the cells until something
+passes; that would be a new look, chosen after seeing the data. The
+pre-registration already declared the next step: the frozen `C-300s` fit is
+run on 2026 days not touched before. More decisions, from more symbols and
+sessions, is the only thing that would make a future negative informative;
+the power study (§23) shows how to size that before running it.
+
+**Check yourself.**
+
+1. A study with 21 decisions reports "no demonstrated edge". What else
+   should it report? *(The interval, so a reader can see which effect sizes
+   it could and could not rule out.)*
+2. Why not lower the threshold until the walk-forward trades more often?
+   *(That is a different configuration: a new look, chosen after seeing the
+   data.)*
+
+## 43. Feedback loops in passive execution
+
+**The question.** A quoter's fills are being run over: each time its ask is
+lifted, the price keeps rising. Should the strategy adapt while it trades?
+
+**What the feedback is.** `iap.execution.markout_feedback` keeps an
+exponentially weighted average of realised markouts, the price move after
+each passive fill measured from the side that filled. A markout enters the
+average only once its horizon has passed on the replay clock, so the loop
+never uses a price it could not yet have seen. When at least `min_fills`
+markouts are known and the average is below the threshold, the policy
+stands down for a cooldown, posts further behind, or posts smaller.
+
+**What it achieves.** On a synthetic regime built to be toxic (the price
+drifts up and the score always sells), the quoter without feedback fills
+192 times and loses 62.75 USD to markout. With a threshold demanding at
+least 2 bp earned per fill it stands down 119 times, fills 8 times, and
+markout falls to −1.75 USD (recipe 64). The run still loses 85 USD.
+Feedback limits damage; it does not create an edge.
+
+**Why loops need care.** A feedback rule is itself a strategy with
+parameters (horizon, half-life, threshold, cooldown), and every one of them
+can be tuned until a backtest looks good, which is the selection problem of
+§40 again. It also changes what the strategy observes: a quoter that stands
+down stops collecting the markouts that would tell it the regime has
+changed, so the cooldown and the EWMA reset are what let it look again. The
+fill hazard (recipe 61) is a different kind of loop: it predicts, before
+posting, whether a repost is likely to fill at all, and gives up instead of
+chasing. Both are opt-in and synthetic-only here; neither has been run on
+the real sessions.
+
+**Check yourself.**
+
+1. Why must the markout enter the average only after its horizon has
+   passed? *(Otherwise the policy uses a future price: look-ahead inside
+   the backtest.)*
+2. The feedback cut the markout loss by 97%. Is the strategy now good?
+   *(No: it still loses; it just quotes much less.)*
+
+## 44. Further reading
 
 Inside this repository, in suggested order:
 

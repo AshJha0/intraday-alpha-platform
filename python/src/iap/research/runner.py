@@ -131,12 +131,14 @@ from iap.research.specs import (
     pinned_horizon,
     verify_experiment_id,
 )
+from iap.validation.deflated import effective_trials
 from iap.validation.leakage import RecomputeSources
 from iap.validation.ledger import ExperimentLedger
 from iap.validation.methods import (
     METHODS_LEGACY,
     METHODS_V2,
     METHODS_V3,
+    METHODS_V4,
     ResearchMethods,
     methods,
 )
@@ -212,6 +214,8 @@ _REPORT_METRICS = {
 }
 #: ``v3`` (v1.9, opt-in) records the numbers its verdict read, like ``v2``.
 _REPORT_METRICS[METHODS_V3] = _REPORT_METRICS[METHODS_V2]
+#: ``v4`` (v1.12, opt-in) adds report-only blocks to ``v3``.
+_REPORT_METRICS[METHODS_V4] = _REPORT_METRICS[METHODS_V2]
 
 #: Result fields a rerun may legitimately change (provenance, not evidence).
 _PROVENANCE_FIELDS = ("git_commit", "n_experiments_in_ledger")
@@ -512,10 +516,19 @@ class ExperimentRunner:
         ingested ITCH dataset is validated as one Nasdaq book.  Earlier
         bundles keep the consolidated default and their published reports."""
         kwargs = dict(bundle.validate_kwargs())
-        if bundle.name == METHODS_V3 and "book_scope" not in kwargs:
+        if bundle.name in (METHODS_V3, METHODS_V4) and "book_scope" not in kwargs:
             root = self.feature_store_dir.parent if self.feature_store_dir else None
             kwargs["book_scope"] = book_scope_for_dataset(root)
         return kwargs
+
+    def _dsr_kwargs(self, spec: ExperimentSpec, bundle: ResearchMethods) -> dict:
+        """``v4``: the DSR trial count = the ledger's distinct configurations,
+        counting this spec when it is new (``iap.validation.deflated``,
+        "Which N")."""
+        if not bundle.deflated_sharpe:
+            return {}
+        new = self.ledger.would_add(spec.alpha_id, LEDGER_KIND, spec.to_dict(), 1) > 0
+        return {"deflated_sharpe_trials": effective_trials(self.ledger, include_new=new)}
 
     @staticmethod
     def _methods(spec: ExperimentSpec) -> ResearchMethods:
@@ -798,6 +811,7 @@ class ExperimentRunner:
                 seed=int(spec.seed),
                 recompute=recompute,
                 dataset_version=spec.dataset_version,
+                **self._dsr_kwargs(spec, bundle),
                 **self._validate_kwargs(bundle),
             )
         except ValueError as exc:  # splitter: too few rows / degenerate boundaries
@@ -812,7 +826,10 @@ class ExperimentRunner:
                 "the recompute leakage probe did not run: no normalized event file for "
                 f"{asset_class} beside the feature store"
             )
-        if bundle.name in (METHODS_V2, METHODS_V3) and not report["label_reopen_available"]:
+        if (
+            bundle.name in (METHODS_V2, METHODS_V3, METHODS_V4)
+            and not report["label_reopen_available"]
+        ):
             run_reasons.append(
                 "the frames carry no label_reopen column: the default row policy could "
                 "not score BLACKOUT rows (feature store written before v1.5.0)"
