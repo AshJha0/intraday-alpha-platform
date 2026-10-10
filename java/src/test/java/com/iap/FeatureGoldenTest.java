@@ -396,14 +396,84 @@ public class FeatureGoldenTest {
         assertTrue(side + ": too few valid features compared", compared > 50);
     }
 
+    /**
+     * Rows INSIDE and right after every SNAPSHOT recovery burst
+     * (expected_features_snapshot_burst.json, Python reference): a staleness
+     * refresh updates the level scalars and records no samples (v1.11.0).
+     */
+    private void checkBurstSide(String side, double tick) {
+        Map<String, Object> golden =
+                Golden.json("expected_features_snapshot_burst.json");
+        Map<String, Object> doc = Json.object(golden.get(side));
+        long iid = Json.asLong(doc.get("instrument_id"));
+        List<MarketEvent> events = Golden.events((String) doc.get("vector"));
+        Map<Long, Double> ticks = new TreeMap<>();
+        ticks.put(iid, tick);
+        FeatureEngine engine = new FeatureEngine(ticks, 0);
+        Map<String, Object> cps = Json.object(doc.get("checkpoints"));
+        FeatureVector vec = new FeatureVector();
+        int seen = 0;
+        int compared = 0;
+        for (int i = 0; i < events.size(); i++) {
+            boolean emitted = engine.apply(events.get(i), vec);
+            Object raw = cps.get(Integer.toString(i + 1));
+            if (raw == null) {
+                continue;
+            }
+            Map<String, Object> cp = Json.object(raw);
+            String at = "burst " + side + "@" + (i + 1);
+            assertTrue(at + ": cadence 0 must emit", emitted);
+            assertEquals(at + ": timestamp", Json.asLong(cp.get("timestamp")),
+                    vec.timestamp);
+            seen++;
+            Map<String, Object> feats = Json.object(cp.get("features"));
+            double rv1 = absValid(feats, "rvol_w1m_v1");
+            double rv5 = absValid(feats, "rvol_w5m_v1");
+            for (Map.Entry<String, Object> e : feats.entrySet()) {
+                int slot = Features.index(e.getKey());
+                if (slot < 0) {
+                    continue;
+                }
+                Map<String, Object> entry = Json.object(e.getValue());
+                boolean wantValid = (Boolean) entry.get("valid");
+                assertEquals(at + " " + e.getKey() + " validity", wantValid,
+                        vec.valid[slot]);
+                if (!wantValid) {
+                    continue;
+                }
+                compared++;
+                double want = Json.asDouble(entry.get("value"));
+                double tol = 1e-9 + 1e-9 * Math.abs(want);
+                // rvol_w1m float residue / (rvol_w5m + EPS) (see the Rust test)
+                if (e.getKey().equals("vol_regime_ratio_v1") && rv1 <= 1e-9) {
+                    tol += 1e-9 / (rv5 + 1e-12);
+                }
+                double got = vec.values[slot];
+                assertTrue(at + " " + e.getKey() + ": got " + got + " want "
+                        + want, Math.abs(got - want) <= tol);
+            }
+        }
+        assertEquals("burst " + side + ": every checkpoint reached",
+                cps.size(), seen);
+        assertTrue("burst " + side + ": too few compared", compared > 100);
+    }
+
+    private static double absValid(Map<String, Object> feats, String name) {
+        Map<String, Object> entry = Json.object(feats.get(name));
+        return Boolean.TRUE.equals(entry.get("valid"))
+                ? Math.abs(Json.asDouble(entry.get("value"))) : 0.0;
+    }
+
     @Test
     public void anomalyGoldenEqCheckpoints() {
         checkAnomalySide("eq", 0.01);
+        checkBurstSide("eq", 0.01);
     }
 
     @Test
     public void anomalyGoldenFxCheckpoints() {
         checkAnomalySide("fx", 1e-05);
+        checkBurstSide("fx", 1e-05);
     }
 
     @Test

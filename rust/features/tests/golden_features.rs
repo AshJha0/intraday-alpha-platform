@@ -307,12 +307,56 @@ fn check_anomaly_side(golden: &serde_json::Value, side: &str, tick: f64) {
 fn anomaly_golden_eq_matches() {
     let golden = load_json("expected_features_anomalies.json");
     check_anomaly_side(&golden, "eq", 0.01);
+    check_snapshot_burst_side("eq", 0.01);
 }
 
 #[test]
 fn anomaly_golden_fx_matches() {
     let golden = load_json("expected_features_anomalies.json");
     check_anomaly_side(&golden, "fx", 1e-5);
+    check_snapshot_burst_side("fx", 1e-5);
+}
+
+/// Rows INSIDE and right after every SNAPSHOT recovery burst
+/// (`expected_features_snapshot_burst.json`, Python reference): interior
+/// records keep the pre-burst derived state (API_FEATURES.md §2). The
+/// anomaly checkpoints above never land in a burst (v1.11.0 fix).
+fn check_snapshot_burst_side(side: &str, tick: f64) {
+    let golden = load_json("expected_features_snapshot_burst.json");
+    let doc = &golden[side];
+    let instrument_id = doc["instrument_id"].as_u64().expect("instrument") as u32;
+    let events = read_jsonl(golden_path(doc["vector"].as_str().unwrap())).expect("vector");
+    let cps = doc["checkpoints"].as_object().expect("checkpoints");
+    let mut eng = engine_for(instrument_id, tick);
+    let (mut seen, mut checked) = (0usize, 0usize);
+    for (i, ev) in events.iter().enumerate() {
+        let vec = eng.apply(ev).expect("anomaly events never error");
+        let key = (i + 1).to_string();
+        let Some(cp) = cps.get(&key) else { continue };
+        let vec = vec.unwrap_or_else(|| panic!("burst {side}@{key}: cadence 0 must emit"));
+        assert_eq!(vec.timestamp, cp["timestamp"].as_i64().unwrap(), "burst {side}@{key}");
+        seen += 1;
+        let feats = cp["features"].as_object().expect("features");
+        let val = |n: &str| feats[n]["value"].as_f64().unwrap_or(0.0).abs();
+        for (name, entry) in feats {
+            let slot = features::feature_index(name).expect("native feature");
+            let want_valid = entry["valid"].as_bool().unwrap();
+            assert_eq!(vec.validity[slot], want_valid, "burst {side}@{key} {name}: validity");
+            if want_valid {
+                let want = entry["value"].as_f64().unwrap();
+                let mut tol = ABS_TOL + REL_TOL * want.abs();
+                // rvol_w1m residue / (rvol_w5m + EPS): see the pyo3 parity test
+                if name == "vol_regime_ratio_v1" && val("rvol_w1m_v1") <= 1e-9 {
+                    tol += 1e-9 / (val("rvol_w5m_v1") + 1e-12);
+                }
+                let got = vec.values[slot];
+                assert!((got - want).abs() <= tol, "burst {side}@{key} {name}: {got} != {want}");
+                checked += 1;
+            }
+        }
+    }
+    assert_eq!(seen, cps.len(), "burst {side}: every checkpoint reached");
+    assert!(checked > 100, "burst {side}: too few valid features compared");
 }
 
 #[test]

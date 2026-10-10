@@ -26,11 +26,20 @@ first seeded equity day at 100 ms cadence. The Python figure is the full
 205-feature engine; the pipeline itself is not faster, because the other
 160 features still run in Python. COOKBOOK recipe 49, API_FEATURES.md §7.1.
 
-**Known gap found by E2.** On the anomaly vectors, rows emitted inside a
-SNAPSHOT recovery burst differ between the engines: Python keeps the
-pre-burst derived state as API_FEATURES §2 pins, the Rust engine reads the
-half-built book. The golden checkpoints are outside bursts and still match;
-the full-row comparison is a strict xfail until the Rust engine is fixed.
+**Fixed (feature engines: Rust, C++ and Java; found by E2).** On a
+*staleness refresh* (the stale-venue set changed, e.g. a venue rejoining at
+the start of a SNAPSHOT recovery burst) the Rust, C++ and Java engines
+recomputed the merged view but returned before updating the level scalars
+(L1 price/size, cumulative depth, mid, spread), so rows emitted until the
+next book-touching refresh carried the previous view's levels and returns.
+The Python reference updates them and records no samples (API_FEATURES §2);
+all three ports now do the same (Java is frozen: bug-fix override, no new
+API). The anomaly golden checkpoints never landed in such a window, so every
+golden passed. New golden `tests/golden/expected_features_snapshot_burst.json`
+(`python/tools/make_golden_snapshot_burst.py`: every event inside and up to
+5 after each burst) is checked by the existing anomaly golden tests of all
+three ports (test counts unchanged), and the pyo3 full-row anomaly
+comparison is no longer an xfail.
 
 **Polyglot policy (IAP_Next_Releases_Plan E3).** New
 [docs/POLYGLOT.md](docs/POLYGLOT.md): an inventory of every component that

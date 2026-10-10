@@ -506,12 +506,12 @@ abs 1e-9 / rel 1e-9. One allowance: `vol_regime_ratio_v1 = rvol_w1m /
 (rvol_w5m + EPS)` on rows where `rvol_w1m` is within 1e-9 of 0 (an emptied
 window leaves float residue in one engine and exact 0 in the other) is
 compared at the input tolerance carried through the division. On the
-anomaly vectors the golden checkpoints match and validity matches on every
-row, but values differ on rows emitted inside a SNAPSHOT recovery burst:
-the Python engine keeps the pre-burst derived state (§2), the Rust engine
-reads the half-built book, and the mid samples it records there move the
-returns for a few rows after. That test is a strict xfail, so a fix to the
-Rust engine shows up as a failure that asks for the marker to be removed.
+anomaly vectors every row matches as well, including the rows inside
+SNAPSHOT recovery bursts, which
+`tests/golden/expected_features_snapshot_burst.json` also pins for the Rust
+crate and the C++ and Java goldens. Before v1.11.0 the Rust, C++ and Java
+engines skipped the level update (L1, depth, mid, spread) on a staleness
+refresh (§2), so those rows differed.
 
 Speed (`python/tools/bench_native_features.py`, CI job summary, GitHub
 ubuntu-24.04 runner): about 5,000 events/s through the Python reference

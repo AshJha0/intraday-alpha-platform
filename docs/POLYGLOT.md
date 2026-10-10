@@ -92,6 +92,14 @@ New features land in Python first and in the C++/Rust fast paths when they
 earn a hot-path place; the Java engine serves only the platform's six golden
 alphas and is frozen.
 
+**Fixed divergence (v1.11.0).** On a staleness refresh (the stale-venue
+set changes, e.g. a venue rejoining at the start of a SNAPSHOT recovery
+burst) Python updates the level scalars (L1, cumulative depth, mid, spread)
+and records no samples; the Rust, C++ and Java copies returned before the
+update. All three were fixed in v1.11.0 (Java under the bug-fix override:
+no new API) and `tests/golden/expected_features_snapshot_burst.json` pins
+the rows in every port's existing anomaly golden test.
+
 ### 1.5 Alpha scoring (the six golden alphas, `linear_z_v1`)
 
 | copy | lines | golden | consumers | decision |
