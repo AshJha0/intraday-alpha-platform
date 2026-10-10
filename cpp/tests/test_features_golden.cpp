@@ -315,10 +315,63 @@ void check_anomaly_side(const std::string& side, double tick) {
     EXPECT_GT(compared, 50) << side << ": too few valid features compared";
 }
 
+// Rows INSIDE and right after every SNAPSHOT recovery burst
+// (expected_features_snapshot_burst.json, Python reference): a staleness
+// refresh updates the level scalars and records no samples (v1.11.0 fix).
+void check_burst_side(const std::string& side, double tick) {
+    const auto golden =
+        iap_test::load_golden_json("expected_features_snapshot_burst.json");
+    const auto& doc = golden[side];
+    const auto iid = static_cast<std::uint32_t>(doc["instrument_id"].i64());
+    const auto events = load_events(doc["vector"].s());
+    std::map<std::uint32_t, double> ticks = {{iid, tick}};
+    FeatureEngine engine(ticks, 0);
+    FeatureVector vec;
+    std::size_t seen = 0;
+    int compared = 0;
+    for (std::size_t i = 0; i < events.size(); ++i) {
+        const bool emitted = engine.apply(events[i], vec);
+        const std::string key = std::to_string(i + 1);
+        if (!doc["checkpoints"].has(key)) continue;
+        const auto& cp = doc["checkpoints"][key];
+        ASSERT_TRUE(emitted) << "burst " << side << "@" << key;
+        EXPECT_EQ(vec.timestamp, cp["timestamp"].i64()) << "burst " << side << "@" << key;
+        ++seen;
+        const auto& feats = cp["features"];
+        auto absval = [&](const char* n) {
+            return feats[n]["valid"].boolean ? std::fabs(feats[n]["value"].num()) : 0.0;
+        };
+        for (const auto& [name, entry] : feats.obj) {
+            const int slot = iap::feature_index(name);
+            if (slot < 0) continue;
+            const bool want_valid = entry["valid"].boolean;
+            EXPECT_EQ(vec.valid[static_cast<std::size_t>(slot)], want_valid)
+                << "burst " << side << "@" << key << " " << name << " validity";
+            if (!want_valid) continue;
+            ++compared;
+            const double want = entry["value"].num();
+            double tol = 1e-9 + 1e-9 * std::fabs(want);
+            // rvol_w1m float residue / (rvol_w5m + EPS) (see the Rust test)
+            if (name == "vol_regime_ratio_v1" && absval("rvol_w1m_v1") <= 1e-9)
+                tol += 1e-9 / (absval("rvol_w5m_v1") + 1e-12);
+            const double got = vec.values[static_cast<std::size_t>(slot)];
+            EXPECT_LE(std::fabs(got - want), tol) << "burst " << side << "@" << key << " " << name;
+        }
+    }
+    EXPECT_EQ(seen, doc["checkpoints"].obj.size()) << "burst " << side;
+    EXPECT_GT(compared, 100) << "burst " << side << ": too few valid features compared";
+}
+
 }  // namespace
 
-TEST(FeatureGolden, AnomalyEqCheckpoints) { check_anomaly_side("eq", 0.01); }
-TEST(FeatureGolden, AnomalyFxCheckpoints) { check_anomaly_side("fx", 1e-05); }
+TEST(FeatureGolden, AnomalyEqCheckpoints) {
+    check_anomaly_side("eq", 0.01);
+    check_burst_side("eq", 0.01);
+}
+TEST(FeatureGolden, AnomalyFxCheckpoints) {
+    check_anomaly_side("fx", 1e-05);
+    check_burst_side("fx", 1e-05);
+}
 
 TEST(FeatureGolden, AnomalyVectorExercisesDropPaths) {
     const auto golden =

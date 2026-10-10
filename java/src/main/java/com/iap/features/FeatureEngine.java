@@ -608,9 +608,11 @@ public final class FeatureEngine {
         }
 
         st.bookOk = st.nBid > 0 && st.nAsk > 0;
-        if (!st.bookOk || !samples) {
+        if (!st.bookOk) {
             return false;
         }
+        // Level scalars follow the merged view on every refresh, a staleness
+        // refresh included (SNAPSHOT-burst fix, v1.11.0); only samples are gated.
 
         st.bestBidP = st.bidP[0];
         st.bestBidQ = st.bidQ[0];
@@ -649,6 +651,9 @@ public final class FeatureEngine {
         st.logmid = Math.log((double) st.mid2);
         st.spreadTicks = st.bestAskP - st.bestBidP;
         st.spreadBps = (double) st.spreadTicks * st.tick / st.mid * 1e4;
+        if (!samples) {
+            return false; // staleness refresh: view updated, nothing recorded
+        }
 
         // Depth sample at every two-sided refresh (ofi_norm denominators).
         st.depthSample[0] = st.db1;

@@ -509,9 +509,9 @@ compared at the input tolerance carried through the division. On the
 anomaly vectors every row matches as well, including the rows inside
 SNAPSHOT recovery bursts, which
 `tests/golden/expected_features_snapshot_burst.json` also pins for the Rust
-crate. Before v1.11.0 the Rust engine skipped the level update (L1, depth,
-mid, spread) on a staleness refresh (§2), so those rows differed; the C++
-and Java copies still do (docs/POLYGLOT.md §1.4).
+crate and the C++ and Java goldens. Before v1.11.0 the Rust, C++ and Java
+engines skipped the level update (L1, depth, mid, spread) on a staleness
+refresh (§2), so those rows differed.
 
 Speed (`python/tools/bench_native_features.py`, CI job summary, GitHub
 ubuntu-24.04 runner): about 5,000 events/s through the Python reference

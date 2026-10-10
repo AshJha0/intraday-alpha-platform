@@ -293,7 +293,9 @@ bool FeatureEngine::refresh_book(InstState& st, std::uint16_t venue_id,
     }
 
     st.book_ok = !st.depth_bid.empty() && !st.depth_ask.empty();
-    if (!st.book_ok || !samples) return false;
+    if (!st.book_ok) return false;
+    // Level scalars follow the merged view on every refresh, a staleness
+    // refresh included (SNAPSHOT-burst fix, v1.11.0); only samples are gated.
 
     st.bid_p = st.depth_bid[0].first;
     st.bid_q = st.depth_bid[0].second;
@@ -322,6 +324,7 @@ bool FeatureEngine::refresh_book(InstState& st, std::uint16_t venue_id,
     st.spread_ticks = st.ask_p - st.bid_p;
     st.spread_bps =
         static_cast<double>(st.spread_ticks) * st.tick / st.mid * 1e4;
+    if (!samples) return false;  // staleness refresh: view updated, nothing recorded
 
     // Depth sample at every two-sided refresh (ofi_norm denominator inputs).
     st.depthavg_10s.add(t, {st.db1, st.da1, st.db5, st.da5});
