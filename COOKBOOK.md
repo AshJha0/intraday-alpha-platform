@@ -47,6 +47,7 @@ Contents:
 36. [Ingest an ITCH 5.0 file and run an alpha on it (no real data needed)](#36-ingest-an-itch-50-file-and-run-an-alpha-on-it-no-real-data-needed)
 37. [Work a parent order passively and read its markouts](#37-work-a-parent-order-passively-and-read-its-markouts)
 38. [Combine alphas out of sample and count the independent bets](#38-combine-alphas-out-of-sample-and-count-the-independent-bets)
+39. [Calibrate the simulator and run a maker-side backtest (v1.9)](#39-calibrate-the-simulator-and-run-a-maker-side-backtest-v19)
 
 Recipes 27–35 were added with v1.3.0. Every command block in them was run
 as printed, from a clean checkout of the release, before it was written
@@ -242,7 +243,15 @@ cd python
 PYTHONPATH=src python3 -m iap.features --cadence-ms 100
 # narrower run: one day's file only
 PYTHONPATH=src python3 -m iap.features --files eq_20260824.normalized.iap1
+# since v1.9.0: one process per day, byte-identical output to the serial run
+PYTHONPATH=src python3 -m iap.features --workers 4
 ```
+
+`--workers N` (default 1 = serial; 0 = auto) replays each input file in its
+own process and stitches the cross-day session profile back together in the
+parent, so the Parquet files are byte-for-byte those of `--workers 1`. N is
+clamped to the file count, the CPU count and `physical RAM / --worker-mem-gb`
+(default 5 GB per worker).
 
 Inspect instrument 1 (columns = registry features, NaN where invalid, plus
 `label_mid_<h>` / `label_cost_<h>` / `label_valid_<h>` and, since v1.5.0,
@@ -737,7 +746,7 @@ bash tests/harness/run_all.sh --golden-only   # golden groups only (fast)
 ```
 
 Exit code 0 iff every language passed; logs land in a temp dir printed on
-the first line. The v1.5.0 counts (CI): python 1988 / cpp 302 /
+the first line. The v1.9.0 counts (CI): python 2114 / cpp 302 /
 rust 358 / java 571 tests passed (golden groups 192/72/71/124), plus
 `integration` (35) and `replay` (6) rows for the repo-level pytest suites, a
 `deployment` row (26 structural checks passed in CI, where `promtool` and
@@ -2162,3 +2171,107 @@ looks; `--members` and `--method` narrow the run, and a narrower member
 list is a different experiment with its own identity. The committed
 verdict: 0 PROMOTE, 8 ITERATE — every combination fails the cost gate
 (`research/combination/REPORT.md`).
+
+## 39. Calibrate the simulator and run a maker-side backtest (v1.9)
+
+The research backtester only takes liquidity. The v1.9 maker path
+(API_TRADING.md §2.6) posts at the touch instead. It first calibrates fill
+rates, queue-depletion hazards, latency, markouts and impact from the event
+stream (M1). It then builds trade-matched labels (M3) and replays a score
+series through the FIFO simulator, gated on expected edge > measured adverse
+selection, with optional tail conditions (M2, M4). The exit is either a taker
+cross (the default) or passive: post at the far touch, repost once, then
+cross whatever is left. The example uses the golden equity vector and a toy
+L1-imbalance score. Rows marked `*` turn the gate off (`margin_bps=-1e9`);
+they are diagnostics, not strategies:
+
+```bash
+PYTHONPATH=python/src python3 - <<'EOF'
+import numpy as np
+import pandas as pd
+from pathlib import Path
+from iap.core.codec import read_jsonl
+from iap.execution import ExecConfig, InstrumentSpec, load_venues
+from iap.execution.calibration import ExecCalibration, estimate_calibration
+from iap.labels.maker_labels import maker_labels
+from iap.backtest.maker import MakerBacktester, MakerConfig
+from iap.tca.markout import build_gated_timeline
+
+events = read_jsonl(Path("tests/golden/events_eq_mbo.jsonl"))
+doc = estimate_calibration(events, {1: 0.01}, source={"file": "events_eq_mbo.jsonl"})
+cal = ExecCalibration.from_dict(doc)
+fr = doc["fill_rates"]["all"]
+print(f"touch joins {fr['n']}  P(any fill) {fr['p_any_fill']:.2f}  P(full) {fr['p_full_fill']:.2f}")
+for h in ("100ms", "1s", "10s"):
+    m = doc["markouts"]["all"][h]
+    print(f"maker adverse selection {h:>5}: {m['mean_bps']:+.2f} bp (se {m['se_bps']:.2f}, n {m['n']})")
+
+# a toy causal score: L1 queue imbalance, sampled every 10 s (a sparse stream)
+tl = build_gated_timeline(events, 1, 0.01)
+SEC = 10**9
+ts = np.arange(tl.ts[0] + SEC, tl.ts[-1], 10 * SEC, dtype=np.int64)
+idx = [tl.prevailing(int(t)) for t in ts]
+imb = np.array([(tl.bid_sz[i] - tl.ask_sz[i]) / (tl.bid_sz[i] + tl.ask_sz[i]) for i in idx])
+scores = pd.DataFrame({"exchange_ts": ts, "expected_return": 1e-4 * imb,
+                       "confidence": np.abs(imb), "z": imb / imb.std()})
+
+cfg = ExecConfig(seed=20260829, venues=load_venues("configs/venues/venues.json"),
+                 instruments={1: InstrumentSpec(1, 0.01, 1.0, 38_000_000.0)})
+lab = maker_labels(events, ts, instrument_id=1, exec_config=cfg, ttl_ns=60 * SEC)
+print(f"labels: bid filled {lab['bid_filled'].mean():.2f}, not run over "
+      f"{np.nanmean(lab['bid_not_run_over']):.2f}")
+base = dict(qty=100, ttl_ns=60 * SEC, horizon_ns=10 * SEC, as_horizon="10s")
+pas = dict(base, exit="passive", exit_timeout_ns=30 * SEC, exit_reprices=1)
+for name, mc in (("taker", MakerConfig(**base)),
+                 ("passive", MakerConfig(**pas)),
+                 ("taker*", MakerConfig(**base, margin_bps=-1e9)),
+                 ("passive*", MakerConfig(**pas, margin_bps=-1e9))):
+    s = MakerBacktester(cfg, mc, cal).run_instrument(events, scores, 1).summary()
+    line = f"{name:<8} posted {s['posted']:>3} filled {s['filled_orders']:>3} gated out {s['gated_out']:>3}"
+    if s["n_trips"]:
+        line += (f" | spread {s['mean_half_spread_earned_bps']:+.2f} AS {s['mean_adverse_selection_bps']:+.2f}"
+                 f" exit {s['mean_exit_slippage_bps']:+.2f} net {s['mean_net_bps']:+.2f} bp/trip,"
+                 f" {s['total_net']:+.2f} USD")
+    if s["passive_exit_trips"]:
+        line += (f" | exit filled passively {s['passive_exit_fill_rate']:.2f},"
+                 f" timeout cross {s['timeout_cross_rate']:.2f}")
+    print(line)
+EOF
+```
+
+```
+touch joins 280  P(any fill) 0.35  P(full) 0.12
+maker adverse selection 100ms: +0.74 bp (se 0.16, n 234)
+maker adverse selection    1s: +0.80 bp (se 0.21, n 233)
+maker adverse selection   10s: +1.36 bp (se 0.40, n 214)
+labels: bid filled 0.17, not run over 0.07
+taker    posted   0 filled   0 gated out 698
+passive  posted  83 filled  22 gated out  22 | spread +5.90 AS +7.13 exit +5.72 net -6.71 bp/trip, -35.70 USD | exit filled passively 0.32, timeout cross 0.68
+taker*   posted 101 filled  27 gated out  38 | spread +3.36 AS +4.20 exit +10.16 net -11.41 bp/trip, -74.70 USD
+passive* posted  83 filled  22 gated out  22 | spread +5.90 AS +7.13 exit +5.72 net -6.71 bp/trip, -35.70 USD | exit filled passively 0.32, timeout cross 0.68
+```
+
+How to read it.
+
+With a taker exit, the gate admits nothing. The half-spread earned on entry
+is paid back on exit, so the gate reduces to
+`|er| + rebate - taker fee - impact > adverse selection`, and a 1 bp score
+cannot clear 1.4 bp of measured adverse selection.
+
+The passive exit changes the gate. It expects to earn the second
+half-spread and rebate with the calibrated touch fill probability (0.35
+here), and on these wide synthetic spreads it then admits nearly every row.
+The outcome does not support that: only 32% of exits fill passively, 68%
+time out and cross, and adverse selection on the trips (+7.1 bp) is far
+above the calibrated +1.4 bp, because the trips that last are the ones the
+market ran over. Net is -6.7 bp per trip. That is better than the -11.4 bp
+of the ungated taker exit, but still a loss.
+
+The decomposition `gross = spread earned - adverse selection - exit slippage`
+holds for every row. With a passive exit, a fully passive exit shows
+negative slippage (the second half-spread earned) and a timeout pays it back.
+These are illustrations on a sparse synthetic stream (2,000 events in two
+hours), not results. To calibrate a real session, run
+`python -m iap.execution.calibration --events <day>.iap1 --tick 1=0.01 --out
+calib.json` and pass `load_calibration("calib.json")` to the simulator and
+the backtester.

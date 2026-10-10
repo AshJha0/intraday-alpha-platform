@@ -65,7 +65,7 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
 <div class="wrap">
   <h2>Measured, not claimed</h2>
   <div class="numbers">
-    Cross-language parity&nbsp;&nbsp;&nbsp; python 1988&nbsp; · cpp 302&nbsp; · rust 358&nbsp; · java 571 tests — 3,219 green, one command; golden groups 192/72/71/124<br>
+    Cross-language parity&nbsp;&nbsp;&nbsp; python 2114&nbsp; · cpp 302&nbsp; · rust 358&nbsp; · java 571 tests — 3,345 green, one command; golden groups 192/72/71/124<br>
     Golden suites&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; identical book states, byte-identical IAP1 SHA-256, features/alphas to 1e-9, byte-identical canonical JSON, trace digests, risk audit and lifecycle registry in all four languages<br>
     C++ hot path&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; IAP1 decode 184.1 ns/event (CRC-32 verified) · book update 26.4 ns · replay 27.2M events/s · 48-feature engine 514.1 ns/event · one decision trace 31.7 µs/trace off the event loop<br>
     Determinism&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; full dataset regeneration is byte-identical (sha256-verified); replays reproduce fills exactly; the MVP run twice and replayed from its capture reproduces its trace digest<br>
@@ -76,6 +76,8 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
     MVP golden run&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 15,805 events · 800 decisions · 235 parent orders · 169 fills · P&amp;L −81.53 USD (cost-negative, stated) · digest 20d4ff76…<br>
     Adaptive lifecycle&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; PSI/KS drift monitors · 88 drift-triggered refits in the study · CUSUM retirement rule · RETIRED halts allocation in the backtest, pages a human live<br>
     Verdicts (honest)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0 PROMOTE · 11 ITERATE · 13 REJECT — 3 alphas clear the multiple-testing threshold (t ≥ 4.365), 18 never forecast a move larger than their cost and make no trade, the 6 that trade lose; nothing survives costs, and we say so<br>
+    Real data&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 7 Nasdaq ITCH sessions (2019-01-30 … 2020-01-30; AAPL, MSFT, QQQ; 3,100,181 feature rows) · 0 PROMOTE / 8 ITERATE / 4 REJECT · strong ICs (EQ01 microprice 0.105, t 21) but not one trade survives costs: a 1 s edge of ~0.07 bp against a ~0.7 bp taker round trip<br>
+    Out-of-time holdout&nbsp;&nbsp;&nbsp;&nbsp; six hypotheses pre-registered and pushed before any 2026 feature existed · 4 of 4 confirmatory signals confirmed on 2026-05-15/18 (EQ01 t 7.7 · EQ02 t 8.0 · EQ10 t 8.1 · EQ05 t 9.5) · both controls behaved as registered · no trade at 1x costs<br>
     Power study&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; planted order flow detected at the PROMOTE threshold (t ≥ 4.365) in 2 of 20 runs on 2 sessions, 10 of 20 on 4 and 20 of 20 on 8 (EQ04, declared 5 s label) · planted lead-lag 0 of 20 at EQ10's declared 1 s label, 16 of 20 at a 5 s label on 8 sessions · null 0 of 20 throughout · nothing promoted at any size — 20 seeds per cell, Wilson 95 % intervals
   </div>
 
@@ -134,6 +136,33 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
     events, fills and P&amp;L are identical. Nothing was tuned to recover a v1.4.0 conclusion.
     Still 0 PROMOTE; details in the
     <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/CHANGELOG.md">changelog</a>.
+  </div>
+
+  <div class="honest">
+    <strong>v1.6.0–v1.8.0 (2026-10-04 … 10-10): real data, then an honest out-of-time test.</strong>
+    v1.6.0 ran the 24-alpha batch on seven real Nasdaq ITCH sessions: 0 PROMOTE / 8 ITERATE / 4 REJECT,
+    and no trade survived costs. v1.7.0 added the agent layer (a governed broker, pre-registration,
+    a reserve) and combined the equity signals: higher IC (up to t 25), still cost-negative.
+    v1.7.2 measured detection power on real-noise nulls (0 of 20 false flags). v1.8.0 cut a full-day
+    ingest from 260 min / 17.6 GB to 59 min / 7.75 GB with byte-identical output, and ran the first
+    out-of-time holdout: four signals pre-registered and git-timestamped before the 2026 data was
+    touched, all four confirmed. The signals are real; at a one-second horizon they are too small to
+    pay a taker's spread and fees. Those 2026 days are now spent.
+  </div>
+
+  <div class="honest">
+    <strong>v1.9.0 (2026-10-10): harden the evidence, then build the maker side.</strong>
+    Two of the seven in-sample days were FOMC days, QQQ was half the rows, and every t-statistic
+    ignored day-level clustering. A new opt-in <code>v3</code> method bundle samples days by seed
+    and stratum and reports with and without event days, clusters inference by day (and bootstraps
+    whole days), cuts folds at session starts, gates on the equal-weight per-instrument IC, labels
+    ITCH-only results honestly as one Nasdaq book, and bounds label freshness causally. The feature
+    build runs one day per process (<code>--workers N</code>, byte-identical, 5.1x on 5 synthetic days).
+    And because a taker cannot pay ~0.7 bp for a ~0.07 bp edge, the platform now has the maker side:
+    a simulator calibrated from the event stream, a backtest that posts at the touch, fills by queue
+    position, earns the rebate and is charged its measured markout, with an optional passive exit.
+    On synthetic data it still loses (−6.7 bp per trip with the passive exit, −11.4 bp crossing out);
+    the real-session maker run comes next. Every default and published number is unchanged.
   </div>
 
   <h2>Start here</h2>

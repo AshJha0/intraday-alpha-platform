@@ -6,6 +6,107 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
+## v1.9.0 — 2026-10-10
+
+Trustworthy evidence, then maker economics (IAP_Next_Releases_Plan v1.9:
+R1-R6, E1, M1-M4 plus a passive exit). Every new path is opt-in: no default,
+golden, published number or cross-language contract changes. Parity counts
+from CI: python 2114 / cpp 302 / rust 358 / java 571. Pull requests
+[#42](https://github.com/AshJha0/intraday-alpha-platform/pull/42) to
+[#45](https://github.com/AshJha0/intraday-alpha-platform/pull/45).
+
+Maker economics (plan items M1-M4). The research backtester only takes
+liquidity: at 1 s, an expected move of about 0.07 bp has to pay about 0.7 bp
+round trip. This release adds the maker side as opt-in Python research code.
+Every default path is unchanged: the synthetic simulator config, the taker
+backtest, the clipped alpha scores, every golden and every cross-language
+contract.
+
+**Added.**
+- M1, `iap.execution.calibration`: estimates a versioned calibration document
+  (`iap.exec_calibration` v1) from the normalized event stream. It covers
+  touch fill rates by queue-ahead bucket (open orders are right-censored),
+  touch queue-depletion hazards per side, feed latency quantiles (with
+  `parametric_latency` as an explicit tail for ITCH, which has no receive
+  stamp), maker adverse selection at 100 ms / 1 s / 10 s, and aggressor
+  impact (mean and slope in bps per % ADV). It also has a CLI
+  (`python -m iap.execution.calibration`). `ExecutionSimulator(config,
+  calibration=None)` draws rule-1 venue latency from the calibrated table
+  when one is given (still one SplitMix64 draw per submit or cancel), and
+  `apply_calibration` sets the impact coefficient.
+- M2, `iap.backtest.maker`: `MakerBacktester` posts at the touch on the
+  alpha's side, takes queue-position fills from the FIFO simulator, credits
+  the venue maker rebate and charges the measured markout. The gate is
+  `|er| + half_spread + rebate - exit_cost > adverse_selection + margin`,
+  with the adverse selection taken from the calibration. The exit is a taker
+  exit (the default), a mark to mid, or an opt-in passive exit. The passive
+  exit posts at the far touch, collects the rebate, is reposted up to
+  `exit_reprices` times after `exit_timeout_ns`, and then crosses whatever is
+  left. The result reports the passive-exit fill rate and the timeout-cross
+  rate. The accounting identity (spread earned, rebates, adverse selection
+  and exit slippage on both legs) is tested for every exit mode.
+- M3, `iap.labels.maker_labels` (a new module; `iap.labels.labels` is
+  unchanged): per decision and side, fill / taker flags, queue ahead,
+  markouts at 100 ms / 1 s / 10 s, and "filled and not run over".
+- M4: `MakerConfig` tail conditions (spread, |z|, |er|, queue imbalance,
+  calibrated far-touch depletion probability); `MakerFilter`, which wires the
+  meta-label GBM or any `iap.models.zoo` model into the maker backtest as an
+  `allow` mask; `LinearAlpha.score_uncapped(data, z_cap=None)`, which makes
+  the z clip optional for research. `score()` keeps the pinned clip.
+- Docs: COOKBOOK recipe 39 and API_TRADING.md §2.6. There are 26 new tests
+  (`python/tests/test_maker_economics.py`) on synthetic MBO data.
+
+**Research note.** On the golden synthetic vector, the gate admits no trade
+with a taker exit, because the half-spread earned on entry is paid back on
+exit. With a passive exit the gate admits nearly every row, but only 32% of
+exits fill passively and 68% time out and cross. Trip adverse selection is
++7.1 bp against a calibrated +1.4 bp, and the result is -6.7 bp per trip
+(against -11.4 bp for an ungated taker exit). Quote skew and inventory (M5,
+v1.10) are still needed. No real-data result is claimed in this entry.
+
+**Added: research-validity options (R1-R6), all opt-in.** Every default is
+the v2 rule, so no published number, golden or headline moves; the new
+`v3` method bundle turns the options on together
+(docs/RESEARCH_VALIDITY.md section 1a).
+
+- R1: `iap.validation.sessions`, with an FOMC / holiday-thin calendar
+  (2019-01-30 and 2019-10-30 are FOMC days, 2019-12-30 is holiday-thin),
+  seeded stratified day sampling recorded in `dataset.json` (`sampling`),
+  and a report block with the gate statistics computed without event days.
+- R2: day-clustered and day-block-bootstrap t-statistics; `day_aligned` and
+  `leave_one_day_out` fold layouts that cut at session starts.
+- R3: `gate_ic_source="instrument_mean"` gates on the equal-weight
+  per-instrument IC; the pooled IC is kept as `gate_ic_pooled`.
+- R4: `book_scope="single_venue"` turns crossed-book conditioning off for
+  ITCH-only data and labels results `nasdaq_bbo`. Under `v3` the experiment
+  runner reads it from `dataset.json`, so ingested datasets get it
+  automatically.
+- R5: `compute_labels(freshness="trailing")`, a causal label freshness bound
+  from a trailing median quote gap.
+  The feature build takes `--label-freshness trailing` (default `whole_day`,
+  so published stores are unchanged).
+- R6: `pooled_slope_hac_tstat(day_ns=...)` forms no lag product across a
+  day boundary; reports can pin `dataset_versions` (the experiment runner
+  passes the spec's); tests for HAC invariance to row duplication.
+
+**Changed.** Every report now carries `gate_ic_source`, `gate_ic_pooled`,
+`book_scope` and `price_reference` (additive keys; values under v2 are
+`pooled`, the gate IC, `consolidated` and `consolidated_mid`).
+
+**Added.** Parallel feature build (plan item E1): `python -m iap.features
+--workers N` replays one normalized file per process (default 1 = the serial
+path, unchanged; 0 = auto). The only cross-day state, the expanding
+per-instrument session profile behind the four `norm_*_m5_v1` features, is
+reconstructed in the parent: each worker records the per-row bucket and raw
+profile metrics, and the parent folds them into the carried profiles in
+trading-day order and rewrites those four values and their validity bits.
+Labels, statistics and Parquet writes stay serial, so the output is
+byte-identical to `--workers 1` (`test_feature_parallel.py`). N is clamped
+to the file count, the CPU count and `physical RAM / --worker-mem-gb`
+(default 5 GB). On a synthetic 5-day dataset (10 files, 12-core machine) the
+build went from 205 s to 101 s with 2 workers and 40 s with 5 (5.1x). On a
+16 GB machine use 2-3 workers for full real ITCH days (REAL_DATA.md).
+
 ## v1.8.0 — 2026-10-10
 
 The first out-of-time holdout (four pre-registered signals confirmed on 2026

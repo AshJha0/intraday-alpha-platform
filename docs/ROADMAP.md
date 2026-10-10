@@ -159,6 +159,36 @@ reported them: three alphas are significant after the multiple-testing
 correction, not six, and EQ11's IC of 0.0261 was a selection effect of the
 rows it dropped (0.0038 once they are scored).
 
+## 3.4 v1.6.0–v1.9.0 (2026-10-04 … 10-10): real data, the holdout, and the next three releases
+
+- **v1.6.0–v1.7.2:** the 24-alpha batch, signal combination and a power study
+  run on 7 real Nasdaq ITCH sessions. Strong ICs, 0 PROMOTE, no trade survives
+  costs ([REAL_DATA.md](REAL_DATA.md)). The agent layer and the
+  pre-registration gate shipped.
+- **v1.8.0:** 4 of 4 pre-registered signals confirmed on unseen 2026 days;
+  full-day ingest 4.4x faster in under half the memory. The 2026 days are spent.
+- **v1.9.0:** the evidence is hardened and the maker side is built.
+  - R1–R6 (opt-in `v3` bundle): seeded stratified day sampling with an
+    FOMC/holiday calendar, day-clustered and day-block-bootstrap t, day-aligned
+    and leave-one-day-out folds, an equal-weight per-instrument IC gate,
+    single-venue (Nasdaq-BBO) labelling, causal label freshness
+    (`--label-freshness trailing`) and validity tests
+    ([RESEARCH_VALIDITY.md](RESEARCH_VALIDITY.md) §1a).
+  - E1: `python -m iap.features --workers N`, byte-identical to serial.
+  - M1–M4: simulator calibration from the event stream, a maker-side backtest
+    (queue-position fills, rebates, measured markout) with an opt-in passive
+    exit, fill/markout labels and tail-only sizing. The taker backtest stays
+    the default. On synthetic data the maker path still loses; the real
+    7-session maker run follows the release.
+
+**Next (each its own release):**
+
+| Release | Theme | Items |
+|---|---|---|
+| v1.10 | New edge + strategy layer | A1 auction/NOII imbalance strategy; M5 signal-skewed quoting with inventory; X1–X3 Almgren–Chriss, alpha-aware urgency, volume curve; G1–G4 governance fixes |
+| v1.11 | Scale + AI | A2 QQQ vs constituents (more symbols); A3 futures lead-lag (needs data); E2–E3 Rust features via pyo3, fewer polyglot copies; AI1–AI4 LLM research agent through the broker, agent evals, model registry/drift |
+| later | Live readiness (optional) | P1–P4 real-time paper adapter, order state machine, reconciliation, capital ramp |
+
 ## 4. MVP success criteria
 
 The MVP's own table (docs/MVP.md §8) restated as the acceptance criteria of

@@ -43,7 +43,7 @@ flowchart TD
 ## 2. Cross-language golden-test topology
 
 How one validated Python reference pins four implementations. The parity table is
-printed by `tests/harness/run_all.sh` (python 1988 · cpp 302 · rust 358 · java 571
+printed by `tests/harness/run_all.sh` (python 2114 · cpp 302 · rust 358 · java 571
 tests; 192/72/71/124 in the golden groups — the Java gate runs all seventeen
 `*GoldenTest` classes, the Rust gate ten golden targets). Two goldens are
 owned by a port language and consumed by Python as well: the fills golden
@@ -1079,7 +1079,7 @@ flowchart TD
 | Governing institutional specification (verbatim) | [SPECIFICATION.md](SPECIFICATION.md) |
 | Teaching walkthrough of every subsystem | [../LEARN.md](../LEARN.md) |
 | How the quant, algo and AI sides work, top-down | [HOW_IT_WORKS.md](HOW_IT_WORKS.md) |
-| 38 runnable recipes | [../COOKBOOK.md](../COOKBOOK.md) |
+| 39 runnable recipes | [../COOKBOOK.md](../COOKBOOK.md) |
 | Data model, views, SQLite/PostgreSQL portability, query cookbook | [DATA_MODEL.md](DATA_MODEL.md) |
 | The 7-state promotion lifecycle: gates, evidence, registry, bootstrap result | [LIFECYCLE.md](LIFECYCLE.md) |
 | The decision trace: record, ids, canonical JSON, digest, sinks, replay | [DECISION_TRACE.md](DECISION_TRACE.md) |

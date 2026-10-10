@@ -109,7 +109,8 @@ PYTHONPATH=src python3 -m iap.features \
     --data-dir ../data/real/nasdaq_2019/normalized \
     --out-dir ../data/real/nasdaq_2019/features \
     --configs ../data/real/nasdaq_2019/configs \
-    --registry-out ../data/real/nasdaq_2019/reference/feature_registry.json
+    --registry-out ../data/real/nasdaq_2019/reference/feature_registry.json \
+    --workers 2
 
 # 4. one alpha as a contract-driven experiment on that dataset
 PYTHONPATH=src python3 -m iap.research run --alpha EQ03 \
@@ -117,6 +118,14 @@ PYTHONPATH=src python3 -m iap.research run --alpha EQ03 \
 PYTHONPATH=src python3 -m iap.research \
     --out-dir ../data/real/nasdaq_2019/research/experiments list
 ```
+
+`--workers N` (v1.9.0) builds the days in parallel, one process per
+normalized file, with output byte-identical to the serial build. Each worker
+holds a whole day's events and feature rows, which on a full ITCH day is
+several GB, so on a 16 GB machine keep N at 2-3 for real data (the CLI also
+caps N at `physical RAM / --worker-mem-gb`, default 5 GB). The synthetic
+5-day benchmark (10 files) went from 205 s serial to 101 s with 2 workers and
+40 s with 5 (5.1x).
 
 A smoke run first is cheap: add `--limit-messages 5000000` to step 1 and
 check the manifest. LOBSTER is the same with `--format lobster --input

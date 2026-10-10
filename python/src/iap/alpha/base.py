@@ -38,6 +38,7 @@ contradicts its rationale can at best be ITERATE, never PROMOTE.
 from __future__ import annotations
 
 import json
+import math
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -290,6 +291,25 @@ class LinearAlpha(AlphaModel):
         self._fitted = True
 
     def score(self, data: Mapping[int, pd.DataFrame]) -> dict[int, pd.DataFrame]:
+        return self._score(data, self.z_clip)
+
+    def score_uncapped(
+        self, data: Mapping[int, pd.DataFrame], z_cap: float | None = None
+    ) -> dict[int, pd.DataFrame]:
+        """Research-only scoring with the z clip made OPTIONAL (v1.9 M4).
+
+        :meth:`score` keeps the pinned ``z_clip`` (the port contract,
+        API_ALPHA section 2); this variant scores ``er = beta * z`` with ``z``
+        clipped at ``z_cap`` instead (``None`` = no clip), so a tail-only
+        maker rule can see how far into the tail a row is. Confidence is
+        computed from the same ``z``. The fitted parameters are unchanged
+        (``beta`` was fitted on the clipped z), and nothing in the ports or
+        the goldens uses this path."""
+        if z_cap is not None and not z_cap > 0:
+            raise ValueError("z_cap must be positive or None")
+        return self._score(data, math.inf if z_cap is None else float(z_cap))
+
+    def _score(self, data: Mapping[int, pd.DataFrame], z_cap: float) -> dict[int, pd.DataFrame]:
         if not self._fitted:
             raise RuntimeError(f"{self.alpha_id}: score() before fit()/load_params()")
         out: dict[int, pd.DataFrame] = {}
@@ -302,8 +322,8 @@ class LinearAlpha(AlphaModel):
             if not dead:
                 z[ok] = np.clip(
                     (x[ok] - self.mu) / (self.sigma + EPS),
-                    -self.z_clip,
-                    self.z_clip,
+                    -z_cap,
+                    z_cap,
                 )
             er = self.beta * z
             conf = np.minimum(1.0, np.abs(z) / self.conf_scale)
