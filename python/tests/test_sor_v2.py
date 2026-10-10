@@ -200,7 +200,7 @@ def test_tier_transitions_monthly_and_deterministic():
 
 def test_venue_model_config_loads_and_precedence():
     venues = load_venues(REPO / "configs" / "venues" / "venues.json")
-    cfg = load_venue_model_config(REPO / "configs" / "venues" / "venue_model.json")
+    cfg = load_venue_model_config(REPO / "research" / "execution" / "venue_model.json")
     ms = build_venue_models(venues, cfg)
     xv1 = next(m for m in ms.values() if m.spec.name == "XV1")
     assert xv1.p_fill_touch == 0.45 and len(xv1.tiers) == 3

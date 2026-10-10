@@ -15,7 +15,7 @@ that tag.
   (`CostAwareRouter`: argmin expected all-in cost for aggressive and passive
   routes, a multi-venue sweep with latency-staggered sends, passive
   allocation by fill probability and toxicity). New versioned config
-  `configs/venues/venue_model.json`; `venues.json` unchanged.
+  `research/execution/venue_model.json`; `venues.json` unchanged.
   `MakerBacktester(..., router=)` opts in. The pinned SOR, the fills golden
   and the C++/Java ports are unchanged. Real data here is Nasdaq only, so
   this is capability for multi-venue data (docs/REAL_DATA.md, API_TRADING.md

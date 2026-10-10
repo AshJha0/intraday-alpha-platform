@@ -613,8 +613,9 @@ adverse selection, bps, positive = adverse, keyed `"100ms"` / `"1s"`) from
 the config, overridden by `toxicity_from_markouts(fills, timeline)` (which
 runs `iap.tca.markout.markout_report` over MAKER fills and reads
 `-price_impact` per venue; cells below `min_fills` are omitted, never 0).
-Config: `configs/venues/venue_model.json` (`schema` `iap.venue_model`,
-`version` 1, keyed by venue name); `venues.json` is unchanged.
+Config: `research/execution/venue_model.json` (`schema` `iap.venue_model`,
+`version` 1, keyed by venue name; kept out of `configs/` so the deployment
+ConfigMaps do not carry research-only data); `venues.json` is unchanged.
 
 **Tiered fees.** `FeeTier(min_monthly_shares, taker_fee_per_share,
 maker_rebate_per_share)`; tiers start at 0 and strictly increase. `FeeLedger`

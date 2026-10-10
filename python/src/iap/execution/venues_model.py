@@ -27,7 +27,7 @@ same fill sequence always yields the same fees. Months roll over on the
 UTC month of the fill timestamp; the accumulator never decreases inside a
 month.
 
-Config: ``configs/venues/venue_model.json`` (``schema``
+Config: ``research/execution/venue_model.json`` (``schema``
 ``"iap.venue_model"``, ``version`` 1), keyed by venue NAME as in
 ``venues.json``; ``venues.json`` itself is unchanged.
 """

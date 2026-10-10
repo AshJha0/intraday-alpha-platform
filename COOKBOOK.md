@@ -3364,7 +3364,7 @@ displayed price and breaks ties on fees; the opt-in
 `iap.execution.sor_v2.CostAwareRouter` prices each venue with a model
 (`iap.execution.venues_model`: fill probability at the touch, maker
 toxicity, latency, volume-tiered fees from
-`configs/venues/venue_model.json`). Two synthetic equity venues, XV1 and
+`research/execution/venue_model.json`). Two synthetic equity venues, XV1 and
 XV2, quote one instrument. Save as `python/recipe56.py` and run
 `cd python && PYTHONUTF8=1 PYTHONPATH=src python recipe56.py`:
 
@@ -3377,7 +3377,7 @@ from iap.orderbook.book import ConsolidatedBook
 
 T0 = 1_700_000_000_000_000_000
 venues = {v: s for v, s in load_venues("../configs/venues/venues.json").items() if v in (1, 2)}
-models = build_venue_models(venues, load_venue_model_config("../configs/venues/venue_model.json"))
+models = build_venue_models(venues, load_venue_model_config("../research/execution/venue_model.json"))
 
 # two synthetic equity venues, one instrument: XV1 (id 1) and XV2 (id 2)
 book, seq = ConsolidatedBook(7), {1: 0, 2: 0}
