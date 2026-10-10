@@ -11,7 +11,7 @@ attrs==26.1.0
 cffi==2.1.1
 cloudpickle==3.1.2
 coverage==7.16.2
-cryptography==50.0.1
+cryptography==50.0.2
 execnet==2.1.2
 iniconfig==2.3.0
 joblib==1.6.0

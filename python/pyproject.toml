@@ -15,7 +15,7 @@ dependencies = [
   "pyarrow>=25,<26",
   "jsonschema>=4.26,<5",
   "referencing>=0.37,<1",
-  "cryptography>=46,<51",
+  "cryptography>=50.0.2,<51",
 ]
 
 [project.optional-dependencies]
