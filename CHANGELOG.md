@@ -60,6 +60,59 @@ cross-language contract are unchanged.
   `tests/test_auction.py`; COOKBOOK recipe 42 and REAL_DATA §3.3 cover usage.
   No real-data run yet.
 
+### Governance (IAP_Next_Releases_Plan G1-G4)
+
+- **G1 — pre-registrations cost a look and commit to code.**
+  `WriteBroker.preregister` debits one look on the multiple-testing ledger
+  (`kind="prereg"`, default `research/experiments.json`, `--ledger` /
+  `--dataset-version` for a dataset ledger) and stores the alpha's code
+  fingerprint (`iap.agents.fingerprint`, scheme 2: sha256 over the alpha's
+  defining modules and, transitively, every `iap.*` module they import
+  (AST walk, LF-normalised, so module-level helpers are covered and the hash
+  is identical on Windows/Linux and across Python minor versions); the
+  declared features closed over `depends_on` with their registry entries and
+  family-module closure; and the numpy/pandas/scipy versions) in a
+  `format: 2` body. What is and is not covered is listed in
+  `docs/governance/GOVERNANCE.md` §2a. The research gate
+  (`prereg_gate.require`) refuses a run when the code hash, feature hash or
+  pinned dependency versions changed since registration; `preregister(..., supersede=True)` re-registers
+  changed code as a new look. New CLI: `python -m iap.agents.cli prereg`.
+  **Not retroactive**: the six 2026 holdout preregs (and any v1.9-format
+  prereg) carry no fingerprint, were never debited and are not debited now,
+  so the committed ledger numbers (5,156 looks over 216 configurations) and
+  every research report are unchanged.
+- **G2 — reserve attempt cap keyed on (alpha, horizon, code hash)**
+  instead of the whole candidate dict; unknown candidate fields are refused
+  and a code change since the prereg is refused.
+- **G3 — external anchoring.** `iap.agents.anchor` + `cli anchor` /
+  `cli verify-board`: every committed version of the blackboard must be a
+  prefix of the current one (catches re-chaining), and
+  `research/agents/anchors.json` records the first commit that contains each
+  entry (the six 2026 preregs: `6723fd0`).
+- **G4 — authenticated agent identity (Ed25519).** `WriteBroker(pubkeys=...)`
+  requires every agent write to carry an Ed25519-signed request (agent, op,
+  argument digest, single-use nonce; `iap.agents.signing`, `broker.sign`);
+  forged, moved and replayed requests are refused and the signed request is
+  stored on the entry (`auth`, `scheme: "ed25519"`) for offline
+  re-verification (`Blackboard.verify_signatures`, `cli verify-board`). The
+  broker and verifiers hold only public keys, from the committed registry
+  `research/agents/agent_pubkeys.json`, so they cannot forge; `cli
+  agent-keygen` writes the private key to a file outside the repository and
+  the public key into the registry. HMAC-SHA256 (the first draft of this
+  change) is legacy, verify-only: new HMAC requests are refused, stored ones
+  still verify with `verify-board --legacy-hmac-keyfile`. New dependency:
+  `cryptography>=46,<51` (pinned `cryptography==50.0.1`, `cffi==2.1.1`,
+  `pycparser==3.0` in `python/requirements-ci.txt`, which CI and the Docker
+  image use as constraints). `research run --no-prereg` results now carry the eligibility
+  reason "not pre-registered (--no-prereg)", so the registry and lifecycle
+  promotion gates refuse them.
+
+**On-disk compatibility.** The blackboard format is unchanged except for an
+optional `auth` field that is covered by the entry hash, so v1.9 code verifies
+v1.10 boards and v1.10 verifies v1.9 boards; no migration. A board written by
+v1.9 code (e.g. a concurrent pre-registration on another branch) is accepted
+as is; its preregs are treated as legacy (no fingerprint, no look debit).
+
 ## v1.9.0 — 2026-10-10
 
 Trustworthy evidence, then maker economics (IAP_Next_Releases_Plan v1.9:
