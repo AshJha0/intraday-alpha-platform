@@ -65,7 +65,7 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
 <div class="wrap">
   <h2>Measured, not claimed</h2>
   <div class="numbers">
-    Cross-language parity&nbsp;&nbsp;&nbsp; python 1988&nbsp; · cpp 302&nbsp; · rust 358&nbsp; · java 571 tests — 3,219 green, one command; golden groups 192/72/71/124<br>
+    Cross-language parity&nbsp;&nbsp;&nbsp; python 2114&nbsp; · cpp 302&nbsp; · rust 358&nbsp; · java 571 tests — 3,345 green, one command; golden groups 192/72/71/124<br>
     Golden suites&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; identical book states, byte-identical IAP1 SHA-256, features/alphas to 1e-9, byte-identical canonical JSON, trace digests, risk audit and lifecycle registry in all four languages<br>
     C++ hot path&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; IAP1 decode 184.1 ns/event (CRC-32 verified) · book update 26.4 ns · replay 27.2M events/s · 48-feature engine 514.1 ns/event · one decision trace 31.7 µs/trace off the event loop<br>
     Determinism&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; full dataset regeneration is byte-identical (sha256-verified); replays reproduce fills exactly; the MVP run twice and replayed from its capture reproduces its trace digest<br>
@@ -148,6 +148,21 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
     out-of-time holdout: four signals pre-registered and git-timestamped before the 2026 data was
     touched, all four confirmed. The signals are real; at a one-second horizon they are too small to
     pay a taker's spread and fees. Those 2026 days are now spent.
+  </div>
+
+  <div class="honest">
+    <strong>v1.9.0 (2026-10-10): harden the evidence, then build the maker side.</strong>
+    Two of the seven in-sample days were FOMC days, QQQ was half the rows, and every t-statistic
+    ignored day-level clustering. A new opt-in <code>v3</code> method bundle samples days by seed
+    and stratum and reports with and without event days, clusters inference by day (and bootstraps
+    whole days), cuts folds at session starts, gates on the equal-weight per-instrument IC, labels
+    ITCH-only results honestly as one Nasdaq book, and bounds label freshness causally. The feature
+    build runs one day per process (<code>--workers N</code>, byte-identical, 5.1x on 5 synthetic days).
+    And because a taker cannot pay ~0.7 bp for a ~0.07 bp edge, the platform now has the maker side:
+    a simulator calibrated from the event stream, a backtest that posts at the touch, fills by queue
+    position, earns the rebate and is charged its measured markout, with an optional passive exit.
+    On synthetic data it still loses (−6.7 bp per trip with the passive exit, −11.4 bp crossing out);
+    the real-session maker run comes next. Every default and published number is unchanged.
   </div>
 
   <h2>Start here</h2>

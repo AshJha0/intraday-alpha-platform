@@ -6,7 +6,14 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
-## v1.9.0 — unreleased
+## v1.9.0 — 2026-10-10
+
+Trustworthy evidence, then maker economics (IAP_Next_Releases_Plan v1.9:
+R1-R6, E1, M1-M4 plus a passive exit). Every new path is opt-in: no default,
+golden, published number or cross-language contract changes. Parity counts
+from CI: python 2114 / cpp 302 / rust 358 / java 571. Pull requests
+[#42](https://github.com/AshJha0/intraday-alpha-platform/pull/42) to
+[#45](https://github.com/AshJha0/intraday-alpha-platform/pull/45).
 
 Maker economics (plan items M1-M4). The research backtester only takes
 liquidity: at 1 s, an expected move of about 0.07 bp has to pay about 0.7 bp

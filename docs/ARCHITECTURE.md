@@ -283,7 +283,7 @@ and are matched by Java, Rust and C++ (the trace and canonical-JSON ports)
 and by Java and Rust (the lifecycle ports). The harness
 (`tests/harness/run_all.sh`, with `run_golden.sh` as the golden-only alias)
 runs every suite with the canonical commands and prints the parity table; a
-v1.5.0 CI run (2026-10-04) passes 1988/302/358/571 tests (192/72/71/124
+v1.9.0 CI run (2026-10-10) passes 2114/302/358/571 tests (192/72/71/124
 golden) across python/cpp/rust/java, plus the repo-level `integration` (35)
 and `replay` (6) rows — the same counts the README parity table records.
 
