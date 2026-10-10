@@ -50,6 +50,7 @@ Contents:
 39. [Calibrate the simulator and run a maker-side backtest (v1.9)](#39-calibrate-the-simulator-and-run-a-maker-side-backtest-v19)
 40. [Quote both sides with an alpha-skewed reservation price (v1.10)](#40-quote-both-sides-with-an-alpha-skewed-reservation-price-v110)
 41. [Optimal execution: Almgren-Chriss, alpha urgency and a forecast VWAP curve (v1.10)](#41-optimal-execution-almgren-chriss-alpha-urgency-and-a-forecast-vwap-curve-v110)
+42. [Extract the NOII auction stream and backtest the closing-cross strategy (v1.10)](#42-extract-the-noii-auction-stream-and-backtest-the-closing-cross-strategy-v110)
 
 Recipes 27–35 were added with v1.3.0. Every command block in them was run
 as printed, from a clean checkout of the release, before it was written
@@ -2379,3 +2380,51 @@ vwap = ParentOrder(algo=AlgoType.VWAP, qty=50_000, slices=13, instrument_id=1,
 
 With few days the estimated curve leans on the U-shape (`weight_empirical =
 days / (days + shrinkage)`); check that field before trusting a curve.
+
+## 42. Extract the NOII auction stream and backtest the closing-cross strategy (v1.10)
+
+Plan item A1. `iap.auction` reads ITCH `I` (NOII) and `Q` (cross) messages
+in a separate, opt-in pass (`Itch50Reader(noii=True)`), so the normalized
+dataset and its version are unchanged. It builds auction features and cross
+targets, then backtests and walk-forwards strategy `AUC01`: take the
+imbalance side at the touch 5 minutes before the close, exit in the cross.
+The example builds 6 synthetic sessions with the test encoder. The cross is
+planted to move with the imbalance, so this shows the plumbing working, not
+an edge:
+
+```bash
+cd python
+PYTHONUTF8=1 PYTHONPATH=src:tests python3 - <<'EOF'
+import tempfile
+from pathlib import Path
+from iap.auction import (AuctionStream, AuctionStrategyConfig, auction_features,
+                         auction_targets, backtest, extract_auction_stream, walk_forward)
+from test_auction import SYMBOLS, _days, _session
+
+tmp = Path(tempfile.mkdtemp())
+stream = AuctionStream.concat(
+    extract_auction_stream(_session(100 + i).write(tmp / f"{d}.itch"), SYMBOLS, d)
+    for i, d in enumerate(_days(6)))
+labels = auction_targets(auction_features(stream.noii, "C"), stream.crosses)
+cfg = AuctionStrategyConfig(decision_s=300, threshold=0.1, exit="cross")
+s = backtest(labels, cfg).summary()
+print(f"in sample: {s['n_trades']} trades, net {s['mean_net_bps']:+.2f} bp (cost {s['mean_cost_bps']:.2f})")
+wf = walk_forward(labels, cfg, n_folds=3)
+print("folds:", [(f["fold"], f["orientation"], f["threshold"], f["test_trades"]) for f in wf.folds])
+o = wf.summary()
+print(f"out of sample: {o['n_trades']} trades over {o['n_days']} days, net {o['mean_net_bps']:+.2f} bp")
+EOF
+```
+
+```
+in sample: 12 trades, net +6.98 bp (cost 1.60)
+folds: [(1, 1, 0.05, 2), (2, 1, 0.05, 2), (3, 1, 0.05, 2)]
+out of sample: 6 trades over 3 days, net +6.94 bp
+```
+
+Every fold learns to follow the imbalance (orientation `+1`), as planted.
+For real files, use the CLI: `python -m iap.auction extract`, then
+`backtest`. Pre-register `AUC01/<cross type>-<seconds>s` and push it before
+the run. `backtest` refuses to run without it unless you pass
+`--no-prereg`. [docs/REAL_DATA.md](docs/REAL_DATA.md) §3.3 has the exact
+commands.
