@@ -6,6 +6,22 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
+## v1.10.0 — unreleased
+
+**Added.**
+- M5, `iap.backtest.quoting`: `QuotingBacktester`, a signal-skewed two-sided
+  quoter (Avellaneda-Stoikov style). The alpha shifts the reservation price.
+  It enforces a hard inventory limit, refreshes quotes through the
+  simulator's latency path, floors the half-spread at the calibrated adverse
+  selection, and flattens at the end of the session. It reports P&L
+  decomposed into spread captured, markout, inventory, flatten cost, rebates
+  and fees (identity tested), fill rates, inventory path statistics and a
+  Sharpe ratio per day. Opt-in and Python only: `backtest/maker.py` and every
+  default path are unchanged. COOKBOOK recipe 40, API_TRADING.md §2.7. On the
+  golden vector the toy imbalance score does not beat the no-skew quoter
+  (+86.50 vs +120.20 USD). With a synthetic look-ahead signal, the skew cuts
+  markout losses (tested). No real-data result is claimed.
+
 ## v1.9.0 — 2026-10-10
 
 Trustworthy evidence, then maker economics (IAP_Next_Releases_Plan v1.9:

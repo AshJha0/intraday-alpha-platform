@@ -524,6 +524,37 @@ is unchanged.
 Research-only scoring with the pinned `z_clip = 4` replaced by `z_cap`
 (`None` means no cap). `score()` and the port contract keep the clip.
 
+### 2.7 Signal-skewed two-sided quoting (v1.10.0, Python only)
+
+`QuotingBacktester(exec_config, QuotingConfig(...), calibration=None)` in
+`iap.backtest.quoting` is opt-in research code; no golden or port contract
+changes. `.run_instrument(events, scores, instrument_id, *, venue_id=None)
+-> QuotingResult` and `.run_days({day: (events, scores)}, instrument_id) ->
+DataFrame` (one flattened session per day); `sharpe_per_day(daily_net)`.
+The module docstring pins the rules:
+
+- each score row (`exchange_ts`, `expected_return`) requotes both sides
+  around `r = mid + alpha_weight * er * mid - gamma * sigma2 * (q / qty) *
+  tau_s`, with half-spread `max(0.5 gamma sigma2 tau + ln(1 + gamma/k) /
+  gamma, min_half_spread_ticks * tick, adverse_selection - rebate)`. The
+  adverse selection comes from the calibration at `as_horizon` (via
+  `MakerBacktester.adverse_selection`), else `adverse_selection_bps`, else 0.
+  `sigma2` is an EWMA of the mid variance rate, or `sigma**2` when it is
+  fixed. Prices snap outward to ticks and never cross the touch.
+- hard limit: quote size is capped so `q + working bids <= max_inventory`
+  (and the mirror for asks), counting orders whose cancel is in flight.
+- changed quotes are cancelled and resubmitted through the latency path
+  (the calibrated latency table when given); fills before the cancel lands
+  count.
+- flatten at `flatten_ts` (default end of stream): sweep working orders,
+  cross the inventory at the touch with taker fee and linear impact.
+- `QuotingResult.pnl`: `gross = spread_captured + markout + inventory_pnl +
+  flatten_cost` (tested), `net = gross + rebates - taker_fees - impact`.
+  `summary()` adds per-side fill rates (filled / posted qty), maker share,
+  `max_abs_inventory`, time-weighted `mean_abs_inventory`, `time_at_limit`
+  and the counters (`requotes`, `cancels`, `*_blocked_by_limit`, ...).
+  `alpha_weight=0` is the no-skew (gamma only) baseline.
+
 ## 3. Where the rules live
 
 | rule set | normative text | Python port entry |

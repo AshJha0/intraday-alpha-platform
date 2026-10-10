@@ -48,6 +48,7 @@ Contents:
 37. [Work a parent order passively and read its markouts](#37-work-a-parent-order-passively-and-read-its-markouts)
 38. [Combine alphas out of sample and count the independent bets](#38-combine-alphas-out-of-sample-and-count-the-independent-bets)
 39. [Calibrate the simulator and run a maker-side backtest (v1.9)](#39-calibrate-the-simulator-and-run-a-maker-side-backtest-v19)
+40. [Quote both sides with an alpha-skewed reservation price (v1.10)](#40-quote-both-sides-with-an-alpha-skewed-reservation-price-v110)
 
 Recipes 27–35 were added with v1.3.0. Every command block in them was run
 as printed, from a clean checkout of the release, before it was written
@@ -2275,3 +2276,74 @@ hours), not results. To calibrate a real session, run
 `python -m iap.execution.calibration --events <day>.iap1 --tick 1=0.01 --out
 calib.json` and pass `load_calibration("calib.json")` to the simulator and
 the backtester.
+
+## 40. Quote both sides with an alpha-skewed reservation price (v1.10)
+
+`iap.backtest.quoting.QuotingBacktester` (API_TRADING.md §2.7) keeps a bid
+and an ask resting through the FIFO simulator. Quotes sit around an
+Avellaneda-Stoikov reservation price that the alpha shifts
+(`r = mid + alpha_weight * er * mid - gamma * sigma^2 * q * tau`), with a
+hard inventory limit, refresh through the latency path, a calibrated
+adverse-selection floor on the half-spread and an end-of-session flatten.
+It compares the alpha-skewed quoter with the no-skew (gamma only) baseline
+on the golden equity vector and the toy L1-imbalance score of recipe 39:
+
+```bash
+PYTHONPATH=python/src python3 - <<'EOF'
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+from iap.backtest.quoting import QuotingBacktester, QuotingConfig
+from iap.core.codec import read_jsonl
+from iap.execution import ExecConfig, InstrumentSpec, load_venues
+from iap.execution.calibration import ExecCalibration, estimate_calibration
+from iap.tca.markout import build_gated_timeline
+
+events = read_jsonl(Path("tests/golden/events_eq_mbo.jsonl"))
+cal = ExecCalibration.from_dict(estimate_calibration(events, {1: 0.01}))
+tl = build_gated_timeline(events, 1, 0.01)
+SEC = 10**9
+ts = np.arange(tl.ts[0] + SEC, tl.ts[-1], 2 * SEC, dtype=np.int64)
+idx = [tl.prevailing(int(t)) for t in ts]
+imb = np.array([(tl.bid_sz[i] - tl.ask_sz[i]) / (tl.bid_sz[i] + tl.ask_sz[i]) for i in idx])
+scores = pd.DataFrame({"exchange_ts": ts, "expected_return": 1e-4 * imb})
+cfg = ExecConfig(seed=20260829, venues=load_venues("configs/venues/venues.json"),
+                 instruments={1: InstrumentSpec(1, 0.01, 1.0, 38_000_000.0)})
+for name, w in (("skewed", 1.0), ("no-skew", 0.0)):
+    qc = QuotingConfig(qty=100, max_inventory=300, gamma=0.1, tau_s=10.0, alpha_weight=w)
+    s = QuotingBacktester(cfg, qc, cal).run_instrument(events, scores, 1).summary()
+    print(f"{name:<8} fills {s['n_quote_fills']:>3} (bid {s['bid_fill_rate']:.2f} ask {s['ask_fill_rate']:.2f})"
+          f" max|q| {s['max_abs_inventory']} mean|q| {s['mean_abs_inventory']:.0f}"
+          f" AS floor {s['as_bps_floor']:+.2f} bp ({s['as_source']})")
+    print(f"         spread {s['spread_captured']:+.2f} markout {s['markout']:+.2f}"
+          f" inventory {s['inventory_pnl']:+.2f} flatten {s['flatten_cost']:+.2f}"
+          f" rebates {s['rebates']:+.2f} fees {-s['taker_fees'] - s['impact']:+.2f}"
+          f" = net {s['net']:+.2f} USD")
+EOF
+```
+
+```
+skewed   fills  97 (bid 0.17 ask 0.19) max|q| 300 mean|q| 151 AS floor +0.80 bp (calibration:1s)
+         spread +205.50 markout -49.00 inventory -82.50 flatten -6.00 rebates +19.40 fees -0.90 = net +86.50 USD
+no-skew  fills 104 (bid 0.19 ask 0.19) max|q| 300 mean|q| 142 AS floor +0.80 bp (calibration:1s)
+         spread +218.50 markout -45.50 inventory -69.00 flatten -4.00 rebates +20.80 fees -0.60 = net +120.20 USD
+```
+
+How to read it. The five P&L terms add up to the gross exactly
+(`spread + markout + inventory + flatten`; the identity is tested), and the
+net adds rebates and subtracts taker fees and impact. On this vector the toy
+imbalance score does not help: skewing moves the quotes, captures less
+spread and does not reduce adverse selection, so the no-skew quoter nets
+more. The tests show the opposite with an informative (look-ahead,
+synthetic) signal: the skew cuts markout losses. Whether a real alpha does
+that is an open question, and this recipe does not answer it. Both quoters
+hit the 300-share limit; it is never exceeded.
+
+To run a real session (not run for v1.10; the machine was busy):
+
+```bash
+python -m iap.execution.calibration --events <day>.iap1 --tick 1=0.01 --out calib.json
+# then, in Python: QuotingBacktester(cfg, QuotingConfig(...), load_calibration("calib.json"))
+#   .run_days({day: (events, scores)}, 1) for each day, and sharpe_per_day(table["net"])
+```
