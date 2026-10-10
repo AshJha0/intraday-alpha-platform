@@ -222,6 +222,8 @@ class Study:
         from iap.execution.config import load_exec_config
 
         self.args = args
+        self.sessions = tuple(getattr(args, "session_list", None) or SESSIONS)
+        self.symbols = dict(getattr(args, "symbol_map", None) or SYMBOLS)
         self.data = Path(args.data_root)
         self.features_dir = self.data / "multi7" / "features"
         self.out = Path(args.out)
@@ -241,7 +243,7 @@ class Study:
         if not self.args.slice:
             return None, None
         a, b = self.args.slice.split("-")
-        date = SESSIONS[day].split("_")[1]
+        date = self.sessions[day].split("_")[1]
         tz = "America/New_York"
         start = pd.Timestamp(f"{date} {a}", tz=tz).value
         end = pd.Timestamp(f"{date} {b}", tz=tz).value
@@ -254,16 +256,16 @@ class Study:
             write_calibration,
         )
 
-        path = self.out / "calib" / f"{unit_name(SESSIONS[day], symbol)}.json"
+        path = self.out / "calib" / f"{unit_name(self.sessions[day], symbol)}.json"
         if path.is_file():
             return json.loads(path.read_text(encoding="utf-8"))
-        iid = SYMBOLS[symbol]
+        iid = self.symbols[symbol]
         tick = self.exec_config.instrument(iid).tick_size
         lat = self.prereg["latency_ASSUMED"]
         doc = estimate_calibration(
             events,
             {iid: tick},
-            source={"dataset": SESSIONS[day], "symbol": symbol, "slice": self.args.slice},
+            source={"dataset": self.sessions[day], "symbol": symbol, "slice": self.args.slice},
         )
         doc["latency"] = {
             str(lat["venue_id"]): parametric_latency(
@@ -277,14 +279,14 @@ class Study:
     def prev_calibration(self, day: int, symbol: str):
         from iap.execution.calibration import load_calibration
 
-        path = self.out / "calib" / f"{unit_name(SESSIONS[day - 1], symbol)}.json"
+        path = self.out / "calib" / f"{unit_name(self.sessions[day - 1], symbol)}.json"
         return load_calibration(path) if path.is_file() else None
 
     def labels(self, day: int, symbol: str, events: list, cal_doc: dict, feats: pd.DataFrame):
         from iap.execution.calibration import ExecCalibration
         from iap.labels.maker_labels import maker_labels
 
-        path = self.out / "labels" / f"{unit_name(SESSIONS[day], symbol)}.parquet"
+        path = self.out / "labels" / f"{unit_name(self.sessions[day], symbol)}.parquet"
         if path.is_file():
             return
         if feats.empty:
@@ -295,7 +297,7 @@ class Study:
         lab = maker_labels(
             events,
             grid["exchange_ts"].to_numpy(dtype=np.int64),
-            instrument_id=SYMBOLS[symbol],
+            instrument_id=self.symbols[symbol],
             exec_config=self.exec_config,
             ttl_ns=SEC,
             qty=100,
@@ -316,7 +318,7 @@ class Study:
         model.horizon = horizon
         need = [*model.features, f"label_mid_{horizon}", f"label_valid_{horizon}", *STATE_COLS]
         train: dict[int, pd.DataFrame] = {}
-        for iid in model.universe(sorted(SYMBOLS.values())):
+        for iid in model.universe(sorted(self.symbols.values())):
             frames = [load_feature_day(self.features_dir, iid, d, need) for d in range(day)]
             train[iid] = pd.concat(frames, ignore_index=True)
         model.fit(train)
@@ -336,10 +338,10 @@ class Study:
 
         xs, ys = [], []
         for d in range(day):
-            for sym, iid in SYMBOLS.items():
+            for sym, iid in self.symbols.items():
                 if iid not in model.universe([iid]):
                     continue
-                p = self.out / "labels" / f"{unit_name(SESSIONS[d], sym)}.parquet"
+                p = self.out / "labels" / f"{unit_name(self.sessions[d], sym)}.parquet"
                 if not p.is_file():
                     continue
                 lab = pd.read_parquet(p)
@@ -366,104 +368,168 @@ class Study:
             cols.append(df[c].to_numpy(dtype=float) if c in df else np.full(len(df), np.nan))
         return np.column_stack(cols)
 
-    def backtests(self, day: int, symbol: str, events: list, feats: pd.DataFrame) -> dict:
+    def unit_features(self, day: int, symbol: str) -> pd.DataFrame:
+        from iap.alpha import build
+
+        need = list(FILTER_FEATURES) + list(STATE_COLS)
+        for c in self.prereg["cells"]:
+            need += list(build(c["alpha"]).features)
+        feats = load_feature_day(self.features_dir, self.symbols[symbol], day, need)
+        _, end = self._window(day)
+        if end is not None:
+            feats = feats[feats["exchange_ts"] <= end].reset_index(drop=True)
+        return feats
+
+    def unit_events(self, day: int, symbol: str) -> list:
+        _, end = self._window(day)
+        return load_events(self.data / self.sessions[day], self.symbols[symbol], end)
+
+    def unit_cells(self, symbol: str) -> list[dict]:
+        """The pre-registered cells whose alpha trades ``symbol``."""
+        from iap.alpha import build
+
+        iid = self.symbols[symbol]
+        return [c for c in self.prereg["cells"] if iid in build(c["alpha"]).universe([iid])]
+
+    def alpha_path(self, day: int, symbol: str, alpha_id: str) -> Path:
+        name = f"{unit_name(self.sessions[day], symbol)}_{alpha_id}.json"
+        return self.out / "alpha_units" / name
+
+    def run_alpha(
+        self, day: int, symbol: str, cell: Mapping[str, Any], events: list, feats: pd.DataFrame
+    ) -> dict[str, Any]:
+        """Every exit and variant of one alpha on one unit (deterministic)."""
         from iap.backtest.maker import MakerBacktester, MakerConfig
 
-        iid = SYMBOLS[symbol]
+        iid = self.symbols[symbol]
         cal = self.prev_calibration(day, symbol)
         start, _ = self._window(day)
-        out: dict[str, Any] = {}
-        for cell in self.prereg["cells"]:
-            aid, hz = cell["alpha"], cell["horizon"]
-            model = self.alpha(aid, hz, day)
-            if iid not in model.universe([iid]):
-                continue
-            t0 = time.time()
-            sc = model.score_uncapped({iid: feats}, z_cap=None)[iid]
-            sc["z"] = self.z_of(model, feats, iid)
-            mask = np.ones(len(sc), dtype=bool)
-            if start is not None:
-                mask = sc["exchange_ts"].to_numpy() >= start
-            sc = sc[mask].reset_index(drop=True)
-            fx = feats[mask].reset_index(drop=True)
-            filt, filt_note = self.maker_filter(model, day)
-            allow_f = filt.allow(self.filter_X(fx, sc["z"].to_numpy())) if filt else None
-            h_ns = HORIZON_NS[hz]
-            cell_out: dict[str, Any] = {
-                "alpha_fit": {
-                    "mu": model.mu,
-                    "sigma": model.sigma,
-                    "beta": model.beta,
-                    "n_train": model.n_train,
-                    "dead": model.is_dead,
-                },
-                "n_scores": len(sc),
-                "filter": filt_note,
-                "filter_allow_share": None if allow_f is None else float(allow_f.mean()),
-            }
-            for exit_mode in self.prereg["exit_modes"]:
-                base: dict[str, Any] = dict(
-                    qty=100, ttl_ns=h_ns, horizon_ns=h_ns, as_horizon=cell["as_horizon"]
+        aid, hz = cell["alpha"], cell["horizon"]
+        model = self.alpha(aid, hz, day)
+        t0 = time.time()
+        sc = model.score_uncapped({iid: feats}, z_cap=None)[iid]
+        sc["z"] = self.z_of(model, feats, iid)
+        mask = np.ones(len(sc), dtype=bool)
+        if start is not None:
+            mask = sc["exchange_ts"].to_numpy() >= start
+        sc = sc[mask].reset_index(drop=True)
+        fx = feats[mask].reset_index(drop=True)
+        filt, filt_note = self.maker_filter(model, day)
+        allow_f = filt.allow(self.filter_X(fx, sc["z"].to_numpy())) if filt else None
+        h_ns = HORIZON_NS[hz]
+        cell_out: dict[str, Any] = {
+            "alpha_fit": {
+                "mu": model.mu,
+                "sigma": model.sigma,
+                "beta": model.beta,
+                "n_train": model.n_train,
+                "dead": model.is_dead,
+            },
+            "n_scores": len(sc),
+            "filter": filt_note,
+            "filter_allow_share": None if allow_f is None else float(allow_f.mean()),
+        }
+        for exit_mode in self.prereg["exit_modes"]:
+            base: dict[str, Any] = dict(
+                qty=100, ttl_ns=h_ns, horizon_ns=h_ns, as_horizon=cell["as_horizon"]
+            )
+            if exit_mode == "passive":
+                base.update(exit="passive", exit_timeout_ns=h_ns, exit_reprices=1)
+            for variant in VARIANTS:
+                if variant == "gated_filter" and allow_f is None:
+                    cell_out[f"{exit_mode}/{variant}"] = {"skipped": filt_note}
+                    continue
+                mc = MakerConfig(**base, margin_bps=-1e9 if variant == "ungated" else 0.0)
+                res = MakerBacktester(self.exec_config, mc, cal).run_instrument(
+                    events,
+                    sc,
+                    iid,
+                    allow=allow_f if variant == "gated_filter" else None,
                 )
-                if exit_mode == "passive":
-                    base.update(exit="passive", exit_timeout_ns=h_ns, exit_reprices=1)
-                for variant in VARIANTS:
-                    if variant == "gated_filter" and allow_f is None:
-                        cell_out[f"{exit_mode}/{variant}"] = {"skipped": filt_note}
-                        continue
-                    mc = MakerConfig(**base, margin_bps=-1e9 if variant == "ungated" else 0.0)
-                    res = MakerBacktester(self.exec_config, mc, cal).run_instrument(
-                        events,
-                        sc,
-                        iid,
-                        allow=allow_f if variant == "gated_filter" else None,
-                    )
-                    s = res.summary()
-                    t = res.trips
-                    s["sum_net_bps"] = float(t["net_bps"].sum()) if len(t) else 0.0
-                    s["sumsq_net_bps"] = float((t["net_bps"] ** 2).sum()) if len(t) else 0.0
-                    cell_out[f"{exit_mode}/{variant}"] = s
-            cell_out["seconds"] = round(time.time() - t0, 1)
-            out[aid] = cell_out
-            log(f"  {SESSIONS[day]} {symbol} {aid}: {cell_out['seconds']}s")
-        return out
+                s = res.summary()
+                t = res.trips
+                s["sum_net_bps"] = float(t["net_bps"].sum()) if len(t) else 0.0
+                s["sumsq_net_bps"] = float((t["net_bps"] ** 2).sum()) if len(t) else 0.0
+                cell_out[f"{exit_mode}/{variant}"] = s
+        cell_out["seconds"] = round(time.time() - t0, 1)
+        return cell_out
+
+    def write_alpha(self, day: int, symbol: str, alpha_id: str, cell_out: Mapping) -> Path:
+        from iap.experiment.locking import atomic_write_text
+
+        path = self.alpha_path(day, symbol, alpha_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        atomic_write_text(
+            path, json.dumps(cell_out, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        return path
+
+    def plan_workers(self, n_alphas: int, n_events: int) -> tuple[int, float, float | None]:
+        """(workers, per-worker GB estimate, available GB) for one unit."""
+        per = max(float(self.args.worker_mem_gb), 0.6 + n_events * 7e-7)
+        avail = available_ram_gb()
+        w = min(int(self.args.workers or 4), n_alphas)
+        if avail is not None:
+            w = min(w, max(1, int((avail - 1.0) // per)))
+        return max(1, w), per, avail
 
     # -- loop ------------------------------------------------------------
 
     def run_unit(self, day: int, symbol: str) -> None:
-        path = self.out / "units" / f"{unit_name(SESSIONS[day], symbol)}.json"
+        path = self.out / "units" / f"{unit_name(self.sessions[day], symbol)}.json"
         if path.is_file():
             log(f"skip {path.name} (done)")
             return
         t0 = time.time()
-        iid = SYMBOLS[symbol]
-        _, end = self._window(day)
-        events = load_events(self.data / SESSIONS[day], iid, end)
+        iid = self.symbols[symbol]
+        events = self.unit_events(day, symbol)
+        n_events = len(events)
         t_load = time.time() - t0
-        log(f"unit {SESSIONS[day]} {symbol}: {len(events)} events loaded in {t_load:.0f}s")
+        log(f"unit {self.sessions[day]} {symbol}: {n_events} events loaded in {t_load:.0f}s")
         cal_doc = self.calibration(day, symbol, events)
-        need = list(FILTER_FEATURES) + list(STATE_COLS)
-        for c in self.prereg["cells"]:
-            from iap.alpha import build
-
-            need += list(build(c["alpha"]).features)
-        feats = load_feature_day(self.features_dir, iid, day, need)
-        if end is not None:
-            feats = feats[feats["exchange_ts"] <= end].reset_index(drop=True)
+        feats = self.unit_features(day, symbol)
         t_cal = time.time() - t0
         self.labels(day, symbol, events, cal_doc, feats)
         t_lab = time.time() - t0
-        results = self.backtests(day, symbol, events, feats) if day > 0 else {}
+        results: dict[str, Any] = {}
+        workers = None
+        if day > 0:
+            cells = self.unit_cells(symbol)
+            todo = [c for c in cells if not self.alpha_path(day, symbol, c["alpha"]).is_file()]
+            for c in cells:
+                if c not in todo:
+                    log(f"  {self.sessions[day]} {symbol} {c['alpha']}: checkpoint found")
+            if todo:
+                workers, per, avail = self.plan_workers(len(todo), n_events)
+                shown = None if avail is None else round(avail, 2)
+                log(
+                    f"  {len(todo)} alphas to run, workers={workers} "
+                    f"(per-worker est {per:.2f} GB, available {shown} GB)"
+                )
+                if workers <= 1:
+                    for c in todo:
+                        out = self.run_alpha(day, symbol, c, events, feats)
+                        out["peak_rss_gb"] = peak_rss_gb()
+                        self.write_alpha(day, symbol, c["alpha"], out)
+                        log(f"  {self.sessions[day]} {symbol} {c['alpha']}: {out['seconds']}s")
+                else:
+                    events = []  # free the parent's copy; each worker loads its own
+                    gc.collect()
+                    self._pool(day, symbol, todo, workers)
+            for c in cells:
+                results[c["alpha"]] = json.loads(
+                    self.alpha_path(day, symbol, c["alpha"]).read_text(encoding="utf-8")
+                )
         t_all = time.time() - t0
         fr = cal_doc.get("fill_rates", {}).get("all", {})
         doc = {
-            "session": SESSIONS[day],
+            "session": self.sessions[day],
             "day_index": day,
             "symbol": symbol,
             "instrument_id": iid,
             "warmup_only": day == 0,
             "slice": self.args.slice,
-            "n_events": len(events),
+            "n_events": n_events,
             "prereg_sha256": self.prereg_sha,
             "calibration_same_day": {
                 "p_any_fill": fr.get("p_any_fill"),
@@ -474,6 +540,7 @@ class Study:
                 "latency": "ASSUMED parametric",
             },
             "results": results,
+            "workers": workers,
             "timing_s": {
                 "load": round(t_load, 1),
                 "calibration": round(t_cal - t_load, 1),
@@ -490,9 +557,25 @@ class Study:
         del events, feats
         gc.collect()
 
+    def _pool(self, day: int, symbol: str, todo: list[dict], workers: int) -> None:
+        import multiprocessing as mp
+        from concurrent.futures import ProcessPoolExecutor, as_completed
+
+        spec = worker_spec(self.args)
+        ctx = mp.get_context("spawn")
+        with ProcessPoolExecutor(max_workers=workers, mp_context=ctx) as ex:
+            futs = {ex.submit(alpha_worker, spec, day, symbol, c["alpha"]): c for c in todo}
+            for f in as_completed(futs):
+                out = f.result()
+                log(
+                    f"  {self.sessions[day]} {symbol} {futs[f]['alpha']}: {out['seconds']}s, "
+                    f"worker peak {out.get('peak_rss_gb') or 0:.2f} GB"
+                )
+
     def run(self) -> None:
-        days = [SESSIONS.index(s) for s in self.args.sessions] if self.args.sessions else range(7)
-        syms = self.args.symbols or list(SYMBOLS)
+        names = self.args.sessions or list(self.sessions)
+        days = [self.sessions.index(s) for s in names]
+        syms = self.args.symbols or list(self.symbols)
         for d in days:
             for s in syms:
                 self.run_unit(d, s)
@@ -501,6 +584,58 @@ class Study:
             json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
         log(f"summary -> {self.out / 'summary.json'}")
+
+
+# ------------------------------------------------------------------ workers
+
+
+def worker_spec(args: argparse.Namespace) -> dict[str, Any]:
+    """A picklable copy of the CLI namespace for a spawned worker."""
+    return dict(vars(args))
+
+
+def alpha_worker(spec: Mapping[str, Any], day: int, symbol: str, alpha_id: str) -> dict:
+    """Process-pool entry point (importable by module name under spawn): one
+    alpha of one unit, from the unit's cached calibration and labels; writes
+    its (unit, alpha) checkpoint atomically and returns it."""
+    study = Study(argparse.Namespace(**spec))
+    cell = next(c for c in study.prereg["cells"] if c["alpha"] == alpha_id)
+    events = study.unit_events(day, symbol)
+    feats = study.unit_features(day, symbol)
+    out = study.run_alpha(day, symbol, cell, events, feats)
+    out["peak_rss_gb"] = peak_rss_gb()
+    study.write_alpha(day, symbol, alpha_id, out)
+    return out
+
+
+def available_ram_gb() -> float | None:
+    """Available physical memory (Windows GlobalMemoryStatusEx, else /proc)."""
+    try:
+        if sys.platform == "win32":
+
+            class MS(ctypes.Structure):
+                _fields_ = [
+                    ("dwLength", ctypes.c_ulong),
+                    ("dwMemoryLoad", ctypes.c_ulong),
+                    ("ullTotalPhys", ctypes.c_ulonglong),
+                    ("ullAvailPhys", ctypes.c_ulonglong),
+                    ("ullTotalPageFile", ctypes.c_ulonglong),
+                    ("ullAvailPageFile", ctypes.c_ulonglong),
+                    ("ullTotalVirtual", ctypes.c_ulonglong),
+                    ("ullAvailVirtual", ctypes.c_ulonglong),
+                    ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+                ]
+
+            ms = MS()
+            ms.dwLength = ctypes.sizeof(MS)
+            ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(ms))
+            return ms.ullAvailPhys / 2**30
+        for line in Path("/proc/meminfo").read_text().splitlines():
+            if line.startswith("MemAvailable:"):
+                return int(line.split()[1]) / 2**20
+    except Exception:  # pragma: no cover - diagnostics only
+        return None
+    return None
 
 
 # ------------------------------------------------------------------ summary
@@ -552,6 +687,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap.add_argument("--symbols", nargs="*", choices=list(SYMBOLS))
     ap.add_argument("--slice", help="smoke slice HH:MM-HH:MM New York time (events to its end)")
     ap.add_argument("--summary-only", action="store_true")
+    ap.add_argument("--workers", type=int, default=4, help="max alpha workers per unit")
+    ap.add_argument("--worker-mem-gb", type=float, default=2.5, help="per-worker RAM budget")
     args = ap.parse_args(list(argv) if argv is not None else None)
     prereg = json.loads(Path(args.prereg).read_text(encoding="utf-8"))
     entries = check_prereg(ROOT, prereg)
@@ -560,6 +697,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if sha not in e["body"]["hypothesis"]:
             raise SystemExit(f"prereg.json sha256 {sha} is not the registered one")
     log(f"prereg verified ({len(entries)} cells, sha256 {sha[:12]})")
+    log(f"resume (parallel): workers<={args.workers}, worker-mem-gb {args.worker_mem_gb}")
     if args.summary_only:
         s = summarise(Path(args.out) / "units", prereg)
         print(json.dumps(s, indent=2, sort_keys=True))
