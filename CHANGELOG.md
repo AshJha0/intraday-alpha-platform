@@ -6,7 +6,21 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
-## Unreleased
+## v1.8.0 — 2026-10-10
+
+The first out-of-time holdout (four pre-registered signals confirmed on 2026
+data), a full-day ingest 4.4x faster in less than half the memory, and the docs
+brought up to date.
+
+**Changed.** Ingest memory: the raw pass keeps 72-byte IAP1 records instead of
+a `MarketEvent` per row, and `normalize_file` packs the kept events the same
+way and does the timestamp-regression drop and the event-time sort with
+`np.lexsort` (stable, the same keys) plus a per-stream running maximum. Output
+bytes are unchanged (the pinned-hash tests pass, and a full-day rerun of
+2026-05-18 reproduced `dataset_version 780916b0…`). That day now ingests in
+59 min with a 7.75 GB peak, against 260 min and 17.6 GB committed on a 16 GB
+machine (REAL_DATA.md §10). A row outside the IAP1 domain falls back to
+decoding the raw file.
 
 **Research.** First out-of-time holdout (REAL_DATA.md §3.2): six hypotheses
 pre-registered and pushed before any 2026 feature existed, run on the full
