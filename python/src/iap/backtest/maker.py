@@ -93,6 +93,8 @@ from iap.core.events import MarketEvent
 from iap.execution.calibration import ExecCalibration, apply_calibration
 from iap.execution.config import ExecConfig
 from iap.execution.simulator import ExecutionSimulator
+from iap.execution.sor import NO_ROUTE
+from iap.execution.sor_v2 import CostAwareRouter
 from iap.execution.types import ChildOrder, Liquidity, OrderType
 
 EXIT_MODES = ("taker", "mid", "passive")
@@ -287,7 +289,11 @@ class MakerBacktester:
         exec_config: ExecConfig,
         config: MakerConfig | None = None,
         calibration: ExecCalibration | None = None,
+        router: CostAwareRouter | None = None,
     ) -> None:
+        #: opt-in v1.12 cost-aware router (iap.execution.sor_v2); None = the
+        #: single given/first venue, exactly as before
+        self.router = router
         self.calibration = calibration
         self.exec_config = apply_calibration(exec_config, calibration)
         self.config = config or MakerConfig()
@@ -318,6 +324,12 @@ class MakerBacktester:
             if venue_id is None:
                 raise ValueError(f"no event for instrument {instrument_id}")
         venue = self.exec_config.venue(venue_id)
+        router = self.router
+        route_cands = (
+            sorted({e.venue_id for e in events if e.instrument_id == instrument_id})
+            if router is not None
+            else None
+        )
         ts = scores["exchange_ts"].to_numpy(dtype=np.int64)
         if ts.size and np.any(np.diff(ts) < 0):
             raise ValueError("scores must be sorted by exchange_ts")
@@ -406,6 +418,7 @@ class MakerBacktester:
             return taker
 
         def decide(r: int) -> None:
+            nonlocal venue_id, venue
             c["decisions"] += 1
             if st["order"] is not None or st["pos"] != 0:
                 c["busy"] += 1
@@ -417,6 +430,20 @@ class MakerBacktester:
             if not math.isfinite(e) or e == 0.0 or not conf[r] >= cfg.conf_min:
                 c["gated_out"] += 1
                 return
+            if router is not None:
+                # opt-in: pick the entry venue by expected all-in passive cost;
+                # the exit then uses the same venue (it only switches while flat)
+                vid = router.route_passive(
+                    sim.instrument_book(instrument_id),
+                    0 if e > 0 else 1,
+                    int(ts[r]),
+                    tick,
+                    route_cands,
+                )
+                if vid == NO_ROUTE:
+                    c["gated_out"] += 1
+                    return
+                venue_id, venue = vid, self.exec_config.venue(vid)
             bs = book_state()
             if bs is None:
                 c["gated_out"] += 1
@@ -555,6 +582,8 @@ class MakerBacktester:
                     "forced": forced,
                 }
             )
+            if router is not None:
+                trips[-1]["venue_id"] = venue_id
             if forced:
                 c["forced_exits"] += 1
             if timeout:
@@ -678,6 +707,8 @@ class MakerBacktester:
             "net_bps",
             "forced",
         ]
+        if router is not None:
+            cols.append("venue_id")
         return MakerResult(
             instrument_id=instrument_id,
             trips=pd.DataFrame(trips, columns=cols),
