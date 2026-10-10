@@ -6,6 +6,29 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
+## v1.12.0 — unreleased
+
+- **Combinatorial purged CV and PBO** (plan item R7, statistics half;
+  opt-in): `iap.validation.cpcv` — `CombinatorialPurgedSplitter` (N
+  groups, day-aligned when there are >= N sessions, k test groups, purge
+  and embargo on both sides, all C(N, k) splits, reassembly into
+  C(N-1, k-1) backtest paths) and `probability_of_backtest_overfitting`
+  (CSCV over a T x M candidate performance matrix).
+- **Deflated Sharpe ratio** (opt-in): `iap.validation.deflated` — PSR,
+  minimum track record length, expected maximum Sharpe of N trials and
+  the DSR with skew/kurtosis-adjusted variance; N defaults to the ledger's
+  distinct configurations (`effective_trials`), with `dsr_at_looks` at the
+  raw look count beside it (RESEARCH_VALIDITY.md §1b). The
+  `study_deflated_sharpe` helper puts a DSR block beside a maker, quoting
+  or auction study's per-day P&L without touching its verdict rule.
+- **`v4` method bundle**: `v3` plus the report-only `cpcv` and
+  `deflated_sharpe` blocks of `validate_alpha` (`cpcv=True`,
+  `deflated_sharpe=True`, `deflated_sharpe_trials=`); 94 looks at four
+  folds. The research runner passes the DSR trial count from its ledger.
+  No gate reads either block; defaults, goldens and published numbers are
+  unchanged.
+- COOKBOOK recipe 56.
+
 ## v1.11.0 — 2026-10-10
 
 Scale and AI (IAP_Next_Releases_Plan v1.11: E2, E3, AI1-AI3; A2, A3 and AI4

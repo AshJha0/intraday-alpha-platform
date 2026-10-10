@@ -17,6 +17,10 @@ Modules:
 - ``methods``  — the research method bundles: ``"v2"``, the defaults since
   v1.5.0, ``"legacy_v1"``, the rules up to v1.4.0, and the opt-in ``"v3"``
   (v1.9 research-validity rules).
+- ``cpcv``     — combinatorial purged cross-validation and the probability
+  of backtest overfitting (v1.12, opt-in).
+- ``deflated`` — probabilistic / deflated Sharpe ratio and minimum track
+  record length (v1.12, opt-in).
 - ``sessions`` — the FOMC / holiday-thin calendar and seeded, stratified
   session-day sampling (v1.9).
 
@@ -24,6 +28,19 @@ The defaults and their named legacy rules are indexed in
 docs/RESEARCH_VALIDITY.md.
 """
 
+from iap.validation.cpcv import (  # noqa: F401
+    CombinatorialPurgedSplitter,
+    CPCVSplit,
+    probability_of_backtest_overfitting,
+)
+from iap.validation.deflated import (  # noqa: F401
+    deflated_sharpe_block,
+    deflated_sharpe_ratio,
+    effective_trials,
+    min_track_record_length,
+    probabilistic_sharpe_ratio,
+    study_deflated_sharpe,
+)
 from iap.validation.diagnostics import (  # noqa: F401
     fold_diagnostics,
     stationary_bootstrap_ci,
@@ -41,6 +58,7 @@ from iap.validation.methods import (  # noqa: F401
     METHODS_LEGACY,
     METHODS_V2,
     METHODS_V3,
+    METHODS_V4,
     ResearchMethods,
     methods,
 )

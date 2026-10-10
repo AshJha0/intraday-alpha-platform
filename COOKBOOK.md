@@ -64,6 +64,7 @@ Contents:
 53. [Change a frozen copy: the `POLYGLOT-OVERRIDE` workflow (v1.11)](#53-change-a-frozen-copy-the-polyglot-override-workflow-v111)
 54. [Monitor a registered maker filter week by week (v1.11)](#54-monitor-a-registered-maker-filter-week-by-week-v111)
 55. [A guarded LLM session end to end, with the scripted client (v1.11)](#55-a-guarded-llm-session-end-to-end-with-the-scripted-client-v111)
+56. [Combinatorial purged CV, PBO and the deflated Sharpe ratio (v1.12)](#56-combinatorial-purged-cv-pbo-and-the-deflated-sharpe-ratio-v112)
 
 Recipes 27–35 were added with v1.3.0. Every command block in them was run
 as printed, from a clean checkout of the release, before it was written
@@ -3355,3 +3356,69 @@ client's synthetic usage at `claude-haiku-5-5` prices; nothing was sent.
 The four entries listed last are what an auditor reads afterwards. To run
 the same session against a real model, use `python -m iap.llm` with a key
 (recipe 51) instead of the scripted client.
+
+## 56. Combinatorial purged CV, PBO and the deflated Sharpe ratio (v1.12)
+
+Plan item R7 (statistics half). Everything here is opt-in and report-only:
+no gate, golden or published number reads it. The `v4` method bundle is
+`v3` plus a `cpcv` block and a `deflated_sharpe` block in every
+validation report (`python -m iap.research run --methods v4`); this recipe
+calls the pieces directly. Save as `python/recipe56.py` and run
+`cd python && PYTHONUTF8=1 PYTHONPATH=src python recipe56.py`:
+
+```python
+import math
+
+import numpy as np
+import pandas as pd
+
+from iap.validation.cpcv import CombinatorialPurgedSplitter, probability_of_backtest_overfitting
+from iap.validation.deflated import deflated_sharpe_ratio, study_deflated_sharpe
+
+# 1. CPCV: 6 groups, 2 test groups -> 15 splits reassembled into 5 paths
+cv = CombinatorialPurgedSplitter(n_groups=6, k_test=2, embargo_ns=60_000_000_000)
+day = 86_400 * 10**9
+ts = np.concatenate([d * day + np.arange(0, 23_400, 10) * 10**9 for d in range(17_920, 17_928)])
+splits = cv.splits(ts)
+print("grouping", cv.grouping, "| splits", len(splits), "| paths", cv.n_paths)
+print("path 0 uses splits", cv.path_assignment()[0])
+
+# 2. PBO by CSCV: 20 candidate configurations, 480 periods
+rng = np.random.default_rng(7)
+noise = rng.standard_normal((480, 20))
+print("PBO noise  ", round(probability_of_backtest_overfitting(noise, n_blocks=10)["pbo"], 3))
+planted = noise.copy()
+planted[:, 13] += 0.6
+print("PBO planted", round(probability_of_backtest_overfitting(planted, n_blocks=10)["pbo"], 3))
+
+# 3. DSR, the published worked example (Bailey & Lopez de Prado 2014)
+d = deflated_sharpe_ratio(2.5 / math.sqrt(250), 1250, 100, -3.0, 10.0, 0.5 / 250)
+print("SR0", round(d["sr0"], 4), "DSR", round(d["dsr"], 4))
+
+# 4. A study's per-day P&L table (e.g. QuotingBacktester.run_days) -> DSR block
+per_day = pd.DataFrame({"day": range(7), "net": [120.0, -40.0, 85.0, 30.0, -10.0, 95.0, 60.0]})
+b = study_deflated_sharpe(per_day, n_trials=12, n_looks=400)
+print({k: (round(v, 3) if isinstance(v, float) else v) for k, v in b.items() if k in (
+    "n_days", "sharpe_per_day", "psr", "dsr", "dsr_at_looks", "min_track_record_days")})
+```
+
+```
+grouping day_aligned | splits 15 | paths 5
+path 0 uses splits {0: 0, 1: 0, 2: 1, 3: 2, 4: 3, 5: 4}
+PBO noise   0.349
+PBO planted 0.0
+SR0 0.1132 DSR 0.9004
+{'n_days': 7, 'sharpe_per_day': 0.834, 'psr': 0.956, 'dsr': 0.624, 'min_track_record_days': 6.57, 'dsr_at_looks': 0.216}
+```
+
+How to read it. Eight sessions are at least six, so the groups are whole
+days; each of the five paths takes every group's prediction from a
+different split. PBO on pure noise is a coin flip (0.349 on this one draw;
+the test suite averages several draws and checks the mean lies between 0.3
+and 0.7); with one configuration genuinely better it falls to 0. The DSR
+line reproduces the paper's worked example (SR0 0.1132, DSR 0.9004). The
+last line is the helper a maker, quoting or auction study calls on its
+per-day P&L: a seven-day PSR of 0.956 against zero becomes a DSR of 0.624
+once twelve distinct configurations are allowed for, and 0.216 at the 400
+raw looks. Which `N` to quote is in RESEARCH_VALIDITY.md §1b; the study's
+registered verdict rule does not read any of it.

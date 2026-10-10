@@ -1,5 +1,6 @@
 """The research method bundles: ``"v2"`` (the default), ``"legacy_v1"`` and
-the opt-in ``"v3"`` (v1.9 research-validity rules).
+the opt-in ``"v3"`` (v1.9 research-validity rules) and ``"v4"`` (v1.12
+overfitting statistics).
 
 Every method choice of the validation chain is an argument somewhere — a
 ``BacktestConfig`` field, a ``CostModel`` field, a ``validate_alpha`` keyword
@@ -35,6 +36,15 @@ carries the ``validity`` block (day-clustered / day-block-bootstrap t, the
 day-separated HAC t, results without FOMC and holiday-thin days).  The
 book scope (R4) is a property of the DATA, not of the bundle: pass
 ``book_scope`` from :func:`iap.validation.sessions.book_scope_for_dataset`.
+
+``"v4"`` (v1.12, opt-in) is ``v3`` plus the report-only overfitting
+statistics of plan item R7: the ``cpcv`` block (combinatorial purged CV,
+:mod:`iap.validation.cpcv`) and the ``deflated_sharpe`` block (PSR, DSR,
+minimum track record length, :mod:`iap.validation.deflated`).  No gate
+reads either, so a ``v4`` verdict equals the ``v3`` verdict on the same
+data; the bundle debits more looks (``looks``).  The DSR trial count is
+the caller's (``deflated_sharpe_trials``; the research runner passes the
+ledger's distinct configurations).
 
 ``ExperimentSpec.configuration["methods"]`` carries the bundle name, so it
 is part of an experiment's identity; the report pipelines put it in their
@@ -81,6 +91,7 @@ __all__ = [
     "METHODS_LEGACY",
     "METHODS_V2",
     "METHODS_V3",
+    "METHODS_V4",
     "ResearchMethods",
     "methods",
 ]
@@ -88,6 +99,7 @@ __all__ = [
 METHODS_V2 = "v2"
 METHODS_LEGACY = "legacy_v1"
 METHODS_V3 = "v3"
+METHODS_V4 = "v4"
 #: The bundle a pipeline uses when it names none.
 DEFAULT_METHODS = METHODS_V2
 
@@ -111,6 +123,8 @@ class ResearchMethods:
     split_mode: str = DEFAULT_SPLIT_MODE
     gate_ic_source: str = DEFAULT_GATE_IC_SOURCE
     validity_diagnostics: bool = False
+    cpcv: bool = False
+    deflated_sharpe: bool = False
 
     def backtest_config(self, **fields: Any) -> BacktestConfig:
         """A ``BacktestConfig`` under this bundle's backtest rules;
@@ -149,13 +163,26 @@ class ResearchMethods:
             kw["gate_ic_source"] = self.gate_ic_source
         if self.validity_diagnostics:
             kw["validity_diagnostics"] = True
+        if self.cpcv:
+            kw["cpcv"] = True
+        if self.deflated_sharpe:
+            kw["deflated_sharpe"] = True
         return kw
 
     def looks(self, n_folds: int) -> int:
         """Looks one validation plus the caller's one out-of-sample backtest
         debits (:func:`iap.validation.validate.looks_per_validation` + 1):
         84 under ``v2`` at four folds, 28 under ``legacy_v1``."""
-        return looks_per_validation(n_folds, self.fold_diagnostics, self.validity_diagnostics) + 1
+        return (
+            looks_per_validation(
+                n_folds,
+                self.fold_diagnostics,
+                self.validity_diagnostics,
+                cpcv=self.cpcv,
+                deflated_sharpe=self.deflated_sharpe,
+            )
+            + 1
+        )
 
 
 METHODS: dict[str, ResearchMethods] = {
@@ -205,6 +232,8 @@ METHODS: dict[str, ResearchMethods] = {
         validity_diagnostics=True,
     ),
 }
+#: ``v4`` (v1.12, opt-in) = ``v3`` + the report-only R7 blocks.
+METHODS[METHODS_V4] = replace(METHODS[METHODS_V3], name=METHODS_V4, cpcv=True, deflated_sharpe=True)
 
 
 def methods(name: str = DEFAULT_METHODS) -> ResearchMethods:

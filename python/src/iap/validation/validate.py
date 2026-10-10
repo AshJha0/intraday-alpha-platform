@@ -159,6 +159,24 @@ defaults are unchanged, so every published number and golden still holds.
   report was computed on, echoed as ``dataset_versions`` so a report can
   never be read against another dataset.
 
+**Overfitting statistics (v1.12, R7; opt-in, the ``"v4"`` bundle turns
+them on).**  Report-only: no gate reads them, so no verdict moves.
+
+- **``cpcv``** - adds a ``cpcv`` block: the model is refit on every one of
+  the ``C(N, k)`` combinatorial purged splits
+  (:mod:`iap.validation.cpcv`, ``cpcv_groups`` = N, ``cpcv_test_groups`` =
+  k; day-aligned groups when there are >= N session days), the
+  out-of-sample standardized signal is reassembled into
+  ``phi = C(N-1, k-1)`` backtest paths and the pooled IC of each path is
+  reported with its spread.  :data:`CPCV_LOOKS` more looks.
+- **``deflated_sharpe``** - adds a ``deflated_sharpe`` block on the
+  per-session-day net P&L of the 1x walk-forward backtests (needs
+  ``fold_diagnostics``): Sharpe, PSR, minimum track record length and the
+  deflated Sharpe ratio at ``deflated_sharpe_trials`` independent trials
+  (:mod:`iap.validation.deflated`, "Which N": the pipelines pass the
+  ledger's distinct configurations), plus ``dsr_at_looks`` at
+  ``ledger_looks``.  :data:`DSR_LOOKS` more look.
+
 **Looks.**  :func:`looks_per_validation` itemises what one call evaluates;
 the ledger debits exactly that.
 """
@@ -172,6 +190,12 @@ import pandas as pd
 
 from iap.backtest.engine import Backtester, BacktestResult
 from iap.labels.frames import DEFAULT_IC_ROWS, IC_ROWS, LEGACY_IC_ROWS, scored_labels
+from iap.validation.cpcv import (
+    DEFAULT_CPCV_GROUPS,
+    DEFAULT_CPCV_TEST_GROUPS,
+    CombinatorialPurgedSplitter,
+)
+from iap.validation.deflated import daily_pnl_from_bars, deflated_sharpe_block
 from iap.validation.diagnostics import (
     BOOTSTRAP_RESAMPLES,
     bar_series,
@@ -256,6 +280,13 @@ DEFAULT_GATE_IC_SOURCE = "pooled"
 BOOK_SCOPES = ("consolidated", "single_venue")
 DEFAULT_BOOK_SCOPE = "consolidated"
 
+#: Looks the ``cpcv`` block adds: one pooled IC per backtest path at the
+#: default N = 6, k = 2 (5 paths).
+CPCV_LOOKS = 5
+#: Looks the ``deflated_sharpe`` block adds: one Sharpe (PSR / DSR / MinTRL
+#: are transforms of it).
+DSR_LOOKS = 1
+
 #: Looks the ``validity`` block adds: ex-event gate IC, day-separated HAC t,
 #: day-clustered t, day-block bootstrap t.
 VALIDITY_LOOKS = 4
@@ -264,7 +295,11 @@ _KEY_1X = f"x{1.0:g}"
 
 
 def looks_per_validation(
-    n_folds: int, fold_diagnostics: bool = True, validity_diagnostics: bool = False
+    n_folds: int,
+    fold_diagnostics: bool = True,
+    validity_diagnostics: bool = False,
+    cpcv: bool = False,
+    deflated_sharpe: bool = False,
 ) -> int:
     """Looks at the data ONE ``validate_alpha`` call makes — the ledger is
     the denominator of every multiple-testing correction, so it counts what
@@ -298,10 +333,17 @@ def looks_per_validation(
     v1.4.0 (28 with the caller's one backtest).
 
     ``validity_diagnostics=True`` (v1.9, opt-in) adds
-    :data:`VALIDITY_LOOKS`.
+    :data:`VALIDITY_LOOKS`; ``cpcv=True`` (v1.12) :data:`CPCV_LOOKS`;
+    ``deflated_sharpe=True`` (v1.12) :data:`DSR_LOOKS`.
     """
     if n_folds < 1:
         raise ValueError("n_folds must be >= 1")
+    if cpcv or deflated_sharpe:
+        return (
+            looks_per_validation(n_folds, fold_diagnostics, validity_diagnostics)
+            + (CPCV_LOOKS if cpcv else 0)
+            + (DSR_LOOKS if deflated_sharpe else 0)
+        )
     if validity_diagnostics:
         return looks_per_validation(n_folds, fold_diagnostics) + VALIDITY_LOOKS
     if not fold_diagnostics:
@@ -507,6 +549,11 @@ def validate_alpha(
     validity_diagnostics: bool = False,
     book_scope: str = DEFAULT_BOOK_SCOPE,
     dataset_version: str | Mapping[str, str] | None = None,
+    cpcv: bool = False,
+    cpcv_groups: int = DEFAULT_CPCV_GROUPS,
+    cpcv_test_groups: int = DEFAULT_CPCV_TEST_GROUPS,
+    deflated_sharpe: bool = False,
+    deflated_sharpe_trials: int | None = None,
 ) -> dict:
     """Full validation of one alpha.  ``model_factory()`` returns a fresh
     unfitted model (a fresh instance per fold — no state bleeds across).
@@ -530,6 +577,13 @@ def validate_alpha(
         raise ValueError(f"unknown gate_ic_source {gate_ic_source!r}; known: {GATE_IC_SOURCES}")
     if book_scope not in BOOK_SCOPES:
         raise ValueError(f"unknown book_scope {book_scope!r}; known: {BOOK_SCOPES}")
+    if deflated_sharpe and not fold_diagnostics:
+        raise ValueError("deflated_sharpe needs fold_diagnostics (the 1x backtest P&L)")
+    if deflated_sharpe and deflated_sharpe_trials is None:
+        raise ValueError(
+            "deflated_sharpe needs deflated_sharpe_trials - the DSR number of independent "
+            "trials (iap.validation.deflated.effective_trials(ledger))"
+        )
     single_venue = book_scope == "single_venue"
     probe = model_factory()
     horizon = probe.horizon
@@ -820,6 +874,25 @@ def validate_alpha(
         method_extras["validity_diagnostics"] = True
     if single_venue:
         method_extras["book_scope"] = book_scope
+    if cpcv:
+        method_extras["cpcv"] = True  # N and k are in the cpcv block
+        extras["cpcv"] = _cpcv_block(
+            model_factory,
+            uframes,
+            horizon,
+            horizon_ns,
+            ic_rows,
+            n_groups=cpcv_groups,
+            k_test=cpcv_test_groups,
+            embargo_ns=embargo_ns,
+        )
+    if deflated_sharpe:
+        method_extras["deflated_sharpe"] = True
+        extras["deflated_sharpe"] = deflated_sharpe_block(
+            _daily_pnl(results_1x),
+            int(deflated_sharpe_trials),
+            n_looks=None if ledger_looks is None else int(ledger_looks),
+        )
     if tstat_threshold != "fixed":
         extras["tstat_threshold_policy"] = tstat_threshold
         extras["ledger_t_threshold"] = float(ledger_t_threshold)
@@ -968,4 +1041,76 @@ def _validity_block(
         ),
         "tstat_day_cluster": _fnum(day_cluster_tstat(ts, x, y)),
         "day_block_bootstrap": {k: _fnum(v) for k, v in boot.items()},
+    }
+
+
+def _daily_pnl(results: list[BacktestResult]) -> list[float]:
+    """Net 1x P&L per UTC session day, pooled over instruments and folds."""
+    ts: list[int] = []
+    pnl: list[float] = []
+    for result in results:
+        for r in result.per_instrument.values():
+            ts.extend(int(t) for t in r.bar_ts)
+            pnl.extend(float(p) for p in r.bar_pnl)
+    return daily_pnl_from_bars(ts, pnl)
+
+
+def _cpcv_block(
+    model_factory,
+    uframes: Mapping[int, pd.DataFrame],
+    horizon: str,
+    horizon_ns: int,
+    ic_rows: str,
+    *,
+    n_groups: int,
+    k_test: int,
+    embargo_ns: int,
+) -> dict:
+    """The ``cpcv`` report block (module docs): per-split and per-path
+    pooled IC of the standardized signal on all scored rows."""
+    splitter = CombinatorialPurgedSplitter(n_groups, k_test, embargo_ns)
+    per_split: dict[int, tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
+    splits = []
+    split_rows = []
+    for split, train, test in splitter.split_frames(uframes, horizon_ns):
+        model = model_factory()
+        model.fit(train)
+        scores = model.score(test)
+        ts, er, y, _ = _pooled_arrays(scores, test, horizon, ic_rows)
+        beta = float(model.params().get("beta", 0.0) or 0.0)
+        z = er / beta if beta != 0.0 else er
+        per_split[split.index] = (ts, z, y)
+        splits.append(split)
+        split_rows.append(
+            {
+                "split": split.index,
+                "test_groups": list(split.test_groups),
+                "n_train": int(model.params().get("n_train", 0)),
+                "n_test_pairs": int(np.sum(np.isfinite(z) & np.isfinite(y))),
+                "ic": _fnum(ic(z, y)),
+            }
+        )
+    path_ics: list[float | None] = []
+    for assignment in splitter.path_assignment():
+        zs, ys = [], []
+        for g, i in sorted(assignment.items()):
+            ts, z, y = per_split[i]
+            m = splits[i].group_mask(ts, g)
+            zs.append(z[m])
+            ys.append(y[m])
+        path_ics.append(_fnum(ic(np.concatenate(zs), np.concatenate(ys))))
+    finite = np.array([v for v in path_ics if v is not None], dtype=float)
+    return {
+        "grouping": splitter.grouping,
+        "n_groups": splitter.n_groups,
+        "k_test": splitter.k_test,
+        "n_splits": splitter.n_splits,
+        "n_paths": splitter.n_paths,
+        "splits": split_rows,
+        "path_ics": path_ics,
+        "path_ic_mean": _fnum(float(finite.mean())) if finite.size else None,
+        "path_ic_std": _fnum(float(finite.std(ddof=1))) if finite.size > 1 else None,
+        "path_ic_min": _fnum(float(finite.min())) if finite.size else None,
+        "path_ic_max": _fnum(float(finite.max())) if finite.size else None,
+        "path_frac_positive": _fnum(float(np.mean(finite > 0))) if finite.size else None,
     }
