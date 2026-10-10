@@ -8,6 +8,31 @@ that tag.
 
 ## v1.9.0 — unreleased
 
+**Added: research-validity options (R1-R6), all opt-in.** Every default is
+the v2 rule, so no published number, golden or headline moves; the new
+`v3` method bundle turns the options on together
+(docs/RESEARCH_VALIDITY.md section 1a).
+
+- R1: `iap.validation.sessions`, with an FOMC / holiday-thin calendar
+  (2019-01-30 and 2019-10-30 are FOMC days, 2019-12-30 is holiday-thin),
+  seeded stratified day sampling recorded in `dataset.json` (`sampling`),
+  and a report block with the gate statistics computed without event days.
+- R2: day-clustered and day-block-bootstrap t-statistics; `day_aligned` and
+  `leave_one_day_out` fold layouts that cut at session starts.
+- R3: `gate_ic_source="instrument_mean"` gates on the equal-weight
+  per-instrument IC; the pooled IC is kept as `gate_ic_pooled`.
+- R4: `book_scope="single_venue"` turns crossed-book conditioning off for
+  ITCH-only data and labels results `nasdaq_bbo`.
+- R5: `compute_labels(freshness="trailing")`, a causal label freshness bound
+  from a trailing median quote gap.
+- R6: `pooled_slope_hac_tstat(day_ns=...)` forms no lag product across a
+  day boundary; reports can pin `dataset_versions` (the experiment runner
+  passes the spec's); tests for HAC invariance to row duplication.
+
+**Changed.** Every report now carries `gate_ic_source`, `gate_ic_pooled`,
+`book_scope` and `price_reference` (additive keys; values under v2 are
+`pooled`, the gate IC, `consolidated` and `consolidated_mid`).
+
 **Added.** Parallel feature build (plan item E1): `python -m iap.features
 --workers N` replays one normalized file per process (default 1 = the serial
 path, unchanged; 0 = auto). The only cross-day state, the expanding

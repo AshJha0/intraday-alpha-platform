@@ -9,4 +9,5 @@ from iap.labels.labels import (  # noqa: F401
     MidSeries,
     compute_labels,
     max_sample_age,
+    trailing_max_sample_age,
 )

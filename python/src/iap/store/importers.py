@@ -429,6 +429,13 @@ _REPORT_METHOD_FIELDS = (
     "fold_diagnostics",
     "recompute_probe",
 )
+#: v1.9 method keys: a report states them only when they differ from the
+#: default, so an absent key means the default value.
+_REPORT_V19_METHOD_FIELDS = {
+    "split_mode": "row_mass",
+    "gate_ic_source": "pooled",
+    "validity_diagnostics": False,
+}
 
 
 def _report_methods(report: Mapping[str, Any], ledger_entry: Mapping[str, Any] | None) -> str:
@@ -446,7 +453,10 @@ def _report_methods(report: Mapping[str, Any], ledger_entry: Mapping[str, Any] |
     if isinstance(block, str):
         return block
     for name, bundle in sorted(METHODS.items()):
-        if all(block.get(key) == getattr(bundle, key) for key in _REPORT_METHOD_FIELDS):
+        if all(block.get(key) == getattr(bundle, key) for key in _REPORT_METHOD_FIELDS) and all(
+            block.get(key, default) == getattr(bundle, key)
+            for key, default in _REPORT_V19_METHOD_FIELDS.items()
+        ):
             return name
     raise ValueError("the report's methods block matches no known bundle")
 

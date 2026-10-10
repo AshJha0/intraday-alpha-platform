@@ -27,6 +27,26 @@ at the timestamp of pooled row ``round(k * N / (n_folds + 1))``, so every
 fold carries (approximately) the same number of rows whatever the calendar
 does.  ``mode="wall_span"`` keeps the old behaviour for regression tests.
 
+**Day-aligned folds (v1.9, R2; opt-in).**  Row-mass boundaries fall
+wherever the quantile lands — mid-session, with the test segment starting
+60 s after the last train row of the same afternoon, so train and test
+share the session's regime and its intraday dependence.  Two day-aligned
+modes cut only at session-day starts (UTC days; a US equity session never
+straddles midnight UTC):
+
+- ``"day_aligned"`` — expanding walk-forward over whole days: with D days
+  the last ``min(n_folds, D - 1)`` days are the test days, each trained on
+  every earlier day (purge + embargo as above);
+- ``"leave_one_day_out"`` — every day is a test day once and the model is
+  trained on ALL other days, before and after it; purge and embargo apply
+  on both sides of the test day (a train row is dropped when ``[t, t +
+  horizon + embargo]`` reaches the test day or ``t`` falls within
+  ``embargo`` after it).  This is cross-validation, not a walk-forward: it
+  answers "does the relation hold on a day the fit never saw", and is the
+  natural design when there are only a handful of sessions.
+
+The default stays ``"row_mass"`` (every published number used it).
+
 A fold whose test set is smaller than ``min_test_pairs`` is **degenerate**:
 it is still yielded (so the caller can count and report it) and must be
 treated as a FAILED fold by the promotion gates, never silently dropped.
@@ -44,6 +64,10 @@ import pandas as pd
 MIN_TEST_PAIRS = 32
 #: Minimum number of non-degenerate folds a PROMOTE verdict requires (pinned).
 MIN_NONDEGENERATE_FOLDS = 3
+#: Fold layouts (module docs): the default first.
+SPLIT_MODES = ("row_mass", "wall_span", "day_aligned", "leave_one_day_out")
+DEFAULT_SPLIT_MODE = "row_mass"
+NS_DAY = 86_400 * 1_000_000_000
 
 
 @dataclass(frozen=True)
@@ -54,10 +78,15 @@ class Fold:
     train_end: int  # exclusive: train rows have t + purge + embargo < test_start
     test_start: int  # inclusive
     test_end: int  # exclusive
+    #: leave-one-day-out: train on both sides of the test span
+    two_sided: bool = False
 
     def train_mask(self, ts: np.ndarray, horizon_ns: int, embargo_ns: int) -> np.ndarray:
         ts = np.asarray(ts, dtype=np.int64)
-        return ts + horizon_ns + embargo_ns < self.test_start
+        before = ts + horizon_ns + embargo_ns < self.test_start
+        if not self.two_sided:
+            return before
+        return before | (ts >= self.test_end + embargo_ns)
 
     def test_mask(self, ts: np.ndarray) -> np.ndarray:
         ts = np.asarray(ts, dtype=np.int64)
@@ -77,8 +106,8 @@ class WalkForwardSplitter:
             raise ValueError("n_folds must be >= 1")
         if embargo_ns < 0:
             raise ValueError("embargo_ns must be >= 0")
-        if mode not in ("row_mass", "wall_span"):
-            raise ValueError("mode must be 'row_mass' or 'wall_span'")
+        if mode not in SPLIT_MODES:
+            raise ValueError(f"mode must be one of {SPLIT_MODES}")
         self.n_folds = n_folds
         self.embargo_ns = embargo_ns
         self.mode = mode
@@ -119,6 +148,37 @@ class WalkForwardSplitter:
             )
         return self._folds_from_bounds(bounds, int(ts[-1]))
 
+    def folds_by_day(self, ts_pooled: np.ndarray) -> list[Fold]:
+        """Day-aligned folds (``day_aligned`` / ``leave_one_day_out``).
+
+        Boundaries are the first row timestamp of each UTC day present in
+        ``ts_pooled``; a test span covers exactly one day.  Fewer than two
+        days is rejected (fail closed): there is nothing to hold out.
+        """
+        ts = np.sort(np.asarray(ts_pooled, dtype=np.int64))
+        if ts.size == 0:
+            raise ValueError("no rows to split")
+        days, first = np.unique(ts // NS_DAY, return_index=True)
+        if days.size < 2:
+            raise ValueError(f"{self.mode} folds need at least 2 session days, got {days.size}")
+        starts = [int(ts[i]) for i in first]
+        ends = [int(ts[i]) for i in first[1:]] + [int(ts[-1]) + 1]
+        if self.mode == "leave_one_day_out":
+            picks = range(days.size)
+        else:
+            k = min(self.n_folds, days.size - 1)
+            picks = range(days.size - k, days.size)
+        return [
+            Fold(
+                index=j,
+                train_end=starts[d],
+                test_start=starts[d],
+                test_end=ends[d],
+                two_sided=self.mode == "leave_one_day_out",
+            )
+            for j, d in enumerate(picks, start=1)
+        ]
+
     def _folds_from_bounds(self, starts: list[int], t1: int) -> list[Fold]:
         out: list[Fold] = []
         for k, test_start in enumerate(starts, start=1):
@@ -145,6 +205,9 @@ class WalkForwardSplitter:
         if self.mode == "row_mass":
             pooled = np.concatenate([df["exchange_ts"].to_numpy(dtype=np.int64) for df in nonempty])
             folds = self.folds_by_row_mass(pooled)
+        elif self.mode in ("day_aligned", "leave_one_day_out"):
+            pooled = np.concatenate([df["exchange_ts"].to_numpy(dtype=np.int64) for df in nonempty])
+            folds = self.folds_by_day(pooled)
         else:
             t0 = min(int(df["exchange_ts"].iloc[0]) for df in nonempty)
             t1 = max(int(df["exchange_ts"].iloc[-1]) for df in nonempty)

@@ -204,7 +204,7 @@ def test_equivalent_configurations_hash_identically(frames):
         {"cost_multiplier": float("nan")},
         {"max_decision_age_ns": 0},
         {"flatten_at_session_end": 1},
-        {"methods": "v3"},  # not a known bundle
+        {"methods": "v99"},  # not a known bundle
         {"methods": None},
         {"tstat_threshold": "ledger"},  # the v1.4.0 knob is part of the bundle now
     ],
@@ -838,7 +838,7 @@ def test_cli_run_options_name_the_bundle_not_the_threshold(capsys):
     assert stop.value.code == 2
     assert "--tstat-threshold" in capsys.readouterr().err
     with pytest.raises(SystemExit) as stop:
-        cli_main(["run", "--alpha", "EQ03", "--methods", "v3"])
+        cli_main(["run", "--alpha", "EQ03", "--methods", "v99"])
     assert stop.value.code == 2
 
 
