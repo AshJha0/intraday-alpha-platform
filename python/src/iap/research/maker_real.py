@@ -466,8 +466,8 @@ class Study:
 
     def plan_workers(self, n_alphas: int, n_events: int) -> tuple[int, float, float | None]:
         """(workers, per-worker GB estimate, available GB) for one unit."""
-        per = max(float(self.args.worker_mem_gb), 0.6 + n_events * 7e-7)
-        avail = available_ram_gb()
+        per = max(float(self.args.worker_mem_gb), 0.6 + n_events * 5e-7)
+        avail = available_ram_gb()  # measured per unit; keep ~1 GB free (below)
         w = min(int(self.args.workers or 4), n_alphas)
         if avail is not None:
             w = min(w, max(1, int((avail - 1.0) // per)))
@@ -688,7 +688,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap.add_argument("--slice", help="smoke slice HH:MM-HH:MM New York time (events to its end)")
     ap.add_argument("--summary-only", action="store_true")
     ap.add_argument("--workers", type=int, default=4, help="max alpha workers per unit")
-    ap.add_argument("--worker-mem-gb", type=float, default=2.5, help="per-worker RAM budget")
+    ap.add_argument("--worker-mem-gb", type=float, default=1.8, help="per-worker RAM floor (GB)")
     args = ap.parse_args(list(argv) if argv is not None else None)
     prereg = json.loads(Path(args.prereg).read_text(encoding="utf-8"))
     entries = check_prereg(ROOT, prereg)
