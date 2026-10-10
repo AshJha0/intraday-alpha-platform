@@ -1,0 +1,35 @@
+{
+  "x-version": 1,
+  "doc": "docs/POLYGLOT.md",
+  "override_marker": "POLYGLOT-OVERRIDE:",
+  "new_api_token": "new-api",
+  "protected": [
+    "tests/harness/polyglot_policy.json"
+  ],
+  "frozen": [
+    {"path": "rust/marketdata/src/", "component": "events / codec", "language": "rust"},
+    {"path": "rust/orderbook/src/", "component": "order book", "language": "rust"},
+    {"path": "rust/replay/src/", "component": "replay", "language": "rust"},
+    {"path": "rust/alpha/src/", "component": "alpha scoring", "language": "rust"},
+    {"path": "rust/contracts/src/", "component": "contracts / canonical JSON / trace", "language": "rust"},
+    {"path": "rust/lifecycle/src/", "component": "lifecycle", "language": "rust"},
+    {"path": "cpp/src/contracts/", "component": "contracts / canonical JSON / trace", "language": "cpp"},
+    {"path": "cpp/include/iap/contracts/", "component": "contracts / canonical JSON / trace", "language": "cpp"},
+    {"path": "java/src/main/java/com/iap/core/", "component": "events / codec", "language": "java"},
+    {"path": "java/src/main/java/com/iap/codec/", "component": "events / codec", "language": "java"},
+    {"path": "java/src/main/java/com/iap/orderbook/", "component": "order book", "language": "java"},
+    {"path": "java/src/main/java/com/iap/replay/", "component": "replay", "language": "java"},
+    {"path": "java/src/main/java/com/iap/features/", "component": "features", "language": "java"},
+    {"path": "java/src/main/java/com/iap/alpha/", "component": "alpha scoring", "language": "java"},
+    {"path": "java/src/main/java/com/iap/risk/", "component": "risk", "language": "java"},
+    {"path": "java/src/main/java/com/iap/execution/", "component": "execution simulator / algos", "language": "java"},
+    {"path": "java/src/main/java/com/iap/sor/", "component": "SOR", "language": "java"},
+    {"path": "java/src/main/java/com/iap/contracts/", "component": "contracts / canonical JSON / trace", "language": "java"},
+    {"path": "java/src/main/java/com/iap/trace/", "component": "contracts / canonical JSON / trace", "language": "java"},
+    {"path": "java/src/main/java/com/iap/lifecycle/", "component": "lifecycle", "language": "java"},
+    {"path": "java/src/main/java/com/iap/portfolio/", "component": "portfolio", "language": "java"},
+    {"path": "java/src/main/java/com/iap/tca/", "component": "TCA", "language": "java"},
+    {"path": "java/src/main/java/com/iap/backtest/", "component": "backtest", "language": "java"},
+    {"path": "java/src/main/java/com/iap/adaptive/", "component": "adaptive monitors", "language": "java"}
+  ]
+}

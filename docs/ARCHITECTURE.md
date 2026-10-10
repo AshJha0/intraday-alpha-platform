@@ -1023,3 +1023,37 @@ every signature. Details and gaps: docs/governance/GOVERNANCE.md §2a.
 | Almgren-Chriss, urgency, volume curve | no real-data study; the volume curve CLI reads real IAP1 files |
 | `v3` bundle | not yet applied to the published real-data batch (planned for v1.11) |
 | governance | in use: the 2026 holdout preregs are anchored to `6723fd0`; the maker study's preregs are on its branch |
+
+## 16. Polyglot policy: canonical and frozen copies (v1.11.0, plan E3)
+
+The responsibility matrix of §2 leaves several components implemented in more
+than one language — the order book in four, the native features and the six
+golden alphas in four, risk in three, the lifecycle in three. Golden fixtures
+keep the copies equal; what they cannot do is stop a copy from growing on its
+own, which is how drift starts. [POLYGLOT.md](POLYGLOT.md) is the inventory
+(every copy, its lines, the golden that pins it, its consumers in CI, Docker,
+k8s and the MVP) and the decision per copy:
+
+- **CANONICAL** (18 copies) — where new behaviour lands: the Python reference
+  for every domain it owns, the normative owners of a rule text (`rust/risk`
+  plus its reference-equivalent Python port and fuzz oracle `iap.risk`;
+  `cpp/{execution,sor}` plus `iap.execution`), the C++ hot path (codec, book,
+  replay, features, alpha) and the Rust feature fast path (`rust/features`,
+  plan item E2).
+- **FROZEN** (20 copies, 24 paths in `tests/harness/polyglot_policy.json`) —
+  the Rust codec/book/replay/alpha/contracts/lifecycle crates, the C++
+  contracts, and the Java ports under `com.iap.{core,codec,orderbook,replay,
+  features,alpha,risk,execution,sor,contracts,trace,lifecycle,portfolio,tca,
+  backtest,adaptive}`. They are built, tested and golden-pinned exactly as
+  before but take no new features; a change must carry `POLYGLOT-OVERRIDE:
+  <reason>` and a new function or type `POLYGLOT-OVERRIDE: new-api <reason>`.
+  `tests/harness/check_polyglot_policy.py` enforces this in the CI
+  `deployment` job (blocking on pull requests).
+- **RETIRE candidates** — Rust `alpha` and Rust `lifecycle` have no consumer
+  outside their own golden tests. They are kept, because those tests are the
+  Rust proof of the alpha and lifecycle contracts; nothing was deleted in
+  v1.11.0 and no parity test changed.
+
+The C++ copy has no risk engine and no lifecycle by design (§10); the Java
+platform vertical (`com.iap.{platform,monitoring,api,config}`) and every
+Python-only subsystem have a single copy and are outside the policy.

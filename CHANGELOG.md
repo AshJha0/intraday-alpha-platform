@@ -32,6 +32,28 @@ pre-burst derived state as API_FEATURES §2 pins, the Rust engine reads the
 half-built book. The golden checkpoints are outside bursts and still match;
 the full-row comparison is a strict xfail until the Rust engine is fixed.
 
+**Polyglot policy (IAP_Next_Releases_Plan E3).** New
+[docs/POLYGLOT.md](docs/POLYGLOT.md): an inventory of every component that
+exists in more than one language (codec, book, replay, features, alpha
+scoring, risk, execution/SOR, contracts/trace, lifecycle, portfolio/TCA/
+backtest/adaptive) with lines of code, the golden fixture that pins each copy,
+its consumers (CI, Docker images, k8s, MVP) and a decision per copy: 18
+CANONICAL, 20 FROZEN (24 paths), of which 2 RETIRE candidates (Rust `alpha`,
+Rust `lifecycle`: no consumer beyond their own golden tests). New
+`tests/harness/check_polyglot_policy.py` + `tests/harness/polyglot_policy.json`,
+run in the CI `deployment` job: a pull request that changes a FROZEN copy
+fails without a `POLYGLOT-OVERRIDE: <reason>` line in a commit message or the
+PR body, and one that adds a function/method/type to a FROZEN copy fails
+without `POLYGLOT-OVERRIDE: new-api <reason>`; `--self-test` runs built-in
+known answers. `CODEOWNERS` lists the frozen paths, and eleven entries whose
+owner was glued to the path (`/java/.../orderbook/@AshJha0`, which GitHub
+reads as a pattern with no owner) now have the separating space.
+
+**Nothing retired.** Every duplicated copy has a consumer in deployment/,
+CI, the MVP or the golden harness, so no code was deleted. No golden fixture,
+tolerance, parity test or test count changed (python 2154 / cpp 302 / rust 358
+/ java 571), and no risk behaviour changed.
+
 ## v1.10.0 — 2026-10-10
 
 New edge and strategy layer (IAP_Next_Releases_Plan v1.10: A1, M5, X1-X3,
