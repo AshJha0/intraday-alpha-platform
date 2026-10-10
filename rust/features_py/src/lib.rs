@@ -12,7 +12,8 @@
 use std::collections::BTreeMap;
 
 use features::{FeatureEngine, FEATURE_COUNT, FEATURE_NAMES, NATIVE_COUNT};
-use marketdata::{decode_iap1, decode_jsonl, read_iap1, read_jsonl, IapError, MarketEvent};
+use marketdata::codec::decode_jsonl;
+use marketdata::{decode_iap1, read_iap1, read_jsonl, IapError, MarketEvent};
 use numpy::ndarray::Array2;
 use numpy::IntoPyArray;
 use pyo3::exceptions::PyValueError;
