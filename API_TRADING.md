@@ -524,6 +524,42 @@ is unchanged.
 Research-only scoring with the pinned `z_clip = 4` replaced by `z_cap`
 (`None` means no cap). `score()` and the port contract keep the clip.
 
+### 2.7 Execution algos: Almgren-Chriss, alpha urgency, forecast volume curve (v1.10.0, Python only)
+
+All three are opt-in. The pinned schedules (TWAP equal weights, VWAP
+`1 + x^2`, IS `exp(-ra * i / (N-1))`) stay the defaults and stay the
+cross-language contract: the golden quantities `{129,71,71,129}` (VWAP) and
+`{304,184,112}` (IS) are unchanged, and the C++/Java/Rust ports are untouched.
+
+**Almgren-Chriss IS (X1) — `iap.execution.optimal`.** `ACParams(sigma, eta,
+gamma, eps, horizon, risk_aversion)`; `ac_holdings` / `ac_trajectory` give the
+closed-form trajectory `x_j = X sinh(kappa (T - t_j)) / sinh(kappa T)` with the
+discrete `kappa` from `2 (cosh(kappa tau) - 1) / tau^2 = lambda sigma^2 /
+eta_tilde`; `ac_cost` returns `(E, V)`; `efficient_frontier(qty, p, n,
+lambdas)` returns `(lambda, E, V)` points (E rises, V falls with lambda).
+`ac_params_from_calibration(sigma=, adv=, price=, calibration=, config=)` maps
+the impact slope (calibration document first, `ExecConfig` fallback) to
+`eta = coeff * 1e-2 * price / adv`. A parent opts in with
+`ParentOrder(algo=AlgoType.IS, is_model=ISModel.ALMGREN_CHRISS,
+ac_params=...)`.
+
+**Alpha-aware urgency (X2) — `iap.execution.urgency`.** `apply_alpha_urgency(
+parent, signal, AlphaUrgencyParams(...))` returns a new parent: when the
+signal agrees with patience (buy and expected fall, sell and expected rise)
+it posts `PASSIVE` at `passive_urgency`; when adverse it switches to
+`adverse_policy` (default `AGGRESSIVE`) at `adverse_urgency` and multiplies
+`risk_aversion` by `accelerate`; inside `threshold` the parent is returned
+unchanged.
+
+**Forecast VWAP curve (X3) — `iap.execution.volume_curve`.**
+`estimate_volume_curves(events, n_bins=, session=, shrinkage=)` builds a
+per-instrument profile from TRADE events (per-day normalized, averaged,
+shrunk to the U-shape with weight `k / (days + k)`), as an
+`iap.volume_curve` v1 document. CLI: `python -m iap.execution.volume_curve
+--events F [F ...] --out curve.json [--bins 26 --shrinkage 5]`.
+`load_volume_curve(path, instrument_id)` feeds `ParentOrder(volume_curve=...)`;
+`curve_slice_weights` resamples the bins to the parent's slices.
+
 ## 3. Where the rules live
 
 | rule set | normative text | Python port entry |

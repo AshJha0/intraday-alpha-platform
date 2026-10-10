@@ -9,6 +9,7 @@ golden ``tests/golden/expected_replay_fills.json`` is reproduced exactly by
 
 from iap.execution.algos import (
     AlgoType,
+    ISModel,
     ParentOrder,
     slice_quantities,
     slice_times,
@@ -88,4 +89,5 @@ __all__ = [
     "slice_quantities",
     "slice_times",
     "slice_weights",
+    "ISModel",
 ]
