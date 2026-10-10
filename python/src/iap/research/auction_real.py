@@ -9,6 +9,11 @@ subcommand that touches results checks the blackboard first.
   (one :class:`ConsolidatedBook` per symbol). NaN when the book is not
   two-sided or is locked/crossed. Writes the ``--mids`` CSV of
   ``python -m iap.auction backtest`` (``symbol,ts,mid,half_spread``).
+
+Resumable: ``extract`` writes a temp dir with ``_DONE.json`` (input name and
+size) and renames it into place, skipping completed days; ``mids`` and the
+summaries are written through temp file + rename and ``mids`` skips an
+existing CSV.
 * ``insample`` - the registered walk-forward per cell (n_folds = 6) with
   session-clustered statistics and the pre-registered verdict.
 * ``holdout`` - the frozen C-300s fit on all in-sample sessions applied
@@ -20,6 +25,8 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
+import shutil
 import time
 from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
@@ -32,6 +39,66 @@ from iap.research.maker_real import ROOT, cluster_stats, file_sha256, log
 
 N_FOLDS = 6
 MIN_SESSIONS = 4
+
+
+# ------------------------------------------------------------------ resumable outputs
+
+DONE_FILE = "_DONE.json"
+
+
+def atomic_text(path: Path, text: str) -> None:
+    """Write ``text`` to ``path`` through a temp file + rename (no partial file)."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.tmp-{os.getpid()}")
+    tmp.write_text(text, encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def input_id(itch: Path) -> dict[str, Any]:
+    st = Path(itch).stat()
+    return {"itch": Path(itch).name, "size": st.st_size}
+
+
+def extract_done(out: Path, itch: Path, date: str) -> bool:
+    """True when ``out`` holds a completed extraction of this input."""
+    marker = Path(out) / DONE_FILE
+    if not marker.is_file():
+        return False
+    try:
+        doc = json.loads(marker.read_text(encoding="utf-8"))
+    except ValueError:
+        return False
+    return doc.get("input") == input_id(itch) and doc.get("date") == date
+
+
+def extract_resumable(
+    itch: Path, date: str, symbols: Sequence[str], out: Path, extract=None
+) -> bool:
+    """Extract into a temp dir, mark it done, rename into ``out``. Returns
+    False (skipped) when ``out`` is already a completed extraction; a partial
+    ``out`` (no marker) is replaced."""
+    out = Path(out)
+    if extract_done(out, itch, date):
+        return False
+    if extract is None:
+        from iap.auction.stream import extract_auction_stream as extract
+    tmp = out.with_name(f".{out.name}.tmp-{os.getpid()}")
+    shutil.rmtree(tmp, ignore_errors=True)
+    s = extract(itch, symbols=list(symbols), date=date)
+    s.write(tmp)
+    meta = {
+        "input": input_id(itch),
+        "date": date,
+        "symbols": list(symbols),
+        "noii_messages": s.meta.get("noii_messages"),
+        "cross_messages": s.meta.get("cross_messages"),
+    }
+    (tmp / DONE_FILE).write_text(json.dumps(meta, sort_keys=True) + "\n", encoding="utf-8")
+    if out.exists():
+        shutil.rmtree(out)
+    os.replace(tmp, out)
+    return True
 
 
 # ------------------------------------------------------------------ mids
@@ -269,6 +336,11 @@ def run_holdout(a: argparse.Namespace) -> dict[str, Any]:
 def main(argv: Sequence[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
+    e = sub.add_parser("extract", help="resumable NOII extraction (temp dir + _DONE.json + rename)")
+    e.add_argument("--itch", required=True)
+    e.add_argument("--date", required=True)
+    e.add_argument("--symbols", nargs="+", required=True)
+    e.add_argument("--out", required=True)
     m = sub.add_parser("mids")
     m.add_argument("--stream", required=True)
     m.add_argument("--session", required=True, help="dataset dir with dataset.json + normalized/")
@@ -285,16 +357,24 @@ def main(argv: Sequence[str] | None = None) -> int:
     h.add_argument("--holdout-mids", nargs="+", required=True)
     a = ap.parse_args(list(argv) if argv is not None else None)
     t0 = time.time()
+    if a.cmd == "extract":
+        did = extract_resumable(Path(a.itch), a.date, a.symbols, Path(a.out))
+        log(
+            f"{a.out}: {'extracted' if did else 'already complete, skipped'} in {time.time() - t0:.0f}s"
+        )
+        return 0
     if a.cmd == "mids":
+        if Path(a.out).is_file():
+            log(f"{a.out}: already complete, skipped")
+            return 0
         df = mids_for_session(Path(a.stream), Path(a.session))
-        Path(a.out).parent.mkdir(parents=True, exist_ok=True)
-        df.to_csv(a.out, index=False)
+        atomic_text(Path(a.out), df.to_csv(index=False))
         ok = int(np.isfinite(df["mid"]).sum())
         log(f"{a.out}: {len(df)} rows ({ok} with a two-sided book) in {time.time() - t0:.0f}s")
         return 0
     doc = run_insample(a) if a.cmd == "insample" else run_holdout(a)
     text = json.dumps(doc, indent=2, sort_keys=True, default=str) + "\n"
-    Path(a.out).write_text(text, encoding="utf-8")
+    atomic_text(Path(a.out), text)
     log(f"{a.cmd} -> {a.out}")
     return 0
 

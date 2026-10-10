@@ -164,7 +164,9 @@ class Study:
         }
         doc["latency_status"] = "ASSUMED (parametric; ITCH has no receive stamp)"
         path = self.out / "calib" / f"{unit_name(SESSIONS[day], symbol)}.json"
-        write_calibration(doc, path)
+        tmp = path.with_name(f".{path.name}.tmp")
+        write_calibration(doc, tmp)
+        tmp.replace(path)  # atomic: a resumed run never reads a partial calibration
         return str(path)
 
     def alpha(self, alpha_id: str, horizon: str, day: int):
@@ -301,8 +303,12 @@ class Study:
             for s in self.args.symbols or list(SYMBOLS):
                 self.run_unit(d, s)
         summary = summarise(self.out / "units", self.prereg)
-        (self.out / "summary.json").write_text(
-            json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        from iap.experiment.locking import atomic_write_text
+
+        atomic_write_text(
+            self.out / "summary.json",
+            json.dumps(summary, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
         )
         log(f"summary -> {self.out / 'summary.json'}")
 

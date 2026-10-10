@@ -94,3 +94,50 @@ def test_summarise_pools_symbols_per_session_and_pairs_with_control(tmp_path):
     # control paired on EQ01's symbols only (AAPL), not QQQ
     assert eq["skew_minus_control"]["mean"] == pytest.approx(11.0)
     assert out["cells"]["QNOSKEW"]["mean"] == pytest.approx(101.0)
+
+
+class _FakeStream:
+    meta = {"noii_messages": 1, "cross_messages": 0}
+
+    def write(self, out):
+        from pathlib import Path
+
+        Path(out).mkdir(parents=True)
+        (Path(out) / "auction_noii.csv").write_text("x\n")
+
+
+def test_extract_resumable_skips_completed_and_redoes_partial(tmp_path):
+    itch = tmp_path / "f.gz"
+    itch.write_bytes(b"abc")
+    out = tmp_path / "auction" / "2019-01-30"
+    calls = []
+
+    def fake(path, symbols, date):
+        calls.append(date)
+        return _FakeStream()
+
+    out.mkdir(parents=True)
+    (out / "auction_noii.csv").write_text("partial")  # killed run: no marker
+    assert ar.extract_resumable(itch, "2019-01-30", ["AAPL"], out, extract=fake)
+    assert (out / ar.DONE_FILE).is_file() and (out / "auction_noii.csv").read_text() == "x\n"
+    assert not ar.extract_resumable(itch, "2019-01-30", ["AAPL"], out, extract=fake)
+    assert calls == ["2019-01-30"]
+    itch.write_bytes(b"abcd")  # a different input is not 'done'
+    assert ar.extract_resumable(itch, "2019-01-30", ["AAPL"], out, extract=fake)
+    assert not list(out.parent.glob(".*tmp*"))
+
+
+def test_atomic_text_leaves_no_temp(tmp_path):
+    p = tmp_path / "a" / "s.json"
+    ar.atomic_text(p, "1")
+    ar.atomic_text(p, "2")
+    assert p.read_text() == "2" and [x.name for x in p.parent.iterdir()] == ["s.json"]
+
+
+def test_quoting_run_unit_skips_a_completed_unit(tmp_path, monkeypatch):
+    study = qr.Study.__new__(qr.Study)
+    study.out = tmp_path
+    (tmp_path / "units").mkdir()
+    (tmp_path / "units" / "ds3_20190130_AAPL.json").write_text("{}")
+    monkeypatch.setattr(qr, "load_events", lambda *a, **k: pytest.fail("reloaded a done unit"))
+    study.run_unit(0, "AAPL")
