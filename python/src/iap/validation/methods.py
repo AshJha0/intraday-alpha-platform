@@ -1,4 +1,5 @@
-"""The research method bundles: ``"v2"`` (the default) and ``"legacy_v1"``.
+"""The research method bundles: ``"v2"`` (the default), ``"legacy_v1"`` and
+the opt-in ``"v3"`` (v1.9 research-validity rules).
 
 Every method choice of the validation chain is an argument somewhere — a
 ``BacktestConfig`` field, a ``CostModel`` field, a ``validate_alpha`` keyword
@@ -24,6 +25,16 @@ capacity                        edge breakeven, capped      participation proxy
 per-fold diagnostics/bootstrap  reported                    not computed
 recompute leakage probe         run when events exist       not run
 ==============================  ==========================  ==========================
+
+``"v3"`` (v1.9, opt-in; NOT the default, so no published number moves) is
+``v2`` plus the research-validity rules of
+:mod:`iap.validation.validate` (R1-R3, R6): the gate reads the
+equal-weight per-instrument IC (``gate_ic_source="instrument_mean"``), the
+folds are day-aligned (``split_mode="day_aligned"``) and every report
+carries the ``validity`` block (day-clustered / day-block-bootstrap t, the
+day-separated HAC t, results without FOMC and holiday-thin days).  The
+book scope (R4) is a property of the DATA, not of the bundle: pass
+``book_scope`` from :func:`iap.validation.sessions.book_scope_for_dataset`.
 
 ``ExperimentSpec.configuration["methods"]`` carries the bundle name, so it
 is part of an experiment's identity; the report pipelines put it in their
@@ -51,9 +62,11 @@ from iap.backtest.engine import (
     BacktestConfig,
 )
 from iap.labels.frames import DEFAULT_IC_ROWS, LEGACY_IC_ROWS
+from iap.validation.splits import DEFAULT_SPLIT_MODE
 from iap.validation.stress import STRESS_VERSION_CARRY, STRESS_VERSION_LEGACY
 from iap.validation.validate import (
     DEFAULT_CAPACITY,
+    DEFAULT_GATE_IC_SOURCE,
     DEFAULT_SIGNIFICANCE,
     DEFAULT_TSTAT_THRESHOLD,
     LEGACY_CAPACITY,
@@ -67,12 +80,14 @@ __all__ = [
     "METHODS",
     "METHODS_LEGACY",
     "METHODS_V2",
+    "METHODS_V3",
     "ResearchMethods",
     "methods",
 ]
 
 METHODS_V2 = "v2"
 METHODS_LEGACY = "legacy_v1"
+METHODS_V3 = "v3"
 #: The bundle a pipeline uses when it names none.
 DEFAULT_METHODS = METHODS_V2
 
@@ -93,6 +108,9 @@ class ResearchMethods:
     capacity: str
     fold_diagnostics: bool
     recompute_probe: bool
+    split_mode: str = DEFAULT_SPLIT_MODE
+    gate_ic_source: str = DEFAULT_GATE_IC_SOURCE
+    validity_diagnostics: bool = False
 
     def backtest_config(self, **fields: Any) -> BacktestConfig:
         """A ``BacktestConfig`` under this bundle's backtest rules;
@@ -115,7 +133,7 @@ class ResearchMethods:
         """The method keywords of :func:`iap.validation.validate.validate_alpha`
         (the ledger threshold, the seed and the recompute source are the
         caller's)."""
-        return {
+        kw: dict[str, Any] = {
             "ic_rows": self.ic_rows,
             "tstat_threshold": self.tstat_threshold,
             "stress_version": self.stress_version,
@@ -123,12 +141,21 @@ class ResearchMethods:
             "capacity": self.capacity,
             "fold_diagnostics": self.fold_diagnostics,
         }
+        # v1.9 options only when they differ from the default, so the v2 and
+        # legacy keyword sets are exactly what they were.
+        if self.split_mode != DEFAULT_SPLIT_MODE:
+            kw["split_mode"] = self.split_mode
+        if self.gate_ic_source != DEFAULT_GATE_IC_SOURCE:
+            kw["gate_ic_source"] = self.gate_ic_source
+        if self.validity_diagnostics:
+            kw["validity_diagnostics"] = True
+        return kw
 
     def looks(self, n_folds: int) -> int:
         """Looks one validation plus the caller's one out-of-sample backtest
         debits (:func:`iap.validation.validate.looks_per_validation` + 1):
         84 under ``v2`` at four folds, 28 under ``legacy_v1``."""
-        return looks_per_validation(n_folds, self.fold_diagnostics) + 1
+        return looks_per_validation(n_folds, self.fold_diagnostics, self.validity_diagnostics) + 1
 
 
 METHODS: dict[str, ResearchMethods] = {
@@ -159,6 +186,23 @@ METHODS: dict[str, ResearchMethods] = {
         capacity=LEGACY_CAPACITY,
         fold_diagnostics=False,
         recompute_probe=False,
+    ),
+    METHODS_V3: ResearchMethods(
+        name=METHODS_V3,
+        ic_rows=DEFAULT_IC_ROWS,
+        stress_version=STRESS_VERSION_CARRY,
+        position_policy=DEFAULT_POSITION_POLICY,
+        cap_fills_at_l1=True,
+        block_invalid_label_rows=True,
+        impact_model=DEFAULT_IMPACT_MODEL,
+        significance=DEFAULT_SIGNIFICANCE,
+        tstat_threshold=DEFAULT_TSTAT_THRESHOLD,
+        capacity=DEFAULT_CAPACITY,
+        fold_diagnostics=True,
+        recompute_probe=True,
+        split_mode="day_aligned",
+        gate_ic_source="instrument_mean",
+        validity_diagnostics=True,
     ),
 }
 

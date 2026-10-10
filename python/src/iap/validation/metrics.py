@@ -419,6 +419,7 @@ def pooled_slope_hac_tstat(
     lags: int = 2,
     bucket_ns: int = 300 * NS_S,
     min_buckets: int = 8,
+    day_ns: int | None = None,
 ) -> float:
     """HAC t-stat of the POOLED slope of label on score (additive statistic).
 
@@ -447,6 +448,14 @@ def pooled_slope_hac_tstat(
     standardized variables), so this is the HAC significance of the number
     the gate actually reads.
 
+    **Day boundaries (v1.9, R6).**  With ``day_ns`` (e.g. 86 400 s) a lag
+    product ``s_k * s_{k+l}`` is only counted when both buckets fall in the
+    same ``ts // day_ns`` day: the last bucket of one session and the first
+    of the next are not neighbours in time, and treating them as adjacent
+    imports an overnight "autocovariance" that does not exist.  ``None``
+    (the default, the v1.5.0-v1.8.0 statistic every published number was
+    computed with) keeps the old adjacency.
+
     Returns NaN with fewer than ``min_buckets`` non-empty buckets, a
     degenerate side, or a non-positive long-run variance.
     """
@@ -466,17 +475,139 @@ def pooled_slope_hac_tstat(
     sxx = float(np.sum(dx * dx))
     slope = float(np.sum(dx * dy)) / sxx
     moment = dx * (dy - slope * dx)
-    _, inverse = np.unique(ts // bucket_ns, return_inverse=True)
+    ubuckets, inverse = np.unique(ts // bucket_ns, return_inverse=True)
     s = np.bincount(inverse, weights=moment)
     n = s.size
     if n < min_buckets:
         return float("nan")
+    if day_ns is not None:
+        if day_ns <= 0:
+            raise ValueError("day_ns must be positive")
+        bday = (ubuckets * bucket_ns) // int(day_ns)
     lrv = float(np.sum(s * s))
     for lag in range(1, min(lags, n - 1) + 1):
-        lrv += 2.0 * (1.0 - lag / (lags + 1.0)) * float(np.sum(s[lag:] * s[:-lag]))
+        prod = s[lag:] * s[:-lag]
+        if day_ns is not None:
+            prod = prod[bday[lag:] == bday[:-lag]]
+        lrv += 2.0 * (1.0 - lag / (lags + 1.0)) * float(np.sum(prod))
     if not lrv > 0.0:
         return float("nan")
     return float(slope * sxx / np.sqrt(lrv))
+
+
+def _day_moments(ts, scores, labels, day_ns):
+    """Per-day sufficient statistics of the finite pairs:
+    ``(days, n, sx, sy, sxx, syy, sxy)`` arrays, one entry per day."""
+    ts = np.asarray(ts, dtype=np.int64)
+    x = np.asarray(scores, dtype=float)
+    y = np.asarray(labels, dtype=float)
+    if not (ts.shape == x.shape == y.shape):
+        raise ValueError("ts/score/label length mismatch")
+    if day_ns <= 0:
+        raise ValueError("day_ns must be positive")
+    ok = np.isfinite(x) & np.isfinite(y)
+    ts, x, y = ts[ok], x[ok], y[ok]
+    days, inv = np.unique(ts // int(day_ns), return_inverse=True)
+
+    def bc(w):
+        return np.bincount(inv, weights=w, minlength=days.size)
+
+    return days, bc(np.ones_like(x)), bc(x), bc(y), bc(x * x), bc(y * y), bc(x * y)
+
+
+def _corr_from_moments(n, sx, sy, sxx, syy, sxy) -> float:
+    if n <= 1:
+        return float("nan")
+    cxx = sxx - sx * sx / n
+    cyy = syy - sy * sy / n
+    cxy = sxy - sx * sy / n
+    if cxx <= EPS * max(1.0, abs(sxx)) or cyy <= EPS * max(1.0, abs(syy)):
+        return float("nan")
+    return float(cxy / np.sqrt(cxx * cyy))
+
+
+def day_cluster_tstat(
+    ts: np.ndarray,
+    scores: np.ndarray,
+    labels: np.ndarray,
+    day_ns: int = 86_400 * NS_S,
+    min_days: int = 2,
+) -> float:
+    """Cluster-robust t of the pooled slope with one cluster per day (R2).
+
+    Same slope, residuals and moments as :func:`pooled_slope_hac_tstat`,
+    but the moment is summed per DAY instead of per 5-minute bucket and no
+    cross-day covariance is assumed: ``var(b) = G/(G-1) * sum_d s_d^2 /
+    Sxx^2`` over the G days.  Every within-day dependence — however long —
+    is absorbed, at the price of G - 1 degrees of freedom: with the 2-7
+    sessions the real data has, read it as a robustness bound on the HAC
+    t, not as a normal z.  NaN with fewer than ``min_days`` days.
+    """
+    ts = np.asarray(ts, dtype=np.int64)
+    x = np.asarray(scores, dtype=float)
+    y = np.asarray(labels, dtype=float)
+    if not (ts.shape == x.shape == y.shape):
+        raise ValueError("ts/score/label length mismatch")
+    ok = np.isfinite(x) & np.isfinite(y)
+    ts, x, y = ts[ok], x[ok], y[ok]
+    if x.size == 0 or x.std() <= EPS or y.std() <= EPS:
+        return float("nan")
+    dx = x - x.mean()
+    dy = y - y.mean()
+    sxx = float(np.sum(dx * dx))
+    slope = float(np.sum(dx * dy)) / sxx
+    moment = dx * (dy - slope * dx)
+    _, inv = np.unique(ts // int(day_ns), return_inverse=True)
+    s = np.bincount(inv, weights=moment)
+    g = s.size
+    if g < max(2, min_days):
+        return float("nan")
+    meat = float(np.sum(s * s)) * g / (g - 1.0)
+    if not meat > 0.0:
+        return float("nan")
+    return float(slope * sxx / np.sqrt(meat))
+
+
+def day_block_bootstrap_tstat(
+    ts: np.ndarray,
+    scores: np.ndarray,
+    labels: np.ndarray,
+    seed: int = 0,
+    n_boot: int = 2000,
+    day_ns: int = 86_400 * NS_S,
+    min_days: int = 2,
+) -> dict[str, float]:
+    """Pooled IC divided by its day-block bootstrap standard error (R2).
+
+    Whole days are resampled with replacement (``numpy.random.default_rng
+    (seed)``), the pooled IC is recomputed from per-day sufficient
+    statistics, and ``t = IC / sd(IC*)``.  Returns ``{"ic", "se", "tstat",
+    "n_days", "p05", "p95"}`` (NaN where undefined).  Deterministic for a
+    seed; O(n_days) per resample, so cheap even on full real sessions.
+    """
+    days, n, sx, sy, sxx, syy, sxy = _day_moments(ts, scores, labels, day_ns)
+    g = int(days.size)
+    nan = float("nan")
+    est = _corr_from_moments(n.sum(), sx.sum(), sy.sum(), sxx.sum(), syy.sum(), sxy.sum())
+    if g < max(2, min_days) or not np.isfinite(est):
+        return {"ic": est, "se": nan, "tstat": nan, "n_days": g, "p05": nan, "p95": nan}
+    rng = np.random.default_rng(int(seed))
+    draws = rng.integers(0, g, size=(int(n_boot), g))
+    counts = np.stack([np.bincount(row, minlength=g) for row in draws]).astype(float)
+    sums = counts @ np.stack([n, sx, sy, sxx, syy, sxy], axis=1)
+    boot = np.array([_corr_from_moments(*row) for row in sums])
+    boot = boot[np.isfinite(boot)]
+    if boot.size < 2:
+        return {"ic": est, "se": nan, "tstat": nan, "n_days": g, "p05": nan, "p95": nan}
+    se = float(boot.std(ddof=1))
+    return {
+        "ic": est,
+        "se": se,
+        "tstat": float(est / se) if se > EPS else nan,
+        "n_days": g,
+        "p05": float(np.quantile(boot, 0.05)),
+        "p95": float(np.quantile(boot, 0.95)),
+    }
 
 
 def decay_curve(

@@ -128,6 +128,37 @@ opt-in are the defaults; each legacy rule stays selectable by name and
   the backtester it is handed and reports the rules in force under
   ``methods``.
 
+**Research-validity options (v1.9, R1-R6; all opt-in, the ``"v3"``
+bundle of** :mod:`iap.validation.methods` **turns them on).**  The v2
+defaults are unchanged, so every published number and golden still holds.
+
+- **``gate_ic_source``** (R3) - ``"pooled"`` (default) gates on the pooled
+  IC as above; ``"instrument_mean"`` gates on the EQUAL-WEIGHT mean of the
+  per-instrument ICs on the same rows (on real data QQQ is about half of
+  the rows, so the pooled IC is largely QQQ's).  The pooled IC stays in the
+  report as ``oos_ic`` / ``gate_ic_pooled``; ``gate_ic_source`` names the
+  one the gate read.  The gate t is unchanged (the pooled-slope HAC t).
+- **``split_mode``** (R2) - the fold layout of
+  :class:`iap.validation.splits.WalkForwardSplitter`: ``"row_mass"``
+  (default), ``"day_aligned"`` or ``"leave_one_day_out"``.
+- **``validity_diagnostics``** (R1/R2/R6) - adds a ``validity`` block: the
+  session days scored and their event tags, the gate statistics with the
+  FOMC and holiday-thin days excluded (``ex_event``), the pooled-slope HAC
+  t with no lag product across a day boundary, the day-clustered t and
+  the day-block bootstrap t of the pooled gate-row IC.  Four more looks
+  (:data:`VALIDITY_LOOKS`).  Report-only: no gate reads them.
+- **``book_scope``** (R4) - ``"consolidated"`` (default: the synthetic
+  multi-venue books, where a crossed book is a stale other-venue quote) or
+  ``"single_venue"`` (ingested ITCH/LOBSTER: one Nasdaq book).  A single
+  venue's own book cannot be crossed by another venue's stale quote, so the
+  crossed/uncrossed split is switched off (``crossed_frac`` and
+  ``oos_ic_crossed`` are ``null``, every row counts as uncrossed) and the
+  report says ``price_reference: "nasdaq_bbo"`` - the label mid is the
+  Nasdaq best bid/offer, not the NBBO.
+- **``dataset_version``** (R6) - the content hash(es) of the data the
+  report was computed on, echoed as ``dataset_versions`` so a report can
+  never be read against another dataset.
+
 **Looks.**  :func:`looks_per_validation` itemises what one call evaluates;
 the ledger debits exactly that.
 """
@@ -155,6 +186,8 @@ from iap.validation.metrics import (
     bucket_size_summary,
     capacity_breakeven,
     capacity_proxy_usd,
+    day_block_bootstrap_tstat,
+    day_cluster_tstat,
     decay_curve,
     hit_rate,
     ic,
@@ -165,9 +198,18 @@ from iap.validation.metrics import (
     rank_ic,
     signal_turnover_detail,
 )
+from iap.validation.sessions import (
+    NS_DAY,
+    day_index_to_iso,
+    day_tags,
+    event_day_mask,
+    session_days,
+)
 from iap.validation.splits import (
+    DEFAULT_SPLIT_MODE,
     MIN_NONDEGENERATE_FOLDS,
     MIN_TEST_PAIRS,
+    SPLIT_MODES,
     WalkForwardSplitter,
 )
 from iap.validation.stress import (
@@ -206,10 +248,24 @@ CAPACITY_DEFINITIONS = ("breakeven", "participation")
 DEFAULT_CAPACITY = "breakeven"
 LEGACY_CAPACITY = "participation"
 
+#: Which IC the gate reads (module docs, R3): default first.
+GATE_IC_SOURCES = ("pooled", "instrument_mean")
+DEFAULT_GATE_IC_SOURCE = "pooled"
+
+#: Book scopes (module docs, R4): default first.
+BOOK_SCOPES = ("consolidated", "single_venue")
+DEFAULT_BOOK_SCOPE = "consolidated"
+
+#: Looks the ``validity`` block adds: ex-event gate IC, day-separated HAC t,
+#: day-clustered t, day-block bootstrap t.
+VALIDITY_LOOKS = 4
+
 _KEY_1X = f"x{1.0:g}"
 
 
-def looks_per_validation(n_folds: int, fold_diagnostics: bool = True) -> int:
+def looks_per_validation(
+    n_folds: int, fold_diagnostics: bool = True, validity_diagnostics: bool = False
+) -> int:
     """Looks at the data ONE ``validate_alpha`` call makes — the ledger is
     the denominator of every multiple-testing correction, so it counts what
     the chain actually evaluates:
@@ -240,9 +296,14 @@ def looks_per_validation(n_folds: int, fold_diagnostics: bool = True) -> int:
     v1.3.0 (the second t, the scale-free ICs, the other-row-policy IC, the
     bootstrap) are not debited, which is the 27 the chain counted up to
     v1.4.0 (28 with the caller's one backtest).
+
+    ``validity_diagnostics=True`` (v1.9, opt-in) adds
+    :data:`VALIDITY_LOOKS`.
     """
     if n_folds < 1:
         raise ValueError("n_folds must be >= 1")
+    if validity_diagnostics:
+        return looks_per_validation(n_folds, fold_diagnostics) + VALIDITY_LOOKS
     if not fold_diagnostics:
         per_fold = len(HORIZON_ORDER) + len(COST_MULTIPLIERS) + 2
         return 1 + per_fold + len(LATENCY_SHIFTS) + len(LATENCY_TIMES_NS) + 2 + 1
@@ -441,6 +502,11 @@ def validate_alpha(
     recompute: RecomputeSource | None = None,
     ledger_looks: int | None = None,
     ic_rows: str = DEFAULT_IC_ROWS,
+    split_mode: str = DEFAULT_SPLIT_MODE,
+    gate_ic_source: str = DEFAULT_GATE_IC_SOURCE,
+    validity_diagnostics: bool = False,
+    book_scope: str = DEFAULT_BOOK_SCOPE,
+    dataset_version: str | Mapping[str, str] | None = None,
 ) -> dict:
     """Full validation of one alpha.  ``model_factory()`` returns a fresh
     unfitted model (a fresh instance per fold — no state bleeds across).
@@ -458,12 +524,19 @@ def validate_alpha(
         raise ValueError(f"unknown capacity {capacity!r}; known: {CAPACITY_DEFINITIONS}")
     if ic_rows not in IC_ROWS:
         raise ValueError(f"unknown ic_rows {ic_rows!r}; known: {IC_ROWS}")
+    if split_mode not in SPLIT_MODES:
+        raise ValueError(f"unknown split_mode {split_mode!r}; known: {SPLIT_MODES}")
+    if gate_ic_source not in GATE_IC_SOURCES:
+        raise ValueError(f"unknown gate_ic_source {gate_ic_source!r}; known: {GATE_IC_SOURCES}")
+    if book_scope not in BOOK_SCOPES:
+        raise ValueError(f"unknown book_scope {book_scope!r}; known: {BOOK_SCOPES}")
+    single_venue = book_scope == "single_venue"
     probe = model_factory()
     horizon = probe.horizon
     horizon_ns = HORIZONS_NS[horizon]
     universe = probe.universe(list(frames))
     uframes = {i: frames[i] for i in universe}
-    splitter = WalkForwardSplitter(n_folds=n_folds, embargo_ns=embargo_ns)
+    splitter = WalkForwardSplitter(n_folds=n_folds, embargo_ns=embargo_ns, mode=split_mode)
     asset_class = "FX" if probe.asset_class == "FX" else "EQUITY"
     bt = backtester.for_horizon(horizon)
 
@@ -490,6 +563,10 @@ def validate_alpha(
         scores = model.score(test)
         ts, er, y, crossed = _pooled_arrays(scores, test, horizon, ic_rows)
         iids = _pooled_instrument_ids(scores, test)
+        if single_venue:
+            # One exchange's own book: a negative spread there is a data
+            # fault, not a stale other-venue quote (module docs, R4).
+            crossed = np.zeros_like(crossed)
         # Pool the standardized signal: folds fit different betas, so pooling
         # expected_return weights each fold by |beta_k| (pinned, round-3).
         beta = float(model.params().get("beta", 0.0) or 0.0)
@@ -571,6 +648,8 @@ def validate_alpha(
     pairs_ok = np.isfinite(x) & np.isfinite(y)
     n_pairs_all = int(pairs_ok.sum())
     crossed_frac = float(np.mean(crossed[pairs_ok])) if n_pairs_all else float("nan")
+    if single_venue:
+        crossed_frac = float("nan")
     unc = ~crossed
     oos_ic_uncrossed = ic(np.where(unc, x, np.nan), np.where(unc, y, np.nan))
     oos_ic_crossed = ic(np.where(crossed, x, np.nan), np.where(crossed, y, np.nan))
@@ -664,7 +743,17 @@ def validate_alpha(
     hypothesis_confirmed = bool(last_model.params().get("hypothesis_confirmed", False))
     # The PROMOTE gate reads the UNCROSSED IC: a crossed consolidated book is
     # a stale-quote artefact, not a tradable state (pinned, round-3).
-    gate_ic = oos_ic_uncrossed if np.isfinite(oos_ic_uncrossed) else oos_ic
+    gate_ic_pooled = oos_ic_uncrossed if np.isfinite(oos_ic_uncrossed) else oos_ic
+    if gate_ic_source == "instrument_mean":
+        # Equal weight per instrument on the rows the pooled gate IC reads
+        # (R3): the pooled IC is dominated by the busiest instrument.
+        gate_ic = (
+            by_instrument_unc["instrument_mean"]
+            if np.isfinite(oos_ic_uncrossed)
+            else by_instrument["instrument_mean"]
+        )
+    else:
+        gate_ic = gate_ic_pooled
     if significance == "pooled_slope":
         gate_t = nw_t_pooled_uncrossed if np.isfinite(nw_t_pooled_uncrossed) else nw_t_pooled
     else:
@@ -704,6 +793,33 @@ def validate_alpha(
     )
 
     extras: dict[str, object] = {}
+    if validity_diagnostics:
+        gate_rows = unc if np.isfinite(oos_ic_uncrossed) else np.ones_like(unc)
+        extras["validity"] = _validity_block(
+            ts[gate_rows],
+            x[gate_rows],
+            y[gate_rows],
+            instrument_ids[gate_rows],
+            lags=lags,
+            gate_ic_source=gate_ic_source,
+            seed=seed,
+            n_boot=n_boot,
+        )
+    if dataset_version is not None:
+        extras["dataset_versions"] = (
+            {"dataset": str(dataset_version)}
+            if isinstance(dataset_version, str)
+            else {str(k): str(v) for k, v in sorted(dataset_version.items())}
+        )
+    method_extras: dict[str, object] = {}
+    if split_mode != DEFAULT_SPLIT_MODE:
+        method_extras["split_mode"] = split_mode
+    if gate_ic_source != DEFAULT_GATE_IC_SOURCE:
+        method_extras["gate_ic_source"] = gate_ic_source
+    if validity_diagnostics:
+        method_extras["validity_diagnostics"] = True
+    if single_venue:
+        method_extras["book_scope"] = book_scope
     if tstat_threshold != "fixed":
         extras["tstat_threshold_policy"] = tstat_threshold
         extras["ledger_t_threshold"] = float(ledger_t_threshold)
@@ -729,6 +845,7 @@ def validate_alpha(
             "cap_fills_at_l1": bool(bt.config.cap_fills_at_l1),
             "block_rows": bt.config.block_rows_label(),
             "impact_model": bt.cost_model.impact_model,
+            **method_extras,
         },
         "alpha_id": probe.alpha_id,
         "name": probe.name,
@@ -755,9 +872,13 @@ def validate_alpha(
         "label_reopen_available": bool(reopen_available),
         "n_blackout_rows_scored": n_blackout_scored if reopen_available else None,
         "oos_ic_uncrossed": _fnum(oos_ic_uncrossed),
-        "oos_ic_crossed": _fnum(oos_ic_crossed),
+        "oos_ic_crossed": None if single_venue else _fnum(oos_ic_crossed),
         "crossed_frac": _fnum(crossed_frac),
         "gate_ic": _fnum(gate_ic),
+        "gate_ic_source": gate_ic_source,
+        "gate_ic_pooled": _fnum(gate_ic_pooled),
+        "book_scope": book_scope,
+        "price_reference": "nasdaq_bbo" if single_venue else "consolidated_mid",
         "gate_tstat": _fnum(gate_t),
         "oos_rank_ic": _fnum(oos_rank_ic),
         "oos_hit_rate": _fnum(oos_hit),
@@ -790,4 +911,61 @@ def validate_alpha(
         # alpha fails (the verdict is PROMOTE iff all are true).
         "promote_gates": promote_gates,
         "verdict": verdict,
+    }
+
+
+def _validity_block(
+    ts: np.ndarray,
+    x: np.ndarray,
+    y: np.ndarray,
+    instrument_ids: np.ndarray,
+    *,
+    lags: int,
+    gate_ic_source: str,
+    seed: int,
+    n_boot: int,
+) -> dict:
+    """The ``validity`` report block (module docs, R1/R2/R6) on the gate's
+    rows: per-day ICs, the event-day split, the day-separated HAC t, the
+    day-clustered t and the day-block bootstrap t."""
+
+    def gate_stat(m: np.ndarray) -> float:
+        if gate_ic_source == "instrument_mean":
+            return instrument_ics(instrument_ids[m], x[m], y[m])["instrument_mean"]
+        return ic(x[m], y[m])
+
+    pairs = np.isfinite(x) & np.isfinite(y)
+    days = session_days(ts)
+    day_rows = []
+    for d in np.unique(days[pairs]):
+        m = pairs & (days == d)
+        iso = day_index_to_iso(int(d))
+        day_rows.append(
+            {
+                "day": iso,
+                "tags": sorted(day_tags(iso)),
+                "n_pairs": int(m.sum()),
+                "ic": _fnum(ic(x[m], y[m])),
+            }
+        )
+    keep = ~event_day_mask(ts)
+    boot = day_block_bootstrap_tstat(ts, x, y, seed=seed, n_boot=min(int(n_boot), 2000))
+    return {
+        "n_days": len(day_rows),
+        "days": day_rows,
+        "ex_event": {
+            "excluded_tags": ["fomc", "holiday_thin"],
+            "n_days_excluded": sum(1 for r in day_rows if r["tags"]),
+            "n_pairs": int(np.sum(pairs & keep)),
+            "gate_ic": _fnum(gate_stat(keep)),
+            "ic_pooled": _fnum(ic(x[keep], y[keep])),
+            "tstat_pooled_slope": _fnum(
+                pooled_slope_hac_tstat(ts[keep], x[keep], y[keep], lags=lags, day_ns=NS_DAY)
+            ),
+        },
+        "tstat_pooled_slope_day_separated": _fnum(
+            pooled_slope_hac_tstat(ts, x, y, lags=lags, day_ns=NS_DAY)
+        ),
+        "tstat_day_cluster": _fnum(day_cluster_tstat(ts, x, y)),
+        "day_block_bootstrap": {k: _fnum(v) for k, v in boot.items()},
     }

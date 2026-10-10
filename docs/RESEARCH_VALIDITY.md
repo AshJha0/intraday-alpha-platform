@@ -129,6 +129,26 @@ ITERATE / 13 REJECT, from 0 / 10 / 14); three alphas clear the ledger
 threshold of 4.365 where six cleared 3.0; 18 of the 24 make no trade at 1x
 costs and the other six lose; the recompute probe passes for all 24.
 
+### 1a. v1.9 research-validity options (opt-in, bundle `v3`)
+
+The v1.9 "R" items add rules that change how a result reads. None of them is
+a default: `v2` reports, the goldens and every published number are
+unchanged. The `v3` bundle (`iap.validation.methods`) turns R1-R3 and the
+validity block on together; R4 and R5 are switched where the data or the
+labels are built.
+
+| Item | Option | What it does |
+|---|---|---|
+| R1 | `iap.validation.sessions` | FOMC / holiday-thin calendar for 2019 and 2026; `stratified_day_sample` (seeded, stratified by month, weekday or event tag) and `record_day_sampling`, which writes the draw into `dataset.json` under `sampling`; the `validity.ex_event` block gives the gate statistics without FOMC and holiday-thin days |
+| R2 | `split_mode="day_aligned"` / `"leave_one_day_out"`; `validity.tstat_day_cluster`, `validity.day_block_bootstrap` | folds cut at session starts instead of mid-session row quantiles; the t of the pooled slope clustered by day, and the pooled IC over its day-block bootstrap standard error |
+| R3 | `gate_ic_source="instrument_mean"` | the IC gate reads the equal-weight mean of per-instrument ICs; the pooled IC stays as `gate_ic_pooled` |
+| R4 | `book_scope="single_venue"` (`sessions.book_scope_for_dataset`) | ITCH/LOBSTER are one Nasdaq book: crossed-book conditioning is off, `crossed_frac` is `null`, and the report says `price_reference: "nasdaq_bbo"` |
+| R5 | `compute_labels(..., freshness="trailing")` | label staleness judged against a causal trailing median quote gap instead of the whole-day median (the feature pipeline still builds whole-day labels) |
+| R6 | `pooled_slope_hac_tstat(..., day_ns=...)`, `dataset_version=` | no Bartlett lag product across a day boundary (`validity.tstat_pooled_slope_day_separated`); the report pins `dataset_versions`; tests pin HAC invariance to row duplication |
+
+The validity block debits four more looks (`VALIDITY_LOOKS`), so a `v3`
+experiment counts 88 looks at four folds against 84 under `v2`.
+
 ## 2. Planted-signal power study
 
 `python -m iap.research power` generates synthetic data with effects of known

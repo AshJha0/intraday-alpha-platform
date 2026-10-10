@@ -42,6 +42,18 @@ where a 15 s gap between LP quotes is normal, not a data outage.  On the
 bundled equities the median gap is about 2 s, so the floor binds and a
 forward mid older than 5 s invalidates the label (``forward_stale``).
 
+**Causal freshness (v1.9, R5; opt-in).**  The whole-day median gap uses
+quotes that arrive AFTER the label's forward instant: a label at 10:00 is
+judged stale or fresh with a bound that depends on the 15:00 quote rate.
+``compute_labels(..., freshness="trailing")`` uses, for the forward sample
+``k``, ``max(LABEL_MAX_AGE_FLOOR_NS, 2 x the median of the last
+LABEL_FRESHNESS_WINDOW distinct-timestamp gaps up to ts[k])``
+(:func:`trailing_max_sample_age`) — only quotes at or before the forward
+sample, so the bound is causal.  The default stays ``"whole_day"`` (the
+pinned rule above: every feature store, golden and published number was
+built with it); the effect is small on the equities, where the 5 s floor
+binds, and larger on the sparse FX streams.
+
 Per-anchor reasons are returned as a bitmask (:class:`LabelReason`) so a
 research report can say WHY a horizon has few usable rows.
 
@@ -60,6 +72,7 @@ per-anchor binary search.
 
 from __future__ import annotations
 
+import bisect
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
@@ -164,6 +177,47 @@ def max_sample_age(series: MidSeries) -> int:
     return max(LABEL_MAX_AGE_FLOOR_NS, LABEL_MAX_AGE_GAP_MULT * series.median_gap_ns())
 
 
+#: Freshness-bound rules of :func:`compute_labels` (module docs): default first.
+FRESHNESS_MODES = ("whole_day", "trailing")
+DEFAULT_FRESHNESS = "whole_day"
+#: Distinct-timestamp gaps the trailing median looks back over.
+LABEL_FRESHNESS_WINDOW = 256
+
+
+def trailing_max_sample_age(series: MidSeries, window: int = LABEL_FRESHNESS_WINDOW) -> list[int]:
+    """Causal freshness bound per series sample (module docs, R5).
+
+    Entry ``k`` is ``max(LABEL_MAX_AGE_FLOOR_NS, LABEL_MAX_AGE_GAP_MULT x
+    median of the last <= window gaps between DISTINCT timestamps at or
+    before ts[k])`` — the floor alone until the series has a gap.  Uses no
+    sample after ``k``.  O(len(series) x window) worst case.
+    """
+    if window < 1:
+        raise ValueError("window must be >= 1")
+    out: list[int] = []
+    recent: list[int] = []  # FIFO of the last `window` gaps
+    ordered: list[int] = []  # the same gaps, sorted
+    head = 0
+    last: int | None = None
+    bound = LABEL_MAX_AGE_FLOOR_NS
+    for t in series.ts:
+        if last is not None and t != last:
+            gap = t - last
+            recent.append(gap)
+            bisect.insort(ordered, gap)
+            if len(recent) - head > window:
+                old = recent[head]
+                head += 1
+                del ordered[bisect.bisect_left(ordered, old)]
+            m = len(ordered)
+            med = ordered[m // 2] if m % 2 else (ordered[m // 2 - 1] + ordered[m // 2]) // 2
+            bound = max(LABEL_MAX_AGE_FLOOR_NS, LABEL_MAX_AGE_GAP_MULT * med)
+        if t != last:
+            last = t
+        out.append(bound)
+    return out
+
+
 @dataclass
 class LabelResult:
     """Labels for one horizon across all anchors (parallel arrays)."""
@@ -186,6 +240,7 @@ def compute_labels(
     horizons: Sequence[str] = HORIZON_ORDER,
     max_age_ns: int | None = None,
     blackout_reopen: bool = True,
+    freshness: str = DEFAULT_FRESHNESS,
 ) -> dict[str, LabelResult]:
     """Two-pointer forward-label sweep (see module docstring for semantics).
 
@@ -204,6 +259,10 @@ def compute_labels(
     validation (:func:`iap.validation.metrics.ic_with_blackout_reopen`, the
     ``label_reopen_<h>`` frame column).  ``False`` skips the computation
     and leaves ``reopen_mid`` empty (the pre-v1.5.0 behaviour).
+
+    ``freshness="trailing"`` (v1.9, opt-in) judges the forward sample ``k``
+    against :func:`trailing_max_sample_age` instead of one whole-series
+    bound; it cannot be combined with an explicit ``max_age_ns``.
     """
     n = len(anchors_ts)
     for i in range(1, n):
@@ -212,6 +271,14 @@ def compute_labels(
     for h in horizons:
         if h not in HORIZONS_NS:
             raise ValueError(f"unknown horizon {h!r}")
+    if freshness not in FRESHNESS_MODES:
+        raise ValueError(f"unknown freshness {freshness!r}; known: {FRESHNESS_MODES}")
+    age_by_sample: list[int] | None = None
+    if freshness == "trailing":
+        if max_age_ns is not None:
+            raise ValueError("freshness='trailing' derives the bound; do not pass max_age_ns")
+        age_by_sample = trailing_max_sample_age(series)
+        max_age_ns = LABEL_MAX_AGE_FLOOR_NS
     if max_age_ns is None:
         max_age_ns = max_sample_age(series)
     if max_age_ns <= 0:
@@ -274,7 +341,8 @@ def compute_labels(
             else:
                 if not tradable[k] or not (mids[k] > 0.0):
                     reason |= LabelReason.BLACKOUT
-                if target - ts[k] > max_age_ns:
+                bound = max_age_ns if age_by_sample is None else age_by_sample[k]
+                if target - ts[k] > bound:
                     reason |= LabelReason.FORWARD_STALE
             if b >= 0 and k >= b and bad[k + 1] - bad[b + 1] > 0:
                 reason |= LabelReason.BLACKOUT

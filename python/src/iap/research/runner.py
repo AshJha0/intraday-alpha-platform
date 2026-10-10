@@ -133,7 +133,13 @@ from iap.research.specs import (
 )
 from iap.validation.leakage import RecomputeSources
 from iap.validation.ledger import ExperimentLedger
-from iap.validation.methods import METHODS_LEGACY, METHODS_V2, ResearchMethods, methods
+from iap.validation.methods import (
+    METHODS_LEGACY,
+    METHODS_V2,
+    METHODS_V3,
+    ResearchMethods,
+    methods,
+)
 from iap.validation.metrics import HORIZONS_NS
 from iap.validation.splits import Fold
 from iap.validation.validate import validate_alpha
@@ -201,6 +207,8 @@ _REPORT_METRICS = {
         ("fold_consistency", "fold_sign_consistency"),
     ),
 }
+#: ``v3`` (v1.9, opt-in) records the numbers its verdict read, like ``v2``.
+_REPORT_METRICS[METHODS_V3] = _REPORT_METRICS[METHODS_V2]
 
 #: Result fields a rerun may legitimately change (provenance, not evidence).
 _PROVENANCE_FIELDS = ("git_commit", "n_experiments_in_ledger")
@@ -771,6 +779,7 @@ class ExperimentRunner:
                 ledger_looks=gate_looks,
                 seed=int(spec.seed),
                 recompute=recompute,
+                dataset_version=spec.dataset_version,
                 **bundle.validate_kwargs(),
             )
         except ValueError as exc:  # splitter: too few rows / degenerate boundaries
@@ -783,7 +792,7 @@ class ExperimentRunner:
                 "the recompute leakage probe did not run: no normalized event file for "
                 f"{asset_class} beside the feature store"
             )
-        if bundle.name == METHODS_V2 and not report["label_reopen_available"]:
+        if bundle.name in (METHODS_V2, METHODS_V3) and not report["label_reopen_available"]:
             run_reasons.append(
                 "the frames carry no label_reopen column: the default row policy could "
                 "not score BLACKOUT rows (feature store written before v1.5.0)"
