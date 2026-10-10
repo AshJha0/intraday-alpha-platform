@@ -67,6 +67,19 @@ that tag.
   API_FEATURES §8.3 records where the features are meant to feed the maker,
   quoting and auction code.
 
+- **X5: cost-aware multi-venue router (Python only, opt-in).** New
+  `iap.execution.venues_model` (per-venue fill probability at the touch,
+  maker toxicity from markouts, latency, volume-tiered fee schedules with a
+  deterministic monthly `FeeLedger`) and `iap.execution.sor_v2`
+  (`CostAwareRouter`: argmin expected all-in cost for aggressive and passive
+  routes, a multi-venue sweep with latency-staggered sends, passive
+  allocation by fill probability and toxicity). New versioned config
+  `research/execution/venue_model.json`; `venues.json` unchanged.
+  `MakerBacktester(..., router=)` opts in. The pinned SOR, the fills golden
+  and the C++/Java ports are unchanged. Real data here is Nasdaq only, so
+  this is capability for multi-venue data (docs/REAL_DATA.md, API_TRADING.md
+  §2.9, COOKBOOK recipe 59).
+
 ## v1.11.0 — 2026-10-10
 
 Scale and AI (IAP_Next_Releases_Plan v1.11: E2, E3, AI1-AI3; A2, A3 and AI4

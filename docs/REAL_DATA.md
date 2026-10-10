@@ -281,6 +281,14 @@ the next confirmatory test needs new, unseen sessions. Experiment ids,
 specs and results are under the git-ignored
 `data/real/holdout2026/research/experiments/`.
 
+**Multi-venue routing on real data (v1.12, X5).** Every real session in
+this repository is Nasdaq TotalView-ITCH (or LOBSTER built from it): one
+venue, `XNAS`. The cost-aware router (`iap.execution.sor_v2`, API_TRADING.md
+§2.9) therefore has a single candidate on real data and always returns it;
+its sweep, passive split, toxicity and tier logic is exercised only on
+synthetic multi-venue books. It is capability for multi-venue data later
+(e.g. a consolidated or second-venue feed), not a measured result.
+
 ### 3.3 Auction imbalance (NOII) study (v1.10, plan item A1) - running, no result yet
 
 **Status (v1.11.0, 2026-10-10).** `AUC01` is being run on the real

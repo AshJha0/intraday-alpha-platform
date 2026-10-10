@@ -67,6 +67,7 @@ Contents:
 56. [Combinatorial purged CV, PBO and the deflated Sharpe ratio (v1.12)](#56-combinatorial-purged-cv-pbo-and-the-deflated-sharpe-ratio-v112)
 57. [Measure tick-to-trade latency percentiles (v1.12)](#57-measure-tick-to-trade-latency-percentiles-v112)
 58. [Opt-in extended features and an event / volume clock (v1.12)](#58-opt-in-extended-features-and-an-event--volume-clock-v112)
+59. [Route across venues: cost-aware choice, sweep, passive split, fee tiers (v1.12)](#59-route-across-venues-cost-aware-choice-sweep-passive-split-fee-tiers-v112)
 
 Recipes 27–35 were added with v1.3.0. Every command block in them was run
 as printed, from a clean checkout of the release, before it was written
@@ -3526,3 +3527,81 @@ PYTHONPATH=src python -m iap.features --feature-set extended --sampling volume:2
 (`python/tests/test_feature_parallel.py`). Nothing in the maker, quoting or
 auction code reads these columns yet, and no real-data run has been made
 with them; API_FEATURES §8.3 lists where they are meant to go.
+
+## 59. Route across venues: cost-aware choice, sweep, passive split, fee tiers (v1.12)
+
+Plan item X5. The pinned router (`iap.execution.sor`) picks the best
+displayed price and breaks ties on fees; the opt-in
+`iap.execution.sor_v2.CostAwareRouter` prices each venue with a model
+(`iap.execution.venues_model`: fill probability at the touch, maker
+toxicity, latency, volume-tiered fees from
+`research/execution/venue_model.json`). Two synthetic equity venues, XV1 and
+XV2, quote one instrument. Save as `python/recipe56.py` and run
+`cd python && PYTHONUTF8=1 PYTHONPATH=src python recipe56.py`:
+
+```python
+from iap.core.events import EventType, MarketEvent
+from iap.execution import load_venues
+from iap.execution.sor_v2 import CostAwareRouter, RouterOptions
+from iap.execution.venues_model import FeeLedger, build_venue_models, load_venue_model_config
+from iap.orderbook.book import ConsolidatedBook
+
+T0 = 1_700_000_000_000_000_000
+venues = {v: s for v, s in load_venues("../configs/venues/venues.json").items() if v in (1, 2)}
+models = build_venue_models(venues, load_venue_model_config("../research/execution/venue_model.json"))
+
+# two synthetic equity venues, one instrument: XV1 (id 1) and XV2 (id 2)
+book, seq = ConsolidatedBook(7), {1: 0, 2: 0}
+for vid, side, px, qty in [
+    (1, 0, 9999, 300), (1, 1, 10001, 200), (1, 1, 10002, 500),
+    (2, 0, 9999, 300), (2, 1, 10001, 100), (2, 1, 10003, 400),
+]:  # fmt: skip
+    seq[vid] += 1
+    ev = MarketEvent(seq[vid], 7, vid, T0, T0, seq[vid], int(EventType.ADD), side, px, qty, seq[vid], 0)
+    book.apply(ev)
+
+router = CostAwareRouter(models, RouterOptions(lot=100))
+print("aggressive buy ->", router.route_aggressive(book, 0, T0, 0.01))
+costs = router.passive_costs(book, 0, T0, 0.01)
+print("passive buy costs (bps)", {v: round(c, 3) for v, c in costs.items()})
+print("passive buy ->", router.route_passive(book, 0, T0, 0.01))
+print("split 1000 passive", router.allocate_passive(book, 0, 1000))
+for k in router.plan_sweep(book, 0, 600, T0):
+    print("sweep", k)
+
+ledger = FeeLedger(models)  # monthly volume -> tier -> fee
+for _ in range(4):
+    fee = ledger.record(1, 4_000_000, T0, maker=True)
+    print("XV1 tier", ledger.tier(1, T0), "fee", round(fee, 2))
+```
+
+Output:
+
+```
+aggressive buy -> 2
+passive buy costs (bps) {1: 0.44, 2: 0.168}
+passive buy -> 2
+split 1000 passive {1: 400, 2: 600}
+sweep SweepChild(venue_id=2, price_ticks=10001, qty=100, send_offset_ns=0, arrival_offset_ns=220000)
+sweep SweepChild(venue_id=1, price_ticks=10001, qty=200, send_offset_ns=70000, arrival_offset_ns=220000)
+sweep SweepChild(venue_id=1, price_ticks=10002, qty=300, send_offset_ns=70000, arrival_offset_ns=220000)
+XV1 tier 0 fee -8000.0
+XV1 tier 0 fee -8000.0
+XV1 tier 1 fee -8000.0
+XV1 tier 1 fee -10000.0
+```
+
+How to read it. Both venues offer 10001; the aggressive buy goes to XV2
+because its taker fee is lower. The passive cost is `p * (-rebate -
+capture + toxicity) + (1 - p) * miss_cost` in bps of the mid: XV2 fills
+more often (0.55 against 0.45) and is less toxic, which outweighs XV1's
+larger rebate, so the passive post and the larger share of the split go to
+XV2. The 600-share sweep takes the 10001 level on both venues before XV1's
+10002; XV1 (150 us) is sent 70 us after XV2 (220 us) so both children
+arrive together. The fee ledger prices each fill at the tier reached
+BEFORE it: the third 4M-share fill is still charged at tier 0 even though
+it takes the month to 12M, and the fourth earns the tier-1 rebate. To use
+the router in a maker backtest pass `MakerBacktester(..., router=router)`;
+the trips then gain a `venue_id` column. The real data in this repository
+is Nasdaq only (one venue), so on it the router has nothing to choose
+between: this is capability for multi-venue data, not a measured result.

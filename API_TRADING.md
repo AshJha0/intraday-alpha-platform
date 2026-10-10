@@ -598,6 +598,60 @@ shrunk to the U-shape with weight `k / (days + k)`), as an
 `load_volume_curve(path, instrument_id)` feeds `ParentOrder(volume_curve=...)`;
 `curve_slice_weights` resamples the bins to the parent's slices.
 
+### 2.9 Cost-aware multi-venue router and venue model (v1.12.0, Python only)
+
+Opt-in (plan item X5). The pinned router (`iap.execution.sor`, C++ hot path,
+fills golden, Java frozen copy) is unchanged and stays the default; the
+cross-language contract and the fills golden do not move.
+
+**Venue model — `iap.execution.venues_model`.** `VenueModel(spec,
+p_fill_touch, toxicity_bps, latency_ns, tiers)`. `build_venue_models(venues,
+config, calibration=, toxicity=, default_p_fill=0.5)` fills it: fill
+probability from the calibration (`fill_rates.by_venue[vid].p_any_fill`,
+then `fill_rates.all`), else the config, else the default; toxicity (maker
+adverse selection, bps, positive = adverse, keyed `"100ms"` / `"1s"`) from
+the config, overridden by `toxicity_from_markouts(fills, timeline)` (which
+runs `iap.tca.markout.markout_report` over MAKER fills and reads
+`-price_impact` per venue; cells below `min_fills` are omitted, never 0).
+Config: `research/execution/venue_model.json` (`schema` `iap.venue_model`,
+`version` 1, keyed by venue name; kept out of `configs/` so the deployment
+ConfigMaps do not carry research-only data); `venues.json` is unchanged.
+
+**Tiered fees.** `FeeTier(min_monthly_shares, taker_fee_per_share,
+maker_rebate_per_share)`; tiers start at 0 and strictly increase. `FeeLedger`
+keeps volume per (venue, UTC month); `record(venue, qty, ts, maker)` prices
+the fill at the tier reached BEFORE it, then credits the volume; a new UTC
+month starts at tier 0. Deterministic. A venue without tiers uses its flat
+`VenueSpec` fee and rebate. The ledger feeds router decisions; the
+simulator's fills keep the flat `VenueSpec` fees.
+
+**Router — `iap.execution.sor_v2.CostAwareRouter(models, RouterOptions,
+sor_options, ledger)`.** Eligibility is the pinned one (book present, not
+stale, TRADING, latency cap); iteration in ascending venue_id; all ties go
+to the lower venue_id. Costs in bps of the consolidated mid, positive = cost:
+
+- `route_aggressive`: argmin of `s (touch - mid)/mid + taker_fee/mid +
+  latency_penalty_bps_per_ms * latency_ms`.
+- `route_passive`: argmin of `p (-rebate/mid - s (mid - touch)/mid +
+  toxicity) + (1 - p) miss_cost_bps` (`miss_cost_bps` default: half spread
+  plus the mean taker fee).
+- `plan_sweep(book, side, qty, ts, limit_ticks=)`: `SweepChild(venue_id,
+  price_ticks, qty, send_offset_ns, arrival_offset_ns)` across displayed
+  depth (`sweep_levels`), best price first, then lower taker fee, then
+  lower venue_id. `stagger="sync_arrival"` (default) sends each child at
+  `max_latency - latency_v` so all arrive together; `"none"` sends all at 0.
+- `allocate_passive(book, side, qty)`: weights `p / (1 + max(tox, 0) /
+  tox_scale_bps)`, venues above `max_toxicity_bps` excluded, integer split
+  by largest remainder in `lot` units.
+
+**Backtest integration.** `MakerBacktester(exec_config, config, calibration,
+router=None)`. With a router each entry decision (taken only while flat)
+picks its venue with `route_passive` among the instrument's venues in the
+event stream; the exit uses the same venue; trips gain a `venue_id` column.
+With `router=None` (the default) the result is unchanged. Real data here is
+Nasdaq only (docs/REAL_DATA.md §3.2), so this is capability for multi-venue
+data. COOKBOOK recipe 56; tests `python/tests/test_sor_v2.py`.
+
 ## 3. Where the rules live
 
 | rule set | normative text | Python port entry |
