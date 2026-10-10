@@ -29,6 +29,73 @@ implementation (`iap.risk`, `iap.execution`) proven by the same golden files
 the Java ports are proven by, so the loop the MVP runs is the reference
 loop end to end.
 
+## Current status (v1.10.0, release branch; v1.9.0 released 2026-10-10)
+
+**Where the research stands.**
+
+- **Synthetic data (bundled):** 24 alphas, 0 PROMOTE. Eighteen never
+  forecast a move larger than their round-trip cost; the six that trade
+  lose. The executable loop loses 81.53 USD on its golden session. Details
+  below.
+- **Real data (owner-supplied, not bundled):** seven Nasdaq TotalView-ITCH
+  sessions, 2019-01-30 to 2020-01-30, AAPL / MSFT / QQQ. The signals are
+  statistically strong (EQ01 microprice gate IC +0.105, t 21) and none
+  survives taker costs: at 1 s the typical forecast is about 0.07 bp against
+  a round trip of about 0.7 bp. Combining the equity alphas raises the t to
+  25 and is still cost-negative. A power study on real-noise nulls flags
+  nothing when nothing is planted and reliably detects planted ICs of about
+  0.01-0.02 ([docs/REAL_DATA.md](docs/REAL_DATA.md) §3.1).
+- **Out-of-time holdout (v1.8.0):** six hypotheses were pre-registered and
+  pushed (commit `6723fd0`) before any 2026 feature existed. On 2026-05-15
+  and 2026-05-18 all four confirmatory signals were confirmed (EQ01 t 7.74,
+  EQ02 8.02, EQ10 8.08, EQ05 9.51) and both controls behaved as registered.
+  No run traded at 1x costs. Those two days are now spent
+  ([docs/REAL_DATA.md](docs/REAL_DATA.md) §3.2, [LEARN.md](LEARN.md) §33).
+- **Maker side (v1.9-v1.10), in progress:** because a taker cannot pay
+  0.7 bp for a 0.07 bp edge, the platform now has a calibrated maker
+  backtest and a skewed two-sided quoter. Measured so far on synthetic data
+  only: the maker backtest loses 6.7 bp per trip with a passive exit (11.4 bp
+  crossing out); the quoter with a toy score nets +86.50 USD skewed against
+  +120.20 USD unskewed. A pre-registered, in-sample maker study on the seven
+  real sessions is **running**; it has no result yet, and by its own
+  verdict rule a positive in-sample result would only justify an
+  out-of-sample test ([LEARN.md](LEARN.md) §31, §34).
+
+**New in v1.9.0** (all opt-in; no default, golden or published number moved):
+
+- research validity R1-R6, the `v3` method bundle: FOMC / holiday calendar
+  and seeded day sampling, day-aligned folds, day-clustered and
+  day-block-bootstrap t, equal-weight per-instrument gate IC, single-venue
+  labelling, causal label freshness
+  ([docs/RESEARCH_VALIDITY.md](docs/RESEARCH_VALIDITY.md) §1a, COOKBOOK 44);
+- parallel feature build, `--workers N`, byte-identical to serial (COOKBOOK 43);
+- maker economics M1-M4: simulator calibration from the event stream, a
+  maker backtest with queue fills, rebates, measured markout and a passive
+  exit, maker labels, tail-conditional sizing
+  ([API_TRADING.md](API_TRADING.md) §2.6, COOKBOOK 39, 45, 46).
+
+**New in v1.10.0** (all opt-in, Python only):
+
+- M5 skewed two-sided quoting with inventory limit and flatten
+  ([API_TRADING.md](API_TRADING.md) §2.7, COOKBOOK 40);
+- A1 auction imbalance: NOII decoding in a separate pass, the closing-cross
+  strategy `AUC01` with a walk-forward, pre-registration required
+  ([docs/REAL_DATA.md](docs/REAL_DATA.md) §3.3, COOKBOOK 42);
+- X1-X3 Almgren-Chriss trajectory and frontier, alpha urgency, forecast
+  VWAP curve ([API_TRADING.md](API_TRADING.md) §2.8, COOKBOOK 41, 48);
+- G1-G4 governance: pre-registrations cost a look and commit to a code
+  fingerprint, the blackboard is anchored to git, agent writes are
+  Ed25519-signed (new dependency `cryptography`)
+  ([docs/governance/GOVERNANCE.md](docs/governance/GOVERNANCE.md) §2a,
+  COOKBOOK 47, [LEARN.md](LEARN.md) §35);
+- a fix: `python -m iap.features --workers N` now works under the spawn
+  start method (Windows, macOS).
+
+**Next (v1.11):** report the maker study whatever it shows; re-run the real
+batch under `v3`; run `AUC01` on real files; more symbols (ETF vs
+constituents); an LLM research agent that works only through the signed
+broker ([docs/ROADMAP.md](docs/ROADMAP.md) §3.5).
+
 ## Architecture in one line
 
 Spec §4, realized end to end in this repository:
@@ -502,12 +569,12 @@ golden tests — the engineering discipline this repo is built around
 
 | document | what it covers |
 |---|---|
-| [LEARN.md](LEARN.md) | textbook walkthrough: microstructure, generator, book, features, honest alpha research, ML/meta-labeling, portfolio, risk, execution, TCA, parity, latency economics, adaptability, contracts & Protocols, the Python risk/execution reference, the 7-state lifecycle, the decision trace, the data model, the MVP walkthrough with its honest numbers, the v1.3.0 review as six case-study chapters (fail-closed risk bugs, simulator realism, statistical power, gate gaming, crash consistency, supply-chain hygiene), pitfalls, interview Q&A |
-| [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) | how the quant, algo and AI sides work — a guided explanation for a newcomer: the pipeline on one page, the research statistics and gates, the execution algorithms and simulator rules, the fail-closed risk engine, the ML layer with its negative results, the LLM/agent boundary (what exists, what is backlog, what would be theatre on this data), determinism and replay; every section ends with where to look and a command that runs |
-| [COOKBOOK.md](COOKBOOK.md) | 48 task-oriented recipes with runnable commands |
+| [LEARN.md](LEARN.md) | textbook walkthrough: microstructure, generator, book, features, honest alpha research, ML/meta-labeling, portfolio, risk, execution, TCA, parity, latency economics, adaptability, contracts & Protocols, the Python risk/execution reference, the 7-state lifecycle, the decision trace, the data model, the MVP walkthrough with its honest numbers, the v1.3.0 review as six case-study chapters (fail-closed risk bugs, simulator realism, statistical power, gate gaming, crash consistency, supply-chain hygiene), pitfalls, interview Q&A, combining signals, adverse selection, and five v1.9-v1.10 case studies (why taker-only research cannot pay at 1 s, the FOMC sampling flaw and day-clustered inference, the 2026 holdout as pre-registration, what the synthetic maker/quoting results show, governance keys and code hashes) |
+| [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) | how the quant, algo and AI sides work — a guided explanation for a newcomer: the pipeline on one page, the research statistics and gates, the execution algorithms and simulator rules, the fail-closed risk engine, the ML layer with its negative results, the LLM/agent boundary (what exists, what is backlog, what would be theatre on this data), determinism and replay; since v1.10 also the real-data path and the `v3` validity bundle, the maker path (calibrate, post or quote, decompose), auctions, optimal execution and the governance chain; every section ends with where to look and a command that runs |
+| [COOKBOOK.md](COOKBOOK.md) | 48 task-oriented recipes with runnable commands (39-48: maker backtest, quoting, optimal execution, auctions, parallel features, the `v3` validity block, calibrating and backtesting a real session, signed pre-registration, the Almgren-Chriss frontier) |
 | [docs/REAL_DATA.md](docs/REAL_DATA.md) | real historical data: what `python -m iap.marketdata ingest` reads (Nasdaq TotalView-ITCH 5.0, LOBSTER), how to obtain files yourself (nothing is bundled), the commands from a downloaded file to an alpha report, the mapping table to canonical events, the point-in-time security master and corporate-actions table, known limitations, and what a first real-data study can and cannot conclude |
 | [docs/RESEARCH_VALIDITY.md](docs/RESEARCH_VALIDITY.md) + [research/power/POWER_REPORT.md](research/power/POWER_REPORT.md) | the corrected research methods (the defaults since v1.5.0, each with its named legacy rule), the research store under parallel writers, gate eligibility; the planted-signal power study of the validation chain |
-| [CHANGELOG.md](CHANGELOG.md) | release notes, newest first (v1.5.0: the corrected research methods become the defaults, every old rule keeps a legacy name, every dataset-derived artefact regenerated; v1.4.0: the generator's equity flow calibration fixed so flow reaches the close, and every dataset-derived artefact regenerated; v1.3.0: fail-closed risk, simulator fill rules, paper-platform safety, governance and deployment hardening, research validity) |
+| [CHANGELOG.md](CHANGELOG.md) | release notes, newest first (v1.10.0: skewed quoting, auctions, optimal execution, governance G1-G4; v1.9.0: research validity options, parallel features, maker economics; v1.8.0: the 2026 holdout and the ingest memory fix; v1.6.0-v1.7.2: real data, the agent layer, signal combination, real-data power; v1.5.0: the corrected research methods become the defaults, every old rule keeps a legacy name, every dataset-derived artefact regenerated; v1.4.0: the generator's equity flow calibration fixed so flow reaches the close, and every dataset-derived artefact regenerated; v1.3.0: fail-closed risk, simulator fill rules, paper-platform safety, governance and deployment hardening, research validity) |
 | [docs/MVP.md](docs/MVP.md) | the executable MVP (`python -m iap.mvp run / replay / verify / explain`): one deterministic, fully traced trading loop on a synthetic equity — the loop module by module, the §11.4 wiring rules with code references, the determinism contract, the incident replay flow, the honest golden-run results (cost-negative) with the realized-IC audit, and the success-criteria table |
 | [docs/LIFECYCLE.md](docs/LIFECYCLE.md) | the 7-state promotion lifecycle: states, the 17-edge transition table, the 20 gates with config keys and defaults, evidence documents, registry and transition-log formats, the bootstrap result (24 CANDIDATE / 0 beyond), the golden, the Java/Rust ports, the RETIRED-is-observational caveat |
 | [docs/DECISION_TRACE.md](docs/DECISION_TRACE.md) | the decision trace: the record, ids, canonical JSON rules, the stream digest with its known answers, sinks, the pinned `explain()` block, store views, emission points in Python / Java / C++ / Rust, incident replay |

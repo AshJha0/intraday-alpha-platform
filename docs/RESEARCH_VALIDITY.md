@@ -10,12 +10,13 @@ does that on data with a known truth — and v1.4.0 kept them opt-in; in those
 two releases every default was the previously pinned behaviour and no gate
 read a new statistic.
 
-The set is written down once, in `iap.validation.methods`, as two bundles:
-`"v2"` (the default) and `"legacy_v1"` (the rules up to v1.4.0). A pipeline
+The set is written down once, in `iap.validation.methods`, as bundles:
+`"v2"` (the default), `"legacy_v1"` (the rules up to v1.4.0) and, since
+v1.9.0, the opt-in `"v3"` (section 1a). A pipeline
 that feeds the ledger or the lifecycle uses a bundle, and the bundle name is
 part of an experiment's identity (`ExperimentSpec.configuration["methods"]`,
 and the ledger configuration of every report pipeline): the same alpha on
-the same data under the other bundle is another look. The drift z, the
+the same data under another bundle is another look. The drift z, the
 retirement rule and the meta-label imputation are not part of the bundle;
 they are configured where they live (`configs/strategies/strategies.json`
 `adaptive`; `iap.models.metalabel`).

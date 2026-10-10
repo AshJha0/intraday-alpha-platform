@@ -2559,8 +2559,7 @@ How to read it.
 On a real dataset the runner does the same with `python -m iap.research run
 --alpha EQ01 --methods v3 --dataset-dir <dataset>`; under `v3` it also
 reads `book_scope` from `dataset.json`, so ITCH-only results are labelled
-`nasdaq_bbo` (R4). The CLI help text still says "v2 (default) or
-legacy_v1"; `v3` is accepted (`choices` is the full `METHODS` table).
+`nasdaq_bbo` (R4).
 
 ## 45. Calibrate the simulator on one real session (v1.9)
 

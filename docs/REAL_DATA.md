@@ -301,11 +301,20 @@ the data is touched), one entry per horizon:
 
 ```bash
 cd python
-PYTHONPATH=src python3 -c "from pathlib import Path; from iap.agents.broker import WriteBroker; \
-print(WriteBroker(Path('..'), {'researcher'}).preregister('researcher', 'AUC01', 'C-300s', \
-'closing-cross price moves with the NOII imbalance sign from 5 min before the cross, net of taker entry', 1))"
-git add ../research/agents/blackboard.jsonl && git commit -m "prereg AUC01/C-300s" && git push
+PYTHONPATH=src python3 -m iap.agents.cli --root .. prereg --agent researcher \
+    --alpha AUC01 --horizon C-300s --expected-sign 1 \
+    --hypothesis "closing-cross price moves with the NOII imbalance sign from 5 min before the cross, net of taker entry"
+git add ../research && git commit -m "prereg AUC01/C-300s" && git push
+PYTHONPATH=src python3 -m iap.agents.cli --root .. anchor
+git add ../research/agents/anchors.json && git commit -m "anchor AUC01/C-300s" && git push
 ```
+
+Since v1.10.0 a pre-registration debits one look on the ledger it names
+(the checkout's `research/experiments.json` by default; `--ledger` and
+`--dataset-version` select a dataset ledger) and, with `--keyfile`, is
+Ed25519-signed (COOKBOOK recipe 47). `AUC01` is not a flagship alpha class,
+so its entry carries no code fingerprint and the gate cannot check the code
+for it.
 
 The horizon string is `<cross type>-<decision seconds>s`, exactly what
 `backtest` checks (`--cross-type O --decision-s 120` needs `O-120s`).
