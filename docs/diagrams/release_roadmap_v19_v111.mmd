@@ -4,25 +4,31 @@ flowchart LR
         E1["E1 parallel feature build"]
         M14["M1-M4 calibration, maker backtest,<br/>maker labels, tail sizing"]
     end
-    subgraph V110["v1.10.0, this release"]
+    subgraph V110["v1.10.0 (2026-10-10), released"]
         M5["M5 skewed two-sided quoting"]
         A1["A1 auction NOII + AUC01"]
         X["X1-X3 Almgren-Chriss,<br/>urgency, volume curve"]
         G["G1-G4 costed, code-bound, anchored,<br/>Ed25519-signed preregs"]
     end
-    subgraph RUN["running (research/maker-real)"]
-        MS["pre-registered in-sample maker study<br/>7 real sessions, no result yet"]
+    subgraph V111["v1.11.0, this release"]
+        E2["E2 Rust features via pyo3<br/>(opt-in --engine rust)"]
+        E3["E3 polyglot policy:<br/>18 canonical / 20 frozen, nothing deleted"]
+        AI3["AI3 model registry, drift,<br/>calibration, shadow mode"]
+        AI12["AI1-AI2 LLM research agent<br/>through the signed broker + evals"]
     end
-    subgraph V111["v1.11, planned"]
-        RV3["real batch re-run under v3"]
-        AUC["AUC01 on real files"]
-        A23["A2 ETF vs constituents, A3 futures lead-lag"]
-        E23["E2-E3 Rust features via pyo3"]
-        AI["AI1-AI4 LLM research agent<br/>through the signed broker"]
+    subgraph RUN["running (exploratory, in-sample, pre-registered)"]
+        MS["maker study, 7 real sessions<br/>(research/maker-real)"]
+        AUC["AUC01 auction + M5 quoting on real files<br/>(research/step2; AUC01 has a 2026 holdout)"]
+    end
+    subgraph LATER["deferred"]
+        A2["A2 QQQ vs constituents (more symbols)"]
+        A3["A3 futures lead-lag (on hold: data cost)"]
+        AI4["AI4 deep LOB baselines"]
     end
     M14 --> M5
     M14 --> MS
-    R --> RV3
-    G --> AI
     A1 --> AUC
-    MS -->|"if an in-sample edge:<br/>pre-register an out-of-sample test"| V111
+    M5 --> AUC
+    G --> AI12
+    E1 --> E2
+    E2 --> E3

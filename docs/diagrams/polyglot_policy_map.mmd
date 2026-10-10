@@ -1,0 +1,25 @@
+flowchart LR
+    subgraph CAN["CANONICAL: new behaviour lands here (18 copies)"]
+        PY["Python reference<br/>codec, book, replay, features (all 205),<br/>alpha, contracts, lifecycle, portfolio, TCA, backtest, adaptive"]
+        RRISK["Rust risk (normative rule text)<br/>+ Python iap.risk port"]
+        CEXEC["C++ execution + SOR (normative)<br/>+ Python iap.execution port"]
+        CHOT["C++ hot path<br/>codec, book, replay, features, alpha"]
+        RFEAT["Rust features (fast path)<br/>behind the pyo3 binding (E2)"]
+    end
+    subgraph FRZ["FROZEN: built, tested, golden-pinned, no new features (20 copies, 24 paths)"]
+        RF["Rust marketdata, orderbook, replay, contracts"]
+        RC["Rust alpha, lifecycle<br/>(RETIRE candidates, kept as parity evidence)"]
+        CC["C++ contracts"]
+        JV["Java core, codec, orderbook, replay, features, alpha,<br/>risk, execution, sor, contracts, trace, lifecycle,<br/>portfolio, tca, backtest, adaptive"]
+    end
+    GOLD[("tests/golden/<br/>pins every copy")] --> CAN
+    GOLD --> FRZ
+    PR["pull request"] --> GATE{"check_polyglot_policy.py<br/>(CI deployment job)"}
+    GATE -->|"touches a FROZEN path"| OV{"line starting<br/>POLYGLOT-OVERRIDE: reason?"}
+    OV -->|"no"| FAIL["fail"]
+    OV -->|"yes"| NA{"adds a function, method or type?"}
+    NA -->|"no"| PASS["pass"]
+    NA -->|"yes"| NA2{"POLYGLOT-OVERRIDE: new-api reason?"}
+    NA2 -->|"no"| FAIL
+    NA2 -->|"yes"| PASS
+    GATE -->|"canonical paths only"| PASS

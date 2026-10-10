@@ -1,0 +1,21 @@
+flowchart TD
+    FIT["fitted model<br/>MakerFilter, iap.models.zoo"] --> REG["ModelRegistry.register"]
+    PRE["blackboard prereg entry<br/>(or exploratory = true, recorded)"] --> REG
+    META["dataset version + date range, features,<br/>feature-registry hash, code fingerprint, seed, params"] --> REG
+    REG --> ID["model id = content hash<br/>artefact (joblib) + canonical JSON record<br/>immutable; parent id for lineage"]
+    ID --> LOAD["from_registry / load_registered<br/>re-hash on load; mismatch refused"]
+    LOAD --> CH["champion: its decisions are used"]
+    LOAD --> MON["monitor(reference window, current window)"]
+    MON --> M1["feature drift: PSI, KS"]
+    MON --> M2["prediction drift: PSI, KS"]
+    MON --> M3["classifier: calibration ECE, Brier<br/>regressor: IC decay"]
+    M1 --> REP["JSON report: OK / ALERT<br/>CLI exit 1 on ALERT"]
+    M2 --> REP
+    M3 --> REP
+    CAND["candidate (registered)"] --> SH["ShadowRunner: same frames as the champion<br/>candidate decisions recorded, never used"]
+    CH --> SH
+    SH --> CMP["compare: IC, hit rate, calibration, P&L delta"]
+    CMP --> PD["promotion_decision"]
+    GATES["lifecycle PROMOTION gates"] --> PD
+    PD -->|"both pass"| NEW["candidate may replace the champion"]
+    PD -->|"either fails"| KEEP["champion kept"]

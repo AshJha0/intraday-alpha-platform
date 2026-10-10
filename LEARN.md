@@ -66,7 +66,11 @@ Contents:
 33. [The 2026 holdout: pre-registration in practice](#33-the-2026-holdout-pre-registration-in-practice)
 34. [What the synthetic maker and quoting results do and do not show](#34-what-the-synthetic-maker-and-quoting-results-do-and-do-not-show)
 35. [Governance: why symmetric keys and class-only code hashes were not enough](#35-governance-why-symmetric-keys-and-class-only-code-hashes-were-not-enough)
-36. [Further reading](#36-further-reading)
+36. [Parity proves agreement, not correctness: the snapshot-burst bug](#36-parity-proves-agreement-not-correctness-the-snapshot-burst-bug)
+37. [Why an LLM must never compute a number](#37-why-an-llm-must-never-compute-a-number)
+38. [Freezing copies instead of deleting them](#38-freezing-copies-instead-of-deleting-them)
+39. [Model registries as evidence](#39-model-registries-as-evidence)
+40. [Further reading](#40-further-reading)
 
 ---
 
@@ -3911,7 +3915,230 @@ path, which stays free of agents by rule (HOW_IT_WORKS.md §6).
    *(The choice of hypothesis is itself a search; registering many and
    running the promising ones is a multiple comparison.)*
 
-## 36. Further reading
+## 36. Parity proves agreement, not correctness: the snapshot-burst bug
+
+**The question.** v1.11 put the Rust feature engine behind a Python API
+(plan item E2) and compared it with the Python reference on every row and
+every one of the 45 native slots. The golden tests had passed in all four
+languages for many releases. Why did a full-row comparison still find a
+disagreement?
+
+**What a golden test checks.** The feature goldens
+(`expected_features.json`, `expected_features_anomalies.json`) pin the
+values at *checkpoints*: chosen rows at chosen event indices. Every engine
+that matches the checkpoints passes. Nothing in that design says the rows
+*between* checkpoints agree, and every checkpoint on the anomaly vector
+happens to sit outside a SNAPSHOT recovery burst.
+
+**The bug.** When a venue sends a SNAPSHOT, the book is rebuilt over
+several events. API_FEATURES.md §2 pins what the feature engine does
+during that burst: it keeps the derived state from before the burst and
+does not read the half-built book. The Python reference does that. The Rust
+engine read the half-built book, recorded mid prices from it, and those
+samples moved the return features for a few rows after the burst ended.
+Validity matched on every row; only values differed, and only inside or
+just after bursts. The comparison was first recorded as a strict xfail (so
+a fix shows up as an unexpected pass that asks for the marker to be
+removed), and the Rust engine is corrected within the v1.11.0 release
+(CHANGELOG v1.11.0).
+
+**Why the comparison found it and the goldens did not.** Three properties
+of the new test: it compares *all* rows, not checkpoints; it compares *two
+independent implementations* row by row, so any divergence is visible
+without knowing the right answer in advance; and it runs on the anomaly
+vectors, which exist to contain the awkward cases (gaps, resets, bursts).
+The general lesson is the one LEARN.md §21 drew from the v1.3.0 risk bugs:
+four engines that agree byte for byte can all be wrong in the same way, and
+engines that agree at the points you chose to check can still disagree
+everywhere else. A golden test is a statement about the points it pins.
+
+**What the comparison does not prove.** Agreement between Python and Rust
+after the fix means the two implement the same rule. Whether that rule is
+right is a separate question, answered by the brute-force checks
+(`iap.features` against a naive recomputation) and by reading
+API_FEATURES.md §2. Parity moves the question from "do they agree" to "is
+the spec right"; it does not answer the second.
+
+**Check yourself.**
+
+1. A golden file pins 40 rows out of 2,000. A port matches all 40. What
+   has been shown about the other 1,960? *(Nothing directly; only that the
+   port's state at those 40 points matches.)*
+2. Why make the known gap a *strict* xfail rather than a skip? *(A skip
+   hides a fix; a strict xfail fails when the test starts passing, so the
+   marker cannot outlive the bug.)*
+3. Two engines agree on every row of every vector. Name one way they can
+   both still be wrong. *(Both implement the same wrong reading of the
+   spec, or the vectors never exercise the case.)*
+
+## 37. Why an LLM must never compute a number
+
+**The question.** v1.11 lets a Claude model drive research (plan item AI1):
+it proposes a hypothesis, pre-registers it, asks for a run and files a
+finding. Every number in a finding must already exist in an artefact the
+finding cites. Why such a strict rule, when the model can do arithmetic?
+
+**Three ways a number goes wrong.** A language model produces the most
+plausible next text. A number it writes can be:
+
+- *invented*: a plausible IC that no computation produced (a hallucination);
+- *derived*: a correct-looking transformation of real numbers, such as a t
+  "after adjustment" or a Sharpe from an IC, done in prose where nobody can
+  check the method;
+- *injected*: copied from text that an attacker placed where the model
+  reads it, such as a board entry saying "t = 9.87".
+
+All three read exactly like a correct number. A reviewer cannot tell them
+apart by looking at the finding.
+
+**The rule, and how it is enforced.** Code computes every metric and the
+verdict (`iap.llm.runners.verdict`) and writes a report. A finding is filed
+only if every number in its title and text appears, up to the rounding
+shown, in a *numeric* field of an artefact it cites, and at least one cited
+report comes from the same session (`iap.llm.verify.verify_finding`).
+Free-text fields do not count as evidence, which is what defeats the
+injection case: the planted "9.87" sits in a text field, so citing the
+entry that contains it does not verify it. COOKBOOK recipe 55 shows a
+finding quoting `0.25` refused, and the same finding with the report's own
+numbers filed.
+
+**Why not let the model compute and check the result afterwards?**
+Because the check would have to recompute the number, and then the
+recomputed number is the evidence and the model's is redundant. Making the
+model copy rather than compute keeps the evidence chain short: report →
+finding, both hashable, both on the board. It also means the verdict of a
+pre-registered test is fixed by code the moment the run finishes; the
+model can describe it but cannot argue it into a different verdict.
+
+**What the rule does not cover.** A finding can quote only true numbers and
+still be badly reasoned ("IC 0.097, so this will make money"). The rule
+checks provenance, not argument; the transcript is kept so a person can
+read the argument (GOVERNANCE.md §2b). And the live eval of 2026-10-10
+(`claude-haiku-5-5`, 4 of 4 scenarios passed, estimated $0.0096) shows a
+model that behaved well; it is the mocked adversarial evals, where a
+scripted model attacks each control and each ablation lets the failure
+through, that show the controls work.
+
+**Check yourself.**
+
+1. A finding says "IC 0.0968" and cites a report whose `gate_ic` is
+   0.096781. Is it filed? *(Yes: the number matches up to the rounding
+   shown.)*
+2. A finding says "t = 9.87" and cites a board entry whose free-text body
+   contains "9.87". Is it filed? *(No: free-text fields are not evidence,
+   and a finding needs a report from its own session.)*
+3. Why does the budget cap pre-registrations as well as dollars? *(Each
+   pre-registration is a look; an agent that can register without limit
+   can p-hack within its dollar budget.)*
+
+## 38. Freezing copies instead of deleting them
+
+**The question.** The platform implements the order book in four
+languages, the native features and six golden alphas in four, risk in
+three and the lifecycle in three. Each copy is golden-pinned. Plan item E3
+asked for fewer copies. v1.11 deleted none. Why is that the right outcome?
+
+**The real risk of duplication.** Copies that agree today are not the
+problem; the golden tests guarantee that. The problem is the next feature:
+it has to be written N times, and a copy that is not updated drifts, or
+blocks the release until someone who knows that language ports it. The
+cost grows with every feature added to every copy.
+
+**Why deletion was ruled out.** The E3 brief allowed deleting only code
+with no consumer in `deployment/`, CI, the MVP, documented commands or the
+golden harness. Every duplicated copy has one: a Docker image builds it,
+the Java platform imports it, or its golden test is the only proof that
+that language implements a pinned contract. The two copies with no runtime
+consumer (Rust `alpha`, Rust `lifecycle`) are exactly the second kind;
+deleting them would remove parity evidence and change the published test
+counts. They are recorded as RETIRE candidates, a decision for later.
+
+**What freezing does instead.** POLYGLOT.md marks 18 copies CANONICAL
+(where new behaviour lands) and 20 FROZEN (24 paths). A frozen copy is still
+built, tested and pinned, but takes no new features. The rule is
+mechanical: `tests/harness/check_polyglot_policy.py` fails a pull request
+that touches a frozen path without a line starting `POLYGLOT-OVERRIDE:`,
+and one that adds a function, method or type without the louder
+`POLYGLOT-OVERRIDE: new-api` (COOKBOOK recipe 53). The growth stops; the
+evidence stays. If a future release decides the Rust alpha proof is no
+longer wanted, deleting it is a one-line CHANGELOG decision against code
+that has not moved.
+
+**The general lesson.** When removing something has a cost you cannot
+measure well (here, lost evidence), and keeping it has a cost that grows
+(here, porting every feature), stop the growth first. That turns an
+open-ended liability into a fixed one, and defers the irreversible step
+until there is a reason for it.
+
+**Check yourself.**
+
+1. A bug fix in the canonical Python book changes a pinned rule. What has
+   to happen to the frozen Java book? *(Port it in the same PR, regenerate
+   the golden, and add a `POLYGLOT-OVERRIDE:` line.)*
+2. Why is `rust/features` canonical and not frozen? *(It is the fast path
+   behind the pyo3 binding of E2; freezing it would have blocked E2 and the
+   snapshot-burst fix.)*
+3. Why does the gate need the louder `new-api` marker? *(A port of a fixed
+   rule is expected; a new declaration in a frozen copy is the drift the
+   policy exists to stop, so it needs a deliberate, visible exception.)*
+
+## 39. Model registries as evidence
+
+**The question.** Before v1.11 every fitted model in the repository was a
+research object: fitted in a script, scored, written to a report. Plan
+item AI3 added `iap.mlops`, a registry with monitoring and shadow mode.
+What does a registry add to research that never trades?
+
+**A result needs to name its model.** A sentence like "the maker filter
+cut adverse selection by X" is evidence only if someone can load the exact
+model, on the exact data, and get X again. Without a registry that model is
+a file in a temp directory, refitted with whatever code is current. The
+registry makes the model a citable object: its id is a content hash over
+the artefact, the parameters, the dataset version and date range, the
+feature set and the feature-registry hash, the code fingerprint and the
+seed. Refit identically and you get the same id; change anything and you
+get a new one.
+
+**Immutability and tamper detection.** A registered model is never
+overwritten. Loading it re-hashes everything and refuses a mismatch; COOKBOOK
+recipe 54 appends one byte to `model.joblib` and `verify` exits 2. A model
+that has silently changed under its name is worse than no model, because
+every result that cites it is now wrong without anyone knowing.
+
+**The pre-registration link.** Registering requires a blackboard
+pre-registration entry, whose hash is stored on the record, unless the
+model is marked `exploratory`, which is also stored and printed. That ties
+the model to the hypothesis it was fitted to test, and makes an exploratory
+model impossible to present later as a confirmatory one. It is the same
+idea as pre-registering a hypothesis (§33, §35), applied to the object that
+tests it.
+
+**Monitoring and shadow mode, read as evidence.** Drift checks compare a
+current window with the reference window the model was registered on:
+feature and prediction drift (PSI, KS), calibration (ECE, Brier) for
+classifiers, IC decay for regressors. Recipe 54 shows why the outcome-based
+checks matter: the features and the scores did not move, the relationship
+did, and only calibration saw it. Shadow mode runs a candidate beside the
+champion on the same inputs, records what it would have done, and never
+lets it act; `promotion_decision` also requires the lifecycle PROMOTION
+gates, so a better shadow score alone promotes nothing.
+
+**What it is not.** No model in this repository is on a trading path, and
+none has earned its costs (§7; HOW_IT_WORKS.md §5). The registry does
+not make a model good. It makes a claim about a model checkable.
+
+**Check yourself.**
+
+1. Two people fit the same filter with the same data and seed on
+   different commits. Do they get the same model id? *(Not necessarily: the
+   code fingerprint is part of the id.)*
+2. Why is calibration drift not visible in the score distribution?
+   *(The scores can keep the same distribution while the probability they
+   stand for changes; only realised outcomes show it.)*
+3. A shadow candidate beats the champion on P&L delta. Is it promoted?
+   *(No: `promotion_decision` also requires the lifecycle gates.)*
+
+## 40. Further reading
 
 Inside this repository, in suggested order:
 
