@@ -1,0 +1,21 @@
+{
+  "schema": "iap.quoting_real_prereg",
+  "version": 1,
+  "title": "v1.10 M5 signal-skewed two-sided quoting on the 7 real XNAS ITCH sessions (exploratory, IN-SAMPLE)",
+  "status_of_data": "IN-SAMPLE. The 7 sessions (2019-01-30, 2019-03-27, 2019-07-30, 2019-08-30, 2019-10-30, 2019-12-30, 2020-01-30; AAPL, MSFT, QQQ) were already used to design, fit and select every alpha. This is exploratory; a positive result only motivates a fresh out-of-sample test. The 2026 holdout (2026-05-15, 2026-05-18) is SPENT for EQ01/05/10 and is not used.",
+  "cells": [
+    {"id": "EQ01", "alpha": "EQ01", "horizon": "1s", "alpha_weight": 1.0, "role": "skewed"},
+    {"id": "EQ05", "alpha": "EQ05", "horizon": "1s", "alpha_weight": 1.0, "role": "skewed"},
+    {"id": "EQ10", "alpha": "EQ10", "horizon": "1s", "alpha_weight": 1.0, "role": "skewed"},
+    {"id": "QNOSKEW", "alpha": null, "horizon": "1s", "alpha_weight": 0.0, "role": "control: no-skew gamma-only quoter on every symbol (expected_return = 0)"}
+  ],
+  "quoting_config": {"qty": 100, "max_inventory": 300, "gamma": 0.1, "k": 50.0, "tau_s": 10.0, "sigma": null, "sigma_halflife": 20, "sigma_init": 0.0001, "min_half_spread_ticks": 0.5, "as_floor": true, "as_horizon": "1s", "adverse_selection_bps": null, "markout_ns": 1000000000, "flatten_ts": "16:00:00 America/New_York of the session", "flatten_lead_ns": 60000000000, "instant_cancel": false},
+  "decisions": "A 1 s grid: the first continuous-trading feature row (is_trading_v1 == 1, is_auction_v1 != 1, is_halt_v1 != 1; multi7 features) of each second from 09:31:00 to 15:59:00 New York time. Skewed cells: expected_return = LinearAlpha.score() (the pinned clipped port path) of the alpha fitted on sessions strictly before the test session, pooled over the alpha's universe; the cell runs on the symbols of that universe. Control: the same grid on all 3 symbols with expected_return = 0 and alpha_weight = 0.",
+  "walk_forward": "Sessions in date order. Session 1 (2019-01-30) is warm-up only (calibration, alpha fit); the test sessions are the 6 later ones. Alpha fit on sessions strictly before; the calibration (latency table, impact, adverse-selection floor) is the PREVIOUS session's for that symbol.",
+  "calibration": "estimate_calibration per session and symbol (the python -m iap.execution.calibration code path) with the ASSUMED parametric latency injected exactly as the maker study (research/maker_real/prereg.json): reused read-only from data/real/maker_real/calib/<session>_<symbol>.json when present, else computed identically by this driver into its own output directory.",
+  "latency_ASSUMED": {"mean_ns": 100000, "jitter_ns": 50000, "tail_prob": 0.01, "tail_mult": 10.0, "venue_id": 101, "note": "ASSUMED, not measured: ITCH carries no receive stamp."},
+  "fees": "configs of the multi7 dataset: XNAS taker 0.003 USD/share, maker rebate 0.002 USD/share (indicative list prices).",
+  "statistic": "Per cell: per test session the net P&L in USD (after rebates, taker fees and impact, flattened at the close) summed over the cell's symbols. Session-clustered mean over the 6 test sessions, Student-t CI with (sessions - 1) df. Reported descriptively: the P&L decomposition (spread_captured, markout, inventory_pnl, flatten_cost, rebates, fees, impact), fills and fill rates, inventory (max, mean, time at limit), flatten stats, net per quote fill in bps of notional, sharpe_per_day of the session nets, and the paired per-session difference skewed minus control on the same symbols.",
+  "verdict_rule": "Quoting edge EXISTS for a cell iff the session-clustered mean net USD per session > 0 AND its CI excludes 0 at the Bonferroni level over the 4 cells (two-sided 0.05/4) AND at least 4 of the 6 test sessions have quote fills. Anything else = no demonstrated quoting edge. Skew HELPS for an alpha cell (secondary, descriptive, same Bonferroni level) iff the session-clustered mean of (skewed - control on the same symbols) > 0 with its Bonferroni CI excluding 0. In-sample: EXISTS reads 'worth an out-of-sample test', never 'profitable'. No parameter is tuned after seeing results; there is no sweep.",
+  "sampling": "Full sessions (decisions 09:31-15:59, events to the close); one (session, symbol) unit at a time."
+}

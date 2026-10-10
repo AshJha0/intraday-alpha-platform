@@ -1,6 +1,6 @@
 {
-  "bonferroni_p_threshold": 9.69743987587277e-06,
-  "bonferroni_t_threshold": 4.423812040443981,
+  "bonferroni_p_threshold": 9.684292078249081e-06,
+  "bonferroni_t_threshold": 4.424104988331581,
   "datasets": [
     {
       "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
@@ -11,10 +11,15 @@
       "dataset_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
       "entries": 146,
       "looks": 4088
+    },
+    {
+      "dataset_version": null,
+      "entries": 7,
+      "looks": 7
     }
   ],
   "description": "Multiple-testing ledger (spec \u00a713). Deterministic: no wall-clock; identical rerun => identical file. Experiments are de-duplicated by (alpha_id, kind, canonical config, dataset_version): re-running the same script on the same dataset does not inflate the Bonferroni denominator; the same configuration on a new dataset is a new look, and the looks of earlier datasets are kept (`datasets`). An entry judged under the ledger t-stat policy carries `gate_looks`, the look count its threshold was derived from.",
-  "distinct_experiments": 216,
+  "distinct_experiments": 223,
   "entries": [
     {
       "alpha_id": "ALL",
@@ -5057,10 +5062,108 @@
         "oos_ic": 0.14020530168439968,
         "verdict": "ITERATE"
       }
+    },
+    {
+      "alpha_id": "AUC01",
+      "config": {
+        "code_hash": null,
+        "feature_hash": null,
+        "horizon": "C-300s",
+        "prereg_id": "0927e6a62bdc2fe6"
+      },
+      "count": 1,
+      "key": "e478b27c7ad0a54352d958dcfb2c9234e65853fe63027c5acfb7f7ff02c894b1",
+      "kind": "prereg",
+      "n": 5157,
+      "result": {}
+    },
+    {
+      "alpha_id": "AUC01",
+      "config": {
+        "code_hash": null,
+        "feature_hash": null,
+        "horizon": "O-300s",
+        "prereg_id": "14827a9e3e7fd45a"
+      },
+      "count": 1,
+      "key": "eeb5be6d110860d54586dc77c1c22c66f643599956b8297b1e627e420eb67792",
+      "kind": "prereg",
+      "n": 5158,
+      "result": {}
+    },
+    {
+      "alpha_id": "AUC01",
+      "config": {
+        "code_hash": null,
+        "feature_hash": null,
+        "horizon": "C-300s:holdout2026",
+        "prereg_id": "3638b574166134e0"
+      },
+      "count": 1,
+      "key": "c97761ddb1249acad44fec66af1339a2e0c28d865245881b09784f3c70b48d00",
+      "kind": "prereg",
+      "n": 5159,
+      "result": {}
+    },
+    {
+      "alpha_id": "EQ01",
+      "config": {
+        "code_hash": "35332637fab6598abfda6cf0ca6f07b19125a084dce3f9a2ec4ce28f52330c8f",
+        "feature_hash": "e0a861a2183199a43b4d33a66c1c12bf1ddef5a685357f25c753f33943e6a65c",
+        "horizon": "1s:quoting-insample",
+        "prereg_id": "4a2841da43afb449"
+      },
+      "count": 1,
+      "key": "dafc2d303aae8b7d23c65d06cbd629e435e894c3fbd778e2c315878a7c51c378",
+      "kind": "prereg",
+      "n": 5160,
+      "result": {}
+    },
+    {
+      "alpha_id": "EQ05",
+      "config": {
+        "code_hash": "35332637fab6598abfda6cf0ca6f07b19125a084dce3f9a2ec4ce28f52330c8f",
+        "feature_hash": "94854443c46625e0329b971c88c0c4ca0f91e2ae93a19aeed29d855932221737",
+        "horizon": "1s:quoting-insample",
+        "prereg_id": "74b1c7ca3eadbd1a"
+      },
+      "count": 1,
+      "key": "762140d13e59cf2a35a2045cec4ca4c8eee995aed9aadb64053d6476b5003855",
+      "kind": "prereg",
+      "n": 5161,
+      "result": {}
+    },
+    {
+      "alpha_id": "EQ10",
+      "config": {
+        "code_hash": "35332637fab6598abfda6cf0ca6f07b19125a084dce3f9a2ec4ce28f52330c8f",
+        "feature_hash": "511d5f579c699cef184415bb650d1b92be3442750487663600a40c12b5e6a638",
+        "horizon": "1s:quoting-insample",
+        "prereg_id": "25b02e7625708fbc"
+      },
+      "count": 1,
+      "key": "da79e89fde90d011727bd1611fdd2322719a327065eb7c58197a04a905a39953",
+      "kind": "prereg",
+      "n": 5162,
+      "result": {}
+    },
+    {
+      "alpha_id": "QNOSKEW",
+      "config": {
+        "code_hash": null,
+        "feature_hash": null,
+        "horizon": "1s:quoting-insample",
+        "prereg_id": "404521cac8103863"
+      },
+      "count": 1,
+      "key": "232923d4840cf6ddbd3c20b4013001fe1279f30e96d71aa5af54d87801b6e423",
+      "kind": "prereg",
+      "n": 5163,
+      "result": {}
     }
   ],
-  "expected_max_null_t": 4.134710718794987,
+  "expected_max_null_t": 4.135038835338708,
   "pinned_alpha": 0.05,
-  "total_experiments": 5156,
+  "total_experiments": 5163,
   "x-version": 3
 }
