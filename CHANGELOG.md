@@ -6,6 +6,28 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
+## v1.12.0 — unreleased
+
+- **Tick-to-trade latency benchmark (plan X6).** New
+  `cpp/bench/bench_tick_to_trade` times every event individually from a raw
+  IAP1 frame through decode, book, native features, alpha scoring and an order
+  decision with a minimal pre-trade check, into an HDR-style log-linear
+  histogram, and reports p50 / p90 / p99 / p99.9 / max end to end and per
+  stage, on the golden `eq_mbo` vector and a generated 100,000-event equity
+  day (pinned seed). Warm-up excluded; timer overhead measured and stated.
+  The boundary is explicit: no network or kernel, and no C++ risk engine (the
+  decision stage is bench-local). CI-runner baseline
+  `benchmarks/results_tick_to_trade.md` (golden: p50 1,279 ns, p99 2,559 ns,
+  p99.9 11,263 ns); method and caveats in `benchmarks/RESULTS.md`.
+- The `cpp` CI job runs it after ctest, writes the table to the job summary
+  and the `bench-tick-to-trade` artifact, and guards the end-to-end p50/p99
+  rows at 8× the baseline. `tests/harness/check_bench_regression.py` gains
+  `--rows` (regex row filter) and `--title`; the existing `bench_all` guard
+  is unchanged.
+- `tools/tick_to_trade_py.py`: the same path through the Python reference
+  implementation (events/s and percentiles; not run in CI).
+- COOKBOOK recipe 56.
+
 ## v1.11.0 — 2026-10-10
 
 Scale and AI (IAP_Next_Releases_Plan v1.11: E2, E3, AI1-AI3; A2, A3 and AI4
