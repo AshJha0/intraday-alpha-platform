@@ -57,6 +57,8 @@ Contents:
 46. [Run the maker backtest on a real session (how-to; results pending)](#46-run-the-maker-backtest-on-a-real-session-how-to-results-pending)
 47. [Pre-register with a signed request, anchor it, and verify the board (v1.10)](#47-pre-register-with-a-signed-request-anchor-it-and-verify-the-board-v110)
 48. [Walk the Almgren-Chriss efficient frontier (v1.10)](#48-walk-the-almgren-chriss-efficient-frontier-v110)
+49. [Compute the native features with the Rust engine from Python (v1.11)](#49-compute-the-native-features-with-the-rust-engine-from-python-v111)
+50. [Register a model, monitor it, and shadow a candidate (v1.11)](#50-register-a-model-monitor-it-and-shadow-a-candidate-v111)
 
 Recipes 27–35 were added with v1.3.0. Every command block in them was run
 as printed, from a clean checkout of the release, before it was written
@@ -2886,3 +2888,76 @@ Measure the speed on your machine with
 `python tools/bench_native_features.py` (CI: about 150x on the golden
 vectors). The anomaly vectors show the one known gap, rows inside a
 SNAPSHOT recovery burst (API_FEATURES.md §7.1).
+
+## 50. Register a model, monitor it, and shadow a candidate (v1.11)
+
+Register a fitted maker filter against its pre-registration, check drift on
+a shifted window, then run a challenger in shadow. Synthetic data; a few
+seconds. Save as `recipe49.py` and run `cd python && PYTHONPATH=src python recipe49.py`.
+
+```python
+import tempfile
+from pathlib import Path
+
+import numpy as np
+
+from iap.agents.blackboard import Blackboard, digest
+from iap.backtest.maker import MakerFilter
+from iap.mlops import ModelRegistry, ShadowRunner, monitor
+
+rng = np.random.default_rng(0)
+
+
+def data(n, shift=0.0):
+    X = rng.normal(size=(n, 3)) + shift
+    y = (rng.random(n) < 1 / (1 + np.exp(-(1.5 * X[:, 0] - X[:, 1])))).astype(float)
+    return X, y
+
+
+tmp = Path(tempfile.mkdtemp())
+entry = Blackboard(tmp / "bb.jsonl").append(
+    "prereg", "research", 1, {"prereg_id": digest({"alpha": "EQ01", "horizon": "1m"})[:16]}
+)
+X, y = data(3000)
+champ = MakerFilter("meta_gbm", tau=0.5).fit(X, y)
+rec = champ.register(
+    ModelRegistry(tmp / "reg"), prereg=entry, dataset_version="synthetic-v1",
+    date_range=("2026-01-02", "2026-03-31"), features=["f0", "f1", "f2"], seed=0,
+)
+print("model", rec.model_id[:16], "prereg", rec.prereg_hash[:12])
+champ = MakerFilter.from_registry(tmp / "reg", rec.model_id)
+
+Xn, yn = data(3000, shift=0.5)
+rep = monitor(
+    kind="classifier",
+    ref_features={f"f{i}": X[:, i] for i in range(3)},
+    cur_features={f"f{i}": Xn[:, i] for i in range(3)},
+    ref_pred=champ.score(X), cur_pred=champ.score(Xn), ref_y=y, cur_y=yn,
+)
+print("monitor", rep["status"], rep["alerts"])
+
+cand = MakerFilter("meta_gbm", tau=0.4).fit(Xn[:1500], yn[:1500])
+sr = ShadowRunner(champ, cand)
+sr.run([Xn[1500:]])
+cmp = sr.compare(yn[1500:], pnl=np.where(yn[1500:] > 0, 1.0, -1.0))
+print("shadow pnl delta", cmp.pnl_delta, "agreement", round(cmp.agreement, 3))
+```
+
+```
+model 9e60a118146c9ef9 prereg f78d0118ad2f
+monitor ALERT ['feature_drift:f0', 'feature_drift:f1', 'feature_drift:f2']
+shadow pnl delta -27.0 agreement 0.878
+```
+
+How to read it. The model id is a content hash of the artefact, data
+version, date range, features, feature-registry hash, code fingerprint and
+seed: refitting identically gives the same id, any change a new one, and
+`from_registry` re-verifies every hash before loading (the id depends on
+the code fingerprint and the prereg hash on the blackboard entry, so yours
+may differ). The +0.5 shift fires PSI/KS on every feature; the score
+distribution moves less, so prediction drift and calibration stay OK. The
+candidate (fitted on the shifted window, lower threshold) trades more and
+loses 27 units against the champion in shadow. Its decisions are recorded
+but never used: `sr.run` returns the champion's mask. Promotion goes
+through `promotion_decision`, which also requires the lifecycle PROMOTION
+gates (API_ADAPTIVE.md section 9).

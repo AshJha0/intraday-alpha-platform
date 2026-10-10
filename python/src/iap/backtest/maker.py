@@ -215,6 +215,7 @@ class MakerFilter:
         self.model_name = model
         self.tau = float(tau)
         self._model: Any = None
+        self.model_id: str | None = None  # set by from_registry (v1.11)
 
     def fit(self, X: np.ndarray, y: np.ndarray) -> MakerFilter:
         X = np.asarray(X, dtype=float)
@@ -247,6 +248,35 @@ class MakerFilter:
     def allow(self, X: np.ndarray) -> np.ndarray:
         s = self.score(X)
         return np.isfinite(s) & (s >= self.tau)
+
+    @classmethod
+    def from_registry(cls, registry, model_id: str, tau: float | None = None) -> MakerFilter:
+        """A fitted filter loaded (and integrity-checked) from an
+        :class:`iap.mlops.ModelRegistry` by id (v1.11).  The record's
+        ``params`` carry ``model`` and ``tau``; ``tau`` overrides the latter."""
+        from iap.mlops.registry import ModelRegistry
+
+        reg = registry if isinstance(registry, ModelRegistry) else ModelRegistry(registry)
+        model, rec = reg.load(model_id)
+        f = cls(model=rec.params.get("model", "meta_gbm"), tau=rec.params.get("tau", 0.5))
+        if tau is not None:
+            f.tau = float(tau)
+        f._model = model
+        f.model_id = rec.model_id
+        return f
+
+    def register(self, registry, **meta):
+        """Register this fitted filter (``iap.mlops.ModelRegistry.register``;
+        ``meta`` = dataset_version, date_range, features, seed, prereg / exploratory...)."""
+        from iap.mlops.registry import ModelRegistry
+
+        if self._model is None:
+            raise RuntimeError("MakerFilter.register() before fit()")
+        reg = registry if isinstance(registry, ModelRegistry) else ModelRegistry(registry)
+        kind = "classifier" if self.model_name == "meta_gbm" else "regressor"
+        params = {"model": self.model_name, "tau": self.tau, **meta.pop("params", {})}
+        meta.setdefault("name", f"maker_filter/{self.model_name}")
+        return reg.register(self._model, kind=kind, params=params, **meta)
 
 
 class MakerBacktester:

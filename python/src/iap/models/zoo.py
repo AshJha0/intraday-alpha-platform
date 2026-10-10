@@ -125,3 +125,12 @@ def model_tier(name: str) -> int:
     if name not in _FACTORIES:
         raise ValueError(f"unknown model {name!r}")
     return _FACTORIES[name][0]
+
+
+def load_registered(registry, model_id: str) -> Any:
+    """A fitted zoo model loaded from an :class:`iap.mlops.ModelRegistry` by
+    id, after its integrity check (v1.11; :func:`make_model` is unchanged)."""
+    from iap.mlops.registry import ModelRegistry
+
+    reg = registry if isinstance(registry, ModelRegistry) else ModelRegistry(registry)
+    return reg.load(model_id)[0]
