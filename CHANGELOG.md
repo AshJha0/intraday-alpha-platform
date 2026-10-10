@@ -25,6 +25,24 @@ that tag.
   (+86.50 vs +120.20 USD). With a synthetic look-ahead signal, the skew cuts
   markout losses (tested). No real-data result is claimed.
 
+Execution algorithms (IAP_Next_Releases_Plan v1.10: X1-X3), Python only and
+opt-in. The pinned TWAP/VWAP/IS schedules, every golden and every
+cross-language contract are unchanged.
+
+**Added.**
+- X1, `iap.execution.optimal`: closed-form Almgren-Chriss implementation
+  shortfall trajectory (sinh/cosh, discrete kappa), expected cost and
+  variance, `efficient_frontier`, and `ac_params_from_calibration` (impact
+  slope from an `iap.exec_calibration` document, `ExecConfig` fallback).
+  Opt in with `ParentOrder(is_model=ISModel.ALMGREN_CHRISS, ac_params=...)`;
+  the default IS schedule stays `exp(-ra * i / (N-1))`.
+- X2, `iap.execution.urgency`: `apply_alpha_urgency` posts passively when the
+  signal agrees with patience and crosses / front-loads when it is adverse.
+- X3, `iap.execution.volume_curve`: per-instrument intraday volume profile
+  from TRADE events, shrunk toward the U-shape, written as `iap.volume_curve`
+  v1 JSON by `python -m iap.execution.volume_curve`; opt in with
+  `ParentOrder(volume_curve=...)`.
+
 ## v1.9.0 — 2026-10-10
 
 Trustworthy evidence, then maker economics (IAP_Next_Releases_Plan v1.9:

@@ -49,6 +49,7 @@ Contents:
 38. [Combine alphas out of sample and count the independent bets](#38-combine-alphas-out-of-sample-and-count-the-independent-bets)
 39. [Calibrate the simulator and run a maker-side backtest (v1.9)](#39-calibrate-the-simulator-and-run-a-maker-side-backtest-v19)
 40. [Quote both sides with an alpha-skewed reservation price (v1.10)](#40-quote-both-sides-with-an-alpha-skewed-reservation-price-v110)
+41. [Optimal execution: Almgren-Chriss, alpha urgency and a forecast VWAP curve (v1.10)](#41-optimal-execution-almgren-chriss-alpha-urgency-and-a-forecast-vwap-curve-v110)
 
 Recipes 27–35 were added with v1.3.0. Every command block in them was run
 as printed, from a clean checkout of the release, before it was written
@@ -2347,3 +2348,34 @@ python -m iap.execution.calibration --events <day>.iap1 --tick 1=0.01 --out cali
 # then, in Python: QuotingBacktester(cfg, QuotingConfig(...), load_calibration("calib.json"))
 #   .run_days({day: (events, scores)}, 1) for each day, and sharpe_per_day(table["net"])
 ```
+## 41. Optimal execution: Almgren-Chriss, alpha urgency and a forecast VWAP curve (v1.10)
+
+Every step is opt-in; a default `ParentOrder` schedules exactly as before.
+
+```python
+from iap.execution import AlgoType, ISModel, ParentOrder, slice_quantities
+from iap.execution.calibration import load_calibration
+from iap.execution.optimal import ac_params_from_calibration, efficient_frontier
+from iap.execution.urgency import AlphaUrgencyParams, apply_alpha_urgency
+from iap.execution.volume_curve import load_volume_curve
+
+# X1: closed-form IS trajectory from the calibrated impact slope (or the config default)
+p = ac_params_from_calibration(sigma=0.4, adv=2e6, price=50.0, horizon=1 / 13,
+                               risk_aversion=1e-5, calibration=load_calibration(None))
+for lam, e, v in efficient_frontier(50_000, p, 10, [0, 1e-6, 1e-5, 1e-4]):
+    print(f"lambda={lam:g}  E={e:.2f}  sd={v ** 0.5:.2f}")
+parent = ParentOrder(algo=AlgoType.IS, qty=50_000, slices=10, start_ts=0, end_ts=1,
+                     is_model=ISModel.ALMGREN_CHRISS, ac_params=p)
+print(slice_quantities(parent))
+
+# X2: post when the alpha says waiting pays, cross and front-load when it does not
+parent = apply_alpha_urgency(parent, signal=+0.8, params=AlphaUrgencyParams(threshold=0.2))
+
+# X3: VWAP on a forecast curve
+#   python -m iap.execution.volume_curve --events day1.iap1 day2.iap1 --out curve.json
+vwap = ParentOrder(algo=AlgoType.VWAP, qty=50_000, slices=13, instrument_id=1,
+                   volume_curve=load_volume_curve("curve.json", 1))
+```
+
+With few days the estimated curve leans on the U-shape (`weight_empirical =
+days / (days + shrinkage)`); check that field before trusting a curve.

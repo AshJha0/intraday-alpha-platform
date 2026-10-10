@@ -40,6 +40,12 @@ These child styles are the ``NATIVE`` execution policy, the default.
 ``ParentOrder.policy`` selects ``AGGRESSIVE`` (every child MARKET) or
 ``PASSIVE`` (the POST -> REST -> REPRICE / CROSS state machine of
 ``iap.execution.passive``) per parent; the schedules above do not change.
+
+v1.10 opt-ins (Python only, not part of the parity contract; defaults keep
+the pinned schedules): ``is_model=ISModel.ALMGREN_CHRISS`` + ``ac_params``
+replaces the IS decay with the closed-form Almgren-Chriss trajectory
+(``iap.execution.optimal``); ``volume_curve`` replaces the VWAP ``1 + x^2``
+curve with a forecast curve (``iap.execution.volume_curve``).
 """
 
 from __future__ import annotations
@@ -47,8 +53,12 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from enum import IntEnum
+from typing import TYPE_CHECKING
 
 from iap.execution.passive import ExecPolicy, PassiveParams
+
+if TYPE_CHECKING:  # pragma: no cover
+    from iap.execution.optimal import ACParams
 
 
 class AlgoType(IntEnum):
@@ -58,6 +68,15 @@ class AlgoType(IntEnum):
     VWAP = 1
     POV = 2
     IS = 3
+
+
+class ISModel(IntEnum):
+    """IS schedule model. EXP_DECAY is pinned across languages; the
+    Almgren-Chriss trajectory (``iap.execution.optimal``) is Python-only and
+    opt-in (v1.10)."""
+
+    EXP_DECAY = 0
+    ALMGREN_CHRISS = 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +98,14 @@ class ParentOrder:
     policy: ExecPolicy = ExecPolicy.NATIVE  #: child style (iap.execution.passive)
     urgency: float = 0.5  #: PASSIVE patience, in [0, 1]; 1 = cross at once
     passive: PassiveParams = PassiveParams()  #: PASSIVE parameters
+    #: IS schedule model (v1.10, opt-in): EXP_DECAY is the pinned default.
+    is_model: ISModel = ISModel.EXP_DECAY
+    #: Almgren-Chriss inputs (``iap.execution.optimal.ACParams``) for
+    #: ``is_model=ALMGREN_CHRISS``; its ``risk_aversion`` is the lambda used.
+    ac_params: ACParams | None = None
+    #: Forecast VWAP volume curve (``iap.execution.volume_curve``, v1.10,
+    #: opt-in); ``None`` keeps the pinned ``1 + x^2`` curve.
+    volume_curve: tuple[float, ...] | None = None
 
 
 def slice_weights(parent: ParentOrder) -> list[float]:
@@ -90,6 +117,16 @@ def slice_weights(parent: ParentOrder) -> list[float]:
         raise ValueError("slices must be > 0")
     if n == 1:
         return [1.0]
+    if parent.algo == AlgoType.VWAP and parent.volume_curve is not None:
+        from iap.execution.volume_curve import curve_slice_weights
+
+        return curve_slice_weights(parent.volume_curve, n)
+    if parent.algo == AlgoType.IS and parent.is_model == ISModel.ALMGREN_CHRISS:
+        from iap.execution.optimal import ac_trajectory
+
+        if parent.ac_params is None:
+            raise ValueError("is_model=ALMGREN_CHRISS needs ac_params")
+        return [max(0.0, x) for x in ac_trajectory(1.0, parent.ac_params, n)]
     w: list[float] = []
     for i in range(n):
         if parent.algo == AlgoType.TWAP:
