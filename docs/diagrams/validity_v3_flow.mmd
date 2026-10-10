@@ -1,0 +1,18 @@
+flowchart TD
+    ING["ingested dataset<br/>dataset.json: sessions, sampling, book_scope"] --> SAMP["R1 stratified_day_sample (seeded)<br/>record_day_sampling -> dataset.json"]
+    SAMP --> FB["feature build<br/>R5 --label-freshness trailing (causal)"]
+    FB --> FOLD["R2 split_mode = day_aligned<br/>folds cut at session starts"]
+    FOLD --> IC["R3 gate IC = equal-weight mean of per-instrument ICs<br/>(pooled kept as gate_ic_pooled)"]
+    ING -->|"R4 single venue"| SCOPE["book_scope = single_venue<br/>crossed_frac null, price_reference nasdaq_bbo"]
+    SCOPE --> IC
+    IC --> GATE["gate t: pooled-slope HAC<br/>vs ledger threshold (unchanged)"]
+    IC --> VAL["validity block (4 extra looks)"]
+    VAL --> D1["per-day ICs with event tags"]
+    VAL --> D2["ex_event: FOMC + holiday-thin days removed"]
+    VAL --> D3["R6 HAC t with no lag across a day boundary"]
+    VAL --> D4["R2 day-clustered t, day-block bootstrap"]
+    GATE --> REP["report pins dataset_versions"]
+    D1 --> REP
+    D2 --> REP
+    D3 --> REP
+    D4 --> REP

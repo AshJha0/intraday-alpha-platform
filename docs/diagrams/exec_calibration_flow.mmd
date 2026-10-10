@@ -1,0 +1,18 @@
+flowchart LR
+    EV["normalized events<br/>IAP1 / JSONL / events.parquet<br/>one session"] --> EST["estimate_calibration<br/>python -m iap.execution.calibration"]
+    TICK["tick sizes<br/>configs/instruments"] --> EST
+    EST --> FR["touch fill rates<br/>by queue-ahead bucket<br/>(open orders right-censored)"]
+    EST --> HZ["queue-depletion hazards<br/>per side"]
+    EST --> LAT["feed latency quantiles<br/>(ITCH: no receive stamp,<br/>use parametric_latency)"]
+    EST --> MK["maker markouts<br/>100 ms / 1 s / 10 s"]
+    EST --> IMP["aggressor impact<br/>mean, slope in bp per % ADV"]
+    FR --> DOC["iap.exec_calibration v1<br/>calib.json"]
+    HZ --> DOC
+    LAT --> DOC
+    MK --> DOC
+    IMP --> DOC
+    DOC -->|"venue latency table"| SIM["ExecutionSimulator<br/>(calibration=...)"]
+    DOC -->|"adverse selection for the gate"| MB["MakerBacktester"]
+    DOC -->|"half-spread floor"| QB["QuotingBacktester"]
+    DOC -->|"impact slope eta"| AC["ac_params_from_calibration<br/>Almgren-Chriss"]
+    DOC -->|"fill probability"| LBL["maker_labels"]

@@ -61,7 +61,12 @@ Contents:
 28. [Twelve interview questions (with answers from this repo)](#28-twelve-interview-questions-with-answers-from-this-repo)
 29. [Combining weak signals, and why correlation gates matter](#29-combining-weak-signals-and-why-correlation-gates-matter)
 30. [Adverse selection and markouts](#30-adverse-selection-and-markouts)
-31. [Further reading](#31-further-reading)
+31. [Why taker-only research cannot pay at 1 s, and what maker economics changes](#31-why-taker-only-research-cannot-pay-at-1-s-and-what-maker-economics-changes)
+32. [The FOMC / sampling flaw, and day-clustered inference](#32-the-fomc--sampling-flaw-and-day-clustered-inference)
+33. [The 2026 holdout: pre-registration in practice](#33-the-2026-holdout-pre-registration-in-practice)
+34. [What the synthetic maker and quoting results do and do not show](#34-what-the-synthetic-maker-and-quoting-results-do-and-do-not-show)
+35. [Governance: why symmetric keys and class-only code hashes were not enough](#35-governance-why-symmetric-keys-and-class-only-code-hashes-were-not-enough)
+36. [Further reading](#36-further-reading)
 
 ---
 
@@ -3590,7 +3595,323 @@ same markout table, and see what the passive fills actually kept.
    you ask for next? *(The fill rate, and the cost of the quantity it did not
    fill.)*
 
-## 31. Further reading
+## 31. Why taker-only research cannot pay at 1 s, and what maker economics changes
+
+**The question.** Seven real Nasdaq sessions (v1.6.0) and a two-day 2026
+holdout (v1.8.0) both show statistically strong signals at 1-5 s: EQ01's
+gate IC is +0.105 in sample and +0.037 out of time. None of them trades
+profitably. Why can a signal be this significant and still lose money?
+
+**The arithmetic.** An information coefficient is a correlation, not a
+return. The return a signal forecasts is roughly `IC × σ(h)`, where `σ(h)`
+is the standard deviation of the mid move over the horizon. For a large-cap
+stock over one second, `σ(1 s)` is of the order of 1 bp, so even an IC of
+0.07-0.1 forecasts a move of well under 0.1 bp on an average row. The
+platform's real-data reports put the typical forecast at about **0.07 bp**.
+A taker round trip pays the spread (one tick on a 150-300 USD stock is
+0.3-0.7 bp), two taker fees (0.003 USD/share is about 0.1-0.2 bp per side)
+and impact: about **0.7 bp** in total. The forecast is about a tenth of
+the cost. A t-statistic of 20 says the forecast is reliably above zero; it
+says nothing about whether it is above 0.7 bp. The cost-aware position
+policy (v1.5.0) makes this visible: it trades only when the forecast
+exceeds the round-trip cost, and on real data it almost never does.
+
+**What a maker changes.** A passive order is paid the half-spread instead
+of paying it, and collects a rebate instead of a fee. Done naively, that
+turns −0.7 bp into roughly +0.7 bp per round trip. The catch is in chapter
+30: the fills a resting order gets are selected against it. The relevant
+comparison is no longer forecast versus spread; it is
+
+```
+|forecast| + half-spread earned + rebate − exit cost  >  adverse selection
+```
+
+and every term on the right is measured, not assumed. That is the v1.9
+design (API_TRADING.md §2.6): calibrate fill probability, queue depletion
+and adverse selection from the event stream (M1), post only when the gate
+above clears (M2), label each decision with what a maker would actually
+have got (M3: filled? run over?), and add conditions on the tail of the
+score and the book (M4).
+
+**What the synthetic numbers say.** On the golden synthetic vector
+(COOKBOOK recipe 39) the gate with a taker exit admits nothing, because the
+half-spread earned on entry is paid back on exit: the gate collapses to
+`|er| + rebate − taker fee − impact > AS`, and a 1 bp toy score cannot clear
+1.4 bp of measured adverse selection. With a passive exit the gate admits
+nearly every row, but only 32% of exits fill passively, the rest time out
+and cross, and adverse selection *on the trips actually taken* is +7.1 bp
+against a calibrated +1.4 bp: the trips that last are the ones the market
+ran over. Net: −6.7 bp per trip, against −11.4 bp for an ungated taker exit.
+Better, and still a loss.
+
+**The general lesson.** The calibrated average adverse selection is not the
+adverse selection of the trades you take. Any gate that conditions on an
+average will be wrong in the direction that hurts, because the trades that
+survive to be measured are selected by the market. This is why the
+maker study on real data (in progress, pre-registered, in-sample) reports
+adverse selection per trip, not per calibration.
+
+**Check yourself.**
+
+1. A signal has IC 0.05 at 1 s on a stock with `σ(1 s)` = 1.2 bp. Spread is
+   one tick on a 200 USD stock, taker fee 0.003 USD/share. Does a taker
+   strategy pay? *(Forecast ≈ 0.06 bp; spread 0.5 bp plus 2 × 0.15 bp fees
+   ≈ 0.8 bp. No, by an order of magnitude.)*
+2. Why does a taker exit make the maker gate almost the same as a taker
+   gate? *(The half-spread earned on entry is paid back crossing out; only
+   the rebate-minus-fee difference and the adverse-selection term remain.)*
+3. The calibration says maker adverse selection is 1.4 bp at 10 s. The
+   backtest's trips show 7.1 bp. Which one is the bug? *(Neither. The
+   calibration averages over all touch joins; the trips are the subset that
+   filled and stayed open, which the market selected.)*
+
+## 32. The FOMC / sampling flaw, and day-clustered inference
+
+**The question.** The seven real sessions behind every v1.6-v1.8 number are
+2019-01-30, 2019-03-27, 2019-07-30, 2019-08-30, 2019-10-30, 2019-12-30 and
+2020-01-30. What is wrong with that sample, and what does a t of 21 on it
+really mean?
+
+**What went wrong.** Three things, each found in the v1.9 review:
+
+- **Event days.** 2019-01-30 and 2019-10-30 are FOMC announcement days, and
+  2019-12-30 is a thin holiday session. Two of seven days are the most
+  unusual afternoons of their year. If a signal works mainly on those days,
+  a pooled statistic says it works.
+- **Unequal weight.** QQQ supplied about half the feature rows. A pooled IC
+  is dominated by the busiest instrument; it answers "does it work on
+  QQQ?" more than "does it work?".
+- **The unit of independence.** Rows within a day share that day's news,
+  volatility and liquidity. A HAC t-statistic corrects for autocorrelation
+  between nearby rows, but it treats seven days of a million rows each as
+  millions of nearly independent observations. A common shock that lasts
+  the whole day is invisible to it. On seven days, the number of independent
+  observations of "a day" is seven.
+
+**What v1.9 adds (opt-in, the `v3` bundle).** Seeded, stratified day
+sampling recorded in `dataset.json` so the draw can be audited (R1); an
+event calendar and a report block with the gate statistics recomputed
+without FOMC and holiday-thin days; folds cut at session starts, and a
+leave-one-day-out layout (R2); a day-clustered t and a day-block bootstrap,
+which resample whole days (R2); the gate IC as the equal-weight mean of
+per-instrument ICs (R3); a HAC t that forms no lag product across a day
+boundary (R6). COOKBOOK recipe 44 shows the block on a synthetic fixture.
+
+**How to read the three t-statistics.** If the row-level HAC t is 20 and
+the day-clustered t is 3, the signal is consistent within days but its
+day-to-day variation is large relative to its mean; with seven days you
+cannot rule out that two good days carry it. The day-clustered t has about
+`days − 1` degrees of freedom, so its critical values are those of a
+t-distribution with 6 degrees of freedom, not a normal. Neither number is
+"the right one"; the day-clustered one answers the question a trader asks
+("will tomorrow look like this?").
+
+**What did not change.** The `v3` bundle is not the default. Every
+published number, golden and report is still the `v2` rule, so nothing
+moved when v1.9 shipped. Re-running the real-data batch under `v3` is a
+v1.11 item (docs/ROADMAP.md §3.5); until then, the honest reading of the
+2019-20 statistics is "strong at the row level, unproven at the day level".
+
+**Check yourself.**
+
+1. Why does a day-block bootstrap use whole days rather than rows? *(Rows
+   within a day are dependent through the day's common shock; resampling
+   rows treats them as independent and understates the variance.)*
+2. A signal's gate IC drops from 0.08 to 0.02 when FOMC days are removed.
+   What do you report? *(Both, with the ex-event number as the one to plan
+   on; and the observation that the signal is concentrated on event days is
+   itself a finding.)*
+
+## 33. The 2026 holdout: pre-registration in practice
+
+**The question.** After v1.7 every alpha had been designed, fitted and
+selected on the same seven sessions. How do you test it on new data without
+fooling yourself?
+
+**The procedure (v1.8.0, docs/REAL_DATA.md §3.2).**
+
+1. *Write the hypotheses before the data exists in usable form.* Six
+   entries went onto `research/agents/blackboard.jsonl`, each naming alpha,
+   horizon, expected sign, role (primary, confirmatory, control) and the
+   pass rule: leakage clean, gate IC of the registered sign, gate t at or
+   above the Bonferroni threshold of the holdout dataset's own fresh ledger.
+2. *Make the timing verifiable.* The entries were committed and pushed
+   (commit `6723fd0`) before any 2026 feature was computed. The commit is
+   the timestamp; v1.10's `anchors.json` now records it for each entry.
+3. *Freeze everything else.* Parameters, cost model, methods and feature
+   registry were frozen at v1.7.2. The data was two full XNAS ITCH days,
+   2026-05-15 and 2026-05-18, on the same three symbols.
+4. *Include controls that should fail.* EQ07 (a "reversal" whose sign was
+   already wrong in sample) and EQ04 (known to be underpowered) were
+   registered as controls. A procedure that confirms everything, controls
+   included, is not testing anything.
+
+**The result.** All four confirmatory signals were confirmed (EQ01 t 7.74,
+EQ02 8.02, EQ10 8.08, EQ05 9.51, each above its threshold of 3.43-3.79).
+EQ07 was significantly wrong-signed again (−3.95): the 10 s relation is
+continuation, not reversal. EQ04 was positive but below threshold, "cannot
+tell" as registered. No run traded at 1x costs.
+
+**What it does and does not establish.** It establishes that the
+microstructure signals are not artefacts of the 2019-20 selection: they
+survive six years and a design they could not have been fitted to. It does
+not establish size: three of the four are a third to a half of their
+in-sample IC (decay, an in-sample inflated by event days, or both), and two
+days cannot separate a signal from a two-day common shock (chapter 32). It
+says nothing about P&L, because none was registered. And it is spent: those
+two days have now been looked at, so the next confirmatory test needs new
+sessions.
+
+**The design choices that matter most.** A fresh ledger per holdout dataset
+(so the threshold is not inflated by thousands of in-sample looks, and not
+deflated by ignoring the looks the holdout itself takes); a pass rule
+written as code-checkable conditions; and controls. The weakest point was
+that nothing tied the registration to the *code* that would run: an alpha
+could have been edited between registration and run without the gate
+noticing. Chapter 35 is how v1.10 closed that.
+
+**Check yourself.**
+
+1. Why give the holdout its own ledger instead of adding its looks to the
+   in-sample one? *(The in-sample ledger's 5,000+ looks were spent
+   searching on other data; charging them to the holdout makes the
+   threshold unreachable for no reason. The holdout is charged for its own
+   looks, which is what multiple-testing control requires.)*
+2. A confirmatory signal passes with t 3.8 against a threshold of 3.79.
+   Is that a confirmation? *(Under the registered rule, yes. Report the
+   margin, and do not lower any other threshold after seeing it.)*
+
+## 34. What the synthetic maker and quoting results do and do not show
+
+**The numbers.** All on synthetic data:
+
+| setup | result | source |
+|---|---|---|
+| maker backtest, golden vector, passive exit | −6.7 bp per trip (32% of exits fill passively) | COOKBOOK 39 |
+| same, ungated, taker exit | −11.4 bp per trip | COOKBOOK 39 |
+| two-sided quoter, golden vector, toy L1-imbalance score, skewed | +86.50 USD | COOKBOOK 40 |
+| same, no skew (inventory term only) | +120.20 USD | COOKBOOK 40 |
+| quoter, 8 synthetic days, look-ahead signal, skewed | +3,326.66 USD, Sharpe per day 34.75 | v1.10 development run* |
+| same, no skew | +2,535.66 USD, Sharpe per day 36.95 | v1.10 development run* |
+
+\* Measured during v1.10 development with the synthetic generator and
+look-ahead score of `python/tests/test_quoting.py` extended to eight days;
+the committed test runs four days and asserts only the direction (skew
+beats no skew on markout and net). The figures are not a committed
+artefact.
+
+**What they show.**
+
+- *The accounting is right.* Every row decomposes exactly: for the maker
+  backtest, `gross = spread earned − adverse selection − exit slippage`;
+  for the quoter, `spread + markout + inventory + flatten` plus rebates
+  minus fees and impact. The identities are tested in every exit mode, so a
+  P&L number cannot come from a term nobody can name.
+- *The controls work.* The inventory limit is never exceeded (both quoters
+  hit 300 shares and stop), the half-spread floor uses the calibrated
+  adverse selection, and the flatten crosses what is left before the close.
+- *Skew is a bet on the signal.* With an informative signal (the
+  look-ahead fixture), skewing the reservation price earns more in total
+  because it leans quotes away from the side about to be run over. With an
+  uninformative one (the toy score on the golden vector), skewing only
+  moves quotes off the best price: less spread captured, no less adverse
+  selection, lower net.
+
+**What they do not show.**
+
+- *Anything about a real alpha.* A look-ahead signal knows the future mid.
+  Its job is to prove that if a signal is informative, the machinery turns
+  that into lower markout losses. Real alphas forecast about 0.07 bp
+  (chapter 31); whether that is enough to move quotes usefully is the open
+  question.
+- *Realistic fill probabilities.* The synthetic generator's order flow
+  decides who trades against a resting quote; real counterparties select
+  harder. Synthetic markouts are a lower bound on how bad it can get only in
+  the sense that they are not evidence at all.
+- *Risk-adjusted superiority.* The skewed quoter earned more on eight days
+  and had a lower Sharpe per day (34.75 against 36.95). Sharpe ratios in the
+  thirties are themselves a sign the data is synthetic.
+
+**The honest next step** is the real-data maker study now running
+(pre-registered, in-sample, seven sessions, EQ01/EQ02/EQ05/EQ10, taker and
+passive exits, session-clustered inference with a Bonferroni correction
+over eight primary cells). Its verdict rule says even a positive in-sample
+result reads "worth an out-of-sample test", never "profitable".
+
+## 35. Governance: why symmetric keys and class-only code hashes were not enough
+
+**The question.** v1.7 gave the agent layer a write broker, a hash-chained
+blackboard and pre-registration. v1.8 used them for the 2026 holdout. What
+could still go wrong, and why did the first fixes in v1.10 need a second
+round?
+
+**Four gaps (plan items G1-G4).**
+
+1. *Pre-registrations were free.* Registering a hypothesis cost no look on
+   the multiple-testing ledger, so an agent could register a hundred
+   hypotheses and report the one that confirmed. Fix: each registration
+   debits one look (`kind="prereg"`).
+2. *A registration did not bind the code.* The entry named an alpha id. The
+   alpha's code could change between registration and run.
+3. *The chain could be rewritten.* A hash chain detects an edited entry, but
+   anyone who can write the file can recompute every later hash. Fix: every
+   committed version of the board must be a prefix of the current one
+   (checked against git history), and `anchors.json` records the first
+   commit holding each entry.
+4. *Agent identity was asserted.* The broker took the agent id from the
+   caller.
+
+**Why the first fix for gap 2 was not enough.** The first draft hashed the
+source of the alpha class and its base classes (`inspect.getsource`).
+That misses module-level helper functions the class calls, constants
+defined next to it, and any `iap.*` module it imports. An alpha's behaviour
+could change completely while its class text stayed identical. It also
+depended on `inspect`, whose output can vary across Python versions. The
+shipped fingerprint (scheme 2) hashes whole source *files*: the defining
+modules and, transitively, every `iap.*` module they import (an AST walk),
+LF-normalised so Windows and Linux agree, plus the declared features'
+registry entries and their family modules, plus the pinned numpy, pandas
+and scipy versions. It over-approximates (editing another alpha in the same
+file changes the hash), which is the safe direction. GOVERNANCE.md §2a
+lists what it still does not cover: implicit package `__init__` modules,
+computed dynamic imports, data and config files read at run time, the
+interpreter.
+
+**Why the first fix for gap 4 was not enough.** The first draft signed
+agent requests with HMAC-SHA256. HMAC is symmetric: the key that verifies a
+signature can also create one. So the broker, every verifier, and anyone
+who audits the board needs the agent's secret, and any of them can forge a
+request in that agent's name. A signature that the verifier could have
+produced proves nothing to a third party. Ed25519 separates the two: the
+agent holds a private key outside the repository, the broker and verifiers
+hold only the public key from `research/agents/agent_pubkeys.json`, and a
+verifier cannot sign. Each request covers the agent, the operation, a
+digest of the arguments and a single-use nonce, so it cannot be moved to
+another operation or replayed. The signed request is stored on the entry,
+so anyone can re-verify the whole board offline (`verify-board`). Stored
+HMAC entries from the draft remain verifiable with the shared key; new HMAC
+writes are refused.
+
+**What is still not covered.** The keys are files; nothing here is a
+hardware module or an identity provider. Git anchoring proves an entry
+existed at a commit, not that the commit's timestamp is honest; pushing to
+a remote someone else controls is what makes it hard to back-date. And all
+of this protects the *research record*. None of it touches the trading
+path, which stays free of agents by rule (HOW_IT_WORKS.md §6).
+
+**Check yourself.**
+
+1. An auditor wants to check that an agent really made a request. With
+   HMAC, what does the auditor need, and what does that let the auditor do?
+   *(The shared secret, which lets the auditor forge requests too.)*
+2. An alpha imports a helper from `iap.features.rolling`. Is a change to
+   that helper caught by scheme 2? *(Yes: the AST walk follows `iap.*`
+   imports transitively. It would not be caught by the class-only draft.)*
+3. Why does a pre-registration cost a look even if the run never happens?
+   *(The choice of hypothesis is itself a search; registering many and
+   running the promising ones is a multiple comparison.)*
+
+## 36. Further reading
 
 Inside this repository, in suggested order:
 

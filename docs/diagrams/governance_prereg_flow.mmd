@@ -1,0 +1,22 @@
+sequenceDiagram
+    autonumber
+    participant A as agent (private key outside the repo)
+    participant B as WriteBroker (public keys only)
+    participant L as ledger research/experiments.json
+    participant BB as blackboard.jsonl (hash chain)
+    participant G as git (commit + push)
+    participant R as research run (prereg gate)
+    participant V as verify-board (anyone)
+    A->>B: preregister(alpha, horizon, sign, hypothesis)<br/>signed: agent, op, args digest, nonce (Ed25519)
+    B->>B: verify signature, refuse a reused nonce
+    B->>B: fingerprint: code modules (AST closure), features, numpy/pandas/scipy versions
+    B->>L: debit one look (kind = prereg)
+    B->>BB: append entry with body + auth, chained hash
+    A->>G: commit and push the board (before touching data)
+    A->>G: cli anchor, commit anchors.json (first commit holding each entry)
+    R->>BB: prereg_gate.require(alpha, horizon)
+    R->>R: recompute fingerprint, refuse if code, features or deps changed
+    R->>R: run, record result (a --no-prereg run is ineligible for promotion)
+    V->>BB: chain intact?
+    V->>G: every committed board a prefix of the current one? anchors match?
+    V->>V: every Ed25519 signature valid against agent_pubkeys.json?

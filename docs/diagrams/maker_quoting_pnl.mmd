@@ -1,0 +1,22 @@
+flowchart TD
+    subgraph MAKER["MakerBacktester: one round trip"]
+        SC["score row: er, z, confidence"] --> GATE{"gate:<br/>abs(er) + half spread + rebate - exit cost<br/>greater than adverse selection + margin?"}
+        GATE -->|no| OUT["gated out<br/>(counted)"]
+        GATE -->|yes| POST["post at the touch on the alpha's side"]
+        POST --> FILL{"filled by queue position<br/>before ttl?"}
+        FILL -->|no| CXL["cancel through the latency path"]
+        FILL -->|yes| ENT["entry: earns half spread + rebate"]
+        ENT --> EXIT{"exit mode"}
+        EXIT -->|taker| TX["cross: pays half spread + fee + impact"]
+        EXIT -->|passive| PX["post at far touch,<br/>reprice up to exit_reprices,<br/>then cross the rest"]
+        TX --> NET
+        PX --> NET
+        NET["net = spread earned - adverse selection - exit slippage<br/>+ rebates - fees - impact"]
+    end
+    subgraph QUOTE["QuotingBacktester: one session"]
+        RP["reservation price r =<br/>mid + alpha_weight * er * mid - gamma * sigma^2 * q * tau"] --> Q2["bid and ask around r,<br/>half spread floored at calibrated AS"]
+        Q2 --> INV["fills move inventory q<br/>(hard limit max_inventory)"]
+        INV --> RP
+        INV --> FL["flatten from flatten_lead_ns before the end:<br/>cancel, count in-flight fills, cross in rounds"]
+        FL --> PNL["gross = spread captured + markout + inventory P&L + flatten cost<br/>net = gross + rebates - taker fees - impact"]
+    end
