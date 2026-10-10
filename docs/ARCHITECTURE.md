@@ -312,6 +312,18 @@ regeneration of `benchmarks/results_cpp.md`; the previous table read
 cross-run variance, and the docs follow the table, not the other way round).
 `-Wall -Wextra -Werror`, C++17, Release `-O3`.
 
+**Tick-to-trade (v1.12).** In this repository "tick-to-trade" means the
+in-process software path from one raw IAP1 frame to an order intent: decode
+(CRC verified) → book → 48 native features → alpha scores → order decision
+with a minimal pre-trade check. It excludes the network, the NIC and the
+kernel (no kernel bypass), order encoding and the wire, the venue, and the
+platform risk engine (Rust/Java/Python; the C++ decision stage is a
+bench-local stand-in). `cpp/bench/bench_tick_to_trade` measures it per
+event with percentiles; on a shared GitHub-hosted runner the committed run
+reads p50 ≈ 1.3 µs and p99 ≈ 2.6 µs end to end on the golden vector, with the
+feature engine the largest stage — figures for a shared VM, not for a
+colocated, pinned host (`benchmarks/RESULTS.md`).
+
 **Decision trace (`cpp/include/iap/contracts/`)**: the C++ hot path (book →
 features → alpha → execution → SOR) is explainable through the same
 `DecisionTrace` record the other languages produce. `iap::contracts::Value`

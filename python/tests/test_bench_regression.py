@@ -63,3 +63,29 @@ def test_cli_exit_codes(tmp_path, capsys):
     assert guard.main(["--current", str(slow)]) == 1
     assert "REGRESSION" in capsys.readouterr().out
     assert guard.main(["--current", str(tmp_path / "missing.md")]) == 2
+
+
+T2T_SAMPLE = """# C++ tick-to-trade latency (bench_tick_to_trade)
+
+| path, workload | p50 ns | p90 ns | p99 ns | p99.9 ns | max ns | mean ns | samples |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| **tick-to-trade (end to end)**, golden eq_mbo (2000 ev) | 1000 | 1200 | 3000 | 9000 | 50000 | 1100.0 | 100000 |
+
+| benchmark (tick-to-trade guard) | ns |
+|---|---:|
+| t2t golden p50 | 1000 |
+| t2t golden p99 | 3000 |
+"""
+
+
+def test_rows_filter_guards_only_the_tick_to_trade_percentiles():
+    base = guard.parse(T2T_SAMPLE)
+    rx = r"^t2t .* p(50|99)$"
+    # the wide-table row (p50 in its first column) is ignored by the filter
+    cur = dict(base, **{"t2t golden p99": 3000 * 7.0})
+    rows, problems = guard.compare(base, cur, factor=8, rows_re=rx)
+    assert len(rows) == 2 and problems == []
+    cur["t2t golden p50"] = 1000 * 9.0
+    assert len(guard.compare(base, cur, factor=8, rows_re=rx)[1]) == 1
+    # a renamed guard table cannot pass silently
+    assert guard.compare(base, {"something else": 1.0}, factor=8, rows_re=rx)[1]

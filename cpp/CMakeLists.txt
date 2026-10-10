@@ -100,3 +100,10 @@ target_link_libraries(make_replay_fills_golden PRIVATE iap_core)
 add_executable(bench_all bench/bench_all.cpp)
 target_link_libraries(bench_all PRIVATE iap_core)
 target_compile_definitions(bench_all PRIVATE IAP_GOLDEN_DIR="${IAP_GOLDEN_DIR}")
+
+# v1.12 (X6): per-event tick-to-trade latency distribution (p50..p99.9, max)
+# of decode -> book -> features -> alpha -> order decision. Additive; writes
+# a markdown table when given an output path (see benchmarks/RESULTS.md).
+add_executable(bench_tick_to_trade bench/bench_tick_to_trade.cpp)
+target_link_libraries(bench_tick_to_trade PRIVATE iap_core)
+target_compile_definitions(bench_tick_to_trade PRIVATE IAP_GOLDEN_DIR="${IAP_GOLDEN_DIR}")

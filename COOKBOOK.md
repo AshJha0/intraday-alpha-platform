@@ -65,6 +65,7 @@ Contents:
 54. [Monitor a registered maker filter week by week (v1.11)](#54-monitor-a-registered-maker-filter-week-by-week-v111)
 55. [A guarded LLM session end to end, with the scripted client (v1.11)](#55-a-guarded-llm-session-end-to-end-with-the-scripted-client-v111)
 56. [Combinatorial purged CV, PBO and the deflated Sharpe ratio (v1.12)](#56-combinatorial-purged-cv-pbo-and-the-deflated-sharpe-ratio-v112)
+57. [Measure tick-to-trade latency percentiles (v1.12)](#57-measure-tick-to-trade-latency-percentiles-v112)
 
 Recipes 27–35 were added with v1.3.0. Every command block in them was run
 as printed, from a clean checkout of the release, before it was written
@@ -3422,3 +3423,35 @@ per-day P&L: a seven-day PSR of 0.956 against zero becomes a DSR of 0.624
 once twelve distinct configurations are allowed for, and 0.216 at the 400
 raw looks. Which `N` to quote is in RESEARCH_VALIDITY.md §1b; the study's
 registered verdict rule does not read any of it.
+
+## 57. Measure tick-to-trade latency percentiles (v1.12)
+
+**Goal:** the per-event latency distribution (p50 / p90 / p99 / p99.9 / max)
+of decode -> book -> features -> alpha -> order decision, end to end and per
+stage, instead of the stage means of `bench_all`.
+
+```bash
+cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=Release && cmake --build cpp/build -j2
+cpp/build/bench_tick_to_trade /tmp/t2t.md
+# guard a fresh run against the committed CI baseline (p50/p99 only)
+python3 tests/harness/check_bench_regression.py --current /tmp/t2t.md   --baseline benchmarks/results_tick_to_trade.md   --rows '^t2t .* p(50|99)$' --factor 8
+# the same path through the Python reference implementation
+PYTHONPATH=python/src python3 tools/tick_to_trade_py.py --passes 3 --genday 20000
+```
+
+The C++ program prints a methodology header, the wide percentile table (one
+end-to-end row and five stage rows per workload: the golden
+`events_eq_mbo.jsonl` × 50 passes and a generated 100,000-event equity day,
+seed 20261012), per-workload counts (feature vectors, orders, pre-trade
+rejects, book drops) and four `t2t <workload> p50|p99` guard rows. The
+committed baseline is a CI-runner run: compare runs on the same class of
+machine, not with your laptop. What "tick-to-trade" covers here (in-process,
+decoded frame in to order intent out; no network, no kernel bypass, no
+platform risk engine, which is not in C++) is spelled out in
+[benchmarks/RESULTS.md](benchmarks/RESULTS.md#tick-to-trade-latency-percentiles-v112).
+In CI the `cpp` job runs the benchmark after ctest, writes the table to the
+job summary and the `bench-tick-to-trade` artifact, and fails only when an
+end-to-end p50 or p99 is more than 8× the baseline. To refresh the baseline,
+download that artifact from a green `main` run and commit it as
+`benchmarks/results_tick_to_trade.md`, then update the table in
+`benchmarks/RESULTS.md`.
