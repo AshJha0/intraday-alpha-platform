@@ -74,6 +74,33 @@ tolerance, parity test or test count changed (python 2154 / cpp 302 / rust 358
   `iap.models.zoo.load_registered` load by id; default behaviour unchanged.
   API_ADAPTIVE.md section 9, COOKBOOK recipe 50.
 
+### LLM research agent (IAP_Next_Releases_Plan AI1-AI2)
+
+- **AI1 - `iap.llm`, `python -m iap.llm`.** A Claude model (default
+  `claude-opus-5-5`, Anthropic Python SDK as the optional `[llm]` extra,
+  cached system prompt) runs hypothesis -> pre-registration -> gated run ->
+  finding through the v1.10 governance: eight allowlisted tools; every
+  write Ed25519-signed by a key the model never sees; each pre-registration
+  one look, capped per session; runs only after `prereg_gate.require` and on
+  explicitly allowed datasets; metrics and verdict computed by code and
+  written as a report. Findings must cite a session report and are filed
+  only if every number in them appears in a cited artefact
+  (`iap.llm.verify`; free-text fields are not evidence). Caps on estimated
+  USD, tokens, tool calls and pre-registrations. Transcript, tool log and
+  summary persisted under `research/agents/llm_sessions/<id>/`.
+- **AI2 - `python -m iap.llm.evals`.** p-hacking, prompt injection (board
+  entry and MCP output), hallucinated citations and task success on a
+  planted alpha. Mocked (scripted adversarial model; CI) with a
+  control-removed ablation for each control, or `--live --env-file PATH
+  --max-usd 2` (default `claude-haiku-5-5`).
+- `iap.agents.citations`: new `report:<session>.<run>` and `board:<hash>`
+  references, and `artefact()` to load what a reference names.
+- `.gitignore`: `.env`, `*.env`, `.iap_keys/`.
+- Docs: GOVERNANCE.md §2b, HOW_IT_WORKS.md §6.2, COOKBOOK recipe 51.
+
+No default, golden, published number or cross-language contract changes.
+No test or CI job calls a model.
+
 ## v1.10.0 — 2026-10-10
 
 New edge and strategy layer (IAP_Next_Releases_Plan v1.10: A1, M5, X1-X3,

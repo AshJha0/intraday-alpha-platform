@@ -13,7 +13,7 @@ import json
 import re
 from pathlib import Path
 
-_REF = re.compile(r"^(experiment|alpha|lifecycle|ledger):([A-Za-z0-9_.-]{1,128})$")
+_REF = re.compile(r"^(experiment|alpha|lifecycle|ledger|report|board):([A-Za-z0-9_.-]{1,128})$")
 
 
 def _json(path: Path):
@@ -27,6 +27,8 @@ def resolve(ref: str, root: Path) -> bool:
         return False
     kind, ident = m.groups()
     research = Path(root) / "research"
+    if kind in ("report", "board"):
+        return artefact(ref, root) is not None
     try:
         if kind == "experiment":
             return (research / "experiments" / ident / "spec.json").is_file()
@@ -58,3 +60,40 @@ def resolve(ref: str, root: Path) -> bool:
 def unresolved(refs, root: Path) -> list[str]:
     """The references in ``refs`` that do not resolve."""
     return [r for r in refs if not resolve(r, root)]
+
+
+_HEX = re.compile(r"^[0-9a-f]{16,64}$")
+
+
+def report_path(root: Path, ident: str) -> Path | None:
+    """``<session>.<run>`` -> the report file, or None if malformed."""
+    parts = ident.split(".")
+    if len(parts) != 2 or any(not p or p.startswith("-") for p in parts):
+        return None
+    session, run = parts
+    return Path(root) / "research" / "agents" / "llm_sessions" / session / "reports" / f"{run}.json"
+
+
+def artefact(ref: str, root: Path):
+    """The JSON a ``report:`` or ``board:`` reference names (a board entry as a
+    whole dict), or None if it does not resolve."""
+    m = _REF.match(ref) if isinstance(ref, str) else None
+    if not m:
+        return None
+    kind, ident = m.groups()
+    try:
+        if kind == "report":
+            path = report_path(root, ident)
+            return _json(path) if path is not None and path.is_file() else None
+        if kind == "board":
+            if not _HEX.match(ident):
+                return None
+            from iap.agents.blackboard import Blackboard
+
+            board = Blackboard(Path(root) / "research" / "agents" / "blackboard.jsonl")
+            board.verify()
+            hits = [e for e in board.entries() if str(e.get("hash", "")).startswith(ident)]
+            return hits[0] if len(hits) == 1 else None
+    except (OSError, ValueError, AttributeError):
+        return None
+    return None
