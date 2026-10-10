@@ -281,7 +281,14 @@ the next confirmatory test needs new, unseen sessions. Experiment ids,
 specs and results are under the git-ignored
 `data/real/holdout2026/research/experiments/`.
 
-### 3.3 Auction imbalance (NOII) study (v1.10, plan item A1) - not yet run
+### 3.3 Auction imbalance (NOII) study (v1.10, plan item A1) - running, no result yet
+
+**Status (v1.11.0, 2026-10-10).** `AUC01` is being run on the real
+sessions, pre-registered, together with the M5 quoter, on branch
+`research/step2`, as a detached job. It is exploratory and in-sample; the
+pre-registration declares a 2026 holdout for any in-sample effect. No
+result is reported here until the run finishes and is read; the commands
+below are the ones it uses.
 
 `iap.auction` extracts ITCH `I` (NOII, about 6.2M a day) and `Q` (cross)
 messages into a **separate** stream directory: one opt-in pass with

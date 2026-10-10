@@ -1423,6 +1423,8 @@ flowchart LR
 | Typed contracts, Protocols, schema index, validation | [../API_CONTRACTS.md](../API_CONTRACTS.md) |
 | Python risk / execution reference ports and their golden parity | [../API_TRADING.md](../API_TRADING.md) |
 | Roadmap: what exists, with evidence; what is backlog | [ROADMAP.md](ROADMAP.md) |
+| Which language copy is canonical, which frozen; the `POLYGLOT-OVERRIDE` rule | [POLYGLOT.md](POLYGLOT.md) |
+| Research governance and the LLM agent's controls | [governance/GOVERNANCE.md](governance/GOVERNANCE.md) §2a-§2b |
 | The research methods (defaults since v1.5.0, with their legacy rules), the safe research store, gate eligibility | [RESEARCH_VALIDITY.md](RESEARCH_VALIDITY.md) |
 | Release notes | [../CHANGELOG.md](../CHANGELOG.md) |
 | Six research papers from the platform's own numbers | [papers/INDEX.md](papers/INDEX.md) |

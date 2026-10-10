@@ -1,7 +1,7 @@
 """API-key loading.
 
 The key is read from ``ANTHROPIC_API_KEY`` or from an env file given by
-``--env-file`` (for example ``C:/Work/Claude/AgenticTrader/.env``).  It is
+``--env-file`` (for example ``~/.config/iap/anthropic.env``).  It is
 returned to the caller only: never printed, logged, persisted or put in a
 transcript.  ``.env`` and ``*.env`` are git-ignored.
 """

@@ -1240,8 +1240,13 @@ agent SDK (plan issue AG03). Two gaps are stated rather than hidden: the test do
 `iap.replay`, which the rule above names, and nothing scans the Rust, C++ or Java trees — those
 remain enforced in review (CODEOWNERS: risk, execution, core).
 
-**What exists and what does not** (2026-10-03). There is no LLM, agent or MCP code in this
-repository. What exists is the foundation an agent layer would stand on, each piece useful
+**What exists and what does not.** *Update (v1.11.0):* the agent layer this paragraph called
+backlog was built in v1.7.0 (`iap.agents`: write broker and blackboard, pre-registration,
+reserve, signed approvals, read-only MCP server, evaluations) and hardened in v1.10.0, and
+v1.11.0 added an optional LLM research agent (`iap.llm`) that works only through it and is
+outside every trading-path package; the rule of this section is unchanged
+(docs/governance/GOVERNANCE.md §2a-§2b). The paragraph as written on 2026-10-03 follows.
+There was no LLM, agent or MCP code in the repository then. What exists is the foundation an agent layer would stand on, each piece useful
 without one: the research store that is safe for parallel automated writers and the gate
 eligibility rule (§13.6), the import-policy test, and machine-readable tooling —
 `python -m iap.research list --json` / `show <id> --json`, `--json-errors` with stable error

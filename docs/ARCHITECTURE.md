@@ -15,7 +15,11 @@ against, the concurrency model of the research store, and the distance
 between this repository and a production system. Section 15 was added with
 v1.10.0: the research subsystems of v1.9 and v1.10 (maker economics,
 quoting, auctions, optimal execution, validity options, governance), where
-each sits, what is opt-in, and what is Python-only.
+each sits, what is opt-in, and what is Python-only. Sections 16 and 17
+were added with v1.11.0: the polyglot policy (which language copy is
+canonical, which is frozen) and the v1.11 subsystems (the LLM research
+agent, the model registry, the Rust feature engine as a Python wheel, and
+the optional extras).
 
 ## 1. Design principles (spec §1, condensed)
 
@@ -51,7 +55,7 @@ repository:
 | Synthetic generator + normalize/QC | `marketdata` (sole owner) | — | — | — |
 | Order book (L1/L2/MBO, consolidated) | `orderbook` (reference) | `orderbook` | `orderbook` crate | `orderbook` |
 | Deterministic replay | `replay` | `replay` | `replay` crate (+ demo bin) | `replay` (+ Demo) |
-| Feature engine (native 40 / registry 205) | `features` (all 205, reference) | `features` | `features` crate | `features` |
+| Feature engine (native 40 / registry 205) | `features` (all 205, reference; `features.native` selects the Rust backend since v1.11) | `features` | `features` crate (+ `rust/features_py`, the pyo3 wheel, outside the workspace) | `features` (frozen since v1.11) |
 | Labels (event-time, 11 horizons) | `labels` (sole owner) | — | — | — |
 | Alpha library / scoring | `alpha` (all 24, fitting) | `alpha` (6 golden, scoring) | `alpha` crate (6 golden, scoring) | `alpha` (6 golden, scoring) |
 | Validation framework, experiment ledger, ExperimentRunner | `validation`, `experiment`, `research` (sole owner) | — | — | — |
@@ -659,15 +663,19 @@ one (EPICS E24 and E30, backlog), and the design rule was pinned before any
 of it was built (`PLATFORM_CONVENTIONS.md` §13.7) so that nothing built
 later can cross it.
 
-**State of the repository, said first (v1.10.0): no LLM is called
-anywhere.** The governance layer an agent would work through does exist:
+**State of the repository, said first (v1.11.0): one optional component
+calls an LLM, the research agent `iap.llm`, and only when an operator runs
+it with an API key; nothing in the default build, the tests or CI calls a
+model, and nothing on the trading path can.** The governance layer it works
+through was built first:
 `iap.agents` (v1.7.0) holds a write broker, a hash-chained blackboard,
 pre-registration, a hidden-seed reserve, signed human approvals, agent
 evaluations, untrusted-text handling and a read-only MCP server, and v1.10.0
 made pre-registrations costed, code-bound, git-anchored and Ed25519-signed
-(§15.5). The research agent itself is not built. Sections 11.1-11.2 describe
-the boundary and the v1.3.0 foundation; §11.3 is the v1.3.0 plan, most of
-which has since been built (the status column says which).
+(§15.5). v1.11.0 added the agent (§17.1) as a client of those controls, not
+an exception to them. Sections 11.1-11.2 describe the boundary and the
+v1.3.0 foundation; §11.3 is the v1.3.0 plan, most of which has since been
+built (the status column says which).
 
 ### 11.1 The boundary (pinned)
 
@@ -719,7 +727,7 @@ core). Plan issue AG03 is closed on that basis, with the gaps recorded in it.
 
 ### 11.3 The v1.3.0 plan, and what has been built since
 
-| planned | epic / issue | why it comes before any agent | status (v1.10.0) |
+| planned | epic / issue | why it comes before any agent | status (v1.11.0) |
 |---|---|---|---|
 | read-only MCP server over the ledger, reports, lifecycle log and traces | E24 AG01, E30 AL05 | resources only, no tool with a side effect; versioned schemas and golden outputs | built v1.7.0 (`iap.agents.mcp_server`, six tools, stdio only) |
 | write broker and append-only blackboard | E30 AL01 | one attributable, replayable path to repository, ledger and lifecycle state | built v1.7.0; signed requests and git anchoring v1.10.0 |
@@ -728,18 +736,18 @@ core). Plan issue AG03 is closed on that basis, with the gaps recorded in it.
 | authenticated HUMAN approvals | E30 AL04 | a lifecycle edge's `actor = HUMAN` was asserted by the caller, not verified | built v1.7.0 for the retire and reset edges |
 | agent evaluations | E30 AL06 | planted leak, seeded bug, shuffled-label null, citation resolution — each must fail when its control is removed | built v1.7.0 (`iap.agents.evals`) |
 | untrusted free-text handling | E30 AL07 | ledger text, report text and tool output are data, not instructions | built v1.7.0 (`iap.agents.untrusted`) |
-| the research agent itself | AI1-AI4 (plan) | — | not built; planned for v1.11 |
+| the research agent itself | AI1-AI4 (plan) | — | built v1.11.0: AI1 the agent (`iap.llm`), AI2 its behaviour evals, AI3 the model registry (`iap.mlops`); AI4 (deep order-book baselines) deferred |
 
 The ordering is the design. An agent given the goal "get an alpha promoted"
 will find the cheapest path to a pass faster than a person: cheaper costs, a
 chosen holdout, uncounted looks. v1.3.0 closed those three in the tooling
 (LEARN.md §24) and measured what the validation chain can detect at all
 (the planted-signal power study, LEARN.md §23). It did not build the agents
-(v1.7.0 built the controls; the agent is still not built), and on two synthetic sessions whose ledger now holds 5,156 looks (1068 on
+(v1.7.0 built the controls; v1.11.0 built the agent on top of them), and on two synthetic sessions whose ledger now holds 5,156 looks (1068 on
 the v1.3.0 dataset, 852 on the regenerated v1.4.0 one, 3,236 on that same
 dataset under the v1.5.0 default methods), more searching is not what the platform lacks (HOW_IT_WORKS.md §6.4
 lists what would be theatre on this data, and why). DIAGRAMS.md §19 draws
-the planned layer and labels it as planned.
+the layer as planned at v1.3.0, and §26 the agent loop as built in v1.11.
 
 ## 12. Failure modes and fail-closed design
 
@@ -1015,13 +1023,13 @@ every signature. Details and gaps: docs/governance/GOVERNANCE.md §2a.
 
 ### 15.6 Real-data status of these subsystems
 
-| subsystem | real-data status (2026-10-10) |
+| subsystem | real-data status (2026-10-10, v1.11.0) |
 |---|---|
-| calibration, maker backtest | a pre-registered, in-sample study on the seven 2019-20 sessions is running (branch `research/maker-real`); no result yet |
-| quoting | no real-data run |
-| auction (`AUC01`) | not run on real files; REAL_DATA.md §3.3 has the commands |
+| calibration, maker backtest | a pre-registered, exploratory in-sample study on the seven 2019-20 sessions is running (branch `research/maker-real`); no result yet |
+| quoting | M5 on real files is running beside `AUC01` (branch `research/step2`, pre-registered, exploratory in-sample); no result yet |
+| auction (`AUC01`) | running on real files (branch `research/step2`), pre-registered, in-sample, with a declared 2026 holdout; no result yet; REAL_DATA.md §3.3 has the commands |
 | Almgren-Chriss, urgency, volume curve | no real-data study; the volume curve CLI reads real IAP1 files |
-| `v3` bundle | not yet applied to the published real-data batch (planned for v1.11) |
+| `v3` bundle | not yet applied to the published real-data batch (not done in v1.11; ROADMAP.md §3.6) |
 | governance | in use: the 2026 holdout preregs are anchored to `6723fd0`; the maker study's preregs are on its branch |
 
 ## 16. Polyglot policy: canonical and frozen copies (v1.11.0, plan E3)
@@ -1057,3 +1065,76 @@ k8s and the MVP) and the decision per copy:
 The C++ copy has no risk engine and no lifecycle by design (§10); the Java
 platform vertical (`com.iap.{platform,monitoring,api,config}`) and every
 Python-only subsystem have a single copy and are outside the policy.
+
+## 17. The v1.11 subsystems: LLM agent, model registry, Rust wheel, extras
+
+All four are opt-in. No default, golden, published number or
+cross-language contract changed, and no test or CI job calls a model.
+DIAGRAMS.md 26-29 draw them.
+
+### 17.1 The LLM research agent (`iap.llm`, AI1-AI2)
+
+A Claude model (default `claude-opus-5-5`; evals default to
+`claude-haiku-5-5`) is given eight tools: list alphas, list features,
+propose a hypothesis, pre-register it, run a gated study, read a report,
+file a finding, finish. Everything else sits in code around it:
+
+- the process holds the agent's Ed25519 private key and signs each
+  broker request; the model never sees the key, and the broker holds only
+  public keys (§15.5);
+- a pre-registration is an ordinary §15.5 pre-registration (one look, code
+  fingerprint) and a session is capped at `--max-preregs`;
+- `run_gated_study` passes `prereg_gate.require`, accepts only explicitly
+  allowed datasets and runs each (alpha, horizon, dataset) once; code
+  computes the metrics and the verdict and writes the report;
+- a finding is filed only if every number in it appears in a numeric field
+  of an artefact it cites (`iap.llm.verify`);
+- caps on estimated USD (projected one call ahead), tokens, tool calls and
+  pre-registrations stop the session;
+- the transcript, tool log and summary are written under
+  `research/agents/llm_sessions/<id>/`, with the API key scrubbed.
+
+The agent package is outside every trading-path package, and the
+import-policy test fails any guarded trading-path module that imports the
+`anthropic` SDK or another LLM client (§11.1). `iap.llm.evals` runs four
+behaviour scenarios mocked in CI and live on demand. GOVERNANCE.md §2b is
+the control table.
+
+### 17.2 The model registry (`iap.mlops`, AI3)
+
+`ModelRegistry` stores each model as an artefact (joblib) plus a canonical
+JSON record under one directory per id; the id is a content hash of the
+artefact and its full identity (parameters, dataset version and date
+range, features and feature-registry hash, code fingerprint, seed). It is
+append-only: a record is never rewritten, and a load re-verifies every
+hash. Registration links to a blackboard pre-registration or is marked
+exploratory. `monitor` and `ShadowRunner` read registered models; nothing
+in the research pipelines loads from the registry unless asked
+(`MakerFilter.from_registry`, `iap.models.zoo.load_registered`). The
+default location is `research/models/registry`. API_ADAPTIVE.md §9.
+
+### 17.3 The Rust feature engine as a Python wheel (E2)
+
+`rust/features_py` is a pyo3 0.22.6 extension module built by maturin
+1.7.8 into a single **abi3** wheel (`iap_features_rs`): one binary per OS
+and architecture serves every CPython from 3.10 up, because it uses only
+the stable ABI. It is a standalone package outside the `rust/` workspace,
+so `cargo build`, `cargo test` and the workspace clippy run never need
+libpython; the CI job `rust-pyo3` builds the wheel, lints it, runs the
+parity tests and records the benchmark. The extension wraps the
+`rust/features` crate (canonical under §16), releases the GIL during a
+replay and hands its row buffers to numpy without a copy.
+`iap.features.native` is the only Python caller and falls back to the
+Python engine when the wheel is absent. API_FEATURES.md §7.1.
+
+### 17.4 Optional extras and dependencies
+
+`python/pyproject.toml` declares two optional extras: `[ml]` (xgboost,
+lightgbm) and, since v1.11, `[llm]` (`anthropic>=1.0,<2`, the Anthropic
+Python SDK, used only by `iap.llm`). Neither is installed by
+`requirements-ci.txt`; tests and CI drive the agent through the scripted
+client `iap.llm.fake.ScriptedClient`. The API key is read from the
+environment or from `--env-file`; `.env`, `*.env` and `.iap_keys/` are
+git-ignored. The pyo3 wheel is not a Python dependency at all: it is built
+from source with maturin (COOKBOOK recipe 52). No new runtime dependency
+was added to the default install in v1.11.

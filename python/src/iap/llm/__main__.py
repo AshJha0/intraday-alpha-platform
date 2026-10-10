@@ -3,7 +3,7 @@
 ::
 
     python -m iap.llm --workspace WS --agent llm-researcher --keyfile KEYS/agent.key \\
-        --env-file C:/Work/Claude/AgenticTrader/.env --task "Test whether ..." \\
+        --env-file ~/.config/iap/anthropic.env --task "Test whether ..." \\
         [--model claude-opus-5-5] [--effort medium] [--max-usd 2] [--max-tool-calls 40]
         [--max-tokens 400000] [--max-preregs 3] [--runner planted|power]
         [--dataset synthetic:planted-v1 ...]

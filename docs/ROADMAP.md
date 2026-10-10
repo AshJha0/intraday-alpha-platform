@@ -27,7 +27,7 @@ the YAML, every `done` evidence path on disk).
 |---|---|---|---|
 | **Phase 2** — research platform | E20 gated ML zoo + meta-labeling, E21 adaptive drift / refit / lifecycle sub-machine, E22 alpha factory on the `ExperimentRunner` | partial: E20 and E21 delivered with honest negative results (since the v1.4.0 dataset the ML gate **passes** — best linear +0.0081 mid-to-mid IC, so xgboost, lightgbm and the MLP are fitted — and no model earns its costs, with the meta-label gate still degenerate; no refit policy demonstrably beats static on two sessions); E22 has the runner and the registry, not the batch driver | `research/ml_reports/ML_REPORT.md`, `research/adaptive_reports/ADAPTIVE_REPORT.md`, `expected_adaptive.json`; backlog: AF02 spec-driven batches (`python -m iap.research run` is the per-spec building block), AF03 gate 8 cross-alpha correlation, AF04 scheduled report regeneration with a stale-number diff, ML04 non-linear model_versions in the production languages, AD05 a multi-week synthetic dataset with power to rank refit policies |
 | **Phase 3** — production engineering | E23: real feed handlers and venue protocols, HA / failover / kernel bypass, regulatory pre-trade controls and best-execution reporting, authenticated read endpoints and external secrets | documented out of scope (README "Real-world usage notes"); PR01 (the container / k8s stack with a singleton trading vertical and durable state) done, PR02–PR05 backlog | `README.md` out-of-scope list, `docs/governance/SECURITY.md` §3–§4, `deployment/` (singleton, NetworkPolicy, token-authenticated admin API only) |
-| **Backlog** — agentic AI / MCP (E24, E30) | E24: AG01 a read-only MCP server over the ledger, reports, lifecycle log and decision traces; AG03 a policy test that no trading-path module imports a network or LLM client. E30: write broker and blackboard, pre-registration, reserve sessions on a hidden seed, authenticated human approvals, agent evaluations, untrusted-text handling (AL01–AL07) | **no LLM, agent or MCP code exists.** AG03 is done since v1.3.0 (`python/tests/test_import_policy.py`, Python packages only — its gaps are recorded in the issue); AG01 and all of E30 are backlog. The design rule is pinned (ARCHITECTURE.md §11, PLATFORM_CONVENTIONS.md §13.7): LLM reasoning is never on the critical path, can only read the store / ledger / TCA / drift, cannot override risk or send orders | what exists to read today: `python -m iap.store sql` (read-only, one statement) and `v_order_chain` / `v_alpha_scorecard`, `python -m iap.store explain`, `python -m iap.lifecycle status`, `python -m iap.research list/show --json`; and the foundation an agent layer would need — a research store safe for parallel writers, gate eligibility, looks that a dry run cannot avoid (ARCHITECTURE.md §11.2) |
+| **Backlog** — agentic AI / MCP (E24, E30) | E24: AG01 a read-only MCP server over the ledger, reports, lifecycle log and decision traces; AG03 a policy test that no trading-path module imports a network or LLM client. E30: write broker and blackboard, pre-registration, reserve sessions on a hidden seed, authenticated human approvals, agent evaluations, untrusted-text handling (AL01–AL07) | **built since v1.3.0 (this row is the v1.3.0 statement, updated):** the read-only MCP server (AG01) and the whole of E30 were built in v1.7.0 and hardened in v1.10.0 (signed, costed, code-bound, anchored pre-registrations); v1.11.0 added the LLM research agent on top of them (§3.6). At v1.3.0 no LLM, agent or MCP code existed. AG03 is done since v1.3.0 (`python/tests/test_import_policy.py`, Python packages only — its gaps are recorded in the issue); AG01 and all of E30 are backlog. The design rule is pinned (ARCHITECTURE.md §11, PLATFORM_CONVENTIONS.md §13.7): LLM reasoning is never on the critical path, can only read the store / ledger / TCA / drift, cannot override risk or send orders | what exists to read today: `python -m iap.store sql` (read-only, one statement) and `v_order_chain` / `v_alpha_scorecard`, `python -m iap.store explain`, `python -m iap.lifecycle status`, `python -m iap.research list/show --json`; and the foundation an agent layer would need — a research store safe for parallel writers, gate eligibility, looks that a dry run cannot avoid (ARCHITECTURE.md §11.2) |
 | **Backlog** — the distance to production (E25–E29, E31) | E25 real historical exchange data with a point-in-time master; E26 measured, gated latency; E27 simulator calibration to live fills; E28 book-level risk; E29 research throughput; E31 differential fuzzing, property tests, crash injection and risk golden coverage | backlog — every issue of E26–E29. E25 is partial: the Python ingestion path is done (XD01, XD03–XD06: ITCH 5.0 and LOBSTER readers, point-in-time master, corporate-actions API, ingest CLI — [REAL_DATA.md](REAL_DATA.md); run on 7 real Nasdaq ITCH days in v1.6.0 with the 24-alpha batch, multi-day merge and a real-data power study command; LOBSTER not yet run on a vendor file). E31 is partial since 2026-10-04: FZ01 (differential fuzzing of the three risk engines), FZ03 (snapshot/restore fuzzing) and FZ05 (risk golden coverage) are done, FZ02 (simulator properties) and FZ04 (crash injection on the Java paper path) stay backlog. Added 2026-10-03 with the v1.3.0 review, which is where the gaps were written down | ARCHITECTURE.md §14 states each gap against what exists; for E31: `tests/golden/risk_fuzz/` (89 scripts; `COVERAGE.txt` names the script reaching each of the 63 reachable reason branches), `.github/workflows/risk-fuzz.yml`, `tests/README.md` |
 
 ## 3. v1.3.0 (2026-10-03): what the review moved to done, and what it added to the backlog
@@ -72,7 +72,7 @@ takes 306-359 s in CI under coverage and xdist for the 1988 tests of the merged 
 
 ## 3.1 In progress
 
-Nothing, as of 2026-10-04. The next work is chosen from the backlog above.
+(Dated 2026-10-04; what is running now is in §3.6.) Nothing, as of 2026-10-04. The next work is chosen from the backlog above.
 The research-side candidates with the highest information value are still
 A07 (can a cost-aware horizon / threshold make EQ03 net-positive? — the
 cost-aware position policy, opt-in in v1.3.0 and the default since v1.5.0,
@@ -189,7 +189,7 @@ rows it dropped (0.0038 once they are scored).
 | v1.11 | Scale + AI | A2 QQQ vs constituents (more symbols); A3 futures lead-lag (needs data); E2–E3 Rust features via pyo3, fewer polyglot copies; AI1–AI4 LLM research agent through the broker, agent evals, model registry/drift |
 | later | Live readiness (optional) | P1–P4 real-time paper adapter, order state machine, reconciliation, capital ramp |
 
-## 3.5 v1.10.0: the strategy layer and the governance fixes (done), and v1.11 (next)
+## 3.5 v1.10.0: the strategy layer and the governance fixes (done), and the v1.11 plan
 
 **Done in v1.10.0** (CHANGELOG.md; all opt-in and Python only: every
 default, golden, published number and cross-language contract is unchanged):
@@ -228,26 +228,26 @@ with a Bonferroni correction over the eight primary cells. It is
 rule reads a positive result as "worth an out-of-sample test", never
 "profitable". No result is reported here.
 
-**Plan status** (IAP_Next_Releases_Plan, 2026-10-10):
+**Plan status** (IAP_Next_Releases_Plan, 2026-10-10, updated for v1.11.0):
 
 | Item | Status |
 |---|---|
 | R1-R6 research validity (`v3` bundle) | done, v1.9.0 (opt-in; the published reports are still `v2`) |
 | R7 more sessions, CPCV, deflated Sharpe | open |
 | E1 parallel feature build | done, v1.9.0 (spawn fix in v1.10.0) |
-| E2-E5 Rust features via pyo3, fewer copies, split god classes, feature memory | open |
+| E2-E5 Rust features via pyo3, fewer copies, split god classes, feature memory | E2 and E3 done, v1.11.0; E4-E5 open |
 | M1-M4 calibration, maker backtest, maker labels, conditional sizing | done, v1.9.0 (synthetic results only) |
 | M5 skewed quoting | done, v1.10.0 (synthetic results only) |
 | M6 new features (time-to-depletion, Hawkes, odd lots) | open |
 | A1 auction imbalance | done, v1.10.0 (code; no real run yet) |
-| A2 ETF vs constituents, A3 futures lead-lag, A4 event-regime study | open |
+| A2 ETF vs constituents, A3 futures lead-lag, A4 event-regime study | open (A2 and A3 deferred in v1.11, §3.6) |
 | X1-X3 Almgren-Chriss, urgency, volume curve | done, v1.10.0 |
 | X4-X6 fill hazard, SOR toxicity, tick-to-trade percentiles | open |
 | G1-G4 governance | done, v1.10.0 |
-| AI1-AI4 LLM research agent, evals, model registry | open (v1.11) |
+| AI1-AI4 LLM research agent, evals, model registry | AI1-AI3 done, v1.11.0; AI4 deferred |
 | P1-P4 live readiness | open (optional, later) |
 
-**Next: v1.11** (scale and AI). The order the evidence asks for:
+**The v1.11 plan as written at v1.10** (scale and AI; §3.6 says what happened). The order the evidence asks for:
 
 1. Read the real-data maker study and report it in REAL_DATA.md, whatever it
    says. If any cell shows an in-sample maker edge, pre-register an
@@ -262,6 +262,62 @@ rule reads a positive result as "worth an out-of-sample test", never
 5. AI1-AI4: an LLM research agent that works only through the signed
    broker, with the agent evaluations of v1.7 run against it. The boundary
    stays: no LLM on the trading path.
+
+## 3.6 v1.11.0: scale and AI (done), the real-data studies (running), and what was deferred
+
+**Done in v1.11.0** (CHANGELOG.md; all opt-in: every default, golden,
+published number and cross-language contract is unchanged, and no test or
+CI job calls a model):
+
+- **E2** the Rust feature engine from Python: `rust/features_py`, a pyo3
+  extension built by maturin into one abi3 wheel by the new `rust-pyo3` CI
+  job; `iap.features.native` and `python -m iap.features --engine rust`.
+  About 150x on the 45 native slots in CI (5,250 against 790,000 events/s
+  on the golden vectors); the pipeline is not faster, because 160 features
+  stay in Python. A row-by-row comparison found the Rust engine reading a
+  half-built book inside SNAPSHOT recovery bursts; the fix is part of this
+  release. API_FEATURES.md §7.1, COOKBOOK recipes 49 and 52, LEARN.md §36.
+- **E3** the polyglot policy: POLYGLOT.md decides every duplicated copy
+  (18 CANONICAL, 20 FROZEN over 24 paths, 2 RETIRE candidates kept);
+  nothing deleted; `tests/harness/check_polyglot_policy.py` and the
+  `POLYGLOT-OVERRIDE:` marker in CI; CODEOWNERS fixed. COOKBOOK recipe 53,
+  LEARN.md §38.
+- **AI3** `iap.mlops`: content-hashed, immutable, pre-registration-linked
+  model registry; drift, calibration and IC-decay monitoring; shadow mode
+  with a promotion decision that also needs the lifecycle gates.
+  API_ADAPTIVE.md §9, COOKBOOK recipes 50 and 54, LEARN.md §39.
+- **AI1-AI2** `iap.llm`: the LLM research agent through the signed broker,
+  the numbers rule, budgets, persisted transcripts; four behaviour evals,
+  mocked in CI with a control-removed ablation each. Live run on
+  2026-10-10 (`claude-haiku-5-5`, estimated $0.0096): 4 of 4 passed; the
+  model behaved well, so the live run did not stress the controls, and the
+  mocked adversarial evals remain the evidence for them. GOVERNANCE.md §2b,
+  COOKBOOK recipes 51 and 55, LEARN.md §37. `.env` files are git-ignored.
+
+**Running (not part of the release; exploratory, in-sample,
+pre-registered, launched detached):**
+
+- the maker study on the seven 2019-20 sessions (branch
+  `research/maker-real`, §3.5);
+- `AUC01` on real files and the M5 quoter on the real sessions (branch
+  `research/step2`); `AUC01` has a declared 2026 holdout.
+
+No result from either is reported here. By their own verdict rules a
+positive in-sample result justifies an out-of-sample test, nothing more.
+
+**Deferred:**
+
+| Item | Why |
+|---|---|
+| A2 QQQ against its constituents | needs more symbols ingested |
+| A3 futures lead-lag | on hold: ES / NQ data from Databento would cost about $10-25 |
+| AI4 deep order-book baselines | nothing in the evidence yet asks for a higher-capacity model (HOW_IT_WORKS.md §6.4) |
+| real batch re-run under `v3` | not done in v1.11; still the next statistics task |
+| E4-E5 split god classes, feature memory | not started |
+
+**Next.** Read the running studies and report them whatever they say
+(REAL_DATA.md); re-run the real batch under `v3`; ingest more symbols for
+A2. The boundary stays: no LLM on the trading path.
 
 ## 4. MVP success criteria
 
