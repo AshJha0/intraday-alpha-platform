@@ -22,9 +22,13 @@ the v2 rule, so no published number, golden or headline moves; the new
 - R3: `gate_ic_source="instrument_mean"` gates on the equal-weight
   per-instrument IC; the pooled IC is kept as `gate_ic_pooled`.
 - R4: `book_scope="single_venue"` turns crossed-book conditioning off for
-  ITCH-only data and labels results `nasdaq_bbo`.
+  ITCH-only data and labels results `nasdaq_bbo`. Under `v3` the experiment
+  runner reads it from `dataset.json`, so ingested datasets get it
+  automatically.
 - R5: `compute_labels(freshness="trailing")`, a causal label freshness bound
   from a trailing median quote gap.
+  The feature build takes `--label-freshness trailing` (default `whole_day`,
+  so published stores are unchanged).
 - R6: `pooled_slope_hac_tstat(day_ns=...)` forms no lag product across a
   day boundary; reports can pin `dataset_versions` (the experiment runner
   passes the spec's); tests for HAC invariance to row duplication.

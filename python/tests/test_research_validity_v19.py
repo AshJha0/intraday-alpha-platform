@@ -453,3 +453,29 @@ def test_v2_defaults_are_unchanged_and_v3_is_opt_in(frames, v2_report):
     r = _validate(frames, **v3.validate_kwargs())
     assert r["gate_ic_source"] == "instrument_mean" and "validity" in r
     assert r["validity"]["n_days"] == 4
+
+
+def test_runner_v3_reads_book_scope_from_dataset(tmp_path):
+    """R4 wired into the runner: under v3 an ingested dataset (dataset.json
+    with a source venue beside the feature store) is validated as one
+    Nasdaq book; v2 keeps the consolidated default."""
+    from types import SimpleNamespace
+
+    from iap.marketdata.ingest import MANIFEST_VERSION
+    from iap.research.runner import ExperimentRunner
+    from iap.validation.methods import methods
+
+    (tmp_path / "features").mkdir()
+    (tmp_path / "dataset.json").write_text(
+        json.dumps({"x-version": MANIFEST_VERSION, "kind": "real", "source": {"venue": "XNAS"}}),
+        encoding="utf-8",
+    )
+    fake = SimpleNamespace(feature_store_dir=tmp_path / "features")
+    v3 = ExperimentRunner._validate_kwargs(fake, methods("v3"))
+    assert v3["book_scope"] == "single_venue"
+    v2 = ExperimentRunner._validate_kwargs(fake, methods("v2"))
+    assert "book_scope" not in v2
+    synthetic = SimpleNamespace(feature_store_dir=None)
+    assert (
+        ExperimentRunner._validate_kwargs(synthetic, methods("v3"))["book_scope"] == "consolidated"
+    )

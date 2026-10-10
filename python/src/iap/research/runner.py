@@ -141,6 +141,7 @@ from iap.validation.methods import (
     methods,
 )
 from iap.validation.metrics import HORIZONS_NS
+from iap.validation.sessions import book_scope_for_dataset
 from iap.validation.splits import Fold
 from iap.validation.validate import validate_alpha
 
@@ -499,6 +500,17 @@ class ExperimentRunner:
             self._frames = load_features(self.feature_store_dir)
         return self._frames
 
+    def _validate_kwargs(self, bundle: ResearchMethods) -> dict:
+        """The bundle's validate kwargs; under ``v3`` the book scope (R4) is
+        read from the data (``dataset.json`` beside the feature store), so an
+        ingested ITCH dataset is validated as one Nasdaq book.  Earlier
+        bundles keep the consolidated default and their published reports."""
+        kwargs = dict(bundle.validate_kwargs())
+        if bundle.name == METHODS_V3 and "book_scope" not in kwargs:
+            root = self.feature_store_dir.parent if self.feature_store_dir else None
+            kwargs["book_scope"] = book_scope_for_dataset(root)
+        return kwargs
+
     @staticmethod
     def _methods(spec: ExperimentSpec) -> ResearchMethods:
         return methods(str(spec.configuration["methods"]))
@@ -780,7 +792,7 @@ class ExperimentRunner:
                 seed=int(spec.seed),
                 recompute=recompute,
                 dataset_version=spec.dataset_version,
-                **bundle.validate_kwargs(),
+                **self._validate_kwargs(bundle),
             )
         except ValueError as exc:  # splitter: too few rows / degenerate boundaries
             raise ResearchError(f"walk-forward validation impossible: {exc}") from exc

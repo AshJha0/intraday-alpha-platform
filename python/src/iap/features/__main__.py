@@ -77,7 +77,10 @@ from iap.features.rolling import SessionProfile
 from iap.features.spec import FAMILY_ORDER
 from iap.features.timeofday import PROFILE_METRICS, _metric_value
 from iap.labels.labels import (
+    DEFAULT_FRESHNESS,
+    FRESHNESS_MODES,
     HORIZON_ORDER,
+    LABEL_MAX_AGE_FLOOR_NS,
     LabelReason,
     MidSeries,
     compute_labels,
@@ -265,6 +268,7 @@ def _flush_file(
     fam_valid: dict[int, np.ndarray],
     row_counts: dict[int, int],
     label_stats: dict[int, dict],
+    label_freshness: str = DEFAULT_FRESHNESS,
 ) -> None:
     """Write one row group per instrument for the just-processed file."""
     nfeat = len(names)
@@ -281,8 +285,14 @@ def _flush_file(
         fam_valid[iid] += validity.sum(axis=0, dtype=np.int64)
         row_counts[iid] = row_counts.get(iid, 0) + rows
 
-        max_age = max_sample_age(buf.series)
-        labels = compute_labels(buf.ts, buf.series, buf.last_event_ts, max_age_ns=max_age)
+        if label_freshness == "trailing":
+            # causal bound (R5): each forward sample judged against the
+            # trailing median gap; the summary keeps the floor it starts from
+            max_age = LABEL_MAX_AGE_FLOOR_NS
+            labels = compute_labels(buf.ts, buf.series, buf.last_event_ts, freshness="trailing")
+        else:
+            max_age = max_sample_age(buf.series)
+            labels = compute_labels(buf.ts, buf.series, buf.last_event_ts, max_age_ns=max_age)
         # Data-quality facts a researcher must see before trusting a row
         # (RESEARCH round-3): how many emissions came from a CROSSED merged
         # book (a stale LP quote makes spread_ticks < 0), how far apart the
@@ -402,6 +412,13 @@ def main(argv: list[str] | None = None) -> int:
         default=5.0,
         help="per-worker memory budget that caps --workers by physical RAM (0 = no cap)",
     )
+    ap.add_argument(
+        "--label-freshness",
+        choices=FRESHNESS_MODES,
+        default=DEFAULT_FRESHNESS,
+        help="label freshness bound: whole_day (default, published stores) or "
+        "trailing (causal, R5: trailing median quote gap)",
+    )
     args = ap.parse_args(argv)
 
     t_start = time.time()
@@ -441,7 +458,17 @@ def main(argv: list[str] | None = None) -> int:
         nonlocal total_events, total_vectors
         total_events += counts[0]
         total_vectors += counts[1]
-        _flush_file(writers, out_dir, schema, buffers, names, fam_valid, row_counts, label_stats)
+        _flush_file(
+            writers,
+            out_dir,
+            schema,
+            buffers,
+            names,
+            fam_valid,
+            row_counts,
+            label_stats,
+            args.label_freshness,
+        )
         print(f"{path.name}: {n_events} events -> {counts[1]} vectors", file=sys.stderr)
 
     if workers <= 1:

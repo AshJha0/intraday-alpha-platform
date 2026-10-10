@@ -40,7 +40,7 @@ def refdata_module():
     return ReferenceData.load(REPO_ROOT / "configs")
 
 
-def _build(root, data, tag, workers):
+def _build(root, data, tag, workers, *extra):
     out = root / tag
     rc = pipeline.main(
         [
@@ -58,6 +58,7 @@ def _build(root, data, tag, workers):
             str(workers),
             "--worker-mem-gb",
             "0",
+            *extra,
         ]
     )
     assert rc == 0
@@ -96,3 +97,25 @@ def test_effective_workers_clamps():
     assert pipeline.effective_workers(8, 2, 0) <= 2
     assert pipeline.effective_workers(0, 1, 0) == 1
     assert pipeline.effective_workers(4, 4, 1e9) == 1  # RAM cap
+
+
+def test_trailing_label_freshness_build(normalized):
+    """R5 wired into the build: ``--label-freshness trailing`` changes only
+    label columns, and its parallel build is byte-identical too."""
+    root, data = normalized
+    base = _build(root, data, "fresh_default", 1)
+    trail = _build(root, data, "fresh_trailing", 1, "--label-freshness", "trailing")
+    trail2 = _build(root, data, "fresh_trailing_par", 2, "--label-freshness", "trailing")
+    for path in sorted(trail.glob("*.parquet")):
+        assert path.read_bytes() == (trail2 / path.name).read_bytes(), path.name
+        t = pq.read_table(path)
+        b = pq.read_table(base / path.name)
+        feats = [c for c in t.column_names if not c.startswith("label")]
+        for c in feats:
+            x, y = t.column(c).to_numpy(), b.column(c).to_numpy()
+            if x.dtype.kind == "f":
+                assert np.array_equal(x, y, equal_nan=True), c
+            else:
+                assert np.array_equal(x, y), c
+    summary = json.loads((trail / "features_summary.json").read_text())
+    assert summary
