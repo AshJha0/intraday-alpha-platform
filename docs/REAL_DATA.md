@@ -224,6 +224,54 @@ intervals are optimistic about their own width: seven sessions, and the
 shifted offsets are not fully independent. The real-label rows are single
 runs (1/1, interval 0.21–1.00).
 
+### 3.2 Out-of-time holdout: 2026-05-15 and 2026-05-18 (v1.8.0)
+
+The first confirmatory test on data that played no part in the design. Six
+hypotheses were written on `research/agents/blackboard.jsonl` and pushed
+(commit `6723fd0`, branch `research/holdout-2026`) **before** any 2026
+feature existed; each names alpha, horizon, expected sign and the pass rule.
+Data: the two full XNAS ITCH days merged (`dataset_version d7f7ffd1…`), same
+universe (AAPL, MSFT, QQQ) and the same feature registry (`585dd7b9…`) as the
+2019–20 sessions; parameters, cost model and methods frozen at v1.7.2.
+
+**Pass rule (registered):** leakage passes, the gate IC has the registered
+sign and the gate t reaches the run's Bonferroni threshold on the holdout
+dataset's own, fresh ledger (84 looks per run, so the threshold rises from
+3.43 to 3.89 in run order). A positive IC below the threshold is "weaker, not
+confirmed". Statistical only: no P&L claim was registered.
+
+| Hypothesis | Role | 2019–20 gate IC (t) | 2026 gate IC | 2026 t | Threshold | Outcome |
+|---|---|---|---|---|---|---|
+| EQ01 microprice @ 1s | primary | +0.105 (21.1) | +0.037 | 7.74 | 3.43 | **confirmed** |
+| EQ02 order-flow imbalance @ 5s | confirmatory (stands for EQ02/03/12) | +0.042 (25.7) | +0.016 | 8.02 | 3.62 | **confirmed** |
+| EQ10 lead-lag @ 1s | confirmatory | +0.076 (13.2) | +0.097 | 8.08 | 3.72 | **confirmed** |
+| EQ05 queue imbalance @ 1s | confirmatory | +0.063 (24.2) | +0.033 | 9.51 | 3.79 | **confirmed** |
+| EQ07 reversal @ 10s, sign + | control, expected to fail | −0.012 (−3.0) | −0.021 | −3.95 | 3.85 | **contradicted** (exit 3), as expected |
+| EQ04 trade flow @ 5s | control, expected underpowered | +0.014 (3.6) | +0.028 | 3.15 | 3.89 | weaker, not confirmed, as expected |
+
+Leakage passed on every run; fold sign consistency was 0.75 (EQ01, EQ02,
+EQ05, EQ04), 1.00 (EQ10) and 0.00 (EQ07). Reading it:
+
+- **All four confirmatory signals hold six years out of time.** The
+  microstructure signals (EQ01, EQ02, EQ05) are about a third to a half of
+  their in-sample IC: decay, an inflated in-sample (two of the seven 2019–20
+  days are FOMC days), or both. The cross-instrument lead-lag (EQ10) is the
+  exception: larger than in-sample.
+- **The controls behave as registered.** EQ07's short-horizon *reversal*
+  rationale is wrong in sign on both periods and now significantly so — the
+  10 s relation is continuation, not reversal. EQ04 is positive but below
+  the threshold, which is "cannot tell", not "no signal".
+- **Still no trade.** As in-sample, no run cleared its costs at 1x (holdout
+  net return 0 bps, no trades): a confirmed IC of 0.03–0.10 at 1–5 s is far
+  smaller than the taker round trip.
+
+What it does not say. Two sessions; the t-statistics use 5-minute event-time
+buckets without day clusters, so two days cannot rule out a day-level common
+shock. Single venue (Nasdaq BBO, not NBBO). The 2026 days are now **spent**:
+the next confirmatory test needs new, unseen sessions. Experiment ids,
+specs and results are under the git-ignored
+`data/real/holdout2026/research/experiments/`.
+
 ## 4. Mapping to canonical events
 
 The canonical contract is the twelve-field `MarketEvent`

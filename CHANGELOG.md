@@ -8,10 +8,14 @@ that tag.
 
 ## Unreleased
 
-Still to do: ingest memory (stream events to disk; a full-day ingest took 260 min
-against 52 min for a similar file because the process outgrew the machine's RAM),
-an out-of-time holdout run on 2026-05-18 (needs a frozen pre-registered
-hypothesis first).
+**Research.** First out-of-time holdout (REAL_DATA.md §3.2): six hypotheses
+pre-registered and pushed before any 2026 feature existed, run on the full
+2026-05-15 and 2026-05-18 XNAS ITCH days. All four confirmatory signals pass
+their registered rule (EQ01 microprice t 7.7, EQ02 order-flow imbalance t 8.0,
+EQ10 lead-lag t 8.1 with an IC above in-sample, EQ05 queue imbalance t 9.5);
+the reversal control EQ07 is contradicted in sign as expected and the trade-flow
+control EQ04 is below threshold as expected. No run traded at 1x costs. The
+2026 days are spent.
 
 **Changed (docs).** The matched-horizon rows of the synthetic `power` study
 (EQ04 at 10 s, EQ10 at 5 s) are a sensitivity check on the registered
