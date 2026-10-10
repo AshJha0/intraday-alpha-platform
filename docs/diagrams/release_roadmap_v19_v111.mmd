@@ -1,0 +1,28 @@
+flowchart LR
+    subgraph V19["v1.9.0 (2026-10-10), released"]
+        R["R1-R6 validity, v3 bundle (opt-in)"]
+        E1["E1 parallel feature build"]
+        M14["M1-M4 calibration, maker backtest,<br/>maker labels, tail sizing"]
+    end
+    subgraph V110["v1.10.0, this release"]
+        M5["M5 skewed two-sided quoting"]
+        A1["A1 auction NOII + AUC01"]
+        X["X1-X3 Almgren-Chriss,<br/>urgency, volume curve"]
+        G["G1-G4 costed, code-bound, anchored,<br/>Ed25519-signed preregs"]
+    end
+    subgraph RUN["running (research/maker-real)"]
+        MS["pre-registered in-sample maker study<br/>7 real sessions, no result yet"]
+    end
+    subgraph V111["v1.11, planned"]
+        RV3["real batch re-run under v3"]
+        AUC["AUC01 on real files"]
+        A23["A2 ETF vs constituents, A3 futures lead-lag"]
+        E23["E2-E3 Rust features via pyo3"]
+        AI["AI1-AI4 LLM research agent<br/>through the signed broker"]
+    end
+    M14 --> M5
+    M14 --> MS
+    R --> RV3
+    G --> AI
+    A1 --> AUC
+    MS -->|"if an in-sample edge:<br/>pre-register an out-of-sample test"| V111

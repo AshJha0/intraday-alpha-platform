@@ -42,7 +42,12 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
        205-feature factory → 24 alphas → validation → ML → portfolio → fail-closed risk →
        execution/SOR → deterministic replay → TCA → decision trace → 7-state promotion
        lifecycle, held together by cross-language golden tests, and run end to end by one
-       command (<code>python -m iap.mvp run</code>) whose golden result is honestly cost-negative.</p>
+       command (<code>python -m iap.mvp run</code>) whose golden result is honestly cost-negative.
+       Since v1.9–v1.10 it also has the maker side (a simulator calibrated from the event
+       stream, a posting backtest and a skewed two-sided quoter), auction-imbalance research,
+       optimal-execution schedules, and pre-registration that is costed, code-bound,
+       git-anchored and Ed25519-signed. Seven real Nasdaq ITCH sessions and a two-day 2026
+       holdout have been studied; nothing is claimed to be profitable.</p>
     <nav>
       <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/HOW_IT_WORKS.md">How it works</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/LEARN.md">Learn (guide)</a>
@@ -53,6 +58,9 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/LIFECYCLE.md">Lifecycle</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/DECISION_TRACE.md">Decision trace</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/ROADMAP.md">Roadmap</a>
+      <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/REAL_DATA.md">Real data</a>
+      <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/governance/GOVERNANCE.md">Governance</a>
+      <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/CHANGELOG.md">Changelog</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/papers/INDEX.md">Research papers</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/SPECIFICATION.md">Specification</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/README.md#references">References</a>
@@ -65,7 +73,7 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
 <div class="wrap">
   <h2>Measured, not claimed</h2>
   <div class="numbers">
-    Cross-language parity&nbsp;&nbsp;&nbsp; python 2114&nbsp; · cpp 302&nbsp; · rust 358&nbsp; · java 571 tests — 3,345 green, one command; golden groups 192/72/71/124<br>
+    Cross-language parity&nbsp;&nbsp;&nbsp; python 2154&nbsp; · cpp 302&nbsp; · rust 358&nbsp; · java 571 tests — 3,385 green, one command; golden groups 192/72/71/124<br>
     Golden suites&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; identical book states, byte-identical IAP1 SHA-256, features/alphas to 1e-9, byte-identical canonical JSON, trace digests, risk audit and lifecycle registry in all four languages<br>
     C++ hot path&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; IAP1 decode 184.1 ns/event (CRC-32 verified) · book update 26.4 ns · replay 27.2M events/s · 48-feature engine 514.1 ns/event · one decision trace 31.7 µs/trace off the event loop<br>
     Determinism&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; full dataset regeneration is byte-identical (sha256-verified); replays reproduce fills exactly; the MVP run twice and replayed from its capture reproduces its trace digest<br>
@@ -78,7 +86,11 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
     Verdicts (honest)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0 PROMOTE · 11 ITERATE · 13 REJECT — 3 alphas clear the multiple-testing threshold (t ≥ 4.365), 18 never forecast a move larger than their cost and make no trade, the 6 that trade lose; nothing survives costs, and we say so<br>
     Real data&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 7 Nasdaq ITCH sessions (2019-01-30 … 2020-01-30; AAPL, MSFT, QQQ; 3,100,181 feature rows) · 0 PROMOTE / 8 ITERATE / 4 REJECT · strong ICs (EQ01 microprice 0.105, t 21) but not one trade survives costs: a 1 s edge of ~0.07 bp against a ~0.7 bp taker round trip<br>
     Out-of-time holdout&nbsp;&nbsp;&nbsp;&nbsp; six hypotheses pre-registered and pushed before any 2026 feature existed · 4 of 4 confirmatory signals confirmed on 2026-05-15/18 (EQ01 t 7.7 · EQ02 t 8.0 · EQ10 t 8.1 · EQ05 t 9.5) · both controls behaved as registered · no trade at 1x costs<br>
-    Power study&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; planted order flow detected at the PROMOTE threshold (t ≥ 4.365) in 2 of 20 runs on 2 sessions, 10 of 20 on 4 and 20 of 20 on 8 (EQ04, declared 5 s label) · planted lead-lag 0 of 20 at EQ10's declared 1 s label, 16 of 20 at a 5 s label on 8 sessions · null 0 of 20 throughout · nothing promoted at any size — 20 seeds per cell, Wilson 95 % intervals
+    Power study&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; planted order flow detected at the PROMOTE threshold (t ≥ 4.365) in 2 of 20 runs on 2 sessions, 10 of 20 on 4 and 20 of 20 on 8 (EQ04, declared 5 s label) · planted lead-lag 0 of 20 at EQ10's declared 1 s label, 16 of 20 at a 5 s label on 8 sessions · null 0 of 20 throughout · nothing promoted at any size — 20 seeds per cell, Wilson 95 % intervals<br>
+    Maker economics&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; calibration from the event stream (touch fill rates by queue-ahead, depletion hazards, latency, maker markouts at 100 ms/1 s/10 s, impact) · posting backtest with FIFO queue fills, rebates and a passive exit · P&amp;L identity tested · synthetic only so far: −6.7 bp/trip passive exit vs −11.4 bp crossing out<br>
+    Quoting&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Avellaneda–Stoikov two-sided quoter with an alpha-skewed reservation price, hard inventory limit, calibrated adverse-selection floor and end-of-session flatten · P&amp;L split into spread, markout, inventory, flatten, rebates, fees · no real-data result<br>
+    Auctions &amp; execution&nbsp;&nbsp; ITCH NOII decoded in a separate opt-in pass (dataset bytes unchanged) · closing-cross strategy with purged day-aligned walk-forward, pre-registration required · Almgren–Chriss trajectory and efficient frontier, alpha urgency, forecast VWAP curve — all opt-in, pinned schedules unchanged<br>
+    Research governance&nbsp;&nbsp;&nbsp; a pre-registration costs one look and records a code + feature + dependency fingerprint · blackboard history checked against git and anchored to the first commit holding each entry · agent writes Ed25519-signed, broker holds public keys only
   </div>
 
   <div class="honest">
@@ -165,6 +177,22 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
     the real-session maker run comes next. Every default and published number is unchanged.
   </div>
 
+  <div class="honest">
+    <strong>v1.10.0: test the maker side properly, and make the research record hard to rewrite.</strong>
+    A quoter that keeps a bid and an ask resting through the queue simulator, centred on a
+    reservation price the alpha shifts, with a hard inventory limit and a flatten before the close.
+    On the synthetic golden vector the toy score does <em>not</em> help (+86.50 USD skewed against
+    +120.20 USD unskewed); with a synthetic look-ahead signal the skew earns more over eight days
+    (+3,326.66 vs +2,535.66 USD) at a slightly lower Sharpe per day (34.75 vs 36.95). A look-ahead
+    signal tests the plumbing; it is not evidence about any alpha. Also new, all opt-in and
+    Python-only: the Nasdaq auction-imbalance stream with a closing-cross strategy, Almgren–Chriss
+    schedules, alpha-driven urgency and a forecast VWAP curve. Pre-registrations now cost a look
+    and commit to a fingerprint of the code; the blackboard is anchored to git history; agent
+    writes carry Ed25519 signatures that anyone can re-verify with public keys. A pre-registered,
+    in-sample maker study on the seven real sessions is <strong>running</strong>; there is no
+    result yet, and an in-sample positive could only justify an out-of-sample test.
+  </div>
+
   <h2>Start here</h2>
   <div class="grid">
     <div class="card"><h3>How the quant, algo and AI sides work</h3>
@@ -174,11 +202,12 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
          section ends with where to look and a command that runs.
          <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/HOW_IT_WORKS.md">HOW_IT_WORKS</a></p></div>
     <div class="card"><h3>AI, LLMs and agents: the boundary</h3>
-      <p>No LLM, agent or MCP code exists in this repository. The rule is pinned first: LLM
+      <p>No LLM is called anywhere in this repository. The rule is pinned first: LLM
          reasoning is never on the trading path, is read-only, and cannot override risk or
-         send an order. What exists is the foundation — a research store safe for parallel
-         writers, gate eligibility, an import-policy test, JSON tooling. The agent layer is a
-         backlog epic, and the page says what would be theatre on this data.
+         send an order. What exists is the governance an agent would have to pass through
+         (v1.7–v1.10): a write broker over a hash-chained blackboard, costed and code-bound
+         pre-registration, a hidden-seed reserve, signed human approvals, a read-only MCP server,
+         git anchoring and Ed25519 agent signatures. The page says what would be theatre on this data.
          <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/HOW_IT_WORKS.md#6-ai-llms-and-agents-the-boundary-what-exists-what-is-planned">HOW_IT_WORKS §6</a></p></div>
     <div class="card"><h3>Research validity &amp; the power study</h3>
       <p>Corrected statistics and policies, added opt-in in v1.3.0 and the defaults since
@@ -191,7 +220,8 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
     <div class="card"><h3>Distance to production</h3>
       <p>Stated plainly, with a backlog epic for each gap: real exchange data at scale
          (ITCH 5.0 / LOBSTER ingestion exists; v1.6.0 ran all alphas on 7 real Nasdaq
-         days — real but untradable signals, no trade survives costs), measured
+         days — real but untradable signals, no trade survives costs; v1.8.0 confirmed four
+         of them out of time), measured
          tick-to-trade latency, a simulator calibrated to live fills, book-level risk,
          research throughput. Nothing here is a claim about a market.
          <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/ARCHITECTURE.md#14-distance-to-production-at-a-top-tier-firm">ARCHITECTURE §14</a></p></div>
@@ -223,7 +253,9 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
       <p>Event-time labels at 11 horizons (10ms–15m), walk-forward with purging + embargo,
          automatic leakage tests incl. a recompute-from-raw-events probe, IC/RankIC/pooled-slope HAC t/hit/decay/turnover/edge-breakeven capacity,
          a persistent multiple-testing ledger, and cost/latency/regime stress — the §20
-         promotion gates, enforced literally.</p></div>
+         promotion gates, enforced literally. The opt-in <code>v3</code> bundle (v1.9) adds
+         day-aligned folds, day-clustered and day-block-bootstrap t, an FOMC/holiday-excluded
+         block and the equal-weight per-instrument gate IC.</p></div>
     <div class="card"><h3>ML &amp; meta-labeling</h3>
       <p>Linear baselines gate the advanced models, literally: trees and the MLP run only if
          the best linear model shows OOS signal against the frictionless label. On the bundled
@@ -249,7 +281,29 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
          modeling for passive orders (pinned depletion rules), fees/rebates/impact,
          venue latency with seeded jitter, and fee-aware smart order routing — C++ reference
          fills reproduced exactly by Java and Python. The simulator never fills more than the
-         market displayed or traded.</p></div>
+         market displayed or traded. Opt-in since v1.10 (Python only): an Almgren–Chriss IS
+         trajectory and efficient frontier, alpha-driven urgency, and a VWAP on a forecast
+         volume curve.</p></div>
+    <div class="card"><h3>Maker economics &amp; quoting</h3>
+      <p>A versioned calibration estimated from the event stream (fill rates, queue-depletion
+         hazards, latency, maker markouts, impact) feeds the simulator. A maker backtest posts at
+         the touch behind a gate on expected edge versus measured adverse selection, with a taker or
+         passive exit; a two-sided quoter skews an Avellaneda–Stoikov reservation price with the
+         alpha. Both decompose P&amp;L exactly. Python research code, opt-in; results so far are
+         synthetic (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/API_TRADING.md">API_TRADING §2.6–2.8</a>).</p></div>
+    <div class="card"><h3>Auction imbalance</h3>
+      <p>Nasdaq NOII and cross messages decoded in a separate opt-in pass, so the normalized
+         dataset and its version do not change. Auction features (imbalance ratio,
+         reference-price drift, far/near spread, time to cross), cross targets, and a
+         closing-cross strategy with a purged, day-aligned walk-forward. The CLI refuses to
+         backtest without a pre-registration. Not yet run on real files.</p></div>
+    <div class="card"><h3>Research governance</h3>
+      <p>Every agent write goes through one broker onto a hash-chained blackboard. A
+         pre-registration debits a look on the multiple-testing ledger and records a fingerprint
+         of the alpha's code, features and pinned dependencies; the gate refuses a run if any
+         changed. <code>verify-board</code> checks the chain, that each committed version is a
+         prefix of the current one, the git anchors, and every Ed25519 signature
+         (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/governance/GOVERNANCE.md">GOVERNANCE</a>).</p></div>
     <div class="card"><h3>Event-driven backtester</h3>
       <p>Replays every market event in event-time through book → features → alphas →
          portfolio → risk → execution with modeled decision/wire/venue latency, partial

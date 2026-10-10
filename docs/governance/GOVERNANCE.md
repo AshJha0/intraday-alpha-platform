@@ -138,6 +138,46 @@ the `research/experiments/<id>/` document, or the `ledger_key` of the
 the PR and in the `LifecycleTransition` document's reason. Reviewers reject
 a change with no id; the CI check for it is backlog issue L05.
 
+### 2a. Agent-layer research governance (v1.10, G1-G4)
+
+| Control | Enforced by | What it stops |
+|---|---|---|
+| A pre-registration debits one look on the ledger (`kind="prereg"`) | `WriteBroker.preregister` | unlimited free hypotheses |
+| The prereg body carries the alpha's code + feature fingerprint; a run with different code is refused | `iap.agents.fingerprint`, `prereg_gate.require` | changing the alpha after registering it |
+| Changed code needs `supersede=True` (a new look) | `WriteBroker.preregister` | silent re-registration |
+| Reserve attempts capped per (alpha, horizon, code hash); unknown candidate fields refused | `ReserveEvaluator` | resetting the cap with a dummy field |
+| Committed board versions must be prefixes of the current board; `research/agents/anchors.json` names the commit holding each entry | `iap.agents.anchor`, `python -m iap.agents.cli verify-board` | re-chaining the hash chain |
+| Agent writes signed with Ed25519 (over agent, op, args digest, single-use nonce); the broker and verifiers hold only public keys (`research/agents/agent_pubkeys.json`), private keys live outside the repo; new HMAC requests refused | `iap.agents.signing`, `WriteBroker(pubkeys=...)`, `Blackboard.verify_signatures`, `cli agent-keygen` / `verify-board` | impersonating an agent id, replay, forgery by a verifier |
+| `--no-prereg` results carry an ineligibility reason | `ExperimentRunner(exploratory=True)` | exploratory runs used as promotion evidence |
+
+Not retroactive: pre-registrations written before v1.10 (the 2026 holdout
+six) have no fingerprint and were never debited; they still pass the gate and
+the committed ledger numbers do not move. Their code is anchored by commit
+`6723fd0` instead. Operator workflow: `python -m iap.agents.cli prereg ...`,
+then commit the board, then `python -m iap.agents.cli anchor` and commit
+`anchors.json`; `verify-board` before any gate run.
+
+**Signature schemes.** `auth.scheme` is `ed25519` for every new entry.
+Entries without `scheme` are the legacy `hmac-sha256` scheme of the first
+v1.10 draft: still verifiable with the shared key
+(`verify-board --legacy-hmac-keyfile`), never accepted for new writes.
+
+**What the code fingerprint covers** (`iap.agents.fingerprint`, scheme 2):
+the source files of the alpha's defining module(s) and, transitively, every
+`iap.*` module they import explicitly (AST walk: top-level, function-local
+and relative imports), hashed per module in sorted order with line endings
+normalised to LF (Windows and Linux checkouts hash alike; no bytecode or
+interpreter version enters, so Python minor versions hash alike); the
+registry entries of the features the alpha declares (closed over
+`depends_on`) and the same module closure of their feature family modules;
+and the installed numpy, pandas and scipy versions (third-party code is
+pinned by version, not hashed). Granularity is the module: editing any code
+in a covered module, e.g. another alpha in `iap/alpha/equity.py`, changes
+the hash. **Not covered:** parent-package `__init__` modules executed only
+implicitly, dynamic `importlib` imports with computed names, data and
+config files read at run time (fitted params, `configs/`), the interpreter,
+and other third-party libraries.
+
 ## 3. Audit-log policy
 
 Auditable events and where they are recorded:

@@ -1,0 +1,11 @@
+flowchart LR
+    ITCH["raw ITCH 5.0 file<br/>.NASDAQ_ITCH50.gz"] -->|"Itch50Reader(noii=True)<br/>python -m iap.auction extract"| STR["auction stream directory<br/>NOII (I) + cross (Q) messages<br/>(refuses to write into a dataset dir)"]
+    ITCH -->|"default ingest, unchanged"| DS["normalized dataset<br/>same bytes, same dataset_version"]
+    STR --> FEAT["auction_features<br/>imbalance ratio, ref-price drift,<br/>far-near spread, near vs ref, time to cross"]
+    STR --> TGT["auction_targets<br/>cross price vs mid at t,<br/>drift into the cross"]
+    FEAT --> LAB["labelled decisions<br/>one per symbol and day"]
+    TGT --> LAB
+    PRE["blackboard prereg<br/>AUC01/C-300s, pushed first"] -->|"required unless --no-prereg"| BT
+    LAB --> BT["python -m iap.auction backtest<br/>AUC01: take imbalance side at the touch,<br/>exit in the cross or by taker"]
+    BT --> WF["purged day-aligned walk-forward<br/>(iap.validation): fit orientation + threshold<br/>on train days only"]
+    WF --> REP["report: trades, net bp after CostModel taker cost,<br/>mid_source (NOII ref price or --mids)"]

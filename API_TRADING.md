@@ -524,6 +524,80 @@ is unchanged.
 Research-only scoring with the pinned `z_clip = 4` replaced by `z_cap`
 (`None` means no cap). `score()` and the port contract keep the clip.
 
+### 2.7 Signal-skewed two-sided quoting (v1.10.0, Python only)
+
+`QuotingBacktester(exec_config, QuotingConfig(...), calibration=None)` in
+`iap.backtest.quoting` is opt-in research code; no golden or port contract
+changes. `.run_instrument(events, scores, instrument_id, *, venue_id=None)
+-> QuotingResult` and `.run_days({day: (events, scores)}, instrument_id) ->
+DataFrame` (one flattened session per day); `sharpe_per_day(daily_net)`.
+The module docstring pins the rules:
+
+- each score row (`exchange_ts`, `expected_return`) requotes both sides
+  around `r = mid + alpha_weight * er * mid - gamma * sigma2 * (q / qty) *
+  tau_s`, with half-spread `max(0.5 gamma sigma2 tau + ln(1 + gamma/k) /
+  gamma, min_half_spread_ticks * tick, adverse_selection - rebate)`. The
+  adverse selection comes from the calibration at `as_horizon` (via
+  `MakerBacktester.adverse_selection`), else `adverse_selection_bps`, else 0.
+  `sigma2` is an EWMA of the mid variance rate, or `sigma**2` when it is
+  fixed. Prices snap outward to ticks and never cross the touch.
+- hard limit: quote size is capped so `q + working bids <= max_inventory`
+  (and the mirror for asks), counting orders whose cancel is in flight.
+- changed quotes are cancelled and resubmitted through the latency path
+  (the calibrated latency table when given); fills before the cancel lands
+  count.
+- flatten: from the first event at/after `flatten_ts - flatten_lead_ns`
+  (default: end of stream minus 1 s), quoting stops and every working quote
+  is cancelled through the latency path. Events keep being processed, so
+  quotes can still fill while their cancels are in flight
+  (`fills_during_cancel`). Before each event, while `q != 0`, the whole
+  `|q|` crosses at the touch with the taker fee and linear impact
+  (`flatten_rounds`). At the end of the stream any remainder crosses on the
+  last book, or is marked at the last mid when no two-sided book remains
+  (`forced_flatten`). `instant_cancel=True` keeps the old zero-latency sweep;
+  with all latencies at zero the two are identical (tested).
+- `QuotingResult.pnl`: `gross = spread_captured + markout + inventory_pnl +
+  flatten_cost` (tested), `net = gross + rebates - taker_fees - impact`.
+  `summary()` adds per-side fill rates (filled / posted qty), maker share,
+  `max_abs_inventory`, time-weighted `mean_abs_inventory`, `time_at_limit`
+  and the counters (`requotes`, `cancels`, `*_blocked_by_limit`, ...).
+  `alpha_weight=0` is the no-skew (gamma only) baseline.
+### 2.8 Execution algos: Almgren-Chriss, alpha urgency, forecast volume curve (v1.10.0, Python only)
+
+All three are opt-in. The pinned schedules (TWAP equal weights, VWAP
+`1 + x^2`, IS `exp(-ra * i / (N-1))`) stay the defaults and stay the
+cross-language contract: the golden quantities `{129,71,71,129}` (VWAP) and
+`{304,184,112}` (IS) are unchanged, and the C++/Java/Rust ports are untouched.
+
+**Almgren-Chriss IS (X1) — `iap.execution.optimal`.** `ACParams(sigma, eta,
+gamma, eps, horizon, risk_aversion)`; `ac_holdings` / `ac_trajectory` give the
+closed-form trajectory `x_j = X sinh(kappa (T - t_j)) / sinh(kappa T)` with the
+discrete `kappa` from `2 (cosh(kappa tau) - 1) / tau^2 = lambda sigma^2 /
+eta_tilde`; `ac_cost` returns `(E, V)`; `efficient_frontier(qty, p, n,
+lambdas)` returns `(lambda, E, V)` points (E rises, V falls with lambda).
+`ac_params_from_calibration(sigma=, adv=, price=, calibration=, config=)` maps
+the impact slope (calibration document first, `ExecConfig` fallback) to
+`eta = coeff * 1e-2 * price / adv`. A parent opts in with
+`ParentOrder(algo=AlgoType.IS, is_model=ISModel.ALMGREN_CHRISS,
+ac_params=...)`.
+
+**Alpha-aware urgency (X2) — `iap.execution.urgency`.** `apply_alpha_urgency(
+parent, signal, AlphaUrgencyParams(...))` returns a new parent: when the
+signal agrees with patience (buy and expected fall, sell and expected rise)
+it posts `PASSIVE` at `passive_urgency`; when adverse it switches to
+`adverse_policy` (default `AGGRESSIVE`) at `adverse_urgency` and multiplies
+`risk_aversion` by `accelerate`; inside `threshold` the parent is returned
+unchanged.
+
+**Forecast VWAP curve (X3) — `iap.execution.volume_curve`.**
+`estimate_volume_curves(events, n_bins=, session=, shrinkage=)` builds a
+per-instrument profile from TRADE events (per-day normalized, averaged,
+shrunk to the U-shape with weight `k / (days + k)`), as an
+`iap.volume_curve` v1 document. CLI: `python -m iap.execution.volume_curve
+--events F [F ...] --out curve.json [--bins 26 --shrinkage 5]`.
+`load_volume_curve(path, instrument_id)` feeds `ParentOrder(volume_curve=...)`;
+`curve_slice_weights` resamples the bins to the parent's slices.
+
 ## 3. Where the rules live
 
 | rule set | normative text | Python port entry |

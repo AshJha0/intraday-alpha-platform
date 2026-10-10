@@ -48,6 +48,15 @@ Contents:
 37. [Work a parent order passively and read its markouts](#37-work-a-parent-order-passively-and-read-its-markouts)
 38. [Combine alphas out of sample and count the independent bets](#38-combine-alphas-out-of-sample-and-count-the-independent-bets)
 39. [Calibrate the simulator and run a maker-side backtest (v1.9)](#39-calibrate-the-simulator-and-run-a-maker-side-backtest-v19)
+40. [Quote both sides with an alpha-skewed reservation price (v1.10)](#40-quote-both-sides-with-an-alpha-skewed-reservation-price-v110)
+41. [Optimal execution: Almgren-Chriss, alpha urgency and a forecast VWAP curve (v1.10)](#41-optimal-execution-almgren-chriss-alpha-urgency-and-a-forecast-vwap-curve-v110)
+42. [Extract the NOII auction stream and backtest the closing-cross strategy (v1.10)](#42-extract-the-noii-auction-stream-and-backtest-the-closing-cross-strategy-v110)
+43. [Build features in parallel with causal (trailing) label freshness (v1.9)](#43-build-features-in-parallel-with-causal-trailing-label-freshness-v19)
+44. [Validate under the `v3` bundle and read the validity block (v1.9)](#44-validate-under-the-v3-bundle-and-read-the-validity-block-v19)
+45. [Calibrate the simulator on one real session (v1.9)](#45-calibrate-the-simulator-on-one-real-session-v19)
+46. [Run the maker backtest on a real session (how-to; results pending)](#46-run-the-maker-backtest-on-a-real-session-how-to-results-pending)
+47. [Pre-register with a signed request, anchor it, and verify the board (v1.10)](#47-pre-register-with-a-signed-request-anchor-it-and-verify-the-board-v110)
+48. [Walk the Almgren-Chriss efficient frontier (v1.10)](#48-walk-the-almgren-chriss-efficient-frontier-v110)
 
 Recipes 27–35 were added with v1.3.0. Every command block in them was run
 as printed, from a clean checkout of the release, before it was written
@@ -746,7 +755,7 @@ bash tests/harness/run_all.sh --golden-only   # golden groups only (fast)
 ```
 
 Exit code 0 iff every language passed; logs land in a temp dir printed on
-the first line. The v1.9.0 counts (CI): python 2114 / cpp 302 /
+the first line. The v1.10.0 counts (CI): python 2154 / cpp 302 /
 rust 358 / java 571 tests passed (golden groups 192/72/71/124), plus
 `integration` (35) and `replay` (6) rows for the repo-level pytest suites, a
 `deployment` row (26 structural checks passed in CI, where `promtool` and
@@ -2275,3 +2284,562 @@ hours), not results. To calibrate a real session, run
 `python -m iap.execution.calibration --events <day>.iap1 --tick 1=0.01 --out
 calib.json` and pass `load_calibration("calib.json")` to the simulator and
 the backtester.
+
+## 40. Quote both sides with an alpha-skewed reservation price (v1.10)
+
+`iap.backtest.quoting.QuotingBacktester` (API_TRADING.md §2.7) keeps a bid
+and an ask resting through the FIFO simulator. Quotes sit around an
+Avellaneda-Stoikov reservation price that the alpha shifts
+(`r = mid + alpha_weight * er * mid - gamma * sigma^2 * q * tau`), with a
+hard inventory limit, refresh through the latency path, a calibrated
+adverse-selection floor on the half-spread and an end-of-session flatten.
+It compares the alpha-skewed quoter with the no-skew (gamma only) baseline
+on the golden equity vector and the toy L1-imbalance score of recipe 39:
+
+```bash
+PYTHONPATH=python/src python3 - <<'EOF'
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+from iap.backtest.quoting import QuotingBacktester, QuotingConfig
+from iap.core.codec import read_jsonl
+from iap.execution import ExecConfig, InstrumentSpec, load_venues
+from iap.execution.calibration import ExecCalibration, estimate_calibration
+from iap.tca.markout import build_gated_timeline
+
+events = read_jsonl(Path("tests/golden/events_eq_mbo.jsonl"))
+cal = ExecCalibration.from_dict(estimate_calibration(events, {1: 0.01}))
+tl = build_gated_timeline(events, 1, 0.01)
+SEC = 10**9
+ts = np.arange(tl.ts[0] + SEC, tl.ts[-1], 2 * SEC, dtype=np.int64)
+idx = [tl.prevailing(int(t)) for t in ts]
+imb = np.array([(tl.bid_sz[i] - tl.ask_sz[i]) / (tl.bid_sz[i] + tl.ask_sz[i]) for i in idx])
+scores = pd.DataFrame({"exchange_ts": ts, "expected_return": 1e-4 * imb})
+cfg = ExecConfig(seed=20260829, venues=load_venues("configs/venues/venues.json"),
+                 instruments={1: InstrumentSpec(1, 0.01, 1.0, 38_000_000.0)})
+for name, w in (("skewed", 1.0), ("no-skew", 0.0)):
+    qc = QuotingConfig(qty=100, max_inventory=300, gamma=0.1, tau_s=10.0, alpha_weight=w)
+    s = QuotingBacktester(cfg, qc, cal).run_instrument(events, scores, 1).summary()
+    print(f"{name:<8} fills {s['n_quote_fills']:>3} (bid {s['bid_fill_rate']:.2f} ask {s['ask_fill_rate']:.2f})"
+          f" max|q| {s['max_abs_inventory']} mean|q| {s['mean_abs_inventory']:.0f}"
+          f" AS floor {s['as_bps_floor']:+.2f} bp ({s['as_source']})")
+    print(f"         spread {s['spread_captured']:+.2f} markout {s['markout']:+.2f}"
+          f" inventory {s['inventory_pnl']:+.2f} flatten {s['flatten_cost']:+.2f}"
+          f" rebates {s['rebates']:+.2f} fees {-s['taker_fees'] - s['impact']:+.2f}"
+          f" = net {s['net']:+.2f} USD")
+EOF
+```
+
+```
+skewed   fills  97 (bid 0.17 ask 0.19) max|q| 300 mean|q| 151 AS floor +0.80 bp (calibration:1s)
+         spread +205.50 markout -49.00 inventory -82.50 flatten -6.00 rebates +19.40 fees -0.90 = net +86.50 USD
+no-skew  fills 104 (bid 0.19 ask 0.19) max|q| 300 mean|q| 142 AS floor +0.80 bp (calibration:1s)
+         spread +218.50 markout -45.50 inventory -69.00 flatten -4.00 rebates +20.80 fees -0.60 = net +120.20 USD
+```
+
+How to read it. The five P&L terms add up to the gross exactly
+(`spread + markout + inventory + flatten`; the identity is tested), and the
+net adds rebates and subtracts taker fees and impact. On this vector the toy
+imbalance score does not help: skewing moves the quotes, captures less
+spread and does not reduce adverse selection, so the no-skew quoter nets
+more. The tests show the opposite with an informative (look-ahead,
+synthetic) signal: the skew cuts markout losses. Whether a real alpha does
+that is an open question, and this recipe does not answer it. Both quoters
+hit the 300-share limit; it is never exceeded.
+
+To run a real session (not run for v1.10; the machine was busy):
+
+```bash
+python -m iap.execution.calibration --events <day>.iap1 --tick 1=0.01 --out calib.json
+# then, in Python: QuotingBacktester(cfg, QuotingConfig(...), load_calibration("calib.json"))
+#   .run_days({day: (events, scores)}, 1) for each day, and sharpe_per_day(table["net"])
+```
+## 41. Optimal execution: Almgren-Chriss, alpha urgency and a forecast VWAP curve (v1.10)
+
+Every step is opt-in; a default `ParentOrder` schedules exactly as before.
+
+```python
+from iap.execution import AlgoType, ISModel, ParentOrder, slice_quantities
+from iap.execution.calibration import load_calibration
+from iap.execution.optimal import ac_params_from_calibration, efficient_frontier
+from iap.execution.urgency import AlphaUrgencyParams, apply_alpha_urgency
+from iap.execution.volume_curve import load_volume_curve
+
+# X1: closed-form IS trajectory from the calibrated impact slope (or the config default)
+p = ac_params_from_calibration(sigma=0.4, adv=2e6, price=50.0, horizon=1 / 13,
+                               risk_aversion=1e-5, calibration=load_calibration(None))
+for lam, e, v in efficient_frontier(50_000, p, 10, [0, 1e-6, 1e-5, 1e-4]):
+    print(f"lambda={lam:g}  E={e:.2f}  sd={v ** 0.5:.2f}")
+parent = ParentOrder(algo=AlgoType.IS, qty=50_000, slices=10, start_ts=0, end_ts=1,
+                     is_model=ISModel.ALMGREN_CHRISS, ac_params=p)
+print(slice_quantities(parent))
+
+# X2: post when the alpha says waiting pays, cross and front-load when it does not
+parent = apply_alpha_urgency(parent, signal=+0.8, params=AlphaUrgencyParams(threshold=0.2))
+
+# X3: VWAP on a forecast curve
+#   python -m iap.execution.volume_curve --events day1.iap1 day2.iap1 --out curve.json
+vwap = ParentOrder(algo=AlgoType.VWAP, qty=50_000, slices=13, instrument_id=1,
+                   volume_curve=load_volume_curve("curve.json", 1))
+```
+
+With few days the estimated curve leans on the U-shape (`weight_empirical =
+days / (days + shrinkage)`); check that field before trusting a curve.
+
+## 42. Extract the NOII auction stream and backtest the closing-cross strategy (v1.10)
+
+Plan item A1. `iap.auction` reads ITCH `I` (NOII) and `Q` (cross) messages
+in a separate, opt-in pass (`Itch50Reader(noii=True)`), so the normalized
+dataset and its version are unchanged. It builds auction features and cross
+targets, then backtests and walk-forwards strategy `AUC01`: take the
+imbalance side at the touch 5 minutes before the close, exit in the cross.
+The example builds 6 synthetic sessions with the test encoder. The cross is
+planted to move with the imbalance, so this shows the plumbing working, not
+an edge:
+
+```bash
+cd python
+PYTHONUTF8=1 PYTHONPATH=src:tests python3 - <<'EOF'
+import tempfile
+from pathlib import Path
+from iap.auction import (AuctionStream, AuctionStrategyConfig, auction_features,
+                         auction_targets, backtest, extract_auction_stream, walk_forward)
+from test_auction import SYMBOLS, _days, _session
+
+tmp = Path(tempfile.mkdtemp())
+stream = AuctionStream.concat(
+    extract_auction_stream(_session(100 + i).write(tmp / f"{d}.itch"), SYMBOLS, d)
+    for i, d in enumerate(_days(6)))
+labels = auction_targets(auction_features(stream.noii, "C"), stream.crosses)
+cfg = AuctionStrategyConfig(decision_s=300, threshold=0.1, exit="cross")
+s = backtest(labels, cfg).summary()
+print(f"in sample: {s['n_trades']} trades, net {s['mean_net_bps']:+.2f} bp (cost {s['mean_cost_bps']:.2f})")
+wf = walk_forward(labels, cfg, n_folds=3)
+print("folds:", [(f["fold"], f["orientation"], f["threshold"], f["test_trades"]) for f in wf.folds])
+o = wf.summary()
+print(f"out of sample: {o['n_trades']} trades over {o['n_days']} days, net {o['mean_net_bps']:+.2f} bp")
+EOF
+```
+
+```
+in sample: 12 trades, net +6.98 bp (cost 1.60)
+folds: [(1, 1, 0.05, 2), (2, 1, 0.05, 2), (3, 1, 0.05, 2)]
+out of sample: 6 trades over 3 days, net +6.94 bp
+```
+
+Every fold learns to follow the imbalance (orientation `+1`), as planted.
+For real files, use the CLI: `python -m iap.auction extract`, then
+`backtest`. Pre-register `AUC01/<cross type>-<seconds>s` and push it before
+the run. `backtest` refuses to run without it unless you pass
+`--no-prereg`. [docs/REAL_DATA.md](docs/REAL_DATA.md) §3.3 has the exact
+commands.
+
+## 43. Build features in parallel with causal (trailing) label freshness (v1.9)
+
+Plan items E1 and R5. `python -m iap.features --workers N` replays one
+normalized file per process and folds the only cross-day state (the
+expanding session profile behind the four `norm_*_m5_v1` features) back in
+trading-day order in the parent, so the output is byte-identical to the
+serial build. `--label-freshness trailing` judges label staleness against a
+trailing median quote gap instead of the whole-day median, so the label
+validity of a row no longer depends on quotes later in the same day. The
+default stays `whole_day`, so the published stores do not change.
+
+The example generates a small two-session synthetic dataset (the tiny MVP
+generator config with `sessions` set to 2), builds its two equity files
+serially and with two workers, and compares the Parquet outputs byte for
+byte:
+
+```bash
+cd python
+OUT=$(mktemp -d)
+python3 -c "import json; c = json.load(open('../configs/mvp/generator_tiny.json')); \
+c['sessions'] = 2; json.dump(c, open('$OUT/gen.json', 'w'))"
+PYTHONPATH=src python3 -m iap.marketdata --config $OUT/gen.json --out $OUT/data
+for w in 1 2; do
+  PYTHONPATH=src python3 -m iap.features --data-dir $OUT/data/normalized \
+      --out-dir $OUT/feat_w$w --registry-out $OUT/reg_w$w.json \
+      --files eq_20260824.normalized.iap1 eq_20260825.normalized.iap1 \
+      --workers $w --label-freshness trailing | tail -2
+done
+for f in $OUT/feat_w2/*.parquet; do cmp -s $f $OUT/feat_w1/$(basename $f) && echo "same $(basename $f)"; done
+```
+
+```
+  "runtime_seconds": 48.26
+}
+  "runtime_seconds": 27.31
+}
+same features_1.parquet
+same features_10.parquet
+...
+same features_9.parquet
+```
+
+Every one of the 11 Parquet files is identical; only `features_summary.json`
+differs, in `runtime_seconds`. The timings are from one run on a busy
+12-core Windows machine and only show the order of magnitude; the
+measured benchmark is in CHANGELOG v1.9.0 (205 s serial, 101 s with 2
+workers, 40 s with 5, on a 5-day synthetic dataset).
+
+Memory sets the worker count, not cores. Each worker holds a whole day's
+events and feature rows; on a full real ITCH day that is several GB, so on
+a 16 GB machine use 2-3 workers. The CLI also caps N at
+`physical RAM / --worker-mem-gb` (default 5 GB). On Windows, set
+`PYTHONPATH=src` the same way; the worker function is submitted by its
+importable module name, so the spawn start method works (before v1.10 the
+CLI failed on Windows and macOS with `BrokenProcessPool` when `--workers`
+was above 1).
+
+## 44. Validate under the `v3` bundle and read the validity block (v1.9)
+
+Plan items R1-R3 and R6. The `v3` method bundle cuts folds at session
+starts, gates on the equal-weight mean of per-instrument ICs, and adds a
+`validity` block: per-day ICs with event tags, the gate statistics without
+FOMC and holiday-thin days, a HAC t with no lag product across a day
+boundary, a day-clustered t and a day-block bootstrap. It debits four more
+looks than `v2` (88 against 84 at four folds). The example uses the test
+fixture of `test_research_validity_v19.py`: five synthetic sessions from
+2019-01-28 with a planted backwards signal on two instruments, the second
+ten times noisier in label scale, and 2019-01-30 an FOMC day:
+
+```bash
+cd python
+PYTHONUTF8=1 PYTHONPATH=src:tests python3 - <<'EOF'
+from iap.validation.methods import METHODS_V2, METHODS_V3, methods
+from test_research_validity_v19 import _multi_day_frames, _validate
+
+frames = _multi_day_frames()  # 5 synthetic sessions from 2019-01-28; 01-30 is FOMC
+for name in (METHODS_V2, METHODS_V3):
+    m = methods(name)
+    r = _validate(frames, **m.validate_kwargs())
+    print(f"{name}: looks {m.looks(4)}  gate IC ({r['gate_ic_source']}) {r['gate_ic']:+.4f}"
+          f"  pooled {r['gate_ic_pooled']:+.4f}  gate t {r['gate_tstat']:+.2f}  verdict {r['verdict']}")
+v = r["validity"]
+for d in v["days"]:
+    print(f"  {d['day']} {','.join(d['tags']) or '-':<6} IC {d['ic']:+.3f}  n {d['n_pairs']}")
+e = v["ex_event"]
+print(f"ex-event: {e['n_days_excluded']} day dropped {e['excluded_tags']}, gate IC {e['gate_ic']:+.4f},"
+      f" t {e['tstat_pooled_slope']:+.2f}")
+b = v["day_block_bootstrap"]
+print(f"t: HAC day-separated {v['tstat_pooled_slope_day_separated']:+.2f}, day-clustered"
+      f" {v['tstat_day_cluster']:+.2f}, day-block bootstrap {b['tstat']:+.2f} over {b['n_days']:.0f} days")
+EOF
+```
+
+```
+v2: looks 84  gate IC (pooled) -0.1784  pooled -0.1784  gate t -8.56  verdict REJECT
+v3: looks 88  gate IC (instrument_mean) -0.2312  pooled -0.1784  gate t -8.56  verdict REJECT
+  2019-01-29 -      IC -0.153  n 1260
+  2019-01-30 fomc   IC -0.132  n 1260
+  2019-01-31 -      IC -0.201  n 1260
+  2019-02-01 -      IC -0.230  n 1260
+ex-event: 1 day dropped ['fomc', 'holiday_thin'], gate IC -0.2424, t -10.10
+t: HAC day-separated -9.22, day-clustered -8.19, day-block bootstrap -9.03 over 4 days
+```
+
+How to read it.
+
+- The verdict is REJECT under both bundles because the fixture is planted
+  *backwards* (its hypothesis sign is wrong). That is the point of the
+  fixture: the statistics are strong and the signal still fails.
+- The gate IC moves from the pooled −0.178 to the instrument mean −0.231.
+  Pooling lets the instrument with the larger label scale dominate; the
+  equal-weight mean asks whether the signal works on each instrument.
+- The first session is the first fold's training data, so the block holds
+  four days. The FOMC day carries the weakest IC; dropping it moves the
+  gate IC from −0.231 to −0.242. On the real 2019-20 sessions, two of seven
+  days are FOMC days, which is why this block exists.
+- The three t-statistics agree here (−8.2 to −9.2). On real data they can
+  disagree a lot: the day-clustered t has only (days − 1) degrees of
+  freedom of information about a day-level shock, and with four or seven
+  days it is the honest one. Read it before the row-level HAC t.
+
+On a real dataset the runner does the same with `python -m iap.research run
+--alpha EQ01 --methods v3 --dataset-dir <dataset>`; under `v3` it also
+reads `book_scope` from `dataset.json`, so ITCH-only results are labelled
+`nasdaq_bbo` (R4).
+
+## 45. Calibrate the simulator on one real session (v1.9)
+
+`python -m iap.execution.calibration` estimates touch fill rates by
+queue-ahead bucket, queue-depletion hazards, feed latency quantiles, maker
+adverse selection at 100 ms / 1 s / 10 s and aggressor impact from a
+normalized event stream, and writes an `iap.exec_calibration` v1 document.
+Run it on one ingested session (REAL_DATA.md §3 builds one). The ids and tick
+sizes come from the dataset's own `configs/instruments/instruments.json`; in
+the AAPL / MSFT / QQQ datasets the ids are 1, 2 and 3 and every tick is
+0.01:
+
+```bash
+cd python
+DS=../data/real/ds3_20190327
+PYTHONUTF8=1 PYTHONPATH=src python3 -m iap.execution.calibration \
+    --events $DS/normalized/eq_20190327.normalized.iap1 \
+    --tick 1=0.01 2=0.01 3=0.01 --out $DS/calibration.json
+python3 -c "import json; d = json.load(open('$DS/calibration.json')); \
+print(d['fill_rates']['all']); print(d['markouts']['all']['1s']); print(d['impact'])"
+```
+
+Not run for this release: the machine was running the maker study below.
+Three things to know before you run it.
+
+- **Memory.** The CLI reads the whole IAP1 file into Python event objects.
+  A full ITCH day for three symbols is several million events and several GB.
+  On a 16 GB machine, calibrate one symbol at a time from
+  `normalized/events.parquet` with a `pyarrow` filter on `instrument_id`
+  (the loader in recipe 46 does this) and call `estimate_calibration`
+  directly.
+- **Latency is assumed, not measured.** ITCH has no receive stamp
+  (`receive_ts == exchange_ts`), so the latency table is degenerate. Inject
+  an explicit assumption with `parametric_latency` and say so in the
+  results.
+- **Calibrate on an earlier day than you test.** A calibration estimated on
+  the test day leaks that day's adverse selection into the gate.
+
+## 46. Run the maker backtest on a real session (how-to; results pending)
+
+This is the shape of one unit of the pre-registered maker study described
+in docs/ROADMAP.md §3.5: fit the alpha on an earlier session, calibrate on
+that same earlier session, then post on the later one with a taker exit and
+with a passive exit. Save it as `maker_day.py`:
+
+```python
+import sys
+from pathlib import Path
+
+import numpy as np
+import pyarrow.parquet as pq
+from iap.alpha import build, configure_universe
+from iap.backtest.maker import MakerBacktester, MakerConfig
+from iap.core.events import MarketEvent
+from iap.execution.calibration import ExecCalibration, estimate_calibration
+from iap.execution.config import load_exec_config
+
+# features dir, configs dir, events.parquet of the earlier day, of the later day,
+# instrument id, alpha, horizon, and the two days' row-group index in features_<iid>.parquet
+FEAT, CONFIGS, EV0, EV1 = (Path(a) for a in sys.argv[1:5])
+IID, ALPHA, HZ = int(sys.argv[5]), sys.argv[6], sys.argv[7]
+TRAIN_DAY, TEST_DAY = int(sys.argv[8]), int(sys.argv[9])
+TICK = 0.01
+SEC = 10**9
+DAY = 86_400 * SEC
+COLS = ["event_id", "instrument_id", "venue_id", "exchange_ts", "receive_ts", "sequence",
+        "event_type", "side", "price_ticks", "qty", "order_id", "trade_id"]
+STATE = ["is_trading_v1", "is_auction_v1", "is_halt_v1"]
+
+
+def events_for(path, iid, any_ts):
+    """The whole UTC day of one instrument (the book is rebuilt from the first event)."""
+    t0 = any_ts // DAY * DAY
+    t = pq.read_table(path, columns=COLS,
+                      filters=[("instrument_id", "=", iid), ("exchange_ts", ">=", t0),
+                               ("exchange_ts", "<", t0 + DAY)])
+    return [MarketEvent(*r) for r in zip(*(t.column(c).to_numpy().tolist() for c in COLS))]
+
+
+def feature_day(iid, day, cols):
+    pf = pq.ParquetFile(FEAT / f"features_{iid}.parquet")
+    df = pf.read_row_group(day, columns=["instrument_id", "exchange_ts", *cols]).to_pandas()
+    ok = (df["is_trading_v1"] == 1) & (df["is_auction_v1"] != 1) & (df["is_halt_v1"] != 1)
+    return df[ok].sort_values("exchange_ts", kind="stable").reset_index(drop=True)
+
+
+configure_universe(CONFIGS / "instruments" / "instruments.json")
+cfg = load_exec_config(CONFIGS)
+model = build(ALPHA)
+model.horizon = HZ
+need = list(dict.fromkeys([*model.features, f"label_mid_{HZ}", f"label_valid_{HZ}", *STATE]))
+train, test = feature_day(IID, TRAIN_DAY, need), feature_day(IID, TEST_DAY, need)
+model.fit({IID: train})                                     # fit on the earlier day only
+
+# calibrate on the EARLIER day (causal), backtest the later one
+d0 = events_for(EV0, IID, int(train.exchange_ts.iloc[0]))
+cal = ExecCalibration.from_dict(estimate_calibration(d0, {IID: TICK}))
+del d0
+d1 = events_for(EV1, IID, int(test.exchange_ts.iloc[0]))
+
+scores = model.score_uncapped({IID: test}, z_cap=None)[IID]
+sig = model.signals({IID: test})[IID].to_numpy(dtype=float)
+scores["z"] = np.nan_to_num((sig - model.mu) / (model.sigma + 1e-12))
+h = {"1s": 1, "5s": 5, "10s": 10}[HZ] * SEC
+passive = dict(exit="passive", exit_timeout_ns=h, exit_reprices=1)
+for name, extra in (("taker", {}), ("passive", passive)):
+    mc = MakerConfig(qty=100, ttl_ns=h, horizon_ns=h, as_horizon="1s", **extra)
+    s = MakerBacktester(cfg, mc, cal).run_instrument(d1, scores, IID).summary()
+    print(f"{name:<8} scores {len(scores)} posted {s['posted']} filled {s['filled_orders']}"
+          f" gated out {s['gated_out']} trips {s['n_trips']}"
+          + (f" net {s['mean_net_bps']:+.2f} bp/trip" if s["n_trips"] else ""))
+```
+
+On a real pair of sessions (row groups are in trading-day order in the
+merged dataset; 0 is 2019-01-30, 1 is 2019-03-27):
+
+```bash
+cd python
+PYTHONUTF8=1 PYTHONPATH=src python3 maker_day.py \
+    ../data/real/multi7/features ../data/real/multi7/configs \
+    ../data/real/ds3_20190130/normalized/events.parquet \
+    ../data/real/ds3_20190327/normalized/events.parquet 1 EQ01 1s 0 1
+```
+
+The real-data result is **not in this book yet**: the pre-registered study
+(`research/maker_real/prereg.json` on branch `research/maker-real`: EQ01,
+EQ02, EQ05 and EQ10, taker and passive exits, walk-forward over the seven
+sessions with session 1 as warm-up) is running. It is in-sample: those
+sessions were used to design every alpha, so even a positive result would
+only justify an out-of-sample test. The run above was checked on the
+two-session synthetic dataset of recipe 43, where it is plumbing only
+(`taker`: every row gated out; `passive`: 2,534 posts, no fill on that
+sparse tiny stream).
+
+Things the script does deliberately: the gate's adverse selection and the
+fill model come from the earlier day, the alpha is fitted on the earlier
+day, rows outside continuous trading are dropped, and the score is
+`score_uncapped` (the pinned `score()` clips z, which hides the tail the
+maker gate needs). The calibration's latency on ITCH is degenerate (recipe
+45); the study injects an assumed parametric table and labels it.
+
+## 47. Pre-register with a signed request, anchor it, and verify the board (v1.10)
+
+Plan items G1-G4. A pre-registration now debits one look on the
+multiple-testing ledger and stores a fingerprint of the alpha's code, its
+declared features and the pinned numpy / pandas / scipy versions. Agent
+writes are Ed25519-signed; the broker holds only public keys. `anchor`
+records the first commit that contains each blackboard entry, and
+`verify-board` checks the hash chain, that every committed version of the
+board is a prefix of the current one, the anchors and every signature.
+
+Do this in a scratch clone the first time, because it writes to the
+blackboard, the ledger and the public-key registry:
+
+```bash
+git clone https://github.com/AshJha0/intraday-alpha-platform /tmp/iap-gov && cd /tmp/iap-gov
+export PYTHONPATH=$PWD/python/src
+KEYS=$HOME/.iap-keys && mkdir -p $KEYS        # private keys live OUTSIDE the repository
+python3 -m iap.agents.cli --root . agent-keygen --agent alpha-researcher --keyfile $KEYS/agent.key
+python3 -m iap.agents.cli --root . prereg --agent alpha-researcher --alpha EQ02 --horizon 10s \
+    --hypothesis "demo: EQ02 at 10s, positive sign" --expected-sign 1 --keyfile $KEYS/agent.key
+git add research && git commit -qm "prereg EQ02/10s"   # push it before touching any data
+python3 -m iap.agents.cli --root . anchor
+python3 -m iap.agents.cli --root . verify-board
+```
+
+```
+private key for 'alpha-researcher' written to <KEYS>/agent.key; public key added to <repo>/research/agents/agent_pubkeys.json
+pre-registered EQ02/10s as a961739d6206a444 (one look debited)
+7 entries anchored in <repo>/research/agents/anchors.json
+{
+  "anchored": 7,
+  "entries": 7,
+  "ok": true,
+  "problems": [],
+  "unanchored": 0
+}
+```
+
+The id and the hash differ in your run (they cover a timestamp and a
+nonce). What the new entry holds:
+
+```
+"auth": {"key_id": "alpha-researcher", "op": "preregister", "scheme": "ed25519", "nonce": "...", "args_digest": "...", "sig": "..."}
+"body": {"alpha_id": "EQ02", "horizon": "10s", "expected_sign": 1, "format": 2, "ledger_total": 5157,
+         "code": {"scheme": 2, "code_hash": "...", "feature_hash": "...",
+                  "modules": ["iap.alpha.base", "iap.alpha.equity"],
+                  "features": ["depth_ask_l1_avg_w10s_v1", ..., "ofi_norm_l1_w1s_v1"],
+                  "deps": {"numpy": "...", "pandas": "...", "scipy": "..."}}}
+```
+
+`ledger_total` is 5157: the committed 5,156 looks plus this one. Now edit
+the hypothesis text of that last entry and verify again:
+
+```bash
+python3 -c "from pathlib import Path; p = Path('research/agents/blackboard.jsonl'); \
+l = p.read_text().splitlines(); l[-1] = l[-1].replace('positive sign', 'negative sign'); \
+p.write_text('\n'.join(l) + '\n')"
+python3 -m iap.agents.cli --root . verify-board; echo "exit $?"
+```
+
+```
+{
+  "anchored": 0,
+  "entries": 0,
+  "ok": false,
+  "problems": [
+    "chain broken at entry 7"
+  ],
+  "unanchored": 0
+}
+exit 1
+```
+
+What the chain cannot catch on its own is a rewrite that re-hashes every
+later entry. That is what the git check is for: every committed version of
+the board must be a prefix of the current one, so a re-chained board fails
+against its own history. The research gate (`prereg_gate.require`, used by
+`python -m iap.research run`) also refuses a run whose code hash, feature
+hash or dependency versions changed since registration; re-register with
+`prereg ... --supersede`, which costs another look. Pre-registrations made
+before v1.10 (the six 2026 holdout entries) carry no fingerprint and were
+never debited; they are anchored to commit `6723fd0`. Non-alpha hypotheses
+such as `AUC01` register and debit a look, but carry no code fingerprint,
+because there is no alpha class to hash. docs/governance/GOVERNANCE.md §2a
+lists what the fingerprint covers and what it does not.
+
+## 48. Walk the Almgren-Chriss efficient frontier (v1.10)
+
+Plan item X1, the closed-form implementation-shortfall trajectory. The
+parameters come from `ac_params_from_calibration`: the temporary impact
+slope `eta` from a calibration document's impact estimate, or the
+`ExecConfig` default when there is none (`load_calibration(None)` returns
+none). The example sells 50,000 shares of a 50 USD stock with 40% annual
+volatility and 2M ADV over half an hour (1/13 of a session) in 10 slices:
+
+```bash
+cd python
+PYTHONPATH=src python3 - <<'EOF'
+from iap.execution import AlgoType, ISModel, ParentOrder, slice_quantities
+from iap.execution.calibration import load_calibration
+from iap.execution.optimal import ac_params_from_calibration, efficient_frontier
+
+p = ac_params_from_calibration(sigma=0.4, adv=2e6, price=50.0, horizon=1 / 13,
+                               risk_aversion=1e-5, calibration=load_calibration(None))
+print(p)
+print(f"{'lambda':>8} {'E[cost] USD':>12} {'sd USD':>10}")
+for lam, e, v in efficient_frontier(50_000, p, 10, [0, 1e-7, 1e-6, 1e-5, 1e-4]):
+    print(f"{lam:>8g} {e:>12.2f} {v ** 0.5:>10.2f}")
+for ra in (0.0, 1e-5, 1e-4):
+    pp = ac_params_from_calibration(sigma=0.4, adv=2e6, price=50.0, horizon=1 / 13,
+                                    risk_aversion=ra, calibration=load_calibration(None))
+    parent = ParentOrder(algo=AlgoType.IS, qty=50_000, slices=10, start_ts=0, end_ts=1,
+                         is_model=ISModel.ALMGREN_CHRISS, ac_params=pp)
+    print(f"risk_aversion {ra:g}: {slice_quantities(parent)}")
+EOF
+```
+
+```
+ACParams(sigma=0.4, eta=5e-07, gamma=0.0, eps=0.0, horizon=0.07692307692307693, risk_aversion=1e-05)
+  lambda  E[cost] USD     sd USD
+       0     16250.00    2961.29
+   1e-07     16250.00    2961.25
+   1e-06     16250.00    2960.86
+   1e-05     16250.13    2956.98
+  0.0001     16262.33    2918.96
+risk_aversion 0: [5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000]
+risk_aversion 1e-05: [5027, 5019, 5011, 5004, 4999, 4994, 4990, 4987, 4985, 4984]
+risk_aversion 0.0001: [5266, 5181, 5107, 5041, 4986, 4939, 4902, 4875, 4856, 4847]
+```
+
+How to read it. At `lambda = 0` the trader is risk-neutral and the optimal
+trajectory is a straight line (TWAP, 5,000 a slice): that minimises
+expected temporary-impact cost. Raising risk aversion front-loads the
+sale, which shortens the time the position is exposed to price variance
+(the standard deviation falls from 2,961 to 2,919 USD) at a higher
+expected cost (16,250 to 16,262 USD). Here the trade-off is flat because
+half an hour is short against the volatility and the default impact slope
+is small; the curve bends more with a larger `eta` (a calibrated one) or a
+longer horizon. `gamma` (permanent impact) and `eps` (fixed cost) are 0
+from this constructor; permanent impact does not change the AC trajectory,
+only its expected cost. The default IS schedule (`exp(-ra * i / (N-1))`)
+is unchanged; Almgren-Chriss runs only when a `ParentOrder` asks for it.

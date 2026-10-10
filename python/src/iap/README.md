@@ -6,7 +6,7 @@ contracts and `tests/golden/`). Two packages run the other way — `risk/` and
 `execution/` are Python ports of the Rust and C++ references, proven by the
 same goldens (`/API_TRADING.md`). Everything deterministic is seeded via
 SplitMix64 only; no wall clock and no network or LLM client on any trading
-path (`PLATFORM_CONVENTIONS.md` §13.7). All 23 packages are listed below.
+path (`PLATFORM_CONVENTIONS.md` §13.7). All 26 packages are listed below.
 
 ```
 iap/
@@ -125,6 +125,18 @@ iap/
                    parents through their schedules (child split at
                    max_child_qty, expire_ts = end_ts, POV deficit vs filled +
                    in-flight); ParentReport / ExecReplayResult.
+    passive.py     the NATIVE / PASSIVE / AGGRESSIVE execution policies (v1.5.0).
+    calibration.py (v1.9, M1, opt-in) estimate_calibration from normalized
+                   events: touch fill rates by queue-ahead bucket, depletion
+                   hazards, latency quantiles (parametric_latency for ITCH),
+                   maker markouts 100 ms / 1 s / 10 s, impact; the
+                   iap.exec_calibration v1 document, load_calibration,
+                   apply_calibration; `python -m iap.execution.calibration`.
+    optimal.py     (v1.10, X1) Almgren-Chriss trajectory, expected cost and
+                   variance, efficient_frontier, ac_params_from_calibration.
+    urgency.py     (v1.10, X2) apply_alpha_urgency.
+    volume_curve.py (v1.10, X3) forecast intraday volume curve (iap.volume_curve
+                   v1 JSON; `python -m iap.execution.volume_curve`).
   features/        The 205-feature factory (API_FEATURES.md): registry.py (the
                    pinned registry + its hash = feature_version), engine.py
                    (event-driven FeatureEngine, validity bitset, cadence),
@@ -142,6 +154,10 @@ iap/
                    frames.py: which rows a research statistic scores
                    (scored_labels / scored_rows; ic_rows "blackout_reopen",
                    the default since v1.5.0, or the legacy "valid_only").
+                   compute_labels(freshness="trailing") is the v1.9 causal
+                   freshness bound (R5). maker_labels.py (v1.9, M3): per
+                   decision and side, fill / taker flags, queue ahead,
+                   markouts, "filled and not run over".
   alpha/           The 24 flagship alphas (API_ALPHA.md): base.py (AlphaModel,
                    linear_z_v1 fit / score, the enforced `Economic rationale:`
                    docstring), equity.py (EQ01..EQ12), fx.py (FX01..FX12),
@@ -175,8 +191,11 @@ iap/
                    PROMOTE t threshold — tstat_threshold="ledger", the
                    default since v1.5.0; "fixed" is the legacy 3.0 — and the
                    PROMOTE / ITERATE / REJECT verdict), methods.py (the
-                   method bundles "v2", the default, and "legacy_v1", the
-                   rules up to v1.4.0: ResearchMethods, methods(name)).
+                   method bundles "v2", the default, "legacy_v1", the
+                   rules up to v1.4.0, and the opt-in "v3" of v1.9:
+                   ResearchMethods, methods(name)), sessions.py (v1.9, R1:
+                   FOMC / holiday-thin calendar, stratified_day_sample,
+                   record_day_sampling, book_scope_for_dataset).
   experiment/      tracker.py — data_version() (sha256 over the normalized IAP1
                    bytes), feature_version() (registry hash), git_commit(),
                    hardware_summary(), ExperimentTracker.write_manifest()
@@ -210,7 +229,13 @@ iap/
                    the v1.4.0 rules), costs.py (half-spread + fees + impact:
                    impact_model="sqrt" by default since v1.5.0, the legacy
                    "linear" via with_linear_impact(); per-currency natives),
-                   adaptive.py (the adaptive walk-forward deployment replay).
+                   adaptive.py (the adaptive walk-forward deployment replay),
+                   maker.py (v1.9, M2/M4, opt-in: MakerBacktester, MakerConfig,
+                   MakerFilter; post at the touch, queue fills, rebates,
+                   measured adverse selection, taker / mid / passive exit),
+                   quoting.py (v1.10, M5, opt-in: QuotingBacktester,
+                   QuotingConfig, sharpe_per_day; alpha-skewed two-sided
+                   quoting with inventory limit and flatten).
   adaptive/        The adaptability reference (API_ADAPTIVE.md): drift.py (PSI,
                    two-sample KS, the rolling IC and its z: ic_z_method
                    "hac" by default since v1.5.0, "legacy" the z up to
@@ -448,6 +473,25 @@ iap/
     __main__.py    `python -m iap.mvp run [--config] [--seed] [--instrument]
                    [--out] [--repo-root] | replay --run <dir> [--repo-root] |
                    verify | explain --run <dir> ID`.
+  agents/          The agent-layer governance (v1.7.0; G1-G4 in v1.10.0), off the
+                   trading path: blackboard.py (append-only hash-chained JSONL),
+                   broker.py (WriteBroker: the only write path; preregister
+                   debits a look and stores the code fingerprint; Ed25519
+                   request verification with pubkeys), prereg_gate.py (the
+                   research-run gate), fingerprint.py (scheme 2 code / feature
+                   / dependency hash), signing.py (Ed25519 requests; HMAC
+                   legacy verify-only), anchor.py (git prefix check and
+                   research/agents/anchors.json), reserve.py / reserve_runner.py
+                   (hidden-seed evaluation), approvals.py (signed HUMAN
+                   approvals), evals.py, untrusted.py, citations.py,
+                   mcp_server.py (read-only MCP over stdio, `iap-mcp`), cli.py
+                   (`iap-agents`: keygen, issue, apply, reserve, agent-keygen,
+                   prereg, anchor, verify-board).
+  auction/         (v1.10, A1, opt-in) Nasdaq NOII / cross stream: stream.py
+                   (extract_auction_stream, AuctionStream), features.py,
+                   targets.py, strategy.py (AUC01 backtest and purged
+                   day-aligned walk_forward), __main__.py (`python -m
+                   iap.auction extract | backtest`, pre-registration required).
   trace/           Building, persisting, digesting and explaining DecisionTraces.
     builder.py     TraceBuilder(session_id, instrument_id, event_ts, sequence,
                    data/feature/model/config_version).add_signal/set_portfolio/
@@ -482,8 +526,10 @@ dataset unless `--allow-rerun` is given (`--list` prints the steps). The
 artefacts committed for v1.4.0 were produced by it in the manual
 `regenerate` job of `.github/workflows/ci.yml`.
 
-Dependencies are declared in `python/pyproject.toml` (1.4.0): numpy, pandas,
-scipy, scikit-learn, pyarrow, jsonschema, referencing; extras `ml`
-(xgboost, lightgbm) and `dev` (pytest, pyyaml). Console entry points:
-`iap-marketdata`, `iap-features`, `iap-tca`, `iap-research`, `iap-lifecycle`,
-`iap-store`, `iap-mvp`.
+Dependencies are declared in `python/pyproject.toml`: numpy, pandas,
+scipy, scikit-learn, pyarrow, jsonschema, referencing and, since v1.10.0,
+cryptography (Ed25519 for `iap.agents.signing` only); extras `ml`
+(xgboost, lightgbm) and `dev` (pytest, pytest-cov, pytest-xdist, pyyaml).
+Console entry points: `iap-marketdata`, `iap-features`, `iap-tca`,
+`iap-research`, `iap-lifecycle`, `iap-store`, `iap-mvp`, `iap-mcp`,
+`iap-agents`.

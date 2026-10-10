@@ -63,8 +63,8 @@ fills are exact integers; features, alphas, portfolio and TCA compare at
 abs and rel 1e-9; adaptive PSI/KS at 1e-10 with exact refit booleans and
 lifecycle state sequences; canonical-JSON lines, trace digests, the risk
 audit / snapshot and the lifecycle registry are byte-identical; the 7-state
-lifecycle golden is compared exactly, field by field. The v1.9.0 table
-(2026-10-10, counts from CI) reads python 2114 / cpp 302 / rust 358 /
+lifecycle golden is compared exactly, field by field. The v1.10.0 table
+(2026-10-10, counts from CI) reads python 2154 / cpp 302 / rust 358 /
 java 571 (golden 192/72/71/124), `integration` 35, `replay` 6.
 
 ## 4. Golden regeneration protocol
@@ -180,7 +180,17 @@ Research truth is the product (spec §32). Two rules are mechanical:
    never below 3.0. A number quoted under a legacy rule says so. Runner entries are never de-duplicated against
    the report pipeline's entries even when the computation coincides, and a
    dataset change adds its looks beside the old ones: the denominator only
-   grows.
+   grows. The opt-in `v3` bundle (v1.9.0) adds a validity block and costs
+   88 looks at four folds. Since v1.7.0 `python -m iap.research run` refuses
+   before reading any data unless the (alpha, horizon) hypothesis is
+   pre-registered on `research/agents/blackboard.jsonl`; `--no-prereg` runs
+   are exploratory and, since v1.10.0, ineligible as promotion evidence.
+   Since v1.10.0 a pre-registration itself debits one look and records the
+   alpha's code fingerprint, and a run whose code changed is refused:
+   register with `python -m iap.agents.cli prereg ...`, commit and push the
+   board, then `python -m iap.agents.cli anchor` and commit `anchors.json`
+   (COOKBOOK recipe 47, docs/governance/GOVERNANCE.md §2a). Private keys
+   for `--keyfile` live outside the repository.
 2. **A PR cannot flip a verdict without the ledger entry.** A change to a
    verdict in `research/alpha_reports/*.json` (PROMOTE / ITERATE / REJECT),
    to a lifecycle state in `research/alpha_registry.json` /

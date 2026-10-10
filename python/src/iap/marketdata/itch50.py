@@ -6,7 +6,8 @@ Two layers (docs/REAL_DATA.md is the user guide and holds the mapping table):
   a sequence of ``2-byte big-endian length | message`` records, optionally
   gzip-compressed (detected by magic, not by file name).  It decodes the
   message types the platform maps (``S R H Y L A F E C X D U P Q B``),
-  length-checks and counts ``I`` (NOII), and skips every other type by its
+  length-checks and counts ``I`` (NOII; decoded only with the opt-in
+  ``noii=True``, for ``iap.auction``), and skips every other type by its
   length prefix with a per-type counter.  With a symbol filter the stock
   locate codes of the wanted symbols are learnt from the day's ``R``
   messages and every other message is skipped after reading three bytes, so
@@ -75,6 +76,7 @@ _U = struct.Struct(">xHHHIQQII")
 _P = struct.Struct(">xHHHIQcI8sIQ")
 _Q = struct.Struct(">xHHHIQ8sIQc")
 _B = struct.Struct(">xHHHIQ")
+_I = struct.Struct(">xHHHIQQc8sIIIcc")
 
 #: Pinned message lengths (type byte included), ITCH 5.0 specification.
 MESSAGE_LENGTHS: dict[str, int] = {
@@ -112,6 +114,7 @@ _STRUCTS = {
     "P": _P,
     "Q": _Q,
     "B": _B,
+    "I": _I,
 }
 for _code, _st in _STRUCTS.items():
     if _st.size != MESSAGE_LENGTHS[_code]:
@@ -274,6 +277,27 @@ class CrossTrade(NamedTuple):
     cross_type: str
 
 
+class NetOrderImbalance(NamedTuple):
+    """``I`` — Net Order Imbalance Indicator (NOII) of an upcoming cross.
+
+    Only yielded by a reader built with ``noii=True`` (opt-in); the default
+    reader length-checks and counts ``I`` and yields nothing for it, so the
+    normalized output and the dataset version do not depend on it.
+    """
+
+    locate: int
+    ts: int
+    paired_shares: int
+    imbalance_shares: int
+    imbalance_direction: str  # B buy, S sell, N none, O insufficient orders
+    stock: str
+    far_price: int
+    near_price: int
+    current_reference_price: int
+    cross_type: str  # O open, C close, H halt/IPO
+    price_variation: str
+
+
 class BrokenTrade(NamedTuple):
     """``B`` — an earlier execution (``match_number``) was broken."""
 
@@ -331,6 +355,7 @@ class Itch50Reader:
         symbols: Iterable[str] | None = None,
         limit_messages: int | None = None,
         chunk_size: int = 1 << 20,
+        noii: bool = False,
     ) -> None:
         if limit_messages is not None and limit_messages < 0:
             raise ValueError("limit_messages must be >= 0")
@@ -343,6 +368,8 @@ class Itch50Reader:
         )
         self.limit_messages = limit_messages
         self.chunk_size = chunk_size
+        #: opt-in: yield ``I`` messages as :class:`NetOrderImbalance`
+        self.noii = bool(noii)
         self.counts: dict[str, int] = {t: 0 for t in SUPPORTED_TYPES}
         self.skipped_unknown: dict[str, int] = {}
         self.filtered = 0
@@ -384,6 +411,7 @@ class Itch50Reader:
         pos = 0
         base = 0  # absolute offset of buf[0] in the decompressed stream
         t_s, t_r, t_i = ord("S"), ord("R"), ord("I")
+        keep_noii = self.noii
         try:
             while True:
                 if limit is not None and total >= limit:
@@ -426,7 +454,7 @@ class Itch50Reader:
                         f"ITCH 5.0 says {expect}",
                         offset=base + start - 2,
                     )
-                if mtype == t_i:
+                if mtype == t_i and not keep_noii:
                     continue  # NOII: length-checked and counted, not mapped
                 if mtype == t_s:
                     _, _, hi, lo, code = _S.unpack_from(buf, start)
@@ -588,7 +616,27 @@ def _dec_b(buf: bytes, start: int) -> BrokenTrade:
     return BrokenTrade(loc, (hi << 32) | lo, match)
 
 
+def _dec_i(buf: bytes, start: int) -> NetOrderImbalance:
+    loc, _, hi, lo, paired, imb, direction, stock, far, near, ref, cross, var = _I.unpack_from(
+        buf, start
+    )
+    return NetOrderImbalance(
+        loc,
+        (hi << 32) | lo,
+        paired,
+        imb,
+        _txt(direction),
+        _txt(stock),
+        far,
+        near,
+        ref,
+        _txt(cross),
+        _txt(var),
+    )
+
+
 _DECODERS = {
+    ord("I"): _dec_i,
     ord("H"): _dec_h,
     ord("Y"): _dec_y,
     ord("L"): _dec_l,

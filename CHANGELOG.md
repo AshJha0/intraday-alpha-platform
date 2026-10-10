@@ -6,6 +6,132 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
+## v1.10.0 — 2026-10-10
+
+New edge and strategy layer (IAP_Next_Releases_Plan v1.10: A1, M5, X1-X3,
+G1-G4), plus a documentation and GitHub Pages refresh. Every new trading and
+research path is opt-in: no default, golden, published number or
+cross-language contract changes. New runtime dependency: `cryptography`
+(Ed25519 agent signatures). Parity counts from CI: python 2154 / cpp 302 /
+rust 358 / java 571. Pull requests
+[#46](https://github.com/AshJha0/intraday-alpha-platform/pull/46) to
+[#50](https://github.com/AshJha0/intraday-alpha-platform/pull/50).
+
+**Fixed.** `python -m iap.features --workers N` (v1.9.0) with N > 1 failed with
+`BrokenProcessPool` on Windows and macOS: spawn-started workers cannot import a
+package's `__main__`, so the worker is now submitted by its importable module
+name. Output stays byte-identical to the serial build. `test_pipeline_config`
+pins the child process's stdio to UTF-8, so it passes on Windows (cp1252).
+
+**In progress.** An exploratory, pre-registered in-sample maker study on the 7
+real sessions (EQ01/EQ02/EQ05/EQ10, taker and passive exits; branch
+`research/maker-real`) is running; its result will be added in a follow-up.
+
+**Added.**
+- M5, `iap.backtest.quoting`: `QuotingBacktester`, a signal-skewed two-sided
+  quoter (Avellaneda-Stoikov style). The alpha shifts the reservation price.
+  It enforces a hard inventory limit, refreshes quotes through the
+  simulator's latency path, floors the half-spread at the calibrated adverse
+  selection, and flattens at the end of the session. The flatten starts
+  `flatten_lead_ns` before the end, cancels through the latency path, lets
+  in-flight quotes still fill (`fills_during_cancel`) and crosses the
+  remainder in repeated rounds (`flatten_rounds`). It reports P&L
+  decomposed into spread captured, markout, inventory, flatten cost, rebates
+  and fees (identity tested), fill rates, inventory path statistics and a
+  Sharpe ratio per day. Opt-in and Python only: `backtest/maker.py` and every
+  default path are unchanged. COOKBOOK recipe 40, API_TRADING.md §2.7. On the
+  golden vector the toy imbalance score does not beat the no-skew quoter
+  (+86.50 vs +120.20 USD). With a synthetic look-ahead signal, the skew cuts
+  markout losses (tested). No real-data result is claimed.
+
+Execution algorithms (IAP_Next_Releases_Plan v1.10: X1-X3), Python only and
+opt-in. The pinned TWAP/VWAP/IS schedules, every golden and every
+cross-language contract are unchanged.
+
+**Added.**
+- X1, `iap.execution.optimal`: closed-form Almgren-Chriss implementation
+  shortfall trajectory (sinh/cosh, discrete kappa), expected cost and
+  variance, `efficient_frontier`, and `ac_params_from_calibration` (impact
+  slope from an `iap.exec_calibration` document, `ExecConfig` fallback).
+  Opt in with `ParentOrder(is_model=ISModel.ALMGREN_CHRISS, ac_params=...)`;
+  the default IS schedule stays `exp(-ra * i / (N-1))`.
+- X2, `iap.execution.urgency`: `apply_alpha_urgency` posts passively when the
+  signal agrees with patience and crosses / front-loads when it is adverse.
+- X3, `iap.execution.volume_curve`: per-instrument intraday volume profile
+  from TRADE events, shrunk toward the U-shape, written as `iap.volume_curve`
+  v1 JSON by `python -m iap.execution.volume_curve`; opt in with
+  `ParentOrder(volume_curve=...)`.
+
+- A1, auction imbalance (NOII), `iap.auction`. `Itch50Reader(noii=True)`
+  decodes ITCH `I` messages (`NetOrderImbalance`: paired and imbalance
+  shares, direction, far / near / current reference price, cross type). This
+  is opt-in: the default reader still only counts them, so the normalized
+  IAP1 bytes and `dataset_version` do not change. Also added:
+  `extract_auction_stream` (writes a separate NOII + cross stream directory),
+  auction features (imbalance ratio, reference-price drift, far-near
+  spread, near-vs-reference, time to the scheduled cross), and targets
+  (cross price vs mid at t, drift into the cross; closing cross primary,
+  opening cross second). Strategy `AUC01` takes at the touch minutes before
+  the cross with the `CostModel` taker cost and exits in the cross or with a
+  taker trade. It comes with a backtest, a purged day-aligned walk-forward
+  on `iap.validation`, and a `python -m iap.auction` CLI that requires a
+  pre-registration (`--no-prereg` to opt out). Synthetic tests are in
+  `tests/test_auction.py`; COOKBOOK recipe 42 and REAL_DATA §3.3 cover usage.
+  No real-data run yet.
+
+### Governance (IAP_Next_Releases_Plan G1-G4)
+
+- **G1 — pre-registrations cost a look and commit to code.**
+  `WriteBroker.preregister` debits one look on the multiple-testing ledger
+  (`kind="prereg"`, default `research/experiments.json`, `--ledger` /
+  `--dataset-version` for a dataset ledger) and stores the alpha's code
+  fingerprint (`iap.agents.fingerprint`, scheme 2: sha256 over the alpha's
+  defining modules and, transitively, every `iap.*` module they import
+  (AST walk, LF-normalised, so module-level helpers are covered and the hash
+  is identical on Windows/Linux and across Python minor versions); the
+  declared features closed over `depends_on` with their registry entries and
+  family-module closure; and the numpy/pandas/scipy versions) in a
+  `format: 2` body. What is and is not covered is listed in
+  `docs/governance/GOVERNANCE.md` §2a. The research gate
+  (`prereg_gate.require`) refuses a run when the code hash, feature hash or
+  pinned dependency versions changed since registration; `preregister(..., supersede=True)` re-registers
+  changed code as a new look. New CLI: `python -m iap.agents.cli prereg`.
+  **Not retroactive**: the six 2026 holdout preregs (and any v1.9-format
+  prereg) carry no fingerprint, were never debited and are not debited now,
+  so the committed ledger numbers (5,156 looks over 216 configurations) and
+  every research report are unchanged.
+- **G2 — reserve attempt cap keyed on (alpha, horizon, code hash)**
+  instead of the whole candidate dict; unknown candidate fields are refused
+  and a code change since the prereg is refused.
+- **G3 — external anchoring.** `iap.agents.anchor` + `cli anchor` /
+  `cli verify-board`: every committed version of the blackboard must be a
+  prefix of the current one (catches re-chaining), and
+  `research/agents/anchors.json` records the first commit that contains each
+  entry (the six 2026 preregs: `6723fd0`).
+- **G4 — authenticated agent identity (Ed25519).** `WriteBroker(pubkeys=...)`
+  requires every agent write to carry an Ed25519-signed request (agent, op,
+  argument digest, single-use nonce; `iap.agents.signing`, `broker.sign`);
+  forged, moved and replayed requests are refused and the signed request is
+  stored on the entry (`auth`, `scheme: "ed25519"`) for offline
+  re-verification (`Blackboard.verify_signatures`, `cli verify-board`). The
+  broker and verifiers hold only public keys, from the committed registry
+  `research/agents/agent_pubkeys.json`, so they cannot forge; `cli
+  agent-keygen` writes the private key to a file outside the repository and
+  the public key into the registry. HMAC-SHA256 (the first draft of this
+  change) is legacy, verify-only: new HMAC requests are refused, stored ones
+  still verify with `verify-board --legacy-hmac-keyfile`. New dependency:
+  `cryptography>=46,<51` (pinned `cryptography==50.0.1`, `cffi==2.1.1`,
+  `pycparser==3.0` in `python/requirements-ci.txt`, which CI and the Docker
+  image use as constraints). `research run --no-prereg` results now carry the eligibility
+  reason "not pre-registered (--no-prereg)", so the registry and lifecycle
+  promotion gates refuse them.
+
+**On-disk compatibility.** The blackboard format is unchanged except for an
+optional `auth` field that is covered by the entry hash, so v1.9 code verifies
+v1.10 boards and v1.10 verifies v1.9 boards; no migration. A board written by
+v1.9 code (e.g. a concurrent pre-registration on another branch) is accepted
+as is; its preregs are treated as legacy (no fingerprint, no look debit).
+
 ## v1.9.0 — 2026-10-10
 
 Trustworthy evidence, then maker economics (IAP_Next_Releases_Plan v1.9:

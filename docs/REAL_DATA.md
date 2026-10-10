@@ -281,6 +281,68 @@ the next confirmatory test needs new, unseen sessions. Experiment ids,
 specs and results are under the git-ignored
 `data/real/holdout2026/research/experiments/`.
 
+### 3.3 Auction imbalance (NOII) study (v1.10, plan item A1) - not yet run
+
+`iap.auction` extracts ITCH `I` (NOII, about 6.2M a day) and `Q` (cross)
+messages into a **separate** stream directory: one opt-in pass with
+`Itch50Reader(noii=True)`. The default ingest is untouched, so the IAP1
+bytes and `dataset_version` do not change, and `extract` refuses to write
+into a dataset directory. The strategy (`AUC01`) decides once per symbol
+and day at the first NOII snapshot within `--decision-s` of the cross,
+trades the imbalance sign at the touch (CostModel taker cost), and exits in
+the cross (`--exit cross`) or with a taker trade just before it (`--exit
+taker`). The closing cross is the primary target; `--cross-type O` runs the
+opening cross as the second one. `--walk-forward` fits orientation and
+threshold on purged, day-aligned train days (`iap.validation`).
+
+**Before any real run, pre-register the hypothesis and push it** (the
+blackboard entry must be on `main`, or at least pushed on the branch, before
+the data is touched), one entry per horizon:
+
+```bash
+cd python
+PYTHONPATH=src python3 -m iap.agents.cli --root .. prereg --agent researcher \
+    --alpha AUC01 --horizon C-300s --expected-sign 1 \
+    --hypothesis "closing-cross price moves with the NOII imbalance sign from 5 min before the cross, net of taker entry"
+git add ../research && git commit -m "prereg AUC01/C-300s" && git push
+PYTHONPATH=src python3 -m iap.agents.cli --root .. anchor
+git add ../research/agents/anchors.json && git commit -m "anchor AUC01/C-300s" && git push
+```
+
+Since v1.10.0 a pre-registration debits one look on the ledger it names
+(the checkout's `research/experiments.json` by default; `--ledger` and
+`--dataset-version` select a dataset ledger) and, with `--keyfile`, is
+Ed25519-signed (COOKBOOK recipe 47). `AUC01` is not a flagship alpha class,
+so its entry carries no code fingerprint and the gate cannot check the code
+for it.
+
+The horizon string is `<cross type>-<decision seconds>s`, exactly what
+`backtest` checks (`--cross-type O --decision-s 120` needs `O-120s`).
+
+Then, one file at a time (a single streaming pass, memory bounded by the
+read buffer; about the time of an ingest pass per full-day file):
+
+```bash
+cd python
+for d in 2019-12-30 2019-12-31; do
+  f=$(date -d $d +%m%d%Y).NASDAQ_ITCH50.gz
+  PYTHONUTF8=1 PYTHONPATH=src python3 -m iap.auction extract \
+      --itch ../data/vendor/$f --date $d --symbols AAPL MSFT QQQ \
+      --out ../data/real/auction/$d
+done
+PYTHONUTF8=1 PYTHONPATH=src python3 -m iap.auction backtest \
+    --stream ../data/real/auction/2019-12-30 ../data/real/auction/2019-12-31 \
+    --cross-type C --decision-s 300 --exit cross --walk-forward --folds 4 \
+    --out ../data/real/auction/AUC01_C-300s.json
+```
+
+Without `--mids` the mid at t is the NOII current reference price (Nasdaq
+publishes it within the inside quotes, but it is a proxy; the report says
+`mid_source`). Pass `--mids mids.csv` (`symbol,ts,mid[,half_spread]`, epoch
+ns, dollars) exported from the normalized book for a true mid and spread.
+With two sessions the walk-forward has one test day; it needs the 9+ days on
+disk to say anything.
+
 ## 4. Mapping to canonical events
 
 The canonical contract is the twelve-field `MarketEvent`
@@ -324,7 +386,7 @@ AUCTION=3 CLOSE=4).
 | `Q` cross trade | none on the event path; recorded per symbol in `dataset.json` (`crosses`: type, price, shares, time) and added to the session volume | an auction print has no aggressor, and `TRADE` is signed flow. The opening cross price is the instrument's `ref_price` |
 | `B` broken trade | none; counted, match numbers listed in the manifest | a break cannot be un-applied to an event stream that has already been replayed |
 | `Y`, `L` | none; counted | |
-| `I` NOII | none; length-checked and counted | |
+| `I` NOII | none; length-checked and counted | the normalized output never carries it. Since v1.10 `Itch50Reader(noii=True)` decodes it (opt-in) for the separate auction-imbalance stream of `iap.auction` (§3.3) |
 | anything else | skipped by length; counted per type in `messages.skipped_unknown_by_type` | |
 
 Inconsistent references are counted and never guessed: an execute, cancel,

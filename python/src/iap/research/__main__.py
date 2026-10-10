@@ -4,7 +4,7 @@
 
     python -m iap.research [--json-errors] run --alpha EQ03 [--horizon 1s]
                                [--config n_folds=3 ...] [--seed N] [--dry-run]
-                               [--methods v2|legacy_v1]
+                               [--methods v2|legacy_v1|v3]
     python -m iap.research list [--alpha EQ03] [--horizon 1s] [--json]
     python -m iap.research show <experiment_id> [--json]
     python -m iap.research power [--levels 0,0.5,1] [--seeds 20]
@@ -359,6 +359,7 @@ def _run(args: argparse.Namespace) -> int:
         repo_root=args.repo_root,
         normalized_dir=args.normalized_dir,
         gate=_runner_gate(args, prereg_entry),
+        exploratory=bool(args.no_prereg),
     )
     configuration = _parse_config(args.config)
     if args.methods is not None:
@@ -658,7 +659,8 @@ def _parser() -> argparse.ArgumentParser:
         "--methods",
         choices=sorted(METHODS),
         default=None,
-        help="research method bundle: v2 (default) or legacy_v1 (the rules up to v1.4.0)",
+        help="research method bundle: v2 (default), legacy_v1 (the rules up to v1.4.0) "
+        "or v3 (opt-in v1.9 research-validity rules, RESEARCH_VALIDITY.md 1a)",
     )
     run.add_argument(
         "--dataset-dir",

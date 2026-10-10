@@ -43,7 +43,7 @@ flowchart TD
 ## 2. Cross-language golden-test topology
 
 How one validated Python reference pins four implementations. The parity table is
-printed by `tests/harness/run_all.sh` (python 2114 · cpp 302 · rust 358 · java 571
+printed by `tests/harness/run_all.sh` (python 2154 · cpp 302 · rust 358 · java 571
 tests; 192/72/71/124 in the golden groups — the Java gate runs all seventeen
 `*GoldenTest` classes, the Rust gate ten golden targets). Two goldens are
 owned by a port language and consumed by Python as well: the fills golden
@@ -1018,7 +1018,18 @@ flowchart LR
     COMPOSE["docker-compose equivalent: the same services on one bridge network,<br/>java-platform, prometheus and alertmanager published on 127.0.0.1 only"] -.-> NS
 ```
 
-## 19. Planned agent layer — PLANNED, BACKLOG, no code exists
+## 19. Agent layer as planned at v1.3.0 (most of it built since v1.7.0)
+
+**Status update (v1.10.0).** This diagram is the v1.3.0 design and is kept
+as drawn. Since then the governance half has been built: the write broker,
+the hash-chained blackboard, pre-registration, the hidden-seed reserve,
+signed human approvals, the agent evaluations, untrusted-text handling and a
+read-only MCP server (v1.7.0), and costed, code-bound, git-anchored and
+Ed25519-signed pre-registrations (v1.10.0, diagram 23). What is still not
+built is the research agent itself: no LLM is called anywhere in the
+repository (plan items AI1-AI4, v1.11). The boundary at the bottom is
+unchanged.
+
 
 **This diagram describes a design, not the repository.** The upper subgraph
 is what exists at v1.3.0 and is useful without any agent; the lower one is the
@@ -1071,7 +1082,192 @@ flowchart TD
     WALL -.-> TRADE["trading path: book, features, alphas, portfolio,<br/>hard risk, execution — no edge from any box above"]
 ```
 
-## 20. Where to go deeper
+## 20. Simulator calibration data flow (v1.9, M1)
+
+How one session's events become the calibration document that the
+simulator, the maker gate and the execution algorithms read. Everything here
+is opt-in: `ExecutionSimulator(config)` without a calibration behaves as
+before. API_TRADING.md §2.6, COOKBOOK recipes 39 and 45.
+
+Source: [`diagrams/exec_calibration_flow.mmd`](diagrams/exec_calibration_flow.mmd).
+
+```mermaid
+flowchart LR
+    EV["normalized events<br/>IAP1 / JSONL / events.parquet<br/>one session"] --> EST["estimate_calibration<br/>python -m iap.execution.calibration"]
+    TICK["tick sizes<br/>configs/instruments"] --> EST
+    EST --> FR["touch fill rates<br/>by queue-ahead bucket<br/>(open orders right-censored)"]
+    EST --> HZ["queue-depletion hazards<br/>per side"]
+    EST --> LAT["feed latency quantiles<br/>(ITCH: no receive stamp,<br/>use parametric_latency)"]
+    EST --> MK["maker markouts<br/>100 ms / 1 s / 10 s"]
+    EST --> IMP["aggressor impact<br/>mean, slope in bp per % ADV"]
+    FR --> DOC["iap.exec_calibration v1<br/>calib.json"]
+    HZ --> DOC
+    LAT --> DOC
+    MK --> DOC
+    IMP --> DOC
+    DOC -->|"venue latency table"| SIM["ExecutionSimulator<br/>(calibration=...)"]
+    DOC -->|"adverse selection for the gate"| MB["MakerBacktester"]
+    DOC -->|"half-spread floor"| QB["QuotingBacktester"]
+    DOC -->|"impact slope eta"| AC["ac_params_from_calibration<br/>Almgren-Chriss"]
+    DOC -->|"fill probability"| LBL["maker_labels"]
+```
+
+Calibrate on a session earlier than the one you test; a same-day
+calibration leaks that day's adverse selection into the gate.
+
+## 21. Maker and quoting P&L decomposition (v1.9 M2, v1.10 M5)
+
+Where each term of a maker trip and of a quoting session comes from. Both
+identities are tested for every exit mode
+(`python/tests/test_maker_economics.py`, `python/tests/test_quoting.py`).
+
+Source: [`diagrams/maker_quoting_pnl.mmd`](diagrams/maker_quoting_pnl.mmd).
+
+```mermaid
+flowchart TD
+    subgraph MAKER["MakerBacktester: one round trip"]
+        SC["score row: er, z, confidence"] --> GATE{"gate:<br/>abs(er) + half spread + rebate - exit cost<br/>greater than adverse selection + margin?"}
+        GATE -->|no| OUT["gated out<br/>(counted)"]
+        GATE -->|yes| POST["post at the touch on the alpha's side"]
+        POST --> FILL{"filled by queue position<br/>before ttl?"}
+        FILL -->|no| CXL["cancel through the latency path"]
+        FILL -->|yes| ENT["entry: earns half spread + rebate"]
+        ENT --> EXIT{"exit mode"}
+        EXIT -->|taker| TX["cross: pays half spread + fee + impact"]
+        EXIT -->|passive| PX["post at far touch,<br/>reprice up to exit_reprices,<br/>then cross the rest"]
+        TX --> NET
+        PX --> NET
+        NET["net = spread earned - adverse selection - exit slippage<br/>+ rebates - fees - impact"]
+    end
+    subgraph QUOTE["QuotingBacktester: one session"]
+        RP["reservation price r =<br/>mid + alpha_weight * er * mid - gamma * sigma^2 * q * tau"] --> Q2["bid and ask around r,<br/>half spread floored at calibrated AS"]
+        Q2 --> INV["fills move inventory q<br/>(hard limit max_inventory)"]
+        INV --> RP
+        INV --> FL["flatten from flatten_lead_ns before the end:<br/>cancel, count in-flight fills, cross in rounds"]
+        FL --> PNL["gross = spread captured + markout + inventory P&L + flatten cost<br/>net = gross + rebates - taker fees - impact"]
+    end
+```
+
+## 22. Auction imbalance pipeline (v1.10, A1)
+
+The NOII stream is extracted in a separate pass so the normalized dataset
+and its version never change. REAL_DATA.md §3.3, COOKBOOK recipe 42.
+
+Source: [`diagrams/auction_pipeline.mmd`](diagrams/auction_pipeline.mmd).
+
+```mermaid
+flowchart LR
+    ITCH["raw ITCH 5.0 file<br/>.NASDAQ_ITCH50.gz"] -->|"Itch50Reader(noii=True)<br/>python -m iap.auction extract"| STR["auction stream directory<br/>NOII (I) + cross (Q) messages<br/>(refuses to write into a dataset dir)"]
+    ITCH -->|"default ingest, unchanged"| DS["normalized dataset<br/>same bytes, same dataset_version"]
+    STR --> FEAT["auction_features<br/>imbalance ratio, ref-price drift,<br/>far-near spread, near vs ref, time to cross"]
+    STR --> TGT["auction_targets<br/>cross price vs mid at t,<br/>drift into the cross"]
+    FEAT --> LAB["labelled decisions<br/>one per symbol and day"]
+    TGT --> LAB
+    PRE["blackboard prereg<br/>AUC01/C-300s, pushed first"] -->|"required unless --no-prereg"| BT
+    LAB --> BT["python -m iap.auction backtest<br/>AUC01: take imbalance side at the touch,<br/>exit in the cross or by taker"]
+    BT --> WF["purged day-aligned walk-forward<br/>(iap.validation): fit orientation + threshold<br/>on train days only"]
+    WF --> REP["report: trades, net bp after CostModel taker cost,<br/>mid_source (NOII ref price or --mids)"]
+```
+
+## 23. Governance: pre-registration, anchoring and signing (v1.10, G1-G4)
+
+From a hypothesis to a gated run, and what `verify-board` re-checks
+offline. GOVERNANCE.md §2a, COOKBOOK recipe 47.
+
+Source: [`diagrams/governance_prereg_flow.mmd`](diagrams/governance_prereg_flow.mmd).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant A as agent (private key outside the repo)
+    participant B as WriteBroker (public keys only)
+    participant L as ledger research/experiments.json
+    participant BB as blackboard.jsonl (hash chain)
+    participant G as git (commit + push)
+    participant R as research run (prereg gate)
+    participant V as verify-board (anyone)
+    A->>B: preregister(alpha, horizon, sign, hypothesis)<br/>signed: agent, op, args digest, nonce (Ed25519)
+    B->>B: verify signature, refuse a reused nonce
+    B->>B: fingerprint: code modules (AST closure), features, numpy/pandas/scipy versions
+    B->>L: debit one look (kind = prereg)
+    B->>BB: append entry with body + auth, chained hash
+    A->>G: commit and push the board (before touching data)
+    A->>G: cli anchor, commit anchors.json (first commit holding each entry)
+    R->>BB: prereg_gate.require(alpha, horizon)
+    R->>R: recompute fingerprint, refuse if code, features or deps changed
+    R->>R: run, record result (a --no-prereg run is ineligible for promotion)
+    V->>BB: chain intact?
+    V->>G: every committed board a prefix of the current one? anchors match?
+    V->>V: every Ed25519 signature valid against agent_pubkeys.json?
+```
+
+## 24. Research validity under the `v3` bundle (v1.9, R1-R6)
+
+What `--methods v3` changes in one validation, against the `v2` default.
+RESEARCH_VALIDITY.md §1a, COOKBOOK recipes 43 and 44.
+
+Source: [`diagrams/validity_v3_flow.mmd`](diagrams/validity_v3_flow.mmd).
+
+```mermaid
+flowchart TD
+    ING["ingested dataset<br/>dataset.json: sessions, sampling, book_scope"] --> SAMP["R1 stratified_day_sample (seeded)<br/>record_day_sampling -> dataset.json"]
+    SAMP --> FB["feature build<br/>R5 --label-freshness trailing (causal)"]
+    FB --> FOLD["R2 split_mode = day_aligned<br/>folds cut at session starts"]
+    FOLD --> IC["R3 gate IC = equal-weight mean of per-instrument ICs<br/>(pooled kept as gate_ic_pooled)"]
+    ING -->|"R4 single venue"| SCOPE["book_scope = single_venue<br/>crossed_frac null, price_reference nasdaq_bbo"]
+    SCOPE --> IC
+    IC --> GATE["gate t: pooled-slope HAC<br/>vs ledger threshold (unchanged)"]
+    IC --> VAL["validity block (4 extra looks)"]
+    VAL --> D1["per-day ICs with event tags"]
+    VAL --> D2["ex_event: FOMC + holiday-thin days removed"]
+    VAL --> D3["R6 HAC t with no lag across a day boundary"]
+    VAL --> D4["R2 day-clustered t, day-block bootstrap"]
+    GATE --> REP["report pins dataset_versions"]
+    D1 --> REP
+    D2 --> REP
+    D3 --> REP
+    D4 --> REP
+```
+
+## 25. Release roadmap, v1.9 to v1.11
+
+Plan items by release (docs/ROADMAP.md §3.4-3.5). Solid boxes are released
+or on the release branch; the maker study is running; v1.11 is planned.
+
+Source: [`diagrams/release_roadmap_v19_v111.mmd`](diagrams/release_roadmap_v19_v111.mmd).
+
+```mermaid
+flowchart LR
+    subgraph V19["v1.9.0 (2026-10-10), released"]
+        R["R1-R6 validity, v3 bundle (opt-in)"]
+        E1["E1 parallel feature build"]
+        M14["M1-M4 calibration, maker backtest,<br/>maker labels, tail sizing"]
+    end
+    subgraph V110["v1.10.0, this release"]
+        M5["M5 skewed two-sided quoting"]
+        A1["A1 auction NOII + AUC01"]
+        X["X1-X3 Almgren-Chriss,<br/>urgency, volume curve"]
+        G["G1-G4 costed, code-bound, anchored,<br/>Ed25519-signed preregs"]
+    end
+    subgraph RUN["running (research/maker-real)"]
+        MS["pre-registered in-sample maker study<br/>7 real sessions, no result yet"]
+    end
+    subgraph V111["v1.11, planned"]
+        RV3["real batch re-run under v3"]
+        AUC["AUC01 on real files"]
+        A23["A2 ETF vs constituents, A3 futures lead-lag"]
+        E23["E2-E3 Rust features via pyo3"]
+        AI["AI1-AI4 LLM research agent<br/>through the signed broker"]
+    end
+    M14 --> M5
+    M14 --> MS
+    R --> RV3
+    G --> AI
+    A1 --> AUC
+    MS -->|"if an in-sample edge:<br/>pre-register an out-of-sample test"| V111
+```
+
+## 26. Where to go deeper
 
 | topic | document |
 |---|---|
@@ -1079,7 +1275,7 @@ flowchart TD
 | Governing institutional specification (verbatim) | [SPECIFICATION.md](SPECIFICATION.md) |
 | Teaching walkthrough of every subsystem | [../LEARN.md](../LEARN.md) |
 | How the quant, algo and AI sides work, top-down | [HOW_IT_WORKS.md](HOW_IT_WORKS.md) |
-| 39 runnable recipes | [../COOKBOOK.md](../COOKBOOK.md) |
+| 48 runnable recipes | [../COOKBOOK.md](../COOKBOOK.md) |
 | Data model, views, SQLite/PostgreSQL portability, query cookbook | [DATA_MODEL.md](DATA_MODEL.md) |
 | The 7-state promotion lifecycle: gates, evidence, registry, bootstrap result | [LIFECYCLE.md](LIFECYCLE.md) |
 | The decision trace: record, ids, canonical JSON, digest, sinks, replay | [DECISION_TRACE.md](DECISION_TRACE.md) |

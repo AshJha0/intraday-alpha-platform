@@ -185,9 +185,83 @@ rows it dropped (0.0038 once they are scored).
 
 | Release | Theme | Items |
 |---|---|---|
-| v1.10 | New edge + strategy layer | A1 auction/NOII imbalance strategy; M5 signal-skewed quoting with inventory; X1–X3 Almgren–Chriss, alpha-aware urgency, volume curve; G1–G4 governance fixes |
+| v1.10 | New edge + strategy layer | A1 auction/NOII imbalance strategy; M5 signal-skewed quoting with inventory; X1–X3 Almgren–Chriss, alpha-aware urgency, volume curve; G1–G4 governance fixes (**done**, §3.5) |
 | v1.11 | Scale + AI | A2 QQQ vs constituents (more symbols); A3 futures lead-lag (needs data); E2–E3 Rust features via pyo3, fewer polyglot copies; AI1–AI4 LLM research agent through the broker, agent evals, model registry/drift |
 | later | Live readiness (optional) | P1–P4 real-time paper adapter, order state machine, reconciliation, capital ramp |
+
+## 3.5 v1.10.0: the strategy layer and the governance fixes (done), and v1.11 (next)
+
+**Done in v1.10.0** (CHANGELOG.md; all opt-in and Python only: every
+default, golden, published number and cross-language contract is unchanged):
+
+- **M5** `iap.backtest.quoting.QuotingBacktester`: a two-sided quoter around
+  an alpha-skewed Avellaneda-Stoikov reservation price, with a hard
+  inventory limit, refresh through the latency path, a calibrated
+  adverse-selection floor and an end-of-session flatten; P&L decomposed into
+  spread, markout, inventory, flatten, rebates and fees (identity tested).
+  API_TRADING.md §2.7, COOKBOOK recipe 40.
+- **A1** `iap.auction`: NOII and cross messages decoded in a separate opt-in
+  pass, auction features and cross targets, strategy `AUC01` with a purged
+  day-aligned walk-forward, a CLI that requires a pre-registration.
+  COOKBOOK recipe 42, REAL_DATA.md §3.3. Not yet run on real files.
+- **X1-X3** `iap.execution.optimal` / `urgency` / `volume_curve`:
+  Almgren-Chriss trajectory and efficient frontier from a calibrated impact
+  slope, alpha-driven urgency, a forecast VWAP curve shrunk toward the
+  U-shape. API_TRADING.md §2.8, COOKBOOK recipes 41 and 48.
+- **G1-G4** governance: a pre-registration debits a look and records a code,
+  feature and dependency fingerprint; the reserve cap is keyed on (alpha,
+  horizon, code hash); the blackboard is checked against git history and
+  anchored per entry; agent writes are Ed25519-signed and the broker holds
+  public keys only. New dependency `cryptography`. GOVERNANCE.md §2a,
+  COOKBOOK recipe 47.
+- A fix outside the plan: `python -m iap.features --workers N` failed with
+  `BrokenProcessPool` under the spawn start method (Windows, macOS); the
+  worker is now submitted by its importable module name.
+
+**In progress (not part of the release):** the first real-data maker study,
+pre-registered on branch `research/maker-real` (`research/maker_real/prereg.json`):
+EQ01, EQ02, EQ05 and EQ10 on the seven 2019-20 sessions, taker and passive
+exits, gated / gated with a meta-label filter / ungated (diagnostic only),
+walk-forward with the first session as warm-up, session-clustered inference
+with a Bonferroni correction over the eight primary cells. It is
+**in-sample**: those sessions were used to design every alpha. Its verdict
+rule reads a positive result as "worth an out-of-sample test", never
+"profitable". No result is reported here.
+
+**Plan status** (IAP_Next_Releases_Plan, 2026-10-10):
+
+| Item | Status |
+|---|---|
+| R1-R6 research validity (`v3` bundle) | done, v1.9.0 (opt-in; the published reports are still `v2`) |
+| R7 more sessions, CPCV, deflated Sharpe | open |
+| E1 parallel feature build | done, v1.9.0 (spawn fix in v1.10.0) |
+| E2-E5 Rust features via pyo3, fewer copies, split god classes, feature memory | open |
+| M1-M4 calibration, maker backtest, maker labels, conditional sizing | done, v1.9.0 (synthetic results only) |
+| M5 skewed quoting | done, v1.10.0 (synthetic results only) |
+| M6 new features (time-to-depletion, Hawkes, odd lots) | open |
+| A1 auction imbalance | done, v1.10.0 (code; no real run yet) |
+| A2 ETF vs constituents, A3 futures lead-lag, A4 event-regime study | open |
+| X1-X3 Almgren-Chriss, urgency, volume curve | done, v1.10.0 |
+| X4-X6 fill hazard, SOR toxicity, tick-to-trade percentiles | open |
+| G1-G4 governance | done, v1.10.0 |
+| AI1-AI4 LLM research agent, evals, model registry | open (v1.11) |
+| P1-P4 live readiness | open (optional, later) |
+
+**Next: v1.11** (scale and AI). The order the evidence asks for:
+
+1. Read the real-data maker study and report it in REAL_DATA.md, whatever it
+   says. If any cell shows an in-sample maker edge, pre-register an
+   out-of-sample test on sessions that have not been touched (the 2026 days
+   are spent).
+2. Re-run the real-data batch under the `v3` bundle so the published 2019-20
+   statistics carry the day-clustered t and the ex-FOMC block (R1-R3).
+3. Run `AUC01` on real files (REAL_DATA.md §3.3), pre-registered first.
+4. A2 (QQQ against its constituents; needs more symbols ingested), A3 if
+   futures data can be obtained, E2-E3 (Rust features through pyo3, fewer
+   polyglot copies).
+5. AI1-AI4: an LLM research agent that works only through the signed
+   broker, with the agent evaluations of v1.7 run against it. The boundary
+   stays: no LLM on the trading path.
 
 ## 4. MVP success criteria
 
