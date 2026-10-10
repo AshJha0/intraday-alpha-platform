@@ -1,0 +1,12 @@
+flowchart LR
+    TS["timestamps of the sample<br/>(day-aligned when sessions >= N)"] --> G["N = 6 groups"]
+    G --> S["all C(6,2) = 15 splits<br/>k = 2 test groups each"]
+    S --> PE["purge + embargo<br/>on both sides of every test group"]
+    PE --> FIT["fit on train groups,<br/>predict the 2 test groups"]
+    FIT --> PA["reassemble into C(5,1) = 5 paths<br/>each path uses every group once"]
+    PA --> DIST["distribution of path Sharpes<br/>instead of one walk-forward number"]
+    M["T periods x M configurations<br/>performance matrix"] --> CSCV["CSCV: every half / half split<br/>of the period blocks"]
+    CSCV --> RANK["rank of the in-sample best<br/>configuration out of sample"]
+    RANK --> PBO["PBO = share of splits where it<br/>falls below the OOS median"]
+    DIST --> REP["v4 report: cpcv block (report-only)"]
+    PBO --> REP

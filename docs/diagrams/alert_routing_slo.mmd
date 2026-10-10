@@ -1,0 +1,16 @@
+flowchart TD
+    H["JVM histograms<br/>order_path_latency_ns, book_update_latency_ns"] --> R["error ratios recorded<br/>over 5m 30m 1h 2h 6h 1d 3d"]
+    R --> FAST{"burn > 14.4 over 1h and 5m<br/>or > 6 over 6h and 30m?"}
+    R --> SLOW{"burn > 3 over 1d and 2h<br/>or > 1 over 3d and 6h?"}
+    FAST -- "yes" --> FB["*LatencySLOFastBurn<br/>severity page"]
+    SLOW -- "yes" --> SB["*LatencySLOSlowBurn<br/>severity warning"]
+    OTHER["other alerts<br/>critical / warning / page"] --> AM
+    WD["Watchdog heartbeat"] --> AM
+    FB --> AM["Alertmanager"]
+    SB --> AM
+    AM --> INH["inhibition within one service:<br/>kill switch mutes symptoms,<br/>feed health mutes SignalRateCollapse,<br/>an SLO page mutes its warning"]
+    INH -- "page" --> PG["receiver page<br/>url_file: page_url"]
+    INH -- "critical, warning, unlabelled" --> TK["receiver ticket<br/>url_file: ticket_url"]
+    INH -- "Watchdog" --> W["receiver watchdog"]
+    PG --> SINK["compose default: local alert-sink<br/>(no secret)"]
+    TK --> SINK

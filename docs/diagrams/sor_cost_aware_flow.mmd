@@ -1,0 +1,14 @@
+flowchart TD
+    CFG[("research/execution/venue_model.json<br/>fill prob, toxicity, latency, fee tiers")] --> VM["venue models"]
+    BOOK["consolidated book"] --> Q{"aggressive or passive?"}
+    VM --> Q
+    Q -- "aggressive, fits at touch" --> AG["argmin all-in cost:<br/>price + taker fee at the current tier"]
+    Q -- "aggressive, larger than touch" --> SW["sweep: levels across venues,<br/>sends staggered by latency<br/>so children arrive together"]
+    Q -- "passive" --> PC["expected cost per venue:<br/>p x (-rebate - capture + toxicity)<br/>+ (1 - p) x miss cost"]
+    PC --> PR["post on the cheapest venue"]
+    PC --> AL["or split the size by<br/>fill probability and toxicity"]
+    AG --> LED["FeeLedger: fill priced at the tier<br/>reached before it; monthly volume"]
+    SW --> LED
+    PR --> LED
+    AL --> LED
+    LED --> VM

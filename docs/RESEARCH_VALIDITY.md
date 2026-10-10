@@ -355,8 +355,9 @@ be checked against the configuration bounds only (`periods_verified: false`).
 
 ## 5. Tooling
 
-- `python -m iap.research run --methods {v2,legacy_v1}`: the method bundle
-  (default `v2`); `--normalized-dir` names the events of the recompute
+- `python -m iap.research run --methods {v2,v3,v4,legacy_v1}`: the method
+  bundle (default `v2`; `v3` adds the v1.9 validity block of §1a, `v4` adds
+  the report-only CPCV / PBO / deflated-Sharpe blocks of §1b); `--normalized-dir` names the events of the recompute
   probe (default `<features-dir>/../normalized`).
 - `python research/alpha_reports/run_all.py --methods legacy_v1`
   `--out-dir <dir>`: the v1.4.0 report, reproduced into `<dir>` with its own

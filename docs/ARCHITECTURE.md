@@ -1045,13 +1045,14 @@ every signature. Details and gaps: docs/governance/GOVERNANCE.md §2a.
 
 ### 15.6 Real-data status of these subsystems
 
-| subsystem | real-data status (2026-10-10, v1.11.0) |
+| subsystem | real-data status (2026-10-10, v1.12.0) |
 |---|---|
-| calibration, maker backtest | a pre-registered, exploratory in-sample study on the seven 2019-20 sessions is running (branch `research/maker-real`); no result yet |
-| quoting | M5 on real files is running beside `AUC01` (branch `research/step2`, pre-registered, exploratory in-sample); no result yet |
-| auction (`AUC01`) | running on real files (branch `research/step2`), pre-registered, in-sample, with a declared 2026 holdout; no result yet; REAL_DATA.md §3.3 has the commands |
+| calibration, maker backtest | a pre-registered, exploratory in-sample study on the seven 2019-20 sessions (EQ01 / EQ02 / EQ05 / EQ10, taker and passive exits) is running; no result yet |
+| quoting | M5 on real files is running (branch `research/step2`, pre-registered, exploratory in-sample; the driver checkpoints per cell); no result yet |
+| auction (`AUC01`) | in-sample result, exploratory: NO DEMONSTRATED EDGE on both cells (`C-300s` session-clustered mean +19.4 bp, 95% CI −254 to +293 bp, 3 trades on 2 sessions; `O-300s` +6.1 bp); underpowered. The declared 2026 holdout is running. REAL_DATA.md §3.3 |
 | Almgren-Chriss, urgency, volume curve | no real-data study; the volume curve CLI reads real IAP1 files |
-| `v3` bundle | not yet applied to the published real-data batch (not done in v1.11; ROADMAP.md §3.6) |
+| `v3` / `v4` bundles | not yet applied to the published real-data batch (ROADMAP.md §3.7) |
+| v1.12 extended features, router, fill hazard | no real-data run; the router has one venue on Nasdaq-only data |
 | governance | in use: the 2026 holdout preregs are anchored to `6723fd0`; the maker study's preregs are on its branch |
 
 ## 16. Polyglot policy: canonical and frozen copies (v1.11.0, plan E3)
@@ -1160,3 +1161,27 @@ environment or from `--env-file`; `.env`, `*.env` and `.iap_keys/` are
 git-ignored. The pyo3 wheel is not a Python dependency at all: it is built
 from source with maturin (COOKBOOK recipe 52). No new runtime dependency
 was added to the default install in v1.11.
+
+## 18. The v1.12 subsystems: statistics, tick-to-trade, execution, operations
+
+All opt-in; the default registry hash, the pinned SOR and simulator rules,
+the goldens and every published number are unchanged.
+
+| piece | module / file | language | feeds |
+|---|---|---|---|
+| CPCV, PBO | `iap.validation.cpcv` | Python | `v4` validation report (`cpcv` block, report-only) |
+| PSR / DSR / MinTRL | `iap.validation.deflated` (`effective_trials` reads the ledger) | Python | `v4` report (`deflated_sharpe` block); `study_deflated_sharpe` beside a study's per-day P&L |
+| tick-to-trade benchmark | `cpp/bench/bench_tick_to_trade`, `tools/tick_to_trade_py.py` | C++ (Python reference tool) | `benchmarks/results_tick_to_trade.md`; CI guard at 8x |
+| extended features, event clocks | `iap.features.extended` | Python | own `feature_version`; nothing downstream reads it yet |
+| cost-aware router | `iap.execution.venues_model`, `iap.execution.sor_v2`, `research/execution/venue_model.json` | Python | `MakerBacktester(router=)` |
+| fill hazard, post-only, feedback | `iap.execution.fill_hazard`, `markout_feedback`, simulator rule 10 | Python | `MakerConfig` / `QuotingConfig` options; hazard registrable in `iap.mlops` |
+| alert routing, SLOs, backup | `deployment/alertmanager/`, `deployment/prometheus/slo.yml`, `deployment/k8s/` state-backup CronJob | config | Alertmanager receivers `page` / `ticket` / `watchdog` |
+
+**Boundaries stated once.** Tick-to-trade is in-process (decoded frame to
+order intent): no network, no kernel bypass, no C++ risk engine; CI runner
+variance is about 2x at p99. The router has nothing to choose between on
+the Nasdaq-only real data. HA is a single pod that restarts and resumes
+from its checkpoint; there is no active-active and no leader election.
+Eight pre-v1.12 alerts still have no promtool test, on an allowlist that
+`check_deployment.py` only lets shrink. Diagrams: DIAGRAMS.md §30-§35.
+

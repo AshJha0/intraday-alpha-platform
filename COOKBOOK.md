@@ -70,6 +70,10 @@ Contents:
 59. [Route across venues: cost-aware choice, sweep, passive split, fee tiers (v1.12)](#59-route-across-venues-cost-aware-choice-sweep-passive-split-fee-tiers-v112)
 60. [Route alerts, read the latency SLOs and back up trading state (v1.12)](#60-route-alerts-read-the-latency-slos-and-back-up-trading-state-v112)
 61. [Fit a fill hazard and run a post-only, repricing, feedback-driven maker (v1.12)](#61-fit-a-fill-hazard-and-run-a-post-only-repricing-feedback-driven-maker-v112)
+62. [Deflate a study's Sharpe with `study_deflated_sharpe` (v1.12)](#62-deflate-a-studys-sharpe-with-study_deflated_sharpe-v112)
+63. [A maker run on extended features, an event clock and a fill hazard (v1.12)](#63-a-maker-run-on-extended-features-an-event-clock-and-a-fill-hazard-v112)
+64. [The markout feedback loop on a toxic regime (v1.12)](#64-the-markout-feedback-loop-on-a-toxic-regime-v112)
+65. [Read the latency SLO burn rates by hand (v1.12)](#65-read-the-latency-slo-burn-rates-by-hand-v112)
 
 Recipes 27–35 were added with v1.3.0. Every command block in them was run
 as printed, from a clean checkout of the release, before it was written
@@ -3736,3 +3740,238 @@ net difference is not evidence of anything. `fill_hazard.json` (schema
 `iap.fill_hazard/1`) can also be registered with
 `hz.register(registry_dir, dataset_version=..., date_range=..., features=...,
 seed=..., exploratory=True)` (recipe 50).
+
+## 62. Deflate a study's Sharpe with `study_deflated_sharpe` (v1.12)
+
+**Goal:** report a deflated Sharpe ratio beside a study's per-day P&L, with
+the number of trials taken from the ledger instead of chosen after the fact
+(RESEARCH_VALIDITY.md §1b, LEARN.md §40). The per-day P&L here is synthetic:
+40 sessions drawn from a fat-tailed distribution with a small positive mean.
+Save as `python/recipe62.py` and run `cd python && PYTHONUTF8=1 PYTHONPATH=src python recipe62.py`:
+
+```python
+import numpy as np
+import pandas as pd
+
+from iap.validation.deflated import effective_trials, study_deflated_sharpe
+from iap.validation.ledger import ExperimentLedger
+
+# a synthetic 40-session study: small positive drift, fat-ish tails
+rng = np.random.default_rng(20261012)
+net = 25.0 + 120.0 * rng.standard_t(df=5, size=40)
+per_day = pd.DataFrame({"day": range(40), "net": net})
+
+ledger = ExperimentLedger("../research/experiments.json")  # read only
+n_ledger = effective_trials(ledger)
+keys = ("sharpe_per_day", "psr", "dsr", "dsr_at_looks", "min_track_record_days")
+for label, n in (("one config ", 1), ("12 configs ", 12), ("ledger N   ", n_ledger)):
+    b = study_deflated_sharpe(per_day, n_trials=n, n_looks=400)
+    print(label, {k: round(b[k], 3) for k in keys})
+print("days needed at 95% (PSR vs 0):", round(b["min_track_record_days"], 1))
+```
+
+Output:
+
+```text
+one config  {'sharpe_per_day': 0.121, 'psr': 0.783, 'dsr': 0.783, 'dsr_at_looks': 0.01, 'min_track_record_days': 172.895}
+12 configs  {'sharpe_per_day': 0.121, 'psr': 0.783, 'dsr': 0.172, 'dsr_at_looks': 0.01, 'min_track_record_days': 172.895}
+ledger N    {'sharpe_per_day': 0.121, 'psr': 0.783, 'dsr': 0.017, 'dsr_at_looks': 0.01, 'min_track_record_days': 172.895}
+days needed at 95% (PSR vs 0): 172.9
+```
+
+How to read it. The per-day Sharpe (0.121) and the PSR against zero (0.783)
+do not depend on `N`: they ask "is this one track record above zero?". The
+DSR asks the question that matters after a search: is it above the best
+Sharpe that `N` worthless configurations would be expected to show? With
+one configuration DSR equals PSR; with twelve it falls to 0.172; with `N`
+from the ledger (the distinct configurations, `effective_trials`, plus one
+for the run being judged) it is 0.017. `dsr_at_looks` (0.01) uses the raw
+look count passed in (`n_looks=400`) and is the harshest reading; the headline is the
+conservative `effective_trials` figure, with the look count printed beside
+it. The minimum track record says 40 days are far too few: about 173
+sessions at this Sharpe would be needed for 95% confidence that the true
+Sharpe is above zero, before any deflation. `ExperimentLedger` is only read
+here: nothing is recorded and no look is charged. The ledger line moves
+whenever the ledger grows, so your third row can differ from this one.
+
+## 63. A maker run on extended features, an event clock and a fill hazard (v1.12)
+
+**Goal:** wire three v1.12 opt-ins together on synthetic data: a score built
+from an extended feature (queue time-to-depletion, recipe 58) sampled on an
+event clock, a fill hazard fitted on maker labels (recipe 61), and the X4
+maker options (post-only, hazard reprices, markout feedback). Save as
+`python/recipe63.py` and run `cd python && PYTHONUTF8=1 PYTHONPATH=src python recipe63.py`:
+
+```python
+import sys
+
+sys.path.insert(0, "tests")  # synthetic MBO stream + exec config of the maker tests
+import numpy as np
+import pandas as pd
+from iap.backtest.maker import MakerBacktester, MakerConfig
+from iap.execution import FeedbackConfig, FillHazardModel
+from iap.execution.fill_hazard import samples_from_maker_labels
+from iap.features.context import build_contexts
+from iap.features.extended import ExtendedFeatureEngine
+from iap.labels.maker_labels import maker_labels
+from test_maker_economics import INS, exec_config, synth_events
+
+# 1. hazard fitted on one stream (as recipe 61)
+train = synth_events(n_steps=3000, seed=1)
+ts = np.array([e.exchange_ts for e in train[50::10]], dtype=np.int64)
+lab = maker_labels(train, ts, instrument_id=INS, exec_config=exec_config(), ttl_ns=2 * 10**9)
+hz = FillHazardModel(edges_ns=(0, 250_000_000, 500_000_000, 10**9, 2 * 10**9))
+hz.fit(samples_from_maker_labels(lab, ttl_ns=2 * 10**9))
+
+# 2. a score from one extended feature, sampled on an event clock (every 25 events)
+test = synth_events(n_steps=3000, seed=2)
+eng = ExtendedFeatureEngine(build_contexts("../configs"), sampling="events", sample_n=25)
+rows = [v for v in map(eng.apply, test) if v is not None]
+jb = eng.feature_names.index("qttd_bid_w1s_v1")
+ja = eng.feature_names.index("qttd_ask_w1s_v1")
+ok = [r for r in rows if r.validity[jb] and r.validity[ja]]
+# bid queue emptying faster than the ask queue -> expect a down-tick -> short
+z = np.clip(np.log([(r.values[jb] + 1) / (r.values[ja] + 1) for r in ok]), -3, 3)
+scores = pd.DataFrame({
+    "exchange_ts": [r.timestamp for r in ok],
+    "expected_return": 2e-4 * z,
+    "confidence": np.minimum(1.0, np.abs(z) / 2.0),
+    "z": z,
+})
+print(f"{len(test)} events -> {len(rows)} event-clock rows, {len(ok)} with a valid score")
+
+# 3. the same maker, default vs hazard + post-only + feedback
+x4 = MakerConfig(ttl_ns=300_000_000, post_only="slide", entry_reprices=3,
+                 reprice_policy="hazard", hazard_give_up_prob=0.2,
+                 feedback=FeedbackConfig(mode="reduce", threshold_bps=0.0))
+for name, cfg in (("default", MakerConfig(ttl_ns=300_000_000)), ("x4", x4)):
+    s = MakerBacktester(exec_config(), cfg, fill_hazard=hz).run_instrument(test, scores, INS).summary()
+    extra = {k: s[k] for k in ("entry_reprices", "hazard_give_ups") if k in s}
+    print(f"{name:8s} posted {s['posted']:3d} filled {s['filled_orders']:3d} "
+          f"net {s['total_net']:.2f} {extra}")
+```
+
+Output:
+
+```text
+3052 events -> 123 event-clock rows, 118 with a valid score
+default  posted  40 filled   7 net -7.71 {}
+x4       posted  30 filled  12 net -7.05 {'entry_reprices': 6, 'hazard_give_ups': 18}
+```
+
+How to read it. The synthetic stream of the maker tests carries ADD,
+CANCEL and EXECUTE messages but no TRADE prints, so a **volume** clock (which
+counts traded shares from TRADE events) would emit only its first row, and
+the trade-sign, Hawkes and odd-lot families stay invalid; that is why this
+recipe samples every 25 events and uses the queue time-to-depletion pair,
+which is valid on 118 of 123 rows. On a real ITCH session, which has TRADE
+prints, `sampling="volume"` works as in recipe 58. With the X4 options the
+maker posts fewer first orders (30 against 40), reposts 6 expired entries,
+abandons 18 that the hazard gave less than a 20% chance of filling, and
+fills more (12 against 7). Both runs lose. The score is an illustration of
+the wiring, chosen without any fitting; one synthetic stream and a dozen
+fills say nothing about whether queue depletion predicts anything.
+
+## 64. The markout feedback loop on a toxic regime (v1.12)
+
+**Goal:** see what `FeedbackConfig` does when every passive fill is run
+over (API_TRADING.md §2.10, LEARN.md §43). The stream drifts up and the score
+always says "sell", so the quoter's asks are lifted just before the price
+rises. Save as `python/recipe64.py` and run `cd python && PYTHONUTF8=1 PYTHONPATH=src python recipe64.py`:
+
+```python
+import sys
+
+sys.path.insert(0, "tests")  # synthetic MBO stream + exec config of the maker tests
+import numpy as np
+import pandas as pd
+from iap.backtest.quoting import QuotingBacktester, QuotingConfig
+from iap.execution import FeedbackConfig
+from test_maker_economics import INS, exec_config, synth_events
+
+# a toxic regime: the price drifts up and the score always says "sell"
+evs = synth_events(n_steps=2500, drift=0.35, seed=4)
+ts = np.array([e.exchange_ts for e in evs[50::20]], dtype=np.int64)
+sc = pd.DataFrame({"exchange_ts": ts, "expected_return": -1e-3, "confidence": 1.0, "z": -3.0})
+
+fb = FeedbackConfig(horizon_ns=500_000_000, min_fills=3, cooldown_ns=60_000_000_000,
+                    threshold_bps=-2.0)  # stand down unless the EWMA earns >= 2 bp per fill
+for name, cfg in (("no feedback", QuotingConfig(alpha_weight=0.0)),
+                  ("feedback   ", QuotingConfig(alpha_weight=0.0, feedback=fb))):
+    r = QuotingBacktester(exec_config(), cfg).run_instrument(evs, sc, INS)
+    p = r.pnl
+    print(f"{name} fills {len(r.fills):3d} markout {p['markout']:8.2f} net {p['net']:8.2f} "
+          f"stood_down {r.counters.get('feedback_stood_down', 0)}")
+```
+
+Output:
+
+```text
+no feedback fills 192 markout   -62.75 net  -462.16 stood_down 0
+feedback    fills   8 markout    -1.75 net   -85.06 stood_down 119
+```
+
+How to read it. Without feedback the quoter fills 192 times and its
+markout (the price move against each fill after 500 ms) costs 62.75 USD.
+With feedback the EWMA of realised markouts must stay at or above +2 bp per
+fill (`threshold_bps=-2.0`); once three fills are known and it is below,
+the quoter stands down for a minute, and it stood down 119 times. Markout
+falls to −1.75 USD and fills to 8. The run still loses 85.06 USD: the
+feedback stops the bleeding from adverse selection, it does not create an
+edge, and on a regime that is toxic all day the right answer is mostly not
+to quote. The stand-down is causal: a fill's markout enters the EWMA only
+after its horizon has passed on the replay clock.
+
+## 65. Read the latency SLO burn rates by hand (v1.12)
+
+**Goal:** know which SLO alert a given latency regression fires, before
+reading `deployment/prometheus/slo.yml` or a promtool test. The SLO is 99%
+of order-path (or event-path) samples under 1,048,575 ns over 30 days, so
+the error budget is 1% and the burn rate is the slow fraction divided by
+0.01. Save as `python/recipe65.py` and run `cd python && python recipe65.py`
+(no repository imports):
+
+```python
+# The thresholds of deployment/prometheus/slo.yml, applied by hand to a
+# steady error ratio (every window then sees the same ratio).
+BUDGET = 0.01  # SLO: 99% of samples under 1,048,575 ns over 30 days
+RULES = [  # (alert, severity, burn factor, long window, short window)
+    ("FastBurn", "page", 14.4, "1h", "5m"),
+    ("FastBurn", "page", 6.0, "6h", "30m"),
+    ("SlowBurn", "warning", 3.0, "1d", "2h"),
+    ("SlowBurn", "warning", 1.0, "3d", "6h"),
+]
+for slow in (0.005, 0.02, 0.04, 0.08, 0.20):
+    burn = slow / BUDGET
+    fired = [f"{a}({s}, {f}x over {lw}+{sw})" for a, s, f, lw, sw in RULES if slow > f * BUDGET]
+    days = 30 / burn
+    print(f"slow {slow:5.3f}  burn {burn:5.1f}  budget gone in {days:5.1f} d  -> "
+          f"{fired[0] if fired else 'nothing fires'}")
+```
+
+Output:
+
+```text
+slow 0.005  burn   0.5  budget gone in  60.0 d  -> nothing fires
+slow 0.020  burn   2.0  budget gone in  15.0 d  -> SlowBurn(warning, 1.0x over 3d+6h)
+slow 0.040  burn   4.0  budget gone in   7.5 d  -> SlowBurn(warning, 3.0x over 1d+2h)
+slow 0.080  burn   8.0  budget gone in   3.8 d  -> FastBurn(page, 6.0x over 6h+30m)
+slow 0.200  burn  20.0  budget gone in   1.5 d  -> FastBurn(page, 14.4x over 1h+5m)
+```
+
+How to read it. A burn rate of 1 spends exactly the 30-day budget in 30
+days. Each alert needs a long and a short window to agree, so a spike that
+has already stopped (short window clean) does not page, and a brief spike
+does not page on the long window alone. A steady 0.5% slow is within budget
+and fires nothing; 2% would spend the month's budget in 15 days and opens a
+ticket (`SlowBurn` has `severity: warning`, which Alertmanager routes to the
+`ticket` receiver); 8% or more pages. The first matching rule is printed;
+when several match, Alertmanager's inhibition mutes the same SLO's warning
+while its page fires. The promtool tests in
+`deployment/prometheus/tests/slo_test.yml` check the same arithmetic on
+series: a healthy 0.5% case fires nothing, a 50% case pages within 20
+minutes, and so on for 8 cases. They run in CI
+(`promtool test rules alerts_test.yml slo_test.yml`, recipe 60); this
+machine has no `promtool`, so this recipe reproduces only the thresholds.
+In Prometheus the same reading is
+`job:order_path_latency_slo_errors:ratio_rate1h / 0.01`.

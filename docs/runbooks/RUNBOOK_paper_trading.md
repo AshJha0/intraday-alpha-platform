@@ -10,9 +10,11 @@ observability — no capital at risk.
 `PlatformSessionFailed`, `SessionStoppedNotResumed`,
 `SessionRestartsClimbing`, `FeedWallClockStall`, `RoutedVenueMismatch`,
 `ResumeReleasedOpenOrders`, and the `Watchdog` heartbeat. Delivery is through Alertmanager
-(`deployment/alertmanager/`, since v1.3.0); until an operator supplies the
-webhook URL the alerts are routed and visible in the Alertmanager UI but
-delivered nowhere (`docs/governance/REPO_SETTINGS.md` §6).
+(`deployment/alertmanager/`, since v1.3.0; `page` / `ticket` / `Watchdog`
+routing since v1.12). Compose delivers to the local `alert-sink` echo service
+until `ALERT_PAGE_URL_FILE` / `ALERT_TICKET_URL_FILE` name real receivers; on
+Kubernetes the Secret `iap-alertmanager-webhook` must carry both `page_url`
+and `ticket_url` (RUNBOOK_alerting.md §2).
 
 > **Status:** the paper-trading loop is LIVE — `com.iap.platform.PaperTrading`
 > (started by `java/paper.sh` locally, or as the `java-platform` compose

@@ -319,6 +319,58 @@ positive in-sample result justifies an out-of-sample test, nothing more.
 (REAL_DATA.md); re-run the real batch under `v3`; ingest more symbols for
 A2. The boundary stays: no LLM on the trading path.
 
+## 3.7 v1.12.0: statistics, latency, execution and operations (done), the first study result, and what remains
+
+**Done (all opt-in; no default, golden, published number or cross-language
+contract moved):**
+
+- **R7 (statistics half)** CPCV, PBO, PSR / DSR / minimum track record with
+  `N` from the ledger (`effective_trials` headline, `dsr_at_looks` beside),
+  the `v4` bundle and `study_deflated_sharpe`; the paper example reproduces
+  (DSR 0.9004). RESEARCH_VALIDITY.md §1b, COOKBOOK 56 and 62, LEARN.md §40.
+- **X6** C++ tick-to-trade benchmark; CI-runner baseline golden p50 1,279
+  ns, p99 2,559 ns, p99.9 11,263 ns; guard at 8x. In-process only.
+  benchmarks/RESULTS.md, COOKBOOK 57, LEARN.md §41.
+- **M6** 19 extended features and event / volume clocks; default registry
+  hash unchanged; no real-data run yet. API_FEATURES.md §8, COOKBOOK 58, 63.
+- **X5** cost-aware multi-venue router; capability only on Nasdaq-only data.
+  API_TRADING.md §2.9, COOKBOOK 59.
+- **P4** page / ticket / watchdog routing from Secret files (operator
+  action: `page_url` + `ticket_url`), latency burn-rate SLOs with promtool
+  tests, state-backup CronJob; HA is restart-and-resume. 8 older alerts
+  still lack promtool tests (an allowlist that can only shrink).
+  RUNBOOK_alerting.md, COOKBOOK 60, 65.
+- **X4** fill hazard (`iap.fill_hazard/1`), post-only, hazard reprices,
+  markout feedback (synthetic quoting markout −62.75 to −1.75 USD at a 2 bp
+  threshold, still losing). API_TRADING.md §2.10, COOKBOOK 61, 63, 64,
+  LEARN.md §43.
+
+**Study results (exploratory, in-sample, pre-registered, branch
+`research/step2`):**
+
+- `AUC01` in-sample: NO DEMONSTRATED EDGE on both cells (`C-300s`
+  session-clustered mean +19.4 bp, 95% CI −254 to +293 bp, 3 trades on 2
+  sessions; `O-300s` +6.1 bp, CI −9.7 to +21.9), underpowered at 21
+  decisions per cell (REAL_DATA.md §3.3, LEARN.md §42).
+
+**Running:** the `AUC01` 2026 holdout (frozen `C-300s` fit); the maker study
+(EQ01 / EQ02 / EQ05 / EQ10, taker and passive exits); the M5 quoting study.
+No result from them is reported. The step-2 pre-registrations charged looks
+on `research/step2` that are not on `main` yet.
+
+**Remaining plan items:**
+
+| Item | State |
+|---|---|
+| R7 data ingest (more symbols and sessions) | next; also unblocks A2 and gives the auction study power |
+| A2 QQQ against its constituents | needs the ingest |
+| A3 futures lead-lag | on hold: ES / NQ data would cost about $10-25 |
+| A4 | not started |
+| AI4 deep order-book baselines | not started; nothing in the evidence asks for it yet |
+| E4-E5 split god classes, feature memory | not started |
+| P1-P3 | not started |
+| real batch re-run under `v3` / `v4` | not done |
+
 ## 4. MVP success criteria
 
 The MVP's own table (docs/MVP.md §8) restated as the acceptance criteria of

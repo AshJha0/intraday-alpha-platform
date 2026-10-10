@@ -619,6 +619,57 @@ costs four more looks per validation (88 instead of 84 at four folds).
 **How to run it:** COOKBOOK recipe 44 (synthetic fixture), or on an ingested
 dataset `python -m iap.research run --alpha EQ01 --methods v3 --dataset-dir <dataset>`.
 
+### 2.15 How much of a Sharpe survives the search: CPCV, PBO, DSR (v1.12)
+
+A walk-forward gives one out-of-sample number, and a reported Sharpe is
+usually the best of several tried. Plan item R7 adds three opt-in,
+report-only answers:
+
+- **Combinatorial purged CV** (`iap.validation.cpcv`): the sample is cut into
+  N groups (whole days when there are at least N sessions), every choice of
+  k test groups is a split (C(N, k) of them), purge and embargo apply on both
+  sides of each test group, and the splits are reassembled into C(N-1, k-1)
+  complete backtest paths. The result is a distribution of path Sharpes
+  instead of one number.
+- **Probability of backtest overfitting** (CSCV over a periods x
+  configurations matrix): how often the configuration that looked best
+  in-sample falls below the median out of sample. About 0.5 on pure noise.
+- **Probabilistic and deflated Sharpe ratio** (`iap.validation.deflated`):
+  PSR asks whether one track record beats zero, given its length, skew and
+  kurtosis; DSR asks whether it beats `SR0`, the Sharpe the best of N
+  worthless trials would be expected to show, plus the minimum track record
+  length. N is taken from the ledger (§2.7): `effective_trials` counts the
+  distinct configurations plus the run being judged, the conservative
+  headline, and `dsr_at_looks` at the raw look count is printed beside it.
+
+The `v4` bundle (`--methods v4`) is `v3` plus a `cpcv` and a
+`deflated_sharpe` block in every validation report; no gate reads them.
+`study_deflated_sharpe` puts the same DSR block beside a maker, quoting or
+auction study's per-day P&L without touching its registered verdict rule.
+The published worked example reproduces (SR0 0.1132, DSR 0.9004).
+
+**Where to look:** `python/src/iap/validation/cpcv.py`, `deflated.py`;
+RESEARCH_VALIDITY.md §1b; LEARN.md §40; DIAGRAMS.md §30-§31.
+
+**How to run it:** COOKBOOK recipes 56 and 62 (synthetic).
+
+### 2.16 Extended features and event clocks (v1.12, M6)
+
+Nineteen opt-in features sit outside the default registry, under their own
+`feature_version`, so the default hash, the goldens and every published
+number are unchanged: queue time-to-depletion at the best bid and ask,
+trade-sign autocorrelation at five lags, Hawkes buy / sell intensities with
+an online recursion (and an offline MLE helper), and odd-lot and
+non-displayed execution shares (invalid when the source reports no
+order-level executions). Rows can also be sampled on an event clock (every
+N applied events) or a volume clock (every N traded shares, which needs
+TRADE prints) instead of the 100 ms clock. Nothing in the maker, quoting or
+auction code reads these columns yet, and they have not been run on the
+real sessions.
+
+**Where to look:** `python/src/iap/features/extended.py`; API_FEATURES.md §8.
+**How to run it:** COOKBOOK recipes 58 and 63.
+
 ## 3. Algo and execution: how an order becomes fills
 
 ### 3.1 The four algorithms
@@ -835,8 +886,9 @@ exit admits nothing; with a passive exit it loses 6.7 bp per trip (against
 the market ran over. The quoter with a toy score nets less skewed than
 unskewed (+86.50 against +120.20 USD). LEARN.md §31 and §34 explain why
 these numbers say nothing about a real alpha. A pre-registered, in-sample
-maker study on the seven real sessions is running; docs/ROADMAP.md §3.5
-describes it.
+maker study on the seven real sessions (EQ01 / EQ02 / EQ05 / EQ10, taker
+and passive exits) and the M5 quoting study are still running; neither has
+a result (docs/REAL_DATA.md §3.3).
 
 **Where to look:** API_TRADING.md §2.6-§2.7; `python/src/iap/execution/calibration.py`,
 `backtest/maker.py`, `backtest/quoting.py`, `labels/maker_labels.py`;
@@ -861,9 +913,16 @@ the cross and exits in it. The walk-forward fits the orientation and
 threshold on purged, day-aligned training days only. The CLI refuses to
 backtest without a pre-registration for `AUC01/<cross>-<seconds>s`.
 
-No real-data result exists yet. On synthetic sessions with a planted
-relation the walk-forward recovers the planted sign, which shows the
-plumbing works and nothing else.
+On synthetic sessions with a planted relation the walk-forward recovers
+the planted sign, which shows the plumbing works and nothing else. The
+first real-data result (v1.12, pre-registered, exploratory, in-sample on
+seven sessions) is NO DEMONSTRATED EDGE on both registered cells: the
+closing cross 300 s before (`C-300s`, primary) traded 3 times on 2 of 6
+test sessions, session-clustered mean +19.4 bp, 95% CI −254 to +293 bp; the
+opening cross (`O-300s`) +6.1 bp, CI −9.7 to +21.9. Both miss the registered
+minimum of four active sessions. With one decision per symbol per day the
+study is underpowered, which is not a negative result (LEARN.md §42). The
+declared 2026 holdout, on the frozen `C-300s` fit, is running.
 
 **Where to look:** `python/src/iap/auction/`; docs/REAL_DATA.md §3.3;
 DIAGRAMS.md §22. **How to run it:** COOKBOOK recipe 42.
@@ -891,6 +950,50 @@ TWAP / VWAP / IS schedules and their goldens are unchanged.
 41 and 48.
 
 ---
+
+### 3.9 Passive execution that learns: fill hazard, post-only, feedback (v1.12, X4)
+
+The v1.9 maker backtest posted once and either filled or expired. X4 adds
+three opt-in pieces (defaults stay byte-identical):
+
+- **Fill hazard** (`iap.execution.fill_hazard`): a discrete-time hazard
+  (complementary log-log link, Cox-style; logit optional) of a passive order
+  filling in each time bucket, on queue ahead, queue-depletion rate, spread,
+  imbalance and time of day, fitted by IRLS on the M3 maker labels, saved as
+  `iap.fill_hazard/1` JSON and registrable in the model registry. It gives
+  `P(fill within t)` for a post not yet made.
+- **Post-only** (simulator rule 10): a child that would take liquidity on
+  arrival is rejected (`POST_ONLY_REJECT`) or slid one tick passive.
+- **Reprices with give-up:** an expired entry is reposted at the new touch
+  up to `entry_reprices` times, unless the hazard says the repost has less
+  than `hazard_give_up_prob` chance of filling, in which case it cancels (or
+  crosses, if configured).
+- **Markout feedback** (`iap.execution.markout_feedback`): a causal EWMA of
+  realised markouts; while it is below a threshold the policy stands down,
+  widens or reduces size. On a synthetic toxic regime the quoter's markout
+  goes from −62.75 to −1.75 USD with an "earn at least 2 bp" threshold, and
+  the run still loses (LEARN.md §43).
+
+All results are synthetic; none of this has been run on the real sessions.
+
+**Where to look:** API_TRADING.md §2.10; DIAGRAMS.md §32. **How to run it:**
+COOKBOOK recipes 61, 63 and 64.
+
+### 3.10 Cost-aware multi-venue routing (v1.12, X5)
+
+The pinned router (§3.2) takes the best displayed price and breaks ties on
+fees. The opt-in `CostAwareRouter` prices each venue from a versioned model
+(`research/execution/venue_model.json`): fill probability at the touch,
+maker toxicity from markouts, latency, and volume-tiered fees tracked by a
+monthly `FeeLedger`. Aggressive orders go to the lowest all-in cost; a
+sweep across venues staggers its sends by latency so the children arrive
+together; a passive post goes where `p x (-rebate - capture + toxicity) +
+(1 - p) x miss cost` is lowest, or is split by fill probability and
+toxicity. The real data here is one Nasdaq book, so on it the router has a
+single candidate: this is capability for multi-venue data, not a result.
+
+**Where to look:** `iap.execution.sor_v2`, `venues_model`; API_TRADING.md
+§2.9; DIAGRAMS.md §33. **How to run it:** COOKBOOK recipe 59.
 
 ## 4. Risk: the engine that says no
 
@@ -1416,6 +1519,46 @@ that adds a function, method or type to a frozen copy needs
 beat deleting; DIAGRAMS.md diagram 28 maps the copies. **How to run it:**
 COOKBOOK recipe 53.
 
+### 7.2 Tick-to-trade: what the latency number means (v1.12, X6)
+
+`cpp/bench/bench_tick_to_trade` times every event individually from a raw
+IAP1 frame in memory through decode, book update, native features, alpha
+scoring and an order decision with a minimal pre-trade check, and reports
+the distribution. On the CI runner (AMD EPYC), golden `eq_mbo` vector: p50
+1,279 ns, p99 2,559 ns, p99.9 11,263 ns, max 33,112 ns; on a generated
+100,000-event day p50 1,407, p99 1,727, p99.9 12,287 ns, max 298,570 ns.
+Stage p50s: decode 271, book 83, features 735, alpha 135, decision 30 ns.
+It is in-process only: no network, no kernel bypass, no platform risk
+engine (that is Rust and Java, not C++). Runner variance is about 2x at
+p99, so CI fails only when an end-to-end p50 or p99 exceeds 8x the
+committed baseline. The Python reference runs the same path at about 4,600
+events/s (p50 176 µs) on a laptop.
+
+**Where to look:** benchmarks/RESULTS.md; LEARN.md §41; DIAGRAMS.md §35.
+**How to run it:** COOKBOOK recipe 57.
+
+### 7.3 Operations: alert routing, latency SLOs, state backup (v1.12, P4)
+
+Alertmanager routes by severity: `page` to the page receiver,
+`critical` / `warning` (and anything unlabelled) to the ticket receiver,
+and the `Watchdog` heartbeat to its own receiver; inhibition mutes
+downstream symptoms of a kill switch or a feed problem within one service.
+Receiver URLs are read from files only: compose defaults to a local
+`alert-sink` echo service, and on Kubernetes the Secret
+`iap-alertmanager-webhook` must hold `page_url` and `ticket_url` (an
+operator action on upgrade). `slo.yml` defines two latency SLOs on the
+existing JVM histograms, 99% of order-path and event-path samples under
+about 1.05 ms over 30 days, with multi-window burn-rate alerts (page at
+14.4x over 1h and 5m or 6x over 6h and 30m; warning at 3x over 1d and 2h or
+1x over 3d and 6h), each covered by promtool tests. A CronJob backs up the
+trading state every 30 minutes. High availability means one pod restarting
+and resuming from its checkpoint; there is no active-active. Eight older
+alerts still lack promtool tests, on an allowlist that may only shrink.
+
+**Where to look:** `deployment/alertmanager/`, `deployment/prometheus/slo.yml`;
+docs/runbooks/RUNBOOK_alerting.md; DIAGRAMS.md §34. **How to run it:**
+COOKBOOK recipes 60 and 65.
+
 ---
 
 ## Where next
@@ -1429,7 +1572,7 @@ COOKBOOK recipe 53.
 | every pinned rule | [../PLATFORM_CONVENTIONS.md](../PLATFORM_CONVENTIONS.md) |
 | what is done and what is backlog | [ROADMAP.md](ROADMAP.md), [EPICS.md](EPICS.md) |
 | to run the pipeline on real historical files you obtained (ITCH 5.0, LOBSTER) | [REAL_DATA.md](REAL_DATA.md) |
-| what changed in each release, v1.1.0 to v1.11.0 | [../CHANGELOG.md](../CHANGELOG.md) |
+| what changed in each release, v1.1.0 to v1.12.0 | [../CHANGELOG.md](../CHANGELOG.md) |
 | the real-data studies: 7 sessions, power, the 2026 holdout, auctions | [REAL_DATA.md](REAL_DATA.md) §3 |
 | the governance controls, one table | [governance/GOVERNANCE.md](governance/GOVERNANCE.md) §2a |
 | the LLM agent's controls and evals | [governance/GOVERNANCE.md](governance/GOVERNANCE.md) §2b |
