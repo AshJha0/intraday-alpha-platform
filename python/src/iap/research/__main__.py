@@ -11,6 +11,13 @@
                                [--sessions 1,2,4] [--break-levels 1]
                                [--gate-looks N] [--jobs N]
                                [--generator-config PATH] [--power-out-dir research/power]
+    python -m iap.research power-real --dataset-dir DIR [--seeds 20] [--restart]
+    python -m iap.research combine [--asset-class EQUITY|FX|all] [--dataset-dir DIR]
+
+``run``, ``combine``, ``power`` and ``power-real`` refuse unless their
+(alpha, horizon) pairs are pre-registered on research/agents/blackboard.jsonl
+(:mod:`iap.agents.prereg_gate`; ``combine`` checks the combination id);
+``--no-prereg`` makes the run exploratory and says so.
 
 ``run`` builds the spec (:func:`iap.research.build_spec`), runs it through
 :class:`iap.research.ExperimentRunner`, prints the result table, the
@@ -33,10 +40,15 @@ v1.4.0 flag ``--tstat-threshold`` is gone: the ledger threshold is part of
 ``python -m iap.research combine [--asset-class EQUITY|FX|all] [--method
 equal_weight,ridge,...] [--members EQ01,EQ03,...] [--horizon 5s]
 [--dry-run]`` validates each (asset class, method) combination as an alpha,
-debits its looks and writes ``research/combination/``.
+debits its looks and writes ``research/combination/``.  An asset class with
+no rows in the dataset (FX on an equity feed) is skipped with a progress
+line; none with rows is an error.
 
 ``power`` runs the planted-signal power study (:mod:`iap.research.power`)
-and writes ``POWER_REPORT.md`` / ``POWER_REPORT.json``.
+and writes ``POWER_REPORT.md`` / ``POWER_REPORT.json``.  ``power-real``
+(:mod:`iap.research.power_real`) is its counterpart on an ingested dataset;
+it appends every finished run to ``REAL_POWER_CHECKPOINT.jsonl`` beside the
+report and resumes from it when rerun (``--restart`` discards it).
 
 **For tools.**  ``list --json`` and ``show --json`` print ONE JSON document
 on stdout (sorted keys): ``list`` gives ``{"experiments": [...], "skipped":
@@ -47,7 +59,9 @@ why — and ``show`` gives ``{"spec", "result", "gate_eligibility"}``.
 failure print exactly one JSON object on stderr,
 ``{"error": {"code", "message"}}``, with a stable ``code``
 (:class:`iap.research.errors.ResearchError`; usage errors are
-``usage_error`` and exit 2, everything else exits 1).
+``usage_error`` and exit 2, everything else exits 1).  ``run`` exits 3 when
+the result's IC contradicts the pre-registered sign: the verdict is printed,
+but it is not evidence for the registered hypothesis.
 """
 
 from __future__ import annotations

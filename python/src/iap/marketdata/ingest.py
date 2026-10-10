@@ -57,7 +57,7 @@ from iap.marketdata.itch50 import (
     ProtoEvent,
 )
 from iap.marketdata.lobster import LobsterConverter, sibling_orderbook, symbol_from_filename
-from iap.marketdata.normalize import normalize_run
+from iap.marketdata.normalize import RECORD_STRUCT, iter_record_events, normalize_run
 from iap.reference.corpactions import CorporateActions
 from iap.reference.secmaster import SecurityMaster, SecurityRecord
 
@@ -299,6 +299,8 @@ _ROW_LINE = (
     '"price_ticks":%d,"qty":%d,"order_id":%d,"trade_id":%d}\n'
 )
 _RAW_BATCH = 8192
+#: Packs one row as its IAP1 record for the normaliser (:func:`_raw_pass`).
+_RECORD_PACK = RECORD_STRUCT.pack
 
 
 class _InstrumentStats:
@@ -632,16 +634,19 @@ def _raw_pass(
     ticks_e4: list[int],
     venue_id: int,
     check: _BookCheck | None,
-    keep: list[MarketEvent] | None = None,
+    keep: bytearray | None = None,
 ) -> dict:
     """Pass 2: spool -> canonical raw JSONL (ticks, sequences, event ids).
 
     Rows are formatted straight into the canonical line and written in
     batches; the bytes are those of ``write_jsonl``.  ``keep`` collects the
-    events for the normaliser, so it does not decode the file just written.
+    events for the normaliser as 72-byte IAP1 records (~3.3 GB for a 46 m
+    event day, where Python objects needed several times that), so it does
+    not decode the file just written.  ``info["kept"]`` is False when a row
+    could not be packed; the normaliser then decodes the file.
     """
     info: dict = {}
-    keep_event = keep.append if keep is not None else None
+    pack = _RECORD_PACK if keep is not None else None
     tmp = raw_path.with_name(raw_path.name + ".partial")
     lines: list[str] = []
     append = lines.append
@@ -651,8 +656,17 @@ def _raw_pass(
             if apply is not None:
                 apply(row[1] - 1, row[6], row[7], row[8], row[9], row[10])
             append(_ROW_LINE % row)
-            if keep_event is not None:
-                keep_event(MarketEvent(*row))
+            if pack is not None:
+                try:
+                    # IAP1 field order: id, inst, venue, type, side, ts, ts, seq, ...
+                    keep += pack(
+                        row[0], row[1], row[2], row[6], row[7], row[3], row[4], row[5],
+                        row[8], row[9], row[10], row[11],
+                    )  # fmt: skip
+                except struct.error:
+                    pack = None
+                    keep.clear()
+                    info["kept"] = False
             if len(lines) >= _RAW_BATCH:
                 f.write("".join(lines).encode("ascii"))
                 lines.clear()
@@ -934,9 +948,11 @@ def ingest(
         ticks = _decide_ticks(universe, stats, TICK_CHOICES[tick_size], previous_ticks)
         check = _BookCheck(len(universe)) if book_check else None
         clock = time.perf_counter()
-        fresh: list[MarketEvent] | None = None if defer_normalize else []
+        fresh: bytearray | None = None if defer_normalize else bytearray()
         with _Stage(progress, "raw_and_book_check", raw_dir / f"{stem}.jsonl.partial"):
             raw_info = _raw_pass(spool, raw_dir / f"{stem}.jsonl", ticks, venue_id, check, fresh)
+        if raw_info.pop("kept", True) is False:
+            fresh = None  # a row out of the IAP1 domain: the normaliser decodes the file
         stage["raw_and_book_check"] = time.perf_counter() - clock
     except BaseException:
         # a refused / failed session leaves no half-written file behind
@@ -1033,7 +1049,10 @@ def ingest(
         return manifest
     clock = time.perf_counter()
     with _Stage(progress, "normalize", normalized_dir):
-        qc = normalize_run(raw_dir, normalized_dir, {raw_file.name: fresh})
+        preloaded = {} if fresh is None else {raw_file.name: iter_record_events(fresh)}
+        fresh = None  # the generator holds the buffer; it is freed once consumed
+        qc = normalize_run(raw_dir, normalized_dir, preloaded)
+        del preloaded
     stage["normalize"] = time.perf_counter() - clock
     qc["raw_dir"] = "raw"
     _write_json(normalized_dir / "qc_report.json", qc, sort_keys=False)

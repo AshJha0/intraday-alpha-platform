@@ -154,7 +154,7 @@ DECISION_TRACE.md §6 (`venue_names` = `{v["venue_id"]: v["venue"]}` from
 | `SmartOrderRouterLike` | `route(order, venues) -> VenueDecision` | `iap.mvp.adapters.SorAdapter` over `iap.execution.sor.SmartOrderRouter` |
 | `ExecutionSimulatorLike` | `submit(order)`, `on_market_event(event)` → `Sequence[ExecutionReport]` | `iap.mvp.adapters.SimulatorAdapter` over `iap.execution.simulator.ExecutionSimulator` |
 | `TCAEngine` | `analyse(parent_order, executions, market) -> TCAResult` | `iap.mvp.adapters.TcaAdapter` over `iap.tca.tca.order_tca` |
-| `ExperimentRunner` | `run(spec) -> ExperimentResult` | `iap.research.ExperimentRunner` |
+| `ExperimentRunner` | `run(spec) -> ExperimentResult` | `iap.research.ExperimentRunner` (optional `gate=` callable, called with the spec before any data is read — the pre-registration check, v1.7.2) |
 | `LifecycleGate` | `name`, `evaluate(alpha_id, evidence) -> GateResult` | every `iap.lifecycle.gates.Gate` |
 | `AlphaLifecycle` | `state(alpha_id)`, `advance(alpha_id, event_ts, evidence) -> LifecycleTransition | None` | `iap.lifecycle.AlphaLifecycle` |
 | `TraceSink` | `emit(trace)` | `MemoryTraceSink`, `JsonlTraceSink`, `StoreTraceSink`, `MultiSink` (`iap.trace.sinks`) |
