@@ -72,9 +72,8 @@ def _assert_parity(py, rs, label):
                 f"{NATIVE_NAMES[k]}: {len(rows)} rows, first row {r} "
                 f"py={a[r, k]!r} rs={b[r, k]!r}, max |d|={np.abs(b - a)[rows, k].max():.3g}"
             )
-        pytest.fail(f"{label}: values differ
-  " + "
-  ".join(report))
+        sep = "\n  "
+        pytest.fail(f"{label}: values differ{sep}" + sep.join(report))
 
 
 # ---------------------------------------------------- backend-independent
