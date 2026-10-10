@@ -195,8 +195,8 @@ grow silently — not by deletion.
    deliberately (CONTRIBUTING.md §4).
 2. Port it to each frozen copy in the **same PR**, so the parity tests prove
    the port.
-3. Put `POLYGLOT-OVERRIDE: <what and why>` in a commit message or the PR
-   body. If the port adds a function, method or type to a frozen copy, write
+3. Put a line that starts with `POLYGLOT-OVERRIDE: <what and why>` in a commit
+   message or the PR body (a quoted or mid-line mention does not count). If the port adds a function, method or type to a frozen copy, write
    `POLYGLOT-OVERRIDE: new-api <what and why>`.
 4. To change the policy itself (`tests/harness/polyglot_policy.json`), the same
    override line is required; update this document in the same PR.

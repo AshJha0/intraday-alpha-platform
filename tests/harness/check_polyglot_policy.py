@@ -12,7 +12,7 @@ Rules, checked over the diff ``<base>...HEAD``:
 
 1. A change to a FROZEN path (or to the policy file itself) fails unless a
    commit message in ``<base>..HEAD`` or the pull-request body (environment
-   variable ``POLYGLOT_PR_BODY``) contains a line ``POLYGLOT-OVERRIDE: <reason>``
+   variable ``POLYGLOT_PR_BODY``) contains a line that starts with ``POLYGLOT-OVERRIDE: <reason>``
    with a non-empty reason.  The legitimate reason is propagating a pinned
    semantics change that the canonical copy already made, together with the
    regenerated golden fixture that proves parity.
@@ -143,11 +143,13 @@ def parse_markers(texts: list[str], marker: str, new_api_token: str) -> Markers:
     out = Markers()
     for text in texts:
         for line in (text or "").splitlines():
-            idx = line.find(marker)
-            if idx < 0:
+            # Only a line that STARTS with the marker counts: prose that quotes
+            # it ("`POLYGLOT-OVERRIDE: <reason>` line ...") is not an override.
+            stripped = line.strip()
+            if not stripped.startswith(marker):
                 continue
-            reason = line[idx + len(marker) :].strip()
-            if not reason:
+            reason = stripped[len(marker) :].strip()
+            if not reason or reason.startswith("<"):
                 continue
             out.override = True
             out.reasons.append(reason)
@@ -277,8 +279,15 @@ def self_test(policy: dict) -> list[str]:
         policy["override_marker"],
         policy["new_api_token"],
     )
+    m_prose = parse_markers(
+        ["needs a `POLYGLOT-OVERRIDE: fix` line\nPOLYGLOT-OVERRIDE: <reason>"],
+        policy["override_marker"],
+        policy["new_api_token"],
+    )
     if m_empty.override:
         fails.append("self-test: an empty override reason must not count")
+    if m_prose.override:
+        fails.append("self-test: a quoted or placeholder override must not count")
     cases = [
         ([("M", "python/src/iap/x.py", "a", "b")], m_none, 0),
         ([("M", frozen, rs_old, rs_old + "// comment\n")], m_none, 1),
