@@ -551,9 +551,13 @@ impl FeatureEngine {
         st.depth_ask = ask;
 
         st.book_ok = !st.depth_bid.is_empty() && !st.depth_ask.is_empty();
-        if !st.book_ok || !samples {
+        if !st.book_ok {
             return false;
         }
+        // The level scalars (L1, cumulative depth, mid, spread) follow the
+        // merged view on EVERY refresh, a staleness refresh included (e.g. a
+        // venue rejoining at the start of a SNAPSHOT recovery burst), exactly
+        // as the Python reference does; only the samples below are gated.
         (st.bid_p, st.bid_q) = st.depth_bid[0];
         (st.ask_p, st.ask_q) = st.depth_ask[0];
         for (i, k) in [1usize, 3, 5, 10].into_iter().enumerate() {
@@ -565,6 +569,9 @@ impl FeatureEngine {
         st.logmid = (st.mid2 as f64).ln();
         st.spread_ticks = st.ask_p - st.bid_p;
         st.spread_bps = st.spread_ticks as f64 * st.tick / st.mid * 1e4;
+        if !samples {
+            return false; // staleness refresh: view updated, nothing recorded
+        }
 
         // depth sample at every two-sided refresh
         st.depthavg.add(t, [st.db[0], st.da[0], st.db[2], st.da[2]]);

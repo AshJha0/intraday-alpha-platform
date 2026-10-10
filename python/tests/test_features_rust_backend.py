@@ -29,7 +29,7 @@ TOL = 1e-9
 #: The pinned golden vectors (expected_features.json): every row must match.
 PRIMARY = ("events_eq_mbo.jsonl", "events_fx_quote.jsonl")
 #: The anomaly vectors (expected_features_anomalies.json): the golden
-#: checkpoints must match; see test_rust_backend_anomaly_rows_known_gap.
+#: checkpoints and every row must match too.
 ANOMALY = ("events_eq_anomalies.jsonl", "events_fx_anomalies.jsonl")
 VECTORS = PRIMARY + ANOMALY
 CADENCES = (0, 100_000_000)
@@ -193,20 +193,15 @@ def test_rust_backend_anomaly_golden_checkpoints(ext, contexts, python_frames, s
                 assert abs(got - want) <= tol, (side, key, name, got, want)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="known Rust/Python gap (v1.11 E2 finding): rows emitted DURING a "
-    "SNAPSHOT recovery burst (interior records, trade_id > 0) -- Python keeps "
-    "the pre-burst derived book state (API_FEATURES s2), the Rust engine "
-    "emits from the half-built book, and the mid history it records then "
-    "shifts returns for a few rows. Golden checkpoints never land inside a "
-    "burst. strict: fixing the Rust engine turns this into an XPASS failure.",
-)
 @pytest.mark.parametrize("vector", ANOMALY)
-def test_rust_backend_anomaly_rows_known_gap(ext, contexts, python_frames, vector):
-    py = python_frames[(vector, 0)]
-    rs = compute_native(read_jsonl(GOLDEN_DIR / vector), contexts, 0, engine="rust")
-    _assert_parity(py, rs, vector)
+def test_rust_backend_parity_on_anomaly_vectors(ext, contexts, python_frames, vector):
+    """Every row, including those inside SNAPSHOT recovery bursts (fixed in
+    v1.11.0: the Rust engine used to skip the level update on a staleness
+    refresh)."""
+    for cadence_ns in CADENCES:
+        py = python_frames[(vector, cadence_ns)]
+        rs = compute_native(read_jsonl(GOLDEN_DIR / vector), contexts, cadence_ns, engine="rust")
+        _assert_parity(py, rs, f"{vector}@{cadence_ns}")
 
 
 def test_rust_file_and_jsonl_bytes_entry_points(ext, contexts, python_frames):

@@ -2887,8 +2887,8 @@ For the feature store, `python3 -m iap.features --engine rust` takes the
 `features_summary.json`; the other 160 features still come from Python.
 Measure the speed on your machine with
 `python tools/bench_native_features.py` (CI: about 150x on the golden
-vectors). The anomaly vectors show the one known gap, rows inside a
-SNAPSHOT recovery burst (API_FEATURES.md §7.1).
+vectors). The anomaly vectors match on every row too (API_FEATURES.md
+§7.1).
 
 ## 50. Register a model, monitor it, and shadow a candidate (v1.11)
 

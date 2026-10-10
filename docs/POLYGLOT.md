@@ -92,6 +92,19 @@ New features land in Python first and in the C++/Rust fast paths when they
 earn a hot-path place; the Java engine serves only the platform's six golden
 alphas and is frozen.
 
+**Known divergence (v1.11.0).** On a staleness refresh (the stale-venue set
+changes, e.g. a venue rejoining at the start of a SNAPSHOT recovery burst)
+Python updates the level scalars (L1, cumulative depth, mid, spread) and
+records no samples. Rust did not update them; fixed in v1.11.0 and pinned by
+`tests/golden/expected_features_snapshot_burst.json`. The C++
+(`FeatureEngine::refresh_book`) and Java (`FeatureEngine.refreshBook`)
+copies still return early (`!book_ok || !samples`), so on rows between such
+a refresh and the next book-touching event they report the previous view's
+levels and returns. Their goldens do not sample those rows, so cross-language
+parity tests pass. Proposed follow-up: move the `samples` check below the
+level update in both, and add the burst golden to `ctest -R Golden` and
+`FeatureGoldenTest`.
+
 ### 1.5 Alpha scoring (the six golden alphas, `linear_z_v1`)
 
 | copy | lines | golden | consumers | decision |
