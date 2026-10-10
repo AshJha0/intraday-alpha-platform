@@ -147,6 +147,7 @@ def main() -> int:
                 "prometheus.yml": prom / "prometheus.yml",
                 "recording.yml": prom / "recording.yml",
                 "alerts.yml": prom / "alerts.yml",
+                "slo.yml": prom / "slo.yml",
                 # NOTE: the rust-telemetry file-SD target list was removed in
                 # round 3 — no component ever wrote /data/telemetry/rust.prom,
                 # so the target was permanently down and TargetDown (critical)
@@ -158,7 +159,7 @@ def main() -> int:
 
     # 3. Alertmanager routing (mounted at /etc/alertmanager). The webhook URL
     #    is NOT here: alertmanager.yml reads it from the Secret-backed file
-    #    /etc/alertmanager/secrets/webhook_url.
+    #    /etc/alertmanager/secrets/{page_url,ticket_url}.
     write(
         out_dir / "configmap-alertmanager.yaml",
         "deployment/alertmanager/alertmanager.yml",

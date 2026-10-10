@@ -1,29 +1,38 @@
 # =============================================================================
 # alertmanager.yml — routing for the alerts in deployment/prometheus/alerts.yml
+# and deployment/prometheus/slo.yml (v1.12.0, plan P4).
 #
 # Single source of truth for both targets: docker-compose mounts this file,
 # and deployment/k8s/configmap-alertmanager.yaml is GENERATED from it
 # (deployment/k8s/generate_configmaps.py).
 #
-# The receiver is a generic webhook. Its URL is a SECRET (it normally embeds a
-# token), so it is never written here: `url_file` makes Alertmanager read it
-# from a mounted file at send time —
-#   docker-compose: the `alert_webhook_url` secret (ALERT_WEBHOOK_URL_FILE)
-#   Kubernetes:     the `iap-alertmanager-webhook` Secret, key `url`
-# The in-repo placeholder (deployment/alertmanager/webhook_url.placeholder)
-# points nowhere; with it, alerts are routed and visible in the Alertmanager
-# UI but not delivered. Real delivery therefore needs the operator to supply a
-# URL — see docs/governance/REPO_SETTINGS.md ("Operational settings").
+# SECRET-FREE. Receiver URLs normally embed a token, so none is written here:
+# every webhook uses `url_file`, read by Alertmanager at send time from a
+# mounted file —
+#   Kubernetes:     Secret `iap-alertmanager-webhook`, keys `page_url` and
+#                   `ticket_url` (created out of band by the operator; see
+#                   docs/runbooks/RUNBOOK_alerting.md §2)
+#   docker-compose: secrets `alert_page_url` / `alert_ticket_url`, from the
+#                   files named by ALERT_PAGE_URL_FILE / ALERT_TICKET_URL_FILE.
+#                   Unset, both default to deployment/alertmanager/local-sink.url,
+#                   which points at the in-compose `alert-sink` echo service —
+#                   NOT a secret, and nothing leaves the compose network.
+# tests/harness/check_deployment.py (`alerting_secret_free`) fails the build
+# if an inline `url:`, a token-looking string, or a non-local URL is committed
+# under deployment/alertmanager/.
 #
-# Watchdog is the always-firing heartbeat from alerts.yml. It is sent to the
-# `watchdog` receiver (a no-op here). To get a dead-man's-switch, point that
-# receiver at an external heartbeat service that pages when it STOPS arriving.
+# Routing by the `severity` label (alerts.yml "Severity policy"):
+#   page               -> receiver `page`   (wake someone up)
+#   critical, warning  -> receiver `ticket` (act during the session / same day)
+#   none (Watchdog)    -> receiver `watchdog` (no-op; point it at a
+#                         dead-man's-switch service to alarm when it STOPS)
+# Anything unlabelled falls through to `ticket` — never silently dropped.
 # =============================================================================
 global:
   resolve_timeout: 5m
 
 route:
-  receiver: webhook
+  receiver: ticket
   group_by: [alertname, service]
   group_wait: 30s
   group_interval: 5m
@@ -34,10 +43,49 @@ route:
       receiver: watchdog
       group_wait: 0s
       repeat_interval: 1m
+    - matchers:
+        - severity = "page"
+      receiver: page
+      group_wait: 10s
+      group_interval: 1m
+      repeat_interval: 1h
+    - matchers:
+        - severity =~ "critical|warning"
+      receiver: ticket
+      repeat_interval: 12h
+
+# Inhibition: suppress the symptom while its cause is already firing, so the
+# on-call sees ONE page per incident. Every rule requires `service` equal, so
+# one service's incident never mutes another's.
+inhibit_rules:
+  # The kill switch halts trading: fill-rate / signal / reject / latency
+  # symptoms that follow are expected and are part of the kill-switch incident.
+  - source_matchers:
+      - alertname = "KillSwitchEngaged"
+    target_matchers:
+      - alertname =~ "FillRateDrop|SignalRateCollapse|PreTradeRejectRatioHigh|LossLimitUtilizationHigh|.*LatencySLO.*"
+    equal: [service]
+  # A stale or gapped feed explains a signal-rate collapse and a fill-rate drop.
+  - source_matchers:
+      - alertname =~ "StaleFeed|FeedWallClockStall|BookStale|SequenceGapDetected"
+    target_matchers:
+      - alertname =~ "SignalRateCollapse|FillRateDrop"
+    equal: [service]
+  # A page on an SLO already covers the slower ticket for the same SLO.
+  - source_matchers:
+      - severity = "page"
+      - slo =~ ".+"
+    target_matchers:
+      - severity = "warning"
+    equal: [slo, service]
 
 receivers:
-  - name: webhook
+  - name: page
     webhook_configs:
-      - url_file: /etc/alertmanager/secrets/webhook_url
+      - url_file: /etc/alertmanager/secrets/page_url
+        send_resolved: true
+  - name: ticket
+    webhook_configs:
+      - url_file: /etc/alertmanager/secrets/ticket_url
         send_resolved: true
   - name: watchdog

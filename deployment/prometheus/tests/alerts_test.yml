@@ -35,6 +35,7 @@ tests:
             exp_annotations:
               summary: "Alerting pipeline heartbeat (always firing)"
               runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+              runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md
               description: >-
                 This alert is always firing. If it stops arriving at the
                 heartbeat receiver, Prometheus rule evaluation or Alertmanager is
@@ -84,6 +85,7 @@ tests:
             exp_annotations:
               summary: "Stale market-data feed on java-platform (6.0s event-time gap)"
               runbook: docs/runbooks/RUNBOOK_data_pipeline.md
+              runbook_url: docs/runbooks/RUNBOOK_data_pipeline.md
               description: >-
                 The gap between consecutive market events exceeded the 5s
                 staleness budget (risk.json stale_feed_timeout_ns). The risk
@@ -117,6 +119,7 @@ tests:
             exp_annotations:
               summary: "No market event processed for 5m 0s on java-platform"
               runbook: docs/runbooks/RUNBOOK_paper_trading.md
+              runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
               description: >-
                 A running realtime session has not processed an event in over a
                 minute of wall clock — a wedged decode/trading thread or a dead
@@ -148,6 +151,7 @@ tests:
             exp_annotations:
               summary: "Daily loss limit utilization 76%"
               runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+              runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md
               description: >-
                 Daily P&L (realized + unrealized, reporting currency) is below
                 -75% of global.max_daily_loss; at 100% the risk engine latches the
@@ -190,6 +194,7 @@ tests:
             exp_annotations:
               summary: "Sequence gap on java-platform (1 in 5m)"
               runbook: docs/runbooks/RUNBOOK_data_pipeline.md
+              runbook_url: docs/runbooks/RUNBOOK_data_pipeline.md
               description: >-
                 At least one sequence gap. max_sequence_gap_before_halt = 1: the
                 affected book is marked stale and the risk engine rejects orders
@@ -209,6 +214,7 @@ tests:
             exp_annotations:
               summary: "Book stale for instrument 1 on java-platform"
               runbook: docs/runbooks/RUNBOOK_data_pipeline.md
+              runbook_url: docs/runbooks/RUNBOOK_data_pipeline.md
               description: >-
                 A venue book has been stale for 2m — no SNAPSHOT recovery after a
                 sequence gap or a venue disconnect. Trading in that instrument is
@@ -237,6 +243,7 @@ tests:
             exp_annotations:
               summary: "Global kill switch engaged on java-platform"
               runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+              runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md
               description: >-
                 The global kill switch latched — trading is halted and every order
                 in scope is rejected pre-trade. The latch SURVIVES a restart
@@ -266,6 +273,7 @@ tests:
             exp_annotations:
               summary: "Paper-trading session FAILED on java-platform"
               runbook: docs/runbooks/RUNBOOK_paper_trading.md
+              runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
               description: >-
                 platform_session_state = 3 (FAILED). /health is 503 with the
                 reason; the container exits non-zero. Check the pod logs and
@@ -305,6 +313,7 @@ tests:
             exp_annotations:
               summary: "Paper-trading session STOPPED and not resumed on java-platform"
               runbook: docs/runbooks/RUNBOOK_paper_trading.md
+              runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
               description: >-
                 The persisted session state is 4 (STOPPED) and no running
                 session has reported for 10m. The session checkpointed
@@ -339,6 +348,7 @@ tests:
             exp_annotations:
               summary: "Paper-trading session STOPPED and not resumed on java-platform"
               runbook: docs/runbooks/RUNBOOK_paper_trading.md
+              runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
               description: >-
                 The persisted session state is 4 (STOPPED) and no running
                 session has reported for 10m. The session checkpointed
@@ -396,6 +406,7 @@ tests:
             exp_annotations:
               summary: "Scrape target java-platform/ down"
               runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+              runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md
               description: >-
                 Prometheus cannot scrape . If this is
                 java-platform during a trading session, treat as a platform
@@ -422,6 +433,7 @@ tests:
             exp_annotations:
               summary: "1 child order(s) routed to a venue the risk check did not approve on java-platform"
               runbook: docs/runbooks/RUNBOOK_paper_trading.md
+              runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
               description: >-
                 A child order was submitted to a venue other than the one named
                 in its pre-trade risk request, so a venue kill or disconnect was
@@ -455,6 +467,7 @@ tests:
             exp_annotations:
               summary: "Orders withheld for a pending admin kill for over 3m on stuck"
               runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+              runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md
               description: >-
                 Orders have been withheld for more than 3m because an admin kill
                 was accepted (202) but the risk engine has not recorded it. No
@@ -483,6 +496,7 @@ tests:
             exp_annotations:
               summary: "Resume released 2 orphaned open order(s) on java-platform"
               runbook: docs/runbooks/RUNBOOK_paper_trading.md
+              runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
               description: >-
                 The session resumed from a checkpoint whose risk snapshot tracked
                 open child orders; they no longer exist in the execution
@@ -518,6 +532,7 @@ tests:
             exp_annotations:
               summary: "Admin API is rate-limiting failed authentications on java-platform"
               runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+              runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md
               description: >-
                 More than 10 failed authentications reached the admin API within
                 one 60s window, so further failures answer 429. Either a client
@@ -551,6 +566,7 @@ tests:
             exp_annotations:
               summary: "Rejected admin requests are no longer individually audited on java-platform"
               runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+              runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md
               description: >-
                 Rejected admin requests exceeded the per-window audit cap, so
                 the remainder were counted and summarised (one audit_summary

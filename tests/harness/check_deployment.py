@@ -60,6 +60,21 @@ Checks (each one is a named case; exit code 0 iff no case FAILED):
                               commit SHA, runners are pinned, every cargo
                               invocation is --locked, permissions are declared
   rust_toolchain_pinned       rust-toolchain.toml == ci.yml == Dockerfile.rust
+  alerting_secret_free        no receiver URL, token or Secret value is
+                              committed: alertmanager.yml uses url_file only,
+                              files under deployment/alertmanager/ hold only a
+                              local (compose-internal) URL, no k8s Secret
+                              manifest carries data (v1.12 P4)
+  alert_rule_metadata         every alert carries severity (page | critical |
+                              warning | none) and runbook + runbook_url
+                              annotations that resolve to a file in the repo
+  alert_rule_tests            every rule file is loaded by a promtool test and
+                              every alert is exercised by name in one (minus a
+                              shrinking, explicit legacy allowlist)
+  k8s_state_backup            the state-backup CronJob reads iap-java-state
+                              READ-ONLY, is pinned to the java-platform node
+                              by required pod affinity, never overlaps itself,
+                              and writes to its own claim
   release_guard               release.yml verifies the commit with
                               tests/harness/verify_ci_green.py, its manual
                               trigger is a dry run (a `dry_run` and a `sha`
@@ -231,7 +246,7 @@ ALLOWED_TEMPLATE_FUNCS = {
     "query",
 }
 
-RULE_FILES = [PROM / "alerts.yml", PROM / "recording.yml"]
+RULE_FILES = [PROM / "alerts.yml", PROM / "recording.yml", PROM / "slo.yml"]
 
 
 def rule_docs() -> list[dict]:
@@ -869,8 +884,11 @@ def check_k8s_pod_hardening() -> None:
             if pvc:
                 claims.setdefault(pvc, []).append(name)
     for pvc, users in claims.items():
-        if len(set(users)) > 1:
-            problems.append(f"PVC {pvc} is shared by {sorted(set(users))}")
+        # A read-only, node-pinned reader (the state-backup CronJob) is the one
+        # sanctioned exception; check_k8s_state_backup pins its shape.
+        writers = set(users) - set(SANCTIONED_READERS.get(pvc, ()))
+        if len(writers) > 1:
+            problems.append(f"PVC {pvc} is shared by {sorted(writers)}")
     declared = {
         d["metadata"]["name"]: d for _, d in k8s_docs() if d["kind"] == "PersistentVolumeClaim"
     }
@@ -914,6 +932,170 @@ def check_k8s_pod_hardening() -> None:
         "PASS" if not problems else "FAIL",
         "; ".join(problems[:6]) or f"{len(pods)} workloads",
     )
+
+
+# PVC -> workloads allowed to mount it in addition to its owner, READ-ONLY and
+# pinned to the owner's node (check_k8s_state_backup enforces both).
+SANCTIONED_READERS = {"iap-java-state": ("state-backup",)}
+
+
+# ---------------------------------------------------------- v1.12 P4 ops ---
+AM_DIR = DEPLOY / "alertmanager"
+SEVERITIES = {"page", "critical", "warning", "none"}
+# Alerts that predate the "every alert has a promtool test" gate (v1.12 P4).
+# This list may only SHRINK: adding a test for one of these fails the check
+# until the name is removed here, and a NEW alert cannot be exempted without a
+# visible diff to this file.
+LEGACY_UNTESTED_ALERTS = {
+    "SignalRateCollapse",
+    "LiveVsBacktestDrift",
+    "AlphaLifecycleRetired",
+    "FillRateDrop",
+    "PreTradeRejectRatioHigh",
+    "GrossNotionalUtilizationHigh",
+    "GcPauseHigh",
+    "SessionRestartsClimbing",
+}
+# A committed receiver URL is only acceptable if it is local: a compose service
+# name or loopback. Anything else is (or will become) a secret.
+LOCAL_URL = re.compile(r"^https?://(alert-sink|localhost|127\.0\.0\.1)(:\d+)?(/\S*)?$")
+TOKENISH = re.compile(
+    r"(hooks\.slack\.com/services/|xox[abpr]-|routing_key:|integration_key|"
+    r"api_key:|apikey|bearer\s+[A-Za-z0-9]|[?&](token|key|secret)=)",
+    re.I,
+)
+
+
+def check_alerting_secret_free() -> None:
+    problems = []
+    am = yaml.safe_load((AM_DIR / "alertmanager.yml").read_text(encoding="utf-8"))
+    for recv in am.get("receivers", []):
+        for kind, cfgs in recv.items():
+            if not kind.endswith("_configs"):
+                continue
+            for cfg in cfgs:
+                for key in ("url", "api_url", "service_key", "routing_key", "auth_password"):
+                    if key in cfg:
+                        problems.append(f"receiver {recv['name']}: inline `{key}` (use *_file)")
+                if kind == "webhook_configs" and "url_file" not in cfg:
+                    problems.append(f"receiver {recv['name']}: webhook without url_file")
+    for f in sorted(AM_DIR.iterdir()):
+        text = f.read_text(encoding="utf-8")
+        if TOKENISH.search(text):
+            problems.append(f"{f.name}: looks like it contains a credential")
+        if f.suffix == ".url" and not LOCAL_URL.match(text.strip()):
+            problems.append(f"{f.name}: committed URL is not a local default")
+        if "placeholder" in f.name:
+            problems.append(f"{f.name}: placeholder receiver file (removed in v1.12)")
+    for fname, doc in k8s_docs():
+        if doc.get("kind") == "Secret" and (doc.get("data") or doc.get("stringData")):
+            problems.append(f"{fname.name}: commits a Secret with data")
+    record("alerting_secret_free", "PASS" if not problems else "FAIL", "; ".join(problems[:6]))
+
+
+def alert_rules() -> list[dict]:
+    return [r for r in all_rules() if "alert" in r]
+
+
+def check_alert_rule_metadata() -> None:
+    problems = []
+    for rule in alert_rules():
+        name = rule["alert"]
+        sev = (rule.get("labels") or {}).get("severity")
+        if sev not in SEVERITIES:
+            problems.append(f"{name}: severity {sev!r} not in {sorted(SEVERITIES)}")
+        ann = rule.get("annotations") or {}
+        for key in ("runbook", "runbook_url"):
+            ref = ann.get(key)
+            if not ref:
+                problems.append(f"{name}: no {key} annotation")
+            elif not (ROOT / ref.split("#", 1)[0]).is_file():
+                problems.append(f"{name}: {key} {ref} does not resolve to a file")
+    record(
+        "alert_rule_metadata",
+        "PASS" if not problems else "FAIL",
+        "; ".join(problems[:6]) or f"{len(alert_rules())} alerts",
+    )
+
+
+def check_alert_rule_tests() -> None:
+    problems = []
+    loaded: set[str] = set()
+    tested: set[str] = set()
+    for t in sorted((PROM / "tests").glob("*.yml")):
+        doc = yaml.safe_load(t.read_text(encoding="utf-8")) or {}
+        loaded |= {Path(rf).name for rf in doc.get("rule_files", [])}
+        for case in doc.get("tests", []):
+            for art in case.get("alert_rule_test", []) or []:
+                tested.add(art.get("alertname"))
+    for f in RULE_FILES:
+        if f.name not in loaded:
+            problems.append(f"{f.name} is not loaded by any promtool test file")
+    names = {r["alert"] for r in alert_rules()}
+    for name in sorted(names - tested - LEGACY_UNTESTED_ALERTS):
+        problems.append(f"{name} has no promtool alert_rule_test")
+    for name in sorted(LEGACY_UNTESTED_ALERTS & tested):
+        problems.append(f"{name} is now tested: remove it from LEGACY_UNTESTED_ALERTS")
+    for name in sorted(LEGACY_UNTESTED_ALERTS - names):
+        problems.append(f"{name} no longer exists: remove it from LEGACY_UNTESTED_ALERTS")
+    record(
+        "alert_rule_tests",
+        "PASS" if not problems else "FAIL",
+        "; ".join(problems[:6])
+        or f"{len(names & tested)}/{len(names)} alerts tested, "
+        f"{len(LEGACY_UNTESTED_ALERTS)} legacy exemptions",
+    )
+
+
+def check_k8s_state_backup() -> None:
+    problems = []
+    job = next(
+        (
+            d
+            for _, d in k8s_docs()
+            if d["kind"] == "CronJob" and d["metadata"]["name"] == "state-backup"
+        ),
+        None,
+    )
+    if job is None:
+        record("k8s_state_backup", "FAIL", "no state-backup CronJob")
+        return
+    spec = job["spec"]
+    if spec.get("concurrencyPolicy") != "Forbid":
+        problems.append("concurrencyPolicy must be Forbid")
+    jspec = spec["jobTemplate"]["spec"]
+    if not jspec.get("activeDeadlineSeconds"):
+        problems.append("needs activeDeadlineSeconds (a Pending job must be reaped)")
+    pod = jspec["template"]["spec"]
+    claims = {
+        (v.get("persistentVolumeClaim") or {}).get("claimName"): v for v in pod.get("volumes", [])
+    }
+    state = claims.get("iap-java-state")
+    if state is None:
+        problems.append("does not mount iap-java-state")
+    else:
+        if state["persistentVolumeClaim"].get("readOnly") is not True:
+            problems.append("iap-java-state volume must be readOnly")
+        for c in pod.get("containers", []):
+            for m in c.get("volumeMounts", []):
+                if m["name"] == state["name"] and m.get("readOnly") is not True:
+                    problems.append("iap-java-state mount must be readOnly")
+    if "iap-java-state-backup" not in claims:
+        problems.append("must write to its own iap-java-state-backup claim")
+    terms = ((pod.get("affinity") or {}).get("podAffinity") or {}).get(
+        "requiredDuringSchedulingIgnoredDuringExecution"
+    ) or []
+    if not any(
+        t.get("topologyKey") == "kubernetes.io/hostname"
+        and (t.get("labelSelector") or {}).get("matchLabels", {}).get("app.kubernetes.io/name")
+        == "java-platform"
+        for t in terms
+    ):
+        problems.append(
+            "needs REQUIRED podAffinity to java-platform on kubernetes.io/hostname "
+            "(ReadWriteOnce is per node)"
+        )
+    record("k8s_state_backup", "PASS" if not problems else "FAIL", "; ".join(problems))
 
 
 def check_k8s_network_policy() -> None:
@@ -1141,6 +1323,10 @@ def main() -> int:
     check_java_golden_gate()
     print("governance hardening:")
     check_alerting_wired()
+    check_alerting_secret_free()
+    check_alert_rule_metadata()
+    check_alert_rule_tests()
+    check_k8s_state_backup()
     check_k8s_pod_hardening()
     check_k8s_network_policy()
     check_compose_exposure()

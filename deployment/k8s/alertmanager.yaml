@@ -3,14 +3,13 @@
 # Routing comes from the GENERATED iap-alertmanager-config ConfigMap
 # (configmap-alertmanager.yaml — regenerate with generate_configmaps.py).
 #
-# The webhook receiver URL is a secret and is NOT in the repo: alertmanager.yml
-# reads it from /etc/alertmanager/secrets/webhook_url (`url_file`), which this
-# pod mounts from the iap-alertmanager-webhook Secret. Create it out of band
-# before first apply (the pod stays in ContainerCreating until it exists):
-#   kubectl -n intraday-alpha create secret generic iap-alertmanager-webhook \
-#     --from-literal=url='<https webhook URL>'
-# Until a real URL is supplied, alerts are routed and visible in the
-# Alertmanager UI but not delivered anywhere.
+# Receiver URLs are secrets and are NOT in the repo: alertmanager.yml reads
+# them from /etc/alertmanager/secrets/{page_url,ticket_url} (`url_file`), which
+# this pod mounts from the iap-alertmanager-webhook Secret. Create it out of
+# band before first apply (the pod stays in ContainerCreating until it exists):
+#   kubectl -n intraday-alpha create secret generic iap-alertmanager-webhook #     --from-file=page_url=/secure/page_url --from-file=ticket_url=/secure/ticket_url
+# Full procedure, rotation and the v1.11 `url` key migration:
+# docs/runbooks/RUNBOOK_alerting.md §2.
 # =============================================================================
 apiVersion: apps/v1
 kind: Deployment
@@ -99,8 +98,10 @@ spec:
           secret:
             secretName: iap-alertmanager-webhook
             items:
-              - key: url
-                path: webhook_url
+              - key: page_url
+                path: page_url
+              - key: ticket_url
+                path: ticket_url
         - name: data
           emptyDir: {}   # silences/notification log are rebuildable; use a PVC to keep silences across restarts
 ---

@@ -1,0 +1,147 @@
+# =============================================================================
+# state-backup — periodic copy of the java trading state volume (v1.12.0,
+# plan P4 "HA for single-PVC state"). Runbook: docs/runbooks/RUNBOOK_alerting.md
+# §4 (backup / restore / node loss).
+#
+# WHAT HA MEANS HERE (and what it does not):
+#   - The trading vertical is a SINGLETON (java-platform.yaml): replicas 1,
+#     strategy Recreate, ReadWriteOnce iap-java-state claim. There is NO
+#     active-active and NO hot standby: two strategy/risk loops without a
+#     fenced leader would duplicate orders the moment a venue adapter is wired.
+#     Leader election (a coordination.k8s.io Lease held by the trading loop) is
+#     a Java change and is NOT implemented — RWO + Recreate is the fence.
+#   - Recovery is RESTART-AND-RESUME: on pod loss Kubernetes reschedules the one
+#     pod; it re-attaches the claim with the checkpoint intact
+#     (PLATFORM_CONVENTIONS.md §12.3; continuing the session needs --resume).
+#     /ready keeps it out of the Service until it is trading.
+#   - What this CronJob adds: if the VOLUME itself is lost or corrupted, the
+#     kill-switch latch, session accounting and audit trail can be restored
+#     from the newest archive on iap-java-state-backup.
+#
+# HOW IT READS AN RWO CLAIM SAFELY: ReadWriteOnce is per NODE, not per pod. The
+# job (a) mounts the claim READ-ONLY and (b) carries a REQUIRED pod affinity to
+# the java-platform pod on the same hostname, so it only ever runs on the node
+# that already has the volume attached — never a Multi-Attach, never a second
+# writer. If java-platform is not running (finished session, rescheduling),
+# the job stays Pending and is reaped by activeDeadlineSeconds: no backup is
+# taken of a volume nobody is writing. tests/harness/check_deployment.py
+# (`k8s_state_backup`) pins all of this.
+#
+# Consistency: the job copies session_state.json (the checkpoint) FIRST and
+# every other file after it. Appends are flushed BEFORE the checkpoint is
+# renamed (PaperTrading resume guard), so in an archive the audit / trace
+# files are never SHORTER than the checkpoint says — but a busy session can
+# make them LONGER, and a checkpoint committed mid-copy can leave the risk
+# snapshot newer than the checkpoint's risk_snapshot_sha256. `--resume` fails
+# CLOSED on any such mismatch: a restored archive either resumes exactly or
+# refuses. Archives taken
+# while the session is quiescent (stopped / halted / between sessions) always
+# match. Restore procedure and what to do on a refusal: the runbook §4.
+#
+# Off-cluster copy: iap-java-state-backup is in-cluster storage. For disaster
+# recovery, ship the archives off-cluster (object storage) — operator-owned,
+# not in this repo.
+# =============================================================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: state-backup
+  namespace: intraday-alpha
+  labels:
+    app.kubernetes.io/part-of: intraday-alpha-platform
+    app.kubernetes.io/name: state-backup
+    app.kubernetes.io/component: storage
+spec:
+  schedule: "*/30 * * * *"
+  timeZone: Etc/UTC
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    metadata:
+      labels:
+        app.kubernetes.io/part-of: intraday-alpha-platform
+        app.kubernetes.io/name: state-backup
+        app.kubernetes.io/component: storage
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 900
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/part-of: intraday-alpha-platform
+            app.kubernetes.io/name: state-backup
+            app.kubernetes.io/component: storage
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            seccompProfile:
+              type: RuntimeDefault
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: java-platform
+                  topologyKey: kubernetes.io/hostname
+          containers:
+            - name: backup
+              # Same image as java-platform (coreutils + tar); no network use.
+              image: ghcr.io/ashjha0/intraday-alpha-platform-java:v1.11.0
+              imagePullPolicy: IfNotPresent
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -eu
+                  test -d /data/state || { echo "no /data/state yet; nothing to back up"; exit 0; }
+                  ts=$(date -u +%Y%m%dT%H%M%SZ)
+                  stage="/backup/.staging-$ts"
+                  mkdir -p "$stage/state"
+                  # checkpoint first, then everything else (see header)
+                  if [ -f /data/state/session_state.json ]; then
+                    cp -p /data/state/session_state.json "$stage/state/"
+                  fi
+                  for f in /data/state/* /data/state/.[!.]*; do
+                    [ -e "$f" ] || continue
+                    [ "$(basename "$f")" = session_state.json ] && continue
+                    cp -rp "$f" "$stage/state/"
+                  done
+                  tar -czf "/backup/.state-$ts.tgz.partial" -C "$stage" state
+                  rm -rf "$stage"
+                  mv "/backup/.state-$ts.tgz.partial" "/backup/state-$ts.tgz"
+                  # keep the newest 96 archives (2 days at */30)
+                  ls -1t /backup/state-*.tgz | tail -n +97 | xargs -r rm -f
+                  echo "backup ok: state-$ts.tgz"
+              volumeMounts:
+                - name: data
+                  mountPath: /data
+                  readOnly: true
+                - name: backup
+                  mountPath: /backup
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+                limits:
+                  cpu: 200m
+                  memory: 128Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: iap-java-state
+                readOnly: true
+            - name: backup
+              persistentVolumeClaim:
+                claimName: iap-java-state-backup

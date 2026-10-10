@@ -399,9 +399,11 @@ histograms end `_ns` with fixed log2 buckets, gauges are bare nouns.
   SessionRestartsClimbing, TargetDown, AdminAuthRateLimited,
   AdminAuditSuppressed, and the always-firing `Watchdog` heartbeat — each with a runbook anchor in
   `docs/runbooks/`). Since v1.3.0 Prometheus delivers to Alertmanager
-  (`deployment/alertmanager/`), which routes to a webhook whose URL is an
-  operator-supplied secret; with the in-repo placeholder, alerts are routed
-  and delivered nowhere. Staleness is judged on the
+  (`deployment/alertmanager/`), which routes by severity (page vs ticket,
+  with inhibition) to webhooks whose URLs are operator-supplied secrets;
+  compose defaults to a local echo sink (v1.12.0). Latency SLOs with
+  multi-window burn-rate alerts sit in `deployment/prometheus/slo.yml`.
+  Staleness is judged on the
   EVENT-time gap so a historical replay does not page; limit-utilization rules
   divide by the exported `risk_limit{limit=...}` gauges, never a copied
   constant. `eventbus_queue_depth` and `md_out_of_order_total` remain
@@ -509,6 +511,14 @@ ports on the host's loopback only. The platform's listener itself binds
 `127.0.0.1` unless `IAP_BIND_ADDR` says otherwise — the containers set it to
 `0.0.0.0` and rely on those controls. DIAGRAMS.md §18 draws the topology;
 §17 the CI and release pipeline that would build the images.
+
+**Ops note (v1.12.0).** Availability of the trading vertical is
+restart-and-resume on one `ReadWriteOnce` claim, never active-active: there is
+no leader election, so the fence is RWO plus `Recreate`. A `state-backup`
+CronJob archives `/data/state` every 30 minutes to its own claim, mounting the
+state read-only on the trading pod's node (required pod affinity).
+docs/runbooks/RUNBOOK_alerting.md §4 has the restore procedure and its
+fail-closed outcome.
 
 Three properties of the shape matter more than the box diagram
 (`PLATFORM_CONVENTIONS.md` §12.3/§12.7):
@@ -824,9 +834,10 @@ does, and — where it applies — what it did before v1.3.0.
   instrument until event time catches up or the engine is restored. That is
   the intended trade: a halt costs basis points, a missing halt costs the
   limit.
-- **It is not delivered alerting.** A latched kill switch pages a human
-  only if Alertmanager has somewhere to send the page, and the repository
-  ships a placeholder.
+- **It is not delivered alerting by itself.** A latched kill switch pages a
+  human only if the operator has created the receiver Secret
+  (RUNBOOK_alerting.md §2); out of the box compose delivers to a local echo
+  sink, not a person.
 
 ## 13. The research-store concurrency model
 

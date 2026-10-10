@@ -1,0 +1,244 @@
+# =============================================================================
+# slo.yml — latency SLOs with multi-window, multi-burn-rate alerts (v1.12.0,
+# plan P4; Google SRE Workbook ch. 5 "Alerting on SLOs").
+#
+# Source metrics: the log2 histograms com.iap.monitoring.MetricsRegistry
+# already exports (PLATFORM_CONVENTIONS.md §12.6) — bucket upper bounds are
+# 2^i - 1 ns, so an SLO threshold MUST be one of those bounds. Both SLOs use
+# le="1048575" (2^20 - 1 ns ~= 1.05 ms): the nearest bound above the measured
+# cold p99 of the event path (<= 524,287 ns, benchmarks/RESULTS.md).
+#
+#   SLO                  objective                               metric
+#   order-path-latency   99% of orders decision->wire < 1.05 ms   order_path_latency_ns
+#   event-path-latency   99% of events onEvent        < 1.05 ms   book_update_latency_ns
+#   window: 30 days rolling; error budget 1%.
+#
+# error ratio(W) = 1 - good(W) / total(W)
+#   good  = rate(<metric>_bucket{le="1048575"}[W])
+#   total = rate(<metric>_count[W])
+# With no traffic the ratio is NaN and nothing fires (a finite paper session
+# that has ended is not an SLO breach; liveness alerts cover a dead feed).
+#
+# Burn-rate alerts (budget 0.01):
+#   *LatencySLOFastBurn  page     14.4x over 1h AND 5m   (2% of budget / 1h)
+#                                 6x    over 6h AND 30m  (5% of budget / 6h)
+#   *LatencySLOSlowBurn  warning  3x    over 1d AND 2h   (10% of budget / 1d)
+#                                 1x    over 3d AND 6h   (10% of budget / 3d)
+# Alertmanager inhibits the warning while the page for the same `slo` and
+# `service` fires (deployment/alertmanager/alertmanager.yml).
+#
+# Caveat (documented, not hidden): the histograms are cumulative per JVM; a
+# restart resets them, which rate() handles. Clock-quantisation: a log2 bucket
+# means "< 1.05 ms" is exact at the bound — no interpolation is involved.
+# Unit tests: deployment/prometheus/tests/slo_test.yml (promtool, CI).
+# =============================================================================
+
+groups:
+  - name: iap-slo-order-path-latency-recording
+    interval: 30s
+    rules:
+      - record: job:order_path_latency_slo_errors:ratio_rate5m
+        expr: >-
+          1 - (
+            sum by (job, service) (rate(order_path_latency_ns_bucket{le="1048575"}[5m]))
+            /
+            sum by (job, service) (rate(order_path_latency_ns_count[5m]))
+          )
+      - record: job:order_path_latency_slo_errors:ratio_rate30m
+        expr: >-
+          1 - (
+            sum by (job, service) (rate(order_path_latency_ns_bucket{le="1048575"}[30m]))
+            /
+            sum by (job, service) (rate(order_path_latency_ns_count[30m]))
+          )
+      - record: job:order_path_latency_slo_errors:ratio_rate1h
+        expr: >-
+          1 - (
+            sum by (job, service) (rate(order_path_latency_ns_bucket{le="1048575"}[1h]))
+            /
+            sum by (job, service) (rate(order_path_latency_ns_count[1h]))
+          )
+      - record: job:order_path_latency_slo_errors:ratio_rate2h
+        expr: >-
+          1 - (
+            sum by (job, service) (rate(order_path_latency_ns_bucket{le="1048575"}[2h]))
+            /
+            sum by (job, service) (rate(order_path_latency_ns_count[2h]))
+          )
+      - record: job:order_path_latency_slo_errors:ratio_rate6h
+        expr: >-
+          1 - (
+            sum by (job, service) (rate(order_path_latency_ns_bucket{le="1048575"}[6h]))
+            /
+            sum by (job, service) (rate(order_path_latency_ns_count[6h]))
+          )
+      - record: job:order_path_latency_slo_errors:ratio_rate1d
+        expr: >-
+          1 - (
+            sum by (job, service) (rate(order_path_latency_ns_bucket{le="1048575"}[1d]))
+            /
+            sum by (job, service) (rate(order_path_latency_ns_count[1d]))
+          )
+      - record: job:order_path_latency_slo_errors:ratio_rate3d
+        expr: >-
+          1 - (
+            sum by (job, service) (rate(order_path_latency_ns_bucket{le="1048575"}[3d]))
+            /
+            sum by (job, service) (rate(order_path_latency_ns_count[3d]))
+          )
+  - name: iap-slo-event-path-latency-recording
+    interval: 30s
+    rules:
+      - record: job:event_path_latency_slo_errors:ratio_rate5m
+        expr: >-
+          1 - (
+            sum by (job, service) (rate(book_update_latency_ns_bucket{le="1048575"}[5m]))
+            /
+            sum by (job, service) (rate(book_update_latency_ns_count[5m]))
+          )
+      - record: job:event_path_latency_slo_errors:ratio_rate30m
+        expr: >-
+          1 - (
+            sum by (job, service) (rate(book_update_latency_ns_bucket{le="1048575"}[30m]))
+            /
+            sum by (job, service) (rate(book_update_latency_ns_count[30m]))
+          )
+      - record: job:event_path_latency_slo_errors:ratio_rate1h
+        expr: >-
+          1 - (
+            sum by (job, service) (rate(book_update_latency_ns_bucket{le="1048575"}[1h]))
+            /
+            sum by (job, service) (rate(book_update_latency_ns_count[1h]))
+          )
+      - record: job:event_path_latency_slo_errors:ratio_rate2h
+        expr: >-
+          1 - (
+            sum by (job, service) (rate(book_update_latency_ns_bucket{le="1048575"}[2h]))
+            /
+            sum by (job, service) (rate(book_update_latency_ns_count[2h]))
+          )
+      - record: job:event_path_latency_slo_errors:ratio_rate6h
+        expr: >-
+          1 - (
+            sum by (job, service) (rate(book_update_latency_ns_bucket{le="1048575"}[6h]))
+            /
+            sum by (job, service) (rate(book_update_latency_ns_count[6h]))
+          )
+      - record: job:event_path_latency_slo_errors:ratio_rate1d
+        expr: >-
+          1 - (
+            sum by (job, service) (rate(book_update_latency_ns_bucket{le="1048575"}[1d]))
+            /
+            sum by (job, service) (rate(book_update_latency_ns_count[1d]))
+          )
+      - record: job:event_path_latency_slo_errors:ratio_rate3d
+        expr: >-
+          1 - (
+            sum by (job, service) (rate(book_update_latency_ns_bucket{le="1048575"}[3d]))
+            /
+            sum by (job, service) (rate(book_update_latency_ns_count[3d]))
+          )
+  - name: iap-slo-order-path-latency-alerts
+    rules:
+      - alert: OrderPathLatencySLOFastBurn
+        expr: >-
+          (
+            job:order_path_latency_slo_errors:ratio_rate1h > (14.4 * 0.01)
+            and job:order_path_latency_slo_errors:ratio_rate5m > (14.4 * 0.01)
+          )
+          or
+          (
+            job:order_path_latency_slo_errors:ratio_rate6h > (6 * 0.01)
+            and job:order_path_latency_slo_errors:ratio_rate30m > (6 * 0.01)
+          )
+        for: 2m
+        labels:
+          severity: page
+          domain: latency
+          slo: order-path-latency
+        annotations:
+          summary: "order-path-latency SLO fast burn on {{ $labels.service }}"
+          description: >-
+            The decision-to-wire order path (incl. the pre-trade risk check) is burning its 30-day error budget (99% under
+            1.05 ms) at 6x or more: at this rate the budget is gone in days.
+            Check job:order_path_latency_ns:p99, GC pauses (job:jvm_gc_pause_ns:p99) and host
+            contention. Runbook: docs/runbooks/RUNBOOK_alerting.md#latency-slo
+          runbook: docs/runbooks/RUNBOOK_alerting.md
+          runbook_url: docs/runbooks/RUNBOOK_alerting.md#latency-slo
+
+      - alert: OrderPathLatencySLOSlowBurn
+        expr: >-
+          (
+            job:order_path_latency_slo_errors:ratio_rate1d > (3 * 0.01)
+            and job:order_path_latency_slo_errors:ratio_rate2h > (3 * 0.01)
+          )
+          or
+          (
+            job:order_path_latency_slo_errors:ratio_rate3d > (1 * 0.01)
+            and job:order_path_latency_slo_errors:ratio_rate6h > (1 * 0.01)
+          )
+        for: 30m
+        labels:
+          severity: warning
+          domain: latency
+          slo: order-path-latency
+        annotations:
+          summary: "order-path-latency SLO slow burn on {{ $labels.service }}"
+          description: >-
+            The decision-to-wire order path (incl. the pre-trade risk check) is consuming its 30-day error budget (99% under
+            1.05 ms) faster than it accrues. Not urgent; investigate the same
+            day. Runbook: docs/runbooks/RUNBOOK_alerting.md#latency-slo
+          runbook: docs/runbooks/RUNBOOK_alerting.md
+          runbook_url: docs/runbooks/RUNBOOK_alerting.md#latency-slo
+  - name: iap-slo-event-path-latency-alerts
+    rules:
+      - alert: EventPathLatencySLOFastBurn
+        expr: >-
+          (
+            job:event_path_latency_slo_errors:ratio_rate1h > (14.4 * 0.01)
+            and job:event_path_latency_slo_errors:ratio_rate5m > (14.4 * 0.01)
+          )
+          or
+          (
+            job:event_path_latency_slo_errors:ratio_rate6h > (6 * 0.01)
+            and job:event_path_latency_slo_errors:ratio_rate30m > (6 * 0.01)
+          )
+        for: 2m
+        labels:
+          severity: page
+          domain: latency
+          slo: event-path-latency
+        annotations:
+          summary: "event-path-latency SLO fast burn on {{ $labels.service }}"
+          description: >-
+            The per-event onEvent path (book + features + alpha + risk) is burning its 30-day error budget (99% under
+            1.05 ms) at 6x or more: at this rate the budget is gone in days.
+            Check job:book_update_latency_ns:p99, GC pauses (job:jvm_gc_pause_ns:p99) and host
+            contention. Runbook: docs/runbooks/RUNBOOK_alerting.md#latency-slo
+          runbook: docs/runbooks/RUNBOOK_alerting.md
+          runbook_url: docs/runbooks/RUNBOOK_alerting.md#latency-slo
+
+      - alert: EventPathLatencySLOSlowBurn
+        expr: >-
+          (
+            job:event_path_latency_slo_errors:ratio_rate1d > (3 * 0.01)
+            and job:event_path_latency_slo_errors:ratio_rate2h > (3 * 0.01)
+          )
+          or
+          (
+            job:event_path_latency_slo_errors:ratio_rate3d > (1 * 0.01)
+            and job:event_path_latency_slo_errors:ratio_rate6h > (1 * 0.01)
+          )
+        for: 30m
+        labels:
+          severity: warning
+          domain: latency
+          slo: event-path-latency
+        annotations:
+          summary: "event-path-latency SLO slow burn on {{ $labels.service }}"
+          description: >-
+            The per-event onEvent path (book + features + alpha + risk) is consuming its 30-day error budget (99% under
+            1.05 ms) faster than it accrues. Not urgent; investigate the same
+            day. Runbook: docs/runbooks/RUNBOOK_alerting.md#latency-slo
+          runbook: docs/runbooks/RUNBOOK_alerting.md
+          runbook_url: docs/runbooks/RUNBOOK_alerting.md#latency-slo
