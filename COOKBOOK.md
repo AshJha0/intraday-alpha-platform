@@ -2171,8 +2171,11 @@ The research backtester only takes liquidity. The v1.9 maker path
 rates, queue-depletion hazards, latency, markouts and impact from the event
 stream (M1). It then builds trade-matched labels (M3) and replays a score
 series through the FIFO simulator, gated on expected edge > measured adverse
-selection, with optional tail conditions (M2, M4). The example uses the golden
-equity vector and a toy L1-imbalance score:
+selection, with optional tail conditions (M2, M4). The exit is either a taker
+cross (the default) or passive: post at the far touch, repost once, then
+cross whatever is left. The example uses the golden equity vector and a toy
+L1-imbalance score. Rows marked `*` turn the gate off (`margin_bps=-1e9`);
+they are diagnostics, not strategies:
 
 ```bash
 PYTHONPATH=python/src python3 - <<'EOF'
@@ -2210,15 +2213,20 @@ lab = maker_labels(events, ts, instrument_id=1, exec_config=cfg, ttl_ns=60 * SEC
 print(f"labels: bid filled {lab['bid_filled'].mean():.2f}, not run over "
       f"{np.nanmean(lab['bid_not_run_over']):.2f}")
 base = dict(qty=100, ttl_ns=60 * SEC, horizon_ns=10 * SEC, as_horizon="10s")
-for name, mc in (("gated", MakerConfig(**base)),
-                 ("no gate", MakerConfig(**base, margin_bps=-1e9)),
-                 ("|z|>=1", MakerConfig(**base, margin_bps=-1e9, min_abs_z=1.0))):
+pas = dict(base, exit="passive", exit_timeout_ns=30 * SEC, exit_reprices=1)
+for name, mc in (("taker", MakerConfig(**base)),
+                 ("passive", MakerConfig(**pas)),
+                 ("taker*", MakerConfig(**base, margin_bps=-1e9)),
+                 ("passive*", MakerConfig(**pas, margin_bps=-1e9))):
     s = MakerBacktester(cfg, mc, cal).run_instrument(events, scores, 1).summary()
     line = f"{name:<8} posted {s['posted']:>3} filled {s['filled_orders']:>3} gated out {s['gated_out']:>3}"
     if s["n_trips"]:
         line += (f" | spread {s['mean_half_spread_earned_bps']:+.2f} AS {s['mean_adverse_selection_bps']:+.2f}"
                  f" exit {s['mean_exit_slippage_bps']:+.2f} net {s['mean_net_bps']:+.2f} bp/trip,"
                  f" {s['total_net']:+.2f} USD")
+    if s["passive_exit_trips"]:
+        line += (f" | exit filled passively {s['passive_exit_fill_rate']:.2f},"
+                 f" timeout cross {s['timeout_cross_rate']:.2f}")
     print(line)
 EOF
 ```
@@ -2229,20 +2237,33 @@ maker adverse selection 100ms: +0.74 bp (se 0.16, n 234)
 maker adverse selection    1s: +0.80 bp (se 0.21, n 233)
 maker adverse selection   10s: +1.36 bp (se 0.40, n 214)
 labels: bid filled 0.17, not run over 0.07
-gated    posted   0 filled   0 gated out 698
-no gate  posted 101 filled  27 gated out  38 | spread +3.36 AS +4.20 exit +10.16 net -11.41 bp/trip, -74.70 USD
-|z|>=1   posted  71 filled  21 gated out  38 | spread +1.76 AS +4.81 exit +11.49 net -14.95 bp/trip, -76.10 USD
+taker    posted   0 filled   0 gated out 698
+passive  posted  83 filled  22 gated out  22 | spread +5.90 AS +7.13 exit +5.72 net -6.71 bp/trip, -35.70 USD | exit filled passively 0.32, timeout cross 0.68
+taker*   posted 101 filled  27 gated out  38 | spread +3.36 AS +4.20 exit +10.16 net -11.41 bp/trip, -74.70 USD
+passive* posted  83 filled  22 gated out  22 | spread +5.90 AS +7.13 exit +5.72 net -6.71 bp/trip, -35.70 USD | exit filled passively 0.32, timeout cross 0.68
 ```
 
-How to read it. The gate admits nothing: with a taker exit, the half-spread
-earned on entry is paid back on exit, so the gate reduces to
+How to read it.
+
+With a taker exit, the gate admits nothing. The half-spread earned on entry
+is paid back on exit, so the gate reduces to
 `|er| + rebate - taker fee - impact > adverse selection`, and a 1 bp score
-cannot clear 1.4 bp of measured adverse selection. With the gate turned off
-(`margin_bps=-1e9`, a diagnostic only) the trips show the decomposition
-`gross = spread earned - adverse selection - exit slippage`. On this sparse
-synthetic stream (2,000 events in two hours, wide spreads) the round trips
-lose money, and the `|z| >= 1` tail is worse, not better. These are
-illustrations on synthetic data, not results. To calibrate a real session,
-run `python -m iap.execution.calibration --events <day>.iap1 --tick 1=0.01
---out calib.json` and pass `load_calibration("calib.json")` to the
-simulator and the backtester.
+cannot clear 1.4 bp of measured adverse selection.
+
+The passive exit changes the gate. It expects to earn the second
+half-spread and rebate with the calibrated touch fill probability (0.35
+here), and on these wide synthetic spreads it then admits nearly every row.
+The outcome does not support that: only 32% of exits fill passively, 68%
+time out and cross, and adverse selection on the trips (+7.1 bp) is far
+above the calibrated +1.4 bp, because the trips that last are the ones the
+market ran over. Net is -6.7 bp per trip. That is better than the -11.4 bp
+of the ungated taker exit, but still a loss.
+
+The decomposition `gross = spread earned - adverse selection - exit slippage`
+holds for every row. With a passive exit, a fully passive exit shows
+negative slippage (the second half-spread earned) and a timeout pays it back.
+These are illustrations on a sparse synthetic stream (2,000 events in two
+hours), not results. To calibrate a real session, run
+`python -m iap.execution.calibration --events <day>.iap1 --tick 1=0.01 --out
+calib.json` and pass `load_calibration("calib.json")` to the simulator and
+the backtester.

@@ -487,8 +487,20 @@ The module docstring pins the rules: each decision posts at the touch of
 the side the alpha points to and fills through the FIFO simulator. The gate
 is `|er| + half_spread + rebate - exit_cost > adverse_selection + margin`
 (bps), using the calibrated adverse selection at `as_horizon`. The position
-is held `horizon_ns` from the first fill, then exits as a taker (`exit="taker"`)
-or is marked to mid (`exit="mid"`, a diagnostic). The accounting identity
+is held `horizon_ns` from the first fill, then exits in one of three ways:
+
+- `exit="taker"` (the default) crosses at the touch.
+- `exit="mid"` marks the position to mid. It is a diagnostic, not a
+  tradable exit.
+- `exit="passive"` posts the whole position at the far touch through the
+  simulator, collecting the rebate. Each post rests for `exit_timeout_ns`
+  and is reposted up to `exit_reprices` times; whatever is left then crosses
+  as a taker. For this mode the gate prices the exit as
+  `p * (-half_spread - rebate) + (1 - p) * taker cost`, where `p` is
+  `passive_exit_fill_prob`, else the calibrated touch `p_any_fill`, else 0.5.
+
+`summary()` adds `passive_exit_fill_rate`, `passive_exit_qty_share` and
+`timeout_cross_rate`. The accounting identity
 `gross = (half_spread_earned - adverse_selection - exit_slippage) * qty`
 is tested. M4 adds `MakerConfig` tail conditions (`min_spread_ticks`,
 `min_abs_z`, `min_abs_er`, `min_queue_imbalance`, `min_p_far_deplete`),

@@ -531,3 +531,96 @@ def test_score_uncapped_is_optional_and_default_is_pinned():
     assert math.isclose(a.z_clip, 4.0)
     with pytest.raises(ValueError):
         a.score_uncapped({1: df}, z_cap=0.0)
+
+
+# ------------------------------------------------------------------ passive exit
+
+
+def _check_identity(t: pd.DataFrame) -> None:
+    s = np.where(t["side"] == 0, 1.0, -1.0)
+    np.testing.assert_allclose(t["gross"], s * (t["exit_px"] - t["entry_px"]) * t["qty"], atol=1e-9)
+    np.testing.assert_allclose(
+        t["net"], t["gross"] - t["entry_fees"] - t["exit_fee"] - t["exit_impact"], atol=1e-9
+    )
+    decomposed = (
+        (t["half_spread_earned_bps"] - t["adverse_selection_bps"] - t["exit_slippage_bps"])
+        * t["entry_px"]
+        * t["qty"]
+        / 1e4
+    )
+    np.testing.assert_allclose(t["gross"], decomposed, atol=1e-6)
+
+
+def test_passive_exit_identity_rebates_and_rates(events):
+    scores = make_scores(events)
+    mc = MakerConfig(exit="passive", exit_timeout_ns=3 * 10**9, margin_bps=-1e9)
+    res = MakerBacktester(exec_config(), mc).run_instrument(events, scores, INS)
+    t = res.trips
+    assert len(t) > 5
+    _check_identity(t)
+    assert (t["exit_mode"] == "passive").all()
+    full = t["exit_passive_qty"] == t["qty"]
+    assert full.any() and t["exit_timeout"].any()
+    # a fully passive exit is a maker fill: rebate on both legs, no impact,
+    # and the second half-spread earned (negative exit slippage)
+    fp = t[full & ~t["forced"]]
+    np.testing.assert_allclose(fp["exit_fee"], -0.002 * fp["qty"])
+    assert (fp["exit_impact"] == 0).all()
+    assert (fp["exit_slippage_bps"] < 0).all()
+    # a timeout crosses the remainder and pays the taker fee on it
+    to = t[t["exit_timeout"]]
+    rem = to["qty"] - to["exit_passive_qty"]
+    np.testing.assert_allclose(
+        to["exit_fee"], -0.002 * to["exit_passive_qty"] + 0.003 * rem, atol=1e-9
+    )
+    summ = res.summary()
+    assert summ["passive_exit_trips"] == len(t)
+    assert summ["passive_exit_fill_rate"] == pytest.approx(full.mean())
+    assert summ["timeout_cross_rate"] == pytest.approx(t["exit_timeout"].mean())
+    assert 0.0 <= summ["passive_exit_qty_share"] <= 1.0
+    assert res.counters["exit_posts"] >= len(t) - res.counters["forced_exits"]
+    assert res.counters["exit_timeouts"] == int(t["exit_timeout"].sum())
+
+
+def test_passive_exit_timeout_and_reprices(events):
+    scores = make_scores(events)
+    quick = MakerConfig(exit="passive", exit_timeout_ns=1, margin_bps=-1e9)
+    a = MakerBacktester(exec_config(), quick).run_instrument(events, scores, INS)
+    patient = MakerConfig(exit="passive", exit_timeout_ns=5 * 10**9, margin_bps=-1e9)
+    b = MakerBacktester(exec_config(), patient).run_instrument(events, scores, INS)
+    assert a.summary()["timeout_cross_rate"] >= b.summary()["timeout_cross_rate"]
+    rep = MakerConfig(exit="passive", exit_timeout_ns=10**8, exit_reprices=2, margin_bps=-1e9)
+    c = MakerBacktester(exec_config(), rep).run_instrument(events, scores, INS)
+    _check_identity(c.trips)
+    assert c.trips["exit_reprices"].max() <= 2
+    crossed = c.trips["exit_timeout"] & ~c.trips["forced"]
+    assert (c.trips.loc[crossed, "exit_reprices"] == 2).all()
+    again = MakerBacktester(exec_config(), rep).run_instrument(events, scores, INS)
+    pd.testing.assert_frame_equal(c.trips, again.trips)
+
+
+def test_passive_exit_gate_is_cheaper_than_taker_gate(events):
+    scores = make_scores(events)
+    taker = MakerBacktester(exec_config(), MakerConfig(adverse_selection_bps=3.0))
+    passive = MakerBacktester(
+        exec_config(),
+        MakerConfig(exit="passive", passive_exit_fill_prob=1.0, adverse_selection_bps=3.0),
+    )
+    rt = taker.run_instrument(events, scores, INS)
+    rp = passive.run_instrument(events, scores, INS)
+    assert rt.counters["gated_out"] > rp.counters["gated_out"]
+    with pytest.raises(ValueError):
+        MakerConfig(exit="passive", passive_exit_fill_prob=1.5)
+    with pytest.raises(ValueError):
+        MakerConfig(exit="passive", exit_timeout_ns=0)
+
+
+def test_default_exit_is_taker(events):
+    assert MakerConfig().exit == "taker"
+    res = MakerBacktester(exec_config(), MakerConfig()).run_instrument(
+        events, make_scores(events), INS
+    )
+    assert (res.trips["exit_mode"] == "taker").all()
+    assert (res.trips["exit_passive_qty"] == 0).all()
+    assert res.summary()["passive_exit_trips"] == 0
+    assert res.summary()["timeout_cross_rate"] is None

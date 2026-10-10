@@ -32,7 +32,12 @@ contract.
   the venue maker rebate and charges the measured markout. The gate is
   `|er| + half_spread + rebate - exit_cost > adverse_selection + margin`,
   with the adverse selection taken from the calibration. The exit is a taker
-  exit or a mark to mid. The accounting identity is tested.
+  exit (the default), a mark to mid, or an opt-in passive exit. The passive
+  exit posts at the far touch, collects the rebate, is reposted up to
+  `exit_reprices` times after `exit_timeout_ns`, and then crosses whatever is
+  left. The result reports the passive-exit fill rate and the timeout-cross
+  rate. The accounting identity (spread earned, rebates, adverse selection
+  and exit slippage on both legs) is tested for every exit mode.
 - M3, `iap.labels.maker_labels` (a new module; `iap.labels.labels` is
   unchanged): per decision and side, fill / taker flags, queue ahead,
   markouts at 100 ms / 1 s / 10 s, and "filled and not run over".
@@ -41,13 +46,16 @@ contract.
   meta-label GBM or any `iap.models.zoo` model into the maker backtest as an
   `allow` mask; `LinearAlpha.score_uncapped(data, z_cap=None)`, which makes
   the z clip optional for research. `score()` keeps the pinned clip.
-- Docs: COOKBOOK recipe 39 and API_TRADING.md §2.6. There are 22 new tests
+- Docs: COOKBOOK recipe 39 and API_TRADING.md §2.6. There are 26 new tests
   (`python/tests/test_maker_economics.py`) on synthetic MBO data.
 
 **Research note.** On the golden synthetic vector, the gate admits no trade
 with a taker exit, because the half-spread earned on entry is paid back on
-exit. A maker strategy needs a passive exit or quote skew (M5, v1.10) before
-the maker rebate can matter. No real-data result is claimed in this entry.
+exit. With a passive exit the gate admits nearly every row, but only 32% of
+exits fill passively and 68% time out and cross. Trip adverse selection is
++7.1 bp against a calibrated +1.4 bp, and the result is -6.7 bp per trip
+(against -11.4 bp for an ungated taker exit). Quote skew and inventory (M5,
+v1.10) are still needed. No real-data result is claimed in this entry.
 
 ## v1.8.0 — 2026-10-10
 

@@ -31,7 +31,10 @@ Pinned rules (``MakerBacktester.run_instrument``):
    ``rebate`` = ``maker_rebate_per_share / mid`` (equity) or minus the FX
    commission; ``exit_cost`` = ``half_spread + taker_fee / mid`` +
    linear impact for ``exit="taker"``, 0 for ``exit="mid"`` (a mark-to-mid
-   diagnostic, not a tradable exit). ``adverse_selection`` is the
+   diagnostic, not a tradable exit), and for ``exit="passive"`` the
+   expectation ``p * (-half_spread - rebate) + (1 - p) * taker_exit_cost``
+   with ``p`` = ``passive_exit_fill_prob``, else the calibration's touch
+   ``p_any_fill``, else 0.5. ``adverse_selection`` is the
    calibration's measured maker markout at ``as_horizon`` (per instrument
    when available), else ``MakerConfig.adverse_selection_bps``, else 0
    (recorded as ``as_source`` so an uncalibrated gate is never mistaken
@@ -50,8 +53,13 @@ Pinned rules (``MakerBacktester.run_instrument``):
    then closed at the first event at or after that time against the book
    state before it: ``exit="taker"`` crosses at the touch paying the taker
    fee and the simulator's linear impact rule; ``exit="mid"`` marks at the
-   mid. A position still open at the end of the stream is closed the same
-   way on the last state (``forced_exits``).
+   mid. ``exit="passive"`` (opt-in) instead POSTS the whole position at the
+   far touch (sell at the best ask / buy at the best bid) through the FIFO
+   simulator, earning the half-spread and the maker rebate when it fills;
+   each post rests ``exit_timeout_ns``, is reposted at the new touch up to
+   ``exit_reprices`` times, and the remainder then crosses as a taker
+   (``exit_timeout``). A position still open at the end of the stream is
+   closed by crossing on the last state (``forced_exits``).
 6. **Accounting** per round trip, side sign ``s``, quote-currency units::
 
        gross       = s * (exit_px - entry_px) * qty * qty_unit
@@ -63,7 +71,12 @@ Pinned rules (``MakerBacktester.run_instrument``):
    (entry_mid - entry_px)`` (``entry_mid`` = the mid before the filling
    event, the MAKER reference of ``iap.tca.markout``), ``adverse_selection =
    s * (entry_mid - exit_mid)`` and ``exit_slippage = s * (exit_mid -
-   exit_px)``. The identity is tested.
+   exit_px)``. With a passive exit ``exit_px`` is the qty-weighted price of
+   the passive exit fills and any crossed remainder, ``exit_fee`` the sum of
+   their fees (a rebate on the passive part), and ``exit_mid`` the mid before
+   the completing fill (or at the cross): a fully passive exit has NEGATIVE
+   exit slippage (the second half-spread, earned), a timeout pays it. The
+   identity is tested for every exit mode.
 """
 
 from __future__ import annotations
@@ -82,7 +95,7 @@ from iap.execution.config import ExecConfig
 from iap.execution.simulator import ExecutionSimulator
 from iap.execution.types import ChildOrder, Liquidity, OrderType
 
-EXIT_MODES = ("taker", "mid")
+EXIT_MODES = ("taker", "mid", "passive")
 
 
 @dataclass(frozen=True)
@@ -99,6 +112,14 @@ class MakerConfig:
     as_horizon: str = "1s"
     #: fallback adverse selection (bps) when the calibration has none
     adverse_selection_bps: float | None = None
+    # ---- passive exit (exit="passive") ----
+    #: how long each passive exit post rests before it is repriced / crossed
+    exit_timeout_ns: int = 1_000_000_000
+    #: reposts at the new touch after a timeout before crossing the remainder
+    exit_reprices: int = 0
+    #: P(passive exit fills) the gate assumes; None = the calibration's
+    #: touch ``p_any_fill``, else 0.5
+    passive_exit_fill_prob: float | None = None
     # ---- M4 tail conditions (None / 0 = off) ----
     min_spread_ticks: int = 1
     min_abs_z: float | None = None
@@ -111,6 +132,11 @@ class MakerConfig:
             raise ValueError("qty, ttl_ns and horizon_ns must be positive")
         if self.exit not in EXIT_MODES:
             raise ValueError(f"exit must be one of {EXIT_MODES}, got {self.exit!r}")
+        if self.exit_timeout_ns <= 0 or self.exit_reprices < 0:
+            raise ValueError("exit_timeout_ns must be positive and exit_reprices >= 0")
+        p = self.passive_exit_fill_prob
+        if p is not None and not 0.0 <= p <= 1.0:
+            raise ValueError("passive_exit_fill_prob must be in [0, 1]")
         if self.min_spread_ticks < 0:
             raise ValueError("min_spread_ticks must be >= 0")
         if self.min_queue_imbalance is not None and not 0.0 <= self.min_queue_imbalance <= 1.0:
@@ -148,6 +174,16 @@ class MakerResult:
             "as_source": self.as_source,
             "n_trips": len(t),
         }
+        passive = t[t["exit_mode"] == "passive"] if len(t) else t
+        n_passive = len(passive)
+        out["passive_exit_trips"] = n_passive
+        out["passive_exit_fill_rate"] = (
+            float((passive["exit_passive_qty"] == passive["qty"]).mean()) if n_passive else None
+        )
+        out["passive_exit_qty_share"] = (
+            float(passive["exit_passive_qty"].sum() / passive["qty"].sum()) if n_passive else None
+        )
+        out["timeout_cross_rate"] = float(passive["exit_timeout"].mean()) if n_passive else None
         for col in ("gross", "entry_fees", "exit_fee", "exit_impact", "net"):
             out[f"total_{col}"] = float(t[col].sum()) if len(t) else 0.0
         for col in (
@@ -282,11 +318,29 @@ class MakerBacktester:
                 "filled_orders",
                 "taker_entries",
                 "forced_exits",
+                "exit_posts",
+                "exit_timeouts",
             ),
             0,
         )
         trips: list[dict[str, Any]] = []
-        st: dict[str, Any] = {"order": None, "pos": 0, "side": 0, "exit_due": None}
+        st: dict[str, Any] = {
+            "order": None,
+            "pos": 0,
+            "side": 0,
+            "exit_due": None,
+            "exit_order": None,
+            "exit_started": False,
+        }
+        # passive-exit ledger of the current trip
+        xl: dict[str, Any] = {"qty": 0, "px_sum": 0.0, "fees": 0.0, "reprices": 0}
+        p_exit = cfg.passive_exit_fill_prob
+        if p_exit is None:
+            p_any = None
+            if self.calibration is not None:
+                fr = (self.calibration.doc.get("fill_rates") or {}).get("all") or {}
+                p_any = fr.get("p_any_fill")
+            p_exit = float(p_any) if p_any is not None else 0.5
         entry: dict[str, Any] = {}
         seen_fills = 0
         last_mid: list[float | None] = [None]
@@ -314,7 +368,12 @@ class MakerBacktester:
                 else 1e4 * venue.taker_fee_per_share / mid
             )
             imp = self.exec_config.impact_coeff_bps_per_pct_adv * (cfg.qty * unit / ins.adv * 100.0)
-            return 1e4 * hs / mid + fee + imp
+            taker = 1e4 * hs / mid + fee + imp
+            if cfg.exit == "passive":
+                # expected: earn the half-spread + rebate when the post fills,
+                # cross as a taker otherwise
+                return p_exit * (-1e4 * hs / mid - rebate_bps(mid)) + (1.0 - p_exit) * taker
+            return taker
 
         def decide(r: int) -> None:
             c["decisions"] += 1
@@ -371,37 +430,70 @@ class MakerBacktester:
             st["order"] = oid
             st["side"] = side
 
-        def close(t: int, forced: bool) -> None:
+        def post_exit(t: int) -> bool:
             bs = book_state()
             if bs is None:
-                if not forced:
-                    return  # no two-sided open book: retry on the next event
-                if last_mid[0] is None:
-                    return
-                exit_mid = last_mid[0]
-                exit_px = exit_mid  # no book at all: mark (counted as forced)
-            else:
-                (bpx, _), (apx, _) = bs
-                exit_mid = 0.5 * (bpx + apx) * tick
-                if cfg.exit == "mid":
-                    exit_px = exit_mid
+                return False
+            (bpx, _), (apx, _) = bs
+            oid = sim.submit(
+                ChildOrder(
+                    instrument_id=instrument_id,
+                    venue_id=venue_id,
+                    side=1 - st["side"],
+                    type=OrderType.LIMIT,
+                    qty=abs(st["pos"]),
+                    limit_ticks=apx if st["side"] == 0 else bpx,
+                    decision_ts=t,
+                    expire_ts=t + cfg.exit_timeout_ns,
+                )
+            )
+            st["exit_order"] = oid
+            c["exit_posts"] += 1
+            return True
+
+        def close(t: int, forced: bool, mid_hint: float | None = None) -> None:
+            q_rem = abs(st["pos"])
+            cross_px = 0.0
+            crossed_at_book = False
+            if q_rem > 0:
+                bs = book_state()
+                if bs is None:
+                    if not forced:
+                        return  # no two-sided open book: retry on the next event
+                    if last_mid[0] is None:
+                        return
+                    exit_mid = last_mid[0]
+                    cross_px = exit_mid  # no book at all: mark (counted as forced)
                 else:
-                    exit_px = (bpx if st["side"] == 0 else apx) * tick
-            q = abs(st["pos"])
+                    (bpx, _), (apx, _) = bs
+                    exit_mid = 0.5 * (bpx + apx) * tick
+                    if cfg.exit == "mid":
+                        cross_px = exit_mid
+                    else:
+                        cross_px = (bpx if st["side"] == 0 else apx) * tick
+                        crossed_at_book = True
+            else:
+                exit_mid = mid_hint if mid_hint is not None else last_mid[0]
+            eo = st["exit_order"]
+            if eo is not None and not sim.orders[eo].is_terminal:
+                sim.cancel(eo, t)
+            q = entry["qty"]
             s = 1.0 if st["side"] == 0 else -1.0
-            notional = q * unit * exit_px
-            if cfg.exit == "taker":
-                exit_fee = (
-                    venue.commission_per_million * notional / 1e6
+            exit_px = (xl["px_sum"] + q_rem * cross_px) / q
+            rem_notional = q_rem * unit * cross_px
+            taker_fee = exit_impact = 0.0
+            if crossed_at_book:
+                taker_fee = (
+                    venue.commission_per_million * rem_notional / 1e6
                     if venue.is_fx
-                    else venue.taker_fee_per_share * q
+                    else venue.taker_fee_per_share * q_rem
                 )
                 imp_bps = self.exec_config.impact_coeff_bps_per_pct_adv * (
-                    q * unit / ins.adv * 100.0
+                    q_rem * unit / ins.adv * 100.0
                 )
-                exit_impact = imp_bps * 1e-4 * notional
-            else:
-                exit_fee = exit_impact = 0.0
+                exit_impact = imp_bps * 1e-4 * rem_notional
+            exit_fee = xl["fees"] + taker_fee
+            timeout = cfg.exit == "passive" and q_rem > 0
             epx = entry["px"]
             gross = s * (exit_px - epx) * q * unit
             net = gross - entry["fees"] - exit_fee - exit_impact
@@ -417,6 +509,10 @@ class MakerBacktester:
                     "exit_px": exit_px,
                     "exit_mid": exit_mid,
                     "liquidity": entry["liq"],
+                    "exit_mode": cfg.exit,
+                    "exit_passive_qty": xl["qty"],
+                    "exit_timeout": timeout,
+                    "exit_reprices": xl["reprices"],
                     "gross": gross,
                     "entry_fees": entry["fees"],
                     "exit_fee": exit_fee,
@@ -431,8 +527,28 @@ class MakerBacktester:
             )
             if forced:
                 c["forced_exits"] += 1
+            if timeout:
+                c["exit_timeouts"] += 1
             st["pos"] = 0
             st["exit_due"] = None
+            st["exit_order"] = None
+            st["exit_started"] = False
+            xl.update(qty=0, px_sum=0.0, fees=0.0, reprices=0)
+
+        def exit_step(t: int) -> None:
+            """Exit work at an event at/after the hold horizon (rule 5)."""
+            if cfg.exit != "passive":
+                close(t, forced=False)
+                return
+            if st["exit_order"] is not None:
+                return  # the post is resting
+            if not st["exit_started"]:
+                st["exit_started"] = post_exit(t)
+            elif xl["reprices"] < cfg.exit_reprices:
+                if post_exit(t):
+                    xl["reprices"] += 1
+            else:
+                close(t, forced=False)  # timeout: cross the remainder
 
         r = 0
         n = int(ts.size)
@@ -446,7 +562,7 @@ class MakerBacktester:
                 decide(r)
                 r += 1
             if st["pos"] != 0 and st["exit_due"] is not None and t >= st["exit_due"]:
-                close(t, forced=False)
+                exit_step(t)
                 while r < n and ts[r] < t:
                     decide(r)
                     r += 1
@@ -459,6 +575,14 @@ class MakerBacktester:
             while seen_fills < len(fills):
                 f = fills[seen_fills]
                 seen_fills += 1
+                if st["exit_order"] is not None and f.order_id == st["exit_order"]:
+                    xl["qty"] += f.qty
+                    xl["px_sum"] += f.price_ticks * tick * f.qty
+                    xl["fees"] += f.fee + f.impact_cost
+                    st["pos"] += f.qty if f.side == 0 else -f.qty
+                    if st["pos"] == 0:
+                        close(f.ts, forced=False, mid_hint=pre_mid)
+                    continue
                 if f.order_id != st["order"]:
                     continue
                 if st["pos"] == 0:
@@ -471,6 +595,7 @@ class MakerBacktester:
                         ts=f.ts,
                         mid=ref,
                         fees=0.0,
+                        qty=0,
                         liq=f.liquidity.name,
                     )
                     st["exit_due"] = f.ts + cfg.horizon_ns
@@ -484,10 +609,14 @@ class MakerBacktester:
                     q_prev + f.qty
                 )
                 entry["fees"] += f.fee + f.impact_cost
+                entry["qty"] += f.qty
                 st["pos"] += f.qty if f.side == 0 else -f.qty
             o = st["order"]
             if o is not None and sim.orders[o].is_terminal:
                 st["order"] = None
+            eo = st["exit_order"]
+            if eo is not None and sim.orders[eo].is_terminal:
+                st["exit_order"] = None  # expired: reprice or cross on the next event
         while r < n:
             decide(r)
             r += 1
@@ -504,6 +633,10 @@ class MakerBacktester:
             "exit_px",
             "exit_mid",
             "liquidity",
+            "exit_mode",
+            "exit_passive_qty",
+            "exit_timeout",
+            "exit_reprices",
             "gross",
             "entry_fees",
             "exit_fee",
