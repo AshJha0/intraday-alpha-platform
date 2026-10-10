@@ -14,11 +14,16 @@ that tag.
   `WriteBroker.preregister` debits one look on the multiple-testing ledger
   (`kind="prereg"`, default `research/experiments.json`, `--ledger` /
   `--dataset-version` for a dataset ledger) and stores the alpha's code
-  fingerprint (`iap.agents.fingerprint`: sha256 of the alpha class and its
-  `iap.alpha` bases, the declared features closed over `depends_on`, and their
-  registry entries + family-module source) in a `format: 2` body. The research
-  gate (`prereg_gate.require`) refuses a run when the code or feature hash has
-  changed since registration; `preregister(..., supersede=True)` re-registers
+  fingerprint (`iap.agents.fingerprint`, scheme 2: sha256 over the alpha's
+  defining modules and, transitively, every `iap.*` module they import
+  (AST walk, LF-normalised, so module-level helpers are covered and the hash
+  is identical on Windows/Linux and across Python minor versions); the
+  declared features closed over `depends_on` with their registry entries and
+  family-module closure; and the numpy/pandas/scipy versions) in a
+  `format: 2` body. What is and is not covered is listed in
+  `docs/governance/GOVERNANCE.md` §2a. The research gate
+  (`prereg_gate.require`) refuses a run when the code hash, feature hash or
+  pinned dependency versions changed since registration; `preregister(..., supersede=True)` re-registers
   changed code as a new look. New CLI: `python -m iap.agents.cli prereg`.
   **Not retroactive**: the six 2026 holdout preregs (and any v1.9-format
   prereg) carry no fingerprint, were never debited and are not debited now,
@@ -32,13 +37,21 @@ that tag.
   prefix of the current one (catches re-chaining), and
   `research/agents/anchors.json` records the first commit that contains each
   entry (the six 2026 preregs: `6723fd0`).
-- **G4 — authenticated agent identity.** `WriteBroker(keys=...)` requires
-  every agent write to carry an HMAC-SHA256 signed request (agent, op,
-  argument digest, single-use nonce; `broker.sign`); forged, moved and
-  replayed requests are refused and the signed request is stored on the entry
-  (`auth`) for offline re-verification (`Blackboard.verify_signatures`,
-  `cli verify-board --keyfile`). `cli agent-keygen` writes keys outside the
-  repository. `research run --no-prereg` results now carry the eligibility
+- **G4 — authenticated agent identity (Ed25519).** `WriteBroker(pubkeys=...)`
+  requires every agent write to carry an Ed25519-signed request (agent, op,
+  argument digest, single-use nonce; `iap.agents.signing`, `broker.sign`);
+  forged, moved and replayed requests are refused and the signed request is
+  stored on the entry (`auth`, `scheme: "ed25519"`) for offline
+  re-verification (`Blackboard.verify_signatures`, `cli verify-board`). The
+  broker and verifiers hold only public keys, from the committed registry
+  `research/agents/agent_pubkeys.json`, so they cannot forge; `cli
+  agent-keygen` writes the private key to a file outside the repository and
+  the public key into the registry. HMAC-SHA256 (the first draft of this
+  change) is legacy, verify-only: new HMAC requests are refused, stored ones
+  still verify with `verify-board --legacy-hmac-keyfile`. New dependency:
+  `cryptography>=46,<51` (pinned `cryptography==50.0.1`, `cffi==2.1.1`,
+  `pycparser==3.0` in `python/requirements-ci.txt`, which CI and the Docker
+  image use as constraints). `research run --no-prereg` results now carry the eligibility
   reason "not pre-registered (--no-prereg)", so the registry and lifecycle
   promotion gates refuse them.
 

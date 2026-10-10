@@ -6,8 +6,10 @@ Editing, deleting or reordering any line breaks the chain and
 :meth:`Blackboard.verify` says where.  Only :mod:`iap.agents.broker` appends.
 
 v1.10 (G4) adds an OPTIONAL ``auth`` field on entries written through an
-authenticated broker: the agent's signed request (``key_id``, ``op``,
-``args_digest``, ``nonce``, ``mac``; see :func:`request_mac`).  It is part
+authenticated broker: the agent's signed request (``scheme``, ``key_id``,
+``op``, ``args_digest``, ``nonce``, ``sig``; :mod:`iap.agents.signing`,
+Ed25519 by default; records without ``scheme`` are legacy HMAC-SHA256 with
+``mac``, see :func:`request_mac`, verify-only).  It is part
 of the hashed entry like any other field, so v1.9 code verifies a v1.10
 board unchanged and v1.9 entries (no ``auth``) verify under v1.10: no
 migration is needed.  A plain hash chain can be rebuilt by anyone with
@@ -40,11 +42,11 @@ class BlackboardError(ValueError):
 
 
 def request_mac(key: bytes, agent: str, op: str, args: Any, nonce: str) -> str:
-    """HMAC-SHA256 an agent puts on a broker request (G4).
+    """LEGACY HMAC-SHA256 over a broker request (the first v1.10 draft).
 
-    Covers the agent id, the operation, a digest of its arguments and a
-    single-use nonce, so a signature cannot be moved to another agent,
-    operation or argument set, nor replayed."""
+    Kept so stored ``hmac-sha256`` records can be re-verified (and tests can
+    build them); the broker no longer accepts new HMAC-signed requests -
+    agents sign with Ed25519 (:func:`iap.agents.signing.sign`)."""
     return _mac(key, agent, op, digest(args), nonce)
 
 
@@ -81,26 +83,34 @@ class Blackboard:
             count = i
         return count
 
-    def verify_signatures(self, keys: dict[str, bytes]) -> list[str]:
-        """Problems with the ``auth`` of every entry (G4); ``[]`` = all good.
+    def verify_signatures(
+        self,
+        pubkeys: dict[str, str],
+        legacy_hmac_keys: dict[str, bytes] | None = None,
+    ) -> list[str]:
+        """Problems with the signed requests on the board (G4); ``[]`` = all good.
 
-        ``keys`` maps agent id -> key.  An entry by an agent that has a key
-        must carry a valid ``auth`` (a re-chained entry cannot be re-signed
-        without the key); entries by any other writer (v1.9 entries, the
-        operator, trusted writers) are not checked here."""
+        ``pubkeys`` maps agent id -> Ed25519 public key (hex): an entry by an
+        agent with a registered key must carry a valid ``auth`` (a re-chained
+        entry cannot be re-signed without the private key).  Every entry that
+        carries an ``auth`` is checked: ``ed25519`` against ``pubkeys``,
+        legacy ``hmac-sha256`` against ``legacy_hmac_keys``.  Entries by other
+        writers without ``auth`` (v1.9 entries, the operator, trusted
+        writers) are not checked here."""
+        from iap.agents import signing
+
         problems: list[str] = []
+        legacy = legacy_hmac_keys or {}
         for e in self.entries():
             agent = e.get("agent", "")
-            key = keys.get(agent)
-            if key is None:
-                continue
             a = e.get("auth")
             if not isinstance(a, dict):
-                problems.append(f"entry {e.get('seq')}: unsigned write by keyed agent {agent}")
+                if agent in pubkeys or agent in legacy:
+                    problems.append(f"entry {e.get('seq')}: unsigned write by keyed agent {agent}")
                 continue
-            want = _mac(key, agent, a.get("op"), a.get("args_digest"), a.get("nonce"))
-            if a.get("key_id") != agent or not hmac.compare_digest(want, str(a.get("mac"))):
-                problems.append(f"entry {e.get('seq')}: bad signature for {agent}")
+            why = signing.verify(a, agent, pubkeys, legacy)
+            if why is not None:
+                problems.append(f"entry {e.get('seq')}: {why}")
         return problems
 
     def append(

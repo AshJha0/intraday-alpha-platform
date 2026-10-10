@@ -9,15 +9,14 @@ import subprocess
 
 import pytest
 from conftest import REPO_ROOT
-from iap.agents import anchor
-from iap.agents.blackboard import Blackboard
+from iap.agents import anchor, signing
+from iap.agents.blackboard import Blackboard, digest, request_mac
 from iap.agents.broker import BrokerError, WriteBroker, sign
 from iap.agents.prereg_gate import PreregistrationError, require
 from iap.agents.reserve import ReserveError, ReserveEvaluator
 from iap.validation.ledger import ExperimentLedger
 
 SEC = 10**9
-KEY = b"k" * 32
 
 
 class Clock:
@@ -90,6 +89,61 @@ def test_real_fingerprint_is_stable_and_covers_features():
     fp = fingerprint("EQ01")
     assert fp == fingerprint("EQ01") and len(fp["code_hash"]) == 64 and fp["features"]
     assert fingerprint("COMB_EQ") is None
+    assert "iap.alpha.base" in fp["modules"] and set(fp["deps"]) == {"numpy", "pandas", "scipy"}
+
+
+def _tree(root, files):
+    for rel, text in files.items():
+        p = root / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(text.encode("utf-8"))
+
+
+def test_closure_follows_helpers_not_unrelated_modules(tmp_path):
+    from iap.agents.fingerprint import closure_hash, module_closure
+
+    files = {
+        "iap/__init__.py": "",
+        "iap/alpha/__init__.py": "",
+        "iap/alpha/m.py": "from .h import f\ndef score():\n    from iap.util import g\n    return f()\n",
+        "iap/alpha/h.py": "def f():\n    return 1\n",
+        "iap/util/__init__.py": "def g():\n    return 2\n",
+        "iap/other.py": "X = 1\n",
+    }
+    _tree(tmp_path, files)
+    mods = module_closure(["iap.alpha.m"], tmp_path)
+    assert mods == ["iap.alpha.h", "iap.alpha.m", "iap.util"]
+    h0 = closure_hash(mods, tmp_path)
+    _tree(tmp_path, {"iap/other.py": "X = 2\n"})
+    assert closure_hash(module_closure(["iap.alpha.m"], tmp_path), tmp_path) == h0
+    _tree(tmp_path, {k: v.replace("\n", "\r\n") for k, v in files.items()})
+    assert closure_hash(module_closure(["iap.alpha.m"], tmp_path), tmp_path) == h0
+    _tree(tmp_path, {"iap/alpha/h.py": "def f():\n    return 3\n"})
+    assert closure_hash(module_closure(["iap.alpha.m"], tmp_path), tmp_path) != h0
+
+
+def test_gate_refuses_after_a_helper_the_alpha_uses_changes(tmp_path):
+    """Real EQ01 on a copy of the source tree: edit a module-level helper in
+    iap/alpha/base.py -> refused; edit an unrelated module -> still allowed."""
+    from iap.agents.fingerprint import SRC_ROOT, fingerprint
+
+    src = tmp_path / "src"
+    shutil.copytree(SRC_ROOT / "iap", src / "iap", ignore=shutil.ignore_patterns("__pycache__"))
+    fp = lambda a: fingerprint(a, src)  # noqa: E731
+    root = tmp_path / "repo"
+    b = WriteBroker(root, {"alice"}, clock=Clock(), fingerprinter=fp)
+    b.preregister("alice", "EQ01", "1s", "h", 1)
+    unrelated = src / "iap" / "execution" / "__init__.py"
+    unrelated.write_text(unrelated.read_text(encoding="utf-8") + "\n# edit\n", encoding="utf-8")
+    require(root, "EQ01", "1s", fingerprinter=fp)
+    base = src / "iap" / "alpha" / "base.py"
+    text = base.read_text(encoding="utf-8")
+    assert "\ndef col(" in text  # a module-level helper the alphas call
+    base.write_text(
+        text.replace("\ndef col(", "\ndef _unused():\n    pass\n\n\ndef col("), encoding="utf-8"
+    )
+    with pytest.raises(PreregistrationError, match="code_hash changed"):
+        require(root, "EQ01", "1s", fingerprinter=fp)
 
 
 # -- G2 ----------------------------------------------------------------------
@@ -150,35 +204,114 @@ def test_anchor_detects_rechaining(tmp_path, code):
 # -- G4 ----------------------------------------------------------------------
 
 
+PRIV, PUB = signing.generate_keypair()
+TASK = {"title": "t", "spec": {}}
+
+
+def test_ed25519_sign_verify_roundtrip():
+    auth = signing.sign(PRIV, "alice", "post_task", TASK)
+    assert auth["scheme"] == "ed25519" and signing.public_of(PRIV) == PUB
+    rec = {"key_id": "alice", "op": "post_task", "args_digest": digest(TASK), **auth}
+    assert signing.verify(rec, "alice", {"alice": PUB}) is None
+    assert signing.verify({**rec, "op": "claim"}, "alice", {"alice": PUB}) == "bad signature"
+
+
+def test_verifier_with_only_the_public_key_cannot_forge(tmp_path, code):
+    """The broker holds only PUB.  Everything derivable from it - the public
+    key used as a key, an HMAC under it, a random signature - is refused."""
+    b = _broker(tmp_path, code, pubkeys={"alice": PUB})
+    assert not hasattr(b, "keys") and b.pubkeys == {"alice": PUB}
+    with pytest.raises(ValueError):  # a public key is not a private key
+        signing.sign(PUB + "00", "alice", "post_task", TASK)
+    nonce = "n" * 32
+    forgeries = [
+        {"scheme": "ed25519", "nonce": nonce, "sig": "00" * 64},
+        {
+            "scheme": "ed25519",
+            "nonce": nonce,
+            "sig": signing.sign(PUB, "alice", "post_task", TASK)["sig"],
+        },
+        {
+            "scheme": "hmac-sha256",
+            "nonce": nonce,
+            "sig": "x",
+            "mac": request_mac(bytes.fromhex(PUB), "alice", "post_task", TASK, nonce),
+        },
+    ]
+    for auth in forgeries:
+        with pytest.raises(BrokerError, match="signature|scheme"):
+            b.post_task("alice", "t", {}, auth=auth)
+    assert b.board.entries() == []
+
+
 def test_authenticated_broker_refuses_unsigned_forged_and_replayed(tmp_path, code):
-    b = _broker(tmp_path, code, keys={"alice": KEY})
+    b = _broker(tmp_path, code, pubkeys={"alice": PUB})
     with pytest.raises(BrokerError, match="unsigned"):
         b.post_task("alice", "t", {})
-    args = {"title": "t", "spec": {}}
-    with pytest.raises(BrokerError, match="bad request signature"):
-        b.post_task("alice", "t", {}, auth=sign(b"x" * 32, "alice", "post_task", args))
+    other, _ = signing.generate_keypair()
+    with pytest.raises(BrokerError, match="bad request signature"):  # someone else's key
+        b.post_task("alice", "t", {}, auth=sign(other, "alice", "post_task", TASK))
     with pytest.raises(BrokerError, match="bad request signature"):  # signature for other args
-        b.post_task("alice", "u", {}, auth=sign(KEY, "alice", "post_task", args))
-    auth = sign(KEY, "alice", "post_task", args)
+        b.post_task("alice", "u", {}, auth=sign(PRIV, "alice", "post_task", TASK))
+    auth = sign(PRIV, "alice", "post_task", TASK)
     tid = b.post_task("alice", "t", {}, auth=auth)
     with pytest.raises(BrokerError, match="replayed"):
         b.post_task("alice", "t", {}, auth=auth)
     with pytest.raises(BrokerError, match="bad request signature"):  # moved to another op
         b.claim("alice", tid, auth=auth)
-    b.claim("alice", tid, auth=sign(KEY, "alice", "claim", {"task_id": tid}))
-    assert Blackboard(b.board.path).verify_signatures({"alice": KEY}) == []
-    assert Blackboard(b.board.path).verify_signatures({"alice": b"y" * 32})
-    with pytest.raises(ValueError, match="no key"):
-        WriteBroker(tmp_path, {"alice", "bob"}, keys={"alice": KEY})
+    b.claim("alice", tid, auth=sign(PRIV, "alice", "claim", {"task_id": tid}))
+    assert Blackboard(b.board.path).verify_signatures({"alice": PUB}) == []
+    _, wrong_pub = signing.generate_keypair()
+    assert Blackboard(b.board.path).verify_signatures({"alice": wrong_pub})
+    with pytest.raises(ValueError, match="no public key"):
+        WriteBroker(tmp_path, {"alice", "bob"}, pubkeys={"alice": PUB})
+
+
+def test_new_hmac_requests_refused_but_old_hmac_entries_verify(tmp_path, code):
+    """Mixed board: a legacy hmac-sha256 entry (first v1.10 draft, no
+    ``scheme``) followed by ed25519 entries verifies; a new HMAC request is
+    refused by the broker."""
+    hkey = b"h" * 32
+    board = Blackboard(tmp_path / "research" / "agents" / "blackboard.jsonl")
+    nonce = "a" * 32
+    legacy = {
+        "key_id": "alice",
+        "op": "post_task",
+        "args_digest": digest({"title": "old", "spec": {}}),
+        "nonce": nonce,
+        "mac": request_mac(hkey, "alice", "post_task", {"title": "old", "spec": {}}, nonce),
+    }
+    board.append("task", "alice", 1, {"task_id": "x" * 16, "title": "old", "spec": {}}, legacy)
+    b = _broker(tmp_path, code, pubkeys={"alice": PUB})
+    with pytest.raises(BrokerError, match="scheme"):
+        b.post_task("alice", "t", {}, auth={"scheme": "hmac-sha256", "nonce": "b", "sig": "c"})
+    b.post_task("alice", "t", {}, auth=sign(PRIV, "alice", "post_task", TASK))
+    assert board.verify() == 2
+    assert board.verify_signatures({"alice": PUB}, {"alice": hkey}) == []
+    assert any("no shared key" in p for p in board.verify_signatures({"alice": PUB}))
+    assert board.verify_signatures({"alice": PUB}, {"alice": b"z" * 32})
 
 
 def test_v19_reader_still_verifies_a_signed_board(tmp_path, code):
     """The on-disk format stays v1.9-readable: the v1.9 verify algorithm
     (hash over every field but ``hash``) accepts entries carrying ``auth``."""
-    from iap.agents.blackboard import GENESIS, digest
+    from iap.agents.blackboard import GENESIS
 
-    b = _broker(tmp_path, code, keys={"alice": KEY})
-    b.post_task("alice", "t", {}, auth=sign(KEY, "alice", "post_task", {"title": "t", "spec": {}}))
+    b = _broker(tmp_path, code, pubkeys={"alice": PUB})
+    b.post_task("alice", "t", {}, auth=sign(PRIV, "alice", "post_task", TASK))
+    b.preregister(
+        "alice",
+        "EQ01",
+        "1s",
+        "h",
+        1,
+        auth=sign(
+            PRIV,
+            "alice",
+            "preregister",
+            {"alpha_id": "EQ01", "horizon": "1s", "hypothesis": "h", "expected_sign": 1},
+        ),
+    )
     prev = GENESIS
     for e in Blackboard(b.board.path).entries():
         assert e["prev"] == prev and e["hash"] == digest(

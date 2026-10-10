@@ -6,13 +6,17 @@ the current state (:meth:`WriteBroker.state`).  Agents hold no verdict,
 lifecycle or order authority: a finding is a claim with citations, nothing
 more.
 
-**Authenticated identity (G4, v1.10).**  Constructed with ``keys`` (agent id
--> secret, from a key file outside the repository), the broker refuses every
-agent write that does not carry a signed request: ``auth = sign(key, agent,
-op, args)`` (:func:`sign`), an HMAC over the agent id, the operation, a digest
-of its arguments and a single-use nonce.  The signed request is stored on
-the entry (``auth``) so :meth:`Blackboard.verify_signatures` can re-check it
-offline and a re-chained board cannot forge it.  Without ``keys`` the broker
+**Authenticated identity (G4, v1.10).**  Constructed with ``pubkeys`` (agent
+id -> Ed25519 public key, from the committed registry
+``research/agents/agent_pubkeys.json``), the broker refuses every agent write
+that does not carry a signed request: ``auth = sign(private_key, agent, op,
+args)`` (:func:`sign`), an Ed25519 signature over the agent id, the
+operation, a digest of its arguments and a single-use nonce.  The private key
+never leaves the agent; the broker and every verifier hold only public keys,
+so they cannot forge.  Legacy HMAC-SHA256 requests are refused.  The signed
+request is stored on the entry (``auth``) so
+:meth:`Blackboard.verify_signatures` can re-check it offline and a re-chained
+board cannot forge it.  Without ``pubkeys`` the broker
 behaves as in v1.9 (ids are bare strings) - the mode the existing tests,
 the evals and the operator's own pre-registrations use.
 
@@ -26,16 +30,14 @@ retroactively, so the committed ledger numbers do not move.
 
 from __future__ import annotations
 
-import hmac
 import re
-import secrets
 import time
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
-from iap.agents import citations
-from iap.agents.blackboard import Blackboard, BlackboardError, digest, request_mac
+from iap.agents import citations, signing
+from iap.agents.blackboard import Blackboard, BlackboardError, digest
 
 AGENT_ID = re.compile(r"^[a-z][a-z0-9_-]{1,31}$")
 LEASE_NS = 15 * 60 * 10**9
@@ -46,10 +48,10 @@ class BrokerError(ValueError):
     pass
 
 
-def sign(key: bytes, agent: str, op: str, args: Mapping[str, Any]) -> dict[str, str]:
-    """The ``auth`` an agent passes with a request (fresh nonce each call)."""
-    nonce = secrets.token_hex(16)
-    return {"nonce": nonce, "mac": request_mac(key, agent, op, dict(args), nonce)}
+def sign(private_hex: str, agent: str, op: str, args: Mapping[str, Any]) -> dict[str, str]:
+    """The ``auth`` an agent passes with a request: Ed25519 over (agent, op,
+    args digest, fresh nonce), signed with the agent's PRIVATE key."""
+    return signing.sign(private_hex, agent, op, dict(args))
 
 
 def _default_fingerprint(alpha_id: str) -> dict[str, Any] | None:
@@ -68,7 +70,7 @@ class WriteBroker:
         lease_ns: int = LEASE_NS,
         board: Path | None = None,
         trusted: set[str] | None = None,
-        keys: Mapping[str, bytes] | None = None,
+        pubkeys: Mapping[str, str] | None = None,
         fingerprinter: Callable[[str], dict[str, Any] | None] = _default_fingerprint,
     ) -> None:
         self.root = Path(root)
@@ -77,14 +79,15 @@ class WriteBroker:
         self.trusted = frozenset(trusted or ())
         if self.agents & self.trusted:
             raise ValueError("an agent cannot also be a trusted writer")
-        #: per-agent secrets (G4); ``None`` = unauthenticated (v1.9 behaviour)
-        self.keys = dict(keys) if keys is not None else None
-        if self.keys is not None:
-            missing = sorted(a for a in self.agents if a not in self.keys)
+        #: per-agent Ed25519 PUBLIC keys, hex (G4); ``None`` = unauthenticated
+        #: (v1.9 behaviour).  The broker holds no secret, so it cannot forge.
+        self.pubkeys = dict(pubkeys) if pubkeys is not None else None
+        if self.pubkeys is not None:
+            missing = sorted(a for a in self.agents if a not in self.pubkeys)
             if missing:
-                raise ValueError(f"authenticated broker: no key for agents {missing}")
-            if any(len(k) < 16 for k in self.keys.values()):
-                raise ValueError("agent keys must be at least 16 bytes")
+                raise ValueError(f"authenticated broker: no public key for agents {missing}")
+            if any(len(bytes.fromhex(k)) != 32 for k in self.pubkeys.values()):
+                raise ValueError("agent public keys must be raw 32-byte Ed25519 keys (hex)")
         self.clock = clock
         self.lease_ns = lease_ns
         self.fingerprinter = fingerprinter
@@ -123,24 +126,31 @@ class WriteBroker:
         ``auth`` record to store on the entry (``None`` when unauthenticated)."""
         if not AGENT_ID.match(str(agent)) or agent not in self.agents:
             raise BrokerError(f"unregistered agent {agent!r}")
-        if self.keys is None:
+        if self.pubkeys is None:
             return None
-        if not auth or "nonce" not in auth or "mac" not in auth:
+        if not auth or "nonce" not in auth or "sig" not in auth:
             raise BrokerError(f"{agent}: unsigned request (this broker requires signed requests)")
+        if auth.get("scheme") != signing.ED25519:
+            raise BrokerError(
+                f"{agent}: signature scheme {auth.get('scheme')!r} refused; new requests "
+                "must be ed25519 (hmac-sha256 is legacy, verify-only)"
+            )
         nonce = str(auth["nonce"])
-        want = request_mac(self.keys[agent], agent, op, dict(args), nonce)
-        if not hmac.compare_digest(want, str(auth["mac"])):
+        args_digest = digest(dict(args))
+        msg = signing.message(agent, op, args_digest, nonce)
+        if not signing.verify_ed25519(self.pubkeys[agent], msg, str(auth["sig"])):
             raise BrokerError(f"{agent}: bad request signature for {op}")
         for e in self.board.entries():
             a = e.get("auth") or e["body"].get("request_auth") or {}
             if a.get("key_id") == agent and a.get("nonce") == nonce:
                 raise BrokerError(f"{agent}: replayed request (nonce already used)")
         return {
+            "scheme": signing.ED25519,
             "key_id": agent,
             "op": op,
-            "args_digest": digest(dict(args)),
+            "args_digest": args_digest,
             "nonce": nonce,
-            "mac": want,
+            "sig": str(auth["sig"]),
         }
 
     def _write(

@@ -67,7 +67,8 @@ def require(
                 f"{alpha_id}/{horizon}: registered with a code fingerprint but the alpha "
                 "no longer exists"
             )
-        changed = [k for k in ("code_hash", "feature_hash") if registered.get(k) != now.get(k)]
+        keys = ("code_hash", "feature_hash", "deps")
+        changed = [k for k in keys if k in registered and registered.get(k) != now.get(k)]
         if changed:
             raise PreregistrationError(
                 f"{alpha_id}/{horizon}: {' and '.join(changed)} changed since pre-registration "

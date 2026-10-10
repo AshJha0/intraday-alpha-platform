@@ -8,8 +8,10 @@
 # Dependabot (pip, /python) proposes bumps; regenerate by re-running the
 # install on a clean Python 3.11 and copying the resolved set.
 attrs==26.1.0
+cffi==2.1.1
 cloudpickle==3.1.2
 coverage==7.16.2
+cryptography==50.0.1
 execnet==2.1.2
 iniconfig==2.3.0
 joblib==1.6.0
@@ -20,6 +22,7 @@ numpy==2.4.6
 packaging==26.3
 pandas==3.0.6
 pluggy==1.6.0
+pycparser==3.0
 pyarrow==25.0.1
 pygments==2.21.0
 pytest-cov==7.1.0

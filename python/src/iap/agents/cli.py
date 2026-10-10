@@ -8,11 +8,12 @@
     apply   --approval FILE --keyfile PATH [--root .]
     reserve --agent ID --alpha EQ01 --horizon 1s --expected-sign 1
             --secret-file PATH [--root .] [--sessions 2]
-    agent-keygen --agent ID --keyfile PATH                     # G4 signing key
+    agent-keygen --agent ID --keyfile PATH     # G4: Ed25519 private key -> PATH,
+                                               # public key -> research/agents/agent_pubkeys.json
     prereg  --agent ID --alpha EQ01 --horizon 1s --hypothesis "..." --expected-sign 1
             [--keyfile PATH] [--ledger FILE] [--dataset-version V] [--supersede]
     anchor                                                     # G3: write anchors.json
-    verify-board [--keyfile PATH]                              # G3/G4 verification
+    verify-board [--legacy-hmac-keyfile PATH]  # G3/G4: chain, git, anchors, signatures
 
 ``issue`` is run by the person approving; ``apply`` verifies the signature,
 burns the nonce on the blackboard and performs the HUMAN lifecycle edge
@@ -37,6 +38,8 @@ from iap.agents.broker import WriteBroker
 from iap.agents.reserve import EVALUATOR, ReserveEvaluator
 
 NS_MIN = 60 * 10**9
+#: committed registry of agent Ed25519 PUBLIC keys (G4); private keys stay outside
+PUBKEYS_RELPATH = Path("research") / "agents" / "agent_pubkeys.json"
 
 
 def _outside(path: Path, root: Path) -> Path:
@@ -124,23 +127,36 @@ def cmd_reserve(a: argparse.Namespace) -> int:
 
 
 def cmd_agent_keygen(a: argparse.Namespace) -> int:
-    """A per-agent signing key (G4) in a key file outside the repository."""
+    """An Ed25519 key pair for an agent (G4): the private key into a key file
+    OUTSIDE the repository, the public key into the committed registry."""
+    from iap.agents import signing
+
     path = _outside(a.keyfile, a.root)
     keys = _keys(path)
-    if a.agent in keys:
+    pub_path = a.root / PUBKEYS_RELPATH
+    pubs = _keys(pub_path)
+    if a.agent in keys or a.agent in pubs:
         raise SystemExit(f"agent {a.agent!r} already has a key")
-    keys[a.agent] = secrets.token_hex(32)
+    priv, pub = signing.generate_keypair()
+    keys[a.agent] = priv
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(keys, sort_keys=True), encoding="ascii")
-    print(f"key for agent {a.agent!r} written to {path}")
+    pubs[a.agent] = pub
+    pub_path.parent.mkdir(parents=True, exist_ok=True)
+    pub_path.write_text(json.dumps(pubs, indent=2, sort_keys=True) + "\n", encoding="ascii")
+    print(f"private key for {a.agent!r} written to {path}; public key added to {pub_path}")
     return 0
+
+
+def _pubkeys(root: Path) -> dict[str, str]:
+    return _keys(root / PUBKEYS_RELPATH)
 
 
 def cmd_prereg(a: argparse.Namespace) -> int:
     """Pre-register a hypothesis (debits one look, records the code fingerprint)."""
     from iap.agents.broker import BrokerError, sign
 
-    keys = None
+    pubkeys = None
     auth = None
     args = {
         "alpha_id": a.alpha,
@@ -152,9 +168,12 @@ def cmd_prereg(a: argparse.Namespace) -> int:
         raw = _keys(_outside(a.keyfile, a.root))
         if a.agent not in raw:
             raise SystemExit(f"no key for agent {a.agent!r}")
-        keys = {a.agent: bytes.fromhex(raw[a.agent])}
-        auth = sign(keys[a.agent], a.agent, "preregister", args)
-    broker = WriteBroker(a.root, {a.agent}, keys=keys)
+        registry = _pubkeys(a.root)
+        if a.agent not in registry:
+            raise SystemExit(f"agent {a.agent!r} has no public key in {PUBKEYS_RELPATH}")
+        pubkeys = {a.agent: registry[a.agent]}
+        auth = sign(raw[a.agent], a.agent, "preregister", args)
+    broker = WriteBroker(a.root, {a.agent}, pubkeys=pubkeys)
     try:
         pid = broker.preregister(
             a.agent,
@@ -192,9 +211,12 @@ def cmd_verify_board(a: argparse.Namespace) -> int:
 
     board = prereg_gate.board_path(a.root)
     report = anchor.verify(a.root, board, a.root / anchor.ANCHORS_RELPATH)
-    if a.keyfile is not None:
-        raw = _keys(_outside(a.keyfile, a.root))
-        sig = Blackboard(board).verify_signatures({k: bytes.fromhex(v) for k, v in raw.items()})
+    legacy = None
+    if a.legacy_hmac_keyfile is not None:
+        raw = _keys(_outside(a.legacy_hmac_keyfile, a.root))
+        legacy = {k: bytes.fromhex(v) for k, v in raw.items()}
+    if report["entries"]:
+        sig = Blackboard(board).verify_signatures(_pubkeys(a.root), legacy)
         report["problems"] += sig
         report["ok"] = report["ok"] and not sig
     print(json.dumps(report, indent=2, sort_keys=True))
@@ -241,7 +263,7 @@ def main(argv: list[str] | None = None) -> int:
     pr.add_argument("--supersede", action="store_true")
     sub.add_parser("anchor")
     vb = sub.add_parser("verify-board")
-    vb.add_argument("--keyfile", type=Path, default=None)
+    vb.add_argument("--legacy-hmac-keyfile", type=Path, default=None)
     a = ap.parse_args(argv)
     return {
         "keygen": cmd_keygen,
