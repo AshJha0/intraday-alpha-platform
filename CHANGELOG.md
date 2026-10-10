@@ -6,7 +6,19 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
-## v1.11.0 — unreleased
+## v1.11.0 — 2026-10-10
+
+Scale and AI (IAP_Next_Releases_Plan v1.11: E2, E3, AI1-AI3; A2, A3 and AI4
+deferred), plus a feature-engine bug fix in three languages and a
+documentation and GitHub Pages refresh. Every new path is opt-in; default
+outputs, published numbers and cross-language contracts are unchanged
+(the new snapshot-burst golden adds checks inside existing golden tests).
+New optional extras: `[llm]` (Anthropic SDK) and the `rust/features_py`
+wheel. Parity counts from CI: python 2185 / cpp 302 / rust 358 / java 571,
+golden 193 / 72 / 71 / 124. Live LLM behaviour evals (claude-haiku-5-5):
+4/4 pass, estimated spend $0.0096. Pull requests
+[#51](https://github.com/AshJha0/intraday-alpha-platform/pull/51) to
+[#56](https://github.com/AshJha0/intraday-alpha-platform/pull/56).
 
 **Added (E2, Rust feature engine via pyo3).** `rust/features_py`, a pyo3
 0.22.6 / maturin 1.7.8 extension module (`iap_features_rs`, abi3 wheel)
