@@ -456,6 +456,24 @@ jobs:
           sudo install -m 0755 /tmp/kubeconform /usr/local/bin/kubeconform
       - name: structural validation of deployment/
         run: python3 tests/harness/check_deployment.py --verbose
+      # docs/POLYGLOT.md (plan E3): a FROZEN language copy may change only with
+      # a `POLYGLOT-OVERRIDE: <reason>` line in a commit message or the PR
+      # body, and may not grow new functions/types without `... new-api ...`.
+      # Blocking on pull requests; advisory on push (a squash commit may not
+      # carry the PR body). The body goes through env, never inline.
+      - name: polyglot policy (frozen copies)
+        env:
+          POLYGLOT_PR_BODY: ${{ github.event.pull_request.body }}
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          python3 tests/harness/check_polyglot_policy.py --self-test
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            python3 tests/harness/check_polyglot_policy.py --base "origin/$BASE_REF"
+          elif [ -n "$BEFORE_SHA" ] && git cat-file -e "$BEFORE_SHA^{commit}" 2>/dev/null; then
+            python3 tests/harness/check_polyglot_policy.py --base "$BEFORE_SHA" --advisory
+          fi
       - name: headline numbers vs artefacts
         # exit 2 = only the research-ledger rows are stale (they move on every
         # research rerun); exit 1 = a platform number is wrong.

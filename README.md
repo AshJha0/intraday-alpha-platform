@@ -500,6 +500,9 @@ headline numbers: all headline numbers match their artefacts
 >> PARITY OK — all languages passed (full suites).
 ```
 
+The policy of [docs/POLYGLOT.md](docs/POLYGLOT.md) (v1.11.0) froze 20 of the
+duplicated language copies and retired none, so these counts are unchanged by it.
+
 (Counts for v1.5.0, 2026-10-04. They are taken from the CI jobs of the
 release line rather than from one local harness run: each CI job runs the
 canonical commands of the matching `run_all.sh` row, and CI installs
@@ -581,6 +584,7 @@ golden tests — the engineering discipline this repo is built around
 | [API_CONTRACTS.md](API_CONTRACTS.md) | the contract layer: 22 typed contracts field by field, ids and canonical JSON, validation, the 18 Protocols and what satisfies them, versioning, the 17-schema index |
 | [API_TRADING.md](API_TRADING.md) | the Python reference ports of the hard risk engine (`iap.risk`) and the execution stack (`iap.execution`): public APIs, golden parity statements, what is pinned about each port |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | the six-week plan (Phase 0 → Week 6) and Phase 2/3 mapped to what exists with evidence, what is backlog, the MVP success criteria |
+| [docs/POLYGLOT.md](docs/POLYGLOT.md) | which language copy of each duplicated component is canonical and which is frozen (v1.11.0, plan E3): inventory, golden pins, consumers, the `POLYGLOT-OVERRIDE:` rule enforced by `tests/harness/check_polyglot_policy.py` |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | system design, per-language responsibilities, contracts, the research → trading → execution → adaptive loop with lifecycle and trace, determinism, golden topology, hot-path notes, observability, the MVP vertical, deployment, the AI / agent boundary (what is pinned, what exists, what is backlog), failure modes and fail-closed design, the research-store concurrency model, and the distance to a production system |
 | [docs/DIAGRAMS.md](docs/DIAGRAMS.md) | all twenty-five architecture diagrams on one page (pipeline, golden topology, paper trading, responsibility matrix, risk decision flow, queue-position model, data model, lifecycle state machine, decision-trace chain, MVP loop; and, since v1.3.0, the fail-closed risk branches, the simulator fill/queue flow, the paper-platform checkpoint commit point and resume, the admin kill latch, the research run with ledger lock and eligibility, the power study, the CI/release pipeline, the deployment topology, the agent layer as planned at v1.3.0; and, since v1.9-v1.10, the simulator calibration flow, the maker and quoting P&L decomposition, the auction pipeline, the governance (prereg, anchoring, signing) sequence, the v3 validity flow and the v1.9-v1.11 roadmap) |
 | [docs/DATA_MODEL.md](docs/DATA_MODEL.md) | the relational data model (`schemas/sql/iap_v2.sql`, SQLite + PostgreSQL): every table, the dataset- and bundle-scoped views, portability rules, how the store indexes the flat-file artefacts, query cookbook |
