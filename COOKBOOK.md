@@ -66,6 +66,7 @@ Contents:
 55. [A guarded LLM session end to end, with the scripted client (v1.11)](#55-a-guarded-llm-session-end-to-end-with-the-scripted-client-v111)
 56. [Combinatorial purged CV, PBO and the deflated Sharpe ratio (v1.12)](#56-combinatorial-purged-cv-pbo-and-the-deflated-sharpe-ratio-v112)
 57. [Measure tick-to-trade latency percentiles (v1.12)](#57-measure-tick-to-trade-latency-percentiles-v112)
+58. [Opt-in extended features and an event / volume clock (v1.12)](#58-opt-in-extended-features-and-an-event--volume-clock-v112)
 
 Recipes 27–35 were added with v1.3.0. Every command block in them was run
 as printed, from a clean checkout of the release, before it was written
@@ -3455,3 +3456,73 @@ end-to-end p50 or p99 is more than 8× the baseline. To refresh the baseline,
 download that artifact from a green `main` run and commit it as
 `benchmarks/results_tick_to_trade.md`, then update the table in
 `benchmarks/RESULTS.md`.
+
+## 58. Opt-in extended features and an event / volume clock (v1.12)
+
+Five feature ideas the default registry lacks (queue time-to-depletion,
+trade-sign autocorrelation, Hawkes intensity, odd-lot / hidden liquidity)
+live in `iap.features.extended`, behind an explicit opt-in so the pinned
+default registry, its hash, the golden vectors and every published number
+stay as they are (API_FEATURES §8). The same engine can also sample rows on
+an event or a volume clock instead of the 100 ms clock. From `python/`:
+
+```bash
+PYTHONPATH=src python - <<'PY'
+from iap.core.codec import read_jsonl
+from iap.features.context import build_contexts
+from iap.features.extended import ExtendedFeatureEngine, extended_registry_hash, specs
+from iap.features.registry import registry_hash
+
+ctx = build_contexts("../configs")
+events = read_jsonl("../tests/golden/events_eq_mbo.jsonl")
+eng = ExtendedFeatureEngine(ctx, sampling="volume", sample_n=5000)
+rows = [v for v in map(eng.apply, events) if v is not None]
+print("default", registry_hash()[:12], "| extended", extended_registry_hash()[:12])
+print(len(events), "events ->", len(rows), "volume-clock rows;", len(specs()), "extra features")
+last = rows[-1]
+for s in specs():
+    j = eng.feature_names.index(s.name)
+    v = f"{last.values[j]:.4f}" if last.validity[j] else "invalid"
+    print(f"  {s.name:<24} {v}")
+PY
+```
+
+```
+default 585dd7b92b73 | extended f60a0d54a05a
+2000 events -> 10 volume-clock rows; 19 extra features
+  qttd_bid_w1s_v1          4.0000
+  qttd_bid_w10s_v1         40.0000
+  qttd_ask_w1s_v1          600.0000
+  qttd_ask_w10s_v1         600.0000
+  sign_acf_l1_n100_v1      -0.0740
+  sign_acf_l2_n100_v1      0.0408
+  sign_acf_l3_n100_v1      -0.1940
+  sign_acf_l5_n100_v1      -0.0748
+  sign_acf_l10_n100_v1     -0.0191
+  hawkes_buy_b1_v1         0.0000
+  hawkes_sell_b1_v1        1.0000
+  hawkes_total_b1_v1       1.0000
+  hawkes_imb_b1_v1         -1.0000
+  hawkes_buy_b0p1_v1       0.2270
+  hawkes_sell_b0p1_v1      1.0619
+  hawkes_total_b0p1_v1     1.2889
+  hawkes_imb_b0p1_v1       -0.6477
+  oddlot_share_w1m_v1      0.0000
+  hidden_share_w1m_v1      0.0000
+```
+
+The default hash `585dd7b92b73` is the unchanged v1.11 `feature_version`;
+an extended row is the 205 default values followed by these 19, under its
+own version `f60a0d54a05a`. The ask queue saw no depletion in the window,
+so its time-to-depletion is the 600 s cap; the golden vector prints every
+displayed fill as EXECUTE + TRADE in round lots, so both liquidity shares
+are 0. For a whole feature store:
+
+```bash
+PYTHONPATH=src python -m iap.features --feature-set extended --sampling volume:20000     --out-dir ../data/features_ext --registry-out ../data/features_ext/feature_registry.json
+```
+
+`--workers N` stays byte-identical with either option
+(`python/tests/test_feature_parallel.py`). Nothing in the maker, quoting or
+auction code reads these columns yet, and no real-data run has been made
+with them; API_FEATURES §8.3 lists where they are meant to go.

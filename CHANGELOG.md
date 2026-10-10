@@ -48,6 +48,25 @@ that tag.
   implementation (events/s and percentiles; not run in CI).
 - COOKBOOK recipe 56.
 
+### Features (M6): opt-in extended set and event-time sampling
+
+- `iap.features.extended`: four Python-only families behind
+  `python -m iap.features --feature-set extended` (19 features, appended
+  after the default registry, own `feature_version`): queue time-to-depletion
+  at the best bid / ask (`qttd_*`), trade-sign autocorrelation
+  (`sign_acf_l*_n100_v1`), exponential-kernel Hawkes intensities with online
+  recursion (`hawkes_{buy,sell,total,imb}_b{1,0p1}_v1`) plus an offline MLE
+  helper (`fit_hawkes_exp`), and odd-lot / non-displayed execution shares
+  (`oddlot_share_w1m_v1`, `hidden_share_w1m_v1`; invalid when the source has
+  no order-level executions). API_FEATURES §8, COOKBOOK recipe 58.
+- `--sampling events:N|volume:N`: rows on an event or volume clock instead of
+  `--cadence-ms`, for either feature set.
+- Unchanged: the default registry and hash, the golden feature vectors, the
+  native 45 slots (no C++/Rust/Java change), published numbers. `--workers`
+  remains byte-identical with the new options (tested). No real-data run yet;
+  API_FEATURES §8.3 records where the features are meant to feed the maker,
+  quoting and auction code.
+
 ## v1.11.0 — 2026-10-10
 
 Scale and AI (IAP_Next_Releases_Plan v1.11: E2, E3, AI1-AI3; A2, A3 and AI4
