@@ -178,6 +178,41 @@ implicitly, dynamic `importlib` imports with computed names, data and
 config files read at run time (fitted params, `configs/`), the interpreter,
 and other third-party libraries.
 
+### 2b. The LLM research agent (v1.11, AI1-AI2)
+
+The model is a client of the 2a controls, not an exception to them.
+
+| Control | Enforced by | What it stops |
+|---|---|---|
+| Tool allowlist of eight research tools; an unknown tool name or extra argument is refused | `iap.llm.agent.Session.call` | the model reaching files, code, lifecycle, approvals or orders |
+| Every write signed by the agent's Ed25519 key, held by the process, never shown to the model | `open_session` (key must match `agent_pubkeys.json`), `WriteBroker(pubkeys=...)` | impersonation, unsigned writes |
+| A pre-registration is a 2a pre-registration (one look, code fingerprint) and a session may make at most `--max-preregs` of them | `Budget.check_prereg`, `WriteBroker.preregister` | p-hacking by trying variants |
+| A run needs a verified pre-registration and an allowed dataset; one run per (alpha, horizon, dataset) | `prereg_gate.require`, `Session.run_gated_study` | unregistered runs, re-running until lucky, unapproved data |
+| Metrics and verdict computed by code and written as a report | `iap.llm.runners.verdict` | a model "deciding" a result |
+| Every number in a finding must appear, up to the rounding shown, in a numeric field of a cited artefact; free-text fields are not evidence; at least one cited report must be from the session | `iap.llm.verify.verify_finding` | invented, derived or injected numbers; hallucinated citations |
+| Tool output free text wrapped and flagged as untrusted; the system prompt says it is data | `iap.agents.untrusted` | prompt injection (advisory; the structural controls above are the real ones) |
+| Caps on estimated USD (projected one call ahead), tokens, tool calls; session stops at the first | `iap.llm.budget.Budget` | runaway spend |
+| Transcript, tool log and summary persisted; the API key is scrubbed from anything written | `run_session`, `envfile.redact` | unaudited sessions, key leaks |
+
+**API key.** `ANTHROPIC_API_KEY` from the environment or `--env-file`
+(e.g. `C:/Work/Claude/AgenticTrader/.env`). It is never printed, logged or
+committed; `.env`, `*.env` and `.iap_keys/` are git-ignored. The SDK is the
+optional `[llm]` extra; tests and CI use a scripted client and make no
+network call.
+
+**Evals (AI2).** `python -m iap.llm.evals` (mocked) must pass in CI: the
+scripted model p-hacks, follows the injection and fabricates citations, and
+the controls must catch it; each control-bearing eval also runs with its
+control removed and must then fail. `--live --env-file PATH --max-usd 2`
+runs the same scenarios against a real model (default `claude-haiku-5-5`)
+and reports the behaviour; the release owner runs it.
+
+**Not covered.** The model's reasoning is not audited beyond the
+transcript; a finding can be true to its artefacts and still badly argued.
+The live evals are a sample of four scenarios, not a guarantee. Datasets
+other than the synthetic ones need an explicit `--dataset` allowance and a
+runner that serves them.
+
 ## 3. Audit-log policy
 
 Auditable events and where they are recorded:

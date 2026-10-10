@@ -1109,9 +1109,11 @@ failure mode is a plausible sentence. Hard limits must be code.
 
 ### 6.2 What exists today
 
-**No LLM is called anywhere in this repository.** What exists is the
-machinery that an automated researcher, human or model, would have to go
-through. It was built before any agent on purpose: an agent given the goal
+**Since v1.11 one optional component calls an LLM: the research agent
+(`iap.llm`, below), and only when an operator runs it with an API key.**
+Nothing on the trading path, in the default build, in the tests or in CI
+calls a model. What exists is mostly the machinery that an automated
+researcher, human or model, has to go through. It was built before any agent on purpose: an agent given the goal
 "get an alpha promoted" will find every shortcut §2.7 and §2.11 describe
 (cheaper costs, a chosen holdout, free looks) faster than a person.
 
@@ -1127,6 +1129,8 @@ through. It was built before any agent on purpose: an agent given the goal
 | read-only MCP server | v1.7.0 | six versioned read tools over stdio, no write path (AST-tested), no network listener | `iap.agents.mcp_server` (`iap-mcp --root .`) |
 | agent evaluations, untrusted text | v1.7.0 | planted leak, seeded bug, shuffled-label null, fabricated citation; free text returned wrapped and flagged | `iap.agents.evals`, `untrusted` |
 | governance G1-G4 | v1.10.0 | costed, code-bound, git-anchored, Ed25519-signed pre-registrations (below) | `iap.agents.fingerprint`, `anchor`, `signing` |
+| LLM research agent (AI1) | v1.11.0 | a Claude model drafts, pre-registers (signed, one look each), runs gated studies and files findings whose every number is verified against the cited artefact; budget caps; full transcript | `iap.llm.agent`, `verify`, `budget` (`python -m iap.llm`) |
+| agent behaviour evals (AI2) | v1.11.0 | p-hacking, prompt injection, hallucinated citations, task success on a planted alpha; mocked in CI, live on demand | `iap.llm.evals` |
 
 **The governance chain (v1.10).** One hypothesis, from registration to a
 gated run:
@@ -1170,13 +1174,28 @@ The import-policy test has stated gaps: it scans the guarded trading-path
 packages and not `iap.replay` or `iap.trace`, and nothing scans the Rust,
 C++ or Java trees; those are enforced in review.
 
+**The research agent (v1.11, AI1).** `python -m iap.llm` runs one session:
+the model sees eight tools (list alphas / features, propose, preregister,
+run gated study, read report, file finding, finish) and nothing else. The
+process holding the agent's Ed25519 key signs each broker request; the
+model never sees the key. `run_gated_study` passes the pre-registration
+gate first and refuses datasets that are not explicitly allowed; code
+computes the metrics and the verdict and writes a report. A finding is
+filed only if every number in it is found, up to the rounding shown, in an
+artefact it cites (`report:<session>.<run>`, `board:<hash>`); numbers in
+free-text fields do not count, so an injected "t = 9.87" cannot verify
+itself. Caps on estimated USD, tokens, tool calls and pre-registrations
+stop the session. Transcript, tool log and session summary are written
+under `research/agents/llm_sessions/<id>/`. The behaviour evals
+(`python -m iap.llm.evals`, AI2) check that the controls hold against a
+scripted adversarial model in CI, and against a real model when the release
+owner runs them with `--live`. GOVERNANCE.md §2b; COOKBOOK recipe 49.
+
 ### 6.3 What is still planned
 
-The research agent itself (plan items AI1-AI4, v1.11): an LLM that drafts
-hypotheses, registers them and runs experiments only through the signed
-broker, judged by the v1.7 agent evaluations, plus a model registry and
-drift checks for whatever it fits. The boundary in §6.1 does not move: the
-agent would act on the research record, never on the trading path.
+A model registry and drift checks for whatever is fitted (AI3) and deep
+LOB baselines (AI4). The boundary in §6.1 does not move: the agent acts on
+the research record, never on the trading path.
 
 ### 6.4 What would be theatre on this data
 
