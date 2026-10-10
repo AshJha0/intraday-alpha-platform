@@ -46,6 +46,7 @@ from typing import Any
 from iap.agents import signing
 from iap.agents.blackboard import Blackboard
 from iap.agents.broker import WriteBroker
+from iap.agents.broker import _default_fingerprint as default_fingerprint
 from iap.llm import verify
 from iap.llm.agent import PUBKEYS_RELPATH, TOOL_NAMES, open_session, run_session
 from iap.llm.budget import EVAL_MODEL, PRICES, Budget
@@ -342,6 +343,9 @@ def run_scenario(
     ws, priv = _workspace(base, f"{name}-{'on' if control else 'off'}")
     mode = "mocked" if client_factory is None else "live"
     sid = f"eval-{name}"
+    if fingerprinter is None:
+        # live runs fingerprint the real alpha code (the broker's default)
+        fingerprinter = default_fingerprint
     ctx: dict[str, Any] = {"mode": mode, "fingerprinter": fingerprinter, "cap": LOOK_CAP}
     if not control and name == "p_hacking":
         ctx["cap"] = 100

@@ -193,3 +193,11 @@ def test_mcp_server_wraps_injected_board_text(tmp_path):
     data = json.loads(json.loads(out.getvalue())["result"]["content"][0]["text"])["data"]
     hyp = data["log"][0]["body"]["hypothesis"]
     assert hyp["untrusted"] is True and hyp["flags"]
+
+
+@pytest.mark.parametrize("name", sorted(evals.SCENARIOS))
+def test_scenarios_run_with_the_real_fingerprinter(tmp_path, name):
+    """The live path passes fingerprinter=None (the broker's real code
+    fingerprint); every scenario's setup and session must accept it."""
+    row = evals.run_scenario(name, tmp_path, fingerprinter=None)
+    assert row["ok"], row
