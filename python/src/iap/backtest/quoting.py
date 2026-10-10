@@ -64,6 +64,16 @@ Pinned rules (``QuotingBacktester.run_instrument``):
        net       = gross + rebates - taker_fees - impact
 
    all times ``qty_unit``; the identity is tested.
+7. **X4 options** (v1.12, off by default; the default run is byte-identical
+   to v1.11). ``post_only`` (``"reject"`` / ``"slide"``) sends every quote
+   as a post-only LIMIT (simulator rule 10: a quote the book moved through
+   while in flight is rejected / slid instead of taking). ``feedback``
+   (:class:`iap.execution.markout_feedback.FeedbackConfig`) registers every
+   MAKER quote fill; once its markout at the feedback horizon is known it
+   updates the EWMA, and while the regime is toxic a requote pulls both
+   quotes (``stand_down``), moves both ``widen_ticks`` further from the
+   touch (``widen``) or quotes ``size_mult`` of the size (``reduce``).
+   Their counters appear only when the option is on.
 """
 
 from __future__ import annotations
@@ -80,6 +90,7 @@ from iap.backtest.maker import MakerBacktester, MakerConfig
 from iap.core.events import MarketEvent
 from iap.execution.calibration import ExecCalibration
 from iap.execution.config import ExecConfig
+from iap.execution.markout_feedback import FeedbackConfig, MarkoutFeedback
 from iap.execution.simulator import ExecutionSimulator
 from iap.execution.types import ChildOrder, Liquidity, OrderType
 
@@ -107,8 +118,13 @@ class QuotingConfig:
     flatten_lead_ns: int = 1_000_000_000
     #: pre-v1.10-M5-fix shortcut: sweep working quotes with no cancel latency
     instant_cancel: bool = False
+    # ---- v1.12 X4 options (rule 7; defaults = off) ----
+    post_only: str = ""
+    feedback: FeedbackConfig | None = None
 
     def __post_init__(self) -> None:
+        if self.post_only not in ("", "reject", "slide"):
+            raise ValueError("post_only must be '', 'reject' or 'slide'")
         if self.qty <= 0 or self.max_inventory < self.qty:
             raise ValueError("qty must be positive and max_inventory >= qty")
         if self.gamma <= 0 or self.k <= 0 or self.tau_s < 0:
@@ -236,6 +252,10 @@ class QuotingBacktester:
             0,
         )
         c["max_inventory"] = cfg.max_inventory
+        fb = MarkoutFeedback(cfg.feedback) if cfg.feedback is not None else None
+        cx: dict[str, int] = {}  # rule-7 counters, reported only when used
+        if fb is not None:
+            cx.update(feedback_stood_down=0, feedback_widened=0, feedback_reduced=0)
         live: dict[int, int | None] = {0: None, 1: None}  # side -> current order id
         q = [0]
         fills: list[dict[str, Any]] = []
@@ -293,12 +313,25 @@ class QuotingBacktester:
                 0: min(math.floor((res - h) / tick + 1e-9), apx - 1),
                 1: max(math.ceil((res + h) / tick - 1e-9), bpx + 1),
             }
+            act = None
+            if fb is not None:
+                fb.advance(t, mid)
+                act = fb.action(t)
+                if act.stand_down:
+                    cx["feedback_stood_down"] += 1
+                elif act.widen_ticks:
+                    cx["feedback_widened"] += 1
+                    want = {0: want[0] - act.widen_ticks, 1: want[1] + act.widen_ticks}
+                elif act.size_mult < 1.0:
+                    cx["feedback_reduced"] += 1
             for side in (0, 1):
                 oid = live[side]
                 cur = None if oid is None or sim.orders[oid].is_terminal else sim.orders[oid]
                 other = working(side) - (cur.remaining if cur is not None else 0)
                 room = cfg.max_inventory - (q[0] if side == 0 else -q[0]) - other
                 size = max(0, min(cfg.qty, room))
+                if act is not None and not act.neutral:
+                    size = min(size, act.size(cfg.qty))
                 if cur is not None and cur.limit_ticks == want[side] and cur.remaining == size:
                     continue
                 if cur is not None:
@@ -308,8 +341,12 @@ class QuotingBacktester:
                     # the in-flight order still counts toward working size
                     room -= cur.remaining
                     size = max(0, min(cfg.qty, room))
+                    if act is not None and not act.neutral:
+                        size = min(size, act.size(cfg.qty))
                 live[side] = None
                 if size <= 0:
+                    if act is not None and act.stand_down:
+                        continue  # pulled by the feedback, not by the limit
                     c["bid_blocked_by_limit" if side == 0 else "ask_blocked_by_limit"] += 1
                     continue
                 new = sim.submit(
@@ -321,6 +358,7 @@ class QuotingBacktester:
                         qty=size,
                         limit_ticks=want[side],
                         decision_ts=t,
+                        post_only=cfg.post_only,
                     )
                 )
                 mine.add(new)
@@ -411,6 +449,10 @@ class QuotingBacktester:
         last_t = evs[0].exchange_ts
         for ev in evs:
             t = ev.exchange_ts
+            if fb is not None:
+                # markouts due strictly before t: the state after every event < t
+                b0 = book_state()
+                fb.advance(t - 1, None if b0 is None else 0.5 * (b0[0] + b0[1]) * tick)
             if not started and t >= start_ts:
                 started = True
                 c["flatten_start_ts"] = t
@@ -449,6 +491,8 @@ class QuotingBacktester:
                     if started:
                         c["fills_during_cancel"] += 1
                     record(f, maker_mid if f.liquidity == Liquidity.MAKER else last_mid, False)
+                    if fb is not None and f.liquidity == Liquidity.MAKER:
+                        fb.on_fill(f.ts, f.side, f.price_ticks * tick)
         # ---- end of stream: sweep what is left, cross or mark the remainder
         sim.cancel_all()
         drain(last_mid)
@@ -500,6 +544,13 @@ class QuotingBacktester:
         pnl["impact"] = float(fdf["impact"].sum())
         pnl["net"] = pnl["gross"] + pnl["rebates"] - pnl["taker_fees"] - pnl["impact"]
         c["flattened"] = int(flattened)
+        if cfg.post_only:
+            cx.update(
+                post_only_rejects=sim.post_only_rejects, post_only_slides=sim.post_only_slides
+            )
+        if fb is not None:
+            cx.update(fb.counters)
+        c.update(cx)
         inv = pd.DataFrame(inv_path + [(t_end, 0)], columns=["ts", "q"])
         return QuotingResult(instrument_id, fdf, inv, pnl, c, as_bps, as_source)
 

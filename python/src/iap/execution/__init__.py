@@ -26,6 +26,8 @@ from iap.execution.config import (
     load_sor_options,
     load_venues,
 )
+from iap.execution.fill_hazard import FillHazardModel
+from iap.execution.markout_feedback import FeedbackConfig, MarkoutFeedback
 from iap.execution.passive import (
     POLICY_NAMES,
     ExecPolicy,
@@ -58,6 +60,9 @@ __all__ = [
     "EXECUTION_FILE",
     "ExecConfig",
     "ExecCounters",
+    "FeedbackConfig",
+    "FillHazardModel",
+    "MarkoutFeedback",
     "ExecPolicy",
     "ExecReplayResult",
     "ExecutionReplay",

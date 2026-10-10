@@ -64,6 +64,7 @@ Contents:
 53. [Change a frozen copy: the `POLYGLOT-OVERRIDE` workflow (v1.11)](#53-change-a-frozen-copy-the-polyglot-override-workflow-v111)
 54. [Monitor a registered maker filter week by week (v1.11)](#54-monitor-a-registered-maker-filter-week-by-week-v111)
 55. [A guarded LLM session end to end, with the scripted client (v1.11)](#55-a-guarded-llm-session-end-to-end-with-the-scripted-client-v111)
+56. [Fit a fill hazard and run a post-only, repricing, feedback-driven maker (v1.12)](#56-fit-a-fill-hazard-and-run-a-post-only-repricing-feedback-driven-maker-v112)
 
 Recipes 27–35 were added with v1.3.0. Every command block in them was run
 as printed, from a clean checkout of the release, before it was written
@@ -3355,3 +3356,77 @@ client's synthetic usage at `claude-haiku-5-5` prices; nothing was sent.
 The four entries listed last are what an auditor reads afterwards. To run
 the same session against a real model, use `python -m iap.llm` with a key
 (recipe 51) instead of the scripted client.
+
+## 56. Fit a fill hazard and run a post-only, repricing, feedback-driven maker (v1.12)
+
+Plan item X4 (API_TRADING.md §2.9). The fill-hazard model is fitted on the
+v1.9 M3 maker labels of one synthetic stream, saved as versioned JSON, and
+drives the hazard reprice policy of the maker backtest on another stream,
+together with post-only posts and markout feedback. Everything is opt-in:
+the `default` row is the v1.11 maker backtest. Save as `python/recipe56.py`
+and run `cd python && PYTHONUTF8=1 PYTHONPATH=src python recipe56.py`:
+
+```python
+import sys
+
+sys.path.insert(0, "tests")  # the synthetic MBO stream of the maker tests
+import numpy as np
+from iap.backtest.maker import MakerBacktester, MakerConfig
+from iap.execution import FeedbackConfig, FillHazardModel
+from iap.execution.fill_hazard import hazard_features, samples_from_maker_labels
+from iap.labels.maker_labels import maker_labels
+from test_maker_economics import INS, exec_config, make_scores, synth_events
+
+# 1. fit the hazard on M3 maker labels of one stream, persist it
+train = synth_events(n_steps=3000, seed=1)
+ts = np.array([e.exchange_ts for e in train[50::10]], dtype=np.int64)
+lab = maker_labels(train, ts, instrument_id=INS, exec_config=exec_config(), ttl_ns=2 * 10**9)
+samples = samples_from_maker_labels(lab, ttl_ns=2 * 10**9)
+hz = FillHazardModel(edges_ns=(0, 250_000_000, 500_000_000, 10**9, 2 * 10**9)).fit(samples)
+hz.save("fill_hazard.json")
+print(f"samples {hz.n_samples}  filled {hz.n_filled}")
+for q in (100, 400, 1600):
+    x = hazard_features(queue_ahead=q, spread_ticks=2, ts_ns=int(ts[0]))
+    print(f"queue {q:5d}: P(fill <= 1s) = {hz.p_fill_within(x, 10**9):.3f}")
+
+# 2. backtest an unseen stream: default vs the X4 options
+test = synth_events(n_steps=3000, seed=2)
+sc = make_scores(test)
+runs = {
+    "default": MakerConfig(ttl_ns=300_000_000),
+    "x4": MakerConfig(
+        ttl_ns=300_000_000,
+        post_only="slide",
+        entry_reprices=3,
+        reprice_policy="hazard",
+        hazard_give_up_prob=0.2,
+        feedback=FeedbackConfig(mode="reduce", threshold_bps=0.0),
+    ),
+}
+for name, cfg in runs.items():
+    s = MakerBacktester(exec_config(), cfg, fill_hazard=hz).run_instrument(test, sc, INS).summary()
+    extra = {k: s[k] for k in ("entry_reprices", "hazard_give_ups", "post_only_slides") if k in s}
+    print(f"{name:8s} posted {s['posted']:3d} filled {s['filled_orders']:3d} "
+          f"taker {s['taker_entries']} net {s['total_net']:.2f} {extra}")
+```
+
+Output:
+
+```text
+samples 602  filled 390
+queue   100: P(fill <= 1s) = 0.967
+queue   400: P(fill <= 1s) = 0.702
+queue  1600: P(fill <= 1s) = 0.346
+default  posted  40 filled  18 taker 0 net -15.83 {}
+x4       posted  31 filled  20 taker 0 net -13.44 {'entry_reprices': 6, 'hazard_give_ups': 11, 'post_only_slides': 0}
+```
+
+How to read it. The fitted fill probability falls with the queue ahead, as
+it must. In the X4 run, 6 expired entries were reposted at the new touch and
+11 were abandoned because the hazard gave a repost less than a 20% chance of
+filling within the ttl; the reprices lift the fill count (18 to 20) from
+fewer first posts. These are a few dozen trips on one synthetic stream: the
+net difference is not evidence of anything. `fill_hazard.json` (schema
+`iap.fill_hazard/1`) can also be registered with
+`hz.register(registry_dir, dataset_version=..., date_range=..., features=...,
+seed=..., exploratory=True)` (recipe 50).

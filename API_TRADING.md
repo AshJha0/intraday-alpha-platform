@@ -598,6 +598,63 @@ shrunk to the U-shape with weight `k / (days + k)`), as an
 `load_volume_curve(path, instrument_id)` feeds `ParentOrder(volume_curve=...)`;
 `curve_slice_weights` resamples the bins to the parent's slices.
 
+### 2.9 Fill hazard, post-only, multiple reprices, markout feedback (v1.12.0, Python only)
+
+Plan item X4. Every option is off by default: the FIFO simulator, the
+cross-language fill goldens (C++ `execution` pins Python `iap.execution`) and
+the default `MakerBacktester` / `QuotingBacktester` outputs are byte-identical
+to v1.11 (a fingerprint test pins the latter). C++, Java and Rust are untouched.
+
+**Fill hazard — `iap.execution.fill_hazard`.** `FillHazardModel(edges_ns,
+link="cloglog"|"logit", ridge)` is a grouped-time hazard: per time bucket
+`h_b(x) = 1 - exp(-exp(a_b + beta . z(x)))` (cloglog = the exact discrete form
+of a proportional-hazards / Cox model with a piecewise-constant baseline).
+`z` standardises `log1p(queue_ahead)`, `log1p(depletion_per_s)`,
+`spread_ticks`, `imbalance` and sin/cos of the time of day
+(`hazard_features(...)` builds one row; training and decisions use the same
+function). `fit(samples)` expands survival samples (`duration_ns`, `filled`,
+censored at the ttl) into person-period rows and runs Newton/IRLS (numpy, no
+RNG: same data, same bytes). `p_fill_within(x, t_ns)` = `1 - prod (1 -
+h_b)^(overlap/width)`. `samples_from_maker_labels(labels, ttl_ns=...)` turns
+the v1.9 M3 maker labels into samples (taker rows dropped). Persistence:
+`to_dict` / `save` / `load`, schema `iap.fill_hazard/1`, sorted-key JSON;
+`register(registry, ...)` / `from_registry` use the v1.11 `iap.mlops`
+registry (kind `classifier`, the JSON in `params`).
+
+**Post-only — simulator rule 10.** `ChildOrder(post_only="reject"|"slide")`
+(default `""` = the pinned behaviour). On arrival at an open venue a post-only
+LIMIT that reaches the displayed opposite touch is cancelled
+(`CancelReason.POST_ONLY_REJECT`) or slid to one tick inside it; it never
+takes liquidity. `sim.post_only_rejects` / `sim.post_only_slides` count them
+outside the pinned `ExecCounters`.
+
+**Maker backtest (`MakerConfig`, rule 7).** `post_only` applies to the entry
+and passive-exit posts. `entry_reprices=N` reposts an entry that expired or
+was rejected unfilled at the current touch (`reprice_policy="follow"`), each
+with a fresh `ttl_ns`; `reprice_policy="hazard"` reposts only while
+`P(fill within ttl) >= hazard_give_up_prob` (needs
+`MakerBacktester(..., fill_hazard=model)`). A give-up does nothing
+(`give_up="cancel"`) or sends a MARKET entry (`give_up="cross"`).
+`min_fill_prob` is a tail condition on the hazard probability at decision
+time. `feedback=FeedbackConfig(...)` adapts posting to realised markouts.
+New counters (`entry_reprices`, `hazard_give_ups`, `give_ups`,
+`give_up_crosses`, `fill_prob_out`, `post_only_*`, `feedback_*`) appear only
+when their option is on. The fixed `max_reprices=1` of the PASSIVE execution
+policy (`PassiveParams`, cross-language golden) is unchanged.
+
+**Markout feedback — `iap.execution.markout_feedback`.**
+`MarkoutFeedback(FeedbackConfig(mode="stand_down"|"widen"|"reduce",
+horizon_ns, halflife, threshold_bps, min_fills, cooldown_ns, widen_ticks,
+size_mult))`. Each passive fill's markout `1e4 * s * (m_h - p) / p` (positive
+= good, the `iap.tca.markout` sign) enters an EWMA only once `fill_ts +
+horizon_ns` has passed on the replay clock (causal). Toxic = at least
+`min_fills` known and `ewma < -threshold_bps` (a negative threshold demands a
+minimum earned markout). Then `stand_down` posts nothing for `cooldown_ns`
+(then the EWMA resets), `widen` posts `widen_ticks` behind the wanted price,
+`reduce` posts `size_mult` of the size. `QuotingConfig(post_only=...,
+feedback=...)` applies both to two-sided quoting (stand-down pulls both
+quotes). COOKBOOK recipe 56.
+
 ## 3. Where the rules live
 
 | rule set | normative text | Python port entry |

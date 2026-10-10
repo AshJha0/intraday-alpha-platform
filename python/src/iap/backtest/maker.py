@@ -77,6 +77,24 @@ Pinned rules (``MakerBacktester.run_instrument``):
    the completing fill (or at the cross): a fully passive exit has NEGATIVE
    exit slippage (the second half-spread, earned), a timeout pays it. The
    identity is tested for every exit mode.
+7. **X4 options** (v1.12, every one off by default; the default run is
+   byte-identical to v1.11). ``post_only`` (``"reject"`` / ``"slide"``)
+   sends the entry and passive-exit posts as post-only LIMITs (simulator
+   rule 10). ``entry_reprices = N`` reposts an entry that expired or was
+   rejected unfilled at the CURRENT touch (``reprice_policy="follow"``) up to
+   N times, each with a fresh ``ttl_ns``; with ``reprice_policy="hazard"``
+   a repost is made only while the fill-hazard model
+   (:mod:`iap.execution.fill_hazard`, ``MakerBacktester(fill_hazard=...)``)
+   gives ``P(fill within ttl_ns) >= hazard_give_up_prob`` at the current
+   book, otherwise the entry gives up early. A give-up (or reprices
+   exhausted) does nothing with ``give_up="cancel"`` and sends a MARKET
+   entry with ``give_up="cross"`` (a taker entry). ``min_fill_prob`` is a
+   tail condition on the same hazard probability at decision time.
+   ``feedback`` (:class:`iap.execution.markout_feedback.FeedbackConfig`)
+   registers every passive entry fill and, once its markout at the feedback
+   horizon is known, updates the EWMA; while toxic, a decision stands down
+   (``feedback_stood_down``), posts ``widen_ticks`` behind the touch, or
+   posts a reduced size. The extra counters appear only when the option is on.
 """
 
 from __future__ import annotations
@@ -92,10 +110,14 @@ import pandas as pd
 from iap.core.events import MarketEvent
 from iap.execution.calibration import ExecCalibration, apply_calibration
 from iap.execution.config import ExecConfig
+from iap.execution.fill_hazard import FillHazardModel, hazard_features
+from iap.execution.markout_feedback import FeedbackConfig, MarkoutFeedback
 from iap.execution.simulator import ExecutionSimulator
-from iap.execution.types import ChildOrder, Liquidity, OrderType
+from iap.execution.types import CancelReason, ChildOrder, Liquidity, OrderType
 
 EXIT_MODES = ("taker", "mid", "passive")
+REPRICE_POLICIES = ("follow", "hazard")
+GIVE_UP_MODES = ("cancel", "cross")
 
 
 @dataclass(frozen=True)
@@ -126,8 +148,33 @@ class MakerConfig:
     min_abs_er: float = 0.0
     min_queue_imbalance: float | None = None
     min_p_far_deplete: float | None = None
+    # ---- v1.12 X4 options (rule 7; defaults = off) ----
+    #: "" (off), "reject" or "slide": post-only entry / exit posts
+    post_only: str = ""
+    #: reposts of an entry that expired / was rejected unfilled
+    entry_reprices: int = 0
+    reprice_policy: str = "follow"
+    #: what an entry does when it gives up: nothing, or cross as a taker
+    give_up: str = "cancel"
+    #: hazard policy: repost only while P(fill within ttl) >= this
+    hazard_give_up_prob: float = 0.0
+    #: tail condition: hazard P(fill within ttl) at decision time
+    min_fill_prob: float | None = None
+    feedback: FeedbackConfig | None = None
 
     def __post_init__(self) -> None:
+        if self.post_only not in ("", "reject", "slide"):
+            raise ValueError("post_only must be '', 'reject' or 'slide'")
+        if self.entry_reprices < 0:
+            raise ValueError("entry_reprices must be >= 0")
+        if self.reprice_policy not in REPRICE_POLICIES:
+            raise ValueError(f"reprice_policy must be one of {REPRICE_POLICIES}")
+        if self.give_up not in GIVE_UP_MODES:
+            raise ValueError(f"give_up must be one of {GIVE_UP_MODES}")
+        for name in ("hazard_give_up_prob", "min_fill_prob"):
+            v = getattr(self, name)
+            if v is not None and not 0.0 <= v <= 1.0:
+                raise ValueError(f"{name} must be in [0, 1]")
         if self.qty <= 0 or self.ttl_ns <= 0 or self.horizon_ns <= 0:
             raise ValueError("qty, ttl_ns and horizon_ns must be positive")
         if self.exit not in EXIT_MODES:
@@ -287,10 +334,15 @@ class MakerBacktester:
         exec_config: ExecConfig,
         config: MakerConfig | None = None,
         calibration: ExecCalibration | None = None,
+        fill_hazard: FillHazardModel | None = None,
     ) -> None:
         self.calibration = calibration
         self.exec_config = apply_calibration(exec_config, calibration)
         self.config = config or MakerConfig()
+        self.fill_hazard = fill_hazard
+        needs = self.config.reprice_policy == "hazard" or self.config.min_fill_prob is not None
+        if needs and fill_hazard is None:
+            raise ValueError("reprice_policy='hazard' / min_fill_prob need fill_hazard=")
 
     def adverse_selection(self, instrument_id: int) -> tuple[float, str]:
         """(bps, source) of the gate's adverse-selection term."""
@@ -335,6 +387,15 @@ class MakerBacktester:
         as_bps, as_source = self.adverse_selection(instrument_id)
         tick = ins.tick_size
         unit = ins.qty_unit
+        x4_entry = cfg.entry_reprices > 0 or cfg.give_up == "cross"
+        fb = MarkoutFeedback(cfg.feedback) if cfg.feedback is not None else None
+        cx: dict[str, int] = {}  # rule-7 counters, reported only when used
+        if x4_entry:
+            cx.update(entry_reprices=0, hazard_give_ups=0, give_ups=0, give_up_crosses=0)
+        if cfg.min_fill_prob is not None:
+            cx["fill_prob_out"] = 0
+        if fb is not None:
+            cx.update(feedback_stood_down=0, feedback_widened=0, feedback_reduced=0)
 
         sim = ExecutionSimulator(self.exec_config, self.calibration)
         c = dict.fromkeys(
@@ -405,6 +466,81 @@ class MakerBacktester:
                 return p_exit * (-1e4 * hs / mid - rebate_bps(mid)) + (1.0 - p_exit) * taker
             return taker
 
+        def p_fill(side: int, bs, t: int) -> float:
+            (bpx, bq), (apx, aq) = bs
+            ours, far = (bq, aq) if side == 0 else (aq, bq)
+            dep = (
+                None
+                if self.calibration is None
+                else self.calibration.queue_depletion_hazard(side, ours)
+            )
+            x = hazard_features(
+                queue_ahead=ours,
+                spread_ticks=apx - bpx,
+                imbalance=ours / (ours + far) if ours + far > 0 else 0.0,
+                depletion_per_s=dep,
+                ts_ns=t,
+            )
+            return float(self.fill_hazard.p_fill_within(x, cfg.ttl_ns))
+
+        def submit_entry(t: int, side: int, qty: int, limit: int) -> None:
+            oid = sim.submit(
+                ChildOrder(
+                    instrument_id=instrument_id,
+                    venue_id=venue_id,
+                    side=side,
+                    type=OrderType.LIMIT,
+                    qty=qty,
+                    limit_ticks=limit,
+                    decision_ts=t,
+                    expire_ts=t + cfg.ttl_ns,
+                    post_only=cfg.post_only,
+                )
+            )
+            st["order"] = oid
+            st["side"] = side
+
+        def give_up(t: int) -> None:
+            ctx = st.pop("ctx")
+            if cfg.give_up != "cross":
+                cx["give_ups"] += 1
+                return
+            cx["give_up_crosses"] += 1
+            st["order"] = sim.submit(
+                ChildOrder(
+                    instrument_id=instrument_id,
+                    venue_id=venue_id,
+                    side=ctx["side"],
+                    type=OrderType.MARKET,
+                    qty=ctx["qty"],
+                    decision_ts=t,
+                )
+            )
+            st["side"] = ctx["side"]
+
+        def entry_unfilled(t: int) -> None:
+            """Rule 7: repost (follow the touch / hazard) or give up."""
+            ctx = st["ctx"]
+            if ctx["reprices"] >= cfg.entry_reprices:
+                give_up(t)
+                return
+            bs = book_state()
+            if bs is None:
+                give_up(t)
+                return
+            if cfg.reprice_policy == "hazard" and p_fill(ctx["side"], bs, t) < (
+                cfg.hazard_give_up_prob
+            ):
+                cx["hazard_give_ups"] += 1
+                give_up(t)
+                return
+            ctx["reprices"] += 1
+            cx["entry_reprices"] += 1
+            (bpx, _), (apx, _) = bs
+            side = ctx["side"]
+            limit = bpx - ctx["widen"] if side == 0 else apx + ctx["widen"]
+            submit_entry(t, side, ctx["qty"], limit)
+
         def decide(r: int) -> None:
             c["decisions"] += 1
             if st["order"] is not None or st["pos"] != 0:
@@ -437,6 +573,10 @@ class MakerBacktester:
                 lam = self.calibration.queue_depletion_hazard(far_side, far_q)
                 p = None if lam is None else 1.0 - math.exp(-lam * cfg.horizon_ns / 1e9)
                 tail_ok = p is not None and p >= cfg.min_p_far_deplete
+            if tail_ok and cfg.min_fill_prob is not None:
+                tail_ok = p_fill(side, bs, int(ts[r])) >= cfg.min_fill_prob
+                if not tail_ok:
+                    cx["fill_prob_out"] += 1
             if not tail_ok:
                 c["tail_out"] += 1
                 return
@@ -444,21 +584,22 @@ class MakerBacktester:
             if not edge > as_bps + cfg.margin_bps:
                 c["gated_out"] += 1
                 return
-            oid = sim.submit(
-                ChildOrder(
-                    instrument_id=instrument_id,
-                    venue_id=venue_id,
-                    side=side,
-                    type=OrderType.LIMIT,
-                    qty=cfg.qty,
-                    limit_ticks=bpx if side == 0 else apx,
-                    decision_ts=int(ts[r]),
-                    expire_ts=int(ts[r]) + cfg.ttl_ns,
-                )
-            )
+            qty, widen = cfg.qty, 0
+            if fb is not None:
+                fb.advance(int(ts[r]), mid)
+                act = fb.action(int(ts[r]))
+                if act.stand_down:
+                    cx["feedback_stood_down"] += 1
+                    return
+                widen = act.widen_ticks
+                qty = act.size(cfg.qty)
+                cx["feedback_widened"] += int(widen > 0)
+                cx["feedback_reduced"] += int(qty < cfg.qty)
+            if x4_entry:
+                st["ctx"] = {"side": side, "qty": qty, "widen": widen, "reprices": 0}
+            limit = bpx - widen if side == 0 else apx + widen
+            submit_entry(int(ts[r]), side, qty, limit)
             c["posted"] += 1
-            st["order"] = oid
-            st["side"] = side
 
         def post_exit(t: int) -> bool:
             bs = book_state()
@@ -475,6 +616,7 @@ class MakerBacktester:
                     limit_ticks=apx if st["side"] == 0 else bpx,
                     decision_ts=t,
                     expire_ts=t + cfg.exit_timeout_ns,
+                    post_only=cfg.post_only,
                 )
             )
             st["exit_order"] = oid
@@ -586,6 +728,11 @@ class MakerBacktester:
             if ev.instrument_id != instrument_id:
                 continue
             t = ev.exchange_ts
+            if fb is not None:
+                # markouts due strictly before t are measured on the state
+                # after every event < t (rule 7)
+                bs0 = book_state()
+                fb.advance(t - 1, None if bs0 is None else 0.5 * (bs0[0][0] + bs0[1][0]) * tick)
             while r < n and ts[r] < t:
                 if st["pos"] != 0 and st["exit_due"] is not None and ts[r] >= st["exit_due"]:
                     break  # exit first; the decision is handled after it
@@ -629,6 +776,9 @@ class MakerBacktester:
                         liq=f.liquidity.name,
                     )
                     st["exit_due"] = f.ts + cfg.horizon_ns
+                    st.pop("ctx", None)
+                    if fb is not None and f.liquidity == Liquidity.MAKER:
+                        fb.on_fill(f.ts, f.side, f.price_ticks * tick)
                     c["filled_orders"] += 1
                     if f.liquidity == Liquidity.TAKER:
                         c["taker_entries"] += 1
@@ -644,6 +794,13 @@ class MakerBacktester:
             o = st["order"]
             if o is not None and sim.orders[o].is_terminal:
                 st["order"] = None
+                if (
+                    "ctx" in st
+                    and st["pos"] == 0
+                    and sim.orders[o].cancel_reason
+                    in (CancelReason.EXPIRED, CancelReason.POST_ONLY_REJECT)
+                ):
+                    entry_unfilled(t)
             eo = st["exit_order"]
             if eo is not None and sim.orders[eo].is_terminal:
                 st["exit_order"] = None  # expired: reprice or cross on the next event
@@ -678,6 +835,13 @@ class MakerBacktester:
             "net_bps",
             "forced",
         ]
+        if cfg.post_only:
+            cx.update(
+                post_only_rejects=sim.post_only_rejects, post_only_slides=sim.post_only_slides
+            )
+        if fb is not None:
+            cx.update(fb.counters)
+        c.update(cx)
         return MakerResult(
             instrument_id=instrument_id,
             trips=pd.DataFrame(trips, columns=cols),
