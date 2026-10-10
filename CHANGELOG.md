@@ -6,6 +6,48 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
+## v1.10.0 — unreleased
+
+### Governance (IAP_Next_Releases_Plan G1-G4)
+
+- **G1 — pre-registrations cost a look and commit to code.**
+  `WriteBroker.preregister` debits one look on the multiple-testing ledger
+  (`kind="prereg"`, default `research/experiments.json`, `--ledger` /
+  `--dataset-version` for a dataset ledger) and stores the alpha's code
+  fingerprint (`iap.agents.fingerprint`: sha256 of the alpha class and its
+  `iap.alpha` bases, the declared features closed over `depends_on`, and their
+  registry entries + family-module source) in a `format: 2` body. The research
+  gate (`prereg_gate.require`) refuses a run when the code or feature hash has
+  changed since registration; `preregister(..., supersede=True)` re-registers
+  changed code as a new look. New CLI: `python -m iap.agents.cli prereg`.
+  **Not retroactive**: the six 2026 holdout preregs (and any v1.9-format
+  prereg) carry no fingerprint, were never debited and are not debited now,
+  so the committed ledger numbers (5,156 looks over 216 configurations) and
+  every research report are unchanged.
+- **G2 — reserve attempt cap keyed on (alpha, horizon, code hash)**
+  instead of the whole candidate dict; unknown candidate fields are refused
+  and a code change since the prereg is refused.
+- **G3 — external anchoring.** `iap.agents.anchor` + `cli anchor` /
+  `cli verify-board`: every committed version of the blackboard must be a
+  prefix of the current one (catches re-chaining), and
+  `research/agents/anchors.json` records the first commit that contains each
+  entry (the six 2026 preregs: `6723fd0`).
+- **G4 — authenticated agent identity.** `WriteBroker(keys=...)` requires
+  every agent write to carry an HMAC-SHA256 signed request (agent, op,
+  argument digest, single-use nonce; `broker.sign`); forged, moved and
+  replayed requests are refused and the signed request is stored on the entry
+  (`auth`) for offline re-verification (`Blackboard.verify_signatures`,
+  `cli verify-board --keyfile`). `cli agent-keygen` writes keys outside the
+  repository. `research run --no-prereg` results now carry the eligibility
+  reason "not pre-registered (--no-prereg)", so the registry and lifecycle
+  promotion gates refuse them.
+
+**On-disk compatibility.** The blackboard format is unchanged except for an
+optional `auth` field that is covered by the entry hash, so v1.9 code verifies
+v1.10 boards and v1.10 verifies v1.9 boards; no migration. A board written by
+v1.9 code (e.g. a concurrent pre-registration on another branch) is accepted
+as is; its preregs are treated as legacy (no fingerprint, no look debit).
+
 ## v1.9.0 — 2026-10-10
 
 Trustworthy evidence, then maker economics (IAP_Next_Releases_Plan v1.9:

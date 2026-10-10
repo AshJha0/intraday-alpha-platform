@@ -4,7 +4,8 @@ The evaluator holds a secret.  For each candidate and attempt it derives a
 session seed as HMAC(secret, candidate hash | attempt), runs the candidate on
 the session that seed generates, and returns ONLY pass/fail and the attempts
 left: never the seed, the statistic or the session.  Attempts per candidate
-are capped and every one is logged on the blackboard, so the reserve cannot
+are capped per (alpha, horizon, code hash) - since v1.10 (G2), not per
+candidate dict, so a dummy field cannot reset the cap - and every one is logged on the blackboard, so the reserve cannot
 be mined by trial and error.  The ``runner`` (seed, candidate) -> bool is
 injected; wiring it to the synthetic generator and the research runner is
 the evaluator operator's step (the secret never enters the repository or an
@@ -55,10 +56,31 @@ class ReserveEvaluator:
             if e["kind"] == "reserve" and e["body"]["candidate_id"] == candidate_id
         )
 
-    def evaluate(self, agent: str, candidate: Mapping[str, Any]) -> dict[str, Any]:
+    def candidate_id(self, alpha_id: str, horizon: str) -> str:
+        """The attempt-cap key (G2): (alpha, horizon, current code hash).
+
+        Only those three, so extra or reordered fields in the candidate do
+        not open a fresh set of attempts; changing the alpha's code does,
+        but then the code no longer matches its pre-registration (which
+        :meth:`evaluate` refuses) until it is re-registered - a new look."""
+        code = self.broker.fingerprinter(alpha_id)
+        code_hash = code.get("code_hash") if code else None
+        return digest({"alpha_id": alpha_id, "horizon": horizon, "code_hash": code_hash})[:16]
+
+    def evaluate(
+        self, agent: str, candidate: Mapping[str, Any], *, auth: Mapping | None = None
+    ) -> dict[str, Any]:
         """Pass/fail for one reserve attempt; the candidate must be pre-registered."""
         if agent not in self.broker.agents:
             raise ReserveError(f"unregistered agent {agent!r}")
+        unknown = sorted(set(candidate) - {"alpha_id", "horizon", "expected_sign"})
+        if unknown:
+            raise ReserveError(f"unknown candidate fields {unknown}")
+        candidate = {k: candidate.get(k) for k in ("alpha_id", "horizon", "expected_sign")}
+        try:
+            request = self.broker.authenticate(agent, "reserve", candidate, auth)
+        except ValueError as exc:
+            raise ReserveError(str(exc)) from exc
         alpha, horizon = candidate.get("alpha_id"), candidate.get("horizon")
         if not self.broker.is_preregistered(str(alpha), str(horizon)):
             raise ReserveError("candidate is not pre-registered")
@@ -70,14 +92,17 @@ class ReserveEvaluator:
         ]
         if not reg or reg[0]["expected_sign"] != sign:
             raise ReserveError("candidate expected_sign does not match its pre-registration")
-        cid = digest(dict(candidate))[:16]
+        registered = reg[0].get("code")
+        current = self.broker.fingerprinter(str(alpha))
+        if registered is not None and registered != current:
+            raise ReserveError("alpha code changed since its pre-registration")
+        cid = self.candidate_id(str(alpha), str(horizon))
         n = self.attempts(cid)
         if n >= self.max_attempts:
             raise ReserveError("reserve attempts exhausted for this candidate")
         passed = bool(self._runner(self._seed(cid, n), candidate))
-        self.broker.write_trusted(
-            EVALUATOR,
-            "reserve",
-            {"candidate_id": cid, "requested_by": agent, "attempt": n + 1, "passed": passed},
-        )
+        body = {"candidate_id": cid, "requested_by": agent, "attempt": n + 1, "passed": passed}
+        if request is not None:
+            body["request_auth"] = request
+        self.broker.write_trusted(EVALUATOR, "reserve", body)
         return {"candidate_id": cid, "passed": passed, "attempts_left": self.max_attempts - n - 1}

@@ -8,6 +8,11 @@
     apply   --approval FILE --keyfile PATH [--root .]
     reserve --agent ID --alpha EQ01 --horizon 1s --expected-sign 1
             --secret-file PATH [--root .] [--sessions 2]
+    agent-keygen --agent ID --keyfile PATH                     # G4 signing key
+    prereg  --agent ID --alpha EQ01 --horizon 1s --hypothesis "..." --expected-sign 1
+            [--keyfile PATH] [--ledger FILE] [--dataset-version V] [--supersede]
+    anchor                                                     # G3: write anchors.json
+    verify-board [--keyfile PATH]                              # G3/G4 verification
 
 ``issue`` is run by the person approving; ``apply`` verifies the signature,
 burns the nonce on the blackboard and performs the HUMAN lifecycle edge
@@ -118,6 +123,84 @@ def cmd_reserve(a: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_agent_keygen(a: argparse.Namespace) -> int:
+    """A per-agent signing key (G4) in a key file outside the repository."""
+    path = _outside(a.keyfile, a.root)
+    keys = _keys(path)
+    if a.agent in keys:
+        raise SystemExit(f"agent {a.agent!r} already has a key")
+    keys[a.agent] = secrets.token_hex(32)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(keys, sort_keys=True), encoding="ascii")
+    print(f"key for agent {a.agent!r} written to {path}")
+    return 0
+
+
+def cmd_prereg(a: argparse.Namespace) -> int:
+    """Pre-register a hypothesis (debits one look, records the code fingerprint)."""
+    from iap.agents.broker import BrokerError, sign
+
+    keys = None
+    auth = None
+    args = {
+        "alpha_id": a.alpha,
+        "horizon": a.horizon,
+        "hypothesis": a.hypothesis,
+        "expected_sign": a.expected_sign,
+    }
+    if a.keyfile is not None:
+        raw = _keys(_outside(a.keyfile, a.root))
+        if a.agent not in raw:
+            raise SystemExit(f"no key for agent {a.agent!r}")
+        keys = {a.agent: bytes.fromhex(raw[a.agent])}
+        auth = sign(keys[a.agent], a.agent, "preregister", args)
+    broker = WriteBroker(a.root, {a.agent}, keys=keys)
+    try:
+        pid = broker.preregister(
+            a.agent,
+            a.alpha,
+            a.horizon,
+            a.hypothesis,
+            a.expected_sign,
+            auth=auth,
+            ledger=a.ledger,
+            dataset_version=a.dataset_version,
+            supersede=a.supersede,
+        )
+    except BrokerError as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 1
+    print(f"pre-registered {a.alpha}/{a.horizon} as {pid} (one look debited)")
+    return 0
+
+
+def cmd_anchor(a: argparse.Namespace) -> int:
+    """Write research/agents/anchors.json: the first commit holding each entry (G3)."""
+    from iap.agents import anchor, prereg_gate
+
+    doc = anchor.anchors(a.root, prereg_gate.board_path(a.root))
+    out = a.root / anchor.ANCHORS_RELPATH
+    out.write_text(json.dumps(doc, indent=2, sort_keys=True) + "\n", encoding="ascii")
+    print(f"{len(doc['entries'])} entries anchored in {out}")
+    return 0
+
+
+def cmd_verify_board(a: argparse.Namespace) -> int:
+    """Chain + git-history (re-chaining) + anchors + signatures (G3, G4)."""
+    from iap.agents import anchor, prereg_gate
+    from iap.agents.blackboard import Blackboard
+
+    board = prereg_gate.board_path(a.root)
+    report = anchor.verify(a.root, board, a.root / anchor.ANCHORS_RELPATH)
+    if a.keyfile is not None:
+        raw = _keys(_outside(a.keyfile, a.root))
+        sig = Blackboard(board).verify_signatures({k: bytes.fromhex(v) for k, v in raw.items()})
+        report["problems"] += sig
+        report["ok"] = report["ok"] and not sig
+    print(json.dumps(report, indent=2, sort_keys=True))
+    return 0 if report["ok"] else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="iap.agents.cli")
     ap.add_argument("--root", type=Path, default=Path.cwd())
@@ -143,10 +226,33 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--expected-sign", type=int, choices=(-1, 1), required=True)
     r.add_argument("--secret-file", type=Path, required=True)
     r.add_argument("--sessions", type=int, default=2)
+    ak = sub.add_parser("agent-keygen")
+    ak.add_argument("--agent", required=True)
+    ak.add_argument("--keyfile", type=Path, required=True)
+    pr = sub.add_parser("prereg")
+    pr.add_argument("--agent", required=True)
+    pr.add_argument("--alpha", required=True)
+    pr.add_argument("--horizon", required=True)
+    pr.add_argument("--hypothesis", required=True)
+    pr.add_argument("--expected-sign", type=int, choices=(-1, 1), required=True)
+    pr.add_argument("--keyfile", type=Path, default=None)
+    pr.add_argument("--ledger", type=Path, default=None)
+    pr.add_argument("--dataset-version", default=None)
+    pr.add_argument("--supersede", action="store_true")
+    sub.add_parser("anchor")
+    vb = sub.add_parser("verify-board")
+    vb.add_argument("--keyfile", type=Path, default=None)
     a = ap.parse_args(argv)
-    return {"keygen": cmd_keygen, "issue": cmd_issue, "apply": cmd_apply, "reserve": cmd_reserve}[
-        a.cmd
-    ](a)
+    return {
+        "keygen": cmd_keygen,
+        "issue": cmd_issue,
+        "apply": cmd_apply,
+        "reserve": cmd_reserve,
+        "agent-keygen": cmd_agent_keygen,
+        "prereg": cmd_prereg,
+        "anchor": cmd_anchor,
+        "verify-board": cmd_verify_board,
+    }[a.cmd](a)
 
 
 if __name__ == "__main__":

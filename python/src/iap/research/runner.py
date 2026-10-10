@@ -184,6 +184,8 @@ LEDGER_KIND = "experiment_runner"
 SPEC_FILE = "spec.json"
 RESULT_FILE = "result.json"
 ELIGIBILITY_FILE = "eligibility.json"
+#: the eligibility reason a ``--no-prereg`` result carries (G4, v1.10)
+EXPLORATORY_REASON = "not pre-registered (--no-prereg): exploratory, not gate evidence"
 #: Prefix of the staging directory a new experiment is assembled in.
 STAGING_PREFIX = ".staging-"
 
@@ -463,7 +465,11 @@ class ExperimentRunner:
         repo_root: Path | None = None,
         normalized_dir: Path | None = None,
         gate: Callable[[ExperimentSpec], None] | None = None,
+        exploratory: bool = False,
     ) -> None:
+        #: ``--no-prereg`` run (G4): the result is recorded and ledgered but its
+        #: eligibility carries a reason, so registry / lifecycle gates refuse it
+        self.exploratory = bool(exploratory)
         if feature_store_dir is None and frames is None:
             raise ResearchError("ExperimentRunner needs a feature_store_dir or frames")
         #: eligibility of the most recent ``run`` (``None`` before any run)
@@ -799,6 +805,8 @@ class ExperimentRunner:
         self.last_report = report
         holdout = self._holdout(spec, full_window, factory)
         run_reasons: list[str] = []
+        if self.exploratory:
+            run_reasons.append(EXPLORATORY_REASON)
         if bundle.recompute_probe and report["leakage"]["recompute_ok"] is None:
             run_reasons.append(
                 "the recompute leakage probe did not run: no normalized event file for "

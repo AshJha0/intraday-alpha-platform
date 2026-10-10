@@ -138,6 +138,27 @@ the `research/experiments/<id>/` document, or the `ledger_key` of the
 the PR and in the `LifecycleTransition` document's reason. Reviewers reject
 a change with no id; the CI check for it is backlog issue L05.
 
+### 2a. Agent-layer research governance (v1.10, G1-G4)
+
+| Control | Enforced by | What it stops |
+|---|---|---|
+| A pre-registration debits one look on the ledger (`kind="prereg"`) | `WriteBroker.preregister` | unlimited free hypotheses |
+| The prereg body carries the alpha's code + feature fingerprint; a run with different code is refused | `iap.agents.fingerprint`, `prereg_gate.require` | changing the alpha after registering it |
+| Changed code needs `supersede=True` (a new look) | `WriteBroker.preregister` | silent re-registration |
+| Reserve attempts capped per (alpha, horizon, code hash); unknown candidate fields refused | `ReserveEvaluator` | resetting the cap with a dummy field |
+| Committed board versions must be prefixes of the current board; `research/agents/anchors.json` names the commit holding each entry | `iap.agents.anchor`, `python -m iap.agents.cli verify-board` | re-chaining the hash chain |
+| Agent writes signed (HMAC-SHA256 over agent, op, args digest, single-use nonce) on a keyed broker | `WriteBroker(keys=...)`, `Blackboard.verify_signatures` | impersonating an agent id, replay |
+| `--no-prereg` results carry an ineligibility reason | `ExperimentRunner(exploratory=True)` | exploratory runs used as promotion evidence |
+
+Not retroactive: pre-registrations written before v1.10 (the 2026 holdout
+six) have no fingerprint and were never debited; they still pass the gate and
+the committed ledger numbers do not move. Their code is anchored by commit
+`6723fd0` instead. Operator workflow: `python -m iap.agents.cli prereg ...`,
+then commit the board, then `python -m iap.agents.cli anchor` and commit
+`anchors.json`; `verify-board` before any gate run. Remaining limits: HMAC
+keys are symmetric (the verifier can forge; Ed25519 would need a non-stdlib
+dependency), and `fingerprint` hashes class source, not module-level helpers.
+
 ## 3. Audit-log policy
 
 Auditable events and where they are recorded:

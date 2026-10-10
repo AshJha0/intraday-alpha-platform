@@ -359,6 +359,7 @@ def _run(args: argparse.Namespace) -> int:
         repo_root=args.repo_root,
         normalized_dir=args.normalized_dir,
         gate=_runner_gate(args, prereg_entry),
+        exploratory=bool(args.no_prereg),
     )
     configuration = _parse_config(args.config)
     if args.methods is not None:
