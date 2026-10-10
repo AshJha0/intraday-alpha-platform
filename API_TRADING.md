@@ -546,8 +546,16 @@ The module docstring pins the rules:
 - changed quotes are cancelled and resubmitted through the latency path
   (the calibrated latency table when given); fills before the cancel lands
   count.
-- flatten at `flatten_ts` (default end of stream): sweep working orders,
-  cross the inventory at the touch with taker fee and linear impact.
+- flatten: from the first event at/after `flatten_ts - flatten_lead_ns`
+  (default: end of stream minus 1 s), quoting stops and every working quote
+  is cancelled through the latency path. Events keep being processed, so
+  quotes can still fill while their cancels are in flight
+  (`fills_during_cancel`). Before each event, while `q != 0`, the whole
+  `|q|` crosses at the touch with the taker fee and linear impact
+  (`flatten_rounds`). At the end of the stream any remainder crosses on the
+  last book, or is marked at the last mid when no two-sided book remains
+  (`forced_flatten`). `instant_cancel=True` keeps the old zero-latency sweep;
+  with all latencies at zero the two are identical (tested).
 - `QuotingResult.pnl`: `gross = spread_captured + markout + inventory_pnl +
   flatten_cost` (tested), `net = gross + rebates - taker_fees - impact`.
   `summary()` adds per-side fill rates (filled / posted qty), maker share,

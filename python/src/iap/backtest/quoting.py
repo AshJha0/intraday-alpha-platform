@@ -33,22 +33,34 @@ Pinned rules (``QuotingBacktester.run_instrument``):
 4. **Refresh.** A side whose desired price or size differs from its
    resting order is cancelled through the latency path and a new order is
    submitted; fills that land before the cancel arrives count.
-5. **Flatten.** At the first event at/after ``flatten_ts`` (default: after
-   the last event) every working order is swept (``cancel_all``) and the
-   inventory crosses at the touch of the pre-event book, paying the taker
-   fee and the linear impact rule; without a two-sided book it is marked
-   at the last mid (``forced_flatten``).
+5. **Flatten.** ``flatten_ts`` defaults to just after the last event; the
+   flatten starts at the first event at/after ``flatten_ts -
+   flatten_lead_ns``. From then on no requote is made, and every working
+   quote gets a cancel through the normal latency path (the calibrated
+   table when given). Events keep being processed, so a quote can still
+   fill while its cancel is in flight (``fills_during_cancel``); the fill
+   counts toward inventory. Before each event, while ``q != 0`` and the
+   book is two-sided, the whole ``|q|`` crosses at the pre-event touch,
+   paying the taker fee and the linear impact rule (one
+   ``flatten_rounds``). The run stops once flat with nothing working. At
+   the end of the stream the rest is swept (``cancel_all``) and any
+   remainder crosses on the last book, or is marked at the last mid
+   (``forced_flatten``) when no two-sided book remains.
+   ``instant_cancel=True`` replaces the latency-path cancels by an
+   immediate ``cancel_all`` (the old shortcut; identical to the latency
+   path when every latency is zero).
 6. **Accounting.** For fill ``i`` with signed qty ``d_i`` (+ buy), price
    ``p_i`` and pre-event mid ``m_i``, markout mid ``m_i^h`` (mid at
-   ``ts_i + markout_ns``, capped at the flatten time) and flatten mid
-   ``M``, since ``sum d_i = 0`` after flattening::
+   ``ts_i + markout_ns``, capped at the last flatten round), flatten round
+   ``f`` crossing at ``p_f`` with pre-event mid ``m_f`` and ``M`` the mid of
+   the last round, since ``sum d_i = 0`` after flattening::
 
        gross     = sum -d_i p_i
                  = spread_captured + markout + inventory_pnl + flatten_cost
        spread_captured = sum_quotes d_i (m_i - p_i)
        markout         = sum_quotes d_i (m_i^h - m_i)     (adverse selection, < 0 bad)
-       inventory_pnl   = sum_quotes d_i (M - m_i^h)
-       flatten_cost    = d_f (M - p_f)
+       inventory_pnl   = sum_quotes d_i (M - m_i^h) + sum_f d_f (M - m_f)
+       flatten_cost    = sum_f d_f (m_f - p_f)
        net       = gross + rebates - taker_fees - impact
 
    all times ``qty_unit``; the identity is tested.
@@ -91,6 +103,10 @@ class QuotingConfig:
     adverse_selection_bps: float | None = None
     markout_ns: int = 1_000_000_000
     flatten_ts: int | None = None
+    #: the flatten starts this long before ``flatten_ts`` (rule 5)
+    flatten_lead_ns: int = 1_000_000_000
+    #: pre-v1.10-M5-fix shortcut: sweep working quotes with no cancel latency
+    instant_cancel: bool = False
 
     def __post_init__(self) -> None:
         if self.qty <= 0 or self.max_inventory < self.qty:
@@ -99,6 +115,8 @@ class QuotingConfig:
             raise ValueError("gamma and k must be positive, tau_s >= 0")
         if self.sigma_halflife <= 0 or self.markout_ns <= 0:
             raise ValueError("sigma_halflife and markout_ns must be positive")
+        if self.flatten_lead_ns < 0:
+            raise ValueError("flatten_lead_ns must be >= 0")
 
 
 PNL_PARTS = ("spread_captured", "markout", "inventory_pnl", "flatten_cost")
@@ -211,6 +229,9 @@ class QuotingBacktester:
                 "bid_blocked_by_limit",
                 "ask_blocked_by_limit",
                 "forced_flatten",
+                "fills_during_cancel",
+                "flatten_rounds",
+                "flatten_start_ts",
             ),
             0,
         )
@@ -329,52 +350,21 @@ class QuotingBacktester:
         seen = 0
         last_mid: float | None = None
         r, n = 0, int(ts.size)
-        flattened = False
-        flat_mid = None
-        for ev in evs:
-            t = ev.exchange_ts
-            if t >= flat_ts:
-                break
-            while r < n and ts[r] < t:
-                decide(r)
-                r += 1
-            bs = book_state()
-            pre_mid = None if bs is None else 0.5 * (bs[0] + bs[1]) * tick
-            if pre_mid is not None:
-                last_mid = pre_mid
-            sim.on_event(ev)
-            post = book_state()
-            if post is not None:
-                mids_ts.append(t)
-                mids.append(0.5 * (post[0] + post[1]) * tick)
-            fl = sim.fills
-            while seen < len(fl):
-                f = fl[seen]
-                seen += 1
-                if f.order_id in mine:
-                    record(f, pre_mid if f.liquidity == Liquidity.MAKER else last_mid, False)
-        # ---- flatten (rule 5)
-        sim.cancel_all()
-        fl = sim.fills
-        while seen < len(fl):
-            f = fl[seen]
-            seen += 1
-            if f.order_id in mine:
-                record(f, last_mid, False)
-        t_end = min(flat_ts, evs[-1].exchange_ts)
-        bs = book_state()
-        if bs is not None:
-            flat_mid = 0.5 * (bs[0] + bs[1]) * tick
-        else:
-            flat_mid = last_mid if last_mid is not None else (fills[-1]["px"] if fills else 0.0)
-        if q[0] != 0:
+        start_ts = flat_ts - cfg.flatten_lead_ns
+        started = False
+        flat_fills: list[int] = []  # indices into ``fills`` of the flatten crosses
+
+        def cross(t: int, bs, mid: float | None) -> None:
+            """One flatten round: cross the whole |q| (rule 5)."""
             d = -q[0]
             qty = abs(d)
             if bs is None:
-                px = flat_mid
+                px = mid if mid is not None else (fills[-1]["px"] if fills else 0.0)
+                mid = px
                 fee = imp = 0.0
                 c["forced_flatten"] += 1
             else:
+                mid = 0.5 * (bs[0] + bs[1]) * tick
                 px = (bs[0] if d < 0 else bs[1]) * tick
                 notional = qty * unit * px
                 fee = (
@@ -386,22 +376,91 @@ class QuotingBacktester:
                     qty * unit / ins.adv * 100
                 )
                 imp = imp_bps * 1e-4 * notional
+            flat_fills.append(len(fills))
             fills.append(
                 {
-                    "ts": t_end,
+                    "ts": t,
                     "side": 0 if d > 0 else 1,
                     "qty": qty,
                     "px": px,
-                    "mid": flat_mid,
+                    "mid": mid,
                     "liquidity": "TAKER",
                     "fee": fee,
                     "impact": imp,
                     "flatten": True,
                 }
             )
+            c["flatten_rounds"] += 1
             q[0] = 0
-            inv_path.append((t_end, 0))
-            flattened = True
+            inv_path.append((t, 0))
+
+        def drain(mid: float | None) -> None:
+            nonlocal seen
+            fl = sim.fills
+            while seen < len(fl):
+                f = fl[seen]
+                seen += 1
+                if f.order_id in mine:
+                    if started:
+                        c["fills_during_cancel"] += 1
+                    record(f, mid, False)
+
+        def any_working() -> bool:
+            return any(not sim.orders[o].is_terminal for o in mine)
+
+        last_t = evs[0].exchange_ts
+        for ev in evs:
+            t = ev.exchange_ts
+            if not started and t >= start_ts:
+                started = True
+                c["flatten_start_ts"] = t
+                if cfg.instant_cancel:
+                    sim.cancel_all()  # the pre-v1.10 shortcut: no cancel latency
+                else:
+                    for o in sorted(mine):
+                        oo = sim.orders[o]
+                        if not oo.is_terminal and oo.cancel_arrival_ts == 0:
+                            sim.cancel(o, t)
+                            c["cancels"] += 1
+            if not started:
+                while r < n and ts[r] < t:
+                    decide(r)
+                    r += 1
+            elif q[0] == 0 and not any_working():
+                break  # flat with nothing resting: the flatten is complete
+            last_t = t
+            bs = book_state()
+            pre_mid = None if bs is None else 0.5 * (bs[0] + bs[1]) * tick
+            if pre_mid is not None:
+                last_mid = pre_mid
+            if started and q[0] != 0 and bs is not None:
+                cross(t, bs, pre_mid)
+            maker_mid = pre_mid
+            sim.on_event(ev)
+            post = book_state()
+            if post is not None:
+                mids_ts.append(t)
+                mids.append(0.5 * (post[0] + post[1]) * tick)
+            fl = sim.fills
+            while seen < len(fl):
+                f = fl[seen]
+                seen += 1
+                if f.order_id in mine:
+                    if started:
+                        c["fills_during_cancel"] += 1
+                    record(f, maker_mid if f.liquidity == Liquidity.MAKER else last_mid, False)
+        # ---- end of stream: sweep what is left, cross or mark the remainder
+        sim.cancel_all()
+        drain(last_mid)
+        if q[0] != 0:
+            cross(last_t, book_state(), last_mid)
+        if flat_fills:
+            flat_mid = fills[flat_fills[-1]]["mid"]
+            t_end = fills[flat_fills[-1]]["ts"]
+        else:
+            flat_mid = last_mid if last_mid is not None else 0.0
+            t_end = min(flat_ts, evs[-1].exchange_ts)
+        flattened = bool(flat_fills)
         fdf = pd.DataFrame(
             fills,
             columns=["ts", "side", "qty", "px", "mid", "liquidity", "fee", "impact", "flatten"],
@@ -418,8 +477,8 @@ class QuotingBacktester:
 
         if len(fdf):
             fdf["mid_h"] = [
-                flat_mid if fl_ else mid_at(int(t) + cfg.markout_ns)
-                for t, fl_ in zip(fdf["ts"], fdf["flatten"], strict=True)
+                m if fl_ else mid_at(int(t) + cfg.markout_ns)
+                for t, m, fl_ in zip(fdf["ts"], fdf["mid"], fdf["flatten"], strict=True)
             ]
             fdf["d"] = np.where(fdf["side"] == 0, 1.0, -1.0) * fdf["qty"] * unit
         else:
@@ -430,8 +489,9 @@ class QuotingBacktester:
         pnl = {
             "spread_captured": float((qt["d"] * (qt["mid"] - qt["px"])).sum()),
             "markout": float((qt["d"] * (qt["mid_h"] - qt["mid"])).sum()),
-            "inventory_pnl": float((qt["d"] * (flat_mid - qt["mid_h"])).sum()),
-            "flatten_cost": float((ft["d"] * (flat_mid - ft["px"])).sum()),
+            "inventory_pnl": float((qt["d"] * (flat_mid - qt["mid_h"])).sum())
+            + float((ft["d"] * (flat_mid - ft["mid"])).sum()),
+            "flatten_cost": float((ft["d"] * (ft["mid"] - ft["px"])).sum()),
         }
         pnl["gross"] = float((-fdf["d"] * fdf["px"]).sum())
         maker = fdf["liquidity"] == "MAKER"

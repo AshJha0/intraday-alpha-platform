@@ -134,3 +134,69 @@ def test_config_validation():
     with pytest.raises(ValueError):
         QuotingConfig(gamma=0)
     assert sharpe_per_day([1.0]) is None
+    with pytest.raises(ValueError):
+        QuotingConfig(flatten_lead_ns=-1)
+
+
+# ---------------------------------------------- realistic flatten (rule 5)
+def _cfg_with_latency(venue_ns: int, internal_zero: bool = False):
+    from dataclasses import replace
+
+    from iap.execution.types import LatencyConfig
+
+    base = exec_config()
+    venues = {k: replace(v, latency_mean_ns=venue_ns) for k, v in base.venues.items()}
+    lat = LatencyConfig(0, 0, 0) if internal_zero else base.latency
+    return replace(base, venues=venues, latency=lat)
+
+
+def _mid_ts(events):
+    return events[len(events) // 2].exchange_ts
+
+
+def test_zero_latency_flatten_matches_instant_sweep(events):
+    sc = make_scores(events)
+    xc = _cfg_with_latency(0, internal_zero=True)
+    kw = dict(flatten_ts=_mid_ts(events), flatten_lead_ns=0)
+    a = QuotingBacktester(xc, QuotingConfig(**kw)).run_instrument(events, sc, INS)
+    b = QuotingBacktester(xc, QuotingConfig(**kw, instant_cancel=True)).run_instrument(
+        events, sc, INS
+    )
+    assert a.counters["fills_during_cancel"] == 0
+    assert a.pnl == pytest.approx(b.pnl)
+    pd.testing.assert_frame_equal(a.fills, b.fills)
+    _identity(a)
+
+
+def test_quote_filling_during_cancel_latency_is_counted_and_flattened(events):
+    sc = make_scores(events, every=3)
+    xc = _cfg_with_latency(3_000_000_000)  # 3 s cancel latency
+    cfg = QuotingConfig(max_inventory=300, flatten_ts=_mid_ts(events), flatten_lead_ns=0)
+    res = QuotingBacktester(xc, cfg).run_instrument(events, sc, INS)
+    c = res.counters
+    assert c["fills_during_cancel"] > 0
+    assert c["flatten_rounds"] >= 1
+    f = res.fills
+    late = f[(~f["flatten"]) & (f["ts"] >= c["flatten_start_ts"])]
+    assert len(late) == c["fills_during_cancel"]
+    d = np.where(f["side"] == 0, 1, -1) * f["qty"]
+    assert d.sum() == 0
+    assert np.abs(np.cumsum(d)).max() <= 300
+    assert f["flatten"].iloc[-1]  # the last late fill was flattened
+    _identity(res)
+
+
+def test_flatten_lead_stops_quoting_early(events):
+    sc = make_scores(events)
+    end = events[-1].exchange_ts
+    a = QuotingBacktester(exec_config(), QuotingConfig(flatten_lead_ns=0)).run_instrument(
+        events, sc, INS
+    )
+    lead = (end - events[0].exchange_ts) // 2
+    b = QuotingBacktester(exec_config(), QuotingConfig(flatten_lead_ns=lead)).run_instrument(
+        events, sc, INS
+    )
+    assert b.counters["requotes"] < a.counters["requotes"]
+    assert b.counters["flatten_start_ts"] >= end + 1 - lead
+    _identity(a)
+    _identity(b)

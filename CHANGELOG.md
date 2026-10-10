@@ -13,7 +13,10 @@ that tag.
   quoter (Avellaneda-Stoikov style). The alpha shifts the reservation price.
   It enforces a hard inventory limit, refreshes quotes through the
   simulator's latency path, floors the half-spread at the calibrated adverse
-  selection, and flattens at the end of the session. It reports P&L
+  selection, and flattens at the end of the session. The flatten starts
+  `flatten_lead_ns` before the end, cancels through the latency path, lets
+  in-flight quotes still fill (`fills_during_cancel`) and crosses the
+  remainder in repeated rounds (`flatten_rounds`). It reports P&L
   decomposed into spread captured, markout, inventory, flatten cost, rebates
   and fees (identity tested), fill rates, inventory path statistics and a
   Sharpe ratio per day. Opt-in and Python only: `backtest/maker.py` and every
