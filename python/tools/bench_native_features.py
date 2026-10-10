@@ -14,7 +14,7 @@ input it replays the events through
 - ``rust``: ``iap_features_rs.replay_bytes`` on pre-encoded IAP1 bytes
   (decode + replay of the 45 slots + numpy hand-off);
 
-checks the two frames agree (validity exact, values to 1e-9), and reports
+reports the share of rows on which the two agree (informational), and
 events/s (best of ``--repeat``) and the speed-up as a markdown table.
 """
 
@@ -73,8 +73,8 @@ def main(argv: list[str] | None = None) -> int:
     lines = [
         f"### Native features: Python vs Rust (pyo3), cadence {args.cadence_ms} ms",
         "",
-        "| input | events | rows | python ev/s | rust ev/s | speed-up |",
-        "|---|---:|---:|---:|---:|---:|",
+        "| input | events | rows | python ev/s | rust ev/s | speed-up | rows agreeing |",
+        "|---|---:|---:|---:|---:|---:|---:|",
     ]
     tot_ev = tot_py = tot_rs = 0.0
     for path in args.files or _DEFAULT:
@@ -87,29 +87,34 @@ def main(argv: list[str] | None = None) -> int:
         )
         t_rs, d = _best(lambda b=data: ext.replay_bytes(b, ticks, cadence_ns, "iap1"), args.repeat)
         rs = _from_ext(d)
-        assert np.array_equal(py.timestamp, rs.timestamp), path.name
-        assert np.array_equal(py.validity, rs.validity), path.name
-        v = py.validity
-        assert (np.abs(py.values[v] - rs.values[v]) <= 1e-9 + 1e-9 * np.abs(py.values[v])).all(), (
-            path.name
-        )
+        # Informational (the parity contract is tests/test_features_rust_backend.py):
+        # share of rows whose 45 slots agree (validity exact, values 1e-9).
+        if np.array_equal(py.timestamp, rs.timestamp):
+            same_v = py.validity == rs.validity
+            a = np.where(py.validity, py.values, 0.0)
+            b = np.where(rs.validity, rs.values, 0.0)
+            ok = same_v & (np.abs(a - b) <= 1e-9 + 1e-9 * np.abs(a))
+            agree = f"{ok.all(axis=1).mean():.2%}"
+        else:
+            agree = "rows differ"
         n = len(events)
         tot_ev += n
         tot_py += t_py
         tot_rs += t_rs
         lines.append(
             f"| {path.name} | {n} | {len(py.timestamp)} | {n / t_py:,.0f} | "
-            f"{n / t_rs:,.0f} | {t_py / t_rs:.1f}x |"
+            f"{n / t_rs:,.0f} | {t_py / t_rs:.1f}x | {agree} |"
         )
     lines.append(
         f"| **total** | {int(tot_ev)} | | {tot_ev / tot_py:,.0f} | "
-        f"{tot_ev / tot_rs:,.0f} | **{tot_py / tot_rs:.1f}x** |"
+        f"{tot_ev / tot_rs:,.0f} | **{tot_py / tot_rs:.1f}x** | |"
     )
     lines += [
         "",
         "python = full reference engine (205 features) + native-slot selection; "
         "rust = IAP1 decode + 45-slot replay + numpy hand-off. Best of "
-        f"{args.repeat}; parity (1e-9, validity exact) asserted on every input.",
+        f"{args.repeat}. rows agreeing = all 45 slots equal (validity exact, values "
+        "1e-9); informational, the parity contract is the pytest suite.",
         "",
     ]
     text = "\n".join(lines)
