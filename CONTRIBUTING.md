@@ -23,6 +23,18 @@ the working procedure.
   that starts `schema:` and names the `x-version` change.
 - Rebase on `main` before requesting review; no merge commits inside a
   branch.
+- **Frozen language copies (since v1.11.0).** `docs/POLYGLOT.md` marks most
+  duplicated copies (the Rust codec, book, replay, alpha, contracts and
+  lifecycle crates, the C++ contracts, the Java ports) FROZEN: new behaviour
+  lands in the canonical copy. A PR that changes a frozen path must carry a
+  line that *starts* with `POLYGLOT-OVERRIDE: <reason>` in a commit message
+  or the PR body, and one that adds a function, method or type to a frozen
+  copy needs `POLYGLOT-OVERRIDE: new-api <reason>`. The legitimate reason is
+  porting a pinned change the canonical copy already made, in the same PR,
+  with the regenerated golden. CI enforces it
+  (`tests/harness/check_polyglot_policy.py`); run it locally with
+  `python3 tests/harness/check_polyglot_policy.py --base origin/main`
+  (COOKBOOK recipe 53).
 
 ## 2. Build and test — the commands CI runs
 
@@ -39,6 +51,16 @@ python3 tests/harness/check_deployment.py --verbose      # deployment checks
 ruff check python tests tools research deployment        # lint (ruff==0.16.10, config: ruff.toml)
 ruff format --check python tests tools research deployment   # formatting (drop --check to apply)
 ```
+
+Optional pieces, not needed for the commands above: the `[ml]` extra
+(`pip install -e "python[ml]"`: xgboost, lightgbm), the `[llm]` extra
+(`pip install -e "python[llm]"`: the Anthropic SDK for `iap.llm`; tests and
+CI use the scripted client and never call a model; never commit a key, and
+`.env` files are git-ignored), and the pyo3 feature wheel, built with
+`maturin build --release -m rust/features_py/Cargo.toml` (needs a Rust
+toolchain; the CI job `rust-pyo3` builds it and runs its parity tests;
+COOKBOOK recipe 52). The policy gate runs with
+`python3 tests/harness/check_polyglot_policy.py --self-test`.
 
 Each language's full run must stay under 120 s; the repo-level suites well
 under a minute. (The Python run is the exception under CI's coverage
@@ -63,9 +85,9 @@ fills are exact integers; features, alphas, portfolio and TCA compare at
 abs and rel 1e-9; adaptive PSI/KS at 1e-10 with exact refit booleans and
 lifecycle state sequences; canonical-JSON lines, trace digests, the risk
 audit / snapshot and the lifecycle registry are byte-identical; the 7-state
-lifecycle golden is compared exactly, field by field. The v1.10.0 table
-(2026-10-10, counts from CI) reads python 2154 / cpp 302 / rust 358 /
-java 571 (golden 192/72/71/124), `integration` 35, `replay` 6.
+lifecycle golden is compared exactly, field by field. The v1.11.0 table
+(2026-10-10, counts from CI) reads python 2185 / cpp 302 / rust 358 /
+java 571 (golden 193/72/71/124), `integration` 35, `replay` 6.
 
 ## 4. Golden regeneration protocol
 
@@ -244,7 +266,8 @@ milestones, epics and issues; `docs/EPICS.md` is generated from it and
 
 ## 9. Documentation that moves with the code
 
-A behaviour change updates its contract in the same PR: `API_CORE.md`,
+A behaviour change updates its contract in the same PR (and, for a
+duplicated component, `docs/POLYGLOT.md` if a copy's decision changes): `API_CORE.md`,
 `API_FEATURES.md`, `API_ALPHA.md`, `API_PORTFOLIO_TCA.md`, `API_ADAPTIVE.md`,
 `API_CONTRACTS.md`, `API_TRADING.md`, `PLATFORM_CONVENTIONS.md` §11–§13,
 `docs/LIFECYCLE.md` / `docs/DECISION_TRACE.md` / `docs/DATA_MODEL.md` /

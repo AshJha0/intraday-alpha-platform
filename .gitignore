@@ -20,6 +20,7 @@ research/models/*/model.pkl
 # swallow any directory of that name anywhere, e.g. a future research/out/)
 /cpp/build/
 /rust/target/
+/rust/features_py/target/
 /java/out/
 
 # --- python
@@ -63,3 +64,8 @@ python/src/iap/_schemas/
 # scripts, engine reports and the minimised divergence - regenerate, never commit
 /risk_fuzz_work/
 /risk_fuzz_artifacts/
+
+# --- secrets: API keys and agent signing keys never enter the repo
+.env
+*.env
+.iap_keys/

@@ -455,3 +455,57 @@ reports every P&L figure in USD.
 ("shifted").  The captured baseline (edges + expected_frac) and both
 cases' PSI / KS D / KS p are pinned at 1e-10.  Any port's PSI, KS and
 baseline-capture code must reproduce all of them from the recipe alone.
+
+## 9. Model registry, monitoring and shadow mode (`iap.mlops`, v1.11)
+
+Opt-in; no default path loads a registered model.
+
+**Registry** — `ModelRegistry(root)`; `register(model, *, name, kind, params,
+dataset_version, date_range, features, seed, metrics=None, prereg=None,
+exploratory=False, parent=None, code_hash=None, feature_registry_hash=None,
+alpha_id=None) -> ModelRecord`. Layout `<root>/<model_id>/{model.joblib,record.json}`.
+
+* `model_id = sha256(canonical({artefact_sha256, params, dataset_version,
+  date_range, features, feature_registry_hash, code_hash, seed}))`;
+  `artefact_sha256` hashes the joblib bytes. `code_hash` defaults to the
+  alpha's `iap.agents.fingerprint` code hash (`alpha_id=`) or the import
+  closure of `iap.models.zoo`/`metalabel`/`iap.backtest.maker`;
+  `feature_registry_hash` defaults to the current feature-registry hash.
+  Training metrics, the pre-registration link and the parent are recorded
+  (covered by `record_hash`) but are not part of the identity.
+* `prereg` must be a blackboard entry of kind `prereg` (e.g.
+  `iap.agents.prereg_gate.require(...)`); its `hash` is recorded as
+  `prereg_hash`. Without one, registration raises `RegistryError` unless
+  `exploratory=True` (recorded on the record).
+* Immutable: identical content is idempotent, different metadata under the
+  same id raises. `verify(id)` / `load(id) -> (model, record)` recompute the
+  artefact hash, id and `record_hash` and raise `TamperError` on mismatch.
+  Also `get`, `list(name=None)`, `ids`, `lineage(id)` (follows `parent`).
+* Wiring: `MakerFilter.from_registry(registry, model_id, tau=None)`,
+  `MakerFilter.register(registry, **meta)`,
+  `iap.models.zoo.load_registered(registry, model_id)`. Default behaviour of
+  `MakerFilter` and `make_model` is unchanged.
+
+**Monitoring** — `monitor(*, kind, ref_features, cur_features, ref_pred,
+cur_pred, ref_y, cur_y, thresholds=MonitorThresholds(), model_id=None) -> dict`
+with `status` `OK`/`ALERT`, `alerts`, `checks`.
+
+| check | statistic | ALERT when (defaults) |
+|---|---|---|
+| `feature_drift` / `prediction_drift` | PSI (pinned §2 recipe) + two-sample KS | `PSI >= 0.25`, or `KS p < 0.01 / n_columns` and `D >= 0.1` |
+| `calibration` (classifier) | reliability bins (10), Brier, ECE | `ECE > 0.10` or `ECE - ECE_ref > 0.05` |
+| `ic_decay` (regressor) | Spearman IC | `IC_ref - IC > 0.05`, or IC undefined |
+
+`calibration(prob, y, n_bins=10)` is exposed on its own.
+CLI: `python -m iap.mlops [--registry DIR] {list,show,verify,lineage,monitor}`;
+`monitor --reference R.npz --current C.npz --kind classifier|regressor [--out F]`
+(arrays = feature columns; reserved names `__pred__`, `__y__`); exit 1 on ALERT.
+
+**Shadow** — `ShadowRunner(champion, candidate, kind="classifier")`;
+`step(X)` returns the champion's decision mask, computed before and
+independently of the candidate (a raising candidate is recorded, not
+propagated). `compare(y, pnl=None) -> ShadowComparison` (IC, hit rate,
+Brier/ECE, allowed counts, P&L of each side's would-be decisions and the
+delta, agreement). `promotion_decision(comparison, evidence, config=None,
+to_state="ACTIVE")` promotes only when the candidate is better in shadow AND
+every gate of the lifecycle PROMOTION edge into `to_state` passes.

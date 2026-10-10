@@ -25,6 +25,9 @@
 #                                check rules/config, promtool test rules, the
 #                                Dockerfile/compose/k8s/ConfigMap/dashboard
 #                                checks and the docker build-context proof
+#   rust-pyo3                    maturin wheel of rust/features_py (pyo3),
+#                                Rust-vs-Python native-feature parity tests
+#                                and the events/s benchmark (job summary)
 #   cpp-sanitizers               ASan+UBSan ctest (blocking; green on first run)
 #   advisory                     ruff (blocking), pip-audit, cargo audit
 #                                (non-blocking); clippy is a blocking step of
@@ -285,6 +288,61 @@ jobs:
           path: coverage-rust-risk.xml
           if-no-files-found: ignore
 
+  # v1.11 E2: the native feature engine exposed to Python through pyo3
+  # (rust/features_py, a standalone package outside the workspace). Builds
+  # the abi3 wheel with maturin, installs it next to the research stack,
+  # runs the Rust-vs-Python parity tests on the golden vectors (they skip
+  # elsewhere, so they must RUN here) and writes the events/s benchmark to
+  # the job summary. Additive: no other job depends on it.
+  rust-pyo3:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # v1 (toolchain pinned by input)
+        with:
+          toolchain: "1.98.1"      # == rust/rust-toolchain.toml (check_deployment.py enforces)
+          components: clippy
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: rust/features_py
+      - name: Install the research stack + maturin
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r python/requirements-ci.txt maturin==1.7.8
+      - name: cargo clippy (features_py, blocking)
+        working-directory: rust/features_py
+        run: cargo clippy --all-targets -- -D warnings
+      - name: build + install the wheel (maturin)
+        run: |
+          maturin build --release -m rust/features_py/Cargo.toml -o dist
+          pip install dist/iap_features_rs-*.whl
+          python -c "import iap_features_rs as m; print(len(m.feature_names()), 'native slots')"
+      - name: parity tests (must run, not skip)
+        working-directory: python
+        env:
+          PYTHONPATH: src
+          PYTHONUTF8: "1"
+        run: |
+          python -m pytest -q -rs tests/test_features_rust_backend.py | tee /tmp/pyo3.txt
+          if grep -q "skipped" /tmp/pyo3.txt; then
+            echo "::error::Rust backend parity tests skipped — the extension did not import"
+            exit 1
+          fi
+      - name: speed benchmark (events/s, python vs rust) -> job summary
+        working-directory: python
+        env:
+          PYTHONPATH: src
+          PYTHONUTF8: "1"
+        run: |
+          python tools/bench_native_features.py --repeat 3 --summary "$GITHUB_STEP_SUMMARY"
+          python3 -m iap.marketdata > /dev/null
+          f=$(ls ../data/normalized/*.normalized.iap1 | head -n 1)
+          python tools/bench_native_features.py "$f" --max-events 200000 --cadence-ms 100             --repeat 1 --summary "$GITHUB_STEP_SUMMARY"
+
   java:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -456,6 +514,24 @@ jobs:
           sudo install -m 0755 /tmp/kubeconform /usr/local/bin/kubeconform
       - name: structural validation of deployment/
         run: python3 tests/harness/check_deployment.py --verbose
+      # docs/POLYGLOT.md (plan E3): a FROZEN language copy may change only with
+      # a `POLYGLOT-OVERRIDE: <reason>` line in a commit message or the PR
+      # body, and may not grow new functions/types without `... new-api ...`.
+      # Blocking on pull requests; advisory on push (a squash commit may not
+      # carry the PR body). The body goes through env, never inline.
+      - name: polyglot policy (frozen copies)
+        env:
+          POLYGLOT_PR_BODY: ${{ github.event.pull_request.body }}
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          python3 tests/harness/check_polyglot_policy.py --self-test
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            python3 tests/harness/check_polyglot_policy.py --base "origin/$BASE_REF"
+          elif [ -n "$BEFORE_SHA" ] && git cat-file -e "$BEFORE_SHA^{commit}" 2>/dev/null; then
+            python3 tests/harness/check_polyglot_policy.py --base "$BEFORE_SHA" --advisory
+          fi
       - name: headline numbers vs artefacts
         # exit 2 = only the research-ledger rows are stale (they move on every
         # research rerun); exit 1 = a platform number is wrong.

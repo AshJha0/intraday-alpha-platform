@@ -1,0 +1,31 @@
+# pyo3 bindings for the native feature engine (v1.11 E2).
+#
+# Deliberately NOT a member of the rust/ workspace: it links against
+# libpython, so `cargo test --workspace`, clippy and cargo-llvm-cov on the
+# workspace stay exactly as before and need no Python. The empty
+# [workspace] table makes this a standalone package. It is built only by
+# maturin (pyproject.toml next to this file) in the `rust-pyo3` CI job.
+[package]
+name = "iap_features_py"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+publish = false
+description = "Python (pyo3) bindings for the IAP native feature engine"
+
+[lib]
+name = "iap_features_rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+features = { path = "../features" }
+marketdata = { path = "../marketdata" }
+# Pinned exactly: pyo3 changes its API between minors. Bump both together
+# (rust-numpy tracks pyo3's minor). abi3: one wheel for every CPython >= 3.10.
+pyo3 = { version = "=0.22.6", features = ["extension-module", "abi3-py310"] }
+numpy = "=0.22.1"
+
+[workspace]
+
+[profile.release]
+overflow-checks = true

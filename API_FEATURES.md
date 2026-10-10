@@ -471,3 +471,54 @@ targets are <= 1 µs/event state update and <= 5 µs per 40-feature
 emission on the benchmark hardware (2 CPUs — methodology per
 `benchmarks/RESULTS.md`), with zero steady-state allocation
 (conventions §8).
+
+### 7.1 The Rust engine from Python (pyo3, v1.11.0)
+
+`rust/features_py` wraps the `features` crate in a pyo3 extension module,
+`iap_features_rs` (pyo3 0.22.6, numpy 0.22.1, maturin 1.7.8, one abi3 wheel
+for CPython >= 3.10). It is a standalone package outside the `rust/`
+workspace, so the workspace builds, tests and lints without libpython. It
+is optional: nothing in the Python package requires it.
+
+| call | returns |
+|---|---|
+| `replay_bytes(data, ticks, cadence_ns=0, format="iap1")` | dict of numpy arrays: `instrument_id` (u32), `event_index` (u64, input position of the emitting event), `timestamp` (i64), `values` (f64, n x 45, NaN where invalid), `validity` (bool, n x 45), plus the engine counters |
+| `replay_file(path, ticks, cadence_ns=0)` | the same, reading `.iap1` (else canonical JSONL) natively |
+| `feature_names()` / `native_count()` | the 45 slot names (the native 40 of §3, then 5 alpha inputs) / 40 |
+
+`ticks` maps instrument_id to tick size. The row buffers are built in Rust
+and moved into numpy without a copy, and the GIL is released during the
+replay. The Python surface is `iap.features.native`:
+`compute_native(events, contexts, cadence_ns, engine="python"|"rust")` and
+`compute_native_file(...)` return the same `NativeFrame` from either
+backend, and `resolve_engine("rust")` falls back to `"python"` with a
+warning when the extension is not installed. `python -m iap.features
+--engine rust` takes the 45 native columns of the feature store from the
+Rust engine (the rows must line up exactly per instrument, else that file
+keeps the Python values); the other 160 registry features are Python only,
+and the default (`--engine python`) output is unchanged.
+
+Parity (`python/tests/test_features_rust_backend.py`, runs in the
+`rust-pyo3` CI job and skips without the extension): on the two golden
+vectors of §5, at cadence 0 and 100 ms, every emitted row and every one of
+the 45 slots matches the Python reference, validity exactly and values at
+abs 1e-9 / rel 1e-9. One allowance: `vol_regime_ratio_v1 = rvol_w1m /
+(rvol_w5m + EPS)` on rows where `rvol_w1m` is within 1e-9 of 0 (an emptied
+window leaves float residue in one engine and exact 0 in the other) is
+compared at the input tolerance carried through the division. On the
+anomaly vectors every row matches as well, including the rows inside
+SNAPSHOT recovery bursts, which
+`tests/golden/expected_features_snapshot_burst.json` also pins for the Rust
+crate and the C++ and Java goldens. Before v1.11.0 the Rust, C++ and Java
+engines skipped the level update (L1, depth, mid, spread) on a staleness
+refresh (§2), so those rows differed.
+
+Speed (`python/tools/bench_native_features.py`, CI job summary, GitHub
+ubuntu-24.04 runner): about 5,000 events/s through the Python reference
+engine against 600,000 to 990,000 events/s through the extension: 150x
+on the four golden vectors at cadence 0 and 123x on the first seeded
+equity day (105,282 events, 100 ms cadence). The Python figure is the full
+205-feature engine, because there is no native-only Python engine, so the
+ratio is what a caller that needs only the native slots saves. It is not a
+pipeline speed-up: `--engine rust` still runs the Python engine for the
+other families.

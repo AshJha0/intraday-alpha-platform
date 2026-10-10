@@ -43,8 +43,8 @@ flowchart TD
 ## 2. Cross-language golden-test topology
 
 How one validated Python reference pins four implementations. The parity table is
-printed by `tests/harness/run_all.sh` (python 2154 · cpp 302 · rust 358 · java 571
-tests; 192/72/71/124 in the golden groups — the Java gate runs all seventeen
+printed by `tests/harness/run_all.sh` (python 2185 · cpp 302 · rust 358 · java 571
+tests; 193/72/71/124 in the golden groups — the Java gate runs all seventeen
 `*GoldenTest` classes, the Rust gate ten golden targets). Two goldens are
 owned by a port language and consumed by Python as well: the fills golden
 (C++) by `iap.execution`, the risk goldens (Rust) by `iap.risk`.
@@ -60,7 +60,7 @@ flowchart LR
     MG --> EXP[("expected_*.json<br/>codec sha256 | book states | features<br/>alpha | backtest | risk decisions + audit + snapshot<br/>replay fills | portfolio | tca (+ timeline cases) | adaptive<br/>contracts examples | canonical json + trace digest<br/>lifecycle | experiment golden frame | mvp")]
     CPPTOOL["cpp/tools/make_replay_fills_golden<br/>(C++ is the fills reference;<br/>Python iap.execution consumes it too)"] --> EXP
     RSTOOL["rust/risk/src/bin/make_risk_golden<br/>(Rust is the risk reference;<br/>Python iap.risk consumes it too)"] --> EXP
-    GV --> PY["python: pytest -k golden<br/>192 tests"]
+    GV --> PY["python: pytest -k golden<br/>193 tests"]
     GV --> CPP["cpp: ctest -R Golden<br/>72 tests"]
     GV --> RS["rust: 10 golden test targets<br/>71 tests"]
     GV --> JV["java: all seventeen *GoldenTest (JUnitCore)<br/>124 golden-group tests"]
@@ -1020,21 +1020,23 @@ flowchart LR
 
 ## 19. Agent layer as planned at v1.3.0 (most of it built since v1.7.0)
 
-**Status update (v1.10.0).** This diagram is the v1.3.0 design and is kept
+**Status update (v1.11.0).** This diagram is the v1.3.0 design and is kept
 as drawn. Since then the governance half has been built: the write broker,
 the hash-chained blackboard, pre-registration, the hidden-seed reserve,
 signed human approvals, the agent evaluations, untrusted-text handling and a
 read-only MCP server (v1.7.0), and costed, code-bound, git-anchored and
-Ed25519-signed pre-registrations (v1.10.0, diagram 23). What is still not
-built is the research agent itself: no LLM is called anywhere in the
-repository (plan items AI1-AI4, v1.11). The boundary at the bottom is
-unchanged.
+Ed25519-signed pre-registrations (v1.10.0, diagram 23). v1.11.0 added the
+research agent itself (`iap.llm`, diagram 26): an optional Claude model
+that works only through those controls, and only when an operator runs it
+with an API key. Nothing in the default build, the tests or CI calls a
+model. The boundary at the bottom is unchanged: no LLM or agent on the
+trading path.
 
 
-**This diagram describes a design, not the repository.** The upper subgraph
-is what exists at v1.3.0 and is useful without any agent; the lower one is the
-agent layer of backlog epics E24 and E30 ([EPICS.md](EPICS.md)), none of which
-has been built. The boundary at the bottom is pinned today (ARCHITECTURE.md
+**As drawn, this diagram described a design, not the repository.** The upper
+subgraph is what existed at v1.3.0 and is useful without any agent; the lower
+one is the agent layer of epics E24 and E30 ([EPICS.md](EPICS.md)), which was
+not built at v1.3.0 (see the status update above for what exists now). The boundary at the bottom is pinned today (ARCHITECTURE.md
 §11, PLATFORM_CONVENTIONS.md §13.7): no LLM or agent on the trading path,
 read-only, unable to override risk or send an order.
 Source: [`diagrams/agent_layer_planned.mmd`](diagrams/agent_layer_planned.mmd).
@@ -1231,8 +1233,11 @@ flowchart TD
 
 ## 25. Release roadmap, v1.9 to v1.11
 
-Plan items by release (docs/ROADMAP.md §3.4-3.5). Solid boxes are released
-or on the release branch; the maker study is running; v1.11 is planned.
+Plan items by release (docs/ROADMAP.md §3.4-3.6). v1.9.0 and v1.10.0 are
+released; v1.11.0 is this release. The real-data studies are running on
+their own branches, are exploratory and in-sample, and have no result
+reported here. Deferred items wait on data (A2, A3) or on evidence that a
+richer model is warranted (AI4).
 
 Source: [`diagrams/release_roadmap_v19_v111.mmd`](diagrams/release_roadmap_v19_v111.mmd).
 
@@ -1243,31 +1248,166 @@ flowchart LR
         E1["E1 parallel feature build"]
         M14["M1-M4 calibration, maker backtest,<br/>maker labels, tail sizing"]
     end
-    subgraph V110["v1.10.0, this release"]
+    subgraph V110["v1.10.0 (2026-10-10), released"]
         M5["M5 skewed two-sided quoting"]
         A1["A1 auction NOII + AUC01"]
         X["X1-X3 Almgren-Chriss,<br/>urgency, volume curve"]
         G["G1-G4 costed, code-bound, anchored,<br/>Ed25519-signed preregs"]
     end
-    subgraph RUN["running (research/maker-real)"]
-        MS["pre-registered in-sample maker study<br/>7 real sessions, no result yet"]
+    subgraph V111["v1.11.0, this release"]
+        E2["E2 Rust features via pyo3<br/>(opt-in --engine rust)"]
+        E3["E3 polyglot policy:<br/>18 canonical / 20 frozen, nothing deleted"]
+        AI3["AI3 model registry, drift,<br/>calibration, shadow mode"]
+        AI12["AI1-AI2 LLM research agent<br/>through the signed broker + evals"]
     end
-    subgraph V111["v1.11, planned"]
-        RV3["real batch re-run under v3"]
-        AUC["AUC01 on real files"]
-        A23["A2 ETF vs constituents, A3 futures lead-lag"]
-        E23["E2-E3 Rust features via pyo3"]
-        AI["AI1-AI4 LLM research agent<br/>through the signed broker"]
+    subgraph RUN["running (exploratory, in-sample, pre-registered)"]
+        MS["maker study, 7 real sessions<br/>(research/maker-real)"]
+        AUC["AUC01 auction + M5 quoting on real files<br/>(research/step2; AUC01 has a 2026 holdout)"]
+    end
+    subgraph LATER["deferred"]
+        A2["A2 QQQ vs constituents (more symbols)"]
+        A3["A3 futures lead-lag (on hold: data cost)"]
+        AI4["AI4 deep LOB baselines"]
     end
     M14 --> M5
     M14 --> MS
-    R --> RV3
-    G --> AI
     A1 --> AUC
-    MS -->|"if an in-sample edge:<br/>pre-register an out-of-sample test"| V111
+    M5 --> AUC
+    G --> AI12
+    E1 --> E2
+    E2 --> E3
 ```
 
-## 26. Where to go deeper
+## 26. The LLM research agent loop and its controls (v1.11, AI1-AI2)
+
+One session, from a tool call to a filed finding. The model only ever sees
+tool names, inputs and results; the key, the budget, the gate and the
+verifier sit in code around it. GOVERNANCE.md §2b, HOW_IT_WORKS.md §6.2,
+COOKBOOK recipes 51 and 55, LEARN.md §37.
+
+Source: [`diagrams/llm_agent_loop.mmd`](diagrams/llm_agent_loop.mmd).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant M as Claude model (sees 8 tools only)
+    participant S as Session (holds the Ed25519 key, budget)
+    participant B as WriteBroker (public keys only)
+    participant G as prereg_gate + dataset allowlist
+    participant R as runner (code computes metrics + verdict)
+    participant V as iap.llm.verify
+    participant P as llm_sessions/ID (transcript, tool log, reports)
+    M->>S: tool_use (name, input)
+    S->>S: refuse an unknown tool or an extra argument
+    S->>S: budget: USD (projected one call ahead), tokens, tool calls
+    M->>S: propose_hypothesis (draft, no look spent)
+    M->>S: preregister(draft)
+    S->>S: pre-registration cap per session
+    S->>B: signed request (agent, op, args digest, nonce)
+    B->>B: verify signature, fingerprint code, debit one look, append to board
+    M->>S: run_gated_study(alpha, horizon, dataset)
+    S->>G: registered on the verified board? dataset allowed? not run before?
+    G->>R: run
+    R->>P: report: metrics + verdict (the model cannot change it)
+    M->>S: file_finding(title, text, refs)
+    S->>V: every number in a numeric field of a cited artefact?
+    V-->>S: a number not found, rejected and logged
+    V->>B: all found, signed post_task / claim / file_finding / release
+    S->>P: every turn and tool call persisted, API key scrubbed
+```
+
+## 27. Model registry, monitoring and shadow mode (v1.11, AI3)
+
+How a fitted model becomes a citable, immutable record, how it is
+monitored, and why a candidate in shadow cannot act. API_ADAPTIVE.md §9,
+COOKBOOK recipes 50 and 54, LEARN.md §39.
+
+Source: [`diagrams/mlops_registry_shadow.mmd`](diagrams/mlops_registry_shadow.mmd).
+
+```mermaid
+flowchart TD
+    FIT["fitted model<br/>MakerFilter, iap.models.zoo"] --> REG["ModelRegistry.register"]
+    PRE["blackboard prereg entry<br/>(or exploratory = true, recorded)"] --> REG
+    META["dataset version + date range, features,<br/>feature-registry hash, code fingerprint, seed, params"] --> REG
+    REG --> ID["model id = content hash<br/>artefact (joblib) + canonical JSON record<br/>immutable; parent id for lineage"]
+    ID --> LOAD["from_registry / load_registered<br/>re-hash on load; mismatch refused"]
+    LOAD --> CH["champion: its decisions are used"]
+    LOAD --> MON["monitor(reference window, current window)"]
+    MON --> M1["feature drift: PSI, KS"]
+    MON --> M2["prediction drift: PSI, KS"]
+    MON --> M3["classifier: calibration ECE, Brier<br/>regressor: IC decay"]
+    M1 --> REP["JSON report: OK / ALERT<br/>CLI exit 1 on ALERT"]
+    M2 --> REP
+    M3 --> REP
+    CAND["candidate (registered)"] --> SH["ShadowRunner: same frames as the champion<br/>candidate decisions recorded, never used"]
+    CH --> SH
+    SH --> CMP["compare: IC, hit rate, calibration, P&L delta"]
+    CMP --> PD["promotion_decision"]
+    GATES["lifecycle PROMOTION gates"] --> PD
+    PD -->|"both pass"| NEW["candidate may replace the champion"]
+    PD -->|"either fails"| KEEP["champion kept"]
+```
+
+## 28. Polyglot policy: canonical and frozen copies (v1.11, E3)
+
+Which copy of each duplicated component takes new behaviour, and the gate a
+pull request passes when it touches a frozen one. POLYGLOT.md,
+COOKBOOK recipe 53, LEARN.md §38.
+
+Source: [`diagrams/polyglot_policy_map.mmd`](diagrams/polyglot_policy_map.mmd).
+
+```mermaid
+flowchart LR
+    subgraph CAN["CANONICAL: new behaviour lands here (18 copies)"]
+        PY["Python reference<br/>codec, book, replay, features (all 205),<br/>alpha, contracts, lifecycle, portfolio, TCA, backtest, adaptive"]
+        RRISK["Rust risk (normative rule text)<br/>+ Python iap.risk port"]
+        CEXEC["C++ execution + SOR (normative)<br/>+ Python iap.execution port"]
+        CHOT["C++ hot path<br/>codec, book, replay, features, alpha"]
+        RFEAT["Rust features (fast path)<br/>behind the pyo3 binding (E2)"]
+    end
+    subgraph FRZ["FROZEN: built, tested, golden-pinned, no new features (20 copies, 24 paths)"]
+        RF["Rust marketdata, orderbook, replay, contracts"]
+        RC["Rust alpha, lifecycle<br/>(RETIRE candidates, kept as parity evidence)"]
+        CC["C++ contracts"]
+        JV["Java core, codec, orderbook, replay, features, alpha,<br/>risk, execution, sor, contracts, trace, lifecycle,<br/>portfolio, tca, backtest, adaptive"]
+    end
+    GOLD[("tests/golden/<br/>pins every copy")] --> CAN
+    GOLD --> FRZ
+    PR["pull request"] --> GATE{"check_polyglot_policy.py<br/>(CI deployment job)"}
+    GATE -->|"touches a FROZEN path"| OV{"line starting<br/>POLYGLOT-OVERRIDE: reason?"}
+    OV -->|"no"| FAIL["fail"]
+    OV -->|"yes"| NA{"adds a function, method or type?"}
+    NA -->|"no"| PASS["pass"]
+    NA -->|"yes"| NA2{"POLYGLOT-OVERRIDE: new-api reason?"}
+    NA2 -->|"no"| FAIL
+    NA2 -->|"yes"| PASS
+    GATE -->|"canonical paths only"| PASS
+```
+
+## 29. Rust and Python feature backends behind one API (v1.11, E2)
+
+Both engines return the same `NativeFrame`; the Rust one is opt-in and
+covers only the 45 native slots. API_FEATURES.md §7.1, COOKBOOK recipes 49
+and 52, LEARN.md §36.
+
+Source: [`diagrams/rust_python_features.mmd`](diagrams/rust_python_features.mmd).
+
+```mermaid
+flowchart LR
+    EV["IAP1 or canonical JSONL events"] --> API["iap.features.native<br/>compute_native / compute_native_file<br/>engine = python or rust"]
+    API --> RES{"resolve_engine"}
+    RES -->|"python, or rust without the wheel<br/>(warning, falls back)"| PYE["Python reference engine<br/>all 205 features"]
+    RES -->|"rust"| EXT["iap_features_rs (pyo3 0.22.6, abi3 wheel,<br/>maturin 1.7.8; GIL released)"]
+    EXT --> RS["rust/features crate<br/>45 native slots: pinned 40 + 5 alpha inputs"]
+    PYE --> NF["NativeFrame<br/>values n x 45 (NaN where invalid),<br/>validity n x 45, ids, event index, timestamps"]
+    RS --> NF
+    NF --> STORE["python -m iap.features --engine rust<br/>45 native columns from Rust,<br/>other 160 from Python; default unchanged"]
+    PYE --> STORE
+    NF --> PAR["parity tests (rust-pyo3 CI job)<br/>every row and slot, validity exact, values 1e-9;<br/>anomaly vectors include SNAPSHOT recovery bursts"]
+    NF --> BEN["bench_native_features.py<br/>about 150x on the golden vectors (CI)"]
+```
+
+## 30. Where to go deeper
 
 | topic | document |
 |---|---|
@@ -1275,7 +1415,7 @@ flowchart LR
 | Governing institutional specification (verbatim) | [SPECIFICATION.md](SPECIFICATION.md) |
 | Teaching walkthrough of every subsystem | [../LEARN.md](../LEARN.md) |
 | How the quant, algo and AI sides work, top-down | [HOW_IT_WORKS.md](HOW_IT_WORKS.md) |
-| 48 runnable recipes | [../COOKBOOK.md](../COOKBOOK.md) |
+| 55 runnable recipes | [../COOKBOOK.md](../COOKBOOK.md) |
 | Data model, views, SQLite/PostgreSQL portability, query cookbook | [DATA_MODEL.md](DATA_MODEL.md) |
 | The 7-state promotion lifecycle: gates, evidence, registry, bootstrap result | [LIFECYCLE.md](LIFECYCLE.md) |
 | The decision trace: record, ids, canonical JSON, digest, sinks, replay | [DECISION_TRACE.md](DECISION_TRACE.md) |
@@ -1283,6 +1423,8 @@ flowchart LR
 | Typed contracts, Protocols, schema index, validation | [../API_CONTRACTS.md](../API_CONTRACTS.md) |
 | Python risk / execution reference ports and their golden parity | [../API_TRADING.md](../API_TRADING.md) |
 | Roadmap: what exists, with evidence; what is backlog | [ROADMAP.md](ROADMAP.md) |
+| Which language copy is canonical, which frozen; the `POLYGLOT-OVERRIDE` rule | [POLYGLOT.md](POLYGLOT.md) |
+| Research governance and the LLM agent's controls | [governance/GOVERNANCE.md](governance/GOVERNANCE.md) §2a-§2b |
 | The research methods (defaults since v1.5.0, with their legacy rules), the safe research store, gate eligibility | [RESEARCH_VALIDITY.md](RESEARCH_VALIDITY.md) |
 | Release notes | [../CHANGELOG.md](../CHANGELOG.md) |
 | Six research papers from the platform's own numbers | [papers/INDEX.md](papers/INDEX.md) |

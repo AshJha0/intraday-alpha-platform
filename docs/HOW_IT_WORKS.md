@@ -42,7 +42,11 @@ Three things to know before reading:
    2026 days (docs/REAL_DATA.md §3). The signals are real and too small to
    pay a taker at 1-5 s. v1.9.0 and v1.10.0 add the opt-in maker path,
    auction research, optimal-execution schedules and stronger research
-   governance; §3.6-§3.8 and §6.2 below explain them. Nothing in this
+   governance; §3.6-§3.8 and §6.2 below explain them. v1.11.0 adds an
+   optional LLM research agent that works only through that governance
+   (§6.2), a model registry with monitoring and shadow mode (§5.4), the
+   Rust feature engine callable from Python (§2.1a) and a policy that
+   freezes most duplicated language copies (§7.1). Nothing in this
    document claims a profitable strategy. Sections 1-5 describe the bundled
    synthetic dataset unless they say otherwise.
 
@@ -132,6 +136,33 @@ cross-asset, venue, regime, execution. The hash of the registry is the
 `feature_version` stamped on every experiment, so a result always says
 which definitions produced it. A 40-feature core set is also implemented
 natively in C++, Rust and Java and matched to 1e-9.
+
+### 2.1a The Rust feature engine from Python (v1.11, E2)
+
+The native core can be computed by the Rust engine from Python. A pyo3
+extension, `iap_features_rs` (one abi3 wheel for CPython 3.10 and newer,
+built with maturin in the `rust-pyo3` CI job, not installed by default),
+replays IAP1 or JSONL events through `rust/features` and returns 45 slots
+(the pinned 40 plus 5 alpha inputs) as numpy arrays. `iap.features.native`
+gives both engines one API, `compute_native(..., engine="python"|"rust")`,
+and falls back to Python with a warning when the wheel is missing;
+`python -m iap.features --engine rust` takes the 45 native columns of the
+feature store from Rust and leaves the other 160 to Python. The default
+output is unchanged.
+
+Measured in CI on the golden vectors: about 5,250 events/s through the
+Python reference and about 790,000 through Rust, 150x (123x on a seeded
+equity day at 100 ms). The Python number is the whole 205-feature engine,
+so the ratio is what a caller that needs only the native slots saves; the
+feature build as a whole is not 150x faster.
+
+Comparing the two engines on every row, rather than only at the golden
+checkpoints, found a real disagreement: inside a SNAPSHOT recovery burst
+the Rust engine read the half-built book, where API_FEATURES.md §2 pins the
+pre-burst derived state. The golden checkpoints sit outside bursts, so no
+golden test had seen it. The bug is corrected in v1.11.0. LEARN.md §36
+draws the lesson; diagram 29 in DIAGRAMS.md shows the two backends.
+**How to run it:** COOKBOOK recipes 49 and 52.
 
 ### 2.2 The alpha contract and the economic-rationale rule
 
@@ -1090,6 +1121,35 @@ PYTHONPATH=src python3 -m pytest -q tests/test_model_gate.py tests/test_adaptive
 `python3 research/ml_reports/run_ml.py` regenerates the report; it adds
 tracked model runs under `research/models/`, so run it deliberately.
 
+### 5.4 Model registry, monitoring and shadow mode (v1.11, AI3)
+
+Up to v1.10 a fitted model was a research object with no version: fitted
+in a script, scored, written into a report. `iap.mlops` makes it a citable
+record:
+
+- **Registry.** `ModelRegistry.register` stores the artefact and a
+  canonical JSON record whose id is a content hash over the artefact, the
+  parameters, the dataset version and date range, the feature set and
+  feature-registry hash, the code fingerprint and the seed. Records are
+  immutable; loading re-hashes and refuses a mismatch; a parent id gives
+  lineage. Registering needs a blackboard pre-registration entry (its hash
+  is stored) unless the model is marked `exploratory`, which is stored too.
+- **Monitoring.** `monitor` compares a current window with the reference:
+  feature and prediction drift (the §5.3 PSI and KS), calibration (ECE,
+  Brier, reliability bins) for classifiers and IC decay for regressors,
+  each OK or ALERT, as a JSON report; the CLI exits 1 on ALERT.
+- **Shadow mode.** `ShadowRunner` scores a candidate beside the champion
+  on the same frames and records its decisions without using them;
+  `compare` reports IC, hit rate, calibration and P&L delta, and
+  `promotion_decision` also requires the lifecycle PROMOTION gates.
+
+`MakerFilter.from_registry` / `.register` and
+`iap.models.zoo.load_registered` load by id; nothing loads from the
+registry unless asked. No registered model is on a trading path, and the
+registry does not make any model earn its costs. **Where to look:**
+`python/src/iap/mlops/`, API_ADAPTIVE.md §9, LEARN.md §39, DIAGRAMS.md
+diagram 27. **How to run it:** COOKBOOK recipes 50 and 54.
+
 ---
 
 ## 6. AI, LLMs and agents: the boundary, what exists, what is planned
@@ -1109,9 +1169,11 @@ failure mode is a plausible sentence. Hard limits must be code.
 
 ### 6.2 What exists today
 
-**No LLM is called anywhere in this repository.** What exists is the
-machinery that an automated researcher, human or model, would have to go
-through. It was built before any agent on purpose: an agent given the goal
+**Since v1.11 one optional component calls an LLM: the research agent
+(`iap.llm`, below), and only when an operator runs it with an API key.**
+Nothing on the trading path, in the default build, in the tests or in CI
+calls a model. What exists besides the agent is the machinery that an
+automated researcher, human or model, has to go through. It was built before any agent on purpose: an agent given the goal
 "get an alpha promoted" will find every shortcut §2.7 and §2.11 describe
 (cheaper costs, a chosen holdout, free looks) faster than a person.
 
@@ -1127,6 +1189,9 @@ through. It was built before any agent on purpose: an agent given the goal
 | read-only MCP server | v1.7.0 | six versioned read tools over stdio, no write path (AST-tested), no network listener | `iap.agents.mcp_server` (`iap-mcp --root .`) |
 | agent evaluations, untrusted text | v1.7.0 | planted leak, seeded bug, shuffled-label null, fabricated citation; free text returned wrapped and flagged | `iap.agents.evals`, `untrusted` |
 | governance G1-G4 | v1.10.0 | costed, code-bound, git-anchored, Ed25519-signed pre-registrations (below) | `iap.agents.fingerprint`, `anchor`, `signing` |
+| LLM research agent (AI1) | v1.11.0 | a Claude model drafts, pre-registers (signed, one look each), runs gated studies and files findings whose every number is verified against the cited artefact; budget caps; full transcript | `iap.llm.agent`, `verify`, `budget` (`python -m iap.llm`) |
+| agent behaviour evals (AI2) | v1.11.0 | p-hacking, prompt injection, hallucinated citations, task success on a planted alpha; mocked in CI, live on demand | `iap.llm.evals` |
+| model registry, monitoring, shadow mode (AI3) | v1.11.0 | content-hashed, immutable, prereg-linked models; drift and calibration checks; a candidate scored beside the champion without acting (§5.4) | `iap.mlops` |
 
 **The governance chain (v1.10).** One hypothesis, from registration to a
 gated run:
@@ -1170,13 +1235,49 @@ The import-policy test has stated gaps: it scans the guarded trading-path
 packages and not `iap.replay` or `iap.trace`, and nothing scans the Rust,
 C++ or Java trees; those are enforced in review.
 
+**The research agent (v1.11, AI1).** `python -m iap.llm` runs one session:
+the model sees eight tools (list alphas / features, propose, preregister,
+run gated study, read report, file finding, finish) and nothing else. The
+process holding the agent's Ed25519 key signs each broker request; the
+model never sees the key. `run_gated_study` passes the pre-registration
+gate first and refuses datasets that are not explicitly allowed; code
+computes the metrics and the verdict and writes a report. A finding is
+filed only if every number in it is found, up to the rounding shown, in an
+artefact it cites (`report:<session>.<run>`, `board:<hash>`); numbers in
+free-text fields do not count, so an injected "t = 9.87" cannot verify
+itself. Caps on estimated USD, tokens, tool calls and pre-registrations
+stop the session. Transcript, tool log and session summary are written
+under `research/agents/llm_sessions/<id>/`. The behaviour evals
+(`python -m iap.llm.evals`, AI2) check that the controls hold against a
+scripted adversarial model in CI, and against a real model when the release
+owner runs them with `--live`. GOVERNANCE.md §2b; COOKBOOK recipes 51
+and 55; DIAGRAMS.md diagram 26.
+
+**Why the model never computes a number.** A number written by a language
+model can be invented, derived in prose where nobody can check the method,
+or copied from text an attacker planted, and all three read like a correct
+number. So code computes every metric and the verdict, and a finding may
+only repeat numbers that already sit in a numeric field of an artefact it
+cites; LEARN.md §37 works through it.
+
+**What the evals showed.** Mocked (every CI run): the scripted model tries
+eight variants against a cap of three, follows a planted instruction and
+cites a report that does not exist; each control catches it, and each run
+with its control removed lets the failure through. Live (2026-10-10,
+`claude-haiku-5-5`, estimated $0.0096 for all four): 4 of 4 passed; the
+model took 1 pre-registration of its 3, did not follow the injected
+instruction and flagged it, filed 1 finding that re-verified, and found the
+planted EQ02 / 1 s effect. Because the live model behaved well, the live
+run did not stress the controls; the mocked adversarial runs are the
+evidence that the controls work.
+
 ### 6.3 What is still planned
 
-The research agent itself (plan items AI1-AI4, v1.11): an LLM that drafts
-hypotheses, registers them and runs experiments only through the signed
-broker, judged by the v1.7 agent evaluations, plus a model registry and
-drift checks for whatever it fits. The boundary in §6.1 does not move: the
-agent would act on the research record, never on the trading path.
+Deep order-book baselines (AI4) are deferred: on this data a
+higher-capacity model has nothing to find (§6.4). The model registry and
+drift checks that were planned here shipped in v1.11 (§5.4). The boundary
+in §6.1 does not move: the agent acts on the research record, never on the
+trading path.
 
 ### 6.4 What would be theatre on this data
 
@@ -1205,26 +1306,31 @@ reason for each:
   sessions add no data. Evidence comes from sessions, and the ledger
   already holds 5,156 looks at them (1,068 on the v1.3.0 dataset, the rest
   on the regenerated one). Debate multiplies looks; it does not add a
-  holdout. Without pre-registration and a hidden reserve seed — both
-  backlog — there is also no way to score who was right.
+  holdout. Pre-registration and a hidden reserve seed (built since v1.7)
+  are what would score who was right, and they score one registered
+  hypothesis at a time, which is what the v1.11 agent is limited to.
 
 What would not be theatre is the unglamorous list: real exchange data,
 measured latency, a simulator calibrated to live fills, book-level risk
-(EPICS E25–E28). The ingestion path for the first of these exists
-([REAL_DATA.md](REAL_DATA.md)); no real file has been run through it yet.
+(EPICS E25–E28). The ingestion path for the first of these exists and
+has been used: seven real Nasdaq ITCH sessions and two 2026 holdout days
+([REAL_DATA.md](REAL_DATA.md) §3).
 
 **Where to look**
 
 - `docs/ARCHITECTURE.md` §11, `PLATFORM_CONVENTIONS.md` §13.7.
 - `python/tests/test_import_policy.py`, `docs/RESEARCH_VALIDITY.md` §3–§5.
 - `docs/EPICS.md` — E24 and E30.
-- `docs/DIAGRAMS.md` §19 — the planned layer, labelled as backlog.
+- `docs/DIAGRAMS.md` §19 (the layer as planned at v1.3.0), §23 (the
+  governance chain) and §26 (the LLM agent loop).
+- `python/src/iap/llm/`, `docs/governance/GOVERNANCE.md` §2b.
 
 **How to run it**
 
 ```bash
 cd python
 PYTHONPATH=src python3 -m pytest -q tests/test_import_policy.py                         # the boundary, as a test
+PYTHONUTF8=1 PYTHONPATH=src python3 -m iap.llm.evals                                      # the agent evals, mocked: no key, no spend
 PYTHONPATH=src python3 -m iap.research --json-errors show 0000000000000000; echo "exit=$?"   # one JSON error object on stderr, exit 1
 PYTHONPATH=src python3 -m iap.store build > /dev/null
 PYTHONPATH=src python3 -m iap.store sql "SELECT pipeline_verdict, COUNT(*) AS n FROM v_alpha_scorecard_current GROUP BY pipeline_verdict ORDER BY pipeline_verdict"
@@ -1269,7 +1375,9 @@ What that buys:
 
 One honest limit: determinism makes results *reproducible*, not *right*.
 Three engines reproducing the same wrong answer pass every parity test.
-That is what the v1.3.0 review found, twice.
+That is what the v1.3.0 review found, twice. And engines that agree at
+every golden checkpoint can still disagree between them: v1.11's row-by-row
+Python/Rust comparison found the snapshot-burst bug that way (§2.1a).
 
 **Where to look**
 
@@ -1287,6 +1395,27 @@ PYTHONPATH=src python3 -m iap.mvp verify                                        
 PYTHONPATH=src python3 -m iap.mvp replay --run ../data/mvp/58a10f2194a3c81c      # same digest from the captured stream
 ```
 
+### 7.1 Which copy is canonical: the polyglot policy (v1.11, E3)
+
+Golden tests keep the copies of a component equal; they cannot stop one
+copy from growing on its own. [POLYGLOT.md](POLYGLOT.md) therefore decides,
+for every duplicated copy, whether it is CANONICAL (new behaviour lands
+here: the Python reference, the normative owners of a rule text such as
+Rust risk and C++ execution, the C++ hot path, the Rust feature fast path)
+or FROZEN (built, tested and golden-pinned, but no new features): 18
+canonical, 20 frozen over 24 paths. Two frozen copies, Rust `alpha` and
+Rust `lifecycle`, have no consumer beyond their own golden tests; they are
+RETIRE candidates and are kept, because those tests are the Rust proof of
+two contracts. Nothing was deleted and no parity test changed.
+
+`tests/harness/check_polyglot_policy.py` runs in the CI `deployment` job:
+a pull request that changes a frozen path fails without a line starting
+`POLYGLOT-OVERRIDE: <reason>` in a commit message or the PR body, and one
+that adds a function, method or type to a frozen copy needs
+`POLYGLOT-OVERRIDE: new-api <reason>`. LEARN.md §38 explains why freezing
+beat deleting; DIAGRAMS.md diagram 28 maps the copies. **How to run it:**
+COOKBOOK recipe 53.
+
 ---
 
 ## Where next
@@ -1300,6 +1429,8 @@ PYTHONPATH=src python3 -m iap.mvp replay --run ../data/mvp/58a10f2194a3c81c     
 | every pinned rule | [../PLATFORM_CONVENTIONS.md](../PLATFORM_CONVENTIONS.md) |
 | what is done and what is backlog | [ROADMAP.md](ROADMAP.md), [EPICS.md](EPICS.md) |
 | to run the pipeline on real historical files you obtained (ITCH 5.0, LOBSTER) | [REAL_DATA.md](REAL_DATA.md) |
-| what changed in each release, v1.1.0 to v1.10.0 | [../CHANGELOG.md](../CHANGELOG.md) |
+| what changed in each release, v1.1.0 to v1.11.0 | [../CHANGELOG.md](../CHANGELOG.md) |
 | the real-data studies: 7 sessions, power, the 2026 holdout, auctions | [REAL_DATA.md](REAL_DATA.md) §3 |
 | the governance controls, one table | [governance/GOVERNANCE.md](governance/GOVERNANCE.md) §2a |
+| the LLM agent's controls and evals | [governance/GOVERNANCE.md](governance/GOVERNANCE.md) §2b |
+| which language copy is canonical, which frozen | [POLYGLOT.md](POLYGLOT.md) |

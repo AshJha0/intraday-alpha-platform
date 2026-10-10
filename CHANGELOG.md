@@ -6,6 +6,122 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
+## v1.11.0 — 2026-10-10
+
+Scale and AI (IAP_Next_Releases_Plan v1.11: E2, E3, AI1-AI3; A2, A3 and AI4
+deferred), plus a feature-engine bug fix in three languages and a
+documentation and GitHub Pages refresh. Every new path is opt-in; default
+outputs, published numbers and cross-language contracts are unchanged
+(the new snapshot-burst golden adds checks inside existing golden tests).
+New optional extras: `[llm]` (Anthropic SDK) and the `rust/features_py`
+wheel. Parity counts from CI: python 2185 / cpp 302 / rust 358 / java 571,
+golden 193 / 72 / 71 / 124. Live LLM behaviour evals (claude-haiku-5-5):
+4/4 pass, estimated spend $0.0096. Pull requests
+[#51](https://github.com/AshJha0/intraday-alpha-platform/pull/51) to
+[#56](https://github.com/AshJha0/intraday-alpha-platform/pull/56).
+
+**Added (E2, Rust feature engine via pyo3).** `rust/features_py`, a pyo3
+0.22.6 / maturin 1.7.8 extension module (`iap_features_rs`, abi3 wheel)
+that replays IAP1 or JSONL events through the native feature engine and
+returns the 45 native slots (the pinned 40 plus 5 alpha inputs) as numpy
+arrays. It is a standalone package outside the Rust workspace, built only by
+the new `rust-pyo3` CI job (clippy, wheel, parity tests, benchmark).
+`iap.features.native` gives both backends one API (`compute_native`,
+`engine="python"|"rust"`, fallback to Python when the extension is
+missing), and `python -m iap.features --engine rust` takes the 45 native
+columns from Rust; the default output is unchanged. Parity on the golden
+vectors: every row and slot, validity exact, values 1e-9, with a
+documented allowance for `vol_regime_ratio_v1` on zero-volatility residue
+rows. Measured in CI (ubuntu-24.04): Python reference about 5,250 events/s,
+Rust about 790,000 events/s on the golden vectors, **150x**; 123x on the
+first seeded equity day at 100 ms cadence. The Python figure is the full
+205-feature engine; the pipeline itself is not faster, because the other
+160 features still run in Python. COOKBOOK recipe 49, API_FEATURES.md §7.1.
+
+**Fixed (feature engines: Rust, C++ and Java; found by E2).** On a
+*staleness refresh* (the stale-venue set changed, e.g. a venue rejoining at
+the start of a SNAPSHOT recovery burst) the Rust, C++ and Java engines
+recomputed the merged view but returned before updating the level scalars
+(L1 price/size, cumulative depth, mid, spread), so rows emitted until the
+next book-touching refresh carried the previous view's levels and returns.
+The Python reference updates them and records no samples (API_FEATURES §2);
+all three ports now do the same (Java is frozen: bug-fix override, no new
+API). The anomaly golden checkpoints never landed in such a window, so every
+golden passed. New golden `tests/golden/expected_features_snapshot_burst.json`
+(`python/tools/make_golden_snapshot_burst.py`: every event inside and up to
+5 after each burst) is checked by the existing anomaly golden tests of all
+three ports (test counts unchanged), and the pyo3 full-row anomaly
+comparison is no longer an xfail.
+
+**Polyglot policy (IAP_Next_Releases_Plan E3).** New
+[docs/POLYGLOT.md](docs/POLYGLOT.md): an inventory of every component that
+exists in more than one language (codec, book, replay, features, alpha
+scoring, risk, execution/SOR, contracts/trace, lifecycle, portfolio/TCA/
+backtest/adaptive) with lines of code, the golden fixture that pins each copy,
+its consumers (CI, Docker images, k8s, MVP) and a decision per copy: 18
+CANONICAL, 20 FROZEN (24 paths), of which 2 RETIRE candidates (Rust `alpha`,
+Rust `lifecycle`: no consumer beyond their own golden tests). New
+`tests/harness/check_polyglot_policy.py` + `tests/harness/polyglot_policy.json`,
+run in the CI `deployment` job: a pull request that changes a FROZEN copy
+fails without a `POLYGLOT-OVERRIDE: <reason>` line in a commit message or the
+PR body, and one that adds a function/method/type to a FROZEN copy fails
+without `POLYGLOT-OVERRIDE: new-api <reason>`; `--self-test` runs built-in
+known answers. `CODEOWNERS` lists the frozen paths, and eleven entries whose
+owner was glued to the path (`/java/.../orderbook/@AshJha0`, which GitHub
+reads as a pattern with no owner) now have the separating space.
+
+**Nothing retired.** Every duplicated copy has a consumer in deployment/,
+CI, the MVP or the golden harness, so no code was deleted. No golden fixture,
+tolerance, parity test or test count changed (python 2154 / cpp 302 / rust 358
+/ java 571), and no risk behaviour changed.
+
+**Added.**
+
+- `iap.mlops` (plan item AI3; models were research-only with no versioning).
+  `ModelRegistry`: immutable, content-addressed model artefacts (joblib +
+  canonical JSON record) whose id hashes the artefact, params, dataset
+  version and date range, feature set and feature-registry hash, code
+  fingerprint (`iap.agents.fingerprint`) and seed; registration requires a
+  blackboard pre-registration entry (its hash is recorded) unless marked
+  exploratory; tamper detection on load; lineage via a parent id.
+  `monitor`: feature and prediction drift (the `iap.adaptive.drift` PSI and
+  KS), calibration drift (reliability bins, Brier, ECE) for classifiers and
+  IC decay for regressors, each OK/ALERT, as a JSON report;
+  `python -m iap.mlops {list,show,verify,lineage,monitor}`.
+  `ShadowRunner`: a candidate scored beside the champion on the same frames,
+  never affecting the champion's decisions; `compare` (IC, hit rate,
+  calibration, P&L delta) and `promotion_decision`, which also requires the
+  lifecycle PROMOTION gates. `MakerFilter.from_registry` / `.register` and
+  `iap.models.zoo.load_registered` load by id; default behaviour unchanged.
+  API_ADAPTIVE.md section 9, COOKBOOK recipe 50.
+
+### LLM research agent (IAP_Next_Releases_Plan AI1-AI2)
+
+- **AI1 - `iap.llm`, `python -m iap.llm`.** A Claude model (default
+  `claude-opus-5-5`, Anthropic Python SDK as the optional `[llm]` extra,
+  cached system prompt) runs hypothesis -> pre-registration -> gated run ->
+  finding through the v1.10 governance: eight allowlisted tools; every
+  write Ed25519-signed by a key the model never sees; each pre-registration
+  one look, capped per session; runs only after `prereg_gate.require` and on
+  explicitly allowed datasets; metrics and verdict computed by code and
+  written as a report. Findings must cite a session report and are filed
+  only if every number in them appears in a cited artefact
+  (`iap.llm.verify`; free-text fields are not evidence). Caps on estimated
+  USD, tokens, tool calls and pre-registrations. Transcript, tool log and
+  summary persisted under `research/agents/llm_sessions/<id>/`.
+- **AI2 - `python -m iap.llm.evals`.** p-hacking, prompt injection (board
+  entry and MCP output), hallucinated citations and task success on a
+  planted alpha. Mocked (scripted adversarial model; CI) with a
+  control-removed ablation for each control, or `--live --env-file PATH
+  --max-usd 2` (default `claude-haiku-5-5`).
+- `iap.agents.citations`: new `report:<session>.<run>` and `board:<hash>`
+  references, and `artefact()` to load what a reference names.
+- `.gitignore`: `.env`, `*.env`, `.iap_keys/`.
+- Docs: GOVERNANCE.md §2b, HOW_IT_WORKS.md §6.2, COOKBOOK recipe 51.
+
+No default, golden, published number or cross-language contract changes.
+No test or CI job calls a model.
+
 ## v1.10.0 — 2026-10-10
 
 New edge and strategy layer (IAP_Next_Releases_Plan v1.10: A1, M5, X1-X3,

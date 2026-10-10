@@ -1,0 +1,26 @@
+sequenceDiagram
+    autonumber
+    participant M as Claude model (sees 8 tools only)
+    participant S as Session (holds the Ed25519 key, budget)
+    participant B as WriteBroker (public keys only)
+    participant G as prereg_gate + dataset allowlist
+    participant R as runner (code computes metrics + verdict)
+    participant V as iap.llm.verify
+    participant P as llm_sessions/ID (transcript, tool log, reports)
+    M->>S: tool_use (name, input)
+    S->>S: refuse an unknown tool or an extra argument
+    S->>S: budget: USD (projected one call ahead), tokens, tool calls
+    M->>S: propose_hypothesis (draft, no look spent)
+    M->>S: preregister(draft)
+    S->>S: pre-registration cap per session
+    S->>B: signed request (agent, op, args digest, nonce)
+    B->>B: verify signature, fingerprint code, debit one look, append to board
+    M->>S: run_gated_study(alpha, horizon, dataset)
+    S->>G: registered on the verified board? dataset allowed? not run before?
+    G->>R: run
+    R->>P: report: metrics + verdict (the model cannot change it)
+    M->>S: file_finding(title, text, refs)
+    S->>V: every number in a numeric field of a cited artefact?
+    V-->>S: a number not found, rejected and logged
+    V->>B: all found, signed post_task / claim / file_finding / release
+    S->>P: every turn and tool call persisted, API key scrubbed

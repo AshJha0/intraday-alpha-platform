@@ -46,8 +46,11 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
        Since v1.9–v1.10 it also has the maker side (a simulator calibrated from the event
        stream, a posting backtest and a skewed two-sided quoter), auction-imbalance research,
        optimal-execution schedules, and pre-registration that is costed, code-bound,
-       git-anchored and Ed25519-signed. Seven real Nasdaq ITCH sessions and a two-day 2026
-       holdout have been studied; nothing is claimed to be profitable.</p>
+       git-anchored and Ed25519-signed. Since v1.11 an optional LLM research agent works only
+       through that governance, fitted models live in a content-hashed registry with drift
+       monitoring and shadow mode, the Rust feature engine is callable from Python, and most
+       duplicated language copies are frozen by policy. Seven real Nasdaq ITCH sessions and a
+       two-day 2026 holdout have been studied; nothing is claimed to be profitable.</p>
     <nav>
       <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/HOW_IT_WORKS.md">How it works</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/LEARN.md">Learn (guide)</a>
@@ -60,6 +63,7 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/ROADMAP.md">Roadmap</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/REAL_DATA.md">Real data</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/governance/GOVERNANCE.md">Governance</a>
+      <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/POLYGLOT.md">Polyglot policy</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/CHANGELOG.md">Changelog</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/papers/INDEX.md">Research papers</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/SPECIFICATION.md">Specification</a>
@@ -73,7 +77,7 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
 <div class="wrap">
   <h2>Measured, not claimed</h2>
   <div class="numbers">
-    Cross-language parity&nbsp;&nbsp;&nbsp; python 2154&nbsp; · cpp 302&nbsp; · rust 358&nbsp; · java 571 tests — 3,385 green, one command; golden groups 192/72/71/124<br>
+    Cross-language parity&nbsp;&nbsp;&nbsp; python 2185&nbsp; · cpp 302&nbsp; · rust 358&nbsp; · java 571 tests — 3,416 green, one command; golden groups 193/72/71/124<br>
     Golden suites&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; identical book states, byte-identical IAP1 SHA-256, features/alphas to 1e-9, byte-identical canonical JSON, trace digests, risk audit and lifecycle registry in all four languages<br>
     C++ hot path&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; IAP1 decode 184.1 ns/event (CRC-32 verified) · book update 26.4 ns · replay 27.2M events/s · 48-feature engine 514.1 ns/event · one decision trace 31.7 µs/trace off the event loop<br>
     Determinism&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; full dataset regeneration is byte-identical (sha256-verified); replays reproduce fills exactly; the MVP run twice and replayed from its capture reproduces its trace digest<br>
@@ -90,7 +94,10 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
     Maker economics&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; calibration from the event stream (touch fill rates by queue-ahead, depletion hazards, latency, maker markouts at 100 ms/1 s/10 s, impact) · posting backtest with FIFO queue fills, rebates and a passive exit · P&amp;L identity tested · synthetic only so far: −6.7 bp/trip passive exit vs −11.4 bp crossing out<br>
     Quoting&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Avellaneda–Stoikov two-sided quoter with an alpha-skewed reservation price, hard inventory limit, calibrated adverse-selection floor and end-of-session flatten · P&amp;L split into spread, markout, inventory, flatten, rebates, fees · no real-data result<br>
     Auctions &amp; execution&nbsp;&nbsp; ITCH NOII decoded in a separate opt-in pass (dataset bytes unchanged) · closing-cross strategy with purged day-aligned walk-forward, pre-registration required · Almgren–Chriss trajectory and efficient frontier, alpha urgency, forecast VWAP curve — all opt-in, pinned schedules unchanged<br>
-    Research governance&nbsp;&nbsp;&nbsp; a pre-registration costs one look and records a code + feature + dependency fingerprint · blackboard history checked against git and anchored to the first commit holding each entry · agent writes Ed25519-signed, broker holds public keys only
+    Research governance&nbsp;&nbsp;&nbsp; a pre-registration costs one look and records a code + feature + dependency fingerprint · blackboard history checked against git and anchored to the first commit holding each entry · agent writes Ed25519-signed, broker holds public keys only<br>
+    Rust engine (pyo3)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; the 45 native feature slots from Python: ~790,000 events/s in Rust vs ~5,250 through the Python reference, 150x on the golden vectors (CI, ubuntu-24.04) · not a pipeline speed-up: 160 features stay in Python · opt-in <code>--engine rust</code><br>
+    LLM agent evals&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 4 of 4 mocked in CI (p-hacking, prompt injection, hallucinated citation, task success), each control also shown to fail when removed · live on claude-haiku-5-5 (2026-10-10): 4 of 4, est. $0.0096 — the model behaved, so the live run did not stress the controls<br>
+    Polyglot policy&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 18 canonical / 20 frozen copies (24 paths) · 2 retire candidates kept as parity evidence · nothing deleted · a change to a frozen copy needs <code>POLYGLOT-OVERRIDE:</code>
   </div>
 
   <div class="honest">
@@ -193,6 +200,25 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
     result yet, and an in-sample positive could only justify an out-of-sample test.
   </div>
 
+  <div class="honest">
+    <strong>v1.11.0: scale and AI, under the governance that came first.</strong>
+    The Rust feature engine is now callable from Python (one abi3 wheel built with maturin; about
+    150x on the 45 native slots in CI, not a pipeline speed-up). Comparing it with the Python
+    reference on every row, not just the golden checkpoints, found a real bug: inside a SNAPSHOT
+    recovery burst the Rust engine read a half-built book. Every golden test had passed, because
+    no checkpoint sits in a burst; the bug is fixed in this release. A polyglot policy freezes 20
+    duplicated copies so they can no longer grow on their own; nothing was deleted. Fitted models
+    get a content-hashed, immutable registry tied to a pre-registration, with drift and calibration
+    monitoring and a shadow mode that cannot act. And an LLM research agent can now propose,
+    pre-register, run and report, but only through the signed broker: it never sees the signing
+    key, code computes every number, and a finding is refused if it quotes a number its cited
+    artefacts do not contain. Its four behaviour evals pass mocked (where a scripted model attacks
+    the controls) and live (where the model behaved well, so the controls were not stressed).
+    Real-data maker, auction and quoting studies are <strong>running</strong>, pre-registered and
+    in-sample; no result is reported yet. Deferred: QQQ vs constituents, futures lead-lag,
+    deep order-book baselines.
+  </div>
+
   <h2>Start here</h2>
   <div class="grid">
     <div class="card"><h3>How the quant, algo and AI sides work</h3>
@@ -202,12 +228,13 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
          section ends with where to look and a command that runs.
          <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/HOW_IT_WORKS.md">HOW_IT_WORKS</a></p></div>
     <div class="card"><h3>AI, LLMs and agents: the boundary</h3>
-      <p>No LLM is called anywhere in this repository. The rule is pinned first: LLM
-         reasoning is never on the trading path, is read-only, and cannot override risk or
-         send an order. What exists is the governance an agent would have to pass through
-         (v1.7–v1.10): a write broker over a hash-chained blackboard, costed and code-bound
-         pre-registration, a hidden-seed reserve, signed human approvals, a read-only MCP server,
-         git anchoring and Ed25519 agent signatures. The page says what would be theatre on this data.
+      <p>The rule was pinned first: LLM reasoning is never on the trading path, is read-only,
+         and cannot override risk or send an order. The governance an agent has to pass through
+         came next (v1.7–v1.10): a write broker over a hash-chained blackboard, costed and
+         code-bound pre-registration, a hidden-seed reserve, signed human approvals, a read-only
+         MCP server, git anchoring and Ed25519 agent signatures. Since v1.11 one optional
+         component calls a model, the research agent, and only when an operator runs it with a
+         key; no test or CI job does. The page says what would be theatre on this data.
          <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/HOW_IT_WORKS.md#6-ai-llms-and-agents-the-boundary-what-exists-what-is-planned">HOW_IT_WORKS §6</a></p></div>
     <div class="card"><h3>Research validity &amp; the power study</h3>
       <p>Corrected statistics and policies, added opt-in in v1.3.0 and the defaults since
@@ -229,6 +256,28 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
 
   <h2>What's inside</h2>
   <div class="grid">
+    <div class="card"><h3>LLM research agent</h3>
+      <p>A Claude model with eight research tools and nothing else: propose, pre-register (signed
+         by a key the model never sees, one look each, capped per session), run a gated study on an
+         allowed dataset, read a report, file a finding. Code computes every metric and the verdict;
+         a finding is filed only if every number in it appears in a cited artefact. Budgets cap
+         spend, tokens, tool calls and pre-registrations; the transcript is kept. Optional
+         <code>[llm]</code> extra; mocked evals in CI
+         (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/governance/GOVERNANCE.md">GOVERNANCE §2b</a>).</p></div>
+    <div class="card"><h3>Model registry &amp; shadow mode</h3>
+      <p>Fitted models as citable records: the id is a content hash of the artefact, data version
+         and dates, features, code fingerprint and seed; records are immutable and re-verified on
+         load; registration needs a pre-registration or is marked exploratory. Feature, prediction
+         and calibration drift (PSI, KS, ECE, Brier, IC decay) as OK/ALERT, and a candidate scored
+         beside the champion that never acts
+         (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/API_ADAPTIVE.md">API_ADAPTIVE §9</a>).</p></div>
+    <div class="card"><h3>Polyglot policy</h3>
+      <p>Every component that exists in more than one language has one decision per copy:
+         canonical (new behaviour lands here) or frozen (built, tested, golden-pinned, no new
+         features). 18 canonical, 20 frozen, nothing deleted. A CI gate fails a pull request that
+         changes a frozen copy without a <code>POLYGLOT-OVERRIDE:</code> line, and one that adds an
+         API without <code>new-api</code>
+         (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/POLYGLOT.md">POLYGLOT</a>).</p></div>
     <div class="card"><h3>Market data foundation</h3>
       <p>Seeded synthetic equity MBO + multi-venue FX quote generator (regime-switching
          efficient price, clustered flow, halts/auctions, injected anomalies), raw→normalized
@@ -243,7 +292,10 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
       <p>205 registered features across price, microstructure, order flow (OFI L1–L10),
          liquidity, volatility, time-of-day, cross-asset, venue, regime and execution
          families; event-driven incremental engines in all four languages validated to 1e-9
-         against golden checkpoints.</p></div>
+         against golden checkpoints. Since v1.11 the Rust engine is callable from Python
+         (pyo3, one abi3 wheel, opt-in <code>--engine rust</code>) for the 45 native slots;
+         its row-by-row comparison with Python found and fixed a snapshot-burst bug the
+         checkpoints could not see.</p></div>
     <div class="card"><h3>Alpha library</h3>
       <p>12 equity + 12 FX flagship alphas (microprice, multi-level OFI, queue depletion,
          momentum/reversal, VWAP deviation, lead-lag, carry-style currency factors,
@@ -296,7 +348,7 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
          dataset and its version do not change. Auction features (imbalance ratio,
          reference-price drift, far/near spread, time to cross), cross targets, and a
          closing-cross strategy with a purged, day-aligned walk-forward. The CLI refuses to
-         backtest without a pre-registration. Not yet run on real files.</p></div>
+         backtest without a pre-registration. Since v1.11 it is running on the real sessions, pre-registered and in-sample, with a declared 2026 holdout; no result yet.</p></div>
     <div class="card"><h3>Research governance</h3>
       <p>Every agent write goes through one broker onto a hash-chained blackboard. A
          pre-registration debits a look on the multiple-testing ledger and records a fingerprint
@@ -327,7 +379,8 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
       <p>The Python reference generates validated golden vectors (events, book states,
          codec SHA-256, features, alphas, risk decisions, fills, portfolio); C++, Rust and
          Java must reproduce every one. <code>tests/harness/run_all.sh</code> prints the
-         parity table in one command.</p></div>
+         parity table in one command. Agreement is not correctness: four engines can agree on
+         a wrong rule, and engines that agree at every checkpoint can differ between them.</p></div>
     <div class="card"><h3>Contracts &amp; the Python reference ports</h3>
       <p>17 JSON Schemas mirrored by 22 frozen, validated Python contracts and 18 runtime-checkable
          Protocols; canonical JSON reproduced byte for byte in four languages. Python ports of the

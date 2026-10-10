@@ -9,6 +9,7 @@ Usage (from python/ with PYTHONPATH=src):
                             [--cadence-ms 100]
                             [--files eq_20260824.normalized.iap1 ...]
                             [--workers N] [--worker-mem-gb 5]
+                            [--engine python|rust]
 
 For every normalized input file (sorted by name = trading-day order; a fresh
 engine per day, session profiles carried across days per instrument), the
@@ -33,6 +34,15 @@ emissions whose merged book is crossed, i.e. a stale LP quote),
 ``label_max_age_ns`` freshness bound, ``label_valid_frac_by_horizon``,
 ``label_zero_frac_by_horizon`` (a 500 ms FX label that is 0 in 99 % of rows
 is a sampling artefact, not evidence) and the invalid-label reason counts.
+
+Native backend (``--engine rust``, v1.11.0): the 45 native slots (the
+pinned native 40 + 5 alpha inputs, :mod:`iap.features.native`) of every row
+are taken from the Rust engine (``iap_features_rs``, pyo3) replaying the same
+file at the same cadence; the other 160 features stay Python.  The emitted
+rows must line up exactly (instrument + timestamp) or that file keeps the
+Python values (warned).  Without the extension the flag falls back to
+``python``.  The Python engine still runs for the other families, so this is
+a cross-checked swap of the native columns, not a pipeline speed-up.
 
 Everything is deterministic: sorted file order, sorted instrument iteration,
 event-time only.
@@ -117,12 +127,51 @@ class _ProfileLog:
         self.curs: list[tuple] = []
 
 
-def _replay_file(path: Path, contexts, cadence_ns: int, profiles, record: bool):
+def _overlay_rust(path: Path, contexts, cadence_ns: int, buffers, nfeat: int) -> bool:
+    """Replace the native slots of ``buffers`` with the Rust engine's output
+    for the same file. Returns False (buffers untouched) if rows differ."""
+    from iap.features.native import NATIVE_NAMES, compute_native_file
+    from iap.features.registry import feature_index
+
+    frame = compute_native_file(path, contexts, cadence_ns, engine="rust")
+    idx = feature_index()
+    cols = [idx[n] for n in NATIVE_NAMES]
+    nbytes = (nfeat + 7) // 8
+    plan = []
+    for iid in sorted(buffers):
+        buf = buffers[iid]
+        rows = np.flatnonzero(frame.instrument_id == iid)
+        if len(rows) != len(buf.ts) or not np.array_equal(
+            frame.timestamp[rows], np.asarray(buf.ts, dtype=np.int64)
+        ):
+            print(
+                f"{path.name}: rust rows differ for instrument {iid}; keeping python values",
+                file=sys.stderr,
+            )
+            return False
+        plan.append((buf, rows))
+    for buf, rows in plan:
+        vals = np.frombuffer(buf.values, dtype=np.float64).reshape(len(rows), nfeat)
+        bits = np.frombuffer(buf.bits, dtype=np.uint8).reshape(len(rows), nbytes)
+        rv = frame.values[rows]
+        ok = frame.validity[rows]
+        for k, j in enumerate(cols):
+            vals[:, j] = np.where(ok[:, k], rv[:, k], _NAN)
+            bit = np.uint8(1 << (j & 7))
+            byte = bits[:, j >> 3]
+            bits[:, j >> 3] = np.where(ok[:, k], byte | bit, byte & ~bit)
+    return True
+
+
+def _replay_file(
+    path: Path, contexts, cadence_ns: int, profiles, record: bool, engine: str = "python"
+):
     """Replay one input file through a fresh engine.
 
     Returns ``(n_events, (events_processed, vectors_emitted), buffers, logs)``;
     ``logs`` is ``{iid: _ProfileLog}`` when ``record`` (parallel mode).
     """
+    backend = engine
     events = _load_events(path)
     engine = FeatureEngine(contexts, cadence_ns=cadence_ns, profiles=profiles)
     buffers: dict[int, _InstrumentBuffer] = {}
@@ -159,13 +208,17 @@ def _replay_file(path: Path, contexts, cadence_ns: int, profiles, record: bool):
                 log.buckets.append(SessionProfile.bucket_of(t, st.ctx.clock.offset_seconds(t)))
                 log.curs.append(tuple(_metric_value(st, m) for m in PROFILE_METRICS))
     counts = (engine.events_processed, engine.vectors_emitted)
+    if backend == "rust":
+        _overlay_rust(path, contexts, cadence_ns, buffers, len(engine.feature_names))
     return len(events), counts, buffers, logs
 
 
 def _worker(job):
     """Process-pool entry point: replay one day against an empty profile."""
-    path, configs, cadence_ns = job
-    return _replay_file(Path(path), build_contexts(configs), cadence_ns, {}, record=True)
+    path, configs, cadence_ns, backend = job
+    return _replay_file(
+        Path(path), build_contexts(configs), cadence_ns, {}, record=True, engine=backend
+    )
 
 
 def _patch_norms(
@@ -420,7 +473,17 @@ def main(argv: list[str] | None = None) -> int:
         help="label freshness bound: whole_day (default, published stores) or "
         "trailing (causal, R5: trailing median quote gap)",
     )
+    ap.add_argument(
+        "--engine",
+        choices=("python", "rust"),
+        default="python",
+        help="backend for the 45 native feature slots: python (default) or rust "
+        "(iap_features_rs, falls back to python when not installed)",
+    )
     args = ap.parse_args(argv)
+    from iap.features.native import resolve_engine
+
+    backend = resolve_engine(args.engine)
 
     t_start = time.time()
     data_dir = Path(args.data_dir)
@@ -475,12 +538,12 @@ def main(argv: list[str] | None = None) -> int:
     if workers <= 1:
         for path in files:
             n_events, counts, buffers, _ = _replay_file(
-                path, contexts, cadence_ns, profiles, record=False
+                path, contexts, cadence_ns, profiles, record=False, engine=backend
             )
             _consume(path, n_events, counts, buffers)
     else:
         norm_idx = [names.index(f"norm_{m}_m5_v1") for m in PROFILE_METRICS]
-        jobs = [(str(p), str(args.configs), cadence_ns) for p in files]
+        jobs = [(str(p), str(args.configs), cadence_ns, backend) for p in files]
         # Under `python -m iap.features` this file runs as `__main__`, and a
         # spawn-start worker (Windows, macOS) does not re-import a package's
         # `__main__`, so `__main__._worker` cannot be unpickled there. Submit
@@ -549,6 +612,8 @@ def main(argv: list[str] | None = None) -> int:
         "runtime_seconds": round(time.time() - t_start, 2),
         "instruments": per_instrument,
     }
+    if backend != "python":  # key absent on the default path: summary bytes unchanged
+        summary["native_engine"] = backend
     with open(out_dir / "features_summary.json", "w") as f:
         json.dump(summary, f, indent=2)
         f.write("\n")

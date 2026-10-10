@@ -29,7 +29,7 @@ implementation (`iap.risk`, `iap.execution`) proven by the same golden files
 the Java ports are proven by, so the loop the MVP runs is the reference
 loop end to end.
 
-## Current status (v1.10.0, release branch; v1.9.0 released 2026-10-10)
+## Current status (v1.11.0, release branch; v1.10.0 released 2026-10-10)
 
 **Where the research stands.**
 
@@ -60,6 +60,10 @@ loop end to end.
   real sessions is **running**; it has no result yet, and by its own
   verdict rule a positive in-sample result would only justify an
   out-of-sample test ([LEARN.md](LEARN.md) §31, §34).
+- **Auctions and quoting on real files (v1.11), in progress:** `AUC01` (the
+  closing-cross strategy, with a declared 2026 holdout) and the M5 quoter
+  are being run on the real sessions, pre-registered, exploratory and
+  in-sample, on branch `research/step2`. No result is reported yet.
 
 **New in v1.9.0** (all opt-in; no default, golden or published number moved):
 
@@ -91,10 +95,46 @@ loop end to end.
 - a fix: `python -m iap.features --workers N` now works under the spawn
   start method (Windows, macOS).
 
-**Next (v1.11):** report the maker study whatever it shows; re-run the real
-batch under `v3`; run `AUC01` on real files; more symbols (ETF vs
-constituents); an LLM research agent that works only through the signed
-broker ([docs/ROADMAP.md](docs/ROADMAP.md) §3.5).
+**New in v1.11.0** (all opt-in; no default, golden, published number or
+cross-language contract moved; no test or CI job calls a model):
+
+- E2, the Rust feature engine from Python: a pyo3 extension
+  (`iap_features_rs`, one abi3 wheel, built by the `rust-pyo3` CI job)
+  behind `iap.features.native`, and `python -m iap.features --engine rust`.
+  Measured in CI on the golden vectors: about 5,250 events/s through the
+  Python reference against about 790,000 through Rust, **150x** on the 45
+  native slots. The pipeline is not 150x faster: the other 160 features
+  still run in Python. Comparing every row (not just the golden
+  checkpoints) found that the Rust engine read a half-built book inside
+  SNAPSHOT recovery bursts; that bug is corrected in this release
+  ([API_FEATURES.md](API_FEATURES.md) §7.1, COOKBOOK 49 and 52,
+  [LEARN.md](LEARN.md) §36);
+- E3, the polyglot policy: [docs/POLYGLOT.md](docs/POLYGLOT.md) decides
+  each duplicated copy, 18 CANONICAL and 20 FROZEN (24 paths; 2 of them
+  RETIRE candidates, kept). Nothing was deleted. A pull request that
+  changes a frozen copy fails without a `POLYGLOT-OVERRIDE: <reason>` line
+  (`tests/harness/check_polyglot_policy.py`, COOKBOOK 53, LEARN.md §38);
+- AI3, `iap.mlops`: an immutable, content-hashed model registry tied to a
+  pre-registration, drift and calibration monitoring, and shadow mode for a
+  candidate model ([API_ADAPTIVE.md](API_ADAPTIVE.md) §9, COOKBOOK 50 and
+  54, LEARN.md §39);
+- AI1-AI2, `iap.llm`: a Claude model that drafts, pre-registers (signed,
+  one look each), runs gated studies and files findings through the v1.10
+  governance; every number in a finding must appear in a cited artefact,
+  and budgets cap spend, tokens, tool calls and pre-registrations. Four
+  behaviour evals (p-hacking, prompt injection, hallucinated citations,
+  task success) run mocked in CI with a control-removed ablation each. A
+  live run on 2026-10-10 (`claude-haiku-5-5`, estimated $0.0096) passed 4
+  of 4; the model behaved well, so the live run did not stress the
+  controls, and the mocked adversarial evals remain the evidence that they
+  work ([docs/governance/GOVERNANCE.md](docs/governance/GOVERNANCE.md) §2b,
+  COOKBOOK 51 and 55, LEARN.md §37). The SDK is the optional `[llm]` extra;
+  `.env` files are git-ignored.
+
+**Deferred:** A2 (QQQ against its constituents; needs more symbols), A3
+(futures lead-lag; on hold, the ES/NQ data would cost about $10-25), AI4
+(deep order-book baselines); the real batch is not yet re-run under `v3`
+([docs/ROADMAP.md](docs/ROADMAP.md) §3.6).
 
 ## Architecture in one line
 
@@ -129,6 +169,8 @@ the full design, data flow, and diagrams.
 | Adaptive deployment study | 4 refit policies × 10 alphas; 88 drift-triggered refits; FX01 retired under every policy; 19 of 40 deployments make no trade, none ends above zero | `research/adaptive_reports/ADAPTIVE_REPORT.md` |
 | Bundled dataset | 2 synthetic sessions, 19 instruments, 308,975 normalized events (`data_version` `116b7787…`; equity flow runs to the close since v1.4.0) | `data/normalized/qc_report.json` |
 | Feature emission | 213,021 vectors at 100 ms cadence | `data/features/features_summary.json` |
+| Rust feature engine from Python (v1.11, CI-measured) | about 5,250 events/s (Python reference, full 205-feature engine) against about 790,000 events/s (Rust, the 45 native slots): **150x** on the golden vectors, 123x on a seeded equity day at 100 ms; not a pipeline speed-up, the other 160 features still run in Python | `API_FEATURES.md` §7.1, `rust-pyo3` CI job summary |
+| LLM agent behaviour evals (v1.11) | 4 of 4 pass mocked in CI, each control-bearing eval also failing with its control removed; live 2026-10-10 on `claude-haiku-5-5`: 4 of 4, estimated $0.0096 (the model behaved well, so the live run did not stress the controls) | `python -m iap.llm.evals`, GOVERNANCE.md §2b |
 | C++ hot path | IAP1 decode 184.1 ns/event (CRC-32 verified); book update 26.4 ns; replay 27.2M events/s; one 5.6 KB decision trace serialised in 31.7 µs off the event loop | `benchmarks/results_cpp.md` |
 
 The honesty is the point (spec §32): of 24 alphas on the bundled synthetic
@@ -375,6 +417,7 @@ intraday-alpha-platform/
   COOKBOOK.md               task-oriented recipes (runnable commands)
   CONTRIBUTING.md           branching, parity harness, golden regeneration, promotion-gate rule
   docs/                     SPECIFICATION.md, ARCHITECTURE.md, DIAGRAMS.md, BUILD_NOTES.md,
+                            HOW_IT_WORKS.md, POLYGLOT.md, REAL_DATA.md, RESEARCH_VALIDITY.md,
                             SCENARIOS.md, MVP.md, LIFECYCLE.md, DECISION_TRACE.md,
                             DATA_MODEL.md, ROADMAP.md, EPICS.md (generated),
                             runbooks/ governance/ papers/ diagrams/ index.html
@@ -401,12 +444,17 @@ intraday-alpha-platform/
                             port) execution (C++-equivalent port) lifecycle (7 states)
                             trace (DecisionTrace, sinks, digest) store (SQLite index)
                             research (ExperimentRunner) mvp (the traced loop)
+                            agents (broker, blackboard, prereg, signing) llm (the
+                            optional LLM research agent + evals, extra [llm])
+                            mlops (model registry, monitoring, shadow mode)
   cpp/                      CMake project: codec, book, features, alpha, execution, SOR,
                             replay, contracts (canonical JSON + decision trace) (+ bench_all)
   rust/                     cargo workspace (11 crates): marketdata, orderbook, eventbus,
                             features, alpha, risk, venue, replay, telemetry,
                             contracts (canonical JSON / DecisionTrace / trace digest),
-                            lifecycle (alpha promotion state machine + registry)
+                            lifecycle (alpha promotion state machine + registry);
+                            rust/features_py: the pyo3 wheel iap_features_rs, built
+                            outside the workspace (v1.11)
   java/                     javac build: com.iap.* — full platform layer + paper trading
                             (+ contracts, trace, lifecycle; PaperTrading emits decision traces)
   research/                 alpha_reports/, ml_reports/, adaptive_reports/, baselines/,
@@ -483,7 +531,7 @@ python3 tools/github/create_issues.py --dry-run   # the epics/issues plan (docs/
 ===================== cross-language parity table =====================
 language | tests passed | golden passed  | time   | status
 ---------+--------------+----------------+--------+-------
-python   | 2154         | 192            |    -s | PASS
+python   | 2185         | 193            |    -s | PASS
 cpp      | 302          | 72             |    -s | PASS
 rust     | 358          | 71             |    -s | PASS
 java     | 571          | 124            |    -s | PASS
@@ -499,6 +547,9 @@ headline numbers: all headline numbers match their artefacts
  parsed — a '?' or FAIL anywhere fails the run.)
 >> PARITY OK — all languages passed (full suites).
 ```
+
+The policy of [docs/POLYGLOT.md](docs/POLYGLOT.md) (v1.11.0) froze 20 of the
+duplicated language copies and retired none, so these counts are unchanged by it.
 
 (Counts for v1.5.0, 2026-10-04. They are taken from the CI jobs of the
 release line rather than from one local harness run: each CI job runs the
@@ -569,20 +620,22 @@ golden tests — the engineering discipline this repo is built around
 
 | document | what it covers |
 |---|---|
-| [LEARN.md](LEARN.md) | textbook walkthrough: microstructure, generator, book, features, honest alpha research, ML/meta-labeling, portfolio, risk, execution, TCA, parity, latency economics, adaptability, contracts & Protocols, the Python risk/execution reference, the 7-state lifecycle, the decision trace, the data model, the MVP walkthrough with its honest numbers, the v1.3.0 review as six case-study chapters (fail-closed risk bugs, simulator realism, statistical power, gate gaming, crash consistency, supply-chain hygiene), pitfalls, interview Q&A, combining signals, adverse selection, and five v1.9-v1.10 case studies (why taker-only research cannot pay at 1 s, the FOMC sampling flaw and day-clustered inference, the 2026 holdout as pre-registration, what the synthetic maker/quoting results show, governance keys and code hashes) |
-| [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) | how the quant, algo and AI sides work — a guided explanation for a newcomer: the pipeline on one page, the research statistics and gates, the execution algorithms and simulator rules, the fail-closed risk engine, the ML layer with its negative results, the LLM/agent boundary (what exists, what is backlog, what would be theatre on this data), determinism and replay; since v1.10 also the real-data path and the `v3` validity bundle, the maker path (calibrate, post or quote, decompose), auctions, optimal execution and the governance chain; every section ends with where to look and a command that runs |
-| [COOKBOOK.md](COOKBOOK.md) | 48 task-oriented recipes with runnable commands (39-48: maker backtest, quoting, optimal execution, auctions, parallel features, the `v3` validity block, calibrating and backtesting a real session, signed pre-registration, the Almgren-Chriss frontier) |
+| [LEARN.md](LEARN.md) | textbook walkthrough: microstructure, generator, book, features, honest alpha research, ML/meta-labeling, portfolio, risk, execution, TCA, parity, latency economics, adaptability, contracts & Protocols, the Python risk/execution reference, the 7-state lifecycle, the decision trace, the data model, the MVP walkthrough with its honest numbers, the v1.3.0 review as six case-study chapters (fail-closed risk bugs, simulator realism, statistical power, gate gaming, crash consistency, supply-chain hygiene), pitfalls, interview Q&A, combining signals, adverse selection, five v1.9-v1.10 case studies (why taker-only research cannot pay at 1 s, the FOMC sampling flaw and day-clustered inference, the 2026 holdout as pre-registration, what the synthetic maker/quoting results show, governance keys and code hashes), and four from v1.11 (parity proves agreement, not correctness: the snapshot-burst bug; why an LLM must never compute a number; freezing copies instead of deleting them; model registries as evidence) |
+| [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) | how the quant, algo and AI sides work — a guided explanation for a newcomer: the pipeline on one page, the research statistics and gates, the execution algorithms and simulator rules, the fail-closed risk engine, the ML layer with its negative results, the LLM/agent boundary (what exists, what is backlog, what would be theatre on this data), determinism and replay; since v1.10 also the real-data path and the `v3` validity bundle, the maker path (calibrate, post or quote, decompose), auctions, optimal execution and the governance chain; since v1.11 the LLM research agent and its controls, the Rust feature engine from Python, the model registry and the polyglot policy; every section ends with where to look and a command that runs |
+| [COOKBOOK.md](COOKBOOK.md) | 55 task-oriented recipes with runnable commands (39-55: maker backtest, quoting, optimal execution, auctions, parallel features, the `v3` validity block, calibrating and backtesting a real session, signed pre-registration, the Almgren-Chriss frontier, the Rust feature engine from Python and building its wheel with maturin, the model registry, shadow mode and week-by-week monitoring, the LLM research agent, its evals and a guarded session with the scripted client, the `POLYGLOT-OVERRIDE` workflow) |
 | [docs/REAL_DATA.md](docs/REAL_DATA.md) | real historical data: what `python -m iap.marketdata ingest` reads (Nasdaq TotalView-ITCH 5.0, LOBSTER), how to obtain files yourself (nothing is bundled), the commands from a downloaded file to an alpha report, the mapping table to canonical events, the point-in-time security master and corporate-actions table, known limitations, and what a first real-data study can and cannot conclude |
 | [docs/RESEARCH_VALIDITY.md](docs/RESEARCH_VALIDITY.md) + [research/power/POWER_REPORT.md](research/power/POWER_REPORT.md) | the corrected research methods (the defaults since v1.5.0, each with its named legacy rule), the research store under parallel writers, gate eligibility; the planted-signal power study of the validation chain |
-| [CHANGELOG.md](CHANGELOG.md) | release notes, newest first (v1.10.0: skewed quoting, auctions, optimal execution, governance G1-G4; v1.9.0: research validity options, parallel features, maker economics; v1.8.0: the 2026 holdout and the ingest memory fix; v1.6.0-v1.7.2: real data, the agent layer, signal combination, real-data power; v1.5.0: the corrected research methods become the defaults, every old rule keeps a legacy name, every dataset-derived artefact regenerated; v1.4.0: the generator's equity flow calibration fixed so flow reaches the close, and every dataset-derived artefact regenerated; v1.3.0: fail-closed risk, simulator fill rules, paper-platform safety, governance and deployment hardening, research validity) |
+| [CHANGELOG.md](CHANGELOG.md) | release notes, newest first (v1.11.0: the Rust feature engine via pyo3, the polyglot policy, the model registry, the LLM research agent and its evals; v1.10.0: skewed quoting, auctions, optimal execution, governance G1-G4; v1.9.0: research validity options, parallel features, maker economics; v1.8.0: the 2026 holdout and the ingest memory fix; v1.6.0-v1.7.2: real data, the agent layer, signal combination, real-data power; v1.5.0: the corrected research methods become the defaults, every old rule keeps a legacy name, every dataset-derived artefact regenerated; v1.4.0: the generator's equity flow calibration fixed so flow reaches the close, and every dataset-derived artefact regenerated; v1.3.0: fail-closed risk, simulator fill rules, paper-platform safety, governance and deployment hardening, research validity) |
 | [docs/MVP.md](docs/MVP.md) | the executable MVP (`python -m iap.mvp run / replay / verify / explain`): one deterministic, fully traced trading loop on a synthetic equity — the loop module by module, the §11.4 wiring rules with code references, the determinism contract, the incident replay flow, the honest golden-run results (cost-negative) with the realized-IC audit, and the success-criteria table |
 | [docs/LIFECYCLE.md](docs/LIFECYCLE.md) | the 7-state promotion lifecycle: states, the 17-edge transition table, the 20 gates with config keys and defaults, evidence documents, registry and transition-log formats, the bootstrap result (24 CANDIDATE / 0 beyond), the golden, the Java/Rust ports, the RETIRED-is-observational caveat |
 | [docs/DECISION_TRACE.md](docs/DECISION_TRACE.md) | the decision trace: the record, ids, canonical JSON rules, the stream digest with its known answers, sinks, the pinned `explain()` block, store views, emission points in Python / Java / C++ / Rust, incident replay |
 | [API_CONTRACTS.md](API_CONTRACTS.md) | the contract layer: 22 typed contracts field by field, ids and canonical JSON, validation, the 18 Protocols and what satisfies them, versioning, the 17-schema index |
 | [API_TRADING.md](API_TRADING.md) | the Python reference ports of the hard risk engine (`iap.risk`) and the execution stack (`iap.execution`): public APIs, golden parity statements, what is pinned about each port |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | the six-week plan (Phase 0 → Week 6) and Phase 2/3 mapped to what exists with evidence, what is backlog, the MVP success criteria |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | the six-week plan (Phase 0 → Week 6) and Phase 2/3 mapped to what exists with evidence, what is backlog, the MVP success criteria; §3.6 is v1.11 (done, running, deferred) |
+| [docs/POLYGLOT.md](docs/POLYGLOT.md) | which language copy of each duplicated component is canonical and which is frozen (v1.11.0, plan E3): inventory, golden pins, consumers, the `POLYGLOT-OVERRIDE:` rule enforced by `tests/harness/check_polyglot_policy.py` (COOKBOOK 53) |
+| [docs/governance/GOVERNANCE.md](docs/governance/GOVERNANCE.md) §2b | the LLM research agent's controls (v1.11.0, AI1-AI2): tool allowlist, a signing key the model never sees, pre-registration caps, the numbers rule, budgets, persisted transcripts, the evals and what they do not cover |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | system design, per-language responsibilities, contracts, the research → trading → execution → adaptive loop with lifecycle and trace, determinism, golden topology, hot-path notes, observability, the MVP vertical, deployment, the AI / agent boundary (what is pinned, what exists, what is backlog), failure modes and fail-closed design, the research-store concurrency model, and the distance to a production system |
-| [docs/DIAGRAMS.md](docs/DIAGRAMS.md) | all twenty-five architecture diagrams on one page (pipeline, golden topology, paper trading, responsibility matrix, risk decision flow, queue-position model, data model, lifecycle state machine, decision-trace chain, MVP loop; and, since v1.3.0, the fail-closed risk branches, the simulator fill/queue flow, the paper-platform checkpoint commit point and resume, the admin kill latch, the research run with ledger lock and eligibility, the power study, the CI/release pipeline, the deployment topology, the agent layer as planned at v1.3.0; and, since v1.9-v1.10, the simulator calibration flow, the maker and quoting P&L decomposition, the auction pipeline, the governance (prereg, anchoring, signing) sequence, the v3 validity flow and the v1.9-v1.11 roadmap) |
+| [docs/DIAGRAMS.md](docs/DIAGRAMS.md) | all twenty-nine architecture diagrams on one page (pipeline, golden topology, paper trading, responsibility matrix, risk decision flow, queue-position model, data model, lifecycle state machine, decision-trace chain, MVP loop; and, since v1.3.0, the fail-closed risk branches, the simulator fill/queue flow, the paper-platform checkpoint commit point and resume, the admin kill latch, the research run with ledger lock and eligibility, the power study, the CI/release pipeline, the deployment topology, the agent layer as planned at v1.3.0; and, since v1.9-v1.10, the simulator calibration flow, the maker and quoting P&L decomposition, the auction pipeline, the governance (prereg, anchoring, signing) sequence, the v3 validity flow and the v1.9-v1.11 roadmap; and, since v1.11, the LLM agent loop with its controls, the model registry and shadow flow, the polyglot canonical/frozen map and the Rust/Python feature backends) |
 | [docs/DATA_MODEL.md](docs/DATA_MODEL.md) | the relational data model (`schemas/sql/iap_v2.sql`, SQLite + PostgreSQL): every table, the dataset- and bundle-scoped views, portability rules, how the store indexes the flat-file artefacts, query cookbook |
 | [docs/index.html](docs/index.html) + [docs/GITHUB_PAGES.md](docs/GITHUB_PAGES.md) | the GitHub Pages landing site and how to publish it (Settings → Pages → main branch, /docs folder) |
 | [docs/SPECIFICATION.md](docs/SPECIFICATION.md) | the governing institutional specification (verbatim) |

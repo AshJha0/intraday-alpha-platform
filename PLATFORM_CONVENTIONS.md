@@ -1240,8 +1240,13 @@ agent SDK (plan issue AG03). Two gaps are stated rather than hidden: the test do
 `iap.replay`, which the rule above names, and nothing scans the Rust, C++ or Java trees — those
 remain enforced in review (CODEOWNERS: risk, execution, core).
 
-**What exists and what does not** (2026-10-03). There is no LLM, agent or MCP code in this
-repository. What exists is the foundation an agent layer would stand on, each piece useful
+**What exists and what does not.** *Update (v1.11.0):* the agent layer this paragraph called
+backlog was built in v1.7.0 (`iap.agents`: write broker and blackboard, pre-registration,
+reserve, signed approvals, read-only MCP server, evaluations) and hardened in v1.10.0, and
+v1.11.0 added an optional LLM research agent (`iap.llm`) that works only through it and is
+outside every trading-path package; the rule of this section is unchanged
+(docs/governance/GOVERNANCE.md §2a-§2b). The paragraph as written on 2026-10-03 follows.
+There was no LLM, agent or MCP code in the repository then. What exists is the foundation an agent layer would stand on, each piece useful
 without one: the research store that is safe for parallel automated writers and the gate
 eligibility rule (§13.6), the import-policy test, and machine-readable tooling —
 `python -m iap.research list --json` / `show <id> --json`, `--json-errors` with stable error
@@ -1435,3 +1440,25 @@ bootstrap, a restore or a malformed kill command; the fills golden contains no s
 and no dropped event; the resume tests restored complete
 checkpoints and never one interrupted between its two files (`PlatformSafetyTest` now does). Parity across three languages proved that the implementations agreed, and they
 agreed on the defect (§14.1 said the same of the simulator on 2026-09-20).
+
+## 16. Polyglot policy (v1.11.0, plan E3 — docs/POLYGLOT.md is normative)
+
+- Every duplicated component has exactly one **CANONICAL** home per role
+  (Python reference; Rust risk and C++ execution as owners of their rule
+  texts; the C++ hot path; the Rust feature fast path) and its other copies are
+  **FROZEN**: kept, built, tested and golden-pinned, but given no new
+  features. New behaviour lands in the canonical copy and its golden first.
+- A frozen copy changes only to port a pinned semantics change of its
+  canonical copy, in the same PR, with the regenerated golden proving parity,
+  and with a `POLYGLOT-OVERRIDE: <reason>` line in a commit message or the PR
+  body. A new function, method or type in a frozen copy additionally needs
+  the token `new-api` (`POLYGLOT-OVERRIDE: new-api <reason>`). The frozen
+  paths are `tests/harness/polyglot_policy.json`; changing that file needs the
+  same override.
+- `tests/harness/check_polyglot_policy.py` enforces both rules in the CI
+  `deployment` job (blocking on pull requests, advisory on push) and checks
+  that every frozen path exists and is named in docs/POLYGLOT.md.
+- Retiring a copy is a separate, explicit decision with a CHANGELOG entry, and
+  only for a copy with no consumer in deployment/, CI, the MVP, a documented
+  command or the golden harness. Parity tests are never weakened to retire
+  anything. §5 (golden tests) and §11 (normative owners) are unchanged.

@@ -52,7 +52,7 @@
 /python/src/iap/risk/               @AshJha0
 /configs/strategies/lifecycle.json  @AshJha0
 /research/alpha_registry.json       @AshJha0
-/research/lifecycle_transitions.jsonl@AshJha0
+/research/lifecycle_transitions.jsonl @AshJha0
 
 # ------------------------------------------------------------- core ---------
 /python/src/iap/marketdata/         @AshJha0
@@ -65,7 +65,7 @@
 /cpp/include/iap/orderbook/         @AshJha0
 /java/src/main/java/com/iap/core/   @AshJha0
 /java/src/main/java/com/iap/codec/  @AshJha0
-/java/src/main/java/com/iap/orderbook/@AshJha0
+/java/src/main/java/com/iap/orderbook/ @AshJha0
 /java/src/main/java/com/iap/replay/ @AshJha0
 
 # ------------------------------------------------------------- execution ----
@@ -74,7 +74,7 @@
 /cpp/src/execution/                 @AshJha0
 /cpp/src/sor/                       @AshJha0
 /python/src/iap/execution/          @AshJha0
-/java/src/main/java/com/iap/execution/@AshJha0
+/java/src/main/java/com/iap/execution/ @AshJha0
 /java/src/main/java/com/iap/sor/    @AshJha0
 /java/src/main/java/com/iap/tca/    @AshJha0
 /python/src/iap/tca/                @AshJha0
@@ -92,22 +92,22 @@
 /python/src/iap/lifecycle/          @AshJha0
 /python/src/iap/adaptive/           @AshJha0
 /rust/lifecycle/                    @AshJha0
-/java/src/main/java/com/iap/lifecycle/@AshJha0
+/java/src/main/java/com/iap/lifecycle/ @AshJha0
 /research/                          @AshJha0
 /research/experiments/              @AshJha0
 /tools/github/                      @AshJha0
 /docs/papers/                       @AshJha0
-/java/src/main/java/com/iap/features/@AshJha0
+/java/src/main/java/com/iap/features/ @AshJha0
 /java/src/main/java/com/iap/alpha/  @AshJha0
-/java/src/main/java/com/iap/adaptive/@AshJha0
+/java/src/main/java/com/iap/adaptive/ @AshJha0
 
 # ------------------------------------------------------------- platform -----
-/java/src/main/java/com/iap/platform/@AshJha0
-/java/src/main/java/com/iap/monitoring/@AshJha0
+/java/src/main/java/com/iap/platform/ @AshJha0
+/java/src/main/java/com/iap/monitoring/ @AshJha0
 /java/src/main/java/com/iap/api/    @AshJha0
 /java/src/main/java/com/iap/config/ @AshJha0
 /java/src/main/java/com/iap/trace/  @AshJha0
-/java/src/main/java/com/iap/contracts/@AshJha0
+/java/src/main/java/com/iap/contracts/ @AshJha0
 /rust/contracts/                    @AshJha0
 /rust/telemetry/                    @AshJha0
 /cpp/include/iap/contracts/         @AshJha0
@@ -127,7 +127,38 @@
 
 # ------------------------------------------------------------- runbooks -----
 /docs/runbooks/                     @AshJha0
-/docs/runbooks/RUNBOOK_incident_kill_switch.md@AshJha0
-/docs/runbooks/RUNBOOK_incident_replay.md@AshJha0
+/docs/runbooks/RUNBOOK_incident_kill_switch.md @AshJha0
+/docs/runbooks/RUNBOOK_incident_replay.md @AshJha0
 /docs/governance/                   @AshJha0
 /docs/SCENARIOS.md                  @AshJha0
+
+# ------------------------------------------------------------- polyglot ---
+# FROZEN language copies (docs/POLYGLOT.md, plan E3): kept and golden-pinned,
+# no new features. A change needs `POLYGLOT-OVERRIDE: <reason>` in a commit
+# or the PR body; tests/harness/check_polyglot_policy.py enforces it in CI.
+/docs/POLYGLOT.md                   @AshJha0
+/tests/harness/polyglot_policy.json  @AshJha0
+/rust/marketdata/src/                @AshJha0
+/rust/orderbook/src/                 @AshJha0
+/rust/replay/src/                    @AshJha0
+/rust/alpha/src/                     @AshJha0
+/rust/contracts/src/                 @AshJha0
+/rust/lifecycle/src/                 @AshJha0
+/cpp/src/contracts/                  @AshJha0
+/cpp/include/iap/contracts/          @AshJha0
+/java/src/main/java/com/iap/core/    @AshJha0
+/java/src/main/java/com/iap/codec/   @AshJha0
+/java/src/main/java/com/iap/orderbook/ @AshJha0
+/java/src/main/java/com/iap/replay/  @AshJha0
+/java/src/main/java/com/iap/features/ @AshJha0
+/java/src/main/java/com/iap/alpha/   @AshJha0
+/java/src/main/java/com/iap/risk/    @AshJha0
+/java/src/main/java/com/iap/execution/ @AshJha0
+/java/src/main/java/com/iap/sor/     @AshJha0
+/java/src/main/java/com/iap/contracts/ @AshJha0
+/java/src/main/java/com/iap/trace/   @AshJha0
+/java/src/main/java/com/iap/lifecycle/ @AshJha0
+/java/src/main/java/com/iap/portfolio/ @AshJha0
+/java/src/main/java/com/iap/tca/     @AshJha0
+/java/src/main/java/com/iap/backtest/ @AshJha0
+/java/src/main/java/com/iap/adaptive/ @AshJha0

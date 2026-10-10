@@ -1,5 +1,8 @@
 [workspace]
 resolver = "2"
+# features_py (pyo3 bindings, v1.11 E2) is a standalone package built by
+# maturin only; excluded so the workspace needs no libpython.
+exclude = ["features_py"]
 members = [
     "marketdata",
     "orderbook",
