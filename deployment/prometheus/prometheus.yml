@@ -28,6 +28,7 @@ global:
 rule_files:
   - /etc/prometheus/recording.yml
   - /etc/prometheus/alerts.yml
+  - /etc/prometheus/slo.yml
 
 # Alert delivery: Alertmanager (deployment/alertmanager/). The same hostname
 # resolves in docker-compose (service name) and Kubernetes (Service name).

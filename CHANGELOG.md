@@ -80,6 +80,47 @@ that tag.
   this is capability for multi-venue data (docs/REAL_DATA.md, API_TRADING.md
   §2.9, COOKBOOK recipe 59).
 
+**Added (P4, alerting, SLOs and state HA).**
+
+- *Alertmanager receivers.* `deployment/alertmanager/alertmanager.yml` now
+  routes by severity: `page` → receiver `page`; `critical`/`warning` →
+  `ticket`; `Watchdog` → `watchdog`; unlabelled alerts fall through to
+  `ticket`. Inhibition: `KillSwitchEngaged` mutes its downstream symptoms,
+  feed-health alerts mute `SignalRateCollapse`/`FillRateDrop`, and an SLO page
+  mutes the same SLO's warning, always within one `service`. Receiver URLs are
+  read with `url_file` only. The `webhook_url.placeholder` file is removed.
+  Compose now defaults to a new `alert-sink` echo service
+  (`local-sink.url`, no secret), so `docker compose up` still starts with no
+  secrets and alerts can be watched arriving.
+- *Latency SLOs.* New `deployment/prometheus/slo.yml`, written against the
+  existing log2 histograms (no exporter change): 99% of order-path
+  (`order_path_latency_ns`) and event-path (`book_update_latency_ns`)
+  samples under 1,048,575 ns over 30 days. Multi-window multi-burn-rate
+  alerts: `*LatencySLOFastBurn` (page; 14.4x over 1h and 5m, or 6x over 6h and
+  30m) and `*LatencySLOSlowBurn` (warning; 3x over 1d and 2h, or 1x over 3d and
+  6h). Error ratios are recorded for 7 windows. Promtool unit tests in
+  `deployment/prometheus/tests/slo_test.yml` cover 8 cases.
+- *State backup.* New `state-backup` CronJob (every 30 min, keeps 96) and
+  `iap-java-state-backup` PVC. The job mounts `iap-java-state` read-only, is
+  pinned by required pod affinity to the `java-platform` node (RWO is per
+  node), copies the checkpoint first, and never overlaps itself. HA is
+  restart-and-resume, not active-active. Lease-based leader election is not
+  implemented (it would be a Java change).
+- *Checks.* `tests/harness/check_deployment.py` adds `alerting_secret_free`,
+  `alert_rule_metadata` (severity + `runbook` + `runbook_url` resolving to a
+  file), `alert_rule_tests` (every rule file has a promtool test; every alert
+  is tested by name, except 8 pre-existing alerts on an allowlist that may
+  only shrink) and `k8s_state_backup`. Every existing alert gained a
+  `runbook_url` annotation.
+- *Docs.* New `docs/runbooks/RUNBOOK_alerting.md`; PLATFORM_CONVENTIONS
+  §12.7, ARCHITECTURE §9 ops note, COOKBOOK recipe 60.
+
+**Changed (operator action).** The k8s Secret `iap-alertmanager-webhook`
+now needs the keys `page_url` and `ticket_url` (was `url`); the Alertmanager
+pod will not start until both keys exist. Compose: `ALERT_PAGE_URL_FILE` /
+`ALERT_TICKET_URL_FILE`; `ALERT_WEBHOOK_URL_FILE` is still honoured as the
+page URL. Migration: RUNBOOK_alerting.md §2.
+
 ## v1.11.0 — 2026-10-10
 
 Scale and AI (IAP_Next_Releases_Plan v1.11: E2, E3, AI1-AI3; A2, A3 and AI4

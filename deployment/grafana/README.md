@@ -216,11 +216,13 @@ so the missed first sample does not matter. Each rule has a
 Prometheus now sends alerts to Alertmanager (`alertmanager:9093`;
 `deployment/alertmanager/alertmanager.yml`, mounted by compose and generated
 into `deployment/k8s/configmap-alertmanager.yaml`). Alerts are grouped by
-`alertname` and `service` and sent to a generic webhook whose URL is read
-from a mounted secret file. **The in-repo placeholder URL delivers nowhere**:
-until an operator supplies one (compose `ALERT_WEBHOOK_URL_FILE`, k8s Secret
-`iap-alertmanager-webhook`), alerts are routed and visible in the
-Alertmanager UI and reach nobody. `Watchdog` (`vector(1)`) fires
+`alertname` and `service` and routed by severity (since v1.12.0: `page` vs
+`ticket` receivers, with inhibition) to webhooks whose URLs are read from
+mounted secret files. Compose defaults to the local `alert-sink` echo
+service; real delivery needs the operator's URLs (compose
+`ALERT_PAGE_URL_FILE` / `ALERT_TICKET_URL_FILE`, k8s Secret
+`iap-alertmanager-webhook` keys `page_url` / `ticket_url`;
+docs/runbooks/RUNBOOK_alerting.md). `Watchdog` (`vector(1)`) fires
 permanently and is routed to its own receiver, which is a no-op here; point
 it at an external dead-man's-switch to be told when the alerting pipeline
 itself stops.

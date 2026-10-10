@@ -68,6 +68,7 @@ Contents:
 57. [Measure tick-to-trade latency percentiles (v1.12)](#57-measure-tick-to-trade-latency-percentiles-v112)
 58. [Opt-in extended features and an event / volume clock (v1.12)](#58-opt-in-extended-features-and-an-event--volume-clock-v112)
 59. [Route across venues: cost-aware choice, sweep, passive split, fee tiers (v1.12)](#59-route-across-venues-cost-aware-choice-sweep-passive-split-fee-tiers-v112)
+60. [Route alerts, read the latency SLOs and back up trading state (v1.12)](#60-route-alerts-read-the-latency-slos-and-back-up-trading-state-v112)
 
 Recipes 27–35 were added with v1.3.0. Every command block in them was run
 as printed, from a clean checkout of the release, before it was written
@@ -3605,3 +3606,58 @@ the router in a maker backtest pass `MakerBacktester(..., router=router)`;
 the trips then gain a `venue_id` column. The real data in this repository
 is Nasdaq only (one venue), so on it the router has nothing to choose
 between: this is capability for multi-venue data, not a measured result.
+
+## 60. Route alerts, read the latency SLOs and back up trading state (v1.12)
+
+Plan item P4. Three operational pieces, all in `deployment/`. The full
+procedures are in `docs/runbooks/RUNBOOK_alerting.md`.
+
+**1. See alerts arrive with no secrets.** Compose routes both receivers to
+the in-compose echo service by default:
+
+```bash
+docker compose -f deployment/docker/docker-compose.yml up -d prometheus alertmanager alert-sink
+docker logs -f iap-alert-sink        # the Watchdog heartbeat arrives within ~1 minute
+```
+
+To deliver for real, put each URL in a file **outside** the repo and name it:
+`export ALERT_PAGE_URL_FILE=$HOME/.iap/page_url ALERT_TICKET_URL_FILE=$HOME/.iap/ticket_url`.
+On Kubernetes the same URLs go in the Secret `iap-alertmanager-webhook`
+(keys `page_url`, `ticket_url`). Nothing secret is committed, and
+`check_deployment.py` fails if something is.
+
+**2. Read the SLOs.** In Prometheus (http://127.0.0.1:9090):
+
+```promql
+job:order_path_latency_slo_errors:ratio_rate1h    # fraction of orders slower than 1.05 ms
+job:event_path_latency_slo_errors:ratio_rate1h    # same for the per-event path
+job:order_path_latency_slo_errors:ratio_rate1h / 0.01   # burn rate (1 = on budget)
+```
+
+A burn rate of 14.4 sustained for an hour (with the 5-minute window agreeing)
+pages; 3 over a day tickets. After a finished paper session the ratios are
+empty (no traffic), and nothing fires.
+
+**3. Run the rule tests yourself** (CI does this; needs `promtool` 2.53):
+
+```bash
+cd deployment/prometheus/tests
+promtool test rules alerts_test.yml slo_test.yml
+cd ../../.. && PYTHONUTF8=1 python tests/harness/check_deployment.py
+```
+
+`check_deployment.py` also checks that every alert has `severity`,
+`runbook` and `runbook_url`, that every rule file has a promtool test, and the
+shape of the backup job.
+
+**4. Back up and restore the trading state (Kubernetes).**
+
+```bash
+kubectl -n intraday-alpha create job --from=cronjob/state-backup state-backup-now
+kubectl -n intraday-alpha logs job/state-backup-now     # backup ok: state-<ts>.tgz
+```
+
+The job runs only on the node that holds the trading pod's volume, and mounts
+it read-only. There is no active-active: recovery is one pod resuming from its
+checkpoint, and a restored archive either resumes exactly or is refused by the
+fail-closed resume guard. RUNBOOK_alerting.md §4 has the restore steps.

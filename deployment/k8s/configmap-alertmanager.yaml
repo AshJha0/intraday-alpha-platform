@@ -12,20 +12,40 @@ metadata:
     app.kubernetes.io/managed-by: generate-configmaps
 data:
   alertmanager.yml: "# =============================================================================\n\
-    # alertmanager.yml \u2014 routing for the alerts in deployment/prometheus/alerts.yml\n#\n# Single\
-    \ source of truth for both targets: docker-compose mounts this file,\n# and deployment/k8s/configmap-alertmanager.yaml\
-    \ is GENERATED from it\n# (deployment/k8s/generate_configmaps.py).\n#\n# The receiver is a generic\
-    \ webhook. Its URL is a SECRET (it normally embeds a\n# token), so it is never written here: `url_file`\
-    \ makes Alertmanager read it\n# from a mounted file at send time \u2014\n#   docker-compose: the `alert_webhook_url`\
-    \ secret (ALERT_WEBHOOK_URL_FILE)\n#   Kubernetes:     the `iap-alertmanager-webhook` Secret, key\
-    \ `url`\n# The in-repo placeholder (deployment/alertmanager/webhook_url.placeholder)\n# points nowhere;\
-    \ with it, alerts are routed and visible in the Alertmanager\n# UI but not delivered. Real delivery\
-    \ therefore needs the operator to supply a\n# URL \u2014 see docs/governance/REPO_SETTINGS.md (\"\
-    Operational settings\").\n#\n# Watchdog is the always-firing heartbeat from alerts.yml. It is sent\
-    \ to the\n# `watchdog` receiver (a no-op here). To get a dead-man's-switch, point that\n# receiver\
-    \ at an external heartbeat service that pages when it STOPS arriving.\n# =============================================================================\n\
-    global:\n  resolve_timeout: 5m\n\nroute:\n  receiver: webhook\n  group_by: [alertname, service]\n\
-    \  group_wait: 30s\n  group_interval: 5m\n  repeat_interval: 4h\n  routes:\n    - matchers:\n    \
-    \    - alertname = \"Watchdog\"\n      receiver: watchdog\n      group_wait: 0s\n      repeat_interval:\
-    \ 1m\n\nreceivers:\n  - name: webhook\n    webhook_configs:\n      - url_file: /etc/alertmanager/secrets/webhook_url\n\
-    \        send_resolved: true\n  - name: watchdog\n"
+    # alertmanager.yml \u2014 routing for the alerts in deployment/prometheus/alerts.yml\n# and deployment/prometheus/slo.yml\
+    \ (v1.12.0, plan P4).\n#\n# Single source of truth for both targets: docker-compose mounts this file,\n\
+    # and deployment/k8s/configmap-alertmanager.yaml is GENERATED from it\n# (deployment/k8s/generate_configmaps.py).\n\
+    #\n# SECRET-FREE. Receiver URLs normally embed a token, so none is written here:\n# every webhook\
+    \ uses `url_file`, read by Alertmanager at send time from a\n# mounted file \u2014\n#   Kubernetes:\
+    \     Secret `iap-alertmanager-webhook`, keys `page_url` and\n#                   `ticket_url` (created\
+    \ out of band by the operator; see\n#                   docs/runbooks/RUNBOOK_alerting.md \xA72)\n\
+    #   docker-compose: secrets `alert_page_url` / `alert_ticket_url`, from the\n#                   files\
+    \ named by ALERT_PAGE_URL_FILE / ALERT_TICKET_URL_FILE.\n#                   Unset, both default to\
+    \ deployment/alertmanager/local-sink.url,\n#                   which points at the in-compose `alert-sink`\
+    \ echo service \u2014\n#                   NOT a secret, and nothing leaves the compose network.\n\
+    # tests/harness/check_deployment.py (`alerting_secret_free`) fails the build\n# if an inline `url:`,\
+    \ a token-looking string, or a non-local URL is committed\n# under deployment/alertmanager/.\n#\n\
+    # Routing by the `severity` label (alerts.yml \"Severity policy\"):\n#   page               -> receiver\
+    \ `page`   (wake someone up)\n#   critical, warning  -> receiver `ticket` (act during the session\
+    \ / same day)\n#   none (Watchdog)    -> receiver `watchdog` (no-op; point it at a\n#            \
+    \             dead-man's-switch service to alarm when it STOPS)\n# Anything unlabelled falls through\
+    \ to `ticket` \u2014 never silently dropped.\n# =============================================================================\n\
+    global:\n  resolve_timeout: 5m\n\nroute:\n  receiver: ticket\n  group_by: [alertname, service]\n \
+    \ group_wait: 30s\n  group_interval: 5m\n  repeat_interval: 4h\n  routes:\n    - matchers:\n     \
+    \   - alertname = \"Watchdog\"\n      receiver: watchdog\n      group_wait: 0s\n      repeat_interval:\
+    \ 1m\n    - matchers:\n        - severity = \"page\"\n      receiver: page\n      group_wait: 10s\n\
+    \      group_interval: 1m\n      repeat_interval: 1h\n    - matchers:\n        - severity =~ \"critical|warning\"\
+    \n      receiver: ticket\n      repeat_interval: 12h\n\n# Inhibition: suppress the symptom while its\
+    \ cause is already firing, so the\n# on-call sees ONE page per incident. Every rule requires `service`\
+    \ equal, so\n# one service's incident never mutes another's.\ninhibit_rules:\n  # The kill switch\
+    \ halts trading: fill-rate / signal / reject / latency\n  # symptoms that follow are expected and\
+    \ are part of the kill-switch incident.\n  - source_matchers:\n      - alertname = \"KillSwitchEngaged\"\
+    \n    target_matchers:\n      - alertname =~ \"FillRateDrop|SignalRateCollapse|PreTradeRejectRatioHigh|LossLimitUtilizationHigh|.*LatencySLO.*\"\
+    \n    equal: [service]\n  # A stale or gapped feed explains a signal-rate collapse and a fill-rate\
+    \ drop.\n  - source_matchers:\n      - alertname =~ \"StaleFeed|FeedWallClockStall|BookStale|SequenceGapDetected\"\
+    \n    target_matchers:\n      - alertname =~ \"SignalRateCollapse|FillRateDrop\"\n    equal: [service]\n\
+    \  # A page on an SLO already covers the slower ticket for the same SLO.\n  - source_matchers:\n \
+    \     - severity = \"page\"\n      - slo =~ \".+\"\n    target_matchers:\n      - severity = \"warning\"\
+    \n    equal: [slo, service]\n\nreceivers:\n  - name: page\n    webhook_configs:\n      - url_file:\
+    \ /etc/alertmanager/secrets/page_url\n        send_resolved: true\n  - name: ticket\n    webhook_configs:\n\
+    \      - url_file: /etc/alertmanager/secrets/ticket_url\n        send_resolved: true\n  - name: watchdog\n"

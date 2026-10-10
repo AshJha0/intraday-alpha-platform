@@ -89,6 +89,8 @@ spec:
                 path: recording.yml
               - key: alerts.yml
                 path: alerts.yml
+              - key: slo.yml
+                path: slo.yml
         - name: tsdb
           emptyDir: {}   # metrics are rebuildable; swap for a PVC to retain across restarts
 ---

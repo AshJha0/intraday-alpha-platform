@@ -881,10 +881,27 @@ Admin endpoints (`RUNBOOK_incident_kill_switch.md` §2 — the manual ENGAGE pat
 - **Alert delivery** (2026-10-03): Prometheus sends to Alertmanager (`alertmanager:9093` in
   compose and Kubernetes; `deployment/alertmanager/alertmanager.yml` is the single source, and
   `configmap-alertmanager.yaml` is generated from it). The receiver is a generic webhook whose
-  URL is read from a mounted secret file; the in-repo placeholder delivers nowhere, so alerts
-  are routed and visible but **not delivered until an operator supplies a URL**
-  (`docs/governance/REPO_SETTINGS.md` §6). `Watchdog` (`vector(1)`, always firing) is the
+  URL is read from a mounted secret file. `Watchdog` (`vector(1)`, always firing) is the
   heartbeat, routed to its own receiver.
+- **Alerting, SLOs and state backup** (v1.12.0, plan P4; docs/runbooks/RUNBOOK_alerting.md):
+  - *Routing*: `severity: page` → receiver `page`; `critical`/`warning` → `ticket`; `Watchdog`
+    → `watchdog`; anything else falls through to `ticket`. Inhibition is always scoped to the same
+    `service`. Every alert carries `severity` (`page|critical|warning|none`) and `runbook` +
+    `runbook_url` annotations that resolve to a file (`alert_rule_metadata`).
+  - *Secret-free*: receivers use `url_file` only — k8s Secret `iap-alertmanager-webhook` keys
+    `page_url`/`ticket_url`, compose `ALERT_PAGE_URL_FILE`/`ALERT_TICKET_URL_FILE`. The only
+    committed URL is `deployment/alertmanager/local-sink.url` → the compose-internal `alert-sink`
+    echo service, so compose starts with no secrets (`alerting_secret_free`).
+  - *SLOs* (`deployment/prometheus/slo.yml`): written against the histograms the platform already
+    exports; a threshold must be a log2 bucket bound (2^i - 1 ns). Multi-window multi-burn-rate:
+    page at 14.4x (1h & 5m) or 6x (6h & 30m), warning at 3x (1d & 2h) or 1x (3d & 6h). No
+    traffic → NaN → no alert.
+  - *Tests*: every rule file is loaded by a promtool test file and every alert is exercised by
+    name (`alert_rule_tests`), except an explicit legacy allowlist that may only shrink.
+  - *State HA*: restart-and-resume on one RWO claim, never active-active (no Lease-based leader
+    election exists). The `state-backup` CronJob is the one sanctioned second mounter of
+    `iap-java-state`: read-only, `concurrencyPolicy: Forbid`, `activeDeadlineSeconds`, required pod
+    affinity to `java-platform` on `kubernetes.io/hostname` (`k8s_state_backup`).
 - **Network policy** (2026-10-03): default-deny ingress and egress in the namespace, then
   Prometheus → java-platform:8080 and → alertmanager:9093, Grafana → Prometheus:9090, the ingress
   controller → Grafana:3000, pods labelled `iap.role=operator` → java-platform:8080 (the admin
