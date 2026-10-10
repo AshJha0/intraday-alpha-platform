@@ -97,6 +97,7 @@ from __future__ import annotations
 
 import bisect
 from dataclasses import replace
+from typing import TYPE_CHECKING
 
 from iap.core.events import EventType, MarketEvent, SessionStatus
 from iap.core.rng import SplitMix64
@@ -120,6 +121,9 @@ from iap.orderbook.book import (
     OrderBook,
 )
 
+if TYPE_CHECKING:  # pragma: no cover
+    from iap.execution.calibration import ExecCalibration
+
 #: Overlay key: (instrument_id, venue_id, side, price_ticks).
 OverlayKey = tuple[int, int, int, int]
 
@@ -127,8 +131,14 @@ OverlayKey = tuple[int, int, int, int]
 class ExecutionSimulator:
     """Simulates child-order lifecycles against the replayed market stream."""
 
-    def __init__(self, config: ExecConfig) -> None:
+    def __init__(self, config: ExecConfig, calibration: ExecCalibration | None = None) -> None:
+        """``calibration`` (v1.9, opt-in; :mod:`iap.execution.calibration`)
+        replaces the rule-1 venue leg ``latency_mean_ns + jitter`` by a draw
+        from the calibrated latency table of that venue, still ONE SplitMix64
+        draw per submit or cancel. ``None`` (the default) is the pinned
+        synthetic rule every golden uses."""
         self._config = config
+        self._calibration = calibration
         self._rng = SplitMix64(config.seed)
         self._books: dict[int, ConsolidatedBook] = {}
         self._orders: dict[int, ChildOrder] = {}
@@ -196,6 +206,11 @@ class ExecutionSimulator:
 
     def _latency_to(self, venue: VenueSpec, decision_ts: int) -> int:
         """Rule 1 / rule 7 arrival time: one jitter draw per call."""
+        if self._calibration is not None:
+            table = self._calibration.latency_for(venue.venue_id)
+            if table is not None:
+                sample = table.sample(self._rng.uniform())
+                return decision_ts + self._config.latency.internal_ns + sample
         jitter = self._rng.below(venue.latency_jitter_ns + 1) if venue.latency_jitter_ns > 0 else 0
         return decision_ts + self._config.latency.internal_ns + venue.latency_mean_ns + jitter
 

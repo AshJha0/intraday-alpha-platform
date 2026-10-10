@@ -6,6 +6,49 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
+## v1.9.0 — unreleased
+
+Maker economics (plan items M1-M4). The research backtester only takes
+liquidity: at 1 s, an expected move of about 0.07 bp has to pay about 0.7 bp
+round trip. This release adds the maker side as opt-in Python research code.
+Every default path is unchanged: the synthetic simulator config, the taker
+backtest, the clipped alpha scores, every golden and every cross-language
+contract.
+
+**Added.**
+- M1, `iap.execution.calibration`: estimates a versioned calibration document
+  (`iap.exec_calibration` v1) from the normalized event stream. It covers
+  touch fill rates by queue-ahead bucket (open orders are right-censored),
+  touch queue-depletion hazards per side, feed latency quantiles (with
+  `parametric_latency` as an explicit tail for ITCH, which has no receive
+  stamp), maker adverse selection at 100 ms / 1 s / 10 s, and aggressor
+  impact (mean and slope in bps per % ADV). It also has a CLI
+  (`python -m iap.execution.calibration`). `ExecutionSimulator(config,
+  calibration=None)` draws rule-1 venue latency from the calibrated table
+  when one is given (still one SplitMix64 draw per submit or cancel), and
+  `apply_calibration` sets the impact coefficient.
+- M2, `iap.backtest.maker`: `MakerBacktester` posts at the touch on the
+  alpha's side, takes queue-position fills from the FIFO simulator, credits
+  the venue maker rebate and charges the measured markout. The gate is
+  `|er| + half_spread + rebate - exit_cost > adverse_selection + margin`,
+  with the adverse selection taken from the calibration. The exit is a taker
+  exit or a mark to mid. The accounting identity is tested.
+- M3, `iap.labels.maker_labels` (a new module; `iap.labels.labels` is
+  unchanged): per decision and side, fill / taker flags, queue ahead,
+  markouts at 100 ms / 1 s / 10 s, and "filled and not run over".
+- M4: `MakerConfig` tail conditions (spread, |z|, |er|, queue imbalance,
+  calibrated far-touch depletion probability); `MakerFilter`, which wires the
+  meta-label GBM or any `iap.models.zoo` model into the maker backtest as an
+  `allow` mask; `LinearAlpha.score_uncapped(data, z_cap=None)`, which makes
+  the z clip optional for research. `score()` keeps the pinned clip.
+- Docs: COOKBOOK recipe 39 and API_TRADING.md §2.6. There are 22 new tests
+  (`python/tests/test_maker_economics.py`) on synthetic MBO data.
+
+**Research note.** On the golden synthetic vector, the gate admits no trade
+with a taker exit, because the half-spread earned on entry is paid back on
+exit. A maker strategy needs a passive exit or quote skew (M5, v1.10) before
+the maker rebate can matter. No real-data result is claimed in this entry.
+
 ## v1.8.0 — 2026-10-10
 
 The first out-of-time holdout (four pre-registered signals confirmed on 2026

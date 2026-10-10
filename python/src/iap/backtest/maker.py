@@ -1,0 +1,524 @@
+"""Maker-side alpha backtest (v1.9 M2, with the M4 conditional rules).
+
+The research backtester (:mod:`iap.backtest.engine`) only TAKES liquidity:
+every trade pays the half-spread and the taker fee on both legs, about
+0.7 bp round trip on AAPL against an expected 1 s move near 0.07 bp. This
+module tests the other side of the book: the alpha decides which side to
+quote, and the order RESTS at the touch, so a fill earns the half-spread
+and the maker rebate and pays only its adverse-selection markout. It is a
+separate, opt-in mode; the taker backtest stays the default everywhere.
+
+Pinned rules (``MakerBacktester.run_instrument``):
+
+1. **Replay.** One ordered event stream of the instrument is replayed
+   through the FIFO execution simulator (:class:`ExecutionSimulator`,
+   rules 1-9: latency, queue position from the displayed size ahead,
+   fills only from observed trades, maker rebate / FX commission per fill).
+   An optional calibration (:mod:`iap.execution.calibration`) supplies the
+   latency table and the impact coefficient; without one the synthetic
+   venue config applies.
+2. **Decisions.** Each score row (``exchange_ts``, ``expected_return``,
+   ``confidence``, optional ``z``) is a decision that sees every event with
+   ``exchange_ts <= t``. A decision acts only while FLAT with no working
+   order; it posts ``qty`` as a LIMIT at the touch of the side the alpha
+   points to (``er > 0`` buys at the best bid, ``er < 0`` sells at the best
+   ask), expiring ``ttl_ns`` after the decision.
+3. **Gate** (expected edge > adverse selection), in bps of the mid::
+
+       edge = |er| * 1e4 + half_spread + rebate - exit_cost
+       trade iff  edge > adverse_selection + margin_bps
+
+   ``rebate`` = ``maker_rebate_per_share / mid`` (equity) or minus the FX
+   commission; ``exit_cost`` = ``half_spread + taker_fee / mid`` +
+   linear impact for ``exit="taker"``, 0 for ``exit="mid"`` (a mark-to-mid
+   diagnostic, not a tradable exit). ``adverse_selection`` is the
+   calibration's measured maker markout at ``as_horizon`` (per instrument
+   when available), else ``MakerConfig.adverse_selection_bps``, else 0
+   (recorded as ``as_source`` so an uncalibrated gate is never mistaken
+   for a calibrated one).
+4. **Tails** (M4, every condition optional, ANDed): ``min_spread_ticks``;
+   ``min_abs_z`` on the scores' ``z`` column (use
+   :meth:`LinearAlpha.score_uncapped` to see past the pinned clip);
+   ``min_abs_er``; ``min_queue_imbalance`` = our side's L1 / (bid + ask
+   L1) at decision time (the far queue is thin); ``min_p_far_deplete`` =
+   the calibrated probability that the FAR touch depletes within
+   ``horizon_ns`` (``1 - exp(-hazard * horizon)``); and an external
+   ``allow`` mask (the metalabel / GBM :class:`MakerFilter`).
+5. **Position.** On the first fill the unfilled remainder is cancelled
+   (through the latency path; fills that land before the cancel add to the
+   position). The position is held ``horizon_ns`` from the first fill and
+   then closed at the first event at or after that time against the book
+   state before it: ``exit="taker"`` crosses at the touch paying the taker
+   fee and the simulator's linear impact rule; ``exit="mid"`` marks at the
+   mid. A position still open at the end of the stream is closed the same
+   way on the last state (``forced_exits``).
+6. **Accounting** per round trip, side sign ``s``, quote-currency units::
+
+       gross       = s * (exit_px - entry_px) * qty * qty_unit
+       net         = gross - entry_fees - exit_fee - exit_impact
+
+   with ``entry_fees`` negative for a rebate. The measured markout is what
+   the gross term charges: ``gross = (half_spread_earned - adverse_selection
+   - exit_slippage) * qty * qty_unit`` where ``half_spread_earned = s *
+   (entry_mid - entry_px)`` (``entry_mid`` = the mid before the filling
+   event, the MAKER reference of ``iap.tca.markout``), ``adverse_selection =
+   s * (entry_mid - exit_mid)`` and ``exit_slippage = s * (exit_mid -
+   exit_px)``. The identity is tested.
+"""
+
+from __future__ import annotations
+
+import math
+from collections.abc import Sequence
+from dataclasses import dataclass, field
+from typing import Any
+
+import numpy as np
+import pandas as pd
+
+from iap.core.events import MarketEvent
+from iap.execution.calibration import ExecCalibration, apply_calibration
+from iap.execution.config import ExecConfig
+from iap.execution.simulator import ExecutionSimulator
+from iap.execution.types import ChildOrder, Liquidity, OrderType
+
+EXIT_MODES = ("taker", "mid")
+
+
+@dataclass(frozen=True)
+class MakerConfig:
+    """Maker backtest parameters (module docstring for the rules)."""
+
+    qty: int = 100
+    ttl_ns: int = 1_000_000_000
+    horizon_ns: int = 1_000_000_000
+    exit: str = "taker"
+    conf_min: float = 0.0
+    margin_bps: float = 0.0
+    #: horizon name of the calibration markout used as adverse selection
+    as_horizon: str = "1s"
+    #: fallback adverse selection (bps) when the calibration has none
+    adverse_selection_bps: float | None = None
+    # ---- M4 tail conditions (None / 0 = off) ----
+    min_spread_ticks: int = 1
+    min_abs_z: float | None = None
+    min_abs_er: float = 0.0
+    min_queue_imbalance: float | None = None
+    min_p_far_deplete: float | None = None
+
+    def __post_init__(self) -> None:
+        if self.qty <= 0 or self.ttl_ns <= 0 or self.horizon_ns <= 0:
+            raise ValueError("qty, ttl_ns and horizon_ns must be positive")
+        if self.exit not in EXIT_MODES:
+            raise ValueError(f"exit must be one of {EXIT_MODES}, got {self.exit!r}")
+        if self.min_spread_ticks < 0:
+            raise ValueError("min_spread_ticks must be >= 0")
+        if self.min_queue_imbalance is not None and not 0.0 <= self.min_queue_imbalance <= 1.0:
+            raise ValueError("min_queue_imbalance must be in [0, 1]")
+        if self.min_p_far_deplete is not None and not 0.0 <= self.min_p_far_deplete <= 1.0:
+            raise ValueError("min_p_far_deplete must be in [0, 1]")
+
+
+@dataclass
+class MakerResult:
+    """Outcome of one maker backtest run on one instrument."""
+
+    instrument_id: int
+    trips: pd.DataFrame = field(repr=False)
+    counters: dict[str, int]
+    as_bps: float
+    as_source: str
+
+    @property
+    def net_pnl(self) -> float:
+        return float(self.trips["net"].sum()) if len(self.trips) else 0.0
+
+    def summary(self) -> dict[str, Any]:
+        """Totals and per-trip means (bps of entry price) for a report."""
+        t = self.trips
+        out: dict[str, Any] = {
+            "instrument_id": self.instrument_id,
+            **self.counters,
+            "fill_rate": (
+                self.counters["filled_orders"] / self.counters["posted"]
+                if self.counters["posted"]
+                else None
+            ),
+            "as_bps_gate": self.as_bps,
+            "as_source": self.as_source,
+            "n_trips": len(t),
+        }
+        for col in ("gross", "entry_fees", "exit_fee", "exit_impact", "net"):
+            out[f"total_{col}"] = float(t[col].sum()) if len(t) else 0.0
+        for col in (
+            "half_spread_earned_bps",
+            "adverse_selection_bps",
+            "exit_slippage_bps",
+            "net_bps",
+        ):
+            out[f"mean_{col}"] = float(t[col].mean()) if len(t) else None
+        return out
+
+
+class MakerFilter:
+    """Optional metalabel / GBM trade filter for the maker backtest (M4).
+
+    ``model="meta_gbm"`` is the pinned meta-label classifier
+    (``HistGradientBoostingClassifier`` with
+    :data:`iap.models.metalabel.META_HYPERPARAMS`), trained on a binary
+    target such as the M3 ``{side}_not_run_over`` label; the score is the
+    positive-class probability. Any :mod:`iap.models.zoo` regressor name
+    (``ridge``, ``lightgbm`` ...) regresses a continuous target such as the
+    M3 markout; its prediction is the score. ``allow(X)`` is
+    ``score >= tau`` (NaN-safe: a row whose score is not finite is blocked).
+    Fit it on rows strictly before the backtest window — the filter is a
+    model and inherits every leakage rule of one.
+    """
+
+    def __init__(self, model: str = "meta_gbm", tau: float = 0.5) -> None:
+        self.model_name = model
+        self.tau = float(tau)
+        self._model: Any = None
+
+    def fit(self, X: np.ndarray, y: np.ndarray) -> MakerFilter:
+        X = np.asarray(X, dtype=float)
+        y = np.asarray(y, dtype=float)
+        ok = np.isfinite(y)
+        if self.model_name == "meta_gbm":
+            from sklearn.ensemble import HistGradientBoostingClassifier
+
+            from iap.models.metalabel import META_HYPERPARAMS
+
+            yb = (y[ok] > 0).astype(int)
+            if yb.min(initial=1) == yb.max(initial=0):
+                raise ValueError("meta_gbm filter needs both classes in y")
+            self._model = HistGradientBoostingClassifier(**META_HYPERPARAMS).fit(X[ok], yb)
+        else:
+            from iap.models.zoo import make_model
+
+            Xf = np.where(np.isfinite(X), X, 0.0)
+            self._model = make_model(self.model_name).fit(Xf[ok], y[ok])
+        return self
+
+    def score(self, X: np.ndarray) -> np.ndarray:
+        if self._model is None:
+            raise RuntimeError("MakerFilter.score() before fit()")
+        X = np.asarray(X, dtype=float)
+        if self.model_name == "meta_gbm":
+            return self._model.predict_proba(X)[:, 1]
+        return np.asarray(self._model.predict(np.where(np.isfinite(X), X, 0.0)), dtype=float)
+
+    def allow(self, X: np.ndarray) -> np.ndarray:
+        s = self.score(X)
+        return np.isfinite(s) & (s >= self.tau)
+
+
+class MakerBacktester:
+    """Event-replay maker backtest (module docstring, rules 1-6)."""
+
+    def __init__(
+        self,
+        exec_config: ExecConfig,
+        config: MakerConfig | None = None,
+        calibration: ExecCalibration | None = None,
+    ) -> None:
+        self.calibration = calibration
+        self.exec_config = apply_calibration(exec_config, calibration)
+        self.config = config or MakerConfig()
+
+    def adverse_selection(self, instrument_id: int) -> tuple[float, str]:
+        """(bps, source) of the gate's adverse-selection term."""
+        if self.calibration is not None:
+            v = self.calibration.adverse_selection_bps(self.config.as_horizon, instrument_id)
+            if v is not None:
+                return v, f"calibration:{self.config.as_horizon}"
+        if self.config.adverse_selection_bps is not None:
+            return float(self.config.adverse_selection_bps), "config"
+        return 0.0, "none"
+
+    def run_instrument(
+        self,
+        events: Sequence[MarketEvent],
+        scores: pd.DataFrame,
+        instrument_id: int,
+        *,
+        venue_id: int | None = None,
+        allow: np.ndarray | None = None,
+    ) -> MakerResult:
+        cfg = self.config
+        ins = self.exec_config.instrument(instrument_id)
+        if venue_id is None:
+            venue_id = next((e.venue_id for e in events if e.instrument_id == instrument_id), None)
+            if venue_id is None:
+                raise ValueError(f"no event for instrument {instrument_id}")
+        venue = self.exec_config.venue(venue_id)
+        ts = scores["exchange_ts"].to_numpy(dtype=np.int64)
+        if ts.size and np.any(np.diff(ts) < 0):
+            raise ValueError("scores must be sorted by exchange_ts")
+        er = scores["expected_return"].to_numpy(dtype=float)
+        conf = scores["confidence"].to_numpy(dtype=float)
+        z = scores["z"].to_numpy(dtype=float) if "z" in scores.columns else None
+        if cfg.min_abs_z is not None and z is None:
+            raise ValueError("min_abs_z needs a 'z' column in scores")
+        if cfg.min_p_far_deplete is not None and self.calibration is None:
+            raise ValueError("min_p_far_deplete needs a calibration")
+        if allow is not None:
+            allow = np.asarray(allow, dtype=bool)
+            if allow.shape != ts.shape:
+                raise ValueError("allow mask must be row-aligned with scores")
+        as_bps, as_source = self.adverse_selection(instrument_id)
+        tick = ins.tick_size
+        unit = ins.qty_unit
+
+        sim = ExecutionSimulator(self.exec_config, self.calibration)
+        c = dict.fromkeys(
+            (
+                "decisions",
+                "busy",
+                "filtered",
+                "tail_out",
+                "gated_out",
+                "posted",
+                "filled_orders",
+                "taker_entries",
+                "forced_exits",
+            ),
+            0,
+        )
+        trips: list[dict[str, Any]] = []
+        st: dict[str, Any] = {"order": None, "pos": 0, "side": 0, "exit_due": None}
+        entry: dict[str, Any] = {}
+        seen_fills = 0
+        last_mid: list[float | None] = [None]
+
+        def book_state():
+            book = sim.venue_book(instrument_id, venue_id)
+            if not sim.venue_open(book):
+                return None
+            bb, ba = book.best_bid(), book.best_ask()
+            if bb is None or ba is None or ba[0] < bb[0]:
+                return None
+            return bb, ba
+
+        def rebate_bps(mid: float) -> float:
+            if venue.is_fx:
+                return -venue.commission_per_million / 100.0
+            return 1e4 * venue.maker_rebate_per_share / mid
+
+        def exit_cost_bps(mid: float, hs: float) -> float:
+            if cfg.exit == "mid":
+                return 0.0
+            fee = (
+                venue.commission_per_million / 100.0
+                if venue.is_fx
+                else 1e4 * venue.taker_fee_per_share / mid
+            )
+            imp = self.exec_config.impact_coeff_bps_per_pct_adv * (cfg.qty * unit / ins.adv * 100.0)
+            return 1e4 * hs / mid + fee + imp
+
+        def decide(r: int) -> None:
+            c["decisions"] += 1
+            if st["order"] is not None or st["pos"] != 0:
+                c["busy"] += 1
+                return
+            if allow is not None and not allow[r]:
+                c["filtered"] += 1
+                return
+            e = er[r]
+            if not math.isfinite(e) or e == 0.0 or not conf[r] >= cfg.conf_min:
+                c["gated_out"] += 1
+                return
+            bs = book_state()
+            if bs is None:
+                c["gated_out"] += 1
+                return
+            (bpx, bq), (apx, aq) = bs
+            side = 0 if e > 0 else 1
+            mid = 0.5 * (bpx + apx) * tick
+            hs = 0.5 * (apx - bpx) * tick
+            # M4 tails
+            tail_ok = apx - bpx >= cfg.min_spread_ticks and abs(e) >= cfg.min_abs_er
+            if tail_ok and cfg.min_abs_z is not None:
+                tail_ok = math.isfinite(z[r]) and abs(z[r]) >= cfg.min_abs_z
+            if tail_ok and cfg.min_queue_imbalance is not None:
+                ours, far = (bq, aq) if side == 0 else (aq, bq)
+                tail_ok = ours + far > 0 and ours / (ours + far) >= cfg.min_queue_imbalance
+            if tail_ok and cfg.min_p_far_deplete is not None:
+                far_side, far_q = (1, aq) if side == 0 else (0, bq)
+                lam = self.calibration.queue_depletion_hazard(far_side, far_q)
+                p = None if lam is None else 1.0 - math.exp(-lam * cfg.horizon_ns / 1e9)
+                tail_ok = p is not None and p >= cfg.min_p_far_deplete
+            if not tail_ok:
+                c["tail_out"] += 1
+                return
+            edge = 1e4 * abs(e) + 1e4 * hs / mid + rebate_bps(mid) - exit_cost_bps(mid, hs)
+            if not edge > as_bps + cfg.margin_bps:
+                c["gated_out"] += 1
+                return
+            oid = sim.submit(
+                ChildOrder(
+                    instrument_id=instrument_id,
+                    venue_id=venue_id,
+                    side=side,
+                    type=OrderType.LIMIT,
+                    qty=cfg.qty,
+                    limit_ticks=bpx if side == 0 else apx,
+                    decision_ts=int(ts[r]),
+                    expire_ts=int(ts[r]) + cfg.ttl_ns,
+                )
+            )
+            c["posted"] += 1
+            st["order"] = oid
+            st["side"] = side
+
+        def close(t: int, forced: bool) -> None:
+            bs = book_state()
+            if bs is None:
+                if not forced:
+                    return  # no two-sided open book: retry on the next event
+                if last_mid[0] is None:
+                    return
+                exit_mid = last_mid[0]
+                exit_px = exit_mid  # no book at all: mark (counted as forced)
+            else:
+                (bpx, _), (apx, _) = bs
+                exit_mid = 0.5 * (bpx + apx) * tick
+                if cfg.exit == "mid":
+                    exit_px = exit_mid
+                else:
+                    exit_px = (bpx if st["side"] == 0 else apx) * tick
+            q = abs(st["pos"])
+            s = 1.0 if st["side"] == 0 else -1.0
+            notional = q * unit * exit_px
+            if cfg.exit == "taker":
+                exit_fee = (
+                    venue.commission_per_million * notional / 1e6
+                    if venue.is_fx
+                    else venue.taker_fee_per_share * q
+                )
+                imp_bps = self.exec_config.impact_coeff_bps_per_pct_adv * (
+                    q * unit / ins.adv * 100.0
+                )
+                exit_impact = imp_bps * 1e-4 * notional
+            else:
+                exit_fee = exit_impact = 0.0
+            epx = entry["px"]
+            gross = s * (exit_px - epx) * q * unit
+            net = gross - entry["fees"] - exit_fee - exit_impact
+            emid = entry["mid"]
+            trips.append(
+                {
+                    "side": st["side"],
+                    "qty": q,
+                    "entry_ts": entry["ts"],
+                    "entry_px": epx,
+                    "entry_mid": emid,
+                    "exit_ts": t,
+                    "exit_px": exit_px,
+                    "exit_mid": exit_mid,
+                    "liquidity": entry["liq"],
+                    "gross": gross,
+                    "entry_fees": entry["fees"],
+                    "exit_fee": exit_fee,
+                    "exit_impact": exit_impact,
+                    "net": net,
+                    "half_spread_earned_bps": 1e4 * s * (emid - epx) / epx,
+                    "adverse_selection_bps": 1e4 * s * (emid - exit_mid) / epx,
+                    "exit_slippage_bps": 1e4 * s * (exit_mid - exit_px) / epx,
+                    "net_bps": 1e4 * net / (q * unit * epx),
+                    "forced": forced,
+                }
+            )
+            if forced:
+                c["forced_exits"] += 1
+            st["pos"] = 0
+            st["exit_due"] = None
+
+        r = 0
+        n = int(ts.size)
+        for ev in events:
+            if ev.instrument_id != instrument_id:
+                continue
+            t = ev.exchange_ts
+            while r < n and ts[r] < t:
+                if st["pos"] != 0 and st["exit_due"] is not None and ts[r] >= st["exit_due"]:
+                    break  # exit first; the decision is handled after it
+                decide(r)
+                r += 1
+            if st["pos"] != 0 and st["exit_due"] is not None and t >= st["exit_due"]:
+                close(t, forced=False)
+                while r < n and ts[r] < t:
+                    decide(r)
+                    r += 1
+            bs = book_state()
+            pre_mid = None if bs is None else 0.5 * (bs[0][0] + bs[1][0]) * tick
+            if pre_mid is not None:
+                last_mid[0] = pre_mid
+            sim.on_event(ev)
+            fills = sim.fills
+            while seen_fills < len(fills):
+                f = fills[seen_fills]
+                seen_fills += 1
+                if f.order_id != st["order"]:
+                    continue
+                if st["pos"] == 0:
+                    ref = pre_mid if f.liquidity == Liquidity.MAKER else None
+                    if ref is None:
+                        ref = last_mid[0] if last_mid[0] is not None else f.price_ticks * tick
+                    entry.clear()
+                    entry.update(
+                        px=f.price_ticks * tick,
+                        ts=f.ts,
+                        mid=ref,
+                        fees=0.0,
+                        liq=f.liquidity.name,
+                    )
+                    st["exit_due"] = f.ts + cfg.horizon_ns
+                    c["filled_orders"] += 1
+                    if f.liquidity == Liquidity.TAKER:
+                        c["taker_entries"] += 1
+                    if not sim.orders[f.order_id].is_terminal:
+                        sim.cancel(f.order_id, f.ts)
+                q_prev = abs(st["pos"])
+                entry["px"] = (entry["px"] * q_prev + f.price_ticks * tick * f.qty) / (
+                    q_prev + f.qty
+                )
+                entry["fees"] += f.fee + f.impact_cost
+                st["pos"] += f.qty if f.side == 0 else -f.qty
+            o = st["order"]
+            if o is not None and sim.orders[o].is_terminal:
+                st["order"] = None
+        while r < n:
+            decide(r)
+            r += 1
+        sim.cancel_all()
+        if st["pos"] != 0:
+            close(events[-1].exchange_ts if len(events) else 0, forced=True)
+        cols = [
+            "side",
+            "qty",
+            "entry_ts",
+            "entry_px",
+            "entry_mid",
+            "exit_ts",
+            "exit_px",
+            "exit_mid",
+            "liquidity",
+            "gross",
+            "entry_fees",
+            "exit_fee",
+            "exit_impact",
+            "net",
+            "half_spread_earned_bps",
+            "adverse_selection_bps",
+            "exit_slippage_bps",
+            "net_bps",
+            "forced",
+        ]
+        return MakerResult(
+            instrument_id=instrument_id,
+            trips=pd.DataFrame(trips, columns=cols),
+            counters=c,
+            as_bps=as_bps,
+            as_source=as_source,
+        )

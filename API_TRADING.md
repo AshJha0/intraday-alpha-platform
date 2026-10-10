@@ -456,6 +456,62 @@ participation controls and the risk check, and is exempt only from the
 slice-interval control (docs/MVP.md §3). The Java `BacktestEngine` /
 `PaperTrading` loop keeps its NATIVE child style.
 
+### 2.6 Maker economics: calibration, maker backtest, maker labels (v1.9.0, Python only)
+
+The research backtester only takes liquidity (`iap.backtest.engine`). v1.9
+adds the maker side as opt-in research code. None of it is a port contract,
+none of it changes a golden, and every default path (synthetic venue config,
+taker backtest, clipped alpha scores) is unchanged.
+
+**Calibration (M1) — `iap.execution.calibration`.**
+
+| entry | what it does |
+|---|---|
+| `estimate_calibration(events, tick_sizes, *, horizons_ns=None, queue_edges=(0,100,500,2000), latency_tail=None, source=None) -> dict` | one pass over an ordered `MarketEvent` stream: touch fill rates by queue-ahead bucket, touch queue-depletion hazards per side, feed latency quantiles (`receive_ts - exchange_ts` > 0), maker adverse selection at 100 ms / 1 s / 10 s, aggressor-sweep impact (mean bps and slope in bps per % of ADV) |
+| `write_calibration(doc, path)` / `load_calibration(path or None)` | sorted-key JSON (`schema "iap.exec_calibration"`, `version 1`; any other schema or version is rejected); `None` returns `None`, which means the synthetic config |
+| `ExecCalibration` | `latency_for(venue_id)`, `adverse_selection_bps(horizon, instrument_id=None)`, `queue_depletion_hazard(side, queue_qty)`, `impact_coeff_bps_per_pct_adv` |
+| `parametric_latency(mean_ns, jitter_ns, tail_prob=0.01, tail_mult=10.0)` | a quantile table with an explicit tail for data that has no receive stamp (ITCH) |
+| `apply_calibration(config, cal)` | the `ExecConfig` with the calibrated impact coefficient |
+| `ExecutionSimulator(config, calibration=None)` | with a calibration, the venue leg of rule 1 is drawn from that venue's latency table. It is still one SplitMix64 draw per submit or cancel; venues the table does not cover keep the config rule |
+| `python -m iap.execution.calibration --events F.. --tick IID=TICK.. --out C.json` | the CLI |
+
+Fill rates count only orders that end inside the stream; orders still open at
+the end are right-censored and reported in `n_open`. A depletion is a touch
+episode that ends with the touch moving away from the spread, and the hazard
+is depletions divided by exposure seconds. Markouts follow the
+`iap.tca.markout` rules for undefined windows (gated timeline).
+
+**Maker backtest (M2 + M4) — `iap.backtest.maker`.**
+`MakerBacktester(exec_config, MakerConfig(...), calibration=None).run_instrument(events, scores, instrument_id, *, venue_id=None, allow=None) -> MakerResult`.
+The module docstring pins the rules: each decision posts at the touch of
+the side the alpha points to and fills through the FIFO simulator. The gate
+is `|er| + half_spread + rebate - exit_cost > adverse_selection + margin`
+(bps), using the calibrated adverse selection at `as_horizon`. The position
+is held `horizon_ns` from the first fill, then exits as a taker (`exit="taker"`)
+or is marked to mid (`exit="mid"`, a diagnostic). The accounting identity
+`gross = (half_spread_earned - adverse_selection - exit_slippage) * qty`
+is tested. M4 adds `MakerConfig` tail conditions (`min_spread_ticks`,
+`min_abs_z`, `min_abs_er`, `min_queue_imbalance`, `min_p_far_deplete`),
+which are all optional and combined with AND, and an `allow` mask from
+`MakerFilter("meta_gbm" | <zoo model>, tau)`.
+`MakerResult.summary()` reports counters, fill rate, the source of the
+adverse-selection figure the gate used (`calibration:<h>`, `config` or
+`none`), totals and mean per-trip bps components.
+
+**Maker labels (M3) — `iap.labels.maker_labels`.**
+`maker_labels(events, decision_ts, *, instrument_id, exec_config, venue_id=None, ttl_ns=1e9, qty=1, horizons_ns=None, run_over_horizon="1s", calibration=None) -> DataFrame`
+returns, per decision and per side (`bid` / `ask`): `post_ticks`,
+`queue_ahead`, `filled` (MAKER fill before the TTL), `taker` (the order
+became marketable on arrival), `fill_ts`, `markout_{100ms,1s,10s}_bps`
+(positive is good; NaN when undefined) and `not_run_over` (1 when the order
+filled with markout >= 0 at `run_over_horizon`, 0 when it filled with a
+negative markout or did not fill, NaN when undefined). `iap.labels.labels`
+is unchanged.
+
+**Optional z cap (M4) — `LinearAlpha.score_uncapped(data, z_cap=None)`.**
+Research-only scoring with the pinned `z_clip = 4` replaced by `z_cap`
+(`None` means no cap). `score()` and the port contract keep the clip.
+
 ## 3. Where the rules live
 
 | rule set | normative text | Python port entry |
