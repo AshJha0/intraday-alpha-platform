@@ -11,8 +11,16 @@ that tag.
 Still to do: ingest memory (stream events to disk; a full-day ingest took 260 min
 against 52 min for a similar file because the process outgrew the machine's RAM),
 an out-of-time holdout run on 2026-05-18 (needs a frozen pre-registered
-hypothesis first). The matched-horizon siblings
-of the synthetic `power` detectors are not gated separately.
+hypothesis first).
+
+**Changed (docs).** The matched-horizon rows of the synthetic `power` study
+(EQ04 at 10 s, EQ10 at 5 s) are a sensitivity check on the registered
+detectors, not separate hypotheses, so they are deliberately not gated on
+their own; v1.7.2 listed this as "not covered". Docs brought up to v1.7.2:
+the `research` module usage (`power-real`, `combine`, the pre-registration
+gate, exit 3), the `power-real` checkpoint and `--restart`, ingest `--quiet`,
+`ExperimentRunner(gate=)` in API_CONTRACTS, and COOKBOOK recipe 36, whose
+`run` lacked the `--no-prereg` it has needed since v1.7.0.
 
 ## v1.7.2 — 2026-10-09
 

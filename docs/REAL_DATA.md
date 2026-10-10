@@ -172,6 +172,12 @@ market; the recompute leakage probe is off. See the module docstring.
 Since v1.7.2 `power` and `power-real` need the declared detectors (EQ04 at 5s
 and EQ10 at 1s) pre-registered on the blackboard, like `run` and `combine`;
 `--no-prereg` opts out and says so in the output.
+A full grid runs for hours, so `power-real` appends every finished run to
+`REAL_POWER_CHECKPOINT.jsonl` beside its report (fsynced, keyed by a
+fingerprint of dataset, grid, thresholds and seeds). Rerunning the same
+command resumes where it stopped and gives the same report as an
+uninterrupted run; a checkpoint written for a different study is refused,
+and `--restart` discards it.
 [COOKBOOK.md](../COOKBOOK.md) recipe 36 runs this whole chain on bytes
 written by the test encoder, so it works without a real file.
 
@@ -563,7 +569,8 @@ until it has finished; the clean rerun needed 260 minutes, so that attempt
 was most likely stopped well before it would have finished.
 Run full-day files alone on the machine, give the job 16 GB or more free, and
 read the `[ingest]` heartbeat (elapsed time and GB written by the running
-stage) instead of waiting for output. Streaming the events to disk instead
+stage) instead of waiting for output (`--quiet` turns the stage and
+heartbeat lines off). Streaming the events to disk instead
 of keeping them is the known fix and is not done.
 
 **Many days.** Every ingest re-normalises all sessions of the dataset

@@ -1289,7 +1289,8 @@ the promotion report runs plus a holdout backtest, writes a typed
 
 ```bash
 cd python
-# since v1.7.0 `run` needs a pre-registration; add --no-prereg for exploratory runs
+# since v1.7.0 `run` needs a pre-registration; add --no-prereg for exploratory runs.
+# A registered run whose IC has the opposite sign to the registered one exits 3 (v1.7.1).
 PYTHONPATH=src python3 -m iap.research run --alpha EQ03 --horizon 1s               # spec block, result table, VERDICT, the t threshold, the ledger note
 PYTHONPATH=src python3 -m iap.research run --alpha EQ03 --horizon 1s --dry-run     # no experiment directory is written; the looks ARE debited in the ledger
 PYTHONPATH=src python3 -m iap.research run --alpha EQ06 --config n_folds=3 --config cost_multiplier=2.0   # a different configuration = a different id
@@ -2000,8 +2001,9 @@ EOF
 PYTHONPATH=src python3 -m iap.features --data-dir ../data/real/demo/normalized \
   --out-dir ../data/real/demo/features --configs ../data/real/demo/configs \
   --registry-out ../data/real/demo/reference/feature_registry.json 2> /dev/null
+# --no-prereg: a demo, not a hypothesis (a real study registers it first, §26)
 PYTHONPATH=src python3 -m iap.research run --alpha EQ03 --dataset-dir ../data/real/demo \
-  | sed -n '1,5p;/VERDICT/p'
+  --no-prereg | sed -n '1,5p;/VERDICT/p'
 # experiment         240bdd3b53899e7f
 # alpha              EQ03
 # horizon            5s
@@ -2020,7 +2022,7 @@ real order book without a dropped event or a crossing displayed order.
 
 The `dataset_version` in the experiment is the manifest's, not the bundled
 dataset's `116b7787…`: the spec, the experiment id and the ledger
-entries of its 28 looks carry it, and the ledger they went into is
+entries of its looks carry it, and the ledger they went into is
 `data/real/demo/research/experiments.json` — `research/experiments.json`
 in the checkout did not move. Ingesting the same bytes again gives the
 same `dataset_version` and byte-identical files.
