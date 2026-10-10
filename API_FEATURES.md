@@ -522,3 +522,75 @@ equity day (105,282 events, 100 ms cadence). The Python figure is the full
 ratio is what a caller that needs only the native slots saves. It is not a
 pipeline speed-up: `--engine rust` still runs the Python engine for the
 other families.
+
+## 8. Extended feature set and event-time sampling (opt-in, v1.12.0)
+
+`iap.features.extended` adds Python-only features and a second row clock.
+Everything here is **opt-in**: the default registry (205 features), its
+hash `585dd7b9...` (the `feature_version` of every published store), the
+golden vectors of §5 and the 45 native slots are unchanged, and nothing was
+added to the cross-language native set (docs/POLYGLOT.md: the Python
+features are the canonical reference; these have no C++/Rust/Java port).
+
+### 8.1 Families
+
+Selected with `python -m iap.features --feature-set extended` or
+`ExtendedFeatureEngine(contexts, feature_set="extended")`. The extended
+registry is the default registry followed by these families in the pinned
+order `xqueue, xsign, xhawkes, xhidden` (19 features with the default
+`ExtendedConfig`); its hash, `extended_registry_hash()`, is the
+`feature_version` of extended rows, and the parameters are part of each
+entry, so a different parameterisation is a different version.
+
+| feature | definition | valid when |
+|---|---|---|
+| `qttd_{bid,ask}_w{1s,10s}_v1` | Q_L1 / (L1 queue decrements over w / w) seconds, capped at `ttd_cap_s` = 600; decrements are the engine's per-refresh L1 queue deltas (cancels, executions, the level vanishing); zero depletion gives the cap | book_ok, window elapsed |
+| `sign_acf_l{1,2,3,5,10}_n100_v1` | sample autocorrelation at lag k of the last n = 100 trade signs (+1 buyer-, -1 seller-initiated; TRADE aggressor flag, which for ITCH hidden prints is the ingest's tick-rule classification) | n signs since the warmup anchor, variance > 0 |
+| `hawkes_{buy,sell,total}_b{1,0p1}_v1` | mu + alpha * sum exp(-beta (t - t_i)) over that side's trades (total = buy + sell), mu = 0, alpha = 1, beta = 1/s and 0.1/s; online recursion S <- S e^{-beta dt} + alpha, decayed to the emission time | 5/beta seconds since the warmup anchor |
+| `hawkes_imb_b{1,0p1}_v1` | (buy - sell) / (buy + sell) | as above and total > EPS |
+| `oddlot_share_w1m_v1` | traded qty in TRADEs below `odd_lot` = 100 shares / traded qty over 1m | equity or ETF, 1m elapsed, volume > 0 |
+| `hidden_share_w1m_v1` | 1 - EXECUTE qty / TRADE qty over 1m, clipped to [0, 1] (ITCH prints a displayed fill as EXECUTE + TRADE and a non-displayed fill as TRADE only) | the source has reported at least one EXECUTE for the instrument, 1m elapsed, volume > 0 |
+
+The hidden-share rule degrades gracefully: a source without order-level
+executions (quote-only FX, consolidated prints) leaves it INVALID instead of
+reporting 100% hidden, and odd lots are undefined outside equities. Rules
+shared with the default families hold: only applied events are folded in,
+a stale->fresh recovery clears the extended state and re-anchors warmup
+(§2.1), quantities above `FEATURE_MAX_QTY` are not folded (§2.2), every
+value goes through the single NaN funnel (NaN is never valid), and a row at
+time t reads only events with `exchange_ts <= t`.
+
+`fit_hawkes_exp(times_s, horizon_s)` is the offline MLE helper for a
+univariate exponential Hawkes process (exact log-likelihood by the Ozaki
+recursion, `hawkes_loglik`; scipy Nelder-Mead on log parameters with
+alpha < beta). It is never called inside a replay: fit offline, then pass
+the parameters in `ExtendedConfig`.
+
+### 8.2 Event-time sampling
+
+`--sampling events:N` emits a row after every N applied events of the
+instrument, `--sampling volume:N` after every N traded shares (TRADE qty,
+a volume clock); the first event of an instrument always emits, and
+`--cadence-ms` is ignored. It works with either feature set. With the
+volume clock the rows are no longer the ones the Rust overlay replays, so
+`--engine rust` falls back to Python values for that file (with a message).
+`features_summary.json` gains `feature_set` / `sampling` keys only when a
+non-default option is used. `--workers N` stays byte-identical to the
+serial build (`python/tests/test_feature_parallel.py`).
+
+### 8.3 Where these are meant to go (no real-data run yet)
+
+No research or real-data run has used these columns. The intended
+consumers: queue time-to-depletion and the Hawkes intensities as inputs to
+the maker filter and quote-skew logic (a short time-to-depletion on the
+side being quoted is adverse-selection risk; a buy-heavy Hawkes imbalance
+argues for skewing the ask); trade-sign autocorrelation as a persistence
+check for order-flow alphas and the meta-label; odd-lot and hidden shares
+as liquidity-regime inputs for auction and close-participation sizing; and
+the volume clock to compare alphas on a clock that equalises activity
+across the day. Each needs its own pre-registered study before it is used.
+
+Tests: `python/tests/test_features_extended.py` (closed-form Hawkes after a
+burst, AR(1)-sign autocorrelation, depletion time for a planted cancel
+rate, odd-lot / hidden shares and their degradation, event / volume row
+counts, causality by perturbing the future, default hash unchanged).
