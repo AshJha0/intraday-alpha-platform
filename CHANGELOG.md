@@ -6,7 +6,19 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
-## v1.12.0 — unreleased
+## v1.12.0 — 2026-10-10
+
+Honest Sharpe, better passive fills, new features, measured latency and
+production alerting (IAP_Next_Releases_Plan: R7 statistics half, X4, X5, X6,
+M6, P4). Every new path is opt-in: no default, golden, published number,
+ledger or cross-language contract changes. **Operator action (P4):** the
+Kubernetes Secret `iap-alertmanager-webhook` now needs keys `page_url` and
+`ticket_url` (RUNBOOK_alerting.md §2). Parity counts from CI: python 2250 /
+cpp 302 / rust 358 / java 571, golden 193 / 72 / 71 / 124. Real-data study
+status: AUC01 in-sample, no demonstrated edge (underpowered); maker, quoting
+and the AUC01 2026 holdout running (REAL_DATA.md §3.3). Pull requests
+[#57](https://github.com/AshJha0/intraday-alpha-platform/pull/57) to
+[#63](https://github.com/AshJha0/intraday-alpha-platform/pull/63).
 
 - **Combinatorial purged CV and PBO** (plan item R7, statistics half;
   opt-in): `iap.validation.cpcv` — `CombinatorialPurgedSplitter` (N

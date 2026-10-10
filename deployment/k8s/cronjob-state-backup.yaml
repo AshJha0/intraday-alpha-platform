@@ -94,7 +94,7 @@ spec:
           containers:
             - name: backup
               # Same image as java-platform (coreutils + tar); no network use.
-              image: ghcr.io/ashjha0/intraday-alpha-platform-java:v1.11.0
+              image: ghcr.io/ashjha0/intraday-alpha-platform-java:v1.12.0
               imagePullPolicy: IfNotPresent
               command: ["/bin/sh", "-c"]
               args:
