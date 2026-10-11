@@ -8,6 +8,14 @@ that tag.
 
 ## Unreleased (v1.15)
 
+- **M-P1-2: conformal sizing (opt-in, Python research only)** —
+  `iap.models.conformal`: split-conformal and adaptive conformal (ACI,
+  rolling window) intervals on alpha forecasts, a confidence-scaled sizing
+  rule (`conformal_size`, monotone in confidence, never above the base target
+  or `max_position`), and `calibration_report` (empirical vs nominal coverage
+  by session). Flag `ConformalSizingConfig.enabled` is OFF by default and is
+  not in `configs/prereg/v2.json`. Not wired into the parity-checked MVP
+  engine sizing, so no golden changes.
 - **X-P1-1: dated SEC Section 31 + FINRA TAF fees** in the Python, C++ and
   Rust execution engines (sell side only), from
   `configs/reference/regulatory_fee_schedule.json` (dated periods with
