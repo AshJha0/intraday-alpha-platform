@@ -38,13 +38,14 @@ Contents: [1 What is supported](#1-what-is-supported) ·
 | Source | Module | What is read |
 |---|---|---|
 | Nasdaq TotalView-ITCH 5.0 historical file | `iap.marketdata.itch50` | the binary file format: `2-byte big-endian length` + message, plain or gzip (detected by magic). Decoded: `S` system event, `R` stock directory, `H` trading action, `Y` Reg SHO, `L` market participant position, `A` / `F` add order, `E` / `C` executed, `X` cancel, `D` delete, `U` replace, `P` non-cross trade, `Q` cross trade, `B` broken trade. `I` (NOII) is length-checked and counted. Every other type (`V W K J h N O …`) is skipped by its length prefix and counted per type |
+| Databento DBN MBO, dataset `XNAS.ITCH` (v1.15) | `iap.marketdata.dbn_mbo` | a `.dbn` or zstd `.dbn.zst` file (detected by magic) decoded with the official `databento-dbn` codec (optional extra `pip install 'iap[dbn]'`). MBO actions `A C M T F R N` are translated into the ITCH 5.0 messages above and mapped by the unchanged ITCH mapper (§4.4); other record types are counted and skipped |
 | LOBSTER message file (+ orderbook file) | `iap.marketdata.lobster` | CSV without header, event types 1–7, one message file per symbol-day; the orderbook file is optional and, when present, verifies the reconstruction level by level (§6) |
 | Corporate actions | `iap.reference.corpactions` | a CSV table you write or export (§5); nothing is downloaded |
 
 One command ingests either source:
 
 ```
-python -m iap.marketdata ingest --format {itch50,lobster} --input FILE... \
+python -m iap.marketdata ingest --format {itch50,dbn-mbo,lobster} --input FILE... \
     --date YYYY-MM-DD --symbols AAPL,MSFT,... --out DATASET_DIR
     [--limit-messages N] [--extended-hours] [--tick-size {auto,0.01,0.0001}]
     [--orderbook FILE...] [--corporate-actions CSV]
@@ -537,6 +538,45 @@ file all of these should be 0; the manifest shows them.
 
 Messages on orders submitted before the file starts are the difference from
 ITCH; §6 describes how they are handled.
+
+### 4.4 Databento DBN MBO (`--format dbn-mbo`, v1.15)
+
+Databento's `XNAS.ITCH` MBO records are Nasdaq TotalView-ITCH re-encoded.
+`iap.marketdata.dbn_mbo.DbnMboReader` translates each record into the ITCH
+message of §4.2 and the ingest runs the same `Itch50Mapper`, so every rule
+of §4.1/§4.2 (quote-rule signing of hidden prints, tick decision, half-penny
+guard, book check, outside-session drops) applies unchanged.
+`python/tests/test_dbn_mbo.py` pins it: an ITCH file and the equivalent DBN
+file give byte-identical raw files and the same per-symbol facts.
+
+| DBN action | ITCH message | Notes |
+|---|---|---|
+| `A` add | `A` add order | side `B` → `B`, `A` → `S`; side `N` is an invalid order |
+| `C` cancel | `X` cancel of `size` shares | a cancel of the whole remaining size removes the order (as `D`) |
+| `M` modify | `U` replace, same order id | cancel + add: the order loses priority |
+| `T` then `F` at the same instrument, time, price and size | `E` executed (or `C` printable at the fill price when it differs from the order's) | one displayed execution |
+| `F` without a `T` | the same execution | counted `fills_unpaired` |
+| `T` unpaired, side `B`/`A` | `P` non-displayed trade | DBN side is the aggressor, ITCH's indicator is the resting side |
+| `T` unpaired, side `N` | `Q` cross | type by time: `O` up to 09:31, `C` from the close, else `H`; volume only, no `TRADE` |
+| `R` clear | `D` for every live order of the instrument | counted `clears`, `clear_deletes` |
+| `N` | — | counted |
+
+What DBN MBO does not carry, and what replaces it:
+
+- **System events**: synthesised from the calendar: `S` 04:00, `Q` 09:30,
+  `M` 16:00 (13:00 on the early closes in `dbn_mbo.EARLY_CLOSES`), `E` four
+  hours after the close, New York time. Trading actions / halts (`H`, `h`)
+  are not in the MBO schema: a halted session is not visible.
+- **Stock directory**: one row per universe symbol from the file's
+  symbology (`raw_symbol` → `instrument_id` valid on the session date),
+  round lot 100, ETP flag from `dbn_mbo.KNOWN_ETPS` (QQQ, SPY, ...). A
+  universe symbol without a mapping fails the ingest.
+- **Match numbers**: none; every print gets a synthetic trade id.
+- **Prices** are 1e-9 fixed point; a price off the 1e-4 grid is rounded half
+  to even and counted (`prices_rounded_to_e4`).
+- Records outside the New York calendar day of `--date` are dropped and
+  counted (`outside_session_date`). The DBN-specific counters are in the
+  manifest under `sessions.<date>.messages.dbn`.
 
 ## 5. Point-in-time reference data
 

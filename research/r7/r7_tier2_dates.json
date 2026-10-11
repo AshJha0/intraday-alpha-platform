@@ -1,0 +1,17 @@
+{
+  "schema": "iap.r7_tier2_dates/v1",
+  "status": "APPROVED by the owner for tier 2 (v1.15); cost estimate required before any download",
+  "source": "Databento XNAS.ITCH, schema mbo, stype_in raw_symbol",
+  "dataset": "XNAS.ITCH",
+  "data_schema": "mbo",
+  "symbols": "AAPL,MSFT,QQQ",
+  "role": "holdout",
+  "sampling": "stratified_day_sample(candidates, 40, seed=20261011, strata='month') over the NYSE trading days 2025-01-02..2026-09-30 minus the spent and tier-1 days (docs/R7_DATA_PLAN.md section 2, COOKBOOK recipe 66)",
+  "dates": [
+    "2025-01-15", "2025-01-22", "2025-02-03", "2025-02-21", "2025-03-12", "2025-03-24", "2025-04-09", "2025-04-11",
+    "2025-05-14", "2025-05-29", "2025-06-17", "2025-06-24", "2025-07-09", "2025-07-22", "2025-08-04", "2025-08-25",
+    "2025-09-03", "2025-09-26", "2025-10-14", "2025-10-23", "2025-11-13", "2025-11-19", "2025-12-23", "2026-01-26",
+    "2026-01-27", "2026-02-06", "2026-02-18", "2026-03-05", "2026-03-23", "2026-04-21", "2026-04-22", "2026-05-08",
+    "2026-06-26", "2026-06-30", "2026-07-16", "2026-07-29", "2026-08-10", "2026-08-13", "2026-09-10", "2026-09-22"
+  ]
+}

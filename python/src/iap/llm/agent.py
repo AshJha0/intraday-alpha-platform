@@ -5,12 +5,18 @@ The model holds a narrow allowlist of tools (:data:`TOOL_SPECS`); there is
 no tool that edits files, runs code, touches the lifecycle or places orders.
 
 - ``propose_hypothesis`` drafts (no look);
-- ``preregister`` turns a draft into a signed ``WriteBroker.preregister``
-  (Ed25519, private key held by this process, never by the model): one look
-  on the ledger, code + feature fingerprint on the board; capped per session;
-- ``run_gated_study`` refuses unless ``prereg_gate.require`` passes and the
-  dataset is allowed; code computes the metrics and the verdict and writes a
-  report under ``research/agents/llm_sessions/<session>/reports/``;
+- ``preregister`` turns a draft into a signed PROPOSAL plus a DRAFT
+  pre-registration (:mod:`iap.agents.workflow`, v1.15 A-P0-1; Ed25519,
+  private key held by this process, never by the model): one look on the
+  chained ledger per proposal, code + feature fingerprint on the board,
+  capped per session.  It never writes a pre-registration: only a HUMAN
+  sign-off turns a draft into one;
+- ``run_gated_study`` is EXPLORATORY only: it refuses unless the (alpha,
+  horizon) is drafted or pre-registered and the dataset is synthetic (a
+  session refuses any non-synthetic dataset at open), and every report says
+  ``"confirmatory": false``.  Confirmatory runs, outcomes and promotion are
+  human-only; code computes the metrics and the verdict and writes a report
+  under ``research/agents/llm_sessions/<session>/reports/``;
 - ``read_report`` returns a report or board entry, free text wrapped as
   untrusted data (:mod:`iap.agents.untrusted`);
 - ``file_finding`` is verified (:func:`iap.llm.verify.verify_finding`) and
@@ -38,11 +44,14 @@ from iap.agents import untrusted
 from iap.agents.broker import BrokerError, WriteBroker, sign
 from iap.agents.mcp_server import FREE_TEXT
 from iap.agents.prereg_gate import PreregistrationError, require
+from iap.agents.workflow import Workflow, WorkflowError
 from iap.llm import verify
 from iap.llm.budget import DEFAULT_MODEL, Budget, BudgetExceeded
 from iap.llm.envfile import redact
 from iap.llm.runners import PLANTED_DATASET, T_THRESHOLD, Runner, verdict
 
+#: the only datasets an agent session may run (A-P0-1: exploratory, never confirmatory)
+EXPLORATORY_PREFIX = "synthetic:"
 SESSIONS_RELPATH = Path("research") / "agents" / "llm_sessions"
 _ALPHA = re.compile(r"^(EQ|FX)\d{2}$")
 _HORIZON = re.compile(r"^\d{1,4}(ms|s|m)$")
@@ -58,13 +67,8 @@ The research protocol, which the tools enforce:
 1. Look at what exists (list_alphas, list_features).
 2. Draft one hypothesis with propose_hypothesis: an alpha id, a horizon, an \
 expected sign (+1 or -1) and a one-sentence economic rationale.
-3. Pre-register the draft with preregister BEFORE any run. Each \
-pre-registration costs one look on the multiple-testing ledger and the \
-session has a small look budget, so pre-register only hypotheses you would \
-defend; trying many variants until one works is p-hacking and the budget \
-will refuse it.
-4. Run the gated study with run_gated_study on an allowed dataset. The \
-platform computes every statistic and the verdict; you do not.
+3. Propose the draft with preregister BEFORE any run. It records your proposal and drafts its pre-registration; only a human can sign a draft off into a pre-registration. Each proposal costs one look on the multiple-testing ledger and the session has a small look budget, so propose only hypotheses you would defend; trying many variants until one works is p-hacking and the budget will refuse it.
+4. Run the exploratory gated study with run_gated_study on an allowed synthetic dataset. You never run confirmatory tests and never promote an alpha. The platform computes every statistic and the verdict; you do not.
 5. File at most one finding per study with file_finding, citing the report \
 (report:<session>.<run>) and the pre-registration board entry \
 (board:<hash>) that the tools returned.
@@ -121,16 +125,18 @@ TOOL_SPECS: list[dict[str, Any]] = [
     {
         "name": "preregister",
         "description": (
-            "Pre-register a drafted hypothesis on the signed blackboard. Costs one look "
-            "on the multiple-testing ledger; refused when the session look budget is spent."
+            "Propose a drafted hypothesis and draft its pre-registration on the signed "
+            "blackboard for HUMAN sign-off. Costs one look on the multiple-testing ledger; "
+            "refused when the session look budget is spent."
         ),
         "input_schema": _schema({"draft_id": _S}, ["draft_id"]),
     },
     {
         "name": "run_gated_study",
         "description": (
-            "Run the gated validation of a PRE-REGISTERED (alpha, horizon) on an allowed "
-            "dataset. Returns the report and its citation."
+            "Run an EXPLORATORY (never confirmatory) validation of a drafted or "
+            "pre-registered (alpha, horizon) on an allowed synthetic dataset. Returns the "
+            "report and its citation."
         ),
         "input_schema": _schema(
             {"alpha_id": _S, "horizon": _S, "dataset": _S}, ["alpha_id", "horizon", "dataset"]
@@ -237,35 +243,61 @@ class Session:
         return {"draft_id": draft_id, "note": "not yet pre-registered; no look spent"}
 
     def preregister(self, draft_id: str) -> dict[str, Any]:
+        """Propose (one look) and draft the pre-registration; a human signs off."""
         d = self.drafts.get(str(draft_id))
         if d is None:
             raise ToolRefused(f"unknown draft {draft_id!r}")
         self.budget.check_prereg()
-        args = {k: d[k] for k in ("alpha_id", "horizon", "hypothesis", "expected_sign")}
+        wf = Workflow(self.broker)
+        p_args = {
+            "alpha_id": d["alpha_id"],
+            "horizon": d["horizon"],
+            "expected_sign": d["expected_sign"],
+            "rationale": d["hypothesis"],
+        }
         try:
-            pid = self.broker.preregister(
-                self.agent, **args, auth=self._signed("preregister", args)
+            prop = wf.propose(self.agent, **p_args, auth=self._signed("propose", p_args))
+            self.budget.preregs += 1
+            dr_args = {"proposal_id": prop["proposal_id"], "hypothesis": d["hypothesis"]}
+            out = wf.draft_prereg(
+                self.agent,
+                prop["proposal_id"],
+                d["hypothesis"],
+                auth=self._signed("draft_prereg", dr_args),
             )
-        except BrokerError as exc:
+        except (BrokerError, WorkflowError) as exc:
             raise ToolRefused(str(exc)) from exc
-        self.budget.preregs += 1
-        entry = self.broker.board.entries()[-1]
         return {
-            "prereg_id": pid,
-            "board_ref": f"board:{entry['hash'][:16]}",
-            "ledger_total": entry["body"]["ledger_total"],
+            "proposal_id": prop["proposal_id"],
+            "board_ref": f"board:{out['draft_hash'][:16]}",
+            "ledger_total": prop["ledger_total"],
+            "status": out["status"],
             "looks_left_this_session": self.budget.max_preregs - self.budget.preregs,
         }
+
+    def _registered(self, alpha_id: str, horizon: str) -> dict[str, Any]:
+        """The draft (this workflow) or human pre-registration for (alpha, horizon)."""
+        for d in Workflow(self.broker).drafts().values():
+            if d["alpha_id"] == alpha_id and d["horizon"] == horizon:
+                return {
+                    "hash": d["hash"],
+                    "body": {"prereg_id": d["proposal_id"], "expected_sign": d["expected_sign"]},
+                }
+        try:
+            return require(
+                self.workspace,
+                alpha_id,
+                horizon,
+                fingerprinter=self.broker.fingerprinter,
+                agents=self.broker.agents,
+            )
+        except PreregistrationError as exc:
+            raise ToolRefused(str(exc)) from exc
 
     def run_gated_study(self, alpha_id: str, horizon: str, dataset: str) -> dict[str, Any]:
         if dataset not in self.datasets:
             raise ToolRefused(f"dataset {dataset!r} not allowed; allowed: {sorted(self.datasets)}")
-        try:
-            entry = require(
-                self.workspace, alpha_id, horizon, fingerprinter=self.broker.fingerprinter
-            )
-        except PreregistrationError as exc:
-            raise ToolRefused(str(exc)) from exc
+        entry = self._registered(alpha_id, horizon)
         key = f"{alpha_id}/{horizon}/{dataset}"
         if key in self.runs:  # one run per pre-registered study and dataset
             ref = self.runs[key]
@@ -287,6 +319,9 @@ class Session:
             "prereg_board_hash": entry["hash"],
             "expected_sign": sign_,
             "t_threshold": self.t_threshold,
+            # A-P0-1: an agent never runs a confirmatory test
+            "confirmatory": False,
+            "evidence": "exploratory; confirmatory runs need a human-signed pre-registration",
             "metrics": metrics,
             "verdict": verdict(metrics, sign_, self.t_threshold),
         }
@@ -380,6 +415,10 @@ def open_session(
     ``private_key``."""
     from iap.agents import signing
 
+    bad = sorted(d for d in datasets if not str(d).startswith(EXPLORATORY_PREFIX))
+    if bad:
+        # A-P0-1: real (confirmatory) data is never an agent's to run
+        raise ValueError(f"agent sessions are exploratory; non-synthetic datasets refused: {bad}")
     workspace = Path(workspace)
     reg_path = workspace / PUBKEYS_RELPATH
     registry = json.loads(reg_path.read_text(encoding="ascii")) if reg_path.is_file() else {}

@@ -120,7 +120,14 @@ def test_full_study_is_signed_debited_and_cited(tmp_path):
     board = Blackboard(s.workspace / "research" / "agents" / "blackboard.jsonl")
     reg = json.loads((s.workspace / evals.PUBKEYS_RELPATH).read_text())
     assert board.verify_signatures(reg) == []
-    assert [e["kind"] for e in board.entries()] == ["prereg", "task", "claim", "finding", "release"]
+    assert [e["kind"] for e in board.entries()] == [
+        "proposal",
+        "prereg_draft",
+        "task",
+        "claim",
+        "finding",
+        "release",
+    ]
 
 
 def test_refusals(tmp_path):
