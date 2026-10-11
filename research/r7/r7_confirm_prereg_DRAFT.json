@@ -21,8 +21,63 @@
     "2025-12-12",
     "2026-06-12"
   ],
+  "holdout_files": {
+    "location": "data/real/itch/r7/ (git-ignored vendor files)",
+    "computed": "2026-10-11, streaming sha256 of the compressed .gz bytes as downloaded; files were not decompressed and no message content was read",
+    "check": "before ingest, each file must match bytes and sha256 exactly; any mismatch stops the run",
+    "files": [
+      {
+        "date": "2025-11-28",
+        "file": "S112825-v50.txt.gz",
+        "bytes": 4735308661,
+        "sha256": "e965ea6f9779c1b5d7b74de4549836ffe29a5f6ff64bb7894186a6f6404baaa4"
+      },
+      {
+        "date": "2025-12-08",
+        "file": "S120825-v50.txt.gz",
+        "bytes": 8775891119,
+        "sha256": "3e3d43c0c827b3d589eee64631b5e5401a39f9c922f29b18bad4a055eb922aa0"
+      },
+      {
+        "date": "2025-12-09",
+        "file": "S120925-v50.txt.gz",
+        "bytes": 7929915419,
+        "sha256": "b6bf2f5dbd87445e37a58951c6119908ef0ea559ca373be80a0346ab73e14d66"
+      },
+      {
+        "date": "2025-12-10",
+        "file": "S121025-v50.txt.gz",
+        "bytes": 11557662295,
+        "sha256": "5a64714a79df1b5ea987b66e12d70005beeefe1cf6cea8c151d1adc842275741"
+      },
+      {
+        "date": "2025-12-11",
+        "file": "S121125-v50.txt.gz",
+        "bytes": 10471034001,
+        "sha256": "de9058d8c600a6510ce087a000cdd3f513197688b7c8ebcc0c7baad9a6796c17"
+      },
+      {
+        "date": "2025-12-12",
+        "file": "S121225-v50.txt.gz",
+        "bytes": 12551644054,
+        "sha256": "46f42fb12f0e659814416713c4e22985dba1b062b0c13097ea9b5b003d612798"
+      },
+      {
+        "date": "2026-06-12",
+        "file": "S061226-v50.txt.gz",
+        "bytes": 17894268560,
+        "sha256": "1f9d35e12120ef37ea22df9f59dc5207fe51b075b6ccf1c9cdfd09fa566dc1d5"
+      }
+    ]
+  },
   "dataset_version": "recorded at ingest",
   "execution_config": "configs/prereg/v2.json",
+  "fingerprints": {
+    "algorithm": "sha256 of the file bytes at drafting (LF line endings, .gitattributes eol=lf)",
+    "research/r7/r7_candidates.json": "e8d5df8183644260c60f5c7db4365fc3641cc89515fad2100faba3939fb431dc",
+    "configs/prereg/v2.json": "db79bef71fe82399dd228e10c5ee79c0c91d59cb357b43ed944fe9392d647d60",
+    "configs/reference/regulatory_fee_schedule.json": "0b8e834ae2221261ee86756d9e1369f744fd0cc73b19ab89ce82c058e621800f"
+  },
   "look": "ONE look per hypothesis; no parameter changes after registration",
   "bundles": [
     "validation v3 (R1 sampling, FOMC/holiday split)",
@@ -32,17 +87,18 @@
     "H1": {
       "name": "maker",
       "statement": "M2/M6 maker policy, edge net of rebate and measured markout > 0",
-      "insample_estimate": "PENDING maker_real summary"
-    },
-    "H3": {
-      "name": "auction",
-      "statement": "AUC01 NOII imbalance -> closing-cross return, IC > 0",
-      "insample_estimate": "frozen at registration"
+      "insample_estimate": "PENDING maker_real summary",
+      "dsr_series": "OPEN: decided after the maker_real summary and the power rerun"
     },
     "H4": {
       "name": "EQ",
-      "statement": "EQ01 1s, EQ02 5s, EQ04 5s, EQ05 1s, EQ07 10s, EQ10 1s pooled uncrossed IC > 0 (same horizons as the v1.8 holdout)",
-      "insample_estimate": "frozen at registration"
+      "statement": "EQ10 1s and EQ05 1s pooled uncrossed IC > 0 (same horizons as the v1.8 holdout); tier 1 = the 7 holdout sessions",
+      "alphas": [
+        "EQ10@1s",
+        "EQ05@1s"
+      ],
+      "insample_estimate": "frozen at registration",
+      "dsr_series": "per-session IC series (defined every session); net-of-cost P&L reported alongside, descriptive only"
     }
   },
   "dropped": {
@@ -50,9 +106,19 @@
       "name": "quoting",
       "decision": "dropped by the owner 2026-10-11: the quoting study was aborted and has no in-sample estimate",
       "future": "may get its own pre-registration later (v2 quoting prereg draft on research/step2)"
+    },
+    "EQ07": {
+      "name": "EQ07 reversal @10s",
+      "decision": "owner decision 2026-10-11 on docs/research/R7_POWER.md: dropped; the drafted sign (+) contradicts the in-sample IC (-0.012) and the v1.8 holdout (-0.021, contradicted); flipping the sign after seeing results would fit to seen data",
+      "future": "may return as a new idea with its own pre-registration"
+    },
+    "H3": {
+      "name": "auction",
+      "decision": "owner decision 2026-10-11 on docs/research/R7_POWER.md: dropped from R7; underpowered even on 47 sessions (joint power about 0.01; MDE about 51 bp, IC 0.41 on 141 decisions)",
+      "future": "needs a redesign (pooled / longer sample) and its own pre-registration"
     }
   },
-  "gate": "HAC t >= ledger threshold in force; deflated Sharpe > 0.95; reported with and without 2025-12-10 (FOMC) and 2025-11-28 (holiday-thin)",
+  "gate": "HAC t >= ledger threshold in force; deflated Sharpe > 0.95 (H4: on the per-session IC series; net-of-cost P&L descriptive only); reported with and without 2025-12-10 (FOMC) and 2025-11-28 (holiday-thin)",
   "decision": "a failure is final for that hypothesis on these sessions",
   "sensitivity": {
     "feed_latency_ns": [
@@ -62,8 +128,38 @@
     "role": "reported alongside results only; never decides pass/fail; not a hypothesis, no ledger look (owner decision 2026-10-11)",
     "applies_to": "hypotheses whose execution depends on feed latency (H1 maker); others unaffected"
   },
+  "cost_sensitivity": {
+    "scales": [
+      0.5,
+      1.0,
+      1.5
+    ],
+    "primary_scale": 1.0,
+    "decides": "only the 1.0x (primary) run decides pass/fail",
+    "role": "reported alongside results only; never decides pass/fail; not a hypothesis, no ledger look",
+    "scaled": "explicit (exchange fee per share / FX commission) and implicit (spread, impact) components of the platform cost model under configs/prereg/v2.json",
+    "not_scaled": "regulatory fees (SEC Section 31, FINRA TAF) stay at configs/reference/regulatory_fee_schedule.json",
+    "hook": "iap.backtest.costs.CostModel.with_cost_sensitivity(scale) (field sensitivity_scale, default 1.0 = byte-identical; COST_SENSITIVITY_SCALES)"
+  },
+  "power": {
+    "report": "docs/research/R7_POWER.md",
+    "data": "research/r7/r7_power.json",
+    "tool": "tools/r7_power.py (iap.research.r7_power); rerun when the maker_real summary exists",
+    "role": "planning aid for the owner before sign-off; does not change the hypotheses; no look, nothing charged to the ledger",
+    "h1": "PLACEHOLDER until the maker_real summary is written",
+    "decisions": "owner decision 2026-10-11 on docs/research/R7_POWER.md: H4 tier 1 = EQ10, EQ05; EQ01/EQ02/EQ04 deferred to tier 2; EQ07 and H3 dropped"
+  },
   "open_for_owner": [
-    "H1 in-sample estimate from the maker_real summary",
+    "H1 in-sample estimate from the maker_real summary, then rerun tools/r7_power.py and decide the H1 deflated-Sharpe series",
     "sign-off and blackboard registration before any holdout data is read"
-  ]
+  ],
+  "deferred_to_tier2": {
+    "decision": "owner decision 2026-10-11 on docs/research/R7_POWER.md",
+    "sessions": "tier 1 + tier 2 = 47, under a later pre-registration",
+    "alphas": {
+      "EQ01@1s": "joint power 0.26 on 7 sessions at the in-sample IC (0.00 at the v1.8 IC); MDE IC 0.175 vs 0.042 on 47",
+      "EQ02@5s": "joint power 0.49 on 7 sessions at the in-sample IC (0.00 at the v1.8 IC); MDE IC 0.057 vs 0.014 on 47",
+      "EQ04@5s": "joint power 0.04 on 7 sessions at the in-sample IC (0.70 at the v1.8 IC); MDE IC 0.031 vs 0.008 on 47"
+    }
+  }
 }

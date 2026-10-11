@@ -17,7 +17,9 @@ and half-spread ``hs`` (all in price units of the instrument):
 with notional = |q| * unit * m, so every cost is in real quote-currency
 terms, matching the engine's P&L accounting (also scaled by unit).  A
 ``multiplier`` scales the TOTAL cost (stress grid {0.5, 1, 2} pinned in the
-config).
+config).  ``sensitivity_scale`` (v1.15, R7 reporting-only sensitivity
+{0.5, 1, 1.5}) scales spread, exchange fee / commission and impact but
+leaves the regulatory fees at their schedule; 1.0 changes nothing.
 
 **Impact model (pinned; the default changed in v1.5.0).**
 
@@ -51,6 +53,7 @@ own pinned impact rule 6 — linear, read from
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -58,6 +61,9 @@ import numpy as np
 
 #: Pinned impact models (module docs): the default, then the legacy rule.
 IMPACT_MODELS = ("sqrt", "linear")
+#: v1.15 pre-registered, reporting-only cost sensitivity scales (R7): 1.0 is
+#: the primary and the only one that decides; regulatory fees at schedule.
+COST_SENSITIVITY_SCALES = (0.5, 1.0, 1.5)
 #: The default impact model.
 DEFAULT_IMPACT_MODEL = "sqrt"
 #: The rule that was the default up to v1.4.0.
@@ -85,8 +91,15 @@ class CostModel:
     per_share_fee_all: float = 0.0
     per_share_fee_cap: float = 0.0
     per_share_fee_sell_only: bool = True
+    #: v1.15 (R7 pre-registration, reporting-only cost sensitivity): scales
+    #: the explicit (exchange fee / FX commission) and implicit (spread,
+    #: impact) components but NOT the regulatory fees, which stay at their
+    #: schedule. Default 1.0 leaves every number byte-identical.
+    sensitivity_scale: float = 1.0
 
     def __post_init__(self) -> None:
+        if not (math.isfinite(self.sensitivity_scale) and self.sensitivity_scale >= 0.0):
+            raise ValueError("sensitivity_scale must be finite and >= 0")
         if min(self.sell_notional_fee_bps, self.per_share_fee_all, self.per_share_fee_cap) < 0:
             raise ValueError("regulatory fees must be >= 0")
         if self.impact_model not in IMPACT_MODELS:
@@ -163,6 +176,11 @@ class CostModel:
             sec.usd_per_million / 100.0, taf.per_share, taf.max_per_trade, True
         )
 
+    def with_cost_sensitivity(self, scale: float) -> CostModel:
+        """This model with explicit + implicit costs scaled by ``scale`` and
+        regulatory fees left at schedule (:data:`COST_SENSITIVITY_SCALES`)."""
+        return replace(self, sensitivity_scale=float(scale))
+
     def with_multiplier(self, multiplier: float) -> CostModel:
         return replace(self, multiplier=multiplier)
 
@@ -196,15 +214,20 @@ class CostModel:
         aq = np.abs(np.asarray(qty, dtype=float))
         mid = np.asarray(mid, dtype=float)
         hs = np.asarray(half_spread, dtype=float)
+        k = self.sensitivity_scale
         if asset_class in ("EQUITY", "ETF"):
             unit = 1.0
             fee_cost = aq * self.equity_taker_fee_per_share
+            if k != 1.0:
+                fee_cost = k * fee_cost
             if self.sell_notional_fee_bps or self.per_share_fee_all:
                 fee_cost = fee_cost + self._regulatory_fee(np.asarray(qty, dtype=float), mid)
         elif asset_class == "FX":
             unit = float(lot_size)
             notional = aq * unit * mid
             fee_cost = notional * self.fx_commission_per_million / 1e6
+            if k != 1.0:
+                fee_cost = k * fee_cost
         else:
             raise ValueError(f"unknown asset class {asset_class!r}")
         if np.any(np.asarray(adv) <= 0):  # a scalar, or per row (per-session ADV)
@@ -215,6 +238,9 @@ class CostModel:
         else:
             impact_bps = self.impact_coeff_bps_per_pct_adv * (aq * unit / adv * 100.0)
         impact_cost = impact_bps * 1e-4 * aq * unit * mid
+        if k != 1.0:
+            spread_cost = k * spread_cost
+            impact_cost = k * impact_cost
         m = self.multiplier
         return {"spread": m * spread_cost, "fee": m * fee_cost, "impact": m * impact_cost}
 
@@ -236,8 +262,11 @@ class CostModel:
         """
         mid = np.asarray(mid, dtype=float)
         hs = np.asarray(half_spread, dtype=float)
+        k = self.sensitivity_scale
         if asset_class in ("EQUITY", "ETF"):
             fee = np.full(mid.shape, self.equity_taker_fee_per_share)
+            if k != 1.0:
+                fee = k * fee
             if self.sell_notional_fee_bps or self.per_share_fee_all:
                 # one of the two legs is a sale: half the regulatory fee per
                 # leg (size-free, so the per-trade cap is not applied)
@@ -245,11 +274,14 @@ class CostModel:
                 fee = fee + 0.5 * self.sell_notional_fee_bps * 1e-4 * mid + per_share
         elif asset_class == "FX":
             fee = mid * self.fx_commission_per_million / 1e6
+            if k != 1.0:
+                fee = k * fee
         else:
             raise ValueError(f"unknown asset class {asset_class!r}")
         ok = np.isfinite(mid) & (mid > 0.0) & np.isfinite(hs) & (hs >= 0.0)
         out = np.full(mid.shape, np.nan)
-        out[ok] = self.multiplier * (2.0 * hs[ok] + 2.0 * fee[ok]) / mid[ok]
+        spread = 2.0 * hs[ok] if k == 1.0 else k * (2.0 * hs[ok])
+        out[ok] = self.multiplier * (spread + 2.0 * fee[ok]) / mid[ok]
         return out
 
     def breakeven_size(
@@ -288,7 +320,12 @@ class CostModel:
         if room <= 0.0:
             return 0.0
         unit = float(lot_size) if asset_class == "FX" else 1.0
-        per_leg_bps = room / (2.0 * self.multiplier * 1e-4) if self.multiplier > 0 else float("inf")
+        scale = (
+            self.multiplier
+            if self.sensitivity_scale == 1.0
+            else (self.multiplier * self.sensitivity_scale)
+        )
+        per_leg_bps = room / (2.0 * scale * 1e-4) if scale > 0 else float("inf")
         if self.impact_model == "sqrt":
             if self.sqrt_impact_coeff_bps <= 0.0 or not np.isfinite(per_leg_bps):
                 return float("inf")

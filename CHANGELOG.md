@@ -8,6 +8,21 @@ that tag.
 
 ## Unreleased (v1.15)
 
+- **R7 pre-registration hardening (DRAFT stays unsigned).** Power analysis
+  `tools/r7_power.py` (`iap.research.r7_power`) writes
+  `docs/research/R7_POWER.md` / `research/r7/r7_power.json`: power and minimum
+  detectable effect per drafted hypothesis on tier 1 (7 sessions) and tier 1+2
+  (47) under the drafted gate (HAC t >= ledger Bonferroni threshold, deflated
+  Sharpe > 0.95), from summary statistics in `research/r7/r7_power_inputs.json`
+  (sources pinned by sha256; no market data read); H1 is a placeholder until the
+  maker summary exists. `r7_confirm_prereg_DRAFT.json` gains holdout file
+  fingerprints (bytes + streaming sha256 of the .gz files, never decompressed),
+  sha256 of the candidates manifest, `configs/prereg/v2.json` and the fee
+  schedule, a reporting-only cost sensitivity (0.5x / 1.0x primary / 1.5x) and a
+  `power` section; hypotheses unchanged. `CostModel.sensitivity_scale` /
+  `with_cost_sensitivity` scales explicit + implicit costs, regulatory fees at
+  schedule; default 1.0 is byte-identical. Tests:
+  `python/tests/test_v115_r7_prereg_hardening.py`.
 - **X-P1-2: the MVP on a real ITCH session** (`python -m iap.mvp.real
   --dataset <dir> --date D --symbols ... --config configs/prereg/v2.json
   --out <dir> [--limit-events N]`): an ingested dataset is streamed (3 passes,
