@@ -28,6 +28,13 @@ that tag.
   `RegistryError` on a missing or invalid card, alongside the content-hash
   check; `promotion.json` records the card hash.
 
+- **A-P1-4: closing-summary check** (`iap.llm.summary_check`): action claims
+  in an agent's closing summary (filed / proposed / drafted / signed off /
+  promoted / recorded an outcome / ran confirmatory / ran a study) must match
+  an accepted tool call of that kind, numbers must match session evidence
+  (`iap.llm.verify` rules); negated and modal clauses are not claims. The
+  session report carries `summary_claims_verified`, `unsupported_claims` and
+  `summary_verdict`; every eval task gains `summary_matches_actions`.
 - **X-P1-1: dated SEC Section 31 + FINRA TAF fees** in the Python, C++ and
   Rust execution engines (sell side only), from
   `configs/reference/regulatory_fee_schedule.json` (dated periods with

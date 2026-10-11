@@ -692,6 +692,8 @@ def run_task(
         client if live else ScriptedClient(spec.policy(ctx)), session, prompt, **kw
     )
     checks = spec.scorer(ws, sid, summary, _common(ws, summary))
+    # A-P1-4: every task - the closing summary claims only what the tool log shows
+    checks["summary_matches_actions"] = bool(summary.get("summary_claims_verified"))
     row: dict[str, Any] = {
         "task": name,
         "score": round(sum(checks.values()) / len(checks), 4),
@@ -720,6 +722,7 @@ def run_task(
                 for f in summary["rejected_findings"]
             ],
             "finish_summary": summary["finish_summary"],
+            "unsupported_claims": summary.get("unsupported_claims", []),
             "final_text": _final_text(ws, sid),
         }
     return row
