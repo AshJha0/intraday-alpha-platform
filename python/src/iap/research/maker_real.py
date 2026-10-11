@@ -172,6 +172,27 @@ def verdict(primary: Mapping[str, Any], min_sessions: int) -> str:
 # ------------------------------------------------------------------ loading
 
 
+def _read_filtered(path: Path, cols: list[str], iid: int, end_ns: int | None):
+    """``pq.read_table(path, columns=cols, filters=...)`` without pyarrow.dataset."""
+    import pyarrow as pa
+    import pyarrow.compute as pc
+    import pyarrow.parquet as pq
+
+    pf = pq.ParquetFile(path)
+    parts = []
+    for rg in range(pf.num_row_groups):
+        t = pf.read_row_group(rg, columns=cols)
+        mask = pc.equal(t.column("instrument_id"), iid)
+        if end_ns is not None:
+            mask = pc.and_(mask, pc.less_equal(t.column("exchange_ts"), end_ns))
+        t = t.filter(mask)
+        if t.num_rows:
+            parts.append(t)
+    if not parts:
+        return pf.schema_arrow.empty_table().select(cols)
+    return pa.concat_tables(parts)
+
+
 def load_events(session_dir: Path, iid: int, end_ns: int | None = None) -> list:
     import pyarrow.parquet as pq
 
@@ -194,7 +215,14 @@ def load_events(session_dir: Path, iid: int, end_ns: int | None = None) -> list:
     filt = [("instrument_id", "=", iid)]
     if end_ns is not None:
         filt.append(("exchange_ts", "<=", end_ns))
-    t = pq.read_table(session_dir / "normalized" / "events.parquet", columns=cols, filters=filt)
+    path = session_dir / "normalized" / "events.parquet"
+    try:
+        t = pq.read_table(path, columns=cols, filters=filt)
+    except (ImportError, ValueError):
+        # pyarrow.dataset can be unavailable (a Windows Application Control
+        # policy blocked its DLL on 2026-10-11); filter row group by row group
+        # with pyarrow.compute instead -- same rows, same file order
+        t = _read_filtered(path, cols, iid, end_ns)
     arrays = [t.column(c).to_numpy().tolist() for c in cols]
     del t
     return [MarketEvent(*row) for row in zip(*arrays, strict=True)]
