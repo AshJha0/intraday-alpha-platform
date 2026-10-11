@@ -568,6 +568,45 @@ jobs:
             echo "::warning::research-ledger numbers are stale — regenerate the research reports and the doc rows together"
           fi
 
+  # v1.13 (G-P1-1, G-P1-2): research-state governance. The blackboard chain,
+  # its git anchors and signatures verify; every agent with signed entries has
+  # a registered public key; and the ledgers and the board only grow against
+  # the base (no lost looks, no rewritten board history). Meant to be a
+  # REQUIRED check (docs/governance/GOVERNANCE.md section 0).
+  governance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0        # verify-board / anchors and the monotone check read history
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - name: Install the research stack
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r python/requirements-ci.txt
+      - name: verify-board (chain, git prefixes, anchors, signatures)
+        env:
+          PYTHONPATH: python/src
+        run: python -m iap.agents.cli verify-board
+      - name: agent public-key registry covers every signed writer
+        run: python tests/harness/check_agent_keys.py
+      - name: ledgers and blackboard are monotone vs the base
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            python tests/harness/check_ledger_monotone.py --base "origin/$BASE_REF"
+          elif [ -n "$BEFORE_SHA" ] && git cat-file -e "$BEFORE_SHA^{commit}" 2>/dev/null; then
+            python tests/harness/check_ledger_monotone.py --base "$BEFORE_SHA"
+          else
+            python tests/harness/check_ledger_monotone.py --base origin/main
+          fi
+
   # Manual: regenerate every committed artefact that derives from the seeded
   # dataset (tools/regenerate_dataset_artifacts.py has the chain and its
   # order) and upload the files that changed. Nothing is committed from here:

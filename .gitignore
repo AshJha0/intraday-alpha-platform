@@ -73,3 +73,6 @@ python/src/iap/_schemas/
 #     secret-free local compose default local-sink.url is tracked
 deployment/alertmanager/*.url
 !deployment/alertmanager/local-sink.url
+# --- v1.13 G-P2-1: transient writer locks of the blackboard / ledgers
+research/**/*.jsonl.lock
+research/**/*.json.lock
