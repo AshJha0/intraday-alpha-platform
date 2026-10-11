@@ -749,13 +749,20 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r python/requirements-ci.txt
       # v1.14 (G-P1-4): anchors, trust roots and the board are checked
-      # against origin/main, which this change cannot rewrite.
+      # against origin/main, which this change cannot rewrite. v1.15 (G-P1-2):
+      # trust roots are enabled; an unsigned registry fails
+      # (docs/governance/TRUST_ROOTS.md).
       - name: verify-board (chain, git prefixes, anchors, signatures)
         env:
           PYTHONPATH: python/src
         run: python -m iap.agents.cli verify-board --trust-ref origin/main
       - name: agent public-key registry covers every signed writer, maintainer-signed
-        run: python tests/harness/check_agent_keys.py --trust-ref origin/main
+        run: python tests/harness/check_agent_keys.py --trust-ref origin/main --require-signed
+      # v1.15 (G-P0-1): every promoted model's content hash matches its artefact.
+      - name: model registry promotions carry a matching content hash
+        env:
+          PYTHONPATH: python/src
+        run: python -m iap.mlops --registry research/models/registry check-promotions
       - name: ledgers and blackboard are monotone vs the base
         env:
           EVENT_NAME: ${{ github.event_name }}

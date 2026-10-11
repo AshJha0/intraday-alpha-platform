@@ -1,4 +1,7 @@
-"""CLI: ``python -m iap.mlops {list,show,verify,lineage,monitor}``.
+"""CLI: ``python -m iap.mlops {list,show,verify,lineage,promote,check-promotions,monitor}``.
+
+``promote`` refuses a model with a missing or mismatched content hash and
+``check-promotions`` exits 1 if any promoted model fails that check (G-P0-1).
 
 ``monitor`` reads two ``.npz`` files (reference and current); every array is
 a feature column except the reserved names ``__pred__`` (model output) and
@@ -34,7 +37,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--registry", default="research/models/registry")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("list")
-    for c in ("show", "verify", "lineage"):
+    sub.add_parser("check-promotions")
+    for c in ("show", "verify", "lineage", "promote"):
         sub.add_parser(c).add_argument("model_id")
     m = sub.add_parser("monitor")
     m.add_argument("--reference", required=True)
@@ -57,6 +61,15 @@ def main(argv: list[str] | None = None) -> int:
             rec = reg.verify(a.model_id) if a.cmd == "verify" else reg.get(a.model_id)
             print(json.dumps(rec.to_dict(), indent=2, sort_keys=True))
             return 0
+        if a.cmd == "promote":
+            print(json.dumps(reg.promote(a.model_id), indent=2, sort_keys=True))
+            return 0
+        if a.cmd == "check-promotions":
+            problems = reg.check_promotions()
+            print(f"promoted models {len(reg.promoted())}; problems {len(problems)}")
+            for p in problems:
+                print(f"error: {p}", file=sys.stderr)
+            return 1 if problems else 0
         if a.cmd == "lineage":
             for r in reg.lineage(a.model_id):
                 print(f"{r.model_id}  {r.name}")
