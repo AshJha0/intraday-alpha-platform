@@ -17,9 +17,9 @@ planned paths of the current release, **backlog** says what would prove it done.
 |---|---:|---:|
 | epics | 35 | |
 | issues | 197 | 651 |
-| issues `done` | 136 | 359.5 |
+| issues `done` | 137 | 361.5 |
 | issues `in-progress` | 2 | 14 |
-| issues `backlog` | 59 | 277.5 |
+| issues `backlog` | 58 | 275.5 |
 
 ### By milestone
 
@@ -38,7 +38,7 @@ planned paths of the current release, **backlog** says what would prove it done.
 | v1.12 | 1 | 5 | 5 | 0 | 0 |
 | v1.13 | 1 | 4 | 4 | 0 | 0 |
 | v1.14 | 1 | 5 | 5 | 0 | 0 |
-| v1.15 | 1 | 20 | 13 | 2 | 5 |
+| v1.15 | 1 | 20 | 14 | 2 | 4 |
 
 Issues are listed under their epic; an issue's own milestone can differ from
 the epic's (a backlog item under a finished epic sits in **Backlog**).
@@ -940,7 +940,7 @@ In progress (IAP_v1.15_Plan.md): R7 confirmatory round, v2 realism config, model
 
 ### E35 — v1.15 - research evidence, models, fees, governance enforcement, release automation
 
-**Status:** in-progress · **Milestone:** v1.15 · **Issues:** 20 (done 13, in-progress 2, backlog 5) · **Estimate:** 54 days · **Labels:** `type:epic`, `area:research`, `phase:phase2`, `priority:p0`, `status:in-progress`
+**Status:** in-progress · **Milestone:** v1.15 · **Issues:** 20 (done 14, in-progress 2, backlog 4) · **Estimate:** 54 days · **Labels:** `type:epic`, `area:research`, `phase:phase2`, `priority:p0`, `status:in-progress`
 
 Release v1.15 per IAP_v1.15_Plan.md: run the R7 confirmatory round on unseen sessions with realism on, land the model work (DeepLOB, conformal sizing), add dated regulatory fees, make the governance controls blocking, narrow the agent job, archive the Java engine and automate the release flow. Item keys are the plan's IDs.
 
@@ -970,7 +970,7 @@ Release v1.15 per IAP_v1.15_Plan.md: run the R7 confirmatory round on unseen ses
 | A-P0-1 | v1.15 A-P0-1: narrower agent job (propose, prereg, human sign-off) | done | 3 | v1.15 | `python/src/iap/agents/cli.py` |
 | A-P1-2 | v1.15 A-P1-2: agent proposals debit the chained ledger | done | 2 | v1.15 | `python/src/iap/validation/ledger.py` |
 | A-P1-3 | v1.15 A-P1-3: agent eval harness | done | 2 | v1.15 | `python/src/iap/agents/eval_harness.py` |
-| A-P1-4 | v1.15 A-P1-4: summary claim check against the tool log | backlog | 2 | v1.15 | `planned: python/src/iap/agents/ (summary claim check)` |
+| A-P1-4 | v1.15 A-P1-4: summary claim check against the tool log | done | 2 | v1.15 | `python/src/iap/agents/eval_harness.py (merged in #103)` |
 | E-P1-1 | v1.15 E-P1-1: release automation (tools/release.py) | done | 2 | v1.15 | `tools/release.py; python/tests/test_release_tool.py; docs/release/V1150_REHEARSAL.md` |
 | E-P2-2 | v1.15 E-P2-2: EPICS.md regeneration | done | 1 | v1.15 | `tools/github/issues.yaml; docs/EPICS.md` |
 | E-P2-3 | v1.15 E-P2-3: housekeeping (stale worktree, step-2 abort entries, v2 quoting prereg in ticks) | backlog | 1 | v1.15 | `planned: research/ (step-2 abort entries)` |

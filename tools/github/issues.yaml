@@ -4140,14 +4140,14 @@ issues:
     title: "v1.15 A-P1-4: summary claim check against the tool log"
     labels: [type:feature, area:agentic, lang:python, priority:p1]
     milestone: "v1.15"
-    status: backlog
+    status: done
     estimate_days: 2
     context: >
       A live eval found a closing summary claiming a finding was filed after a rejection; summaries must be verified against the tool log.
     acceptance:
       - "Unsupported summary claims are flagged"
     evidence:
-      - "planned: python/src/iap/agents/ (summary claim check)"
+      - "python/src/iap/agents/eval_harness.py (merged in #103)"
 
   - key: E-P1-1
     epic: E35
